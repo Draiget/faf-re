@@ -426,7 +426,7 @@ msvc8::vector<SSTICommandSource>* CopyConstructCommandSourceVector(
   msvc8::vector<SSTICommandSource>* const out
 )
 {
-  out->reset_range_lanes_preserve_proxy();
+  out->release_storage_without_free();
 
   const std::size_t count = src.size();
   if (count != 0U) {

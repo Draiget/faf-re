@@ -146,6 +146,24 @@ SAiReservedTransportBone& SAiReservedTransportBone::operator=(const SAiReservedT
 }
 
 /**
+ * Address: 0x005EAC50 (FUN_005EAC50,
+ * Moho::SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBone&))
+ *
+ * What it does:
+ * Memberwise copy construction: both bone indices, the weak unit link (which
+ * links the new node into the same owner chain) and the reserved-bones
+ * vector. Reached per element from `msvc8::vector<SAiReservedTransportBone>`'s
+ * `_Uninit_copy` (0x005EFF70) and `resize` (0x005EA590).
+ */
+SAiReservedTransportBone::SAiReservedTransportBone(const SAiReservedTransportBone& other)
+  : transportBoneIndex(other.transportBoneIndex)
+  , attachBoneIndex(other.attachBoneIndex)
+  , reservedUnit(other.reservedUnit)
+  , reservedBones(other.reservedBones)
+{
+}
+
+/**
  * Address: 0x005EB860 (FUN_005EB860, Moho::SAiReservedTransportBone::MemberDeserialize)
  *
  * What it does:

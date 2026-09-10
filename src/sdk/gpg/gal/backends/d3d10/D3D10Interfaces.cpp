@@ -4535,7 +4535,7 @@ namespace gpg::gal
       if (begin != nullptr) {
         ::operator delete(static_cast<void*>(begin));
       }
-      storage.reset_range_lanes_preserve_proxy();
+      storage.release_storage_without_free();
     }
 
     /**

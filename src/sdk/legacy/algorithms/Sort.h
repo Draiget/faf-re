@@ -88,6 +88,9 @@ namespace msvc8
          * `_callgraph_index.sqlite`; removed from there in favor of this
          * citation.)
          */
+        /**
+         * Address: 0x00575210 (FUN_00575210 -- `iter_swap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): `T temp = lhs; lhs = rhs; rhs = temp` through the element copy constructor (0x0056CB60) and `operator=` (0x00573340).)
+         */
         template <class T>
         void iter_swap_value(T& lhs, T& rhs)
         {
@@ -150,6 +153,10 @@ namespace msvc8
          * Finish()`'s `std::sort` (Reflection.cpp) -- not third-party
          * runtime. DB-integrity fix, corrected to skip/cited-here.)
          */
+        /**
+         * Address: 0x005751C0 (FUN_005751C0 -- `_Med3` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
+         * Address: 0x0054FC70 (FUN_0054FC70 -- `_Med3` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         */
         template <class T, class Compare>
         void median3(T* const a, T* const b, T* const c, Compare comp)
         {
@@ -186,6 +193,10 @@ namespace msvc8
          * mis-tagged `external_dependency` for the same reason `FUN_008D9EE0`
          * was; corrected.)
          */
+        /**
+         * Address: 0x00574830 (FUN_00574830 -- `_Median` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): `count <= 40` falls through to `_Med3`, else the ninther.)
+         * Address: 0x0054F8A0 (FUN_0054F8A0 -- `_Median` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         */
         template <class T, class Compare>
         void select_ninther(T* const first, T* const middle, T* const last, Compare comp)
         {
@@ -201,12 +212,72 @@ namespace msvc8
         }
 
         /**
+         * VC8's `_Rotate` for random-access iterators, the body behind
+         * `std::rotate`: the gcd-cycle ("juggling") rotation that moves each
+         * element once through a chain of `count / gcd(count, shift)`
+         * subcycles. `insertion_sort` below is its only caller in this
+         * binary, which is why every instantiation sits next to an
+         * `_Insertion_sort` emission.
+         */
+        /**
+         * Address: 0x00575690 (FUN_00575690 -- `_Rotate` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
+         * Address: 0x005754F0 (FUN_005754F0 -- register bridge into the `_Rotate` at 0x00575690; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x005502C0 (FUN_005502C0 -- `_Rotate` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         * Address: 0x0054FEB0 (FUN_0054FEB0 -- register bridge into the `_Rotate` at 0x005502C0; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         */
+        template <class T>
+        void rotate_cycles(T* const first, T* const middle, T* const last)
+        {
+            const std::ptrdiff_t shift = middle - first;
+            std::ptrdiff_t count = last - first;
+            for (std::ptrdiff_t factor = shift; factor != 0;) {
+                // gcd of the shift and the length is the subcycle count.
+                const std::ptrdiff_t next = count % factor;
+                count = factor;
+                factor = next;
+            }
+            if (count < last - first) {
+                for (; 0 < count; --count) {
+                    // Rotate one subcycle, starting at `first + count`.
+                    T* const hole = first + count;
+                    T* next = hole;
+                    T value = *hole;
+                    T* next1 = (next + shift == last) ? first : next + shift;
+                    while (next1 != hole) {
+                        *next = *next1;
+                        next = next1;
+                        next1 = (shift < last - next1) ? next1 + shift : first + (shift - (last - next1));
+                    }
+                    *next = value;
+                }
+            }
+        }
+
+        /**
+         * `std::rotate(first, middle, last)`: VC8 inlines this
+         * `first != middle && middle != last` guard at every call site and
+         * only then calls the out-of-line `_Rotate` above.
+         */
+        template <class T>
+        void rotate(T* const first, T* const middle, T* const last)
+        {
+            if (first != middle && middle != last) {
+                rotate_cycles(first, middle, last);
+            }
+        }
+
+        /**
          * Address: 0x005958C0 (FUN_005958C0, `_Insertion_sort`)
          *
          * What it does:
-         * Walks forward from the second element, sliding each one back over the
-         * run of larger predecessors. The first element is special-cased so the
-         * inner scan never needs a bounds test.
+         * VC8's `_Insertion_sort`: walks forward from the second element and
+         * rotates each one back over the run of predecessors that compare
+         * greater. An element that compares less than `*first` is rotated
+         * straight to the front; otherwise the scan back from the element
+         * stops at the first predecessor that does not compare greater and
+         * rotates the element into that hole. Both moves are `std::rotate`
+         * (`rotate` above), which is how VC8 wrote it: the compiler emits one
+         * out-of-line `_Rotate` per element type beside every one of these.
          */
         /**
          * Address: 0x0089C4A0 (FUN_0089C4A0, the `SBuildTemplateInfo` body --
@@ -250,6 +321,10 @@ namespace msvc8
          * (0x008DB073/0x008DB33B) sit in address ranges IDA did not box
          * into named functions -- not chased further this pass.
          */
+        /**
+         * Address: 0x00574170 (FUN_00574170 -- `_Insertion_sort` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): rotates on `pred = greater` over the `+0x18` key, the direction `CompareRunScriptCandidateByDistanceSq` reproduces.)
+         * Address: 0x0054F290 (FUN_0054F290 -- `_Insertion_sort` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         */
         template <class T, class Compare>
         void insertion_sort(T* const first, T* const last, Compare comp)
         {
@@ -257,24 +332,17 @@ namespace msvc8
                 return;
             }
 
-            for (T* cursor = first + 1; cursor != last; ++cursor) {
-                T value = *cursor;
-
-                if (comp(value, *first)) {
-                    // Smaller than everything placed so far: rotate it to the front.
-                    for (T* hole = cursor; hole != first; --hole) {
-                        *hole = *(hole - 1);
+            for (T* next = first; ++next != last;) {
+                T* next1 = next;
+                if (comp(*next, *first)) {
+                    // New earliest element: rotate it to the front.
+                    rotate(first, next, ++next1);
+                } else {
+                    // Look for the insertion point after `first`.
+                    for (T* first1 = next1; comp(*next, *--first1); next1 = first1) {
                     }
-                    *first = value;
-                    continue;
+                    rotate(next1, next, next + 1);
                 }
-
-                T* hole = cursor;
-                while (comp(value, *(hole - 1))) {
-                    *hole = *(hole - 1);
-                    --hole;
-                }
-                *hole = value;
             }
         }
 
@@ -328,6 +396,15 @@ namespace msvc8
          * callee at all; corrected to skip/cited-here, same `_Adjust_heap`
          * split-phase shape as `0x0089C170`/`0x0089C350` above.)
          */
+        /**
+         * Address: 0x00575280 (FUN_00575280 -- `_Adjust_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp) (sift-down half, hands the hole to the `_Push_heap` at 0x00575500).)
+         * Address: 0x00575500 (FUN_00575500 -- `_Push_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp) (settle-upward half).)
+         * Address: 0x0054FD90 (FUN_0054FD90 -- `_Adjust_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         * Address: 0x005501E0 (FUN_005501E0 -- `_Push_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         * Address: 0x008DA500 (FUN_008DA500 -- `_Push_heap` for the `gpg::RField` instantiation (the settle-upward half the `_Adjust_heap` at 0x008DAF60 calls).)
+         * Address: 0x00595F40 (FUN_00595F40 -- `_Push_heap` for the `SDepositCandidate` instantiation (called from the `_Adjust_heap` at 0x00595DF0).)
+         * Address: 0x00A72840 (FUN_00A72840 -- `_Adjust_heap` for the 8-byte `{float, dword}` instantiation (`make_heap` 0x00A72D40 / `sort_heap` 0x00A73E20); its `_Push_heap` half is 0x00A72360.)
+         */
         template <class T, class Compare>
         void adjust_heap(T* const first, std::ptrdiff_t hole, const std::ptrdiff_t count, T value, Compare comp)
         {
@@ -374,6 +451,10 @@ namespace msvc8
          * Reached from `_Sort`'s (`FUN_008DD790`, cited below) ideal-budget-
          * exhausted heapsort fallback. Was mis-tagged `external_dependency`;
          * corrected to skip/cited-here.)
+         */
+        /**
+         * Address: 0x00574A30 (FUN_00574A30 -- `make_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
+         * Address: 0x0054F990 (FUN_0054F990 -- `make_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          */
         template <class T, class Compare>
         void make_heap(T* const first, T* const last, Compare comp)
@@ -425,6 +506,17 @@ namespace msvc8
          * (`FUN_008DD790`, cited below) heapsort fallback, right after
          * `make_heap`'s `FUN_008DB2A0`. Was mis-tagged `external_dependency`;
          * corrected to skip/cited-here.)
+         */
+        /**
+         * Address: 0x00574B40 (FUN_00574B40 -- `sort_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
+         * Address: 0x0054F9E0 (FUN_0054F9E0 -- `sort_heap` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
+         * Address: 0x00575950 (FUN_00575950 -- `_Pop_heap_hole` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): writes the root into the vacated tail slot and re-sifts the displaced value.)
+         * Address: 0x00575490 (FUN_00575490 -- `pop_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00575660 (FUN_00575660 -- `pop_heap` for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00550280 (FUN_00550280 -- `_Pop_heap`/`_Pop_heap_hole` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00550450 (FUN_00550450 -- `_Pop_heap`/`_Pop_heap_hole` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73F50 (FUN_00A73F50 -- thunks into the `{float, dword}`/`double` `sort_heap` bodies at 0x00A73E20/0x00A73E70; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00A73F60 (FUN_00A73F60 -- thunks into the `{float, dword}`/`double` `sort_heap` bodies at 0x00A73E20/0x00A73E70; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          */
         template <class T, class Compare>
         void sort_heap(T* const first, T* last, Compare comp)
@@ -489,6 +581,9 @@ namespace msvc8
          * dword compares on the leading key field rather than a named
          * callee -- same algorithm, comparator capture just didn't survive
          * as a separate symbol.)
+         */
+        /**
+         * Address: 0x0054EE30 (FUN_0054EE30 -- `_Unguarded_partition` for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp).)
          */
         template <class T, class Compare>
         std::pair<T*, T*> unguarded_partition(T* const first, T* const last, Compare comp)
@@ -629,6 +724,10 @@ namespace msvc8
          * `FUN_00A73500`, falls to `FUN_00A73BD0` / `FUN_00A72E20` +
          * `FUN_00A73E70`.)
          */
+        /**
+         * Address: 0x005734F0 (FUN_005734F0 -- `_Sort` driver for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp): partition, recurse into the smaller half, heapsort fallback.)
+         * Address: 0x0054E4B0 (FUN_0054E4B0 -- `_Sort` driver for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp) (0x0054A32C).)
+         */
         template <class T, class Compare>
         void sort_impl(T* first, T* last, std::ptrdiff_t ideal, Compare comp)
         {
@@ -673,6 +772,10 @@ namespace msvc8
      * nine-body instantiation (`_Sort`/`_Unguarded_partition`/`_Median`/
      * `_Med3`/`iter_swap`/`_Insertion_sort`/`make_heap`/`sort_heap`/
      * `_Adjust_heap` x2) is catalogued on the members above.
+     */
+    /**
+     * Address: 0x00572350 (FUN_00572350 -- `std::sort` entry for the `SFormationRunScriptCandidate` (0x48) instantiation of `CFormationInstance::RunScript`'s sort (CAiFormationInstance.cpp).)
+     * Address: 0x0054DDD0 (FUN_0054DDD0 -- `std::sort` entry for the `SAniSkelBoneNameIndex` (8-byte `{const char*, int32}`) instantiation of `CAniSkel::CAniSkel`'s bone-name sort (CAniSkel.cpp): `return _Sort(first, last, (last - first) >> 3, comp)`.)
      */
     template <class T, class Compare>
     void sort(T* const first, T* const last, Compare comp)
