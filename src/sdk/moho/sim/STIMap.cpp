@@ -4272,34 +4272,30 @@ namespace moho
 
   /**
    * Address: 0x00564F80 (FUN_00564F80, Moho::OCCUPY_CheckEdgeFlatness)
-   *
-   * IDA signature:
-   * bool __usercall Moho::OCCUPY_CheckEdgeFlatness@<al>(
-   *   gpg::Rect2f *rect@<eax>,
-   *   __m128i pivotArg@<xmm0>,
-   *   __m128i xmm1Slot@<xmm1>,
-   *   Moho::RUnitBlueprint *blueprint,
-   *   Moho::STIMap *map,
-   *   float *outMinHeight,
-   *   float *outMaxHeight);
+   * Mangled: ?OCCUPY_CheckEdgeFlatness@Moho@@YA_NPBVRUnitBlueprint@1@ABV?$Rect2@M@gpg@@PBVSTIMap@1@PAM3@Z
    *
    * What it does:
    * Walks only the 1-cell-wider perimeter of `rect` (the horizontal bands at
-   * `y0-1` and `y1+1`, then the vertical bands at `x0-1` and `x1+1`), finds
-   * min/max elevation along the edge, and checks whether the largest
-   * one-sided deviation from `pivot = ceil(pivotArg)` fits within
-   * `blueprint->Physics.MaxGroundVariation`. Used for `FlattenSkirt`
-   * blueprints that flatten the interior at placement time and only need the
-   * skirt boundary to be flat.
+   * `z0-1` and `z1+1`, then the vertical bands at `x0-1` and `x1+1`), finds
+   * min/max elevation along the edge, and checks whether the largest one-sided
+   * deviation from `ceil(lastSample)` fits within
+   * `blueprint.Physics.MaxGroundVariation`. Used for `FlattenSkirt` blueprints,
+   * which level the ground at placement time: the pivot is the integer height
+   * the skirt gets flattened to, so the test asks whether the existing edge can
+   * be pulled to it within the blueprint's tolerance.
    *
-   * Callers always pass `(0.0f, 0.5f)` for the two XMM slots; `xmm1Slot` is
-   * unused as an input in the binary (IDA picked it up via calling convention
-   * but no loads observe it).
+   * `lastSample` is the second elevation read in the last perimeter iteration
+   * that ran -- the binary keeps it in xmm0 and computes `ceil` on that same
+   * register at 0x005650D6. IDA's `__usercall` prototype turned that register
+   * into a `pivotArg` parameter because the both-loops-skipped path reads it
+   * before writing it; the mangled symbol has no float parameters at all. This
+   * recovery had taken the invented parameter at face value and pivoted on the
+   * caller's `0.0f`, so the deviation came out as the site's full elevation
+   * (18.68 on SCMP_009) and every `FlattenSkirt` structure -- which is every
+   * ordinary building -- failed its placement check on flat ground.
    */
   bool OCCUPY_CheckEdgeFlatness(
     const gpg::Rect2f& rect,
-    const float pivotArg,
-    const float xmm1Slot,
     const RUnitBlueprint& blueprint,
     const STIMap& map,
     float* const outMinHeight,
@@ -4314,30 +4310,36 @@ namespace moho
     float minHeight = std::numeric_limits<float>::max();
     float maxHeight = -std::numeric_limits<float>::max();
 
+    // The elevation sampled last. Zero when neither band runs, matching the
+    // register the binary reads on that path.
+    float lastSample = 0.0f;
+
     const CHeightField* const field = map.mHeightField.get();
 
-    // Horizontal perimeter bands at (y0 - 1) and (y1 + 1), walked from
+    // Horizontal perimeter bands at (z0 - 1) and (z1 + 1), walked from
     // (x0 - 1) through (x1 + 1).
     for (int cellX = x0 - 1; cellX <= x1 + 1; ++cellX) {
       const float topSample = SampleClampedElevation(*field, cellX, z0 - 1);
-      const float bottomSample = SampleClampedElevation(*field, cellX, z1 + 1);
-      minHeight = std::min({minHeight, topSample, bottomSample});
-      maxHeight = std::max({maxHeight, topSample, bottomSample});
+      lastSample = SampleClampedElevation(*field, cellX, z1 + 1);
+      minHeight = std::min({minHeight, topSample, lastSample});
+      maxHeight = std::max({maxHeight, topSample, lastSample});
     }
 
     // Vertical perimeter bands at (x0 - 1) and (x1 + 1), walked from z0
     // through z1 (inclusive).
     for (int cellZ = z0; cellZ <= z1; ++cellZ) {
       const float leftSample = SampleClampedElevation(*field, x0 - 1, cellZ);
-      const float rightSample = SampleClampedElevation(*field, x1 + 1, cellZ);
-      minHeight = std::min({minHeight, leftSample, rightSample});
-      maxHeight = std::max({maxHeight, leftSample, rightSample});
+      lastSample = SampleClampedElevation(*field, x1 + 1, cellZ);
+      minHeight = std::min({minHeight, leftSample, lastSample});
+      maxHeight = std::max({maxHeight, leftSample, lastSample});
     }
 
     *outMinHeight = minHeight;
     *outMaxHeight = maxHeight;
 
-    const float pivot = std::ceil(pivotArg);
+    // 0x005650D6: `ceil` runs on the same register the loop last stored a
+    // sample into -- the height the skirt will be flattened to.
+    const float pivot = std::ceil(lastSample);
     const float deviationFromPivot = std::max(maxHeight - pivot, pivot - minHeight);
     return blueprint.Physics.MaxGroundVariation >= deviationFromPivot;
   }
@@ -4422,7 +4424,7 @@ namespace moho
     float skirtMaxHeight = 0.0f;
     const bool flatnessOk =
       blueprint.Physics.FlattenSkirt != 0u
-        ? OCCUPY_CheckEdgeFlatness(skirtWorldRect, 0.0f, 0.5f, blueprint, map, &skirtMinHeight, &skirtMaxHeight)
+        ? OCCUPY_CheckEdgeFlatness(skirtWorldRect, blueprint, map, &skirtMinHeight, &skirtMaxHeight)
         : OCCUPY_CheckAreaFlatness(skirtWorldRect, blueprint, map, &skirtMinHeight, &skirtMaxHeight);
 
     std::int32_t layerCaps = blueprint.Physics.BuildOnLayerCapsMask;

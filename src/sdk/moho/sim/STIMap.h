@@ -1062,20 +1062,24 @@ namespace moho
 
   /**
    * Address: 0x00564F80 (FUN_00564F80, Moho::OCCUPY_CheckEdgeFlatness)
+   * Mangled: ?OCCUPY_CheckEdgeFlatness@Moho@@YA_NPBVRUnitBlueprint@1@ABV?$Rect2@M@gpg@@PBVSTIMap@1@PAM3@Z
    *
    * What it does:
-   * `FlattenSkirt`-mode flatness check: walks only the 1-cell-wider
-   * perimeter of `rect`, finds min/max elevation, writes them to the out
-   * params, and checks whether the deviation from `ceil(pivotArg)` fits
-   * within `blueprint.Physics.MaxGroundVariation`. Binary always passes
-   * `(pivotArg = 0.0f, xmm1Slot = 0.5f)`; `xmm1Slot` is a register-slot
-   * artifact and has no observed input use.
+   * `FlattenSkirt`-mode flatness check: walks only the 1-cell-wider perimeter
+   * of `rect`, finds min/max elevation, writes them to the out params, and
+   * checks whether the largest one-sided deviation from the height the skirt
+   * would be flattened TO -- `ceil` of the last perimeter sample taken -- fits
+   * within `blueprint.Physics.MaxGroundVariation`.
+   *
+   * The mangled symbol is the authority on the parameter list: five arguments,
+   * none of them float. IDA typed this `__usercall` with two extra `xmm`
+   * parameters because the function reads xmm0 before writing it on the path
+   * where both perimeter loops are skipped -- that register holds a LOCAL, the
+   * elevation sampled last, not anything the caller passes.
    */
   [[nodiscard]]
   bool OCCUPY_CheckEdgeFlatness(
     const gpg::Rect2f& rect,
-    float pivotArg,
-    float xmm1Slot,
     const RUnitBlueprint& blueprint,
     const STIMap& map,
     float* outMinHeight,
