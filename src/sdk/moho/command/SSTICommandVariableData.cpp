@@ -131,7 +131,7 @@ namespace
   [[nodiscard]] gpg::RType* ResolveEntIdVectorType()
   {
     if (gEntIdVectorType == nullptr) {
-      gEntIdVectorType = gpg::LookupRType(typeid(msvc8::vector<moho::EntId>));
+      gEntIdVectorType = gpg::LookupRType(typeid(gpg::fastvector<moho::EntId>));
     }
     return gEntIdVectorType;
   }
@@ -155,7 +155,7 @@ namespace
   [[nodiscard]] gpg::RType* ResolveSOCellPosVectorType()
   {
     if (gCellVectorType == nullptr) {
-      gCellVectorType = gpg::LookupRType(typeid(msvc8::vector<moho::SOCellPos>));
+      gCellVectorType = gpg::LookupRType(typeid(gpg::fastvector<moho::SOCellPos>));
     }
     return gCellVectorType;
   }
@@ -495,15 +495,11 @@ namespace moho
    */
   SSTICommandVariableData::SSTICommandVariableData()
     : mEntIds{}
-    , v1(0)
-    , v2(0)
     , mCmdType(EUnitCommandType::UNITCOMMAND_None)
     , mTarget1{}
     , mTarget2{}
     , v14(0)
     , mCells{}
-    , v19(0)
-    , v20(0)
     , mMaxCount(-1)
     , mCount(-1)
     , v23(0)
@@ -554,15 +550,11 @@ namespace moho
    */
   SSTICommandVariableData::SSTICommandVariableData(const SSTICommandVariableData& other)
     : mEntIds(other.mEntIds)
-    , v1(other.v1)
-    , v2(other.v2)
     , mCmdType(other.mCmdType)
     , mTarget1(other.mTarget1)
     , mTarget2(other.mTarget2)
     , v14(other.v14)
     , mCells(other.mCells)
-    , v19(other.v19)
-    , v20(other.v20)
     , mMaxCount(other.mMaxCount)
     , mCount(other.mCount)
     , v23(other.v23)
@@ -577,15 +569,11 @@ namespace moho
    */
   SSTICommandVariableData::SSTICommandVariableData(const SSTICommandIssueData& issueData)
     : mEntIds{}
-    , v1(0)
-    , v2(0)
     , mCmdType(issueData.mCommandType)
     , mTarget1(issueData.mTarget)
     , mTarget2(issueData.mTarget2)
     , v14(issueData.unk38)
     , mCells{}
-    , v19(0)
-    , v20(0)
     , mMaxCount(issueData.unk70)
     , mCount(issueData.unk74)
     , v23(0)
