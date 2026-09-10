@@ -94,6 +94,95 @@ using namespace gpg;
 
 namespace
 {
+  /**
+   * The reflected read/write callbacks a type descriptor installs: resolve the
+   * cached `RType` for `T`, then hand the object to the archive. MSVC emits one
+   * pair per element type; every recovered pair is cited here.
+   */
+  template <gpg::RType* (*ResolveType)()>
+  /**
+   * Address: 0x0050D190 (FUN_0050D190 -- the reflected `read` callback for `Rect2i`; zero callers, unreachable; formerly `ReadRect2iArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D1D0 (FUN_0050D1D0 -- the reflected `read` callback for `ELayer`; zero callers, unreachable; formerly `ReadELayerArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D2D0 (FUN_0050D2D0 -- the reflected `read` callback for `Rect2i`; zero callers, unreachable; formerly `ReadRect2iArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D330 (FUN_0050D330 -- the reflected `read` callback for `ELayer`; zero callers, unreachable; formerly `ReadELayerArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0064A040 (FUN_0064A040 -- the reflected `read` callback for `EEconResource`; zero callers, unreachable; formerly `ReadEEconResourceArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0064A0C0 (FUN_0064A0C0 -- the reflected `read` callback for `EEconResource`; zero callers, unreachable; formerly `ReadEEconResourceArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658C20 (FUN_00658C20 -- the reflected `read` callback for `CEffectImpl`; zero callers, unreachable; formerly `ReadCEffectImplArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658C60 (FUN_00658C60 -- the reflected `read` callback for `SEntAttachInfo`; zero callers, unreachable; formerly `ReadSEntAttachInfoArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658CA0 (FUN_00658CA0 -- the reflected `read` callback for `SWorldBeam`; zero callers, unreachable; formerly `ReadSWorldBeamArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00688C50 (FUN_00688C50 -- the reflected `read` callback for `IdPool`; zero callers, unreachable; formerly `ReadIdPoolArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689190 (FUN_00689190 -- the reflected `read` callback for `IdPool`; zero callers, unreachable; formerly `ReadIdPoolArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689B40 (FUN_00689B40 -- the reflected `read` callback for `MapUIntIdPool`; zero callers, unreachable; formerly `ReadMapUIntIdPoolArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689B80 (FUN_00689B80 -- the reflected `read` callback for `ListEntityPtr`; zero callers, unreachable; formerly `ReadListEntityPtrArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689C70 (FUN_00689C70 -- the reflected `read` callback for `MapUIntIdPool`; zero callers, unreachable; formerly `ReadMapUIntIdPoolArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689CD0 (FUN_00689CD0 -- the reflected `read` callback for `ListEntityPtr`; zero callers, unreachable; formerly `ReadListEntityPtrArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071DB80 (FUN_0071DB80 -- the reflected `read` callback for `InfluenceMapEntry`; zero callers, unreachable; formerly `ReadInfluenceMapEntryArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071DBE0 (FUN_0071DBE0 -- the reflected `read` callback for `SThreat`; zero callers, unreachable; formerly `ReadSThreatArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071E310 (FUN_0071E310 -- the reflected `read` callback for `MapUIntInfluenceMapEntry`; zero callers, unreachable; formerly `ReadMapUIntInfluenceMapEntryArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071E350 (FUN_0071E350 -- the reflected `read` callback for `VectorSThreat`; zero callers, unreachable; formerly `ReadVectorSThreatArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071EEA0 (FUN_0071EEA0 -- the reflected `read` callback for `MapUIntInfluenceMapEntry`; zero callers, unreachable; formerly `ReadMapUIntInfluenceMapEntryArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071EF00 (FUN_0071EF00 -- the reflected `read` callback for `VectorSThreat`; zero callers, unreachable; formerly `ReadVectorSThreatArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FAE0 (FUN_0071FAE0 -- the reflected `read` callback for `MapUIntInt`; zero callers, unreachable; formerly `ReadMapUIntIntArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FB20 (FUN_0071FB20 -- the reflected `read` callback for `VectorInfluenceGrid`; zero callers, unreachable; formerly `ReadVectorInfluenceGridArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FDE0 (FUN_0071FDE0 -- the reflected `read` callback for `MapUIntInt`; zero callers, unreachable; formerly `ReadMapUIntIntArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FE40 (FUN_0071FE40 -- the reflected `read` callback for `VectorInfluenceGrid`; zero callers, unreachable; formerly `ReadVectorInfluenceGridArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0072B620 (FUN_0072B620 -- the reflected `read` callback for `ESquadClass`; zero callers, unreachable; formerly `ReadESquadClassArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0072B6A0 (FUN_0072B6A0 -- the reflected `read` callback for `ESquadClass`; zero callers, unreachable; formerly `ReadESquadClassArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006941E0 (FUN_006941E0 -- the reflected `read` callback for `EntitySetBase` (called with a null owner ref); zero callers, unreachable; formerly `ReadEntitySetBaseArchiveObjectWithNullOwner` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005592D0 (FUN_005592D0 -- the reflected `read` callback for `EntId` (called with a null owner ref); zero callers, unreachable; formerly `ReadEntIdArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005596F0 (FUN_005596F0 -- the reflected `read` callback for `EntId` (called with a null owner ref); zero callers, unreachable; formerly `ReadEntIdArchiveObjectLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00763BA0 (FUN_00763BA0 -- the reflected `read` callback for `VectorHPathCell` (called with a null owner ref); zero callers, unreachable; formerly `ReadVectorHPathCellArchiveObjectWithNullOwner` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0077A6D0 (FUN_0077A6D0 -- the cached `RType` lookup those callbacks resolve through; callers ; formerly `ResolveInfluenceMapEntryArchiveAdapterType` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
+  gpg::ReadArchive* ReadArchiveObjectOfType(gpg::ReadArchive* const archive, void* const object, const gpg::RRef& ownerRef)
+  {
+    archive->Read(ResolveType(), object, ownerRef);
+    return archive;
+  }
+
+  /**
+   * The write half of the pair above.
+   */
+  template <gpg::RType* (*ResolveType)()>
+  /**
+   * Address: 0x0050D210 (FUN_0050D210 -- the reflected `write` callback for `Rect2i`; zero callers, unreachable; formerly `WriteRect2iArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D250 (FUN_0050D250 -- the reflected `write` callback for `ELayer`; zero callers, unreachable; formerly `WriteELayerArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D300 (FUN_0050D300 -- the reflected `write` callback for `Rect2i`; zero callers, unreachable; formerly `WriteRect2iArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0050D360 (FUN_0050D360 -- the reflected `write` callback for `ELayer`; zero callers, unreachable; formerly `WriteELayerArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0064A080 (FUN_0064A080 -- the reflected `write` callback for `EEconResource`; zero callers, unreachable; formerly `WriteEEconResourceArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0064A0F0 (FUN_0064A0F0 -- the reflected `write` callback for `EEconResource`; zero callers, unreachable; formerly `WriteEEconResourceArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658CE0 (FUN_00658CE0 -- the reflected `write` callback for `CEffectImpl`; zero callers, unreachable; formerly `WriteCEffectImplArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658D20 (FUN_00658D20 -- the reflected `write` callback for `SEntAttachInfo`; zero callers, unreachable; formerly `WriteSEntAttachInfoArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00658D60 (FUN_00658D60 -- the reflected `write` callback for `SWorldBeam`; zero callers, unreachable; formerly `WriteSWorldBeamArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00688C90 (FUN_00688C90 -- the reflected `write` callback for `IdPool`; zero callers, unreachable; formerly `WriteIdPoolArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x006891C0 (FUN_006891C0 -- the reflected `write` callback for `IdPool`; zero callers, unreachable; formerly `WriteIdPoolArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689BC0 (FUN_00689BC0 -- the reflected `write` callback for `MapUIntIdPool`; zero callers, unreachable; formerly `WriteMapUIntIdPoolArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689C00 (FUN_00689C00 -- the reflected `write` callback for `ListEntityPtr`; zero callers, unreachable; formerly `WriteListEntityPtrArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689CA0 (FUN_00689CA0 -- the reflected `write` callback for `MapUIntIdPool`; zero callers, unreachable; formerly `WriteMapUIntIdPoolArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00689D00 (FUN_00689D00 -- the reflected `write` callback for `ListEntityPtr`; zero callers, unreachable; formerly `WriteListEntityPtrArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00694220 (FUN_00694220 -- the reflected `write` callback for `EntitySetBase` (called with a null owner ref); zero callers, unreachable; formerly `WriteEntitySetBaseArchiveObjectWithNullOwner` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00559310 (FUN_00559310 -- the reflected `write` callback for `EntId` (called with a null owner ref); zero callers, unreachable; formerly `WriteEntIdArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00559730 (FUN_00559730 -- the reflected `write` callback for `EntId` (called with a null owner ref); zero callers, unreachable; formerly `WriteEntIdArchiveObjectLane2` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071DBB0 (FUN_0071DBB0 -- the reflected `write` callback for `InfluenceMapEntry`; zero callers, unreachable; formerly `WriteInfluenceMapEntryArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071DC10 (FUN_0071DC10 -- the reflected `write` callback for `SThreat`; zero callers, unreachable; formerly `WriteSThreatArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071E390 (FUN_0071E390 -- the reflected `write` callback for `MapUIntInfluenceMapEntry`; zero callers, unreachable; formerly `WriteMapUIntInfluenceMapEntryArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071E3D0 (FUN_0071E3D0 -- the reflected `write` callback for `VectorSThreat`; zero callers, unreachable; formerly `WriteVectorSThreatArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071EED0 (FUN_0071EED0 -- the reflected `write` callback for `MapUIntInfluenceMapEntry`; zero callers, unreachable; formerly `WriteMapUIntInfluenceMapEntryArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071EF30 (FUN_0071EF30 -- the reflected `write` callback for `VectorSThreat`; zero callers, unreachable; formerly `WriteVectorSThreatArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FB60 (FUN_0071FB60 -- the reflected `write` callback for `MapUIntInt`; zero callers, unreachable; formerly `WriteMapUIntIntArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FBA0 (FUN_0071FBA0 -- the reflected `write` callback for `VectorInfluenceGrid`; zero callers, unreachable; formerly `WriteVectorInfluenceGridArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FE10 (FUN_0071FE10 -- the reflected `write` callback for `MapUIntInt`; zero callers, unreachable; formerly `WriteMapUIntIntArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0071FE70 (FUN_0071FE70 -- the reflected `write` callback for `VectorInfluenceGrid`; zero callers, unreachable; formerly `WriteVectorInfluenceGridArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0072B660 (FUN_0072B660 -- the reflected `write` callback for `ESquadClass`; zero callers, unreachable; formerly `WriteESquadClassArchiveAdapter` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0072B6D0 (FUN_0072B6D0 -- the reflected `write` callback for `ESquadClass`; zero callers, unreachable; formerly `WriteESquadClassArchiveObjectLane1` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00763BE0 (FUN_00763BE0 -- the reflected `write` callback for `VectorHPathCell` (called with a null owner ref); zero callers, unreachable; formerly `WriteVectorHPathCellArchiveObjectWithNullOwner` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
+  gpg::WriteArchive* WriteArchiveObjectOfType(gpg::WriteArchive* const archive, const void* const object, const gpg::RRef& ownerRef)
+  {
+    archive->Write(ResolveType(), object, ownerRef);
+    return archive;
+  }
+
   template <class T>
   [[nodiscard]] gpg::RType* CachedCompatRType()
   {
@@ -2638,52 +2727,6 @@ namespace
     return archive ? archive->ReadPointerOwned_PathQueue(outValue, ownerRef) : archive;
   }
 
-  [[nodiscard]] gpg::RType* ResolveRect2iArchiveAdapterType()
-  {
-    gpg::RType* type = gpg::Rect2i::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(gpg::Rect2<int>));
-      gpg::Rect2i::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveELayerArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::ELayer");
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::ELayer));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEntIdArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::EntId");
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::EntId));
-      }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveEEconResourceArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::EEconResource");
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::EEconResource));
-      }
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveCThrustManipulatorArchiveAdapterType()
   {
     static gpg::RType* sType = nullptr;
@@ -2702,36 +2745,6 @@ namespace
     if (type == nullptr) {
       type = gpg::LookupRType(typeid(moho::RDebugOverlay));
       moho::RDebugOverlay::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveCEffectImplArchiveAdapterType()
-  {
-    gpg::RType* type = moho::CEffectImpl::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::CEffectImpl));
-      moho::CEffectImpl::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSEntAttachInfoArchiveAdapterType()
-  {
-    gpg::RType* type = moho::SEntAttachInfo::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SEntAttachInfo));
-      moho::SEntAttachInfo::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSWorldBeamArchiveAdapterType()
-  {
-    gpg::RType* type = moho::SWorldBeam::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SWorldBeam));
-      moho::SWorldBeam::sType = type;
     }
     return type;
   }
@@ -2786,16 +2799,6 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RType* ResolveIdPoolArchiveAdapterType()
-  {
-    gpg::RType* type = moho::IdPool::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::IdPool));
-      moho::IdPool::sType = type;
-    }
-    return type;
-  }
-
   [[nodiscard]] gpg::RType* ResolveEntitySetBaseArchiveAdapterType()
   {
     gpg::RType* type = moho::EntitySetBase::sType;
@@ -2804,24 +2807,6 @@ namespace
       moho::EntitySetBase::sType = type;
     }
     return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveMapUIntIdPoolArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::map<unsigned int, moho::IdPool>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveListEntityPtrArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::list<moho::Entity*>));
-    }
-    return sType;
   }
 
   /**
@@ -3012,211 +2997,9 @@ namespace
     return archive;
   }
 
-  /**
-   * Address: 0x0050D190 (FUN_0050D190)
-   *
-   * What it does:
-   * Lazily resolves the reflected `Rect2<int>` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadRect2iArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveRect2iArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D210 (FUN_0050D210)
-   *
-   * What it does:
-   * Lazily resolves the reflected `Rect2<int>` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteRect2iArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveRect2iArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D1D0 (FUN_0050D1D0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ELayer` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadELayerArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveELayerArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D250 (FUN_0050D250)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ELayer` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteELayerArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveELayerArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0050D2D0 (FUN_0050D2D0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `Rect2<int>` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  void ReadRect2iArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveRect2iArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0050D300 (FUN_0050D300)
-   *
-   * What it does:
-   * Lazily resolves the reflected `Rect2<int>` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  void WriteRect2iArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveRect2iArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0050D330 (FUN_0050D330)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ELayer` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  void ReadELayerArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveELayerArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0050D360 (FUN_0050D360)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ELayer` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  void WriteELayerArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveELayerArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
 } // namespace
 namespace
 {
-  /**
-   * Address: 0x0064A040 (FUN_0064A040)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EEconResource` type and reads one object
-   * lane through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadEEconResourceArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveEEconResourceArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0064A080 (FUN_0064A080)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EEconResource` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteEEconResourceArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveEEconResourceArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0064A0C0 (FUN_0064A0C0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EEconResource` type and reads one object
-   * lane through `ReadArchive::Read` using the provided owner reference.
-   */
-  void ReadEEconResourceArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveEEconResourceArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0064A0F0 (FUN_0064A0F0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EEconResource` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  void WriteEEconResourceArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveEEconResourceArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
   /**
    * Address: 0x0064B4F0 (FUN_0064B4F0)
    *
@@ -3241,114 +3024,6 @@ namespace
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveRDebugOverlayArchiveAdapterType());
     return static_cast<moho::RDebugOverlay*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00658C20 (FUN_00658C20)
-   *
-   * What it does:
-   * Lazily resolves the reflected `CEffectImpl` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadCEffectImplArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveCEffectImplArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00658C60 (FUN_00658C60)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SEntAttachInfo` type and reads one object
-   * lane through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadSEntAttachInfoArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveSEntAttachInfoArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00658CA0 (FUN_00658CA0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SWorldBeam` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadSWorldBeamArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveSWorldBeamArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00658CE0 (FUN_00658CE0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `CEffectImpl` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteCEffectImplArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveCEffectImplArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00658D20 (FUN_00658D20)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SEntAttachInfo` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteSEntAttachInfoArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveSEntAttachInfoArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00658D60 (FUN_00658D60)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SWorldBeam` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteSWorldBeamArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveSWorldBeamArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
   }
 
   /**
@@ -3418,76 +3093,6 @@ namespace
   }
 
   /**
-   * Address: 0x00688C50 (FUN_00688C50)
-   *
-   * What it does:
-   * Lazily resolves the reflected `IdPool` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadIdPoolArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveIdPoolArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00688C90 (FUN_00688C90)
-   *
-   * What it does:
-   * Lazily resolves the reflected `IdPool` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteIdPoolArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveIdPoolArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00689190 (FUN_00689190)
-   *
-   * What it does:
-   * Lazily resolves the reflected `IdPool` type and reads one object lane
-   * through `ReadArchive::Read` using the provided owner reference.
-   */
-  void ReadIdPoolArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveIdPoolArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x006891C0 (FUN_006891C0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `IdPool` type and writes one object lane
-   * through `WriteArchive::Write` using the provided owner reference.
-   */
-  void WriteIdPoolArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveIdPoolArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
    * Address: 0x006898E0 (FUN_006898E0)
    *
    * What it does:
@@ -3498,178 +3103,6 @@ namespace
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveEntitySetBaseArchiveAdapterType());
     return static_cast<moho::EntitySetBase*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00689B40 (FUN_00689B40)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int,IdPool>` type and reads
-   * one object lane through `ReadArchive::Read` using the provided owner
-   * reference.
-   */
-  gpg::ReadArchive* ReadMapUIntIdPoolArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIdPoolArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00689B80 (FUN_00689B80)
-   *
-   * What it does:
-   * Lazily resolves the reflected `list<Entity*>` type and reads one object
-   * lane through `ReadArchive::Read` using the provided owner reference.
-   */
-  gpg::ReadArchive* ReadListEntityPtrArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveListEntityPtrArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00689BC0 (FUN_00689BC0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int,IdPool>` type and writes
-   * one object lane through `WriteArchive::Write` using the provided owner
-   * reference.
-   */
-  gpg::WriteArchive* WriteMapUIntIdPoolArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIdPoolArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00689C00 (FUN_00689C00)
-   *
-   * What it does:
-   * Lazily resolves the reflected `list<Entity*>` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  gpg::WriteArchive* WriteListEntityPtrArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveListEntityPtrArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x00689C70 (FUN_00689C70)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int,IdPool>` type and reads
-   * one object lane through `ReadArchive::Read` using the provided owner
-   * reference.
-   */
-  void ReadMapUIntIdPoolArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIdPoolArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x00689CA0 (FUN_00689CA0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int,IdPool>` type and writes
-   * one object lane through `WriteArchive::Write` using the provided owner
-   * reference.
-   */
-  void WriteMapUIntIdPoolArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIdPoolArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x00689CD0 (FUN_00689CD0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `list<Entity*>` type and reads one object
-   * lane through `ReadArchive::Read` using the provided owner reference.
-   */
-  void ReadListEntityPtrArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveListEntityPtrArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x00689D00 (FUN_00689D00)
-   *
-   * What it does:
-   * Lazily resolves the reflected `list<Entity*>` type and writes one object
-   * lane through `WriteArchive::Write` using the provided owner reference.
-   */
-  void WriteListEntityPtrArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveListEntityPtrArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x006941E0 (FUN_006941E0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntitySetBase` type and reads one object
-   * lane through `ReadArchive::Read` with one local null owner reference.
-   */
-  void ReadEntitySetBaseArchiveObjectWithNullOwner(gpg::ReadArchive* const archive, void* const object)
-  {
-    gpg::RType* const objectType = ResolveEntitySetBaseArchiveAdapterType();
-    gpg::RRef ownerRef{};
-    archive->Read(objectType, object, ownerRef);
-  }
-
-  /**
-   * Address: 0x00694220 (FUN_00694220)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntitySetBase` type and writes one object
-   * lane through `WriteArchive::Write` with one local null owner reference.
-   */
-  void WriteEntitySetBaseArchiveObjectWithNullOwner(gpg::WriteArchive* const archive, void** const objectSlot)
-  {
-    gpg::RType* const objectType = ResolveEntitySetBaseArchiveAdapterType();
-    const gpg::RRef ownerRef{};
-    archive->Write(objectType, objectSlot, ownerRef);
   }
 
 } // namespace
@@ -4777,62 +4210,6 @@ namespace
     (void)a5;
     auto* const writeResult = WriteTrackedPointerFromRefBuilder(archive, gpg::RRef_REntityBlueprint, value, gpg::TrackedPointerState::Unowned);
     return writeResult;
-  }
-
-  /**
-   * Address: 0x005592D0 (FUN_005592D0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntId` type and reads one object lane
-   * through `ReadArchive::Read` with a local empty owner reference.
-   */
-  void ReadEntIdArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object)
-  {
-    gpg::RType* const objectType = ResolveEntIdArchiveAdapterType();
-    gpg::RRef ownerRef{};
-    archive->Read(objectType, object, ownerRef);
-  }
-
-  /**
-   * Address: 0x00559310 (FUN_00559310)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntId` type and writes one object lane
-   * through `WriteArchive::Write` with a local empty owner reference.
-   */
-  void WriteEntIdArchiveObjectLane1(gpg::WriteArchive* const archive, void** const objectSlot)
-  {
-    gpg::RType* const objectType = ResolveEntIdArchiveAdapterType();
-    const gpg::RRef ownerRef{};
-    archive->Write(objectType, objectSlot, ownerRef);
-  }
-
-  /**
-   * Address: 0x005596F0 (FUN_005596F0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntId` type and reads one object lane
-   * through `ReadArchive::Read` with a local empty owner reference.
-   */
-  void ReadEntIdArchiveObjectLane2(gpg::ReadArchive* const archive, void* const object)
-  {
-    gpg::RType* const objectType = ResolveEntIdArchiveAdapterType();
-    gpg::RRef ownerRef{};
-    archive->Read(objectType, object, ownerRef);
-  }
-
-  /**
-   * Address: 0x00559730 (FUN_00559730)
-   *
-   * What it does:
-   * Lazily resolves the reflected `EntId` type and writes one object lane
-   * through `WriteArchive::Write` with a local empty owner reference.
-   */
-  void WriteEntIdArchiveObjectLane2(gpg::WriteArchive* const archive, void** const objectSlot)
-  {
-    gpg::RType* const objectType = ResolveEntIdArchiveAdapterType();
-    const gpg::RRef ownerRef{};
-    archive->Write(objectType, objectSlot, ownerRef);
   }
 
   /**
@@ -7557,87 +6934,6 @@ namespace
    * moho/entity/CTextureScroller.cpp.
    */
 
-  /**
-   * `InstallMohoSDecalInfoSerializerCallbacks` removed here (2026-08-26
-   * ArchiveSerialization audit): its `Address: 0x0077A6D0` citation was
-   * disproven -- ground-truth `.c` disassembly shows the standard direct-
-   * assignment `Init()` shape (`type->serLoadFunc_ = ...` / `->mSerLoadFunc =
-   * ...`), not the generic by-name lookup this file modeled, and had zero
-   * callers in this file. Address cited elsewhere as the real Init():
-   * moho/render/CDecalTypes.cpp.
-   */
-
-  [[nodiscard]] gpg::RType* ResolveInfluenceMapEntryArchiveAdapterType()
-  {
-    gpg::RType* type = moho::InfluenceMapEntry::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::InfluenceMapEntry));
-      moho::InfluenceMapEntry::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveSThreatArchiveAdapterType()
-  {
-    gpg::RType* type = moho::SThreat::sType;
-    if (type == nullptr) {
-      type = gpg::LookupRType(typeid(moho::SThreat));
-      moho::SThreat::sType = type;
-    }
-    return type;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveMapUIntInfluenceMapEntryArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::map<unsigned int, moho::InfluenceMapEntry>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVectorSThreatArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::vector<moho::SThreat>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveMapUIntIntArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::map<unsigned int, int>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVectorInfluenceGridArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::vector<moho::InfluenceGrid>));
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveESquadClassArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::REF_FindTypeNamed("Moho::ESquadClass");
-      if (sType == nullptr) {
-        sType = gpg::REF_FindTypeNamed("ESquadClass");
-      }
-      if (sType == nullptr) {
-        sType = gpg::LookupRType(typeid(moho::ESquadClass));
-      }
-    }
-    return sType;
-  }
-
   [[nodiscard]] gpg::RType* ResolveCDamageArchiveAdapterType()
   {
     gpg::RType* type = moho::CDamage::sType;
@@ -7656,15 +6952,6 @@ namespace
       if (sType == nullptr) {
         sType = gpg::LookupRType(typeid(moho::Shield));
       }
-    }
-    return sType;
-  }
-
-  [[nodiscard]] gpg::RType* ResolveVectorHPathCellArchiveAdapterType()
-  {
-    static gpg::RType* sType = nullptr;
-    if (sType == nullptr) {
-      sType = gpg::LookupRType(typeid(std::vector<moho::HPathCell>));
     }
     return sType;
   }
@@ -7703,388 +6990,6 @@ namespace
   }
 
   /**
-   * Address: 0x0071DB80 (FUN_0071DB80)
-   *
-   * What it does:
-   * Lazily resolves the reflected `InfluenceMapEntry` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadInfluenceMapEntryArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveInfluenceMapEntryArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071DBB0 (FUN_0071DBB0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `InfluenceMapEntry` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteInfluenceMapEntryArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveInfluenceMapEntryArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071DBE0 (FUN_0071DBE0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SThreat` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadSThreatArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveSThreatArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071DC10 (FUN_0071DC10)
-   *
-   * What it does:
-   * Lazily resolves the reflected `SThreat` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteSThreatArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveSThreatArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071E310 (FUN_0071E310)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, InfluenceMapEntry>` type and reads one object lane through
-   * `ReadArchive::Read`.
-   */
-  gpg::ReadArchive* ReadMapUIntInfluenceMapEntryArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntInfluenceMapEntryArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071E350 (FUN_0071E350)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<SThreat>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  gpg::ReadArchive* ReadVectorSThreatArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorSThreatArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071E390 (FUN_0071E390)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, InfluenceMapEntry>` type and writes one object lane through
-   * `WriteArchive::Write`.
-   */
-  gpg::WriteArchive* WriteMapUIntInfluenceMapEntryArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntInfluenceMapEntryArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071E3D0 (FUN_0071E3D0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<SThreat>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  gpg::WriteArchive* WriteVectorSThreatArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorSThreatArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071EEA0 (FUN_0071EEA0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, InfluenceMapEntry>` type and reads one object lane through
-   * `ReadArchive::Read`.
-   */
-  void ReadMapUIntInfluenceMapEntryArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntInfluenceMapEntryArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071EED0 (FUN_0071EED0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, InfluenceMapEntry>` type and writes one object lane through
-   * `WriteArchive::Write`.
-   */
-  void WriteMapUIntInfluenceMapEntryArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntInfluenceMapEntryArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071EF00 (FUN_0071EF00)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<SThreat>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadVectorSThreatArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveVectorSThreatArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071EF30 (FUN_0071EF30)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<SThreat>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteVectorSThreatArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorSThreatArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071FAE0 (FUN_0071FAE0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, int>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  gpg::ReadArchive* ReadMapUIntIntArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIntArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071FB20 (FUN_0071FB20)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<InfluenceGrid>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  gpg::ReadArchive* ReadVectorInfluenceGridArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorInfluenceGridArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071FB60 (FUN_0071FB60)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, int>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  gpg::WriteArchive* WriteMapUIntIntArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIntArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071FBA0 (FUN_0071FBA0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<InfluenceGrid>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  gpg::WriteArchive* WriteVectorInfluenceGridArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorInfluenceGridArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0071FDE0 (FUN_0071FDE0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, int>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadMapUIntIntArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveMapUIntIntArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071FE10 (FUN_0071FE10)
-   *
-   * What it does:
-   * Lazily resolves the reflected `map<unsigned int, int>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteMapUIntIntArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveMapUIntIntArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071FE40 (FUN_0071FE40)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<InfluenceGrid>` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadVectorInfluenceGridArchiveObjectLane1(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorInfluenceGridArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0071FE70 (FUN_0071FE70)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<InfluenceGrid>` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteVectorInfluenceGridArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveVectorInfluenceGridArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0072B620 (FUN_0072B620)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ESquadClass` type and reads one object lane through `ReadArchive::Read`.
-   */
-  gpg::ReadArchive* ReadESquadClassArchiveAdapter(
-    gpg::ReadArchive* const archive,
-    void* const object,
-    gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveESquadClassArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0072B660 (FUN_0072B660)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ESquadClass` type and writes one object lane through `WriteArchive::Write`.
-   */
-  gpg::WriteArchive* WriteESquadClassArchiveAdapter(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveESquadClassArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-    return archive;
-  }
-
-  /**
-   * Address: 0x0072B6A0 (FUN_0072B6A0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ESquadClass` type and reads one object lane through `ReadArchive::Read`.
-   */
-  void ReadESquadClassArchiveObjectLane1(gpg::ReadArchive* const archive, void* const object, gpg::RRef* const ownerRef)
-  {
-    gpg::RType* const objectType = ResolveESquadClassArchiveAdapterType();
-    archive->Read(objectType, object, *ownerRef);
-  }
-
-  /**
-   * Address: 0x0072B6D0 (FUN_0072B6D0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `ESquadClass` type and writes one object lane through `WriteArchive::Write`.
-   */
-  void WriteESquadClassArchiveObjectLane1(
-    gpg::WriteArchive* const archive,
-    void** const objectSlot,
-    const gpg::RRef* const ownerRef
-  )
-  {
-    gpg::RType* const objectType = ResolveESquadClassArchiveAdapterType();
-    archive->Write(objectType, objectSlot, *ownerRef);
-  }
-
-  /**
    * Address: 0x0073AD60 (FUN_0073AD60)
    *
    * What it does:
@@ -8106,34 +7011,6 @@ namespace
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, ResolveShieldArchiveAdapterType());
     return static_cast<moho::Shield*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00763BA0 (FUN_00763BA0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<HPathCell>` type and reads one object lane through `ReadArchive::Read` with one
-   * local null owner reference.
-   */
-  void ReadVectorHPathCellArchiveObjectWithNullOwner(gpg::ReadArchive* const archive, void* const object)
-  {
-    gpg::RType* const objectType = ResolveVectorHPathCellArchiveAdapterType();
-    gpg::RRef ownerRef{};
-    archive->Read(objectType, object, ownerRef);
-  }
-
-  /**
-   * Address: 0x00763BE0 (FUN_00763BE0)
-   *
-   * What it does:
-   * Lazily resolves the reflected `vector<HPathCell>` type and writes one object lane through `WriteArchive::Write` with
-   * one local null owner reference.
-   */
-  void WriteVectorHPathCellArchiveObjectWithNullOwner(gpg::WriteArchive* const archive, void** const objectSlot)
-  {
-    gpg::RType* const objectType = ResolveVectorHPathCellArchiveAdapterType();
-    const gpg::RRef ownerRef{};
-    archive->Write(objectType, objectSlot, ownerRef);
   }
 
   /**
