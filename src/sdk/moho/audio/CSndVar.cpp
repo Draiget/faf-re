@@ -9,7 +9,6 @@
 #include <vector>
 
 #include "gpg/core/algorithms/MD5.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
@@ -312,7 +311,7 @@ namespace
     const std::uint32_t* const lane08Source
   )
   {
-    auto* const entry = static_cast<SndVarRegistryEntryRuntimeView*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    auto* const entry = msvc8::detail::allocate_checked<SndVarRegistryEntryRuntimeView>(1u);
     if (entry != nullptr) {
       entry->lane00 = lane00;
     }
@@ -327,7 +326,7 @@ namespace
 
   [[nodiscard]] SndVarTreeNodeHeadRuntimeView* AllocateSndVarTreeNodeHeadRuntime()
   {
-    auto* const node = static_cast<SndVarTreeNodeHeadRuntimeView*>(gpg::core::legacy::AllocateChecked24ByteLane(1u));
+    auto* const node = msvc8::detail::allocate_checked<SndVarTreeNodeHeadRuntimeView>(1u);
     if (node != nullptr) {
       node->parent = 0;
     }

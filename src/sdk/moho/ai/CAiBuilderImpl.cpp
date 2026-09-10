@@ -10,7 +10,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -350,9 +350,7 @@ namespace
   [[nodiscard]] SBuilderRebuildNode* CreateRebuildMapNode() noexcept
   {
     static_assert(sizeof(SBuilderRebuildNode) == 24, "SBuilderRebuildNode must be 24 bytes");
-    auto* const node = static_cast<SBuilderRebuildNode*>(
-      gpg::core::legacy::AllocateChecked24ByteLane(1u)
-    );
+    auto* const node = msvc8::detail::allocate_checked<SBuilderRebuildNode>(1u);
     if (node == nullptr) {
       return nullptr;
     }

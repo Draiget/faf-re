@@ -11,7 +11,7 @@
 
 #include <d3d9.h>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/BinaryWriter.h"
 #include "gpg/gal/Device.hpp"
@@ -222,7 +222,7 @@ namespace
   [[nodiscard]] moho::CartographicDecalNode* CreateCartographicDecalSentinelNode()
   {
     auto* const sentinel =
-      static_cast<moho::CartographicDecalNode*>(gpg::core::legacy::AllocateChecked48ByteLane(1u));
+      msvc8::detail::allocate_checked<moho::CartographicDecalNode>(1u);
     sentinel->mNext = sentinel;
     sentinel->mPrev = sentinel;
     return sentinel;

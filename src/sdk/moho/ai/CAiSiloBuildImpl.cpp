@@ -9,7 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/entity/Entity.h"
@@ -202,7 +202,7 @@ namespace
    */
   [[nodiscard]] SSiloTypeListNode* AllocateSelfLinkedSiloTypeSentinel()
   {
-    auto* const node = static_cast<SSiloTypeListNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+    auto* const node = msvc8::detail::allocate_checked<SSiloTypeListNode>(1u);
     node->mNext = node;
     node->mPrev = node;
     return node;

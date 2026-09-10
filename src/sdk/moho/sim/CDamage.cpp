@@ -9,7 +9,7 @@
 #include <string_view>
 #include <typeinfo>
 
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -234,7 +234,7 @@ namespace
   [[maybe_unused]] [[nodiscard]] DamageShieldListSentinelRuntimeNode* AllocateSelfLinkedDamageShieldSentinel()
   {
     auto* const node =
-      static_cast<DamageShieldListSentinelRuntimeNode*>(gpg::core::legacy::AllocateChecked12ByteLane(1u));
+      msvc8::detail::allocate_checked<DamageShieldListSentinelRuntimeNode>(1u);
     node->next = node;
     node->prev = node;
     return node;
@@ -269,7 +269,7 @@ namespace
     DamageLinkedPairNodeRuntime* const prev
   )
   {
-    auto* const node = static_cast<DamageLinkedPairNodeRuntime*>(gpg::core::legacy::AllocateChecked16ByteLane(1u));
+    auto* const node = msvc8::detail::allocate_checked<DamageLinkedPairNodeRuntime>(1u);
     node->next = next;
     node->prev = prev;
     node->payload0 = seed.first;

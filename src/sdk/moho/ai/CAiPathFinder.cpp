@@ -13,7 +13,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -310,9 +310,7 @@ namespace
     const gpg::Rect2i& rect
   )
   {
-    auto* const node = static_cast<RectHistoryNode*>(
-      gpg::core::legacy::AllocateChecked24ByteLane(1u)
-    );
+    auto* const node = msvc8::detail::allocate_checked<RectHistoryNode>(1u);
     if (node != nullptr) {
       node->next = next;
     }

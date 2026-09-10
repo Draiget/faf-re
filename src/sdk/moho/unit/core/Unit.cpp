@@ -16,7 +16,6 @@
 #include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"

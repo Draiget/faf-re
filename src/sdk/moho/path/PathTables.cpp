@@ -13,7 +13,7 @@
 #include <utility>
 
 #include "gpg/core/algorithms/AStarSearch.h"
-#include "gpg/core/containers/CheckedArrayAllocationLanes.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -1728,11 +1728,7 @@ namespace
       newCapacity = newSize;
     }
 
-    auto* const newFirst = static_cast<moho::OccupySourceBinding*>(
-      newCapacity != 0u
-        ? gpg::core::legacy::AllocateChecked12ByteLane(static_cast<std::uint32_t>(newCapacity))
-        : ::operator new(0)
-    );
+    auto* const newFirst = msvc8::detail::allocate_checked<moho::OccupySourceBinding>(newCapacity);
 
     moho::OccupySourceBinding* dest = newFirst;
     for (const moho::OccupySourceBinding* src = storage.mFirst; src != insertPosition; ++src, ++dest) {
