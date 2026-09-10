@@ -835,6 +835,51 @@ void CScriptObject::LogScriptWarning(CScriptObject* obj, const char* which, cons
 }
 
 /**
+ * Address: 0x0060C2C0 (FUN_0060C2C0)
+ *
+ * What it does:
+ * See the declaration. The weak-link guard is installed before `FindScript`
+ * and outlives the call, so the object the warning names is resolved back out
+ * of the guard's own owner slot -- a callback that destroys `this` leaves a
+ * detached slot there rather than a dangling pointer, which is exactly what
+ * 0x0060C41C's argument is reading.
+ */
+bool CScriptObject::RunScriptBool(const char* const name, const LuaPlus::LuaObject& arg)
+{
+  const WeakObject::ScopedWeakLinkGuard weakGuard(this);
+
+  const auto resolveWarningTarget = [&weakGuard]() -> CScriptObject* {
+    const WeakObject::WeakLinkSlot* const ownerLinkSlot = weakGuard.OwnerLinkSlotAddress();
+    if (!ownerLinkSlot) {
+      return nullptr;
+    }
+
+    return WeakPtr<CScriptObject>::DecodeOwnerObject(
+      reinterpret_cast<void*>(const_cast<WeakObject::WeakLinkSlot*>(ownerLinkSlot))
+    );
+  };
+
+  LuaPlus::LuaObject script;
+  FindScript(&script, name);
+  if (!script) {
+    return false;
+  }
+
+  try {
+    LuaPlus::LuaFunction<bool> callback(script);
+    return callback(mLuaObj, arg);
+  } catch (const std::exception& exception) {
+    LogScriptWarning(
+      resolveWarningTarget(), name ? name : "<unknown>", exception.what() ? exception.what() : ""
+    );
+  } catch (...) {
+    LogScriptWarning(resolveWarningTarget(), name ? name : "<unknown>", "unknown exception");
+  }
+
+  return false;
+}
+
+/**
  * Address: 0x004C74B0
  */
 LuaPlus::LuaObject CScriptObject::FindScript(LuaPlus::LuaObject* dest, const char* name)

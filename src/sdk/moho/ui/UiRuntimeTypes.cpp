@@ -5005,48 +5005,6 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
   };
 
   /**
-   * Address: 0x0060C2C0 (FUN_0060C2C0)
-   *
-   * What it does:
-   * Calls one script callback with `(self, objectArg)` and logs script warning
-   * text on callback exceptions.
-   */
-  [[nodiscard]] bool InvokeControlScriptObjectBool(
-    moho::CMauiControl* const control,
-    const char* const callbackName,
-    const LuaPlus::LuaObject& objectArg
-  )
-  {
-    moho::CScriptObject* const scriptObject = reinterpret_cast<moho::CScriptObject*>(control);
-    ScriptCallbackWeakGuard weakGuard(scriptObject);
-
-    LuaPlus::LuaObject callbackObject{};
-    scriptObject->FindScript(&callbackObject, callbackName);
-    if (!callbackObject) {
-      return false;
-    }
-
-    try {
-      LuaPlus::LuaFunction<bool> callback(callbackObject);
-      return callback(CMauiControlScriptObjectRuntimeView::FromControl(control)->mLuaObj, objectArg);
-    } catch (const std::exception& exception) {
-      scriptObject->LogScriptWarning(
-        weakGuard.ResolveObjectForWarning(),
-        callbackName != nullptr ? callbackName : "<unknown>",
-        exception.what() != nullptr ? exception.what() : ""
-      );
-    } catch (...) {
-      scriptObject->LogScriptWarning(
-        weakGuard.ResolveObjectForWarning(),
-        callbackName != nullptr ? callbackName : "<unknown>",
-        "unknown exception"
-      );
-    }
-
-    return false;
-  }
-
-  /**
    * Address: 0x0078A839 (FUN_0078A839)
    *
    * What it does:
@@ -24531,7 +24489,7 @@ bool moho::CMauiControl::HandleEvent(const SMauiEventData& eventData)
   LuaPlus::LuaState* const activeState = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);
-  return InvokeControlScriptObjectBool(this, "HandleEvent", eventObject);
+  return RunScriptBool("HandleEvent", eventObject);
 }
 
 /**

@@ -113,6 +113,30 @@ namespace moho
     LuaPlus::LuaObject FindScript(LuaPlus::LuaObject* dest, const char* name);
 
     /**
+     * Address: 0x0060C2C0 (FUN_0060C2C0)
+     *
+     * IDA signature:
+     * bool __thiscall sub_60C2C0(Moho::CScriptObject *this, char *name,
+     *     LuaPlus::LuaObject *arg);
+     *
+     * What it does:
+     * Invokes one script callback as `(self, arg)` through
+     * `LuaFunction<bool>` and answers what it returned. A callback this object
+     * does not define answers `false`, and a callback that throws is reported
+     * through `LogScriptWarning` and also answers `false`.
+     *
+     * The bool return type is the whole point, and the reason this is not
+     * `RunScript(name, arg).GetBoolean()`: `RunScript` hands back an *unbound*
+     * `LuaObject` when the script is missing or returns nothing, and every
+     * `LuaObject` accessor asserts `m_state != nullptr`. Spelling it that way
+     * turned a "this unit has no such callback" answer into a thrown
+     * `LuaAssertion("m_state")` that aborted the whole sim thread -- which is
+     * what `IAiCommandDispatchImpl::DispatchTask`'s `CheckBuildRestriction`
+     * gate did to every mobile-build order.
+     */
+    bool RunScriptBool(const char* name, const LuaPlus::LuaObject& arg);
+
+    /**
      * Address: 0x004C7580
      */
     bool RunScriptMultiRet(
