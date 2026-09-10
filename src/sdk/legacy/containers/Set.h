@@ -91,6 +91,7 @@ namespace msvc8
          * Runs the `_Lbound` descent and confirms the landed key is not ordered
          * after the probe, returning `end()` when the key is absent.
          * Address: 0x008D5020 (FUN_008D5020 -- `find` -- that lower bound plus the equivalence check, returning the header on a miss for `msvc8::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D21E0, 0x008D26D0; formerly `ResolveAdapterModeSortInsertionAnchor` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x007D7C20 (FUN_007D7C20 -- `find` -- lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D64D0 (unreached); formerly `FindRegionKeyExactOrHead` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) const { return iterator(tree_.find_node(k)); }
 
@@ -163,6 +164,7 @@ namespace msvc8
          * -- see that citation for the full evidence trail, including why
          * the general equal-range-based shape (not a `find`+single-`erase`
          * shortcut) is what the binary actually emits.
+         * Address: 0x007D7B90 (FUN_007D7B90 -- `erase(const key_type&)` -- count the equal range, then erase it for `msvc8::set<moho::ClutterRegionKey, moho::ClutterRegionKeyLess>` (`Clutter::mKeys` at +0x191C; node 0x1C, the 0x0C key at node+0x0C, colour/nil at +0x18/+0x19); callers 0x007D7080; formerly `EraseRegionKeyRange` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          */
         size_type erase(const key_type& k) { return tree_.erase(k); }
 

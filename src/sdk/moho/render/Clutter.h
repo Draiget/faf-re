@@ -1,5 +1,7 @@
 #pragma once
 
+#include "legacy/containers/Set.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -15,7 +17,7 @@ namespace moho
 
   struct ClutterRegion;
   struct ClutterRegionKey;
-  struct ClutterRegionKeyNode;
+
   struct ClutterListNode;
   struct ClutterRegionListNode;
 
@@ -205,38 +207,53 @@ namespace moho
     offsetof(ClutterRegionListState, head) == 0x04, "ClutterRegionListState::head offset must be 0x04"
   );
 
-  struct ClutterRegionKey
+  /**
+   * The region-key element of `Clutter::mKeys`. The vtable slot at +0x00 is a
+   * real vptr, not a stored field: every recovered "initializer" wrote the
+   * same constant there and the tree's teardown wrote it back before freeing
+   * the node, which is exactly what MSVC emits for a polymorphic class's
+   * constructors and destructor.
+   * Address: 0x007D5C90 (FUN_007D5C90 -- `ClutterRegionKey(x, z)` for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromCoordinates` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007D5CA0 (FUN_007D5CA0 -- `ClutterRegionKey(const ClutterRegion&)` for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromRegion` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007D92A0 (FUN_007D92A0 -- the copy constructor for `moho::ClutterRegionKey`; zero callers, unreachable; formerly `InitializeRegionKeyFromSourceKey` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007D5CC0 (FUN_007D5CC0 -- `~ClutterRegionKey` -- the vtable reset MSVC emits for a polymorphic class's destructor for `moho::ClutterRegionKey`; callers 0x007D6E40, 0x007D7080; formerly `ResetRegionKeyVtable` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+   */
+  class ClutterRegionKey
   {
-    void* vtable; // +0x00
-    std::int32_t mX; // +0x04
-    std::int32_t mZ; // +0x08
+  public:
+    ClutterRegionKey() noexcept = default;
+
+    ClutterRegionKey(const std::int32_t x, const std::int32_t z) noexcept : mX(x), mZ(z) {}
+
+    explicit ClutterRegionKey(const ClutterRegion& region) noexcept;
+
+    ClutterRegionKey(const ClutterRegionKey& other) noexcept = default;
+    ClutterRegionKey& operator=(const ClutterRegionKey& other) noexcept = default;
+
+    virtual ~ClutterRegionKey() = default;
+
+    std::int32_t mX = 0; // +0x04
+    std::int32_t mZ = 0; // +0x08
   };
   static_assert(sizeof(ClutterRegionKey) == 0x0C, "ClutterRegionKey size must be 0x0C");
   static_assert(offsetof(ClutterRegionKey, mX) == 0x04, "ClutterRegionKey::mX offset must be 0x04");
   static_assert(offsetof(ClutterRegionKey, mZ) == 0x08, "ClutterRegionKey::mZ offset must be 0x08");
 
-  struct ClutterRegionKeyNode
+  /**
+   * Ordering for `Clutter::mKeys`: x, then z.
+   */
+  struct ClutterRegionKeyLess
   {
-    ClutterRegionKeyNode* left; // +0x00
-    ClutterRegionKeyNode* parent; // +0x04
-    ClutterRegionKeyNode* right; // +0x08
-    ClutterRegionKey key; // +0x0C
-    std::uint8_t color; // +0x18 (red-black lane)
-    std::uint8_t isNil; // +0x19
-    std::uint8_t reserved1A[0x2]; // +0x1A
+    [[nodiscard]] bool operator()(const ClutterRegionKey& lhs, const ClutterRegionKey& rhs) const noexcept
+    {
+      return (lhs.mX < rhs.mX) || (lhs.mX == rhs.mX && lhs.mZ < rhs.mZ);
+    }
   };
-  static_assert(sizeof(ClutterRegionKeyNode) == 0x1C, "ClutterRegionKeyNode size must be 0x1C");
-  static_assert(offsetof(ClutterRegionKeyNode, key) == 0x0C, "ClutterRegionKeyNode::key offset must be 0x0C");
-  static_assert(offsetof(ClutterRegionKeyNode, color) == 0x18, "ClutterRegionKeyNode::color offset must be 0x18");
-  static_assert(offsetof(ClutterRegionKeyNode, isNil) == 0x19, "ClutterRegionKeyNode::isNil offset must be 0x19");
 
-  struct ClutterRegionKeyTreeState
-  {
-    std::uint32_t comparatorCookie; // +0x00
-    ClutterRegionKeyNode* head; // +0x04
-    std::uint32_t size; // +0x08
-  };
-  static_assert(sizeof(ClutterRegionKeyTreeState) == 0x0C, "ClutterRegionKeyTreeState size must be 0x0C");
+  using ClutterRegionKeySet = msvc8::set<ClutterRegionKey, ClutterRegionKeyLess>;
+  static_assert(sizeof(ClutterRegionKeySet) == 0x0C, "ClutterRegionKeySet size must be 0x0C");
+
+
 
   struct ClutterRegionMapPayloadVTable
   {
@@ -477,7 +494,7 @@ namespace moho
     ClutterRegionListState mList2; // +0x10
     std::uint8_t mBuffer[0x100]; // +0x1C
     ClutterSurfaceEntry mSurfaces[256]; // +0x11C
-    ClutterRegionKeyTreeState mKeys; // +0x191C
+    ClutterRegionKeySet mKeys; // +0x191C
     ClutterRegion* mCurRegion; // +0x1928
   };
 
@@ -502,23 +519,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x007D81C0 (FUN_007D81C0)
-   *
-   * What it does:
-   * Recursively releases one region-key tree subtree using node-isNil sentinels.
-   */
-  void DestroyRegionKeySubtree(Clutter* owner, ClutterRegionKeyNode* node);
-
-  /**
-   * Address: 0x007D5CC0 (FUN_007D5CC0)
-   *
-   * What it does:
-   * Resets one `ClutterRegionKey` vtable lane to the runtime `RegionKey`
-   * virtual table token.
-   */
-  void ResetRegionKeyVtable(ClutterRegionKey* key);
-
-  /**
    * Address: 0x007D5F80 (FUN_007D5F80)
    *
    * What it does:
@@ -526,18 +526,6 @@ namespace moho
    * map payload instances through the mesh-renderer destroy-instance lane.
    */
   ClutterRegionMapState* ResetRegionRuntimeState(ClutterRegion* region);
-
-  /**
-   * Address: 0x007D7B90 (FUN_007D7B90)
-   *
-   * What it does:
-   * Counts and erases all key-tree nodes in the `[lower_bound, upper_bound)`
-   * range for one `ClutterRegionKey`.
-   */
-  std::uint32_t EraseRegionKeyRange(
-    ClutterRegionKey* key,
-    ClutterRegionKeyTreeState* tree
-  );
 
   /**
    * Address: 0x007D8980 (FUN_007D8980)
