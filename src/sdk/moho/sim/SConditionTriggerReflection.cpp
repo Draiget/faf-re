@@ -1,3 +1,4 @@
+#include "legacy/containers/Vector.h"
 #include "moho/sim/SConditionTriggerTypes.h"
 
 #include <cstdlib>
@@ -825,13 +826,13 @@ namespace
      * Address: 0x00712F40 (FUN_00712F40, gpg::RListType_shared_ptr_STrigger::RListType_shared_ptr_STrigger)
      *
      * What it does:
-     * Preregisters `std::list<boost::shared_ptr<moho::STrigger>>` reflection
+     * Preregisters `msvc8::list<boost::shared_ptr<moho::STrigger>>` reflection
      * metadata at startup.
      */
     RListSharedPtrSTriggerTypeInfo()
       : gpg::RType()
     {
-      gpg::PreRegisterRType(typeid(std::list<boost::shared_ptr<moho::STrigger>>), this);
+      gpg::PreRegisterRType(typeid(msvc8::list<boost::shared_ptr<moho::STrigger>>), this);
     }
 
     /**
@@ -870,7 +871,7 @@ namespace
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override
     {
       const msvc8::string base = gpg::RType::GetLexical(ref);
-      const auto* const list = static_cast<const std::list<boost::shared_ptr<moho::STrigger>>*>(ref.mObj);
+      const auto* const list = static_cast<const msvc8::list<boost::shared_ptr<moho::STrigger>>*>(ref.mObj);
       const int size = list ? static_cast<int>(list->size()) : 0;
       return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
     }
@@ -884,7 +885,7 @@ namespace
      */
     static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto* const list = reinterpret_cast<std::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
+      auto* const list = reinterpret_cast<msvc8::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
       if (archive == nullptr || list == nullptr) {
         return;
       }
@@ -910,7 +911,7 @@ namespace
      */
     static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      const auto* const list = reinterpret_cast<const std::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
+      const auto* const list = reinterpret_cast<const msvc8::list<boost::shared_ptr<moho::STrigger>>*>(objectPtr);
       if (archive == nullptr || list == nullptr) {
         return;
       }

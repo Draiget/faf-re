@@ -1,3 +1,4 @@
+#include "legacy/containers/Vector.h"
 #include "moho/ai/CAiPathFinderTypeInfo.h"
 
 #include <cstdint>
@@ -76,7 +77,7 @@ namespace
   {
     if (!gRect2iListTypeInfoConstructed) {
       auto* const typeInfo = new (gRect2iListTypeInfoStorage) Rect2iListTypeInfo();
-      gpg::PreRegisterRType(typeid(std::list<gpg::Rect2i>), typeInfo);
+      gpg::PreRegisterRType(typeid(msvc8::list<gpg::Rect2i>), typeInfo);
       gRect2iListTypeInfoConstructed = true;
     }
 
@@ -97,21 +98,6 @@ namespace
   {
     gRect2iListTypeName.clear();
     gRect2iListTypeNameCleanupRegistered = false;
-  }
-
-  /**
-   * Address: 0x005AAF60 (FUN_005AAF60, sub_5AAF60)
-   *
-   * What it does:
-   * Clears one reflected `list<Rect2i>` storage lane and releases all list
-   * nodes, resetting the list into its empty sentinel state.
-   */
-  [[nodiscard]] std::list<gpg::Rect2i>* ClearRect2iListStorage(std::list<gpg::Rect2i>* const list)
-  {
-    if (list != nullptr) {
-      list->clear();
-    }
-    return list;
   }
 
   /**
@@ -144,7 +130,7 @@ namespace
   msvc8::string Rect2iListTypeInfo::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string lexical = gpg::RType::GetLexical(ref);
-    const auto* const list = static_cast<const std::list<gpg::Rect2i>*>(ref.mObj);
+    const auto* const list = static_cast<const msvc8::list<gpg::Rect2i>*>(ref.mObj);
     const int size = list ? static_cast<int>(list->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
   }
@@ -158,7 +144,7 @@ namespace
    */
   void Rect2iListTypeInfo::Init()
   {
-    size_ = sizeof(std::list<gpg::Rect2i>);
+    size_ = sizeof(msvc8::list<gpg::Rect2i>);
     version_ = 1;
     serLoadFunc_ = &Rect2iListTypeInfo::SerLoad;
     serSaveFunc_ = &Rect2iListTypeInfo::SerSave;
@@ -178,14 +164,14 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    auto* const list = reinterpret_cast<std::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
+    auto* const list = reinterpret_cast<msvc8::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
     if (archive == nullptr || list == nullptr) {
       return;
     }
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
-    (void)ClearRect2iListStorage(list);
+    list->clear();
 
     gpg::RType* const elementType = CachedRect2iType();
     if (elementType == nullptr) {
@@ -214,7 +200,7 @@ namespace
     gpg::RRef* const ownerRef
   )
   {
-    const auto* const list = reinterpret_cast<const std::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
+    const auto* const list = reinterpret_cast<const msvc8::list<gpg::Rect2i>*>(static_cast<std::uintptr_t>(objectPtr));
     if (archive == nullptr) {
       return;
     }

@@ -1,3 +1,4 @@
+#include "legacy/containers/Vector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiSiloBuildImplTypeInfo.h"
 
@@ -82,7 +83,7 @@ namespace
   {
     if (!gESiloTypeListTypeInfoConstructed) {
       auto* const typeInfo = new (gESiloTypeListTypeInfoStorage) ESiloTypeListTypeInfo();
-      gpg::PreRegisterRType(typeid(std::list<ESiloType>), typeInfo);
+      gpg::PreRegisterRType(typeid(msvc8::list<ESiloType>), typeInfo);
       gESiloTypeListTypeInfoConstructed = true;
     }
 
@@ -130,7 +131,7 @@ namespace
    * Address: 0x005D0B00 (FUN_005D0B00, sub_5D0B00)
    *
    * What it does:
-   * Constructs and preregisters reflected `std::list<ESiloType>` type-info.
+   * Constructs and preregisters reflected `msvc8::list<ESiloType>` type-info.
    */
   [[nodiscard]] gpg::RType* preregister_ESiloTypeListTypeInfo()
   {
@@ -188,7 +189,7 @@ namespace
    * Address: 0x00BF7FC0 (FUN_00BF7FC0, cleanup_ESiloTypeListTypeInfo)
    *
    * What it does:
-   * Tears down static reflected `std::list<ESiloType>` type-info storage.
+   * Tears down static reflected `msvc8::list<ESiloType>` type-info storage.
    */
   void cleanup_ESiloTypeListTypeInfo()
   {
@@ -302,7 +303,7 @@ const char* ESiloTypeListTypeInfo::GetName() const
 msvc8::string ESiloTypeListTypeInfo::GetLexical(const gpg::RRef& ref) const
 {
   const msvc8::string lexical = gpg::RType::GetLexical(ref);
-  const auto* const list = static_cast<const std::list<ESiloType>*>(ref.mObj);
+  const auto* const list = static_cast<const msvc8::list<ESiloType>*>(ref.mObj);
   const int size = list ? static_cast<int>(list->size()) : 0;
   return gpg::STR_Printf("%s, size=%d", lexical.c_str(), size);
 }
@@ -316,7 +317,7 @@ msvc8::string ESiloTypeListTypeInfo::GetLexical(const gpg::RRef& ref) const
  */
 void ESiloTypeListTypeInfo::Init()
 {
-  size_ = sizeof(std::list<ESiloType>);
+  size_ = sizeof(msvc8::list<ESiloType>);
   version_ = 1;
   serLoadFunc_ = &ESiloTypeListTypeInfo::SerLoad;
   serSaveFunc_ = &ESiloTypeListTypeInfo::SerSave;
@@ -336,7 +337,7 @@ void ESiloTypeListTypeInfo::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const list = reinterpret_cast<std::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
+  auto* const list = reinterpret_cast<msvc8::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(list != nullptr);
   if (!archive || !list) {
@@ -375,7 +376,7 @@ void ESiloTypeListTypeInfo::SerSave(
   gpg::RRef* const ownerRef
 )
 {
-  const auto* const list = reinterpret_cast<const std::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
+  const auto* const list = reinterpret_cast<const msvc8::list<ESiloType>*>(static_cast<std::uintptr_t>(objectPtr));
   GPG_ASSERT(archive != nullptr);
   if (!archive) {
     return;
@@ -430,7 +431,7 @@ int moho::register_CAiSiloBuildImplTypeInfo()
  * Address: 0x00BCE190 (FUN_00BCE190, register_ESiloTypeListTypeInfo)
  *
  * What it does:
- * Registers reflected `std::list<ESiloType>` type-info and installs
+ * Registers reflected `msvc8::list<ESiloType>` type-info and installs
  * process-exit cleanup for its static storage.
  */
 int moho::register_ESiloTypeListTypeInfo()
