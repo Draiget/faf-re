@@ -554,6 +554,7 @@ namespace
    * here regardless, since `IsPeerNameInIgnoreList` only ever compares
    * ignore-list tokens against real peer names and an empty token from
    * compressed-away adjacent separators can never match one.
+   * Address: 0x007CDF90 (FUN_007CDF90 -- `boost::iterator_range<It>::iterator_range(It, It)` for the split pipeline's 2-dword ranges (`*out = {*begin, *end}`); zero callers, unreachable; formerly `CopyDwordPairFromIndependentWordSources` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
    */
   [[nodiscard]] msvc8::vector<msvc8::string> BuildLobbyIgnoreNameList(const msvc8::set<char>& separatorsParam)
   {

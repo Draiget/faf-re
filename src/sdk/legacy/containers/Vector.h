@@ -8330,8 +8330,7 @@ namespace msvc8
          * (0x00869C80), all cited below -- plus `J` (0x00701FA0), cited
          * inline on `detail::LegacyVectorDwordInsertN` in Vector.cpp instead
          * since that instantiation's fill step is already expressed as part
-         * of that helper's own in-place/reallocation arms. `FillDwordSpanByCount`/
-         * `FillDwordSpanByEnd` are kept alive only for copy `X` (0x008B2FD0),
+         * of that helper's own in-place/reallocation arms. Copy `X` (0x008B2FD0) is cited below too, although it is
          * the sole lettered copy still without a confirmed element `T`: its
          * grow-path caller `FUN_008B31B0` has two genuine, non-padding call
          * sites (0x008B29CA, 0x008B2F47, hand-verified against the raw PE
@@ -8727,6 +8726,7 @@ namespace msvc8
          * Address: 0x004A0A10 (FUN_004A0A10 -- `_Ufill` (fill-construct `count` copies) for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueAndReturnRemainingDuplicateD` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range fill helper that writes one source slot value.)
          * Address: 0x004A0BD0 (FUN_004A0BD0 -- `_Ufill` (fill-construct `count` copies) for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueAndReturnRemainingDuplicateE` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range fill helper that writes one source slot value.)
          * Address: 0x004A0BF0 (FUN_004A0BF0 -- `_Ufill` (fill-construct `count` copies) for `std::uint32_t`; zero callers, unreachable; formerly `FillDwordRangeFromPointerValueAndReturnRemainingDuplicateF` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10; Duplicate dword-range fill helper that writes one source slot value.)
+         * Address: 0x008B2FD0 (FUN_008B2FD0 -- `_Ufill` for a 4-byte element, copy `X` of the lettered fill family; its only caller is the `_Insert_n` grow lane 0x008B31B0 (unreached, two hand-verified call sites at 0x008B29CA / 0x008B2F47 that IDA never boxed); formerly `FillDwordSpanCountedLaneX` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
