@@ -31,8 +31,8 @@ namespace moho
   namespace
   {
     using Implementation = CD3DEffect::Technique::Implementation;
-    using IntAnnotationNode = Implementation::IntAnnotationNode;
-    using StringAnnotationNode = Implementation::StringAnnotationNode;
+
+
     using IntAnnotationTree = Implementation::IntAnnotationTree;
     using StringAnnotationTree = Implementation::StringAnnotationTree;
     using TechniqueNode = CD3DEffect::TechniqueNode;
@@ -69,157 +69,6 @@ namespace moho
       return CompareStringViews(lhs.view(), rhs.view());
     }
 
-    [[nodiscard]] IntAnnotationNode* AllocateIntAnnotationSentinel()
-    {
-      void* const storage = ::operator new(sizeof(IntAnnotationNode));
-      auto* const head = static_cast<IntAnnotationNode*>(storage);
-      head->mLeft = nullptr;
-      head->mParent = nullptr;
-      head->mRight = nullptr;
-      head->mColor = 1;
-      head->mIsNil = 0;
-      return head;
-    }
-
-    [[nodiscard]] StringAnnotationNode* AllocateStringAnnotationSentinel()
-    {
-      void* const storage = ::operator new(sizeof(StringAnnotationNode));
-      auto* const head = static_cast<StringAnnotationNode*>(storage);
-      head->mLeft = nullptr;
-      head->mParent = nullptr;
-      head->mRight = nullptr;
-      head->mColor = 1;
-      head->mIsNil = 0;
-      return head;
-    }
-
-    template <typename NodeT>
-    void InitializeSentinelMap(
-      Implementation::AnnotationTreeMap<NodeT>& map,
-      NodeT* const head
-    ) noexcept
-    {
-      map.mHead = head;
-      head->mIsNil = 1;
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      map.mSize = 0;
-    }
-
-    /**
-     * Address: 0x00432400 (FUN_00432400)
-     *
-     * What it does:
-     * Initializes one integer-annotation tree lane with a fresh sentinel node.
-     */
-    IntAnnotationTree* InitializeIntAnnotationTreeStorage(IntAnnotationTree* const outTree)
-    {
-      if (outTree == nullptr) {
-        return nullptr;
-      }
-
-      IntAnnotationNode* const head = AllocateIntAnnotationSentinel();
-      InitializeSentinelMap(*outTree, head);
-      return outTree;
-    }
-
-    /**
-     * Address: 0x00432430 (FUN_00432430)
-     *
-     * What it does:
-     * Returns the current begin-node pointer for one integer-annotation tree.
-     */
-    [[nodiscard]] IntAnnotationNode* GetIntAnnotationTreeBegin(const IntAnnotationTree& tree) noexcept
-    {
-      IntAnnotationNode* const head = tree.mHead;
-      return head != nullptr ? head->mLeft : nullptr;
-    }
-
-    /**
-     * Address: 0x00432440 (FUN_00432440)
-     *
-     * What it does:
-     * Returns the sentinel-head pointer for one integer-annotation tree.
-     */
-    [[nodiscard]] IntAnnotationNode* GetIntAnnotationTreeHead(const IntAnnotationTree& tree) noexcept
-    {
-      return tree.mHead;
-    }
-
-    void DestroyIntegerTreeNodes(IntAnnotationNode* node) noexcept
-    {
-      IntAnnotationNode* current = node;
-      while (current != nullptr && current->mIsNil == 0u) {
-        DestroyIntegerTreeNodes(current->mRight);
-
-        IntAnnotationNode* const next = current->mLeft;
-        current->mKey.tidy(true, 0U);
-        ::operator delete(current);
-        current = next;
-      }
-    }
-
-    void DestroyStringTreeNodes(StringAnnotationNode* node) noexcept
-    {
-      StringAnnotationNode* current = node;
-      while (current != nullptr && current->mIsNil == 0u) {
-        DestroyStringTreeNodes(current->mRight);
-
-        StringAnnotationNode* const next = current->mLeft;
-        current->mValue.tidy(true, 0U);
-        current->mKey.tidy(true, 0U);
-        ::operator delete(current);
-        current = next;
-      }
-    }
-
-    template <typename NodeT>
-    void DestroyAnnotationMap(
-      Implementation::AnnotationTreeMap<NodeT>& map,
-      void (*destroyNodes)(NodeT*) noexcept
-    ) noexcept
-    {
-      NodeT* const head = map.mHead;
-      destroyNodes(head->mParent);
-      ::operator delete(head);
-      map.mHead = nullptr;
-      map.mSize = 0;
-    }
-
-    template <typename NodeT>
-    void ClearAnnotationMapNodes(
-      Implementation::AnnotationTreeMap<NodeT>& map,
-      void (*destroyNodes)(NodeT*) noexcept
-    ) noexcept
-    {
-      NodeT* const head = map.mHead;
-      destroyNodes(head->mParent);
-      head->mParent = head;
-      head->mLeft = head;
-      head->mRight = head;
-      map.mSize = 0;
-    }
-
-    /**
-     * Address: 0x004325C0 (FUN_004325C0)
-     *
-     * What it does:
-     * Erases integer-annotation tree content for the full-range erase case used
-     * by implementation teardown/assignment paths.
-     */
-    void ClearIntAnnotationTreeFullRange(IntAnnotationTree& tree) noexcept
-    {
-      IntAnnotationNode* const begin = GetIntAnnotationTreeBegin(tree);
-      IntAnnotationNode* const head = GetIntAnnotationTreeHead(tree);
-      if (begin == nullptr || head == nullptr || begin == head) {
-        tree.mSize = 0;
-        return;
-      }
-
-      ClearAnnotationMapNodes(tree, &DestroyIntegerTreeNodes);
-    }
-
     template <typename NodeT>
     [[nodiscard]] NodeT* FindTreeMinNode(NodeT* node) noexcept
     {
@@ -238,142 +87,6 @@ namespace moho
         current = current->mRight;
       }
       return current;
-    }
-
-    template <typename NodeT>
-    void RefreshHeadBounds(Implementation::AnnotationTreeMap<NodeT>& map) noexcept
-    {
-      NodeT* const head = map.mHead;
-      if (head->mParent->mIsNil != 0u) {
-        head->mParent = head;
-        head->mLeft = head;
-        head->mRight = head;
-        return;
-      }
-
-      head->mLeft = FindTreeMinNode(head->mParent);
-      head->mRight = FindTreeMaxNode(head->mParent);
-    }
-
-    [[nodiscard]] IntAnnotationNode* CloneIntegerSubtree(
-      const IntAnnotationNode* const sourceNode,
-      const IntAnnotationNode* const sourceHead,
-      IntAnnotationNode* const destinationHead,
-      IntAnnotationNode* const parentNode
-    )
-    {
-      if (sourceNode == nullptr || sourceNode == sourceHead || sourceNode->mIsNil != 0u) {
-        return destinationHead;
-      }
-
-      auto* const clonedNode = new IntAnnotationNode();
-      clonedNode->mParent = parentNode;
-      clonedNode->mKey.assign(sourceNode->mKey, 0U, msvc8::string::npos);
-      clonedNode->mValue = sourceNode->mValue;
-      clonedNode->mColor = sourceNode->mColor;
-      clonedNode->mIsNil = 0;
-      clonedNode->mPad2E[0] = sourceNode->mPad2E[0];
-      clonedNode->mPad2E[1] = sourceNode->mPad2E[1];
-      clonedNode->mLeft = CloneIntegerSubtree(sourceNode->mLeft, sourceHead, destinationHead, clonedNode);
-      clonedNode->mRight = CloneIntegerSubtree(sourceNode->mRight, sourceHead, destinationHead, clonedNode);
-      return clonedNode;
-    }
-
-    [[nodiscard]] StringAnnotationNode* CloneStringSubtree(
-      const StringAnnotationNode* const sourceNode,
-      const StringAnnotationNode* const sourceHead,
-      StringAnnotationNode* const destinationHead,
-      StringAnnotationNode* const parentNode
-    )
-    {
-      if (sourceNode == nullptr || sourceNode == sourceHead || sourceNode->mIsNil != 0u) {
-        return destinationHead;
-      }
-
-      auto* const clonedNode = new StringAnnotationNode();
-      clonedNode->mParent = parentNode;
-      clonedNode->mKey.assign(sourceNode->mKey, 0U, msvc8::string::npos);
-      clonedNode->mValue.assign(sourceNode->mValue, 0U, msvc8::string::npos);
-      clonedNode->mColor = sourceNode->mColor;
-      clonedNode->mIsNil = 0;
-      clonedNode->mPad46[0] = sourceNode->mPad46[0];
-      clonedNode->mPad46[1] = sourceNode->mPad46[1];
-      clonedNode->mLeft = CloneStringSubtree(sourceNode->mLeft, sourceHead, destinationHead, clonedNode);
-      clonedNode->mRight = CloneStringSubtree(sourceNode->mRight, sourceHead, destinationHead, clonedNode);
-      return clonedNode;
-    }
-
-    void CopyIntegerAnnotationTree(IntAnnotationTree& destination, const IntAnnotationTree& source)
-    {
-      IntAnnotationNode* const destinationHead = destination.mHead;
-      const IntAnnotationNode* const sourceHead = source.mHead;
-      destinationHead->mParent = CloneIntegerSubtree(sourceHead->mParent, sourceHead, destinationHead, destinationHead);
-      destination.mSize = source.mSize;
-      RefreshHeadBounds(destination);
-    }
-
-    void CopyStringAnnotationTree(StringAnnotationTree& destination, const StringAnnotationTree& source)
-    {
-      StringAnnotationNode* const destinationHead = destination.mHead;
-      const StringAnnotationNode* const sourceHead = source.mHead;
-      destinationHead->mParent = CloneStringSubtree(sourceHead->mParent, sourceHead, destinationHead, destinationHead);
-      destination.mSize = source.mSize;
-      RefreshHeadBounds(destination);
-    }
-
-    /**
-     * Address: 0x0042C150 (FUN_0042C150)
-     *
-     * What it does:
-     * Destroys the integer-annotation tree storage and clears the tree header lane.
-     */
-    int DestroyIntegerAnnotationTreeStorage(IntAnnotationTree& tree) noexcept
-    {
-      DestroyAnnotationMap(tree, &DestroyIntegerTreeNodes);
-      return 0;
-    }
-
-    /**
-     * Address: 0x0042C180 (FUN_0042C180)
-     *
-     * What it does:
-     * Destroys the string-annotation tree storage and clears the tree header lane.
-     */
-    int DestroyStringAnnotationTreeStorage(StringAnnotationTree& tree) noexcept
-    {
-      DestroyAnnotationMap(tree, &DestroyStringTreeNodes);
-      return 0;
-    }
-
-    /**
-     * Address: 0x0042C2C0 (FUN_0042C2C0)
-     * Address: 0x00432690 (FUN_00432690, shared tree-assign helper lane)
-     *
-     * What it does:
-     * Replaces one integer-annotation tree with a copy of another tree lane.
-     */
-    IntAnnotationTree& AssignIntegerAnnotationTree(IntAnnotationTree& destination, const IntAnnotationTree& source)
-    {
-      if (&destination != &source) {
-        ClearIntAnnotationTreeFullRange(destination);
-        CopyIntegerAnnotationTree(destination, source);
-      }
-      return destination;
-    }
-
-    /**
-     * Address: 0x0042C2F0 (FUN_0042C2F0)
-     *
-     * What it does:
-     * Replaces one string-annotation tree with a copy of another tree lane.
-     */
-    StringAnnotationTree& AssignStringAnnotationTree(StringAnnotationTree& destination, const StringAnnotationTree& source)
-    {
-      if (&destination != &source) {
-        ClearAnnotationMapNodes(destination, &DestroyStringTreeNodes);
-        CopyStringAnnotationTree(destination, source);
-      }
-      return destination;
     }
 
     /**
@@ -405,73 +118,6 @@ namespace moho
     [[nodiscard]] bool HasConstructedLaneName(const Implementation& lane) noexcept
     {
       return lane.mName.mySize != 0U;
-    }
-
-    template <typename NodeT>
-    [[nodiscard]] NodeT* LowerBoundAnnotationNode(
-      const Implementation::AnnotationTreeMap<NodeT>& map,
-      const msvc8::string& key
-    ) noexcept
-    {
-      NodeT* const head = map.mHead;
-      NodeT* result = head;
-      NodeT* node = head->mParent;
-      while (node != nullptr && node->mIsNil == 0u) {
-        if (CompareLegacyStrings(node->mKey, key) >= 0) {
-          result = node;
-          node = node->mLeft;
-        } else {
-          node = node->mRight;
-        }
-      }
-
-      return result;
-    }
-
-    /**
-     * Address: 0x00432450 (FUN_00432450)
-     *
-     * What it does:
-     * Returns the lower-bound node for one integer-annotation key query.
-     */
-    [[nodiscard]] IntAnnotationNode*
-    LowerBoundIntAnnotationNode(const IntAnnotationTree& tree, const msvc8::string& key) noexcept
-    {
-      return LowerBoundAnnotationNode(tree, key);
-    }
-
-    template <typename NodeT>
-    [[nodiscard]] NodeT* FindAnnotationNode(
-      const Implementation::AnnotationTreeMap<NodeT>& map,
-      const msvc8::string& key
-    ) noexcept
-    {
-      NodeT* const head = map.mHead;
-      NodeT* const lowerBound = LowerBoundAnnotationNode(map, key);
-      if (lowerBound == nullptr || lowerBound == head || CompareLegacyStrings(key, lowerBound->mKey) < 0) {
-        return head;
-      }
-
-      return lowerBound;
-    }
-
-    /**
-     * Address: 0x00432680 (FUN_00432680)
-     *
-     * What it does:
-     * Returns one integer-annotation node matching the requested key (or
-     * sentinel when absent).
-     */
-    [[nodiscard]] IntAnnotationNode*
-    FindIntAnnotationNodeBridge(const IntAnnotationTree& tree, const msvc8::string& key) noexcept
-    {
-      IntAnnotationNode* const head = GetIntAnnotationTreeHead(tree);
-      IntAnnotationNode* const lowerBound = LowerBoundIntAnnotationNode(tree, key);
-      if (lowerBound == nullptr || lowerBound == head || CompareLegacyStrings(key, lowerBound->mKey) < 0) {
-        return head;
-      }
-
-      return lowerBound;
     }
 
     template <typename T>
@@ -879,54 +525,6 @@ namespace moho
       return comparison >= 0;
     }
 
-    template <typename NodeT>
-    [[nodiscard]] NodeT* FindOrInsertAnnotationNode(
-      Implementation::AnnotationTreeMap<NodeT>& map,
-      const msvc8::string& key
-    )
-    {
-      NodeT* const existing = FindAnnotationNode(map, key);
-      if (existing != map.mHead) {
-        return existing;
-      }
-
-      if (map.mSize > kMaxAnnotationTreeNodeCount) {
-        ThrowMapSetTooLong();
-      }
-
-      NodeT* const head = map.mHead;
-      NodeT* parent = head;
-      NodeT* node = head->mParent;
-      bool insertLeft = true;
-      while (node != nullptr && node->mIsNil == 0u) {
-        parent = node;
-        if (CompareLegacyStrings(key, node->mKey) < 0) {
-          insertLeft = true;
-          node = node->mLeft;
-        } else {
-          insertLeft = false;
-          node = node->mRight;
-        }
-      }
-
-      auto* const inserted = new NodeT{};
-      try {
-        inserted->mKey.assign(key, 0U, msvc8::string::npos);
-      } catch (...) {
-        delete inserted;
-        throw;
-      }
-
-      inserted->mParent = parent;
-      inserted->mLeft = head;
-      inserted->mRight = head;
-      inserted->mColor = kTreeColorRed;
-      inserted->mIsNil = 0;
-
-      LinkInsertedTreeNode(map, parent, inserted, insertLeft);
-      return inserted;
-    }
-
     [[nodiscard]] std::int32_t ResolveGraphicsFidelityIndex()
     {
       return graphics_Fidelity;
@@ -956,13 +554,7 @@ namespace moho
    * What it does:
    * Initializes one technique implementation lane with empty annotation trees.
    */
-  CD3DEffect::Technique::Implementation::Implementation()
-  {
-    (void)InitializeIntAnnotationTreeStorage(&mIntegerAnnotations);
-
-    StringAnnotationNode* const stringHead = AllocateStringAnnotationSentinel();
-    InitializeSentinelMap(mStringAnnotations, stringHead);
-  }
+  CD3DEffect::Technique::Implementation::Implementation() = default;
 
   /**
    * Address: 0x0042BC10 (FUN_0042BC10)
@@ -974,11 +566,6 @@ namespace moho
   CD3DEffect::Technique::Implementation::Implementation(const msvc8::string& implementationName)
   {
     mName.assign(implementationName, 0U, msvc8::string::npos);
-
-    (void)InitializeIntAnnotationTreeStorage(&mIntegerAnnotations);
-
-    StringAnnotationNode* const stringHead = AllocateStringAnnotationSentinel();
-    InitializeSentinelMap(mStringAnnotations, stringHead);
   }
 
   /**
@@ -990,8 +577,6 @@ namespace moho
    */
   CD3DEffect::Technique::Implementation::~Implementation()
   {
-    DestroyStringAnnotationTreeStorage(mStringAnnotations);
-    DestroyIntegerAnnotationTreeStorage(mIntegerAnnotations);
     mName.tidy(true, 0U);
   }
 
@@ -1008,8 +593,8 @@ namespace moho
   )
   {
     mName.assign(other.mName, 0U, msvc8::string::npos);
-    AssignIntegerAnnotationTree(mIntegerAnnotations, other.mIntegerAnnotations);
-    AssignStringAnnotationTree(mStringAnnotations, other.mStringAnnotations);
+    mIntegerAnnotations = other.mIntegerAnnotations;
+    mStringAnnotations = other.mStringAnnotations;
     return *this;
   }
 
@@ -1024,12 +609,12 @@ namespace moho
     std::int32_t* const outValue
   ) const
   {
-    IntAnnotationNode* const node = FindIntAnnotationNodeBridge(mIntegerAnnotations, annotationName);
-    if (node == mIntegerAnnotations.mHead) {
+    const auto node = mIntegerAnnotations.find(annotationName);
+    if (node == mIntegerAnnotations.end()) {
       return false;
     }
 
-    *outValue = node->mValue;
+    *outValue = node->second;
     return true;
   }
 
@@ -1044,12 +629,12 @@ namespace moho
     msvc8::string* const outValue
   ) const
   {
-    StringAnnotationNode* const node = FindAnnotationNode(mStringAnnotations, annotationName);
-    if (node == mStringAnnotations.mHead) {
+    const auto node = mStringAnnotations.find(annotationName);
+    if (node == mStringAnnotations.end()) {
       return false;
     }
 
-    outValue->assign(node->mValue, 0U, msvc8::string::npos);
+    outValue->assign(node->second, 0U, msvc8::string::npos);
     return true;
   }
 
@@ -1525,8 +1110,7 @@ namespace moho
     Technique::Implementation& lane = definition->mTechnique.GetImplementationLanes()[fidelityIndex];
     if (!lane.TryGetIntegerAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
-      IntAnnotationNode* const annotationNode = FindOrInsertAnnotationNode(lane.mIntegerAnnotations, annotationName);
-      annotationNode->mValue = resolvedValue;
+      lane.mIntegerAnnotations[annotationName] = resolvedValue;
     }
 
     return resolvedValue;
@@ -1587,8 +1171,7 @@ namespace moho
     Technique::Implementation& lane = definition->mTechnique.GetImplementationLanes()[fidelityIndex];
     if (!lane.TryGetStringAnnotation(annotationName, &resolvedValue)) {
       (void)GetImplAnnotation(&resolvedValue, lane.mName, annotationName);
-      StringAnnotationNode* const annotationNode = FindOrInsertAnnotationNode(lane.mStringAnnotations, annotationName);
-      annotationNode->mValue.assign(resolvedValue, 0U, msvc8::string::npos);
+      lane.mStringAnnotations[annotationName] = resolvedValue;
     }
 
     return resolvedValue;
