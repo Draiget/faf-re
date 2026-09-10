@@ -82,9 +82,9 @@ namespace moho
      * differs), and assigns the nested `reservedBones` vector via its own
      * `operator=` (tail call into `msvc8::vector<int>::operator=`,
      * 0x005ED190). Used by the erase-and-shift loop
-     * (`EraseReservedTransportBoneAndAdvance`) and by whole-vector assignment
-     * (`AssignReservedTransportBoneVector`) whenever `vector<SAiReservedTransportBone>`
-     * needs to assign one already-constructed element from another.
+     * (`EraseReservedTransportBoneAndAdvance`) and by the vector's own
+     * `operator=` whenever `vector<SAiReservedTransportBone>` needs to assign
+     * one already-constructed element from another.
      */
     SAiReservedTransportBone& operator=(const SAiReservedTransportBone& other);
 

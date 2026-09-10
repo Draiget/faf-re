@@ -321,140 +321,6 @@ namespace
   using ReservedTransportBoneVector = msvc8::vector<moho::SAiReservedTransportBone>;
   using AttachPointVector = msvc8::vector<moho::SAttachPoint>;
 
-  /**
-   * Address: 0x005EA480 (FUN_005EA480, msvc8::vector<SAiReservedTransportBone>::operator=)
-   *
-   * What it does:
-   * Per-T canonical-template-helper binding for the engine-instantiated
-   * `msvc8::vector<SAiReservedTransportBone>::operator=(const vector&)`
-   * body (32-byte element stride). Forwards to the compiler-emitted
-   * copy-assignment which performs the canonical
-   *   - assign existing slots up to min(srcCount, dstCount),
-   *   - copy-construct or destroy tail to align the destination range,
-   *   - update _Mylast.
-   *
-   * Used by `RVectorType_SAiReservedTransportBone::SerLoad` to bind the
-   * deserialized payload into the destination storage; routing through
-   * the named helper preserves the MSVC8 per-T template emission symbol
-   * shape even when the modern compiler would inline `dst = src;`.
-   */
-  void AssignReservedTransportBoneVector(
-    ReservedTransportBoneVector& destination,
-    const ReservedTransportBoneVector& source)
-  {
-    destination = source;
-  }
-
-  /**
-   * Address: 0x005EAFF0 (FUN_005EAFF0, msvc8::vector<SAiReservedTransportBone>::push_back)
-   *
-   * What it does:
-   * Per-T canonical-template-helper binding for the engine-instantiated
-   * `msvc8::vector<SAiReservedTransportBone>::push_back(const T&)` body
-   * (32-byte element stride). Forwards to the compiler-emitted push_back
-   * which performs the canonical capacity check and either an in-place
-   * copy-construct at `_Mylast` or a slow-path `_Insert(_Mylast, 1, value)`.
-   *
-   * Used by `RVectorType_SAiReservedTransportBone::SerLoad` to bind one
-   * deserialized element into the loaded payload; routing through the
-   * named helper preserves the MSVC8 per-T template emission symbol
-   * shape even when the modern compiler would inline `vec.push_back(e)`.
-   */
-  void PushBackReservedTransportBoneVector(
-    ReservedTransportBoneVector& destination,
-    const moho::SAiReservedTransportBone& value)
-  {
-    destination.push_back(value);
-  }
-
-  /**
-   * Address: 0x005EACC0 (FUN_005EACC0)
-   *
-   * What it does:
-   * Ensures one `vector<int>` has at least `targetCapacity` storage lanes,
-   * preserving existing contents and returning resulting capacity.
-   */
-  [[nodiscard]] unsigned int EnsureIntVectorCapacity(
-    IntVector& storage,
-    const unsigned int targetCapacity
-  )
-  {
-    if (targetCapacity > 0x3FFFFFFFu) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    const unsigned int currentCapacity = static_cast<unsigned int>(storage.capacity());
-    if (currentCapacity < targetCapacity) {
-      storage.reserve(static_cast<std::size_t>(targetCapacity));
-      return targetCapacity;
-    }
-
-    return currentCapacity;
-  }
-
-  /**
-   * Address: 0x005EB150 (FUN_005EB150)
-   *
-   * What it does:
-   * Ensures one `vector<SAttachPoint>` has at least `targetCapacity` storage
-   * lanes, preserving existing contents and returning resulting storage base.
-   */
-  [[nodiscard]] unsigned int EnsureAttachPointVectorCapacity(
-    AttachPointVector& storage,
-    const unsigned int targetCapacity
-  )
-  {
-    if (targetCapacity > 0x0CCCCCCCu) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    const unsigned int currentCapacity = static_cast<unsigned int>(storage.capacity());
-    if (currentCapacity < targetCapacity) {
-      storage.reserve(static_cast<std::size_t>(targetCapacity));
-      return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(storage.data()));
-    }
-
-    return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(storage.data()));
-  }
-
-  /**
-   * Address: 0x005EB260 (FUN_005EB260)
-   *
-   * What it does:
-   * Resizes one `vector<SAttachPoint>` payload to `targetCount`, preserving
-   * prefix elements and default-constructing growth lanes.
-   */
-  [[nodiscard]] unsigned int ResizeAttachPointVectorToCount(
-    AttachPointVector& storage,
-    const unsigned int targetCount
-  )
-  {
-    const std::size_t targetSize = static_cast<std::size_t>(targetCount);
-    if (storage.size() < targetSize) {
-      storage.resize(targetSize, moho::SAttachPoint{});
-    } else if (targetSize < storage.size()) {
-      storage.resize(targetSize);
-    }
-
-    return static_cast<unsigned int>(storage.size());
-  }
-
-  /**
-   * Address: 0x005EA890 (FUN_005EA890)
-   *
-   * What it does:
-   * Resize-wrapper lane that materializes one zero-initialized
-   * `moho::SAttachPoint` default element and forwards to the canonical
-   * attach-point vector resize helper.
-   */
-  [[maybe_unused]] [[nodiscard]] unsigned int ResizeAttachPointVectorWithDefaultLane(
-    AttachPointVector& storage,
-    const unsigned int targetCount
-  )
-  {
-    return ResizeAttachPointVectorToCount(storage, targetCount);
-  }
-
   alignas(BroadcasterTransportType) unsigned char gBroadcasterTransportTypeStorage[sizeof(BroadcasterTransportType)];
   bool gBroadcasterTransportTypeConstructed = false;
 
@@ -931,7 +797,7 @@ void gpg::RVectorType_int::SerLoad(gpg::ReadArchive* const archive, const int ob
   archive->ReadUInt(&count);
 
   IntVector loaded{};
-  (void)EnsureIntVectorCapacity(loaded, count);
+  loaded.reserve(count);
   for (unsigned int i = 0; i < count; ++i) {
     int value = 0;
     archive->ReadInt(&value);
@@ -1100,13 +966,13 @@ void gpg::RVectorType_SAiReservedTransportBone::SerLoad(
   for (unsigned int i = 0; i < count; ++i) {
     moho::SAiReservedTransportBone entry{};
     archive->Read(elementType, &entry, elementOwner);
-    PushBackReservedTransportBoneVector(loaded, entry);
+    loaded.push_back(entry);
   }
 
   // Route the per-T copy-assignment through the canonical helper
   // (FUN_005EA480) so the MSVC8 vector<SAiReservedTransportBone>::operator=
   // template emission symbol shape is preserved.
-  AssignReservedTransportBoneVector(*storage, loaded);
+  *storage = loaded;
 }
 
 /**
@@ -1262,7 +1128,7 @@ void gpg::RVectorType_SAttachPoint::SerLoad(gpg::ReadArchive* const archive, con
   archive->ReadUInt(&count);
 
   AttachPointVector loaded{};
-  (void)EnsureAttachPointVectorCapacity(loaded, count);
+  loaded.reserve(count);
 
   gpg::RType* const elementType = ResolveAttachPointType();
   GPG_ASSERT(elementType != nullptr);
@@ -1344,7 +1210,7 @@ void gpg::RVectorType_SAttachPoint::SetCount(void* const obj, const int count) c
     return;
   }
 
-  (void)ResizeAttachPointVectorToCount(*storage, static_cast<unsigned int>(count));
+  storage->resize(static_cast<std::size_t>(count), moho::SAttachPoint{});
 }
 
 gpg::RType* IAiTransport::sType = nullptr;
