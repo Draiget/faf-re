@@ -6,6 +6,7 @@
 
 #include "boost/shared_ptr.h"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
@@ -38,6 +39,15 @@ namespace moho
    * Profile payload consumed by the three ring-render passes
    * (build/selected/highlighted) and by extract/submit chains.
    */
+  /**
+   * Address: 0x007F0ED0 (FUN_007F0ED0, sub_7F0ED0)
+   *
+   * What it does:
+   * The implicit copy assignment MSVC emits for this record: the extractor
+   * name's `_Tidy`-then-assign, the category filter's word-vector rebind, and
+   * a straight copy of the three colours and two radius pairs. No source line
+   * of its own - `mRangeProfiles[name] = profile` is what reaches it.
+   */
   struct SRangeRenderProfile
   {
     msvc8::string mExtractorName;                  // +0x00
@@ -62,40 +72,22 @@ namespace moho
   static_assert(sizeof(SRangeRenderProfile) == 0x88, "SRangeRenderProfile size must be 0x88");
 
   /**
-   * RB-tree entry value lane used by the range-profile registry tree.
-   * Prefix ownership remains unresolved and is kept as an explicit typed byte lane.
+   * The registry of range profiles, keyed on the extractor name the profile
+   * was registered under.
+   *
+   * The node is 0xC0 bytes (its allocator, `FUN_007F3670`, computes
+   * `lea edx,[ecx+ecx*2]; shl edx,6`) with the key at `node+0x10` and the
+   * profile at `node+0x30`: `_Lbound` (`FUN_007F13A0`) hands `node+0x10` to
+   * the key comparison as `this` and reads `_Mysize` at `this+0x14`, which is
+   * the 0x1C `msvc8::string` layout. The value therefore starts four bytes
+   * past the end of the key, and the node four past the end of the links -
+   * `SRangeRenderProfile` is 8-aligned, because `CategoryWordRangeView` is.
    */
-  struct SRangeRenderCategoryEntry
-  {
-    std::uint8_t mRuntimeMetadata00[0x24]; // +0x00
-    SRangeRenderProfile mProfile;          // +0x24
-  };
-  static_assert(offsetof(SRangeRenderCategoryEntry, mProfile) == 0x24, "SRangeRenderCategoryEntry::mProfile");
-  static_assert(sizeof(SRangeRenderCategoryEntry) == 0xAC, "SRangeRenderCategoryEntry size must be 0xAC");
-
-  struct SRangeRenderCategoryTreeNode
-  {
-    SRangeRenderCategoryTreeNode* mLeft;   // +0x00
-    SRangeRenderCategoryTreeNode* mParent; // +0x04
-    SRangeRenderCategoryTreeNode* mRight;  // +0x08
-    SRangeRenderCategoryEntry mEntry;      // +0x0C
-    std::uint8_t mColor;                   // +0xB8
-    std::uint8_t mIsSentinel;              // +0xB9
-    std::uint8_t mPadBA[2];                // +0xBA
-  };
-  static_assert(offsetof(SRangeRenderCategoryTreeNode, mEntry) == 0x0C, "SRangeRenderCategoryTreeNode::mEntry");
-  static_assert(offsetof(SRangeRenderCategoryTreeNode, mIsSentinel) == 0xB9, "SRangeRenderCategoryTreeNode::mIsSentinel");
-  static_assert(sizeof(SRangeRenderCategoryTreeNode) == 0xBC, "SRangeRenderCategoryTreeNode size must be 0xBC");
-
-  struct SRangeRenderCategoryTree
-  {
-    std::uint32_t mMeta00;                  // +0x00
-    SRangeRenderCategoryTreeNode* mHead;    // +0x04
-    std::uint32_t mSize;                    // +0x08
-  };
-  static_assert(sizeof(SRangeRenderCategoryTree) == 0x0C, "SRangeRenderCategoryTree size must be 0x0C");
-  static_assert(offsetof(SRangeRenderCategoryTree, mHead) == 0x04, "SRangeRenderCategoryTree::mHead");
-  static_assert(offsetof(SRangeRenderCategoryTree, mSize) == 0x08, "SRangeRenderCategoryTree::mSize");
+  using SRangeRenderProfileMap = msvc8::map<msvc8::string, SRangeRenderProfile>;
+  static_assert(sizeof(SRangeRenderProfileMap) == 0x0C, "SRangeRenderProfileMap size must be 0x0C");
+  static_assert(
+    sizeof(SRangeRenderProfileMap::value_type) == 0xA8, "SRangeRenderProfileMap::value_type size must be 0xA8"
+  );
 
   /**
    * VFTABLE: 0x00E3F918
@@ -175,11 +167,10 @@ namespace moho
     void ResetRenderResources() noexcept;
 
   private:
-    static void InitRangeProfileTree(SRangeRenderCategoryTree& tree);
-    static void DestroyRangeProfileTree(SRangeRenderCategoryTree& tree);
+
 
   public:
-    SRangeRenderCategoryTree mRangeProfiles;                           // +0x04
+    SRangeRenderProfileMap mRangeProfiles;                             // +0x04
     msvc8::vector<SRangeRenderProfile> mVisibleProfiles;              // +0x10
     std::uint32_t mIndexCount;                                        // +0x20
     std::uint32_t mVertexCount;                                       // +0x24

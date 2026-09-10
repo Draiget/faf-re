@@ -1099,6 +1099,22 @@ namespace moho
     mWordUniverseHandle = ownerHandle;
   }
 
+  const CategoryWordRangeView* EntityCategoryLookupTableRuntimeView::TryFind(
+    const msvc8::string& categoryName
+  ) const
+  {
+    const CategoryLookupMap::const_iterator found = mCategoryMap.find(categoryName);
+    return found == mCategoryMap.end() ? nullptr : &found->second;
+  }
+
+  const CategoryWordRangeView* EntityCategoryLookupTableRuntimeView::FindOrFallback(
+    const msvc8::string& categoryName
+  ) const
+  {
+    const CategoryWordRangeView* const found = TryFind(categoryName);
+    return found != nullptr ? found : &mCategoryFallback;
+  }
+
   // No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
   // CategoryLookupValue>`) and `mCategoryFallback` (`CategoryWordRangeView`)
   // are both real typed members, so implicit member destruction already runs

@@ -33,8 +33,22 @@ namespace moho
    * Convenience accessors below mirror the legacy CategoryWordRangeView API
    * so all category/word-range call sites operate on a single canonical type.
    */
+  /**
+   * Eight-byte aligned, which is what makes `mReserved04` a hole rather than a
+   * field and puts this record on an eight-byte boundary inside everything
+   * that embeds it. Read off `EntityCategoryLookupTableRuntimeView`
+   * (RRuleGameRules.h), whose fallback set follows a 0x0C-byte
+   * `msvc8::map` at **+0x10**: `FindOrFallback` (0x005552C0) returns
+   * `lea eax,[esi+10h]` on its miss path. The same alignment is why that
+   * map's nodes put their value at `node+0x10` rather than `node+0x0C` and
+   * come out 0x60 bytes rather than 0x54 (`FUN_005569C0` / `FUN_005579D0`).
+   *
+   * The alignment is this record's, not `BVIntSet`'s: `SoundHandleIdPool`
+   * (`{BVIntSet, std::uint32_t}`, CUserSoundManager.h) is 0x24, so the
+   * embedded set alone does not round anything up to eight.
+   */
   template <class T, class U>
-  struct BVSet
+  struct alignas(8) BVSet
   {
     static_assert(sizeof(U) == 4u, "BVSet<T,U>::U must be exactly 4 bytes to preserve binary layout.");
 
@@ -172,4 +186,5 @@ namespace moho
   static_assert(offsetof(BVSetWord32, mReserved04) == 0x04, "BVSet::mReserved04 offset must be 0x04");
   static_assert(offsetof(BVSetWord32, mBits) == 0x08, "BVSet::mBits offset must be 0x08");
   static_assert(sizeof(BVSetWord32) == 0x28, "BVSet size must be 0x28");
+  static_assert(alignof(BVSetWord32) == 8, "BVSet must be 8-aligned");
 } // namespace moho
