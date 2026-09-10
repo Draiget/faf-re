@@ -9,6 +9,7 @@
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "legacy/containers/AutoPtr.h"
+#include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
@@ -41,31 +42,34 @@ namespace moho
   static_assert(offsetof(SZipFileCachedEntry, mData) == 0x08, "SZipFileCachedEntry::mData offset must be 0x08");
   static_assert(sizeof(SZipFileCachedEntry) == 0x10, "SZipFileCachedEntry size must be 0x10");
 
-  struct SZipFileNameIndexMapNode
+  /**
+   * Zip entry names compare case-insensitively: every descent in the binary's
+   * name index ends in a `_stricmp` of the two `c_str()`s (`_Lbound` at
+   * 0x0046E5B0, `find` at 0x0046D960).
+   */
+  struct ZipEntryNameLess
   {
-    SZipFileNameIndexMapNode* mLeft = nullptr;    // +0x00
-    SZipFileNameIndexMapNode* mParent = nullptr;  // +0x04
-    SZipFileNameIndexMapNode* mRight = nullptr;   // +0x08
-    msvc8::string mCanonicalPath{};               // +0x0C
-    std::uint32_t mEntryIndex = 0;                // +0x28
-    std::uint8_t mColor = 0;                      // +0x2C
-    std::uint8_t mIsNil = 0;                      // +0x2D
-    std::uint16_t mPadding2E = 0;                 // +0x2E
+    [[nodiscard]] bool operator()(const msvc8::string& lhs, const msvc8::string& rhs) const
+    {
+      return gpg::STR_CompareNoCase(lhs.c_str(), rhs.c_str()) < 0;
+    }
   };
 
-  static_assert(offsetof(SZipFileNameIndexMapNode, mCanonicalPath) == 0x0C, "SZipFileNameIndexMapNode::mCanonicalPath offset must be 0x0C");
-  static_assert(offsetof(SZipFileNameIndexMapNode, mEntryIndex) == 0x28, "SZipFileNameIndexMapNode::mEntryIndex offset must be 0x28");
-  static_assert(offsetof(SZipFileNameIndexMapNode, mIsNil) == 0x2D, "SZipFileNameIndexMapNode::mIsNil offset must be 0x2D");
-  static_assert(sizeof(SZipFileNameIndexMapNode) == 0x30, "SZipFileNameIndexMapNode size must be 0x30");
-
-  struct SZipFileNameIndexMap
-  {
-    void* mProxy = nullptr;                    // +0x00
-    SZipFileNameIndexMapNode* mHead = nullptr; // +0x04
-    std::uint32_t mSize = 0;                   // +0x08
-  };
+  /**
+   * Canonical entry name -> index into `CZipFile::mEntries`.
+   *
+   * IDA types the emissions `std::map_string_uint`. The node is 0x30 (its
+   * allocator, 0x0046F170, computes `lea edx,[ecx+ecx*2]; shl edx,4`) with the
+   * key at `node+0x0C` -- `find` reads `_Bx` at `node+0x10` and `_Myres` at
+   * `node+0x24`, the plain 0x1C `msvc8::string` -- the index at `node+0x28`,
+   * and colour/nil at `+0x2C`/`+0x2D`.
+   */
+  using SZipFileNameIndexMap = msvc8::map<msvc8::string, std::uint32_t, ZipEntryNameLess>;
 
   static_assert(sizeof(SZipFileNameIndexMap) == 0x0C, "SZipFileNameIndexMap size must be 0x0C");
+  static_assert(
+    sizeof(SZipFileNameIndexMap::value_type) == 0x20, "SZipFileNameIndexMap::value_type size must be 0x20"
+  );
 
 #pragma pack(push, 1)
   struct SZipLocalFileHeader
