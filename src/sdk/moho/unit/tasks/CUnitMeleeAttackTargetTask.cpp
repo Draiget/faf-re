@@ -292,12 +292,12 @@ namespace
     destination.x = static_cast<std::int16_t>(
       static_cast<int>(std::lrintf(
         ((targetPos.x + ownerPos.x) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeX) * 0.5f)
-      )
+      ))
     );
     destination.z = static_cast<std::int16_t>(
       static_cast<int>(std::lrintf(
         ((targetPos.z + ownerPos.z) * 0.5f) - (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f)
-      )
+      ))
     );
     return destination;
   }

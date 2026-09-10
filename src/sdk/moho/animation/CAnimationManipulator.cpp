@@ -96,7 +96,6 @@ namespace
     std::uint32_t mBoneNameTableOffset; // +0x14 (from the header start; NUL-separated names)
   };
 
-  struct AnimationResourceView
   // One bone key inside an SCA frame: position then rotation, 28 bytes.
   struct AnimationBoneKeyView
   {
@@ -105,13 +104,13 @@ namespace
   };
   static_assert(sizeof(AnimationBoneKeyView) == 0x1C, "AnimationBoneKeyView size must be 0x1C");
 
+  struct AnimationResourceView
   {
     std::uint8_t mReserved00[0x2C];
     AnimationClipHeaderView* mClipHeader; // +0x2C (RScaResource::mStart: the SCA header)
     char* mAnimData;                      // +0x30 (RScaResource::mEnd: 28-byte root transform, then frames)
   };
 
-  [[nodiscard]] const AnimationClipHeaderView*
   // Frame `index` of a clip: the animation section starts with a 28-byte root
   // transform, each frame is an 8-byte prefix (time, flags) plus one 28-byte
   // key per bone track (0x0063FDD0: stride = 28 * tracks + 8, base + 28).
@@ -137,6 +136,7 @@ namespace
     return skeleton->GetBone(static_cast<std::uint32_t>(bone.mIdx));
   }
 
+  [[nodiscard]] const AnimationClipHeaderView*
   GetAnimationClipHeader(const moho::CAnimationManipulator::AnimationResourceRef& ref)
   {
     if (!ref.px) {

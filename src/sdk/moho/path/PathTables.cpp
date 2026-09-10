@@ -417,7 +417,6 @@ namespace
       }
 
       const int candidateX = static_cast<std::uint16_t>(cell.x) + kStepOffsetX[step];
-        ++probeGated;
       const int candidateZ = static_cast<std::uint16_t>(cell.z) + kStepOffsetZ[step];
 
       if (!traveler->ShouldSearchRect(implBase.mClusterMap->ClusterRect(candidateX, candidateZ, 1u))) {
@@ -425,7 +424,6 @@ namespace
       }
 
       moho::SOCellPos candidate{};
-        ++probeRect;
       candidate.x = static_cast<std::int16_t>(candidateX);
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
@@ -434,16 +432,13 @@ namespace
       }
 
       float cost = kStepCost[step];
-        ++probeTraverse;
       if (!traveler->IsInBounds(cell, candidate, &cost)) {
         continue;
       }
 
       PathQueueNeighbour neighbour{};
-        ++probeBounds;
       neighbour.mCell = candidate;
       neighbour.mCost = cost;
-      ++probeAccepted;
       outNeighbours.push_back(neighbour);
 
       acceptedMask |= 1u << step;
@@ -2260,8 +2255,6 @@ namespace moho
    * Replaces one owner slot with a new queue pointer, then tears down and
    * frees the previous queue payload when present.
    */
-  void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
-  {
   void PathQueue::QueueTraveler(IPathTraveler& traveller)
   {
     PathQueueIntrusiveNode& node = traveller.mPathQueueNode;
@@ -2276,6 +2269,8 @@ namespace moho
     node.mPrev->mNext = &node;
   }
 
+  void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
+  {
     PathQueue* const previous = *slot;
     *slot = replacement;
 
