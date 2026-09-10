@@ -2455,19 +2455,7 @@ namespace gpg::gal
       return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(elementSize));
     }
 
-    /**
-     * Address: 0x008F8E70 (FUN_008F8E70)
-     *
-     * uint32_t
-     *
-     * What it does:
-     * Allocates `count * 0x13C` bytes with overflow guard and throws
-     * `std::bad_alloc` on overflow.
-     */
-    void* AllocateStride13CArray(const std::uint32_t count)
-    {
-      return AllocateArrayOrThrow(count, 0x13CU);
-    }
+
 
     /**
      * Address: 0x008F8ED0 (FUN_008F8ED0)
@@ -2695,18 +2683,7 @@ namespace gpg::gal
       return ReleaseComLikeWithResult(adapter->dxgiAdapter_);
     }
 
-    /**
-     * Address: 0x009009D0 (FUN_009009D0)
-     *
-     * What it does:
-     * Appends one adapter wrapper into the retained backend adapter vector.
-     */
-    void AppendBackendAdapter(msvc8::vector<AdapterD3D10>& adapters, const AdapterD3D10& adapter)
-    {
-      // push_back's capacity-full path is `msvc8::vector<AdapterD3D10>::insert`
-      // (FUN_00900630), reached through the single-value insert lane (FUN_00900960).
-      adapters.push_back(adapter);
-    }
+
 
     // Defined later in this TU; used by the vector<void*>::_Insert_n grow lane below.
     [[noreturn]] void ThrowVectorTooLongLengthErrorB();
@@ -4061,176 +4038,6 @@ namespace gpg::gal
       variable->name_.tidy(true, 0U);
     }
 
-    AdapterD3D10* UninitializedFillAdapterRangeCore(
-      AdapterD3D10* const destinationBegin,
-      std::size_t copyCount,
-      const AdapterD3D10* const sourceAdapter
-    )
-    {
-      AdapterD3D10* destinationCursor = destinationBegin;
-      try {
-        while (copyCount != 0u) {
-          new (static_cast<void*>(destinationCursor)) AdapterD3D10(*sourceAdapter);
-          --copyCount;
-          ++destinationCursor;
-        }
-      }
-      catch (...) {
-        for (AdapterD3D10* it = destinationBegin; it != destinationCursor; ++it) {
-          it->~AdapterD3D10();
-        }
-        throw;
-      }
-
-      return destinationCursor;
-    }
-
-    AdapterD3D10* UninitializedCopyAdapterRangeCore(
-      const AdapterD3D10* sourceFirst,
-      const AdapterD3D10* const sourceLast,
-      AdapterD3D10* destinationFirst
-    )
-    {
-      AdapterD3D10* destinationCursor = destinationFirst;
-      try {
-        while (sourceFirst != sourceLast) {
-          new (static_cast<void*>(destinationCursor)) AdapterD3D10(*sourceFirst);
-          ++sourceFirst;
-          ++destinationCursor;
-        }
-      }
-      catch (...) {
-        for (AdapterD3D10* it = destinationFirst; it != destinationCursor; ++it) {
-          it->~AdapterD3D10();
-        }
-        throw;
-      }
-
-      return destinationCursor;
-    }
-
-    /**
-     * Address: 0x008FF3E0 (FUN_008FF3E0, std::fill<AdapterD3D10*, AdapterD3D10>)
-     *
-     * What it does:
-     * Compiler-emitted `std::fill<AdapterD3D10*, AdapterD3D10>` inner helper
-     * used by `msvc8::vector<AdapterD3D10>::insert(pos, n, value)` and
-     * `push_back` slow paths. Assigns `source` into every slot of
-     * `[destinationFirst, destinationLast)` using `AdapterD3D10::operator=`
-     * per slot (316-byte stride).
-     *
-     * Implicitly re-emitted by the recovered `AppendBackendAdapter` ->
-     * `vector<AdapterD3D10>::push_back` template chain.
-     */
-    void FillAssignAdapterRangeCore(
-      AdapterD3D10* destinationFirst,
-      AdapterD3D10* const destinationLast,
-      const AdapterD3D10& source
-    )
-    {
-      while (destinationFirst != destinationLast) {
-        *destinationFirst = source;
-        ++destinationFirst;
-      }
-    }
-
-    /**
-     * Address: 0x009000F0 (FUN_009000F0)
-     * Address: 0x00900570 (FUN_00900570)
-     *
-     * What it does:
-     * Copy-constructs `copyCount` adapter lanes from one source adapter into
-     * contiguous uninitialized destination lanes.
-     */
-    AdapterD3D10* UninitializedFillAdapterRangeDispatchA(
-      AdapterD3D10* const destinationBegin,
-      const std::size_t copyCount,
-      const AdapterD3D10* const sourceAdapter
-    )
-    {
-      return UninitializedFillAdapterRangeCore(destinationBegin, copyCount, sourceAdapter);
-    }
-
-    /**
-     * Address: 0x00900400 (FUN_00900400)
-     *
-     * What it does:
-     * Preserves the one-jump thunk lane into the core adapter-range
-     * uninitialized fill helper.
-     */
-    AdapterD3D10* UninitializedFillAdapterRangeDispatchB(
-      AdapterD3D10* const destinationBegin,
-      const std::size_t copyCount,
-      const AdapterD3D10* const sourceAdapter
-    )
-    {
-      return UninitializedFillAdapterRangeCore(destinationBegin, copyCount, sourceAdapter);
-    }
-
-    /**
-     * Address: 0x00900180 (FUN_00900180)
-     *
-     * What it does:
-     * Preserves one forwarding lane into the adapter-range uninitialized-copy
-     * helper for source range `[sourceFirst, sourceLast)`.
-     */
-    AdapterD3D10* UninitializedCopyAdapterRangeDispatchA(
-      const AdapterD3D10* const sourceFirst,
-      const AdapterD3D10* const sourceLast,
-      AdapterD3D10* const destinationBegin
-    )
-    {
-      return UninitializedCopyAdapterRangeCore(sourceFirst, sourceLast, destinationBegin);
-    }
-
-    /**
-     * Address: 0x00900430 (FUN_00900430)
-     *
-     * What it does:
-     * Preserves one forwarding lane into the adapter-range uninitialized-copy
-     * helper for source range `[sourceFirst, sourceLast)`.
-     */
-    AdapterD3D10* UninitializedCopyAdapterRangeDispatchB(
-      const AdapterD3D10* const sourceFirst,
-      const AdapterD3D10* const sourceLast,
-      AdapterD3D10* const destinationBegin
-    )
-    {
-      return UninitializedCopyAdapterRangeCore(sourceFirst, sourceLast, destinationBegin);
-    }
-
-    /**
-     * Address: 0x009005B0 (FUN_009005B0)
-     *
-     * What it does:
-     * Preserves one forwarding lane into the adapter-range uninitialized-copy
-     * helper for source range `[sourceFirst, sourceLast)`.
-     */
-    AdapterD3D10* UninitializedCopyAdapterRangeDispatchC(
-      const AdapterD3D10* const sourceFirst,
-      const AdapterD3D10* const sourceLast,
-      AdapterD3D10* const destinationBegin
-    )
-    {
-      return UninitializedCopyAdapterRangeCore(sourceFirst, sourceLast, destinationBegin);
-    }
-
-    /**
-     * Address: 0x008FF4C0 (FUN_008FF4C0)
-     *
-     * What it does:
-     * Preserves one dispatch lane into range fill-assignment for adapter
-     * lanes `[destinationFirst, destinationLast)`.
-     */
-    void FillAssignAdapterRangeDispatch(
-      AdapterD3D10* const destinationFirst,
-      AdapterD3D10* const destinationLast,
-      const AdapterD3D10& source
-    )
-    {
-      FillAssignAdapterRangeCore(destinationFirst, destinationLast, source);
-    }
-
     /**
      * Address: 0x009001B0 (FUN_009001B0)
      *
@@ -4349,41 +4156,6 @@ namespace gpg::gal
     , description_(other.description_)
     , modes_(other.modes_)
   {}
-
-  /**
-   * Address: 0x008FF520 (FUN_008FF520)
-   *
-   * IDA signature:
-   * void __cdecl __noreturn sub_8FF520(int srcBegin, int srcEnd, void *dst);
-   *
-   * What it does:
-   * Legacy uninitialized `AdapterD3D10` array copy-construct lane used by
-   * vector growth/reserve paths. Copy-constructs `[srcBegin, srcEnd)` into
-   * `dst` forward, and if any element copy-ctor throws, walks the
-   * already-constructed prefix forward destroying each element via its virtual
-   * non-deleting destructor and rethrows the original exception.
-   *
-   * The caller supplies raw byte pointers because the heap allocation comes
-   * from `AllocateStride13CArray` (raw `operator new`) before any element has
-   * been constructed.
-   */
-  void CopyConstructAdapterD3D10ArrayOrUnwind(
-    const AdapterD3D10* const srcBegin,
-    const AdapterD3D10* const srcEnd,
-    AdapterD3D10* const dst)
-  {
-    AdapterD3D10* cursor = dst;
-    try {
-      for (const AdapterD3D10* src = srcBegin; src != srcEnd; ++src, ++cursor) {
-        ::new (static_cast<void*>(cursor)) AdapterD3D10(*src);
-      }
-    } catch (...) {
-      for (AdapterD3D10* already = dst; already != cursor; ++already) {
-        already->~AdapterD3D10();
-      }
-      throw;
-    }
-  }
 
   /**
    * Address: 0x008FF2F0 (FUN_008FF2F0)
@@ -6391,7 +6163,7 @@ namespace gpg::gal
     for (unsigned int adapterIndex = 0U; result >= 0; ++adapterIndex) {
       AdapterD3D10 adapterEntry(adapter);
       if (adapterEntry.ProbeOutputsAndModes() >= 0) {
-        AppendBackendAdapter(backend->adapters_, adapterEntry);
+        backend->adapters_.push_back(adapterEntry);
       }
 
       adapter = nullptr;
