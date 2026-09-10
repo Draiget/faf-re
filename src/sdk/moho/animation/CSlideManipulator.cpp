@@ -576,7 +576,7 @@ moho::CSlideManipulator::CSlideManipulator(moho::Sim* const sim, moho::CAniActor
  */
 bool moho::CSlideManipulator::ManipulatorUpdate()
 {
-  const SAniManipBinding* const watchedBinding = mWatchBones.mBegin;
+  const SAniManipBinding* const watchedBinding = mWatchBones.begin();
   if (watchedBinding == nullptr || (watchedBinding->mFlags & 0x8000) == 0) {
     return false;
   }

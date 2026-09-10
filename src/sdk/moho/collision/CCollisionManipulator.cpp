@@ -767,7 +767,7 @@ namespace moho
   void CCollisionManipulator::DisableCollisionCallbacks() noexcept
   {
     mCollisionCallbacksEnabled = false;
-    for (auto* watchBone = mWatchBones.mBegin; watchBone != mWatchBones.mEnd; ++watchBone) {
+    for (auto* watchBone = mWatchBones.begin(); watchBone != mWatchBones.end(); ++watchBone) {
       watchBone->mFlags &= ~static_cast<int>(kAnimCollisionNotifiedMask);
     }
   }
@@ -806,7 +806,7 @@ namespace moho
     const VTransform& ownerTransform = mOwnerUnit->GetTransform();
     bool raisedCallback = false;
 
-    for (auto* watchBone = mWatchBones.mBegin; watchBone != mWatchBones.mEnd; ++watchBone) {
+    for (auto* watchBone = mWatchBones.begin(); watchBone != mWatchBones.end(); ++watchBone) {
       std::uint32_t flags = static_cast<std::uint32_t>(watchBone->mFlags);
       if ((flags & kWatchBoneActiveMask) == 0u) {
         continue;

@@ -251,7 +251,7 @@ namespace
       return false;
     }
 
-    for (moho::SAniManipBinding* binding = manipulator->mWatchBones.mBegin; binding != manipulator->mWatchBones.mEnd;
+    for (moho::SAniManipBinding* binding = manipulator->mWatchBones.begin(); binding != manipulator->mWatchBones.end();
          ++binding) {
       const moho::CAniActor* const ownerActor = manipulator->mOwnerActor;
       if (ownerActor == nullptr) {
@@ -290,7 +290,7 @@ namespace
       return false;
     }
 
-    for (const moho::SAniManipBinding* binding = manipulator->mWatchBones.mBegin; binding != manipulator->mWatchBones.mEnd;
+    for (const moho::SAniManipBinding* binding = manipulator->mWatchBones.begin(); binding != manipulator->mWatchBones.end();
          ++binding) {
       if (binding->mBoneIndex == index) {
         return true;
@@ -333,7 +333,7 @@ namespace
       ? static_cast<std::size_t>(poseBonesEnd - poseBonesBegin)
       : 0u;
 
-    for (const moho::SAniManipBinding* binding = manipulator->mWatchBones.mBegin; binding != manipulator->mWatchBones.mEnd;
+    for (const moho::SAniManipBinding* binding = manipulator->mWatchBones.begin(); binding != manipulator->mWatchBones.end();
          ++binding) {
       const std::uint32_t boneIndex = static_cast<std::uint32_t>(binding->mBoneIndex);
       if (boneIndex >= poseBoneCount) {
@@ -778,7 +778,7 @@ namespace moho
         continue;
       }
 
-      for (SAniManipBinding* binding = manipulator->mWatchBones.mBegin; binding != manipulator->mWatchBones.mEnd;
+      for (SAniManipBinding* binding = manipulator->mWatchBones.begin(); binding != manipulator->mWatchBones.end();
            ++binding) {
         if (binding->mBoneIndex != index) {
           continue;

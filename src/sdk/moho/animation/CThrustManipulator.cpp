@@ -235,7 +235,7 @@ namespace
   ) noexcept
   {
     if (manipulator == nullptr || manipulator->mOwnerActor == nullptr ||
-        manipulator->mWatchBones.mBegin == manipulator->mWatchBones.mEnd) {
+        manipulator->mWatchBones.begin() == manipulator->mWatchBones.end()) {
       return nullptr;
     }
 
@@ -244,7 +244,7 @@ namespace
       return nullptr;
     }
 
-    const std::int32_t boneIndex = manipulator->mWatchBones.mBegin->mBoneIndex;
+    const std::int32_t boneIndex = manipulator->mWatchBones.begin()->mBoneIndex;
     const std::ptrdiff_t boneCount = pose->mBones.end() - pose->mBones.begin();
     if (boneIndex < 0 || static_cast<std::ptrdiff_t>(boneIndex) >= boneCount) {
       return nullptr;

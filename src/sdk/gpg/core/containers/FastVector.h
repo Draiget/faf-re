@@ -1062,6 +1062,7 @@ namespace gpg::core
      * Address: 0x0080F1B0 (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.)
      * Address: 0x0059C890 (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs, unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly `BindFormationInstanceInlineRuntimeView`, removed 2026-09-10.)
+     * Address: 0x0063C070 (FUN_0063C070 -- `FastVectorN<T, N>()` -- arm the lane on its inline window for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `InitializeWatchBoneStorageInline` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
     FastVectorN()
     {
@@ -1305,6 +1306,8 @@ namespace gpg::core
 
     /**
      * Append by copy; grows capacity exponentially.
+     * Address: 0x0063C5F0 (FUN_0063C5F0 -- `PushBack` for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063B6D0, 0x0063C090; formerly `AppendWatchBoneBinding` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0063C090 (FUN_0063C090 -- `PushBack` through a pointer to the value for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `AppendWatchBoneBindingFromPointer` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
     void PushBack(const T& v)
     {
@@ -1998,6 +2001,7 @@ namespace gpg::core
      * Address: 0x0071EC90 (FUN_0071EC90 -- copy-forward (`_Ucopy`/`_Copy`) for a 56-byte element (calling-convention bridge); Register-shape adapter lane that forwards one 56-byte source-first copy into `CopyForward56ByteLaneSourceFirst`.)
      * Address: 0x00754830 (FUN_00754830 -- forward copy for an 8-byte element (eax=dest, edx=end, ecx=begin register convention), the copy step of `fastvector::operator=` 0x00752A70; formerly `CopyDwordPairRangeLaneA` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x007547A0 (FUN_007547A0 -- forward copy for a 12-byte element, the copy step of `fastvector::operator=` 0x00752830; formerly `CopyDwordTripleRangeLaneA`, removed.)
+     * Address: 0x0063CA20 (FUN_0063CA20 -- `CopyRangeForward` for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C950; formerly `CopyBindingRange` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
     static T* CopyRangeForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
@@ -3116,6 +3120,9 @@ namespace gpg
    * map stays one-to-one for each FUN_ token.
    */
   template <class T>
+  /**
+   * Address: 0x0063C950 (FUN_0063C950 -- the reallocating insert (buy, copy prefix / inserted run / suffix, stamp the inline capacity sentinel or free the old block, rebase) for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C700, 0x0063C903; formerly `ReallocateWatchBoneStorageForInsert` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+   */
   inline std::size_t FastVectorRuntimeReallocateInsert(
     fastvector_runtime_view<T>& view,
     T* insertPos,
