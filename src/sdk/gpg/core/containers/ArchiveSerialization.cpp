@@ -1273,6 +1273,15 @@ namespace
   }
 
   template <class T>
+  /**
+   * Address: 0x0054B200 (FUN_0054B200 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::CAniSkel`; callers 0x0054FF20; formerly `AssignSharedCAniSkelRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00551ED0 (FUN_00551ED0 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::CIntelGrid`; callers 0x00551CC0; formerly `AssignSharedCIntelGridRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CE430 (FUN_005CE430 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::CIntelGrid`; callers 0x005CE220; formerly `AssignSharedCIntelGrid2Retained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00714530 (FUN_00714530 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::STrigger`; callers 0x007142F0; formerly `AssignSharedSTriggerRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00758150 (FUN_00758150 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::ISimResources`; callers 0x00757900; formerly `AssignSharedISimResourcesRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0087FCB0 (FUN_0087FCB0 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::LaunchInfoBase`; callers 0x00884C90; formerly `AssignSharedLaunchInfoBaseRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00884670 (FUN_00884670 -- `shared_ptr<T>::operator=` (assign-and-retain through `assign_retain`) for `moho::SSessionSaveData`; callers 0x008843F0; formerly `AssignSharedSSessionSaveDataRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
   [[nodiscard]] boost::SharedPtrRaw<T>* AssignSharedPtrRawRetained(
     const boost::SharedPtrRaw<T>* const source,
     boost::SharedPtrRaw<T>* const destination
@@ -1283,6 +1292,14 @@ namespace
   }
 
   template <class T>
+  /**
+   * Address: 0x00550130 (FUN_00550130 -- `shared_ptr<T>::reset()` (release the control block) for `moho::CAniSkel`; callers 0x0054FF20; formerly `ResetSharedCAniSkel` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00551F00 (FUN_00551F00 -- `shared_ptr<T>::reset()` (release the control block) for `moho::CIntelGrid`; callers 0x00551CC0; formerly `ResetSharedCIntelGrid` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00714560 (FUN_00714560 -- `shared_ptr<T>::reset()` (release the control block) for `moho::STrigger`; callers 0x007142F0; formerly `ResetSharedSTrigger` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0073F5B0 (FUN_0073F5B0 -- `shared_ptr<T>::reset()` (release the control block) for `moho::LaunchInfoBase`; callers 0x00884C90; formerly `ResetSharedLaunchInfoBase` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00758180 (FUN_00758180 -- `shared_ptr<T>::reset()` (release the control block) for `moho::ISimResources`; callers 0x00757900; formerly `ResetSharedISimResources` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x008846E0 (FUN_008846E0 -- `shared_ptr<T>::reset()` (release the control block) for `moho::SSessionSaveData`; callers 0x008843F0; formerly `ResetSharedSSessionSaveData` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
   [[nodiscard]] boost::SharedPtrRaw<T>* ResetSharedPtrRaw(boost::SharedPtrRaw<T>* const value) noexcept
   {
     value->release();
@@ -1290,6 +1307,16 @@ namespace
   }
 
   template <class T>
+  /**
+   * Address: 0x005503F0 (FUN_005503F0 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::CAniSkel`; callers 0x0054FF20; formerly `CopySharedCAniSkelRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00551FE0 (FUN_00551FE0 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::CIntelGrid`; callers 0x00551CC0; formerly `CopySharedCIntelGridRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0055FDD0 (FUN_0055FDD0 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::CAniPose`; callers 0x0055F990; formerly `CopySharedCAniPoseRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x005CE720 (FUN_005CE720 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::CIntelGrid`; callers 0x005CE220; formerly `CopySharedCIntelGrid2Retained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00714A50 (FUN_00714A50 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::STrigger`; callers 0x007142F0; formerly `CopySharedSTriggerRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x007584E0 (FUN_007584E0 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::ISimResources`; callers 0x00757900; formerly `CopySharedISimResourcesRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x008849F0 (FUN_008849F0 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::SSessionSaveData`; callers 0x008843F0; formerly `CopySharedSSessionSaveDataRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x00885150 (FUN_00885150 -- `shared_ptr<T>::shared_ptr(const shared_ptr&)` (copy both lanes and `add_ref_copy`) for `moho::LaunchInfoBase`; callers 0x00884C90; formerly `CopySharedLaunchInfoBaseRetained` in gpg/core/containers/ArchiveSerialization.cpp (RULE ONE), removed 2026-09-10.)
+   */
   [[nodiscard]] boost::SharedPtrRaw<T>* CopySharedPtrRawRetained(
     boost::SharedPtrRaw<T>* const destination,
     const boost::SharedPtrRaw<T>* const source
@@ -1310,90 +1337,6 @@ namespace
       value->pi->release();
     }
     return value;
-  }
-
-  /**
-   * Address: 0x0054B200 (FUN_0054B200)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<CAniSkel>` lane and releases the
-   * previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CAniSkel>* AssignSharedCAniSkelRetained(
-    const boost::SharedPtrRaw<moho::CAniSkel>* const source,
-    boost::SharedPtrRaw<moho::CAniSkel>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x00550130 (FUN_00550130)
-   *
-   * What it does:
-   * Clears one `shared_ptr<CAniSkel>` lane and releases one retained owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CAniSkel>* ResetSharedCAniSkel(
-    boost::SharedPtrRaw<moho::CAniSkel>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
-   * Address: 0x005503F0 (FUN_005503F0)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<CAniSkel>` pair and retains the source owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CAniSkel>* CopySharedCAniSkelRetained(
-    boost::SharedPtrRaw<moho::CAniSkel>* const destination,
-    const boost::SharedPtrRaw<moho::CAniSkel>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
-   * Address: 0x00551ED0 (FUN_00551ED0)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<CIntelGrid>` lane and releases the
-   * previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CIntelGrid>* AssignSharedCIntelGridRetained(
-    const boost::SharedPtrRaw<moho::CIntelGrid>* const source,
-    boost::SharedPtrRaw<moho::CIntelGrid>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x00551F00 (FUN_00551F00)
-   *
-   * What it does:
-   * Clears one `shared_ptr<CIntelGrid>` lane and releases one retained owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CIntelGrid>* ResetSharedCIntelGrid(
-    boost::SharedPtrRaw<moho::CIntelGrid>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
-   * Address: 0x00551FE0 (FUN_00551FE0)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<CIntelGrid>` pair and retains the source owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CIntelGrid>* CopySharedCIntelGridRetained(
-    boost::SharedPtrRaw<moho::CIntelGrid>* const destination,
-    const boost::SharedPtrRaw<moho::CIntelGrid>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
   }
 
   /**
@@ -1455,135 +1398,6 @@ namespace
   }
 
   /**
-   * Address: 0x0055FDD0 (FUN_0055FDD0)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<CAniPose>` pair and retains the source owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CAniPose>* CopySharedCAniPoseRetained(
-    boost::SharedPtrRaw<moho::CAniPose>* const destination,
-    const boost::SharedPtrRaw<moho::CAniPose>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
-   * Address: 0x005CE430 (FUN_005CE430)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<CIntelGrid>` lane for the legacy
-   * CIntelPosHandle serializer path and releases the previous owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CIntelGrid>* AssignSharedCIntelGrid2Retained(
-    const boost::SharedPtrRaw<moho::CIntelGrid>* const source,
-    boost::SharedPtrRaw<moho::CIntelGrid>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x005CE720 (FUN_005CE720)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<CIntelGrid>` pair for the legacy
-   * CIntelPosHandle serializer path and retains the source owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::CIntelGrid>* CopySharedCIntelGrid2Retained(
-    boost::SharedPtrRaw<moho::CIntelGrid>* const destination,
-    const boost::SharedPtrRaw<moho::CIntelGrid>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
-   * Address: 0x00714530 (FUN_00714530)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<STrigger>` lane and releases the
-   * previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::STrigger>* AssignSharedSTriggerRetained(
-    const boost::SharedPtrRaw<moho::STrigger>* const source,
-    boost::SharedPtrRaw<moho::STrigger>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x00714560 (FUN_00714560)
-   *
-   * What it does:
-   * Clears one `shared_ptr<STrigger>` lane and releases one retained owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::STrigger>* ResetSharedSTrigger(
-    boost::SharedPtrRaw<moho::STrigger>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
-   * Address: 0x00714A50 (FUN_00714A50)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<STrigger>` pair and retains the source owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::STrigger>* CopySharedSTriggerRetained(
-    boost::SharedPtrRaw<moho::STrigger>* const destination,
-    const boost::SharedPtrRaw<moho::STrigger>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
-   * Address: 0x0073F5B0 (FUN_0073F5B0)
-   *
-   * What it does:
-   * Clears one `shared_ptr<LaunchInfoBase>` lane and releases one retained
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::LaunchInfoBase>* ResetSharedLaunchInfoBase(
-    boost::SharedPtrRaw<moho::LaunchInfoBase>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
-   * Address: 0x00758150 (FUN_00758150)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<ISimResources>` lane and releases the
-   * previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::ISimResources>* AssignSharedISimResourcesRetained(
-    const boost::SharedPtrRaw<moho::ISimResources>* const source,
-    boost::SharedPtrRaw<moho::ISimResources>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x00758180 (FUN_00758180)
-   *
-   * What it does:
-   * Clears one `shared_ptr<ISimResources>` lane and releases one retained
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::ISimResources>* ResetSharedISimResources(
-    boost::SharedPtrRaw<moho::ISimResources>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
    * Address: 0x007584A0 (FUN_007584A0, func_CastISimResources)
    *
    * What it does:
@@ -1597,80 +1411,6 @@ namespace
   }
 
   /**
-   * Address: 0x007584E0 (FUN_007584E0)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<ISimResources>` pair and retains the source
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::ISimResources>* CopySharedISimResourcesRetained(
-    boost::SharedPtrRaw<moho::ISimResources>* const destination,
-    const boost::SharedPtrRaw<moho::ISimResources>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
-   * Address: 0x0087FCB0 (FUN_0087FCB0)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<LaunchInfoBase>` lane and releases
-   * the previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::LaunchInfoBase>* AssignSharedLaunchInfoBaseRetained(
-    const boost::SharedPtrRaw<moho::LaunchInfoBase>* const source,
-    boost::SharedPtrRaw<moho::LaunchInfoBase>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x00884670 (FUN_00884670)
-   *
-   * What it does:
-   * Rebinds one retained raw `shared_ptr<SSessionSaveData>` lane and releases
-   * the previously bound owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::SSessionSaveData>* AssignSharedSSessionSaveDataRetained(
-    const boost::SharedPtrRaw<moho::SSessionSaveData>* const source,
-    boost::SharedPtrRaw<moho::SSessionSaveData>* const destination
-  ) noexcept
-  {
-    return AssignSharedPtrRawRetained(source, destination);
-  }
-
-  /**
-   * Address: 0x008846E0 (FUN_008846E0)
-   *
-   * What it does:
-   * Clears one `shared_ptr<SSessionSaveData>` lane and releases one retained
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::SSessionSaveData>* ResetSharedSSessionSaveData(
-    boost::SharedPtrRaw<moho::SSessionSaveData>* const value
-  ) noexcept
-  {
-    return ResetSharedPtrRaw(value);
-  }
-
-  /**
-   * Address: 0x008849F0 (FUN_008849F0)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<SSessionSaveData>` pair and retains the source
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::SSessionSaveData>* CopySharedSSessionSaveDataRetained(
-    boost::SharedPtrRaw<moho::SSessionSaveData>* const destination,
-    const boost::SharedPtrRaw<moho::SSessionSaveData>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
-  }
-
-  /**
    * Address: 0x00885110 (FUN_00885110, func_CastLaunchInfoBase)
    *
    * What it does:
@@ -1681,21 +1421,6 @@ namespace
   {
     const gpg::RRef upcast = gpg::REF_UpcastPtr(source, CachedLaunchInfoBaseType());
     return static_cast<moho::LaunchInfoBase*>(upcast.mObj);
-  }
-
-  /**
-   * Address: 0x00885150 (FUN_00885150)
-   *
-   * What it does:
-   * Copies one raw `shared_ptr<LaunchInfoBase>` pair and retains the source
-   * owner.
-   */
-  [[nodiscard]] boost::SharedPtrRaw<moho::LaunchInfoBase>* CopySharedLaunchInfoBaseRetained(
-    boost::SharedPtrRaw<moho::LaunchInfoBase>* const destination,
-    const boost::SharedPtrRaw<moho::LaunchInfoBase>* const source
-  ) noexcept
-  {
-    return CopySharedPtrRawRetained(destination, source);
   }
 
   /**
