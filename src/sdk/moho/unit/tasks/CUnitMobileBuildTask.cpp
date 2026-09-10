@@ -243,8 +243,7 @@ namespace moho
    * placement/runtime weak-link state.
    */
   CUnitMobileBuildTask::CUnitMobileBuildTask()
-    : CCommandTask()
-    , CUnitMobileBuildTaskListenerPad{}
+    : CCommandTaskWithListenerSlot()
     , Listener<ECommandEvent>()
     , mBuildHelper()
     , mCommand(nullptr)
@@ -279,8 +278,7 @@ namespace moho
     const Wm3::Quatf& buildOrientation,
     const Wm3::Vector3f& buildDirection
   )
-    : CCommandTask(dispatchTask)
-    , CUnitMobileBuildTaskListenerPad{}
+    : CCommandTaskWithListenerSlot(dispatchTask)
     , Listener<ECommandEvent>()
     , mBuildHelper("MobileBuild", dispatchTask != nullptr ? dispatchTask->mUnit : nullptr)
     , mCommand(nullptr)

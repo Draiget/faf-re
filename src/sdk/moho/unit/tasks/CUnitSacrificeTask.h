@@ -19,17 +19,11 @@ namespace moho
   class CUnitCommand;
   class Unit;
 
-  struct CUnitSacrificeTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitSacrificeTaskListenerPad) == 0x04, "CUnitSacrificeTaskListenerPad size must be 0x04");
 
   /**
    * Runtime owner for unit-sacrifice command task state.
    */
-  class CUnitSacrificeTask : public CCommandTask, public CUnitSacrificeTaskListenerPad, public Listener<ECommandEvent>
+  class CUnitSacrificeTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
   {
   public:
     /**

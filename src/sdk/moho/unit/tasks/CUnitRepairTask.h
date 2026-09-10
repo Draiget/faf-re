@@ -21,12 +21,6 @@ namespace moho
   class CUnitCommand;
   class Unit;
 
-  struct CUnitRepairTaskListenerPad
-  {
-    std::uint32_t mListenerPad{};
-  };
-
-  static_assert(sizeof(CUnitRepairTaskListenerPad) == 0x04, "CUnitRepairTaskListenerPad size must be 0x04");
 
   /**
    * Address: 0x005F8C80 (FUN_005F8C80, ??0CUnitRepairTask@Moho@@QAE@@Z)
@@ -35,7 +29,7 @@ namespace moho
    * Builds the repair-task command/listener subobjects, initializes the shared
    * build helper, binds the target weak lane, and primes the repair mode flags.
    */
-  class CUnitRepairTask : public CCommandTask, public CUnitRepairTaskListenerPad, public Listener<ECommandEvent>
+  class CUnitRepairTask : public CCommandTaskWithListenerSlot, public Listener<ECommandEvent>
   {
   public:
     static gpg::RType* sType;

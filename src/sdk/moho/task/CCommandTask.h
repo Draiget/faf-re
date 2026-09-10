@@ -195,6 +195,48 @@ namespace moho
   );
   static_assert(offsetof(CCommandTask, mLinkResult) == 0x2C, "CCommandTask::mLinkResult offset must be 0x2C");
   static_assert(sizeof(CCommandTaskTypeInfo) == 0x64, "CCommandTaskTypeInfo size must be 0x64");
+
+  /**
+   * `CCommandTask` plus the four-byte slot that sits between it and the
+   * `Listener<ECommandEvent>` subobject of every command task that listens for
+   * its own command's events.
+   *
+   * Six task types register that listener at +0x34 rather than +0x30, which is
+   * where `CCommandTask` ends: `AddBase` stores the literal in
+   * CUnitCaptureTask (0x005F1B90-family), CUnitGuardTask, CUnitMobileBuildTask,
+   * CUnitReclaimTask, CUnitRepairTask and CUnitSacrificeTask. The two command
+   * tasks with a differently-shaped second base register it at +0x30 with no
+   * gap - `IAiCommandDispatchImpl` puts `IAiCommandDispatch` there
+   * (0x00596E00) and `CUnitScriptTask` puts `CScriptObject` there
+   * (0x00623E30) - so the four bytes belong to those six derived types, not to
+   * `CCommandTask` itself.
+   *
+   * The slot used to be modelled as a separate empty-ish base declared between
+   * `CCommandTask` and the listener in each of the six. That does not survive a
+   * modern MSVC: it lays every polymorphic base out ahead of every
+   * non-polymorphic one, so the pad was moved past the listener to the tail of
+   * the class and the listener slid back to +0x30 - measured with
+   * `/d1reportSingleClassLayout` on all six. Folding the slot into a
+   * polymorphic intermediate keeps it where the binary puts it, because the
+   * intermediate introduces no vfptr of its own and inherits `CCommandTask`'s
+   * position.
+   */
+  class CCommandTaskWithListenerSlot : public CCommandTask
+  {
+  public:
+    using CCommandTask::CCommandTask;
+
+    /// +0x30. Never read; no command-task path in the binary touches it.
+    std::uint32_t mListenerPad{0};
+  };
+
+  static_assert(
+    sizeof(CCommandTaskWithListenerSlot) == 0x34, "CCommandTaskWithListenerSlot size must be 0x34"
+  );
+  static_assert(
+    offsetof(CCommandTaskWithListenerSlot, mListenerPad) == 0x30,
+    "CCommandTaskWithListenerSlot::mListenerPad offset must be 0x30"
+  );
 } // namespace moho
 
 namespace gpg

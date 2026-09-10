@@ -283,8 +283,7 @@ namespace moho
    * runtime lanes used by reflection allocation paths.
    */
   CUnitReclaimTask::CUnitReclaimTask()
-    : CCommandTask()
-    , CUnitReclaimTaskListenerPad{}
+    : CCommandTaskWithListenerSlot()
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
@@ -320,8 +319,7 @@ namespace moho
     Entity* const targetEntity,
     const Wm3::Vector3f& targetPos
   )
-    : CCommandTask(parentTask)
-    , CUnitReclaimTaskListenerPad{}
+    : CCommandTaskWithListenerSlot(parentTask)
     , Listener<ECommandEvent>()
     , mCommand(nullptr)
     , mTargetEntity{}
