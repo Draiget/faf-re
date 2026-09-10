@@ -295,22 +295,6 @@ namespace
     return baseLane->base + byteOffset;
   }
 
-  [[nodiscard]] ForwardLinkNodeRuntime** AdvanceForwardLinkSlot(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    *slot = (*slot)->next;
-    return slot;
-  }
-
-  [[nodiscard]] ForwardLinkNodeRuntime** ResetForwardLinkSlot(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    *slot = nullptr;
-    return slot;
-  }
-
   /**
    * Address: 0x0067CC90 (FUN_0067CC90)
    *
@@ -608,19 +592,6 @@ namespace
   {
     *outNode = runtime->head->next;
     return outNode;
-  }
-
-  /**
-   * Address: 0x006858A0 (FUN_006858A0)
-   *
-   * What it does:
-   * Resets one intrusive node to self-links.
-   */
-  moho::CEntityDbListHead* ResetListNodeSelfLinks(moho::CEntityDbListHead* const node) noexcept
-  {
-    node->prev = node;
-    node->next = node;
-    return node;
   }
 
   /**
@@ -980,45 +951,6 @@ namespace
   }
 
   /**
-   * Address: 0x00687850 (FUN_00687850)
-   *
-   * What it does:
-   * Advances one forward-link slot to `slot->next`.
-   */
-  ForwardLinkNodeRuntime** AdvanceForwardLinkSlotPrimary(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    return AdvanceForwardLinkSlot(slot);
-  }
-
-  /**
-   * Address: 0x00687860 (FUN_00687860)
-   *
-   * What it does:
-   * Secondary lane that advances one forward-link slot to `slot->next`.
-   */
-  ForwardLinkNodeRuntime** AdvanceForwardLinkSlotSecondary(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    return AdvanceForwardLinkSlot(slot);
-  }
-
-  /**
-   * Address: 0x00687870 (FUN_00687870)
-   *
-   * What it does:
-   * Clears one forward-link slot to null.
-   */
-  ForwardLinkNodeRuntime** ClearForwardLinkSlotPrimary(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    return ResetForwardLinkSlot(slot);
-  }
-
-  /**
    * Address: 0x006878A0 (FUN_006878A0)
    *
    * What it does:
@@ -1110,19 +1042,6 @@ namespace
   {
     (void)UnlinkEmbeddedBackLinkHookOwnerSlot(value);
     return value;
-  }
-
-  /**
-   * Address: 0x006886B0 (FUN_006886B0)
-   *
-   * What it does:
-   * Secondary lane that clears one forward-link slot to null.
-   */
-  ForwardLinkNodeRuntime** ClearForwardLinkSlotSecondary(
-    ForwardLinkNodeRuntime** const slot
-  ) noexcept
-  {
-    return ResetForwardLinkSlot(slot);
   }
 
   /**
@@ -1581,30 +1500,6 @@ namespace
   }
 
   /**
-   * Address: 0x00684510 (FUN_00684510)
-   *
-   * What it does:
-   * Finds one all-units tree node for `entityId` and stores `entity` in that
-   * node payload lane.
-   */
-  moho::CEntityDbAllUnitsNode* AssignEntityPayloadAtIdNode(
-    moho::CEntityDb* const entityDb,
-    const std::uint32_t entityId,
-    moho::Entity* const entity
-  ) noexcept
-  {
-    if (entityDb == nullptr) {
-      return nullptr;
-    }
-
-    moho::CEntityDbAllUnitsNode* const node = FindExactEntityNodeOrHead(entityDb->AllUnitsHead(), entityId);
-    if (node != nullptr) {
-      node->unitListNode = entity;
-    }
-    return node;
-  }
-
-  /**
    * Address: 0x00684530 (FUN_00684530)
    *
    * What it does:
@@ -1967,25 +1862,6 @@ namespace
     return reinterpret_cast<moho::Unit*>(encodedNode - 0x8u);
   }
 
-  /**
-   * Address: 0x00685410 (FUN_00685410, std::map<EntId, Entity*>::erase(iterator))
-   *
-   * The all-units map is `msvc8::map<std::uint32_t, Entity*>`; its node
-   * erase/rotate/subtree-destroy emissions live on `legacy/containers/RbTree.h`
-   * (RULE ONE). The two wrappers below only translate the family-boundary
-   * iterators' node view into map iterators.
-   */
-  moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeNode(
-    moho::CEntityDb* const entityDb,
-    moho::CEntityDbAllUnitsNode* const erased
-  )
-  {
-    using Map = msvc8::map<std::uint32_t, moho::Entity*>;
-    const Map::const_iterator position(reinterpret_cast<Map::const_iterator::node_type*>(erased));
-    const Map::iterator next = entityDb->mAllUnits.erase(position);
-    return reinterpret_cast<moho::CEntityDbAllUnitsNode*>(next.node());
-  }
-
   moho::CEntityDbAllUnitsNode* EraseAllUnitsTreeRange(
     moho::CEntityDb* const entityDb,
     moho::CEntityDbAllUnitsNode** const outPosition,
@@ -2027,39 +1903,6 @@ namespace
     std::uint32_t size;
   };
   static_assert(sizeof(BackRefListOwnerRuntime) == 0x0C, "BackRefListOwnerRuntime size must be 0x0C");
-
-  /**
-   * Address: 0x00685950 (FUN_00685950)
-   *
-   * What it does:
-   * Unlinks one back-reference node lane from owner storage, optionally frees
-   * the removed node, and returns the next node lane through `outNextNode`.
-   */
-  BackRefListNodeRuntime** EraseBackRefListNodeAndStoreNext(
-    BackRefListNodeRuntime** const outNextNode,
-    BackRefListOwnerRuntime* const owner,
-    BackRefListNodeRuntime* const node
-  ) noexcept
-  {
-    BackRefListNodeRuntime* const nextNode = node != nullptr ? node->next : nullptr;
-
-    if (owner != nullptr && node != nullptr && node != owner->head) {
-      if (node->backRef != nullptr) {
-        *node->backRef = nextNode;
-      }
-      if (nextNode != nullptr) {
-        nextNode->backRef = node->backRef;
-      }
-
-      ::operator delete(node);
-      --owner->size;
-    }
-
-    if (outNextNode != nullptr) {
-      *outNextNode = nextNode;
-    }
-    return outNextNode;
-  }
 
   /**
    * Address: 0x00685BA0 (FUN_00685BA0)

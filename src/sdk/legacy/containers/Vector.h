@@ -11024,6 +11024,10 @@ namespace msvc8
              * Address: 0x00931A00 (FUN_00931A00 -- a second emission of that assignment for an intrusive-list iterator (the 4-byte node cursor the path-search frontier walks); zero callers, unreachable; formerly `SetNodeCursor_B` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00931A50 (FUN_00931A50 -- a third emission of that assignment for an intrusive-list iterator (the 4-byte node cursor the path-search frontier walks); zero callers, unreachable; formerly `SetNodeCursor_C` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00931AA0 (FUN_00931AA0 -- a fourth emission of that assignment for an intrusive-list iterator (the 4-byte node cursor the path-search frontier walks); zero callers, unreachable; formerly `SetNodeCursor_D` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00687850 (FUN_00687850 -- `operator++` written through a caller slot for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `AdvanceForwardLinkSlotPrimary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00687860 (FUN_00687860 -- a second emission of that increment for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `AdvanceForwardLinkSlotSecondary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00687870 (FUN_00687870 -- an iterator reset to null for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ClearForwardLinkSlotPrimary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x006886B0 (FUN_006886B0 -- a second emission of that reset for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ClearForwardLinkSlotSecondary` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
              */
             iterator& operator++()
             {
@@ -11574,6 +11578,7 @@ namespace msvc8
          * Address: 0x00932D40 (FUN_00932D40 -- `list<T>::erase(first, last)` (the whole-list case routed through `clear`); zero callers, unreachable; formerly `EraseIntrusiveNodeRangeAndStoreCursorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004E1B50 (FUN_004E1B50 -- `remove(value)` -- the same `erase(pos)` run over every equal node for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DFA20; formerly `EraseSndVarNodesByKey` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004E25E0 (FUN_004E25E0 -- `erase(pos)` -- unlink, free, decrement, hand back the successor for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004E5960; formerly `UnlinkAndDeleteSndVarListNode` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00685950 (FUN_00685950 -- `erase(pos)` over the back-reference list, patching the back pointer and exporting the successor for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `EraseBackRefListNodeAndStoreNext` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos)
         {
@@ -11738,6 +11743,7 @@ namespace msvc8
          * Address: 0x00739E50 (FUN_00739E50 -- `list<T>::_Buynode()` of the self-linked head sentinel; callers 0x00737680, 0x00737B30, 0x00737ED0; formerly `AllocateSelfLinkedPairNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D7FD0 (FUN_007D7FD0 -- `_Buy_head()` -- the self-linked sentinel for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D60D0, 0x007D7940; formerly `AllocateListSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D7D00 (FUN_007D7D00 -- the same `_Buy_head()` for the region-map list for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D5EE0, 0x007D7790; formerly `AllocateRegionMapSentinelNode` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x006858A0 (FUN_006858A0 -- the header sentinel's self-link, the second half of `_Buy_head` for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `ResetListNodeSelfLinks` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Buy_head()
         {
