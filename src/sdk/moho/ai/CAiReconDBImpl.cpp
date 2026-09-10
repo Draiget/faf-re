@@ -32,191 +32,7 @@ namespace
 {
   using PerArmyReconView = SPerArmyReconInfo;
 
-  struct ReconMapNodeView
-  {
-    ReconMapNodeView* left;   // +0x00
-    ReconMapNodeView* parent; // +0x04
-    ReconMapNodeView* right;  // +0x08
-    SReconKey key;            // +0x0C
-    ReconBlip* value;         // +0x18
-    std::uint8_t color;       // +0x1C (0=red, 1=black)
-    std::uint8_t isNil;       // +0x1D
-    std::uint8_t pad_1E_1F[0x02];
-  };
-  static_assert(sizeof(ReconMapNodeView) == 0x20, "ReconMapNodeView size must be 0x20");
-  static_assert(offsetof(ReconMapNodeView, key) == 0x0C, "ReconMapNodeView::key offset must be 0x0C");
-  static_assert(offsetof(ReconMapNodeView, value) == 0x18, "ReconMapNodeView::value offset must be 0x18");
-  static_assert(offsetof(ReconMapNodeView, color) == 0x1C, "ReconMapNodeView::color offset must be 0x1C");
-  static_assert(offsetof(ReconMapNodeView, isNil) == 0x1D, "ReconMapNodeView::isNil offset must be 0x1D");
 
-  constexpr std::uint8_t kNodeColorRed = 0u;
-  constexpr std::uint8_t kNodeColorBlack = 1u;
-  constexpr std::uint32_t kReconMapMaxSize = 0x0FFFFFFEu;
-
-  /**
-   * Address: 0x005C8800 (FUN_005C8800)
-   *
-   * What it does:
-   * Allocates one map-head node with null child/parent links and black color.
-   * The caller performs final sentinel self-link initialization.
-   */
-  [[nodiscard]] ReconMapNodeView* AllocateReconMapHeadNode()
-  {
-    auto* const head = new ReconMapNodeView{};
-    head->left = nullptr;
-    head->parent = nullptr;
-    head->right = nullptr;
-    head->color = kNodeColorBlack;
-    head->isNil = 0u;
-    return head;
-  }
-
-  [[nodiscard]] ReconMapNodeView* MapHead(const CAiReconDBImpl* const owner) noexcept
-  {
-    return owner ? reinterpret_cast<ReconMapNodeView*>(owner->mBlipMap.mHead) : nullptr;
-  }
-
-  [[nodiscard]] bool IsNil(const ReconMapNodeView* const node) noexcept
-  {
-    return !node || node->isNil != 0u;
-  }
-
-  [[nodiscard]] ReconMapNodeView* MapEnd(const CAiReconDBImpl* const owner) noexcept
-  {
-    return MapHead(owner);
-  }
-
-  /**
-   * Address: 0x005C5CC0 (FUN_005C5CC0)
-   * Address: 0x008D6BD0 (FUN_008D6BD0)
-   *
-   * What it does:
-   * Returns the leftmost (minimum-key) node reachable from `node`.
-   */
-  [[nodiscard]] ReconMapNodeView* TreeMin(ReconMapNodeView* node, ReconMapNodeView* const head) noexcept
-  {
-    while (!IsNil(node->left)) {
-      node = node->left;
-    }
-    return node ? node : head;
-  }
-
-  /**
-   * Address: 0x005C5CA0 (FUN_005C5CA0)
-   * Address: 0x008D6BB0 (FUN_008D6BB0)
-   *
-   * What it does:
-   * Returns the rightmost (maximum-key) node reachable from `node`.
-   */
-  [[nodiscard]] ReconMapNodeView* TreeMax(ReconMapNodeView* node, ReconMapNodeView* const head) noexcept
-  {
-    while (!IsNil(node->right)) {
-      node = node->right;
-    }
-    return node ? node : head;
-  }
-
-  [[nodiscard]] ReconMapNodeView* MapBegin(const CAiReconDBImpl* const owner) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head || IsNil(head->parent)) {
-      return head;
-    }
-    return head->left;
-  }
-
-  /**
-   * Address: 0x005C7A90 (FUN_005C7A90)
-   *
-   * What it does:
-   * Returns the in-order successor for one recon-map node iterator.
-   */
-  [[nodiscard]] ReconMapNodeView* MapNext(ReconMapNodeView* node, ReconMapNodeView* const head) noexcept
-  {
-    if (!node || IsNil(node)) {
-      return head;
-    }
-
-    ReconMapNodeView* right = node->right;
-    if (IsNil(right)) {
-      ReconMapNodeView* parent = node->parent;
-      while (!IsNil(parent) && node == parent->right) {
-        node = parent;
-        parent = parent->parent;
-      }
-      return parent;
-    }
-
-    node = right;
-    while (!IsNil(node->left)) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x005C5C50 (FUN_005C5C50)
-   *
-   * What it does:
-   * Performs one left rotation around `node` in the recon-map RB-tree.
-   */
-  void RotateLeft(ReconMapNodeView* const node, CAiReconDBImpl* const owner) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head || !node) {
-      return;
-    }
-
-    ReconMapNodeView* const right = node->right;
-    node->right = right->left;
-    if (!IsNil(right->left)) {
-      right->left->parent = node;
-    }
-
-    right->parent = node->parent;
-    if (node == head->parent) {
-      head->parent = right;
-    } else if (node == node->parent->left) {
-      node->parent->left = right;
-    } else {
-      node->parent->right = right;
-    }
-
-    right->left = node;
-    node->parent = right;
-  }
-
-  /**
-   * Address: 0x005C5D00 (FUN_005C5D00)
-   *
-   * What it does:
-   * Performs one right rotation around `node` in the recon-map RB-tree.
-   */
-  void RotateRight(ReconMapNodeView* const node, CAiReconDBImpl* const owner) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head || !node) {
-      return;
-    }
-
-    ReconMapNodeView* const left = node->left;
-    node->left = left->right;
-    if (!IsNil(left->right)) {
-      left->right->parent = node;
-    }
-
-    left->parent = node->parent;
-    if (node == head->parent) {
-      head->parent = left;
-    } else if (node == node->parent->right) {
-      node->parent->right = left;
-    } else {
-      node->parent->left = left;
-    }
-
-    left->right = node;
-    node->parent = left;
-  }
 
   void LinkKeyToSourceChain(SReconKey& key) noexcept
   {
@@ -234,32 +50,16 @@ namespace
     key.sourceUnit.UnlinkFromOwnerChain();
   }
 
-  /**
-   * Address: 0x005C8840 (FUN_005C8840)
-   *
-   * What it does:
-   * Allocates one recon-map node, copies key payload, and links key weak-chain
-   * ownership for `sourceUnit`.
-   */
-  [[nodiscard]] ReconMapNodeView* AllocateMapNode(
-    ReconMapNodeView* const head, ReconMapNodeView* const parent, const SReconKey& key, ReconBlip* const value
-  )
-  {
-    auto* const node = new ReconMapNodeView{};
-    node->left = head;
-    node->parent = parent;
-    node->right = head;
-    node->key = key;
-    node->value = value;
-    node->color = kNodeColorRed;
-    node->isNil = 0u;
-    LinkKeyToSourceChain(node->key);
-    return node;
-  }
-
   [[nodiscard]] std::uint32_t GetSourceEntityId(const Unit* const source) noexcept
   {
     return source ? static_cast<std::uint32_t>(source->id_) : 0u;
+  }
+
+  [[nodiscard]] SReconKey MakeReconProbeKey(const std::uint32_t sourceEntityId) noexcept
+  {
+    SReconKey probe{};
+    probe.sourceEntityId = sourceEntityId;
+    return probe;
   }
 
   [[nodiscard]] SReconKey MakeReconMapKey(Unit* const sourceUnit) noexcept
@@ -270,461 +70,10 @@ namespace
     return key;
   }
 
-  struct ReconMapInsertResult
-  {
-    ReconMapNodeView* node;
-    bool inserted;
-  };
-
-  /**
-   * Address: 0x005C7430 (FUN_005C7430)
-   *
-   * What it does:
-   * Inserts one node at the precomputed parent/side location and runs RB-tree
-   * recolor/rotation fixup.
-   */
-  [[nodiscard]] ReconMapNodeView* InsertMapNodeWithHint(
-    CAiReconDBImpl* const owner,
-    ReconMapNodeView* const parent,
-    const bool insertLeft,
-    const SReconKey& key,
-    ReconBlip* const value
-  )
-  {
-    auto* const head = MapHead(owner);
-    if (!head) {
-      return nullptr;
-    }
-
-    if (owner->mBlipMap.mSize >= kReconMapMaxSize) {
-      throw std::length_error("map/set<T> too long");
-    }
-
-    ReconMapNodeView* const insertedNode = AllocateMapNode(head, parent, key, value);
-    ++owner->mBlipMap.mSize;
-
-    if (parent == head) {
-      head->parent = insertedNode;
-      head->left = insertedNode;
-      head->right = insertedNode;
-    } else if (insertLeft) {
-      parent->left = insertedNode;
-      if (parent == head->left) {
-        head->left = insertedNode;
-      }
-    } else {
-      parent->right = insertedNode;
-      if (parent == head->right) {
-        head->right = insertedNode;
-      }
-    }
-
-    ReconMapNodeView* node = insertedNode;
-    while (node->parent->color == kNodeColorRed) {
-      ReconMapNodeView* const parentNode = node->parent;
-      ReconMapNodeView* const grandParent = parentNode->parent;
-      if (parentNode == grandParent->left) {
-        ReconMapNodeView* const uncle = grandParent->right;
-        if (uncle->color == kNodeColorBlack) {
-          if (node == parentNode->right) {
-            node = parentNode;
-            RotateLeft(parentNode, owner);
-          }
-          node->parent->color = kNodeColorBlack;
-          node->parent->parent->color = kNodeColorRed;
-          RotateRight(node->parent->parent, owner);
-        } else {
-          parentNode->color = kNodeColorBlack;
-          uncle->color = kNodeColorBlack;
-          grandParent->color = kNodeColorRed;
-          node = grandParent;
-          continue;
-        }
-      } else {
-        ReconMapNodeView* const uncle = grandParent->left;
-        if (uncle->color == kNodeColorBlack) {
-          if (node == parentNode->left) {
-            node = parentNode;
-            RotateRight(parentNode, owner);
-          }
-          node->parent->color = kNodeColorBlack;
-          node->parent->parent->color = kNodeColorRed;
-          RotateLeft(node->parent->parent, owner);
-        } else {
-          parentNode->color = kNodeColorBlack;
-          uncle->color = kNodeColorBlack;
-          grandParent->color = kNodeColorRed;
-          node = grandParent;
-          continue;
-        }
-      }
-      break;
-    }
-    head->parent->color = kNodeColorBlack;
-    return insertedNode;
-  }
-
-  /**
-   * Address: 0x005C5AF0 (FUN_005C5AF0)
-   *
-   * What it does:
-   * Finds insertion parent/side by `SReconKey::sourceEntityId` ordering and
-   * forwards to the core insert+rebalance helper.
-   */
-  [[nodiscard]] ReconMapInsertResult InsertMapNodeBySourceEntityId(
-    CAiReconDBImpl* const owner, const SReconKey& key, ReconBlip* const value
-  )
-  {
-    auto* const head = MapHead(owner);
-    if (!head) {
-      return {nullptr, false};
-    }
-
-    ReconMapNodeView* parent = head;
-    ReconMapNodeView* cursor = head->parent;
-    bool insertLeft = true;
-    while (!IsNil(cursor)) {
-      parent = cursor;
-      insertLeft = key.sourceEntityId < cursor->key.sourceEntityId;
-      cursor = insertLeft ? cursor->left : cursor->right;
-    }
-
-    return {InsertMapNodeWithHint(owner, parent, insertLeft, key, value), true};
-  }
-
-  [[nodiscard]] ReconMapNodeView* InsertMapNode(CAiReconDBImpl* const owner, const SReconKey& key, ReconBlip* const value)
-  {
-    return InsertMapNodeBySourceEntityId(owner, key, value).node;
-  }
-
-  /**
-   * Address: 0x005C44F0 (FUN_005C44F0)
-   *
-   * What it does:
-   * Register-shape adapter that inserts one recon-map node by source-entity id
-   * and stores only the resulting node pointer in `outNode`.
-   */
-  [[maybe_unused]] ReconMapNodeView** InsertMapNodeBySourceEntityIdNodeOutAdapter(
-    CAiReconDBImpl* const owner,
-    const SReconKey& key,
-    ReconBlip* const value,
-    ReconMapNodeView** const outNode
-  )
-  {
-    const ReconMapInsertResult result = InsertMapNodeBySourceEntityId(owner, key, value);
-    *outNode = result.node;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x005C4950 (FUN_005C4950)
-   *
-   * What it does:
-   * Finds the first map node whose `sourceEntityId` is not less than the
-   * queried id.
-   */
-  [[nodiscard]] ReconMapNodeView* LowerBoundByEntityId(CAiReconDBImpl* const owner, const std::uint32_t sourceEntityId) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head) {
-      return nullptr;
-    }
-
-    ReconMapNodeView* result = head;
-    ReconMapNodeView* cursor = head->parent;
-    while (!IsNil(cursor)) {
-      if (cursor->key.sourceEntityId >= sourceEntityId) {
-        result = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x005C49B0 (FUN_005C49B0)
-   *
-   * What it does:
-   * Finds the first map node whose `sourceEntityId` is greater than the
-   * queried id.
-   */
-  [[nodiscard]] ReconMapNodeView* UpperBoundByEntityId(CAiReconDBImpl* const owner, const std::uint32_t sourceEntityId) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head) {
-      return nullptr;
-    }
-
-    ReconMapNodeView* result = head;
-    ReconMapNodeView* cursor = head->parent;
-    while (!IsNil(cursor)) {
-      if (sourceEntityId < cursor->key.sourceEntityId) {
-        result = cursor;
-        cursor = cursor->left;
-      } else {
-        cursor = cursor->right;
-      }
-    }
-    return result;
-  }
-
-  [[nodiscard]] std::pair<ReconMapNodeView*, ReconMapNodeView*>
+  [[nodiscard]] std::pair<ReconBlipMap::iterator, ReconBlipMap::iterator>
   FindReconBlipRange(CAiReconDBImpl* const owner, Unit* const sourceUnit)
   {
-    const std::uint32_t sourceEntityId = GetSourceEntityId(sourceUnit);
-    return {LowerBoundByEntityId(owner, sourceEntityId), UpperBoundByEntityId(owner, sourceEntityId)};
-  }
-
-  void EraseFixup(CAiReconDBImpl* const owner, ReconMapNodeView* node, ReconMapNodeView* parent) noexcept
-  {
-    auto* const head = MapHead(owner);
-    if (!head) {
-      return;
-    }
-
-    while (node != head->parent && node->color == kNodeColorBlack) {
-      if (node == parent->left) {
-        ReconMapNodeView* sibling = parent->right;
-        if (sibling->color == kNodeColorRed) {
-          sibling->color = kNodeColorBlack;
-          parent->color = kNodeColorRed;
-          RotateLeft(parent, owner);
-          sibling = parent->right;
-        }
-        if (IsNil(sibling)) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-        if (sibling->left->color == kNodeColorBlack && sibling->right->color == kNodeColorBlack) {
-          sibling->color = kNodeColorRed;
-          node = parent;
-          parent = node->parent;
-        } else {
-          if (sibling->right->color == kNodeColorBlack) {
-            sibling->left->color = kNodeColorBlack;
-            sibling->color = kNodeColorRed;
-            RotateRight(sibling, owner);
-            sibling = parent->right;
-          }
-          sibling->color = parent->color;
-          parent->color = kNodeColorBlack;
-          sibling->right->color = kNodeColorBlack;
-          RotateLeft(parent, owner);
-          break;
-        }
-      } else {
-        ReconMapNodeView* sibling = parent->left;
-        if (sibling->color == kNodeColorRed) {
-          sibling->color = kNodeColorBlack;
-          parent->color = kNodeColorRed;
-          RotateRight(parent, owner);
-          sibling = parent->left;
-        }
-        if (IsNil(sibling)) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-        if (sibling->right->color == kNodeColorBlack && sibling->left->color == kNodeColorBlack) {
-          sibling->color = kNodeColorRed;
-          node = parent;
-          parent = node->parent;
-        } else {
-          if (sibling->left->color == kNodeColorBlack) {
-            sibling->right->color = kNodeColorBlack;
-            sibling->color = kNodeColorRed;
-            RotateLeft(sibling, owner);
-            sibling = parent->left;
-          }
-          sibling->color = parent->color;
-          parent->color = kNodeColorBlack;
-          sibling->left->color = kNodeColorBlack;
-          RotateRight(parent, owner);
-          break;
-        }
-      }
-    }
-    node->color = kNodeColorBlack;
-  }
-
-  /**
-   * Address: 0x005C4580 (FUN_005C4580)
-   *
-   * What it does:
-   * Erases one RB-tree node from the typed recon map and restores tree
-   * invariants, then unlinks `SReconKey` weak ownership and decrements size.
-   */
-  [[nodiscard]] ReconMapNodeView* EraseMapNode(CAiReconDBImpl* const owner, ReconMapNodeView* const node)
-  {
-    auto* const head = MapHead(owner);
-    if (!head || !node || node == head || IsNil(node)) {
-      return head;
-    }
-
-    ReconMapNodeView* const next = MapNext(node, head);
-    ReconMapNodeView* x = nullptr;
-    ReconMapNodeView* xParent = nullptr;
-
-    if (IsNil(next)) {
-      x = node->right;
-      xParent = node->parent;
-
-      if (!IsNil(x)) {
-        x->parent = xParent;
-      }
-
-      if (head->parent == node) {
-        head->parent = x;
-      } else if (xParent->left == node) {
-        xParent->left = x;
-      } else {
-        xParent->right = x;
-      }
-    } else if (IsNil(node->right)) {
-      x = node->left;
-      xParent = node->parent;
-
-      if (!IsNil(x)) {
-        x->parent = xParent;
-      }
-
-      if (head->parent == node) {
-        head->parent = x;
-      } else if (xParent->left == node) {
-        xParent->left = x;
-      } else {
-        xParent->right = x;
-      }
-    } else {
-      ReconMapNodeView* const successor = next;
-      x = successor->right;
-
-      node->left->parent = successor;
-      successor->left = node->left;
-      if (successor == node->right) {
-        xParent = successor;
-      } else {
-        xParent = successor->parent;
-        if (!IsNil(x)) {
-          x->parent = xParent;
-        }
-        xParent->left = x;
-        successor->right = node->right;
-        node->right->parent = successor;
-      }
-
-      if (head->parent == node) {
-        head->parent = successor;
-      } else if (node->parent->left == node) {
-        node->parent->left = successor;
-      } else {
-        node->parent->right = successor;
-      }
-      successor->parent = node->parent;
-      std::swap(successor->color, node->color);
-    }
-
-    if (head->left == node) {
-      head->left = IsNil(x) ? xParent : TreeMin(x, head);
-    }
-    if (head->right == node) {
-      head->right = IsNil(x) ? xParent : TreeMax(x, head);
-    }
-
-    if (node->color == kNodeColorBlack) {
-      EraseFixup(owner, x, xParent);
-    }
-
-    UnlinkKeyFromSourceChain(node->key);
-    delete node;
-    if (owner->mBlipMap.mSize > 0) {
-      --owner->mBlipMap.mSize;
-    }
-
-    if (owner->mBlipMap.mSize == 0 || IsNil(head->parent)) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-    }
-
-    return next;
-  }
-
-  /**
-   * Address: 0x005C5BE0 (FUN_005C5BE0)
-   *
-   * IDA signature:
-   * void __stdcall sub_5C5BE0(_DWORD *a1);
-   *
-   * What it does:
-   * Recursively destroys one recon-map RB-tree subtree rooted at `node`,
-   * unlinking each node's `SReconKey::sourceUnit` weak-owner chain before
-   * releasing node storage. Walks the right branch via self-recursion and
-   * iterates left spine, matching the binary's `while (!isNil) { recurse(right);
-   * unlink_chain; node = left; delete node; }` shape.
-   */
-  void DestroyReconMapSubtree(ReconMapNodeView* node)
-  {
-    while (node != nullptr && node->isNil == 0u) {
-      ReconMapNodeView* const current = node;
-      DestroyReconMapSubtree(current->right);
-      node = current->left;
-      UnlinkKeyFromSourceChain(current->key);
-      delete current;
-    }
-  }
-
-  /**
-   * Address: 0x005C4860 (FUN_005C4860)
-   *
-   * What it does:
-   * Clears one node range from the recon map; when used with
-   * `[MapBegin(owner), MapEnd(owner))`, this performs a full map clear via the
-   * recursive subtree destruct lane (`DestroyReconMapSubtree`).
-   */
-  void ClearMap(CAiReconDBImpl* const owner)
-  {
-    auto* const head = MapHead(owner);
-    if (!owner || !head) {
-      return;
-    }
-
-    // Fast path used by the binary's full-range erase: recursively destroy the
-    // whole tree rooted at `head->parent` and reset the sentinel links.
-    DestroyReconMapSubtree(head->parent);
-
-    owner->mBlipMap.mSize = 0u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    head->color = kNodeColorBlack;
-    head->isNil = 1u;
-  }
-
-  /**
-   * Address: 0x005C2330 (FUN_005C2330)
-   *
-   * What it does:
-   * Clears all recon-map nodes, frees map-head storage, and resets map header
-   * lanes to null/zero.
-   */
-  void DestroyReconMapStorage(CAiReconDBImpl* const owner)
-  {
-    if (!owner) {
-      return;
-    }
-
-    if (owner->mBlipMap.mHead) {
-      ClearMap(owner);
-      delete reinterpret_cast<ReconMapNodeView*>(owner->mBlipMap.mHead);
-    }
-
-    owner->mBlipMap.mAllocProxy = nullptr;
-    owner->mBlipMap.mHead = nullptr;
-    owner->mBlipMap.mSize = 0u;
+    return owner->mBlipMap.equal_range(MakeReconProbeKey(GetSourceEntityId(sourceUnit)));
   }
 
   [[nodiscard]] bool IsInsideRectXZ(const moho::Rect2<int>& rect, const Wm3::Vec3f& pos) noexcept
@@ -941,7 +290,7 @@ namespace
 
   void SeedReconMapFromBlipList(CAiReconDBImpl* const owner)
   {
-    if (!owner || owner->mBlipMap.mSize != 0u) {
+    if (!owner || !owner->mBlipMap.empty()) {
       return;
     }
 
@@ -949,7 +298,7 @@ namespace
       if (!blip) {
         continue;
       }
-      InsertMapNode(owner, MakeReconMapKey(DecodeBlipSourceUnit(blip)), blip);
+      (void)owner->mBlipMap.insert({MakeReconMapKey(DecodeBlipSourceUnit(blip)), blip});
     }
   }
 
@@ -1011,13 +360,13 @@ namespace
       return;
     }
 
-    const std::size_t targetCount = static_cast<std::size_t>(owner->mBlipMap.mSize) + owner->mTempBlips.size();
+    const std::size_t targetCount = owner->mBlipMap.size() + owner->mTempBlips.size();
     ResizeBlipPointerVector(owner->mBblips, targetCount);
 
     std::size_t writeIndex = 0u;
-    for (ReconMapNodeView* node = MapBegin(owner); node != MapEnd(owner); node = MapNext(node, MapEnd(owner))) {
-      if (node->value) {
-        owner->mBblips.begin()[writeIndex] = node->value;
+    for (const auto& entry : owner->mBlipMap) {
+      if (entry.second) {
+        owner->mBblips.begin()[writeIndex] = entry.second;
         ++writeIndex;
       }
     }
@@ -1179,15 +528,7 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
     mFogOfWar(static_cast<std::uint8_t>(fogOfWar ? 1u : 0u)),
     mPadA9{0, 0, 0, 0, 0, 0, 0}
 {
-  mBlipMap.mAllocProxy = nullptr;
-  mBlipMap.mHead = AllocateReconMapHeadNode();
-  if (auto* const head = reinterpret_cast<ReconMapNodeView*>(mBlipMap.mHead)) {
-    head->isNil = 1u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-  }
-  mBlipMap.mSize = 0u;
+
 
   if (!mArmy) {
     return;
@@ -1223,7 +564,7 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
  */
 CAiReconDBImpl::~CAiReconDBImpl()
 {
-  DestroyReconMapStorage(this);
+
 
   mBblips.clear();
   mTempBlips.clear();
@@ -1262,9 +603,8 @@ void CAiReconDBImpl::Flush()
   }
   mTempBlips.clear();
 
-  ReconMapNodeView* const head = MapEnd(this);
-  for (ReconMapNodeView* it = MapBegin(this); it != head; it = MapNext(it, head)) {
-    ReconBlip* const blip = it->value;
+  for (auto it = mBlipMap.begin(); it != mBlipMap.end(); ++it) {
+    ReconBlip* const blip = it->second;
     if (!blip) {
       continue;
     }
@@ -1272,7 +612,7 @@ void CAiReconDBImpl::Flush()
     blip->DestroyIfUnused();
   }
 
-  ClearMap(this);
+  mBlipMap.clear();
   mBblips.clear();
 }
 
@@ -1287,7 +627,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   }
 
   SeedReconMapFromBlipList(this);
-  ReconMapNodeView* const mapHead = MapEnd(this);
+
 
   mSim->Logf("ReconTick for army %d: %s [%s]\n", mArmy->ArmyId, mArmy->PlayerName.raw_data_unsafe(), mArmy->ArmyName.raw_data_unsafe());
 
@@ -1303,17 +643,16 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
-  for (ReconMapNodeView* it = MapBegin(this); it != mapHead;) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, mapHead);
+  for (auto it = mBlipMap.begin(); it != mBlipMap.end();) {
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     if (!blip) {
-      EraseMapNode(this, node);
+      (void)mBlipMap.erase(node);
       continue;
     }
 
-    Unit* sourceUnit = node->key.sourceUnit.GetObjectPtr();
+    Unit* sourceUnit = node->first.sourceUnit.GetObjectPtr();
     if (!sourceUnit) {
       sourceUnit = DecodeBlipSourceUnit(blip);
     }
@@ -1335,7 +674,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
         }
       }
 
-      EraseMapNode(this, node);
+      (void)mBlipMap.erase(node);
       continue;
     }
   }
@@ -1370,7 +709,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
       if (rangeBegin != rangeEnd) {
         bool keepStaticLosBlip = false;
-        PerArmyReconView* const recon = GetPerArmyReconSlot(rangeBegin->value, mArmy->ArmyId);
+        PerArmyReconView* const recon = GetPerArmyReconSlot(rangeBegin->second, mArmy->ArmyId);
         if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_LOSEver)) != 0u && !unit->IsMobile()) {
           keepStaticLosBlip = true;
         }
@@ -1403,12 +742,10 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
  */
 void CAiReconDBImpl::ReconRefresh()
 {
-  ReconMapNodeView* const head = MapEnd(this);
-  for (ReconMapNodeView* it = MapBegin(this); it != head;) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, head);
+  for (auto it = mBlipMap.begin(); it != mBlipMap.end();) {
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     if (!blip) {
       continue;
     }
@@ -1506,7 +843,7 @@ void CAiReconDBImpl::GenerateNewBlips(const msvc8::vector<SNewBlip>& pending)
     }
 
     UpdateBlip(blip, candidate.sourceUnit, static_cast<std::uint32_t>(candidate.detectedFlags));
-    InsertMapNode(this, MakeReconMapKey(candidate.sourceUnit), blip);
+    (void)mBlipMap.insert({MakeReconMapKey(candidate.sourceUnit), blip});
   }
 }
 
@@ -1711,21 +1048,19 @@ void CAiReconDBImpl::UpdateBlips(
   const std::int32_t requiredFakeBlips = std::max(0, GetActiveJammerBlipCount(sourceUnit));
   std::int32_t refreshedFakeBlips = 0;
 
-  ReconMapNodeView* const head = MapEnd(this);
   while (it != end) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, head);
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     if (!blip) {
-      EraseMapNode(this, node);
+      (void)mBlipMap.erase(node);
       continue;
     }
 
     if (IsFakeBlip(blip)) {
       if (refreshedFakeBlips >= requiredFakeBlips) {
         DeleteBlip(blip);
-        EraseMapNode(this, node);
+        (void)mBlipMap.erase(node);
         continue;
       }
 
@@ -1786,16 +1121,14 @@ void CAiReconDBImpl::DeleteBlips(Unit* const sourceUnit)
   }
 
   auto [it, end] = FindReconBlipRange(this, sourceUnit);
-  ReconMapNodeView* const head = MapEnd(this);
   while (it != end) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, head);
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     if (blip) {
       DeleteBlip(blip);
     }
-    EraseMapNode(this, node);
+    (void)mBlipMap.erase(node);
   }
 }
 
@@ -2385,8 +1718,8 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
   }
 
   auto* const owner = const_cast<CAiReconDBImpl*>(this);
-  ReconMapNodeView* const node = LowerBoundByEntityId(owner, static_cast<std::uint32_t>(unit->id_));
-  return (node && node != MapEnd(this)) ? node->value : nullptr;
+  const auto node = owner->mBlipMap.lower_bound(MakeReconProbeKey(static_cast<std::uint32_t>(unit->id_)));
+  return (node != owner->mBlipMap.end()) ? node->second : nullptr;
 }
 
 /**
@@ -2408,10 +1741,9 @@ EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
   SeedReconMapFromBlipList(this);
   auto [it, end] = FindReconBlipRange(this, unit);
   while (it != end) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, MapEnd(this));
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     if (!blip) {
       continue;
     }
@@ -2442,12 +1774,10 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
     }
   }
 
-  ReconMapNodeView* const head = MapEnd(this);
-  for (ReconMapNodeView* it = MapBegin(this); it != head;) {
-    ReconMapNodeView* const node = it;
-    it = MapNext(node, MapEnd(this));
+  for (auto it = mBlipMap.begin(); it != mBlipMap.end();) {
+    const auto node = it++;
 
-    ReconBlip* const blip = node->value;
+    ReconBlip* const blip = node->second;
     auto* const entity = reinterpret_cast<Entity*>(blip);
     if (!entity || !IsInsideRectXZ(rect, entity->GetPositionWm3())) {
       continue;
@@ -2459,7 +1789,7 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
     }
 
     ClearPerArmyRecon(this, blip, true);
-    EraseMapNode(this, node);
+    (void)mBlipMap.erase(node);
   }
 
   RebuildBlipListFromMapAndOrphans(this);
@@ -2490,3 +1820,12 @@ CIntelGrid* CAiReconDBImpl::MakeGrid(STIMap* const map, const std::uint32_t grid
 
   return new CIntelGrid(map, gridSize);
 }
+
+
+namespace moho
+{
+  bool SReconKeyLess::operator()(const SReconKey& lhs, const SReconKey& rhs) const noexcept
+  {
+    return lhs.sourceEntityId < rhs.sourceEntityId;
+  }
+} // namespace moho

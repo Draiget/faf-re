@@ -572,8 +572,105 @@ namespace msvc8
         tree_type tree_;
     };
 
+    /**
+     * MSVC8's `std::multimap`: the same `_Tree` as `map`, instantiated with
+     * `_Multi = true`, so the only differences are the insert (equivalent keys
+     * are allowed and land in insertion order) and the absence of `operator[]`
+     * and `at`. Same 0x0C head, same node.
+     *
+     * `CAiReconDBImpl::mBlipMap` (`multimap<moho::SReconKey, moho::ReconBlip*>`,
+     * ordered on the key's `sourceEntityId`) is the instantiation this models;
+     * its `insert` emission is cited on `rb_tree::insert_equal` in `RbTree.h`.
+     */
+    template<class Key, class T, class Less = std::less<Key>>
+    class multimap
+    {
+        using traits = detail::rb_map_traits<Key, T, Less>;
+        using tree_type = detail::rb_tree<traits>;
+        using node_type = typename tree_type::node_type;
+
+    public:
+        using key_type = Key;
+        using mapped_type = T;
+        using value_type = std::pair<const Key, T>;
+        using key_compare = Less;
+        using size_type = std::size_t;
+        using difference_type = std::ptrdiff_t;
+        using reference = value_type&;
+        using const_reference = const value_type&;
+
+        using iterator = detail::rb_iterator<traits, false>;
+        using const_iterator = detail::rb_iterator<traits, true>;
+
+        multimap() noexcept {}
+        explicit multimap(const key_compare& comp) : tree_(comp) {}
+        multimap(const multimap& o) : tree_(o.tree_) {}
+        multimap& operator=(const multimap& o)
+        {
+            if (this != &o) {
+                tree_ = o.tree_;
+            }
+            return *this;
+        }
+        multimap(multimap&& o) noexcept : tree_(std::move(o.tree_)) {}
+        multimap& operator=(multimap&& o) noexcept
+        {
+            if (this != &o) {
+                tree_ = std::move(o.tree_);
+            }
+            return *this;
+        }
+
+        [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
+        [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
+        [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
+        [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
+
+        [[nodiscard]] size_type size() const noexcept { return tree_.size(); }
+        [[nodiscard]] bool empty() const noexcept { return tree_.empty(); }
+        [[nodiscard]] key_compare key_comp() const { return tree_.key_comp(); }
+
+        [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
+        [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
+        [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
+
+        [[nodiscard]] iterator lower_bound(const key_type& k) { return iterator(tree_.lower_bound_node(k)); }
+        [[nodiscard]] const_iterator lower_bound(const key_type& k) const
+        {
+            return const_iterator(tree_.lower_bound_node(k));
+        }
+        [[nodiscard]] iterator upper_bound(const key_type& k) { return iterator(tree_.upper_bound_node(k)); }
+        [[nodiscard]] const_iterator upper_bound(const key_type& k) const
+        {
+            return const_iterator(tree_.upper_bound_node(k));
+        }
+        [[nodiscard]] std::pair<iterator, iterator> equal_range(const key_type& k)
+        {
+            const std::pair<node_type*, node_type*> range = tree_.equal_range(k);
+            return {iterator(range.first), iterator(range.second)};
+        }
+
+        /** Always inserts; equal keys keep insertion order. See `rb_tree::insert_equal`. */
+        iterator insert(const value_type& v) { return iterator(tree_.insert_equal(v)); }
+        iterator insert(const_iterator hint, const value_type& v) { return iterator(tree_.insert_hint(hint, v)); }
+
+        iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
+        iterator erase(const_iterator first, const_iterator last)
+        {
+            return iterator(tree_.erase_range(first.node(), last.node()));
+        }
+        size_type erase(const key_type& k) { return tree_.erase(k); }
+
+        void clear() noexcept { tree_.clear(); }
+        void swap(multimap& other) noexcept { tree_.swap(other.tree_); }
+
+    private:
+        tree_type tree_;
+    };
+
     // --------- Convenience: ensure 32-bit pointer size assumed ----------
     static_assert(sizeof(map<void*, void*>) == 0x0C, "msvc8::map size should be 0x0C");
+    static_assert(sizeof(multimap<void*, void*>) == 0x0C, "msvc8::multimap size should be 0x0C");
 
 } // namespace msvc8
 

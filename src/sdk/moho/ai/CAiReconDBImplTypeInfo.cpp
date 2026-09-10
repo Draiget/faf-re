@@ -17,24 +17,7 @@ using namespace moho;
 
 namespace
 {
-  constexpr std::uint8_t kNodeColorRed = 0u;
-  constexpr std::uint8_t kNodeColorBlack = 1u;
-  constexpr std::uint32_t kReconMapMaxSize = 0x0FFFFFFEu;
 
-  struct ReconMapNodeRuntime
-  {
-    ReconMapNodeRuntime* left;   // +0x00
-    ReconMapNodeRuntime* parent; // +0x04
-    ReconMapNodeRuntime* right;  // +0x08
-    SReconKey key;               // +0x0C
-    ReconBlip* value;            // +0x18
-    std::uint8_t color;          // +0x1C
-    std::uint8_t isNil;          // +0x1D
-    std::uint8_t pad_1E_1F[0x02];
-  };
-  static_assert(sizeof(ReconMapNodeRuntime) == 0x20, "ReconMapNodeRuntime size must be 0x20");
-  static_assert(offsetof(ReconMapNodeRuntime, key) == 0x0C, "ReconMapNodeRuntime::key offset must be 0x0C");
-  static_assert(offsetof(ReconMapNodeRuntime, value) == 0x18, "ReconMapNodeRuntime::value offset must be 0x18");
 
   /**
    * Address: 0x005C58E0 (FUN_005C58E0)
@@ -315,267 +298,6 @@ namespace
     return static_cast<ReconBlip*>(upcast.mObj);
   }
 
-  [[nodiscard]] bool IsNil(const ReconMapNodeRuntime* node) noexcept
-  {
-    return !node || node->isNil != 0u;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* MapHead(SReconBlipMapStorage* storage) noexcept
-  {
-    return storage ? reinterpret_cast<ReconMapNodeRuntime*>(storage->mHead) : nullptr;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* MapHead(const SReconBlipMapStorage* storage) noexcept
-  {
-    return storage ? reinterpret_cast<ReconMapNodeRuntime*>(storage->mHead) : nullptr;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* AllocateMapHeadNode()
-  {
-    auto* const head = new ReconMapNodeRuntime{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->value = nullptr;
-    head->color = kNodeColorBlack;
-    head->isNil = 1u;
-    return head;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* EnsureMapHead(SReconBlipMapStorage* storage)
-  {
-    if (!storage) {
-      return nullptr;
-    }
-
-    auto* head = MapHead(storage);
-    if (!head) {
-      head = AllocateMapHeadNode();
-      storage->mHead = head;
-    }
-    return head;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* MapBegin(const SReconBlipMapStorage* storage) noexcept
-  {
-    auto* const head = MapHead(storage);
-    if (!head || IsNil(head->parent)) {
-      return head;
-    }
-    return head->left;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* MapNext(ReconMapNodeRuntime* node, ReconMapNodeRuntime* head) noexcept
-  {
-    if (!node || IsNil(node)) {
-      return head;
-    }
-
-    ReconMapNodeRuntime* right = node->right;
-    if (IsNil(right)) {
-      ReconMapNodeRuntime* parent = node->parent;
-      while (!IsNil(parent) && node == parent->right) {
-        node = parent;
-        parent = parent->parent;
-      }
-      return parent;
-    }
-
-    node = right;
-    while (!IsNil(node->left)) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  void ClearMapStorage(SReconBlipMapStorage* storage)
-  {
-    auto* const head = EnsureMapHead(storage);
-    if (!head) {
-      return;
-    }
-
-    for (ReconMapNodeRuntime* node = MapBegin(storage); node != head;) {
-      ReconMapNodeRuntime* const current = node;
-      node = MapNext(current, head);
-      current->key.sourceUnit.UnlinkFromOwnerChain();
-      delete current;
-    }
-
-    storage->mSize = 0u;
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    head->color = kNodeColorBlack;
-    head->isNil = 1u;
-  }
-
-  void RotateLeft(SReconBlipMapStorage* storage, ReconMapNodeRuntime* node) noexcept
-  {
-    auto* const head = MapHead(storage);
-    if (!head || !node) {
-      return;
-    }
-
-    ReconMapNodeRuntime* const right = node->right;
-    node->right = right->left;
-    if (!IsNil(right->left)) {
-      right->left->parent = node;
-    }
-
-    right->parent = node->parent;
-    if (node == head->parent) {
-      head->parent = right;
-    } else if (node == node->parent->left) {
-      node->parent->left = right;
-    } else {
-      node->parent->right = right;
-    }
-
-    right->left = node;
-    node->parent = right;
-  }
-
-  void RotateRight(SReconBlipMapStorage* storage, ReconMapNodeRuntime* node) noexcept
-  {
-    auto* const head = MapHead(storage);
-    if (!head || !node) {
-      return;
-    }
-
-    ReconMapNodeRuntime* const left = node->left;
-    node->left = left->right;
-    if (!IsNil(left->right)) {
-      left->right->parent = node;
-    }
-
-    left->parent = node->parent;
-    if (node == head->parent) {
-      head->parent = left;
-    } else if (node == node->parent->right) {
-      node->parent->right = left;
-    } else {
-      node->parent->left = left;
-    }
-
-    left->right = node;
-    node->parent = left;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime*
-  AllocateMapNode(ReconMapNodeRuntime* head, ReconMapNodeRuntime* parent, const SReconKey& key, ReconBlip* value)
-  {
-    auto* const node = new ReconMapNodeRuntime{};
-    node->left = head;
-    node->parent = parent;
-    node->right = head;
-    node->key = key;
-    node->value = value;
-    node->color = kNodeColorRed;
-    node->isNil = 0u;
-    node->key.sourceUnit.LinkIntoOwnerChainHeadUnlinked();
-    return node;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* InsertNodeWithFixup(
-    SReconBlipMapStorage* storage, ReconMapNodeRuntime* parent, bool insertLeft, const SReconKey& key, ReconBlip* value
-  )
-  {
-    auto* const head = EnsureMapHead(storage);
-    if (!head) {
-      return nullptr;
-    }
-
-    GPG_ASSERT(storage->mSize < kReconMapMaxSize);
-    if (storage->mSize >= kReconMapMaxSize) {
-      return nullptr;
-    }
-
-    ReconMapNodeRuntime* const inserted = AllocateMapNode(head, parent, key, value);
-    ++storage->mSize;
-
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-    } else if (insertLeft) {
-      parent->left = inserted;
-      if (parent == head->left) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (parent == head->right) {
-        head->right = inserted;
-      }
-    }
-
-    ReconMapNodeRuntime* node = inserted;
-    while (node->parent->color == kNodeColorRed) {
-      ReconMapNodeRuntime* const parentNode = node->parent;
-      ReconMapNodeRuntime* const grandParent = parentNode->parent;
-      if (parentNode == grandParent->left) {
-        ReconMapNodeRuntime* const uncle = grandParent->right;
-        if (uncle->color == kNodeColorBlack) {
-          if (node == parentNode->right) {
-            node = parentNode;
-            RotateLeft(storage, parentNode);
-          }
-          node->parent->color = kNodeColorBlack;
-          node->parent->parent->color = kNodeColorRed;
-          RotateRight(storage, node->parent->parent);
-        } else {
-          parentNode->color = kNodeColorBlack;
-          uncle->color = kNodeColorBlack;
-          grandParent->color = kNodeColorRed;
-          node = grandParent;
-          continue;
-        }
-      } else {
-        ReconMapNodeRuntime* const uncle = grandParent->left;
-        if (uncle->color == kNodeColorBlack) {
-          if (node == parentNode->left) {
-            node = parentNode;
-            RotateRight(storage, parentNode);
-          }
-          node->parent->color = kNodeColorBlack;
-          node->parent->parent->color = kNodeColorRed;
-          RotateLeft(storage, node->parent->parent);
-        } else {
-          parentNode->color = kNodeColorBlack;
-          uncle->color = kNodeColorBlack;
-          grandParent->color = kNodeColorRed;
-          node = grandParent;
-          continue;
-        }
-      }
-      break;
-    }
-
-    head->parent->color = kNodeColorBlack;
-    head->isNil = 1u;
-    return inserted;
-  }
-
-  [[nodiscard]] ReconMapNodeRuntime* InsertMapNodeBySourceEntityId(SReconBlipMapStorage* storage, const SReconKey& key, ReconBlip* value)
-  {
-    auto* const head = EnsureMapHead(storage);
-    if (!head) {
-      return nullptr;
-    }
-
-    ReconMapNodeRuntime* parent = head;
-    ReconMapNodeRuntime* cursor = head->parent;
-    bool insertLeft = true;
-    while (!IsNil(cursor)) {
-      parent = cursor;
-      insertLeft = key.sourceEntityId < cursor->key.sourceEntityId;
-      cursor = insertLeft ? cursor->left : cursor->right;
-    }
-
-    return InsertNodeWithFixup(storage, parent, insertLeft, key, value);
-  }
-
   class DeleteWithFlagSlot0Runtime
   {
   public:
@@ -804,14 +526,14 @@ namespace
   msvc8::string ReconBlipMapTypeRuntime::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
-    const auto* const storage = static_cast<const SReconBlipMapStorage*>(ref.mObj);
-    const std::uint32_t count = storage ? storage->mSize : 0u;
+    const auto* const storage = static_cast<const ReconBlipMap*>(ref.mObj);
+    const std::uint32_t count = storage ? static_cast<std::uint32_t>(storage->size()) : 0u;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), static_cast<int>(count));
   }
 
   void ReconBlipMapTypeRuntime::Init()
   {
-    size_ = sizeof(SReconBlipMapStorage);
+    size_ = sizeof(ReconBlipMap);
     version_ = 1;
     serLoadFunc_ = &DeserializeReconBlipMapStorage;
     serSaveFunc_ = &SerializeReconBlipMapStorage;
@@ -887,13 +609,13 @@ namespace
       return;
     }
 
-    auto* const storage = reinterpret_cast<SReconBlipMapStorage*>(
+    auto* const storage = reinterpret_cast<ReconBlipMap*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
 
     unsigned int count = 0;
     archive->ReadUInt(&count);
-    ClearMapStorage(storage);
+    storage->clear();
 
     gpg::RType* const keyType = CachedSReconKeyType();
     GPG_ASSERT(keyType != nullptr);
@@ -907,7 +629,7 @@ namespace
       archive->Read(keyType, &key, owner);
 
       const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, owner);
-      (void)InsertMapNodeBySourceEntityId(storage, key, DecodeTrackedReconBlipPointer(tracked));
+      (void)storage->insert({key, DecodeTrackedReconBlipPointer(tracked)});
 
       key.sourceUnit.UnlinkFromOwnerChain();
     }
@@ -922,15 +644,14 @@ namespace
       return;
     }
 
-    const auto* const storage = reinterpret_cast<const SReconBlipMapStorage*>(
+    const auto* const storage = reinterpret_cast<const ReconBlipMap*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
     );
 
-    const unsigned int count = storage ? storage->mSize : 0u;
+    const unsigned int count = storage ? static_cast<unsigned int>(storage->size()) : 0u;
     archive->WriteUInt(count);
 
-    auto* const head = MapHead(storage);
-    if (!head || count == 0u) {
+    if (!storage || count == 0u) {
       return;
     }
 
@@ -941,9 +662,9 @@ namespace
     }
 
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (ReconMapNodeRuntime* node = MapBegin(storage); node != head; node = MapNext(node, head)) {
-      archive->Write(keyType, &node->key, owner);
-      gpg::WriteRawPointer(archive, MakeReconBlipObjectRef(node->value), gpg::TrackedPointerState::Unowned, owner);
+    for (const auto& entry : *storage) {
+      archive->Write(keyType, &entry.first, owner);
+      gpg::WriteRawPointer(archive, MakeReconBlipObjectRef(entry.second), gpg::TrackedPointerState::Unowned, owner);
     }
   }
 
@@ -1089,7 +810,7 @@ int moho::register_RVectorType_ReconBlipPtr()
 gpg::RType* moho::preregister_RMultiMapType_SReconKey_ReconBlipPtr()
 {
   auto* const type = AcquireReconBlipMapType();
-  gpg::PreRegisterRType(typeid(SReconBlipMapStorage), type);
+  gpg::PreRegisterRType(typeid(ReconBlipMap), type);
   return type;
 }
 
