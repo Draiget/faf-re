@@ -11,6 +11,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/core/streams/Stream.h"
 #include "legacy/containers/AutoPtr.h"
+#include "legacy/containers/Map.h"
 #include "moho/misc/CVirtualFileSystem.h"
 
 struct lua_State;
@@ -37,10 +38,26 @@ namespace moho
   {
     EFileAttributes mFileAttributes = FA_None; // +0x00
     std::uint32_t mFileSize = 0;               // +0x04
-    FILETIME mLastWriteTime{};                 // +0x08
+
+    /**
+     * The write time is an eight-byte quantity, and the whole record inherits
+     * its alignment. That is not a guess: the file-info cache is a
+     * `std::map<std::string, SDiskFileInfo>`, and its node geometry only works
+     * out if this record is 8-aligned. `_Buynode` (0x0045E420) writes the key
+     * at `node+0x10` -- not `node+0x0C`, where the links end -- and copies the
+     * mapped record to `node+0x30`, four bytes past the end of the 0x1C-byte
+     * key. `allocator<_Node>::allocate` (0x0045F380) multiplies by 0x48
+     * (`lea edx,[ecx+ecx*8]` then three doublings), and `_Insert`'s length
+     * guard (0x0045CEE8) compares against `0x5555554` = `0xFFFFFFFF / 0x30 - 1`,
+     * so `sizeof(std::pair<const std::string, SDiskFileInfo>)` is 0x30 with a
+     * four-byte hole after the key. Every one of those numbers follows from
+     * `alignof(SDiskFileInfo) == 8` and none of them from 4.
+     */
+    alignas(8) FILETIME mLastWriteTime{};      // +0x08
   };
 
   static_assert(sizeof(SDiskFileInfo) == 0x10, "SDiskFileInfo size must be 0x10");
+  static_assert(alignof(SDiskFileInfo) == 8, "SDiskFileInfo must be 8-aligned");
 
   struct SFileWaitHandle
   {
@@ -76,54 +93,34 @@ namespace moho
 
   static_assert(sizeof(FWHSEntry) == 0x08, "FWHSEntry size must be 0x08");
 
-  struct FWHSZipEntryMapNode
-  {
-    FWHSZipEntryMapNode* mLeft = nullptr;    // +0x00
-    FWHSZipEntryMapNode* mParent = nullptr;  // +0x04
-    FWHSZipEntryMapNode* mRight = nullptr;   // +0x08
-    msvc8::string mCanonicalPath{};          // +0x0C
-    FWHSEntry mEntry{};                      // +0x28
-    std::uint8_t mColor = 0;                 // +0x30
-    std::uint8_t mIsNil = 0;                 // +0x31
-    std::uint16_t mPadding32 = 0;            // +0x32
-  };
+  /**
+   * The mounted-archive index: one entry per file inside every mounted `.scd`
+   * / `.zip`, keyed on its canonical lower-cased path.
+   *
+   * IDA names the emissions `std::map_string_FWHSEntry::*`, and the geometry
+   * agrees: `_Buynode` (0x0045E1B0) puts the key at `node+0x0C` and the entry
+   * at `node+0x28`, colour and nil land at `+0x30`/`+0x31`, and the node
+   * allocator hands out 0x34 bytes -- exactly
+   * `{left, parent, right, std::pair<const std::string, FWHSEntry>, colour, isNil}`
+   * with a 0x1C-byte key and an 8-byte value.
+   */
+  using FWHSZipEntryMap = msvc8::map<msvc8::string, FWHSEntry>;
 
-  static_assert(offsetof(FWHSZipEntryMapNode, mCanonicalPath) == 0x0C, "FWHSZipEntryMapNode::mCanonicalPath offset must be 0x0C");
-  static_assert(offsetof(FWHSZipEntryMapNode, mEntry) == 0x28, "FWHSZipEntryMapNode::mEntry offset must be 0x28");
-  static_assert(offsetof(FWHSZipEntryMapNode, mIsNil) == 0x31, "FWHSZipEntryMapNode::mIsNil offset must be 0x31");
-  static_assert(sizeof(FWHSZipEntryMapNode) == 0x34, "FWHSZipEntryMapNode size must be 0x34");
+  static_assert(sizeof(FWHSZipEntryMap) == 0x0C, "FWHSZipEntryMap size must be 0x0C");
+  static_assert(sizeof(FWHSZipEntryMap::value_type) == 0x24, "FWHSZipEntryMap::value_type size must be 0x24");
 
-  struct FWHSFileInfoMapNode
-  {
-    FWHSFileInfoMapNode* mLeft = nullptr;    // +0x00
-    FWHSFileInfoMapNode* mParent = nullptr;  // +0x04
-    FWHSFileInfoMapNode* mRight = nullptr;   // +0x08
-    std::uint32_t mUnknown0C = 0;            // +0x0C
-    msvc8::string mCanonicalPath{};          // +0x10
-    std::uint32_t mUnknown2C = 0;            // +0x2C
-    SDiskFileInfo mInfo{};                   // +0x30
-    std::uint8_t mColor = 0;                 // +0x40
-    std::uint8_t mIsNil = 0;                 // +0x41
-    std::uint16_t mPadding42 = 0;            // +0x42
-    std::uint32_t mUnknown44 = 0;            // +0x44
-  };
+  /**
+   * The metadata cache: the last `SDiskFileInfo` resolved for a canonical
+   * path, so a repeated `DiskGetFileInfo` does not re-hit the filesystem.
+   *
+   * `std::map_string_SDiskFileInfo::*` in IDA. The key sits at `node+0x10`
+   * and the record at `node+0x30` because `SDiskFileInfo` is 8-aligned (see
+   * its declaration above), which also makes the node 0x48 rather than 0x40.
+   */
+  using FWHSFileInfoMap = msvc8::map<msvc8::string, SDiskFileInfo>;
 
-  static_assert(offsetof(FWHSFileInfoMapNode, mCanonicalPath) == 0x10, "FWHSFileInfoMapNode::mCanonicalPath offset must be 0x10");
-  static_assert(offsetof(FWHSFileInfoMapNode, mInfo) == 0x30, "FWHSFileInfoMapNode::mInfo offset must be 0x30");
-  static_assert(offsetof(FWHSFileInfoMapNode, mIsNil) == 0x41, "FWHSFileInfoMapNode::mIsNil offset must be 0x41");
-  static_assert(offsetof(FWHSFileInfoMapNode, mUnknown44) == 0x44, "FWHSFileInfoMapNode::mUnknown44 offset must be 0x44");
-  static_assert(sizeof(FWHSFileInfoMapNode) == 0x48, "FWHSFileInfoMapNode size must be 0x48");
-
-  template <typename TNode>
-  struct FWHSTreeMap
-  {
-    void* mProxy = nullptr;  // +0x00
-    TNode* mHead = nullptr;  // +0x04
-    std::uint32_t mSize = 0; // +0x08
-  };
-
-  static_assert(sizeof(FWHSTreeMap<FWHSZipEntryMapNode>) == 0x0C, "FWHSTreeMap<FWHSZipEntryMapNode> size must be 0x0C");
-  static_assert(sizeof(FWHSTreeMap<FWHSFileInfoMapNode>) == 0x0C, "FWHSTreeMap<FWHSFileInfoMapNode> size must be 0x0C");
+  static_assert(sizeof(FWHSFileInfoMap) == 0x0C, "FWHSFileInfoMap size must be 0x0C");
+  static_assert(sizeof(FWHSFileInfoMap::value_type) == 0x30, "FWHSFileInfoMap::value_type size must be 0x30");
 
   struct FWHSLockRuntime
   {
@@ -155,8 +152,8 @@ namespace moho
     std::uint8_t mPadding29[3]{};                     // +0x29
     SFileWaitHandle* mPrev = nullptr;                 // +0x2C
     SFileWaitHandle* mNext = nullptr;                 // +0x30
-    FWHSTreeMap<FWHSZipEntryMapNode> mZipEntries{};   // +0x34
-    FWHSTreeMap<FWHSFileInfoMapNode> mFileInfo{};     // +0x40
+    FWHSZipEntryMap mZipEntries{};                    // +0x34
+    FWHSFileInfoMap mFileInfo{};                      // +0x40
     CVirtualFileSystem* mHandle = nullptr;            // +0x4C
     FWHSThreadStateRuntime mThreadStateInd{};         // +0x50
 

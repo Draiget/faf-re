@@ -300,6 +300,7 @@ namespace msvc8
          * If `built` is true and the string is in heap mode, releases the heap buffer.
          *
          * Address: 0x00402740 (FUN_00402740)
+         * Address: 0x0045F3F0 (FUN_0045F3F0 -- `_Tidy(true)` -- free the heap buffer and restore the empty SSO state for `msvc8::string` (the canonical path keys of both wait-handle-set maps); callers 0x0045E870, 0x0045F670, 0x0045F7A0; formerly `ResetLegacyStringStorage` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
          */
         void tidy(bool built = true, uint32_t newSize = 0U) noexcept;
 
