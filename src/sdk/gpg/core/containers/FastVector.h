@@ -28,6 +28,13 @@ namespace gpg
   template <class T>
   fastvector_runtime_view<T>*
   FastVectorRuntimeCopyAssign(fastvector_runtime_view<T>& destination, const fastvector_runtime_view<T>& source);
+
+  template <class T>
+  [[nodiscard]] T*
+  FastVectorRuntimeInsertRange(fastvector_runtime_view<T>& view, T* insertPos, const T* sourceBegin, const T* sourceEnd);
+
+  template <class T>
+  std::size_t FastVectorRuntimeEnsureCapacity(std::size_t requiredCount, fastvector_runtime_view<T>& view);
 } // namespace gpg
 
 namespace gpg::core
@@ -777,13 +784,208 @@ namespace gpg::core
   };
 
   /**
-   * Small-buffer optimized vector based on FastVector.
-   * No dependency on Base internals (has its own byte helpers).
+   * The capacity-independent head of an inline-backed fast vector:
+   * `{begin, end, capacityEnd, originalVec}`, 0x10 bytes. This is the shape
+   * the binary hands to code that does not know `N` -- `SWeakUnitRefList`
+   * (`CAiFormationDBImpl::NewFormation` reads it at +0x08 of its argument) and
+   * `Unit::GuardedByList` both embed one, with their inline slot run declared
+   * by the derived struct.
+   *
+   * `originalVec_` is the inline anchor: storage is released only when the
+   * active buffer is not that anchor, and the first word of the inline window
+   * holds the saved capacity sentinel so a lane that spilled to the heap can
+   * find its way back. Every growing operation is overridden here because
+   * `FastVector<T>`'s own `Reserve` frees `start_` unconditionally, which
+   * would hand the inline window to `operator delete`.
+   */
+  template <class T>
+  class FastVectorInline : public FastVector<T>
+  {
+  public:
+    using value_type = T;
+    using size_type = std::size_t;
+    using iterator = T*;
+    using const_iterator = const T*;
+
+    T* originalVec_{nullptr}; // +0x0C
+
+    FastVectorInline() = default;
+
+    /**
+     * Address: 0x00401DE0 (FUN_00401DE0, gpg::fastvector_n2_uint::~fastvector_n2_uint)
+     *
+     * What it does:
+     * Destroys the live range, releases the heap block when one is active (the
+     * inline buffer is never freed) and nulls the lanes so the base destructor
+     * has nothing left to do.
+     * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
+     */
+    ~FastVectorInline()
+    {
+      detail::DestroyRange(this->start_, this->end_);
+      if (this->start_ && this->start_ != originalVec_) {
+        detail::FreeElements(this->start_);
+      }
+      // Prevent Base dtor from touching inline storage
+      this->start_ = this->end_ = this->capacity_ = nullptr;
+    }
+
+    FastVectorInline(const FastVectorInline&) = delete;
+    FastVectorInline& operator=(const FastVectorInline&) = delete;
+
+    /**
+     * Bind the lanes to a caller-owned inline window of `count` slots. The
+     * derived struct owns the storage (`FastVectorN<T, N>::inlineVec_`, or the
+     * slot run an engine struct declares after this head), so binding is the
+     * only thing this level can do about it.
+     */
+    void BindInlineStorage(T* const storage, const size_type count) noexcept
+    {
+      this->start_ = storage;
+      this->end_ = storage;
+      this->capacity_ = storage + count;
+      originalVec_ = storage;
+    }
+
+    /**
+     * Returns true while the active buffer is the inline window.
+     */
+    [[nodiscard]] bool UsesInlineStorage() const noexcept
+    {
+      return this->start_ == originalVec_;
+    }
+
+    /**
+     * Address: 0x004021F0 (FUN_004021F0)
+     * Address: 0x004022A0 (FUN_004022A0)
+     * Address: 0x008969E0 (FUN_008969E0,
+     * Moho::CWldSession::ClearBuildTemplates -- the `SBuildTemplateInfo, 16>`
+     * instantiation, recovered as `mBuildTemplates.ResetStorageToInline();`
+     * at the call site (CWldSession.cpp).)
+     * Address: 0x00561D40 (FUN_00561D40,
+     * Moho::SSTIUnitVariableData::~SSTIUnitVariableData -- the
+     * `UnitWeaponInfo, 1>` instantiation, recovered as
+     * `mWeaponInfo.ResetStorageToInline();` at the call site (Unit.cpp).)
+     *
+     * What it does:
+     * if heap-backed -> free heap and restore inline pointers from saved header;
+     * otherwise only reset end to start.
+     * Address: 0x004E7280 (FUN_004E7280 -- reset to inline storage for a 24-byte element; Resets one 24-byte fastvector lane to its inline origin storage, releasing heap storage when the active lane is not already inline.)
+     * Address: 0x0054CCF0 (FUN_0054CCF0 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
+     * Address: 0x0054D760 (FUN_0054D760 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x006FD160 (FUN_006FD160 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
+     * Address: 0x006FD190 (FUN_006FD190 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active lane is not already inline.)
+     * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
+     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+     */
+    void ResetStorageToInline() noexcept
+    {
+      ResetInline_();
+    }
+
+    /**
+     * Address: 0x0070FAD0 (FUN_0070FAD0, `gpg::fastvector_SCondition::
+     * insert_range` -- the ordered insert `Unit::GuardedByList` and the
+     * formation weak-ref sets perform; its reallocating branch is
+     * 0x00710E90, cited on `FastVectorRuntimeReallocateInsert`.)
+     *
+     * What it does:
+     * Inserts `[first, last)` at `pos`, growing storage when the run no longer
+     * fits and never freeing the inline window. Returns the new end, exactly
+     * as the binary body does.
+     */
+    T* InsertRange(T* const pos, const T* const first, const T* const last)
+    {
+      return gpg::FastVectorRuntimeInsertRange<T>(gpg::AsFastVectorRuntimeView<T>(this), pos, first, last);
+    }
+
+    void PushBack(const T& v)
+    {
+      (void)InsertRange(this->end_, &v, &v + 1);
+    }
+
+    void push_back(const T& v)
+    {
+      (void)InsertRange(this->end_, &v, &v + 1);
+    }
+
+    void Reserve(const size_type n)
+    {
+      (void)gpg::FastVectorRuntimeEnsureCapacity<T>(n, gpg::AsFastVectorRuntimeView<T>(this));
+    }
+
+    void reserve(const size_type n)
+    {
+      Reserve(n);
+    }
+
+    void resize(const size_type n)
+    {
+      const T zeroFill{};
+      gpg::FastVectorRuntimeResizeFill<T>(
+        &zeroFill, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
+      );
+    }
+
+    void resize(const size_type n, const T& value)
+    {
+      gpg::FastVectorRuntimeResizeFill<T>(
+        &value, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
+      );
+    }
+
+  protected:
+    /**
+     * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue):
+     * destroy the live range, release the heap block if one is active and
+     * restore the inline window from its saved capacity sentinel.
+     */
+    void ResetInline_() noexcept
+    {
+      detail::DestroyRange(this->start_, this->end_);
+      if (this->start_ != originalVec_) {
+        detail::FreeElements(this->start_);
+        this->start_ = originalVec_;
+        this->capacity_ = InlineCapacityFromHeader_();
+      }
+      this->end_ = this->start_;
+    }
+
+    /**
+     * Save inline capacity in the first pointer-sized slot of inline storage.
+     * This mirrors FA/Moho fastvector_n grow helpers that write:
+     *   if (start == origin) *origin = capacity;
+     */
+    void SaveInlineCapacity_() noexcept
+    {
+      if (!originalVec_) {
+        return;
+      }
+      *reinterpret_cast<T**>(originalVec_) = this->capacity_;
+    }
+
+    T* InlineCapacityFromHeader_() const noexcept
+    {
+      if (!originalVec_) {
+        return nullptr;
+      }
+      return *reinterpret_cast<T* const*>(originalVec_);
+    }
+  };
+
+  static_assert(sizeof(FastVectorInline<int>) == 0x10, "FastVectorInline<T> must be 0x10");
+
+  /**
+   * Small-buffer optimized vector: `FastVectorInline<T>`'s head plus the
+   * inline window it anchors.
    */
   template <class T, size_t N>
-  class FastVectorN : public FastVector<T>
+  class FastVectorN : public FastVectorInline<T>
   {
-    using Base = FastVector<T>;
+    using Base = FastVectorInline<T>;
 
     // Element size in bytes (void is not a valid element, but keep generic math)
     static constexpr size_t ElemSize = std::is_void_v<T> ? 1 : sizeof(T);
@@ -804,7 +1006,6 @@ namespace gpg::core
     }
 
   public:
-    T* originalVec_{};
     /**
      * The inline window is raw, suitably aligned storage -- not `T[N]`. Only
      * `[start_, end_)` ever holds objects, exactly as in the shipped container:
@@ -865,8 +1066,8 @@ namespace gpg::core
       this->start_ = InlineStorage();
       this->end_ = InlineStorage();
       this->capacity_ = InlineStorage() + N;
-      originalVec_ = InlineStorage();
-      SaveInlineCapacity_();
+      this->originalVec_ = InlineStorage();
+      this->SaveInlineCapacity_();
     }
 
     /**
@@ -1018,25 +1219,6 @@ namespace gpg::core
         }
       }
       return *this;
-    }
-
-    /**
-     * Address: 0x00401DE0 (FUN_00401DE0, gpg::fastvector_n2_uint::~fastvector_n2_uint)
-     *
-     * What it does:
-     * Destroys the live range, releases the heap block when one is active (the
-     * inline buffer is never freed) and nulls the lanes so the base destructor
-     * has nothing left to do.
-     * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
-     */
-    ~FastVectorN()
-    {
-      detail::DestroyRange(this->start_, this->end_);
-      if (this->start_ && this->start_ != originalVec_) {
-        detail::FreeElements(this->start_);
-      }
-      // Prevent Base dtor from touching inline storage
-      this->start_ = this->end_ = this->capacity_ = nullptr;
     }
 
     /**
@@ -1588,46 +1770,15 @@ namespace gpg::core
     // Reset to inline storage and copy from a plain FastVector view
     void ResetFrom(const FastVector<T>& src)
     {
-      ResetInline_();
+      this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
 
     // Reset to inline storage and copy from another FastVectorN
     void ResetFrom(const FastVectorN<T, N>& src)
     {
-      ResetInline_();
+      this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
-    }
-
-    /**
-     * Address: 0x004021F0 (FUN_004021F0)
-     * Address: 0x004022A0 (FUN_004022A0)
-     * Address: 0x008969E0 (FUN_008969E0,
-     * Moho::CWldSession::ClearBuildTemplates -- the `SBuildTemplateInfo, 16>`
-     * instantiation, recovered as `mBuildTemplates.ResetStorageToInline();`
-     * at the call site (CWldSession.cpp).)
-     * Address: 0x00561D40 (FUN_00561D40,
-     * Moho::SSTIUnitVariableData::~SSTIUnitVariableData -- the
-     * `UnitWeaponInfo, 1>` instantiation, recovered as
-     * `mWeaponInfo.ResetStorageToInline();` at the call site (Unit.cpp).)
-     *
-     * What it does:
-     * if heap-backed -> free heap and restore inline pointers from saved header;
-     * otherwise only reset end to start.
-     * Address: 0x004E7280 (FUN_004E7280 -- reset to inline storage for a 24-byte element; Resets one 24-byte fastvector lane to its inline origin storage, releasing heap storage when the active lane is not already inline.)
-     * Address: 0x0054CCF0 (FUN_0054CCF0 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
-     * Address: 0x0054D760 (FUN_0054D760 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x006FD160 (FUN_006FD160 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
-     * Address: 0x006FD190 (FUN_006FD190 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active lane is not already inline.)
-     * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     */
-    void ResetStorageToInline() noexcept
-    {
-      ResetInline_();
     }
 
     /**
@@ -1642,7 +1793,7 @@ namespace gpg::core
      */
     void RebindInlineNoFree() noexcept
     {
-      originalVec_ = InlineStorage();
+      this->originalVec_ = InlineStorage();
       this->start_ = InlineStorage();
       this->end_ = InlineStorage();
       this->capacity_ = InlineStorage() + N;
@@ -1666,7 +1817,7 @@ namespace gpg::core
     [[nodiscard]]
     bool UsingInlineStorage() const noexcept
     {
-      return this->start_ == originalVec_;
+      return this->start_ == this->originalVec_;
     }
 
     /**
@@ -1674,7 +1825,7 @@ namespace gpg::core
      */
     void SaveInlineCapacityHeader() noexcept
     {
-      SaveInlineCapacity_();
+      this->SaveInlineCapacity_();
     }
 
     /**
@@ -2074,8 +2225,8 @@ namespace gpg::core
         reinterpret_cast<IntrusiveWeakLinkNode*>(oldStart), reinterpret_cast<IntrusiveWeakLinkNode*>(oldEnd)
       );
 
-      if (oldStart == originalVec_) {
-        SaveInlineCapacity_();
+      if (oldStart == this->originalVec_) {
+        this->SaveInlineCapacity_();
       } else {
         detail::FreeElements(oldStart);
       }
@@ -2149,8 +2300,8 @@ namespace gpg::core
       }
 
       detail::DestroyRange(oldStart, oldEnd);
-      if (oldStart == originalVec_) {
-        SaveInlineCapacity_();
+      if (oldStart == this->originalVec_) {
+        this->SaveInlineCapacity_();
       } else {
         detail::FreeElements(oldStart);
       }
@@ -2253,8 +2404,8 @@ namespace gpg::core
         write = CopyRangeForward(write, insStart, insEnd);
         write = CopyRangeForward(write, pos, this->end_);
 
-        if (this->start_ == originalVec_) {
-          SaveInlineCapacity_();
+        if (this->start_ == this->originalVec_) {
+          this->SaveInlineCapacity_();
         } else {
           detail::FreeElements(this->start_);
         }
@@ -2263,43 +2414,6 @@ namespace gpg::core
         this->end_ = write;
         this->capacity_ = newBuffer + newCapacity;
       }
-    }
-
-    /**
-     * Rebind this container to its inline buffer (like func_Reset_fastvector_n prologue):
-     * destroy the live range, release the heap block if one is active and
-     * restore the inline window from its saved capacity sentinel.
-     */
-    void ResetInline_() noexcept
-    {
-      detail::DestroyRange(this->start_, this->end_);
-      if (this->start_ != originalVec_) {
-        detail::FreeElements(this->start_);
-        this->start_ = originalVec_;
-        this->capacity_ = InlineCapacityFromHeader_();
-      }
-      this->end_ = this->start_;
-    }
-
-    /**
-     * Save inline capacity in the first pointer-sized slot of inline storage.
-     * This mirrors FA/Moho fastvector_n grow helpers that write:
-     *   if (start == origin) *origin = capacity;
-     */
-    void SaveInlineCapacity_() noexcept
-    {
-      if (!originalVec_) {
-        return;
-      }
-      *reinterpret_cast<T**>(originalVec_) = this->capacity_;
-    }
-
-    T* InlineCapacityFromHeader_() const noexcept
-    {
-      if (!originalVec_) {
-        return nullptr;
-      }
-      return *reinterpret_cast<T* const*>(originalVec_);
     }
 
     /**
@@ -2359,7 +2473,7 @@ namespace gpg::core
         return;
       }
 
-      // Callers reach here straight after `ResetInline_()`, so the live range is
+      // Callers reach here straight after `this->ResetInline_()`, so the live range is
       // empty and every slot written below is raw storage to construct into.
       if (count <= N) {
         if constexpr (std::is_trivially_copyable_v<T>) {
@@ -2385,10 +2499,10 @@ namespace gpg::core
       }
 
       // Free previous heap buffer only if not using inline storage
-      if (this->start_ && this->start_ != originalVec_) {
+      if (this->start_ && this->start_ != this->originalVec_) {
         detail::FreeElements(this->start_);
-      } else if (this->start_ == originalVec_) {
-        SaveInlineCapacity_();
+      } else if (this->start_ == this->originalVec_) {
+        this->SaveInlineCapacity_();
       }
 
       this->start_ = p;
@@ -2411,10 +2525,10 @@ namespace gpg::core
         detail::DestroyRange(this->start_, this->end_);
       }
 
-      if (this->start_ != originalVec_) {
+      if (this->start_ != this->originalVec_) {
         detail::FreeElements(this->start_);
       } else {
-        SaveInlineCapacity_();
+        this->SaveInlineCapacity_();
       }
 
       this->start_ = newBuf;

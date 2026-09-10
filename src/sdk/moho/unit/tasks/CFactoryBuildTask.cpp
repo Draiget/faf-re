@@ -469,10 +469,8 @@ namespace moho
         // Select a TRANSPORTATION guard that is ferrying, preferring one that is
         // not currently moving; stop at the first stationary transport.
         Unit* selectedTransport = nullptr;
-        const gpg::fastvector_runtime_view<SGuardedByWeakOwnerSlot> guardSlots =
-          terminalGuarded->GuardedByList.mSlots;
-        for (const SGuardedByWeakOwnerSlot* slot = guardSlots.begin; slot != guardSlots.end; ++slot) {
-          const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(slot->ownerLinkSlot);
+        for (const SGuardedByWeakOwnerSlot& guardSlot : terminalGuarded->GuardedByList.mSlots) {
+          const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(guardSlot.ownerLinkSlot);
           if (encoded == 0) {
             break;
           }
