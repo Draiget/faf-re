@@ -1622,6 +1622,7 @@ namespace msvc8
          * Address: 0x0047D7F0 (FUN_0047D7F0 -- `allocator<T>::allocate` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D2D0 (unreached); formerly `AllocateStampStorage` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E270 (FUN_0047E270 -- `allocator<T>::allocate` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D3C0, 0x0047D7F0, 0x0047D96F; formerly `AllocateStampArray` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047E400 (FUN_0047E400 -- `allocator<T>::allocate` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DD80, 0x0047E11F, 0x007F4C6E; formerly `AllocateBandwidthSampleArray` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E3450 (FUN_004E3450 -- `allocate_checked` for a 0x0C `{next, prev, value}` list node, then the three link/value stores `_Buynode` follows it with; callers 0x004DF990, 0x004E1B2C, 0x004E25B0; formerly `AllocateSndVarRegistryEntryRuntime` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
@@ -11257,6 +11258,8 @@ namespace msvc8
         /**
          * Address: 0x007D7A10 (FUN_007D7A10 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D60D0, 0x007D61E0, 0x007D7FF3; formerly `ClearIntrusiveListNodes` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007D7820 (FUN_007D7820 -- the region-map list's `clear()` for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D5F20, 0x007D5F80, 0x007D7D23; formerly `ClearRegionMapList` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E3410 (FUN_004E3410 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DF0E0, 0x004DFC80, 0x004E2630; formerly `ClearSndVarListStorage` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E4A40 (FUN_004E4A40 -- the payload destructor pass a `clear()` runs over the range before freeing the nodes for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DF0E0; formerly `DestroyCSndVarPayloadRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          */
         void clear()
         {
@@ -11489,6 +11492,8 @@ namespace msvc8
          * Address: 0x00932880 (FUN_00932880 -- `list<T>::erase(pos)` returning the successor through the hidden slot; callers 0x00933C40 (unreached); formerly `EraseIntrusiveNodeAndStoreNextRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0092E640 (FUN_0092E640 -- `list<T>::erase(first, last)` (the whole-list case routed through `clear`); zero callers, unreachable; formerly `EraseIntrusiveNodeRangeAndStoreCursorRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00932D40 (FUN_00932D40 -- `list<T>::erase(first, last)` (the whole-list case routed through `clear`); zero callers, unreachable; formerly `EraseIntrusiveNodeRangeAndStoreCursorRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E1B50 (FUN_004E1B50 -- `remove(value)` -- the same `erase(pos)` run over every equal node for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DFA20; formerly `EraseSndVarNodesByKey` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E25E0 (FUN_004E25E0 -- `erase(pos)` -- unlink, free, decrement, hand back the successor for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004E5960; formerly `UnlinkAndDeleteSndVarListNode` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos)
         {
@@ -11679,6 +11684,8 @@ namespace msvc8
          * Address: 0x00495F30 (FUN_00495F30 -- `list<ParticleBuffer*>::_Tidy` (the clear / destructor walk; reached from `CWorldParticles::CWorldParticles`'s unwind funclet and `~CWorldParticles`); callers 0x004925E0, 0x00492780, 0x00497D23; formerly `ClearLegacyPoolListNodes` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Clears one legacy intrusive list by unlinking the head sentinel and freeing all non-sentinel nodes.)
          * Address: 0x0092DB40 (FUN_0092DB40 -- `list<T>::clear()` / `_Tidy`; callers 0x0092E640 (unreached); formerly `ClearIntrusiveNodeListRuntimeA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00932760 (FUN_00932760 -- `list<T>::clear()` / `_Tidy`; callers 0x00932D40 (unreached); formerly `ClearIntrusiveNodeListRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E5A00 (FUN_004E5A00 -- the detached-chain teardown: unlink every node, then free the head for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; zero callers, unreachable; formerly `DestroyDetachedSndVarChainHead` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004E2630 (FUN_004E2630 -- `~list()` -- `_Tidy` then free the header for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004E1A60; formerly `DestroySndVarListStorageAndReleaseHead` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          */
         void _Tidy()
         {
