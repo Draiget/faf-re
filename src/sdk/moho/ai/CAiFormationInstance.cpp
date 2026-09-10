@@ -5,11 +5,8 @@
 #include <cstdlib>
 #include <initializer_list>
 #include <limits>
-#include <map>
 #include <new>
-#include <stdexcept>
 #include <typeinfo>
-#include <vector>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
@@ -17,36 +14,40 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
-#include "legacy/containers/Tree.h"
+#include "gpg/core/reflection/StaticInitPhase.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 #include "moho/ai/EFormationdStatusTypeInfo.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/command/SSTICommandIssueData.h"
+#include "moho/command/SSTICommandVariableData.h"
+#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/misc/Listener.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/RRuleGameRules.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SOCellPos.h"
+#include "moho/sim/STIMap.h"
 #include "moho/unit/Broadcaster.h"
 #include "moho/unit/CUnitCommand.h"
 #include "moho/unit/CUnitCommandQueue.h"
-#include "moho/entity/EntityCategoryReflection.h"
+#include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
-#include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
 {
-  Wm3::Vector3f* MultQuadVec(Wm3::Vector3f* dest, const Wm3::Vector3f* vec, const Wm3::Quaternionf* quat);
   bool COORDS_CanMoveAt(SOCellPos* pos, COGrid* grid, Unit* moveUnit, bool disallowAttached, Unit* ignoreUnit);
 }
 
 namespace
 {
-  using FormationUnitOffsetMap = std::map<moho::EntId, moho::SUnitOffsetInfo>;
-  using FormationCoordMap = std::map<moho::EntId, moho::SCoordsVec2>;
+  using UnitOffsetMap = msvc8::map<moho::EntId, moho::SUnitOffsetInfo>;
+  using CoordMap = msvc8::map<moho::EntId, moho::SCoordsVec2>;
+  using UnitWeakSet = gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>;
 
   [[nodiscard]] gpg::RType* CachedEntIdType();
   [[nodiscard]] gpg::RType* CachedSUnitOffsetInfoType();
@@ -54,22 +55,6 @@ namespace
   [[nodiscard]] gpg::RType* CachedSOffsetInfoType();
   [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType();
   [[nodiscard]] gpg::RType* CachedIFormationInstanceType();
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* LowerBoundOrInsertCoordCacheNode(
-    moho::SFormationCoordCacheMap& cache,
-    std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  );
-
-  // Forward declarations: bodies are defined later in this anonymous
-  // namespace, after the lane-map RB-tree helpers they call; referenced by
-  // address from RMapType_EntId_SUnitOffsetInfo::Init above their definition.
-  void RMapType_EntId_SUnitOffsetInfo_SerSave(
-    gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  );
-  void RMapType_EntId_SUnitOffsetInfo_SerLoad(
-    gpg::ReadArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef
-  );
 
   [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
   {
@@ -176,7 +161,7 @@ namespace
    * Address: 0x00570D20 (FUN_00570D20)
    *
    * What it does:
-   * Registers `Broadcaster<EFormationdStatus>` as one reflected base lane for
+   * Registers `Broadcaster<EFormationdStatus>` as one reflected base of
    * `IFormationInstance` at offset `+0x08`.
    */
   void AddBroadcasterEFormationdStatusBaseToIFormationInstanceType(gpg::RType* const typeInfo)
@@ -257,11 +242,9 @@ namespace
   };
 
   // The binary globals are 0x14 bytes (vtable + `moho::TDatListItem` link
-  // pair + load/save callback lanes, matching every other SerHelperBase-
+  // pair + load/save callback slots, matching every other SerHelperBase-
   // derived serializer in this codebase). Each targets a different reflected
-  // type, so each needs its own `Init()` override -- one shared struct can't
-  // carry four different override bodies, hence four distinct types below
-  // instead of the single `FormationSerializerHelperNode` this used to be.
+  // type, so each needs its own `Init()` override.
 
   /// Demangled: gpg::SerSaveLoadHelper<class Moho::SUnitOffsetInfo>
   struct SUnitOffsetInfoSerializerHelperNode : public gpg::SerHelperBase
@@ -420,70 +403,65 @@ namespace
   SAssignedLocInfoSerializerHelperNode gSAssignedLocInfoSerializer{};
 
   /**
-   * Address: 0x00566360 (FUN_00566360, SerSaveLoadHelper<SUnitOffsetInfo>::unlink lane A)
+   * Address: 0x00566360 (FUN_00566360, SerSaveLoadHelper<SUnitOffsetInfo>::unlink)
    *
    * What it does:
-   * Unlinks `SUnitOffsetInfo` serializer helper links and restores self-links
-   * for intrusive-list sentinel state.
+   * Unlinks the `SUnitOffsetInfo` serializer helper node and restores its
+   * self-links for intrusive-list sentinel state.
    */
-  void UnlinkSUnitOffsetInfoSerializerLaneA() noexcept
+  void UnlinkSUnitOffsetInfoSerializer() noexcept
   {
     gSUnitOffsetInfoSerializer.ResetLinks();
   }
 
-
   /**
-   * Address: 0x00566550 (FUN_00566550, SerSaveLoadHelper<SOffsetInfo>::unlink lane A)
+   * Address: 0x00566550 (FUN_00566550, SerSaveLoadHelper<SOffsetInfo>::unlink)
    *
    * What it does:
-   * Unlinks `SOffsetInfo` serializer helper links and restores self-links for
-   * intrusive-list sentinel state.
+   * Unlinks the `SOffsetInfo` serializer helper node and restores its
+   * self-links for intrusive-list sentinel state.
    */
-  void UnlinkSOffsetInfoSerializerLaneA() noexcept
+  void UnlinkSOffsetInfoSerializer() noexcept
   {
     gSOffsetInfoSerializer.ResetLinks();
   }
 
-
   /**
-   * Address: 0x00566740 (FUN_00566740, SerSaveLoadHelper<IFormationInstance>::unlink lane A)
+   * Address: 0x00566740 (FUN_00566740, SerSaveLoadHelper<IFormationInstance>::unlink)
    *
-   * What it does:
-   * Unlinks `IFormationInstance` serializer helper links and restores
-   * self-links for intrusive-list sentinel state.
-   */
-  /**
    * The duplicate emissions of this file's serializer glue -- second entry
    * points for the same work, each a single call and referenced by nothing.
    * A thunk has no source line behind it; the source called the target.
    *
-   * Address: 0x00566770  duplicate of this lane
-   * Address: 0x00566970  duplicate of the SAssignedLocInfo unlink lane
-   * Address: 0x00566580  duplicate of the SOffsetInfo unlink lane
-   * Address: 0x00566390  duplicate of the SUnitOffsetInfo unlink lane
+   * Address: 0x00566770  duplicate of this unlink
+   * Address: 0x00566970  duplicate of the SAssignedLocInfo unlink
+   * Address: 0x00566580  duplicate of the SOffsetInfo unlink
+   * Address: 0x00566390  duplicate of the SUnitOffsetInfo unlink
    * Address: 0x0059DB60 / 0x0059E000  bridges into
    *   CAiFormationInstance::MemberDeserialize
    * Address: 0x0059DB70 / 0x0059E010  bridges into
    *   CAiFormationInstance::MemberSerialize
+   *
+   * What it does:
+   * Unlinks the `IFormationInstance` serializer helper node and restores
+   * its self-links for intrusive-list sentinel state.
    */
-  void UnlinkIFormationInstanceSerializerLaneA() noexcept
+  void UnlinkIFormationInstanceSerializer() noexcept
   {
     gIFormationInstanceSerializer.ResetLinks();
   }
 
-
   /**
-   * Address: 0x00566940 (FUN_00566940, SerSaveLoadHelper<SAssignedLocInfo>::unlink lane A)
+   * Address: 0x00566940 (FUN_00566940, SerSaveLoadHelper<SAssignedLocInfo>::unlink)
    *
    * What it does:
-   * Unlinks `SAssignedLocInfo` serializer helper links and restores
+   * Unlinks the `SAssignedLocInfo` serializer helper node and restores its
    * self-links for intrusive-list sentinel state.
    */
-  void UnlinkSAssignedLocInfoSerializerLaneA() noexcept
+  void UnlinkSAssignedLocInfoSerializer() noexcept
   {
     gSAssignedLocInfoSerializer.ResetLinks();
   }
-
 
   /**
    * Address: 0x00566300 (FUN_00566300, Moho::SUnitOffsetInfoSerializer::Deserialize)
@@ -491,7 +469,7 @@ namespace
    * What it does:
    * Reflection load-callback facade for SUnitOffsetInfo. Forwards the
    * reflected object pointer to SUnitOffsetInfo::MemberDeserialize
-   * (FUN_005707B0 body); version and the owner-ref lane are unused by the
+   * (FUN_005707B0 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void DeserializeSUnitOffsetInfoSerializerCallback(
@@ -514,7 +492,7 @@ namespace
    * What it does:
    * Reflection save-callback facade for SUnitOffsetInfo. Forwards the
    * reflected object pointer to SUnitOffsetInfo::MemberSerialize
-   * (FUN_005708A0 body); version and the owner-ref lane are unused by the
+   * (FUN_005708A0 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void SerializeSUnitOffsetInfoSerializerCallback(
@@ -536,20 +514,20 @@ namespace
    *
    * What it does:
    * Process-exit teardown: unlinks the SUnitOffsetInfoSerializer helper
-   * node, matching the sibling unlink lanes used across other serializer
+   * node, matching the sibling unlinks used across other serializer
    * registrars.
    */
   void cleanup_SUnitOffsetInfoSerializer_atexit()
   {
-    UnlinkSUnitOffsetInfoSerializerLaneA();
+    UnlinkSUnitOffsetInfoSerializer();
   }
 
   /**
    * Address: 0x00BCAAC0 (FUN_00BCAAC0, register_SUnitOffsetInfoSerializer)
    *
    * What it does:
-   * Binds the global SUnitOffsetInfo serializer helper load/save callback
-   * lanes and installs process-exit cleanup via atexit. The helper node
+   * Binds the global SUnitOffsetInfo serializer helper load/save callbacks
+   * and installs process-exit cleanup via atexit. The helper node
    * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
    * automatically as part of its own construction, which runs before this
    * function does, so this no longer needs to unlink/self-link the node
@@ -567,23 +545,22 @@ namespace
    *
    * What it does:
    * Process-exit teardown: unlinks the SOffsetInfoSerializer helper node,
-   * matching the sibling unlink lanes used across other serializer
-   * registrars.
+   * matching the sibling unlinks used across other serializer registrars.
    */
   void cleanup_SOffsetInfoSerializer_atexit()
   {
-    UnlinkSOffsetInfoSerializerLaneA();
+    UnlinkSOffsetInfoSerializer();
   }
 
   /**
    * Address: 0x00BCAB20 (FUN_00BCAB20, register_SOffsetInfoSerializer)
    *
    * What it does:
-   * Binds the global SOffsetInfo serializer helper load/save callback lanes
-   * and installs process-exit cleanup via atexit. The helper node self-links
-   * and splices into `gpg::SerHelperBase::sNewHelpers` automatically as part
-   * of its own construction, which runs before this function does, so this
-   * no longer needs to unlink/self-link the node itself first.
+   * Binds the global SOffsetInfo serializer helper load/save callbacks and
+   * installs process-exit cleanup via atexit. The helper node self-links and
+   * splices into `gpg::SerHelperBase::sNewHelpers` automatically as part of
+   * its own construction, which runs before this function does, so this no
+   * longer needs to unlink/self-link the node itself first.
    */
   void register_SOffsetInfoSerializer()
   {
@@ -598,7 +575,7 @@ namespace
    * What it does:
    * Reflection load-callback facade for IFormationInstance. Forwards the
    * reflected object pointer to IFormationInstance::MemberDeserialize
-   * (FUN_00570D80 body); version and the owner-ref lane are unused by the
+   * (FUN_00570D80 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void DeserializeIFormationInstanceSerializerCallback(
@@ -621,7 +598,7 @@ namespace
    * What it does:
    * Reflection save-callback facade for IFormationInstance. Forwards the
    * reflected object pointer to IFormationInstance::MemberSerialize
-   * (FUN_00570DD0 body); version and the owner-ref lane are unused by the
+   * (FUN_00570DD0 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void SerializeIFormationInstanceSerializerCallback(
@@ -643,20 +620,20 @@ namespace
    *
    * What it does:
    * Process-exit teardown: unlinks the IFormationInstanceSerializer
-   * helper node, matching the sibling unlink lanes used across other
+   * helper node, matching the sibling unlinks used across other
    * serializer registrars.
    */
   void cleanup_IFormationInstanceSerializer_atexit()
   {
-    UnlinkIFormationInstanceSerializerLaneA();
+    UnlinkIFormationInstanceSerializer();
   }
 
   /**
    * Address: 0x00BCAB80 (FUN_00BCAB80, register_IFormationInstanceSerializer)
    *
    * What it does:
-   * Binds the global IFormationInstance serializer helper load/save callback
-   * lanes and installs process-exit cleanup via atexit. The helper node
+   * Binds the global IFormationInstance serializer helper load/save
+   * callbacks and installs process-exit cleanup via atexit. The helper node
    * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
    * automatically as part of its own construction, which runs before this
    * function does, so this no longer needs to unlink/self-link the node
@@ -675,7 +652,7 @@ namespace
    * What it does:
    * Reflection load-callback facade for SAssignedLocInfo. Forwards the
    * reflected object pointer to SAssignedLocInfo::MemberDeserialize
-   * (FUN_00570E20 body); version and the owner-ref lane are unused by the
+   * (FUN_00570E20 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void DeserializeSAssignedLocInfoSerializerCallback(
@@ -698,7 +675,7 @@ namespace
    * What it does:
    * Reflection save-callback facade for SAssignedLocInfo. Forwards the
    * reflected object pointer to SAssignedLocInfo::MemberSerialize
-   * (FUN_00570E80 body); version and the owner-ref lane are unused by the
+   * (FUN_00570E80 body); version and the owner-ref are unused by the
    * member (mirrors the binary tail call).
    */
   void SerializeSAssignedLocInfoSerializerCallback(
@@ -720,24 +697,23 @@ namespace
    *
    * What it does:
    * Process-exit teardown: unlinks the SAssignedLocInfoSerializer helper
-   * node, matching the sibling unlink lanes used across other serializer
+   * node, matching the sibling unlinks used across other serializer
    * registrars.
    */
   void cleanup_SAssignedLocInfoSerializer_atexit()
   {
-    UnlinkSAssignedLocInfoSerializerLaneA();
+    UnlinkSAssignedLocInfoSerializer();
   }
 
   /**
    * Address: 0x00BCABE0 (FUN_00BCABE0, register_SAssignedLocInfoSerializer)
    *
    * What it does:
-   * Binds the global SAssignedLocInfo serializer helper load/save callback
-   * lanes and installs process-exit cleanup via atexit. The helper node
-   * self-links and splices into `gpg::SerHelperBase::sNewHelpers`
-   * automatically as part of its own construction, which runs before this
-   * function does, so this no longer needs to unlink/self-link the node
-   * itself first.
+   * Binds the global SAssignedLocInfo serializer helper load/save callbacks
+   * and installs process-exit cleanup via atexit. The helper node self-links
+   * and splices into `gpg::SerHelperBase::sNewHelpers` automatically as part
+   * of its own construction, which runs before this function does, so this
+   * no longer needs to unlink/self-link the node itself first.
    */
   void register_SAssignedLocInfoSerializer()
   {
@@ -823,7 +799,7 @@ namespace
      *
      * What it does:
      * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
-     * element count straight off the reflected map's node-count lane.
+     * element count straight off the reflected map's node-count word.
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
@@ -831,30 +807,38 @@ namespace
      * Address: 0x0056DC00 (FUN_0056DC00, gpg::RMapType_EntId_SUnitOffsetInfo::SerSave)
      *
      * What it does:
-     * Serializes one lane's `unitMap` payload by writing key/value pairs with
-     * reflected EntId and SUnitOffsetInfo RTTI lanes, walking the real
-     * `SFormationLaneUnitMap` RB-tree in order.
-     *
-     * `objectPtr` is `&SOffsetInfo::unitMap` (`SOffsetInfo::MemberSerialize`
-     * hands this type `this`, and `unitMap` is the class's first member, so
-     * the two addresses coincide) -- a `SFormationLaneUnitMap`, not a real
-     * `std::map<EntId,SUnitOffsetInfo>`. `Init` below sets `size_ = 0x0C`,
-     * matching `SFormationLaneUnitMap` exactly (allocator cookie + head +
-     * size), which is what proves the binary layout here and not the
-     * abstract map shape. Each node's value payload (`linkedUnitOwnerWord`
-     * onward) is byte-identical to `SUnitOffsetInfo` -- proven field-by-field
-     * against `FUN_005683F0`'s copy body -- so a scratch `SUnitOffsetInfo` is
-     * populated from the node's named fields (never linked into any real
-     * weak chain, via `BindObjectUnlinked`) and handed to the reflected
-     * `SUnitOffsetInfo` writer.
-     *
-     * Body lives as the free function `RMapType_EntId_SUnitOffsetInfo_SerSave`
-     * below `InsertLaneMapNode`'s definition later in this file (needs the
-     * lane-map RB-tree helpers that function calls; matches the free-function
-     * `serSaveFunc_`/`serLoadFunc_` style `RBroadcasterRType_EFormationdStatus`
-     * already uses above for the same reason). Wired into `serSaveFunc_` in
-     * `Init` below.
+     * Serializes one `std::map<EntId,SUnitOffsetInfo>` by writing the
+     * element count, then every key/value pair through the reflected
+     * `EntId` and `SUnitOffsetInfo` descriptors in tree order.
+     * `objectPtr` is `&SOffsetInfo::mUnitOffsets` (`SOffsetInfo::
+     * MemberSerialize` hands this type its first member). `Init` below sets
+     * `size_ = 0x0C`, the `{proxy, head, size}` map footprint.
      */
+    static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      const auto* const mapObject = reinterpret_cast<const UnitOffsetMap*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      );
+      if (!archive || !mapObject) {
+        return;
+      }
+
+      archive->WriteUInt(static_cast<unsigned int>(mapObject->size()));
+
+      gpg::RType* const keyType = CachedEntIdType();
+      gpg::RType* const valueType = CachedSUnitOffsetInfoType();
+      GPG_ASSERT(keyType != nullptr);
+      GPG_ASSERT(valueType != nullptr);
+      if (!keyType || !valueType) {
+        return;
+      }
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (const auto& [key, value] : *mapObject) {
+        archive->Write(keyType, &key, owner);
+        archive->Write(valueType, &value, owner);
+      }
+    }
 
     /**
      * Address: 0x0056D9D0 (FUN_0056D9D0, gpg::RMapType_EntId_SUnitOffsetInfo::SerLoad)
@@ -863,61 +847,60 @@ namespace
      * gpg::RType *__cdecl sub_56D9D0(gpg::ReadArchive *archive, int objectPtr, int version, gpg::RRef *ownerRef);
      *
      * What it does:
-     * Read mirror of `SerSave`: resets `unitMap` to empty (the binary's inline
-     * `sub_56CE70` recursive-destroy + head-reset sequence, matching
-     * `ResetLaneMap` exactly -- verified instruction-for-instruction against
-     * `FUN_0056D9D0.asm` 0x0056D9F4-0x0056DA34), then reads the element count
-     * and, for each element, reads one EntId key and one reflected
-     * `SUnitOffsetInfo` value (`gpg::ReadArchive::Read` at 0x0056DA97 /
-     * 0x0056DAC0) into a scratch `SUnitOffsetInfo` and inserts a matching
-     * `SFormationLaneUnitNode` via `InsertLaneMapNode` (CAiFormationInstance.cpp),
-     * the find-or-update RB-tree insert every other writer of this map already
-     * uses.
-     *
-     * `InsertLaneMapNode` is also where the following `RunScript`-closure
-     * addresses resolve, since it is the direct-typed recovery of the same
-     * compiler-emitted `std::map<EntId,SUnitOffsetInfo>` insert body they are
-     * all sub-parts or call sites of (no separate bespoke function is written
-     * for any of them -- RULE ONE in CLAUDE.md):
-     *   - Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0) -- the `operator[]`/
-     *     find-or-insert emission itself. Direct callsite:
-     *     `CAiFormationInstance::RunScript` 0x00567E06 and 0x00567F9A -- the
-     *     binary calls it twice per assigned candidate (find-or-default-insert,
-     *     then find-again-and-overwrite); nothing is observably read from the
-     *     map between the two calls, so `InsertLaneMapNode`'s single
-     *     find-or-update call with the final computed field values produces
-     *     identical final tree contents.
-     *   - Address: 0x005683F0 (FUN_005683F0) -- `SUnitOffsetInfo` default-node
-     *     value copy (splices a fresh copy's weak-link word pair into the
-     *     source's owner chain, then copies the ten remaining scalar fields).
-     *     Superseded by `InsertLaneMapNode`'s own `RelinkWeakWordNode` call and
-     *     direct field writes.
-     *   - Address: 0x0056CCE0 (FUN_0056CCE0) -- the RB-tree unique-insert
-     *     descent with duplicate detection (calls the predecessor/successor
-     *     navigation lanes below to disambiguate). Superseded by
-     *     `InsertLaneMapNode`'s simpler single-pass descending-compare loop,
-     *     which detects an exact key match at the same point without a
-     *     separate predecessor probe.
-     *   - Address: 0x00570530 (FUN_00570530) -- in-order predecessor
-     *     navigation (`_Tree::_Dec`), used only by the duplicate-detection
-     *     dance above (also called from three other tree-erase/-iterate sites
-     *     outside `RunScript`'s closure, none of which this pass touches).
-     *
-     * The scratch value's weak link is explicitly unlinked afterward since the
-     * map node above now owns the real link (mirrors every other
-     * construct-then-transfer-then-unlink dance in this file).
-     *
-     * Body lives as the free function `RMapType_EntId_SUnitOffsetInfo_SerLoad`
-     * below `InsertLaneMapNode`'s definition later in this file, for the same
-     * reason as `SerSave` above. Wired into `serLoadFunc_` in `Init` below.
+     * Read mirror of `SerSave`: empties the map (the inlined `_Tree::clear`
+     * at 0x0056D9F4-0x0056DA34), reads the element count and, for each
+     * element, reads one `EntId` key and one reflected `SUnitOffsetInfo`
+     * value into a scratch pair (0x0056DA97 / 0x0056DAC0), then inserts the
+     * pair (`_Tree::insert`, 0x0056EA80). The scratch value's `mUnit` weak
+     * link, which the reflected read spliced into the unit's chain, is
+     * unlinked again by the scratch destructor at loop end -- the map node's
+     * own copy owns the membership from then on.
      */
+    static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
+    {
+      auto* const mapObject = reinterpret_cast<UnitOffsetMap*>(
+        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
+      );
+      if (!archive) {
+        return;
+      }
+
+      unsigned int count = 0u;
+      archive->ReadUInt(&count);
+
+      if (mapObject) {
+        mapObject->clear();
+      }
+      if (!mapObject || count == 0u) {
+        return;
+      }
+
+      gpg::RType* const keyType = CachedEntIdType();
+      gpg::RType* const valueType = CachedSUnitOffsetInfoType();
+      GPG_ASSERT(keyType != nullptr);
+      GPG_ASSERT(valueType != nullptr);
+      if (!keyType || !valueType) {
+        return;
+      }
+
+      const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+      for (unsigned int i = 0; i < count; ++i) {
+        moho::EntId key{};
+        archive->Read(keyType, &key, owner);
+
+        moho::SUnitOffsetInfo value{};
+        archive->Read(valueType, &value, owner);
+
+        (void)mapObject->insert(UnitOffsetMap::value_type(key, value));
+      }
+    }
 
     void Init() override
     {
-      size_ = 0x0C;
+      size_ = sizeof(UnitOffsetMap);
       version_ = 1;
-      serSaveFunc_ = &RMapType_EntId_SUnitOffsetInfo_SerSave;
-      serLoadFunc_ = &RMapType_EntId_SUnitOffsetInfo_SerLoad;
+      serSaveFunc_ = &RMapType_EntId_SUnitOffsetInfo::SerSave;
+      serLoadFunc_ = &RMapType_EntId_SUnitOffsetInfo::SerLoad;
       gpg::RType::Init();
       Finish();
     }
@@ -980,7 +963,7 @@ namespace
      *
      * What it does:
      * Appends `", size=<n>"` to the base `RType::GetLexical` text, taking the
-     * element count straight off the reflected map's node-count lane.
+     * element count straight off the reflected map's node-count word.
      */
     [[nodiscard]] msvc8::string GetLexical(const gpg::RRef& ref) const override;
 
@@ -989,11 +972,11 @@ namespace
      *
      * What it does:
      * Serializes one `std::map<EntId,SCoordsVec2>` payload by writing key/value
-     * pairs with reflected EntId and SCoordsVec2 RTTI lanes.
+     * pairs with the reflected EntId and SCoordsVec2 descriptors.
      */
     static void SerSave(gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      const auto* const mapObject = reinterpret_cast<const FormationCoordMap*>(
+      const auto* const mapObject = reinterpret_cast<const CoordMap*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
       );
       if (!archive || !mapObject) {
@@ -1023,13 +1006,11 @@ namespace
      * What it does:
      * Deserializes one `std::map<EntId,SCoordsVec2>` payload: clears the
      * destination map, reads an element count, then reads that many
-     * reflected EntId/SCoordsVec2 pairs, inserting each by key. Mirror of
-     * `SerSave` above -- `SerSave` was already recovered and wired, this
-     * counterpart was not.
+     * reflected EntId/SCoordsVec2 pairs, inserting each by key.
      */
     static void SerLoad(gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef)
     {
-      auto* const mapObject = reinterpret_cast<FormationCoordMap*>(
+      auto* const mapObject = reinterpret_cast<CoordMap*>(
         static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
       );
       if (!archive) {
@@ -1068,7 +1049,7 @@ namespace
 
     void Init() override
     {
-      size_ = 0x0C;
+      size_ = sizeof(CoordMap);
       version_ = 1;
       serSaveFunc_ = &RMapType_EntId_SCoordsVec2::SerSave;
       serLoadFunc_ = &RMapType_EntId_SCoordsVec2::SerLoad;
@@ -1116,7 +1097,7 @@ namespace
   msvc8::string RMapType_EntId_SUnitOffsetInfo::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
-    const auto* const mapObject = static_cast<const FormationUnitOffsetMap*>(ref.mObj);
+    const auto* const mapObject = static_cast<const UnitOffsetMap*>(ref.mObj);
     const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
   }
@@ -1208,7 +1189,7 @@ namespace
   msvc8::string RMapType_EntId_SCoordsVec2::GetLexical(const gpg::RRef& ref) const
   {
     const msvc8::string base = gpg::RType::GetLexical(ref);
-    const auto* const mapObject = static_cast<const FormationCoordMap*>(ref.mObj);
+    const auto* const mapObject = static_cast<const CoordMap*>(ref.mObj);
     const int count = mapObject ? static_cast<int>(mapObject->size()) : 0;
     return gpg::STR_Printf("%s, size=%d", base.c_str(), count);
   }
@@ -1296,7 +1277,7 @@ namespace
     return type;
   }
 
-  // Reflected-type caches for the lanes CFormationInstance serializes. The
+  // Reflected-type caches for the fields CFormationInstance serializes. The
   // binary keeps one global per type in a single .data cluster; these mirror
   // them, following the gXxxType convention in Reflection.cpp. They are not
   // function-local statics on purpose - see the descriptor-cache defects fixed
@@ -1308,10 +1289,10 @@ namespace
   gpg::RType* gFastVectorSAssignedLocInfoType = nullptr;
   gpg::RType* gQuaternionfType = nullptr;
 
-  /// One reflected lane, skipped when its descriptor has not resolved. The
-  /// binary emits the same null-guarded Write/Read at every lane; lifting it
+  /// One reflected field, skipped when its descriptor has not resolved. The
+  /// binary emits the same null-guarded Write/Read at every field; lifting it
   /// keeps the eighteen call sites readable.
-  void WriteFormationLane(
+  void WriteFormationField(
     gpg::WriteArchive* const archive, gpg::RType* const type, const void* const field, const gpg::RRef& ownerRef
   )
   {
@@ -1321,7 +1302,7 @@ namespace
     }
   }
 
-  void ReadFormationLane(
+  void ReadFormationField(
     gpg::ReadArchive* const archive, gpg::RType* const type, void* const field, const gpg::RRef& ownerRef
   )
   {
@@ -1342,15 +1323,21 @@ namespace
   [[nodiscard]] gpg::RType* CachedMapEntIdSCoordsVec2Type()
   {
     if (!gMapEntIdSCoordsVec2Type) {
-      gMapEntIdSCoordsVec2Type = gpg::LookupRType(typeid(moho::SFormationCoordCacheMap));
+      gMapEntIdSCoordsVec2Type = gpg::LookupRType(typeid(CoordMap));
     }
     return gMapEntIdSCoordsVec2Type;
   }
 
+  // The three fastvector descriptors are registered under the base
+  // `gpg::fastvector<T>` type ids (IUnitWeakPtrReflection.cpp:599,
+  // FastVectorUIntReflection.cpp:2081/2212), which is what the binary's own
+  // `LookupRType` calls at 0x00574518/0x0057453F/0x00574588 key on -- the
+  // inline capacity is not part of the reflected type.
+
   [[nodiscard]] gpg::RType* CachedFastVectorWeakPtrIUnitType()
   {
     if (!gFastVectorWeakPtrIUnitType) {
-      gFastVectorWeakPtrIUnitType = gpg::LookupRType(typeid(moho::SFormationLinkedUnitRefVec));
+      gFastVectorWeakPtrIUnitType = gpg::LookupRType(typeid(gpg::fastvector<moho::WeakPtr<moho::IUnit>>));
     }
     return gFastVectorWeakPtrIUnitType;
   }
@@ -1358,7 +1345,7 @@ namespace
   [[nodiscard]] gpg::RType* CachedFastVectorSOffsetInfoType()
   {
     if (!gFastVectorSOffsetInfoType) {
-      gFastVectorSOffsetInfoType = gpg::LookupRType(typeid(moho::SFormationLaneVec));
+      gFastVectorSOffsetInfoType = gpg::LookupRType(typeid(gpg::fastvector<moho::SOffsetInfo>));
     }
     return gFastVectorSOffsetInfoType;
   }
@@ -1366,7 +1353,7 @@ namespace
   [[nodiscard]] gpg::RType* CachedFastVectorSAssignedLocInfoType()
   {
     if (!gFastVectorSAssignedLocInfoType) {
-      gFastVectorSAssignedLocInfoType = gpg::LookupRType(typeid(moho::SFormationOccupiedSlotVec));
+      gFastVectorSAssignedLocInfoType = gpg::LookupRType(typeid(gpg::fastvector<moho::SAssignedLocInfo>));
     }
     return gFastVectorSAssignedLocInfoType;
   }
@@ -1386,16 +1373,14 @@ namespace
    * at 0x010C6F8C, filled at 0x00570B8D by `SOffsetInfo::MemberSerialize`),
    * separate from the element-type cache `Moho::SOffsetInfo::sType` at
    * 0x010C6F6C that `RFastVectorType<SOffsetInfo>::SerLoad` fills at
-   * 0x0056DF43. This lane previously stored the *map* descriptor into
-   * `SOffsetInfo::sType`, which would hand an `SOffsetInfo`-typed consumer a
-   * `map<...>` descriptor instead.
+   * 0x0056DF43.
    */
   gpg::RType* gMapEntIdSUnitOffsetInfoType = nullptr;
 
   [[nodiscard]] gpg::RType* CachedMapEntIdSUnitOffsetInfoType()
   {
     if (!gMapEntIdSUnitOffsetInfoType) {
-      gMapEntIdSUnitOffsetInfoType = gpg::LookupRType(typeid(FormationUnitOffsetMap));
+      gMapEntIdSUnitOffsetInfoType = gpg::LookupRType(typeid(UnitOffsetMap));
     }
     return gMapEntIdSUnitOffsetInfoType;
   }
@@ -1518,2885 +1503,155 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, gpg::TrackedPointerState::Unowned, ownerRef);
   }
 
-  constexpr Wm3::Vec3f kZeroForwardVector{0.0f, 0.0f, 0.0f};
+  /// The binary's `quat0`: a function-local `static const Quaternionf(0,0,0,0)`
+  /// (guarded init at every reader) that the orientation compares test against.
   constexpr Wm3::Quatf kZeroQuaternion{0.0f, 0.0f, 0.0f, 0.0f};
 
-  /// Formation layer indices into `CAiFormationInstance::mLanes`. `GetLayer`
+  /// Formation layer indices into `CFormationInstance::mOffsetInfo`. `GetLayer`
   /// (0x00569BD0) returns exactly one of these, and `UpdateFormation`
   /// (0x00568CA0) drives its rebuild loop over `[0, kFormationLayerCount)`.
   constexpr std::int32_t kGroundFormationLayer = 0;
   constexpr std::int32_t kAirFormationLayer = 1;
   constexpr std::int32_t kFormationLayerCount = 2;
 
-  /**
-   * Address: 0x0059A420 (FUN_0059A420)
-   *
-   * What it does:
-   * Returns the unit navigator lane stored in `Unit` runtime state.
-   */
-  [[nodiscard]] moho::IAiNavigator* GetUnitNavigatorLane(moho::Unit* const unit) noexcept
-  {
-    return unit->AiNavigator;
-  }
-
-  /**
-   * Address: 0x0059C790 (FUN_0059C790)
-   *
-   * What it does:
-   * Copies one occupied-slot footprint-size lane (`+0x08`) into caller output.
-   */
-  [[nodiscard]] std::int32_t* CopyOccupiedSlotFootprintSizeLane(
-    std::int32_t* const destination,
-    const moho::SAssignedLocInfo* const source
-  ) noexcept
-  {
-    *destination = source->footprintSize;
-    return destination;
-  }
-
-  /**
-   * Address: 0x0059C7A0 (FUN_0059C7A0)
-   *
-   * What it does:
-   * Copies one occupied-slot lane-token lane (`+0x0C`) into caller output.
-   */
-  [[nodiscard]] std::int32_t* CopyOccupiedSlotLaneTokenLane(
-    std::int32_t* const destination,
-    const moho::SAssignedLocInfo* const source
-  ) noexcept
-  {
-    *destination = source->laneToken;
-    return destination;
-  }
-
-  struct SFormationLinkedUnitRefWordView
-  {
-    std::uint32_t ownerChainHeadWord;
-    std::uint32_t nextChainLinkWord;
-  };
-  static_assert(
-    sizeof(SFormationLinkedUnitRefWordView) == sizeof(moho::SFormationLinkedUnitRef),
-    "SFormationLinkedUnitRefWordView size must match SFormationLinkedUnitRef"
-  );
-
-  [[nodiscard]] bool BinaryFloatNotEqual(const float lhs, const float rhs) noexcept
-  {
-    // Matches the recovered x87 `ucomiss` compare shape:
-    // true only when values are different and both are not NaN.
-    return ((std::isnan(lhs) || std::isnan(rhs)) == (lhs == rhs));
-  }
-
-  [[nodiscard]] bool QuaternionEqualsExact(const Wm3::Quatf& lhs, const Wm3::Quatf& rhs) noexcept
-  {
-    return lhs.w == rhs.w && lhs.x == rhs.x && lhs.y == rhs.y && lhs.z == rhs.z;
-  }
-
-  /**
-   * Address: 0x0056D8E0 (FUN_0056D8E0, sub_56D8E0)
-   *
-   * What it does:
-   * Destroys one coord-cache tree lane by recursively tearing down right
-   * branches and iterating through the left spine.
-   */
-  void DestroyCoordCacheSubtree(moho::SFormationCoordCacheNode* node, const moho::SFormationCoordCacheNode* head)
-  {
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      moho::SFormationCoordCacheNode* const current = node;
-      DestroyCoordCacheSubtree(node->right, head);
-      node = node->left;
-      delete current;
-    }
-  }
-
-  /**
-   * Address: 0x0056F430 (FUN_0056F430, sub_56F430)
-   *
-   * IDA signature:
-   * int **__userpurge sub_56F430@<eax>(int this@<edi>, int **outIt, int *rangeBegin, int *rangeEnd);
-   *
-   * What it does:
-   * `std::map<EntId, SCoordsVec2>::erase(first, last)`. Every reachable
-   * caller in this binary (both `CFormationInstance` constructors and its
-   * destructor, via `CleanupFormation`/`DestroyCoordCacheMapStorage`) passes
-   * `rangeBegin == head->left` and `rangeEnd == head`, i.e. always erases the
-   * whole tree -- the fast path taken here. The general per-node loop the
-   * binary also contains (erasing an arbitrary subrange one element at a
-   * time via `FUN_0056FFB0`) is unreached from any recovered or otherwise
-   * reachable call site (confirmed via xref sweep: `FUN_0056FFB0`'s only
-   * other citing caller, `FUN_0056B740`, is itself byte-verified to have
-   * zero incoming references anywhere in this binary), so it is not
-   * modelled here.
-   */
-  void ResetCoordCacheMap(moho::SFormationCoordCacheMap& cache)
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      cache.size = 0;
-      return;
-    }
-
-    DestroyCoordCacheSubtree(head->parent, head);
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    cache.size = 0;
-  }
-
-  template <class T>
-  [[nodiscard]] std::uint32_t PtrToWord(T* const ptr) noexcept
-  {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(ptr));
-  }
-
-  template <class T>
-  [[nodiscard]] T* WordToPtr(const std::uint32_t word) noexcept
-  {
-    return reinterpret_cast<T*>(static_cast<std::uintptr_t>(word));
-  }
-
-  [[nodiscard]] std::uint32_t EncodeUnitOwnerSlotWord(moho::Unit* const unit) noexcept
-  {
-    if (!unit) {
-      return 0;
-    }
-
-    constexpr std::uintptr_t kWeakOwnerLinkOffset = 0x4u;
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(unit) + kWeakOwnerLinkOffset);
-  }
-
-  [[nodiscard]] moho::Unit* DecodeUnitOwnerSlotWord(const std::uint32_t ownerWord) noexcept
-  {
-    constexpr std::uintptr_t kWeakOwnerLinkOffset = 0x4u;
-    const auto encoded = static_cast<std::uintptr_t>(ownerWord);
-    if (encoded <= kWeakOwnerLinkOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Unit*>(encoded - kWeakOwnerLinkOffset);
-  }
-
-  void UnlinkWeakWordNode(std::uint32_t& ownerWord, std::uint32_t& nextWord) noexcept
-  {
-    if (ownerWord == 0u) {
-      nextWord = 0u;
-      return;
-    }
-
-    std::uint32_t* cursor = WordToPtr<std::uint32_t>(ownerWord);
-    if (!cursor) {
-      ownerWord = 0u;
-      nextWord = 0u;
-      return;
-    }
-
-    const std::uint32_t selfWord = PtrToWord(&ownerWord);
-    constexpr int kMaxFollowSteps = 1 << 20;
-    for (int i = 0; i < kMaxFollowSteps && *cursor != 0u && *cursor != selfWord; ++i) {
-      cursor = moho::SFormationLinkedUnitRef::NextChainLinkSlot(*cursor);
-      if (!cursor) {
-        break;
-      }
-    }
-
-    if (cursor && *cursor == selfWord) {
-      *cursor = nextWord;
-    }
-
-    ownerWord = 0u;
-    nextWord = 0u;
-  }
-
-  void RelinkWeakWordNode(std::uint32_t& ownerWord, std::uint32_t& nextWord, moho::Unit* const owner) noexcept
-  {
-    ownerWord = EncodeUnitOwnerSlotWord(owner);
-    if (ownerWord == 0u) {
-      nextWord = 0u;
-      return;
-    }
-
-    std::uint32_t* const head = WordToPtr<std::uint32_t>(ownerWord);
-    if (!head) {
-      ownerWord = 0u;
-      nextWord = 0u;
-      return;
-    }
-
-    nextWord = *head;
-    *head = PtrToWord(&ownerWord);
-  }
-
-  /**
-   * Address: 0x00568490 (FUN_00568490, sub_568490)
-   *
-   * What it does:
-   * Copy-assigns one `SUnitOffsetInfo` lane: when the weak-unit owner slot
-   * differs, it unlinks destination from the old owner chain, relinks it into
-   * the source owner chain head, then copies the remaining payload fields.
-   */
-  [[maybe_unused]] moho::SUnitOffsetInfo* AssignUnitOffsetInfoWithWeakRelink(
-    moho::SUnitOffsetInfo* const destination,
-    const moho::SUnitOffsetInfo* const source
-  ) noexcept
-  {
-    if (source->mUnit.ownerLinkSlot != destination->mUnit.ownerLinkSlot) {
-      if (destination->mUnit.ownerLinkSlot != nullptr) {
-        auto** cursor = reinterpret_cast<moho::WeakPtr<moho::IUnit>**>(destination->mUnit.ownerLinkSlot);
-        while (*cursor != &destination->mUnit) {
-          cursor = &(*cursor)->nextInOwner;
-        }
-        *cursor = destination->mUnit.nextInOwner;
-      }
-
-      destination->mUnit.ownerLinkSlot = source->mUnit.ownerLinkSlot;
-      if (source->mUnit.ownerLinkSlot == nullptr) {
-        destination->mUnit.nextInOwner = nullptr;
-      } else {
-        auto** const ownerHead = reinterpret_cast<moho::WeakPtr<moho::IUnit>**>(source->mUnit.ownerLinkSlot);
-        destination->mUnit.nextInOwner = *ownerHead;
-        *ownerHead = &destination->mUnit;
-      }
-    }
-
-    destination->mLeaderPriority = source->mLeaderPriority;
-    destination->mOffset = source->mOffset;
-    destination->mDirection = source->mDirection;
-    destination->mWeight = source->mWeight;
-    destination->mSpeedBandLow = source->mSpeedBandLow;
-    destination->mSpeedBandMid = source->mSpeedBandMid;
-    destination->mSpeedBandHigh = source->mSpeedBandHigh;
-    return destination;
-  }
-
-  [[nodiscard]] moho::Unit* DecodeLinkedRefUnit(const moho::SFormationLinkedUnitRef& link) noexcept
-  {
-    if (!link.ownerChainHead) {
-      return nullptr;
-    }
-    return DecodeUnitOwnerSlotWord(PtrToWord(link.ownerChainHead));
-  }
-
-  void UnlinkLinkedRef(moho::SFormationLinkedUnitRef& link) noexcept
-  {
-    if (!link.ownerChainHead) {
-      link.nextChainLink = 0u;
-      return;
-    }
-
-    std::uint32_t* cursor = link.ownerChainHead;
-    const std::uint32_t selfWord = PtrToWord(&link);
-    constexpr int kMaxFollowSteps = 1 << 20;
-    for (int i = 0; i < kMaxFollowSteps && *cursor != 0u && *cursor != selfWord; ++i) {
-      cursor = moho::SFormationLinkedUnitRef::NextChainLinkSlot(*cursor);
-      if (!cursor) {
-        break;
-      }
-    }
-
-    if (cursor && *cursor == selfWord) {
-      *cursor = link.nextChainLink;
-    }
-
-    link.ownerChainHead = nullptr;
-    link.nextChainLink = 0u;
-  }
-
-  void RelinkLinkedRef(moho::SFormationLinkedUnitRef& link, moho::Unit* const owner) noexcept
-  {
-    if (!owner) {
-      link.ownerChainHead = nullptr;
-      link.nextChainLink = 0u;
-      return;
-    }
-
-    auto* const ownerHead = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(owner) + 0x4u);
-    link.ownerChainHead = ownerHead;
-    link.nextChainLink = *ownerHead;
-    *ownerHead = PtrToWord(&link);
-  }
-
-  [[nodiscard]] std::uint32_t UnitEntityIdWord(const moho::Unit* const unit) noexcept
-  {
-    if (!unit) {
-      return 0u;
-    }
-
-    return static_cast<std::uint32_t>(unit->GetEntityId());
-  }
-
-  void EnsureLaneMapHead(moho::SFormationLaneUnitMap& map)
-  {
-    if (map.head != nullptr) {
-      return;
-    }
-
-    auto* const head = new moho::SFormationLaneUnitNode{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->isNil = 1u;
-    map.head = head;
-    map.size = 0u;
-  }
-
-  /**
-   * Internal decomposition helper for `LaneMapFindNode` below (not a distinct
-   * binary function on its own -- it has no other caller in this file).
-   * Descends to the first lane-map node whose `unitEntityId` is not less than
-   * the requested key, matching the raw descent half of the real function's
-   * inlined `_Tree::find` body.
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapLowerBoundNode(
-    const moho::SFormationLaneUnitMap& map,
-    const std::uint32_t unitEntityId
-  ) noexcept
-  {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    return msvc8::lower_bound_node<
-      moho::SFormationLaneUnitNode,
-      &moho::SFormationLaneUnitNode::isNil
-    >(head, unitEntityId, [](const moho::SFormationLaneUnitNode& node, const std::uint32_t key) noexcept {
-      return node.unitEntityId < key;
-    });
-  }
-
-  /**
-   * Address: 0x0056AF80 (FUN_0056AF80, decompiles as a raw `SFormationLaneUnitNode`-
-   * shaped `_Tree::find`: descend by `unitEntityId`, then collapse to "not found"
-   * when the descended node is the head sentinel or its key doesn't match)
-   * Address: 0x0056AFE0 (FUN_0056AFE0, IDA name `std::map_EntId_SUnitOffsetInfo::find`
-   * -- byte-identical compiled body reached from 8 call sites in this file
-   * (Func6/GetFormationLayer, GetFormationPosition, Func9, Func10,
-   * Func17/Contains, CalcFormationSpeed, Func11, Func12); the doc comment
-   * above `SOffsetInfo::unitMap` explains why: `unitMap` is "the same 0x0C
-   * MSVC8 tree the reflected `map<EntId,SUnitOffsetInfo>` serializer writes",
-   * so the compiler emits the identical `_Tree::find` body once per
-   * differently-typed call site instead of folding them)
-   *
-   * What it does:
-   * Finds the lane-map node whose `unitEntityId` exactly matches the
-   * requested key, or `nullptr` if no such node exists (the head sentinel and
-   * a lower-bound mismatch both collapse to "not found").
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapFindNode(
-    const moho::SFormationLaneUnitMap& map,
-    const std::uint32_t unitEntityId
-  )
-  {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::SFormationLaneUnitNode* const lowerBound = LaneMapLowerBoundNode(map, unitEntityId);
-    if (lowerBound == nullptr || lowerBound == head || lowerBound->isNil != 0u) {
-      return nullptr;
-    }
-
-    return (lowerBound->unitEntityId == unitEntityId) ? lowerBound : nullptr;
-  }
-
-  /**
-   * Address: 0x0056CE70 (FUN_0056CE70)
-   *
-   * IDA signature:
-   * void __stdcall sub_56CE70(_DWORD *a1);
-   *
-   * What it does:
-   * Recursively destroys one lane-map RB-tree subtree rooted at `node`,
-   * unlinking each node's weak owner-word chain before releasing node storage.
-   * The 7 binary callers (incl. `CFormationInstance::CleanupFormation` at
-   * `0x00568AC0`) use this helper for full-map teardown and for node-range
-   * erasure. Here we follow the "both sides recursive" form; the binary
-   * iterates the left spine with a right-recursion, which has the same
-   * observable net behavior (each node's `operator delete` + weak-word chain
-   * unlink happens exactly once in the same order relative to descendants).
-   */
-  void DestroyLaneMapSubtree(moho::SFormationLaneUnitNode* node, const moho::SFormationLaneUnitNode* head)
-  {
-    if (!node || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    DestroyLaneMapSubtree(node->left, head);
-    DestroyLaneMapSubtree(node->right, head);
-    UnlinkWeakWordNode(node->linkedUnitOwnerWord, node->linkedUnitNextWord);
-    delete node;
-  }
-
-  void ResetLaneMap(moho::SFormationLaneUnitMap& map)
-  {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (!head) {
-      map.size = 0u;
-      return;
-    }
-
-    DestroyLaneMapSubtree(head->parent, head);
-    head->parent = head;
-    head->left = head;
-    head->right = head;
-    map.size = 0u;
-  }
-
-  /**
-   * Address: 0x0056CF50 (FUN_0056CF50, sub_56CF50)
-   *
-   * What it does:
-   * Walks one lane-map subtree to its left-most (minimum-key) node.
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapLeftmostNode(
-    moho::SFormationLaneUnitNode* node
-  ) noexcept
-  {
-    if (node == nullptr || node->isNil != 0u) {
-      return node;
-    }
-
-    moho::SFormationLaneUnitNode* child = node->left;
-    while (child != nullptr && child->isNil == 0u) {
-      node = child;
-      child = node->left;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x0056CF30 (FUN_0056CF30, sub_56CF30)
-   *
-   * What it does:
-   * Walks one lane-map subtree to its right-most (maximum-key) node.
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapRightmostNode(
-    moho::SFormationLaneUnitNode* node
-  ) noexcept
-  {
-    if (node == nullptr || node->isNil != 0u) {
-      return node;
-    }
-
-    moho::SFormationLaneUnitNode* child = node->right;
-    while (child != nullptr && child->isNil == 0u) {
-      node = child;
-      child = node->right;
-    }
-    return node;
-  }
-
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapMinimumNode(
-    moho::SFormationLaneUnitNode* node,
-    const moho::SFormationLaneUnitNode* const head
-  ) noexcept
-  {
-    if (node == nullptr || node == head || node->isNil != 0u) {
-      return const_cast<moho::SFormationLaneUnitNode*>(head);
-    }
-
-    return LaneMapLeftmostNode(node);
-  }
-
-  [[nodiscard]] moho::SFormationLaneUnitNode* LaneMapMaximumNode(
-    moho::SFormationLaneUnitNode* node,
-    const moho::SFormationLaneUnitNode* const head
-  ) noexcept
-  {
-    if (node == nullptr || node == head || node->isNil != 0u) {
-      return const_cast<moho::SFormationLaneUnitNode*>(head);
-    }
-
-    return LaneMapRightmostNode(node);
-  }
-
-  /**
-   * Address: 0x0056CEE0 (FUN_0056CEE0, sub_56CEE0)
-   *
-   * What it does:
-   * Performs a left rotation around `pivot` inside one lane-map tree.
-   */
-  void RotateLaneMapLeft(
-    moho::SFormationLaneUnitNode* const pivot,
-    moho::SFormationLaneUnitMap& map
-  ) noexcept
-  {
-    if (pivot == nullptr) {
-      return;
-    }
-
-    moho::SFormationLaneUnitNode* const promoted = pivot->right;
-    if (promoted == nullptr) {
-      return;
-    }
-
-    pivot->right = promoted->left;
-    if (pivot->right != nullptr && pivot->right->isNil == 0u) {
-      pivot->right->parent = pivot;
-    }
-
-    promoted->parent = pivot->parent;
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    if (pivot == head->parent) {
-      head->parent = promoted;
-    } else if (pivot == pivot->parent->left) {
-      pivot->parent->left = promoted;
-    } else {
-      pivot->parent->right = promoted;
-    }
-
-    promoted->left = pivot;
-    pivot->parent = promoted;
-  }
-
-  /**
-   * Address: 0x0056CF90 (FUN_0056CF90, sub_56CF90)
-   *
-   * What it does:
-   * Performs a right rotation around `pivot` inside one lane-map tree.
-   */
-  void RotateLaneMapRight(
-    moho::SFormationLaneUnitNode* const pivot,
-    moho::SFormationLaneUnitMap& map
-  ) noexcept
-  {
-    if (pivot == nullptr) {
-      return;
-    }
-
-    moho::SFormationLaneUnitNode* const promoted = pivot->left;
-    if (promoted == nullptr) {
-      return;
-    }
-
-    pivot->left = promoted->right;
-    if (pivot->left != nullptr && pivot->left->isNil == 0u) {
-      pivot->left->parent = pivot;
-    }
-
-    promoted->parent = pivot->parent;
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    if (pivot == head->parent) {
-      head->parent = promoted;
-    } else if (pivot == pivot->parent->right) {
-      pivot->parent->right = promoted;
-    } else {
-      pivot->parent->left = promoted;
-    }
-
-    promoted->right = pivot;
-    pivot->parent = promoted;
-  }
-
-  /**
-   * Address: 0x0056D090 (FUN_0056D090, sub_56D090)
-   *
-   * What it does:
-   * Advances one lane-map node cursor to its in-order successor.
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* AdvanceLaneMapNodeCursor(
-    moho::SFormationLaneUnitNode*& nodeCursor
-  ) noexcept
-  {
-    moho::SFormationLaneUnitNode* result = nodeCursor;
-    if (result == nullptr || result->isNil != 0u) {
-      return result;
-    }
-
-    moho::SFormationLaneUnitNode* child = result->right;
-    if (child != nullptr && child->isNil == 0u) {
-      nodeCursor = LaneMapLeftmostNode(child);
-      return nodeCursor;
-    }
-
-    result = result->parent;
-    while (result != nullptr && result->isNil == 0u) {
-      if (nodeCursor != result->right) {
-        break;
-      }
-      nodeCursor = result;
-      result = result->parent;
-    }
-    nodeCursor = result;
-    return result;
-  }
-
-  [[nodiscard]] moho::SFormationLaneUnitNode* NextLaneMapNodeInOrder(
-    moho::SFormationLaneUnitNode* const node,
-    moho::SFormationLaneUnitNode* const head
-  ) noexcept;
-
-  /**
-   * Address: 0x0056AC60 (FUN_0056AC60, sub_56AC60)
-   *
-   * What it does:
-   * Erases one validated lane-map iterator (`std::_Tree::erase(iterator)`),
-   * running the full red-black delete fixup -- rotating via `RotateLaneMapLeft`/
-   * `RotateLaneMapRight` (FUN_0056CEE0/FUN_0056CF90) exactly as the binary
-   * does -- and returns the in-order successor so callers can continue
-   * traversal. Mirrors the proven `EraseAllUnitsTreeNode` (EntityDb.cpp)
-   * shape for the same dinkumware `_Tree::erase` algorithm over a sibling
-   * RB-tree instantiation.
-   */
-  [[nodiscard]] moho::SFormationLaneUnitNode* EraseLaneMapNodeAndAdvance(
-    moho::SFormationLaneUnitMap& map,
-    moho::SFormationLaneUnitNode* const erased
-  )
-  {
-    if (erased == nullptr || erased->isNil != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    moho::SFormationLaneUnitNode* const head = map.head;
-    moho::SFormationLaneUnitNode* const next = NextLaneMapNodeInOrder(erased, head);
-
-    moho::SFormationLaneUnitNode* lifted = erased;
-    moho::SFormationLaneUnitNode* fix = nullptr;
-    moho::SFormationLaneUnitNode* fixParent = nullptr;
-
-    if (erased->left->isNil != 0u) {
-      fix = erased->right;
-    } else if (erased->right->isNil != 0u) {
-      fix = erased->left;
-    } else {
-      lifted = next;
-      fix = lifted->right;
-    }
-
-    if (lifted == erased) {
-      fixParent = erased->parent;
-      if (fix->isNil == 0u) {
-        fix->parent = fixParent;
-      }
-
-      if (head->parent == erased) {
-        head->parent = fix;
-      } else if (fixParent->left == erased) {
-        fixParent->left = fix;
-      } else {
-        fixParent->right = fix;
-      }
-
-      if (head->left == erased) {
-        head->left = (fix->isNil != 0u) ? fixParent : LaneMapMinimumNode(fix, head);
-      }
-      if (head->right == erased) {
-        head->right = (fix->isNil != 0u) ? fixParent : LaneMapMaximumNode(fix, head);
-      }
-    } else {
-      erased->left->parent = lifted;
-      lifted->left = erased->left;
-
-      if (lifted == erased->right) {
-        fixParent = lifted;
-      } else {
-        fixParent = lifted->parent;
-        if (fix->isNil == 0u) {
-          fix->parent = fixParent;
-        }
-        fixParent->left = fix;
-        lifted->right = erased->right;
-        erased->right->parent = lifted;
-      }
-
-      if (head->parent == erased) {
-        head->parent = lifted;
-      } else if (erased->parent->left == erased) {
-        erased->parent->left = lifted;
-      } else {
-        erased->parent->right = lifted;
-      }
-
-      lifted->parent = erased->parent;
-      std::swap(lifted->color, erased->color);
-    }
-
-    if (erased->color == 1u) {
-      moho::SFormationLaneUnitNode* fixCursor = fix;
-      moho::SFormationLaneUnitNode* fixParentCursor = fixParent;
-      while (fixCursor != head->parent && fixCursor->color == 1u) {
-        if (fixCursor == fixParentCursor->left) {
-          moho::SFormationLaneUnitNode* sibling = fixParentCursor->right;
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            fixParentCursor->color = 0u;
-            RotateLaneMapLeft(fixParentCursor, map);
-            sibling = fixParentCursor->right;
-          }
-
-          if (sibling->isNil != 0u) {
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else if (sibling->left->color == 1u && sibling->right->color == 1u) {
-            sibling->color = 0u;
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else {
-            if (sibling->right->color == 1u) {
-              sibling->left->color = 1u;
-              sibling->color = 0u;
-              RotateLaneMapRight(sibling, map);
-              sibling = fixParentCursor->right;
-            }
-            sibling->color = fixParentCursor->color;
-            fixParentCursor->color = 1u;
-            sibling->right->color = 1u;
-            RotateLaneMapLeft(fixParentCursor, map);
-            fixCursor = head->parent;
-            break;
-          }
-        } else {
-          moho::SFormationLaneUnitNode* sibling = fixParentCursor->left;
-          if (sibling->color == 0u) {
-            sibling->color = 1u;
-            fixParentCursor->color = 0u;
-            RotateLaneMapRight(fixParentCursor, map);
-            sibling = fixParentCursor->left;
-          }
-
-          if (sibling->isNil != 0u) {
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else if (sibling->right->color == 1u && sibling->left->color == 1u) {
-            sibling->color = 0u;
-            fixCursor = fixParentCursor;
-            fixParentCursor = fixCursor->parent;
-          } else {
-            if (sibling->left->color == 1u) {
-              sibling->right->color = 1u;
-              sibling->color = 0u;
-              RotateLaneMapLeft(sibling, map);
-              sibling = fixParentCursor->left;
-            }
-            sibling->color = fixParentCursor->color;
-            fixParentCursor->color = 1u;
-            sibling->left->color = 1u;
-            RotateLaneMapRight(fixParentCursor, map);
-            fixCursor = head->parent;
-            break;
-          }
-        }
-      }
-      fixCursor->color = 1u;
-    }
-
-    UnlinkWeakWordNode(erased->linkedUnitOwnerWord, erased->linkedUnitNextWord);
-    delete erased;
-    if (map.size != 0u) {
-      --map.size;
-    }
-
-    return next;
-  }
-
-  void DestroyLaneMapStorage(moho::SFormationLaneUnitMap& map)
-  {
-    if (map.head == nullptr) {
-      map.size = 0u;
-      return;
-    }
-
-    ResetLaneMap(map);
-    delete map.head;
-    map.head = nullptr;
-    map.size = 0u;
-  }
-
-  /**
-   * Address: 0x00568AE9 (inside FUN_00568AC0), 0x005690C3 (inside FUN_00568CA0)
-   *
-   * What it does:
-   * Tears one formation layer back down to empty: every lane entry drops its
-   * cached leader back-link and frees its unit map, then the lane vector itself
-   * returns to inline storage. `CleanupFormation` runs this over both layers;
-   * `UpdateFormation` runs it per layer immediately before rebuilding that
-   * layer from the formation script.
-   */
-  void ReleaseFormationLaneEntries(moho::SFormationLaneVec& lane)
-  {
-    for (moho::SFormationLaneEntry& entry : lane) {
-      UnlinkWeakWordNode(entry.linkedUnitBackLinkHeadWord, entry.linkedUnitBackLinkNextWord);
-      DestroyLaneMapStorage(entry.unitMap);
-    }
-
-    lane.ResetStorageToInline();
-  }
-
-  /**
-   * Address: 0x00569470 (FUN_00569470, sub_569470)
-   *
-   * What it does:
-   * Tears one `SFormationCoordCacheMap` all the way down: empties the tree
-   * via the range-erase dispatcher (`ResetCoordCacheMap`, FUN_0056F430),
-   * then frees the head sentinel itself and zeroes the map back to its
-   * unconstructed state. Called (via `CleanupFormation`) from both
-   * `CFormationInstance` constructors and its destructor, always with the
-   * full-range `[head->left, head)` erase -- the only shape
-   * `ResetCoordCacheMap`'s fast path needs to cover for every reachable
-   * caller in this binary.
-   */
-  void DestroyCoordCacheMapStorage(moho::SFormationCoordCacheMap& cache)
-  {
-    if (cache.head == nullptr) {
-      cache.size = 0u;
-      return;
-    }
-
-    ResetCoordCacheMap(cache);
-    delete cache.head;
-    cache.head = nullptr;
-    cache.size = 0u;
-  }
-
-  void CleanupFormationTransientState(moho::CFormationInstance& formation)
-  {
-    formation.mOccupiedSlots.ResetStorageToInline();
-    DestroyCoordCacheMapStorage(formation.mCoordCachePrimary);
-    DestroyCoordCacheMapStorage(formation.mCoordCacheSecondary);
-    formation.mOrientationBaseline = kZeroQuaternion;
-
-    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
-      moho::SFormationLaneEntry* lane = formation.mLanes[laneIndex].begin();
-      const moho::SFormationLaneEntry* const laneEnd = formation.mLanes[laneIndex].end();
-      while (lane != laneEnd) {
-        UnlinkWeakWordNode(lane->linkedUnitBackLinkHeadWord, lane->linkedUnitBackLinkNextWord);
-        DestroyLaneMapStorage(lane->unitMap);
-        ++lane;
-      }
+  constexpr float kPi = 3.1415927f;
+  constexpr float kTwoPi = 6.2831855f;
 
-      formation.mLanes[laneIndex].ResetStorageToInline();
-    }
-  }
-
-  void CleanupFormationUnitLinks(moho::CFormationInstance& formation)
-  {
-    moho::SFormationLinkedUnitRef* unitRef = formation.mUnits.begin();
-    const moho::SFormationLinkedUnitRef* const endRef = formation.mUnits.end();
-    while (unitRef != endRef) {
-      UnlinkLinkedRef(*unitRef);
-      ++unitRef;
-    }
-    formation.mUnits.ResetStorageToInline();
-  }
-
-  void CollectLaneMapNodes(
-    const moho::SFormationLaneUnitNode* node,
-    const moho::SFormationLaneUnitNode* head,
-    std::vector<moho::SFormationLaneUnitNode>& out
-  )
-  {
-    if (!node || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    CollectLaneMapNodes(node->left, head, out);
-
-    moho::SFormationLaneUnitNode value = *node;
-    value.left = nullptr;
-    value.parent = nullptr;
-    value.right = nullptr;
-    value.color = 0u;
-    value.isNil = 0u;
-    out.push_back(value);
-
-    CollectLaneMapNodes(node->right, head, out);
-  }
-
-  [[nodiscard]] moho::SFormationLaneUnitNode* InsertLaneMapNode(
-    moho::SFormationLaneUnitMap& map,
-    const moho::SFormationLaneUnitNode& src
-  )
-  {
-    EnsureLaneMapHead(map);
-    moho::SFormationLaneUnitNode* const head = map.head;
-
-    moho::SFormationLaneUnitNode* parent = head;
-    moho::SFormationLaneUnitNode* node = head->parent;
-    bool insertLeft = true;
-
-    while (node && node != head && node->isNil == 0u) {
-      parent = node;
-      if (src.unitEntityId < node->unitEntityId) {
-        insertLeft = true;
-        node = node->left;
-      } else if (node->unitEntityId < src.unitEntityId) {
-        insertLeft = false;
-        node = node->right;
-      } else {
-        UnlinkWeakWordNode(node->linkedUnitOwnerWord, node->linkedUnitNextWord);
-
-        node->unitEntityId = src.unitEntityId;
-        node->leaderPriority = src.leaderPriority;
-        node->formationOffsetX = src.formationOffsetX;
-        node->formationOffsetZ = src.formationOffsetZ;
-        node->formationVector = src.formationVector;
-        node->formationWeight = src.formationWeight;
-        node->speedBandLow = src.speedBandLow;
-        node->speedBandMid = src.speedBandMid;
-        node->speedBandHigh = src.speedBandHigh;
-        node->color = src.color;
-
-        RelinkWeakWordNode(
-          node->linkedUnitOwnerWord,
-          node->linkedUnitNextWord,
-          DecodeUnitOwnerSlotWord(src.linkedUnitOwnerWord)
-        );
-        return node;
-      }
-    }
-
-    auto* const inserted = new moho::SFormationLaneUnitNode{};
-    *inserted = src;
-    inserted->left = head;
-    inserted->right = head;
-    inserted->parent = parent;
-    inserted->color = 0u;
-    inserted->isNil = 0u;
-    inserted->linkedUnitOwnerWord = 0u;
-    inserted->linkedUnitNextWord = 0u;
-
-    RelinkWeakWordNode(
-      inserted->linkedUnitOwnerWord,
-      inserted->linkedUnitNextWord,
-      DecodeUnitOwnerSlotWord(src.linkedUnitOwnerWord)
-    );
-
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-    } else if (insertLeft) {
-      parent->left = inserted;
-      if (head->left == head || inserted->unitEntityId < head->left->unitEntityId) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (head->right == head || head->right->unitEntityId < inserted->unitEntityId) {
-        head->right = inserted;
-      }
-    }
-
-    ++map.size;
-    return inserted;
-  }
-
-  // Out-of-line RMapType_EntId_SUnitOffsetInfo::SerSave/SerLoad bodies (class
-  // declared earlier in this file, doc comments there). Placed here, after
-  // the lane-map RB-tree helpers above, so they call those helpers directly
-  // instead of needing forward declarations.
-  void RMapType_EntId_SUnitOffsetInfo_SerSave(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
-  {
-    const auto* const map = reinterpret_cast<const moho::SFormationLaneUnitMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (!archive || !map) {
-      return;
-    }
-
-    archive->WriteUInt(map->size);
-
-    gpg::RType* const keyType = CachedEntIdType();
-    gpg::RType* const valueType = CachedSUnitOffsetInfoType();
-    GPG_ASSERT(keyType != nullptr);
-    GPG_ASSERT(valueType != nullptr);
-    if (!keyType || !valueType) {
-      return;
-    }
-
-    moho::SFormationLaneUnitNode* const head = map->head;
-    if (!head) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    moho::SFormationLaneUnitNode* node = LaneMapLeftmostNode(head->parent);
-    while (node != nullptr && node != head) {
-      const std::uint32_t key = node->unitEntityId;
-      archive->Write(keyType, &key, owner);
-
-      moho::SUnitOffsetInfo value{};
-      value.mUnit.BindObjectUnlinked(DecodeUnitOwnerSlotWord(node->linkedUnitOwnerWord));
-      value.mLeaderPriority = node->leaderPriority;
-      value.mOffset = moho::SCoordsVec2{node->formationOffsetX, node->formationOffsetZ};
-      value.mDirection = node->formationVector;
-      value.mWeight = node->formationWeight;
-      value.mSpeedBandLow = node->speedBandLow;
-      value.mSpeedBandMid = node->speedBandMid;
-      value.mSpeedBandHigh = node->speedBandHigh;
-      archive->Write(valueType, &value, owner);
-
-      (void)AdvanceLaneMapNodeCursor(node);
-    }
-  }
-
-  void RMapType_EntId_SUnitOffsetInfo_SerLoad(
-    gpg::ReadArchive* const archive, const int objectPtr, const int, gpg::RRef* const ownerRef
-  )
-  {
-    auto* const map = reinterpret_cast<moho::SFormationLaneUnitMap*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(objectPtr))
-    );
-    if (!archive) {
-      return;
-    }
-
-    unsigned int count = 0u;
-    archive->ReadUInt(&count);
-
-    if (map) {
-      ResetLaneMap(*map);
-    }
-    if (!map || count == 0u) {
-      return;
-    }
-
-    gpg::RType* const keyType = CachedEntIdType();
-    gpg::RType* const valueType = CachedSUnitOffsetInfoType();
-    GPG_ASSERT(keyType != nullptr);
-    GPG_ASSERT(valueType != nullptr);
-    if (!keyType || !valueType) {
-      return;
-    }
-
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      std::uint32_t key = 0u;
-      archive->Read(keyType, &key, owner);
-
-      moho::SUnitOffsetInfo value{};
-      archive->Read(valueType, &value, owner);
-
-      moho::SFormationLaneUnitNode node{};
-      node.unitEntityId = key;
-      node.leaderPriority = value.mLeaderPriority;
-      node.formationOffsetX = value.mOffset.x;
-      node.formationOffsetZ = value.mOffset.z;
-      node.formationVector = value.mDirection;
-      node.formationWeight = value.mWeight;
-      node.speedBandLow = value.mSpeedBandLow;
-      node.speedBandMid = value.mSpeedBandMid;
-      node.speedBandHigh = value.mSpeedBandHigh;
-      node.linkedUnitOwnerWord = EncodeUnitOwnerSlotWord(static_cast<moho::Unit*>(value.mUnit.GetObjectPtr()));
-      (void)InsertLaneMapNode(*map, node);
-
-      // The scratch value's mUnit may have been linked into the resolved
-      // unit's real weak chain by the reflected Read above
-      // (WeakPtr<IUnit>::ResetFromObject); the map node's own link now owns
-      // that membership, so unlink the transient stage explicitly
-      // (WeakPtr<T>'s destructor is a no-op -- every other transient weak
-      // slot in this file is unlinked the same explicit way).
-      value.mUnit.UnlinkFromOwnerChain();
-    }
-  }
-
-  void EraseLaneMapNodeByEntityId(moho::SFormationLaneUnitMap& map, const std::uint32_t unitEntityId)
-  {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (!head) {
-      return;
-    }
-
-    if (moho::SFormationLaneUnitNode* const node = LaneMapFindNode(map, unitEntityId); node != nullptr) {
-      (void)EraseLaneMapNodeAndAdvance(map, node);
-    }
-  }
-
-  /**
-   * Address: 0x00570300 (FUN_00570300)
-   *
-   * What it does:
-   * Allocates one `SFormationCoordCacheNode`, clears link lanes, and seeds
-   * the marker bytes used by the coord-cache map-head initialization path.
-   */
-  [[nodiscard]] moho::SFormationCoordCacheNode* AllocateFormationCoordCacheHeadNode()
-  {
-    auto* const node = new moho::SFormationCoordCacheNode{};
-    node->left = nullptr;
-    node->parent = nullptr;
-    node->right = nullptr;
-    node->color = 1u;
-    node->isNil = 0u;
-    return node;
-  }
-
-  // `sub_570390`, the `SFormationScriptSlot` destroy-range, used to live here as
-  // an untyped 0x38-byte view (`FormationScriptSlotNestedVectorRuntimeView`)
-  // with no caller. Now that `SFormationScriptSlot` is a real type it is
-  // `moho::ReleaseFormationScriptSlotCategoryStorage`, declared in
-  // `moho/ai/IAiFormationDB.h` and invoked from `~SFormationScriptResult`.
-
-  void EnsureCoordCacheHead(moho::SFormationCoordCacheMap& cache)
-  {
-    if (cache.head != nullptr) {
-      return;
-    }
-
-    auto* const head = AllocateFormationCoordCacheHeadNode();
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->isNil = 1u;
-    cache.head = head;
-    cache.size = 0u;
-  }
-
-  /**
-   * Address: 0x0056B7B0 (FUN_0056B7B0, sub_56B7B0)
-   * Address: 0x0082E560 (FUN_0082E560)
-   *
-   * What it does:
-   * Finds the first coord-cache node whose key is not less than
-   * `unitEntityId`.
-   */
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheLowerBoundNode(
-    const moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId
-  ) noexcept
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    return msvc8::lower_bound_node<
-      moho::SFormationCoordCacheNode,
-      &moho::SFormationCoordCacheNode::isNil
-    >(head, unitEntityId, [](const moho::SFormationCoordCacheNode& node, const std::uint32_t key) noexcept {
-      return node.unitEntityId < key;
-    });
-  }
-
-  [[nodiscard]] bool IsCoordCacheSentinel(
-    const moho::SFormationCoordCacheNode* const node,
-    const moho::SFormationCoordCacheNode* const head
-  ) noexcept
-  {
-    return node == nullptr || node == head || node->isNil != 0u;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheLeftmostNode(
-    moho::SFormationCoordCacheNode* node,
-    const moho::SFormationCoordCacheNode* const head
-  ) noexcept
-  {
-    while (!IsCoordCacheSentinel(node, head) && !IsCoordCacheSentinel(node->left, head)) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheRightmostNode(
-    moho::SFormationCoordCacheNode* node,
-    const moho::SFormationCoordCacheNode* const head
-  ) noexcept
-  {
-    while (!IsCoordCacheSentinel(node, head) && !IsCoordCacheSentinel(node->right, head)) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCachePredecessor(
-    moho::SFormationCoordCacheNode* node,
-    moho::SFormationCoordCacheNode* const head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-    if (node == head) {
-      return head->right;
-    }
-    if (!IsCoordCacheSentinel(node->left, head)) {
-      return CoordCacheRightmostNode(node->left, head);
-    }
-
-    moho::SFormationCoordCacheNode* parent = node->parent;
-    while (!IsCoordCacheSentinel(parent, head) && node == parent->left) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent ? parent : head;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheSuccessor(
-    moho::SFormationCoordCacheNode* node,
-    moho::SFormationCoordCacheNode* const head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr) {
-      return head;
-    }
-    if (node == head) {
-      return head->left;
-    }
-    if (!IsCoordCacheSentinel(node->right, head)) {
-      return CoordCacheLeftmostNode(node->right, head);
-    }
-
-    moho::SFormationCoordCacheNode* parent = node->parent;
-    while (!IsCoordCacheSentinel(parent, head) && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent ? parent : head;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* AllocateCoordCacheNode(
-    moho::SFormationCoordCacheNode* const head,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    auto* const inserted = new moho::SFormationCoordCacheNode{};
-    inserted->left = head;
-    inserted->parent = head;
-    inserted->right = head;
-    inserted->unitEntityId = unitEntityId;
-    inserted->position = position;
-    inserted->color = 0u;
-    inserted->isNil = 0u;
-    return inserted;
-  }
-
-  void LinkCoordCacheNode(
-    moho::SFormationCoordCacheMap& cache,
-    moho::SFormationCoordCacheNode* const parent,
-    moho::SFormationCoordCacheNode* const inserted,
-    const bool insertLeft
-  ) noexcept
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr || inserted == nullptr) {
-      return;
-    }
-
-    inserted->parent = parent;
-    if (parent == head) {
-      head->parent = inserted;
-      head->left = inserted;
-      head->right = inserted;
-      ++cache.size;
-      return;
-    }
-
-    if (insertLeft) {
-      parent->left = inserted;
-      if (head->left == head || head->left == parent || inserted->unitEntityId < head->left->unitEntityId) {
-        head->left = inserted;
-      }
-    } else {
-      parent->right = inserted;
-      if (head->right == head || head->right == parent || head->right->unitEntityId < inserted->unitEntityId) {
-        head->right = inserted;
-      }
-    }
-    ++cache.size;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheInsertBySearch(
-    moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    moho::SFormationCoordCacheNode* parent = head;
-    moho::SFormationCoordCacheNode* cursor = head->parent;
-    bool insertLeft = true;
-    while (!IsCoordCacheSentinel(cursor, head)) {
-      parent = cursor;
-      if (unitEntityId < cursor->unitEntityId) {
-        insertLeft = true;
-        cursor = cursor->left;
-      } else {
-        insertLeft = false;
-        cursor = cursor->right;
-      }
-    }
-
-    moho::SFormationCoordCacheNode* const inserted = AllocateCoordCacheNode(head, unitEntityId, position);
-    LinkCoordCacheNode(cache, parent, inserted, insertLeft);
-    return inserted;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheInsertBeforeHint(
-    moho::SFormationCoordCacheMap& cache,
-    moho::SFormationCoordCacheNode* hint,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    if (hint == nullptr) {
-      hint = head;
-    }
-
-    moho::SFormationCoordCacheNode* parent = head;
-    bool insertLeft = true;
-    if (hint == head) {
-      parent = head->right;
-      insertLeft = false;
-      if (IsCoordCacheSentinel(parent, head)) {
-        parent = head;
-        insertLeft = true;
-      }
-    } else if (IsCoordCacheSentinel(hint->left, head)) {
-      parent = hint;
-      insertLeft = true;
-    } else {
-      parent = CoordCacheRightmostNode(hint->left, head);
-      insertLeft = false;
-    }
-
-    moho::SFormationCoordCacheNode* const inserted = AllocateCoordCacheNode(head, unitEntityId, position);
-    LinkCoordCacheNode(cache, parent, inserted, insertLeft);
-    return inserted;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheInsertAfterHint(
-    moho::SFormationCoordCacheMap& cache,
-    moho::SFormationCoordCacheNode* hint,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    if (hint == nullptr || hint == head) {
-      return CoordCacheInsertBySearch(cache, unitEntityId, position);
-    }
-
-    moho::SFormationCoordCacheNode* parent = head;
-    bool insertLeft = false;
-    if (IsCoordCacheSentinel(hint->right, head)) {
-      parent = hint;
-      insertLeft = false;
-    } else {
-      parent = CoordCacheLeftmostNode(hint->right, head);
-      insertLeft = true;
-    }
-
-    moho::SFormationCoordCacheNode* const inserted = AllocateCoordCacheNode(head, unitEntityId, position);
-    LinkCoordCacheNode(cache, parent, inserted, insertLeft);
-    return inserted;
-  }
-
-  /**
-   * Address: 0x0056D790 (FUN_0056D790, sub_56D790)
-   *
-   * What it does:
-   * Uses one coord-cache insertion hint to resolve an existing node by key or
-   * inserts a new node with `position` when the key is missing.
-   *
-   * Address: 0x00570640 (FUN_00570640, this map's predecessor-lookup /
-   * `_Dec` emission -- isNil@+0x19 matches a 12-byte value_type
-   * (uint32 key(4) + SCoordsVec2 position(8), static_assert-confirmed).
-   * The callgraph shows this function's own binary address calling
-   * FUN_00570640 directly.)
-   */
-  [[nodiscard]] moho::SFormationCoordCacheNode* ResolveCoordCacheNodeWithHint(
-    moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position,
-    moho::SFormationCoordCacheNode* hint
-  )
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    if (cache.size == 0u) {
-      return CoordCacheInsertBySearch(cache, unitEntityId, position);
-    }
-
-    if (hint == nullptr) {
-      hint = head;
-    }
-
-    if (hint == head->left) {
-      if (!IsCoordCacheSentinel(hint, head) && unitEntityId < hint->unitEntityId) {
-        return CoordCacheInsertBeforeHint(cache, hint, unitEntityId, position);
-      }
-    } else if (hint == head) {
-      moho::SFormationCoordCacheNode* const rightMost = head->right;
-      if (!IsCoordCacheSentinel(rightMost, head) && rightMost->unitEntityId < unitEntityId) {
-        return CoordCacheInsertAfterHint(cache, rightMost, unitEntityId, position);
-      }
-    } else if (unitEntityId < hint->unitEntityId) {
-      moho::SFormationCoordCacheNode* const predecessor = CoordCachePredecessor(hint, head);
-      if (!IsCoordCacheSentinel(predecessor, head) && predecessor->unitEntityId < unitEntityId) {
-        if (IsCoordCacheSentinel(predecessor->right, head)) {
-          return CoordCacheInsertBeforeHint(cache, hint, unitEntityId, position);
-        }
-        return CoordCacheInsertAfterHint(cache, predecessor, unitEntityId, position);
-      }
-    } else if (hint->unitEntityId < unitEntityId) {
-      moho::SFormationCoordCacheNode* const successor = CoordCacheSuccessor(hint, head);
-      if (successor == head || unitEntityId < successor->unitEntityId) {
-        if (IsCoordCacheSentinel(hint->right, head)) {
-          return CoordCacheInsertBeforeHint(cache, successor, unitEntityId, position);
-        }
-        return CoordCacheInsertAfterHint(cache, hint, unitEntityId, position);
-      }
-    } else {
-      return hint;
-    }
-
-    return LowerBoundOrInsertCoordCacheNode(cache, unitEntityId, position);
-  }
-
-  /**
-   * Address: 0x0056F370 (FUN_0056F370, sub_56F370)
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_56F370@<eax>(int a1@<eax>, unsigned int *ebx0@<ebx>, _DWORD *a2);
-   *
-   * What it does:
-   * Performs one lower-bound traversal of the coord-cache red-black tree for
-   * `unitEntityId`; when the key is not present the helper routes the insert
-   * to either the shared tree-insert lane (`FUN_0056F520`, recovered as
-   * `RuntimeThrowMapSetTooLongQ`'s neighbor `InsertCoordCacheNodeAtEdge`)
-   * with an appropriate `insertLeft` flag, or falls back to a
-   * predecessor-walk (`FUN_00570640`, recovered as `CoordCachePredecessor`)
-   * when the candidate parent is not the leftmost in the subtree. The
-   * returned `output` slot receives the matched or newly inserted node in
-   * the first word and a `found` flag in byte +4, matching the 2-byte-packed
-   * `std::pair<iterator,bool>` return the MSVC8 `std::map::insert` emits.
-   *
-   * Reconstruction note: this is the non-hint specialization of
-   * `ResolveCoordCacheNodeWithHint`; it is invoked from the shared resolver
-   * when the caller did not supply a valid hint position.
-   */
-  struct CoordCacheInsertResult
-  {
-    moho::SFormationCoordCacheNode* mNode;
-    bool mInserted;
-    std::uint8_t mPad05[3];
-  };
-  static_assert(sizeof(CoordCacheInsertResult) == 0x08, "CoordCacheInsertResult size must be 0x08");
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* LowerBoundOrInsertCoordCacheNode(
-    moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    // Walk the tree to locate the lower-bound node. `parent` tracks the last
-    // non-nil node visited; `insertLeft` flips between the left/right branch
-    // taken at each level, matching the binary's `setb cl` capture.
-    moho::SFormationCoordCacheNode* parent = head->parent;
-    moho::SFormationCoordCacheNode* cursor = parent;
-    bool insertLeft = true;
-
-    if (!IsCoordCacheSentinel(cursor, head)) {
-      while (!IsCoordCacheSentinel(cursor, head)) {
-        parent = cursor;
-        if (unitEntityId < cursor->unitEntityId) {
-          insertLeft = true;
-          cursor = cursor->left;
-        } else {
-          insertLeft = false;
-          cursor = cursor->right;
-        }
-      }
-    }
-
-    moho::SFormationCoordCacheNode* candidate = parent;
-    if (insertLeft) {
-      if (candidate == head->left) {
-        moho::SFormationCoordCacheNode* const inserted =
-          CoordCacheInsertBeforeHint(cache, candidate, unitEntityId, position);
-        return inserted;
-      }
-      candidate = CoordCachePredecessor(candidate, head);
-    }
-
-    if (candidate == nullptr || candidate == head || candidate->unitEntityId < unitEntityId) {
-      moho::SFormationCoordCacheNode* const inserted =
-        CoordCacheInsertAfterHint(cache, candidate, unitEntityId, position);
-      return inserted;
-    }
-
-    return candidate;
-  }
-
-  /**
-   * Iterator-proxy lane used by the MSVC8 legacy `std::map<uint, ...>` ABI the
-   * binary emits for coord-cache lookups. The parent container parks the
-   * proxy on an on-stack sentinel while the lookup runs so iterator-debugging
-   * builds can detect container invalidation; the binary tracks the same
-   * linked list even in release.
-   */
-  struct CoordCacheIteratorProxyChain
-  {
-    CoordCacheIteratorProxyChain* mNext;
-  };
-  static_assert(
-    sizeof(CoordCacheIteratorProxyChain) == 0x04,
-    "CoordCacheIteratorProxyChain size must be 0x04"
-  );
-
-  /**
-   * 2-word iterator-pair output emitted by
-   * `PublishCoordCacheLowerBoundIteratorPair`. The binary writes the key in
-   * the first slot and the first data-member of the matched node (typically
-   * the intrusive `_Left` link that STL uses to reach the entry payload) in
-   * the second.
-   */
-  struct CoordCacheIteratorPair
-  {
-    std::uint32_t mKey;
-    void* mNodeFirstField;
-  };
-  static_assert(sizeof(CoordCacheIteratorPair) == 0x08, "CoordCacheIteratorPair size must be 0x08");
-
-  /**
-   * Address: 0x0082CEA0 (FUN_0082CEA0)
-   *
-   * IDA signature:
-   * _DWORD *__userpurge sub_82CEA0@<eax>(int cache@<eax>, _DWORD *output@<edi>, int key);
-   *
-   * What it does:
-   * Runs one coord-cache lower-bound lookup for `key` and publishes the
-   * resulting `(key, node->first_field)` iterator pair into `output`. While
-   * the lookup runs, the helper pushes an on-stack proxy-chain sentinel onto
-   * the cache's iterator-orphan list (at `cache + 8`) and unlinks it on
-   * return, mirroring the MSVC8 STL iterator-debug contract the binary
-   * preserves even in release.
-   *
-   * Callers:
-   *   - 4 AI-formation helper lanes (sub_826140, sub_8281E0, sub_82BA20,
-   *     sub_8B4300) that iterate the formation coord-cache to pair a unit
-   *     entity id with its cached position metadata.
-   *   - cfunc_UserUnitHasUnloadCommandQueuedUpL (0x008C2810) when an attached
-   *     transport lookup needs the matching cache entry.
-   *
-   * The body delegates the tree traversal to `CoordCacheLowerBoundNode`
-   * (FUN_0082E560 in this subsystem) so the intent-first helper does not
-   * re-open the red-black traversal loop at every callsite.
-   */
-  CoordCacheIteratorPair* PublishCoordCacheLowerBoundIteratorPair(
-    const moho::SFormationCoordCacheMap& cache,
-    CoordCacheIteratorPair* const output,
-    const std::uint32_t key
-  )
-  {
-    if (output == nullptr) {
-      return nullptr;
-    }
-
-    // Binary iterator-debug chain: push an on-stack proxy sentinel onto
-    // `cache.iterator_orphan_list` (at cache+8 in the MSVC8 ABI) while the
-    // lookup runs. In modern SDK code we skip the chain link when the
-    // container does not expose the orphan lane via a typed accessor.
-    CoordCacheIteratorProxyChain sentinel{nullptr};
-    (void)sentinel;  // retain for binary-layout fidelity; not wired until the
-                     // SFormationCoordCacheMap::iteratorOrphanHead lane is
-                     // named.
-
-    moho::SFormationCoordCacheNode* const node = CoordCacheLowerBoundNode(cache, key);
-
-    output->mKey = key;
-    output->mNodeFirstField = (node != nullptr) ? *reinterpret_cast<void**>(node) : nullptr;
-    return output;
-  }
-
-  [[nodiscard]] moho::SFormationCoordCacheNode* CoordCacheFindNode(
-    const moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId
-  ) noexcept
-  {
-    // Publish the iterator pair for the lookup so tooling (formation-coord
-    // iteration callers at 0x826140/0x8281E0/0x82BA20/0x8B4300 and the
-    // UserUnit attachment-parent lookup at 0x8C2810) observe the same
-    // `(key, node_first_field)` layout the binary emits. Used here as the
-    // intent-first call site for FUN_0082CEA0 so the helper is never a dead
-    // orphan in the recovered SDK.
-    CoordCacheIteratorPair iteratorPair{};
-    (void)PublishCoordCacheLowerBoundIteratorPair(cache, &iteratorPair, unitEntityId);
-
-    moho::SFormationCoordCacheNode* const node = CoordCacheLowerBoundNode(cache, unitEntityId);
-    if (node == nullptr || node == cache.head || node->isNil != 0u || node->unitEntityId != unitEntityId) {
-      return nullptr;
-    }
-
-    return node;
-  }
-
-  /**
-   * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0)
-   *
-   * What it does:
-   * Looks up the cache slot for `unitEntityId` in the coord-cache tree and
-   * either returns the existing position reference or inserts a new node and
-   * returns the new position reference.
-   */
-  [[nodiscard]] moho::SCoordsVec2* CoordCacheInsertOrAssign(
-    moho::SFormationCoordCacheMap& cache,
-    const std::uint32_t unitEntityId,
-    const moho::SCoordsVec2& position
-  )
-  {
-    EnsureCoordCacheHead(cache);
-    moho::SFormationCoordCacheNode* const head = cache.head;
-    moho::SFormationCoordCacheNode* const lowerBound = CoordCacheLowerBoundNode(cache, unitEntityId);
-    if (lowerBound != nullptr && lowerBound != head && lowerBound->isNil == 0u && lowerBound->unitEntityId == unitEntityId) {
-      lowerBound->position = position;
-      return &lowerBound->position;
-    }
-
-    moho::SFormationCoordCacheNode* const resolved =
-      ResolveCoordCacheNodeWithHint(cache, unitEntityId, position, lowerBound);
-    if (resolved == nullptr) {
-      return nullptr;
-    }
-    resolved->position = position;
-    return &resolved->position;
-  }
-
-  /**
-   * Address: 0x005688C0 (FUN_005688C0, sub_5688C0)
-   *
-   * What it does:
-   * Returns true when two formation lane rectangles overlap on both axes.
-   */
-  [[nodiscard]] bool LaneEntriesOverlap(
-    const moho::SFormationLaneEntry& lhs,
-    const moho::SFormationLaneEntry& rhs
-  ) noexcept
+  /// Wraps a heading difference into `(-pi, pi]`, the way every orientation
+  /// compare in this file does it.
+  [[nodiscard]] float WrapAngle(const float angle) noexcept
   {
-    const bool overlapX = (lhs.overlapRadius.x - lhs.overlapAnchor.x) <= (rhs.overlapAnchor.x + rhs.overlapRadius.x)
-      && (rhs.overlapRadius.x - rhs.overlapAnchor.x) <= (lhs.overlapAnchor.x + lhs.overlapRadius.x);
-    if (!overlapX) {
-      return false;
+    if (angle > kPi) {
+      return angle - kTwoPi;
     }
-
-    const bool overlapZ = (lhs.overlapRadius.z - lhs.overlapAnchor.z) <= (rhs.overlapAnchor.z + rhs.overlapRadius.z)
-      && (rhs.overlapRadius.z - rhs.overlapAnchor.z) <= (lhs.overlapAnchor.z + lhs.overlapRadius.z);
-    return overlapZ;
-  }
-
-  /**
-   * What it does:
-   * Rebuilds a linked-unit reference lane from a compacted list of surviving
-   * units while preserving intrusive owner-chain wiring for each entry.
-   */
-  void ResetLinkedUnitRefsFromUnits(
-    moho::CFormationInstance& formation,
-    const std::vector<moho::Unit*>& keptUnits
-  )
-  {
-    formation.mUnits.ResetStorageToInline();
-    for (moho::Unit* const keptUnit : keptUnits) {
-      moho::SFormationLinkedUnitRef linked{};
-      formation.mUnits.push_back(linked);
-      RelinkLinkedRef(formation.mUnits.back(), keptUnit);
-    }
-  }
-
-  struct FormationUpdateListenerNode
-  {
-    void** vtable;                                // +0x00
-    moho::TDatListItem<void, void> updateLink;   // +0x04
-  };
-  static_assert(
-    offsetof(FormationUpdateListenerNode, updateLink) == 0x04,
-    "FormationUpdateListenerNode::updateLink offset must be 0x04"
-  );
-
-  [[nodiscard]] FormationUpdateListenerNode* ListenerOwnerFromLink(
-    moho::TDatListItem<void, void>* const link
-  ) noexcept
-  {
-    if (link == nullptr) {
-      return nullptr;
-    }
-    return reinterpret_cast<FormationUpdateListenerNode*>(
-      reinterpret_cast<std::uintptr_t>(link) - offsetof(FormationUpdateListenerNode, updateLink)
-    );
-  }
-
-  /**
-   * Address: 0x0056B070 (FUN_0056B070, sub_56B070)
-   *
-   * What it does:
-   * Detaches one intrusive listener ring, relinks listeners back to the owner
-   * head one-by-one, and dispatches one integer update event through each
-   * listener's vtable slot-0 callback.
-   */
-  void DispatchFormationUpdateEvent(
-    const std::int32_t eventCode,
-    moho::TDatListItem<void, void>& listenerHead
-  )
-  {
-    moho::TDatListItem<void, void> detached{};
-    if (listenerHead.mNext == &listenerHead) {
-      return;
-    }
-
-    detached.mNext = listenerHead.mNext;
-    detached.mPrev = listenerHead.mPrev;
-    detached.mNext->mPrev = &detached;
-    detached.mPrev->mNext = &detached;
-    listenerHead.ListResetLinks();
-
-    while (detached.mNext != &detached) {
-      auto* const listenerLink = detached.mNext;
-      listenerLink->ListLinkAfter(&listenerHead);
-
-      using OnEventFn = void(__thiscall*)(FormationUpdateListenerNode*, std::int32_t);
-      if (FormationUpdateListenerNode* const listener = ListenerOwnerFromLink(listenerLink);
-          listener != nullptr && listener->vtable != nullptr && listener->vtable[0] != nullptr) {
-        reinterpret_cast<OnEventFn>(listener->vtable[0])(listener, eventCode);
-      }
+    if (angle < -kPi) {
+      return angle + kTwoPi;
     }
-
-    detached.mNext->mPrev = detached.mPrev;
-    detached.mPrev->mNext = detached.mNext;
+    return angle;
   }
 
-  [[nodiscard]] moho::SFormationLaneUnitNode* NextLaneMapNodeInOrder(
-    moho::SFormationLaneUnitNode* const node,
-    moho::SFormationLaneUnitNode* const head
-  ) noexcept
+  /// Yaw of a unit's orientation quaternion, as the binary computes it from
+  /// the transform: `atan2(2(xz + wy), 1 - 2(x^2 + y^2))`.
+  [[nodiscard]] float HeadingOf(const Wm3::Quatf& q) noexcept
   {
-    if (node == nullptr || head == nullptr || node == head || node->isNil != 0u) {
-      return head;
-    }
-
-    moho::SFormationLaneUnitNode* cursor = node;
-    (void)AdvanceLaneMapNodeCursor(cursor);
-    if (cursor == nullptr || cursor->isNil != 0u) {
-      return head;
-    }
-    return cursor;
+    return std::atan2((q.z * q.x + q.y * q.w) * 2.0f, 1.0f - (q.y * q.y + q.x * q.x) * 2.0f);
   }
 
-  /**
-   * Address: 0x0056EB40 (FUN_0056EB40, sub_56EB40)
-   *
-   * What it does:
-   * Erases one lane-map node range [`beginNode`, `endNode`) and returns the
-   * next in-order node after the erased span; includes full-map clear fast path.
-   */
-  [[maybe_unused]] moho::SFormationLaneUnitNode* EraseLaneMapNodeRange(
-    moho::SFormationLaneUnitMap& map,
-    moho::SFormationLaneUnitNode*& outNextNode,
-    moho::SFormationLaneUnitNode* beginNode,
-    moho::SFormationLaneUnitNode* endNode
-  )
+  /// The unit-forward vector (third rotation-matrix column) of `q`, the
+  /// formula `SetOrientation` (0x0056A520) and the constructor share.
+  [[nodiscard]] Wm3::Vec3f ForwardOf(const Wm3::Quatf& q) noexcept
   {
-    moho::SFormationLaneUnitNode* const head = map.head;
-    if (head == nullptr) {
-      outNextNode = nullptr;
-      return outNextNode;
-    }
-
-    if (beginNode == head->left && endNode == head) {
-      ResetLaneMap(map);
-      outNextNode = head->left;
-      return outNextNode;
-    }
-
-    const bool endIsHead = (endNode == head);
-    const std::uint32_t endEntityId =
-      (!endIsHead && endNode != nullptr && endNode != head && endNode->isNil == 0u) ? endNode->unitEntityId : 0u;
-
-    auto resolveEndNode = [&map, endIsHead, endEntityId]() -> moho::SFormationLaneUnitNode* {
-      moho::SFormationLaneUnitNode* const currentHead = map.head;
-      if (currentHead == nullptr) {
-        return nullptr;
-      }
-      if (endIsHead) {
-        return currentHead;
-      }
-      if (moho::SFormationLaneUnitNode* const resolved = LaneMapFindNode(map, endEntityId); resolved != nullptr) {
-        return resolved;
-      }
-      return currentHead;
+    return Wm3::Vec3f{
+      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
+      ((q.y * q.z) - (q.w * q.x)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
     };
-
-    moho::SFormationLaneUnitNode* current = beginNode;
-    moho::SFormationLaneUnitNode* resolvedEnd = resolveEndNode();
-    while (current != nullptr && current != resolvedEnd) {
-      if (current == map.head || current->isNil != 0u) {
-        break;
-      }
-
-      const moho::SFormationLaneUnitNode* const eraseNode = current;
-      moho::SFormationLaneUnitNode* const successor = NextLaneMapNodeInOrder(current, map.head);
-      const bool successorIsHead = successor == nullptr || successor == map.head || successor->isNil != 0u;
-      const std::uint32_t successorEntityId = successorIsHead ? 0u : successor->unitEntityId;
-
-      EraseLaneMapNodeByEntityId(map, eraseNode->unitEntityId);
-
-      if (map.head == nullptr) {
-        current = nullptr;
-        resolvedEnd = nullptr;
-        break;
-      }
-
-      resolvedEnd = resolveEndNode();
-      if (successorIsHead) {
-        current = map.head;
-      } else if (moho::SFormationLaneUnitNode* const resolved = LaneMapFindNode(map, successorEntityId);
-                 resolved != nullptr) {
-        current = resolved;
-      } else {
-        current = map.head;
-      }
-    }
-
-    outNextNode = current;
-    return outNextNode;
   }
 
-  /**
-   * Address: 0x00568360 (FUN_00568360, sub_568360)
-   *
-   * What it does:
-   * Unlinks one lane-entry weak back-link chain node, erases the entire lane
-   * unit-map range, releases head storage, then resets the map pointer/count
-   * lanes to null/zero.
-   */
-  [[maybe_unused]] void ResetFormationLaneEntryUnitMapStorage(
-    moho::SFormationLaneEntry& laneEntry
-  )
+  /// Rotation about the Y axis by `angle`, stored scalar-first: the shape
+  /// `UpdateFormation` writes into `mOrientationChange` and `Update` builds
+  /// for each unit's heading correction.
+  [[nodiscard]] Wm3::Quatf YawQuaternion(const float angle) noexcept
   {
-    UnlinkWeakWordNode(laneEntry.linkedUnitBackLinkHeadWord, laneEntry.linkedUnitBackLinkNextWord);
-
-    moho::SFormationLaneUnitNode* nextNode = nullptr;
-    moho::SFormationLaneUnitNode* const head = laneEntry.unitMap.head;
-    (void)EraseLaneMapNodeRange(laneEntry.unitMap, nextNode, head->left, head);
-    delete head;
-
-    laneEntry.unitMap.head = nullptr;
-    laneEntry.unitMap.size = 0u;
+    const float halfAngle = angle * 0.5f;
+    const float sinHalf = std::sin(halfAngle);
+    return Wm3::Quatf{std::cos(halfAngle), sinHalf * 0.0f, sinHalf, sinHalf * 0.0f};
   }
 
-  void CopyLaneMapIntoClearedStorage(
-    moho::SFormationLaneUnitMap& destination,
-    const moho::SFormationLaneUnitMap& source
-  );
-
-  /**
-   * Address: 0x00565AB0 (FUN_00565AB0)
-   *
-   * What it does:
-   * Initializes one lane-entry payload to default formation values: creates a
-   * fresh sentinel-backed lane map, clears dynamic/overlap lanes, seeds
-   * default anchor/speed values, and unlinks any prior weak-unit backlink
-   * chain.
-   *
-   * `new moho::SFormationLaneUnitNode{}` below is FUN_0056FE00 (checked
-   * `operator new(68)` via FUN_00571780, the 68-byte lane already cited on
-   * `AllocateCheckedElementBlock` in RbTree.h's sibling Vector.cpp) plus a
-   * zero/default field init (isNil=0, color=1). The binary then overwrites
-   * `isNil` back to 1 and self-links left/parent/right here to promote the
-   * fresh node into the sentinel head -- exactly what `head->left = head;
-   * head->parent = head; head->right = head; head->color = 1u; head->isNil
-   * = 1u;` below expresses; no separate `buy_head()`-style helper exists
-   * for this hand-rolled node type.
-   */
-  moho::SFormationLaneEntry* InitializeDefaultFormationLaneEntry(
-    moho::SFormationLaneEntry* const laneEntry
-  )
+  /// Flat (XZ) distance between two positions, `sqrtf(dz*dz + dx*dx)`.
+  [[nodiscard]] float FlatDistance(const Wm3::Vec3f& a, const Wm3::Vec3f& b) noexcept
   {
-    auto* const head = new moho::SFormationLaneUnitNode{};
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->color = 1u;
-    head->isNil = 1u;
-    laneEntry->unitMap.head = head;
-    laneEntry->unitMap.size = 0u;
-
-    laneEntry->mPos = Wm3::Vec3f{};
-    laneEntry->overlapRadius.x = 0.0f;
-    laneEntry->overlapRadius.z = 0.0f;
-    laneEntry->dynamicOffset.x = 0.0f;
-    laneEntry->dynamicOffset.z = 0.0f;
-    laneEntry->overlapAnchor.x = 2.0f;
-    laneEntry->overlapAnchor.z = 2.0f;
-    laneEntry->applyDynamicOffset = 0u;
-    laneEntry->slotAvailable = 0u;
-    laneEntry->preferredSpeed = std::numeric_limits<float>::infinity();
-    laneEntry->speedAnchor = 0.0f;
-
-    UnlinkWeakWordNode(laneEntry->linkedUnitBackLinkHeadWord, laneEntry->linkedUnitBackLinkNextWord);
-    laneEntry->linkedUnitBackLinkHeadWord = 0u;
-    laneEntry->linkedUnitBackLinkNextWord = 0u;
-    return laneEntry;
+    const float dx = a.x - b.x;
+    const float dz = a.z - b.z;
+    return std::sqrt(dz * dz + dx * dx);
   }
 
-  /**
-   * Address: 0x0056CC50 (FUN_0056CC50)
-   *
-   * What it does:
-   * Initializes one lane-entry map head as sentinel (`isNil=1`, self-linked)
-   * and clones source lane-map topology/payload into that fresh storage.
-   *
-   * `new moho::SFormationLaneUnitNode{}` below is the same FUN_0056FE00
-   * checked-allocate-and-default-init emission cited on
-   * `InitializeDefaultFormationLaneEntry` above, followed by the same
-   * isNil/self-link sentinel promotion.
-   */
-  moho::SFormationLaneEntry* InitializeLaneEntryMapAndCloneSource(
-    moho::SFormationLaneEntry* const destination,
-    const moho::SFormationLaneEntry* const source
-  )
+  [[nodiscard]] moho::Unit* UnitOf(const moho::WeakPtr<moho::IUnit>& link) noexcept
   {
-    auto* const head = new moho::SFormationLaneUnitNode{};
-    destination->unitMap.head = head;
-    head->color = 1u;
-    head->isNil = 1u;
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    destination->unitMap.size = 0u;
-
-    CopyLaneMapIntoClearedStorage(destination->unitMap, source->unitMap);
-    return destination;
-  }
-
-  /**
-   * Address: 0x0056CAA0 (FUN_0056CAA0)
-   *
-   * What it does:
-   * Copy-constructs one lane-entry from source: initializes/clones map lanes,
-   * copies scalar payload, then links destination back-link word into the same
-   * owner chain as source.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyConstructLaneEntryWithWeakBackLinkRelink(
-    const moho::SFormationLaneEntry* const source,
-    moho::SFormationLaneEntry* const destination
-  )
-  {
-    (void)InitializeLaneEntryMapAndCloneSource(destination, source);
-
-    destination->mPos = source->mPos;
-    destination->overlapRadius.x = source->overlapRadius.x;
-    destination->overlapRadius.z = source->overlapRadius.z;
-    destination->dynamicOffset.x = source->dynamicOffset.x;
-    destination->dynamicOffset.z = source->dynamicOffset.z;
-    destination->overlapAnchor.x = source->overlapAnchor.x;
-    destination->overlapAnchor.z = source->overlapAnchor.z;
-    destination->applyDynamicOffset = source->applyDynamicOffset;
-    destination->slotAvailable = source->slotAvailable;
-    destination->preferredSpeed = source->preferredSpeed;
-    destination->speedAnchor = source->speedAnchor;
-
-    destination->linkedUnitBackLinkHeadWord = source->linkedUnitBackLinkHeadWord;
-    if (destination->linkedUnitBackLinkHeadWord != 0u) {
-      if (std::uint32_t* const ownerHead = WordToPtr<std::uint32_t>(destination->linkedUnitBackLinkHeadWord);
-          ownerHead != nullptr) {
-        destination->linkedUnitBackLinkNextWord = *ownerHead;
-        *ownerHead = PtrToWord(&destination->linkedUnitBackLinkHeadWord);
-      } else {
-        destination->linkedUnitBackLinkHeadWord = 0u;
-        destination->linkedUnitBackLinkNextWord = 0u;
-      }
-    } else {
-      destination->linkedUnitBackLinkNextWord = 0u;
-    }
-
-    return destination;
-  }
-
-  [[nodiscard]] moho::SFormationLaneEntry* ResetLaneEntryStorageAndReturnSelf(
-    moho::SFormationLaneEntry* const lane
-  )
-  {
-    ResetFormationLaneEntryUnitMapStorage(*lane);
-    return lane;
-  }
-
-  /**
-   * Address: 0x0056D620 (FUN_0056D620)
-   *
-   * What it does:
-   * Destroys one contiguous lane-entry range by applying lane reset on each
-   * 0x4C-byte entry in forward order.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* DestroyLaneEntryRangeForward(
-    moho::SFormationLaneEntry* const begin,
-    moho::SFormationLaneEntry* const end
-  )
-  {
-    moho::SFormationLaneEntry* result = begin;
-    for (moho::SFormationLaneEntry* cursor = begin; cursor != end; ++cursor) {
-      result = ResetLaneEntryStorageAndReturnSelf(cursor);
-    }
-    return result;
-  }
-
-  /**
-   * Address: 0x0056F1F0 (FUN_0056F1F0)
-   *
-   * What it does:
-   * Copy-constructs one lane-entry range into uninitialized destination
-   * storage; on construction failure it destroys already-constructed
-   * destination lanes in reverse order and rethrows.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyConstructLaneEntryRangeWithRollback(
-    const moho::SFormationLaneEntry* sourceBegin,
-    const moho::SFormationLaneEntry* const sourceEnd,
-    moho::SFormationLaneEntry* destinationBegin
-  )
-  {
-    moho::SFormationLaneEntry* destinationCursor = destinationBegin;
-    const moho::SFormationLaneEntry* sourceCursor = sourceBegin;
-    try {
-      while (sourceCursor != sourceEnd) {
-        (void)CopyConstructLaneEntryWithWeakBackLinkRelink(sourceCursor, destinationCursor);
-        ++sourceCursor;
-        ++destinationCursor;
-      }
-      return destinationCursor;
-    } catch (...) {
-      while (destinationCursor != destinationBegin) {
-        --destinationCursor;
-        ResetFormationLaneEntryUnitMapStorage(*destinationCursor);
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x00573270 (FUN_00573270)
-   *
-   * What it does:
-   * Copy-assigns one lane-entry payload: clears/rebuilds destination unit-map
-   * storage when assigning from a different source lane, copies scalar lane
-   * fields, and rewires the weak back-link chain when owner head differs.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* AssignFormationLaneEntryWithMapAndBackLinkRelink(
-    moho::SFormationLaneEntry* const destination,
-    const moho::SFormationLaneEntry* const source
-  )
-  {
-    if (destination == nullptr || source == nullptr) {
-      return destination;
-    }
-
-    if (destination != source) {
-      moho::SFormationLaneUnitNode* nextNode = nullptr;
-      if (moho::SFormationLaneUnitNode* const destinationHead = destination->unitMap.head; destinationHead != nullptr) {
-        (void)EraseLaneMapNodeRange(destination->unitMap, nextNode, destinationHead->left, destinationHead);
-      }
-      CopyLaneMapIntoClearedStorage(destination->unitMap, source->unitMap);
-    }
-
-    destination->mPos = source->mPos;
-    destination->overlapRadius.x = source->overlapRadius.x;
-    destination->overlapRadius.z = source->overlapRadius.z;
-    destination->dynamicOffset.x = source->dynamicOffset.x;
-    destination->dynamicOffset.z = source->dynamicOffset.z;
-    destination->overlapAnchor.x = source->overlapAnchor.x;
-    destination->overlapAnchor.z = source->overlapAnchor.z;
-    destination->applyDynamicOffset = source->applyDynamicOffset;
-    destination->slotAvailable = source->slotAvailable;
-    destination->preferredSpeed = source->preferredSpeed;
-    destination->speedAnchor = source->speedAnchor;
-
-    if (source->linkedUnitBackLinkHeadWord != destination->linkedUnitBackLinkHeadWord) {
-      UnlinkWeakWordNode(destination->linkedUnitBackLinkHeadWord, destination->linkedUnitBackLinkNextWord);
-
-      destination->linkedUnitBackLinkHeadWord = source->linkedUnitBackLinkHeadWord;
-      if (destination->linkedUnitBackLinkHeadWord != 0u) {
-        if (std::uint32_t* const ownerHead = WordToPtr<std::uint32_t>(destination->linkedUnitBackLinkHeadWord);
-            ownerHead != nullptr) {
-          destination->linkedUnitBackLinkNextWord = *ownerHead;
-          *ownerHead = PtrToWord(&destination->linkedUnitBackLinkHeadWord);
-        } else {
-          destination->linkedUnitBackLinkHeadWord = 0u;
-          destination->linkedUnitBackLinkNextWord = 0u;
-        }
-      } else {
-        destination->linkedUnitBackLinkNextWord = 0u;
-      }
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x00571150 (FUN_00571150)
-   *
-   * What it does:
-   * Copy-assigns one lane-entry range backward from `[sourceBegin,
-   * sourceEndCursor)` into the destination tail range by repeatedly applying
-   * `FUN_00573270`.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyAssignLaneEntryRangeBackwardA(
-    const moho::SFormationLaneEntry* sourceEndCursor,
-    moho::SFormationLaneEntry* destinationEndCursor,
-    const moho::SFormationLaneEntry* const sourceBegin
-  )
-  {
-    const moho::SFormationLaneEntry* sourceCursor = sourceEndCursor;
-    moho::SFormationLaneEntry* destinationCursor = destinationEndCursor;
-    while (sourceCursor != sourceBegin) {
-      --sourceCursor;
-      --destinationCursor;
-      (void)AssignFormationLaneEntryWithMapAndBackLinkRelink(destinationCursor, sourceCursor);
-    }
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x00571180 (FUN_00571180)
-   *
-   * What it does:
-   * Duplicate backward lane-entry copy-assignment lane that forwards to the
-   * same recovered reverse range helper.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyAssignLaneEntryRangeBackwardB(
-    const moho::SFormationLaneEntry* const sourceEndCursor,
-    moho::SFormationLaneEntry* const destinationEndCursor,
-    const moho::SFormationLaneEntry* const sourceBegin
-  )
-  {
-    return CopyAssignLaneEntryRangeBackwardA(sourceEndCursor, destinationEndCursor, sourceBegin);
-  }
-
-  /**
-   * Address: 0x005716D0 (FUN_005716D0)
-   *
-   * What it does:
-   * Copy-assigns one lane-entry range forward from `[sourceBegin, sourceEnd)`
-   * into destination by repeatedly applying `FUN_00573270`.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyAssignLaneEntryRangeForward(
-    const moho::SFormationLaneEntry* sourceBegin,
-    moho::SFormationLaneEntry* destinationBegin,
-    const moho::SFormationLaneEntry* const sourceEnd
-  )
-  {
-    const moho::SFormationLaneEntry* sourceCursor = sourceBegin;
-    moho::SFormationLaneEntry* destinationCursor = destinationBegin;
-    while (sourceCursor != sourceEnd) {
-      (void)AssignFormationLaneEntryWithMapAndBackLinkRelink(destinationCursor, sourceCursor);
-      ++sourceCursor;
-      ++destinationCursor;
-    }
-    return destinationCursor;
-  }
-
-  /**
-   * Address: 0x0056F0A0 (FUN_0056F0A0)
-   *
-   * What it does:
-   * Copies one lane-entry suffix forward into destination range start, destroys
-   * trailing stale destination lanes, and updates vector end pointer.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* CopyAssignLaneEntrySuffixAndTrimTail(
-    const moho::SFormationLaneEntry* const sourceBegin,
-    moho::SFormationLaneVec* const destinationVector,
-    moho::SFormationLaneEntry* const destinationBegin
-  )
-  {
-    if (destinationBegin == sourceBegin) {
-      return destinationBegin;
-    }
-
-    moho::SFormationLaneEntry* const oldEnd = destinationVector->end_;
-    moho::SFormationLaneEntry* const newEnd = CopyAssignLaneEntryRangeForward(sourceBegin, destinationBegin, oldEnd);
-
-    for (moho::SFormationLaneEntry* lane = newEnd; lane != oldEnd; ++lane) {
-      ResetFormationLaneEntryUnitMapStorage(*lane);
-    }
-
-    destinationVector->end_ = newEnd;
-    return destinationBegin;
-  }
-
-  /**
-   * Address: 0x0056F100 (FUN_0056F100)
-   *
-   * What it does:
-   * Reallocates one lane-entry vector to `requestedCapacity`, inserts source
-   * range `[sourceBegin, sourceEnd)` at `splitPosition`, destroys old storage,
-   * and rebinds begin/end/capacity lanes. Preserves inline-capacity sentinel
-   * behavior for inline-backed storage.
-   */
-  [[maybe_unused]] void ReallocateLaneEntryVectorInsertRangeAndRebind(
-    const unsigned int requestedCapacity,
-    const moho::SFormationLaneEntry* const sourceBegin,
-    const moho::SFormationLaneEntry* const sourceEnd,
-    moho::SFormationLaneEntry* const splitPosition,
-    moho::SFormationLaneVec* const laneVector
-  )
-  {
-    auto& vectorView = gpg::AsFastVectorRuntimeView<moho::SFormationLaneEntry>(laneVector);
-    const std::size_t allocationBytes = sizeof(moho::SFormationLaneEntry) * static_cast<std::size_t>(requestedCapacity);
-    auto* const newBegin = static_cast<moho::SFormationLaneEntry*>(::operator new(allocationBytes));
-
-    moho::SFormationLaneEntry* constructedEnd = newBegin;
-    try {
-      constructedEnd = CopyConstructLaneEntryRangeWithRollback(vectorView.begin, splitPosition, constructedEnd);
-      constructedEnd = CopyConstructLaneEntryRangeWithRollback(sourceBegin, sourceEnd, constructedEnd);
-      constructedEnd = CopyConstructLaneEntryRangeWithRollback(splitPosition, vectorView.end, constructedEnd);
-    } catch (...) {
-      (void)DestroyLaneEntryRangeForward(newBegin, constructedEnd);
-      ::operator delete[](newBegin);
-      throw;
-    }
-
-    (void)DestroyLaneEntryRangeForward(vectorView.begin, vectorView.end);
-
-    auto* const inlineBegin = static_cast<moho::SFormationLaneEntry*>(vectorView.metadata);
-    if (vectorView.begin != inlineBegin) {
-      ::operator delete[](vectorView.begin);
-    } else if (inlineBegin != nullptr) {
-      *reinterpret_cast<moho::SFormationLaneEntry**>(inlineBegin) = vectorView.capacityEnd;
-    }
-
-    vectorView.begin = newBegin;
-    vectorView.end = constructedEnd;
-    vectorView.capacityEnd = newBegin + requestedCapacity;
-  }
-
-  /**
-   * Address: 0x0056D3F0 (FUN_0056D3F0)
-   *
-   * What it does:
-   * Inserts one lane-entry source range `[sourceBegin, sourceEnd)` before
-   * `insertPosition`, growing/reallocating storage when needed; otherwise
-   * performs in-place tail move and backward copy-assignment lanes.
-   */
-  [[maybe_unused]] void InsertLaneEntryRangeBeforePosition(
-    moho::SFormationLaneVec* const laneVector,
-    moho::SFormationLaneEntry* insertPosition,
-    const moho::SFormationLaneEntry* const sourceBegin,
-    const moho::SFormationLaneEntry* const sourceEnd
-  )
-  {
-    auto& vectorView = gpg::AsFastVectorRuntimeView<moho::SFormationLaneEntry>(laneVector);
-
-    const std::size_t insertCount = static_cast<std::size_t>(sourceEnd - sourceBegin);
-    std::size_t requiredCount = insertCount + static_cast<std::size_t>(vectorView.end - vectorView.begin);
-    const std::size_t currentCapacity = static_cast<std::size_t>(vectorView.capacityEnd - vectorView.begin);
-    if (requiredCount > currentCapacity) {
-      const std::size_t doubledCapacity = currentCapacity * 2u;
-      if (requiredCount < doubledCapacity) {
-        requiredCount = doubledCapacity;
-      }
-      ReallocateLaneEntryVectorInsertRangeAndRebind(
-        static_cast<unsigned int>(requiredCount), sourceBegin, sourceEnd, insertPosition, laneVector
-      );
-      return;
-    }
-
-    moho::SFormationLaneEntry* const oldEnd = vectorView.end;
-    moho::SFormationLaneEntry* const insertEnd =
-      insertPosition + static_cast<std::ptrdiff_t>(insertCount);
-
-    if (insertEnd > oldEnd) {
-      const std::size_t tailCount = static_cast<std::size_t>(oldEnd - insertPosition);
-      const moho::SFormationLaneEntry* const sourceMiddle =
-        sourceBegin + static_cast<std::ptrdiff_t>(tailCount);
-
-      moho::SFormationLaneEntry* newEnd =
-        CopyConstructLaneEntryRangeWithRollback(sourceMiddle, sourceEnd, oldEnd);
-      vectorView.end = newEnd;
-
-      newEnd = CopyConstructLaneEntryRangeWithRollback(insertPosition, oldEnd, newEnd);
-      vectorView.end = newEnd;
-
-      (void)CopyAssignLaneEntryRangeBackwardA(sourceMiddle, oldEnd, sourceBegin);
-      return;
-    }
-
-    moho::SFormationLaneEntry* const tailCopyBegin =
-      oldEnd - static_cast<std::ptrdiff_t>(insertCount);
-
-    moho::SFormationLaneEntry* newEnd =
-      CopyConstructLaneEntryRangeWithRollback(tailCopyBegin, oldEnd, oldEnd);
-    vectorView.end = newEnd;
-
-    (void)CopyAssignLaneEntryRangeBackwardB(tailCopyBegin, oldEnd, insertPosition);
-    (void)CopyAssignLaneEntryRangeBackwardA(sourceEnd, insertEnd, sourceBegin);
-  }
-
-  /**
-   * Address: 0x0056D500 (FUN_0056D500)
-   *
-   * What it does:
-   * Resizes one lane-entry vector to `requestedCount`: shrinks via suffix
-   * overwrite+trim lane, grows by ensuring capacity then copy-constructing
-   * appended entries from `fillSource`.
-   */
-  void ResizeLaneEntryVectorByCountWithFill(
-    const unsigned int requestedCount,
-    moho::SFormationLaneVec* const laneVector,
-    const moho::SFormationLaneEntry* const fillSource
-  )
-  {
-    auto& vectorView = gpg::AsFastVectorRuntimeView<moho::SFormationLaneEntry>(laneVector);
-    const unsigned int currentCount = static_cast<unsigned int>(vectorView.end - vectorView.begin);
-    if (requestedCount < currentCount) {
-      moho::SFormationLaneEntry* const newEnd = vectorView.begin + requestedCount;
-      (void)CopyAssignLaneEntrySuffixAndTrimTail(vectorView.end, laneVector, newEnd);
-      return;
-    }
-
-    if (requestedCount > currentCount) {
-      const unsigned int capacityCount = static_cast<unsigned int>(vectorView.capacityEnd - vectorView.begin);
-      if (requestedCount > capacityCount) {
-        ReallocateLaneEntryVectorInsertRangeAndRebind(
-          requestedCount, vectorView.begin, vectorView.begin, vectorView.begin, laneVector
-        );
-      }
-
-      moho::SFormationLaneEntry* const requestedEnd = vectorView.begin + requestedCount;
-      while (vectorView.end != requestedEnd) {
-        moho::SFormationLaneEntry* const slot = vectorView.end;
-        vectorView.end = slot + 1;
-        if (slot != nullptr) {
-          (void)CopyConstructLaneEntryWithWeakBackLinkRelink(fillSource, slot);
-        }
-      }
-    }
-  }
-
-} // namespace
-
-// ---------------------------------------------------------------------------
-// gpg::RFastVectorType<Moho::SOffsetInfo> / gpg::RFastVectorType<Moho::SAssignedLocInfo>
-// reflection SetCount/SerLoad/SerSave bodies.
-//
-// Exposed with external linkage (not file-local) because
-// `gpg::RFastVectorType<Moho::SOffsetInfo>::Init/SetCount` and
-// `gpg::RFastVectorType<Moho::SAssignedLocInfo>::Init/SetCount`
-// (FastVectorUIntReflection.cpp) store/call these addresses directly; the
-// lane-entry default-prototype, resize, and teardown helpers they need stay
-// file-local to this translation unit, so their bodies live here rather than
-// beside the rest of the descriptor's slots.
-// ---------------------------------------------------------------------------
-
-namespace moho
-{
-  /**
-   * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
-   *
-   * IDA signature:
-   * int __stdcall gpg::RFastVectorType_SOffsetInfo::SetCount(void *obj, int count);
-   *
-   * What it does:
-   * `RIndexed::SetCount` slot of the `fastvector<SOffsetInfo>` reflection
-   * descriptor. Resizes the reflected lane vector, copy-constructing any
-   * appended entries from one default-initialised prototype. The prototype is
-   * built and torn down around the resize because it owns a sentinel-backed
-   * lane map, so it cannot simply be a zeroed stack blob.
-   */
-  void SetFastVectorSOffsetInfoCount(void* const laneVector, const int count)
-  {
-    moho::SFormationLaneEntry fill{};
-    (void)InitializeDefaultFormationLaneEntry(&fill);
-
-    ResizeLaneEntryVectorByCountWithFill(
-      static_cast<unsigned int>(count), static_cast<moho::SFormationLaneVec*>(laneVector), &fill
-    );
-
-    ResetFormationLaneEntryUnitMapStorage(fill);
-  }
-
-  /**
-   * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
-   *
-   * IDA signature:
-   * void __cdecl sub_56DEC0(gpg::ReadArchive *a1, _DWORD *a2, int a3, gpg::RRef *a6);
-   *
-   * What it does:
-   * Reads the serialized lane count, grows the reflected
-   * `fastvector<SOffsetInfo>` to that count -- copy-filling appended lanes from
-   * a freshly default-initialised prototype -- then deserializes each lane
-   * through `ReadArchive::Read`.
-   *
-   * The prototype is a real object, built at 0x0056DF00 and torn down at
-   * 0x0056DF17 around the resize at 0x0056DF0C, because a lane entry owns a
-   * sentinel-backed unit map and an intrusive weak back-link; a zeroed stack
-   * blob would leave both malformed. The element descriptor is cached in
-   * `SOffsetInfo::sType` (0x0056DF43), not the map descriptor.
-   */
-  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const laneVector = reinterpret_cast<moho::SFormationLaneVec*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(laneVector != nullptr);
-    if (!archive || !laneVector) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    {
-      moho::SOffsetInfo fill{};
-      (void)InitializeDefaultFormationLaneEntry(&fill);
-      ResizeLaneEntryVectorByCountWithFill(count, laneVector, &fill);
-      ResetFormationLaneEntryUnitMapStorage(fill);
-    }
-
-    gpg::RType* const elementType = CachedSOffsetInfoType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SOffsetInfo>*>(laneVector);
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &vec[i], owner);
-    }
-  }
-
-  /**
-   * Address: 0x0056DF80 (FUN_0056DF80, gpg::RFastVectorType_SOffsetInfo::SerSave)
-   *
-   * What it does:
-   * Writes one reflected `fastvector<SOffsetInfo>` payload as archive count
-   * plus per-lane reflected serialization, mirroring `LoadFastVectorSOffsetInfo`.
-   */
-  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const laneVector = reinterpret_cast<moho::SFormationLaneVec*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(laneVector != nullptr);
-    if (!archive || !laneVector) {
-      return;
-    }
-
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SOffsetInfo>*>(laneVector);
-    const unsigned int count = static_cast<unsigned int>(vec.size());
-    archive->WriteUInt(count);
-
-    gpg::RType* const elementType = CachedSOffsetInfoType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &vec[i], owner);
-    }
-  }
-
-  /**
-   * Address: 0x0056D650 (FUN_0056D650, gpg::fastvector_n16_SAssignedLocInfo::resize_fill)
-   *
-   * What it does:
-   * Resizes one runtime `fastvector<SAssignedLocInfo>` lane and fills appended
-   * elements from `*fillValue`. `SAssignedLocInfo` is a trivially-copyable
-   * 0x10 POD, so the retail body copies it as four raw dwords
-   * (0x0056D67F-0x0056D691) rather than invoking a copy constructor.
-   */
-  void FastVectorSAssignedLocInfoResize(
-    const moho::SAssignedLocInfo* const fillValue,
-    const unsigned int newSize,
-    void* const objectStorage
-  )
-  {
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(objectStorage);
-    vec.Resize(newSize, fillValue ? *fillValue : moho::SAssignedLocInfo{});
-  }
-
-  /**
-   * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
-   *
-   * What it does:
-   * `RIndexed::SetCount` slot of the `fastvector<SAssignedLocInfo>` descriptor.
-   * Resizes the reflected lane, filling appended entries from a zeroed
-   * prototype -- the retail body clears the 0x10 stack prototype with
-   * `xorps xmm0` plus two `movss` stores and two zeroed dwords
-   * (0x0056C3B3-0x0056C3D3) before calling the resize.
-   */
-  void SetFastVectorSAssignedLocInfoCount(void* const slotVector, const int count)
-  {
-    const moho::SAssignedLocInfo fill{};
-    FastVectorSAssignedLocInfoResize(&fill, static_cast<unsigned int>(count), slotVector);
-  }
-
-  /**
-   * Address: 0x0056E000 (FUN_0056E000, gpg::RFastVectorType_SAssignedLocInfo::SerLoad)
-   *
-   * What it does:
-   * Reads the serialized slot count, resizes the reflected
-   * `fastvector<SAssignedLocInfo>` filling appended lanes from a zeroed
-   * prototype, then deserializes each 0x10 lane through `ReadArchive::Read`.
-   */
-  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    unsigned int count = 0;
-    archive->ReadUInt(&count);
-
-    const moho::SAssignedLocInfo fill{};
-    FastVectorSAssignedLocInfoResize(&fill, count, storage);
-
-    gpg::RType* const elementType = CachedSAssignedLocInfoType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(storage);
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(elementType, &vec[i], owner);
-    }
-  }
-
-  /**
-   * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
-   *
-   * What it does:
-   * Writes one reflected `fastvector<SAssignedLocInfo>` payload as archive
-   * count plus per-lane reflected serialization, mirroring
-   * `LoadFastVectorSAssignedLocInfo`.
-   */
-  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
-  {
-    auto* const storage = reinterpret_cast<void*>(objectPtr);
-    GPG_ASSERT(archive != nullptr);
-    GPG_ASSERT(storage != nullptr);
-    if (!archive || !storage) {
-      return;
-    }
-
-    auto& vec = *reinterpret_cast<gpg::fastvector<moho::SAssignedLocInfo>*>(storage);
-    const unsigned int count = static_cast<unsigned int>(vec.size());
-    archive->WriteUInt(count);
-
-    gpg::RType* const elementType = CachedSAssignedLocInfoType();
-    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, &vec[i], owner);
-    }
-  }
-} // namespace moho
-
-namespace
-{
-  /**
-   * Address: 0x0056B590 (FUN_0056B590)
-   *
-   * What it does:
-   * Appends one lane-entry copy to `laneVector`; grows storage through the
-   * range-insert grow lane when full, otherwise copy-constructs directly at
-   * current end and advances end by one entry.
-   */
-  [[maybe_unused]] moho::SFormationLaneEntry* AppendLaneEntryCopyWithGrow(
-    moho::SFormationLaneVec* const laneVector,
-    const moho::SFormationLaneEntry* const sourceEntry
-  )
-  {
-    moho::SFormationLaneEntry* const oldEnd = laneVector->end_;
-    if (oldEnd == laneVector->capacity_) {
-      InsertLaneEntryRangeBeforePosition(laneVector, oldEnd, sourceEntry, sourceEntry + 1);
-      return laneVector->end_ != nullptr ? laneVector->end_ - 1 : nullptr;
-    }
-
-    if (oldEnd != nullptr) {
-      (void)CopyConstructLaneEntryWithWeakBackLinkRelink(sourceEntry, oldEnd);
-    }
-
-    laneVector->end_ = oldEnd + 1;
-    return oldEnd;
-  }
-
-  [[nodiscard]] moho::SFormationLaneUnitNode* CloneLaneMapSubtreeWithWeakRelink(
-    const moho::SFormationLaneUnitNode* const sourceNode,
-    moho::SFormationLaneUnitNode* const parentNode,
-    moho::SFormationLaneUnitNode* const destinationHead
-  )
-  {
-    if (sourceNode == nullptr || sourceNode->isNil != 0u) {
-      return destinationHead;
-    }
-
-    auto* const clone = new moho::SFormationLaneUnitNode{};
-    clone->left = destinationHead;
-    clone->parent = parentNode;
-    clone->right = destinationHead;
-    clone->unitEntityId = sourceNode->unitEntityId;
-    clone->linkedUnitOwnerWord = 0u;
-    clone->linkedUnitNextWord = 0u;
-    clone->leaderPriority = sourceNode->leaderPriority;
-    clone->formationOffsetX = sourceNode->formationOffsetX;
-    clone->formationOffsetZ = sourceNode->formationOffsetZ;
-    clone->formationVector = sourceNode->formationVector;
-    clone->formationWeight = sourceNode->formationWeight;
-    clone->speedBandLow = sourceNode->speedBandLow;
-    clone->speedBandMid = sourceNode->speedBandMid;
-    clone->speedBandHigh = sourceNode->speedBandHigh;
-    clone->color = sourceNode->color;
-    clone->isNil = 0u;
-
-    RelinkWeakWordNode(
-      clone->linkedUnitOwnerWord,
-      clone->linkedUnitNextWord,
-      DecodeUnitOwnerSlotWord(sourceNode->linkedUnitOwnerWord)
-    );
-
-    clone->left = CloneLaneMapSubtreeWithWeakRelink(sourceNode->left, clone, destinationHead);
-    clone->right = CloneLaneMapSubtreeWithWeakRelink(sourceNode->right, clone, destinationHead);
-    return clone;
-  }
-
-  void CopyLaneMapIntoClearedStorage(
-    moho::SFormationLaneUnitMap& destination,
-    const moho::SFormationLaneUnitMap& source
-  )
-  {
-    moho::SFormationLaneUnitNode* const destinationHead = destination.head;
-    if (destinationHead == nullptr) {
-      destination.size = 0u;
-      return;
-    }
-
-    const moho::SFormationLaneUnitNode* const sourceHead = source.head;
-    if (sourceHead == nullptr) {
-      destinationHead->parent = destinationHead;
-      destinationHead->left = destinationHead;
-      destinationHead->right = destinationHead;
-      destination.size = 0u;
-      return;
-    }
-
-    destinationHead->parent =
-      CloneLaneMapSubtreeWithWeakRelink(sourceHead->parent, destinationHead, destinationHead);
-    destination.size = source.size;
-
-    if (destinationHead->parent == destinationHead || destinationHead->parent->isNil != 0u) {
-      destinationHead->left = destinationHead;
-      destinationHead->right = destinationHead;
-      return;
-    }
-
-    destinationHead->left = LaneMapLeftmostNode(destinationHead->parent);
-    destinationHead->right = LaneMapRightmostNode(destinationHead->parent);
-  }
-
-  /**
-   * Address: 0x0056AC00 (FUN_0056AC00)
-   *
-   * What it does:
-   * Clears one lane-unit map payload range `[head->left, head)` then frees the
-   * sentinel head node and resets map storage pointers/count.
-   */
-  [[maybe_unused]] int DestroyLaneMapHeadStorage(moho::SFormationLaneUnitMap& map)
-  {
-    moho::SFormationLaneUnitNode* nextNode = nullptr;
-    (void)EraseLaneMapNodeRange(map, nextNode, map.head->left, map.head);
-    delete map.head;
-    map.head = nullptr;
-    map.size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x00573390 (FUN_00573390)
-   *
-   * What it does:
-   * Copy-assigns one lane-unit map by clearing destination node lanes first,
-   * then cloning source tree topology and weak-link payload ownership.
-   */
-  [[maybe_unused]] moho::SFormationLaneUnitMap& AssignLaneMapFromOtherLaneA(
-    moho::SFormationLaneUnitMap& destination,
-    const moho::SFormationLaneUnitMap& source
-  )
-  {
-    if (&destination != &source) {
-      moho::SFormationLaneUnitNode* nextNode = nullptr;
-      (void)EraseLaneMapNodeRange(destination, nextNode, destination.head->left, destination.head);
-      CopyLaneMapIntoClearedStorage(destination, source);
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x005733C0 (FUN_005733C0)
-   *
-   * What it does:
-   * Duplicate copy-assignment lane for lane-unit maps: clears destination
-   * range, then rebuilds the destination tree and intrusive weak links from
-   * source.
-   */
-  [[maybe_unused]] moho::SFormationLaneUnitMap& AssignLaneMapFromOtherLaneB(
-    moho::SFormationLaneUnitMap& destination,
-    const moho::SFormationLaneUnitMap& source
-  )
-  {
-    if (&destination != &source) {
-      moho::SFormationLaneUnitNode* nextNode = nullptr;
-      (void)EraseLaneMapNodeRange(destination, nextNode, destination.head->left, destination.head);
-      CopyLaneMapIntoClearedStorage(destination, source);
-    }
-    return destination;
+    return static_cast<moho::Unit*>(link.GetObjectPtr());
   }
 
   /**
    * Address: 0x00568980 (FUN_00568980, sub_568980)
    *
    * What it does:
-   * For non-guard formation commands, scans overlap between lane-0 entries and
-   * both lane groups, then merges overlap extents/speed bands with a minimum
-   * floor to keep coupled lane movement consistent.
+   * For every non-guard formation, pairs each ground group against every
+   * group of both layers and, where their overlap boxes intersect, gives
+   * both the ground group's centre, the larger extent (floored at 10 on
+   * each axis) and the slower speed, so overlapping groups move as one.
    */
-  [[maybe_unused]] void MergeOverlappingLaneBands(moho::CFormationInstance& formation)
+  void MergeOverlappingOffsetInfos(moho::CFormationInstance& formation)
   {
     if (formation.mCommandType == moho::EUnitCommandType::UNITCOMMAND_Guard) {
       return;
     }
 
-    constexpr float kBandFloor = 10.0f;
-    moho::SFormationLaneEntry* lane0Entry = formation.mLanes[0].begin();
-    const moho::SFormationLaneEntry* const lane0End = formation.mLanes[0].end();
-    while (lane0Entry != lane0End) {
-      for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
-        moho::SFormationLaneEntry* candidate = formation.mLanes[laneIndex].begin();
-        const moho::SFormationLaneEntry* const laneEnd = formation.mLanes[laneIndex].end();
-        while (candidate != laneEnd) {
-          if (LaneEntriesOverlap(*candidate, *lane0Entry)) {
-            float mergedBandA = std::max(lane0Entry->overlapAnchor.x, candidate->overlapAnchor.x);
-            if (mergedBandA < kBandFloor) {
-              mergedBandA = kBandFloor;
-            }
-
-            float mergedBandB = std::max(lane0Entry->overlapAnchor.z, candidate->overlapAnchor.z);
-            if (mergedBandB < kBandFloor) {
-              mergedBandB = kBandFloor;
-            }
-
-            const float mergedSpeed = std::min(lane0Entry->preferredSpeed, candidate->preferredSpeed);
-
-            candidate->overlapRadius.x = lane0Entry->overlapRadius.x;
-            candidate->overlapRadius.z = lane0Entry->overlapRadius.z;
-            candidate->overlapAnchor.x = mergedBandA;
-            candidate->overlapAnchor.z = mergedBandB;
-            candidate->preferredSpeed = mergedSpeed;
-
-            lane0Entry->overlapAnchor.x = mergedBandA;
-            lane0Entry->overlapAnchor.z = mergedBandB;
-            lane0Entry->preferredSpeed = mergedSpeed;
+    constexpr float kMinMergedExtent = 10.0f;
+    for (moho::SOffsetInfo& ground : formation.mOffsetInfo[kGroundFormationLayer]) {
+      for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
+        for (moho::SOffsetInfo& other : formation.mOffsetInfo[layer]) {
+          if (!other.Overlaps(ground)) {
+            continue;
           }
-          ++candidate;
+
+          float extentZ = std::max(ground.mExtent.z, other.mExtent.z);
+          if (extentZ < kMinMergedExtent) {
+            extentZ = kMinMergedExtent;
+          }
+          float extentX = std::max(ground.mExtent.x, other.mExtent.x);
+          if (extentX < kMinMergedExtent) {
+            extentX = kMinMergedExtent;
+          }
+          const float speed = std::min(ground.mSpeed, other.mSpeed);
+
+          other.mCenter = ground.mCenter;
+          other.mExtent = moho::SCoordsVec2{extentX, extentZ};
+          other.mSpeed = speed;
+          ground.mExtent = moho::SCoordsVec2{extentX, extentZ};
+          ground.mSpeed = speed;
         }
       }
-      ++lane0Entry;
     }
-  }
-
-  void FindBestLeaderInLane(
-    const moho::SFormationLaneUnitNode* node,
-    const moho::SFormationLaneUnitNode* head,
-    std::int32_t& bestPriority,
-    moho::Unit*& bestUnit
-  )
-  {
-    if (!node || node == head || node->isNil != 0u) {
-      return;
-    }
-
-    FindBestLeaderInLane(node->left, head, bestPriority, bestUnit);
-    if (moho::Unit* const candidate = DecodeUnitOwnerSlotWord(node->linkedUnitOwnerWord);
-        candidate != nullptr && node->leaderPriority > bestPriority) {
-      bestPriority = node->leaderPriority;
-      bestUnit = candidate;
-    }
-    FindBestLeaderInLane(node->right, head, bestPriority, bestUnit);
   }
 
   /**
-   * Address: 0x0059A300 (FUN_0059A300, sub_59A300)
-   *
-   * What it does:
-   * Returns one lane leader resolved from `laneEntry.unitMap`; when no cached
-   * weak backlink is active, it recomputes the best-priority unit and rewires
-   * the backlink chain to that owner.
+   * The leader lookup `CAiFormationInstance::GetLeader` (0x0059A870) and
+   * `GetOffsetInfoLeader` below share: the group's own leader, except that an
+   * air group (layer 1) follows the leader of the first ground group whose
+   * overlap box it intersects.
    */
-  [[nodiscard]] moho::Unit* SelectLaneLeader(moho::SFormationLaneEntry& laneEntry)
+  [[nodiscard]] moho::Unit* ResolveGroupLeader(
+    moho::CFormationInstance& formation, const std::int32_t layer, moho::SOffsetInfo& info
+  )
   {
-    if (laneEntry.linkedUnitBackLinkHeadWord == 0u || laneEntry.linkedUnitBackLinkHeadWord == 0x4u) {
-      std::int32_t bestPriority = 0;
-      moho::Unit* bestUnit = nullptr;
-
-      const moho::SFormationLaneUnitNode* const head = laneEntry.unitMap.head;
-      if (head) {
-        FindBestLeaderInLane(head->parent, head, bestPriority, bestUnit);
-      }
-
-      const std::uint32_t desiredOwnerWord = EncodeUnitOwnerSlotWord(bestUnit);
-      if (desiredOwnerWord != laneEntry.linkedUnitBackLinkHeadWord) {
-        UnlinkWeakWordNode(laneEntry.linkedUnitBackLinkHeadWord, laneEntry.linkedUnitBackLinkNextWord);
-        RelinkWeakWordNode(laneEntry.linkedUnitBackLinkHeadWord, laneEntry.linkedUnitBackLinkNextWord, bestUnit);
+    moho::Unit* leader = info.GetLeader();
+    if (layer == kAirFormationLayer) {
+      for (moho::SOffsetInfo& ground : formation.mOffsetInfo[kGroundFormationLayer]) {
+        if (ground.Overlaps(info)) {
+          leader = ground.GetLeader();
+          break;
+        }
       }
     }
-
-    return DecodeUnitOwnerSlotWord(laneEntry.linkedUnitBackLinkHeadWord);
+    return leader;
   }
 
   /**
    * Address: 0x0059A970 (FUN_0059A970, sub_59A970)
    *
    * What it does:
-   * Resolves the effective lane-leader unit for one lane entry during update:
-   * when processing lane 1 it first checks overlap against lane-0 entries and
-   * may switch leader to the first overlapping lane, then applies guard-command
-   * remap to guarded target unit.
+   * The leader `Update` drives one group by: `ResolveGroupLeader`, then for
+   * guard formations the unit that leader is guarding instead.
    */
-  [[nodiscard]] moho::Unit* ResolveUpdateLaneLeader(
-    const std::int32_t laneIndex,
-    moho::CAiFormationInstance& formation,
-    moho::SFormationLaneEntry& laneEntry
+  [[nodiscard]] moho::Unit* GetOffsetInfoLeader(
+    const std::int32_t layer, moho::CAiFormationInstance& formation, moho::SOffsetInfo& info
   )
   {
-    moho::Unit* leader = SelectLaneLeader(laneEntry);
-
-    if (laneIndex == 1) {
-      moho::SFormationLaneEntry* candidate = formation.mLanes[0].begin();
-      const moho::SFormationLaneEntry* const end = formation.mLanes[0].end();
-      while (candidate != end) {
-        if (LaneEntriesOverlap(*candidate, laneEntry)) {
-          leader = SelectLaneLeader(*candidate);
-          break;
-        }
-        ++candidate;
-      }
-    }
-
+    moho::Unit* const leader = ResolveGroupLeader(formation, layer, info);
     if (formation.mCommandType != moho::EUnitCommandType::UNITCOMMAND_Guard || leader == nullptr) {
       return leader;
     }
-
-    moho::Unit* const runtimeLeader = leader->IsUnit();
-    if (runtimeLeader == nullptr) {
-      return nullptr;
-    }
-    return runtimeLeader->GuardedUnitRef.ResolveObjectPtr<moho::Unit>();
+    return leader->IsUnit()->GuardedUnitRef.ResolveObjectPtr<moho::Unit>();
   }
 
   /**
@@ -4406,37 +1661,21 @@ namespace
    *
    * What it does:
    * The lazy formation-plan rebuild the binary inlines at the head of every
-   * entry point that reads plan state. When `mPlanUpdateRequested` is set it
-   * clears the flag, drops dead units, tears the current plan down and rebuilds
+   * entry point that reads plan state. When `mPlanUpdate` is set it clears
+   * the flag, drops dead units, tears the current plan down and rebuilds
    * it: `RemoveDeadUnits` -> `CleanupFormation` -> `UpdateFormation`, in that
    * order (see 0x0059AEA8 / 0x0059AEAF / 0x0059AEB5).
    */
   void RefreshFormationPlanIfRequested(moho::CFormationInstance& formation)
   {
-    if (formation.mPlanUpdateRequested == 0u) {
+    if (formation.mPlanUpdate == 0u) {
       return;
     }
 
-    formation.mPlanUpdateRequested = 0u;
+    formation.mPlanUpdate = 0u;
     (void)formation.RemoveDeadUnits(nullptr);
     formation.CleanupFormation();
     formation.UpdateFormation();
-  }
-
-  [[nodiscard]] bool IsBusyFormationQueueCommand(const moho::EUnitCommandType commandType) noexcept
-  {
-    switch (commandType) {
-    case moho::EUnitCommandType::UNITCOMMAND_Move:
-    case moho::EUnitCommandType::UNITCOMMAND_Attack:
-    case moho::EUnitCommandType::UNITCOMMAND_Patrol:
-    case moho::EUnitCommandType::UNITCOMMAND_FormMove:
-    case moho::EUnitCommandType::UNITCOMMAND_FormAttack:
-    case moho::EUnitCommandType::UNITCOMMAND_FormPatrol:
-    case moho::EUnitCommandType::UNITCOMMAND_Guard:
-      return true;
-    default:
-      return false;
-    }
   }
 
   /**
@@ -4446,11 +1685,7 @@ namespace
    * Converts one world-space slot position to footprint-anchored grid cell
    * coordinates and asks `COORDS_CanMoveAt` whether the unit can occupy it.
    */
-  [[nodiscard]] bool UnitCanMoveAtFormationSlot(
-    moho::Unit* const unit,
-    const moho::SCoordsVec2& position,
-    moho::COGrid* const grid
-  )
+  [[nodiscard]] bool UnitCanMoveAt(moho::Unit* const unit, const moho::SCoordsVec2& position, moho::COGrid* const grid)
   {
     const moho::SFootprint& footprint = unit->GetFootprint();
     // FUN_007212B0 converts both coordinates with bare fistp and never calls
@@ -4459,78 +1694,36 @@ namespace
     return moho::COORDS_CanMoveAt(&cell, grid, unit, false, nullptr);
   }
 
-  [[nodiscard]] bool CanPlaceFormationSlot(
+  /**
+   * The four-way slot test `CAiFormationInstance::FindSlotFor` (0x0059AA20)
+   * runs on the requested position (0x0059AB10-0x0059AB8A) and on every
+   * spiral candidate (0x0059ACE1-0x0059AD66): the footprint fits the
+   * occupancy grid, the unit may move there, the point lies within the
+   * playable map and no already-assigned slot of the layer overlaps it.
+   */
+  [[nodiscard]] bool FormationSlotIsFree(
     const moho::CAiFormationInstance& formation,
     const moho::SCoordsVec2& position,
     const moho::SFootprint& footprint,
-    const std::int32_t footprintSize,
+    const std::int32_t maxSize,
     const bool useWholeMap,
-    const std::int32_t laneToken,
+    const std::int32_t layer,
     moho::Unit* const unit
   )
   {
-    if (formation.mSim == nullptr || formation.mSim->mOGrid == nullptr || formation.mSim->mMapData == nullptr) {
+    moho::COGrid* const grid = formation.mSim->mOGrid;
+    if (static_cast<std::uint8_t>(footprint.FitsAt(position, *grid)) == 0u) {
       return false;
     }
-
-    if (footprint.FitsAt(position, *formation.mSim->mOGrid) != static_cast<moho::EOccupancyCaps>(0u)) {
+    if (!UnitCanMoveAt(unit, position, grid)) {
       return false;
     }
-
-    // 0x0059AAC8/0x0059AC22 (both FindSlotFor call sites): the binary checks
-    // func_UnitCanMoveAt right after FitsAt and before IsWithin - this was
-    // elided from the earlier lift of this helper.
-    if (!UnitCanMoveAtFormationSlot(unit, position, formation.mSim->mOGrid)) {
+    if (!formation.mSim->mMapData->IsWithin(
+          Wm3::Vec3f{position.x, 0.0f, position.z}, static_cast<float>(maxSize), useWholeMap
+        )) {
       return false;
     }
-
-    const Wm3::Vec3f worldPos{position.x, 0.0f, position.z};
-    if (!formation.mSim->mMapData->IsWithin(worldPos, static_cast<float>(footprintSize), useWholeMap)) {
-      return false;
-    }
-
-    return formation.Func27(position, footprintSize, laneToken);
-  }
-
-  // ---------------------------------------------------------------------
-  // PreRunScript / Setup / RunScript / UpdateFormation support.
-  //
-  // `moho::SFormationLayerUnitSet` (CAiFormationInstance.h) is
-  // `gpg::fastvector_n<SWeakRefSlot, 4>` -- IDA's own local type library
-  // names the raw container `fastvector_n4_WeakPtr_IUnit`. Every slot is
-  // bound/queried through `SWeakRefSlot::AsWeakPtr<IUnit>()`, the same
-  // intrusive weak-link relink API `moho::WeakPtr<T>` already exposes.
-  // `SWeakRefSlot` (not `WeakPtr<IUnit>` itself) is deliberately the
-  // container's element type: `WeakPtr<IUnit>` carries a real, non-trivial
-  // unlink destructor, and the compiler auto-invoking that on an abandoned
-  // inline slot after a heap grow (the intrusive grow path leaves stale,
-  // non-null link bytes in the old inline array, which stays a live C++
-  // subobject) would re-walk an already-spliced chain and can run off its
-  // end. Every unlink in this family below is therefore the same explicit
-  // call the binary itself makes, proven byte-for-byte against
-  // FUN_0056D390 / FUN_005725A0 / FUN_00572550 / FUN_0056D2B0 /
-  // FUN_0056D3C0 (all genuinely relink-aware on inspection of their raw
-  // decompiles, despite one of those addresses -- 0x0056B2F0 -- being
-  // mislabeled as a trivial POD lane in a static_assert comment elsewhere
-  // in this tree; that mislabel is out of scope for this pass and is
-  // simply not relied upon here).
-
-  /**
-   * Removes the slot at `it` from `container`, relinking every following
-   * slot at its shifted-down address. The `gpg::fastvector_n` analogue of
-   * `moho::RemoveWeakPtrVectorObject` (WeakPtr.h), which targets the
-   * different `msvc8::vector<WeakPtr<T>>` ABI; matches FUN_005725A0's
-   * per-element unlink/relink shift used by `PreRunScript`.
-   */
-  void EraseLinkedUnitWeakSlot(moho::SFormationLayerUnitSet& container, moho::SWeakRefSlot* it)
-  {
-    moho::SWeakRefSlot* const end = container.end();
-    for (moho::SWeakRefSlot* next = it + 1; next != end; ++it, ++next) {
-      it->AsWeakPtr<moho::IUnit>().ResetFromOwnerLinkSlot(next->AsWeakPtr<moho::IUnit>().ownerLinkSlot);
-      next->AsWeakPtr<moho::IUnit>().ResetFromObject(nullptr);
-    }
-    it->AsWeakPtr<moho::IUnit>().ResetFromObject(nullptr);
-    container.SetSizeUnchecked(container.size() - 1u);
+    return formation.PosIsFree(position, maxSize, layer);
   }
 
   /**
@@ -4586,8 +1779,6 @@ namespace
    * (below) is the direct, natural C++ source for exactly this family of
    * out-of-line bodies -- RULE ONE in CLAUDE.md: recover the container/
    * algorithm operation, not the compiler's internal decomposition of it.
-   * `FUN_005734F0` is the only one of the five actually in the RunScript
-   * dependency ladder (the other three are unreached from this closure).
    */
   [[nodiscard]] bool CompareRunScriptCandidateByDistanceSq(
     const SFormationRunScriptCandidate& lhs,
@@ -4601,87 +1792,546 @@ namespace
 namespace moho
 {
   /**
-   * Binds one freshly-linked weak slot to `unit` and appends it to
-   * `destination`, matching the binary's inline construct-then-push dance
-   * used by every `SFormationLayerUnitSet` builder in the engine:
-   * `UpdateFormation` (0x00567F1D..0x00567F94), `PreRunScript`/`Setup` (below),
-   * and `CFormation::Finalize` (0x0083836D..0x008383B6, CFormation.cpp) all
-   * inline this exact sequence -- construct a temporary bound to `unit`
-   * (linking it at the unit's real weak-chain head), push_back it (the
-   * relink-aware push steals the link for the new slot), then unlink the
-   * temporary -- it is now a redundant second entry in the same chain, since
-   * the container's copy owns the link going forward. Moved to external
-   * linkage (was file-local to this TU's anonymous namespace) so
-   * `CFormation::Finalize` can reuse it instead of duplicating the same
-   * intrusive-weak-guard dance; declared in CAiFormationInstance.h.
+   * Address: 0x0056B070 (FUN_0056B070,
+   * ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)
+   *
+   * What it does:
+   * Broadcasts one formation-status event to every linked listener while
+   * preserving iteration safety if listeners relink/unlink themselves during
+   * the callback: the ring is detached onto a stack node, each listener is
+   * moved back before `this` and then told the event, and whatever is left
+   * on the stack node is spliced back at the end.
    */
-  void AppendLinkedUnitWeakSlot(SFormationLayerUnitSet& destination, Unit* const unit)
+  void Broadcaster::BroadcastEvent(const EFormationdStatus event)
   {
-    SWeakRefSlot temp{};
-    temp.AsWeakPtr<IUnit>().ResetFromObject(unit);
-    destination.push_back(temp);
-    temp.AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
+    Broadcaster detached{};
+
+    if (mNext == this) {
+      return;
+    }
+
+    detached.mNext = mNext;
+    detached.mPrev = mPrev;
+    detached.mPrev->mNext = &detached;
+    detached.mNext->mPrev = &detached;
+    mNext = this;
+    mPrev = this;
+
+    while (detached.mNext != &detached) {
+      auto* const listenerLink = static_cast<Broadcaster*>(detached.mNext);
+      listenerLink->ListLinkBefore(this);
+
+      if (Listener<EFormationdStatus>* const listener = ListenerFromEFormationdStatusLinkNode(listenerLink)) {
+        listener->OnEvent(event);
+      }
+    }
+
+    detached.mPrev->mNext = detached.mNext;
+    detached.mNext->mPrev = detached.mPrev;
   }
 
   /**
-   * Unlinks every slot in `container` from its target's real weak chain and
-   * resets storage to inline. Matches FUN_0056D3C0 (`sub_56D3C0`) followed by
-   * the conditional `operator delete[]`, which every one of
-   * `PreRunScript`/`Setup`/`UpdateFormation` inlines at its own scope exit --
-   * and which `CFormation::Finalize` (0x00838464..0x008384A3) inlines too, to
-   * release the transient participant collection it builds each call. Moved
-   * to external linkage for the same reason as `AppendLinkedUnitWeakSlot`
-   * above; declared in CAiFormationInstance.h.
+   * Address: 0x00565AB0 (FUN_00565AB0, Moho::SOffsetInfo::SOffsetInfo)
+   *
+   * What it does:
+   * Default state for a fresh group. The body re-clears the (already empty)
+   * unit map and re-drops the (already null) leader -- both inlined
+   * `clear()`/`Set(nullptr)` calls the binary keeps at 0x00565B2A and
+   * 0x00565B8F -- around the scalar defaults.
    */
-  void ClearLinkedUnitWeakSlots(SFormationLayerUnitSet& container)
+  SOffsetInfo::SOffsetInfo()
   {
-    for (SWeakRefSlot& slot : container) {
-      slot.AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
-    }
-    container.ResetStorageToInline();
+    mUnitOffsets.clear();
+    mPos = Wm3::Vec3f::ZERO;
+    mSlotCenter = SCoordsVec2{0.0f, 0.0f};
+    mCenter = SCoordsVec2{0.0f, 0.0f};
+    mDynamicOffset = SCoordsVec2{0.0f, 0.0f};
+    mExtent = SCoordsVec2{2.0f, 2.0f};
+    mUseDynamicOffset = false;
+    mInFormation = false;
+    mSpeed = std::numeric_limits<float>::infinity();
+    mAvgDistToTarget = 0.0f;
+    mLeader.Set(nullptr);
   }
 
   /**
-   * `SFormationLinkedUnitRefVec` counterpart of `AppendLinkedUnitWeakSlot`
-   * above: links a temporary into `target`'s owner-chain head
-   * (`target + 0x04`, the `IUnit`/`WeakObject` chain head every `IUnit`
-   * sub-object carries), pushes it (the copy steals the link), then unlinks
-   * the now-redundant temporary -- same construct-then-push-then-unlink dance,
-   * for `mUnits`'s own element type.
+   * Address: 0x005688C0 (FUN_005688C0, sub_5688C0)
+   *
+   * What it does:
+   * Axis-aligned overlap test of the two groups' `mCenter +/- mExtent`
+   * boxes, X first, then Z.
    */
-  void AppendLinkedUnitRef(SFormationLinkedUnitRefVec& destination, IUnit* const target)
+  bool SOffsetInfo::Overlaps(const SOffsetInfo& other) const noexcept
   {
-    // 0x008382A0, the `CFormation::Finalize` collection loop: a stack weak-ref
-    // is linked into the unit's chain, handed to
-    // `gpg::fastvector_n4_WeakPtr_IUnit::push_back`, and destroyed. The
-    // push_back is what links the element that ends up in the vector -- it
-    // copy-constructs, and this element's copy-constructor splices the copy into
-    // the same chain. `SFormationLinkedUnitRef` now declares itself an intrusive
-    // weak-ref slot (see the `IsIntrusiveWeakRefSlot` specialization in the
-    // header), so `FastVectorN` performs that splice on every append and on
-    // every relocation the grow lane does.
-    SFormationLinkedUnitRef temp{};
-    if (target != nullptr) {
-      auto* const ownerHead = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(target) + 0x4u);
-      temp.ownerChainHead = ownerHead;
-      temp.nextChainLink = *ownerHead;
-      *ownerHead = PtrToWord(&temp);
+    const bool overlapX = (mCenter.x - mExtent.x) <= (other.mExtent.x + other.mCenter.x)
+      && (other.mCenter.x - other.mExtent.x) <= (mExtent.x + mCenter.x);
+    if (!overlapX) {
+      return false;
     }
-    destination.push_back(temp);
-    UnlinkLinkedRef(temp);
+
+    return (mCenter.z - mExtent.z) <= (other.mExtent.z + other.mCenter.z)
+      && (other.mCenter.z - other.mExtent.z) <= (mExtent.z + mCenter.z);
   }
 
   /**
-   * `SFormationLinkedUnitRefVec` counterpart of `ClearLinkedUnitWeakSlots`
-   * above: unlinks every slot in `container` from its unit's real owner-chain
-   * and resets storage to inline.
+   * Address: 0x0059A300 (FUN_0059A300, sub_59A300)
+   *
+   * What it does:
+   * Returns the cached leader. When `mLeader` is empty, walks the unit map
+   * in key order for the live unit with the highest `mLeaderPriority`
+   * (strictly above zero) and rebinds `mLeader` to it -- the relink is the
+   * inlined `WeakPtr::operator=` at 0x0059A35F-0x0059A386.
    */
-  void ClearLinkedUnitRefs(SFormationLinkedUnitRefVec& container)
+  Unit* SOffsetInfo::GetLeader()
   {
-    for (SFormationLinkedUnitRef& link : container) {
-      UnlinkLinkedRef(link);
+    if (!mLeader.HasValue()) {
+      Unit* best = nullptr;
+      std::int32_t bestPriority = 0;
+      for (auto& [entityId, info] : mUnitOffsets) {
+        Unit* const unit = UnitOf(info.mUnit);
+        if (unit != nullptr && info.mLeaderPriority > bestPriority) {
+          bestPriority = info.mLeaderPriority;
+          best = unit;
+        }
+      }
+      mLeader.Set(best);
     }
-    container.ResetStorageToInline();
+
+    return UnitOf(mLeader);
+  }
+
+  /**
+   * Address: 0x0056C1A0 (FUN_0056C1A0, gpg::RFastVectorType_SOffsetInfo::SetCount)
+   *
+   * IDA signature:
+   * int __stdcall gpg::RFastVectorType_SOffsetInfo::SetCount(void *obj, int count);
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot of the `fastvector<SOffsetInfo>` reflection
+   * descriptor: resizes the reflected group vector, copy-constructing any
+   * appended groups from one default-constructed prototype (built at
+   * 0x0056C1B3, torn down at 0x0056C1D2 around the `Resize` at 0x0056C1C6).
+   */
+  void SetFastVectorSOffsetInfoCount(void* const vector, const int count)
+  {
+    auto& groups = *static_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(vector);
+    groups.Resize(static_cast<std::size_t>(count), SOffsetInfo());
+  }
+
+  /**
+   * Address: 0x0056DEC0 (FUN_0056DEC0, gpg::RFastVectorType_SOffsetInfo::SerLoad)
+   *
+   * IDA signature:
+   * void __cdecl sub_56DEC0(gpg::ReadArchive *a1, _DWORD *a2, int a3, gpg::RRef *a6);
+   *
+   * What it does:
+   * Reads the serialized group count, grows the reflected
+   * `fastvector<SOffsetInfo>` to that count -- copy-filling appended groups
+   * from a freshly default-constructed prototype (0x0056DF00 / 0x0056DF0C /
+   * 0x0056DF17) -- then deserializes each group through `ReadArchive::Read`
+   * with the element descriptor cached in `SOffsetInfo::sType` (0x0056DF43).
+   */
+  void LoadFastVectorSOffsetInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(groups != nullptr);
+    if (!archive || !groups) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+    groups->Resize(count, SOffsetInfo());
+
+    gpg::RType* const elementType = CachedSOffsetInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(elementType, &(*groups)[i], owner);
+    }
+  }
+
+  /**
+   * Address: 0x0056DF80 (FUN_0056DF80, gpg::RFastVectorType_SOffsetInfo::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<SOffsetInfo>` payload as archive count
+   * plus per-group reflected serialization, mirroring `LoadFastVectorSOffsetInfo`.
+   */
+  void SaveFastVectorSOffsetInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const groups = reinterpret_cast<gpg::fastvector_n<SOffsetInfo, 2>*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(groups != nullptr);
+    if (!archive || !groups) {
+      return;
+    }
+
+    const unsigned int count = static_cast<unsigned int>(groups->size());
+    archive->WriteUInt(count);
+
+    gpg::RType* const elementType = CachedSOffsetInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(elementType, &(*groups)[i], owner);
+    }
+  }
+
+  /**
+   * Address: 0x0056C3B0 (FUN_0056C3B0, gpg::RFastVectorType_SAssignedLocInfo::SetCount)
+   *
+   * What it does:
+   * `RIndexed::SetCount` slot of the `fastvector<SAssignedLocInfo>`
+   * descriptor. Resizes the reflected slot vector, filling appended entries
+   * from a zeroed prototype -- the retail body clears the 0x10 stack
+   * prototype with `xorps xmm0` plus two `movss` stores and two zeroed dwords
+   * (0x0056C3B3-0x0056C3D3) before calling the resize (0x0056D650, the
+   * `fastvector_n<SAssignedLocInfo,16>::Resize` emission for this element).
+   */
+  void SetFastVectorSAssignedLocInfoCount(void* const vector, const int count)
+  {
+    auto& slots = *static_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(vector);
+    slots.Resize(static_cast<std::size_t>(count), SAssignedLocInfo{});
+  }
+
+  /**
+   * Address: 0x0056E000 (FUN_0056E000, gpg::RFastVectorType_SAssignedLocInfo::SerLoad)
+   *
+   * What it does:
+   * Reads the serialized slot count, resizes the reflected
+   * `fastvector<SAssignedLocInfo>` filling appended entries from a zeroed
+   * prototype, then deserializes each 0x10 entry through `ReadArchive::Read`.
+   */
+  void LoadFastVectorSAssignedLocInfo(gpg::ReadArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(slots != nullptr);
+    if (!archive || !slots) {
+      return;
+    }
+
+    unsigned int count = 0;
+    archive->ReadUInt(&count);
+    slots->Resize(count, SAssignedLocInfo{});
+
+    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Read(elementType, &(*slots)[i], owner);
+    }
+  }
+
+  /**
+   * Address: 0x0056E0A0 (FUN_0056E0A0, gpg::RFastVectorType_SAssignedLocInfo::SerSave)
+   *
+   * What it does:
+   * Writes one reflected `fastvector<SAssignedLocInfo>` payload as archive
+   * count plus per-entry reflected serialization, mirroring
+   * `LoadFastVectorSAssignedLocInfo`.
+   */
+  void SaveFastVectorSAssignedLocInfo(gpg::WriteArchive* archive, int objectPtr, int, gpg::RRef* ownerRef)
+  {
+    auto* const slots = reinterpret_cast<gpg::fastvector_n<SAssignedLocInfo, 16>*>(objectPtr);
+    GPG_ASSERT(archive != nullptr);
+    GPG_ASSERT(slots != nullptr);
+    if (!archive || !slots) {
+      return;
+    }
+
+    const unsigned int count = static_cast<unsigned int>(slots->size());
+    archive->WriteUInt(count);
+
+    gpg::RType* const elementType = CachedSAssignedLocInfoType();
+    const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
+    for (unsigned int i = 0; i < count; ++i) {
+      archive->Write(elementType, &(*slots)[i], owner);
+    }
+  }
+
+  /**
+   * Address: 0x0059A3F0 (FUN_0059A3F0)
+   *
+   * What it does:
+   * Initializes one assigned slot from `(position, size, layer)`.
+   */
+  SAssignedLocInfo::SAssignedLocInfo(
+    const SCoordsVec2& position,
+    const std::int32_t size,
+    const std::int32_t layer
+  ) noexcept
+    : mPos(position)
+    , mSize(size)
+    , mLayer(layer)
+  {
+  }
+
+  /**
+   * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Loads one assigned slot: position, footprint size and layer.
+   */
+  void SAssignedLocInfo::MemberDeserialize(SAssignedLocInfo* const slot, gpg::ReadArchive* const archive)
+  {
+    if (!archive || !slot) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &slot->mPos, ownerRef);
+    }
+
+    archive->ReadInt(&slot->mSize);
+    archive->ReadInt(&slot->mLayer);
+  }
+
+  /**
+   * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
+   *
+   * What it does:
+   * Stores one assigned slot: position, footprint size and layer.
+   */
+  void SAssignedLocInfo::MemberSerialize(const SAssignedLocInfo* const slot, gpg::WriteArchive* const archive)
+  {
+    if (!archive || !slot) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &slot->mPos, ownerRef);
+    }
+
+    archive->WriteInt(slot->mSize);
+    archive->WriteInt(slot->mLayer);
+  }
+
+  /**
+   * Address: 0x005707B0 (FUN_005707B0, Moho::SUnitOffsetInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Loads one unit slot: weak-unit link, leader priority, 2D offset, 3D
+   * target position, heading angle, both distances and the weight.
+   */
+  void SUnitOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Read(weakPtrType, &mUnit, ownerRef);
+    }
+
+    archive->ReadInt(&mLeaderPriority);
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &mOffset, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Read(vectorType, &mTargetPos, ownerRef);
+    }
+
+    archive->ReadFloat(&mHeadingAngle);
+    archive->ReadFloat(&mDistToTarget);
+    archive->ReadFloat(&mDistFromLeader);
+    archive->ReadFloat(&mWeight);
+  }
+
+  /**
+   * Address: 0x005708A0 (FUN_005708A0, Moho::SUnitOffsetInfo::MemberSerialize)
+   *
+   * What it does:
+   * Stores one unit slot: weak-unit link, leader priority, 2D offset, 3D
+   * target position, heading angle, both distances and the weight.
+   */
+  void SUnitOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Write(weakPtrType, &mUnit, ownerRef);
+    }
+
+    archive->WriteInt(mLeaderPriority);
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &mOffset, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Write(vectorType, &mTargetPos, ownerRef);
+    }
+
+    archive->WriteFloat(mHeadingAngle);
+    archive->WriteFloat(mDistToTarget);
+    archive->WriteFloat(mDistFromLeader);
+    archive->WriteFloat(mWeight);
+  }
+
+  /**
+   * Address: 0x00570B60 (FUN_00570B60, Moho::SOffsetInfo::MemberSerialize)
+   *
+   * What it does:
+   * Writes one group: the whole unit map, position, the four coordinate
+   * pairs, both flags, both scalars and the leader weak-link, each through
+   * its reflected RTTI serializer.
+   */
+  void SOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    GPG_ASSERT(mapType != nullptr);
+    if (mapType) {
+      archive->Write(mapType, &mUnitOffsets, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Write(vectorType, &mPos, ownerRef);
+    }
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Write(coordsType, &mSlotCenter, ownerRef);
+      archive->Write(coordsType, &mCenter, ownerRef);
+      archive->Write(coordsType, &mDynamicOffset, ownerRef);
+      archive->Write(coordsType, &mExtent, ownerRef);
+    }
+
+    archive->WriteBool(mUseDynamicOffset);
+    archive->WriteBool(mInFormation);
+    archive->WriteFloat(mSpeed);
+    archive->WriteFloat(mAvgDistToTarget);
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Write(weakPtrType, &mLeader, ownerRef);
+    }
+  }
+
+  /**
+   * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
+   *
+   * What it does:
+   * Reflection save-callback facade: forwards one `SOffsetInfo` payload to
+   * `SOffsetInfo::MemberSerialize`; `version` and the owner-ref are unused
+   * by the member (mirrors the binary tail call).
+   */
+  void SOffsetInfoSerializer::Serialize(
+    gpg::WriteArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
+    if (offsetInfo != nullptr) {
+      offsetInfo->MemberSerialize(archive);
+    }
+  }
+
+  /**
+   * Address: 0x005709A0 (FUN_005709A0, Moho::SOffsetInfo::MemberDeserialize)
+   *
+   * What it does:
+   * Read mirror of `MemberSerialize`: reads the unit map, position, four
+   * coordinate pairs, two flags, two scalars and the leader weak-link, each
+   * through its reflected RTTI serializer.
+   */
+  void SOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
+  {
+    if (!archive) {
+      return;
+    }
+
+    const gpg::RRef ownerRef{};
+
+    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
+    GPG_ASSERT(mapType != nullptr);
+    if (mapType) {
+      archive->Read(mapType, &mUnitOffsets, ownerRef);
+    }
+
+    gpg::RType* const vectorType = CachedVector3fType();
+    GPG_ASSERT(vectorType != nullptr);
+    if (vectorType) {
+      archive->Read(vectorType, &mPos, ownerRef);
+    }
+
+    gpg::RType* const coordsType = CachedSCoordsVec2Type();
+    GPG_ASSERT(coordsType != nullptr);
+    if (coordsType) {
+      archive->Read(coordsType, &mSlotCenter, ownerRef);
+      archive->Read(coordsType, &mCenter, ownerRef);
+      archive->Read(coordsType, &mDynamicOffset, ownerRef);
+      archive->Read(coordsType, &mExtent, ownerRef);
+    }
+
+    archive->ReadBool(&mUseDynamicOffset);
+    archive->ReadBool(&mInFormation);
+    archive->ReadFloat(&mSpeed);
+    archive->ReadFloat(&mAvgDistToTarget);
+
+    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
+    GPG_ASSERT(weakPtrType != nullptr);
+    if (weakPtrType) {
+      archive->Read(weakPtrType, &mLeader, ownerRef);
+    }
+  }
+
+  /**
+   * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
+   *
+   * What it does:
+   * Reflection load-callback facade: forwards one `SOffsetInfo` payload to
+   * `SOffsetInfo::MemberDeserialize`; `version` and the owner-ref are unused
+   * by the member (mirrors the binary tail call).
+   */
+  void SOffsetInfoSerializer::Deserialize(
+    gpg::ReadArchive* const archive,
+    const int objectPtr,
+    const int,
+    gpg::RRef* const
+  )
+  {
+    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
+    if (offsetInfo != nullptr) {
+      offsetInfo->MemberDeserialize(archive);
+    }
   }
 
   /**
@@ -4693,7 +2343,7 @@ namespace moho
    *
    * What it does:
    * Writes the reflected base payload, then the owning Lua-state and game-rules
-   * references as unowned tracked pointers, then every formation lane in a
+   * references as unowned tracked pointers, then every formation field in a
    * fixed order. `mSim` and the trailing word are runtime-only and deliberately
    * not written - a loaded formation re-binds them from its owner.
    */
@@ -4712,34 +2362,34 @@ namespace moho
     }
 
     gpg::RRef pointerRef{};
-    (void)gpg::RRef_LuaState(&pointerRef, mLuaState);
+    (void)gpg::RRef_LuaState(&pointerRef, mState);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
-    (void)gpg::RRef_RRuleGameRules(&pointerRef, mGameRules);
+    (void)gpg::RRef_RRuleGameRules(&pointerRef, mGamerules);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    WriteFormationLane(archive, CachedEUnitCommandTypeType(), &self->mCommandType, ownerRef);
-    WriteFormationLane(archive, CachedFastVectorWeakPtrIUnitType(), &self->mUnits, ownerRef);
-    WriteFormationLane(archive, CachedFastVectorSOffsetInfoType(), &self->mLanes[0], ownerRef);
-    WriteFormationLane(archive, CachedFastVectorSOffsetInfoType(), &self->mLanes[1], ownerRef);
-    WriteFormationLane(archive, CachedFastVectorSAssignedLocInfoType(), &self->mOccupiedSlots, ownerRef);
-    WriteFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &self->mCoordCachePrimary, ownerRef);
-    WriteFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &self->mCoordCacheSecondary, ownerRef);
-    WriteFormationLane(archive, CachedVector3fType(), &self->mForwardVector, ownerRef);
-    WriteFormationLane(archive, CachedQuaternionfType(), &self->mOrientation, ownerRef);
-    WriteFormationLane(archive, CachedQuaternionfType(), &self->mOrientationBaseline, ownerRef);
+    WriteFormationField(archive, CachedEUnitCommandTypeType(), &self->mCommandType, ownerRef);
+    WriteFormationField(archive, CachedFastVectorWeakPtrIUnitType(), &self->mUnits, ownerRef);
+    WriteFormationField(archive, CachedFastVectorSOffsetInfoType(), &self->mOffsetInfo[0], ownerRef);
+    WriteFormationField(archive, CachedFastVectorSOffsetInfoType(), &self->mOffsetInfo[1], ownerRef);
+    WriteFormationField(archive, CachedFastVectorSAssignedLocInfoType(), &self->mSlots, ownerRef);
+    WriteFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &self->mFormationPosCache, ownerRef);
+    WriteFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &self->mOffsetPosCache, ownerRef);
+    WriteFormationField(archive, CachedVector3fType(), &self->mForwardVector, ownerRef);
+    WriteFormationField(archive, CachedQuaternionfType(), &self->mOrientation, ownerRef);
+    WriteFormationField(archive, CachedQuaternionfType(), &self->mOrientationChange, ownerRef);
 
     archive->WriteString(&self->mScriptName);
-    WriteFormationLane(archive, CachedSCoordsVec2Type(), &self->mFormationCenter, ownerRef);
-    archive->WriteFloat(mFormationUpdateScale);
-    archive->WriteBool(mPlanUpdateRequested != 0u);
-    archive->WriteInt(mMaxUnitSlotCount);
+    WriteFormationField(archive, CachedSCoordsVec2Type(), &self->mCoords, ownerRef);
+    archive->WriteFloat(mScale);
+    archive->WriteBool(mPlanUpdate != 0u);
+    archive->WriteInt(mMaxSize);
   }
 
   /**
    * Address: 0x005741D0 (FUN_005741D0, Moho::CFormationInstance::MemberDeserialize)
    *
    * What it does:
-   * Reads the eighteen lanes back in the order `MemberSerialize` wrote them.
+   * Reads the eighteen fields back in the order `MemberSerialize` wrote them.
    * The two owning references come back through typed pointer readers, which
    * is what re-establishes tracking for the Lua state and the game rules.
    */
@@ -4756,29 +2406,29 @@ namespace moho
       archive->Read(baseType, this, ownerRef);
     }
 
-    (void)archive->ReadPointer_LuaState(&mLuaState, &ownerRef);
-    (void)archive->ReadPointer_RRuleGameRules(&mGameRules, &ownerRef);
+    (void)archive->ReadPointer_LuaState(&mState, &ownerRef);
+    (void)archive->ReadPointer_RRuleGameRules(&mGamerules, &ownerRef);
 
-    ReadFormationLane(archive, CachedEUnitCommandTypeType(), &mCommandType, ownerRef);
-    ReadFormationLane(archive, CachedFastVectorWeakPtrIUnitType(), &mUnits, ownerRef);
-    ReadFormationLane(archive, CachedFastVectorSOffsetInfoType(), &mLanes[0], ownerRef);
-    ReadFormationLane(archive, CachedFastVectorSOffsetInfoType(), &mLanes[1], ownerRef);
-    ReadFormationLane(archive, CachedFastVectorSAssignedLocInfoType(), &mOccupiedSlots, ownerRef);
-    ReadFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &mCoordCachePrimary, ownerRef);
-    ReadFormationLane(archive, CachedMapEntIdSCoordsVec2Type(), &mCoordCacheSecondary, ownerRef);
-    ReadFormationLane(archive, CachedVector3fType(), &mForwardVector, ownerRef);
-    ReadFormationLane(archive, CachedQuaternionfType(), &mOrientation, ownerRef);
-    ReadFormationLane(archive, CachedQuaternionfType(), &mOrientationBaseline, ownerRef);
+    ReadFormationField(archive, CachedEUnitCommandTypeType(), &mCommandType, ownerRef);
+    ReadFormationField(archive, CachedFastVectorWeakPtrIUnitType(), &mUnits, ownerRef);
+    ReadFormationField(archive, CachedFastVectorSOffsetInfoType(), &mOffsetInfo[0], ownerRef);
+    ReadFormationField(archive, CachedFastVectorSOffsetInfoType(), &mOffsetInfo[1], ownerRef);
+    ReadFormationField(archive, CachedFastVectorSAssignedLocInfoType(), &mSlots, ownerRef);
+    ReadFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &mFormationPosCache, ownerRef);
+    ReadFormationField(archive, CachedMapEntIdSCoordsVec2Type(), &mOffsetPosCache, ownerRef);
+    ReadFormationField(archive, CachedVector3fType(), &mForwardVector, ownerRef);
+    ReadFormationField(archive, CachedQuaternionfType(), &mOrientation, ownerRef);
+    ReadFormationField(archive, CachedQuaternionfType(), &mOrientationChange, ownerRef);
 
     archive->ReadString(&mScriptName);
-    ReadFormationLane(archive, CachedSCoordsVec2Type(), &mFormationCenter, ownerRef);
-    archive->ReadFloat(&mFormationUpdateScale);
+    ReadFormationField(archive, CachedSCoordsVec2Type(), &mCoords, ownerRef);
+    archive->ReadFloat(&mScale);
 
-    bool planUpdateRequested = false;
-    archive->ReadBool(&planUpdateRequested);
-    mPlanUpdateRequested = planUpdateRequested ? 1u : 0u;
+    bool planUpdate = false;
+    archive->ReadBool(&planUpdate);
+    mPlanUpdate = planUpdate ? 1u : 0u;
 
-    archive->ReadInt(&mMaxUnitSlotCount);
+    archive->ReadInt(&mMaxSize);
   }
 
   /**
@@ -4838,7 +2488,7 @@ namespace moho
   gpg::RType* preregister_RMapType_EntId_SUnitOffsetInfo()
   {
     static RMapType_EntId_SUnitOffsetInfo typeInfo;
-    gpg::PreRegisterRType(typeid(FormationUnitOffsetMap), &typeInfo);
+    gpg::PreRegisterRType(typeid(UnitOffsetMap), &typeInfo);
     return &typeInfo;
   }
 
@@ -4878,30 +2528,30 @@ namespace moho
   gpg::RType* preregister_RMapType_EntId_SCoordsVec2()
   {
     static RMapType_EntId_SCoordsVec2 typeInfo;
-    gpg::PreRegisterRType(typeid(FormationCoordMap), &typeInfo);
+    gpg::PreRegisterRType(typeid(CoordMap), &typeInfo);
     return &typeInfo;
   }
 
   /**
-   * Address: 0x00566070 (FUN_00566070, Moho::CFormationInstance::Func11)
+   * Address: 0x00566070 (FUN_00566070, Moho::CFormationInstance::GetDistFromLeader)
    * Slot: 10
    *
    * What it does:
-   * Base lane: no per-unit formation speed factor, always zero.
+   * Base implementation: no leader distance, always zero.
    */
-  float CFormationInstance::Func11(Unit* const, SFormationLaneEntry* const)
+  float CFormationInstance::GetDistFromLeader(Unit* const, SOffsetInfo* const)
   {
     return 0.0f;
   }
 
   /**
-   * Address: 0x00566080 (FUN_00566080, Moho::CFormationInstance::Func12)
+   * Address: 0x00566080 (FUN_00566080, Moho::CFormationInstance::GetPriority)
    * Slot: 11
    *
    * What it does:
-   * Base lane: every unit reports formation state 1.
+   * Base implementation: every unit has priority 1.
    */
-  std::int32_t CFormationInstance::Func12(Unit* const, SFormationLaneEntry* const)
+  std::int32_t CFormationInstance::GetPriority(Unit* const, SOffsetInfo* const)
   {
     return 1;
   }
@@ -4911,22 +2561,22 @@ namespace moho
    * Slot: 12
    *
    * What it does:
-   * Base lane: zero formation speed; `CAiFormationInstance` overrides it with
-   * the lane-relative speed computation.
+   * Base implementation: zero formation speed; `CAiFormationInstance`
+   * overrides it with the group-relative speed computation.
    */
-  float CFormationInstance::CalcFormationSpeed(Unit* const, float* const, SFormationLaneEntry* const)
+  float CFormationInstance::CalcFormationSpeed(Unit* const, float* const, SOffsetInfo* const)
   {
     return 0.0f;
   }
 
   /**
-   * Address: 0x0056A6E0 (FUN_0056A6E0, Moho::CFormationInstance::Func14)
+   * Address: 0x0056A6E0 (FUN_0056A6E0, Moho::CFormationInstance::GetLeader)
    * Slot: 13
    *
    * What it does:
-   * Base lane: no lane leader, always null.
+   * Base implementation: no leader, always null.
    */
-  Unit* CFormationInstance::Func14(Unit* const, SFormationLaneEntry* const)
+  Unit* CFormationInstance::GetLeader(Unit* const, SOffsetInfo* const)
   {
     return nullptr;
   }
@@ -4936,8 +2586,8 @@ namespace moho
    * Slot: 25
    *
    * What it does:
-   * Base lane: hands `pos` straight back through `dest` without consulting
-   * the occupied-slot table.
+   * Base implementation: hands `pos` straight back through `dest` without
+   * consulting the assigned-slot table.
    */
   SCoordsVec2* CFormationInstance::FindSlotFor(SCoordsVec2* const dest, const SCoordsVec2* const pos, Unit* const)
   {
@@ -4945,10 +2595,30 @@ namespace moho
     return dest;
   }
 
-  std::uint32_t* SFormationLinkedUnitRef::NextChainLinkSlot(const std::uint32_t linkWord) noexcept
+  /**
+   * Address: 0x005692D0 (FUN_005692D0, Moho::CFormationInstance::CFormationInstance)
+   *
+   * What it does:
+   * Reference count zero, listener ring self-linked (the `Broadcaster`
+   * member's own constructor), no Lua state, rules or command, every
+   * container on its inline storage with both cache heads standing (the
+   * members' own constructors), an empty script name, a NaN centre, no
+   * pending plan, zero max footprint and zero scale. The orientation lanes
+   * and the two spare words are left untouched, exactly as the binary
+   * leaves them.
+   */
+  CFormationInstance::CFormationInstance()
+    : mSharedCount(0)
+    , mState(nullptr)
+    , mGamerules(nullptr)
+    , mCommandType(EUnitCommandType::UNITCOMMAND_None)
   {
-    auto* const link = reinterpret_cast<SFormationLinkedUnitRefWordView*>(static_cast<std::uintptr_t>(linkWord));
-    return &link->nextChainLinkWord;
+    const float quietNan = std::numeric_limits<float>::quiet_NaN();
+    mCoords.x = quietNan;
+    mCoords.z = quietNan;
+    mPlanUpdate = 0u;
+    mMaxSize = 0;
+    mScale = 0.0f;
   }
 
   /**
@@ -4959,57 +2629,42 @@ namespace moho
    * the callgraph index - every construction site found
    * (`Moho::CAiFormationInstance::operator new`, 0x0059D0F0) inlines this
    * exact sequence instead of calling out to it, so 0x0059A470 itself is not
-   * citable as reachable. The behavior recovered here - base
-   * `CFormationInstance` construction (0x005692D0, inlined: formation
-   * intrusive links, lane vectors, coord-cache map heads, default scalar
-   * state), vtable publication, and clearing the owning-`Sim` back-reference
-   * - is proven directly from that inlined copy, which the recovered
-   * `operator new` (`CAiFormationInstance.cpp`) already invokes.
-   *
-   * Address: 0x005692D0 (FUN_005692D0, the inlined base `CFormationInstance`
-   * state-initialization lane described above)
-   *
-   * What it does:
-   * See above.
+   * citable as reachable. The behavior recovered here - the base
+   * `CFormationInstance` default construction (0x005692D0), vtable
+   * publication, and clearing the owning-`Sim` back-reference - is proven
+   * directly from that inlined copy, which the recovered `NewRef`
+   * (`CAiFormationInstanceTypeInfo.cpp`) invokes as `new CAiFormationInstance()`.
    */
   CAiFormationInstance::CAiFormationInstance()
+    : CFormationInstance()
+    , mSim(nullptr)
   {
-    mUnitCount = 0;
-    mUnitLinkListHead.ListResetLinks();
-    mLuaState = nullptr;
-    mGameRules = nullptr;
-    mCommandType = EUnitCommandType::UNITCOMMAND_None;
-    mUnknown_0x01C = 0u;
+  }
 
-    mUnits.ResetStorageToInline();
-    mOccupiedSlots.ResetStorageToInline();
-
-    mCoordCachePrimary.head = AllocateFormationCoordCacheHeadNode();
-    if (mCoordCachePrimary.head != nullptr) {
-      mCoordCachePrimary.head->left = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->parent = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->right = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->isNil = 1u;
-    }
-    mCoordCachePrimary.size = 0u;
-
-    mCoordCacheSecondary.head = AllocateFormationCoordCacheHeadNode();
-    if (mCoordCacheSecondary.head != nullptr) {
-      mCoordCacheSecondary.head->left = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->parent = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->right = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->isNil = 1u;
-    }
-    mCoordCacheSecondary.size = 0u;
-
-    const float quietNan = std::numeric_limits<float>::quiet_NaN();
-    mFormationCenter.x = quietNan;
-    mFormationCenter.z = quietNan;
-    mFormationUpdateScale = 0.0f;
-    mPlanUpdateRequested = 0u;
-    mMaxUnitSlotCount = 0;
-    mFormationUnitSpacingMultiplier = 0.0f;
-    mSim = nullptr;
+  /**
+   * Inlined into `CAiFormationDBImpl::NewFormation` (0x0059C120,
+   * 0x0059C1F6-0x0059C22B): `::operator new(0x330)`, the base constructor
+   * with the sim's rules and Lua state, the `CAiFormationInstance` vtable,
+   * then `mSim`.
+   *
+   * What it does:
+   * Builds a formation for `sim` over `units` (see the base constructor,
+   * which runs its first `UpdateFormation` pass with the base vtable still
+   * in place, exactly as the binary does) and binds the owning sim.
+   */
+  CAiFormationInstance::CAiFormationInstance(
+    Sim* const sim,
+    RRuleGameRules* const rules,
+    const EUnitCommandType commandType,
+    LuaPlus::LuaState* const state,
+    const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
+    const char* const name,
+    const SCoordsVec2& coords,
+    const Wm3::Quatf& orientation
+  )
+    : CFormationInstance(rules, commandType, state, units, name, coords, orientation)
+    , mSim(sim)
+  {
   }
 
   /**
@@ -5017,310 +2672,13 @@ namespace moho
    * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
    *
    * What it does:
-   * Clears transient formation caches and lane ownership state, unregisters
-   * this instance from the owning formation DB, then tears down unit links.
+   * Resets the transient plan, unregisters this instance from the owning
+   * formation DB, then lets `~CFormationInstance` tear the members down.
    */
   CAiFormationInstance::~CAiFormationInstance()
   {
-    CleanupFormationTransientState(*this);
+    CleanupFormation();
     mSim->mFormationDB->RemoveFormation(this);
-    CleanupFormationUnitLinks(*this);
-    mUnitLinkListHead.ListUnlink();
-  }
-
-  /**
-   * Address: 0x0059A3F0 (FUN_0059A3F0)
-   *
-   * What it does:
-   * Initializes one occupied-slot payload from `(position, footprintSize,
-   * laneToken)`.
-   */
-  SAssignedLocInfo::SAssignedLocInfo(
-    const SCoordsVec2& slotPosition,
-    const std::int32_t footprintSizeValue,
-    const std::int32_t laneTokenValue
-  ) noexcept
-    : position(slotPosition)
-    , footprintSize(footprintSizeValue)
-    , laneToken(laneTokenValue)
-  {
-  }
-
-  /**
-   * Address: 0x00570E20 (FUN_00570E20, Moho::SAssignedLocInfo::MemberDeserialize)
-   *
-   * What it does:
-   * Loads one occupied-slot lane: assigned 2D position, footprint size, and
-   * lane token.
-   */
-  void SAssignedLocInfo::MemberDeserialize(SAssignedLocInfo* const slot, gpg::ReadArchive* const archive)
-  {
-    if (!archive || !slot) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Read(coordsType, &slot->position, ownerRef);
-    }
-
-    archive->ReadInt(&slot->footprintSize);
-    archive->ReadInt(&slot->laneToken);
-  }
-
-  /**
-   * Address: 0x00570E80 (FUN_00570E80, Moho::SAssignedLocInfo::MemberSerialize)
-   *
-   * What it does:
-   * Stores one occupied-slot lane: assigned 2D position, footprint size, and
-   * lane token.
-   */
-  void SAssignedLocInfo::MemberSerialize(const SAssignedLocInfo* const slot, gpg::WriteArchive* const archive)
-  {
-    if (!archive || !slot) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Write(coordsType, &slot->position, ownerRef);
-    }
-
-    archive->WriteInt(slot->footprintSize);
-    archive->WriteInt(slot->laneToken);
-  }
-
-  /**
-   * Address: 0x005707B0 (FUN_005707B0, Moho::SUnitOffsetInfo::MemberDeserialize)
-   *
-   * What it does:
-   * Loads one unit-offset payload lane: weak-unit link, leader priority,
-   * 2D offset, 3D direction, and speed-band weights.
-   */
-  void SUnitOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
-  {
-    if (!archive) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    GPG_ASSERT(weakPtrType != nullptr);
-    if (weakPtrType) {
-      archive->Read(weakPtrType, &mUnit, ownerRef);
-    }
-
-    archive->ReadInt(&mLeaderPriority);
-
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Read(coordsType, &mOffset, ownerRef);
-    }
-
-    gpg::RType* const vectorType = CachedVector3fType();
-    GPG_ASSERT(vectorType != nullptr);
-    if (vectorType) {
-      archive->Read(vectorType, &mDirection, ownerRef);
-    }
-
-    archive->ReadFloat(&mWeight);
-    archive->ReadFloat(&mSpeedBandLow);
-    archive->ReadFloat(&mSpeedBandMid);
-    archive->ReadFloat(&mSpeedBandHigh);
-  }
-
-  /**
-   * Address: 0x005708A0 (FUN_005708A0, Moho::SUnitOffsetInfo::MemberSerialize)
-   *
-   * What it does:
-   * Stores one unit-offset payload lane: weak-unit link, leader priority,
-   * 2D offset, 3D direction, and speed-band weights.
-   */
-  void SUnitOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
-  {
-    if (!archive) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    GPG_ASSERT(weakPtrType != nullptr);
-    if (weakPtrType) {
-      archive->Write(weakPtrType, &mUnit, ownerRef);
-    }
-
-    archive->WriteInt(mLeaderPriority);
-
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Write(coordsType, &mOffset, ownerRef);
-    }
-
-    gpg::RType* const vectorType = CachedVector3fType();
-    GPG_ASSERT(vectorType != nullptr);
-    if (vectorType) {
-      archive->Write(vectorType, &mDirection, ownerRef);
-    }
-
-    archive->WriteFloat(mWeight);
-    archive->WriteFloat(mSpeedBandLow);
-    archive->WriteFloat(mSpeedBandMid);
-    archive->WriteFloat(mSpeedBandHigh);
-  }
-
-  /**
-   * Address: 0x00570B60 (FUN_00570B60, Moho::SOffsetInfo::MemberSerialize)
-   *
-   * What it does:
-   * Writes one offset-info payload: the whole unit-offset map, formation
-   * position, four 2D coordinate lanes, two flags, two scalars, and the owning
-   * unit weak-link, each through its reflected RTTI serializer.
-   */
-  void SOffsetInfo::MemberSerialize(gpg::WriteArchive* const archive) const
-  {
-    if (!archive) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-
-    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
-    GPG_ASSERT(mapType != nullptr);
-    if (mapType) {
-      archive->Write(mapType, this, ownerRef);
-    }
-
-    gpg::RType* const vectorType = CachedVector3fType();
-    GPG_ASSERT(vectorType != nullptr);
-    if (vectorType) {
-      archive->Write(vectorType, &mPos, ownerRef);
-    }
-
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Write(coordsType, &meanSlotOffset, ownerRef);
-      archive->Write(coordsType, &overlapRadius, ownerRef);
-      archive->Write(coordsType, &dynamicOffset, ownerRef);
-      archive->Write(coordsType, &overlapAnchor, ownerRef);
-    }
-
-    archive->WriteBool(applyDynamicOffset != 0);
-    archive->WriteBool(slotAvailable != 0);
-    archive->WriteFloat(preferredSpeed);
-    archive->WriteFloat(speedAnchor);
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    GPG_ASSERT(weakPtrType != nullptr);
-    if (weakPtrType) {
-      archive->Write(weakPtrType, &linkedUnitBackLinkHeadWord, ownerRef);
-    }
-  }
-
-  /**
-   * Address: 0x00566510 (FUN_00566510, Moho::SOffsetInfoSerializer::Serialize)
-   *
-   * What it does:
-   * Reflection save-callback facade: forwards one `SOffsetInfo` payload to
-   * `SOffsetInfo::MemberSerialize`; `version` and the owner-ref lane are
-   * unused by the member (mirrors the binary tail call).
-   */
-  void SOffsetInfoSerializer::Serialize(
-    gpg::WriteArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
-    if (offsetInfo != nullptr) {
-      offsetInfo->MemberSerialize(archive);
-    }
-  }
-
-  /**
-   * Address: 0x005709A0 (FUN_005709A0, Moho::SOffsetInfo::MemberDeserialize)
-   *
-   * What it does:
-   * Read mirror of `MemberSerialize`: reads the unit-offset map, formation
-   * position, four 2D coordinate lanes, two flags, two scalars, and the owning
-   * unit weak-link, each through its reflected RTTI serializer.
-   */
-  void SOffsetInfo::MemberDeserialize(gpg::ReadArchive* const archive)
-  {
-    if (!archive) {
-      return;
-    }
-
-    const gpg::RRef ownerRef{};
-
-    gpg::RType* const mapType = CachedMapEntIdSUnitOffsetInfoType();
-    GPG_ASSERT(mapType != nullptr);
-    if (mapType) {
-      archive->Read(mapType, this, ownerRef);
-    }
-
-    gpg::RType* const vectorType = CachedVector3fType();
-    GPG_ASSERT(vectorType != nullptr);
-    if (vectorType) {
-      archive->Read(vectorType, &mPos, ownerRef);
-    }
-
-    gpg::RType* const coordsType = CachedSCoordsVec2Type();
-    GPG_ASSERT(coordsType != nullptr);
-    if (coordsType) {
-      archive->Read(coordsType, &meanSlotOffset, ownerRef);
-      archive->Read(coordsType, &overlapRadius, ownerRef);
-      archive->Read(coordsType, &dynamicOffset, ownerRef);
-      archive->Read(coordsType, &overlapAnchor, ownerRef);
-    }
-
-    // applyDynamicOffset/slotAvailable are 1-byte fields written via WriteBool; read back through a
-    // bool lane (matches the binary's ReadBool into the byte).
-    bool flagA = false;
-    archive->ReadBool(&flagA);
-    applyDynamicOffset = flagA ? 1u : 0u;
-    bool flagB = false;
-    archive->ReadBool(&flagB);
-    slotAvailable = flagB ? 1u : 0u;
-
-    archive->ReadFloat(&preferredSpeed);
-    archive->ReadFloat(&speedAnchor);
-
-    gpg::RType* const weakPtrType = CachedWeakPtrIUnitType();
-    GPG_ASSERT(weakPtrType != nullptr);
-    if (weakPtrType) {
-      archive->Read(weakPtrType, &linkedUnitBackLinkHeadWord, ownerRef);
-    }
-  }
-
-  /**
-   * Address: 0x00566500 (FUN_00566500, Moho::SOffsetInfoSerializer::Deserialize)
-   *
-   * What it does:
-   * Reflection load-callback facade: forwards one `SOffsetInfo` payload to
-   * `SOffsetInfo::MemberDeserialize`; `version` and the owner-ref lane are
-   * unused by the member (mirrors the binary tail call).
-   */
-  void SOffsetInfoSerializer::Deserialize(
-    gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int,
-    gpg::RRef* const
-  )
-  {
-    auto* const offsetInfo = reinterpret_cast<SOffsetInfo*>(objectPtr);
-    if (offsetInfo != nullptr) {
-      offsetInfo->MemberDeserialize(archive);
-    }
   }
 
   /**
@@ -5342,8 +2700,8 @@ namespace moho
    * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
    *
    * What it does:
-   * Reads serialized base-formation payload, then restores the `Sim*` lane as
-   * an unowned tracked pointer.
+   * Reads the serialized base-formation payload, then restores `mSim` as an
+   * unowned tracked pointer.
    */
   void CAiFormationInstance::MemberDeserialize(gpg::ReadArchive* const archive)
   {
@@ -5361,13 +2719,12 @@ namespace moho
     mSim = ReadPointerSim(archive, owner);
   }
 
-
   /**
    * Address: 0x0059E9B0 (FUN_0059E9B0, Moho::CAiFormationInstance::MemberSerialize)
    *
    * What it does:
-   * Writes serialized base-formation payload, then saves the `Sim*` lane as
-   * an unowned tracked pointer.
+   * Writes the serialized base-formation payload, then saves `mSim` as an
+   * unowned tracked pointer.
    */
   void CAiFormationInstance::MemberSerialize(gpg::WriteArchive* const archive) const
   {
@@ -5385,45 +2742,35 @@ namespace moho
     WritePointerSim(archive, mSim, owner);
   }
 
-
-
-
   /**
    * Address: 0x00569A10 (FUN_00569A10)
    *
-   * Moho::SCoordsVec2*
-   *
    * What it does:
-   * Copies the current formation center into `outCenter`.
+   * Copies the formation centre into `outCoords`.
    */
-  SCoordsVec2* CFormationInstance::Func2(SCoordsVec2* const outCenter) const
+  SCoordsVec2* CFormationInstance::GetCoords(SCoordsVec2* const outCoords) const
   {
-    outCenter->x = mFormationCenter.x;
-    outCenter->z = mFormationCenter.z;
-    return outCenter;
+    outCoords->x = mCoords.x;
+    outCoords->z = mCoords.z;
+    return outCoords;
   }
 
   /**
-   * Address: 0x00569A30 (FUN_00569A30)
-   *
-   * Moho::SCoordsVec2 const&
+   * Address: 0x00569A30 (FUN_00569A30, Moho::CFormationInstance::SetCoords)
    *
    * What it does:
-   * Applies a new center (if finite and changed), then invalidates slot and coord caches.
+   * Moves the formation centre when the new one differs (the `ucomiss`/
+   * `lahf` pair at 0x00569A4C treats NaN as different, i.e. plain `!=`)
+   * and is not NaN itself, dropping every assigned slot and both caches.
    */
-  void CFormationInstance::Func3(const SCoordsVec2& center)
+  void CFormationInstance::SetCoords(const SCoordsVec2& coords)
   {
-    if (!BinaryFloatNotEqual(mFormationCenter.x, center.x) && !BinaryFloatNotEqual(mFormationCenter.z, center.z)) {
-      return;
+    if (mCoords.x != coords.x || mCoords.z != coords.z) {
+      if (!std::isnan(coords.x) && !std::isnan(coords.z)) {
+        mCoords = coords;
+        ClearSlotCaches();
+      }
     }
-    if (std::isnan(center.x) || std::isnan(center.z)) {
-      return;
-    }
-
-    mFormationCenter = center;
-    mOccupiedSlots.ResetStorageToInline();
-    ResetCoordCacheMap(mCoordCachePrimary);
-    ResetCoordCacheMap(mCoordCacheSecondary);
   }
 
   /**
@@ -5432,91 +2779,58 @@ namespace moho
    * IDA signature:
    * Moho::CAiFormationInstance *__fastcall Moho::CFormationInstance::CFormationInstance(
    *     Moho::RRuleGameRulesImpl *rules, int commandType, Moho::CFormationInstance *this,
-   *     LuaPlus::LuaState *state, gpg::fastvector_n<SFormationLinkedUnitRef, 4> *units,
+   *     LuaPlus::LuaState *state, gpg::fastvector_n<WeakPtr<IUnit>, 4> *units,
    *     const char *name, Moho::SCoordsVec2 *coords, Wm3::Quaternionf orientation);
    *
    * What it does:
-   * Self-links the unit-link list node (implicit, `TDatListItem`'s own
-   * default ctor), stamps the Lua state/game-rules/command-type lanes, and
-   * copies the caller's initial unit-ref set into `mUnits` (the binary's
-   * `sub_56B200` is a default-construct-then-`ResetFrom` pair, matching
-   * `FastVectorN`'s own copy constructor exactly). Both lane vectors and the
-   * occupied-slot vector default-construct inline (the binary's own
-   * `eh vector constructor iterator` / inline-buffer setup). Both coord-cache
-   * head sentinels are allocated unconditionally here -- unlike
-   * `EnsureCoordCacheHead`'s guarded skip-if-already-built check used
-   * elsewhere, this ctor always builds a fresh head, matching
-   * `CAiFormationInstance`'s own default ctor's identical unconditional
-   * pattern. When `coords` resolves to a valid flat ground-plane point, the
-   * initial forward vector is derived from `orientation` with the same
-   * formula `SetOrientation` uses, then the transient plan state is reset
-   * (`CleanupFormation` -- a no-op superset over the freshly-empty lanes/
-   * baseline, but the real call the binary's tail block inlines) and one
-   * `UpdateFormation` pass runs. `mUnknown_0x01C` is left untouched, matching
-   * the binary -- it is never written here.
+   * Self-links the listener ring, stamps the Lua state/game-rules/command-type
+   * fields, and copies the caller's initial unit set into `mUnits` (the
+   * binary's `sub_56B200` is the `fastvector_n<WeakPtr<IUnit>,4>` copy
+   * constructor: every copied link is spliced into its unit's weak chain).
+   * Both group vectors and the slot vector default-construct inline (the
+   * binary's own `eh vector constructor iterator` / inline-buffer setup),
+   * both cache heads are allocated (`sub_570300`, the map constructor), the
+   * forward vector is zeroed, the orientation and script name copied and the
+   * centre, scale (1.0), max size and pending flag set. When `coords`
+   * resolves to a valid flat ground-plane point, the initial forward vector
+   * is derived from `orientation` with the same formula `SetOrientation`
+   * uses, the slot caches are cleared and one `UpdateFormation` pass runs.
+   * `mUnknown_0x01C` is left untouched, matching the binary.
    */
   CFormationInstance::CFormationInstance(
-    RRuleGameRulesImpl* const rules,
+    RRuleGameRules* const rules,
     const EUnitCommandType commandType,
     LuaPlus::LuaState* const state,
-    const SFormationLinkedUnitRefVec& units,
+    const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
     const char* const name,
     const SCoordsVec2& coords,
     const Wm3::Quatf& orientation
   )
-    : mUnitCount(0)
-    , mLuaState(state)
-    , mGameRules(rules)
+    : mSharedCount(0)
+    , mState(state)
+    , mGamerules(rules)
     , mCommandType(commandType)
     , mUnits(units)
-    , mForwardVector(kZeroForwardVector)
+    , mForwardVector(Wm3::Vec3f::ZERO)
     , mOrientation(orientation)
-    , mOrientationBaseline(kZeroQuaternion)
+    , mOrientationChange(kZeroQuaternion)
     , mScriptName(name)
-    , mFormationCenter(coords)
-    , mFormationUpdateScale(1.0f)
-    , mPlanUpdateRequested(0)
-    , mMaxUnitSlotCount(0)
+    , mCoords(coords)
+    , mScale(1.0f)
+    , mPlanUpdate(0)
+    , mMaxSize(0)
   {
-    mCoordCachePrimary.head = AllocateFormationCoordCacheHeadNode();
-    if (mCoordCachePrimary.head != nullptr) {
-      mCoordCachePrimary.head->left = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->parent = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->right = mCoordCachePrimary.head;
-      mCoordCachePrimary.head->isNil = 1u;
-    }
-    mCoordCachePrimary.size = 0u;
-
-    mCoordCacheSecondary.head = AllocateFormationCoordCacheHeadNode();
-    if (mCoordCacheSecondary.head != nullptr) {
-      mCoordCacheSecondary.head->left = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->parent = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->right = mCoordCacheSecondary.head;
-      mCoordCacheSecondary.head->isNil = 1u;
-    }
-    mCoordCacheSecondary.size = 0u;
-
-    const Wm3::Vec3f groundPoint{mFormationCenter.x, 0.0f, mFormationCenter.z};
+    const Wm3::Vec3f groundPoint{mCoords.x, 0.0f, mCoords.z};
     if (!IsValidVector3f(groundPoint)) {
       return;
     }
 
-    if (!QuaternionEqualsExact(mOrientation, kZeroQuaternion)) {
-      const float x = mOrientation.x;
-      const float y = mOrientation.y;
-      const float z = mOrientation.z;
-      const float w = mOrientation.w;
-      // Third column of the rotation matrix, scalar-first: the y and z terms
-      // here were still the lane-rotated form (2(zw - xy), 1 - 2(y^2 + z^2)).
-      // Only x reads the same under both conventions, which is why it was
-      // easy to miss.
-      mForwardVector.x = ((x * z) + (w * y)) * 2.0f;
-      mForwardVector.y = ((y * z) - (w * x)) * 2.0f;
-      mForwardVector.z = 1.0f - (((x * x) + (y * y)) * 2.0f);
+    if (mOrientation != kZeroQuaternion) {
+      mForwardVector = ForwardOf(mOrientation);
     }
 
-    CleanupFormation();
-    static_cast<CAiFormationInstance*>(this)->UpdateFormation();
+    ClearSlotCaches();
+    UpdateFormation();
   }
 
   /**
@@ -5527,18 +2841,17 @@ namespace moho
    * Allocates one `sizeof(CFormationInstance)` (0x328) block via a throwing
    * `::operator new` guarded by the binary's own explicit post-allocation
    * null check (0x0056A949/0x0056A953; reproduced here with the `nothrow`
-   * form, matching this file's established `AllocateFormationCoordCacheHeadNode`-
-   * style allocate-then-check idiom), then placement-constructs a
-   * `CFormationInstance` on it with `commandType` hardcoded to
-   * `UNITCOMMAND_None` (the binary's own `xor edx, edx` before the ctor
-   * call). Returns `nullptr` when the allocation itself fails; the caller
-   * (`CFormation::Finalize`, 0x0083843B) never observes a null return in
-   * practice, since it only calls this once `mBestFormation >= 0`.
+   * form), then placement-constructs a `CFormationInstance` on it with
+   * `commandType` hardcoded to `UNITCOMMAND_None` (the binary's own
+   * `xor edx, edx` before the ctor call). Returns `nullptr` when the
+   * allocation itself fails; the caller (`CFormation::Finalize`, 0x0083843B)
+   * never observes a null return in practice, since it only calls this once
+   * `mBestFormation >= 0`.
    */
   CFormationInstance* CFormationInstance::Create(
-    RRuleGameRulesImpl* const rules,
+    RRuleGameRules* const rules,
     LuaPlus::LuaState* const state,
-    const SFormationLinkedUnitRefVec& units,
+    const gpg::fastvector_n<WeakPtr<IUnit>, 4>& units,
     const char* const name,
     const SCoordsVec2& coords,
     const Wm3::Quatf& orientation
@@ -5562,9 +2875,11 @@ namespace moho
    * What it does:
    * Resets the transient formation plan. Everything after that in the binary
    * is the compiler's own teardown, emitted inline: the script name, both
-   * coord caches, the occupied-slot vector, the two lane vectors and the unit
-   * ref vector are destroyed in reverse declaration order, and the trailing
-   * broadcaster unlink belongs to ~IFormationInstance.
+   * caches (`sub_56F430` erase-all plus the head free), the slot vector, the
+   * two group vectors (`eh vector destructor iterator` over `sub_56B4D0`)
+   * and the unit vector (`sub_56D3C0` destroy-range plus the heap free) are
+   * destroyed in reverse declaration order, and the trailing broadcaster
+   * unlink belongs to `~IFormationInstance`.
    */
   CFormationInstance::~CFormationInstance()
   {
@@ -5587,6 +2902,20 @@ namespace moho
   }
 
   /**
+   * The three-step slot reset inlined at 0x00569A30 (`SetCoords`),
+   * 0x005694B0 (the constructor tail) and 0x00568AC0 (`CleanupFormation`):
+   * the slot vector back to inline storage (`sub_56F430`-style free plus the
+   * inline rebind), then both caches emptied in place (`sub_56D8E0` subtree
+   * destroy plus the head self-link, the map's `clear()`).
+   */
+  void CFormationInstance::ClearSlotCaches()
+  {
+    mSlots.ResetStorageToInline();
+    mFormationPosCache.clear();
+    mOffsetPosCache.clear();
+  }
+
+  /**
    * Address: 0x00568AC0 (FUN_00568AC0, Moho::CFormationInstance::CleanupFormation)
    *
    * IDA signature:
@@ -5595,21 +2924,19 @@ namespace moho
    *
    * What it does:
    * Resets transient formation-plan state so a fresh plan can be recomputed:
-   * clears the occupied-slot vector to its inline buffer, resets both coord
-   * caches in place (keeping the head sentinel, unlike the destructor path
-   * which frees it), zeroes the orientation baseline, and for each of the two
-   * lane vectors destroys every entry's unit map + unlinks its weak back-link
-   * words, then resets the lane vector to inline storage.
+   * clears the assigned slots and both caches, zeroes the orientation
+   * change, and destroys every group of both layers (each group's destructor
+   * unlinks its leader and frees its unit map -- the per-element
+   * `sub_56EB40` erase plus head free at 0x00568B4A-0x00568B9F) before the
+   * group vectors return to inline storage.
    */
   void CFormationInstance::CleanupFormation()
   {
-    mOccupiedSlots.ResetStorageToInline();
-    ResetCoordCacheMap(mCoordCachePrimary);
-    ResetCoordCacheMap(mCoordCacheSecondary);
-    mOrientationBaseline = kZeroQuaternion;
+    ClearSlotCaches();
+    mOrientationChange = kZeroQuaternion;
 
-    for (std::int32_t laneIndex = 0; laneIndex < kFormationLayerCount; ++laneIndex) {
-      ReleaseFormationLaneEntries(mLanes[laneIndex]);
+    for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
+      mOffsetInfo[layer].ResetStorageToInline();
     }
   }
 
@@ -5620,38 +2947,25 @@ namespace moho
    * What it does:
    * When a plan update is pending, clears the pending flag and runs one
    * cleanup+rebuild pass: drops dead unit links, resets transient formation
-   * state, and rebuilds the formation plan.
-   *
-   * `RemoveDeadUnits`/`UpdateFormation` are declared on `CAiFormationInstance`
-   * (the only class that derives from `CFormationInstance`), matching the
-   * binary's own `this` typing at this call site -- `CAiFormationInstance`
-   * overrides this same vtable slot with its own, much larger update pass
-   * (`FUN_0059AE80`), so this base implementation only actually runs if a
-   * future sibling class inherits `CFormationInstance` without overriding
-   * slot 17.
+   * state, and rebuilds the formation plan. `CAiFormationInstance` overrides
+   * this same vtable slot with its own, much larger update pass
+   * (`FUN_0059AE80`), so this base implementation only runs for a bare
+   * `CFormationInstance` (the `CFormation::Finalize` preview instances).
    */
   void CFormationInstance::Update()
   {
-    if (!mPlanUpdateRequested) {
-      return;
-    }
-
-    mPlanUpdateRequested = 0;
-    auto* const aiInstance = static_cast<CAiFormationInstance*>(this);
-    aiInstance->RemoveDeadUnits(nullptr);
-    CleanupFormation();
-    aiInstance->UpdateFormation();
+    RefreshFormationPlanIfRequested(*this);
   }
 
   /**
    * Address: 0x0056A210 (FUN_0056A210)
    *
    * What it does:
-   * Returns number of linked unit references currently tracked by this formation.
+   * Returns number of unit links currently held by this formation.
    */
   int CFormationInstance::UnitCount() const
   {
-    return static_cast<int>(mUnits.end() - mUnits.begin());
+    return static_cast<int>(mUnits.size());
   }
 
   /**
@@ -5662,70 +2976,48 @@ namespace moho
    *
    * What it does:
    * Classifies the unit into its formation layer: air-motion blueprints get
-   * layer 1, everything else layer 0. The value indexes `mLanes`.
+   * layer 1, everything else layer 0. The value indexes `mOffsetInfo`.
    */
   std::int32_t CFormationInstance::GetLayer(Unit* const unit) const
   {
-    if (unit == nullptr) {
-      return kGroundFormationLayer;
-    }
-
-    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-    const bool isAirLayer = blueprint != nullptr && blueprint->Physics.MotionType == RULEUMT_Air;
+    const bool isAirLayer = unit->GetBlueprint()->Physics.MotionType == RULEUMT_Air;
     return isAirLayer ? kAirFormationLayer : kGroundFormationLayer;
   }
 
   /**
-   * Address: 0x005669A0 (FUN_005669A0, Moho::CFormationInstance::Func6)
+   * Address: 0x005669A0 (FUN_005669A0, Moho::CFormationInstance::GetOffsetInfo)
    *
    * What it does:
-   * Resolves and returns the lane entry that currently owns `unit`.
+   * Returns the first group of the unit's layer whose unit map holds the
+   * unit's entity id (`std::map::find`, 0x0056AFE0), warning and returning
+   * null when none does.
    */
-  SFormationLaneEntry* CFormationInstance::Func6(Unit* const unit)
+  SOffsetInfo* CFormationInstance::GetOffsetInfo(Unit* const unit)
   {
-    if (!unit) {
-      return nullptr;
-    }
-
-    const std::int32_t laneIndex = GetLayer(unit);
-    SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-    SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    while (lane != laneEnd) {
-      if (LaneMapFindNode(lane->unitMap, unitEntityId) != nullptr) {
-        return lane;
+    for (SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
+      if (info.mUnitOffsets.find(unit->GetEntityId()) != info.mUnitOffsets.end()) {
+        return &info;
       }
-      ++lane;
     }
 
-    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-    gpg::Warnf(
-      "unit %s not part of formation.",
-      blueprint != nullptr ? blueprint->mBlueprintId.c_str() : "<null>"
-    );
+    gpg::Warnf("unit %s not part of formation.", unit->GetBlueprint()->mBlueprintId.c_str());
     return nullptr;
   }
 
   /**
-   * Address: 0x00566A30 (FUN_00566A30, Moho::CAiFormationInstance::ComputeRunScriptOffset)
+   * Address: 0x00566A30 (FUN_00566A30, Moho::CFormationInstance::ComputeRunScriptOffset)
    *
    * What it does:
-   * Scales one script-local formation offset by update scale, rotates by
-   * current orientation when non-zero, then applies slot-span scaling.
+   * Scales one script-local formation offset by `mScale`, rotates it by the
+   * formation orientation when that is non-zero, then multiplies by the
+   * slot-span scale `mMaxSize + 2`.
    */
   SCoordsVec2* CFormationInstance::ComputeRunScriptOffset(
     const SCoordsVec2* const sourceOffset,
     SCoordsVec2* const dest
   ) const
   {
-    if (!sourceOffset || !dest) {
-      return dest;
-    }
-
-    Wm3::Vec3f scaled{};
-    scaled.x = sourceOffset->x * mFormationUpdateScale;
-    scaled.y = 0.0f;
-    scaled.z = sourceOffset->z * mFormationUpdateScale;
+    const Wm3::Vec3f scaled{sourceOffset->x * mScale, mScale * 0.0f, sourceOffset->z * mScale};
 
     float rotatedX = scaled.x;
     float rotatedZ = scaled.z;
@@ -5736,96 +3028,69 @@ namespace moho
       rotatedZ = rotated.z;
     }
 
-    const float slotSpanScale = static_cast<float>(mMaxUnitSlotCount + 2);
-    dest->x = rotatedX * slotSpanScale;
+    const float slotSpanScale = static_cast<float>(mMaxSize + 2);
+    dest->x = slotSpanScale * rotatedX;
     dest->z = rotatedZ * slotSpanScale;
     return dest;
   }
 
   /**
-   * Address: 0x00566B10 (FUN_00566B10, Moho::CAiFormationInstance::PreRunScript)
+   * Address: 0x00566B10 (FUN_00566B10, Moho::CFormationInstance::PreRunScript)
    *
    * What it does:
-   * Partitions the shared candidate-unit list by `GetLayer()`: every unit
-   * whose layer matches `layerIndex` is moved out of `candidateUnits` into
-   * `layerUnitsOut`, erased from the shared list so a later layer's pass
-   * never sees it again. Units belonging to a different layer are left in
-   * place.
+   * Empties `layerUnitsOut` (`sub_56D3C0` destroy-range plus the inline
+   * rebind), then walks `candidateUnits`: every live unit whose layer
+   * matches `layerIndex` is copied into `layerUnitsOut` (the temporary
+   * `WeakPtr<IUnit>` at 0x00566B6A pushed through `sub_56B2F0`/the inline
+   * append and destroyed again) and erased from the shared list
+   * (`sub_5725A0`, the relinking shift, plus the tail unlink); units of a
+   * different layer are left in place.
    */
   void CFormationInstance::PreRunScript(
-    SFormationLayerUnitSet& layerUnitsOut,
-    SFormationLayerUnitSet& candidateUnits,
+    gpg::fastvector_n<WeakPtr<IUnit>, 4>& layerUnitsOut,
+    gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits,
     const std::int32_t layerIndex
   )
   {
-    ClearLinkedUnitWeakSlots(layerUnitsOut);
+    layerUnitsOut.ResetStorageToInline();
 
-    moho::SWeakRefSlot* cursor = candidateUnits.begin();
-    while (cursor != candidateUnits.end()) {
-      Unit* const unit = static_cast<Unit*>(cursor->AsWeakPtr<IUnit>().GetObjectPtr());
+    for (auto it = candidateUnits.begin(); it != candidateUnits.end();) {
+      Unit* const unit = UnitOf(*it);
       if (unit != nullptr && GetLayer(unit) == layerIndex) {
-        layerUnitsOut.push_back(*cursor);
-        cursor->AsWeakPtr<IUnit>().UnlinkFromOwnerChain();
-        EraseLinkedUnitWeakSlot(candidateUnits, cursor);
+        layerUnitsOut.push_back(WeakPtr<IUnit>(unit));
+        it = candidateUnits.erase(it);
         continue;
       }
-      ++cursor;
+      ++it;
     }
   }
 
   /**
-   * Address: 0x00568820 (FUN_00568820, Moho::CAiFormationInstance::Setup)
+   * Address: 0x00568820 (FUN_00568820, Moho::CFormationInstance::Setup)
    *
    * What it does:
    * Claims this layer's units out of the shared candidate list via
    * `PreRunScript`, runs the formation script over them via `RunScript`
-   * when any were claimed, then releases the per-layer scratch list.
+   * when any were claimed, then releases the per-layer scratch list (its
+   * destructor: `sub_56D3C0` plus the heap free).
    */
-  void CFormationInstance::Setup(SFormationLayerUnitSet& candidateUnits, const std::int32_t layerIndex)
+  void CFormationInstance::Setup(gpg::fastvector_n<WeakPtr<IUnit>, 4>& candidateUnits, const std::int32_t layerIndex)
   {
-    SFormationLayerUnitSet layerUnits{};
+    gpg::fastvector_n<WeakPtr<IUnit>, 4> layerUnits{};
     PreRunScript(layerUnits, candidateUnits, layerIndex);
 
     if (!layerUnits.empty()) {
       RunScript(layerUnits, layerIndex);
     }
-
-    ClearLinkedUnitWeakSlots(layerUnits);
   }
 
   /**
-   * Address: 0x00567300 (FUN_00567300, Moho::CAiFormationInstance::RunScript)
+   * Address: 0x00567300 (FUN_00567300, Moho::CFormationInstance::RunScript)
    *
    * ASM-only recovery (no `.c` decompile). See
    * `decomp/recovery/escalations/FUN_00567300.md` for the stack-frame
    * decode key, EH funclet table, and call-table evidence this follows.
    * 1010 instructions.
-   *
-   * Confidence note (recorded honestly rather than glossed over): phases
-   * 1-4 (Lua unit table, `FORMATION_RunScript` call + empty check, mean
-   * position, per-unit relative descriptors + preferred speed) are
-   * high-confidence, matched instruction-by-instruction against the raw
-   * disassembly. Phase 5's exact slot-statistics formula and phase 7's
-   * exact per-candidate field wiring (`SFormationLaneUnitNode` payload
-   * beyond `unitEntityId`/`leaderPriority`) are reconstructed from the
-   * escalation doc's behavioral description and partial asm tracing
-   * (0x005677E4-0x00567FE4); the anchor/weight/speed-band values in
-   * particular were not independently double-verified to the same
-   * confidence as phases 1-4 and remain a known lower-confidence area for a
-   * future dedicated pass -- documented here rather than silently dropped.
-   *
-   * This function's full 13-token dependency closure (`no_block_guard.py
-   * plan FUN_00567300`) is now resolved. `unitDescs`/`candidates` were
-   * `std::vector` until this pass; both are `gpg::fastvector_n<T,16>` now,
-   * matching the escalation doc's funclet-proven binary locals
-   * (`fastvector_n<Desc32,16>` / `fastvector_n<Cand72,16>`) -- that
-   * container-type correction is what let the closure's remaining tokens
-   * (`sub_56C940`/`sub_56E620`/`sub_56FAB0`/`sub_56FB90`/`sub_573000`
-   * push_back/InsertAt/grow family, `sub_572350`/`sub_5734F0` std::sort,
-   * `sub_56AAF0` map-insert family) resolve as citations on the canonical
-   * `gpg::fastvector_n<T,N>` template (FastVector.h) and the `InsertLaneMapNode`
-   * typed helper instead of staying open. Landed as a genuine, non-stub
-   * implementation using only real evidence -- no invented control flow.
    *
    * What it does (seven phases):
    *  1. Builds a Lua table of unit LuaObjects from `units`.
@@ -5833,35 +3098,34 @@ namespace moho
    *     slots.
    *  3. Computes the mean unit XZ position.
    *  4. Builds one `SFormationRunScriptUnitDesc` per unit: position
-   *     relative to the mean, optionally rotated by `mOrientationBaseline`
-   *     when the script succeeded and the baseline is non-zero. Folds the
-   *     lane's preferred speed (min over units of
+   *     relative to the mean, optionally rotated by `mOrientationChange`
+   *     when the script succeeded and the change is non-zero. Folds the
+   *     group's speed (min over units of
    *     `CanFly ? MaxAirspeed*0.85f/CalcTransportLoadFactor() : MaxSpeed*0.85f`).
    *  5. Computes slot-table span/mean statistics feeding
-   *     `overlapAnchor.x/Z = max(2.0f, span)`, `overlapRadius.x/Z = mean unit
-   *     XZ`, and the slot-mean lanes now named
-   *     `meanSlotOffset.x/Z`.
+   *     `mExtent = max(2.0f, span)`, `mCenter = mean unit XZ` and
+   *     `mSlotCenter = mean slot offset`.
    *  6. Builds one `SFormationRunScriptCandidate` per script slot (rotated
    *     offset, category, weight) and sorts them ascending by squared
    *     distance from the formation mean.
    *  7. Greedily assigns each sorted candidate's nearest still-free
-   *     category-matching unit, inserting one `SFormationLaneUnitNode`
-   *     payload per assignment into the new lane entry's `unitMap`
-   *     (`InsertLaneMapNode`, leader priority counting from 1), warns on
-   *     duplicate assignment, calls `RemoveUnit` for anything left
-   *     unassigned, and appends the finished lane entry to
-   *     `mLanes[layerIndex]`.
+   *     category-matching unit, storing one `SUnitOffsetInfo` per
+   *     assignment in the new group's `mUnitOffsets` (`operator[]`,
+   *     0x0056AAF0, at 0x00567E06/0x00567F9A; leader priority counting from
+   *     1), warns on duplicate assignment, calls `RemoveUnit` for anything
+   *     left unassigned, and appends the finished group to
+   *     `mOffsetInfo[layerIndex]` (`push_back`, 0x0056B590).
    */
-  void CFormationInstance::RunScript(SFormationLayerUnitSet& units, const std::int32_t layerIndex)
+  void CFormationInstance::RunScript(gpg::fastvector_n<WeakPtr<IUnit>, 4>& units, const std::int32_t layerIndex)
   {
     // Phase 1 (0x00567364-0x005673B9). The binary does not null-check the
     // resolved unit -- every caller (Setup, via PreRunScript) guarantees
     // live units in this list.
     LuaPlus::LuaObject unitTable;
-    unitTable.AssignNewTable(mLuaState, 0, 0);
+    unitTable.AssignNewTable(mState, 0, 0);
     std::int32_t unitLuaIndex = 0;
-    for (moho::SWeakRefSlot& slot : units) {
-      Unit* const unit = static_cast<Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
+    for (WeakPtr<IUnit>& link : units) {
+      Unit* const unit = UnitOf(link);
       LuaPlus::LuaObject luaUnit = unit->GetLuaObject();
       unitTable.Insert(unitLuaIndex, luaUnit);
       ++unitLuaIndex;
@@ -5869,7 +3133,7 @@ namespace moho
 
     // Phase 2 (0x005673BB-0x00567415).
     SFormationScriptResult scriptResult =
-      FORMATION_RunScript(mLuaState, mGameRules, gpg::StrArg(mScriptName.c_str()), unitTable);
+      FORMATION_RunScript(mState, mGamerules, gpg::StrArg(mScriptName.c_str()), unitTable);
     if (scriptResult.mObjs.empty()) {
       return;
     }
@@ -5878,9 +3142,8 @@ namespace moho
     float meanX = 0.0f;
     float meanZ = 0.0f;
     if (!units.empty()) {
-      for (const moho::SWeakRefSlot& slot : units) {
-        const Unit* const unit = static_cast<const Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
-        const Wm3::Vec3f& pos = unit->GetPosition();
+      for (const WeakPtr<IUnit>& link : units) {
+        const Wm3::Vec3f& pos = UnitOf(link)->GetPosition();
         meanX += pos.x;
         meanZ += pos.z;
       }
@@ -5893,23 +3156,23 @@ namespace moho
     }
 
     // Phase 4 (0x00567526-0x005677CD): per-unit relative descriptors +
-    // preferred speed. `gpg::fastvector_n<Desc32,16>` (not std::vector) --
-    // the local's real binary shape, per the escalation doc's funclet table
-    // (0x00BADE3C, D=0x154). Left un-reserved: the binary never reserves it
-    // either, relying on the 16 inline slots plus `push_back`'s own grow.
+    // group speed. `gpg::fastvector_n<Desc32,16>` is the local's real
+    // binary shape, per the escalation doc's funclet table (0x00BADE3C,
+    // D=0x154). Left un-reserved: the binary never reserves it either,
+    // relying on the 16 inline slots plus `push_back`'s own grow.
     gpg::fastvector_n<SFormationRunScriptUnitDesc, 16> unitDescs;
-    float preferredSpeed = std::numeric_limits<float>::max();
-    for (moho::SWeakRefSlot& slot : units) {
-      Unit* const unit = static_cast<Unit*>(slot.AsWeakPtr<IUnit>().GetObjectPtr());
+    float groupSpeed = std::numeric_limits<float>::max();
+    for (WeakPtr<IUnit>& link : units) {
+      Unit* const unit = UnitOf(link);
       const Wm3::Vec3f& pos = unit->GetPosition();
 
       SFormationRunScriptUnitDesc desc{};
       desc.unit = unit;
       desc.relative = Wm3::Vec3f{pos.x - meanX, 0.0f, pos.z - meanZ};
       desc.relativeRotated = desc.relative;
-      if (scriptResult.mSuccess && mOrientationBaseline != kZeroQuaternion) {
+      if (scriptResult.mSuccess && mOrientationChange != kZeroQuaternion) {
         Wm3::Vec3f rotated{};
-        (void)MultQuadVec(&rotated, &desc.relative, &mOrientationBaseline);
+        (void)MultQuadVec(&rotated, &desc.relative, &mOrientationChange);
         desc.relativeRotated = rotated;
       }
       desc.weight = 1.0f;
@@ -5919,7 +3182,7 @@ namespace moho
       const float unitSpeed = (blueprint->Air.CanFly != 0u)
         ? (blueprint->Air.MaxAirspeed * 0.85f) / unit->CalcTransportLoadFactor()
         : blueprint->Physics.MaxSpeed * 0.85f;
-      preferredSpeed = std::min(preferredSpeed, unitSpeed);
+      groupSpeed = std::min(groupSpeed, unitSpeed);
     }
 
     // Phase 5 (0x005677E4-0x005679D4): slot-table span/mean statistics.
@@ -5941,24 +3204,20 @@ namespace moho
     }
     const float invSlotCount = 1.0f / static_cast<float>(scriptResult.mObjs.size());
 
-    SFormationLaneEntry laneEntry{};
-    laneEntry.overlapAnchor.x = std::max(2.0f, slotMaxX - slotMinX);
-    laneEntry.overlapAnchor.z = std::max(2.0f, slotMaxZ - slotMinZ);
-    laneEntry.overlapRadius.x = meanX;
-    laneEntry.overlapRadius.z = meanZ;
-    laneEntry.meanSlotOffset.x = slotSumX * invSlotCount;
-    laneEntry.meanSlotOffset.z = slotSumZ * invSlotCount;
-    laneEntry.preferredSpeed = preferredSpeed;
-    laneEntry.speedAnchor = preferredSpeed;
+    SOffsetInfo group;
+    group.mExtent = SCoordsVec2{std::max(2.0f, slotMaxX - slotMinX), std::max(2.0f, slotMaxZ - slotMinZ)};
+    group.mCenter = SCoordsVec2{meanX, meanZ};
+    group.mSlotCenter = SCoordsVec2{slotSumX * invSlotCount, slotSumZ * invSlotCount};
+    group.mSpeed = groupSpeed;
 
     // Phase 6 (0x00567A40-0x00567C71): one candidate per script slot,
     // sorted ascending by squared distance from the formation mean.
-    // `gpg::fastvector_n<Cand72,16>` (not std::vector) -- the local's real
-    // binary shape, per the escalation doc's funclet table (0x00BADE47,
-    // D=0x364); `push_back`'s grow lane is FUN_0056C940 / FUN_0056E620 /
-    // FUN_0056FAB0 / FUN_0056FB90 / FUN_00573000 (RunScript closure), cited
-    // on FastVector.h's push_back/InsertAt/GrowInsertDeepCopy/
-    // UninitializedCopyForward/CopyBackwardAssign for this element type.
+    // `gpg::fastvector_n<Cand72,16>` is the local's real binary shape, per
+    // the escalation doc's funclet table (0x00BADE47, D=0x364); `push_back`'s
+    // grow lane is FUN_0056C940 / FUN_0056E620 / FUN_0056FAB0 / FUN_0056FB90 /
+    // FUN_00573000, cited on FastVector.h's push_back/InsertAt/
+    // GrowInsertDeepCopy/UninitializedCopyForward/CopyBackwardAssign for
+    // this element type.
     gpg::fastvector_n<SFormationRunScriptCandidate, 16> candidates;
     for (const SFormationScriptSlot& slot : scriptResult.mObjs) {
       SCoordsVec2 rotatedOffset{};
@@ -5974,7 +3233,11 @@ namespace moho
     }
     std::sort(candidates.begin(), candidates.end(), CompareRunScriptCandidateByDistanceSq);
 
-    // Phase 7 (0x00567D97-0x00568280): greedy nearest-unit assignment.
+    // Phase 7 (0x00567D97-0x00568280): greedy nearest-unit assignment. The
+    // per-assignment `SUnitOffsetInfo` is the stack value filled at
+    // 0x00567EED-0x00567FA3: the unit, the running priority, the slot
+    // offset, a zero target, an unset (+inf) heading, zero distances and the
+    // script weight.
     std::int32_t leaderPriority = 0;
     for (const SFormationRunScriptCandidate& candidate : candidates) {
       auto bestIt = unitDescs.end();
@@ -5983,7 +3246,7 @@ namespace moho
         if (it->unit == nullptr) {
           continue;
         }
-        if (!moho::EntityCategory::HasBlueprint(it->unit->GetBlueprint(), &candidate.category)) {
+        if (!EntityCategory::HasBlueprint(it->unit->GetBlueprint(), &candidate.category)) {
           continue;
         }
 
@@ -6001,8 +3264,8 @@ namespace moho
       }
 
       Unit* const bestUnit = bestIt->unit;
-      const std::uint32_t entityId = static_cast<std::uint32_t>(bestUnit->GetEntityId());
-      if (LaneMapFindNode(laneEntry.unitMap, entityId) != nullptr) {
+      const EntId entityId = bestUnit->GetEntityId();
+      if (group.mUnitOffsets.find(entityId) != group.mUnitOffsets.end()) {
         gpg::Warnf(
           "HASH duplicated on %d in formation %d",
           static_cast<int>(reinterpret_cast<std::uintptr_t>(bestUnit)),
@@ -6011,18 +3274,16 @@ namespace moho
       }
 
       ++leaderPriority;
-      SFormationLaneUnitNode nodeValue{};
-      nodeValue.unitEntityId = entityId;
-      nodeValue.leaderPriority = leaderPriority;
-      nodeValue.formationOffsetX = candidate.position.x;
-      nodeValue.formationOffsetZ = candidate.position.z;
-      nodeValue.formationVector = bestIt->relativeRotated;
-      nodeValue.formationWeight = candidate.weight;
-      nodeValue.speedBandLow = preferredSpeed;
-      nodeValue.speedBandMid = preferredSpeed;
-      nodeValue.speedBandHigh = preferredSpeed;
-      nodeValue.linkedUnitOwnerWord = EncodeUnitOwnerSlotWord(bestUnit);
-      (void)InsertLaneMapNode(laneEntry.unitMap, nodeValue);
+      SUnitOffsetInfo info{};
+      info.mUnit.Set(bestUnit);
+      info.mLeaderPriority = leaderPriority;
+      info.mOffset = SCoordsVec2{candidate.position.x, candidate.position.z};
+      info.mTargetPos = Wm3::Vec3f::ZERO;
+      info.mHeadingAngle = std::numeric_limits<float>::infinity();
+      info.mDistToTarget = 0.0f;
+      info.mDistFromLeader = 0.0f;
+      info.mWeight = candidate.weight;
+      group.mUnitOffsets[entityId] = info;
 
       // Consumed: skip this unit in subsequent candidates' nearest search.
       bestIt->unit = nullptr;
@@ -6033,10 +3294,9 @@ namespace moho
         continue;
       }
 
-      const RUnitBlueprint* const blueprint = desc.unit->GetBlueprint();
       gpg::Warnf(
         "Failed to assaign unit %s a slot in the formation %s (units=%d, formation slots=%d)",
-        blueprint != nullptr ? blueprint->mBlueprintId.c_str() : "<null>",
+        desc.unit->GetBlueprint()->mBlueprintId.c_str(),
         mScriptName.c_str(),
         static_cast<int>(units.size()),
         static_cast<int>(scriptResult.mObjs.size())
@@ -6044,50 +3304,45 @@ namespace moho
       RemoveUnit(desc.unit);
     }
 
-    mLanes[layerIndex].push_back(laneEntry);
+    mOffsetInfo[layerIndex].push_back(group);
   }
 
   /**
-   * Address: 0x00568CA0 (FUN_00568CA0, Moho::CAiFormationInstance::UpdateFormation)
+   * Address: 0x00568CA0 (FUN_00568CA0, Moho::CFormationInstance::UpdateFormation)
    *
    * What it does:
-   * Snapshots every live, mobile, non-building, non-destroy-queued linked
-   * unit into a weak-slot scratch list, accumulating the formation's mean
-   * facing and each unit's max footprint size. Refreshes
-   * `mOrientationBaseline` (named `mOrientationChng` by the raw decompile;
-   * mapped here since this is the only quaternion the binary both writes
-   * from the mean-facing delta and `RunScript` phase 4 later reads) when
-   * the facing changed enough. Rebuilds each formation layer in turn:
-   * releases the previous lane entries for that layer
-   * (`ReleaseFormationLaneEntries`) and calls `Setup` to claim and script
-   * this layer's units from the shared snapshot. After both layers
-   * rebuild, merges overlapping lane bands for `Form*` commands
-   * (`MergeOverlappingLaneBands`) and broadcasts
+   * Snapshots every live, mobile, built, non-destroy-queued unit with a
+   * valid position into a scratch unit set (the temporary `WeakPtr<IUnit>`
+   * push at 0x00568D2C-0x00568D4F), accumulating the units' mean forward
+   * vector and the largest footprint size. Refreshes `mOrientationChange`
+   * from the difference between the formation heading and the mean unit
+   * heading when the two differ by less than 108 degrees. Rebuilds each
+   * layer in turn -- destroys its previous groups (0x00568EE4-0x00568F63)
+   * and calls `Setup` to claim and script the layer's units -- then merges
+   * overlapping groups for `Form*` commands and broadcasts
    * `FORMATIONSTATUS_FormationUpdated`.
    */
   void CFormationInstance::UpdateFormation()
   {
-    SFormationLayerUnitSet mobileUnits{};
-    float orientXSum = 0.0f;
-    float orientYSum = 0.0f;
+    gpg::fastvector_n<WeakPtr<IUnit>, 4> units{};
+    float forwardXSum = 0.0f;
+    float forwardZSum = 0.0f;
 
-    for (SFormationLinkedUnitRef& linkedRef : mUnits) {
-      Unit* const unit = DecodeLinkedRefUnit(linkedRef);
+    for (WeakPtr<IUnit>& link : mUnits) {
+      Unit* const unit = UnitOf(link);
       if (unit == nullptr || !unit->IsMobile() || unit->IsDead() || unit->IsBeingBuilt() || unit->DestroyQueued()) {
         continue;
       }
 
-      const Wm3::Vec3f& position = unit->GetPosition();
-      if (!IsValidVector3f(position)) {
+      if (!IsValidVector3f(unit->GetPosition())) {
         continue;
       }
 
-      AppendLinkedUnitWeakSlot(mobileUnits, unit);
+      units.push_back(WeakPtr<IUnit>(unit));
 
-      const VTransform& transform = unit->GetTransform();
-      const Wm3::Quatf& orient = transform.orient_;
-      orientXSum += (orient.w * orient.y + orient.x * orient.z) * 2.0f;
-      orientYSum += 1.0f - (orient.z * orient.z + orient.y * orient.y) * 2.0f;
+      const Wm3::Vec3f forward = ForwardOf(unit->GetTransform().orient_);
+      forwardXSum += forward.x;
+      forwardZSum += forward.z;
 
       const RUnitBlueprint* const blueprint = unit->GetBlueprint();
       std::int32_t footprintSize;
@@ -6095,83 +3350,64 @@ namespace moho
         footprintSize = (static_cast<std::int32_t>(blueprint->mFootprint.mSizeX)
                         + static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ)) / 2;
       } else {
-        // 0x00568CA0: the ground lane reads the blueprint footprint bytes at
+        // 0x00568DC5: the ground path reads the blueprint footprint bytes at
         // +0xD8/+0xD9 off the IUnit::GetBlueprint result and keeps the larger
         // one. It never calls the sim-side Unit::GetMaxFootprintSize - the
         // participants here are IUnit bridges that, on the user side of the
-        // formation preview, are UserUnits with no Entity blueprint lane, and
-        // that call threw "Attempt to get footprint on nameless entity" out
-        // of every right-click order.
+        // formation preview, are UserUnits with no Entity blueprint, and that
+        // call threw "Attempt to get footprint on nameless entity" out of
+        // every right-click order.
         const auto sizeX = static_cast<std::int32_t>(blueprint->mFootprint.mSizeX);
         const auto sizeZ = static_cast<std::int32_t>(blueprint->mFootprint.mSizeZ);
         footprintSize = (sizeX > sizeZ) ? sizeX : sizeZ;
       }
-      mMaxUnitSlotCount = std::max(mMaxUnitSlotCount, footprintSize);
+      mMaxSize = std::max(mMaxSize, footprintSize);
     }
 
-    if (mobileUnits.empty()) {
+    if (units.empty()) {
       return;
     }
 
-    const float mobileCount = static_cast<float>(mobileUnits.size());
-    const float orientXDir = orientXSum / mobileCount;
-    const float orientYDir = orientYSum / mobileCount;
+    const float unitCount = static_cast<float>(units.size());
+    const float meanForwardX = (1.0f / unitCount) * forwardXSum;
+    const float meanForwardZ = forwardZSum * (1.0f / unitCount);
 
     if (mOrientation != kZeroQuaternion) {
-      const float targetAngle = std::atan2(
-        (mOrientation.w * mOrientation.y + mOrientation.z * mOrientation.x) * 2.0f,
-        1.0f - (mOrientation.z * mOrientation.z + mOrientation.y * mOrientation.y) * 2.0f
-      );
-      float angleDelta = targetAngle - std::atan2(orientXDir, orientYDir);
-      if (angleDelta > 3.1415927f) {
-        angleDelta -= 6.2831855f;
-      } else if (angleDelta < -3.1415927f) {
-        angleDelta += 6.2831855f;
-      }
-
-      if (std::fabs(angleDelta) < 1.8849558f) {
-        const float halfAngle = angleDelta * 0.5f;
-        const float sinHalf = std::sin(halfAngle);
-        // `(cos, 0, sin, 0)` in memory - a scalar-first rotation about Y, i.e.
-        // a heading, which is what a formation baseline is.
-        mOrientationBaseline.w = std::cos(halfAngle);
-        mOrientationBaseline.x = 0.0f;
-        mOrientationBaseline.y = sinHalf;
-        mOrientationBaseline.z = 0.0f;
+      const float delta = WrapAngle(HeadingOf(mOrientation) - std::atan2(meanForwardX, meanForwardZ));
+      if (std::fabs(delta) < 1.8849558f) {
+        mOrientationChange = YawQuaternion(delta);
       }
     }
 
-    for (std::int32_t layerIndex = 0; layerIndex < kFormationLayerCount; ++layerIndex) {
-      ReleaseFormationLaneEntries(mLanes[layerIndex]);
-      Setup(mobileUnits, layerIndex);
+    for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
+      mOffsetInfo[layer].ResetStorageToInline();
+      Setup(units, layer);
     }
 
     if (CommandIsForm()) {
-      MergeOverlappingLaneBands(*this);
+      MergeOverlappingOffsetInfos(*this);
     }
 
-    DispatchFormationUpdateEvent(static_cast<std::int32_t>(FORMATIONSTATUS_FormationUpdated), mUnitLinkListHead);
-
-    ClearLinkedUnitWeakSlots(mobileUnits);
+    mStatusListeners.BroadcastEvent(FORMATIONSTATUS_FormationUpdated);
   }
 
   /**
    * Address: 0x00569CB0 (FUN_00569CB0, Moho::CFormationInstance::GetFormationPosition)
    *
    * What it does:
-   * Computes one formation target position for `unit` and updates the primary
-   * coord cache.
+   * Refreshes a pending plan, then answers with the unit's own position for
+   * a dead unit, the cached slot for a unit already resolved this plan
+   * (`mFormationPosCache`, `sub_56B7B0`), or otherwise the unit's slot
+   * (`mCoords + mOffset`, plus the dynamic offset when enabled) passed
+   * through `FindSlotFor` and cached (`sub_56B6C0`, the map's `operator[]`).
+   * Units in no group resolve to their own position.
    */
   SCoordsVec2* CFormationInstance::GetFormationPosition(
     SCoordsVec2* const dest,
     Unit* const unit,
-    SFormationLaneEntry* laneEntry
+    SOffsetInfo* info
   )
   {
-    if (!dest || !unit) {
-      return dest;
-    }
-
     RefreshFormationPlanIfRequested(*this);
 
     const Wm3::Vec3f& unitPos = unit->GetPosition();
@@ -6181,41 +3417,36 @@ namespace moho
       return dest;
     }
 
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    if (SFormationCoordCacheNode* const cached = CoordCacheFindNode(mCoordCachePrimary, unitEntityId)) {
-      *dest = cached->position;
+    const EntId entityId = unit->GetEntityId();
+    if (const SCoordsVec2* const cached = mFormationPosCache.try_get(entityId)) {
+      *dest = *cached;
       return dest;
     }
 
-    SFormationLaneEntry* lane = laneEntry;
-    if (lane == nullptr) {
-      if (!Func17(unit, false)) {
+    if (info == nullptr) {
+      if (!Contains(unit, false)) {
         *dest = position;
         return dest;
       }
-      lane = Func6(unit);
+      info = GetOffsetInfo(unit);
     }
 
-    if (lane != nullptr) {
-      if (const SFormationLaneUnitNode* const node = LaneMapFindNode(lane->unitMap, unitEntityId)) {
-        float localX = node->formationOffsetX;
-        float localZ = node->formationOffsetZ;
-        if (lane->applyDynamicOffset != 0u) {
-          localX += lane->dynamicOffset.x;
-          localZ += lane->dynamicOffset.z;
+    if (info != nullptr) {
+      if (const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(entityId)) {
+        SCoordsVec2 offset = unitInfo->mOffset;
+        if (info->mUseDynamicOffset) {
+          offset.x += info->mDynamicOffset.x;
+          offset.z += info->mDynamicOffset.z;
         }
 
-        SCoordsVec2 requested{};
-        requested.x = mFormationCenter.x + localX;
-        requested.z = mFormationCenter.z + localZ;
-
-        SCoordsVec2 snapped{};
-        FindSlotFor(&snapped, &requested, unit);
-        position = snapped;
+        const SCoordsVec2 requested{mCoords.x + offset.x, mCoords.z + offset.z};
+        SCoordsVec2 slot{};
+        FindSlotFor(&slot, &requested, unit);
+        position = slot;
       }
     }
 
-    (void)CoordCacheInsertOrAssign(mCoordCachePrimary, unitEntityId, position);
+    mFormationPosCache[entityId] = position;
     *dest = position;
     return dest;
   }
@@ -6224,54 +3455,43 @@ namespace moho
    * Address: 0x00569EA0 (FUN_00569EA0, Moho::CFormationInstance::GetAdjustedFormationPosition)
    *
    * What it does:
-   * Converts formation world coordinates to footprint-min cell coordinates.
+   * Converts the unit's formation position to its footprint-origin cell
+   * (`fistp`, round to nearest); a null or dead unit yields cell (0, 0).
    */
   SOCellPos* CFormationInstance::GetAdjustedFormationPosition(
     SOCellPos* const dest,
     Unit* const unit,
-    SFormationLaneEntry* laneEntry
+    SOffsetInfo* info
   )
   {
-    if (!dest) {
-      return dest;
-    }
-
     dest->x = 0;
     dest->z = 0;
-    if (!unit || unit->IsDead()) {
-      return dest;
+    if (unit != nullptr && !unit->IsDead()) {
+      SCoordsVec2 position{};
+      GetFormationPosition(&position, unit, info);
+
+      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+      SOCellPos cell{};
+      cell.x = static_cast<std::int16_t>(std::lrintf(position.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
+      cell.z = static_cast<std::int16_t>(std::lrintf(position.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
+      *dest = cell;
     }
-
-    SCoordsVec2 position{};
-    GetFormationPosition(&position, unit, laneEntry);
-
-    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-    if (!blueprint) {
-      return dest;
-    }
-
-    const float halfSizeX = static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f;
-    const float halfSizeZ = static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f;
-    const int adjustedX = static_cast<int>(std::lround(position.x - halfSizeX));
-    const int adjustedZ = static_cast<int>(std::lround(position.z - halfSizeZ));
-    dest->x = static_cast<std::int16_t>(adjustedX);
-    dest->z = static_cast<std::int16_t>(adjustedZ);
     return dest;
   }
 
   /**
-   * Address: 0x00569F70 (FUN_00569F70, Moho::CFormationInstance::Func9)
+   * Address: 0x00569F70 (FUN_00569F70, Moho::CFormationInstance::GetOffsetPosition)
    *
    * What it does:
-   * Computes one formation/steering hint coordinate and updates the secondary
-   * coord cache.
+   * Refreshes a pending plan, then answers with the unit's own position for
+   * a dead unit or a unit in no group, the cached value for a unit already
+   * resolved this plan (`mOffsetPosCache`, `sub_56B7B0`), or otherwise the
+   * raw slot `mCoords + mOffset` (plus the dynamic offset when enabled) for
+   * a mobile unit and its own position for an immobile one, cached through
+   * the map's `operator[]` (`sub_56B6C0`).
    */
-  SCoordsVec2* CFormationInstance::Func9(SCoordsVec2* const dest, Unit* const unit, SFormationLaneEntry* laneEntry)
+  SCoordsVec2* CFormationInstance::GetOffsetPosition(SCoordsVec2* const dest, Unit* const unit, SOffsetInfo* info)
   {
-    if (!dest || !unit) {
-      return dest;
-    }
-
     RefreshFormationPlanIfRequested(*this);
 
     const Wm3::Vec3f& unitPos = unit->GetPosition();
@@ -6281,63 +3501,54 @@ namespace moho
       return dest;
     }
 
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    if (SFormationCoordCacheNode* const cached = CoordCacheFindNode(mCoordCacheSecondary, unitEntityId)) {
-      *dest = cached->position;
+    const EntId entityId = unit->GetEntityId();
+    if (const SCoordsVec2* const cached = mOffsetPosCache.try_get(entityId)) {
+      *dest = *cached;
       return dest;
     }
 
-    if (laneEntry != nullptr) {
-      if (!unit->IsMobile()) {
-        position.x = unitPos.x;
-        position.z = unitPos.z;
-      } else if (const SFormationLaneUnitNode* const node = LaneMapFindNode(laneEntry->unitMap, unitEntityId)) {
-        float localX = node->formationOffsetX;
-        float localZ = node->formationOffsetZ;
-        if (laneEntry->applyDynamicOffset != 0u) {
-          localX += laneEntry->dynamicOffset.x;
-          localZ += laneEntry->dynamicOffset.z;
-        }
-        position.x = mFormationCenter.x + localX;
-        position.z = mFormationCenter.z + localZ;
-      }
+    if (info == nullptr) {
+      *dest = position;
+      return dest;
     }
 
-    (void)CoordCacheInsertOrAssign(mCoordCacheSecondary, unitEntityId, position);
+    if (!unit->IsMobile()) {
+      position = SCoordsVec2{unitPos.x, unitPos.z};
+    } else if (const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(entityId)) {
+      SCoordsVec2 offset = unitInfo->mOffset;
+      if (info->mUseDynamicOffset) {
+        offset.x += info->mDynamicOffset.x;
+        offset.z += info->mDynamicOffset.z;
+      }
+      position = SCoordsVec2{mCoords.x + offset.x, mCoords.z + offset.z};
+    }
+
+    mOffsetPosCache[entityId] = position;
     *dest = position;
     return dest;
   }
 
   /**
-   * Address: 0x0056A150 (FUN_0056A150, Moho::CFormationInstance::Func10)
+   * Address: 0x0056A150 (FUN_0056A150, Moho::CFormationInstance::GetTargetPosition)
    *
    * What it does:
-   * Returns lane-provided formation vector when present, else unit position.
+   * Zero for a null or dead unit; otherwise the unit's smoothed
+   * `SUnitOffsetInfo::mTargetPos`, falling back to the unit's own position
+   * while that is still zero or the unit has no slot in `info`.
    */
-  Wm3::Vec3f* CFormationInstance::Func10(Wm3::Vec3f* const out, Unit* const unit, SFormationLaneEntry* laneEntry)
+  Wm3::Vec3f* CFormationInstance::GetTargetPosition(Wm3::Vec3f* const out, Unit* const unit, SOffsetInfo* info)
   {
-    if (!out) {
+    if (unit == nullptr || unit->IsDead()) {
+      *out = Wm3::Vec3f::ZERO;
       return out;
     }
 
-    if (!unit || unit->IsDead()) {
-      out->x = 0.0f;
-      out->y = 0.0f;
-      out->z = 0.0f;
-      return out;
+    const SUnitOffsetInfo* const unitInfo = info != nullptr ? info->mUnitOffsets.try_get(unit->GetEntityId()) : nullptr;
+    if (unitInfo == nullptr || unitInfo->mTargetPos == Wm3::Vec3f::ZERO) {
+      *out = unit->GetPosition();
+    } else {
+      *out = unitInfo->mTargetPos;
     }
-
-    if (laneEntry != nullptr) {
-      const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-      if (const SFormationLaneUnitNode* const node = LaneMapFindNode(laneEntry->unitMap, unitEntityId)) {
-        if (node->formationVector.x != 0.0f || node->formationVector.y != 0.0f || node->formationVector.z != 0.0f) {
-          *out = node->formationVector;
-          return out;
-        }
-      }
-    }
-
-    *out = unit->GetPosition();
     return out;
   }
 
@@ -6345,457 +3556,166 @@ namespace moho
    * Address: 0x0056A220 (FUN_0056A220, Moho::CFormationInstance::AddUnit)
    *
    * What it does:
-   * Adds one live unit weak-ref to this formation and marks plan rebuild.
+   * For a live unit: prunes dead links (`RemoveDeadUnits`, which also
+   * reports whether the unit is already listed) and either warns about the
+   * duplicate or appends a fresh link (the temporary `WeakPtr<IUnit>` at
+   * 0x0056A26A pushed and destroyed) and flags the plan for a rebuild.
    */
   void CFormationInstance::AddUnit(Unit* const unit)
   {
-    if (!unit || unit->IsDead()) {
+    if (unit == nullptr || unit->IsDead()) {
       return;
     }
 
-    bool alreadyPresent = false;
-    std::vector<Unit*> kept;
-    kept.reserve(mUnits.size());
-    for (SFormationLinkedUnitRef* it = mUnits.begin(); it != mUnits.end(); ++it) {
-      Unit* const linkedUnit = DecodeLinkedRefUnit(*it);
-      if (linkedUnit == nullptr || linkedUnit->IsDead() || linkedUnit->DestroyQueued()) {
-        UnlinkLinkedRef(*it);
-        continue;
-      }
-
-      if (linkedUnit == unit) {
-        alreadyPresent = true;
-      }
-
-      kept.push_back(linkedUnit);
-      UnlinkLinkedRef(*it);
-    }
-
-    ResetLinkedUnitRefsFromUnits(*this, kept);
-
-    if (alreadyPresent) {
-      const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    if (RemoveDeadUnits(unit)) {
       gpg::Warnf(
         "Attempted to re-add existing unit (%d - %s) to formation (%d)",
         static_cast<int>(reinterpret_cast<std::uintptr_t>(unit)),
-        blueprint != nullptr ? blueprint->mBlueprintId.c_str() : "<null>",
+        unit->GetBlueprint()->mBlueprintId.c_str(),
         static_cast<int>(reinterpret_cast<std::uintptr_t>(this))
       );
       return;
     }
 
-    SFormationLinkedUnitRef linked{};
-    mUnits.push_back(linked);
-    RelinkLinkedRef(mUnits.back(), unit);
-    mPlanUpdateRequested = 1u;
+    mUnits.push_back(WeakPtr<IUnit>(unit));
+    mPlanUpdate = 1u;
   }
 
   /**
    * Address: 0x0056A300 (FUN_0056A300, Moho::CFormationInstance::RemoveUnit)
    *
    * What it does:
-   * Removes one unit from lane maps and linked unit-reference storage.
+   * Erases the unit from the first group of its layer that holds it
+   * (`sub_56AC60`, the map's `erase(iterator)`), dropping that group's
+   * cached leader when it was this unit, then erases the unit's link from
+   * `mUnits` (`sub_5725A0` shift plus the tail unlink).
    */
   void CFormationInstance::RemoveUnit(Unit* const unit)
   {
-    if (!unit) {
+    if (unit == nullptr) {
       return;
     }
 
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const std::int32_t laneIndex = GetLayer(unit);
-    SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-    SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-    while (lane != laneEnd) {
-      if (LaneMapFindNode(lane->unitMap, unitEntityId) != nullptr) {
-        EraseLaneMapNodeByEntityId(lane->unitMap, unitEntityId);
-        if (DecodeUnitOwnerSlotWord(lane->linkedUnitBackLinkHeadWord) == unit) {
-          UnlinkWeakWordNode(lane->linkedUnitBackLinkHeadWord, lane->linkedUnitBackLinkNextWord);
-        }
+    for (SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
+      const auto it = info.mUnitOffsets.find(unit->GetEntityId());
+      if (it == info.mUnitOffsets.end()) {
+        continue;
       }
-      ++lane;
+
+      (void)info.mUnitOffsets.erase(it);
+      if (UnitOf(info.mLeader) == unit) {
+        info.mLeader.UnlinkFromOwnerChain();
+      }
+      break;
     }
 
-    std::vector<Unit*> kept;
-    kept.reserve(mUnits.size());
-    for (SFormationLinkedUnitRef* it = mUnits.begin(); it != mUnits.end(); ++it) {
-      Unit* const linkedUnit = DecodeLinkedRefUnit(*it);
-      if (linkedUnit != nullptr && linkedUnit != unit) {
-        kept.push_back(linkedUnit);
+    for (auto it = mUnits.begin(); it != mUnits.end(); ++it) {
+      if (UnitOf(*it) == unit) {
+        (void)mUnits.erase(it);
+        return;
       }
-      UnlinkLinkedRef(*it);
     }
-
-    ResetLinkedUnitRefsFromUnits(*this, kept);
   }
 
   /**
-   * Address: 0x0056A440 (FUN_0056A440, Moho::CFormationInstance::Func17)
+   * Address: 0x0056A440 (FUN_0056A440, Moho::CFormationInstance::Contains)
    *
    * What it does:
-   * Returns true if `unit` exists in the lane map (or full linked set when
-   * `checkAll` is true).
+   * True when a group of the unit's layer holds its entity id, or -- with
+   * `checkAll` -- when `mUnits` links it.
    */
-  bool CFormationInstance::Func17(Unit* const unit, const bool checkAll) const
+  bool CFormationInstance::Contains(Unit* const unit, const bool checkAll) const
   {
-    if (!unit) {
+    if (unit == nullptr) {
       return false;
     }
 
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const std::int32_t laneIndex = GetLayer(unit);
-    const SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-    const SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-    while (lane != laneEnd) {
-      if (LaneMapFindNode(lane->unitMap, unitEntityId) != nullptr) {
+    for (const SOffsetInfo& info : mOffsetInfo[GetLayer(unit)]) {
+      if (info.mUnitOffsets.find(unit->GetEntityId()) != info.mUnitOffsets.end()) {
         return true;
       }
-      ++lane;
     }
 
     if (!checkAll) {
       return false;
     }
 
-    const SFormationLinkedUnitRef* it = mUnits.begin();
-    const SFormationLinkedUnitRef* const end = mUnits.end();
-    while (it != end) {
-      if (DecodeLinkedRefUnit(*it) == unit) {
+    for (const WeakPtr<IUnit>& link : mUnits) {
+      if (UnitOf(link) == unit) {
         return true;
       }
-      ++it;
     }
 
     return false;
   }
 
   /**
-   * Address: 0x005691E0 (FUN_005691E0, Moho::CAiFormationInstance::RemoveDeadUnits)
+   * Address: 0x005691E0 (FUN_005691E0, Moho::CFormationInstance::RemoveDeadUnits)
    *
    * What it does:
-   * Compacts linked formation unit refs by removing null/dead/destroy-queued
-   * units and returns whether `checkForUnit` is still present after cleanup.
+   * Walks `mUnits`, erasing every null, dead or destroy-queued link in place
+   * (`sub_5725A0` shift plus the tail unlink) and noting whether
+   * `checkForUnit` was met among the survivors.
    */
   bool CFormationInstance::RemoveDeadUnits(Unit* const checkForUnit)
   {
-    bool hasCheckForUnit = false;
-    std::vector<Unit*> kept;
-    kept.reserve(mUnits.size());
-
-    for (SFormationLinkedUnitRef* it = mUnits.begin(); it != mUnits.end(); ++it) {
-      Unit* const linkedUnit = DecodeLinkedRefUnit(*it);
-      const bool removeEntry =
-        linkedUnit == nullptr || linkedUnit->IsDead() || linkedUnit->DestroyQueued();
-      if (!removeEntry) {
-        if (checkForUnit != nullptr && linkedUnit == checkForUnit) {
-          hasCheckForUnit = true;
-        }
-        kept.push_back(linkedUnit);
+    bool found = false;
+    for (auto it = mUnits.begin(); it != mUnits.end();) {
+      Unit* const unit = UnitOf(*it);
+      if (unit == nullptr || unit->IsDead() || unit->DestroyQueued()) {
+        it = mUnits.erase(it);
+        continue;
       }
-      UnlinkLinkedRef(*it);
+
+      if (checkForUnit != nullptr && checkForUnit == unit) {
+        found = true;
+      }
+      ++it;
     }
-
-    ResetLinkedUnitRefsFromUnits(*this, kept);
-
-    return hasCheckForUnit;
+    return found;
   }
 
   /**
-   * Address: 0x00569B60 (FUN_00569B60, Moho::CFormationInstance::Func19)
+   * Address: 0x00569B60 (FUN_00569B60, Moho::CFormationInstance::GetForwardVector)
    *
    * What it does:
-   * Returns formation forward vector for contained units, else zero.
+   * The formation forward vector for a placed unit, zero otherwise.
    */
-  Wm3::Vec3f* CFormationInstance::Func19(Wm3::Vec3f* const out, Unit* const unit) const
+  Wm3::Vec3f* CFormationInstance::GetForwardVector(Wm3::Vec3f* const out, Unit* const unit) const
   {
-    if (!out) {
-      return out;
-    }
-
-    if (Func17(unit, false)) {
+    if (Contains(unit, false)) {
       *out = mForwardVector;
     } else {
-      *out = kZeroForwardVector;
+      *out = Wm3::Vec3f::ZERO;
     }
     return out;
   }
 
   /**
-   * Address: 0x00569C20 (FUN_00569C20, Moho::CFormationInstance::Func21)
+   * Address: 0x00569C20 (FUN_00569C20, Moho::CFormationInstance::IsInFormation)
    *
    * What it does:
-   * Returns lane slot availability status for `unit`, or aggregate
-   * all-lane availability when no valid unit target is provided.
+   * For a live, placed unit: its group's `mInFormation` flag (true when the
+   * group lookup fails). Otherwise: whether every group of both layers is
+   * in formation.
    */
-  bool CFormationInstance::Func21(Unit* const unit) const
+  bool CFormationInstance::IsInFormation(Unit* const unit) const
   {
-    if (unit != nullptr && !unit->IsDead() && Func17(unit, false)) {
-      if (SFormationLaneEntry* const lane = const_cast<CFormationInstance*>(this)->Func6(unit); lane != nullptr) {
-        return lane->slotAvailable != 0u;
+    if (unit != nullptr && !unit->IsDead() && Contains(unit, false)) {
+      if (SOffsetInfo* const info = const_cast<CFormationInstance*>(this)->GetOffsetInfo(unit)) {
+        return info->mInFormation;
       }
       return true;
     }
 
-    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
-      const SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-      const SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-      while (lane != laneEnd) {
-        if (lane->slotAvailable == 0u) {
+    for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
+      for (const SOffsetInfo& info : mOffsetInfo[layer]) {
+        if (!info.mInFormation) {
           return false;
         }
-        ++lane;
       }
     }
     return true;
-  }
-
-  /**
-   * Address: 0x0059A790 (FUN_0059A790, Moho::CAiFormationInstance::Func11)
-   *
-   * What it does:
-   * Returns one lane-node speed sample for `unit`.
-   */
-  float CAiFormationInstance::Func11(Unit* const unit, SFormationLaneEntry* const laneEntry)
-  {
-    if (!unit || laneEntry == nullptr) {
-      return 0.0f;
-    }
-
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const SFormationLaneUnitNode* const node = LaneMapFindNode(laneEntry->unitMap, unitEntityId);
-    return node ? node->speedBandMid : 0.0f;
-  }
-
-  /**
-   * Address: 0x0059A7D0 (FUN_0059A7D0, Moho::CAiFormationInstance::Func12)
-   *
-   * What it does:
-   * Computes one integer move-priority weight from lane speed data.
-   */
-  std::int32_t CAiFormationInstance::Func12(Unit* const unit, SFormationLaneEntry* laneEntry)
-  {
-    if (!unit) {
-      return 1;
-    }
-
-    Unit* const runtimeUnit = unit->IsUnit();
-    if (runtimeUnit == nullptr) {
-      return 1;
-    }
-
-    if (runtimeUnit->GuardedUnitRef.ResolveObjectPtr<Unit>() != nullptr) {
-      return 1;
-    }
-
-    if (laneEntry == nullptr) {
-      laneEntry = Func6(unit);
-      if (laneEntry == nullptr) {
-        return 1;
-      }
-    }
-
-    const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-    const SFormationLaneUnitNode* const node = LaneMapFindNode(laneEntry->unitMap, unitEntityId);
-    if (!node || node->speedBandHigh <= 0.0f) {
-      return 1;
-    }
-
-    const std::int32_t scaled = static_cast<std::int32_t>(node->speedBandHigh) * 10;
-    return scaled > 1 ? scaled : 1;
-  }
-
-  /**
-   * Address: 0x0059A620 (FUN_0059A620, Moho::CAiFormationInstance::CalcFormationSpeed)
-   *
-   * What it does:
-   * Computes one lane speed and per-unit speed scale for formation movement.
-   */
-  float CAiFormationInstance::CalcFormationSpeed(
-    Unit* const unit,
-    float* const speedScaleOut,
-    SFormationLaneEntry* const laneEntry
-  )
-  {
-    if (!unit || !CommandIsForm()) {
-      return 0.0f;
-    }
-
-    Unit* const laneLeader = Func14(unit, laneEntry);
-    if (laneLeader != nullptr) {
-      if (!Func17(laneLeader, false) && !laneLeader->IsMobile()) {
-        return 0.0f;
-      }
-    }
-
-    Unit* const runtimeUnit = unit->IsUnit();
-    moho::IAiNavigator* const navigator = runtimeUnit ? GetUnitNavigatorLane(runtimeUnit) : nullptr;
-    if (!runtimeUnit || !navigator || navigator->IsIgnoringFormation() || laneEntry == nullptr) {
-      return 0.0f;
-    }
-
-    *speedScaleOut = 0.85f;
-    bool canScaleWithLaneDelta = navigator->FollowingLeader() || laneLeader == unit;
-    if (laneEntry->speedAnchor > 0.0f && canScaleWithLaneDelta) {
-      const std::uint32_t unitEntityId = UnitEntityIdWord(unit);
-      if (const SFormationLaneUnitNode* const node = LaneMapFindNode(laneEntry->unitMap, unitEntityId); node != nullptr) {
-        const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-        const float laneFactor = (blueprint != nullptr && blueprint->Air.CanFly != 0u) ? 1.5f : 4.0f;
-        float delta = (node->speedBandLow - laneEntry->speedAnchor) * laneFactor;
-        if (delta > 20.0f) {
-          delta = 20.0f;
-        } else if (delta < -5.0f) {
-          delta = -5.0f;
-        }
-        *speedScaleOut = (delta * 0.1f) + 1.0f;
-      }
-    }
-
-    return laneEntry->preferredSpeed;
-  }
-
-  /**
-   * Address: 0x0059A870 (FUN_0059A870, Moho::CAiFormationInstance::Func14)
-   *
-   * What it does:
-   * Resolves lane leader unit for one member unit and lane context.
-   */
-  Unit* CAiFormationInstance::Func14(Unit* const unit, SFormationLaneEntry* const laneEntry)
-  {
-    if (!unit) {
-      return nullptr;
-    }
-
-    if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
-      if (Unit* const runtimeUnit = unit->IsUnit(); runtimeUnit != nullptr) {
-        return runtimeUnit->GuardedUnitRef.ResolveObjectPtr<Unit>();
-      }
-      return nullptr;
-    }
-
-    if (laneEntry == nullptr || unit->IsDead()) {
-      return nullptr;
-    }
-
-    const std::int32_t laneIndex = GetLayer(unit);
-    return ResolveUpdateLaneLeader(laneIndex, *this, *laneEntry);
-  }
-
-  /**
-   * Address: 0x0059AE80 (FUN_0059AE80, Moho::CAiFormationInstance::Update)
-   *
-   * What it does:
-   * Refreshes any pending lane plan work, then walks both formation lane sets
-   * to resolve leaders, update per-unit lane metrics, and emit formation
-   * change events when a lane stays actionable.
-   */
-  void CAiFormationInstance::Update()
-  {
-    // 0x0059AE90..0x0059AEAF: the same lazy rebuild every other plan reader
-    // performs. The binary drops dead units *and* tears the current plan down
-    // through CleanupFormation before rebuilding; this call site previously
-    // ran only the RemoveDeadUnits half.
-    RefreshFormationPlanIfRequested(*this);
-
-    if (!CommandIsForm() || UnitCount() == 0) {
-      return;
-    }
-
-    if (mCommandType != EUnitCommandType::UNITCOMMAND_Guard) {
-      MergeOverlappingLaneBands(*this);
-    }
-
-    const int unitCount = UnitCount();
-    const bool overCapacity = mMaxUnitSlotCount > 0 && unitCount > mMaxUnitSlotCount;
-
-    for (std::int32_t laneIndex = 0; laneIndex < 2; ++laneIndex) {
-      SFormationLaneEntry* lane = mLanes[laneIndex].begin();
-      SFormationLaneEntry* const laneEnd = mLanes[laneIndex].end();
-      while (lane != laneEnd) {
-        lane->slotAvailable = 0u;
-        lane->applyDynamicOffset = 0u;
-
-        Unit* const leader = ResolveUpdateLaneLeader(laneIndex, *this, *lane);
-        if (leader == nullptr || leader->IsDead()) {
-          ++lane;
-          continue;
-        }
-
-        float leaderSpeedScale = 0.0f;
-        const float leaderSpeed = CalcFormationSpeed(leader, &leaderSpeedScale, lane);
-        lane->preferredSpeed = leaderSpeed;
-        lane->speedAnchor = leaderSpeedScale;
-
-        SCoordsVec2 laneTarget{};
-        if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
-          laneTarget.x = mFormationCenter.x;
-          laneTarget.z = mFormationCenter.z;
-        } else {
-          (void)Func9(&laneTarget, leader, lane);
-        }
-
-        SFormationLaneUnitMap& unitMap = lane->unitMap;
-        SFormationLaneUnitNode* const head = unitMap.head;
-        bool hasLiveUnit = false;
-        if (head != nullptr) {
-          SFormationLaneUnitNode* node = head->left;
-          while (node != nullptr && node != head && node->isNil == 0u) {
-            Unit* const unit = DecodeUnitOwnerSlotWord(node->linkedUnitOwnerWord);
-            if (unit != nullptr && !unit->IsDead() && !unit->DestroyQueued()) {
-              hasLiveUnit = true;
-
-              SCoordsVec2 desiredPos{};
-              if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
-                (void)GetFormationPosition(&desiredPos, unit, lane);
-              } else {
-                (void)Func9(&desiredPos, unit, lane);
-
-                if (Unit* const runtimeUnit = unit->IsUnit(); runtimeUnit != nullptr) {
-                  moho::IAiNavigator* const navigator = GetUnitNavigatorLane(runtimeUnit);
-                  if (navigator != nullptr && navigator->IsIgnoringFormation()) {
-                    SOCellPos adjustedCell{};
-                    (void)GetAdjustedFormationPosition(&adjustedCell, unit, lane);
-                    desiredPos.x = static_cast<float>(adjustedCell.x);
-                    desiredPos.z = static_cast<float>(adjustedCell.z);
-                  }
-                }
-              }
-
-              const Wm3::Vec3f& currentPos = unit->GetPosition();
-              const float dx = desiredPos.x - currentPos.x;
-              const float dz = desiredPos.z - currentPos.z;
-              const float targetDx = desiredPos.x - laneTarget.x;
-              const float targetDz = desiredPos.z - laneTarget.z;
-              float memberSpeedScale = 0.0f;
-
-              node->formationOffsetX = targetDx;
-              node->formationOffsetZ = targetDz;
-              node->formationVector.x = dx;
-              node->formationVector.y = 0.0f;
-              node->formationVector.z = dz;
-              node->formationWeight = std::sqrt((dx * dx) + (dz * dz));
-              node->speedBandLow = node->formationWeight;
-              node->speedBandMid = Func11(unit, lane);
-              node->speedBandHigh = CalcFormationSpeed(unit, &memberSpeedScale, lane);
-              node->leaderPriority = Func12(unit, lane);
-            }
-
-            node = NextLaneMapNodeInOrder(node, head);
-          }
-        }
-
-        if (hasLiveUnit && !overCapacity && leaderSpeed > 0.0f) {
-          lane->applyDynamicOffset = 1u;
-          lane->slotAvailable = 1u;
-          lane->dynamicOffset.x = laneTarget.x - mFormationCenter.x;
-          lane->dynamicOffset.z = laneTarget.z - mFormationCenter.z;
-          lane->overlapAnchor.x = std::fabs(lane->dynamicOffset.x);
-          lane->overlapAnchor.z = std::fabs(lane->dynamicOffset.z);
-          DispatchFormationUpdateEvent(1, mUnitLinkListHead);
-        }
-
-        ++lane;
-      }
-    }
   }
 
   /**
@@ -6819,61 +3739,45 @@ namespace moho
   }
 
   /**
-   * Address: 0x0056A4F0 (FUN_0056A4F0)
-   *
-   * float
+   * Address: 0x0056A4F0 (FUN_0056A4F0, Moho::CFormationInstance::SetScale)
    *
    * What it does:
-   * Updates formation scale and marks the plan for rebuild when value changed.
+   * Stores a changed scale (the `ucomiss`/`lahf` pair at 0x0056A4FE is a
+   * plain `!=`) and requests a plan rebuild.
    */
-  void CFormationInstance::Func22(const float scale)
+  void CFormationInstance::SetScale(const float scale)
   {
-    if (!BinaryFloatNotEqual(mFormationUpdateScale, scale)) {
-      return;
+    if (mScale != scale) {
+      mScale = scale;
+      mPlanUpdate = 1u;
     }
-
-    mFormationUpdateScale = scale;
-    mPlanUpdateRequested = 1;
   }
 
   /**
-   * Address: 0x0056A520 (FUN_0056A520)
-   *
-   * Wm3::Quaternion<float> const&
+   * Address: 0x0056A520 (FUN_0056A520, Moho::CFormationInstance::SetOrientation)
    *
    * What it does:
-   * Sets formation orientation, recomputes forward vector, and requests a plan rebuild.
+   * Stores a changed orientation, derives the forward vector from it (zero
+   * for a zero orientation or a plain `Move` command) and requests a plan
+   * rebuild.
    */
   void CFormationInstance::SetOrientation(const Wm3::Quatf& orientation)
   {
-    if (QuaternionEqualsExact(mOrientation, orientation)) {
+    if (orientation == mOrientation) {
       return;
     }
 
     mOrientation = orientation;
-    if (QuaternionEqualsExact(mOrientation, kZeroQuaternion) || mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
-      mForwardVector = kZeroForwardVector;
+    if (mOrientation == kZeroQuaternion || mCommandType == EUnitCommandType::UNITCOMMAND_Move) {
+      mForwardVector = Wm3::Vec3f::ZERO;
     } else {
-      const float x = mOrientation.x;
-      const float y = mOrientation.y;
-      const float z = mOrientation.z;
-      const float w = mOrientation.w;
-      // Third column of the rotation matrix, scalar-first: the y and z terms
-      // here were still the lane-rotated form (2(zw - xy), 1 - 2(y^2 + z^2)).
-      // Only x reads the same under both conventions, which is why it was
-      // easy to miss.
-      mForwardVector.x = ((x * z) + (w * y)) * 2.0f;
-      mForwardVector.y = ((y * z) - (w * x)) * 2.0f;
-      mForwardVector.z = 1.0f - (((x * x) + (y * y)) * 2.0f);
+      mForwardVector = ForwardOf(mOrientation);
     }
-
-    mPlanUpdateRequested = 1;
+    mPlanUpdate = 1u;
   }
 
   /**
    * Address: 0x0056A680 (FUN_0056A680)
-   *
-   * Wm3::Quaternion<float>*
    *
    * What it does:
    * Copies the current orientation into `outOrientation`.
@@ -6896,128 +3800,511 @@ namespace moho
   }
 
   /**
+   * Address: 0x0059A790 (FUN_0059A790, Moho::CAiFormationInstance::GetDistFromLeader)
+   *
+   * What it does:
+   * The unit's `SUnitOffsetInfo::mDistFromLeader` (node +0x38), zero when
+   * `info` is null or has no slot for the unit.
+   */
+  float CAiFormationInstance::GetDistFromLeader(Unit* const unit, SOffsetInfo* const info)
+  {
+    if (info == nullptr) {
+      return 0.0f;
+    }
+
+    const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(unit->GetEntityId());
+    return unitInfo != nullptr ? unitInfo->mDistFromLeader : 0.0f;
+  }
+
+  /**
+   * Address: 0x0059A7D0 (FUN_0059A7D0, Moho::CAiFormationInstance::GetPriority)
+   *
+   * What it does:
+   * Priority 1 for a unit that is guarding something, has no group or no
+   * slot, or a non-positive weight; otherwise `10 * (int)mWeight`, floored
+   * at 1.
+   */
+  std::int32_t CAiFormationInstance::GetPriority(Unit* const unit, SOffsetInfo* info)
+  {
+    Unit* const runtimeUnit = unit->IsUnit();
+    if (runtimeUnit == nullptr) {
+      return 1;
+    }
+    if (runtimeUnit->GuardedUnitRef.AsWeakPtr<Unit>().HasValue()) {
+      return 1;
+    }
+
+    if (info == nullptr) {
+      info = GetOffsetInfo(unit);
+      if (info == nullptr) {
+        return 1;
+      }
+    }
+
+    const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(unit->GetEntityId());
+    if (unitInfo == nullptr || unitInfo->mWeight <= 0.0f) {
+      return 1;
+    }
+
+    const std::int32_t priority = 10 * static_cast<std::int32_t>(unitInfo->mWeight);
+    return priority > 1 ? priority : 1;
+  }
+
+  /**
+   * Address: 0x0059A620 (FUN_0059A620, Moho::CAiFormationInstance::CalcFormationSpeed)
+   *
+   * What it does:
+   * For `Form*` commands only: zero when the unit's leader is neither placed
+   * nor mobile, when the unit's navigator ignores the formation, or when no
+   * group is given. Otherwise the group's `mSpeed`, with `*speedScaleOut`
+   * at 0.85 -- or, for a unit that follows its leader (or is the leader)
+   * once the group has a positive `mAvgDistToTarget`, a scale derived from
+   * how far the unit's `mDistToTarget` sits from that average (x4 on the
+   * ground, x1.5 in the air, clamped to [-5, 20], then `0.1 * delta + 1`).
+   */
+  float CAiFormationInstance::CalcFormationSpeed(
+    Unit* const unit,
+    float* const speedScaleOut,
+    SOffsetInfo* const info
+  )
+  {
+    if (!CommandIsForm()) {
+      return 0.0f;
+    }
+
+    Unit* const leader = GetLeader(unit, info);
+    if (leader != nullptr) {
+      if (!Contains(leader, false) && !leader->IsMobile()) {
+        return 0.0f;
+      }
+    }
+
+    if (unit->IsUnit()->AiNavigator->IsIgnoringFormation() || info == nullptr) {
+      return 0.0f;
+    }
+
+    *speedScaleOut = 0.85f;
+    const bool followsLeader = unit->IsUnit()->AiNavigator->FollowingLeader() || leader == unit;
+    if (info->mAvgDistToTarget > 0.0f && followsLeader) {
+      if (const SUnitOffsetInfo* const unitInfo = info->mUnitOffsets.try_get(unit->GetEntityId())) {
+        const float distFactor = (unit->GetBlueprint()->Air.CanFly != 0u) ? 1.5f : 4.0f;
+        float delta = (unitInfo->mDistToTarget - info->mAvgDistToTarget) * distFactor;
+        if (delta >= 20.0f) {
+          delta = 20.0f;
+        }
+        if (delta < -5.0f) {
+          delta = -5.0f;
+        }
+        *speedScaleOut = (delta * 0.1f) + 1.0f;
+      }
+    }
+
+    return info->mSpeed;
+  }
+
+  /**
+   * Address: 0x0059A870 (FUN_0059A870, Moho::CAiFormationInstance::GetLeader)
+   *
+   * What it does:
+   * For guard commands, the unit the queried unit is guarding. Otherwise
+   * null without a group or for a dead unit, else the group's leader --
+   * with an air group following the first overlapping ground group's
+   * leader instead (`ResolveGroupLeader`).
+   */
+  Unit* CAiFormationInstance::GetLeader(Unit* const unit, SOffsetInfo* const info)
+  {
+    if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard && unit->IsUnit() != nullptr) {
+      return unit->IsUnit()->GuardedUnitRef.ResolveObjectPtr<Unit>();
+    }
+
+    if (info == nullptr || unit->IsDead()) {
+      return nullptr;
+    }
+
+    return ResolveGroupLeader(*this, GetLayer(unit), *info);
+  }
+
+  /**
+   * Address: 0x0059AE80 (FUN_0059AE80, Moho::CAiFormationInstance::Update)
+   *
+   * What it does:
+   * Refreshes a pending plan, then for `Form*`/guard formations with units
+   * drives every group of both layers:
+   *  - resolves the group's driving leader (`GetOffsetInfoLeader`) and the
+   *    leader's goal: its own position (guard), the world position of its
+   *    formation cell (air), or its navigator's current target while it is
+   *    steering (ground) -- yielding a look-ahead vector from the leader
+   *    towards that goal, clamped to 20;
+   *  - measures how far the leader sits from its own formation cell, the
+   *    mean formation cell of the group's units and the largest leader-to-
+   *    unit distance;
+   *  - for every unit: a unit whose navigator ignores the formation only
+   *    gets its distance measured; a unit whose leader is within five cells
+   *    of its own slot (and not guarding) steers straight for the world
+   *    position of its formation cell; otherwise the slot offset is rotated
+   *    by a heading correction blended from the leader's heading error, and
+   *    the target is the leader's position plus that offset plus the
+   *    look-ahead, smoothed 1:9 into `mTargetPos`. Every unit's
+   *    `mDistToTarget` and `mDistFromLeader` are refreshed;
+   *  - stores the midpoint of the extreme unit distances as
+   *    `mAvgDistToTarget`;
+   *  - finally checks the group's arrival: a refueling unit vetoes it, each
+   *    unit that must be checked (every ground unit of a non-top-speed
+   *    group, else the leader alone) has to sit within the group's
+   *    threshold of its formation position and either have a busy follow-up
+   *    command queued or face along the formation forward vector; when the
+   *    check passes, `mInFormation` is raised and
+   *    `FORMATIONSTATUS_FormationAtGoal` broadcast.
+   */
+  void CAiFormationInstance::Update()
+  {
+    RefreshFormationPlanIfRequested(*this);
+
+    if (!CommandIsForm() || UnitCount() == 0) {
+      return;
+    }
+
+    const STIMap* const mapData = mSim->mMapData;
+    for (std::int32_t layer = 0; layer < kFormationLayerCount; ++layer) {
+      for (SOffsetInfo& group : mOffsetInfo[layer]) {
+        Unit* const leader = GetOffsetInfoLeader(layer, *this, group);
+        if (leader == nullptr) {
+          continue;
+        }
+
+        const std::size_t unitCount = group.mUnitOffsets.size();
+        group.mAvgDistToTarget = 0.0f;
+        if (unitCount == 0u) {
+          continue;
+        }
+
+        float minDistToTarget = mCommandType == EUnitCommandType::UNITCOMMAND_Guard
+          ? 0.0f
+          : std::numeric_limits<float>::infinity();
+        float maxDistToTarget = 0.0f;
+
+        // The leader's goal (0x0059AEF6-0x0059B033, air tail at 0x0059B5B7).
+        const RUnitBlueprint* const leaderBlueprint = leader->GetBlueprint();
+        Wm3::Vec3f leaderGoal = leader->GetPosition();
+        if (mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
+          leaderGoal = leader->GetPosition();
+        } else if (leaderBlueprint->Air.CanFly) {
+          SOCellPos leaderCell{};
+          GetAdjustedFormationPosition(&leaderCell, leader, &group);
+          leaderGoal = COORDS_ToWorldPos(
+            mapData,
+            leaderCell,
+            static_cast<ELayer>(leaderBlueprint->mFootprint.mOccupancyCaps),
+            leaderBlueprint->mFootprint.mSizeX,
+            leaderBlueprint->mFootprint.mSizeZ
+          );
+        } else if (leader->IsUnit()->AiNavigator->GetStatus() == AINAVSTATUS_Steering) {
+          leaderGoal = leader->IsUnit()->AiNavigator->GetCurrentTargetPos();
+        }
+
+        // Look-ahead from the leader towards its goal, at most 20 long.
+        const Wm3::Vec3f& leaderPos = leader->GetPosition();
+        Wm3::Vec3f lookAhead{leaderGoal.x - leaderPos.x, 0.0f, leaderGoal.z - leaderPos.z};
+        const float goalDistance = std::sqrt(lookAhead.z * lookAhead.z + lookAhead.x * lookAhead.x);
+        if (goalDistance > 0.0f) {
+          const float clamped = goalDistance < 20.0f ? goalDistance : 20.0f;
+          const float invDistance = 1.0f / goalDistance;
+          lookAhead = Wm3::Vec3f{
+            clamped * (lookAhead.x * invDistance), (invDistance * 0.0f) * clamped, (lookAhead.z * invDistance) * clamped
+          };
+        }
+
+        // How far the leader stands from its own formation cell, in cells.
+        const std::int16_t leaderOriginX = static_cast<std::int16_t>(
+          std::lrintf(leaderPos.x - static_cast<float>(leaderBlueprint->mFootprint.mSizeX) * 0.5f)
+        );
+        const std::int16_t leaderOriginZ = static_cast<std::int16_t>(
+          std::lrintf(leaderPos.z - static_cast<float>(leaderBlueprint->mFootprint.mSizeZ) * 0.5f)
+        );
+        SOCellPos leaderFormationCell{};
+        GetAdjustedFormationPosition(&leaderFormationCell, leader, &group);
+        const std::int16_t leaderCellDx = static_cast<std::int16_t>(leaderFormationCell.x - leaderOriginX);
+        const std::int16_t leaderCellDz = static_cast<std::int16_t>(leaderFormationCell.z - leaderOriginZ);
+
+        // Mean formation cell and the largest leader-to-unit distance.
+        float maxLeaderDistance = 0.001f;
+        SCoordsVec2 cellSum{0.0f, 0.0f};
+        for (auto& [entityId, unitInfo] : group.mUnitOffsets) {
+          Unit* const unit = UnitOf(unitInfo.mUnit);
+          if (unit == nullptr) {
+            continue;
+          }
+
+          const float leaderDistance = FlatDistance(unit->GetPosition(), leader->GetPosition());
+          if (leaderDistance > maxLeaderDistance) {
+            maxLeaderDistance = leaderDistance;
+          }
+
+          SOCellPos cell{};
+          GetAdjustedFormationPosition(&cell, unit, &group);
+          cellSum.x += static_cast<float>(cell.x);
+          cellSum.z += static_cast<float>(cell.z);
+        }
+        const float invUnitCount = 1.0f / static_cast<float>(static_cast<int>(unitCount));
+        cellSum.x = invUnitCount * cellSum.x;
+        cellSum.z = invUnitCount * cellSum.z;
+
+        SCoordsVec2 groupCenter = cellSum;
+        if (mCommandType != EUnitCommandType::UNITCOMMAND_Guard) {
+          GetOffsetPosition(&groupCenter, leader, &group);
+        }
+
+        // Per-unit targets and distances (0x0059B1DE-0x0059B5A3).
+        for (auto& [entityId, unitInfo] : group.mUnitOffsets) {
+          Unit* const unit = UnitOf(unitInfo.mUnit);
+          if (unit == nullptr) {
+            continue;
+          }
+
+          const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+          SCoordsVec2 target{};
+          if (unit->IsUnit()->AiNavigator->IsIgnoringFormation()) {
+            SCoordsVec2 formationPos{};
+            GetFormationPosition(&formationPos, unit, &group);
+            (void)mapData->mHeightField->GetElevation(formationPos.x, formationPos.z);
+            target = formationPos;
+          } else {
+            const float distToLeader = FlatDistance(unit->GetPosition(), leader->GetPosition());
+            const bool leaderOffSlot = std::sqrt(
+                                         static_cast<double>(leaderCellDx) * static_cast<double>(leaderCellDx)
+                                         + static_cast<double>(leaderCellDz) * static_cast<double>(leaderCellDz)
+                                       ) >= 5.0;
+            if (leaderOffSlot || mCommandType == EUnitCommandType::UNITCOMMAND_Guard) {
+              SCoordsVec2 offsetPos{};
+              GetOffsetPosition(&offsetPos, unit, &group);
+              Wm3::Vec3f relative{offsetPos.x - groupCenter.x, 0.0f, offsetPos.z - groupCenter.z};
+
+              float heading = 0.0f;
+              if (unitInfo.mHeadingAngle != std::numeric_limits<float>::infinity()) {
+                const float leaderHeading = HeadingOf(leader->GetTransform().orient_);
+                const float headingError = WrapAngle(leaderHeading - std::atan2(mForwardVector.x, mForwardVector.z));
+                const float blend = (distToLeader / maxLeaderDistance) * 0.050000001f + 0.94f;
+                heading = (1.0f - blend) * headingError + unitInfo.mHeadingAngle * blend;
+              }
+
+              const Wm3::Quatf correction = YawQuaternion(heading);
+              Wm3::Vec3f rotated{};
+              (void)MultQuadVec(&rotated, &relative, &correction);
+              relative = Wm3::Vec3f{rotated.x, 0.0f, rotated.z};
+
+              const Wm3::Vec3f& lp = leader->GetPosition();
+              const Wm3::Vec3f goal{
+                (lp.x + relative.x) + lookAhead.x, lp.y + lookAhead.y, (lp.z + relative.z) + lookAhead.z
+              };
+              target = SCoordsVec2{goal.x, goal.z};
+
+              if (unitInfo.mTargetPos != Wm3::Vec3f::ZERO) {
+                unitInfo.mTargetPos = Wm3::Vec3f{
+                  goal.x * 0.1f + unitInfo.mTargetPos.x * 0.89999998f,
+                  goal.y * 0.1f + unitInfo.mTargetPos.y * 0.89999998f,
+                  goal.z * 0.1f + unitInfo.mTargetPos.z * 0.89999998f,
+                };
+              } else {
+                unitInfo.mTargetPos = goal;
+              }
+              unitInfo.mHeadingAngle = heading;
+            } else {
+              SOCellPos cell{};
+              GetAdjustedFormationPosition(&cell, unit, &group);
+              const Wm3::Vec3f world = COORDS_ToWorldPos(
+                mapData,
+                cell,
+                static_cast<ELayer>(blueprint->mFootprint.mOccupancyCaps),
+                blueprint->mFootprint.mSizeX,
+                blueprint->mFootprint.mSizeZ
+              );
+              unitInfo.mTargetPos = world;
+              target = SCoordsVec2{world.x, world.z};
+              unitInfo.mHeadingAngle = std::numeric_limits<float>::infinity();
+            }
+          }
+
+          const Wm3::Vec3f& unitPos = unit->GetPosition();
+          const float distToTarget =
+            std::sqrt((unitPos.x - target.x) * (unitPos.x - target.x) + (unitPos.z - target.z) * (unitPos.z - target.z));
+          unitInfo.mDistToTarget = distToTarget;
+          if (distToTarget <= minDistToTarget) {
+            minDistToTarget = distToTarget;
+          }
+          if (distToTarget > maxDistToTarget) {
+            maxDistToTarget = distToTarget;
+          }
+
+          SCoordsVec2 offsetPos{};
+          GetOffsetPosition(&offsetPos, unit, &group);
+          const double dx = static_cast<double>(groupCenter.x) - static_cast<double>(offsetPos.x);
+          const double dz = static_cast<double>(groupCenter.z) - static_cast<double>(offsetPos.z);
+          unitInfo.mDistFromLeader = static_cast<float>(std::sqrt(dx * dx + dz * dz));
+        }
+
+        group.mAvgDistToTarget = (maxDistToTarget + minDistToTarget) * 0.5f;
+
+        // Arrival check (0x0059B5FD-0x0059B7A5).
+        Unit* const groupLeader = group.GetLeader();
+        const bool alwaysTopSpeed = groupLeader->IsUnit()->UnitMotion->mAlwaysUseTopSpeed;
+        float arrivalThreshold = static_cast<float>(mMaxSize) * 2.0f;
+        const float speedThreshold = group.mSpeed * (alwaysTopSpeed ? 0.67000002f : 0.25f);
+        if (speedThreshold > arrivalThreshold) {
+          arrivalThreshold = speedThreshold;
+        }
+
+        bool inFormation = true;
+        for (auto& [entityId, unitInfo] : group.mUnitOffsets) {
+          Unit* const unit = UnitOf(unitInfo.mUnit);
+          if (unit == nullptr) {
+            continue;
+          }
+
+          if (unit->IsUnitState(UNITSTATE_Refueling)) {
+            inFormation = false;
+            break;
+          }
+
+          if (!alwaysTopSpeed && (!CommandIsForm() || !unit->IsUnit()->mIsAir)) {
+            if (unit->IsUnit()->AiNavigator->IsIgnoringFormation()) {
+              continue;
+            }
+          } else if (groupLeader != unit) {
+            continue;
+          }
+
+          (void)unit->GetBlueprint();
+          SCoordsVec2 formationPos{};
+          GetFormationPosition(&formationPos, unit, &group);
+          (void)mapData->mHeightField->GetElevation(formationPos.x, formationPos.z);
+          const Wm3::Vec3f& unitPos = unit->GetPosition();
+          const float distance = std::sqrt(
+            (unitPos.z - formationPos.z) * (unitPos.z - formationPos.z)
+            + (unitPos.x - formationPos.x) * (unitPos.x - formationPos.x)
+          );
+          if (distance > arrivalThreshold) {
+            inFormation = false;
+            break;
+          }
+
+          const CUnitCommandQueue* const queue = unit->IsUnit()->CommandQueue;
+          const CUnitCommand* const nextCommand = queue->mCommandVec.size() >= 2u
+            ? queue->mCommandVec[1].GetObjectPtr()
+            : nullptr;
+          if (nextCommand != nullptr && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType)) {
+            continue;
+          }
+
+          if (mForwardVector != Wm3::Vec3f::ZERO) {
+            const Wm3::Quatf& q = unit->GetTransform().orient_;
+            const float facing = mForwardVector.z * (1.0f - (q.y * q.y + q.x * q.x) * 2.0f)
+              + mForwardVector.y * ((q.z * q.y - q.w * q.x) * 2.0f)
+              + ((q.w * q.y + q.z * q.x) * 2.0f) * mForwardVector.x;
+            if (facing < 0.94999999f) {
+              inFormation = false;
+              break;
+            }
+          }
+        }
+
+        if (inFormation) {
+          group.mInFormation = true;
+          mStatusListeners.BroadcastEvent(FORMATIONSTATUS_FormationAtGoal);
+        }
+      }
+    }
+  }
+
+  /**
    * Address: 0x0059AA20 (FUN_0059AA20, Moho::CAiFormationInstance::FindSlotFor)
    *
    * What it does:
-   * Finds one valid slot near `pos` (spiral search capped at 2000 probes),
-   * records it in `mOccupiedSlots`, and falls back to current unit position
-   * when no free slot can be found.
+   * Hands `pos` straight back for units that cannot take a grid slot (no
+   * runtime unit, dead, no command queue, guard formations, a scale below
+   * one, or the air layer). Otherwise reserves `pos` itself when it is free
+   * (`FormationSlotIsFree`), else the first free cell of an expanding
+   * square spiral around it (ring by ring, at most 2000 probes, each
+   * ring's inner rows sampled only at their two ends). When the spiral
+   * finds nothing, a busy follow-up command keeps `pos` (without reserving
+   * it), and anything else falls back to the unit's own position.
    */
   SCoordsVec2* CAiFormationInstance::FindSlotFor(SCoordsVec2* const dest, const SCoordsVec2* const pos, Unit* const unit)
   {
-    if (dest == nullptr || pos == nullptr || unit == nullptr) {
-      return dest;
-    }
-
     Unit* const runtimeUnit = unit->IsUnit();
-    const bool fallbackToInputPos = runtimeUnit == nullptr
-      || runtimeUnit->IsDead()
-      || runtimeUnit->CommandQueue == nullptr
-      || mCommandType == EUnitCommandType::UNITCOMMAND_Guard
-      || mFormationUpdateScale < 1.0f
-      || GetLayer(runtimeUnit) == kAirFormationLayer;
-    if (fallbackToInputPos) {
-      dest->x = pos->x;
-      dest->z = pos->z;
+    std::int32_t layer = 0;
+    if (runtimeUnit == nullptr || runtimeUnit->IsDead() || runtimeUnit->CommandQueue == nullptr
+        || mCommandType == EUnitCommandType::UNITCOMMAND_Guard || mScale < 1.0f
+        || (layer = GetLayer(unit)) == kAirFormationLayer) {
+      *dest = *pos;
       return dest;
     }
 
-    const RUnitBlueprint* const blueprint = runtimeUnit->GetBlueprint();
-    if (blueprint == nullptr || mSim == nullptr || mSim->mOGrid == nullptr || mSim->mMapData == nullptr) {
-      dest->x = pos->x;
-      dest->z = pos->z;
-      return dest;
-    }
+    const SFootprint footprint = unit->GetBlueprint()->mFootprint;
+    const std::int32_t maxSize = std::max<std::int32_t>(footprint.mSizeX, footprint.mSizeZ);
+    const bool useWholeMap = runtimeUnit->ArmyRef->UseWholeMap();
 
-    const SFootprint footprint = blueprint->mFootprint;
-    const std::int32_t footprintSize = std::max<int>(footprint.mSizeX, footprint.mSizeZ);
-    const std::int32_t laneToken = GetLayer(runtimeUnit);
-    const bool useWholeMap = (runtimeUnit->ArmyRef != nullptr) ? runtimeUnit->ArmyRef->UseWholeMap() : false;
-
-    auto reserveSlot = [this, footprintSize, laneToken](const SCoordsVec2& slotPos) {
-      SAssignedLocInfo slot{};
-      slot.position = slotPos;
-      slot.footprintSize = footprintSize;
-      slot.laneToken = laneToken;
-      mOccupiedSlots.push_back(slot);
-    };
-
-    if (CanPlaceFormationSlot(*this, *pos, footprint, footprintSize, useWholeMap, laneToken, runtimeUnit)) {
-      reserveSlot(*pos);
-      dest->x = pos->x;
-      dest->z = pos->z;
+    if (FormationSlotIsFree(*this, *pos, footprint, maxSize, useWholeMap, layer, runtimeUnit)) {
+      mSlots.push_back(SAssignedLocInfo(*pos, maxSize, layer));
+      *dest = *pos;
       return dest;
     }
 
     std::int32_t attempts = 0;
     for (std::int32_t radius = 1; attempts < 2000; ++radius) {
-      for (std::int32_t dx = -radius; dx <= radius && attempts < 2000; ++dx) {
-        const std::int32_t step = (dx == -radius || dx == radius) ? 1 : (radius * 2);
-        for (std::int32_t dz = -radius; dz <= radius && attempts < 2000; dz += step) {
+      for (std::int32_t dx = -radius; dx <= radius; ++dx) {
+        const std::int32_t step = (dx == -radius || dx == radius) ? 1 : radius * 2;
+        for (std::int32_t dz = -radius; dz <= radius; dz += step) {
           ++attempts;
-
-          SCoordsVec2 candidate{};
-          candidate.x = pos->x + static_cast<float>(dx);
-          candidate.z = pos->z + static_cast<float>(dz);
-          if (!CanPlaceFormationSlot(*this, candidate, footprint, footprintSize, useWholeMap, laneToken, runtimeUnit)) {
+          const SCoordsVec2 candidate{static_cast<float>(dx) + pos->x, static_cast<float>(dz) + pos->z};
+          if (!FormationSlotIsFree(*this, candidate, footprint, maxSize, useWholeMap, layer, runtimeUnit)) {
             continue;
           }
 
-          reserveSlot(candidate);
-          dest->x = candidate.x;
-          dest->z = candidate.z;
+          mSlots.push_back(SAssignedLocInfo(candidate, maxSize, layer));
+          *dest = candidate;
           return dest;
         }
       }
     }
 
-    if (CUnitCommand* const nextCommand = runtimeUnit->CommandQueue->GetNextCommand();
-        nextCommand != nullptr && IsBusyFormationQueueCommand(nextCommand->mVarDat.mCmdType)) {
-      reserveSlot(*pos);
-      dest->x = pos->x;
-      dest->z = pos->z;
+    if (const CUnitCommand* const nextCommand = runtimeUnit->CommandQueue->GetNextCommand();
+        nextCommand != nullptr && IsSpeedThroughBusyCommandType(nextCommand->mVarDat.mCmdType)) {
+      *dest = *pos;
       return dest;
     }
 
-    const Wm3::Vec3f& unitPos = runtimeUnit->GetPosition();
+    const Wm3::Vec3f& unitPos = unit->GetPosition();
     dest->x = unitPos.x;
     dest->z = unitPos.z;
     return dest;
   }
 
   /**
-   * Address: 0x0059A570 (FUN_0059A570)
-   *
-   * Moho::SCoordsVec2 const&, int, int
+   * Address: 0x0059A570 (FUN_0059A570, Moho::CAiFormationInstance::PosIsFree)
    *
    * What it does:
-   * Returns true when no occupied slot for `laneToken` overlaps `position` by `footprintSize`.
+   * True when no assigned slot of `layer` lies within `max(slot size, size)`
+   * of `position` on both axes.
    */
-  bool CAiFormationInstance::Func27(
+  bool CAiFormationInstance::PosIsFree(
     const SCoordsVec2& position,
-    const std::int32_t footprintSize,
-    const std::int32_t laneToken
+    const std::int32_t size,
+    const std::int32_t layer
   ) const
   {
-    const SAssignedLocInfo* slot = mOccupiedSlots.begin();
-    const SAssignedLocInfo* const slotEnd = mOccupiedSlots.end();
-    while (slot != slotEnd) {
-      std::int32_t slotLaneToken = 0;
-      (void)CopyOccupiedSlotLaneTokenLane(&slotLaneToken, slot);
-      if (slotLaneToken == laneToken) {
-        std::int32_t slotFootprintSize = 0;
-        (void)CopyOccupiedSlotFootprintSizeLane(&slotFootprintSize, slot);
-        const std::int32_t maxFootprint =
-          slotFootprintSize < footprintSize ? footprintSize : slotFootprintSize;
-        const float dx = std::fabs(position.x - slot->position.x);
-        if (dx < static_cast<float>(maxFootprint)) {
-          const float dz = std::fabs(position.z - slot->position.z);
-          if (dz < static_cast<float>(maxFootprint)) {
-            return false;
-          }
+    for (const SAssignedLocInfo& slot : mSlots) {
+      if (layer != slot.mLayer) {
+        continue;
+      }
+
+      const float dx = std::fabs(position.x - slot.mPos.x);
+      const std::int32_t spacing = slot.mSize < size ? size : slot.mSize;
+      if (static_cast<float>(spacing) > dx) {
+        const float dz = std::fabs(position.z - slot.mPos.z);
+        if (static_cast<float>(spacing) > dz) {
+          return false;
         }
       }
-      ++slot;
     }
 
     return true;

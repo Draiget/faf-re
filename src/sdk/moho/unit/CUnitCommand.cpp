@@ -1793,7 +1793,7 @@ CAiFormationInstance* CUnitCommand::InFormation(Unit* const unit, CUnitCommand* 
   }
 
   CAiFormationInstance* const formationInstance = command->mFormationInstance;
-  if (!formationInstance || !formationInstance->Func17(unit, true)) {
+  if (!formationInstance || !formationInstance->Contains(unit, true)) {
     return nullptr;
   }
 
@@ -1845,7 +1845,7 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
   }
 
   CAiFormationInstance* const formationInstance = command->mFormationInstance;
-  if (formationInstance && !formationInstance->Func17(unit, true) && !unit->IsDead() && !unit->DestroyQueued()) {
+  if (formationInstance && !formationInstance->Contains(unit, true) && !unit->IsDead() && !unit->DestroyQueued()) {
     formationInstance->AddUnit(unit);
     return;
   }
@@ -1901,7 +1901,7 @@ void CUnitCommand::Move(Unit* const unit, CUnitCommand* const command)
 
   AssignFormationInstanceRef(command->mFormationInstance, newFormation);
   if (command->mFormationInstance != nullptr) {
-    command->mFormationInstance->Func22(command->mConstDat.unk1);
+    command->mFormationInstance->SetScale(command->mConstDat.unk1);
   }
 }
 

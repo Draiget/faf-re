@@ -2102,6 +2102,11 @@ namespace moho
     CAniActor* AniActor;               // 0x0540
     class CAiAttackerImpl* AiAttacker; // 0x0544
     class IAiCommandDispatchImpl* AiCommandDispatch; // 0x0548
+    /// Address: 0x0059A420 (FUN_0059A420) -- the compiler's out-of-line
+    /// `IAiNavigator* <- AiNavigator` accessor emission for this field. It
+    /// has no caller in the shipped binary (every formation-side reader,
+    /// `CAiFormationInstance::CalcFormationSpeed`/`Update`, loads the field
+    /// inline), so it anchors on the field rather than on a function.
     IAiNavigator* AiNavigator;                       // 0x054C
     IAiSteering* AiSteering;                         // 0x0550
     IAiBuilder* AiBuilder;                           // 0x0554

@@ -342,7 +342,7 @@ namespace moho
     // formation still reports this unit as a member.
     if (CUnitCommand* const command = mCommandRef.GetObjectPtr(); command != nullptr) {
       CAiFormationInstance* const formation = command->mFormationInstance;
-      if (formation != nullptr && mUnit != nullptr && formation->Func17(mUnit, true) &&
+      if (formation != nullptr && mUnit != nullptr && formation->Contains(mUnit, true) &&
           command->mFormationInstance != nullptr) {
         Listener<EFormationdStatus>::mListenerLink.ListUnlink();
       }

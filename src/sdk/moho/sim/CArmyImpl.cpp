@@ -1402,10 +1402,7 @@ namespace moho
     , UnknownShared220{}
     , UnitCategorySets()
   {
-    PlatoonPool.platoons.start_ = PlatoonPool.platoons.inlineVec_;
-    PlatoonPool.platoons.end_ = PlatoonPool.platoons.inlineVec_;
-    PlatoonPool.platoons.capacity_ = PlatoonPool.platoons.inlineVec_ + 8;
-    PlatoonPool.platoons.originalVec_ = PlatoonPool.platoons.inlineVec_;
+    PlatoonPool.platoons.RebindInlineNoFree();
   }
 
   /**

@@ -197,6 +197,9 @@ namespace msvc8
          */
         [[nodiscard]] size_type count(const key_type& k) const { return tree_.count(k); }
 
+        /**
+         * Address: 0x0082CEA0 (FUN_0082CEA0, sub_82CEA0 -- the iterator-returning `lower_bound` wrapper over the `WeakEntitySetUserEntity` tree descent at 0x0082E560 (`LowerBoundWeakEntitySetNode`, CWldSession.cpp). Reached from sub_826140, sub_8281E0, sub_82BA20, sub_8B4300 and `cfunc_UserUnitHasUnloadCommandQueuedUpL` (0x008C2810).)
+         */
         [[nodiscard]] iterator lower_bound(const key_type& k) { return iterator(tree_.lower_bound_node(k)); }
         [[nodiscard]] const_iterator lower_bound(const key_type& k) const
         {
@@ -461,6 +464,8 @@ namespace msvc8
          * `CDecalManager::LoadDecalGroup`'s
          * `mDecalGroupLookupBySplatIndex[*group->GetIndex()] = group;`
          * (`CWldSplat.cpp`).
+         * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
+         * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
          */
         mapped_type& operator[](const key_type& k)
         {

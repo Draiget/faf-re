@@ -199,9 +199,8 @@ namespace gpg
    *
    * What it is:
    * Reflection/indexing adapter for `gpg::fastvector<Moho::SOffsetInfo>`.
-   * `Moho::SOffsetInfo` is the RTTI name for the formation lane entry (also
-   * aliased `moho::SFormationLaneEntry` in CAiFormationInstance.h); it is
-   * 0x4C bytes, so `GetCount` divides the byte span by 76.
+   * `Moho::SOffsetInfo` (CAiFormationInstance.h) is one formation group; it
+   * is 0x4C bytes, so `GetCount` divides the byte span by 76.
    */
   template <>
   class RFastVectorType<moho::SOffsetInfo> final : public gpg::RType, public gpg::RIndexed
@@ -259,9 +258,9 @@ namespace gpg
    *
    * What it is:
    * Reflection/indexing adapter for `gpg::fastvector<Moho::SAssignedLocInfo>`.
-   * The element (`SAssignedLocInfo`, aliased `moho::SFormationOccupiedSlot`)
-   * is a trivially-copyable 0x10-byte POD (2D position + footprint size +
-   * lane token), so `GetCount` divides the byte span by 16 with a shift.
+   * The element (`SAssignedLocInfo`, CAiFormationInstance.h) is a
+   * trivially-copyable 0x10-byte POD (2D position + footprint size + layer),
+   * so `GetCount` divides the byte span by 16 with a shift.
    */
   template <>
   class RFastVectorType<moho::SAssignedLocInfo> final : public gpg::RType, public gpg::RIndexed
@@ -2059,9 +2058,8 @@ void gpg::RFastVectorType<moho::UnitWeaponInfo>::SetCount(void* obj, const int c
 //
 // The SetCount/SerLoad/SerSave bodies live in CAiFormationInstance.cpp
 // (as `moho::SetFastVectorSOffsetInfoCount`/`moho::LoadFastVectorSOffsetInfo`/
-// `moho::SaveFastVectorSOffsetInfo`) because they need the lane-entry
-// default-prototype (sentinel-backed unit map + intrusive weak back-link) and
-// resize helpers that are file-local to that translation unit.
+// `moho::SaveFastVectorSOffsetInfo`) beside the `SOffsetInfo` element type
+// they resize and serialize.
 // ---------------------------------------------------------------------------
 
 namespace gpg

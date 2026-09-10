@@ -114,6 +114,19 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
+  /**
+   * Address: 0x00552C10 (FUN_00552C10, func_UnitStateIsBusy)
+   *
+   * What it does:
+   * True for the movement/engagement command families -- `Move`, `Attack`,
+   * `Patrol`, their `Form*` variants and `Guard` -- the commands that keep a
+   * unit's navigation busy. `Unit::MotionTick` treats two queued busy
+   * commands as a speed-through, and `CAiFormationInstance` (`FindSlotFor`,
+   * `Update`) treats a busy follow-up command as a reason to keep a unit's
+   * formation slot rather than snap it back to the unit's own position.
+   */
+  [[nodiscard]] bool IsSpeedThroughBusyCommandType(EUnitCommandType commandType) noexcept;
+
   class SSTICommandVariableDataSerializer : public gpg::SerHelperBase
   {
   public:

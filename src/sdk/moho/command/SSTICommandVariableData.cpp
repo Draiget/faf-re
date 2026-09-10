@@ -722,6 +722,32 @@ namespace moho
     GPG_ASSERT(type->serSaveFunc_ == nullptr);
     type->serSaveFunc_ = mSerSaveFunc;
   }
+
+  /**
+   * Address: 0x00552C10 (FUN_00552C10, func_UnitStateIsBusy)
+   *
+   * What it does:
+   * Returns whether `commandType` is one of the movement/engagement command
+   * families that keep a unit's navigation busy (see the header). Called
+   * out-of-line from `CAiFormationInstance::FindSlotFor` (0x0059AA20) and
+   * `Unit::MotionTick`, and inlined into `CAiFormationInstance::Update`
+   * (0x0059AE80, the seven-way command-type compare at 0x0059B3xx).
+   */
+  bool IsSpeedThroughBusyCommandType(const EUnitCommandType commandType) noexcept
+  {
+    switch (commandType) {
+      case EUnitCommandType::UNITCOMMAND_Move:
+      case EUnitCommandType::UNITCOMMAND_Attack:
+      case EUnitCommandType::UNITCOMMAND_Patrol:
+      case EUnitCommandType::UNITCOMMAND_FormMove:
+      case EUnitCommandType::UNITCOMMAND_FormAttack:
+      case EUnitCommandType::UNITCOMMAND_FormPatrol:
+      case EUnitCommandType::UNITCOMMAND_Guard:
+        return true;
+      default:
+        return false;
+    }
+  }
 } // namespace moho
 
 namespace
