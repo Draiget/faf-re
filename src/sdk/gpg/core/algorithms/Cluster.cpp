@@ -17,7 +17,6 @@
 #include "gpg/core/algorithms/AStarSearch.h"
 #include "gpg/core/algorithms/MD5.h"
 #include "gpg/core/containers/FastVector.h"
-#include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "legacy/containers/HashMap.h"
@@ -143,14 +142,9 @@ namespace
         return source;
     }
 
-    struct FastVectorShortRuntimeView
-    {
-        std::int16_t* start;        // +0x00
-        std::int16_t* end;          // +0x04
-        std::int16_t* capacity;     // +0x08
-        std::int16_t* inlineOrigin; // +0x0C
-    };
-    static_assert(sizeof(FastVectorShortRuntimeView) == 0x10, "FastVectorShortRuntimeView size must be 0x10");
+    // The cluster node scratch of `ClusterBuild`: `gpg::fastvector_n<Node, 16>`,
+    // one packed `x | (z << 8)` word per boundary node.
+    using ClusterNodeScratch = gpg::fastvector_n<std::int16_t, 16>;
 
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartBit = { 0u, 0u, 0u, 8u };
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartLayer = { 0u, 8u, 0u, 0u };
@@ -158,7 +152,7 @@ namespace
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeLayerStep = { 0u, 0u, 1u, 1u };
 
     void AppendPackedEdgeWord(
-      FastVectorShortRuntimeView& outEdges,
+      ClusterNodeScratch& outEdges,
       const std::uint8_t lowByte,
       const std::uint8_t highByte
     )
@@ -166,23 +160,9 @@ namespace
       const std::uint16_t packed = static_cast<std::uint16_t>(lowByte)
         | static_cast<std::uint16_t>(static_cast<std::uint16_t>(highByte) << 8u);
 
-      if (outEdges.end == outEdges.capacity) {
-        auto& insertView = reinterpret_cast<gpg::core::legacy::FastVectorInsertRuntimeView&>(outEdges);
-        const std::byte* const sourceBegin = reinterpret_cast<const std::byte*>(&packed);
-        const std::byte* const sourceEnd = sourceBegin + sizeof(packed);
-        (void)gpg::core::legacy::AppendRangeWordLane(
-          insertView,
-          reinterpret_cast<std::byte*>(outEdges.end),
-          sourceBegin,
-          sourceEnd
-        );
-        return;
-      }
-
-      if (outEdges.end != nullptr) {
-        *outEdges.end = static_cast<std::int16_t>(packed);
-      }
-      ++outEdges.end;
+      // `fastvector<Node>::push_back`; its grow arm is the `insert_range` at
+      // 0x0092D9B0 (cited on FastVector.h's `InsertAt`).
+      outEdges.push_back(static_cast<std::int16_t>(packed));
     }
 
     /**
@@ -196,7 +176,7 @@ namespace
      */
     std::int16_t* BuildOccupationEdgeContacts(
       const gpg::HaStar::OccupationData& occupationData,
-      FastVectorShortRuntimeView& outEdges
+      ClusterNodeScratch& outEdges
     )
     {
       for (std::uint32_t edgeIndex = 0; edgeIndex < 4u; ++edgeIndex) {
@@ -247,9 +227,9 @@ namespace
         }
       }
 
-      std::sort(outEdges.start, outEdges.end);
-      outEdges.end = std::unique(outEdges.start, outEdges.end);
-      return outEdges.end;
+      std::sort(outEdges.begin(), outEdges.end());
+      outEdges.erase(std::unique(outEdges.begin(), outEdges.end()), outEdges.end());
+      return outEdges.end();
     }
 
     struct TripleWordValueRuntime
@@ -4016,12 +3996,11 @@ namespace
      */
     void BuildClusterEdgeCosts(
       const gpg::HaStar::OccupationData& occupation,
-      const FastVectorShortRuntimeView& nodes,
+      const ClusterNodeScratch& nodes,
       InlineBackedByteVectorRuntime& outEdges
     )
     {
-      const std::uint32_t nodeCount =
-        static_cast<std::uint32_t>(nodes.end - nodes.start);
+      const std::uint32_t nodeCount = static_cast<std::uint32_t>(nodes.Size());
 
       if (nodeCount < 2u) {
         // No pairs: drop any heap storage and reset the edge vector to empty.
@@ -4049,7 +4028,7 @@ namespace
       for (auto& cell : grid) {
         (void)InitializePathSearchFrontierNode(&cell);
       }
-      const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(nodes.start);
+      const auto* const nodeBytes = reinterpret_cast<const std::uint8_t*>(nodes.begin());
       // Occupation rows are a uint16 bitmask grid: row r's passability mask is
       // the 16-bit word at byte offset r*2 (the binary reads word ptr[a1 + r*2]).
       const std::uint16_t* const layerRows = occupation.mRows;
@@ -4167,8 +4146,8 @@ namespace
      * `nnodes_used == ioNodes.size()` and
      * `ioEdges.size() == TriangularSize(nnodes_used)`.
      */
-    void EraseUnconnectedNodes(
-      FastVectorShortRuntimeView& ioNodes,
+    void DropUnreachedClusterNodes(
+      ClusterNodeScratch& ioNodes,
       InlineBackedByteVectorRuntime& ioEdges
     )
     {
@@ -4189,8 +4168,7 @@ namespace
       reachable.capacityEnd = scratch.capacitySentinel;
       reachable.inlineOrigin = scratch.inlineVec;
 
-      const std::uint32_t nodeCount =
-        static_cast<std::uint32_t>(ioNodes.end - ioNodes.start);
+      const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
       const char clearFlag = 0;
       FastVectorN12CharResize(reachable, nodeCount, &clearFlag);
 
@@ -4217,7 +4195,7 @@ namespace
         // Compact both arrays, keeping only reached nodes and their pairwise
         // edges (writing the surviving triangular matrix row by row).
         auto* edgeWrite = edgeBytes;
-        auto* nodeWrite = ioNodes.start;
+        auto* nodeWrite = ioNodes.begin();
 
         for (std::uint32_t high = 0u; high < nodeCount; ++high) {
           if (reachable.start[high] == 0) {
@@ -4232,18 +4210,16 @@ namespace
               }
             }
           }
-          *nodeWrite = ioNodes.start[high];
+          *nodeWrite = ioNodes[high];
           ++nodeWrite;
         }
 
-        if (nodeWrite != ioNodes.end) {
-          ioNodes.end = nodeWrite;
-        }
+        ioNodes.erase(nodeWrite, ioNodes.end());
         if (edgeWrite != ioEdges.mEnd) {
           ioEdges.mEnd = edgeWrite;
         }
 
-        if (reachedCount != static_cast<std::int32_t>(ioNodes.end - ioNodes.start)) {
+        if (reachedCount != static_cast<std::int32_t>(ioNodes.Size())) {
           gpg::HandleAssertFailure(
             "nnodes_used == ioNodes.size()",
             168,
@@ -4521,14 +4497,7 @@ unsigned int hash_value(const Cluster& cluster)
 Cluster ClusterBuild(const OccupationData& occupationData)
 {
     // Node scratch: fastvector<Node> with a 32-byte (16-node) inline buffer.
-    // The capacity cursor is one past the inline buffer, matching the binary's
-    // stack layout where `capacity` points just past the 32-byte region.
-    std::int16_t nodeInline[16] = {};
-    FastVectorShortRuntimeView nodeView{};
-    nodeView.start = nodeInline;
-    nodeView.end = nodeInline;
-    nodeView.capacity = nodeInline + 16;
-    nodeView.inlineOrigin = nodeInline;
+    ClusterNodeScratch nodeView;
 
     // Edge scratch: fastvector<Edge> with a 120-byte inline buffer.
     std::uint8_t edgeInline[120] = {};
@@ -4540,23 +4509,21 @@ Cluster ClusterBuild(const OccupationData& occupationData)
 
     (void)BuildOccupationEdgeContacts(occupationData, nodeView);
     BuildClusterEdgeCosts(occupationData, nodeView, edgeView);
-    EraseUnconnectedNodes(nodeView, edgeView);
+    DropUnreachedClusterNodes(nodeView, edgeView);
 
     Cluster cluster{};
     cluster.mData = &Cluster::sDefaultConstructData;
     ++Cluster::sDefaultConstructData.mRefs;
     cluster.SetData(
-        reinterpret_cast<const Cluster::Node*>(nodeView.start),
+        reinterpret_cast<const Cluster::Node*>(nodeView.begin()),
         reinterpret_cast<const Cluster::Edge*>(edgeView.mBegin),
-        static_cast<unsigned int>(nodeView.end - nodeView.start)
+        static_cast<unsigned int>(nodeView.Size())
     );
 
-    // Release scratch heap storage (edges first, then nodes) if either spilled.
+    // Release the edge scratch's heap storage if it spilled; the node scratch
+    // is a real fastvector_n and frees its own.
     if (edgeView.mBegin != edgeInline) {
         ::operator delete[](edgeView.mBegin);
-    }
-    if (nodeView.start != nodeInline) {
-        ::operator delete[](nodeView.start);
     }
 
     return cluster;

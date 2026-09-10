@@ -16,7 +16,6 @@
 #include <string>
 #include <typeinfo>
 
-#include "gpg/core/containers/FastVectorInsertLanes.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
@@ -1493,43 +1492,16 @@ namespace moho
      * with one indirect load rather than recomputing it. `mInline[1]` is
      * reserved storage the constructor deliberately keeps outside the capacity.
      */
-    struct CommandGraphDwordLane
-    {
-      std::uint32_t* mBegin;        // +0x00
-      std::uint32_t* mEnd;          // +0x04
-      std::uint32_t* mCapacity;     // +0x08
-      std::uint32_t* mInlineOrigin; // +0x0C
-      std::uint32_t mInline[2];     // +0x10
+    struct CommandGraphEdge;
 
-      void ReleaseToInline() noexcept
-      {
-        if (mBegin != mInlineOrigin) {
-          ::operator delete[](mBegin);
-          mBegin = mInlineOrigin;
-          mCapacity = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*mInlineOrigin));
-        }
-        mEnd = mBegin;
-      }
-
-      [[nodiscard]] std::int32_t size() const noexcept
-      {
-        return static_cast<std::int32_t>(mEnd - mBegin);
-      }
-
-      [[nodiscard]] bool empty() const noexcept { return mEnd == mBegin; }
-
-      /**
-       * Every lane in this class stores pointers, so the raw dword element is
-       * always read back as one. The cast lives here rather than at the call
-       * sites: the lane's storage is dword-shaped because that is the binary's
-       * `gpg::fastvector` instantiation, not because callers think in dwords.
-       */
-      template <typename T>
-      [[nodiscard]] T* At(const std::int32_t index) const noexcept
-      {
-        return reinterpret_cast<T*>(static_cast<std::uintptr_t>(mBegin[index]));
-      }
-    };
+    /**
+     * The two per-node edge lists (`mLaneA`: edges arriving here, `mLaneB`:
+     * edges leaving here) are `gpg::fastvector_n<CommandGraphEdge*, 2>`: the
+     * 0x10 header plus two inline slots the binary's node layout carries at
+     * +0x48 and +0x60. Growth, copy and release go through the template
+     * (`push_back`, the copy constructor, `ResetStorageToInline`).
+     */
+    using CommandGraphDwordLane = gpg::fastvector_n<CommandGraphEdge*, 2>;
 
     /**
      * Payload of one command-graph hash node — the drawable record for a single
@@ -4551,8 +4523,8 @@ namespace moho
    */
   UICommandGraph::UICommandGraphDrawNode::~UICommandGraphDrawNode()
   {
-    mLaneB.ReleaseToInline();
-    mLaneA.ReleaseToInline();
+    mLaneB.ResetStorageToInline();
+    mLaneA.ResetStorageToInline();
 
     mMeshInstance.release();
 
@@ -4751,17 +4723,10 @@ namespace moho
     destination->mUnitCountScale = source.mUnitCountScale;
     destination->mCompletionTick = source.mCompletionTick;
 
-    const auto relocateLane = [](CommandGraphDwordLane& dstLane, const CommandGraphDwordLane& srcLane) {
-      const gpg::core::legacy::FastVectorInsertRuntimeView sourceView{
-        reinterpret_cast<std::byte*>(srcLane.mBegin), reinterpret_cast<std::byte*>(srcLane.mEnd),
-        reinterpret_cast<std::byte*>(srcLane.mCapacity), reinterpret_cast<std::byte*>(srcLane.mInlineOrigin)
-      };
-      (void)gpg::core::legacy::InitializeDwordInlineScratchFromView(
-        reinterpret_cast<gpg::core::legacy::DwordVectorInlineScratch*>(&dstLane), sourceView
-      );
-    };
-    relocateLane(destination->mLaneA, source.mLaneA);
-    relocateLane(destination->mLaneB, source.mLaneB);
+    // The two lane copies: `fastvector_n<CommandGraphEdge*, 2>`'s copy constructor
+    // (0x0082E5E0, cited on FastVector.h) into the raw destination slots.
+    ::new (static_cast<void*>(&destination->mLaneA)) CommandGraphDwordLane(source.mLaneA);
+    ::new (static_cast<void*>(&destination->mLaneB)) CommandGraphDwordLane(source.mLaneB);
 
     return destination;
   }
@@ -6380,9 +6345,9 @@ namespace moho
     drawNode.mCompletionTick = static_cast<std::uint32_t>(mSession->mGameTick);
 
     std::uint32_t startTick = static_cast<std::uint32_t>(mSession->mGameTick);
-    const std::int32_t incomingCount = drawNode.mLaneA.size();
+    const std::int32_t incomingCount = static_cast<std::int32_t>(drawNode.mLaneA.Size());
     for (std::int32_t index = 0; index < incomingCount; ++index) {
-      auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+      auto* const edge = drawNode.mLaneA[static_cast<std::size_t>(index)];
       UICommandGraphDrawNode* const predecessor = edge->mFromNode;
       if (predecessor != nullptr) {
         ResolveDrawNodeCompletionTick(*predecessor);
@@ -6432,16 +6397,16 @@ namespace moho
     // Draw nodes survive a rebuild; only the edge lanes they own are dropped,
     // back to inline storage so the common single-edge case never re-allocates.
     for (HashListNode88* node = mMapAB0.mListHead->mNext; node != mMapAB0.mListHead; node = node->mNext) {
-      node->mDraw.mLaneA.ReleaseToInline();
-      node->mDraw.mLaneB.ReleaseToInline();
+      node->mDraw.mLaneA.ResetStorageToInline();
+      node->mDraw.mLaneB.ResetStorageToInline();
     }
 
     // Queue-head nodes additionally lose their accumulated centroid: the
     // rebuild re-adds one weighted position per unit sharing the queue, so
     // leaving the old sum in place would double-count every frame.
     for (HashListNode88* node = mMapAB1.mListHead->mNext; node != mMapAB1.mListHead; node = node->mNext) {
-      node->mDraw.mLaneA.ReleaseToInline();
-      node->mDraw.mLaneB.ReleaseToInline();
+      node->mDraw.mLaneA.ResetStorageToInline();
+      node->mDraw.mLaneB.ResetStorageToInline();
       node->mDraw.mPositionSum = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
       node->mDraw.mWeight = 0.0f;
     }
@@ -6519,10 +6484,10 @@ namespace moho
     // endpoint is each edge's `mFromNode` and the direction points inbound.
     DrawNodeOrientationAccumulator laneA{};
     {
-      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneA.size());
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneA.Size());
       const float laneSpan = static_cast<float>(count) - 1.0f;
       for (std::int32_t index = 0; index < count; ++index) {
-        auto* const edge = drawNode.mLaneA.At<CommandGraphEdge>(index);
+        auto* const edge = drawNode.mLaneA[static_cast<std::size_t>(index)];
         const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mFromNode);
 
         float dx = centroid.x - farCentroid.x;
@@ -6555,10 +6520,10 @@ namespace moho
     // edge's `mToNode` and the direction points outbound.
     DrawNodeOrientationAccumulator laneB{};
     {
-      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneB.size());
+      const std::int32_t count = static_cast<std::int32_t>(drawNode.mLaneB.Size());
       const float laneSpan = static_cast<float>(count) - 1.0f;
       for (std::int32_t index = 0; index < count; ++index) {
-        auto* const edge = drawNode.mLaneB.At<CommandGraphEdge>(index);
+        auto* const edge = drawNode.mLaneB[static_cast<std::size_t>(index)];
         const Wm3::Vector3f farCentroid = DrawNodeCentroid(*edge->mToNode);
 
         float dx = farCentroid.x - centroid.x;
@@ -14941,16 +14906,9 @@ namespace moho
       edge->mFromNode = &fromNode;
       edge->mToNode = &toNode;
 
-      const auto appendToLane = [](UICommandGraph::CommandGraphDwordLane& lane, const void* const value) {
-        const auto rawValue = reinterpret_cast<std::uintptr_t>(value);
-        gpg::core::legacy::PushBackDwordElementLaneRaw(
-          reinterpret_cast<std::byte*&>(lane.mBegin), reinterpret_cast<std::byte*&>(lane.mEnd),
-          reinterpret_cast<std::byte*&>(lane.mCapacity), reinterpret_cast<std::byte*>(lane.mInlineOrigin),
-          reinterpret_cast<const std::byte*>(&rawValue)
-        );
-      };
-      appendToLane(fromNode.mLaneB, edge);
-      appendToLane(toNode.mLaneA, edge);
+      // `fastvector_n<CommandGraphEdge*, 2>::push_back` on both endpoints.
+      fromNode.mLaneB.push_back(edge);
+      toNode.mLaneA.push_back(edge);
 
       auto* const helper = reinterpret_cast<UserCommandIssueHelper*>(toNode.mHelperLink.mHead);
       const auto commandType = ResolveCommandIssueHelperCommandType(*helper);

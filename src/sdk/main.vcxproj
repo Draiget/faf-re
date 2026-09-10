@@ -387,7 +387,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\core\containers\FastVectorEntIdReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorIFormationInstanceReflection.cpp" />
     <ClCompile Include="gpg\core\containers\FastVectorSOCellPosReflection.cpp" />
-    <ClCompile Include="gpg\core\containers\FastVectorInsertLanes.cpp" />
     <ClCompile Include="moho\misc\ThreadSafeCountedObjectTypeInfo.cpp" />
     <ClCompile Include="moho\misc\CVirtualFileSystem.cpp" />
     <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp" />
@@ -1507,7 +1506,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\core\containers\FastVectorEntIdReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorIFormationInstanceReflection.h" />
     <ClInclude Include="gpg\core\containers\FastVectorSOCellPosReflection.h" />
-    <ClInclude Include="gpg\core\containers\FastVectorInsertLanes.h" />
     <ClInclude Include="moho\serialization\PrefetchHandleBaseVectorReflection.h" />
     <ClInclude Include="moho\serialization\CPrefetchSet.h" />
     <ClInclude Include="moho\serialization\CPrefetchSetSerializer.h" />
