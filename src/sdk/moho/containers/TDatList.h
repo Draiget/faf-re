@@ -97,6 +97,14 @@ namespace moho
      * Unlinks this node from its current ring and resets it to singleton state.
      * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils: unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7340 (FUN_005A7340 -- an iterator over that ring, stored through a caller slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7370 (FUN_005A7370 -- that iterator read back out of its slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `LoadNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A75C0 (FUN_005A75C0 -- `mNext` stored through the caller's cursor slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A10 (FUN_005A7A10 -- a second emission of that `mNext` store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A20 (FUN_005A7A20 -- a second emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` -- step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AF0 (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      */
     item_t* ListUnlink() noexcept
     {
@@ -186,6 +194,8 @@ namespace moho
      * What it does:
      * Unlinks this node from its current ring and returns this node after
      * restoring singleton self-links.
+     * Address: 0x005A7690 (FUN_005A7690 -- `ListUnlinkSelf` -- neighbours adopt each other, then self-link, handing this node back for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNode` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A90 (FUN_005A7A90 -- a second emission of that unlink for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNodeAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      */
     item_t* ListUnlinkSelf() noexcept
     {
