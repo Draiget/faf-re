@@ -11412,6 +11412,10 @@ namespace msvc8
             return *this;
         }
 
+        /**
+         * Address: 0x007020B0 (FUN_007020B0 -- `~list()` -- `_Tidy` then free the header sentinel for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); zero callers, unreachable; formerly `ReleaseArmyTriggerListStorage` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x007015C0 (FUN_007015C0 -- a second emission of `~list()`; this is `mTriggers`' member destructor, reached from `~CArmyStats` 0x00704A40 for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x0070BEA0; formerly `CArmyStats::DestroyAuxList` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
+         */
         ~list()
         {
             _Tidy();
@@ -11530,6 +11534,7 @@ namespace msvc8
          * Address: 0x004E3410 (FUN_004E3410 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DF0E0, 0x004DFC80, 0x004E2630; formerly `ClearSndVarListStorage` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004E4A40 (FUN_004E4A40 -- the payload destructor pass a `clear()` runs over the range before freeing the nodes for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004DF0E0; formerly `DestroyCSndVarPayloadRange` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x005AAF60 (FUN_005AAF60 -- `clear()` / `_Tidy` -- relink the header, zero the size, then free the nodes for `msvc8::list<gpg::Rect2i>` (the reflected path-finder rect list; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x005AA000, 0x005AA310, 0x005AA576; formerly `ClearRect2iListStorage` in moho/ai/CAiPathFinderTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00702BB0 (FUN_00702BB0 -- `clear()` / `_Tidy` -- relink the header, zero the size, then walk the former payload nodes releasing each `shared_ptr`'s control block and freeing the node for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x007015C0, 0x007020B0, 0x00704A40; formerly `CArmyStats::ClearTriggerList` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          */
         void clear()
         {
@@ -11786,6 +11791,7 @@ namespace msvc8
          * Address: 0x004E25E0 (FUN_004E25E0 -- `erase(pos)` -- unlink, free, decrement, hand back the successor for an `msvc8::list` over a 0x0C `{next, prev, value}` node with the 0x0C `{proxy, head, size}` head; callers 0x004E5960; formerly `UnlinkAndDeleteSndVarListNode` in moho/audio/CSndVar.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00685950 (FUN_00685950 -- `erase(pos)` over the back-reference list, patching the back pointer and exporting the successor for the entity-db intrusive lists (an 8-byte `{next, prev}` node behind a 0x0C `{proxy, head, size}` head); zero callers, unreachable; formerly `EraseBackRefListNodeAndStoreNext` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00776C30 (FUN_00776C30 -- `remove(value)` -- `erase(pos)` run over every node whose value matches, rewiring the neighbours and dropping the size for `msvc8::list<moho::Shield*>` (`Sim::mShields`; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007762BD, 0x00776600; formerly `UnlinkShieldListNodesByValue` in moho/entity/Shield.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x0070E460 (FUN_0070E460 -- `erase(pos)` -- unlink, free, decrement, hand back the successor. Reached from `CArmyStats::RemoveArmyStatsTrigger` for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x0070BE50, 0x0070BEA0; formerly `EraseTriggerListNodeAndAdvance` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          */
         iterator erase(const_iterator pos)
         {
@@ -11958,6 +11964,7 @@ namespace msvc8
          * Address: 0x0052CB30 (FUN_0052CB30 -- `_Buy_head()` -- the self-linked sentinel for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); callers 0x00529120, 0x00529550, 0x0052BAC0; formerly `AllocateSelfLinkedSRuleFootprintSentinelNode` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00529550 (FUN_00529550 -- the list constructor that buys it for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `InitializeSRuleFootprintsBlueprintList` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0081B790 (FUN_0081B790 -- `_Buy_head` -- allocate the 0x0C header sentinel and self-link its links for `msvc8::list<moho::VisionDB::Pool::PooledNode*>` (`VisionDB::Pool::mEntryBlocks` at +0x04 and `mFreeEntries` at +0x10; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x0081ACA0, 0x0081B5E0; formerly `VisionDbAllocateSelfLinkedListSentinel12` in moho/vision/VisionDB.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00702090 (FUN_00702090 -- `_Buy_head` -- allocate the 0x10 header sentinel and self-link its links for `msvc8::list<boost::shared_ptr<moho::STrigger>>` (`CArmyStats::mTriggers` at +0x20; head `{proxy, head, size}` 0x0C, node `{next, prev, shared_ptr}` 0x10); callers 0x006FD7C0, 0x007015A0, 0x0070BEA0; formerly `AllocateSelfLinkedArmyTriggerSentinel` in moho/sim/CArmyStats.cpp (RULE ONE), removed 2026-09-11.)
          */
         void _Buy_head()
         {
