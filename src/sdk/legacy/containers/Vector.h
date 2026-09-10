@@ -2989,6 +2989,8 @@ namespace msvc8
          * Address: 0x00507F40 (FUN_00507F40 -- `resize(n)` (value-initialised fill) for `moho::SDelayedSubVizInfo`, a register-order adapter over 0x005083C0; zero callers, unreachable. Formerly `ResizeDelayedSubVizVectorWithDefaultFill` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          * Address: 0x0067DAA0 (FUN_0067DAA0 -- `vector<T>::resize(n)` for a 4-byte pointer / id element (zero-fills the appended tail); callers 0x0067C250, 0x0067CAA0; formerly `ResizePointerVectorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0067CAA0 (FUN_0067CAA0 -- the `jmp` thunk into `vector<T>::resize(n)` for the 4-byte pointer / id element; zero callers, unreachable; formerly `ResizePointerVectorRuntimeThunk` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054CA40 (FUN_0054CA40 -- `resize(n)` -- shrink destroys the tail and rebases `mLast`, grow value-initialises for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); callers 0x0054A0A0, 0x0054A390, 0x0054C080; formerly `ResizeAniSkelBoneVector` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054C080 (FUN_0054C080 -- the register-shape adapter over that same `resize(n)` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResizeAniSkelBoneVectorRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3208,6 +3210,8 @@ namespace msvc8
          * Address: 0x00719820 (FUN_00719820 -- `resize(n, SThreat{})` for the 0x38-byte `moho::SThreat`; callers 0x007192E0; formerly `ResizeSThreatVectorWithZeroFill` in moho/sim/CInfluenceMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008A8430 (FUN_008A8430 -- `resize(n, value)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); callers 0x008A54D0, 0x008A7C20; formerly `ResizeNormalMapHandleStorage` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008A7C20 (FUN_008A7C20 -- `resize(n, value)` for the terrain normal-map handle vector (`boost::shared_ptr<CD3DDynamicTextureSheet>` elements); zero callers, unreachable; formerly `ResizeNormalMapHandleStorage` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054C190 (FUN_0054C190 -- the default-filled form of that same `resize(n, value)` for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); zero callers, unreachable; formerly `ResizeAniSkelBoneNameIndexVectorWithDefaultFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054CB80 (FUN_0054CB80 -- `resize(n, value)` -- the shrink is a bare `mLast` rebase because the element is trivially destructible for `msvc8::vector<moho::SAniSkelBoneNameIndex>` (`CAniSkel::mBoneNameToIndex`); callers 0x0054A0A0, 0x0054A390, 0x0054C190; formerly `ResizeAniSkelBoneNameIndexVectorWithFill` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          */
         void resize(std::size_t newSize, const T& value) {
             const std::size_t cur = size();
@@ -3341,6 +3345,9 @@ namespace msvc8
          * Address: 0x00478830 (FUN_00478830 -- `_Tidy` for the 0x18-byte `moho::CHeightFieldTier` (each element owns a min/max grid and a height-word grid) (`~CHeightField` runs it before the member destructor); zero callers, unreachable; formerly `ReleaseHeightFieldTierVectorStorage` in moho/sim/STIMap.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008FA920 (FUN_008FA920 -- `~vector` / `tidy` -- destroy the range, free the block, null the triple for `msvc8::vector<gpg::gal::AdapterD3D10>` (`BackendD3D10::adapters_`); callers 0x008FAA40, 0x00900450; formerly `DestroyDeviceAdapterStorage` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008FAA40 (FUN_008FAA40 -- the one-jump thunk into that same `~vector` / `tidy` for `msvc8::vector<gpg::gal::AdapterD3D10>`; callers 0x008FE5D0, 0x00900450; formerly `DestroyDeviceAdapterStorageThunk` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054CB30 (FUN_0054CB30 -- `tidy()` -- free the block and null the triple for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneA` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054CC40 (FUN_0054CC40 -- a second emission of that `tidy()` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneB` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054CD70 (FUN_0054CD70 -- a third emission of that `tidy()` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `ResetHeapBackedRangeHandleLaneC` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -7878,6 +7885,7 @@ namespace msvc8
          * Address: 0x0093FBC0 (FUN_0093FBC0 -- a fourth emission of `uninit_copy_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); zero callers, unreachable; formerly `UninitializedCopyEffectMacroRangeDispatchB` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0093FC90 (FUN_0093FC90 -- a fifth emission of `uninit_copy_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); zero callers, unreachable; formerly `UninitializedCopyEffectMacroRangeDispatchC` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0093FE80 (FUN_0093FE80 -- a sixth emission of `uninit_copy_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); callers 0x0093FEB0; formerly `UninitializedCopyEffectMacroRangeDispatchD` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054D050 (FUN_0054D050 -- the tail copy `uninit_copy_n` performs during a grow, writing the new end back into the head for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `CopyAniSkelBoneTailAndStoreDestinationBegin` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8971,6 +8979,8 @@ namespace msvc8
          * Address: 0x0093FA10 (FUN_0093FA10 -- `uninit_fill_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); callers 0x0093FB50, 0x0093FC50, 0x00940230; formerly `UninitializedFillEffectMacroRangeCore` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0093FC50 (FUN_0093FC50 -- a second emission of `uninit_fill_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); callers 0x0093FEB0; formerly `UninitializedFillEffectMacroRangeDispatchA` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0093FB50 (FUN_0093FB50 -- a third emission of `uninit_fill_n` for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContextRuntime::lane54` at +0x54; the 0x10 `{proxy, first, last, end}` head); zero callers, unreachable; formerly `UninitializedFillEffectMacroRangeDispatchB` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054E070 (FUN_0054E070 -- `uninit_fill_n` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); callers 0x0054D090; formerly `FillAniSkelBoneRangeFromSingleNonNull` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0054E2D0 (FUN_0054E2D0 -- the register-shape adapter over `uninit_fill_n` for `msvc8::vector<moho::SAniSkelBone>` (`CAniSkel::mBones`); zero callers, unreachable; formerly `FillAniSkelBoneRangeRegisterAdapter` in moho/animation/CAniSkel.cpp (RULE ONE), removed 2026-09-10.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
