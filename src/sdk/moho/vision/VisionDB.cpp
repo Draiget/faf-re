@@ -10,80 +10,6 @@ using namespace moho;
 
 namespace
 {
-  /**
-   * Address: 0x006610E0 (FUN_006610E0, nullsub_3)
-   *
-   * What it does:
-   * Preserves one legacy list-node callback lane used by VisionDB pool setup/teardown.
-   */
-  void VisionDbPoolNoOpListCallback(void* /*self*/) {}
-
-  struct VisionDbIntrusiveListNodeRuntime
-  {
-    VisionDbIntrusiveListNodeRuntime* next; // +0x00
-    VisionDbIntrusiveListNodeRuntime* prev; // +0x04
-  };
-
-  struct VisionDbIntrusiveListStateRuntime
-  {
-    std::uint32_t listCookie;              // +0x00
-    VisionDbIntrusiveListNodeRuntime* head; // +0x04
-    std::uint32_t size;                    // +0x08
-  };
-
-  static_assert(
-    sizeof(VisionDbIntrusiveListStateRuntime) == 0x0C,
-    "VisionDbIntrusiveListStateRuntime size must be 0x0C"
-  );
-
-  /**
-   * Address: 0x0081B9C0 (FUN_0081B9C0)
-   *
-   * What it does:
-   * Clears one intrusive list while preserving its sentinel node.
-   */
-  VisionDbIntrusiveListNodeRuntime* VisionDbClearListNodesKeepingSentinel(
-    VisionDbIntrusiveListStateRuntime* const listState
-  ) noexcept
-  {
-    if (listState == nullptr || listState->head == nullptr) {
-      return nullptr;
-    }
-
-    VisionDbIntrusiveListNodeRuntime* const head = listState->head;
-    VisionDbIntrusiveListNodeRuntime* node = head->next;
-    head->next = head;
-    head->prev = head;
-    listState->size = 0;
-
-    while (node != head) {
-      VisionDbIntrusiveListNodeRuntime* const next = node->next;
-      ::operator delete(node);
-      node = next;
-    }
-
-    return head;
-  }
-
-  /**
-   * Address: 0x0081B790 (FUN_0081B790)
-   *
-   * What it does:
-   * Allocates one 12-byte intrusive-list sentinel lane and self-links its
-   * `prev/next` pointers.
-   */
-  [[nodiscard]] VisionDbIntrusiveListNodeRuntime* VisionDbAllocateSelfLinkedListSentinel12()
-  {
-    auto* const node = msvc8::detail::allocate_checked<VisionDbIntrusiveListNodeRuntime>(1u);
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    node->next = node;
-    node->prev = node;
-    return node;
-  }
-
   void ResetVisionEntry(
     VisionDB::Pool::Entry* const entry,
     const VisionDB::Pool::EntryCircle& previousCircle,
@@ -242,17 +168,8 @@ namespace
  */
 VisionDB::Pool::Pool()
 {
-  mEntriesHead = reinterpret_cast<ZoneBlockEntry*>(VisionDbAllocateSelfLinkedListSentinel12());
-  if (mEntriesHead != nullptr) {
-    mEntriesHead->blockBase = nullptr;
-  }
-  mEntriesSize = 0;
-
-  mEntryPoolHead = reinterpret_cast<FreeNodeEntry*>(VisionDbAllocateSelfLinkedListSentinel12());
-  if (mEntryPoolHead != nullptr) {
-    mEntryPoolHead->node = nullptr;
-  }
-  mEntryPoolSize = 0;
+  // Both members buy and self-link their own header sentinel; that is the
+  // whole body of 0x0081ACA0, and MSVC emits it.
 }
 
 /**
@@ -264,22 +181,9 @@ VisionDB::Pool::Pool()
  */
 void VisionDB::Pool::Clear()
 {
-  VisionDbPoolNoOpListCallback(this);
-  FreeZoneBlocks(mEntriesHead);
-
-  if (mEntryPoolHead != nullptr) {
-    auto* const entryPoolState = reinterpret_cast<VisionDbIntrusiveListStateRuntime*>(&mEntryPoolListState);
-    (void)VisionDbClearListNodesKeepingSentinel(entryPoolState);
-    ::operator delete(mEntryPoolHead);
-    mEntryPoolHead = nullptr;
-  }
-
-  if (mEntriesHead != nullptr) {
-    auto* const entriesState = reinterpret_cast<VisionDbIntrusiveListStateRuntime*>(&mEntriesListState);
-    (void)VisionDbClearListNodesKeepingSentinel(entriesState);
-    ::operator delete(mEntriesHead);
-    mEntriesHead = nullptr;
-  }
+  FreeZoneBlocks(mEntryBlocks);
+  mFreeEntries.clear();
+  mEntryBlocks.clear();
 }
 
 /**
@@ -304,9 +208,7 @@ VisionDB::Pool::~Pool()
 VisionDB::Pool::Entry*
 VisionDB::Pool::NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, const bool isReal)
 {
-  VisionDbPoolNoOpListCallback(this);
-
-  if (mEntryPoolSize == 0) {
+  if (mFreeEntries.empty()) {
     constexpr std::uint32_t kEntryBlockCount = 500;
     const std::size_t blockBytes = sizeof(std::uint32_t) + sizeof(Entry) * kEntryBlockCount;
     auto* const rawBlock = static_cast<std::uint8_t*>(::operator new[](blockBytes));
@@ -318,59 +220,35 @@ VisionDB::Pool::NewEntry(const EntryCircle& previousCircle, const EntryCircle& c
       ResetVisionEntry(&entryBlock[index], EntryCircle{}, EntryCircle{}, false);
     }
 
-    auto* const blockNode = new ZoneBlockEntry();
-    blockNode->blockBase = entryBlock;
-    blockNode->ListLinkBefore(mEntriesHead);
-    ++mEntriesSize;
+    mEntryBlocks.push_back(entryBlock);
 
     for (std::uint32_t index = 0; index < kEntryBlockCount; ++index) {
-      // Address: 0x0081BA00 (FUN_0081BA00) -- std::list<Entry*>::_Buynode
-      // for this pool's free list (IDA's own type inference: `_List_nod_
-      // VisionDB_Entry::_Node`), matching FreeNodeEntry's real 12-byte
-      // {_Next,_Prev,_Myval=Entry*} layout exactly.
-      auto* const freeEntry = new FreeNodeEntry();
-      freeEntry->node = &entryBlock[index];
-      freeEntry->ListLinkBefore(mEntryPoolHead);
-      // Address: 0x0081BA40 (FUN_0081BA40) -- the sibling `_Incsize`,
-      // checked against the Dinkumware 0x3FFFFFFF cap and throwing
-      // std::length_error("list<T> too long") on overflow.
-      if (mEntryPoolSize == 0x3FFFFFFFu) {
-        throw std::length_error("list<T> too long");
-      }
-      ++mEntryPoolSize;
+      mFreeEntries.push_back(&entryBlock[index]);
     }
   }
 
-  if (mEntryPoolHead == nullptr || mEntryPoolHead->mNext == mEntryPoolHead) {
+  if (mFreeEntries.empty()) {
     return nullptr;
   }
 
-  auto* const freeEntry = static_cast<FreeNodeEntry*>(mEntryPoolHead->mNext);
-  Entry* const entry = freeEntry->node;
-  freeEntry->ListUnlink();
-  ::operator delete(freeEntry);
-  --mEntryPoolSize;
+  Entry* const entry = mFreeEntries.front();
+  (void)mFreeEntries.erase(mFreeEntries.begin());
 
   ResetVisionEntry(entry, previousCircle, currentCircle, isReal);
   return entry;
 }
 
-void VisionDB::Pool::FreeZoneBlocks(ZoneBlockEntry* head)
+void VisionDB::Pool::FreeZoneBlocks(EntryList& blocks)
 {
-  if (!head) {
-    return;
-  }
-
-  for (ZoneBlockEntry* it = static_cast<ZoneBlockEntry*>(head->mNext); it != head;
-       it = static_cast<ZoneBlockEntry*>(it->mNext)) {
-    if (!it->blockBase) {
+  for (Entry*& blockBase : blocks) {
+    if (blockBase == nullptr) {
       continue;
     }
 
     // The block is allocated as: [count dword][count * Entry].
-    auto* rawBlock = reinterpret_cast<std::uint32_t*>(it->blockBase) - 1;
+    auto* const rawBlock = reinterpret_cast<std::uint32_t*>(blockBase) - 1;
     ::operator delete[](rawBlock);
-    it->blockBase = nullptr;
+    blockBase = nullptr;
   }
 }
 
@@ -474,17 +352,12 @@ void VisionDB::Handle::UnlinkFromOwnerTree(OwnerChainView* ownerChain, Pool::Poo
  */
 void VisionDB::Handle::ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* node)
 {
-  if (!node || !ownerPool || !ownerPool->mEntryPoolHead) {
+  if (!node || !ownerPool) {
     return;
   }
 
   ResetVisionEntry(node, Pool::EntryCircle{}, Pool::EntryCircle{}, false);
-
-  auto* const entry = static_cast<Pool::FreeNodeEntry*>(::operator new(sizeof(Pool::FreeNodeEntry)));
-  entry->node = node;
-  entry->ListLinkBefore(ownerPool->mEntryPoolHead);
-
-  ++ownerPool->mEntryPoolSize;
+  ownerPool->mFreeEntries.push_back(node);
 }
 
 /**

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/FastVector.h"
 #include "moho/containers/TDatList.h"
 #include "Wm3Box2.h"
@@ -81,22 +82,15 @@ namespace moho
       using Entry = PooledNode;
 
       /**
-       * Circular-list node that points to a pooled-node block base.
+       * Both of this pool's lists hold one `PooledNode*` per node: the
+       * `{next, prev, value}` 0x0C node and the `{proxy, head, size}` 0x0C
+       * head are `msvc8::list<PooledNode*>` exactly, which is what IDA already
+       * types the free list (`_List_nod_VisionDB_Entry::_Node`, 0x0081BA00)
+       * and what the 0x3FFFFFFF `_Incsize` guard at 0x0081BA40 belongs to.
        */
-      struct ZoneBlockEntry : TDatListItem<ZoneBlockEntry, void>
-      {
-        PooledNode* blockBase{nullptr}; // +0x08
-      };
-      MOHO_VISIONDB_X86_ASSERT(sizeof(ZoneBlockEntry) == 0x0C, "VisionDB::Pool::ZoneBlockEntry size must be 0x0C");
+      using EntryList = msvc8::list<PooledNode*>;
 
-      /**
-       * Circular-list node that points to one reusable pooled node.
-       */
-      struct FreeNodeEntry : TDatListItem<FreeNodeEntry, void>
-      {
-        PooledNode* node{nullptr}; // +0x08
-      };
-      MOHO_VISIONDB_X86_ASSERT(sizeof(FreeNodeEntry) == 0x0C, "VisionDB::Pool::FreeNodeEntry size must be 0x0C");
+      MOHO_VISIONDB_X86_ASSERT(sizeof(EntryList) == 0x0C, "VisionDB::Pool::EntryList size must be 0x0C");
 
       /**
        * Address: 0x0081ACA0 (FUN_0081ACA0)
@@ -138,27 +132,18 @@ namespace moho
       [[nodiscard]] Entry* NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, bool isReal);
 
     private:
-      static void FreeZoneBlocks(ZoneBlockEntry* head);
+      static void FreeZoneBlocks(EntryList& blocks);
 
     public:
       friend class Handle;
 
-      std::uint32_t mEntriesListState{0};       // +0x04 (legacy std::list proxy lane)
-      ZoneBlockEntry* mEntriesHead{nullptr};    // +0x08
-      std::uint32_t mEntriesSize{0};            // +0x0C
-      std::uint32_t mEntryPoolListState{0};     // +0x10 (legacy std::list proxy lane)
-      FreeNodeEntry* mEntryPoolHead{nullptr};   // +0x14
-      std::uint32_t mEntryPoolSize{0};          // +0x18
+      /// One entry per allocated block; the value is the block's first node,
+      /// and the block's element count sits in the dword before it.
+      EntryList mEntryBlocks{}; // +0x04
+      /// The reusable nodes handed back out by `NewEntry`.
+      EntryList mFreeEntries{}; // +0x10
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Pool) == 0x1C, "VisionDB::Pool size must be 0x1C");
-    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntriesHead) == 0x08, "VisionDB::Pool::mEntriesHead offset must be 0x08");
-    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntriesSize) == 0x0C, "VisionDB::Pool::mEntriesSize offset must be 0x0C");
-    MOHO_VISIONDB_X86_ASSERT(
-      offsetof(Pool, mEntryPoolHead) == 0x14, "VisionDB::Pool::mEntryPoolHead offset must be 0x14"
-    );
-    MOHO_VISIONDB_X86_ASSERT(
-      offsetof(Pool, mEntryPoolSize) == 0x18, "VisionDB::Pool::mEntryPoolSize offset must be 0x18"
-    );
 
     /**
      * VFTABLE: 0x00E422BC
