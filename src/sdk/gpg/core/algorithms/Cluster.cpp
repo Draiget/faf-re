@@ -234,30 +234,6 @@ namespace
       return outEdges.end();
     }
 
-    struct TripleWordValueRuntime
-    {
-        std::uint32_t lane0;
-        std::uint32_t lane1;
-        std::uint32_t lane2;
-    };
-    static_assert(sizeof(TripleWordValueRuntime) == 0x0C, "TripleWordValueRuntime size must be 0x0C");
-
-    struct TripleWordVectorRuntime
-    {
-        std::uint32_t lane00;
-        TripleWordValueRuntime* begin;
-        TripleWordValueRuntime* end;
-    };
-    static_assert(sizeof(TripleWordVectorRuntime) == 0x0C, "TripleWordVectorRuntime size must be 0x0C");
-    static_assert(offsetof(TripleWordVectorRuntime, begin) == 0x04, "TripleWordVectorRuntime::begin offset must be 0x04");
-    static_assert(offsetof(TripleWordVectorRuntime, end) == 0x08, "TripleWordVectorRuntime::end offset must be 0x08");
-
-    struct ByteCursorRuntime
-    {
-        std::uint8_t* cursor;
-    };
-    static_assert(sizeof(ByteCursorRuntime) == 0x04, "ByteCursorRuntime size must be 0x04");
-
     struct InlineByteCursorBuffer200Runtime
     {
         std::uint8_t* lane00;
@@ -389,103 +365,6 @@ namespace
         ForwardLinkNodeRuntime* next;
     };
     static_assert(sizeof(ForwardLinkNodeRuntime) == 0x08, "ForwardLinkNodeRuntime size must be 0x08");
-
-    struct NodeCursorRuntime
-    {
-        ForwardLinkNodeRuntime* node;
-    };
-    static_assert(sizeof(NodeCursorRuntime) == 0x04, "NodeCursorRuntime size must be 0x04");
-
-    /**
-     * Address: 0x0092DC50 (FUN_0092DC50)
-     *
-     * What it does:
-     * Stores one triple-word vector begin cursor into `outCursor`.
-     */
-    TripleWordValueRuntime** StoreTripleWordVectorBeginCursor(
-      const TripleWordVectorRuntime* const vectorState,
-      TripleWordValueRuntime** const outCursor
-    ) noexcept
-    {
-      *outCursor = vectorState->begin;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092DC60 (FUN_0092DC60)
-     *
-     * What it does:
-     * Stores one triple-word vector end cursor into `outCursor`.
-     */
-    TripleWordValueRuntime** StoreTripleWordVectorEndCursor_A(
-      const TripleWordVectorRuntime* const vectorState,
-      TripleWordValueRuntime** const outCursor
-    ) noexcept
-    {
-      *outCursor = vectorState->end;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092DE20 (FUN_0092DE20)
-     *
-     * What it does:
-     * Returns one byte cursor advanced by eight bytes.
-     */
-    [[nodiscard]] std::uint8_t* ComputeByteCursorPlus8(
-      const ByteCursorRuntime* const cursor
-    ) noexcept
-    {
-      return cursor->cursor + 8;
-    }
-
-    /**
-     * Address: 0x0092DE30 (FUN_0092DE30)
-     *
-     * What it does:
-     * Writes one cursor advanced by `index * 12` bytes into `outCursor`.
-     */
-    ByteCursorRuntime* ComputeByteCursorPlusStride12(
-      const ByteCursorRuntime* const baseCursor,
-      ByteCursorRuntime* const outCursor,
-      const int index
-    ) noexcept
-    {
-      outCursor->cursor = baseCursor->cursor + static_cast<std::ptrdiff_t>(12 * index);
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092DE50 (FUN_0092DE50)
-     *
-     * What it does:
-     * Writes one cursor rewound by `index * 12` bytes into `outCursor`.
-     */
-    ByteCursorRuntime* ComputeByteCursorMinusStride12(
-      const ByteCursorRuntime* const baseCursor,
-      ByteCursorRuntime* const outCursor,
-      const int index
-    ) noexcept
-    {
-      outCursor->cursor = baseCursor->cursor - static_cast<std::ptrdiff_t>(12 * index);
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092DE70 (FUN_0092DE70)
-     *
-     * What it does:
-     * Writes one cursor advanced by `index * 4` bytes into `outCursor`.
-     */
-    ByteCursorRuntime* ComputeByteCursorPlusStride4(
-      const ByteCursorRuntime* const baseCursor,
-      ByteCursorRuntime* const outCursor,
-      const int index
-    ) noexcept
-    {
-      outCursor->cursor = baseCursor->cursor + static_cast<std::ptrdiff_t>(4 * index);
-      return outCursor;
-    }
 
     /**
      * Address: 0x0092E3C0 (FUN_0092E3C0)
@@ -765,107 +644,6 @@ namespace
     }
 
     /**
-     * Address: 0x0092E490 (FUN_0092E490)
-     *
-     * What it does:
-     * Stores one triple-word vector end cursor into `outCursor`.
-     */
-    TripleWordValueRuntime** StoreTripleWordVectorEndCursor_B(
-      const TripleWordVectorRuntime* const vectorState,
-      TripleWordValueRuntime** const outCursor
-    ) noexcept
-    {
-      *outCursor = vectorState->end;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092E630 (FUN_0092E630)
-     *
-     * What it does:
-     * Returns one byte cursor positioned one triple-word record before `end`.
-     */
-    [[nodiscard]] std::uint8_t* ComputeTripleWordEndMinusOneRecord(
-      const TripleWordVectorRuntime* const vectorState
-    ) noexcept
-    {
-      return reinterpret_cast<std::uint8_t*>(vectorState->end) - sizeof(TripleWordValueRuntime);
-    }
-
-    /**
-     * Address: 0x0092E9B0 (FUN_0092E9B0)
-     *
-     * What it does:
-     * Compacts one triple-word range forward from `readCursor` to `writeCursor`,
-     * updates vector end, and stores `writeCursor` to `outCursor`.
-     */
-    TripleWordValueRuntime** CompactTripleWordRangeForward_A(
-      TripleWordVectorRuntime* const vectorState,
-      TripleWordValueRuntime** const outCursor,
-      TripleWordValueRuntime* const writeCursor,
-      TripleWordValueRuntime* readCursor
-    ) noexcept
-    {
-      if (writeCursor != readCursor) {
-        TripleWordValueRuntime* const end = vectorState->end;
-        TripleWordValueRuntime* dst = writeCursor;
-        if (readCursor != end) {
-          do {
-            *dst = *readCursor;
-            ++readCursor;
-            ++dst;
-          } while (readCursor != end);
-        }
-        vectorState->end = dst;
-      }
-
-      *outCursor = writeCursor;
-      return outCursor;
-    }
-
-    /**
-     * Address: 0x0092EAC0 (FUN_0092EAC0)
-     *
-     * What it does:
-     * Alias lane that compacts one triple-word range forward and updates end.
-     */
-    TripleWordValueRuntime** CompactTripleWordRangeForward_B(
-      TripleWordVectorRuntime* const vectorState,
-      TripleWordValueRuntime** const outCursor,
-      TripleWordValueRuntime* const writeCursor,
-      TripleWordValueRuntime* readCursor
-    ) noexcept
-    {
-      return CompactTripleWordRangeForward_A(vectorState, outCursor, writeCursor, readCursor);
-    }
-
-    /**
-     * Address: 0x0092ED20 (FUN_0092ED20)
-     *
-     * What it does:
-     * Resets vector end to begin when begin/end differ.
-     */
-    void ResetTripleWordVectorEndToBegin_A(TripleWordVectorRuntime* const vectorState) noexcept
-    {
-      if (vectorState->begin != vectorState->end) {
-        vectorState->end = vectorState->begin;
-      }
-    }
-
-    /**
-     * Address: 0x0092EDF0 (FUN_0092EDF0)
-     *
-     * What it does:
-     * Alias lane that resets vector end to begin when begin/end differ.
-     */
-    void ResetTripleWordVectorEndToBegin_B(TripleWordVectorRuntime* const vectorState) noexcept
-    {
-      if (vectorState->begin != vectorState->end) {
-        vectorState->end = vectorState->begin;
-      }
-    }
-
-    /**
      * Address: 0x00931640 (FUN_00931640)
      *
      * What it does:
@@ -968,186 +746,6 @@ namespace
       return destination;
     }
 
-    /**
-     * Address: 0x00931930 (FUN_00931930)
-     *
-     * What it does:
-     * Clears one node cursor lane to null.
-     */
-    NodeCursorRuntime* ClearNodeCursor_A(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = nullptr;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931940 (FUN_00931940)
-     *
-     * What it does:
-     * Advances one node cursor to `node->next`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToNext_A(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->next;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931960 (FUN_00931960)
-     *
-     * What it does:
-     * Alias lane that clears one node cursor lane to null.
-     */
-    NodeCursorRuntime* ClearNodeCursor_B(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = nullptr;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931970 (FUN_00931970)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->next`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToNext_B(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->next;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x009319F0 (FUN_009319F0)
-     *
-     * What it does:
-     * Sets one node cursor lane from caller-supplied pointer.
-     */
-    NodeCursorRuntime* SetNodeCursor_A(
-      NodeCursorRuntime* const cursor,
-      ForwardLinkNodeRuntime* const node
-    ) noexcept
-    {
-      cursor->node = node;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931A00 (FUN_00931A00)
-     *
-     * What it does:
-     * Alias lane that sets one node cursor from caller-supplied pointer.
-     */
-    NodeCursorRuntime* SetNodeCursor_B(
-      NodeCursorRuntime* const cursor,
-      ForwardLinkNodeRuntime* const node
-    ) noexcept
-    {
-      cursor->node = node;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931A50 (FUN_00931A50)
-     *
-     * What it does:
-     * Alias lane that sets one node cursor from caller-supplied pointer.
-     */
-    NodeCursorRuntime* SetNodeCursor_C(
-      NodeCursorRuntime* const cursor,
-      ForwardLinkNodeRuntime* const node
-    ) noexcept
-    {
-      cursor->node = node;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00931AA0 (FUN_00931AA0)
-     *
-     * What it does:
-     * Alias lane that sets one node cursor from caller-supplied pointer.
-     */
-    NodeCursorRuntime* SetNodeCursor_D(
-      NodeCursorRuntime* const cursor,
-      ForwardLinkNodeRuntime* const node
-    ) noexcept
-    {
-      cursor->node = node;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00932170 (FUN_00932170)
-     *
-     * What it does:
-     * Alias lane that clears one node cursor lane to null.
-     */
-    NodeCursorRuntime* ClearNodeCursor_C(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = nullptr;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00932180 (FUN_00932180)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->next`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToNext_C(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->next;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x00932190 (FUN_00932190)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->lane00`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToLane00_A(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->lane00;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x009321A0 (FUN_009321A0)
-     *
-     * What it does:
-     * Alias lane that clears one node cursor lane to null.
-     */
-    NodeCursorRuntime* ClearNodeCursor_D(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = nullptr;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x009321B0 (FUN_009321B0)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->next`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToNext_D(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->next;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x009321C0 (FUN_009321C0)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->lane00`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToLane00_B(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->lane00;
-      return cursor;
-    }
-
     struct SingleDwordLaneRuntime
     {
       std::uint32_t value = 0;
@@ -1240,30 +838,6 @@ namespace
     int LoadVtableDwordSlot15(const VtableProbeRuntime* const object) noexcept
     {
       return static_cast<int>(object->vtable[15]);
-    }
-
-    /**
-     * Address: 0x009326A0 (FUN_009326A0)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->lane00`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToLane00_C(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->lane00;
-      return cursor;
-    }
-
-    /**
-     * Address: 0x009326B0 (FUN_009326B0)
-     *
-     * What it does:
-     * Alias lane that advances one node cursor to `node->lane00`.
-     */
-    NodeCursorRuntime* AdvanceNodeCursorToLane00_D(NodeCursorRuntime* const cursor) noexcept
-    {
-      cursor->node = cursor->node->lane00;
-      return cursor;
     }
 
     struct TwoDwordLaneRuntime
@@ -2443,19 +2017,6 @@ namespace
       return 0;
     }
 
-    struct InlineBackedByteVectorRuntime
-    {
-        std::uint8_t* mBegin;             // +0x00
-        std::uint8_t* mEnd;               // +0x04
-        std::uint8_t* mCapacityEnd;       // +0x08
-        std::uint8_t* mInlineStorageLane; // +0x0C
-    };
-    static_assert(sizeof(InlineBackedByteVectorRuntime) == 0x10, "InlineBackedByteVectorRuntime size must be 0x10");
-    static_assert(
-      offsetof(InlineBackedByteVectorRuntime, mInlineStorageLane) == 0x0C,
-      "InlineBackedByteVectorRuntime::mInlineStorageLane offset must be 0x0C"
-    );
-
     [[nodiscard]] std::uint8_t* CopyByteRangeForward(
       const std::uint8_t* sourceBegin,
       const std::uint8_t* sourceEnd,
@@ -2472,114 +2033,6 @@ namespace
         ++writeCursor;
       }
       return writeCursor;
-    }
-
-    /**
-     * Address: 0x0092CCF0 (FUN_0092CCF0)
-     *
-     * What it does:
-     * Reallocates one inline-backed byte vector to `newCapacity` and rebuilds
-     * contents as `[oldBegin, splitPoint) + [insertBegin, insertEnd) + [splitPoint, oldEnd)`.
-     */
-    [[nodiscard]] int ReallocateInlineBackedByteVectorWithSplitInsert(
-      InlineBackedByteVectorRuntime& vector,
-      const std::uint32_t newCapacity,
-      const std::uint8_t* const splitPoint,
-      const std::uint8_t* const insertBegin,
-      const std::uint8_t* const insertEnd
-    )
-    {
-      std::uint8_t* const newStorage = static_cast<std::uint8_t*>(::operator new(newCapacity));
-      std::uint8_t* writeCursor = newStorage;
-      writeCursor = CopyByteRangeForward(vector.mBegin, splitPoint, writeCursor);
-      writeCursor = CopyByteRangeForward(insertBegin, insertEnd, writeCursor);
-      writeCursor = CopyByteRangeForward(splitPoint, vector.mEnd, writeCursor);
-
-      if (vector.mBegin == vector.mInlineStorageLane) {
-        if (vector.mInlineStorageLane != nullptr) {
-          *reinterpret_cast<std::uint8_t**>(vector.mInlineStorageLane) = vector.mCapacityEnd;
-        }
-      }
-      else if (vector.mBegin != nullptr) {
-        ::operator delete[](vector.mBegin);
-      }
-
-      vector.mBegin = newStorage;
-      vector.mEnd = writeCursor;
-      vector.mCapacityEnd = newStorage + newCapacity;
-      return static_cast<int>(newCapacity);
-    }
-
-    [[nodiscard]] std::uint8_t* ShiftByteRangeLeftAndCommitEnd(
-      InlineBackedByteVectorRuntime& vector,
-      std::uint8_t* const destination,
-      const std::uint8_t* const sourceBegin
-    )
-    {
-      if (destination == sourceBegin) {
-        return destination;
-      }
-
-      if (sourceBegin != vector.mEnd) {
-        const std::size_t byteCount = static_cast<std::size_t>(
-          reinterpret_cast<std::uintptr_t>(vector.mEnd) - reinterpret_cast<std::uintptr_t>(sourceBegin)
-        );
-        std::memmove(destination, sourceBegin, byteCount);
-      }
-      vector.mEnd = destination + static_cast<std::size_t>(
-        reinterpret_cast<std::uintptr_t>(vector.mEnd) - reinterpret_cast<std::uintptr_t>(sourceBegin)
-      );
-      return destination;
-    }
-
-    /**
-     * Address: 0x0092E410 (FUN_0092E410)
-     *
-     * What it does:
-     * Resizes one inline-backed byte vector to `targetSize` by truncating or
-     * appending fill-byte lanes, growing storage when capacity is insufficient.
-     */
-    [[nodiscard]] std::uint8_t* ResizeInlineBackedByteVectorWithFill(
-      InlineBackedByteVectorRuntime& vector,
-      const std::uint32_t targetSize,
-      const std::uint8_t* const fillByte
-    )
-    {
-      std::uint8_t* result = vector.mBegin;
-      const std::uint32_t currentSize = static_cast<std::uint32_t>(
-        reinterpret_cast<std::uintptr_t>(vector.mEnd) - reinterpret_cast<std::uintptr_t>(vector.mBegin)
-      );
-
-      if (targetSize < currentSize) {
-        return ShiftByteRangeLeftAndCommitEnd(vector, vector.mBegin + targetSize, vector.mEnd);
-      }
-
-      if (targetSize > currentSize) {
-        const std::uint32_t currentCapacity = static_cast<std::uint32_t>(
-          reinterpret_cast<std::uintptr_t>(vector.mCapacityEnd) - reinterpret_cast<std::uintptr_t>(vector.mBegin)
-        );
-        if (targetSize > currentCapacity) {
-          result = vector.mBegin;
-          (void)ReallocateInlineBackedByteVectorWithSplitInsert(
-            vector,
-            targetSize,
-            result,
-            result,
-            result
-          );
-        }
-
-        std::uint8_t* const targetEnd = vector.mBegin + targetSize;
-        while (vector.mEnd != targetEnd) {
-          result = vector.mEnd;
-          vector.mEnd = result + 1;
-          if (result != nullptr) {
-            *result = *fillByte;
-          }
-        }
-      }
-
-      return result;
     }
 
     // `{start, end, capacity, inline}` at 0x10 is `gpg::core::FastVectorInline`:
@@ -2670,91 +2123,6 @@ namespace
         outNodes.end_ = dedupEnd;
       }
       return result;
-    }
-
-    struct FastVectorN12CharRuntime
-    {
-        char* start;        // +0x00
-        char* end;          // +0x04
-        char* capacityEnd;  // +0x08
-        char* inlineOrigin; // +0x0C
-    };
-    static_assert(sizeof(FastVectorN12CharRuntime) == 0x10, "FastVectorN12CharRuntime size must be 0x10");
-    static_assert(
-        offsetof(FastVectorN12CharRuntime, capacityEnd) == 0x08,
-        "FastVectorN12CharRuntime::capacityEnd offset must be 0x08"
-    );
-    static_assert(
-        offsetof(FastVectorN12CharRuntime, inlineOrigin) == 0x0C,
-        "FastVectorN12CharRuntime::inlineOrigin offset must be 0x0C"
-    );
-
-    void EnsureFastVectorN12CharCapacity(FastVectorN12CharRuntime& view, const unsigned int requiredCount)
-    {
-        const auto currentCapacity = (view.start != nullptr && view.capacityEnd != nullptr)
-            ? static_cast<unsigned int>(view.capacityEnd - view.start)
-            : 0u;
-        if (requiredCount <= currentCapacity) {
-            return;
-        }
-
-        const auto oldCount = (view.start != nullptr && view.end != nullptr)
-            ? static_cast<unsigned int>(view.end - view.start)
-            : 0u;
-        char* const newStorage = static_cast<char*>(::operator new[](requiredCount));
-        if (oldCount != 0u && view.start != nullptr) {
-            std::memcpy(newStorage, view.start, oldCount);
-        }
-
-        if (view.start == view.inlineOrigin) {
-            if (view.inlineOrigin != nullptr) {
-                *reinterpret_cast<char**>(view.inlineOrigin) = view.capacityEnd;
-            }
-        }
-        else if (view.start != nullptr) {
-            ::operator delete[](view.start);
-        }
-
-        view.start = newStorage;
-        view.end = newStorage + oldCount;
-        view.capacityEnd = newStorage + requiredCount;
-    }
-
-    /**
-     * Address: 0x009545D0 (FUN_009545D0, gpg::fastvector_char::Resize)
-     *
-     * What it does:
-     * Resizes one `fastvector_n<char,12>` lane to `newSize`, truncating when
-     * shrinking and fill-writing one byte value into appended slots when
-     * growing.
-     */
-    void
-    FastVectorN12CharResize(FastVectorN12CharRuntime& view, const unsigned int newSize, const char* const fillValue)
-    {
-        const auto currentSize = (view.start != nullptr && view.end != nullptr)
-            ? static_cast<unsigned int>(view.end - view.start)
-            : 0u;
-        if (newSize < currentSize) {
-            char* const newEnd = view.start + newSize;
-            if (newEnd != view.end) {
-                view.end = newEnd;
-            }
-            return;
-        }
-        if (newSize == currentSize) {
-            return;
-        }
-
-        EnsureFastVectorN12CharCapacity(view, newSize);
-        const char fillByte = fillValue ? *fillValue : '\0';
-        char* const desiredEnd = view.start + newSize;
-        while (view.end != desiredEnd) {
-            char* const slot = view.end;
-            view.end = slot + 1;
-            if (slot != nullptr) {
-                *slot = fillByte;
-            }
-        }
     }
 
     /**
@@ -3432,27 +2800,21 @@ namespace
     void BuildClusterEdgeCosts(
       const gpg::HaStar::OccupationData& occupation,
       const ClusterNodeScratch& nodes,
-      InlineBackedByteVectorRuntime& outEdges
+      gpg::core::FastVectorInline<std::uint8_t>& outEdges
     )
     {
       const std::uint32_t nodeCount = static_cast<std::uint32_t>(nodes.Size());
 
       if (nodeCount < 2u) {
-        // No pairs: drop any heap storage and reset the edge vector to empty.
-        if (outEdges.mBegin != outEdges.mInlineStorageLane) {
-          ::operator delete[](outEdges.mBegin);
-          outEdges.mBegin = outEdges.mInlineStorageLane;
-          outEdges.mCapacityEnd =
-            *reinterpret_cast<std::uint8_t**>(outEdges.mInlineStorageLane);
-        }
-        outEdges.mEnd = outEdges.mBegin;
+        // No pairs: drop any heap storage and go back to the inline block.
+        outEdges.ResetStorageToInline();
         return;
       }
 
       // Prefill the whole triangular matrix with -1 (unreachable).
       const std::uint32_t triangularSize = TriangularEdgePairIndex(0u, nodeCount);
       const std::uint8_t fillUnreachable = 0xFFu;
-      (void)ResizeInlineBackedByteVectorWithFill(outEdges, triangularSize, &fillUnreachable);
+      outEdges.resize(triangularSize, fillUnreachable);
 
       // 9x9 search grid + FIFO open-list sentinel. The binary constructs all 81
       // cells once (each self-linked with zero cost/flags/packedCell) via the
@@ -3543,7 +2905,7 @@ namespace
             grid[targetZ * kEdgeSearchGridSpan + targetX];
 
           if (targetCell.visitFlags == 0u) {
-            outEdges.mBegin[edgeIndex] = fillUnreachable;
+            outEdges.start_[edgeIndex] = fillUnreachable;
             continue;
           }
 
@@ -3558,7 +2920,7 @@ namespace
           const int bucket = static_cast<int>(
             gpg::HaStar::Cluster::QuantizeEdgeCost(targetCell.pathCost, octileDistance)
           );
-          outEdges.mBegin[edgeIndex] = static_cast<std::uint8_t>(static_cast<std::int8_t>(bucket));
+          outEdges.start_[edgeIndex] = static_cast<std::uint8_t>(static_cast<std::int8_t>(bucket));
         }
       }
     }
@@ -3583,31 +2945,18 @@ namespace
      */
     void DropUnreachedClusterNodes(
       ClusterNodeScratch& ioNodes,
-      InlineBackedByteVectorRuntime& ioEdges
+      gpg::core::FastVectorInline<std::uint8_t>& ioEdges
     )
     {
       // Reachability scratch: one byte per node, backed by a fastvector_n<char,12>.
-      // The binary keeps a 12-byte inline buffer with the capacity sentinel in a
-      // separate 12-byte region; mirror that stack layout here so
-      // `FastVectorN12CharResize` follows the inline/heap transition faithfully.
-      struct FastVectorN12CharStorage
-      {
-        FastVectorN12CharRuntime header;
-        char inlineVec[12];
-        char capacitySentinel[12];
-      };
-      FastVectorN12CharStorage scratch{};
-      FastVectorN12CharRuntime& reachable = scratch.header;
-      reachable.start = scratch.inlineVec;
-      reachable.end = scratch.inlineVec;
-      reachable.capacityEnd = scratch.capacitySentinel;
-      reachable.inlineOrigin = scratch.inlineVec;
+      // A 12-element inline buffer, exactly the shape the binary builds on the
+      // stack before the reachability pass.
+      gpg::fastvector_n<char, 12> reachable;
 
       const std::uint32_t nodeCount = static_cast<std::uint32_t>(ioNodes.Size());
-      const char clearFlag = 0;
-      FastVectorN12CharResize(reachable, nodeCount, &clearFlag);
+      reachable.resize(nodeCount, char{0});
 
-      auto* const edgeBytes = ioEdges.mBegin;
+      auto* const edgeBytes = ioEdges.start_;
       std::int32_t reachedCount = 0;
 
       // Mark endpoints of every non-negative edge as reached.
@@ -3618,10 +2967,10 @@ namespace
         std::uint32_t edgeIndex = TriangularEdgePairIndex(0u, high);
         for (std::uint32_t low = 0u; low < high; ++low, ++edgeIndex) {
           if (static_cast<std::int8_t>(edgeBytes[edgeIndex]) >= 0) {
-            reachedCount += (reachable.start[low] == 0) ? 1 : 0;
-            reachedCount += (reachable.start[high] == 0) ? 1 : 0;
-            reachable.start[low] = 1;
-            reachable.start[high] = 1;
+            reachedCount += (reachable.start_[low] == 0) ? 1 : 0;
+            reachedCount += (reachable.start_[high] == 0) ? 1 : 0;
+            reachable.start_[low] = 1;
+            reachable.start_[high] = 1;
           }
         }
       }
@@ -3633,13 +2982,13 @@ namespace
         auto* nodeWrite = ioNodes.begin();
 
         for (std::uint32_t high = 0u; high < nodeCount; ++high) {
-          if (reachable.start[high] == 0) {
+          if (reachable.start_[high] == 0) {
             continue;
           }
           if (high != 0u) {
             const std::uint32_t rowBase = TriangularEdgePairIndex(0u, high);
             for (std::uint32_t low = 0u; low < high; ++low) {
-              if (reachable.start[low] != 0) {
+              if (reachable.start_[low] != 0) {
                 *edgeWrite = edgeBytes[rowBase + low];
                 ++edgeWrite;
               }
@@ -3650,8 +2999,8 @@ namespace
         }
 
         ioNodes.erase(nodeWrite, ioNodes.end());
-        if (edgeWrite != ioEdges.mEnd) {
-          ioEdges.mEnd = edgeWrite;
+        if (edgeWrite != ioEdges.end_) {
+          ioEdges.end_ = edgeWrite;
         }
 
         if (reachedCount != static_cast<std::int32_t>(ioNodes.Size())) {
@@ -3663,7 +3012,7 @@ namespace
         }
         const std::uint32_t survivingTriangular =
           TriangularEdgePairIndex(0u, static_cast<std::uint32_t>(reachedCount));
-        if (static_cast<std::uint32_t>(ioEdges.mEnd - ioEdges.mBegin) != survivingTriangular) {
+        if (static_cast<std::uint32_t>(ioEdges.end_ - ioEdges.start_) != survivingTriangular) {
           gpg::HandleAssertFailure(
             "ioEdges.size() == TriangularSize(nnodes_used)",
             169,
@@ -3672,9 +3021,6 @@ namespace
         }
       }
 
-      if (reachable.start != reachable.inlineOrigin) {
-        ::operator delete[](reachable.start);
-      }
     }
 }
 
@@ -3935,12 +3281,7 @@ Cluster ClusterBuild(const OccupationData& occupationData)
     ClusterNodeScratch nodeView;
 
     // Edge scratch: fastvector<Edge> with a 120-byte inline buffer.
-    std::uint8_t edgeInline[120] = {};
-    InlineBackedByteVectorRuntime edgeView{};
-    edgeView.mBegin = edgeInline;
-    edgeView.mEnd = edgeInline;
-    edgeView.mCapacityEnd = edgeInline + 120;
-    edgeView.mInlineStorageLane = edgeInline;
+    gpg::fastvector_n<std::uint8_t, 120> edgeView;
 
     (void)BuildOccupationEdgeContacts(occupationData, nodeView);
     BuildClusterEdgeCosts(occupationData, nodeView, edgeView);
@@ -3951,15 +3292,9 @@ Cluster ClusterBuild(const OccupationData& occupationData)
     ++Cluster::sDefaultConstructData.mRefs;
     cluster.SetData(
         reinterpret_cast<const Cluster::Node*>(nodeView.begin()),
-        reinterpret_cast<const Cluster::Edge*>(edgeView.mBegin),
+        reinterpret_cast<const Cluster::Edge*>(edgeView.start_),
         static_cast<unsigned int>(nodeView.Size())
     );
-
-    // Release the edge scratch's heap storage if it spilled; the node scratch
-    // is a real fastvector_n and frees its own.
-    if (edgeView.mBegin != edgeInline) {
-        ::operator delete[](edgeView.mBegin);
-    }
 
     return cluster;
 }
