@@ -1183,62 +1183,7 @@ namespace
     "SerSaveConstructArgsResultView::mFlagByte4 offset must be 0x4"
   );
 
-  struct TrackedPointerTreeNodeView : msvc8::Tree<TrackedPointerTreeNodeView>
-  {
-    gpg::RRef ref;                         // +0x0C
-    std::uint8_t reserved14_24[0x11]{};   // +0x14
-    std::uint8_t isNil = 0;               // +0x25
-  };
-  static_assert(offsetof(TrackedPointerTreeNodeView, ref) == 0x0C, "TrackedPointerTreeNodeView::ref offset must be 0x0C");
-  static_assert(
-    offsetof(TrackedPointerTreeNodeView, isNil) == 0x25,
-    "TrackedPointerTreeNodeView::isNil offset must be 0x25"
-  );
 
-  struct TrackedPointerTreeView
-  {
-    void* unknown00 = nullptr;             // +0x00
-    TrackedPointerTreeNodeView* head = nullptr; // +0x04
-  };
-  static_assert(offsetof(TrackedPointerTreeView, head) == 0x04, "TrackedPointerTreeView::head offset must be 0x04");
-
-  /**
-   * Address: 0x0094FA20 (FUN_0094FA20, _Tree_RRef_TrackedPointer::_Lbound)
-   *
-   * What it does:
-   * Performs one lower-bound walk over the tracked-pointer RB-tree using
-   * `RRef` key ordering (`mType`, then `mObj`) and returns the first node not
-   * less than the probe key.
-   */
-  [[maybe_unused]] TrackedPointerTreeNodeView* FindLowerBoundTrackedPointerNode(
-    TrackedPointerTreeView* const tree,
-    const gpg::RRef& objectRef
-  ) noexcept
-  {
-    TrackedPointerTreeNodeView* result = tree->head;
-    TrackedPointerTreeNodeView* parent = result->parent;
-
-    if (parent->isNil == 0) {
-      gpg::RType* const probeType = objectRef.mType;
-      do {
-        gpg::RType* const nodeType = parent->ref.mType;
-        bool nodeLessThanProbe = nodeType < probeType;
-
-        if (nodeType == probeType) {
-          nodeLessThanProbe = parent->ref.mObj < objectRef.mObj;
-        }
-
-        if (nodeLessThanProbe) {
-          parent = parent->right;
-        } else {
-          result = parent;
-          parent = parent->left;
-        }
-      } while (parent->isNil == 0);
-    }
-
-    return result;
-  }
 
   constexpr const char* kSerializationCppPath = "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.cpp";
 
@@ -1791,17 +1736,15 @@ void gpg::WriteRawPointer(
     return;
   }
 
-  msvc8::map<const void*, WriteArchive::TrackedPointerRecord>::iterator it = archive->mObjRefs.find(objectRef.mObj);
+  const auto found = archive->mObjRefs.find(objectRef);
   WriteArchive::TrackedPointerRecord* record = nullptr;
 
-  if (it == archive->mObjRefs.end()) {
+  if (found == archive->mObjRefs.end()) {
     WriteArchive::TrackedPointerRecord fresh{};
-    fresh.type = objectRef.mType;
     fresh.index = static_cast<int>(archive->mObjRefs.size());
     fresh.ownership = TrackedPointerState::Reserved;
 
-    const std::pair<msvc8::map<const void*, WriteArchive::TrackedPointerRecord>::iterator, bool> inserted =
-      archive->mObjRefs.insert(std::make_pair(objectRef.mObj, fresh));
+    const auto inserted = archive->mObjRefs.insert({objectRef, fresh});
     record = &inserted.first->second;
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::NewObject));
@@ -1824,7 +1767,7 @@ void gpg::WriteRawPointer(
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
   } else {
-    record = &it->second;
+    record = &found->second;
     if (record->ownership == TrackedPointerState::Reserved) {
       ThrowSerializationError(
         "Error while creating archive: recursively encountered a pointer to an object for which construction data is "

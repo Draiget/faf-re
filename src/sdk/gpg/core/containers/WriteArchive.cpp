@@ -35,7 +35,7 @@ const char* SafeTypeName(const RType* const type)
 }
 
 constexpr char kArchiveTokenBytes[] = {'}', 'N', '0', '*', '{'};
-using TrackedPointerMap = msvc8::map<const void*, WriteArchive::TrackedPointerRecord>;
+using TrackedPointerMap = msvc8::map<RRef, WriteArchive::TrackedPointerRecord, RRefCompare>;
 
 class BinaryWriteArchive;
 
@@ -915,17 +915,16 @@ WriteArchive& WriteArchive::PreCreatedPtr(const RRef& objectRef)
         ThrowSerializationError("Error while creating archive: NULL pre-created pointers are not allowed.");
     }
 
-    if (mObjRefs.find(objectRef.mObj) != mObjRefs.end()) {
+    if (mObjRefs.find(objectRef) != mObjRefs.end()) {
         ThrowSerializationError(
             "Error while creating archive: can't register pre-created pointer because it has already been serialized."
         );
     }
 
     WriteArchive::TrackedPointerRecord record{};
-    record.type = objectRef.mType;
     record.index = static_cast<int>(mObjRefs.size());
     record.ownership = TrackedPointerState::Owned;
-    mObjRefs.insert(std::make_pair(objectRef.mObj, record));
+    (void)mObjRefs.insert({objectRef, record});
     return *this;
 }
 
@@ -966,12 +965,11 @@ void WriteArchive::EndSection(const bool skipOwnershipValidation)
 {
     if (!skipOwnershipValidation) {
         for (TrackedPointerMap::const_iterator it = mObjRefs.begin(); it != mObjRefs.end(); ++it) {
-            const WriteArchive::TrackedPointerRecord& ptr = it->second;
-            if (ptr.ownership == TrackedPointerState::Unowned) {
+            if (it->second.ownership == TrackedPointerState::Unowned) {
                 ThrowSerializationError(STR_Printf(
                     "Error while creating archive: nobody claimed ownership of %s 0x%08x",
-                    SafeTypeName(ptr.type),
-                    reinterpret_cast<unsigned int>(it->first)
+                    SafeTypeName(it->first.mType),
+                    reinterpret_cast<unsigned int>(it->first.mObj)
                 ));
             }
 
