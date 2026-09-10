@@ -18759,13 +18759,30 @@ namespace moho
                 resolvedByUi = true;
                 mode.mMode = COMMOD_Order;
 
+                // 0x0081F91C-0x0081F965: the command name is never compared
+                // against a fixed list. It is decoded through reflection
+                // straight into `mode.mCommandCaps`:
+                //
+                //   0x0081F947  call LuaObject::GetString      ; the "name" field
+                //   0x0081F94E  lea  eax, [esp+mode.mCommandCaps]
+                //   0x0081F956  call gpg::RRef_ERuleBPUnitCommandCaps
+                //   0x0081F962  mov  eax, [edx+14h]            ; RType::SetLexical
+                //   0x0081F965  call eax
+                //
+                // The enum registers its lexicals as "RULEUCC_Move",
+                // "RULEUCC_Repair", ... (RUnitBlueprintEnumTypeInfo.cpp), which
+                // is exactly what the UI sends. The previous two strcmps looked
+                // for bare "Transport"/"CallTransport" and so matched nothing at
+                // all: every command-panel order - repair, reclaim, guard,
+                // patrol, move - resolved with mCommandCaps left at
+                // RULEUCC_None and was silently dropped.
                 LuaPlus::LuaObject commandName = moho::SCR_GetLuaTableField(mState, uiMode.mPayload, "name");
-                if (commandName && commandName.IsString()) {
-                  const char* const commandCapsName = commandName.GetString();
-                  if (commandCapsName && std::strcmp(commandCapsName, "Transport") == 0) {
-                    mode.mCommandCaps = RULEUCC_Transport;
-                  } else if (commandCapsName && std::strcmp(commandCapsName, "CallTransport") == 0) {
-                    mode.mCommandCaps = RULEUCC_CallTransport;
+                if (const char* const commandCapsName = commandName ? commandName.GetString() : nullptr;
+                    commandCapsName != nullptr) {
+                  gpg::RRef capsRef{};
+                  (void)gpg::RRef_ERuleBPUnitCommandCaps(&capsRef, &mode.mCommandCaps);
+                  if (capsRef.mType != nullptr) {
+                    (void)capsRef.mType->SetLexical(capsRef, commandCapsName);
                   }
                 }
               } else if (uiMode.mMode == "build" || uiMode.mMode == "buildanchored") {
