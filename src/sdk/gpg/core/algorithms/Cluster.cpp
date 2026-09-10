@@ -1756,16 +1756,16 @@ namespace
     };
     static_assert(sizeof(ClusterNodeSearchState) == 0x1C, "ClusterNodeSearchState size must be 0x1C");
 
-    struct ClusterSearchOpenHeapEntryRuntime
+    struct ClusterSearchOpenHeapEntry
     {
         float mCost;                    // +0x00
         ClusterNodeSearchState* mNode;  // +0x04
         std::int32_t mHandle;           // +0x08
     };
-    static_assert(sizeof(ClusterSearchOpenHeapEntryRuntime) == 0x0C, "ClusterSearchOpenHeapEntryRuntime size must be 0x0C");
+    static_assert(sizeof(ClusterSearchOpenHeapEntry) == 0x0C, "ClusterSearchOpenHeapEntry size must be 0x0C");
     static_assert(
-      offsetof(ClusterSearchOpenHeapEntryRuntime, mHandle) == 0x08,
-      "ClusterSearchOpenHeapEntryRuntime::mHandle offset must be 0x08"
+      offsetof(ClusterSearchOpenHeapEntry, mHandle) == 0x08,
+      "ClusterSearchOpenHeapEntry::mHandle offset must be 0x08"
     );
 
     /**
@@ -1787,7 +1787,7 @@ namespace
      */
     struct ClusterSearchOpenHeapRuntime
     {
-        msvc8::vector<ClusterSearchOpenHeapEntryRuntime> mHeap; // +0x00
+        msvc8::vector<ClusterSearchOpenHeapEntry> mHeap; // +0x00
         msvc8::vector<std::int32_t> mHandleToHeapIndex;         // +0x10
         std::int32_t mFreeHandleHead;                           // +0x20
     };
@@ -1949,7 +1949,7 @@ namespace
 
         if (heapCount != 0u) {
             // Bare `_Mylast` decrement, matching the binary: the popped
-            // entry is a trivially-destructible POD (`ClusterSearchOpenHeapEntryRuntime`)
+            // entry is a trivially-destructible POD (`ClusterSearchOpenHeapEntry`)
             // and its slot was already relocated by the swap-to-tail above,
             // so no destructor call is needed -- see `pop_back_no_destroy`.
             openHeap.mHeap.pop_back_no_destroy();
@@ -2007,26 +2007,26 @@ namespace
         return it->second;
     }
 
-    struct ClusterSearchEdgeTraversalLaneRuntime
+    struct ClusterSearchEdge
     {
       float mAccumulatedCost;                // +0x00
       std::uint32_t mPackedNodeCoordinate;   // +0x04
       float mTraversalCost;                  // +0x08
     };
-    static_assert(sizeof(ClusterSearchEdgeTraversalLaneRuntime) == 0x0C, "ClusterSearchEdgeTraversalLaneRuntime size must be 0x0C");
+    static_assert(sizeof(ClusterSearchEdge) == 0x0C, "ClusterSearchEdge size must be 0x0C");
 
     /**
-     * `msvc8::vector<ClusterSearchEdgeTraversalLaneRuntime>::push_back` is
+     * `msvc8::vector<ClusterSearchEdge>::push_back` is
      * `FUN_009302E0` -- see the `Address:` block cited onto `vector<T>::
      * push_back` in `legacy/containers/Vector.h` for the full grow-chain
      * evidence (`FUN_00930000` -> `FUN_0092F630`). The former per-type
-     * `AppendClusterSearchEdgeTraversalLane` wrapper added nothing over that
+     * per-type append wrapper added nothing over that
      * member -- its capacity-checked fast path and the discarded `int`
-     * return (`edgeLanes.mFirst + size`, EAX left over from the callee, never
+     * return (`edges.mFirst + size`, EAX left over from the callee, never
      * read by either real caller) are exactly `push_back`'s own shape -- so
      * callers now invoke `.push_back(lane)` directly.
      */
-    using ClusterSearchEdgeTraversalVectorRuntime = msvc8::vector<ClusterSearchEdgeTraversalLaneRuntime>;
+    using ClusterSearchEdgeVector = msvc8::vector<ClusterSearchEdge>;
 
     struct ClusterSearchTraversalContextRuntime
     {
@@ -2138,12 +2138,12 @@ namespace
      *
      * What it does:
      * Expands one frontier node over cluster-cell edge payloads and appends
-     * reachable edge-traversal lanes into the output edge vector.
+     * reachable edges into the output edge vector.
      */
     [[nodiscard]] char ExpandClusterSearchFrontierEdges(
       const ClusterSearchTraversalContextRuntime& context,
       const ClusterSearchFrontierStateRuntime* const frontier,
-      ClusterSearchEdgeTraversalVectorRuntime& outEdgeLanes
+      ClusterSearchEdgeVector& outEdges
     )
     {
       if (context.mSubclusterData == nullptr || frontier == nullptr) {
@@ -2197,13 +2197,13 @@ namespace
             const float traversalDistance = ComputeEdgeTraversalDistance(sourceX, sourceZ, targetX, targetZ);
             const float traversalCost = DequantizeEdgeTraversalCost(bucketCost, traversalDistance);
 
-            ClusterSearchEdgeTraversalLaneRuntime lane{};
-            lane.mAccumulatedCost = frontier->mAccumulatedCost + traversalCost;
-            lane.mPackedNodeCoordinate =
+            ClusterSearchEdge edge{};
+            edge.mAccumulatedCost = frontier->mAccumulatedCost + traversalCost;
+            edge.mPackedNodeCoordinate =
               static_cast<std::uint32_t>(static_cast<std::uint8_t>(tileBaseX + targetX))
               | (static_cast<std::uint32_t>(static_cast<std::uint8_t>(tileBaseZ + targetZ)) << 8u);
-            lane.mTraversalCost = traversalCost;
-            outEdgeLanes.push_back(lane);
+            edge.mTraversalCost = traversalCost;
+            outEdges.push_back(edge);
           }
         }
       }
@@ -2253,7 +2253,7 @@ namespace
       const std::int32_t heapIndex = static_cast<std::int32_t>(openHeap.mHeap.size());
       const std::int32_t handle = AcquireOrReuseClusterSearchOpenHandle(openHeap, heapIndex);
 
-      ClusterSearchOpenHeapEntryRuntime entry{};
+      ClusterSearchOpenHeapEntry entry{};
       entry.mCost = cost;
       entry.mNode = nodeState;
       entry.mHandle = handle;
@@ -2357,7 +2357,7 @@ namespace
      *
      * What it does:
      * Runs the clustered A* frontier loop until the open heap is drained:
-     * expand one node into edge lanes, close/pop the node, and relax all
+     * expand one node into edges, close/pop the node, and relax all
      * discovered neighbors with heap-key updates.
      */
     [[nodiscard]] char ProcessClusterSearchOpenFrontier(
@@ -2366,8 +2366,8 @@ namespace
       const ClusterSearchTraversalContextRuntime& context
     )
     {
-      // RAII: `edgeLanes`'s destructor now performs exactly what the
-      // original hand-rolled `releaseEdgeLanes()` lambda did by hand on
+      // RAII: `edges`'s destructor now performs exactly what the
+      // original hand-rolled release lambda did by hand on
       // every exit path (early-return and normal loop drain alike) --
       // matching the original binary's own scope-exit teardown of this
       // scratch vector, just expressed as the shared `msvc8::vector<T>`
@@ -2375,18 +2375,18 @@ namespace
       // additionally mismatched its own allocator: the vector's own growth
       // path allocates with scalar `::operator new`, so freeing with
       // `delete[]` was already undefined behavior prior to this migration).
-      ClusterSearchEdgeTraversalVectorRuntime edgeLanes{};
+      ClusterSearchEdgeVector edges{};
 
       while (openHeap.mHeap.size() != 0u) {
         ClusterNodeSearchState* const currentNode = openHeap.mHeap.front().mNode;
 
         // The original code reuses the same storage and resets vector size each pass.
-        edgeLanes.clear();
+        edges.clear();
 
         const char expandStatus = ExpandClusterSearchFrontierEdges(
           context,
           reinterpret_cast<const ClusterSearchFrontierStateRuntime*>(currentNode),
-          edgeLanes
+          edges
         );
         if (expandStatus != 0) {
           return expandStatus;
@@ -2395,21 +2395,21 @@ namespace
         currentNode->mState = 2;
         (void)RemoveClusterSearchOpenHeapEntryAt(openHeap, 0u);
 
-        const std::uint32_t laneCount = static_cast<std::uint32_t>(edgeLanes.size());
-        for (std::uint32_t laneIndex = 0u; laneIndex < laneCount; ++laneIndex) {
-          const ClusterSearchEdgeTraversalLaneRuntime& lane = edgeLanes[laneIndex];
-          const std::uint8_t nodeX = static_cast<std::uint8_t>(lane.mPackedNodeCoordinate & 0xFFu);
-          const std::uint8_t nodeZ = static_cast<std::uint8_t>((lane.mPackedNodeCoordinate >> 8u) & 0xFFu);
+        const std::uint32_t edgeCount = static_cast<std::uint32_t>(edges.size());
+        for (std::uint32_t edgeIndex = 0u; edgeIndex < edgeCount; ++edgeIndex) {
+          const ClusterSearchEdge& edge = edges[edgeIndex];
+          const std::uint8_t nodeX = static_cast<std::uint8_t>(edge.mPackedNodeCoordinate & 0xFFu);
+          const std::uint8_t nodeZ = static_cast<std::uint8_t>((edge.mPackedNodeCoordinate >> 8u) & 0xFFu);
           ClusterNodeSearchState& nodeState = ClusterNodeStateMapIndex(stateByCoordinate, nodeX, nodeZ);
 
-          const float candidatePathCost = currentNode->mPathCost + lane.mTraversalCost;
+          const float candidatePathCost = currentNode->mPathCost + edge.mTraversalCost;
 
           if (nodeState.mState == 0) {
             nodeState.mState = 1;
             nodeState.mHeuristicCost = 0.0f;
             nodeState.mHeapLane = PointerToRawI32Bits(currentNode);
-            nodeState.mOwnerNodeIndex = FloatToRawI32Bits(lane.mAccumulatedCost);
-            nodeState.mPackedNodeCoordinate = lane.mPackedNodeCoordinate;
+            nodeState.mOwnerNodeIndex = FloatToRawI32Bits(edge.mAccumulatedCost);
+            nodeState.mPackedNodeCoordinate = edge.mPackedNodeCoordinate;
             nodeState.mPathCost = candidatePathCost;
             nodeState.mOpenListHandle = PushClusterSearchOpenNode(openHeap, candidatePathCost, &nodeState);
             continue;
@@ -2420,8 +2420,8 @@ namespace
               const float heuristicCost = nodeState.mHeuristicCost;
               const std::int32_t openHandle = nodeState.mOpenListHandle;
               nodeState.mHeapLane = PointerToRawI32Bits(currentNode);
-              nodeState.mOwnerNodeIndex = FloatToRawI32Bits(lane.mAccumulatedCost);
-              nodeState.mPackedNodeCoordinate = lane.mPackedNodeCoordinate;
+              nodeState.mOwnerNodeIndex = FloatToRawI32Bits(edge.mAccumulatedCost);
+              nodeState.mPackedNodeCoordinate = edge.mPackedNodeCoordinate;
               nodeState.mPathCost = candidatePathCost;
               UpdateClusterSearchOpenHeapCost(openHeap, openHandle, heuristicCost + candidatePathCost);
             }

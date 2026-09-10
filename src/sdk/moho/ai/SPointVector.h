@@ -39,6 +39,15 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
+    /**
+     * Address: 0x0057C9F0 (FUN_0057C9F0 -- the compiler-generated copy
+     * assignment of this 24-byte aggregate (two `Vector3<float>` field
+     * copies), emitted out of line for `msvc8::vector<SPointVector>`'s
+     * element-wise copy steps and called from 0x0057C290 (CAiBrain.cpp).
+     * No source line: it is the implicit `operator=`. Formerly transcribed
+     * as `CopySPointVectorAndReturnDestination` in CAiBrain.cpp, removed
+     * 2026-09-10.)
+     */
     Wm3::Vector3<float> point;  // +0x00
     Wm3::Vector3<float> vector; // +0x0C
   };
