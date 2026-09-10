@@ -28,7 +28,7 @@
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/StartupHelpers.h"
-#include "moho/misc/EngineVectorHelpers.h"
+
 #include "moho/net/INetNATTraversalProviderWeakPtrReflection.h"
 #include "moho/sim/ISTIDriver.h"
 #include "moho/sim/SimDriver.h"
@@ -730,22 +730,19 @@ moho::SNetCommand::SNetCommand(
  * Address: 0x007BCE70 (FUN_007BCE70)
  *
  * What it does:
- * Copy-constructs one queued command entry by initializing destination name
- * and argument-vector storage from source lanes, then copying queued value.
- *
- * The argument-vector copy is routed through the per-T named helper
- * `CopyConstructVectorOfSNetCommandArg` (FUN_007BAFE0) to preserve the
- * MSVC8 `vector<SNetCommandArg>::vector(const vector&)` symbol shape.
+ * Copy-constructs one queued command entry. `mArgs`' own copy constructor is
+ * the emission at 0x007BAFE0 (0x24 element, `_Ucopy` under an EH scope that
+ * tidies the partial destination and rethrows); only the name and the value
+ * are written by hand.
  */
 moho::SNetCommand::SNetCommand(
   const SNetCommand& source
 )
   : mName()
-  , mArgs()
+  , mArgs(source.mArgs)
   , mVal(0)
 {
   mName.reset_and_assign(source.mName);
-  CopyConstructVectorOfSNetCommandArg(mArgs, source.mArgs);
   mVal = source.mVal;
 }
 

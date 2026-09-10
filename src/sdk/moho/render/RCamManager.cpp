@@ -8,7 +8,7 @@
 
 #include "moho/console/CConCommand.h"
 #include "moho/console/CConFunc.h"
-#include "moho/misc/EngineVectorHelpers.h"
+
 #include "moho/render/camera/CameraImpl.h"
 
 namespace moho
@@ -268,13 +268,10 @@ namespace moho
   /**
    * Address: 0x007AA9C0 (FUN_007AA9C0, ?CreateCamera@RCamManager@Moho@@QAEPAVRCamCamera@2@VStrArg@gpg@@ABVSTIMap@2@PAVLuaState@LuaPlus@@@Z)
    *
-   * The `mCams` append is routed through the per-T push_back-shape helper
-   * `AppendCameraImplPtr` (which folds the fast-path in-place store and the
-   * capacity-full `_Insert_n` grow lane FUN_007AFD10 / FUN_007AE990). In the
-   * binary, CreateCamera open-codes the fast path inline and calls the grow
-   * lane directly (0x007AAA68 `call sub_7AFD10`); wiring through the named
-   * helper preserves those per-T MSVC8 symbols, which a bare
-   * `mCams.push_back(camera)` would inline away.
+   * MSVC inlines the `mCams.push_back(camera)` fast path here and calls the
+   * grow half directly (0x007AAA68 `call sub_7AFD10`), which is why the
+   * out-of-line `push_back` for this element (0x007AE990) ends up with no
+   * callers at all.
    */
   CameraImpl* RCamManager::CreateCamera(
     const gpg::StrArg name, const STIMap& map, LuaPlus::LuaState* const luaState
@@ -295,7 +292,7 @@ namespace moho
       }
     }
 
-    AppendCameraImplPtr(mCams, camera);
+    mCams.push_back(camera);
     return camera;
   }
 
@@ -335,17 +332,12 @@ namespace moho
   /**
    * Address: 0x007AAB60 (FUN_007AAB60, ?GetAllCameras@RCamManager@Moho@@QAE?AV?$vector@PAVCameraImpl@Moho@@V?$allocator@PAVCameraImpl@Moho@@@std@@@std@@XZ)
    *
-   * Returns the camera vector by value. The deep copy is routed through the
-   * per-T named helper `CopyConstructVectorOfCameraImplPtr` (FUN_007AE840) so
-   * the MSVC8 `vector<CameraImpl*>::vector(const vector&)` symbol shape is
-   * preserved — a bare `return mCams;` would let the compiler NRVO the
-   * out-of-line copy-ctor away.
+   * Returns the camera vector by value; the copy is `mCams`' own copy
+   * constructor at 0x007AE840.
    */
   msvc8::vector<CameraImpl*> RCamManager::GetAllCameras()
   {
-    msvc8::vector<CameraImpl*> result;
-    moho::CopyConstructVectorOfCameraImplPtr(result, mCams);
-    return result;
+    return mCams;
   }
 
   /**

@@ -389,7 +389,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\IdPoolTypeInfo.cpp" />
     <ClCompile Include="moho\sim\IdPoolSerializer.cpp" />
     <ClCompile Include="moho\misc\EngineStatsCleanup.cpp" />
-    <ClCompile Include="moho\misc\EngineVectorHelpers.cpp" />
     <ClCompile Include="moho\projectile\Projectile.cpp" />
     <ClCompile Include="moho\task\CTaskEvent.cpp" />
     <ClCompile Include="moho\task\CTaskThread.cpp" />
@@ -2166,7 +2165,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\EntityCategorySetTypeInfo.h" />
     <ClInclude Include="moho\entity\EntityCategorySetVectorReflection.h" />
     <ClInclude Include="moho\misc\EngineStatsCleanup.h" />
-    <ClInclude Include="moho\misc\EngineVectorHelpers.h" />
     <ClInclude Include="moho\projectile\CProjectileAttributes.h" />
     <ClInclude Include="moho\projectile\EProjectileImpactEvent.h" />
     <ClInclude Include="moho\projectile\Projectile.h" />

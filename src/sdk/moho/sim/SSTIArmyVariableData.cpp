@@ -9,7 +9,7 @@
 #include <typeinfo>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/misc/EngineVectorHelpers.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -290,19 +290,13 @@ namespace moho
   }
 
   /**
-   * Member-wise copy-ctor for `SArmyVectorWithMeta`.
-   *
-   * The engine emitted the underlying `msvc8::vector<uint32_t>` copy operation
-   * at 0x00560A90 because the original 2007 source default-initialized this
-   * struct member-wise. Default-construct `mWords` then route the inner-vector
-   * deep copy through the named per-T helper so the linker keeps that
-   * out-of-line symbol bound from this source-level call site.
+   * Member-wise copy constructor. `mWords`' own copy constructor is what the
+   * engine emitted at 0x00560A90; the body says nothing.
    */
   SArmyVectorWithMeta::SArmyVectorWithMeta(const SArmyVectorWithMeta& other)
-    : mWords()
+    : mWords(other.mWords)
     , mMetaWord(other.mMetaWord)
   {
-    moho::AssignCopyVectorUint32(mWords, other.mWords);
   }
 
   /**
