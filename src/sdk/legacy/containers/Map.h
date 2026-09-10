@@ -490,6 +490,7 @@ namespace msvc8
          * Address: 0x004AC460 (FUN_004AC460 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9F30, 0x004AA090; formerly `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
          * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
+         * Address: 0x00684510 (FUN_00684510 -- the mapped-value store `operator[]` performs -- `Entity::StandardInit` writing the entity into the reserved id's slot for `msvc8::map<std::uint32_t, moho::Entity*>` (`CEntityDb::mAllUnits` at +0x00); zero callers, unreachable; formerly `AssignEntityPayloadAtIdNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         mapped_type& operator[](const key_type& k)
         {
@@ -518,6 +519,7 @@ namespace msvc8
          * it just never trips, since `position` is always a live, valid
          * cursor from the enclosing walk.
          * Address: 0x004AC520 (FUN_004AC520 -- `erase(const_iterator)` with the invalid-iterator throw for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9FC0, 0x004AE0D0; formerly `EraseFactoryRegistrationAtIterator` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00685410 (FUN_00685410 -- `erase(const_iterator)` for `msvc8::map<std::uint32_t, moho::Entity*>` (`CEntityDb::mAllUnits` at +0x00); callers 0x00684690, 0x00686EF0; formerly `EraseAllUnitsTreeNode` in moho/entity/EntityDb.cpp (RULE ONE), removed 2026-09-10.)
          */
         iterator erase(const_iterator pos) { return iterator(tree_.erase_node(pos.node())); }
 
