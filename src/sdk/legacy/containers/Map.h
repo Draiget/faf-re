@@ -189,6 +189,7 @@ namespace msvc8
          * mis-attribution, not a real recovery of this address); that
          * helper is deleted and this member's real call sites (`.find()`)
          * are the recovery now (DB-integrity fix).
+         * Address: 0x004E1950 (FUN_004E1950 -- `find` -- lower_bound plus the equivalence check, returning the header on a miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `FindSndLoopNodeByParams` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) { return iterator(tree_.find_node(k)); }
         [[nodiscard]] const_iterator find(const key_type& k) const { return const_iterator(tree_.find_node(k)); }
@@ -276,6 +277,7 @@ namespace msvc8
          * What it does:
          * Links a copy of `v` into the tree when its key is absent and reports
          * `true`; otherwise returns a cursor on the colliding node and `false`.
+         * Address: 0x004E1890 (FUN_004E1890 -- `insert(value)` -- the lookup-or-insert that follows the miss for `msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>` (`gSharedAmbientLoopsByParams` in moho/audio/CSndParams.cpp, node 0x18, mapped handle at node+0x10); callers 0x004DF2B0; formerly `EnsureSharedAmbientLoopMapEntry` in moho/audio/CSndParams.cpp (RULE ONE), removed 2026-09-10.)
          */
         std::pair<iterator, bool> insert(const value_type& v)
         {

@@ -6,7 +6,7 @@
 #include <mutex>
 #include <string>
 #include <typeinfo>
-#include <unordered_map>
+#include "legacy/containers/Map.h"
 #include <vector>
 
 #include "gpg/core/algorithms/MD5.h"
@@ -56,8 +56,15 @@ namespace
   std::recursive_mutex gSndParamsRegistryMutex;
   msvc8::list<moho::CSndParams*> gSndParamsRegistry;
   std::unordered_multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
-  std::mutex gSharedAmbientLoopMutex;
-  std::unordered_map<moho::CSndParams*, std::unique_ptr<moho::HSndEntityLoop>> gSharedAmbientLoopsByParams;
+  // The shipped cache is an RB-tree keyed on the descriptor pointer: node
+  // 0x18, the mapped handle at node+0x10 and the colour/nil pair at +0x14/+0x15
+  // (0x004DF2B0 reads `[found+0x10]` and compares the result against the
+  // header). The lock beside it is a `boost::mutex`, taken through
+  // `boost::mutex::do_lock` at 0x004DF2FB.
+  using SharedAmbientLoopMap = msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>;
+
+  boost::mutex gSharedAmbientLoopMutex;
+  SharedAmbientLoopMap gSharedAmbientLoopsByParams{};
   moho::HSndEntityLoop gDefaultSharedAmbientLoop{nullptr, -1, nullptr};
 
   struct CSndParamsTemp
@@ -391,83 +398,6 @@ namespace
     return CopyPairHeadTail(outPair, headValueSlot, tailValueSlot);
   }
 
-  struct SndLoopTreeNodeRuntimeView
-  {
-    SndLoopTreeNodeRuntimeView* mLeft;   // +0x00
-    SndLoopTreeNodeRuntimeView* mParent; // +0x04
-    SndLoopTreeNodeRuntimeView* mRight;  // +0x08
-    std::uintptr_t mParamsKeyWord = 0;   // +0x0C
-    moho::HSndEntityLoop* mLoop = nullptr; // +0x10
-    std::uint8_t mColor = 0;             // +0x14
-    std::uint8_t mIsNil = 0;             // +0x15
-    std::uint8_t mReserved16[0x2]{};     // +0x16
-  };
-  static_assert(
-    offsetof(SndLoopTreeNodeRuntimeView, mParamsKeyWord) == 0x0C,
-    "SndLoopTreeNodeRuntimeView::mParamsKeyWord offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SndLoopTreeNodeRuntimeView, mLoop) == 0x10,
-    "SndLoopTreeNodeRuntimeView::mLoop offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SndLoopTreeNodeRuntimeView, mIsNil) == 0x15,
-    "SndLoopTreeNodeRuntimeView::mIsNil offset must be 0x15"
-  );
-  static_assert(sizeof(SndLoopTreeNodeRuntimeView) == 0x18, "SndLoopTreeNodeRuntimeView size must be 0x18");
-
-  struct SndLoopTreeOwnerRuntimeView
-  {
-    std::uint32_t mReserved00 = 0;          // +0x00
-    SndLoopTreeNodeRuntimeView* mHeader = nullptr; // +0x04
-  };
-  static_assert(
-    offsetof(SndLoopTreeOwnerRuntimeView, mHeader) == 0x04,
-    "SndLoopTreeOwnerRuntimeView::mHeader offset must be 0x04"
-  );
-  static_assert(sizeof(SndLoopTreeOwnerRuntimeView) == 0x8, "SndLoopTreeOwnerRuntimeView size must be 0x8");
-
-  struct SndLoopTreeFindResultRuntimeView
-  {
-    SndLoopTreeNodeRuntimeView* mNode = nullptr; // +0x00
-  };
-  static_assert(sizeof(SndLoopTreeFindResultRuntimeView) == 0x4, "SndLoopTreeFindResultRuntimeView size must be 0x4");
-
-  /**
-   * Address: 0x004E1950 (FUN_004E1950)
-   *
-   * What it does:
-   * Performs a lower-bound walk in the legacy shared-loop RB-tree and writes
-   * either the exact key node or the end sentinel.
-   */
-  [[maybe_unused]] [[nodiscard]] SndLoopTreeFindResultRuntimeView* FindSndLoopNodeByParams(
-    SndLoopTreeFindResultRuntimeView* const outResult,
-    const SndLoopTreeOwnerRuntimeView* const treeOwner,
-    const moho::CSndParams* const* const paramsSlot
-  ) noexcept
-  {
-    SndLoopTreeNodeRuntimeView* candidate = treeOwner->mHeader;
-    SndLoopTreeNodeRuntimeView* cursor = candidate->mParent;
-    const std::uintptr_t keyWord = reinterpret_cast<std::uintptr_t>(*paramsSlot);
-
-    while (cursor->mIsNil == 0u) {
-      if (cursor->mParamsKeyWord >= keyWord) {
-        candidate = cursor;
-        cursor = cursor->mLeft;
-      } else {
-        cursor = cursor->mRight;
-      }
-    }
-
-    SndLoopTreeNodeRuntimeView* const endNode = treeOwner->mHeader;
-    if (candidate == endNode || keyWord < candidate->mParamsKeyWord) {
-      outResult->mNode = endNode;
-    } else {
-      outResult->mNode = candidate;
-    }
-    return outResult;
-  }
-
   struct HeaderPointerOwnerView
   {
     std::uint32_t mReserved00;   // +0x00
@@ -656,41 +586,6 @@ namespace
   }
 
   /**
-   * Address: 0x004E1890 (FUN_004E1890, msvc8::map<CSndParams*, HSndEntityLoop*>::_Insert_lower_bound)
-   *
-   * What it does:
-   * Per-T canonical-template-helper binding for the engine-instantiated
-   * `msvc8::map<CSndParams*, HSndEntityLoop*>::_Insert` lookup-or-insert
-   * lane. The binary walked the RB-tree by `CSndParams*` key, returned the
-   * existing iterator when present, otherwise inserted a fresh node and
-   * returned `(node, inserted=true)`.
-   *
-   * The recovered ambient-loop cache moved to `std::unordered_map` with
-   * `std::unique_ptr` value to preserve RAII, so this wrapper expresses
-   * the same find-or-insert semantics through the modern container while
-   * still exposing the per-T symbol so the engine-instantiated template
-   * emission has a named source-level invocation point.
-   */
-  [[nodiscard]] moho::HSndEntityLoop* EnsureSharedAmbientLoopMapEntry(
-    std::unordered_map<moho::CSndParams*, std::unique_ptr<moho::HSndEntityLoop>>& cache,
-    moho::CSndParams* const params)
-  {
-    const auto it = cache.find(params);
-    if (it != cache.end()) {
-      return it->second.get();
-    }
-
-    auto created = std::make_unique<moho::HSndEntityLoop>();
-    created->mListLinkHead = nullptr;
-    created->mLoopIndex = -1;
-    created->mParams = params;
-
-    moho::HSndEntityLoop* const handle = created.get();
-    cache.emplace(params, std::move(created));
-    return handle;
-  }
-
-  /**
    * Address: 0x004DF2B0 (FUN_004DF2B0, func_GetSndLoop)
    *
    * What it does:
@@ -703,8 +598,21 @@ namespace
       return &gDefaultSharedAmbientLoop;
     }
 
-    std::lock_guard<std::mutex> lock(gSharedAmbientLoopMutex);
-    return EnsureSharedAmbientLoopMapEntry(gSharedAmbientLoopsByParams, params);
+    boost::mutex::scoped_lock lock(gSharedAmbientLoopMutex);
+
+    const auto existing = gSharedAmbientLoopsByParams.find(params);
+    if (existing != gSharedAmbientLoopsByParams.end()) {
+      return existing->second;
+    }
+
+    // 0x0C bytes from `operator new`, then the three fields in order: no list
+    // head, index -1, and the descriptor that keyed the entry.
+    auto* const loop = new moho::HSndEntityLoop();
+    loop->mListLinkHead = nullptr;
+    loop->mLoopIndex = -1;
+    loop->mParams = params;
+    (void)gSharedAmbientLoopsByParams.insert({params, loop});
+    return loop;
   }
 
   /**
