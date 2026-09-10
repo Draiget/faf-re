@@ -2181,13 +2181,11 @@ namespace gpg::gal
       return getString(stringVariable, outValue);
     }
 
-    struct EffectContextLane54Runtime final
-    {
-      void* proxy = nullptr;        // +0x00
-      EffectMacro* first = nullptr; // +0x04
-      EffectMacro* last = nullptr;  // +0x08
-      EffectMacro* end = nullptr;   // +0x0C
-    };
+    // `{proxy, first, last, end}` at 0x10 is `msvc8::vector<EffectMacro>`
+    // itself, so the lane is the container, not a view over it.
+    using EffectMacroVector = msvc8::vector<EffectMacro>;
+
+    static_assert(sizeof(EffectMacroVector) == 0x10, "EffectMacroVector size must be 0x10");
 
     struct EffectContextRuntime final
     {
@@ -2201,7 +2199,7 @@ namespace gpg::gal
       boost::detail::sp_counted_base* sharedCount48 = nullptr; // +0x48
       std::uint32_t field4C = 0U;                              // +0x4C
       std::uint32_t field50 = 0U;                              // +0x50
-      EffectContextLane54Runtime lane54{};                     // +0x54
+      EffectMacroVector lane54{};                     // +0x54
     };
 
     static_assert(offsetof(EffectContextRuntime, field04) == 0x04, "EffectContextRuntime::field04 offset must be 0x04");
@@ -2215,7 +2213,7 @@ namespace gpg::gal
     static_assert(offsetof(EffectContextRuntime, field4C) == 0x4C, "EffectContextRuntime::field4C offset must be 0x4C");
     static_assert(offsetof(EffectContextRuntime, field50) == 0x50, "EffectContextRuntime::field50 offset must be 0x50");
     static_assert(offsetof(EffectContextRuntime, lane54) == 0x54, "EffectContextRuntime::lane54 offset must be 0x54");
-    static_assert(sizeof(EffectContextLane54Runtime) == 0x10, "EffectContextLane54Runtime size must be 0x10");
+
     static_assert(sizeof(EffectContextRuntime) == 0x64, "EffectContextRuntime size must be 0x64");
 
     EffectContextRuntime* AsEffectContextRuntime(EffectD3D10* const effect) noexcept
@@ -3816,44 +3814,6 @@ namespace gpg::gal
       return outPipelineState;
     }
 
-    std::size_t EffectMacroCount(const EffectContextLane54Runtime& runtime) noexcept
-    {
-      if (runtime.first == nullptr) {
-        return 0U;
-      }
-
-      return static_cast<std::size_t>(runtime.last - runtime.first);
-    }
-
-    std::size_t EffectMacroCapacity(const EffectContextLane54Runtime& runtime) noexcept
-    {
-      if (runtime.first == nullptr) {
-        return 0U;
-      }
-
-      return static_cast<std::size_t>(runtime.end - runtime.first);
-    }
-
-    void DestroyEffectMacroRange(EffectMacro* first, EffectMacro* last) noexcept
-    {
-      while (first != last) {
-        first->~EffectMacro();
-        ++first;
-      }
-    }
-
-    void DestroyEffectMacroStorage(EffectContextLane54Runtime& runtime) noexcept
-    {
-      if (runtime.first != nullptr) {
-        DestroyEffectMacroRange(runtime.first, runtime.last);
-        ::operator delete(static_cast<void*>(runtime.first));
-      }
-
-      runtime.first = nullptr;
-      runtime.last = nullptr;
-      runtime.end = nullptr;
-    }
-
     /**
      * Address: 0x008FAA50 (FUN_008FAA50)
      *
@@ -3960,28 +3920,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008FDF70 (FUN_008FDF70)
-     *
-     * What it does:
-     * Clears one proxy-vector lane and reserves `count` `0x13C`-byte entries
-     * with legacy VC8 vector-length overflow semantics.
-     */
-    bool TryInitializeEffectMacroProxyVectorLane(
-      EffectContextLane54Runtime* const lane,
-      const std::uint32_t elementCount
-    )
-    {
-      return TryInitializeRuntimeProxyVectorLane(
-        reinterpret_cast<RuntimeProxyVectorLane*>(lane),
-        elementCount,
-        0x00CF6474U,
-        0x13CU,
-        ThrowVectorTooLongLengthErrorA,
-        AllocateStride13CArray
-      );
-    }
-
-    /**
      * Address: 0x008FDFC0 (FUN_008FDFC0)
      *
      * What it does:
@@ -4003,283 +3941,6 @@ namespace gpg::gal
       );
     }
 
-    bool TryReserveEffectMacroStorage(EffectContextLane54Runtime& runtime, const std::size_t elementCount) noexcept
-    {
-      if (elementCount == 0U) {
-        runtime.first = nullptr;
-        runtime.last = nullptr;
-        runtime.end = nullptr;
-        return false;
-      }
-
-      if (elementCount > 0x04444444U) {
-        ThrowVectorTooLongLengthErrorA();
-      }
-
-      try {
-        auto* const storage = static_cast<EffectMacro*>(::operator new(sizeof(EffectMacro) * elementCount));
-        runtime.first = storage;
-        runtime.last = storage;
-        runtime.end = storage + elementCount;
-        return true;
-      } catch (...) {
-        runtime.first = nullptr;
-        runtime.last = nullptr;
-        runtime.end = nullptr;
-        return false;
-      }
-    }
-
-    /**
-     * Address: 0x0093F790 (FUN_0093F790)
-     *
-     * What it does:
-     * Copy-assigns both string lanes of one `EffectMacro` entry.
-     */
-    EffectMacro* AssignEffectMacroStrings(
-      EffectMacro* const destination, const EffectMacro& source
-    )
-    {
-      destination->keyText_.assign(source.keyText_, 0U, msvc8::string::npos);
-      destination->valueText_.assign(source.valueText_, 0U, msvc8::string::npos);
-      return destination;
-    }
-
-    /**
-     * Address: 0x0093FAB0 (FUN_0093FAB0)
-     *
-     * What it does:
-     * Performs element-wise copy-assignment over `[sourceFirst,sourceLast)` for
-     * `EffectMacro` lanes using string `assign` on both text fields.
-     */
-    EffectMacro* CopyAssignEffectMacroRange(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      const EffectMacro* read = sourceFirst;
-      EffectMacro* write = destinationFirst;
-      while (read != sourceLast) {
-        AssignEffectMacroStrings(write, *read);
-        ++read;
-        ++write;
-      }
-
-      return write;
-    }
-
-    /**
-     * Address: 0x008FAB30 (FUN_008FAB30)
-     *
-     * What it does:
-     * Conditionally copy-constructs one `EffectMacro` entry at destination and
-     * returns destination.
-     */
-    EffectMacro* ConstructEffectMacroIfPresent(EffectMacro* const destination, const EffectMacro& source)
-    {
-      if (destination != nullptr) {
-        ::new (static_cast<void*>(destination)) EffectMacro(source);
-      }
-
-      return destination;
-    }
-
-    /**
-     * Address: 0x0093F810 (FUN_0093F810)
-     *
-     * What it does:
-     * Copy-constructs one contiguous uninitialized destination range from one
-     * source `[first,last)` effect-macro range.
-     */
-    EffectMacro* UninitializedCopyEffectMacroRangeCore(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      const EffectMacro* read = sourceFirst;
-      EffectMacro* write = destinationFirst;
-      try {
-        while (read != sourceLast) {
-          ConstructEffectMacroIfPresent(write, *read);
-          ++read;
-          ++write;
-        }
-      }
-      catch (...) {
-        DestroyEffectMacroRange(destinationFirst, write);
-        throw;
-      }
-
-      return write;
-    }
-
-    /**
-     * Address: 0x0093FA10 (FUN_0093FA10)
-     *
-     * What it does:
-     * Copy-constructs `count` effect-macro entries from one source entry into
-     * contiguous uninitialized destination lanes.
-     */
-    EffectMacro* UninitializedFillEffectMacroRangeCore(
-      EffectMacro* destinationFirst, std::size_t count, const EffectMacro& source
-    )
-    {
-      EffectMacro* write = destinationFirst;
-      try {
-        while (count != 0U) {
-          ConstructEffectMacroIfPresent(write, source);
-          ++write;
-          --count;
-        }
-      }
-      catch (...) {
-        DestroyEffectMacroRange(destinationFirst, write);
-        throw;
-      }
-
-      return write;
-    }
-
-    /**
-     * Address: 0x0093FB50 (FUN_0093FB50)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` fill helper.
-     */
-    void UninitializedFillEffectMacroRangeDispatchB(
-      EffectMacro* const destinationFirst, const std::size_t count, const EffectMacro& source
-    )
-    {
-      (void)UninitializedFillEffectMacroRangeCore(destinationFirst, count, source);
-    }
-
-    EffectMacro* UninitializedCopyEffectMacroRange(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    /**
-     * Address: 0x0093FB20 (FUN_0093FB20)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
-     * helper.
-     */
-    EffectMacro* UninitializedCopyEffectMacroRangeDispatchA(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    /**
-     * Address: 0x0093FBC0 (FUN_0093FBC0)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
-     * helper.
-     */
-    EffectMacro* UninitializedCopyEffectMacroRangeDispatchB(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    /**
-     * Address: 0x0093FB80 (FUN_0093FB80)
-     *
-     * What it does:
-     * Dispatch bridge into the `EffectMacro` copy-assignment range helper.
-     *
-     * Note: 0x00937360 was previously listed here; that address is actually a
-     * `jmp sub_937290` tail-thunk into the `boost::function1` dispatch helper
-     * (see `moho/containers/LegacyContainerFillLanes.cpp`), not an
-     * `EffectMacro` copy-range dispatch.
-     */
-    EffectMacro* CopyAssignEffectMacroRangeDispatchA(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return CopyAssignEffectMacroRange(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    /**
-     * Address: 0x0093FC50 (FUN_0093FC50)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` fill helper.
-     */
-    EffectMacro* UninitializedFillEffectMacroRangeDispatchA(
-      EffectMacro* destinationFirst, const std::size_t count, const EffectMacro& source
-    )
-    {
-      return UninitializedFillEffectMacroRangeCore(destinationFirst, count, source);
-    }
-
-    /**
-     * Address: 0x0093FC90 (FUN_0093FC90)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
-     * helper.
-     */
-    EffectMacro* UninitializedCopyEffectMacroRangeDispatchC(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    /**
-     * Address: 0x0093FE80 (FUN_0093FE80)
-     *
-     * What it does:
-     * Dispatch bridge into the core uninitialized `EffectMacro` range-copy
-     * helper.
-     */
-    EffectMacro* UninitializedCopyEffectMacroRangeDispatchD(
-      const EffectMacro* sourceFirst, const EffectMacro* sourceLast, EffectMacro* destinationFirst
-    )
-    {
-      return UninitializedCopyEffectMacroRangeCore(sourceFirst, sourceLast, destinationFirst);
-    }
-
-    void AssignEffectContextLane54(EffectContextLane54Runtime& destination, const EffectContextLane54Runtime& source)
-    {
-      if (&destination == &source) {
-        return;
-      }
-
-      const std::size_t sourceCount = EffectMacroCount(source);
-      if (sourceCount == 0U) {
-        DestroyEffectMacroRange(destination.first, destination.last);
-        destination.last = destination.first;
-        return;
-      }
-
-      const std::size_t destinationSize = EffectMacroCount(destination);
-      if (sourceCount > destinationSize) {
-        const std::size_t destinationCapacity = EffectMacroCapacity(destination);
-        if (sourceCount <= destinationCapacity) {
-          EffectMacro* const splitSource = source.first + destinationSize;
-          CopyAssignEffectMacroRange(source.first, splitSource, destination.first);
-          destination.last = UninitializedCopyEffectMacroRange(splitSource, source.last, destination.last);
-          return;
-        }
-
-        DestroyEffectMacroStorage(destination);
-        if (TryReserveEffectMacroStorage(destination, sourceCount)) {
-          destination.last = UninitializedCopyEffectMacroRange(source.first, source.last, destination.first);
-        }
-        return;
-      }
-
-      EffectMacro* const compactedEnd = CopyAssignEffectMacroRange(source.first, source.last, destination.first);
-      DestroyEffectMacroRange(compactedEnd, destination.last);
-      destination.last = destination.first + sourceCount;
-    }
-
     EffectContextRuntime*
     CopyEffectContextRuntime(EffectContextRuntime* const destination, const EffectContextRuntime* const source)
     {
@@ -4295,7 +3956,7 @@ namespace gpg::gal
       AssignSharedCount(destination->sharedCount48, source->sharedCount48);
       destination->field4C = source->field4C;
       destination->field50 = source->field50;
-      AssignEffectContextLane54(destination->lane54, source->lane54);
+      destination->lane54 = source->lane54;
       return destination;
     }
 
@@ -4312,19 +3973,18 @@ namespace gpg::gal
       context.sharedCount48 = nullptr;
       context.field4C = 0U;
       context.field50 = 0U;
-      context.lane54 = {};
+      ::new (static_cast<void*>(&context.lane54)) EffectMacroVector();
     }
 
     void DestroyEffectContextRuntimeStorage(EffectContextRuntime& context) noexcept
     {
       ReleaseSharedCount(context.sharedCount48);
-      DestroyEffectMacroStorage(context.lane54);
+      context.lane54.tidy();
       context.field0C.tidy(true, 0U);
       context.field28.tidy(true, 0U);
       context.field44 = 0U;
       context.field4C = 0U;
       context.field50 = 0U;
-      context.lane54.proxy = nullptr;
     }
 
     /**
@@ -4399,40 +4059,6 @@ namespace gpg::gal
       ReleaseComLike(variable->dxEffect_);
       variable->variableHandle_ = nullptr;
       variable->name_.tidy(true, 0U);
-    }
-
-    template <class T>
-    void DestroyVectorOwnedStorage(msvc8::vector<T>& storage) noexcept
-    {
-      T* const begin = storage.begin();
-      storage.clear();
-      if (begin != nullptr) {
-        ::operator delete(static_cast<void*>(begin));
-      }
-      storage.release_storage_without_free();
-    }
-
-    /**
-     * Address: 0x008FA920 (FUN_008FA920)
-     *
-     * What it does:
-     * Runs `AdapterD3D10` range destruction for one retained adapter vector and
-     * releases the owned storage lane while preserving the proxy lane.
-     */
-    void DestroyDeviceAdapterStorage(msvc8::vector<AdapterD3D10>& adapters) noexcept
-    {
-      DestroyVectorOwnedStorage(adapters);
-    }
-
-    /**
-     * Address: 0x008FAA40 (FUN_008FAA40)
-     *
-     * What it does:
-     * Preserves the one-jump thunk lane into `DestroyDeviceAdapterStorage`.
-     */
-    void DestroyDeviceAdapterStorageThunk(msvc8::vector<AdapterD3D10>& adapters) noexcept
-    {
-      DestroyDeviceAdapterStorage(adapters);
     }
 
     AdapterD3D10* UninitializedFillAdapterRangeCore(
@@ -4684,10 +4310,10 @@ namespace gpg::gal
       static_cast<void>(ResetDeviceD3D10Runtime(backend));
       backend->cursor_.~CursorD3D10();
       backend->pipelineState_.reset();
-      DestroyVectorOwnedStorage(backend->swapChains_);
-      DestroyDeviceAdapterStorageThunk(backend->adapters_);
+      backend->swapChains_.tidy();
+      backend->adapters_.tidy();
       backend->deviceContext_.~DeviceContext();
-      DestroyVectorOwnedStorage(backend->logStorage_);
+      backend->logStorage_.tidy();
       backend->outputContext_.~OutputContext();
     }
   } // namespace
@@ -7234,15 +6860,16 @@ namespace gpg::gal
     const EffectContextRuntime* const inboundRuntime = AsEffectContextRuntime(context);
     const EffectContextRuntime* const localRuntime = AsEffectContextRuntime(localContext);
 
-    const std::size_t totalMacroCount = EffectMacroCount(localRuntime->lane54);
+    const std::size_t totalMacroCount = localRuntime->lane54.size();
     D3D10_SHADER_MACRO* defines = nullptr;
     if (totalMacroCount != 0U) {
       defines = new D3D10_SHADER_MACRO[totalMacroCount + 1U];
 
       std::size_t writeIndex = 0U;
-      for (EffectMacro* read = localRuntime->lane54.first; read != localRuntime->lane54.last; ++read, ++writeIndex) {
-        defines[writeIndex].Name = read->keyText_.c_str();
-        defines[writeIndex].Definition = read->valueText_.c_str();
+      for (const EffectMacro& macro : localRuntime->lane54) {
+        defines[writeIndex].Name = macro.keyText_.c_str();
+        defines[writeIndex].Definition = macro.valueText_.c_str();
+        ++writeIndex;
       }
 
       defines[writeIndex].Name = nullptr;
