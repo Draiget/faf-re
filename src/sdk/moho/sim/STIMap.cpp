@@ -461,62 +461,7 @@ namespace
   }
 
 
-  /**
-   * Address: 0x004785D0 (FUN_004785D0)
-   *
-   * What it does:
-   * Zeros all lanes of one `CHeightFieldTier` aggregate.
-   */
-  void ZeroHeightFieldTier(moho::CHeightFieldTier& tier) noexcept
-  {
-    tier.data1.data = nullptr;
-    tier.data1.width = 0;
-    tier.data1.height = 0;
-    tier.data2.data = nullptr;
-    tier.data2.width = 0;
-    tier.data2.height = 0;
-  }
-
-  /**
-   * Address: 0x00478610 (FUN_00478610)
-   *
-   * What it does:
-   * Zeros all lanes of one 16-bit height-word grid aggregate.
-   */
-  void ZeroHeightWordGridVariant1(moho::CHeightFieldI16Grid& grid) noexcept
-  {
-    grid.data = nullptr;
-    grid.width = 0;
-    grid.height = 0;
-  }
-
-  /**
-   * Address: 0x004786C0 (FUN_004786C0)
-   *
-   * What it does:
-   * Duplicate zero-initialize lane for 16-bit height-word grid aggregates.
-   */
-  void ZeroHeightWordGridVariant2(moho::CHeightFieldI16Grid& grid) noexcept
-  {
-    grid.data = nullptr;
-    grid.width = 0;
-    grid.height = 0;
-  }
-
   using HeightFieldTierVector = msvc8::vector<moho::CHeightFieldTier>;
-
-  template <typename ElementT>
-  [[nodiscard]] constexpr std::uint32_t LegacyVectorMaxCount_0xFFFFFFFC() noexcept
-  {
-    return static_cast<std::uint32_t>(0xFFFFFFFCu / sizeof(ElementT));
-  }
-
-  template <typename ElementT>
-  [[nodiscard]] std::uint32_t LegacyVectorSizeFromPointers(const ElementT* const first, const ElementT* const last)
-    noexcept
-  {
-    return first != nullptr ? static_cast<std::uint32_t>(last - first) : 0u;
-  }
 
   [[nodiscard]] std::size_t MinMaxGridSampleCount(const moho::CHeightFieldMinMaxGrid& grid) noexcept
   {
@@ -566,88 +511,6 @@ namespace
     for (std::size_t i = 0; i < count; ++i) {
       dst.data[i] = src.data[i];
     }
-  }
-
-  void CopyHeightFieldTierDeep(const moho::CHeightFieldTier& src, moho::CHeightFieldTier& dst)
-  {
-    ZeroHeightFieldTier(dst);
-    CopyMinMaxGridDeep(src.data1, dst.data1);
-    try {
-      CopyHeightWordGridDeep(src.data2, dst.data2);
-    } catch (...) {
-      delete[] dst.data1.data;
-      ZeroHeightFieldTier(dst);
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x00478D10 (FUN_00478D10)
-   *
-   * What it does:
-   * Writes a tier pointer lane into `outValue`.
-   */
-  moho::CHeightFieldTier**
-  StoreTierPointerVariant1(moho::CHeightFieldTier*& outValue, moho::CHeightFieldTier* value) noexcept
-  {
-    outValue = value;
-    return &outValue;
-  }
-
-  /**
-   * Address: 0x00478E80 (FUN_00478E80)
-   *
-   * What it does:
-   * Duplicate lane writing a tier pointer into `outValue`.
-   */
-  moho::CHeightFieldTier**
-  StoreTierPointerVariant2(moho::CHeightFieldTier*& outValue, moho::CHeightFieldTier* value) noexcept
-  {
-    outValue = value;
-    return &outValue;
-  }
-
-  /**
-   * Address: 0x00478D20 (FUN_00478D20)
-   *
-   * What it does:
-   * Writes `base[index]` into `outValue` from a raw tier-pointer lane.
-   */
-  moho::CHeightFieldTier** StoreTierPointerByIndex(
-    moho::CHeightFieldTier*& outValue,
-    moho::CHeightFieldTier* const* const baseLane,
-    const std::int32_t index
-  ) noexcept
-  {
-    outValue = (*baseLane) + index;
-    return &outValue;
-  }
-
-  /**
-   * Address: 0x00478E50 (FUN_00478E50)
-   *
-   * What it does:
-   * Duplicate lane returning legacy max element count for 24-byte tier entries.
-   */
-  [[nodiscard]] constexpr std::uint32_t HeightFieldTierVectorMaxCountVariant2() noexcept
-  {
-    return LegacyVectorMaxCount_0xFFFFFFFC<moho::CHeightFieldTier>();
-  }
-
-  /**
-   * Address: 0x00479130 (FUN_00479130)
-   *
-   * What it does:
-   * Allocates raw storage for `count` tier entries and throws `std::bad_alloc`
-   * on overflow.
-   */
-  void* AllocateHeightFieldTierStorage(const std::uint32_t count)
-  {
-    if (count != 0u && (std::numeric_limits<std::uint32_t>::max() / count) < sizeof(moho::CHeightFieldTier)) {
-      throw std::bad_alloc();
-    }
-
-    return ::operator new(static_cast<std::size_t>(count) * sizeof(moho::CHeightFieldTier));
   }
 
   /**
@@ -749,337 +612,6 @@ namespace
   }
 
   /**
-   * Address: 0x00479580 (FUN_00479580)
-   *
-   * What it does:
-   * Releases deep-owned arrays of one tier aggregate.
-   */
-  void DestroyHeightFieldTierEntry(moho::CHeightFieldTier& tier) noexcept
-  {
-    delete[] tier.data2.data;
-    delete[] tier.data1.data;
-  }
-
-  /**
-   * Address: 0x00479090 (FUN_00479090)
-   *
-   * What it does:
-   * Duplicate range destroy loop for deep-owned tier entries.
-   */
-  void DestroyHeightFieldTierRangeVariant2(
-    moho::CHeightFieldTier* first,
-    moho::CHeightFieldTier* last
-  ) noexcept
-  {
-    for (moho::CHeightFieldTier* it = first; it != last; ++it) {
-      DestroyHeightFieldTierEntry(*it);
-    }
-  }
-
-  /**
-   * Address: 0x00479260 (FUN_00479260)
-   *
-   * What it does:
-   * Copies `[first,last)` tier entries into initialized destination range
-   * starting at `dstFirst`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeForward(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* dstFirst
-  )
-  {
-    const moho::CHeightFieldTier* src = first;
-    moho::CHeightFieldTier* dst = dstFirst;
-    while (src != last) {
-      AssignMinMaxGrid(dst->data1, src->data1);
-      AssignHeightWordGrid(dst->data2, src->data2);
-      ++src;
-      ++dst;
-    }
-
-    return dst;
-  }
-
-  /**
-   * Address: 0x00479300 (FUN_00479300)
-   *
-   * What it does:
-   * Copies from `srcFirst` into initialized destination range
-   * `[dstFirst,dstLast)`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeToInitialized(
-    moho::CHeightFieldTier* dstFirst,
-    moho::CHeightFieldTier* dstLast,
-    const moho::CHeightFieldTier* srcFirst
-  )
-  {
-    moho::CHeightFieldTier* dst = dstFirst;
-    const moho::CHeightFieldTier* src = srcFirst;
-    while (dst != dstLast) {
-      AssignMinMaxGrid(dst->data1, src->data1);
-      AssignHeightWordGrid(dst->data2, src->data2);
-      ++dst;
-      ++src;
-    }
-
-    return dst;
-  }
-
-  /**
-   * Address: 0x004795D0 (FUN_004795D0)
-   *
-   * What it does:
-   * Copies a tier range backwards, starting from `dstEnd`/`srcEnd`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeBackward(
-    moho::CHeightFieldTier* dstEnd,
-    moho::CHeightFieldTier* dstBegin,
-    moho::CHeightFieldTier* srcEnd
-  )
-  {
-    moho::CHeightFieldTier* dst = dstEnd;
-    moho::CHeightFieldTier* src = srcEnd;
-    while (dstBegin != dst) {
-      --dst;
-      --src;
-      AssignMinMaxGrid(dst->data1, src->data1);
-      AssignHeightWordGrid(dst->data2, src->data2);
-    }
-
-    return src;
-  }
-
-  /**
-   * Address: 0x00479380 (FUN_00479380)
-   *
-   * What it does:
-   * Constructs `count` deep-copied tier entries from one prototype into
-   * uninitialized destination storage.
-   */
-  void ConstructHeightFieldTierFill(
-    moho::CHeightFieldTier* outFirst,
-    std::uint32_t count,
-    const moho::CHeightFieldTier& prototype
-  )
-  {
-    moho::CHeightFieldTier* outIt = outFirst;
-    try {
-      while (count != 0u) {
-        if (outIt != nullptr) {
-          CopyMinMaxGridAllocateAndCopy(outIt->data1, prototype.data1);
-          try {
-            CopyHeightWordGridAllocateAndCopy(prototype.data2, outIt->data2);
-          } catch (...) {
-            delete[] outIt->data1.data;
-            outIt->data1.data = nullptr;
-            throw;
-          }
-        }
-
-        ++outIt;
-        --count;
-      }
-    } catch (...) {
-      for (moho::CHeightFieldTier* it = outFirst; it != outIt; ++it) {
-        DestroyHeightFieldTierEntry(*it);
-      }
-      throw;
-    }
-  }
-
-  /**
-   * Address: 0x004796D0 (FUN_004796D0)
-   *
-   * What it does:
-   * Constructs deep-copied tier entries from `[first,last)` into uninitialized
-   * destination storage and returns the end pointer.
-   */
-  moho::CHeightFieldTier* ConstructHeightFieldTierRange(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* outFirst
-  )
-  {
-    const moho::CHeightFieldTier* srcIt = first;
-    moho::CHeightFieldTier* outIt = outFirst;
-    try {
-      while (srcIt != last) {
-        if (outIt != nullptr) {
-          CopyMinMaxGridAllocateAndCopy(outIt->data1, srcIt->data1);
-          try {
-            CopyHeightWordGridAllocateAndCopy(srcIt->data2, outIt->data2);
-          } catch (...) {
-            delete[] outIt->data1.data;
-            outIt->data1.data = nullptr;
-            throw;
-          }
-        }
-
-        ++srcIt;
-        ++outIt;
-      }
-    } catch (...) {
-      for (moho::CHeightFieldTier* it = outFirst; it != outIt; ++it) {
-        DestroyHeightFieldTierEntry(*it);
-      }
-      throw;
-    }
-
-    return outIt;
-  }
-
-  /**
-   * Address: 0x00478E30 (FUN_00478E30)
-   *
-   * What it does:
-   * EH thunk forwarding to `ConstructHeightFieldTierFill`.
-   */
-  void ConstructHeightFieldTierFillThunkVariant1(
-    const moho::CHeightFieldTier& prototype,
-    moho::CHeightFieldTier* outFirst,
-    const std::uint32_t count
-  )
-  {
-    ConstructHeightFieldTierFill(outFirst, count, prototype);
-  }
-
-  /**
-   * Address: 0x00479190 (FUN_00479190)
-   *
-   * What it does:
-   * Duplicate EH thunk forwarding to `ConstructHeightFieldTierFill`.
-   */
-  void ConstructHeightFieldTierFillThunkVariant2(
-    const moho::CHeightFieldTier& prototype,
-    moho::CHeightFieldTier* outFirst,
-    const std::uint32_t count
-  )
-  {
-    ConstructHeightFieldTierFill(outFirst, count, prototype);
-  }
-
-  /**
-   * Address: 0x004790C0 (FUN_004790C0)
-   *
-   * What it does:
-   * EH thunk forwarding to `ConstructHeightFieldTierRange`.
-   */
-  void ConstructHeightFieldTierRangeThunkVariant1(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* outFirst
-  )
-  {
-    (void)ConstructHeightFieldTierRange(first, last, outFirst);
-  }
-
-  /**
-   * Address: 0x004792D0 (FUN_004792D0)
-   *
-   * What it does:
-   * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
-   */
-  void ConstructHeightFieldTierRangeThunkVariant2(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* outFirst
-  )
-  {
-    (void)ConstructHeightFieldTierRange(first, last, outFirst);
-  }
-
-  /**
-   * Address: 0x004795A0 (FUN_004795A0)
-   *
-   * What it does:
-   * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
-   */
-  void ConstructHeightFieldTierRangeThunkVariant3(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* outFirst
-  )
-  {
-    (void)ConstructHeightFieldTierRange(first, last, outFirst);
-  }
-
-  /**
-   * Address: 0x004796A0 (FUN_004796A0)
-   *
-   * What it does:
-   * Duplicate EH thunk forwarding to `ConstructHeightFieldTierRange`.
-   */
-  void ConstructHeightFieldTierRangeThunkVariant4(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* outFirst
-  )
-  {
-    (void)ConstructHeightFieldTierRange(first, last, outFirst);
-  }
-
-  /**
-   * Address: 0x00479060 (FUN_00479060)
-   *
-   * What it does:
-   * EH thunk forwarding to `CopyHeightFieldTierRangeForward`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeForwardThunk(
-    const moho::CHeightFieldTier* first,
-    const moho::CHeightFieldTier* last,
-    moho::CHeightFieldTier* dstFirst
-  )
-  {
-    return CopyHeightFieldTierRangeForward(first, last, dstFirst);
-  }
-
-  /**
-   * Address: 0x004790F0 (FUN_004790F0)
-   *
-   * What it does:
-   * Thunk forwarding to `CopyHeightFieldTierRangeToInitialized`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeToInitializedThunk(
-    moho::CHeightFieldTier* dstFirst,
-    moho::CHeightFieldTier* dstLast,
-    const moho::CHeightFieldTier* srcFirst
-  )
-  {
-    return CopyHeightFieldTierRangeToInitialized(dstFirst, dstLast, srcFirst);
-  }
-
-  /**
-   * Address: 0x00479100 (FUN_00479100)
-   *
-   * What it does:
-   * EH thunk forwarding to `CopyHeightFieldTierRangeBackward`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant1(
-    moho::CHeightFieldTier* dstEnd,
-    moho::CHeightFieldTier* dstBegin,
-    moho::CHeightFieldTier* srcEnd
-  )
-  {
-    return CopyHeightFieldTierRangeBackward(dstEnd, dstBegin, srcEnd);
-  }
-
-  /**
-   * Address: 0x00479350 (FUN_00479350)
-   *
-   * What it does:
-   * Duplicate EH thunk forwarding to `CopyHeightFieldTierRangeBackward`.
-   */
-  moho::CHeightFieldTier* CopyHeightFieldTierRangeBackwardThunkVariant2(
-    moho::CHeightFieldTier* dstEnd,
-    moho::CHeightFieldTier* dstBegin,
-    moho::CHeightFieldTier* srcEnd
-  )
-  {
-    return CopyHeightFieldTierRangeBackward(dstEnd, dstBegin, srcEnd);
-  }
-
-  /**
    * Address: 0x00479250 (FUN_00479250)
    *
    * What it does:
@@ -1157,299 +689,6 @@ namespace
     outValue.x = x;
     outValue.y = y;
     return &outValue;
-  }
-
-  /**
-   * Address: 0x004788B0 (FUN_004788B0)
-   *
-   * What it does:
-   * Returns legacy max element count for 24-byte tier entries.
-   */
-  [[nodiscard]] constexpr std::uint32_t HeightFieldTierVectorMaxCountVariant1() noexcept
-  {
-    return LegacyVectorMaxCount_0xFFFFFFFC<moho::CHeightFieldTier>();
-  }
-
-  /**
-   * Address: 0x00478C50 (FUN_00478C50)
-   *
-   * What it does:
-   * Throws the legacy VC8 `vector<T> too long` length-error.
-   */
-  [[noreturn]] void ThrowHeightFieldTierVectorTooLong()
-  {
-    throw std::length_error("vector<T> too long");
-  }
-
-  /**
-   * Address: 0x00478560 (FUN_00478560)
-   *
-   * What it does:
-   * Returns current logical element count from `[begin,end)` lanes.
-   */
-  [[nodiscard]] std::uint32_t HeightFieldTierVectorSize(const HeightFieldTierVector& tiers) noexcept
-  {
-    return LegacyVectorSizeFromPointers(tiers.begin(), tiers.end());
-  }
-
-  /**
-   * Address: 0x00478580 (FUN_00478580)
-   *
-   * What it does:
-   * Returns pointer to tier element at `index`.
-   */
-  moho::CHeightFieldTier*
-  HeightFieldTierVectorElementAtVariant1(HeightFieldTierVector& tiers, const std::int32_t index) noexcept
-  {
-    moho::CHeightFieldTier* const first = tiers.begin();
-    return first != nullptr ? first + index : nullptr;
-  }
-
-  /**
-   * Address: 0x00478590 (FUN_00478590)
-   *
-   * What it does:
-   * Duplicate lane returning pointer to tier element at `index`.
-   */
-  moho::CHeightFieldTier*
-  HeightFieldTierVectorElementAtVariant2(HeightFieldTierVector& tiers, const std::int32_t index) noexcept
-  {
-    return HeightFieldTierVectorElementAtVariant1(tiers, index);
-  }
-
-  /**
-   * Address: 0x00478890 (FUN_00478890)
-   *
-   * What it does:
-   * Writes vector begin pointer lane into `outBegin`.
-   */
-  moho::CHeightFieldTier**
-  WriteHeightFieldTierVectorBegin(moho::CHeightFieldTier*& outBegin, HeightFieldTierVector& tiers) noexcept
-  {
-    outBegin = tiers.begin();
-    return &outBegin;
-  }
-
-  /**
-   * Address: 0x004788A0 (FUN_004788A0)
-   *
-   * What it does:
-   * Writes vector end pointer lane into `outEnd`.
-   */
-  moho::CHeightFieldTier**
-  WriteHeightFieldTierVectorEnd(moho::CHeightFieldTier*& outEnd, HeightFieldTierVector& tiers) noexcept
-  {
-    outEnd = tiers.end();
-    return &outEnd;
-  }
-
-  /**
-   * Address: 0x00478910 (FUN_00478910)
-   *
-   * What it does:
-   * Releases deep-owned subgrid arrays for each tier in `[first,last)`.
-   */
-  void DestroyHeightFieldTierRangeVariant1(moho::CHeightFieldTier* first, moho::CHeightFieldTier* last) noexcept
-  {
-    for (moho::CHeightFieldTier* it = first; it != last; ++it) {
-      delete[] it->data2.data;
-      delete[] it->data1.data;
-      it->data1.data = nullptr;
-      it->data2.data = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x004788C0 (FUN_004788C0)
-   *
-   * What it does:
-   * Removes one `[eraseFirst,eraseLast)` range and returns the new range start.
-   */
-  moho::CHeightFieldTier** EraseHeightFieldTierRange(
-    HeightFieldTierVector& tiers,
-    moho::CHeightFieldTier*& outBegin,
-    moho::CHeightFieldTier* eraseFirst,
-    moho::CHeightFieldTier* eraseLast
-  )
-  {
-    if (eraseFirst != eraseLast) {
-      const std::size_t firstIndex = static_cast<std::size_t>(eraseFirst - tiers.begin());
-      const std::size_t lastIndex = static_cast<std::size_t>(eraseLast - tiers.begin());
-      if (lastIndex > firstIndex) {
-        DestroyHeightFieldTierRangeVariant1(eraseFirst, eraseLast);
-        tiers.erase(tiers.begin() + static_cast<std::ptrdiff_t>(firstIndex), tiers.begin() + static_cast<std::ptrdiff_t>(lastIndex));
-      }
-      outBegin = tiers.begin() + static_cast<std::ptrdiff_t>(firstIndex);
-    } else {
-      outBegin = eraseFirst;
-    }
-
-    return &outBegin;
-  }
-
-  /**
-   * Address: 0x004787E0 (FUN_004787E0)
-   *
-   * What it does:
-   * Resets tier vector storage and reserves `capacity` entries.
-   */
-  bool ResetHeightFieldTierVectorStorage(
-    HeightFieldTierVector& tiers,
-    const std::uint32_t capacity
-  )
-  {
-    if (capacity > HeightFieldTierVectorMaxCountVariant1()) {
-      ThrowHeightFieldTierVectorTooLong();
-    }
-
-    moho::CHeightFieldTier* begin = nullptr;
-    moho::CHeightFieldTier* end = nullptr;
-    (void)WriteHeightFieldTierVectorBegin(begin, tiers);
-    (void)WriteHeightFieldTierVectorEnd(end, tiers);
-    if (begin != nullptr) {
-      DestroyHeightFieldTierRangeVariant1(begin, end);
-    }
-
-    HeightFieldTierVector fresh{};
-    if (capacity != 0u) {
-      fresh.reserve(capacity);
-    }
-    tiers = std::move(fresh);
-    return true;
-  }
-
-  /**
-   * Address: 0x00478940 (FUN_00478940)
-   *
-   * What it does:
-   * Inserts `count` deep-copied tier entries at `insertAt`.
-   */
-  void InsertHeightFieldTierCopies(
-    const moho::CHeightFieldTier& prototype,
-    HeightFieldTierVector& tiers,
-    moho::CHeightFieldTier* insertAt,
-    const std::uint32_t count
-  )
-  {
-    if (count == 0u) {
-      return;
-    }
-
-    const std::uint32_t currentSize = HeightFieldTierVectorSize(tiers);
-    if (HeightFieldTierVectorMaxCountVariant1() - currentSize < count) {
-      ThrowHeightFieldTierVectorTooLong();
-    }
-
-    std::size_t insertIndex = static_cast<std::size_t>(currentSize);
-    if (tiers.begin() != nullptr && insertAt != nullptr) {
-      insertIndex = static_cast<std::size_t>(insertAt - tiers.begin());
-      if (insertIndex > static_cast<std::size_t>(currentSize)) {
-        insertIndex = static_cast<std::size_t>(currentSize);
-      }
-    }
-    if (insertIndex != static_cast<std::size_t>(currentSize)) {
-      insertIndex = static_cast<std::size_t>(currentSize);
-    }
-
-    const std::size_t targetSize = static_cast<std::size_t>(currentSize) + static_cast<std::size_t>(count);
-    if (tiers.capacity() < targetSize) {
-      std::size_t grown = tiers.capacity() + tiers.capacity() / 2u;
-      if (grown < targetSize) {
-        grown = targetSize;
-      }
-
-      const std::size_t maxCount = static_cast<std::size_t>(HeightFieldTierVectorMaxCountVariant1());
-      if (grown > maxCount) {
-        grown = maxCount;
-      }
-      if (grown < targetSize) {
-        ThrowHeightFieldTierVectorTooLong();
-      }
-
-      if (currentSize == 0u && tiers.begin() == nullptr) {
-        (void)ResetHeightFieldTierVectorStorage(tiers, static_cast<std::uint32_t>(grown));
-      } else {
-        tiers.reserve(grown);
-      }
-    }
-
-    for (std::uint32_t i = 0; i < count; ++i) {
-      moho::CHeightFieldTier copiedTier{};
-      CopyHeightFieldTierDeep(prototype, copiedTier);
-      tiers.push_back(copiedTier);
-    }
-  }
-
-  /**
-   * Address: 0x00478700 (FUN_00478700)
-   *
-   * What it does:
-   * Resizes the tier vector to `numSubgrids` using deep-copied `fillValue` entries.
-   */
-  void ResizeHeightFieldTierVector(
-    const std::uint32_t numSubgrids,
-    HeightFieldTierVector& tiers,
-    const moho::CHeightFieldTier& fillValue
-  )
-  {
-    const std::uint32_t currentSize = HeightFieldTierVectorSize(tiers);
-    if (currentSize >= numSubgrids) {
-      if (tiers.begin() != nullptr && numSubgrids < currentSize) {
-        moho::CHeightFieldTier* newBegin = nullptr;
-        (void)EraseHeightFieldTierRange(
-          tiers,
-          newBegin,
-          HeightFieldTierVectorElementAtVariant2(tiers, static_cast<std::int32_t>(numSubgrids)),
-          tiers.end()
-        );
-      }
-    } else {
-      InsertHeightFieldTierCopies(
-        fillValue,
-        tiers,
-        tiers.end(),
-        static_cast<std::uint32_t>(numSubgrids - currentSize)
-      );
-    }
-  }
-
-  /**
-   * Address: 0x00478530 (FUN_00478530)
-   *
-   * What it does:
-   * Resizes tier vector using zero-initialized default tier entries.
-   */
-  void ResizeHeightFieldTierVectorWithZeroTemplate(
-    HeightFieldTierVector& tiers,
-    const std::uint32_t numSubgrids
-  )
-  {
-    moho::CHeightFieldTier zeroTemplate{};
-    ZeroHeightFieldTier(zeroTemplate);
-    ResizeHeightFieldTierVector(numSubgrids, tiers, zeroTemplate);
-    delete[] zeroTemplate.data2.data;
-    delete[] zeroTemplate.data1.data;
-  }
-
-  /**
-   * Address: 0x00478830 (FUN_00478830)
-   *
-   * What it does:
-   * Releases all deep-owned tier entries and resets vector storage to empty.
-   */
-  void ReleaseHeightFieldTierVectorStorage(HeightFieldTierVector& tiers)
-  {
-    moho::CHeightFieldTier* begin = nullptr;
-    moho::CHeightFieldTier* end = nullptr;
-    (void)WriteHeightFieldTierVectorBegin(begin, tiers);
-    (void)WriteHeightFieldTierVectorEnd(end, tiers);
-
-    if (begin != nullptr) {
-      DestroyHeightFieldTierRangeVariant1(begin, end);
-    }
-
-    HeightFieldTierVector empty{};
-    tiers = std::move(empty);
   }
 
   [[nodiscard]] Wm3::Vec3f PointOnLine(const moho::GeomLine3& line, const float t) noexcept
@@ -1958,6 +1197,43 @@ namespace moho
    * What it does:
    * Builds base + tier grids used by terrain sampling and broad collision logic.
    */
+  /**
+   * Address: 0x00479580 (FUN_00479580 -- `~CHeightFieldTier`, the element
+   * destructor `_Destroy_range` runs over the tier vector.)
+   */
+  CHeightFieldTier::~CHeightFieldTier()
+  {
+    delete[] data2.data;
+    delete[] data1.data;
+  }
+
+  /**
+   * Deep-copies both owned grids; on a failure part way through, the already
+   * copied min/max grid is released before the exception leaves, which is the
+   * rollback the binary's copy body performs.
+   */
+  CHeightFieldTier::CHeightFieldTier(const CHeightFieldTier& other)
+  {
+    CopyMinMaxGridDeep(other.data1, data1);
+    try {
+      CopyHeightWordGridDeep(other.data2, data2);
+    } catch (...) {
+      delete[] data1.data;
+      data1 = {};
+      throw;
+    }
+  }
+
+  CHeightFieldTier& CHeightFieldTier::operator=(const CHeightFieldTier& other)
+  {
+    if (this != &other) {
+      CHeightFieldTier copy(other);
+      std::swap(data1, copy.data1);
+      std::swap(data2, copy.data2);
+    }
+    return *this;
+  }
+
   CHeightField::CHeightField(const std::int32_t widthArg, const std::int32_t heightArg)
     : data(nullptr)
     , width(0)
@@ -1976,7 +1252,7 @@ namespace moho
       }
     }
 
-    ResizeHeightFieldTierVectorWithZeroTemplate(mGrids, static_cast<std::uint32_t>(numSubgrids));
+    mGrids.resize(static_cast<std::size_t>(numSubgrids), CHeightFieldTier{});
     for (std::int32_t level = 0; level < numSubgrids; ++level) {
       const std::int32_t shift = level + 1;
       const std::int32_t levelHeight = std::max(heightArg >> shift, 1);
@@ -2016,7 +1292,7 @@ namespace moho
   {
     delete[] data;
     data = nullptr;
-    ReleaseHeightFieldTierVectorStorage(mGrids);
+    mGrids.tidy();
   }
 
   /**
