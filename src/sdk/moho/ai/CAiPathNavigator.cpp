@@ -1434,10 +1434,10 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
   if (pathSize <= 0) {
     return false;
   }
+  const std::int32_t firstReachableIndex = (mHasForwardProbe != 0u) ? std::max(0, ComputeDirectPrefixSpan(*this)) : 0;
   const std::int32_t furthestCandidateIndex = (mHasForwardProbe != 0u)
     ? std::min(pathSize - 1, std::max(10, firstReachableIndex))
     : std::min(pathSize - 1, 1);
-  const std::int32_t firstReachableIndex = (mHasForwardProbe != 0u) ? std::max(0, ComputeDirectPrefixSpan(*this)) : 0;
 
   // The path length is read after the direct-prefix scan: that scan consumes the
   // cell the unit already stands on (0x005AF7E0 reads _Mylast - _Myfirst only
