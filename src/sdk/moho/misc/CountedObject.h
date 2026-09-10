@@ -56,6 +56,8 @@ namespace moho
      * as emitted for the beam vector copies (retain the new texture, release the
      * old one). Formerly `CopyCountedParticleTextureLaneRetain` in
      * BeamRenderHelpers.cpp, removed 2026-09-10.)
+     * Address: 0x00794E10 (FUN_00794E10 -- `CountedPtr<T>::operator=` reading the source handle through a slot: retain the new object, release the old one; callers `DrawUnitCustomNameLabel` 0x0085E0A0 and `DrawUnitSelectionSetNameLabel` 0x0085E3A0 (CWldSession.cpp); formerly `AssignIntrusiveRefCountedWordFromSlot` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
+     * Address: 0x0089E580 (FUN_0089E580 -- the same `CountedPtr<T>::operator=` shape for a second handle type; zero callers, unreachable; formerly `AssignIntrusiveRefCountedWordFromSlot` in moho/containers/LegacyContainerFillLanes.cpp (RULE ONE), file removed 2026-09-10.)
      */
     CountedPtr& operator=(const CountedPtr& other) noexcept
     {

@@ -10,6 +10,23 @@
 
 namespace moho
 {
+  /**
+   * boost::function1<R, A>::operator() as instantiated by the engine's
+   * one-argument callbacks (the three `boost::function_void::operator()`
+   * twins 0x004135C0 / 0x00413E60 / 0x00461910 dispatch through it):
+   * Address: 0x00937290 (FUN_00937290 -- the dispatch: `vtable == 0` raises
+   *   `boost::bad_function_call` through `boost::throw_exception`, otherwise
+   *   `invoker(functor at this+0x08, arg)` via the manager/invoker table's
+   *   second slot; formerly `InvokeBoostFunction1` in
+   *   moho/containers/LegacyContainerFillLanes.cpp, file removed 2026-09-10.)
+   * Address: 0x00937360 (FUN_00937360 -- its one-instruction `jmp` tail thunk;
+   *   formerly `InvokeBoostFunction1TailThunk`.)
+   * Address: 0x00937490 (FUN_00937490 -- the pointer-indirected adapter
+   *   (`(*self)->operator()(arg)`); formerly `InvokeBoostFunction1IndirectAdapter`.)
+   * The bodies live in boost 1.34.1's function_template.hpp; no engine
+   * source line maps to them beyond the `boost::function<void(A)>` members
+   * that instantiate the template.
+   */
     class RScmResource;
     class RScaResource;
     class CHeightField;
