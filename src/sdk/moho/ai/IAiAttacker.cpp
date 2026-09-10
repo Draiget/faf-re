@@ -333,110 +333,6 @@ namespace
     return gpg::STR_Printf("%s, size=%d", base.c_str(), size);
   }
 
-  /**
-   * Address: 0x005DC810 (FUN_005DC810)
-   *
-   * What it does:
-   * Sets `vector<UnitWeapon*>` length to `requestedCount`, preserving existing
-   * pointer lanes on shrink and appending null pointer lanes on growth.
-   */
-  [[nodiscard]] std::uintptr_t ResizeUnitWeaponPointerVectorAndReturnBegin(
-    UnitWeaponPtrVector& storage,
-    const unsigned int requestedCount
-  )
-  {
-    const std::size_t currentCount = storage.size();
-    if (requestedCount < currentCount) {
-      storage.resize(static_cast<std::size_t>(requestedCount));
-    } else if (requestedCount > currentCount) {
-      storage.resize(static_cast<std::size_t>(requestedCount), nullptr);
-    }
-
-    return reinterpret_cast<std::uintptr_t>(storage.data());
-  }
-
-  /**
-   * Address: 0x005DD570 (FUN_005DD570, msvc8::vector<moho::CAcquireTargetTask*>::_Insert_n)
-   *
-   * IDA signature:
-   * int __userpurge sub_5DD570@<eax>(int *value@<eax>, unsigned int count@<ecx>, int *vec, _DWORD *pos);
-   *
-   * What it does:
-   * Engine-instantiated body of `msvc8::vector<moho::CAcquireTargetTask*>::_Insert_n`.
-   * Inserts `count` copies of `*value` at `pos`. When spare capacity is
-   * sufficient the live tail `[pos, end)` is shifted right by `count` slots and
-   * the gap is filled with the pointer value; otherwise a 1.5x-grown buffer is
-   * allocated, the head is moved, the insert window is fill-constructed, the
-   * tail is moved, and the previous block is freed. This canonical MSVC8
-   * `_Insert_n` lane backs both `push_back(x)` slow-path append and
-   * `resize(n, value)` growth for the CAcquireTargetTask* pointer vector; the
-   * body itself lives in `msvc8::vector<T>::insert` (legacy/containers/Vector.h)
-   * and this per-T free helper is the source-level by-name invocation that keeps
-   * the emitted symbol.
-   */
-  void InsertNCopiesCAcquireTargetTaskPtrVector(
-    CAcquireTargetTaskPtrVector& storage,
-    moho::CAcquireTargetTask** const insertPosition,
-    const unsigned int insertCount,
-    moho::CAcquireTargetTask* const fillValue
-  )
-  {
-    if (insertCount == 0u) {
-      return;
-    }
-
-    const auto offset = static_cast<std::size_t>(insertPosition - storage.begin());
-    storage.insert(storage.begin() + offset, static_cast<std::size_t>(insertCount), fillValue);
-  }
-
-  /**
-   * Address: 0x005DC660 (FUN_005DC660, gpg::RVectorType_CAcquireTargetTask_P::SerLoad append lane)
-   *
-   * What it does:
-   * Appends one deserialized `CAcquireTargetTask*` into the destination vector,
-   * mirroring the MSVC8 inlined `push_back` shape used by the binary SerLoad
-   * loop: when the pre-reserved capacity is exhausted the append reaches the
-   * canonical `vector<CAcquireTargetTask*>::_Insert_n` slow-path
-   * (`InsertNCopiesCAcquireTargetTaskPtrVector`, FUN_005DD570); otherwise it is
-   * a fast-path in-place store.
-   */
-  void AppendLoadedCAcquireTargetTaskPtr(
-    CAcquireTargetTaskPtrVector& storage,
-    moho::CAcquireTargetTask* const value
-  )
-  {
-    if (storage.size() == storage.capacity()) {
-      InsertNCopiesCAcquireTargetTaskPtrVector(storage, storage.end(), 1u, value);
-    } else {
-      storage.push_back(value);
-    }
-  }
-
-  /**
-   * Address: 0x005DC9B0 (FUN_005DC9B0)
-   *
-   * What it does:
-   * Sets `vector<CAcquireTargetTask*>` length to `requestedCount`,
-   * preserving existing lanes on shrink and appending null pointer lanes on
-   * growth. Growth routes through the canonical
-   * `vector<CAcquireTargetTask*>::_Insert_n` lane
-   * (`InsertNCopiesCAcquireTargetTaskPtrVector`, FUN_005DD570) to preserve the
-   * MSVC8 per-T symbol shape; shrink remains an inline tail erase.
-   */
-  void ResizeCAcquireTargetTaskPointerVector(CAcquireTargetTaskPtrVector& storage, const unsigned int requestedCount)
-  {
-    const std::size_t currentCount = storage.size();
-    if (requestedCount < currentCount) {
-      storage.resize(static_cast<std::size_t>(requestedCount));
-      return;
-    }
-
-    if (requestedCount > currentCount) {
-      const auto growBy = static_cast<unsigned int>(requestedCount - currentCount);
-      InsertNCopiesCAcquireTargetTaskPtrVector(storage, storage.end(), growBy, nullptr);
-    }
-  }
-
   void cleanup_RBroadcasterRType_EAiAttackerEvent()
   {
     if (!gBroadcasterAttackerTypeConstructed) {
@@ -782,7 +678,7 @@ void gpg::RVectorType_UnitWeaponPtr::SetCount(void* const obj, const int count) 
     return;
   }
 
-  (void)ResizeUnitWeaponPointerVectorAndReturnBegin(*storage, static_cast<unsigned int>(count));
+  storage->resize(static_cast<std::size_t>(count), nullptr);
 }
 
 /**
@@ -859,7 +755,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SerLoad(
   for (unsigned int i = 0; i < count; ++i) {
     moho::CAcquireTargetTask* value = nullptr;
     archive->ReadPointer_CAcquireTargetTask(&value, ownerRef);
-    AppendLoadedCAcquireTargetTaskPtr(loaded, value);
+    loaded.push_back(value);
   }
 
   *storage = std::move(loaded);
@@ -926,7 +822,7 @@ void gpg::RVectorType_CAcquireTargetTaskPtr::SetCount(void* const obj, const int
     return;
   }
 
-  ResizeCAcquireTargetTaskPointerVector(*storage, static_cast<unsigned int>(count));
+  storage->resize(static_cast<std::size_t>(count), nullptr);
 }
 
 /**
