@@ -27,51 +27,6 @@ namespace moho
       return static_cast<std::uint32_t>(entity->id_);
     }
 
-    /**
-     * Address: 0x0057D3F0 (FUN_0057D3F0, gpg::fastvector_n4_Entity::cpy)
-     *
-     * What it does:
-     * Rebinds one destination inline fast-vector lane and copies all entity
-     * entries from `source`.
-     */
-    void CopyEntityInlineVector(
-      const gpg::fastvector_n<Entity*, 4>& source,
-      gpg::fastvector_n<Entity*, 4>& destination
-    )
-    {
-      destination.ResetStorageToInline();
-      destination.reserve(source.size());
-      for (Entity* const entity : source) {
-        destination.push_back(entity);
-      }
-    }
-
-    /**
-     * Address: 0x005E8900 (FUN_005E8900, erase-and-return-cursor helper)
-     *
-     * What it does:
-     * Erases one slot from the sorted entity vector and returns the stable
-     * post-erase cursor position.
-     */
-    [[nodiscard]] Entity** EraseEntityVectorSlotAndReturnCursor(
-      gpg::fastvector_n<Entity*, 4>& entities,
-      Entity** const slot
-    )
-    {
-      Entity** const begin = entities.begin();
-      Entity** const end = entities.end();
-      if (slot == nullptr || slot < begin || slot >= end) {
-        return end;
-      }
-
-      const std::ptrdiff_t erasedIndex = slot - begin;
-      (void)entities.erase(slot);
-      Entity** const newBegin = entities.begin();
-      Entity** const newEnd = entities.end();
-      Entity** const newCursor = newBegin + erasedIndex;
-      return (newCursor <= newEnd) ? newCursor : newEnd;
-    }
-
   } // namespace
 
   /**
@@ -125,102 +80,16 @@ namespace moho
    * What it does:
    * Resets intrusive links to singleton state and copies entity-set storage
    * from `other`.
+   * Address: 0x00705AE0 (FUN_00705AE0 -- a second emission of this copy constructor, guarded on a null source; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentPrimary`, removed 2026-09-11.)
+   * Address: 0x00706230 (FUN_00706230 -- a third emission of it; zero callers, unreachable; formerly `CopyConstructEntitySetTemplateUnitIfPresentSecondary`, removed 2026-09-11.)
    */
   SEntitySetTemplateUnit::SEntitySetTemplateUnit(const SEntitySetTemplateUnit& other)
     : TDatList<SEntitySetTemplateUnit, void>()
-    , mVec()
+    , mVec(other.mVec)
   {
-    CopyEntityInlineVector(other.mVec, mVec);
-  }
-
-  [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresent(
-    SEntitySetTemplateUnit* const destination,
-    const SEntitySetTemplateUnit* const source
-  )
-  {
-    if (source == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (destination) SEntitySetTemplateUnit(*source);
-  }
-
-  /**
-   * Address: 0x00705AE0 (FUN_00705AE0)
-   *
-   * What it does:
-   * Primary register-lane adapter for nullable `SEntitySetTemplateUnit`
-   * copy-construction into caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresentPrimary(
-    SEntitySetTemplateUnit* const destination,
-    const SEntitySetTemplateUnit* const source
-  )
-  {
-    return CopyConstructEntitySetTemplateUnitIfPresent(destination, source);
-  }
-
-  /**
-   * Address: 0x00706230 (FUN_00706230)
-   *
-   * What it does:
-   * Secondary register-lane adapter for nullable `SEntitySetTemplateUnit`
-   * copy-construction into caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitIfPresentSecondary(
-    SEntitySetTemplateUnit* const destination,
-    const SEntitySetTemplateUnit* const source
-  )
-  {
-    return CopyConstructEntitySetTemplateUnitIfPresent(destination, source);
-  }
-
-  /**
-   * Address: 0x00706D70 (FUN_00706D70)
-   *
-   * What it does:
-   * Copy-constructs one contiguous `[sourceBegin, sourceEnd)` range of
-   * `SEntitySetTemplateUnit` records into uninitialized destination storage;
-   * on exception, resets already-constructed destination entries and rethrows.
-   */
-  [[maybe_unused]] [[nodiscard]] SEntitySetTemplateUnit* CopyConstructEntitySetTemplateUnitRangeWithRollback(
-    const SEntitySetTemplateUnit* sourceBegin,
-    const SEntitySetTemplateUnit* const sourceEnd,
-    SEntitySetTemplateUnit* destinationBegin
-  )
-  {
-    std::uintptr_t sourceCursorWord = reinterpret_cast<std::uintptr_t>(sourceBegin);
-    const std::uintptr_t sourceEndWord = reinterpret_cast<std::uintptr_t>(sourceEnd);
-    std::uintptr_t destinationCursorWord = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    const std::uintptr_t destinationBeginWord = destinationCursorWord;
-
-    try {
-      while (sourceCursorWord != sourceEndWord) {
-        const auto* const source = reinterpret_cast<const SEntitySetTemplateUnit*>(sourceCursorWord);
-        auto* const destination = reinterpret_cast<SEntitySetTemplateUnit*>(destinationCursorWord);
-
-        if (destination != nullptr) {
-          destination->ListResetLinks();
-          destination->mVec.ResetStorageToInline();
-          destination->mVec.AddAll(&source->mVec);
-        }
-
-        sourceCursorWord += sizeof(SEntitySetTemplateUnit);
-        destinationCursorWord += sizeof(SEntitySetTemplateUnit);
-      }
-
-      return reinterpret_cast<SEntitySetTemplateUnit*>(destinationCursorWord);
-    } catch (...) {
-      for (
-        std::uintptr_t rollbackCursorWord = destinationBeginWord;
-        rollbackCursorWord != destinationCursorWord;
-        rollbackCursorWord += sizeof(SEntitySetTemplateUnit)
-      ) {
-        auto* const rollback = reinterpret_cast<SEntitySetTemplateUnit*>(rollbackCursorWord);
-        rollback->~SEntitySetTemplateUnit();
-      }
-      throw;
-    }
+    // 0x00579500 self-links the two list words and then hands `this + 8` to
+    // the inline vector's copy constructor (0x0057D3F0). Both are member
+    // initialisation; the body is empty.
   }
 
   Unit* SEntitySetTemplateUnit::UnitFromEntry(Entity* const entity) noexcept
@@ -348,7 +217,7 @@ namespace moho
       return false;
     }
 
-    (void)EraseEntityVectorSlotAndReturnCursor(mVec, it);
+    (void)mVec.erase(it);
     return true;
   }
 
