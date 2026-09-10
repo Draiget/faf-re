@@ -660,6 +660,9 @@ namespace gpg::core
       end_ = ptr_at(start_, n);
     }
 
+    /**
+     * Address: 0x005E8900 (FUN_005E8900 -- `erase(pos)` -- shift the tail down one slot and rewind `end_`, handing back a cursor on the same index. Reached from `SEntitySetTemplateUnit::RemoveUnit`'s `mVec.erase(it)` for `gpg::core::FastVectorN<moho::Entity*, 4>` (`SEntitySetTemplateUnit::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block); callers 0x00608EF0; formerly `EraseEntityVectorSlotAndReturnCursor` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
+     */
     iterator erase(iterator pos)
     {
       return erase(pos, pos + 1);
@@ -1142,6 +1145,7 @@ namespace gpg::core
      * -- identical end state, without constructing over a live object.)
      * Address: 0x0056B200 (FUN_0056B200, sub_56B200 -- the copy constructor of `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08): `mUnits(units)` in `CFormationInstance::CFormationInstance` (0x005694B0); each copied `WeakPtr<IUnit>` relinks into its unit's weak chain.)
      * Address: 0x0082E5E0 (FUN_0082E5E0 -- copy constructor for a 4-byte element; Initializes one stack-style inline dword-vector scratch lane and assigns source content into that lane via `AssignDwordVectorRange`.)
+     * Address: 0x0057D3F0 (FUN_0057D3F0 -- the copy constructor -- seat the three lanes plus `originalVec_` on the inline block at `this+0x10`, then `AddAll` the source; ten callers, `SEntitySetTemplateUnit`'s own copy constructor 0x00579500 among them for `gpg::core::FastVectorN<moho::Entity*, 4>` (`SEntitySetTemplateUnit::mVec` at +0x08; the 0x10 head sits in front of its own four-slot inline block); callers 0x00579500, 0x005ADC70, 0x005FA790; formerly `CopyEntityInlineVector` in moho/sim/ArmyUnitSet.cpp (RULE ONE), removed 2026-09-11.)
      */
     FastVectorN(const FastVectorN& other)
       : FastVectorN()
