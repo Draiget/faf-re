@@ -7,27 +7,7 @@ namespace moho
 {
   struct RMeshBlueprintLOD;
 
-  /**
-   * Address: 0x005195B0 (FUN_005195B0)
-   *
-   * What it does:
-   * Releases a `msvc8::vector<RMeshBlueprintLOD>`'s backing storage: destroys
-   * each live LOD element (tearing down its seven legacy string lanes via
-   * `FUN_00519800`), frees the storage block, and nulls the container
-   * pointer lanes. Used by `RMeshBlueprint::~RMeshBlueprint()`
-   * (`FUN_00528410`) and the blueprint construct deletion lane.
-   */
-  void ClearAndFreeMeshBlueprintLodVectorStorage(msvc8::vector<RMeshBlueprintLOD>* storage);
 
-  /**
-   * Address: 0x0051A530 (FUN_0051A530)
-   *
-   * What it does:
-   * Allocates a contiguous block of `count * sizeof(RMeshBlueprintLOD)` bytes
-   * for a `msvc8::vector<RMeshBlueprintLOD>` storage lane. Raises
-   * `std::bad_alloc` on the legacy 32-bit overflow check.
-   */
-  [[nodiscard]] void* AllocateMeshBlueprintLodArrayOrThrow(unsigned int count);
 
   /**
    * VFTABLE: 0x00E0FE1C
