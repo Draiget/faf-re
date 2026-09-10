@@ -1027,6 +1027,23 @@ namespace moho
   [[nodiscard]] UserCommandIssueHelper* GetUserUnitManagerLastQueuedHelper(UserCommandQueue* manager) noexcept;
 
   /**
+   * Address: 0x008B6F60 (FUN_008B6F60, struct_UserUnitManager::Get)
+   *
+   * What it does:
+   * Returns the queue's live link run: `primaryLinks` while no issue is
+   * pending, otherwise the `resolvedLinks` view, rebuilt first when the
+   * pending-issue ring has dirtied it. Cross-TU form of the file-local
+   * `RebuildAndGetUserUnitManagerQueue` every reader inside UserUnit.cpp
+   * already goes through.
+   *
+   * Exposed because reading `resolvedLinks` directly is wrong outside that
+   * accessor: it is EMPTY in the steady state, when the answer lives in
+   * `primaryLinks`. `AddCommandQueueToCommandGraph` (CWldSession.cpp) did
+   * exactly that and so never saw a single queued order.
+   */
+  [[nodiscard]] UserCommandQueueLinkVector* GetUserUnitManagerQueueLinks(UserCommandQueue* manager) noexcept;
+
+  /**
    * Address: 0x008B6E60 (FUN_008B6E60, struct_UserUnitManager::reset)
    *
    * What it does:
