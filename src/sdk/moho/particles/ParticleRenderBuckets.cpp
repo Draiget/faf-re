@@ -57,228 +57,6 @@ namespace
 
   static_assert(sizeof(ParticleInstanceRuntime) == 0x5C, "ParticleInstanceRuntime size must be 0x5C");
 
-  [[nodiscard]] moho::ParticleBufferPoolListRuntime* ResolveOwnerBufferPool(moho::CWorldParticles* const owner) noexcept
-  {
-    if (owner == nullptr) {
-      return nullptr;
-    }
-
-    auto* const ownerView = reinterpret_cast<moho::CWorldParticlesParticlePoolRuntimeView*>(owner);
-    return &ownerView->availableBuffers;
-  }
-
-  [[nodiscard]] moho::ParticleBuffer* PopFrontBufferFromOwnerPool(moho::CWorldParticles* const owner) noexcept
-  {
-    moho::ParticleBufferPoolListRuntime* const pool = ResolveOwnerBufferPool(owner);
-    if (pool == nullptr || pool->head == nullptr || pool->size == 0U) {
-      return nullptr;
-    }
-
-    moho::ParticleBufferPoolNodeRuntime* const first = pool->head->next;
-    if (first == nullptr || first == pool->head) {
-      return nullptr;
-    }
-
-    first->prev->next = first->next;
-    first->next->prev = first->prev;
-
-    moho::ParticleBuffer* const buffer = first->value;
-    ::operator delete(first);
-    --pool->size;
-    return buffer;
-  }
-
-  void PushBackBufferToOwnerPool(moho::CWorldParticles* const owner, moho::ParticleBuffer* const buffer)
-  {
-    (void)moho::AppendParticleBufferToOwnerAvailablePool(owner, buffer);
-  }
-
-  /**
-   * What it does:
-   * Legacy intrusive-list node lane used by multiple world-particle pool helper
-   * thunks.
-   */
-  struct LegacyPoolListNodeRuntime
-  {
-    LegacyPoolListNodeRuntime* next = nullptr; // +0x00
-    LegacyPoolListNodeRuntime* prev = nullptr; // +0x04
-  };
-
-  static_assert(
-    offsetof(LegacyPoolListNodeRuntime, next) == 0x00,
-    "LegacyPoolListNodeRuntime::next offset must be 0x00"
-  );
-  static_assert(
-    offsetof(LegacyPoolListNodeRuntime, prev) == 0x04,
-    "LegacyPoolListNodeRuntime::prev offset must be 0x04"
-  );
-  static_assert(sizeof(LegacyPoolListNodeRuntime) == 0x08, "LegacyPoolListNodeRuntime size must be 0x08");
-
-  /**
-   * What it does:
-   * Legacy list header lane (`proxy + head + size`) used by helper thunks at
-   * `0x00495EA0..0x00495FF0`.
-   */
-  struct LegacyPoolListRuntime
-  {
-    std::uint32_t iteratorProxy = 0U;    // +0x00
-    LegacyPoolListNodeRuntime* head = nullptr; // +0x04
-    std::uint32_t size = 0U;             // +0x08
-  };
-
-  static_assert(
-    offsetof(LegacyPoolListRuntime, head) == 0x04,
-    "LegacyPoolListRuntime::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyPoolListRuntime, size) == 0x08,
-    "LegacyPoolListRuntime::size offset must be 0x08"
-  );
-  static_assert(sizeof(LegacyPoolListRuntime) == 0x0C, "LegacyPoolListRuntime size must be 0x0C");
-
-  /**
-   * Address: 0x00495E30 (FUN_00495E30, sub_495E30)
-   *
-   * What it does:
-   * Returns the `next` lane from one legacy intrusive-list node.
-   */
-  [[nodiscard]] LegacyPoolListNodeRuntime* GetLegacyPoolNodeNext(
-    LegacyPoolListNodeRuntime* const node
-  ) noexcept
-  {
-    return node->next;
-  }
-
-  /**
-   * Address: 0x00495EA0 (FUN_00495EA0, sub_495EA0)
-   *
-   * What it does:
-   * Writes the begin-node (`head->next`) from one legacy list header into
-   * caller storage.
-   */
-  LegacyPoolListNodeRuntime** GetLegacyPoolListBeginNode(
-    LegacyPoolListNodeRuntime** const outBeginNode,
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    *outBeginNode = list.head->next;
-    return outBeginNode;
-  }
-
-  /**
-   * Address: 0x00495EB0 (FUN_00495EB0, sub_495EB0)
-   *
-   * What it does:
-   * Writes the head-sentinel node pointer from one legacy list header into
-   * caller storage.
-   */
-  LegacyPoolListNodeRuntime** GetLegacyPoolListHeadNode(
-    LegacyPoolListNodeRuntime** const outHeadNode,
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    *outHeadNode = list.head;
-    return outHeadNode;
-  }
-
-  /**
-   * Address: 0x00495EC0 (FUN_00495EC0, sub_495EC0)
-   *
-   * What it does:
-   * Returns the node count from one legacy list header lane.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyPoolListSize(
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    return list.size;
-  }
-
-  /**
-   * Address: 0x00495F30 (FUN_00495F30, sub_495F30)
-   *
-   * What it does:
-   * Clears one legacy intrusive list by unlinking the head sentinel and freeing
-   * all non-sentinel nodes.
-   */
-  LegacyPoolListNodeRuntime* ClearLegacyPoolListNodes(
-    LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    LegacyPoolListNodeRuntime* node = list.head->next;
-    list.head->next = list.head;
-    list.head->prev = list.head;
-    list.size = 0U;
-
-    while (node != list.head) {
-      LegacyPoolListNodeRuntime* const next = node->next;
-      ::operator delete(node);
-      node = next;
-    }
-
-    return node;
-  }
-
-  /**
-   * Address: 0x00495FD0 (FUN_00495FD0, sub_495FD0)
-   *
-   * What it does:
-   * Duplicate begin-node accessor thunk for the same legacy list layout used by
-   * sibling pool lanes.
-   */
-  LegacyPoolListNodeRuntime** GetLegacyPoolListBeginNodeDuplicate(
-    LegacyPoolListNodeRuntime** const outBeginNode,
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    return GetLegacyPoolListBeginNode(outBeginNode, list);
-  }
-
-  /**
-   * Address: 0x00495FE0 (FUN_00495FE0, sub_495FE0)
-   *
-   * What it does:
-   * Duplicate head-sentinel accessor thunk for the same legacy list layout used
-   * by sibling pool lanes.
-   */
-  LegacyPoolListNodeRuntime** GetLegacyPoolListHeadNodeDuplicate(
-    LegacyPoolListNodeRuntime** const outHeadNode,
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    return GetLegacyPoolListHeadNode(outHeadNode, list);
-  }
-
-  /**
-   * Address: 0x00495FF0 (FUN_00495FF0, sub_495FF0)
-   *
-   * What it does:
-   * Duplicate list-size accessor thunk for the same legacy list layout used by
-   * sibling pool lanes.
-   */
-  [[nodiscard]] std::uint32_t GetLegacyPoolListSizeDuplicate(
-    const LegacyPoolListRuntime& list
-  ) noexcept
-  {
-    return GetLegacyPoolListSize(list);
-  }
-
-  /**
-   * What it does:
-   * One forward-linked intrusive node lane used by legacy iterator/pop helper
-   * thunks.
-   */
-  struct LegacyForwardNodeRuntime
-  {
-    LegacyForwardNodeRuntime* next = nullptr; // +0x00
-  };
-
-  static_assert(
-    offsetof(LegacyForwardNodeRuntime, next) == 0x00,
-    "LegacyForwardNodeRuntime::next offset must be 0x00"
-  );
-  static_assert(sizeof(LegacyForwardNodeRuntime) == 0x04, "LegacyForwardNodeRuntime size must be 0x04");
-
   /**
    * Address: 0x00496710 (FUN_00496710, sub_496710)
    *
@@ -396,102 +174,6 @@ namespace
   }
 
   /**
-   * Address: 0x004968A0 (FUN_004968A0, sub_4968A0)
-   *
-   * What it does:
-   * Advances one intrusive forward-list iterator slot to `node->next`.
-   */
-  LegacyForwardNodeRuntime** AdvanceLegacyForwardListIterator(
-    LegacyForwardNodeRuntime** const inOutNodeSlot
-  ) noexcept
-  {
-    *inOutNodeSlot = (*inOutNodeSlot)->next;
-    return inOutNodeSlot;
-  }
-
-  /**
-   * Address: 0x004968B0 (FUN_004968B0, sub_4968B0)
-   *
-   * What it does:
-   * Pops the head node from one intrusive forward list and exports the removed
-   * node to caller storage.
-   */
-  LegacyForwardNodeRuntime** PopLegacyForwardListHeadNode(
-    LegacyForwardNodeRuntime** const outPoppedNode,
-    LegacyForwardNodeRuntime** const inOutHeadSlot
-  ) noexcept
-  {
-    LegacyForwardNodeRuntime* const popped = *inOutHeadSlot;
-    *outPoppedNode = popped;
-    *inOutHeadSlot = popped->next;
-    return outPoppedNode;
-  }
-
-  /**
-   * Address: 0x0049AD90 (FUN_0049AD90, nullsub_594)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAJ() noexcept {}
-
-  /**
-   * Address: 0x00496C60 (FUN_00496C60, sub_496C60)
-   *
-   * What it does:
-   * Returns one pointer value from caller pointer slot.
-   */
-  [[nodiscard]] void* ReadPointerSlotValueA(void* const* const pointerSlot) noexcept
-  {
-    return *pointerSlot;
-  }
-
-  /**
-   * Address: 0x00496CA0 (FUN_00496CA0, sub_496CA0)
-   *
-   * What it does:
-   * Returns one pointer value from caller pointer slot.
-   */
-  [[nodiscard]] void* ReadPointerSlotValueB(void* const* const pointerSlot) noexcept
-  {
-    return *pointerSlot;
-  }
-
-
-
-  /**
-   * Address: 0x0049B060 (FUN_0049B060, nullsub_595)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAK() noexcept {}
-
-  /**
-   * Address: 0x0049B710 (FUN_0049B710, nullsub_598)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAN() noexcept {}
-
-  /**
-   * Address: 0x0049B330 (FUN_0049B330, nullsub_596)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAL() noexcept {}
-
-  /**
-   * Address: 0x0049BA30 (FUN_0049BA30, nullsub_599)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAO() noexcept {}
-
-  /**
    * What it does:
    * Small two-dword lane used by scalar helper-thunk copies.
    */
@@ -505,78 +187,8 @@ namespace
   static_assert(offsetof(TwoUInt32Runtime, second) == 0x04, "TwoUInt32Runtime::second offset must be 0x04");
   static_assert(sizeof(TwoUInt32Runtime) == 0x08, "TwoUInt32Runtime size must be 0x08");
 
-  /**
-   * Address: 0x0049B440 (FUN_0049B440, nullsub_597)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkAM() noexcept {}
-
-  /**
-   * Address: 0x00497080 (FUN_00497080, sub_497080)
-   *
-   * What it does:
-   * Returns one 32-bit scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUint32SlotValueA(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x004970C0 (FUN_004970C0, sub_4970C0)
-   *
-   * What it does:
-   * Returns one 32-bit scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUint32SlotValueB(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x00497100 (FUN_00497100, sub_497100)
-   *
-   * What it does:
-   * Returns one 32-bit scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadUint32SlotValueC(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
   constexpr std::uint8_t kTrailSegmentPoolColorRed = 0U;
   constexpr std::uint8_t kTrailSegmentPoolColorBlack = 1U;
-  constexpr std::uint32_t kLegacyListMaxSize = 0x3FFFFFFFU;
-
-  [[nodiscard]] std::uint32_t IncrementLegacyListSizeChecked(
-    moho::ParticleBufferPoolListRuntime& listRuntime
-  )
-  {
-    if (listRuntime.size == kLegacyListMaxSize) {
-      throw std::length_error("list<T> too long");
-    }
-
-    ++listRuntime.size;
-    return listRuntime.size;
-  }
-
-  [[nodiscard]] std::uintptr_t TrailSegmentPointerKey(
-    const moho::TrailSegmentBufferRuntime* const segmentBuffer
-  ) noexcept
-  {
-    return reinterpret_cast<std::uintptr_t>(segmentBuffer);
-  }
-
-  [[nodiscard]] bool IsTrailSegmentPointerLess(
-    const moho::TrailSegmentBufferRuntime* const lhs,
-    const moho::TrailSegmentBufferRuntime* const rhs
-  ) noexcept
-  {
-    return TrailSegmentPointerKey(lhs) < TrailSegmentPointerKey(rhs);
-  }
-
 
 
   [[nodiscard]] bool AppendInterval(
@@ -672,44 +284,6 @@ namespace
 
 
   /**
-   * Address: 0x0049E460 (FUN_0049E460, sub_49E460)
-   *
-   * What it does:
-   * Allocates one world-particle array lane (`0x8C` bytes per element) and
-   * throws `std::bad_alloc` on legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateWorldParticleArrayOrThrow(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kWorldParticleSize = sizeof(moho::SWorldParticle);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kWorldParticleSize) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kWorldParticleSize);
-  }
-
-  /**
-   * Address: 0x0049E530 (FUN_0049E530, sub_49E530)
-   *
-   * What it does:
-   * Allocates one trail-runtime array lane (`0x60` bytes per element) and
-   * throws `std::bad_alloc` on legacy overflow guard failure.
-   */
-  [[nodiscard]] void* AllocateTrailRuntimeArrayOrThrow(const std::uint32_t elementCount)
-  {
-    constexpr std::size_t kTrailRuntimeSize = sizeof(moho::TrailRuntimeView);
-    constexpr std::uint32_t kLegacyUIntMax = std::numeric_limits<std::uint32_t>::max();
-
-    if (elementCount != 0U && (kLegacyUIntMax / elementCount) < kTrailRuntimeSize) {
-      throw std::bad_alloc{};
-    }
-
-    return ::operator new(static_cast<std::size_t>(elementCount) * kTrailRuntimeSize);
-  }
-
-  /**
    * What it does:
    * One packed dword+byte lane used by legacy pointer/flag helper thunks.
    */
@@ -729,77 +303,6 @@ namespace
     "DwordAndByteRuntime::flag offset must be 0x04"
   );
   static_assert(sizeof(DwordAndByteRuntime) == 0x08, "DwordAndByteRuntime size must be 0x08");
-
-  /**
-   * Address: 0x004979F0 (FUN_004979F0, sub_4979F0)
-   *
-   * What it does:
-   * Reads one 32-bit value from offset `+0x04` of caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadDwordAtOffset4(const std::uint32_t* const valueBase) noexcept
-  {
-    return valueBase[1];
-  }
-
-  /**
-   * Address: 0x00497AA0 (FUN_00497AA0, sub_497AA0)
-   *
-   * What it does:
-   * Writes one 32-bit scalar into caller output storage.
-   */
-  std::uint32_t* WriteDwordToOutputSlot(
-    std::uint32_t* const outValue,
-    const std::uint32_t value
-  ) noexcept
-  {
-    *outValue = value;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00497AE0 (FUN_00497AE0, sub_497AE0)
-   *
-   * What it does:
-   * Reads one 32-bit scalar from caller storage.
-   */
-  [[nodiscard]] std::uint32_t ReadDwordFromSlot(const std::uint32_t* const valueSlot) noexcept
-  {
-    return *valueSlot;
-  }
-
-  /**
-   * Address: 0x00497AF0 (FUN_00497AF0, sub_497AF0)
-   *
-   * What it does:
-   * Packs one 32-bit scalar and one byte flag from caller slots into output
-   * storage.
-   */
-  DwordAndByteRuntime* WriteDwordAndBytePair(
-    DwordAndByteRuntime* const outPair,
-    const std::uint32_t* const valueSlot,
-    const std::uint8_t* const flagSlot
-  ) noexcept
-  {
-    outPair->value = *valueSlot;
-    outPair->flag = *flagSlot;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x00497B30 (FUN_00497B30, sub_497B30)
-   *
-   * What it does:
-   * Writes one 32-bit value from offset `+0x08` of caller storage into output
-   * slot.
-   */
-  std::uint32_t* WriteDwordAtOffset8ToOutputSlot(
-    std::uint32_t* const outValue,
-    const std::uint32_t* const valueBase
-  ) noexcept
-  {
-    *outValue = valueBase[2];
-    return outValue;
-  }
 
   /**
    * Address: 0x00497C70 (FUN_00497C70, sub_497C70)
@@ -827,106 +330,10 @@ namespace
     return *pointerSlot;
   }
 
-  /**
-   * Address: 0x00497CB0 (FUN_00497CB0, nullsub_556)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkA() noexcept {}
-
-  /**
-   * Address: 0x00497D40 (FUN_00497D40, nullsub_557)
-   *
-   * What it does:
-   * No-op helper thunk retained for binary parity.
-   */
-  void NoOpHelperThunkB(const std::uint32_t /*unused*/) noexcept {}
-
-  void ReleaseBeamTextureHandlesInRange(
-    moho::SWorldBeam* const begin,
-    moho::SWorldBeam* const end
-  ) noexcept
-  {
-    if (begin == nullptr || end == nullptr || end < begin) {
-      return;
-    }
-
-    for (moho::SWorldBeam* beam = begin; beam != end; ++beam) {
-      moho::ResetCountedParticleTexturePtr(beam->mTexture1);
-      moho::ResetCountedParticleTexturePtr(beam->mTexture2);
-    }
-  }
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00492CA0 (FUN_00492CA0, sub_492CA0)
-   *
-   * What it does:
-   * Appends one particle-buffer pointer into the owner available-buffer pool
-   * list.
-   */
-  std::uint32_t AppendParticleBufferToOwnerAvailablePool(
-    CWorldParticles* const owner,
-    ParticleBuffer* const particleBuffer
-  )
-  {
-    auto* const ownerView = reinterpret_cast<CWorldParticlesParticlePoolRuntimeView*>(owner);
-    ParticleBufferPoolListRuntime* const pool = &ownerView->availableBuffers;
-    ParticleBufferPoolNodeRuntime* const head = pool->head;
-
-    auto* const node = static_cast<ParticleBufferPoolNodeRuntime*>(::operator new(sizeof(ParticleBufferPoolNodeRuntime)));
-    node->next = head;
-    node->prev = head->prev;
-    node->value = particleBuffer;
-
-    const std::uint32_t updatedSize = IncrementLegacyListSizeChecked(*pool);
-    head->prev = node;
-    node->prev->next = node;
-    return updatedSize;
-  }
-
-  /**
-   * Address: 0x00492CE0 (FUN_00492CE0, sub_492CE0)
-   *
-   * What it does:
-   * Pops and returns one trail-segment buffer pointer from the owner pool.
-   * Returns `nullptr` when the pool is empty.
-   */
-  TrailSegmentBufferRuntime* AcquireTrailSegmentBufferFromOwnerPool(CWorldParticles* const owner)
-  {
-    auto* const ownerView = reinterpret_cast<CWorldParticlesTrailSegmentPoolRuntimeView*>(owner);
-    TrailSegmentPoolRuntime* const pool = &ownerView->trailSegmentPool;
-    if (pool->empty()) {
-      return nullptr;
-    }
-
-    // The binary takes the leftmost node, keeps its buffer and erases it,
-    // discarding the successor the erase hands back.
-    const auto first = pool->begin();
-    TrailSegmentBufferRuntime* const segmentBuffer = *first;
-    (void)pool->erase(first);
-    return segmentBuffer;
-  }
-
-  /**
-   * Address: 0x00492D10 (FUN_00492D10, sub_492D10)
-   *
-   * What it does:
-   * Returns one trail-segment buffer pointer back into the owner pool.
-   */
-  void ReturnTrailSegmentBufferToOwnerPool(
-    CWorldParticles* const owner,
-    TrailSegmentBufferRuntime* const segmentBuffer
-  )
-  {
-    auto* const ownerView = reinterpret_cast<CWorldParticlesTrailSegmentPoolRuntimeView*>(owner);
-    TrailSegmentPoolRuntime* const pool = &ownerView->trailSegmentPool;
-    (void)pool->insert(segmentBuffer);
-  }
-
   /**
    * Address: 0x00493480 (FUN_00493480, sub_493480)
    *
@@ -1117,7 +524,7 @@ namespace moho
       if (workItem == nullptr) {
         continue;
       }
-      PushBackBufferToOwnerPool(bucket.owner, static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
+      bucket.owner->ReleaseParticleBuffer(static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
       (void)DestroyParticleRenderWorkItem(workItem);
     }
     bucket.activeWorkItems.clear();
@@ -1157,7 +564,7 @@ namespace moho
       }
       if (bucket.owner != nullptr && workItem->mParticleBuffer != nullptr) {
         auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer);
-        ReturnTrailSegmentBufferToOwnerPool(bucket.owner, segmentBuffer);
+        bucket.owner->ReleaseTrailSegmentBuffer(segmentBuffer);
       }
 
       ResetParticleRenderWorkItemIntervals(*workItem);
@@ -1206,7 +613,7 @@ namespace moho
       }
 
       if (AdvanceParticleRenderWorkItemCursorToFrame(*workItem, frameValue)) {
-        PushBackBufferToOwnerPool(bucket.owner, static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
+        bucket.owner->ReleaseParticleBuffer(static_cast<ParticleBuffer*>(workItem->mParticleBuffer));
         (void)DestroyParticleRenderWorkItem(workItem);
         continue;
       }
@@ -1237,7 +644,7 @@ namespace moho
     }
 
     while (!bucket.pendingParticles.empty()) {
-      ParticleBuffer* const pooledBuffer = PopFrontBufferFromOwnerPool(bucket.owner);
+      ParticleBuffer* const pooledBuffer = bucket.owner->AcquireParticleBuffer();
       if (pooledBuffer == nullptr) {
         gpg::Logf(kParticleCapExceededLog);
         bucket.pendingParticles.clear();
@@ -1423,7 +830,7 @@ namespace moho
 
       if (AdvanceParticleRenderWorkItemCursorToFrame(*workItem, frameValue)) {
         if (bucket.owner != nullptr && workItem->mParticleBuffer != nullptr) {
-          ReturnTrailSegmentBufferToOwnerPool(bucket.owner, static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer));
+          bucket.owner->ReleaseTrailSegmentBuffer(static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer));
         }
 
         (void)DestroyParticleRenderWorkItem(workItem);
@@ -1456,7 +863,7 @@ namespace moho
     }
 
     while (!bucket.pendingTrails.empty()) {
-      TrailSegmentBufferRuntime* const pooledBuffer = AcquireTrailSegmentBufferFromOwnerPool(bucket.owner);
+      TrailSegmentBufferRuntime* const pooledBuffer = bucket.owner->AcquireTrailSegmentBuffer();
       if (pooledBuffer == nullptr) {
         gpg::Logf("Wow!  Ran out of segment buffers from the pool, discarding segments!\n");
         bucket.pendingTrails.clear();

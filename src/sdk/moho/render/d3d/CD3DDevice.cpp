@@ -376,14 +376,9 @@ namespace
   void ResetWorldParticleBuffers()
   {
     auto& runtime = reinterpret_cast<moho::CWorldParticlesRuntimeView&>(moho::sWorldParticles);
-    moho::ParticleBufferPoolNodeRuntime* const head = runtime.allParticleBuffers.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    for (moho::ParticleBufferPoolNodeRuntime* node = head->next; node != nullptr && node != head; node = node->next) {
-      if (node->value != nullptr) {
-        node->value->Reset();
+    for (moho::ParticleBuffer* const particleBuffer : runtime.allParticleBuffers) {
+      if (particleBuffer != nullptr) {
+        particleBuffer->Reset();
       }
     }
   }
