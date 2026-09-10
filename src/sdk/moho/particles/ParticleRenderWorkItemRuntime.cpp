@@ -32,13 +32,8 @@ namespace moho
    */
   void ResetParticleRenderWorkItemIntervals(ParticleRenderWorkItemRuntime& workItem)
   {
-    if (workItem.mIntervalsBegin != nullptr) {
-      ::operator delete(workItem.mIntervalsBegin);
-    }
-
-    workItem.mIntervalsBegin = nullptr;
-    workItem.mIntervalsEnd = nullptr;
-    workItem.mIntervalsCapacityEnd = nullptr;
+    // `msvc8::vector<ParticleRenderIntervalRuntime>::_Tidy` (cited on Vector.h).
+    workItem.mIntervals.tidy();
   }
 
   /**
@@ -53,9 +48,7 @@ namespace moho
     void* const particleBuffer
   )
   {
-    workItem.mIntervalsBegin = nullptr;
-    workItem.mIntervalsEnd = nullptr;
-    workItem.mIntervalsCapacityEnd = nullptr;
+    ::new (static_cast<void*>(&workItem.mIntervals)) msvc8::vector<ParticleRenderIntervalRuntime>();
     workItem.mIntervalCapacityHint = intervalCapacityHint;
     workItem.mParticleBuffer = particleBuffer;
     workItem.mRenderStartIndex = 0U;
@@ -72,19 +65,15 @@ namespace moho
    */
   bool AdvanceParticleRenderWorkItemCursorToFrame(ParticleRenderWorkItemRuntime& workItem, const float frameValue)
   {
-    auto* interval = reinterpret_cast<ParticleRenderIntervalRuntime*>(
-      reinterpret_cast<std::uintptr_t>(workItem.mIntervalsBegin) +
-      (static_cast<std::uintptr_t>(workItem.mIntervalCursor) * sizeof(ParticleRenderIntervalRuntime))
-    );
-
-    if (interval == workItem.mIntervalsEnd) {
+    const ParticleRenderIntervalRuntime* interval = workItem.mIntervals.begin() + workItem.mIntervalCursor;
+    if (interval == workItem.mIntervals.end()) {
       return true;
     }
 
     while ((interval->beginFrame + interval->lifeFrames) <= frameValue) {
       ++workItem.mIntervalCursor;
       ++interval;
-      if (interval == workItem.mIntervalsEnd) {
+      if (interval == workItem.mIntervals.end()) {
         return true;
       }
     }

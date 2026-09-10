@@ -2717,8 +2717,8 @@ namespace moho
     key->sortScalar = trail.sortScalar;
 
     CParticleTexture::TextureResourceHandle texture0{};
-    if (trail.texture0 != nullptr) {
-      trail.texture0->GetTexture(texture0);
+    if (trail.texture0.tex != nullptr) {
+      trail.texture0.tex->GetTexture(texture0);
     }
     boost::AssignSharedPairRetain(
       reinterpret_cast<boost::SharedCountPair*>(&key->texture0),
@@ -2726,8 +2726,8 @@ namespace moho
     );
 
     CParticleTexture::TextureResourceHandle texture1{};
-    if (trail.texture1 != nullptr) {
-      trail.texture1->GetTexture(texture1);
+    if (trail.texture1.tex != nullptr) {
+      trail.texture1.tex->GetTexture(texture1);
     }
     boost::AssignSharedPairRetain(
       reinterpret_cast<boost::SharedCountPair*>(&key->texture1),

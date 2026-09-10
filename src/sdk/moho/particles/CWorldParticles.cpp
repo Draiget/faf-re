@@ -366,88 +366,6 @@ namespace
 
   ParticleShaderVarBootstrap gParticleShaderVarBootstrap;
 
-  template <typename TValue>
-  [[nodiscard]] std::size_t RenderBucketVectorCount(
-    const moho::RenderBucketVectorRuntime<TValue>& vector
-  ) noexcept
-  {
-    if (vector.begin == nullptr || vector.end == nullptr || vector.end < vector.begin) {
-      return 0U;
-    }
-
-    return static_cast<std::size_t>(vector.end - vector.begin);
-  }
-
-  template <typename TValue>
-  [[nodiscard]] std::size_t RenderBucketVectorCapacity(
-    const moho::RenderBucketVectorRuntime<TValue>& vector
-  ) noexcept
-  {
-    if (vector.begin == nullptr || vector.capacityEnd == nullptr || vector.capacityEnd < vector.begin) {
-      return 0U;
-    }
-
-    return static_cast<std::size_t>(vector.capacityEnd - vector.begin);
-  }
-
-  template <typename TValue>
-  TValue* AppendRenderBucketVectorValue(
-    moho::RenderBucketVectorRuntime<TValue>& vector,
-    const TValue& value
-  )
-  {
-    const std::size_t size = RenderBucketVectorCount(vector);
-    const std::size_t capacity = RenderBucketVectorCapacity(vector);
-
-    if (size >= kLegacyVectorMaxCount) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    if (size == capacity) {
-      std::size_t newCapacity = capacity != 0U ? capacity + (capacity / 2U) : 1U;
-      if (newCapacity < size + 1U) {
-        newCapacity = size + 1U;
-      }
-      if (newCapacity > kLegacyVectorMaxCount) {
-        newCapacity = kLegacyVectorMaxCount;
-      }
-      if (newCapacity < size + 1U ||
-          newCapacity > (std::numeric_limits<std::size_t>::max() / sizeof(TValue))) {
-        throw std::length_error("vector<T> too long");
-      }
-
-      auto* const newStorage = static_cast<TValue*>(::operator new(newCapacity * sizeof(TValue)));
-      std::size_t constructedCount = 0U;
-      try {
-        for (; constructedCount < size; ++constructedCount) {
-          ::new (static_cast<void*>(newStorage + constructedCount)) TValue(vector.begin[constructedCount]);
-        }
-      } catch (...) {
-        while (constructedCount != 0U) {
-          --constructedCount;
-          (newStorage + constructedCount)->~TValue();
-        }
-        ::operator delete(newStorage);
-        throw;
-      }
-
-      if (vector.begin != nullptr) {
-        for (TValue* element = vector.begin; element != vector.end; ++element) {
-          element->~TValue();
-        }
-        ::operator delete(vector.begin);
-      }
-
-      vector.begin = newStorage;
-      vector.end = newStorage + size;
-      vector.capacityEnd = newStorage + newCapacity;
-    }
-
-    ::new (static_cast<void*>(vector.end)) TValue(value);
-    ++vector.end;
-    return vector.end - 1;
-  }
-
   // A `ResolveParticleTechniqueSuffix(blendMode, allowRefract, assertLine)`
   // free function previously lived here, byte-for-byte identical (same
   // switch, same case strings) to moho/particles/BeamRenderHelpers.cpp's own
@@ -4964,21 +4882,12 @@ namespace
   }
 
   void AssignTrailRuntimeTextureLaneLocal(
-    moho::CParticleTexture*& destination,
+    moho::CountedPtr_CParticleTexture& destination,
     moho::CParticleTexture* const source
   ) noexcept
   {
-    if (destination == source) {
-      return;
-    }
-
-    if (destination != nullptr) {
-      destination->ReleaseReferenceAtomic();
-    }
-    destination = source;
-    if (source != nullptr) {
-      source->AddReferenceAtomic();
-    }
+    // release-old / retain-new through the counted handle
+    (void)moho::AssignCountedParticleTexturePtr(&destination, source);
   }
 
   void CopyTrailRuntimeViewForVectorMoveLocal(
@@ -4989,8 +4898,8 @@ namespace
     // Copy the 0x00..0x4F scalar-lane block (all float fields up to but not
     // including the texture pointers at 0x50).
     std::memcpy(&destination.prevPosX, &source.prevPosX, 0x50u);
-    AssignTrailRuntimeTextureLaneLocal(destination.texture0, source.texture0);
-    AssignTrailRuntimeTextureLaneLocal(destination.texture1, source.texture1);
+    AssignTrailRuntimeTextureLaneLocal(destination.texture0, source.texture0.tex);
+    AssignTrailRuntimeTextureLaneLocal(destination.texture1, source.texture1.tex);
     destination.tag = source.tag;
     destination.uvScalar = source.uvScalar;
   }
@@ -5006,10 +4915,9 @@ namespace
       offsetof(moho::TrailRuntimeView, texture0)
     );
 
-    destination.texture0 = source.texture0;
-    AddReferenceParticleTextureIfPresentLocal(destination.texture0);
-    destination.texture1 = source.texture1;
-    AddReferenceParticleTextureIfPresentLocal(destination.texture1);
+    // fresh storage: the counted handles' copy constructor retains
+    ::new (static_cast<void*>(&destination.texture0)) moho::CountedPtr_CParticleTexture(source.texture0);
+    ::new (static_cast<void*>(&destination.texture1)) moho::CountedPtr_CParticleTexture(source.texture1);
     destination.tag = source.tag;
     destination.uvScalar = source.uvScalar;
   }
@@ -8176,7 +8084,7 @@ namespace moho
 
     Init();
     if (bucketCacheSlot != nullptr && *bucketCacheSlot != nullptr) {
-      (void)AppendRenderBucketVectorValue((*bucketCacheSlot)->pendingParticles, particle);
+      (*bucketCacheSlot)->pendingParticles.push_back(particle);
       return;
     }
 
@@ -8213,14 +8121,14 @@ namespace moho
         candidateNode = reinterpret_cast<ParticleBucketTreeNodeRuntime*>(insertResult.pointer);
       }
 
-      (void)AppendRenderBucketVectorValue(AsParticleBucketEntryNode(candidateNode)->bucket->pendingParticles, particle);
+      AsParticleBucketEntryNode(candidateNode)->bucket->pendingParticles.push_back(particle);
       ResetParticleBucketKeyResources(lookupKey);
       return;
     }
 
     if (runtime.cachedParticleBucket != nullptr &&
         AreParticleBucketKeysEquivalent(runtime.particleBucketLookupKey, lookupKey)) {
-      (void)AppendRenderBucketVectorValue(runtime.cachedParticleBucket->pendingParticles, particle);
+      runtime.cachedParticleBucket->pendingParticles.push_back(particle);
       ResetParticleBucketKeyResources(lookupKey);
       return;
     }
@@ -8249,7 +8157,7 @@ namespace moho
     }
 
     ParticleRenderBucketRuntime* const bucket = AsParticleBucketEntryNode(candidateNode)->bucket;
-    (void)AppendRenderBucketVectorValue(bucket->pendingParticles, particle);
+    bucket->pendingParticles.push_back(particle);
     (void)CopyParticleBucketKey(&runtime.particleBucketLookupKey, &lookupKey);
     runtime.cachedParticleBucket = bucket;
 
@@ -8278,7 +8186,7 @@ namespace moho
 
     Init();
     if (bucketCacheSlot != nullptr && *bucketCacheSlot != nullptr) {
-      (void)AppendRenderBucketVectorValue((*bucketCacheSlot)->pendingTrails, trail);
+      (*bucketCacheSlot)->pendingTrails.push_back(trail);
       return;
     }
 
@@ -8288,7 +8196,7 @@ namespace moho
 
     if (runtime.cachedTrailBucket != nullptr &&
         AreTrailBucketKeysEquivalent(runtime.trailBucketLookupKey, lookupKey)) {
-      (void)AppendRenderBucketVectorValue(runtime.cachedTrailBucket->pendingTrails, trail);
+      runtime.cachedTrailBucket->pendingTrails.push_back(trail);
       ResetTrailBucketKeyResources(lookupKey);
       return;
     }
@@ -8320,7 +8228,7 @@ namespace moho
     }
 
     TrailRenderBucketRuntime* const bucket = AsTrailBucketEntryNode(candidateNode)->bucket;
-    (void)AppendRenderBucketVectorValue(bucket->pendingTrails, trail);
+    bucket->pendingTrails.push_back(trail);
     (void)CopyTrailBucketKey(&runtime.trailBucketLookupKey, &lookupKey);
     runtime.cachedTrailBucket = bucket;
 
