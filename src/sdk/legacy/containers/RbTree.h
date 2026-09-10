@@ -1536,6 +1536,7 @@ namespace msvc8
              * Address: 0x0049DE90 (FUN_0049DE90 -- `rb_iterator::operator++` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveTrailBucketIteratorToNextDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049EDF0 (FUN_0049EDF0 -- `rb_iterator::operator++` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveParticleBucketIteratorToNextDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049EE10 (FUN_0049EE10 -- `rb_iterator::operator++` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `MoveTrailBucketIteratorToNextDuplicateB` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A150 (FUN_0049A150 -- `rb_iterator::operator++` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491E40, 0x00495C92, 0x00497AD2; formerly `AdvanceBeamBucketTreeIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_iterator& operator++() noexcept
             {
@@ -1672,6 +1673,7 @@ namespace msvc8
              * Address: 0x00948CB0 (FUN_00948CB0 -- a `thiscall` adapter into `rb_iterator::operator--` (nil byte at node+0x15); zero callers, unreachable; formerly `RetreatMapIteratorFlag21OwnerAdapterLaneF` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DA50 (FUN_0049DA50 -- `rb_iterator::operator--` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049A870, 0x0049C9C2, 0x0049D4E2; formerly `GetPreviousParticleBucketTreeNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DB20 (FUN_0049DB20 -- `rb_iterator::operator--` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049AAB0, 0x0049CD72, 0x0049D932; formerly `GetPreviousTrailBucketTreeNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C550 (FUN_0049C550 -- `rb_iterator::operator--` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495AE0, 0x00497AC2, 0x0049A142; formerly `GetPreviousBeamBucketTreeNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             rb_iterator& operator--() noexcept
             {
@@ -2643,6 +2645,7 @@ namespace msvc8
              * Address: 0x00498610 (FUN_00498610 -- `end()` -- the header sentinel read for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeHeadNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049A9B0 (FUN_0049A9B0 -- `end()` -- the header sentinel read for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `ReadParticleBucketTreeHeadNodeFromHeader` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049AC50 (FUN_0049AC50 -- `end()` -- the header sentinel read for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `ReadTrailBucketTreeHeadNodeFromHeader` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x004921A0 (FUN_004921A0 -- `~rb_tree()` -- `erase(leftmost(), header())`, free the header, null `head_`/`size_` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `DestroyBeamTextureBucketMap` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             ~rb_tree()
             {
@@ -2730,6 +2733,7 @@ namespace msvc8
              * Address: 0x00498600 (FUN_00498600 -- `_Lmost` / `begin()` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `GetTrailBucketTreeBeginNodeDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DA00 (FUN_0049DA00 -- `_Min` (descend left) for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049D0D0; formerly `GetParticleBucketTreeMinimum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DAD0 (FUN_0049DAD0 -- `_Min` (descend left) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049D520; formerly `GetTrailBucketTreeMinimum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C4B0 (FUN_0049C4B0 -- `_Min` (descend left) for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049C1F0; formerly `FindBeamBucketTreeLeftmostDescendant` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* leftmost() const noexcept { return head_->left; }
             /**
@@ -2740,6 +2744,7 @@ namespace msvc8
              * Address: 0x007120D0 (FUN_007120D0 -- `_Rmost` (nil byte at node+0x11); callers 0x00711BE0; formerly `FindTreeRightmostNodeFlag17Runtime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049D9E0 (FUN_0049D9E0 -- `_Max` (descend right) for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049D0D0; formerly `GetParticleBucketTreeMaximum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DAB0 (FUN_0049DAB0 -- `_Max` (descend right) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049D520; formerly `GetTrailBucketTreeMaximum` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049D030 (FUN_0049D030 -- `_Max` (descend right) for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049C1F0; formerly `GetBeamBucketTreeMaximum` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* rightmost() const noexcept { return head_->right; }
 
@@ -2763,6 +2768,8 @@ namespace msvc8
              * The `_Insert` guard in the binary tests `_Mysize >= max_size() - 1`;
              * 0x007E3F10 compares against 0x07FFFFFE for a 0x20-byte value type,
              * i.e. 0xFFFFFFFF/0x20 - 1.
+             * Address: 0x00499E40 (FUN_00499E40 -- `max_size()` -- 0xFFFFFFFF/0x24 for this instantiation's 0x24-byte value type for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetLegacyDivisionMagicConstant_0x71C71C7` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C520 (FUN_0049C520 -- `max_size()` -- the second emission of the same 0xFFFFFFFF/0x24 constant for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetLegacyMapMaxElementCount_0x71C71C7` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] static constexpr size_type max_size() noexcept
             {
@@ -2941,6 +2948,7 @@ namespace msvc8
              * Address: 0x00861C70 (FUN_00861C70 -- `_Lbound` over a file-static tree with 0xC49-byte-offset nil flag (LTCG clone with `this` folded); callers 0x00860E20, 0x00861320, 0x00861640; formerly `FindLowerBoundInGlobalFlag3145TreeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049C940 (FUN_0049C940 -- `_Lbound` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x004963E0, 0x004983A0, 0x0049A955; formerly `FindParticleBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049CC90 (FUN_0049CC90 -- `_Lbound` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00496590, 0x00498650, 0x0049AC00; formerly `FindTrailBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499F40 (FUN_00499F40 -- `_Lbound` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495C10, 0x004977F0; formerly `FindBeamBucketLowerBoundCandidateNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {
@@ -3327,6 +3335,7 @@ namespace msvc8
              * Address: 0x00496590 (FUN_00496590 -- `find` (lower_bound plus the equivalence check) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494C20; formerly `ResolveTrailBucketCandidateOrHead` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x004983A0 (FUN_004983A0 -- `find` (lower_bound plus the equivalence check) for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `ResolveParticleBucketCandidateOrHeadDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00498650 (FUN_00498650 -- `find` (lower_bound plus the equivalence check) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `ResolveTrailBucketCandidateOrHeadDuplicate` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00495C10 (FUN_00495C10 -- `find` (lower_bound plus the equivalence check) for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindBeamBucketEquivalentOrEnd` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* find_node(const key_type& k) const
             {
@@ -4214,6 +4223,7 @@ namespace msvc8
              * cross-instance pattern this is the seventh (and, per that
              * file's own tracking, final known) confirmed instance of.
              * Address: 0x0056D790 (FUN_0056D790, sub_56D790 -- the hinted insert for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19).)
+             * Address: 0x00497840 (FUN_00497840 -- `_Insert(hint, value)` including the `_Xlen` size guard for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495AE0; formerly `InsertBeamBucketMapEntryAtHint` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {
@@ -4950,6 +4960,7 @@ namespace msvc8
              * Address: 0x0049D520 (FUN_0049D520 -- `_Erase` (unlink, lift the successor, free the node) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049CA30; formerly `EraseTrailBucketTreeKeyNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049C6E0 (FUN_0049C6E0 -- `_Erase` (unlink, lift the successor, free the node) for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x00496430, 0x00498330, 0x0049A9F0; formerly `EraseParticleBucketTreeNodeRangeAndStoreIterator` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049CA30 (FUN_0049CA30 -- `_Erase` (unlink, lift the successor, free the node) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x004965E0, 0x004985E0, 0x0049AC90; formerly `EraseTrailBucketTreeNodeRangeAndStoreIterator` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C1F0 (FUN_0049C1F0 -- `erase(const_iterator)` -- unlink, lift the successor, free the node for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00499E50; formerly `EraseOneBeamBucketIteratorAndExportSuccessor` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             node_type* erase_node(node_type* const erased)
             {
@@ -5663,6 +5674,7 @@ namespace msvc8
              * (`AudioEngine.cpp`, deleted by this migration).
              * Address: 0x0056EB40 (FUN_0056EB40, sub_56EB40 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), the whole-range erase of every `~SOffsetInfo`.)
              * Address: 0x0056F430 (FUN_0056F430, sub_56F430 -- `erase(first, last)` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19), the whole-range erase of the cache destructors; every reachable caller passes the full range, so the `clear()` fast path is the one taken.)
+             * Address: 0x00499E50 (FUN_00499E50 -- `erase(first, last)` -- the whole-tree `clear()` fast path plus the `erase(_First++)` walk for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004921A0, 0x00493090, 0x00495AA0; formerly `EraseBeamBucketIteratorRange` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             node_type* erase_range(node_type* const first, node_type* const last)
             {
@@ -6236,6 +6248,8 @@ namespace msvc8
              * `AllocateCategoryVolumeNodeStorage` (`AudioEngine.cpp`, deleted
              * by this migration).
              * Address: 0x0056FE00 (FUN_0056FE00 -- the 68-byte node allocation for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41), through the checked `operator new(68)` at 0x00571780.)
+             * Address: 0x0049EB80 (FUN_0049EB80 -- `allocator<_Node>::allocate` -- the checked `n * 0x34` `operator new` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049A030, 0x0049C4D0, 0x0049C530; formerly `AllocateBeamBucketTreeNodes` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C530 (FUN_0049C530 -- the one-node tail call into the same checked allocator for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `AllocateSingleBeamBucketTreeNodeArray` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] static node_type* alloc_raw()
             {
@@ -6606,6 +6620,7 @@ namespace msvc8
              * Address: 0x0077BE50 (FUN_0077BE50 -- `_Buynode()` of the head sentinel for the decal-buffer tree (nil byte at node+0x1D); zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageHeadRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0077A220 (FUN_0077A220 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageA` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0077AEF0 (FUN_0077AEF0 -- the decal-buffer tree's `_Init` (head sentinel + size), returning the tree; zero callers, unreachable; formerly `InitializeDecalBufferTreeStorageAndReturnStorageB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049C4D0 (FUN_0049C4D0 -- `_Buynode()` for the header sentinel -- links nulled, colour black, `isNil` cleared for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004914B0, 0x00495A60, 0x004977C0; formerly `AllocateBeamBucketTreeNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] static node_type* buy_head()
             {
@@ -7115,6 +7130,10 @@ namespace msvc8
              * Address: 0x004A0920 (FUN_004A0920 -- `_Buynode(value)` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x004925E0, 0x00496550, 0x00498440; formerly `AllocateTrailBucketTreeNodeWithNullLinksBlack` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DA30 (FUN_0049DA30 -- `_Buynode`'s raw storage allocation for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `AllocateSingleParticleBucketTreeNodeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049DB00 (FUN_0049DB00 -- `_Buynode`'s raw storage allocation for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `AllocateSingleTrailBucketTreeNodeStorage` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049A030 (FUN_0049A030 -- `_Buynode(left, parent, right)` -- links bound, value default-constructed for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840; formerly `AllocateBeamBucketTreeEntryNodeWithLinks` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CFD0 (FUN_0049CFD0 -- the node value's copy construction inside `_Buynode(value)` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049A030, 0x0049CF20; formerly `CopyBeamTextureBucketEntryPayload` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x0049CF20 (FUN_0049CF20 -- `_Buynode(left, parent, right, value)` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamBucketTreeEntryNodeWithEntryCopy` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00495CC0 (FUN_00495CC0 -- the `pair<const Key, mapped_type>` construction inside `_Buynode(value)` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `InitializeBeamTextureBucketEntry` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* buy_node(Args&&... args)
             {
@@ -7201,6 +7220,7 @@ namespace msvc8
              * above.)
              * Address: 0x0049F3C0 (FUN_0049F3C0 -- the node's value destructor before `_Freenode` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `DestroyParticleBucketNodeMappedBucketIfPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049F420 (FUN_0049F420 -- the node's value destructor before `_Freenode` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); zero callers, unreachable; formerly `DestroyTrailBucketNodeMappedBucketIfPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00492200 (FUN_00492200 -- the node value's destructor (`~vector` plus the two retained texture handles) before `_Freenode` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540, 0x00497800, 0x0049A104; formerly `DestroyBeamTextureBucketEntry` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             static void free_node(node_type* const n) noexcept
             {
@@ -7667,6 +7687,7 @@ namespace msvc8
              * Address: 0x0049E290 (FUN_0049E290 -- `_Erase(root)` (the recursive teardown) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494E10, 0x004965E0, 0x0049668A; formerly `DestroyTrailBucketPayloadRange` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049A970 (FUN_0049A970 -- `_Erase(root)` (the recursive teardown) for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494E10, 0x004964E8, 0x0049837C; formerly `DestroyParticleBucketKeyNodeSubtreeOnly` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049AC10 (FUN_0049AC10 -- `_Erase(root)` (the recursive teardown) for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00494E10, 0x00496698, 0x0049862C; formerly `DestroyTrailBucketKeyNodeSubtreeOnly` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00497800 (FUN_00497800 -- `_Erase(root)` -- the recursive teardown for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x0049151F, 0x00492E30, 0x00494E10; formerly `DestroyBeamBucketTreeSubtree` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             void destroy_subtree(node_type* rootNode) noexcept
             {
@@ -8123,6 +8144,7 @@ namespace msvc8
              * Address: 0x0083B0F0 (FUN_0083B0F0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_left`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeLeftViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              * Address: 0x0049D390 (FUN_0049D390 -- `_Lrotate` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049C7A0, 0x0049D0D0; formerly `RotateParticleBucketTreeLeft` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049D7E0 (FUN_0049D7E0 -- `_Lrotate` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049CAF0, 0x0049D520; formerly `RotateTrailBucketTreeLeft` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499F90 (FUN_00499F90 -- `_Lrotate` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840, 0x0049C1F0; formerly `RotateBeamBucketTreeLeft` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             void rotate_left(node_type* const n) noexcept
             {
@@ -8406,6 +8428,7 @@ namespace msvc8
              * Address: 0x0083B1A0 (FUN_0083B1A0 -- LTCG clone with `this` folded to the file-static `map<unsigned int, msvc8::string>` at 0x010C1AD0 (`_Myhead` 0x010C1AD4, nil byte at node+0x2D; UiRuntimeTypes.cpp's key-action name map) -- `rotate_right`; callers 0x0083A640, 0x0083B9E0; formerly `RotateOffset2DTreeRightViaPrimaryGlobalHead` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
              * Address: 0x0049D3E0 (FUN_0049D3E0 -- `_Rrotate` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049C7A0, 0x0049D0D0; formerly `RotateParticleBucketTreeRight` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049D830 (FUN_0049D830 -- `_Rrotate` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x0049CAF0, 0x0049D520; formerly `RotateTrailBucketTreeRight` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x00499FE0 (FUN_00499FE0 -- `_Rrotate` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00497840, 0x0049C1F0; formerly `RotateBeamBucketTreeRight` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             void rotate_right(node_type* const n) noexcept
             {

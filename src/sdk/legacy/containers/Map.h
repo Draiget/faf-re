@@ -132,11 +132,15 @@ namespace msvc8
          * this sweep) beyond this member's own generic API surface, which
          * every range-for loop over `commands` in `CCommandDb.cpp` now
          * uses.)
+         * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator begin() noexcept { return iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator begin() const noexcept { return const_iterator(tree_.leftmost()); }
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
 
+        /**
+         * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         */
         [[nodiscard]] iterator end() noexcept { return iterator(tree_.header()); }
         [[nodiscard]] const_iterator end() const noexcept { return const_iterator(tree_.header()); }
         [[nodiscard]] const_iterator cend() const noexcept { return end(); }
@@ -466,6 +470,7 @@ namespace msvc8
          * (`CWldSplat.cpp`).
          * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
          * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
+         * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         mapped_type& operator[](const key_type& k)
         {

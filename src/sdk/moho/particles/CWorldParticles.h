@@ -22,13 +22,13 @@ namespace moho
   class ID3DRenderTarget;
   struct GeomCamera3;
   class ID3DIndexSheet;
-  struct ParticleBucketTreeNodeRuntime;
-  struct TrailBucketTreeNodeRuntime;
+
 
   /**
    * What it does:
    * Stores beam render-bucket state on `CWorldParticles` at the recovered
    * `+0xCC` lane.
+   * Address: 0x004914B0 (FUN_004914B0 -- the aggregate's implicit default constructor: null the vertex sheet, then `rb_tree()` buys the header sentinel and self-links it for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x004925E0, 0x004928A0, 0x00493090; formerly `InitializeBeamBucketMapStorage` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
   struct BeamBucketContainerRuntime
   {
@@ -40,64 +40,8 @@ namespace moho
     offsetof(BeamBucketContainerRuntime, mVertexSheet) == 0x00,
     "BeamBucketContainerRuntime::mVertexSheet offset must be 0x00"
   );
+  static_assert(sizeof(BeamBucketContainerRuntime) == 0x10, "BeamBucketContainerRuntime size must be 0x10");
 
-  /**
-   * What it does:
-   * One red-black tree node runtime lane used by world-particle bucket maps at
-   * `CWorldParticles + 0x28` and `+0x34`.
-   */
-  struct ParticleBucketTreeNodeRuntime
-  {
-    ParticleBucketTreeNodeRuntime* left = nullptr;   // +0x00
-    ParticleBucketTreeNodeRuntime* parent = nullptr; // +0x04
-    ParticleBucketTreeNodeRuntime* right = nullptr;  // +0x08
-    std::uint8_t payload0C_4B[0x40]{};               // +0x0C
-    std::uint8_t color = 0U;                         // +0x4C
-    std::uint8_t isNil = 0U;                         // +0x4D
-    std::uint16_t padding4E = 0U;                    // +0x4E
-  };
-
-  static_assert(
-    offsetof(ParticleBucketTreeNodeRuntime, color) == 0x4C,
-    "ParticleBucketTreeNodeRuntime::color offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(ParticleBucketTreeNodeRuntime, isNil) == 0x4D,
-    "ParticleBucketTreeNodeRuntime::isNil offset must be 0x4D"
-  );
-  static_assert(sizeof(ParticleBucketTreeNodeRuntime) == 0x50, "ParticleBucketTreeNodeRuntime size must be 0x50");
-
-  /**
-   * What it does:
-   * One red-black tree node runtime lane used by world-trail bucket maps at
-   * `CWorldParticles + 0x40`.
-   */
-  struct TrailBucketTreeNodeRuntime
-  {
-    TrailBucketTreeNodeRuntime* left = nullptr;      // +0x00
-    TrailBucketTreeNodeRuntime* parent = nullptr;    // +0x04
-    TrailBucketTreeNodeRuntime* right = nullptr;     // +0x08
-    std::uint8_t payload0C_43[0x38]{};               // +0x0C
-    std::uint8_t color = 0U;                         // +0x44
-    std::uint8_t isNil = 0U;                         // +0x45
-    std::uint16_t padding46 = 0U;                    // +0x46
-  };
-
-  static_assert(
-    offsetof(TrailBucketTreeNodeRuntime, color) == 0x44,
-    "TrailBucketTreeNodeRuntime::color offset must be 0x44"
-  );
-  static_assert(
-    offsetof(TrailBucketTreeNodeRuntime, isNil) == 0x45,
-    "TrailBucketTreeNodeRuntime::isNil offset must be 0x45"
-  );
-  static_assert(sizeof(TrailBucketTreeNodeRuntime) == 0x48, "TrailBucketTreeNodeRuntime size must be 0x48");
-
-  /**
-   * What it does:
-   * Legacy tree-map header lane (`proxy + head + size`) used by world-particle
-   * bucket maps.
-   */
   /**
    * Ordering of the render buckets: ascending `sortScalar`, then the state
    * byte, blend and z modes, the two texture handles and the tag. The binary's
