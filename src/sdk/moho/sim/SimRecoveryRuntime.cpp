@@ -5316,45 +5316,6 @@ void ClearAndReleaseCartographicDecalOwnerRuntime(
 }
 
 /**
- * Address: 0x007E2E60 (FUN_007E2E60)
- *
- * What it does:
- * Finds one lookup node by text key and returns either the matched node or the
- * owner sentinel when append-to-sink fails.
- */
-void** FindLookupNodeAndAppendTextRuntime(
-  void* const textSink,
-  void** const outNode,
-  void* const owner,
-  const void* const key,
-  const LookupNodeByTextFn lookupFn,
-  const AppendLookupTextFn appendFn
-)
-{
-  if (outNode == nullptr) {
-    return nullptr;
-  }
-
-  void* sentinel = nullptr;
-  if (owner != nullptr) {
-    sentinel = *reinterpret_cast<void**>(static_cast<std::byte*>(owner) + 4u);
-  }
-
-  void* node = sentinel;
-  if (lookupFn != nullptr) {
-    node = lookupFn(owner, key);
-  }
-
-  if (node == sentinel || appendFn == nullptr || appendFn(textSink, node) < 0) {
-    *outNode = sentinel;
-    return outNode;
-  }
-
-  *outNode = node;
-  return outNode;
-}
-
-/**
  * Address: 0x007E5170 (FUN_007E5170)
  *
  * What it does:
