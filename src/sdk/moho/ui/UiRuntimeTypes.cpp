@@ -22792,13 +22792,19 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
       }
   // The rest of the frame's cursor-state update runs unconditionally,
   // whether or not the raycast landed on the world.
+  // The id of the command node the cursor is over, or -1. This is the value
+  // the whole order-interaction layer keys off: `GetLeftMouseButtonAction`
+  // feeds it to `DefaultModeFromDrag`, which answers COMMOD_Move for the -1
+  // sentinel (top byte 0xFF) and COMMOD_Reclaim - the "grab this command
+  // node" arm that builds a `UICommandDragger` - for a real CmdId. It is also
+  // what `HasHoveredCommand`, the Lua `IsDragging` binding, and the
+  // shift+ctrl right-release command-strip path read.
   CmdId highlightCommandId = -1;
   if (mHighlightEnabled && !mIsMiniMap) {
     highlightCommandId =
       ResolveCommandGraphCursorHighlightIfPresent(mComGraph.px, mCamera->CameraGetView(), mouseScreenPos);
         rejectProbe("ACCEPT");
   }
-  (void)highlightCommandId;
 
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
@@ -22862,6 +22868,7 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
   resultCursor.mHitValid = hit.mHitValid;
   resultCursor.mMouseWorldPos = hit.mMouseWorldPos;
   resultCursor.SetHoveredEntity(bestCandidate);
+  resultCursor.mIsDragger = highlightCommandId;
   resultCursor.mMouseScreenPos = mouseScreenPos;
   mWldSession->CursorInfo() = resultCursor;
 }
