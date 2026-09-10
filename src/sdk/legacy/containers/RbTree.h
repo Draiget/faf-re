@@ -2959,6 +2959,7 @@ namespace msvc8
              * Address: 0x0049C940 (FUN_0049C940 -- `_Lbound` for `ParticleBucketMap` (`msvc8::map<ParticleBucketKeyRuntime, ParticleRenderBucketRuntime*>`, 0x50-byte node); callers 0x004963E0, 0x004983A0, 0x0049A955; formerly `FindParticleBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0049CC90 (FUN_0049CC90 -- `_Lbound` for `TrailBucketMap` (`msvc8::map<TrailBucketKeyRuntime, TrailRenderBucketRuntime*>`, 0x50-byte node); callers 0x00496590, 0x00498650, 0x0049AC00; formerly `FindTrailBucketLowerBoundCandidateNode` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x00499F40 (FUN_00499F40 -- `_Lbound` for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00495C10, 0x004977F0; formerly `FindBeamBucketLowerBoundCandidateNode` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+             * Address: 0x008D6170 (FUN_008D6170 -- `_Lbound` -- the width/height/refresh walk for `msvc8::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D5020, 0x008D5710; formerly `FindAdapterModeSortLowerBoundNode` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
              */
             [[nodiscard]] node_type* lower_bound_node(const key_type& k) const
             {

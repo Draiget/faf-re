@@ -1,5 +1,7 @@
 #include "moho/misc/StartupHelpers.h"
 
+#include "legacy/containers/Set.h"
+
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -1145,180 +1147,6 @@ namespace
     return false;
   }
 
-  struct AdapterModeSortKeyRuntimeView
-  {
-    std::uint32_t mReserved00; // +0x00
-    std::uint32_t mWidth;      // +0x04
-    std::uint32_t mHeight;     // +0x08
-    std::uint32_t mRefresh;    // +0x0C
-  };
-  static_assert(
-    offsetof(AdapterModeSortKeyRuntimeView, mWidth) == 0x04,
-    "AdapterModeSortKeyRuntimeView::mWidth offset must be 0x04"
-  );
-  static_assert(
-    offsetof(AdapterModeSortKeyRuntimeView, mHeight) == 0x08,
-    "AdapterModeSortKeyRuntimeView::mHeight offset must be 0x08"
-  );
-  static_assert(
-    offsetof(AdapterModeSortKeyRuntimeView, mRefresh) == 0x0C,
-    "AdapterModeSortKeyRuntimeView::mRefresh offset must be 0x0C"
-  );
-
-  struct AdapterModeSortTreeNodeRuntimeView
-  {
-    AdapterModeSortTreeNodeRuntimeView* mLeft;   // +0x00
-    AdapterModeSortTreeNodeRuntimeView* mParent; // +0x04
-    AdapterModeSortTreeNodeRuntimeView* mRight;  // +0x08
-    void* mResolutionVtable;                     // +0x0C
-    std::uint32_t mWidth;                        // +0x10
-    std::uint32_t mHeight;                       // +0x14
-    std::uint32_t mRefresh;                      // +0x18
-    std::uint8_t mColor;                         // +0x1C
-    std::uint8_t mIsNil;                         // +0x1D
-    std::uint8_t mPad1E_1F[0x02];
-  };
-  static_assert(sizeof(AdapterModeSortTreeNodeRuntimeView) == 0x20, "AdapterModeSortTreeNodeRuntimeView size must be 0x20");
-  static_assert(
-    offsetof(AdapterModeSortTreeNodeRuntimeView, mResolutionVtable) == 0x0C,
-    "AdapterModeSortTreeNodeRuntimeView::mResolutionVtable offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(AdapterModeSortTreeNodeRuntimeView, mWidth) == 0x10,
-    "AdapterModeSortTreeNodeRuntimeView::mWidth offset must be 0x10"
-  );
-  static_assert(
-    offsetof(AdapterModeSortTreeNodeRuntimeView, mHeight) == 0x14,
-    "AdapterModeSortTreeNodeRuntimeView::mHeight offset must be 0x14"
-  );
-  static_assert(
-    offsetof(AdapterModeSortTreeNodeRuntimeView, mRefresh) == 0x18,
-    "AdapterModeSortTreeNodeRuntimeView::mRefresh offset must be 0x18"
-  );
-  static_assert(
-    offsetof(AdapterModeSortTreeNodeRuntimeView, mIsNil) == 0x1D,
-    "AdapterModeSortTreeNodeRuntimeView::mIsNil offset must be 0x1D"
-  );
-
-  [[nodiscard]] void* ResolveResolutionVtableRuntimeTag() noexcept
-  {
-    static const moho::Resolution kResolutionVtableSeed{};
-    return *reinterpret_cast<void* const*>(static_cast<const void*>(&kResolutionVtableSeed));
-  }
-
-  /**
-   * Address: 0x008D6B70 (FUN_008D6B70)
-   *
-   * What it does:
-   * Recursively destroys one adapter-mode sort subtree by walking the right
-   * lane first, then iterating left-lane links until the RB-tree nil sentinel.
-   */
-  [[maybe_unused]] void DestroyAdapterModeSortSubtreeRuntime(
-    void* const ownerRuntime,
-    AdapterModeSortTreeNodeRuntimeView* node
-  )
-  {
-    AdapterModeSortTreeNodeRuntimeView* current = node;
-    AdapterModeSortTreeNodeRuntimeView* previous = node;
-    while (current != nullptr && current->mIsNil == 0u) {
-      DestroyAdapterModeSortSubtreeRuntime(ownerRuntime, current->mRight);
-      current = current->mLeft;
-      previous->mResolutionVtable = ResolveResolutionVtableRuntimeTag();
-      ::operator delete(previous);
-      previous = current;
-    }
-    (void)ownerRuntime;
-  }
-
-  struct AdapterModeSortTreeRuntimeView
-  {
-    void* mAllocProxy;                               // +0x00
-    AdapterModeSortTreeNodeRuntimeView* mHead;      // +0x04
-    std::uint32_t mSize;                            // +0x08
-  };
-  static_assert(sizeof(AdapterModeSortTreeRuntimeView) == 0x0C, "AdapterModeSortTreeRuntimeView size must be 0x0C");
-
-  /**
-   * Address: 0x008D6170 (FUN_008D6170)
-   *
-   * What it does:
-   * Performs lower-bound lookup in the adapter-mode RB-tree using
-   * `(width,height,refresh)` tuple ordering.
-   */
-  [[nodiscard]] AdapterModeSortTreeNodeRuntimeView* FindAdapterModeSortLowerBoundNode(
-    const AdapterModeSortTreeRuntimeView& tree,
-    const AdapterModeSortKeyRuntimeView& key
-  )
-  {
-    AdapterModeSortTreeNodeRuntimeView* result = tree.mHead;
-    AdapterModeSortTreeNodeRuntimeView* node = (tree.mHead != nullptr) ? tree.mHead->mParent : nullptr;
-
-    while (node != nullptr && node->mIsNil == 0u) {
-      const std::uint32_t nodeWidth = node->mWidth;
-      const std::uint32_t nodeHeight = node->mHeight;
-      const std::uint32_t nodeRefresh = node->mRefresh;
-      if (
-        nodeWidth < key.mWidth
-        || (nodeWidth == key.mWidth && nodeHeight < key.mHeight)
-        || (nodeWidth == key.mWidth && nodeHeight == key.mHeight && nodeRefresh < key.mRefresh)
-      ) {
-        node = node->mRight;
-      } else {
-        result = node;
-        node = node->mLeft;
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * Address: 0x008D5020 (FUN_008D5020, sub_8D5020)
-   *
-   * What it does:
-   * Resolves one adapter-mode tree insertion anchor by lower-bound lookup on
-   * `(width,height,refresh)` and writes the chosen node lane to `*outNode`.
-   *
-   * Real callers, confirmed but not wired: the callgraph index cites this
-   * address's two callers as `func_SetupPrimaryAdapterSettings`
-   * (FUN_008D21E0) and `func_SetupSecondaryAdapterSettings` (FUN_008D26D0) --
-   * i.e. this IS the binary's real `msvc8::rb_tree<moho::Resolution>::
-   * lower_bound`-based insertion-anchor step for the sorted adapter-mode
-   * dedup tree, exactly as legacy/containers/RbTree.h's
-   * `insert_at`/`buy_node`-with-value catalog entry (~line 6200) already
-   * documents. That entry also explains why this isn't wired here: the
-   * currently recovered `SetupPrimaryAdapterSettings`/
-   * `SetupSecondaryAdapterSettings` (`CollectAdapterModes`/`HasMode` in this
-   * file) dedup via an O(n) linear scan instead of this sorted tree --
-   * same resulting set, different observable UI order -- and migrating to
-   * the real tree requires recovering the rest of the
-   * `T=Resolution` instantiation (`insert_at`, buy-node-with-value,
-   * rotations) first. See RbTree.h for the full analysis; not attempted in
-   * this pass.
-   */
-  [[maybe_unused]] AdapterModeSortTreeNodeRuntimeView** ResolveAdapterModeSortInsertionAnchor(
-    const AdapterModeSortKeyRuntimeView& key,
-    const AdapterModeSortTreeRuntimeView& tree,
-    AdapterModeSortTreeNodeRuntimeView** const outNode
-  )
-  {
-    AdapterModeSortTreeNodeRuntimeView* const candidate = FindAdapterModeSortLowerBoundNode(tree, key);
-    AdapterModeSortTreeNodeRuntimeView* const head = tree.mHead;
-
-    if (
-      candidate == head
-      || key.mWidth < candidate->mWidth
-      || (key.mWidth == candidate->mWidth && key.mHeight < candidate->mHeight)
-      || (key.mWidth == candidate->mWidth && key.mHeight == candidate->mHeight && key.mRefresh < candidate->mRefresh)
-    ) {
-      *outNode = head;
-    } else {
-      *outNode = candidate;
-    }
-
-    return outNode;
-  }
-
   struct SelfLinkedDwordNodeRuntimeView
   {
     SelfLinkedDwordNodeRuntimeView* mNext; // +0x00
@@ -1369,27 +1197,35 @@ namespace
       mode.height >= static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
   }
 
-  [[nodiscard]]
-  bool HasMode(const msvc8::vector<gpg::gal::HeadAdapterMode>& acceptedModes, const gpg::gal::HeadAdapterMode& mode)
+  /**
+   * Ordering for the adapter-mode dedup tree: width, then height, then refresh
+   * rate. `0x008D6170` walks the tree with exactly this three-step compare.
+   */
+  struct ResolutionLess
   {
-    const gpg::gal::HeadAdapterMode* const start = acceptedModes.begin();
-    const gpg::gal::HeadAdapterMode* const finish = acceptedModes.end();
-    if (start == nullptr || finish == nullptr) {
-      return false;
-    }
-
-    for (const gpg::gal::HeadAdapterMode* it = start; it != finish; ++it) {
-      if (it->width == mode.width && it->height == mode.height && it->refreshRate == mode.refreshRate) {
-        return true;
+    [[nodiscard]] bool operator()(const moho::Resolution& lhs, const moho::Resolution& rhs) const noexcept
+    {
+      if (lhs.width != rhs.width) {
+        return lhs.width < rhs.width;
       }
+      if (lhs.height != rhs.height) {
+        return lhs.height < rhs.height;
+      }
+      return lhs.framesPerSecond < rhs.framesPerSecond;
     }
+  };
 
-    return false;
-  }
+  // The shipped dedup is an RB-tree of `Resolution` (node 0x20: the 0x10
+  // element at +0x0C, colour and nil at +0x1C/+0x1D), built on the stack by
+  // `SetupPrimaryAdapterSettings` and `SetupSecondaryAdapterSettings` and torn
+  // down when they return. The tree only suppresses repeats -- the option
+  // states are published in the adapter's own order as the scan walks it.
+  using AdapterModeDedup = msvc8::set<moho::Resolution, ResolutionLess>;
 
   [[nodiscard]] msvc8::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(const std::uint32_t headIndex)
   {
     msvc8::vector<gpg::gal::HeadAdapterMode> modes;
+    AdapterModeDedup published;
 
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
@@ -1412,9 +1248,15 @@ namespace
       if (!IsModeAboveWindowMinimum(*it)) {
         continue;
       }
-      if (HasMode(modes, *it)) {
+      const moho::Resolution mode(
+        static_cast<std::int32_t>(it->width),
+        static_cast<std::int32_t>(it->height),
+        static_cast<std::int32_t>(it->refreshRate)
+      );
+      if (published.find(mode) != published.end()) {
         continue;
       }
+      (void)published.insert(mode);
       modes.push_back(*it);
     }
 

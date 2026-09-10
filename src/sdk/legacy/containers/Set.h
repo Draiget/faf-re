@@ -90,6 +90,7 @@ namespace msvc8
          * What it does:
          * Runs the `_Lbound` descent and confirms the landed key is not ordered
          * after the probe, returning `end()` when the key is absent.
+         * Address: 0x008D5020 (FUN_008D5020 -- `find` -- that lower bound plus the equivalence check, returning the header on a miss for `msvc8::set<moho::Resolution>` (the adapter-mode dedup tree in moho/misc/StartupHelpers.cpp, node 0x20, element 0x10 at node+0x0C, isNil@+0x1D); callers 0x008D21E0, 0x008D26D0; formerly `ResolveAdapterModeSortInsertionAnchor` in moho/misc/StartupHelpers.cpp (RULE ONE), removed 2026-09-10.)
          */
         [[nodiscard]] iterator find(const key_type& k) const { return iterator(tree_.find_node(k)); }
 
