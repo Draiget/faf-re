@@ -1298,6 +1298,13 @@ namespace msvc8
          * all -- see `vector`'s `HasDebugProxy` template parameter below.
          * `[[msvc::no_unique_address]]` lets the compiler fully elide this
          * tag's storage, dropping the class from 16 to 12 bytes.
+         * Address: 0x00508040 (FUN_00508040 -- the empty `_Container_base` / `_Iterator_base` bodies of a release build (`_Orphan_all`, `_Swap_all`, `_Adopt` and friends), as emitted for `msvc8::vector<moho::SDelayedSubVizInfo>`; each is a bare `ret`, zero callers, unreachable. Formerly the seven `noop_DelayedSubVizLaneVariant*` functions in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005080A0 (FUN_005080A0 -- same, taking one ignored argument.)
+         * Address: 0x005080B0 (FUN_005080B0 -- same.)
+         * Address: 0x005087C0 (FUN_005087C0 -- same.)
+         * Address: 0x00508A80 (FUN_00508A80 -- same.)
+         * Address: 0x00508A90 (FUN_00508A90 -- same.)
+         * Address: 0x00508B00 (FUN_00508B00 -- same.)
          */
         struct NoDebugProxy {};
 
@@ -1479,6 +1486,10 @@ namespace msvc8
          * Address: 0x0083C3A0 (FUN_0083C3A0 -- `_Allocate(1)` for a 48-byte node, the count-1 adapter a `_Buynode` reaches.)
          */
         template <class T>
+        /**
+         * Address: 0x00508CB0 (FUN_00508CB0 -- `_Allocate` for the 20-byte `moho::SDelayedSubVizInfo` element (0xFFFFFFFF / 20 guard, `operator new`); callers 0x00507FF0 `_Buy`, 0x005082B0 `assign`, 0x00508480 `_Insert_n`. Formerly `AllocateDelayedSubVizElementStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005087E0 (FUN_005087E0 -- `allocator<moho::SDelayedSubVizInfo>::allocate`: 0x00508CB0 for a non-zero count, `operator new(0)` otherwise; caller 0x00508F50 (the copy constructor). Formerly `AllocateDelayedSubVizStorage`.)
+         */
         [[nodiscard]] inline T* allocate_checked(const std::size_t count)
         {
             if (count != 0 && (static_cast<std::size_t>(0xFFFFFFFFu) / count) < sizeof(T)) {
@@ -1563,6 +1574,7 @@ namespace msvc8
     public:
         /**
          * Default constructor: empty
+         * Address: 0x00507920 (FUN_00507920 -- the default constructor's three null stores for `msvc8::vector<moho::SDelayedSubVizInfo>` (the debug-proxy slot untouched); zero callers, unreachable. Formerly `ClearDelayedSubVizVectorLanes` in moho/sim/SDelayedSubVizInfoReflection.cpp (RULE ONE), removed 2026-09-10.)
          */
         vector() noexcept :
     		myProxy_{},
@@ -1896,6 +1908,7 @@ namespace msvc8
          * Address: 0x00752BA0 (FUN_00752BA0 -- copy constructor for the 12-byte `{dword, dword, shared-count control}` element of `SSyncData` (buy at 0x0074D8C0); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00752DE0 (FUN_00752DE0 -- copy constructor for a 40-byte element (buy at 0x0074DA70); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005DB610 (FUN_005DB610 -- copy constructor for the 8-byte `moho::WeakPtr<CUnitCommand>` element: null the triple, buy exactly `size()` slots (0x005A1D60), `_Ucopy` 0x005E1840 (each node relinks at its owner's chain head through `WeakPtr`'s copy constructor), `_Tidy` 0x005A07A0 on the throw path. Twelve callers, e.g. 0x005D7340 (CAiAttackerImpl.cpp), 0x005FA340 / 0x005FA550 (CFactoryBuildTask). Formerly `CopyWeakPtrCUnitCommandVector` in moho/unit/CUnitCommandWeakPtrReflection.cpp (RULE ONE); its callers now copy or assign the vector directly.)
+         * Address: 0x00508F50 (FUN_00508F50 -- copy constructor for `moho::SDelayedSubVizInfo`: null the triple, allocate exactly `size()` slots (0x005087E0), copy through 0x00508BE0; zero callers, unreachable. Formerly `CopyDelayedSubVizStorageDeep` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -2214,6 +2227,7 @@ namespace msvc8
          * Address: 0x006DE400 (FUN_006DE400 -- `operator=` for the 12-byte `moho::SBlackListInfo` element (`WeakPtr<Entity>` + int; the element-wise assign/copy-construct steps relink each weak reference through `WeakPtr<Entity>`'s own copy semantics). Zero callers, no xrefs, unreachable from every seeded root. Formerly the runtime-view transcription `AssignBlacklistInfoVectorPreservingWeakLinks` in moho/unit/core/UnitWeapon.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00628560 (FUN_00628560 -- `operator=` for the 12-byte `moho::SPickUpInfo` element (`WeakPtr<Unit>` + float). Zero callers, no xrefs, unreachable. Formerly `AssignPickUpInfoVectorPreservingWeakLinks` in moho/unit/tasks/CUnitLoadUnits.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00583A20 (FUN_00583A20 -- `operator=` for `msvc8::vector<int>` (the `SAttackVectorGridRow::mOccupancyWords` member, assigned per row by the fill step 0x00583850; empty-source arm `clear()` 0x00583C30, assign-over step `_Copy_opt` 0x00584480). Formerly the orphan `CopyAssignLegacyIntVector` in CAiBrain.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00509010 (FUN_00509010 -- `operator=` for `msvc8::vector<moho::SDelayedSubVizInfo>`: the four VC8 arms (`clear()` 0x005091D0, assign-over, assign-then-append through 0x00509850, `_Tidy` 0x00508050 + `assign` 0x005082B0); zero callers, unreachable. Formerly `AssignDelayedSubVizVector` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         vector& operator=(const vector& rhs) {
             if (this == &rhs) return *this;
@@ -2306,6 +2320,8 @@ namespace msvc8
          * Address: 0x00591E90 (FUN_00591E90 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x004FD980 (FUN_004FD980 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00504EC0 (FUN_00504EC0 -- out-of-line `begin()` (loads `first_` at +0x04); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00507960 (FUN_00507960 -- `begin()` for `msvc8::vector<moho::SDelayedSubVizInfo>` returned through the hidden iterator slot; zero callers, unreachable. Formerly `ExportDelayedSubVizBeginLane` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005091B0 (FUN_005091B0 -- a second `begin()` copy for the same instantiation; zero callers. Formerly `ExportDelayedSubVizBeginPointer`.)
          */
         T* begin() const noexcept { return first_; }
 
@@ -2345,10 +2361,13 @@ namespace msvc8
          * Address: 0x00591DD0 (FUN_00591DD0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x004FD750 (FUN_004FD750 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00504ED0 (FUN_00504ED0 -- out-of-line `end()` (loads `last_` at +0x08); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00507970 (FUN_00507970 -- `end()` for `msvc8::vector<moho::SDelayedSubVizInfo>` returned through the hidden iterator slot; zero callers, unreachable. Formerly `ExportDelayedSubVizEndLane` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005091C0 (FUN_005091C0 -- a second `end()` copy for the same instantiation; zero callers. Formerly `ExportDelayedSubVizEndPointer`.)
          */
         T* end() const noexcept { return last_; }
         /**
          * Address: 0x0077A060 (FUN_0077A060 -- `empty()` for `msvc8::vector<moho::SDecalInfo>` (null-`first_` guard, then `last_ == first_`). Zero callers, no xrefs, unreachable. Formerly `IsSDecalInfoVectorRuntimeEmpty` over a hand-rolled `SDecalInfoVectorRuntimeView` in moho/render/CDecalTypes.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00507980 (FUN_00507980 -- `empty()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `IsDelayedSubVizLaneSpanEmpty` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         [[nodiscard]] bool empty() const noexcept {
 	        return first_ == last_;
@@ -2463,6 +2482,7 @@ namespace msvc8
          *
          * Returns reserved element capacity from retained `[first_, end_)` range.
          * Address: 0x0077AC70 (FUN_0077AC70 -- `capacity()` for `msvc8::vector<moho::SDecalInfo>`. Zero callers, no xrefs, unreachable. Formerly `CountSDecalInfoVectorRuntimeCapacity` in moho/render/CDecalTypes.cpp, removed 2026-09-10.)
+         * Address: 0x00507F20 (FUN_00507F20 -- `capacity()` for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLaneCapacityCount` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
@@ -2473,6 +2493,8 @@ namespace msvc8
          * Address: 0x00547740 (FUN_00547740 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00A724E0 (FUN_00A724E0 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00A72510 (FUN_00A72510 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00507F70 (FUN_00507F70 -- `operator[]` (`first_ + index`) for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `DelayedSubVizLanePointerAt` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508470 (FUN_00508470 -- a second copy of that subscript; zero callers. Formerly `DelayedSubVizVectorPointerAt`.)
          */
         T& operator[](std::size_t i) const noexcept {
 	        return first_[i];
@@ -2766,6 +2788,7 @@ namespace msvc8
          * note with no caller evidence; this pass supplies the concrete
          * caller chain.
          * Address: 0x006EA710 (FUN_006EA710 -- the `_Ufill` grow step of `resize(n)` (`_Insert_n(end(), n - size(), T())`) for `moho::WeakPtr<CUnitCommand>`, materialising the value-initialised temporary; source call `RVectorType<WeakPtr<CUnitCommand>>::SetCount` 0x006E9D10. Zero callers in the index (folded into its caller), unreachable.)
+         * Address: 0x00507F40 (FUN_00507F40 -- `resize(n)` (value-initialised fill) for `moho::SDelayedSubVizInfo`, a register-order adapter over 0x005083C0; zero callers, unreachable. Formerly `ResizeDelayedSubVizVectorWithDefaultFill` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void resize(std::size_t newSize) {
             // VC8 defines this as `resize(_Newsize, _Ty())` -- the temporary is
@@ -3022,6 +3045,7 @@ namespace msvc8
          * Address: 0x00703040 (FUN_00703040 -- `clear()` for `SEntitySetTemplateUnit` (destroy the range at 0x007056D0, then `last_ = first_`), the empty-source arm of `operator=` (0x00704D80) and `resize` (0x00702450).)
          * Address: 0x00583C30 (FUN_00583C30 -- `clear()` for `msvc8::vector<int>`, the empty-source arm of `operator=` 0x00583A20. Formerly the orphan `ClearLegacyIntVectorLogicalRange` in CAiBrain.cpp, removed 2026-09-10.)
          * Address: 0x0057D8B0 (FUN_0057D8B0 -- `clear()` for `msvc8::vector<moho::SPointVector>` (24-byte element), the empty-source arm of that vector's `operator=` 0x00582890. Formerly the orphan `ResetSPointVectorVectorEndToBegin` in CAiBrain.cpp, removed 2026-09-10.)
+         * Address: 0x005091D0 (FUN_005091D0 -- `clear()` (`erase(begin(), end())`: a zero-length self copy then `last_ = first_`) for `moho::SDelayedSubVizInfo`, the empty-source arm of `operator=` 0x00509010. Formerly `NormalizeDelayedSubVizFinish` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void clear() noexcept {
             destroy_all();
@@ -3078,6 +3102,7 @@ namespace msvc8
          * Address: 0x0055FE70 (FUN_0055FE70 -- `_Tidy` for `msvc8::vector<std::uint32_t>` (`SArmyVectorWithMeta::mWords`): free the block, null the triple; the catch arm of the copy constructor as instantiated by `SSTIArmyVariableData`'s copy constructor 0x0055FF80 and by 0x00764A80 / 0x00764CF0 in Sim.cpp. Formerly `ResetLegacyWordVectorStorage` over a `LegacyWordVectorRuntimeView` in moho/sim/SSTIArmyVariableData.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00580D10 (FUN_00580D10 -- the destroy step of `_Tidy` for `msvc8::vector<SAttackVectorGridRow>` (forwards to `_Destroy_range` 0x005837F0); reached only from the ICF-folded 0x00580D30. Was cited on the same removed CAiBrain.cpp orphan.)
          * Address: 0x005A07A0 (FUN_005A07A0 -- `_Tidy` for `msvc8::vector<moho::WeakPtr<CUnitCommand>>`: `_Destroy_range` 0x005A2270, free, null the triple; the catch arm of the copy constructor 0x005DB610. Formerly `ResetWeakPtrCUnitCommandVectorStorage` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508050 (FUN_00508050 -- `_Tidy` for `msvc8::vector<moho::SDelayedSubVizInfo>`: free, null the triple; `CIntelGrid::~CIntelGrid` 0x00508D80's member destructor and `operator=` 0x00509010's grow arm. Formerly `ReleaseDelayedSubVizVectorStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -3117,6 +3142,8 @@ namespace msvc8
          * Address: 0x005ECC10 (FUN_005ECC10 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005ECE50 (FUN_005ECE50 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005ECE80 (FUN_005ECE80 -- `swap` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00508B70 (FUN_00508B70 -- `swap` of the three pointers for `msvc8::vector<moho::SDelayedSubVizInfo>`; zero callers, unreachable. Formerly `SwapDelayedSubVizStoragePointersVariant1` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508DB0 (FUN_00508DB0 -- forwarding copy of that swap; zero callers. Formerly `SwapDelayedSubVizStoragePointersVariant2`.)
          */
         void swap(vector& other) noexcept {
             T* const otherFirst = other.first_;
@@ -3618,6 +3645,7 @@ namespace msvc8
          * Address: 0x0067B810 (FUN_0067B810 -- `vector<EntId>::push_back` for `SSyncData::mDeleteIds`/`mEraseIds` (`Entity::DestroyInterface` 0x0067A260, `Prop::Sync` 0x006FA2A0); the capacity-full arm calls the `_Insert_n` at 0x0067D660.)
          * Address: 0x00940230 (FUN_00940230 -- `push_back` for the 60-byte `gpg::gal::EffectMacro` element; capacity-full path is the single-value `insert` 0x009401C0 / `_Insert_n` 0x0093FEB0. Reached from `EffectContext::DefineMacro` 0x009402D0, which now calls `macros.push_back(newMacro)` directly; the former a per-type free function wrapper in gpg/gal/ContextInterfaces.cpp was removed 2026-09-10.)
          * Address: 0x006E9680 (FUN_006E9680 -- `push_back` for `moho::WeakPtr<CUnitCommand>`: in-place `_Ufill` 0x006EC5B0 (cited on WeakPtr.h `FillConstructRange`) when capacity remains, else `_Insert_n` 0x006EA440. Fourteen callers, e.g. 0x006E9000 (CUnitCommand.cpp), 0x006EDFC0 (CUnitCommandQueue.cpp), the reflection SerLoad 0x006EA8F0. `PushBackWeakPtrCUnitCommand` in CUnitCommandWeakPtrReflection.cpp is now a one-line forwarder kept for CUnitCommand.cpp's call site.)
+         * Address: 0x005079C0 (FUN_005079C0 -- `push_back` for the 20-byte `moho::SDelayedSubVizInfo` element: in-place `_Ufill` when capacity remains, else `insert(end(), value)` 0x00507F80. Callers `CIntelGrid::DelayedSubtractCircle` 0x005076B0 (`mUpdateList.push_back(update)`) and the reflection SerLoad 0x005080C0. Formerly `PushBackDelayedSubVizInfo` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -3832,6 +3860,7 @@ namespace msvc8
          * Address: 0x00936610 (FUN_00936610 -- `erase(pos)` for a 4-byte scalar element: memmove tail shift, `--last_`, iterator returned through the hidden result slot; zero callers, no xrefs, unreachable from every seeded root. Formerly `EraseDwordAtCursorAndReturnSlot` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006DB1E0 (FUN_006DB1E0 -- `erase(pos)` for the 12-byte `moho::SBlackListInfo` element: element-wise tail shift through the weak-link-aware assignment, unlink of the stale last slot, `--last_`. Zero callers, no xrefs, unreachable. Formerly `EraseBlacklistEntryShiftLeftRuntime` in moho/unit/core/UnitWeapon.cpp, removed 2026-09-10.)
          * Address: 0x00626EA0 (FUN_00626EA0 -- `erase(pos)` for the 12-byte `moho::SPickUpInfo` element (the range overload 0x006273B0 is the live one). Zero callers, no xrefs, unreachable. Formerly `ErasePickUpInfoAndStoreIterator` in moho/unit/tasks/CUnitLoadUnits.cpp, removed 2026-09-10.)
+         * Address: 0x00507A50 (FUN_00507A50 -- `erase(pos)` for `moho::SDelayedSubVizInfo`: tail shift 0x005093E0, `--last_`, iterator through the hidden slot; the source call is `CIntelGrid::Tick` 0x005077B0's `update = mUpdateList.erase(update)`. Formerly `EraseDelayedSubVizElementAndShiftTail` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         iterator erase(iterator pos) {
             assert(pos >= first_ && pos < last_);
@@ -3995,6 +4024,7 @@ namespace msvc8
          * Address: 0x00652220 (FUN_00652220 -- `erase(first, last)` for a pointer element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x0054D3F0 (FUN_0054D3F0 -- `erase(first, last)` for an 8-byte element (`CAniSkel`, 0x0054CB80).)
          * Address: 0x008D7AF0 (FUN_008D7AF0 -- `erase(first, last)` for a 12-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00508860 (FUN_00508860 -- `erase(first, last)` for `moho::SDelayedSubVizInfo`, the shrink arm of `resize` 0x005083C0 (result through the hidden iterator slot). Formerly `EraseDelayedSubVizVectorTail` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5055,6 +5085,7 @@ namespace msvc8
          * returned iterator survives a reallocation. The `size() == 0` guard
          * mirrors the binary: on an empty vector `pos` may be null, so the
          * difference is never taken.
+         * Address: 0x00507F80 (FUN_00507F80 -- single-value `insert(pos, value)` for `moho::SDelayedSubVizInfo`, the capacity-full path of `push_back` 0x005079C0 (computes the offset, `_Insert_n` 0x00508480, returns `begin() + offset`). Formerly `GrowAndInsertDelayedSubVizInfo` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6136,6 +6167,9 @@ namespace msvc8
          * Address: 0x00582380 (FUN_00582380 -- register-order bridge into that same fill step; zero callers, unreachable. Formerly `FillScalarAndIntVectorRangeFromPrototypeSourceFirstAdapter` in CAiBrain.cpp, removed.)
          * Address: 0x006EA440 (FUN_006EA440 -- `_Insert_n` for the 8-byte `moho::WeakPtr<CUnitCommand>` element (max_size 0x1FFFFFFF, throw 0x005A0DD0): the staged by-value copy of `value` relinks at the owner head for the duration of the call, the in-place arm shifts with `_Ucopy` 0x005FF400 / `_Copy_backward` 0x006EB820 and fills the seam with `std::fill` 0x006EC520, the grow arm re-copies through 0x006EB7F0. Callers 0x006E9680 `push_back`, 0x006E96F0 (CUnitCommand.cpp). Formerly `GrowAndFillWeakPtrCUnitCommandVector` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
          * Address: 0x006EC520 (FUN_006EC520 -- the `std::fill(where, where + count, value)` seam step of that `_Insert_n`: assignment with relink per node (`WeakPtr::operator=`). Formerly `AssignFillWeakPtrCUnitCommandLanes`, removed.)
+         * Address: 0x00509650 (FUN_00509650 -- the `std::fill(where, where + count, value)` gap-overwrite step of `_Insert_n` 0x00508480 for the 20-byte `moho::SDelayedSubVizInfo` element; zero callers in the index. Formerly `WriteRepeatedDelayedSubVizValue` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508C40 (FUN_00508C40 -- the same `std::fill` step as reached from 0x00508480. Formerly `FillDelayedSubVizInfoRange`.)
+         * Address: 0x00508C10 (FUN_00508C10 -- `std::fill` with a value-initialised `SDelayedSubVizInfo`, the `resize(n)` flavour of that step. Formerly `ZeroFillDelayedSubVizInfoRange`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -7369,6 +7403,20 @@ namespace msvc8
          * Address: 0x006EC500 (FUN_006EC500 -- ICF-separated copy of that bridge; zero callers, unreachable.)
          * Address: 0x006ED0D0 (FUN_006ED0D0 -- ICF-separated copy of that bridge; zero callers, unreachable.)
          * Address: 0x005E1840 (FUN_005E1840 -- the `_Ucopy` step of the copy constructor 0x005DB610 for `moho::WeakPtr<CUnitCommand>`; DB carried it as recovered with no source path.)
+         * Address: 0x005093E0 (FUN_005093E0 -- the element-wise forward copy (`_Ucopy`/`_Copy` share one body for the trivially copyable 20-byte `moho::SDelayedSubVizInfo`); callers 0x00507A50 `erase`, 0x00508860, 0x00508AA0 and its bridges. Formerly `CopyDelayedSubVizInfoRangeVariant2` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508BE0 (FUN_00508BE0 -- the same forward copy through the per-element copy 0x00508840; caller 0x00508F50 (the copy constructor). Formerly `CopyDelayedSubVizInfoRangeVariant1`.)
+         * Address: 0x00509CB0 (FUN_00509CB0 -- bridge into 0x005093E0 used by `_Insert_n` 0x00508480 (`_Umove`). Formerly `CopyDelayedSubVizInfoRangeVariant8`.)
+         * Address: 0x00509D20 (FUN_00509D20 -- bridge into 0x005093E0 used by `assign` 0x005082B0 (`_Ucopy`). Formerly `CopyDelayedSubVizInfoRangeVariant9`.)
+         * Address: 0x00509C70 (FUN_00509C70 -- bridge into 0x005093E0; callers 0x00508F50, 0x00509820, 0x005099F0. Formerly `CopyDelayedSubVizInfoRangeVariant7`.)
+         * Address: 0x00509820 (FUN_00509820 -- wrapper over 0x00509C70; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant3`.)
+         * Address: 0x00509920 (FUN_00509920 -- wrapper over 0x00509D20; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant4`.)
+         * Address: 0x005099F0 (FUN_005099F0 -- wrapper over 0x00509C70; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant5`.)
+         * Address: 0x00509A80 (FUN_00509A80 -- wrapper over 0x00509D20; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant6`.)
+         * Address: 0x00509850 (FUN_00509850 -- wrapper over 0x00509CB0 used by `operator=` 0x00509010's append arm. Formerly `CopyDelayedSubVizInfoTail`.)
+         * Address: 0x00509600 (FUN_00509600 -- stack-order bridge into 0x00509D20; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant9Adapter`.)
+         * Address: 0x00509630 (FUN_00509630 -- mixed-order bridge into 0x00509CB0; zero callers. Formerly `CopyDelayedSubVizInfoRangeVariant8Adapter`.)
+         * Address: 0x00509950 (FUN_00509950 -- zero-width copy through 0x00509CB0; zero callers. Formerly `ZeroWidthDelayedSubVizCopy`.)
+         * Address: 0x00509A20 (FUN_00509A20 -- zero-width self copy through 0x00509CB0; zero callers. Formerly `ZeroWidthDelayedSubVizSelfCopy`.)
          */
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -8397,6 +8445,8 @@ namespace msvc8
          * Address: 0x006E34E0 (FUN_006E34E0 -- `_Fill` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x008DB390 (FUN_008DB390 -- `_Ufill` (advance-returning `_Uninit_fill_n`) for the 4-byte `gpg::RType*` element of `_Insert_n` 0x008DD050 (`gpg::RType::RegisterType`'s TypeVec insert); formerly lettered copy `Y` in moho/containers/LegacyContainerFillLanesB.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00932F90 (FUN_00932F90 -- `_Ufill` for the 4-byte element of `_Insert_n` 0x00933640; was DB `skip` ("RULE ONE emission") with no anchor.)
+         * Address: 0x005095C0 (FUN_005095C0 -- `_Uninit_fill_n` for `moho::SDelayedSubVizInfo` (per-slot copy of the value); callers 0x005079C0 `push_back`, 0x00508080, 0x00508480 `_Insert_n`. Formerly `CopyDelayedSubVizInfoRepeated` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508080 (FUN_00508080 -- the advance-returning `_Ufill` adapter over 0x005095C0 with a value-initialised element, called from `_Insert_n` 0x00508480. Formerly `FillDefaultDelayedSubVizInfoSpan`.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9220,6 +9270,10 @@ namespace msvc8
          * Address: 0x0064FAC0 (FUN_0064FAC0 -- register bridge into the `SDebugScreenText` backward copy; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00932940 (FUN_00932940 -- `_Copy_backward_opt` for the 4-byte element of `_Insert_n` 0x00933640 (the in-place shift arm); formerly `CopyDwordRangeBackwardRuntimeH` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x006EB820 (FUN_006EB820 -- `_Copy_backward` for `moho::WeakPtr<CUnitCommand>`, the in-place tail shift of `_Insert_n` 0x006EA440; a trampoline into the generic relinking core 0x006ED0F0 cited on WeakPtr.h. Formerly `AssignWeakPtrCUnitCommandRangeBackward` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00509970 (FUN_00509970 -- `_Copy_backward` for `moho::SDelayedSubVizInfo` (element loop, back to front); callers 0x00508C80, 0x00509690. Formerly `CopyDelayedSubVizInfoRangeBackward` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508C80 (FUN_00508C80 -- the memmove-shaped `_Copy_backward_opt` of the same instantiation, reached from `_Insert_n` 0x00508480. Formerly `MoveDelayedSubVizInfoRangeToEnd`.)
+         * Address: 0x00508AA0 (FUN_00508AA0 -- the same backward move as reached from `operator=` 0x00509010. Formerly `MoveDelayedSubVizInfoSpanToEnd`.)
+         * Address: 0x00509690 (FUN_00509690 -- stack-order bridge into 0x00509970; zero callers. Formerly `CopyDelayedSubVizInfoRangeBackwardAdapter`.)
          */
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
             if constexpr (std::is_trivially_copy_assignable_v<T>) {
@@ -9328,6 +9382,7 @@ namespace msvc8
          *
          * What it does:
          * Frees retained heap storage and clears all pointers.
+         * Address: 0x005087D0 (FUN_005087D0 -- `allocator<moho::SDelayedSubVizInfo>::deallocate`, a bare `operator delete`; zero callers, unreachable. Formerly `DeleteDelayedSubVizStorage` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         void deallocate_all() noexcept {
 #if MSVC8_VECTOR_DISABLE_FREE
@@ -9841,6 +9896,8 @@ namespace msvc8
          * Address: 0x00561EB0 (FUN_00561EB0 -- out-of-line `max_size()` for a 352-byte element (0xBA2E8B); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x005617B0 (FUN_005617B0 -- out-of-line `max_size()` for a 568-byte element (0x73615A); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00561ED0 (FUN_00561ED0 -- out-of-line `max_size()` for a 568-byte element (0x73615A); zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x00508460 (FUN_00508460 -- `max_size()` for the 20-byte `moho::SDelayedSubVizInfo` element (0x0CCCCCCC); zero callers, unreachable. Formerly `DelayedSubVizVectorMaxCountVariant2` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
+         * Address: 0x005088A0 (FUN_005088A0 -- ICF-separated copy of that `max_size()`; zero callers. Formerly `DelayedSubVizVectorMaxCountVariant1`.)
          */
         [[nodiscard]] static constexpr std::size_t max_size() noexcept
         {
@@ -9967,6 +10024,7 @@ namespace msvc8
          * Throws `std::length_error` with the legacy VC8 vector overflow message.
          * Address: 0x00933470 (FUN_00933470 -- `_Xlen` of the 4-byte `_Insert_n` 0x00933640.)
          * Address: 0x005A0DD0 (FUN_005A0DD0 -- `_Xlen` for the 8-byte `moho::WeakPtr<CUnitCommand>` instantiation (max_size 0x1FFFFFFF), reached from `_Insert_n` 0x006EA440, the copy constructor 0x005DB610 and 0x005A0740. Formerly `ThrowWeakPtrVectorTooLong` in CUnitCommandWeakPtrReflection.cpp, removed 2026-09-10.)
+         * Address: 0x00508740 (FUN_00508740 -- `_Xlen` for the 20-byte `moho::SDelayedSubVizInfo` instantiation; callers 0x00507FF0 `_Buy`, 0x005082B0 `assign`, 0x00508480 `_Insert_n`. Formerly `ThrowDelayedSubVizVectorTooLong` in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.)
          */
         [[noreturn]] static void throw_too_long()
         {
@@ -10118,37 +10176,6 @@ namespace msvc8
         sizeof(vector<int, false>) == 3 * sizeof(void*),
         "vector<T,false> (no VC8 debug-iterator proxy) must drop to a bare 3-pointer layout"
     );
-
-    /**
-     * Non-owning runtime view for legacy MSVC8 vector layout.
-     *
-     * Layout:
-     *   +0x00: proxy pointer
-     *   +0x04: begin
-     *   +0x08: end
-     *   +0x0C: capacity end
-     */
-    template <class T>
-    struct vector_runtime_view
-    {
-        void* proxy;   // +0x00
-        T* begin;      // +0x04
-        T* end;        // +0x08
-        T* capacityEnd;// +0x0C
-    };
-    static_assert(sizeof(vector_runtime_view<void>) == 0x10, "vector_runtime_view<T> must be 0x10");
-
-    template <class T>
-    [[nodiscard]] inline vector_runtime_view<T>& AsVectorRuntimeView(vector<T>& vec) noexcept
-    {
-        return *reinterpret_cast<vector_runtime_view<T>*>(&vec);
-    }
-
-    template <class T>
-    [[nodiscard]] inline const vector_runtime_view<T>& AsVectorRuntimeView(const vector<T>& vec) noexcept
-    {
-        return *reinterpret_cast<const vector_runtime_view<T>*>(&vec);
-    }
 
     /**
 	 * Small-vector with inline storage and heap fallback (non-owning SDK view).

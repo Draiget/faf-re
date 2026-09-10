@@ -14,6 +14,11 @@ namespace gpg
    * - 0x00507AA0 / 0x00507B40 / 0x00507B60 / 0x00507BF0
    * - 0x00507C00 / 0x00507C30 / 0x00507C50
    * - 0x005080C0 / 0x005081B0
+   * - 0x00508D00 (the implicit non-deleting destructor: frees `fields_` and
+   *   `bases_`, restores `RObject`'s vtable) / 0x00508EF0 (its deleting twin);
+   *   no source line, formerly transcribed as
+   *   `ResetDelayedSubVizVectorTypeRuntime` / `DestroyDelayedSubVizVectorType`
+   *   in SDelayedSubVizInfoReflection.cpp, removed 2026-09-10.
    *
    * What it is:
    * Reflection/indexing adapter for `msvc8::vector<moho::SDelayedSubVizInfo>`.

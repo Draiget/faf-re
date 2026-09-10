@@ -138,19 +138,19 @@ namespace
     return out;
   }
 
-  template <class TView>
+  template <class T>
   void SaveContiguousArchiveVectorPayload(
     gpg::WriteArchive* const archive,
-    const TView& view,
+    const T* const elements,
+    const unsigned int count,
     gpg::RType* const elementType,
     const gpg::RRef& ownerRef
   )
   {
-    const unsigned int count = view.begin != nullptr ? static_cast<unsigned int>(view.end - view.begin) : 0u;
     archive->WriteUInt(count);
 
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(elementType, view.begin + i, ownerRef);
+      archive->Write(elementType, elements + i, ownerRef);
     }
   }
 
@@ -851,7 +851,8 @@ namespace gpg
 
     const auto& view =
       gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(reinterpret_cast<const void*>(static_cast<std::uintptr_t>(objectPtr)));
-    SaveContiguousArchiveVectorPayload(archive, view, CachedCompatRType<moho::UnitWeaponInfo>(), ownerRef ? *ownerRef : gpg::RRef{});
+    const unsigned int count = view.begin != nullptr ? static_cast<unsigned int>(view.end - view.begin) : 0u;
+    SaveContiguousArchiveVectorPayload(archive, view.begin, count, CachedCompatRType<moho::UnitWeaponInfo>(), ownerRef ? *ownerRef : gpg::RRef{});
   }
 
   // DB-integrity fix: this file previously carried two more unwired
@@ -900,9 +901,9 @@ namespace gpg
 
     const auto* const storage =
       reinterpret_cast<const msvc8::vector<moho::SPerArmyReconInfo>*>(static_cast<std::uintptr_t>(objectPtr));
-    const auto& view = msvc8::AsVectorRuntimeView(*storage);
     SaveContiguousArchiveVectorPayload(
-      archive, view, CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
+      archive, storage->data(), static_cast<unsigned int>(storage->size()),
+      CachedCompatRType<moho::SPerArmyReconInfo>(), ownerRef ? *ownerRef : gpg::RRef{}
     );
   }
 
@@ -979,9 +980,9 @@ namespace gpg
     const auto* const storage = reinterpret_cast<const msvc8::vector<moho::EntitySetTemplate<moho::Unit>>*>(
       static_cast<std::uintptr_t>(objectPtr)
     );
-    const auto& view = msvc8::AsVectorRuntimeView(*storage);
     SaveContiguousArchiveVectorPayload(
-      archive, view, CachedCompatRType<moho::EntitySetTemplate<moho::Unit>>(), ownerRef ? *ownerRef : gpg::RRef{}
+      archive, storage->data(), static_cast<unsigned int>(storage->size()),
+      CachedCompatRType<moho::EntitySetTemplate<moho::Unit>>(), ownerRef ? *ownerRef : gpg::RRef{}
     );
   }
 
