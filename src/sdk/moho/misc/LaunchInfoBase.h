@@ -500,20 +500,6 @@ namespace moho
     const ArmyLaunchInfo& entry
   );
 
-  /**
-   * Address: 0x00543910 (FUN_00543910)
-   *
-   * What it does:
-   * Resizes `msvc8::vector<ArmyLaunchInfo>` to `newSize`, fill-constructing new
-   * trailing entries from `fillValue` when growing and forwarding to the
-   * inner range-erase helper when shrinking. Out-of-line specialization of
-   * `vector<ArmyLaunchInfo>::resize(size_type, const ArmyLaunchInfo&)`.
-   */
-  void ResizeArmyLaunchInfoVectorWithFill(
-    msvc8::vector<ArmyLaunchInfo>& armyLaunchInfo,
-    std::size_t newSize,
-    const ArmyLaunchInfo& fillValue
-  );
 } // namespace moho
 
 namespace gpg
