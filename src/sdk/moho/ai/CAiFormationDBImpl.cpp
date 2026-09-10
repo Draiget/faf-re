@@ -1,3 +1,4 @@
+#include "moho/unit/CUnitCommand.h"
 #include "moho/ai/CAiFormationDBImpl.h"
 
 #include <cstddef>
@@ -175,21 +176,7 @@ namespace
     return bucket;
   }
 
-  struct FormationTypeSelectionSetRuntimeView
-  {
-    std::uint32_t lane00; // +0x00
-    std::uint32_t lane04; // +0x04
-    const std::uint32_t* begin; // +0x08
-    const std::uint32_t* end;   // +0x0C
-  };
-  static_assert(
-    offsetof(FormationTypeSelectionSetRuntimeView, begin) == 0x08,
-    "FormationTypeSelectionSetRuntimeView::begin offset must be 0x08"
-  );
-  static_assert(
-    offsetof(FormationTypeSelectionSetRuntimeView, end) == 0x0C,
-    "FormationTypeSelectionSetRuntimeView::end offset must be 0x0C"
-  );
+
 
   /**
    * Address: 0x0062EE40 (FUN_0062EE40)
@@ -205,32 +192,33 @@ namespace
    * `RUnitBlueprint + 0x278`) at its `MotionType` field (`Physics + 0x18`).
    * The compared constant 2 is `RULEUMT_Air`.
    *
-   * The unit set is taken type-erased: callers pass two distinct but
-   * layout-compatible types -- `moho::SEntitySetTemplateUnit` (GetScriptIndex) and
-   * `moho::SCommandUnitSet` (GetScriptName) -- both exposing the weak-entry
-   * begin/end lane at the same offsets, viewed here through
-   * `FormationTypeSelectionSetRuntimeView`.
+   * The unit set is taken type-erased because the vtable slot is: both
+   * `moho::SEntitySetTemplateUnit` (GetScriptIndex) and `moho::SCommandUnitSet`
+   * (GetScriptName) reach it as a `void*`. What lives at `+0x08` in both is the
+   * set's own `gpg::core::FastVectorN<CScriptObject*, 4>`, so the scan below
+   * walks that container rather than a bespoke `{begin, end}` view of it, and
+   * unbiases each entry through `SCommandUnitSet::UnitFromEntry` -- the same
+   * -0x08 subobject adjustment, written as the downcast it is.
    */
   [[nodiscard]] int ResolveFormationBucketTypeFromUnitSet(const void* const unitSet)
   {
-    const auto* const weakSet = static_cast<const FormationTypeSelectionSetRuntimeView*>(unitSet);
-    if (weakSet == nullptr || weakSet->begin == weakSet->end) {
+    if (unitSet == nullptr) {
+      return 0;
+    }
+
+    const auto& entries = *reinterpret_cast<const gpg::core::FastVectorN<moho::CScriptObject*, 4>*>(
+      static_cast<const std::uint8_t*>(unitSet) + offsetof(moho::SCommandUnitSet, mVec)
+    );
+    if (entries.empty()) {
       return 0;
     }
 
     bool hasAirBucket = false;
     bool hasNonAirBucket = false;
 
-    for (const std::uint32_t* cursor = weakSet->begin; cursor != weakSet->end; ++cursor) {
-      // The weak entry stores the referenced unit biased by 8; the entity base
-      // sits at `Unit + 0x08`, so unbiasing yields the owning `Unit`.
-      const std::uint32_t weakWord = *cursor;
-      auto* const unit = (weakWord != 0u)
-        ? reinterpret_cast<const moho::Unit*>(static_cast<std::uintptr_t>(weakWord) - 8u)
-        : nullptr;
-
-      const moho::RUnitBlueprint* const blueprint =
-        (unit != nullptr) ? unit->GetBlueprint() : nullptr;
+    for (const moho::CScriptObject* const entry : entries) {
+      const moho::Unit* const unit = moho::SCommandUnitSet::UnitFromEntry(entry);
+      const moho::RUnitBlueprint* const blueprint = (unit != nullptr) ? unit->GetBlueprint() : nullptr;
 
       if (blueprint != nullptr && blueprint->Physics.MotionType == moho::RULEUMT_Air) {
         hasAirBucket = true;
