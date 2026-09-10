@@ -761,66 +761,6 @@ namespace moho
     return AssignWeakPtrRangeBackward(destinationEnd, sourceBegin, sourceEnd);
   }
 
-  /**
-   * Address: 0x006ED8E0 (FUN_006ED8E0)
-   * Address: 0x006EBC10 (FUN_006EBC10)
-   * Address: 0x006EC950 (FUN_006EC950)
-   * Address: 0x006ED260 (FUN_006ED260)
-   * Address: 0x008B7DA0 (FUN_008B7DA0, sibling emission for the
-   * `UserCommandQueueEntry` instantiation -- reached from
-   * `CopyQueueLinkRangeWithOwnerRelink` in UserUnit.cpp)
-   * Address: 0x007A61F0 (FUN_007A61F0, separate non-ICF-folded emission of
-   * the same body -- direct callers are `FUN_007A5A70` (still `blocked`,
-   * two call sites) and `FUN_007A5E90`. `FUN_007A6010`/`FUN_007A6100`/
-   * `FUN_007A61E1` also call it, all still `skip`/unclassified fragments in
-   * the same address neighborhood.)
-   * Address: 0x007A5E90 (FUN_007A5E90) - same-register-shape trampoline into
-   *          0x007A61F0 immediately above; no separate logic of its own.
-   *
-   * What it does:
-   * Copies one contiguous weak-link range `[sourceBegin, sourceEnd)` into
-   * destination storage and relinks each copied node into the source owner
-   * chain head.
-   */
-  [[nodiscard]] inline WeakPtr<void>* CopyWeakPtrRangeStdOrder(
-    WeakPtr<void>* destination,
-    const WeakPtr<void>* sourceBegin,
-    const WeakPtr<void>* sourceEnd
-  ) noexcept
-  {
-    for (const WeakPtr<void>* source = sourceBegin; source != sourceEnd; ++source, ++destination) {
-      if (destination == nullptr) {
-        continue;
-      }
-
-      destination->ownerLinkSlot = source->ownerLinkSlot;
-      if (source->ownerLinkSlot == nullptr) {
-        destination->nextInOwner = nullptr;
-      } else {
-        auto** const ownerHead = reinterpret_cast<WeakPtr<void>**>(source->ownerLinkSlot);
-        destination->nextInOwner = *ownerHead;
-        *ownerHead = destination;
-      }
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x006ED580 (FUN_006ED580)
-   *
-   * What it does:
-   * Thin forwarding lane that preserves a distinct call ABI shape while
-   * delegating weak-pointer range copy semantics to `FUN_006ED8E0`.
-   */
-  [[maybe_unused]] [[nodiscard]] inline WeakPtr<void>* CopyWeakPtrRangeStdOrderAdapter(
-    WeakPtr<void>* destination,
-    const WeakPtr<void>* sourceBegin,
-    const WeakPtr<void>* sourceEnd
-  ) noexcept
-  {
-    return CopyWeakPtrRangeStdOrder(destination, sourceBegin, sourceEnd);
-  }
-
   struct PrefixedWeakPtrDwordPayloadLane
   {
     std::uint32_t prefix0;
