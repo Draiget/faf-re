@@ -19825,6 +19825,16 @@ std::uint32_t* StorePointerSlotAddressWord(
  */
 LuaState* LuaObject::GetActiveState() const
 {
+	// An unbound LuaObject answers null rather than faulting. Every caller in
+	// this tree already treats null as "no script state": CScriptObject::
+	// FindScript reads this straight into `state` and returns early on null,
+	// which only means anything if null is reachable. Unit::Unit reaches it that
+	// way -- SetAutoMode -> CallbackStr -> FindScript runs at Unit.cpp:13518,
+	// before the unit's own Lua object exists -- and without this the read of
+	// `m_state->m_state` faulted on address 0.
+	if (m_state == nullptr || m_state->m_state == nullptr) {
+		return nullptr;
+	}
 	return m_state->m_state->l_G->lstate->stateUserData;
 }
 
