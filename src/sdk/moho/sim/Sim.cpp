@@ -4533,10 +4533,27 @@ namespace moho
       }
     }
 
+    // The local "set-target" event is keyed by the cookie the driver hands
+    // back - `CSimDriver::SetCommandTarget` returns `mNextIssueBeat`, the beat
+    // the retarget takes effect on - not by the helper's own command id. The
+    // binary threads it through a hidden return buffer and feeds that same
+    // dword straight into the event:
+    //
+    //   0x008B118C  lea   eax, [esp+9Ch+var_78]   ; return buffer
+    //   0x008B1190  push  eax
+    //   0x008B1191  call  edx                     ; ISTIDriver::SetCommandTarget
+    //   0x008B1193  mov   eax, [esp+94h+var_78]   ; the returned cookie
+    //   0x008B1199  push  esi                     ; helper
+    //   0x008B119A  call  sub_8B4A40              ; queue the local event
+    //
+    // which is the same shape `ISSUE_DecreaseCommandCount` already uses for
+    // its own `resultCookie`. Passing the command id instead put a command id
+    // where the drain expects a beat.
+    CmdId resultCookie = helperView.commandId;
     if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
-      simDriver->SetCommandTarget(helperView.commandId, ConvertUserCommandTargetToSSTITarget(target));
+      resultCookie = simDriver->SetCommandTarget(helperView.commandId, ConvertUserCommandTargetToSSTITarget(target));
     }
-    QueueCommandIssueSetTargetEvent(helperView, helperView.commandId, target);
+    QueueCommandIssueSetTargetEvent(helperView, resultCookie, target);
   }
 } // namespace moho
 
