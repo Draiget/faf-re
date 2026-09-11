@@ -238,7 +238,18 @@ int CFireWeaponTask::Execute()
   }
 
   if (mFireClock == 0 && unit->FireState != kHoldFireState && WeaponHasTarget(weapon)) {
-    if (WeaponCanAttackTarget(weapon) && WeaponCheckSilo(weapon) && !WeaponTargetIsTooClose(weapon)) {
+    // 0x006D3DC0 nests the gate as CanAttackTarget, then
+    // `CanFire && CheckSilo && !TargetIsTooClose`. The `CanFire` term was
+    // missing here, and for every non-winged unit that call reduces to
+    // `weapon->mCanFire` -- the flag CAimManipulator raises once the turret has
+    // actually reached its aim point. Without it the gun fires the moment it has
+    // a target, while the turret is still slewing, so the shot leaves along
+    // whatever direction the muzzle happens to be pointing rather than at the
+    // ordered position.
+    if (WeaponCanAttackTarget(weapon)
+        && UnitWeapon::CanFire(weapon, &weapon->mTarget)
+        && WeaponCheckSilo(weapon)
+        && !WeaponTargetIsTooClose(weapon)) {
       const bool canAttackGround =
         weapon->mWeaponBlueprint == nullptr || weapon->mWeaponBlueprint->CannotAttackGround == 0u;
       if (canAttackGround || weapon->mTarget.targetType != EAiTargetType::AITARGET_Ground) {
