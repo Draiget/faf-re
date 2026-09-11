@@ -40431,6 +40431,22 @@ long wxWindowMswRuntime::MSWWindowProc(
     processed = HandleDisplayChange();
     break;
 
+  case WM_CLOSE:
+    // 0x0096D110 `case WM_CLOSE: return 1;` - answered here and never passed to
+    // MSWDefWindowProc, because DefWindowProc's WM_CLOSE is DestroyWindow and a
+    // wx window destroys itself from ~wxWindow instead.
+    //
+    // wxFrame::MSWWindowProc (0x0099F4B0) has already run the close
+    // negotiation by the time this is reached: it does
+    // `processed = (Close(false) == 0)`, and a close that was NOT vetoed leaves
+    // `processed` false and falls through to here. So this case is the only
+    // thing standing between an accepted close and Windows tearing the frame
+    // down. Without it WSupComFrame::OnCloseWindow would ask Lua for the quit
+    // dialog and the frame would be destroyed out from under it in the same
+    // message - the window vanished while the app, its sim and its audio all
+    // kept running, because nothing had called ExitMainLoop.
+    return 1;
+
   case WM_QUERYENDSESSION: {
     // Answering means "the session may end"; saying nothing leaves the
     // decision to the default handler.
