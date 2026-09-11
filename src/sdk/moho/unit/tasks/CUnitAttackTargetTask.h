@@ -5,6 +5,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "Wm3Vector3.h"
 #include "moho/ai/EAiAttackerEvent.h"
+#include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 
 namespace gpg
@@ -22,11 +23,28 @@ namespace moho
   class UnitWeapon;
 
   /**
-   * Minimal recovered owner lane for attack-target task dispatch allocation.
+   * Shared base for the two concrete attack-target tasks, and the home of the
+   * dispatch allocation helpers.
+   *
+   * The RTTI carries no `CAttackTargetTask` type: both
+   * `.?AVCUnitAttackTargetTask@Moho@@` and `.?AVCUnitMeleeAttackTargetTask@Moho@@`
+   * list `Moho::CCommandTask` as their first base, followed by
+   * `Listener<EAiAttackerEvent>` and `Listener<ECommandEvent>`. So this class is
+   * a recovery-side holder for the two allocation lanes plus the layout the two
+   * siblings share -- but it MUST carry the real `CCommandTask` base, because
+   * that is where the task-thread's `Execute` vtable slot lives.
+   *
+   * Deriving from the raw-storage stub instead left the embedded command task
+   * holding `CCommandTask`'s own vtable, so `CTaskStage::UserFrame` dispatched
+   * every attack task into `CCommandTask::Execute` -- the `_purecall` slot,
+   * whose recovered stand-in calls `std::terminate()`. Issuing any attack order
+   * aborted the process from the sim thread.
    */
-  class CAttackTargetTask
+  class CAttackTargetTask : public CCommandTaskWithListenerSlot
   {
   public:
+    using CCommandTaskWithListenerSlot::CCommandTaskWithListenerSlot;
+
     /**
      * Address: 0x005F27D0 (FUN_005F27D0, Moho::CAttackTargetTask::operator new)
      *
@@ -59,7 +77,9 @@ namespace moho
     );
 
   protected:
-    unsigned char mPadding[0x90];
+    /// +0x34..+0x8F. The two siblings keep their own fields here and reach them
+    /// through their file-local runtime views; nothing addresses this directly.
+    unsigned char mPadding[0x90 - sizeof(CCommandTaskWithListenerSlot)];
   };
 
   static_assert(sizeof(CAttackTargetTask) == 0x90, "CAttackTargetTask size must be 0x90");
@@ -143,6 +163,18 @@ namespace moho
      * movement/range management, attack handoff, and final fire gating.
      */
     [[nodiscard]] int TaskTick();
+
+    /**
+     * VFTable SLOT: 1 (CTask::Execute)
+     *
+     * What it does:
+     * Dispatches the command-task execute slot into `TaskTick`, the same way
+     * `CUnitReclaimTask` and the other recovered command tasks do. The binary
+     * puts `TaskTick` (0x005F34C0) straight in the slot; the forwarder keeps
+     * `TaskTick` callable by name from the recovered helpers that already use
+     * it.
+     */
+    int Execute() override;
 
     /**
      * Address: 0x005F4DC0 (FUN_005F4DC0, Moho::CUnitAttackTargetTask::MemberDeserialize)

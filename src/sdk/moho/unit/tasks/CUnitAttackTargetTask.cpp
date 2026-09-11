@@ -451,9 +451,9 @@ namespace moho
    * listener nodes and default target/cache lanes.
    */
   CUnitAttackTargetTask::CUnitAttackTargetTask()
+    : CAttackTargetTask()
   {
     CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    (void)new (runtime->mCommandTaskStorage) CCommandTask();
 
     runtime->mUnknown0030 = 0;
     runtime->mAiAttackerListenerVftable = 0;
@@ -494,9 +494,9 @@ namespace moho
     const bool ignoreFormation,
     const bool enableOverchargeWeapon
   )
+    : CAttackTargetTask(dispatchTask)
   {
     CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    (void)new (runtime->mCommandTaskStorage) CCommandTask(dispatchTask);
 
     runtime->mUnknown0030 = 0;
     runtime->mAiAttackerListenerVftable = 0;
@@ -643,7 +643,10 @@ namespace moho
     runtime->mCommandEventListenerLink.ListResetLinks();
     runtime->mAiAttackerListenerLink.ListResetLinks();
 
-    commandTask->~CCommandTask();
+    // The base slice is a real `CCommandTask` base now, not raw storage, so the
+    // compiler chains its destructor. Calling it here as well would run it
+    // twice -- and `~CCommandTask` is virtual, so the call would dispatch back
+    // into this destructor and recurse.
   }
 
   /**
@@ -1209,6 +1212,18 @@ namespace moho
     archive->WriteBool(runtime->mHasMobileTarget != 0u);
     archive->WriteBool(runtime->mIgnoreFormationUpdates != 0u);
     archive->WriteBool(runtime->mIsGrounded != 0u);
+  }
+
+  /**
+   * VFTable SLOT: 1 (CTask::Execute)
+   *
+   * What it does:
+   * Runs one attack-target tick for the task thread. The binary's vtable slot
+   * holds `TaskTick` itself; forwarding keeps the named entry point intact.
+   */
+  int CUnitAttackTargetTask::Execute()
+  {
+    return TaskTick();
   }
 
   /**

@@ -467,9 +467,9 @@ namespace moho
    * nodes, empty dispatch/formation lanes, and default target/cache state.
    */
   CUnitMeleeAttackTargetTask::CUnitMeleeAttackTargetTask()
+    : CAttackTargetTask()
   {
     CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    (void)new (runtime->mCommandTaskStorage) CCommandTask();
 
     runtime->mUnknown0030 = 0;
     runtime->mAiAttackerListenerVftable = 0;
@@ -510,9 +510,9 @@ namespace moho
     CAiFormationInstance* const formation,
     const bool ignoreFormation
   )
+    : CAttackTargetTask(dispatchTask)
   {
     CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    (void)new (runtime->mCommandTaskStorage) CCommandTask(dispatchTask);
 
     runtime->mUnknown0030 = 0;
     runtime->mAiAttackerListenerVftable = 0;
@@ -654,7 +654,10 @@ namespace moho
     runtime->mCommandEventListenerLink.ListResetLinks();
     runtime->mAiAttackerListenerLink.ListResetLinks();
 
-    commandTask->~CCommandTask();
+    // The base slice is a real `CCommandTask` base now, not raw storage, so the
+    // compiler chains its destructor. Calling it here as well would run it
+    // twice -- and `~CCommandTask` is virtual, so the call would dispatch back
+    // into this destructor and recurse.
   }
 
   /**
@@ -1359,6 +1362,18 @@ namespace moho
     }
 
     return nullptr;
+  }
+
+  /**
+   * VFTable SLOT: 1 (CTask::Execute)
+   *
+   * What it does:
+   * Runs one melee attack-target tick for the task thread. The binary's vtable
+   * slot holds `TaskTick` itself; forwarding keeps the named entry point intact.
+   */
+  int CUnitMeleeAttackTargetTask::Execute()
+  {
+    return TaskTick();
   }
 
   /**
