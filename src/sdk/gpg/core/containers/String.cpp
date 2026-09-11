@@ -1166,16 +1166,37 @@ msvc8::string gpg::STR_Va(
   // stages them in the thread-local arena behind get_concat_buffer and adopts
   // that storage, which is the same lifetime contract every operator+ already
   // relies on.
+  // 0x00938E1F / 0x00938E6B call MSVC8's `_vsnprintf`, whose truncation signal
+  // is a -1 return; the binary's `while (n == -1)` loop is built on that.
+  // `std::vsnprintf` here is the C99/UCRT function, which instead returns the
+  // length the message WOULD have needed and only returns negative on an
+  // encoding error. Comparing it against -1 therefore reports "it fit" for
+  // every message longer than the buffer, and the length handed to the string
+  // then runs off the end of the 256-byte stack array -- an out-of-bounds read
+  // on any long diagnostic (a nested Lua lazy-var error clears 255 characters
+  // easily). Keep the binary's two-phase shape and its 2x growth, and spell the
+  // predicate the way `_vsnprintf`'s -1 actually meant it: it did not fit.
+  const auto didNotFit = [](const int written, const std::size_t capacity) {
+    return written < 0 || static_cast<std::size_t>(written) >= capacity;
+  };
+
   char stackBuffer[256]{};
   int formattedLength = std::vsnprintf(stackBuffer, sizeof(stackBuffer), fmt, va);
-  if (formattedLength == -1) {
+  if (didNotFit(formattedLength, sizeof(stackBuffer))) {
     msvc8::vector<char> dynamicBuffer{};
     std::size_t capacity = sizeof(stackBuffer);
     do {
       capacity *= 2;
       dynamicBuffer.resize(capacity, 0);
       formattedLength = std::vsnprintf(dynamicBuffer.data(), capacity, fmt, va);
-    } while (formattedLength == -1);
+      if (formattedLength < 0) {
+        // `_vsnprintf` only ever returned -1 for truncation, so the binary's
+        // loop always terminated. The C99 function also returns negative for a
+        // genuine encoding error, which would spin here forever; there is no
+        // message to recover in that case.
+        return msvc8::string{};
+      }
+    } while (didNotFit(formattedLength, capacity));
 
     return msvc8::string{} +
            std::string_view(dynamicBuffer.data(), static_cast<std::size_t>(formattedLength));
