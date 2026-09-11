@@ -807,7 +807,16 @@ void CScriptObject::CreateLuaObject(
  */
 void CScriptObject::SetLuaObject(const LuaPlus::LuaObject& obj)
 {
-  LuaPlus::LuaState* const state = obj.GetActiveState();
+  // The object's own bound state, not `GetActiveState()`. 0x004C72D0 opens with
+  // a plain field read of the argument's state pointer and bails on null
+  // (`mov ebx,[ebp+8]` / `test ebx,ebx` / `jz`) *before* it calls `IsNil`, and
+  // it hands that same pointer to `func_CreateLuaScriptObject` as `a1`
+  // (`mov ecx,ebx` at 0x004C7304). `GetActiveState` is a different accessor
+  // that walks `m_state->m_state->l_G->lstate->stateUserData`, so asking it
+  // first faulted on exactly the unbound object this null test exists to
+  // reject -- which is how an entity whose script factory returned nil turned
+  // into a crash inside its own constructor.
+  LuaPlus::LuaState* const state = obj.m_state;
   if (!state || obj.IsNil()) {
     return;
   }
