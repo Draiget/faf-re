@@ -968,29 +968,42 @@ void moho::CAimManipulator::operator_delete(const std::int32_t deleteFlags)
 }
 
 /**
- * Address: 0x00630DB0 (FUN_00630DB0, Moho::CAimManipulator::AimManip)
+ * Address: 0x00630DB0 (FUN_00630DB0, IDA `Moho::CAimManipulator::MoveManipulator`)
+ *
+ * VFTable SLOT: 1 of `??_7CAimManipulator@Moho@@6B@` -- the same slot
+ * `CAnimationManipulator::ManipulatorUpdate` (0x0063FDD0) occupies in its own
+ * vtable, which is why IDA gives both bodies the name `MoveManipulator`.
+ * Declaring this as a fresh virtual instead of an override left the slot
+ * holding `IAniManipulator::ManipulatorUpdate`, so `CAniActor::UpdateManipulators`
+ * never ran the aim update: turrets never tracked, and every weapon fired along
+ * the hull's facing instead of at its target.
+ *
+ * The binary leaves the return value undefined (0x0063118C returns with eax
+ * holding whatever the last computation left), and the sole call site --
+ * 0x0063AB29 in CAniActor::UpdateManipulators -- discards it, so this reports
+ * no frame change.
  *
  * What it does:
  * Executes one manipulator update: validates owner/weapon state, drives aim
  * target tracking, mirrors on-target state into weapon lanes, and updates
  * task-event signaling.
  */
-void moho::CAimManipulator::AimManip()
+bool moho::CAimManipulator::ManipulatorUpdate()
 {
   auto* const runtimeView = AimManipulatorRuntimeView(this);
   Unit* const unit = runtimeView->mUnit.GetObjectPtr();
   if (unit == nullptr) {
-    return;
+    return false;
   }
 
   if (unit->IsBeingBuilt()) {
-    return;
+    return false;
   }
 
   const bool aimsStraightOnDisable =
     runtimeView->mUnitWepBlueprint != nullptr && runtimeView->mUnitWepBlueprint->AimsStraightOnDisable != 0u;
   if (!runtimeView->mEnabled && !aimsStraightOnDisable) {
-    return;
+    return false;
   }
 
   auto* const taskEvent = reinterpret_cast<CTaskEvent*>(this);
@@ -1004,7 +1017,7 @@ void moho::CAimManipulator::AimManip()
       watchBone1->Rotate(runtimeView->mBone1Rot);
     }
     taskEvent->EventSetSignaled(false);
-    return;
+    return false;
   }
 
   weapon->mUnknown174 = 1u;
@@ -1068,10 +1081,11 @@ void moho::CAimManipulator::AimManip()
 
   if (runtimeView->mOnTarget) {
     taskEvent->EventSetSignaled(true);
-    return;
+    return false;
   }
 
   taskEvent->EventSetSignaled(false);
+  return false;
 }
 
 /**

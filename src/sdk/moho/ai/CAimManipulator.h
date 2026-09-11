@@ -151,15 +151,17 @@ namespace moho
 
     /**
      * Address: 0x00630DB0 (FUN_00630DB0)
-     * Slot: 1
-     * Demangled: Moho::CAimManipulator::AimManip
+     * VFTable SLOT: 1 of `??_7CAimManipulator@Moho@@6B@` -- `IAniManipulator::
+     * ManipulatorUpdate`, the slot `CAniActor::UpdateManipulators` drives every
+     * tick. IDA names it `MoveManipulator`, the same name it gives
+     * `CAnimationManipulator::ManipulatorUpdate` at 0x0063FDD0.
      *
      * What it does:
      * Runs one aim-manipulator update tick: validates owner/weapon state,
      * resolves target aim direction, updates tracking state, and toggles
      * event signaled state when target lock is achieved.
      */
-    virtual void AimManip();
+    bool ManipulatorUpdate() override;
 
     /**
      * Address: 0x00633730 (FUN_00633730, Moho::CAimManipulator::MemberDeserialize)
