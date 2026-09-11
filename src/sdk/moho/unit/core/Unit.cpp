@@ -13427,6 +13427,25 @@ Unit::Unit(const SUnitConstructionParams& params)
   NeedSyncGameData = true;
   CaptorCount = 0;
 
+  // 0x006A572F: `mov byte ptr [ebp+1C0h], 1` -- `ebp` is the Unit here (the two
+  // neighbouring stores are `NeedSyncGameData` at Unit+0x68E and `CaptorCount`
+  // at Unit+0x690, and the next one is `MaxHealth` at Unit+0x9C), so this is
+  // `Entity::mQueueRelinkBlocked` at Entity+0x1B8.
+  //
+  // It pins the unit in `Sim::mCoordEntities` for life. `Entity::Sync`
+  // (0x0067A114) unlinks the node it was reached through *unless* this flag is
+  // set, and `Sim::Sync` publishes exactly the entities on that run -- so a
+  // unit that is never unlinked is republished on every sync, whether or not
+  // anything relinked it. That is what makes a value which changes with no
+  // other side effect reach the client at all: `Unit::WorkProgress`
+  // (Unit+0x2AC) is written by `CBuildTaskHelper::UpdateWorkProgress` and by
+  // the `SetWorkProgress` Lua binding (0x006CCC85) as a bare `fstp`, with no
+  // dirty mark and no relink anywhere. Without this line a stationary builder
+  // published once and then froze: a factory's build bar never moved, and
+  // neither did the intel-recharge bar Lua drives the same way. Props,
+  // projectiles and blips keep the base default and stay change-driven.
+  mQueueRelinkBlocked = 1u;
+
   // --- blueprint-derived health and attributes ---------------------------
   MaxHealth = blueprint.Defense.MaxHealth;
   Health = params.mComplete != 0 ? blueprint.Defense.Health : 1.0f;
