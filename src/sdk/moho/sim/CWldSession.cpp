@@ -10862,8 +10862,15 @@ namespace moho
       // mRelationLookupKey`'s doc comment for the same "shape confirmed,
       // semantic id not confirmed" caveat.
       WeakEntitySetUserEntity mRelationTree{}; // +0x08
-      std::uint8_t mUnknown14_23[0x10]{};
-      CommandGraphAnchorSampleRuntimeView mAnchorSample{}; // +0x24
+      std::uint8_t mUnknown14_17[0x04]{};
+      // +0x18, not +0x24: `sub_8B4080` takes the sample's address as
+      // `lea esi, [entry]` + `add esi, 18h` at 0x008B40CB, and this is the same
+      // 0x50-byte local command-issue event `CommandIssueUpdateEventRuntimeView`
+      // (Sim.cpp) describes, whose `CAiTarget target` sits at +0x18 behind
+      // `count` at +0x14. The two views agree field for field once this one
+      // stops padding twelve bytes too far: sample kind is the target type,
+      // `mWeakRef` is `CAiTarget::targetEntity`, `mWorldPosition` its position.
+      CommandGraphAnchorSampleRuntimeView mAnchorSample{}; // +0x18
     };
     static_assert(
       offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mEntryType) == 0x04,
@@ -10874,8 +10881,8 @@ namespace moho
       "CommandGraphAnchorHistoryEntryRuntimeView::mRelationTree offset must be 0x08"
     );
     static_assert(
-      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mAnchorSample) == 0x24,
-      "CommandGraphAnchorHistoryEntryRuntimeView::mAnchorSample offset must be 0x24"
+      offsetof(CommandGraphAnchorHistoryEntryRuntimeView, mAnchorSample) == 0x18,
+      "CommandGraphAnchorHistoryEntryRuntimeView::mAnchorSample offset must be 0x18"
     );
 
     struct CommandGraphAnchorHistoryRuntimeView
