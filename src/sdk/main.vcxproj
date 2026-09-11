@@ -635,6 +635,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintSaveConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\RProjectileBlueprintConstruct.cpp" />
     <ClCompile Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RPropBlueprintDefenseTypeInfo.cpp" />
+    <ClCompile Include="moho\resource\blueprints\RPropBlueprintEconomyTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RPropBlueprintTypeInfo.cpp" />
     <ClCompile Include="moho\resource\blueprints\RTrailBlueprint.cpp" />
     <ClCompile Include="moho\resource\blueprints\RUnitBlueprintEnumTypeInfo.cpp" />
@@ -1868,6 +1870,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\resource\blueprints\RProjectileBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RPropBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\RPropBlueprintDisplayTypeInfo.h" />
+    <ClInclude Include="moho\resource\blueprints\RPropBlueprintDefenseTypeInfo.h" />
+    <ClInclude Include="moho\resource\blueprints\RPropBlueprintEconomyTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RPropBlueprintTypeInfo.h" />
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprint.h" />
     <ClInclude Include="moho\resource\blueprints\RTrailBlueprintConstruct.h" />
