@@ -2329,7 +2329,13 @@ void CScriptObject::OnStopBuild(const WeakPtr<Unit>& unitLink, const std::string
   try {
     LuaPlus::LuaFunction<void> fn{script};
     const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink);
-    fn(mLuaObj, reason, unitObject);
+    // The unit goes second and the reason third, matching `OnStartBuild` just
+    // below. `Call_ObjectStringWeakunit`'s name describes its own C++ parameter
+    // order, not the order it pushes: 0x005FD6B0 pushes the function, then
+    // `self` (0x005FD701), then the weak unit's Lua object at `[unit+0x20]`
+    // (0x005FD71E, `lua_pushnil` when the link is dead), and only then
+    // `lua_pushlstring` for the reason (0x005FD744), before `lua_call`.
+    fn(mLuaObj, unitObject, reason);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBuild, ex.what());
   } catch (...) {
