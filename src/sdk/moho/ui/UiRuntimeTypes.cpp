@@ -3454,9 +3454,9 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    * FUN_007A5D20, cited on `msvc8::vector<T>::throw_too_long` in Vector.h):
    *   - Capacity available (`capacity() >= size()+1`): if inserting before
    *     the end, extends the live range by duplicating the current last
-   *     element into the new slot (`CopyWeakPtrRangeStdOrder`), shifts the
+   *     element into the new slot (`uninit_copy_n`), shifts the
    *     middle range `[insertAt, oldLast)` backward by one
-   *     (`AssignWeakPtrRangeBackward`), then assigns the staged value into
+   *     (`copy_backward_assign`), then assigns the staged value into
    *     the vacated gap (`WeakPtr<T>::AssignFillRange`); if inserting at
    *     the end, constructs the staged value directly at `_Mylast`
    *     (`WeakPtr<T>::FillConstructRange`) and bumps it by one element.
@@ -3465,9 +3465,9 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
    *     redundant re-derivation of `size()+1` for the "1.5x wasn't enough"
    *     case), allocates the new buffer (`allocate_slots_checked`,
    *     FUN_007A5EF0), copies the prefix `[begin,insertAt)` into it
-   *     (`CopyWeakPtrRangeStdOrder`), fill-constructs the staged value into
+   *     (`uninit_copy_n`), fill-constructs the staged value into
    *     the gap (`WeakPtr<T>::FillConstructRange`), copies the suffix
-   *     `[insertAt,end)` after it (`CopyWeakPtrRangeStdOrder`), then (if
+   *     `[insertAt,end)` after it (`uninit_copy_n`), then (if
    *     there was an old buffer) unlinks its live range
    *     (`UnlinkWeakPtrRangeWithoutClearing`) and frees it, and commits the
    *     new `{begin,end,capacityEnd}` triplet.
@@ -3504,19 +3504,20 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
         // Real shift: duplicate the last live element into the new
         // (currently uninitialized) one-past-end slot, extending the live
         // range by one -- this is a *construct*, matching
-        // CopyWeakPtrRangeStdOrder's shape, not an assign.
-        VoidWeakPtr* const newEnd = moho::CopyWeakPtrRangeStdOrder(
-          reinterpret_cast<VoidWeakPtr*>(oldLast),
+        // uninit_copy_n's shape, not an assign.
+        msvc8::vector<VoidWeakPtr>::uninit_copy_n(
           reinterpret_cast<const VoidWeakPtr*>(oldLast - 1),
-          reinterpret_cast<const VoidWeakPtr*>(oldLast)
+          1u,
+          reinterpret_cast<VoidWeakPtr*>(oldLast)
         );
+        VoidWeakPtr* const newEnd = reinterpret_cast<VoidWeakPtr*>(oldLast) + 1;
         moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = reinterpret_cast<CaptureWeakPtr*>(newEnd);
 
         // Shift [insertAt, oldLast-1) backward by one to open the gap.
-        (void)moho::AssignWeakPtrRangeBackward(
-          reinterpret_cast<VoidWeakPtr*>(oldLast),
+        msvc8::vector<VoidWeakPtr>::copy_backward_assign(
           reinterpret_cast<const VoidWeakPtr*>(insertAt),
-          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1)
+          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1),
+          reinterpret_cast<VoidWeakPtr*>(oldLast)
         );
 
         // Assign the staged value into the now-vacated gap.
@@ -3533,19 +3534,21 @@ ResolveInputCaptureStorageWithArg(const std::int32_t /*ignoredArg*/) noexcept
         ? sInputCapture.allocate_slots_checked(newCapacity)
         : static_cast<CaptureWeakPtr*>(::operator new(0u));
 
-      VoidWeakPtr* const afterPrefixVoid = moho::CopyWeakPtrRangeStdOrder(
-        reinterpret_cast<VoidWeakPtr*>(newBuffer),
+      const std::size_t prefixCount = static_cast<std::size_t>(insertAt - sInputCapture.begin());
+      msvc8::vector<VoidWeakPtr>::uninit_copy_n(
         reinterpret_cast<const VoidWeakPtr*>(sInputCapture.begin()),
-        reinterpret_cast<const VoidWeakPtr*>(insertAt)
+        prefixCount,
+        reinterpret_cast<VoidWeakPtr*>(newBuffer)
       );
+      VoidWeakPtr* const afterPrefixVoid = reinterpret_cast<VoidWeakPtr*>(newBuffer) + prefixCount;
       CaptureWeakPtr* const afterPrefix = reinterpret_cast<CaptureWeakPtr*>(afterPrefixVoid);
 
       (void)CaptureWeakPtr::FillConstructRange(afterPrefix, 1, stagedValue);
 
-      (void)moho::CopyWeakPtrRangeStdOrder(
-        reinterpret_cast<VoidWeakPtr*>(afterPrefix + 1),
+      msvc8::vector<VoidWeakPtr>::uninit_copy_n(
         reinterpret_cast<const VoidWeakPtr*>(insertAt),
-        reinterpret_cast<const VoidWeakPtr*>(sInputCapture.end())
+        static_cast<std::size_t>(sInputCapture.end() - insertAt),
+        reinterpret_cast<VoidWeakPtr*>(afterPrefix + 1)
       );
 
       if (sInputCapture.begin() != nullptr) {
