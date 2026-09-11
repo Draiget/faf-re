@@ -18,6 +18,7 @@
 #include "moho/render/d3d/RD3DTextureResource.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/d3d/CD3DVertexFormat.h"
+#include "moho/render/d3d/CD3DIndexSheet.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/D3DSingletonCleanup.h"
@@ -498,11 +499,16 @@ namespace moho
       return false;
     }
 
-    ID3DIndexSheet* sharedIndexSheet = GetSharedTrailQuadIndexSheet();
-    if (sharedIndexSheet == nullptr) {
-      (void)RebuildSharedTrailQuadIndexSheet();
-      sharedIndexSheet = GetSharedTrailQuadIndexSheet();
-    }
+    // 0x00492078-0x0049209E: beams index through `sIndexSheet`, the sheet
+    // `func_InitSharedIndexSheet` (0x0043C800) fills FORWARD - quad q at
+    // indices [6q, 6q+6) - which is why the draw below starts at index 0.
+    // That is a different singleton from `indexSheet1`, the trail sheet
+    // `func_CreateIndexSheet1` (0x004986F0) fills back to front so that
+    // `DrawTrailSegmentBatch` can read it from the tail. Using the trail sheet
+    // here handed every beam the indices of quad 0x3FFF downwards - vertex
+    // numbers around 65532 against a 1000-vertex beam buffer - so no beam
+    // produced a visible triangle.
+    ID3DIndexSheet* const sharedIndexSheet = func_GetSharedIndexSheet();
     if (sharedIndexSheet == nullptr) {
       return false;
     }
@@ -1002,7 +1008,9 @@ namespace moho
       vertexView.endVertex = (4 * quadCount) - 1;
 
       CD3DIndexSheetViewRuntime indexView{};
-      indexView.sheet = GetSharedTrailQuadIndexSheet();
+      // 0x0043C580 reads the forward-filled `sIndexSheet` singleton, not the
+      // back-to-front trail sheet - same distinction as `DrawBeamParticle`.
+      indexView.sheet = func_GetSharedIndexSheet();
       indexView.startIndex = 0;
       indexView.indexCount = 6 * quadCount;
 
