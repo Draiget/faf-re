@@ -146,11 +146,6 @@ namespace
     return reinterpret_cast<const moho::CCommandTask*>(runtime->mCommandTaskStorage);
   }
 
-  [[nodiscard]] bool IsNullOrSentinelPointer(const void* const pointer) noexcept
-  {
-    return pointer == nullptr || reinterpret_cast<std::uintptr_t>(pointer) == 0x4u;
-  }
-
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
     gpg::RType* type = moho::CCommandTask::sType;
@@ -1057,11 +1052,29 @@ namespace moho
       return;
     }
 
-    const bool hasCommandEntityTarget =
-      runtime->mCommand->mTarget.targetEntity.ownerLinkSlot != nullptr
-      && !runtime->mCommand->mTarget.targetEntity.IsSentinel();
-    const bool invalidSimPointer = IsNullOrSentinelPointer(commandTask->mSim);
-    if (!hasCommandEntityTarget && !invalidSimPointer) {
+    // Both gates read a target-entity link slot, not `mSim`. `ebp` is the
+    // `Listener<ECommandEvent>` sub-object at task+0x44, so:
+    //
+    //   0x005F4024 `ecx = [ebp+0x10]`    -> mCommand      (task+0x54)
+    //   0x005F4027 `eax = [ecx+0x120]`   -> the COMMAND's mTarget.targetEntity
+    //                                       (its CAiTarget is at +0x11C, copied
+    //                                        from `lea esi, [ecx+0x11C]`)
+    //   0x005F403A `eax = [ebp+0x20]`    -> task+0x64, THIS TASK's own
+    //                                       mTarget.targetEntity (mTarget +0x60)
+    //
+    // so the task retires only when the command no longer names a live entity
+    // AND the task is still holding one - the "my target died" case. Reading
+    // `mSim` for the second operand instead made the condition
+    // `!hasCommandEntityTarget`, which is permanently true for an attack-GROUND
+    // order: every command event retired the task, so dragging such an order to
+    // a new spot discarded it outright.
+    const auto hasLiveEntity = [](const CAiTarget& target) {
+      return target.targetEntity.ownerLinkSlot != nullptr && !target.targetEntity.IsSentinel();
+    };
+
+    const bool commandHasLiveEntityTarget = hasLiveEntity(runtime->mCommand->mTarget);
+    const bool taskHeldLiveEntityTarget = hasLiveEntity(runtime->mTarget);
+    if (!commandHasLiveEntityTarget && taskHeldLiveEntityTarget) {
       commandTask->mTaskState = TASKSTATE_5;
       WakeOwnerThreadForImmediateTick(commandTask);
       return;
@@ -1069,10 +1082,15 @@ namespace moho
 
     runtime->mTarget = runtime->mCommand->mTarget;
 
+    // 0x005F4062 re-reads the same task+0x64 slot, now holding the freshly
+    // copied command target: a live entity refreshes the attacker's goal, a
+    // ground/cleared one halts fire and drops the desired target.
+    const bool newTargetHasLiveEntity = hasLiveEntity(runtime->mTarget);
+
     Unit* const unit = commandTask->mUnit;
     CAiAttackerImpl* const attacker = (unit != nullptr) ? unit->AiAttacker : nullptr;
     if (attacker != nullptr) {
-      if (!invalidSimPointer) {
+      if (newTargetHasLiveEntity) {
         CAiTarget* const desiredTarget = attacker->GetDesiredTarget();
         if (desiredTarget != nullptr && desiredTarget->HasTarget()) {
           (void)UpdateAttacker(&runtime->mTarget);
