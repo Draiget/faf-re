@@ -2610,13 +2610,18 @@ namespace moho
     }
 
     // BuildFactory: issue `count` commands per selected live FACTORY-category
-    // unit. The binary stashes the blueprint pointer bits in the command's
-    // orientation quaternion w-component (a float slot), NOT in mBlueprint
-    // (FUN_00841C10 branch write to mOri.w @ +0x48, distinct from the else
-    // branch's mBlueprint @ +0x50).
+    // unit. The blueprint travels in `mBlueprint`, exactly as it does for every
+    // other command type.
+    //
+    // IDA renders this branch's store as `v36.mOri.w = v9`, which is a label
+    // artifact, not a different lane: it places the payload at `esp+0x70` while
+    // the branch's own `lea ecx,[esp+190h+var_130]` puts it at `esp+0x60`. The
+    // store `mov [esp+0B0h], ebx` (0x00841E3D) is therefore `base+0x50`, i.e.
+    // `mBlueprint` -- the same offset the else branch writes at 0x00841F71
+    // (`lea edx,[esp+0F0h]` then `mov [esp+140h], ebx`). Both branches agree.
     if (commandType == EUnitCommandType::UNITCOMMAND_BuildFactory) {
       SSTICommandIssueData factoryCommand(EUnitCommandType::UNITCOMMAND_BuildFactory);
-      std::memcpy(&factoryCommand.mOri.w, &blueprint, sizeof(float));
+      factoryCommand.mBlueprint = static_cast<RUnitBlueprint*>(blueprint);
 
       const msvc8::string factoryCategory("FACTORY");
       SSelectionSetUserEntity& selection = session->mSelection;
