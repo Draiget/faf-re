@@ -29,6 +29,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/unit/tasks/CUnitReclaimTask.h"
 #include "moho/unit/tasks/CUnitRepairTask.h"
 
 namespace
@@ -100,7 +101,7 @@ namespace
   {
     moho::CAiTarget target{};
     (void)target.UpdateTarget(targetEntity);
-    AsDispatchImpl(task->mDispatchTask)->IssueReclaimTask(target);
+    IssueReclaimTask(task->mDispatchTask, target);
   }
 
   [[nodiscard]] moho::Unit* ResolveFocusUnit(moho::Unit* const unit) noexcept
