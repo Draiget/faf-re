@@ -6875,7 +6875,21 @@ namespace moho
 
     CHeightField* const heightField = mSession->mWldMap->mTerrainRes->GetHeightField();
     CameraImpl* const camera = CAM_GetCamera(gpg::StrArg("WorldCamera"));
-    const std::uint32_t color = drawNode.mIsVisible ? 0xD8000000u : 0xD8280000u;
+    // 0x00828F09..0x00828F1A picks the skirt colour branchlessly:
+    //
+    //   mov  cl, [edi+1Eh]        ; mIsVisible
+    //   neg  cl                   ; CF set when it is non-zero
+    //   sbb  ecx, ecx             ; ecx = -1 when visible, 0 when not
+    //   and  ecx, 0FF28D800h
+    //   add  ecx, 0D8D80000h
+    //
+    // so a placeable node gets 0xFF28D800 + 0xD8D80000 = 0xD800D800 (ARGB:
+    // 84% alpha, pure green) and a rejected one gets 0xD8D80000 (same alpha,
+    // pure red). The two constants here had lost their colour bytes
+    // entirely - 0xD8000000 is transparent black, which is exactly how the
+    // footprint outline drew under a dragged building: visible, but with no
+    // indication of whether the drop would be accepted.
+    const std::uint32_t color = drawNode.mIsVisible ? 0xD800D800u : 0xD8D80000u;
     DrawUnitSkirt(heightField, unitBlueprint, camera->CameraGetView(), anchor, mSession, &batcher, color);
   }
 
@@ -14519,6 +14533,30 @@ namespace moho
     mSelection.mAllocProxy = nullptr;
     (void)InitializeSelectionSetHeadStorage(&mSelection);
     mSelection.mSizeMirrorOrUnused = 0;
+
+    // 0x0089349D..0x008934D9 is `MouseInfo`'s default constructor, inlined
+    // over the cursor lane this class still spells out field by field
+    // (`mCursorWorldState` / `CursorWorldPos` / `pad_04C0` /
+    // `HighlightCommandId` / `CursorScreenPos` - see `CursorInfo()`):
+    //
+    //   0x0089349D  mov  [ebp+4B0h], bl    ; mHitValid   = 0
+    //   0x008934A3  movss [ebp+4B4h], xmm0 ; mMouseWorldPos = (0,0,0)
+    //   0x008934BB  mov  [ebp+4C0h], ebx   ; mUnitHover.ownerLinkSlot = null
+    //   0x008934C1  mov  [ebp+4C4h], ebx   ; mUnitHover.nextInOwner   = null
+    //   0x008934C7  mov  [ebp+4C8h], -1    ; mIsDragger  = -1
+    //   0x008934D1  movss [ebp+4CCh], xmm0 ; mMouseScreenPos = (0,0)
+    //
+    // The two weak-link stores were missing, so the cursor's hovered-unit
+    // `WeakPtr` began life pointing at whatever heap bytes this allocation
+    // happened to contain. The first thing to touch it is
+    // `CWldSession::GetLeftMouseButtonAction`'s `mode.mMouseDragStart =
+    // *mouseInfo`, which relinks through `other.ownerLinkSlot` - so on any
+    // run where those bytes were not already zero, the very first frame
+    // walked a garbage owner chain and faulted in
+    // `WeakPtr<UserEntity>::ResetFromOwnerLinkSlot`. Whether a given build
+    // survived startup came down to heap layout.
+    mCursorWorldState[0] = 0u;
+    ::new (static_cast<void*>(&pad_04C0[0])) WeakPtr<UserEntity>{};
 
     // 0x00893160 line ~288-293: seeds the initial cursor world position from
     // the map's own bounds midpoint, not the origin - matters because
