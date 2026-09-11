@@ -18368,6 +18368,35 @@ LuaState::~LuaState()
 	}
 
 	if (m_state != nullptr) {
+		// `l_G->lstate` names the currently-executing thread, and it is the lane
+		// every `LuaObject::GetActiveState()` resolves through
+		// (0x009072B0: `m_state->m_state->l_G->lstate->stateUserData`). The
+		// binary dereferences that result with no null check at all -- see
+		// `CScriptObject::FindScript`, which calls `GetActiveState` at
+		// 0x004C74DF and reads straight through the returned pointer at
+		// 0x004C74E6 -- so the thread `lstate` names must always still own a
+		// live wrapper.
+		//
+		// Clearing `stateUserData` below while `lstate` still names this thread
+		// breaks exactly that, and it does so silently: `GetActiveState()` then
+		// answers null for *every* object bound to this state root, not just
+		// ones related to the thread being torn down, until the dead thread is
+		// finally collected and `luaE_freethread` puts `lstate` back. Measured
+		// window: a forked unit-script coroutine tearing down mid-beat left
+		// `CScriptObject::FindScript` unable to find any script at all for the
+		// next ~400 sim frames, so `RunScriptBool("CheckBuildRestriction")`
+		// answered false, `IAiCommandDispatchImpl::DispatchTask` built no task
+		// for `UNITCOMMAND_BuildMobile`, and `TaskTick` retired the command --
+		// every structure queued on a commander during its warp-in vanished.
+		//
+		// Dropping back to the main thread restores the binary's invariant at
+		// the point the wrapper dies, which is where the window opens; the same
+		// correction in `luaE_freethread` only closes it again much later.
+		global_State* const globalState = m_state->l_G;
+		if (globalState != nullptr && globalState->lstate == m_state) {
+			globalState->lstate = globalState->mainthread;
+		}
+
 		m_state->stateUserData = nullptr;
 		if (m_ownState != 0) {
 			lua_close(m_state);
