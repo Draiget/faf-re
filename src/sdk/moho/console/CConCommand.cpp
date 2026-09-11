@@ -2952,8 +2952,8 @@ void moho::RenameUnit(void* const commandArgs)
  * Console handler for the `StartCommandMode` command. When no world session
  * is active, prints the localized "<LOC _No_session>" feedback. With a
  * session and at least three argument tokens (program name, mode token, mode
- * payload tag), builds a `UICommandModeData{mode, {name=arg1}}`, compares the
- * requested mode against the currently active UI command mode, and:
+ * payload tag), builds a `UICommandModeData{mode=arg1, {name=arg2}}`, compares
+ * the requested mode against the currently active UI command mode, and:
  *   - if the mode matches both the active mode string and its `name` payload
  *     field, ends the current command mode through `UI_EndCommandMode`
  *     (toggle off);
@@ -2976,16 +2976,28 @@ void moho::CON_StartCommandMode(void* const commandArgs)
     return;
   }
 
+  // `StartCommandMode order RULEUCC_Move` reaches here as three tokens: the
+  // command name, the mode, and the mode's payload tag. The binary reads them
+  // from two distinct slots of the argument vector -- `args[1]` at
+  // `0x0083398D` (`add eax, 1Ch`) for the mode string, and `args[2]` at
+  // `0x008339B2` (`add eax, 38h`, i.e. 2 * sizeof(std::string)) for the
+  // `name` field of the payload table. They are not the same token: the mode
+  // selects the UI command-mode family ("order", "build", "ping"), while the
+  // name is what `SetLexical` resolves into an `ERuleBPUnitCommandCaps` bit
+  // below. Feeding the mode token to `SetLexical` leaves the caps mask at
+  // zero, the selection scan then matches nothing and the command mode never
+  // starts -- which is every order hotkey silently doing nothing.
   const msvc8::string* const modeToken = args.At(1u);
-  if (modeToken == nullptr) {
+  const msvc8::string* const nameToken = args.At(2u);
+  if (modeToken == nullptr || nameToken == nullptr) {
     return;
   }
 
-  // Build the requested command-mode data: mode = arg1, payload = { name = arg1 }.
+  // Build the requested command-mode data: mode = arg1, payload = { name = arg2 }.
   UICommandModeData requested;
   requested.mMode = modeToken->c_str();
   requested.mPayload.AssignNewTable(session->mState, 0, 0u);
-  requested.mPayload.SetString("name", modeToken->c_str());
+  requested.mPayload.SetString("name", nameToken->c_str());
 
   // Read the active command mode through the UI Lua state.
   UICommandModeData active;
