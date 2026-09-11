@@ -355,16 +355,29 @@ int CUnitUpgradeTask::TaskTick()
       return 10;
     }
 
-    const SFootprint& footprint = mUnit->GetFootprint();
-    Wm3::Vector3f position = mUnit->GetPosition();
-    position.x -= static_cast<float>(footprint.mSizeX) * 0.5f;
-    position.z -= static_cast<float>(footprint.mSizeZ) * 0.5f;
-
+    // The upgraded unit is constructed at the upgrading unit's own position,
+    // unshifted. 0x005F89EF..0x005F8A11 calls `GetPosition` (vtable slot 5) a
+    // second time and hands that pointer straight to
+    // `SUnitConstructionParams` as `pos`:
+    //
+    //   0x005F89FE  mov   edx, [eax+14h]   ; Entity::GetPosition
+    //   0x005F8A02  call  edx
+    //   0x005F8A08  mov   ecx, eax         ; -> the ctor's `pos` argument
+    //
+    // The half-footprint subtraction at 0x005F8977..0x005F89B6 belongs to two
+    // `fistp` conversions into stack slots at `esp+0x10` and `esp+0x18` - the
+    // footprint-origin cell of the *old* unit. `params` starts at `esp+0x2C`
+    // (0x005F8A33, `lea edx, [esp+2Ch]`), so neither slot is part of it, and
+    // nothing in the function ever reads either one back: they are dead
+    // stores. Feeding that shifted vector to the constructor instead spawned
+    // every upgrade half its own footprint toward -X/-Z - up and to the left
+    // on screen - so the upgrade's placement mesh sat beside the structure it
+    // was replacing and read as a second, duplicated building.
     mUnit->UnitStateMask |= kUpgradeOwnerHighMask;
 
     SUnitConstructionParams params(
       static_cast<std::int32_t>(mUnit->mCurrentLayer),
-      position,
+      mUnit->GetPosition(),
       mUnit->ArmyRef,
       mToBlueprint,
       mUnit,
