@@ -572,7 +572,14 @@ namespace moho
         }
         const VTransform& transform = mUnit->GetTransform();
         const VAxes3 axes{transform.orient_};
-        Wm3::Vector3f forward{axes.vX.x, 0.0f, axes.vX.z};
+        // 0x005F7916 builds the basis at `esp+40h`, then 0x005F791F and
+        // 0x005F7934 sample `esp+58h` and `esp+60h` - +0x18 and +0x20 into it,
+        // i.e. `vZ.x` and `vZ.z`. `vZ` is the unit's forward lane (`vX` at
+        // +0x00 is its right lane), so reading `vX` here compared the builder's
+        // sideways axis against the direction to the site: the dot product was
+        // near zero whenever the unit was actually facing the spot, and the
+        // task kept re-issuing a facing turn instead of starting work.
+        Wm3::Vector3f forward{axes.vZ.x, 0.0f, axes.vZ.z};
         (void)forward.Normalize();
         const Wm3::Vec3f& builderPos = mUnit->GetPosition();
         Wm3::Vector3f toTarget{mBuildPosition.x - builderPos.x, 0.0f, mBuildPosition.z - builderPos.z};
