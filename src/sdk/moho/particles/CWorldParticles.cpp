@@ -1181,9 +1181,23 @@ namespace moho
       return 0;
     }
 
+    // The sheet is filled BACK TO FRONT: quad 0's six indices go in the LAST
+    // slot, quad 1's in the one below it, and so on. 0x004986F0 starts its
+    // write cursor near the end of the locked buffer and steps it down by
+    // `12` bytes - six 16-bit indices - per quad (`v7 -= 12`), while the
+    // quad's own vertex numbers (`4q .. 4q+3`) count up.
+    //
+    // That ordering is what makes `DrawTrailSegmentBatch` (0x004967E0) work:
+    // it draws `6 * segmentCount` indices starting at
+    // `6 * (0x4000 - segmentCount)`, i.e. the TAIL of the sheet, which holds
+    // exactly quads 0..segmentCount-1. Filling front to front instead left
+    // that tail holding quads 0x4000-N..0x3FFF, whose vertex numbers run to
+    // ~65532 - thousands of vertices past the end of the trail's own buffer -
+    // so every ribbon quad collapsed and a polytrail rendered as a line of
+    // disconnected specks instead of a continuous strip.
     for (std::uint32_t quadIndex = 0U; quadIndex < kSharedTrailQuadCount; ++quadIndex) {
       const std::uint16_t baseVertex = static_cast<std::uint16_t>(quadIndex * 4U);
-      const std::uint32_t indexBase = quadIndex * kIndicesPerTrailQuad;
+      const std::uint32_t indexBase = (kSharedTrailQuadCount - 1U - quadIndex) * kIndicesPerTrailQuad;
 
       mappedIndices[indexBase + 0U] = static_cast<std::int16_t>(baseVertex + 0U);
       mappedIndices[indexBase + 1U] = static_cast<std::int16_t>(baseVertex + 1U);
