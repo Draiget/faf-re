@@ -1206,7 +1206,7 @@ namespace
       return 1;
     }
 
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -5016,9 +5016,14 @@ namespace moho
       return 1;
     }
 
+    // `CAiTarget::SetTarget`, not `SCR_FromLuaCopy<CAiTarget>`: 0x006F29D0 calls
+    // the former at 0x006F2AE6, exactly as `cfunc_IssueMoveL` does. The two take
+    // different Lua shapes -- `SetTarget` accepts the bare `{x,y,z}` vector every
+    // caller passes here, while `SCR_FromLuaCopy` wants a `{Type=..., Position=...}`
+    // descriptor and leaves `targetType` at `AITARGET_None` for anything else, so
+    // the next line raised on every call.
     CAiTarget target{};
-    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
-    SCR_FromLuaCopy_CAiTarget(target, targetObject);
+    target.SetTarget(state, kIssueMoveOffFactoryHelpText, LuaPlus::LuaStackObject(state, 2));
     if (!IsValidVector3f(target.position) || target.targetType == EAiTargetType::AITARGET_None) {
       LuaPlus::LuaState::Error(state, kIssueMoveOffFactoryInvalidTargetError);
     }
@@ -5044,7 +5049,7 @@ namespace moho
     }
 
     issuedCommand->mUnknownFlag142 = true;
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -5448,7 +5453,7 @@ namespace moho
       return 1;
     }
 
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -5498,7 +5503,7 @@ namespace moho
 
     CUnitCommand* const issuedCommand = IssueCommandToSelectedUnits(sim, selectedUnits, commandIssueData, false);
     if (issuedCommand != nullptr) {
-      issuedCommand->mArgs.PushStack(state);
+      issuedCommand->mLuaObj.PushStack(state);
     } else {
       lua_pushnil(rawState);
       (void)lua_gettop(rawState);
@@ -5727,7 +5732,7 @@ namespace moho
       return 0;
     }
 
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -5848,7 +5853,7 @@ namespace moho
       return 1;
     }
 
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -6927,7 +6932,7 @@ namespace moho
       return 1;
     }
 
-    issuedCommand->mArgs.PushStack(state);
+    issuedCommand->mLuaObj.PushStack(state);
     return 1;
   }
 
