@@ -1659,7 +1659,13 @@ namespace moho
     const bool reachedEnd = (mRate > 0.0f) && (mAnimationTime == duration);
     const bool shouldSignal = missingAnimation || zeroRate || (!mLooping && (reachedStart || reachedEnd));
 
-    mTriggered = shouldSignal;
+    // Publish through the task-event, not by writing `mTriggered`: 0x0063FB10
+    // reaches `CTaskEvent::EventSetSignaled` on both of its exits (0x0063FB45
+    // for the false arm, 0x0063FB8B for the true one), and that is what drains
+    // `mWaitLinks` and unstages the threads parked on this manipulator. Setting
+    // the flag alone left every `WaitFor(animator)` in the sim suspended for
+    // good.
+    EventSetSignaled(shouldSignal);
     return shouldSignal;
   }
 
