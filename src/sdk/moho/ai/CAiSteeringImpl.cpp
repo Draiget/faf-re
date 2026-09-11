@@ -857,9 +857,7 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
 {
   if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
       !candidate->IsMobile() ||
-      (mode == 1 &&
-        Wm3::Vector3f::Compare(
-          &candidate->GetPositionHistory(0).pos_, &candidate->GetPositionHistory(1).pos_))) {
+      (mode == 1 && Wm3::Vector3f::Compare(&candidate->Position, &candidate->PrevPosition))) {
     return true;
   }
 
