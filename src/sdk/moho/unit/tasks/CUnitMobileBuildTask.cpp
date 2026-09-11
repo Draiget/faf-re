@@ -631,7 +631,14 @@ namespace moho
 
         const RUnitBlueprint* spawnBlueprint = mBlueprint;
         if (!mBlueprint->General.SeedUnit.name.empty()) {
-          spawnBlueprint = mSim->mRules->GetUnitBlueprint(RResId{mBlueprint->General.SeedUnit.name});
+          // 0x005F7C00 normalises the seed id through `STR_SetFilename` into a
+          // scoped temporary before handing it to the rules lookup, the same
+          // shape the build-drag run uses at 0x008235A5. Copying the raw
+          // blueprint string skipped that, so a seed id that is not already
+          // filename-normalised missed in the rules table.
+          RResId seedBlueprintId{};
+          (void)gpg::STR_SetFilename(&seedBlueprintId.name, gpg::StrArg(mBlueprint->General.SeedUnit.name.c_str()));
+          spawnBlueprint = mSim->mRules->GetUnitBlueprint(seedBlueprintId);
         }
 
         static TSimConVar<bool> sAiInstaBuild(false, "ai_InstaBuild", false);
