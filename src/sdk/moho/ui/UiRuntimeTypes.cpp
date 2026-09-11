@@ -29954,7 +29954,7 @@ bool moho::IN_InitKeyHandler()
  * order. Slot 0 is resolved through IN_FindKeyNameIndexCi against the
  * runtime-loaded in_keyNames table (unknown key names yield -1, preserving the
  * binary's signed return). Each modifier slot is compared case-insensitively
- * (ALT -> 0x80000000, CONTROL -> 0x40000000, SHIFT -> 0x20000000); an
+ * (SHIFT -> 0x80000000, CTRL -> 0x40000000, ALT -> 0x20000000); an
  * unrecognized modifier emits a gpg::Warnf. Returns 0 when the input string is
  * empty.
  *
@@ -29974,9 +29974,35 @@ int moho::IN_ParseKeyModifiers(const msvc8::string& keyBindingSpec)
   // the middle one had been modelled as "CONTROL" and so matched nothing -
   // every Ctrl binding in the game logged "unrecognized modifier string: Ctrl"
   // and silently lost its modifier bit, leaving it bound to the bare key.
-  const msvc8::scoped_string altModifier{"ALT"};
-  const msvc8::scoped_string controlModifier{"CTRL"};
+  // Which spelling sits in which slot is fixed by the *other* end of this
+  // lane. `CUIKeyHandler::OnKeyDown` builds the lookup key for this very map
+  // out of the wxKeyEvent flag bytes, and the binary spells that packing out:
+  //
+  //   0x00838D2C  mov bl, [ebp+2Dh]   ; m_shiftDown
+  //   0x00838D34  mov al, [ebp+2Ch]   ; m_controlDown
+  //   0x00838D31  mov dl, [ebp+2Eh]   ; m_altDown
+  //   0x00838D44  or ecx, 80000000h   ; <- shift
+  //   0x00838D4E  or ecx, 40000000h   ; <- control
+  //   0x00838D58  or ecx, 20000000h   ; <- alt
+  //
+  // (the flag-byte offsets are wxKeyEvent's own declaration order --
+  // m_controlDown, m_shiftDown, m_altDown, m_metaDown -- and are asserted on
+  // `WxKeyEventDispatchRuntimeView`.)
+  //
+  // So the first of the three reference strings must be SHIFT and the third
+  // ALT. They had been modelled the other way round, which put every `Shift-`
+  // and `Alt-` binding in the map under a mask `OnKeyDown` can never produce:
+  // measured at runtime, `Shift-6` was stored as 0x20000036 and `Alt-F9` as
+  // 0x80000078, while a real Shift-6 press looks up 0x80000036 and a real
+  // Alt-F9 press looks up 0x20000078. Neither ever matched, so every modified
+  // binding in the shipped keymap was dead (Ctrl-only ones happened to work,
+  // since 0x40000000 was right in both places). Worse, the wrong masks
+  // collided with each other -- `Shift-R` landed on `Alt-R`'s real mask -- so
+  // 12 of the 196 shipped bindings were silently overwriting one another; the
+  // map held 184 entries before this and holds 196 after.
   const msvc8::scoped_string shiftModifier{"SHIFT"};
+  const msvc8::scoped_string controlModifier{"CTRL"};
+  const msvc8::scoped_string altModifier{"ALT"};
 
   // SBO scratch: 4 inline msvc8::string slots, teardown frees heap only when the
   // token count spilled past the inline window (start != inline origin).
@@ -30001,11 +30027,11 @@ int moho::IN_ParseKeyModifiers(const msvc8::string& keyBindingSpec)
   const std::size_t tokenCount = tokens.Size();
   for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
     const msvc8::scoped_string& modifier = tokens.Data()[tokenIndex];
-    if (_stricmp(modifier.c_str(), altModifier.c_str()) == 0) {
+    if (_stricmp(modifier.c_str(), shiftModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x80000000u);
     } else if (_stricmp(modifier.c_str(), controlModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x40000000u);
-    } else if (_stricmp(modifier.c_str(), shiftModifier.c_str()) == 0) {
+    } else if (_stricmp(modifier.c_str(), altModifier.c_str()) == 0) {
       keyMask |= static_cast<int>(0x20000000u);
     } else {
       gpg::Warnf("Key map contains unrecognized modifier string: %s\n", modifier.c_str());
