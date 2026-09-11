@@ -1,5 +1,6 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <new>
@@ -119,12 +120,37 @@ namespace
     return value.x == 0.0f && value.y == 0.0f && value.z == 0.0f;
   }
 
-  [[nodiscard]] moho::SOCellPos ToCellPos(const Wm3::Vector3f& position, const moho::SFootprint& footprint) noexcept
+  /**
+   * Address: 0x006183BA..0x0061846B (inline lane inside FUN_006180E0)
+   *
+   * What it does:
+   * Second gate on re-deriving a fresh destination in the `CUnitMoveTask`
+   * constructor, taken only when the command-target gate above declined.
+   * It is an air-only lane: the blueprint must be able to fly
+   * (`0x006183C4 cmp [bp+368h], 0`), the goal handed to the task must carry
+   * `LAYER_Land` (`0x006183D5 cmp [ebp+84h], 1` - the goal's `mLayer`), and
+   * the unit must not be mid-pickup. A transport gets its own shorter test
+   * (`0x00618402` "TRANSPORTATION", then states 23h/1Eh); everything else
+   * falls through to the plain "not loading, not refuelling" pair at
+   * `0x0061842B..0x00618449`.
+   */
+  [[nodiscard]] bool ShouldRecentreOnGoalCell(moho::Unit& unit, const moho::SNavGoal& moveGoal)
   {
-    moho::SOCellPos cell{};
-    cell.x = static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
-    cell.z = static_cast<std::int16_t>(std::lrintf(position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f)));
-    return cell;
+    const moho::RUnitBlueprint* const blueprint = unit.GetBlueprint();
+    if (blueprint == nullptr || !blueprint->Air.CanFly) {
+      return false;
+    }
+
+    if (moveGoal.mLayer != moho::LAYER_Land) {
+      return false;
+    }
+
+    if (unit.IsInCategory("TRANSPORTATION") && !unit.IsUnitState(moho::UNITSTATE_LandingOnPlatform) &&
+        !unit.IsUnitState(moho::UNITSTATE_Refueling)) {
+      return true;
+    }
+
+    return !unit.IsUnitState(moho::UNITSTATE_TransportLoading) && !unit.IsUnitState(moho::UNITSTATE_Refueling);
   }
 
   [[nodiscard]] moho::Broadcaster* NavigatorListenerHead(moho::IAiNavigator* const navigator) noexcept
@@ -473,13 +499,18 @@ namespace moho
       return false;
     }
 
-    if (mUnit->IsUnitState(UNITSTATE_WaitForFerry)) {
+    // 0x00618A0B / 0x00618A1B / 0x00618A2B push 8, 13h and 4 into
+    // `Unit::IsUnitState` (vtable slot 15, `[vt+3Ch]`) - `TransportLoading`,
+    // `Teleporting` and `Guarding`. A unit in any of those three is moving
+    // under someone else's control, so its goal must not be re-derived from
+    // the command it happens to be carrying.
+    if (mUnit->IsUnitState(UNITSTATE_TransportLoading)) {
       return false;
     }
-    if (mUnit->IsUnitState(UNITSTATE_LandingOnPlatform)) {
+    if (mUnit->IsUnitState(UNITSTATE_Teleporting)) {
       return false;
     }
-    if (mUnit->IsUnitState(UNITSTATE_Attached)) {
+    if (mUnit->IsUnitState(UNITSTATE_Guarding)) {
       return false;
     }
 
@@ -620,35 +651,61 @@ namespace moho
     }
 
     if (command) {
+      // 0x00618318 seeds one candidate destination with the zero vector and
+      // only two lanes below ever write it. If neither fires, the compare at
+      // 0x006184C5 finds it still zero and the whole tail is skipped - which
+      // is how the goal our caller just published on the navigator survives.
+      //
+      // That "leave the caller's goal alone" case is the common one, and it
+      // matters: `CUnitMobileBuildTask` hands `NewMoveTask` a cell it picked
+      // with `Unit::PrepareMove` precisely so the builder stands clear of the
+      // structure's skirt. Re-deriving the goal from the build order's own
+      // target here walks the engineer into the middle of its own footprint
+      // instead.
+      Wm3::Vector3f destination = Wm3::Vector3f::Zero();
+
       if (ShouldUseCurrentCommandTargetPosition()) {
+        // 0x0061834D..0x006183B5: the command's live gun-target position with
+        // X and Z snapped to whole world units (two `fld`/`fistp` round-trips
+        // through the x87 rounding mode, i.e. round-to-nearest, not truncate).
+        // Y is carried through untouched.
         const Wm3::Vector3f targetPosition = command->mTarget.GetTargetPosGun(false);
-        if (!IsZeroVector(targetPosition)) {
-          const SOCellPos targetCell = ToCellPos(targetPosition, mUnit->GetFootprint());
-          mMoveGoal = SNavGoal(targetCell);
-          mMoveGoal.mLayer = moveGoal.mLayer;
+        destination.x = static_cast<float>(std::lrintf(targetPosition.x));
+        destination.y = targetPosition.y;
+        destination.z = static_cast<float>(std::lrintf(targetPosition.z));
+      } else if (ShouldRecentreOnGoalCell(*mUnit, moveGoal)) {
+        // 0x0061846D..0x006184BF: re-centre on the goal cell this task was
+        // constructed with (`[ebp+64h]`/`[ebp+68h]` = the goal's minX/minZ),
+        // so a flier settles on the middle of the cell it was sent to.
+        const SOCellPos goalCell{
+          static_cast<std::int16_t>(mMoveGoal.minX),
+          static_cast<std::int16_t>(mMoveGoal.minZ),
+        };
+        destination = COORDS_ToWorldPos(mUnit->SimulationRef->mMapData, goalCell, mUnit->GetFootprint());
+      }
 
-          if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
-            navigator->SetGoal(mMoveGoal);
-          }
+      if (!IsZeroVector(destination)) {
+        mHasPreparedDynamicGoal = 1;
 
-          const gpg::Rect2i reservedRect{
-            mMoveGoal.mPos1.x0,
-            mMoveGoal.mPos1.z0,
-            mMoveGoal.mPos1.x1,
-            mMoveGoal.mPos1.z1,
-          };
-          mUnit->ReserveOgridRect(reservedRect);
-          mIsOccupying = 1;
-          mHasPreparedDynamicGoal = 1;
-        }
-      } else {
-        SOCellPos commandCell{};
-        (void)CUnitCommand::GetPosition(command, mUnit, &commandCell);
-        mMoveGoal = SNavGoal(commandCell);
-        mMoveGoal.mLayer = moveGoal.mLayer;
+        // 0x006184F6..0x00618521: coerce the destination onto a reachable
+        // cell with an empty exclusion rect, then rebuild the goal from where
+        // it actually landed.
+        gpg::Rect2f skirtRect{};
+        (void)mUnit->PrepareMove(/*moveFlags=*/0, &destination, &skirtRect, mUnit->ArmyRef->UseWholeMap());
+
+        const ELayer preservedLayer = moveGoal.mLayer;
+        mMoveGoal = SNavGoal(mUnit->GetFootprint().ToCellPos(destination));
+        mMoveGoal.mLayer = preservedLayer;
+
         if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
           navigator->SetGoal(mMoveGoal);
         }
+
+        const SCoordsVec2 destinationXZ{destination.x, destination.z};
+        gpg::Rect2i ogridRect{};
+        (void)COORDS_ToGridRect(&ogridRect, destinationXZ, mUnit->GetFootprint());
+        mUnit->ReserveOgridRect(ogridRect);
+        mIsOccupying = 1;
       }
     }
 
