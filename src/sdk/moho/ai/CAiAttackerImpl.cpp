@@ -1588,7 +1588,14 @@ bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
     return false;
   }
 
-  return ResolveWeaponTargetRangeStatus(weapon, target) == WeaponTargetRangeStatus::Available;
+  // 0x005D70D9 calls `Moho::UnitWeapon::TargetIsTooClose` (0x006D5D80) and
+  // compares its result against TRS_Available. The local
+  // `ResolveWeaponTargetRangeStatus` duplicate that stood here went straight to
+  // the gun solution, losing that function's melee arm: for a melee unit the
+  // binary resolves the target entity and runs `TargetIsTooCloseMelee`
+  // (footprint-touch / collision-shell probes) instead of a radius test, so
+  // melee units judged their own attack range with the wrong rule entirely.
+  return weapon->TargetIsTooClose(target) == ESolutionStatus::TRS_Available;
 }
 
 /**
