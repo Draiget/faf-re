@@ -228,20 +228,56 @@ namespace
     return out;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject ResolveUnitLuaObjectFromWeakLink(const WeakPtr<Unit>& unitLink)
+  /**
+   * A weak link that no longer resolves becomes Lua `nil` -- never an unbound
+   * `LuaObject`. Every `LuaFunction::Call_Object*Weak*` body in the binary
+   * branches to `lua_pushnil` for the dead case and then calls the script
+   * anyway: `Call_ObjectWeakent` at 0x00605841, `Call_ObjectWeakunit` at
+   * 0x005FDBE6, `Call_ObjectStringWeakunit` at 0x005FD71E,
+   * `Call_ObjectWeakentNumString_Num` at 0x0073AB66.
+   *
+   * Returning a default-constructed `LuaObject` instead is not the same thing:
+   * `LuaObject::PushStack` (0x00907D10) throws on `m_state == nullptr`, so the
+   * callback never runs at all. That is silent, and it bites precisely when the
+   * subject of the callback has just been destroyed -- which is the *normal*
+   * case for the stop half of a pair. A prop that has been reclaimed to nothing
+   * is gone by the time `CUnitReclaimTask::TaskTick` reaches its null-target
+   * branch (0x0061F0FE -> 0x00620098) and fires `OnStopReclaim`, so the reclaim
+   * beam and its ambient loop were never cleaned up and hung on the reclaimer
+   * for the rest of the game.
+   */
+  [[nodiscard]] LuaPlus::LuaObject MakeNilLuaObject(const LuaPlus::LuaObject& stateOwner)
+  {
+    LuaPlus::LuaObject nilObject;
+    if (LuaPlus::LuaState* const state = stateOwner.GetActiveState(); state != nullptr) {
+      nilObject.AssignNil(state);
+    }
+    return nilObject;
+  }
+
+  [[nodiscard]] LuaPlus::LuaObject ResolveUnitLuaObjectFromWeakLink(
+    const WeakPtr<Unit>& unitLink, const LuaPlus::LuaObject& selfObject
+  )
   {
     Unit* const unit = unitLink.GetObjectPtr();
     if (!unit) {
-      return {};
+      return MakeNilLuaObject(selfObject);
     }
-    return unit->GetLuaObject();
+
+    LuaPlus::LuaObject unitObject = unit->GetLuaObject();
+    if (!unitObject.m_state) {
+      return MakeNilLuaObject(selfObject);
+    }
+    return unitObject;
   }
 
-  [[nodiscard]] LuaPlus::LuaObject ResolveEntityLuaObjectFromWeakLink(const WeakPtr<Entity>& entityLink)
+  [[nodiscard]] LuaPlus::LuaObject ResolveEntityLuaObjectFromWeakLink(
+    const WeakPtr<Entity>& entityLink, const LuaPlus::LuaObject& selfObject
+  )
   {
     const Entity* const entity = entityLink.GetObjectPtr();
     if (!entity) {
-      return {};
+      return MakeNilLuaObject(selfObject);
     }
 
     // The script-side object, not the `_c_object` userdata. Both weak-entity
@@ -256,7 +292,7 @@ namespace
     // script before `GetReclaimCosts` and failed the whole reclaim task.
     const CScriptObject* const scriptObject = static_cast<const CScriptObject*>(entity);
     if (!scriptObject->mLuaObj.m_state) {
-      return {};
+      return MakeNilLuaObject(selfObject);
     }
     return scriptObject->mLuaObj;
   }
@@ -1765,7 +1801,7 @@ void CScriptObject::RunScriptWeakUnit(const char* const scriptName, const WeakPt
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink);
+    const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink, mLuaObj);
     fn(mLuaObj, unitObject);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
@@ -1789,7 +1825,7 @@ void CScriptObject::RunScriptWeakEntity(const char* const scriptName, const Weak
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject entityObject = ResolveEntityLuaObjectFromWeakLink(entityLink);
+    const LuaPlus::LuaObject entityObject = ResolveEntityLuaObjectFromWeakLink(entityLink, mLuaObj);
     fn(mLuaObj, entityObject);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), scriptName ? scriptName : "<unknown>", ex.what());
@@ -2347,7 +2383,7 @@ void CScriptObject::OnStopBuild(const WeakPtr<Unit>& unitLink, const std::string
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink);
+    const LuaPlus::LuaObject unitObject = ResolveUnitLuaObjectFromWeakLink(unitLink, mLuaObj);
     // The unit goes second and the reason third, matching `OnStartBuild` just
     // below. `Call_ObjectStringWeakunit`'s name describes its own C++ parameter
     // order, not the order it pushes: 0x005FD6B0 pushes the function, then
@@ -2414,7 +2450,7 @@ void CScriptObject::RunScriptOnBuildProgress(
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink);
+    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, sourceUnitObject, previousProgress, currentProgress);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnBuildProgress, ex.what());
@@ -2619,7 +2655,7 @@ void CScriptObject::StartTransportBeamUp(const WeakPtr<Unit>& sourceUnitLink, co
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink);
+    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, attachBone, sourceUnitObject);
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStartTransportBeamUp, ex.what());
@@ -2739,7 +2775,7 @@ void CScriptObject::RunScriptOnStopBeingBuilt(const WeakPtr<Unit>& sourceUnitLin
 
   try {
     LuaPlus::LuaFunction<void> fn{script};
-    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink);
+    const LuaPlus::LuaObject sourceUnitObject = ResolveUnitLuaObjectFromWeakLink(sourceUnitLink, mLuaObj);
     fn(mLuaObj, sourceUnitObject, layerName ? layerName : "");
   } catch (const std::exception& ex) {
     LogScriptWarning(weakGuard.ResolveObjectForWarning(), kOnStopBeingBuilt, ex.what());
