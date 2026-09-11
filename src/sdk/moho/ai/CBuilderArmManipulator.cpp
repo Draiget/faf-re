@@ -11,6 +11,7 @@
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
+#include "moho/entity/Entity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/sim/ManipulatorLuaFunctionThunks.h"
@@ -96,12 +97,6 @@ namespace
     }
 
     return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchSlot].mBoneIndex);
-  }
-
-  [[nodiscard]] float ComputePitchRadians(const Wm3::Vector3f& vector) noexcept
-  {
-    const float horizontalLength = std::sqrt((vector.x * vector.x) + (vector.z * vector.z));
-    return std::atan2(vector.y, horizontalLength);
   }
 
   [[nodiscard]] float WrapSignedRadians(const float angle) noexcept
@@ -455,7 +450,10 @@ namespace moho
       Wm3::Vector3f pitchSpaceTarget{};
       MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
       currentAngleLane = &mPitch;
-      desiredAngle = angleCenter - ComputePitchRadians(pitchSpaceTarget);
+      // 0x0063632E calls `Moho::COORDS_Pitch(Wm3::Vector3<float> const&)` (0x0050B710):
+      // `acos(y/|v|) - pi/2`, the negated elevation. The local `atan2(y, hypot(x, z))`
+      // that stood here returned the opposite sign, mirroring the build arm's pitch.
+      desiredAngle = angleCenter - moho::COORDS_Pitch(pitchSpaceTarget);
     }
 
     const float currentAngle = *currentAngleLane;

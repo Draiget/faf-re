@@ -425,12 +425,6 @@ namespace
     return angleRadians;
   }
 
-  [[nodiscard]] float ComputePitchRadians(const Wm3::Vector3f& vector) noexcept
-  {
-    const float horizontalLength = std::sqrt((vector.x * vector.x) + (vector.z * vector.z));
-    return std::atan2(vector.y, horizontalLength);
-  }
-
   [[nodiscard]] CAimManipulatorBaseRuntimeView* AimManipulatorBaseView(moho::CAimManipulator* const manipulator) noexcept
   {
     return reinterpret_cast<CAimManipulatorBaseRuntimeView*>(manipulator);
@@ -1452,7 +1446,13 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     Wm3::Vector3f pitchSpaceTarget{};
     MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
     currentAngleLane = &runtimeView->mPitch;
-    desiredAngle = minAngleCenter - ComputePitchRadians(pitchSpaceTarget);
+    // 0x00630B04 calls `Moho::COORDS_Pitch(Wm3::Vector3<float> const&)` (0x0050B710),
+    // which returns `acos(y/|v|) - pi/2` -- the NEGATED elevation. A local
+    // `atan2(y, hypot(x, z))` re-implementation stood here and returned `+asin(y/|v|)`
+    // instead, so every gun mirrored its pitch: aiming at a target below the muzzle
+    // elevated the barrel by the same angle, and the shot left along the reflected
+    // direction. `CBuilderArmManipulator` (0x0063632E) carried the same duplicate.
+    desiredAngle = minAngleCenter - moho::COORDS_Pitch(pitchSpaceTarget);
   }
 
   const float currentAngle = *currentAngleLane;
