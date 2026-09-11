@@ -1914,13 +1914,10 @@ namespace
     const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntry*>(
-      CopyWeakPtrRangeStdOrder(
-        AsWeakLane(destination),
-        AsWeakLane(sourceBegin),
-        AsWeakLane(sourceEnd)
-      )
-    );
+    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
+    msvc8::vector<WeakPtr<void>>::uninit_copy_n(
+      AsWeakLane(sourceBegin), count, AsWeakLane(destination));
+    return destination + count;
   }
 
   [[nodiscard]] UserCommandQueueEntry* AssignQueueLinkRangeWithOwnerRelink(
@@ -1929,13 +1926,10 @@ namespace
     const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntry*>(
-      AssignWeakPtrRangeForward(
-        AsWeakLane(destination),
-        AsWeakLane(sourceBegin),
-        AsWeakLane(sourceEnd)
-      )
-    );
+    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
+    msvc8::vector<WeakPtr<void>>::copy_or_move_assign(
+      AsWeakLane(destination), AsWeakLane(sourceBegin), count);
+    return destination + count;
   }
 
   [[nodiscard]] UserCommandQueueEntry* AssignQueueLinkRangeBackwardWithOwnerRelink(
@@ -1944,13 +1938,10 @@ namespace
     const UserCommandQueueEntry* const sourceEnd
   ) noexcept
   {
-    return reinterpret_cast<UserCommandQueueEntry*>(
-      AssignWeakPtrRangeBackward(
-        AsWeakLane(destinationEnd),
-        AsWeakLane(sourceBegin),
-        AsWeakLane(sourceEnd)
-      )
-    );
+    const std::size_t count = static_cast<std::size_t>(sourceEnd - sourceBegin);
+    msvc8::vector<WeakPtr<void>>::copy_backward_assign(
+      AsWeakLane(sourceBegin), AsWeakLane(sourceEnd), AsWeakLane(destinationEnd));
+    return destinationEnd - count;
   }
 
   /**

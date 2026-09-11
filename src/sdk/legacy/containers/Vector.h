@@ -8093,6 +8093,7 @@ namespace msvc8
          * Address: 0x007A5E90 (FUN_007A5E90 -- a same-register-shape trampoline into that separate emission for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each copied node splices itself onto the source's owner chain head, so this is never a memcpy). The body is ICF-folded across every `T`; callers 0x007A5A70 (unreached); formerly `CopyWeakPtrRangeStdOrder` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x006ED580 (FUN_006ED580 -- a forwarding bridge into 0x006ED8E0 preserving a distinct call ABI for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each copied node splices itself onto the source's owner chain head, so this is never a memcpy). The body is ICF-folded across every `T`; zero callers, unreachable; formerly `CopyWeakPtrRangeStdOrderAdapter` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          */
+    public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
                 std::memcpy(dst, src, n * sizeof(T));
@@ -8106,6 +8107,7 @@ namespace msvc8
                 }
             }
         }
+    private:
 
         /**
          * Address: 0x006DEA30 (FUN_006DEA30, msvc8::vector<moho::EntityCategorySet>::uninit_fill_n

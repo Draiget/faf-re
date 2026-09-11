@@ -10135,9 +10135,9 @@ void Sim::Setup(LaunchInfoNew* const info)
   if (!CFG_GetArgOption("/noprops", 0u, nullptr)) {
     CWldProps* const props = info->mProps;
     int propCount = 0;
-    if (props != nullptr && props->mEntriesBegin != nullptr) {
-      propCount = static_cast<int>(props->mEntriesEnd - props->mEntriesBegin);
-      for (const CWldPropEntry* entry = props->mEntriesBegin; entry != props->mEntriesEnd; ++entry) {
+    if (props != nullptr && !props->mEntries.empty()) {
+      propCount = static_cast<int>(props->mEntries.size());
+      for (const CWldPropEntry* entry = props->mEntries.begin(); entry != props->mEntries.end(); ++entry) {
         (void)PROP_Create(this, entry->mTransform, entry->mBlueprintPath.c_str());
       }
     }

@@ -8,6 +8,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/Vector.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
@@ -355,7 +356,8 @@ namespace
     if (sourceSize != 0u) {
       auto* const destinationBeginWeak = reinterpret_cast<moho::WeakPtr<void>*>(destination->begin);
       auto* const sourceBeginWeak = reinterpret_cast<const moho::WeakPtr<void>*>(source->begin);
-      (void)moho::AssignWeakPtrRangeForward(destinationBeginWeak, sourceBeginWeak, sourceBeginWeak + sourceSize);
+      msvc8::vector<moho::WeakPtr<void>>::copy_or_move_assign(
+        destinationBeginWeak, sourceBeginWeak, sourceSize);
     }
 
     if (destinationSize > sourceSize && destination->begin != nullptr) {
