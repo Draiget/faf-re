@@ -465,7 +465,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_Reclaim: {
-        dispatch->IssueReclaimTask(command->mTarget);
+        IssueReclaimTask(dispatch, command->mTarget);
         return;
       }
 
@@ -939,25 +939,6 @@ void IAiCommandDispatchImpl::IssueCarrierLandTask(Unit* const unit, CCommandTask
   }
 
   (void)new (std::nothrow) CUnitCarrierLand(parentTask, unit);
-}
-
-/**
- * Address: 0x0061EF60 (FUN_0061EF60, Moho::IAiCommandDispatchImpl::IssueReclaimTask)
- *
- * What it does:
- * Validates the target entity lane, then schedules the recovered reclaim task
- * using the target's gun position.
- */
-void IAiCommandDispatchImpl::IssueReclaimTask(const CAiTarget& target)
-{
-  Entity* const targetEntity = target.GetEntity();
-  if (targetEntity == nullptr) {
-    mLinkResult = static_cast<EAiResult>(2);
-    return;
-  }
-
-  const Wm3::Vec3f targetPos = const_cast<CAiTarget&>(target).GetTargetPosGun(false);
-  (void)new (std::nothrow) CUnitReclaimTask(this, targetEntity, targetPos);
 }
 
 /**

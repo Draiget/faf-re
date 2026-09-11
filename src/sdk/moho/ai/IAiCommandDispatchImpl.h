@@ -130,15 +130,6 @@ namespace moho
     static void IssueCarrierLandTask(Unit* unit, CCommandTask* parentTask);
 
     /**
-     * Address: 0x0061EF60 (FUN_0061EF60, Moho::IAiCommandDispatchImpl::IssueReclaimTask)
-     *
-     * What it does:
-     * Validates the reclaim target entity lane and schedules the recovered
-     * reclaim task using the target's gun position.
-     */
-    void IssueReclaimTask(const CAiTarget& target);
-
-    /**
      * Address: 0x006012B0 (FUN_006012B0, Moho::IAiCommandDispatchImpl::IssueCallTeleportTask)
      *
      * What it does:

@@ -13,6 +13,7 @@
 
 namespace moho
 {
+  class CAiTarget;
   class CUnitCommand;
   class Entity;
 
@@ -144,6 +145,27 @@ namespace moho
   static_assert(
     offsetof(CUnitReclaimTask, mReclaimPerSecond) == 0x68, "CUnitReclaimTask::mReclaimPerSecond offset must be 0x68"
   );
+
+  /**
+   * Address: 0x0061EF60 (FUN_0061EF60)
+   *
+   * IDA signature:
+   * void __cdecl IssueReclaimTask(Moho::CCommandTask *a1, Moho::CAiTarget *a2);
+   *
+   * What it does:
+   * Spawns one `CUnitReclaimTask` under `parentTask` aimed at whatever
+   * `target` resolves to, using the target's gun position. A target that no
+   * longer resolves to a live entity fails the parent task instead
+   * (`0x0061EFDC mov [eax+2Ch], 2` - `CCommandTask::mLinkResult`).
+   *
+   * Free function, not a method: the binary calls it `__cdecl` with both
+   * operands on the stack, and `a1` is a plain `CCommandTask*` - the build
+   * task hands it its own `this` at `0x005F74B1`, while the patrol and
+   * dispatch lanes hand it a dispatch. `mLinkResult` lives at +0x2C, inside
+   * the `CCommandTask` subobject that every one of those shares
+   * (`IAiCommandDispatch` only starts at +0x30).
+   */
+  void IssueReclaimTask(CCommandTask* parentTask, const CAiTarget& target);
 } // namespace moho
 
 namespace gpg

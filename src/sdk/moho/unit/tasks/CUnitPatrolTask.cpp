@@ -44,6 +44,7 @@
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 #include "moho/unit/tasks/CUnitRepairTask.h"
+#include "moho/unit/tasks/CUnitReclaimTask.h"
 
 namespace gpg
 {
@@ -905,7 +906,7 @@ namespace moho
     (void)mMembership.Add(reclaimCandidate);
     CAiTarget reclaimTarget{};
     reclaimTarget.UpdateTarget(reclaimCandidate);
-    mDispatch->IssueReclaimTask(reclaimTarget);
+    IssueReclaimTask(mDispatch, reclaimTarget);
     mMoving = false;
     return 7;
   }

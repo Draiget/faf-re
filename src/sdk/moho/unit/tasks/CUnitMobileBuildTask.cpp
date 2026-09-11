@@ -41,6 +41,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/SUnitConstructionParams.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "moho/unit/tasks/CUnitReclaimTask.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/CUnitCommand.h"
@@ -473,7 +474,7 @@ namespace moho
         if (Entity* const obstruction = FindObstructingPropToReclaim(); obstruction != nullptr) {
           CAiTarget reclaimTarget{};
           reclaimTarget.UpdateTarget(obstruction);
-          reinterpret_cast<IAiCommandDispatchImpl*>(this)->IssueReclaimTask(reclaimTarget);
+          IssueReclaimTask(this, reclaimTarget);
           return 1;
         }
         if (mUnit->IsMobile()) {
