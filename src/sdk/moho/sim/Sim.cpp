@@ -8806,6 +8806,20 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     outSyncData->mStream = beatStream;
 
     (void)syncTable.ToByteStream(*outSyncData->mStream);
+
+    // 0x00747E9F-0x00747EAE: the table is emptied the instant it has been
+    // published, by running the sim-side Lua helper.
+    //
+    //     *(_DWORD *)esp = "ResetSyncTable()";
+    //     SCR_LuaDoString(this->mLuaState, ...);
+    //
+    // Nothing in lua/ clears `Sync` per beat - `ResetSyncTable` is called from
+    // `SetupSession` exactly once and otherwise only from here. Without this
+    // call every entry ever written to `Sync` is re-serialised on every
+    // subsequent beat: `CWldSession::DoBeat` keeps handing the UI the same
+    // `Sync.Voice` cue, so a single "commander under attack" VO replays every
+    // beat forever, and the table grows without bound for the whole session.
+    (void)SCR_LuaDoString("ResetSyncTable()", mLuaState);
   }
 
   // The desync run is moved, not copied: the sim hands its accumulated
