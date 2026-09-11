@@ -220,7 +220,7 @@ namespace
    * Returns cached `CUnitCommand` metatable object from Lua object-factory
    * storage.
    */
-  [[maybe_unused]] [[nodiscard]] LuaPlus::LuaObject GetUnitCommandFactory(LuaPlus::LuaState* const state)
+  [[nodiscard]] LuaPlus::LuaObject GetUnitCommandFactory(LuaPlus::LuaState* const state)
   {
     return CScrLuaMetatableFactory<CUnitCommand>::Instance().Get(state);
   }
@@ -1308,8 +1308,20 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
  * digest/counter state, and links coordinating-order relationships, using the
  * resolved command id passed by command-db allocation paths.
  */
+// A command is a script object with its own Lua self, and that is what every
+// `IssueXxx` binding hands back to Lua. 0x006E81B0 builds it that way: three
+// default `LuaObject`s (0x006E81D6/81EB/81FD), the cached `CUnitCommand`
+// metatable from `GetUnitCommandFactory` at 0x006E821C -- called with
+// `sim->mLuaState`, read as `[sim+8D8h]` at 0x006E8212 -- and then the
+// four-argument `CScriptObject` ctor at 0x006E8238, which is what creates
+// `mLuaObj`.
 CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData, const CmdId resolvedCommandId)
-  : CScriptObject()
+  : CScriptObject(
+      GetUnitCommandFactory(sim != nullptr ? sim->mLuaState : nullptr),
+      LuaPlus::LuaObject{},
+      LuaPlus::LuaObject{},
+      LuaPlus::LuaObject{}
+    )
   , unk0(nullptr)
   , mSim(sim)
   , mConstDat{}
