@@ -22824,7 +22824,22 @@ void moho::CUIWorldView::UpdateSelection(const Wm3::Vector2f& mouseScreenPos)
         if (simResources != nullptr &&
             simResources->FindClosestDeposit(&searchFrom, &foundDeposit, snapRadius, depositType)) {
           const SOCellPos snappedCell{static_cast<std::int16_t>(foundDeposit.x), static_cast<std::int16_t>(foundDeposit.z)};
-          hit.mMouseWorldPos = COORDS_ToWorldPos(mWldSession->GetSTIMap(), snappedCell, LAYER_None, 1, 1);
+          // The layer argument is the build blueprint's own occupancy caps
+          // (0x008701A2, `movzx ecx, byte ptr [eax+0DAh]` - `mFootprint` at
+          // +0xD8, `mOccupancyCaps` its third byte), not LAYER_None. It is
+          // what decides whether the snapped cursor takes the seabed height
+          // or the water plane, so a hydrocarbon/mass structure that builds
+          // on the seabed was being snapped to the water surface instead of
+          // the deposit it is standing on. The 1x1 extent is the binary's
+          // (`push 1` twice at 0x008701A9): a deposit occupies one cell
+          // regardless of what gets built over it.
+          hit.mMouseWorldPos = COORDS_ToWorldPos(
+            mWldSession->GetSTIMap(),
+            snappedCell,
+            static_cast<ELayer>(static_cast<std::uint8_t>(buildBlueprint->mFootprint.mOccupancyCaps)),
+            1,
+            1
+          );
         }
       }
     }
