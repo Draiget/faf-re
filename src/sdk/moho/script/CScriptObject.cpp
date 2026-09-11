@@ -244,11 +244,21 @@ namespace
       return {};
     }
 
+    // The script-side object, not the `_c_object` userdata. Both weak-entity
+    // call lanes push `entity + 0x20` -- `CScriptObject::mLuaObj` --
+    // `LuaFunction::Call_ObjectWeakent` at 0x00605836 (`lea ecx, [eax+20h]`
+    // off `ownerLinkSlot - 4`) and `Call_ObjectWeakentNumString_Num` at
+    // 0x0073AB66. `cObject` sits at +0x0C and carries only the bare
+    // `CScrLuaMetatableFactory<CScriptObject*>` metatable, which defines no
+    // methods at all, so every callback that takes an entity got a handle it
+    // could not call anything on: `OnStartReclaim(self, target)` died on
+    // `target:GetPosition()` in effectutilitiesgeneric.lua, which aborted the
+    // script before `GetReclaimCosts` and failed the whole reclaim task.
     const CScriptObject* const scriptObject = static_cast<const CScriptObject*>(entity);
-    if (!scriptObject->cObject.m_state) {
+    if (!scriptObject->mLuaObj.m_state) {
       return {};
     }
-    return scriptObject->cObject;
+    return scriptObject->mLuaObj;
   }
 
   struct WeakEntityUnlinkScope
