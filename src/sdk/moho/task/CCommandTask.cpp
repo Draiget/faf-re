@@ -398,6 +398,17 @@ void DestroyCCommandTaskThunkVariantA(CCommandTask* const task)
 
 int CCommandTask::Execute()
 {
+  // `CCommandTask`'s own vtable slot 1 is `_purecall` in the binary: a bare
+  // command task is never scheduled, only its concrete subclasses are. Reaching
+  // here means a subclass did not install its own vtable -- which is what
+  // happened to the attack tasks while they carried `CCommandTask` as raw
+  // storage instead of a real base, and it aborted the sim thread with no clue
+  // as to which task was at fault. Name the object before going down.
+  gpg::Warnf(
+    "CCommandTask::Execute reached on '%s': that vtable slot is pure in the "
+    "binary, so this task type never installed its own Execute.",
+    typeid(*this).name()
+  );
   std::terminate();
 }
 

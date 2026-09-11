@@ -96,6 +96,15 @@ namespace moho
     int TaskTick();
 
     /**
+     * VFTable SLOT: 1 (CTask::Execute)
+     *
+     * What it does:
+     * Dispatches the command-task execute slot into `TaskTick` (0x00616C70),
+     * matching every other recovered command task.
+     */
+    int Execute() override;
+
+    /**
      * Address: 0x00617D00 (FUN_00617D00)
      *
      * What it does:
