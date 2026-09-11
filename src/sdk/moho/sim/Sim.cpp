@@ -29153,31 +29153,52 @@ namespace moho
 
     // Enqueue the published command into each selected unit's command manager.
     // FUN_008B0180 asm 0x008B0540-0x008B0577: the binary gates the per-unit
-    // reset and the UI notification on a separate "command issued" latch
-    // (ebp-4, set to 1 at 0x008B03F7 on this post-gate path), NOT on clearQueue.
-    // That latch is always 1 here (the loop is only reached once the command
-    // has been issued), so both the <=500 and >500 queue-size branches reset
-    // the manager and then add the command -- the >500 branch reaches the
-    // shared reset->add through the binary's fall-through (loc_8B055C ->
-    // loc_8B0566). clearQueue (the BOOL param a2) feeds only
-    // UserUnitManagerAdd's flag; UI_OnCommandIssued's bool arg is the issued
-    // latch, i.e. true.
+    // 0x008B0540-0x008B0577 gates the per-unit lane on `clearQueue`, and the
+    // two queue-size branches are not the same:
+    //
+    //   cmp  ecx, 1F4h          ; queue size
+    //   jbe  loc_8B0553
+    //   cmp  [flag], 0          ; > 500 entries
+    //   jz   loc_8B057C         ;   appending -> drop this unit entirely
+    //   jmp  loc_8B055C         ;   replacing -> reset, then add
+    //   loc_8B0553:             ; <= 500 entries
+    //   cmp  [flag], 0
+    //   jz   loc_8B0566         ;   appending -> add without resetting
+    //   loc_8B055C: reset
+    //   loc_8B0566: add
+    //
+    // That is the ~500-order queue cap: a command that replaces the queue
+    // always goes through because it wipes it first, one that appends is
+    // refused. Read as a constant "a command was issued" the >500 branch
+    // becomes byte-identical to the other one and the cap does nothing, so
+    // the flag the binary tests here is `clearQueue`.
+    //
+    // The same flag is what 0x008B058A hands to `UI_OnCommandIssued`, and the
+    // UI contract needs it: `commandmode.lua:OnCommandIssued` ends command
+    // mode on exactly `command.Clear` (identically in all three shipped
+    // variants - lua.nx2, lua.nx5 and faforever.faf). Notifying `true`
+    // unconditionally tore down build mode on the first structure of a
+    // shift-held run, so every further placement needed another trip to the
+    // construction panel - even though this call already had the right
+    // answer: the run's own log shows twenty `BuildMobile` orders issued with
+    // `clear=0` while the notification said otherwise.
     for (UserUnit* const unit : units) {
       UserCommandQueue* const unitManager = unit->GetCommandQueue();
       if (unitManager == nullptr) {
         continue;
       }
 
-      if (GetUserUnitManagerQueueSize(unitManager) <= 500) {
-        ResetUserUnitManagerState(unitManager, commandId);
-        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
-      } else {
-        ResetUserUnitManagerState(unitManager, commandId);
-        UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
+      if (GetUserUnitManagerQueueSize(unitManager) > 500 && !clearQueue) {
+        continue;
       }
+
+      if (clearQueue) {
+        ResetUserUnitManagerState(unitManager, commandId);
+      }
+      UserUnitManagerAdd(unitManager, commandHelper, commandId, clearQueue);
     }
 
-    UI_OnCommandIssued(units, data, true);
+    UI_OnCommandIssued(units, data, clearQueue);
     session->DirtyCommandGraph();
   }
 
