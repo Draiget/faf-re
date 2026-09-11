@@ -14,9 +14,22 @@
 
 namespace moho
 {
-  float cam_HighLOD = 2.0f;
+  // `.data` initializers, read straight out of the shipped image:
+  // 0x00F58E40 = 0.9, 0x00F58E44 = 1.0, 0x00F58E48 = 1.2.
+  //
+  // These feed `GeomCamera3::SetLODScale`, and `viewport.r[1]` - the row every
+  // LOD cutoff in the engine is measured against - is `viewport.r[0] *
+  // lodScale`. A *larger* scale therefore makes the measured depth larger and
+  // culls sooner, so the detail levels run high -> low as 0.9 -> 1.0 -> 1.2.
+  // The values that used to sit here (2.0 / 1.0 / 0.0) had the relation
+  // backwards and far out of range: on the "High" detail setting the scale was
+  // 2.0 instead of 0.9, which is 2.2x too large, so every effect carrying a
+  // LODCutoff - build beams among them - disappeared at 45% of the camera
+  // distance it should survive to; "Low" became 0.0, which disables LOD
+  // rejection altogether.
+  float cam_HighLOD = 0.9f;
   float cam_MediumLOD = 1.0f;
-  float cam_LowLOD = 0.0f;
+  float cam_LowLOD = 1.2f;
   float cam_DefaultLOD = 1.0f;
 } // namespace moho
 
