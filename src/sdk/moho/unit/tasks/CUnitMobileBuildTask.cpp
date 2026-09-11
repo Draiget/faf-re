@@ -544,7 +544,20 @@ namespace moho
           return -1;
         }
         if (IAiBuilder* const builder = mUnit->AiBuilder; builder != nullptr) {
-          const float aimY = (mBlueprint->Physics.SkirtSizeX * 0.5f) + mBlueprint->Physics.SkirtSizeZ + mBuildPosition.y;
+          // 0x005F786F..0x005F78A6 aims at the middle of the target's collision
+          // box, not at anything horizontal:
+          //
+          //   movss xmm0, [eax+0B0h]      ; REntityBlueprint::mSizeY
+          //   mulss xmm0, ds:flt_E4F724   ; * 0.5
+          //   addss xmm0, [eax+0CCh]      ; + mCollisionOffsetY
+          //   addss xmm0, xmm2            ; + mBuildPosition.y
+          //
+          // The recovered form read `Physics.SkirtSizeX`/`SkirtSizeZ` (+0x284
+          // and +0x288) instead, i.e. it fed two ground-plane extents into a
+          // height, so the build beam pointed at the wrong altitude for every
+          // structure whose skirt and mesh height disagree.
+          const float aimY =
+            (mBlueprint->mSizeY * 0.5f) + mBlueprint->mCollisionOffsetY + mBuildPosition.y;
           builder->BuilderSetAimTarget(Wm3::Vector3f{mBuildPosition.x, aimY, mBuildPosition.z});
         }
         mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
