@@ -6436,14 +6436,24 @@ void moho::USER_SavePreferences()
  */
 std::int32_t moho::OPTIONS_GetInt(const gpg::StrArg key)
 {
-  IUserPrefs* const preferences = USER_GetPreferences();
-  if (preferences == nullptr) {
+  // 0x008C68C1-0x008C6939: the option is resolved through the Lua helper, not
+  // read straight off the preference root - `GetOption` looks the key up
+  // inside the *current profile's* `options` table. A direct
+  // `IUserPrefs::GetInteger(key)` used to stand here, which searches the top
+  // level of `Game.prefs` where no option key exists at all, so every engine
+  // option read as 0 (and, in OPTIONS_GetString below, as "") for the whole
+  // session regardless of what the player had configured.
+  try {
+    LuaPlus::LuaState* const state = USER_GetLuaState();
+    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
+    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
+    LuaPlus::LuaObject optionValue = getOptionFn(key);
+    return optionValue.GetInteger();
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
     return 0;
   }
-
-  msvc8::string optionKey;
-  optionKey.assign_owned(key != nullptr ? key : "");
-  return preferences->GetInteger(optionKey, 0);
 }
 
 /**
@@ -6480,19 +6490,30 @@ float moho::OPTIONS_GetFloat(const gpg::StrArg key)
  */
 msvc8::string moho::OPTIONS_GetString(const gpg::StrArg key)
 {
-  IUserPrefs* const preferences = USER_GetPreferences();
-  if (preferences == nullptr) {
+  // 0x008C6AD9-0x008C6B72: same `/lua/user/prefs.lua:GetOption` bridge as
+  // OPTIONS_GetInt above; the binary takes `LuaObject::GetString()` and builds
+  // the result with an inlined strlen. Reading the preference root directly
+  // instead (what used to be here) never finds an option key, so
+  // `primary_adapter` came back empty and `CScApp` could not tell windowed
+  // mode from a resolution triple - it fell through to the two-head branch
+  // and built the render head at the default size no matter what the player
+  // had chosen.
+  try {
+    LuaPlus::LuaState* const state = USER_GetLuaState();
+    LuaPlus::LuaObject prefsModule = SCR_Import(state, kUserPrefsModulePath);
+    LuaPlus::LuaObject getOptionFnObject = prefsModule[kGetOptionMethodName];
+    LuaPlus::LuaFunction<LuaPlus::LuaObject> getOptionFn(getOptionFnObject);
+    LuaPlus::LuaObject optionValue = getOptionFn(key);
+    const char* const optionText = optionValue.GetString();
+    msvc8::string result;
+    result.assign_owned(optionText != nullptr ? optionText : "");
+    return result;
+  } catch (const std::exception& exception) {
+    gpg::Warnf(kUserPrefsGetOptionLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
     msvc8::string fallback;
     fallback.assign_owned("");
     return fallback;
   }
-
-  msvc8::string optionKey;
-  optionKey.assign_owned(key != nullptr ? key : "");
-
-  msvc8::string fallback;
-  fallback.assign_owned("");
-  return preferences->GetString(optionKey, fallback);
 }
 
 /**
@@ -6523,7 +6544,7 @@ bool moho::OPTIONS_GetBool(const gpg::StrArg key)
  * Mangled: ?OPTIONS_Apply@Moho@@YAXXZ
  *
  * What it does:
- * Invokes `/lua/options/optionslogic.lua:Apply()` and discards the return
+ * Invokes `/lua/options/optionslogic.lua:Apply(true)` and discards the return
  * object. Lua bridge failures are logged without aborting startup flow.
  */
 void moho::OPTIONS_Apply()
@@ -6533,7 +6554,20 @@ void moho::OPTIONS_Apply()
     LuaPlus::LuaObject optionsModule = SCR_Import(state, kOptionsLogicModulePath);
     LuaPlus::LuaObject applyFnObject = optionsModule[kApplyMethodName];
     LuaPlus::LuaFunction<LuaPlus::LuaObject> applyFn(applyFnObject);
-    LuaPlus::LuaObject callResult = applyFn();
+    // 0x008C6D76 `call LuaPlus__LuaFunction__Call_True_Obj`: the single
+    // argument is the boolean `true` - Apply's `startup` flag. Calling it with
+    // no arguments (what used to be here) made `startup` false, and
+    // `/lua/options/options.lua`'s primary_adapter handler is written as
+    //
+    //     set = function(key, value, startup)
+    //         if not startup then ConExecute("SC_PrimaryAdapter " .. value) end
+    //
+    // so every launch re-ran the adapter console command. In windowed mode
+    // that command resizes the frame to `Windows.Main.Previous.width/height`,
+    // a pair of keys nothing in the engine or in lua/ ever writes, so it fell
+    // back to wnd_DefaultCreateWidth/Height and shrank the window to 1024x768
+    // on startup no matter what size the player had saved.
+    LuaPlus::LuaObject callResult = applyFn(true);
     (void)callResult;
   } catch (const std::exception& exception) {
     gpg::Warnf(kOptionsApplyLuaRunErrorPrefix, exception.what() != nullptr ? exception.what() : "");
