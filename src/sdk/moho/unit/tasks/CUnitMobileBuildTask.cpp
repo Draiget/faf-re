@@ -496,9 +496,22 @@ namespace moho
           const bool outOfRange = range > mUnit->GetBlueprint()->Economy.MaxBuildDistance;
           const bool overlaps = mBuildSkirt.OverlapsInclusive(builderSkirt);
           if (!fits || outOfRange || overlaps) {
+            // 0x005F7616..0x006184BF grows the exclusion rect by one cell on
+            // all four sides before handing it to `Unit::PrepareMove`:
+            //
+            //   0x005F7640  subss xmm1, xmm0   ; x0 - 1.0   (ds:a7 == 1.0f)
+            //   0x005F765D  subss xmm1, xmm0   ; z0 - 1.0
+            //   0x005F7673  addss xmm1, xmm0   ; x1 + 1.0
+            //   0x005F768D  addss xmm1, xmm0   ; z1 + 1.0
+            //
+            // Only the middle two were recovered, so the builder was allowed
+            // to park flush against the structure on the -X and +Z sides
+            // instead of keeping the one cell of clearance the original left.
             gpg::Rect2f moveSkirt = mBuildSkirt;
+            moveSkirt.x0 = moveSkirt.x0 - 1.0f;
             moveSkirt.z0 = moveSkirt.z0 - 1.0f;
             moveSkirt.x1 = moveSkirt.x1 + 1.0f;
+            moveSkirt.z1 = moveSkirt.z1 + 1.0f;
             Wm3::Vector3f moveTarget{mBuildPosition.x, mBuildPosition.y, mBuildPosition.z};
             const bool useWholeMap = mUnit->ArmyRef->UseWholeMap();
             (void)mUnit->PrepareMove(1, &moveTarget, &moveSkirt, useWholeMap);
