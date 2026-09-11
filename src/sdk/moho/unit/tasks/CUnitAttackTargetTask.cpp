@@ -456,10 +456,8 @@ namespace moho
     CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
     runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerVftable = 0;
     runtime->mAiAttackerListenerLink.ListResetLinks();
     runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerVftable = 0;
     runtime->mCommandEventListenerLink.ListResetLinks();
 
     runtime->mDispatchTask = nullptr;
@@ -499,10 +497,8 @@ namespace moho
     CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
     runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerVftable = 0;
     runtime->mAiAttackerListenerLink.ListResetLinks();
     runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerVftable = 0;
     runtime->mCommandEventListenerLink.ListResetLinks();
 
     runtime->mDispatchTask = dispatchTask;
@@ -1112,11 +1108,17 @@ namespace moho
       return false;
     }
 
+    // 0x005F34C0's caller lane calls CAiTarget::HasSameTargetEntity (0x005E2D40)
+    // here, and that predicate is false unless BOTH sides resolve a live entity
+    // and it is the same one. Open-coding it as a raw pointer comparison made
+    // two entity-less targets -- which is exactly what an attack-ground order
+    // is -- compare equal, so the task reported "nothing changed" and never
+    // handed the target to the attacker. The attacker's desired target stayed
+    // AITARGET_None, no CAcquireTargetTask ever assigned the weapon a target,
+    // and attack-ground silently did nothing.
     CAiTarget* const currentDesiredTarget = attacker->GetDesiredTarget();
-    Entity* const desiredEntityTarget = (desiredTarget != nullptr) ? desiredTarget->targetEntity.GetObjectPtr() : nullptr;
-    Entity* const currentEntityTarget =
-      (currentDesiredTarget != nullptr) ? currentDesiredTarget->targetEntity.GetObjectPtr() : nullptr;
-    if (desiredEntityTarget == currentEntityTarget) {
+    if (desiredTarget != nullptr && currentDesiredTarget != nullptr
+        && desiredTarget->HasSameTargetEntity(*currentDesiredTarget)) {
       attacker->ResetReportingState();
       return false;
     }

@@ -472,10 +472,8 @@ namespace moho
     CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
     runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerVftable = 0;
     runtime->mAiAttackerListenerLink.ListResetLinks();
     runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerVftable = 0;
     runtime->mCommandEventListenerLink.ListResetLinks();
 
     runtime->mDispatchTask = nullptr;
@@ -515,10 +513,8 @@ namespace moho
     CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
     runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerVftable = 0;
     runtime->mAiAttackerListenerLink.ListResetLinks();
     runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerVftable = 0;
     runtime->mCommandEventListenerLink.ListResetLinks();
 
     runtime->mDispatchTask = dispatchTask;
@@ -1009,10 +1005,15 @@ namespace moho
       return false;
     }
 
+    // 0x00615FFB calls CAiTarget::HasSameTargetEntity (0x005E2D40), which is
+    // false unless BOTH sides resolve a live entity and it is the same one.
+    // A raw pointer comparison instead makes two entity-less targets -- an
+    // attack-ground order, say -- look identical, so the attacker never
+    // receives the new target and nothing ever fires.
     CAiTarget* const currentDesiredTarget = attacker->GetDesiredTarget();
-    Entity* const desiredEntityTarget = desiredTarget ? desiredTarget->targetEntity.GetObjectPtr() : nullptr;
-    Entity* const currentEntityTarget = currentDesiredTarget ? currentDesiredTarget->targetEntity.GetObjectPtr() : nullptr;
-    if (desiredEntityTarget != currentEntityTarget) {
+    const bool sameEntityTarget = desiredTarget != nullptr && currentDesiredTarget != nullptr
+                               && desiredTarget->HasSameTargetEntity(*currentDesiredTarget);
+    if (!sameEntityTarget) {
       attacker->SetDesiredTarget(desiredTarget);
       return true;
     }

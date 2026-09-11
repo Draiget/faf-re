@@ -278,6 +278,18 @@ namespace moho
      * waiting to starting state.
      */
     void HandleCommandEvent(ECommandEvent event);
+
+    /**
+     * VFTable SLOT: 0 of the task's `Listener<EAiAttackerEvent>` sub-object
+     * vtable, installed at +0x34 by the constructor at 0x00615690.
+     */
+    void OnEvent(EAiAttackerEvent event) override { HandleAiAttackerEvent(event); }
+
+    /**
+     * VFTable SLOT: 0 of the task's `Listener<ECommandEvent>` sub-object
+     * vtable, installed at +0x44 by the constructor at 0x00615690.
+     */
+    void OnEvent(ECommandEvent event) override { HandleCommandEvent(event); }
   };
 
   static_assert(sizeof(CUnitMeleeAttackTargetTask) == 0x90, "CUnitMeleeAttackTargetTask size must be 0x90");

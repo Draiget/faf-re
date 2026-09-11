@@ -5,6 +5,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "Wm3Vector3.h"
 #include "moho/ai/EAiAttackerEvent.h"
+#include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
 #include "moho/unit/ECommandEvent.h"
 
@@ -40,7 +41,25 @@ namespace moho
    * whose recovered stand-in calls `std::terminate()`. Issuing any attack order
    * aborted the process from the sim thread.
    */
-  class CAttackTargetTask : public CCommandTaskWithListenerSlot
+  /**
+   * `Listener<EAiAttackerEvent>` (0x0C) plus the four-byte slot that separates
+   * it from the `Listener<ECommandEvent>` base at +0x44. Both attack tasks lay
+   * their attacker listener at +0x34 and their command listener at +0x44, which
+   * leaves exactly one dword between the two 0x0C-byte bases.
+   */
+  class AiAttackerListenerWithSlot : public Listener<EAiAttackerEvent>
+  {
+  public:
+    /// +0x40. Never read; present only to place the next base at +0x44.
+    std::uint32_t mListenerPad{0};
+  };
+
+  static_assert(sizeof(AiAttackerListenerWithSlot) == 0x10, "AiAttackerListenerWithSlot size must be 0x10");
+
+  class CAttackTargetTask
+    : public CCommandTaskWithListenerSlot
+    , public AiAttackerListenerWithSlot
+    , public Listener<ECommandEvent>
   {
   public:
     using CCommandTaskWithListenerSlot::CCommandTaskWithListenerSlot;
@@ -77,9 +96,9 @@ namespace moho
     );
 
   protected:
-    /// +0x34..+0x8F. The two siblings keep their own fields here and reach them
+    /// +0x50..+0x8F. The two siblings keep their own fields here and reach them
     /// through their file-local runtime views; nothing addresses this directly.
-    unsigned char mPadding[0x90 - sizeof(CCommandTaskWithListenerSlot)];
+    unsigned char mPadding[0x90 - 0x50];
   };
 
   static_assert(sizeof(CAttackTargetTask) == 0x90, "CAttackTargetTask size must be 0x90");
@@ -265,6 +284,18 @@ namespace moho
      * refreshes attacker desired-target state, and wakes owner-thread flow.
      */
     void HandleCommandEvent(ECommandEvent event);
+
+    /**
+     * VFTable SLOT: 0 of `??_7CUnitAttackTargetTask@Moho@@6B?$Listener@W4EAiAttackerEvent@Moho@@@Moho@@@`,
+     * installed at +0x34 by the constructor at 0x005F29E5.
+     */
+    void OnEvent(EAiAttackerEvent event) override { HandleAiAttackerEvent(event); }
+
+    /**
+     * VFTable SLOT: 0 of `??_7CUnitAttackTargetTask@Moho@@6B?$Listener@W4ECommandEvent@Moho@@@Moho@@@`,
+     * installed at +0x44 by the constructor at 0x005F29EC.
+     */
+    void OnEvent(ECommandEvent event) override { HandleCommandEvent(event); }
 
     /**
      * Address: 0x005F3450 (FUN_005F3450, Moho::CUnitAttackTargetTask::UpdateAttacker)
