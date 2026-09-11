@@ -1783,7 +1783,14 @@ void moho::CameraImpl::CameraSetAccType(const msvc8::string& accType)
 void moho::CameraImpl::CameraSpin(const Wm3::Vector2f& spinDelta)
 {
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
-  const float spinScale = (cam_SpinSpeed / runtime->mVerticalZoomMetricScale) * kDegreesToRadians;
+  // 0x007A6CFB divides `cam_SpinSpeed` by `[this+0x32C]`. `mCam` sits at +0x070 and
+  // `GeomCamera3::viewport` at +0x284 within it, so +0x32C is `viewport.r[3].z` --
+  // the viewport WIDTH in pixels ({X, Y, Width, Height}, the same lanes
+  // `GeomCamera3::Unproject` reads). Spin is normalised per pixel of drag so that a
+  // full-width sweep turns the same amount at any resolution. This divided by
+  // `mVerticalZoomMetricScale` (+0x338, the ~1.33 aspect ratio) instead, making every
+  // mouse pixel rotate the camera roughly 770x too far.
+  const float spinScale = (cam_SpinSpeed / runtime->mCam.viewport.r[3].z) * kDegreesToRadians;
   const float headingDelta = spinDelta.x * spinScale;
   const float pitchDelta = spinDelta.y * spinScale;
 
