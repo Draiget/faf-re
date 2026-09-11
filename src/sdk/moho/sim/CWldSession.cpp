@@ -6741,11 +6741,29 @@ namespace moho
 
       // Frustum-cull the averaged anchor against the camera's view solid
       // before spending a projection + hit test on it.
+      //
+      // `CGeomSolid3` carries *outward*-facing plane normals, so a point is
+      // outside the solid when its signed distance is positive - the same
+      // convention `SolidContainsAabb` (moho/mesh/Mesh.cpp) rejects on, and
+      // exactly what 0x008298B2..0x008298BE spells:
+      //
+      //   0x008298B2  subss  xmm0, [edx+0Ch]        ; d = n.X - constant
+      //   0x008298B7  comiss xmm0, ds:dword_E4F6E0  ; the .rdata word is 0.0f
+      //   0x008298BE  ja     loc_829B12             ; d > 0 -> next node
+      //
+      // Testing `<= 0` here instead inverted the whole predicate: every
+      // command node actually on screen was discarded, the walk always fell
+      // through to `bestCommandId == -1`, and so `CUIWorldView::
+      // UpdateSelection` never wrote a real `CmdId` into `MouseInfo::
+      // mIsDragger`. With that sentinel permanently -1, `DefaultModeFromDrag`
+      // only ever answered COMMOD_Move, the "grab this command node" arm that
+      // builds a `UICommandDragger` never ran, and no issued order could be
+      // picked up and dragged anywhere.
       bool culledByFrustum = false;
       for (const Wm3::Plane3f& plane : camera.solid2.planes_) {
         const float signedDistance =
           ((plane.Normal.x * avg.x) + (plane.Normal.y * avg.y) + (plane.Normal.z * avg.z)) - plane.Constant;
-        if (signedDistance <= 0.0f) {
+        if (signedDistance > 0.0f) {
           culledByFrustum = true;
           break;
         }
@@ -11400,11 +11418,11 @@ namespace moho
             ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(8)) {
           if (const REntityBlueprint* const genericBlueprint = helper->mConstantData.blueprint;
               genericBlueprint != nullptr) {
-            gpg::RRef blueprintRef{};
-            (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<REntityBlueprint*>(genericBlueprint));
-            const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, RUnitBlueprint::StaticGetClass());
-            if (unitBlueprintRef.mObj != nullptr) {
-              const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
+            // 0x00829C48..0x00829C4D is a plain virtual dispatch through slot
+            // 5 of the blueprint's own vtable - `REntityBlueprint::
+            // IsUnitBlueprint` - not a reflection upcast.
+            if (const RUnitBlueprint* const unitBlueprint = genericBlueprint->IsUnitBlueprint();
+                unitBlueprint != nullptr) {
               const float inverseWeight = 1.0f / drawNode->mWeight;
               const SCoordsVec2 buildCenter{
                 drawNode->mPositionSum.x * inverseWeight, drawNode->mPositionSum.z * inverseWeight
@@ -11429,6 +11447,22 @@ namespace moho
       if (!released || suppressDispatch) {
         return;
       }
+
+      // The playable-rect clamp runs once, here, ahead of all three dispatch
+      // arms - 0x00829CF4..0x00829D7D sits between the `released` gate and
+      // the cached-target search, and every later read (the distance loop's
+      // `var_200`/`result`, the factory arm's `ToCellPos` input, and the
+      // default arm's position target) is of the clamped vector, never of the
+      // raw mouse. Clamping only inside the default arm let the other two
+      // arms act on an off-map cursor.
+      const STIMap* const map = reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      Wm3::Vector3f clampedPos = mouse;
+      clampedPos.x = std::clamp(
+        clampedPos.x, static_cast<float>(map->mPlayableRect.x0 + 1), static_cast<float>(map->mPlayableRect.x1 - 1)
+      );
+      clampedPos.z = std::clamp(
+        clampedPos.z, static_cast<float>(map->mPlayableRect.z0 + 1), static_cast<float>(map->mPlayableRect.z1 - 1)
+      );
 
       if (UserEntity* const cachedTargetEntity = ResolveCommandTargetEntityFromAnchorHistory(
             reinterpret_cast<CommandGraphAnchorHistoryRuntimeView*>(helper)
@@ -11459,8 +11493,8 @@ namespace moho
           }
 
           const Wm3::Vec3f& candidatePos = candidate->mVariableData.mCurTransform.pos_;
-          const float deltaX = mouse.x - candidatePos.x;
-          const float deltaZ = mouse.z - candidatePos.z;
+          const float deltaX = clampedPos.x - candidatePos.x;
+          const float deltaZ = clampedPos.z - candidatePos.z;
           const float distanceSq = (deltaX * deltaX) + (deltaZ * deltaZ);
           if (distanceSq < closestDistanceSq) {
             closestDistanceSq = distanceSq;
@@ -11481,39 +11515,37 @@ namespace moho
       const REntityBlueprint* const genericBlueprint = helper->mConstantData.blueprint;
       if (ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(8) &&
           genericBlueprint != nullptr) {
-        // Factory-build command: snap to the blueprint's resolved-footprint
-        // world position.
-        gpg::RRef blueprintRef{};
-        (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<REntityBlueprint*>(genericBlueprint));
-        const gpg::RRef unitBlueprintRef = gpg::REF_UpcastPtr(blueprintRef, RUnitBlueprint::StaticGetClass());
-        const auto* const unitBlueprint = static_cast<const RUnitBlueprint*>(unitBlueprintRef.mObj);
-        const SFootprint* const footprint =
-          (unitBlueprint != nullptr) ? unitBlueprint->Physics.ResolvedFootprint : nullptr;
-        if (footprint != nullptr) {
-          const STIMap* const map =
-            reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
-          const SOCellPos cell = footprint->ToCellPos(mouse);
-          const Wm3::Vector3f worldPos = COORDS_ToWorldPos(map, cell, LAYER_None, 1, 1);
+        // Factory-build command: re-snap the dropped cursor onto the
+        // blueprint's own footprint grid.
+        //
+        // 0x00829F0D..0x00829F40 copies the sixteen bytes at
+        // `REntityBlueprint+0xD8` - the blueprint's inline `mFootprint` - into
+        // a stack `SFootprint`; there is no reflection upcast and no
+        // `Physics.ResolvedFootprint` indirection anywhere in this arm. The
+        // upcast-and-deref version this replaces dropped the whole drag
+        // silently whenever either step yielded null, so a queued building
+        // could not be moved at all.
+        const SFootprint& footprint = genericBlueprint->mFootprint;
+        const SOCellPos cell = footprint.ToCellPos(clampedPos);
 
-          UserCommandTargetView positionTarget{};
-          positionTarget.targetType = UserTargetType::Position;
-          positionTarget.position = worldPos;
-          ISSUE_SetCommandTarget(helper, positionTarget);
-        }
+        // 0x00829F5E calls the `(STIMap const*, SOCellPos const&, SFootprint
+        // const&)` overload, which re-centres the origin cell over the *full*
+        // footprint (`cell + size/2`). Passing `1, 1` instead re-centred every
+        // structure as if it were one cell across, displacing the re-issued
+        // build position by `((1 - sizeX) / 2, (1 - sizeZ) / 2)` - i.e. toward
+        // -X/-Z, up and to the left on screen, by a whole cell for a 3-cell
+        // footprint - so the dropped order and its green placement ghost
+        // landed off the structure they belonged to.
+        const Wm3::Vector3f worldPos = COORDS_ToWorldPos(map, cell, footprint);
+
+        UserCommandTargetView positionTarget{};
+        positionTarget.targetType = UserTargetType::Position;
+        positionTarget.position = worldPos;
+        ISSUE_SetCommandTarget(helper, positionTarget);
         return;
       }
 
-      // Default: clamp the raw mouse position to the map's playable rect and
-      // issue it as a `Position` target.
-      const STIMap* const map = reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
-      Wm3::Vector3f clampedPos = mouse;
-      clampedPos.x = std::clamp(
-        clampedPos.x, static_cast<float>(map->mPlayableRect.x0 + 1), static_cast<float>(map->mPlayableRect.x1 - 1)
-      );
-      clampedPos.z = std::clamp(
-        clampedPos.z, static_cast<float>(map->mPlayableRect.z0 + 1), static_cast<float>(map->mPlayableRect.z1 - 1)
-      );
-
+      // Default: issue the clamped cursor position as a `Position` target.
       UserCommandTargetView positionTarget{};
       positionTarget.targetType = UserTargetType::Position;
       positionTarget.position = clampedPos;
