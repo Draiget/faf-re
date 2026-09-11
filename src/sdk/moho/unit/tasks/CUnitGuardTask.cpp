@@ -41,6 +41,7 @@
 #include "moho/unit/tasks/CUnitMoveTask.h"
 #include "moho/unit/tasks/CUnitRepairTask.h"
 #include "moho/unit/tasks/CUnitUpgradeTask.h"
+#include "moho/unit/tasks/CUnitReclaimTask.h"
 
 namespace moho
 {
@@ -1722,7 +1723,7 @@ namespace moho
 
     CAiTarget targetPayload{};
     (void)targetPayload.UpdateTarget(targetEntity);
-    static_cast<IAiCommandDispatchImpl*>(mCommandTask)->IssueReclaimTask(targetPayload);
+    IssueReclaimTask(mCommandTask, targetPayload);
   }
 
   /**

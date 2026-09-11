@@ -949,6 +949,33 @@ namespace
   moho::CUnitReclaimTaskSerializer gCUnitReclaimTaskSerializer;
 } // namespace
 
+namespace moho
+{
+  /**
+   * Address: 0x0061EF60 (FUN_0061EF60)
+   *
+   * What it does:
+   * See the declaration. `0x0061EF7E` resolves the target's entity lane and
+   * `0x0061EF85`/`0x0061EF8C` fail the parent task through
+   * `[a1+2Ch] = AIRESULT_Failed` when nothing lives there any more; otherwise
+   * `0x0061EFB2` samples the gun position and `0x0061EFC0` constructs the
+   * reclaim task under the parent.
+   */
+  void IssueReclaimTask(CCommandTask* const parentTask, const CAiTarget& target)
+  {
+    Entity* const targetEntity = target.GetEntity();
+    if (targetEntity == nullptr) {
+      if (parentTask != nullptr) {
+        parentTask->mLinkResult = static_cast<EAiResult>(2);
+      }
+      return;
+    }
+
+    const Wm3::Vec3f targetPos = const_cast<CAiTarget&>(target).GetTargetPosGun(false);
+    (void)new (std::nothrow) CUnitReclaimTask(parentTask, targetEntity, targetPos);
+  }
+} // namespace moho
+
 namespace gpg
 {
   /**
