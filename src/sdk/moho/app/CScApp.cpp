@@ -601,36 +601,23 @@ namespace
    * Validates windowed command-line option arguments as two positive
    * integer dimensions.
    */
-  // Deliberate deviation from the shipped binary, for development only.
-  //
-  // The binary treats a missing or malformed /windowed as a request for
-  // fullscreen, which takes the whole display the moment the engine starts and
-  // rearranges every other window on the desktop. That is the wrong default
-  // while the engine is being launched dozens of times a day under a debugger,
-  // so an unspecified mode means windowed here and fullscreen has to be asked
-  // for by name. Pass /fullscreen for the binary's own behaviour.
-  constexpr const char* kDevelopmentWindowedWidth = "1024";
-  constexpr const char* kDevelopmentWindowedHeight = "768";
-
   [[nodiscard]] bool TryGetWindowedOptionArgs(msvc8::vector<msvc8::string>* const outArgs)
   {
-    if (moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)
+    // 0x008D02DB-0x008D0331: `/windowed` has to be present with two positive
+    // integer dimensions, and there is no fallback of any kind - every other
+    // path returns false and lets the caller fall through to the adapter
+    // preferences. A development default used to sit here, substituting a
+    // hard-coded 1024x768 whenever no explicit mode was on the command line.
+    // That short-circuited the `primary_adapter` branch below, so a normal
+    // launch built a 1024x768 head no matter what `Windows.Main.width`/
+    // `.height` said, while the frame itself came up at the saved window
+    // size - the whole presented image was then stretched from 1024x768 to
+    // the real client area, which is what made the UI look magnified and
+    // blurry next to an unscaled mouse cursor.
+    return moho::CFG_GetArgOptionAliases(moho::CFG_GetWindowedOptionAliases(), 2, outArgs)
       && outArgs->size() == 2
       && IsPositiveIntegerArg((*outArgs)[0])
-      && IsPositiveIntegerArg((*outArgs)[1])) {
-      return true;
-    }
-
-    // Asked for fullscreen by name: let the caller fall through to it.
-    msvc8::vector<msvc8::string> fullscreenArgs;
-    if (moho::CFG_GetArgOption("fullscreen", 0, &fullscreenArgs)) {
-      return false;
-    }
-
-    outArgs->clear();
-    outArgs->push_back(msvc8::string(kDevelopmentWindowedWidth));
-    outArgs->push_back(msvc8::string(kDevelopmentWindowedHeight));
-    return true;
+      && IsPositiveIntegerArg((*outArgs)[1]);
   }
 
   [[nodiscard]] bool IsDisabledAdapterToken(const msvc8::string& value)
