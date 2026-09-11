@@ -2565,6 +2565,37 @@ namespace
   }
 
   /**
+   * The crash record's second home, written with a bare `FILE*` that is closed
+   * before this function returns.
+   *
+   * `gpg::Logf` reaches the `.sclog` through a `std::ofstream` (see
+   * `TryInitializeStartupLogTarget`, moho/app/IWinApp.cpp), which buffers. The
+   * BugSplat arm of `TopLevelExceptionFilter` then blocks forever in a report
+   * this build never completes, so the process never exits, the stream is
+   * never flushed, and the whole crash record dies in that buffer - which is
+   * exactly what a crash looks like from outside: the log stops mid-frame at
+   * whatever was last flushed, no `CRASH:` line anywhere, no Windows Error
+   * Reporting event either, because the filter handled the exception. Every
+   * line also goes here, and this file is flushed and closed line by line, so
+   * a faulted process always leaves its symbolised stack on disk.
+   */
+  void WriteCrashRecordLine(const char* const format, ...)
+  {
+    std::FILE* const file = std::fopen("crash_callstack.txt", "a");
+    if (file == nullptr) {
+      return;
+    }
+
+    std::va_list args;
+    va_start(args, format);
+    (void)std::vfprintf(file, format, args);
+    va_end(args);
+
+    (void)std::fputc('\n', file);
+    (void)std::fclose(file);
+  }
+
+  /**
    * Writes the fault and its symbolised callstack to the log.
    *
    * Not in the binary: this build has no working crash dialog resource and no
@@ -2578,11 +2609,23 @@ namespace
       return;
     }
 
+    // Start a fresh record for this fault, so the file always describes the
+    // crash that just happened rather than accumulating across runs.
+    if (std::FILE* const truncate = std::fopen("crash_callstack.txt", "w"); truncate != nullptr) {
+      (void)std::fclose(truncate);
+    }
+
     const EXCEPTION_RECORD& record = *exceptionInfo->ExceptionRecord;
     const auto faultAddress =
       static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(record.ExceptionAddress));
 
     gpg::Logf(
+      "CRASH: %s (0x%08X) at address 0x%08X",
+      StructuredExceptionToString(record.ExceptionCode),
+      static_cast<unsigned int>(record.ExceptionCode),
+      faultAddress
+    );
+    WriteCrashRecordLine(
       "CRASH: %s (0x%08X) at address 0x%08X",
       StructuredExceptionToString(record.ExceptionCode),
       static_cast<unsigned int>(record.ExceptionCode),
@@ -2595,6 +2638,11 @@ namespace
         record.ExceptionInformation[0] != 0u ? "write" : "read",
         static_cast<unsigned int>(record.ExceptionInformation[1])
       );
+      WriteCrashRecordLine(
+        "CRASH: attempted to %s memory at 0x%08X",
+        record.ExceptionInformation[0] != 0u ? "write" : "read",
+        static_cast<unsigned int>(record.ExceptionInformation[1])
+      );
     }
 
     std::uint32_t stackFrames[64]{};
@@ -2602,6 +2650,7 @@ namespace
       moho::PLAT_GetCallStack(exceptionInfo->ContextRecord, 64, stackFrames);
     if (frameCount == 0u) {
       gpg::Logf("CRASH callstack: unavailable.");
+      WriteCrashRecordLine("CRASH callstack: unavailable.");
       return;
     }
 
@@ -2612,6 +2661,7 @@ namespace
     // single multi-line call silently loses everything past the first frame or
     // two -- which is precisely the part that names the faulting engine code.
     gpg::Logf("CRASH callstack: %u frames", static_cast<unsigned int>(frameCount));
+    WriteCrashRecordLine("CRASH callstack: %u frames", static_cast<unsigned int>(frameCount));
     const char* const text = callstackText.c_str();
     std::size_t lineStart = 0u;
     for (std::size_t i = 0u;; ++i) {
@@ -2625,6 +2675,7 @@ namespace
       }
       if (lineLength != 0u) {
         gpg::Logf("CRASH   %.*s", static_cast<int>(lineLength), text + lineStart);
+        WriteCrashRecordLine("CRASH   %.*s", static_cast<int>(lineLength), text + lineStart);
       }
       if (ch == '\0') {
         break;
@@ -2636,6 +2687,7 @@ namespace
     // text above says nothing useful, but these still resolve against main.pdb.
     for (std::uint32_t frame = 0u; frame < frameCount; ++frame) {
       gpg::Logf("CRASH   frame[%u] = 0x%08X", frame, stackFrames[frame]);
+      WriteCrashRecordLine("CRASH   frame[%u] = 0x%08X", frame, stackFrames[frame]);
     }
   }
 
