@@ -578,7 +578,22 @@ namespace moho
       }
     }
 
-    const bool stanceOrSpatialUpdateNeeded = transformChanged || scaleChanged;
+    // 0x008B9351/0x008B9358 test two byte slots: esp+0x13, written only by the
+    // transform comparison at 0x008B8F9A/0x008B8FA4, and esp+0x18, written only
+    // by the mesh-rebuild test at 0x008B8EFF/0x008B8F0D -- the same slot read at
+    // 0x008B9066 to gate the rebuild block itself. The scale flag (esp+0x12) is
+    // not in this gate; it only guards the `mesh->scale` copy at 0x008B9268.
+    //
+    // This matters for structures. A building never moves, so `transformChanged`
+    // is false for every sync after its first, and the mesh instance is created
+    // on a *later* beat than the entity (the SCM resource arrives after the
+    // create record). With `scaleChanged` here, that creation beat did not
+    // refresh the spatial entry, so the entry kept the degenerate
+    // position-only box installed while `mMeshInstance` was still null -- and
+    // nothing ever moved the building to refresh it. `CollectInVolume` then
+    // never returned it, which is why a finished mass extractor could not be
+    // clicked and drew no strategic icon while mobile units picked fine.
+    const bool stanceOrSpatialUpdateNeeded = transformChanged || requiresMeshRebuild;
     if (mMeshInstance != nullptr) {
       if (scaleChanged) {
         mMeshInstance->scale = mVariableData.mScale;
