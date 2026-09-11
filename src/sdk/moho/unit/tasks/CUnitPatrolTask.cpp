@@ -25,12 +25,14 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/Prop.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector3f.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/EAllianceTypeInfo.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
@@ -608,12 +610,31 @@ namespace moho
 
     CArmyImpl* const army = unit->ArmyRef;
 
-    // No-rush zone extents: start position offset by the per-army no-rush offset,
-    // gated by whether the army still has no-rush time remaining.
+    // Storage-pressure gates, read out of the army economy (`IArmy` vtable slot
+    // +0x24 = `GetEconomy`, called twice at 0x0061BB35 and 0x0061BB5B). The
+    // binary loads `mStored` at economy+0x18/+0x1C and `mMaxStorage` at
+    // economy+0x40/+0x48, converts each u64 max to floating point with the
+    // two-`fild` unsigned-64 sequence at 0x0061BB78..0x0061BB9B, scales it by
+    // `dword_E4F7C8` = 0.75f and compares (0x0061BBEA, 0x0061BBFB).
+    //
+    // So: "am I already sitting on more than three quarters of a full store of
+    // this resource". A prop is worth reclaiming only for a resource that is
+    // *not* near-capped, and an ally is worth assisting only when both stores
+    // are, i.e. when there is surplus to spend.
+    const CSimArmyEconomyInfo* const economy = army->GetEconomy();
+    const SEconTotals& totals = economy->economy;
+    const bool energyStorageNearFull =
+      totals.mStored.ENERGY > static_cast<float>(static_cast<double>(totals.mMaxStorage.ENERGY) * 0.75);
+    const bool massStorageNearFull =
+      totals.mStored.MASS > static_cast<float>(static_cast<double>(totals.mMaxStorage.MASS) * 0.75);
+
+    // No-rush zone centre: start position offset by the per-army no-rush offset.
+    // X pairs with the candidate's X and Z with its Z -- 0x0061C00A subtracts
+    // `position.z` (entity+0xB4) from `StartPosition.Y + NoRushOffsetY` and
+    // 0x0061C018 subtracts `position.x` (entity+0xAC) from
+    // `StartPosition.X + NoRushOffsetX`.
     const float noRushCenterX = army->StartPosition.X() + army->NoRushOffsetX;
     const float noRushCenterZ = army->StartPosition.Y() + army->NoRushOffsetY;
-    const bool massReclaimZoneOpen = army->StartPosition.X() > (army->NoRushRadius * 0.75f);
-    const bool energyReclaimZoneOpen = army->StartPosition.Y() > (army->NoRushRadius * 0.75f);
 
     gpg::core::FastVectorN<CollisionResult, 10> collisions;
     Sim* const sim = unit->SimulationRef;
@@ -629,32 +650,55 @@ namespace moho
     const std::ptrdiff_t count = collisions.end() - collisions.begin();
     for (std::ptrdiff_t i = 0; i < count; ++i) {
       Entity* const candidate = collisions.begin()[i].sourceEntity;
+      // Both type tests run for every candidate, in this order: Entity vtable
+      // +0x10 `IsUnit` at 0x0061BCF1, +0x14 `IsProp` at 0x0061BD05.
       Unit* const candidateUnit = candidate->IsUnit();
+      Prop* const candidateProp = candidate->IsProp();
       float weight = 1.0f;
 
-      if (candidateUnit == nullptr || candidate->IsBeingBuilt()) {
-        // Prop / non-unit reclaim branch.
-        if (candidate == nullptr) {
+      // 0x0061BD21 dispatches Unit vtable +0x28, which is `IUnit::IsDead` --
+      // slot 10 of the IUnit vtable, two slots below `IsBeingBuilt` at +0x34.
+      // Reading it as `IsBeingBuilt` sent every unit under construction down
+      // the prop-reclaim branch, where the only gates are "I can reclaim" and
+      // "it is RECLAIMABLE". An allied unit on the factory pad passes both, and
+      // `Execute` then turns an allied candidate into a `CUnitRepairTask` -- so
+      // an engineer rolling off a factory with an attack-move rally point
+      // immediately turned around and assisted the factory instead of going out
+      // to reclaim. With the real test the same unit falls through to the unit
+      // branch below and is dropped by the stationary check, which is what
+      // leaves the engineer free to reclaim.
+      if (candidateUnit == nullptr || candidateUnit->IsDead()) {
+        // Prop reclaim branch. A candidate that is neither a live unit nor a
+        // prop is skipped outright (0x0061BE40 `test edi, edi`).
+        if (candidateProp == nullptr) {
           continue;
         }
         if (!unit->IsInCategory("RECLAIM")) {
           continue;
         }
-        if (!candidate->IsInCategory("RECLAIMABLE")) {
+        if (!candidateProp->IsInCategory("RECLAIMABLE")) {
           continue;
         }
-        if (massReclaimZoneOpen || energyReclaimZoneOpen) {
+        if (energyStorageNearFull || massStorageNearFull) {
           const auto* const propBlueprint =
-            reinterpret_cast<const RPropBlueprint*>(candidate->BluePrint);
+            reinterpret_cast<const RPropBlueprint*>(candidateProp->BluePrint);
           bool hasReclaimValue = false;
-          if (!massReclaimZoneOpen) {
+          if (!energyStorageNearFull) {
             hasReclaimValue = propBlueprint->Economy.ReclaimEnergyMax > 0.0f;
           }
-          if ((energyReclaimZoneOpen || propBlueprint->Economy.ReclaimMassMax <= 0.0f) && !hasReclaimValue) {
+          if ((massStorageNearFull || propBlueprint->Economy.ReclaimMassMax <= 0.0f) && !hasReclaimValue) {
             continue;
           }
         }
         weight = 1.0f;
+
+        // The already-claimed set is consulted on the prop lane only: the two
+        // unit lanes below jump straight past it to the map-bounds test
+        // (0x0061BDDE and 0x0061BE3B both target 0x0061BF8E, while the prop
+        // lane falls through the `sub_61C540` lookup at 0x0061BF81).
+        if (mMembership.Contains(candidateProp)) {
+          continue;
+        }
       } else {
         // Unit attack/reclaim branch.
         if (candidateUnit == unit) {
@@ -677,19 +721,14 @@ namespace moho
           }
           weight = 0.5f;
         } else {
-          // Allied damaged unit inside an open no-rush zone -> assist-reclaim.
-          if (!massReclaimZoneOpen || !energyReclaimZoneOpen
+          // Allied damaged unit, but only while both stores are near full.
+          if (!energyStorageNearFull || !massStorageNearFull
               || candidate->Health >= (candidate->MaxHealth * 0.9f)
               || candidateUnit->IsUnitState(UNITSTATE_BeingReclaimed)) {
             continue;
           }
           weight = 2.0f;
         }
-      }
-
-      // Skip entities already tracked in the per-army membership set.
-      if (mMembership.Contains(candidate)) {
-        continue;
       }
 
       const bool wholeMap = army->UseWholeMap();
@@ -699,8 +738,8 @@ namespace moho
 
       // Guard-return radius gate around the no-rush center.
       if (army->NoRushTicks > 0) {
-        const float ddz = noRushCenterX - candidate->Position.z;
-        const float ddx = noRushCenterZ - candidate->Position.x;
+        const float ddz = noRushCenterZ - candidate->Position.z;
+        const float ddx = noRushCenterX - candidate->Position.x;
         const float noRushDistance = std::sqrt(ddz * ddz + ddx * ddx);
         if (noRushDistance > army->NoRushRadius) {
           continue;
