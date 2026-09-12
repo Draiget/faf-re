@@ -130,13 +130,16 @@ extern "C" {
   // MWSFD_IsEnableHndl(ply) call while always answering "not enabled" -- which
   // is why a successfully created playback handle still drew "handle is
   // invalid" from mwPlyGetStat, mwPlySetFrmSync and mwPlyStartFname alike.
-  void* MWSFD_SetCond() { return nullptr; }
+  // MWSFD_SetCond (0x00ACB930): real body in SofdecAdxPlatformRuntime.cpp
+  // beside MWSFD_GetCond, which it mirrors.
   // MWSFD_SetReqSvrBdrHn (0x00AD9910): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp, next to MWSFSVR_SetHnSfdSvrFlg.
   // As a no-arg void* stub it silently ate the "server border requested" flag
   // instead of publishing it into the playback handle / library work lane, so
   // mwlSfdSleepDecSvr's idle-border dance never actually latched anything.
-  void* MWSFPLY_SetFlowLimit() { return nullptr; }
+  // MWSFPLY_SetFlowLimit (0x00ACB330) has had a real body in
+  // SofdecAdxPlatformRuntime.cpp for some time; this stub was left behind and
+  // referenced by nothing.
   // MWSFSVM_Error: real body in SofdecSvmTransferRuntime.cpp.
   // MWSFSVM_GotoIdleBorder (0x00ACCD00): real body in
   // cri/sofdec/SofdecSvmTransferRuntime.cpp. A thin `SVM_GotoSvrBorder(6)`

@@ -1889,7 +1889,11 @@ extern "C"
   std::int32_t mwsflib_SetDefCond(const float* startupConditionValue);
   void MWSFLIB_SetSeekFlg(std::int32_t enabled);
   std::int32_t MWSFLIB_GetSeekFlg();
-  std::int32_t MWSFD_SetCond(std::int32_t laneId, std::int32_t conditionId, std::int32_t value);
+  std::int32_t MWSFD_SetCond(
+    moho::MwsfdPlaybackStateSubobj* ply,
+    std::int32_t conditionId,
+    std::int32_t conditionValue
+  );
   std::int32_t mwPlySfdFinish();
   std::int32_t SFD_Finish();
   std::int32_t SFD_Destroy(void* sfdHandle);
