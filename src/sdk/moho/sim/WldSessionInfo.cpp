@@ -287,6 +287,9 @@ namespace moho
     }
 
     if (mState == EWldScenarioLoadControlState::kNotStarted) {
+      // 0x00413005: the announcement is made before the state moves to running,
+      // so the log reads start -> running -> finished for every task.
+      gpg::Logf("Starting background task \"%s\"", mThreadName.c_str());
       mState = EWldScenarioLoadControlState::kRunning;
 
       boost::thread* worker = nullptr;
@@ -302,6 +305,8 @@ namespace moho
         delete previousWorker;
       }
     } else if (mState == EWldScenarioLoadControlState::kPaused) {
+      // 0x004130BF: same shape on the resume arm - log, then state, then wake.
+      gpg::Logf("Resuming background task \"%s\"", mThreadName.c_str());
       mState = EWldScenarioLoadControlState::kRunning;
       mWakeSet.SignalOne();
     }
