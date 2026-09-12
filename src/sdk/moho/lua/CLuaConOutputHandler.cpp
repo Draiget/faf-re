@@ -76,11 +76,26 @@ namespace
    *
    * What it does:
    * Builds `gpg::RRef` for `CLuaConOutputHandler*` userdata payload.
+   *
+   * A `gpg::RRef` names a value *by address*: `mObj` points at storage holding
+   * a `mType`, which here is the reflected type of `CLuaConOutputHandler*`, so
+   * `mObj` has to be a `CLuaConOutputHandler**`. 0x00420FF0 takes exactly that
+   * (`sub_420FF0(CLuaConOutputHandler **eax0, ...)`) and hands it to
+   * `gpg::RRef_CLuaConOutputHandler_P` at 0x00420FF9.
+   *
+   * That is load-bearing rather than pedantic: `CreateRefUserdata` copies
+   * `mType->size_` bytes out of `*mObj` into the Lua userdata payload, and
+   * `SCR_GetLuaConOutputHandlerSlot` reads the handler back out of that
+   * payload. Passing the handler itself made the copy take the first four
+   * bytes *of the handler object* - its vptr - so every later
+   * `RemoveConsoleOutputReciever` unlinked a "node" whose prev/next were the
+   * first two entries of `IConOutputHandler`'s vtable and wrote through them
+   * into the code image.
    */
-  gpg::RRef MakeConOutputHandlerPointerRef(moho::CLuaConOutputHandler* handler)
+  gpg::RRef MakeConOutputHandlerPointerRef(moho::CLuaConOutputHandler*& handlerSlot)
   {
     gpg::RRef ref{};
-    ref.mObj = handler;
+    ref.mObj = &handlerSlot;
     ref.mType = CachedCLuaConOutputHandlerPointerType();
     return ref;
   }
@@ -380,7 +395,12 @@ moho::SCR_CreateLuaConOutputHandlerObject(LuaPlus::LuaState* const state, CLuaCo
 {
   LuaPlus::LuaObject out;
   LuaPlus::LuaObject metatable = CScrLuaMetatableFactory<CLuaConOutputHandler*>::Instance().Get(state);
-  out.AssignNewUserData(state, MakeConOutputHandlerPointerRef(handler));
+  // The ref names this local, not the handler: `AssignNewUserData` copies the
+  // pointer out of it into the userdata payload, which is where
+  // `SCR_GetLuaConOutputHandlerSlot` later reads it from. 0x00420937 does the
+  // same with its own stack slot.
+  CLuaConOutputHandler* handlerPointer = handler;
+  out.AssignNewUserData(state, MakeConOutputHandlerPointerRef(handlerPointer));
   out.SetMetaTable(metatable);
   return out;
 }
