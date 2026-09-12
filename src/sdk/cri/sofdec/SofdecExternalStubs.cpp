@@ -90,7 +90,10 @@ extern "C" {
   // M2TSD_Init (0x00ADFD90): real body in cri/sofdec/SofdecSfdRuntime.cpp,
   // beside M2TSD_Finish and M2TSD_GetVersionStr, the other two members of the
   // same library-lifetime trio.
-  void* M2T_Create() { return nullptr; }
+  // M2T_Create (0x00AE32C0): real body in cri/sofdec/SofdecSfdRuntime.cpp,
+  // beside M2T_Destroy. While it was a stub initHn_m2tsd handed every M2TSD
+  // handle a null M2T supply address, so the transport-stream layer had
+  // nothing to demultiplex into.
   // The twelve MPS_* public entry points (MPS_DecHd 0x00AEB560, MPS_Destroy
   // 0x00AEB3C0, MPS_Finish 0x00AEB030, MPS_GetElementaryInfo 0x00AECBC0,
   // MPS_GetLastSysHd 0x00AECB40, MPS_GetPackHd 0x00AECAB0, MPS_GetPketHd
