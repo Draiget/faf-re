@@ -43,7 +43,7 @@ namespace moho
    *   see the field's own doc comment for the full resolution of a
    *   previously-flagged (and now closed) +0x60-vs-+0x64 discrepancy.
    */
-  struct REntityBlueprint
+  struct REntityBlueprint : public gpg::RObject
   {
     // +0x00 is the vtable word. It is a real vptr rather than an opaque pointer
     // field, because the type tests below are virtuals in the binary
@@ -187,7 +187,7 @@ namespace moho
      * Releases strategic-icon weak-pointer lanes, destroys derived entity
      * string/vector fields, then tears down base blueprint ownership lanes.
      */
-    virtual ~REntityBlueprint();
+    ~REntityBlueprint() override;
 
     /**
      * Address: 0x00512060 (FUN_00512060)
@@ -195,8 +195,12 @@ namespace moho
      * What it does:
      * Initializes default footprint extents and inertia tensor values for
      * entity blueprints before derived blueprint init code runs.
+     *
+     * Virtual, and the first slot this class adds above gpg::RObject's three:
+     * slot 3, which is what puts IsMobile and IsUnitBlueprint at the slots 4
+     * and 5 the class comment cites from ??_7RUnitBlueprint@Moho@@6B@.
      */
-    void OnInitBlueprint();
+    virtual void OnInitBlueprint();
 
     /**
      * Address: 0x00511B60 (FUN_00511B60)
