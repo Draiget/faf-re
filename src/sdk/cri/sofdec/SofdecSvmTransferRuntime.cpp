@@ -1523,7 +1523,10 @@
   std::int32_t CFT_Ycc420plnToArgb8888Int1smp(
     const CftYcc420PlanarInputLanes* const inputLanes,
     const CftPixelSurfaceLanes* const outputSurface,
-    const __m64* const colorTable
+    const __m64* const colorTable,
+    // 0x00B03E0A reads it, 0x00B03E12 pushes it on; the MMX kernel beneath
+    // (FUN_00B059E0) never reads it, the same as the progressive pair.
+    [[maybe_unused]] const std::uintptr_t scratchBufferAddress
   )
   {
     if (UTY_SupportSse() == 0) {
@@ -2789,6 +2792,86 @@
    * argument carries is the scratch lane, read at 0x00AEEB8E from its second
    * word.
    */
+  void cft_c_Ycc420plnToArgb8888Int2smp(
+    const CftYcc420PlanarInputLanes* inputLanes,
+    const CftPixelSurfaceLanes* outputSurface
+  );
+  std::uint8_t cft_sse_Ycc420plnToArgb8888Int2smp(
+    const CftYcc420PlanarInputLanes* inputLanes,
+    const CftPixelSurfaceLanes* outputSurface,
+    const __m64* colorTable,
+    std::uintptr_t scratchBufferAddress
+  );
+
+  /**
+   * Address: 0x00AEE960 (FUN_00AEE960, _CFT_Ycc420plnToArgb8888Int)
+   *
+   * IDA signature:
+   * int __cdecl CFT_Ycc420plnToArgb8888Int(_DWORD *a1, _DWORD *a2, int a3);
+   *
+   * What it does:
+   * The interlaced half of the pair `SFX_CnvFrmARGB8888ByCbFunc` chooses
+   * between at 0x004BE58x: same dispatch as `CFT_Ycc420plnToArgb8888Prg` on
+   * the same preconditions, into the 2-sample interlaced kernels instead of
+   * the progressive ones, because the frame's two fields carry their chroma
+   * on alternate rows.
+   */
+  std::int32_t CFT_Ycc420plnToArgb8888Int(
+    const CftYcc420PlanarPackedWords* const inputWords,
+    const CftRgb16OutputPackedWords* const outputWords,
+    const std::int32_t* const scratchBufferWords
+  )
+  {
+    const auto* const inputView = reinterpret_cast<const CftYcc420PlanarPackedWordsView*>(inputWords);
+    const auto* const outputView = reinterpret_cast<const CftRgb16OutputPackedWordsView*>(outputWords);
+
+    CftYcc420PlanarInputLanesView inputLanes{};
+    inputLanes.yPlane = reinterpret_cast<std::uint8_t*>(inputView->yPlaneWords);
+    inputLanes.cbPlane = reinterpret_cast<std::uint8_t*>(inputView->cbPlaneWords);
+    inputLanes.crPlane = reinterpret_cast<std::uint8_t*>(inputView->crPlaneWords);
+    inputLanes.yStrideBytes = inputView->yStrideBytes;
+    inputLanes.cbStrideBytes = inputView->cbStrideBytes;
+    inputLanes.crStrideBytes = inputView->crStrideBytes;
+
+    CftPixelSurfaceLanesView outputSurface{};
+    outputSurface.pixelBase = outputView->pixelBase;
+    outputSurface.widthPixels = outputView->widthPixels;
+    outputSurface.heightPixels = outputView->heightPixels;
+    outputSurface.strideBytes = outputView->strideBytes;
+
+    const auto* const inputLanesPtr = reinterpret_cast<const CftYcc420PlanarInputLanes*>(&inputLanes);
+    const auto* const outputSurfacePtr = reinterpret_cast<const CftPixelSurfaceLanes*>(&outputSurface);
+    const std::uintptr_t scratchBufferAddress =
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(scratchBufferWords[1]));
+
+    if (CFTCOM_GetOptimizeSpeed() != 0) {
+      return CFT_Ycc420plnToArgb8888Int1smp(
+        inputLanesPtr, outputSurfacePtr, reinterpret_cast<const __m64*>(cftbgra256x3), scratchBufferAddress
+      );
+    }
+
+    const std::uintptr_t alignmentMask =
+      reinterpret_cast<std::uintptr_t>(inputLanes.yPlane) |
+      reinterpret_cast<std::uintptr_t>(inputLanes.cbPlane) |
+      reinterpret_cast<std::uintptr_t>(inputLanes.crPlane) |
+      reinterpret_cast<std::uintptr_t>(outputSurface.pixelBase);
+    const std::int32_t alignedWidthPixels = (outputSurface.widthPixels + 15) & ~15;
+    if (
+      UTY_SupportSse() == 0 ||
+      (alignmentMask & 0x0Fu) != 0u ||
+      (outputSurface.heightPixels & 3) != 0 ||
+      (outputSurface.widthPixels & 0x0F) != 0 ||
+      std::abs(outputSurface.strideBytes) < (4 * alignedWidthPixels)
+    ) {
+      cft_c_Ycc420plnToArgb8888Int2smp(inputLanesPtr, outputSurfacePtr);
+      return 0;
+    }
+
+    return cft_sse_Ycc420plnToArgb8888Int2smp(
+      inputLanesPtr, outputSurfacePtr, reinterpret_cast<const __m64*>(cftbgra256x3), scratchBufferAddress
+    );
+  }
+
   std::int32_t CFT_Ycc420plnToArgb8888Prg(
     const CftYcc420PlanarPackedWords* const inputWords,
     const CftRgb16OutputPackedWords* const outputWords,
@@ -3653,6 +3736,558 @@
    * Converts one YCC420 planar frame to packed ARGB8888 using MMX lookup-table
    * lanes and writes two output scanlines per chroma row.
    */
+  /**
+   * Address: 0x00AEEE20 (FUN_00AEEE20, _cft_c_Ycc420plnToArgb8888Int2smp)
+   *
+   * IDA signature:
+   * unsigned __int8 *__cdecl cft_c_Ycc420plnToArgb8888Int2smp(int *a1, int *a2);
+   *
+   * What it does:
+   * The scalar YCC420-planar -> ARGB8888 *interlaced* kernel, and the fallback
+   * `CFT_Ycc420plnToArgb8888Int` takes whenever the frame is not shaped the way
+   * the MMX kernel needs.
+   *
+   * Interlaced 4:2:0 puts the two fields' chroma on alternate rows, so a luma
+   * row cannot simply borrow the chroma row above it the way the progressive
+   * kernel does - it has to interpolate within its own field. That is what the
+   * middle phase does, four luma rows at a time against four chroma rows, with
+   * the weights the binary uses at 0x00AEF0xx: rows 0 and 2 mix chroma rows 0
+   * and 2 (5:3 then 7:1), rows 1 and 3 mix chroma rows 1 and 3 (7:1 then 5:3).
+   * `BlendChromaLane` is the same `(a*lhs + b*rhs + 4) >> 3` the YCC422
+   * interlaced kernel already uses.
+   *
+   * The first two rows and whatever is left after the last full group of four
+   * have no second chroma row of their own field to interpolate against, so
+   * they read their chroma row straight, exactly as the progressive kernel
+   * does. Horizontally all three phases are the same: the even pixel of a pair
+   * takes the chroma sample, the odd one the average with the next column's.
+   *
+   * Like its progressive twin the return value is dead - the binary hands back
+   * whichever pointer the last block left in `eax`.
+   */
+  void cft_c_Ycc420plnToArgb8888Int2smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Int2smp");
+
+    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
+    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
+
+    const std::int32_t widthPixels = output->widthPixels;
+    const std::int32_t heightPixels = output->heightPixels;
+    const std::int32_t strideBytes = output->strideBytes;
+    const std::int32_t yStrideBytes = input->yStrideBytes;
+    const std::int32_t cbStrideBytes = input->cbStrideBytes;
+    const std::int32_t crStrideBytes = input->crStrideBytes;
+
+    const std::int32_t oddWidth = widthPixels & 1;
+    const std::uint32_t pixelPairsPerRow =
+      static_cast<std::uint32_t>(widthPixels + oddWidth) >> 1;
+
+    // Per single row, and per four-row group.
+    const std::int32_t lumaRowAdvance = yStrideBytes - widthPixels;
+    const std::int32_t chromaRowAdvance =
+      cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+    const std::int32_t pixelRowAdvance = (strideBytes - 4 * widthPixels) / 4;
+    const std::int32_t lumaGroupAdvance = 4 * yStrideBytes - widthPixels;
+    const std::int32_t chromaGroupAdvance =
+      2 * cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+    const std::int32_t pixelGroupAdvance = strideBytes - widthPixels;
+
+    const std::uint8_t* lumaRow = input->yPlane;
+    const std::uint8_t* chromaBlueRow = input->cbPlane;
+    const std::uint8_t* chromaRedRow = input->crPlane;
+    auto* pixelRow = reinterpret_cast<std::uint32_t*>(output->pixelBase);
+
+    // One row of the leading/trailing phases: chroma read straight off the row.
+    const auto convertPlainRow = [&]() {
+      if (pixelPairsPerRow != 1) {
+        std::uint32_t remainingPairs = pixelPairsPerRow - 1;
+        do {
+          const std::uint32_t chromaBlue = *chromaBlueRow;
+          const std::uint32_t chromaRed = *chromaRedRow;
+          pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+
+          const std::uint32_t chromaBlueMid =
+            static_cast<std::uint32_t>(chromaBlueRow[0] + chromaBlueRow[1] + 1) >> 1;
+          const std::uint32_t chromaRedMid =
+            static_cast<std::uint32_t>(chromaRedRow[0] + chromaRedRow[1] + 1) >> 1;
+          pixelRow[1] = Argb8888FromYuvTables(lumaRow[1], chromaBlueMid, chromaRedMid);
+
+          lumaRow += 2;
+          pixelRow += 2;
+          ++chromaBlueRow;
+          ++chromaRedRow;
+          --remainingPairs;
+        } while (remainingPairs != 0);
+      }
+
+      const std::uint32_t chromaBlue = *chromaBlueRow;
+      const std::uint32_t chromaRed = *chromaRedRow;
+      pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+      ++lumaRow;
+      ++pixelRow;
+      if (oddWidth == 0) {
+        pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+        ++lumaRow;
+        ++pixelRow;
+      }
+
+      lumaRow += lumaRowAdvance;
+      chromaBlueRow += chromaRowAdvance;
+      chromaRedRow += chromaRowAdvance;
+      pixelRow += pixelRowAdvance;
+    };
+
+    std::int32_t completedRows = 0;
+    const std::int32_t leadingRows = (heightPixels > 2) ? 2 : heightPixels;
+    while (completedRows < leadingRows) {
+      convertPlainRow();
+      ++completedRows;
+    }
+
+    // ----- Interlaced middle: four luma rows against four chroma rows -----
+    const std::uint32_t pixelRowStrideWords = static_cast<std::uint32_t>(strideBytes) >> 2;
+    std::uint32_t* pixelRow0 = pixelRow;
+    std::uint32_t* pixelRow1 = pixelRow + pixelRowStrideWords;
+    std::uint32_t* pixelRow2 = pixelRow + 2 * pixelRowStrideWords;
+    std::uint32_t* pixelRow3 = pixelRow + 3 * pixelRowStrideWords;
+
+    const std::uint8_t* lumaRow0 = lumaRow;
+    const std::uint8_t* lumaRow1 = lumaRow + yStrideBytes;
+    const std::uint8_t* lumaRow2 = lumaRow + 2 * yStrideBytes;
+    const std::uint8_t* lumaRow3 = lumaRow2 + yStrideBytes;
+
+    const std::uint8_t* chromaBlueRow0 = chromaBlueRow;
+    const std::uint8_t* chromaBlueRow1 = chromaBlueRow + cbStrideBytes;
+    const std::uint8_t* chromaBlueRow2 = chromaBlueRow + 2 * cbStrideBytes;
+    const std::uint8_t* chromaBlueRow3 = chromaBlueRow2 + cbStrideBytes;
+
+    const std::uint8_t* chromaRedRow0 = chromaRedRow;
+    const std::uint8_t* chromaRedRow1 = chromaRedRow + crStrideBytes;
+    const std::uint8_t* chromaRedRow2 = chromaRedRow + 2 * crStrideBytes;
+    const std::uint8_t* chromaRedRow3 = chromaRedRow2 + crStrideBytes;
+
+    if (completedRows + 3 < heightPixels) {
+      std::int32_t lastRowOfGroup = completedRows + 3;
+      do {
+        // The four field-interpolated chroma values for output column `column`
+        // of this group, at the offset the callers have already advanced to.
+        const auto blueAt = [&](const std::ptrdiff_t column) {
+          return std::array<std::uint32_t, 4>{
+            BlendChromaLane(chromaBlueRow2[column], chromaBlueRow0[column], 3u, 5u),
+            BlendChromaLane(chromaBlueRow1[column], chromaBlueRow3[column], 7u, 1u),
+            BlendChromaLane(chromaBlueRow2[column], chromaBlueRow0[column], 7u, 1u),
+            BlendChromaLane(chromaBlueRow3[column], chromaBlueRow1[column], 5u, 3u),
+          };
+        };
+        const auto redAt = [&](const std::ptrdiff_t column) {
+          return std::array<std::uint32_t, 4>{
+            BlendChromaLane(chromaRedRow2[column], chromaRedRow0[column], 3u, 5u),
+            BlendChromaLane(chromaRedRow1[column], chromaRedRow3[column], 7u, 1u),
+            BlendChromaLane(chromaRedRow2[column], chromaRedRow0[column], 7u, 1u),
+            BlendChromaLane(chromaRedRow1[column], chromaRedRow3[column], 3u, 5u),
+          };
+        };
+
+        if (pixelPairsPerRow != 1) {
+          std::uint32_t remainingPairs = pixelPairsPerRow - 1;
+          do {
+            const std::array<std::uint32_t, 4> blue = blueAt(0);
+            const std::array<std::uint32_t, 4> red = redAt(0);
+            const std::array<std::uint32_t, 4> blueNext = blueAt(1);
+            const std::array<std::uint32_t, 4> redNext = redAt(1);
+
+            pixelRow0[0] = Argb8888FromYuvTables(lumaRow0[0], blue[0], red[0]);
+            pixelRow0[1] = Argb8888FromYuvTables(
+              lumaRow0[1], (blueNext[0] + blue[0] + 1) >> 1, (redNext[0] + red[0] + 1) >> 1
+            );
+            pixelRow1[0] = Argb8888FromYuvTables(lumaRow1[0], blue[1], red[1]);
+            pixelRow1[1] = Argb8888FromYuvTables(
+              lumaRow1[1], (blueNext[1] + blue[1] + 1) >> 1, (redNext[1] + red[1] + 1) >> 1
+            );
+            pixelRow2[0] = Argb8888FromYuvTables(lumaRow2[0], blue[2], red[2]);
+            pixelRow2[1] = Argb8888FromYuvTables(
+              lumaRow2[1], (blueNext[2] + blue[2] + 1) >> 1, (redNext[2] + red[2] + 1) >> 1
+            );
+            pixelRow3[0] = Argb8888FromYuvTables(lumaRow3[0], blue[3], red[3]);
+            pixelRow3[1] = Argb8888FromYuvTables(
+              lumaRow3[1], (blueNext[3] + blue[3] + 1) >> 1, (redNext[3] + red[3] + 1) >> 1
+            );
+
+            lumaRow0 += 2;
+            lumaRow1 += 2;
+            lumaRow2 += 2;
+            lumaRow3 += 2;
+            pixelRow0 += 2;
+            pixelRow1 += 2;
+            pixelRow2 += 2;
+            pixelRow3 += 2;
+            ++chromaBlueRow0;
+            ++chromaBlueRow1;
+            ++chromaBlueRow2;
+            ++chromaBlueRow3;
+            ++chromaRedRow0;
+            ++chromaRedRow1;
+            ++chromaRedRow2;
+            ++chromaRedRow3;
+            --remainingPairs;
+          } while (remainingPairs != 0);
+        }
+
+        // Last pair of the group's rows: nothing to the right to average with.
+        {
+          const std::array<std::uint32_t, 4> blue = blueAt(0);
+          const std::array<std::uint32_t, 4> red = redAt(0);
+
+          pixelRow0[0] = Argb8888FromYuvTables(lumaRow0[0], blue[0], red[0]);
+          ++lumaRow0;
+          ++pixelRow0;
+          if (oddWidth == 0) {
+            pixelRow0[0] = Argb8888FromYuvTables(lumaRow0[0], blue[0], red[0]);
+            ++lumaRow0;
+            ++pixelRow0;
+          }
+
+          pixelRow1[0] = Argb8888FromYuvTables(lumaRow1[0], blue[1], red[1]);
+          ++lumaRow1;
+          ++pixelRow1;
+          if (oddWidth == 0) {
+            pixelRow1[0] = Argb8888FromYuvTables(lumaRow1[0], blue[1], red[1]);
+            ++lumaRow1;
+            ++pixelRow1;
+          }
+
+          pixelRow2[0] = Argb8888FromYuvTables(lumaRow2[0], blue[2], red[2]);
+          ++lumaRow2;
+          ++pixelRow2;
+          if (oddWidth == 0) {
+            pixelRow2[0] = Argb8888FromYuvTables(lumaRow2[0], blue[2], red[2]);
+            ++lumaRow2;
+            ++pixelRow2;
+          }
+
+          pixelRow3[0] = Argb8888FromYuvTables(lumaRow3[0], blue[3], red[3]);
+          ++lumaRow3;
+          ++pixelRow3;
+          if (oddWidth == 0) {
+            pixelRow3[0] = Argb8888FromYuvTables(lumaRow3[0], blue[3], red[3]);
+            ++lumaRow3;
+            ++pixelRow3;
+          }
+        }
+
+        lumaRow0 += lumaGroupAdvance;
+        lumaRow1 += lumaGroupAdvance;
+        lumaRow2 += lumaGroupAdvance;
+        lumaRow3 += lumaGroupAdvance;
+        chromaBlueRow0 += chromaGroupAdvance;
+        chromaBlueRow1 += chromaGroupAdvance;
+        chromaBlueRow2 += chromaGroupAdvance;
+        chromaBlueRow3 += chromaGroupAdvance;
+        chromaRedRow0 += chromaGroupAdvance;
+        chromaRedRow1 += chromaGroupAdvance;
+        chromaRedRow2 += chromaGroupAdvance;
+        chromaRedRow3 += chromaGroupAdvance;
+        pixelRow0 += pixelGroupAdvance;
+        pixelRow1 += pixelGroupAdvance;
+        pixelRow2 += pixelGroupAdvance;
+        pixelRow3 += pixelGroupAdvance;
+
+        completedRows += 4;
+        lastRowOfGroup += 4;
+      } while (lastRowOfGroup < heightPixels);
+    }
+
+    // ----- Trailing rows: back to a straight chroma read -----
+    lumaRow = lumaRow0;
+    chromaBlueRow = chromaBlueRow0;
+    chromaRedRow = chromaRedRow0;
+    pixelRow = pixelRow0;
+    while (completedRows < heightPixels) {
+      convertPlainRow();
+      ++completedRows;
+    }
+  }
+
+  /**
+   * Address: 0x00B012D0 (FUN_00B012D0, _cft_sse_Ycc420plnToArgb8888Int2smp)
+   *
+   * IDA signature:
+   * char __cdecl cft_sse_Ycc420plnToArgb8888Int2smp(int *a1, int *a2, int a3, int a4);
+   *
+   * What it does:
+   * The MMX interlaced YCC420 -> ARGB8888 kernel: the same conversion
+   * `cft_c_Ycc420plnToArgb8888Int2smp` does, on frames laid out the way the
+   * vector loads need.
+   *
+   * It reuses the two stages the progressive kernel has - an 8-row horizontal
+   * `pavgb` expansion into the interleave plane, then four table lookups and a
+   * `psraw 6` per pixel - and replaces the vertical replication with the
+   * field-aware blend. That blend is the scalar kernel's `(a*x + b*y + 4) >> 3`
+   * put through `pmullw`/`paddusw`/`psrlw 3`, and it fills all eight half-width
+   * scratch rows at once: Cb rows 0-3 at scratch+0/H/2H/3H, Cr rows 0-3 at
+   * scratch+4H..7H, with H the half width.
+   *
+   * The frame is walked as two leading rows, then groups of four, then two
+   * trailing rows - the same partition the scalar kernel uses, and the reason
+   * the leading and trailing phases copy their chroma row across unblended
+   * (0x00B0131B and 0x00B01C4B): neither has a second row of its own field to
+   * interpolate against.
+   *
+   * The binary omits the `pmullw` where a weight is 1; multiplying by a vector
+   * of ones is the same value, and keeping one blend helper is what the source
+   * had.
+   */
+  std::uint8_t cft_sse_Ycc420plnToArgb8888Int2smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const __m64* const colorTable,
+    const std::uintptr_t scratchBufferAddress
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_sse_Ycc420plnToArgb8888Int2smp");
+
+    const std::uint32_t alignedWidth = static_cast<std::uint32_t>(outputSurface->widthPixels + 15) & 0xFFFFFFF0u;
+    const std::uint32_t halfWidth = alignedWidth >> 1;
+    const std::uintptr_t scratchPlaneBase =
+      (scratchBufferAddress + 31u) & ~static_cast<std::uintptr_t>(31u);
+    const std::uintptr_t interleavePlaneBase =
+      (scratchPlaneBase + (8u * halfWidth) + 31u) & ~static_cast<std::uintptr_t>(31u);
+
+    const std::int32_t cbStrideBytes = inputLanes->cbStrideBytes;
+    const std::int32_t crStrideBytes = inputLanes->crStrideBytes;
+
+    std::uint8_t* lumaRow = inputLanes->yPlane;
+    std::uint8_t* outputRow = outputSurface->pixelBase;
+
+    const __m64 kZero = _mm_setzero_si64();
+    constexpr __m64 kAdjust = (__m64)0x0020002000200020LL;
+    constexpr __m64 kBlendBias = (__m64)0x0004000400040004LL;
+    auto extractWord = [](const __m64 packed, const std::size_t wordIndex) -> std::uint32_t {
+      const auto words = std::bit_cast<std::array<std::uint16_t, 4>>(packed);
+      return words[wordIndex];
+    };
+    auto weightVector = [](const std::uint16_t weight) -> __m64 {
+      const std::uint64_t lane = static_cast<std::uint64_t>(weight);
+      return std::bit_cast<__m64>((lane << 48) | (lane << 32) | (lane << 16) | lane);
+    };
+
+    // One 8-byte chroma block blended out of two source rows of the same
+    // field, low and high halves separately, then packed back to bytes.
+    auto blendChromaBlock = [&](const __m64 lhs, const __m64 rhs, const __m64 lhsWeight, const __m64 rhsWeight) {
+      return _m_packuswb(
+        _m_psrlwi(
+          _m_paddusw(
+            _m_paddusw(
+              _m_pmullw(_m_punpcklbw(lhs, kZero), lhsWeight),
+              _m_pmullw(_m_punpcklbw(rhs, kZero), rhsWeight)
+            ),
+            kBlendBias
+          ),
+          3u
+        ),
+        _m_psrlwi(
+          _m_paddusw(
+            _m_paddusw(
+              _m_pmullw(_m_punpckhbw(lhs, kZero), lhsWeight),
+              _m_pmullw(_m_punpckhbw(rhs, kZero), rhsWeight)
+            ),
+            kBlendBias
+          ),
+          3u
+        )
+      );
+    };
+
+    // Fill two scratch rows from one pair of same-field chroma rows.
+    auto blendChromaRowPair = [&](
+      const std::uint8_t* const nearRow,
+      const std::uint8_t* const farRow,
+      const std::uintptr_t nearScratchOffset,
+      const std::uintptr_t farScratchOffset,
+      const __m64 nearWeight,
+      const __m64 farWeight,
+      const __m64 nearWeightFar,
+      const __m64 farWeightFar
+    ) {
+      const auto* source0 = reinterpret_cast<const __m64*>(nearRow);
+      const auto* source1 = reinterpret_cast<const __m64*>(farRow);
+      auto* destination = reinterpret_cast<std::uint8_t*>(scratchPlaneBase);
+      std::uint32_t blockCount = alignedWidth >> 4;
+      std::uintptr_t blockOffset = 0;
+      while (blockCount-- != 0u) {
+        // `near` and `far` are still macros in windef.h, hence the names.
+        const __m64 nearPack = *source0;
+        const __m64 farPack = *source1;
+        *reinterpret_cast<__m64*>(destination + nearScratchOffset + blockOffset) =
+          blendChromaBlock(nearPack, farPack, nearWeight, farWeight);
+        *reinterpret_cast<__m64*>(destination + farScratchOffset + blockOffset) =
+          blendChromaBlock(nearPack, farPack, nearWeightFar, farWeightFar);
+        ++source0;
+        ++source1;
+        blockOffset += sizeof(__m64);
+      }
+    };
+
+    // Copy one chroma row pair across unblended, into scratch rows 0 and 1.
+    auto copyLeadingChromaRows = [&](const std::uint8_t*& cbCursor, const std::uint8_t*& crCursor) {
+      std::uintptr_t scratchRowOffset = 0;
+      for (std::int32_t pass = 0; pass < 2; ++pass) {
+        auto* destination = reinterpret_cast<std::uint8_t*>(scratchPlaneBase + scratchRowOffset);
+        for (std::uint32_t remaining = halfWidth; remaining != 0u; --remaining) {
+          destination[0] = *cbCursor++;
+          destination[4u * halfWidth] = *crCursor++;
+          ++destination;
+        }
+        cbCursor += cbStrideBytes - static_cast<std::int32_t>(halfWidth);
+        crCursor += crStrideBytes - static_cast<std::int32_t>(halfWidth);
+        scratchRowOffset += halfWidth;
+      }
+    };
+
+    // Expand the eight half-width scratch rows to full width with pavgb.
+    auto upsampleScratchRows = [&]() {
+      for (std::int32_t upsampleRow = 0; upsampleRow < 8; ++upsampleRow) {
+        auto* upsampleDst = reinterpret_cast<__m64*>(interleavePlaneBase + (alignedWidth * upsampleRow));
+        auto* upsampleSrc = reinterpret_cast<__m64*>(scratchPlaneBase + ((alignedWidth * upsampleRow) >> 1));
+        std::int32_t laneBlocks = static_cast<std::int32_t>(alignedWidth >> 3) - 1;
+        while (laneBlocks-- > 0) {
+          const __m64 srcPack = *upsampleSrc;
+          *upsampleDst = _m_punpcklbw(srcPack, _m_psrlqi(_m_pavgb(srcPack, _m_psllqi(srcPack, 8u)), 8u));
+          upsampleSrc = reinterpret_cast<__m64*>(reinterpret_cast<std::uint8_t*>(upsampleSrc) + 4);
+          ++upsampleDst;
+        }
+
+        const __m64 srcTail = *upsampleSrc;
+        const __m64 carry = _m_psrlqi(_m_psllqi(_m_punpcklbw(_m_psrlqi(srcTail, 8u), kZero), 0x10u), 0x10u);
+        *upsampleDst = _m_punpcklbw(
+          srcTail,
+          _m_packuswb(
+            _m_pavgw(
+              _m_punpcklbw(srcTail, kZero),
+              _m_por(carry, _m_psllqi(_m_psrlqi(carry, 0x20u), 0x30u))
+            ),
+            kZero
+          )
+        );
+      }
+      _m_empty();
+    };
+
+    // Table-convert `rowCount` output rows out of the interleave plane.
+    auto convertPixelRows = [&](const std::int32_t rowCount) {
+      auto* interleaveRow = reinterpret_cast<std::uint8_t*>(interleavePlaneBase);
+      for (std::int32_t row = 0; row < rowCount; ++row) {
+        std::int32_t byteOffset = 0;
+        while (byteOffset < static_cast<std::int32_t>(alignedWidth)) {
+          const __m64 yPacked = *reinterpret_cast<const __m64*>(lumaRow + byteOffset);
+          const __m64 cbPacked = *reinterpret_cast<const __m64*>(interleaveRow + byteOffset);
+          const __m64 crPacked = *reinterpret_cast<const __m64*>(interleaveRow + (4u * alignedWidth) + byteOffset);
+
+          auto* dst = reinterpret_cast<__m64*>(outputRow + (4 * byteOffset));
+          for (std::size_t wordIndex = 0; wordIndex < 4; ++wordIndex) {
+            const std::uint32_t yPair = extractWord(yPacked, wordIndex);
+            const std::uint32_t cbPair = extractWord(cbPacked, wordIndex);
+            const std::uint32_t crPair = extractWord(crPacked, wordIndex);
+
+            const __m64 mixLo = _m_paddw(colorTable[yPair & 0xFFu], colorTable[256u + (cbPair & 0xFFu)]);
+            const __m64 mixHi = _m_paddw(colorTable[(yPair >> 8) & 0xFFu], colorTable[256u + ((cbPair >> 8) & 0xFFu)]);
+            dst[wordIndex] = _m_packuswb(
+              _m_psrawi(_m_paddw(_m_paddw(mixLo, colorTable[512u + (crPair & 0xFFu)]), kAdjust), 6u),
+              _m_psrawi(_m_paddw(_m_paddw(mixHi, colorTable[512u + ((crPair >> 8) & 0xFFu)]), kAdjust), 6u)
+            );
+          }
+
+          byteOffset += 8;
+        }
+
+        _m_empty();
+        lumaRow += inputLanes->yStrideBytes;
+        outputRow += 4 * (outputSurface->strideBytes / 4);
+        interleaveRow += alignedWidth;
+      }
+    };
+
+    const std::uint32_t kWeight1 = 1u;
+    const std::uint32_t kWeight3 = 3u;
+    const std::uint32_t kWeight5 = 5u;
+    const std::uint32_t kWeight7 = 7u;
+    const __m64 weight1 = weightVector(static_cast<std::uint16_t>(kWeight1));
+    const __m64 weight3 = weightVector(static_cast<std::uint16_t>(kWeight3));
+    const __m64 weight5 = weightVector(static_cast<std::uint16_t>(kWeight5));
+    const __m64 weight7 = weightVector(static_cast<std::uint16_t>(kWeight7));
+
+    // ----- Leading two rows -----
+    {
+      const std::uint8_t* cbCursor = inputLanes->cbPlane;
+      const std::uint8_t* crCursor = inputLanes->crPlane;
+      copyLeadingChromaRows(cbCursor, crCursor);
+    }
+    upsampleScratchRows();
+    convertPixelRows(2);
+
+    // ----- Interlaced middle, four rows at a time -----
+    const std::uint8_t* chromaBlueRow0 = inputLanes->cbPlane;
+    const std::uint8_t* chromaBlueRow1 = inputLanes->cbPlane + cbStrideBytes;
+    const std::uint8_t* chromaBlueRow2 = inputLanes->cbPlane + 2 * cbStrideBytes;
+    const std::uint8_t* chromaBlueRow3 = chromaBlueRow2 + cbStrideBytes;
+    const std::uint8_t* chromaRedRow0 = inputLanes->crPlane;
+    const std::uint8_t* chromaRedRow1 = inputLanes->crPlane + crStrideBytes;
+    const std::uint8_t* chromaRedRow2 = inputLanes->crPlane + 2 * crStrideBytes;
+    const std::uint8_t* chromaRedRow3 = chromaRedRow2 + crStrideBytes;
+
+    const std::uint32_t middleRows = static_cast<std::uint32_t>(outputSurface->heightPixels - 4);
+    if (middleRows > 2u) {
+      std::uint32_t remainingGroups = ((middleRows - 3u) >> 2) + 1u;
+      do {
+        // Cb rows 0/2 fill output rows 0 and 2; rows 1/3 fill 1 and 3. Cr the
+        // same, four half-width rows further into the scratch plane.
+        blendChromaRowPair(
+          chromaBlueRow0, chromaBlueRow2, 0u, alignedWidth, weight5, weight3, weight1, weight7
+        );
+        blendChromaRowPair(
+          chromaBlueRow1, chromaBlueRow3, halfWidth, halfWidth + alignedWidth, weight7, weight1, weight3, weight5
+        );
+        blendChromaRowPair(
+          chromaRedRow0, chromaRedRow2, 4u * halfWidth, 2u * halfWidth + 2u * alignedWidth,
+          weight5, weight3, weight1, weight7
+        );
+        blendChromaRowPair(
+          chromaRedRow1, chromaRedRow3, 2u * alignedWidth + halfWidth, 3u * halfWidth + 2u * alignedWidth,
+          weight7, weight1, weight3, weight5
+        );
+        _m_empty();
+
+        chromaBlueRow0 += 2 * cbStrideBytes;
+        chromaBlueRow1 += 2 * cbStrideBytes;
+        chromaBlueRow2 += 2 * cbStrideBytes;
+        chromaBlueRow3 += 2 * cbStrideBytes;
+        chromaRedRow0 += 2 * crStrideBytes;
+        chromaRedRow1 += 2 * crStrideBytes;
+        chromaRedRow2 += 2 * crStrideBytes;
+        chromaRedRow3 += 2 * crStrideBytes;
+
+        upsampleScratchRows();
+        convertPixelRows(4);
+        --remainingGroups;
+      } while (remainingGroups != 0u);
+    }
+
+    // ----- Trailing two rows -----
+    {
+      const std::uint8_t* cbCursor = chromaBlueRow0;
+      const std::uint8_t* crCursor = chromaRedRow0;
+      copyLeadingChromaRows(cbCursor, crCursor);
+    }
+    upsampleScratchRows();
+    convertPixelRows(2);
+
+    return 0;
+  }
+
   std::int32_t cft_sse_Ycc420plnToArgb8888Prg1smp(
     const CftYcc420PlanarInputLanes* const inputLanes,
     const CftPixelSurfaceLanes* const outputSurface,
