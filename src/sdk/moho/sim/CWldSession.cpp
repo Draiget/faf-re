@@ -3649,6 +3649,16 @@ namespace moho
      * Stages the pause-callback intrusive list into a temporary sentinel lane,
      * reinserts each callback back into the owner list, and dispatches pause
      * state notifications in original iteration order.
+     *
+     * The lane it takes is the session's *second* intrusive head, `head1` at
+     * +0x08 -- both call sites reach it through `add esi, 8` (0x008942E5 and
+     * 0x0089431C in RequestPause, 0x00894364 and 0x0089439D in Resume). `head0`
+     * at +0x00 is a different lane entirely: it is the
+     * `Broadcaster<SSelectionEvent>` listener list, whose nodes sit at +0x08 of
+     * a listener whose *secondary* vtable is at +0x04. Handing that lane to
+     * this function makes the `[eax-4]` owner adjustment land on the secondary
+     * vtable and the slot-0 call dispatch `SelectionListener::OnEvent`, which
+     * then reads `SSelectionEvent`'s set pointers out of the `bool`.
      */
     void DispatchSessionPauseCallbacks(gpg::core::IntrusiveLink<CWldSession*>& head, const bool isPaused)
     {
@@ -15663,7 +15673,7 @@ namespace moho
       mPauseRequester = commandCookie;
     }
 
-    DispatchSessionPauseCallbacks(head0, true);
+    DispatchSessionPauseCallbacks(head1, true);
   }
 
   /**
@@ -15685,7 +15695,7 @@ namespace moho
       mPauseRequester = commandCookie;
     }
 
-    DispatchSessionPauseCallbacks(head0, false);
+    DispatchSessionPauseCallbacks(head1, false);
   }
 
   /**
