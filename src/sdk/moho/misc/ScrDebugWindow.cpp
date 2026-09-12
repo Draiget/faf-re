@@ -1297,39 +1297,11 @@ namespace
   // dispatch, per CLAUDE.md's ban on `*(T**)(obj+0xNN)` vtable magic in
   // recovered source.
 
-  /**
-   * Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem)
-   * Real signature: wxMenuItem(wxMenu* parentMenu, int id, const wxString&
-   * text, const wxString& helpString, bool isCheckable, wxMenu* subMenu).
-   */
-  void* ConstructWxMenuItem(
-    void* storage,
-    void* parentMenu,
-    std::int32_t id,
-    const wxStringRuntime* text,
-    const wxStringRuntime* helpString,
-    bool isCheckable,
-    void* subMenu
-  );
-
-  /** wxMenuBar::Append(wxMenu*, const wxString&) - vtable dispatch at this call site. */
-  void AppendWxMenuBarMenu(void* menuBar, void* menu, const wxStringRuntime* title);
-
-  /** Address: 0x0099EE20 (?CreateToolBar@wxFrame@@UAEPAVwxToolBar@@JHABVwxString@@@Z) */
-  void* CreateFrameToolBar(void* frameThis, std::int32_t style, std::int32_t id, const wxStringRuntime* name);
-
-  /** Address: 0x004BB2D0 (sub_4BB2D0, wxToolBarBase::AddTool convenience overload) */
-  void AddToolBarTool(
-    void* toolbar,
-    std::int32_t id,
-    const wxStringRuntime* label,
-    void* bitmap,
-    const wxStringRuntime* shortHelp
-  );
-
-  /** Address: 0x00977BF0 (??0wxBitmap@@QAE@@Z_1, wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
-  void* ConstructWxBitmapFromFile(void* storage, const wxStringRuntime* path, std::int32_t type);
-
+  
+  
+  
+  
+  
   /**
    * Address: 0x004BB1F0 (??0wxTextCtrl@@QAE@...@Z, wxTextCtrl::wxTextCtrl)
    * Real signature: wxTextCtrl(wxWindow* parent, wxWindowID id, const
@@ -1348,70 +1320,11 @@ namespace
     const wxStringRuntime* name
   );
 
-  /**
-   * Address: 0x004BB380 (sub_4BB380, wxSplitterWindow::wxSplitterWindow)
-   * Binary call shape: (storage, parent, id, name) - position/size/style use
-   * wx's own defaults (wxDefaultPosition/wxDefaultSize/wxSP_3D) internally.
-   */
-  void* ConstructWxSplitterWindow(void* storage, void* parent, std::int32_t id, const wxStringRuntime* name);
-
-  /**
-   * Address: 0x004BB4A0 (sub_4BB4A0, wxGenericDirCtrl::wxGenericDirCtrl)
-   * Binary call shape: (storage, parent, defaultPath, filter, name); id/pos/
-   * size/style use wx's own defaults internally.
-   */
-  void* ConstructWxGenericDirCtrl(
-    void* storage,
-    void* parent,
-    const wxStringRuntime* defaultPath,
-    const wxStringRuntime* filter,
-    const wxStringRuntime* name
-  );
-
-  /**
-   * Address: 0x009A7740 (sub_9A7740, wxNotebook::wxNotebook)
-   * Binary call shape: (storage, parent, id, pos, size, style, name).
-   *
-   * Still declaration-only, same defect class as its siblings in this block
-   * (see the block comment above). The real body chains through
-   * `sub_9A6450` (base ctor), `sub_9A66D0` (field init) and `sub_9A7290`
-   * (`Create` - the actual native `SysTabControl32` window creation), none
-   * of which are recovered yet. `wxNotebookRuntime`
-   * (`moho/app/WxRuntimeTypes.h`) now exists as the real C++ type this
-   * bridge should placement-construct once that chain is recovered; for now
-   * `moho::ScrSourceCtrl` - a genuine `wxNotebook` per RTTI, constructed a
-   * few lines below this bridge's own call site - already carries
-   * `wxNotebookRuntime::MSWOnScroll` through ordinary virtual dispatch, so
-   * `FUN_009A6E10` does not depend on this bridge being finished.
-   */
-  void* ConstructWxNotebook(
-    void* storage,
-    void* parent,
-    std::int32_t id,
-    const wxPoint* position,
-    const wxSize* size,
-    std::int32_t style,
-    const wxStringRuntime* name
-  );
-
-  /** wxNotebook::AddPage(wxWindow*, const wxString&, bool, int) - vtable dispatch (+0x250) at this call site. */
-  void AddNotebookPage(void* notebook, void* page, const wxStringRuntime* label, bool select, std::int32_t imageId);
-
-  /**
-   * Address: 0x004BB680 (sub_4BB680, wxListCtrl::wxListCtrl)
-   * Binary call shape: (storage, parent, id, pos, size, style, validator, name).
-   */
-  void* ConstructWxListCtrl(
-    void* storage,
-    void* parent,
-    std::int32_t id,
-    const wxPoint* position,
-    const wxSize* size,
-    std::int32_t style,
-    const void* validator,
-    const wxStringRuntime* name
-  );
-
+  
+  
+  
+  
+  
   // ---------------------------------------------------------------------
   // The accelerator-table pair below is NOT a forwarding bridge like the rest
   // of this block: both bodies are recovered outright, because both are small,
@@ -1599,14 +1512,12 @@ namespace
    */
   void AppendMenuItem(void* const menu, const std::int32_t id, const wchar_t* const label, const wchar_t* const help)
   {
-    const wxStringRuntime labelText = wxStringRuntime::Borrow(label);
-    const wxStringRuntime helpText = wxStringRuntime::Borrow(help);
     void* const itemStorage = ::operator new(0x74u, std::nothrow);
     if (itemStorage == nullptr) {
       return;
     }
 
-    void* const item = ConstructWxMenuItem(itemStorage, menu, id, &labelText, &helpText, false, nullptr);
+    void* const item = moho::scrdebug::ConstructWxMenuItem(itemStorage, menu, id, label, help, false, nullptr);
     moho::scrdebug::AppendWxMenuItem(menu, item);
   }
 
@@ -1627,7 +1538,6 @@ namespace
     (void)vfs->FindFile(&resolvedPath, vfsPath, nullptr);
 
     const std::wstring wideResolvedPath = gpg::STR_Utf8ToWide(resolvedPath.c_str());
-    const wxStringRuntime widePathText = wxStringRuntime::Borrow(wideResolvedPath.c_str());
 
     void* const bitmapStorage = ::operator new(0x18u, std::nothrow);
     if (bitmapStorage == nullptr) {
@@ -1635,7 +1545,9 @@ namespace
     }
 
     constexpr std::int32_t kWxBitmapTypeBmpResource = 1;
-    return ConstructWxBitmapFromFile(bitmapStorage, &widePathText, kWxBitmapTypeBmpResource);
+    return moho::scrdebug::ConstructWxBitmapFromFile(
+      bitmapStorage, wideResolvedPath.c_str(), kWxBitmapTypeBmpResource
+    );
   }
 
   /**
@@ -1652,9 +1564,7 @@ namespace
   )
   {
     void* const bitmap = LoadToolbarBitmapFromVfs(vfsBitmapPath);
-    const wxStringRuntime labelText = wxStringRuntime::Borrow(label);
-    const wxStringRuntime shortHelpText = wxStringRuntime::Borrow(shortHelp);
-    AddToolBarTool(toolbar, id, &labelText, bitmap, &shortHelpText);
+    moho::scrdebug::AddToolBarTool(toolbar, id, label, bitmap, shortHelp);
     moho::scrdebug::DestroyWxBitmap(bitmap);
   }
 
@@ -1715,17 +1625,14 @@ moho::ScrDebugWindow::ScrDebugWindow()
   AppendMenuItem(debugMenu, 305, L"Clear breakpoints", L"Clear all breakpoints");
 
   void* const menuBar = moho::scrdebug::ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
-  const wxStringRuntime fileMenuTitle = wxStringRuntime::Borrow(L"File");
-  const wxStringRuntime viewMenuTitle = wxStringRuntime::Borrow(L"View");
-  const wxStringRuntime debugMenuTitle = wxStringRuntime::Borrow(L"Debug");
-  AppendWxMenuBarMenu(menuBar, fileMenu, &fileMenuTitle);
-  AppendWxMenuBarMenu(menuBar, viewMenu, &viewMenuTitle);
-  AppendWxMenuBarMenu(menuBar, debugMenu, &debugMenuTitle);
+  moho::scrdebug::AppendWxMenuBarMenu(menuBar, fileMenu, L"File");
+  moho::scrdebug::AppendWxMenuBarMenu(menuBar, viewMenu, L"View");
+  moho::scrdebug::AppendWxMenuBarMenu(menuBar, debugMenu, L"Debug");
   moho::scrdebug::SetFrameMenuBar(this, menuBar);
 
   // ----- Toolbar -----
   constexpr std::int32_t kToolBarStyle = 2097188; // 0x200124 (binary's wxToolBar style word, 0x004BCA5B)
-  void* const toolBar = CreateFrameToolBar(this, kToolBarStyle, -1, nullptr);
+  void* const toolBar = moho::scrdebug::CreateFrameToolBar(this, kToolBarStyle, -1, nullptr);
   AddToolbarButton(toolBar, 302, "/coderes/engine/dbg_tool_resume.bmp", L"Resume", L"Resume execution");
   AddToolbarButton(toolBar, 301, "/coderes/engine/dbg_tool_step.bmp", L"Step", L"Step into");
   moho::scrdebug::AddToolBarSeparator(toolBar);
@@ -1744,12 +1651,13 @@ moho::ScrDebugWindow::ScrDebugWindow()
   moho::scrdebug::RealizeToolBar(toolBar);
 
   // ----- Nested splitters: outer(source tree | notebook) -----
-  const wxStringRuntime outerSplitterName = wxStringRuntime::Borrow(L"splitter");
-  void* const outerSplitter = ConstructWxSplitterWindow(::operator new(0x1A4u, std::nothrow), this, 102, &outerSplitterName);
+  void* const outerSplitter = moho::scrdebug::ConstructWxSplitterWindow(
+    ::operator new(0x1A4u, std::nothrow), this, 102, L"splitter"
+  );
 
-  const wxStringRuntime innerSplitterName = wxStringRuntime::Borrow(L"splitter");
-  void* const innerSplitter =
-    ConstructWxSplitterWindow(::operator new(0x1A4u, std::nothrow), outerSplitter, 101, &innerSplitterName);
+  void* const innerSplitter = moho::scrdebug::ConstructWxSplitterWindow(
+    ::operator new(0x1A4u, std::nothrow), outerSplitter, 101, L"splitter"
+  );
 
   // Source-file tree, parented to the outer splitter's first pane.
   moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS();
@@ -1758,11 +1666,9 @@ moho::ScrDebugWindow::ScrDebugWindow()
     (void)vfs->FindFile(&resolvedRootPath, "/", nullptr);
   }
   const std::wstring wideRootPath = gpg::STR_Utf8ToWide(resolvedRootPath.c_str());
-  const wxStringRuntime rootPathText = wxStringRuntime::Borrow(wideRootPath.c_str());
-  const wxStringRuntime luaFilterText = wxStringRuntime::Borrow(L"Script files (*.lua)|*.lua");
-  const wxStringRuntime treeCtrlName = wxStringRuntime::Borrow(L"treeCtrl");
-  void* const sourceTree = ConstructWxGenericDirCtrl(
-    ::operator new(0x158u, std::nothrow), innerSplitter, &rootPathText, &luaFilterText, &treeCtrlName
+  void* const sourceTree = moho::scrdebug::ConstructWxGenericDirCtrl(
+    ::operator new(0x158u, std::nothrow), innerSplitter, wideRootPath.c_str(),
+    L"Script files (*.lua)|*.lua", L"treeCtrl"
   );
   mSourcePathOwnerControl = sourceTree;
 
@@ -1770,27 +1676,15 @@ moho::ScrDebugWindow::ScrDebugWindow()
   mSourceControl = new moho::ScrSourceCtrl(reinterpret_cast<wxWindowBase*>(innerSplitter));
 
   // ----- Notebook: Stack / Locals / Globals, parented to the outer splitter's second pane -----
-  const wxPoint kDefaultPosition{-1, -1};
-  const wxSize kDefaultSize{-1, -1};
-  const wxStringRuntime notebookName = wxStringRuntime::Borrow(L"notebook");
-  void* const notebook = ConstructWxNotebook(
-    ::operator new(0x1A4u, std::nothrow),
-    outerSplitter,
-    -1,
-    &kDefaultPosition,
-    &kDefaultSize,
-    0x90,
-    &notebookName
+  void* const notebook = moho::scrdebug::ConstructWxNotebook(
+    ::operator new(0x1A4u, std::nothrow), outerSplitter, -1, -1, -1, -1, -1, 0x90, L"notebook"
   );
 
-  const wxStringRuntime listCtrlName = wxStringRuntime::Borrow(L"wxListCtrl");
-  void* const callStackListRaw = ConstructWxListCtrl(
-    ::operator new(0x150u, std::nothrow), notebook, 301, &kDefaultPosition, &kDefaultSize, 32,
-    nullptr, &listCtrlName
+  void* const callStackListRaw = moho::scrdebug::ConstructWxListCtrl(
+    ::operator new(0x150u, std::nothrow), notebook, 301, -1, -1, -1, -1, 32, L"wxListCtrl"
   );
   mCallStackControl = callStackListRaw;
-  const wxStringRuntime stackPageTitle = wxStringRuntime::Borrow(L"Stack");
-  AddNotebookPage(notebook, callStackListRaw, &stackPageTitle, false, -1);
+  moho::scrdebug::AddNotebookPage(notebook, callStackListRaw, L"Stack", false, -1);
 
   const std::int32_t localValueWidth =
     preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugLocalWatchValueColumnPreferenceKey), 128) : 128;
@@ -1803,8 +1697,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
     static_cast<std::uint32_t>(localNameWidth), static_cast<std::uint32_t>(localTypeWidth),
     static_cast<std::uint32_t>(localValueWidth)
   );
-  const wxStringRuntime localsPageTitle = wxStringRuntime::Borrow(L"Locals");
-  AddNotebookPage(notebook, mLocalWatchControl, &localsPageTitle, false, -1);
+  moho::scrdebug::AddNotebookPage(notebook, mLocalWatchControl, L"Locals", false, -1);
 
   const std::int32_t globalValueWidth =
     preferences != nullptr ? preferences->GetInteger(msvc8::string(kDebugGlobalWatchValueColumnPreferenceKey), 128) : 128;
@@ -1817,8 +1710,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
     static_cast<std::uint32_t>(globalNameWidth), static_cast<std::uint32_t>(globalTypeWidth),
     static_cast<std::uint32_t>(globalValueWidth)
   );
-  const wxStringRuntime globalsPageTitle = wxStringRuntime::Borrow(L"Globals");
-  AddNotebookPage(notebook, mGlobalWatchControl, &globalsPageTitle, false, -1);
+  moho::scrdebug::AddNotebookPage(notebook, mGlobalWatchControl, L"Globals", false, -1);
 
   // Source-tree double-click/activation opens the file (0x004BD9EF: Connect
   // on the dircontrol's own id, matching OnSourceTreeItemActivated's already-

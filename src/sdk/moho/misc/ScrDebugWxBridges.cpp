@@ -16,6 +16,10 @@
 #include <wx/menu.h>
 #include <wx/splitter.h>
 #include <wx/toolbar.h>
+#include <wx/notebook.h>
+#include <wx/listctrl.h>
+#include <wx/dirctrl.h>
+#include <wx/bitmap.h>
 
 // wx/memory.h does `#define new WXDEBUG_NEW` whenever __WXDEBUG__ is on, which
 // _DEBUG turns on for us (wx/debug.h:26) even though the shipped game linked wx
@@ -146,6 +150,184 @@ namespace moho::scrdebug
 
     return static_cast<wxSplitterWindow*>(splitter)->SplitVertically(
       static_cast<wxWindow*>(leftPane), static_cast<wxWindow*>(rightPane), sashPosition
+    );
+  }
+
+  /** Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem) */
+  void* ConstructWxMenuItem(
+    void* const storage,
+    void* const parentMenu,
+    const int id,
+    const wchar_t* const text,
+    const wchar_t* const helpString,
+    const bool isCheckable,
+    void* const subMenu
+  )
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString text_(text != nullptr ? text : L"");
+    const wxString helpString_(helpString != nullptr ? helpString : L"");
+    return ::new (storage) wxMenuItem(
+      static_cast<wxMenu*>(parentMenu), id, text_, helpString_,
+      isCheckable ? wxITEM_CHECK : wxITEM_NORMAL, static_cast<wxMenu*>(subMenu)
+    );
+  }
+
+  /** wxMenuBar::Append(wxMenu*, const wxString&) */
+  void AppendWxMenuBarMenu(void* const menuBar, void* const menu, const wchar_t* const title)
+  {
+    if (menuBar == nullptr || menu == nullptr) {
+      return;
+    }
+
+    const wxString title_(title != nullptr ? title : L"");
+    (void)static_cast<wxMenuBar*>(menuBar)->Append(static_cast<wxMenu*>(menu), title_);
+  }
+
+  /** Address: 0x0099EE20 (?CreateToolBar@wxFrame@@UAEPAVwxToolBar@@JHABVwxString@@@Z) */
+  void* CreateFrameToolBar(void* const frameThis, const int style, const int id, const wchar_t* const name)
+  {
+    if (frameThis == nullptr) {
+      return nullptr;
+    }
+
+    const wxString name_(name != nullptr ? name : wxToolBarNameStr);
+    return static_cast<wxFrame*>(frameThis)->CreateToolBar(static_cast<long>(style), id, name_);
+  }
+
+  /** Address: 0x004BB2D0 (wxToolBarBase::AddTool convenience overload) */
+  void AddToolBarTool(
+    void* const toolbar,
+    const int id,
+    const wchar_t* const label,
+    void* const bitmap,
+    const wchar_t* const shortHelp
+  )
+  {
+    if (toolbar == nullptr || bitmap == nullptr) {
+      return;
+    }
+
+    const wxString label_(label != nullptr ? label : L"");
+    const wxString shortHelp_(shortHelp != nullptr ? shortHelp : L"");
+    (void)static_cast<wxToolBar*>(toolbar)->AddTool(
+      id, label_, *static_cast<wxBitmap*>(bitmap), shortHelp_
+    );
+  }
+
+  /** Address: 0x00977BF0 (wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
+  void* ConstructWxBitmapFromFile(void* const storage, const wchar_t* const path, const int type)
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString path_(path != nullptr ? path : L"");
+    return ::new (storage) wxBitmap(path_, static_cast<wxBitmapType>(type));
+  }
+
+  /** Address: 0x004BB380 (wxSplitterWindow::wxSplitterWindow) */
+  void* ConstructWxSplitterWindow(void* const storage, void* const parent, const int id, const wchar_t* const name)
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString name_(name != nullptr ? name : L"splitterWindow");
+    return ::new (storage) wxSplitterWindow(
+      static_cast<wxWindow*>(parent), id, wxDefaultPosition, wxDefaultSize, wxSP_3D, name_
+    );
+  }
+
+  /** Address: 0x004BB4A0 (wxGenericDirCtrl::wxGenericDirCtrl) */
+  void* ConstructWxGenericDirCtrl(
+    void* const storage,
+    void* const parent,
+    const wchar_t* const defaultPath,
+    const wchar_t* const filter,
+    const wchar_t* const name
+  )
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString defaultPath_(defaultPath != nullptr ? defaultPath : L"");
+    const wxString filter_(filter != nullptr ? filter : L"");
+    const wxString name_(name != nullptr ? name : wxTreeCtrlNameStr);
+    return ::new (storage) wxGenericDirCtrl(
+      static_cast<wxWindow*>(parent), wxID_ANY, defaultPath_, wxDefaultPosition, wxDefaultSize,
+      wxDIRCTRL_3D_INTERNAL, filter_, 0, name_
+    );
+  }
+
+  /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
+  void* ConstructWxNotebook(
+    void* const storage,
+    void* const parent,
+    const int id,
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const int style,
+    const wchar_t* const name
+  )
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString name_(name != nullptr ? name : L"notebook");
+    return ::new (storage) wxNotebook(
+      static_cast<wxWindow*>(parent), id, wxPoint(x, y), wxSize(width, height),
+      static_cast<long>(style), name_
+    );
+  }
+
+  /** wxNotebook::AddPage(wxWindow*, const wxString&, bool, int) */
+  void AddNotebookPage(
+    void* const notebook,
+    void* const page,
+    const wchar_t* const title,
+    const bool select,
+    const int imageId
+  )
+  {
+    if (notebook == nullptr || page == nullptr) {
+      return;
+    }
+
+    const wxString title_(title != nullptr ? title : L"");
+    (void)static_cast<wxNotebook*>(notebook)->AddPage(
+      static_cast<wxWindow*>(page), title_, select, imageId
+    );
+  }
+
+  /** wxListCtrl::wxListCtrl(parent, id, pos, size, style, validator, name) */
+  void* ConstructWxListCtrl(
+    void* const storage,
+    void* const parent,
+    const int id,
+    const int x,
+    const int y,
+    const int width,
+    const int height,
+    const int style,
+    const wchar_t* const name
+  )
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    const wxString name_(name != nullptr ? name : L"listCtrl");
+    return ::new (storage) wxListCtrl(
+      static_cast<wxWindow*>(parent), id, wxPoint(x, y), wxSize(width, height),
+      static_cast<long>(style), wxDefaultValidator, name_
     );
   }
 } // namespace moho::scrdebug

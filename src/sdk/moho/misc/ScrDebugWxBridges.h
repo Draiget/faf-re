@@ -51,4 +51,74 @@ namespace moho::scrdebug
 
   /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - vtable dispatch (+0x20C). */
   bool SplitWxSplitterWindowVertically(void* splitter, void* leftPane, void* rightPane, int sashPosition);
+
+  // The wx string/geometry types cannot cross this boundary either, so these
+  // take plain `wchar_t` text and loose integers and rebuild wxString /
+  // wxPoint / wxSize on the far side. `wxStringRuntime` is a single
+  // `wchar_t* m_pchData` - wx 2.4.2's own wxString layout - so nothing is
+  // lost in the narrowing.
+
+  /** Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem) */
+  void* ConstructWxMenuItem(
+    void* storage,
+    void* parentMenu,
+    int id,
+    const wchar_t* text,
+    const wchar_t* helpString,
+    bool isCheckable,
+    void* subMenu
+  );
+
+  /** wxMenuBar::Append(wxMenu*, const wxString&) - vtable dispatch at the call site. */
+  void AppendWxMenuBarMenu(void* menuBar, void* menu, const wchar_t* title);
+
+  /** Address: 0x0099EE20 (?CreateToolBar@wxFrame@@UAEPAVwxToolBar@@JHABVwxString@@@Z) */
+  void* CreateFrameToolBar(void* frameThis, int style, int id, const wchar_t* name);
+
+  /** Address: 0x004BB2D0 (wxToolBarBase::AddTool convenience overload) */
+  void AddToolBarTool(void* toolbar, int id, const wchar_t* label, void* bitmap, const wchar_t* shortHelp);
+
+  /** Address: 0x00977BF0 (wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
+  void* ConstructWxBitmapFromFile(void* storage, const wchar_t* path, int type);
+
+  /** Address: 0x004BB380 (wxSplitterWindow::wxSplitterWindow) */
+  void* ConstructWxSplitterWindow(void* storage, void* parent, int id, const wchar_t* name);
+
+  /** Address: 0x004BB4A0 (wxGenericDirCtrl::wxGenericDirCtrl) */
+  void* ConstructWxGenericDirCtrl(
+    void* storage,
+    void* parent,
+    const wchar_t* defaultPath,
+    const wchar_t* filter,
+    const wchar_t* name
+  );
+
+  /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
+  void* ConstructWxNotebook(
+    void* storage,
+    void* parent,
+    int id,
+    int x,
+    int y,
+    int width,
+    int height,
+    int style,
+    const wchar_t* name
+  );
+
+  /** wxNotebook::AddPage(wxWindow*, const wxString&, bool, int) - vtable dispatch. */
+  void AddNotebookPage(void* notebook, void* page, const wchar_t* title, bool select, int imageId);
+
+  /** wxListCtrl::wxListCtrl(parent, id, pos, size, style, validator, name) */
+  void* ConstructWxListCtrl(
+    void* storage,
+    void* parent,
+    int id,
+    int x,
+    int y,
+    int width,
+    int height,
+    int style,
+    const wchar_t* name
+  );
 } // namespace moho::scrdebug
