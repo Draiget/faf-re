@@ -39,16 +39,6 @@ objects are our reconstructions rather than real wx instances.
 _CFT_Ycc420plnToArgb8888Int
 _CFT_Ycc420plnToArgb8888Prg
 _mwsffrm_CallbackAnalyzeSofdecHeader
-void * __cdecl `anonymous namespace'::ConstructWxBitmapFromFile(void *,struct wxStringRuntime const *,int)
-void * __cdecl `anonymous namespace'::ConstructWxGenericDirCtrl(void *,void *,struct wxStringRuntime const *,struct wxStringRuntime const *,struct wxStringRuntime const *)
-void * __cdecl `anonymous namespace'::ConstructWxListCtrl(void *,void *,int,struct wxPoint const *,struct wxSize const *,int,void const *,struct wxStringRuntime const *)
-void * __cdecl `anonymous namespace'::ConstructWxMenuItem(void *,void *,int,struct wxStringRuntime const *,struct wxStringRuntime const *,bool,void *)
-void * __cdecl `anonymous namespace'::ConstructWxNotebook(void *,void *,int,struct wxPoint const *,struct wxSize const *,int,struct wxStringRuntime const *)
-void * __cdecl `anonymous namespace'::ConstructWxSplitterWindow(void *,void *,int,struct wxStringRuntime const *)
-void * __cdecl `anonymous namespace'::CreateFrameToolBar(void *,int,int,struct wxStringRuntime const *)
-void __cdecl `anonymous namespace'::AddNotebookPage(void *,void *,struct wxStringRuntime const *,bool,int)
-void __cdecl `anonymous namespace'::AddToolBarTool(void *,int,struct wxStringRuntime const *,void *,struct wxStringRuntime const *)
-void __cdecl `anonymous namespace'::AppendWxMenuBarMenu(void *,void *,struct wxStringRuntime const *)
 void __cdecl `anonymous namespace'::ConnectDynamicTreeItemActivatedHandler(void * const,int,int,void * const,void * const)
 void __cdecl `anonymous namespace'::ConnectDynamicTreeItemActivatedHandler(void *,int,int,void *,void *)
 ```
