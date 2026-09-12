@@ -14866,23 +14866,70 @@
   }
 
   /**
+   * Address: 0x00B0B1E0 (FUN_00B0B1E0, _adxf_SetFileInfoEx)
+   *
+   * What it does:
+   * Binds a file to one freshly created ADXF handle and fills in what the rest
+   * of the handle needs to know about it: the name and bind offset it was opened
+   * with, its length in bytes and in sectors, and a read cursor back at zero.
+   * The bind is issued over the whole file -- range 0 to 0xFFFFF sectors
+   * (0x00B0B203) -- and the bound range lanes are set to cover all of it.
+   *
+   * Two failure exits, both -1: a null file name, and a bind that leaves the
+   * stream in state 4 (0x00B0B22E), in which case the file is released again so
+   * the caller's `adxf_Close` is not left with a half-bound handle.
+   *
+   * adxf_OpenRange is the only caller, and treats a negative answer as "this
+   * handle is unusable, close it", so a stub returning null made every
+   * range-open succeed with a handle bound to nothing.
+   */
+  std::int32_t
+  adxf_SetFileInfoEx(void* const adxfHandleAddress, const char* const fileName, const std::int32_t startOffset)
+  {
+    if (fileName == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrSetFileInfoExNullName);
+      return -1;
+    }
+
+    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    adxfHandle->boundFileName = fileName;
+    adxfHandle->fileStartOffset = startOffset;
+    adxfHandle->readStartSector = 0;
+
+    constexpr std::int32_t kBindWholeFileSectors = 0xFFFFF;
+    (void)ADXSTM_BindFile(adxfHandle->streamHandle, fileName, startOffset, 0, kBindWholeFileSectors);
+
+    if (ADXSTM_GetStat(adxfHandle->streamHandle) == 4) {
+      ADXSTM_ReleaseFile(adxfHandle->streamHandle);
+      return -1;
+    }
+
+    adxfHandle->fileSizeBytes = ADXSTM_GetFileLen(adxfHandle->streamHandle);
+    const std::int32_t fileSizeSectors = ADXSTM_GetFileLen64(adxfHandle->streamHandle);
+    adxfHandle->fileSizeSectors = fileSizeSectors;
+    adxfHandle->boundRangeStartSector = 0;
+    adxfHandle->boundRangeSectorCount = fileSizeSectors;
+    return 0;
+  }
+
+  /**
    * Address: 0x00B0B2A0 (FUN_00B0B2A0, _adxf_OpenRange)
    *
    * What it does:
    * Allocates one ADXF handle and binds point/file range metadata for blocking
    * range-open lanes.
    */
-  void* adxf_OpenRange(void* const afsPointHandle, const std::int32_t fileIndex)
+  void* adxf_OpenRange(const char* const fileName, const std::int32_t startOffset)
   {
-    (void)adxf_SetCmdHstry(1, 0, afsPointHandle, fileIndex, -1);
+    (void)adxf_SetCmdHstry(1, 0, const_cast<char*>(fileName), startOffset, -1);
 
     void* openedHandle = adxf_CreateAdxFs();
-    if (openedHandle != nullptr && adxf_SetFileInfoEx(openedHandle, afsPointHandle, fileIndex) < 0) {
+    if (openedHandle != nullptr && adxf_SetFileInfoEx(openedHandle, fileName, startOffset) < 0) {
       adxf_Close(openedHandle);
       openedHandle = nullptr;
     }
 
-    (void)adxf_SetCmdHstry(1, 1, afsPointHandle, fileIndex, -1);
+    (void)adxf_SetCmdHstry(1, 1, const_cast<char*>(fileName), startOffset, -1);
     return openedHandle;
   }
 
@@ -14892,10 +14939,10 @@
    * What it does:
    * Runs point/file range-open lane under ADXF enter/leave guards.
    */
-  void* ADXF_OpenRange(void* const afsPointHandle, const std::int32_t fileIndex)
+  void* ADXF_OpenRange(const char* const fileName, const std::int32_t startOffset)
   {
     adxf_enter();
-    void* const openedHandle = adxf_OpenRange(afsPointHandle, fileIndex);
+    void* const openedHandle = adxf_OpenRange(fileName, startOffset);
     adxf_leave();
     return openedHandle;
   }

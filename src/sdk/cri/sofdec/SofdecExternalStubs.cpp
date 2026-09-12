@@ -261,7 +261,11 @@ extern "C" {
   // adxf_Seek (0x00B0BC30): real body in SofdecAdxPlatformRuntime.cpp,
   // beside its ADXF_Seek guard wrapper and the adxf_Stop it calls first when
   // the handle is still transferring.
-  void* adxf_SetFileInfoEx() { return nullptr; }
+  // adxf_SetFileInfoEx (0x00B0B1E0): real body in
+  // SofdecAdxPlatformRuntime.cpp, above adxf_OpenRange, its only caller.
+  // adxf_OpenRange treats a negative answer as 'close this handle', so a stub
+  // returning null made every range-open succeed with a handle bound to
+  // nothing.
   // adxf_Stop (0x00B0B9F0): real body in SofdecAdxPlatformRuntime.cpp,
   // beside its ADXF_Stop guard wrapper. adxf_Close and adxf_Seek both route
   // through it, so while it was a stub a handle was closed or seeked without
