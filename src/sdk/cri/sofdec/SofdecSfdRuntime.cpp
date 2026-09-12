@@ -2693,6 +2693,48 @@
   }
 
   /**
+   * Address: 0x00AE32C0 (FUN_00AE32C0, _M2T_Create)
+   *
+   * What it does:
+   * Claims one free M2T handle slot from `_M2T_libobj+4`, initializes one
+   * 32-byte-aligned runtime handle in the caller's work block, and returns that
+   * address. The same shape as `M2PES_Create` and `M2TSD_Create` beside it: a
+   * null work block, a block under 0x180 bytes (0x00AE32C8), or a full table
+   * all answer 0 -- EDI is zeroed at 0x00AE32D4 and is what the exhausted-table
+   * exit returns at 0x00AE32E9.
+   *
+   * `initHn_m2tsd` (0x00ADFEFC) is the caller, and while this was a stub every
+   * M2TSD handle got a null M2T supply address: the transport-stream layer had
+   * nothing to demultiplex into.
+   */
+  extern "C" std::int32_t M2T_Create(const std::int32_t workAddress, const std::int32_t workSizeBytes)
+  {
+    constexpr std::uint32_t kM2TWorkBytes = 0x180u;
+    if (workAddress == 0 || static_cast<std::uint32_t>(workSizeBytes) < kM2TWorkBytes) {
+      return 0;
+    }
+
+    auto& slots = M2THandleSlots();
+    std::size_t freeSlotIndex = slots.size();
+    for (std::size_t slotIndex = 0; slotIndex < slots.size(); ++slotIndex) {
+      if (slots[slotIndex] == 0) {
+        freeSlotIndex = slotIndex;
+        break;
+      }
+    }
+    if (freeSlotIndex == slots.size()) {
+      return 0;
+    }
+
+    const std::int32_t alignedWorkAddress = Align32ByteAddress(workAddress);
+    (void)initHn_m2sts(
+      reinterpret_cast<M2THandleInitRuntimeView*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(alignedWorkAddress)))
+    );
+    slots[freeSlotIndex] = alignedWorkAddress;
+    return alignedWorkAddress;
+  }
+
+  /**
    * Address: 0x00AE33A0 (FUN_00AE33A0, _M2T_Destroy)
    *
    * What it does:
