@@ -3549,8 +3549,8 @@
    */
   std::int32_t mwsflib_SetDefCond(const float* const startupConditionValue)
   {
-    (void)MWSFD_SetCond(0, 27, static_cast<std::int32_t>(*startupConditionValue));
-    return MWSFD_SetCond(0, 7, 1);
+    (void)MWSFD_SetCond(nullptr, 27, static_cast<std::int32_t>(*startupConditionValue));
+    return MWSFD_SetCond(nullptr, 7, 1);
   }
 
   /**
@@ -4154,6 +4154,32 @@
 
     std::memset(outPlyInfo, 0, sizeof(MwsfdRawPlaybackInfo));
     return sfdHandleAddress;
+  }
+
+  /**
+   * Address: 0x00ACB930 (FUN_00ACB930, _MWSFD_SetCond)
+   *
+   * What it does:
+   * Writes one condition lane, to a playback handle's SFD work control when
+   * one is given and to the library-wide defaults otherwise. The mirror of
+   * MWSFD_GetCond below, down to the same two tail jumps into SFD_SetCond
+   * (0x00ACB93F, 0x00ACB94A).
+   */
+  std::int32_t MWSFD_SetCond(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t conditionId,
+    const std::int32_t conditionValue
+  )
+  {
+    if (ply != nullptr) {
+      return SFD_SetCond(
+        reinterpret_cast<moho::SofdecSfdWorkctrlSubobj*>(ply->handle),
+        conditionId,
+        conditionValue
+      );
+    }
+
+    return SFD_SetCond(nullptr, conditionId, conditionValue);
   }
 
   /**
