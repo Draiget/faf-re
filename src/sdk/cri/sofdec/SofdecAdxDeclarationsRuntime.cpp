@@ -1686,7 +1686,7 @@
   std::int32_t ADXSJD_TermSupply(std::int32_t sjdHandle);
   std::int32_t ADXAMP_Start(void* channelExpandHandle);
   void ADXAMP_Stop(void* channelExpandHandle);
-  void CRIERR_CallErr(const char* message);
+  void CRIERR_CallErr(const char* format, ...);
   std::int32_t j__CRIERR_SetCbErr(moho::AdxmErrorCallback callbackFunction, std::int32_t callbackObject);
   std::int32_t ADXRNA_EntryErrFunc(moho::AdxmErrorCallback callbackFunction, std::int32_t callbackObject);
   std::int32_t ADXRNA_Create(std::int32_t sourceJoinHandleTableAddress, std::int32_t channelCount);

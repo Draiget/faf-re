@@ -79,7 +79,11 @@ extern "C" {
   // it was a stub nothing ever registered adxt_exec_fssvr on the FS lane, so
   // adxstm_ExecServer never ran and no ADXSTM slot was ever serviced: movies
   // bound their file, started their stream, and read zero bytes forever.
-  void* CRIERR_CallErr() { return nullptr; }
+  // CRIERR_CallErr (0x00B20770): real body in
+  // cri/sofdec/SofdecAdxXeficRuntime.cpp, beside CRIERR_SetCbErr which
+  // registers the callback it dispatches to. C linkage let this no-argument
+  // stub stand in for the real variadic reporter, so all sixty-six Sofdec
+  // diagnostics were formatted into nothing and dropped.
   void* M2TSD_Init() { return nullptr; }
   void* M2T_Create() { return nullptr; }
   // The twelve MPS_* public entry points (MPS_DecHd 0x00AEB560, MPS_Destroy
