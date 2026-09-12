@@ -47,6 +47,9 @@
 namespace gpg::gal
 {
 #include <d3d9caps.h>
+int gProbeFrameSeq = 0; int gProbeFrameDiagLeft = 0; // TEMPORARY PROBE (do not commit)
+extern "C" int FafProbeFrameSeq() { return gProbeFrameSeq; }
+extern "C" int FafProbeFrameDiag() { return gProbeFrameDiagLeft; }
 
     /**
      * Address: 0x008F3810 (FUN_008F3810)
