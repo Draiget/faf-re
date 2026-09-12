@@ -249,6 +249,26 @@ extern "C" {
   // pixels. While they stood as C-linkage stubs the whole pipeline reported
   // success - the frame decoded, the texture was locked and unlocked - and
   // every frame came out transparent black.
+  // cft_sse_Ycc420plnToArgb8888Int1smp (FUN_00B059E0) is the last of the six
+  // ARGB8888 kernels still stubbed; the other five and both dispatchers are
+  // recovered in cri/sofdec/SofdecSvmTransferRuntime.cpp. Two things are
+  // already established about it, to save the next reader the work:
+  //
+  //  - It writes two output rows per pass, from luma rows 0 and 2 of the
+  //    group (yPlane and yPlane + 2*yStride), reading chroma straight from
+  //    the planes with no scratch or upsample stage.
+  //  - The second row's second pixel-pair reuses the *first* chroma pair.
+  //    That is not a transcription slip: 0x00B05B43/0x00B05B46 load mm4 and
+  //    mm5 from mm6 where the three stores around them use mm7
+  //    (0x00B05AC7, 0x00B05B19), so half of row 2 gets row-0-pair chroma.
+  //    Reproduce it; it is what the shipped game does.
+  //
+  // What is NOT yet understood, and must be before anyone writes it: the
+  // group advance adds 3*strideBytes to both output row pointers
+  // (v111 = 3 * a2[3]) while the group spans four luma rows and only two are
+  // written. Either the decompiler's SSA split of v115/v116 and v117/v118 is
+  // hiding a second pair of stores, or the row mapping is not the obvious
+  // one. Read FUN_00B059E0.asm's tail before trusting the .c here.
   void* cft_sse_Ycc420plnToArgb8888Int1smp() { return nullptr; }
   void* decodeTsSub() { return nullptr; }
   // mpvcmc_InitMcOiTa: real body in SofdecMpvRuntime.cpp.
