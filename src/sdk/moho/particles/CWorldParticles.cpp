@@ -1259,16 +1259,16 @@ namespace moho
 
     DestroyWorldParticlesSingleton();
 
-    ShutdownBeamBuckets();
     ResetTrailBucketKeyResources(runtime.trailBucketLookupKey);
     ResetParticleBucketKeyResources(runtime.particleBucketLookupKey);
 
     runtime.trailBuckets.~TrailBucketMap();
     runtime.refractingParticleBuckets.~ParticleBucketMap();
     runtime.particleBuckets.~ParticleBucketMap();
-    // mTrailSegmentPool (`erase(begin(), end())` 0x0049A6C0 + head free),
-    // mAvailableParticleBuffers and mParticleBuffers (`_Tidy` 0x00495F30 +
-    // head free) are destroyed by their member destructors after this body.
+    // mBeams (0x00493090), mTrailSegmentPool (`erase(begin(), end())`
+    // 0x0049A6C0 + head free), mAvailableParticleBuffers and mParticleBuffers
+    // (`_Tidy` 0x00495F30 + head free) are destroyed by their member
+    // destructors after this body.
   }
 
   ParticleBuffer* CWorldParticles::AcquireParticleBuffer()
@@ -1661,19 +1661,6 @@ namespace moho
    * Releases beam-bucket map resources and destroys the retained beam vertex
    * sheet lane.
    */
-  void CWorldParticles::ShutdownBeamBuckets()
-  {
-    // The shipped body runs the map's destructor here rather than `clear()`:
-    // the header node is freed and `head_`/`size_` left null, so the buckets
-    // stay dead until the next `BeamBucketContainerRuntime` is constructed.
-    mBeams.mBuckets.~BeamTextureBucketMapRuntime();
-
-    if (mBeams.mVertexSheet != nullptr) {
-      delete mBeams.mVertexSheet;
-      mBeams.mVertexSheet = nullptr;
-    }
-  }
-
   /**
    * Address: 0x00494E10 (FUN_00494E10)
    *
