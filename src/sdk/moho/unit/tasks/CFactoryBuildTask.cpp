@@ -453,6 +453,12 @@ namespace moho
         Unit* const newUnit = mBuildHelper.mFocus.GetObjectPtr();
         mBuildHelper.OnStopBuild(true);
         mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_Building));
+        // Waiting -> Starting, the step the finished unit earns. Without it the
+        // next tick re-enters Waiting with a build helper whose focus has just
+        // been released, `IsGood()` answers false, and the case below resets to
+        // Preparing -- so the factory builds the head command again, forever,
+        // and never reaches Complete for the destructor to report success with.
+        mTaskState = static_cast<ETaskState>(static_cast<int>(mTaskState) + 1);
 
         // Walk the guard chain to the terminal guarded unit.
         Unit* terminalGuarded = mUnit;
