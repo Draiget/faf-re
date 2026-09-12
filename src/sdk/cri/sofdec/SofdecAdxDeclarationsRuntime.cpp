@@ -1220,7 +1220,8 @@
   std::int32_t cft_sse_Ycc420plnToArgb8888Int1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface,
-    const __m64* colorTable
+    const __m64* colorTable,
+    std::uintptr_t scratchBufferAddress
   );
   std::int32_t cft_c_Ycc420plnToArgb8888Prg1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
