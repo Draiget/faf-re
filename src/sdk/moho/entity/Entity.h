@@ -1209,20 +1209,23 @@ namespace moho
     void GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const;
 
     /**
-      * Alias of FUN_0067AE00 (non-canonical helper lane).
+     * Address: 0x0067AE00 (FUN_0067AE00, ?SetCollisionShapeNone@Entity@Moho@@QAEXXZ)
      *
      * What it does:
      * Deletes active collision primitive and clears collision-cell span.
      */
-    void RevertCollisionShape();
+    void SetCollisionShapeNone();
 
     /**
-     * Address: 0x0067AE70 (FUN_0067AE70)
+     * Address: 0x0067AE70 (FUN_0067AE70, ?RevertCollisionShape@Entity@Moho@@QAEXXZ)
      *
      * What it does:
-     * Rebuilds collision primitive from blueprint collision-shape fields.
+     * Rebuilds the collision primitive from the blueprint's collision-shape
+     * fields -- "revert" as in "back to the blueprint spec", which is what the
+     * `Unit:RevertCollisionShape()` binder's own help text says it does. It is
+     * NOT a clear; clearing is `SetCollisionShapeNone` (0x0067AE00).
      */
-    void RefreshCollisionShapeFromBlueprint();
+    void RevertCollisionShape();
 
     /**
      * Address: 0x0067A220 (FUN_0067A220, ?CreateInterface@Entity@Moho@@MAEXPAUSSyncData@2@@Z)
