@@ -15391,6 +15391,63 @@
   }
 
   /**
+   * Address: 0x00B0BC30 (FUN_00B0BC30, _adxf_Seek)
+   *
+   * What it does:
+   * Moves one ADXF handle's read cursor, in sectors, and answers where it
+   * landed. A handle still transferring (status 2, 0x00B0BC68) is stopped first,
+   * so a seek never leaves a stream running against the old position.
+   *
+   * The three origins are the usual set -- 0 from the start, 1 from the current
+   * cursor, 2 from the end, reading the file's sector count at [esi+0x0C]
+   * (0x00B0BC8F) -- and anything else is rejected with `'type' is illigal`, the
+   * banner's own spelling. The result is then clamped into [0, fileSizeSectors]
+   * (0x00B0BC9A..0x00B0BCAE) rather than being allowed off either end.
+   *
+   * As with adxf_Stop the command-history bracket is asymmetric: the opening
+   * entry precedes the null check, and the closing one is only written on the
+   * path that actually moved the cursor.
+   */
+  std::int32_t adxf_Seek(void* const adxfHandleAddress, const std::int32_t seekOffset, const std::int32_t seekOrigin)
+  {
+    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    (void)adxf_SetCmdHstry(6, 0, adxfHandleAddress, seekOffset, seekOrigin);
+
+    if (adxfHandle == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrSeekNullHandle);
+      return -3;
+    }
+
+    if (adxfHandle->status == 2u) {
+      (void)adxf_Stop(adxfHandleAddress);
+    }
+
+    switch (seekOrigin) {
+      case 0:
+        adxfHandle->readStartSector = seekOffset;
+        break;
+      case 1:
+        adxfHandle->readStartSector = adxfHandle->readStartSector + seekOffset;
+        break;
+      case 2:
+        adxfHandle->readStartSector = adxfHandle->fileSizeSectors + seekOffset;
+        break;
+      default:
+        (void)ADXERR_CallErrFunc1_(kAdxfErrSeekIllegalType);
+        return -3;
+    }
+
+    if (adxfHandle->readStartSector < 0) {
+      adxfHandle->readStartSector = 0;
+    } else if (adxfHandle->readStartSector > adxfHandle->fileSizeSectors) {
+      adxfHandle->readStartSector = adxfHandle->fileSizeSectors;
+    }
+
+    (void)adxf_SetCmdHstry(6, 1, adxfHandleAddress, seekOffset, seekOrigin);
+    return adxfHandle->readStartSector;
+  }
+
+  /**
    * Address: 0x00B0BD00 (FUN_00B0BD00, _adxf_Tell)
    *
    * What it does:

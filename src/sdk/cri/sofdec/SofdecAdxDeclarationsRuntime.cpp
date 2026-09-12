@@ -4153,6 +4153,8 @@ namespace
   constexpr std::int32_t kMwsfdErrCodeInvalidHandle = -12;
   constexpr char kMwsfcreErrAttachPicUsrBufInternal[] = "E02120501: Internal Error: mwsfcre_AttachPicUsrBuf().";
   constexpr char kMwsfcreErrAttachPicUsrBufShort[] = "E02120502: mwsfcre_AttachPicUsrBuf(): usrdatbuf is short.";
+  constexpr char kAdxfErrSeekNullHandle[] = "E9040825:'adxf' is NULL.(adxf_Seek)";
+  constexpr char kAdxfErrSeekIllegalType[] = "E9040826:'type' is illigal.(adxf_Seek)";
   constexpr char kAdxfErrStopNullHandle[] = "E9040822:'adxf' is NULL.(adxf_Stop)";
   constexpr char kAdxfErrStopNullStream[] = "E9040823:'adxf->stm' is NULL.(adxf_Stop)";
   constexpr char kAdxfErrCreateNoHandles[] = "E04041201:not enough ADXF handle (adxf_CreateAdxFs)";
