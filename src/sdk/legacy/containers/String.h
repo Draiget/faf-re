@@ -123,23 +123,10 @@ namespace msvc8
          * a no-op rather than a double free.
          */
         /**
-         * STATUS: the body is currently a no-op. See String.cpp.
-         *
-         * Freeing here is the correct recovery and its effect was measured --
-         * allocator in-use on SCMP_009 went from 632.4 MB to 243.8 MB, below
-         * retail's 293.3 MB. But it also makes freed blocks actually recycle,
-         * which turned a latent double free into a hard crash: the lobby's
-         * `SNetCommandArg` copy faults inside `assign_owned`'s memcpy on a
-         * string whose `bx.ptr` is dangling but whose header still passes
-         * `basic_sanity()`.
-         *
-         * The destructor is kept declared, so the type stays
-         * non-trivially-destructible and every container keeps running element
-         * teardown -- reverting that too would silently change which branch
-         * `msvc8::vector`'s `if constexpr (!is_trivially_destructible_v<T>)`
-         * guards take, and mask the bug rather than park it.
-         *
-         * Restore the `tidy(true, 0U);` call once the double free is found.
+         * The dangling source this used to hit was `substr` adopting a pointer
+         * into another string's buffer; see its comment. With that gone,
+         * nothing in the class produces a heap-looking string it does not own,
+         * and the release below is safe.
          */
         ~string() noexcept;
 
@@ -414,7 +401,8 @@ namespace msvc8
 	        return raw_data_unsafe()[i];
         }
         /**
-         * Assign from C-string; in-place if it fits, otherwise adopt pointer (non-owning).
+         * Assign from C-string; in-place when it fits the current capacity,
+         * otherwise through `assign_owned`, which takes a block of its own.
          */
         string& operator=(const char* s) noexcept;
 
@@ -432,11 +420,6 @@ namespace msvc8
     	std::string to_std() const {
             return { data(), size() };
         }
-
-        /**
-         * Factory to adopt an external mutable buffer with explicit capacity (no ownership).
-         */
-        static string adopt(char* buf, uint32_t len, uint32_t cap) noexcept;
 
         /**
          * Assign from a substring of another msvc8::string.
@@ -500,9 +483,21 @@ namespace msvc8
 
         /**
 		 * Return substring [from .. from+maxLen) as a new msvc8::string.
-		 * - If length fits SSO (<=15) OR source is SSO, we make an SSO copy.
-		 * - Otherwise (heap case with long slice), we adopt a pointer into the
-		 *   original buffer without taking ownership (no guaranteed trailing NUL).
+		 *
+		 * Always a copy, which is what MSVC8's own `basic_string::substr` is:
+		 * `return basic_string(*this, off, count)`.
+		 *
+		 * It used to adopt a pointer into the source's buffer whenever the
+		 * source was heap-backed and the slice ran past 15 characters. That
+		 * produced a string with `myRes >= 16` - heap-backed, to every other
+		 * member of this class - over memory it did not own, and `tidy` frees
+		 * on exactly that test, as does the binary's own emission of it
+		 * (FUN_008846B0). So the object could not exist in the type this
+		 * models, and it is why the destructor had to stay a no-op: `CLobby`
+		 * builds its player names with `desired.substr(0, maxLen)`, the
+		 * temporary released the *source's* block, and the name that reached
+		 * `SNetCommandArg` pointed at freed memory while still passing
+		 * `basic_sanity()`.
 		 *
 		 * @param from   Start position (clamped: if >= size() -> empty string).
 		 * @param maxLen Max number of chars; npos means "to the end".
@@ -530,26 +525,9 @@ namespace msvc8
 
             const char* src = raw_data_unsafe() + from;
 
-            // If source is SSO, mySize <= 15, so len <= 15 -> SSO copy is guaranteed.
-            // If heap and len <= 15, also prefer SSO copy to keep c_str() well-terminated.
-            if (is_sso() || len <= 15) {
-                return string(src, len); // our (ptr, len) ctor will SSO-copy when len<=15
-            }
-
-            // Heap + long slice: adopt pointer into existing buffer (non-owning).
-            // Capacity from this slice forward is (myRes - from), clamp to maxCapGuard.
-            const uint32_t capForward = (myRes > from)
-                ? myRes - from
-                : 0u;
-
-            const uint32_t effCap = (capForward > maxCapGuard)
-                ? static_cast<uint32_t>(maxCapGuard)
-                : capForward;
-
-            // Cast away const: we don't mutate, but adopt() expects mutable char*.
-            return adopt(const_cast<char*>(src),
-                static_cast<uint32_t>(len),
-                effCap);
+            // The (ptr, len) constructor copies: inline below 16 characters,
+            // its own heap block above.
+            return string(src, len);
         }
 
         /** Compare with another msvc8::string. */
