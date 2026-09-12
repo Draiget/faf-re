@@ -30,4 +30,25 @@ namespace moho::scrdebug
 
   /** Address: 0x009A9570 (?SetMenuBar@wxFrameBase@@UAEXPAVwxMenuBar@@@Z) */
   void SetFrameMenuBar(void* frameThis, void* menuBar);
+
+  /** Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu) */
+  void* ConstructWxMenu(void* storage);
+
+  /** wxMenu::Append(wxMenuItem*) - vtable dispatch at the call site. */
+  void AppendWxMenuItem(void* menu, void* menuItem);
+
+  /** Address: 0x004BAF20 (wxMenu::AppendSeparator) */
+  void AppendWxMenuSeparator(void* menu);
+
+  /** wxToolBar::AddSeparator() - vtable dispatch (+0x228) at the call site. */
+  void AddToolBarSeparator(void* toolbar);
+
+  /** wxToolBar::Realize() - vtable dispatch (+0x240) at the call site. */
+  void RealizeToolBar(void* toolbar);
+
+  /** Address: 0x00975B00 (??1wxBitmap@@UAE@XZ, wxBitmap::~wxBitmap) */
+  void DestroyWxBitmap(void* bitmap);
+
+  /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - vtable dispatch (+0x20C). */
+  bool SplitWxSplitterWindowVertically(void* splitter, void* leftPane, void* rightPane, int sashPosition);
 } // namespace moho::scrdebug

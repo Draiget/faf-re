@@ -14,6 +14,8 @@
 
 #include <wx/frame.h>
 #include <wx/menu.h>
+#include <wx/splitter.h>
+#include <wx/toolbar.h>
 
 // wx/memory.h does `#define new WXDEBUG_NEW` whenever __WXDEBUG__ is on, which
 // _DEBUG turns on for us (wx/debug.h:26) even though the shipped game linked wx
@@ -59,5 +61,91 @@ namespace moho::scrdebug
     }
 
     static_cast<wxFrame*>(frameThis)->SetMenuBar(static_cast<wxMenuBar*>(menuBar));
+  }
+
+  /**
+   * Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu)
+   *
+   * Same split as the menu bar: the caller owns the 0x74-byte allocation.
+   */
+  void* ConstructWxMenu(void* const storage)
+  {
+    if (storage == nullptr) {
+      return nullptr;
+    }
+
+    return ::new (storage) wxMenu();
+  }
+
+  /** wxMenu::Append(wxMenuItem*) - a virtual on wxMenuBase. */
+  void AppendWxMenuItem(void* const menu, void* const menuItem)
+  {
+    if (menu == nullptr || menuItem == nullptr) {
+      return;
+    }
+
+    static_cast<wxMenu*>(menu)->Append(static_cast<wxMenuItem*>(menuItem));
+  }
+
+  /** Address: 0x004BAF20 (wxMenu::AppendSeparator) */
+  void AppendWxMenuSeparator(void* const menu)
+  {
+    if (menu == nullptr) {
+      return;
+    }
+
+    static_cast<wxMenu*>(menu)->AppendSeparator();
+  }
+
+  /** wxToolBar::AddSeparator() - vtable dispatch (+0x228) at the call site. */
+  void AddToolBarSeparator(void* const toolbar)
+  {
+    if (toolbar == nullptr) {
+      return;
+    }
+
+    static_cast<wxToolBar*>(toolbar)->AddSeparator();
+  }
+
+  /** wxToolBar::Realize() - vtable dispatch (+0x240) at the call site. */
+  void RealizeToolBar(void* const toolbar)
+  {
+    if (toolbar == nullptr) {
+      return;
+    }
+
+    (void)static_cast<wxToolBar*>(toolbar)->Realize();
+  }
+
+  /**
+   * Address: 0x00975B00 (??1wxBitmap@@UAE@XZ, wxBitmap::~wxBitmap)
+   *
+   * Destroys without freeing: the call site builds its bitmap into storage it
+   * owns, so the storage outlives this and is released by the caller.
+   */
+  void DestroyWxBitmap(void* const bitmap)
+  {
+    if (bitmap == nullptr) {
+      return;
+    }
+
+    static_cast<wxBitmap*>(bitmap)->~wxBitmap();
+  }
+
+  /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - virtual, +0x20C. */
+  bool SplitWxSplitterWindowVertically(
+    void* const splitter,
+    void* const leftPane,
+    void* const rightPane,
+    const int sashPosition
+  )
+  {
+    if (splitter == nullptr) {
+      return false;
+    }
+
+    return static_cast<wxSplitterWindow*>(splitter)->SplitVertically(
+      static_cast<wxWindow*>(leftPane), static_cast<wxWindow*>(rightPane), sashPosition
+    );
   }
 } // namespace moho::scrdebug

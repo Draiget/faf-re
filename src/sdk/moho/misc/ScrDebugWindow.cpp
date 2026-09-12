@@ -1297,9 +1297,6 @@ namespace
   // dispatch, per CLAUDE.md's ban on `*(T**)(obj+0xNN)` vtable magic in
   // recovered source.
 
-  /** Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu) */
-  void* ConstructWxMenu(void* storage);
-
   /**
    * Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem)
    * Real signature: wxMenuItem(wxMenu* parentMenu, int id, const wxString&
@@ -1314,12 +1311,6 @@ namespace
     bool isCheckable,
     void* subMenu
   );
-
-  /** wxMenu::Append(wxMenuItem*) - vtable dispatch at this call site. */
-  void AppendWxMenuItem(void* menu, void* menuItem);
-
-  /** wxMenu::AppendSeparator() - Address: 0x004BAF20 (wxMenu::AppendSeparator). */
-  void AppendWxMenuSeparator(void* menu);
 
   /** wxMenuBar::Append(wxMenu*, const wxString&) - vtable dispatch at this call site. */
   void AppendWxMenuBarMenu(void* menuBar, void* menu, const wxStringRuntime* title);
@@ -1336,17 +1327,8 @@ namespace
     const wxStringRuntime* shortHelp
   );
 
-  /** wxToolBar::AddSeparator() - vtable dispatch (+0x228) at this call site. */
-  void AddToolBarSeparator(void* toolbar);
-
-  /** wxToolBar::Realize() - vtable dispatch (+0x240) at this call site. */
-  void RealizeToolBar(void* toolbar);
-
   /** Address: 0x00977BF0 (??0wxBitmap@@QAE@@Z_1, wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
   void* ConstructWxBitmapFromFile(void* storage, const wxStringRuntime* path, std::int32_t type);
-
-  /** Address: 0x00975B00 (__imp_??1wxBitmap@@UAE@XZ, wxBitmap::~wxBitmap) */
-  void DestroyWxBitmap(void* bitmap);
 
   /**
    * Address: 0x004BB1F0 (??0wxTextCtrl@@QAE@...@Z, wxTextCtrl::wxTextCtrl)
@@ -1372,9 +1354,6 @@ namespace
    * wx's own defaults (wxDefaultPosition/wxDefaultSize/wxSP_3D) internally.
    */
   void* ConstructWxSplitterWindow(void* storage, void* parent, std::int32_t id, const wxStringRuntime* name);
-
-  /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - vtable dispatch (+0x20C) at this call site. */
-  bool SplitWxSplitterWindowVertically(void* splitter, void* leftPane, void* rightPane, std::int32_t sashPosition);
 
   /**
    * Address: 0x004BB4A0 (sub_4BB4A0, wxGenericDirCtrl::wxGenericDirCtrl)
@@ -1628,7 +1607,7 @@ namespace
     }
 
     void* const item = ConstructWxMenuItem(itemStorage, menu, id, &labelText, &helpText, false, nullptr);
-    AppendWxMenuItem(menu, item);
+    moho::scrdebug::AppendWxMenuItem(menu, item);
   }
 
   /**
@@ -1676,7 +1655,7 @@ namespace
     const wxStringRuntime labelText = wxStringRuntime::Borrow(label);
     const wxStringRuntime shortHelpText = wxStringRuntime::Borrow(shortHelp);
     AddToolBarTool(toolbar, id, &labelText, bitmap, &shortHelpText);
-    DestroyWxBitmap(bitmap);
+    moho::scrdebug::DestroyWxBitmap(bitmap);
   }
 
   constexpr char kDebugWindowWidthPreferenceKey[] = "Windows.Debug.width";
@@ -1718,21 +1697,21 @@ moho::ScrDebugWindow::ScrDebugWindow()
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
   // ----- Menu bar: File / View / Debug -----
-  void* const fileMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const fileMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
   AppendMenuItem(fileMenu, 101, L"Close", L"Close source file");
   AppendMenuItem(fileMenu, 102, L"Close All", L"Close all files");
   AppendMenuItem(fileMenu, 103, L"Reload All", L"Reload all source file");
 
-  void* const viewMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const viewMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
   AppendMenuItem(viewMenu, 201, L"Goto", L"Goto line number");
 
-  void* const debugMenu = ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const debugMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
   AppendMenuItem(debugMenu, 301, L"Step", L"Step execution");
   AppendMenuItem(debugMenu, 302, L"Resume", L"Resume execution");
-  AppendWxMenuSeparator(debugMenu);
+  moho::scrdebug::AppendWxMenuSeparator(debugMenu);
   AppendMenuItem(debugMenu, 303, L"Enable breakpoints", L"Enable all breakpoints");
   AppendMenuItem(debugMenu, 304, L"Disable breakpoints", L"Disable all breakpoints");
-  AppendWxMenuSeparator(debugMenu);
+  moho::scrdebug::AppendWxMenuSeparator(debugMenu);
   AppendMenuItem(debugMenu, 305, L"Clear breakpoints", L"Clear all breakpoints");
 
   void* const menuBar = moho::scrdebug::ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
@@ -1749,20 +1728,20 @@ moho::ScrDebugWindow::ScrDebugWindow()
   void* const toolBar = CreateFrameToolBar(this, kToolBarStyle, -1, nullptr);
   AddToolbarButton(toolBar, 302, "/coderes/engine/dbg_tool_resume.bmp", L"Resume", L"Resume execution");
   AddToolbarButton(toolBar, 301, "/coderes/engine/dbg_tool_step.bmp", L"Step", L"Step into");
-  AddToolBarSeparator(toolBar);
+  moho::scrdebug::AddToolBarSeparator(toolBar);
   AddToolbarButton(
     toolBar, 303, "/coderes/engine/dbg_tool_enablebreakpoints.bmp", L"Enable", L"Enable all breakpoints"
   );
   AddToolbarButton(
     toolBar, 304, "/coderes/engine/dbg_tool_disablebreakpoints.bmp", L"Disable", L"Disable all breakpoints"
   );
-  AddToolBarSeparator(toolBar);
+  moho::scrdebug::AddToolBarSeparator(toolBar);
   AddToolbarButton(toolBar, 305, "/coderes/engine/dbg_tool_clearbreakpoints.bmp", L"Clear", L"Clear breakpoints");
-  AddToolBarSeparator(toolBar);
+  moho::scrdebug::AddToolBarSeparator(toolBar);
   AddToolbarButton(toolBar, 1002, "/coderes/engine/dbg_tool_find.bmp", L"Find", L"Find");
   AddToolbarButton(toolBar, 1003, "/coderes/engine/dbg_tool_findnext.bmp", L"Next", L"Find Next");
   AddToolbarButton(toolBar, 1004, "/coderes/engine/dbg_tool_findprev.bmp", L"Previous", L"Find Previous");
-  RealizeToolBar(toolBar);
+  moho::scrdebug::RealizeToolBar(toolBar);
 
   // ----- Nested splitters: outer(source tree | notebook) -----
   const wxStringRuntime outerSplitterName = wxStringRuntime::Borrow(L"splitter");
@@ -1873,7 +1852,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
   const std::int32_t verticalSashPosition = preferences != nullptr
     ? preferences->GetInteger(msvc8::string(kDebugVerticalSashPreferenceKey), verticalSashDefault)
     : verticalSashDefault;
-  (void)SplitWxSplitterWindowVertically(outerSplitter, innerSplitter, notebook, verticalSashPosition);
+  (void)moho::scrdebug::SplitWxSplitterWindowVertically(outerSplitter, innerSplitter, notebook, verticalSashPosition);
 
   const std::int32_t horizontalSashDefault = static_cast<std::int32_t>(static_cast<float>(clientWidth) * 0.25f);
   const std::int32_t horizontalSashPosition = preferences != nullptr
@@ -1882,7 +1861,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
   // Inner splitter's second pane is `mSourceControl` (the ScrSourceCtrl page
   // list), not the notebook - matches 0x004BD4A3 reading `this->v97`
   // (mSourceControl), not `this->v96` (mSourcePathOwnerControl) reread twice.
-  (void)SplitWxSplitterWindowVertically(innerSplitter, sourceTree, mSourceControl, horizontalSashPosition);
+  (void)moho::scrdebug::SplitWxSplitterWindowVertically(innerSplitter, sourceTree, mSourceControl, horizontalSashPosition);
 
   // ----- Keyboard accelerator table -----
   struct WxAcceleratorEntryRaw
