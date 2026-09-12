@@ -64,33 +64,6 @@ namespace
     keyText.assign_owned("<unknown>");
     return keyText;
   }
-  /**
-   * Address: 0x0097AC50 (FUN_0097AC50, wxEvtHandler::Connect)
-   *
-   * wxWidgets-2.4.2 library method (classified `external_dependency` bridge:
-   * real wx headers cannot be `#include`d alongside this project's "Runtime"
-   * reconstruction headers - both declare incompatible global `wxPoint`/
-   * `wxSize`/`wxEventTable`/etc, confirmed by a direct build attempt - so this
-   * reaches the statically-linked library body through a minimal
-   * evidence-matched trampoline instead, the same bridging idiom
-   * `ConstructWxFileDialog` uses in `moho/app/WEmitterWx.cpp` for
-   * `wxFileDialog::wxFileDialog`).
-   *
-   * Builds one dynamic event-table entry `{eventType,id,lastId,fn,userData}`
-   * and appends it to this handler's `m_dynamicEvents` list (lazily
-   * allocated on first use). `memberFunctionThunk` is the raw code address of
-   * a non-virtual `void (T::*)(wxTreeEventRuntime&)` handler, extracted via
-   * the same pointer-to-member reinterpretation wx's own event-table macros
-   * perform (safe here because `OnItemActivate` is non-virtual, single
-   * inheritance).
-   */
-  void ConnectDynamicTreeItemActivatedHandler(
-    void* const evtHandlerThis,
-    const std::int32_t id,
-    const std::int32_t lastId,
-    void* const memberFunctionThunk,
-    void* const userData
-  );
 } // namespace
 
 wxEventTable moho::ScrWatchCtrl::sm_eventTable = {nullptr, nullptr};
@@ -125,6 +98,10 @@ moho::ScrWatchCtrl::ScrWatchCtrl(
   AddColumn(wxStringRuntime::Borrow(L"Value"), valueColumnWidth, true);
   mRootItem = AddRoot(wxStringRuntime::Borrow(L"Variable"));
 
+  // 0x004D71AB-0x004D71C0: Connect(GetId(), -1, wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+  // &ScrWatchCtrl::OnItemActivate, nullptr). This control's static event table
+  // is empty - the binary binds the handler per instance instead, because the
+  // id it matches on is the one the caller passed to this constructor.
   using OnItemActivateThunk = void (ScrWatchCtrl::*)(wxTreeEventRuntime&);
   constexpr OnItemActivateThunk kOnItemActivate = &ScrWatchCtrl::OnItemActivate;
   void* rawHandlerAddress = nullptr;
@@ -132,7 +109,7 @@ moho::ScrWatchCtrl::ScrWatchCtrl(
                 "non-virtual single-inheritance member pointer must be a plain code address");
   std::memcpy(&rawHandlerAddress, &kOnItemActivate, sizeof(rawHandlerAddress));
 
-  ConnectDynamicTreeItemActivatedHandler(this, windowId, -1, rawHandlerAddress, nullptr);
+  Connect(windowId, -1, WX_GetCommandTreeItemActivatedEventType(), rawHandlerAddress, nullptr);
 }
 
 /**

@@ -1753,6 +1753,51 @@ public:
   virtual bool SearchEventTable(void* eventTable, void* event);
 
   /**
+   * Address: 0x0097AC50 (FUN_0097AC50)
+   * Mangled: ?Connect@wxEvtHandler@@QAEXHHHP8wxEvtHandler@@AEXAAVwxEvent@@@ZPAVwxObject@@@Z
+   *
+   * IDA signature:
+   * void __thiscall wxEvtHandler::Connect(wxEvtHandler *this, int id, int lastId,
+   *                                       int eventType, void *func, wxObject *userData);
+   *
+   * What it does:
+   * Binds one handler to this object at run time, for classes whose static
+   * event table cannot name it - a control built in a constructor, where the
+   * id is only known once the control exists. The binding is appended, so
+   * bindings are offered in the order they were made.
+   *
+   * The binary allocates a 0x14-byte entry at 0x0097AC75 and fills it
+   * `{id, lastId, fn, userData, eventType}`, then lazily creates the
+   * `m_dynamicEvents` list (window +0x10) on the first binding and appends to
+   * it. Note the entry stores the event type *by value*, unlike the static
+   * `wxEventTableEntry`, which holds a pointer so that startup-assigned ids
+   * can be read through it.
+   */
+  void Connect(
+    std::int32_t id,
+    std::int32_t lastId,
+    std::int32_t eventType,
+    void* handlerFunction,
+    void* userData
+  );
+
+  /**
+   * Address: 0x0097ADC0 (FUN_0097ADC0)
+   * Mangled: ?SearchDynamicEventTable@wxEvtHandler@@AAE_NAAVwxEvent@@@Z
+   *
+   * IDA signature:
+   * bool __thiscall wxEvtHandler::SearchDynamicEventTable(wxEvtHandler *this, wxEvent *event);
+   *
+   * What it does:
+   * Offers one event to the bindings made through Connect, matching on event
+   * type and id range exactly as SearchEventTable does for the static tables.
+   * Unlike SearchEventTable it keeps going after a handler that called Skip()
+   * (0x0097AE27 falls through to the next node), so a skipped event can still
+   * reach a later binding.
+   */
+  bool SearchDynamicEventTable(void* event);
+
+  /**
    * Address: 0x00964A50 (FUN_00964A50)
    * Mangled: ?GetEventTable@wxWindowBase@@MBEPBUwxEventTable@@XZ
    *
@@ -7393,6 +7438,15 @@ namespace moho
   };
 
   [[nodiscard]] WxEventFamily WX_ClassifyEventType(std::int32_t eventType);
+
+  /**
+   * `wxEVT_COMMAND_TREE_ITEM_ACTIVATED` (0x00F8F7B0), the one event type read
+   * from outside this translation unit: both Connect call sites that bind a
+   * tree activation handler name it - `ScrWatchCtrl`'s constructor at
+   * 0x004D71AB and `ScrDebugWindow`'s at 0x004BE578. Assigned by
+   * `wxNewEventType` on first use, like every other type in this build.
+   */
+  [[nodiscard]] std::int32_t WX_GetCommandTreeItemActivatedEventType();
 
   /**
    * Hook consulted by `wxWindowBase::ProcessEvent` before its own event tables.
