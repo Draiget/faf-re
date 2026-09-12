@@ -109,18 +109,6 @@ namespace
   }
 
 
-  struct RBlueprintVTableView
-  {
-    void* destroy;
-    void* deletingDestroy;
-    void* getClass;
-    void(__thiscall* onInitBlueprint)(moho::RBlueprint*);
-  };
-
-  [[nodiscard]] const RBlueprintVTableView* GetVTableView(const moho::RBlueprint* const blueprint) noexcept
-  {
-    return reinterpret_cast<const RBlueprintVTableView*>(blueprint ? blueprint->mVTable : nullptr);
-  }
 
   struct SerializerCallbackRuntimeView
   {
@@ -232,8 +220,7 @@ namespace moho
    * blueprint ordinal from the rules' virtual `AssignNextOrdinal` slot.
    */
   RBlueprint::RBlueprint(RRuleGameRules* const owner, const RResId& resId)
-    : mVTable(nullptr)
-    , mOwner(owner)
+    : mOwner(owner)
     , mBlueprintId()
     , mDescription()
     , mSource()
@@ -278,10 +265,9 @@ namespace moho
     AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), -1L);
 
     // The binary ends here by storing the gpg::RObject vtable into the object's
-    // first word, which is the inlined base destructor. This layout keeps that
-    // word as a plain `mVTable` field rather than inheriting RObject, so there
-    // is no base sub-object to unwind. Reaching for `~RObject()` through a cast
-    // would dispatch a virtual call on whatever `mVTable` happens to hold.
+    // first word. That is the inlined base destructor, and the compiler emits it
+    // now that RObject is a declared base rather than a hand-modelled word -- so
+    // there is nothing to write here.
   }
 
   /**
@@ -318,11 +304,9 @@ namespace moho
     LuaPlus::LuaObject valueObject(luaBlueprint);
     (void)SCR_LuaBuildObject(valueObject, destination, true);
 
-    if (const auto* const vtableView = GetVTableView(this); vtableView && vtableView->onInitBlueprint) {
-      vtableView->onInitBlueprint(this);
-    } else {
-      OnInitBlueprint();
-    }
+    // 0x0050DF4D: slot 3 on this object's own vtable. An ordinary virtual
+    // call now that the base is declared rather than hand-modelled.
+    OnInitBlueprint();
 
     gpg::RRef source{};
     (void)gpg::RRef_RBlueprint(&source, this);
