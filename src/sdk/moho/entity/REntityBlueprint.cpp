@@ -104,7 +104,18 @@ namespace moho
    * Releases strategic-icon weak-pointer lanes, destroys derived entity
    * string/vector fields, then tears down base blueprint ownership lanes.
    */
-  REntityBlueprint::~REntityBlueprint() = default;
+  REntityBlueprint::~REntityBlueprint()
+  {
+    // 0x0051203A calls Moho::RBlueprint::~RBlueprint() -- the base-destructor
+    // call the compiler emits because REntityBlueprint derives from
+    // RBlueprint in the binary. This class duplicates that header rather than
+    // inheriting it, so the base destructor never runs, and the one thing it
+    // does that the members do not do for themselves is release the shared
+    // instance count the constructor took through RBlueprint::InitIdentity.
+    // Without this the "Instance Counts_Moho::RBlueprint" stat only ever
+    // climbs -- once per unit, prop and projectile blueprint, every session.
+    BP_AddInstanceCountDelta(-1L);
+  }
 
   namespace
   {

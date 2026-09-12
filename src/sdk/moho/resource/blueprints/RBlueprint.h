@@ -29,6 +29,16 @@ namespace moho
    * What it does:
    * Reflection type init for the common blueprint base (`sizeof = 0x60`).
    */
+  /**
+   * Applies one delta to the shared `InstanceCounter<RBlueprint>` stat lane.
+   *
+   * Exposed because `REntityBlueprint` duplicates this class's header
+   * instead of deriving from it, so the base constructor and destructor that
+   * would otherwise pair the count do not run on one. See the call in
+   * `~REntityBlueprint` for the evidence that the binary pairs them.
+   */
+  void BP_AddInstanceCountDelta(long delta);
+
   struct RBlueprint : public gpg::RObject
   {
     static gpg::RType* sPointerType;
