@@ -164,6 +164,14 @@ namespace moho
     COMMOD_Move = 4,
     COMMOD_Reclaim = 5,
     COMMOD_Ping = 6,
+    /**
+     * The mode `func_GetRightMouseButtonAction` (0x0081ED4E) writes whenever a
+     * UI command mode is already engaged, so that the right-click that follows
+     * cancels the placement instead of issuing an order. The jump table at
+     * 0x00821F04 routes it to the same `UI_EndCommandMode` arm as
+     * `COMMOD_Ping`.
+     */
+    COMMOD_CancelCommandMode = 7,
   };
 
   struct CommandModeData
