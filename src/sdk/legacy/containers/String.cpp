@@ -98,16 +98,7 @@ msvc8::string& msvc8::string::operator=(const string& other) noexcept {
  * no-op rather than a double free.
  */
 msvc8::string::~string() noexcept {
-    // TEMPORARILY DISABLED -- see the note in String.h. Freeing here is
-    // correct and recovers ~443 MB (measured 2026-09-02: 736.0M -> 288.0M
-    // allocator-in-use on SCMP_009), but it surfaces a latent double free that
-    // crashes in the lobby (SNetCommandArg copy -> assign_owned).
-    //
-    // Re-measured with the free live: the main menu survives 70 s and a
-    // /map skirmish survives 120 s, both clean. That does NOT clear it --
-    // `/map` bypasses `CLobby::HostGame`, which is the path the crash was
-    // reported on, so the one path that matters here is still untested.
-    // Restore `tidy(true, 0U);` once that is found.
+    tidy(true, 0U);
 }
 
 msvc8::string::string(string&& other) noexcept {
@@ -672,26 +663,24 @@ msvc8::string& msvc8::string::operator=(const char* s) noexcept {
     return *this;
 }
 
-msvc8::string msvc8::string::adopt(char* buf, const uint32_t len, const uint32_t cap) noexcept {
-    string s;
-    s.bx.ptr = buf;
-    s.mySize = len;
-    s.myRes = cap;
-    // leave _Alval as nullptr; we never free adopted memory
-    return s;
-}
-
 /**
  * Address: 0x004422C0 (FUN_004422C0)
  * Address: 0x00445FD0 (FUN_00445FD0)
  *
  * What it does:
  * Reinitializes this string to empty SSO storage, then copies full source text.
+ *
+ * The reset is `tidy(true, 0)`, not a bare header rewrite: overwriting
+ * `myRes` with 15 while a heap block was attached abandoned that block, so
+ * every `SNetCommandArg::operator=` -- the only caller shape this has -- leaked
+ * one allocation per assignment.
  */
 msvc8::string& msvc8::string::reset_and_assign(const string& other) noexcept {
-    mySize = 0U;
-    myRes = 15U;
-    bx.buf[0] = '\0';
+    if (this == &other) {
+        return *this;
+    }
+
+    tidy(true, 0U);
     return assign(other, 0U, npos);
 }
 
