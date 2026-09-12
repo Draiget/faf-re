@@ -1717,15 +1717,6 @@ namespace
     return localBox;
   }
 
-  [[nodiscard]] Wm3::Vec3f BuildBlueprintCollisionCenter(const moho::REntityBlueprint& blueprint)
-  {
-    Wm3::Vec3f center{};
-    center.x = blueprint.mCollisionOffsetX;
-    center.y = blueprint.mCollisionOffsetY + blueprint.mSizeY * 0.5f;
-    center.z = blueprint.mCollisionOffsetZ;
-    return center;
-  }
-
   [[nodiscard]] std::uint32_t ReadBlueprintCategoryBitIndex(const moho::REntityBlueprint* blueprint) noexcept
   {
     return blueprint ? blueprint->mCategoryBitIndex : 0u;
@@ -3303,7 +3294,10 @@ namespace moho
       (void)CTask::CreateTaskThread(static_cast<CTask*>(this), &sim->mTaskStageA, false);
     }
 
-    RefreshCollisionShapeFromBlueprint();
+    // 0x0067847E: `call ?RevertCollisionShape@Entity@Moho@@QAEXXZ` -- the
+    // blueprint rebuild, which is what gives a freshly-created entity its
+    // collision primitive in the first place.
+    RevertCollisionShape();
 
     if (SimulationRef) {
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
@@ -4442,6 +4436,14 @@ namespace moho
     if (next < 0.0f) {
       next = 0.0f;
     }
+    {
+      static int sAdjProbe = 0;
+      if (delta < 0.0f && sAdjProbe++ < 40) {
+        gpg::Warnf("[DMGDIAG] AdjustHealth this=%p isUnit=%d health=%.2f maxHealth=%.2f delta=%.2f next=%.2f willSet=%d",
+                   static_cast<void*>(this), (IsUnit() != nullptr) ? 1 : 0,
+                   Health, MaxHealth, delta, next, (next != Health) ? 1 : 0);
+      }
+    }
     if (next != Health) {
       SetHealth(next);
     }
@@ -4690,39 +4692,54 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_0067AE00 (non-canonical helper lane).
+   * Address: 0x0067AE00 (FUN_0067AE00, ?SetCollisionShapeNone@Entity@Moho@@QAEXXZ)
    *
    * What it does:
    * Clears active collision primitive and resets collision-cell span to zero.
    */
-  void Entity::RevertCollisionShape()
+  void Entity::SetCollisionShapeNone()
   {
     InstallCollisionPrimitiveAndRefresh(*this, nullptr);
   }
 
   /**
-   * Address: 0x0067AE70 (FUN_0067AE70)
+   * Address: 0x0067AE70 (FUN_0067AE70, ?RevertCollisionShape@Entity@Moho@@QAEXXZ)
    *
    * What it does:
-   * Recreates collision primitive from blueprint shape descriptor.
+   * Recreates the collision primitive from the blueprint shape descriptor.
+   *
+   * 0x0067AE7D: a null blueprint tail-jumps to `SetCollisionShapeNone`
+   * (0x0067AFE8), and `mCollisionShape` (blueprint +0xA8) then selects between
+   * that same clear (0), the box builder (1) and the sphere builder (2); any
+   * other value returns having touched nothing (0x0067AE9A -> 0x0067AEE9).
    */
-  void Entity::RefreshCollisionShapeFromBlueprint()
+  void Entity::RevertCollisionShape()
   {
     if (!BluePrint) {
-      RevertCollisionShape();
+      SetCollisionShapeNone();
       return;
     }
 
     switch (BluePrint->mCollisionShape) {
     case COLSHAPE_None:
-      RevertCollisionShape();
+      SetCollisionShapeNone();
       break;
     case COLSHAPE_Box:
       SetCollisionBoxShape(BuildBlueprintCollisionBox(*BluePrint));
       break;
-    case COLSHAPE_Sphere:
-      SetCollisionSphereShape(BuildBlueprintCollisionCenter(*BluePrint), BluePrint->mSizeX * 0.5f);
+    case COLSHAPE_Sphere: {
+      // 0x0067AE9C-0x0067AEC4: the sphere's radius is `mSizeX * 0.5`, and it is
+      // that same radius -- not `mSizeY * 0.5` -- that is added to
+      // `mCollisionOffsetY` to lift the centre off the ground.
+      const float radius = BluePrint->mSizeX * 0.5f;
+      const Wm3::Vec3f localCenter{
+        BluePrint->mCollisionOffsetX,
+        BluePrint->mCollisionOffsetY + radius,
+        BluePrint->mCollisionOffsetZ,
+      };
+      SetCollisionSphereShape(localCenter, radius);
       break;
+    }
     default:
       break;
     }
@@ -6326,9 +6343,11 @@ namespace moho
     }
 
     bool didDetach = false;
-    if (Entity* const parent = entity->mAttachInfo.GetAttachTargetEntity(); parent != nullptr) {
+    Entity* const parentForProbe = entity->mAttachInfo.GetAttachTargetEntity();
+    if (Entity* const parent = parentForProbe; parent != nullptr) {
       didDetach = entity->DetachFrom(parent, skipBallistic);
     }
+
 
     lua_pushboolean(rawState, didDetach ? 1 : 0);
     return 1;
@@ -6654,6 +6673,13 @@ namespace moho
     }
     const float delta = static_cast<float>(lua_tonumber(rawState, 3));
 
+    {
+      static int sBindProbe = 0;
+      if (delta < 0.0f && sBindProbe++ < 30) {
+        gpg::Warnf("[DMGDIAG] Lua AdjustHealth binding entity=%p isUnit=%d delta=%.1f",
+                   static_cast<void*>(entity), (entity->IsUnit() != nullptr) ? 1 : 0, delta);
+      }
+    }
     entity->SimulationRef->Logf("Entity[0x%08x]:AdjustHealth(%.5f)\n", static_cast<std::uint32_t>(entity->id_), delta);
     entity->AdjustHealth(instigator, delta);
     return 0;
@@ -7145,6 +7171,7 @@ namespace moho
     const EntityDetachAllArgs args = DecodeEntityDetachAllArgs(state);
     const msvc8::vector<Entity*> attachedSnapshot(args.entity->GetAttachedEntities());
 
+
     for (Entity* const attached : attachedSnapshot) {
       if (attached == nullptr || attached->mAttachInfo.mParentBoneIndex != args.parentBoneIndex) {
         continue;
@@ -7266,7 +7293,10 @@ namespace moho
     }
 
     if (shape == COLSHAPE_None) {
-      entity->RevertCollisionShape();
+      // 0x0068F4DC: `SetCollisionShape('None')` clears the primitive outright;
+      // it is the only Lua entry point that does, and it is a different
+      // function from `RevertCollisionShape` (0x0067AE70).
+      entity->SetCollisionShapeNone();
       return 0;
     }
 
