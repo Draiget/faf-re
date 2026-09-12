@@ -1924,8 +1924,10 @@ moho_cri_sfx_internal::SfxMakeColorAdjustTableCallback SFX_SetMakeColAdjTableCbF
 // ---------------------------------------------------------------------------
 
 // The progressive and interlaced ARGB variants are only address-taken by
-// SFX_CnvFrmARGB8888ByCbFunc below. Their bodies (0x00AEEB40 / 0x00AEE960)
-// and the cft_c_/cft_sse_ leaf tier under them are the next recovery step.
+// SFX_CnvFrmARGB8888ByCbFunc below. The progressive one (0x00AEEB40) and its
+// cft_c_/cft_sse_ leaf pair are in SofdecSvmTransferRuntime.cpp; the
+// interlaced one (0x00AEE960) and its own 2-sample leaf tier are the next
+// recovery step.
 extern "C" std::int32_t CFT_Ycc420plnToArgb8888Prg(
   const CftYcc420PlanarPackedWords* inputWords,
   const CftRgb16OutputPackedWords* outputWords,
