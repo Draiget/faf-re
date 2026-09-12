@@ -1116,9 +1116,18 @@ void CSimDriver::ShutDown()
   }
 
   if (mSim) {
-    // The original shutdown path calls Sim::Shutdown() and then performs one
-    // final sync transfer before deleting the object.
+    // 0x0073BD7D-0x0073BD88: Shutdown, then one last sync pass, and only then
+    // the delete. The sync pass is not bookkeeping - it is what retires the
+    // commands. Shutdown destroys every unit, but a command only leaves
+    // `CCommandDb::commands` when `RefreshPublishedCommandEvent` finds its
+    // live-unit set empty and deletes it, and the only thing that runs that
+    // over the map is `CCommandDb::PublishSyncData`, reached from `Sim::Sync`
+    // at 0x00747B0C. Without it every order still standing at quit outlived
+    // the map, and `~CCommandDb` met its own "isn't empty" Die - so ending a
+    // game with any unit under orders killed the process on the way out
+    // instead of returning to the front end.
     mSim->Shutdown();
+    FinalizeSyncDispatchLocked(lock);
     delete mSim;
     mSim = nullptr;
   }
