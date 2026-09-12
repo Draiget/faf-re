@@ -34,6 +34,7 @@
 #include "moho/misc/ScrDebugHooks.h"
 #include "moho/misc/StatItem.h"
 #include "moho/resource/blueprints/RBlueprint.h"
+#include "moho/resource/blueprints/REffectBlueprint.h"
 #include "moho/entity/REntityBlueprint.h"
 #include "moho/resource/blueprints/RBeamBlueprint.h"
 #include "moho/resource/blueprints/REmitterBlueprint.h"
@@ -967,14 +968,31 @@ namespace moho
       drained.swap(rules.mBlueprintsByOrdinal);
     }
 
-    void DestroyBlueprintObjectsFromMap(RRuleGameRulesBlueprintMap& map) noexcept
+    void DestroyEffectBlueprintsInMap(RRuleGameRulesBlueprintMap& map) noexcept
     {
       // The binary deletes the pointed-to blueprints and nulls each lane but
       // leaves the nodes in place; the map's own destructor tears the tree
       // down afterwards.
+      //
+      // The three maps this runs over -- beam, emitter and trail -- hold
+      // REffectBlueprint-derived objects, not RBlueprint ones. Those two
+      // share a vtable word and an id string at +0x08 and nothing else:
+      // REffectBlueprint puts its three fidelity bytes at +0x24, where
+      // RBlueprint has mDescription, and its derived payload at +0x40, where
+      // RBlueprint has mSource. Casting to RBlueprint* therefore ran
+      // ~RBlueprint over the wrong fields, and its first statement --
+      // mSource.tidy -- handed msvc8::string a pointer assembled out of
+      // whatever the derived type keeps there. That reached free() with an
+      // address no page record owns, which is where quitting a game faulted.
+      //
+      // REffectBlueprint derives from gpg::RObject, whose destructor is
+      // virtual at slot 2 -- the slot the binary dispatches, call [[ecx]+8]
+      // with the delete flag set, in all three of its loops (0x0052978E,
+      // 0x005297F3, 0x00529856). Deleting through that base is what makes
+      // each object run its own destructor.
       for (auto& entry : map) {
         if (entry.second != nullptr) {
-          delete static_cast<RBlueprint*>(entry.second);
+          delete static_cast<REffectBlueprint*>(entry.second);
           entry.second = nullptr;
         }
       }
@@ -1314,9 +1332,9 @@ namespace moho
   {
     DestroyBlueprintObjectsFromOrdinalArray(*this);
 
-    DestroyBlueprintObjectsFromMap(mBeamBlueprints);
-    DestroyBlueprintObjectsFromMap(mEmitterBlueprints);
-    DestroyBlueprintObjectsFromMap(mTrailBlueprints);
+    DestroyEffectBlueprintsInMap(mBeamBlueprints);
+    DestroyEffectBlueprintsInMap(mEmitterBlueprints);
+    DestroyEffectBlueprintsInMap(mTrailBlueprints);
 
     // No manual teardown here: `mMaps` (now a real `msvc8::vector<
     // RRuleGameRulesLuaExportBinding>`) is destroyed by ordinary implicit
