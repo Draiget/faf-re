@@ -29,11 +29,11 @@ namespace moho
    * What it does:
    * Reflection type init for the common blueprint base (`sizeof = 0x60`).
    */
-  struct RBlueprint
+  struct RBlueprint : public gpg::RObject
   {
     static gpg::RType* sPointerType;
 
-    void* mVTable;                  // +0x00
+    // +0x00 is gpg::RObject's vptr.
     RRuleGameRules* mOwner;         // +0x04
     msvc8::string mBlueprintId;     // +0x08
     msvc8::string mDescription;     // +0x24
@@ -82,10 +82,10 @@ namespace moho
      * What it does:
      * Releases base blueprint string lanes and decrements the shared instance
      * counter stat slot. The binary closes with a store of the `gpg::RObject`
-     * vtable into the object's first word - the inlined base destructor - which
-     * this layout models as a plain `mVTable` field and so has nothing to undo.
+     * vtable into the object's first word, which is the inlined gpg::RObject
+     * base destructor the compiler now emits from the base declaration.
      */
-    ~RBlueprint();
+    ~RBlueprint() override;
 
     /**
      * Address: 0x0050DF10 (FUN_0050DF10, Moho::RBlueprint::InitBlueprint)
@@ -103,8 +103,12 @@ namespace moho
      *
      * What it does:
      * Base blueprint post-load hook; default implementation is empty.
+     *
+     * Virtual, and the first one this class adds: `M` in the mangled name is
+     * protected-virtual, and 0x0050DF4D dispatches it through slot 3, which
+     * is where a first derived virtual lands above gpg::RObject's three.
      */
-    void OnInitBlueprint();
+    virtual void OnInitBlueprint();
 
     /**
      * Address: 0x00556CE0 (FUN_00556CE0, Moho::RBlueprint::GetPointerType)
