@@ -1484,22 +1484,6 @@ namespace
     ::operator delete(refData);
   }
 
-  /**
-   * Address: 0x0097AC50 (FUN_0097AC50, wxEvtHandler::Connect)
-   *
-   * Same bridge as `ScrWatchCtrl.cpp`'s copy (each translation unit needs its
-   * own extern declaration for the shared statically-linked symbol - see that
-   * file for the full rationale). Builds one dynamic event-table entry and
-   * appends it to the target handler's `m_dynamicEvents` list.
-   */
-  void ConnectDynamicTreeItemActivatedHandler(
-    void* evtHandlerThis,
-    std::int32_t id,
-    std::int32_t lastId,
-    void* memberFunctionThunk,
-    void* userData
-  );
-
   // ===========================================================================
   // Local construction helpers - collapse the ~15 repeated menu-item /
   // toolbar-button decompiler blocks (each: build wxString label/help, build
@@ -1702,15 +1686,24 @@ moho::ScrDebugWindow::ScrDebugWindow()
   );
   moho::scrdebug::AddNotebookPage(notebook, mGlobalWatchControl, L"Globals", false, -1);
 
-  // Source-tree double-click/activation opens the file (0x004BD9EF: Connect
-  // on the dircontrol's own id, matching OnSourceTreeItemActivated's already-
-  // recovered read of `mSourcePathOwnerControl`).
+  // Source-tree double-click/activation opens the file. 0x004BE568-0x004BE58D
+  // binds it on the *window*, not on the dir control -- `ecx` is `this` at the
+  // call -- which is what makes OnSourceTreeItemActivated's read of
+  // `mSourcePathOwnerControl` meaningful. The id it matches on is the inner
+  // wxTreeCtrl's (0x004BE56E fetches it through the dir control's GetTreeCtrl
+  // slot and reads +0x28), because that control is what raises the event.
   {
     using OnSourceTreeItemActivatedThunk = void (ScrDebugWindow::*)(void*);
     constexpr OnSourceTreeItemActivatedThunk kHandler = &ScrDebugWindow::OnSourceTreeItemActivated;
     void* rawHandlerAddress = nullptr;
     std::memcpy(&rawHandlerAddress, &kHandler, sizeof(rawHandlerAddress));
-    ConnectDynamicTreeItemActivatedHandler(sourceTree, -1, -1, rawHandlerAddress, nullptr);
+    Connect(
+      moho::scrdebug::GetWxGenericDirCtrlTreeControlId(sourceTree),
+      -1,
+      moho::WX_GetCommandTreeItemActivatedEventType(),
+      rawHandlerAddress,
+      nullptr
+    );
   }
 
   // ----- Persisted geometry -----

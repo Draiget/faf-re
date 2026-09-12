@@ -11463,6 +11463,26 @@ namespace
 
   std::unordered_map<const wxTreeListCtrlRuntime*, WxTreeListRuntimeState> gWxTreeListRuntimeStateByControl{};
 
+  /**
+   * One binding made through `wxEvtHandler::Connect` - the 0x14 bytes
+   * 0x0097AC75 allocates, filled at 0x0097AC8B-0x0097ACA2.
+   *
+   * The field order below is the binary's, but the notable difference from the
+   * static `wxEventTableEntry` is `eventType`: Connect stores the caller's
+   * event type straight into +0x10, and SearchDynamicEventTable compares the
+   * event's own type against it directly at 0x0097ADED. The static tables hold
+   * a *pointer* there instead, because their entries are written at compile
+   * time while the ids they name are handed out by wxNewEventType at startup.
+   */
+  struct WxDynamicEventTableEntry
+  {
+    std::int32_t id = -1;              // +0x00 single id, or range start
+    std::int32_t lastId = -1;          // +0x04 range end; -1 when not a range
+    void* fn = nullptr;                // +0x08 handler; skipped when null
+    void* callbackUserData = nullptr;  // +0x0C copied onto the event before dispatch
+    std::int32_t eventType = 0;        // +0x10 by value, not by pointer
+  };
+
   struct WxWindowBaseRuntimeState
   {
     std::int32_t minWidth = -1;
@@ -11477,7 +11497,7 @@ namespace
     // bindings, and the next/previous handlers in the push/pop chain (see
     // wxWindowBase::PushEventHandler/PopEventHandler).
     std::uint8_t handlerEnabled = 1;
-    void* dynamicEvents = nullptr;
+    std::vector<WxDynamicEventTableEntry> dynamicEvents{};
     wxWindowBase* nextHandler = nullptr;
     wxWindowBase* previousHandler = nullptr;
     // wxWindow sets this in its destructor (the +0x0CC bit-3 flag at
@@ -11670,6 +11690,8 @@ namespace
   std::int32_t gWxEvtMouseCaptureChangedRuntimeType = 0;
   std::int32_t gWxEvtUpdateUiRuntimeType = 0;
   std::int32_t gWxEvtCommandMenuSelectedRuntimeType = 0;
+  // wxEVT_COMMAND_TREE_ITEM_ACTIVATED at 0x00F8F7B0.
+  std::int32_t gWxEvtCommandTreeItemActivatedRuntimeType = 0;
   std::int32_t gWxEvtMenuHighlightRuntimeType = 0;
   // Stock frame icons. Both read 0x00000000 in the shipped image - they are
   // filled in by the wx stock-object init lane, which is not recovered yet,
@@ -11797,6 +11819,14 @@ namespace
       gWxEvtCommandMenuSelectedRuntimeType = wxNewEventType();
     }
     return gWxEvtCommandMenuSelectedRuntimeType;
+  }
+
+  [[nodiscard]] std::int32_t EnsureWxEvtCommandTreeItemActivatedRuntimeType()
+  {
+    if (gWxEvtCommandTreeItemActivatedRuntimeType == 0) {
+      gWxEvtCommandTreeItemActivatedRuntimeType = wxNewEventType();
+    }
+    return gWxEvtCommandTreeItemActivatedRuntimeType;
   }
 
   [[nodiscard]] std::int32_t EnsureWxEvtMenuHighlightRuntimeType()
@@ -39556,6 +39586,95 @@ bool wxWindowBase::SearchEventTable(void* const eventTable, void* const event)
 }
 
 /**
+ * Address: 0x0097AC50 (FUN_0097AC50)
+ * Mangled: ?Connect@wxEvtHandler@@QAEXHHHP8wxEvtHandler@@AEXAAVwxEvent@@@ZPAVwxObject@@@Z
+ *
+ * What it does:
+ * See the declaration in WxRuntimeTypes.h: appends one dynamic binding to this
+ * handler's list, which ProcessEvent offers events to before its static tables.
+ *
+ * The binary's list is a wxList it allocates on the first Connect and hangs off
+ * window +0x10; this project's windows keep their wxEvtHandler lanes in the
+ * window-keyed side table instead (the same place PushEventHandler/
+ * PopEventHandler keep the handler chain), so the list is a vector and its
+ * lifetime is the state entry's. Append order is what matters and is preserved:
+ * the binary calls wxList::Append (0x00978440) rather than Insert.
+ */
+void wxWindowBase::Connect(
+  const std::int32_t id,
+  const std::int32_t lastId,
+  const std::int32_t eventType,
+  void* const handlerFunction,
+  void* const userData
+)
+{
+  WxDynamicEventTableEntry entry{};
+  entry.id = id;
+  entry.lastId = lastId;
+  entry.fn = handlerFunction;
+  entry.callbackUserData = userData;
+  entry.eventType = eventType;
+
+  EnsureWxWindowBaseRuntimeState(this).dynamicEvents.push_back(entry);
+}
+
+/**
+ * Address: 0x0097ADC0 (FUN_0097ADC0)
+ * Mangled: ?SearchDynamicEventTable@wxEvtHandler@@AAE_NAAVwxEvent@@@Z
+ *
+ * What it does:
+ * See the declaration in WxRuntimeTypes.h: offers one event to the bindings
+ * Connect made, in the order they were made.
+ */
+bool wxWindowBase::SearchDynamicEventTable(void* const event)
+{
+  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
+  if (wxEvent == nullptr) {
+    return false;
+  }
+
+  const std::int32_t eventType = wxEvent->mEventType;
+  const std::int32_t eventId = wxEvent->mEventId;
+
+  // Looked up by index, and re-looked-up each round: a handler may Connect
+  // another binding or create a window, either of which can move this vector
+  // and rehash the side table. The binary walks a linked list of separately
+  // allocated nodes and has neither hazard.
+  for (std::size_t index = 0;; ++index) {
+    const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+    if (state == nullptr || index >= state->dynamicEvents.size()) {
+      break;
+    }
+
+    const WxDynamicEventTableEntry entry = state->dynamicEvents[index];
+    if (entry.fn == nullptr || entry.eventType != eventType) {
+      continue;
+    }
+
+    const bool matches = (entry.id == -1)
+      || (entry.lastId == -1
+            ? (eventId == entry.id)
+            : (eventId >= entry.id && eventId <= entry.lastId));
+    if (!matches) {
+      continue;
+    }
+
+    wxEvent->mSkipped = 0;
+    wxEvent->mCallbackUserData = entry.callbackUserData;
+    InvokeWxEventTableHandler(this, entry.fn, *wxEvent);
+
+    // 0x0097AE23: a handler that called Skip() does not end the walk here, so
+    // a later binding still gets its turn - which is where this differs from
+    // SearchEventTable, whose single table answers for the whole class.
+    if (wxEvent->mSkipped == 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Address: 0x0097AF30 (FUN_0097AF30)
  * Mangled: ?ProcessEvent@wxEvtHandler@@UAE_NAAVwxEvent@@@Z
  *
@@ -39593,6 +39712,14 @@ bool wxWindowBase::ProcessEvent(void* const event)
   const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
 
   if (state == nullptr || state->handlerEnabled != 0) {
+    // Bindings made through Connect come first (0x0097AF6D tests the list at
+    // window +0x10 before reaching the static tables), which is what lets a
+    // control wire up a handler whose id its class's compile-time table could
+    // not have named.
+    if (state != nullptr && !state->dynamicEvents.empty() && SearchDynamicEventTable(event)) {
+      return true;
+    }
+
     // Static tables: this class's, then each base class's behind it.
     for (const auto* table = static_cast<const wxEventTable*>(GetEventTable());
          table != nullptr;
@@ -43385,6 +43512,11 @@ std::int32_t moho::WX_GetWxEvtLeftDownType()
 std::int32_t moho::WX_GetWxEvtMiddleDownType()
 {
   return *WxEventTypeSlot(gWxEvtMiddleDownRuntimeType);
+}
+
+std::int32_t moho::WX_GetCommandTreeItemActivatedEventType()
+{
+  return EnsureWxEvtCommandTreeItemActivatedRuntimeType();
 }
 
 moho::WxEventFamily moho::WX_ClassifyEventType(const std::int32_t eventType)

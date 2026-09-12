@@ -98,6 +98,16 @@ namespace moho::scrdebug
     const wchar_t* name
   );
 
+  /**
+   * Address: 0x004BE56E-0x004BE57E (wxGenericDirCtrl::GetTreeCtrl, vtable
+   * slot +0x250, then the returned control's window id at +0x28)
+   *
+   * The id the debug window's tree-activation binding matches on: the events
+   * are raised by the dir control's inner wxTreeCtrl, not by the dir control
+   * itself, so the binding names the inner control's id.
+   */
+  int GetWxGenericDirCtrlTreeControlId(void* dirCtrl);
+
   /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
   void* ConstructWxNotebook(
     void* parent,

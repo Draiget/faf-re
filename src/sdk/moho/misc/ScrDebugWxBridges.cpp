@@ -237,6 +237,21 @@ namespace moho::scrdebug
     );
   }
 
+  /**
+   * Address: 0x004BE56E-0x004BE57E (wxGenericDirCtrl::GetTreeCtrl, then the
+   * returned control's window id)
+   */
+  int GetWxGenericDirCtrlTreeControlId(void* const dirCtrl)
+  {
+    auto* const control = static_cast<wxGenericDirCtrl*>(dirCtrl);
+    if (control == nullptr) {
+      return wxID_ANY;
+    }
+
+    const wxTreeCtrl* const treeControl = control->GetTreeCtrl();
+    return (treeControl != nullptr) ? treeControl->GetId() : wxID_ANY;
+  }
+
   /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
   void* ConstructWxNotebook(
     void* const parent,
