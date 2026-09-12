@@ -59,7 +59,11 @@
 
 // === Function stubs (cdecl no-arg, return 0/null) ===
 extern "C" {
-  void* ADXM_Finish() { return nullptr; }
+  // ADXM_Finish (0x00B06DC0): real body in SofdecAdxPlatformRuntime.cpp,
+  // right after adxm_setup_thrd whose work it undoes. While it was a stub
+  // CMovieManager::Destroy left the three Sofdec worker threads running, the
+  // multimedia timer armed and the vsync event open for the rest of the
+  // process.
   // ADXM_SetupThrd (0x00B07C80): real body in SofdecAdxPlatformRuntime.cpp.
   // This is what creates the three Sofdec worker threads. While it was a
   // stub none of them existed, so nothing ticked the SFD decode server and
