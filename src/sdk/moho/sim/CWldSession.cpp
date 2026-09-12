@@ -11034,7 +11034,8 @@ namespace moho
       if (outSample->mSampleKind == 2) {
         // 0x008BEC94..0x008BECAA: destination `+0x0C/+0x10/+0x14` from source
         // `+0x08/+0x0C/+0x10`. The two shapes differ by one dword, so copying
-        // the source's `+0x0C` run instead handed the graph `(y, z, junk)`.
+        // the source's `+0x0C` run instead handed the graph `(y, z, junk)` and
+        // every order node landed at an impossible place.
         outSample->mWorldPosition.x = fallbackSample->mPos.x;
         outSample->mWorldPosition.y = fallbackSample->mPos.y;
         outSample->mWorldPosition.z = fallbackSample->mPos.z;
@@ -11523,6 +11524,9 @@ namespace moho
           }
         }
 
+        gpg::Warnf("[DRAGDIAG] cached-entity arm: cachedTarget=%p closest=%p candidates=%u clamped=(%.1f,%.1f,%.1f)",
+                   static_cast<void*>(cachedTargetEntity), static_cast<void*>(closest),
+                   static_cast<unsigned>(candidates.size()), clampedPos.x, clampedPos.y, clampedPos.z);
         if (closest != nullptr) {
           UserCommandTargetView entityTarget{};
           entityTarget.targetType = UserTargetType::Entity;
@@ -11570,6 +11574,10 @@ namespace moho
       UserCommandTargetView positionTarget{};
       positionTarget.targetType = UserTargetType::Position;
       positionTarget.position = clampedPos;
+      gpg::Warnf("[DRAGDIAG] default arm: mouse=(%.1f,%.1f,%.1f) clamped=(%.1f,%.1f,%.1f) rect=(%d,%d)-(%d,%d) map=%p",
+                 mouse.x, mouse.y, mouse.z, clampedPos.x, clampedPos.y, clampedPos.z,
+                 map->mPlayableRect.x0, map->mPlayableRect.z0, map->mPlayableRect.x1, map->mPlayableRect.z1,
+                 static_cast<const void*>(map));
       ISSUE_SetCommandTarget(helper, positionTarget);
     }
 
@@ -16238,6 +16246,61 @@ namespace moho
       OrphanEntity(LookupEntityId(erasedId));
     }
 
+    { static int sBeatCount = 0; ++sBeatCount; if (sBeatCount <= 5 || (sBeatCount % 50) == 0) { gpg::Warnf("[POSEDIAG] beat=%d poseUpdates=%u entityUpdates=%u unitUpdates=%u", sBeatCount, static_cast<unsigned>(beat.mPoseUpdates.size()), static_cast<unsigned>(beat.mEntityUpdates.size()), static_cast<unsigned>(beat.mUnitUpdates.size())); } } // TEMPORARY PROBE (do not commit)
+    // TEMPORARY PROBE -- input-free attack-order harness, delete when resolved.
+    // The game window is not enumerable from the agent's session, so synthetic
+    // clicks never arrive; this issues the order the test needs from inside the
+    // sim instead, at fixed beats, so the attack path can be measured headlessly.
+    {
+      static int sHarnessBeat = 0;
+      ++sHarnessBeat;
+      if (sHarnessBeat == 150 && std::getenv("FAF_HARNESS") != nullptr) {
+        const STIMap* const playableMap =
+          (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr)
+            ? reinterpret_cast<const STIMap*>(mWldMap->mTerrainRes->mPlayableRectSource)
+            : nullptr;
+        gpg::Warnf("[HARNESS] rect=(%d,%d)-(%d,%d) map=%p",
+                   playableMap != nullptr ? playableMap->mPlayableRect.x0 : -1,
+                   playableMap != nullptr ? playableMap->mPlayableRect.z0 : -1,
+                   playableMap != nullptr ? playableMap->mPlayableRect.x1 : -1,
+                   playableMap != nullptr ? playableMap->mPlayableRect.z1 : -1,
+                   static_cast<const void*>(playableMap));
+
+        gpg::fastvector<UserEntity*> allEntities{};
+        auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+        (void)spatialDb->Collect(allEntities, ENTITYTYPE_Unit);
+
+        UserUnit* ownUnit = nullptr;
+        for (UserEntity* const entity : allEntities) {
+          if (entity == nullptr) {
+            continue;
+          }
+          if (UserUnit* const asUnit = entity->IsUserUnit(); asUnit != nullptr) {
+            ownUnit = asUnit;
+            break;
+          }
+        }
+
+        if (ownUnit != nullptr) {
+          const Wm3::Vec3f unitPos = reinterpret_cast<UserEntity*>(ownUnit)->mVariableData.mCurTransform.pos_;
+          SSTICommandIssueData issueData(EUnitCommandType::UNITCOMMAND_Attack);
+          issueData.mTarget.mType = EAiTargetType::AITARGET_Ground;
+          issueData.mTarget.mPos.x = unitPos.x + 12.0f;
+          issueData.mTarget.mPos.y = unitPos.y;
+          issueData.mTarget.mPos.z = unitPos.z;
+
+          gpg::fastvector<UserUnit*> orderUnits{};
+          orderUnits.push_back(ownUnit);
+          gpg::Warnf("[HARNESS] issuing attack-ground unit=%p from=(%.1f,%.1f,%.1f) to=(%.1f,%.1f,%.1f)",
+                     static_cast<void*>(ownUnit), unitPos.x, unitPos.y, unitPos.z,
+                     issueData.mTarget.mPos.x, issueData.mTarget.mPos.y, issueData.mTarget.mPos.z);
+          ISSUE_Command(orderUnits, issueData, true);
+        } else {
+          gpg::Warnf("[HARNESS] no own unit found among %u entities",
+                     static_cast<unsigned>(allEntities.size()));
+        }
+      }
+    }
     for (const SEntityPoseUpdateEntry& poseUpdate : beat.mPoseUpdates) {
       UserEntity* const entity = LookupEntityId(poseUpdate.mEntityId);
       if (entity == nullptr) {
@@ -16260,11 +16323,15 @@ namespace moho
       helper->mVariableDataDirty = 1u;
     }
 
+    { static int c = 0; if ((!beat.mPendingCommandEventRemovals.empty() || !beat.mPendingReleasedCommandIds.empty()) && c++ < 200) gpg::Warnf("[GHOST] DoBeat removals=%u released=%u mCommands=%u", static_cast<unsigned>(beat.mPendingCommandEventRemovals.size()), static_cast<unsigned>(beat.mPendingReleasedCommandIds.size()), static_cast<unsigned>(mCommandManager->mCommands.size())); } // TEMPORARY PROBE (do not commit)
     for (const CmdId removedCommandId : beat.mPendingCommandEventRemovals) {
+      { static int c = 0; if (c++ < 200) gpg::Warnf("[GHOST]   removal id=0x%08X helper=%p", static_cast<unsigned>(removedCommandId), static_cast<void*>(FindCommandIssueHelper(*mCommandManager, removedCommandId))); } // TEMPORARY PROBE (do not commit)
       delete FindCommandIssueHelper(*mCommandManager, removedCommandId);
     }
 
+    { static int c = 0; for (const CmdId rid : beat.mPendingReleasedCommandIds) { if (c++ < 200) gpg::Warnf("[GHOST]   release id=0x%08X helper=%p", static_cast<unsigned>(rid), static_cast<void*>(FindCommandIssueHelper(*mCommandManager, rid))); } } // TEMPORARY PROBE (do not commit)
     DeleteCommandIssueHelpers(*mCommandManager, beat.mPendingReleasedCommandIds);
+    { static int c = 0; if ((!beat.mPendingCommandEventRemovals.empty() || !beat.mPendingReleasedCommandIds.empty()) && c++ < 200) gpg::Warnf("[GHOST] DoBeat after mCommands=%u", static_cast<unsigned>(mCommandManager->mCommands.size())); } // TEMPORARY PROBE (do not commit)
 
     // The command graph only gets marked here; the mesh rebuild it implies runs
     // back in `SessionFrame`.
@@ -16379,7 +16446,23 @@ namespace moho
       (void)sEngineStat_UserSync_SessionTick_NumTickers->SetInt(&tickerCount);
 
       for (std::int32_t i = 0; i < tickerCount; ++i) {
-        tickers[static_cast<std::size_t>(i)]->Tick(beat.mCurBeat);
+        UserEntity* const ticker = tickers[static_cast<std::size_t>(i)];
+        // TEMPORARY GUARD -- spatial-db triage, delete when resolved: a
+        // collected owner whose vtable is unreadable or whose Tick slot is
+        // null is reported and skipped rather than called.
+        {
+          const void* const* const vtable =
+            ticker != nullptr && ::IsBadReadPtr(ticker, sizeof(void*)) == FALSE
+              ? *reinterpret_cast<const void* const* const*>(ticker) : nullptr;
+          const bool ok = vtable != nullptr && ::IsBadReadPtr(vtable, sizeof(void*) * 4) == FALSE
+            && vtable[0] != nullptr && vtable[1] != nullptr;
+          if (!ok) {
+            gpg::Warnf("[TICKBAD] idx=%d/%d owner=%p vtable=%p", i, tickerCount, static_cast<void*>(ticker),
+                       static_cast<const void*>(vtable));
+            continue;
+          }
+        }
+        ticker->Tick(beat.mCurBeat);
       }
     }
 
@@ -18019,8 +18102,8 @@ namespace moho
 
       case COMMOD_Ping:
       // The jump table at 0x00821F04 routes mode 7 to the same entry as
-      // `COMMOD_Ping`; the recovered enum has no name for it.
-      case static_cast<ECommandMode>(COMMOD_Ping + 1):
+      // `COMMOD_Ping`.
+      case COMMOD_CancelCommandMode:
         UI_EndCommandMode();
         return;
 
@@ -18532,6 +18615,12 @@ namespace moho
 
     UserEntity* const hoveredEntity = this->GetHoveredUserEntity();
     UserUnit* const hoveredUnit = hoveredEntity != nullptr ? hoveredEntity->IsUserUnit() : nullptr;
+    // TEMPORARY PROBE (do not commit): click-select triage.
+    gpg::Warnf("[CLICKDIAG] ReleaseDrag mods=0x%X hovered=%p unit=%p selectable=%d army=%p focus=%p canSelect=%d",
+               static_cast<unsigned>(modifierBits), static_cast<void*>(hoveredEntity), static_cast<void*>(hoveredUnit),
+               hoveredEntity != nullptr ? (hoveredEntity->IsSelectable() ? 1 : 0) : -1,
+               hoveredEntity != nullptr ? static_cast<void*>(hoveredEntity->mArmy) : nullptr,
+               static_cast<void*>(GetFocusUserArmy()), CanSelectUnit(hoveredUnit) ? 1 : 0);
 
     if (ui_DebugAltClick && (modifierBits & kAltMask) != 0u && hoveredEntity != nullptr) {
       UserArmy* const hoveredArmy = hoveredEntity->mArmy;
@@ -19527,7 +19616,6 @@ namespace moho
         const float fuelRatio = unit->mUnitVarDat.mFuelRatio;
         const float shieldRatio = unit->mUnitVarDat.mShieldRatio;
         const float workProgress = unit->mUnitVarDat.mWorkProgress;
-
         // -1 is the "this unit has no fuel lane" sentinel, distinct from an
         // empty tank at 0 (0x0085D0D3 / 0x0085D180).
         constexpr float kNoFuelLaneSentinel = -1.0f;
@@ -22132,11 +22220,23 @@ moho::CommandModeData* func_GetRightMouseButtonAction(
     return out;
   }
 
-  // An active UI command mode (e.g. a placement mode already engaged) suppresses
-  // right-click command resolution; leave `out` untouched and bail.
+  // An active UI command mode (a build placement, a ping, a targeting order the
+  // UI started) does not resolve a right-click into an order - it resolves it
+  // into "cancel the mode you are in".
+  //
+  //     0x0081ED4E  mov [esp+commandModeData.mMode], 7
+  //     0x0081ED56  call SCommandModeData::SCommandModeData(out, &commandModeData)
+  //
+  // `CommandModeData::HandleEvent` routes mode 7 to `UI_EndCommandMode`, so the
+  // matching right-button release tears the placement down. Returning `out`
+  // untouched left it `COMMOD_None`, and the release arm skips `COMMOD_None`
+  // entirely - which is why right-clicking never discarded a building you were
+  // about to place.
   UICommandModeData commandMode{};
   TryGetUICommandMode(wldSession->mState, commandMode);
   if (!commandMode.mMode.empty()) {
+    commandModeData.mMode = COMMOD_CancelCommandMode;
+    *out = commandModeData;
     return out;
   }
 
