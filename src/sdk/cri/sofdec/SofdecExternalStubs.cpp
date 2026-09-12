@@ -164,7 +164,9 @@ extern "C" {
   // gate; while it was a no-op stub the first decode pass latched the gate and
   // no later pass ever got past it.
   void* MWSST_Destroy() { return nullptr; }
-  void* MWSST_GetStat() { return nullptr; }
+  // MWSST_GetStat (0x00AD9C40): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside MWSST_Stop and
+  // MWSST_Pause, the other entries of the same installed descriptor.
   // MWSST_Stop (0x00AD9C10), MWSST_Pause (0x00AD9CC0): real bodies in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // The MWSTM family (0x00AD90D0 / 0x00AD91A0 / 0x00AD9150 / 0x00AD9160 /
@@ -283,7 +285,9 @@ extern "C" {
   // to mwPlySfdInit. The SFD transfer strategy table it depends on
   // (mwsfd_initsfdpara.callbacks -> 0x00D7F3D0) is now modelled at the end of
   // cri/sofdec/SofdecSfdRuntime.cpp.
-  void* mwPlyIsNextFrmReady() { return nullptr; }
+  // mwPlyIsNextFrmReady (0x00ACA7D0): real body in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside mwPlyRelCurFrm which
+  // releases the frames its answer lets mwPlyGetCurFrm drop.
   // mwPlyPause (0x00ACB220): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp. CMovie arms the pause in
   // OpenMovie and releases it in PlayMovie; while this was a stub neither call

@@ -4042,6 +4042,34 @@
   }
 
   /**
+   * Address: 0x00ACA7D0 (FUN_00ACA7D0, _mwPlyIsNextFrmReady)
+   *
+   * What it does:
+   * Reports whether the SFD lane behind this playback handle already holds the
+   * frame after the current one. `mwPlyGetCurFrm` (0x00ACA10B) asks this once
+   * per pooled frame to decide how many intermediate frames it may drop, so a
+   * stubbed answer of 0 meant a late decoder never caught up -- it released
+   * exactly one frame per call however far behind it had fallen.
+   *
+   * A handle with no SFD lane answers 0 rather than reaching the tail jump at
+   * 0x00ACA806.
+   */
+  std::int32_t mwPlyIsNextFrmReady(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    if (MWSFD_IsEnableHndl(ply) != 1) {
+      (void)MWSFSVM_Error(kMwsfdErrIsNextFrmReadyInvalidHandle);
+      return 0;
+    }
+
+    const std::int32_t sfdHandleAddress = mwPlyGetSfdHn(ply);
+    if (sfdHandleAddress == 0) {
+      return 0;
+    }
+
+    return SFD_IsNextFrmReady(sfdHandleAddress);
+  }
+
+  /**
    * Address: 0x00ACA8A0 (FUN_00ACA8A0, _mwPlyGetNumSkipDisp)
    *
    * What it does:
@@ -5169,6 +5197,7 @@
   /// Slot offsets in the installed stream-manager descriptor.
   constexpr std::size_t kMwsstIfStartSjSlot = 20 / sizeof(void*);
   constexpr std::size_t kMwsstIfStopSlot = 24 / sizeof(void*);
+  constexpr std::size_t kMwsstIfGetStatSlot = 28 / sizeof(void*);
   constexpr std::size_t kMwsstIfPauseSlot = 36 / sizeof(void*);
 
   using MwsstIfTable = void**;
@@ -5249,6 +5278,36 @@
       return 0;
     }
     return stop(streamState->streamObject);
+  }
+
+  /**
+   * Address: 0x00AD9C40 (FUN_00AD9C40, _MWSST_GetStat)
+   *
+   * What it does:
+   * Asks the descriptor's status entry what one live stream lane is doing. A
+   * lane that is not live, a descriptor with no status entry, and an entry that
+   * answers nothing all come out as 0 -- EDI is zeroed at 0x00AD9C47 and only
+   * the dispatch at 0x00AD9C6F ever replaces it.
+   *
+   * `mwsfsvr_StartPlayback` (0x00AD95F9) compares the answer against 2 to
+   * decide whether the stream has already primed enough to start the decoder.
+   */
+  std::int32_t MWSST_GetStat(moho::MwsstStreamStateSubobj* const streamState)
+  {
+    if (MWSST_IsEnable(streamState) != 1) {
+      return 0;
+    }
+
+    const MwsstIfTable ifTable = MWSST_GetIfTbl();
+    if (ifTable == nullptr) {
+      return 0;
+    }
+
+    const auto getStat = reinterpret_cast<std::int32_t(__cdecl*)(void*)>(ifTable[kMwsstIfGetStatSlot]);
+    if (getStat == nullptr) {
+      return 0;
+    }
+    return getStat(streamState->streamObject);
   }
 
   /**
