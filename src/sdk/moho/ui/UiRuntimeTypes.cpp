@@ -20488,7 +20488,16 @@ moho::CUIWorldView::~CUIWorldView()
   UnlinkFocusControlSentinel(&view->mOverlayLink);
 
   view->mCameraTrack = msvc8::string();
-  view->mSubobject.~CUIWorldViewBuildDragRuntimeView();
+
+  // mBuildDrag is not destroyed here. It is a member of the CRenderWorldView
+  // base, so the compiler destroys it as part of that base -- which is what
+  // the single call to struct_WorldView_object::~struct_WorldView_object at
+  // 0x0086EB18 is, sitting where reverse-declaration-order member destruction
+  // puts it, ahead of the two ~SCommandModeData calls at 0x0086EB5C/0x0086EB67
+  // for the same base's command-mode blocks. Calling it explicitly here ran it
+  // twice: the second pass re-entered ~map on mMeshes after the first had
+  // already released the tree, and read through the freed head.
+
   // Owning handle, and this pair has no destructor - clearing the two words
   // would leak the reference and with it the whole command graph, ghost meshes
   // included. Same release `CRenderWorldView::RenderCommandGraph` performs when
