@@ -4845,6 +4845,48 @@
     return enabled;
   }
 
+  // ADXM_WaitVsync lives in the MwPlayback fragment, which this aggregate
+  // compiles after this one.
+  std::int32_t ADXM_WaitVsync();
+
+  /**
+   * Address: 0x00AD91E0 (FUN_00AD91E0, _mwsfsvr_ExecForceSvrBdr)
+   *
+   * What it does:
+   * Drains a playback handle that is parked on a server boundary: raise the
+   * boundary request, let one vsync pass so the server threads run, drop the
+   * request, and repeat while the handle still reports itself parked, up to
+   * ten times (0x00AD9209).
+   */
+  void mwsfsvr_ExecForceSvrBdr(moho::MwsfdPlaybackStateSubobj* const ply)
+  {
+    for (std::int32_t attempt = 0; attempt < 10; ++attempt) {
+      MWSFD_SetReqSvrBdrHn(ply, 1);
+      (void)ADXM_WaitVsync();
+      MWSFD_SetReqSvrBdrHn(ply, 0);
+      if (ply->mwplyServerFlag != 1) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Address: 0x00AD91C0 (FUN_00AD91C0, _MWSFSVR_CheckForceSvrBdr)
+   *
+   * What it does:
+   * Runs the drain above only for a handle that is actually parked; a handle
+   * that is not returns immediately (0x00AD91C8).
+   */
+  std::int32_t MWSFSVR_CheckForceSvrBdr(const std::int32_t plyAddress)
+  {
+    auto* const ply =
+      reinterpret_cast<moho::MwsfdPlaybackStateSubobj*>(SjAddressToPointer(plyAddress));
+    if (ply->mwplyServerFlag == 1) {
+      mwsfsvr_ExecForceSvrBdr(ply);
+    }
+    return 0;
+  }
+
   /**
    * Address: 0x00AD9910 (FUN_00AD9910, _MWSFD_SetReqSvrBdrHn)
    *

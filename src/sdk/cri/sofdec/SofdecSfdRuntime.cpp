@@ -26,6 +26,53 @@
   static_assert(sizeof(SofdecHeaderAnalyzerPoolState) == 0x0C, "SofdecHeaderAnalyzerPoolState size must be 0x0C");
 
   extern "C" SofdecHeaderAnalyzerPoolState sfh_workinfo;
+  extern "C" std::int32_t sfh_init_cont;
+  /**
+   * Address: 0x00ADC7F0 (FUN_00ADC7F0, sub_ADC7F0)
+   *
+   * What it does:
+   * Clears one SFH pool-state descriptor: three dwords to zero, the inverse
+   * of func_SofDec_InitSfhWork above.
+   */
+  extern "C" void func_SofDec_ClearSfhWork(SofdecHeaderAnalyzerPoolState* const poolState)
+  {
+    poolState->size = 0;
+    poolState->cur = 0;
+    poolState->ptr = nullptr;
+  }
+
+  /**
+   * Address: 0x00ADC740 (FUN_00ADC740, _SFH_Finish)
+   *
+   * What it does:
+   * Drops one analyser-library nesting level and, once the last one is gone,
+   * clears the pool descriptor so the next SFH_Init rebuilds it.
+   *
+   * The decrement is unconditional (0x00ADC745), unlike SUD_Finish's, so a
+   * count that has already reached zero goes negative and the clear runs
+   * again. That is what the binary does; nothing here depends on it.
+   */
+  extern "C" void SFH_Finish()
+  {
+    --sfh_init_cont;
+    if (sfh_init_cont <= 0) {
+      func_SofDec_ClearSfhWork(&sfh_workinfo);
+    }
+  }
+
+  /**
+   * Address: 0x00AE7160 (FUN_00AE7160, _SFHDS_Finish)
+   *
+   * What it does:
+   * The header-dataset library's teardown, which is nothing but the
+   * analyser's: 0x00AE7160 is a single `jmp _SFH_Finish`.
+   */
+  extern "C" std::int32_t SFHDS_Finish()
+  {
+    SFH_Finish();
+    return 0;
+  }
+
   /**
    * Address: 0x00ADC800 (FUN_00ADC800, func_SofDec_InitSfhWork)
    *

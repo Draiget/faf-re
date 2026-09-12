@@ -148,7 +148,9 @@ extern "C" {
   // SofdecAdxPlatformRuntime.cpp. These are the Sofdec worker-thread bodies;
   // while they were stubs nothing ticked the SFD decode server, so no movie
   // frame was ever decoded.
-  void* MWSFSVR_CheckForceSvrBdr() { return nullptr; }
+  // MWSFSVR_CheckForceSvrBdr (0x00AD91C0) and mwsfsvr_ExecForceSvrBdr
+  // (0x00AD91E0): real bodies in SofdecAdxPlatformRuntime.cpp beside
+  // MWSFD_SetReqSvrBdrHn, the request lane they drive.
   // MWSFSVR_SetMwsfdSvrFlg (0x00AD9870): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This releases the decode-server
   // gate; while it was a no-op stub the first decode pass latched the gate and
@@ -168,7 +170,8 @@ extern "C" {
   void* SFADXT_SetAudioStreamType() { return nullptr; }
   void* SFAOAP_SetSpeed() { return nullptr; }
   void* SFD_tr_ad_adxt() { return nullptr; }
-  void* SFHDS_Finish() { return nullptr; }
+  // SFHDS_Finish (0x00AE7160), its target SFH_Finish (0x00ADC740) and the
+  // pool clear behind it (0x00ADC7F0): real bodies in SofdecSfdRuntime.cpp.
   // SFHDS_FinishFhd: real body in SofdecSfdRuntime.cpp (0x00AE7190).
   // SFHDS_GetMuxVerNum (0x00AE7870): real body in SofdecSfdRuntime.cpp beside
   // SFHDS_ProcessHdr. As a no-argument stub it answered 0 for every file, so
