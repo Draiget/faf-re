@@ -3709,12 +3709,19 @@ Cluster ClusterBuild(const SubclusterData& subclusterData)
  */
 ClusterCache::~ClusterCache()
 {
-    const bool releasedLast = ReleaseSharedCount(mCacheRefs);
-    if (!mCacheRefs || releasedLast) {
-        delete mCacheTree;
-    }
-    mCacheRefs = nullptr;
-    mCacheTree = nullptr;
+    // 0x00931FB0 is the whole body: load the control block, and if there is
+    // none, return. It never reads `mCacheTree` -- the impl is deleted by the
+    // control block's own `dispose()` (0x00935520,
+    // DestroyClusterCacheImplPointee), which `ReleaseSharedCount` invokes
+    // through vtable slot 1 when the use count reaches zero.
+    //
+    // So a `delete mCacheTree` here is wrong twice over: on the last reference
+    // it frees the impl a second time, and on a `ClusterCache` that never went
+    // through `InitializeClusterCache` it deletes a pointer this handle never
+    // owned. The second case is what faulted on the way out of a game --
+    // `~PathTables` reached `~ClusterCacheImpl` on storage no constructor had
+    // run over, and its first member's hash map read a null list head.
+    (void)ReleaseSharedCount(mCacheRefs);
 }
 
 /**
