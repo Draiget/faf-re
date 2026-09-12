@@ -44,7 +44,6 @@ void * __cdecl `anonymous namespace'::ConstructWxBitmapFromFile(void *,struct wx
 void * __cdecl `anonymous namespace'::ConstructWxGenericDirCtrl(void *,void *,struct wxStringRuntime const *,struct wxStringRuntime const *,struct wxStringRuntime const *)
 void * __cdecl `anonymous namespace'::ConstructWxListCtrl(void *,void *,int,struct wxPoint const *,struct wxSize const *,int,void const *,struct wxStringRuntime const *)
 void * __cdecl `anonymous namespace'::ConstructWxMenu(void *)
-void * __cdecl `anonymous namespace'::ConstructWxMenuBar(void *)
 void * __cdecl `anonymous namespace'::ConstructWxMenuItem(void *,void *,int,struct wxStringRuntime const *,struct wxStringRuntime const *,bool,void *)
 void * __cdecl `anonymous namespace'::ConstructWxNotebook(void *,void *,int,struct wxPoint const *,struct wxSize const *,int,struct wxStringRuntime const *)
 void * __cdecl `anonymous namespace'::ConstructWxSplitterWindow(void *,void *,int,struct wxStringRuntime const *)
@@ -59,5 +58,4 @@ void __cdecl `anonymous namespace'::ConnectDynamicTreeItemActivatedHandler(void 
 void __cdecl `anonymous namespace'::ConnectDynamicTreeItemActivatedHandler(void *,int,int,void *,void *)
 void __cdecl `anonymous namespace'::DestroyWxBitmap(void *)
 void __cdecl `anonymous namespace'::RealizeToolBar(void *)
-void __cdecl `anonymous namespace'::SetFrameMenuBar(void *,void *)
 ```

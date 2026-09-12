@@ -1,4 +1,5 @@
 #include "moho/misc/ScrDebugWindow.h"
+#include "moho/misc/ScrDebugWxBridges.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -1320,14 +1321,8 @@ namespace
   /** wxMenu::AppendSeparator() - Address: 0x004BAF20 (wxMenu::AppendSeparator). */
   void AppendWxMenuSeparator(void* menu);
 
-  /** Address: 0x00998B90 (??0wxMenuBar@@Z, wxMenuBar::wxMenuBar) */
-  void* ConstructWxMenuBar(void* storage);
-
   /** wxMenuBar::Append(wxMenu*, const wxString&) - vtable dispatch at this call site. */
   void AppendWxMenuBarMenu(void* menuBar, void* menu, const wxStringRuntime* title);
-
-  /** Address: 0x009A9570 (?SetMenuBar@wxFrameBase@@UAEXPAVwxMenuBar@@@Z) */
-  void SetFrameMenuBar(void* frameThis, void* menuBar);
 
   /** Address: 0x0099EE20 (?CreateToolBar@wxFrame@@UAEPAVwxToolBar@@JHABVwxString@@@Z) */
   void* CreateFrameToolBar(void* frameThis, std::int32_t style, std::int32_t id, const wxStringRuntime* name);
@@ -1740,14 +1735,14 @@ moho::ScrDebugWindow::ScrDebugWindow()
   AppendWxMenuSeparator(debugMenu);
   AppendMenuItem(debugMenu, 305, L"Clear breakpoints", L"Clear all breakpoints");
 
-  void* const menuBar = ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
+  void* const menuBar = moho::scrdebug::ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
   const wxStringRuntime fileMenuTitle = wxStringRuntime::Borrow(L"File");
   const wxStringRuntime viewMenuTitle = wxStringRuntime::Borrow(L"View");
   const wxStringRuntime debugMenuTitle = wxStringRuntime::Borrow(L"Debug");
   AppendWxMenuBarMenu(menuBar, fileMenu, &fileMenuTitle);
   AppendWxMenuBarMenu(menuBar, viewMenu, &viewMenuTitle);
   AppendWxMenuBarMenu(menuBar, debugMenu, &debugMenuTitle);
-  SetFrameMenuBar(this, menuBar);
+  moho::scrdebug::SetFrameMenuBar(this, menuBar);
 
   // ----- Toolbar -----
   constexpr std::int32_t kToolBarStyle = 2097188; // 0x200124 (binary's wxToolBar style word, 0x004BCA5B)
