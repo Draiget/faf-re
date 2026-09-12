@@ -254,7 +254,10 @@ extern "C" {
   // UTY_MemsetDword: real body in SofdecMpvRuntime.cpp.
   void* adxf_GetPtStat() { return nullptr; }
   void* adxf_LoadPtBothNw() { return nullptr; }
-  void* adxf_ReadNw32() { return nullptr; }
+  // adxf_ReadNw32 (0x00B0B850): real body in SofdecAdxPlatformRuntime.cpp,
+  // above adxf_ReadNw, which is a straight forward into it. It wraps a
+  // caller-supplied buffer in a ring source-join object and runs the ordinary
+  // SJ read over it.
   // adxf_ReadSj32 (0x00B0B770): real body in SofdecAdxPlatformRuntime.cpp,
   // beside its ADXF_ReadSj32 guard wrapper. It is the argument gate in front
   // of adxf_read_sj32, which until now had no caller at all.
