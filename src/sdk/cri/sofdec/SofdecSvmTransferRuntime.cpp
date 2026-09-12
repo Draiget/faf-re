@@ -234,7 +234,7 @@
    * Configures one ADXF stream window for SJ-backed read and starts ADXSTM
    * sector transfer.
    */
-  [[maybe_unused]] std::int32_t adxf_read_sj32(
+  std::int32_t adxf_read_sj32(
     AdxfRuntimeHandleView* const adxfHandle,
     const std::int32_t requestedSectors,
     void* const sourceJoinObject

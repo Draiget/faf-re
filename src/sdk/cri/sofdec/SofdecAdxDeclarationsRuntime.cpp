@@ -4153,6 +4153,9 @@ namespace
   constexpr std::int32_t kMwsfdErrCodeInvalidHandle = -12;
   constexpr char kMwsfcreErrAttachPicUsrBufInternal[] = "E02120501: Internal Error: mwsfcre_AttachPicUsrBuf().";
   constexpr char kMwsfcreErrAttachPicUsrBufShort[] = "E02120502: mwsfcre_AttachPicUsrBuf(): usrdatbuf is short.";
+  constexpr char kAdxfErrReadSj32NullHandle[] = "E9040811:'adxf' is NULL.(adxf_ReadSj32)";
+  constexpr char kAdxfErrReadSj32NegativeSectors[] = "E9040812:'nsct'is negative.(adxf_ReadSj32)";
+  constexpr char kAdxfErrReadSj32NullSj[] = "E9040813:'sj'is NULL.(adxf_ReadSj32)";
   constexpr char kAdxfErrSeekNullHandle[] = "E9040825:'adxf' is NULL.(adxf_Seek)";
   constexpr char kAdxfErrSeekIllegalType[] = "E9040826:'type' is illigal.(adxf_Seek)";
   constexpr char kAdxfErrStopNullHandle[] = "E9040822:'adxf' is NULL.(adxf_Stop)";

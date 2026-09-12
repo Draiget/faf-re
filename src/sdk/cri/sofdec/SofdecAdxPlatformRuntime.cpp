@@ -15208,6 +15208,52 @@
     return result;
   }
 
+  // Defined in SofdecSvmTransferRuntime.cpp, which this translation unit
+  // assembles after SofdecAdxRuntime.cpp.
+  std::int32_t adxf_read_sj32(AdxfRuntimeHandleView* adxfHandle, std::int32_t requestedSectors, void* sourceJoinObject);
+
+  /**
+   * Address: 0x00B0B770 (FUN_00B0B770, _adxf_ReadSj32)
+   *
+   * What it does:
+   * The argument gate in front of `adxf_read_sj32`: rejects a null handle, a
+   * negative sector count and a null source-join object, each with its own
+   * banner and -3, and answers 0 without doing anything for a handle already
+   * transferring (status 2, 0x00B0B7C5). Otherwise it starts the read and marks
+   * the handle SJ-backed (`[esi+2] = 1`, 0x00B0B7DA), answering whatever the
+   * read reported.
+   *
+   * `adxf_ReadSj` (0x00B0B810) is a straight `jmp` here, and `ADXF_ReadSj32` is
+   * the lock-guarded wrapper, so this stub was the only thing between the ADX
+   * file layer and every SJ-backed sector read -- and it answered null.
+   */
+  std::int32_t
+  adxf_ReadSj32(void* const adxfHandleAddress, const std::int32_t requestedSectors, void* const sourceJoinObject)
+  {
+    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+
+    if (adxfHandle == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadSj32NullHandle);
+      return -3;
+    }
+    if (requestedSectors < 0) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadSj32NegativeSectors);
+      return -3;
+    }
+    if (sourceJoinObject == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadSj32NullSj);
+      return -3;
+    }
+
+    if (adxfHandle->status == 2u) {
+      return 0;
+    }
+
+    const std::int32_t result = adxf_read_sj32(adxfHandle, requestedSectors, sourceJoinObject);
+    adxfHandle->sjFlag = 1;
+    return result;
+  }
+
   /**
    * Address: 0x00B0B9C0 (FUN_00B0B9C0, _adxf_ReadNw)
    *
