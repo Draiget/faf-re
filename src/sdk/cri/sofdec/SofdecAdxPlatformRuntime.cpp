@@ -2055,7 +2055,39 @@
   std::int32_t MWSFTAG_SetAinfSj(moho::MwsfdPlaybackStateSubobj* ply);
   void MWSFTAG_InitTagInf(moho::MwsfdPlaybackStateSubobj* ply);
   void* MWSFSFX_Create(std::int32_t workBufferAddress, std::int32_t workBufferSize, std::int32_t configTag);
-  void mwsffrm_CallbackAnalyzeSofdecHeader();
+  void mwsffrm_CallbackAnalyzeSofdecHeader(
+    moho::MwsfdPlaybackStateSubobj* ply,
+    std::int32_t bufferAddress,
+    std::int32_t bufferSize
+  );
+
+  // The Sofdec header analyser lives in the SofdecSfdRuntime fragment, which
+  // this aggregate compiles after this one, so its handle type and the six
+  // entry points mwsffrm_CallbackAnalyzeSofdecHeader reaches through are
+  // announced here.
+  struct SofdecHeaderAnalyzerRuntimeView;
+  extern "C" SofdecHeaderAnalyzerRuntimeView* SFH_Create(std::int32_t bufferAddress, std::int32_t remainingBytes);
+  extern "C" std::int32_t SFH_Destroy(SofdecHeaderAnalyzerRuntimeView* handle);
+  extern "C" std::int32_t SFH_IsSfdHeader(SofdecHeaderAnalyzerRuntimeView* handle, std::uint32_t* outIsSfdHeader);
+  extern "C" std::int32_t SFH_IsExistStmId(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::uint32_t streamId,
+    std::int32_t* outExists
+  );
+  extern "C" std::int32_t SFH_AnlyFtrColType(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::uint32_t streamId,
+    std::int32_t* outColourType
+  );
+  extern "C" std::int32_t SFH_AnlyFtrFxType(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::uint32_t streamId,
+    std::uint32_t* outEffectType
+  );
+  extern "C" std::int32_t SFH_AnlyMaxFrmNum(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::int32_t* outFrameNumber
+  );
 
   // Both live in fragments compiled later in this aggregate; declared with the
   // shared parameter types so the C-linkage symbols still match.
@@ -2522,6 +2554,145 @@
       entry = moho::SofdecSfhInfoEntry{};
       entry.state = moho::kSofdecSfhInfoSlotUnused;
     }
+  }
+
+  /** The video elementary-stream id every one of these analysers asks about. */
+  constexpr std::uint32_t kSofdecVideoStreamId = 224u;
+
+  /** `SFH_AnlyFtrColType`'s value for HSYUV (0x00ACAC2B). */
+  constexpr std::int32_t kSofdecColourTypeHsyuv = 3;
+
+  /**
+   * The three slot-state codes `mwsffrm_AnalyFxType` maps effect types 1, 3
+   * and 6 onto (0x00ACAA2E, 0x00ACAA38, 0x00ACAA42). Anything else keeps the
+   * ring's own `kSofdecSfhInfoSlotUnused`.
+   */
+  constexpr std::int32_t kSofdecSfhInfoSlotFxType1 = 0x21;
+  constexpr std::int32_t kSofdecSfhInfoSlotFxType3 = 0x51;
+  constexpr std::int32_t kSofdecSfhInfoSlotFxType6 = 0x61;
+
+  /** 0x00ACAB19: a header shorter than this is not analysed. */
+  constexpr std::int32_t kSofdecHeaderMinimumBytes = 2048;
+
+  /** `MwsfdPlaybackStateSubobj::sfhInfoTable` holds eight records. */
+  constexpr std::int32_t kSofdecSfhInfoRingSize = 8;
+
+  /**
+   * Address: 0x00ACABF0 (FUN_00ACABF0, _mwsffrm_AnalyColHsyuv)
+   *
+   * What it does:
+   * Whether this movie's video stream carries HSYUV colour. Stream 224 has
+   * to exist and its feature record has to report colour type 3; anything
+   * else, including a header too old to have the field, answers false.
+   */
+  [[nodiscard]] std::int32_t mwsffrm_AnalyColHsyuv(SofdecHeaderAnalyzerRuntimeView* const header)
+  {
+    std::int32_t streamExists = 0;
+    if (SFH_IsExistStmId(header, kSofdecVideoStreamId, &streamExists) != 1 || streamExists != 1) {
+      return 0;
+    }
+
+    std::int32_t colourType = 0;
+    if (SFH_AnlyFtrColType(header, kSofdecVideoStreamId, &colourType) != 1) {
+      return 0;
+    }
+
+    return (colourType == kSofdecColourTypeHsyuv) ? 1 : 0;
+  }
+
+  /**
+   * Address: 0x00ACA9B0 (FUN_00ACA9B0, _mwsffrm_AnalyTotalFrm)
+   *
+   * What it does:
+   * The movie's frame count, or -1 when the header does not state one.
+   */
+  [[nodiscard]] std::int32_t mwsffrm_AnalyTotalFrm(SofdecHeaderAnalyzerRuntimeView* const header)
+  {
+    std::int32_t frameCount = 0;
+    return (SFH_AnlyMaxFrmNum(header, &frameCount) != 0) ? frameCount : -1;
+  }
+
+  /**
+   * Address: 0x00ACAA00 (FUN_00ACAA00, _mwsffrm_AnalyFxType)
+   *
+   * What it does:
+   * Maps the header's effect-type byte onto the slot-state code the ring
+   * stores. Three values are recognised (0x00ACAA2E-0x00ACAA45); everything
+   * else, and a header with no readable effect type at all, falls back to
+   * the same `kSofdecSfhInfoSlotUnused` the table is initialised with.
+   */
+  [[nodiscard]] std::int32_t mwsffrm_AnalyFxType(SofdecHeaderAnalyzerRuntimeView* const header)
+  {
+    std::uint32_t effectType = 0;
+    if (SFH_AnlyFtrFxType(header, kSofdecVideoStreamId, &effectType) != 1) {
+      return moho::kSofdecSfhInfoSlotUnused;
+    }
+
+    switch (effectType) {
+      case 1u:
+        return kSofdecSfhInfoSlotFxType1;
+      case 3u:
+        return kSofdecSfhInfoSlotFxType3;
+      case 6u:
+        return kSofdecSfhInfoSlotFxType6;
+      default:
+        return moho::kSofdecSfhInfoSlotUnused;
+    }
+  }
+
+  /**
+   * Address: 0x00ACAB00 (FUN_00ACAB00, _mwsffrm_CallbackAnalyzeSofdecHeader)
+   *
+   * IDA signature:
+   * void __cdecl mwsffrm_CallbackAnalyzeSofdecHeader(unsigned int a1, int a2, int a3);
+   *
+   * What it does:
+   * The callback `MWSFFRM_SetShfCbFn` registers on the SFD work control, so
+   * the demuxer hands every Sofdec header it meets to this. It counts the
+   * header, and when the buffer is a full one (at least 2048 bytes) and
+   * really is an SFD header, records what the header says about the movie --
+   * HSYUV colour, frame count and effect type -- into the next slot of the
+   * eight-entry ring `MWSFFRM_InitSfhInfTable` prepares.
+   *
+   * The frame index stored is the count *before* this header
+   * (0x00ACAB59 reads the already-incremented counter and subtracts one), so
+   * a reader can line each record up with the frame it arrived on.
+   */
+  void mwsffrm_CallbackAnalyzeSofdecHeader(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const std::int32_t bufferAddress,
+    const std::int32_t bufferSize
+  )
+  {
+    ++ply->retrievedFrameCount;
+
+    if (bufferSize < kSofdecHeaderMinimumBytes || bufferAddress == 0) {
+      return;
+    }
+
+    SofdecHeaderAnalyzerRuntimeView* const header = SFH_Create(bufferAddress, bufferSize);
+    if (header == nullptr) {
+      return;
+    }
+
+    std::uint32_t isSfdHeader = 0;
+    if (SFH_IsSfdHeader(header, &isSfdHeader) == 1 && isSfdHeader == 1) {
+      const std::int32_t colourIsHsyuv = mwsffrm_AnalyColHsyuv(header);
+      const std::int32_t totalFrames = mwsffrm_AnalyTotalFrm(header);
+      const std::int32_t effectType = mwsffrm_AnalyFxType(header);
+
+      const std::int32_t slot = ply->sfhInfoWriteIndex;
+      moho::SofdecSfhInfoEntry& entry = ply->sfhInfoTable[static_cast<std::size_t>(slot)];
+      entry.streamPosition = 1;
+      entry.frameIndex = ply->retrievedFrameCount - 1;
+      entry.headerWord0 = colourIsHsyuv;
+      entry.headerWord1 = totalFrames;
+      entry.state = effectType;
+
+      ply->sfhInfoWriteIndex = (slot + 1) % kSofdecSfhInfoRingSize;
+    }
+
+    (void)SFH_Destroy(header);
   }
 
   constexpr std::int32_t kMwsfcreErrCodeDestroySfd = -306;

@@ -289,8 +289,9 @@ extern "C" {
   // mwsfcre_UsrMalloc: real body in cri/sofdec/SofdecAdxPlatformRuntime.cpp.
   // mwsfdcre_IsPlayableByHdrInf: real body in moho/misc/StartupHelpers.cpp
   // (0x00AC8F30, same original translation unit as mwPlyGetHdrInf).
-  void* mwsffrm_AnalyFxType() { return nullptr; }
-  void* mwsffrm_AnalyTotalFrm() { return nullptr; }
+  // mwsffrm_AnalyFxType / mwsffrm_AnalyTotalFrm / mwsffrm_AnalyColHsyuv:
+  // real bodies in cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside the
+  // MWSFFRM_InitSfhInfTable that owns the ring they write into.
   void* mwsffrm_CheckAinf() { return nullptr; }
   void* mwsffrm_GetNumAudioCh() { return nullptr; }
   void* mwsffrm_GetNumVideoCh() { return nullptr; }
