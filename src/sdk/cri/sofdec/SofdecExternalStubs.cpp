@@ -170,7 +170,9 @@ extern "C" {
   void* SFD_tr_ad_adxt() { return nullptr; }
   void* SFHDS_Finish() { return nullptr; }
   // SFHDS_FinishFhd: real body in SofdecSfdRuntime.cpp (0x00AE7190).
-  void* SFHDS_GetMuxVerNum() { return nullptr; }
+  // SFHDS_GetMuxVerNum (0x00AE7870): real body in SofdecSfdRuntime.cpp beside
+  // SFHDS_ProcessHdr. As a no-argument stub it answered 0 for every file, so
+  // sfsee_ExecHeadAnaly always took its pre-1.08 byte-rate fallback.
   // SFHDS_Init: real body in SofdecSfdRuntime.cpp (0x00AE7150).
   // SFHDS_InitFhd: real body in SofdecSfdRuntime.cpp (0x00AE7170). Another
   // no-argument stub that C linkage let stand in for the real one-parameter

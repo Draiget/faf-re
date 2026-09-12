@@ -3839,6 +3839,33 @@
   }
 
   /**
+   * Address: 0x00AE7870 (FUN_00AE7870, _SFHDS_GetMuxVerNum)
+   *
+   * What it does:
+   * Answers the multiplexer version the parsed file header reports, as
+   * `major * 100 + minor` -- so tool version 1.08 reads 108, which is the
+   * threshold `sfsee_ExecHeadAnaly`'s byte-rate fallback compares against.
+   * An unparsed header answers 0.
+   *
+   * The `lea eax,[eax+eax*4]` pair followed by `lea eax,[ecx+eax*4]`
+   * (0x00AE7887-0x00AE788D) is that multiply: 5, then 25, then 25*4 plus the
+   * minor. The three lanes it reads are the first three dwords of the
+   * workctrl's embedded file header at +0x78.
+   */
+  std::int32_t SFHDS_GetMuxVerNum(const std::int32_t workctrlAddress)
+  {
+    const auto* const workctrlSubobj =
+      reinterpret_cast<const moho::SofdecSfdWorkctrlSubobj*>(SjAddressToPointer(workctrlAddress));
+    const auto* const header =
+      reinterpret_cast<const SfcreHeaderRuntimeView*>(workctrlSubobj->fileHeader);
+
+    if (header->headerValid == 0) {
+      return 0;
+    }
+    return header->toolVersionMajor * 100 + header->toolVersionMinor;
+  }
+
+  /**
    * Address: 0x00AE7400 (FUN_00AE7400, _SFHDS_ProcessHdr)
    *
    * What it does:
