@@ -114,7 +114,13 @@ namespace moho
   constexpr float kLayerExitLeadTicks = 10.0f;
 
   constexpr EUnitMotionCarrierEvent kUnitMotionCarrierEventRelativeHeight = static_cast<EUnitMotionCarrierEvent>(1);
-    constexpr Wm3::Quaternionf kWingedOrientationQuarterTurnRotation{0.0f, 0.70710677f, 0.0f, 0.70710677f};
+    // `quat_45deg2` at 0x010B6178, built by register_quat_45deg2 (0x00BD7390)
+    // from a half-angle of `flt_E4F8B0` = 0x3F490FDB = pi/4: it stores cos into
+    // lane 0 and sin into lane 2, zeroing lanes 1 and 3 -- so the rotation is a
+    // quarter turn about Y, and `Wm3::Quaternionf`'s scalar-first member order
+    // puts cos in `w` and sin in `y`. Spelled `{0, cos, 0, sin}` it was a
+    // zero-scalar quaternion instead: a half turn about (cos, 0, sin).
+    constexpr Wm3::Quaternionf kWingedOrientationQuarterTurnRotation{0.70710677f, 0.0f, 0.70710677f, 0.0f};
     constexpr const char* kUnitMotionScriptStateNames[] = {
       "None",
       "Attached",
@@ -3118,12 +3124,17 @@ namespace moho
       turnDelta = -maxTurnDelta;
     }
 
-    const float halfTurnAngle = turnDelta * 5.0f;
+    // 0x006BDBB5/0x006BDBBB: the clamped delta is scaled by 10.0 (dword_DFF31C)
+    // and then halved (flt_E4F724), so this is the half-angle of a ten-times
+    // exaggerated yaw. 0x006BDBE3 stores cos into lane 0 and 0x006BDBF6 stores
+    // sin into lane 2, with lanes 1 and 3 zeroed at 0x006BDC06/0x006BDC0C --
+    // the same {w, 0, y, 0} shape as `quat_45deg2`.
+    const float halfTurnAngle = (turnDelta * 10.0f) * 0.5f;
     const Wm3::Quaternionf turnQuaternion{
-      0.0f,
       std::cos(halfTurnAngle),
       0.0f,
       std::sin(halfTurnAngle),
+      0.0f,
     };
 
     Wm3::Vector3f rotatedSelectedVector = selectedVector;
@@ -3167,9 +3178,16 @@ namespace moho
     };
 
     const Wm3::Vector3f wingAxis = RotateByQuaternion(rotatedSelectedVector, kWingedOrientationQuarterTurnRotation);
+    // Lane by lane against 0x006BDD94..0x006BDDCD: `[eax]` (wingAxis.x) feeds
+    // the value that ends up in `vY.x` at 0x006BDE52, `[eax+4]` (wingAxis.y)
+    // the one that gets the `+1.0` (0x006BDDA8) and lands in `vY.y` at
+    // 0x006BDE5D, `[eax+8]` (wingAxis.z) the one in `vY.z` at 0x006BDE62 --
+    // and each subtracts the matching lane of `wingProjection`. The `+1.0` is
+    // world up, so putting it in `.x` rolls every winged aircraft a quarter
+    // turn and it flies on its side.
     Wm3::Vector3f wingUpVector{
-      (wingAxis.y * wingOrientationBias) + 1.0f - wingProjection.y,
       (wingOrientationBias * wingAxis.x) - wingProjection.x,
+      (wingAxis.y * wingOrientationBias) + 1.0f - wingProjection.y,
       (wingOrientationBias * wingAxis.z) - wingProjection.z,
     };
 
@@ -3196,15 +3214,18 @@ namespace moho
     CAiTarget& target
   )
   {
-    // Lazily-derived +-45 degree yaw quaternions (w-first: w=cos(halfAngle),
-    // x=0, y=sin(halfAngle), z=0), selecting a clockwise/counterclockwise
-    // tangential offset from the direct-to-target heading. The binary reads
-    // these from two fixed, pre-initialized data addresses (no static-init
-    // call site found in this export set to confirm the exact stored value
-    // against); reconstructed here from the symbol names rather than an
-    // unverified raw-byte read.
-    static const Wm3::Quaternionf kCirclingYawNeg45{std::cos(-0.3926990817f), 0.0f, std::sin(-0.3926990817f), 0.0f};
-    static const Wm3::Quaternionf kCirclingYawPos45{std::cos(0.3926990817f), 0.0f, std::sin(0.3926990817f), 0.0f};
+    // The two fixed quaternions the binary selects between at 0x006BE26C and
+    // 0x006BE277: `quat_n45deg` (0x010B6158) and `quat_45deg2` (0x010B6178),
+    // which pick a clockwise or counter-clockwise tangential offset from the
+    // direct-to-target heading. Their static initialisers -- 0x00BD7330 and
+    // 0x00BD7390 -- take the half-angle from `flt_E4FA28` (0xBF490FDB) and
+    // `flt_E4F8B0` (0x3F490FDB), i.e. -+pi/4, store cos into lane 0 and sin
+    // into lane 2, and zero lanes 1 and 3. So each is a quarter turn about Y,
+    // not the eighth turn a half-angle of pi/8 would have given.
+    static const Wm3::Quaternionf kCirclingYawNeg90{
+      std::cos(-0.78539816f), 0.0f, std::sin(-0.78539816f), 0.0f};
+    static const Wm3::Quaternionf kCirclingYawPos90{
+      std::cos(0.78539816f), 0.0f, std::sin(0.78539816f), 0.0f};
 
     const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
     const RUnitBlueprintPhysics& physics = blueprint->Physics;
@@ -3277,7 +3298,7 @@ namespace moho
     Wm3::Vector3f::Normalize(&toTarget);
 
     Wm3::Vector3f tangentDirection{};
-    MultQuadVec(&tangentDirection, &toTarget, mUnknownBool8F ? &kCirclingYawNeg45 : &kCirclingYawPos45);
+    MultQuadVec(&tangentDirection, &toTarget, mUnknownBool8F ? &kCirclingYawNeg90 : &kCirclingYawPos90);
 
     Wm3::Vector3f steerOffset{
       (tangentDirection.x * air.MinAirspeed) + position.x - targetX,
