@@ -1170,7 +1170,8 @@
   std::int32_t CFT_Ycc420plnToArgb8888Prg1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface,
-    const __m64* colorTable
+    const __m64* colorTable,
+    std::uintptr_t scratchBufferAddress
   );
 
   /**
@@ -1254,7 +1255,8 @@
   std::int32_t cft_sse_Ycc420plnToArgb8888Prg1smp(
     const CftYcc420PlanarInputLanes* inputLanes,
     const CftPixelSurfaceLanes* outputSurface,
-    const __m64* colorTable
+    const __m64* colorTable,
+    std::uintptr_t scratchBufferAddress
   );
   /**
    * Address: 0x00B06770 (FUN_00B06770, _cft_sse_Ycc420plnToYcc422pix2Int1smp)
