@@ -121,6 +121,21 @@ namespace moho
     virtual std::int32_t __stdcall SetVariable(std::uint16_t variableIndex, float value) = 0;
   };
 
+  class IXACTWaveBank
+  {
+  public:
+    /**
+     * VTable slot 0 (+0x00).
+     *
+     * The only slot either wave-bank resource dtor dispatches through:
+     * both `Moho::RWaveBankResInMemory::~` (0x004DAD72/0x004DAD75) and
+     * `Moho::RWaveBankResStreaming::~` (0x004DB001/0x004DB004) load
+     * `[[bank]+0x00]` and call it `__stdcall` with the bank pushed as the sole
+     * argument.
+     */
+    virtual void __stdcall Destroy() = 0;
+  };
+
   class IXACTEngine
   {
   public:

@@ -1108,11 +1108,6 @@ namespace
     }
   }
 
-  struct AudioStreamingRuntimeHandle
-  {
-    virtual void __stdcall Release() = 0;
-  };
-
   /**
    * Address: 0x004DAD40 (FUN_004DAD40)
    *
@@ -1121,7 +1116,7 @@ namespace
    * wave-bank runtime handle, clears the mapped-file shared buffer lanes, and
    * resets the stored bank-name string to empty SSO state.
    */
-  [[maybe_unused]] void DestroyInMemoryWaveBankResourceNoDelete(
+  void DestroyInMemoryWaveBankResourceNoDelete(
     AudioInMemoryWaveBankLoader* const inMemoryResource
   ) noexcept
   {
@@ -1130,8 +1125,7 @@ namespace
     }
 
     if (inMemoryResource->mWaveBank != nullptr) {
-      auto* const runtimeHandle = reinterpret_cast<AudioStreamingRuntimeHandle*>(inMemoryResource->mWaveBank);
-      runtimeHandle->Release();
+      inMemoryResource->mWaveBank->Destroy();
       inMemoryResource->mWaveBank = nullptr;
     }
 
@@ -1156,8 +1150,7 @@ namespace
     }
 
     if (streamingResource->mWaveBank != nullptr) {
-      auto* const runtimeHandle = reinterpret_cast<AudioStreamingRuntimeHandle*>(streamingResource->mWaveBank);
-      runtimeHandle->Release();
+      streamingResource->mWaveBank->Destroy();
       streamingResource->mWaveBank = nullptr;
     }
     if (streamingResource->mFileHandle != INVALID_HANDLE_VALUE) {
@@ -2525,6 +2518,20 @@ namespace moho
    */
   AudioEngineImpl::~AudioEngineImpl()
   {
+    // The banks and wave banks go first, while `mInstance` is still alive:
+    // every loader's dtor calls `Destroy()` on an `IXACTSoundBank` /
+    // `IXACTWaveBank` that the engine instance owns, so shutting the engine
+    // down ahead of them leaves those dtors dispatching through freed vtables.
+    // 0x004DA2CB-0x004DA35D clears mBanks (+0x08) and then mHandles (+0x18) --
+    // both through the destroy-range helper, then an `erase(begin(), end())`
+    // that only walks the end iterator back -- and reaches the engine
+    // teardown at 0x004DA360 with both already empty.
+    DestroyAudioSoundBankLoaderRange(mBanks.begin(), mBanks.end());
+    mBanks.clear();
+
+    DestroyAudioRuntimeHandleRange(mHandles.begin(), mHandles.end());
+    mHandles.clear();
+
     if (mInstance != nullptr) {
       mInstance->ShutDown();
       mInstance->Release();
@@ -2536,12 +2543,10 @@ namespace moho
     delete[] mSettings.mMatrixCoefficients;
     mSettings.mMatrixCoefficients = nullptr;
 
-    DestroyAudioRuntimeHandleRange(mHandles.begin(), mHandles.end());
-    mHandles.tidy();
-
-    DestroyAudioSoundBankLoaderRange(mBanks.begin(), mBanks.end());
-    mBanks.tidy();
-
+    // The storage behind mBanks/mHandles is released by their own implicit
+    // member destructors, which is where 0x004DA475 and 0x004DA4CC free it --
+    // by then both ranges are empty, so those emissions only free the buffer.
+    //
     // mCategoryVolumes (msvc8::map<std::uint16_t, float>) and
     // mPausedCategoryNames (msvc8::set<msvc8::string>) both tear themselves
     // down via their own implicit member destructors, which run AFTER this
