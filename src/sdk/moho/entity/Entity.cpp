@@ -1735,68 +1735,6 @@ namespace
     return baseBlueprint->GetLuaBlueprint(state);
   }
 
-  struct AttachRuntimeNodeView
-  {
-    AttachRuntimeNodeView* next;
-    AttachRuntimeNodeView* prev;
-    std::uint8_t pad_08[0x04];
-    AttachRuntimeNodeView** owner;
-    std::uint8_t pad_10[0x04];
-    std::int32_t pendingValue;
-    std::uint8_t queuedFlag;
-    std::uint8_t pad_19[0x03];
-  };
-
-  static_assert(offsetof(AttachRuntimeNodeView, owner) == 0x0C, "AttachRuntimeNodeView::owner offset must be 0x0C");
-  static_assert(
-    offsetof(AttachRuntimeNodeView, pendingValue) == 0x14, "AttachRuntimeNodeView::pendingValue offset must be 0x14"
-  );
-  static_assert(
-    offsetof(AttachRuntimeNodeView, queuedFlag) == 0x18, "AttachRuntimeNodeView::queuedFlag offset must be 0x18"
-  );
-
-  /**
-   * An inlined block inside `Entity::AttachTo` (0x00679550), not a function of
-   * its own.
-   *
-   * What it does:
-   * Relinks an attached runtime node back to its owner list when it is marked queued.
-   */
-  void ResetAttachRuntimeNodeIfQueued(moho::Entity* entity)
-  {
-    if (!entity) {
-      return;
-    }
-
-    auto* node = reinterpret_cast<AttachRuntimeNodeView*>(entity->mSubtask);
-    if (!node || node->queuedFlag == 0u) {
-      return;
-    }
-
-    node->pendingValue = 0;
-
-    AttachRuntimeNodeView* const next = node->next;
-    AttachRuntimeNodeView* const prev = node->prev;
-    if (next && prev) {
-      next->prev = prev;
-      prev->next = next;
-    }
-
-    node->next = node;
-    node->prev = node;
-
-    AttachRuntimeNodeView** const owner = node->owner;
-    if (owner) {
-      node->next = *owner;
-      node->prev = reinterpret_cast<AttachRuntimeNodeView*>(owner);
-      *owner = node;
-      if (node->next) {
-        node->next->prev = node;
-      }
-    }
-
-    node->queuedFlag = 0u;
-  }
 
   [[nodiscard]] const char* ResolveEntityBlueprintName(const moho::Entity* entity) noexcept
   {
@@ -4250,7 +4188,29 @@ namespace moho
     }
 
     parentChildren.push_back(this);
-    ResetAttachRuntimeNodeIfQueued(this);
+
+    // 0x00679621-0x00679660. `[edi+40h]` is the CTask subobject's
+    // `mOwnerThread` (Entity+0x34 + CTask+0x0C), the same field `SetMotor`
+    // wakes, and what follows the hoisted `mStaged` test is
+    // `CTask::TaskResume(false, 0)` inlined - null check, pending-frame
+    // counter zeroed, unlink from the staged list, relink before the stage's
+    // active sentinel, flag cleared.
+    //
+    // It matters because an entity with no motor stages itself on its first
+    // beat (`Entity::MotionTick` returns -2 while `mMotor` is null), and
+    // `TaskTick`'s attach-follow arm is what keeps an attached entity glued to
+    // its parent's transform every beat. On a thread nobody resumes, that arm
+    // never runs again.
+    //
+    // This was previously modelled as a list-repair pass over a
+    // `{next, prev, owner, pendingValue, queuedFlag}` node read out of
+    // `mSubtask` (CTask+0x10). That read the wrong field and did the wrong
+    // thing; the offsets only lined up because a task thread and the invented
+    // node happened to share a shape.
+    if (mOwnerThread != nullptr && mOwnerThread->mStaged) {
+      TaskResume(false, 0);
+    }
+
     ApplyAttachInfo(mAttachInfo, attachInfo);
     return true;
   }
