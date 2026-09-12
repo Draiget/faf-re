@@ -87,6 +87,13 @@
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DDepthStencil.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
+#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp" // TEMPORARY PROBE (do not commit)
+extern "C" int FafProbeFrameSeq(); extern "C" int FafProbeFrameDiag(); // TEMPORARY PROBE (do not commit)
+namespace gpg::gal
+{
+  // TEMPORARY PROBE (do not commit): defined in D3D9Interfaces.cpp.
+  long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
+}
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -99,6 +106,7 @@
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/sim/CDebugCanvas.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/sim/STIMap.h"
@@ -106,7 +114,6 @@
 #include "moho/terrain/TerrainCommon.h"
 #include "moho/terrain/HighFidelityTerrain.h"
 #include "moho/terrain/LowFidelityTerrain.h"
-#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
@@ -37049,7 +37056,17 @@ bool wxWindowMswRuntime::HandleMouseEvent(
 
   WxMouseEventFactoryRuntime event{*eventTypeSlot};
   InitWxMouseEventRuntime(*this, event, x, y, flags);
-  return GetEventHandler()->ProcessEvent(&event);
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  if (message != WM_MOUSEMOVE) {
+    gpg::Warnf("[MSWMOUSE] HandleMouseEvent enter msg=0x%X type=%d", message, *eventTypeSlot);
+  }
+  const bool processed = GetEventHandler()->ProcessEvent(&event);
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  if (message != WM_MOUSEMOVE) {
+    gpg::Warnf("[MSWMOUSE] HandleMouseEvent msg=0x%X type=%d window=%p handler=%p processed=%d",
+               message, *eventTypeSlot, static_cast<void*>(this), static_cast<void*>(GetEventHandler()), processed ? 1 : 0);
+  }
+  return processed;
 }
 
 /**
@@ -40190,6 +40207,10 @@ long wxWindowMswRuntime::MSWWindowProc(
     // enormous ones.
     std::int32_t x = static_cast<std::int16_t>(LOWORD(lParam));
     std::int32_t y = static_cast<std::int16_t>(HIWORD(lParam));
+
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[MSWMOUSE] wndproc msg=0x%X window=%p capture=%p pos=(%d,%d)", message, static_cast<void*>(this),
+               static_cast<void*>(GetCapture()), x, y);
 
     // A window holding the capture keeps the event whatever it is over.
     // Otherwise the click belongs to whichever child is under the pointer.
@@ -70495,6 +70516,35 @@ namespace
   // loading screen. Setting FAF_NO_RENDER_ADDITIONS=1 skips exactly those
   // three and nothing else, which separates "one of today's blocks corrupts
   // the heap" from "the corruption predates them" in a single run.
+  // TEMPORARY: FAF_NO_SHADOWS=1 drops the shadow context and the shadow pass
+  // (black-wedge triage).
+  [[nodiscard]] bool ShadowsDisabledByEnv() noexcept
+  {
+    static const bool disabled = [] {
+      std::size_t length = 0u;
+      char value[8] = {};
+      return ::getenv_s(&length, value, sizeof(value), "FAF_NO_SHADOWS") == 0 && length != 0u && value[0] == '1';
+    }();
+    // Runtime toggle: "<FAF_TOGGLE_DIR>\noshadow.on" while it exists.
+    static char sToggleDir[512] = {};
+    static bool sToggleDirResolved = false;
+    if (!sToggleDirResolved) {
+      sToggleDirResolved = true;
+      std::size_t length = 0u;
+      if (::getenv_s(&length, sToggleDir, sizeof(sToggleDir), "FAF_TOGGLE_DIR") != 0 || length == 0u) {
+        sToggleDir[0] = 0;
+      }
+    }
+    static unsigned sPollCounter = 0u;
+    static bool sToggled = false;
+    if (sToggleDir[0] != 0 && (sPollCounter++ % 30u) == 0u) {
+      char path[640];
+      (void)std::snprintf(path, sizeof(path), "%s\\noshadow.on", sToggleDir);
+      sToggled = ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+    }
+    return disabled || sToggled;
+  }
+
   [[nodiscard]] bool RenderAdditionsDisabled() noexcept
   {
     static const bool disabled = [] {
@@ -70693,7 +70743,13 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // read like a sheet comparison). `UpdateCurrent` retires regions the camera
     // has left, `GenerateNew` fills in the ones it has entered; both take the
     // view camera and both live at `viewport + 0x808`.
-    if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled()) {
+    // TEMPORARY: FAF_NO_CLUTTER=1 skips only this block (black-sliver triage).
+    static const bool sClutterDisabled = [] {
+      std::size_t length = 0u;
+      char value[8] = {};
+      return ::getenv_s(&length, value, sizeof(value), "FAF_NO_CLUTTER") == 0 && length != 0u && value[0] == '1';
+    }();
+    if (moho::ren_Clutter && worldView == begin && !RenderAdditionsDisabled() && !sClutterDisabled) {
       headView->mClutter.UpdateCurrent(runtime->mCam);
       headView->mClutter.GenerateNew(runtime->mCam);
     }
@@ -70712,13 +70768,18 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     // this view's own CameraSetViewport-pushed one.
     UpdateRenderViewportCoordinates();
 
-    gpg::Warnf(
-      "[MMDIAG] Render.loop view=%p isMiniMap=%d mScreenPos=(%d,%d) mScreenSize=(%d,%d) camViewportR3=(%.1f,%.1f,%.1f,%.1f)",
-      static_cast<const void*>(worldView->view), static_cast<int>(worldView->view->IsMiniMap()),
-      runtime->mScreenPos.x, runtime->mScreenPos.y, runtime->mScreenSize.x, runtime->mScreenSize.y,
-      runtime->mCam->viewport.r[3].x, runtime->mCam->viewport.r[3].y, runtime->mCam->viewport.r[3].z,
-      runtime->mCam->viewport.r[3].w
-    );
+    static const bool sNoFogState = [] { char d[512] = {}; std::size_t l = 0; if (::getenv_s(&l, d, sizeof(d), "FAF_TOGGLE_DIR") != 0 || l == 0u) return false; char pth[600]; (void)std::snprintf(pth, sizeof(pth), "%s/nofogstate.on", d); return ::GetFileAttributesA(pth) != INVALID_FILE_ATTRIBUTES; }(); // TEMPORARY PROBE (do not commit)
+    static const bool sNoEffects = [] { char d[512] = {}; std::size_t l = 0; if (::getenv_s(&l, d, sizeof(d), "FAF_TOGGLE_DIR") != 0 || l == 0u) return false; char pth[600]; (void)std::snprintf(pth, sizeof(pth), "%s/noeffects.on", d); return ::GetFileAttributesA(pth) != INVALID_FILE_ATTRIBUTES; }(); // TEMPORARY PROBE (do not commit)
+    { // TEMPORARY PROBE (do not commit): nominimap.on skips minimap views entirely
+      static const bool sNoMiniMap = [] { char d[512] = {}; std::size_t l = 0; if (::getenv_s(&l, d, sizeof(d), "FAF_TOGGLE_DIR") != 0 || l == 0u) return false; char pth[600]; (void)std::snprintf(pth, sizeof(pth), "%s/nominimap.on", d); return ::GetFileAttributesA(pth) != INVALID_FILE_ATTRIBUTES; }();
+      if (sNoMiniMap && worldView->view->IsMiniMap()) { continue; }
+    }
+    if (FafProbeFrameDiag() > 0) { // TEMPORARY PROBE (do not commit)
+      gpg::Warnf("[FD] f=%d view=%p mini=%d screen=(%d,%d %dx%d) cam=(%.1f,%.1f,%.1f) head=%d",
+        FafProbeFrameSeq(), static_cast<const void*>(worldView->view), static_cast<int>(worldView->view->IsMiniMap()),
+        runtime->mScreenPos.x, runtime->mScreenPos.y, runtime->mScreenSize.x, runtime->mScreenSize.y,
+        runtime->mCam->inverseView.r[3].x, runtime->mCam->inverseView.r[3].y, runtime->mCam->inverseView.r[3].z, static_cast<int>(head));
+    }
 
     // Render the atmosphere/cloud sky dome for this world view before the
     // terrain composite pass (binary order: WRenViewport::Render @0x007F90D0
@@ -70776,7 +70837,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       reinterpret_cast<moho::Shadow*>(&runtime->mShadowRenderer)->RenderFrameShadows(
         terrain, *runtime->mCam, worldView->view->CameraGetTargetZoom());
 
-      FogOn(worldView->view->CameraGetZoom());
+      if (sNoFogState) { FogOff(); } else { FogOn(worldView->view->CameraGetZoom()); } // TEMPORARY PROBE (do not commit)
       RenderCompositeTerrain(terrain);
     }
 
@@ -70797,7 +70858,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
 
     RenderReflections();
     RenderMeshes(0x14, false);
-    RenderEffects(true);
+    if (!sNoEffects) { RenderEffects(true); } // TEMPORARY PROBE (do not commit)
     RenderMeshes(0x18, false);
     FogOff();
 
@@ -70807,7 +70868,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       // Fog density tracks the camera zoom - the binary dispatches
       // IRenderWorldView slot 8 (CameraGetZoom) straight into FogOn at
       // 0x007F94B8..0x007F94C8, it is not a constant.
-      FogOn(worldView->view->CameraGetZoom());
+      if (sNoFogState) { FogOff(); } else { FogOn(worldView->view->CameraGetZoom()); } // TEMPORARY PROBE (do not commit)
       RenderWater(terrain);
     }
 
@@ -70861,7 +70922,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     }
 
     RenderMeshes(0x24, false);
-    RenderEffects(false);
+    if (!sNoEffects) { RenderEffects(false); } // TEMPORARY PROBE (do not commit)
     RenderMeshes(0x28, false);
 
     // Fog is dropped *before* the refracting-effects pass, not after it. The
@@ -70950,6 +71011,16 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     runtime->mCam = nullptr;
   }
 
+  // Every world view has consumed this frame's decal set, so drop the decal
+  // manager's pending-changes flag. Binary 0x007F9779..0x007F979C: inside the
+  // non-empty-list branch, after the loop - `sWldMap`, its `mTerrainRes`
+  // (which is what REN_GetTerrainRes checks), `GetDecalManager` (slot +0x130),
+  // then slot +0x74 on the manager. Without it HasPendingChanges stays set
+  // and every view re-tessellates the terrain each frame.
+  if (moho::IWldTerrainRes* const decalTerrainRes = moho::REN_GetTerrainRes(); decalTerrainRes != nullptr) {
+    static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
+  }
+
   // Shared tail, reached from the per-view loop, from the empty-list jump
   // (loc_7F9779) and from the ren_Oblivion jump (loc_7F979E) alike. The binary
   // has exactly one call to this at 0x007F97A4, after the loop rather than
@@ -70989,16 +71060,6 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
   }
 
   // Unit-silhouette overlay. Binary (WRenViewport::Render @0x007F90D0,
-  // Every world view has consumed this frame's decal set, so drop the decal
-  // manager's pending-changes flag. Binary 0x007F9779..0x007F979C: inside the
-  // non-empty-list branch, after the loop - `sWldMap`, its `mTerrainRes`
-  // (which is what REN_GetTerrainRes checks), `GetDecalManager` (slot +0x130),
-  // then slot +0x74 on the manager. Without it HasPendingChanges stays set
-  // and every view re-tessellates the terrain each frame.
-  if (moho::IWldTerrainRes* const decalTerrainRes = moho::REN_GetTerrainRes(); decalTerrainRes != nullptr) {
-    static_cast<moho::CDecalManager*>(decalTerrainRes->GetDecalManager())->ClearPendingChanges();
-  }
-
   // 0x007F95EC..0x007F9614) calls it right after the UI prim-batcher pass:
   //   lea ecx, [ebp+2134h]   -> &mSilhouetteRenderer
   //   mov edi, [ebp+219Ch]   -> the camera
@@ -71170,7 +71231,7 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
   // (0x007F8221: cmp [esi+4F8h], 0), and the normal target is
   // mPrimaryTargetLocks[mHead], retained across the call.
   moho::TerrainShadowContext* const shadowContext =
-    runtime->mShadowRenderer.shadow_Fidelity != 0
+    runtime->mShadowRenderer.shadow_Fidelity != 0 && !ShadowsDisabledByEnv()
       ? reinterpret_cast<moho::TerrainShadowContext*>(&runtime->mShadowRenderer)
       : nullptr;
 
@@ -71181,6 +71242,37 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
     shadowContext
   );
   terrain->DrawTerrainSkirt();
+  // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\dumpnormals.on" saves both
+  // primary composite targets once (head = normals target this frame).
+  {
+    static bool sNormalsDumped = false;
+    static unsigned sNormalsDumpCalls = 0;
+    if (!sNormalsDumped && (sNormalsDumpCalls++ % 120u) == 90u) {
+      char dir[512] = {};
+      std::size_t length = 0;
+      if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
+        char path[600];
+        (void)std::snprintf(path, sizeof(path), "%s\\dumpnormals.on", dir);
+        if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
+          sNormalsDumped = true;
+          for (int lock = 0; lock < 2; ++lock) {
+            const auto& target = AsRenderPassView(this)->mPrimaryTargetLocks[lock];
+            if (!target) {
+              continue;
+            }
+            moho::ID3DRenderTarget::SurfaceHandle surface{};
+            (void)target->GetSurface(surface);
+            if (!surface) {
+              continue;
+            }
+            (void)std::snprintf(path, sizeof(path), "%s\\composite_lock%d_head%d.bmp", dir, lock, runtime->mHead);
+            const long hr = gpg::gal::DebugSaveSurfaceToFileA(path, 0U, surface->GetSurface());
+            gpg::Warnf("[NORMALSDUMP] lock=%d head=%d -> %s hr=0x%08lX", lock, runtime->mHead, path, hr);
+          }
+        }
+      }
+    }
+  }
 
   // TEMPORARY PROBE (do not commit). The tessellator produces real geometry
   // (rectCacheCount=122..128) and the vertex upload runs, yet the viewport is
@@ -71313,7 +71405,7 @@ void moho::WRenViewport::RenderMeshes(const int meshFlags, const bool mirrored)
   SetViewportToLocalScreen();
   device->SetColorWriteState(true, true);
 
-  moho::Shadow* const shadowRenderer = runtime->mShadowRenderer.shadow_Fidelity != 0
+  moho::Shadow* const shadowRenderer = runtime->mShadowRenderer.shadow_Fidelity != 0 && !ShadowsDisabledByEnv()
     ? reinterpret_cast<moho::Shadow*>(&runtime->mShadowRenderer)
     : nullptr;
 
@@ -71465,7 +71557,29 @@ void moho::WRenViewport::RenderReflections()
     0
   );
 
-  if (!moho::ren_Reflection) {
+  // TEMPORARY: FAF_NO_REFLECTION=1 skips the mirrored mesh pass (black-wedge
+  // triage). Also report, once, whether the reflection target actually exists:
+  // a null target here would leave the back buffer bound and paint the
+  // mirrored meshes straight onto the scene.
+  static const bool sReflectionDisabled = [] {
+    std::size_t length = 0u;
+    char value[8] = {};
+    return ::getenv_s(&length, value, sizeof(value), "FAF_NO_REFLECTION") == 0 && length != 0u && value[0] == '1';
+  }();
+  {
+    static int sReflBudget = 0;
+    if (sReflBudget < 2) {
+      ++sReflBudget;
+      char probe[160];
+      (void)std::snprintf(probe, sizeof(probe), "[REFLDIAG] head=%d rt=%p ds=%p ren_Reflection=%d\n",
+                          static_cast<int>(reflectionIndex),
+                          static_cast<const void*>(reflectionView->mRenderTargetSlots[reflectionIndex].mRenderTarget),
+                          static_cast<const void*>(reflectionView->mDepthStencilSlots[reflectionIndex].mDepthStencil),
+                          moho::ren_Reflection ? 1 : 0);
+      ::OutputDebugStringA(probe);
+    }
+  }
+  if (!moho::ren_Reflection || sReflectionDisabled) {
     return;
   }
   SetViewportToLocalScreen();
@@ -71732,8 +71846,12 @@ void moho::WRenViewport::TransformTerrainNormals()
     // REN_MaybeDumpFrame) so we can see whether DrawTerrainNormal actually
     // wrote normals and whether TCreateBasis produced a usable basis.
     static int sBasisDumps = 0;
-    if (sBasisDumps < 2 && getenv("FAF_DUMP_BASIS") != nullptr) {
-      const int which = sBasisDumps++;
+    static int sBasisCloseDumps = 0;
+    const bool closeCamera = runtime->mCam != nullptr && runtime->mCam->tranform.pos_.y < 300.0f;
+    const bool wantDump = getenv("FAF_DUMP_BASIS") != nullptr
+      && ((sBasisDumps < 2) || (closeCamera && sBasisCloseDumps < 2));
+    if (wantDump) {
+      const int which = (sBasisDumps < 2) ? sBasisDumps++ : sBasisCloseDumps++;
       moho::ID3DRenderTarget* const target = (which == 0)
         ? passView->mSecondaryTargetLocks[head].get()
         : passView->mPrimaryTargetLocks[head].get();
