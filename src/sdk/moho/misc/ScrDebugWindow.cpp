@@ -1512,12 +1512,7 @@ namespace
    */
   void AppendMenuItem(void* const menu, const std::int32_t id, const wchar_t* const label, const wchar_t* const help)
   {
-    void* const itemStorage = ::operator new(0x74u, std::nothrow);
-    if (itemStorage == nullptr) {
-      return;
-    }
-
-    void* const item = moho::scrdebug::ConstructWxMenuItem(itemStorage, menu, id, label, help, false, nullptr);
+    void* const item = moho::scrdebug::ConstructWxMenuItem(menu, id, label, help, false, nullptr);
     moho::scrdebug::AppendWxMenuItem(menu, item);
   }
 
@@ -1539,14 +1534,9 @@ namespace
 
     const std::wstring wideResolvedPath = gpg::STR_Utf8ToWide(resolvedPath.c_str());
 
-    void* const bitmapStorage = ::operator new(0x18u, std::nothrow);
-    if (bitmapStorage == nullptr) {
-      return nullptr;
-    }
-
     constexpr std::int32_t kWxBitmapTypeBmpResource = 1;
     return moho::scrdebug::ConstructWxBitmapFromFile(
-      bitmapStorage, wideResolvedPath.c_str(), kWxBitmapTypeBmpResource
+      wideResolvedPath.c_str(), kWxBitmapTypeBmpResource
     );
   }
 
@@ -1607,15 +1597,15 @@ moho::ScrDebugWindow::ScrDebugWindow()
   moho::IUserPrefs* const preferences = moho::USER_GetPreferences();
 
   // ----- Menu bar: File / View / Debug -----
-  void* const fileMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const fileMenu = moho::scrdebug::ConstructWxMenu();
   AppendMenuItem(fileMenu, 101, L"Close", L"Close source file");
   AppendMenuItem(fileMenu, 102, L"Close All", L"Close all files");
   AppendMenuItem(fileMenu, 103, L"Reload All", L"Reload all source file");
 
-  void* const viewMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const viewMenu = moho::scrdebug::ConstructWxMenu();
   AppendMenuItem(viewMenu, 201, L"Goto", L"Goto line number");
 
-  void* const debugMenu = moho::scrdebug::ConstructWxMenu(::operator new(0x74u, std::nothrow));
+  void* const debugMenu = moho::scrdebug::ConstructWxMenu();
   AppendMenuItem(debugMenu, 301, L"Step", L"Step execution");
   AppendMenuItem(debugMenu, 302, L"Resume", L"Resume execution");
   moho::scrdebug::AppendWxMenuSeparator(debugMenu);
@@ -1624,7 +1614,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
   moho::scrdebug::AppendWxMenuSeparator(debugMenu);
   AppendMenuItem(debugMenu, 305, L"Clear breakpoints", L"Clear all breakpoints");
 
-  void* const menuBar = moho::scrdebug::ConstructWxMenuBar(::operator new(0x160u, std::nothrow));
+  void* const menuBar = moho::scrdebug::ConstructWxMenuBar();
   moho::scrdebug::AppendWxMenuBarMenu(menuBar, fileMenu, L"File");
   moho::scrdebug::AppendWxMenuBarMenu(menuBar, viewMenu, L"View");
   moho::scrdebug::AppendWxMenuBarMenu(menuBar, debugMenu, L"Debug");
@@ -1652,11 +1642,11 @@ moho::ScrDebugWindow::ScrDebugWindow()
 
   // ----- Nested splitters: outer(source tree | notebook) -----
   void* const outerSplitter = moho::scrdebug::ConstructWxSplitterWindow(
-    ::operator new(0x1A4u, std::nothrow), this, 102, L"splitter"
+    this, 102, L"splitter"
   );
 
   void* const innerSplitter = moho::scrdebug::ConstructWxSplitterWindow(
-    ::operator new(0x1A4u, std::nothrow), outerSplitter, 101, L"splitter"
+    outerSplitter, 101, L"splitter"
   );
 
   // Source-file tree, parented to the outer splitter's first pane.
@@ -1667,7 +1657,7 @@ moho::ScrDebugWindow::ScrDebugWindow()
   }
   const std::wstring wideRootPath = gpg::STR_Utf8ToWide(resolvedRootPath.c_str());
   void* const sourceTree = moho::scrdebug::ConstructWxGenericDirCtrl(
-    ::operator new(0x158u, std::nothrow), innerSplitter, wideRootPath.c_str(),
+    innerSplitter, wideRootPath.c_str(),
     L"Script files (*.lua)|*.lua", L"treeCtrl"
   );
   mSourcePathOwnerControl = sourceTree;
@@ -1677,11 +1667,11 @@ moho::ScrDebugWindow::ScrDebugWindow()
 
   // ----- Notebook: Stack / Locals / Globals, parented to the outer splitter's second pane -----
   void* const notebook = moho::scrdebug::ConstructWxNotebook(
-    ::operator new(0x1A4u, std::nothrow), outerSplitter, -1, -1, -1, -1, -1, 0x90, L"notebook"
+    outerSplitter, -1, -1, -1, -1, -1, 0x90, L"notebook"
   );
 
   void* const callStackListRaw = moho::scrdebug::ConstructWxListCtrl(
-    ::operator new(0x150u, std::nothrow), notebook, 301, -1, -1, -1, -1, 32, L"wxListCtrl"
+    notebook, 301, -1, -1, -1, -1, 32, L"wxListCtrl"
   );
   mCallStackControl = callStackListRaw;
   moho::scrdebug::AddNotebookPage(notebook, callStackListRaw, L"Stack", false, -1);
