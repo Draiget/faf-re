@@ -1438,6 +1438,20 @@
   extern "C" std::int32_t m2tsd_outsj[3];
   extern "C" std::int32_t m2tsd_insj = 0;
 
+  // `_cri_verstr_ptr_m2tsd` (0x00FFFC00) and the four transport-stream error
+  // counters `M2TSD_Init` resets: `_m2tsd_cnt_transport_error_indicator`
+  // (0x011F89EC), `_m2tsd_cnt_discontinuity_indicator` (0x011F894C),
+  // `_m2tsd_cnt_err_continuity_counter` (0x011F89E8) and
+  // `_m2tsd_cnt_duplicate` (0x011F89E4). `decodeTsSub` (0x00AE0420) is the one
+  // that raises them, off each TS packet header's own flags.
+  extern "C" const char* cri_verstr_ptr_m2tsd = nullptr;
+  extern "C" std::int32_t m2tsd_cnt_transport_error_indicator = 0;
+  extern "C" std::int32_t m2tsd_cnt_discontinuity_indicator = 0;
+  extern "C" std::int32_t m2tsd_cnt_err_continuity_counter = 0;
+  extern "C" std::int32_t m2tsd_cnt_duplicate = 0;
+
+  [[nodiscard]] static std::array<std::int32_t, 32>& M2TsdHandleSlots() noexcept;
+
   /**
    * Address: 0x00ACF120 (FUN_00ACF120, _chkFatal)
    *
@@ -1632,6 +1646,35 @@
   extern "C" const char* M2TSD_GetVersionStr()
   {
     return kM2TsdVersionString;
+  }
+
+  /**
+   * Address: 0x00ADFD90 (FUN_00ADFD90, _M2TSD_Init)
+   *
+   * What it does:
+   * Brings the M2TSD transport-stream demultiplexer up. Publishes the version
+   * banner, bumps the library nesting count, clears the 32 handle slots on the
+   * very first call (`rep stosd` of 0x20 dwords at `_M2TSD_libobj+4`,
+   * 0x00ADFDB3), and resets the four TS error counters on every call.
+   *
+   * Unlike `M2T_Init`, which answers the new count, this one always leaves 0 in
+   * EAX: both arms of the branch fall into the `xor eax, eax` at 0x00ADFDBB.
+   */
+  extern "C" std::int32_t M2TSD_Init()
+  {
+    cri_verstr_ptr_m2tsd = kM2TsdVersionString;
+
+    const std::int32_t previousRefCount = M2TSD_libobj;
+    M2TSD_libobj = previousRefCount + 1;
+    if (previousRefCount == 0) {
+      M2TsdHandleSlots().fill(0);
+    }
+
+    m2tsd_cnt_transport_error_indicator = 0;
+    m2tsd_cnt_discontinuity_indicator = 0;
+    m2tsd_cnt_err_continuity_counter = 0;
+    m2tsd_cnt_duplicate = 0;
+    return 0;
   }
 
   struct M2TsdSupplyStatusView
