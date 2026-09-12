@@ -21,18 +21,25 @@ namespace moho::scrdebug
    * `ScrDebugWxBridges.cpp` can include the real wx headers and nothing else,
    * while the callers keep including only their own.
    *
+   * The constructors allocate for themselves. The shipped binary split
+   * allocation from construction and the call sites carried its byte counts
+   * (0x74 wxMenu, 0x160 wxMenuBar, 0x1A4 wxSplitterWindow, ...), but a
+   * static_assert showed sizeof(wxMenuItem) in this vendored wx build already
+   * exceeds the 0x74 it was given - those numbers describe the wx Gas Powered
+   * Games linked, not the one we link, and reusing them was a heap overflow.
+   *
    * Each entry cites the wx library body its call site dispatches to, read
    * from the disassembly of `ScrDebugWindow`'s constructor (`FUN_004BC110`).
    */
 
   /** Address: 0x00998B90 (??0wxMenuBar@@QAE@Z, wxMenuBar::wxMenuBar) */
-  void* ConstructWxMenuBar(void* storage);
+  void* ConstructWxMenuBar();
 
   /** Address: 0x009A9570 (?SetMenuBar@wxFrameBase@@UAEXPAVwxMenuBar@@@Z) */
   void SetFrameMenuBar(void* frameThis, void* menuBar);
 
   /** Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu) */
-  void* ConstructWxMenu(void* storage);
+  void* ConstructWxMenu();
 
   /** wxMenu::Append(wxMenuItem*) - vtable dispatch at the call site. */
   void AppendWxMenuItem(void* menu, void* menuItem);
@@ -60,7 +67,6 @@ namespace moho::scrdebug
 
   /** Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem) */
   void* ConstructWxMenuItem(
-    void* storage,
     void* parentMenu,
     int id,
     const wchar_t* text,
@@ -79,14 +85,13 @@ namespace moho::scrdebug
   void AddToolBarTool(void* toolbar, int id, const wchar_t* label, void* bitmap, const wchar_t* shortHelp);
 
   /** Address: 0x00977BF0 (wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
-  void* ConstructWxBitmapFromFile(void* storage, const wchar_t* path, int type);
+  void* ConstructWxBitmapFromFile(const wchar_t* path, int type);
 
   /** Address: 0x004BB380 (wxSplitterWindow::wxSplitterWindow) */
-  void* ConstructWxSplitterWindow(void* storage, void* parent, int id, const wchar_t* name);
+  void* ConstructWxSplitterWindow(void* parent, int id, const wchar_t* name);
 
   /** Address: 0x004BB4A0 (wxGenericDirCtrl::wxGenericDirCtrl) */
   void* ConstructWxGenericDirCtrl(
-    void* storage,
     void* parent,
     const wchar_t* defaultPath,
     const wchar_t* filter,
@@ -95,7 +100,6 @@ namespace moho::scrdebug
 
   /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
   void* ConstructWxNotebook(
-    void* storage,
     void* parent,
     int id,
     int x,
@@ -111,7 +115,6 @@ namespace moho::scrdebug
 
   /** wxListCtrl::wxListCtrl(parent, id, pos, size, style, validator, name) */
   void* ConstructWxListCtrl(
-    void* storage,
     void* parent,
     int id,
     int x,

@@ -24,7 +24,8 @@
 // wx/memory.h does `#define new WXDEBUG_NEW` whenever __WXDEBUG__ is on, which
 // _DEBUG turns on for us (wx/debug.h:26) even though the shipped game linked wx
 // with it off. That macro rewrites the placement-new below into a three-argument
-// call that has no overload. Drop it; this file wants the real operator.
+// call that has no overload, and rewrites plain `new` into wx's debug
+// allocator. Drop it; this file wants the real operator.
 #ifdef new
 #undef new
 #endif
@@ -38,17 +39,13 @@ namespace moho::scrdebug
   /**
    * Address: 0x00998B90 (??0wxMenuBar@@QAE@Z, wxMenuBar::wxMenuBar)
    *
-   * The call site allocates the storage itself - `operator new(0x160)` in
-   * `ScrDebugWindow`'s constructor - and passes it in, matching the binary's
-   * split of allocation from construction, so this placement-news into it.
+   * The binary split allocation from construction and its call site passed in
+   * `operator new(0x160)`; that byte count is not this wx build's, so the
+   * allocation lives here instead. See the header.
    */
-  void* ConstructWxMenuBar(void* const storage)
+  void* ConstructWxMenuBar()
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (storage) wxMenuBar();
+    return new wxMenuBar();
   }
 
   /**
@@ -70,15 +67,10 @@ namespace moho::scrdebug
   /**
    * Address: 0x004BB050 (??0wxMenu@@QAE@@Z, wxMenu::wxMenu)
    *
-   * Same split as the menu bar: the caller owns the 0x74-byte allocation.
    */
-  void* ConstructWxMenu(void* const storage)
+  void* ConstructWxMenu()
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
-    return ::new (storage) wxMenu();
+    return new wxMenu();
   }
 
   /** wxMenu::Append(wxMenuItem*) - a virtual on wxMenuBase. */
@@ -124,8 +116,7 @@ namespace moho::scrdebug
   /**
    * Address: 0x00975B00 (??1wxBitmap@@UAE@XZ, wxBitmap::~wxBitmap)
    *
-   * Destroys without freeing: the call site builds its bitmap into storage it
-   * owns, so the storage outlives this and is released by the caller.
+   * Paired with ConstructWxBitmapFromFile, which allocates - so this deletes.
    */
   void DestroyWxBitmap(void* const bitmap)
   {
@@ -133,7 +124,7 @@ namespace moho::scrdebug
       return;
     }
 
-    static_cast<wxBitmap*>(bitmap)->~wxBitmap();
+    delete static_cast<wxBitmap*>(bitmap);
   }
 
   /** wxSplitterWindow::SplitVertically(wxWindow*, wxWindow*, int) - virtual, +0x20C. */
@@ -155,7 +146,6 @@ namespace moho::scrdebug
 
   /** Address: 0x009A6240 (??2wxMenuItem@@QAE@@Z, wxMenuItem::wxMenuItem) */
   void* ConstructWxMenuItem(
-    void* const storage,
     void* const parentMenu,
     const int id,
     const wchar_t* const text,
@@ -164,13 +154,9 @@ namespace moho::scrdebug
     void* const subMenu
   )
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString text_(text != nullptr ? text : L"");
     const wxString helpString_(helpString != nullptr ? helpString : L"");
-    return ::new (storage) wxMenuItem(
+    return new wxMenuItem(
       static_cast<wxMenu*>(parentMenu), id, text_, helpString_,
       isCheckable ? wxITEM_CHECK : wxITEM_NORMAL, static_cast<wxMenu*>(subMenu)
     );
@@ -219,46 +205,33 @@ namespace moho::scrdebug
   }
 
   /** Address: 0x00977BF0 (wxBitmap::wxBitmap(const wxString&, wxBitmapType)) */
-  void* ConstructWxBitmapFromFile(void* const storage, const wchar_t* const path, const int type)
+  void* ConstructWxBitmapFromFile(const wchar_t* const path, const int type)
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString path_(path != nullptr ? path : L"");
-    return ::new (storage) wxBitmap(path_, static_cast<wxBitmapType>(type));
+    return new wxBitmap(path_, static_cast<wxBitmapType>(type));
   }
 
   /** Address: 0x004BB380 (wxSplitterWindow::wxSplitterWindow) */
-  void* ConstructWxSplitterWindow(void* const storage, void* const parent, const int id, const wchar_t* const name)
+  void* ConstructWxSplitterWindow(void* const parent, const int id, const wchar_t* const name)
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString name_(name != nullptr ? name : L"splitterWindow");
-    return ::new (storage) wxSplitterWindow(
+    return new wxSplitterWindow(
       static_cast<wxWindow*>(parent), id, wxDefaultPosition, wxDefaultSize, wxSP_3D, name_
     );
   }
 
   /** Address: 0x004BB4A0 (wxGenericDirCtrl::wxGenericDirCtrl) */
   void* ConstructWxGenericDirCtrl(
-    void* const storage,
     void* const parent,
     const wchar_t* const defaultPath,
     const wchar_t* const filter,
     const wchar_t* const name
   )
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString defaultPath_(defaultPath != nullptr ? defaultPath : L"");
     const wxString filter_(filter != nullptr ? filter : L"");
     const wxString name_(name != nullptr ? name : wxTreeCtrlNameStr);
-    return ::new (storage) wxGenericDirCtrl(
+    return new wxGenericDirCtrl(
       static_cast<wxWindow*>(parent), wxID_ANY, defaultPath_, wxDefaultPosition, wxDefaultSize,
       wxDIRCTRL_3D_INTERNAL, filter_, 0, name_
     );
@@ -266,7 +239,6 @@ namespace moho::scrdebug
 
   /** Address: 0x009A7740 (wxNotebook::wxNotebook) */
   void* ConstructWxNotebook(
-    void* const storage,
     void* const parent,
     const int id,
     const int x,
@@ -277,12 +249,8 @@ namespace moho::scrdebug
     const wchar_t* const name
   )
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString name_(name != nullptr ? name : L"notebook");
-    return ::new (storage) wxNotebook(
+    return new wxNotebook(
       static_cast<wxWindow*>(parent), id, wxPoint(x, y), wxSize(width, height),
       static_cast<long>(style), name_
     );
@@ -309,7 +277,6 @@ namespace moho::scrdebug
 
   /** wxListCtrl::wxListCtrl(parent, id, pos, size, style, validator, name) */
   void* ConstructWxListCtrl(
-    void* const storage,
     void* const parent,
     const int id,
     const int x,
@@ -320,12 +287,8 @@ namespace moho::scrdebug
     const wchar_t* const name
   )
   {
-    if (storage == nullptr) {
-      return nullptr;
-    }
-
     const wxString name_(name != nullptr ? name : L"listCtrl");
-    return ::new (storage) wxListCtrl(
+    return new wxListCtrl(
       static_cast<wxWindow*>(parent), id, wxPoint(x, y), wxSize(width, height),
       static_cast<long>(style), wxDefaultValidator, name_
     );
