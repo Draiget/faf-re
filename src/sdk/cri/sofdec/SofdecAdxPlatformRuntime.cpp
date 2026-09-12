@@ -19171,11 +19171,11 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   );
 
   /// SUD (Sofdec Universal Dispatch) helper that classifies one SFD frame's
-  /// `(constrained_parameters_flag, progressive_sequence)` pair as a
+  /// `(sudRecordAddress, sudFieldIndex)` pair as a
   /// colour-adjust frame. Returns `1` for colour-adjust frames, `0` otherwise.
   std::int32_t SUD_AnalyTypeCcs(
-    std::int32_t constrainedParametersFlag,
-    std::int32_t progressiveSequence
+    std::int32_t sudRecordAddress,
+    std::int32_t sudFieldIndex
   );
 
   // ---------------------------------------------------------------------------
@@ -19207,8 +19207,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t concat_cnt;                       ///< +0x30 stream-table index
     std::int32_t nfrm;                             ///< +0x34 frame count in pool
     std::uint8_t mUnknown38[0x50];                 ///< +0x38
-    std::int32_t constrained_parameters_flag;      ///< +0x88
-    std::int32_t progressive_sequence;             ///< +0x8C
+    std::int32_t sudRecordAddress;      ///< +0x88
+    std::int32_t sudFieldIndex;             ///< +0x8C
     std::int32_t picture_structure_src;            ///< +0x90
     std::int32_t chroma_format_src;                ///< +0x94
     std::int32_t picture_detail_unknown_98;        ///< +0x98
@@ -19221,12 +19221,12 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   static_assert(offsetof(MwsfdSfdFrmObj, concat_cnt) == 0x30, "MwsfdSfdFrmObj::concat_cnt offset must be 0x30");
   static_assert(offsetof(MwsfdSfdFrmObj, nfrm) == 0x34, "MwsfdSfdFrmObj::nfrm offset must be 0x34");
   static_assert(
-    offsetof(MwsfdSfdFrmObj, constrained_parameters_flag) == 0x88,
-    "MwsfdSfdFrmObj::constrained_parameters_flag offset must be 0x88"
+    offsetof(MwsfdSfdFrmObj, sudRecordAddress) == 0x88,
+    "MwsfdSfdFrmObj::sudRecordAddress offset must be 0x88"
   );
   static_assert(
-    offsetof(MwsfdSfdFrmObj, progressive_sequence) == 0x8C,
-    "MwsfdSfdFrmObj::progressive_sequence offset must be 0x8C"
+    offsetof(MwsfdSfdFrmObj, sudFieldIndex) == 0x8C,
+    "MwsfdSfdFrmObj::sudFieldIndex offset must be 0x8C"
   );
   static_assert(
     offsetof(MwsfdSfdFrmObj, picture_structure_src) == 0x90,
@@ -19346,8 +19346,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     std::int32_t chromaPosLo;                      ///< +0x74
     std::int32_t chromaPosHi;                      ///< +0x78
     std::uint8_t mUnknown7C[0x0C];                 ///< +0x7C
-    std::int32_t constrainedParametersFlag;        ///< +0x88 (copied from frmcodec)
-    std::int32_t progressiveSequence;              ///< +0x8C (copied from frmcodec)
+    std::int32_t sudRecordAddress;        ///< +0x88 (copied from frmcodec)
+    std::int32_t sudFieldIndex;              ///< +0x8C (copied from frmcodec)
     std::int32_t isColAdjFrame;                    ///< +0x90
     std::int32_t fxType;                           ///< +0x94
   };
@@ -19363,10 +19363,10 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
   static_assert(offsetof(MwsfdSfxFrameInfo, pictureStructure) == 0x60, "MwsfdSfxFrameInfo::pictureStructure offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, chromaFormat) == 0x64, "MwsfdSfxFrameInfo::chromaFormat offset");
   static_assert(
-    offsetof(MwsfdSfxFrameInfo, constrainedParametersFlag) == 0x88,
-    "MwsfdSfxFrameInfo::constrainedParametersFlag offset"
+    offsetof(MwsfdSfxFrameInfo, sudRecordAddress) == 0x88,
+    "MwsfdSfxFrameInfo::sudRecordAddress offset"
   );
-  static_assert(offsetof(MwsfdSfxFrameInfo, progressiveSequence) == 0x8C, "MwsfdSfxFrameInfo::progressiveSequence offset");
+  static_assert(offsetof(MwsfdSfxFrameInfo, sudFieldIndex) == 0x8C, "MwsfdSfxFrameInfo::sudFieldIndex offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, isColAdjFrame) == 0x90, "MwsfdSfxFrameInfo::isColAdjFrame offset");
   static_assert(offsetof(MwsfdSfxFrameInfo, fxType) == 0x94, "MwsfdSfxFrameInfo::fxType offset");
 
@@ -19577,8 +19577,8 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * Converts one MWSFD-side decoded frame descriptor into the SFX-side
    * `MwsfdSfxFrameInfo` block consumed by the Sofdec SFX runtime. Runs the
    * canonical 5-step CRI pipeline (format/plane/nfrm/tag/detail) and then
-   * patches the per-frame `constrained_parameters_flag` /
-   * `progressive_sequence` lanes, the per-file colour-adjust flag, the
+   * patches the per-frame `sudRecordAddress` /
+   * `sudFieldIndex` lanes, the per-file colour-adjust flag, the
    * per-stream FX-type override, and finally pushes the resulting composition
    * mode into the bound SFX handle via `mwsfsfx_DecideCompoMode`.
    *
@@ -19598,12 +19598,12 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
     // FUN_00AC6710 line 7 passes `a1` - the playback handle - not the frame.
     mwsfsfx_SetFrmDetail(ply, outSfx);
 
-    // Copy the two-dword `frmcodec.u.frmm2v.{constrained_parameters_flag,
-    // progressive_sequence}` pair as a single QWORD load/store, matching the
+    // Copy the two-dword `frmcodec.u.frmm2v.{sudRecordAddress,
+    // sudFieldIndex}` pair as a single QWORD load/store, matching the
     // `mov ecx,[esi+0x88] / mov [edi+0x88], ecx / mov edx,[esi+0x8C] /
     // mov [edi+0x8C], edx` sequence in the binary.
-    outSfx->constrainedParametersFlag = frm->constrained_parameters_flag;
-    outSfx->progressiveSequence = frm->progressive_sequence;
+    outSfx->sudRecordAddress = frm->sudRecordAddress;
+    outSfx->sudFieldIndex = frm->sudFieldIndex;
 
     const std::int32_t plyAddress = static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply));
     outSfx->isColAdjFrame = MWSFD_IsColAdjFrame(plyAddress, frm);
@@ -19684,17 +19684,17 @@ void ADXM_SetupThrd(const moho::AdxmThreadStartupParams* const startupParams)
    * Returns 1 when the supplied frame is a colour-adjust frame.
    * The decision is two-stage: first the per-file colour-adjust enable
    * (`MWSFD_IsColAdjFile`) is checked; then, if the frame carries a
-   * non-zero `constrained_parameters_flag`, the SUD type analyser
+   * non-zero `sudRecordAddress`, the SUD type analyser
    * (`SUD_AnalyTypeCcs`) is consulted with the constrained-parameters lane
    * and the progressive-sequence lane.
    */
   std::int32_t MWSFD_IsColAdjFrame(const std::int32_t mwsfdLibBase, MwsfdSfdFrmObj* const frm)
   {
     const std::int32_t isColAdjFile = MWSFD_IsColAdjFile(mwsfdLibBase, frm->concat_cnt);
-    const std::int32_t constrainedParametersFlag = frm->constrained_parameters_flag;
+    const std::int32_t sudRecordAddress = frm->sudRecordAddress;
     const std::int32_t fileResult = (isColAdjFile == 1) ? 1 : 0;
-    if (constrainedParametersFlag != 0) {
-      return SUD_AnalyTypeCcs(constrainedParametersFlag, frm->progressive_sequence);
+    if (sudRecordAddress != 0) {
+      return SUD_AnalyTypeCcs(sudRecordAddress, frm->sudFieldIndex);
     }
     return fileResult;
   }

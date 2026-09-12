@@ -226,9 +226,9 @@ extern "C" {
   // SFX_SetZbit (0x00ACDFF0): real body in SofdecAdxPlatformRuntime.cpp, next
   // to SFXZ_IsSetZclip. Was a no-argument stub; SFX_MakeTblZ16/32 silently
   // discarded both the handle and the requested bit depth.
-  void* SUD_AnalyTypeCcs() { return nullptr; }
-  void* SUD_Finish() { return nullptr; }
-  void* SUD_Init() { return nullptr; }
+  // SUD_AnalyTypeCcs (0x00ACD2C0), SUD_Init (0x00ACD110) and SUD_Finish
+  // (0x00ACD140): real bodies in cri/sofdec/SofdecSfxRuntime.cpp, beside
+  // SUD_AnalyTypeDivField which shares their record layout.
   // UTY_MemsetDword: real body in SofdecMpvRuntime.cpp.
   void* adxf_GetPtStat() { return nullptr; }
   void* adxf_LoadPtBothNw() { return nullptr; }
