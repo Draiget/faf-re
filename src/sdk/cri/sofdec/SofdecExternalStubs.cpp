@@ -258,7 +258,10 @@ extern "C" {
   void* adxf_ReadSj32() { return nullptr; }
   void* adxf_Seek() { return nullptr; }
   void* adxf_SetFileInfoEx() { return nullptr; }
-  void* adxf_Stop() { return nullptr; }
+  // adxf_Stop (0x00B0B9F0): real body in SofdecAdxPlatformRuntime.cpp,
+  // beside its ADXF_Stop guard wrapper. adxf_Close and adxf_Seek both route
+  // through it, so while it was a stub a handle was closed or seeked without
+  // its stream ever being stopped or its read progress recorded.
   void* adxt_Create() { return nullptr; }
   void* adxt_GetTime() { return nullptr; }
   void* adxt_Pause() { return nullptr; }

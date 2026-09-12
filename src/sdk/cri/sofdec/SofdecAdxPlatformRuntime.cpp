@@ -15263,6 +15263,60 @@
   }
 
   /**
+   * Address: 0x00B0B9F0 (FUN_00B0B9F0, _adxf_Stop)
+   *
+   * What it does:
+   * Stops one ADXF handle's transfer and records how much of the request it got
+   * through. A handle already idle (status 1) or merely stop-pending (status 3)
+   * only has its status settled; an actively reading one has its stream stopped,
+   * its read progress measured against the start sector under the ADXCRS lock,
+   * and its SJ transfer closed.
+   *
+   * Every exit answers `readStartSector` -- both the status-1 tail at
+   * 0x00B0BA87 and the status-3 arm at 0x00B0BA29 read `[esi+0x14]` -- except
+   * the two null checks, which answer -3 and -1.
+   *
+   * Note the command-history bracket: the open entry (0x00B0B9FE) is written
+   * before the null check, so a call on a null handle is still recorded, while
+   * the closing entry (0x00B0BA7F) is only written on the path that actually
+   * stopped something.
+   */
+  std::int32_t adxf_Stop(void* const adxfHandleAddress)
+  {
+    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    (void)adxf_SetCmdHstry(5, 0, adxfHandleAddress, -1, -1);
+
+    if (adxfHandle == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrStopNullHandle);
+      return -3;
+    }
+
+    if (adxfHandle->status == 3u) {
+      const std::int32_t startSector = adxfHandle->readStartSector;
+      adxfHandle->status = 1;
+      return startSector;
+    }
+
+    if (adxfHandle->status != 1u) {
+      void* const streamHandle = adxfHandle->streamHandle;
+      if (streamHandle == nullptr) {
+        (void)ADXERR_CallErrFunc1_(kAdxfErrStopNullStream);
+        return -1;
+      }
+
+      ADXSTM_Stop(streamHandle);
+      ADXCRS_Lock();
+      adxfHandle->readProgressSectors = ADXSTM_Tell(adxfHandle->streamHandle) - adxfHandle->readStartSector;
+      adxf_CloseSjStm(adxfHandleAddress);
+      adxfHandle->status = 1;
+      ADXCRS_Unlock();
+      (void)adxf_SetCmdHstry(5, 1, adxfHandleAddress, -1, -1);
+    }
+
+    return adxfHandle->readStartSector;
+  }
+
+  /**
    * Address: 0x00B0BB30 (FUN_00B0BB30, _adxf_ExecOne)
    *
    * What it does:
