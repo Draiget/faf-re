@@ -255,7 +255,9 @@ extern "C" {
   void* adxf_GetPtStat() { return nullptr; }
   void* adxf_LoadPtBothNw() { return nullptr; }
   void* adxf_ReadNw32() { return nullptr; }
-  void* adxf_ReadSj32() { return nullptr; }
+  // adxf_ReadSj32 (0x00B0B770): real body in SofdecAdxPlatformRuntime.cpp,
+  // beside its ADXF_ReadSj32 guard wrapper. It is the argument gate in front
+  // of adxf_read_sj32, which until now had no caller at all.
   // adxf_Seek (0x00B0BC30): real body in SofdecAdxPlatformRuntime.cpp,
   // beside its ADXF_Seek guard wrapper and the adxf_Stop it calls first when
   // the handle is still transferring.
