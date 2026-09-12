@@ -7399,12 +7399,13 @@ namespace moho
     // GetLeftMouseButtonAction, then immediately overwrites it with a copy of
     // the resolved commandData and destroys it - net zero data effect, since
     // neither commandData nor anything outside this scratch's own lifetime is
-    // touched. No named ECommandMode value 7 exists (this isn't a real
-    // COMMOD_Ping|COMMOD_Order union - plain sequential enum, not flag bits);
-    // kept as the raw literal the binary compares against.
+    // touched. Mode 7 is `COMMOD_CancelCommandMode`, the value
+    // `func_GetRightMouseButtonAction` writes at 0x0081ED4E when a UI command
+    // mode is already engaged - this comparison is how that value was first
+    // sighted, and it was dead until the writer was restored.
     CommandModeData commandData{};
     (void)func_GetRightMouseButtonAction(&commandData, &session->CursorInfo(), 0, session);
-    if (commandData.mMode == static_cast<ECommandMode>(7)) {
+    if (commandData.mMode == COMMOD_CancelCommandMode) {
       CommandModeData scratch{};
       (void)session->GetLeftMouseButtonAction(&scratch, &session->CursorInfo(), 0);
     }
