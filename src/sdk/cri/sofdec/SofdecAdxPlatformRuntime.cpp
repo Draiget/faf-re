@@ -15302,14 +15302,97 @@
   }
 
   /**
+   * Address: 0x00B0B850 (FUN_00B0B850, _adxf_ReadNw32)
+   *
+   * What it does:
+   * Reads sectors into a caller-supplied buffer by wrapping that buffer in a
+   * ring-buffer source-join object and then running the ordinary SJ read. The
+   * ring is created over `requestedSectors << 11` bytes (0x00B0B8E9 -- 2048
+   * bytes a sector) at the caller's address, with no pack area.
+   *
+   * Four -3/-1 rejections, each with its own banner: a null handle, a negative
+   * sector count, a null buffer, and a handle that already owns a source-join
+   * object -- this entry point is the one that creates it, so finding one is a
+   * caller error. A handle already transferring answers 0, and a ring the pool
+   * could not supply answers -2.
+   *
+   * The ring's address and byte size are also parked in the two OCBI callback
+   * lanes, which is what ADXF_Ocbi is handed while the lock is held; the same
+   * pair is replayed by adxf_CloseSjStm when the object is released. If the
+   * read did not come back positive the ring is destroyed again through its own
+   * dispatch table, so a failed read leaves no orphan object behind.
+   *
+   * Note `sjFlag` is cleared here (0x00B0B96F) where adxf_ReadSj32 sets it: the
+   * flag records who owns the source-join object, and the one created here
+   * belongs to ADXF.
+   */
+  std::int32_t
+  adxf_ReadNw32(void* const adxfHandleAddress, const std::int32_t requestedSectors, const std::int32_t bufferAddress)
+  {
+    auto* const adxfHandle = static_cast<AdxfRuntimeHandleView*>(adxfHandleAddress);
+    (void)adxf_SetCmdHstry(4, 0, adxfHandleAddress, requestedSectors, bufferAddress);
+
+    if (adxfHandle == nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadNw32NullHandle);
+      return -3;
+    }
+    if (requestedSectors < 0) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadNw32NegativeSectors);
+      return -3;
+    }
+    if (bufferAddress == 0) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadNw32NullBuffer);
+      return -3;
+    }
+    if (adxfHandle->status == 2u) {
+      return 0;
+    }
+    if (adxfHandle->sourceJoinObject != nullptr) {
+      (void)ADXERR_CallErrFunc1_(kAdxfErrReadNw32SjNotNull);
+      return -1;
+    }
+
+    constexpr std::int32_t kSectorShift = 11;
+    const std::int32_t bufferSizeBytes = requestedSectors << kSectorShift;
+    auto* const ringBuffer = SJRBF_Create(bufferAddress, bufferSizeBytes, 0);
+    if (ringBuffer == nullptr) {
+      return -2;
+    }
+
+    ADXCRS_Lock();
+    adxfHandle->ocbiCallbackArg0 = bufferAddress;
+    adxfHandle->ocbiCallbackArg1 = bufferSizeBytes;
+    adxfHandle->sourceJoinObject = reinterpret_cast<moho::SofdecSjSupplyHandle*>(ringBuffer);
+    if (gAdxfOcbiEnabled == 1) {
+      ADXF_Ocbi(bufferAddress, bufferSizeBytes);
+    }
+    ADXCRS_Unlock();
+
+    const std::int32_t readResult = adxf_read_sj32(adxfHandle, requestedSectors, adxfHandle->sourceJoinObject);
+    if (readResult <= 0) {
+      ADXCRS_Lock();
+      moho::SofdecSjSupplyHandle* const sourceJoinObject = adxfHandle->sourceJoinObject;
+      if (sourceJoinObject != nullptr) {
+        sourceJoinObject->dispatchTable->destroy(sourceJoinObject);
+        adxfHandle->sourceJoinObject = nullptr;
+      }
+      ADXCRS_Unlock();
+    }
+
+    adxfHandle->sjFlag = 0;
+    (void)adxf_SetCmdHstry(4, 1, adxfHandleAddress, requestedSectors, bufferAddress);
+    return readResult;
+  }
+
+  /**
    * Address: 0x00B0B9C0 (FUN_00B0B9C0, _adxf_ReadNw)
    *
    * What it does:
    * Thin thunk that forwards ADXF network reads into the 32-bit implementation.
    */
-  std::int32_t adxf_ReadNw(void* const adxfHandle, const std::int32_t requestedSectors, const std::int32_t readMode)
+  std::int32_t adxf_ReadNw(void* const adxfHandle, const std::int32_t requestedSectors, const std::int32_t bufferAddress)
   {
-    return adxf_ReadNw32(adxfHandle, requestedSectors, readMode);
+    return adxf_ReadNw32(adxfHandle, requestedSectors, bufferAddress);
   }
 
   /**

@@ -2101,7 +2101,10 @@
     std::int32_t arg2
   );
   std::int32_t adxf_ReadSj32(void* adxfHandle, std::int32_t requestedSectors, void* sourceJoinObject);
-  std::int32_t adxf_ReadNw32(void* adxfHandle, std::int32_t requestedSectors, std::int32_t readMode);
+  // The third argument is the caller's buffer address, not a mode:
+  // adxf_ReadNw32 hands it to SJRBF_Create (0x00B0B8EF) as the ring's backing
+  // store, and rejects it with `'buf' is NULL` when it is zero.
+  std::int32_t adxf_ReadNw32(void* adxfHandle, std::int32_t requestedSectors, std::int32_t bufferAddress);
   std::int32_t adxf_GetStat(void* adxfHandle);
   void adxf_wait_until_file_open(void* streamHandle);
   std::int32_t adxf_GetPtStat(std::int32_t pointId);
@@ -4165,6 +4168,10 @@ namespace
   constexpr std::int32_t kMwsfdErrCodeInvalidHandle = -12;
   constexpr char kMwsfcreErrAttachPicUsrBufInternal[] = "E02120501: Internal Error: mwsfcre_AttachPicUsrBuf().";
   constexpr char kMwsfcreErrAttachPicUsrBufShort[] = "E02120502: mwsfcre_AttachPicUsrBuf(): usrdatbuf is short.";
+  constexpr char kAdxfErrReadNw32NullHandle[] = "E9040816:'adxf' is NULL.(adxf_ReadNw32)";
+  constexpr char kAdxfErrReadNw32NegativeSectors[] = "E9040817:'nsct' is negative.(adxf_ReadNw32)";
+  constexpr char kAdxfErrReadNw32NullBuffer[] = "E9040818:'buf' is NULL.(adxf_ReadNw32)";
+  constexpr char kAdxfErrReadNw32SjNotNull[] = "E9040821:'sj' must be NULL.(adxf_ReadNw32)";
   constexpr char kAdxfErrSetFileInfoExNullName[] =
     "E9081901:illigal parameter fname=null.(adxf_SetFileInfoEx)";
   constexpr char kAdxfErrReadSj32NullHandle[] = "E9040811:'adxf' is NULL.(adxf_ReadSj32)";
