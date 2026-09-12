@@ -1133,6 +1133,34 @@
     return 1;
   }
 
+  /**
+   * Address: 0x00ADD730 (FUN_00ADD730, _SFH_AnlyFtrFxType)
+   *
+   * The effect type at element[39]. Unlike its siblings above this one is
+   * version-gated: 0x00ADD75E compares the analyzer's version word against
+   * 210 and answers 0 for anything older, because the byte did not exist in
+   * the earlier header layout.
+   */
+  extern "C" std::int32_t SFH_AnlyFtrFxType(
+    const SofdecHeaderAnalyzerRuntimeView* const handle,
+    const std::uint32_t streamId,
+    std::uint32_t* const outEffectType
+  )
+  {
+    *outEffectType = static_cast<std::uint32_t>(-1);
+    const std::uint8_t* const element = SfhEnabledFeatureElement(handle, streamId);
+    if (element == nullptr) {
+      return 0;
+    }
+
+    if (handle->version < 210) {
+      return 0;
+    }
+
+    *outEffectType = element[39];
+    return 1;
+  }
+
   /** Address: 0x00ADD5B0 (FUN_00ADD5B0, _SFH_AnlyFtrShcFixFlg) - bit 4 of the same byte. */
   extern "C" std::int32_t SFH_AnlyFtrShcFixFlg(
     const SofdecHeaderAnalyzerRuntimeView* const handle,
