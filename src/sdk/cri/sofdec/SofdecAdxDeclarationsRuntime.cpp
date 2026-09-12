@@ -4130,6 +4130,7 @@ namespace
   constexpr char kMwsfdErrStopInvalidHandle[] = "E1122602 mwSfdStop: handle is invalid.";
   constexpr char kMwsfdErrGetNumSkipDispInvalidHandle[] = "E202231: mwPlyGetNumSkipDisp: handle is invalid.";
   constexpr char kMwsfdErrGetSfdHandleInvalidHandle[] = "E1122640: mwPlyGetSfdHn: handle is invalid.";
+  constexpr char kMwsfdErrIsNextFrmReadyInvalidHandle[] = "E1122618: mwPlyIsNextFrmReady: handle is invalid.";
   constexpr char kMwsfdErrGetNumDropFrmInvalidHandle[] = "E202232: mwPlyGetNumDropFrm: handle is invalid.";
   constexpr char kMwsfdErrGetNumSkipDecInvalidHandle[] = "E1122619: mwPlyGetNumSkipDec: handle is invalid.";
   constexpr char kMwsfdErrGetNumSkipEmptyBInvalidHandle[] = "E1122623: mwPlyGetNumSkipEmptyB: handle is invalid.";
