@@ -2088,6 +2088,14 @@
     const SofdecHeaderAnalyzerRuntimeView* handle,
     std::int32_t* outFrameNumber
   );
+  extern "C" std::int32_t SFH_AnlyNumElemAud(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::int32_t* outCount
+  );
+  extern "C" std::int32_t SFH_AnlyNumElemVid(
+    const SofdecHeaderAnalyzerRuntimeView* handle,
+    std::int32_t* outCount
+  );
 
   // Both live in fragments compiled later in this aggregate; declared with the
   // shared parameter types so the C-linkage symbols still match.
@@ -2537,6 +2545,68 @@
       kSfdCondSofdecHeaderCallback,
       reinterpret_cast<std::int32_t>(&mwsffrm_CallbackAnalyzeSofdecHeader));
     (void)SFD_SetCond(workctrl, kSfdCondSofdecHeaderContext, reinterpret_cast<std::int32_t>(ply));
+  }
+
+  /**
+   * Address: 0x00ACA1D0 (FUN_00ACA1D0, _mwsffrm_CheckAinf)
+   *
+   * IDA signature:
+   * void __cdecl mwsffrm_CheckAinf(int ply, int frmInf);
+   *
+   * What it does:
+   * Refreshes the playback object's AINF/SFX tag lanes when the frame just
+   * handed out belongs to a later concatenated stream than the one those
+   * lanes were built from, then records the frame's concat index as the new
+   * stamp. Both branches end in that same store (0x00ACA1F1, 0x00ACA1FE).
+   *
+   * Returns nothing: neither path writes EAX. Its one caller,
+   * mwPlyGetCurFrm, tail-calls it and returns whatever the preceding
+   * mwl_convFrmInfFromSFD happened to leave there, and CMovie::Update
+   * discards that value -- so the frame info the caller was given is what
+   * this hands back instead.
+   */
+  void mwsffrm_CheckAinf(
+    moho::MwsfdPlaybackStateSubobj* const ply,
+    const moho::MwsfdFrameInfo* const frameInfo
+  )
+  {
+    if (ply->additionalInfoStamp < frameInfo->concatCount) {
+      (void)MWSFTAG_UpdateTagInf(ply);
+    }
+
+    ply->additionalInfoStamp = frameInfo->concatCount;
+  }
+
+  /**
+   * Address: 0x00ACAA50 (FUN_00ACAA50, _mwsffrm_GetNumAudioCh)
+   *
+   * What it does:
+   * Answers how many audio elements the analysed Sofdec header declares,
+   * or -1 when the analyser does not report success.
+   */
+  int mwsffrm_GetNumAudioCh(SofdecHeaderAnalyzerRuntimeView* const handle)
+  {
+    std::int32_t elementCount = 0;
+    if (SFH_AnlyNumElemAud(handle, &elementCount) != 1) {
+      return -1;
+    }
+    return elementCount;
+  }
+
+  /**
+   * Address: 0x00ACAA70 (FUN_00ACAA70, _mwsffrm_GetNumVideoCh)
+   *
+   * What it does:
+   * The video counterpart of mwsffrm_GetNumAudioCh, byte-for-byte the same
+   * shape against SFH_AnlyNumElemVid.
+   */
+  int mwsffrm_GetNumVideoCh(SofdecHeaderAnalyzerRuntimeView* const handle)
+  {
+    std::int32_t elementCount = 0;
+    if (SFH_AnlyNumElemVid(handle, &elementCount) != 1) {
+      return -1;
+    }
+    return elementCount;
   }
 
   /**
@@ -3935,10 +4005,8 @@
 
       outFrameInfo->frameId = outFrameInfo->frameNumber;
       ply->lastFrameConcatCount = outFrameInfo->concatCount;
-      return reinterpret_cast<moho::MwsfdFrameInfo*>(mwsffrm_CheckAinf(
-        static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(ply)),
-        static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(outFrameInfo))
-      ));
+      mwsffrm_CheckAinf(ply, outFrameInfo);
+      return outFrameInfo;
     }
 
     outFrameInfo->bufferAddress = 0;

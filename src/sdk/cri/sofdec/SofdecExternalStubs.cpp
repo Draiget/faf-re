@@ -300,9 +300,10 @@ extern "C" {
   // mwsffrm_AnalyFxType / mwsffrm_AnalyTotalFrm / mwsffrm_AnalyColHsyuv:
   // real bodies in cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside the
   // MWSFFRM_InitSfhInfTable that owns the ring they write into.
-  void* mwsffrm_CheckAinf() { return nullptr; }
-  void* mwsffrm_GetNumAudioCh() { return nullptr; }
-  void* mwsffrm_GetNumVideoCh() { return nullptr; }
+  // mwsffrm_CheckAinf (0x00ACA1D0), mwsffrm_GetNumAudioCh (0x00ACAA50) and
+  // mwsffrm_GetNumVideoCh (0x00ACAA70): real bodies in
+  // cri/sofdec/SofdecAdxPlatformRuntime.cpp, beside the header-analysis
+  // callbacks they belong to.
   // mwsffrm_SetFrmApi: real body in SofdecAdxPlatformRuntime.cpp (0x00ACA1A0).
   // As a no-argument stub it silently satisfied the two properly-declared
   // `mwsffrm_SetFrmApi(ply, 1)` calls in mwPlyGetCurFrm / mwPlyRelCurFrm, so the

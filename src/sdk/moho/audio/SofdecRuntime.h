@@ -1115,9 +1115,13 @@ namespace moho
     std::int32_t bufferAddress = 0; // +0x00
     std::int32_t frameId = 0;       // +0x04
     std::uint8_t mUnknown08[0x1C]{};
-    std::int32_t concatCount = 0; // +0x24
+    std::int32_t frameNumber = 0; // +0x24
     std::uint8_t mUnknown28[0x8]{};
-    std::int32_t frameNumber = 0; // +0x30
+    /// The concatenated-stream index this frame came from. mwPlyGetCurFrm
+    /// copies it into `MwsfdPlaybackStateSubobj::lastFrameConcatCount`
+    /// (0x00ACA171) and mwsffrm_CheckAinf compares it against
+    /// `additionalInfoStamp` to decide whether the tag lanes are stale.
+    std::int32_t concatCount = 0; // +0x30
     std::uint8_t mUnknown34[0x5C]{};
   };
 
@@ -1127,12 +1131,12 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(offsetof(MwsfdFrameInfo, frameId) == 0x04, "MwsfdFrameInfo::frameId offset must be 0x04");
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(MwsfdFrameInfo, concatCount) == 0x24,
-    "MwsfdFrameInfo::concatCount offset must be 0x24"
+    offsetof(MwsfdFrameInfo, frameNumber) == 0x24,
+    "MwsfdFrameInfo::frameNumber offset must be 0x24"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(MwsfdFrameInfo, frameNumber) == 0x30,
-    "MwsfdFrameInfo::frameNumber offset must be 0x30"
+    offsetof(MwsfdFrameInfo, concatCount) == 0x30,
+    "MwsfdFrameInfo::concatCount offset must be 0x30"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(MwsfdFrameInfo) == 0x90, "MwsfdFrameInfo size must be 0x90");
 

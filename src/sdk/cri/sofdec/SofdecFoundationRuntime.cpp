@@ -1956,7 +1956,7 @@ extern "C"
   void mwsfcre_IncMallocCnt(moho::MwsfdPlaybackStateSubobj* ply);
   std::int32_t MWSFD_IsEnableHndl(moho::MwsfdPlaybackStateSubobj* ply);
   void mwsffrm_SetFrmApi(moho::MwsfdPlaybackStateSubobj* ply, std::int32_t type);
-  std::int32_t mwsffrm_CheckAinf(std::int32_t playbackAddress, std::int32_t frameInfoAddress);
+  void mwsffrm_CheckAinf(moho::MwsfdPlaybackStateSubobj* ply, const moho::MwsfdFrameInfo* frameInfo);
   void mwl_convFrmInfFromSFD(std::int32_t playbackAddress, std::int32_t sfdFrameAddress, std::int32_t outFrameInfoAddress);
   void mwsffrm_SaveFrmDetail(std::int32_t playbackAddress, std::int32_t sfdFrameAddress);
   std::int32_t mwPlyIsNextFrmReady(moho::MwsfdPlaybackStateSubobj* ply);
