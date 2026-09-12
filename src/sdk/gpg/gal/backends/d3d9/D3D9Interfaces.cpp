@@ -10986,3 +10986,17 @@ extern "C" int FafProbeFrameDiag() { return gProbeFrameDiagLeft; }
         return vertexDeclaration_;
     }
 }
+
+// Debug surface dump used by the committed [NORMALSDUMP] diagnostic in
+// WxRuntimeTypes.cpp, which reaches it only when FAF_TOGGLE_DIR names a
+// directory holding dumpnormals.on. Defined here because this is where the
+// D3DX export is already resolved.
+namespace gpg::gal
+{
+    long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
+}
+
+long gpg::gal::DebugSaveSurfaceToFileA(const char* const filePath, const unsigned int fileFormat, void* const sourceSurface)
+{
+    return static_cast<long>(gpg::gal::InvokeD3DXSaveSurfaceToFileA(filePath, fileFormat, sourceSurface));
+}
