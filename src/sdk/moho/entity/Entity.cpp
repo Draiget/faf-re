@@ -4097,7 +4097,8 @@ namespace moho
    * Address: 0x00679FA0 (FUN_00679FA0)
    *
    * What it does:
-   * Replaces entity motor from auto_ptr handoff storage.
+   * Replaces entity motor from auto_ptr handoff storage, then wakes the task
+   * thread so the new motor actually gets ticked.
    */
   void Entity::SetMotor(msvc8::auto_ptr<EntityMotor>& motor)
   {
@@ -4112,6 +4113,20 @@ namespace moho
     if (mMotor) {
       mMotor->BindEntity(this);
     }
+
+    // 0x00679FD5-0x0067A00E is `TaskResume(false, 0)` inlined: read
+    // `mOwnerThread` from the CTask subobject (`[esi+40h]` = Entity+0x34+0x0C),
+    // zero its pending-frame counter, and - when `mStaged` (`[thread+0x18]`) is
+    // set - unlink the thread from the staged list and relink it before the
+    // stage's active-thread sentinel, clearing the flag.
+    //
+    // Without it an entity that gains a motor after creation never runs it.
+    // `Entity::MotionTick` returns -2 while `mMotor` is null (0x00679F99), and
+    // -2 makes the scheduler stage the thread (0x004092DC), so every prop parks
+    // itself on its first beat. `Entity:FallDown()` then installed a
+    // `MotorFallDown` onto a thread nothing would step again: trees took their
+    // hit and stayed bolt upright, and wreckage never sank.
+    TaskResume(false, 0);
   }
 
   /**
