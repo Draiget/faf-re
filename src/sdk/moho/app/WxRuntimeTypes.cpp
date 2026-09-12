@@ -67654,6 +67654,71 @@ moho::MohoApp::MohoApp()
 {}
 
 /**
+ * wx 2.4.2 `src/common/appcmn.cpp:513`, the `__WXDEBUG__`-only helper behind
+ * `wxASSERT` / `wxASSERT_MSG`.
+ *
+ * The shipped game does not contain this symbol - searching the retail image
+ * for "wxAssert", "wxOnAssert" or "UngetWriteBuf" finds nothing, because its
+ * wx was built with `__WXDEBUG__` off. Ours is on: `wx/debug.h:26` promotes
+ * `_DEBUG` to `__WXDEBUG__`, and `wxASSERT_MSG(cond, msg)` expands to
+ * `wxAssert(!!(cond), ...)` - an UNCONDITIONAL call, made even when the
+ * condition holds. `wxString`'s copy constructor carries one
+ * (`wx/string.h:293`), so without a definition every wxString copy in the
+ * program is a jump to a `/FORCE`-resolved RVA 0, i.e. to the image base.
+ * That is the same crash shape as the frame-probe hooks fixed in 2a63b8be.
+ *
+ * Not recovered engine code - this exists only because we build wx in a
+ * configuration the shipped game did not. It keeps wx's own semantics:
+ * report on failure, do nothing otherwise.
+ */
+void wxAssert(
+  const int condition,
+  const wchar_t* const fileName,
+  const int lineNumber,
+  const wchar_t* const conditionText,
+  const wchar_t* const message
+)
+{
+  if (condition != 0) {
+    return;
+  }
+
+  // Narrowed and length-bounded before formatting: gpg's formatter runs through
+  // sprintf_s, which aborts the process on overflow rather than truncating.
+  const auto narrow = [](const wchar_t* const wide, char* const out, const std::size_t capacity) {
+    if (wide == nullptr || capacity == 0u) {
+      if (capacity != 0u) {
+        out[0] = '\0';
+      }
+      return;
+    }
+
+    std::size_t written = 0u;
+    for (; written + 1u < capacity && wide[written] != L'\0'; ++written) {
+      const wchar_t ch = wide[written];
+      out[written] = (ch >= 0x20 && ch < 0x7F) ? static_cast<char>(ch) : '?';
+    }
+    out[written] = '\0';
+  };
+
+  char fileNarrow[160]{};
+  char conditionNarrow[160]{};
+  char messageNarrow[160]{};
+  narrow(fileName, fileNarrow, sizeof(fileNarrow));
+  narrow(conditionText, conditionNarrow, sizeof(conditionNarrow));
+  narrow(message, messageNarrow, sizeof(messageNarrow));
+
+  gpg::Warnf(
+    "wx assert failed: %s(%d): %s%s%s",
+    fileNarrow[0] != '\0' ? fileNarrow : "<unknown>",
+    lineNumber,
+    conditionNarrow[0] != '\0' ? conditionNarrow : "<unknown>",
+    messageNarrow[0] != '\0' ? " -- " : "",
+    messageNarrow
+  );
+}
+
+/**
  * What it does:
  * Creates the one application object and publishes it as `wxTheApp`, which is
  * what wx's own `wxApp::wxApp()` does in a build that goes through `wxEntry`.
