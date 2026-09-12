@@ -3911,13 +3911,20 @@
    * Address: 0x00B0F2C0 (FUN_00B0F2C0, _ADXT_DetachMPEG2AAC)
    *
    * What it does:
-   * Dispatches ADXT MPEG-2 AAC detach through the installed link callback lane.
+   * Dispatches ADXT MPEG-2 AAC detach through the installed link callback lane,
+   * answering whatever that callback answers and 0 when none is installed --
+   * the null pointer the test loaded is still in EAX at the ret.
+   *
+   * This carried the name of 0x00B0CEB0, its byte-identical sibling in
+   * SofdecAdxCodecRuntime.cpp, which carried this one's. Nothing called it
+   * under that name, so SFD_DetachMPEG2AAC's one caller reached the stub.
    */
-  void adxt_detach_m2a(void* const adxtRuntime)
+  extern "C" std::int32_t ADXT_DetachMPEG2AAC(void* const adxtRuntime)
   {
     if (m2adetachfunc != nullptr) {
-      (void)m2adetachfunc(adxtRuntime);
+      return m2adetachfunc(adxtRuntime);
     }
+    return 0;
   }
 
   /**

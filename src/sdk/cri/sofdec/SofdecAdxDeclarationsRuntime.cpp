@@ -1598,7 +1598,7 @@
    * What it does:
    * Dispatches ADXT MPEG-2 AAC detach through the installed link callback lane.
    */
-  void adxt_detach_m2a(void* adxtRuntime);
+  extern "C" std::int32_t ADXT_DetachMPEG2AAC(void* adxtRuntime);
   void adxt_Stop(void* adxtRuntime);
   std::int32_t ADXB_SetAhxInSj(moho::AdxBitstreamDecoderState* decoder);
   std::uint32_t ADXB_SetAhxDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);

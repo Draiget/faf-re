@@ -72,7 +72,10 @@ extern "C" {
   void* ADXPC_SetupSoundDirectSound8() { return nullptr; }
   void* ADXRNA_ExecHndl() { return nullptr; }
   void* ADXT_AttachDolbyProLogicII() { return nullptr; }
-  void* ADXT_DetachMPEG2AAC() { return nullptr; }
+  // ADXT_DetachMPEG2AAC (0x00B0F2C0): real body in SofdecAdxXeficRuntime.cpp.
+  // It was already recovered there under the name of its byte-identical
+  // sibling at 0x00B0CEB0, so nothing reached it and SFD_DetachMPEG2AAC's
+  // caller got this stub instead -- MPEG-2 AAC audio was never detached.
   // ADXT_Init (0x00B0A390): real body in
   // cri/sofdec/SofdecAdxPlatformRuntime.cpp. This is the ADX runtime bootstrap
   // and, critically, the registrar for the three ADXT server callbacks. While
