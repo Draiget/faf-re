@@ -19069,6 +19069,45 @@
     ++adxm_init_level;
   }
 
+  /**
+   * Address: 0x00B06DC0 (FUN_00B06DC0, _ADXM_Finish)
+   *
+   * What it does:
+   * The counterpart of `adxm_setup_thrd`: drops one nesting level and, when the
+   * last one goes, tears the ADXM platform layer down in the order the binary
+   * does it. Stop the three workers, re-arm the timer switch signal, release
+   * the vsync event -- pulsed first, at 0x00B06DEC, so nothing is left parked
+   * inside `ADXM_WaitVsync` on a handle that is about to close -- then shut SVM
+   * down and delete the lock.
+   *
+   * The decrement at 0x00B06DC5 is unconditional and the guard tests only for
+   * non-zero, so an over-release drives the level negative and skips the
+   * teardown rather than repeating it.
+   *
+   * While this was a stub, `CMovieManager::Destroy` (0x00875295) left all three
+   * Sofdec worker threads running, the multimedia timer armed and the vsync
+   * event open for the rest of the process.
+   */
+  void ADXM_Finish()
+  {
+    --adxm_init_level;
+    if (adxm_init_level != 0) {
+      return;
+    }
+
+    (void)adxm_destroy_thrd();
+    gAdxmTimerSwitchSignal = 1;
+
+    if (gAdxtVsyncEventHandle != nullptr) {
+      PulseEvent(gAdxtVsyncEventHandle);
+      CloseHandle(gAdxtVsyncEventHandle);
+      gAdxtVsyncEventHandle = nullptr;
+    }
+
+    SVM_Finish();
+    DeleteCriticalSection(&gAdxmLock);
+  }
+
 /**
  * Address: 0x00B07C80 (FUN_00B07C80, _ADXM_SetupThrd)
  *
