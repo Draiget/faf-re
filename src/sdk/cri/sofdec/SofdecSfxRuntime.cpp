@@ -1948,11 +1948,28 @@ std::int32_t sfxcnv_forcesplit = 0;
 
 constexpr char kSfxErrCnvUpHalfCompo[] = "E201312: sfxcnv_IsCnvUpHalf : compo is invalid.";
 
-/// First byte `SUD_AnalyTypeDivField` matches in a SUD type string.
-constexpr char kSudDivFieldTypeTag[] = "d";
+/// Byte `SUD_AnalyTypeDivField` matches in a SUD record, at +0x12. The
+/// literal at 0x00F41678 is `44 00` -- uppercase; this was written "d", and
+/// strncmp does not forgive that, so no stream was ever divided-field.
+constexpr char kSudDivFieldTypeTag[] = "D";
+
+/// Byte `SUD_AnalyTypeCcs` matches, at +0x13 (literal at 0x00F41670, `43 00`).
+constexpr char kSudCcsTypeTag[] = "C";
 
 /// Offset of the type string inside a SUD record.
 constexpr std::int32_t kSudTypeStringOffset = 18;
+
+/// The CCS tag sits one byte further in than the divided-field one.
+constexpr std::int32_t kSudCcsTypeStringOffset = 19;
+
+/// `sud_ver_str` at 0x00D7F44C, byte for byte.
+constexpr char kSudVersionString[] =
+  "\nCRI SUD/PC Ver.0.05 Build:Feb 28 2005 21:37:17\n";
+
+/// `sud_init_cnt`: SUD's nesting count, and `sud_dummy`, the version
+/// banner pointer the first Init stores purely to keep the string alive.
+std::int32_t sud_init_cnt = 0;
+const char* sud_dummy = nullptr;
 
 /// Distance from the composition plane base to the colour-adjust table.
 constexpr std::int32_t kSfxColorAdjustTableOffset = 8223;
@@ -2203,6 +2220,79 @@ std::int32_t SFX_GetForceSplitField()
 // second one with the same C linkage.
 
 /**
+ * Address: 0x00ACD130 (FUN_00ACD130, _sud_GetVersionStr)
+ *
+ * What it does:
+ * Returns the SUD build banner.
+ */
+const char* sud_GetVersionStr()
+{
+  return moho_cri_sfx_internal::kSudVersionString;
+}
+
+/**
+ * Address: 0x00ACD110 (FUN_00ACD110, _SUD_Init)
+ *
+ * What it does:
+ * Brings the SUD library up once. Later calls see a non-zero nesting count
+ * and do nothing; the first stores the version banner into `sud_dummy`,
+ * which is the only thing that keeps it referenced.
+ */
+void SUD_Init()
+{
+  using namespace moho_cri_sfx_internal;
+
+  if (sud_init_cnt >= 1) {
+    return;
+  }
+
+  sud_dummy = sud_GetVersionStr();
+  ++sud_init_cnt;
+}
+
+/**
+ * Address: 0x00ACD140 (FUN_00ACD140, _SUD_Finish)
+ *
+ * What it does:
+ * Drops one SUD nesting level and answers the count that is left; a count
+ * already at zero is left alone.
+ */
+std::int32_t SUD_Finish()
+{
+  using namespace moho_cri_sfx_internal;
+
+  if (sud_init_cnt > 0) {
+    --sud_init_cnt;
+  }
+  return sud_init_cnt;
+}
+
+/**
+ * Address: 0x00ACD2C0 (FUN_00ACD2C0, _SUD_AnalyTypeCcs)
+ *
+ * IDA signature:
+ * BOOL __cdecl SUD_AnalyTypeCcs(int a1, int a2);
+ *
+ * What it does:
+ * Reports whether a SUD record describes a colour-adjust stream, the same
+ * shape as SUD_AnalyTypeDivField below against the next byte of the type
+ * string. MWSFD_IsColAdjFrame (0x00AC680E) is its caller.
+ */
+std::int32_t SUD_AnalyTypeCcs(const std::int32_t sudRecordAddress, const std::int32_t sudFieldIndex)
+{
+  using namespace moho_cri_sfx_internal;
+
+  if (sudRecordAddress == 0 || sudFieldIndex < 0) {
+    return 0;
+  }
+
+  const auto* const typeString = reinterpret_cast<const char*>(
+    static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sudRecordAddress)) + kSudCcsTypeStringOffset
+  );
+  return std::strncmp(typeString, kSudCcsTypeTag, 1) == 0 ? 1 : 0;
+}
+
+/**
  * Address: 0x00ACD290 (FUN_00ACD290, _SUD_AnalyTypeDivField)
  *
  * IDA signature:
@@ -2251,8 +2341,8 @@ std::int32_t SFX_IsMergeField(
     return (splitField == 1) ? 1 : 0;
   }
 
-  const std::int32_t sudRecordAddress = frameInfo->constrainedParametersFlag;
-  if (sudRecordAddress != 0 && SUD_AnalyTypeDivField(sudRecordAddress, frameInfo->progressiveSequence) != 0) {
+  const std::int32_t sudRecordAddress = frameInfo->sudRecordAddress;
+  if (sudRecordAddress != 0 && SUD_AnalyTypeDivField(sudRecordAddress, frameInfo->sudFieldIndex) != 0) {
     return (SFX_GetProgOut(const_cast<moho_cri_sfx_internal::SfxHandle*>(handle)) == 0) ? 1 : 0;
   }
 
