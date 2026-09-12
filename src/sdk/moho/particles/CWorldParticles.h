@@ -34,6 +34,33 @@ namespace moho
   {
     CD3DVertexSheet* mVertexSheet = nullptr; // +0x00
     BeamTextureBucketMapRuntime mBuckets;     // +0x04
+
+    /**
+     * Address: 0x00493090 (FUN_00493090, sub_493090)
+     *
+     * What it does:
+     * Drains the bucket map (`erase_range(leftmost(), header())` through
+     * 0x00499E50), frees its header and nulls `head_`/`size_`, then releases
+     * the retained vertex sheet through its virtual deleting destructor
+     * (`call [[ecx]]` with the delete flag at 0x004930F8).
+     *
+     * Its only two xrefs are `~CWorldParticles` (0x004927C3) and that
+     * function's unwind funclet (0x00BAAA77), so the container is torn down
+     * exactly once per owner. It used to live as
+     * `CWorldParticles::ShutdownBeamBuckets`, called explicitly from the
+     * destructor body -- and since `mBeams` is an ordinary member, the
+     * compiler emitted this teardown again afterwards. The second pass found
+     * `head_` already null and faulted in `leftmost()` on every process exit.
+     *
+     * The binary releases the map before the sheet, which is reverse
+     * declaration order and therefore emitted rather than written; a body
+     * runs before its members, so the order here is the other way round.
+     * Neither object reaches the other, so nothing observes the difference.
+     */
+    ~BeamBucketContainerRuntime()
+    {
+      delete mVertexSheet;
+    }
   };
 
   static_assert(
@@ -306,15 +333,6 @@ namespace moho
   private:
     friend void ResetWorldParticlesRuntimeState(CWorldParticles& worldParticles);
     friend void DestroyWorldParticlesSingleton();
-
-    /**
-     * Address: 0x00493090 (FUN_00493090, sub_493090)
-     *
-     * What it does:
-     * Releases beam-bucket map resources and destroys the retained beam vertex
-     * sheet lane.
-     */
-    void ShutdownBeamBuckets();
 
     /**
      * Every pooled particle buffer (IDA: `mParticleBuffers`) and the subset not
