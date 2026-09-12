@@ -6475,6 +6475,37 @@
   }
 
   /**
+   * Address: 0x00B20770 (_CRIERR_CallErr)
+   *
+   * IDA signature:
+   * void __cdecl CRIERR_CallErr(const char *Format, ...);
+   *
+   * What it does:
+   * Formats one middleware diagnostic into the shared 0x100-byte message
+   * buffer and hands it to the callback CRIERR_SetCbErr registered, if any.
+   * Sixty-six call sites across Sofdec report through here.
+   *
+   * The binary uses `vsprintf` into that fixed buffer with no bound
+   * (0x00B2077F); this uses the counted form against the same buffer, which
+   * differs only where the original would have overrun it. The same
+   * departure is documented on MWSFSVM_Error, which is the same shape.
+   *
+   * Unlike ADXERR_CallErrFunc1_ below, this one does not forward to
+   * SVM_CallErr: 0x00B20770 ends at the callback.
+   */
+  void CRIERR_CallErr(const char* const format, ...)
+  {
+    std::va_list args;
+    va_start(args, format);
+    (void)std::vsnprintf(crierr_err_msg, sizeof(crierr_err_msg), format, args);
+    va_end(args);
+
+    if (crierr_callback_func != nullptr) {
+      crierr_callback_func(static_cast<std::uint32_t>(crierr_callback_obj), crierr_err_msg);
+    }
+  }
+
+  /**
    * Address: 0x00B10730 (FUN_00B10730, _ADXERR_Init)
    *
    * What it does:
