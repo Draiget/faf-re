@@ -2001,6 +2001,14 @@
    */
   std::int32_t ADXSTM_GetFileSize(char* fileName);
   std::int32_t ADXSTM_GetFileLen(void* streamHandle);
+  /**
+   * Address: 0x00B101A0 (FUN_00B101A0, _ADXSTM_GetFileLen64)
+   *
+   * What it does:
+   * Reads the bound file's length in sectors, the companion of
+   * ADXSTM_GetFileLen's byte count.
+   */
+  std::int32_t ADXSTM_GetFileLen64(void* streamHandle);
   std::int32_t ADXSTM_GetReadFlg(void* streamHandle);
   /**
    * Address: 0x00B0FA40 (FUN_00B0FA40, _ADXSTM_Tell)
@@ -2059,7 +2067,11 @@
   );
   const char* adxf_GetFnameFromPt(std::int32_t afsHandle);
   std::int32_t adxf_SetAfsFileInfo(void* adxfHandle, void* afsPointHandle, std::int32_t fileIndex);
-  std::int32_t adxf_SetFileInfoEx(void* adxfHandle, void* afsPointHandle, std::int32_t fileIndex);
+  // The second and third arguments are a file name and a bind offset, not an
+  // AFS point handle and an index: adxf_SetFileInfoEx hands them straight to
+  // ADXSTM_BindFile (0x00B0B21D) as its fileName and startOffset, and the
+  // banner it raises for a null second argument says `fname=null`.
+  std::int32_t adxf_SetFileInfoEx(void* adxfHandle, const char* fileName, std::int32_t startOffset);
   std::int32_t adxf_SetFileInfoRangeNw(
     void* adxfHandle,
     const char* fileName,
@@ -4153,6 +4165,8 @@ namespace
   constexpr std::int32_t kMwsfdErrCodeInvalidHandle = -12;
   constexpr char kMwsfcreErrAttachPicUsrBufInternal[] = "E02120501: Internal Error: mwsfcre_AttachPicUsrBuf().";
   constexpr char kMwsfcreErrAttachPicUsrBufShort[] = "E02120502: mwsfcre_AttachPicUsrBuf(): usrdatbuf is short.";
+  constexpr char kAdxfErrSetFileInfoExNullName[] =
+    "E9081901:illigal parameter fname=null.(adxf_SetFileInfoEx)";
   constexpr char kAdxfErrReadSj32NullHandle[] = "E9040811:'adxf' is NULL.(adxf_ReadSj32)";
   constexpr char kAdxfErrReadSj32NegativeSectors[] = "E9040812:'nsct'is negative.(adxf_ReadSj32)";
   constexpr char kAdxfErrReadSj32NullSj[] = "E9040813:'sj'is NULL.(adxf_ReadSj32)";
