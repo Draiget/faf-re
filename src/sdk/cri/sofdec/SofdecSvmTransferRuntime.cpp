@@ -1552,7 +1552,9 @@
       return cft_c_Ycc420plnToArgb8888Int1smp(inputLanes, outputSurface);
     }
 
-    return cft_sse_Ycc420plnToArgb8888Int1smp(inputLanes, outputSurface, colorTable);
+    return cft_sse_Ycc420plnToArgb8888Int1smp(
+      inputLanes, outputSurface, colorTable, scratchBufferAddress
+    );
   }
 
   /**
@@ -4334,6 +4336,159 @@
       convertPlainRow();
       ++completedRows;
     }
+  }
+
+  /**
+   * Address: 0x00B059E0 (FUN_00B059E0, _cft_sse_Ycc420plnToArgb8888Int1smp)
+   *
+   * IDA signature:
+   * char __cdecl cft_sse_Ycc420plnToArgb8888Int1smp(int *a1, int *a2, int a3, int a4);
+   *
+   * What it does:
+   * The MMX interlaced kernel `CFT_Ycc420plnToArgb8888Int1smp` reaches when
+   * the frame is shaped the way its loads need. It takes every chroma sample
+   * as it finds it -- no scratch plane, no upsample, no blend -- which is why
+   * it is so much shorter than the 2-sample kernel above.
+   *
+   * A group is four rows, and the body runs two passes over it. The first
+   * (0x00B05A66) writes output rows 0 and 2 from luma rows 0 and 2 against
+   * chroma row 0; then 0x00B05E43 steps chroma, luma and output on by one
+   * row each; then the second pass (0x00B05E87) writes rows 1 and 3 against
+   * chroma row 1. That pairing is the interlacing: rows 0 and 2 are one
+   * field and share its chroma row, rows 1 and 3 the other.
+   *
+   * The group advance at 0x00B06264 then adds what is left -- three luma and
+   * three output rows (`lea` by 3 at 0x00B05A16/0x00B05A21) and one more
+   * chroma row -- which totals four luma rows, four output rows and two
+   * chroma rows per group. Both chroma cursors advance by the *Cb* stride:
+   * 0x00B05E4F and 0x00B06270 read [a1+0x10] for the Cr plane too.
+   *
+   * One quirk to reproduce rather than correct. Within a pair, the first
+   * output row takes the low chroma pair for its first two pixels and the
+   * high pair for its next two; the second output row takes the **low** pair
+   * for both. 0x00B05B43, 0x00B05F64, 0x00B0604C, 0x00B06144 and 0x00B0622C
+   * all load mm4/mm5 from mm6 where the store beside them uses mm7, so half
+   * of every second row carries its neighbour's chroma. It is systematic,
+   * not a stray instruction, and it is what the shipped game draws.
+   *
+   * The byte it returns is the group counter the last iteration left.
+   */
+  std::int32_t cft_sse_Ycc420plnToArgb8888Int1smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface,
+    const __m64* const colorTable,
+    // Pushed by the caller but never read, as in the progressive pair.
+    [[maybe_unused]] const std::uintptr_t scratchBufferAddress
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_sse_Ycc420plnToArgb8888Int1smp");
+
+    const std::int32_t groupRows = (outputSurface->heightPixels + 3) & ~3;
+    const std::int32_t chromaBytesPerRow = ((outputSurface->widthPixels + 15) >> 1) & ~7;
+    const std::int32_t yStrideBytes = inputLanes->yStrideBytes;
+    const std::int32_t chromaStrideBytes = inputLanes->cbStrideBytes;
+    const std::int32_t outputStrideBytes = outputSurface->strideBytes;
+
+    std::uint8_t* chromaBlueRow = inputLanes->cbPlane;
+    std::uint8_t* chromaRedRow = inputLanes->crPlane;
+    std::uint8_t* lumaRowA = inputLanes->yPlane;
+    std::uint8_t* lumaRowB = inputLanes->yPlane + 2 * yStrideBytes;
+    std::uint8_t* outputRowA = outputSurface->pixelBase;
+    std::uint8_t* outputRowB = outputSurface->pixelBase + 2 * outputStrideBytes;
+
+    constexpr __m64 kAdjust = (__m64)0x0020002000200020LL;
+    auto extractWord = [](const __m64 packed, const std::size_t wordIndex) -> std::uint32_t {
+      const auto words = std::bit_cast<std::array<std::uint16_t, 4>>(packed);
+      return words[wordIndex];
+    };
+
+    // One pass over two output rows that share a chroma row.
+    auto convertRowPair = [&]() {
+      std::int32_t chromaByteOffset = 0;
+      while (chromaByteOffset < chromaBytesPerRow) {
+        const __m64 cbPacked = *reinterpret_cast<const __m64*>(chromaBlueRow + chromaByteOffset);
+        const __m64 crPacked = *reinterpret_cast<const __m64*>(chromaRedRow + chromaByteOffset);
+
+        auto* dstA = reinterpret_cast<__m64*>(outputRowA + (8 * chromaByteOffset));
+        auto* dstB = reinterpret_cast<__m64*>(outputRowB + (8 * chromaByteOffset));
+
+        // Four chroma words, but the luma is reloaded halfway: words 0 and 1
+        // pair with the first eight luma bytes, words 2 and 3 with the next.
+        for (std::size_t half = 0; half < 2; ++half) {
+          const std::int32_t lumaByteOffset = (2 * chromaByteOffset) + static_cast<std::int32_t>(8 * half);
+          const __m64 yPackedA = *reinterpret_cast<const __m64*>(lumaRowA + lumaByteOffset);
+          const __m64 yPackedB = *reinterpret_cast<const __m64*>(lumaRowB + lumaByteOffset);
+
+          for (std::size_t pair = 0; pair < 2; ++pair) {
+            const std::size_t chromaWord = (2 * half) + pair;
+            const std::uint32_t cbPair = extractWord(cbPacked, chromaWord);
+            const std::uint32_t crPair = extractWord(crPacked, chromaWord);
+
+            const __m64 chromaLo = _m_paddw(
+              _m_paddw(colorTable[256u + (cbPair & 0xFFu)], colorTable[512u + (crPair & 0xFFu)]),
+              kAdjust
+            );
+            const __m64 chromaHi = _m_paddw(
+              _m_paddw(colorTable[256u + (cbPair >> 8)], colorTable[512u + (crPair >> 8)]),
+              kAdjust
+            );
+
+            const std::uint32_t yPairA0 = extractWord(yPackedA, 2 * pair);
+            const std::uint32_t yPairB0 = extractWord(yPackedB, 2 * pair);
+            const std::uint32_t yPairA1 = extractWord(yPackedA, (2 * pair) + 1);
+            const std::uint32_t yPairB1 = extractWord(yPackedB, (2 * pair) + 1);
+
+            const std::size_t slot = (4 * half) + (2 * pair);
+            auto blend = [&](const __m64 chroma, const std::uint32_t yPair) {
+              return _m_packuswb(
+                _m_psrawi(_m_paddw(chroma, colorTable[yPair & 0xFFu]), 6u),
+                _m_psrawi(_m_paddw(chroma, colorTable[yPair >> 8]), 6u)
+              );
+            };
+
+            dstA[slot] = blend(chromaLo, yPairA0);
+            dstB[slot] = blend(chromaLo, yPairB0);
+            dstA[slot + 1] = blend(chromaHi, yPairA1);
+            // chromaLo, not chromaHi -- see the note above.
+            dstB[slot + 1] = blend(chromaLo, yPairB1);
+          }
+        }
+
+        chromaByteOffset += 8;
+      }
+      _m_empty();
+    };
+
+    std::int32_t result = 0;
+    if (groupRows > 0) {
+      std::int32_t remainingGroups = ((groupRows - 1) >> 2) + 1;
+      do {
+        convertRowPair();
+
+        // 0x00B05E43: one row on, for the other field.
+        chromaBlueRow += chromaStrideBytes;
+        chromaRedRow += chromaStrideBytes;
+        lumaRowA += yStrideBytes;
+        lumaRowB += yStrideBytes;
+        outputRowA += outputStrideBytes;
+        outputRowB += outputStrideBytes;
+
+        convertRowPair();
+
+        // 0x00B06264: the rest of the group.
+        chromaBlueRow += chromaStrideBytes;
+        chromaRedRow += chromaStrideBytes;
+        lumaRowA += 3 * yStrideBytes;
+        lumaRowB += 3 * yStrideBytes;
+        outputRowA += 3 * outputStrideBytes;
+        outputRowB += 3 * outputStrideBytes;
+
+        --remainingGroups;
+        result = remainingGroups;
+      } while (remainingGroups != 0);
+    }
+
+    return result;
   }
 
   /**
