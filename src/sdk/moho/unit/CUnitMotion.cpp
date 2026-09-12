@@ -3754,6 +3754,16 @@ namespace moho
     headingVector.y = 0.0f;
     Wm3::Vector3f::Normalize(&headingVector);
 
+    // 0x006BF20D-0x006BF24A zeroes all six floats of the local SControlOutput
+    // before either branch runs, and the shared tail integrates from *this*
+    // local (force at frame 0x94/0x98/0x9C, torque at 0xA0) - never from
+    // `mForce`/`mVector108`. That distinction matters: `ComputeAirControl`
+    // writes `out->torque` as the inertia-scaled, world-space torque, while it
+    // stashes the raw body-local torque in `mVector108` for
+    // `CalcMoveBallistic`. Feeding `mVector108` to the angular integrator
+    // spins the airframe on an unscaled body-local axis.
+    SControlOutput control{};
+
     const float sampleElevation = mapData->GetHeightField()->GetElevation(outTransform.pos_.x, outTransform.pos_.z);
 
     Wm3::Vector3f desiredVelocity{
@@ -3939,7 +3949,6 @@ namespace moho
       }
 
       const Wm3::Vector3f desiredVelocityNorm = Wm3::Vector3f::NormalizeOrZero(desiredVelocity);
-      SControlOutput control{};
       ComputeAirControl(*physBody, headingVector, desiredVelocity, headingVector, desiredVelocityNorm, &control, combatTarget);
 
       if (horizontalDistance > air.StartTurnDistance) {
@@ -4023,7 +4032,15 @@ namespace moho
     }
 
     // ---- Shared tail: physics integration + layer/collision + writeback ----
-    physBody->IntegrateFreefallStep(mForce, kFixedIntegrationDt, mVector108);
+    // 0x006C0073-0x006C0186: both branches land here, and the dead/ballistic
+    // one arrives with `control` still zeroed - it contributes no force and no
+    // torque this beat, having handed its tumble to `mVector108` for
+    // `CalcMoveBallistic` to pick up on the next.
+    //
+    // 0x006C0073-0x006C0093 copies the pre-integration velocity into
+    // `mPreviousVelocity` (+0xB4) every beat, not just on the landing return.
+    mPreviousVelocity = physBody->mVelocity;
+    physBody->IntegrateFreefallStep(control.force, kFixedIntegrationDt, control.torque);
 
     const bool groundHit = HandleGroundCollision();
     if (groundHit && mLayer != LAYER_None && (mReservation.x0 != 0 || mReservation.z0 != 0)) {
