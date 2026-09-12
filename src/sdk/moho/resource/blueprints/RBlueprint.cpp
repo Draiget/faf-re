@@ -219,6 +219,11 @@ namespace moho
    * default-initializes `mDescription` and `mSource`, and assigns the next
    * blueprint ordinal from the rules' virtual `AssignNextOrdinal` slot.
    */
+  void BP_AddInstanceCountDelta(const long delta)
+  {
+    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), delta);
+  }
+
   RBlueprint::RBlueprint(RRuleGameRules* const owner, const RResId& resId)
     : mOwner(owner)
     , mBlueprintId()
