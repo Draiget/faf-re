@@ -239,7 +239,8 @@ extern "C" {
   void* ahxexecfunc() { return nullptr; }
   void* ahxsetsjifunc() { return nullptr; }
   void* ahxtermsupplyfunc() { return nullptr; }
-  void* cft_c_Ycc420plnToArgb8888Int1smp() { return nullptr; }
+  // cft_c_Ycc420plnToArgb8888Int1smp: real body in
+  // cri/sofdec/SofdecSvmTransferRuntime.cpp, beside its 2-sample twin.
   // cft_c_Ycc420plnToArgb8888Prg1smp: real body in
   // cri/sofdec/SofdecSvmTransferRuntime.cpp, beside its 2-sample twin.
   // cft_mmx_Ycc420plnToArgb8888UserTable (0x00AF3040) and

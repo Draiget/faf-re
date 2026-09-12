@@ -3877,6 +3877,190 @@
   }
 
   /**
+   * Address: 0x00B03F10 (FUN_00B03F10, _cft_c_Ycc420plnToArgb8888Int1smp)
+   *
+   * IDA signature:
+   * int __cdecl cft_c_Ycc420plnToArgb8888Int1smp(int *a1, int *a2);
+   *
+   * What it does:
+   * The scalar interlaced kernel `CFT_Ycc420plnToArgb8888Int1smp` falls back
+   * to. It walks the frame in the same three phases as
+   * `cft_c_Ycc420plnToArgb8888Int2smp` -- two leading rows, groups of four,
+   * then the remainder -- and takes every chroma sample as it finds it.
+   *
+   * Where the 2-sample kernel interpolates twice, this one does neither.
+   * Vertically, each of a group's four output rows reads its own chroma row
+   * straight (0x00B03FF0 onward sets up four cursors, one per row, and the
+   * loop body dereferences each without a blend); horizontally, both pixels
+   * of a pair take the same sample. The group still advances chroma by two
+   * rows per four luma rows, so successive groups overlap -- which is what
+   * keeps each field reading its own chroma even without the weights.
+   *
+   * Return value is dead, as everywhere in this family.
+   */
+  std::int32_t cft_c_Ycc420plnToArgb8888Int1smp(
+    const CftYcc420PlanarInputLanes* const inputLanes,
+    const CftPixelSurfaceLanes* const outputSurface
+  )
+  {
+    CFTCOM_SetCftFunctionName("cft_c_Ycc420plnToArgb8888Int1smp");
+
+    const auto* const input = reinterpret_cast<const CftYcc420PlanarInputLanesView*>(inputLanes);
+    const auto* const output = reinterpret_cast<const CftPixelSurfaceLanesView*>(outputSurface);
+
+    const std::int32_t widthPixels = output->widthPixels;
+    const std::int32_t heightPixels = output->heightPixels;
+    const std::int32_t strideBytes = output->strideBytes;
+    const std::int32_t yStrideBytes = input->yStrideBytes;
+    const std::int32_t cbStrideBytes = input->cbStrideBytes;
+    const std::int32_t crStrideBytes = input->crStrideBytes;
+
+    const std::int32_t oddWidth = widthPixels & 1;
+    const std::uint32_t pixelPairsPerRow =
+      static_cast<std::uint32_t>(widthPixels + oddWidth) >> 1;
+
+    const std::int32_t lumaRowAdvance = yStrideBytes - widthPixels;
+    const std::int32_t chromaRowAdvance =
+      cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+    const std::int32_t pixelRowAdvance = (strideBytes - 4 * widthPixels) / 4;
+    const std::int32_t lumaGroupAdvance = 4 * yStrideBytes - widthPixels;
+    const std::int32_t chromaGroupAdvance =
+      2 * cbStrideBytes - static_cast<std::int32_t>(pixelPairsPerRow) + 1;
+    const std::int32_t pixelGroupAdvance = strideBytes - widthPixels;
+
+    const std::uint8_t* lumaRow = input->yPlane;
+    const std::uint8_t* chromaBlueRow = input->cbPlane;
+    const std::uint8_t* chromaRedRow = input->crPlane;
+    auto* pixelRow = reinterpret_cast<std::uint32_t*>(output->pixelBase);
+
+    // One row of the leading/trailing phases.
+    const auto convertPlainRow = [&]() {
+      if (pixelPairsPerRow != 1) {
+        std::uint32_t remainingPairs = pixelPairsPerRow - 1;
+        do {
+          const std::uint32_t chromaBlue = *chromaBlueRow;
+          const std::uint32_t chromaRed = *chromaRedRow;
+          pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+          pixelRow[1] = Argb8888FromYuvTables(lumaRow[1], chromaBlue, chromaRed);
+
+          lumaRow += 2;
+          pixelRow += 2;
+          ++chromaBlueRow;
+          ++chromaRedRow;
+          --remainingPairs;
+        } while (remainingPairs != 0);
+      }
+
+      const std::uint32_t chromaBlue = *chromaBlueRow;
+      const std::uint32_t chromaRed = *chromaRedRow;
+      pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+      ++lumaRow;
+      ++pixelRow;
+      if (oddWidth == 0) {
+        pixelRow[0] = Argb8888FromYuvTables(lumaRow[0], chromaBlue, chromaRed);
+        ++lumaRow;
+        ++pixelRow;
+      }
+
+      lumaRow += lumaRowAdvance;
+      chromaBlueRow += chromaRowAdvance;
+      chromaRedRow += chromaRowAdvance;
+      pixelRow += pixelRowAdvance;
+    };
+
+    std::int32_t completedRows = 0;
+    const std::int32_t leadingRows = (heightPixels > 2) ? 2 : heightPixels;
+    while (completedRows < leadingRows) {
+      convertPlainRow();
+      ++completedRows;
+    }
+
+    // ----- Groups of four, each output row on its own chroma row -----
+    const std::uint32_t pixelRowStrideWords = static_cast<std::uint32_t>(strideBytes) >> 2;
+    std::uint32_t* pixelRows[4] = {
+      pixelRow,
+      pixelRow + pixelRowStrideWords,
+      pixelRow + 2 * pixelRowStrideWords,
+      pixelRow + 3 * pixelRowStrideWords,
+    };
+    const std::uint8_t* lumaRows[4] = {
+      lumaRow,
+      lumaRow + yStrideBytes,
+      lumaRow + 2 * yStrideBytes,
+      lumaRow + 3 * yStrideBytes,
+    };
+    const std::uint8_t* chromaBlueRows[4] = {
+      chromaBlueRow,
+      chromaBlueRow + cbStrideBytes,
+      chromaBlueRow + 2 * cbStrideBytes,
+      chromaBlueRow + 3 * cbStrideBytes,
+    };
+    const std::uint8_t* chromaRedRows[4] = {
+      chromaRedRow,
+      chromaRedRow + crStrideBytes,
+      chromaRedRow + 2 * crStrideBytes,
+      chromaRedRow + 3 * crStrideBytes,
+    };
+
+    if (completedRows + 3 < heightPixels) {
+      std::int32_t lastRowOfGroup = completedRows + 3;
+      do {
+        if (pixelPairsPerRow != 1) {
+          std::uint32_t remainingPairs = pixelPairsPerRow - 1;
+          do {
+            for (std::size_t row = 0; row < 4; ++row) {
+              const std::uint32_t chromaBlue = *chromaBlueRows[row];
+              const std::uint32_t chromaRed = *chromaRedRows[row];
+              pixelRows[row][0] = Argb8888FromYuvTables(lumaRows[row][0], chromaBlue, chromaRed);
+              pixelRows[row][1] = Argb8888FromYuvTables(lumaRows[row][1], chromaBlue, chromaRed);
+              lumaRows[row] += 2;
+              pixelRows[row] += 2;
+              ++chromaBlueRows[row];
+              ++chromaRedRows[row];
+            }
+            --remainingPairs;
+          } while (remainingPairs != 0);
+        }
+
+        for (std::size_t row = 0; row < 4; ++row) {
+          const std::uint32_t chromaBlue = *chromaBlueRows[row];
+          const std::uint32_t chromaRed = *chromaRedRows[row];
+          pixelRows[row][0] = Argb8888FromYuvTables(lumaRows[row][0], chromaBlue, chromaRed);
+          ++lumaRows[row];
+          ++pixelRows[row];
+          if (oddWidth == 0) {
+            pixelRows[row][0] = Argb8888FromYuvTables(lumaRows[row][0], chromaBlue, chromaRed);
+            ++lumaRows[row];
+            ++pixelRows[row];
+          }
+        }
+
+        for (std::size_t row = 0; row < 4; ++row) {
+          lumaRows[row] += lumaGroupAdvance;
+          chromaBlueRows[row] += chromaGroupAdvance;
+          chromaRedRows[row] += chromaGroupAdvance;
+          pixelRows[row] += pixelGroupAdvance;
+        }
+
+        completedRows += 4;
+        lastRowOfGroup += 4;
+      } while (lastRowOfGroup < heightPixels);
+    }
+
+    // ----- Whatever the groups left -----
+    lumaRow = lumaRows[0];
+    chromaBlueRow = chromaBlueRows[0];
+    chromaRedRow = chromaRedRows[0];
+    pixelRow = pixelRows[0];
+    while (completedRows < heightPixels) {
+      convertPlainRow();
+      ++completedRows;
+    }
+
+    return 0;
+  }
+
+  /**
    * Address: 0x00AEEE20 (FUN_00AEEE20, _cft_c_Ycc420plnToArgb8888Int2smp)
    *
    * IDA signature:
