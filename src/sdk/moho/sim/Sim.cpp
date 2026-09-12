@@ -1065,6 +1065,8 @@ namespace
   constexpr const char* kSessionRequestPauseNoActiveSessionText = "SessionRequestPause(): no active session.";
   constexpr const char* kSessionResumeNoActiveSessionText = "SessionResume(): no active session.";
   constexpr const char* kSessionGetScenarioInfoNoActiveSessionText = "no active session.";
+  constexpr const char* kSessionEndGameHelpText =
+    "End the current game session.  The session says active, we just disconnect from everyone else and freeze play.";
   constexpr const char* kWrongLuaStateText = "wrong lua state.";
   constexpr const char* kRandomSimHelpText = "Random([[min,] max])";
   constexpr const char* kSelectedUnitHelpText =
@@ -20667,6 +20669,83 @@ int moho::cfunc_SessionGetScenarioInfoL(LuaPlus::LuaState* const state)
 }
 
 /**
+ * Address: 0x00898430 (FUN_00898430, cfunc_SessionEndGame)
+ *
+ * What it does:
+ * Unwraps Lua callback context and dispatches to `cfunc_SessionEndGameL`.
+ */
+int moho::cfunc_SessionEndGame(lua_State* const luaContext)
+{
+  return cfunc_SessionEndGameL(moho::SCR_ResolveBindingState(luaContext));
+}
+
+/**
+ * Address: 0x00898450 (FUN_00898450, func_SessionEndGame_LuaFuncDef)
+ *
+ * What it does:
+ * Publishes the global Lua binder definition for `SessionEndGame`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionEndGame_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    UserLuaInitSet(),
+    "SessionEndGame",
+    &moho::cfunc_SessionEndGame,
+    nullptr,
+    "<global>",
+    kSessionEndGameHelpText
+  );
+  return &binder;
+}
+
+/**
+ * Address: 0x008984B0 (FUN_008984B0, j_func_SessionEndGame)
+ *
+ * What it does:
+ * Validates zero args, then disconnects every client from the active sim
+ * driver. The world session is deliberately left alive - the help text spells
+ * this out: play freezes, it is not torn down.
+ *
+ * FAF's patcher has overwritten the first nine bytes at 0x008984B0 with
+ * `jmp 0x0128CB50` + four `nop`s, so IDA shows only the `.exxt` replacement -
+ * which wraps this same logic in FAF's own connectivity bookkeeping (a
+ * `WaitForSingleObject` on the client handshake, and 0x0128B450 zeroing a
+ * 0x40-byte `client_ptr` table). None of that is Moho source. The engine's
+ * own body is still present in the image directly behind the patch, and it is
+ * what this recovery follows:
+ *
+ *   0x008984B9  push eax / call lua_gettop / test eax,eax / jz 0x008984D8
+ *   0x008984C6  push eax, 0, esi(help), "%s\n  expected %d args, but got %d",
+ *               edi(state) -> LuaPlus::LuaState::Error
+ *   0x008984D8  mov eax, sSimDriver ; test ; jnz 0x008984F1
+ *   0x008984E3  push "no active session." / edi -> LuaState::Error
+ *   0x008984F1  mov edx,[esi] / mov eax,[edx+4] / call eax
+ *   0x008984F9  xor eax,eax / ret
+ *
+ * `[vtable+0x04]` is slot 1 on `ISTIDriver`, `DisconnectClients`.
+ */
+int moho::cfunc_SessionEndGameL(LuaPlus::LuaState* const state)
+{
+  if (!state || !state->m_state) {
+    return 0;
+  }
+
+  const int argumentCount = lua_gettop(state->m_state);
+  if (argumentCount != 0) {
+    LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kSessionEndGameHelpText, 0, argumentCount);
+  }
+
+  ISTIDriver* const driver = SIM_GetActiveDriver();
+  if (driver == nullptr) {
+    LuaPlus::LuaState::Error(state, kSessionGetScenarioInfoNoActiveSessionText);
+    return 0;
+  }
+
+  driver->DisconnectClients();
+  return 0;
+}
+
+/**
  * Address: 0x00842BB0 (FUN_00842BB0, cfunc_GetMouseWorldPos)
  *
  * What it does:
@@ -29904,6 +29983,7 @@ namespace
       (void)::moho::func_SessionCanRestart_LuaFuncDef();
       (void)::moho::func_SessionIsActive_LuaFuncDef();
       (void)::moho::func_SessionGetScenarioInfo_LuaFuncDef();
+      (void)::moho::func_SessionEndGame_LuaFuncDef();
       (void)::moho::func_GetMouseWorldPosUser_LuaFuncDef();
       (void)::moho::func_GetMouseScreenPos_LuaFuncDef();
       (void)::moho::func_SetFocusArmyUser_LuaFuncDef();

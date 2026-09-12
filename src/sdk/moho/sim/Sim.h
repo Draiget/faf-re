@@ -5094,6 +5094,36 @@ namespace moho
   int cfunc_SessionGetScenarioInfoL(LuaPlus::LuaState* state);
 
   /**
+   * Address: 0x00898430 (FUN_00898430, cfunc_SessionEndGame)
+   *
+   * lua_State *
+   *
+   * What it does:
+   * Unwraps Lua callback context and dispatches to `cfunc_SessionEndGameL`.
+   */
+  int cfunc_SessionEndGame(lua_State* luaContext);
+
+  /**
+   * Address: 0x00898450 (FUN_00898450, func_SessionEndGame_LuaFuncDef)
+   *
+   * What it does:
+   * Publishes the global Lua binder definition for `SessionEndGame`.
+   */
+  CScrLuaInitForm* func_SessionEndGame_LuaFuncDef();
+
+  /**
+   * Address: 0x008984B0 (FUN_008984B0, j_func_SessionEndGame)
+   *
+   * LuaPlus::LuaState *
+   *
+   * What it does:
+   * Disconnects every client from the active sim driver, which freezes play
+   * while leaving the session itself alive. The engine body survives behind
+   * FAF's hot-patch jump at 0x008984B9; see the definition for the trace.
+   */
+  int cfunc_SessionEndGameL(LuaPlus::LuaState* state);
+
+  /**
    * Address: 0x008420A0 (FUN_008420A0, cfunc_GetCurrentUIState)
    *
    * lua_State *
