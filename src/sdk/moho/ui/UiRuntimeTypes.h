@@ -1790,6 +1790,13 @@ namespace moho
     virtual ~CMauiControl();
 
     /**
+     * Address: 0x00786E90 (FUN_00786E90, Moho::CMauiControl::DoInit)
+     *
+     * What it does:
+     * Invokes script callback `OnInit` on this control object.
+     */
+    virtual void DoInit();
+    /**
      * Address: 0x00786EF0 (FUN_00786EF0, Moho::CMauiControl::Destroy)
      *
      * What it does:
@@ -1797,7 +1804,57 @@ namespace moho
      * deleted-control list, dispatches `OnDestroy`, then destroys children.
      */
     virtual void Destroy();
-
+    /**
+     * Address: 0x00787160 (FUN_00787160, Moho::CMauiControl::DoRender)
+     *
+     * What it does:
+     * Default no-op render dispatch for controls that do not draw.
+     */
+    virtual void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
+    /**
+     * Address: 0x00787170 (FUN_00787170, Moho::CMauiControl::SetHidden)
+     *
+     * What it does:
+     * Calls `OnHide(hidden)` and, when not consumed, updates the hidden lane
+     * and propagates the same hidden state to child controls.
+     */
+    virtual void SetHidden(bool hidden);
+    /**
+     * Address: 0x007871C0 (FUN_007871C0, Moho::CMauiControl::IsHidden)
+     *
+     * What it does:
+     * Returns hidden-state lane for this control.
+     */
+    [[nodiscard]] virtual bool IsHidden();
+    /**
+     * Address: 0x00787270 (FUN_00787270, Moho::CMauiControl::HitTest)
+     *
+     * What it does:
+     * Returns whether `(x,y)` lies inside the control bounds.
+     */
+    [[nodiscard]] virtual bool HitTest(float x, float y);
+    /**
+     * Address: 0x00787210 (FUN_00787210, Moho::CMauiControl::DisableHitTest)
+     *
+     * What it does:
+     * Sets hit-test disabled state and optionally applies it recursively to
+     * child controls.
+     */
+    virtual void DisableHitTest(bool disableHitTest, bool applyChildren);
+    /**
+     * Address: 0x00787260 (FUN_00787260, Moho::CMauiControl::IsHitTestDisabled)
+     *
+     * What it does:
+     * Returns hit-test disabled state for this control.
+     */
+    [[nodiscard]] virtual bool IsHitTestDisabled();
+    /**
+     * Address: 0x007873A0 (FUN_007873A0, Moho::CMauiControl::HandleEvent)
+     *
+     * What it does:
+     * Builds Lua event payload and invokes `HandleEvent(self, event)` callback.
+     */
+    [[nodiscard]] virtual bool HandleEvent(const SMauiEventData& eventData);
     /**
      * Address: 0x00787420 (FUN_00787420, Moho::CMauiControl::Frame)
      *
@@ -1805,7 +1862,73 @@ namespace moho
      * Invokes script callback `OnFrame(deltaSeconds)` on this control object.
      */
     virtual void Frame(float deltaSeconds);
-
+    /**
+     * Address: 0x00787460 (FUN_00787460, Moho::CMauiControl::AcquireKeyboardFocus)
+     *
+     * What it does:
+     * Routes one focus-acquire request through global MAUI focus ownership.
+     */
+    virtual void AcquireKeyboardFocus(bool blocksKeyDown);
+    /**
+     * Address: 0x00787480 (FUN_00787480, Moho::CMauiControl::AbandonKeyboardFocus)
+     *
+     * What it does:
+     * Clears global keyboard focus when this control currently owns it.
+     */
+    virtual void AbandonKeyboardFocus();
+    /**
+     * Address: 0x00787440 (FUN_00787440, Moho::CMauiControl::LosingKeyboardFocus)
+     *
+     * What it does:
+     * Invokes `OnLoseKeyboardFocus` callback on this control script object.
+     */
+    virtual void LosingKeyboardFocus();
+    /**
+     * Address: 0x00787450 (FUN_00787450, Moho::CMauiControl::OnKeyboardFocusChange)
+     *
+     * What it does:
+     * Invokes `OnKeyboardFocusChange` callback on this control script object.
+     */
+    virtual void OnKeyboardFocusChange();
+    /**
+     * Address: 0x007876D0 (FUN_007876D0, Moho::CMauiControl::IsScrollable)
+     *
+     * What it does:
+     * Converts axis enum to lexical token and queries script-side
+     * `IsScrollable(axisText)` callback.
+     */
+    [[nodiscard]] virtual bool IsScrollable(EMauiScrollAxis axis);
+    /**
+     * Address: 0x007874B0 (FUN_007874B0, Moho::CMauiControl::GetScrollValues)
+     *
+     * What it does:
+     * Calls script callback `GetScrollValues(axisLexical)` and returns
+     * `{minRange,maxRange,minVisible,maxVisible}` numeric lanes when all four
+     * results are provided.
+     */
+    virtual SMauiScrollValues GetScrollValues(EMauiScrollAxis axis);
+    /**
+     * Address: 0x00787780 (FUN_00787780, Moho::CMauiControl::ScrollLines)
+     *
+     * What it does:
+     * Invokes script callback `ScrollLines(axisText, amount)`.
+     */
+    virtual void ScrollLines(EMauiScrollAxis axis, float amount);
+    /**
+     * Address: 0x00787830 (FUN_00787830, Moho::CMauiControl::ScrollPages)
+     *
+     * What it does:
+     * Invokes script callback `ScrollLines(axisText, amount)` for page-scroll
+     * requests (binary callback name lane).
+     */
+    virtual void ScrollPages(EMauiScrollAxis axis, float amount);
+    /**
+     * Address: 0x007878E0 (FUN_007878E0, Moho::CMauiControl::ScrollSetTop)
+     *
+     * What it does:
+     * Invokes script callback `ScrollSetTop(axisText, amount)`.
+     */
+    virtual void ScrollSetTop(EMauiScrollAxis axis, float amount);
     /**
      * Address: 0x007871D0 (FUN_007871D0, Moho::CMauiControl::OnMinimized)
      *
@@ -1813,6 +1936,15 @@ namespace moho
      * Propagates minimized-state notifications to direct/indirect children.
      */
     virtual void OnMinimized(bool minimized);
+    /**
+     * Address: 0x00786B40 (FUN_00786B40, Moho::CMauiControl::Dump)
+     *
+     * What it does:
+     * Logs debug identity/state and resolved layout lazy-vars for this control.
+     */
+    virtual void Dump();
+
+
 
     /**
      * Address: 0x00786F60 (FUN_00786F60, Moho::CMauiControl::ClearChildren)
@@ -1821,7 +1953,7 @@ namespace moho
      * Unlinks each direct child from the intrusive child list and dispatches
      * virtual destroy on each child control.
      */
-    virtual void ClearChildren();
+     void ClearChildren();
 
     /**
      * Address: 0x00786FA0 (FUN_00786FA0, Moho::CMauiControl::Render)
@@ -1831,32 +1963,10 @@ namespace moho
      * visible rendered-child lane when invalidated or depth-changed, then sorts
      * the lane by depth.
      */
-    virtual void Render();
+     void Render();
 
-    /**
-     * Address: 0x00787160 (FUN_00787160, Moho::CMauiControl::DoRender)
-     *
-     * What it does:
-     * Default no-op render dispatch for controls that do not draw.
-     */
-    virtual void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask);
 
-    /**
-     * Address: 0x007871C0 (FUN_007871C0, Moho::CMauiControl::IsHidden)
-     *
-     * What it does:
-     * Returns hidden-state lane for this control.
-     */
-    [[nodiscard]] virtual bool IsHidden();
 
-    /**
-     * Address: 0x00787170 (FUN_00787170, Moho::CMauiControl::SetHidden)
-     *
-     * What it does:
-     * Calls `OnHide(hidden)` and, when not consumed, updates the hidden lane
-     * and propagates the same hidden state to child controls.
-     */
-    virtual void SetHidden(bool hidden);
 
     /**
      * Address: 0x0078A700 (FUN_0078A700, Moho::CMauiControl::OnHide)
@@ -1867,14 +1977,6 @@ namespace moho
      */
     [[nodiscard]] bool OnHide(const bool& hidden);
 
-    /**
-     * Address: 0x007876D0 (FUN_007876D0, Moho::CMauiControl::IsScrollable)
-     *
-     * What it does:
-     * Converts axis enum to lexical token and queries script-side
-     * `IsScrollable(axisText)` callback.
-     */
-    [[nodiscard]] virtual bool IsScrollable(EMauiScrollAxis axis);
 
     /**
      * Address: 0x0078AA00 (FUN_0078AA00, Moho::CMauiControl::GetIsScrollable)
@@ -1885,63 +1987,12 @@ namespace moho
      */
     [[nodiscard]] bool GetIsScrollable(const char* axisLexical);
 
-    /**
-     * Address: 0x00787270 (FUN_00787270, Moho::CMauiControl::HitTest)
-     *
-     * What it does:
-     * Returns whether `(x,y)` lies inside the control bounds.
-     */
-    [[nodiscard]] virtual bool HitTest(float x, float y);
 
-    /**
-     * Address: 0x00787210 (FUN_00787210, Moho::CMauiControl::DisableHitTest)
-     *
-     * What it does:
-     * Sets hit-test disabled state and optionally applies it recursively to
-     * child controls.
-     */
-    virtual void DisableHitTest(bool disableHitTest, bool applyChildren);
 
-    /**
-     * Address: 0x00787260 (FUN_00787260, Moho::CMauiControl::IsHitTestDisabled)
-     *
-     * What it does:
-     * Returns hit-test disabled state for this control.
-     */
-    [[nodiscard]] virtual bool IsHitTestDisabled();
 
-    /**
-     * Address: 0x00787780 (FUN_00787780, Moho::CMauiControl::ScrollLines)
-     *
-     * What it does:
-     * Invokes script callback `ScrollLines(axisText, amount)`.
-     */
-    virtual void ScrollLines(EMauiScrollAxis axis, float amount);
 
-    /**
-     * Address: 0x00787830 (FUN_00787830, Moho::CMauiControl::ScrollPages)
-     *
-     * What it does:
-     * Invokes script callback `ScrollLines(axisText, amount)` for page-scroll
-     * requests (binary callback name lane).
-     */
-    virtual void ScrollPages(EMauiScrollAxis axis, float amount);
 
-    /**
-     * Address: 0x007878E0 (FUN_007878E0, Moho::CMauiControl::ScrollSetTop)
-     *
-     * What it does:
-     * Invokes script callback `ScrollSetTop(axisText, amount)`.
-     */
-    virtual void ScrollSetTop(EMauiScrollAxis axis, float amount);
 
-    /**
-     * Address: 0x007873A0 (FUN_007873A0, Moho::CMauiControl::HandleEvent)
-     *
-     * What it does:
-     * Builds Lua event payload and invokes `HandleEvent(self, event)` callback.
-     */
-    [[nodiscard]] virtual bool HandleEvent(const SMauiEventData& eventData);
 
     /**
      * Address: 0x00787370 (FUN_00787370, Moho::CMauiControl::PostEvent)
@@ -2017,13 +2068,6 @@ namespace moho
      */
     void SetParent(CMauiControl* newParent);
 
-    /**
-     * Address: 0x00786E90 (FUN_00786E90, Moho::CMauiControl::DoInit)
-     *
-     * What it does:
-     * Invokes script callback `OnInit` on this control object.
-     */
-    virtual void DoInit();
 
     /**
      * Address: 0x00786EA0 (FUN_00786EA0, Moho::CMauiControl::DepthFirstSuccessor)
@@ -2130,15 +2174,6 @@ namespace moho
      */
     [[nodiscard]] bool NeedsFrameUpdate();
 
-    /**
-     * Address: 0x007874B0 (FUN_007874B0, Moho::CMauiControl::GetScrollValues)
-     *
-     * What it does:
-     * Calls script callback `GetScrollValues(axisLexical)` and returns
-     * `{minRange,maxRange,minVisible,maxVisible}` numeric lanes when all four
-     * results are provided.
-     */
-    virtual SMauiScrollValues GetScrollValues(EMauiScrollAxis axis);
 
     /**
      * Address: 0x00787990 (FUN_00787990, Moho::CMauiControl::ApplyFunction)
@@ -2148,37 +2183,9 @@ namespace moho
      */
     void ApplyFunction(const LuaPlus::LuaObject& functionObject);
 
-    /**
-     * Address: 0x00787440 (FUN_00787440, Moho::CMauiControl::LosingKeyboardFocus)
-     *
-     * What it does:
-     * Invokes `OnLoseKeyboardFocus` callback on this control script object.
-     */
-    virtual void LosingKeyboardFocus();
 
-    /**
-     * Address: 0x00787450 (FUN_00787450, Moho::CMauiControl::OnKeyboardFocusChange)
-     *
-     * What it does:
-     * Invokes `OnKeyboardFocusChange` callback on this control script object.
-     */
-    virtual void OnKeyboardFocusChange();
 
-    /**
-     * Address: 0x00787460 (FUN_00787460, Moho::CMauiControl::AcquireKeyboardFocus)
-     *
-     * What it does:
-     * Routes one focus-acquire request through global MAUI focus ownership.
-     */
-    virtual void AcquireKeyboardFocus(bool blocksKeyDown);
 
-    /**
-     * Address: 0x00787480 (FUN_00787480, Moho::CMauiControl::AbandonKeyboardFocus)
-     *
-     * What it does:
-     * Clears global keyboard focus when this control currently owns it.
-     */
-    virtual void AbandonKeyboardFocus();
 
     /**
      * Address: 0x0077F6F0 (FUN_0077F6F0, Moho::CMauiControl::GetDebugName)
@@ -2196,13 +2203,6 @@ namespace moho
      */
     void SetDebugName(msvc8::string debugName);
 
-    /**
-     * Address: 0x00786B40 (FUN_00786B40, Moho::CMauiControl::Dump)
-     *
-     * What it does:
-     * Logs debug identity/state and resolved layout lazy-vars for this control.
-     */
-    virtual void Dump();
 
     /**
      * Address: 0x007872E0 (FUN_007872E0, Moho::CMauiControl::GetTopmostControl)
