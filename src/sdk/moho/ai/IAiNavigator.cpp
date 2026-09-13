@@ -1022,77 +1022,6 @@ namespace
   }
 
   /**
-   * Address: 0x005B0900 (FUN_005B0900)
-   *
-   * What it does:
-   * Wrapper lane that preserves the legacy insert-path calling shape and
-   * forwards to the range-insert helper.
-   */
-  [[nodiscard]] std::uint32_t InsertCellRangeBridge(
-    SNavPath& path,
-    SOCellPos* const insertPos,
-    const SOCellPos* const sourceBegin,
-    const SOCellPos* const sourceEnd
-  )
-  {
-    const std::size_t insertCount = static_cast<std::size_t>(CountPathCellSpan(sourceEnd, sourceBegin));
-    if (insertCount == 0u) {
-      return static_cast<std::uint32_t>(path.Count());
-    }
-
-    const std::size_t currentCount = path.Count();
-    if (insertCount > (GetPathCellLimitAlias() - currentCount)) {
-      ThrowPathCellVectorTooLong();
-    }
-
-    const std::size_t currentCapacity = path.CapacityCount();
-    const std::size_t insertIndex =
-      (path.start && insertPos) ? static_cast<std::size_t>(insertPos - path.start) : 0u;
-    SOCellPos* const position = path.start ? (path.start + insertIndex) : nullptr;
-    const std::size_t requiredSize = currentCount + insertCount;
-
-    if (currentCapacity >= requiredSize) {
-      SOCellPos* const oldFinish = path.finish;
-      const std::size_t tailCount = static_cast<std::size_t>(oldFinish - position);
-      if (tailCount >= insertCount) {
-        SOCellPos* const tailSource = oldFinish - insertCount;
-        path.finish = CopyCellsForInsertBridge(oldFinish, tailSource, oldFinish);
-        (void)MoveCellsBackward(oldFinish, position, tailSource);
-        (void)CopyCellsForwardAllowNull(position, sourceBegin, sourceEnd);
-      } else {
-        const std::uint32_t spillCount = static_cast<std::uint32_t>(insertCount - tailCount);
-        (void)CopyCellsForwardAllowNull(oldFinish, sourceBegin, sourceBegin + spillCount);
-        path.finish = oldFinish + spillCount;
-        path.finish = CopyCellsForwardStackBridge(path.finish, position, oldFinish);
-        (void)CopyCellsForwardAllowNull(position, sourceBegin + spillCount, sourceEnd);
-      }
-      return static_cast<std::uint32_t>(path.Count());
-    }
-
-    std::size_t grownCapacity = ComputeGrowthCapacity(currentCapacity, requiredSize);
-    if (grownCapacity > GetPathCellLimitAlias()) {
-      ThrowPathCellVectorTooLong();
-    }
-
-    SOCellPos* const newStorage = (grownCapacity != 0u)
-      ? AllocatePathCellStorageChecked(static_cast<std::uint32_t>(grownCapacity))
-      : static_cast<SOCellPos*>(::operator new(0));
-
-    SOCellPos* write = CopyCellsForwardAllowNull(newStorage, path.start, position);
-    write = CopyCellsForwardAllowNull(write, sourceBegin, sourceEnd);
-    write = CopyCellsForwardAllowNull(write, position, path.finish);
-
-    if (path.start) {
-      ::operator delete(path.start);
-    }
-
-    path.start = newStorage;
-    path.finish = write;
-    path.capacity = newStorage + grownCapacity;
-    return static_cast<std::uint32_t>(path.Count());
-  }
-
-  /**
    * Address: 0x005B0A00 (FUN_005B0A00)
    *
    * What it does:
@@ -1326,6 +1255,10 @@ void SNavPath::AppendCells(const SOCellPos* const begin, const SOCellPos* const 
 
 /**
  * Address: 0x005B0B60 (FUN_005B0B60)
+ * Address: 0x005B0900 (FUN_005B0900 -- a four-instruction forwarder into the
+ * body above: it loads the four stack arguments, pushes the last one twice and
+ * tail-calls 0x005B0B60 with `this` in ecx, `retn 10h`. No branches, no work
+ * of its own.)
  *
  * What it does:
  * Prepends one cell range at path front, preserving existing ordering while
