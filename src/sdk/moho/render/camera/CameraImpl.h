@@ -459,71 +459,56 @@ namespace moho
     void CameraSetAccType(const msvc8::string& accType);
 
     /**
-     * Address: 0x007A6CE0 (FUN_007A6CE0, Moho::CameraImpl::CameraSpin)
-     * Mangled: ?CameraSpin@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
-     *
-     * What it does:
-     * Applies heading/pitch spin deltas from one 2D input vector using
-     * zoom-scaled spin speed and clamps pitch to valid camera limits.
+     * Address: 0x007A69F0 (Moho::CameraImpl::CameraGetName)
+     * Slot: 1
      */
-    virtual void CameraSpin(const Wm3::Vector2f& spinDelta);
-
+    [[nodiscard]] virtual const char* CameraGetName() const;
     /**
-     * Address: 0x007A8260 (FUN_007A8260, Moho::CameraImpl::CameraZoom)
-     * Mangled: ?CameraZoom@CameraImpl@Moho@@UAEXM@Z
-     *
-     * What it does:
-     * Scales near-zoom exponentially from wheel/input delta and clamps it to
-     * `[cam_NearZoom, GetMaxZoom()]`.
+     * Address: 0x007A6A00 (Moho::CameraImpl::CameraGetView)
+     * Slot: 2
      */
-    virtual void CameraZoom(float zoomDelta);
-
+    [[nodiscard]] virtual const GeomCamera3& CameraGetView() const;
     /**
-     * Address: 0x007A6DF0 (FUN_007A6DF0, Moho::CameraImpl::CameraSetPitch)
-     * Mangled: ?CameraSetPitch@CameraImpl@Moho@@UAEXM@Z
+     * Address: 0x007A6A80 (FUN_007A6A80, Moho::CameraImpl::CameraSetViewport)
+     * Mangled: ?CameraSetViewport@CameraImpl@Moho@@QAEPAV?$Vector2@M@Wm3@@ABV34@0@Z
      *
      * What it does:
-     * Arms rotated mode, clears revert state, and stores current pitch lane.
+     * Updates camera viewport origin/size lanes, rebuilds viewport row-2
+     * normalization from row-1, and refreshes zoom-metric aspect scaling.
      */
-    virtual void CameraSetPitch(float pitchRadians);
-
+    virtual void CameraSetViewport(const Wm3::Vector2f& viewportOrigin, const Wm3::Vector2f& viewportSize);
     /**
-     * Address: 0x007A6E10 (FUN_007A6E10, Moho::CameraImpl::CameraSetHeading)
-     * Mangled: ?CameraSetHeading@CameraImpl@Moho@@UAEXM@Z
+     * Address: 0x007A6B20 (FUN_007A6B20, Moho::CameraImpl::CameraGetViewport)
+     * Mangled: ?CameraGetViewport@CameraImpl@Moho@@UBEXAAV?$Vector2@M@Wm3@@0@Z
      *
      * What it does:
-     * Arms rotated mode, clears revert state, and stores current heading lane.
+     * Returns current camera viewport origin and viewport size lanes.
      */
-    virtual void CameraSetHeading(float headingRadians);
-
+    virtual void CameraGetViewport(Wm3::Vector2f& viewportOrigin, Wm3::Vector2f& viewportSize) const;
     /**
-     * Address: 0x007A6DE0 (FUN_007A6DE0, Moho::CameraImpl::CameraHoldRotation)
-     * Mangled: ?CameraHoldRotation@CameraImpl@Moho@@QAEXXZ
+     * Address: 0x007A6B50 (FUN_007A6B50, ?Project@CameraImpl@Moho@@UBE?AV?$Vector2@M@Wm3@@ABV?$Vector3@M@4@@Z)
      *
      * What it does:
-     * Arms camera rotation hold mode and clears any pending revert flag.
+     * Projects one world-space point through the embedded camera view and
+     * returns screen-space coordinates.
      */
-    void CameraHoldRotation();
-
+    [[nodiscard]] virtual Wm3::Vector2f Project(const Wm3::Vector3f& worldPoint) const;
     /**
-     * Address: 0x007A6F00 (FUN_007A6F00, Moho::CameraImpl::CameraPan)
-     * Mangled: ?CameraPan@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
-     * Slot: 32 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474)
-     *
-     * IDA signature:
-     * _DWORD *__thiscall Moho::CameraImpl::CameraPan(CameraImpl *this, const Wm3::Vector2f *delta);
+     * Address: 0x007A6B70 (FUN_007A6B70, ?Unproject@CameraImpl@Moho@@UBE?AU?$GeomLine3@M@2@ABV?$Vector2@M@Wm3@@@Z)
      *
      * What it does:
-     * Pans the camera target location across the ground plane by a 2D input
-     * delta, unless the UI is in non-interactive (NIS) mode. The screen-space
-     * delta is projected onto the camera's inverse-view right axis (row 0) and
-     * a flattened forward axis (row 1 with Y zeroed and renormalized), scaled by
-     * the current target zoom, the inverse viewport width, and `cam_PanSpeed`.
-     * Panning first clears any active entity target through the virtual
-     * `TargetNothing` lane.
+     * Builds one world-space ray from a screen-space point using the embedded
+     * camera view/projection/viewport lanes.
      */
-    virtual void CameraPan(const Wm3::Vector2f& panDelta);
-
+    [[nodiscard]] virtual GeomLine3 Unproject(const Wm3::Vector2f& screenPoint) const;
+    /**
+     * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
+     *
+     * What it does:
+     * Unprojects one screen-space point and resolves the terrain/water surface
+     * intersection point on the active map.
+     */
+    [[nodiscard]] virtual Wm3::Vector3f CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const;
     /**
      * Address: 0x007A80A0 (FUN_007A80A0, Moho::CameraImpl::CameraReset)
      * Mangled: ?CameraReset@CameraImpl@Moho@@UAEXXZ
@@ -532,7 +517,176 @@ namespace moho
      * Resets runtime camera orientation/target lanes to map-centered defaults.
      */
     virtual void CameraReset();
-
+    /**
+      * Alias of FUN_007A6BF0 (non-canonical helper lane).
+     * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Stops entity tracking broadcasts when needed, resets target mode to
+     * location, and clears target-time lanes.
+     */
+    virtual void TargetNothing();
+    /**
+     * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
+     * Mangled: ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z
+     *
+     * What it does:
+     * Targets one world-space location with optional timed transition and
+     * immediate focus/FOV update when `seconds == 0`.
+     */
+    virtual void TargetLocation(const Wm3::Vec3f& position, float seconds);
+    /**
+     * Address: 0x007A8580 (FUN_007A8580, Moho::CameraImpl::TargetEntityBox)
+     * Mangled: ?TargetEntityBox@CameraImpl@Moho@@UAEXPAVUserEntity@2@M@Z
+     *
+     * What it does:
+     * Targets one entity by expanding its mesh-instance interpolated AABB on
+     * the X/Z axes by `cam_EntityBoxExpand` and dispatches through `TargetBox`;
+     * when `seconds == 0` additionally clears any active entity target by
+     * dispatching through `TargetNothing`.
+     */
+    virtual void TargetEntityBox(UserEntity* entity, float seconds);
+    /**
+     * Address: 0x007A8640 (FUN_007A8640, Moho::CameraImpl::TargetEntities)
+     * Mangled: ?TargetEntities@CameraImpl@Moho@@UAEXABV?$WeakSet@VUserEntity@Moho@@@2@_NMM@Z
+     *
+     * What it does:
+     * Replaces camera target weak-list from one entity weak-set, then starts
+     * tracked or untracked multi-entity target behavior.
+     */
+    virtual void TargetEntities(
+      const SSelectionSetUserEntity& entities,
+      bool trackEntities,
+      float zoom,
+      float seconds
+    );
+    /**
+     * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
+     * Mangled: ?TargetBox@CameraImpl@Moho@@UAEXABV?$AxisAlignedBox3@M@Wm3@@M@Z
+     *
+     * What it does:
+     * Targets one world-space AABB, derives focus/near-zoom lanes from box
+     * bounds, and optionally applies immediate focus+FOV clamping.
+     */
+    virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds);
+    /**
+     * Address: 0x007A8D40 (FUN_007A8D40, Moho::CameraImpl::TargetManual)
+     * Mangled: ?TargetManual@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@MMMM@Z
+     *
+     * What it does:
+     * Targets one world-space location plus heading/pitch/zoom lanes and
+     * either applies the result immediately or seeds Hermite transition state.
+     */
+    virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds);
+    /**
+     * Address: 0x007A7290 (FUN_007A7290, Moho::CameraImpl::GetTargetEntity)
+     * Mangled: ?GetTargetEntity@CameraImpl@Moho@@UBEPAVUserEntity@2@XZ
+     *
+     * What it does:
+     * Returns current live entity target when target mode is entity/nose-cam.
+     */
+    [[nodiscard]] virtual UserEntity* GetTargetEntity() const;
+    /**
+     * Address: 0x007A71B0 (FUN_007A71B0, Moho::CameraImpl::CameraFollow)
+     * Mangled: ?CameraFollow@CameraImpl@Moho@@UAEXABUSCamFollowParams@2@@Z
+     *
+     * What it does:
+     * Promotes one follow target into the active camera target list when the
+     * current entity-id gate still matches.
+     */
+    virtual void CameraFollow(const SCamFollowParams& followParams);
+    /**
+     * Address: 0x007A8EE0 (FUN_007A8EE0, Moho::CameraImpl::TargetNextEntity)
+     * Mangled: ?TargetNextEntity@CameraImpl@Moho@@UAEXXZ
+     *
+     * What it does:
+     * Advances active entity-target cursor to the next live weak target,
+     * prunes stale weak nodes, and emits tracking stop/start notifications.
+     */
+    virtual void TargetNextEntity();
+    /**
+     * Address: 0x007A6C80 (Moho::CameraImpl::CameraGetOffset)
+     * Slot: 18
+     *
+     * What it does:
+     * Returns the world-camera offset vector used by listener metric updates.
+     */
+    [[nodiscard]] virtual const Wm3::Vec3f& CameraGetOffset() const;
+    /**
+     * Address: 0x007A6CA0 (Moho::CameraImpl::CameraGetTargetZoom)
+     * Slot: 19
+     */
+    [[nodiscard]] virtual float CameraGetTargetZoom() const;
+    /**
+     * Address: 0x007A7310 (Moho::CameraImpl::GetMaxZoom)
+     * Slot: 20
+     */
+    [[nodiscard]] virtual float GetMaxZoom() const;
+    /**
+     * Address: 0x007A73C0 (FUN_007A73C0, Moho::CameraImpl::SetMaxZoomMult)
+     * Slot: 21
+     *
+     * What it does:
+     * Updates one runtime multiplier that scales the max zoom limit.
+     */
+    virtual void SetMaxZoomMult(float maxZoomMult);
+    /**
+     * Address: 0x007A6C90 (FUN_007A6C90, Moho::CameraImpl::CameraGetZoom)
+     * Mangled: ?CameraGetZoom@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera zoom lane.
+     */
+    [[nodiscard]] virtual float CameraGetZoom() const;
+    /**
+     * Address: 0x007A6CD0 (FUN_007A6CD0, Moho::CameraImpl::CameraGetPitch)
+     * Mangled: ?CameraGetPitch@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera pitch lane in radians.
+     */
+    [[nodiscard]] virtual float CameraGetPitch() const;
+    /**
+     * Address: 0x007A6CC0 (FUN_007A6CC0, Moho::CameraImpl::CameraGetHeading)
+     * Mangled: ?CameraGetHeading@CameraImpl@Moho@@UBEMXZ
+     *
+     * What it does:
+     * Returns current camera heading lane in radians.
+     */
+    [[nodiscard]] virtual float CameraGetHeading() const;
+    /**
+     * Address: 0x007A6DF0 (FUN_007A6DF0, Moho::CameraImpl::CameraSetPitch)
+     * Mangled: ?CameraSetPitch@CameraImpl@Moho@@UAEXM@Z
+     *
+     * What it does:
+     * Arms rotated mode, clears revert state, and stores current pitch lane.
+     */
+    virtual void CameraSetPitch(float pitchRadians);
+    /**
+     * Address: 0x007A6E10 (FUN_007A6E10, Moho::CameraImpl::CameraSetHeading)
+     * Mangled: ?CameraSetHeading@CameraImpl@Moho@@UAEXM@Z
+     *
+     * What it does:
+     * Arms rotated mode, clears revert state, and stores current heading lane.
+     */
+    virtual void CameraSetHeading(float headingRadians);
+    /**
+     * Address: 0x007A6CE0 (FUN_007A6CE0, Moho::CameraImpl::CameraSpin)
+     * Mangled: ?CameraSpin@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+     *
+     * What it does:
+     * Applies heading/pitch spin deltas from one 2D input vector using
+     * zoom-scaled spin speed and clamps pitch to valid camera limits.
+     */
+    virtual void CameraSpin(const Wm3::Vector2f& spinDelta);
+    /**
+     * Address: 0x007A6E30 (FUN_007A6E30, Moho::CameraImpl::CameraIsRotated)
+     * Mangled: ?CameraIsRotated@CameraImpl@Moho@@UBE_NXZ
+     *
+     * What it does:
+     * Returns whether rotated-camera mode is currently enabled.
+     */
+    [[nodiscard]] virtual bool CameraIsRotated() const;
     /**
      * Address: 0x007A6E40 (FUN_007A6E40, Moho::CameraImpl::CameraRevertRotation)
      * Mangled: ?CameraRevertRotation@CameraImpl@Moho@@UAEXXZ
@@ -541,7 +695,6 @@ namespace moho
      * Schedules a rotation revert when the camera is currently in rotated mode.
      */
     virtual void CameraRevertRotation();
-
     /**
      * Address: 0x007A8240 (FUN_007A8240, Moho::CameraImpl::CameraSetPivot)
      * Slot: 30 (+0x78 of ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, between
@@ -560,49 +713,33 @@ namespace moho
      * argument left in `eax`; no caller reads it.
      */
     virtual void CameraSetPivot(const Wm3::Vector2f& pivot);
-
     /**
-     * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
-     * Slot: 0
+     * Address: 0x007A8260 (FUN_007A8260, Moho::CameraImpl::CameraZoom)
+     * Mangled: ?CameraZoom@CameraImpl@Moho@@UAEXM@Z
      *
      * What it does:
-     * Runs `CameraImpl` teardown and frees object storage when
-     * `deleteFlags & 1` is set.
+     * Scales near-zoom exponentially from wheel/input delta and clamps it to
+     * `[cam_NearZoom, GetMaxZoom()]`.
      */
-    virtual void operator_delete(std::int32_t deleteFlags);
-
+    virtual void CameraZoom(float zoomDelta);
     /**
-     * Address: 0x007A69F0 (Moho::CameraImpl::CameraGetName)
-     * Slot: 1
-     */
-    [[nodiscard]] virtual const char* CameraGetName() const;
-
-    /**
-     * Address: 0x007A6A00 (Moho::CameraImpl::CameraGetView)
-     * Slot: 2
-     */
-    [[nodiscard]] virtual const GeomCamera3& CameraGetView() const;
-
-    /**
-     * Address: 0x007A7410 (FUN_007A7410, Moho::CameraImpl::GetViewBox)
-     * Mangled: ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ
+     * Address: 0x007A6F00 (FUN_007A6F00, Moho::CameraImpl::CameraPan)
+     * Mangled: ?CameraPan@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
+     * Slot: 32 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474)
+     *
+     * IDA signature:
+     * _DWORD *__thiscall Moho::CameraImpl::CameraPan(CameraImpl *this, const Wm3::Vector2f *delta);
      *
      * What it does:
-     * Returns an axis-aligned box centered on the target location with half
-     * extents derived from half of the current near-zoom lane.
+     * Pans the camera target location across the ground plane by a 2D input
+     * delta, unless the UI is in non-interactive (NIS) mode. The screen-space
+     * delta is projected onto the camera's inverse-view right axis (row 0) and
+     * a flattened forward axis (row 1 with Y zeroed and renormalized), scaled by
+     * the current target zoom, the inverse viewport width, and `cam_PanSpeed`.
+     * Panning first clears any active entity target through the virtual
+     * `TargetNothing` lane.
      */
-    [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetViewBox() const;
-
-    /**
-     * Address: 0x007A6A80 (FUN_007A6A80, Moho::CameraImpl::CameraSetViewport)
-     * Mangled: ?CameraSetViewport@CameraImpl@Moho@@QAEPAV?$Vector2@M@Wm3@@ABV34@0@Z
-     *
-     * What it does:
-     * Updates camera viewport origin/size lanes, rebuilds viewport row-2
-     * normalization from row-1, and refreshes zoom-metric aspect scaling.
-     */
-    void CameraSetViewport(const Wm3::Vector2f& viewportOrigin, const Wm3::Vector2f& viewportSize);
-
+    virtual void CameraPan(const Wm3::Vector2f& panDelta);
     /**
      * Address: 0x007A6A10 (FUN_007A6A10, Moho::CameraImpl::CameraSetOrtho)
      * Mangled: ?CameraSetOrtho@CameraImpl@Moho@@UAEX_N@Z
@@ -611,7 +748,6 @@ namespace moho
      * Stores orthographic-camera mode flag lane.
      */
     virtual void CameraSetOrtho(bool enabled);
-
     /**
      * Address: 0x007A6A20 (FUN_007A6A20, Moho::CameraImpl::CameraIsOrtho)
      * Mangled: ?CameraIsOrtho@CameraImpl@Moho@@UAE_NXZ
@@ -620,79 +756,11 @@ namespace moho
      * Returns orthographic-camera mode flag lane.
      */
     [[nodiscard]] virtual bool CameraIsOrtho();
-
     /**
-     * Address: 0x007A6B20 (FUN_007A6B20, Moho::CameraImpl::CameraGetViewport)
-     * Mangled: ?CameraGetViewport@CameraImpl@Moho@@UBEXAAV?$Vector2@M@Wm3@@0@Z
-     *
-     * What it does:
-     * Returns current camera viewport origin and viewport size lanes.
+     * Address: 0x007A72C0 (FUN_007A72C0, Moho::CameraImpl::LODMetric)
+     * Slot: 45
      */
-    virtual void CameraGetViewport(Wm3::Vector2f& viewportOrigin, Wm3::Vector2f& viewportSize) const;
-
-    /**
-     * Address: 0x007A6C90 (FUN_007A6C90, Moho::CameraImpl::CameraGetZoom)
-     * Mangled: ?CameraGetZoom@CameraImpl@Moho@@UBEMXZ
-     *
-     * What it does:
-     * Returns current camera zoom lane.
-     */
-    [[nodiscard]] virtual float CameraGetZoom() const;
-
-    /**
-     * Address: 0x007A6CC0 (FUN_007A6CC0, Moho::CameraImpl::CameraGetHeading)
-     * Mangled: ?CameraGetHeading@CameraImpl@Moho@@UBEMXZ
-     *
-     * What it does:
-     * Returns current camera heading lane in radians.
-     */
-    [[nodiscard]] virtual float CameraGetHeading() const;
-
-    /**
-     * Address: 0x007A6CD0 (FUN_007A6CD0, Moho::CameraImpl::CameraGetPitch)
-     * Mangled: ?CameraGetPitch@CameraImpl@Moho@@UBEMXZ
-     *
-     * What it does:
-     * Returns current camera pitch lane in radians.
-     */
-    [[nodiscard]] virtual float CameraGetPitch() const;
-
-    /**
-     * Address: 0x007A6E30 (FUN_007A6E30, Moho::CameraImpl::CameraIsRotated)
-     * Mangled: ?CameraIsRotated@CameraImpl@Moho@@UBE_NXZ
-     *
-     * What it does:
-     * Returns whether rotated-camera mode is currently enabled.
-     */
-    [[nodiscard]] virtual bool CameraIsRotated() const;
-
-    /**
-     * Address: 0x007A6B50 (FUN_007A6B50, ?Project@CameraImpl@Moho@@UBE?AV?$Vector2@M@Wm3@@ABV?$Vector3@M@4@@Z)
-     *
-     * What it does:
-     * Projects one world-space point through the embedded camera view and
-     * returns screen-space coordinates.
-     */
-    [[nodiscard]] virtual Wm3::Vector2f Project(const Wm3::Vector3f& worldPoint) const;
-
-    /**
-     * Address: 0x007A6B70 (FUN_007A6B70, ?Unproject@CameraImpl@Moho@@UBE?AU?$GeomLine3@M@2@ABV?$Vector2@M@Wm3@@@Z)
-     *
-     * What it does:
-     * Builds one world-space ray from a screen-space point using the embedded
-     * camera view/projection/viewport lanes.
-     */
-    [[nodiscard]] virtual GeomLine3 Unproject(const Wm3::Vector2f& screenPoint) const;
-
-    /**
-     * Address: 0x007A6BB0 (FUN_007A6BB0, ?CameraScreenToSurface@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@ABV?$Vector2@M@4@@Z)
-     *
-     * What it does:
-     * Unprojects one screen-space point and resolves the terrain/water surface
-     * intersection point on the active map.
-     */
-    [[nodiscard]] virtual Wm3::Vector3f CameraScreenToSurface(const Wm3::Vector2f& screenPoint) const;
-
+    [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
     /**
      * Address: 0x007A72F0 (FUN_007A72F0, ?SetLODScale@CameraImpl@Moho@@UAEXM@Z)
      *
@@ -700,7 +768,6 @@ namespace moho
      * Updates embedded camera LOD scale used by projection/unprojection lanes.
      */
     virtual void SetLODScale(float scale);
-
     /**
      * Address: 0x007A7120 (FUN_007A7120, Moho::CameraImpl::CanShake)
      * Mangled: ?CanShake@CameraImpl@Moho@@UAEX_N@Z
@@ -709,7 +776,6 @@ namespace moho
      * Enables or disables camera-shake application for this camera runtime.
      */
     virtual void CanShake(bool canShake);
-
     /**
      * Address: 0x007A7130 (FUN_007A7130, Moho::CameraImpl::CameraShake)
      * Mangled: ?CameraShake@CameraImpl@Moho@@UAEXABUSCamShakeParams@2@@Z
@@ -719,7 +785,6 @@ namespace moho
      * shake finished or incoming shake has stronger minimum magnitude.
      */
     virtual void CameraShake(const SCamShakeParams& shakeParams);
-
     /**
      * Address: 0x007A78F0 (FUN_007A78F0,
      *   ?GetAllSoundEntitiesInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ)
@@ -745,7 +810,6 @@ namespace moho
      * `UAE` in the mangled name says the same thing -- public virtual.
      */
     [[nodiscard]] virtual CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum();
-
     /**
      * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
      * Mangled: ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
@@ -769,7 +833,6 @@ namespace moho
      * than "focus army's units only".
      */
     [[nodiscard]] virtual CameraFrustumUserEntityList* GetAllUnitsInFrustum();
-
     /**
      * Address: 0x007A7910 (FUN_007A7910, Moho::CameraImpl::GetArmyUnitsInFrustum)
      * Mangled: ?GetArmyUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
@@ -781,36 +844,15 @@ namespace moho
      * camera frustum.
      */
     [[nodiscard]] virtual CameraFrustumUserEntityList* GetArmyUnitsInFrustum();
-
     /**
-      * Alias of FUN_007A6BF0 (non-canonical helper lane).
-     * Mangled: ?TargetNothing@CameraImpl@Moho@@UAEXXZ
+     * Address: 0x007A7410 (FUN_007A7410, Moho::CameraImpl::GetViewBox)
+     * Mangled: ?GetViewBox@CameraImpl@Moho@@UBE?AV?$AxisAlignedBox3@M@Wm3@@XZ
      *
      * What it does:
-     * Stops entity tracking broadcasts when needed, resets target mode to
-     * location, and clears target-time lanes.
+     * Returns an axis-aligned box centered on the target location with half
+     * extents derived from half of the current near-zoom lane.
      */
-    virtual void TargetNothing();
-
-    /**
-     * Address: 0x007A7290 (FUN_007A7290, Moho::CameraImpl::GetTargetEntity)
-     * Mangled: ?GetTargetEntity@CameraImpl@Moho@@UBEPAVUserEntity@2@XZ
-     *
-     * What it does:
-     * Returns current live entity target when target mode is entity/nose-cam.
-     */
-    [[nodiscard]] virtual UserEntity* GetTargetEntity() const;
-
-    /**
-     * Address: 0x007A71B0 (FUN_007A71B0, Moho::CameraImpl::CameraFollow)
-     * Mangled: ?CameraFollow@CameraImpl@Moho@@UAEXABUSCamFollowParams@2@@Z
-     *
-     * What it does:
-     * Promotes one follow target into the active camera target list when the
-     * current entity-id gate still matches.
-     */
-    virtual void CameraFollow(const SCamFollowParams& followParams);
-
+    [[nodiscard]] virtual Wm3::AxisAlignedBox3f GetViewBox() const;
     /**
      * Address: 0x007A73E0 (FUN_007A73E0, Moho::CameraImpl::GetTargetPosition)
      * Mangled: ?GetTargetPosition@CameraImpl@Moho@@UBE?AV?$Vector3@M@Wm3@@XZ
@@ -820,25 +862,48 @@ namespace moho
      */
     [[nodiscard]] virtual Wm3::Vector3f GetTargetPosition() const;
 
-    /**
-     * Address: 0x007A82F0 (FUN_007A82F0, Moho::CameraImpl::TargetLocation)
-     * Mangled: ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z
-     *
-     * What it does:
-     * Targets one world-space location with optional timed transition and
-     * immediate focus/FOV update when `seconds == 0`.
-     */
-    virtual void TargetLocation(const Wm3::Vec3f& position, float seconds);
+
+
 
     /**
-     * Address: 0x007A8D40 (FUN_007A8D40, Moho::CameraImpl::TargetManual)
-     * Mangled: ?TargetManual@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@MMMM@Z
+     * Address: 0x007A6DE0 (FUN_007A6DE0, Moho::CameraImpl::CameraHoldRotation)
+     * Mangled: ?CameraHoldRotation@CameraImpl@Moho@@QAEXXZ
      *
      * What it does:
-     * Targets one world-space location plus heading/pitch/zoom lanes and
-     * either applies the result immediately or seeds Hermite transition state.
+     * Arms camera rotation hold mode and clears any pending revert flag.
      */
-    virtual void TargetManual(const Wm3::Vec3f& position, float heading, float pitch, float zoom, float seconds);
+    void CameraHoldRotation();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     /**
      * Address: 0x007A8E90 (FUN_007A8E90, Moho::CameraImpl::SetZoom)
@@ -851,52 +916,9 @@ namespace moho
      */
     void SetZoom(float zoom, float seconds);
 
-    /**
-     * Address: 0x007A83E0 (FUN_007A83E0, Moho::CameraImpl::TargetBox)
-     * Mangled: ?TargetBox@CameraImpl@Moho@@UAEXABV?$AxisAlignedBox3@M@Wm3@@M@Z
-     *
-     * What it does:
-     * Targets one world-space AABB, derives focus/near-zoom lanes from box
-     * bounds, and optionally applies immediate focus+FOV clamping.
-     */
-    virtual void TargetBox(const Wm3::AxisAlignedBox3f& targetBox, float seconds);
 
-    /**
-     * Address: 0x007A8580 (FUN_007A8580, Moho::CameraImpl::TargetEntityBox)
-     * Mangled: ?TargetEntityBox@CameraImpl@Moho@@UAEXPAVUserEntity@2@M@Z
-     *
-     * What it does:
-     * Targets one entity by expanding its mesh-instance interpolated AABB on
-     * the X/Z axes by `cam_EntityBoxExpand` and dispatches through `TargetBox`;
-     * when `seconds == 0` additionally clears any active entity target by
-     * dispatching through `TargetNothing`.
-     */
-    virtual void TargetEntityBox(UserEntity* entity, float seconds);
 
-    /**
-     * Address: 0x007A8640 (FUN_007A8640, Moho::CameraImpl::TargetEntities)
-     * Mangled: ?TargetEntities@CameraImpl@Moho@@UAEXABV?$WeakSet@VUserEntity@Moho@@@2@_NMM@Z
-     *
-     * What it does:
-     * Replaces camera target weak-list from one entity weak-set, then starts
-     * tracked or untracked multi-entity target behavior.
-     */
-    virtual void TargetEntities(
-      const SSelectionSetUserEntity& entities,
-      bool trackEntities,
-      float zoom,
-      float seconds
-    );
 
-    /**
-     * Address: 0x007A8EE0 (FUN_007A8EE0, Moho::CameraImpl::TargetNextEntity)
-     * Mangled: ?TargetNextEntity@CameraImpl@Moho@@UAEXXZ
-     *
-     * What it does:
-     * Advances active entity-target cursor to the next live weak target,
-     * prunes stale weak nodes, and emits tracking stop/start notifications.
-     */
-    virtual void TargetNextEntity();
 
     /**
      * Address: 0x007A8A20 (FUN_007A8A20, Moho::CameraImpl::TargetNoseCam)
@@ -963,35 +985,9 @@ namespace moho
      */
     void CalculateFOV();
 
-    /**
-     * Address: 0x007A6C80 (Moho::CameraImpl::CameraGetOffset)
-     * Slot: 18
-     *
-     * What it does:
-     * Returns the world-camera offset vector used by listener metric updates.
-     */
-    [[nodiscard]] virtual const Wm3::Vec3f& CameraGetOffset() const;
 
-    /**
-     * Address: 0x007A6CA0 (Moho::CameraImpl::CameraGetTargetZoom)
-     * Slot: 19
-     */
-    [[nodiscard]] virtual float CameraGetTargetZoom() const;
 
-    /**
-     * Address: 0x007A7310 (Moho::CameraImpl::GetMaxZoom)
-     * Slot: 20
-     */
-    [[nodiscard]] virtual float GetMaxZoom() const;
 
-    /**
-     * Address: 0x007A73C0 (FUN_007A73C0, Moho::CameraImpl::SetMaxZoomMult)
-     * Slot: 21
-     *
-     * What it does:
-     * Updates one runtime multiplier that scales the max zoom limit.
-     */
-    virtual void SetMaxZoomMult(float maxZoomMult);
 
     /**
      * Address: 0x007A6A30 (FUN_007A6A30, Moho::CameraImpl::SetTimeSource)
@@ -1003,11 +999,6 @@ namespace moho
      */
     void SetTimeSource(ECamTimeSource timeSource);
 
-    /**
-     * Address: 0x007A72C0 (FUN_007A72C0, Moho::CameraImpl::LODMetric)
-     * Slot: 45
-     */
-    [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
 
   };
 
