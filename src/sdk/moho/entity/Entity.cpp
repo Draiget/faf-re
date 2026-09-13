@@ -422,6 +422,45 @@ namespace
     varData.mScroll0V = 0.0f;
     varData.mScroll1U = 0.0f;
     varData.mScroll1V = 0.0f;
+
+    // The block's tail, named as `Entity` fields here but the same words the
+    // binary's constructor writes at 0x00558801..0x0055882F.
+    //
+    // The two sound lanes are the ones that mattered: nothing initialised them,
+    // so every entity whose ambient sound is never set from Lua carried
+    // whatever the allocator left at +0x108. `Entity::SyncInterface` ships the
+    // whole block to the client, `UserEntity::UpdateEntityData` copies it into
+    // `mAmbientLoop.mParams`, and the sound beat then dereferences a pointer
+    // that was never a `CSndParams` -- committed memory, absent from the
+    // descriptor registry, with junk where `mResolvePolicy` and the engine
+    // weak_ptr should be.
+    entity.mAmbientSound = nullptr; // +0x90 (entity +0x108), `mov [eax+90h], ecx`
+    entity.mRumbleSound = nullptr;  // +0x94 (entity +0x10C), `mov [eax+94h], ecx`
+    entity.mVisibilityState = 0u;   // +0x98 (entity +0x110)
+
+    // +0x9C (entity +0x114) is the visibility mode, and its default is
+    // `MapPlayableRect`, not zero: `mov dword ptr [eax+9Ch], 2` at 0x00558813.
+    // Zero is not a value the enum has. An entity left holding it is neither
+    // `ReconGrid` nor anything else the client tests for, so
+    // `UserEntity::UpdateEntityData` never registers it for visibility updates
+    // and every consumer that switches on the mode falls out of its cases.
+    entity.mFootprintLayer = static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect);
+
+    entity.mCurrentLayer = moho::LAYER_None; // +0xA0 (entity +0x118)
+    entity.mUseAltFootprint = 0u;            // +0xA4 (entity +0x11C)
+    entity.mUseAltFootprintSecondary = 0u;
+
+    // +0xB0..+0xCC (entity +0x128..+0x144): the eight intel lanes. `Unit`
+    // overwrites them from its blueprint, but a plain `Entity` never did, and
+    // the recon grid reads them for every entity.
+    entity.IntelAttributes.vision = 0u;
+    entity.IntelAttributes.waterVision = 0u;
+    entity.IntelAttributes.radar = 0u;
+    entity.IntelAttributes.sonar = 0u;
+    entity.IntelAttributes.omni = 0u;
+    entity.IntelAttributes.radarStealth = 0u;
+    entity.IntelAttributes.sonarStealth = 0u;
+    entity.IntelAttributes.cloak = 0u;
   }
 
   /**
@@ -2823,12 +2862,6 @@ namespace moho
 
     ResetEntityVariableDataDefaults(*this);
 
-    mVisibilityState = 0u;
-    mFootprintLayer = 0;
-    mCurrentLayer = LAYER_None;
-    mUseAltFootprint = 0u;
-    mUseAltFootprintSecondary = 0u;
-
     SimulationRef = sim;
     ArmyRef = nullptr;
 
@@ -2946,12 +2979,6 @@ namespace moho
 
     ResetEntityVariableDataDefaults(*this);
 
-    mVisibilityState = 0u;
-    mFootprintLayer = 0;
-    mCurrentLayer = LAYER_None;
-    mUseAltFootprint = 0u;
-    mUseAltFootprintSecondary = 0u;
-
     SimulationRef = nullptr;
     ArmyRef = nullptr;
 
@@ -3058,12 +3085,6 @@ namespace moho
 
     ResetEntityVariableDataDefaults(*this);
 
-    mVisibilityState = 0u;
-    mFootprintLayer = 0;
-    mCurrentLayer = LAYER_None;
-    mUseAltFootprint = 0u;
-    mUseAltFootprintSecondary = 0u;
-
     SimulationRef = nullptr;
     ArmyRef = nullptr;
 
@@ -3169,12 +3190,6 @@ namespace moho
     FractionCompleted = 1.0f;
 
     ResetEntityVariableDataDefaults(*this);
-
-    mVisibilityState = 0u;
-    mFootprintLayer = 0;
-    mCurrentLayer = LAYER_None;
-    mUseAltFootprint = 0u;
-    mUseAltFootprintSecondary = 0u;
 
     SimulationRef = nullptr;
     ArmyRef = nullptr;
