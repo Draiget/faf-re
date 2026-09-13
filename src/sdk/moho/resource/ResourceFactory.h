@@ -119,7 +119,19 @@ namespace moho
      * What it does:
      * Forwards load requests into `LoadImpl` using one temporary handle lane.
      */
-    virtual ResourceHandle& Load(ResourceHandle& outResource, const char* path)
+    // NOT virtual, despite forwarding to a virtual `*Impl`. The binary's factory
+    // vtable is seven slots -- Init, Load, Preload, LoadFrom, LoadImpl,
+    // PreloadImpl, LoadFromImpl -- read straight off
+    // ??_7?$ResourceFactory@VRScmResource@Moho@@@Moho@@6B@ (0x00E163D0) and
+    // ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), which agree slot for slot.
+    // Slots 1..3 are already declared on ResourceFactoryBase (as the
+    // type-erased `*ResourcePair` forms ResourceManager dispatches through --
+    // slot 3 is the `mov edx, [eax+0Ch]` / `call edx` at 0x004AA83B-0x004AA845).
+    // Declaring these typed forms `virtual` as well gave each of them a fresh
+    // slot of its own after the base's four, pushing LoadImpl/PreloadImpl/
+    // LoadFromImpl from slots 4/5/6 down to 7/8/9 -- so every dispatch through
+    // this hierarchy landed on the wrong function.
+    ResourceHandle& Load(ResourceHandle& outResource, const char* path)
     {
       ResourceHandle loadedResource;
       LoadImpl(loadedResource, path);
@@ -135,7 +147,7 @@ namespace moho
      * What it does:
      * Forwards preload requests into `PreloadImpl` using one temporary handle lane.
      */
-    virtual PrefetchHandle& Preload(PrefetchHandle& outPrefetchData, const char* path)
+    PrefetchHandle& Preload(PrefetchHandle& outPrefetchData, const char* path)
     {
       PrefetchHandle prefetchedData;
       PreloadImpl(prefetchedData, path);
@@ -149,7 +161,7 @@ namespace moho
      * What it does:
      * Forwards load-from-prefetch requests into `LoadFromImpl`.
      */
-    virtual ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, PrefetchHandle prefetchData)
+    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, PrefetchHandle prefetchData)
     {
       PrefetchHandle prefetchCopy = prefetchData;
       ResourceHandle loadedResource;
@@ -309,26 +321,17 @@ namespace moho
     void Init() override;
 
     /**
-     * Address: 0x00539290 (FUN_00539290, Moho::CScmResourceFactory::Load)
+     * Address: 0x00539290 (FUN_00539290)
+     * Primary vtable slot 4 -- the pure slot `ResourceFactory<RScmResource>`
+     * declares and this class fills in. Read off
+     * ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), whose slot 4 holds
+     * this body where the template's own vftable holds `_purecall`; slots
+     * 1..3 are the template's `Load`/`Preload`/`LoadFrom` in BOTH vftables,
+     * so this class overrides neither of them.
      *
      * What it does:
      * Reads one SCM payload from disk, validates minimum byte length, then
      * materializes one `RScmResource` bound to aliased file bytes.
-     */
-    ResourceHandle& Load(ResourceHandle& outResource, const char* path) override;
-
-    /**
-     * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
-     *
-     * What it does:
-     * Clones prefetch handle lane, forwards into `LoadFromImpl`, and assigns
-     * the loaded resource handle to `outResource`.
-     */
-    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, ResourceHandle prefetchData) override;
-
-    /**
-     * What it does:
-     * Shares the same SCM load lane as `Load` for base template dispatch.
      */
     ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
   };

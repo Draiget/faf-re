@@ -166,6 +166,11 @@ namespace moho
 
     /**
      * Address: 0x0053AAD0 (FUN_0053AAD0)
+     * Primary vtable slot 4 -- the pure slot `ResourceFactory<RScaResource>`
+     * declares and this class fills in. ??_7CScaResourceFactory@Moho@@6B@
+     * (0x00E1646C) holds this body at slot 4 where the template's own
+     * vftable (0x00E1648C) holds `_purecall`; slots 1..3 are the template's
+     * Load/Preload/LoadFrom in BOTH, so this class overrides neither.
      * Mangled: ?Load@CScaResourceFactory@Moho@@UAEAAV?$shared_ptr@VRScaResource@Moho@@@boost@@AAV34@PBD@Z
      *
      * IDA signature:
@@ -179,24 +184,7 @@ namespace moho
      * Default-constructs an `RScaResource`, parses the SCA file via
      * `LoadScaFile`, and resets the out handle on failure.
      */
-    ResourceHandle& Load(ResourceHandle& outResource, const char* path) override;
-
-    /**
-     * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
-     *
-     * What it does:
-     * Clones prefetch handle lane, forwards into `LoadFromImpl`, and assigns
-     * the loaded resource handle to `outResource`.
-     */
-    ResourceHandle& LoadFrom(ResourceHandle& outResource, const char* path, ResourceHandle prefetchData) override;
-
-    /**
-     * Forwarded by the base `LoadImpl` lane.
-     */
-    ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override
-    {
-      return Load(outResource, path);
-    }
+    ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
   };
 
   /**
