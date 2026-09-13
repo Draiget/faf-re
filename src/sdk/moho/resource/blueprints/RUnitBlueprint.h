@@ -758,6 +758,25 @@ namespace moho
   {
     static gpg::RType* sPointerType;
 
+    /**
+     * The reflection descriptor cache for `RUnitBlueprint` itself. It has to be
+     * declared here, not inherited: the binary keeps this class's cache in its
+     * own global (`RUnitBlueprint::StaticGetClass` at 0x0051E400 reads and
+     * writes 0x010C6E0C) separately from the base's
+     * (`REntityBlueprint::StaticGetClass` at 0x0051CC20 uses 0x010C6DE8), and
+     * the sibling subclasses `RProjectileBlueprint` and `RPropBlueprint` each
+     * declare their own too.
+     *
+     * Without it, every `RUnitBlueprint::sType` in the tree silently resolved
+     * to `REntityBlueprint::sType` -- one slot shared by two different types.
+     * Whichever lazy resolver ran first won, and the other then handed out the
+     * wrong `RType`: `CachedRUnitBlueprintType` (ReadArchive.cpp) and
+     * `RUnitBlueprint::StaticGetClass` both stamped the unit descriptor over
+     * the entity-blueprint one that `CachedREntityBlueprintType` and
+     * `REntityBlueprintTypeInfo`'s registration read back.
+     */
+    static gpg::RType* sType;
+
     RUnitBlueprintGeneral General;     // +0x17C
     RUnitBlueprintDisplay Display;     // +0x200
     RUnitBlueprintPhysics Physics;     // +0x278

@@ -24,6 +24,10 @@
 namespace moho
 {
   gpg::RType* RUnitBlueprint::sPointerType = nullptr;
+  // 0x010C6E0C -- this class's own reflection-descriptor cache, distinct from
+  // REntityBlueprint's at 0x010C6DE8. See the declaration for what sharing one
+  // slot between the two did.
+  gpg::RType* RUnitBlueprint::sType = nullptr;
 
   namespace
   {
