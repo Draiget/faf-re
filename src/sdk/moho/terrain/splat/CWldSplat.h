@@ -157,14 +157,6 @@ namespace moho
   class CDecalManager : public IDecalManager
   {
   public:
-    /**
-     * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
-     *
-     * What it does:
-     * Initializes decal vectors, keyed lookup sentinels, and embedded spatial
-     * db storage for the owning terrain map.
-     */
-    explicit CDecalManager(IWldTerrainRes* terrainRes);
 
     /**
      * Address: 0x00877B70 (FUN_00877B70, Moho::CDecalManager::~CDecalManager)
@@ -224,44 +216,6 @@ namespace moho
     virtual void Save(gpg::BinaryWriter& writer);
 
     /**
-     * Address: 0x00878D90 (FUN_00878D90, Moho::CDecalManager::operator new)
-     * Mangled: ??2CDecalManager@Moho@@QAE@@Z
-     *
-     * IDA signature:
-     * Moho::CDecalManager *__cdecl Moho::CDecalManager::operator new(Moho::CWldTerrainRes *a1);
-     *
-     * What it does:
-     * Class-static allocating factory: reserves 0x114 bytes via the global
-     * throwing operator new, and on a non-null block constructs one
-     * CDecalManager owned by `terrainRes`. Returns the constructed manager, or
-     * nullptr when the raw allocation yielded null.
-     *
-     * (The binary mangling is the class allocating `operator new`; recovered as
-     * an intent-named static factory per the symbol-naming contract. The
-     * parameter is spelled IWldTerrainRes* — every caller passes a
-     * CWldTerrainRes* which upcasts to its IWldTerrainRes primary base.)
-     */
-    static CDecalManager* Create(IWldTerrainRes* terrainRes);
-
-  public:
-    /**
-     * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
-     *
-     * IDA signature:
-     * Moho::CWldTerrainDecal *__thiscall Moho::CDecalManager::Func5(Moho::CDecalManager *this, unsigned int decalIndex);
-     *
-     * What it does:
-     * Looks up one decal-index key in `mDecalGroupLookupByDecalIndex` and
-     * returns the registered `CWldTerrainDecal*`, or `nullptr` when the key
-     * is absent. (The prior recovery pass named this "group index" and typed
-     * it `std::int32_t`; the real mapped value, confirmed from
-     * `LoadDecal`'s write side at 0x008780A0, is the decal pointer itself --
-     * this map is a `decalIndex -> CWldTerrainDecal*` lookup, not a group
-     * membership table.)
-     */
-    [[nodiscard]] CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const;
-
-    /**
      * Address: 0x00877F90 (FUN_00877F90, Moho::CDecalManager::GetDecalCount)
      * Slot: 4 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
      *
@@ -282,28 +236,48 @@ namespace moho
     [[nodiscard]] virtual CWldTerrainDecal* GetDecal(std::int32_t index) const;
 
     /**
+     * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
+     *
+     * IDA signature:
+     * Moho::CWldTerrainDecal *__thiscall Moho::CDecalManager::Func5(Moho::CDecalManager *this, unsigned int decalIndex);
+     *
+     * What it does:
+     * Looks up one decal-index key in `mDecalGroupLookupByDecalIndex` and
+     * returns the registered `CWldTerrainDecal*`, or `nullptr` when the key
+     * is absent. (The prior recovery pass named this "group index" and typed
+     * it `std::int32_t`; the real mapped value, confirmed from
+     * `LoadDecal`'s write side at 0x008780A0, is the decal pointer itself --
+     * this map is a `decalIndex -> CWldTerrainDecal*` lookup, not a group
+     * membership table.)
+     */
+    [[nodiscard]] virtual CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const;
+
+    /**
+     * Address: 0x008780A0 (FUN_008780A0, Moho::CDecalManager::LoadDecal)
+     *
+     * What it does:
+     * Loads one existing decal (or allocates a new one), appends it to active
+     * manager storage, and updates the decal-index lookup lane.
+     */
+    [[nodiscard]] virtual CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x00878020 (FUN_00878020, Moho::CDecalManager::NewDecal)
+     *
+     * What it does:
+     * Allocates one terrain decal for the requested runtime index, marks the
+     * manager dirty, and forwards to `LoadDecal`.
+     */
+    [[nodiscard]] virtual CWldTerrainDecal* NewDecal(std::int32_t decalIndex);
+
+    /**
      * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
      *
      * What it does:
      * Removes one decal from group memberships and manager storage, destroys
      * the decal object, and compacts vector-index lanes.
      */
-    void DestroyDecal(CWldTerrainDecal* decal);
-
-    /**
-     * Address: 0x008782A0 (FUN_008782A0, Moho::CDecalManager::Func10)
-     *
-     * IDA signature:
-     * Moho::CDecalGroup *__thiscall Moho::CDecalManager::Func10(Moho::CDecalManager *this, unsigned int groupIndex);
-     *
-     * What it does:
-     * Looks up one group-index key in `mDecalGroupLookupBySplatIndex` and
-     * returns the registered `CDecalGroup*`, or `nullptr` when the key is
-     * absent. (The prior recovery pass typed the return `std::int32_t`; the
-     * real mapped value, confirmed from `LoadDecalGroup`'s write side at
-     * 0x008782D0, is the group pointer itself.)
-     */
-    [[nodiscard]] CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const;
+    virtual void DestroyDecal(CWldTerrainDecal* decal);
 
     /**
      * Address: 0x00878270 (FUN_00878270, Moho::CDecalManager::DecalGroupCount)
@@ -325,6 +299,40 @@ namespace moho
     [[nodiscard]] virtual CDecalGroup* GetDecalGroup(std::int32_t index) const;
 
     /**
+     * Address: 0x008782A0 (FUN_008782A0, Moho::CDecalManager::Func10)
+     *
+     * IDA signature:
+     * Moho::CDecalGroup *__thiscall Moho::CDecalManager::Func10(Moho::CDecalManager *this, unsigned int groupIndex);
+     *
+     * What it does:
+     * Looks up one group-index key in `mDecalGroupLookupBySplatIndex` and
+     * returns the registered `CDecalGroup*`, or `nullptr` when the key is
+     * absent. (The prior recovery pass typed the return `std::int32_t`; the
+     * real mapped value, confirmed from `LoadDecalGroup`'s write side at
+     * 0x008782D0, is the group pointer itself.)
+     */
+    [[nodiscard]] virtual CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const;
+
+    /**
+     * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
+     *
+     * What it does:
+     * Get-or-create decal group: when `group` is null, allocates a new
+     * CDecalGroup(mNumDecals++) and names it "Group_<index>"; appends the group
+     * to mDecalGroups and maps its index into the splat-index lookup lane.
+     */
+    virtual CDecalGroup* LoadDecalGroup(CDecalGroup* group);
+
+    /**
+     * Address: 0x00878460 (FUN_00878460, Moho::CDecalManager::DestroyDecalGroup)
+     *
+     * What it does:
+     * Removes one decal-group mapping, erases the group from manager storage,
+     * then deletes the group object.
+     */
+    virtual std::int32_t DestroyDecalGroup(CDecalGroup* group);
+
+    /**
      * Address: 0x00877FB0 (FUN_00877FB0, Moho::CDecalManager::SplatCount)
      * Slot: 15 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
      *
@@ -343,6 +351,51 @@ namespace moho
     [[nodiscard]] virtual CWldSplat* GetSplat(std::int32_t index) const;
 
     /**
+     * Address: 0x008784C0 (FUN_008784C0, Moho::CDecalManager::NewSplatAt)
+     *
+     * What it does:
+     * Creates one splat, applies type/name/transform defaults, refreshes the
+     * splat runtime state, and reports success.
+     */
+    virtual bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name);
+
+    /**
+     * Address: 0x00878530 (FUN_00878530, Moho::CDecalManager::AddSplat)
+     *
+     * What it does:
+     * Moves one existing decal pointer to the end of the active decal vector
+     * and reindexes after the move.
+     */
+    virtual void AddSplat(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x00878590 (FUN_00878590, Moho::CDecalManager::Func17)
+     *
+     * What it does:
+     * Finds one decal in `mDecals`, moves it to the front while preserving
+     * relative order of earlier entries, then reindexes the decal lane.
+     */
+    virtual void MoveDecalToFront(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x008785D0 (FUN_008785D0, Moho::CDecalManager::Func18)
+     *
+     * What it does:
+     * Finds one decal in `mDecals`, swaps it with the next entry when it is
+     * not the last element, then reindexes when the decal exists.
+     */
+    virtual void MoveDecalTowardBack(CWldTerrainDecal* decal);
+
+    /**
+     * Address: 0x00878610 (FUN_00878610, Moho::CDecalManager::Func19)
+     *
+     * What it does:
+     * Finds one decal in `mDecals`, swaps it with the previous entry when it
+     * is not the first element, then reindexes when a swap is applied.
+     */
+    virtual void MoveDecalTowardFront(CWldTerrainDecal* decal);
+
+    /**
      * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
      * Slot: 22 (`??_7CDecalManager@Moho@@6B@` + 0x58)
      *
@@ -357,7 +410,7 @@ namespace moho
      * the handle / fade deadline / army / fidelity lanes across, and settle the
      * cutoff LOD.
      */
-    void AddDecals(const msvc8::vector<SDecalInfo>& decals);
+    virtual void AddDecals(const msvc8::vector<SDecalInfo>& decals);
 
     /**
      * Address: 0x00878A40 (FUN_00878A40, Moho::CDecalManager::RemoveDecals)
@@ -367,79 +420,7 @@ namespace moho
      * Scans all active decals for each requested runtime handle and marks
      * matching decals for deferred removal.
      */
-    void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles);
-
-    /**
-     * Address: 0x008776D0 (FUN_008776D0, Moho::CDecalManager::Reindex)
-     *
-     * What it does:
-     * Refreshes each decal's `mVecIndex` lane to match the current `mDecals`
-     * vector order.
-     */
-    void Reindex();
-
-    /**
-     * Address: 0x00878590 (FUN_00878590, Moho::CDecalManager::Func17)
-     *
-     * What it does:
-     * Finds one decal in `mDecals`, moves it to the front while preserving
-     * relative order of earlier entries, then reindexes the decal lane.
-     */
-    void MoveDecalToFront(CWldTerrainDecal* decal);
-
-    /**
-     * Address: 0x008785D0 (FUN_008785D0, Moho::CDecalManager::Func18)
-     *
-     * What it does:
-     * Finds one decal in `mDecals`, swaps it with the next entry when it is
-     * not the last element, then reindexes when the decal exists.
-     */
-    void MoveDecalTowardBack(CWldTerrainDecal* decal);
-
-    /**
-     * Address: 0x00878610 (FUN_00878610, Moho::CDecalManager::Func19)
-     *
-     * What it does:
-     * Finds one decal in `mDecals`, swaps it with the previous entry when it
-     * is not the first element, then reindexes when a swap is applied.
-     */
-    void MoveDecalTowardFront(CWldTerrainDecal* decal);
-
-    /**
-     * Address: 0x00878020 (FUN_00878020, Moho::CDecalManager::NewDecal)
-     *
-     * What it does:
-     * Allocates one terrain decal for the requested runtime index, marks the
-     * manager dirty, and forwards to `LoadDecal`.
-     */
-    [[nodiscard]] CWldTerrainDecal* NewDecal(std::int32_t decalIndex);
-
-    /**
-     * Address: 0x008780A0 (FUN_008780A0, Moho::CDecalManager::LoadDecal)
-     *
-     * What it does:
-     * Loads one existing decal (or allocates a new one), appends it to active
-     * manager storage, and updates the decal-index lookup lane.
-     */
-    [[nodiscard]] CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal);
-
-    /**
-     * Address: 0x00878460 (FUN_00878460, Moho::CDecalManager::DestroyDecalGroup)
-     *
-     * What it does:
-     * Removes one decal-group mapping, erases the group from manager storage,
-     * then deletes the group object.
-     */
-    std::int32_t DestroyDecalGroup(CDecalGroup* group);
-
-    /**
-     * Address: 0x00878530 (FUN_00878530, Moho::CDecalManager::AddSplat)
-     *
-     * What it does:
-     * Moves one existing decal pointer to the end of the active decal vector
-     * and reindexes after the move.
-     */
-    void AddSplat(CWldTerrainDecal* decal);
+    virtual void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles);
 
     /**
      * Address: 0x00878A90 (FUN_00878A90, Moho::CDecalManager::ProcessRemovals)
@@ -448,7 +429,7 @@ namespace moho
      * Fades scheduled decals/splats toward zero alpha and erases fully faded
      * entries from manager storage.
      */
-    void ProcessRemovals(std::int32_t tick);
+    virtual void ProcessRemovals(std::int32_t tick);
 
     /**
      * Address: 0x00878BE0 (FUN_00878BE0, Moho::CDecalManager::EntitiesInView)
@@ -457,7 +438,7 @@ namespace moho
      * Collects one camera-visible entity lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod);
+    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod);
 
     /**
      * Address: 0x00878C40 (FUN_00878C40, Moho::CDecalManager::PropsInView)
@@ -466,7 +447,7 @@ namespace moho
      * Collects one camera-visible prop lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
+    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
 
     /**
      * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)
@@ -488,7 +469,7 @@ namespace moho
      * `ProcessRemovals` setting `mDidSomething`). Read-only - does not clear
      * the flag itself.
      */
-    [[nodiscard]] bool HasPendingChanges() const;
+    [[nodiscard]] virtual bool HasPendingChanges() const;
 
     /**
      * Address: 0x00878CC0 (FUN_00878CC0, Moho::CDecalManager::Func27)
@@ -499,9 +480,45 @@ namespace moho
      * once per frame after every world view has consumed the decal set
      * (WRenViewport::Render, 0x007F9779..0x007F979C).
      */
-    void ClearPendingChanges();
+    virtual void ClearPendingChanges();
+    /**
+     * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
+     *
+     * What it does:
+     * Initializes decal vectors, keyed lookup sentinels, and embedded spatial
+     * db storage for the owning terrain map.
+     */
+    explicit CDecalManager(IWldTerrainRes* terrainRes);
 
-  public:
+    /**
+     * Address: 0x00878D90 (FUN_00878D90, Moho::CDecalManager::operator new)
+     * Mangled: ??2CDecalManager@Moho@@QAE@@Z
+     *
+     * IDA signature:
+     * Moho::CDecalManager *__cdecl Moho::CDecalManager::operator new(Moho::CWldTerrainRes *a1);
+     *
+     * What it does:
+     * Class-static allocating factory: reserves 0x114 bytes via the global
+     * throwing operator new, and on a non-null block constructs one
+     * CDecalManager owned by `terrainRes`. Returns the constructed manager, or
+     * nullptr when the raw allocation yielded null.
+     *
+     * (The binary mangling is the class allocating `operator new`; recovered as
+     * an intent-named static factory per the symbol-naming contract. The
+     * parameter is spelled IWldTerrainRes* — every caller passes a
+     * CWldTerrainRes* which upcasts to its IWldTerrainRes primary base.)
+     */
+    static CDecalManager* Create(IWldTerrainRes* terrainRes);
+
+    /**
+     * Address: 0x008776D0 (FUN_008776D0, Moho::CDecalManager::Reindex)
+     *
+     * What it does:
+     * Refreshes each decal's `mVecIndex` lane to match the current `mDecals`
+     * vector order.
+     */
+    void Reindex();
+
     /**
      * Address: 0x00878190 (FUN_00878190, Moho::CDecalManager::NewSplat)
      *
@@ -510,25 +527,6 @@ namespace moho
      * owner and terrain resource, then appends it to `mSplats`.
      */
     [[nodiscard]] CWldSplat* NewSplat();
-
-    /**
-     * Address: 0x008784C0 (FUN_008784C0, Moho::CDecalManager::NewSplatAt)
-     *
-     * What it does:
-     * Creates one splat, applies type/name/transform defaults, refreshes the
-     * splat runtime state, and reports success.
-     */
-    bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name);
-
-    /**
-     * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
-     *
-     * What it does:
-     * Get-or-create decal group: when `group` is null, allocates a new
-     * CDecalGroup(mNumDecals++) and names it "Group_<index>"; appends the group
-     * to mDecalGroups and maps its index into the splat-index lookup lane.
-     */
-    CDecalGroup* LoadDecalGroup(CDecalGroup* group);
 
     /**
      * Address: 0x00877730 (FUN_00877730, Moho::CDecalManager::RebuildLodHistogram)
