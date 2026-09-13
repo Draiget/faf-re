@@ -489,12 +489,34 @@ namespace moho
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetBackground() const;
 
     /**
+     * Address: 0x008A1180 (FUN_008A1180,
+     *   ?GetBackgroundFile@CWldTerrainRes@Moho@@UBEABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
+     * Slot: 10 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54)
+     *
+     * What it does:
+     * Returns the path `SetBackground` stored, by reference. The whole body is
+     * `lea eax, [ecx+95Ch]; retn` -- the string itself, not a copy.
+     */
+    [[nodiscard]] virtual const msvc8::string& GetBackgroundFile() const;
+
+    /**
      * Address: 0x008A12D0 (FUN_008A12D0, ?GetSkycube@CWldTerrainRes@Moho@@UBE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ)
      *
      * What it does:
      * Returns one retained shared texture handle for terrain skycube.
      */
     [[nodiscard]] boost::shared_ptr<ID3DTextureSheet> GetSkycube() const;
+
+    /**
+     * Address: 0x008A12C0 (FUN_008A12C0,
+     *   ?GetSkycubeFile@CWldTerrainRes@Moho@@UBEABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@XZ)
+     * Slot: 7 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54)
+     *
+     * What it does:
+     * The skycube counterpart of `GetBackgroundFile`: `lea eax, [ecx+980h];
+     * retn`, returning the stored path by reference.
+     */
+    [[nodiscard]] virtual const msvc8::string& GetSkycubeFile() const;
 
     /**
      * Address: 0x008A1300 (FUN_008A1300)
@@ -955,6 +977,18 @@ namespace moho
     [[nodiscard]] std::uint8_t* GetWaterFlatness();
 
     /**
+     * Address: 0x008A6E70 (FUN_008A6E70, ?GetWaterDepthBias@CWldTerrainRes@Moho@@EAEPAEXZ)
+     * Slot: 68 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54), immediately
+     * after `GetWaterFlatness` at slot 67
+     *
+     * What it does:
+     * The third of the three water masks, and the only one that had no
+     * declaration here: `mov eax, [ecx+9D0h]; retn`, the same shape as its two
+     * neighbours at +0x9C8 and +0x9CC.
+     */
+    [[nodiscard]] virtual std::uint8_t* GetWaterDepthBias();
+
+    /**
      * Address: 0x008A6E80 (FUN_008A6E80, ?IsInEditMode@CWldTerrainRes@Moho@@EBE_NXZ)
      *
      * What it does:
@@ -1124,6 +1158,22 @@ namespace moho
       std::int32_t columnEnd,
       std::int32_t rowEnd
     );
+
+    /**
+     * Address: 0x008A4EA0 (FUN_008A4EA0, ?UpdateStratumMask@CWldTerrainRes@Moho@@UAEXHPBE@Z)
+     * Slot: 39 (`??_7CWldTerrainRes@Moho@@6B@` at 0x00E4BD54; the six-argument
+     * overload above is slot 38)
+     *
+     * What it does:
+     * Updates the whole stratum mask rather than a sub-rectangle: forwards to
+     * the six-argument overload with the rectangle spanning (0, 0) to the mask
+     * texture's own size. The binary reaches the overload through the vtable
+     * (`call [eax+98h]` at 0x008A4EC4, which is slot 38) and takes the two
+     * extents from `mStratumMaskWidth`/`mStratumMaskHeight` at +0x4CC/+0x4D0 --
+     * the half-chart dimensions `Reset` seeded at 0x008A65B3/0x008A65B9 when it
+     * created the mask textures.
+     */
+    virtual void UpdateStratumMask(std::int32_t stratumIndex, const std::uint8_t* sourceMask);
 
     /**
      * Address: 0x008A4F90 (FUN_008A4F90, ?GetStratumMask@CWldTerrainRes@Moho@@UAEXHPAE@Z)
