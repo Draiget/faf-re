@@ -8951,12 +8951,30 @@ namespace
  * What it does:
  * Releases tracked pointer/type-handle section state, including releasing
  * shared control blocks for tracked shared-pointer lanes.
+ *
+ * The state this deletes on is `Unowned`, not `Owned`, and the binary is
+ * explicit about it: the loop tests `cmp dword ptr [eax+esi+10h], 1` at
+ * 0x00952C03 and skips the delete on anything else, while
+ * `SerConstructResult::SetUnowned` (0x0094F630) writes 1 at 0x0094F668 and
+ * `SetOwned` (0x0094F5E0) writes 2 at 0x0094F614.
+ *
+ * The names read backwards until you take them from the construct helper's
+ * point of view rather than the archive's. `SetOwned` means "this object is
+ * already owned by someone else, so the archive must not free it";
+ * `SetUnowned` means "nobody else has claimed this one", which makes the
+ * archive responsible for it. So deleting exactly the `Unowned` entries is
+ * what keeps a construct helper's cached instances alive.
+ *
+ * `CSndParamsConstruct::Construct` (0x004E0E10) is the case that makes this
+ * load-bearing: it resolves the key through `FindOrCreateSndParamsByKey`,
+ * which hands back a permanently cached, shared `CSndParams`, and then marks
+ * it `SetOwned`. Deleting on `Owned` freed those out from under the cache.
  */
 void ReadArchive::EndSection(const bool)
 {
   for (size_t i = 0; i < mTrackedPtrs.size(); ++i) {
     TrackedPointerInfo& tracked = mTrackedPtrs[i];
-    if (tracked.state == TrackedPointerState::Owned && tracked.object && tracked.type) {
+    if (tracked.state == TrackedPointerState::Unowned && tracked.object && tracked.type) {
       RRef ref{};
       ref.mObj = tracked.object;
       ref.mType = tracked.type;
