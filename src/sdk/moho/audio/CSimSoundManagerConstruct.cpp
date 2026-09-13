@@ -70,7 +70,7 @@ namespace moho
    * through `SerConstructResult` as unowned payload.
    */
   void CSimSoundManagerConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     Sim* sim = nullptr;

@@ -51,10 +51,7 @@ void SaveConstructArgs_RScaResourceThunk(
 // RScaResourceConstruct ctor below only needs the signature to bind the
 // callback pointer.
 void Construct_RScaResource(
-  gpg::ReadArchive* archive,
-  int objectPtr,
-  int version,
-  gpg::SerConstructResult* result
+  gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
 );
 
 namespace
@@ -349,10 +346,7 @@ void SetConstructResultSharedScaResource(
  * resource, and forwards it into construct-result shared ownership.
  */
 void Construct_RScaResource(
-  gpg::ReadArchive* const archive,
-  const int,
-  const int,
-  gpg::SerConstructResult* const result
+  gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   msvc8::string resourcePath{};

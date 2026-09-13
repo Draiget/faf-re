@@ -1820,10 +1820,7 @@ namespace moho
    * Address: 0x0063F220 (FUN_0063F220, Moho::CAnimationManipulatorConstruct::Construct)
    */
   void CAnimationManipulatorConstruct::Construct(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (result == nullptr) {

@@ -176,7 +176,9 @@ namespace moho
      * Allocates one recovered command-dispatch object and stores it as an
      * unowned construct result payload.
      */
-    static void MemberConstruct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void MemberConstruct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x00599C80 (FUN_00599C80, Moho::IAiCommandDispatchImpl::MemberDeserialize)

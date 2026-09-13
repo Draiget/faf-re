@@ -1112,7 +1112,7 @@ void IAiCommandDispatchImpl::IssueRefuelTask(Unit* const unit)
 void IAiCommandDispatchImpl::MemberConstruct(
   gpg::ReadArchive* const,
   const int,
-  const int,
+  gpg::RRef* const,
   gpg::SerConstructResult* const result
 )
 {

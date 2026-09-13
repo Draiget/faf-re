@@ -53,9 +53,7 @@ namespace moho
    */
   void UnitConstruct::Construct(
     gpg::ReadArchive* const archive,
-    const int,
-    const int version,
-    gpg::SerConstructResult* const result
+    const int version, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (!archive || !result) {

@@ -41,7 +41,7 @@ namespace moho
      * the serialization construct result as an unowned object.
      */
     static void Construct(
-      gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
     );
 
     /**

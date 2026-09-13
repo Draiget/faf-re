@@ -243,7 +243,7 @@ namespace
     * Alias of FUN_006967E0 (non-canonical helper lane).
    */
   void Construct_MotorSinkAway_Callback(
-    gpg::ReadArchive*, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive*, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     Construct_MotorSinkAway_Object(result);

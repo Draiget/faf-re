@@ -869,7 +869,9 @@ namespace moho
   /**
    * Address: 0x0063B020 (FUN_0063B020, Moho::CAniActorConstruct::Construct)
    */
-  void CAniActorConstruct::Construct(gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result)
+  void CAniActorConstruct::Construct(
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+  )
   {
     if (!result) {
       return;

@@ -272,7 +272,7 @@ namespace moho
  * Wraps serializer construct callback and forwards to CTaskThread allocator path.
  */
 void moho::CTaskThreadConstruct::Construct(
-  void* /*archive*/, void* /*objectStorage*/, int /*version*/, gpg::SerConstructResult* const result
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   ConstructTaskThreadForSerializer(result);

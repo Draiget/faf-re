@@ -240,7 +240,9 @@ namespace
   /**
    * Address: 0x00694FE0 (FUN_00694FE0, construct callback thunk)
    */
-  void ConstructMotorFallDownCallback(gpg::ReadArchive*, const int, const int, gpg::SerConstructResult* const result)
+  void ConstructMotorFallDownCallback(
+    gpg::ReadArchive*, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+  )
   {
     ConstructMotorFallDownObject(result);
   }

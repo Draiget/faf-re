@@ -45,7 +45,9 @@ namespace moho
      * What it does:
      * Forwards construct callback flow into `Unit::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x006B1010 (FUN_006B1010, Moho::UnitConstruct::Deconstruct)

@@ -243,10 +243,7 @@ namespace moho
    * Address: 0x004E0560 (FUN_004E0560, Moho::CSndVarConstruct::Construct)
    */
   void CSndVarConstruct::Construct(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     msvc8::string variableName{};
@@ -307,6 +304,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {

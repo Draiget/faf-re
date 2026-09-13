@@ -61,7 +61,9 @@ namespace moho
      * Reads archive construct args, allocates one `CParticleTexture`, and
      * returns it through `SerConstructResult` as unowned payload.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0048FFB0 (FUN_0048FFB0, Moho::CParticleTextureConstruct::Deconstruct)

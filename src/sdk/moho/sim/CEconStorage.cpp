@@ -55,10 +55,7 @@ namespace
    * publishes the object as an unowned construct result.
    */
   [[maybe_unused]] void ConstructCEconStorageSerializerCallback(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (result == nullptr) {

@@ -74,7 +74,7 @@ namespace moho
    * `mOwnerSim` field at +0x04) as an unowned tracked pointer.
    */
   void CSimSoundManagerSaveConstruct::SaveConstructArgs(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const soundManager = reinterpret_cast<CSimSoundManager*>(objectPtr);

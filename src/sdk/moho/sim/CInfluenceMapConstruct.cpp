@@ -20,7 +20,7 @@ namespace
    * Address: 0x00717670 (FUN_00717670, sub_717670)
    */
   void Construct_CInfluenceMap(
-    gpg::ReadArchive*, const int, const int, gpg::SerConstructResult* const constructResult
+    gpg::ReadArchive*, const int, gpg::RRef* const, gpg::SerConstructResult* const constructResult
   )
   {
     moho::CInfluenceMap* const object = new (std::nothrow) moho::CInfluenceMap();
@@ -37,12 +37,11 @@ namespace
   /**
    * Address: 0x00717660 (FUN_00717660, sub_717660)
    */
-  int Construct_CInfluenceMapThunk(const int a1, const int a2, const int a3, gpg::SerConstructResult* const result)
+  int Construct_CInfluenceMapThunk(
+    gpg::ReadArchive* const archive, const int version, gpg::RRef* const ownerRef, gpg::SerConstructResult* const result
+  )
   {
-    (void)a1;
-    (void)a2;
-    (void)a3;
-    Construct_CInfluenceMap(nullptr, 0, 0, result);
+    Construct_CInfluenceMap(archive, version, ownerRef, result);
     return 0;
   }
 

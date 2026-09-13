@@ -41,12 +41,10 @@ namespace
  */
 void IAiCommandDispatchImplConstruct::Construct(
   gpg::ReadArchive* const archive,
-  const int objectPtr,
-  const int version,
-  gpg::SerConstructResult* const result
+  const int version, gpg::RRef* const ownerRef, gpg::SerConstructResult* const result
 )
 {
-  IAiCommandDispatchImpl::MemberConstruct(archive, objectPtr, version, result);
+  IAiCommandDispatchImpl::MemberConstruct(archive, version, ownerRef, result);
 }
 
 /**

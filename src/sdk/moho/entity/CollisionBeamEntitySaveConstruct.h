@@ -55,6 +55,7 @@ namespace moho
       gpg::WriteArchive* archive,
       int objectPtr,
       int version,
+      gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
 

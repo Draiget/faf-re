@@ -42,7 +42,9 @@ namespace moho
      * Allocates one `CAiBuilderImpl` and publishes it as unowned construct
      * result payload.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005A1C80 (FUN_005A1C80, delete callback)

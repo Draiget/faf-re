@@ -34,7 +34,9 @@ namespace
 /**
  * Address: 0x005CF840 (FUN_005CF840, Moho::CAiSiloBuildImplConstruct::Construct)
  */
-void CAiSiloBuildImplConstruct::Construct(gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result)
+void CAiSiloBuildImplConstruct::Construct(
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+)
 {
   if (!result) {
     return;

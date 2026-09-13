@@ -64,6 +64,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {
@@ -89,10 +90,7 @@ namespace moho
    * Forwards construct callback flow into `Projectile::MemberConstruct`.
    */
   void ProjectileConstruct::Construct(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (!archive || !result) {

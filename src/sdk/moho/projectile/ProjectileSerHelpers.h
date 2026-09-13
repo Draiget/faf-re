@@ -64,6 +64,7 @@ namespace moho
       gpg::WriteArchive* archive,
       int objectPtr,
       int version,
+      gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
 
@@ -129,7 +130,9 @@ namespace moho
      * What it does:
      * Forwards construct callback flow into `Projectile::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0069F880 (FUN_0069F880, Moho::ProjectileConstruct::Deconstruct)

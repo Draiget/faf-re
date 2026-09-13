@@ -1410,10 +1410,7 @@ namespace moho
    * `CPlatoonConstruct::mConstructCallback`.
    */
   void ConstructCPlatoonForSerializerThunk(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     CPlatoon::ConstructForSerializer(result);
@@ -1495,7 +1492,7 @@ namespace moho
    * version operands and forwards the result slot to the CSquad construct
    * callback.
    */
-  int ConstructCSquadForSerializerThunk(const int, const int, const int, gpg::SerConstructResult* const result)
+  int ConstructCSquadForSerializerThunk(const int, const int, gpg::RRef* const, gpg::SerConstructResult* const result)
   {
     return ConstructCSquadForSerializerAlias(result);
   }

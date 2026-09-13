@@ -73,10 +73,7 @@ namespace moho
    * blueprint pointer, and stores it as owned construct result.
    */
   void Construct_RBeamBlueprint(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int version,
-    gpg::SerConstructResult* result
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
   );
 
   /**

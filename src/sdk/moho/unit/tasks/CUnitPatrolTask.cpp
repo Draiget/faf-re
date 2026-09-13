@@ -1364,10 +1364,17 @@ namespace
    * `gpg::SerConstructResult::SetUnowned`. Invoked by the reflection
    * subsystem during archive replay when a patrol-task instance must be
    * materialized before its fields are streamed in.
+   *
+   * The reflected slot actually holds the thunk at 0x0061AD00, which takes the
+   * dispatcher's four arguments and forwards only `arg_C` (the construct
+   * result) to this body -- MSVC's way of adapting a one-argument source
+   * function to the `mSerConstructFunc` signature. The source is the four
+   * argument form; the thunk is the emission, not a separate function.
    */
-  void ConstructCUnitPatrolTaskSerializerCallback(void* const constructResultStorage)
+  void ConstructCUnitPatrolTaskSerializerCallback(
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+  )
   {
-    auto* const result = static_cast<gpg::SerConstructResult*>(constructResultStorage);
     if (result == nullptr) {
       return;
     }

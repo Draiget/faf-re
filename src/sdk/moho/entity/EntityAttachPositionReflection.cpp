@@ -261,7 +261,9 @@ namespace moho
      * What it does:
      * Forwards save-construct callback flow into `Entity::MemberSaveConstructArgs`.
      */
-    static void Construct(gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result);
+    static void Construct(
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef*, gpg::SerSaveConstructArgsResult* result
+    );
 
     /**
      * Address: 0x0067C500 (FUN_0067C500, gpg::SerSaveConstructHelper_Entity::Init)
@@ -312,7 +314,9 @@ namespace moho
      * What it does:
      * Forwards construct callback flow into `Entity::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0067F5D0 (FUN_0067F5D0, Moho::EntityConstruct::Deconstruct)
@@ -1168,7 +1172,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int version,
-    gpg::SerSaveConstructArgsResult* const result
+    gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const entity = reinterpret_cast<Entity*>(objectPtr);
@@ -1211,7 +1215,7 @@ namespace moho
    * Address: 0x0067B550 (FUN_0067B550, Moho::EntityConstruct::Construct)
    */
   void
-  EntityConstruct::Construct(gpg::ReadArchive* const archive, const int, const int version, gpg::SerConstructResult* const result)
+  EntityConstruct::Construct(gpg::ReadArchive* const archive, const int version, gpg::RRef* const, gpg::SerConstructResult* const result)
   {
     if (!archive || !result) {
       return;

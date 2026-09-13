@@ -69,7 +69,7 @@ namespace moho
      * Address: 0x006EE9C0 (FUN_006EE9C0, save-construct callback thunk)
      */
     static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
     );
 
     /**
@@ -107,7 +107,9 @@ namespace moho
     /**
      * Address: 0x006EEAA0 (FUN_006EEAA0, Moho::CUnitCommandQueueConstruct::Construct)
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x006F8D00 (FUN_006F8D00, Moho::CUnitCommandQueueConstruct::Deconstruct)

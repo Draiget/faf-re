@@ -38,7 +38,9 @@ namespace moho
   // Forward declarations: real definitions sit further down in this TU;
   // RScmResourceConstruct/RScmResourceSaveConstruct's ctors below only need
   // the signatures to bind their callback pointers.
-  void Construct_RScmResource(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+  void Construct_RScmResource(
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+  );
   void DeleteRScmResource(void* self);
   void SaveConstructArgs_RScmResourceThunk(
     gpg::WriteArchive* archive,
@@ -449,10 +451,7 @@ namespace moho
    * resource, and forwards it into construct-result shared ownership.
    */
   void Construct_RScmResource(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int version, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     msvc8::string modelPath{};

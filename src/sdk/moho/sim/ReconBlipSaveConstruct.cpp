@@ -38,7 +38,7 @@ namespace
    * marks the serializer lane as unowned.
    */
   void SaveConstructArgs_ReconBlip(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const object = reinterpret_cast<moho::ReconBlip*>(static_cast<std::uintptr_t>(objectPtr));

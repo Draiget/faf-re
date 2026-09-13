@@ -1198,7 +1198,7 @@ namespace
    * publishes it as an unowned serializer construct result.
    */
   void ConstructStatsCArmyStatItemForSerializer(
-    const int, const int, const int, gpg::SerConstructResult* const constructResult
+    const int, const int, gpg::RRef* const, gpg::SerConstructResult* const constructResult
   )
   {
     auto* const stats = new (std::nothrow) moho::Stats<moho::CArmyStatItem>();

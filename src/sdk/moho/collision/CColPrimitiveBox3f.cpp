@@ -307,7 +307,9 @@ namespace
    * Reconstructs one box collision primitive from archived box/vector payloads
    * and returns it as an unowned construct result.
    */
-  void ConstructDColPrimBox(gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result)
+  void ConstructDColPrimBox(
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+  )
   {
     Wm3::Box3f shape{};
     Wm3::Vec3f localCenter{};
@@ -354,7 +356,7 @@ namespace
    * serialization helper.
    */
   void SaveConstructArgsDColPrimBox(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const primitive = reinterpret_cast<moho::BoxCollisionPrimitive*>(objectPtr);

@@ -55,7 +55,7 @@ namespace
    * construct-result payload.
    */
   void ConstructDefaultSkeletonSharedObject(
-    gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (result == nullptr) {

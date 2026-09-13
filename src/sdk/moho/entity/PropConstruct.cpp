@@ -78,7 +78,7 @@ namespace
    * Construct callback thunk forwarding to `ConstructPropFromArchive`.
    */
   void ConstructPropCallback(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     ConstructPropFromArchive(archive, result);

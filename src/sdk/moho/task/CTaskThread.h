@@ -129,7 +129,9 @@ namespace moho
      * What it does:
      * Forwards serializer construct callback into CTaskThread allocation/init path.
      */
-    static void Construct(void* archive, void* objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0040B420 (FUN_0040B420, Moho::CTaskThreadConstruct::Deconstruct)

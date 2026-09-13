@@ -33,7 +33,7 @@ namespace
    * Address: 0x0070E140 (FUN_0070E140, sub_70E140)
    */
   void Construct_CArmyStats(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     moho::CAiBrain* ownerArmy = nullptr;

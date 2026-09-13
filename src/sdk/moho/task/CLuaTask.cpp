@@ -468,6 +468,7 @@ int moho::cfunc_WaitForL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kWaitForForkOnlyError);
   }
 
+
   CLuaTask* const luaTask = state->m_luaTask;
   CWaitForTask* const waitTask = new (std::nothrow) CWaitForTask(eventObject);
   if (waitTask != nullptr) {
@@ -565,6 +566,7 @@ int moho::cfunc_ForkThreadL(LuaPlus::LuaState* const curState)
     const LuaPlus::LuaObject argumentObject(LuaPlus::LuaStackObject(curState, stackIndex));
     PushForkThreadArgumentAndIncrementResumeCount(task, argumentObject);
   }
+
 
   const LuaPlus::LuaObject threadObject(threadState->m_threadObj);
   threadObject.PushStack(curState);
@@ -1008,7 +1010,7 @@ CLuaTaskConstruct::~CLuaTaskConstruct()
  * placement-construct + `SetUnowned` body.
  */
 void CLuaTaskConstruct::Construct(
-  void* /*archive*/, void* /*objectStorage*/, int /*version*/, gpg::SerConstructResult* const result
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   ConstructCLuaTaskForSerializer(result);

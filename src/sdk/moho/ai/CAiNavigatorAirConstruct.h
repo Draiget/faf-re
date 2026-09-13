@@ -39,7 +39,9 @@ namespace moho
      * Allocates one `CAiNavigatorAir` and publishes it as unowned construct
      * result payload.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005A7ED0 (FUN_005A7ED0, delete callback)

@@ -123,7 +123,9 @@ namespace moho
    * What it does:
    * Construct callback thunk forwarding to `construct_UnitWeapon_00Variant2`.
    */
-  void construct_UnitWeapon_00Variant1(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+  void construct_UnitWeapon_00Variant1(
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+  );
 
   /**
    * Address: 0x006DD740 (FUN_006DD740, sub_6DD740)

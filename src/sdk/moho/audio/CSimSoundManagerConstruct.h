@@ -38,7 +38,9 @@ namespace moho
      * Reads the owning `Sim*`, allocates one `CSimSoundManager`, and returns it
      * through `SerConstructResult` as unowned payload.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x007623F0 (FUN_007623F0)

@@ -38,7 +38,9 @@ namespace moho
      * fields through constructor semantics, and returns it as an unowned
      * construct-result payload.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0076FCB0 (FUN_0076FCB0)
