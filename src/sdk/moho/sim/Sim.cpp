@@ -10958,12 +10958,24 @@ void Sim::RequestPause()
     return;
   }
 
+  // Three-way, not two: only a timeout budget of exactly zero refuses the
+  // pause. A negative budget means unlimited, and pauses without spending
+  // anything -- which is what every local player has, since SessionStartup
+  // seeds `mTimeouts = -1`.
+  //
+  //   0x00748985  test edx, edx
+  //   0x00748987  jz   locret_74899A       ; == 0, refuse
+  //   0x00748989  jle  short loc_74898E    ; <  0, skip the decrement
+  //   0x0074898B  add  dword ptr [eax], -1 ; >  0, spend one
+  //   0x0074898E  mov  [ecx+8E0h], eax     ; both surviving paths pause
   int& timeouts = mCommandSources[mCurCommandSource].mTimeouts;
-  if (timeouts <= 0) {
+  if (timeouts == 0) {
     return;
   }
 
-  --timeouts;
+  if (timeouts > 0) {
+    --timeouts;
+  }
   mPausedByCommandSource = mCurCommandSource;
 }
 
