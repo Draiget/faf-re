@@ -721,6 +721,32 @@ namespace moho
     virtual void CameraShake(const SCamShakeParams& shakeParams);
 
     /**
+     * Address: 0x007A78F0 (FUN_007A78F0,
+     *   ?GetAllSoundEntitiesInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ)
+     * Slot: 39 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
+     * ctor 0x007A7950)
+     *
+     * IDA signature:
+     * gpg::fastvector_n<Moho::WeakPtr<Moho::UserEntity>, 40> &__thiscall
+     *   Moho::CameraImpl::GetAllSoundEntitiesInFrustum(Moho::CameraImpl *this);
+     *
+     * What it does:
+     * Returns the first of the three frustum caches `CacheCameraFrustumUnits`
+     * rebuilds -- every live entity currently inside the camera view, held as
+     * weak references. The whole body is `lea eax, [ecx+460h]; retn`.
+     *
+     * Its one caller is `CUserSoundManager::UpdateSoundRequests`, which reaches
+     * it through the vtable (`mov edx, [eax+9Ch]; call edx` at 0x008AC9FB), so
+     * the slot has to exist and has to be this one. The three consecutive
+     * words of the shipped vtable settle both facts: 0x00E3C510 holds
+     * 0x007A78F0 (this), 0x00E3C514 holds 0x007A7900 (`GetAllUnitsInFrustum`,
+     * slot 40) and 0x00E3C518 holds 0x007A7910 (`GetArmyUnitsInFrustum`, slot
+     * 41), with `CameraShake` at 0x007A7130 immediately above in slot 38. The
+     * `UAE` in the mangled name says the same thing -- public virtual.
+     */
+    [[nodiscard]] virtual CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum();
+
+    /**
      * Address: 0x007A7900 (FUN_007A7900, Moho::CameraImpl::GetAllUnitsInFrustum)
      * Mangled: ?GetAllUnitsInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ
      * Slot: 40 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED via
@@ -983,25 +1009,6 @@ namespace moho
      */
     [[nodiscard]] virtual float LODMetric(const Wm3::Vec3f& offset) const;
 
-    /**
-     * Address: 0x007A78F0 (FUN_007A78F0,
-     *   ?GetAllSoundEntitiesInFrustum@CameraImpl@Moho@@UAEAAV?$fastvector_n@V?$WeakPtr@VUserEntity@Moho@@@Moho@@$0CI@@gpg@@XZ)
-     * Slot: 39 (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474)
-     *
-     * IDA signature:
-     * gpg::fastvector_n<Moho::WeakPtr<Moho::UserEntity>, 40> &__thiscall
-     *   Moho::CameraImpl::GetAllSoundEntitiesInFrustum(Moho::CameraImpl *this);
-     *
-     * What it does:
-     * Returns the first of the three frustum caches `CacheCameraFrustumUnits`
-     * rebuilds -- every live entity currently inside the camera view, held as
-     * weak references. The whole body is `lea eax, [ecx+460h]; retn`.
-     *
-     * Its one caller is `CUserSoundManager::UpdateSoundRequests`, which walks
-     * this list to start the ambient and rumble loops of everything the
-     * listener can currently hear.
-     */
-    [[nodiscard]] CameraFrustumUserEntityList& GetAllSoundEntitiesInFrustum();
   };
 
   /**

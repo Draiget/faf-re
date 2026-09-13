@@ -2625,7 +2625,8 @@ float moho::CameraImpl::LODMetric(const Wm3::Vec3f& offset) const
 
 /**
  * Address: 0x007A78F0 (FUN_007A78F0, Moho::CameraImpl::GetAllSoundEntitiesInFrustum)
- * Slot: 39 (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474)
+ * Slot: 39 (`??_7CameraImpl@Moho@@6B@` at 0x00E3C474; see the header for the
+ * byte-verified slot evidence)
  *
  * What it does:
  * Hands back the sound/all-entities frustum cache at `camera + 0x460` -- the
