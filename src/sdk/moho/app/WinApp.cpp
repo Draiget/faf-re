@@ -63,8 +63,10 @@ namespace moho
 {
   struct STimeBarThreadInfo;
 
-  msvc8::vector<ManagedWindowSlot> managedWindows{};
-  msvc8::vector<ManagedWindowSlot> managedFrames{};
+  // managedWindows / managedFrames are defined by WxRuntimeTypes.cpp, which owns
+  // WxRuntimeTypes.h's declarations of them, the slot type, and the vector
+  // insert emissions that resize them. This file only registers, drains and
+  // destroys their contents, so it takes them through the header's externs.
   CWinLogTarget sLogWindowTarget{};
 }
 
