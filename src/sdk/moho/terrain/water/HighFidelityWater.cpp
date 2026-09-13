@@ -241,7 +241,7 @@ namespace moho
    * Clears the cached runtime state used by the high-fidelity water render
    * path, including both shared texture handles and owned render sheets.
    */
-  void HighFidelityWater::ReleaseRenderState()
+  void HighFidelityWater::Destroy()
   {
     mFresnelLookupTexture.release();
     DeleteOwned(mVertexSheet);
@@ -395,6 +395,6 @@ namespace moho
    */
   HighFidelityWater::~HighFidelityWater()
   {
-    ReleaseRenderState();
+    HighFidelityWater::Destroy();
   }
 } // namespace moho

@@ -91,17 +91,31 @@ namespace moho
     SkyDome();
 
     /**
-     * Address: 0x00814CD0 (FUN_00814CD0, ??1SkyDome@Moho@@UAE@XZ)
-     */
-    virtual ~SkyDome();
-
-    /**
      * Address: 0x008175D0 (FUN_008175D0, Moho::SkyDome::Destroy)
+     *
+     * Vtable slot 0 of ??_7SkyDome@Moho@@6B@ (0x00E422A0); the destructor is
+     * slot 1. The order matters and is not a matter of taste: MSVC numbers
+     * virtuals in declaration order, so declaring the destructor first -- as
+     * this header did -- puts it in slot 0 and leaves the class one slot short,
+     * with Destroy demoted to a non-virtual nothing can dispatch to.
+     *
+     * That this is virtual at all is settled by the image rather than inferred:
+     * 0x008175D0 has exactly one reference in the whole binary, the vtable
+     * entry at 0x00E422A0. There is no direct call or jump to it anywhere, not
+     * even from ~SkyDome, so the slot is its only entry point.
      *
      * What it does:
      * Releases all D3D resource handles and resets rendering state.
      */
-    void Destroy();
+    virtual void Destroy();
+
+    /**
+     * Address: 0x00814CD0 (FUN_00814CD0, ??1SkyDome@Moho@@UAE@XZ)
+     *
+     * Vtable slot 1; the shipped slot holds the scalar-deleting thunk at
+     * 0x00814CA0, which calls this body.
+     */
+    virtual ~SkyDome();
 
     /**
      * Address: 0x00815FA0 (FUN_00815FA0, ?Load@SkyDome@Moho@@QAEXIAAVBinaryReader@gpg@@@Z)
