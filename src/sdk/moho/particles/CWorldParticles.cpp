@@ -1663,13 +1663,15 @@ namespace moho
    */
   /**
    * Address: 0x00494E10 (FUN_00494E10)
+   * Slot: 0 (see the header for the byte-verified vtable order)
    *
    * What it does:
    * Clears the runtime particle, refracting-particle, and trail bucket lanes
    * owned by one world-particles instance.
    */
-  void ResetWorldParticlesRuntimeState(CWorldParticles& worldParticles)
+  void CWorldParticles::ClearRenderBuckets()
   {
+    CWorldParticles& worldParticles = *this;
     auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(worldParticles);
 
     // Each entry owns its bucket, so the payload goes before the node.
