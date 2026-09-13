@@ -46,7 +46,11 @@ namespace moho
   bool dbg_Projectile = false;
   gpg::RType* CProjectileAttributes::sType = nullptr;
   gpg::RType* ManyToOneBroadcaster<EProjectileImpactEvent>::sType = nullptr;
-  gpg::RType* ManyToOneListener<EProjectileImpactEvent>::sType = nullptr;
+  // The listener half's storage belongs to CAcquireTargetTask.cpp, alongside
+  // ManyToOneListener_ECollisionBeamEvent::sType -- this file only registers and
+  // clears it (register_/cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo,
+  // 0x00BD64E0 / 0x00BFD760), exactly as CollisionBeamStartupRegistrations.cpp
+  // does for its own twin while defining only the broadcaster.
   CScrLuaMetatableFactory<Projectile> CScrLuaMetatableFactory<Projectile>::sInstance{};
 } // namespace moho
 
