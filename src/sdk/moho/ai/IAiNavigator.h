@@ -101,6 +101,7 @@ namespace moho
 
     /**
      * Address: 0x005B0B60 (FUN_005B0B60)
+     * Address: 0x005B0900 (FUN_005B0900 -- forwarder into the body above)
      *
      * What it does:
      * Inserts one front range into this path span with vector-style growth and
