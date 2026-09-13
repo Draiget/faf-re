@@ -29,13 +29,57 @@ namespace moho
     IMovie();
 
     /**
-     * Address: 0x00873BF0 (FUN_00873BF0, vtable-slot-2 scalar deleting
+     * Address: 0x00873BF0 (FUN_00873BF0, vtable-slot-0 scalar deleting
      * destructor: this base interface owns no resources, so the body is
      * just the vftable restore plus a conditional `operator delete` --
      * ordinary C++ `delete` semantics, not modeled as a separate function
      * here)
      */
     virtual ~IMovie() = default;
+
+    /// Slot 1.
+    virtual bool OpenMovie(const char* path) = 0;
+
+    /// Slot 2.
+    virtual void Dispose() = 0;
+
+    /// Slot 3.
+    virtual bool PlayMovie() = 0;
+
+    /// Slot 4.
+    virtual bool Stop() = 0;
+
+    /// Slot 5.
+    virtual void StartMoviePlaybackFromName() = 0;
+
+    /// Slot 6.
+    [[nodiscard]] virtual bool IsLoaded() = 0;
+
+    /// Slot 7.
+    [[nodiscard]] virtual bool HasPlaybackFinished() = 0;
+
+    /// Slot 8.
+    virtual void UpdatePlaybackFrame() = 0;
+
+    /// Slot 9.
+    [[nodiscard]] virtual std::int32_t GetWidth() const = 0;
+
+    /// Slot 10.
+    [[nodiscard]] virtual std::int32_t GetHeight() const = 0;
+
+    /// Slot 11.
+    [[nodiscard]] virtual std::int32_t GetFrameCount() = 0;
+
+    /// Slot 12.
+    [[nodiscard]] virtual float GetFrameRate() = 0;
+
+    /// Slot 13.
+    [[nodiscard]] virtual const msvc8::string* GetSubtitleText() = 0;
+
+    /// Slot 14.
+    virtual boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
+      boost::shared_ptr<ID3DTextureSheet>* outHandle
+    ) = 0;
   };
 
   static_assert(sizeof(IMovie) == 0x04, "IMovie size must be 0x04");
@@ -145,7 +189,7 @@ namespace moho
      * loop, builds the movie texture, allocates the subtitle buffer, and uploads
      * the first frame. Returns true on success.
      */
-    virtual bool OpenMovie(const char* path);
+    bool OpenMovie(const char* path) override;
 
     /**
      * Address: 0x00874530 (FUN_00874530, Moho::CMovie::Dispose) - vtable slot 2
@@ -154,7 +198,7 @@ namespace moho
      * Tears down one active Sofdec playback handle, clears the movie texture
      * sheet shared-owner lane, and marks playback inactive.
      */
-    virtual void Dispose();
+    void Dispose() override;
 
     /**
      * Address: 0x00874590 (FUN_00874590, Moho::CMovie::PlayMovie) - vtable slot 3
@@ -163,7 +207,7 @@ namespace moho
      * Logs one movie-start debug line and unpauses playback when a Sofdec
      * handle is active.
      */
-    virtual bool PlayMovie();
+    bool PlayMovie() override;
 
     /**
      * Address: 0x008745D0 (FUN_008745D0, Moho::CMovie::Stop) - vtable slot 4
@@ -171,7 +215,7 @@ namespace moho
      * What it does:
      * Pauses one active Sofdec playback handle.
      */
-    virtual bool Stop();
+    bool Stop() override;
 
     /**
      * Address: 0x008745F0 (FUN_008745F0) - vtable slot 5
@@ -179,7 +223,7 @@ namespace moho
      * What it does:
      * Starts playback for the retained movie-name lane and clears pause state.
      */
-    virtual void StartMoviePlaybackFromName();
+    void StartMoviePlaybackFromName() override;
 
     /**
      * Address: 0x00874630 (FUN_00874630) - vtable slot 6
@@ -192,7 +236,7 @@ namespace moho
      * playback-enabled lane `OpenMovie` sets once the player, texture and
      * subtitle buffer are all in place.
      */
-    [[nodiscard]] virtual bool IsLoaded();
+    [[nodiscard]] bool IsLoaded() override;
 
     /**
      * Address: 0x00874640 (FUN_00874640) - vtable slot 7
@@ -203,7 +247,7 @@ namespace moho
      * What it does:
      * Reports whether the Sofdec player has reached playback-end status (3).
      */
-    [[nodiscard]] virtual bool HasPlaybackFinished();
+    [[nodiscard]] bool HasPlaybackFinished() override;
 
     /**
      * Address: 0x00874660 (FUN_00874660) - vtable slot 8
@@ -212,7 +256,7 @@ namespace moho
      * Performs one per-frame playback tick: waits vsync, uploads the current
      * frame, refreshes subtitle text, and emits optional debug counters.
      */
-    virtual void UpdatePlaybackFrame();
+    void UpdatePlaybackFrame() override;
 
     /**
      * Address: 0x00874780 (FUN_00874780, Moho::CMovie::GetWidth) - vtable slot 9
@@ -220,7 +264,7 @@ namespace moho
      * What it does:
      * Returns the decoded movie frame width.
      */
-    [[nodiscard]] virtual std::int32_t GetWidth() const;
+    [[nodiscard]] std::int32_t GetWidth() const override;
 
     /**
      * Address: 0x00874790 (FUN_00874790, Moho::CMovie::GetHeight) - vtable slot 10
@@ -228,7 +272,7 @@ namespace moho
      * What it does:
      * Returns the decoded movie frame height.
      */
-    [[nodiscard]] virtual std::int32_t GetHeight() const;
+    [[nodiscard]] std::int32_t GetHeight() const override;
 
     /**
      * Address: 0x00874870 (FUN_00874870) - vtable slot 11
@@ -239,7 +283,7 @@ namespace moho
      * What it does:
      * Returns the frame count read out of the SFD header.
      */
-    [[nodiscard]] virtual std::int32_t GetFrameCount();
+    [[nodiscard]] std::int32_t GetFrameCount() override;
 
     /**
      * Address: 0x00874880 (FUN_00874880) - vtable slot 12
@@ -252,7 +296,7 @@ namespace moho
      * a double because the value comes back on the x87 stack; the field and
      * the load (`fld dword ptr [ecx+40h]`) are both single precision.
      */
-    [[nodiscard]] virtual float GetFrameRate();
+    [[nodiscard]] float GetFrameRate() override;
 
     /**
      * Address: 0x00874740 (FUN_00874740, Moho::CMovie::Func9) - vtable slot 13
@@ -264,7 +308,7 @@ namespace moho
      * Hands out the subtitle string lane itself, which `UpdatePlaybackFrame`
      * refreshes each tick. The caller does not own it.
      */
-    [[nodiscard]] virtual const msvc8::string* GetSubtitleText();
+    [[nodiscard]] const msvc8::string* GetSubtitleText() override;
 
     /**
      * Address: 0x00874750 (FUN_00874750, Moho::CMovie::Func10) - vtable slot 14
@@ -278,9 +322,9 @@ namespace moho
      * result straight to `CD3DPrimBatcher::SetTexture(shared_ptr<...>)`, which
      * the binary calls at 0x00438870 by pushing the pair as two words.
      */
-    virtual boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
+    boost::shared_ptr<ID3DTextureSheet>* GetTextureSheetHandle(
       boost::shared_ptr<ID3DTextureSheet>* outHandle
-    );
+    ) override;
 
   public:
     // +0x04 vptr and +0x08 mListenerLink come from the Listener base above.
