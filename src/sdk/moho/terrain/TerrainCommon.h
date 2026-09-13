@@ -57,6 +57,18 @@ namespace moho
    * recovered on all three (HighFidelityTerrain.cpp, MediumFidelityTerrain.cpp,
    * LowFidelityTerrain.cpp) and is declared here.
    */
+  /**
+   * The three terrain fidelity levels, as `graphics_Fidelity` encodes them.
+   *
+   * Fixed by two independent sites in the binary: `IRenTerrain::Create`
+   * (0x00809DA0) switches on these to pick which renderer to construct, and
+   * each renderer's `IsFidelity` (slot 1) compares against its own value --
+   * 0x00808190 against 0, 0x00803BF0 against 1, 0x007FFB70 against 2.
+   */
+  inline constexpr std::int32_t kLowTerrainFidelity = 0;
+  inline constexpr std::int32_t kMediumTerrainFidelity = 1;
+  inline constexpr std::int32_t kHighTerrainFidelity = 2;
+
   class TerrainCommon
   {
   public:
@@ -76,6 +88,24 @@ namespace moho
      * base vtable lane during teardown.
      */
     virtual ~TerrainCommon();
+
+    /**
+     * Primary vtable slot 1 (unnamed in the binary; `Func1` in per-class
+     * recovery notes). Bodies: 0x00808190 (Low), 0x00803BF0 (Medium),
+     * 0x007FFB70 (High).
+     *
+     * What it does:
+     * Answers whether this renderer is the given fidelity level. Each of the
+     * three implementations is the same four instructions against a different
+     * constant -- `xor eax, eax; cmp [esp+4], N; setz al; retn 4` -- with N
+     * being 0, 1 and 2 respectively.
+     *
+     * Those constants are the same ones `IRenTerrain::Create` (0x00809DA0)
+     * switches `graphics_Fidelity` on to pick which class to construct, so
+     * the level encoding is fixed by two independent sites: 0 is low, 1 is
+     * medium, 2 is high.
+     */
+    [[nodiscard]] virtual bool IsFidelity(std::int32_t fidelity) const = 0;
 
     /**
      * What it does:

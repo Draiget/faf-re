@@ -78,13 +78,13 @@ namespace moho
     TerrainCommon* result = nullptr;
     const char* selectedPath = nullptr;
 
-    if (graphics_Fidelity == 0) {
+    if (graphics_Fidelity == kLowTerrainFidelity) {
       result = AllocateTerrainNoThrow<LowFidelityTerrain>();
       selectedPath = "creating low fidelity terrain";
-    } else if (graphics_Fidelity == 1) {
+    } else if (graphics_Fidelity == kMediumTerrainFidelity) {
       result = AllocateTerrainNoThrow<MediumFidelityTerrain>();
       selectedPath = "creating medium fidelity terrain";
-    } else if (graphics_Fidelity == 2) {
+    } else if (graphics_Fidelity == kHighTerrainFidelity) {
       result = AllocateTerrainNoThrow<HighFidelityTerrain>();
       selectedPath = "creating high fidelity terrain";
     } else {
