@@ -31,7 +31,19 @@ namespace moho
      * What it does:
      * Forwards texture load requests into implementation lane.
      */
-    virtual TextureResourceHandle& Load(TextureResourceHandle& outTexture, const char* path);
+    // NOT virtual, despite forwarding to a virtual `*Impl`. The binary's factory
+    // vtable is seven slots -- Init, Load, Preload, LoadFrom, LoadImpl,
+    // PreloadImpl, LoadFromImpl -- read straight off
+    // ??_7?$ResourceFactory@VRScmResource@Moho@@@Moho@@6B@ (0x00E163D0) and
+    // ??_7CScmResourceFactory@Moho@@6B@ (0x00E163B0), which agree slot for slot.
+    // Slots 1..3 are already declared on ResourceFactoryBase (as the
+    // type-erased `*ResourcePair` forms ResourceManager dispatches through --
+    // slot 3 is the `mov edx, [eax+0Ch]` / `call edx` at 0x004AA83B-0x004AA845).
+    // Declaring these typed forms `virtual` as well gave each of them a fresh
+    // slot of its own after the base's four, pushing LoadImpl/PreloadImpl/
+    // LoadFromImpl from slots 4/5/6 down to 7/8/9 -- so every dispatch through
+    // this hierarchy landed on the wrong function.
+    TextureResourceHandle& Load(TextureResourceHandle& outTexture, const char* path);
 
     /**
      * Address: 0x004435E0 (FUN_004435E0)
@@ -41,7 +53,7 @@ namespace moho
      * What it does:
      * Forwards texture prefetch requests into implementation lane.
      */
-    virtual PrefetchDataHandle& Preload(PrefetchDataHandle& outPrefetchData, const char* path);
+    PrefetchDataHandle& Preload(PrefetchDataHandle& outPrefetchData, const char* path);
 
     /**
      * Address: 0x00443690 (FUN_00443690)
@@ -51,7 +63,7 @@ namespace moho
      * What it does:
      * Forwards load-from-prefetched-data requests into implementation lane.
      */
-    virtual TextureResourceHandle&
+    TextureResourceHandle&
       LoadFrom(TextureResourceHandle& outTexture, const char* path, PrefetchDataHandle prefetchData);
 
     /**

@@ -116,14 +116,16 @@ namespace moho
   }
 
   /**
-   * Address: 0x00539290 (FUN_00539290, Moho::CScmResourceFactory::Load)
+   * Address: 0x00539290 (FUN_00539290) -- vtable slot 4, the pure slot
+   * `ResourceFactory<RScmResource>` declares. Slots 1..3 stay the
+   * template's own `Load`/`Preload`/`LoadFrom` in both vftables.
    *
    * What it does:
    * Reads one SCM payload from disk, validates minimum byte length, then
    * materializes one `RScmResource` bound to aliased file bytes.
    */
   CScmResourceFactory::ResourceHandle&
-  CScmResourceFactory::Load(ResourceHandle& outResource, const char* const path)
+  CScmResourceFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
   {
     outResource.reset();
 
@@ -155,29 +157,6 @@ namespace moho
 
     ConstructSharedRScmResourceFromRaw(&outResource, rawResource);
     return outResource;
-  }
-
-  /**
-   * Address: 0x00539950 (FUN_00539950, Moho::ResourceFactory_RScmResource::LoadFrom)
-   *
-   * What it does:
-   * Clones prefetch handle lane, forwards into `LoadFromImpl`, and copies the
-   * resulting resource handle into `outResource`.
-   */
-  CScmResourceFactory::ResourceHandle&
-  CScmResourceFactory::LoadFrom(ResourceHandle& outResource, const char* const path, ResourceHandle prefetchData)
-  {
-    ResourceHandle prefetchCopy = prefetchData;
-    ResourceHandle loadedResource{};
-    (void)LoadFromImpl(loadedResource, path, prefetchCopy);
-    outResource = loadedResource;
-    return outResource;
-  }
-
-  CScmResourceFactory::ResourceHandle&
-  CScmResourceFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
-  {
-    return Load(outResource, path);
   }
 
   /**

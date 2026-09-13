@@ -547,7 +547,7 @@ bool RScaResource::LoadScaFile(const char* filename)
  * and resets the out handle to null when parsing fails.
  */
 CScaResourceFactory::ResourceHandle&
-CScaResourceFactory::Load(ResourceHandle& outResource, const char* const path)
+CScaResourceFactory::LoadImpl(ResourceHandle& outResource, const char* const path)
 {
   auto* const rawResource = new (std::nothrow) RScaResource();
   outResource.reset(rawResource);
@@ -560,23 +560,6 @@ CScaResourceFactory::Load(ResourceHandle& outResource, const char* const path)
     outResource.reset();
   }
 
-  return outResource;
-}
-
-/**
- * Address: 0x0053AF60 (FUN_0053AF60, Moho::ResourceFactory_RScaResource::LoadFrom)
- *
- * What it does:
- * Clones prefetch handle lane, forwards into `LoadFromImpl`, and copies the
- * resulting resource handle into `outResource`.
- */
-CScaResourceFactory::ResourceHandle&
-CScaResourceFactory::LoadFrom(ResourceHandle& outResource, const char* const path, ResourceHandle prefetchData)
-{
-  ResourceHandle prefetchCopy = prefetchData;
-  ResourceHandle loadedResource{};
-  (void)LoadFromImpl(loadedResource, path, prefetchCopy);
-  outResource = loadedResource;
   return outResource;
 }
 
