@@ -199,8 +199,16 @@ namespace moho
      * What it does:
      * Tears down the singleton world-particles state, including beam buckets
      * and pooled render storage.
+     *
+     * Not virtual: the `Q` in the mangled name is public non-virtual, and slot
+     * 0 of `??_7CWorldParticles@Moho@@6B@` holds 0x00494E10
+     * (`ClearRenderBuckets`, 216 instructions), not a deleting destructor.
+     * Declaring it virtual put a phantom slot in front of the eight real ones
+     * and shifted every one of them down a place. Nothing deletes this class
+     * polymorphically -- the only instance is the `sWorldParticles` singleton
+     * at 0x010A81B0.
      */
-    virtual ~CWorldParticles();
+    ~CWorldParticles();
 
     /**
      * Address: 0x004928A0 (FUN_004928A0)
@@ -245,42 +253,90 @@ namespace moho
      */
     void ReleaseTrailSegmentBuffer(TrailSegmentBufferRuntime* segmentBuffer);
 
+  public:
+    // ---- the eight virtuals, in vtable order -------------------------------
+    //
+    // `??_7CWorldParticles@Moho@@6B@` lives at 0x00E06908 and the singleton
+    // constructor (0x004925FF) stores it into `sWorldParticles` at offset
+    // +0x00, the only vtable store anywhere in the class, so this is the whole
+    // table and the class is singly derived. Read out of the shipped image the
+    // eight words are 0x00494E10, 0x00492D30, 0x00494930, 0x00494C20,
+    // 0x00492D50, 0x00495080, 0x004952A0, 0x00492E30 -- which is the order
+    // below. The pure-virtual base they implement is `IWorldParticles`, whose
+    // own table at 0x00E068CC is eight consecutive `_purecall` slots.
+    //
+    // None of them may be reordered or made non-virtual: every one has zero
+    // code xrefs, so the vtable is the only way any of them is ever reached.
+
+    /**
+     * Address: 0x00494E10 (FUN_00494E10)
+     * Slot: 0
+     *
+     * What it does:
+     * Clears the runtime particle, refracting-particle and trail bucket lanes
+     * this instance owns, deleting each bucket payload before its node and
+     * dropping the two cached bucket pointers and lookup keys.
+     */
+    virtual void ClearRenderBuckets();
+
     /**
      * Address: 0x00492D30 (FUN_00492D30)
      * Mangled: ?AddBeam@CWorldParticles@Moho@@UAEXPBUSWorldBeam@2@@Z
+     * Slot: 1
      *
      * What it does:
      * Inserts one beam into the persistent beam render-bucket map.
      */
-    void AddBeam(const SWorldBeam& beam);
+    virtual void AddBeam(const SWorldBeam& beam);
+
+    /**
+     * Address: 0x00494930 (FUN_00494930, Moho::CWorldParticles::AddWorldParticle)
+     * Slot: 2
+     *
+     * What it does:
+     * Resolves/creates the world-particle bucket for one particle payload and
+     * appends that payload into the bucket pending vector. Also called
+     * directly by particle emitters (`WaveGenerator::Update`, asm direct call
+     * at 0x0088873E), so it is a public entry as well as a slot.
+     */
+    virtual void AddWorldParticle(
+      const SWorldParticle& particle,
+      ParticleRenderBucketRuntime** bucketCacheSlot
+    );
+
+    /**
+     * Address: 0x00494C20 (FUN_00494C20, Moho::CWorldParticles::AddTrail)
+     * Slot: 3
+     *
+     * What it does:
+     * Resolves/creates the trail bucket for one trail payload and appends that
+     * payload into the bucket pending vector.
+     */
+    virtual void AddTrail(
+      const TrailRuntimeView& trail,
+      TrailRenderBucketRuntime** bucketCacheSlot
+    );
 
     /**
      * Address: 0x00492D50 (FUN_00492D50)
      * Mangled: ?AddParticles@CWorldParticles@Moho@@UAEXPBUSParticleBuffer@2@@Z
+     * Slot: 4
      *
      * What it does:
      * Dispatches one submit-buffer payload into world-particle, trail, and beam
      * append paths in original order.
      */
-    void AddParticles(const SParticleBuffer& batch);
-
-    /**
-     * Address: 0x00492E30 (FUN_00492E30)
-     * Mangled: ?AdvancementBeat@CWorldParticles@Moho@@UAEXXZ
-     *
-     * What it does:
-     * Advances beat counter and clears transient beam bucket contents.
-     */
-    void AdvancementBeat();
+    virtual void AddParticles(const SParticleBuffer& batch);
 
     /**
      * Address: 0x00495080 (FUN_00495080)
+     * Slot: 5
      *
      * What it does:
      * Sets particle camera shader variables, optionally renders beams, then
      * renders particle buckets on the correct side of the water-surface gate.
      */
-    char RenderEffects(
+    virtual char RenderEffects(
       GeomCamera3* camera,
       char renderWaterSurface,
       char suppressTLight,
@@ -290,48 +346,30 @@ namespace moho
 
     /**
      * Address: 0x004952A0 (FUN_004952A0)
+     * Slot: 6
      *
      * What it does:
      * Renders the refracting particle-bucket lane with the particle background
      * texture bound and camera shader state initialized.
      */
-    void RenderRefractingEffects(
+    virtual void RenderRefractingEffects(
       GeomCamera3* camera,
       int tick,
       float frameDelta,
       const boost::shared_ptr<ID3DRenderTarget>& backgroundTexture
     );
 
-  public:
     /**
-     * Address: 0x00494930 (FUN_00494930, Moho::CWorldParticles::AddWorldParticle)
+     * Address: 0x00492E30 (FUN_00492E30)
+     * Mangled: ?AdvancementBeat@CWorldParticles@Moho@@UAEXXZ
+     * Slot: 7
      *
      * What it does:
-     * Resolves/creates the world-particle bucket for one particle payload and
-     * appends that payload into the bucket pending vector. Called externally by
-     * particle emitters (e.g. `WaveGenerator::Update`, asm direct call at
-     * 0x0088873E), so this is a public entry, not a protected helper.
+     * Advances beat counter and clears transient beam bucket contents.
      */
-    void AddWorldParticle(
-      const SWorldParticle& particle,
-      ParticleRenderBucketRuntime** bucketCacheSlot
-    );
-
-  protected:
-    /**
-     * Address: 0x00494C20 (FUN_00494C20, Moho::CWorldParticles::AddTrail)
-     *
-     * What it does:
-     * Resolves/creates the trail bucket for one trail payload and appends that
-     * payload into the bucket pending vector.
-     */
-    void AddTrail(
-      const TrailRuntimeView& trail,
-      TrailRenderBucketRuntime** bucketCacheSlot
-    );
+    virtual void AdvancementBeat();
 
   private:
-    friend void ResetWorldParticlesRuntimeState(CWorldParticles& worldParticles);
     friend void DestroyWorldParticlesSingleton();
 
     /**
@@ -370,15 +408,6 @@ namespace moho
    * interface lane used by legacy exit paths.
    */
   [[nodiscard]] CWorldParticles* GetLegacyWorldParticlesSingleton() noexcept;
-
-  /**
-   * Address: 0x00494E10 (FUN_00494E10)
-   *
-   * What it does:
-   * Clears the runtime particle, refracting-particle, and trail bucket lanes
-   * owned by one world-particles instance.
-   */
-  void ResetWorldParticlesRuntimeState(CWorldParticles& worldParticles);
 
   /**
    * Address: 0x00495440 (FUN_00495440, sub_495440)
