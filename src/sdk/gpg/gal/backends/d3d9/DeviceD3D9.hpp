@@ -53,7 +53,7 @@ namespace gal {
        * Slot: 0
        * Demangled: DestroyBackendObject
        */
-      virtual void DestroyBackendObject();
+      virtual void DestroyBackendObject() override;
       /**
        * Address: 0x008E81D0 (FUN_008E81D0)
        * Slot: 1
@@ -62,7 +62,7 @@ namespace gal {
        * What it does:
        * Returns the global D3D9 log-storage lane used by this backend.
        */
-      virtual void* GetLog();
+      virtual void* GetLog() override;
       /**
        * Address: 0x008E81E0 (FUN_008E81E0)
        * Slot: 2
@@ -71,7 +71,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook and returns the embedded device-context lane.
        */
-      virtual DeviceContext* GetDeviceContext();
+      virtual DeviceContext* GetDeviceContext() override;
       /**
        * Address: 0x008E81F0 (FUN_008E81F0)
        * Slot: 3
@@ -80,7 +80,7 @@ namespace gal {
        * What it does:
        * Returns the retained current thread-id lane at `this+0x24`.
        */
-      virtual int GetCurThreadId();
+      virtual int GetCurThreadId() override;
       /**
        * Address: 0x008E8200 (FUN_008E8200)
        * Slot: 4
@@ -89,7 +89,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op virtual pre-hook slot.
        */
-      virtual void Func1();
+      virtual void Func1() override;
       /**
        * Address: 0x008F0170
        * Slot: 5
@@ -105,7 +105,7 @@ namespace gal {
        * Validates one head index and returns the retained head lane pointer from
        * `this+0x7C` (`index * 0x20`).
        */
-      virtual Head* GetHead1(unsigned int headIndex);
+      virtual Head* GetHead1(unsigned int headIndex) override;
       /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
@@ -115,7 +115,7 @@ namespace gal {
        * Validates one head index and returns the retained head lane pointer from
        * `this+0x7C` (`index * 0x20`).
        */
-      virtual Head* GetHead2(unsigned int headIndex);
+      virtual Head* GetHead2(unsigned int headIndex) override;
       /**
        * Address: 0x008E9B00 (FUN_008E9B00)
        * Slot: 8
@@ -311,7 +311,7 @@ namespace gal {
           gpg::MemBuffer<char>* outTextureData,
           std::uint32_t* outWidth,
           int* outHeight
-       );
+       ) override;
       /**
        * Address: 0x008E9B40 (FUN_008E9B40)
        * Slot: 24
@@ -324,7 +324,7 @@ namespace gal {
       virtual boost::weak_ptr<void>* Func7(
           boost::weak_ptr<void>* outWeakHandle,
           boost::shared_ptr<void> temporarySharedHandle
-       );
+       ) override;
       /**
        * Address: 0x008E8210 (FUN_008E8210)
        * Slot: 25
@@ -333,7 +333,7 @@ namespace gal {
        * What it does:
        * Forwards the embedded device-context lane to slot-26 reset dispatch.
        */
-      virtual int Func8();
+      virtual int Func8() override;
       /**
        * Address: 0x008F3070 (FUN_008F3070)
        * Slot: 26
@@ -345,7 +345,7 @@ namespace gal {
        * Resets the native D3D9 device using one context payload, then rebuilds
        * capabilities/head resources and recreates pipeline/query state.
        */
-      virtual int Func9(DeviceContext* context);
+      virtual int Func9(DeviceContext* context) override;
       /**
        * Address: 0x008ED360 (FUN_008ED360)
        * Slot: 27
@@ -355,7 +355,7 @@ namespace gal {
        * Probes native cooperative-level state and maps D3D9 result values into backend
        * status tokens (`0`, `1`, `2`).
        */
-      virtual int TestCooperativeLevel();
+      virtual int TestCooperativeLevel() override;
       /**
        * Address: 0x008ED450 (FUN_008ED450)
        * Slot: 28
@@ -365,7 +365,7 @@ namespace gal {
        * Begins one native D3D9 scene and issues one begin marker on the retained frame
        * event query when available.
        */
-      virtual int BeginScene();
+      virtual int BeginScene() override;
       /**
        * Address: 0x008ED550 (FUN_008ED550)
        * Slot: 29
@@ -374,7 +374,7 @@ namespace gal {
        * What it does:
        * Ends one native D3D9 scene and throws on failing HRESULT.
        */
-      virtual void EndScene();
+      virtual void EndScene() override;
       /**
        * Address: 0x008ED640 (FUN_008ED640)
        * Slot: 30
@@ -383,7 +383,7 @@ namespace gal {
        * What it does:
        * Flushes pending frame-event query data then presents the native swap chain.
        */
-      virtual void Present();
+      virtual void Present() override;
       /**
        * Address: 0x008ED750 (FUN_008ED750)
        * Slot: 31
@@ -395,7 +395,7 @@ namespace gal {
        * Resolves one level-0 cursor surface from context texture lanes and binds cursor
        * hotspot/surface properties on the native device.
        */
-      virtual void SetCursor(const CursorContext* context);
+      virtual void SetCursor(const CursorContext* context) override;
       /**
        * Address: 0x008E8220 (FUN_008E8220)
        * Slot: 32
@@ -415,7 +415,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook then forwards to native D3D9 `ShowCursor`.
        */
-      virtual int ShowCursor(bool show);
+      virtual int ShowCursor(bool show) override;
       /**
        * Address: 0x008ED910 (FUN_008ED910)
        * Slot: 34
@@ -426,7 +426,7 @@ namespace gal {
        * What it does:
        * Binds one viewport payload on the native D3D9 device lane.
        */
-      virtual void SetViewport(const void* viewport);
+      virtual void SetViewport(const void* viewport) override;
       /**
        * Address: 0x008EDA00 (FUN_008EDA00)
        * Slot: 35
@@ -437,7 +437,7 @@ namespace gal {
        * What it does:
        * Reads one native D3D9 viewport into caller-provided payload storage.
        */
-      virtual void GetViewport(void* outViewport);
+      virtual void GetViewport(void* outViewport) override;
       /**
        * Address: 0x008EDAF0 (FUN_008EDAF0)
        * Slot: 36
@@ -449,7 +449,7 @@ namespace gal {
        * Applies output target/depth-stencil surface bindings from one output-context
        * payload onto the native D3D9 device.
        */
-      virtual void ClearTarget(const OutputContext* context);
+      virtual void ClearTarget(const OutputContext* context) override;
       // Slot 37 is gpg::gal::Device::GetContext (0x008E6810). Both
       // ??_7Device@gal@gpg@@6B@ and ??_7DeviceD3D9@gal@gpg@@6B@ carry that
       // same address there, so the backend inherits it rather than
@@ -472,7 +472,7 @@ namespace gal {
           std::uint32_t color,
           float depth,
           int stencil
-       );
+       ) override;
       /**
        * Address: 0x008E8EE0 (FUN_008E8EE0)
        * Slot: 39
@@ -481,7 +481,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook then clears bound textures through pipeline-state helper.
        */
-      virtual int ClearTextures();
+      virtual int ClearTextures() override;
       /**
        * Address: 0x008EDF70 (FUN_008EDF70)
        * Slot: 40
@@ -538,7 +538,7 @@ namespace gal {
           float fogStart,
           float fogEnd,
           int fogColor
-       );
+       ) override;
       /**
        * Address: 0x008EE510 (FUN_008EE510)
        * Slot: 44
@@ -549,7 +549,7 @@ namespace gal {
        * What it does:
        * Validates retained pipeline state and forwards one wireframe-mode toggle.
        */
-      virtual int SetWireframeState(bool enabled);
+      virtual int SetWireframeState(bool enabled) override;
       /**
        * Address: 0x008EE5E0 (FUN_008EE5E0)
        * Slot: 45
@@ -561,7 +561,7 @@ namespace gal {
        * Validates retained pipeline state and forwards recovered color-write mask
        * toggles.
        */
-      virtual int SetColorWriteState(bool arg1, bool arg2);
+      virtual int SetColorWriteState(bool arg1, bool arg2) override;
       /**
        * Address: 0x008EE850 (FUN_008EE850)
        * Slot: 46
@@ -573,7 +573,7 @@ namespace gal {
        * Validates indexed draw topology, binds native primitive type, and
        * dispatches one native indexed draw.
        */
-      virtual int DrawIndexedPrimitive(const void* context);
+      virtual int DrawIndexedPrimitive(const void* context) override;
       /**
        * Address: 0x008EE6B0 (FUN_008EE6B0)
        * Slot: 47
@@ -585,7 +585,7 @@ namespace gal {
        * Validates non-indexed draw topology, binds native primitive type, and
        * dispatches one native draw.
        */
-      virtual int DrawPrimitive(const void* context);
+      virtual int DrawPrimitive(const void* context) override;
       /**
        * Address: 0x008EEA00 (FUN_008EEA00)
        * Slot: 48
@@ -595,7 +595,7 @@ namespace gal {
        * Validates retained pipeline state then forwards begin-technique state
        * setup.
        */
-      virtual void BeginTechnique();
+      virtual void BeginTechnique() override;
       /**
        * Address: 0x008EEAC0 (FUN_008EEAC0)
        * Slot: 49
@@ -604,7 +604,7 @@ namespace gal {
        * What it does:
        * Validates retained pipeline state then forwards end-technique cleanup.
        */
-      virtual void EndTechnique();
+      virtual void EndTechnique() override;
 
       /**
        * Address: 0x008E82B0 (FUN_008E82B0)

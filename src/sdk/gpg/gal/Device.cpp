@@ -331,4 +331,22 @@ namespace gpg::gal
     {
         return outEffect;
     }
+
+    void Device::GetTexture2D(
+        const void* const /*sourceData*/,
+        const std::uint32_t /*sourceBytes*/,
+        gpg::MemBuffer<char>* const /*outTextureData*/,
+        std::uint32_t* const /*outWidth*/,
+        int* const /*outHeight*/
+    )
+    {
+    }
+
+    boost::weak_ptr<void>* Device::Func7(
+        boost::weak_ptr<void>* const outWeakHandle,
+        boost::shared_ptr<void> /*temporarySharedHandle*/
+    )
+    {
+        return outWeakHandle;
+    }
 }

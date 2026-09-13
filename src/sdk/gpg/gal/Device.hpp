@@ -3,6 +3,8 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "boost/weak_ptr.h"
+#include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/OutputContext.hpp"
 
 namespace gpg::gal
@@ -277,17 +279,37 @@ namespace gpg::gal
      */
     virtual void purecall22() {}
     /**
-     * Address: 0x00A82547
+     * Address: 0x00A82547 (_purecall in the base's own table)
      * Slot: 23
-     * Demangled: _purecall
+     *
+     * What it does:
+     * Decodes one texture payload from memory and exports the block-compressed
+     * bytes plus its dimensions.
+     *
+     * Declared here for the same reason CreateEffect is (slot 9 above): a slot
+     * the base leaves as an argument-less stub is not a slot a backend can
+     * override, so the backend's method gets appended past the base's table and
+     * the real slot keeps answering with the stub.
      */
-    virtual void purecall23() {}
+    virtual void GetTexture2D(
+      const void* sourceData,
+      std::uint32_t sourceBytes,
+      gpg::MemBuffer<char>* outTextureData,
+      std::uint32_t* outWidth,
+      int* outHeight
+    );
     /**
-     * Address: 0x00A82547
+     * Address: 0x00A82547 (_purecall in the base's own table)
      * Slot: 24
-     * Demangled: _purecall
+     *
+     * What it does:
+     * Clears the caller's weak handle and consumes one temporary shared handle
+     * by value.
      */
-    virtual void purecall24() {}
+    virtual boost::weak_ptr<void>* Func7(
+      boost::weak_ptr<void>* outWeakHandle,
+      boost::shared_ptr<void> temporarySharedHandle
+    );
     /**
      * Slot: 25 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -348,6 +370,15 @@ namespace gpg::gal
      * Address: 0x00A82547
      * Slot: 32
      * Demangled: _purecall
+     *
+     * Still a stub, and still one of the slots DeviceD3D9 fails to override --
+     * but this one cannot simply be declared here, because `Device` already has
+     * a *static* InitCursor (0x0042EAE0) forwarding to the backend, and C++
+     * will not let a static and a virtual share a name and parameter list. One
+     * of the two names is wrong; both come from IDA heuristics rather than
+     * symbols (the D3D9 body at 0x008E8220 is a single `ret`, so it says
+     * nothing), and resolving it means renaming the static and its call sites
+     * in WxRuntimeTypes.cpp.
      */
     virtual void purecall32() {}
     /**
