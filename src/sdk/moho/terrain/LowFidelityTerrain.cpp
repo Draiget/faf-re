@@ -419,7 +419,7 @@ namespace moho
    * Dispatches the shared low-fidelity water alpha-mask render lane for the
    * active terrain camera.
    */
-  void LowFidelityTerrain::DrawWaterLine(const std::int32_t /*arg0*/, const std::int32_t /*arg1*/)
+  void LowFidelityTerrain::DrawWaterLine(const std::int32_t /*gameTick*/, const float /*deltaSeconds*/)
   {
     (void)sTerrainWaterSurface->RenderWaterLayerAlphaMask(mCamera);
   }
@@ -605,18 +605,20 @@ namespace moho
   /**
    * Address: 0x00809D30 (FUN_00809D30, Moho::LowFidelityTerrain::DrawTerrain)
    *
+   * Primary vtable slot 13.
+   *
    * What it does:
-   * Releases one retained shared-control lane passed by the render caller and
-   * leaves terrain draw behavior as an empty hook for this fidelity path.
+   * Nothing: low fidelity draws no separate opaque terrain technique pass.
+   * The whole body is the by-value `shared_ptr` parameter's destructor, which
+   * is why IDA types this as `(int, sp_counted_base*, int)` -- it only ever saw
+   * the handle's two raw words go past. The `retn 0Ch` matches the medium and
+   * high overrides exactly, so the parameter list is theirs.
    */
   void LowFidelityTerrain::DrawTerrain(
-    const std::int32_t /*arg0*/,
-    boost::detail::sp_counted_base* retainedControl,
-    const std::int32_t /*arg1*/
+    boost::shared_ptr<CD3DDynamicTextureSheet> /*overlayTexture*/,
+    const msvc8::string* /*techniqueName*/
   )
-  {
-    ReleaseSharedCount(retainedControl);
-  }
+  {}
 
   /**
    * Address: 0x00809D70 (FUN_00809D70, Moho::LowFidelityTerrain::DrawDirtyTerrain)

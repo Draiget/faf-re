@@ -1597,13 +1597,13 @@ namespace moho
   }
 
   /**
-   * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterline)
+   * Address: 0x008033E0 (FUN_008033E0, Moho::HighFidelityTerrain::DrawWaterLine)
    *
    * What it does:
    * Dispatches high-fidelity water utility-mask rendering and then draws the
    * current shoreline sheet using the active camera.
    */
-  void HighFidelityTerrain::DrawWaterline(const std::int32_t /*arg0*/, const std::int32_t /*arg1*/)
+  void HighFidelityTerrain::DrawWaterLine(const std::int32_t /*gameTick*/, const float /*deltaSeconds*/)
   {
     (void)sHighFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
     DrawShoreline(&mShoreline, mCamera);
@@ -1793,11 +1793,11 @@ namespace moho
   }
 
   /**
-   * Address: 0x00803640 (FUN_00803640, Moho::HighFidelityTerrain::DrawTerrainTechnique)
+   * Address: 0x00803640 (FUN_00803640, Moho::HighFidelityTerrain::DrawTerrain)
    * Primary vtable slot 13 (vftable @0x00E41A14, slot @0x00E41A48 -> 0x00803640).
    *
    * IDA signature:
-   * void __thiscall Moho::HighFidelityTerrain::DrawTerrainTechnique(
+   * void __thiscall Moho::HighFidelityTerrain::DrawTerrain(
    *     Moho::HighFidelityTerrain *this, boost::shared_ptr_CD3DDynamicTextureSheet overlay,
    *     std::string *techniqueName);
    *
@@ -1816,7 +1816,7 @@ namespace moho
    * preserved here; the same shape is in
    * `MediumFidelityTerrain::DrawTerrain` (0x00807660).
    */
-  void HighFidelityTerrain::DrawTerrainTechnique(
+  void HighFidelityTerrain::DrawTerrain(
     boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
     const msvc8::string* const techniqueName
   )

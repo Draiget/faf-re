@@ -242,7 +242,7 @@ namespace moho
      * Releases all owned tesselator/sheet lanes and clears the shared decal
      * mask ownership handle.
      */
-    void Destroy();
+    void Destroy() override;
 
     /**
      * Address: 0x00803CE0 (FUN_00803CE0, Moho::MediumFidelityTerrain::Init)
@@ -251,7 +251,7 @@ namespace moho
      * Rebuilds medium-fidelity terrain tessellation/sheet lanes, fills dynamic
      * quad index buffers, and lazily initializes runtime texture helpers.
      */
-    bool Init();
+    [[nodiscard]] bool Init() override;
 
     /**
      * Address: 0x00804DF0 (FUN_00804DF0, Moho::MediumFidelityTerrain::LoadShaderVars)
@@ -330,10 +330,10 @@ namespace moho
      * texture, loads the base terrain shader vars, and submits the terrain
      * triangle list. Releases the retained overlay-texture handle on return.
      */
-    virtual void DrawTerrain(
+    void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
       const msvc8::string* techniqueName
-    );
+    ) override;
 
     /**
      * Address: 0x00807410 (FUN_00807410, Moho::MediumFidelityTerrain::DrawWaterLine)
@@ -342,7 +342,7 @@ namespace moho
      * Dispatches the shared medium-fidelity water alpha-mask lane for the
      * active terrain camera.
      */
-    void DrawWaterLine(std::int32_t arg0, std::int32_t arg1);
+    void DrawWaterLine(std::int32_t gameTick, float deltaSeconds) override;
 
     /**
      * Address: 0x00805C20 (FUN_00805C20, Moho::MediumFidelityTerrain::DrawNormals)
@@ -457,7 +457,7 @@ namespace moho
      * modeled; the dead leading argument has no observable effect. The
      * low-fidelity override at 0x00809050 has the identical frame.
      */
-    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+    void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params) override;
 
     /**
      * Address: 0x00805F10 (FUN_00805F10, Moho::MediumFidelityTerrain::DrawDirtyTerrain)

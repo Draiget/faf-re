@@ -91,7 +91,7 @@ namespace moho
      * Releases shoreline/tessellator/render-sheet ownership and drops retained
      * decal-mask texture ownership.
      */
-    void Destroy();
+    void Destroy() override;
 
     /**
      * Address: 0x007FFC60 (FUN_007FFC60, Moho::HighFidelityTerrain::Init)
@@ -100,7 +100,7 @@ namespace moho
      * Rebuilds high-fidelity terrain sheets/tessellation, regenerates shoreline
      * cells, and lazily initializes shared terrain texture helpers.
      */
-    bool Init();
+    [[nodiscard]] bool Init() override;
 
     /**
      * Address: 0x00800DC0 (FUN_00800DC0, Moho::HighFidelityTerrain::LoadShaderVars)
@@ -252,7 +252,7 @@ namespace moho
      */
     void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) override;
 
-    void DrawWaterline(std::int32_t arg0, std::int32_t arg1);
+    void DrawWaterLine(std::int32_t gameTick, float deltaSeconds) override;
 
     /**
      * Address: 0x008014F0 (FUN_008014F0, Moho::HighFidelityTerrain::DrawTerrainSkirt)
@@ -304,7 +304,7 @@ namespace moho
      * reads the same three displacements the medium override does: +0x00/+0x18
      * for the technique string, +0x1C for the projection, +0x5C for the view.
      */
-    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+    void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params) override;
 
     /**
      * Address: 0x00803640 (FUN_00803640, Moho::HighFidelityTerrain::DrawTerrainTechnique)
@@ -323,10 +323,10 @@ namespace moho
      * terrain triangle list. The retained overlay handle is released as the
      * by-value `shared_ptr` parameter goes out of scope.
      */
-    virtual void DrawTerrainTechnique(
+    void DrawTerrain(
       boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
       const msvc8::string* techniqueName
-    );
+    ) override;
 
     /**
      * Address: 0x00801EE0 (FUN_00801EE0, Moho::HighFidelityTerrain::DrawDirtyTerrain)
