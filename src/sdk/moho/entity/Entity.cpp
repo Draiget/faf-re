@@ -44,6 +44,7 @@
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/misc/WeakPtr.h"
+#include "moho/entity/REntityBlueprintTypeInfo.h"
 #include "moho/resource/RResId.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/blueprints/RBlueprint.h"
@@ -1032,22 +1033,43 @@ namespace
       return BlueprintKind::Unknown;
     }
 
-    // 0x00677360 asks the reflection system to upcast the blueprint to each
-    // concrete type in turn (`REF_UpcastPtr` against `RUnitBlueprint::sType2`
-    // and friends) and takes the first that succeeds. `dynamic_cast` is the
-    // same question. The name-sniffing below is a fallback for blueprints whose
-    // concrete type is not one of the three - it used to be the *only* test,
-    // which meant a unit whose blueprint named neither "unit" nor its script
-    // class exactly "Unit" fell through to "can't tell the type of blueprint
-    // id '<x>'. No scripts for you", and then every GetWeaponClass on it
-    // returned nil.
-    if (dynamic_cast<const moho::RUnitBlueprint*>(blueprint) != nullptr) {
+    // 0x00677360 asks the *reflection* system, not C++ RTTI: it builds one
+    // `RRef` off the blueprint (`gpg::RRef_REntityBlueprint` at 0x0067741D,
+    // which upgrades the ref to the dynamic derived type) and then upcasts that
+    // same ref against each concrete blueprint descriptor in turn, taking the
+    // first that comes back non-null. `dynamic_cast` answers a similar question
+    // over a different hierarchy; this asks the one the engine actually indexes
+    // its script factories by.
+    //
+    // The name-sniffing below is a fallback for blueprints whose concrete type
+    // is not one of the three - it used to be the *only* test, which meant a
+    // unit whose blueprint named neither "unit" nor its script class exactly
+    // "Unit" fell through to "can't tell the type of blueprint id '<x>'. No
+    // scripts for you", and then every GetWeaponClass on it returned nil.
+    gpg::RRef blueprintRef{};
+    // The RRef builder takes a mutable pointer because an RRef models a mutable
+    // reflected reference; nothing here writes through it.
+    (void)gpg::RRef_REntityBlueprint(&blueprintRef, const_cast<moho::REntityBlueprint*>(blueprint));
+
+    // Unit: 0x006773C7-0x006773EC, against RUnitBlueprint's own descriptor
+    // cache (0x010C6E0C, i.e. `StaticGetClass`) - not the base's.
+    if (gpg::REF_UpcastPtr(blueprintRef, moho::RUnitBlueprint::StaticGetClass()).mObj != nullptr) {
       return BlueprintKind::Unit;
     }
-    if (dynamic_cast<const moho::RProjectileBlueprint*>(blueprint) != nullptr) {
+
+    // Projectile: 0x0067742E-0x00677463, lazy-resolving the descriptor inline
+    // exactly as the binary does rather than through a helper.
+    gpg::RType* projectileType = moho::RProjectileBlueprint::sType;
+    if (!projectileType) {
+      projectileType = gpg::LookupRType(typeid(moho::RProjectileBlueprint));
+      moho::RProjectileBlueprint::sType = projectileType;
+    }
+    if (gpg::REF_UpcastPtr(blueprintRef, projectileType).mObj != nullptr) {
       return BlueprintKind::Projectile;
     }
-    if (dynamic_cast<const moho::RPropBlueprint*>(blueprint) != nullptr) {
+
+    // Prop: the one arm the binary keeps out of line, called at 0x006774AB.
+    if (func_CastRPropBlueprint(blueprintRef) != nullptr) {
       return BlueprintKind::Prop;
     }
 
