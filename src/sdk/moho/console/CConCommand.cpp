@@ -2762,18 +2762,10 @@ void moho::CON_AddSplat(void* const commandArgs)
     return;
   }
 
-  // `GetDecalManager()` returns the `IDecalManager` interface pointer the
-  // binary dispatches `NewSplatAt` through (vtable slot +0x44); `CDecalManager`
-  // is this engine's sole concrete implementation, and `NewSplatAt` is not
-  // yet one of the members `CDecalManager` has moved into its declared
-  // "virtual dispatch table, in binary slot order" section (see that
-  // section's own comment in CWldSplat.h), so this calls it directly on the
-  // concrete type rather than through a not-yet-modelled virtual slot --
-  // behaviorally identical while there is only one implementing class.
+  // Dispatched straight off the interface, as the binary does: `NewSplatAt` is
+  // slot 17 of ??_7IDecalManager@Moho@@6B@, reached at +0x44.
   if (IDecalManager* const decalManager = terrainRes->GetDecalManager(); decalManager != nullptr) {
-    (void)static_cast<CDecalManager*>(decalManager)->NewSplatAt(
-      session->CursorWorldPos, WldTerrainDecalType_Albedo, texturePath
-    );
+    (void)decalManager->NewSplatAt(session->CursorWorldPos, WldTerrainDecalType_Albedo, texturePath);
   }
 }
 

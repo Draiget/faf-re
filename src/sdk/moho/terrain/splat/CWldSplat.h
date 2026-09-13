@@ -146,6 +146,110 @@ namespace moho
      * here)
      */
     virtual ~IDecalManager() = default;
+
+    /**
+     * The 29 pure slots this interface declares, slots 1..29 of
+     * ??_7IDecalManager@Moho@@6B@ (0x00E49774), whose slot 0 is the
+     * destructor above and whose every other entry is `_purecall`.
+     * `CDecalManager` (??_7CDecalManager@Moho@@6B@, 0x00E4982C) is this
+     * binary's only implementation and overrides all 29 in the same order;
+     * its declarations carry the per-method `Address:` blocks.
+     *
+     * They belong here because the engine hands this interface out and
+     * dispatches through it: `IWldTerrainRes::GetDecalManager` returns an
+     * `IDecalManager*`, and the binary reaches `LoadDecal` at +0x1C (slot 7),
+     * `NewSplatAt` at +0x44 (slot 17) and `MoveDecalToFront` at +0x4C
+     * (slot 19) straight off that pointer's vftable. While the interface
+     * declared nothing callable, all three call sites had to downcast to
+     * `CDecalManager` instead -- a workaround that only held because there
+     * is a single implementing class.
+     */
+    /// Slot 1.
+    [[nodiscard]] virtual float GetLodThreshold(std::int32_t lodIndex) const = 0;
+
+    /// Slot 2.
+    virtual void Load(gpg::BinaryReader& reader, unsigned int version) = 0;
+
+    /// Slot 3.
+    virtual void Save(gpg::BinaryWriter& writer) = 0;
+
+    /// Slot 4.
+    [[nodiscard]] virtual std::int32_t GetDecalCount() const = 0;
+
+    /// Slot 5.
+    [[nodiscard]] virtual CWldTerrainDecal* GetDecal(std::int32_t index) const = 0;
+
+    /// Slot 6.
+    [[nodiscard]] virtual CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const = 0;
+
+    /// Slot 7.
+    [[nodiscard]] virtual CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 8.
+    [[nodiscard]] virtual CWldTerrainDecal* NewDecal(std::int32_t decalIndex) = 0;
+
+    /// Slot 9.
+    virtual void DestroyDecal(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 10.
+    [[nodiscard]] virtual std::int32_t GetDecalGroupCount() const = 0;
+
+    /// Slot 11.
+    [[nodiscard]] virtual CDecalGroup* GetDecalGroup(std::int32_t index) const = 0;
+
+    /// Slot 12.
+    [[nodiscard]] virtual CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const = 0;
+
+    /// Slot 13.
+    virtual CDecalGroup* LoadDecalGroup(CDecalGroup* group) = 0;
+
+    /// Slot 14.
+    virtual std::int32_t DestroyDecalGroup(CDecalGroup* group) = 0;
+
+    /// Slot 15.
+    [[nodiscard]] virtual std::int32_t GetSplatCount() const = 0;
+
+    /// Slot 16.
+    [[nodiscard]] virtual CWldSplat* GetSplat(std::int32_t index) const = 0;
+
+    /// Slot 17.
+    virtual bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name) = 0;
+
+    /// Slot 18.
+    virtual void AddSplat(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 19.
+    virtual void MoveDecalToFront(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 20.
+    virtual void MoveDecalTowardBack(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 21.
+    virtual void MoveDecalTowardFront(CWldTerrainDecal* decal) = 0;
+
+    /// Slot 22.
+    virtual void AddDecals(const msvc8::vector<SDecalInfo>& decals) = 0;
+
+    /// Slot 23.
+    virtual void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles) = 0;
+
+    /// Slot 24.
+    virtual void ProcessRemovals(std::int32_t tick) = 0;
+
+    /// Slot 25.
+    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod) = 0;
+
+    /// Slot 26.
+    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod) = 0;
+
+    /// Slot 27.
+    virtual void MarkPendingChanges() = 0;
+
+    /// Slot 28.
+    [[nodiscard]] virtual bool HasPendingChanges() const = 0;
+
+    /// Slot 29.
+    virtual void ClearPendingChanges() = 0;
   };
 
   static_assert(sizeof(IDecalManager) == 0x04, "IDecalManager size must be 0x04");
@@ -188,7 +292,7 @@ namespace moho
      * Returns one entry of the decal-area decile histogram, clamping the index
      * into the 0..9 range the table holds.
      */
-    [[nodiscard]] virtual float GetLodThreshold(std::int32_t lodIndex) const;
+    [[nodiscard]] float GetLodThreshold(std::int32_t lodIndex) const override;
 
     /**
      * Address: 0x00877CD0 (FUN_00877CD0, Moho::CDecalManager::Load)
@@ -203,7 +307,7 @@ namespace moho
      * CDecalGroup + ReadFromStream + LoadDecalGroup), reindexes the decal
      * vector, and rebuilds the LOD decile histogram.
      */
-    virtual void Load(gpg::BinaryReader& reader, unsigned int version);
+    void Load(gpg::BinaryReader& reader, unsigned int version) override;
 
     /**
      * Address: 0x00877E40 (FUN_00877E40, Moho::CDecalManager::Save)
@@ -213,7 +317,7 @@ namespace moho
      * Writes manager decal counts, serializes active decals, then serializes
      * all decal groups to the binary writer.
      */
-    virtual void Save(gpg::BinaryWriter& writer);
+    void Save(gpg::BinaryWriter& writer) override;
 
     /**
      * Address: 0x00877F90 (FUN_00877F90, Moho::CDecalManager::GetDecalCount)
@@ -224,7 +328,7 @@ namespace moho
      * word pair at +0x10/+0x14, with a null-first guard returning 0 -- the
      * shape a VC8 `size()` on an unallocated vector compiles to.
      */
-    [[nodiscard]] virtual std::int32_t GetDecalCount() const;
+    [[nodiscard]] std::int32_t GetDecalCount() const override;
 
     /**
      * Address: 0x00877FE0 (FUN_00877FE0, Moho::CDecalManager::GetDecal)
@@ -233,7 +337,7 @@ namespace moho
      * What it does:
      * `mDecals[index]`, unchecked: `mov eax,[ecx+10h]; mov eax,[eax+ecx*4]`.
      */
-    [[nodiscard]] virtual CWldTerrainDecal* GetDecal(std::int32_t index) const;
+    [[nodiscard]] CWldTerrainDecal* GetDecal(std::int32_t index) const override;
 
     /**
      * Address: 0x00877FF0 (FUN_00877FF0, Moho::CDecalManager::Func5)
@@ -250,7 +354,7 @@ namespace moho
      * this map is a `decalIndex -> CWldTerrainDecal*` lookup, not a group
      * membership table.)
      */
-    [[nodiscard]] virtual CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const;
+    [[nodiscard]] CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const override;
 
     /**
      * Address: 0x008780A0 (FUN_008780A0, Moho::CDecalManager::LoadDecal)
@@ -259,7 +363,7 @@ namespace moho
      * Loads one existing decal (or allocates a new one), appends it to active
      * manager storage, and updates the decal-index lookup lane.
      */
-    [[nodiscard]] virtual CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal);
+    [[nodiscard]] CWldTerrainDecal* LoadDecal(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x00878020 (FUN_00878020, Moho::CDecalManager::NewDecal)
@@ -268,7 +372,7 @@ namespace moho
      * Allocates one terrain decal for the requested runtime index, marks the
      * manager dirty, and forwards to `LoadDecal`.
      */
-    [[nodiscard]] virtual CWldTerrainDecal* NewDecal(std::int32_t decalIndex);
+    [[nodiscard]] CWldTerrainDecal* NewDecal(std::int32_t decalIndex) override;
 
     /**
      * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
@@ -277,7 +381,7 @@ namespace moho
      * Removes one decal from group memberships and manager storage, destroys
      * the decal object, and compacts vector-index lanes.
      */
-    virtual void DestroyDecal(CWldTerrainDecal* decal);
+    void DestroyDecal(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x00878270 (FUN_00878270, Moho::CDecalManager::DecalGroupCount)
@@ -287,7 +391,7 @@ namespace moho
      * `mDecalGroups.size()`, the same open-coded shape as `GetDecalCount` over
      * the word pair at +0x2C/+0x30.
      */
-    [[nodiscard]] virtual std::int32_t GetDecalGroupCount() const;
+    [[nodiscard]] std::int32_t GetDecalGroupCount() const override;
 
     /**
      * Address: 0x00878290 (FUN_00878290, Moho::CDecalManager::GetDecalGroup)
@@ -296,7 +400,7 @@ namespace moho
      * What it does:
      * `mDecalGroups[index]`, unchecked.
      */
-    [[nodiscard]] virtual CDecalGroup* GetDecalGroup(std::int32_t index) const;
+    [[nodiscard]] CDecalGroup* GetDecalGroup(std::int32_t index) const override;
 
     /**
      * Address: 0x008782A0 (FUN_008782A0, Moho::CDecalManager::Func10)
@@ -311,7 +415,7 @@ namespace moho
      * real mapped value, confirmed from `LoadDecalGroup`'s write side at
      * 0x008782D0, is the group pointer itself.)
      */
-    [[nodiscard]] virtual CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const;
+    [[nodiscard]] CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const override;
 
     /**
      * Address: 0x008782D0 (FUN_008782D0, Moho::CDecalManager::LoadDecalGroup)
@@ -321,7 +425,7 @@ namespace moho
      * CDecalGroup(mNumDecals++) and names it "Group_<index>"; appends the group
      * to mDecalGroups and maps its index into the splat-index lookup lane.
      */
-    virtual CDecalGroup* LoadDecalGroup(CDecalGroup* group);
+    CDecalGroup* LoadDecalGroup(CDecalGroup* group) override;
 
     /**
      * Address: 0x00878460 (FUN_00878460, Moho::CDecalManager::DestroyDecalGroup)
@@ -330,7 +434,7 @@ namespace moho
      * Removes one decal-group mapping, erases the group from manager storage,
      * then deletes the group object.
      */
-    virtual std::int32_t DestroyDecalGroup(CDecalGroup* group);
+    std::int32_t DestroyDecalGroup(CDecalGroup* group) override;
 
     /**
      * Address: 0x00877FB0 (FUN_00877FB0, Moho::CDecalManager::SplatCount)
@@ -339,7 +443,7 @@ namespace moho
      * What it does:
      * `mSplats.size()`, over the word pair at +0x48/+0x4C.
      */
-    [[nodiscard]] virtual std::int32_t GetSplatCount() const;
+    [[nodiscard]] std::int32_t GetSplatCount() const override;
 
     /**
      * Address: 0x00877FD0 (FUN_00877FD0, Moho::CDecalManager::GetSplat)
@@ -348,7 +452,7 @@ namespace moho
      * What it does:
      * `mSplats[index]`, unchecked.
      */
-    [[nodiscard]] virtual CWldSplat* GetSplat(std::int32_t index) const;
+    [[nodiscard]] CWldSplat* GetSplat(std::int32_t index) const override;
 
     /**
      * Address: 0x008784C0 (FUN_008784C0, Moho::CDecalManager::NewSplatAt)
@@ -357,7 +461,7 @@ namespace moho
      * Creates one splat, applies type/name/transform defaults, refreshes the
      * splat runtime state, and reports success.
      */
-    virtual bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name);
+    bool NewSplatAt(const Wm3::Vec3f& position, EWldTerrainDecalType type, const msvc8::string& name) override;
 
     /**
      * Address: 0x00878530 (FUN_00878530, Moho::CDecalManager::AddSplat)
@@ -366,7 +470,7 @@ namespace moho
      * Moves one existing decal pointer to the end of the active decal vector
      * and reindexes after the move.
      */
-    virtual void AddSplat(CWldTerrainDecal* decal);
+    void AddSplat(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x00878590 (FUN_00878590, Moho::CDecalManager::Func17)
@@ -375,7 +479,7 @@ namespace moho
      * Finds one decal in `mDecals`, moves it to the front while preserving
      * relative order of earlier entries, then reindexes the decal lane.
      */
-    virtual void MoveDecalToFront(CWldTerrainDecal* decal);
+    void MoveDecalToFront(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x008785D0 (FUN_008785D0, Moho::CDecalManager::Func18)
@@ -384,7 +488,7 @@ namespace moho
      * Finds one decal in `mDecals`, swaps it with the next entry when it is
      * not the last element, then reindexes when the decal exists.
      */
-    virtual void MoveDecalTowardBack(CWldTerrainDecal* decal);
+    void MoveDecalTowardBack(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x00878610 (FUN_00878610, Moho::CDecalManager::Func19)
@@ -393,7 +497,7 @@ namespace moho
      * Finds one decal in `mDecals`, swaps it with the previous entry when it
      * is not the first element, then reindexes when a swap is applied.
      */
-    virtual void MoveDecalTowardFront(CWldTerrainDecal* decal);
+    void MoveDecalTowardFront(CWldTerrainDecal* decal) override;
 
     /**
      * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
@@ -410,7 +514,7 @@ namespace moho
      * the handle / fade deadline / army / fidelity lanes across, and settle the
      * cutoff LOD.
      */
-    virtual void AddDecals(const msvc8::vector<SDecalInfo>& decals);
+    void AddDecals(const msvc8::vector<SDecalInfo>& decals) override;
 
     /**
      * Address: 0x00878A40 (FUN_00878A40, Moho::CDecalManager::RemoveDecals)
@@ -420,7 +524,7 @@ namespace moho
      * Scans all active decals for each requested runtime handle and marks
      * matching decals for deferred removal.
      */
-    virtual void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles);
+    void RemoveDecals(const msvc8::vector<std::uint32_t>& decalHandles) override;
 
     /**
      * Address: 0x00878A90 (FUN_00878A90, Moho::CDecalManager::ProcessRemovals)
@@ -429,7 +533,7 @@ namespace moho
      * Fades scheduled decals/splats toward zero alpha and erases fully faded
      * entries from manager storage.
      */
-    virtual void ProcessRemovals(std::int32_t tick);
+    void ProcessRemovals(std::int32_t tick) override;
 
     /**
      * Address: 0x00878BE0 (FUN_00878BE0, Moho::CDecalManager::EntitiesInView)
@@ -438,7 +542,7 @@ namespace moho
      * Collects one camera-visible entity lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod);
+    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878C40 (FUN_00878C40, Moho::CDecalManager::PropsInView)
@@ -447,7 +551,7 @@ namespace moho
      * Collects one camera-visible prop lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
+    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)
@@ -457,7 +561,7 @@ namespace moho
      * The setter half of the pair below: `mov byte ptr [ecx+110h], 1`, raising
      * the same `mDidSomething` flag that slot 28 reads and slot 29 clears.
      */
-    virtual void MarkPendingChanges();
+    void MarkPendingChanges() override;
 
     /**
      * Address: 0x00878CB0 (FUN_00878CB0, Moho::CDecalManager::Func26)
@@ -469,7 +573,7 @@ namespace moho
      * `ProcessRemovals` setting `mDidSomething`). Read-only - does not clear
      * the flag itself.
      */
-    [[nodiscard]] virtual bool HasPendingChanges() const;
+    [[nodiscard]] bool HasPendingChanges() const override;
 
     /**
      * Address: 0x00878CC0 (FUN_00878CC0, Moho::CDecalManager::Func27)
@@ -480,7 +584,7 @@ namespace moho
      * once per frame after every world view has consumed the decal set
      * (WRenViewport::Render, 0x007F9779..0x007F979C).
      */
-    virtual void ClearPendingChanges();
+    void ClearPendingChanges() override;
     /**
      * Address: 0x00877A60 (FUN_00877A60, Moho::CDecalManager::CDecalManager)
      *
