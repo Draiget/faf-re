@@ -95,7 +95,7 @@ namespace moho
      * Rebuilds low-fidelity terrain tessellation and render-sheet ownership
      * lanes for the active terrain resource.
      */
-    bool Init();
+    [[nodiscard]] bool Init() override;
 
     /**
      * Address: 0x00809B30 (FUN_00809B30, Moho::LowFidelityTerrain::DrawWaterLine)
@@ -104,7 +104,7 @@ namespace moho
      * Dispatches the shared low-fidelity water alpha-mask lane for the active
      * terrain camera.
      */
-    void DrawWaterLine(std::int32_t arg0, std::int32_t arg1);
+    void DrawWaterLine(std::int32_t gameTick, float deltaSeconds) override;
 
     /**
      * Address: 0x00809C80 (FUN_00809C80, Moho::LowFidelityTerrain::DrawTerrainSkirt)
@@ -158,7 +158,7 @@ namespace moho
      * scratch for the height scale at 0x008090DF) followed by the params block.
      * Only the params block is modeled.
      */
-    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params);
+    void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params) override;
 
     /**
      * Address: 0x00809B20 (FUN_00809B20, Moho::LowFidelityTerrain::DrawTerrainNormal)
@@ -176,11 +176,10 @@ namespace moho
      * Releases one retained shared-control lane passed by the render caller and
      * leaves terrain draw behavior as an empty hook for this fidelity path.
      */
-    virtual void DrawTerrain(
-      std::int32_t arg0,
-      boost::detail::sp_counted_base* retainedControl,
-      std::int32_t arg1
-    );
+    void DrawTerrain(
+      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+      const msvc8::string* techniqueName
+    ) override;
 
     /**
      * Address: 0x00809D70 (FUN_00809D70, Moho::LowFidelityTerrain::DrawDirtyTerrain)
@@ -203,7 +202,7 @@ namespace moho
      * Releases owned tessellator/render-sheet lanes and drops retained decal
      * mask texture ownership.
      */
-    void Destroy();
+    void Destroy() override;
 
     /**
      * Address: 0x00809120 (FUN_00809120, Moho::LowFidelityTerrain::DrawNormals)

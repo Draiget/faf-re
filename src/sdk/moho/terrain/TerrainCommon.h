@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "legacy/containers/String.h"
 
 namespace moho
 {
@@ -13,6 +14,11 @@ namespace moho
   class ID3DRenderTarget;
   struct TerrainShadowContext;
   class CD3DPrimBatcher;
+  class CD3DDynamicTextureSheet;
+  // Slot 7's argument block. Its single owning definition lives in
+  // MediumFidelityTerrain.h, which includes this header, so it can only be
+  // named here by forward declaration - it is passed by const reference.
+  struct STerrainTechniqueDrawParams;
 
   /**
    * VFTABLE: 0x00E419D4
@@ -49,13 +55,16 @@ namespace moho
    *   |  13  | DrawTerrain                | 0x809D30  | 0x807660  | 0x803640  |
    *   |  14  | DrawDirtyTerrain           | 0x809D70  | 0x805F10  | 0x801EE0  |
    *
-   * Only the slots whose body exists in every fidelity class are declared
-   * here - a slot declared on the base but unimplemented in one derived class
-   * would force a stub, which this project forbids. The remaining slots stay
-   * on the derived classes until their bodies are recovered, at which point
-   * they move up in the order above. Slot 14 (DrawDirtyTerrain) is now
-   * recovered on all three (HighFidelityTerrain.cpp, MediumFidelityTerrain.cpp,
-   * LowFidelityTerrain.cpp) and is declared here.
+   * All fifteen are declared here, in that order. They have to be: the binary
+   * dispatches terrain by slot index, so a slot missing from the base does not
+   * merely go undeclared - it shifts every slot below it. Slots 3, 4, 7, 10 and
+   * 13 were previously left on the derived classes (`Init`, `Destroy`,
+   * `DrawWaterLine` as non-virtuals, `CondDrawTerrainTechnique` and
+   * `DrawTerrain` as *new* virtuals), which appended two fresh slots per
+   * derived class after slot 9 and moved `DrawWaterTerrain`, `DrawTerrainSkirt`
+   * and `DrawDirtyTerrain` off the indices the binary's call sites use. Every
+   * one of those bodies is now recovered in all three fidelity classes, so they
+   * are declared in the base and overridden below.
    */
   /**
    * The three terrain fidelity levels, as `graphics_Fidelity` encodes them.
@@ -115,6 +124,27 @@ namespace moho
     [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
 
     /**
+     * Primary vtable slot 3. Bodies: 0x00808240 (Low), 0x00803CE0 (Medium),
+     * 0x007FFC60 (High).
+     *
+     * What it does:
+     * Builds the fidelity-specific device resources the terrain needs -
+     * vertex/index sheets, effect handles and, on high fidelity, the
+     * shoreline - and reports whether the renderer came up.
+     */
+    [[nodiscard]] virtual bool Init() = 0;
+
+    /**
+     * Primary vtable slot 4. Bodies: 0x00808590 (Low), 0x00804350 (Medium),
+     * 0x008002E0 (High).
+     *
+     * What it does:
+     * Releases everything `Init` built, in the reverse order. High fidelity
+     * tears its shoreline down first (`Shoreline::Destroy` at 0x008002EB).
+     */
+    virtual void Destroy() = 0;
+
+    /**
      * Primary vtable slot 5 (unnamed in the binary; `Func3` in per-class
      * recovery notes).
      *
@@ -154,6 +184,18 @@ namespace moho
     virtual void DrawTerrainDepth(const GeomCamera3& camera) = 0;
 
     /**
+     * Primary vtable slot 7. Bodies: 0x00809050 (Low), 0x00805B50 (Medium),
+     * 0x00801B10 (High) - all three are the same body to the instruction.
+     *
+     * What it does:
+     * Draws the terrain with a technique chosen by the caller rather than a
+     * literal, which is what makes it the `Cond` variant of the slot-13 pass:
+     * it binds the params block's view and projection matrices plus the
+     * tesselator height scale, then issues the terrain triangle list.
+     */
+    virtual void CondDrawTerrainTechnique(const STerrainTechniqueDrawParams& params) = 0;
+
+    /**
      * Primary vtable slot 8.
      *
      * What it does:
@@ -189,17 +231,16 @@ namespace moho
     virtual void DrawTerrainNormal(std::int32_t gameTick, float deltaSeconds) = 0;
 
     /**
-     * Primary vtable slot 12.
+     * Primary vtable slot 10. Bodies: 0x00809B30 (Low), 0x00807410 (Medium),
+     * 0x008033E0 (High).
      *
      * What it does:
-     * Emits the terrain skirt geometry - the vertical band that closes the
-     * gap between the terrain grid edge and the world bounds - for whichever
-     * fidelity path is active.
-     *
-     * Dispatched from `WRenViewport::RenderCompositeTerrain` (0x007F81C0),
-     * which tail-jumps through this slot: `mov edx, [eax+30h]` / `jmp edx`
-     * at 0x007F8285.
+     * Issues the water alpha-mask lane - the shoreline waterline band - for
+     * the active terrain camera, through whichever `waterFidelity` path is
+     * selected (0x008033E3 loads the global and dispatches its slot 3).
      */
+    virtual void DrawWaterLine(std::int32_t gameTick, float deltaSeconds) = 0;
+
     /**
      * Primary vtable slot 11.
      *
@@ -217,7 +258,42 @@ namespace moho
       boost::shared_ptr<ID3DRenderTarget> refractionTexture,
       boost::shared_ptr<ID3DRenderTarget> reflectionTexture) = 0;
 
+    /**
+     * Primary vtable slot 12.
+     *
+     * What it does:
+     * Emits the terrain skirt geometry - the vertical band that closes the
+     * gap between the terrain grid edge and the world bounds - for whichever
+     * fidelity path is active.
+     *
+     * Dispatched from `WRenViewport::RenderCompositeTerrain` (0x007F81C0),
+     * which tail-jumps through this slot: `mov edx, [eax+30h]` / `jmp edx`
+     * at 0x007F8285.
+     */
     virtual void DrawTerrainSkirt() = 0;
+
+    /**
+     * Primary vtable slot 13. Bodies: 0x00809D30 (Low), 0x00807660 (Medium),
+     * 0x00803640 (High) - all three `retn 0Ch`, i.e. 12 bytes of arguments:
+     * the by-value `shared_ptr` (8) plus the technique-name pointer (4).
+     *
+     * What it does:
+     * Runs one full opaque terrain pass: rebinds every terrain-lighting shader
+     * var with no shadow source, re-selects the `terrain` effect, selects the
+     * caller-provided technique, binds the overlay texture sheet, loads the
+     * base terrain shader vars with no terrain-normal target, and submits the
+     * terrain triangle list. The retained overlay handle is released as the
+     * by-value `shared_ptr` parameter goes out of scope.
+     *
+     * Low fidelity draws no terrain here, so its body consists of nothing but
+     * that parameter's destructor -- which is why IDA types 0x00809D30 as
+     * `(int, sp_counted_base*, int)`: it only ever saw the `shared_ptr`'s two
+     * raw words go by. The same 12 argument bytes are the same two parameters
+     * in all three classes.
+     */
+    virtual void DrawTerrain(
+      boost::shared_ptr<CD3DDynamicTextureSheet> overlayTexture,
+      const msvc8::string* techniqueName) = 0;
 
     /**
      * Primary vtable slot 14.

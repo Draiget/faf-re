@@ -71492,30 +71492,6 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
 
 namespace
 {
-  void DispatchTerrainWaterMaskPass(
-    moho::TerrainCommon* const terrain,
-    const std::int32_t gameTick,
-    const float simDeltaSeconds
-  )
-  {
-    if (terrain == nullptr) {
-      return;
-    }
-
-    if (auto* const highTerrain = dynamic_cast<moho::HighFidelityTerrain*>(terrain); highTerrain != nullptr) {
-      highTerrain->DrawWaterline(gameTick, static_cast<std::int32_t>(simDeltaSeconds));
-      return;
-    }
-
-    if (auto* const mediumTerrain = dynamic_cast<moho::MediumFidelityTerrain*>(terrain); mediumTerrain != nullptr) {
-      mediumTerrain->DrawWaterLine(gameTick, static_cast<std::int32_t>(simDeltaSeconds));
-      return;
-    }
-
-    if (auto* const lowTerrain = dynamic_cast<moho::LowFidelityTerrain*>(terrain); lowTerrain != nullptr) {
-      lowTerrain->DrawWaterLine(gameTick, static_cast<std::int32_t>(simDeltaSeconds));
-    }
-  }
 } // namespace
 
 /**
@@ -71538,11 +71514,13 @@ void moho::WRenViewport::RenderWaterMask(TerrainCommon* const terrain)
   device->SetRenderTarget2(runtime->mHead, false, 0, 1.0f, 0);
   device->SetViewport(&runtime->mScreenPos, &runtime->mScreenSize, 0.0f, 1.0f);
 
-  DispatchTerrainWaterMaskPass(
-    terrain,
-    moho::REN_GetGameTick(),
-    moho::REN_GetSimDeltaSeconds()
-  );
+  // Slot 10, dispatched straight off the terrain vptr: `mov eax, [ebx]` /
+  // `mov edx, [eax+28h]` / `call edx` at 0x007F83C1-0x007F83D3, with
+  // `sCurGameTick` pushed last and `sDeltaFrame` stored as a float in the
+  // slot above it. There is no fidelity test here in the binary -- this used
+  // to be a three-way `dynamic_cast` chain only because `DrawWaterLine` was
+  // not declared on the base, so it had no slot to dispatch through.
+  terrain->DrawWaterLine(moho::REN_GetGameTick(), moho::REN_GetSimDeltaSeconds());
 
   device->SetColorWriteState(true, true);
 }

@@ -835,7 +835,7 @@ namespace moho
    * Dispatches the shared medium-fidelity water alpha-mask render lane for the
    * active terrain camera.
    */
-  void MediumFidelityTerrain::DrawWaterLine(const std::int32_t /*arg0*/, const std::int32_t /*arg1*/)
+  void MediumFidelityTerrain::DrawWaterLine(const std::int32_t /*gameTick*/, const float /*deltaSeconds*/)
   {
     (void)sMediumFidelityWaterSurface->RenderWaterLayerAlphaMask(mCamera);
   }
