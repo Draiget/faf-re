@@ -1668,11 +1668,18 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
  * to forget this camera from the global manager and rejoin the broadcaster
  * ring to its self-linked idle state.
  *
- * Reached from the scalar-deleting wrapper at vtable slot 0 (FUN_007A7DC0,
- * `operator_delete`), which is referenced by the `CameraImpl` vtable at
- * 0x00E3C474 and its `CScriptEvent` / `CScriptObject` sub-object vtable
- * thunks. The wrapper is invoked at runtime via `delete camera` from
- * `RCamManager::~RCamManager` (0x007AA930).
+ * Reached from the scalar-deleting wrapper at vtable slot 0 (FUN_007A7DC0),
+ * which is referenced by the `CameraImpl` vtable at 0x00E3C474 and its
+ * `CScriptEvent` / `CScriptObject` sub-object vtable thunks. The wrapper is
+ * invoked at runtime via `delete camera` from `RCamManager::~RCamManager`
+ * (0x007AA930).
+ *
+ * That wrapper is MSVC's own emission for a class with a virtual destructor
+ * (`??_ECameraImpl@moho@@UAEPAXI@Z`), not a function anyone wrote: the
+ * compiler produces it from `virtual ~RCamCamera()` and puts it in slot 0.
+ * It used to be hand-written here as a virtual named `operator_delete`,
+ * which gave the class a forty-fifth slot that nothing ever called and that
+ * displaced every method below it.
  *
  * The `mTimeSources` cleanup loop below is the typed recovery of
  * `FUN_007AE630` (`ReleaseOwnedRuntimePointerSlotWithDeleteFlag`,
@@ -1728,23 +1735,6 @@ moho::CameraImpl::~CameraImpl()
   // from the global manager and rejoining the broadcaster sentinel -- see
   // `RCamCamera::~RCamCamera`) are both real bases now and tear down
   // automatically, in reverse construction order, once this body returns.
-}
-
-/**
- * Address: 0x007A7DC0 (FUN_007A7DC0, CameraImpl deleting wrapper)
- *
- * What it does:
- * Scalar-deleting destructor wrapper sitting in vtable slot 0 (and the
- * matching `CScriptEvent` / `CScriptObject` sub-object vtable slots).
- * Runs `~CameraImpl` and, when `deleteFlags & 1` is set, releases this
- * object's storage through the global `operator delete`.
- */
-void moho::CameraImpl::operator_delete(const std::int32_t deleteFlags)
-{
-  this->~CameraImpl();
-  if ((deleteFlags & 1) != 0) {
-    ::operator delete(this);
-  }
 }
 
 /**
