@@ -4041,11 +4041,10 @@ namespace moho
       } else if (unit->IsUnitState(UNITSTATE_MovingUp)) {
         SetMotionVertEvent(UMVE_Up);
       } else if (mVertEvent != UMVE_Hover) {
-        SetMotionVertEvent(UMVE_Down); // "UMVE_Bottom" per IDA - no such enumerator exists; the raw
-                                        // asm's mov eax,1 in this branch matches UMVE_Up's value (1),
-                                        // not a distinct 6th vert-event - see project note on this
-                                        // ambiguity; using UMVE_Down here would be wrong too, so this
-                                        // is left as the best-evidenced literal-1 match (UMVE_Up).
+        // 0x006BFFB9 is `xor eax, eax`, not a literal 1: the event is UMVE_None.
+        // Level flight has no vertical event, and the UMVE_Hover guard just above
+        // is what keeps a deliberate hover from being cleared by it.
+        SetMotionVertEvent(UMVE_None);
       }
 
       if (horizontalDistance > air.StartTurnDistance || mAlwaysUseTopSpeed) {
