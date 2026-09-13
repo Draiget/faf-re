@@ -38,8 +38,18 @@ namespace moho
      *
      * What it does:
      * Unregisters this command name from the global sim-command registry.
+     *
+     * Not virtual, despite the `UAE` in the mangled name above, which is
+     * unsourced: this class has no mangled symbols in the image. The vtables
+     * are direct evidence and they are consistent across the whole family --
+     * ??_7CSimConCommand@Moho@@6B@ (0x00E32B1C) is two slots with slot 0
+     * `_purecall`, while both derived tables put their own Func1 there
+     * (CSimConFunc 0x00E1D960, CSimConVarBase 0x00E198DC). Slot 0 is that pure
+     * virtual, not a destructor, so a virtual destructor here displaced it and
+     * everything after it in all three classes. Nothing deletes through a
+     * `CSimConCommand*`.
      */
-    virtual ~CSimConCommand();
+    ~CSimConCommand();
 
     /**
      * Address: 0x00A82547 (FUN_00A82547, _purecall in base CSimConCommand vtable)

@@ -29,15 +29,28 @@ namespace moho
     IPathTraveler();
 
     /**
-     * Address: 0x007657A0 (FUN_007657A0, `PathPreviewFinder`'s scalar-deleting
-     * dtor emission -- see IPathTraveler.cpp for the shared unlink body)
-     *
      * What it does:
      * Unlinks `mPathQueueNode` from the path-queue ring before base teardown,
      * so a traveler destroyed while still queued does not leave a dangling
      * node behind.
+     *
+     * Deliberately NOT virtual. ??_7IPathTraveler@Moho@@6B@ (0x00E1C304) is
+     * twelve slots and every one of them is `_purecall`, so the interface has
+     * no destructor slot; CAiPathFinder's own table (0x00E1C338) correspondingly
+     * starts at GetFootprint, and PathPreviewFinder's (0x00E35D5C) is twelve
+     * slots too. Declaring this virtual put a thirteenth slot at index 0 and
+     * pushed every pure slot down one.
+     *
+     * 0x007657A0, which this block used to cite as a "scalar-deleting dtor
+     * emission", is nothing of the kind: it stores 0x00E35D5C -- PathPreviewFinder's
+     * own vftable -- before unlinking the node, which is what MSVC emits at the
+     * head of any destructor of a polymorphic class. It is ~PathPreviewFinder,
+     * non-virtual, and a class with no virtual destructor emits no ??_E at all.
+     *
+     * Nothing in the tree deletes through an `IPathTraveler*`; every use is a
+     * reflection/serialization handle or a queue walk.
      */
-    virtual ~IPathTraveler();
+    ~IPathTraveler();
 
     /**
      * Address: 0x00A82547 (_purecall in FA binary)

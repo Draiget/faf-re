@@ -164,7 +164,15 @@ namespace moho
      * Returns the per-symbol doc/source string.
      */
     [[nodiscard]] const char* GetDocString() const;
-    virtual ~CScrLuaInitForm() = default;
+    // Not virtual: ??_7CScrLuaInitForm@Moho@@6B@ (0x00E0A6BC) is a single
+    // `_purecall` slot, which is Run below, and the three concrete binders all
+    // have one-slot tables of their own holding only their Run
+    // (CScrLuaBinder 0x00E00E8C, CScrLuaClassBinder 0x00E072A8,
+    // CScrLuaBaseClassSpec 0x00E1D7B8). A virtual destructor here took slot 0
+    // and pushed Run into slot 1 in every one of them. Nothing deletes through
+    // a CScrLuaInitForm*; the forms are static objects that link themselves
+    // into their set.
+    ~CScrLuaInitForm() = default;
 
     virtual void Run(LuaPlus::LuaState* state) = 0;
 

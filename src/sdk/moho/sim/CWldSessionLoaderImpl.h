@@ -36,8 +36,16 @@ namespace moho
      * What it does:
      * Restores the base `IWldSessionLoader` vtable lane during base
      * destruction.
+     *
+     * Not virtual: ??_7IWldSessionLoader@Moho@@6B@ (0x00E49FA4) is seven slots
+     * and all seven are `_purecall`, so the interface has no destructor slot;
+     * CWldSessionLoaderImpl's table (0x00E49FC4) is seven too and starts at
+     * SetCreated. Declaring this virtual added an eighth slot at index 0 and
+     * displaced SetCreated, GetScenarioInfo, CreateScenarioInfo, IsLoaded and
+     * LoadGameData by one each. Nothing deletes through an
+     * `IWldSessionLoader*`.
      */
-    virtual ~IWldSessionLoader();
+    ~IWldSessionLoader();
 
     /**
      * Address: 0x00885890 (FUN_00885890, ?SetCreated@CWldSessionLoaderImpl@Moho@@UAEXXZ)
@@ -95,7 +103,7 @@ namespace moho
     /**
      * Address: 0x00885660 (FUN_00885660, ??1CWldSessionLoaderImpl@Moho@@QAE@@Z_0)
      */
-    ~CWldSessionLoaderImpl() override;
+    ~CWldSessionLoaderImpl();
 
     /**
      * Address: 0x00885890 (FUN_00885890)
