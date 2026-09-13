@@ -289,6 +289,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x00803BF0 (FUN_00803BF0, Moho::MediumFidelityTerrain::Func1)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::MediumFidelityTerrain::Func1(MediumFidelityTerrain *this, int fidelity);
+   *
+   * What it does:
+   * Reports medium fidelity. `IRenTerrain::Create` (0x00809DA0) constructs
+   * this class when `graphics_Fidelity` is 1, and the binary compares against
+   * that same constant here.
+   */
+  bool MediumFidelityTerrain::IsFidelity(const std::int32_t fidelity) const
+  {
+    return fidelity == kMediumTerrainFidelity;
+  }
+
+  /**
    * Address: 0x00803C00 (FUN_00803C00, Moho::MediumFidelityTerrain::Create)
    *
    * What it does:

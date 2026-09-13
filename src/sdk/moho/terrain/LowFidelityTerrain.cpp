@@ -301,6 +301,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x00808190 (FUN_00808190, Moho::LowFidelityTerrain::Func1)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::LowFidelityTerrain::Func1(LowFidelityTerrain *this, int fidelity);
+   *
+   * What it does:
+   * Reports low fidelity. `IRenTerrain::Create` (0x00809DA0) constructs this
+   * class when `graphics_Fidelity` is 0, and the binary compares against that
+   * same constant here (as `cmp [esp+4], eax` with eax already zeroed).
+   */
+  bool LowFidelityTerrain::IsFidelity(const std::int32_t fidelity) const
+  {
+    return fidelity == kLowTerrainFidelity;
+  }
+
+  /**
    * Address: 0x008081A0 (FUN_008081A0, Moho::LowFidelityTerrain::Create)
    *
    * What it does:

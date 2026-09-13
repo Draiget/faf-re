@@ -218,6 +218,15 @@ namespace moho
     ) noexcept;
 
     /**
+     * Address: 0x00803BF0 (FUN_00803BF0, Moho::MediumFidelityTerrain::Func1)
+     * Primary vtable slot 1 (vftable @0x00E41A54, slot @0x00E41A58).
+     *
+     * What it does:
+     * Reports medium fidelity, which `IRenTerrain::Create` encodes as level 1.
+     */
+    [[nodiscard]] bool IsFidelity(std::int32_t fidelity) const override;
+
+    /**
      * Address: 0x00803C00 (FUN_00803C00, Moho::MediumFidelityTerrain::Create)
      *
      * What it does:

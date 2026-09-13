@@ -71,6 +71,15 @@ namespace moho
     static LowFidelityTerrain* DeleteWithFlag(LowFidelityTerrain* object, std::uint8_t deleteFlags) noexcept;
 
     /**
+     * Address: 0x00808190 (FUN_00808190, Moho::LowFidelityTerrain::Func1)
+     * Primary vtable slot 1 (vftable @0x00E41A94, slot @0x00E41A98).
+     *
+     * What it does:
+     * Reports low fidelity, which `IRenTerrain::Create` encodes as level 0.
+     */
+    [[nodiscard]] bool IsFidelity(std::int32_t fidelity) const override;
+
+    /**
      * Address: 0x008081A0 (FUN_008081A0, Moho::LowFidelityTerrain::Create)
      *
      * What it does:

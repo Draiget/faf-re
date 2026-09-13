@@ -268,6 +268,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x007FFB70 (FUN_007FFB70, Moho::HighFidelityTerrain::Func1)
+   *
+   * IDA signature:
+   * bool __thiscall Moho::HighFidelityTerrain::Func1(HighFidelityTerrain *this, int fidelity);
+   *
+   * What it does:
+   * Reports high fidelity. `IRenTerrain::Create` (0x00809DA0) constructs this
+   * class when `graphics_Fidelity` is 2, and the binary compares against that
+   * same constant here.
+   */
+  bool HighFidelityTerrain::IsFidelity(const std::int32_t fidelity) const
+  {
+    return fidelity == kHighTerrainFidelity;
+  }
+
+  /**
    * Address: 0x007FFB80 (FUN_007FFB80, Moho::HighFidelityTerrain::Create)
    *
    * What it does:

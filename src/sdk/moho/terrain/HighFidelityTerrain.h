@@ -67,6 +67,15 @@ namespace moho
     static HighFidelityTerrain* DeleteWithFlag(HighFidelityTerrain* object, std::uint8_t deleteFlags) noexcept;
 
     /**
+     * Address: 0x007FFB70 (FUN_007FFB70, Moho::HighFidelityTerrain::Func1)
+     * Primary vtable slot 1 (vftable @0x00E41A14, slot @0x00E41A18).
+     *
+     * What it does:
+     * Reports high fidelity, which `IRenTerrain::Create` encodes as level 2.
+     */
+    [[nodiscard]] bool IsFidelity(std::int32_t fidelity) const override;
+
+    /**
      * Address: 0x007FFB80 (FUN_007FFB80, Moho::HighFidelityTerrain::Create)
      *
      * What it does:
