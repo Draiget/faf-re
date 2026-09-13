@@ -16609,7 +16609,12 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
     return;
   }
 
-  UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_TransportUnloading));
+  // 0x006A81A2: `or dword ptr [esi+4A4h], 200h`. That is the HIGH state dword,
+  // so bit 9 of it is state 32+9 = 41, UNITSTATE_NoCost -- what CArmyImpl's
+  // unit-cap walk skips on, so a unit stops counting against the cap the moment
+  // it starts dying. Read as a low-dword write it came out as state 9,
+  // UNITSTATE_TransportUnloading, which every corpse then carried.
+  UnitStateMask |= (1ull << static_cast<std::uint32_t>(UNITSTATE_NoCost));
 
   SEntitySetTemplateUnit overlappingStructures{};
   if (!IsMobile()) {
