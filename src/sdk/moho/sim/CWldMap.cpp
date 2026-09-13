@@ -287,7 +287,14 @@ namespace
     {
       struct
       {
-        std::uint8_t mUnknown0008_04D3[0x4CC];      // +0x08
+        std::uint8_t mUnknown0008_04CB[0x4C4];      // +0x08
+        // The stratum-mask texture's own dimensions, half the chart size:
+        // `Reset` halves each axis at 0x008A65AC/0x008A65B1 and stores them
+        // here (0x008A65B3, 0x008A65B9) right before creating the two mask
+        // textures at that size. The whole-mask `UpdateStratumMask` overload
+        // reads them back as the update rectangle's far corner.
+        std::int32_t mStratumMaskWidth;             // +0x4CC
+        std::int32_t mStratumMaskHeight;            // +0x4D0
         boost::shared_ptr<moho::CD3DDynamicTextureSheet> mStratumMask0; // +0x4D4
         boost::shared_ptr<moho::CD3DDynamicTextureSheet> mStratumMask1; // +0x4DC
         std::uint8_t mUnknown04E4_0947[0x464];      // +0x4E4
@@ -306,6 +313,14 @@ namespace
   static_assert(
     offsetof(TerrainNormalMapRuntimeView, mMap) == 0x04,
     "TerrainNormalMapRuntimeView::mMap offset must be 0x04"
+  );
+  static_assert(
+    offsetof(TerrainNormalMapRuntimeView, mStratumMaskWidth) == 0x4CC,
+    "TerrainNormalMapRuntimeView::mStratumMaskWidth offset must be 0x4CC"
+  );
+  static_assert(
+    offsetof(TerrainNormalMapRuntimeView, mStratumMaskHeight) == 0x4D0,
+    "TerrainNormalMapRuntimeView::mStratumMaskHeight offset must be 0x4D0"
   );
   static_assert(
     offsetof(TerrainNormalMapRuntimeView, mStratumMask0) == 0x4D4,
@@ -2143,6 +2158,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A1180 (FUN_008A1180, ?GetBackgroundFile@CWldTerrainRes@Moho@@UBEABV?$basic_string@...@XZ)
+   *
+   * What it does: see the header -- returns the stored path by reference.
+   */
+  const msvc8::string& IWldTerrainRes::GetBackgroundFile() const
+  {
+    return AsTerrainRuntimeView(this)->mBackgroundFile;
+  }
+
+  /**
+   * Address: 0x008A12C0 (FUN_008A12C0, ?GetSkycubeFile@CWldTerrainRes@Moho@@UBEABV?$basic_string@...@XZ)
+   *
+   * What it does: see the header -- returns the stored path by reference.
+   */
+  const msvc8::string& IWldTerrainRes::GetSkycubeFile() const
+  {
+    return AsTerrainRuntimeView(this)->mSkycubeFile;
+  }
+
+  /**
    * Address: 0x008A1300 (FUN_008A1300)
    * (FUN_008A1300, ?AddEnvLookup@CWldTerrainRes@Moho@@UAEXABV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@0@Z)
    *
@@ -3018,6 +3053,17 @@ namespace moho
   }
 
   /**
+   * Address: 0x008A6E70 (FUN_008A6E70, ?GetWaterDepthBias@CWldTerrainRes@Moho@@EAEPAEXZ)
+   *
+   * What it does: see the header -- the third water mask, alongside the foam
+   * and flatness masks either side of it.
+   */
+  std::uint8_t* IWldTerrainRes::GetWaterDepthBias()
+  {
+    return AsTerrainRuntimeView(this)->mWaterDepthBias;
+  }
+
+  /**
    * Address: 0x008A6E80 (FUN_008A6E80, ?IsInEditMode@CWldTerrainRes@Moho@@EBE_NXZ)
    *
    * What it does:
@@ -3725,6 +3771,17 @@ namespace moho
       kChannelShift[channel],
       sourceMask
     );
+  }
+
+  /**
+   * Address: 0x008A4EA0 (FUN_008A4EA0, ?UpdateStratumMask@CWldTerrainRes@Moho@@UAEXHPBE@Z)
+   *
+   * What it does: see the header -- the whole-mask form of the overload above.
+   */
+  void IWldTerrainRes::UpdateStratumMask(const std::int32_t stratumIndex, const std::uint8_t* const sourceMask)
+  {
+    const auto* const view = AsTerrainNormalMapRuntimeView(this);
+    UpdateStratumMask(stratumIndex, sourceMask, 0, 0, view->mStratumMaskWidth, view->mStratumMaskHeight);
   }
 
   /**
