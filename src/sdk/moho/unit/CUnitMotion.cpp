@@ -3795,6 +3795,14 @@ namespace moho
       mAlwaysUseTopSpeed ? unit->mInfoCache.mFormationTopSpeed : std::min(horizontalDistance, unit->mInfoCache.mFormationTopSpeed);
     (void)VecSetLength(&desiredVelocity, topSpeedTarget);
 
+    // The fourth vector `ComputeAirControl` takes, and the one this recovery
+    // had no local for at all: the frame's `{a1.y, a1.z, var_AC}` triple, handed
+    // over in EAX at 0x006BFE15. It is whatever this beat decided the airframe
+    // should fall back to when it is too slow or too close to steer -- the
+    // formation vector on the near/landing path, and a snapshot of the raw
+    // steering vector on the far path.
+    Wm3::Vector3f fallbackVector{};
+
     bool enteredLandingPhase = false;
 
     if (!unit->IsDead() || (mLayer != LAYER_Air && !ShouldHoverInsteadOfLand())) {
@@ -3837,16 +3845,22 @@ namespace moho
           }
         }
 
-        // Formation-vector selection: prefer a live formation vector, else
-        // the unit's own normalized formation lane, else the phase-1 heading.
-        const Wm3::Vector3f liveFormation = unit->GetFormationVector();
-        if (Wm3::Vector3f::Compare(&liveFormation, &Wm3::Vector3f::ZERO)) {
-          mFormationVec = liveFormation;
+        // Formation-vector selection, 0x006BF685..0x006BF732. The chosen vector
+        // is what this branch leaves in `fallbackVector`: a live formation
+        // vector if the unit has one (which is also stored back into
+        // `mFormationVec`), else the stored lane normalized, else the phase-1
+        // heading. `GetFormationVector` returns by value straight into the
+        // local -- `lea ebx, [esp+a1.y]` at 0x006BF688 is its return slot.
+        fallbackVector = unit->GetFormationVector();
+        if (Wm3::Vector3f::Compare(&fallbackVector, &Wm3::Vector3f::ZERO)) {
+          mFormationVec = fallbackVector;
         } else if (Wm3::Vector3f::Compare(&mFormationVec, &Wm3::Vector3f::ZERO)) {
-          Wm3::Vector3f::Normalize(&mFormationVec);
+          // 0x006BF6ED normalizes into a scratch (esi) from the member (edi);
+          // `mFormationVec` itself is left alone.
+          Wm3::Vector3f::NormalizeInto(mFormationVec, &fallbackVector);
+        } else {
+          fallbackVector = headingVector;
         }
-        // (else: keep the phase-1 headingVector as the implicit fallback -
-        // matches the binary using a6/v161/v162 directly in that branch.)
 
         if (enteredLandingPhase) {
           unit->UnitStateMask |= (1ull << UNITSTATE_BlockCommandQueue);
@@ -3866,6 +3880,11 @@ namespace moho
           unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
         }
       } else {
+        // 0x006BF3E9..0x006BF409: too far to be landing, so the fallback is a
+        // snapshot of the steering vector taken here -- before the look-ahead
+        // shaping below narrows it and before the elevation term fills in y.
+        fallbackVector = desiredVelocity;
+
         mNewElevation = GetElevation();
         unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
         unit->UnitStateMask &= ~(1ull << UNITSTATE_BlockCommandQueue);
@@ -3969,8 +3988,19 @@ namespace moho
         mCombatState = ACS_None;
       }
 
+      // Argument order read off the pushes at 0x006BFDEC..0x006BFE19. Stack
+      // args, lowest address first, are `this`, the body, `desiredVelocity`,
+      // its normalization, and `headingVector`; the fallback lane travels in
+      // EAX. So the desired direction is the *primary* vector and the nose is
+      // the *reference* -- which is what makes the airframe steer. Handing the
+      // heading to both slots, as this did, told CalcWingedOrientation the
+      // aircraft already pointed where it wanted to: `selectedVector` came back
+      // as the current heading, `vZ` with it, the turn delta collapsed to zero,
+      // and nothing ever asked the airframe to rotate.
       const Wm3::Vector3f desiredVelocityNorm = Wm3::Vector3f::NormalizeOrZero(desiredVelocity);
-      ComputeAirControl(*physBody, headingVector, desiredVelocity, headingVector, desiredVelocityNorm, &control, combatTarget);
+      ComputeAirControl(
+        *physBody, fallbackVector, desiredVelocity, desiredVelocityNorm, headingVector, &control, combatTarget
+      );
 
       if (horizontalDistance > air.StartTurnDistance) {
         Wm3::Vector3f flatDesired{desiredVelocity.x, 0.0f, desiredVelocity.z};
