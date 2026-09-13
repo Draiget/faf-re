@@ -238,7 +238,7 @@ namespace
    * this takes the slot itself, not an already-resolved reference.
    */
   void CreateHighlightDecal(
-    moho::CDecalManager& decalManager,
+    moho::IDecalManager& decalManager,
     moho::WeakPtr<moho::CWldTerrainDecal>& decalSlot,
     const moho::EWldTerrainDecalType decalType
   )
@@ -996,14 +996,9 @@ namespace moho
 
     // `mDecalManager` is the `IDecalManager*` the terrain resource handed out,
     // and the binary reaches both of the calls below through its vtable
-    // (+0x1C `LoadDecal`, +0x4C `MoveDecalToFront`). Those two slots live in
-    // the block `CDecalManager` has not yet promoted into its declared virtual
-    // table, so - exactly as `CConCommand.cpp`'s `NewSplatAt` call site and
-    // `CWldSession.cpp`'s `AddDecals`/`ProcessRemovals` call sites already do -
-    // they are reached through the sole implementing class. `CDecalManager` is
-    // the only class deriving from `IDecalManager` in this binary, so this is
-    // behaviourally identical to the virtual dispatch it stands in for.
-    CDecalManager& decalManager = *static_cast<CDecalManager*>(mDecalManager);
+    // (+0x1C `LoadDecal` = slot 7, +0x4C `MoveDecalToFront` = slot 19). Both
+    // are declared on the interface, so they dispatch through it directly.
+    IDecalManager& decalManager = *mDecalManager;
 
     CreateHighlightDecal(decalManager, mAlbedoDecal, WldTerrainDecalType_Albedo);
     CreateHighlightDecal(decalManager, mWaterAlbedoDecal, WldTerrainDecalType_WaterAlbedo);
