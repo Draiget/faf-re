@@ -3863,7 +3863,14 @@ namespace moho
         }
 
         if (enteredLandingPhase) {
-          unit->UnitStateMask |= (1ull << UNITSTATE_BlockCommandQueue);
+          // 0x006BF740: `or dword ptr [eax+4A0h], 400h` -- bit 10 of the LOW
+          // state dword, UNITSTATE_MovingDown. Not BlockCommandQueue (42),
+          // which lives in the high dword and which this function never
+          // writes at all. Setting it here stopped
+          // IAiCommandDispatchImpl::TaskTick from dispatching anything to the
+          // aircraft -- 0x00598F99 tests state 42 and bails -- so it could
+          // never be given a move order and never left the ground.
+          unit->UnitStateMask |= (1ull << UNITSTATE_MovingDown);
           if (mHeight == std::numeric_limits<float>::infinity()) {
             if (ShouldHoverInsteadOfLand() || mVertEvent == UMVE_Hover) {
               mNewElevation = air.TransportHoverHeight;
@@ -3877,7 +3884,9 @@ namespace moho
           }
         } else {
           mNewElevation = GetElevation();
-          unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
+          // 0x006BF7E3: `and [eax+4A0h], 0FFFFF7FFh` clears low bit 11,
+          // UNITSTATE_MovingUp.
+          unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
         }
       } else {
         // 0x006BF3E9..0x006BF409: too far to be landing, so the fallback is a
@@ -3886,8 +3895,11 @@ namespace moho
         fallbackVector = desiredVelocity;
 
         mNewElevation = GetElevation();
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
-        unit->UnitStateMask &= ~(1ull << UNITSTATE_BlockCommandQueue);
+        // 0x006BF422 / 0x006BF43B clear low bits 11 and 10 -- MovingUp then
+        // MovingDown. Something far from its target is neither climbing to
+        // reach it nor descending onto it.
+        unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
+        unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingDown);
         if (unit->IsUnitState(UNITSTATE_CannotFindPlaceToLand)) {
           unit->UnitStateMask &= ~(1ull << UNITSTATE_CannotFindPlaceToLand);
           unit->UpdateSpeedThroughStatus();
@@ -3943,8 +3955,10 @@ namespace moho
             mReservation = gpg::Rect2i{};
             unit->FreeOgridRect();
             unit->SetCurrentLayer(mLayer);
-            unit->UnitStateMask &= ~(1ull << UNITSTATE_MakingAttackRun);
-            unit->UnitStateMask &= ~(1ull << UNITSTATE_BlockCommandQueue);
+            // 0x006BFB5C / 0x006BFB75: low bits 11 and 10 again -- it has
+            // arrived, so it is neither climbing nor descending.
+            unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingUp);
+            unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingDown);
 
             if (!ShouldHoverInsteadOfLand()) {
               SetMotionVertEvent(UMVE_Top);
@@ -3958,7 +3972,10 @@ namespace moho
           }
         } else {
           if (mVertEvent == UMVE_Top || mVertEvent == UMVE_Hover) {
-            unit->UnitStateMask |= (1ull << UNITSTATE_MakingAttackRun);
+            // 0x006BFC53: `or [eax+4A0h], 800h` -- low bit 11,
+            // UNITSTATE_MovingUp. Coming off a deck or out of a hover is a
+            // climb.
+            unit->UnitStateMask |= (1ull << UNITSTATE_MovingUp);
           }
 
           if (mNewElevation > 0.0f && mCurElevation < mNewElevation * 0.5f) {
