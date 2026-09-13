@@ -37,7 +37,9 @@ namespace
  * What it does:
  * Forwards construct callback flow into `CAiTransportImpl::MemberConstruct`.
  */
-void CAiTransportImplConstruct::Construct(gpg::ReadArchive* const, const int, const int, gpg::SerConstructResult* const result)
+void CAiTransportImplConstruct::Construct(
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+)
 {
   if (!result) {
     return;

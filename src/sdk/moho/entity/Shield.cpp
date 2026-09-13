@@ -268,10 +268,7 @@ namespace moho
    * `ConstructShieldForSerializerFromArchive`.
    */
   void ConstructShieldSerializerThunk(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     ConstructShieldForSerializerFromArchive(archive, result);
@@ -460,6 +457,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {

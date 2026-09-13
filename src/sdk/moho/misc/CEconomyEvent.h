@@ -441,10 +441,7 @@ namespace moho
    * `ConstructCEconomyEventForSerializer`.
    */
   void ConstructCEconomyEventSerializerThunk(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int version,
-    gpg::SerConstructResult* result
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
   );
 
 #if defined(MOHO_STRICT_LAYOUT_ASSERTS)

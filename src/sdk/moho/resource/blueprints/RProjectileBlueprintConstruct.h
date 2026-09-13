@@ -73,10 +73,7 @@ namespace moho
    * projectile blueprint pointer, and stores it as owned construct result.
    */
   void Construct_RProjectileBlueprint(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int version,
-    gpg::SerConstructResult* result
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
   );
 
   /**

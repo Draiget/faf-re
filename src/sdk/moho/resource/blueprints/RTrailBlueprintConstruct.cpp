@@ -75,10 +75,7 @@ namespace moho
    * blueprint pointer, and stores it as owned construct result.
    */
   void Construct_RTrailBlueprint(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     RRuleGameRules* const gameRules = ReadRuleGameRulesPointer(archive);

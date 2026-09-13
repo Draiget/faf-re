@@ -307,7 +307,9 @@ namespace moho
      * Reads construct arguments (`STIMap*`, `mGridSize`) and returns a new
      * `CIntelGrid` as an unowned construct result.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005089F0 (FUN_005089F0, Moho::CIntelGridConstruct::Deconstruct)

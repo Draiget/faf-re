@@ -86,10 +86,7 @@ namespace
  * `0x005D83A0`.
  */
 void CAiAttackerImplConstruct::Construct(
-  gpg::ReadArchive* const,
-  const int,
-  const int,
-  gpg::SerConstructResult* const result
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   ConstructCAiAttackerImplForResult(result);

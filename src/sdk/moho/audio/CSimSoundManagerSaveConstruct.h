@@ -38,7 +38,7 @@ namespace moho
      * `mOwnerSim` field at +0x04) as an unowned tracked pointer.
      */
     static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
     );
 
     /**

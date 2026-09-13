@@ -63,10 +63,7 @@ namespace moho
    * Address: 0x006D7A70 (FUN_006D7A70, sub_6D7A70)
    */
   void construct_UnitWeapon_00Variant1(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     construct_UnitWeapon_00Variant2(result);

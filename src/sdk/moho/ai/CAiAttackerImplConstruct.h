@@ -24,7 +24,9 @@ namespace moho
      * What it does:
      * Constructs a recovered `CAiAttackerImpl` object for archive loading.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005DEB50 (FUN_005DEB50)

@@ -43,7 +43,7 @@ namespace
    * Allocates one `CAiBrain`, wraps it in a reflected `RRef`, and publishes
    * that reference through `SerConstructResult::SetUnowned`.
    */
-  void ConstructCAiBrainForResult(gpg::ReadArchive*, int, int, gpg::SerConstructResult* const result)
+  void ConstructCAiBrainForResult(gpg::ReadArchive*, int, gpg::RRef*, gpg::SerConstructResult* const result)
   {
     CAiBrain* object = nullptr;
     void* const storage = ::operator new(sizeof(CAiBrain), std::nothrow);
@@ -63,12 +63,10 @@ namespace
    */
   void ConstructCAiBrainForResultThunk(
     gpg::ReadArchive* const archive,
-    const int objectLane,
-    const int version,
-    gpg::SerConstructResult* const result
+    const int version, gpg::RRef* const ownerRef, gpg::SerConstructResult* const result
   )
   {
-    ConstructCAiBrainForResult(archive, objectLane, version, result);
+    ConstructCAiBrainForResult(archive, version, ownerRef, result);
   }
 
   /**

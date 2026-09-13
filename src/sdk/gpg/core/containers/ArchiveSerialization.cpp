@@ -1157,7 +1157,7 @@ namespace
     gpg::RRef mRef;                   // +0x00
     boost::SharedPtrRaw<void> mSharedPtr; // +0x08
     TrackedPointerState mState;       // +0x10
-    std::uint8_t mSharedFlag;         // +0x14
+    std::uint8_t mLoadMembers;         // +0x14
   };
   static_assert(offsetof(SerConstructResultView, mRef) == 0x0, "SerConstructResultView::mRef offset must be 0x0");
   static_assert(
@@ -1165,22 +1165,22 @@ namespace
   );
   static_assert(offsetof(SerConstructResultView, mState) == 0x10, "SerConstructResultView::mState offset must be 0x10");
   static_assert(
-    offsetof(SerConstructResultView, mSharedFlag) == 0x14, "SerConstructResultView::mSharedFlag offset must be 0x14"
+    offsetof(SerConstructResultView, mLoadMembers) == 0x14, "SerConstructResultView::mLoadMembers offset must be 0x14"
   );
   static_assert(sizeof(SerConstructResultView) == 0x18, "SerConstructResultView size must be 0x18");
 
   struct SerSaveConstructArgsResultView
   {
     TrackedPointerState mOwnership;
-    std::uint8_t mFlagByte4;
+    std::uint8_t mWriteMembers;
   };
   static_assert(
     offsetof(SerSaveConstructArgsResultView, mOwnership) == 0x0,
     "SerSaveConstructArgsResultView::mOwnership offset must be 0x0"
   );
   static_assert(
-    offsetof(SerSaveConstructArgsResultView, mFlagByte4) == 0x4,
-    "SerSaveConstructArgsResultView::mFlagByte4 offset must be 0x4"
+    offsetof(SerSaveConstructArgsResultView, mWriteMembers) == 0x4,
+    "SerSaveConstructArgsResultView::mWriteMembers offset must be 0x4"
   );
 
 
@@ -1564,7 +1564,7 @@ namespace
  *
  * What it does:
  * Transitions one construct-result lane from `RESERVED` to `OWNED`, stores the
- * reflected object reference, and clears the shared-flag byte when bit 0 in
+ * reflected object reference, and clears the member-load flag when bit 0 in
  * `flags` is set.
  */
 void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags)
@@ -1577,7 +1577,7 @@ void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags
   view->mRef = ref;
   view->mState = TrackedPointerState::Owned;
   if ((flags & 1u) != 0u) {
-    view->mSharedFlag = 0;
+    view->mLoadMembers = 0;
   }
 }
 
@@ -1586,7 +1586,7 @@ void gpg::SerConstructResult::SetOwned(const RRef& ref, const unsigned int flags
  *
  * What it does:
  * Transitions one construct-result lane from `RESERVED` to `UNOWNED`, stores
- * the reflected object reference, and clears the shared-flag byte when bit 0
+ * the reflected object reference, and clears the member-load flag when bit 0
  * in `flags` is set.
  */
 void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int flags)
@@ -1599,7 +1599,7 @@ void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int fla
   view->mRef = ref;
   view->mState = TrackedPointerState::Unowned;
   if ((flags & 1u) != 0u) {
-    view->mSharedFlag = 0;
+    view->mLoadMembers = 0;
   }
 }
 
@@ -1609,8 +1609,8 @@ void gpg::SerConstructResult::SetUnowned(const RRef& ref, const unsigned int fla
  *
  * What it does:
  * Transitions one construct-result lane from `RESERVED` to `SHARED`, stores
- * the reflected object reference lane directly, and clears the shared-flag
- * byte when bit 0 in `flags` is set.
+ * the reflected object reference lane directly, and clears the member-load
+ * flag when bit 0 in `flags` is set.
  */
 void gpg::SerConstructResult::SetShared(const RRef& ref, const unsigned int flags)
 {
@@ -1622,7 +1622,7 @@ void gpg::SerConstructResult::SetShared(const RRef& ref, const unsigned int flag
   view->mRef = ref;
   view->mState = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mSharedFlag = 0;
+    view->mLoadMembers = 0;
   }
 }
 
@@ -1632,7 +1632,7 @@ void gpg::SerConstructResult::SetShared(const RRef& ref, const unsigned int flag
  * What it does:
  * Transitions one construct-result lane from `RESERVED` to `SHARED`, retains
  * the incoming shared control block, stores the reflected object reference,
- * and clears the shared-flag byte when bit 0 in `flags` is set.
+ * and clears the member-load flag when bit 0 in `flags` is set.
  */
 void gpg::SerConstructResult::SetShared(
   const boost::shared_ptr<void>& object,
@@ -1651,7 +1651,7 @@ void gpg::SerConstructResult::SetShared(
   view->mRef.mType = type;
   view->mState = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mSharedFlag = 0;
+    view->mLoadMembers = 0;
   }
 }
 
@@ -1661,7 +1661,7 @@ void gpg::SerConstructResult::SetShared(
  *
  * What it does:
  * Transitions one save-construct result lane from `RESERVED` to `OWNED`
- * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ * and clears the write-members flag when bit 0 in `flags` is set.
  */
 void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
 {
@@ -1672,7 +1672,7 @@ void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
 
   view->mOwnership = TrackedPointerState::Owned;
   if ((flags & 1u) != 0u) {
-    view->mFlagByte4 = 0;
+    view->mWriteMembers = 0;
   }
 }
 
@@ -1681,7 +1681,7 @@ void gpg::SerSaveConstructArgsResult::SetOwned(const unsigned int flags)
  *
  * What it does:
  * Transitions one save-construct result lane from `RESERVED` to `UNOWNED`
- * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ * and clears the write-members flag when bit 0 in `flags` is set.
  */
 void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
 {
@@ -1692,7 +1692,7 @@ void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
 
   view->mOwnership = TrackedPointerState::Unowned;
   if ((flags & 1u) != 0u) {
-    view->mFlagByte4 = 0;
+    view->mWriteMembers = 0;
   }
 }
 
@@ -1701,7 +1701,7 @@ void gpg::SerSaveConstructArgsResult::SetUnowned(const unsigned int flags)
  *
  * What it does:
  * Transitions one save-construct result lane from `RESERVED` to `SHARED`
- * and clears the byte-at-+4 lane when bit 0 in `flags` is set.
+ * and clears the write-members flag when bit 0 in `flags` is set.
  */
 void gpg::SerSaveConstructArgsResult::SetShared(const unsigned int flags)
 {
@@ -1712,7 +1712,7 @@ void gpg::SerSaveConstructArgsResult::SetShared(const unsigned int flags)
 
   view->mOwnership = TrackedPointerState::Shared;
   if ((flags & 1u) != 0u) {
-    view->mFlagByte4 = 0;
+    view->mWriteMembers = 0;
   }
 }
 
@@ -1748,21 +1748,59 @@ void gpg::WriteRawPointer(
     record = &inserted.first->second;
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::NewObject));
-    archive->WriteRefCounts(objectRef.mType);
 
-    if (!objectRef.mType || !objectRef.mType->serSaveFunc_) {
+    RType* const objectType = objectRef.mType;
+    if (!objectType || (!objectType->serConstructFunc_ && !objectType->newRefFunc_)) {
       ThrowSerializationError(STR_Printf(
-        "Error while creating archive: encounted an object of type \"%s\", but we don't have a save function for it.",
-        SafeTypeName(objectRef.mType)
+        "Error while creating archive: encounted a pointer to an object of type \"%s\", but we don't have a "
+        "constructor for it.",
+        SafeTypeName(objectType)
       ));
     }
 
-    objectRef.mType->serSaveFunc_(
-      archive, reinterpret_cast<int>(objectRef.mObj), objectRef.mType->version_, const_cast<RRef*>(&ownerRef)
-    );
+    archive->WriteRefCounts(objectType);
 
-    if (record->ownership == TrackedPointerState::Reserved) {
-      record->ownership = TrackedPointerState::Unowned;
+    // A type with a save-construct hook writes its own construction arguments
+    // here, and may then declare that the member payload must be skipped -- the
+    // reader will rebuild the object from those arguments alone. `CSndParams`
+    // does exactly that (`SaveConstructArgs` at 0x004E0CD0 writes one
+    // `SParamKey` and calls `SetOwned(1)`), which is why the reader can hand
+    // back the one shared descriptor for that key instead of a fresh object.
+    SerSaveConstructArgsResultView saveResult{};
+    saveResult.mOwnership = TrackedPointerState::Reserved;
+    saveResult.mWriteMembers = 1u;
+
+    if (objectType->serSaveConstructArgsFunc_) {
+      objectType->serSaveConstructArgsFunc_(
+        archive,
+        objectRef.mObj,
+        objectType->version_,
+        const_cast<RRef*>(&ownerRef),
+        reinterpret_cast<SerSaveConstructArgsResult*>(&saveResult)
+      );
+      if (saveResult.mOwnership == TrackedPointerState::Reserved) {
+        gpg::HandleAssertFailure("saveConstructArgsResult.mOwnership != RESERVED", 319, kSerializationCppPath);
+      }
+    } else {
+      saveResult.mOwnership = TrackedPointerState::Unowned;
+    }
+
+    if (record->ownership != TrackedPointerState::Reserved) {
+      gpg::HandleAssertFailure("iter->second.mOwnership == RESERVED", 321, kSerializationCppPath);
+    }
+    record->ownership = saveResult.mOwnership;
+
+    if (saveResult.mWriteMembers != 0u) {
+      if (!objectType->serSaveFunc_) {
+        ThrowSerializationError(STR_Printf(
+          "Error while creating archive: encounted an object of type \"%s\", but we don't have a save function for it.",
+          SafeTypeName(objectType)
+        ));
+      }
+
+      objectType->serSaveFunc_(
+        archive, reinterpret_cast<int>(objectRef.mObj), objectType->version_, const_cast<RRef*>(&ownerRef)
+      );
     }
 
     archive->WriteMarker(static_cast<int>(ArchiveToken::ObjectTerminator));
@@ -1839,54 +1877,90 @@ TrackedPointerInfo& gpg::ReadRawPointer(ReadArchive* const archive, const RRef& 
     );
   }
 
+  // The slot is claimed BEFORE the type handle is read, exactly as the binary
+  // does it (0x00953720 computes the index and pushes an empty record before
+  // `ReadTypeHandle`). It matters as soon as construct hooks run: `CSndParams`'s
+  // hook reads an `SParamKey` out of the stream, and anything nested in there
+  // takes the next index. The writer reserves its index at the same point
+  // (0x00953320 inserts the record before `WriteRefCounts`), so back-references
+  // only line up if both sides claim first and fill in after.
+  const size_t trackedIndex = archive->mTrackedPtrs.size();
+  archive->mTrackedPtrs.push_back(TrackedPointerInfo{});
+
   const TypeHandle handle = archive->ReadTypeHandle();
   if (!handle.type) {
     ThrowSerializationError("Error detected in archive: null type handle.");
   }
 
-  if (!handle.type->newRefFunc_) {
-    ThrowSerializationError(STR_Printf(
-      "Error detected in archive: found a pointer to an object of type \"%s\", but we don't have a constructor for it.",
-      SafeTypeName(handle.type)
-    ));
+  SerConstructResultView constructResult{};
+  constructResult.mState = TrackedPointerState::Reserved;
+  constructResult.mLoadMembers = 1u;
+
+  if (handle.type->serConstructFunc_) {
+    handle.type->serConstructFunc_(
+      archive,
+      handle.version,
+      const_cast<RRef*>(&ownerRef),
+      reinterpret_cast<SerConstructResult*>(&constructResult)
+    );
+    if (constructResult.mState == TrackedPointerState::Reserved) {
+      gpg::HandleAssertFailure("constructResult.mInfo.mState != RESERVED", 156, kSerializationCppPath);
+    }
+  } else {
+    if (!handle.type->newRefFunc_) {
+      ThrowSerializationError(STR_Printf(
+        "Error detected in archive: found a pointer to an object of type \"%s\", but we don't have a constructor for "
+        "it.",
+        SafeTypeName(handle.type)
+      ));
+    }
+
+    const RRef objectRef = handle.type->newRefFunc_();
+    constructResult.mRef.mObj = objectRef.mObj;
+    constructResult.mRef.mType = objectRef.mType ? objectRef.mType : handle.type;
+    constructResult.mState = TrackedPointerState::Unowned;
   }
 
-  const RRef objectRef = handle.type->newRefFunc_();
-  TrackedPointerInfo tracked{};
-  tracked.object = objectRef.mObj;
-  tracked.type = objectRef.mType ? objectRef.mType : handle.type;
-  tracked.state = TrackedPointerState::Reserved;
-  tracked.sharedObject = nullptr;
-  tracked.sharedControl = nullptr;
-
-  const size_t trackedIndex = archive->mTrackedPtrs.size();
-  archive->mTrackedPtrs.push_back(tracked);
-
-  RType* const loadedType = archive->mTrackedPtrs[trackedIndex].type;
-  void* const loadedObject = archive->mTrackedPtrs[trackedIndex].object;
-  if (!loadedType || !loadedType->serLoadFunc_) {
-    ThrowSerializationError(STR_Printf(
-      "Error detected in archive: found an object of type \"%s\", but we don't have a loader for it.",
-      SafeTypeName(loadedType)
-    ));
+  {
+    TrackedPointerInfo& slot = archive->mTrackedPtrs[trackedIndex];
+    slot.object = constructResult.mRef.mObj;
+    slot.type = constructResult.mRef.mType;
+    slot.state = constructResult.mState;
+    // Ownership of the construct result's shared lane moves into the table
+    // rather than being copied, so nothing releases it twice.
+    slot.sharedObject = constructResult.mSharedPtr.px;
+    slot.sharedControl = constructResult.mSharedPtr.pi;
+    constructResult.mSharedPtr.px = nullptr;
+    constructResult.mSharedPtr.pi = nullptr;
   }
 
-  loadedType->serLoadFunc_(archive, reinterpret_cast<int>(loadedObject), handle.version, const_cast<RRef*>(&ownerRef));
+  // A construct hook that rebuilt the object from its own arguments clears this
+  // flag, and the member payload it skipped on the way out is not in the stream
+  // to be read back.
+  if (constructResult.mLoadMembers != 0u) {
+    if (!handle.type->serLoadFunc_) {
+      ThrowSerializationError(STR_Printf(
+        "Error detected in archive: found an object of type \"%s\", but we don't have a loader for it.",
+        SafeTypeName(handle.type)
+      ));
+    }
 
-  TrackedPointerInfo& trackedRef = archive->mTrackedPtrs[trackedIndex];
+    handle.type->serLoadFunc_(
+      archive,
+      reinterpret_cast<int>(constructResult.mRef.mObj),
+      handle.version,
+      const_cast<RRef*>(&ownerRef)
+    );
+  }
 
   if (archive->NextMarker() != static_cast<int>(ArchiveToken::ObjectTerminator)) {
     ThrowSerializationError(STR_Printf(
       "Error detected in archive: data for object of type \"%s\" did not terminate properly.",
-      SafeTypeName(trackedRef.type)
+      SafeTypeName(handle.type)
     ));
   }
 
-  if (trackedRef.state == TrackedPointerState::Reserved) {
-    trackedRef.state = TrackedPointerState::Unowned;
-  }
-
-  return trackedRef;
+  return archive->mTrackedPtrs[trackedIndex];
 }
 
 namespace
@@ -5487,7 +5561,9 @@ namespace
    * What it does:
    * Writes one reflected `gpg::RRef_Sim` owner-field lane as `unowned` tracked-pointer state into one write archive lane.
    */
-  void SaveUnownedRawPointerFromSimOwnerFieldLane5(gpg::WriteArchive* archive, int ownerToken, int a3, gpg::SerSaveConstructArgsResult* constructResult)
+  void SaveUnownedRawPointerFromSimOwnerFieldLane5(
+    gpg::WriteArchive* archive, int ownerToken, int a3, gpg::SerSaveConstructArgsResult* constructResult
+  )
   {
     (void)a3;
     struct OwnerFieldView
@@ -5590,7 +5666,9 @@ namespace
    * What it does:
    * Writes one reflected `gpg::RRef_Sim` owner-field lane as `unowned` tracked-pointer state into one write archive lane.
    */
-  void SaveUnownedRawPointerFromSimOwnerFieldLane7(gpg::WriteArchive* archive, int ownerToken, int a3, gpg::SerSaveConstructArgsResult* constructResult)
+  void SaveUnownedRawPointerFromSimOwnerFieldLane7(
+    gpg::WriteArchive* archive, int ownerToken, int a3, gpg::SerSaveConstructArgsResult* constructResult
+  )
   {
     (void)a3;
     struct OwnerFieldView

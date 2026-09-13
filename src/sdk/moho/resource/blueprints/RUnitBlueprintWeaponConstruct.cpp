@@ -85,10 +85,7 @@ namespace moho
    * `RUnitBlueprintWeapon*` from the owner blueprint weapon array.
    */
   void Construct_RUnitBlueprintWeapon(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     RUnitBlueprint* const ownerBlueprint = ReadUnitBlueprintPointer(archive);

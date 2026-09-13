@@ -55,7 +55,9 @@ namespace moho
      * Forwards construct callback arguments into
      * `IAiCommandDispatchImpl::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005999D0 (FUN_005999D0, Moho::IAiCommandDispatchImplConstruct::Deconstruct)

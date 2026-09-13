@@ -36,7 +36,7 @@ namespace
    * save-construct-args callback only marks the result as owned.
    */
   void SaveDefaultSkelConstructArgsOwned(
-    gpg::WriteArchive* const, const int, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const, const int, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     if (result != nullptr) {

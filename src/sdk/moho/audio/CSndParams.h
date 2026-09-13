@@ -177,7 +177,9 @@ namespace moho
      * Deserializes one `SParamKey`, resolves/creates the matching cached
      * `CSndParams` instance, and returns it as an owned construct result.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x004E4CA0 (FUN_004E4CA0, Moho::CSndParamsConstruct::Deconstruct)
@@ -253,6 +255,7 @@ namespace moho
       gpg::WriteArchive* archive,
       int objectPtr,
       int version,
+      gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
 

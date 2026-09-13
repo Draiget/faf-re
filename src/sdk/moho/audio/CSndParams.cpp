@@ -910,10 +910,7 @@ namespace moho
    * Address: 0x004E0E10 (FUN_004E0E10, Moho::CSndParamsConstruct::Construct)
    */
   void CSndParamsConstruct::Construct(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     SParamKey key{};
@@ -973,10 +970,11 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int version,
+    gpg::RRef* const ownerRef,
     gpg::SerSaveConstructArgsResult* const result
   )
   {
-    SaveConstructArgs_CSndParams(archive, objectPtr, version, nullptr, result);
+    SaveConstructArgs_CSndParams(archive, objectPtr, version, ownerRef, result);
   }
 
   /**

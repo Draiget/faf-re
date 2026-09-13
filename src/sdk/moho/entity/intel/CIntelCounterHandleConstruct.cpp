@@ -71,12 +71,10 @@ namespace moho
    */
   void ConstructCIntelCounterHandleSerializerThunk(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::SerConstructResult* const result
+    const int version, gpg::RRef* const ownerRef, gpg::SerConstructResult* const result
   )
   {
-    CIntelCounterHandleConstruct::Construct(archive, objectPtr, version, result);
+    CIntelCounterHandleConstruct::Construct(archive, version, ownerRef, result);
   }
 
   /**
@@ -85,7 +83,7 @@ namespace moho
   void CIntelCounterHandleConstruct::Construct(
     gpg::ReadArchive* const,
     const int,
-    const int,
+    gpg::RRef* const,
     gpg::SerConstructResult* const result
   )
   {

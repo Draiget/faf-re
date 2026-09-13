@@ -60,7 +60,7 @@ namespace
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
-    const int,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {

@@ -214,7 +214,9 @@ namespace moho
      * What it does:
      * Dispatches construct callback flow into `CAniActor::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x0063CAB0 (FUN_0063CAB0, Moho::CAniActorConstruct::Deconstruct)

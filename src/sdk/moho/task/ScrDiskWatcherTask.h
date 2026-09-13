@@ -51,7 +51,7 @@ namespace moho
      * and returns it through unowned construct-result storage.
      */
     static void Construct(
-      gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
     );
 
     /**
@@ -69,7 +69,7 @@ namespace moho
      * Saves LuaState constructor-args lane as unowned tracked pointer.
      */
     static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
     );
 
     /**

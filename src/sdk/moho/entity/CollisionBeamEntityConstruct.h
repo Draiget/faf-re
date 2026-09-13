@@ -43,7 +43,9 @@ namespace moho
      * What it does:
      * Forwards construct callback flow into `CollisionBeamEntity::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, const int version, gpg::RRef* const, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x00675570 (FUN_00675570, Moho::CollisionBeamEntityConstruct::Deconstruct)

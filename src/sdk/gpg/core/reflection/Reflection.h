@@ -260,6 +260,10 @@ namespace gpg
   class RField;
   class REnumType;
   class RIndexed;
+  class ReadArchive;
+  class WriteArchive;
+  class SerConstructResult;
+  class SerSaveConstructArgsResult;
   /**
    * VFTABLE: 0x00D48B90 (`??_7SerHelperBase@gpg@@6B@`)
    *
@@ -3981,9 +3985,26 @@ namespace gpg
   {
     // Primary vftable (11 entries)
   public:
-    using save_construct_args_func_t = void (*)(void*);
+    // The two construct hooks are what let a type decide how its instances come
+    // into being across an archive, instead of being default-built and then
+    // filled in field by field. `CSndParams` is the clearest case: its save hook
+    // writes an `SParamKey` and clears the write-members flag, and its load hook
+    // reads that key back and returns the *shared* descriptor from
+    // `FindOrCreateSndParamsByKey`, so both sides of a sync stream keep pointing
+    // at one registered descriptor per (cue, bank, cutoff, rpc) tuple.
+    //
+    // The signatures are the ones the binary actually calls with, read off the
+    // two dispatchers rather than guessed:
+    //   0x00953720 `ReadRawPointer`  -> mSerConstructFunc(archive, version, ownerRef, result)
+    //   0x00953320 `WriteRawPointer` -> mSerSaveConstructArgsFunc(archive, object, version, ownerRef, result)
+    // Both are `__cdecl` free functions; the save hook's five arguments are
+    // confirmed by the `CSndParams` thunk at 0x004E0C50, which takes arg_0..arg_10
+    // and forwards arg_0, arg_4 and arg_10 to the body at 0x004E0CD0.
+    using save_construct_args_func_t =
+      void (*)(WriteArchive* archive, void* object, int version, RRef* ownerRef, SerSaveConstructArgsResult* result);
     using save_func_t = void (*)(WriteArchive*, int, int, RRef*);
-    using construct_func_t = void (*)(void*);
+    using construct_func_t =
+      void (*)(ReadArchive* archive, int version, RRef* ownerRef, SerConstructResult* result);
     using load_func_t = void (*)(ReadArchive*, int, int, RRef*);
     using new_ref_func_t = RRef (*)();
     using cpy_ref_func_t = RRef (*)(RRef*);

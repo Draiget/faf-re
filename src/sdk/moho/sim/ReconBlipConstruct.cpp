@@ -31,7 +31,7 @@ namespace moho
    * Forwards construct callback flow into `ReconBlip::MemberConstruct`.
    */
   void ReconBlipConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, const int version, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int version, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (!archive || !result) {

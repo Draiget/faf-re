@@ -311,7 +311,7 @@ CWaitForTaskConstruct::~CWaitForTaskConstruct()
  * default-construct + `SetUnowned` body.
  */
 void CWaitForTaskConstruct::Construct(
-  void* /*archive*/, void* /*objectStorage*/, int /*version*/, gpg::SerConstructResult* const result
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   ConstructCWaitForTaskForSerializer(result);

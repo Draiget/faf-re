@@ -54,7 +54,9 @@ namespace moho
      * What it does:
      * Forwards construct callback flow into `CAiTransportImpl::MemberConstruct`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x005EC380 (FUN_005EC380, Moho::CAiTransportImplConstruct::Deconstruct)

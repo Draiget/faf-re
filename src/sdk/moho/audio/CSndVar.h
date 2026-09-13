@@ -114,7 +114,9 @@ namespace moho
      * Reads one variable-name construct arg, interns/creates the matching
      * `CSndVar`, and returns it as an owned reflection result.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x004E4BD0 (FUN_004E4BD0, Moho::CSndVarConstruct::Deconstruct)
@@ -188,6 +190,7 @@ namespace moho
       gpg::WriteArchive* archive,
       int objectPtr,
       int version,
+      gpg::RRef* ownerRef,
       gpg::SerSaveConstructArgsResult* result
     );
 

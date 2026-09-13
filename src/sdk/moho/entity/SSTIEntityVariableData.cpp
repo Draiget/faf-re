@@ -1066,23 +1066,21 @@ namespace moho
 
     const gpg::RRef ownerRef{};
 
-    gpg::RType* const scmType = ResolveRScmResourceType();
-    GPG_ASSERT(scmType != nullptr);
-    gpg::WriteRawPointer(
-      archive,
-      MakeObjectRef(const_cast<RScmResource*>(mScmResource.get()), scmType),
-      gpg::TrackedPointerState::Shared,
-      ownerRef
-    );
+    // The reflected type has to be the one the reflection system registered
+    // against `typeid(T)`, because that is the `RType` the load/save-construct
+    // hooks were installed on -- resolving it by *name* can hand back a
+    // different descriptor, and then the reader silently falls through to
+    // default construction. The binary builds these refs with the canonical
+    // typed builders (0x00559E34 `RRef_RScmResource`, 0x00559E5F
+    // `RRef_RMeshBlueprint`, and `RRef_CSndParams` for the two sound lanes
+    // below), so this does too.
+    gpg::RRef scmRef{};
+    (void)gpg::RRef_RScmResource(&scmRef, const_cast<RScmResource*>(mScmResource.get()));
+    gpg::WriteRawPointer(archive, scmRef, gpg::TrackedPointerState::Shared, ownerRef);
 
-    gpg::RType* const meshType = ResolveRMeshBlueprintType();
-    GPG_ASSERT(meshType != nullptr);
-    gpg::WriteRawPointer(
-      archive,
-      MakeObjectRef(const_cast<RMeshBlueprint*>(mMeshBlueprint), meshType),
-      gpg::TrackedPointerState::Unowned,
-      ownerRef
-    );
+    gpg::RRef meshRef{};
+    (void)gpg::RRef_RMeshBlueprint(&meshRef, const_cast<RMeshBlueprint*>(mMeshBlueprint));
+    gpg::WriteRawPointer(archive, meshRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     gpg::RType* const vector3Type = ResolveVector3fType();
     GPG_ASSERT(vector3Type != nullptr);
@@ -1113,20 +1111,13 @@ namespace moho
     archive->WriteFloat(mScroll1U);
     archive->WriteFloat(mScroll1V);
 
-    gpg::RType* const soundType = ResolveCSndParamsType();
-    GPG_ASSERT(soundType != nullptr);
-    gpg::WriteRawPointer(
-      archive,
-      MakeObjectRef(mAmbientSound, soundType),
-      gpg::TrackedPointerState::Unowned,
-      ownerRef
-    );
-    gpg::WriteRawPointer(
-      archive,
-      MakeObjectRef(mRumbleSound, soundType),
-      gpg::TrackedPointerState::Unowned,
-      ownerRef
-    );
+    gpg::RRef ambientRef{};
+    (void)gpg::RRef_CSndParams(&ambientRef, mAmbientSound);
+    gpg::WriteRawPointer(archive, ambientRef, gpg::TrackedPointerState::Unowned, ownerRef);
+
+    gpg::RRef rumbleRef{};
+    (void)gpg::RRef_CSndParams(&rumbleRef, mRumbleSound);
+    gpg::WriteRawPointer(archive, rumbleRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
     archive->WriteBool(mVisibilityHidden != 0u);
 

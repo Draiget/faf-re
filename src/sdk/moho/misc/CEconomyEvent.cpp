@@ -51,7 +51,9 @@ namespace
   // anonymous namespace; CEconRequestConstruct/CEconRequestSerializer's
   // ctors and Init() bodies below only need the signatures.
   [[nodiscard]] gpg::RType* CachedCEconRequestType();
-  void ConstructCEconRequestSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+  void ConstructCEconRequestSerializerCallback(
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+  );
   void DeconstructCEconRequestSerializerCallback(moho::CEconRequest* request);
   void DeserializeCEconRequestSerializerCallback(gpg::ReadArchive* archive, moho::CEconRequest* request);
   void SerializeCEconRequestSerializerCallback(gpg::WriteArchive* archive, moho::CEconRequest* request);
@@ -304,10 +306,7 @@ namespace
    * publishes the object as an unowned construct result.
    */
   [[maybe_unused]] void ConstructCEconRequestSerializerCallback(
-    gpg::ReadArchive* const,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (result == nullptr) {
@@ -1197,7 +1196,7 @@ void moho::ConstructCEconomyEventForSerializer(gpg::SerConstructResult* const re
 [[maybe_unused]] void moho::ConstructCEconomyEventSerializerThunk(
   gpg::ReadArchive* const,
   const int,
-  const int,
+  gpg::RRef* const,
   gpg::SerConstructResult* const result
 )
 {

@@ -135,10 +135,7 @@ namespace moho
    * `ConstructShieldForSerializerFromArchive`.
    */
   void ConstructShieldSerializerThunk(
-    gpg::ReadArchive* archive,
-    int objectPtr,
-    int version,
-    gpg::SerConstructResult* result
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
   );
 
   /**
@@ -174,7 +171,7 @@ namespace moho
      * `Entity::SimulationRef` field at +0x148) as an unowned tracked pointer.
      */
     static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
     );
 
     /**

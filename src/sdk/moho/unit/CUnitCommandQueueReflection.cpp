@@ -148,6 +148,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int version,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {
@@ -199,9 +200,7 @@ namespace moho
    */
   void CUnitCommandQueueConstruct::Construct(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::SerConstructResult* const result
+    const int version, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (archive == nullptr || result == nullptr) {
@@ -209,7 +208,6 @@ namespace moho
     }
 
     CUnitCommandQueue::MemberConstruct(*archive, version, gpg::RRef{}, *result);
-    (void)objectPtr;
   }
 
   /**

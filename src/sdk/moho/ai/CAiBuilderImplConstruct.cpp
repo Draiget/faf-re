@@ -89,10 +89,7 @@ namespace
  * Address: 0x0059FD80 (FUN_0059FD80, construct callback)
  */
 void CAiBuilderImplConstruct::Construct(
-  gpg::ReadArchive* const,
-  const int,
-  const int,
-  gpg::SerConstructResult* const result
+  gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
 )
 {
   if (!result) {

@@ -161,7 +161,7 @@ namespace
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int version,
-    gpg::SerSaveConstructArgsResult* const result
+    gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     SaveConstructArgs_SPhysBodyVariant2(archive, objectPtr, version, result);
@@ -171,10 +171,7 @@ namespace
    * Address: 0x006981B0 (FUN_006981B0, construct callback body)
    */
   void ConstructSPhysBody(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     moho::SPhysConstants* const constants = ReadSPhysConstantsPointer(archive);

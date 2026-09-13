@@ -42,7 +42,7 @@ namespace
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
-    gpg::SerSaveConstructArgsResult* const result
+    gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const unit = reinterpret_cast<moho::Unit*>(objectPtr);

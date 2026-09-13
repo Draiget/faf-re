@@ -558,9 +558,7 @@ namespace moho
    */
   void CIntelGridConstruct::Construct(
     gpg::ReadArchive* const archive,
-    const int objectPtr,
-    const int version,
-    gpg::SerConstructResult* const result
+    const int version, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     if (archive == nullptr || result == nullptr) {
@@ -579,7 +577,6 @@ namespace moho
     (void)FillCIntelGridRef(intelGrid, &outRef);
     result->SetUnowned(outRef, 0u);
 
-    (void)objectPtr;
     (void)version;
   }
 

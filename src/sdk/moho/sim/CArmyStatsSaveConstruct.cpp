@@ -32,7 +32,7 @@ namespace
    * Address: 0x0070DF60 (FUN_0070DF60, sub_70DF60)
    */
   void SaveConstructArgs_CArmyStats(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const object = reinterpret_cast<moho::CArmyStats*>(objectPtr);

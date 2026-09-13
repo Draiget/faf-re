@@ -51,7 +51,7 @@ namespace moho
      * Serializes the owning `Sim` pointer for `CCommandDb` as an unowned tracked pointer.
      */
     static void SaveConstructArgs(
-      gpg::WriteArchive* archive, int objectPtr, int version, gpg::SerSaveConstructArgsResult* result
+      gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef, gpg::SerSaveConstructArgsResult* result
     );
 
     /**
@@ -102,7 +102,9 @@ namespace moho
      * What it does:
      * Reads the owning `Sim` pointer, allocates `CCommandDb`, and returns it as unowned.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x006E1BA0 (FUN_006E1BA0, Moho::CCommandDBConstruct::RegisterConstructFunction)

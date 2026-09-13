@@ -40,6 +40,7 @@ namespace moho
     gpg::WriteArchive* const archive,
     const int objectPtr,
     const int,
+    gpg::RRef* const,
     gpg::SerSaveConstructArgsResult* const result
   )
   {

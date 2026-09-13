@@ -41,7 +41,7 @@ namespace moho
    * returns it through `SerConstructResult` as unowned payload.
    */
   void CParticleTextureConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     msvc8::string texturePath{};

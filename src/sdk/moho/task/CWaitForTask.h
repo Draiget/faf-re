@@ -102,7 +102,9 @@ namespace moho
      * allocates its own `CWaitForTask` storage rather than using any
      * caller-provided storage.
      */
-    static void Construct(void* archive, void* objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x004CB9E0 (FUN_004CB9E0, CWaitForTask construct delete callback)

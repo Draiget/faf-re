@@ -227,7 +227,7 @@ namespace
    * payloads and returns it as an unowned construct result.
    */
   void ConstructDColPrimSphere(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     Wm3::Sphere3f shape{};
@@ -277,7 +277,7 @@ namespace
    * primitive serialization helper.
    */
   void SaveConstructArgsDColPrimSphere(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const primitive = reinterpret_cast<moho::SphereCollisionPrimitive*>(objectPtr);

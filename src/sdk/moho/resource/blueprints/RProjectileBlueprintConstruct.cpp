@@ -79,10 +79,7 @@ namespace moho
    * projectile blueprint pointer, and stores it as owned construct result.
    */
   void Construct_RProjectileBlueprint(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     RRuleGameRules* const gameRules = ReadRuleGameRulesPointer(archive);

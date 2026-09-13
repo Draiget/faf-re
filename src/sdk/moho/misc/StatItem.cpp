@@ -33,6 +33,15 @@
 
 #include "gpg/core/reflection/StaticInitPhase.h"
 
+namespace gpg
+{
+  class SerConstructResult
+  {
+  public:
+    void SetUnowned(const RRef& ref, unsigned int flags);
+  };
+} // namespace gpg
+
 namespace
 {
   struct StatIntrusiveNode
@@ -281,13 +290,27 @@ namespace
 
   /**
    * Address: 0x00419F00 (FUN_00419F00, func_NewStats_StatItem)
+   *
+   * IDA signature:
+   * void __cdecl sub_419F00(int a1, int _2C, int a3, gpg::SerConstructResult *a4);
+   *
+   * What it does:
+   * The `Stats<StatItem>` load-construct hook: heap-allocates the container,
+   * runs its constructor, and publishes it to the archive as an unowned
+   * construct result, leaving the member payload to the loader. The body reads
+   * its result out of `arg_C` (0x00419F69, `mov ecx, [ebp+arg_C]`), which is the
+   * fourth of the four arguments `ReadRawPointer` dispatches with.
    */
-  void ConstructStatsStatItem(void* objectStorage)
+  void ConstructStatsStatItem(
+    gpg::ReadArchive* const, const int, gpg::RRef* const, gpg::SerConstructResult* const result
+  )
   {
-    if (!objectStorage) {
+    if (!result) {
       return;
     }
-    new (objectStorage) moho::Stats<moho::StatItem>();
+
+    auto* const stats = new (std::nothrow) moho::Stats<moho::StatItem>();
+    result->SetUnowned(MakeStatsStatItemRef(stats), 0u);
   }
 
   /**

@@ -553,7 +553,9 @@ namespace moho
      * Allocates one `CAnimationManipulator`, runs constructor setup, and
      * returns an unowned reflected reference through `SerConstructResult`.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x00642340 (FUN_00642340, Moho::CAnimationManipulatorConstruct::Deconstruct)

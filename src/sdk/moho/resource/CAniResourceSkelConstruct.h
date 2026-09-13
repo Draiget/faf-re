@@ -47,7 +47,9 @@ namespace moho
      * resource, acquires its shared skeleton payload, and forwards it into the
      * construct result as shared `CAniSkel` content.
      */
-    static void Construct(gpg::ReadArchive* archive, int objectStorage, int version, gpg::SerConstructResult* result);
+    static void Construct(
+      gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+    );
 
     /**
      * Address: 0x00539B80 (FUN_00539B80, Moho::CAniResourceSkelConstruct::Deconstruct)

@@ -94,7 +94,7 @@ namespace moho
    * construct-result shared ownership as a `CAniSkel` lane.
    */
   void CAniResourceSkelConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     msvc8::string modelPath{};

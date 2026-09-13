@@ -34,7 +34,9 @@ namespace moho
   // Forward declaration: the real definition sits further down in this TU;
   // RPropBlueprintConstruct's ctor below only needs the signature to bind
   // the callback pointer.
-  void Construct_RPropBlueprint(gpg::ReadArchive* archive, int objectPtr, int version, gpg::SerConstructResult* result);
+  void Construct_RPropBlueprint(
+    gpg::ReadArchive* archive, int version, gpg::RRef* ownerRef, gpg::SerConstructResult* result
+  );
 
   // Forward declaration: the real definition sits further down in this TU;
   // RPropBlueprintSaveConstruct's ctor below only needs the signature to
@@ -348,10 +350,7 @@ namespace moho
    * owned construct-result payload.
    */
   void Construct_RPropBlueprint(
-    gpg::ReadArchive* const archive,
-    const int,
-    const int,
-    gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     RRuleGameRules* gameRules = nullptr;

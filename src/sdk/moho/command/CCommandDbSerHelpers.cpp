@@ -115,7 +115,7 @@ namespace moho
    * Serializes the owning `Sim` pointer for `CCommandDb` as an unowned tracked pointer.
    */
   void CCommandDBSaveConstruct::SaveConstructArgs(
-    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::SerSaveConstructArgsResult* const result
+    gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
     auto* const commandDb = reinterpret_cast<moho::CCommandDb*>(objectPtr);
@@ -179,7 +179,7 @@ namespace moho
    * Reads the owning `Sim` pointer, allocates `CCommandDb`, and returns it as unowned.
    */
   void CCommandDBConstruct::Construct(
-    gpg::ReadArchive* const archive, const int, const int, gpg::SerConstructResult* const result
+    gpg::ReadArchive* const archive, const int, gpg::RRef* const, gpg::SerConstructResult* const result
   )
   {
     moho::Sim* const ownerSim = ReadSimOwner(archive);
