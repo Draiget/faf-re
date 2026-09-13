@@ -102,8 +102,17 @@ namespace moho
      *
      * What it does:
      * Unregisters from the active watch, then clears pattern/event vectors.
+     *
+     * Not virtual, and the mangled name above says so itself: `??1...@QAE@XZ`
+     * is a public non-virtual member (a virtual one decorates `UAE`).
+     * ??_7CDiskWatchListener@Moho@@6B@ (0x00E03474) agrees -- three slots
+     * starting at OnEvent -- as does ResourceManager, which derives from this
+     * and whose table (0x00E07604) also starts at CDiskWatchListener::OnEvent.
+     * A virtual destructor here displaced OnEvent, FilterEvent and
+     * OnDiskWatchEvent by one in both classes. Nothing deletes through a
+     * `CDiskWatchListener*`.
      */
-    virtual ~CDiskWatchListener();
+    ~CDiskWatchListener();
 
     /**
      * Address: 0x00461DC0 (FUN_00461DC0, ?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)

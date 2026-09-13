@@ -43,7 +43,7 @@ namespace moho
      * What it does:
      * Releases embedded sheet/target wrappers and clears vector storage.
      */
-    ~CD3DDeviceResources() override;
+    ~CD3DDeviceResources();
 
     /**
      * Address: 0x00440DC0 (FUN_00440DC0)

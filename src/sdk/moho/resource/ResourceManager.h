@@ -112,7 +112,7 @@ namespace moho
      * Address: 0x004A9C00 (FUN_004A9C00)
      * Mangled context: teardown helper used by singleton cleanup.
      */
-    ~ResourceManager() override;
+    ~ResourceManager();
 
     /**
      * Address: 0x00461DC0 (FUN_00461DC0, ?OnEvent@CDiskWatchListener@Moho@@EAEXABUSDiskWatchEvent@2@@Z)
