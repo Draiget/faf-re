@@ -146,6 +146,18 @@
 #include "moho/sim/UserArmy.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
+#include "moho/sim/STIMapReflection.h"
+
+namespace gpg
+{
+  /**
+   * What it does:
+   * Builds one typed reflection reference for a `CTaskStage*`. Declared here
+   * because its definition lives beside the other archive reference builders
+   * in `gpg/core/containers/ArchiveSerialization.cpp` and has no header yet.
+   */
+  RRef* RRef_CTaskStage(RRef* outRef, moho::CTaskStage* value);
+} // namespace gpg
 #include "moho/ui/CUIManager.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/EIntelTypeInfo.h"
@@ -8027,6 +8039,42 @@ namespace
       table.SetObject(key, value);
     }
   }
+  /**
+   * Address: 0x007551C0 (the save half, nine `PreCreatedPtr` calls at
+   * 0x0075520A..0x00755391) and 0x00754C60 (the load half, nine
+   * `TrackPointer` calls at 0x00754C95..0x00754E1C)
+   *
+   * What it does:
+   * Names the nine objects that already exist on both ends of a sim archive
+   * before any payload moves: the sim itself, its Lua state, the game rules
+   * and the footprint blueprint they own, the map, the path tables, and the
+   * three task stages.
+   *
+   * Registering them up front is what lets everything nested below refer to
+   * them by index instead of by value. It is not an optimisation: none of
+   * those types carries a construct or new-ref callback, so a nested write
+   * that met one of them for the first time would have nothing to build it
+   * with and would raise `SerializationError`. A blueprint's save-construct
+   * arguments are exactly that case -- they lead with the owning
+   * `RRuleGameRules*` -- which is why the serializer opens here.
+   *
+   * Both halves register the same nine in the same order, which is also what
+   * keeps the two tracked-pointer tables index-aligned.
+   */
+  void CollectSimArchiveRoots(moho::Sim* const sim, gpg::RRef (&outRoots)[9])
+  {
+    outRoots[0] = MakeSimOwnerRef(sim);
+    (void)gpg::RRef_LuaState(&outRoots[1], sim->mLuaState);
+    (void)gpg::RRef_RRuleGameRules(&outRoots[2], sim->mRules);
+    (void)gpg::RRef_SRuleFootprintsBlueprint(
+      &outRoots[3], const_cast<moho::SRuleFootprintsBlueprint*>(sim->mRules->GetFootprints())
+    );
+    (void)gpg::RRef_STIMap(&outRoots[4], sim->mMapData);
+    (void)gpg::RRef_PathTables(&outRoots[5], sim->mPathTables);
+    (void)gpg::RRef_CTaskStage(&outRoots[6], &sim->mTaskStageA);
+    (void)gpg::RRef_CTaskStage(&outRoots[7], &sim->mDiskWatcherTaskStage);
+    (void)gpg::RRef_CTaskStage(&outRoots[8], &sim->mTaskStageB);
+  }
 } // namespace
 
 /**
@@ -8042,6 +8090,19 @@ void Sim::SerializeLoadBody(gpg::ReadArchive* archive)
   }
 
   const gpg::RRef ownerRef = MakeSimOwnerRef(this);
+
+  // 0x00754C95..0x00754E1C: the nine objects the reader already holds are
+  // pushed into the tracked-pointer table before a byte of payload is read,
+  // so the indices the writer emitted resolve to the live objects.
+  gpg::RRef roots[9]{};
+  CollectSimArchiveRoots(this, roots);
+  for (const gpg::RRef& root : roots) {
+    (void)archive->TrackPointer(root);
+  }
+
+  // 0x00754E34: the sim's `Sync` table is emptied before the incoming state
+  // is applied, so nothing from the previous session leaks into this one.
+  (void)SCR_LuaDoString("ResetSyncTable()", mLuaState);
 
   // 0x00754C60 order recovered from IDA/decomp.
   SerMapData(archive);
@@ -8186,6 +8247,19 @@ void Sim::SerializeSaveBody(gpg::WriteArchive* archive)
   }
 
   const gpg::RRef ownerRef = MakeSimOwnerRef(this);
+
+  // 0x0075520A..0x00755391: the nine objects the reader already holds are
+  // registered before any payload is written, so every nested reference to
+  // them goes out as an index rather than as an object the far side would
+  // have to construct.
+  gpg::RRef roots[9]{};
+  CollectSimArchiveRoots(this, roots);
+  for (const gpg::RRef& root : roots) {
+    (void)archive->PreCreatedPtr(root);
+  }
+
+  // 0x007553A9: `Sync` is emptied once the snapshot has been taken.
+  (void)SCR_LuaDoString("ResetSyncTable()", mLuaState);
 
   // 0x007551C0 order recovered from IDA/decomp.
   SerMapData(archive);
