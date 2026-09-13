@@ -56,7 +56,7 @@ namespace moho
      * Clears the cached runtime state used by the high-fidelity water render
      * path, including both shared texture handles and owned render sheets.
      */
-    void ReleaseRenderState();
+    void Destroy() override;
 
     /**
      * Address: 0x008105E0 (FUN_008105E0, Moho::HighFidelityWater::Func2)

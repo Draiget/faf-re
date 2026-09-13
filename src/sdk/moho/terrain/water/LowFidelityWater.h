@@ -45,7 +45,7 @@ namespace moho
      * Releases retained low-fidelity water vertex/index sheet ownership and
      * clears the bound terrain-resource lane.
      */
-    std::int32_t ReleaseRenderSheets();
+    void Destroy() override;
 
     /**
      * Address: 0x0080FC70 (FUN_0080FC70, Moho::LowFidelityWater::Func2)
