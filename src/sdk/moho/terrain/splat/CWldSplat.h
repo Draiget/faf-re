@@ -262,6 +262,26 @@ namespace moho
     [[nodiscard]] CWldTerrainDecal* FindDecalByIndex(std::uint32_t decalIndex) const;
 
     /**
+     * Address: 0x00877F90 (FUN_00877F90, Moho::CDecalManager::GetDecalCount)
+     * Slot: 4 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mDecals.size()`, open-coded as `(last - first) >> 2` over the vector's
+     * word pair at +0x10/+0x14, with a null-first guard returning 0 -- the
+     * shape a VC8 `size()` on an unallocated vector compiles to.
+     */
+    [[nodiscard]] virtual std::int32_t GetDecalCount() const;
+
+    /**
+     * Address: 0x00877FE0 (FUN_00877FE0, Moho::CDecalManager::GetDecal)
+     * Slot: 5 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mDecals[index]`, unchecked: `mov eax,[ecx+10h]; mov eax,[eax+ecx*4]`.
+     */
+    [[nodiscard]] virtual CWldTerrainDecal* GetDecal(std::int32_t index) const;
+
+    /**
      * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
      *
      * What it does:
@@ -284,6 +304,43 @@ namespace moho
      * 0x008782D0, is the group pointer itself.)
      */
     [[nodiscard]] CDecalGroup* FindGroupBySplatIndex(std::uint32_t splatIndex) const;
+
+    /**
+     * Address: 0x00878270 (FUN_00878270, Moho::CDecalManager::DecalGroupCount)
+     * Slot: 10 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mDecalGroups.size()`, the same open-coded shape as `GetDecalCount` over
+     * the word pair at +0x2C/+0x30.
+     */
+    [[nodiscard]] virtual std::int32_t GetDecalGroupCount() const;
+
+    /**
+     * Address: 0x00878290 (FUN_00878290, Moho::CDecalManager::GetDecalGroup)
+     * Slot: 11 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mDecalGroups[index]`, unchecked.
+     */
+    [[nodiscard]] virtual CDecalGroup* GetDecalGroup(std::int32_t index) const;
+
+    /**
+     * Address: 0x00877FB0 (FUN_00877FB0, Moho::CDecalManager::SplatCount)
+     * Slot: 15 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mSplats.size()`, over the word pair at +0x48/+0x4C.
+     */
+    [[nodiscard]] virtual std::int32_t GetSplatCount() const;
+
+    /**
+     * Address: 0x00877FD0 (FUN_00877FD0, Moho::CDecalManager::GetSplat)
+     * Slot: 16 (`??_7CDecalManager@Moho@@6B@` at 0x00E4982C)
+     *
+     * What it does:
+     * `mSplats[index]`, unchecked.
+     */
+    [[nodiscard]] virtual CWldSplat* GetSplat(std::int32_t index) const;
 
     /**
      * Address: 0x00878650 (FUN_00878650, Moho::CDecalManager::AddDecals)
@@ -410,6 +467,16 @@ namespace moho
      * registration and sorts the collected pointer range.
      */
     std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod);
+
+    /**
+     * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)
+     * Slot: 27 (`??_7CDecalManager@Moho@@6B@` + 0x6C)
+     *
+     * What it does:
+     * The setter half of the pair below: `mov byte ptr [ecx+110h], 1`, raising
+     * the same `mDidSomething` flag that slot 28 reads and slot 29 clears.
+     */
+    virtual void MarkPendingChanges();
 
     /**
      * Address: 0x00878CB0 (FUN_00878CB0, Moho::CDecalManager::Func26)

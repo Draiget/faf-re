@@ -361,6 +361,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x00877F90 (FUN_00877F90, Moho::CDecalManager::GetDecalCount)
+   *
+   * What it does: see the header -- the decal vector's element count.
+   */
+  std::int32_t CDecalManager::GetDecalCount() const
+  {
+    return static_cast<std::int32_t>(mDecals.size());
+  }
+
+  /**
+   * Address: 0x00877FE0 (FUN_00877FE0, Moho::CDecalManager::GetDecal)
+   *
+   * What it does: see the header -- unchecked indexed access.
+   */
+  CWldTerrainDecal* CDecalManager::GetDecal(const std::int32_t index) const
+  {
+    return mDecals[static_cast<std::size_t>(index)];
+  }
+
+  /**
    * Address: 0x00878250 (FUN_00878250, Moho::CDecalManager::DestroyDecal)
    *
    * IDA signature:
@@ -388,6 +408,46 @@ namespace moho
   {
     CDecalGroup* const* const found = mDecalGroupLookupBySplatIndex.try_get(splatIndex);
     return found != nullptr ? *found : nullptr;
+  }
+
+  /**
+   * Address: 0x00878270 (FUN_00878270, Moho::CDecalManager::DecalGroupCount)
+   *
+   * What it does: see the header -- the decal-group vector's element count.
+   */
+  std::int32_t CDecalManager::GetDecalGroupCount() const
+  {
+    return static_cast<std::int32_t>(mDecalGroups.size());
+  }
+
+  /**
+   * Address: 0x00878290 (FUN_00878290, Moho::CDecalManager::GetDecalGroup)
+   *
+   * What it does: see the header -- unchecked indexed access.
+   */
+  CDecalGroup* CDecalManager::GetDecalGroup(const std::int32_t index) const
+  {
+    return mDecalGroups[static_cast<std::size_t>(index)];
+  }
+
+  /**
+   * Address: 0x00877FB0 (FUN_00877FB0, Moho::CDecalManager::SplatCount)
+   *
+   * What it does: see the header -- the splat vector's element count.
+   */
+  std::int32_t CDecalManager::GetSplatCount() const
+  {
+    return static_cast<std::int32_t>(mSplats.size());
+  }
+
+  /**
+   * Address: 0x00877FD0 (FUN_00877FD0, Moho::CDecalManager::GetSplat)
+   *
+   * What it does: see the header -- unchecked indexed access.
+   */
+  CWldSplat* CDecalManager::GetSplat(const std::int32_t index) const
+  {
+    return mSplats[static_cast<std::size_t>(index)];
   }
 
   /**
@@ -819,6 +879,16 @@ namespace moho
   bool CDecalManager::HasPendingChanges() const
   {
     return mDidSomething != 0;
+  }
+
+  /**
+   * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)
+   *
+   * What it does: see the header -- raises the pending-changes flag.
+   */
+  void CDecalManager::MarkPendingChanges()
+  {
+    mDidSomething = 1;
   }
 
   /**
