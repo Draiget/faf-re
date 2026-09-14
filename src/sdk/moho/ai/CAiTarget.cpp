@@ -47,20 +47,17 @@ namespace
     return cursor;
   }
 
+  // `CAiTarget::DecodeFromSSTITarget` (0x005E2620) resolves an id with
+  // `std::map<EntId, Entity*>::find` over `EntityDB::mAllUnits`, collapsing a
+  // miss onto the head node -- which is exactly `CEntityDb::FindEntityById`
+  // (0x006856C0, over `FindEntityPayloadByIdNode` 0x00684530). A hand-rolled
+  // linear walk of the recovery's own side list used to stand here; it is a
+  // second, unevidenced spelling of a lookup the engine already has, and the
+  // two containers are maintained by different code paths, so they can
+  // disagree about an id the tree still holds.
   [[nodiscard]] Entity* FindEntityById(CEntityDb* entityDb, const EntId entityId)
   {
-    if (!entityDb) {
-      return nullptr;
-    }
-
-    for (auto it = entityDb->Entities().begin(); it != entityDb->Entities().end(); ++it) {
-      Entity* const entity = *it;
-      if (entity && entity->id_ == entityId) {
-        return entity;
-      }
-    }
-
-    return nullptr;
+    return entityDb != nullptr ? entityDb->FindEntityById(static_cast<std::uint32_t>(entityId)) : nullptr;
   }
 
   [[nodiscard]] gpg::RType* CachedEAiTargetType()
