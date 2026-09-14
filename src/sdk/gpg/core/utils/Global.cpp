@@ -198,14 +198,6 @@ namespace
 
     void __stdcall TlsCallback_1(void* moduleHandle, DWORD reason, void* reserved);
 
-    struct ThreadCacheTlsDetachBridge
-    {
-        ~ThreadCacheTlsDetachBridge()
-        {
-            TlsCallback_1(nullptr, DLL_THREAD_DETACH, nullptr);
-        }
-    };
-
     thread_local ThreadHeapCache* gThreadHeapCache = nullptr;
 
     // TEMPORARY PROBE (do not commit). Registry of caches currently held by a
@@ -239,7 +231,6 @@ namespace
             if (slot.cache == cache) { slot.cache = nullptr; slot.tid = 0; return; }
         }
     }
-    [[maybe_unused]] thread_local ThreadCacheTlsDetachBridge gThreadCacheTlsDetachBridge{};
 
     [[nodiscard]] constexpr std::uint32_t BytesToPages(const std::uint32_t bytes)
     {
@@ -1457,6 +1448,39 @@ namespace
         return nullptr;
     }
 }
+
+/**
+ * The shipped image registers `TlsCallback_1` (0x009583F0) through the PE's own
+ * TLS callback directory: the TLS data directory at RVA 0x00A4FA30 points its
+ * `AddressOfCallBacks` at 0x00D410F8, whose two entries are 0x00AC6060 and
+ * 0x009583F0.
+ *
+ * That registration is load bearing, and emulating it with a `thread_local`
+ * object whose destructor calls `TlsCallback_1(nullptr, DLL_THREAD_DETACH,
+ * nullptr)` -- which is what this file did until now -- is wrong twice over.
+ *
+ *  - It reports the wrong reason at process exit. Windows delivers
+ *    `DLL_PROCESS_DETACH` there, and `TlsCallback_1` acts only on
+ *    `DLL_THREAD_DETACH`, so the shipped engine flushes nothing while the
+ *    process is tearing down. The bridge forced the thread-detach path anyway,
+ *    from a CRT dynamic TLS destructor inside `LdrShutdownProcess`, long after
+ *    the allocator's page-owner map is usable: `FlushCurrentThreadHeapCache` ->
+ *    `TrimThreadCache` -> `PushHeapBlock` then read `owner->blocks` through a
+ *    null `GetPageOwner` result and faulted on address 0x00000020 (observed
+ *    live, with that exact stack).
+ *  - A namespace-scope `thread_local` with a non-trivial destructor is only
+ *    constructed on threads that actually touch it, and nothing referenced this
+ *    one, so on every other thread the per-thread cache was never returned to
+ *    the global free lists at all.
+ *
+ * Registering the real callback fixes both: the reason code is whatever Windows
+ * passes, and every thread exit runs it.
+ */
+#pragma comment(linker, "/INCLUDE:__tls_used")
+#pragma comment(linker, "/INCLUDE:_gAllocatorTlsCallbackEntry")
+#pragma const_seg(".CRT$XLB")
+extern "C" const PIMAGE_TLS_CALLBACK gAllocatorTlsCallbackEntry = &TlsCallback_1;
+#pragma const_seg()
 
 // 0x0093EDE0
 void gpg::HandleAssertFailure(const char* msg, int line, const char* file)
