@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "moho/ai/CAiBrain.h"
+#include "moho/animation/CAniActor.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/intel/CIntel.h"
@@ -859,7 +860,36 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
   }
 
   if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_LOSNow)) != 0u) {
+    // 0x005C1BD5 `mov eax, [ebx+88h]` / `mov [edi+8], eax`: the source unit's
+    // mesh-blueprint lane (Entity +0x80 == SSTIEntityVariableData +0x08) into
+    // `SPerArmyReconInfo::mStiMesh` -- the same union slot this field names.
     perArmy->mMeshTypeClassId = sourceUnit->mMeshTypeClassId;
+
+    // 0x005C1BE5 `Entity::GetMesh()` returns a retained
+    // `shared_ptr<RScmResource>`; the snapshot takes its own owner on the
+    // control block (0x005C1BF2..0x005C1C1B) and the temporary is released at
+    // 0x005C1C2A.
+    //
+    // This capture was missing. `ReconBlip::SyncInterface` ships
+    // `mMesh.px`/`mMesh.pi` to the client through `PatchEntityUpdateReconMesh`,
+    // and `UserEntity::UpdateEntityData` only builds a mesh instance when the
+    // incoming `mScmResource` is non-null -- so every recon blip arrived with no
+    // scm resource and the client drew the unit's footprint and attached
+    // effects but never its mesh.
+    boost::SharedPtrRaw<RScmResource> unitMesh = sourceUnit->Entity::GetMesh();
+    perArmy->mMesh.reset_from(unitMesh);
+    unitMesh.release();
+
+    // 0x005C1C2F: an animated source unit reseats both pose lanes from its
+    // actor; one without an actor drops them instead (0x005C1C95/0x005C1CA0).
+    if (CAniActor* const actor = sourceUnit->AniActor; actor != nullptr) {
+      perArmy->mPriorPose.reset_from_owner(actor->GetPriorPoseShared());
+      perArmy->mPose.reset_from_owner(actor->GetPoseShared());
+    } else {
+      perArmy->mPriorPose.release();
+      perArmy->mPose.release();
+    }
+
     perArmy->mHealth = sourceUnit->Health;
     perArmy->mMaxHealth = sourceUnit->MaxHealth;
     perArmy->mFractionComplete = sourceUnit->FractionCompleted;
