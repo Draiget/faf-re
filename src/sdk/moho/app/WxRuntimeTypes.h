@@ -38,6 +38,7 @@
  * include the real header and let the library provide the body.
  */
 #include <wx/defs.h>
+#include <wx/layout.h>
 #include <wx/object.h>
 #include <wx/stream.h>
 #include <wx/file.h>
@@ -1933,6 +1934,17 @@ public:
    */
   void SetPalette(const wxPaletteRuntime& palette);
 
+  /**
+   * `wxWindowBase::GetConstraints`/`SetConstraints` are trivial one-line
+   * accessors in real wx (`return m_constraints;` / `m_constraints = c;`)
+   * and are inlined at every call site in this binary - there is no
+   * separate compiled body to cite an address for.
+   * `wxWindowBase::LayoutPhase1` (0x009643F0) reads `this->m_constraints`
+   * directly rather than through a call, which is the evidence for that.
+   */
+  [[nodiscard]] void* GetConstraints() const;
+  void SetConstraints(void* constraints);
+
   virtual void Raise() {}
   virtual void Lower() {}
   /**
@@ -2358,11 +2370,17 @@ public:
    */
   virtual void* GetDropTarget() const;
   virtual void SetConstraintSizes(bool recurse) { (void)recurse; }
-  virtual bool LayoutPhase1(std::int32_t* flags)
-  {
-    (void)flags;
-    return false;
-  }
+
+  /**
+   * Address: 0x009643F0 (FUN_009643F0, wxWindowBase::LayoutPhase1)
+   * Mangled: ?LayoutPhase1@wxWindowBase@@UAE_NPAH@Z
+   *
+   * What it does:
+   * First phase of constraint-layout evaluation: try to satisfy this
+   * window's own constraints, if it has any.
+   */
+  virtual bool LayoutPhase1(std::int32_t* noChanges);
+
   virtual bool LayoutPhase2(std::int32_t* flags)
   {
     (void)flags;
