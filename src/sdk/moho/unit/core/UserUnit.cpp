@@ -251,34 +251,14 @@ namespace
   );
   static_assert(offsetof(UserUnitIntelRangeView, cloak) == 0x11C, "UserUnitIntelRangeView::cloak offset must be 0x11C");
 
-  struct UserUnitWeaponRuntimeView
-  {
-    EntityCategorySet rejectCategorySet; // +0x00
-    EntityCategorySet requireCategorySet; // +0x28
-    ELayer layerMask; // +0x50
-    float minRange; // +0x54
-    float maxRange; // +0x58
-    std::uint8_t pad_005C_0098[0x98 - 0x5C];
-  };
-  static_assert(
-    offsetof(UserUnitWeaponRuntimeView, rejectCategorySet) == 0x00,
-    "UserUnitWeaponRuntimeView::rejectCategorySet offset must be 0x00"
-  );
-  static_assert(
-    offsetof(UserUnitWeaponRuntimeView, requireCategorySet) == 0x28,
-    "UserUnitWeaponRuntimeView::requireCategorySet offset must be 0x28"
-  );
-  static_assert(
-    offsetof(UserUnitWeaponRuntimeView, layerMask) == 0x50,
-    "UserUnitWeaponRuntimeView::layerMask offset must be 0x50"
-  );
-  static_assert(
-    offsetof(UserUnitWeaponRuntimeView, minRange) == 0x54, "UserUnitWeaponRuntimeView::minRange offset must be 0x54"
-  );
-  static_assert(
-    offsetof(UserUnitWeaponRuntimeView, maxRange) == 0x58, "UserUnitWeaponRuntimeView::maxRange offset must be 0x58"
-  );
-  static_assert(sizeof(UserUnitWeaponRuntimeView) == 0x98, "UserUnitWeaponRuntimeView size must be 0x98");
+  // The weapon snapshot the client reads here is the very `UnitWeaponInfo` the
+  // sim publishes into `SSTIUnitVariableData::mWeaponInfo` (Unit.h), so it is
+  // named directly rather than re-declared. A second byte-identical layout used
+  // to stand here and was reached by `reinterpret_cast` off the same vector --
+  // its own asserts pinned +0x00/+0x28/+0x50/+0x54/+0x58 and 0x98, exactly
+  // `UnitWeaponInfo`'s, which means any future change to one of the two would
+  // have silently misread `layerMask`/`minRange`/`maxRange` here instead of
+  // failing to compile.
 
   struct UserUnitLuaRuntimeView
   {
@@ -3120,16 +3100,14 @@ namespace
     return *reinterpret_cast<const UserEntityUiFlagView*>(self);
   }
 
-  [[nodiscard]] const UserUnitWeaponRuntimeView* GetWeaponInfoBegin(const UserUnit* const self) noexcept
+  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoBegin(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(self->mUnitVarDat.mWeaponInfo.data());
+    return self->mUnitVarDat.mWeaponInfo.data();
   }
 
-  [[nodiscard]] const UserUnitWeaponRuntimeView* GetWeaponInfoEnd(const UserUnit* const self) noexcept
+  [[nodiscard]] const UnitWeaponInfo* GetWeaponInfoEnd(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const UserUnitWeaponRuntimeView*>(
-      self->mUnitVarDat.mWeaponInfo.data() + self->mUnitVarDat.mWeaponInfo.size()
-    );
+    return self->mUnitVarDat.mWeaponInfo.data() + self->mUnitVarDat.mWeaponInfo.size();
   }
 
   [[nodiscard]] bool ContainsBlueprintCategory(
@@ -3141,16 +3119,16 @@ namespace
   }
 
   [[nodiscard]] bool WeaponAllowsBlueprint(
-    const UserUnitWeaponRuntimeView& weaponInfo,
+    const UnitWeaponInfo& weaponInfo,
     const REntityBlueprint* const blueprint
   ) noexcept
   {
-    if (!weaponInfo.rejectCategorySet.Bits().mWords.empty()
-        && ContainsBlueprintCategory(weaponInfo.rejectCategorySet, blueprint)) {
+    if (!weaponInfo.mCat1.Bits().mWords.empty()
+        && ContainsBlueprintCategory(weaponInfo.mCat1, blueprint)) {
       return false;
     }
-    if (!weaponInfo.requireCategorySet.Bits().mWords.empty()
-        && !ContainsBlueprintCategory(weaponInfo.requireCategorySet, blueprint)) {
+    if (!weaponInfo.mCat2.Bits().mWords.empty()
+        && !ContainsBlueprintCategory(weaponInfo.mCat2, blueprint)) {
       return false;
     }
     return true;
@@ -5035,7 +5013,7 @@ bool UserUnit::FindWeaponBy(
   const IUnit* const iunitBridge = GetIUnitBridge(this);
   const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
   const auto& weaponBlueprints = blueprint->Weapons.WeaponBlueprints;
-  const auto* const weaponRuntime = reinterpret_cast<const UserUnitWeaponRuntimeView*>(mUnitVarDat.mWeaponInfo.data());
+  const UnitWeaponInfo* const weaponRuntime = mUnitVarDat.mWeaponInfo.data();
 
   for (std::size_t i = 0; i < weaponBlueprints.size(); ++i) {
     const auto& weaponBlueprint = weaponBlueprints[i];
@@ -5045,11 +5023,11 @@ bool UserUnit::FindWeaponBy(
     }
 
     const auto& weaponStats = weaponRuntime[weaponBlueprint.WeaponIndex];
-    if (weaponStats.maxRange > *outMaxRange) {
-      *outMaxRange = weaponStats.maxRange;
+    if (weaponStats.mMaxRadius > *outMaxRange) {
+      *outMaxRange = weaponStats.mMaxRadius;
     }
-    if (weaponStats.minRange <= *outMinRange) {
-      *outMinRange = weaponStats.minRange;
+    if (weaponStats.mMinRadius <= *outMinRange) {
+      *outMinRange = weaponStats.mMinRadius;
     }
   }
 
@@ -5366,13 +5344,13 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
       : 0.0f;
     const std::uint32_t targetLayerMask = targetEntity->mVariableData.mLayerMask;
 
-    const UserUnitWeaponRuntimeView* weaponInfo = GetWeaponInfoBegin(this);
-    const UserUnitWeaponRuntimeView* const weaponInfoEnd = GetWeaponInfoEnd(this);
+    const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
+    const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
     while (weaponInfo != weaponInfoEnd) {
-      if ((static_cast<std::uint32_t>(weaponInfo->layerMask) & targetLayerMask) != 0u
+      if ((static_cast<std::uint32_t>(weaponInfo->mLayer) & targetLayerMask) != 0u
           && WeaponAllowsBlueprint(*weaponInfo, targetBlueprint)) {
         if (iunitBridge->IsMobile() || !rangeCheck
-            || (weaponInfo->minRange <= targetDistance && targetDistance <= weaponInfo->maxRange)) {
+            || (weaponInfo->mMinRadius <= targetDistance && targetDistance <= weaponInfo->mMaxRadius)) {
           return true;
         }
       }
@@ -5395,10 +5373,10 @@ bool UserUnit::CanAttackTarget(const UserEntity* targetEntity, bool rangeCheck) 
   }
 
   const float cursorDistance = PlanarDistanceXZ(selfEntity->mVariableData.mCurTransform.pos_, activeSession->CursorWorldPos);
-  const UserUnitWeaponRuntimeView* weaponInfo = GetWeaponInfoBegin(this);
-  const UserUnitWeaponRuntimeView* const weaponInfoEnd = GetWeaponInfoEnd(this);
+  const UnitWeaponInfo* weaponInfo = GetWeaponInfoBegin(this);
+  const UnitWeaponInfo* const weaponInfoEnd = GetWeaponInfoEnd(this);
   while (weaponInfo != weaponInfoEnd) {
-    if (cursorDistance > weaponInfo->minRange && weaponInfo->maxRange > cursorDistance) {
+    if (cursorDistance > weaponInfo->mMinRadius && weaponInfo->mMaxRadius > cursorDistance) {
       return true;
     }
     ++weaponInfo;
