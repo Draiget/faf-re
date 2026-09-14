@@ -14359,12 +14359,10 @@ moho::CMauiBorder::~CMauiBorder()
   AsLazyVarObject(borderView->mBorderHeightLV).~LuaObject();
   AsLazyVarObject(borderView->mBorderWidthLV).~LuaObject();
 
-  borderView->mTexLR.~shared_ptr();
-  borderView->mTexLL.~shared_ptr();
-  borderView->mTexUR.~shared_ptr();
-  borderView->mTexUL.~shared_ptr();
-  borderView->mTexHorz.~shared_ptr();
-  borderView->mTex1.~shared_ptr();
+  // The container/handle members are destroyed by the compiler-emitted
+  // member teardown after this body, in reverse declaration order, exactly
+  // as the binary does. Running them here as well would destroy each one
+  // twice.
 }
 
 /**
@@ -14993,8 +14991,12 @@ moho::CMauiText::~CMauiText()
   AsLazyVarObject(textView->mFontAscentLV).~LuaObject();
   AsLazyVarObject(textView->mTextAdvanceLV).~LuaObject();
 
-  textView->mText.~string();
   ReleaseIntrusiveFont(textView->mFont);
+
+  // The container/handle members are destroyed by the compiler-emitted
+  // member teardown after this body, in reverse declaration order, exactly
+  // as the binary does. Running them here as well would destroy each one
+  // twice.
 }
 
 /**
@@ -17128,7 +17130,6 @@ moho::CMauiMovie::~CMauiMovie()
   // we do it explicitly, matching the binary's destroy-in-reverse sequence.
   reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieHeightLV)->~LuaObject();
   reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieWidthLV)->~LuaObject();
-  movieView->mSubtitleCache.tidy(true, 0U);
 
   if (movieView->mMovie != nullptr) {
     delete movieView->mMovie;
@@ -17817,16 +17818,12 @@ moho::CMauiScrollbar::~CMauiScrollbar()
 {
   CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
 
-  // ---- Step 1: Release the four texture shared-pointer lanes ----
-  // Reverse declaration order, matching the binary's member-teardown sequence.
-  // These are overlay-only members, so their destructors will not run unless
-  // invoked explicitly here.
-  scrollbarView->mBackground.~shared_ptr();
-  scrollbarView->mThumbMiddle.~shared_ptr();
-  scrollbarView->mThumbBottom.~shared_ptr();
-  scrollbarView->mThumbTop.~shared_ptr();
+  // The four texture lanes are real members now, so the compiler emits their
+  // `~shared_ptr` after this body in reverse declaration order - the same
+  // sequence the binary runs. Releasing them here as well would decrement
+  // each refcount twice.
 
-  // ---- Step 2: Unlink the bound scrollable focus sentinel ----
+  // Unlink the bound scrollable focus sentinel.
   UnlinkFocusControlSentinel(&scrollbarView->mScrollableLink);
 
   // ---- Step 3: the embedded IMauiDragger sub-object ----
@@ -24820,10 +24817,15 @@ moho::CMauiBitmap::~CMauiBitmap()
     bitmapView->mHitMask = nullptr;
   }
 
-  bitmapView->mFrames.~vector();
+  // `CScriptLazyVar_float` has no destructor of its own, so its LuaObject
+  // payload still has to be torn down by hand.
   AsLazyVarObject(bitmapView->mBitmapHeightLV).~LuaObject();
   AsLazyVarObject(bitmapView->mBitmapWidthLV).~LuaObject();
-  bitmapView->mTextureBatches.~vector();
+
+  // The container/handle members are destroyed by the compiler-emitted
+  // member teardown after this body, in reverse declaration order, exactly
+  // as the binary does. Running them here as well would destroy each one
+  // twice.
 }
 
 /**
@@ -25332,16 +25334,15 @@ moho::CMauiEdit::CMauiEdit(LuaPlus::LuaObject* const luaObject, CMauiControl* co
 moho::CMauiEdit::~CMauiEdit()
 {
   CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  editView->mText.tidy(true, 0U);
   ReleaseIntrusiveFont(editView->mFont);
 
   // asm 0x0078F230: destroying the embedded IMauiDragger sub-object resets its
   // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable, and
   // asm 0x0078F236-0x0078F250 then drains the base's weak-reference head at
   // +0x120, clearing each node's owner/next lanes. Both halves are
-  // `~IMauiDragger` (0x0078DB20) inlined, so running the typed sub-object's
-  // destructor performs the whole sequence.
-  editView->mClickDragger.~CMauiEditClickDragger();
+  // `~IMauiDragger` (0x0078DB20) inlined. `mClickDragger` is a real member
+  // now, so the compiler emits that sub-object destruction after this body
+  // along with `mText`'s; neither belongs here.
 }
 
 /**
