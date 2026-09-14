@@ -36710,6 +36710,70 @@ const void* wxWindowBase::GetEventTable() const
 }
 
 /**
+ * Address: 0x009C9850 (FUN_009C9850)
+ * Mangled: ?DrawAnyText@wxDC@@QAEXABVwxString@@HH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxDC::DrawAnyText(wxDC *this, LPCWSTR *text, int x, int y);
+ *
+ * What it does:
+ * Sets the text foreground colour (when the current one is valid), sets and
+ * remembers the previous background colour (when valid), sets the
+ * background draw mode from `mBackgroundMode`, draws `text` at `(x, y)` via
+ * `TextOutW`, restores the background colour, and forces the background
+ * mode back to transparent - matching `wxDC::DrawAnyText`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1043-1075) line for line.
+ */
+void wxDC::DrawAnyText(const wxStringRuntime& text, const std::int32_t x, const std::int32_t y) const noexcept
+{
+  auto* const nativeDc = static_cast<HDC>(m_hDC);
+
+  if (m_textForegroundColour.IsOk()) {
+    (void)::SetTextColor(nativeDc, m_textForegroundColour.GetPixel());
+  }
+
+  COLORREF previousBackgroundColor = 0;
+  if (m_textBackgroundColour.IsOk()) {
+    previousBackgroundColor = ::SetBkColor(nativeDc, m_textBackgroundColour.GetPixel());
+  }
+
+  (void)::SetBkMode(nativeDc, mBackgroundMode != 106 ? OPAQUE : TRANSPARENT);
+
+  const wchar_t* const drawText = text.c_str() != nullptr ? text.c_str() : wxEmptyString;
+  const auto* const sharedPrefixWords = reinterpret_cast<const std::int32_t*>(drawText) - 3;
+  const int drawTextLength = sharedPrefixWords[1];
+  (void)::TextOutW(nativeDc, x, y, drawText, drawTextLength);
+
+  if (m_textBackgroundColour.IsOk()) {
+    (void)::SetBkColor(nativeDc, previousBackgroundColor);
+  }
+  (void)::SetBkMode(nativeDc, TRANSPARENT);
+}
+
+/**
+ * Address: 0x009CA790 (FUN_009CA790)
+ * Mangled: ?DoDrawText@wxDC@@MAEXABVwxString@@HH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxDC::DoDrawText(wxDC *this, LPCWSTR *text, int x, int y);
+ *
+ * What it does:
+ * Draws `text` at `(x, y)` via `DrawAnyText`, then extends the bounding box
+ * to cover the drawn glyphs' extent - matching `wxDC::DoDrawText`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1027-1041) line for line.
+ */
+void wxDC::DoDrawText(const wxStringRuntime& text, const std::int32_t x, const std::int32_t y)
+{
+  DrawAnyText(text, x, y);
+  CalcBoundingBox(x, y);
+
+  std::int32_t width = 0;
+  std::int32_t height = 0;
+  DoGetTextExtent(text, &width, &height);
+  CalcBoundingBox(x + width, y + height);
+}
+
+/**
  * Address: 0x009CAAA0 (FUN_009CAAA0)
  * Mangled: ?InitializePalette@wxDC@@IAEXXZ
  *

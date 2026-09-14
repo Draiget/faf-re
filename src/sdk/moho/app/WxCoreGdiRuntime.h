@@ -252,6 +252,7 @@ public:
   [[nodiscard]] std::uint8_t Green() const noexcept { return mGreen; }
   [[nodiscard]] std::uint8_t Blue() const noexcept { return mBlue; }
   [[nodiscard]] bool IsOk() const noexcept { return mIsInit != 0; }
+  [[nodiscard]] std::uint32_t GetPixel() const noexcept { return mPixel; }
 
 private:
   std::uint32_t mPixel = 0;  // +0x08, WXCOLORREF
