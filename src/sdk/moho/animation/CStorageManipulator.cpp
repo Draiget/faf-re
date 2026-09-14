@@ -172,6 +172,24 @@ namespace moho
      * free helper.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
+
+    /**
+     * Address: 0x00649260 (FUN_00649260, Moho::CStorageManipulator::MoveManipulator)
+     *
+     * VFTable SLOT: 1 (primary CTaskEvent/CScriptEvent view) - the slot
+     * `IAniManipulator` leaves as `_purecall` at 0x00A82547, and which every
+     * other manipulator overrides (`CRotateManipulator` 0x00643860,
+     * `CSlaveManipulator` 0x00646140, `CBuilderArmManipulator` 0x00636590).
+     *
+     * What it does:
+     * Per-tick storage-offset update; forwards to the recovered body below.
+     *
+     * Without this override the class inherited the pure slot, so the recovered
+     * 0x00649260 body was never dispatched and the manipulator never ran: the
+     * watched storage bone kept whatever offset the constructor applied and the
+     * economy ratio never moved it again.
+     */
+    bool ManipulatorUpdate() override;
   };
 
   /**
@@ -420,7 +438,7 @@ namespace moho
    * the unit is still being built), applies the rotated offset to the watched
    * bone local transform, and signals the manipulator event lane.
    */
-  [[maybe_unused]] void UpdateCStorageManipulatorRuntime(CStorageManipulatorRuntimeView* const runtime)
+  void UpdateCStorageManipulatorRuntime(CStorageManipulatorRuntimeView* const runtime)
   {
     if (runtime == nullptr) {
       return;
@@ -466,6 +484,22 @@ namespace moho
 
     ApplyStorageOffsetToWatchedBone(watchedBone, ToStorageVector(runtime->mCur));
     reinterpret_cast<moho::CTaskEvent*>(runtime)->EventSetSignaled(true);
+  }
+
+  /**
+   * Address: 0x00649260 (FUN_00649260, Moho::CStorageManipulator::MoveManipulator)
+   *
+   * What it does: see the declaration above. The field run past `+0x80` is
+   * still modelled on `CStorageManipulatorRuntimeView`, so the override casts
+   * to it the same way the constructor and the (de)serializers already do.
+   * Neither this body nor its siblings set `eax` before `retn` -- the `bool`
+   * is this tree's modelling of the slot, matching `CRotateManipulator`
+   * (0x00643860).
+   */
+  bool CStorageManipulator::ManipulatorUpdate()
+  {
+    UpdateCStorageManipulatorRuntime(reinterpret_cast<CStorageManipulatorRuntimeView*>(this));
+    return true;
   }
 
   /**
