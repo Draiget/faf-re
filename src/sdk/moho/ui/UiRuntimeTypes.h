@@ -10729,4 +10729,26 @@ namespace moho
   void PushBackMeshInstanceSharedPtrVector(
     msvc8::vector<boost::shared_ptr<MeshInstance>>& destination,
     const boost::shared_ptr<MeshInstance>& value);
+
+  // ---------------------------------------------------------------------
+  // Every `*RuntimeView` in this header is reinterpret_cast over a real
+  // control, so a view larger than the object it overlays is an
+  // out-of-bounds write by construction -- which is exactly what eleven of
+  // these controls were doing while they declared no data members at all.
+  // Keep the relation asserted so it cannot come back.
+  // ---------------------------------------------------------------------
+  static_assert(sizeof(CMauiBitmapRuntimeView) <= sizeof(CMauiBitmap), "CMauiBitmapRuntimeView overruns CMauiBitmap");
+  static_assert(sizeof(CMauiBorderRuntimeView) <= sizeof(CMauiBorder), "CMauiBorderRuntimeView overruns CMauiBorder");
+  static_assert(sizeof(CMauiControlExtendedRuntimeView) <= sizeof(CMauiControl), "CMauiControlExtendedRuntimeView overruns CMauiControl");
+  static_assert(sizeof(CMauiControlFrameUpdateRuntimeView) <= sizeof(CMauiControl), "CMauiControlFrameUpdateRuntimeView overruns CMauiControl");
+  static_assert(sizeof(CMauiControlRuntimeView) <= sizeof(CMauiControl), "CMauiControlRuntimeView overruns CMauiControl");
+  static_assert(sizeof(CMauiCursorRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorRuntimeView overruns CMauiCursor");
+  static_assert(sizeof(CMauiCursorTextureRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorTextureRuntimeView overruns CMauiCursor");
+  static_assert(sizeof(CMauiEditRuntimeView) <= sizeof(CMauiEdit), "CMauiEditRuntimeView overruns CMauiEdit");
+  static_assert(sizeof(CMauiFrameRuntimeView) <= sizeof(CMauiFrame), "CMauiFrameRuntimeView overruns CMauiFrame");
+  static_assert(sizeof(CMauiHistogramRuntimeView) <= sizeof(CMauiHistogram), "CMauiHistogramRuntimeView overruns CMauiHistogram");
+  static_assert(sizeof(CMauiItemListRuntimeView) <= sizeof(CMauiItemList), "CMauiItemListRuntimeView overruns CMauiItemList");
+  static_assert(sizeof(CMauiMeshRuntimeView) <= sizeof(CMauiMesh), "CMauiMeshRuntimeView overruns CMauiMesh");
+  static_assert(sizeof(CMauiTextRuntimeView) <= sizeof(CMauiText), "CMauiTextRuntimeView overruns CMauiText");
+  static_assert(sizeof(CUIMapPreviewRuntimeView) <= sizeof(CUIMapPreview), "CUIMapPreviewRuntimeView overruns CUIMapPreview");
 } // namespace moho
