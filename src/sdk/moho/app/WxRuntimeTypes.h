@@ -4121,7 +4121,9 @@ public:
   }
   virtual void DoDrawRoundedRectangle() {} // slot 50 (+0xC8)
   virtual void DoDrawEllipse() {} // slot 51 (+0xCC)
-  virtual void DoCrossHair() {} // slot 52 (+0xD0)
+  // Real override is `wxDC::DoCrossHair` (this base stays the shape-only
+  // no-op interface, matching `DoDrawText` above).
+  virtual void DoCrossHair(std::int32_t x, std::int32_t y) { (void)x; (void)y; } // slot 52 (+0xD0)
   virtual void DoDrawIcon() {} // slot 53 (+0xD4)
   virtual void DoDrawBitmap() {} // slot 54 (+0xD8)
   // Real override is `wxDC::DoDrawText` (this base stays the shape-only
@@ -4324,6 +4326,22 @@ public:
    * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1027-1041) line for line.
    */
   void DoDrawText(const wxStringRuntime& text, std::int32_t x, std::int32_t y) override;
+
+  /**
+   * Address: 0x009C8CF0 (FUN_009C8CF0)
+   * Mangled: ?DoCrossHair@wxDC@@MAEXHH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxDC::DoCrossHair(HDC *this, int x, int y);
+   *
+   * What it does:
+   * Draws a full-length horizontal and vertical line crossing at `(x, y)`
+   * (each arm extending 1000 device units either side) and extends the
+   * bounding box to cover both endpoints of the cross - matching
+   * `wxDC::DoCrossHair` (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:524-543)
+   * line for line.
+   */
+  void DoCrossHair(std::int32_t x, std::int32_t y) override;
 
   /**
    * Address: 0x009CAAA0 (FUN_009CAAA0)

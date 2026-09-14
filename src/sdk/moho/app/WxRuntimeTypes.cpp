@@ -36774,6 +36774,39 @@ void wxDC::DoDrawText(const wxStringRuntime& text, const std::int32_t x, const s
 }
 
 /**
+ * Address: 0x009C8CF0 (FUN_009C8CF0)
+ * Mangled: ?DoCrossHair@wxDC@@MAEXHH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxDC::DoCrossHair(HDC *this, int x, int y);
+ *
+ * What it does:
+ * Draws a full-length horizontal and vertical line crossing at `(x, y)`
+ * (each arm extending `VIEWPORT_EXTENT` device units either side) and
+ * extends the bounding box to cover both endpoints of the cross - matching
+ * `wxDC::DoCrossHair` (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:524-543)
+ * line for line.
+ */
+void wxDC::DoCrossHair(const std::int32_t x, const std::int32_t y)
+{
+  constexpr std::int32_t kViewportExtent = 1000;
+
+  const std::int32_t x1 = x - kViewportExtent;
+  const std::int32_t y1 = y - kViewportExtent;
+  const std::int32_t x2 = x + kViewportExtent;
+  const std::int32_t y2 = y + kViewportExtent;
+
+  auto* const nativeDc = static_cast<HDC>(m_hDC);
+  (void)::MoveToEx(nativeDc, x1, y, nullptr);
+  (void)::LineTo(nativeDc, x2, y);
+  (void)::MoveToEx(nativeDc, x, y1, nullptr);
+  (void)::LineTo(nativeDc, x, y2);
+
+  CalcBoundingBox(x1, y1);
+  CalcBoundingBox(x2, y2);
+}
+
+/**
  * Address: 0x009CAAA0 (FUN_009CAAA0)
  * Mangled: ?InitializePalette@wxDC@@IAEXXZ
  *
