@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <new>
 
 #include "lua/LuaTableIterator.h"
 #include "moho/console/CConAlias.h"
@@ -498,7 +499,23 @@ namespace moho
     constructionParams.mTransform.orient_.z = 0.0f;
     constructionParams.mUseLayerOverride = 1;
 
-    Unit* const unit = sim ? sim->CreateUnitForScript(constructionParams, true) : nullptr;
+    // 0x0070950D `call ??2@YAPAXI@Z` then 0x0070952B
+    // `call ??0Unit@Moho@@QAE@ABUSUnitConstructionParams@1@@Z`: the initial
+    // army unit is constructed directly, with nothing between the
+    // unknown-blueprint `Error` at 0x0070949C and that `operator new` -- no
+    // `IgnoreUnitCap`, no `GetUnitCap`, no `GetArmyUnitCostTotal`.
+    //
+    // Routing this through `Sim::CreateUnitForScript` added `Sim::CreateUnit`'s
+    // unit-cap gate, which returns nullptr (and fires the army brain's
+    // `OnUnitCapLimitReached`) whenever
+    // `GetArmyUnitCostTotal() + General.CapCost > GetUnitCap()`. At game start
+    // the army's cap has not been configured yet, so the very first unit an
+    // army creates -- its commander -- was the one the gate rejected, leaving
+    // `SetArmyStart() failed` and no ACU on the map. The cap belongs on the
+    // ordinary build paths (factory, mobile build, upgrade, brain spawns), all
+    // of which keep calling `CreateUnitForScript`; the scenario's initial unit
+    // deliberately predates it.
+    Unit* const unit = sim ? sim->CreateInitialArmyUnit(constructionParams) : nullptr;
     if (!unit) {
       LuaPlus::LuaState::Error(state, "SetArmyStart() failed");
     }

@@ -11146,6 +11146,20 @@ Unit* Sim::CreateUnitForScript(const SUnitConstructionParams& params, const bool
 }
 
 /**
+ * The inlined construction in `cfunc_CreateInitialArmyUnitL` (0x00709340); see
+ * the declaration in Sim.h for the evidence that no unit-cap gate stands in
+ * front of it.
+ */
+Unit* Sim::CreateInitialArmyUnit(const SUnitConstructionParams& params)
+{
+  if (!params.mArmy || !params.mBlueprint) {
+    return nullptr;
+  }
+
+  return new (std::nothrow) Unit(params);
+}
+
+/**
  * Address: 0x007468E0 (FUN_007468E0, ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z)
  * Mangled: ?TransferUnit@Sim@Moho@@QAEPAVUnit@2@PAV32@PAVSimArmy@2@@Z
  *

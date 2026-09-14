@@ -1153,6 +1153,21 @@ namespace moho
      */
     [[nodiscard]] Unit* CreateUnitForScript(const SUnitConstructionParams& params, bool doCallback);
 
+    /**
+     * Constructs one unit with no unit-cap gate, for the scenario's initial
+     * army unit.
+     *
+     * `cfunc_CreateInitialArmyUnitL` (0x00709340) inlines the construction:
+     * `operator new` at 0x0070950D followed immediately by
+     * `??0Unit@Moho@@QAE@ABUSUnitConstructionParams@1@@Z` at 0x0070952B, with
+     * no call between it and the unknown-blueprint `Error` at 0x0070949C --
+     * no `IgnoreUnitCap`, no `GetUnitCap`, no `GetArmyUnitCostTotal`. `Unit`'s
+     * params constructor is private to this tree with `Sim` as its friend, so
+     * that inlined construction is expressed as this one-line member rather
+     * than widening the constructor's access.
+     */
+    [[nodiscard]] Unit* CreateInitialArmyUnit(const SUnitConstructionParams& params);
+
   private:
     /**
      * Address: 0x0074ADB0 (FUN_0074ADB0, ?FlushLog@Sim@Moho@@AAEXXZ)
