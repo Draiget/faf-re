@@ -43536,6 +43536,92 @@ void wxDC::DoGetSizeMM(
   }
 }
 
+// wxColourChanger (dc.cpp:121-191, this scoped fg/bg swap for
+// wxSTIPPLE_MASK_OPAQUE brushes) is already recovered as the
+// wxCaptureAndApplyDcColourStateRuntime / wxApplyPendingDcTextColorsRuntime
+// pair further down this file (Address: 0x009C8A40 / 0x009C8AE0) - forward
+// declared here rather than re-cited, since this function is defined before
+// that pair textually.
+[[nodiscard]] void* wxCaptureAndApplyDcColourStateRuntime(void* outStateScopeRuntime, void* dcRuntime) noexcept;
+void wxApplyPendingDcTextColorsRuntime(void* colorStateRuntime) noexcept;
+
+namespace
+{
+  // Thin RAII wrapper around the wxColourChanger pair above so
+  // DoDrawPolygon gets scope-exit-safe restore without re-declaring the
+  // capture logic. The 0x10-byte scope buffer matches
+  // WxDcColourStateScopeRuntimeView / WxDcColorStateRuntimeView's shared
+  // {sourceDc, prevText, prevBackground, active} layout.
+  class WxColourChangerScopeRuntime
+  {
+  public:
+    explicit WxColourChangerScopeRuntime(void* const dcRuntime) noexcept
+    {
+      (void)wxCaptureAndApplyDcColourStateRuntime(mScope, dcRuntime);
+    }
+
+    ~WxColourChangerScopeRuntime()
+    {
+      wxApplyPendingDcTextColorsRuntime(mScope);
+    }
+
+    WxColourChangerScopeRuntime(const WxColourChangerScopeRuntime&) = delete;
+    WxColourChangerScopeRuntime& operator=(const WxColourChangerScopeRuntime&) = delete;
+
+  private:
+    alignas(void*) std::byte mScope[0x10]{};
+  };
+}
+
+/**
+ * Address: 0x009C9090 (FUN_009C9090)
+ * Mangled: ?DoDrawPolygon@wxDC@@MAEXHPAVwxPoint@@HHH@Z
+ *
+ * IDA signature:
+ * int __thiscall wxDC::DoDrawPolygon(HDC *this, int cpt, POINT *apt, int xoffset, int yoffset, unsigned __int8 fillStyle);
+ *
+ * What it does:
+ * Draws a filled polygon, offsetting every point by (xoffset, yoffset)
+ * first when either is non-zero (into a temporary heap copy), extending the
+ * bounding box over every point along the way, then calls Polygon with
+ * the fill mode translated from wx's fillStyle - matching
+ * wxDC::DoDrawPolygon (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:669-704)
+ * line for line.
+ */
+void wxDC::DoDrawPolygon(
+  const std::int32_t pointCount,
+  const POINT* const points,
+  const std::int32_t xOffset,
+  const std::int32_t yOffset,
+  const std::int32_t fillStyle
+)
+{
+  const WxColourChangerScopeRuntime colourChanger(this);
+  auto* const nativeDc = static_cast<HDC>(m_hDC);
+  const int polyFillMode = fillStyle == 1 /* wxODDEVEN_RULE */ ? ALTERNATE : WINDING;
+
+  if (xOffset != 0 || yOffset != 0) {
+    std::vector<POINT> offsetPoints(static_cast<std::size_t>(pointCount));
+    for (std::int32_t i = 0; i < pointCount; ++i) {
+      offsetPoints[static_cast<std::size_t>(i)].x = points[i].x + xOffset;
+      offsetPoints[static_cast<std::size_t>(i)].y = points[i].y + yOffset;
+      CalcBoundingBox(offsetPoints[static_cast<std::size_t>(i)].x, offsetPoints[static_cast<std::size_t>(i)].y);
+    }
+
+    const int previousFillMode = ::SetPolyFillMode(nativeDc, polyFillMode);
+    (void)::Polygon(nativeDc, offsetPoints.data(), pointCount);
+    (void)::SetPolyFillMode(nativeDc, previousFillMode);
+  } else {
+    for (std::int32_t i = 0; i < pointCount; ++i) {
+      CalcBoundingBox(points[i].x, points[i].y);
+    }
+
+    const int previousFillMode = ::SetPolyFillMode(nativeDc, polyFillMode);
+    (void)::Polygon(nativeDc, points, pointCount);
+    (void)::SetPolyFillMode(nativeDc, previousFillMode);
+  }
+}
+
 /**
  * Fills a rectangle with the selected brush.
  *
