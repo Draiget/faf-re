@@ -1329,15 +1329,31 @@ void CAiTransportImpl::TransportFindAttachList(
     (void)CopyAttachPointVector(mGenericAttachPoints, attachPoints);
   }
 
-  if (outAttachSize == 0) {
-    if (!mClass1AttachPoints.empty()) {
-      (void)CopyAttachPointVector(mClass1AttachPoints, attachPoints);
-    } else {
-      (void)CopyAttachPointVector(mGenericAttachPoints, attachPoints);
-    }
+  // 0x005E6B99: the tail picks the *source of the hook list*, and it never
+  // touches the class attach list selected above:
+  //
+  //   if ( *outAttachSize ) {
+  //     src = &mClass1AttachPoints;
+  //     if ( class1 is empty ) src = &mGenericAttachPoints;
+  //   }
+  //   vector_SAttachPoint::cpy(src, outAttachPoints);
+  //
+  // so a non-zero attach size makes the hooks the transport's fine-grained
+  // Class1 (or Generic) bones while `attachPoints` stays the coarse per-class
+  // list the caller iterates. Testing `== 0` and copying into `attachPoints`
+  // inverted both halves: it overwrote the class list with Class1's whenever
+  // the blueprint declared no attach size, and otherwise left the hooks equal
+  // to the class list. `GetClosestAttachPointsTo` then had fewer hooks than
+  // the requested attach size for every multi-slot class, returned an empty
+  // candidate set, and `TransportAssignSlot` refused every such unit -- so
+  // `CUnitLoadUnits::DoTask` assigned no slots, `mReadyUnitCount` stayed 0,
+  // and the transport had nothing to pick up.
+  const msvc8::vector<SAttachPoint>* hookSource = &attachPoints;
+  if (outAttachSize != 0) {
+    hookSource = mClass1AttachPoints.empty() ? &mGenericAttachPoints : &mClass1AttachPoints;
   }
 
-  (void)CopyAttachPointVector(attachPoints, outAttachPoints);
+  (void)CopyAttachPointVector(*hookSource, outAttachPoints);
 }
 
 /**
