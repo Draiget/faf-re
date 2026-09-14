@@ -71,6 +71,7 @@ namespace moho
   class CMauiControl;
   class CMauiEdit;
   class CMauiEditClickDragger;
+  struct SHistogramColumn;
   class CMauiLuaDragger;
   class CMauiBorder;
   class CMauiFrame;
@@ -2751,7 +2752,23 @@ namespace moho
      * and dumps every control that is under the cursor.
      */
     static void DumpControlsUnder(CMauiFrame* frame, float x, float y);
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x134.
+    // `cfunc_InternalCreateFrameL` calls `operator new(0x134)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiFrameRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
+    TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
+    wxEvtHandlerRuntime* mEventHandler = nullptr;       // +0x12C
+    std::int32_t mTargetHead = -1;                      // +0x130
   };
+
+  static_assert(sizeof(CMauiFrame) == 0x134, "CMauiFrame size must be 0x134");
+  static_assert(offsetof(CMauiFrame, mSelfWeak) == 0x11c, "CMauiFrame::mSelfWeak offset must be 0x11c");
+  static_assert(offsetof(CMauiFrame, mDeletedControlList) == 0x124, "CMauiFrame::mDeletedControlList offset must be 0x124");
+  static_assert(offsetof(CMauiFrame, mTargetHead) == 0x130, "CMauiFrame::mTargetHead offset must be 0x130");
 
   class CMauiBitmap : public CMauiControl
   {
@@ -3092,7 +3109,28 @@ namespace moho
      */
     void Dump() override;
 
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x134.
+    // `cfunc_InternalCreateHistogramL` calls `operator new(0x134)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiHistogramRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    // +0x124 is a real field whose meaning is still unknown: the constructor
+    // at 0x007977A0 and the destructor at 0x00797840 touch only
+    // 0x128/0x12C/0x130. It is not an MSVC8 vector proxy word -- the column
+    // array is a bare begin/end/capacity triple with no proxy.
+    std::int32_t mXIncrement = 0;              // +0x11C
+    std::int32_t mYIncrement = 0;              // +0x120
+    std::uint8_t mUnknown124To127[0x4]{};      // +0x124
+    SHistogramColumn* mDataStart = nullptr;    // +0x128
+    SHistogramColumn* mDataEnd = nullptr;      // +0x12C
+    SHistogramColumn* mDataCapacity = nullptr; // +0x130
   };
+
+  static_assert(sizeof(CMauiHistogram) == 0x134, "CMauiHistogram size must be 0x134");
+  static_assert(offsetof(CMauiHistogram, mXIncrement) == 0x11c, "CMauiHistogram::mXIncrement offset must be 0x11c");
+  static_assert(offsetof(CMauiHistogram, mDataStart) == 0x128, "CMauiHistogram::mDataStart offset must be 0x128");
 
   class CMauiItemList : public CMauiControl
   {
@@ -3289,7 +3327,33 @@ namespace moho
      * continues base `CMauiControl` teardown.
      */
     ~CMauiItemList() override;
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x158.
+    // `cfunc_InternalCreateItemListL` calls `operator new(0x158)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiItemListRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    CD3DFont* mFont = nullptr;                   // +0x11C
+    std::uint32_t mForegroundColor = 0;          // +0x120
+    std::uint32_t mBackgroundColor = 0;          // +0x124
+    std::uint32_t mSelectedForegroundColor = 0;  // +0x128
+    std::uint32_t mSelectedBackgroundColor = 0;  // +0x12C
+    std::uint32_t mHighlightForegroundColor = 0; // +0x130
+    std::uint32_t mHighlightBackgroundColor = 0; // +0x134
+    msvc8::vector<msvc8::string> mItems;         // +0x138
+    std::int32_t mCurSelection = -1;             // +0x148
+    std::int32_t mHoverItem = -1;                // +0x14C
+    bool mShowSelection = false;                 // +0x150
+    bool mShowMouseoverItem = false;             // +0x151
+    std::uint8_t mPad152To153[0x2]{};
+    std::int32_t mScrollPosition = 0;            // +0x154
   };
+
+  static_assert(sizeof(CMauiItemList) == 0x158, "CMauiItemList size must be 0x158");
+  static_assert(offsetof(CMauiItemList, mFont) == 0x11c, "CMauiItemList::mFont offset must be 0x11c");
+  static_assert(offsetof(CMauiItemList, mItems) == 0x138, "CMauiItemList::mItems offset must be 0x138");
+  static_assert(offsetof(CMauiItemList, mScrollPosition) == 0x154, "CMauiItemList::mScrollPosition offset must be 0x154");
 
   class CMauiMesh : public CMauiControl
   {
@@ -3393,7 +3457,25 @@ namespace moho
      * base `CMauiControl` teardown.
      */
     ~CMauiMesh() override;
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x140.
+    // `cfunc_InternalCreateMeshL` calls `operator new(0x140)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiMeshRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    boost::shared_ptr<CD3DBatchTexture> mTexture;  // +0x11C
+    bool mIsRotated = false;                       // +0x124
+    std::uint8_t mPad125To127[0x3]{};
+    RMeshBlueprint* mMeshBlueprint = nullptr;      // +0x128
+    Wm3::Quaternionf mOrientation{};               // +0x12C
+    std::int32_t mUnknown13C = 0;                  // +0x13C
   };
+
+  static_assert(sizeof(CMauiMesh) == 0x140, "CMauiMesh size must be 0x140");
+  static_assert(offsetof(CMauiMesh, mTexture) == 0x11c, "CMauiMesh::mTexture offset must be 0x11c");
+  static_assert(offsetof(CMauiMesh, mMeshBlueprint) == 0x128, "CMauiMesh::mMeshBlueprint offset must be 0x128");
+  static_assert(offsetof(CMauiMesh, mOrientation) == 0x12c, "CMauiMesh::mOrientation offset must be 0x12c");
 
   class CMauiMovie : public CMauiControl
   {
@@ -3741,7 +3823,30 @@ namespace moho
      * base CMauiControl teardown.
      */
     ~CMauiText() override;
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x194.
+    // `cfunc_InternalCreateTextL` calls `operator new(0x194)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiTextRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    CD3DFont* mFont = nullptr;                     // +0x11C
+    msvc8::string mText{};                         // +0x120
+    std::uint32_t mColor = 0;                      // +0x13C
+    bool mDropShadow = false;                      // +0x140
+    bool mClipToWidth = false;                     // +0x141
+    bool mCenteredHorizontally = false;            // +0x142
+    bool mCenteredVertically = false;              // +0x143
+    CScriptLazyVar_float mTextAdvanceLV{};         // +0x144
+    CScriptLazyVar_float mFontAscentLV{};          // +0x158
+    CScriptLazyVar_float mFontDescentLV{};         // +0x16C
+    CScriptLazyVar_float mFontExternalLeadingLV{}; // +0x180
   };
+
+  static_assert(sizeof(CMauiText) == 0x194, "CMauiText size must be 0x194");
+  static_assert(offsetof(CMauiText, mFont) == 0x11c, "CMauiText::mFont offset must be 0x11c");
+  static_assert(offsetof(CMauiText, mColor) == 0x13c, "CMauiText::mColor offset must be 0x13c");
+  static_assert(offsetof(CMauiText, mTextAdvanceLV) == 0x144, "CMauiText::mTextAdvanceLV offset must be 0x144");
 
   class CMauiBorder : public CMauiControl
   {
@@ -3828,7 +3933,27 @@ namespace moho
      * VFTable SLOT: 6 (+0x18) - the class's `DoRender` override.
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x174.
+    // `cfunc_InternalCreateBorderL` calls `operator new(0x174)`, but this class
+    // declared no data members at all, so it inherited only `CMauiControl`'s
+    // 0x11C and every access through `CMauiBorderRuntimeView` -- which describes
+    // exactly this run -- wrote past the end of the heap block.
+    // ---------------------------------------------------------------------
+    boost::shared_ptr<CD3DBatchTexture> mTex1;    // +0x11C
+    boost::shared_ptr<CD3DBatchTexture> mTexHorz; // +0x124
+    boost::shared_ptr<CD3DBatchTexture> mTexUL;   // +0x12C
+    boost::shared_ptr<CD3DBatchTexture> mTexUR;   // +0x134
+    boost::shared_ptr<CD3DBatchTexture> mTexLL;   // +0x13C
+    boost::shared_ptr<CD3DBatchTexture> mTexLR;   // +0x144
+    CScriptLazyVar_float mBorderWidthLV;          // +0x14C
+    CScriptLazyVar_float mBorderHeightLV;         // +0x160
   };
+
+  static_assert(sizeof(CMauiBorder) == 0x174, "CMauiBorder size must be 0x174");
+  static_assert(offsetof(CMauiBorder, mTex1) == 0x11c, "CMauiBorder::mTex1 offset must be 0x11c");
+  static_assert(offsetof(CMauiBorder, mTexLR) == 0x144, "CMauiBorder::mTexLR offset must be 0x144");
+  static_assert(offsetof(CMauiBorder, mBorderHeightLV) == 0x160, "CMauiBorder::mBorderHeightLV offset must be 0x160");
 
   class CUIMapPreview : public CMauiControl
   {
