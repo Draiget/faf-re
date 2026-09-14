@@ -413,23 +413,6 @@ namespace moho
      * `SerializeCThrustManipulatorSerializerState` body.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
-
-    /**
-     * Address: 0x0064A800 (FUN_0064A800, Moho::CThrustManipulator::MoveManipulator)
-     *
-     * VFTable SLOT: 1 (primary CTaskEvent/CScriptEvent view) - the slot
-     * `IAniManipulator` leaves as `_purecall` at 0x00A82547.
-     *
-     * What it does:
-     * Per-tick thrust-orientation update; forwards to the recovered body below.
-     *
-     * Without this override the class inherited the pure slot, so the recovered
-     * 0x0064A800 body was never dispatched: the watched thrust bone kept its
-     * construction-time orientation and never turned with the owner's motion
-     * force, leaving engine nozzles -- and every effect parented to those
-     * bones -- fixed relative to the hull instead of tracking it.
-     */
-    bool ManipulatorUpdate() override;
   };
 
   /**
@@ -680,7 +663,7 @@ namespace moho
    * shortest-arc delta, applies turn-step interpolation, rotates the watched
    * bone, and stores the latest orientation delta state.
    */
-  void UpdateCThrustManipulatorRuntime(CThrustManipulatorSerializerRuntimeView* const runtime)
+  [[maybe_unused]] void UpdateCThrustManipulatorRuntime(CThrustManipulatorSerializerRuntimeView* const runtime)
   {
     if (runtime == nullptr) {
       return;
@@ -751,20 +734,6 @@ namespace moho
 
     watchedBone->Rotate(blendedOrientation);
     runtime->mOrientation = blendedOrientation;
-  }
-
-  /**
-   * Address: 0x0064A800 (FUN_0064A800, Moho::CThrustManipulator::MoveManipulator)
-   *
-   * What it does: see the declaration above. The field run past the
-   * `IAniManipulator` base is still modelled on
-   * `CThrustManipulatorSerializerRuntimeView`, so the override casts to it the
-   * same way the (de)serializers already do.
-   */
-  bool CThrustManipulator::ManipulatorUpdate()
-  {
-    UpdateCThrustManipulatorRuntime(reinterpret_cast<CThrustManipulatorSerializerRuntimeView*>(this));
-    return true;
   }
 
   /**
