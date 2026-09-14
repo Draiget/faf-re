@@ -2953,20 +2953,24 @@ namespace
     const bool enabled
   ) noexcept
   {
+    // `Moho::Set` already implements both halves of this, and the reader side
+    // -- `BVIntSet::Contains` (0x004035F0) and `Set::Contains`, which is what
+    // `Sim::OkayToMessWith` calls on this very set -- addresses a word as
+    // `(value >> 5) - baseWordIndex`. The open-coded copy that stood here
+    // computed `value >> (5 - baseWordIndex)` instead: a variable shift, right
+    // only for `baseWordIndex == 0`, off by whole words for any other base, and
+    // undefined once the base reaches 6. A source bit written into one word and
+    // read back from another leaves `OkayToMessWith` answering false, and every
+    // command arriving from that source is then dropped before it reaches a
+    // unit. `Set::Add`/`Set::Remove` also keep the used-word window and the
+    // empty-set case right, which the copy did not.
     Set& validSources = army.MohoSetValidCommandSources;
 
     const std::uint32_t source = static_cast<std::uint32_t>(sourceIndex);
-    const std::uint32_t wordOffset = source >> (5u - static_cast<std::uint32_t>(validSources.baseWordIndex));
-    std::uint32_t* const word = validSources.items_begin + wordOffset;
-    if (word >= validSources.items_end) {
-      validSources.items_end = word + 1;
-    }
-
-    const std::uint32_t bitMask = 1u << (source & 31u);
     if (enabled) {
-      *word |= bitMask;
+      validSources.Add(source);
     } else {
-      *word &= ~bitMask;
+      validSources.Remove(source);
     }
   }
 
