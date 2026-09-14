@@ -147,17 +147,6 @@
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/SSTICommandSource.h"
 #include "moho/sim/STIMapReflection.h"
-
-namespace gpg
-{
-  /**
-   * What it does:
-   * Builds one typed reflection reference for a `CTaskStage*`. Declared here
-   * because its definition lives beside the other archive reference builders
-   * in `gpg/core/containers/ArchiveSerialization.cpp` and has no header yet.
-   */
-  RRef* RRef_CTaskStage(RRef* outRef, moho::CTaskStage* value);
-} // namespace gpg
 #include "moho/ui/CUIManager.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/EIntelTypeInfo.h"

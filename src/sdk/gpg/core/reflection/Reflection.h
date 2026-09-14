@@ -64,6 +64,7 @@ namespace moho
   class IAiFormationDB;
   class IPathTraveler;
   class PathTables;
+  class CTaskStage;
   class CAiPersonality;
   class CAiFormationInstance;
   class CAiFormationDBImpl;
@@ -3064,6 +3065,19 @@ namespace gpg
    * Builds a reflected reference for a `moho::PathTables` object pointer.
    */
   RRef* RRef_PathTables(RRef* out, moho::PathTables* value);
+
+  /**
+   * Address: 0x0040C300 (FUN_0040C300, gpg::RRef_CTaskStage)
+   *
+   * IDA signature:
+   * gpg::RRef *__cdecl gpg::RRef_CTaskStage(gpg::RRef *out, Moho::CTaskStage *value);
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CTaskStage` object pointer,
+   * resolving the derived runtime type through the same TLS type cache the
+   * other pointer builders use.
+   */
+  RRef* RRef_CTaskStage(RRef* out, moho::CTaskStage* value);
 
   /**
    * Address: 0x00707A10 (FUN_00707A10, gpg::RRef_CArmyStats)
