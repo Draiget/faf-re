@@ -43623,6 +43623,65 @@ void wxDC::DoDrawPolygon(
 }
 
 /**
+ * Address: 0x009C95A0 (FUN_009C95A0)
+ * Mangled: ?DoDrawEllipticArc@wxDC@@MAEXHHHHNN@Z
+ *
+ * IDA signature:
+ * COLORREF __thiscall wxDC::DoDrawEllipticArc(HDC *this, int x, int y, int width, int height, double startAngle, double endAngle);
+ *
+ * What it does:
+ * Draws a pie slice with a NULL_PEN border first (so no spoke line to the
+ * centre shows through), then the outline arc on top; each endpoint is the
+ * ellipse's centre offset by 100x the half-extent scaled by cos/sin of the
+ * start/end angle (in radians) and mSignY - matching wxDC::DoDrawEllipticArc
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:836-881) line for line.
+ */
+void wxDC::DoDrawEllipticArc(
+  const std::int32_t x,
+  const std::int32_t y,
+  const std::int32_t width,
+  const std::int32_t height,
+  const double startAngle,
+  const double endAngle
+)
+{
+  const WxColourChangerScopeRuntime colourChanger(this);
+
+  const std::int32_t x2 = x + width;
+  const std::int32_t y2 = y + height;
+
+  std::int32_t rx1 = x + width / 2;
+  std::int32_t ry1 = y + height / 2;
+  std::int32_t rx2 = rx1;
+  std::int32_t ry2 = ry1;
+
+  const double startRadians = startAngle * 3.141592653589793 / 180.0;
+  const double endRadians = endAngle * 3.141592653589793 / 180.0;
+
+  rx1 += static_cast<std::int32_t>(100.0 * std::abs(width) * std::cos(startRadians));
+  ry1 -= static_cast<std::int32_t>(100.0 * std::abs(height) * mSignY * std::sin(startRadians));
+  rx2 += static_cast<std::int32_t>(100.0 * std::abs(width) * std::cos(endRadians));
+  ry2 -= static_cast<std::int32_t>(100.0 * std::abs(height) * mSignY * std::sin(endRadians));
+
+  auto* const nativeDc = static_cast<HDC>(m_hDC);
+
+  // Draw pie with NULL_PEN first and then outline, otherwise a line is
+  // drawn from the start and end points to the centre.
+  HGDIOBJ const oldPen = ::SelectObject(nativeDc, ::GetStockObject(NULL_PEN));
+  if (mSignY > 0) {
+    (void)::Pie(nativeDc, x, y, x2 + 1, y2 + 1, rx1, ry1, rx2, ry2);
+  } else {
+    (void)::Pie(nativeDc, x, y - 1, x2 + 1, y2, rx1, ry1 - 1, rx2, ry2 - 1);
+  }
+  (void)::SelectObject(nativeDc, oldPen);
+
+  (void)::Arc(nativeDc, x, y, x2, y2, rx1, ry1, rx2, ry2);
+
+  CalcBoundingBox(x, y);
+  CalcBoundingBox(x2, y2);
+}
+
+/**
  * Fills a rectangle with the selected brush.
  *
  * This had an empty body, so every background the viewport asked for went

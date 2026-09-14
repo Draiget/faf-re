@@ -4105,7 +4105,25 @@ public:
   virtual void DoDrawLine() {} // slot 45 (+0xB4)
   virtual void DoDrawArc() {} // slot 46 (+0xB8)
   virtual void DoDrawCheckMark() {} // slot 47 (+0xBC)
-  virtual void DoDrawEllipticArc() {} // slot 48 (+0xC0)
+  // Real override is `wxDC::DoDrawEllipticArc` (this base stays the
+  // shape-only no-op interface, matching `DoDrawText`/`DoCrossHair`/
+  // `DoGetSizeMM`/`DoDrawPolygon` above).
+  virtual void DoDrawEllipticArc(
+    std::int32_t x,
+    std::int32_t y,
+    std::int32_t width,
+    std::int32_t height,
+    double startAngle,
+    double endAngle
+  )
+  {
+    (void)x;
+    (void)y;
+    (void)width;
+    (void)height;
+    (void)startAngle;
+    (void)endAngle;
+  } // slot 48 (+0xC0)
   // slot 49 (+0xC4)
   virtual void DoDrawRectangle(
     std::int32_t x,
@@ -4343,6 +4361,29 @@ public:
     std::int32_t xOffset,
     std::int32_t yOffset,
     std::int32_t fillStyle
+  ) override;
+
+  /**
+   * Address: 0x009C95A0 (FUN_009C95A0)
+   * Mangled: ?DoDrawEllipticArc@wxDC@@MAEXHHHHNN@Z
+   *
+   * IDA signature:
+   * COLORREF __thiscall wxDC::DoDrawEllipticArc(HDC *this, int x, int y, int width, int height, double startAngle, double endAngle);
+   *
+   * What it does:
+   * Draws a pie slice with a NULL_PEN border first (to avoid a spoke line
+   * to the centre showing through), then the outline arc on top, computing
+   * each endpoint from the start/end angles via sin/cos scaled by the
+   * ellipse's half-extents and m_signY - matching wxDC::DoDrawEllipticArc
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:836-881) line for line.
+   */
+  void DoDrawEllipticArc(
+    std::int32_t x,
+    std::int32_t y,
+    std::int32_t width,
+    std::int32_t height,
+    double startAngle,
+    double endAngle
   ) override;
 
   void DoDrawRectangle(
