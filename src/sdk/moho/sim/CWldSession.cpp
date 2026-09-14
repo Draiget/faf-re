@@ -15849,30 +15849,13 @@ namespace moho
       return;
     }
 
-    msvc8::vector<UserEntity*> previousSelection{};
-    CollectSelectionEntities(mSelection, previousSelection);
-    const bool selectionChanged = !AreEntitySetsEqual(previousSelection, filteredSelection);
-
-    ClearSelectionSet(mSelection);
+    ScopedLocalSelectionSet refreshedSelectionGuard{};
+    SSelectionSetUserEntity& refreshedSelection = refreshedSelectionGuard.get();
     for (UserEntity* const entity : filteredSelection) {
-      (void)InsertSelectionEntity(mSelection, entity);
+      (void)InsertSelectionEntity(refreshedSelection, entity);
     }
 
-    mSelection.mSizeMirrorOrUnused = mSelection.mSize;
-    reinterpret_cast<CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize =
-      static_cast<std::int32_t>(mSelection.mSize);
-
-    if (!selectionChanged) {
-      return;
-    }
-
-    if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
-      SSyncFilterMaskBlock selectionMask{};
-      BuildSelectionSyncMask(mSelection, selectionMask);
-      activeDriver->SetSyncFilterMaskB(selectionMask);
-    }
-
-    UI_EndCommandMode();
+    SetSelection(refreshedSelection);
   }
 
   /**
