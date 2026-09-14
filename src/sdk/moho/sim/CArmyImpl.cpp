@@ -1096,14 +1096,23 @@ namespace
       return;
     }
 
+    // Call order is the binary's (0x006FED6D onward): radar, sonar, vision,
+    // water, omni, RCI, SCI, VCI. Each lands in the lane the constructor's
+    // own stores name, which the disassembly pins by pairing the recon-DB
+    // vtable slot with the destination displacement:
+    //
+    //   slot +0x20 vision -> +0x48    slot +0x30 omni -> +0x68
+    //   slot +0x24 water  -> +0x50    slot +0x34 RCI  -> +0x70
+    //   slot +0x28 radar  -> +0x58    slot +0x38 SCI  -> +0x78
+    //   slot +0x2C sonar  -> +0x60    slot +0x3C VCI  -> +0x80
     AssignRetainedReconGrid(army.RadarReconGrid, reconDb->ReconGetRadarGrid());
     AssignRetainedReconGrid(army.SonarReconGrid, reconDb->ReconGetSonarGrid());
-    AssignRetainedReconGrid(army.ExploredReconGrid, reconDb->ReconGetVisionGrid());
+    AssignRetainedReconGrid(army.VisionReconGrid, reconDb->ReconGetVisionGrid());
     AssignRetainedReconGrid(army.WaterReconGrid, reconDb->ReconGetWaterGrid());
     AssignRetainedReconGrid(army.OmniReconGrid, reconDb->ReconGetOmniGrid());
     AssignRetainedReconGrid(army.RciReconGrid, reconDb->ReconGetRCIGrid());
     AssignRetainedReconGrid(army.SciReconGrid, reconDb->ReconGetSCIGrid());
-    AssignRetainedReconGrid(army.FogReconGrid, reconDb->ReconGetVCIGrid());
+    AssignRetainedReconGrid(army.VciReconGrid, reconDb->ReconGetVCIGrid());
   }
   /**
    * Absorbs binary helpers:
@@ -1173,6 +1182,9 @@ namespace
     if (const moho::CategoryWordRangeView* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
         allUnits != nullptr) {
       army.BuildCategoryFilterSet = *allUnits;
+
+    } else {
+      gpg::Logf("[ALLUNITS] GetEntityCategory(\"ALLUNITS\") returned null");
     }
   }
 

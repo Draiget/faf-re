@@ -120,7 +120,7 @@ namespace moho
    */
   boost::shared_ptr<CIntelGrid> UserArmy::GetExploredReconGrid() const
   {
-    return mExploredReconGrid;
+    return mVisionReconGrid;
   }
 
   /**
@@ -128,7 +128,7 @@ namespace moho
    */
   boost::shared_ptr<CIntelGrid> UserArmy::GetFogReconGrid() const
   {
-    return mFogReconGrid;
+    return mWaterReconGrid;
   }
 
   /**
@@ -174,7 +174,7 @@ namespace moho
    */
   bool UserArmy::CanSeeCell(const std::int32_t x, const std::int32_t z, const EReconGridMask gridMask) const
   {
-    CIntelGrid* const exploredGrid = mExploredReconGrid.get();
+    CIntelGrid* const exploredGrid = mVisionReconGrid.get();
     if (!exploredGrid) {
       return true;
     }
@@ -188,7 +188,7 @@ namespace moho
     if (useExplored && exploredGrid->IsVisible(x, z)) {
       return true;
     }
-    if (useFog && mFogReconGrid && mFogReconGrid->IsVisible(x, z)) {
+    if (useFog && mWaterReconGrid && mWaterReconGrid->IsVisible(x, z)) {
       return true;
     }
 
@@ -222,7 +222,7 @@ namespace moho
    */
   bool UserArmy::CanSeePoint(const Wm3::Vec3f& worldPos, const EReconGridMask gridMask) const
   {
-    CIntelGrid* const exploredGrid = mExploredReconGrid.get();
+    CIntelGrid* const exploredGrid = mVisionReconGrid.get();
     if (!exploredGrid) {
       return true;
     }

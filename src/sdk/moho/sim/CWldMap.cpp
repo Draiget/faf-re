@@ -870,20 +870,21 @@ namespace
    * size, one by the water grid's) and calls `FUN_008B19A0` with both
    * rects and two enable flags (checkVision=1, checkWater=1) always set.
    * `FUN_008B19A0` first checks the focus army's OWN grids directly by
-   * offset -- `mExploredReconGrid`(+0x40) against the vision-space rect,
-   * `mFogReconGrid`(+0x48) against the water-space rect (NOT
-   * `mWaterReconGrid`(+0x50) -- confirmed from the raw offsets, `a1[16]`/
-   * `a1[18]`) -- matching this function's own unchanged fast path below
-   * (`exploredGrid`/`fogGrid`). It then iterates every ally (bitset
-   * membership test against `focusArmy`'s ally mask) checking each
-   * ally's vision grid (for the vision-space rect) and, on an ally
-   * match, that ally's WATER grid (for the water-space rect) via
-   * `Moho::UserArmy::GetVisionReconGrid`/`GetWaterReconGrid` --
-   * `GetVisionReconGrid` is the accessor name for `mExploredReconGrid`.
-   * The ally loop's `mFogReconGrid` -> `mWaterReconGrid` fix already
-   * landed in this function (see the ally-loop check below) matches this
-   * evidence exactly; the focus army's own fast path genuinely uses Fog,
-   * not Water, and was correctly left unchanged.
+   * offset -- `mVisionReconGrid`(+0x40) against the vision-space rect and
+   * `mWaterReconGrid`(+0x48) against the water-space rect (raw offsets
+   * `a1[16]`/`a1[18]`). It then iterates every ally (bitset membership
+   * test against `focusArmy`'s ally mask), checking that ally's vision
+   * grid against the vision-space rect and its water grid against the
+   * water-space rect, through `Moho::UserArmy::GetVisionReconGrid` and
+   * `GetWaterReconGrid`. Both halves use the same two lanes; there is no
+   * third grid in this function.
+   *
+   * The lane names here were once skewed by one slot -- a phantom "Fog"
+   * lane sat at +0x48 and pushed water, radar, sonar, omni, RCI and SCI
+   * each one slot up, leaving VCI unnamed. That skew is why an earlier
+   * pass "fixed" this ally loop from the +0x48 lane to the +0x50 one and
+   * moved it from right to wrong. The lanes are now named for the grids
+   * they actually hold; see `CopyReconGridsFromDatabase`.
    *
    * The recovered `TerrainRectVisibleForFocusArmy`/
    * `IntelRectVisibleOrGridMissing` below is a faithful-BEHAVIOR
@@ -904,13 +905,13 @@ namespace
       return true;
     }
 
-    const moho::CIntelGrid* const exploredGrid = focusArmy->mExploredReconGrid.get();
-    if (exploredGrid == nullptr || !moho::console::RenderFogOfWarEnabled()) {
+    const moho::CIntelGrid* const visionGrid = focusArmy->mVisionReconGrid.get();
+    if (visionGrid == nullptr || !moho::console::RenderFogOfWarEnabled()) {
       return true;
     }
 
-    const moho::CIntelGrid* const fogGrid = focusArmy->mFogReconGrid.get();
-    if (exploredGrid->IsVisible(rect, false) || fogGrid->IsVisible(rect, false)) {
+    const moho::CIntelGrid* const waterGrid = focusArmy->mWaterReconGrid.get();
+    if (visionGrid->IsVisible(rect, false) || waterGrid->IsVisible(rect, false)) {
       return true;
     }
 
@@ -926,7 +927,7 @@ namespace
       }
 
       if (
-        IntelRectVisibleOrGridMissing(alliedArmy->mExploredReconGrid.get(), rect)
+        IntelRectVisibleOrGridMissing(alliedArmy->mVisionReconGrid.get(), rect)
         || IntelRectVisibleOrGridMissing(alliedArmy->mWaterReconGrid.get(), rect)
       ) {
         return true;
