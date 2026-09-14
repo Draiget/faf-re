@@ -641,7 +641,13 @@ namespace moho
         }
 
         if (mIsStagingPlatform || mIsTeleporter || !mUnit->mIsAir) {
-          if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
+          // 0x00625A9E: the abort is guarded by
+          // `Wm3::Vector3::Compare(mCurTransform.pos, mLastTransform.pos)`,
+          // which reports a *difference* -- so the move is only aborted while
+          // the unit is still travelling. A stationary transport advances
+          // straight to the next state with its navigator untouched.
+          IAiNavigator* const navigator = mUnit->AiNavigator;
+          if (navigator != nullptr && Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
             navigator->AbortMove();
           }
 
