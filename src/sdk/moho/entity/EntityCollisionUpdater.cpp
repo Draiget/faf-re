@@ -104,13 +104,6 @@ namespace
     return {box.Center[0], box.Center[1], box.Center[2]};
   }
 
-  void WriteBoxCenter(Wm3::Box3f& box, const Wm3::Vec3f& center) noexcept
-  {
-    box.Center[0] = center.x;
-    box.Center[1] = center.y;
-    box.Center[2] = center.z;
-  }
-
   [[nodiscard]] Wm3::Vec3f BoxAxis(const Wm3::Box3f& box, const int axisIndex) noexcept
   {
     return {box.Axis[axisIndex][0], box.Axis[axisIndex][1], box.Axis[axisIndex][2]};
@@ -559,11 +552,28 @@ namespace moho
    * Address: 0x004FFBE0 (FUN_004FFBE0, Moho::CColPrimitive_Box::GetCenter)
    *
    * What it does:
-   * Writes current box center to caller output.
+   * Writes the primitive's LOCAL center to caller output.
+   *
+   * 0x004FFBE4/E9/EF read `[ecx+40h]`, `[ecx+44h]`, `[ecx+48h]` -- that is
+   * `mLocalCenter`, not `mShape.Center`. `SetTransform` (0x004FF470) settles
+   * which is which: it rotates `[edi+40h]` through `MultQuadVec`
+   * (`lea esi, [edi+40h]` at 0x004FF47D), adds the world position, and stores
+   * the result into `[edi+4]`/`[edi+8]`/`[edi+0Ch]` -- `mShape.Center`. So
+   * `mShape` is the world-space volume the grid and collision queries use, and
+   * `mLocalCenter` is the untransformed offset this accessor exposes.
+   *
+   * Returning the world centre here put `Entity::GetTerrainCollisionGeom`'s
+   * corner points in world space, and `CUnitMotion::HandleGroundCollision`
+   * (0x006BC460) multiplies them by the body's world matrix again -- landing
+   * every ground-contact sample at roughly twice the unit's world position.
+   * `SPhysBody::ApplyGroundCollisionResponse` takes `relative = sample - mPos`
+   * as a lever arm, so a unit 4.5 units long got an arm of several hundred,
+   * and the angular impulse it accumulated grew by four orders of magnitude in
+   * a single contact instead of damping.
    */
   Wm3::Vec3f* BoxCollisionPrimitive::GetCenter(Wm3::Vec3f* outCenter) const
   {
-    *outCenter = BuildBoxCenter(mShape);
+    *outCenter = mLocalCenter;
     return outCenter;
   }
 
@@ -571,11 +581,15 @@ namespace moho
    * Address: 0x004FFC00 (FUN_004FFC00, Moho::CColPrimitive_Box::SetCenter)
    *
    * What it does:
-   * Copies caller center into current box center.
+   * Copies caller center into the primitive's LOCAL center.
+   *
+   * 0x004FFC06/0C/12 store to `[ecx+40h]`, `[ecx+44h]`, `[ecx+48h]` --
+   * `mLocalCenter`, the same lane `GetCenter` reads. The world-space
+   * `mShape.Center` is derived from it by `SetTransform`, never written here.
    */
   const Wm3::Vec3f* BoxCollisionPrimitive::SetCenter(const Wm3::Vec3f* center)
   {
-    WriteBoxCenter(mShape, *center);
+    mLocalCenter = *center;
     return center;
   }
 
@@ -740,11 +754,16 @@ namespace moho
    * Address: 0x004FF960 (FUN_004FF960, Moho::CColPrimitive_Sphere::GetCenter)
    *
    * What it does:
-   * Writes current sphere center to caller output.
+   * Writes the primitive's LOCAL center to caller output.
+   *
+   * 0x004FF964/69/6F read `[ecx+14h]`, `[ecx+18h]`, `[ecx+1Ch]` --
+   * `mLocalCenter`. `mShape` (the world-space sphere) sits at +0x04 and is
+   * written by `SetTransform`; see the box primitive's `GetCenter` for the
+   * full evidence and for what reading the world lane here costs.
    */
   Wm3::Vec3f* SphereCollisionPrimitive::GetCenter(Wm3::Vec3f* outCenter) const
   {
-    *outCenter = mShape.Center;
+    *outCenter = mLocalCenter;
     return outCenter;
   }
 
@@ -752,11 +771,14 @@ namespace moho
    * Address: 0x004FF980 (FUN_004FF980, Moho::CColPrimitive_Sphere::SetCenter)
    *
    * What it does:
-   * Copies caller center into current sphere center.
+   * Copies caller center into the primitive's LOCAL center.
+   *
+   * 0x004FF986/8C/92 store to `[ecx+14h]`, `[ecx+18h]`, `[ecx+1Ch]` --
+   * `mLocalCenter`, the same lane `GetCenter` reads.
    */
   const Wm3::Vec3f* SphereCollisionPrimitive::SetCenter(const Wm3::Vec3f* center)
   {
-    mShape.Center = *center;
+    mLocalCenter = *center;
     return center;
   }
 
