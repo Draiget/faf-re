@@ -657,7 +657,26 @@ namespace moho
           return 1;
         }
 
-        if (mLoadedUnitCount == 0 && !transport->TransportHasAvailableStorage()) {
+        // 0x00625AF1: `cmp [ebp+74h], esi` guards the storage probe, and
+        // `+0x74` is `mReadyUnitCount` -- `DoTask` zeroes it at 0x006251F4
+        // beside `mProcessingTicks` (+0x7C) and bumps it with
+        // `add dword ptr [ebp+74h], 1` (0x00625414) for every unit
+        // `TransportAssignSlot` accepts. A non-zero count jumps straight past
+        // the probe (`jnz` to 0x00625B0E); only a transport that assigned
+        // nothing has to justify itself by having internal storage.
+        //
+        // `mLoadedUnitCount` (+0x78) is the wrong lane: it counts units
+        // already physically attached, so it is zero on every fresh load. That
+        // made the guard always reach `TransportHasAvailableStorage`, which is
+        // `(stored + reserved) < Transport.StorageSlots` -- and every stock air
+        // transport blueprint omits `StorageSlots`, leaving the ctor default of
+        // 0 (ours and the binary's alike, 0x0051E5F7). `(0 + 0) < 0` is false,
+        // so the task returned -1 on its first Waiting tick, every time. Its
+        // destructor then cleared `kUnitStateMaskTransportLoading`, and the
+        // cargo's `CUnitCallTransport` sat in TASKSTATE_Preparing forever
+        // waiting for a flag that was already gone -- the order stayed queued
+        // and nothing moved.
+        if (mReadyUnitCount == 0 && !transport->TransportHasAvailableStorage()) {
           return -1;
         }
 
