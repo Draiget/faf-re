@@ -4474,9 +4474,20 @@ namespace moho
       parent->AttachedEntityKilled(this);
     }
 
-    for (Entity* child : mAttachedEntities) {
-      if (child) {
-        child->ParentEntityKilled(this);
+    // 0x00679AAC..0x00679AD3. The cursor (`edi`) is loaded once from
+    // `_Myfirst`, but `_Mylast` is re-read out of `[esi+184h]` on every
+    // iteration - for the entry test at 0x00679AB2 and again for the loop-back
+    // test at 0x00679ACD. That reload is load bearing, not a missed
+    // optimisation: `ParentEntityKilled` runs the `OnParentKilled` script, and
+    // a script that detaches or destroys a sibling reaches
+    // `Entity::DetachFrom`, which erases from this very vector. A cached `end()`
+    // then walks one slot past the live range and dereferences the stale copy
+    // the erase left behind - which is a freed `Entity` whenever the sibling was
+    // being destroyed. Re-reading `end()` stops at the shortened range, exactly
+    // as the shipped loop does.
+    for (Entity** child = mAttachedEntities.begin(); child != mAttachedEntities.end(); ++child) {
+      if (*child) {
+        (*child)->ParentEntityKilled(this);
       }
     }
 
@@ -4503,9 +4514,13 @@ namespace moho
       (void)DetachFrom(parent, false);
     }
 
-    for (Entity* child : mAttachedEntities) {
-      if (child) {
-        child->ParentEntityDestroyed(this);
+    // 0x00679C15..0x00679C36, the same reload-`_Mylast`-every-iteration shape as
+    // `Kill` above, and load bearing for the same reason: `ParentEntityDestroyed`
+    // runs the `OnParentDestroyed` script, whose own `Destroy` calls re-enter
+    // this function on a sibling and erase it from this vector.
+    for (Entity** child = mAttachedEntities.begin(); child != mAttachedEntities.end(); ++child) {
+      if (*child) {
+        (*child)->ParentEntityDestroyed(this);
       }
     }
   }
