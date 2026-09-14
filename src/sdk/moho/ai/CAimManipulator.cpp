@@ -253,6 +253,15 @@ namespace
     "CAimManipulatorRuntimeView::mHeadingOffset offset must be 0x10C"
   );
 
+  // A view that reinterpret_casts over an object must never be larger than the
+  // object: every field past `sizeof(CAimManipulator)` would be a write off the
+  // end of the block. This held only once `CAimManipulator` declared the whole
+  // 0x80..0x110 run the binary allocates for it.
+  static_assert(
+    sizeof(CAimManipulatorRuntimeView) <= sizeof(moho::CAimManipulator),
+    "CAimManipulatorRuntimeView overruns CAimManipulator"
+  );
+
   /**
    * Address: 0x0062FEB0 (FUN_0062FEB0)
    *
@@ -937,7 +946,11 @@ moho::CAimManipulator::~CAimManipulator()
   }
 
   AimManipulatorBaseView(this)->mBaseEnabled = false;
-  runtimeView->mLabel.tidy(true, 0U);
+
+  // `mLabel` is a real member now, so the compiler emits `~msvc8::string`
+  // after this body -- the same teardown the binary runs, and the one the
+  // 2007 source never wrote down. Tidying it here as well would release the
+  // storage twice.
   runtimeView->mWeapon.UnlinkFromOwnerChain();
   runtimeView->mUnit.UnlinkFromOwnerChain();
 

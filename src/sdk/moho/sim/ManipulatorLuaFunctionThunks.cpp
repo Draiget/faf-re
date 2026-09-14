@@ -1138,12 +1138,12 @@ namespace moho
     }
     weapon->mBone = effectiveMuzzleBone;
 
-    // The binary allocates the full 0x110-byte manipulator and constructs it in
-    // place; `CAimManipulator` is modeled as a thin view over that storage, so the
-    // allocation size is explicit rather than `sizeof(CAimManipulator)`.
-    void* const storage = ::operator new(0x110u);
+    // `CAimManipulator` now declares the whole 0x110-byte run the binary
+    // allocates here (`operator new(110h)`), so this is the plain `new` the
+    // 2007 source wrote rather than an explicit-size allocation with a
+    // placement-construct on top.
     CAimManipulator* const manipulator =
-      new (storage) CAimManipulator(weapon, weapon->mSim, label, turretBone, barrelBone, muzzleBoneArg);
+      new CAimManipulator(weapon, weapon->mSim, label, turretBone, barrelBone, muzzleBoneArg);
 
     manipulator->mLuaObj.PushStack(state);
     return 1;

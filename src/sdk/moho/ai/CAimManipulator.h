@@ -6,9 +6,12 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/String.h"
 #include "moho/animation/IAniManipulator.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/WeakPtr.h"
+#include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
 namespace LuaPlus
@@ -23,7 +26,10 @@ namespace moho
   class CAniPoseBone;
   class CScrLuaInitForm;
   class Sim;
+  class Unit;
   class UnitWeapon;
+  struct RProjectileBlueprintPhysics;
+  struct RUnitBlueprintWeapon;
 
   /**
    * Address: 0x010A6396 (?dbg_Ballistics@Moho@@3_NA)
@@ -239,7 +245,65 @@ namespace moho
      * Applies second-axis (pitch) bone rotation using tracked quaternion lane.
      */
     void Rotate2(bool reset);
+
+  public:
+    // -----------------------------------------------------------------------
+    // State the binary allocates for this manipulator, +0x80..+0x110.
+    // `CAimManipulatorTypeInfo::NewRef` (0x00632EA0) calls
+    // `operator new(110h)` at 0x00632EB8 and then
+    // `CAimManipulator::CAimManipulator()` at 0x00632ED7, but this class
+    // declared no data members at all, so it inherited only
+    // `IAniManipulator`'s 0x80 -- and the constructor, the destructor and
+    // every accessor reach these fields through `CAimManipulatorRuntimeView`,
+    // which describes exactly this run. Every one of those writes landed past
+    // the end of the heap block, 0x90 bytes of it, once per manipulator: one
+    // is created for every turreted unit in the session.
+    // -----------------------------------------------------------------------
+    WeakPtr<Unit> mUnit{};                                 // +0x80
+    WeakPtr<UnitWeapon> mWeapon{};                         // +0x88
+    msvc8::string mLabel{};                                // +0x90
+    RUnitBlueprintWeapon* mUnitWepBlueprint = nullptr;     // +0xAC
+    RProjectileBlueprintPhysics* mProjPhysBlueprint = nullptr; // +0xB0
+    bool mEnabled = false;                                 // +0xB4
+    std::uint8_t mPadB5ToB7[0x3]{};
+    float mHeading = 0.0f;                                 // +0xB8
+    float mPitch = 0.0f;                                   // +0xBC
+    std::int32_t mMuzzleBone = 0;                          // +0xC0
+    bool mIsTracking = false;                              // +0xC4
+    std::uint8_t mPadC5ToC7[0x3]{};
+    float mMinHeading = 0.0f;                              // +0xC8
+    float mMaxHeading = 0.0f;                              // +0xCC
+    float mHeadingMaxSlew = 0.0f;                          // +0xD0
+    float mMinPitch = 0.0f;                                // +0xD4
+    float mMaxPitch = 0.0f;                                // +0xD8
+    float mPitchMaxSlew = 0.0f;                            // +0xDC
+    bool mOnTarget = false;                                // +0xE0
+    bool mUnknownBoolE1 = false;                           // +0xE1
+    std::uint8_t mPadE2ToE3[0x2]{};
+    std::int32_t mResetPoseTime = 0;                       // +0xE4
+    std::int32_t mResetTime = 0;                           // +0xE8
+    Wm3::Quaternionf mBone0Rot{};                          // +0xEC
+    Wm3::Quaternionf mBone1Rot{};                          // +0xFC
+    float mHeadingOffset = 0.0f;                           // +0x10C
   };
+
+  static_assert(sizeof(CAimManipulator) == 0x110, "moho::CAimManipulator size must be 0x110");
+  static_assert(offsetof(CAimManipulator, mUnit) == 0x80, "CAimManipulator::mUnit offset must be 0x80");
+  static_assert(offsetof(CAimManipulator, mWeapon) == 0x88, "CAimManipulator::mWeapon offset must be 0x88");
+  static_assert(offsetof(CAimManipulator, mLabel) == 0x90, "CAimManipulator::mLabel offset must be 0x90");
+  static_assert(
+    offsetof(CAimManipulator, mUnitWepBlueprint) == 0xAC,
+    "CAimManipulator::mUnitWepBlueprint offset must be 0xAC"
+  );
+  static_assert(offsetof(CAimManipulator, mHeading) == 0xB8, "CAimManipulator::mHeading offset must be 0xB8");
+  static_assert(offsetof(CAimManipulator, mMinHeading) == 0xC8, "CAimManipulator::mMinHeading offset must be 0xC8");
+  static_assert(offsetof(CAimManipulator, mResetPoseTime) == 0xE4, "CAimManipulator::mResetPoseTime offset must be 0xE4");
+  static_assert(offsetof(CAimManipulator, mBone0Rot) == 0xEC, "CAimManipulator::mBone0Rot offset must be 0xEC");
+  static_assert(offsetof(CAimManipulator, mBone1Rot) == 0xFC, "CAimManipulator::mBone1Rot offset must be 0xFC");
+  static_assert(
+    offsetof(CAimManipulator, mHeadingOffset) == 0x10C,
+    "CAimManipulator::mHeadingOffset offset must be 0x10C"
+  );
 
   template <>
   class CScrLuaMetatableFactory<CAimManipulator> final : public CScrLuaObjectFactory
