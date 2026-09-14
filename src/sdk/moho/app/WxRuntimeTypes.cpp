@@ -11559,6 +11559,15 @@ namespace
     // a Win95+ SCROLLINFO quirk (see SetScrollbar/GetScrollRange below).
     std::int32_t xThumbSize = 0;
     std::int32_t yThumbSize = 0;
+    // The constraint-layout object this window owns, if any
+    // (`wxWindowBase::SetConstraints`/`GetConstraints`). Opaque here for the
+    // same reason `dropTarget` above is: interpreted only by the
+    // constraint-solving functions (`GetConstraints`/`SetConstraints`,
+    // `wxIndividualLayoutConstraint::GetEdge`/`SatisfyConstraint`,
+    // `wxLayoutConstraints::SatisfyConstraints`), each of which reinterprets
+    // it through its own locally-declared `WxLayoutConstraintsRuntimeView`,
+    // matching this file's existing `wxCreateLayoutConstraintsRuntimeClassInstance`.
+    void* constraints = nullptr;
   };
 
   struct WxTextCtrlRuntimeState
@@ -41626,6 +41635,17 @@ void wxWindowBase::SetPalette(const wxPaletteRuntime& palette)
 
   wxWindowDC dc(this);
   dc.SetPalette(&palette);
+}
+
+void* wxWindowBase::GetConstraints() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->constraints : nullptr;
+}
+
+void wxWindowBase::SetConstraints(void* const constraints)
+{
+  EnsureWxWindowBaseRuntimeState(this).constraints = constraints;
 }
 
 /**
@@ -79061,6 +79081,650 @@ void* wxCreateLayoutConstraintsRuntimeClassInstance()
   runtime->constraints[4].edgeKind = 4;
   runtime->constraints[5].edgeKind = 5;
   return runtime;
+}
+
+namespace
+{
+  // Local, correctly-named mirror of `WxIndividualLayoutConstraintRuntimeView`
+  // (declared above as part of `wxCreateLayoutConstraintsRuntimeClassInstance`)
+  // for the solver functions below. Two pre-existing fields in that struct
+  // are misleadingly named for this purpose - `siblingConstraint`@0x08 is
+  // really `otherWin` (a `wxWindowBase*`, not a constraint) and
+  // `doneState`@0x20 is really `otherEdge` (a `wxEdge`, not a done flag) -
+  // confirmed against the real field order in `wx/layout.h`
+  // (`wxIndividualLayoutConstraint`: `otherWin, myEdge, relationship, margin,
+  // value, percent, otherEdge, done`, right after the inherited `wxObject`
+  // vtable+refData pair). Same physical layout, correct names, used only
+  // here.
+  struct WxLayoutConstraintSlotRuntimeView
+  {
+    void* vtable = nullptr;         // +0x00 (wxObject)
+    void* refData = nullptr;        // +0x04 (wxObject::m_refData, unused)
+    wxWindowBase* otherWin = nullptr; // +0x08
+    wxEdge myEdge = wxLeft;          // +0x0C
+    wxRelationship relationship = wxAsIs; // +0x10
+    std::int32_t margin = 0;        // +0x14
+    std::int32_t value = 0;         // +0x18
+    std::int32_t percent = 0;       // +0x1C
+    wxEdge otherEdge = wxLeft;       // +0x20
+    std::uint8_t done = 0;          // +0x24
+    std::uint8_t reserved25_27[0x3]{};
+  };
+  static_assert(sizeof(WxLayoutConstraintSlotRuntimeView) == 0x28, "WxLayoutConstraintSlotRuntimeView size must be 0x28");
+
+  struct WxLayoutConstraintsSetRuntimeView
+  {
+    void* vtable = nullptr;
+    void* refData = nullptr;
+    std::array<WxLayoutConstraintSlotRuntimeView, 8> edges{};
+  };
+  static_assert(sizeof(WxLayoutConstraintsSetRuntimeView) == 0x148, "WxLayoutConstraintsSetRuntimeView size must be 0x148");
+
+  // Array-index order of `edges` above, matching the declaration order of
+  // `wxLayoutConstraints`'s eight `wxIndividualLayoutConstraint` members
+  // (`wx/layout.h`: left, top, right, bottom, width, height, centreX,
+  // centreY) and independently cross-checked against every `isSatisfied`
+  // byte offset `FUN_009CC6B0` reads (44, 84, 124, 164, 204, 244, 284, 324
+  // for indices 0-7 respectively).
+  constexpr int kLayoutEdgeLeft = 0;
+  constexpr int kLayoutEdgeTop = 1;
+  constexpr int kLayoutEdgeRight = 2;
+  constexpr int kLayoutEdgeBottom = 3;
+  constexpr int kLayoutEdgeWidth = 4;
+  constexpr int kLayoutEdgeHeight = 5;
+  constexpr int kLayoutEdgeCentreX = 6;
+  constexpr int kLayoutEdgeCentreY = 7;
+
+  // `wxEdge`'s real numeric values (`wx/layout.h`) skip 6 (`wxCentre`, never
+  // used as an actual member selector), so the array index isn't the enum
+  // value directly.
+  [[nodiscard]] int LayoutEdgeToIndex(const wxEdge edge) noexcept
+  {
+    switch (edge) {
+      case wxLeft: return kLayoutEdgeLeft;
+      case wxTop: return kLayoutEdgeTop;
+      case wxRight: return kLayoutEdgeRight;
+      case wxBottom: return kLayoutEdgeBottom;
+      case wxWidth: return kLayoutEdgeWidth;
+      case wxHeight: return kLayoutEdgeHeight;
+      case wxCentreX: return kLayoutEdgeCentreX;
+      case wxCentreY: return kLayoutEdgeCentreY;
+      default: return -1;
+    }
+  }
+
+  /**
+   * Address: 0x009CC060 (FUN_009CC060)
+   * Mangled: ?GetEdge@wxIndividualLayoutConstraint@@BEHW4wxEdge@@PAVwxWindowBase@@1@Z
+   *
+   * What it does:
+   * Resolves the current position of one edge/dimension of `otherWin`,
+   * relative to `thisWin`: an immediate client-size-derived value when
+   * `otherWin` is `thisWin`'s parent, otherwise `otherWin`'s own resolved
+   * constraint value if it has one and it is already satisfied, or its
+   * current on-screen position/size if it has no constraints at all.
+   * Returns -1 when the value cannot yet be determined.
+   */
+  [[nodiscard]] std::int32_t wxLayoutConstraintGetEdgeRuntime(
+    const wxEdge which,
+    wxWindowBase* const thisWin,
+    wxWindowBase* const otherWin
+  )
+  {
+    const auto isParent = [&] {
+      for (wxWindowBase* const child : otherWin->GetChildren()) {
+        if (child == thisWin) {
+          return true;
+        }
+      }
+      return false;
+    }();
+
+    if (isParent) {
+      std::int32_t w = 0;
+      std::int32_t h = 0;
+      switch (which) {
+        case wxLeft:
+        case wxTop:
+          return 0;
+        case wxRight:
+        case wxWidth:
+          otherWin->GetClientSizeConstraint(&w, &h);
+          return w;
+        case wxBottom:
+        case wxHeight:
+          otherWin->GetClientSizeConstraint(&w, &h);
+          return h;
+        case wxCentreX:
+          otherWin->GetClientSizeConstraint(&w, &h);
+          return w / 2;
+        case wxCentreY:
+          otherWin->GetClientSizeConstraint(&w, &h);
+          return h / 2;
+        default:
+          return -1;
+      }
+    }
+
+    auto* const otherConstraintsView =
+      static_cast<WxLayoutConstraintsSetRuntimeView*>(otherWin->GetConstraints());
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t w = 0;
+    std::int32_t h = 0;
+    switch (which) {
+      case wxLeft:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeLeft];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        return x;
+      case wxTop:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeTop];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        return y;
+      case wxRight:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeRight];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        otherWin->DoGetSize(&w, &h);
+        return x + w;
+      case wxBottom:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeBottom];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        otherWin->DoGetSize(&w, &h);
+        return y + h;
+      case wxWidth:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeWidth];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetSize(&w, &h);
+        return w;
+      case wxHeight:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeHeight];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetSize(&w, &h);
+        return h;
+      case wxCentreX:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeCentreX];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        otherWin->DoGetSize(&w, &h);
+        return x + w / 2;
+      case wxCentreY:
+        if (otherConstraintsView != nullptr) {
+          const auto& edge = otherConstraintsView->edges[kLayoutEdgeCentreY];
+          return edge.done != 0 ? edge.value : -1;
+        }
+        otherWin->DoGetPosition(&x, &y);
+        otherWin->DoGetSize(&w, &h);
+        return y + h / 2;
+      default:
+        return -1;
+    }
+  }
+
+  /**
+   * Address: 0x009CC6B0 (FUN_009CC6B0)
+   * Mangled: ?SatisfyConstraint@wxIndividualLayoutConstraint@@QAE_NPAVwxLayoutConstraints@@PAVwxWindowBase@@@Z
+   *
+   * What it does:
+   * Tries to resolve this one edge/dimension's value from its relationship
+   * to another edge, a sibling window, or the window's current geometry.
+   * Transcribed from the real body (`dependencies/wxWindows-2.4.2/src/
+   * common/layout.cpp:155-727`, byte-identical field offsets confirmed
+   * against the complete disassembly) rather than the decompiler's
+   * goto-heavy rendering of the same switch.
+   */
+  bool wxLayoutConstraintSatisfyConstraintRuntime(
+    WxLayoutConstraintSlotRuntimeView* const self,
+    WxLayoutConstraintsSetRuntimeView* const constraintsView,
+    wxWindowBase* const win
+  )
+  {
+    if (self->relationship == wxAbsolute) {
+      self->done = 1;
+      return true;
+    }
+
+    const auto& edges = constraintsView->edges;
+    const auto edgeDone = [&](const int idx) { return edges[idx].done != 0; };
+    const auto edgeValue = [&](const int idx) { return edges[idx].value; };
+    const auto resolveViaOtherEdge = [&]() -> std::int32_t {
+      return wxLayoutConstraintGetEdgeRuntime(self->otherEdge, win, self->otherWin);
+    };
+
+    switch (self->myEdge) {
+      case wxLeft:
+        switch (self->relationship) {
+          case wxLeftOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxRightOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeRight) && edgeDone(kLayoutEdgeWidth)) {
+              self->value = edgeValue(kLayoutEdgeRight) - edgeValue(kLayoutEdgeWidth) + self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreX) && edgeDone(kLayoutEdgeWidth)) {
+              self->value = edgeValue(kLayoutEdgeCentreX) - edgeValue(kLayoutEdgeWidth) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          case wxAsIs: {
+            std::int32_t y = 0;
+            win->DoGetPosition(&self->value, &y);
+            self->done = 1;
+            return true;
+          }
+          default:
+            break;
+        }
+        break;
+
+      case wxRight:
+        switch (self->relationship) {
+          case wxLeftOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxRightOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeLeft) && edgeDone(kLayoutEdgeWidth)) {
+              self->value = edgeValue(kLayoutEdgeLeft) + edgeValue(kLayoutEdgeWidth) - self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreX) && edgeDone(kLayoutEdgeWidth)) {
+              self->value = edgeValue(kLayoutEdgeCentreX) + edgeValue(kLayoutEdgeWidth) / 2 - self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          case wxAsIs: {
+            std::int32_t x = 0;
+            std::int32_t y = 0;
+            std::int32_t w = 0;
+            std::int32_t h = 0;
+            win->DoGetSize(&w, &h);
+            win->DoGetPosition(&x, &y);
+            self->value = x + w;
+            self->done = 1;
+            return true;
+          }
+          default:
+            break;
+        }
+        break;
+
+      case wxTop:
+        switch (self->relationship) {
+          case wxAbove: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxBelow: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeBottom) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeBottom) - edgeValue(kLayoutEdgeHeight) + self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreY) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeCentreY) - edgeValue(kLayoutEdgeHeight) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          case wxAsIs: {
+            std::int32_t x = 0;
+            win->DoGetPosition(&x, &self->value);
+            self->done = 1;
+            return true;
+          }
+          default:
+            break;
+        }
+        break;
+
+      case wxBottom:
+        switch (self->relationship) {
+          case wxAbove: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxBelow: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeTop) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeTop) + edgeValue(kLayoutEdgeHeight) - self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreY) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeCentreY) + edgeValue(kLayoutEdgeHeight) / 2 - self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          case wxAsIs: {
+            std::int32_t x = 0;
+            std::int32_t y = 0;
+            std::int32_t w = 0;
+            std::int32_t h = 0;
+            win->DoGetSize(&w, &h);
+            win->DoGetPosition(&x, &y);
+            self->value = y + h;
+            self->done = 1;
+            return true;
+          }
+          default:
+            break;
+        }
+        break;
+
+      case wxCentreX:
+        switch (self->relationship) {
+          case wxLeftOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxRightOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeLeft) && edgeDone(kLayoutEdgeWidth)) {
+              self->value = edgeValue(kLayoutEdgeLeft) + edgeValue(kLayoutEdgeWidth) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeRight) && edgeDone(kLayoutEdgeWidth)) {
+              // Matches the real body exactly - this branch reads `left`,
+              // not `right`, on its right-hand side too (layout.cpp:527).
+              self->value = edgeValue(kLayoutEdgeLeft) - edgeValue(kLayoutEdgeWidth) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          default:
+            break;
+        }
+        break;
+
+      case wxCentreY:
+        switch (self->relationship) {
+          case wxAbove: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos - self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxBelow: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = edgePos + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01)) + self->margin;
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeBottom) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeBottom) - edgeValue(kLayoutEdgeHeight) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeTop) && edgeDone(kLayoutEdgeHeight)) {
+              self->value = edgeValue(kLayoutEdgeTop) + edgeValue(kLayoutEdgeHeight) / 2 + self->margin;
+              self->done = 1;
+              return true;
+            }
+            return false;
+          default:
+            break;
+        }
+        break;
+
+      case wxWidth:
+        switch (self->relationship) {
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01));
+            self->done = 1;
+            return true;
+          }
+          case wxAsIs: {
+            if (win == nullptr) return false;
+            std::int32_t h = 0;
+            win->DoGetSize(&self->value, &h);
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeLeft) && edgeDone(kLayoutEdgeRight)) {
+              self->value = edgeValue(kLayoutEdgeRight) - edgeValue(kLayoutEdgeLeft);
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreX) && edgeDone(kLayoutEdgeLeft)) {
+              self->value = 2 * (edgeValue(kLayoutEdgeCentreX) - edgeValue(kLayoutEdgeLeft));
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeCentreX) && edgeDone(kLayoutEdgeRight)) {
+              self->value = 2 * (edgeValue(kLayoutEdgeRight) - edgeValue(kLayoutEdgeCentreX));
+              self->done = 1;
+              return true;
+            }
+            return false;
+          default:
+            break;
+        }
+        break;
+
+      case wxHeight:
+        switch (self->relationship) {
+          case wxPercentOf: {
+            const std::int32_t edgePos = resolveViaOtherEdge();
+            if (edgePos == -1) return false;
+            self->value = static_cast<std::int32_t>(edgePos * (self->percent * 0.01));
+            self->done = 1;
+            return true;
+          }
+          case wxAsIs: {
+            if (win == nullptr) return false;
+            std::int32_t w = 0;
+            win->DoGetSize(&w, &self->value);
+            self->done = 1;
+            return true;
+          }
+          case wxUnconstrained:
+            if (edgeDone(kLayoutEdgeTop) && edgeDone(kLayoutEdgeBottom)) {
+              self->value = edgeValue(kLayoutEdgeBottom) - edgeValue(kLayoutEdgeTop);
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeTop) && edgeDone(kLayoutEdgeCentreY)) {
+              self->value = 2 * (edgeValue(kLayoutEdgeCentreY) - edgeValue(kLayoutEdgeTop));
+              self->done = 1;
+              return true;
+            }
+            if (edgeDone(kLayoutEdgeBottom) && edgeDone(kLayoutEdgeCentreY)) {
+              self->value = 2 * (edgeValue(kLayoutEdgeBottom) - edgeValue(kLayoutEdgeCentreY));
+              self->done = 1;
+              return true;
+            }
+            return false;
+          default:
+            break;
+        }
+        break;
+
+      default:
+        break;
+    }
+
+    return false;
+  }
+} // namespace
+
+/**
+ * Address: 0x009CCEC0 (FUN_009CCEC0)
+ * Mangled: ?SatisfyConstraints@wxLayoutConstraints@@QAE_NPAVwxWindowBase@@PAH@Z
+ *
+ * What it does:
+ * Tries to satisfy each of the eight edge/dimension constraints that isn't
+ * already done, counting how many changed into `*noChanges`. Returns
+ * whether the four constraints `AreSatisfied()` cares about (left, top,
+ * width, height) are now all satisfied.
+ */
+bool wxLayoutConstraintsSatisfyConstraintsRuntime(
+  void* const constraintsRuntime,
+  wxWindowBase* const win,
+  std::int32_t* const noChanges
+)
+{
+  auto* const constraintsView = static_cast<WxLayoutConstraintsSetRuntimeView*>(constraintsRuntime);
+  std::int32_t changed = 0;
+
+  // Matches the binary's own check order exactly (width, height, left, top,
+  // right, bottom, centreX, centreY - not declaration order).
+  static constexpr int kCheckOrder[8] = {
+    kLayoutEdgeWidth, kLayoutEdgeHeight, kLayoutEdgeLeft, kLayoutEdgeTop,
+    kLayoutEdgeRight, kLayoutEdgeBottom, kLayoutEdgeCentreX, kLayoutEdgeCentreY,
+  };
+  for (const int idx : kCheckOrder) {
+    auto& edge = constraintsView->edges[idx];
+    const bool wasDone = edge.done != 0;
+    const bool nowDone = wasDone
+      ? true
+      : wxLayoutConstraintSatisfyConstraintRuntime(&edge, constraintsView, win);
+    if (nowDone != wasDone) {
+      ++changed;
+    }
+  }
+
+  *noChanges = changed;
+  return constraintsView->edges[kLayoutEdgeLeft].done != 0
+    && constraintsView->edges[kLayoutEdgeTop].done != 0
+    && constraintsView->edges[kLayoutEdgeWidth].done != 0
+    && constraintsView->edges[kLayoutEdgeHeight].done != 0;
+}
+
+/**
+ * Address: 0x009643F0 (FUN_009643F0, wxWindowBase::LayoutPhase1)
+ * Mangled: ?LayoutPhase1@wxWindowBase@@UAE_NPAH@Z
+ *
+ * What it does:
+ * First phase of constraint-layout evaluation: try to satisfy this
+ * window's own constraints, if it has any.
+ */
+bool wxWindowBase::LayoutPhase1(std::int32_t* const noChanges)
+{
+  void* const constraints = GetConstraints();
+  return constraints == nullptr
+    || wxLayoutConstraintsSatisfyConstraintsRuntime(constraints, this, noChanges);
 }
 
 /**
