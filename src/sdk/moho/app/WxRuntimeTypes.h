@@ -4137,7 +4137,22 @@ public:
   // no-op interface, matching `DoDrawText`/`DoCrossHair` above).
   virtual void DoGetSizeMM(std::int32_t* outWidthMM, std::int32_t* outHeightMM) const { (void)outWidthMM; (void)outHeightMM; } // slot 59 (+0xEC)
   virtual void DoDrawLines() {} // slot 60 (+0xF0)
-  virtual void DoDrawPolygon() {} // slot 61 (+0xF4)
+  // Real override is `wxDC::DoDrawPolygon` (this base stays the shape-only
+  // no-op interface, matching `DoDrawText`/`DoCrossHair`/`DoGetSizeMM` above).
+  virtual void DoDrawPolygon(
+    std::int32_t pointCount,
+    const POINT* points,
+    std::int32_t xOffset,
+    std::int32_t yOffset,
+    std::int32_t fillStyle
+  )
+  {
+    (void)pointCount;
+    (void)points;
+    (void)xOffset;
+    (void)yOffset;
+    (void)fillStyle;
+  } // slot 61 (+0xF4)
   virtual void DoSetClippingRegionAsRegion() {} // slot 62 (+0xF8)
   virtual void DoSetClippingRegion() {} // slot 63 (+0xFC)
   virtual void DoGetClippingRegion() {} // slot 64 (+0x100)
@@ -4307,6 +4322,28 @@ public:
    * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1928-1958) line for line.
    */
   void DoGetSizeMM(std::int32_t* outWidthMM, std::int32_t* outHeightMM) const noexcept override;
+
+  /**
+   * Address: 0x009C9090 (FUN_009C9090)
+   * Mangled: ?DoDrawPolygon@wxDC@@MAEXHPAVwxPoint@@HHH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxDC::DoDrawPolygon(HDC *this, int cpt, POINT *apt, int xoffset, int yoffset, unsigned __int8 fillStyle);
+   *
+   * What it does:
+   * Draws a filled polygon, offsetting every point by (xoffset, yoffset)
+   * first when either is non-zero, extending the bounding box over every
+   * point, then calls Polygon with the fill mode translated from wx's
+   * fillStyle - matching wxDC::DoDrawPolygon
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:669-704) line for line.
+   */
+  void DoDrawPolygon(
+    std::int32_t pointCount,
+    const POINT* points,
+    std::int32_t xOffset,
+    std::int32_t yOffset,
+    std::int32_t fillStyle
+  ) override;
 
   void DoDrawRectangle(
     std::int32_t x,

@@ -412,6 +412,11 @@ public:
    * freeing the shared payload once nothing references it any more.
    */
   ~wxBrushRuntimeObject() override;
+
+  // wxBrush::GetStyle() is already recovered as the generic
+  // wxGetNestedRuntimeLaneValue(const void*) in WxRuntimeTypes.cpp
+  // (Address: 0x009D2A80) - no second accessor added here to avoid a
+  // duplicate Address citation for that same binary address.
 };
 
 static_assert(sizeof(wxBrushRuntimeObject) == 0xC, "wxBrushRuntimeObject size must be 0xC");
