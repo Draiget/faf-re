@@ -4039,7 +4039,7 @@ public:
   virtual void SetFont() {} // slot 13 (+0x34)
   virtual void SetPen() {} // slot 14 (+0x38)
   // slot 15 (+0x3C)
-  virtual void SetBrush(const void* brush) noexcept;
+  virtual void SetBrush(const void* brush) noexcept { (void)brush; }
   // `WD3DViewport::DrawBackgroundImage`'s slot-shape derivation only exercises
   // +0x3C/+0xC4/+0xE8; this slot's real wx signature takes the brush being
   // installed (`void SetBackground(const wxBrush&)`), needed so
@@ -4088,7 +4088,13 @@ public:
     std::int32_t y,
     std::int32_t width,
     std::int32_t height
-  ) noexcept;
+  ) noexcept
+  {
+    (void)x;
+    (void)y;
+    (void)width;
+    (void)height;
+  }
   virtual void DoDrawRoundedRectangle() {} // slot 50 (+0xC8)
   virtual void DoDrawEllipse() {} // slot 51 (+0xCC)
   virtual void DoCrossHair() {} // slot 52 (+0xD0)
@@ -4098,7 +4104,7 @@ public:
   virtual void DoDrawRotatedText() {} // slot 56 (+0xE0)
   virtual void DoBlit() {} // slot 57 (+0xE4)
   // slot 58 (+0xE8)
-  virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept;
+  virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept { (void)outWidth; (void)outHeight; }
   virtual void DoGetSizeMM() {} // slot 59 (+0xEC)
   virtual void DoDrawLines() {} // slot 60 (+0xF0)
   virtual void DoDrawPolygon() {} // slot 61 (+0xF4)
