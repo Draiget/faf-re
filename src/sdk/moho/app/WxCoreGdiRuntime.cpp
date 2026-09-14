@@ -233,3 +233,45 @@ const wxClassInfoRuntime* wxFontRuntimeObject::GetClassInfo() const
 }
 
 void wxFontRuntimeObject::Init() noexcept {}
+
+/**
+ * Address: 0x0096FB10 (FUN_0096FB10)
+ * Mangled: ??0wxColour@@QAE@ABV0@@Z
+ *
+ * What it does:
+ * Copies the packed pixel value and the four colour component lanes from
+ * `other`; the base `wxObjectRuntime()` default constructor already leaves
+ * ref-data null, matching the binary's own `this->m_refData = 0` (it is
+ * never shared between colour copies in this build).
+ */
+wxColourRuntimeObject::wxColourRuntimeObject(const wxColourRuntimeObject& other) noexcept
+  : wxObjectRuntime()
+  , mPixel(other.mPixel)
+  , mIsInit(other.mIsInit)
+  , mRed(other.mRed)
+  , mBlue(other.mBlue)
+  , mGreen(other.mGreen)
+{}
+
+/**
+ * Address: 0x004F17A0 (FUN_004F17A0)
+ * Mangled: ??0wxGDIImage@@QAE@@Z
+ *
+ * What it does:
+ * Chains to the `wxGDIObject` base state (ref-data cleared, not visible);
+ * carries no lanes of its own.
+ */
+wxGDIImageRuntime::wxGDIImageRuntime() noexcept = default;
+
+/**
+ * Address: 0x004F3310 (FUN_004F3310)
+ * Mangled: ??0wxBitmap@@QAE@@Z
+ *
+ * What it does:
+ * Builds an invalid ("null") bitmap: chains through the `wxGDIImage` /
+ * `wxGDIObject` base state and stamps this class's own vtable. The binary's
+ * third step (`call FUN_00975AF0`) targets a one-byte `retn` - an empty
+ * compiler-emitted body with no observable effect - so it is not reproduced
+ * here; see FUN_00975AF0's own progress note.
+ */
+wxBitmapRuntimeObject::wxBitmapRuntimeObject() noexcept = default;

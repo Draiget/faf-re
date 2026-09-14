@@ -12,6 +12,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "moho/app/WxCoreGdiRuntime.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/math/Vector3f.h"
 
@@ -1920,6 +1921,17 @@ public:
    * Returns one copy of the current window background-colour runtime lane.
    */
   [[nodiscard]] wxColourRuntime GetBackgroundColour() const;
+
+  /**
+   * Address: 0x009651C0 (FUN_009651C0)
+   * Mangled: ?SetPalette@wxWindowBase@@UAEXABVwxPalette@@@Z
+   *
+   * What it does:
+   * Adopts the given palette as this window's own (sharing its ref-data
+   * rather than copying it, matching the binary's `wxObject::Ref`), then
+   * realizes it immediately through a temporary window device context.
+   */
+  void SetPalette(const wxPaletteRuntime& palette);
 
   virtual void Raise() {}
   virtual void Lower() {}
@@ -3962,6 +3974,14 @@ wxStringRuntime* wxBuildUserConfigRootPath(wxStringRuntime* outText);
  * wxDC's own first field sits at +0xE8 (`mov [esi+0E8h], edi` in the wxDC
  * constructor at 0x009CA490), so everything below it belongs here.
  */
+// A polymorphic class with a trailing `double` member normally gets its
+// first data member padded out to the class's own (8-byte) alignment on
+// this toolset - MSVC reserves that alignment for the vfptr's own slot,
+// not just for the eventual double - which would shift every real-binary
+// offset below by 4 or 8 bytes. `pack(1)` disables that; every offset here
+// is explicit and asserted, so there is nothing left for the default
+// alignment to usefully add.
+#pragma pack(push, 1)
 class wxDCBase
 {
 public:
@@ -3997,6 +4017,12 @@ public:
    * exist so the fields line up.
    */
   virtual void* GetClassInfo() const { return nullptr; } // slot 0 (+0x00)
+  // Address: 0x009C87F0 (FUN_009C87F0, wxDCBase::~wxDCBase). The binary tears
+  // down the palette/font/text-colours/brushes/pen members by hand, in
+  // exactly reverse-declaration order, then unrefs its own (always-null)
+  // base ref-data. C++'s automatic member (and base) destruction already
+  // runs in that same reverse order, so `= default` reproduces it exactly -
+  // no hand-written body needed.
   virtual ~wxDCBase() = default;                         // slot 1 (+0x04)
   virtual void* CreateRefData() const { return nullptr; } // slot 2 (+0x08)
   virtual void* CloneRefData(const void*) const { return nullptr; } // slot 3 (+0x0C)
@@ -4014,9 +4040,18 @@ public:
   virtual void SetPen() {} // slot 14 (+0x38)
   // slot 15 (+0x3C)
   virtual void SetBrush(const void* brush) noexcept;
-  virtual void SetBackground() {} // slot 16 (+0x40)
+  // `WD3DViewport::DrawBackgroundImage`'s slot-shape derivation only exercises
+  // +0x3C/+0xC4/+0xE8; this slot's real wx signature takes the brush being
+  // installed (`void SetBackground(const wxBrush&)`), needed so
+  // `wxWindowDC::InitDC`'s call through it (real wx vtable, slot 16) compiles
+  // with the right argument - the body itself is never entered, same as
+  // every other unimplemented slot in this class.
+  virtual void SetBackground(const void* brush) noexcept { (void)brush; } // slot 16 (+0x40)
   virtual void SetBackgroundMode() {} // slot 17 (+0x44)
-  virtual void SetPalette() {} // slot 18 (+0x48)
+  // Real wx signature: `void SetPalette(const wxPalette&)`, needed so
+  // `wxWindowBase::SetPalette`'s call through this slot (real wx vtable)
+  // compiles with the right argument; the body itself is never entered.
+  virtual void SetPalette(const void* palette) noexcept { (void)palette; } // slot 18 (+0x48)
   virtual void DestroyClippingRegion() {} // slot 19 (+0x4C)
   virtual void GetCharHeight() {} // slot 20 (+0x50)
   virtual void GetCharWidth() {} // slot 21 (+0x54)
@@ -4078,7 +4113,41 @@ public:
 
   void* m_refData = nullptr;                 // +0x04, from wxObject
   std::uint8_t m_flags = 0;                  // +0x08 bit 1: the DC is usable
-  std::uint8_t mDrawingState[0xCB]{};        // +0x09, not yet mapped
+  std::uint8_t mPadding09[0x3]{};            // +0x09, alignment only
+
+  // The drawing state below is read off `wxDCBase::wxDCBase` (0x009CA340),
+  // which writes every one of these fields in order; names and defaults
+  // match the values the constructor stores.
+  std::int32_t mLogicalOriginX = 0;   // +0x0C
+  std::int32_t mLogicalOriginY = 0;   // +0x10
+  std::int32_t mDeviceOriginX = 0;    // +0x14
+  std::int32_t mDeviceOriginY = 0;    // +0x18
+  std::uint8_t mPadding1C[0x4]{};     // +0x1C, alignment for the doubles below
+  double mLogicalScaleX = 1.0;        // +0x20
+  double mLogicalScaleY = 1.0;        // +0x28
+  double mUserScaleX = 1.0;           // +0x30
+  double mUserScaleY = 1.0;           // +0x38
+  double mScaleX = 1.0;               // +0x40
+  double mScaleY = 1.0;               // +0x48
+  std::int32_t mSignX = 1;            // +0x50
+  std::int32_t mSignY = 1;            // +0x54
+  std::int32_t mMinX = 0;             // +0x58
+  std::int32_t mMinY = 0;             // +0x5C
+  std::int32_t mMaxX = 0;             // +0x60
+  std::int32_t mMaxY = 0;             // +0x64
+  std::int32_t mClipX1 = 0;           // +0x68
+  std::int32_t mClipY1 = 0;           // +0x6C
+  std::int32_t mClipX2 = 0;           // +0x70
+  std::int32_t mClipY2 = 0;           // +0x74
+  std::int32_t mLogicalFunction = 5;  // +0x78 (wxCOPY)
+  std::int32_t mBackgroundMode = 106; // +0x7C (wxTRANSPARENT)
+  std::int32_t mMappingMode = 1;      // +0x80 (wxMM_TEXT)
+  wxPenRuntimeObject m_pen{};                        // +0x84
+  wxBrushRuntimeObject m_brush{};                    // +0x90
+  wxBrushRuntimeObject m_backgroundBrush;            // +0x9C
+  wxColourRuntimeObject m_textForegroundColour;      // +0xA8
+  wxColourRuntimeObject m_textBackgroundColour;      // +0xB8
+  wxFontRuntimeObject m_font{};                      // +0xC8
   // The palette a context draws through, borrowed from whichever window up
   // the chain owns one. Offsets from wxDC::InitializePalette (0x009CAAA0),
   // which writes the flag at +0xE0 and takes a reference on the palette at
@@ -4086,10 +4155,32 @@ public:
   wxPaletteRuntime m_palette{};              // +0xD4
   std::uint8_t m_hasCustomPalette = 0;       // +0xE0
   std::uint8_t mPaddingE1[0x7]{};            // +0xE1
+
+  // Real device contexts are unique OS resources; matches real wx's
+  // `DECLARE_NO_COPY_CLASS(wxDCBase)`.
+  wxDCBase(const wxDCBase&) = delete;
+  wxDCBase& operator=(const wxDCBase&) = delete;
 };
+#pragma pack(pop)
 
 static_assert(offsetof(wxDCBase, m_refData) == 0x04, "wxDCBase::m_refData offset must be 0x04");
 static_assert(offsetof(wxDCBase, m_flags) == 0x08, "wxDCBase::m_flags offset must be 0x08");
+static_assert(offsetof(wxDCBase, mLogicalOriginX) == 0x0C, "wxDCBase::mLogicalOriginX offset must be 0x0C");
+static_assert(offsetof(wxDCBase, mLogicalScaleX) == 0x20, "wxDCBase::mLogicalScaleX offset must be 0x20");
+static_assert(offsetof(wxDCBase, mSignX) == 0x50, "wxDCBase::mSignX offset must be 0x50");
+static_assert(offsetof(wxDCBase, mLogicalFunction) == 0x78, "wxDCBase::mLogicalFunction offset must be 0x78");
+static_assert(offsetof(wxDCBase, m_pen) == 0x84, "wxDCBase::m_pen offset must be 0x84");
+static_assert(offsetof(wxDCBase, m_brush) == 0x90, "wxDCBase::m_brush offset must be 0x90");
+static_assert(offsetof(wxDCBase, m_backgroundBrush) == 0x9C, "wxDCBase::m_backgroundBrush offset must be 0x9C");
+static_assert(
+  offsetof(wxDCBase, m_textForegroundColour) == 0xA8,
+  "wxDCBase::m_textForegroundColour offset must be 0xA8"
+);
+static_assert(
+  offsetof(wxDCBase, m_textBackgroundColour) == 0xB8,
+  "wxDCBase::m_textBackgroundColour offset must be 0xB8"
+);
+static_assert(offsetof(wxDCBase, m_font) == 0xC8, "wxDCBase::m_font offset must be 0xC8");
 static_assert(offsetof(wxDCBase, m_palette) == 0xD4, "wxDCBase::m_palette offset must be 0xD4");
 static_assert(
   offsetof(wxDCBase, m_hasCustomPalette) == 0xE0,
@@ -4173,8 +4264,7 @@ public:
   virtual void DoSelectPalette(bool realize);
 
   void* m_canvas = nullptr;                  // +0xE8 the window being drawn on
-  void* m_selectedBitmap = nullptr;          // +0xEC wxBitmap, 0xC bytes
-  std::uint8_t mSelectedBitmapRest[0x8]{};   // +0xF0
+  wxBitmapRuntimeObject m_selectedBitmap;    // +0xEC ("null" bitmap; nothing is ever selected into it here)
   std::uint8_t m_bOwnsDC = 0;                // +0xF8 bit 0: destroy m_hDC with the DC
   std::uint8_t mPaddingF9[0x3]{};            // +0xF9
   void* m_hDC = nullptr;                     // +0xFC
@@ -4194,6 +4284,37 @@ static_assert(offsetof(wxDC, m_oldPen) == 0x104, "wxDC::m_oldPen offset must be 
 static_assert(offsetof(wxDC, m_oldBrush) == 0x108, "wxDC::m_oldBrush offset must be 0x108");
 static_assert(offsetof(wxDC, m_oldFont) == 0x10C, "wxDC::m_oldFont offset must be 0x10C");
 static_assert(offsetof(wxDC, m_oldPalette) == 0x110, "wxDC::m_oldPalette offset must be 0x110");
+
+/**
+ * A device context for drawing directly on a window's client area.
+ */
+class wxWindowDC : public wxDC
+{
+public:
+  /**
+   * Address: 0x0097E100 (FUN_0097E100)
+   * Mangled: ??0wxWindowDC@@QAE@PAVwxWindow@@@Z
+   *
+   * What it does:
+   * When given a window, takes its native device context and runs `InitDC`;
+   * a null window leaves the DC exactly as `wxDC::wxDC` left it (unattached,
+   * owning nothing), matching the binary's `if (a2)` guard.
+   */
+  explicit wxWindowDC(wxWindowBase* window) noexcept;
+
+private:
+  /**
+   * Address: 0x0097DC50 (FUN_0097DC50)
+   * Mangled: ?InitDC@wxWindowDC@@AAEXXZ
+   *
+   * What it does:
+   * Sets transparent background mode, then selects the window's background
+   * colour as a solid brush (through the real wx vtable's `SetBackground`)
+   * for the duration of the call, and finally lets the base class adopt any
+   * inherited custom palette.
+   */
+  void InitDC() noexcept;
+};
 
 /**
  * A device context borrowed from somewhere else.

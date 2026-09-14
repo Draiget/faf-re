@@ -202,3 +202,244 @@ private:
 };
 
 static_assert(sizeof(wxFontRuntimeObject) == 0xC, "wxFontRuntimeObject size must be 0xC");
+
+/**
+ * Minimal recovered wxColour runtime lane.
+ *
+ * `wxColour` derives from `wxObject` directly (not `wxGDIObject`) and never
+ * shares ref-data between copies in this build: every constructor - default,
+ * from-components, and copy - stores its own colour lanes by value and
+ * leaves `mRefData` untouched at the base class's default-initialized
+ * `nullptr`. That is why the copy constructor below delegates to
+ * `wxObjectRuntime`'s default constructor instead of copying the source's
+ * ref-data pointer: `wxColour::wxColour(const wxColour&)`
+ * (0x0096FB10) does exactly that on the binary side (`this->m_refData = 0;`
+ * ahead of the five field copies), and the destructor never needs to unref
+ * anything beyond the always-null base lane.
+ */
+class wxColourRuntimeObject : public wxObjectRuntime
+{
+public:
+  wxColourRuntimeObject() noexcept = default;
+
+  // Not itself tied to one decompiled address - this is the ordinary
+  // from-components constructor (real wx: `wxColour(r, g, b)`, `Set()`)
+  // used here only to seed the stock black/white colour constants
+  // `wxDCBase::wxDCBase` copy-constructs its text colours from.
+  wxColourRuntimeObject(
+    const std::uint8_t red,
+    const std::uint8_t green,
+    const std::uint8_t blue
+  ) noexcept
+    : mPixel((static_cast<std::uint32_t>(blue) << 16) | (static_cast<std::uint32_t>(green) << 8) | red)
+    , mIsInit(true)
+    , mRed(red)
+    , mBlue(blue)
+    , mGreen(green)
+  {}
+
+  /**
+   * Address: 0x0096FB10 (FUN_0096FB10)
+   * Mangled: ??0wxColour@@QAE@ABV0@@Z
+   *
+   * What it does:
+   * Copies the packed pixel value and the four colour component lanes from
+   * `other`; ref-data ownership is never shared, matching the binary.
+   */
+  wxColourRuntimeObject(const wxColourRuntimeObject& other) noexcept;
+
+  [[nodiscard]] std::uint8_t Red() const noexcept { return mRed; }
+  [[nodiscard]] std::uint8_t Green() const noexcept { return mGreen; }
+  [[nodiscard]] std::uint8_t Blue() const noexcept { return mBlue; }
+  [[nodiscard]] bool IsOk() const noexcept { return mIsInit != 0; }
+
+private:
+  std::uint32_t mPixel = 0;  // +0x08, WXCOLORREF
+  bool mIsInit = false;      // +0x0C
+  std::uint8_t mRed = 0;     // +0x0D
+  std::uint8_t mBlue = 0;    // +0x0E
+  std::uint8_t mGreen = 0;   // +0x0F
+};
+
+static_assert(sizeof(wxColourRuntimeObject) == 0x10, "wxColourRuntimeObject size must be 0x10");
+
+/**
+ * `wxGDIImage` in this wx build (`wx/msw/gdiimage.h`) is a pure pass-through
+ * base over `wxGDIObject` - it declares native-format conversion virtuals
+ * but adds no data of its own, and its constructor
+ * (0x004F17A0) does nothing but chain to `wxGDIObject::wxGDIObject` and
+ * re-stamp its own vtable. Modelled as a thin alias rather than a
+ * data-bearing layer for exactly that reason.
+ */
+class wxGDIImageRuntime : public wxGDIObjectRuntime
+{
+public:
+  /**
+   * Address: 0x004F17A0 (FUN_004F17A0)
+   * Mangled: ??0wxGDIImage@@QAE@@Z
+   *
+   * What it does:
+   * Chains to the `wxGDIObject` base state (ref-data cleared, not visible);
+   * carries no lanes of its own.
+   */
+  wxGDIImageRuntime() noexcept;
+};
+
+/**
+ * Minimal recovered wxBitmap runtime lane (the default/"null" state only -
+ * this project never constructs a populated bitmap through this lane).
+ */
+class wxBitmapRuntimeObject : public wxGDIImageRuntime
+{
+public:
+  /**
+   * Address: 0x004F3310 (FUN_004F3310)
+   * Mangled: ??0wxBitmap@@QAE@@Z
+   *
+   * What it does:
+   * Builds an invalid ("null") bitmap: chains through the `wxGDIImage` /
+   * `wxGDIObject` base state and stamps this class's own vtable. The
+   * binary's third step (`call FUN_00975AF0`) targets a one-byte `retn` -
+   * an empty compiler-emitted body with no observable effect - so it is not
+   * reproduced here; see FUN_00975AF0's own progress note.
+   */
+  wxBitmapRuntimeObject() noexcept;
+};
+
+static_assert(sizeof(wxBitmapRuntimeObject) == 0xC, "wxBitmapRuntimeObject size must be 0xC");
+
+/**
+ * Minimal recovered wxBrush ref-data lane: the shared, ref-counted payload
+ * a `wxBrushRuntimeObject` points `mRefData` at once it owns a real brush.
+ *
+ * Offsets are read off the constructor at 0x009D2570, which writes every
+ * one of them: `m_count`(ref count, from `wxObjectRefData`) at +0x04,
+ * `m_style` at +0x08, an embedded `wxBitmap m_stipple` value at +0x0C, an
+ * embedded `wxColour m_colour` value at +0x18, and `m_hBrush` at +0x28 -
+ * `operator new(0x2Cu)` confirms the total size.
+ */
+class wxBrushRefDataRuntimeObject
+{
+public:
+  /**
+   * Address: 0x009D2570 (FUN_009D2570)
+   * Mangled: ??0wxBrushRefData@@QAE@ABVwxColour@@H@Z
+   *
+   * What it does:
+   * Seeds a one-owner ref count, stores the requested style and colour, and
+   * leaves the stipple bitmap and native handle empty.
+   */
+  wxBrushRefDataRuntimeObject(
+    const wxColourRuntimeObject& colour,
+    const std::int32_t style
+  ) noexcept;
+
+  // `wxGDIRefData : wxObjectRefData` supplies this vtable slot; a plain
+  // virtual destructor reproduces it without modelling the (empty) base
+  // classes separately.
+  virtual ~wxBrushRefDataRuntimeObject() = default;
+
+  [[nodiscard]] std::int32_t Style() const noexcept { return mStyle; }
+  [[nodiscard]] const wxColourRuntimeObject& Colour() const noexcept { return mColour; }
+
+  // Matches `wxObject::Ref`/`wxEvent::UnRef`'s intrusive counting for this
+  // payload: callers share a brush by bumping the count, and release it by
+  // dropping the count and freeing once nothing references it any more.
+  void AddRef() noexcept { ++mRefCount; }
+  [[nodiscard]] bool ReleaseRef() noexcept { return --mRefCount == 0; }
+
+private:
+  std::int32_t mRefCount = 1;         // +0x04 (wxObjectRefData::m_count)
+  std::int32_t mStyle = 0;            // +0x08
+  wxBitmapRuntimeObject mStipple{};   // +0x0C
+  wxColourRuntimeObject mColour{};    // +0x18
+  void* mNativeBrushHandle = nullptr; // +0x28 (WXHBRUSH)
+};
+
+static_assert(sizeof(wxBrushRefDataRuntimeObject) == 0x2C, "wxBrushRefDataRuntimeObject size must be 0x2C");
+
+/**
+ * Minimal recovered wxBrush runtime lane.
+ *
+ * Every constructor stores its ref-data pointer through the shared
+ * `wxObjectRuntime::mRefData` lane; this project never dereferences a
+ * brush's ref-data as anything but an opaque shared payload (`SetBrush`
+ * selects the *native* handle produced elsewhere, never this object), so
+ * `wxBrushRefDataRuntimeObject` is allocated and owned but not otherwise
+ * read back through this class.
+ */
+class wxBrushRuntimeObject : public wxGDIObjectRuntime
+{
+public:
+  /**
+   * Address: 0x009C8760 (FUN_009C8760)
+   * Mangled: ??0wxBrush@@QAE@@Z
+   *
+   * What it does:
+   * Default-constructs an empty ("null") brush: no ref-data, not visible.
+   */
+  wxBrushRuntimeObject() noexcept;
+
+  /**
+   * Address: 0x009D2860 (FUN_009D2860)
+   * Mangled: ??0wxBrush@@QAE@ABV0@@Z
+   *
+   * What it does:
+   * Shares the source brush's ref-data (`wxObject::Ref`): points at the same
+   * payload and bumps its ref count, matching the binary's
+   * `wxObject::Ref(this, a2)` tail call.
+   */
+  wxBrushRuntimeObject(const wxBrushRuntimeObject& other) noexcept;
+
+  /**
+   * Address: 0x009D2880 (FUN_009D2880)
+   * Mangled: ??0wxBrush@@QAE@ABVwxColour@@H@Z
+   *
+   * What it does:
+   * Allocates a fresh, single-owner `wxBrushRefData` for the given
+   * colour/style pair, matching `operator new(0x2Cu)` plus the ref-data
+   * constructor in the binary.
+   */
+  wxBrushRuntimeObject(const wxColourRuntimeObject& colour, std::int32_t style);
+
+  /**
+   * Address: 0x009D2910 (FUN_009D2910)
+   * Mangled: ??1wxBrush@@QAE@XZ
+   *
+   * What it does:
+   * Drops this instance's share of the ref-data (`wxEvent::UnRef`),
+   * freeing the shared payload once nothing references it any more.
+   */
+  ~wxBrushRuntimeObject() override;
+};
+
+static_assert(sizeof(wxBrushRuntimeObject) == 0xC, "wxBrushRuntimeObject size must be 0xC");
+
+/**
+ * Minimal recovered wxPen runtime lane (the default/"null" state only - this
+ * project never constructs a populated pen through this lane, so there is no
+ * evidenced ref-data shape to model yet).
+ */
+class wxPenRuntimeObject : public wxGDIObjectRuntime
+{
+public:
+  /**
+   * Address: 0x009EB2A0 (FUN_009EB2A0)
+   * Mangled: ??0wxPen@@QAE@@Z
+   *
+   * What it does:
+   * Default-constructs an empty ("null") pen: no ref-data, not visible.
+   */
+  wxPenRuntimeObject() noexcept;
+
+  /**
+   * Address: 0x009EB2E0 (FUN_009EB2E0)
+   * Mangled: ??1wxPen@@QAE@XZ
+   *
+   * What it does:
+   * Releases ref-data ownership through the shared unref lane.
+   */
+  ~wxPenRuntimeObject() override;
+};
+
+static_assert(sizeof(wxPenRuntimeObject) == 0xC, "wxPenRuntimeObject size must be 0xC");
