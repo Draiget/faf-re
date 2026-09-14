@@ -9,6 +9,7 @@
 #include "CTask.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/String.h"
+#include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
@@ -241,14 +242,6 @@ namespace
       actual ? actual : "null"
     );
     throw std::runtime_error(msg.c_str());
-  }
-
-  /**
-   * Address: 0x0040C300 (FUN_0040C300, func_RRefCTaskStage)
-   */
-  gpg::RRef SerializeTaskStagePointer(CTaskStage* stage)
-  {
-    return MakeDerivedRef(stage, CachedCTaskStageType());
   }
 
   /**
@@ -609,7 +602,8 @@ void CTaskThread::MemberDeserialize(gpg::ReadArchive* const archive, gpg::RRef* 
 void CTaskThread::MemberSerialize(gpg::WriteArchive* const archive, gpg::RRef* const ownerRef)
 {
   const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-  const gpg::RRef stageRef = SerializeTaskStagePointer(mStage);
+  gpg::RRef stageRef{};
+  (void)gpg::RRef_CTaskStage(&stageRef, mStage);
   gpg::WriteRawPointer(archive, stageRef, gpg::TrackedPointerState::Unowned, owner);
   archive->WriteInt(mPendingFrames);
   archive->WriteBool(mStaged);

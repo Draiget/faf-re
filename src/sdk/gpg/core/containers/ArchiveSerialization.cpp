@@ -716,7 +716,19 @@ namespace gpg
     return outRef;
   }
 
-  gpg::RRef* RRef_CTaskStage(gpg::RRef* const outRef, moho::CTaskStage* const value)
+  /**
+   * Address: 0x0040C300 (FUN_0040C300, gpg::RRef_CTaskStage)
+   *
+   * What it does:
+   * Builds one reflected reference for a `moho::CTaskStage` object pointer.
+   *
+   * The parameters are deliberately not `T* const`: MSVC mangles a top-level
+   * const on a pointer parameter as `QA` rather than `PA` when the definition
+   * carries it and no prior declaration does, which produced a symbol no
+   * caller could resolve. The declaration in Reflection.h now fixes the
+   * mangling for every translation unit.
+   */
+  gpg::RRef* RRef_CTaskStage(gpg::RRef* outRef, moho::CTaskStage* value)
   {
     return BuildCompatTypedRef(outRef, value, CachedCompatRType<moho::CTaskStage>());
   }
