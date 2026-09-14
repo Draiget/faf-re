@@ -78962,18 +78962,26 @@ void* wxInitializeIndividualLayoutConstraintRuntime(
   void* const constraintRuntime
 ) noexcept
 {
+  // Field names/types match the real declaration order in `wx/layout.h`
+  // (`wxIndividualLayoutConstraint`: `otherWin, myEdge, relationship,
+  // margin, value, percent, otherEdge, done`, right after the inherited
+  // `wxObject` vtable+refData pair) - `otherWin`/`otherEdge` were
+  // previously misnamed `siblingConstraint`/`doneState` here (fixed
+  // alongside landing the solver that actually reads them, see
+  // `wxLayoutConstraintSatisfyConstraintRuntime`/`wxLayoutConstraintGetEdgeRuntime`
+  // further down this file).
   struct WxIndividualLayoutConstraintRuntimeView
   {
     void* vtable = nullptr;               // +0x00
-    void* ownerWindow = nullptr;          // +0x04
-    std::int32_t siblingConstraint = 0;   // +0x08
-    std::int32_t edgeKind = 1;            // +0x0C
-    std::int32_t relationKind = 0;        // +0x10
+    void* ownerWindow = nullptr;          // +0x04 (wxObject::m_refData, unused)
+    wxWindowBase* otherWin = nullptr;     // +0x08
+    std::int32_t edgeKind = 1;            // +0x0C (myEdge)
+    std::int32_t relationKind = 0;        // +0x10 (relationship)
     std::int32_t margin = 0;              // +0x14
     std::int32_t value = 0;               // +0x18
     std::int32_t percent = 0;             // +0x1C
-    std::int32_t doneState = 1;           // +0x20
-    std::uint8_t isSatisfied = 0;         // +0x24
+    wxEdge otherEdge = wxLeft;            // +0x20
+    std::uint8_t isSatisfied = 0;         // +0x24 (done)
     std::uint8_t reserved25_27[0x3]{};
   };
   static_assert(sizeof(WxIndividualLayoutConstraintRuntimeView) == 0x28, "WxIndividualLayoutConstraintRuntimeView size must be 0x28");
@@ -78987,13 +78995,13 @@ void* wxInitializeIndividualLayoutConstraintRuntime(
 
   runtime->vtable = &sWxIndividualLayoutConstraintRuntimeVTableTag;
   runtime->ownerWindow = nullptr;
-  runtime->siblingConstraint = 0;
+  runtime->otherWin = nullptr;
   runtime->edgeKind = 1;
   runtime->relationKind = 0;
   runtime->margin = 0;
   runtime->value = 0;
   runtime->percent = 0;
-  runtime->doneState = 1;
+  runtime->otherEdge = wxLeft;
   runtime->isSatisfied = 0;
   return runtime;
 }
@@ -79025,18 +79033,21 @@ void* wxCreateIndividualLayoutConstraintRuntimeClassInstance()
  */
 void* wxCreateLayoutConstraintsRuntimeClassInstance()
 {
+  // See `wxInitializeIndividualLayoutConstraintRuntime` above for why
+  // `otherWin`/`otherEdge` are named that way rather than the more
+  // confusing `siblingConstraint`/`doneState`.
   struct WxIndividualLayoutConstraintRuntimeView
   {
     void* vtable = nullptr;               // +0x00
-    void* ownerWindow = nullptr;          // +0x04
-    std::int32_t siblingConstraint = 0;   // +0x08
-    std::int32_t edgeKind = 1;            // +0x0C
-    std::int32_t relationKind = 0;        // +0x10
+    void* ownerWindow = nullptr;          // +0x04 (wxObject::m_refData, unused)
+    wxWindowBase* otherWin = nullptr;     // +0x08
+    std::int32_t edgeKind = 1;            // +0x0C (myEdge)
+    std::int32_t relationKind = 0;        // +0x10 (relationship)
     std::int32_t margin = 0;              // +0x14
     std::int32_t value = 0;               // +0x18
     std::int32_t percent = 0;             // +0x1C
-    std::int32_t doneState = 1;           // +0x20
-    std::uint8_t isSatisfied = 0;         // +0x24
+    wxEdge otherEdge = wxLeft;            // +0x20
+    std::uint8_t isSatisfied = 0;         // +0x24 (done)
     std::uint8_t reserved25_27[0x3]{};
   };
   static_assert(sizeof(WxIndividualLayoutConstraintRuntimeView) == 0x28, "WxIndividualLayoutConstraintRuntimeView size must be 0x28");
