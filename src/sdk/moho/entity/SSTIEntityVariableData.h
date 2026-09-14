@@ -128,6 +128,36 @@ namespace moho
     ~SSTIEntityVariableData();
 
     /**
+     * Address: 0x00560150 (FUN_00560150, ??0SSTIEntityVariableData@Moho@@QAE@ABU01@@Z)
+     *
+     * What it does:
+     * Copy-constructs one replicated variable payload, giving the copy its own
+     * aux-value buffer.
+     *
+     * The binary's body is a copy constructor, not a helper: it `lock xadd`s
+     * the `mScmResource` control block at 0x00560184 (an addref with no
+     * release, which only a constructor does), it is guarded by a
+     * construction-unwind SEH frame at 0x00560158, and at 0x00560234 -- sat
+     * exactly between the `+0x64` and `+0x80` member copies, i.e. over
+     * `mAuxValueVector` at `+0x68` -- it calls the dedicated
+     * small-buffer-aware copy `sub_560B90` instead of copying those six words
+     * inline as it does for every trivial lane around it.
+     *
+     * `mAuxValueVector` keeps its first two elements inside the object and
+     * points `mInlineBegin` at itself, so the implicit member-wise copy leaves
+     * the copy aliasing the source's storage: sharing its heap buffer when
+     * dynamic, or pointing into the source object itself when inline. That is
+     * live in `msvc8::vector<SEntityVariableUpdateEntry>::insert`, whose
+     * `uninit_move_n` copy-constructs each element into the newly grown buffer
+     * and then runs `destroy_range` over the old one -- so the old element's
+     * destructor freed the buffer the new, live element had just aliased.
+     * `Entity::SyncInterface` -> `QueueEntityVariableUpdate` pushes onto that
+     * vector every sync, and the resulting invalid free was caught by
+     * `HeapValidate` under `FAF_SYSHEAP=2`.
+     */
+    SSTIEntityVariableData(const SSTIEntityVariableData& rhs);
+
+    /**
      * Address: 0x0067A3E0 (FUN_0067A3E0, ??4SSTIEntityVariableData@Moho@@QAEAAU01@ABU01@@Z)
      *
      * What it does:

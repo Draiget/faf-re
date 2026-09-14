@@ -896,6 +896,54 @@ namespace moho
   }
 
   /**
+   * Address: 0x00560150 (FUN_00560150, ??0SSTIEntityVariableData@Moho@@QAE@ABU01@@Z)
+   *
+   * What it does: see header.
+   */
+  SSTIEntityVariableData::SSTIEntityVariableData(const SSTIEntityVariableData& rhs)
+    : mScmResource(rhs.mScmResource)
+    , mMeshBlueprint(rhs.mMeshBlueprint)
+    , mScale(rhs.mScale)
+    , mHealth(rhs.mHealth)
+    , mMaxHealth(rhs.mMaxHealth)
+    , mIsBeingBuilt(rhs.mIsBeingBuilt)
+    , mIsDead(rhs.mIsDead)
+    , mRequestRefreshUI(rhs.mRequestRefreshUI)
+    , pad_0023(0)
+    , mCurTransform(rhs.mCurTransform)
+    , mLastTransform(rhs.mLastTransform)
+    , mCurImpactValue(rhs.mCurImpactValue)
+    , mFractionComplete(rhs.mFractionComplete)
+    , mAttachmentParentRef(rhs.mAttachmentParentRef)
+    , mAuxValueVector()
+    , mScroll0U(rhs.mScroll0U)
+    , mScroll0V(rhs.mScroll0V)
+    , mScroll1U(rhs.mScroll1U)
+    , mScroll1V(rhs.mScroll1V)
+    , mAmbientSound(rhs.mAmbientSound)
+    , mRumbleSound(rhs.mRumbleSound)
+    , mVisibilityHidden(rhs.mVisibilityHidden)
+    , pad_0099_009B{0, 0, 0}
+    , mVisibilityMode(rhs.mVisibilityMode)
+    , mLayerMask(rhs.mLayerMask)
+    , mUsingAltFootprint(rhs.mUsingAltFootprint)
+    , pad_00A5_00A7{0, 0, 0}
+    , mUnderlayTexture(rhs.mUnderlayTexture)
+    , mIntelAttributes(rhs.mIntelAttributes)
+  {
+    // The aux vector must own its storage before it can take a copy: seed the
+    // inline lanes exactly as the default constructor does -- `mInlineStorage0`
+    // carries the inline-capacity restore pointer while dynamic, so it has to
+    // be planted before `ResetToInlineStorage` reads it back as the capacity
+    // end -- then let `AssignFrom` (0x00560B90) allocate if `rhs` outgrew the
+    // inline buffer.
+    mAuxValueVector.mInlineStorage0 =
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&mAuxValueVector.mInlineStorage1));
+    mAuxValueVector.ResetToInlineStorage();
+    mAuxValueVector.AssignFrom(rhs.mAuxValueVector);
+  }
+
+  /**
    * Address: 0x00560310 (FUN_00560310, ??1SSTIEntityVariableData@Moho@@QAE@XZ)
    */
   SSTIEntityVariableData::~SSTIEntityVariableData()
