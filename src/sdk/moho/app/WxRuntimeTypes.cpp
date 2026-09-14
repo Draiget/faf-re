@@ -32292,8 +32292,14 @@ bool wxTopLevelWindowRuntime::DoShowWindow(
  * What it does:
  * Maximises (or restores) the frame straight away when it is already shown -
  * the visible bit at window+0xCC - and otherwise remembers the request so the
- * next `Show(true)` can raise it maximised instead.
+ * next `Show(true)` can raise it maximised instead (`maximizeOnShow`, the
+ * same side-table lane `DoShowWindow` (0x0098C250) consumes).
+ *
+ * Definition is further down this file (~line 32520), grouped with
+ * `ShowFullScreen` rather than here - do not add a second body for this
+ * address next to this comment.
  */
+
 /**
  * Address: 0x0098C430 (FUN_0098C430)
  * Mangled: ?ShowFullScreen@wxTopLevelWindowMSW@@UAE_N_NJ@Z
@@ -38915,6 +38921,12 @@ unsigned long wxWindowMswRuntime::MSWGetParent() const
  * +0x108; this reconstruction keeps window state in a side table, so the same
  * value comes from WxWindowBaseRuntimeState::nativeHandle.
  */
+unsigned long wxWindowBase::GetHandle() const
+{
+  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
+  return state != nullptr ? state->nativeHandle : 0u;
+}
+
 /**
  * Address: 0x0098C050 (FUN_0098C050)
  * Mangled: ?MSWGetStyle@wxTopLevelWindowMSW@@MBEKJPAK@Z
@@ -40818,12 +40830,6 @@ bool wxWindowMswRuntime::HandleDestroy()
   }
 
   return true;
-}
-
-unsigned long wxWindowBase::GetHandle() const
-{
-  const WxWindowBaseRuntimeState* const state = FindWxWindowBaseRuntimeState(this);
-  return state != nullptr ? state->nativeHandle : 0u;
 }
 
 /**
