@@ -498,12 +498,23 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Dock: {
         Unit* const target = CUnitCommand::GetTarget(command);
 
+        // 0x00609BE4-0x00609C6F: a ferry beacon always routes here, and so does
+        // any FACTORY target that is *neither* an air-staging platform nor a
+        // teleporter -- `jz` past both `IsInCategory` probes is what reaches
+        // the `HIBYTE(v94) = 1` arm. The two exclusions are not an extra way
+        // in, they are the way out: air-staging platforms and teleporters are
+        // factories too, and the tail of this same arm gives them their own
+        // handling (`IssueRefuelTask` / `IssueCallTeleportTask`). Testing them
+        // positively sent exactly the two targets that must fall through into
+        // the ferry wait, and dropped every ordinary factory -- the ferry
+        // pickup point -- into the `mIsAir` tail instead, where a land factory
+        // ends up in `IssueCallLandTransportTask`.
         bool routeToFerry = false;
         if (target != nullptr) {
           if (target->IsInCategory("FERRYBEACON")) {
             routeToFerry = true;
           } else if (target->IsInCategory("FACTORY")) {
-            routeToFerry = target->IsInCategory("AIRSTAGINGPLATFORM") || target->IsInCategory("TELEPORTATION");
+            routeToFerry = !target->IsInCategory("AIRSTAGINGPLATFORM") && !target->IsInCategory("TELEPORTATION");
           }
         }
 
