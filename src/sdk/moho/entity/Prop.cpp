@@ -10,6 +10,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/EntityDb.h"
+#include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/misc/StatItem.h"
@@ -574,8 +575,13 @@ namespace moho
     mReclaimMass = blueprint->Economy.ReclaimMassMax;
     mReclaimEnergy = blueprint->Economy.ReclaimEnergyMax;
 
-    mVizToNeutrals = 2;
-    mFootprintLayer = static_cast<int>(LAYER_Seabed);
+    // 0x006F9ED1 `mov eax, 2` feeds both stores: 0x006F9EE8 into +0x1E8
+    // (mVizToNeutrals) and 0x006F9EF4 into +0x114. The second lane is the
+    // resolved visibility mode -- the one `Entity::UpdateVisibility` fills from
+    // the matching viz channel -- so both hold VIZMODE_Always. It was spelled
+    // `LAYER_Seabed` here, which is the same number for an unrelated enum.
+    mVizToNeutrals = VIZMODE_Always;
+    mFootprintLayer = static_cast<std::int32_t>(VIZMODE_Always);
     mVisibilityState = 1u;
 
     SetMesh(blueprint->Display.MeshBlueprint, nullptr, true);
