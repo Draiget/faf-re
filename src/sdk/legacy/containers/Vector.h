@@ -8092,6 +8092,20 @@ namespace msvc8
          * Address: 0x007A61F0 (FUN_007A61F0 -- a separate, non-ICF-folded emission of the same body for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each copied node splices itself onto the source's owner chain head, so this is never a memcpy). The body is ICF-folded across every `T`; callers 0x007A5A70, 0x007A5E90, 0x007A6010 (unreached); formerly `CopyWeakPtrRangeStdOrder` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x007A5E90 (FUN_007A5E90 -- a same-register-shape trampoline into that separate emission for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each copied node splices itself onto the source's owner chain head, so this is never a memcpy). The body is ICF-folded across every `T`; callers 0x007A5A70 (unreached); formerly `CopyWeakPtrRangeStdOrder` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x006ED580 (FUN_006ED580 -- a forwarding bridge into 0x006ED8E0 preserving a distinct call ABI for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each copied node splices itself onto the source's owner chain head, so this is never a memcpy). The body is ICF-folded across every `T`; zero callers, unreachable; formerly `CopyWeakPtrRangeStdOrderAdapter` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00653790 (FUN_00653790, msvc8::vector<moho::SDebugWorldText>::
+         * uninit_copy_n's per-element step for the 0x30-byte non-trivial element --
+         * copy-constructs one element from `src` into uninitialized `dst` storage
+         * (position floats copied raw, `text` re-seeded to empty SSO state then
+         * assigned the source text, style/depth copied raw); zero callers, no
+         * xrefs, unreachable from every seeded root: a linker-retained copy
+         * nothing runs. Formerly `CopyConstructDebugWorldTextCore` in
+         * moho/unit/core/RDebugWeapons.cpp (RULE ONE), removed 2026-09-14.
+         * Address: 0x00653E00 (FUN_00653E00 -- a null-guarded caller-side wrapper
+         * around the 0x00653790 per-element step above for the same
+         * `msvc8::vector<moho::SDebugWorldText>::uninit_copy_n` emission (`if (dst)
+         * uninit_copy_n_step(src, dst); return;` shape); zero callers, no xrefs,
+         * unreachable from every seeded root: a linker-retained copy nothing
+         * runs.)
          */
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
