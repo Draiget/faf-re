@@ -60,31 +60,13 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x00653790 (FUN_00653790)
-   *
-   * What it does:
-   * Copies one `SDebugWorldText` payload into uninitialized destination
-   * storage: clones world-position floats, reinitializes the legacy string lane
-   * to empty SSO state before assigning full source text, and copies style/depth.
-   */
-  [[maybe_unused]] moho::SDebugWorldText* CopyConstructDebugWorldTextCore(
-    const moho::SDebugWorldText* const source,
-    moho::SDebugWorldText* const destination
-  ) noexcept
-  {
-    if (source == nullptr || destination == nullptr) {
-      return destination;
-    }
-
-    destination->position.x = source->position.x;
-    destination->position.y = source->position.y;
-    destination->position.z = source->position.z;
-    destination->text.reset_and_assign(source->text);
-    destination->style = source->style;
-    destination->depth = source->depth;
-    return destination;
-  }
+  // FUN_00653790 (`msvc8::vector<moho::SDebugWorldText>::uninit_copy_n`'s
+  // per-element step) and its null-guarded wrapper FUN_00653E00 are cited on
+  // `uninit_copy_n` in src/sdk/legacy/containers/Vector.h (RULE ONE) - both
+  // are zero-caller, zero-xref, linker-retained emissions of that template
+  // member, not free-standing engine functions. The per-type free function
+  // that used to be transcribed here (`CopyConstructDebugWorldTextCore`) was
+  // removed 2026-09-14.
 
   /**
    * Address: 0x00652C70 (FUN_00652C70)
