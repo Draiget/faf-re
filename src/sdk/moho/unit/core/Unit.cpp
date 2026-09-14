@@ -14368,7 +14368,25 @@ void Unit::SetTargetBlipEntity(Entity* const blipEntity)
  */
 float Unit::CalcTransportLoadFactor() const
 {
-  if (GetTransportedBy() == nullptr) {
+  // 0x006A8B36: `cmp dword ptr [edi+55Ch], 0` / `jz loc_6A8C17` (`fld1`;
+  // return 1.0f). `[this+0x55C]` is `AiTransport`, the transport subsystem a
+  // CARRIER owns -- not `TransportedByRef`, the link to whatever is carrying
+  // this unit. The two are opposite ends of the same relationship, and the
+  // body below is written from the carrier's side: it sums
+  // `mAttachedEntities` ([this+0x188]..[this+0x18C] at 0x006A8B8F) and stores
+  // `(carried + own) / own` into `TransportLoadFactor` ([this+0x564] at
+  // 0x006A8C03).
+  //
+  // Testing the wrong end inverted the function. A loaded transport -- which
+  // owns an AiTransport and is carried by nothing -- returned 1.0f here and
+  // never computed its load at all, so `CUnitMotion::ComputeAirControl`
+  // divided its turn, roll and lift gains by 1.0 and flew it as though it
+  // were empty, and `GetTopSpeed` never scaled its airspeed down. A carried
+  // unit, whose `mAttachedEntities` is empty, fell into the computation
+  // instead; that path also returns the negative recompute sentinel
+  // unchanged whenever `thisMass <= 0`, and `ComputeAirControl` takes
+  // `1.0f / loadFactor` of it.
+  if (AiTransport == nullptr) {
     return 1.0f;
   }
 
