@@ -3803,6 +3803,70 @@ namespace moho
       AccountFireRangeStats(*unit, *this);
     }
 
+    {
+      static int sFireProbe = 0;
+      if (sFireProbe++ < 20) {
+        const RUnitBlueprint* const ubp = (mUnit != nullptr) ? mUnit->GetBlueprint() : nullptr;
+        const auto& bpVec = ubp->Weapons.WeaponBlueprints;
+        const int bpCount = static_cast<int>(bpVec.end() - bpVec.begin());
+        const RUnitBlueprintWeapon* const byIndex =
+          (mWeaponIndex >= 0 && mWeaponIndex < bpCount) ? (bpVec.begin() + mWeaponIndex) : nullptr;
+        // Read back exactly what cfunc_UnitWeaponGetBlueprintL hands to Lua.
+        double luaDamage = -999.0;
+        double luaRadius = -999.0;
+        const char* luaLabel = "<none>";
+        int luaWeaponCount = -1;
+        if (mUnit != nullptr && mUnit->SimulationRef != nullptr && mUnit->SimulationRef->mLuaState != nullptr) {
+          LuaPlus::LuaState* const ls = mUnit->SimulationRef->mLuaState;
+          LuaPlus::LuaObject bpObj = ubp->GetLuaBlueprint(ls);
+          LuaPlus::LuaObject weaponArray = bpObj["Weapon"];
+          if (weaponArray.IsTable()) {
+            luaWeaponCount = weaponArray.GetTableCount();
+            LuaPlus::LuaObject entry = weaponArray[mWeaponIndex + 1];
+            if (entry.IsTable()) {
+              LuaPlus::LuaObject dmg = entry["Damage"];
+              if (dmg.IsNumber()) { luaDamage = dmg.GetNumber(); } else { luaDamage = -111.0; }
+              LuaPlus::LuaObject rad = entry["DamageRadius"];
+              luaRadius = rad.IsNumber() ? rad.GetNumber() : -111.0;
+              LuaPlus::LuaObject lbl = entry["Label"];
+              if (lbl.IsString()) { luaLabel = lbl.GetString(); }
+            } else {
+              luaDamage = -222.0;
+            }
+          } else {
+            luaDamage = -333.0;
+          }
+        }
+        gpg::Warnf("[FIREDIAG] Fire idx=%d bound='%s' dmg=%.1f | engineCount=%d match=%d | LUA count=%d label='%s' Damage=%.1f Radius=%.2f",
+                   mWeaponIndex,
+                   (mWeaponBlueprint != nullptr) ? mWeaponBlueprint->Label.c_str() : "<null>",
+                   (mWeaponBlueprint != nullptr) ? mWeaponBlueprint->Damage : -1.0f,
+                   bpCount, (byIndex == mWeaponBlueprint) ? 1 : 0,
+                   luaWeaponCount, luaLabel, luaDamage, luaRadius);
+      }
+    }
+    // Direct area-damage probe: with the ACU's zero-splash gun the projectile
+    // path can never hurt a prop, so invoke the damage system itself once and
+    // see whether trees actually lose health.
+    {
+      static int sAreaProbeShots = 0;
+      ++sAreaProbeShots;
+      if ((sAreaProbeShots == 1 || sAreaProbeShots == 6) && std::getenv("FAF_HARNESS") != nullptr && mUnit != nullptr && mUnit->SimulationRef != nullptr) {
+        Sim* const sim = mUnit->SimulationRef;
+        const Wm3::Vec3f tgt = mTarget.GetTargetPosGun(false);
+        CDamage areaDamage(sim);
+        areaDamage.mOrigin = tgt;
+        areaDamage.mRadius = 30.0f;
+        areaDamage.mAmount = 500.0f;
+        areaDamage.mType.assign_owned("Normal");
+        areaDamage.mDamageFriendly = 1u;
+        areaDamage.mDamageSelf = 0u;
+        areaDamage.mMethod = CDamage_AREA_EFFECT;
+        gpg::Warnf("[HARNESS] direct SIM_DoDamageArea origin=(%.1f,%.1f,%.1f) r=%.1f amt=%.1f",
+                   tgt.x, tgt.y, tgt.z, areaDamage.mRadius, areaDamage.mAmount);
+        SIM_DoDamageArea(sim, areaDamage);
+      }
+    }
     RunScript("OnFire");
     ++mShotsAtTarget;
   }
@@ -3825,24 +3889,36 @@ namespace moho
       return nullptr;
     }
 
-    WeaponCollisionEntry* const begin = collisions->begin();
-    WeaponCollisionEntry* const end = collisions->end();
-    if (begin == nullptr || end == nullptr || begin == end) {
+    if (collisions->begin() == nullptr || collisions->begin() == collisions->end()) {
       return nullptr;
     }
 
     std::int32_t closestIndex = -1;
     float closestDistance = std::numeric_limits<float>::infinity();
-    const std::size_t collisionCount = static_cast<std::size_t>(end - begin);
-    for (std::size_t index = 0; index < collisionCount; ++index) {
-      WeaponCollisionEntry& candidate = begin[index];
-      Entity* const candidateEntity = candidate.entity;
+
+    // The shipped loop re-reads BOTH `start` and `end` from the container on
+    // every iteration: its continuation test is `index < (a1->end - a1->start)`
+    // and it refreshes the base with `start = a1->start` on every path through
+    // the body, with each post-script field access spelled `a1->start[index]`
+    // rather than reading through a hoisted pointer.
+    //
+    // That is not incidental. The body runs the `OnCollisionCheck` script, and
+    // this container is a `fastvector_n<CollisionEntry, 10>` - a script that
+    // pushes an eleventh entry spills the run out of the inline window onto the
+    // heap, and any pointer captured before that call is left aiming at storage
+    // the container no longer uses. Caching begin/end/count across the call
+    // leaves the loop walking a stale buffer and returning a pointer into it.
+    for (std::size_t index = 0; index < static_cast<std::size_t>(collisions->end() - collisions->begin()); ++index) {
+      Entity* const candidateEntity = collisions->begin()[index].entity;
       if (candidateEntity != nullptr && !candidateEntity->RunScriptOnCollisionCheckWeapon(weapon)) {
         continue;
       }
 
-      if (ignoreAlly && ownerUnit != nullptr && candidateEntity != nullptr) {
-        Unit* const candidateUnit = candidateEntity->IsUnit();
+      if (ignoreAlly && ownerUnit != nullptr) {
+        // 0x006D6A00's `v9 = a1->start[v7].entity` - re-read after the script,
+        // not the value loaded ahead of it.
+        Entity* const allyCheckEntity = collisions->begin()[index].entity;
+        Unit* const candidateUnit = (allyCheckEntity != nullptr) ? allyCheckEntity->IsUnit() : nullptr;
         if (candidateUnit != nullptr && candidateUnit->mCurrentLayer == LAYER_Air && ownerUnit->ArmyRef != nullptr) {
           const std::uint32_t candidateArmyIndex = (candidateUnit->ArmyRef != nullptr)
             ? static_cast<std::uint32_t>(candidateUnit->ArmyRef->ArmyId)
@@ -3853,10 +3929,11 @@ namespace moho
         }
       }
 
+      WeaponCollisionEntry& candidate = collisions->begin()[index];
       if (closestDistance > candidate.dist) {
-        if (candidateEntity == nullptr || candidateEntity->IsUnit() != ownerUnit) {
+        if (candidate.entity == nullptr || candidate.entity->IsUnit() != ownerUnit) {
           closestIndex = static_cast<std::int32_t>(index);
-          closestDistance = candidate.dist;
+          closestDistance = collisions->begin()[index].dist;
         }
       }
     }
@@ -3865,7 +3942,7 @@ namespace moho
       return nullptr;
     }
 
-    return begin + closestIndex;
+    return collisions->begin() + closestIndex;
   }
 
   /**
