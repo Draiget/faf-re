@@ -13,6 +13,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiReconDBImpl.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/core/EIntelTypeInfo.h"
 
 namespace
 {
@@ -118,11 +119,9 @@ namespace moho
     , mVCIGrid(nullptr)
     , mReservedGrid(nullptr)
   {
-    BoolFieldInit(&mJamming);
-    BoolFieldInit(&mCloak);
-    BoolFieldInit(&mSpoof);
-    BoolFieldInit(&mSonarStealth);
-    BoolFieldInit(&mRadarStealth);
+    for (CIntelToggleState& toggleState : mToggleStates) {
+      BoolFieldInit(&toggleState);
+    }
   }
 
   /**
@@ -252,14 +251,13 @@ namespace moho
       }
     }
 
-    CIntelToggleState* const toggles[5] = {&mJamming, &mCloak, &mSpoof, &mSonarStealth, &mRadarStealth};
-    for (CIntelToggleState* const toggle : toggles) {
+    for (CIntelToggleState& toggle : mToggleStates) {
       bool present = false;
       bool enabled = false;
       archive.ReadBool(&present);
       archive.ReadBool(&enabled);
-      toggle->present = static_cast<std::uint8_t>(present ? 1u : 0u);
-      toggle->enabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
+      toggle.present = static_cast<std::uint8_t>(present ? 1u : 0u);
+      toggle.enabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
     }
   }
 
@@ -277,10 +275,9 @@ namespace moho
       gpg::WriteRawPointer(&archive, handleRef, gpg::TrackedPointerState::Owned, ownerRef);
     }
 
-    const CIntelToggleState* const toggles[5] = {&mJamming, &mCloak, &mSpoof, &mSonarStealth, &mRadarStealth};
-    for (const CIntelToggleState* const toggle : toggles) {
-      archive.WriteBool(toggle->present != 0u);
-      archive.WriteBool(toggle->enabled != 0u);
+    for (const CIntelToggleState& toggle : mToggleStates) {
+      archive.WriteBool(toggle.present != 0u);
+      archive.WriteBool(toggle.enabled != 0u);
     }
   }
 
@@ -408,17 +405,21 @@ namespace moho
     case 8:
       replaceCounterHandle(mVCIGrid, new (std::nothrow) CIntelCounterHandle(radius, sim, INTELCOUNTER_CloakField, reconDB));
       return;
-    case 9:
+    // 0x0076E3F4 folds every toggle lane into one indexed store,
+    // `mov [ebp+ecx*2+12h], 1` for `intelType >= INTEL_Jammer` -- so the lane
+    // is always the one this `EIntel` value names. `INTEL_Spoof` is absent on
+    // purpose: the binary leaves 10 in the jump table's default arm and warns.
+    case INTEL_Jammer:
       mJamming.present = 1u;
       return;
-    case 11:
-      mSpoof.present = 1u;
+    case INTEL_Cloak:
+      mCloak.present = 1u;
       return;
-    case 12:
-      mSonarStealth.present = 1u;
-      return;
-    case 13:
+    case INTEL_RadarStealth:
       mRadarStealth.present = 1u;
+      return;
+    case INTEL_SonarStealth:
+      mSonarStealth.present = 1u;
       return;
     default:
       gpg::Warnf("Unknown intel type %i", intelType);

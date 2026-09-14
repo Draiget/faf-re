@@ -46,6 +46,13 @@ namespace moho
     static constexpr std::size_t kHandleCount = 9u;
 
     /**
+     * `CIntel::WriteArchive` (0x0076EB25) walks the toggle block as a flat run
+     * of five `{present, enabled}` pairs from +0x24, so the lanes are one
+     * array, not five unrelated members.
+     */
+    static constexpr std::size_t kToggleCount = 5u;
+
+    /**
      * Address: 0x00683170 (FUN_00683170)
      *
      * What it does:
@@ -166,19 +173,42 @@ namespace moho
       CIntelPosHandle* mIntelHandles[kHandleCount]; // +0x00
     };
 
-    CIntelToggleState mJamming;      // +0x24
-    CIntelToggleState mCloak;        // +0x26
-    CIntelToggleState mSpoof;        // +0x28
-    CIntelToggleState mSonarStealth; // +0x2A
-    CIntelToggleState mRadarStealth; // +0x2C
+    /**
+     * The five toggle lanes sit in `EIntel` order starting at `INTEL_Jammer`,
+     * so every indexed lane lookup in the binary is one address computation:
+     * `CIntel::InitIntel` (0x0076E3F9) stores the presence byte with
+     * `mov [ebp+ecx*2+12h], 1` and `cfunc_EntityEnableIntelL` (0x0068E1F1)
+     * stores the enabled byte with `mov [ecx+eax*2+13h], 1`, both indexed by
+     * the raw `EIntel` value. That pins Spoof(10) at +0x26 and Cloak(11) at
+     * +0x28, RadarStealth(12) at +0x2A and SonarStealth(13) at +0x2C.
+     *
+     * The blueprint constructor (0x0076DAE0) writes the same lanes by name and
+     * agrees: `Cloak` (blueprint +0x16) lands at +0x28, `SpoofRadius.max`
+     * (+0x34) at +0x26, `RadarStealth` (+0x14) at +0x2A and `SonarStealth`
+     * (+0x15) at +0x2C. So does `ApplyReconCounters` (0x005CB460), which
+     * suppresses LOS from +0x28, radar from +0x2A and sonar from +0x2C.
+     */
+    union
+    {
+      struct
+      {
+        CIntelToggleState mJamming;      // +0x24 (INTEL_Jammer = 9)
+        CIntelToggleState mSpoof;        // +0x26 (INTEL_Spoof = 10)
+        CIntelToggleState mCloak;        // +0x28 (INTEL_Cloak = 11)
+        CIntelToggleState mRadarStealth; // +0x2A (INTEL_RadarStealth = 12)
+        CIntelToggleState mSonarStealth; // +0x2C (INTEL_SonarStealth = 13)
+      };
+      CIntelToggleState mToggleStates[kToggleCount]; // +0x24
+    };
   };
 
   static_assert(offsetof(CIntel, mVisionGrid) == 0x00, "CIntel::mVisionGrid offset must be 0x00");
   static_assert(offsetof(CIntel, mReservedGrid) == 0x20, "CIntel::mReservedGrid offset must be 0x20");
   static_assert(offsetof(CIntel, mJamming) == 0x24, "CIntel::mJamming offset must be 0x24");
-  static_assert(offsetof(CIntel, mCloak) == 0x26, "CIntel::mCloak offset must be 0x26");
-  static_assert(offsetof(CIntel, mSpoof) == 0x28, "CIntel::mSpoof offset must be 0x28");
-  static_assert(offsetof(CIntel, mSonarStealth) == 0x2A, "CIntel::mSonarStealth offset must be 0x2A");
-  static_assert(offsetof(CIntel, mRadarStealth) == 0x2C, "CIntel::mRadarStealth offset must be 0x2C");
+  static_assert(offsetof(CIntel, mSpoof) == 0x26, "CIntel::mSpoof offset must be 0x26");
+  static_assert(offsetof(CIntel, mCloak) == 0x28, "CIntel::mCloak offset must be 0x28");
+  static_assert(offsetof(CIntel, mRadarStealth) == 0x2A, "CIntel::mRadarStealth offset must be 0x2A");
+  static_assert(offsetof(CIntel, mSonarStealth) == 0x2C, "CIntel::mSonarStealth offset must be 0x2C");
+  static_assert(offsetof(CIntel, mToggleStates) == 0x24, "CIntel::mToggleStates offset must be 0x24");
   static_assert(sizeof(CIntel) == 0x30, "CIntel size must be 0x30");
 } // namespace moho
