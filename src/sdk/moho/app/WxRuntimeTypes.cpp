@@ -44916,6 +44916,33 @@ wxStringRuntime* wxFormatDdeErrorString(
 void wxLogDdeFailureMessage(const wxStringRuntime& prefixText, unsigned int ddeErrorCode);
 [[nodiscard]] HSZ wxCreateDdeStringHandleRuntime(const wxStringRuntime& text);
 
+// Bridges into SimRecoveryRuntime.cpp's already-recovered, generically-typed
+// node-list-by-id removal bodies (defined at file scope there, at the very
+// end of that TU). FUN_00A31040 / FUN_00A311D0 (wxDDEServer::DeleteConnection
+// / wxDDEClient::DeleteConnection) reach the exact same compiled addresses
+// as those bodies: same "walk a wxNodeBase-shaped node chain, compare a
+// field at payload+0x24 to a handle, release the matching node through its
+// own vtable slot 0" logic, for an owner whose two list heads sit at
+// +0x1C/+0x20 -- exactly where wxDDEClient/wxDDEServer keep
+// m_connections.m_nodeFirst. Kept as thin `void*`-typed forwarders (named
+// for the DDE-side role they play here) rather than re-citing those two
+// addresses a second time in this file.
+[[nodiscard]] std::uint8_t wxDdeTryUnmapServerConnectionRuntime(void* server, std::int32_t hConvAsId) noexcept;
+[[nodiscard]] std::uint8_t wxDdeTryUnmapClientConnectionRuntime(void* client, std::int32_t hConvAsId) noexcept;
+
+// wxDDEConnection::OnDisconnect (FUN_00A30EE0) -- SimRecoveryRuntime.cpp,
+// generic "delete this through its own vtable slot 1, return true" body;
+// reused as-is (the default `wxDDEConnection::OnDisconnect` override, which
+// is the only one anything in this binary ever installs, is exactly this).
+char ReleaseOptionalObjectAndReturnTrueRuntime(void* object);
+
+// Shared vtable-identity tags for the DDE proxy classes below (construction
+// and teardown must agree on the same address). Matches this file's
+// established `gWxListBaseRuntimeVTableTag`-style convention, kept local to
+// this cluster since nothing outside it needs to name these classes.
+std::uint8_t gWxDdeConnectionRuntimeVTableTag = 0;
+std::uint8_t gWxDdeServerRuntimeVTableTag = 0;
+
 namespace
 {
   DWORD gWxDdeInstanceId = 0;
@@ -44963,13 +44990,62 @@ namespace
 
   struct WxDdeServerRuntimeView
   {
-    std::uint8_t reserved00_0B[0x0C]{};
-    wxStringRuntime serviceName{}; // +0x0C
+    void* vtable = nullptr;                          // +0x00
+    std::uint8_t reserved04_0B[0x08]{};               // +0x04  wxObject::m_refData, m_lastError
+    wxStringRuntime serviceName{};                   // +0x0C  m_serviceName
+    void* connectionsVTable = nullptr;                // +0x10  m_connections.vtable (wxList's own)
+    std::uint8_t reserved14_1F[0x0C]{};               // +0x14  m_connections.{refData,m_count,m_destroy}
+    wxNodeBaseRuntime* connectionsFirst = nullptr;    // +0x20  m_connections.m_nodeFirst
+    wxNodeBaseRuntime* connectionsLast = nullptr;     // +0x24  m_connections.m_nodeLast
+    std::int32_t connectionsKeyType = 0;              // +0x28  m_connections.m_keyType
   };
   static_assert(
     offsetof(WxDdeServerRuntimeView, serviceName) == 0x0C,
     "WxDdeServerRuntimeView::serviceName offset must be 0x0C"
   );
+  static_assert(
+    offsetof(WxDdeServerRuntimeView, connectionsVTable) == 0x10,
+    "WxDdeServerRuntimeView::connectionsVTable offset must be 0x10"
+  );
+  static_assert(
+    offsetof(WxDdeServerRuntimeView, connectionsFirst) == 0x20,
+    "WxDdeServerRuntimeView::connectionsFirst offset must be 0x20"
+  );
+  static_assert(
+    offsetof(WxDdeServerRuntimeView, connectionsLast) == 0x24,
+    "WxDdeServerRuntimeView::connectionsLast offset must be 0x24"
+  );
+  static_assert(
+    offsetof(WxDdeServerRuntimeView, connectionsKeyType) == 0x28,
+    "WxDdeServerRuntimeView::connectionsKeyType offset must be 0x28"
+  );
+  static_assert(sizeof(WxDdeServerRuntimeView) == 0x2C, "WxDdeServerRuntimeView size must be 0x2C");
+
+  // wxDDEClient (dde.h:109-132): same shape as WxDdeServerRuntimeView minus
+  // `m_serviceName` (wxDDEClient never has one), so every field below sits
+  // 4 bytes earlier. Nothing in this binary ever constructs a wxDDEClient;
+  // this view exists solely so wxDDEConnection::~wxDDEConnection's
+  // `m_client`-owned-connection branch (never taken in practice, since
+  // nothing ever sets `m_client` either, but still real binary logic) has a
+  // named field instead of a raw `+0xC` offset.
+  struct WxDdeClientRuntimeView
+  {
+    std::uint8_t reserved00_0B[0x0C]{};               // vtable, wxObject::m_refData, m_lastError
+    void* connectionsVTable = nullptr;                // +0x0C  m_connections.vtable (wxList's own)
+    std::uint8_t reserved10_1B[0x0C]{};               // +0x10  m_connections.{refData,m_count,m_destroy}
+    wxNodeBaseRuntime* connectionsFirst = nullptr;    // +0x1C  m_connections.m_nodeFirst
+    wxNodeBaseRuntime* connectionsLast = nullptr;     // +0x20  m_connections.m_nodeLast
+    std::int32_t connectionsKeyType = 0;              // +0x24  m_connections.m_keyType
+  };
+  static_assert(
+    offsetof(WxDdeClientRuntimeView, connectionsVTable) == 0x0C,
+    "WxDdeClientRuntimeView::connectionsVTable offset must be 0x0C"
+  );
+  static_assert(
+    offsetof(WxDdeClientRuntimeView, connectionsFirst) == 0x1C,
+    "WxDdeClientRuntimeView::connectionsFirst offset must be 0x1C"
+  );
+  static_assert(sizeof(WxDdeClientRuntimeView) == 0x28, "WxDdeClientRuntimeView size must be 0x28");
 
   struct WxDdeConnectionRuntimeView
   {
@@ -45113,8 +45189,8 @@ namespace
   struct WxConnectionBaseRuntimeView
   {
     void* vtable = nullptr;                    // +0x00
-    void* lane04 = nullptr;                    // +0x04
-    std::uint8_t lane08 = 1;                   // +0x08
+    void* refData = nullptr;                   // +0x04  wxObject::m_refData (always null, never read)
+    std::uint8_t connected = 1;                // +0x08  m_connected
     std::uint8_t reserved09_0B[0x03]{};        // +0x09
     void* exchangeBuffer = nullptr;            // +0x0C
     std::uint32_t exchangeBufferChars = 0;     // +0x10
@@ -45122,8 +45198,8 @@ namespace
     std::uint8_t reserved15_17[0x03]{};        // +0x15
   };
   static_assert(
-    offsetof(WxConnectionBaseRuntimeView, lane08) == 0x08,
-    "WxConnectionBaseRuntimeView::lane08 offset must be 0x08"
+    offsetof(WxConnectionBaseRuntimeView, connected) == 0x08,
+    "WxConnectionBaseRuntimeView::connected offset must be 0x08"
   );
   static_assert(
     offsetof(WxConnectionBaseRuntimeView, exchangeBuffer) == 0x0C,
@@ -45142,25 +45218,33 @@ namespace
   struct WxDdeConnectionCtorRuntimeView
   {
     WxConnectionBaseRuntimeView base{};          // +0x00
-    wchar_t* itemText = nullptr;                 // +0x18
-    std::uint32_t lane1C = 0;                    // +0x1C
-    std::uint32_t lane20 = 0;                    // +0x20
-    HCONV conversationHandle = nullptr;          // +0x24
-    void* lane28 = nullptr;                      // +0x28
-    std::uint32_t lane2C = 0;                    // +0x2C
-    std::uint32_t lane30 = 0;                    // +0x30
+    wxStringRuntime topicName{};                 // +0x18  m_topicName
+    WxDdeServerRuntimeView* server = nullptr;     // +0x1C  m_server
+    WxDdeClientRuntimeView* client = nullptr;      // +0x20  m_client
+    HCONV conversationHandle = nullptr;          // +0x24  m_hConv
+    wchar_t* sendingData = nullptr;               // +0x28  m_sendingData
+    std::int32_t dataSize = 0;                    // +0x2C  m_dataSize
+    std::uint32_t dataType = 0;                   // +0x30  m_dataType (wxIPCFormat)
   };
   static_assert(
-    offsetof(WxDdeConnectionCtorRuntimeView, itemText) == 0x18,
-    "WxDdeConnectionCtorRuntimeView::itemText offset must be 0x18"
+    offsetof(WxDdeConnectionCtorRuntimeView, topicName) == 0x18,
+    "WxDdeConnectionCtorRuntimeView::topicName offset must be 0x18"
+  );
+  static_assert(
+    offsetof(WxDdeConnectionCtorRuntimeView, server) == 0x1C,
+    "WxDdeConnectionCtorRuntimeView::server offset must be 0x1C"
+  );
+  static_assert(
+    offsetof(WxDdeConnectionCtorRuntimeView, client) == 0x20,
+    "WxDdeConnectionCtorRuntimeView::client offset must be 0x20"
   );
   static_assert(
     offsetof(WxDdeConnectionCtorRuntimeView, conversationHandle) == 0x24,
     "WxDdeConnectionCtorRuntimeView::conversationHandle offset must be 0x24"
   );
   static_assert(
-    offsetof(WxDdeConnectionCtorRuntimeView, lane28) == 0x28,
-    "WxDdeConnectionCtorRuntimeView::lane28 offset must be 0x28"
+    offsetof(WxDdeConnectionCtorRuntimeView, sendingData) == 0x28,
+    "WxDdeConnectionCtorRuntimeView::sendingData offset must be 0x28"
   );
   static_assert(sizeof(WxDdeConnectionCtorRuntimeView) == 0x34, "WxDdeConnectionCtorRuntimeView size must be 0x34");
 
@@ -45184,9 +45268,9 @@ namespace
     }
 
     connectionRuntime->exchangeBufferChars = exchangeBufferChars;
-    connectionRuntime->lane04 = nullptr;
+    connectionRuntime->refData = nullptr;
     connectionRuntime->vtable = &sWxConnectionBaseRuntimeVTableTag;
-    connectionRuntime->lane08 = 1u;
+    connectionRuntime->connected = 1u;
     connectionRuntime->exchangeBuffer = exchangeBuffer;
     connectionRuntime->ownsExchangeBuffer = 0u;
     if (exchangeBuffer == nullptr) {
@@ -45213,9 +45297,9 @@ namespace
       return nullptr;
     }
 
-    connectionRuntime->lane04 = nullptr;
+    connectionRuntime->refData = nullptr;
     connectionRuntime->vtable = &sWxConnectionBaseRuntimeVTableTag;
-    connectionRuntime->lane08 = 1u;
+    connectionRuntime->connected = 1u;
     connectionRuntime->exchangeBuffer = nullptr;
     connectionRuntime->exchangeBufferChars = 0u;
     connectionRuntime->ownsExchangeBuffer = 1u;
@@ -45238,14 +45322,13 @@ namespace
       return nullptr;
     }
 
-    static std::uint8_t sWxDdeConnectionRuntimeVTableTag = 0;
     (void)wxConstructConnectionBaseDefaultRuntime(&connectionRuntime->base);
-    connectionRuntime->base.vtable = &sWxDdeConnectionRuntimeVTableTag;
-    connectionRuntime->itemText = const_cast<wchar_t*>(wxEmptyString);
-    connectionRuntime->lane1C = 0u;
-    connectionRuntime->lane20 = 0u;
+    connectionRuntime->base.vtable = &gWxDdeConnectionRuntimeVTableTag;
+    connectionRuntime->topicName = wxStringRuntime::Borrow(wxEmptyString);
+    connectionRuntime->server = nullptr;
+    connectionRuntime->client = nullptr;
     connectionRuntime->conversationHandle = nullptr;
-    connectionRuntime->lane28 = nullptr;
+    connectionRuntime->sendingData = nullptr;
     return connectionRuntime;
   }
 
@@ -55790,6 +55873,242 @@ namespace
     ::operator delete(node);
     return true;
   }
+}
+
+namespace
+{
+  /**
+   * `wxListBase::DeleteObject(void*)`: locates the first node whose payload
+   * is `value` and releases just that node. Named once here since the DDE
+   * teardown chain below needs the same `WxListFindMemberNode` +
+   * `wxDeleteNodeFromOwningListRuntime` composition twice.
+   */
+  bool WxListReleaseMemberNodeRuntime(
+    WxListInsertRuntimeView* const list,
+    const void* const value
+  ) noexcept
+  {
+    if (list == nullptr) {
+      return false;
+    }
+
+    wxNodeBaseRuntime* const node = WxListFindMemberNode(list, value);
+    return node != nullptr && wxDeleteNodeFromOwningListRuntime(node);
+  }
+}
+
+// wxDDEServerObjects / wxDDEClientObjects (dde.cpp:133-134): every live
+// wxDDEServer/wxDDEClient registers itself here at construction and
+// unregisters at destruction. Nothing in this binary's engine-reachable
+// code ever constructs either class -- both exist purely for wx's own DDE
+// self-registration, reached only through wxDDEServer::sm_classInfo -- so
+// these two lists are always empty in practice; they still back the real
+// wxNodeBase-walking logic the destructors below perform.
+WxListInsertRuntimeView gWxDdeServerObjectsRuntime{};
+WxListInsertRuntimeView gWxDdeClientObjectsRuntime{};
+
+/**
+ * Address: 0x00A31530 (FUN_00A31530)
+ *
+ * What it does:
+ * `DDEDeleteConnection(HCONV hConv)`: removes the hConv->connection mapping
+ * by walking every live wxDDEServer (via `wxDDEServerObjects`) and asking
+ * each to drop a matching connection node; if none matched, falls back to
+ * every live wxDDEClient (via `wxDDEClientObjects`).
+ */
+void wxDdeDeleteConnectionMappingRuntime(const HCONV hConv) noexcept
+{
+  const auto id = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(hConv));
+
+  bool found = false;
+  for (wxNodeBaseRuntime* node = gWxDdeServerObjectsRuntime.first; node != nullptr && !found; node = node->mNext) {
+    found = wxDdeTryUnmapServerConnectionRuntime(node->mValue, id) != 0;
+  }
+  if (!found) {
+    for (wxNodeBaseRuntime* node = gWxDdeClientObjectsRuntime.first; node != nullptr && !found; node = node->mNext) {
+      found = wxDdeTryUnmapClientConnectionRuntime(node->mValue, id) != 0;
+    }
+  }
+}
+
+/**
+ * Address: 0x00A31D00 (FUN_00A31D00)
+ *
+ * What it does:
+ * `wxDDEConnection::Disconnect()`: no-ops if already disconnected; else
+ * drops the hConv mapping, calls `DdeDisconnect`, logs a failure on error,
+ * and marks the connection disconnected either way (so a second call is a
+ * no-op).
+ */
+bool wxDdeConnectionDisconnectRuntime(
+  WxDdeConnectionCtorRuntimeView* const connection
+) noexcept
+{
+  if (connection == nullptr || connection->base.connected == 0) {
+    return true;
+  }
+
+  wxDdeDeleteConnectionMappingRuntime(connection->conversationHandle);
+
+  const bool ok = ::DdeDisconnect(connection->conversationHandle) != FALSE;
+  if (!ok) {
+    wxLogDdeFailureMessage(wxStringRuntime::Borrow(L"Failed to disconnect from DDE server gracefully"), 0);
+  }
+
+  connection->base.connected = 0;
+  return ok;
+}
+
+/**
+ * Address: 0x00A323B0 (FUN_00A323B0)
+ *
+ * What it does:
+ * `wxDDEConnection::~wxDDEConnection()`: disconnects, then unlinks itself
+ * from its owning server's (or client's) connection list. The
+ * compiler-chained member/base destruction that follows in the binary --
+ * releasing `m_topicName`'s string ref, then `~wxConnectionBase()` -- has no
+ * source line of its own; it is the natural C++ member teardown a caller
+ * gets by destructing the object, not written out by hand in the original.
+ */
+void wxDestroyDdeConnectionNoDeleteRuntime(
+  WxDdeConnectionCtorRuntimeView* const connection
+) noexcept
+{
+  if (connection == nullptr) {
+    return;
+  }
+
+  connection->base.vtable = &gWxDdeConnectionRuntimeVTableTag;
+  (void)wxDdeConnectionDisconnectRuntime(connection);
+
+  if (connection->server != nullptr) {
+    (void)WxListReleaseMemberNodeRuntime(
+      reinterpret_cast<WxListInsertRuntimeView*>(&connection->server->connectionsVTable),
+      connection
+    );
+  } else if (connection->client != nullptr) {
+    (void)WxListReleaseMemberNodeRuntime(
+      reinterpret_cast<WxListInsertRuntimeView*>(&connection->client->connectionsVTable),
+      connection
+    );
+  }
+
+  ReleaseOwnedWxString(connection->topicName);
+  wxDestroyConnectionBaseRuntime(&connection->base);
+}
+
+/**
+ * Address: 0x00A32580 (FUN_00A32580)
+ *
+ * What it does:
+ * `wxDDEConnection`'s scalar deleting destructor (vtable slot 1): runs the
+ * real destructor, then frees the connection when `deleteFlag` is set.
+ */
+void* wxDeleteDdeConnectionWithFlagRuntime(
+  void* const connectionRuntime,
+  const int deleteFlag
+) noexcept
+{
+  auto* const connection = static_cast<WxDdeConnectionCtorRuntimeView*>(connectionRuntime);
+  wxDestroyDdeConnectionNoDeleteRuntime(connection);
+  if ((deleteFlag & 1) != 0) {
+    ::operator delete(connection);
+  }
+  return connection;
+}
+
+/**
+ * Address: 0x00A32140 (FUN_00A32140)
+ *
+ * What it does:
+ * `wxDDEServer::~wxDDEServer()`: unregisters the DDE service name (logging
+ * on failure), removes itself from `wxDDEServerObjects`, disconnects every
+ * live connection (`SetConnected(false)` + `OnDisconnect()`, which by
+ * default self-deletes), then scalar-deletes any connections that survived
+ * that pass. The trailing `m_connections`/`m_serviceName` teardown and the
+ * `wxObject` vtable reset are the compiler-chained member/base destruction
+ * that follows `~wxDDEServer`'s own body in the binary.
+ */
+void wxDestroyDdeServerNoDeleteRuntime(
+  WxDdeServerRuntimeView* const server
+) noexcept
+{
+  if (server == nullptr) {
+    return;
+  }
+
+  server->vtable = &gWxDdeServerRuntimeVTableTag;
+
+  if (server->serviceName.c_str() != nullptr && server->serviceName.c_str()[0] != L'\0') {
+    const HSZ serviceHandle = wxCreateDdeStringHandleRuntime(server->serviceName);
+    if (!::DdeNameService(gWxDdeInstanceId, serviceHandle, nullptr, DNS_UNREGISTER)) {
+      const wchar_t* templateText = L"Failed to unregister DDE server '%s'";
+      if (wxLocale* const locale = wxGetLocale(); locale != nullptr) {
+        templateText = locale->GetString(templateText, 0);
+      }
+
+      wxStringRuntime formatted{};
+      (void)wxStringFormat(&formatted, templateText, server->serviceName.c_str());
+      wxLogDdeFailureMessage(formatted, 0);
+      ReleaseOwnedWxString(formatted);
+    }
+  }
+
+  (void)WxListReleaseMemberNodeRuntime(&gWxDdeServerObjectsRuntime, server);
+
+  for (wxNodeBaseRuntime* node = server->connectionsFirst; node != nullptr;) {
+    auto* const connection = static_cast<WxDdeConnectionCtorRuntimeView*>(node->mValue);
+    wxNodeBaseRuntime* const next = node->mNext;
+    if (connection != nullptr) {
+      connection->base.connected = 0;
+      (void)ReleaseOptionalObjectAndReturnTrueRuntime(connection);
+    }
+    node = next;
+  }
+
+  for (wxNodeBaseRuntime* node = server->connectionsFirst; node != nullptr;) {
+    void* const connection = node->mValue;
+    wxNodeBaseRuntime* const next = node->mNext;
+    if (connection != nullptr) {
+      (void)wxDeleteDdeConnectionWithFlagRuntime(connection, 1);
+    }
+    node = next;
+  }
+
+  // ~wxListBase() on the embedded m_connections sub-object (same
+  // reset-vtable/clear-nodes/reset-vtable/unref shape as
+  // `wxDestroyListBaseNoDeleteRuntime`, inlined here since that function is
+  // defined later in this file and cannot be forward-declared out of its
+  // enclosing anonymous namespace).
+  server->connectionsVTable = &gWxListBaseRuntimeVTableTag;
+  WxListBaseClearNodesRuntime(reinterpret_cast<WxListBaseLinkedRuntimeView*>(&server->connectionsVTable));
+  server->connectionsVTable = &gWxObjectRuntimeVTableTag;
+  wxEventUnRefRuntime(reinterpret_cast<WxObjectRuntimeView*>(&server->connectionsVTable));
+
+  ReleaseOwnedWxString(server->serviceName);
+
+  server->vtable = &gWxObjectRuntimeVTableTag;
+  wxEventUnRefRuntime(reinterpret_cast<WxObjectRuntimeView*>(server));
+}
+
+/**
+ * Address: 0x00A32560 (FUN_00A32560)
+ *
+ * What it does:
+ * `wxDDEServer`'s scalar deleting destructor (vtable slot 1): runs the real
+ * destructor, then frees the server when `deleteFlag` is set.
+ */
+void* wxDeleteDdeServerWithFlagRuntime(
+  void* const serverRuntime,
+  const int deleteFlag
+) noexcept
+{
+  auto* const server = static_cast<WxDdeServerRuntimeView*>(serverRuntime);
+  wxDestroyDdeServerNoDeleteRuntime(server);
+  if ((deleteFlag & 1) != 0) {
+    ::operator delete(server);
+  }
+  return server;
 }
 
 /**
