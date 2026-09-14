@@ -397,6 +397,10 @@ namespace moho
   {
     DragMove(eventData);
 
+    // TEMPORARY PROBE (do not commit): click-select triage.
+    gpg::Warnf("[CLICKDIAG] DragRelease at=(%.0f,%.0f) start=(%.0f,%.0f) active=%d",
+               eventData->mMousePos.x, eventData->mMousePos.y, mX0, mY0, HasActiveSelectionDrag() ? 1 : 0);
+
     if (!HasActiveSelectionDrag()) {
       mSess->ReleaseDrag(eventData->mModifiers);
       return;
@@ -405,6 +409,9 @@ namespace moho
     ScopedLocalSelectionSet draggedSelectionGuard{};
     SSelectionSetUserEntity& draggedSelection = draggedSelectionGuard.get();
     CollectSelectionDraggerEntities(draggedSelection, *this);
+
+    // TEMPORARY PROBE -- band-box triage, delete when resolved.
+    gpg::Warnf("[BOXDIAG] release drag=(%.0f,%.0f) dragged=%d", mX0, mY0, draggedSelection.size());
 
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
       // The binary treats `mSess->mSelection` as mutable here (its own
@@ -421,10 +428,16 @@ namespace moho
         (void)AddSelectionRange(currentSelection, liveSelection, first, liveSelection.mHead);
       }
 
-      const std::int32_t missingFromCurrent = draggedSelection.CountEntitiesMissingFrom(currentSelection);
-      if (missingFromCurrent >= draggedSelection.size()) {
-        // None of the dragged entities were already selected: keep every
-        // currently-selected entity that the drag did not cover.
+      // 0x0086393D calls sub_863760, which counts the dragged entities that are
+      // ALREADY in the current selection (see CountEntitiesPresentIn), and
+      // 0x0086394E/0x00863950 compare that against the dragged set's own size,
+      // taking this arm when it is not below. So this arm is "every dragged
+      // entity was already selected" -- a shift band-box re-drawn over an
+      // existing selection, which deselects it.
+      const std::int32_t alreadySelected = draggedSelection.CountEntitiesPresentIn(currentSelection);
+      if (alreadySelected >= draggedSelection.size()) {
+        // Every dragged entity was already selected: keep only the
+        // currently-selected entities the drag did not cover (toggle off).
         ScopedLocalSelectionSet keptSelectionGuard{};
         SSelectionSetUserEntity& keptSelection = keptSelectionGuard.get();
 
@@ -446,8 +459,9 @@ namespace moho
 
         mSess->SetSelection(keptSelection);
       } else {
-        // At least one dragged entity is genuinely new: merge the current
-        // selection into the dragged set and select the union.
+        // At least one dragged entity was not already selected: merge the
+        // current selection into the dragged set and select the union, so a
+        // shift band-box over fresh units ADDS them.
         SSelectionNodeUserEntity* first = currentSelection.mHead->mLeft;
         first = SSelectionSetUserEntity::find(&currentSelection, first, &first);
         (void)AddSelectionRange(draggedSelection, currentSelection, first, currentSelection.mHead);
