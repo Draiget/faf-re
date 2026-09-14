@@ -1517,40 +1517,27 @@ namespace
     moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
-    const std::array<moho::CIntelToggleState*, 5> toggleLanes = {
-      &intelManager.mJamming,
-      &intelManager.mCloak,
-      &intelManager.mSpoof,
-      &intelManager.mSonarStealth,
-      &intelManager.mRadarStealth,
-    };
-
+    // 0x0068E1F1 reaches the lane with `mov [ecx+eax*2+13h], 1`, indexing the
+    // toggle block by the raw `EIntel` value -- so the lane order is the enum
+    // order from `INTEL_Jammer` on, which is exactly `CIntel::mToggleStates`.
     const int toggleIndex = static_cast<int>(intelType) - static_cast<int>(moho::INTEL_Jammer);
-    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(toggleLanes.size())) {
+    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(moho::CIntel::kToggleCount)) {
       return nullptr;
     }
 
-    return toggleLanes[static_cast<std::size_t>(toggleIndex)];
+    return &intelManager.mToggleStates[static_cast<std::size_t>(toggleIndex)];
   }
 
   [[nodiscard]] const moho::CIntelToggleState* ResolveIntelToggleStateForType(
     const moho::CIntel& intelManager, const moho::EIntel intelType
   ) noexcept
   {
-    const std::array<const moho::CIntelToggleState*, 5> toggleLanes = {
-      &intelManager.mJamming,
-      &intelManager.mCloak,
-      &intelManager.mSpoof,
-      &intelManager.mSonarStealth,
-      &intelManager.mRadarStealth,
-    };
-
     const int toggleIndex = static_cast<int>(intelType) - static_cast<int>(moho::INTEL_Jammer);
-    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(toggleLanes.size())) {
+    if (toggleIndex < 0 || toggleIndex >= static_cast<int>(moho::CIntel::kToggleCount)) {
       return nullptr;
     }
 
-    return toggleLanes[static_cast<std::size_t>(toggleIndex)];
+    return &intelManager.mToggleStates[static_cast<std::size_t>(toggleIndex)];
   }
 
   void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
