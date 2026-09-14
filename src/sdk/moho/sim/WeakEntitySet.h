@@ -109,6 +109,24 @@ namespace moho
     WeakEntitySetUserEntity(const WeakEntitySetUserEntity& other);
 
     /**
+     * Deep copy-assignment, completing the rule of three this type already
+     * half-satisfied with its copy constructor and destructor.
+     *
+     * The set is intrusive: `mHead` is a heap-allocated sentinel and every
+     * node is owned by this set, so the implicit member-wise assignment left
+     * two sets sharing one node chain and leaked the destination's own. When
+     * the source was a temporary -- `extraSelection = session.GetExtraSelectList()`
+     * in `IssueTransportOrderForDrag`, where `GetExtraSelectList` returns
+     * `WeakSet<UserEntity>` by value (mangled
+     * `?GetExtraSelectList@CWldSession@Moho@@QBE?AV?$WeakSet@VUserEntity@Moho@@@2@XZ`)
+     * -- the temporary's destructor then freed the chain the assignee still
+     * pointed at, and the next `IsEmptyFromHeadFind` read `mHead->mLeft` out
+     * of freed memory. Observed as a fault reading 0xFEEEFEFE, the debug
+     * free-fill 0xFEEEFEEE plus the `mLeft` displacement.
+     */
+    WeakEntitySetUserEntity& operator=(const WeakEntitySetUserEntity& other);
+
+    /**
      * Address: 0x00868E50 (FUN_00868E50, `sub_868E50`) - same body as
      * `ReleaseSelectionWeakSetStorageCompat`'s null-head-checked branch,
      * generalized onto the owning type itself: erases every node and frees the

@@ -14159,6 +14159,41 @@ namespace moho
   }
 
   /**
+   * Deep copy-assignment. See the declaration in WeakEntitySet.h for why the
+   * implicit member-wise one could not be left in place.
+   */
+  WeakEntitySetUserEntity& WeakEntitySetUserEntity::operator=(const WeakEntitySetUserEntity& other)
+  {
+    if (this == &other) {
+      return *this;
+    }
+
+    // Drop this set's own nodes and sentinel before taking the source's
+    // contents; `ReleaseStorage` leaves `mHead` null, which is exactly the
+    // state `InitWeakEntitySetHead` expects to build a fresh sentinel from.
+    (void)ReleaseStorage();
+    InitWeakEntitySetHead(*this);
+
+    if (other.mHead == nullptr) {
+      return *this;
+    }
+
+    auto& otherMutable = const_cast<WeakEntitySetUserEntity&>(other);
+    SSelectionNodeUserEntity* node = otherMutable.mHead->mLeft;
+    node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
+    while (node != otherMutable.mHead) {
+      if (UserEntity* const entity = DecodeSelectedUserEntity(node->mEnt); entity != nullptr) {
+        (void)InsertSelectionEntity(*this, entity);
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(&otherMutable, node, &node);
+    }
+
+    return *this;
+  }
+
+  /**
    * Address: 0x007AE1B0 (FUN_007AE1B0, Moho::WeakSet_UserEntity::Add) - bare-
    * header sibling of `SSelectionSetUserEntity::Add` below, generalized the
    * same way `find`/`Iterator_inc`/`EraseRange` already are on this header.
