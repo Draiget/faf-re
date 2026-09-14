@@ -4133,7 +4133,9 @@ public:
   virtual void DoBlit() {} // slot 57 (+0xE4)
   // slot 58 (+0xE8)
   virtual void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept { (void)outWidth; (void)outHeight; }
-  virtual void DoGetSizeMM() {} // slot 59 (+0xEC)
+  // Real override is `wxDC::DoGetSizeMM` (this base stays the shape-only
+  // no-op interface, matching `DoDrawText`/`DoCrossHair` above).
+  virtual void DoGetSizeMM(std::int32_t* outWidthMM, std::int32_t* outHeightMM) const { (void)outWidthMM; (void)outHeightMM; } // slot 59 (+0xEC)
   virtual void DoDrawLines() {} // slot 60 (+0xF0)
   virtual void DoDrawPolygon() {} // slot 61 (+0xF4)
   virtual void DoSetClippingRegionAsRegion() {} // slot 62 (+0xF8)
@@ -4291,6 +4293,21 @@ public:
    */
   void SetBrush(const void* brush) noexcept override;
   void DoGetSize(std::int32_t* outWidth, std::int32_t* outHeight) const noexcept override;
+
+  /**
+   * Address: 0x009CA100 (FUN_009CA100)
+   * Mangled: ?DoGetSizeMM@wxDC@@MBEXPAH0@Z
+   *
+   * IDA signature:
+   * int __thiscall wxDC::DoGetSizeMM(HDC *this, int *outWidthMM, int *outHeightMM);
+   *
+   * What it does:
+   * Converts `DoGetSize`'s pixel extent to millimetres via the device's
+   * physical-size-to-pixel-resolution ratio - matching `wxDC::DoGetSizeMM`
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1928-1958) line for line.
+   */
+  void DoGetSizeMM(std::int32_t* outWidthMM, std::int32_t* outHeightMM) const noexcept override;
+
   void DoDrawRectangle(
     std::int32_t x,
     std::int32_t y,

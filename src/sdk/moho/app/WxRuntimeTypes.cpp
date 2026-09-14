@@ -43503,6 +43503,40 @@ void wxDC::DoGetSize(
 }
 
 /**
+ * Address: 0x009CA100 (FUN_009CA100)
+ * Mangled: ?DoGetSizeMM@wxDC@@MBEXPAH0@Z
+ *
+ * IDA signature:
+ * int __thiscall wxDC::DoGetSizeMM(HDC *this, int *outWidthMM, int *outHeightMM);
+ *
+ * What it does:
+ * Converts `DoGetSize`'s pixel extent to millimetres using the device's
+ * physical size vs. pixel resolution ratio (`HORZSIZE/HORZRES`,
+ * `VERTSIZE/VERTRES`) - matching `wxDC::DoGetSizeMM`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1928-1958) line for line.
+ */
+void wxDC::DoGetSizeMM(
+  std::int32_t* const outWidthMM,
+  std::int32_t* const outHeightMM
+) const noexcept
+{
+  std::int32_t widthPixels = 0;
+  std::int32_t heightPixels = 0;
+  DoGetSize(&widthPixels, &heightPixels);
+
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+
+  if (outWidthMM != nullptr) {
+    const std::int32_t widthTotal = ::GetDeviceCaps(deviceContext, HORZRES);
+    *outWidthMM = widthTotal != 0 ? (widthPixels * ::GetDeviceCaps(deviceContext, HORZSIZE)) / widthTotal : 0;
+  }
+  if (outHeightMM != nullptr) {
+    const std::int32_t heightTotal = ::GetDeviceCaps(deviceContext, VERTRES);
+    *outHeightMM = heightTotal != 0 ? (heightPixels * ::GetDeviceCaps(deviceContext, VERTSIZE)) / heightTotal : 0;
+  }
+}
+
+/**
  * Fills a rectangle with the selected brush.
  *
  * This had an empty body, so every background the viewport asked for went
