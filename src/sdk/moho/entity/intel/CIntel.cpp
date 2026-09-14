@@ -76,9 +76,17 @@ namespace
     return static_cast<moho::CIntelPosHandle*>(upcast.mObj);
   }
 
+  // 0x0076E4EA: `CIntel::Update` decides whether a handle has to be re-rastered
+  // with `Wm3::Vector3::Compare(newPos, &handle->mLastPos)`, which reports a
+  // *difference* and does so against WildMagic's 1e-5 epsilon
+  // (Wm3Vector3.h:245) -- not an exact float comparison. The exact form that
+  // stood here re-rastered on any bit-level jitter, tearing the circle out of
+  // the grid and queueing a delayed subtract every tick for a unit the engine
+  // considers stationary. `CIntelPosHandle::Update` reaches the same
+  // `Compare` through 0x0076D8D0, so this is the one spelling both lanes share.
   [[nodiscard]] bool PositionChanged(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& position) noexcept
   {
-    return handle.mLastPos.x != position.x || handle.mLastPos.y != position.y || handle.mLastPos.z != position.z;
+    return Wm3::Vec3f::Compare(&position, &handle.mLastPos) != 0;
   }
 } // namespace
 
