@@ -594,7 +594,14 @@ namespace moho
         mBeam.mEnd.x = beamLength * 0.0f;
         mBeam.mEnd.y = beamLength * 0.0f;
         mBeam.mEnd.z = beamLength;
-        mBeam.mLastInterpolation = sourceEntity->mVelocityScale;
+        // 0x00655076 / 0x00655117 both `fld dword ptr [ebx+170h]`, which is
+        // `mPendingVelocityScale` -- the scalar `Entity::SetPendingTransform`
+        // stores at 0x00678ED1 (`movss [ecx+170h], xmm0`) beside the pending
+        // transform this same function reads for `mCurStart`/`mLastStart`.
+        // `mVelocityScale` is a different field at +0x00D4, so the beam was
+        // interpolating between its two endpoint transforms with a scalar that
+        // has nothing to do with them.
+        mBeam.mLastInterpolation = sourceEntity->mPendingVelocityScale;
 
         if (mEntityInfo.mParentBoneIndex != -1) {
           const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
@@ -619,7 +626,7 @@ namespace moho
         const Wm3::Vec3f localEnd = FetchVectorParam(*this, 3);
         mBeam.mEnd = ApplyPoint(endBoneTransform, localEnd);
 
-        mBeam.mLastInterpolation = sourceEntity->mVelocityScale;
+        mBeam.mLastInterpolation = sourceEntity->mPendingVelocityScale;
       }
 
       if (mIsNew) {
