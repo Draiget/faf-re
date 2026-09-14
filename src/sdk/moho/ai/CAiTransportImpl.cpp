@@ -1201,24 +1201,36 @@ const SAiReservedTransportBone* CAiTransportImpl::GetReservedBone(Unit* const un
 /**
  * Address: 0x005E50A0 (FUN_005E50A0)
  */
-unsigned int CAiTransportImpl::GetBestAttachPoint(Unit* const unit) const
+int CAiTransportImpl::GetBestAttachPoint(Unit* const unit) const
 {
   if (!unit) {
-    return 0u;
+    return -1;
   }
 
+  // 0x005E50A0 reads `[edi+540h]` for the skeleton and dispatches
+  // `GetBlueprint` (`call [eax+1Ch]`) at 0x005E50FF on that *same* `edi` --
+  // and `edi` is the `Unit*` argument, not `this`. The bone this resolves is
+  // the one the carried unit hangs by (`SEntAttachInfo::mChildBoneIndex`), so
+  // it has to come out of the carried unit's own skeleton; reading the
+  // transport's returned a bone index that means nothing on the passenger.
   boost::shared_ptr<const CAniSkel> holdSkel{};
-  const CAniSkel* const skeleton = ResolveUnitSkeleton(mUnit, holdSkel);
+  const CAniSkel* const skeleton = ResolveUnitSkeleton(unit, holdSkel);
   const int attachPointIndex = skeleton ? skeleton->FindBoneIndex("AttachPoint") : -1;
-  if (attachPointIndex >= 0) {
-    return static_cast<unsigned int>(attachPointIndex);
+
+  // 0x005E5101: `cmp byte ptr [eax+368h], 0` is `Air.CanFly`, not
+  // `Transport.AirClass` (+0x410). A flier with no "AttachPoint" bone hangs
+  // by its root (0); everything else keeps `-1`, which
+  // `Unit::GetBoneLocalTransform` resolves to the blueprint's centre-height
+  // anchor. Testing `Transport.AirClass` -- which land units set to say they
+  // are air-transportable -- forced those passengers onto bone 0 instead.
+  if (attachPointIndex < 0) {
+    const RUnitBlueprint* const blueprint = unit->GetBlueprint();
+    if (blueprint && blueprint->Air.CanFly != 0) {
+      return 0;
+    }
   }
 
-  const RUnitBlueprint* const blueprint = unit->GetBlueprint();
-  if (blueprint && blueprint->Transport.AirClass != 0) {
-    return 0u;
-  }
-  return static_cast<unsigned int>(attachPointIndex);
+  return attachPointIndex;
 }
 
 /**
@@ -1483,7 +1495,10 @@ bool CAiTransportImpl::TransportAssignSlot(Unit* const unit, const int hookIndex
     return false;
   }
 
-  const unsigned int bestAttachBoneIndex = GetBestAttachPoint(unit);
+  // `GetBestAttachPoint` returns `-1` for "no attach bone"; the reservation
+  // stores it as the raw dword the binary stores, and `AttachUnitToBone`
+  // reads it back signed into `mChildBoneIndex`.
+  const auto bestAttachBoneIndex = static_cast<unsigned int>(GetBestAttachPoint(unit));
   msvc8::vector<SAttachPoint> attachVec{};
   msvc8::vector<SAttachPoint> hookVec{};
   int attachSize = 1;

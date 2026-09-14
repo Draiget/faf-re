@@ -489,8 +489,15 @@ namespace moho
 
     /**
      * Address: 0x005E50A0 (FUN_005E50A0)
+     * Mangled: ?GetBestAttachPoint@CAiTransportImpl@Moho@@AAEHPAVUnit@2@@Z
+     *
+     * What it does:
+     * Returns the bone on the *carried unit* that it should hang by: the
+     * index of its own "AttachPoint" bone, else `0` when the unit can fly,
+     * else `-1` for the blueprint centre-height anchor. The mangling returns
+     * `H` (int) because `-1` is one of its real answers.
      */
-    unsigned int GetBestAttachPoint(Unit*) const;
+    int GetBestAttachPoint(Unit*) const;
 
     /**
      * Address: 0x005E5150 (FUN_005E5150)
