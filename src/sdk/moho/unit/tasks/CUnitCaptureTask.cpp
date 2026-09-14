@@ -423,8 +423,16 @@ namespace moho
         float energyCost = captureCostResults[1].ToNumber();
         float massCost = captureCostResults[2].ToNumber();
 
+        // 0x00604A45..0x00604B96: the cursor comes from `[ebp+4]` once, but the
+        // bound is re-read out of `[ebp+8]` (`_Mylast`) both for the entry test
+        // at 0x00604A48 and for the loop-back test at 0x00604B93. The body runs
+        // the `GetCaptureCosts` script on each attached unit, so the compiler
+        // cannot hoist that load and neither may we: a script that destroys an
+        // attached unit erases it from this very list, and a cached `end()`
+        // would then read the slot the erase vacated.
         const msvc8::vector<Entity*>& attachedEntities = targetEntity->GetAttachedEntities();
-        for (Entity* const attachedEntity : attachedEntities) {
+        for (Entity* const* cursor = attachedEntities.begin(); cursor != attachedEntities.end(); ++cursor) {
+          Entity* const attachedEntity = *cursor;
           Unit* const attachedUnit = (attachedEntity != nullptr) ? attachedEntity->IsUnit() : nullptr;
           if (attachedUnit == nullptr || attachedUnit->IsDead()) {
             continue;
