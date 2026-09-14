@@ -9687,3 +9687,34 @@ int InvokeSlot08RuntimeB(Slot08OwnerRuntime* const owner)
 {
   return owner->vtable->slot08(owner);
 }
+
+/**
+ * `wxDDEServer::DeleteConnection(WXHCONV conv)` -- FUN_00A31040. Not a
+ * second citation of that address (see `RemovePayloadByIdFromList20Runtime`
+ * above, the canonical recovery for it): its compiled body matches this
+ * file's generic managed-node helper exactly, reached from this second,
+ * independent call site too. This bridge lets `WxRuntimeTypes.cpp` -- a
+ * different translation unit -- invoke that helper by pointer/id instead of
+ * duplicating its logic. Semantically: walk the node chain at `owner+0x20`
+ * for the first payload whose id field (`+0x24`) equals `hConvAsId`, and
+ * release just that node.
+ */
+std::uint8_t wxDdeTryUnmapServerConnectionRuntime(void* const server, const std::int32_t hConvAsId) noexcept
+{
+  auto* const owner = reinterpret_cast<ManagedNodeListsOwnerRuntime*>(server);
+  return owner != nullptr ? RemoveManagedNodeByIdRuntime(owner->listAt20, hConvAsId) : 0u;
+}
+
+/**
+ * `wxDDEClient::DeleteConnection(WXHCONV conv)` -- FUN_00A311D0. Not a
+ * second citation of that address either (see
+ * `RemovePayloadByIdFromList1CRuntime` above): same shared compiled body
+ * and bridging rationale as `wxDdeTryUnmapServerConnectionRuntime` above,
+ * for the node chain at `owner+0x1C` (wxDDEClient's layout is one field
+ * shorter than wxDDEServer's: no `m_serviceName`).
+ */
+std::uint8_t wxDdeTryUnmapClientConnectionRuntime(void* const client, const std::int32_t hConvAsId) noexcept
+{
+  auto* const owner = reinterpret_cast<ManagedNodeListsOwnerRuntime*>(client);
+  return owner != nullptr ? RemoveManagedNodeByIdRuntime(owner->listAt1C, hConvAsId) : 0u;
+}
