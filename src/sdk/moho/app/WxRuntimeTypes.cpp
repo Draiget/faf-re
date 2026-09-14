@@ -68208,14 +68208,54 @@ void wxApp::OnInitCmdLine(wxCmdLineParser& parser)
   parser.SetDesc(s_cmdLineDesc);
 }
 
-/** Address: 0x009AAAD0 (FUN_009AAAD0, wxAppBase::OnCmdLineParsed) */
-bool wxApp::OnCmdLineParsed(void* /*cmdLineParser*/) { return true; }
+/**
+ * Address: 0x009AAAD0 (FUN_009AAAD0, wxAppBase::OnCmdLineParsed)
+ * Mangled: ?OnCmdLineParsed@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+ *
+ * What it does:
+ * Turns on this build's verbose-logging flag when `--verbose` was given
+ * (`parser.Found`, a real wxmsw.lib body), matching the `--verbose` entry
+ * `OnInitCmdLine` registers above. Same "never actually reached" caveat as
+ * `OnInitCmdLine` - this tree never calls `wxEntry`.
+ */
+char wxSetVerboseLoggingEnabledRuntime(char enabledFlag) noexcept;
 
-/** Address: 0x009AAB70 (FUN_009AAB70, wxAppBase::OnCmdLineHelp) */
-bool wxApp::OnCmdLineHelp(void* /*cmdLineParser*/) { return false; }
+bool wxApp::OnCmdLineParsed(wxCmdLineParser& parser)
+{
+  if (parser.Found(wxT("verbose"))) {
+    (void)wxSetVerboseLoggingEnabledRuntime(1);
+  }
+  return true;
+}
 
-/** Address: 0x009AAB80 (FUN_009AAB80, wxAppBase::OnCmdLineError) */
-bool wxApp::OnCmdLineError(void* /*cmdLineParser*/) { return false; }
+/**
+ * Address: 0x009AAB70 (FUN_009AAB70, wxAppBase::OnCmdLineHelp)
+ * Mangled: ?OnCmdLineHelp@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+ *
+ * What it does:
+ * Prints the command-line usage text (`parser.Usage()`, a real wxmsw.lib
+ * body reached through `wxMessageOutput::Get()->Printf()`) and reports the
+ * parse as unhandled.
+ */
+bool wxApp::OnCmdLineHelp(wxCmdLineParser& parser)
+{
+  parser.Usage();
+  return false;
+}
+
+/**
+ * Address: 0x009AAB80 (FUN_009AAB80, wxAppBase::OnCmdLineError)
+ * Mangled: ?OnCmdLineError@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+ *
+ * What it does:
+ * Same usage-text response as `OnCmdLineHelp`, for a parse error instead of
+ * an explicit `--help`.
+ */
+bool wxApp::OnCmdLineError(wxCmdLineParser& parser)
+{
+  parser.Usage();
+  return false;
+}
 
 /**
  * Address: 0x009AA8A0 (FUN_009AA8A0, wxAppBase::CreateLogTarget)

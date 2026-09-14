@@ -6848,9 +6848,36 @@ public:
   virtual bool IsActive() const;
   virtual wxWindowBase* GetTopWindow() const;
   virtual void OnInitCmdLine(wxCmdLineParser& parser);
-  virtual bool OnCmdLineParsed(void* cmdLineParser);
-  virtual bool OnCmdLineHelp(void* cmdLineParser);
-  virtual bool OnCmdLineError(void* cmdLineParser);
+
+  /**
+   * Address: 0x009AAAD0 (FUN_009AAAD0, wxAppBase::OnCmdLineParsed)
+   * Mangled: ?OnCmdLineParsed@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+   *
+   * What it does:
+   * Turns on this build's verbose-logging flag when `--verbose` was given.
+   */
+  virtual bool OnCmdLineParsed(wxCmdLineParser& parser);
+  /**
+   * Address: 0x009AAB70 (FUN_009AAB70, wxAppBase::OnCmdLineHelp)
+   * Mangled: ?OnCmdLineHelp@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+   *
+   * What it does:
+   * Prints the command-line usage text (`wxCmdLineParser::Usage`, a real
+   * wxmsw.lib body - the binary reaches it through
+   * `wxMessageOutput::Get()->Printf()`, both genuinely external) and
+   * reports the parse as unhandled.
+   */
+  virtual bool OnCmdLineHelp(wxCmdLineParser& parser);
+
+  /**
+   * Address: 0x009AAB80 (FUN_009AAB80, wxAppBase::OnCmdLineError)
+   * Mangled: ?OnCmdLineError@wxAppBase@@UAE_NAAVwxCmdLineParser@@@Z
+   *
+   * What it does:
+   * Same usage-text response as `OnCmdLineHelp`, for a parse error instead
+   * of an explicit `--help`.
+   */
+  virtual bool OnCmdLineError(wxCmdLineParser& parser);
   virtual void* CreateLogTarget();
   virtual void* CreateMessageOutput();
   virtual void* GetStdIcon(std::int32_t iconId) const;
