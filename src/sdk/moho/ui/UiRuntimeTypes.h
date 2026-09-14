@@ -82,6 +82,7 @@ namespace moho
   class CMauiScrollbar;
   class CMauiText;
   class CUIMapPreview;
+  class CMovie;
   class CD3DFont;
   class CD3DPrimBatcher;
   class CD3DBatchTexture;
@@ -2244,6 +2245,22 @@ namespace moho
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
 
   /**
+   * Runtime view for global keyboard-focus tracking lane.
+   *
+   * `mFocusedControlPrevNextField` stores an encoded intrusive-link value:
+   * - `0` means no focus owner.
+   * - `4` means the list sentinel lane.
+   * - any other value points to the focused control's embedded `mNext` lane.
+   */
+  struct CMauiCurrentFocusControlRuntimeView
+  {
+    std::uint32_t mFocusedControlPrevNextField = 0; // +0x0
+    std::uint32_t mNextPrevNextField = 0;           // +0x4
+
+    [[nodiscard]] CMauiControl* ResolveFocusedControl() const noexcept;
+  };
+
+  /**
    * The edit control's embedded click-dragger sub-object.
    *
    * Layout: this is the concrete `IMauiDragger`-derived object that the binary
@@ -3664,7 +3681,30 @@ namespace moho
      * teardown.
      */
     ~CMauiMovie() override;
+
+  public:
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x168.
+    // `cfunc_InternalCreateMovieL` calls `operator new(0x168)` at 0x0079F64B,
+    // but this class declared no data members at all, so it inherited only
+    // `CMauiControl`'s 0x11C and every access through `CMauiMovieRuntimeView`
+    // -- which describes exactly this run -- wrote past the end of the block.
+    // ---------------------------------------------------------------------
+    CMovie* mMovie = nullptr;              // +0x11C
+    bool mIsPlaying = false;               // +0x120
+    bool mDoLoop = false;                  // +0x121
+    bool mIsStopped = false;               // +0x122
+    bool mIsMinimized = false;             // +0x123
+    msvc8::string mSubtitleCache{};        // +0x124
+    CScriptLazyVar_float mMovieWidthLV{};  // +0x140
+    CScriptLazyVar_float mMovieHeightLV{}; // +0x154
   };
+
+  static_assert(sizeof(CMauiMovie) == 0x168, "moho::CMauiMovie size must be 0x168");
+  static_assert(offsetof(CMauiMovie, mMovie) == 0x11c, "CMauiMovie::mMovie offset must be 0x11c");
+  static_assert(offsetof(CMauiMovie, mSubtitleCache) == 0x124, "CMauiMovie::mSubtitleCache offset must be 0x124");
+  static_assert(offsetof(CMauiMovie, mMovieWidthLV) == 0x140, "CMauiMovie::mMovieWidthLV offset must be 0x140");
+  static_assert(offsetof(CMauiMovie, mMovieHeightLV) == 0x154, "CMauiMovie::mMovieHeightLV offset must be 0x154");
 
   class CMauiScrollbar : public CMauiControl, public IMauiDragger
   {
@@ -3772,6 +3812,24 @@ namespace moho
      * `IMauiDragger` teardown emitted by the compiler.
      */
     ~CMauiScrollbar() override;
+
+  public:
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x124..+0x158 -- the run
+    // that starts right after the embedded `IMauiDragger` sub-object.
+    // `cfunc_InternalCreateScrollbarL` calls `operator new(0x158)` at
+    // 0x007A16F7, but this class stopped at 0x124, so every access through
+    // `CMauiScrollbarRuntimeView` -- which describes exactly this run -- wrote
+    // past the end of the block.
+    // ---------------------------------------------------------------------
+    CMauiCurrentFocusControlRuntimeView mScrollableLink{}; // +0x124
+    boost::shared_ptr<CD3DBatchTexture> mThumbTop{};       // +0x12C
+    boost::shared_ptr<CD3DBatchTexture> mThumbBottom{};    // +0x134
+    boost::shared_ptr<CD3DBatchTexture> mThumbMiddle{};    // +0x13C
+    boost::shared_ptr<CD3DBatchTexture> mBackground{};     // +0x144
+    float mDragStart = 0.0f;                               // +0x14C
+    float mTopAtDragStart = 0.0f;                          // +0x150
+    EMauiScrollAxis mAxis{};                               // +0x154
   };
 
   // The `IMauiDragger` sub-object has to begin at +0x11C; that holds only
@@ -3781,9 +3839,12 @@ namespace moho
   // `WeakObject::weakLinkHead_` and `mov [esi+11Ch], offset
   // ??_7IMauiDragger@Moho@@6B@` (0x007A04F3) installs the base vptr before
   // 0x007A0503 replaces it with the scrollbar's own thunk vtable - so the
-  // class ends at 0x124. The remaining lanes up to the binary's 0x158
-  // allocation live in `CMauiScrollbarRuntimeView`.
-  static_assert(sizeof(CMauiScrollbar) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
+  // sub-object runs 0x11C..0x124, and the control's own state follows it up
+  // to the 0x158 the binary allocates.
+  static_assert(offsetof(CMauiScrollbar, mScrollableLink) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
+  static_assert(sizeof(CMauiScrollbar) == 0x158, "moho::CMauiScrollbar size must be 0x158");
+  static_assert(offsetof(CMauiScrollbar, mThumbTop) == 0x12c, "CMauiScrollbar::mThumbTop offset must be 0x12c");
+  static_assert(offsetof(CMauiScrollbar, mAxis) == 0x154, "CMauiScrollbar::mAxis offset must be 0x154");
 
   class CMauiText : public CMauiControl
   {
@@ -4095,7 +4156,21 @@ namespace moho
      * drawMask is unused.
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
+
+  public:
+    // ---------------------------------------------------------------------
+    // State the binary allocates for this control, +0x11C..+0x124.
+    // `cfunc_InternalCreateMapPreviewL` calls `operator new(0x124)` at
+    // 0x00850E2B, but this class declared no data members at all, so it
+    // inherited only `CMauiControl`'s 0x11C and every access through
+    // `CUIMapPreviewRuntimeView` wrote past the end of the block. This one
+    // draws on the loading screen, which is where it showed up.
+    // ---------------------------------------------------------------------
+    boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
   };
+
+  static_assert(sizeof(CUIMapPreview) == 0x124, "moho::CUIMapPreview size must be 0x124");
+  static_assert(offsetof(CUIMapPreview, mTexture) == 0x11c, "CUIMapPreview::mTexture offset must be 0x11c");
 
   struct CMauiControlRuntimeView
   {
@@ -4253,22 +4328,6 @@ namespace moho
     "CMauiControlExtendedRuntimeView::mDebugName offset must be 0x100"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::string) == 0x1C, "msvc8::string size must be 0x1C");
-
-  /**
-   * Runtime view for global keyboard-focus tracking lane.
-   *
-   * `mFocusedControlPrevNextField` stores an encoded intrusive-link value:
-   * - `0` means no focus owner.
-   * - `4` means the list sentinel lane.
-   * - any other value points to the focused control's embedded `mNext` lane.
-   */
-  struct CMauiCurrentFocusControlRuntimeView
-  {
-    std::uint32_t mFocusedControlPrevNextField = 0; // +0x0
-    std::uint32_t mNextPrevNextField = 0;           // +0x4
-
-    [[nodiscard]] CMauiControl* ResolveFocusedControl() const noexcept;
-  };
 
 
   /**
