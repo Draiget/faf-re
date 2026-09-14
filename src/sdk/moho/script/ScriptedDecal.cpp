@@ -16,6 +16,7 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/script/CScriptEvent.h"
 #include "Wm3Vector2.h"
@@ -244,10 +245,37 @@ namespace
     return linkNode;
   }
 
-  [[nodiscard]] IDecalRuntimeService* ResolveDecalService(CWldSession* const) noexcept
+  /**
+   * `ScriptedDecal::ScriptedDecal` (0x0087EB60) fills its service lane from
+   * `session->mWldMap->mTerrainRes->GetDecalManager()`, which returns the
+   * engine's one `IDecalManager`.
+   *
+   * `IDecalRuntimeService` is a slot-shaped stand-in for that interface, and
+   * the three slots this file dispatches through line up with it exactly:
+   *
+   *   vtable +0x1C (slot 7)  Slot07               -> IDecalManager::LoadDecal
+   *   vtable +0x24 (slot 9)  RemoveRuntimeDecal   -> IDecalManager::DestroyDecal
+   *   vtable +0x48 (slot 18) Slot18_Commit...     -> IDecalManager::AddSplat
+   *
+   * `ScriptedDecalRuntimeEntryView` is likewise `CWldTerrainDecal`: the link
+   * node this file backs up four bytes from is `mLinkHead` (+0x04), and the
+   * lanes it writes are `mScale` (+0x5C), `mType` (+0x1C), `mFidelity`
+   * (+0x20), `mCutoffLOD` (+0x80) and `mNearCutoff` (+0x84). Collapsing both
+   * stand-ins onto the real types is follow-up work; this returns the real
+   * manager so the runtime entry actually gets created.
+   */
+  [[nodiscard]] IDecalRuntimeService* ResolveDecalService(CWldSession* const session) noexcept
   {
-    // Terrain decal-manager accessor is still being recovered for IWldTerrainRes.
-    return nullptr;
+    if (session == nullptr || session->mWldMap == nullptr) {
+      return nullptr;
+    }
+
+    IWldTerrainRes* const terrainRes = session->mWldMap->mTerrainRes;
+    if (terrainRes == nullptr) {
+      return nullptr;
+    }
+
+    return reinterpret_cast<IDecalRuntimeService*>(terrainRes->GetDecalManager());
   }
 } // namespace
 
