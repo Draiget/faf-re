@@ -13173,16 +13173,24 @@ namespace moho
               && !transporter->IsBeingBuilt()                              // v6 vtable slot +0x34
               && !transporterBridge->DestroyQueued())                      // slot +0x2C
           {
-            // Group 1: decide whether to skip this transporter.
-            // CANTRANSPORTCOMMANDER(hover) or FERRYBEACON(hover) -> not a skip;
-            // otherwise skip iff the transporter is not COMMAND.
+            // Group 1: decide whether to skip this selected unit.
+            // CANTRANSPORTCOMMANDER(hover) or FERRYBEACON(hover) -> never a
+            // skip; otherwise skip iff the selected unit IS the commander,
+            // because a transport not flagged CANTRANSPORTCOMMANDER cannot
+            // carry it.
+            //
+            // The binary spells this as
+            //   if (IsInCategory(hover,"CANTRANSPORTCOMMANDER")) goto accept;
+            //   if (IsInCategory(hover,"FERRYBEACON")
+            //       || (skip = 1, !IsInCategory(selected,"COMMAND"))) { accept: skip = 0; }
+            // so `skip` survives as 1 only when the selected unit IS COMMAND.
             bool skip;
             if (hoverEntity->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
               skip = false;
             } else if (hoverEntity->IsInCategory(msvc8::string("FERRYBEACON"))) {
               skip = false;
             } else {
-              skip = !reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("COMMAND"));
+              skip = reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("COMMAND"));
             }
 
             if (!skip) {
@@ -13204,10 +13212,15 @@ namespace moho
                   return true;
                 }
               } else if (hoverEntity->IsInCategory(msvc8::string("AIRSTAGINGPLATFORM"))) {
-                // Accept if the transporter can't fly, or can fly but is
-                // CANNOTUSEAIRSTAGING (still a valid staging interaction).
-                if (transporterBridge->GetBlueprint()->Air.CanFly == 0u
-                    || reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("CANNOTUSEAIRSTAGING"))) {
+                // An air staging platform docks aircraft, so accept only a
+                // selected unit that can fly and is not CANNOTUSEAIRSTAGING.
+                //
+                // Same short-circuit shape as group 1: the binary's
+                //   if (!CanFly || (ok = 1, IsInCategory(sel,"CANNOTUSEAIRSTAGING"))) ok = 0;
+                //   if (ok) return 1;
+                // leaves `ok` set only on the can-fly / not-excluded path.
+                if (transporterBridge->GetBlueprint()->Air.CanFly != 0u
+                    && !reinterpret_cast<const UserEntity*>(transporter)->IsInCategory(msvc8::string("CANNOTUSEAIRSTAGING"))) {
                   return true;
                 }
               }
@@ -13273,13 +13286,15 @@ namespace moho
               && candidate->mVariableData.mLayerMask != static_cast<std::uint32_t>(LAYER_Seabed)) {
             // Group 2: TRANSPORTFOCUS(candidate).
             if (candidate->IsInCategory(msvc8::string("TRANSPORTFOCUS"))) {
-              // Group 3: CANTRANSPORTCOMMANDER(candidate) -> not a skip;
-              // otherwise skip iff the hover unit is not COMMAND.
+              // Group 3: CANTRANSPORTCOMMANDER(candidate) -> never a skip;
+              // otherwise skip iff the hovered unit IS the commander, which a
+              // transport without that flag cannot pick up. Same
+              // `|| (skip = 1, !cond)` shape as the two groups above.
               bool skip;
               if (candidate->IsInCategory(msvc8::string("CANTRANSPORTCOMMANDER"))) {
                 skip = false;
               } else {
-                skip = !reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
+                skip = reinterpret_cast<const UserEntity*>(hoverUnit)->IsInCategory(msvc8::string("COMMAND"));
               }
 
               if (!skip) {
