@@ -5959,6 +5959,15 @@ namespace moho
   int cfunc_SessionIsReplaySim(lua_State* luaContext);
 
   /**
+   * Address: 0x012928A5 (the `.exxt` register block that fills
+   * `luadef_SessionIsReplaySim` at 0x012932A8 and binds 0x0128CC35)
+   *
+   * What it does:
+   * Publishes the sim-lane Lua binder definition for global `SessionIsReplay`.
+   */
+  CScrLuaInitForm* func_SessionIsReplaySim_LuaFuncDef();
+
+  /**
    * Address: 0x0128BBFC (FUN_0128BBFC, cfunc_SetFocusArmySim)
    *
    * lua_State *

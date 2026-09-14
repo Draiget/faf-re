@@ -26539,26 +26539,35 @@ int moho::cfunc_GetDepositsAroundPoint(lua_State* const luaContext)
 }
 
 /**
- * Address: 0x0128BB27 (FUN_0128BB27, cfunc_SessionIsReplaySim)
+ * Address: 0x0128CC35 (the sim-lane `SessionIsReplay` body; IDA's
+ * `cfunc_SessionIsReplaySim` label sits on 0x0128BB27, which is other code)
  *
  * What it does:
  * Pushes whether the current world session is in replay mode.
  *
- * @note Deliberately not registered through `SimLuaInitSet()`, and that is not
- * an oversight. The string `"SessionIsReplay"` has exactly one reference in the
- * whole image -- `func_SessionIsReplayUser_LuaFuncDef` (0x00897D90), the
- * **user** binder recovered above -- so the base engine publishes this global
- * to the UI Lua state only. This body lives at 0x0128BB27, inside `.exxt`
- * (VA 0x0128B000), the section FAF's own patcher owns: `start_exxt`
- * (0x0128BE0D) `LoadLibraryA`s `faext.dll` and hot-patches slots from a
- * `(procName, target)` table via `VirtualProtect`. The sim-side binding is
- * installed at runtime by that external DLL, not by anything in this binary.
+ * The `.exxt` section (VA 0x0128B000) is FAF's own patch region, and it does
+ * register this into the sim set -- the earlier note here claimed the string
+ * `"SessionIsReplay"` had "exactly one reference in the whole image" and told
+ * the next reader not to add a binder. Scanning the shipped PE refutes that:
+ * the string at 0x00E4AFBC has **two** referents.
  *
- * The visible consequence is real -- `lua/sim/score.lua(288)` calls
- * `SessionIsReplay()` and logs "access to nonexistent global variable", which
- * kills the forked `ScoreThread` only and does not stop the beat. Do not
- * "fix" it by adding a `CScrLuaBinder` to the sim set: there is no callsite
- * evidence for one, so that would be fabricated recovery.
+ *   0x00897DA5  `func_SessionIsReplayUser_LuaFuncDef`, the user binder above;
+ *   0x012928BF  a register block at 0x012928A5 that fills a def at 0x012932A8
+ *               with the method name 0x00E4AFBC, class `"<global>"`
+ *               (0x00E00D90), the help string 0x00E4AF84 it shares with the
+ *               user form, and a function slot holding **0x0128CC35**.
+ *
+ * 0x0128CC35 is this body: `mov eax, ds:sWldSession` / `movzx eax, byte ptr
+ * [eax+484h]` (`CWldSession::IsReplay`) / `lua_pushboolean` / `mov eax, 1`.
+ * IDA labels 0x0128BB27 with this name, but that address holds unrelated code
+ * -- neither the string reference nor the def's function slot points there.
+ *
+ * The consequence of leaving it unregistered is not confined to one thread:
+ * `lua/sim/score.lua(288)` calls `SessionIsReplay()`, the missing global aborts
+ * the score pass, the score UI never receives data, and
+ * `/lua/ui/game/layouts/score_mini.lua` then reports a circular lazy-evaluation
+ * dependency on every frame -- 60 in the first seconds of a live session, each
+ * throwing a C++ exception out of the Lua binding.
  */
 int moho::cfunc_SessionIsReplaySim(lua_State* const luaContext)
 {
@@ -26569,6 +26578,28 @@ int moho::cfunc_SessionIsReplaySim(lua_State* const luaContext)
   const CWldSession* const session = WLD_GetActiveSession();
   lua_pushboolean(luaContext, (session && session->IsReplay) ? 1 : 0);
   return 1;
+}
+
+/**
+ * Address: 0x012928A5 (the `.exxt` register block that fills
+ * `luadef_SessionIsReplaySim` at 0x012932A8 and binds 0x0128CC35)
+ *
+ * What it does:
+ * Publishes the sim-lane Lua binder definition for global `SessionIsReplay`.
+ * The sim and user Lua lanes have separate global tables and separate init
+ * sets, so the user-lane form above is not visible to `/lua/sim/*`.
+ */
+moho::CScrLuaInitForm* moho::func_SessionIsReplaySim_LuaFuncDef()
+{
+  static CScrLuaBinder binder(
+    SimLuaInitSet(),
+    "SessionIsReplay",
+    &moho::cfunc_SessionIsReplaySim,
+    nullptr,
+    "<global>",
+    kSessionIsReplayUserHelpText
+  );
+  return &binder;
 }
 
 /**
@@ -30043,6 +30074,7 @@ namespace
       (void)::moho::func_SessionIsGameOver_LuaFuncDef();
       (void)::moho::func_SessionGetLocalCommandSource_LuaFuncDef();
       (void)::moho::func_SessionIsReplayUser_LuaFuncDef();
+      (void)::moho::func_SessionIsReplaySim_LuaFuncDef();
       (void)::moho::func_SessionIsBeingRecorded_LuaFuncDef();
       (void)::moho::func_SessionIsMultiplayer_LuaFuncDef();
       (void)::moho::func_SessionIsObservingAllowed_LuaFuncDef();
