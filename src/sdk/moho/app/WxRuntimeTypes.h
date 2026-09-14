@@ -4092,7 +4092,13 @@ public:
   virtual void SetLogicalFunction() {} // slot 38 (+0x98)
   virtual void SetOptimization() {} // slot 39 (+0x9C)
   virtual void GetOptimization() {} // slot 40 (+0xA0)
-  virtual void CalcBoundingBox() {} // slot 41 (+0xA4)
+  // Real wx: `virtual void CalcBoundingBox(wxCoord x, wxCoord y)` (dc.h),
+  // tracks {m_minX,m_minY,m_maxX,m_maxY}/m_isBBoxValid. No confirmed
+  // caller of THIS slot specifically yet (only DoDrawText's real body,
+  // wxDC::DoDrawText, is known to dispatch through it) - shape kept in
+  // sync with the real signature so that call compiles and slots
+  // correctly; body intentionally left a no-op pending that evidence.
+  virtual void CalcBoundingBox(std::int32_t x, std::int32_t y) { (void)x; (void)y; } // slot 41 (+0xA4)
   virtual void DoFloodFill() {} // slot 42 (+0xA8)
   virtual void DoGetPixel() {} // slot 43 (+0xAC)
   virtual void DoDrawPoint() {} // slot 44 (+0xB0)
@@ -4118,7 +4124,9 @@ public:
   virtual void DoCrossHair() {} // slot 52 (+0xD0)
   virtual void DoDrawIcon() {} // slot 53 (+0xD4)
   virtual void DoDrawBitmap() {} // slot 54 (+0xD8)
-  virtual void DoDrawText() {} // slot 55 (+0xDC)
+  // Real override is `wxDC::DoDrawText` (this base stays the shape-only
+  // no-op interface, matching `DoGetTextExtent`/`CalcBoundingBox` above).
+  virtual void DoDrawText(const wxStringRuntime& text, std::int32_t x, std::int32_t y) { (void)text; (void)x; (void)y; } // slot 55 (+0xDC)
   virtual void DoDrawRotatedText() {} // slot 56 (+0xE0)
   virtual void DoBlit() {} // slot 57 (+0xE4)
   // slot 58 (+0xE8)
@@ -4132,7 +4140,30 @@ public:
   virtual void DoGetClippingBox() {} // slot 65 (+0x104)
   virtual void DoGetLogicalOrigin() {} // slot 66 (+0x108)
   virtual void DoGetDeviceOrigin() {} // slot 67 (+0x10C)
-  virtual void DoGetTextExtent() {} // slot 68 (+0x110)
+  // Real wx: `virtual void DoGetTextExtent(const wxString&, wxCoord* x,
+  // wxCoord* y, wxCoord* descent = NULL, wxCoord* externalLeading = NULL,
+  // wxFont* theFont = NULL) const = 0` (dc.h) -- queries GDI font metrics
+  // via GetTextExtentPoint32/GetTextMetrics. No confirmed caller of THIS
+  // slot specifically yet (only DoDrawText's real body dispatches through
+  // it, with the trailing three optional params inlined away as NULL at
+  // that call site) - shape kept in sync with the real signature; body
+  // intentionally left a no-op pending that evidence.
+  virtual void DoGetTextExtent(
+    const wxStringRuntime& text,
+    std::int32_t* outWidth,
+    std::int32_t* outHeight,
+    std::int32_t* outDescent = nullptr,
+    std::int32_t* outExternalLeading = nullptr,
+    const void* font = nullptr
+  ) const
+  {
+    (void)text;
+    if (outWidth != nullptr) { *outWidth = 0; }
+    if (outHeight != nullptr) { *outHeight = 0; }
+    (void)outDescent;
+    (void)outExternalLeading;
+    (void)font;
+  } // slot 68 (+0x110)
   virtual void DoDrawSpline() {} // slot 69 (+0x114)
 
   void* m_refData = nullptr;                 // +0x04, from wxObject
@@ -4264,6 +4295,35 @@ public:
     std::int32_t width,
     std::int32_t height
   ) noexcept override;
+
+  /**
+   * Address: 0x009C9850 (FUN_009C9850)
+   * Mangled: ?DrawAnyText@wxDC@@QAEXABVwxString@@HH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxDC::DrawAnyText(wxDC *this, LPCWSTR *text, int x, int y);
+   *
+   * What it does:
+   * Sets the text foreground/background colours (when valid) and the
+   * background draw mode, calls `TextOutW` at `(x, y)`, then restores the
+   * background colour and forces the background mode back to transparent -
+   * matching `wxDC::DrawAnyText` (dependencies/wxWindows-2.4.2/src/msw/dc.cpp).
+   */
+  void DrawAnyText(const wxStringRuntime& text, std::int32_t x, std::int32_t y) const noexcept;
+
+  /**
+   * Address: 0x009CA790 (FUN_009CA790)
+   * Mangled: ?DoDrawText@wxDC@@MAEXABVwxString@@HH@Z
+   *
+   * IDA signature:
+   * int __thiscall wxDC::DoDrawText(wxDC *this, LPCWSTR *text, int x, int y);
+   *
+   * What it does:
+   * Draws `text` at `(x, y)` via `DrawAnyText`, then extends the bounding
+   * box to cover the drawn glyphs' extent - matching `wxDC::DoDrawText`
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1027-1041) line for line.
+   */
+  void DoDrawText(const wxStringRuntime& text, std::int32_t x, std::int32_t y) override;
 
   /**
    * Address: 0x009CAAA0 (FUN_009CAAA0)
