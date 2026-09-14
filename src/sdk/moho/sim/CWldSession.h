@@ -422,6 +422,17 @@ namespace moho
      * What it does:
      * Counts live weak-set entries in this set that are absent from `other`.
      */
+    /**
+     * Address: 0x00863760 (FUN_00863760, sub_863760)
+     *
+     * Counts live entries of this set that are ALSO present in `other`. See the
+     * definition for the increment-gating evidence; this is the quantity
+     * `SelectionDragger`'s shift-drag arm compares against the dragged set's
+     * size.
+     */
+    [[nodiscard]] std::int32_t CountEntitiesPresentIn(const SSelectionSetUserEntity& other) const;
+
+    /** Recovery-local complement of `CountEntitiesPresentIn` (not a binary body). */
     [[nodiscard]] std::int32_t CountEntitiesMissingFrom(const SSelectionSetUserEntity& other) const;
 
     /**

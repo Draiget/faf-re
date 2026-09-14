@@ -13906,7 +13906,57 @@ namespace moho
    * Address: 0x00863760 (FUN_00863760, sub_863760)
    *
    * What it does:
-   * Counts live weak-set entries in this set that are absent from `other`.
+   * Counts live weak-set entries in this set that are ALSO present in `other`.
+   *
+   * The increment is gated the other way round from the name this body used to
+   * carry. 0x008637A8 calls the `other`-side `Find`, 0x008637AD compares the
+   * returned `mRes` against `other`'s head sentinel, and 0x008637B0 `jz`
+   * SKIPS the `add [count], 1` at 0x008637B2 -- so the entry is counted when
+   * `mRes != other.mHead`, i.e. when it WAS found. Recovered as "absent", it
+   * returned the complement.
+   *
+   * Its only binary caller is `SelectionDragger`'s shift-drag arm
+   * (0x0086393D, inside FUN_00863870), which compares the result against the
+   * dragged set's own size. With the complement the comparison inverted, so a
+   * shift band-box over units that were NOT yet selected took the arm that
+   * keeps only the untouched part of the current selection -- dropping them --
+   * instead of the arm that merges the two sets. That is the "shift box does
+   * not add the units" behaviour.
+   */
+  std::int32_t SSelectionSetUserEntity::CountEntitiesPresentIn(const SSelectionSetUserEntity& other) const
+  {
+    auto* const thisMutable = const_cast<SSelectionSetUserEntity*>(this);
+    auto* const otherMutable = const_cast<SSelectionSetUserEntity*>(&other);
+    if (thisMutable->mHead == nullptr) {
+      return 0;
+    }
+
+    std::int32_t presentCount = 0;
+    SSelectionNodeUserEntity* node = thisMutable->mHead->mLeft;
+    node = SSelectionSetUserEntity::find(thisMutable, node, &node);
+    while (node != thisMutable->mHead) {
+      UserEntity* const selectedEntity = DecodeSelectedUserEntity(node->mEnt);
+      SSelectionSetUserEntity::FindResult foundInOther{};
+      (void)FindSelectionNodeByEntityGuarded(&foundInOther, otherMutable, selectedEntity);
+      if (foundInOther.mRes != otherMutable->mHead) {
+        ++presentCount;
+      }
+
+      SSelectionSetUserEntity::Iterator_inc(&node);
+      node = SSelectionSetUserEntity::find(thisMutable, node, &node);
+    }
+
+    return presentCount;
+  }
+
+  /**
+   * Recovery-local complement of `CountEntitiesPresentIn`: counts live entries
+   * of this set that are absent from `other`.
+   *
+   * This is NOT a separate binary body. `HasSameLiveEntitySet` (0x00868690)
+   * inlines its own comparison walk rather than calling 0x00863760, so this
+   * helper exists only to keep that recovery expressible; the binary's
+   * 0x00863760 is `CountEntitiesPresentIn` above.
    */
   std::int32_t SSelectionSetUserEntity::CountEntitiesMissingFrom(const SSelectionSetUserEntity& other) const
   {
