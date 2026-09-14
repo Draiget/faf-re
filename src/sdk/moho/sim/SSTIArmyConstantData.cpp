@@ -6,6 +6,7 @@
 #include <typeinfo>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "moho/sim/CIntelGrid.h"
@@ -151,18 +152,35 @@ namespace moho
     archive->ReadBool(&isCivilian);
     mIsCivilian = static_cast<std::uint8_t>(isCivilian ? 1 : 0);
 
-    // gpg::ReadPointerShared_CIntelGrid takes a `boost::SharedPtrRaw<CIntelGrid>&`,
-    // not a `boost::shared_ptr<CIntelGrid>*`. The conversion between the two
-    // raw-storage layouts is pending a wider boost::shared_ptr / SharedPtrRaw
-    // adapter recovery pass — re-enable the eight reads once that lands.
-    (void)mVisionReconGrid;
-    (void)mWaterReconGrid;
-    (void)mRadarReconGrid;
-    (void)mSonarReconGrid;
-    (void)mOmniReconGrid;
-    (void)mRciReconGrid;
-    (void)mSciReconGrid;
-    (void)mVciReconGrid;
+    // Eight tracked-shared grid pointers, in the same order MemberSerialize
+    // writes them. The binary gives each read its own zeroed owner ref rather
+    // than sharing one.
+    //
+    // `ReadPointerShared_CIntelGrid` takes a `boost::SharedPtrRaw<CIntelGrid>&`
+    // and the lanes are declared as `boost::shared_ptr<CIntelGrid>`; the two
+    // are the same (px, pi) pair, which `SharedPtrRaw::reset_from_owner`
+    // already static_asserts, so the view is taken here rather than at each of
+    // the eight call sites.
+    const auto readSharedGridPointer = [archive](boost::shared_ptr<CIntelGrid>& gridPointer) {
+      static_assert(
+        sizeof(boost::shared_ptr<CIntelGrid>) == sizeof(boost::SharedPtrRaw<CIntelGrid>),
+        "boost::shared_ptr<CIntelGrid> must have the same (px, pi) layout as SharedPtrRaw<CIntelGrid>"
+      );
+
+      const gpg::RRef ownerRef{};
+      gpg::ReadPointerShared_CIntelGrid(
+        reinterpret_cast<boost::SharedPtrRaw<CIntelGrid>&>(gridPointer), archive, ownerRef
+      );
+    };
+
+    readSharedGridPointer(mVisionReconGrid);
+    readSharedGridPointer(mWaterReconGrid);
+    readSharedGridPointer(mRadarReconGrid);
+    readSharedGridPointer(mSonarReconGrid);
+    readSharedGridPointer(mOmniReconGrid);
+    readSharedGridPointer(mRciReconGrid);
+    readSharedGridPointer(mSciReconGrid);
+    readSharedGridPointer(mVciReconGrid);
   }
 
   /**
