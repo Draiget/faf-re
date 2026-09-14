@@ -310,8 +310,16 @@ namespace moho
         if (mLoadedUnits.Empty()) {
           detachedUnits = mUnit->AiTransport->TransportDetachAllUnits(false);
         } else {
-          for (Entity* const entry : mLoadedUnits.mVec) {
-            Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(entry);
+          // The shipped loop loads the cursor once and re-reads the set's end
+          // pointer out of the task member on every iteration
+          // (`do { ... ++Mysize; } while (Mysize != this->v13)` in
+          // FUN_00626390). That matters because `TransportDetachUnit` runs the
+          // `OnTransportDetach` script, and a script that destroys or re-issues
+          // orders to the unit it just unloaded can shorten this very set. A
+          // cached end then steps past the live range into the slot the removal
+          // vacated.
+          for (Entity* const* entry = mLoadedUnits.mVec.begin(); entry != mLoadedUnits.mVec.end(); ++entry) {
+            Unit* const candidate = SEntitySetTemplateUnit::UnitFromEntry(*entry);
             if (!IsUsableDetachedUnit(candidate)) {
               continue;
             }
