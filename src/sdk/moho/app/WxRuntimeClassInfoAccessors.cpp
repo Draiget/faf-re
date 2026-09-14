@@ -1,3 +1,5 @@
+#include "WxCoreGdiRuntime.h"
+
 namespace
 {
   void* gWxFontListClassInfoTable[1] = {nullptr};
@@ -754,3 +756,99 @@ namespace
     return gWxConnectionBaseClassInfoTable;
   }
 } // namespace
+
+/**
+ * Address: 0x009D2570 (FUN_009D2570)
+ * Mangled: ??0wxBrushRefData@@QAE@ABVwxColour@@H@Z
+ *
+ * What it does:
+ * Seeds a one-owner ref count, stores the requested style and colour, and
+ * leaves the stipple bitmap ("null", default-constructed) and native handle
+ * empty - matching the binary body field for field.
+ */
+wxBrushRefDataRuntimeObject::wxBrushRefDataRuntimeObject(
+  const wxColourRuntimeObject& colour,
+  const std::int32_t style
+) noexcept
+  : mStyle(style)
+  , mColour(colour)
+{}
+
+/**
+ * Address: 0x009C8760 (FUN_009C8760)
+ * Mangled: ??0wxBrush@@QAE@@Z
+ *
+ * What it does:
+ * Default-constructs an empty ("null") brush: no ref-data, not visible.
+ */
+wxBrushRuntimeObject::wxBrushRuntimeObject() noexcept = default;
+
+/**
+ * Address: 0x009D2860 (FUN_009D2860)
+ * Mangled: ??0wxBrush@@QAE@ABV0@@Z
+ *
+ * What it does:
+ * Shares the source brush's ref-data (`wxObject::Ref`): points at the same
+ * payload and bumps its ref count, matching the binary's
+ * `wxObject::Ref(this, a2)` tail call.
+ */
+wxBrushRuntimeObject::wxBrushRuntimeObject(const wxBrushRuntimeObject& other) noexcept
+{
+  mRefData = other.mRefData;
+  if (auto* const refData = static_cast<wxBrushRefDataRuntimeObject*>(mRefData)) {
+    refData->AddRef();
+  }
+}
+
+/**
+ * Address: 0x009D2880 (FUN_009D2880)
+ * Mangled: ??0wxBrush@@QAE@ABVwxColour@@H@Z
+ *
+ * What it does:
+ * Allocates a fresh, single-owner `wxBrushRefData` for the given
+ * colour/style pair, matching `operator new(0x2Cu)` plus the ref-data
+ * constructor in the binary.
+ */
+wxBrushRuntimeObject::wxBrushRuntimeObject(
+  const wxColourRuntimeObject& colour,
+  const std::int32_t style
+)
+{
+  mRefData = new wxBrushRefDataRuntimeObject(colour, style);
+}
+
+/**
+ * Address: 0x009D2910 (FUN_009D2910)
+ * Mangled: ??1wxBrush@@QAE@XZ
+ *
+ * What it does:
+ * Drops this instance's share of the ref-data (`wxEvent::UnRef`), freeing
+ * the shared payload once nothing references it any more.
+ */
+wxBrushRuntimeObject::~wxBrushRuntimeObject()
+{
+  if (auto* const refData = static_cast<wxBrushRefDataRuntimeObject*>(mRefData)) {
+    if (refData->ReleaseRef()) {
+      delete refData;
+    }
+    mRefData = nullptr;
+  }
+}
+
+/**
+ * Address: 0x009EB2A0 (FUN_009EB2A0)
+ * Mangled: ??0wxPen@@QAE@@Z
+ *
+ * What it does:
+ * Default-constructs an empty ("null") pen: no ref-data, not visible.
+ */
+wxPenRuntimeObject::wxPenRuntimeObject() noexcept = default;
+
+/**
+ * Address: 0x009EB2E0 (FUN_009EB2E0)
+ * Mangled: ??1wxPen@@QAE@XZ
+ *
+ * What it does:
+ * Releases ref-data ownership through the shared unref lane.
+ */
+wxPenRuntimeObject::~wxPenRuntimeObject() = default;

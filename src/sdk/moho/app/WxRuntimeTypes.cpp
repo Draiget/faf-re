@@ -14851,14 +14851,27 @@ namespace
    * field type so a splash object can hold one by value and share it
    * through the already-recovered `wxObject::Ref` primitive
    * (`wxObjectRefRuntime` above).
+   *
+   * `depth`/`handle`/`numColors`/`palette` extend the original width/height
+   * pair to the real `wxBitmapRefData` shape (`wx/msw/bitmap.h`, cross-checked
+   * against `FUN_009AC230`'s own decompile: it reaches this bitmap's embedded
+   * palette as `&m_refData[3].m_count` under IDA's best-guess typing, which
+   * is `m_refData + 3*sizeof(wxObjectRefData) + offsetof(m_count)` =
+   * `m_refData + 0x1C` - the same address this struct now names `palette`).
    */
   struct WxBitmapRefDataRuntimeView
   {
-    void* vtable = nullptr;    // +0x00
-    std::int32_t refCount = 0; // +0x04
-    std::int32_t width = 0;    // +0x08
-    std::int32_t height = 0;   // +0x0C
+    void* vtable = nullptr;      // +0x00
+    std::int32_t refCount = 0;   // +0x04
+    std::int32_t width = 0;      // +0x08
+    std::int32_t height = 0;     // +0x0C
+    std::int32_t depth = 0;      // +0x10
+    void* handle = nullptr;      // +0x14
+    std::int32_t numColors = 0;  // +0x18
+    wxPaletteRuntime palette{};  // +0x1C
   };
+  static_assert(offsetof(WxBitmapRefDataRuntimeView, palette) == 0x1C, "WxBitmapRefDataRuntimeView::palette offset must be 0x1C");
+  static_assert(sizeof(WxBitmapRefDataRuntimeView) == 0x28, "WxBitmapRefDataRuntimeView size must be 0x28");
 
   struct WxBitmapValueRuntimeView
   {
@@ -14920,15 +14933,11 @@ namespace
    * `m_bitmap = bitmap` assignment).
    *
    * A low-colour-depth branch follows in the real binary: on a <16bpp
-   * display, if the source bitmap carries its own palette, the window
-   * adopts it (`wxWindowBase::SetPalette`, 0x009651C0). `wxDisplayDepth()`
-   * is still called here to match the binary's evidenced call, but the
-   * adopt step is unreachable in this reconstruction:
-   * `WxBitmapValueRuntimeView` does not model a bitmap's embedded palette
-   * sub-object (`wxBitmapRefData`'s `wxPalette` member), so there is never a
-   * palette to adopt regardless of depth. `wxWindowBase::SetPalette` is left
-   * `blocked` for the same reason - see the recovery report for
-   * FUN_009AC230/FUN_009AC610.
+   * display, and only when the source bitmap has ref-data at all, the
+   * window adopts the source bitmap's embedded palette as its own
+   * (`wxWindowBase::SetPalette`, 0x009651C0) - unconditionally on whether
+   * that palette is itself populated, matching the binary (it never tests
+   * the palette's own `Ok()`, only the bitmap's).
    */
   class wxSplashScreenWindowRuntime final : public wxWindowMswRuntime
   {
@@ -14953,11 +14962,11 @@ namespace
         );
       }
 
-      // See the class comment: the binary's follow-up SetPalette adoption
-      // never has anything to adopt in this reconstruction, so it is
-      // omitted; the depth query itself is kept for parity with the
-      // evidenced call.
-      (void)wxDisplayDepth();
+      // See the class comment: adopt the source bitmap's embedded palette
+      // when the desktop is below 16bpp, exactly as the binary does.
+      if (bitmap.refData != nullptr && wxDisplayDepth() < 16) {
+        SetPalette(bitmap.refData->palette);
+      }
     }
 
     std::uint8_t mUnknown004To124[0x120]{};
@@ -41595,6 +41604,31 @@ wxColourRuntime wxWindowBase::GetBackgroundColour() const
 }
 
 /**
+ * Address: 0x009651C0 (FUN_009651C0)
+ * Mangled: ?SetPalette@wxWindowBase@@UAEXABVwxPalette@@@Z
+ *
+ * What it does:
+ * Adopts `palette` as this window's own - sharing its ref-data rather than
+ * copying it, matching the binary's `wxObject::Ref` (only when it is not
+ * already the one this window holds) - and realizes it immediately through
+ * a temporary window device context.
+ */
+void wxWindowBase::SetPalette(const wxPaletteRuntime& palette)
+{
+  WxWindowBaseRuntimeState& state = EnsureWxWindowBaseRuntimeState(this);
+  state.hasCustomPalette = 1;
+  if (state.palette.mRefData != palette.mRefData) {
+    wxObjectRefRuntime(
+      reinterpret_cast<WxObjectRuntimeView*>(&state.palette),
+      reinterpret_cast<const WxObjectRuntimeView*>(&palette)
+    );
+  }
+
+  wxWindowDC dc(this);
+  dc.SetPalette(&palette);
+}
+
+/**
  * Address: 0x00963540 (FUN_00963540)
  * Mangled: ?GetClientAreaOrigin@wxWindowBase@@UBE?AVwxPoint@@XZ
  *
@@ -58183,6 +58217,59 @@ wxDCBase* wxDeleteDCBaseWithFlagRuntime(
   return dcBaseRuntime;
 }
 
+namespace
+{
+  /**
+   * Address: 0x009C7D70 (FUN_009C7D70)
+   * Mangled: ?wxColourDisplay@@YAHXZ
+   *
+   * What it does:
+   * Reports whether the desktop is a colour display, probing
+   * `GetDeviceCaps(BITSPIXEL)` once and caching the answer for the life of
+   * the process (matches the real wx `wxColourDisplay::s_isColour` static).
+   */
+  BOOL wxColourDisplayRuntime() noexcept
+  {
+    static int s_isColour = -1;
+    if (s_isColour == -1) {
+      HDC const screenDc = ::GetDC(nullptr);
+      int const bitsPerPixel = ::GetDeviceCaps(screenDc, BITSPIXEL);
+      s_isColour = (bitsPerPixel == -1 || bitsPerPixel > 2) ? 1 : 0;
+      (void)::ReleaseDC(nullptr, screenDc);
+    }
+    return s_isColour != 0;
+  }
+
+  // Stock colour/brush constants `wxDCBase::wxDCBase` copy-constructs its
+  // text colours and background brush from (real wx: `wxBLACK`, `wxWHITE`,
+  // `wxTRANSPARENT_BRUSH`). Values only - these stock objects are never
+  // shared/ref-counted with anything else in this reconstruction, so a
+  // colour value plus a single-owner brush are sufficient.
+  const wxColourRuntimeObject gStockBlackColour(0u, 0u, 0u);
+  const wxColourRuntimeObject gStockWhiteColour(0xFFu, 0xFFu, 0xFFu);
+  const wxBrushRuntimeObject gStockTransparentBrush(gStockBlackColour, wxTRANSPARENT);
+} // namespace
+
+/**
+ * Address: 0x009CA340 (FUN_009CA340)
+ * Mangled: ??0wxDCBase@@QAE@@Z
+ *
+ * What it does:
+ * Initializes the drawing-state lanes every device context carries: unit
+ * scale/origin, an empty clip/bounding box, `wxCOPY` as the logical
+ * function, a transparent background mode, `wxMM_TEXT` mapping, a default
+ * pen/brush, a transparent background brush, black-on-white text colours, a
+ * default font, and no custom palette. `m_flags` folds in whether the
+ * desktop is a colour display alongside the "usable" bit.
+ */
+wxDCBase::wxDCBase()
+  : m_backgroundBrush(gStockTransparentBrush)
+  , m_textForegroundColour(gStockBlackColour)
+  , m_textBackgroundColour(gStockWhiteColour)
+{
+  m_flags = static_cast<std::uint8_t>((m_flags & 0xE2u) | (wxColourDisplayRuntime() ? 1u : 0u) | 2u);
+}
+
 /**
  * Address: 0x009CA490 (FUN_009CA490)
  * Mangled: ??0wxDC@@QAE@@Z
@@ -58191,6 +58278,18 @@ wxDCBase* wxDeleteDCBaseWithFlagRuntime(
  * Initializes one device-context lane with cleared selected object and native
  * handle ownership state.
  */
+wxDC::wxDC()
+  : wxDCBase()
+{
+  m_bOwnsDC &= static_cast<std::uint8_t>(~1u);
+  m_canvas = nullptr;
+  m_oldBitmap = nullptr;
+  m_oldPen = nullptr;
+  m_oldBrush = nullptr;
+  m_oldFont = nullptr;
+  m_oldPalette = nullptr;
+  m_hDC = nullptr;
+}
 
 /**
  * Address: 0x009CB5D0 (FUN_009CB5D0)
@@ -58208,6 +58307,52 @@ wxDC* wxDeleteDCWithFlagRuntime(
     ::operator delete(dcRuntime);
   }
   return dcRuntime;
+}
+
+/**
+ * Address: 0x0097E100 (FUN_0097E100)
+ * Mangled: ??0wxWindowDC@@QAE@PAVwxWindow@@@Z
+ *
+ * What it does:
+ * When given a window, takes its native device context and runs `InitDC`;
+ * a null window leaves the DC exactly as `wxDC::wxDC` left it.
+ */
+wxWindowDC::wxWindowDC(wxWindowBase* const window) noexcept
+  : wxDC()
+{
+  if (window == nullptr) {
+    return;
+  }
+
+  m_canvas = window;
+  m_hDC = ::GetWindowDC(GetWxWindowNativeHandle(window));
+  InitDC();
+}
+
+/**
+ * Address: 0x0097DC50 (FUN_0097DC50)
+ * Mangled: ?InitDC@wxWindowDC@@AAEXXZ
+ *
+ * What it does:
+ * Sets transparent background mode, then selects the window's background
+ * colour as a solid brush through the real wx vtable's `SetBackground` for
+ * the duration of the call, and finally lets the base class adopt any
+ * inherited custom palette.
+ */
+void wxWindowDC::InitDC() noexcept
+{
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+  (void)::SetBkMode(deviceContext, TRANSPARENT);
+
+  const wxColourRuntime background =
+    static_cast<wxWindowBase*>(m_canvas)->GetBackgroundColour();
+  {
+    const wxColourRuntimeObject backgroundColour(background.Red(), background.Green(), background.Blue());
+    wxBrushRuntimeObject backgroundBrush(backgroundColour, wxSOLID);
+    SetBackground(&backgroundBrush);
+  }
+
+  InitializePalette();
 }
 
 namespace
