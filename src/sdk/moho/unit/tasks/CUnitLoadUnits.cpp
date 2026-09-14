@@ -225,13 +225,34 @@ namespace
     (void)unit->RunScript(scriptName);
   }
 
+  /**
+   * 0x00625215-0x0062526A, the candidate filter inside
+   * `CUnitLoadUnits::DoTask`. Exactly five tests, in this order:
+   * `IsDead` (vtable +0x28), `DestroyQueued` (+0x2C), `IsUnitState(0x0E)`
+   * = `UNITSTATE_Attached`, `IsUnitState(0x07)` =
+   * `UNITSTATE_WaitingForTransport`, and finally the weak slot at
+   * `Unit+0x4C8` read inline as `test eax,eax / add eax,-4 / jnz skip`,
+   * i.e. accepted only when it resolves to null.
+   *
+   * Two things that were here before are not in the binary. `IsBeingBuilt`
+   * (+0x34) is called by the `TASKSTATE_Preparing` loop at 0x00625A65, not
+   * by this one, so screening it here is an extra way for a candidate to be
+   * dropped that the engine never had. And `Unit+0x4C8` is
+   * `AssignedTransportRef` -- the slot `GetFerryUnit` reads -- not
+   * `TransportedByRef` at +0x4C0 that `GetTransportedBy` reads; both
+   * accessors share the same `value - 4` decode (0x005F0980 / 0x005E3C30),
+   * which is where the `add eax,-4` comes from. Units already inside a
+   * transport are excluded by the `UNITSTATE_Attached` test above, so this
+   * last test is about units already committed to a ferry, and reading the
+   * neighbouring slot let an unrelated transport claim them.
+   */
   [[nodiscard]] bool IsEligiblePickupCandidate(const moho::Unit* const unit) noexcept
   {
     if (!IsUsableUnitSlot(unit)) {
       return false;
     }
 
-    if (unit->IsDead() || unit->IsBeingBuilt() || unit->DestroyQueued()) {
+    if (unit->IsDead() || unit->DestroyQueued()) {
       return false;
     }
 
@@ -239,7 +260,7 @@ namespace
       return false;
     }
 
-    return unit->GetTransportedBy() == nullptr;
+    return unit->GetFerryUnit() == nullptr;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
