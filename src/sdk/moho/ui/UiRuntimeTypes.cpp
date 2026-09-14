@@ -24770,7 +24770,6 @@ moho::CMauiBitmap::CMauiBitmap(LuaPlus::LuaObject* const luaObject, CMauiControl
   : CMauiControl(luaObject, parent, "Bitmap")
 {
   CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  new (&bitmapView->mTextureBatches) msvc8::vector<boost::shared_ptr<CD3DBatchTexture>>();
 
   LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
   new (&bitmapView->mBitmapWidthLV) CScriptLazyVar_float(activeState);
@@ -24791,7 +24790,16 @@ moho::CMauiBitmap::CMauiBitmap(LuaPlus::LuaObject* const luaObject, CMauiControl
   for (std::uint8_t& lane : bitmapView->mUnknown17CTo17F) {
     lane = 0;
   }
-  new (&bitmapView->mFrames) msvc8::vector<std::int32_t>();
+  // `mTextureBatches` and `mFrames` are constructed by the compiler-emitted
+  // member initialisation before this body runs, which is what the binary
+  // does and what the source never spelled out. Placement-newing `mFrames`
+  // here spelled it `msvc8::vector<std::int32_t>` - the DEFAULT second
+  // template argument, i.e. the 0x10 proxied form - over a member declared
+  // as the 0x0C proxy-less `msvc8::vector<std::int32_t, false>` at +0x180.
+  // The object ends at 0x18C (`operator new(18Ch)` at 0x00780E2B; the ctor
+  // at 0x0077F950 writes its last three dwords to 0x180/0x184/0x188), so
+  // that construction wrote a fourth word at 0x18C..0x18F - four bytes past
+  // the end of every CMauiBitmap block ever allocated.
 
   LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
   controlLuaObject.SetObject("BitmapWidth", &AsLazyVarObject(bitmapView->mBitmapWidthLV));
