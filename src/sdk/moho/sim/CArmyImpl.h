@@ -309,14 +309,14 @@ namespace moho
     msvc8::string PlayerName;                            // 0x0028
     std::uint8_t IsCivilian;                             // 0x0044
     char pad_0045[3];                                    // 0x0045
-    boost::shared_ptr<CIntelGrid> ExploredReconGrid;     // 0x0048
-    boost::shared_ptr<CIntelGrid> FogReconGrid;          // 0x0050
-    boost::shared_ptr<CIntelGrid> WaterReconGrid;        // 0x0058
-    boost::shared_ptr<CIntelGrid> RadarReconGrid;        // 0x0060
-    boost::shared_ptr<CIntelGrid> SonarReconGrid;        // 0x0068
-    boost::shared_ptr<CIntelGrid> OmniReconGrid;         // 0x0070
-    boost::shared_ptr<CIntelGrid> RciReconGrid;          // 0x0078
-    boost::shared_ptr<CIntelGrid> SciReconGrid;          // 0x0080
+    boost::shared_ptr<CIntelGrid> VisionReconGrid;       // 0x0048
+    boost::shared_ptr<CIntelGrid> WaterReconGrid;        // 0x0050
+    boost::shared_ptr<CIntelGrid> RadarReconGrid;        // 0x0058
+    boost::shared_ptr<CIntelGrid> SonarReconGrid;        // 0x0060
+    boost::shared_ptr<CIntelGrid> OmniReconGrid;         // 0x0068
+    boost::shared_ptr<CIntelGrid> RciReconGrid;         // 0x0070
+    boost::shared_ptr<CIntelGrid> SciReconGrid;          // 0x0078
+    boost::shared_ptr<CIntelGrid> VciReconGrid;          // 0x0080
     float EnergyCurrent;                                 // 0x0088
     float MassCurrent;                                   // 0x008C
     float IncomeEnergy10x;                               // 0x0090

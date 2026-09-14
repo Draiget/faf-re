@@ -82,14 +82,14 @@ namespace moho
     msvc8::string mPlayerName;                        // +0x20
     std::uint8_t mIsCivilian;                         // +0x3C
     std::uint8_t mPad3D[3];                           // +0x3D
-    boost::shared_ptr<CIntelGrid> mExploredReconGrid; // +0x40
-    boost::shared_ptr<CIntelGrid> mFogReconGrid;      // +0x48
-    boost::shared_ptr<CIntelGrid> mWaterReconGrid;    // +0x50
-    boost::shared_ptr<CIntelGrid> mRadarReconGrid;    // +0x58
-    boost::shared_ptr<CIntelGrid> mSonarReconGrid;    // +0x60
-    boost::shared_ptr<CIntelGrid> mOmniReconGrid;     // +0x68
-    boost::shared_ptr<CIntelGrid> mRciReconGrid;      // +0x70
-    boost::shared_ptr<CIntelGrid> mSciReconGrid;      // +0x78
+    boost::shared_ptr<CIntelGrid> mVisionReconGrid;  // +0x40
+    boost::shared_ptr<CIntelGrid> mWaterReconGrid;   // +0x48
+    boost::shared_ptr<CIntelGrid> mRadarReconGrid;   // +0x50
+    boost::shared_ptr<CIntelGrid> mSonarReconGrid;   // +0x58
+    boost::shared_ptr<CIntelGrid> mOmniReconGrid;    // +0x60
+    boost::shared_ptr<CIntelGrid> mRciReconGrid;     // +0x68
+    boost::shared_ptr<CIntelGrid> mSciReconGrid;     // +0x70
+    boost::shared_ptr<CIntelGrid> mVciReconGrid;     // +0x78
   };
 
   /**
@@ -114,11 +114,11 @@ namespace moho
     offsetof(SSTIArmyConstantData, mIsCivilian) == 0x3C, "SSTIArmyConstantData::mIsCivilian offset must be 0x3C"
   );
   static_assert(
-    offsetof(SSTIArmyConstantData, mExploredReconGrid) == 0x40,
-    "SSTIArmyConstantData::mExploredReconGrid offset must be 0x40"
+    offsetof(SSTIArmyConstantData, mVisionReconGrid) == 0x40,
+    "SSTIArmyConstantData::mVisionReconGrid offset must be 0x40"
   );
   static_assert(
-    offsetof(SSTIArmyConstantData, mSciReconGrid) == 0x78, "SSTIArmyConstantData::mSciReconGrid offset must be 0x78"
+    offsetof(SSTIArmyConstantData, mVciReconGrid) == 0x78, "SSTIArmyConstantData::mVciReconGrid offset must be 0x78"
   );
   static_assert(sizeof(SSTIArmyConstantData) == 0x80, "SSTIArmyConstantData size must be 0x80");
 

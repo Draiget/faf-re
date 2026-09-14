@@ -51,14 +51,14 @@ namespace moho
     , mPlayerName()
     , mIsCivilian(0)
     , mPad3D{0, 0, 0}
-    , mExploredReconGrid()
-    , mFogReconGrid()
+    , mVisionReconGrid()
     , mWaterReconGrid()
     , mRadarReconGrid()
     , mSonarReconGrid()
     , mOmniReconGrid()
     , mRciReconGrid()
     , mSciReconGrid()
+    , mVciReconGrid()
   {}
 
   /**
@@ -76,14 +76,14 @@ namespace moho
     , mPlayerName(other.mPlayerName)
     , mIsCivilian(other.mIsCivilian)
     , mPad3D{other.mPad3D[0], other.mPad3D[1], other.mPad3D[2]}
-    , mExploredReconGrid(other.mExploredReconGrid)
-    , mFogReconGrid(other.mFogReconGrid)
+    , mVisionReconGrid(other.mVisionReconGrid)
     , mWaterReconGrid(other.mWaterReconGrid)
     , mRadarReconGrid(other.mRadarReconGrid)
     , mSonarReconGrid(other.mSonarReconGrid)
     , mOmniReconGrid(other.mOmniReconGrid)
     , mRciReconGrid(other.mRciReconGrid)
     , mSciReconGrid(other.mSciReconGrid)
+    , mVciReconGrid(other.mVciReconGrid)
   {}
 
   /**
@@ -120,14 +120,14 @@ namespace moho
       gpg::WriteRawPointer(archive, gridRef, gpg::TrackedPointerState::Shared, ownerRef);
     };
 
-    writeSharedGridPointer(mExploredReconGrid);
-    writeSharedGridPointer(mFogReconGrid);
+    writeSharedGridPointer(mVisionReconGrid);
     writeSharedGridPointer(mWaterReconGrid);
     writeSharedGridPointer(mRadarReconGrid);
     writeSharedGridPointer(mSonarReconGrid);
     writeSharedGridPointer(mOmniReconGrid);
     writeSharedGridPointer(mRciReconGrid);
     writeSharedGridPointer(mSciReconGrid);
+    writeSharedGridPointer(mVciReconGrid);
   }
 
   /**
@@ -155,14 +155,14 @@ namespace moho
     // not a `boost::shared_ptr<CIntelGrid>*`. The conversion between the two
     // raw-storage layouts is pending a wider boost::shared_ptr / SharedPtrRaw
     // adapter recovery pass — re-enable the eight reads once that lands.
-    (void)mExploredReconGrid;
-    (void)mFogReconGrid;
+    (void)mVisionReconGrid;
     (void)mWaterReconGrid;
     (void)mRadarReconGrid;
     (void)mSonarReconGrid;
     (void)mOmniReconGrid;
     (void)mRciReconGrid;
     (void)mSciReconGrid;
+    (void)mVciReconGrid;
   }
 
   /**
