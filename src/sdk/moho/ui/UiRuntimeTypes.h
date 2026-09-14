@@ -2926,7 +2926,51 @@ namespace moho
      * flag, and animation playback state.
      */
     void Dump() override;
+
+    // ---------------------------------------------------------------------
+    // Bitmap state, +0x11C..+0x18C.
+    //
+    // These were missing entirely: the class declared nothing but methods, so
+    // `sizeof(CMauiBitmap)` was whatever `CMauiControl` ends at (0x11C) while
+    // `cfunc_InternalCreateBitmapL` allocates `operator new(0x18C)` at
+    // 0x00780E2B (`push 18Ch`) and the constructor at 0x0077F950 writes as far
+    // out as `[esi+188h]`. Every access through `CMauiBitmapRuntimeView` --
+    // which describes exactly this run -- therefore wrote past the end of the
+    // heap block, which the debug CRT catches on free as
+    // "HEAP CORRUPTION DETECTED: after Normal block" inside
+    // `CMauiBitmap::~CMauiBitmap` via `CMauiFrame::PurgeDeleted`.
+    //
+    // `mFrames` is the proxy-less 0x0C form: the constructor zeroes exactly
+    // three consecutive dwords at 0x180/0x184/0x188 (not 0x184/0x188/0x18C),
+    // so there is no debug-proxy word ahead of the `{first, last, end}` triple
+    // -- which is also what makes the object end at 0x18C rather than 0x190.
+    // ---------------------------------------------------------------------
+    msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
+    CScriptLazyVar_float mBitmapWidthLV{};                              // +0x12C
+    CScriptLazyVar_float mBitmapHeightLV{};                             // +0x140
+    float mU0 = 0.0f;                                                   // +0x154
+    float mV0 = 0.0f;                                                   // +0x158
+    float mU1 = 0.0f;                                                   // +0x15C
+    float mV1 = 0.0f;                                                   // +0x160
+    void* mHitMask = nullptr;                                           // +0x164
+    bool mUseAlphaHitTest = false;                                      // +0x168
+    bool mIsTiled = false;                                              // +0x169
+    std::uint8_t mUnknown16ATo16B[0x2]{};
+    float mFrameDurationSeconds = 0.0f;                                 // +0x16C
+    bool mIsPlaying = false;                                            // +0x170
+    bool mDoLoop = false;                                               // +0x171
+    std::uint8_t mUnknown172To173[0x2]{};
+    std::int32_t mCurrentFrame = 0;                                     // +0x174
+    float mCurrentFrameTimeSeconds = 0.0f;                              // +0x178
+    std::uint8_t mUnknown17CTo17F[0x4]{};
+    msvc8::vector<std::int32_t, false> mFrames;                         // +0x180
   };
+
+  static_assert(sizeof(CMauiBitmap) == 0x18C, "CMauiBitmap size must be 0x18C");
+  static_assert(offsetof(CMauiBitmap, mTextureBatches) == 0x11C, "CMauiBitmap::mTextureBatches offset must be 0x11C");
+  static_assert(offsetof(CMauiBitmap, mBitmapWidthLV) == 0x12C, "CMauiBitmap::mBitmapWidthLV offset must be 0x12C");
+  static_assert(offsetof(CMauiBitmap, mHitMask) == 0x164, "CMauiBitmap::mHitMask offset must be 0x164");
+  static_assert(offsetof(CMauiBitmap, mFrames) == 0x180, "CMauiBitmap::mFrames offset must be 0x180");
 
   class CMauiGroup : public CMauiControl
   {
@@ -4599,7 +4643,13 @@ namespace moho
     std::int32_t mCurrentFrame = 0; // +0x174
     float mCurrentFrameTimeSeconds = 0.0f; // +0x178
     std::uint8_t mUnknown17CTo17F[0x4]{};
-    msvc8::vector<std::int32_t> mFrames; // +0x180
+    // Proxy-less 0x0C form, matching `CMauiBitmap::mFrames`: the constructor at
+    // 0x0077F950 zeroes three consecutive dwords at 0x180/0x184/0x188, so there
+    // is no debug-proxy word ahead of the triple. Spelling it as the default
+    // 0x10 vector made this view 0x190 long over an object the binary allocates
+    // as 0x18C (`push 18Ch` at 0x00780E2B), so touching the end pointer ran four
+    // bytes past the block.
+    msvc8::vector<std::int32_t, false> mFrames; // +0x180
 
     [[nodiscard]] static CMauiBitmapRuntimeView* FromBitmap(CMauiBitmap* bitmap) noexcept
     {
