@@ -1477,7 +1477,17 @@ namespace moho
     ReplaceDeleteOwnedPointer(InfluenceMap, new CInfluenceMap(ResolveInfluenceMapGridSize(mapMaxExtent), sim, this));
     ReplaceDeletingDtorOwnedPointer<2>(AiBrain, new CAiBrain(this));
 
-    const char* const fogOfWar = GetLuaStringField(scenarioInfoOptions, "FogOfWar", "none");
+    // 0x006FEC7C reads the option and hands `GetString()` straight to an inline
+    // strlen -- there is no default, and the `compare(0, size, "none", 4)` at
+    // 0x006FECF6 is what decides fog, so anything that is not literally "none"
+    // (an absent option included, which compares as the empty string) leaves
+    // fog on. Defaulting to "none" here disabled fog for every army whenever
+    // the scenario carried no FogOfWar option: `CAiReconDBImpl` then skipped
+    // its vision and water grids entirely, `GetNewReconFor` took the
+    // null-vision-grid arm and answered RECON_LOSNow for every probe, and the
+    // whole map -- enemy meshes, blips and build effects alike -- was visible
+    // with no intel at all.
+    const char* const fogOfWar = GetLuaStringField(scenarioInfoOptions, "FogOfWar");
     ReplaceDeletingDtorOwnedPointer<0>(AiReconDb, CAiReconDBImpl::Create(this, std::strcmp(fogOfWar, "none") != 0));
     CopyReconGridsFromDatabase(*this);
 
