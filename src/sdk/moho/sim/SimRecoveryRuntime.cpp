@@ -8497,7 +8497,7 @@ int ReturnFirstStdcallArgumentRuntime(
  * Calls the optional release slot (`+0x04`) with lane `1` and reports success.
  */
 char ReleaseOptionalObjectAndReturnTrueRuntime(
-  void* const object
+  void* object
 )
 {
   if (object != nullptr) {
@@ -9699,7 +9699,7 @@ int InvokeSlot08RuntimeB(Slot08OwnerRuntime* const owner)
  * for the first payload whose id field (`+0x24`) equals `hConvAsId`, and
  * release just that node.
  */
-std::uint8_t wxDdeTryUnmapServerConnectionRuntime(void* const server, const std::int32_t hConvAsId) noexcept
+std::uint8_t wxDdeTryUnmapServerConnectionRuntime(void* server, const std::int32_t hConvAsId) noexcept
 {
   auto* const owner = reinterpret_cast<ManagedNodeListsOwnerRuntime*>(server);
   return owner != nullptr ? RemoveManagedNodeByIdRuntime(owner->listAt20, hConvAsId) : 0u;
@@ -9713,7 +9713,7 @@ std::uint8_t wxDdeTryUnmapServerConnectionRuntime(void* const server, const std:
  * for the node chain at `owner+0x1C` (wxDDEClient's layout is one field
  * shorter than wxDDEServer's: no `m_serviceName`).
  */
-std::uint8_t wxDdeTryUnmapClientConnectionRuntime(void* const client, const std::int32_t hConvAsId) noexcept
+std::uint8_t wxDdeTryUnmapClientConnectionRuntime(void* client, const std::int32_t hConvAsId) noexcept
 {
   auto* const owner = reinterpret_cast<ManagedNodeListsOwnerRuntime*>(client);
   return owner != nullptr ? RemoveManagedNodeByIdRuntime(owner->listAt1C, hConvAsId) : 0u;

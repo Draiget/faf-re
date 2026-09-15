@@ -55367,7 +55367,7 @@ LONG wxGetTextMetricAverageCharWidthRuntime(
  * switches the host DC to transparent text background mode.
  */
 void wxApplyPendingDcTextColorsRuntime(
-  void* const colorStateRuntime
+  void* colorStateRuntime
 ) noexcept
 {
   struct WxDcColorHostRuntimeView
