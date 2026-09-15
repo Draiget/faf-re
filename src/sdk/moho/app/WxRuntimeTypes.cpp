@@ -60792,6 +60792,47 @@ void* wxPngHandlerRuntime::GetClassInfo() const
 wxPngHandlerRuntime::~wxPngHandlerRuntime() = default;
 
 /**
+ * Address: 0x009710A0 (FUN_009710A0)
+ * Mangled: ?GetImageCount@wxPNGHandler@@UAEHAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxPNGHandler::GetImageCount` - real vtable slot 6 of 14
+ * (`??_7wxPNGHandler@@6B@` @ 0xD4E6A0, VTABLE_CONFIRMED via the already
+ * recovered `wxPngHandlerRuntime::wxPngHandlerRuntime`). Matches
+ * `wxImageHandler`'s base implementation exactly (PNG files are always
+ * single-image): unconditionally reports one image, ignoring the stream.
+ */
+[[nodiscard]] int wxPngHandlerGetImageCount(wxInputStream& /*stream*/) noexcept
+{
+  return 1;
+}
+
+/**
+ * Address: 0x00975620 (FUN_00975620)
+ * Mangled: ?DoCanRead@wxPNGHandler@@UAE_NAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxPNGHandler::DoCanRead` - real vtable slot 7 of 14 (same vtable as
+ * above; overrides `wxImageHandler::DoCanRead`, pure in the base). Reads
+ * the first 4 bytes of the stream and reports a PNG match only when the
+ * read succeeded (`IsOk()`) and those bytes equal the PNG signature prefix
+ * `\x89PNG` (the binary only checks 4 of the format's full 8-byte
+ * signature).
+ */
+[[nodiscard]] bool wxPngHandlerDoCanRead(wxInputStream& stream) noexcept
+{
+  static constexpr std::uint8_t kPngSignaturePrefix[4] = {0x89u, 'P', 'N', 'G'};
+
+  std::uint8_t signature[4]{};
+  (void)stream.Read(signature, sizeof(signature));
+  if (!stream.IsOk()) {
+    return false;
+  }
+
+  return std::memcmp(signature, kPngSignaturePrefix, sizeof(signature)) == 0;
+}
+
+/**
  * Address: 0x00970250 (FUN_00970250, ??0wxBMPHandler@@QAE@XZ)
  * Mangled: ??0wxBMPHandler@@QAE@XZ
  *
