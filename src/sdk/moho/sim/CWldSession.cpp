@@ -15561,12 +15561,24 @@ namespace moho
   void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
   {
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    if (!SSelectionSetUserEntity::Erase(extraSelection, entity)) {
-      return;
-    }
 
-    SSelectionNodeUserEntity* const head = extraSelection.mHead;
-    if (head != nullptr && head->mLeft == head) {
+    // 0x00896844 `call sub_8676E0` -- the erase's result is pushed nowhere and
+    // never tested. The emptiness re-check that follows is unconditional:
+    //
+    //   0x00896849: mov  ebx, [esi+4]      ; head
+    //   0x0089684C: mov  eax, [ebx]        ; head->left
+    //   0x00896853: call find
+    //   0x00896858: cmp  [eax], ebx
+    //   0x0089685A: jnz  ret               ; still non-empty -> keep the mode
+    //   0x0089685C: call UI_EndCommandMode
+    //
+    // Returning early when the erase reports "not found" strands the
+    // RULEUCC_Transport command mode `AddToExtraSelectList` started: every
+    // later right-click then issues a transport order instead of the default
+    // attack/move, which is why clicking an enemy unit appeared to do nothing.
+    (void)SSelectionSetUserEntity::Erase(extraSelection, entity);
+
+    if (extraSelection.IsEmptyFromHeadFind()) {
       UI_EndCommandMode();
     }
   }
@@ -15581,11 +15593,14 @@ namespace moho
   void CWldSession::ClearExtraSelectList()
   {
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
-    SSelectionNodeUserEntity* const head = extraSelection.mHead;
-    if (head == nullptr || head->mLeft == head) {
+    // 0x00896881-0x00896896: the emptiness test is `find(head->left) == head`,
+    // not a raw `head->left == head` -- `find` walks past weak entries whose
+    // target has died, so a set holding only dead nodes counts as empty here.
+    if (extraSelection.IsEmptyFromHeadFind()) {
       return;
     }
 
+    SSelectionNodeUserEntity* const head = extraSelection.mHead;
     SSelectionNodeUserEntity* node = head->mLeft;
     (void)extraSelection.EraseRange(&node, head->mLeft, head);
     extraSelection.mSizeMirrorOrUnused = extraSelection.mSize;
