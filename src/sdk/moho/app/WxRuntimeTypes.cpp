@@ -43781,7 +43781,10 @@ void wxDC::Clear()
 
   RECT rect{};
   if (m_canvas != nullptr) {
-    ::GetClientRect(static_cast<HWND>(static_cast<wxWindowBase*>(m_canvas)->GetNativeHandle()), &rect);
+    ::GetClientRect(
+      reinterpret_cast<HWND>(static_cast<std::uintptr_t>(static_cast<wxWindowBase*>(m_canvas)->GetHandle())),
+      &rect
+    );
   } else {
     if (!m_selectedBitmap.IsOk()) {
       return;
@@ -61234,6 +61237,64 @@ wxAniHandlerRuntime::wxAniHandlerRuntime()
   }
 
   return -1;
+}
+
+/**
+ * Address: 0x009DA540 (FUN_009DA540)
+ * Mangled: ?DoCanRead@wxANIHandler@@UAE_NAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxANIHandler::DoCanRead` - real vtable slot 7 of 12 (same vtable as
+ * `wxAniHandlerGetImageCount` above). Walks the RIFF chunk list exactly the
+ * same way (confirm the outer `"RIFF"` tag; per chunk, read the 4-byte
+ * size rounded up to even, discard the 4-byte form-type for `"RIFF"`/
+ * `"LIST"` container chunks, skip unrecognized chunks via
+ * `SeekI(TellI() + size, wxFromStart)`) but only asks whether an `"anih"`
+ * chunk exists at all - no allocation, no frame-count extraction - and
+ * reports failure as soon as a read leaves the stream not `IsOk()`.
+ * Verified against `FUN_009DA540.asm` instruction-by-instruction, matching
+ * `wxAniHandlerGetImageCount`'s already-verified loop shape.
+ */
+[[nodiscard]] bool wxAniHandlerDoCanRead(wxInputStream& stream) noexcept
+{
+  static constexpr std::uint32_t kTagRIFF = 0x46464952u; // "RIFF"
+  static constexpr std::uint32_t kTagLIST = 0x5453494Cu; // "LIST"
+  static constexpr std::uint32_t kTagAnih = 0x68696E61u; // "anih"
+
+  (void)stream.SeekI(0, wxFromStart);
+
+  std::uint32_t tag = 0;
+  (void)stream.Read(&tag, sizeof(tag));
+  if (!stream.IsOk() || tag != kTagRIFF) {
+    return false;
+  }
+
+  while (stream.IsOk()) {
+    std::uint32_t chunkSize = 0;
+    (void)stream.Read(&chunkSize, sizeof(chunkSize));
+    if ((chunkSize & 1u) != 0u) {
+      ++chunkSize;
+    }
+
+    if (tag == kTagAnih) {
+      return true;
+    }
+
+    if (tag == kTagRIFF || tag == kTagLIST) {
+      std::uint32_t formType = 0;
+      (void)stream.Read(&formType, sizeof(formType));
+    } else {
+      const off_t skipTo = stream.TellI() + static_cast<off_t>(chunkSize);
+      (void)stream.SeekI(skipTo, wxFromStart);
+    }
+
+    (void)stream.Read(&tag, sizeof(tag));
+    if (!stream.IsOk()) {
+      break;
+    }
+  }
+
+  return false;
 }
 
 /**
