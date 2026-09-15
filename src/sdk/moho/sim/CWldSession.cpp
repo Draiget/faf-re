@@ -14566,6 +14566,25 @@ namespace moho
     // head and silently drops the entry, so unit picking, band-box
     // selection and every area query see an empty database.
     static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->InitializeStorage();
+    // 0x00893214-0x0089323D, immediately after that ctor: the extra-selection
+    // weak set at +0xE0 gets its head sentinel built inline, exactly like every
+    // other `WeakSet<UserEntity>` in this class --
+    //
+    //   0x00893214: call sub_7B08D0            ; BuyNode
+    //   0x00893219: mov  [ebp+0E4h], eax       ; set.mHead = node
+    //   0x0089321F: mov  byte ptr [eax+19h], 1 ; node->mIsSentinel = 1
+    //   0x00893229: mov  [eax+4], eax          ; mRight  = head
+    //   0x00893232: mov  [eax], eax            ; mLeft   = head
+    //   0x0089323A: mov  [eax+8], eax          ; mParent = head
+    //   0x0089323D: mov  [ebp+0E8h], ebx       ; set.mSize = 0
+    //
+    // The memset above leaves that lane all-zero, so `mHead` stayed null and
+    // the set read as permanently empty: `IsEmptyFromHeadFind` short-circuits
+    // on a null head and `GetExtraSelectList` returns a blank clone. Every
+    // cargo unit the player picked out of a transport's panel was therefore
+    // dropped on the floor, and `IssueTransportOrderForDrag` always took the
+    // unload-EVERYTHING branch instead of the unload-specific one.
+    InitializeLocalSelectionSet(ExtraSelectionView());
     // mBuildTemplates (gpg::fastvector_n<SBuildTemplateInfo, 16>) already rebound
     // itself to inline storage via its own default constructor, which runs
     // implicitly before this body -- matching the binary's per-member subobject
