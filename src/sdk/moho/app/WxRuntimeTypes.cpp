@@ -60836,6 +60836,27 @@ wxPngHandlerRuntime::~wxPngHandlerRuntime() = default;
 }
 
 /**
+ * Address: 0x009D9EF0 (FUN_009D9EF0)
+ * Mangled: ?DoCanRead@wxBMPHandler@@UAE_NAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxBMPHandler::DoCanRead` - real vtable slot 7 of 11
+ * (`??_7wxBMPHandler@@6B@` @ 0xD4E098, VTABLE_CONFIRMED via the already
+ * recovered `wxBmpHandlerRuntime::wxBmpHandlerRuntime`). Reads the first 2
+ * bytes of the stream and reports a BMP match only when the read succeeded
+ * (`IsOk()`) and those two bytes equal the `"BM"` file-header magic
+ * (`0x4D42` as a little-endian `WORD`).
+ */
+[[nodiscard]] bool wxBmpHandlerDoCanRead(wxInputStream& stream) noexcept
+{
+  constexpr std::uint16_t kBmpSignature = 0x4D42u; // 'B' | ('M' << 8)
+
+  std::uint16_t signature = 0;
+  (void)stream.Read(&signature, sizeof(signature));
+  return stream.IsOk() && signature == kBmpSignature;
+}
+
+/**
  * Address: 0x00970250 (FUN_00970250, ??0wxBMPHandler@@QAE@XZ)
  * Mangled: ??0wxBMPHandler@@QAE@XZ
  *
