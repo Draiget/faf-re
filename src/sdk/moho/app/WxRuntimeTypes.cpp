@@ -55359,6 +55359,8 @@ LONG wxGetTextMetricAverageCharWidthRuntime(
   return textMetrics.tmAveCharWidth;
 }
 
+} // namespace
+
 /**
  * Address: 0x009C8AE0 (FUN_009C8AE0)
  *
@@ -55415,6 +55417,8 @@ void wxApplyPendingDcTextColorsRuntime(
   (void)::SetBkColor(deviceContext, colorState->mBackgroundColor);
 }
 
+namespace
+{
 /**
  * Address: 0x009C8BB0 (FUN_009C8BB0)
  *
