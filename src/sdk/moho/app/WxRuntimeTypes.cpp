@@ -43746,9 +43746,9 @@ void wxDC::DoGetSizeMM(
  * disassembly, which passes `x`/`y` straight through.
  */
 bool wxDC::DoGetPixel(
-  const std::int32_t x,
-  const std::int32_t y,
-  wxColourRuntimeObject* const col
+  std::int32_t x,
+  std::int32_t y,
+  wxColourRuntimeObject* col
 ) const noexcept
 {
   if (col == nullptr) {
