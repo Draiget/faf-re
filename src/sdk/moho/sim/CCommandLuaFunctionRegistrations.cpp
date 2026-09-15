@@ -1195,7 +1195,7 @@ namespace
     // plain position (e.g. AIBehaviors.lua's
     // `IssueAttack({unit}, unit:GetPosition())`) died on GetString() of a nil
     // `Type` field instead of issuing the order.
-    target.SetTarget(state, "IssueFactoryRallyPoint", LuaPlus::LuaStackObject(state, 2));
+    target.SetTarget(state, helpText, LuaPlus::LuaStackObject(state, 2));
     if (!moho::IsValidVector3f(target.position) || target.targetType == moho::EAiTargetType::AITARGET_None) {
       LuaPlus::LuaState::Error(state, invalidTargetError);
     }
@@ -1281,7 +1281,7 @@ namespace
     // plain position (e.g. AIBehaviors.lua's
     // `IssueAttack({unit}, unit:GetPosition())`) died on GetString() of a nil
     // `Type` field instead of issuing the order.
-    target.SetTarget(state, "IssueGuard", LuaPlus::LuaStackObject(state, 2));
+    target.SetTarget(state, helpText, LuaPlus::LuaStackObject(state, 2));
     if (requireValidTargetVector
         && (!moho::IsValidVector3f(target.position) || target.targetType == moho::EAiTargetType::AITARGET_None)) {
       LuaPlus::LuaState::Error(state, invalidTargetError);
@@ -6049,8 +6049,14 @@ namespace moho
     }
 
     CAiTarget target{};
-    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
-    SCR_FromLuaCopy_CAiTarget(target, targetObject);
+    // 0x006EEF60 `CAiTarget::SetTarget(state, <context>, arg)` -- the binary's
+    // Lua target setter, which takes an entity userdata OR a bare three-element
+    // {x,y,z} table. `SCR_FromLuaCopy_CAiTarget` only reads a
+    // `{Type=..., Position=...}` table, so every shipped call that passes a
+    // plain position (e.g. AIBehaviors.lua's
+    // `IssueAttack({unit}, unit:GetPosition())`) died on GetString() of a nil
+    // `Type` field instead of issuing the order.
+    target.SetTarget(state, "IssueFerry", LuaPlus::LuaStackObject(state, 2));
     if (!IsValidVector3f(target.position) || target.targetType == EAiTargetType::AITARGET_None) {
       LuaPlus::LuaState::Error(state, kIssueFerryInvalidTargetError);
     }
@@ -6937,8 +6943,14 @@ namespace moho
     }
 
     CAiTarget target{};
-    const LuaPlus::LuaObject targetObject(LuaPlus::LuaStackObject(state, 2));
-    SCR_FromLuaCopy_CAiTarget(target, targetObject);
+    // 0x006EEF60 `CAiTarget::SetTarget(state, <context>, arg)` -- the binary's
+    // Lua target setter, which takes an entity userdata OR a bare three-element
+    // {x,y,z} table. `SCR_FromLuaCopy_CAiTarget` only reads a
+    // `{Type=..., Position=...}` table, so every shipped call that passes a
+    // plain position (e.g. AIBehaviors.lua's
+    // `IssueAttack({unit}, unit:GetPosition())`) died on GetString() of a nil
+    // `Type` field instead of issuing the order.
+    target.SetTarget(state, "IssueAggressiveMove", LuaPlus::LuaStackObject(state, 2));
     if (!IsValidVector3f(target.position) || target.targetType == EAiTargetType::AITARGET_None) {
       LuaPlus::LuaState::Error(state, kIssueAggressiveMoveInvalidTargetError);
     }
