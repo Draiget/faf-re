@@ -4630,6 +4630,197 @@ namespace
     return object;
   }
 
+} // namespace
+
+// Real wx global stock object (`wx/gdicmn.h`), provided by the externally
+// linked wx library. An incomplete forward declaration is enough: every use
+// below immediately reinterprets the resulting pointer, and this keeps the
+// mangled symbol name (and therefore the link) identical to a real
+// `wxFont*` global without pulling in `<wx/font.h>`. Declared at namespace
+// `moho` scope (outside the anonymous namespace above/below) so it keeps
+// external linkage and actually names the real, externally linked symbol.
+class wxFont;
+extern wxFont* wxSWISS_FONT;
+
+// Forward declaration: real definition is much further down this TU
+// (`wxArrayString`/path-splitting neighbourhood), used here ahead of it.
+[[nodiscard]] bool wxSharedWideStringEqualsWithStoredLength(
+  const wchar_t* const* leftTextLane,
+  const wchar_t* const* rightTextLane
+) noexcept;
+
+namespace {
+
+  // Reaches the real (externally linked) wxFontBase ABI's virtual getter
+  // slots 10-16 (GetPointSize..GetEncoding, per dumps/rtti_dump_all.hpp's
+  // wxFontBase vftable dump) on a genuine wxFont instance. Slots 0-9
+  // (GetClassInfo/dtor/CreateRefData/CloneRefData/RealizeResource/
+  // FreeResource/IsFree/GetResourceHandle/GetVisible/SetVisible) are unused
+  // placeholders that exist only to hold 10-16 at the right vtable offset --
+  // this type is never constructed, only `reinterpret_cast` onto a real
+  // wxFont's own vtable pointer, so slots 0-9 are never entered.
+  class WxFontGetterVTableShapeRuntime
+  {
+  public:
+    virtual void ReservedSlot00() {}
+    virtual void ReservedSlot01() {}
+    virtual void ReservedSlot02() {}
+    virtual void ReservedSlot03() {}
+    virtual void ReservedSlot04() {}
+    virtual void ReservedSlot05() {}
+    virtual void ReservedSlot06() {}
+    virtual void ReservedSlot07() {}
+    virtual void ReservedSlot08() {}
+    virtual void ReservedSlot09() {}
+
+    [[nodiscard]] virtual std::int32_t GetPointSize() const { return 0; }
+    [[nodiscard]] virtual std::int32_t GetFamily() const { return 0; }
+    [[nodiscard]] virtual std::int32_t GetStyle() const { return 0; }
+    [[nodiscard]] virtual std::int32_t GetWeight() const { return 0; }
+    [[nodiscard]] virtual bool GetUnderlined() const { return false; }
+    [[nodiscard]] virtual wxStringRuntime GetFaceName() const { return {}; }
+    [[nodiscard]] virtual std::int32_t GetEncoding() const { return 0; }
+  };
+
+  // Releases one wxString COW buffer using the raw sentinel/refcount
+  // convention the binary reads directly at `pchData - 12` (a `-1` sentinel
+  // marks a static/literal buffer that is never freed) -- distinct from
+  // `ReleaseOwnedWxString`, which only tracks buffers this project's own
+  // construction paths allocated. A real wxFont's face name comes from the
+  // externally linked wx library's own allocator instead, so it is never in
+  // that tracking set.
+  void ReleaseExternalWxStringBuffer(wxStringRuntime& value) noexcept
+  {
+    if (value.m_pchData == nullptr) {
+      return;
+    }
+
+    auto* const header = reinterpret_cast<std::int32_t*>(value.m_pchData) - 3;
+    if (*header != -1) {
+      --*header;
+      if (*header == 0) {
+        delete header;
+      }
+    }
+    value.m_pchData = nullptr;
+  }
+
+  /**
+   * Address: 0x0097E590 (FUN_0097E590)
+   * Mangled: ??8wxFontBase@@QBE_NABVwxFont@@@Z
+   *
+   * What it does:
+   * Real `wxFontBase::operator==`: identical ref-data is an immediate match;
+   * exactly one side being "not ok" (null ref-data) is an immediate
+   * mismatch; otherwise compares PointSize/Family/Style/Weight/Underlined/
+   * FaceName/Encoding through the real wxFont virtual getters.
+   */
+  [[nodiscard]] bool wxFontsAreEqualRuntime(
+    const void* const lhsFont,
+    const void* const rhsFont
+  ) noexcept
+  {
+    const auto* const lhsObject = static_cast<const WxObjectRuntimeView*>(lhsFont);
+    const auto* const rhsObject = static_cast<const WxObjectRuntimeView*>(rhsFont);
+
+    if (lhsObject->refData == rhsObject->refData) {
+      return true;
+    }
+    if ((lhsObject->refData != nullptr) != (rhsObject->refData != nullptr)) {
+      return false;
+    }
+
+    const auto* const lhs = static_cast<const WxFontGetterVTableShapeRuntime*>(lhsFont);
+    const auto* const rhs = static_cast<const WxFontGetterVTableShapeRuntime*>(rhsFont);
+
+    if (lhs->GetPointSize() != rhs->GetPointSize()) {
+      return false;
+    }
+    if (lhs->GetFamily() != rhs->GetFamily()) {
+      return false;
+    }
+    if (lhs->GetStyle() != rhs->GetStyle()) {
+      return false;
+    }
+    if (lhs->GetWeight() != rhs->GetWeight()) {
+      return false;
+    }
+    if (lhs->GetUnderlined() != rhs->GetUnderlined()) {
+      return false;
+    }
+
+    wxStringRuntime lhsFaceName = lhs->GetFaceName();
+    wxStringRuntime rhsFaceName = rhs->GetFaceName();
+    const bool faceNameEqual = wxSharedWideStringEqualsWithStoredLength(
+      &lhsFaceName.m_pchData,
+      &rhsFaceName.m_pchData
+    );
+    ReleaseExternalWxStringBuffer(lhsFaceName);
+    ReleaseExternalWxStringBuffer(rhsFaceName);
+    if (!faceNameEqual) {
+      return false;
+    }
+
+    return lhs->GetEncoding() == rhs->GetEncoding();
+  }
+
+  // Reach-in view for the two `wxWindowBase` lanes `wxWindowBaseSetFontRuntime`
+  // touches: the embedded `wxFont m_font` value at +0x74 (only its shared
+  // `{vtable, refData}` header is ever accessed here, never its own data
+  // lanes, since real fonts are always externally constructed) and a
+  // bit-flag lane at +0xCC this function ORs a "best size is now stale" bit
+  // into. `wxWindowBase`'s own full layout is not modelled by this view.
+  struct WxWindowFontAssignRuntimeView
+  {
+    std::uint8_t reserved00_73[0x74]{};        // +0x00
+    std::uint8_t fontLane74_7F[0xC]{};         // +0x74
+    std::uint8_t reserved80_CB[0xCC - 0x80]{}; // +0x80
+    std::uint32_t mLayoutFlags = 0;            // +0xCC
+  };
+  static_assert(
+    offsetof(WxWindowFontAssignRuntimeView, fontLane74_7F) == 0x74,
+    "WxWindowFontAssignRuntimeView::fontLane74_7F offset must be 0x74"
+  );
+  static_assert(
+    offsetof(WxWindowFontAssignRuntimeView, mLayoutFlags) == 0xCC,
+    "WxWindowFontAssignRuntimeView::mLayoutFlags offset must be 0xCC"
+  );
+
+  /**
+   * Address: 0x009638F0 (FUN_009638F0)
+   * Mangled: ?SetFont@wxWindowBase@@UAE_NABVwxFont@@@Z
+   *
+   * What it does:
+   * Real `wxWindowBase::SetFont`: substitutes the stock Swiss font for a
+   * not-ok font, returns false without side effects when it already matches
+   * the window's current font, otherwise assigns the new font's shared
+   * ref-data and marks the window's best-size lane stale.
+   */
+  [[nodiscard]] bool wxWindowBaseSetFontRuntime(
+    void* const windowRuntime,
+    const void* const requestedFont
+  ) noexcept
+  {
+    const auto* const requestedFontObject = static_cast<const WxObjectRuntimeView*>(requestedFont);
+    const void* const effectiveFont = (requestedFontObject->refData != nullptr)
+      ? requestedFont
+      : static_cast<const void*>(wxSWISS_FONT);
+
+    auto* const view = static_cast<WxWindowFontAssignRuntimeView*>(windowRuntime);
+    auto* const currentFontLane = reinterpret_cast<WxObjectRuntimeView*>(view->fontLane74_7F);
+
+    if (wxFontsAreEqualRuntime(effectiveFont, currentFontLane)) {
+      return false;
+    }
+
+    (void)wxObjectCopySharedRefDataRuntime(
+      currentFontLane,
+      const_cast<WxObjectRuntimeView*>(static_cast<const WxObjectRuntimeView*>(effectiveFont))
+    );
+    view->mLayoutFlags |= 0x40u;
+    return true;
+  }
+
   struct WxRegionRefDataRuntimeView : WxObjectRefDataRuntimeView
   {
     HRGN regionHandle = nullptr; // +0x08
