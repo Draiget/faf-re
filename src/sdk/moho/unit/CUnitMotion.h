@@ -795,6 +795,11 @@ namespace moho
   static_assert(
     offsetof(CUnitMotion, mRaisedPlatformUnit) == 0x114, "CUnitMotion::mRaisedPlatformUnit offset must be 0x114"
   );
+  // The raised-platform candidate lane. `ProcessSurfaceCollisionFromLastMove`
+  // reads its begin/end at `[ebx+178h]`/`[ebx+17Ch]` (0x006B9055 / 0x006B904F)
+  // and `FindIntersectingRaisedPlatform` at the same pair (0x006C2F33 /
+  // 0x006C2F39), so the inline weak-slot vector starts at 0x178.
+  static_assert(offsetof(CUnitMotion, mPad178) == 0x178, "CUnitMotion::mPad178 offset must be 0x178");
   static_assert(offsetof(CUnitMotion, mLastTrans) == 0x120, "CUnitMotion::mLastTrans offset must be 0x120");
   static_assert(offsetof(CUnitMotion, mCurTrans) == 0x13C, "CUnitMotion::mCurTrans offset must be 0x13C");
   static_assert(offsetof(CUnitMotion, mReservation) == 0x158, "CUnitMotion::mReservation offset must be 0x158");
