@@ -168,12 +168,19 @@ namespace moho
       "UnitRecoilOrientationRuntimeView::mCurrentOrientation offset must be 0xA4"
     );
 
+    // The candidate slots hold weak references to the *entities* the collision
+    // grid returned, not to units: `ProcessSurfaceCollisionFromLastMove` builds
+    // each node straight from `CollisionPairResult::sourceEntity`
+    // (0x006B9260 `mov ecx, [ebx+edi+4]` -> 0x006B9268 `call sub_5A6DB0`, whose
+    // only adjustment is `add ecx, 4` -- Entity's `WeakObject` base, RTTI
+    // mdisp=4). A candidate may therefore be a Prop as easily as a Unit, which
+    // is why the consumer dispatches `Entity::IsUnit()` rather than casting.
     struct CUnitMotionRaisedPlatformCandidatesRuntimeView
     {
-      WeakPtr<Unit>* mBegin;
-      WeakPtr<Unit>* mEnd;
-      WeakPtr<Unit>* mCapacityEnd;
-      WeakPtr<Unit>* mInlineBegin;
+      WeakPtr<Entity>* mBegin;
+      WeakPtr<Entity>* mEnd;
+      WeakPtr<Entity>* mCapacityEnd;
+      WeakPtr<Entity>* mInlineBegin;
     };
     static_assert(
       sizeof(CUnitMotionRaisedPlatformCandidatesRuntimeView) == 0x10,
@@ -744,7 +751,7 @@ namespace moho
     void DestroyRaisedPlatformCandidateStorage(CUnitMotionRaisedPlatformCandidatesRuntimeView& runtime) noexcept
     {
       if (runtime.mBegin != nullptr && runtime.mEnd != nullptr && runtime.mEnd >= runtime.mBegin) {
-        for (WeakPtr<Unit>* lane = runtime.mBegin; lane != runtime.mEnd; ++lane) {
+        for (WeakPtr<Entity>* lane = runtime.mBegin; lane != runtime.mEnd; ++lane) {
           lane->ResetFromObject(nullptr);
         }
       }
@@ -864,10 +871,10 @@ namespace moho
     mCurTrans.orient_.z = 0.0f;
 
     CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
-    auto* const inlineBegin = reinterpret_cast<WeakPtr<Unit>*>(mPad178 + 0x10);
+    auto* const inlineBegin = reinterpret_cast<WeakPtr<Entity>*>(mPad178 + 0x10);
     candidates.mBegin = inlineBegin;
     candidates.mEnd = inlineBegin;
-    candidates.mCapacityEnd = reinterpret_cast<WeakPtr<Unit>*>(mPad178 + 0x60);
+    candidates.mCapacityEnd = reinterpret_cast<WeakPtr<Entity>*>(mPad178 + 0x60);
     candidates.mInlineBegin = inlineBegin;
   }
 
@@ -2344,8 +2351,21 @@ namespace moho
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
     float nearestDistanceSq = std::numeric_limits<float>::infinity();
 
-    for (WeakPtr<Unit>* candidate = candidates.mBegin; candidate != candidates.mEnd; ++candidate) {
-      Unit* const platformUnit = candidate->GetObjectPtr();
+    for (WeakPtr<Entity>* candidate = candidates.mBegin; candidate != candidates.mEnd; ++candidate) {
+      // The slot holds an Entity. Recover the unit through the virtual
+      // downcast the binary uses -- Entity's vtable slot 4 (0x006C2F97
+      // `mov edx, [ecx]` / 0x006C2F99 `mov eax, [edx+10h]` / 0x006C2F9C
+      // `call eax`), which is `Entity::IsUnit` (Entity vftable@0xE274F4 slot 4
+      // = sub_5BDB10, the base returning null). Props collide here too on the
+      // staggered beat, and this null return is what filters them out;
+      // casting the slot straight to `Unit*` instead type-confuses every
+      // non-unit candidate and reads its blueprint through the wrong vtable.
+      Entity* const candidateEntity = candidate->GetObjectPtr();
+      if (candidateEntity == nullptr) {
+        continue;
+      }
+
+      Unit* const platformUnit = candidateEntity->IsUnit();
       if (platformUnit == nullptr || platformUnit->IsDead()) {
         continue;
       }
@@ -2442,7 +2462,11 @@ namespace moho
     Sim::DoCollisionsFor(sim, mUnit, &hits);
 
     for (const CollisionResult& hit : hits) {
-      WeakPtr<Unit> candidateRef(reinterpret_cast<Unit*>(hit.sourceEntity));
+      // The node binds to the entity's own weak-link head (sub_5A6DB0's
+      // `add ecx, 4`); it is NOT narrowed to a unit here -- see
+      // FindIntersectingRaisedPlatform, which does the `Entity::IsUnit`
+      // dispatch when the list is consumed.
+      WeakPtr<Entity> candidateRef(hit.sourceEntity);
       candidates.push_back(reinterpret_cast<const SWeakRefSlot&>(candidateRef));
     }
   }
