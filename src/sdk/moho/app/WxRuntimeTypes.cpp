@@ -43728,6 +43728,90 @@ void wxDC::DoGetSizeMM(
   }
 }
 
+/**
+ * Address: 0x009C8CA0 (FUN_009C8CA0)
+ * Mangled: ?DoGetPixel@wxDC@@MBE_NHHPAVwxColour@@@Z
+ *
+ * IDA signature:
+ * char __thiscall wxDC::DoGetPixel(HDC *this, int x, int y, wxColour *col);
+ *
+ * What it does:
+ * Reads the device pixel at `(x, y)` and stores it into `*col` via
+ * `wxColour::Set`, returning `false` without touching `*col` when `col` is
+ * null - matching `wxDC::DoGetPixel`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:508-522). This build's
+ * `XLOG2DEV`/`YLOG2DEV` macros are plain identity passthroughs here
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:97-98), so no logical-to-device
+ * transform is applied before the raw `GetPixel` call - confirmed against the
+ * disassembly, which passes `x`/`y` straight through.
+ */
+bool wxDC::DoGetPixel(
+  const std::int32_t x,
+  const std::int32_t y,
+  wxColourRuntimeObject* const col
+) const noexcept
+{
+  if (col == nullptr) {
+    return false;
+  }
+
+  const COLORREF pixel = ::GetPixel(static_cast<HDC>(m_hDC), x, y);
+  col->Set(GetRValue(pixel), GetGValue(pixel), GetBValue(pixel));
+  return true;
+}
+
+/**
+ * Address: 0x009CA650 (FUN_009CA650)
+ * Mangled: ?Clear@wxDC@@UAEXXZ
+ *
+ * IDA signature:
+ * int __thiscall wxDC::Clear(wxDC *this);
+ *
+ * What it does:
+ * Fills the context's drawable extent (the canvas's client rect when one is
+ * attached, otherwise the selected bitmap's own extent) with the current
+ * background colour, then reinstates the MM_ANISOTROPIC mapping mode with a
+ * 1000x1000 viewport extent and the window extent/origins that reproduce the
+ * pre-existing logical scale - matching `wxDC::Clear`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:435-474) line for line.
+ */
+void wxDC::Clear()
+{
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+
+  RECT rect{};
+  if (m_canvas != nullptr) {
+    ::GetClientRect(static_cast<HWND>(static_cast<wxWindowBase*>(m_canvas)->GetNativeHandle()), &rect);
+  } else {
+    if (!m_selectedBitmap.IsOk()) {
+      return;
+    }
+
+    rect.left = 0;
+    rect.top = 0;
+    rect.right = m_selectedBitmap.GetWidth();
+    rect.bottom = m_selectedBitmap.GetHeight();
+  }
+
+  (void)::SetMapMode(deviceContext, MM_TEXT);
+
+  const DWORD colour = ::GetBkColor(deviceContext);
+  HBRUSH const brush = ::CreateSolidBrush(colour);
+  ::FillRect(deviceContext, &rect, brush);
+  (void)::DeleteObject(brush);
+
+  constexpr std::int32_t kViewportExtent = 1000;
+  const auto* const transform = reinterpret_cast<const WxDisplayTransformRuntimeView*>(this);
+  const std::int32_t width = wxDisplayTransformScaleX(transform, kViewportExtent) * mSignX;
+  const std::int32_t height = wxDisplayTransformScaleY(transform, kViewportExtent) * mSignY;
+
+  (void)::SetMapMode(deviceContext, MM_ANISOTROPIC);
+  (void)::SetViewportExtEx(deviceContext, kViewportExtent, kViewportExtent, nullptr);
+  (void)::SetWindowExtEx(deviceContext, width, height, nullptr);
+  (void)::SetViewportOrgEx(deviceContext, mDeviceOriginX, mDeviceOriginY, nullptr);
+  (void)::SetWindowOrgEx(deviceContext, mLogicalOriginX, mLogicalOriginY, nullptr);
+}
+
 // wxColourChanger (dc.cpp:121-191, this scoped fg/bg swap for
 // wxSTIPPLE_MASK_OPAQUE brushes) is already recovered as the
 // wxCaptureAndApplyDcColourStateRuntime / wxApplyPendingDcTextColorsRuntime
@@ -61073,6 +61157,83 @@ wxAniHandlerRuntime::wxAniHandlerRuntime()
   : wxCurHandlerRuntime()
 {
   SetDescriptor(L"Windows animated cursor file", L"ani", L"image/x-ani", 27);
+}
+
+/**
+ * Address: 0x009DA620 (FUN_009DA620)
+ * Mangled: ?GetImageCount@wxANIHandler@@UAEHAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxANIHandler::GetImageCount` - real vtable slot 6 of 12
+ * (`??_7wxANIHandler@@6B@` @ 0xD61E34, VTABLE_CONFIRMED via the already
+ * recovered `wxAniHandlerRuntime::wxAniHandlerRuntime`). ANI is a RIFF
+ * container, so this reads its chunk list from the start looking for the
+ * `"anih"` (ANI header) chunk: rewind, confirm the outer `"RIFF"` tag,
+ * then loop reading each chunk's 4-byte size (rounded up to even per the
+ * RIFF padding rule) and 4-byte tag - `"RIFF"`/`"LIST"` container chunks
+ * have their 4-byte form-type consumed and discarded before moving on to
+ * their first child tag, unrecognized chunks are skipped over via
+ * `SeekI(TellI() + size, wxFromStart)`, and hitting `"anih"` allocates a
+ * buffer sized to the chunk (rounded down to a whole number of `DWORD`s,
+ * with the same overflow-clamps-to-max-size defensive multiply the binary
+ * uses), reads the whole chunk into it, and returns the second `DWORD` of
+ * the real `ANIHEADER` layout - `nFrames` - freeing the buffer before
+ * returning. Verified instruction-by-instruction against
+ * `FUN_009DA620.asm`, not just the decompiled `.c` (register reuse across
+ * the loop's iterations made the raw decompile misleading).
+ */
+[[nodiscard]] int wxAniHandlerGetImageCount(wxInputStream& stream) noexcept
+{
+  static constexpr std::uint32_t kTagRIFF = 0x46464952u; // "RIFF"
+  static constexpr std::uint32_t kTagLIST = 0x5453494Cu; // "LIST"
+  static constexpr std::uint32_t kTagAnih = 0x68696E61u; // "anih"
+
+  (void)stream.SeekI(0, wxFromStart);
+
+  std::uint32_t tag = 0;
+  (void)stream.Read(&tag, sizeof(tag));
+  if (tag != kTagRIFF) {
+    return -1;
+  }
+
+  while (stream.IsOk()) {
+    std::uint32_t chunkSize = 0;
+    (void)stream.Read(&chunkSize, sizeof(chunkSize));
+    if ((chunkSize & 1u) != 0u) {
+      ++chunkSize;
+    }
+
+    if (tag == kTagRIFF || tag == kTagLIST) {
+      std::uint32_t formType = 0;
+      (void)stream.Read(&formType, sizeof(formType));
+    } else if (tag == kTagAnih) {
+      // Round down to a whole number of DWORDs; clamp to SIZE_MAX instead of
+      // wrapping if the multiply overflows, matching the binary's
+      // seto/neg/or idiom.
+      const std::uint32_t dwordCount = chunkSize >> 2;
+      const std::uint64_t wideByteCount = static_cast<std::uint64_t>(dwordCount) * 4u;
+      const std::size_t allocSize = (wideByteCount > 0xFFFFFFFFu)
+        ? static_cast<std::size_t>(0xFFFFFFFFu)
+        : static_cast<std::size_t>(wideByteCount);
+
+      auto* const buffer = static_cast<std::uint8_t*>(::operator new(allocSize));
+      (void)stream.Read(buffer, chunkSize);
+      std::uint32_t frameCount = 0;
+      std::memcpy(&frameCount, buffer + sizeof(std::uint32_t), sizeof(frameCount));
+      ::operator delete(buffer);
+      return static_cast<int>(frameCount);
+    } else {
+      const off_t skipTo = stream.TellI() + static_cast<off_t>(chunkSize);
+      (void)stream.SeekI(skipTo, wxFromStart);
+    }
+
+    (void)stream.Read(&tag, sizeof(tag));
+    if (!stream.IsOk()) {
+      break;
+    }
+  }
+
+  return -1;
 }
 
 /**
