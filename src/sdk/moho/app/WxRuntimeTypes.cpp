@@ -60968,6 +60968,66 @@ wxCurHandlerRuntime::wxCurHandlerRuntime()
 }
 
 /**
+ * Address: 0x009DA250 (FUN_009DA250)
+ * Mangled: ?GetImageCount@wxCURHandler@@UAEHAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxCURHandler::GetImageCount` - real vtable slot 6 of 12
+ * (`??_7wxCURHandler@@6B@` @ 0xD61DC4, VTABLE_CONFIRMED via the already
+ * recovered `wxCurHandlerRuntime::wxCurHandlerRuntime`). ICO/CUR files can
+ * hold multiple images, so - unlike the single-image formats above - this
+ * reads the real directory count: saves the current stream position,
+ * rewinds to the start, reads the 6-byte ICONDIR header
+ * (`{WORD reserved; WORD type; WORD count;}`), then restores the original
+ * position before returning `count` so the call is transparent to whatever
+ * comes after it (typically `LoadFile`).
+ */
+[[nodiscard]] int wxCurHandlerGetImageCount(wxInputStream& stream) noexcept
+{
+  const off_t originalPosition = stream.TellI();
+  (void)stream.SeekI(0, wxFromStart);
+
+  struct WxIconDirHeader
+  {
+    std::uint16_t reserved;
+    std::uint16_t type;
+    std::uint16_t count;
+  } header{};
+  (void)stream.Read(&header, sizeof(header));
+
+  (void)stream.SeekI(originalPosition, wxFromStart);
+  return header.count;
+}
+
+/**
+ * Address: 0x009DA370 (FUN_009DA370)
+ * Mangled: ?DoCanRead@wxCURHandler@@UAE_NAAVwxInputStream@@@Z
+ *
+ * What it does:
+ * `wxCURHandler::DoCanRead` - real vtable slot 7 of 12 (same vtable as
+ * above). Rewinds to the start of the stream (no position restore
+ * afterward - `DoCanRead` runs before any real decoding, so there is
+ * nothing to preserve), reads the 4-byte `{WORD reserved; WORD type;}`
+ * prefix of the ICONDIR header, and reports a match only when the read
+ * succeeded (`IsOk()`) and `reserved == 0 && type == 2` (`2` is the CUR
+ * file type; `1` would be ICO, checked by the sibling `wxICOHandler`
+ * override at a different address).
+ */
+[[nodiscard]] bool wxCurHandlerDoCanRead(wxInputStream& stream) noexcept
+{
+  (void)stream.SeekI(0, wxFromStart);
+
+  struct WxIconDirPrefix
+  {
+    std::uint16_t reserved;
+    std::uint16_t type;
+  } prefix{};
+  (void)stream.Read(&prefix, sizeof(prefix));
+
+  return stream.IsOk() && prefix.reserved == 0u && prefix.type == 2u;
+}
+
+/**
  * Address: 0x009D7EA0 (FUN_009D7EA0)
  *
  * What it does:
