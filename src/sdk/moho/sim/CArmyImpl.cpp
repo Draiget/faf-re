@@ -1860,8 +1860,25 @@ namespace moho
 
     CMersenneTwister& rng = Simulation->mRngState->twister;
 
-    const float rx = CMersenneTwister::ToUnitFloat(rng.NextUInt32()) + 0.1f;
-    const float ry = CMersenneTwister::ToUnitFloat(rng.NextUInt32()) + 0.1f;
+    // 0x006FFCE1 `fmul ds:flt_E4F7F4` then 0x006FFCF5
+    // `fadd dword ptr ds:dbl_E4F710+4`. The two constants are
+    // flt_E4F7F4 = 1.8626450382086546e-10 and dbl_E4F710+4 = 0.1f, and that
+    // scale is not 1/2^32 (2.3283064365e-10) -- it is 0.8/2^32. So the binary
+    // folds a 0.8 span into the conversion and offsets it by 0.1, putting the
+    // generated fraction in [0.1, 0.9): a start position always inside the
+    // map, with a tenth of the extent kept clear at each edge.
+    //
+    // Recovering the scale as a plain unit float and adding 0.1 separately
+    // produced [0.1, 1.1) instead, so a generated start could be placed up to
+    // a tenth of the map PAST the far edge. `cfunc_CreateInitialArmyUnitL`
+    // feeds this straight into the initial unit's construction transform, so
+    // an army whose start is generated rather than authored got its commander
+    // built outside the playable area.
+    constexpr float kStartFractionSpan = 0.8f;
+    constexpr float kStartFractionMargin = 0.1f;
+
+    const float rx = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
+    const float ry = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
 
     StartPosition.x = (width > 0) ? static_cast<float>(width - 1) * rx : 0.0f;
     StartPosition.y = (height > 0) ? static_cast<float>(height - 1) * ry : 0.0f;
