@@ -7184,6 +7184,294 @@ namespace {
     return true;
   }
 
+  /**
+   * Address: 0x00A1C1F0 (FUN_00A1C1F0)
+   *
+   * What it does:
+   * Tears down one config-group subtree: deletes every entry (releasing its
+   * key/value string lanes first), recursively destroys and frees every
+   * child group, releases the group's own retained name string, then frees
+   * the entry and child-group pointer-array buffers. Mirrors
+   * wxFileConfigGroup::~wxFileConfigGroup() plus its compiler-generated
+   * member teardown (the m_strName / m_aSubgroups / m_aEntries dtors that
+   * run after the explicit destructor body, in reverse declaration order).
+   */
+  void WxFileConfigDestroyGroupTree(
+    WxFileConfigGroupRuntimeView* const groupView
+  )
+  {
+    for (std::uint32_t entryIndex = 0; entryIndex < groupView->entryCount; ++entryIndex) {
+      auto* const entry = reinterpret_cast<WxFileConfigEntryRuntimeView*>(groupView->entries[entryIndex]);
+      if (entry != nullptr) {
+        WxFileConfigReleaseEntryTextLanes(entry);
+        ::operator delete(entry);
+      }
+    }
+
+    for (std::uint32_t groupIndex = 0; groupIndex < groupView->childGroupCount; ++groupIndex) {
+      WxFileConfigGroupRuntimeView* const childGroup = groupView->childGroups[groupIndex];
+      if (childGroup != nullptr) {
+        WxFileConfigDestroyGroupTree(childGroup);
+        ::operator delete(childGroup);
+      }
+    }
+
+    ReleaseWxStringSharedPayload(groupView->groupName);
+
+    if (groupView->childGroups != nullptr) {
+      delete[] groupView->childGroups;
+      groupView->childGroups = nullptr;
+    }
+    if (groupView->entries != nullptr) {
+      delete[] groupView->entries;
+      groupView->entries = nullptr;
+    }
+  }
+
+  /**
+   * What it does:
+   * Removes one child-group pointer from a parent's sorted child-group lane
+   * by identity, compacting the pointer array. Removal-side counterpart of
+   * WxFileConfigInsertChildGroupPointer; mirrors the array bookkeeping half
+   * of wxFileConfigGroup::DeleteSubgroup's `m_aSubgroups.Remove(pGroup)`.
+   */
+  void WxFileConfigRemoveChildGroupPointer(
+    WxFileConfigGroupRuntimeView* const parentGroup,
+    WxFileConfigGroupRuntimeView* const childGroup
+  )
+  {
+    std::uint32_t removeIndex = parentGroup->childGroupCount;
+    for (std::uint32_t index = 0; index < parentGroup->childGroupCount; ++index) {
+      if (parentGroup->childGroups[index] == childGroup) {
+        removeIndex = index;
+        break;
+      }
+    }
+
+    if (removeIndex >= parentGroup->childGroupCount) {
+      return;
+    }
+
+    if (parentGroup->childGroupCount == 1u) {
+      delete[] parentGroup->childGroups;
+      parentGroup->childGroups = nullptr;
+      parentGroup->childGroupCount = 0;
+      return;
+    }
+
+    const std::uint32_t newCount = parentGroup->childGroupCount - 1u;
+    auto** const newGroups = new (std::nothrow) WxFileConfigGroupRuntimeView*[newCount];
+    if (newGroups == nullptr) {
+      return;
+    }
+
+    std::uint32_t outIndex = 0;
+    for (std::uint32_t index = 0; index < parentGroup->childGroupCount; ++index) {
+      if (index == removeIndex) {
+        continue;
+      }
+      newGroups[outIndex++] = parentGroup->childGroups[index];
+    }
+
+    delete[] parentGroup->childGroups;
+    parentGroup->childGroups = newGroups;
+    parentGroup->childGroupCount = newCount;
+  }
+
+  /**
+   * Address: 0x00A1D220 (FUN_00A1D220)
+   *
+   * What it does:
+   * Recursively deletes one child group and everything under it: removes
+   * each of its entries' source lines, recursively deletes its own
+   * subgroups, removes the group's own source line (updating the parent's
+   * "last group" line-insertion cache -- `lineOwnerDescendant`, i.e. real
+   * wx's `m_pLastGroup` -- when the removed group owned it), marks the
+   * parent's dirty chain, drops the group pointer from the parent's sorted
+   * child-group lane, then destroys and frees the group itself. Mirrors
+   * wxFileConfigGroup::DeleteSubgroup(wxFileConfigGroup*) line for line.
+   */
+  [[nodiscard]] bool WxFileConfigDeleteSubgroupRecursive(
+    WxFileConfigGroupRuntimeView* const parentGroup,
+    WxFileConfigGroupRuntimeView* const pGroup
+  )
+  {
+    if (pGroup == nullptr) {
+      return false;
+    }
+
+    wxLogTrace(
+      L"wxFileConfig",
+      L"Deleting group '%s' from '%s'",
+      pGroup->groupName.c_str(),
+      parentGroup->groupName.c_str()
+    );
+    wxLogTrace(
+      L"wxFileConfig",
+      L"  (m_pLine) = prev: %p, this %p, next %p",
+      parentGroup->groupLine != nullptr ? parentGroup->groupLine->prev : nullptr,
+      parentGroup->groupLine,
+      parentGroup->groupLine != nullptr ? parentGroup->groupLine->next : nullptr
+    );
+    wxLogTrace(L"wxFileConfig", L"  text: '%s'", WxFileConfigLineTextOrEmpty(parentGroup->groupLine));
+
+    const std::uint32_t entryCountToClear = pGroup->entryCount;
+    wxLogTrace(L"wxFileConfig", L"Removing %lu Entries", static_cast<unsigned long>(entryCountToClear));
+    for (std::uint32_t entryIndex = 0; entryIndex < entryCountToClear; ++entryIndex) {
+      auto* const entry = reinterpret_cast<WxFileConfigEntryRuntimeView*>(pGroup->entries[entryIndex]);
+      WxFileConfigLineRuntime* const entryLine = entry != nullptr ? entry->entryLine : nullptr;
+      if (entryLine != nullptr) {
+        wxLogTrace(L"wxFileConfig", L"    '%s'", entryLine->text.c_str());
+        WxFileConfigRemoveLine(
+          reinterpret_cast<WxFileConfigLineListRuntimeView*>(parentGroup->ownerConfig),
+          entryLine
+        );
+      }
+    }
+
+    const std::uint32_t childGroupCountToClear = pGroup->childGroupCount;
+    wxLogTrace(L"wxFileConfig", L"Removing %lu SubGroups", static_cast<unsigned long>(childGroupCountToClear));
+    for (std::uint32_t groupIndex = 0; groupIndex < childGroupCountToClear; ++groupIndex) {
+      WxFileConfigDeleteSubgroupRecursive(pGroup, pGroup->childGroups[0]);
+    }
+
+    WxFileConfigLineRuntime* const groupOwnLine = pGroup->groupLine;
+    if (groupOwnLine != nullptr) {
+      wxLogTrace(
+        L"wxFileConfig",
+        L"  Removing line entry for Group '%s' : '%s'",
+        pGroup->groupName.c_str(),
+        groupOwnLine->text.c_str()
+      );
+      wxLogTrace(
+        L"wxFileConfig",
+        L"  Removing from Group '%s' : '%s'",
+        parentGroup->groupName.c_str(),
+        WxFileConfigLineTextOrEmpty(parentGroup->groupLine)
+      );
+
+      // Note: we may only test this inside the "line != null" branch because
+      // the last group's line is surely non-null (matches the original's
+      // comment on the equivalent wxFileConfigGroup::DeleteSubgroup check).
+      if (pGroup == parentGroup->lineOwnerDescendant) {
+        wxLogTrace(L"wxFileConfig", L"  ------- Removing last group -------");
+
+        WxFileConfigGroupRuntimeView* replacementLastGroup = nullptr;
+        WxFileConfigLineRuntime* scanLine = groupOwnLine->prev;
+        while (scanLine != nullptr && scanLine != parentGroup->groupLine) {
+          for (std::uint32_t n = 0; n < parentGroup->childGroupCount; ++n) {
+            if (parentGroup->childGroups[n]->groupLine == parentGroup->groupLine) {
+              replacementLastGroup = parentGroup->childGroups[n];
+              break;
+            }
+          }
+          if (replacementLastGroup != nullptr) {
+            break;
+          }
+          scanLine = scanLine->prev;
+        }
+
+        if (scanLine == parentGroup->groupLine || parentGroup->parentGroup == nullptr) {
+          wxLogTrace(L"wxFileConfig", L"  ------- No previous group found -------");
+          parentGroup->lineOwnerDescendant = nullptr;
+        } else {
+          wxLogTrace(
+            L"wxFileConfig",
+            L"  ------- Last Group set to '%s' -------",
+            replacementLastGroup->groupName.c_str()
+          );
+          parentGroup->lineOwnerDescendant = replacementLastGroup;
+        }
+      }
+
+      WxFileConfigRemoveLine(
+        reinterpret_cast<WxFileConfigLineListRuntimeView*>(parentGroup->ownerConfig),
+        groupOwnLine
+      );
+    } else {
+      wxLogTrace(L"wxFileConfig", L"  No line entry for Group '%s'?", pGroup->groupName.c_str());
+    }
+
+    WxFileConfigMarkGroupChainDirty(parentGroup);
+    WxFileConfigRemoveChildGroupPointer(parentGroup, pGroup);
+
+    WxFileConfigDestroyGroupTree(pGroup);
+    ::operator delete(pGroup);
+    return true;
+  }
+
+  /**
+   * Address: 0x00A1E130 (FUN_00A1E130)
+   *
+   * What it does:
+   * Finds one immediate child group by case-insensitive name and, if found,
+   * recursively deletes it. Mirrors
+   * wxFileConfigGroup::DeleteSubgroupByName(const wxChar*).
+   */
+  [[nodiscard]] bool WxFileConfigDeleteSubgroupByName(
+    WxFileConfigGroupRuntimeView* const groupView,
+    const wchar_t* const szName
+  )
+  {
+    WxFileConfigGroupRuntimeView* const foundGroup =
+      WxFileConfigFindChildGroupByNameNoCase(groupView, szName);
+    return foundGroup != nullptr
+      ? WxFileConfigDeleteSubgroupRecursive(groupView, foundGroup)
+      : false;
+  }
+
+  /**
+   * Address: 0x00A1E180 (FUN_00A1E180)
+   *
+   * IDA signature:
+   * char __thiscall sub_A1E180(wxFileConfig *this, const wxString *key, bool bGroupIfEmptyAlso);
+   *
+   * What it does:
+   * wxConfigBase::DeleteEntry override -- vtable slot 15 (byte offset 0x3C)
+   * of both `??_7wxFileConfig@@6B@` (0xD6A634) and `??_7wxMemoryConfig@@6B@`
+   * (0xD61474); wxMemoryConfig inherits this implementation directly rather
+   * than overriding it (both vtables carry the identical address at that
+   * slot, confirmed via incoming_xrefs at 0xD6A670 and 0xD614B0). Deletes
+   * one entry by key from the current group (through a
+   * wxConfigPathChanger-equivalent key/path context), then -- when the
+   * caller asked and the group is now empty and isn't the root -- walks up
+   * to the parent path and deletes the now-empty subgroup too. Mirrors
+   * wxFileConfig::DeleteEntry(const wxString&, bool) exactly.
+   */
+  [[nodiscard]] bool WxFileConfigDeleteEntry(
+    WxFileConfigRuntimeView* const ownerConfig,
+    const wxStringRuntime* const key,
+    const bool bGroupIfEmptyAlso
+  )
+  {
+    WxFileConfigKeyContextRuntimeView keyContext{};
+    WxFileConfigPrepareKeyContext(&keyContext, ownerConfig, key);
+
+    if (!WxFileConfigDeleteEntryByName(ownerConfig->currentGroup, keyContext.keyToken.c_str())) {
+      WxFileConfigFinalizeKeyContext(&keyContext);
+      return false;
+    }
+
+    if (bGroupIfEmptyAlso) {
+      WxFileConfigGroupRuntimeView* const currentGroup = ownerConfig->currentGroup;
+      if (currentGroup->entryCount == 0 && currentGroup->childGroupCount == 0) {
+        if (currentGroup != ownerConfig->rootGroup) {
+          WxFileConfigGroupRuntimeView* const emptyGroup = currentGroup;
+
+          wxStringRuntime parentPath = AllocateOwnedWxString(std::wstring(L".."));
+          WxFileConfigCallSetPathVirtual(ownerConfig, &parentPath);  // changes ownerConfig->currentGroup!
+          ReleaseWxStringSharedPayload(parentPath);
+
+          WxFileConfigDeleteSubgroupByName(ownerConfig->currentGroup, emptyGroup->groupName.c_str());
+        }
+        //else: never delete the root group
+      }
+    }
+
+    WxFileConfigFinalizeKeyContext(&keyContext);
+    return true;
+  }
+
   void RetainWxStringRuntime(
     wxStringRuntime* const outValue,
     const wxStringRuntime* const sourceValue
