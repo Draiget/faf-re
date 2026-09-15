@@ -400,6 +400,9 @@ namespace moho
   static_assert(offsetof(CArmyImpl, ArmyId) == 0x08, "CArmyImpl::ArmyId offset must be 0x08");
   static_assert(offsetof(CArmyImpl, EnergyCurrent) == 0x88, "CArmyImpl::EnergyCurrent offset must be 0x88");
   static_assert(offsetof(CArmyImpl, IsAlly) == 0x128, "CArmyImpl::IsAlly offset must be 0x128");
+  // GenerateArmyStart (0x006FFCB0) stores the two lanes at 0x006FFD5B /
+  // 0x006FFD61 as `fstp dword ptr [esi+1C4h]` / `[esi+1C8h]`.
+  static_assert(offsetof(CArmyImpl, StartPosition) == 0x1C4, "CArmyImpl::StartPosition offset must be 0x1C4");
   static_assert(
     offsetof(CArmyImpl, RuntimeWordVectorWithMeta) == 0x17C, "CArmyImpl::RuntimeWordVectorWithMeta offset must be 0x17C"
   );
