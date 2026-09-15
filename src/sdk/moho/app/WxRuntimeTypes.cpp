@@ -296,6 +296,7 @@ wxLocale* wxGetLocale();
 #include <wx/log.h>
 extern int wxCharCodeMSWToWX(int keyCode);
 #include <wx/cmdline.h>
+#include <wx/palette.h>
 wxStringRuntime* wxCopySharedWxStringRuntime(
   const wxStringRuntime* source,
   wxStringRuntime* outValue
@@ -62362,6 +62363,294 @@ bool wxCreateBitmapFromGlobalDib(
 
   (void)::GlobalUnlock(dibGlobalHandle);
   return succeeded;
+}
+
+/**
+ * Address: 0x009ECD00 (FUN_009ECD00)
+ *
+ * What it does:
+ * `wxBMPFileHandler`'s file-format core: opens the BMP by its wide-text
+ * path, reads the 14-byte file header (validated by the `'BM'` magic only —
+ * the rest of that header is never read here, matching the binary), then
+ * reads either the legacy 12-byte OS/2 `BITMAPCOREHEADER` or the modern
+ * 40-byte `BITMAPINFOHEADER`, upgrading the former in place to the latter's
+ * shape (width/height widened to `LONG`, planes/bit-count repositioned) so
+ * the rest of the function only ever deals with one layout. Computes the
+ * palette size from `biClrUsed` (falling back to `1 << biBitCount` for
+ * non-24bpp images with no explicit count), reads the colour table --
+ * converting the OS/2 3-byte-per-entry `RGBTRIPLE` table to 4-byte
+ * `RGBQUAD` in place when it came from a core header -- then the pixel
+ * data, verifies the payload size via `ReadBitmapPayloadChunked`, and hands
+ * the assembled global DIB block to `wxCreateBitmapFromGlobalDib`.
+ */
+bool wxLoadBmpFileIntoBitmapAndPalette(
+  const void* const sourceWideText,
+  HBITMAP* const outBitmap,
+  HPALETTE* const outPalette
+) noexcept
+{
+  char* pathStorage = nullptr;
+  const char* const* const convertedPath =
+    wxConvertWideTextToAllocatedMultiByteRuntimeAdapter(wxConvCurrent, &pathStorage, sourceWideText);
+  OFSTRUCT reopenBuffer{};
+  const HFILE fileHandle = ::OpenFile(*convertedPath, &reopenBuffer, 0);
+  _free_crt(pathStorage);
+
+  if (fileHandle == HFILE_ERROR) {
+    const auto* const filePath = static_cast<const wchar_t*>(sourceWideText);
+    if (wxLocale* const locale = wxGetLocale(); locale != nullptr) {
+      wxLogError(locale->GetString(L"Can't open file '%s'", 0), filePath);
+    } else {
+      wxLogError(L"Can't open file '%s'", filePath);
+    }
+    return false;
+  }
+
+  const HGLOBAL dibGlobalHandle = ::GlobalAlloc(GMEM_MOVEABLE, sizeof(BITMAPINFOHEADER));
+  if (dibGlobalHandle == nullptr) {
+    return false;
+  }
+  auto* infoHeader = static_cast<BITMAPINFOHEADER*>(::GlobalLock(dibGlobalHandle));
+
+  std::uint8_t fileHeader[14]{};
+  bool isCoreHeader = false;
+  if (::_lread(fileHandle, fileHeader, sizeof(fileHeader)) != sizeof(fileHeader) ||
+      *reinterpret_cast<const std::uint16_t*>(fileHeader) != 0x4D42u /* 'BM' */ ||
+      ::_lread(fileHandle, infoHeader, sizeof(BITMAPCOREHEADER)) != sizeof(BITMAPCOREHEADER)) {
+    ::GlobalUnlock(dibGlobalHandle);
+    ::GlobalFree(dibGlobalHandle);
+    ::_lclose(fileHandle);
+    return false;
+  }
+
+  if (infoHeader->biSize == sizeof(BITMAPCOREHEADER)) {
+    const auto* const coreHeader = reinterpret_cast<const BITMAPCOREHEADER*>(infoHeader);
+    const LONG coreWidth = coreHeader->bcWidth;
+    const LONG coreHeight = coreHeader->bcHeight;
+    const WORD corePlanes = coreHeader->bcPlanes;
+    // bcBitCount already sits at BITMAPINFOHEADER's biBitCount offset (14)
+    // once biSize/biWidth/biHeight/biPlanes are rewritten in front of it, so
+    // it is left untouched here exactly as the binary leaves it.
+    infoHeader->biSize = sizeof(BITMAPINFOHEADER);
+    infoHeader->biPlanes = corePlanes;
+    infoHeader->biHeight = coreHeight;
+    infoHeader->biWidth = coreWidth;
+    isCoreHeader = true;
+  } else {
+    (void)::_llseek(fileHandle, 14, 0);
+    if (::_lread(fileHandle, infoHeader, sizeof(BITMAPINFOHEADER)) != sizeof(BITMAPINFOHEADER)) {
+      ::GlobalUnlock(dibGlobalHandle);
+      ::GlobalFree(dibGlobalHandle);
+      ::_lclose(fileHandle);
+      return false;
+    }
+  }
+
+  std::uint32_t paletteColourCount = infoHeader->biClrUsed;
+  if (paletteColourCount == 0u && infoHeader->biBitCount != 24u) {
+    paletteColourCount = 1u << infoHeader->biBitCount;
+  }
+  if (infoHeader->biSizeImage == 0u) {
+    infoHeader->biSizeImage = infoHeader->biHeight *
+      (((infoHeader->biWidth * static_cast<std::uint32_t>(infoHeader->biBitCount) + 31u) >> 3) & 0x1FFFFFFCu);
+  }
+
+  (void)::GlobalUnlock(dibGlobalHandle);
+  const std::uint32_t paletteBytes = 4u * paletteColourCount;
+  const SIZE_T totalDibBytes = infoHeader->biSizeImage + paletteBytes + sizeof(BITMAPINFOHEADER);
+  const HGLOBAL resizedDibHandle = ::GlobalReAlloc(dibGlobalHandle, totalDibBytes, 0);
+  if (resizedDibHandle == nullptr) {
+    ::GlobalFree(dibGlobalHandle);
+    ::_lclose(fileHandle);
+    return false;
+  }
+
+  auto* const dibBase = static_cast<std::uint8_t*>(::GlobalLock(resizedDibHandle));
+  auto* const paletteDestination = dibBase + reinterpret_cast<BITMAPINFOHEADER*>(dibBase)->biSize;
+
+  if (isCoreHeader) {
+    // The OS/2 palette is a packed RGBTRIPLE[paletteColourCount] table (3
+    // bytes/entry, no reserved byte); expand it to RGBQUAD[] (4 bytes/entry,
+    // BGR + a zeroed reserved byte) in place, walking backward so writes
+    // never overtake the not-yet-consumed source bytes.
+    (void)::_lread(fileHandle, paletteDestination, 3u * paletteColourCount);
+    auto* quadCursor = paletteDestination + 4 * (paletteColourCount - 1u) + 1u;
+    auto* tripleCursor = paletteDestination + 2u * (paletteColourCount - 1u) + paletteColourCount;
+    for (std::uint32_t remaining = paletteColourCount; remaining > 0u; --remaining) {
+      quadCursor[1] = tripleCursor[1];
+      quadCursor[-1] = tripleCursor[-1];
+      quadCursor[0] = tripleCursor[0];
+      quadCursor[2] = 0u;
+      tripleCursor -= 3;
+      quadCursor -= 4;
+    }
+  } else {
+    (void)::_lread(fileHandle, paletteDestination, paletteBytes);
+  }
+
+  const std::int32_t bitsFileOffset = *reinterpret_cast<const LONG*>(fileHeader + 0x0A);
+  const std::uint32_t pixelDataOffset =
+    reinterpret_cast<BITMAPINFOHEADER*>(dibBase)->biSize + paletteBytes;
+  if (bitsFileOffset != 0) {
+    (void)::_llseek(fileHandle, bitsFileOffset, 0);
+  }
+
+  auto* const dibHeader = reinterpret_cast<BITMAPINFOHEADER*>(dibBase);
+  bool succeeded = false;
+  if (ReadBitmapPayloadChunked(
+        reinterpret_cast<char*>(dibBase + pixelDataOffset),
+        dibHeader->biSizeImage,
+        fileHandle
+      ) == dibHeader->biSizeImage) {
+    (void)::GlobalUnlock(resizedDibHandle);
+    const HDC screenDc = ::GetDC(nullptr);
+    if (wxCreateBitmapFromGlobalDib(screenDc, resizedDibHandle, outPalette, outBitmap)) {
+      (void)::ReleaseDC(nullptr, screenDc);
+      (void)::GlobalFree(resizedDibHandle);
+      succeeded = true;
+    } else {
+      (void)::ReleaseDC(nullptr, screenDc);
+      (void)::GlobalFree(resizedDibHandle);
+    }
+  } else {
+    (void)::GlobalUnlock(resizedDibHandle);
+    (void)::GlobalFree(resizedDibHandle);
+  }
+
+  (void)::_lclose(fileHandle);
+  return succeeded;
+}
+
+/**
+ * Address: 0x009ED030 (FUN_009ED030)
+ *
+ * What it does:
+ * Loads a BMP into a Win32 bitmap/palette pair via
+ * `wxLoadBmpFileIntoBitmapAndPalette`, then transfers the result into the
+ * caller's `wxBitmap`: wraps the palette into a fresh `wxPalette` when the
+ * caller asked for one, lazily creates the bitmap's own ref-data (via its
+ * `CreateRefData` virtual) the first time any of these fields is written,
+ * and stores the native bitmap handle plus its `BITMAP` metrics onto it.
+ */
+// The four lanes `wxBMPFileHandler::LoadFile`'s chain pokes directly into a
+// freshly created `wxBitmapRefData` after loading succeeds - offsets read
+// off this exact call sequence (`this+20`=handle, `this+8`=width,
+// `this+12`=height, `this+16`=planes*bitsPerPixel), not a full model of
+// every `wxBitmapRefData` lane.
+struct WxBitmapRefDataForBmpLoadRuntimeView
+{
+  std::uint8_t reserved00_07[0x08]{};  // +0x00 (wxObjectRefData: vtable, refcount)
+  std::int32_t width = 0;              // +0x08
+  std::int32_t height = 0;             // +0x0C
+  std::int32_t depth = 0;              // +0x10 (bmPlanes * bmBitsPixel)
+  HBITMAP nativeHandle = nullptr;      // +0x14
+};
+static_assert(offsetof(WxBitmapRefDataForBmpLoadRuntimeView, width) == 0x08, "WxBitmapRefDataForBmpLoadRuntimeView::width offset must be 0x08");
+static_assert(offsetof(WxBitmapRefDataForBmpLoadRuntimeView, height) == 0x0C, "WxBitmapRefDataForBmpLoadRuntimeView::height offset must be 0x0C");
+static_assert(offsetof(WxBitmapRefDataForBmpLoadRuntimeView, depth) == 0x10, "WxBitmapRefDataForBmpLoadRuntimeView::depth offset must be 0x10");
+static_assert(offsetof(WxBitmapRefDataForBmpLoadRuntimeView, nativeHandle) == 0x14, "WxBitmapRefDataForBmpLoadRuntimeView::nativeHandle offset must be 0x14");
+
+char wxCreateBitmapAndPaletteFromBmpFile(
+  const void* const sourceWideText,
+  WxObjectRuntimeView* const bitmapRuntime,
+  wxPalette** const outPalette
+) noexcept
+{
+  HBITMAP bitmapHandle = nullptr;
+  HPALETTE paletteHandle = nullptr;
+  if (!wxLoadBmpFileIntoBitmapAndPalette(sourceWideText, &bitmapHandle, &paletteHandle)) {
+    return 0;
+  }
+
+  if (paletteHandle != nullptr) {
+    if (outPalette != nullptr) {
+      *outPalette = new (std::nothrow) wxPalette();
+      if (*outPalette != nullptr) {
+        (*outPalette)->SetHPALETTE(reinterpret_cast<WXHPALETTE>(paletteHandle));
+      }
+    } else {
+      (void)::DeleteObject(paletteHandle);
+    }
+  } else if (outPalette != nullptr) {
+    *outPalette = nullptr;
+  }
+
+  if (bitmapHandle == nullptr) {
+    return 0;
+  }
+
+  BITMAP bitmapMetrics{};
+  (void)::GetObjectW(bitmapHandle, sizeof(bitmapMetrics), &bitmapMetrics);
+
+  if (bitmapRuntime->refData == nullptr) {
+    using WxBitmapCreateRefDataFn = void* (__thiscall*)(WxObjectRuntimeView*);
+    const auto createRefData =
+      reinterpret_cast<WxBitmapCreateRefDataFn>((*reinterpret_cast<void***>(bitmapRuntime))[10]);
+    bitmapRuntime->refData = createRefData(bitmapRuntime);
+  }
+  auto* const refData = static_cast<WxBitmapRefDataForBmpLoadRuntimeView*>(bitmapRuntime->refData);
+  refData->width = bitmapMetrics.bmWidth;
+  refData->height = bitmapMetrics.bmHeight;
+  refData->depth = static_cast<std::int32_t>(bitmapMetrics.bmPlanes) * bitmapMetrics.bmBitsPixel;
+  refData->nativeHandle = bitmapHandle;
+  return 1;
+}
+
+/**
+ * Address: 0x009AAEC0 (FUN_009AAEC0)
+ * Mangled: ?LoadFile@wxBMPFileHandler@@UAE_NPAVwxBitmap@@ABVwxString@@JHH@Z
+ *
+ * What it does:
+ * `wxBMPFileHandler::LoadFile` - slot 8 of the real (externally linked)
+ * `wxBMPFileHandler` vtable (`??_7wxBMPFileHandler@@6B@` @ 0xD59BDC,
+ * confirmed constructed by `wxBmpFileHandlerRuntime::wxBmpFileHandlerRuntime`
+ * per `vtable_writers`; slot arithmetic matches the declaration order in
+ * dependencies/wxWindows-2.4.2/include/wx/msw/{gdiimage,bitmap}.h: wxObject's
+ * 4 base slots, then wxGDIImageHandler's Create/Load/Save (4-6), then
+ * wxBitmapHandler's own Create(wxBitmap*)/LoadFile/SaveFile (7-9) - so slot 8
+ * is LoadFile). This project's own `wxBmpFileHandlerRuntime` class models
+ * only the handler-registry metadata (name/extension/mime/type) and does not
+ * carry this slot; `LoadFile`/`SaveFile` are recovered as free functions
+ * reached through the real vtable, matching how `wxDCBase`'s equivalent
+ * slots are handled elsewhere in this file. Delegates the actual file
+ * decoding to `wxCreateBitmapAndPaletteFromBmpFile`, forwarding only the
+ * palette when the caller asked for one and releasing it immediately
+ * afterward otherwise (the scalar-deleting-destructor call on its vtable
+ * slot 1).
+ */
+// Minimal shape for the one real, externally linked wxBitmap method this TU
+// needs to call. `<wx/bitmap.h>` cannot be included here - it pulls in
+// `<wx/gdicmn.h>`, which redefines wxSize/wxPoint/wxRect/wxColourDatabase
+// against this project's own versions of those types used throughout the
+// rest of the file. A non-virtual member's mangled name depends only on the
+// class name, method name and parameter types, not on the class's other
+// members, so this compiles to the exact same call the real
+// `<wx/bitmap.h>` declaration would - deliberately at ordinary file scope,
+// NOT inside an anonymous namespace (that would mangle it as
+// `` `anonymous-namespace'::wxBitmap `` instead of the real external type).
+class wxBitmap
+{
+public:
+  void SetPalette(const wxPalette& palette);
+};
+
+bool wxBmpFileHandlerLoadFile(
+  WxObjectRuntimeView* const bitmap,
+  const wxStringRuntime* const name,
+  const std::int32_t /*flags*/,
+  const std::int32_t /*desiredWidth*/,
+  const std::int32_t /*desiredHeight*/
+) noexcept
+{
+  wxPalette* palette = nullptr;
+  const bool loaded = wxCreateBitmapAndPaletteFromBmpFile(name->m_pchData, bitmap, &palette) != 0;
+  if (palette != nullptr) {
+    if (loaded) {
+      reinterpret_cast<wxBitmap*>(bitmap)->SetPalette(*palette);
+    }
+    delete palette;
+  }
+  return loaded;
 }
 
 /**
