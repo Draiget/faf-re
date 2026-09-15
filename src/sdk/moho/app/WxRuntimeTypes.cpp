@@ -60793,16 +60793,19 @@ wxPngHandlerRuntime::~wxPngHandlerRuntime() = default;
 
 /**
  * Address: 0x009710A0 (FUN_009710A0)
- * Mangled: ?GetImageCount@wxPNGHandler@@UAEHAAVwxInputStream@@@Z
+ * Mangled: ?GetImageCount@wxImageHandler@@UAEHAAVwxInputStream@@@Z
  *
  * What it does:
- * `wxPNGHandler::GetImageCount` - real vtable slot 6 of 14
- * (`??_7wxPNGHandler@@6B@` @ 0xD4E6A0, VTABLE_CONFIRMED via the already
- * recovered `wxPngHandlerRuntime::wxPngHandlerRuntime`). Matches
- * `wxImageHandler`'s base implementation exactly (PNG files are always
- * single-image): unconditionally reports one image, ignoring the stream.
+ * `wxImageHandler::GetImageCount`'s own base implementation, reached
+ * unmodified through both `wxPNGHandler`'s vtable (slot 6 of 14,
+ * `??_7wxPNGHandler@@6B@` @ 0xD4E6A0) and `wxBMPHandler`'s (slot 6 of 11,
+ * `??_7wxBMPHandler@@6B@` @ 0xD4E098) - neither overrides it, both vtables
+ * carry the identical address, confirming this is the shared base body, not
+ * a PNG-specific override. VTABLE_CONFIRMED via both classes' already
+ * recovered constructors. Every format handler that doesn't override this
+ * inherits the same "single image per file" default.
  */
-[[nodiscard]] int wxPngHandlerGetImageCount(wxInputStream& /*stream*/) noexcept
+[[nodiscard]] int wxImageHandlerGetImageCount(wxInputStream& /*stream*/) noexcept
 {
   return 1;
 }
