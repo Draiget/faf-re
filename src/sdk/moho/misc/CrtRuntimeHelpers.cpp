@@ -17417,12 +17417,24 @@ extern "C" double __cdecl _difftime64(const __time64_t timeA, const __time64_t t
   /**
    * Address: 0x00A48C90 (FUN_00A48C90)
    *
+   * IDA signature:
+   * size_t __cdecl ReadAndByteSwapU16Array(FILE *file, size_t count, void *buffer);
+   *
    * What it does:
    * Reads `count` 16-bit values from `file` into `buffer` via `fread`, then
    * byte-swaps each one in place (`ReverseRecordByteOrder`) -- a foreign-
    * endian array read helper. Returns the byte count requested (`count*2`).
+   *
+   * Parameter order is (file, count, buffer), which is what the binary does
+   * and is worth stating because it is the reverse of the obvious spelling.
+   * At 0x00A48C90 the incoming arguments land in eax=arg1, esi=arg2, edi=arg3,
+   * and the fread call at 0x00A48CA3 pushes them as
+   * `fread(buffer=edi, size=2, count=esi, stream=eax)` -- so arg1 is the
+   * stream and arg3 is the destination. The follow-up at 0x00A48CAC passes
+   * `(2, esi, edi)` to ReverseRecordByteOrder, i.e. the same edi buffer, and
+   * the return is `lea eax,[esi+esi]` = count*2.
    */
-  std::size_t ReadAndByteSwapU16Array(void* const buffer, const std::size_t count, std::FILE* const file)
+  std::size_t ReadAndByteSwapU16Array(std::FILE* const file, const std::size_t count, void* const buffer)
   {
     (void)std::fread(buffer, 2u, count, file);
     ReverseRecordByteOrder(2, static_cast<std::int32_t>(count), buffer);
