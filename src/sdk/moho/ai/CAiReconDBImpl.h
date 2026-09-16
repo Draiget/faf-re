@@ -60,7 +60,15 @@ namespace moho
    *
    * Address family:
    * - 0x005C4450 (`SReconKey` serializer registration)
-   * - 0x005C4950/0x005C49B0 (entity-id range lower/upper bound)
+   * - 0x005C4950 — `find`, NOT a bare lower_bound. It descends like one
+   *   (remember the last node whose key is not less than the probe, go left),
+   *   but then applies `if (v4 == head || probe < v4->key) return end;`. That
+   *   trailing "not greater" test is the equality check, so a unit with no
+   *   entry gets `end()` rather than its nearest neighbour's entry. Reading
+   *   this line as a plain lower_bound is what left `ReconGetBlip` handing back
+   *   another unit's blip.
+   * - 0x005C49B0 — `equal_range`: two descents, upper bound then lower bound,
+   *   returning the pair. This is what `FindReconBlipRange` models.
    * - 0x005C5AF0 (insert path)
    *
    * What it does:
