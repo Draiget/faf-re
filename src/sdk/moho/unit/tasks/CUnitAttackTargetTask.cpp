@@ -961,10 +961,34 @@ namespace moho
                                                                            : runtime->mTargetPosition;
         SetPosGoalFromWorldPosition(targetPosition);
       } else {
-        Entity* const destinationEntity = runtime->mTarget.targetEntity.GetObjectPtr();
-        if (destinationEntity != nullptr) {
+        // 0x005F32EF tests `CAiTarget::HasTarget` *before* looking at the entity
+        // link, and only the entity-link arm reaches `SetDestUnit`:
+        //
+        //   0x005F32EF  call HasTarget
+        //   0x005F32F6  je   0x5F3343   ; no live target -> position goal
+        //   0x005F32FD  je   0x5F3343   ; link slot null -> position goal
+        //   0x005F3302  je   0x5F3343   ; link slot sentinel -> position goal
+        //   0x005F3325  call [navigator+0x0C]   ; SetDestUnit(entity)
+        //
+        // Dropping the HasTarget test kept chasing a target the moment it died:
+        // `HasTarget` is what reports a dead unit or a retired recon blip, while
+        // the weak link stays resolvable for as long as the object lives, so the
+        // navigator was re-pointed at a corpse instead of falling back to the
+        // last known position.
+        //
+        // The call also passes the resolved entity straight through. 0x005F3304
+        // decodes the link slot and pushes it unchanged - there is no IsUnit()
+        // narrowing - and `CAiNavigatorLand::SetDestUnit` (0x005A4180) only
+        // reads position fields off it. `IsUnit()` returns null for a ReconBlip,
+        // so attacking anything seen on radar handed the navigator a null
+        // destination. The melee task's own `SetDestUnit` lane (0x00615A70) and
+        // the Lua binder both already pass the entity through with a cast.
+        if (!runtime->mTarget.HasTarget()) {
+          SetPosGoalFromWorldPosition(runtime->mTargetPosition);
+        } else if (Entity* const destinationEntity = runtime->mTarget.targetEntity.GetObjectPtr();
+                   destinationEntity != nullptr) {
           if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
-            navigator->SetDestUnit(destinationEntity->IsUnit());
+            navigator->SetDestUnit(static_cast<Unit*>(destinationEntity));
           }
         } else {
           SetPosGoalFromWorldPosition(runtime->mTargetPosition);
