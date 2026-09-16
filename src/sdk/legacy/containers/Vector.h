@@ -8106,6 +8106,20 @@ namespace msvc8
          * uninit_copy_n_step(src, dst); return;` shape); zero callers, no xrefs,
          * unreachable from every seeded root: a linker-retained copy nothing
          * runs.)
+         * Address: 0x006DFC60 (FUN_006DFC60 -- the null-guarded per-element step
+         * for an element laid out `{dword +0x00, dword +0x08, fastvector_n
+         * +0x10}`: it copies the two leading header dwords raw and then hands the
+         * inline-backed vector member to `FastVectorInline<T>::ResetStorageToInline`
+         * (FUN_00402220, cited on FastVector.h) so the copy rebinds to its OWN
+         * inline window instead of aliasing the source's heap block -- which is why
+         * this element is not trivially copyable and takes the placement-new arm
+         * below rather than the `memcpy` one. Reached from 0x006DF031, an interior
+         * site of `uninit_copy_n`'s own emission at FUN_006DEFC0, so it is live.
+         * Formerly parked as `blocker=owner_layout` on the grounds that the owning
+         * type was unreconstructed; under RULE ONE the owning type does not need a
+         * name here -- MSVC emits this body for whichever `T` the vector is
+         * instantiated with, and the recovery is this citation plus the template
+         * above, not a hand-written per-type copy helper.)
          */
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
