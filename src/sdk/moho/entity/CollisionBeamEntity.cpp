@@ -474,9 +474,12 @@ namespace moho
       launcherWeapon->CreateCollisionBeamHelper(&beam, mAttachInfo.mParentBoneIndex);
     }
 
-    // Notify the bound listener of the collision outcome.
-    if (auto* const listener =
-          static_cast<ManyToOneListener_ECollisionBeamEvent*>(mListener.ownerLinkSlot);
+    // Notify the bound listener of the collision outcome. `mListener` stores the
+    // address of the listener node's weak-link field, so the listener itself is
+    // that slot minus 0x04; the bare offset value is the empty-chain sentinel and
+    // decays to null under the same subtraction (0x006733F0: `lea ecx,[eax-4]`
+    // followed by `test ecx,ecx / jz`).
+    if (ManyToOneListener_ECollisionBeamEvent* const listener = mListener.GetListener();
         listener != nullptr) {
       Entity* const hitEntity = beam.mEntity.GetObjectPtr();
       ECollisionBeamEvent eventCode;
