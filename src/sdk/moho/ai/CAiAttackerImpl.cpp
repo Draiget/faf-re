@@ -465,7 +465,13 @@ namespace
       (task->mAttacker != nullptr) ? task->mAttacker->GetDesiredTarget() : nullptr;
 
     if (desiredTarget != nullptr && desiredTarget->targetType == EAiTargetType::AITARGET_None) {
-      if (task->mWeapon->mWeaponBlueprint != nullptr && task->mWeapon->mWeaponBlueprint->NeedPrep != 0u) {
+      // 0x005D9542 reads `*(BYTE*)(blueprint + 76)`, i.e. +0x4C. The reflection
+      // registration in FUN_00522340 puts `AutoInitiateAttackCommand` at 0x4C
+      // (line 101) and `NeedPrep` at 0x123 (line 198), so the prep flag was the
+      // wrong field: it made every auto-initiating weapon reschedule on the
+      // slow TargetCheckInterval path instead of the 2-tick one.
+      if (task->mWeapon->mWeaponBlueprint != nullptr
+          && task->mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand != 0u) {
         pendingFrames = 2;
       } else {
         const float checkInterval =

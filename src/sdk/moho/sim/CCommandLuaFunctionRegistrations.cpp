@@ -7167,13 +7167,28 @@ namespace moho
         continue;
       }
 
-      IAiTransport* const transport = transportUnit->AiTransport;
-      if (transport == nullptr) {
-        continue;
-      }
+      // 0x006F7C63 `lea ecx,[eax+8]` / `mov eax,[ecx]` / `mov edx,[eax+0x58]` /
+      // `call edx` -- Entity vtable slot 22 = GetAttachedEntities, reached
+      // through the Unit's Entity base at +0x08, then iterated over
+      // `[result+4]`..`[result+8]`. The binary reads the attachment list
+      // directly and never consults AiTransport here, so it has no
+      // "AiTransport is null" escape: a transport whose transport lane is
+      // momentarily absent still contributes its cargo, and the order still
+      // gets issued. Going through TransportGetLoadedUnits added that escape,
+      // and an empty result silently turned "unload these units" into an order
+      // carrying no cargo at all -- which CUnitUnloadUnits then reads as its
+      // documented "empty means detach everything" case (0x0062655C).
+      for (Entity* const attachedEntity : transportUnit->GetAttachedEntities()) {
+        if (attachedEntity == nullptr) {
+          continue;
+        }
 
-      const auto loadedUnits = transport->TransportGetLoadedUnits(false);
-      for (Unit* const loadedUnit : loadedUnits) {
+        // 0x006F7C84 `mov eax,[ecx]` / `mov edx,[eax+0x10]` / `call edx` --
+        // Entity vtable slot 4 = IsUnit(); `85 DB / 74 44` skips a non-unit
+        // attachment. (The binary does not null-check the list entry itself;
+        // the guard above is defensive only and cannot change behaviour for a
+        // well-formed attachment list.)
+        Unit* const loadedUnit = attachedEntity->IsUnit();
         if (loadedUnit == nullptr) {
           continue;
         }
