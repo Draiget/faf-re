@@ -7136,7 +7136,32 @@ namespace moho
     const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
     const EntityCategorySet* const categorySet = func_GetCObj_EntityCategory(categoryObject);
 
-    SEntitySetTemplateUnit unitsToUnload{};
+    // The order is issued to the validated transports UNION the cargo being
+    // unloaded, not to the cargo alone. Both halves are load-bearing:
+    //
+    //  - `IAiCommandDispatchImpl` dispatches
+    //    `UNITCOMMAND_TransportUnloadSpecificUnits` through the RECEIVING
+    //    unit's `AiTransport`, so a transport has to receive the order for
+    //    `CUnitUnloadUnits` to be created at all;
+    //  - `UNIT_IssueCommand` (0x006F12C0) copies the whole issued set into the
+    //    command's own unit set -- 0x006F1358 `fastvector_Entity::AddAll` into
+    //    the `SSTICommandIssueData` local, which `CommandDatabase::AddIssueData`
+    //    then stores -- so the cargo has to be in the issued set for
+    //    `command->mUnitSet` to carry the chosen subset. `CUnitUnloadUnits`'
+    //    constructor filters that shared set down to its own passengers with
+    //    `transportOwner == mUnit`.
+    //
+    // The binary builds exactly this union: `func_Validate_IssueCommand` fills
+    // the set with the transports, then 0x006F7D0E
+    // `sub_6F8F10(thatSet, cargo.begin, cargo.end)` adds the cargo into it and
+    // 0x006F7DE3 issues that set. Issuing the cargo alone (what this did) meant
+    // no transport ever saw the order and `mUnitSet` never carried the subset,
+    // so a queued "unload these units here" did nothing and the transport was
+    // left to unload everything on whatever generic unload order ran next.
+    SEntitySetTemplateUnit orderRecipients{};
+    orderRecipients.AddUnits(transportUnits);
+
+    bool hasUnitsToUnload = false;
     for (Unit* const transportUnit : transportUnits) {
       if (transportUnit == nullptr) {
         continue;
@@ -7162,11 +7187,14 @@ namespace moho
           continue;
         }
 
-        (void)unitsToUnload.AddUnit(loadedUnit);
+        (void)orderRecipients.AddUnit(loadedUnit);
+        hasUnitsToUnload = true;
       }
     }
 
-    if (unitsToUnload.Empty()) {
+    // 0x006F7CFF `cmp eax, ecx` / `je` -- the binary skips the AddAll and the
+    // issue entirely when no cargo matched the category.
+    if (!hasUnitsToUnload) {
       return 0;
     }
 
@@ -7187,7 +7215,7 @@ namespace moho
     commandIssueData.mTarget.mPos = targetPosition;
 
     Sim* const sim = lua_getglobaluserdata(rawState);
-    (void)IssueCommandToSelectedUnits(sim, unitsToUnload, commandIssueData, false);
+    (void)IssueCommandToSelectedUnits(sim, orderRecipients, commandIssueData, false);
     return 0;
   }
 } // namespace moho
