@@ -3963,11 +3963,29 @@ namespace moho
       mCurElevation = outTransform.pos_.y - sampleElevation;
       desiredVelocity.y = (mTargetElevation + mNewElevation) - outTransform.pos_.y;
 
+      // These are MINIMUM descent rates, not maximums -- both arms store the
+      // constant when the computed value compares *greater* than it:
+      //
+      //   0x006BFA5F  movss  xmm1, [esp+28h]          ; desiredVelocity.y
+      //   0x006BFA65  comiss xmm1, xmm0               ; xmm0 = [0x00E4F754] = -3.0
+      //   0x006BFA68  jbe    ...                      ; y <= -3.0 -> leave alone
+      //   0x006BFA6A  movss  [esp+28h], xmm0          ; else y = -3.0
+      //
+      //   0x006BFA78  mulss  xmm0, [0x00E4F724]       ; * 0.5
+      //   0x006BFA88  comiss xmm0, xmm1               ; xmm1 = [0x00E4F9D4] = -0.25
+      //   0x006BFA8B  jbe    0x006BFA6A               ; t <= -0.25 -> store t
+      //   0x006BFA8D  movss  [esp+28h], xmm1          ; else y = -0.25
+      //
+      // So each is `min`, and the constants were read out of the PE. With
+      // `max` the sense inverted twice over: a shallow descent was slowed to
+      // the floor value instead of being pushed down to it, and a steep one
+      // was capped at 3.0/tick instead of being left alone. A transport that
+      // should drop at 3 units a tick crawled.
       if (enteredLandingPhase && desiredVelocity.y < 0.0f) {
         if (unit->IsInCategory("TRANSPORTATION")) {
-          desiredVelocity.y = std::max(desiredVelocity.y, -3.0f);
+          desiredVelocity.y = std::min(desiredVelocity.y, -3.0f);
         } else {
-          desiredVelocity.y = std::max(desiredVelocity.y * 0.5f, -0.25f);
+          desiredVelocity.y = std::min(desiredVelocity.y * 0.5f, -0.25f);
         }
       }
 
@@ -4134,7 +4152,29 @@ namespace moho
     physBody->IntegrateFreefallStep(control.force, kFixedIntegrationDt, control.torque);
 
     const bool groundHit = HandleGroundCollision();
-    if (groundHit && mLayer != LAYER_None && (mReservation.x0 != 0 || mReservation.z0 != 0)) {
+    // The engine's predicate is `groundHit && enteredLandingPhase &&
+    // horizontalDistance < 0.5f` (0x006C0191 `test al,al`, 0x006C0195 `cmp
+    // byte [esp+17h],0`, 0x006C019C-0x006C01A9 `movss xmm0,[0x00E4F724=0.5] /
+    // comiss xmm0,[esp+44h] / jbe`). What stood here had neither a
+    // landing-phase term nor a distance term: `mLayer` and `mReservation`
+    // both persist across ticks from an earlier landing attempt, so a ground
+    // touch at ANY horizontal distance latched `unit->mCurrentLayer = mLayer`.
+    // That is the second disjunct of the arrival test above, so latching it
+    // early lets a flier declare arrival without the elevation-convergence
+    // check and settle into UMVE_Top/UMVE_Hover -- and `AtTarget()` reports
+    // true unconditionally while hovering, which makes every later navigator
+    // goal arrive instantly.
+    //
+    // Note for anyone byte-checking this against bin/2025.7.1: that build does
+    // not run this block at all. 0x006C018B holds `EB 2E` -- an unconditional
+    // jump over it -- followed by `90 90 90 90`, the hot-patch signature, and
+    // a scan finds no call to HandleGroundCollision (FUN_006BC460) anywhere in
+    // that image. The call at 0x006C0186 still runs; only its result is
+    // discarded. Recovered here as the engine's own source rather than as the
+    // post-link patch, since a patch is not something source compiles to; the
+    // corrected predicate is in any case strictly narrower than what it
+    // replaces.
+    if (groundHit && enteredLandingPhase && horizontalDistance < 0.5f) {
       unit->SetCurrentLayer(mLayer);
     } else if (mVertEvent != UMVE_Hover) {
       const ELayer previousLayer2 = unit->mCurrentLayer;
