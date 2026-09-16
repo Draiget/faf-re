@@ -611,6 +611,14 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     if (shouldDelete) {
       ClearPerArmyRecon(this, blip, true);
       it = mTempBlips.erase(it);
+      // 0x005C0E15. Clearing the per-army record is only half the teardown --
+      // the blip is an Entity, and this army was holding it alive. Without the
+      // release it stays in `sourceUnit->mReconBlips`, where `FindOrCreateBlip`
+      // (0x005C0930) finds it again on a later tick, sets `mNeedsFlush` back to
+      // 1 and republishes it. `ReconBlip::UpdateVisibility` (0x005BEE40) gates
+      // sim visibility on exactly that byte, so a blip nothing destroys is a
+      // ghost that keeps coming back.
+      blip->DestroyIfUnused();
     } else {
       ++it;
     }
@@ -644,11 +652,13 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       // decoy ghosts that nothing would ever clear.
       if (blip->mDeleteWhenStale != 0u) {
         ClearPerArmyRecon(this, blip, true);
+        blip->DestroyIfUnused();  // 0x005C0F14
       } else {
         const bool shouldDeleteFake = BlipArmyTreatsViewerAsAlly(this, blip) ||
           (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
         if (shouldDeleteFake) {
           ClearPerArmyRecon(this, blip, true);
+          blip->DestroyIfUnused();  // 0x005C0FBA
         } else {
           PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->ArmyId);
           if (recon) {
