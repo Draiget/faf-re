@@ -161,15 +161,23 @@ namespace
   ) noexcept
   {
     for (; begin != end; ++begin) {
-      auto** ownerCursor = reinterpret_cast<moho::WeakPtr<moho::Entity>**>(begin->mEntity.ownerLinkSlot);
-      if (ownerCursor == nullptr) {
-        continue;
-      }
-
-      while (*ownerCursor != &begin->mEntity) {
-        ownerCursor = &(*ownerCursor)->nextInOwner;
-      }
-      *ownerCursor = begin->mEntity.nextInOwner;
+      // The binary open-codes the splice here (0x006DEAE5-0x006DEAFC: load the
+      // slot, walk `while (*cursor != node) cursor = &(*cursor)->nextInOwner`,
+      // then `*cursor = node->nextInOwner`) and steps by 0x0C, which is
+      // sizeof(SBlackListInfo). That is WeakPtr<Entity>::UnlinkFromOwnerChain
+      // (0x005A6DE0) spelled inline, so it belongs on the node, not here.
+      //
+      // It also matters that our version clears the node afterwards, which the
+      // binary's does not (it leaves ownerLinkSlot pointing at a chain the node
+      // has just left). The original could afford that because its element
+      // destructor is trivial; ours is not -- ~WeakPtr gained a body in
+      // 8316e257 -- so the blacklist.clear() at the sole call site below would
+      // walk that stale chain a second time for a node no longer in it. The
+      // binary's walk has no termination guard (`75 F7 jne` loops until it
+      // finds the node), so on a freed owner that second pass is the dead-owner
+      // fault. UnlinkFromOwnerChain zeroes both words on success, which makes
+      // the destructor pass a no-op.
+      (void)begin->mEntity.UnlinkFromOwnerChain();
     }
   }
 
@@ -185,8 +193,12 @@ namespace
   ) noexcept
   {
     if (!blacklist.empty()) {
-      // SBlackListInfo's weak entity link is not unlinked by the trivial
-      // element destructor, so it has to be detached before the slots go.
+      // The binary detaches explicitly here because its element destructor does
+      // not. Ours still calls this first -- the explicit pass is the recovered
+      // 0x006DEAE0 body and keeps the detach order identical -- but the node is
+      // left cleared, so the destructors clear() then runs are no-ops rather
+      // than a second walk. (The comment that used to sit here called the
+      // element destructor "trivial"; that stopped being true in 8316e257.)
       UnlinkBlacklistWeakEntityRange(blacklist.begin(), blacklist.end());
       blacklist.clear();
     }
