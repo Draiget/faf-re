@@ -44103,6 +44103,101 @@ void wxDC::Clear()
   (void)::SetWindowOrgEx(deviceContext, mLogicalOriginX, mLogicalOriginY, nullptr);
 }
 
+/**
+ * Address: 0x009CAC10 (FUN_009CAC10)
+ * Mangled: ?SetMapMode@wxDC@@UAEXH@Z
+ *
+ * IDA signature:
+ * void __thiscall wxDC::SetMapMode(wxDC *this, int mode);
+ *
+ * What it does:
+ * Records the mapping mode and derives the logical scale it implies, then
+ * re-establishes MM_ANISOTROPIC with the viewport/window extents and origins
+ * that realise that scale - matching `wxDC::SetMapMode`
+ * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1529-1598) line for line.
+ *
+ * The mode values are the Win32 MM_* constants plus wx's two extensions, and
+ * they are taken from the binary's own switch: the jump table at 0x009CAD8C
+ * is indexed by `mode - 2`, and only entries 2 (LOMETRIC), 6 (TWIPS),
+ * 9 (POINTS) and 10 (METRIC) reach real arms - 3, 4, 5, 7 and 8 land on the
+ * default at 0x009CACF2, which pops both ratios and leaves the scale alone.
+ * wxMM_TEXT is handled before the switch by the `cmp ebp, 1` at 0x009CAC19.
+ * The two scale constants are read out of the image rather than inferred:
+ * 0x00F36E10 = 0.017638888906880555 (twips2mm) and
+ * 0x00F36E20 = 0.35277777813761113 (pt2mm).
+ */
+void wxDC::SetMapMode(const int mode)
+{
+  // Win32 MM_* plus wx's wxMM_POINTS/wxMM_METRIC, confirmed from the jump
+  // table at 0x009CAD8C rather than from a header.
+  constexpr int kMapModeText = 1;      // MM_TEXT
+  constexpr int kMapModeLoMetric = 2;  // MM_LOMETRIC
+  constexpr int kMapModeTwips = 6;     // MM_TWIPS
+  constexpr int kMapModePoints = 9;    // wxMM_POINTS
+  constexpr int kMapModeMetric = 10;   // wxMM_METRIC
+
+  constexpr double kTwipsToMm = 0.017638888906880555;  // 0x00F36E10
+  constexpr double kPointsToMm = 0.35277777813761113;  // 0x00F36E20
+
+  mMappingMode = mode;
+
+  if (mode == kMapModeText) {
+    mLogicalScaleX = 1.0;
+    mLogicalScaleY = 1.0;
+  } else {
+    auto* const deviceContext = static_cast<HDC>(m_hDC);
+
+    const int pixelWidth = ::GetDeviceCaps(deviceContext, HORZRES);
+    const int pixelHeight = ::GetDeviceCaps(deviceContext, VERTRES);
+    const int millimetreWidth = ::GetDeviceCaps(deviceContext, HORZSIZE);
+    const int millimetreHeight = ::GetDeviceCaps(deviceContext, VERTSIZE);
+
+    if (millimetreWidth == 0 || millimetreHeight == 0) {
+      // Can't derive mm-to-pixel ratios, so leave the scale untouched.
+      return;
+    }
+
+    const double mmToPixelsX = static_cast<double>(pixelWidth) / millimetreWidth;
+    const double mmToPixelsY = static_cast<double>(pixelHeight) / millimetreHeight;
+
+    switch (mode) {
+      case kMapModeTwips:
+        mLogicalScaleX = kTwipsToMm * mmToPixelsX;
+        mLogicalScaleY = kTwipsToMm * mmToPixelsY;
+        break;
+      case kMapModePoints:
+        mLogicalScaleX = kPointsToMm * mmToPixelsX;
+        mLogicalScaleY = kPointsToMm * mmToPixelsY;
+        break;
+      case kMapModeMetric:
+        mLogicalScaleX = mmToPixelsX;
+        mLogicalScaleY = mmToPixelsY;
+        break;
+      case kMapModeLoMetric:
+        mLogicalScaleX = mmToPixelsX / 10.0;
+        mLogicalScaleY = mmToPixelsY / 10.0;
+        break;
+      default:
+        // Unknown mode: the binary discards both ratios and keeps the
+        // existing scale.
+        break;
+    }
+  }
+
+  auto* const deviceContext = static_cast<HDC>(m_hDC);
+
+  constexpr std::int32_t kViewportExtent = 1000;
+  const auto* const transform = reinterpret_cast<const WxDisplayTransformRuntimeView*>(this);
+  const std::int32_t width = wxDisplayTransformScaleX(transform, kViewportExtent) * mSignX;
+  const std::int32_t height = wxDisplayTransformScaleY(transform, kViewportExtent) * mSignY;
+
+  (void)::SetMapMode(deviceContext, MM_ANISOTROPIC);
+  (void)::SetViewportExtEx(deviceContext, kViewportExtent, kViewportExtent, nullptr);
+  (void)::SetWindowExtEx(deviceContext, width, height, nullptr);
+  (void)::SetViewportOrgEx(deviceContext, mDeviceOriginX, mDeviceOriginY, nullptr);
+  (void)::SetWindowOrgEx(deviceContext, mLogicalOriginX, mLogicalOriginY, nullptr);
+}
+
 // wxColourChanger (dc.cpp:121-191, this scoped fg/bg swap for
 // wxSTIPPLE_MASK_OPAQUE brushes) is already recovered as the
 // wxCaptureAndApplyDcColourStateRuntime / wxApplyPendingDcTextColorsRuntime
