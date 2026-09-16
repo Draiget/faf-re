@@ -609,8 +609,27 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     const bool shouldDelete = BlipArmyTreatsViewerAsAlly(this, blip) ||
       (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
     if (shouldDelete) {
-      ClearPerArmyRecon(this, blip, true);
+      // 0x005C0D39-0x005C0D74: the orphan teardown logs the confirmation and
+      // feeds the sim checksum -- tag 2, then the blip id, four bytes each, the
+      // same shape UpdateBlip uses with tag 4. Both writes were missing, so
+      // every orphan retirement left this client's checksum one pair of words
+      // behind a client that ran the real code: a desync, not a cosmetic gap.
+      const std::uint32_t blipId = static_cast<std::uint32_t>(blip->id_);
+      mSim->Logf("  orphan 0x%08x confirmed dead\n", blipId);
+      std::uint32_t checksumTag = 2u;
+      mSim->mContext.Update(&checksumTag, sizeof(checksumTag));
+      checksumTag = blipId;
+      mSim->mContext.Update(&checksumTag, sizeof(checksumTag));
+
       it = mTempBlips.erase(it);
+
+      // 0x005C0D9F. The blip also owns an influence-map entry; leaving it
+      // behind keeps a dead blip contributing threat to the AI's grid forever.
+      if (mIMap) {
+        mIMap->RemoveEntry(blipId);
+      }
+
+      ClearPerArmyRecon(this, blip, true);
       // 0x005C0E15. Clearing the per-army record is only half the teardown --
       // the blip is an Entity, and this army was holding it alive. Without the
       // release it stays in `sourceUnit->mReconBlips`, where `FindOrCreateBlip`
@@ -657,6 +676,12 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
         const bool shouldDeleteFake = BlipArmyTreatsViewerAsAlly(this, blip) ||
           (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
         if (shouldDeleteFake) {
+          // 0x005C0F8A. Same influence-map release as the orphan arm. The
+          // stale-mobile arm below deliberately has none -- the binary does not
+          // call it there either.
+          if (mIMap) {
+            mIMap->RemoveEntry(static_cast<std::uint32_t>(blip->id_));
+          }
           ClearPerArmyRecon(this, blip, true);
           blip->DestroyIfUnused();  // 0x005C0FBA
         } else {
