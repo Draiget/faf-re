@@ -4079,8 +4079,11 @@ namespace
   constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset one or more named cameras.";
   constexpr const char* kConsoleStartupConInBindKeyDescription =
     "Specify a key combo and a console command, binds console command to key";
+  constexpr const char* kConsoleStartupConInDumpKeyBindingsDescription = "Shows all the key bindings";
   constexpr const char* kConsoleStartupConInSetKeyNameDescription = "Set a key name to map to a key code";
-  constexpr const char* kConsoleStartupConInDumpKeyNamesDescription = "Shows all the key names.";
+  // No trailing period: the registrar's stru_F5B1BC description pointer
+  // (0x00E43DB8) spells this exactly "Shows all the key names".
+  constexpr const char* kConsoleStartupConInDumpKeyNamesDescription = "Shows all the key names";
   constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
   constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
   constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
@@ -4157,6 +4160,7 @@ namespace
   CConFunc gCConFunc_ExecutePasteBuffer{};
   CConFunc gCConFunc_UI_ResetView{};
   CConFunc gCConFunc_IN_BindKey{};
+  CConFunc gCConFunc_IN_DumpKeyBindings{};
   CConFunc gCConFunc_IN_SetKeyName{};
   CConFunc gCConFunc_IN_DumpKeyNames{};
   CConFunc gCConFunc_GetVersion{};
@@ -5102,6 +5106,44 @@ namespace moho
       "IN_BindKey",
       &moho::IN_BindKey,
       &cleanup_CConFunc_IN_BindKey
+    );
+  }
+
+  /**
+   * Address: 0x00C06790 (FUN_00C06790, the `atexit` target the registrar
+   * below installs)
+   *
+   * What it does:
+   * Unregisters startup command storage for `IN_DumpKeyBindings`.
+   */
+  void cleanup_CConFunc_IN_DumpKeyBindings()
+  {
+    CleanupStartupConCommand(gCConFunc_IN_DumpKeyBindings);
+  }
+
+  /**
+   * Address: 0x00BE4890 (FUN_00BE4890, register_CConFunc_IN_DumpKeyBindings)
+   *
+   * What it does:
+   * Registers the `IN_DumpKeyBindings` startup console callback with its exact
+   * command metadata (name and description read from the registrar's
+   * stru_F5B19C in the PE .data image: name pointer 0x00E43CC4
+   * "IN_DumpKeyBindings", description pointer 0x00E43CA8 "Shows all the key
+   * bindings") and schedules the generated command-object cleanup lane.
+   *
+   * The registrar stores the callback at CConFunc +0x0C as
+   * `mov dword ptr [0x00F5B1A8], 0x0083A070` -- the address of a five-byte
+   * `jmp` thunk onto the command body at 0x00839DC0, which is why the body
+   * itself carries no direct caller.
+   */
+  void register_CConFunc_IN_DumpKeyBindings()
+  {
+    RegisterStartupConFunc(
+      gCConFunc_IN_DumpKeyBindings,
+      kConsoleStartupConInDumpKeyBindingsDescription,
+      "IN_DumpKeyBindings",
+      &moho::IN_DumpKeyBindings,
+      &cleanup_CConFunc_IN_DumpKeyBindings
     );
   }
 
@@ -6378,6 +6420,7 @@ namespace
       moho::register_CConFunc_CON_ExecuteLastCommand();
       moho::register_CConFunc_ANI_DumpSkeleton();
       moho::register_CConFunc_IN_BindKey();
+      moho::register_CConFunc_IN_DumpKeyBindings();
       moho::register_CConFunc_IN_SetKeyName();
       moho::register_CConFunc_IN_DumpKeyNames();
       moho::register_console_command_buffer();

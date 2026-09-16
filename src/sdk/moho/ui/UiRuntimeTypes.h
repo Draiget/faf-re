@@ -1339,6 +1339,35 @@ namespace moho
   [[nodiscard]] int IN_FindKeyNameIndexCi(const msvc8::string& needle);
 
   /**
+   * Address: 0x00838E70 (FUN_00838E70, Moho::IN_GetKeyName)
+   *
+   * What it does:
+   * Yields `in_keyNames[keyCode]`, or an empty string for a code outside the
+   * 256-slot table.
+   */
+  [[nodiscard]] msvc8::scoped_string IN_GetKeyName(unsigned int keyCode);
+
+  /**
+   * Address: 0x00839840 (FUN_00839840, Moho::IN_DescribeKeyBinding)
+   *
+   * What it does:
+   * Renders one packed key mask as the chord spelling `IN_BindKey` accepts:
+   * the `Ctrl-` / `Alt-` / `Shift-` prefixes in that order, then the key name.
+   */
+  [[nodiscard]] msvc8::scoped_string IN_DescribeKeyBinding(std::uint32_t keyMask);
+
+  /**
+   * Address: 0x00839DC0 (FUN_00839DC0, Moho::IN_DumpKeyBindings)
+   *
+   * What it does:
+   * The `IN_DumpKeyBindings` console command ("Shows all the key bindings"):
+   * prints every entry of `gUiKeyActionMap` as
+   * `"<chord> :: <console command> :: repeat = <true|false>"`. Takes no
+   * command arguments, matching the binary's `CConFunc::Callback` shape.
+   */
+  void IN_DumpKeyBindings(void* commandArgs);
+
+  /**
    * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
    *
    * What it does:
