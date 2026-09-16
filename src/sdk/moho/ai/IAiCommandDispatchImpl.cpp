@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdarg>
+#include <cstdio>
 #include <new>
 #include <typeinfo>
 
@@ -77,6 +79,23 @@ namespace gpg
 
 namespace
 {
+  // TEMPORARY PROBE SINK -- transport/effects triage, delete when resolved.
+  // gpg::Warnf reaches nothing until `/log <name>` installs a target
+  // (gpg::InitLogSingleton creates the context but registers no target), so the
+  // probes below append here instead. The file lands beside the executable.
+  void DiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc('\n', sink);
+    (void)std::fclose(sink);
+  }
   class IAiCommandDispatchImplConstructed final : public IAiCommandDispatchImpl
   {
   public:
@@ -220,7 +239,7 @@ namespace
    * Resolves one target entity to `Unit*` and, when this dispatch unit has
    * transport AI state, applies that unit as teleport destination.
    */
-  [[maybe_unused]] Entity* TrySetTransportTeleportDestinationFromTarget(
+  Entity* TrySetTransportTeleportDestinationFromTarget(
     IAiCommandDispatchImpl* const dispatch,
     CAiTarget* const target
   )
@@ -498,6 +517,16 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Dock: {
         Unit* const target = CUnitCommand::GetTarget(command);
 
+        // TEMPORARY PROBE -- transport-load triage, delete when resolved.
+        // A null target here means the whole arm falls through without
+        // consuming the command, which leaves the order sitting in the queue
+        // with nothing running -- on the transport and on every unit alike.
+        DiagLine(
+          "[XPORTDIAG] Dispatch transport arm: unit=%p target=%p self=%d setSize=%u",
+          static_cast<void*>(unit), static_cast<void*>(target), (target == unit) ? 1 : 0,
+          static_cast<unsigned int>(command->mUnitSet.mVec.size())
+        );
+
         // 0x00609BE4-0x00609C6F: a ferry beacon always routes here, and so does
         // any FACTORY target that is *neither* an air-staging platform nor a
         // teleporter -- `jz` past both `IsInCategory` probes is what reaches
@@ -633,8 +662,16 @@ namespace
         if (!transport) {
           return;
         }
+        // 0x0060A207-0x0060A228: once the transport is a teleporter and the
+        // command carries a target entity, the binary hands `&command->mTarget`
+        // and the dispatch to FUN_0060B8B0 (`mov eax, esi` / `push ecx` /
+        // `call 0x60B8B0`), which resolves the target to a Unit and applies it
+        // as the teleport destination. It does not touch the reservation. That
+        // call site was missing, which is why the recovered helper below sat
+        // orphaned with `[[maybe_unused]]` even though `faidx` reports this
+        // function as its only caller in the binary.
         if (transport->TransportIsTeleporter() && command->mTarget.GetEntity()) {
-          transport->TransportResetReservation();
+          (void)TrySetTransportTeleportDestinationFromTarget(dispatch, &command->mTarget);
           return;
         }
         const EntitySetTemplate<Unit> loaded = transport->TransportGetLoadedUnits(false);
@@ -875,6 +912,20 @@ void IAiCommandDispatchImpl::OnEvent(const EUnitCommandQueueStatus event)
   }
 
   if (event > EUnitCommandQueueStatus::UCQS_Changed && event <= EUnitCommandQueueStatus::UCQS_NeedsRefresh) {
+    // TEMPORARY PROBE -- "queued unload drops on the spot". This arm discards
+    // every task above the dispatch, including a move a sibling task just
+    // pushed, so it matters exactly when it fires. Filtered to units that are
+    // mid-unload so the line is rare enough to reach faf_diag.log.
+    if (mUnit != nullptr && mUnit->IsUnitState(UNITSTATE_TransportUnloading)) {
+      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
+        (void)std::fprintf(
+          sink, "[DISPEVT] interrupt-while-unloading event=%d unit=%p thread=%p staged=%d\n",
+          static_cast<int>(event), static_cast<void*>(mUnit), static_cast<void*>(mOwnerThread),
+          (mOwnerThread != nullptr && mOwnerThread->mStaged) ? 1 : 0
+        );
+        (void)std::fclose(sink);
+      }
+    }
     if (mOwnerThread != nullptr) {
       mOwnerThread->mPendingFrames = 0;
       if (mOwnerThread->mStaged) {
@@ -985,6 +1036,9 @@ ETaskStatus IAiCommandDispatchImpl::TaskTick()
 
     mState = 1u;
     mLinkResult = static_cast<EAiResult>(0);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] Dispatch cmdType=%d unit=%p nav=%p", static_cast<int>(currentCommand->mVarDat.mCmdType),
+               static_cast<void*>(mUnit), static_cast<void*>(mUnit->AiNavigator));
     DispatchQueuedCommand(this, currentCommand);
     return static_cast<ETaskStatus>(0);
   };
