@@ -386,7 +386,18 @@ namespace moho
       const std::size_t rowBase = static_cast<std::size_t>(z) * static_cast<std::size_t>(mWidth);
       for (std::int32_t x = minX; x < maxX; ++x) {
         const std::size_t index = rowBase + static_cast<std::size_t>(x);
-        if (mGrid[index] != 0) {
+        // STRICTLY positive, and the asymmetry with the point overloads above
+        // is deliberate in the original. This scan is
+        // `while (*(char *)(...) <= 0) ++x;` -- a SIGNED compare that keeps
+        // walking on a negative cell -- while the point overloads at
+        // 0x005BE150 and 0x005BE1C0 genuinely use `test al,al` / `setne`.
+        //
+        // It matters because `mGrid` is `std::int8_t` and `Raster` applies
+        // `cell += ±1`, so an unbalanced SubViz can drive a cell below zero.
+        // Reading that as visible handed coverage to `ReconCanDetect`'s rect
+        // queries (the decal and terrain-fog reveals) over ground no army was
+        // actually watching.
+        if (mGrid[index] > 0) {
           return true;
         }
       }
