@@ -237,14 +237,38 @@ namespace
     return static_cast<std::int32_t>(blueprint->Intel.JammerBlips);
   }
 
-  [[nodiscard]] bool IsViewerAlliedWithBlipArmy(CAiReconDBImpl* const owner, ReconBlip* const blip) noexcept
+  /**
+   * "Does the blip's own army count the viewer as an ally?"
+   *
+   * The direction matters and it is the opposite of `IsAlliedOrSameArmy`.
+   * `ReconTick` loads the VIEWER's army index and tests it against the BLIP
+   * army's ally set (0x005C0CC0 `mov ecx,[esi+30h]` / `mov eax,[ecx+8]` ->
+   * viewer army index; 0x005C0CCB `mov ecx,[edi+14Ch]` -> blip->ArmyRef; then
+   * the set is read out of THAT army at `[ecx+0E8h]` / `[ecx+0F0h]` /
+   * `[ecx+0F4h]`). `ReconCanDetect` at 0x005C193C asks the question the other
+   * way round, which is why both forms exist in this file -- with asymmetric
+   * alliances they are genuinely different answers.
+   *
+   * An unfocused viewer (index -1) short-circuits to false at 0x005C0CC6
+   * `cmp eax,-1`, leaving the decision to the LOS probe beside this call.
+   */
+  [[nodiscard]] bool BlipArmyTreatsViewerAsAlly(CAiReconDBImpl* const owner, ReconBlip* const blip) noexcept
   {
-    if (!owner || !blip) {
+    if (!owner || !blip || !owner->mArmy) {
       return false;
     }
 
-    auto* const entity = reinterpret_cast<Entity*>(blip);
-    return IsAlliedOrSameArmy(owner->mArmy, entity ? entity->ArmyRef : nullptr);
+    const std::int32_t viewerArmyId = owner->mArmy->ArmyId;
+    if (viewerArmyId == -1) {
+      return false;
+    }
+
+    CArmyImpl* const blipArmy = reinterpret_cast<Entity*>(blip)->ArmyRef;
+    if (!blipArmy) {
+      return false;
+    }
+
+    return blipArmy->Allies.Contains(static_cast<std::uint32_t>(viewerArmyId));
   }
 
   [[nodiscard]] Wm3::Vec3f BlipProbePosition(ReconBlip* const blip) noexcept
@@ -575,14 +599,14 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     return;
   }
 
-  SeedReconMapFromBlipList(this);
-
-
+  // 0x005C0C40 opens on the Logf and goes straight into the orphan loop at
+  // 0x005C0CA5. There is no map re-seed here; seeding belongs to the two entry
+  // points that can be reached with an empty map, not to the per-tick path.
   mSim->Logf("ReconTick for army %d: %s [%s]\n", mArmy->ArmyId, mArmy->PlayerName.raw_data_unsafe(), mArmy->ArmyName.raw_data_unsafe());
 
   for (auto it = mTempBlips.begin(); it != mTempBlips.end();) {
     ReconBlip* const blip = *it;
-    const bool shouldDelete = IsViewerAlliedWithBlipArmy(this, blip) ||
+    const bool shouldDelete = BlipArmyTreatsViewerAsAlly(this, blip) ||
       (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
     if (shouldDelete) {
       ClearPerArmyRecon(this, blip, true);
@@ -601,16 +625,27 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       continue;
     }
 
-    Unit* sourceUnit = node->first.sourceUnit.GetObjectPtr();
-    if (!sourceUnit) {
-      sourceUnit = DecodeBlipSourceUnit(blip);
-    }
+    // 0x005C0E54-0x005C0E7C decodes the source from the MAP KEY's weak pointer
+    // and nothing else: a null pointer goes straight to the dead-source arm.
+    // Falling back to `blip->GetSourceUnit()` here used to resurrect a source
+    // the weak pointer had already given up on, so the entry never left the map
+    // and its recon record never cleared -- a blip stranded visible forever.
+    Unit* const sourceUnit = node->first.sourceUnit.GetObjectPtr();
 
     if (!sourceUnit || sourceUnit->DestroyQueued()) {
-      if (!IsFakeBlip(blip)) {
+      // 0x005C0E9B `cmp byte ptr [edi+278h], 0` -- `mDeleteWhenStale`, which the
+      // constructor sets to `sourceUnit->IsMobile()` (ReconBlip.cpp:1071). So a
+      // MOBILE source drops its blip outright, and a STRUCTURE keeps it as a
+      // RECON_MaybeDead ghost until the viewer can prove the spot is empty.
+      //
+      // This tested `IsFakeBlip` (+0x294, `mUnitConstDat.mFake`) instead, which
+      // is a different field with an unrelated meaning: dead structures lost the
+      // ghost they are supposed to leave behind, and dead jammers left permanent
+      // decoy ghosts that nothing would ever clear.
+      if (blip->mDeleteWhenStale != 0u) {
         ClearPerArmyRecon(this, blip, true);
       } else {
-        const bool shouldDeleteFake = IsViewerAlliedWithBlipArmy(this, blip) ||
+        const bool shouldDeleteFake = BlipArmyTreatsViewerAsAlly(this, blip) ||
           (ReconCanDetectEntity(this, reinterpret_cast<Entity*>(blip), BlipProbePosition(blip), RECON_LOSNow) != RECON_None);
         if (shouldDeleteFake) {
           ClearPerArmyRecon(this, blip, true);
@@ -638,7 +673,13 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       if (!unit->BluePrint) {
         continue;
       }
-      if (IsAlliedOrSameArmy(mArmy, unit->ArmyRef)) {
+      // 0x005C107B `cmp eax,[esi+30h]` / `je` -- a POINTER-identity test against
+      // this recon DB's own army, not an alliance test. Allied units do get
+      // blips: that is how you see an ally's army at all, and `ReconCanDetect`
+      // (0x005C18F0) hands allied entities their incoming flags back unchanged
+      // rather than re-deriving them from the grids. Skipping every ally here
+      // made an ally's units invisible.
+      if (unit->ArmyRef == mArmy) {
         continue;
       }
       if (!mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex)) {
