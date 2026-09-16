@@ -541,19 +541,23 @@ namespace moho
       // +0x154, on this command and on every resolved peer in
       // `mCoordinatingOrders`, and `TaskTick`'s TASKSTATE_Preparing arm parks
       // the task on `return 10` while `IsCoordinating() && !IsDone()`. Setting
-      // the wrong byte therefore left +0x154 clear forever, so every ranged
-      // attack order whose command carries coordination links -- which is every
-      // order issued to a multi-unit selection, since
-      // `CUnitCommand::CoordinateWith` chains the selection's commands through
-      // the issue data's coordinate-with id -- spun in Preparing and the unit
-      // never moved or fired. `CUnitMeleeAttackTargetTask`'s identical
-      // constructor lane (0x0061580B) already wrote +0x154, which is why melee
-      // units were the only ones that still executed an attack order.
+      // the wrong byte left +0x154 clear forever, so a ranged attack task whose
+      // command carries coordination links never left Preparing: it returned the
+      // wait status every tick and the unit neither moved nor fired.
+      // `mCoordinatingOrders` is filled by `CUnitCommand::CoordinateWith`, whose
+      // two producers are the `CoordinateAttacks` Lua binding (0x006F3980, which
+      // links every pair in the table it is handed) and the UI's "Coordinated
+      // Attack!" drag gesture, so those are the orders that hung.
+      // `CUnitMeleeAttackTargetTask`'s identical constructor lane (0x0061580B)
+      // already wrote +0x154; only the ranged task was wrong.
       //
-      // The stray +0x142 write was wrong in the other direction too: that flag
-      // marks a factory-issued command (Sim.cpp's factory-order path is its only
-      // real writer), and `CUnitMoveTask`'s goal-rederivation predicate gates on
-      // it, so every command a ranged attack task started on was mislabelled.
+      // The stray +0x142 write was wrong in the other direction too. That byte
+      // is the factory-issued-command marker - the factory order path and the
+      // Lua factory binding are its only real writers, and
+      // `CUnitMoveTask::ShouldUseCurrentCommandTargetPosition` (0x00618A00,
+      // `cmp byte ptr [eax+0x142], 0`) is what reads it - so every command a
+      // ranged attack task started on was left mislabelled as factory-issued
+      // for any move task constructed under it afterwards.
       runtime->mCommand->mUnknownFlag154 = true;
       if (Broadcaster* const commandListenerHead = CommandEventListenerHead(runtime->mCommand); commandListenerHead != nullptr)
       {
