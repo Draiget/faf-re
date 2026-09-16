@@ -393,6 +393,14 @@ namespace gpg::core
      */
     ~FastVector()
     {
+      // See ~FastVectorInline: an intrusive weak-ref slot has to leave its
+      // target's chain before its storage goes away, and DestroyRange cannot do
+      // it because the slot is trivially destructible.
+      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
+        detail::UnlinkIntrusiveWeakRefRange(
+          reinterpret_cast<IntrusiveWeakLinkNode*>(start_), reinterpret_cast<IntrusiveWeakLinkNode*>(end_)
+        );
+      }
       detail::DestroyRange(start_, end_);
       detail::FreeElements(start_);
     }
@@ -860,6 +868,20 @@ namespace gpg::core
      */
     ~FastVectorInline()
     {
+      // An intrusive weak-ref slot is a node the target's weak-link chain points
+      // AT, so releasing the storage without splicing each slot out leaves the
+      // target naming memory that is about to be freed -- and for a vector with
+      // live inline storage, that memory is the owning frame. `DestroyRange`
+      // cannot do this: the slot is two raw `void*`, hence trivially
+      // destructible, so its `is_trivially_destructible_v` branch is a no-op.
+      // The binary emits the unlink here for exactly that reason, as
+      // `sub_61CA70` immediately before `operator delete[]`.
+      if constexpr (IsIntrusiveWeakRefSlot<T>::value) {
+        detail::UnlinkIntrusiveWeakRefRange(
+          reinterpret_cast<IntrusiveWeakLinkNode*>(this->start_),
+          reinterpret_cast<IntrusiveWeakLinkNode*>(this->end_)
+        );
+      }
       detail::DestroyRange(this->start_, this->end_);
       if (this->start_ && this->start_ != originalVec_) {
         detail::FreeElements(this->start_);
