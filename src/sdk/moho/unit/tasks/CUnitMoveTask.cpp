@@ -1,5 +1,3 @@
-#include "gpg/core/utils/Logging.h"
-#include <cmath>
 #include "moho/unit/tasks/CUnitMoveTask.h"
 
 #include <cmath>
@@ -638,10 +636,13 @@ namespace moho
     mCommandRef.BindObjectUnlinked(sourceCommand);
     (void)mCommandRef.LinkIntoOwnerChainHeadUnlinked();
 
-    if (!mUnit) {
-      return;
-    }
-
+    // No `if (!mUnit) return;` here: the binary loads `[ebp+0x1c]` at
+    // 0x006181A7 and immediately runs `or [eax+0x4a0], 4` at 0x006181CF with
+    // no null test, so `mUnit` is an invariant of this constructor (the only
+    // caller, `NewMoveTask`, has already dereferenced it to reach the
+    // navigator). An early return here is worse than a crash: it silently
+    // skips the tail `Stage()` below, which is the one thing that suspends
+    // the owning task thread while the move runs.
     mUnit->UnitStateMask |= 0x0000000000000004ull;
 
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
@@ -659,6 +660,33 @@ namespace moho
     }
 
     if (command) {
+      // 0x0061827C `lea ecx, [eax + 0x34]` (eax = the bound command) /
+      // 0x0061827F `lea eax, [ebp + 0x54]` -> `add eax, 4`: splice this task's
+      // `Listener<ECommandEvent>` node (+0x54, link at +0x58) into the bound
+      // command's broadcaster ring. `CUnitCommand` derives `Broadcaster`
+      // after `CScriptObject`, and `sizeof(CScriptObject) == 0x34`, so the
+      // ring head the binary computes is exactly that base subobject.
+      //
+      // Without this link `CUnitMoveTask::OnEvent(ECommandEvent)` is dead
+      // code and the move never learns that the command it is serving was
+      // retargeted, cancelled or completed. Every sibling command task
+      // (`CUnitPatrolTask`, `CUnitGuardTask`, `CUnitFormAndMoveTask`) makes
+      // the same link; `~CUnitMoveTask` already unlinks both nodes below,
+      // which is what makes the omission visible.
+      Listener<ECommandEvent>::mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(command));
+
+      // 0x006182BC `mov ecx, [esi + 0x118]` = `command->mFormationInstance`
+      // (`mUnitSet` ends at +0x118), guarded by the virtual at
+      // 0x006182D2 `mov eax, [edx + 0x40]` / `call eax` with `push 1` /
+      // `push unit` -- `IFormationInstance` slot 16, `Contains(unit, true)`.
+      // On success 0x006182E5 `lea ecx, [eax + 8]` / 0x006182E8
+      // `lea eax, [ebp + 0x44]` splices the `Listener<EFormationdStatus>`
+      // node (+0x44) into `CAiFormationInstance::mStatusListeners` (+0x08).
+      if (CAiFormationInstance* const formation = command->mFormationInstance;
+          formation != nullptr && formation->Contains(mUnit, true)) {
+        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(&formation->mStatusListeners);
+      }
+
       // 0x00618318 seeds one candidate destination with the zero vector and
       // only two lanes below ever write it. If neither fires, the compare at
       // 0x006184C5 finds it still zero and the whole tail is skipped - which
@@ -741,12 +769,6 @@ namespace moho
    */
   int CUnitMoveTask::Execute()
   {
-    // TEMPORARY PROBE -- "queued unload drops on the spot".
-    gpg::Warnf("[MOVETASK] Execute this=%08X dispatchIssued=%d needsTransportCat=%d variant=%d navStatus=%d",
-               reinterpret_cast<unsigned>(this), static_cast<int>(mTransportDispatchIssued),
-               static_cast<int>(mRequiresTransportCategoryCheck), static_cast<int>(mMoveVariant),
-               (mUnit != nullptr && mUnit->AiNavigator != nullptr)
-                 ? static_cast<int>(mUnit->AiNavigator->GetStatus()) : -1);
     if (mTransportDispatchIssued != 0u) {
       return -1;
     }
@@ -857,26 +879,21 @@ namespace moho
     }
 
     IAiNavigator* const navigator = dispatchTask->mUnit->AiNavigator;
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    gpg::Warnf("[NAVDIAG] NewMoveTask unit=%p nav=%p goal cell=(%d,%d)-(%d,%d)", static_cast<void*>(dispatchTask->mUnit),
-               static_cast<void*>(navigator), goal.minX, goal.minZ, goal.maxX, goal.maxZ);
     if (!navigator) {
       return;
     }
 
+    // 0x006190C3 `mov eax, [ecx]` / `mov edx, [eax+8]` / `push edi` /
+    // `call edx`: the goal reaches the navigator before the task exists, so a
+    // task that dies early still leaves the unit walking to the goal.
     navigator->SetGoal(goal);
-    CUnitMoveTask* const child = new (std::nothrow)
+
+    // 0x006190CB `push 0x98` / `call operator new` then 0x006190FA
+    // `call 0x6180e0`. The constructor pushes itself onto the dispatch's task
+    // thread and stages that thread, which is what suspends the caller until
+    // the move finishes.
+    (void)new (std::nothrow)
       CUnitMoveTask(dispatchTask, goal, requiresTransportCategoryCheck, sourceCommand, moveVariant);
-    // TEMPORARY PROBE -- "queued unload drops on the spot". The child only
-    // becomes the thread's top task when the parent has an owner thread
-    // (CTask::CTask ignores a null thread), so a parent with none leaves this
-    // task orphaned and resumes immediately.
-    gpg::Warnf("[NAVDIAG] NewMoveTask child=%08X parentThread=%08X childThread=%08X childTop=%08X",
-               reinterpret_cast<unsigned>(child),
-               reinterpret_cast<unsigned>(dispatchTask->mOwnerThread),
-               reinterpret_cast<unsigned>(child != nullptr ? child->mOwnerThread : nullptr),
-               reinterpret_cast<unsigned>(
-                 (child != nullptr && child->mOwnerThread != nullptr) ? child->mOwnerThread->mTaskTop : nullptr));
   }
 } // namespace moho
 
