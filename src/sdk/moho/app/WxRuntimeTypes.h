@@ -4055,7 +4055,10 @@ public:
   virtual void StartPage() {} // slot 11 (+0x2C)
   virtual void EndPage() {} // slot 12 (+0x30)
   virtual void SetFont() {} // slot 13 (+0x34)
-  virtual void SetPen() {} // slot 14 (+0x38)
+  // Real wx: `virtual void SetPen(const wxPen& pen)` (dc.h). The shape is
+  // pinned by `wxDCBase::DoDrawCheckMark` (0x009CFBA3), which constructs a
+  // temporary pen and dispatches it through this slot before destroying it.
+  virtual void SetPen(const wxPenRuntimeObject& pen) { (void)pen; } // slot 14 (+0x38)
   // slot 15 (+0x3C)
   virtual void SetBrush(const void* brush) noexcept { (void)brush; }
   // `WD3DViewport::DrawBackgroundImage`'s slot-shape derivation only exercises
@@ -4078,7 +4081,12 @@ public:
   virtual void CanGetTextExtent() {} // slot 24 (+0x60)
   virtual void GetDepth() {} // slot 25 (+0x64)
   virtual void GetPPI() {} // slot 26 (+0x68)
-  virtual void Ok() {} // slot 27 (+0x6C)
+  // Real wx: `virtual bool Ok() const { return m_ok; }` (dc.h). The result is
+  // returned in `al` and branched on at 0x009CFB50, so the slot is a
+  // bool-returning const query, not the void placeholder it was. The real
+  // implementation is `wxDC`'s override; this base keeps the shape-only body,
+  // as slot 43 `DoGetPixel` does.
+  [[nodiscard]] virtual bool Ok() const { return false; } // slot 27 (+0x6C)
   virtual void SetTextForeground() {} // slot 28 (+0x70)
   virtual void SetTextBackground() {} // slot 29 (+0x74)
   virtual void SetMapMode(int /*mode*/) {} // slot 30 (+0x78)
@@ -4102,9 +4110,39 @@ public:
   virtual void DoFloodFill() {} // slot 42 (+0xA8)
   virtual void DoGetPixel() {} // slot 43 (+0xAC)
   virtual void DoDrawPoint() {} // slot 44 (+0xB0)
-  virtual void DoDrawLine() {} // slot 45 (+0xB4)
+  // Real wx: `virtual void DoDrawLine(wxCoord x1, wxCoord y1, wxCoord x2,
+  // wxCoord y2)` (dc.h). Both dispatches in `wxDCBase::DoDrawCheckMark`
+  // (0x009CFBF1, 0x009CFC06) push four coordinates through this slot.
+  virtual void DoDrawLine(
+    const std::int32_t x1,
+    const std::int32_t y1,
+    const std::int32_t x2,
+    const std::int32_t y2
+  )
+  {
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+  } // slot 45 (+0xB4)
   virtual void DoDrawArc() {} // slot 46 (+0xB8)
-  virtual void DoDrawCheckMark() {} // slot 47 (+0xBC)
+  /**
+   * Address: 0x009CFB20 (FUN_009CFB20)
+   * Mangled: ?DoDrawCheckMark@wxDCBase@@MAEXHHHH@Z
+   *
+   * IDA signature:
+   * void __thiscall wxDCBase::DoDrawCheckMark(wxDCBase *this, int x1, int y1, int width, int height);
+   *
+   * What it does:
+   * Draws a scaled tick inside the given box using a pen derived from the
+   * current text foreground colour.
+   */
+  virtual void DoDrawCheckMark(
+    std::int32_t x1,
+    std::int32_t y1,
+    std::int32_t width,
+    std::int32_t height
+  ); // slot 47 (+0xBC)
   // Real override is `wxDC::DoDrawEllipticArc` (this base stays the
   // shape-only no-op interface, matching `DoDrawText`/`DoCrossHair`/
   // `DoGetSizeMM`/`DoDrawPolygon` above).

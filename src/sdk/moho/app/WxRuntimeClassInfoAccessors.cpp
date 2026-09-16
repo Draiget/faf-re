@@ -836,6 +836,19 @@ wxBrushRuntimeObject::~wxBrushRuntimeObject()
 }
 
 /**
+ * Address: 0x009EB0F0 (FUN_009EB0F0)
+ * Mangled: ??0wxPenRefData@@QAE@XZ
+ *
+ * What it does:
+ * Seeds a one-owner ref count and wx's default pen description, writing every
+ * field the binary writes: width 1 (+0x08), `wxSOLID` (+0x0C), `wxJOIN_ROUND`
+ * (+0x10), `wxCAP_ROUND` (+0x14), an empty dash array (+0x24/+0x28) and a null
+ * native handle (+0x3C). The stipple bitmap (+0x18) and colour (+0x2C) are
+ * default-constructed in place, matching the two embedded constructor calls.
+ */
+wxPenRefDataRuntimeObject::wxPenRefDataRuntimeObject() noexcept = default;
+
+/**
  * Address: 0x009EB2A0 (FUN_009EB2A0)
  * Mangled: ??0wxPen@@QAE@@Z
  *
@@ -845,10 +858,67 @@ wxBrushRuntimeObject::~wxBrushRuntimeObject()
 wxPenRuntimeObject::wxPenRuntimeObject() noexcept = default;
 
 /**
+ * Address: 0x009EB8D0 (FUN_009EB8D0)
+ * Mangled: ??0wxPen@@QAE@ABVwxColour@@HH@Z
+ *
+ * IDA signature:
+ * wxPen *__thiscall wxPen::wxPen(wxPen *this, const wxColour *col, int Width, int Style);
+ *
+ * What it does:
+ * Allocates a fresh, single-owner `wxPenRefData` (`operator new(0x40u)` then
+ * the ref-data constructor), stores the requested colour, width and style over
+ * its defaults, then applies wx's Win32S guard: that platform cannot draw a
+ * dashed pen wider than one unit, so any of `wxDOT`/`wxLONG_DASH`/
+ * `wxSHORT_DASH`/`wxDOT_DASH`/`wxUSER_DASH` is clamped back to width 1. The
+ * binary compares `wxGetOsVersion()` against 0x13 for exactly this test and
+ * matches dependencies/wxWindows-2.4.2/src/msw/pen.cpp:78-112.
+ *
+ * The trailing `RealizeResource()` is the binary's `call 0x009EB630`
+ * (`wxPen::Create`, this class's slot-4 override). That override is not
+ * recovered yet, so the call currently reaches `wxGDIObject`'s base answer of
+ * "no realizable native resource" and no HPEN is produced; the pen's
+ * description is still correct and shared. Its return value is discarded here
+ * because the binary discards it too - it returns `this`, never the flag.
+ */
+wxPenRuntimeObject::wxPenRuntimeObject(
+  const wxColourRuntimeObject& colour,
+  const std::int32_t width,
+  const std::int32_t style
+)
+{
+  auto* const refData = new wxPenRefDataRuntimeObject();
+  refData->SetColour(colour);
+  refData->SetWidth(width);
+  refData->SetStyle(style);
+  mRefData = refData;
+
+  const bool isDashedStyle = style == kWxStyleDot || style == kWxStyleLongDash
+                          || style == kWxStyleShortDash || style == kWxStyleDotDash
+                          || style == kWxStyleUserDash;
+  if (wxGetOsVersion(nullptr, nullptr) == kWxPlatformWin32s && isDashedStyle) {
+    refData->SetWidth(1);
+  }
+
+  (void)RealizeResource();
+}
+
+/**
  * Address: 0x009EB2E0 (FUN_009EB2E0)
  * Mangled: ??1wxPen@@QAE@XZ
  *
  * What it does:
- * Releases ref-data ownership through the shared unref lane.
+ * Drops this instance's share of the ref-data, freeing the shared payload once
+ * nothing references it any more. The binary stamps the `wxGDIObject` vtable
+ * back down and tail-jumps to the shared unref lane; the base's
+ * `ReleaseRefData` only clears the pointer, so - exactly as
+ * `~wxBrushRuntimeObject` does - the typed release belongs here.
  */
-wxPenRuntimeObject::~wxPenRuntimeObject() = default;
+wxPenRuntimeObject::~wxPenRuntimeObject()
+{
+  if (auto* const refData = static_cast<wxPenRefDataRuntimeObject*>(mRefData)) {
+    if (refData->ReleaseRef()) {
+      delete refData;
+    }
+    mRefData = nullptr;
+  }
+}

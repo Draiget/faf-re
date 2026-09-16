@@ -59534,7 +59534,7 @@ namespace
   // colour value plus a single-owner brush are sufficient.
   const wxColourRuntimeObject gStockBlackColour(0u, 0u, 0u);
   const wxColourRuntimeObject gStockWhiteColour(0xFFu, 0xFFu, 0xFFu);
-  const wxBrushRuntimeObject gStockTransparentBrush(gStockBlackColour, wxTRANSPARENT);
+  const wxBrushRuntimeObject gStockTransparentBrush(gStockBlackColour, kWxStyleTransparent);
 } // namespace
 
 /**
@@ -59555,6 +59555,56 @@ wxDCBase::wxDCBase()
   , m_textBackgroundColour(gStockWhiteColour)
 {
   m_flags = static_cast<std::uint8_t>((m_flags & 0xE2u) | (wxColourDisplayRuntime() ? 1u : 0u) | 2u);
+}
+
+/**
+ * Address: 0x009CFB20 (FUN_009CFB20)
+ * Mangled: ?DoDrawCheckMark@wxDCBase@@MAEXHHHH@Z
+ *
+ * IDA signature:
+ * void __thiscall wxDCBase::DoDrawCheckMark(wxDCBase *this, int x1, int y1, int width, int height);
+ *
+ * What it does:
+ * Draws a scaled version of wx's tick bitmap inside the box `(x1, y1)` to
+ * `(x1 + width, y1 + height)`, using a solid pen in the current text
+ * foreground colour, then grows the bounding box to cover the box's two
+ * opposite corners - matching `wxDCBase::DoDrawCheckMark`
+ * (dependencies/wxWindows-2.4.2/src/common/dcbase.cpp:45-64) line for line.
+ *
+ * The three divisions are MSVC magic-constant sequences, read out of the
+ * instruction stream rather than assumed: `0x92492493` with `sar edx, 2` is
+ * the signed divide by 7 that yields the pen width (3 for a 10x10 box),
+ * `0x66666667` with `sar edx, 2` the signed divide by 10 applied to `4*width`,
+ * and `cdq; sub eax, edx; sar eax, 1` the signed halving of `height`.
+ *
+ * `GetTextForeground()` does not appear as a call: the binary inlines it to a
+ * direct read of `m_textForegroundColour` (`lea ecx, [esi+0xA8]`), so the
+ * member is used here directly.
+ */
+void wxDCBase::DoDrawCheckMark(
+  const std::int32_t x1,
+  const std::int32_t y1,
+  const std::int32_t width,
+  const std::int32_t height
+)
+{
+  if (!Ok()) {
+    return;
+  }
+
+  const std::int32_t x2 = x1 + width;
+  const std::int32_t y2 = y1 + height;
+
+  // Yields a width of 3 for a 10x10 check mark.
+  SetPen(wxPenRuntimeObject(m_textForegroundColour, (width + height + 1) / 7, kWxStyleSolid));
+
+  const std::int32_t x3 = x1 + (4 * width) / 10;  // x of the tick bottom
+  const std::int32_t y3 = y1 + height / 2;        // y of the left tick branch
+  DoDrawLine(x1, y3, x3, y2);
+  DoDrawLine(x3, y2, x2, y1);
+
+  CalcBoundingBox(x1, y1);
+  CalcBoundingBox(x2, y2);
 }
 
 /**
@@ -59635,7 +59685,7 @@ void wxWindowDC::InitDC() noexcept
     static_cast<wxWindowBase*>(m_canvas)->GetBackgroundColour();
   {
     const wxColourRuntimeObject backgroundColour(background.Red(), background.Green(), background.Blue());
-    wxBrushRuntimeObject backgroundBrush(backgroundColour, wxSOLID);
+    wxBrushRuntimeObject backgroundBrush(backgroundColour, kWxStyleSolid);
     SetBackground(&backgroundBrush);
   }
 
