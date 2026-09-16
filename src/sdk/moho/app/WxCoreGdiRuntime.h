@@ -309,6 +309,31 @@ public:
 
 static_assert(sizeof(wxBitmapRuntimeObject) == 0xC, "wxBitmapRuntimeObject size must be 0xC");
 
+// wx's shared pen/brush style enumeration (wxWindows-2.4.2 include/wx/defs.h:
+// styles from 1456, joins from 1478, caps from 1482). The engine folds these
+// straight into the instruction stream, so they are named here from the
+// vendored header rather than inferred from the values: the join and cap runs
+// are adjacent and trivially transposed.
+inline constexpr std::int32_t kWxStyleSolid = 100;         // wxSOLID
+inline constexpr std::int32_t kWxStyleDot = 101;           // wxDOT
+inline constexpr std::int32_t kWxStyleLongDash = 102;      // wxLONG_DASH
+inline constexpr std::int32_t kWxStyleShortDash = 103;     // wxSHORT_DASH
+inline constexpr std::int32_t kWxStyleDotDash = 104;       // wxDOT_DASH
+inline constexpr std::int32_t kWxStyleUserDash = 105;      // wxUSER_DASH
+inline constexpr std::int32_t kWxStyleTransparent = 106;   // wxTRANSPARENT
+inline constexpr std::int32_t kWxPenJoinRound = 122;       // wxJOIN_ROUND
+inline constexpr std::int32_t kWxPenCapRound = 130;        // wxCAP_ROUND
+
+// wxWindows-2.4.2 include/wx/defs.h:485 enumerates the OS families from
+// `wxUNKNOWN_PLATFORM = 0`; `wxWIN32S` is the twentieth entry.
+inline constexpr int kWxPlatformWin32s = 19;               // wxWIN32S
+
+// Declared with its full address block in WxRuntimeTypes.h (0x009C7540); the
+// GDI layer sits below that header and only needs the signature, so it is
+// forward-declared rather than pulling the whole wx runtime header in here.
+int wxGetOsVersion(int* majorVsn, int* minorVsn);
+
+
 /**
  * Minimal recovered wxBrush ref-data lane: the shared, ref-counted payload
  * a `wxBrushRuntimeObject` points `mRefData` at once it owns a real brush.
@@ -422,9 +447,70 @@ public:
 static_assert(sizeof(wxBrushRuntimeObject) == 0xC, "wxBrushRuntimeObject size must be 0xC");
 
 /**
- * Minimal recovered wxPen runtime lane (the default/"null" state only - this
- * project never constructs a populated pen through this lane, so there is no
- * evidenced ref-data shape to model yet).
+ * Minimal recovered wxPen ref-data lane: the shared, ref-counted payload a
+ * `wxPenRuntimeObject` points `mRefData` at once it owns a real pen.
+ *
+ * Offsets are read off the constructor at 0x009EB0F0, which writes every one
+ * of them: `m_count` (ref count, from `wxObjectRefData`) at +0x04, `m_width`
+ * at +0x08, `m_style` at +0x0C, `m_join` at +0x10, `m_cap` at +0x14, an
+ * embedded `wxBitmap m_stipple` value at +0x18, `m_nbDash` at +0x24, `m_dash`
+ * at +0x28, an embedded `wxColour m_colour` value at +0x2C and `m_hPen` at
+ * +0x3C. `operator new(0x40u)` in the colour/width/style constructor at
+ * 0x009EB8D0 confirms the total size.
+ */
+class wxPenRefDataRuntimeObject
+{
+public:
+  /**
+   * Address: 0x009EB0F0 (FUN_009EB0F0)
+   * Mangled: ??0wxPenRefData@@QAE@XZ
+   *
+   * What it does:
+   * Seeds a one-owner ref count and wx's default pen description - width 1,
+   * `wxSOLID`, round join, round cap - and leaves the stipple bitmap, dash
+   * array and native handle empty.
+   */
+  wxPenRefDataRuntimeObject() noexcept;
+
+  // `wxGDIRefData : wxObjectRefData` supplies this vtable slot; a plain
+  // virtual destructor reproduces it without modelling the (empty) base
+  // classes separately, exactly as `wxBrushRefDataRuntimeObject` does.
+  virtual ~wxPenRefDataRuntimeObject() = default;
+
+  [[nodiscard]] std::int32_t Width() const noexcept { return mWidth; }
+  [[nodiscard]] std::int32_t Style() const noexcept { return mStyle; }
+  [[nodiscard]] const wxColourRuntimeObject& Colour() const noexcept { return mColour; }
+
+  void SetWidth(const std::int32_t width) noexcept { mWidth = width; }
+  void SetStyle(const std::int32_t style) noexcept { mStyle = style; }
+  void SetColour(const wxColourRuntimeObject& colour) noexcept { mColour = colour; }
+
+  // Matches `wxObject::Ref`/`wxObject::UnRef`'s intrusive counting for this
+  // payload: callers share a pen by bumping the count, and release it by
+  // dropping the count and freeing once nothing references it any more.
+  void AddRef() noexcept { ++mRefCount; }
+  [[nodiscard]] bool ReleaseRef() noexcept { return --mRefCount == 0; }
+
+private:
+  std::int32_t mRefCount = 1;                // +0x04 (wxObjectRefData::m_count)
+  std::int32_t mWidth = 1;                   // +0x08
+  std::int32_t mStyle = kWxStyleSolid;       // +0x0C
+  std::int32_t mJoin = kWxPenJoinRound;      // +0x10
+  std::int32_t mCap = kWxPenCapRound;        // +0x14
+  wxBitmapRuntimeObject mStipple{};          // +0x18
+  std::int32_t mDashCount = 0;               // +0x24
+  void* mDashes = nullptr;                   // +0x28
+  wxColourRuntimeObject mColour{};           // +0x2C
+  void* mNativePenHandle = nullptr;          // +0x3C (WXHPEN)
+};
+
+static_assert(
+  sizeof(wxPenRefDataRuntimeObject) == 0x40,
+  "wxPenRefDataRuntimeObject size must be 0x40"
+);
+
+/**
+ * Minimal recovered wxPen runtime lane.
  */
 class wxPenRuntimeObject : public wxGDIObjectRuntime
 {
@@ -437,6 +523,25 @@ public:
    * Default-constructs an empty ("null") pen: no ref-data, not visible.
    */
   wxPenRuntimeObject() noexcept;
+
+  /**
+   * Address: 0x009EB8D0 (FUN_009EB8D0)
+   * Mangled: ??0wxPen@@QAE@ABVwxColour@@HH@Z
+   *
+   * IDA signature:
+   * wxPen *__thiscall wxPen::wxPen(wxPen *this, const wxColour *col, int Width, int Style);
+   *
+   * What it does:
+   * Allocates a fresh, single-owner `wxPenRefData` for the given
+   * colour/width/style triple, matching `operator new(0x40u)` plus the
+   * ref-data constructor in the binary, applies wx's Win32S dashed-pen width
+   * clamp, and realizes the native pen.
+   */
+  wxPenRuntimeObject(
+    const wxColourRuntimeObject& colour,
+    std::int32_t width,
+    std::int32_t style
+  );
 
   /**
    * Address: 0x009EB2E0 (FUN_009EB2E0)
