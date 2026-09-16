@@ -144,6 +144,14 @@ namespace moho
       "Up",
       "Down",
       "Hover",
+    };
+    // Turn-event names, the three-entry table at 0x00F58374. These used to be
+    // appended to the vert-event names above, but the binary keeps four
+    // separate tables back to back -- horz at 0x00F58350, vert at 0x00F58360,
+    // turn at 0x00F58374, motion state at 0x00F58380 -- and both
+    // SetMotionTurnEvent (0x006B8FB0) and CalcMoveAir's inlined reset index
+    // this one from its own base.
+    constexpr const char* kUnitMotionScriptTurnEventNames[] = {
       "Straight",
       "Turn",
       "SharpTurn",
@@ -154,6 +162,8 @@ namespace moho
       sizeof(kUnitMotionScriptHorzEventNames) / sizeof(kUnitMotionScriptHorzEventNames[0]);
     constexpr std::size_t kUnitMotionScriptVertEventNameCount =
       sizeof(kUnitMotionScriptVertEventNames) / sizeof(kUnitMotionScriptVertEventNames[0]);
+    constexpr std::size_t kUnitMotionScriptTurnEventNameCount =
+      sizeof(kUnitMotionScriptTurnEventNames) / sizeof(kUnitMotionScriptTurnEventNames[0]);
     constexpr std::uint64_t kVerticalMotionStateMask =
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown)) |
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
@@ -430,6 +440,20 @@ namespace moho
         return "";
       }
       return kUnitMotionScriptVertEventNames[eventOffset];
+    }
+
+    [[nodiscard]] const char* UnitMotionTurnEventToScriptString(const EUnitMotionTurnEvent event) noexcept
+    {
+      const auto eventIndex = static_cast<std::int32_t>(event);
+      if (eventIndex < 0) {
+        return "";
+      }
+
+      const auto eventOffset = static_cast<std::size_t>(eventIndex);
+      if (eventOffset >= kUnitMotionScriptTurnEventNameCount) {
+        return "";
+      }
+      return kUnitMotionScriptTurnEventNames[eventOffset];
     }
 
     [[nodiscard]] bool IsVector3fBinaryZero(const Wm3::Vector3f& value) noexcept
@@ -1651,11 +1675,30 @@ namespace moho
    * Mangled: ?SetMotionTurnEvent@CUnitMotion@Moho@@AAEXW4EUnitMotionTurnEvent@2@@Z
    *
    * What it does:
-   * Current binary implementation is a no-op lane.
+   * Stores the new turn event and, when it actually changed, reports it to the
+   * unit's script as `OnMotionTurnEventChange(new, old)`.
+   *
+   * 2025.7.1 hot-patches this body out, exactly as it does the air-landing
+   * ground gate: the eight bytes at 0x006B8FB9 hold `E9 22 00 00 00` followed
+   * by three `90`s, which is a five-byte jump straight to the epilogue plus
+   * padding, overwriting `74 25` (the "unchanged" early-out) AND the six-byte
+   * store `89 81 84 00 00 00`. The `cmp` at 0x006B8FB7 still runs and its
+   * result is discarded. Everything after the patch survives intact and is
+   * recovered here; the unpatched sibling `SetMotionState` (0x006B8FF0) has
+   * the identical shape against field +0x78, which is what pins the store's
+   * position and width.
    */
   void CUnitMotion::SetMotionTurnEvent(const EUnitMotionTurnEvent event)
   {
-    (void)event;
+    const EUnitMotionTurnEvent previousEvent = mTurnEvent;
+    if (previousEvent == event) {
+      return;
+    }
+
+    const char* oldEventName = UnitMotionTurnEventToScriptString(previousEvent);
+    const char* newEventName = UnitMotionTurnEventToScriptString(event);
+    mTurnEvent = event;
+    mUnit->CallbackStr("OnMotionTurnEventChange", &newEventName, &oldEventName);
   }
 
   /**
@@ -4079,19 +4122,44 @@ namespace moho
         *physBody, fallbackVector, desiredVelocity, desiredVelocityNorm, headingVector, &control, combatTarget
       );
 
+      // Turn-sharpness classification, 0x006BFE28-0x006BFF22. The thresholds
+      // and their senses are read off the two compares; both constants come
+      // from the PE:
+      //
+      //   0x006BFEEB  movss  xmm1, [0x00E4F724]   ; = 0.5
+      //   0x006BFEF3  comiss xmm1, xmm0           ; 0.5 vs dot
+      //   0x006BFEF8  jbe    0x6BFF06             ;   0.5 <= dot -> next test
+      //   0x006BFEFA  mov    eax, 2               ;   dot <  0.5 -> SharpTurn
+      //   0x006BFF06  comiss xmm0, [0x00E4F99C]   ; dot vs 0.95
+      //   0x006BFF0D  jbe    0x6BFF18             ;   dot <= 0.95 -> Turn
+      //   0x006BFF0F  xor    eax, eax             ;   dot >  0.95 -> Straight
+      //   0x006BFF18  mov    eax, 1               ; Turn
+      //
+      // What was here read `> 0.5 -> Straight`, `> -0.05 -> Right`, else
+      // `Left`, which inverts the 0.5 test, invents -0.05 (no such constant is
+      // loaded), and drops 0.95 entirely. Combined with the old enum order it
+      // reported "SharpTurn" for an aircraft flying straight at its goal and
+      // "Straight" for one pointing away from it.
       if (horizontalDistance > air.StartTurnDistance) {
         Wm3::Vector3f flatDesired{desiredVelocity.x, 0.0f, desiredVelocity.z};
         Wm3::Vector3f::Normalize(&flatDesired);
         if (Wm3::Vector3f::LengthSq(headingVector) > 0.000001f && Wm3::Vector3f::LengthSq(flatDesired) > 0.000001f) {
           const float turnDot = (headingVector.x * flatDesired.x) + (headingVector.z * flatDesired.z) + (headingVector.y * flatDesired.y);
-          if (turnDot > 0.5f) {
+          if (turnDot < 0.5f) {
+            SetMotionTurnEvent(UMTE_SharpTurn);
+          } else if (turnDot > 0.95f) {
             SetMotionTurnEvent(UMTE_Straight);
-          } else if (turnDot > -0.05f) {
-            SetMotionTurnEvent(UMTE_Right);
           } else {
-            SetMotionTurnEvent(UMTE_Left);
+            SetMotionTurnEvent(UMTE_Turn);
           }
         }
+      } else {
+        // 0x006BFE2F `jbe 0x6BFF24` -- inside StartTurnDistance the event is
+        // reset to Straight. MSVC inlined this one call (0x006BFF24-0x006BFF50,
+        // itself hot-patched at 0x006BFF2C), folding `table[0]` into the
+        // literal `push 0xF58374`. Without it a flier keeps whichever turn
+        // event its last long leg left behind for the rest of its life.
+        SetMotionTurnEvent(UMTE_Straight);
       }
 
       const float groundSpeed = std::sqrt((physBody->mVelocity.x * physBody->mVelocity.x) + (physBody->mVelocity.z * physBody->mVelocity.z));
