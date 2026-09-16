@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <cstdarg>
-#include <cstdio>
 #include <new>
 #include <typeinfo>
 
@@ -79,23 +77,6 @@ namespace gpg
 
 namespace
 {
-  // TEMPORARY PROBE SINK -- transport/effects triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target
-  // (gpg::InitLogSingleton creates the context but registers no target), so the
-  // probes below append here instead. The file lands beside the executable.
-  void DiagLine(const char* const fmt, ...)
-  {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
-    }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc('\n', sink);
-    (void)std::fclose(sink);
-  }
   class IAiCommandDispatchImplConstructed final : public IAiCommandDispatchImpl
   {
   public:
@@ -517,16 +498,6 @@ namespace
       case EUnitCommandType::UNITCOMMAND_Dock: {
         Unit* const target = CUnitCommand::GetTarget(command);
 
-        // TEMPORARY PROBE -- transport-load triage, delete when resolved.
-        // A null target here means the whole arm falls through without
-        // consuming the command, which leaves the order sitting in the queue
-        // with nothing running -- on the transport and on every unit alike.
-        DiagLine(
-          "[XPORTDIAG] Dispatch transport arm: unit=%p target=%p self=%d setSize=%u",
-          static_cast<void*>(unit), static_cast<void*>(target), (target == unit) ? 1 : 0,
-          static_cast<unsigned int>(command->mUnitSet.mVec.size())
-        );
-
         // 0x00609BE4-0x00609C6F: a ferry beacon always routes here, and so does
         // any FACTORY target that is *neither* an air-staging platform nor a
         // teleporter -- `jz` past both `IsInCategory` probes is what reaches
@@ -912,20 +883,6 @@ void IAiCommandDispatchImpl::OnEvent(const EUnitCommandQueueStatus event)
   }
 
   if (event > EUnitCommandQueueStatus::UCQS_Changed && event <= EUnitCommandQueueStatus::UCQS_NeedsRefresh) {
-    // TEMPORARY PROBE -- "queued unload drops on the spot". This arm discards
-    // every task above the dispatch, including a move a sibling task just
-    // pushed, so it matters exactly when it fires. Filtered to units that are
-    // mid-unload so the line is rare enough to reach faf_diag.log.
-    if (mUnit != nullptr && mUnit->IsUnitState(UNITSTATE_TransportUnloading)) {
-      if (std::FILE* const sink = std::fopen("faf_diag.log", "a"); sink != nullptr) {
-        (void)std::fprintf(
-          sink, "[DISPEVT] interrupt-while-unloading event=%d unit=%p thread=%p staged=%d\n",
-          static_cast<int>(event), static_cast<void*>(mUnit), static_cast<void*>(mOwnerThread),
-          (mOwnerThread != nullptr && mOwnerThread->mStaged) ? 1 : 0
-        );
-        (void)std::fclose(sink);
-      }
-    }
     if (mOwnerThread != nullptr) {
       mOwnerThread->mPendingFrames = 0;
       if (mOwnerThread->mStaged) {
@@ -1036,9 +993,6 @@ ETaskStatus IAiCommandDispatchImpl::TaskTick()
 
     mState = 1u;
     mLinkResult = static_cast<EAiResult>(0);
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    gpg::Warnf("[NAVDIAG] Dispatch cmdType=%d unit=%p nav=%p", static_cast<int>(currentCommand->mVarDat.mCmdType),
-               static_cast<void*>(mUnit), static_cast<void*>(mUnit->AiNavigator));
     DispatchQueuedCommand(this, currentCommand);
     return static_cast<ETaskStatus>(0);
   };
@@ -1051,11 +1005,14 @@ ETaskStatus IAiCommandDispatchImpl::TaskTick()
   CUnitCommand* const currentCommand = commandQueue != nullptr ? commandQueue->GetCurrentCommand() : nullptr;
   mState = 0u;
 
-  if (currentCommand == nullptr || commandQueue == nullptr) {
-    return tryDispatchHead();
-  }
-
+  // 0x00598EBB `cmp [edi+0x2c], edx` (edx = 2) is tested *before* the queue-head
+  // null test at 0x00598EEA, and the failure arm reads `mVarDat.mCmdType`
+  // straight off the head at 0x00598EC3 with no null guard of its own.
   if (mLinkResult == static_cast<EAiResult>(2)) {
+    if (currentCommand == nullptr || commandQueue == nullptr) {
+      return static_cast<ETaskStatus>(1);
+    }
+
     const EUnitCommandType commandType = currentCommand->mVarDat.mCmdType;
     if (commandType == EUnitCommandType::UNITCOMMAND_Patrol || commandType == EUnitCommandType::UNITCOMMAND_FormPatrol) {
       commandQueue->MoveFirstCommandToBackOfQueue();
@@ -1064,6 +1021,14 @@ ETaskStatus IAiCommandDispatchImpl::TaskTick()
     }
 
     return tryDispatchHead();
+  }
+
+  // 0x00598EEA `cmp esi, ebx` / `je 0x598F3B`, and 0x00598F3B is `mov eax, 1` /
+  // `ret` -- an exhausted queue ends the tick with status 1. Every arm that
+  // really does want another dispatch attempt encodes it as `jmp 0x598F6D`
+  // instead, so retrying here was an invented extra pass over the queue head.
+  if (currentCommand == nullptr || commandQueue == nullptr) {
+    return static_cast<ETaskStatus>(1);
   }
 
   if (currentCommand->mVarDat.mCount > 1) {
