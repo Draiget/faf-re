@@ -1771,9 +1771,21 @@ ReconBlip* CAiReconDBImpl::ReconGetBlip(Unit* const unit) const
     return nullptr;
   }
 
+  // `lower_bound` answers "the first key not less than this one", which is not
+  // the question. For a unit with no blip it returns the next unit's entry, and
+  // the only rejection here was against `end()` -- so the caller got somebody
+  // else's blip for every unit whose id sorts below some blipped unit's, and a
+  // null only for a unit sorting past the last entry in the map.
+  //
+  // `Unit::UpdateBlipsInRange` (0x006ACC60) gates its candidate list on exactly
+  // this call returning null, so a wrong-but-non-null answer puts the wrong
+  // entity into the attacker's blip list.
+  //
+  // Every other lookup in this file already uses the key-matching form via
+  // `FindReconBlipRange`; this one is now the same.
   auto* const owner = const_cast<CAiReconDBImpl*>(this);
-  const auto node = owner->mBlipMap.lower_bound(MakeReconProbeKey(static_cast<std::uint32_t>(unit->id_)));
-  return (node != owner->mBlipMap.end()) ? node->second : nullptr;
+  auto [first, last] = FindReconBlipRange(owner, unit);
+  return (first != last) ? first->second : nullptr;
 }
 
 /**
