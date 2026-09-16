@@ -4081,7 +4081,7 @@ public:
   virtual void Ok() {} // slot 27 (+0x6C)
   virtual void SetTextForeground() {} // slot 28 (+0x70)
   virtual void SetTextBackground() {} // slot 29 (+0x74)
-  virtual void SetMapMode() {} // slot 30 (+0x78)
+  virtual void SetMapMode(int /*mode*/) {} // slot 30 (+0x78)
   virtual void GetUserScale() {} // slot 31 (+0x7C)
   virtual void SetUserScale() {} // slot 32 (+0x80)
   virtual void GetLogicalScale() {} // slot 33 (+0x84)
@@ -4437,6 +4437,23 @@ public:
    * line for line.
    */
   void DoCrossHair(std::int32_t x, std::int32_t y) override;
+
+  /**
+   * Address: 0x009CAC10 (FUN_009CAC10)
+   * Mangled: ?SetMapMode@wxDC@@UAEXH@Z
+   *
+   * IDA signature:
+   * void __thiscall wxDC::SetMapMode(wxDC *this, int mode);
+   *
+   * What it does:
+   * Records the mapping mode and derives the logical scale it implies: unity
+   * for `wxMM_TEXT`, otherwise the device's millimetre-to-pixel ratio scaled
+   * by the unit the mode names. Then re-establishes MM_ANISOTROPIC with the
+   * viewport/window extents and origins that realise that scale - matching
+   * `wxDC::SetMapMode`
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:1529-1598) line for line.
+   */
+  void SetMapMode(int mode) override;
 
   /**
    * Address: 0x009CAAA0 (FUN_009CAAA0)
