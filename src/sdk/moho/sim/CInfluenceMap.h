@@ -377,17 +377,26 @@ namespace moho
      */
     void InsertEntry(std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* sourceBlueprint);
 
+    [[nodiscard]] static bool IsInCategory(const CategoryWordRangeView* category, std::uint32_t categoryBitIndex);
+
+  public:
     /**
      * Address: 0x00715EB0 (FUN_00715EB0, Moho::CInfluenceMap::RemoveEntry)
      *
      * What it does:
      * Removes one blip entry from the owning influence cell and drops the
      * corresponding blip-to-cell index lane.
+     *
+     * Public because `CAiReconDBImpl::ReconTick` calls it directly on the
+     * recon DB's `mIMap` when a blip is retired (0x005C0D9F and 0x005C0F8A).
+     * Note that the IDA database labels this address
+     * `?CheckIntelEvents@CAiReconDBImpl@Moho@@QAEXPAVReconBlip@2@HH@Z`, which
+     * is wrong -- the body walks `mMapEntries` and `InfluenceGrid`, and the
+     * real `CAiReconDBImpl::CheckIntelEvents` is a different function at
+     * 0x005C0890. The `Q` in that mangling does confirm public access.
      */
     void RemoveEntry(std::uint32_t blipId);
-    [[nodiscard]] static bool IsInCategory(const CategoryWordRangeView* category, std::uint32_t categoryBitIndex);
 
-  public:
     CArmyImpl* mArmy;                     // +0x00
     std::int32_t mTotal;                  // +0x04
     std::int32_t mWidth;                  // +0x08
