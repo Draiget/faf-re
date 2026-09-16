@@ -146,17 +146,6 @@ namespace
     return static_cast<CScriptObject**>(upcast.mObj);
   }
 
-  void ClearWeakObjectChain(WeakObject& weakObject) noexcept
-  {
-    auto* cursor = reinterpret_cast<WeakObject::WeakLinkNodeView**>(weakObject.WeakLinkHeadSlot());
-    while (cursor && *cursor) {
-      WeakObject::WeakLinkNodeView* const node = *cursor;
-      *cursor = node->nextInOwner;
-      node->ownerLinkSlot = nullptr;
-      node->nextInOwner = nullptr;
-    }
-  }
-
   gpg::RType* CachedLuaObjectType()
   {
     gpg::RType* cached = LuaPlus::LuaObject::sType;
@@ -706,7 +695,7 @@ CScriptObject::~CScriptObject()
   }
 
   AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), -1);
-  ClearWeakObjectChain(*static_cast<WeakObject*>(this));
+  DetachAllWeakReferences();
 }
 
 /**

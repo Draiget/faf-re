@@ -151,17 +151,6 @@ namespace
     gpg::WriteRawPointer(archive, pointerRef, state, ownerRef);
   }
 
-  void ClearWeakObjectChain(WeakObject& weakObject)
-  {
-    auto* cursor = reinterpret_cast<WeakObject::WeakLinkNodeView**>(weakObject.WeakLinkHeadSlot());
-    while (cursor && *cursor) {
-      WeakObject::WeakLinkNodeView* const node = *cursor;
-      *cursor = node->nextInOwner;
-      node->ownerLinkSlot = nullptr;
-      node->nextInOwner = nullptr;
-    }
-  }
-
   void AddBase(gpg::RType* const ownerType, gpg::RType* const baseType, const std::int32_t offset)
   {
     GPG_ASSERT(ownerType != nullptr);
@@ -422,8 +411,8 @@ namespace moho
   CAcquireTargetTask::~CAcquireTargetTask()
   {
     AddStatCounter(InstanceCounter<CAcquireTargetTask>::GetStatItem(), -1);
-    ClearWeakObjectChain(static_cast<ManyToOneListener_ECollisionBeamEvent&>(*this));
-    ClearWeakObjectChain(static_cast<ManyToOneListener_EProjectileImpactEvent&>(*this));
+    static_cast<ManyToOneListener_ECollisionBeamEvent&>(*this).DetachAllWeakReferences();
+    static_cast<ManyToOneListener_EProjectileImpactEvent&>(*this).DetachAllWeakReferences();
   }
 
   /**

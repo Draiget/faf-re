@@ -12816,17 +12816,6 @@ namespace
     head->ListResetLinks();
   }
 
-  void ClearWeakObjectChain(WeakObject& weakObject) noexcept
-  {
-    auto* cursor = reinterpret_cast<WeakObject::WeakLinkNodeView**>(weakObject.WeakLinkHeadSlot());
-    while (cursor != nullptr && *cursor != nullptr) {
-      WeakObject::WeakLinkNodeView* const node = *cursor;
-      *cursor = node->nextInOwner;
-      node->ownerLinkSlot = nullptr;
-      node->nextInOwner = nullptr;
-    }
-  }
-
   void ClearUnitWeakReferences(Unit& unit) noexcept
   {
     unit.CreatorRef.AsWeakPtr<Unit>().UnlinkFromOwnerChain();
@@ -13732,7 +13721,7 @@ Unit::~Unit()
   DestroyUnitEconomyRequest(mConsumptionData);
   DestroyUnitExtraStorage(mExtraStorage);
 
-  ClearWeakObjectChain(static_cast<WeakObject&>(static_cast<IUnit&>(*this)));
+  static_cast<IUnit&>(*this).DetachAllWeakReferences();
 
   // Decrement the Unit instance-count stat (binary FUN_006A6BF0 line ~467). The
   // constructor bumps it +1; the recovered destructor had dropped the matching
