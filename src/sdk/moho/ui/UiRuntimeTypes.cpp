@@ -29842,6 +29842,105 @@ int moho::IN_FindKeyNameIndexCi(const msvc8::string& needle)
   return -1;
 }
 
+namespace
+{
+  /// Modifier bits `IN_ParseKeyModifiers` packs into a `UiKeyMask`. Named here
+  /// for the two binding-description lanes below; the older key-event and
+  /// parse lanes in this file still spell them numerically.
+  constexpr UiKeyMask kUiKeyMaskShift = 0x80000000u;
+  constexpr UiKeyMask kUiKeyMaskCtrl = 0x40000000u;
+  constexpr UiKeyMask kUiKeyMaskAlt = 0x20000000u;
+} // namespace
+
+/**
+ * Address: 0x00838E70 (FUN_00838E70, Moho::IN_GetKeyName)
+ *
+ * IDA signature:
+ * std::string *__usercall sub_838E70@<eax>(std::string *out@<esi>, unsigned int keyCode);
+ *
+ * What it does:
+ * Yields `in_keyNames[keyCode]`, or an empty string when the code falls
+ * outside the 256-slot table. The binary indexes it as `28 * keyCode +
+ * 0x010C1B48` -- stride `sizeof(msvc8::string) == 0x1C` over `in_keyNames`,
+ * which is what fixes that global's element type -- and materialises a
+ * temporary empty string for the out-of-range arm so both arms can share one
+ * `assign` tail.
+ */
+msvc8::scoped_string moho::IN_GetKeyName(const unsigned int keyCode)
+{
+  msvc8::scoped_string keyName{};
+  if (keyCode < 256u) {
+    const msvc8::string& slot = in_keyNames[keyCode];
+    keyName.assign_owned(std::string_view{slot.c_str(), slot.size()});
+  }
+  return keyName;
+}
+
+/**
+ * Address: 0x00839840 (FUN_00839840, Moho::IN_DescribeKeyBinding)
+ *
+ * IDA signature:
+ * std::string *__usercall sub_839840@<eax>(std::string *out@<eax>, unsigned int keyMask@<ecx>);
+ *
+ * What it does:
+ * Renders one packed key mask as the human-readable chord `IN_BindKey`
+ * accepts -- modifier prefixes in the fixed order `Ctrl-`, `Alt-`, `Shift-`,
+ * then the key name. The binary tests and clears each modifier bit in turn
+ * (`& 0xBFFFFFFF`, then `& 0xDFFFFFFF`, then the sign test and `& 0x7FFFFFFF`)
+ * so that what reaches `IN_GetKeyName` is the bare key code; testing each bit
+ * against the original mask is equivalent, because clearing one modifier
+ * never disturbs another.
+ */
+msvc8::scoped_string moho::IN_DescribeKeyBinding(const UiKeyMask keyMask)
+{
+  msvc8::scoped_string description{};
+
+  if ((keyMask & kUiKeyMaskCtrl) != 0u) {
+    AppendLegacyStringOrThrow(description, "Ctrl-", 5u);
+  }
+  if ((keyMask & kUiKeyMaskAlt) != 0u) {
+    AppendLegacyStringOrThrow(description, "Alt-", 4u);
+  }
+  if ((keyMask & kUiKeyMaskShift) != 0u) {
+    AppendLegacyStringOrThrow(description, "Shift-", 6u);
+  }
+
+  const UiKeyMask keyCode = keyMask & ~(kUiKeyMaskCtrl | kUiKeyMaskAlt | kUiKeyMaskShift);
+  const msvc8::scoped_string keyName = IN_GetKeyName(keyCode);
+  AppendLegacyStringOrThrow(description, keyName.c_str(), keyName.size());
+
+  return description;
+}
+
+/**
+ * Address: 0x00839DC0 (FUN_00839DC0, Moho::IN_DumpKeyBindings)
+ *
+ * What it does:
+ * The `IN_DumpKeyBindings` console command ("Shows all the key bindings"):
+ * walks `gUiKeyActionMap` in key order and prints each entry as
+ * `"<chord> :: <console command> :: repeat = <true|false>"`, where the repeat
+ * flag is membership of the same mask in `gUiKeyRepeatMap`.
+ *
+ * The binary's shape is entirely the two containers': the walk is
+ * `_Tree::_Inc` (0x0083C0B0) from `gUiKeyActionMap`'s leftmost node to its
+ * head, and the repeat test is `_Tree::find` spelled as a lower-bound descent
+ * (`_Left@0x00`, `_Right@0x08`, `_Myval@0x0C`, `_Isnil@0x15`) followed by the
+ * `end()`-or-greater equivalence check. Both are `msvc8::map`'s already.
+ */
+void moho::IN_DumpKeyBindings(void* const /*commandArgs*/)
+{
+  for (const auto& binding : gUiKeyActionMap) {
+    const msvc8::scoped_string chord = IN_DescribeKeyBinding(binding.first);
+    const bool repeats = gUiKeyRepeatMap.find(binding.first) != gUiKeyRepeatMap.end();
+    CON_Printf(
+      "%s :: %s :: repeat = %s",
+      chord.c_str(),
+      binding.second.c_str(),
+      repeats ? "true" : "false"
+    );
+  }
+}
+
 /**
  * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
  *
