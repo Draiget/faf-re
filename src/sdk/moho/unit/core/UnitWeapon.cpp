@@ -503,10 +503,31 @@ namespace
       return false;
     }
 
-    if (!weapon->mCat1.Bits().mWords.empty() && !EntityCategoryContainsBlueprint(blueprint, weapon->mCat1)) {
+    // `mCat1` is the blueprint's `TargetRestrictDisallow` set and `mCat2` its
+    // `TargetRestrictOnlyAllow` set (the weapon constructor at 0x006D4310 parses
+    // them in that order: 0x006D4621 guards the store to +0xF8, 0x006D46A0 the
+    // store to +0x120). So membership rejects for the first and *non*-membership
+    // rejects for the second, which is how the binary reads:
+    //
+    //   0x006D5690  cmp ecx,[ebx+0x10c]   ; mCat1 empty?
+    //   0x006D5696  je  0x6D56CB          ;   -> skip the test entirely
+    //   0x006D56BF  cmp edx,[eax+8]       ; find(bit) vs end()
+    //   0x006D56C2  jne 0x6D561E          ;   FOUND     -> reject
+    //   0x006D56D1  cmp ecx,[ebx+0x134]   ; mCat2 empty?
+    //   0x006D56D7  je  0x6D5709          ;   -> accept
+    //   0x006D5700  cmp edx,[eax+8]
+    //   0x006D5703  je  0x6D561E          ;   NOT FOUND -> reject
+    //
+    // Both tests were inverted here, which rejected almost every target: 463 of
+    // the 538 weapon entries in `gamedata/units` carry a `TargetRestrictDisallow`
+    // list, so the first test alone suppressed auto-acquisition and explicit
+    // attack orders for every ACU and basic tank in the game. The matching
+    // UI-side copy in `UserUnit::WeaponAllowsBlueprint` was already correct,
+    // which is why the attack cursor appeared while no order ever survived.
+    if (!weapon->mCat1.Bits().mWords.empty() && EntityCategoryContainsBlueprint(blueprint, weapon->mCat1)) {
       return false;
     }
-    if (!weapon->mCat2.Bits().mWords.empty() && EntityCategoryContainsBlueprint(blueprint, weapon->mCat2)) {
+    if (!weapon->mCat2.Bits().mWords.empty() && !EntityCategoryContainsBlueprint(blueprint, weapon->mCat2)) {
       return false;
     }
 
