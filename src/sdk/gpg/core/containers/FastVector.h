@@ -89,6 +89,29 @@ namespace gpg::core
   struct IsIntrusiveWeakRefSlot : std::false_type
   {};
 
+  // Compile-time gate for the lanes that move elements WITHOUT relinking.
+  //
+  // An intrusive weak-ref slot is not a value: it is a node that the owner's
+  // weak-link chain points *at* by address. Copying or relocating one is only
+  // correct if the node is spliced out of the chain it left and into the chain
+  // at its new address -- which is why the binary emits a dedicated relinking
+  // body for every operation this element type supports, and no memcpy lane at
+  // all: `push_back` (FUN_0061C5E0), `InsertAt` (FUN_0061C750), the reallocate
+  // arm (FUN_0061C940), `_Ucopy` (FUN_0061CA20), `_Copy_backward`
+  // (FUN_0061CE90/FUN_0061CF00) and the range unlink (FUN_0061CA70). Those six
+  // are the only lanes the shipped image has for this element type.
+  //
+  // A raw-copy lane applied to such a slot leaves the destination claiming an
+  // owner whose chain never contained it. Nothing faults at that moment; the
+  // damage surfaces later, in whichever unrelated walk of that owner's chain
+  // runs off the end -- `moho::UnlinkWeakPtrRangeWithoutClearing` being the
+  // usual victim, since its loop is the binary's own unguarded
+  // `mov eax,[eax]; add eax,4; cmp [eax],ecx` (0x007A5FC0) and so cannot defend
+  // itself. Diagnosing that from the crash site is near-impossible, so reject it
+  // here instead: route through the relinking lane, or add the missing lane to
+  // this container if the binary has an emission the template lacks -- never a
+  // per-element-type copy outside the container homes (RULE ONE).
+
   /**
    * Typed view over an 8-byte intrusive weak-owner slot. This mirrors the
    * `moho::WeakPtr<void>` / `moho::SWeakRefSlot` layout exactly:
@@ -564,6 +587,11 @@ namespace gpg::core
      */
     void Reserve(size_t n)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVector<T>::Reserve relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if (Capacity() >= n)
         return;
       const size_t oldSize = Size();
@@ -588,6 +616,11 @@ namespace gpg::core
      */
     void PushBack(const T& v)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVector<T>::PushBack relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if (end_ == capacity_) {
         const size_t newCap = Capacity() ? Capacity() * 2 : 4;
         Reserve(newCap);
@@ -905,16 +938,31 @@ namespace gpg::core
      */
     T* InsertRange(T* const pos, const T* const first, const T* const last)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::InsertRange relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       return gpg::FastVectorRuntimeInsertRange<T>(gpg::AsFastVectorRuntimeView<T>(this), pos, first, last);
     }
 
     void PushBack(const T& v)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::PushBack relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
     void push_back(const T& v)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::push_back relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       (void)InsertRange(this->end_, &v, &v + 1);
     }
 
@@ -923,6 +971,11 @@ namespace gpg::core
      */
     void Reserve(const size_type n)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::Reserve relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       (void)gpg::FastVectorRuntimeEnsureCapacity<T>(n, gpg::AsFastVectorRuntimeView<T>(this));
     }
 
@@ -933,6 +986,11 @@ namespace gpg::core
 
     void resize(const size_type n)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::resize relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       const T zeroFill{};
       gpg::FastVectorRuntimeResizeFill<T>(
         &zeroFill, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
@@ -945,6 +1003,11 @@ namespace gpg::core
      */
     void resize(const size_type n, const T& value)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorInline<T>::resize(n, value) relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       gpg::FastVectorRuntimeResizeFill<T>(
         &value, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
       );
@@ -1195,6 +1258,11 @@ namespace gpg::core
     FastVectorN(FastVectorN&& other) noexcept
       : FastVectorN()
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>'s move constructor relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if (other.start_ != other.originalVec_) {
         this->start_ = other.start_;
         this->end_ = other.end_;
@@ -1218,6 +1286,11 @@ namespace gpg::core
      */
     FastVectorN& operator=(FastVectorN&& other) noexcept
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>'s move assignment relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if (this != &other) {
         if (other.start_ != other.originalVec_) {
           detail::DestroyRange(this->start_, this->end_);
@@ -1622,9 +1695,7 @@ namespace gpg::core
         this->end_ = reinterpret_cast<T*>(write);
         detail::AssignIntrusiveWeakRefRangeBackwardRelink(endNode, insStartNode, insStartNode + prefixCount);
         return;
-      }
-
-      if constexpr (!std::is_trivially_copyable_v<T>) {
+      } else if constexpr (!std::is_trivially_copyable_v<T>) {
         // Deep-copy lane (FUN_0083B6F0 / FUN_004C7EB0 / FUN_0084E570): element-wise
         // construct + assign; never memmove a value type that owns storage.
         T* const start = this->start_;
@@ -1672,44 +1743,44 @@ namespace gpg::core
         //    (binary `std::_Copy_backward(insStart, insStart+prefixCount, end)`).
         CopyBackwardAssign(insStart + prefixCount, end, insStart);
         return;
-      }
-
-      T* const start = this->start_;
-      T* const end = this->end_;
-      std::size_t requiredSize = static_cast<std::size_t>(end - start) + insertCount;
-      const std::size_t currentCapacity = static_cast<std::size_t>(this->capacity_ - start);
-      if (requiredSize > currentCapacity) {
-        const std::size_t doubledCapacity = currentCapacity * 2;
-        if (requiredSize < doubledCapacity) {
-          requiredSize = doubledCapacity;
+      } else {
+        T* const start = this->start_;
+        T* const end = this->end_;
+        std::size_t requiredSize = static_cast<std::size_t>(end - start) + insertCount;
+        const std::size_t currentCapacity = static_cast<std::size_t>(this->capacity_ - start);
+        if (requiredSize > currentCapacity) {
+          const std::size_t doubledCapacity = currentCapacity * 2;
+          if (requiredSize < doubledCapacity) {
+            requiredSize = doubledCapacity;
+          }
+          GrowInsert(pos, requiredSize, insStart, insEnd);
+          return;
         }
-        GrowInsert(pos, requiredSize, insStart, insEnd);
-        return;
-      }
 
-      const std::uintptr_t posAddress = reinterpret_cast<std::uintptr_t>(pos);
-      const std::uintptr_t insStartAddress = reinterpret_cast<std::uintptr_t>(insStart);
-      const std::uintptr_t insEndAddress = reinterpret_cast<std::uintptr_t>(insEnd);
-      T* const translatedInsertEnd = reinterpret_cast<T*>(insEndAddress + (posAddress - insStartAddress));
-      if (translatedInsertEnd <= end) {
-        T* const tailStart = end - insertCount;
-        this->end_ = CopyRangeForward(end, tailStart, end);
+        const std::uintptr_t posAddress = reinterpret_cast<std::uintptr_t>(pos);
+        const std::uintptr_t insStartAddress = reinterpret_cast<std::uintptr_t>(insStart);
+        const std::uintptr_t insEndAddress = reinterpret_cast<std::uintptr_t>(insEnd);
+        T* const translatedInsertEnd = reinterpret_cast<T*>(insEndAddress + (posAddress - insStartAddress));
+        if (translatedInsertEnd <= end) {
+          T* const tailStart = end - insertCount;
+          this->end_ = CopyRangeForward(end, tailStart, end);
 
-        const std::ptrdiff_t middleCount = tailStart - pos;
-        if (middleCount > 0) {
-          std::memmove(end - middleCount, pos, static_cast<std::size_t>(middleCount) * ElemSize);
+          const std::ptrdiff_t middleCount = tailStart - pos;
+          if (middleCount > 0) {
+            std::memmove(end - middleCount, pos, static_cast<std::size_t>(middleCount) * ElemSize);
+          }
+          if (insertCount > 0) {
+            std::memmove(translatedInsertEnd - insertCount, insStart, insertCount * ElemSize);
+          }
+          return;
         }
-        if (insertCount > 0) {
-          std::memmove(translatedInsertEnd - insertCount, insStart, insertCount * ElemSize);
-        }
-        return;
-      }
 
-      T* write = CopyRangeForward(end, insStart + (end - pos), insEnd);
-      this->end_ = CopyRangeForward(write, pos, end);
-      const std::ptrdiff_t prefixCount = end - pos;
-      if (prefixCount > 0) {
-        std::memmove(pos, insStart, static_cast<std::size_t>(prefixCount) * ElemSize);
+        T* write = CopyRangeForward(end, insStart + (end - pos), insEnd);
+        this->end_ = CopyRangeForward(write, pos, end);
+        const std::ptrdiff_t prefixCount = end - pos;
+        if (prefixCount > 0) {
+          std::memmove(pos, insStart, static_cast<std::size_t>(prefixCount) * ElemSize);
+        }
       }
     }
 
@@ -1790,6 +1861,11 @@ namespace gpg::core
      */
     void ResetFrom(const FastVector<T>& src)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::ResetFrom(FastVector) relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
@@ -1797,6 +1873,11 @@ namespace gpg::core
     // Reset to inline storage and copy from another FastVectorN
     void ResetFrom(const FastVectorN<T, N>& src)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::ResetFrom(FastVectorN) relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       this->ResetInline_();
       CopyFromRaw_(src.start_, static_cast<size_t>(src.end_ - src.start_));
     }
@@ -2305,6 +2386,11 @@ namespace gpg::core
      */
     void GrowInsertDeepCopy(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::GrowInsertDeepCopy relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       T* const oldStart = this->start_;
       T* const oldEnd = this->end_;
 
@@ -2416,6 +2502,11 @@ namespace gpg::core
      */
     void GrowInsert(T* pos, const std::size_t newCapacity, const T* insStart, const T* insEnd)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::GrowInsert relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if constexpr (!std::is_trivially_copyable_v<T>) {
         GrowInsertDeepCopy(pos, newCapacity, insStart, insEnd);
         return;
@@ -2490,6 +2581,11 @@ namespace gpg::core
      */
     void CopyFromRaw_(const T* src, size_t count)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::CopyFromRaw_ relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       if (count == 0 || src == nullptr) {
         return;
       }
@@ -2534,6 +2630,11 @@ namespace gpg::core
     /** Reallocate to exactly newCap elements; preserve contents. */
     void GrowToCapacity(size_t newCap)
     {
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVectorN<T, N>::GrowToCapacity relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
       const size_t sz = this->Size();
       T* newBuf = detail::AllocateElements<T>(newCap);
 
