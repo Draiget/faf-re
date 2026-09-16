@@ -2895,7 +2895,8 @@ namespace
 
       for (EntId* entityIdCursor = helper->cursorEntityIdsBegin; entityIdCursor != helper->cursorEntityIdsEnd;
            ++entityIdCursor) {
-        UserEntity* const entity = FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(*entityIdCursor));
+        UserEntity* const entity =
+          FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(*entityIdCursor));
         AddIssueWeakSetEntity(helper->cursorEntitySet, entity);
       }
 
@@ -3723,6 +3724,7 @@ namespace moho
 
     mCursorEntitySet.mHead = head;
     mCursorEntitySet.mSize = 0u;
+    { static int c = 0; if (c++ < 200) gpg::Warnf("[HELPER] ctor cmd=0x%08X delWhenDue=%u dueSeq=%d this=%p", static_cast<unsigned>(constantData.cmd), static_cast<unsigned>(deleteWhenDue), dueSeqNo, static_cast<void*>(this)); } // TEMPORARY PROBE (do not commit)
   }
 
   /**
@@ -3737,6 +3739,7 @@ namespace moho
     const auto dueDelta = static_cast<std::int32_t>(
       static_cast<std::uint32_t>(mDueSeqNo) - static_cast<std::uint32_t>(beat)
     );
+    { static int c = 0; if (mDeleteWhenDue != 0u && c++ < 200) gpg::Warnf("[HELPER] due cmd=0x%08X dueSeq=%d beat=%d delta=%d cursor=%u", static_cast<unsigned>(mConstantData.cmd), mDueSeqNo, beat, dueDelta, mCursorEntitySet.mSize); } // TEMPORARY PROBE (do not commit)
     if (mDeleteWhenDue != 0u && dueDelta <= 0) {
       this->~UserCommandIssueHelper();
       ::operator delete(this);
@@ -4268,12 +4271,22 @@ void UserUnit::UpdateVisibility()
       return;
     }
 
+    // A structure shows on RECON_LOSEver (bit 0x10, `shr edx,4 / not dl / and
+    // dl,1` at 0x008C0A02) and freezes its pose whenever it is not currently in
+    // LOS. 0x008C0A16 computes `!(mIntelStateFlags & 0x08)` into cl and TAIL
+    // JUMPS to MeshInstance::LockPose (0x007DE6E0) -- it does not write
+    // `isLocked` itself.
+    //
+    // This open-coded the assignment and lost the two things LockPose actually
+    // does. It never ran the lock arm's `endPose->CopyPose(curPose, true)`, so a
+    // ghost was flagged locked but kept the live pose it was interpolating --
+    // a building out of intel went on animating its construction. And with no
+    // change guard, the unlock arm re-stamped `frameCounter` and reset
+    // `currInterpolant` to -1 on every single beat a structure was visible,
+    // restarting its pose interpolation continuously instead of only on the
+    // transition.
     meshInstance->isHidden = ((mIntelStateFlags & 0x10u) == 0u) ? 1u : 0u;
-    meshInstance->isLocked = ((mIntelStateFlags & 0x08u) == 0u) ? 1u : 0u;
-    if (meshInstance->isLocked == 0u) {
-      meshInstance->frameCounter = MeshInstance::sFrameCounter;
-      meshInstance->currInterpolant = -1.0f;
-    }
+    meshInstance->LockPose((mIntelStateFlags & 0x08u) == 0u);
     break;
   }
 }
@@ -4305,6 +4318,34 @@ void UserUnit::UpdateUnitData(const SSTIUnitVariableData& payload, const std::ui
 
   mPosePrimary = mUnitVarDat.mPriorSharedPose;
   mPoseSecondary = mUnitVarDat.mSharedPose;
+  // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
+  {
+    static int sUpdCount = 0;
+    if ((sUpdCount++ % 20) == 0) {
+      auto countVisible = [](const CAniPose* pose) {
+        int n = 0;
+        if (pose != nullptr) {
+          for (const CAniPoseBone& b : pose->mBones) {
+            n += b.mVisible != 0u ? 1 : 0;
+          }
+        }
+        return n;
+      };
+      char flags[40] = {};
+      if (mPoseSecondary) {
+        int w = 0;
+        for (const CAniPoseBone& b : mPoseSecondary->mBones) {
+          if (w < 30) {
+            flags[w++] = b.mVisible != 0u ? '1' : '0';
+          }
+        }
+      }
+      gpg::Warnf("[POSEDIAG] UserUnit::UpdateUnitData this=%p secondary=%p visible=%d primary=%p visible=%d bones=%s mesh=%p n=%d",
+                 static_cast<void*>(this), static_cast<const void*>(mPoseSecondary.get()), countVisible(mPoseSecondary.get()),
+                 static_cast<const void*>(mPosePrimary.get()), countVisible(mPosePrimary.get()), flags,
+                 static_cast<const void*>(mMeshInstance), sUpdCount);
+    }
+  }
 
   const EntId replicatedCreator = mUnitVarDat.mCreator;
   if ((replicatedCreator & 0xF0000000u) == 0xF0000000u) {
@@ -4808,6 +4849,7 @@ bool UserUnit::IsSelectable() const
   }
 
   const UserEntity* const entityView = this;  // base conversion, not a reinterpretation
+
 
   const msvc8::string podCategory("POD", 3u);
   if (mUnitVarDat.mIsBusy && iunitBridge->IsMobile() && !entityView->IsInCategory(podCategory)) {
