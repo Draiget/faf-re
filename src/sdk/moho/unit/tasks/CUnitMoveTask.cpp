@@ -1,3 +1,5 @@
+#include "gpg/core/utils/Logging.h"
+#include <cmath>
 #include "moho/unit/tasks/CUnitMoveTask.h"
 
 #include <cmath>
@@ -559,7 +561,13 @@ namespace moho
         break;
 
       case AINAVEVENT_ResumeTask:
-        if (mTransportDispatchIssued == 0u) {
+        // 0x00618BCD `cmp byte ptr [ecx+0x5d], dl` / `je 0x618C15`. This entry
+        // is reached through the `Listener<EAiNavigatorEvent>` subobject, so
+        // `ecx` is `this + 0x34`: the store at 0x00618BDE, `mov [ecx+0x5c], dl`,
+        // is `mNextCmdIsInstant` (+0x90, static_assert-backed below), which
+        // pins the guard byte at +0x91 -- `mRequiresTransportCategoryCheck`,
+        // not `mTransportDispatchIssued` at +0x93.
+        if (mRequiresTransportCategoryCheck == 0u) {
           return;
         }
         if (mDispatchResult != nullptr) {
@@ -733,6 +741,12 @@ namespace moho
    */
   int CUnitMoveTask::Execute()
   {
+    // TEMPORARY PROBE -- "queued unload drops on the spot".
+    gpg::Warnf("[MOVETASK] Execute this=%08X dispatchIssued=%d needsTransportCat=%d variant=%d navStatus=%d",
+               reinterpret_cast<unsigned>(this), static_cast<int>(mTransportDispatchIssued),
+               static_cast<int>(mRequiresTransportCategoryCheck), static_cast<int>(mMoveVariant),
+               (mUnit != nullptr && mUnit->AiNavigator != nullptr)
+                 ? static_cast<int>(mUnit->AiNavigator->GetStatus()) : -1);
     if (mTransportDispatchIssued != 0u) {
       return -1;
     }
@@ -843,13 +857,26 @@ namespace moho
     }
 
     IAiNavigator* const navigator = dispatchTask->mUnit->AiNavigator;
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] NewMoveTask unit=%p nav=%p goal cell=(%d,%d)-(%d,%d)", static_cast<void*>(dispatchTask->mUnit),
+               static_cast<void*>(navigator), goal.minX, goal.minZ, goal.maxX, goal.maxZ);
     if (!navigator) {
       return;
     }
 
     navigator->SetGoal(goal);
-    (void)new (std::nothrow)
+    CUnitMoveTask* const child = new (std::nothrow)
       CUnitMoveTask(dispatchTask, goal, requiresTransportCategoryCheck, sourceCommand, moveVariant);
+    // TEMPORARY PROBE -- "queued unload drops on the spot". The child only
+    // becomes the thread's top task when the parent has an owner thread
+    // (CTask::CTask ignores a null thread), so a parent with none leaves this
+    // task orphaned and resumes immediately.
+    gpg::Warnf("[NAVDIAG] NewMoveTask child=%08X parentThread=%08X childThread=%08X childTop=%08X",
+               reinterpret_cast<unsigned>(child),
+               reinterpret_cast<unsigned>(dispatchTask->mOwnerThread),
+               reinterpret_cast<unsigned>(child != nullptr ? child->mOwnerThread : nullptr),
+               reinterpret_cast<unsigned>(
+                 (child != nullptr && child->mOwnerThread != nullptr) ? child->mOwnerThread->mTaskTop : nullptr));
   }
 } // namespace moho
 
