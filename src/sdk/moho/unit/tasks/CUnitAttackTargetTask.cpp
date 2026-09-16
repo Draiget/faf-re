@@ -535,7 +535,26 @@ namespace moho
       runtime->mCommand = commandQueue->GetCurrentCommand();
     }
     if (runtime->mCommand != nullptr) {
-      runtime->mCommand->mUnknownFlag142 = true;
+      // 0x005F2AE7 `mov byte ptr [eax+0x154], 1` -- the command's
+      // coordination-ready flag (`mUnknownFlag154`), not the factory-command
+      // flag at +0x142. `CUnitCommand::IsDone` (0x006E90A0) reads exactly
+      // +0x154, on this command and on every resolved peer in
+      // `mCoordinatingOrders`, and `TaskTick`'s TASKSTATE_Preparing arm parks
+      // the task on `return 10` while `IsCoordinating() && !IsDone()`. Setting
+      // the wrong byte therefore left +0x154 clear forever, so every ranged
+      // attack order whose command carries coordination links -- which is every
+      // order issued to a multi-unit selection, since
+      // `CUnitCommand::CoordinateWith` chains the selection's commands through
+      // the issue data's coordinate-with id -- spun in Preparing and the unit
+      // never moved or fired. `CUnitMeleeAttackTargetTask`'s identical
+      // constructor lane (0x0061580B) already wrote +0x154, which is why melee
+      // units were the only ones that still executed an attack order.
+      //
+      // The stray +0x142 write was wrong in the other direction too: that flag
+      // marks a factory-issued command (Sim.cpp's factory-order path is its only
+      // real writer), and `CUnitMoveTask`'s goal-rederivation predicate gates on
+      // it, so every command a ranged attack task started on was mislabelled.
+      runtime->mCommand->mUnknownFlag154 = true;
       if (Broadcaster* const commandListenerHead = CommandEventListenerHead(runtime->mCommand); commandListenerHead != nullptr)
       {
         runtime->mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
@@ -930,12 +949,15 @@ namespace moho
 
       if (runtime->mIsGrounded != 0u && attacker != nullptr) {
         UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&runtime->mTarget);
+        gpg::Warnf("[GOALDIAG] grounded arm: targetWeapon=%08X", reinterpret_cast<unsigned>(targetWeapon));
         if (targetWeapon != nullptr) {
           SetWeaponGoal(runtime->mTarget.GetTargetPosGun(false), targetWeapon);
           runtime->mIsGrounded = 0u;
           return;
         }
       }
+      gpg::Warnf("[GOALDIAG] position arm: grounded=%d hasMobile=%d attacker=%08X",
+                 runtime->mIsGrounded, runtime->mHasMobileTarget, reinterpret_cast<unsigned>(attacker));
 
       if (runtime->mHasMobileTarget == 0u) {
         const Wm3::Vector3f targetPosition = runtime->mTarget.HasTarget() ? runtime->mTarget.GetTargetPosGun(false)
@@ -1401,6 +1423,20 @@ namespace moho
         const bool targetInWeaponRange =
           attacker != nullptr && attacker->TargetIsWithinWeaponAttackRange(weapon, &runtime->mTarget);
         const float engageDistance = (blueprint != nullptr) ? blueprint->Air.EngageDistance : 0.0f;
+        {
+          const Wm3::Vector3f up = unit->GetPosition();
+          const Wm3::Vector3f tp = runtime->mTarget.GetTargetPosGun(false);
+          const float dx = tp.x - up.x;
+          const float dz = tp.z - up.z;
+          gpg::Warnf("[RNGDIAG] weapon=%08X inRange=%d dist=%.2f maxR=%.2f maxRsq=%.2f minRsq=%.2f engage=%.2f grounded=%d navStat=%d",
+                     reinterpret_cast<unsigned>(weapon), targetInWeaponRange ? 1 : 0,
+                     std::sqrt((dx * dx) + (dz * dz)),
+                     (weapon != nullptr && weapon->mWeaponBlueprint != nullptr) ? weapon->mWeaponBlueprint->MaxRadius : -1.0f,
+                     (weapon != nullptr) ? weapon->mAttributes.mMaxRadiusSq : -1.0f,
+                     (weapon != nullptr) ? weapon->mAttributes.mMinRadiusSq : -1.0f,
+                     engageDistance, runtime->mIsGrounded,
+                     (navigator != nullptr) ? static_cast<int>(navigator->GetStatus()) : -1);
+        }
 
         if (!targetInWeaponRange && !IsWithinHorizontalDistance(engageDistance)) {
           if (attacker != nullptr && attacker->IsTooClose(&runtime->mTarget)) {
@@ -1445,6 +1481,8 @@ namespace moho
         }
 
         if (!attacker->CanAttackTarget(&runtime->mTarget)) {
+          gpg::Warnf("[ATKDIAG] abort: attacker->CanAttackTarget=false targetType=%d",
+                     static_cast<int>(runtime->mTarget.targetType));
           return -1;
         }
 
@@ -1454,7 +1492,12 @@ namespace moho
           navigator->IgnoreFormation(true);
         }
 
-        (void)UpdateAttacker(&runtime->mTarget);
+        {
+          const bool changed = UpdateAttacker(&runtime->mTarget);
+          gpg::Warnf("[ATKDIAG] inRange: UpdateAttacker changed=%d mWeapon=%08X targetType=%d",
+                     changed ? 1 : 0, reinterpret_cast<unsigned>(runtime->mWeapon),
+                     static_cast<int>(runtime->mTarget.targetType));
+        }
 
         if (runtime->mWeapon == nullptr) {
           return -2;
@@ -1511,6 +1554,10 @@ namespace moho
           return 1;
         }
 
+        gpg::Warnf("[ATKDIAG] complete: enabled=%d canFire=%d canWeaponFireScript=1 targetType=%d",
+                   static_cast<int>(runtime->mWeapon->mEnabled),
+                   UnitWeapon::CanFire(runtime->mWeapon, &runtime->mTarget) ? 1 : 0,
+                   static_cast<int>(runtime->mTarget.targetType));
         if (runtime->mWeapon->mEnabled != 0u && UnitWeapon::CanFire(runtime->mWeapon, &runtime->mTarget)) {
           runtime->mWeapon->Fire();
           commandTask->mTaskState = TASKSTATE_5;
