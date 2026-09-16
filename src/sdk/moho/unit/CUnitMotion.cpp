@@ -3809,7 +3809,22 @@ namespace moho
     // spins the airframe on an unscaled body-local axis.
     SControlOutput control{};
 
-    const float sampleElevation = mapData->GetHeightField()->GetElevation(outTransform.pos_.x, outTransform.pos_.z);
+    // Fliers that cannot fly in water measure their elevation against the
+    // water surface, not the sea bed. 0x006BF041 `cmp byte [ecx+36Ah], 0`
+    // tests `Air.FlyInWater` (Air at blueprint+0x368, FlyInWater at +0x02);
+    // only when it is clear does the binary fall through to
+    //   0x006BF074  80 BF 34 15 00 00 00     cmp    byte [edi+1534h], 0
+    //   0x006BF083  F3 0F 10 8F 38 15 00 00  movss  xmm1, [edi+1538h]
+    //   0x006BF08B  0F 2F C8 / 76 03         comiss xmm1, xmm0 / jbe
+    //   0x006BF091  0F 28 C1                 movaps xmm0, xmm1
+    // i.e. clamp the sample up to `mWaterElevation` when water is enabled and
+    // stands above the terrain. Without it `mCurElevation` reads too large over
+    // water, so `(mCurElevation - mNewElevation) < 0.1f` never holds and a
+    // flier never settles there.
+    float sampleElevation = mapData->GetHeightField()->GetElevation(outTransform.pos_.x, outTransform.pos_.z);
+    if (air.FlyInWater == 0u && mapData->mWaterEnabled != 0u && mapData->mWaterElevation > sampleElevation) {
+      sampleElevation = mapData->mWaterElevation;
+    }
 
     Wm3::Vector3f desiredVelocity{
       mTargetPosition.x - outTransform.pos_.x, 0.0f, mTargetPosition.z - outTransform.pos_.z
@@ -3829,7 +3844,10 @@ namespace moho
 
     bool enteredLandingPhase = false;
 
-    if (!unit->IsDead() || (mLayer != LAYER_Air && !ShouldHoverInsteadOfLand())) {
+    // 0x006BF150 `mov ecx,[ebp+0]` / `cmp [ecx+120h], esi` -- the guard reads
+    // the UNIT's layer, not the motion's. Unit's Entity base sits at +0x08 and
+    // Entity::mCurrentLayer at +0x118, so +0x120 from a Unit* is that field.
+    if (!unit->IsDead() || (unit->mCurrentLayer != LAYER_Air && !ShouldHoverInsteadOfLand())) {
       if (horizontalDistance <= air.StartTurnDistance || mCarrierEvent == kCarrierEventDescendToDeck) {
         enteredLandingPhase = (mLayer != LAYER_None && mLayer != LAYER_Air);
         const auto autoLandTicks = static_cast<std::int32_t>(air.AutoLandTime * 10.0f);
@@ -4102,8 +4120,15 @@ namespace moho
       }
     } else {
       // ---- Dead / not-flying: force LAYER_Air + UMS_Ballistic tumble -------
-      const ELayer previousLayer = mLayer;
-      mLayer = LAYER_Air;
+      // 0x006BF16D `mov eax,[edx+120h]` then 0x006BF178 `mov [edx+118h], esi`
+      // with edx advanced to the Entity subobject at +0x08 -- both halves are
+      // `unit->mCurrentLayer`, not the motion's `mLayer`. An exhaustive scan
+      // for writes to `mLayer` ([ebp+0x74]) finds exactly three, all in the
+      // preparation block, so this branch never touches it. Writing `mLayer`
+      // here both fabricated that write and dropped the real one, and `mLayer`
+      // is one half of the landing arrival test.
+      const ELayer previousLayer = unit->mCurrentLayer;
+      unit->mCurrentLayer = LAYER_Air;
       if (previousLayer != LAYER_Air) {
         const char* oldLayerName =
           (static_cast<std::uint32_t>(previousLayer) > static_cast<std::uint32_t>(LAYER_Orbit)) ? "" : Entity::LayerToString(previousLayer);
