@@ -314,29 +314,7 @@ namespace moho
       std::uint32_t verticesPerPrimitive
     );
 
-  private:
-    // Every field of this object is declared by CD3DPrimBatcherRuntimeView and
-    // written through it, so the class itself has to own the bytes the view
-    // addresses. Without them `new CD3DPrimBatcher` reserves only the vptr and
-    // the constructor writes 0x120 bytes past the end of its allocation. The
-    // binary sizes the object explicitly - `push 124h` immediately before the
-    // `operator new` that feeds the ctor at 0x007F6BCB.
-    std::uint8_t mRuntimeStorage[0x120]{}; // +0x04
-  };
-
-  static_assert(sizeof(CD3DPrimBatcher) == 0x124, "moho::CD3DPrimBatcher size must be 0x124");
-  static_assert(sizeof(CD3DPrimBatcher::Vertex) == 0x18, "moho::CD3DPrimBatcher::Vertex size must be 0x18");
-  static_assert(offsetof(CD3DPrimBatcher::Vertex, mX) == 0x00, "moho::CD3DPrimBatcher::Vertex::mX offset must be 0x00");
-  static_assert(offsetof(CD3DPrimBatcher::Vertex, mY) == 0x04, "moho::CD3DPrimBatcher::Vertex::mY offset must be 0x04");
-  static_assert(offsetof(CD3DPrimBatcher::Vertex, mZ) == 0x08, "moho::CD3DPrimBatcher::Vertex::mZ offset must be 0x08");
-  static_assert(
-    offsetof(CD3DPrimBatcher::Vertex, mColor) == 0x0C, "moho::CD3DPrimBatcher::Vertex::mColor offset must be 0x0C"
-  );
-  static_assert(offsetof(CD3DPrimBatcher::Vertex, mU) == 0x10, "moho::CD3DPrimBatcher::Vertex::mU offset must be 0x10");
-  static_assert(offsetof(CD3DPrimBatcher::Vertex, mV) == 0x14, "moho::CD3DPrimBatcher::Vertex::mV offset must be 0x14");
-
-  struct CD3DPrimBatcherRuntimeView
-  {
+  public:
     template <typename T>
     struct LegacyVector
     {
@@ -363,7 +341,7 @@ namespace moho
       boost::detail::sp_counted_base* pi;    // +0x04
     };
 
-    void* mVftable = nullptr;                            // +0x00
+    // +0x00 is the vtable pointer the virtuals above install.
     CD3DVertexSheet* mVertexSheets[3]{};                // +0x04
     CD3DTextureBatcher* mTextureBatcher = nullptr;      // +0x10
     CD3DIndexSheet* mIndexSheet = nullptr;              // +0x14
@@ -392,64 +370,63 @@ namespace moho
     std::uint8_t mUnknown11ETo11F[0x02]{};             // +0x11E
     float mAlphaMultiplier = 1.0f;                     // +0x120
 
-    [[nodiscard]] static CD3DPrimBatcherRuntimeView* FromBatcher(CD3DPrimBatcher* batcher) noexcept
-    {
-      return reinterpret_cast<CD3DPrimBatcherRuntimeView*>(batcher);
-    }
-
-    [[nodiscard]] static const CD3DPrimBatcherRuntimeView* FromBatcher(const CD3DPrimBatcher* batcher) noexcept
-    {
-      return reinterpret_cast<const CD3DPrimBatcherRuntimeView*>(batcher);
-    }
   };
 
+  static_assert(sizeof(CD3DPrimBatcher) == 0x124, "moho::CD3DPrimBatcher size must be 0x124");
+  static_assert(sizeof(CD3DPrimBatcher::Vertex) == 0x18, "moho::CD3DPrimBatcher::Vertex size must be 0x18");
+  static_assert(offsetof(CD3DPrimBatcher::Vertex, mX) == 0x00, "moho::CD3DPrimBatcher::Vertex::mX offset must be 0x00");
+  static_assert(offsetof(CD3DPrimBatcher::Vertex, mY) == 0x04, "moho::CD3DPrimBatcher::Vertex::mY offset must be 0x04");
+  static_assert(offsetof(CD3DPrimBatcher::Vertex, mZ) == 0x08, "moho::CD3DPrimBatcher::Vertex::mZ offset must be 0x08");
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mVertices) == 0x1C,
-    "moho::CD3DPrimBatcherRuntimeView::mVertices offset must be 0x1C"
+    offsetof(CD3DPrimBatcher::Vertex, mColor) == 0x0C, "moho::CD3DPrimBatcher::Vertex::mColor offset must be 0x0C"
+  );
+  static_assert(offsetof(CD3DPrimBatcher::Vertex, mU) == 0x10, "moho::CD3DPrimBatcher::Vertex::mU offset must be 0x10");
+  static_assert(offsetof(CD3DPrimBatcher::Vertex, mV) == 0x14, "moho::CD3DPrimBatcher::Vertex::mV offset must be 0x14");
+
+
+  static_assert(
+    offsetof(CD3DPrimBatcher, mVertices) == 0x1C,
+    "moho::CD3DPrimBatcher::mVertices offset must be 0x1C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mPrimitives) == 0x2C,
-    "moho::CD3DPrimBatcherRuntimeView::mPrimitives offset must be 0x2C"
+    offsetof(CD3DPrimBatcher, mPrimitives) == 0x2C,
+    "moho::CD3DPrimBatcher::mPrimitives offset must be 0x2C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mMode) == 0x38,
-    "moho::CD3DPrimBatcherRuntimeView::mMode offset must be 0x38"
+    offsetof(CD3DPrimBatcher, mMode) == 0x38,
+    "moho::CD3DPrimBatcher::mMode offset must be 0x38"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mDynamicTexSheet) == 0x3C,
-    "moho::CD3DPrimBatcherRuntimeView::mDynamicTexSheet offset must be 0x3C"
+    offsetof(CD3DPrimBatcher, mDynamicTexSheet) == 0x3C,
+    "moho::CD3DPrimBatcher::mDynamicTexSheet offset must be 0x3C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mTexture) == 0x44,
-    "moho::CD3DPrimBatcherRuntimeView::mTexture offset must be 0x44"
+    offsetof(CD3DPrimBatcher, mTexture) == 0x44,
+    "moho::CD3DPrimBatcher::mTexture offset must be 0x44"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mViewMatrix) == 0x5C,
-    "moho::CD3DPrimBatcherRuntimeView::mViewMatrix offset must be 0x5C"
+    offsetof(CD3DPrimBatcher, mViewMatrix) == 0x5C,
+    "moho::CD3DPrimBatcher::mViewMatrix offset must be 0x5C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mProjectionMatrix) == 0x9C,
-    "moho::CD3DPrimBatcherRuntimeView::mProjectionMatrix offset must be 0x9C"
+    offsetof(CD3DPrimBatcher, mProjectionMatrix) == 0x9C,
+    "moho::CD3DPrimBatcher::mProjectionMatrix offset must be 0x9C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mComposite) == 0xDC,
-    "moho::CD3DPrimBatcherRuntimeView::mComposite offset must be 0xDC"
+    offsetof(CD3DPrimBatcher, mComposite) == 0xDC,
+    "moho::CD3DPrimBatcher::mComposite offset must be 0xDC"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mResetComposite) == 0x11C,
-    "moho::CD3DPrimBatcherRuntimeView::mResetComposite offset must be 0x11C"
+    offsetof(CD3DPrimBatcher, mResetComposite) == 0x11C,
+    "moho::CD3DPrimBatcher::mResetComposite offset must be 0x11C"
   );
   static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mRebuildComposite) == 0x11D,
-    "moho::CD3DPrimBatcherRuntimeView::mRebuildComposite offset must be 0x11D"
+    offsetof(CD3DPrimBatcher, mRebuildComposite) == 0x11D,
+    "moho::CD3DPrimBatcher::mRebuildComposite offset must be 0x11D"
   );
   static_assert(
-    sizeof(CD3DPrimBatcherRuntimeView) == 0x124,
-    "moho::CD3DPrimBatcherRuntimeView size must be 0x124"
-  );
-  static_assert(
-    offsetof(CD3DPrimBatcherRuntimeView, mAlphaMultiplier) == 0x120,
-    "moho::CD3DPrimBatcherRuntimeView::mAlphaMultiplier offset must be 0x120"
+    offsetof(CD3DPrimBatcher, mAlphaMultiplier) == 0x120,
+    "moho::CD3DPrimBatcher::mAlphaMultiplier offset must be 0x120"
   );
 
   /**

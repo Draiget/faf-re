@@ -33313,7 +33313,7 @@ namespace moho
 
     // Clear the composite-rebuild flag so the pass reuses the view/projection
     // set immediately below rather than rebuilding it per primitive.
-    CD3DPrimBatcherRuntimeView::FromBatcher(batcher)->mRebuildComposite = 0;
+    batcher->mRebuildComposite = 0;
     batcher->SetViewProjMatrix(camera);
     batcher->SetTexture(CD3DBatchTexture::FromSolidColor(0xFFFFFFFFu));
 

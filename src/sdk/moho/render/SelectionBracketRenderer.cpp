@@ -429,7 +429,7 @@ namespace moho
           CD3DDevice* const device = D3D_GetDevice();
           (void)device->SelectFxFile(kSelectionBracketEffectFile);
           (void)device->SelectTechnique(kSelectionBracketTechnique);
-          CD3DPrimBatcherRuntimeView::FromBatcher(batcher)->mRebuildComposite = 0u;
+          batcher->mRebuildComposite = 0u;
 
           batcher->SetTexture(bracketTexture);
           DrawSelectionBrackets(hoveredEntity, batcher, camera, interpolationAlpha);
@@ -447,7 +447,7 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
     (void)device->SelectFxFile(kSelectionBracketEffectFile);
     (void)device->SelectTechnique(kSelectionBracketTechnique);
-    CD3DPrimBatcherRuntimeView::FromBatcher(batcher)->mRebuildComposite = 0u;
+    batcher->mRebuildComposite = 0u;
 
     auto* node = sBlinkyBoxes.mNext;
     while (node != &sBlinkyBoxes) {

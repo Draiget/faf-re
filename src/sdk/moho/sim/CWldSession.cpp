@@ -20705,7 +20705,7 @@ namespace moho
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectFxFile("primbatcher");
     device->SelectTechnique(kProjectileIconTechnique);
-    CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+    primBatcher->mRebuildComposite = 0;
 
     const CategoryWordRangeView* const projectileCategory = mRules->GetEntityCategory("PROJECTILE");
     UserArmy* const focusArmy = GetFocusArmy();
