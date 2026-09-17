@@ -6,6 +6,7 @@
 #include <typeinfo>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/ai/IAiSteering.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/SFootprint.h"
