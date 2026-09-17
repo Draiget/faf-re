@@ -1,6 +1,9 @@
 #include "Global.h"
 
 #include <Windows.h>
+// TEMPORARY PROBE (do not commit): `_malloc_dbg`/`_free_dbg`/`_msize_dbg` for
+// the FAF_SYSHEAP=2 instrumented-heap mode.
+#include <crtdbg.h>
 
 #include <intrin.h>   // TEMPORARY PROBE (do not commit): _ReturnAddress
 
@@ -317,6 +320,156 @@ namespace
     // class every stamp/chain/double-free probe below now watches.
     constexpr std::uint32_t kProbeWatchedKind = 6u;
     constexpr std::uint32_t kProbeFreedMagic = 0xFEEDFACEu;
+
+    // Read with `GetEnvironmentVariableA` into a stack buffer on purpose.
+    // `_dupenv_s` returns a block from the CRT's heap, and the matching release
+    // in this translation unit resolves to the *engine* `free` defined below --
+    // which would hand a CRT pointer to `GetPageOwner` and fault. That was a
+    // live hazard in `ProbeWatchAllLanes` below: it stayed latent only because
+    // the early return fires whenever the variable is unset, so the release
+    // would have been reached for the first time by the very run that turned
+    // the probe on. Neither helper may allocate: both run inside `malloc_0`.
+    [[nodiscard]] bool ProbeEnvFlagEnabled(const char* const name) noexcept
+    {
+        char value[8] = {};
+        const DWORD written = ::GetEnvironmentVariableA(name, value, static_cast<DWORD>(sizeof(value)));
+        if (written == 0u || written >= sizeof(value)) {
+            return false;
+        }
+        return value[0] != '\0' && value[0] != '0';
+    }
+
+    // Re-pointed for the transport-flight heap fault (reported 2026-09-14: the
+    // debug CRT aborts inside ucrtbased once units are loaded and the transport
+    // takes off, with a stack the debugger cannot walk). The size class is not
+    // known in advance there, so `kProbeWatchedKind` alone is useless -- set
+    // FAF_HEAPWATCH=1 in the environment to stamp and validate EVERY lane
+    // instead of just that one.
+    //
+    // Watch-all skips `RtlCaptureStackBackTrace` on the stamp: capturing three
+    // frames on every free in the engine is far too slow to reach a
+    // reproduction. `freedBy` (a free `_ReturnAddress()`) still names the
+    // freeing caller, and the [CLOBBER]/[CHAIN] line still arrives on the first
+    // allocator operation that sees the damage, which is what bounds the
+    // window.
+    [[nodiscard]] bool ProbeWatchAllLanes() noexcept
+    {
+        static const bool sEnabled = ProbeEnvFlagEnabled("FAF_HEAPWATCH");
+        return sEnabled;
+    }
+
+    // Opt-in as a whole. This used to watch size class 6 unconditionally, which
+    // meant every run paid for the stamping, the chain validation, the
+    // quarantine-and-leak on every third refill, and -- most expensively under a
+    // debugger -- an `OutputDebugStringA` plus a DR0 re-arm across every thread
+    // each time that lane refilled. Under `dbgrun` that reduced startup to a
+    // crawl and buried the run log. Nothing may watch anything unless
+    // FAF_HEAPWATCH says so.
+    [[nodiscard]] bool ProbeWatchesKind(const std::uint32_t kind) noexcept
+    {
+        if (!ProbeWatchAllLanes()) {
+            return false;
+        }
+        return kind == kProbeWatchedKind || ProbeWatchAllLanes();
+    }
+
+    // TEMPORARY PROBE (do not commit). Route every engine allocation away from
+    // the recovered small-block allocator to an *instrumented* heap when
+    // FAF_SYSHEAP is set:
+    //
+    //   FAF_SYSHEAP=1  the process heap (`HeapAlloc`), which is what PageHeap
+    //                  and Application Verifier instrument;
+    //   FAF_SYSHEAP=2  the debug CRT heap (`_malloc_dbg`), which needs no
+    //                  external tooling at all -- it brackets every block with
+    //                  no-mans-land bytes, checks them on free, and reports a
+    //                  broken one through the `_CrtSetReportHook` `WinMain`
+    //                  already installs. With `/heapcheck` (which arms
+    //                  `_CRTDBG_CHECK_ALWAYS_DF`) the whole heap is validated
+    //                  on every allocator call, so the report arrives on the
+    //                  first engine allocation after the overrun instead of
+    //                  whenever the damaged block is next used.
+    //
+    // Start with 2: it is self-contained and bounds the window to one
+    // allocator call. Use 1 with `gflags -p /enable main.exe /full` when the
+    // window still is not tight enough -- a guard page faults on the storing
+    // instruction itself.
+    //
+    // The transport-flight fault is heap corruption whose *victim* is known
+    // (a `vector<MeshInstance*>` bucket in the shadow pass: first as a
+    // `bad_alloc`, then as a fault inside `uninit_move_n`'s memcpy) and whose
+    // *writer* is not. Every container, tree and lifetime on the victim's side
+    // has now been read against the disassembly and is faithful, so the write
+    // comes from somewhere else entirely and only a watchpoint on the block
+    // itself will name it.
+    //
+    // The engine allocator cannot provide that: it has no redzones, it reuses
+    // freed blocks immediately, and its free list lives *inside* the freed
+    // blocks, so an overrun or a use-after-free is silently absorbed and only
+    // surfaces later somewhere unrelated. `HeapAlloc` on the process heap can,
+    // because Windows already ships the instrumentation for it -- with
+    // PageHeap armed (`gflags -p /enable main.exe /full`, or Application
+    // Verifier's Heaps check) every block gets its own guard page, so an
+    // overrun faults on the storing instruction and a use-after-free faults on
+    // the touching instruction, with the culprit's stack rather than the
+    // victim's.
+    //
+    // Every entry point funnels through `malloc_0`/`free`/`msize`
+    // (`operator new` -> `malloc` -> `malloc_0`; `operator delete` ->
+    // `free_crt` -> `free`; `realloc_0`/`_expand` -> both), so bypassing those
+    // three is enough to keep allocation and release on the same heap. The
+    // flag is read once, on the first allocation the process makes, and never
+    // changes, so no block can be allocated on one heap and freed on the other.
+    enum class ProbeHeapMode : std::uint32_t
+    {
+        Engine = 0,
+        ProcessHeap = 1,
+        DebugCrtHeap = 2,
+    };
+
+    [[nodiscard]] ProbeHeapMode ProbeHeapModeSelected() noexcept
+    {
+        static const ProbeHeapMode sMode = [] {
+            char value[8] = {};
+            const DWORD written = ::GetEnvironmentVariableA("FAF_SYSHEAP", value, static_cast<DWORD>(sizeof(value)));
+            if (written == 0u || written >= sizeof(value) || value[0] == '\0' || value[0] == '0') {
+                return ProbeHeapMode::Engine;
+            }
+            return (value[0] == '2') ? ProbeHeapMode::DebugCrtHeap : ProbeHeapMode::ProcessHeap;
+        }();
+        return sMode;
+    }
+
+    [[nodiscard]] bool ProbeUseSystemHeap() noexcept
+    {
+        return ProbeHeapModeSelected() != ProbeHeapMode::Engine;
+    }
+
+    [[nodiscard]] void* ProbeSystemHeapAlloc(const std::size_t size) noexcept
+    {
+        const std::size_t bytes = (size != 0u) ? size : 1u;
+        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
+            return ::_malloc_dbg(bytes, _NORMAL_BLOCK, "engine", 0);
+        }
+        return ::HeapAlloc(::GetProcessHeap(), 0, bytes);
+    }
+
+    void ProbeSystemHeapFree(void* const ptr) noexcept
+    {
+        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
+            ::_free_dbg(ptr, _NORMAL_BLOCK);
+            return;
+        }
+        (void)::HeapFree(::GetProcessHeap(), 0, ptr);
+    }
+
+    [[nodiscard]] std::size_t ProbeSystemHeapSize(void* const ptr) noexcept
+    {
+        if (ProbeHeapModeSelected() == ProbeHeapMode::DebugCrtHeap) {
+            return ::_msize_dbg(ptr, _NORMAL_BLOCK);
+        }
+        const SIZE_T heapSize = ::HeapSize(::GetProcessHeap(), 0, ptr);
+        return (heapSize == static_cast<SIZE_T>(-1)) ? 0u : static_cast<std::size_t>(heapSize);
+    }
     // Victim block address observed by [CLOBBER]; heap layout is deterministic.
     constexpr std::uintptr_t kProbeVictimBlock = 0x5C803E00u;
 
@@ -336,7 +489,12 @@ namespace
         auto* const stamp = reinterpret_cast<ProbeFreedStamp*>(node);
         stamp->magic = kProbeFreedMagic;
         stamp->freedBy = freedBy;
-        {
+        if (ProbeWatchAllLanes()) {
+            // Too hot to walk the stack on every free across every size class.
+            stamp->frames[0] = nullptr;
+            stamp->frames[1] = nullptr;
+            stamp->frames[2] = nullptr;
+        } else {
             void* captured[8] = {};
             const USHORT got = ::RtlCaptureStackBackTrace(3, 3, captured, nullptr);
             for (int i = 0; i < 3; ++i) {
@@ -434,7 +592,7 @@ namespace
     void ProbeCheckWatchedLaneEveryOp(ThreadHeapCache* const cache, const std::uint32_t opSize,
                                       const void* const caller, const char* const where);
 
-    void ProbeValidateLaneChain(const ThreadSmallBlockLane& lane, const char* const where)
+    void ProbeValidateLaneChain(const ThreadSmallBlockLane& lane, const char* const where, const std::uint32_t kind)
     {
         static int sChainBudget = 0;
         const SmallBlockNode* previous = nullptr;
@@ -453,8 +611,8 @@ namespace
                     ++sClobberBudget;
                     char probe[224];
                     sprintf_s(probe, sizeof(probe),
-                              "[CLOBBER] %s block=%08X next=%08X expected=%08X freedBy=%08X step=%d\n",
-                              where, static_cast<unsigned>(bits),
+                              "[CLOBBER] %s kind=%u block=%08X next=%08X expected=%08X freedBy=%08X step=%d\n",
+                              where, kind, static_cast<unsigned>(bits),
                               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->next)),
                               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->nextCopy)),
                               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(stamp->freedBy)),
@@ -470,8 +628,8 @@ namespace
                     const auto* const prevStamp = reinterpret_cast<const ProbeFreedStamp*>(previous);
                     char probe[256];
                     sprintf_s(probe, sizeof(probe),
-                              "[CHAIN] %s step=%d bad=%08X magic=%08X prev=%08X prevFreedBy=%08X count=%d\n",
-                              where, step, static_cast<unsigned>(bits),
+                              "[CHAIN] %s kind=%u step=%d bad=%08X magic=%08X prev=%08X prevFreedBy=%08X count=%d\n",
+                              where, kind, step, static_cast<unsigned>(bits),
                               plausible ? stamp->magic : 0u,
                               static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(previous)),
                               previous != nullptr
@@ -1568,6 +1726,15 @@ extern "C" void* __cdecl malloc(size_t size)
  */
 extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 {
+    // TEMPORARY PROBE (do not commit). See `ProbeUseSystemHeap`.
+    if (ProbeUseSystemHeap()) {
+        void* const block = ProbeSystemHeapAlloc(size);
+        if (gMemHook != nullptr) {
+            gMemHook(0, static_cast<int>(size), block);
+        }
+        return block;
+    }
+
     ThreadHeapCache* const threadCache = GetOrCreateThreadHeapCache();
     SmallBlockNode* allocation = nullptr;
 
@@ -1604,7 +1771,7 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
                 // TEMPORARY PROBE (do not commit). Stamp the freshly refilled
                 // blocks too, so a cleared magic means a real overwrite rather
                 // than "this block was never freed".
-                if (kind == kProbeWatchedKind) {
+                if (ProbeWatchesKind(kind)) {
                     for (SmallBlockNode* fresh = lane.head; fresh != nullptr; fresh = fresh->next) {
                         ProbeStampFreedBlock(fresh, nullptr);
                     }
@@ -1621,8 +1788,12 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
                     // correct behaviour). So UNLINK the block first -- it is
                     // never handed to anyone -- and then watch it. Nothing may
                     // ever write to it, so any reported write is the bug.
+                    // Not in watch-all mode: this quarantine deliberately
+                    // unlinks a block and never reissues it, and perturbing a
+                    // lane (and leaking a block) is exactly what must not
+                    // happen on a run whose purpose is finding a leak.
                     static int sRefills = 0;
-                    if (++sRefills == 3 && lane.head != nullptr) {
+                    if (!ProbeWatchAllLanes() && ++sRefills == 3 && lane.head != nullptr) {
                         SmallBlockNode* const quarantined = lane.head;
                         lane.head = quarantined->next;
                         --lane.count;
@@ -1653,9 +1824,11 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
             // so a freed block is being written by engine code. Catch it at
             // the first bad head and name the size class.
             {
-                if (kind == kProbeWatchedKind) {
-                    ProbeValidateLaneChain(lane, "alloc");
-                    ProbeRearmOnHead(lane);
+                if (ProbeWatchesKind(kind)) {
+                    ProbeValidateLaneChain(lane, "alloc", kind);
+                    if (!ProbeWatchAllLanes()) {
+                        ProbeRearmOnHead(lane);
+                    }
                 }
                 const auto headBits = reinterpret_cast<std::uintptr_t>(lane.head);
                 if (lane.head != nullptr && (headBits < 0x10000u || (headBits & 3u) != 0u)) {
@@ -1703,6 +1876,17 @@ extern "C" void* __cdecl malloc_0(const std::uint32_t size)
 extern "C" void __cdecl free(void* ptr)
 {
     if (ptr == nullptr) {
+        return;
+    }
+
+    // TEMPORARY PROBE (do not commit). See `ProbeUseSystemHeap`. This has to
+    // come before `GetPageOwner`, which is only meaningful for pages the
+    // engine allocator owns.
+    if (ProbeUseSystemHeap()) {
+        if (gMemHook != nullptr) {
+            gMemHook(1, 0, ptr);
+        }
+        ProbeSystemHeapFree(ptr);
         return;
     }
 
@@ -1798,11 +1982,15 @@ extern "C" void __cdecl free(void* ptr)
             // whose free chain rots. Stamp each freed block with a magic and the
             // freeing caller, then verify the chain; the first bad chain reports
             // the block and who freed it, and dbgrun symbolises this stack.
-            if (kind == kProbeWatchedKind) {
+            if (ProbeWatchesKind(kind)) {
                 ProbeDetectDoubleFree(lane, static_cast<SmallBlockNode*>(ptr), _ReturnAddress());
                 ProbeStampFreedBlock(static_cast<SmallBlockNode*>(ptr), _ReturnAddress());
-                ProbeValidateLaneChain(lane, "free");
-                ProbeRearmOnHead(lane);
+                ProbeValidateLaneChain(lane, "free", kind);
+                if (!ProbeWatchAllLanes()) {
+                    // Arms dbgrun's single DR0 watchpoint; meaningless once
+                    // every class is being stamped.
+                    ProbeRearmOnHead(lane);
+                }
             }
 
             threadCache->cachedBytes += static_cast<std::int32_t>(blockSize);
@@ -1842,7 +2030,18 @@ extern "C" void __cdecl free(void* ptr)
  */
 extern "C" size_t __cdecl msize(void* memblock)
 {
-    if (memblock == nullptr || gPageOwnerByPage == nullptr) {
+    if (memblock == nullptr) {
+        return 0;
+    }
+
+    // TEMPORARY PROBE (do not commit). See `ProbeUseSystemHeap`. `realloc_0`
+    // sizes its copy from this, so it has to answer for process-heap blocks
+    // too; `HeapSize` reports `(SIZE_T)-1` for a pointer it does not own.
+    if (ProbeUseSystemHeap()) {
+        return ProbeSystemHeapSize(memblock);
+    }
+
+    if (gPageOwnerByPage == nullptr) {
         return 0;
     }
 
@@ -1995,6 +2194,34 @@ void* __cdecl operator new(const std::size_t size)
         }
 
         if (_callnewh(size) == 0) {
+            // TEMPORARY PROBE (do not commit). A bad_alloc out of here is the
+            // transport-flight fault, and the requested size alone separates
+            // the two candidate causes: an absurd size means a corrupted
+            // element count upstream (a clobbered container header), a small
+            // one means the engine allocator or the address space is actually
+            // exhausted. Report it with the committed-bytes counters so a
+            // genuine exhaustion is distinguishable from a single wild request.
+            //
+            // The engine counters are read without the allocator lock on
+            // purpose: this path is already failing, and taking the lock here
+            // risks deadlocking the report inside the allocator it describes.
+            // A slightly torn counter is fine for a diagnostic.
+            {
+                MEMORYSTATUS status{};
+                status.dwLength = sizeof(status);
+                ::GlobalMemoryStatus(&status);
+                char probe[320];
+                sprintf_s(probe, sizeof(probe),
+                          "[BADALLOC] request=%Iu (0x%IX) availVirtual=%luMB availPhys=%luMB load=%lu%% "
+                          "heap: reserved=%uMB committed=%uMB total=%uMB inSmallBlocks=%uMB inUse=%uMB\n",
+                          size, size,
+                          static_cast<unsigned long>(status.dwAvailVirtual >> 20),
+                          static_cast<unsigned long>(status.dwAvailPhys >> 20),
+                          static_cast<unsigned long>(status.dwMemoryLoad),
+                          gHeapReserved >> 20, gHeapCommitted >> 20, gHeapTotal >> 20,
+                          gHeapInSmallBlocks >> 20, gHeapInUse >> 20);
+                ::OutputDebugStringA(probe);
+            }
             throw std::bad_alloc{};
         }
     }

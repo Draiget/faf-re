@@ -1,4 +1,5 @@
 #include "PathTables.h"
+#include "gpg/core/utils/Logging.h"
 
 #include <array>
 #include <cassert>
@@ -411,8 +412,12 @@ namespace
     }
 
     std::uint32_t acceptedMask = 0u;
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    static int sProbeCalls = 0;
+    int probeGated = 0, probeRect = 0, probeTraverse = 0, probeBounds = 0, probeAccepted = 0;
     for (std::size_t step = 0; step < 8; ++step) {
       if ((acceptedMask & kStepGate[step]) != kStepGate[step]) {
+        ++probeGated;
         continue;
       }
 
@@ -420,6 +425,7 @@ namespace
       const int candidateZ = static_cast<std::uint16_t>(cell.z) + kStepOffsetZ[step];
 
       if (!traveler->ShouldSearchRect(implBase.mClusterMap->ClusterRect(candidateX, candidateZ, 1u))) {
+        ++probeRect;
         continue;
       }
 
@@ -428,13 +434,16 @@ namespace
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
       if (!traveler->CanTraverseCell(candidate)) {
+        ++probeTraverse;
         continue;
       }
 
       float cost = kStepCost[step];
       if (!traveler->IsInBounds(cell, candidate, &cost)) {
+        ++probeBounds;
         continue;
       }
+      ++probeAccepted;
 
       PathQueueNeighbour neighbour{};
       neighbour.mCell = candidate;
@@ -442,6 +451,12 @@ namespace
       outNeighbours.push_back(neighbour);
 
       acceptedMask |= 1u << step;
+    }
+    if (sProbeCalls++ < 40) {
+      const gpg::Rect2i r = implBase.mClusterMap->ClusterRect(static_cast<std::uint16_t>(cell.x), static_cast<std::uint16_t>(cell.z), 1u);
+      gpg::Warnf("[PATHDIAG] Adjacent cell=(%d,%d) gated=%d rect=%d traverse=%d bounds=%d accepted=%d rect1=(%d,%d)-(%d,%d)",
+                 static_cast<int>(cell.x), static_cast<int>(cell.z), probeGated, probeRect, probeTraverse, probeBounds,
+                 probeAccepted, r.x0, r.z0, r.x1, r.z1);
     }
     return true;
   }
@@ -511,6 +526,15 @@ namespace
           if (nodes[fromIndex].x == static_cast<std::uint8_t>(cellX - originX)
               && nodes[fromIndex].z == static_cast<std::uint8_t>(cellZ - originZ)) {
             break;
+          }
+        }
+        // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+        {
+          static int sProbeCalls = 0;
+          if (sProbeCalls++ < 60) {
+            gpg::Warnf("[PATHDIAG] ClusterEdges cell=(%d,%d) level=%d cluster=(%d,%d) data=%p nodes=%u from=%u budget=%d",
+                       cellX, cellZ, level, clusterX, clusterZ, static_cast<const void*>(data), nodeCount, fromIndex,
+                       implBase.mBudget);
           }
         }
 
@@ -2101,6 +2125,12 @@ namespace moho
     // is the base, so the concrete type has to be recovered here.
     const auto* const namedFootprint = static_cast<const SNamedFootprint*>(footprint);
     implBase.mClusterMap = owner.ClusterMapForFootprint(namedFootprint->mIndex);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[PATHDIAG] Begin traveler=%p fpIndex=%d fp=%dx%d caps=0x%X cluster=%p cap=%d anchor=(%d,%d)",
+               static_cast<void*>(&traveler), namedFootprint->mIndex, static_cast<int>(namedFootprint->mSizeX),
+               static_cast<int>(namedFootprint->mSizeZ), static_cast<unsigned>(namedFootprint->mOccupancyCaps),
+               static_cast<void*>(implBase.mClusterMap), implBase.mPathCap, static_cast<int>(implBase.mClosestCell.x),
+               static_cast<int>(implBase.mClosestCell.z));
 
     implBase.ResetSearch();
     implBase.mResultCells.clear();
@@ -2135,6 +2165,11 @@ namespace moho
 
     implBase.mResultCells.clear();
     (void)implBase.BuildPath(implBase.mClosestCell, implBase.mResultCells);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[PATHDIAG] Finish traveler=%p reachedGoal=%d cells=%d expand=%d closest=(%d,%d) closestDist=%.1f",
+               static_cast<void*>(traveler), reachedGoal ? 1 : 0, static_cast<int>(implBase.mResultCells.size()),
+               implBase.mExpandCount, static_cast<int>(implBase.mClosestCell.x), static_cast<int>(implBase.mClosestCell.z),
+               implBase.mClosestDistance);
 
     UnlinkAndResetPathQueueNode(implBase.mTraveler);
 

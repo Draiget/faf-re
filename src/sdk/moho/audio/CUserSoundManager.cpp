@@ -9,6 +9,9 @@
 #include <stdexcept>
 #include <utility>
 
+#include <cstdio>
+
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "lua/LuaObject.h"
 #include "moho/audio/AudioEngine.h"
@@ -35,6 +38,13 @@ namespace moho
   void SND_StopEntityLoop(SoundHandleRecord* record);
   void SND_DestroyEntityLoop(SoundHandleRecord* record);
   const char* func_SoundErrorCodeToMsg(int errorCode);
+
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- defined in CSndParams.cpp,
+  // which owns the registry of every live descriptor. Declared here rather than
+  // in the header because the probes come back out again. It has to sit at
+  // `moho` scope, not in the anonymous namespace below, or it would name a
+  // distinct internal-linkage symbol that nothing ever defines.
+  bool SndDiagIsRegisteredParams(const void* candidate);
 } // namespace moho
 
 namespace
@@ -668,6 +678,131 @@ namespace
     return value.DoResolve();
   }
 
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- reports which memory region a
+  // pointer lands in, without dereferencing it. `MEM_COMMIT` means the bytes
+  // are really there (so a bad value was written into them); anything else
+  // means the memory was handed back, which is a lifetime defect instead.
+  const char* SndDiagRegionState(const void* const address)
+  {
+    if (address == nullptr) {
+      return "null";
+    }
+
+    MEMORY_BASIC_INFORMATION region{};
+    if (::VirtualQuery(address, &region, sizeof(region)) != sizeof(region)) {
+      return "unqueryable";
+    }
+    switch (region.State) {
+      case MEM_COMMIT:
+        return (region.Protect == 0u || (region.Protect & PAGE_NOACCESS) != 0u) ? "commit-noaccess" : "commit";
+      case MEM_RESERVE:
+        return "reserve";
+      case MEM_FREE:
+        return "free";
+      default:
+        return "unknown";
+    }
+  }
+
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- decides WHICH defect we are
+  // looking at, before the read that faults.
+  //
+  // The crash presents two ways: the assert "Reached the supposably
+  // unreachable" (SndParams.cpp:387 -- `mResolvePolicy` at params+0x40 outside
+  // the 0..4 the switch at 0x004E0892 covers), and an access violation inside
+  // `weak_ptr<AudioEngine>::lock()` reading the control block stored at
+  // params+0x4C. From the call stack those are one bug, but they have three
+  // possible causes and each wants a completely different search:
+  //
+  //   reg=0                   the pointer is not a live descriptor at all, so
+  //                           the defect is upstream of the audio code: either
+  //                           a dangling `UserEntity` decoded out of the camera
+  //                           frustum lane, or a garbage
+  //                           `HSndEntityLoop::mParams`.
+  //   reg=1 pi!=commit        the descriptor is real, but the AudioEngine
+  //                           control block has been returned to the OS. The
+  //                           weak count was therefore never held -- i.e. a
+  //                           `weak_ptr` got byte-copied somewhere instead of
+  //                           copy-constructed.
+  //   reg=1 pi==commit        the descriptor is real and its control block is
+  //                           still mapped, so the bytes at +0x40/+0x4C were
+  //                           overwritten in place: a stray write.
+  //
+  // The verdict is delivered through `HandleAssertFailure` rather than
+  // `gpg::Warnf` for a practical reason: the engine's assert dialog shows only
+  // the last 100 log lines, and the navigation/steering/motion probes emit
+  // several hundred lines per second, so a warning logged here is guaranteed to
+  // have scrolled away before anyone can read it. Putting the verdict in the
+  // dialog headline is the one channel that cannot be lost.
+  //
+  // Returns true when the descriptor is safe to dereference.
+  bool SndDiagParamsLooksLive(
+    const char* const arm, const moho::UserEntity* const entity, const moho::CSndParams* const params
+  )
+  {
+    if (params == nullptr) {
+      return false;
+    }
+
+    const char* const paramsRegion = SndDiagRegionState(params);
+    const bool registered = moho::SndDiagIsRegisteredParams(params);
+    if (!registered || std::strcmp(paramsRegion, "commit") != 0) {
+      char verdict[512] = {};
+      std::snprintf(
+        verdict,
+        sizeof(verdict),
+        "[SNDDIAG] WILD PARAMS POINTER arm=%s entity=%p entityRegion=%.16s params=%p paramsRegion=%.16s "
+        "registered=%d -- the descriptor was never a live CSndParams, so the defect is upstream: the entity "
+        "or its HSndEntityLoop is dangling.",
+        arm,
+        static_cast<const void*>(entity),
+        SndDiagRegionState(entity),
+        static_cast<const void*>(params),
+        paramsRegion,
+        registered ? 1 : 0
+      );
+      gpg::HandleAssertFailure(verdict, __LINE__, __FILE__);
+      return false;
+    }
+
+    // Raw {px_, pi_} of the weak_ptr at +0x48. boost::weak_ptr does not expose
+    // pi_, and the whole question is whether it is a real control block, so
+    // read the lane rather than trusting the type.
+    std::uint32_t engineLane[2] = {0u, 0u};
+    std::memcpy(engineLane, &params->mEngine, sizeof(engineLane));
+
+    const std::uint32_t policy = params->mResolvePolicy;
+    const std::uint32_t control = engineLane[1];
+    const char* const controlRegion = SndDiagRegionState(reinterpret_cast<const void*>(control));
+    const bool controlUsable = control == 0u || std::strcmp(controlRegion, "commit") == 0;
+    if (policy <= 4u && controlUsable) {
+      return true;
+    }
+
+    char verdict[512] = {};
+    std::snprintf(
+      verdict,
+      sizeof(verdict),
+      "[SNDDIAG] %s arm=%s entity=%p entityId=%d params=%p bank=%u cue=%u policy=%u px=%08X pi=%08X "
+      "piRegion=%.16s -- descriptor is registered and mapped, so %s",
+      controlUsable ? "TAIL OVERWRITTEN" : "ENGINE CONTROL BLOCK FREED",
+      arm,
+      static_cast<const void*>(entity),
+      entity != nullptr ? static_cast<int>(entity->mParams.mEntityId) : -1,
+      static_cast<const void*>(params),
+      static_cast<unsigned>(params->mBankId),
+      static_cast<unsigned>(params->mCueId),
+      policy,
+      engineLane[0],
+      control,
+      controlRegion,
+      controlUsable ? "a stray write hit params+0x40/+0x4C in place."
+                    : "the AudioEngine control block was released while this weak_ptr still referenced it."
+    );
+    gpg::HandleAssertFailure(verdict, __LINE__, __FILE__);
+    return false;
+  }
+
   bool ParamsHasResolvedEngine(const moho::CSndParams& params)
   {
     boost::shared_ptr<moho::AudioEngine> resolvedEngine;
@@ -1247,8 +1382,19 @@ namespace moho
    * entities through `EraseEntityLoopTreeNode` (and release the whole set once
    * the last one goes), ambient loops stop or destroy outright.
    */
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- defined in CSndParams.cpp,
+  // which owns the registry of every live descriptor. Declared here rather
+  // than in the header because the probes come back out again.
+  void SndDiagScanParamsRegistry();
+
   void CUserSoundManager::UpdateSoundRequests(const gpg::fastvector<SAudioRequest>& requests)
   {
+    // TEMPORARY PROBE [SNDDIAG] (do not commit) -- sweep every live descriptor
+    // once a beat so a corrupted one is reported on the beat it goes bad,
+    // rather than later when whichever entity happens to own it enters the
+    // sound frustum.
+    SndDiagScanParamsRegistry();
+
     EnsureSoundCounterStat(gEngineStatSoundLimitedLoop, "Sound_LimitedLoop");
     EnsureSoundCounterStat(gEngineStatSoundStartEntityLoop, "Sound_StartEntityLoop");
     EnsureSoundCounterStat(gEngineStatSoundStopEntityLoop, "Sound_StopEntityLoop");
@@ -1501,7 +1647,8 @@ namespace moho
       // Ambient loop: the entity's own inline HSndEntityLoop, started once and
       // then held down by its mLoopIndex leaving -1 (0x008ACA2F..0x008ACAE4).
       CSndParams* const ambientParams = entity->mAmbientLoop.mParams;
-      if (ambientParams != nullptr && ParamsHasResolvedEngine(*ambientParams)
+      if (ambientParams != nullptr && SndDiagParamsLooksLive("ambient", entity, ambientParams)
+          && ParamsHasResolvedEngine(*ambientParams)
           && entity->mAmbientLoop.mLoopIndex == -1) {
         if (FilterSound(ambientParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);
@@ -1514,7 +1661,8 @@ namespace moho
       // call at 0x008ACBA6 and cleared by the cull pass above.
       HSndEntityLoop* const rumbleLoop = entity->mRumbleLoopHandle;
       CSndParams* const rumbleParams = rumbleLoop != nullptr ? rumbleLoop->mParams : nullptr;
-      if (rumbleParams != nullptr && ParamsHasResolvedEngine(*rumbleParams)
+      if (rumbleParams != nullptr && SndDiagParamsLooksLive("rumble", entity, rumbleParams)
+          && ParamsHasResolvedEngine(*rumbleParams)
           && entity->mHasInitialUpdate == 0u) {
         if (FilterSound(rumbleParams, layer, &position) == EFilterType::Pass) {
           const std::int32_t entityId = static_cast<std::int32_t>(entity->mParams.mEntityId);

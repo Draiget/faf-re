@@ -1,3 +1,4 @@
+#include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiNavigatorLand.h"
 
 #include <cmath>
@@ -516,6 +517,16 @@ bool CAiNavigatorLand::NavigatorMakeIdle()
  */
 int CAiNavigatorLand::Execute()
 {
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  {
+    static int sCount = 0;
+    if ((sCount++ % 50) == 0) {
+      gpg::Warnf("[NAVDIAG] CAiNavigatorLand::Execute unit=%p pathNav=%p status=%d pathState=%d steering=%p n=%d",
+                 static_cast<void*>(mUnit), static_cast<void*>(mPathNavigator), static_cast<int>(mStatus),
+                 mPathNavigator != nullptr ? static_cast<int>(mPathNavigator->mState) : -1,
+                 mUnit != nullptr ? static_cast<void*>(mUnit->AiSteering) : nullptr, sCount);
+    }
+  }
   if (!mUnit || !mPathNavigator) {
     return 1;
   }
@@ -550,6 +561,10 @@ int CAiNavigatorLand::Execute()
   }
 
   if (mPathNavigator->mState <= AIPATHNAVSTATE_Failed) {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] Land::Execute pathState=%d -> idle, event=%s", static_cast<int>(mPathNavigator->mState),
+               mPathNavigator->mState == AIPATHNAVSTATE_Idle ? "Succeeded" : "Failed");
+    gpg::Warnf("[STEERDIAG] Stop() from %s", "navLandIdle"); // TEMPORARY PROBE
     steering->Stop();
     NavigatorMakeIdle();
 

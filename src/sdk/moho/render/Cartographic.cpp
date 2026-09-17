@@ -1,9 +1,10 @@
 #include "moho/render/Cartographic.h"
 
+#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <bit>
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -1925,6 +1926,27 @@ namespace moho
     mHypsometricColors[3] = static_cast<std::int32_t>(hypsometricColor3);
     mHypsometricColors[4] = static_cast<std::int32_t>(hypsometricColor4);
 
+    { // TEMPORARY PROBE (do not commit): cartographic elevation range
+      const float span = mElevMaximum - mElevMinimum;
+      const float inv = span > 0.0f ? 1.0f / span : 1.0f;
+      const int cx = heightField.width / 2, cz = heightField.height / 2;
+      gpg::Warnf("[CARTOELEV] hf=%dx%d grid=%dx%d elev=[%.3f..%.3f] surf=%.3f water=%.3f def=%.3f bounds=%d hscale=%.4f",
+        heightField.width, heightField.height, gridWidth, gridHeight, mElevMinimum, mElevMaximum,
+        mSurfaceElevation, mWaterElevation, mDefaultElevation, mHasElevationBounds ? 1 : 0, mTerrainHeightScale);
+      { const auto* tb = heightField.mGrids.begin(); const auto* te = heightField.mGrids.end();
+        const int tc = tb ? static_cast<int>(te - tb) : 0;
+        gpg::Warnf("[CARTOTIER] tierCount=%d data=%p w=%d h=%d", tc, static_cast<const void*>(heightField.data), heightField.width, heightField.height);
+        for (int t = 0; t < tc && t < 6; ++t) {
+          gpg::Warnf("[CARTOTIER]  tier[%d] data1(w=%d h=%d p=%p) data2(w=%d h=%d p=%p)", t,
+            tb[t].data1.width, tb[t].data1.height, static_cast<const void*>(tb[t].data1.data),
+            tb[t].data2.width, tb[t].data2.height, static_cast<const void*>(tb[t].data2.data));
+        } }
+      gpg::Warnf("[CARTOELEV] samples n(0,0)=%.4f n(c,c)=%.4f n(w-1,h-1)=%.4f | grid=(%.5f,%.5f) tsize=(%.5f,%.5f)",
+        SampleCartographicHeightKernel(heightField, 0, 0, mElevMinimum, inv),
+        SampleCartographicHeightKernel(heightField, cx, cz, mElevMinimum, inv),
+        SampleCartographicHeightKernel(heightField, heightField.width - 1, heightField.height - 1, mElevMinimum, inv),
+        mGridSizeCoeff[0], mGridSizeCoeff[1], mTerrainSizeCoeff[0], mTerrainSizeCoeff[1]);
+    }
     InitializeTerrainTextures(heightField, gridWidth, gridHeight, topographicSamples);
 
     boost::shared_ptr<gpg::gal::VertexFormatD3D9> terrainVertexFormat;

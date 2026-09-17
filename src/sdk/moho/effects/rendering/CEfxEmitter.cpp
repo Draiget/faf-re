@@ -1,6 +1,8 @@
 #include "moho/effects/rendering/CEfxEmitter.h"
 
 #include <cmath>
+#include <cstdio>   // TEMPORARY PROBE (do not commit)
+#include <windows.h> // TEMPORARY PROBE (do not commit)
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -417,6 +419,40 @@ namespace moho
   )
   {
     Entity* const attachedEntity = effect->mEntityInfo.GetAttachTargetEntity();
+
+    // TEMPORARY PROBE (do not commit). Engine effects on a flying transport sit
+    // still beside the hull instead of riding it, and the beam probe already
+    // showed a live-looking source whose Position reads NaN. Both are this
+    // resolve: report when the weak attach target is gone (the effect then
+    // falls back to its creation-time matrix and never moves again) and when it
+    // resolves to something whose transform is not a number. The vftable word
+    // separates "freed and reused" from "live entity that really has no
+    // position yet".
+    {
+      static int sAttachProbeBudget = 0;
+      const bool lostParent = (attachedEntity == nullptr) && effect->mEntityInfo.mParentBoneIndex != -1;
+      const bool badTransform = (attachedEntity != nullptr) &&
+        !(std::isfinite(attachedEntity->Position.x) && std::isfinite(attachedEntity->Position.y) &&
+          std::isfinite(attachedEntity->Position.z));
+      if ((lostParent || badTransform) && sAttachProbeBudget < 24) {
+        ++sAttachProbeBudget;
+        char probe[320];
+        sprintf_s(probe, sizeof(probe),
+                  "[EFXATTACH] %s effect=%08X ent=%08X cls=%.50s bone=%d dead=%d destroyQ=%d pos=(%.1f,%.1f,%.1f)\n",
+                  lostParent ? "lost-parent" : "nan-transform",
+                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(effect)),
+                  static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(attachedEntity)),
+                  (attachedEntity != nullptr) ? typeid(*attachedEntity).name() : "<null>",
+                  effect->mEntityInfo.mParentBoneIndex,
+                  (attachedEntity != nullptr) ? static_cast<int>(attachedEntity->Dead) : -1,
+                  (attachedEntity != nullptr) ? static_cast<int>(attachedEntity->DestroyQueuedFlag) : -1,
+                  (attachedEntity != nullptr) ? attachedEntity->Position.x : 0.0f,
+                  (attachedEntity != nullptr) ? attachedEntity->Position.y : 0.0f,
+                  (attachedEntity != nullptr) ? attachedEntity->Position.z : 0.0f);
+        ::OutputDebugStringA(probe);
+      }
+    }
+
     if (attachedEntity == nullptr) {
       *outMatrix = effect->mMatrix;
       return true;

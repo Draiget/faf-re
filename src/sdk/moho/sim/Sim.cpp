@@ -10,6 +10,8 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstddef>
+#include <cstdarg>
+#include <cstdio>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -5180,6 +5182,23 @@ namespace
     return currentCommand->mUnit.GetObjectPtr();
   }
 
+  // TEMPORARY PROBE SINK -- transport triage, delete when resolved.
+  // gpg::Warnf reaches nothing until `/log <name>` installs a target, so the
+  // probe below appends here instead. The file lands beside the executable.
+  void DiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
+
   [[nodiscard]] bool HasCommandCap(const Unit* const unit, const ERuleBPUnitCommandCaps commandCap) noexcept
   {
     return unit != nullptr && (unit->GetAttributes().commandCapsMask & static_cast<std::uint32_t>(commandCap)) != 0u;
@@ -5907,6 +5926,24 @@ namespace
         queue->InsertCommandToQueue(issuedCommand, insertIndex);
         queuedAtLeastOnce = true;
       }
+    }
+
+    // TEMPORARY PROBE -- transport-load triage, delete when resolved.
+    // Covers the half the dispatch probe cannot see: whether the order was
+    // issued at all, what target id rode with it, and how many of the selected
+    // units actually took it. A TransportLoadUnits (22) line with queued=0, or
+    // with a target id that resolves to nothing, says the failure is here
+    // rather than in the task.
+    if (commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_TransportLoadUnits
+        || commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_TransportReverseLoadUnits
+        || commandIssueData.mCommandType == EUnitCommandType::UNITCOMMAND_Dock) {
+      DiagLine(
+        "[XPORTDIAG] Issue: cmd=%d targetType=%d targetId=0x%08x cmdObj=%p queued=%d",
+        static_cast<int>(commandIssueData.mCommandType),
+        static_cast<int>(commandIssueData.mTarget.mType),
+        static_cast<unsigned int>(commandIssueData.mTarget.mEntityId),
+        static_cast<void*>(issuedCommand), queuedAtLeastOnce ? 1 : 0
+      );
     }
 
     if (issuedCommand == nullptr || !queuedAtLeastOnce) {
@@ -8019,6 +8056,7 @@ namespace
       table.SetObject(key, value);
     }
   }
+
   /**
    * Address: 0x007551C0 (the save half, nine `PreCreatedPtr` calls at
    * 0x0075520A..0x00755391) and 0x00754C60 (the load half, nine
@@ -9877,6 +9915,21 @@ void Sim::Logf(const char* fmt, ...)
   va_end(args);
 }
 
+namespace
+{
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  void ProbeTerrainOccupancy(const moho::COGrid* const grid, const char* const stage)
+  {
+    if (grid == nullptr) { return; }
+    const gpg::BitArray2D& occ = grid->terrainOccupation;
+    int setBits = 0;
+    for (int i = 0; i < occ.size; ++i) { std::uint32_t w = static_cast<std::uint32_t>(occ.ptr[i]); while (w != 0u) { w &= w - 1u; ++setBits; } }
+    gpg::Warnf("[OCCDIAG] %s terrainOcc setBits=%d ptr=%p size=%d grid=%p gridSim=%p water=%p occ=%p", stage, setBits,
+               static_cast<const void*>(occ.ptr), occ.size, static_cast<const void*>(grid), static_cast<const void*>(grid->sim),
+               static_cast<const void*>(grid->waterOccupation.ptr), static_cast<const void*>(grid->mOccupation.ptr));
+  }
+} // namespace
+
 /**
  * Address: 0x007462A0 (FUN_007462A0, ?Printf@Sim@Moho@@QAAXPBDZZ)
  *
@@ -10035,6 +10088,7 @@ Sim::Sim(LaunchInfoBase* const info)
       delete previousGrid;
     }
     ogridScope.Emit();
+    ProbeTerrainOccupancy(mOGrid, "after COGrid ctor");
   }
 
   // Allocate the path tables sized to the interior of the heightfield.
@@ -10051,6 +10105,7 @@ Sim::Sim(LaunchInfoBase* const info)
     }
   }
 
+  ProbeTerrainOccupancy(mOGrid, "after PathTables ctor");
   // Seed the rolling sim checksum from the rules and log the initial digest.
   mRules->UpdateChecksum(&mContext, mLog);
   const gpg::MD5Digest digest = mContext.Digest();
@@ -10135,6 +10190,7 @@ void Sim::Setup(LaunchInfoNew* const info)
       setupSession.TypeError("call");
     }
     setupSession.Call();
+    ProbeTerrainOccupancy(mOGrid, "after SetupSession");
   }
 
   // Refresh heightfield bounds to the full grid.
@@ -10202,7 +10258,9 @@ void Sim::Setup(LaunchInfoNew* const info)
   }
 
   // Create the armies from the scenario launch info.
+  ProbeTerrainOccupancy(mOGrid, "before CreateArmies");
   CreateArmies(info->mArmyLaunchInfo, armySetupObjects, scenarioInfoOptions);
+  ProbeTerrainOccupancy(mOGrid, "after CreateArmies");
 
   // Optional sound manager: only when a non-empty engine list is configured and
   // sound is not disabled.
@@ -10224,12 +10282,22 @@ void Sim::Setup(LaunchInfoNew* const info)
     int propCount = 0;
     if (props != nullptr && !props->mEntries.empty()) {
       propCount = static_cast<int>(props->mEntries.size());
-      for (const CWldPropEntry* entry = props->mEntries.begin(); entry != props->mEntries.end(); ++entry) {
+      // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+      const void* probeOccPtr = mOGrid ? static_cast<const void*>(mOGrid->terrainOccupation.ptr) : nullptr;
+      int probeIndex = 0;
+      for (const CWldPropEntry* entry = props->mEntries.begin(); entry != props->mEntries.end(); ++entry, ++probeIndex) {
         (void)PROP_Create(this, entry->mTransform, entry->mBlueprintPath.c_str());
+        if (mOGrid && static_cast<const void*>(mOGrid->terrainOccupation.ptr) != probeOccPtr) {
+          gpg::Warnf("[OCCDIAG] terrainOcc.ptr changed after prop #%d %s at (%.1f,%.1f,%.1f): %p -> %p", probeIndex,
+                     entry->mBlueprintPath.c_str(), entry->mTransform.pos_.x, entry->mTransform.pos_.y, entry->mTransform.pos_.z,
+                     probeOccPtr, static_cast<const void*>(mOGrid->terrainOccupation.ptr));
+          probeOccPtr = static_cast<const void*>(mOGrid->terrainOccupation.ptr);
+        }
       }
     }
     gpg::Warnf(" NUM PROPS = %d", propCount);
   }
+  ProbeTerrainOccupancy(mOGrid, "after props");
 
   // BeginSession() Lua callback.
   {
@@ -10239,9 +10307,11 @@ void Sim::Setup(LaunchInfoNew* const info)
     }
     beginSession.Call();
   }
+  ProbeTerrainOccupancy(mOGrid, "after BeginSession");
 
   // Final post-initialization pass (prebuilt units, etc.).
   PostInitialize(scenarioInfoOptions);
+  ProbeTerrainOccupancy(mOGrid, "end of Sim::Setup");
 }
 
 /**
@@ -11595,6 +11665,16 @@ void Sim::IssueCommand(
 
   auto collectUnit = [this, &selectedUnits](const EntId entId) {
     Entity* entity = FindEntityById(mEntityDB, entId);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    {
+      const bool okay = entity != nullptr && OkayToMessWith(entity);
+      auto* const armyImpl = entity != nullptr ? static_cast<CArmyImpl*>(static_cast<SimArmy*>(entity->ArmyRef)) : nullptr;
+      DiagLine("[ORDERDIAG]   collect id=0x%08X entity=%p army=%p okay=%d curSrc=%d outOfGame=%d validSrcCount=%d isUnit=%p",
+                 static_cast<unsigned>(entId), static_cast<void*>(entity), static_cast<void*>(armyImpl), okay ? 1 : 0,
+                 static_cast<int>(mCurCommandSource), armyImpl != nullptr ? (armyImpl->mVarDat.mIsOutOfGame ? 1 : 0) : -1,
+                 armyImpl != nullptr ? static_cast<int>(reinterpret_cast<const BVIntSet&>(armyImpl->mVarDat.mValidCommandSources).Count()) : -1,
+                 entity != nullptr ? static_cast<void*>(entity->IsUnit()) : nullptr);
+    }
     if (!entity || !OkayToMessWith(entity)) {
       return;
     }
@@ -11610,6 +11690,13 @@ void Sim::IssueCommand(
   entities.ForEachValue([&collectUnit](const unsigned int value) {
     collectUnit(static_cast<EntId>(value));
   });
+
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  DiagLine("[ORDERDIAG] Sim::IssueCommand type=%d id=0x%08X targetType=%d pos=(%.1f,%.1f,%.1f) selectedEmpty=%d clear=%d",
+             static_cast<int>(commandIssueData.mCommandType), static_cast<unsigned>(commandIssueData.nextCommandId),
+             static_cast<int>(commandIssueData.mTarget.mType), commandIssueData.mTarget.mPos.x,
+             commandIssueData.mTarget.mPos.y, commandIssueData.mTarget.mPos.z, selectedUnits.Empty() ? 1 : 0,
+             clearQueue ? 1 : 0);
 
   if (selectedUnits.Empty()) {
     ReleaseCommandIdIfUnconsumed(mCommandDB, commandIssueData.nextCommandId);
@@ -13641,6 +13728,23 @@ void Sim::AdvanceBeat(const int amt)
     lua_sethook(mLuaState->m_state, GetDebugLuaHook(), 4, 0);
   }
 
+  // TEMPORARY PROBE -- delete once resolved. Reports whether the sim body
+  // below (which contains the recon drive) is entered at all, so a "recon never
+  // ticks" reading can be told apart from "the sim is simply paused".
+  {
+    static int sProbe = 0;
+    if (sProbe++ < 6) {
+      gpg::Warnf(
+        "[SIMGATE] tick=%u gameOver=%d pausedBy=%d singleStep=%d armies=%u",
+        mCurTick,
+        static_cast<int>(mGameOver),
+        static_cast<int>(mPausedByCommandSource),
+        static_cast<int>(mSingleStep),
+        static_cast<unsigned>(mArmiesList.size())
+      );
+    }
+  }
+
   if (!mGameOver && (mPausedByCommandSource == -1 || mSingleStep)) {
     ++mCurTick;
     Logf("  tick number %u\n", mCurTick);
@@ -13674,6 +13778,47 @@ void Sim::AdvanceBeat(const int amt)
     TickTaskStage(&mDiskWatcherTaskStage);
     TickTaskStage(&mTaskStageA);
     RefreshBlips();
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    if (mOGrid != nullptr) {
+      static int sLastCount = -1;
+      const gpg::BitArray2D& occ = mOGrid->terrainOccupation;
+      int setBits = 0;
+      for (int i = 0; i < occ.size; ++i) {
+        std::uint32_t w = static_cast<std::uint32_t>(occ.ptr[i]);
+        while (w != 0u) { w &= w - 1u; ++setBits; }
+      }
+      if (setBits != sLastCount) {
+        gpg::Warnf("[OCCDIAG] tick=%u terrainOcc setBits=%d (was %d) ptr=%p size=%d w=%d h=%d", mCurTick, setBits, sLastCount,
+                   static_cast<const void*>(occ.ptr), occ.size, occ.width, occ.height);
+        sLastCount = setBits;
+      }
+    }
+
+    // TEMPORARY PROBE -- delete once resolved.
+    //
+    // ReconTick is measurably never reached (its own probe never fires while
+    // the sim is beating), so recon never runs: no blips, anySense=0x00 on
+    // every probe, and with it the fog, auto-attack, attack-ground and
+    // enemy-click symptoms. This reports which of the two guards below is
+    // dropping out -- an empty army list, or a null recon DB per army.
+    {
+      static int sProbe = 0;
+      if (sProbe++ < 4) {
+        std::size_t nullDb = 0;
+        for (std::size_t i = 0; i < mArmiesList.size(); ++i) {
+          CArmyImpl* const a = mArmiesList[i];
+          if (a == nullptr || a->GetReconDB() == nullptr) {
+            ++nullDb;
+          }
+        }
+        gpg::Warnf(
+          "[RECONDRIVE] tick=%u armies=%u nullReconDb=%u",
+          mCurTick,
+          static_cast<unsigned>(mArmiesList.size()),
+          static_cast<unsigned>(nullDb)
+        );
+      }
+    }
 
     if (!mArmiesList.empty()) {
       const std::size_t armyCount = mArmiesList.size();
@@ -25584,6 +25729,27 @@ int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
   }
 
   if (CIntel* const intelManager = entity->mIntelManager; intelManager != nullptr) {
+    // TEMPORARY PROBE -- delete once resolved. CIntelGrid::AddCircle fires
+    // exactly once per game, so vision is never rastered and every recon probe
+    // reads an empty grid. This is the only runtime path that arms a handle, so
+    // it reports the intel type asked for, whether a handle exists for it, and
+    // whether the arm actually happened -- separating "Lua never asks" from
+    // "the handle was never allocated by InitIntel" (only 2 of 9 slots are
+    // non-null) from "it was already enabled".
+    {
+      static unsigned sCalls = 0;
+      CIntelPosHandle* const probeHandle = ResolveIntelPosHandleForType(*intelManager, intelType);
+      if (sCalls++ < 40) {
+        gpg::Warnf(
+          "[ENABLEINTEL] call=%u type=%d handle=%p enabled=%u radius=%u grid=%p",
+          sCalls, static_cast<int>(intelType), static_cast<void*>(probeHandle),
+          probeHandle ? static_cast<unsigned>(probeHandle->mEnabled) : 9u,
+          probeHandle ? static_cast<unsigned>(probeHandle->mRadius) : 0u,
+          probeHandle ? static_cast<void*>(probeHandle->mGrid.px) : nullptr
+        );
+      }
+    }
+
     if (CIntelPosHandle* const handle = ResolveIntelPosHandleForType(*intelManager, intelType); handle != nullptr) {
       if (handle->mEnabled == 0u) {
         handle->mEnabled = 1u;
@@ -29345,6 +29511,20 @@ namespace moho
     // recovered 3-arg driver IssueCommand returns void, so nothing is discarded.
     BVSet<EntId, EntIdUniverse> issuedEntitySet{};
     func_DecodeEntIdSet(issuedEntitySet, units);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    DiagLine("[ORDERDIAG] ISSUE_Command type=%d targetType=%d pos=(%.1f,%.1f,%.1f) units=%u clear=%d id=0x%08X driver=%p",
+               static_cast<int>(data.mCommandType), static_cast<int>(data.mTarget.mType),
+               data.mTarget.mPos.x, data.mTarget.mPos.y, data.mTarget.mPos.z,
+               static_cast<unsigned>(units.size()), clearQueue ? 1 : 0,
+               static_cast<unsigned>(data.nextCommandId), static_cast<void*>(SIM_GetActiveDriver()));
+    issuedEntitySet.ForEachValue([](const unsigned int value) {
+      DiagLine("[ORDERDIAG]   sent id=0x%08X", value);
+    });
+    for (moho::UserUnit* const unit : units) {
+      DiagLine("[ORDERDIAG]   user unit=%p entityId=0x%08X", static_cast<void*>(unit),
+                 reinterpret_cast<const moho::UserEntity*>(unit)->mParams.mEntityId);
+    }
+
     if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
       simDriver->IssueCommand(issuedEntitySet, data, clearQueue);
     }

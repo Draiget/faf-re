@@ -701,6 +701,16 @@ namespace moho
     if (postArmorAmount > 0.0f) {
       Entity* const finalTarget = damage.mTarget.GetObjectPtr();
       const EntId targetId = (finalTarget != nullptr) ? finalTarget->id_ : EntId{0};
+      {
+        const char* bpid = "<none>";
+        if (finalTarget != nullptr && finalTarget->BluePrint != nullptr) {
+          bpid = finalTarget->BluePrint->mBlueprintId.c_str();
+        }
+        gpg::Warnf("[DMGDIAG] Point target=%p isUnit=%d amt=%.1f post=%.1f bp='%s'",
+                   static_cast<void*>(finalTarget),
+                   (finalTarget != nullptr && finalTarget->IsUnit() != nullptr) ? 1 : 0,
+                   damage.mAmount, postArmorAmount, bpid);
+      }
       sim->Logf("DealDamage(target=0x%08x, amt=%.1f)\n", targetId, postArmorAmount);
 
       const LuaPlus::LuaObject damagePayload = SCR_ToLua<Wm3::Vector3<float>>(sim->mLuaState, damage.mVector);
@@ -1004,6 +1014,9 @@ namespace moho
 
     const CollisionResult* const resultsBegin = areaResults.start_;
     const CollisionResult* const resultsEnd = areaResults.end_;
+    gpg::Warnf("[DMGDIAG] Area origin=(%.1f,%.1f,%.1f) radius=%.1f amount=%.1f collected=%d",
+               damage.mOrigin.x, damage.mOrigin.y, damage.mOrigin.z, damage.mRadius, damage.mAmount,
+               static_cast<int>(resultsEnd - resultsBegin));
     for (const CollisionResult* result = resultsBegin; result != resultsEnd; ++result) {
       Entity* const target = result->sourceEntity;
 

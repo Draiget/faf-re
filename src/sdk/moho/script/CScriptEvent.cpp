@@ -1,6 +1,7 @@
 #include "CScriptEvent.h"
 
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <cstdint>
 #include <new>
@@ -1988,6 +1989,26 @@ CAiNavigatorImpl* moho::SCR_FromLua_CAiNavigatorImpl(const LuaPlus::LuaObject& o
 
   const gpg::RRef sourceRef = SCR_MakeScriptObjectRef(scriptObject);
   const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedCAiNavigatorImplType());
+  { // TEMPORARY PROBE (do not commit)
+    static int navProbe = 0;
+    if (navProbe++ < 12) {
+      std::int32_t derivedOffset = -1;
+      if (sourceRef.mType != nullptr) {
+        (void)sourceRef.mType->IsDerivedFrom(CachedCAiNavigatorImplType(), &derivedOffset);
+      }
+      const char* const srcTypeName = sourceRef.mType != nullptr ? sourceRef.mType->GetName() : "<null>";
+      const char* const tgtTypeName =
+        CachedCAiNavigatorImplType() != nullptr ? CachedCAiNavigatorImplType()->GetName() : "<null>";
+      if (std::FILE* const probeFile = std::fopen("C:/ProgramData/FAForever/bin/navlay.txt", "a")) {
+        std::fprintf(probeFile,
+                     "slot=%p scriptObj=%p srcObj=%p srcType=%s upcast=%p tgt=%s derivedOff=%d rtti=%s vptr=%p\n",
+                     static_cast<void*>(scriptObjectSlot), static_cast<void*>(scriptObject), sourceRef.mObj,
+                     srcTypeName, upcast.mObj, tgtTypeName, derivedOffset, typeid(*scriptObject).name(),
+                     upcast.mObj != nullptr ? *reinterpret_cast<void**>(upcast.mObj) : nullptr);
+        std::fclose(probeFile);
+      }
+    }
+  }
   if (!upcast.mObj) {
     luaL_error(state ? state->GetActiveCState() : nullptr, kIncorrectGameObjectTypeError);
     return nullptr;

@@ -7,6 +7,7 @@
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/sim/CIntelGrid.h"
 
 namespace
@@ -335,6 +336,33 @@ namespace moho
    */
   void CIntelPosHandle::AddViz()
   {
+    // TEMPORARY PROBE -- delete once resolved. CIntelGrid::AddCircle is called
+    // exactly ONCE in a 200s ten-army game, so vision is never stamped and every
+    // recon probe reads an empty grid. This reports which of the three gates
+    // below drops the call.
+    {
+      static unsigned sCalls = 0, sDisabled = 0, sNoRadius = 0, sNoGrid = 0, sPassed = 0;
+      ++sCalls;
+      if (mEnabled == 0u) {
+        ++sDisabled;
+      } else if (mRadius == 0u) {
+        ++sNoRadius;
+      } else if (mGrid.px == nullptr) {
+        ++sNoGrid;
+      } else {
+        ++sPassed;
+      }
+      if ((sCalls % 100u) == 0u) {
+        gpg::Warnf(
+          "[VIZGATE] AddViz calls=%u disabled=%u noRadius=%u noGrid=%u passed=%u "
+          "(this: enabled=%u radius=%u grid=%p pos=(%.1f,%.1f))",
+          sCalls, sDisabled, sNoRadius, sNoGrid, sPassed,
+          static_cast<unsigned>(mEnabled), static_cast<unsigned>(mRadius),
+          static_cast<void*>(mGrid.px), mLastPos.x, mLastPos.z
+        );
+      }
+    }
+
     if (mEnabled == 0u || mRadius == 0u || mGrid.px == nullptr) {
       return;
     }

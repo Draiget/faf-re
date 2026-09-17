@@ -1,5 +1,7 @@
 // Auto-generated from IDA VFTABLE/RTTI scan.
 #include "moho/unit/core/Unit.h"
+#include "gpg/core/utils/Logging.h"
+#include "moho/ai/CAiNavigatorImpl.h"
 
 #include <algorithm>
 #include <array>
@@ -32,6 +34,7 @@
 #include "moho/ai/IFormationInstance.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/animation/CAniPose.h"
+#include "moho/animation/CAniSkel.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityCollisionUpdater.h"
@@ -7302,6 +7305,7 @@ int moho::cfunc_UnitSetBlockCommandQueueL(LuaPlus::LuaState* const state)
     unit->UnitStateMask &= ~kBlockCommandQueueMask;
   }
 
+
   return 0;
 }
 
@@ -7417,6 +7421,8 @@ int moho::cfunc_UnitSetUnSelectableL(LuaPlus::LuaState* const state)
   const bool shouldSetUnSelectable = flagArg.GetBoolean();
 
   constexpr std::uint64_t kUnSelectableMask = 0x0000000200000000ull;
+  // TEMPORARY PROBE -- warp-in triage, delete when resolved.
+  gpg::Warnf("[WARPDIAG] SetUnSelectable unit=%p flag=%d", static_cast<void*>(unit), shouldSetUnSelectable ? 1 : 0);
   if (shouldSetUnSelectable) {
     unit->UnitStateMask |= kUnSelectableMask;
   } else {
@@ -10099,6 +10105,23 @@ int moho::cfunc_UnitShowBoneL(LuaPlus::LuaState* const state)
     }
   }
 
+  // TEMPORARY PROBE -- warp-in triage, delete when resolved.
+  {
+    int visibleCount = 0;
+    int totalCount = 0;
+    const void* posePtr = nullptr;
+    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.px != nullptr) {
+      CAniPose* const pose = unit->AniActor->mPose.px;
+      posePtr = pose;
+      for (const CAniPoseBone& bone : pose->mBones) {
+        ++totalCount;
+        visibleCount += bone.mVisible != 0u ? 1 : 0;
+      }
+    }
+    gpg::Warnf("[WARPDIAG] ShowBone unit=%p bone=%d recur=%d pose=%p visible=%d/%d",
+               static_cast<void*>(unit), boneIndex, affectChildren ? 1 : 0, posePtr, visibleCount, totalCount);
+  }
+
   return 0;
 }
 
@@ -10155,6 +10178,20 @@ int moho::cfunc_UnitHideBoneL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaStackObject affectChildrenArg(state, 3);
   const bool affectChildren = affectChildrenArg.GetBoolean();
+
+  // TEMPORARY PROBE -- warp-in triage, delete when resolved.
+  {
+    const char* requested = lua_isstring(rawState, 2) != 0 ? lua_tostring(rawState, 2) : "<index>";
+    const char* resolved = "<none>";
+    if (unit != nullptr && unit->AniActor != nullptr && unit->AniActor->mPose.px != nullptr && boneIndex >= 0) {
+      const boost::shared_ptr<const CAniSkel> skeleton = unit->AniActor->mPose.px->GetSkeleton();
+      if (const SAniSkelBone* const bone = skeleton ? skeleton->GetBone(static_cast<std::uint32_t>(boneIndex)) : nullptr) {
+        resolved = bone->mBoneName != nullptr ? bone->mBoneName : "<null>";
+      }
+    }
+    gpg::Warnf("[WARPDIAG] HideBone unit=%p bone=%d recur=%d requested=%s resolved=%s",
+               static_cast<void*>(unit), boneIndex, affectChildren ? 1 : 0, requested, resolved);
+  }
 
   if (unit != nullptr && boneIndex >= 0) {
     if (CAniPoseBone* const poseBone = ResolveUnitPoseBone(*unit, boneIndex); poseBone != nullptr) {
@@ -13113,6 +13150,16 @@ void Unit::UpdateGuardFormation()
 int Unit::MotionTick()
 {
   SimulationRef->Logf("0x%08x's motion tick.\n", id_);
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  {
+    static int sMotionTickCount = 0;
+    if ((sMotionTickCount++ % 100) == 0) {
+      const Wm3::Vec3f& p = GetPosition();
+      gpg::Warnf("[MOTDIAG] Unit::MotionTick id=0x%08X pos=(%.1f,%.1f,%.1f) motion=%p nav=%p queue=%d n=%d",
+                 static_cast<unsigned>(id_), p.x, p.y, p.z, static_cast<void*>(UnitMotion), static_cast<void*>(AiNavigator),
+                 CommandQueue != nullptr ? static_cast<int>(CommandQueue->mCommandVec.size()) : -1, sMotionTickCount);
+    }
+  }
 
   if (AiSiloBuild != nullptr) {
     AiSiloBuild->SiloTick();
@@ -15356,6 +15403,56 @@ void Unit::UpdateBlipsInRange()
     }
   }
 
+  // TEMPORARY PROBE -- "nothing auto-attacks / attack-ground does nothing"
+  // triage. Delete once resolved.
+  //
+  // Everything downstream of this list is now verified against the binary
+  // (CanWeaponAttackEntityTarget's two category tests byte-for-byte at
+  // 0x006D5690..0x006D5703, FindBestEnemy's filter, IArmy::IsEnemy), so if
+  // weapons still never acquire, this list is empty. This separates the three
+  // ways that happens: the grid returned no units, every unit was filtered out
+  // before the recon lookup, or the recon DB had no blip for them. ReconGetBlip
+  // now returns null where it used to return a neighbour's blip, so a broken
+  // blip supply became newly fatal rather than merely wrong.
+  {
+    // Periodic and only when something is actually in range -- an early
+    // "enemy=0" just means the armies have not met yet.
+    static int sProbe = 0;
+    if ((unitsInRange.end() - unitsInRange.begin()) > 1 && (sProbe++ % 40) == 0) {
+      std::size_t candidates = 0;
+      std::size_t enemies = 0;
+      std::size_t withBlip = 0;
+      for (const CollisionResult& hit : unitsInRange) {
+        Entity* const probeEntity = hit.sourceEntity;
+        if (probeEntity == nullptr) {
+          continue;
+        }
+        ++candidates;
+        CArmyImpl* const probeArmy = probeEntity->ArmyRef;
+        const std::uint32_t probeArmyIndex =
+          (probeArmy != nullptr) ? static_cast<std::uint32_t>(probeArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
+        if (army->mVarDat.mAllies.Contains(probeArmyIndex)) {
+          continue;
+        }
+        ++enemies;
+        Unit* const probeUnit = probeEntity->IsUnit();
+        CAiReconDBImpl* const probeDb = army->GetReconDB();
+        if (probeUnit != nullptr && probeDb != nullptr && probeDb->ReconGetBlip(probeUnit) != nullptr) {
+          ++withBlip;
+        }
+      }
+      gpg::Warnf(
+        "[BLIPSUPPLY] unit=%p radius=%.1f cand=%u enemy=%u withBlip=%u listed=%u",
+        static_cast<void*>(this),
+        scanRadius,
+        static_cast<unsigned>(candidates),
+        static_cast<unsigned>(enemies),
+        static_cast<unsigned>(withBlip),
+        static_cast<unsigned>(mBlipsInRange.end() - mBlipsInRange.begin())
+      );
+    }
+  }
+
   mBlipLastUpdateTick = static_cast<std::int32_t>(SimulationRef->mCurTick);
 }
 
@@ -17214,6 +17311,35 @@ void Unit::Sync(SSyncData* const syncData)
 
   VarDat().mSharedPose = AniActor->GetPoseShared();
   VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
+  // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
+  if (GetBlueprint() != nullptr && std::strstr(GetBlueprint()->mBlueprintId.c_str(), "uel0001") != nullptr) {
+    static int sSyncCount = 0;
+    if ((sSyncCount++ % 20) == 0) {
+      auto countVisible = [](const CAniPose* pose) {
+        int n = 0;
+        if (pose != nullptr) {
+          for (const CAniPoseBone& b : pose->mBones) {
+            n += b.mVisible != 0u ? 1 : 0;
+          }
+        }
+        return n;
+      };
+      const CAniPose* const cur = VarDat().mSharedPose.get();
+      const CAniPose* const prior = VarDat().mPriorSharedPose.get();
+      char rootFlags[40] = {};
+      if (cur != nullptr) {
+        int w = 0;
+        for (const CAniPoseBone& b : cur->mBones) {
+          if (w < 30) {
+            rootFlags[w++] = b.mVisible != 0u ? '1' : '0';
+          }
+        }
+      }
+      gpg::Warnf("[POSEDIAG] Sync unit=%p cur=%p visible=%d prior=%p visible=%d bones=%s n=%d", static_cast<void*>(this),
+                 static_cast<const void*>(cur), countVisible(cur), static_cast<const void*>(prior), countVisible(prior), rootFlags,
+                 sSyncCount);
+    }
+  }
 
   Entity::Sync(syncData);
 }

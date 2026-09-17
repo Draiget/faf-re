@@ -1356,6 +1356,14 @@ namespace moho
       impactObject = LuaPlus::LuaObject(scriptState);
     }
 
+    {
+      static int sImpactProbe = 0;
+      if (sImpactProbe++ < 20) {
+        gpg::Warnf("[IMPACTDIAG] Projectile::Impact this=%p type='%s' collided=%p",
+                   static_cast<void*>(this), impactTypeString != nullptr ? impactTypeString : "<null>",
+                   static_cast<void*>(collidedEntity));
+      }
+    }
     this->LuaPCall("OnImpact", impactArgs, &impactObject);
 
     // Target/army accounting: only when the projectile had a real target entity.

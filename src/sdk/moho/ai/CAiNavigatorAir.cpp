@@ -454,6 +454,39 @@ int CAiNavigatorAir::Execute()
   const std::int16_t goalCellX = GridCellCoord(mGoalPos.x, footprint.mSizeX);
   const std::int16_t goalCellZ = GridCellCoord(mGoalPos.z, footprint.mSizeZ);
 
+  // TEMPORARY PROBE -- air-transport "unloads instantly at the current position,
+  // then flies to the drop point" triage. Delete once resolved.
+  //
+  // Every function feeding this decision has now been verified 1:1 against the
+  // binary -- AtTarget (0x006B9730), ShouldHoverInsteadOfLand (0x006BC820),
+  // SetGoal's goal->current-target copy (0x005A4C60 +112..+120 from +124..+132),
+  // and this cell test itself. On paper the original arrives instantly too,
+  // which cannot be right, so the remaining difference is WHEN this runs
+  // relative to CalcMoveAir -- the only thing that converts UMVE_Hover into
+  // UMVE_Up and so makes AtTarget stop returning true regardless of distance.
+  //
+  // This reports the decision inputs on the first ticks after a goal is set. A
+  // line with atTarget=1 and a large dist is the bug reproducing: arrival
+  // declared while still far away, because vert=Hover skipped the distance test.
+  {
+    static int sProbe = 0;
+    if (sProbe++ < 60) {
+      const CUnitMotion* const motion = mUnit->UnitMotion;
+      const float dx = mGoalPos.x - mUnit->GetPosition().x;
+      const float dz = mGoalPos.z - mUnit->GetPosition().z;
+      gpg::Warnf(
+        "[XPORTARRIVE] atTarget=%d vert=%d curLayer=%d tgtLayer=%d dist=%.1f cells=(%d,%d)vs(%d,%d)",
+        (motion != nullptr && motion->AtTarget()) ? 1 : 0,
+        motion != nullptr ? static_cast<int>(motion->mVertEvent) : -1,
+        static_cast<int>(mUnit->mCurrentLayer),
+        motion != nullptr ? static_cast<int>(motion->mLayer) : -1,
+        std::sqrt((dx * dx) + (dz * dz)),
+        static_cast<int>(currentTargetCellX), static_cast<int>(currentTargetCellZ),
+        static_cast<int>(goalCellX), static_cast<int>(goalCellZ)
+      );
+    }
+  }
+
   if (mUnit->UnitMotion && mUnit->UnitMotion->AtTarget() &&
       static_cast<std::uint16_t>(currentTargetCellX) == static_cast<std::uint16_t>(goalCellX) &&
       static_cast<std::uint16_t>(currentTargetCellZ) == static_cast<std::uint16_t>(goalCellZ)) {

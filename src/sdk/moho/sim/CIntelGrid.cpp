@@ -9,6 +9,7 @@
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/utils/Global.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/math/GridPos.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/STIMapReflection.h"
@@ -410,6 +411,27 @@ namespace moho
    */
   void CIntelGrid::AddCircle(const Wm3::Vec3f& position, const std::uint32_t radius)
   {
+    // TEMPORARY PROBE -- delete once resolved. GetReconFlags returns None for
+    // ~99.9% of probes (gridNone=7990 / gridHit=10), so the grids are
+    // effectively empty. This reports whether anything stamps vision into them
+    // at all, and what cell radius survives the integer divide by mGridSize --
+    // a world radius smaller than the cell size truncates to 0 and writes
+    // nothing.
+    {
+      static unsigned sCalls = 0;
+      static unsigned sZeroCell = 0;
+      ++sCalls;
+      if ((radius / mGridSize) == 0u) {
+        ++sZeroCell;
+      }
+      if ((sCalls % 100u) == 0u) {
+        gpg::Warnf(
+          "[INTELSTAMP] calls=%u zeroCellRadius=%u radius=%u gridSize=%u cells=%u pos=(%.1f,%.1f)",
+          sCalls, sZeroCell, radius, mGridSize, radius / mGridSize, position.x, position.z
+        );
+      }
+    }
+
     Raster(position, radius / mGridSize, true);
   }
 

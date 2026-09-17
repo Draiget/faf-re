@@ -1234,6 +1234,8 @@ namespace moho
   void CUnitMotion::Stop(const Wm3::Vector3f* const holdPosition)
   {
     Unit* const unit = mUnit;
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[MOTDIAG] Stop unit=%p hold=%d state=%d", static_cast<void*>(unit), holdPosition ? 1 : 0, static_cast<int>(mMotionState));
     mStopRequested = 1;
 
     if (unit->mIsAir && !unit->IsUnitState(UNITSTATE_TransportUnloading) &&
@@ -1310,6 +1312,20 @@ namespace moho
     const ELayer layer
   )
   {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    // Bounded: this is a sim hot path (every move order, every unit, every
+    // retarget), and ungated it buries every other probe in the .sclog and
+    // slows the beat enough to change the timing being measured.
+    {
+      static int sMotDiag = 0;
+      if (sMotDiag++ < 200) {
+        gpg::Warnf(
+          "[MOTDIAG] SetTarget unit=%p target=(%.1f,%.1f) layer=%d state=%d",
+          static_cast<void*>(mUnit), target.x, target.z,
+          static_cast<int>(layer), static_cast<int>(mMotionState)
+        );
+      }
+    }
     mStopRequested = 0;
     mTargetPosition = target;
 
@@ -1444,6 +1460,14 @@ namespace moho
 
     Entity& entity = *static_cast<Entity*>(mUnit);
     entity.SetPendingTransform(transform, pendingVelocityScale);
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    {
+      static int sCount = 0;
+      if ((sCount++ % 20) == 0) {
+        gpg::Warnf("[MOTDIAG] MoveTo unit=%p to=(%.2f,%.2f,%.2f) step=%.3f n=%d", static_cast<void*>(mUnit),
+                   transform.pos_.x, transform.pos_.y, transform.pos_.z, timeStep, sCount);
+      }
+    }
     mUnit->SimulationRef->Logf(
       "  MoveTo(<%7.2f,%7.2f,%7.2f>)\n",
       transform.pos_.x,
@@ -2569,6 +2593,32 @@ namespace moho
       }
     }
 
+    // TEMPORARY PROBE -- lever-arm triage for the ground-collision angular
+    // runaway. Delete when resolved.
+    if (anyGroundHit) {
+      static int sLeverCount = 0;
+      if (sLeverCount++ < 12) {
+        const Wm3::Sphere3f& s0 = *collisionSpheres.begin();
+        const GroundPenetrationSample& h0 = *hitRecords.begin();
+        gpg::Warnf(
+          "[GEOMLEVER] unit=%p spheres=%d hits=%d sphere0=(%.2f,%.2f,%.2f r=%.2f) "
+          "world0=(%.2f,%.2f,%.2f) bodyPos=(%.2f,%.2f,%.2f) rel0=(%.2f,%.2f,%.2f) unitPos=(%.2f,%.2f,%.2f) "
+          "bpSize=(%.3f,%.3f,%.3f) bpDensity=%.4f bodyMass=%.3f bpElev=%.2f bpGndOff=%.3f",
+          static_cast<void*>(unit),
+          static_cast<int>(collisionSpheres.end() - collisionSpheres.begin()),
+          static_cast<int>(hitRecords.end() - hitRecords.begin()),
+          s0.Center.x, s0.Center.y, s0.Center.z, s0.Radius,
+          h0.x, h0.y, h0.z,
+          physBody->mPos.x, physBody->mPos.y, physBody->mPos.z,
+          h0.x - physBody->mPos.x, h0.y - physBody->mPos.y, h0.z - physBody->mPos.z,
+          unit->GetPosition().x, unit->GetPosition().y, unit->GetPosition().z,
+          blueprint->mSizeX, blueprint->mSizeY, blueprint->mSizeZ,
+          blueprint->mAverageDensity, physBody->mMass,
+          blueprint->Physics.Elevation, blueprint->Physics.GroundCollisionOffset
+        );
+      }
+    }
+
     if (anyGroundHit) {
       physBody->ApplyGroundCollisionResponse(hitRecords);
     }
@@ -2956,6 +3006,31 @@ namespace moho
     }
 
     if (initiallyFits && UnitWontFitAt(transform.pos_, unit)) {
+      // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+      {
+        const SFootprint& fp = unit->GetFootprint();
+        const SOCellPos cell = fp.ToCellPos(transform.pos_);
+        const COGrid& grid = *unit->SimulationRef->mOGrid;
+        const EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(fp, *unit->SimulationRef->mMapData, cell);
+        gpg::Warnf("[MOTDIAG] WontFit from=(%.2f,%.2f) to=(%.2f,%.2f) cell=(%d,%d) fp=%dx%d caps=0x%X terrainOcc=%d waterOcc=%d filter=0x%X",
+                   originalPosition.x, originalPosition.z, transform.pos_.x, transform.pos_.z, static_cast<int>(cell.x), static_cast<int>(cell.z),
+                   static_cast<int>(fp.mSizeX), static_cast<int>(fp.mSizeZ), static_cast<unsigned>(mobileCaps),
+                   grid.terrainOccupation.GetRectOr(cell.x, cell.z, 1, 1, true) ? 1 : 0,
+                   grid.waterOccupation.GetRectOr(cell.x, cell.z, 1, 1, true) ? 1 : 0,
+                   static_cast<unsigned>(OCCUPY_Filter(fp, grid, cell, mobileCaps)));
+        static bool sDumped = false;
+        if (!sDumped) {
+          sDumped = true;
+          for (int z = static_cast<int>(cell.z) - 6; z <= static_cast<int>(cell.z) + 6; ++z) {
+            char row[40] = {};
+            int w = 0;
+            for (int x = static_cast<int>(cell.x) - 12; x <= static_cast<int>(cell.x) + 12; ++x) {
+              row[w++] = grid.terrainOccupation.GetRectOr(static_cast<std::int16_t>(x), static_cast<std::int16_t>(z), 1, 1, true) ? '#' : '.';
+            }
+            gpg::Warnf("[MOTDIAG] occ z=%d x=%d.. %s", z, static_cast<int>(cell.x) - 12, row);
+          }
+        }
+      }
       mVector44 = {};
       mVelocity = {};
       if (!mIsBeingPushed) {
@@ -3565,6 +3640,29 @@ namespace moho
 
     Wm3::Vector3f torqueWorld{};
     MultQuadVec(&torqueWorld, &torqueLocalScaled, &body.mOrientation);
+
+    // TEMPORARY PROBE -- air force runaway triage, delete when resolved.
+    {
+      const float accelMag = std::sqrt((accelX * accelX) + (accelY * accelY) + (accelZ * accelZ));
+      if (!std::isfinite(accelMag) || accelMag > 2000.0f) {
+        static int sAirBlowCount = 0;
+        if (sAirBlowCount++ < 24) {
+          gpg::Warnf(
+            "[AIRBLOW] unit=%p load=%.5f gains(turn=%.4f roll=%.4f lift=%.4f) dampMv=%.4f "
+            "KMove=%.4f KLiftDamp=%.4f KTurnDamp=%.4f steer=(%.2f,%.2f,%.2f) vel=(%.2f,%.2f,%.2f) "
+            "accel=(%.2f,%.2f,%.2f) mass=%.3f topSpeed=%.3f dock=%d wImp=(%.2f,%.2f,%.2f) "
+            "rotErr=(%.3f,%.3f,%.3f) invI=(%.4f,%.4f,%.4f)",
+            static_cast<void*>(mUnit), loadFactor, turnGain, rollGain, liftGain, movementDamping,
+            air.KMove, air.KLiftDamping, air.KTurnDamping, steeringForce.x, steeringForce.y, steeringForce.z,
+            body.mVelocity.x, body.mVelocity.y, body.mVelocity.z, accelX, accelY, accelZ, mass,
+            mUnit->mInfoCache.mFormationTopSpeed, useDockingBlend ? 1 : 0,
+            body.mWorldImpulse.x, body.mWorldImpulse.y, body.mWorldImpulse.z,
+            rotationError.x, rotationError.y, rotationError.z,
+            body.mInvInertiaTensor.x, body.mInvInertiaTensor.y, body.mInvInertiaTensor.z
+          );
+        }
+      }
+    }
 
     out->force = force;
     out->torque = torqueWorld;
@@ -4242,9 +4340,68 @@ namespace moho
     // 0x006C0073-0x006C0093 copies the pre-integration velocity into
     // `mPreviousVelocity` (+0xB4) every beat, not just on the landing return.
     mPreviousVelocity = physBody->mVelocity;
+
+    // TEMPORARY PROBE -- angular runaway triage. Snapshots mWorldImpulse around
+    // each of its two writers so the growth can be attributed. Delete when
+    // resolved.
+    const Wm3::Vector3f wImpBeforeIntegrate = physBody->mWorldImpulse;
+
     physBody->IntegrateFreefallStep(control.force, kFixedIntegrationDt, control.torque);
 
+    const Wm3::Vector3f wImpAfterIntegrate = physBody->mWorldImpulse;
+
     const bool groundHit = HandleGroundCollision();
+
+    {
+      const Wm3::Vector3f wImpAfterGround = physBody->mWorldImpulse;
+      const float pre = Wm3::Vector3f::Length(wImpBeforeIntegrate);
+      const float mid = Wm3::Vector3f::Length(wImpAfterIntegrate);
+      const float post = Wm3::Vector3f::Length(wImpAfterGround);
+      const float worst = (post > mid) ? post : mid;
+      if (!std::isfinite(worst) || worst > 1000.0f || (pre > 1.0f && worst > (pre * 1.3f))) {
+        static int sSpinCount = 0;
+        if (sSpinCount++ < 40) {
+          gpg::Warnf(
+            "[AIRSPIN] unit=%p ground=%d |wImp| pre=%.3f afterIntegrate=%.3f afterGround=%.3f "
+            "(integrateGain=%.3f groundGain=%.3f) torque=(%.1f,%.1f,%.1f) "
+            "invI=(%.6f,%.6f,%.6f) mass=%.2f curElev=%.2f speed=%.2f",
+            static_cast<void*>(unit), groundHit ? 1 : 0, pre, mid, post,
+            (pre > 0.0f) ? (mid / pre) : 0.0f, (mid > 0.0f) ? (post / mid) : 0.0f,
+            control.torque.x, control.torque.y, control.torque.z,
+            physBody->mInvInertiaTensor.x, physBody->mInvInertiaTensor.y, physBody->mInvInertiaTensor.z,
+            physBody->mMass, mCurElevation, Wm3::Vector3f::Length(physBody->mVelocity)
+          );
+        }
+      }
+    }
+
+    // TEMPORARY PROBE -- "collides with ground then flees at insane speed"
+    // triage. Reports the tick's whole velocity history so the runaway can be
+    // attributed to the control force, the freefall step, or the ground
+    // collision response. Delete when resolved.
+    {
+      const float postSpeed = Wm3::Vector3f::Length(physBody->mVelocity);
+      const float preSpeed = Wm3::Vector3f::Length(mPreviousVelocity);
+      if (!std::isfinite(postSpeed) || postSpeed > 250.0f) {
+        static int sFleeCount = 0;
+        if (sFleeCount++ < 24) {
+          gpg::Warnf(
+            "[AIRFLEE] unit=%p ground=%d preSpeed=%.2f postSpeed=%.2f pre=(%.2f,%.2f,%.2f) "
+            "post=(%.2f,%.2f,%.2f) force=(%.1f,%.1f,%.1f) torque=(%.1f,%.1f,%.1f) "
+            "pos=(%.1f,%.1f,%.1f) curElev=%.2f tgtElev=%.2f newElev=%.2f layer=%d vert=%d",
+            static_cast<void*>(unit), groundHit ? 1 : 0, preSpeed, postSpeed,
+            mPreviousVelocity.x, mPreviousVelocity.y, mPreviousVelocity.z,
+            physBody->mVelocity.x, physBody->mVelocity.y, physBody->mVelocity.z,
+            control.force.x, control.force.y, control.force.z,
+            control.torque.x, control.torque.y, control.torque.z,
+            physBody->mPos.x, physBody->mPos.y, physBody->mPos.z,
+            mCurElevation, mTargetElevation, mNewElevation,
+            static_cast<int>(mLayer), static_cast<int>(mVertEvent)
+          );
+        }
+      }
+    }
+
     // The engine's predicate is `groundHit && enteredLandingPhase &&
     // horizontalDistance < 0.5f` (0x006C0191 `test al,al`, 0x006C0195 `cmp
     // byte [esp+17h],0`, 0x006C019C-0x006C01A9 `movss xmm0,[0x00E4F724=0.5] /
@@ -4294,6 +4451,15 @@ namespace moho
    */
   ETaskStatus CUnitMotion::MotionTick()
   {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    {
+      static int sCount = 0;
+      if ((sCount++ % 100) == 0) {
+        gpg::Warnf("[MOTDIAG] CUnitMotion::MotionTick unit=%p state=%d target=(%.1f,%.1f,%.1f) n=%d",
+                   static_cast<void*>(mUnit), static_cast<int>(mMotionState), mTargetPosition.x, mTargetPosition.y,
+                   mTargetPosition.z, sCount);
+      }
+    }
     if (mUnit->IsBeingBuilt()) {
       if (mUnit->mCurrentLayer == LAYER_Sub) {
         SetMotionVertEvent(UMVE_Bottom);

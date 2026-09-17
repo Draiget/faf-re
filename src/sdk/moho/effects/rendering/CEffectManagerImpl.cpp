@@ -1,5 +1,7 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 
+#include <cstdarg>
+#include <cstdio>
 #include <new>
 #include <typeinfo>
 
@@ -23,6 +25,27 @@
 #include "moho/resource/RResId.h"
 #include "moho/sim/RRuleGameRules.h"
 #include "moho/sim/Sim.h"
+
+
+namespace
+{
+  // TEMPORARY PROBE SINK -- effects triage, delete when resolved.
+  // gpg::Warnf reaches nothing until `/log <name>` installs a target, so the
+  // probes below append here instead. The file lands beside the executable.
+  void DiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
+} // namespace
 
 namespace moho
 {
@@ -610,6 +633,17 @@ namespace moho
     const int armyIndex
   )
   {
+    // TEMPORARY PROBE -- enemy build-beam triage, delete when resolved.
+    // If an enemy ACU/engineer build produces no line at all, this says which
+    // of the two it is: no line here means the sim never asked for the beam;
+    // a line here plus a culled [EFXDIAG] CanSeeCam means it was created and
+    // then hidden by the recon probe.
+    DiagLine(
+      "[EFXDIAG] AttachBeam: army=%d src=%p srcBone=%d dst=%p dstBone=%d",
+      armyIndex, static_cast<void*>(sourceEntity), sourceBoneIndex,
+      static_cast<void*>(targetEntity), targetBoneIndex
+    );
+
     CEfxBeam* const effect = new (std::nothrow) CEfxBeam(this, beamBlueprint, armyIndex);
     if (effect == nullptr) {
       return nullptr;

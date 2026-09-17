@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -904,7 +906,152 @@ namespace moho
    * What it does:
    * Releases one `CSndParams` descriptor's owned string and weak-engine lanes.
    */
-  CSndParams::~CSndParams() = default;
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- catches the corruption at the
+  // moment it happens instead of at the read that faults.
+  //
+  // Every CSndParams ever built is registered here and none are ever freed, so
+  // the whole population can be walked cheaply once a beat. Shadowing each
+  // descriptor's tail (mResolvePolicy at +0x40 and the weak_ptr lanes at +0x48)
+  // and reporting the first scan where one goes bad turns "something wrote over
+  // this at some point" into "it changed between beat N and N+1, from X to Y" --
+  // and the value it changed TO usually identifies the writer.
+  //
+  // The bank name is captured on first sight, while the object is known good,
+  // so that reporting a corrupted one cannot fault a second time on a trashed
+  // string.
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- the single most decisive fact
+  // available at the crash site, and one the crash itself cannot tell us.
+  //
+  // Every CSndParams ever constructed registers here and none are ever
+  // destroyed (`func_GetCSndParams` at 0x004DF790 is an insert-only cache, and
+  // the shared-ambient-loop map at 0x004DF2B0 is keyed on the descriptor
+  // pointer and never erased). So membership is an exact liveness oracle: if
+  // the pointer an entity handed us is NOT in here, it was never a CSndParams
+  // at all and the defect is upstream -- a dangling `UserEntity`, or a garbage
+  // `HSndEntityLoop::mParams`. If it IS in here, the object is real and
+  // something wrote over it, which is a completely different search.
+  bool SndDiagIsRegisteredParams(const void* candidate)
+  {
+    if (candidate == nullptr) {
+      return false;
+    }
+
+    std::lock_guard<std::recursive_mutex> lock(gSndParamsRegistryMutex);
+    for (auto entry = gSndParamsRegistry.begin(); entry != gSndParamsRegistry.end(); ++entry) {
+      if (static_cast<const void*>(*entry) == candidate) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void SndDiagScanParamsRegistry()
+  {
+    // The whole 0x50-byte object is snapshotted, not just the tail, so the
+    // report can say how WIDE the damage is. A stray write that clobbers one
+    // dword at +0x48 and a wild write that scribbles over the whole block look
+    // identical from the crash site but point at completely different causes.
+    struct Shadow
+    {
+      std::uint32_t policy;
+      std::uint32_t px;
+      std::uint32_t pi;
+      std::uint8_t image[sizeof(CSndParams)];
+      msvc8::string bank;
+    };
+
+    static std::map<const CSndParams*, Shadow> sShadow;
+    static std::uint32_t sScan = 0u;
+    ++sScan;
+
+    std::lock_guard<std::recursive_mutex> lock(gSndParamsRegistryMutex);
+    for (auto entry = gSndParamsRegistry.begin(); entry != gSndParamsRegistry.end(); ++entry) {
+      CSndParams* const params = *entry;
+      if (params == nullptr) {
+        continue;
+      }
+
+      std::uint32_t lanes[2] = {0u, 0u};
+      std::memcpy(lanes, &params->mEngine, sizeof(lanes));
+      const std::uint32_t policy = params->mResolvePolicy;
+      const std::uint32_t control = lanes[1];
+      const bool wild = control != 0u && (control < 0x10000u || (control & 3u) != 0u);
+      const bool bad = policy > 4u || wild;
+
+      const auto seen = sShadow.find(params);
+      if (seen == sShadow.end()) {
+        Shadow fresh{policy, lanes[0], control, {}, params->mBank};
+        std::memcpy(fresh.image, params, sizeof(fresh.image));
+        sShadow.emplace(params, std::move(fresh));
+        if (bad) {
+          gpg::Warnf(
+            "[SNDDIAG] BORN BAD scan=%u params=%p bank='%s' policy=%u px=%08X pi=%08X",
+            sScan, static_cast<const void*>(params), params->mBank.c_str(), policy, lanes[0], control
+          );
+        }
+        continue;
+      }
+
+      Shadow& previous = seen->second;
+      if (previous.policy == policy && previous.px == lanes[0] && previous.pi == control) {
+        continue;
+      }
+
+      if (bad) {
+        std::uint8_t current[sizeof(CSndParams)];
+        std::memcpy(current, params, sizeof(current));
+
+        int firstChanged = -1;
+        int lastChanged = -1;
+        for (int offset = 0; offset < static_cast<int>(sizeof(current)); ++offset) {
+          if (current[offset] != previous.image[offset]) {
+            if (firstChanged < 0) {
+              firstChanged = offset;
+            }
+            lastChanged = offset;
+          }
+        }
+
+        gpg::Warnf(
+          "[SNDDIAG] CORRUPTED scan=%u params=%p bank='%s' policy %u->%u px %08X->%08X pi %08X->%08X "
+          "changed=+0x%02X..+0x%02X",
+          sScan,
+          static_cast<const void*>(params),
+          previous.bank.c_str(),
+          previous.policy, policy,
+          previous.px, lanes[0],
+          previous.pi, control,
+          firstChanged < 0 ? 0 : firstChanged,
+          lastChanged < 0 ? 0 : lastChanged
+        );
+      }
+
+      previous.policy = policy;
+      previous.px = lanes[0];
+      previous.pi = control;
+      std::memcpy(previous.image, params, sizeof(previous.image));
+    }
+  }
+
+  // TEMPORARY PROBE [SNDDIAG] (do not commit) -- was `= default`.
+  //
+  // Entities and the shared-ambient-loop map both hold raw CSndParams* for the
+  // life of the session, and the loop map is keyed by that pointer and never
+  // erased, so a single destruction poisons it permanently. Nothing should
+  // reach this for a descriptor that came out of FindOrCreateSndParamsByKey's
+  // cache; if the log shows a pointer here that later shows up in a
+  // "[SNDDIAG] DEAD PARAMS" line, that is the use-after-free, and the route
+  // that destroyed it is whatever called this.
+  CSndParams::~CSndParams()
+  {
+    gpg::Warnf(
+      "[SNDDIAG] ~CSndParams params=%p bank=%u cue=%u policy=%u",
+      static_cast<const void*>(this),
+      static_cast<unsigned>(mBankId),
+      static_cast<unsigned>(mCueId),
+      mResolvePolicy
+    );
+  }
 
   /**
    * Address: 0x004E0E10 (FUN_004E0E10, Moho::CSndParamsConstruct::Construct)
@@ -1140,6 +1287,23 @@ namespace moho
     if (resolvedEngine.get() == nullptr) {
       resolvedEngine = SND_FindEngine(mBank.c_str());
       mEngine = resolvedEngine;
+
+      // TEMPORARY PROBE [SNDDIAG] (do not commit) -- record the control block
+      // this weak_ptr just took a weak reference to. If the crash-site probe
+      // later reports a different pi for the same params, the lane was
+      // overwritten; if it reports the same pi, the control block was freed
+      // despite our weak count, and the fault is in whoever released it.
+      {
+        std::uint32_t storedLane[2] = {0u, 0u};
+        std::memcpy(storedLane, &mEngine, sizeof(storedLane));
+        gpg::Warnf(
+          "[SNDDIAG] resolve params=%p bank='%s' px=%08X pi=%08X",
+          static_cast<const void*>(this),
+          mBank.c_str(),
+          storedLane[0],
+          storedLane[1]
+        );
+      }
 
       if (resolvedEngine.get() == nullptr) {
         gpg::Warnf("Error resolving bank '%s' to audio engine", mBank.c_str());

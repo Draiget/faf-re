@@ -15836,9 +15836,33 @@ extern "C"
 				break;
 			}
 
-			case kOpGetUpval:
-				*ra = *cl->upvals[LuaGetArgB(i)]->v;
+			case kOpGetUpval: {
+				// TEMPORARY PROBE (do not commit) -- the read side of the same
+				// null-upvalue fault the SETUPVAL case below reports.
+				const int upIndex = LuaGetArgB(i);
+				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
+					static int sGetUpvalBudget = 0;
+					if (sGetUpvalBudget < 20) {
+						++sGetUpvalBudget;
+						const Proto* const proto = cl->p;
+						const char* const source =
+							(proto != nullptr && proto->source != nullptr) ? proto->source->str : "<no source>";
+						const int line = (proto != nullptr && proto->lineinfo != nullptr && proto->code != nullptr)
+							? proto->lineinfo[(pc - 1) - proto->code]
+							: -1;
+						char probe[288];
+						sprintf_s(probe, sizeof(probe),
+						          "[LUAUPVAL] GETUPVAL bad: cl=%08X nups=%d B=%d src=%.150s line=%d\n",
+						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cl)),
+						          static_cast<int>(cl->nupvalues), upIndex, source, line);
+						::OutputDebugStringA(probe);
+					}
+					ra->tt = LUA_TNIL;
+					break;
+				}
+				*ra = *cl->upvals[upIndex]->v;
 				break;
+			}
 
 			case kOpGetGlobal: {
 				const TObject* const key = &k[LuaGetArgBx(i)];
@@ -15873,9 +15897,38 @@ extern "C"
 				luaV_settable(L, &cl->g, &k[LuaGetArgBx(i)], ra);
 				break;
 
-			case kOpSetUpval:
-				*cl->upvals[LuaGetArgB(i)]->v = *ra;
+			case kOpSetUpval: {
+				// TEMPORARY PROBE (do not commit). The sim thread dies here --
+				// luaV_execute+0x570, reading address 8, i.e. `cl->upvals[B]` is
+				// null and `->v` sits at +8. Name the closure and the Lua line
+				// instead of faulting, and keep running so every occurrence is
+				// reported rather than only the first.
+				const int upIndex = LuaGetArgB(i);
+				if (upIndex >= static_cast<int>(cl->nupvalues) || cl->upvals[upIndex] == nullptr) {
+					static int sSetUpvalBudget = 0;
+					if (sSetUpvalBudget < 20) {
+						++sSetUpvalBudget;
+						const Proto* const proto = cl->p;
+						const char* const source =
+							(proto != nullptr && proto->source != nullptr) ? proto->source->str : "<no source>";
+						const int line = (proto != nullptr && proto->lineinfo != nullptr && proto->code != nullptr)
+							? proto->lineinfo[(pc - 1) - proto->code]
+							: -1;
+						char probe[288];
+						sprintf_s(probe, sizeof(probe),
+						          "[LUAUPVAL] SETUPVAL bad: cl=%08X nups=%d B=%d slot=%08X src=%.150s line=%d\n",
+						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(cl)),
+						          static_cast<int>(cl->nupvalues), upIndex,
+						          static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(
+							          upIndex < static_cast<int>(cl->nupvalues) ? cl->upvals[upIndex] : nullptr)),
+						          source, line);
+						::OutputDebugStringA(probe);
+					}
+					break;
+				}
+				*cl->upvals[upIndex]->v = *ra;
 				break;
+			}
 
 			case kOpSetTable:
 				luaV_settable(L, ra, rkb(), rkc());
