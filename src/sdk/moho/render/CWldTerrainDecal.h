@@ -8,6 +8,7 @@
 #include "moho/math/VMatrix4.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/CountedObject.h"
+#include "moho/misc/WeakObject.h"
 #include "moho/render/CWldTerrainDecalTYPETypeInfo.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -27,17 +28,18 @@ namespace gpg
 namespace moho
 {
 
-  struct CWldTerrainDecalLink
-  {
-    CWldTerrainDecalLink* mPrev; // +0x00
-    CWldTerrainDecalLink* mNext; // +0x04
-  };
-  static_assert(sizeof(CWldTerrainDecalLink) == 0x08, "CWldTerrainDecalLink size must be 0x08");
-
   /**
    * Terrain-decal base object recovered from the Moho render runtime.
+   *
+   * The `WeakObject` base is what every observer of a decal binds to: RTTI
+   * lists it at `mdisp=4` (`.?AVCWldTerrainDecal@Moho@@`), which is where a
+   * polymorphic class puts its first non-polymorphic base, and the holders
+   * (`SelectionDragger3D`'s two highlight lanes, `ScriptedDecal`'s decal lane)
+   * all decode it with the `slot - 4` downcast `moho::WeakPtr<T>` emits.
+   * Because the manager owns decals and hands them out, that weak head is how
+   * `~CWldTerrainDecal` blanks the observers it leaves behind.
    */
-  class CWldTerrainDecal
+  class CWldTerrainDecal : public WeakObject
   {
   public:
     /**
@@ -302,7 +304,7 @@ namespace moho
     static msvc8::string sTypeDesc[10];
 
   public:
-    CWldTerrainDecalLink* mLinkHead;           // +0x04
+    // +0x04 is the `WeakObject` base's `weakLinkHead_`.
     IWldTerrainRes* mTerrainRes;               // +0x08
     SpatialDB_MeshInstance mEntry;             // +0x0C
     std::uint32_t mVecIndex;                   // +0x14
@@ -344,7 +346,6 @@ namespace moho
     Quad mCachedFlatQuad;                      // +0x140
   };
 
-  static_assert(offsetof(CWldTerrainDecal, mLinkHead) == 0x04, "CWldTerrainDecal::mLinkHead offset must be 0x04");
   static_assert(offsetof(CWldTerrainDecal, mTerrainRes) == 0x08, "CWldTerrainDecal::mTerrainRes offset must be 0x08");
   static_assert(offsetof(CWldTerrainDecal, mEntry) == 0x0C, "CWldTerrainDecal::mEntry offset must be 0x0C");
   static_assert(offsetof(CWldTerrainDecal, mVecIndex) == 0x14, "CWldTerrainDecal::mVecIndex offset must be 0x14");
