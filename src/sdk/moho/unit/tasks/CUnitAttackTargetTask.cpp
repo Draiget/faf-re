@@ -982,17 +982,21 @@ namespace moho
         //
         // The call also passes the resolved entity straight through. 0x005F3304
         // decodes the link slot and pushes it unchanged - there is no IsUnit()
-        // narrowing - and `CAiNavigatorLand::SetDestUnit` (0x005A4180) only
-        // reads position fields off it. `IsUnit()` returns null for a ReconBlip,
-        // so attacking anything seen on radar handed the navigator a null
-        // destination. The melee task's own `SetDestUnit` lane (0x00615A70) and
-        // the Lua binder both already pass the entity through with a cast.
+        // narrowing and no downcast - because `IAiNavigator::SetDestUnit` takes
+        // an `Entity`: both navigators keep it in a `WeakPtr<Entity>` and read
+        // `Entity::Position` (+0xAC) off it. Casting it to `Unit*` here shifted
+        // the pointer back by the 8 bytes `Unit`'s `Entity` base sits at, so
+        // attacking anything that is not a `Unit` - a recon blip, i.e. anything
+        // seen only on radar - linked the weak node into the 4 bytes in front
+        // of the blip and then dispatched through whatever those bytes held.
+        // That is the T1-bomber-versus-engineer crash: `0x38343031`, the ASCII
+        // text "1048", reached as a vtable.
         if (!runtime->mTarget.HasTarget()) {
           SetPosGoalFromWorldPosition(runtime->mTargetPosition);
         } else if (Entity* const destinationEntity = runtime->mTarget.targetEntity.GetObjectPtr();
                    destinationEntity != nullptr) {
           if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
-            navigator->SetDestUnit(static_cast<Unit*>(destinationEntity));
+            navigator->SetDestUnit(destinationEntity);
           }
         } else {
           SetPosGoalFromWorldPosition(runtime->mTargetPosition);

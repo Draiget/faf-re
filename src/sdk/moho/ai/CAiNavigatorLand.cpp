@@ -100,11 +100,15 @@ namespace
     return CAiPathNavigator::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakUnitType()
+  /**
+   * The reflected type of the destination lane, read at 0x005A8FCC through the
+   * type descriptor at 0x00F6B8A4: `.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`.
+   */
+  [[nodiscard]] gpg::RType* CachedWeakEntityType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Unit>));
+      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
     }
     return cached;
   }
@@ -188,7 +192,7 @@ gpg::RType* CAiNavigatorLand::sType = nullptr;
 CAiNavigatorLand::CAiNavigatorLand()
   : CAiNavigatorImpl()
   , mPathNavigator(nullptr)
-  , mDestinationUnit{}
+  , mDestinationEntity{}
   , mGoal{}
 {
   mGoal = BuildSingleCellGoal(0, 0);
@@ -200,7 +204,7 @@ CAiNavigatorLand::CAiNavigatorLand()
 CAiNavigatorLand::CAiNavigatorLand(Unit* const unit)
   : CAiNavigatorImpl(unit)
   , mPathNavigator(nullptr)
-  , mDestinationUnit{}
+  , mDestinationEntity{}
   , mGoal{}
 {
   if (unit) {
@@ -220,7 +224,7 @@ CAiNavigatorLand::CAiNavigatorLand(Unit* const unit)
  */
 CAiNavigatorLand::~CAiNavigatorLand()
 {
-  mDestinationUnit.ResetFromObject(nullptr);
+  mDestinationEntity.ResetFromObject(nullptr);
 
   delete mPathNavigator;
   mPathNavigator = nullptr;
@@ -255,10 +259,10 @@ void CAiNavigatorLand::MemberDeserialize(CAiNavigatorLand* const object, gpg::Re
     delete loadedPathNavigator;
   }
 
-  WeakPtr<Unit> destinationUnit{};
+  WeakPtr<Entity> destinationEntity{};
   archive->Read(
-    CachedWeakUnitType(),
-    object ? static_cast<void*>(&object->mDestinationUnit) : static_cast<void*>(&destinationUnit),
+    CachedWeakEntityType(),
+    object ? static_cast<void*>(&object->mDestinationEntity) : static_cast<void*>(&destinationEntity),
     ownerRef
   );
 
@@ -294,10 +298,10 @@ void CAiNavigatorLand::MemberSerialize(const CAiNavigatorLand* const object, gpg
     ownerRef
   );
 
-  const WeakPtr<Unit> destinationUnit{};
+  const WeakPtr<Entity> destinationEntity{};
   archive->Write(
-    CachedWeakUnitType(),
-    object ? static_cast<const void*>(&object->mDestinationUnit) : static_cast<const void*>(&destinationUnit),
+    CachedWeakEntityType(),
+    object ? static_cast<const void*>(&object->mDestinationEntity) : static_cast<const void*>(&destinationEntity),
     ownerRef
   );
 
@@ -336,18 +340,21 @@ void CAiNavigatorLand::SetGoal(const SAiNavigatorGoal& goal)
 /**
  * Address: 0x005A4180 (FUN_005A4180)
  */
-void CAiNavigatorLand::SetDestUnit(Unit* const destinationUnit)
+void CAiNavigatorLand::SetDestUnit(Entity* const destinationEntity)
 {
-  if (!destinationUnit) {
-    mDestinationUnit.ResetFromObject(nullptr);
+  if (!destinationEntity) {
+    mDestinationEntity.ResetFromObject(nullptr);
     return;
   }
 
-  const Wm3::Vector3f targetPos = destinationUnit->GetPosition();
+  // 0x005A4191/0x005A4199 read `Entity::Position` (+0xAC/+0xB4) off the
+  // argument directly, which is why this takes an `Entity` and works for a
+  // recon blip as well as a unit.
+  const Wm3::Vector3f& targetPos = destinationEntity->Position;
   const std::int32_t cellX = static_cast<std::int32_t>(targetPos.x - 0.5f);
   const std::int32_t cellZ = static_cast<std::int32_t>(targetPos.z - 0.5f);
   SetGoal(BuildSingleCellGoal(cellX, cellZ));
-  mDestinationUnit.ResetFromObject(destinationUnit);
+  mDestinationEntity.ResetFromObject(destinationEntity);
 }
 
 /**
@@ -503,7 +510,7 @@ bool CAiNavigatorLand::NavigatorMakeIdle()
     mPathNavigator->ResetPathState();
   }
 
-  mDestinationUnit.ResetFromObject(nullptr);
+  mDestinationEntity.ResetFromObject(nullptr);
 
   if (mUnit && mUnit->AiSteering) {
     mUnit->AiSteering->SetWaypoints(nullptr, 0);
