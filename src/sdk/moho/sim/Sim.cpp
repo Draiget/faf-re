@@ -13664,9 +13664,15 @@ void Sim::AdvanceBeat(const int amt)
       }
     }
 
-    TickTaskStage(&mTaskStageA);
-    TickTaskStage(&mDiskWatcherTaskStage);
+    // 0x0074A10A / 0x0074A115 / 0x0074A120: `lea ecx,[ebp+958h]`, `[ebp+944h]`,
+    // `[ebp+930h]`, each followed by `call 0x409AC0` (CTaskStage::UserFrame).
+    // Stage B (unit command threads) runs first and stage A (entity TaskTick /
+    // MotionTick) last, so a goal set by a command task is acted on by motion
+    // within the same beat. Ticking A first reversed that and let the air
+    // navigator declare arrival from stale state (see IAiCommandDispatchImpl).
     TickTaskStage(&mTaskStageB);
+    TickTaskStage(&mDiskWatcherTaskStage);
+    TickTaskStage(&mTaskStageA);
     RefreshBlips();
 
     if (!mArmiesList.empty()) {
