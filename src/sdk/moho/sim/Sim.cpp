@@ -4474,7 +4474,7 @@ namespace moho
     auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(*helper);
 
     CWldSession* const session = WLD_GetActiveSession();
-    auto* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+    auto* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     bool shouldRetarget = (target.targetType == UserTargetType::None);
     if (!shouldRetarget) {
@@ -29457,7 +29457,7 @@ namespace moho
 
     // The playable-rect source at terrain-res +0x04 is the live STIMap in this
     // build; STIMap::IsPlayable is the concrete method dispatched at 0x008B030F.
-    STIMap* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+    STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     // Allocate the next command id and stamp it into the issue payload.
     std::uint32_t packedCommandId = 0u;

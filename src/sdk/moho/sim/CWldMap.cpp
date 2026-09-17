@@ -1145,7 +1145,7 @@ namespace
    * lighting/fog/hypsometric defaults, empty string/handle/container lanes, and
    * self-linked env-lookup map + debug dirty-rect list sentinel heads.
    *
-   * The IWldTerrainRes base vtable + mMap/mPlayableRectSource lane are installed
+   * The IWldTerrainRes base vtable + mMap lane are installed
    * by the base ctor at the factory before this fills the derived fields.
    */
   void ConstructTerrainResFields(TerrainRuntimeView& view) noexcept
@@ -1680,7 +1680,7 @@ namespace moho
     }
 
     // Base ctor installs the (now concrete) IWldTerrainRes vtable at +0x00 and
-    // zeroes the mMap/mPlayableRectSource lane at +0x04. The derived field graph
+    // zeroes the mMap lane at +0x04. The derived field graph
     // is then filled over the same storage via the runtime overlay.
     IWldTerrainRes* const terrainRes = new (rawStorage) IWldTerrainRes();
     ConstructTerrainResFields(*rawStorage);
@@ -2047,8 +2047,7 @@ namespace moho
    */
   const VisibilityRect* IWldTerrainRes::GetPlayableMapRect(VisibilityRect& outRect) const
   {
-    const TerrainPlayableRectSource* const source = mPlayableRectSource;
-    outRect = source->mPlayableRect;
+    outRect = VisibilityRect::FromRect2i(mMap->mPlayableRect);
     return &outRect;
   }
 
@@ -2061,7 +2060,7 @@ namespace moho
    */
   bool IWldTerrainRes::SetPlayableMapRect(const VisibilityRect& rect)
   {
-    STIMap* const map = reinterpret_cast<STIMap*>(mPlayableRectSource);
+    STIMap* const map = mMap;
     if (map == nullptr) {
       return false;
     }
@@ -3143,22 +3142,18 @@ namespace moho
    * source ownership to null.
    */
   IWldTerrainRes::IWldTerrainRes()
-    : mPlayableRectSource(nullptr)
+    : mMap(nullptr)
   {}
 
   /**
    * Address: 0x0089E870 (FUN_0089E870, IWldTerrainRes scalar-deleting destructor)
    *
    * What it does:
-   * Releases the owned `mPlayableRectSource` (the terrain's real `STIMap`,
-   * reached through the same `reinterpret_cast` used elsewhere in this file)
-   * before the base object is torn down.
+   * Releases the owned `mMap` before the base object is torn down.
    */
   IWldTerrainRes::~IWldTerrainRes()
   {
-    if (mPlayableRectSource != nullptr) {
-      delete reinterpret_cast<STIMap*>(mPlayableRectSource);
-    }
+    delete mMap;
   }
 
   /**
@@ -3888,7 +3883,7 @@ namespace moho
   {
     auto* const normalView = AsTerrainNormalMapRuntimeView(this);
     normalView->mStrata = StratumMaterial{};
-    normalView->mStrata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(this));
+    normalView->mStrata.SetSizeTo(this);
   }
 
   /**

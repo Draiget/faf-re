@@ -3,25 +3,12 @@
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
 namespace
 {
-  struct CWldTerrainResRuntimeView
-  {
-    void* vftable;
-    moho::STIMap* mMap;
-  };
 
-  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(CWldTerrainResRuntimeView, mMap) == 0x04, "CWldTerrainResRuntimeView::mMap offset must be 0x04"
-  );
-
-  [[nodiscard]] const CWldTerrainResRuntimeView* AsTerrainView(const moho::CWldTerrainRes* terrainRes) noexcept
-  {
-    return reinterpret_cast<const CWldTerrainResRuntimeView*>(terrainRes);
-  }
 
   [[nodiscard]] moho::CStratumMaterial& AssignTextureDefaults(moho::CStratumMaterial& material) noexcept
   {
@@ -223,7 +210,7 @@ namespace moho
    * What it does:
    * Applies world-map dimensions to every non-empty terrain layer.
    */
-  void StratumMaterial::SetSizeTo(CWldTerrainRes* const terrainRes)
+  void StratumMaterial::SetSizeTo(IWldTerrainRes* const terrainRes)
   {
     if (terrainRes == nullptr) {
       return;
@@ -234,13 +221,13 @@ namespace moho
       (void)device->GetResources();
     }
 
-    const CWldTerrainResRuntimeView* const view = AsTerrainView(terrainRes);
-    if (view == nullptr || view->mMap == nullptr || view->mMap->mHeightField.get() == nullptr) {
+    const STIMap* const map = terrainRes->mMap;
+    if (map == nullptr || map->mHeightField.get() == nullptr) {
       return;
     }
 
-    const float maxX = static_cast<float>(view->mMap->mHeightField->width - 1);
-    const float maxY = static_cast<float>(view->mMap->mHeightField->height - 1);
+    const float maxX = static_cast<float>(map->mHeightField->width - 1);
+    const float maxY = static_cast<float>(map->mHeightField->height - 1);
     const Wm3::Vector2f maxSize{maxX, maxY};
 
     auto applyIfConfigured = [&maxSize](CStratumMaterial& material) {

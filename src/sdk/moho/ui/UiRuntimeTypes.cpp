@@ -2716,7 +2716,7 @@ namespace
   )
   {
     const auto* const map =
-      reinterpret_cast<const moho::STIMap*>(worldViewView.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      worldViewView.mSession->mWldMap->mTerrainRes->mMap;
     return map->mHeightField->GetElevation(cursorWorldPosition.x, cursorWorldPosition.z);
   }
 
@@ -21529,7 +21529,7 @@ moho::CUIWorldView::CUIWorldView(
     control->SetDebugName(msvc8::string(name, std::strlen(name)));
 
     moho::STIMap* const map =
-      reinterpret_cast<moho::STIMap*>(view->mWldSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      view->mWldSession->mWldMap->mTerrainRes->mMap;
     LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
     moho::RCamManager* const camManager = moho::CAM_GetManager();
     moho::CameraImpl* const camera = camManager->CreateCamera(gpg::StrArg(name), *map, activeState);

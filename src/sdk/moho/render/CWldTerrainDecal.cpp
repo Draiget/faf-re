@@ -27,7 +27,7 @@ namespace
   [[nodiscard]] const moho::CHeightField&
   GetTerrainHeightField(const moho::IWldTerrainRes& terrainRes) noexcept
   {
-    const auto* const map = reinterpret_cast<const moho::STIMap*>(terrainRes.mPlayableRectSource);
+    const auto* const map = terrainRes.mMap;
     return *map->GetHeightField();
   }
 

@@ -9,7 +9,7 @@
 
 namespace moho
 {
-  class CWldTerrainRes;
+  class IWldTerrainRes;
   class RD3DTextureResource;
 
   /**
@@ -105,7 +105,7 @@ namespace moho
      * What it does:
      * Applies world-map dimensions to every configured terrain stratum layer.
      */
-    void SetSizeTo(CWldTerrainRes* terrainRes);
+    void SetSizeTo(IWldTerrainRes* terrainRes);
 
   public:
     std::uint8_t byte0{0};                       // +0x00

@@ -672,7 +672,7 @@ namespace moho
     SetShaderVarMem(shaderVars.terrainScale, 4U, terrainScale);
 
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
-    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+    strata.SetSizeTo(terrainRes);
 
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);
     BindTextureShaderVar(shaderVars.utilityTextureB, strata.mStratumMask1);
