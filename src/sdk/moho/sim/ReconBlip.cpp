@@ -13,6 +13,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/SerializationError.h"
 #include "lua/LuaObject.h"
+#include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/animation/CAniPose.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/entity/EntityDb.h"
@@ -1061,12 +1062,16 @@ void SPerArmyReconInfo::MemberSerialize(gpg::WriteArchive* const archive, const 
  * initializes per-army recon state storage, and performs an initial refresh.
  */
 ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
-    Entity(
-      sourceUnit ? reinterpret_cast<REntityBlueprint*>(sourceUnit->BluePrint) : nullptr,
-      sim,
-      ReserveReconBlipId(sim, sourceUnit),
-      kUnitCollisionBucketFlags
-    ),
+    // 0x005BE737: `push 100h` / `push id` / `push sim` / `call 0x678160` -- the
+    // blueprint-less `Entity(Sim*, EntId, int)`, NOT the blueprint overload. A blip
+    // therefore reaches StandardInit's RevertCollisionShape with no blueprint and
+    // gets no collision primitive, and it never becomes a script object of the
+    // unit's class. Building it through the blueprint overload gave every blip the
+    // unit's collision box AND the unit's Lua class: projectiles collided with
+    // their own army's blips of enemy units (Unit.lua's OnCollisionCheck answers
+    // true for a self with no Army), and direct-fire damage landed on the blip
+    // instead of the unit.
+    Entity(sim, ReserveReconBlipId(sim, sourceUnit), kUnitCollisionBucketFlags),
     mCreator{},
     mDeleteWhenStale(static_cast<std::uint8_t>((sourceUnit && sourceUnit->IsMobile()) ? 1u : 0u)),
     mPad279{0, 0, 0},
@@ -1078,6 +1083,20 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), 1L);
 
   mCreator.ResetFromObject(sourceUnit);
+
+  // 0x005BE7D3..0x005BE85B: three empty LuaObjects, then
+  // `CreateLuaObject(SCR_Import(sim->mLuaState, "/lua/sim/Blip.lua").Blip, ...)`
+  // (0x004D3250, 0x0090A160 GetByName, 0x004C70D0). A blip's script object is a
+  // `Blip`, whatever unit it stands for.
+  {
+    const LuaPlus::LuaObject arg1{};
+    const LuaPlus::LuaObject arg2{};
+    const LuaPlus::LuaObject arg3{};
+    const LuaPlus::LuaObject blipModule = SCR_Import(sim->mLuaState, "/lua/sim/Blip.lua");
+    const LuaPlus::LuaObject blipClass = blipModule.GetByName("Blip");
+    CreateLuaObject(blipClass, arg1, arg2, arg3);
+  }
+
   mQueueRelinkBlocked = 1u;
 
   if (fake) {
