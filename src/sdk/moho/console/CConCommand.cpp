@@ -315,11 +315,11 @@ namespace
    * The session's terrain map header. Every console command that needs it walks
    * the same two hops the binary does (`mWldMap` -> `mTerrainRes` -> the
    * terrain-owned `STIMap`); the recovered `IWldTerrainRes` types that lane as
-   * `mPlayableRectSource`, which is the same word.
+   * `mMap`, which is the same word.
    */
   [[nodiscard]] const STIMap* ResolveSessionTerrainMap(const CWldSession* const session) noexcept
   {
-    return reinterpret_cast<const STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+    return session->mWldMap->mTerrainRes->mMap;
   }
 
   /**

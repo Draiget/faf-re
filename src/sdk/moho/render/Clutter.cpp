@@ -63,14 +63,7 @@ namespace
     std::int32_t ownerToken;
   };
 
-  struct CWldTerrainResRuntimeView
-  {
-    void* vtable;
-    moho::STIMap* map;
-  };
 
-  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x8, "CWldTerrainResRuntimeView size must be 0x8");
-  static_assert(offsetof(CWldTerrainResRuntimeView, map) == 0x4, "CWldTerrainResRuntimeView::map offset must be 0x4");
 
 
   RegionRuntimeVtableResetTag gRegionRuntimeVtableResetTag{};
@@ -209,8 +202,7 @@ namespace
       return nullptr;
     }
 
-    const auto* const terrainView = reinterpret_cast<const CWldTerrainResRuntimeView*>(session->mWldMap->mTerrainRes);
-    return terrainView ? terrainView->map : nullptr;
+    return session->mWldMap->mTerrainRes->mMap;
   }
 
   [[nodiscard]] float NextGlobalRandomSignedUnit()

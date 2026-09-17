@@ -5445,7 +5445,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
 {
   (void)allowCommandOverlap;
 
-  auto* const map = reinterpret_cast<STIMap*>(session.mWldMap->mTerrainRes->mPlayableRectSource);
+  auto* const map = session.mWldMap->mTerrainRes->mMap;
   auto* const resources = reinterpret_cast<ISimResources*>(session.mSimResources.px);
   if (!OCCUPY_Check(*map, *buildBlueprint, buildPosition, *resources, *buildInfo)) {
     return false;
@@ -5588,7 +5588,7 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
     return false;
   }
 
-  STIMap* const map = reinterpret_cast<STIMap*>(session.mWldMap->mTerrainRes->mPlayableRectSource);
+  STIMap* const map = session.mWldMap->mTerrainRes->mMap;
   CHeightField* const field = map->GetHeightField();
 
   const std::int32_t rectX1 = static_cast<std::int32_t>(cellX) + static_cast<std::int32_t>(footprint.mSizeX);

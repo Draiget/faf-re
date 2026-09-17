@@ -19,27 +19,12 @@
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DTextureBatcher.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/sim/CWldMap.h"
 #include "moho/sim/STIMap.h"
 
 namespace
 {
-  struct CWldTerrainResRuntimeView
-  {
-    void* mVftable;
-    moho::STIMap* mMap;
-  };
 
-  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(CWldTerrainResRuntimeView, mMap) == 0x04,
-    "CWldTerrainResRuntimeView::mMap offset must be 0x04"
-  );
-
-  [[nodiscard]] const CWldTerrainResRuntimeView*
-  AsCWldTerrainResRuntimeView(const moho::IWldTerrainRes* const terrainRes) noexcept
-  {
-    return reinterpret_cast<const CWldTerrainResRuntimeView*>(terrainRes);
-  }
 
   /// True when a decal texture reference already names an absolute location -
   /// a UNC share, a drive-qualified path, or a rooted one - and so must be used
@@ -270,7 +255,7 @@ namespace moho
       return;
     }
 
-    const STIMap* const map = AsCWldTerrainResRuntimeView(mWldTerrain)->mMap;
+    const STIMap* const map = mWldTerrain->mMap;
     if (map == nullptr || map->mHeightField.get() == nullptr) {
       return;
     }
@@ -970,8 +955,7 @@ namespace moho
    */
   void CWldSplat::UpdateVertices()
   {
-    const auto* const terrainView = AsCWldTerrainResRuntimeView(mTerrainRes);
-    const STIMap* const map = terrainView->mMap;
+    const STIMap* const map = mTerrainRes->mMap;
     const CHeightField* const heightField = map->mHeightField.get();
 
     const Wm3::Vec2f localCorners[4]{

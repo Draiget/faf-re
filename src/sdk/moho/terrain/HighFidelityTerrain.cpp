@@ -437,7 +437,7 @@ namespace moho
 
     auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
-    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+    strata.SetSizeTo(terrainRes);
 
     // TEMPORARY PROBE -- terrain overexposure triage, delete with the others.
     // The reference binary renders textured ground here; ours renders a flat

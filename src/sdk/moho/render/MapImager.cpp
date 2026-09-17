@@ -38,14 +38,7 @@ namespace
     "WRenViewportMapImagerView::mMapImager offset must be 0x32C"
   );
 
-  struct CWldTerrainResRuntimeView
-  {
-    void* vftable;
-    moho::STIMap* mMap;
-  };
 
-  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
-  static_assert(offsetof(CWldTerrainResRuntimeView, mMap) == 0x04, "CWldTerrainResRuntimeView::mMap offset must be 0x04");
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
   {
@@ -151,8 +144,7 @@ void MapImager::AddBorder(const msvc8::string& meshBlueprintPath)
     return;
   }
 
-  const auto* const terrainResView = reinterpret_cast<const CWldTerrainResRuntimeView*>(session->mWldMap->mTerrainRes);
-  const STIMap* const terrainMap = terrainResView->mMap;
+  const STIMap* const terrainMap = session->mWldMap->mTerrainRes->mMap;
   if (terrainMap == nullptr || terrainMap->mHeightField.get() == nullptr) {
     return;
   }
@@ -220,8 +212,7 @@ void MapImager::UpdateMeshStances()
     return;
   }
 
-  const auto* const terrainResView = reinterpret_cast<const CWldTerrainResRuntimeView*>(terrainRes);
-  STIMap* const terrainMap = terrainResView->mMap;
+  STIMap* const terrainMap = terrainRes->mMap;
   if (terrainMap == nullptr) {
     return;
   }

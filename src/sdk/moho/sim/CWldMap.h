@@ -45,6 +45,7 @@ namespace moho
   class IWldTerrainRes;
   class RD3DTextureResource;
   class SkyDome;
+  class STIMap;
   class StratumMaterial;
   struct Vector4f;
   class WaveSystem;
@@ -285,16 +286,6 @@ namespace moho
   using TerrainEnvironmentLookupPairs = msvc8::vector<TerrainEnvironmentLookupPair>;
   static_assert(sizeof(TerrainEnvironmentLookupPair) == 0x38, "TerrainEnvironmentLookupPair size must be 0x38");
 
-  struct TerrainPlayableRectSource
-  {
-    std::uint8_t pad_0000_0008[0x08];
-    VisibilityRect mPlayableRect; // 0x08
-  };
-  static_assert(
-    offsetof(TerrainPlayableRectSource, mPlayableRect) == 0x08,
-    "TerrainPlayableRectSource::mPlayableRect offset must be 0x08"
-  );
-
   struct SNormalMapInfo
   {
     float mXResolution;                                    // +0x00
@@ -371,7 +362,7 @@ namespace moho
      * Address: 0x0089E870 (FUN_0089E870, IWldTerrainRes scalar-deleting destructor)
      *
      * What it does:
-     * Tears down the owned `mPlayableRectSource` (the terrain's real runtime
+     * Tears down the owned `mMap` (the terrain's real runtime
      * `STIMap`, reached through the same `reinterpret_cast` this class's other
      * accessors already use) before the base object is released.
      */
@@ -1248,7 +1239,14 @@ namespace moho
     void UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect);
 
   public:
-    TerrainPlayableRectSource* mPlayableRectSource; // 0x04
+    /**
+     * The terrain's map data, owned by this interface: `~IWldTerrainRes`
+     * deletes it, `GetPlayableMapRect` reads `mPlayableRect` out of it at
+     * +0x08, and every consumer that reaches `[terrainRes+0x04]` in the binary
+     * - the cartographic view, the splat and clutter passes, the map imager,
+     * the console's map queries - follows it straight into `STIMap`.
+     */
+    STIMap* mMap; // 0x04
   };
   static_assert(sizeof(IWldTerrainRes) == 0x08, "IWldTerrainRes head size must be 0x08");
 

@@ -11507,7 +11507,7 @@ namespace moho
       // default arm's position target) is of the clamped vector, never of the
       // raw mouse. Clamping only inside the default arm let the other two
       // arms act on an off-map cursor.
-      const STIMap* const map = reinterpret_cast<STIMap*>(graph.mSession->mWldMap->mTerrainRes->mPlayableRectSource);
+      const STIMap* const map = graph.mSession->mWldMap->mTerrainRes->mMap;
       Wm3::Vector3f clampedPos = mouse;
       clampedPos.x = std::clamp(
         clampedPos.x, static_cast<float>(map->mPlayableRect.x0 + 1), static_cast<float>(map->mPlayableRect.x1 - 1)
@@ -15700,7 +15700,7 @@ namespace moho
    */
   STIMap* CWldSession::GetSTIMap() const
   {
-    return reinterpret_cast<STIMap*>(mWldMap->mTerrainRes->mPlayableRectSource);
+    return mWldMap->mTerrainRes->mMap;
   }
 
   /**
@@ -16430,7 +16430,7 @@ namespace moho
       if (sHarnessBeat == 150 && std::getenv("FAF_HARNESS") != nullptr) {
         const STIMap* const playableMap =
           (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr)
-            ? reinterpret_cast<const STIMap*>(mWldMap->mTerrainRes->mPlayableRectSource)
+            ? mWldMap->mTerrainRes->mMap
             : nullptr;
         gpg::Warnf("[HARNESS] rect=(%d,%d)-(%d,%d) map=%p",
                    playableMap != nullptr ? playableMap->mPlayableRect.x0 : -1,
@@ -17016,7 +17016,7 @@ namespace moho
   {
     CWldSession* const session = WLD_GetActiveSession();
     CommandManager* const commandManager = session->mCommandManager;
-    STIMap* const playableMap = reinterpret_cast<STIMap*>(session->mWldMap->mTerrainRes->mPlayableRectSource);
+    STIMap* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
     std::uint32_t packedCommandId = 0u;
     commandIssueData.nextCommandId =
@@ -20990,7 +20990,7 @@ namespace moho
 
     // `mWldMap->mTerrainRes` + 0x04 is the active `STIMap`; its playable rect
     // sits at +0x08 (0x00862B09..0x00862B4D reads all four bounds).
-    const VisibilityRect& playableRect = mWldMap->mTerrainRes->mPlayableRectSource->mPlayableRect;
+    const VisibilityRect& playableRect = VisibilityRect::FromRect2i(mWldMap->mTerrainRes->mMap->mPlayableRect);
 
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(*camera));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
@@ -21565,7 +21565,7 @@ namespace moho
       // The launch info keeps its own copy of the playable map so a restart can
       // rebuild the session without the terrain resource still being alive.
       auto* const playableMap =
-        reinterpret_cast<STIMap*>(wldSession->mWldMap->mTerrainRes->mPlayableRectSource);
+        wldSession->mWldMap->mTerrainRes->mMap;
       STIMap* const launchMap = new STIMap(playableMap);
 
       LaunchInfoBase* const launchInfo = sessionInfo->mLaunchInfo.get();

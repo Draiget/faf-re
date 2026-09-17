@@ -72030,22 +72030,7 @@ namespace
     };
   }
 
-  /**
-   * Runtime overlay for the leading `IWldTerrainRes` layout `RenderCartographic`
-   * reads directly: the owning `STIMap` pointer at `IWldTerrainRes+0x04`
-   * (0x007F8C74 `mov eax, [edi+4]`), used only for a null check that gates the
-   * playable-boundary renderer selection. `Cartographic.cpp` already models
-   * this identical shape as `CWldTerrainResRuntimeView` for its own internal
-   * use (see that file's comment on why this two-field view is duplicated
-   * per-consumer rather than shared - it has internal linkage there).
-   */
-  struct WRenTerrainResMapView
-  {
-    const void* mVftable; // +0x00
-    const void* mMap;     // +0x04
-  };
 
-  static_assert(offsetof(WRenTerrainResMapView, mMap) == 0x04, "WRenTerrainResMapView::mMap offset must be 0x04");
 } // namespace
 
 /**
@@ -72233,11 +72218,12 @@ unsigned int moho::REN_RenderCartographic(
   gpg::gal::DeviceContext* const deviceContext = galInstance->GetDeviceContext();
   (void)deviceContext->GetHead(static_cast<std::uint32_t>(head)); // result unused, matches the binary
 
-  const auto* const terrainMapView = reinterpret_cast<const WRenTerrainResMapView*>(terrain);
   auto* const destroyView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(viewport);
 
+  // 0x007F8C74 `mov eax,[edi+4]` is `IWldTerrainRes::mMap`, read only to gate
+  // the playable-boundary renderer on the terrain having map data.
   BoundaryRenderer* const boundaryRenderer =
-    (moho::ren_PlayableBoundary && terrainMapView->mMap != nullptr) ? &destroyView->mBoundaryRenderer : nullptr;
+    (moho::ren_PlayableBoundary && terrain->mMap != nullptr) ? &destroyView->mBoundaryRenderer : nullptr;
 
   moho::CWldSession* const activeSession = moho::WLD_GetActiveSession();
   VisionRenderer* const visionRenderer =
@@ -72680,7 +72666,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
     moho::ed_EnableHook = true;
     return;
   }
-  moho::STIMap* const map = reinterpret_cast<moho::STIMap*>(terrainRes->mPlayableRectSource);
+  moho::STIMap* const map = terrainRes->mMap;
 
   moho::RCamManager* const camManager = moho::CAM_GetManager();
   moho::CameraImpl* const camera = camManager->CreateCamera("Strategic map render camera", *map, nullptr);

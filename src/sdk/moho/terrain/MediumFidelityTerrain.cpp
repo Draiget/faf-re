@@ -74,13 +74,13 @@ namespace
    *
    * `REN_GetTerrainRes()` is inlined at 0x00805F88 (`mov eax, sWldMap` /
    * `mov eax, [eax+4]`); the two further loads at 0x00805F98/0x00805F9B walk
-   * `IWldTerrainRes::mPlayableRectSource` (+0x04, the owning `STIMap`) and
+   * `IWldTerrainRes::mMap` (+0x04, the owning `STIMap`) and
    * that map's first member, the shared height-field handle. There is no null
    * guard in the binary and none is added here.
    */
   [[nodiscard]] moho::CHeightField& ActiveTerrainHeightField(moho::IWldTerrainRes& terrainRes) noexcept
   {
-    return *reinterpret_cast<moho::STIMap*>(terrainRes.mPlayableRectSource)->GetHeightField();
+    return *terrainRes.mMap->GetHeightField();
   }
 
   /**
@@ -422,7 +422,7 @@ namespace moho
 
     auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
-    strata.SetSizeTo(reinterpret_cast<CWldTerrainRes*>(terrainRes));
+    strata.SetSizeTo(terrainRes);
 
     BindTextureShaderVar(shaderVars.skirtTexture, boost::static_pointer_cast<ID3DTextureSheet>(sMediumFidelityGridTexture));
     BindTextureShaderVar(shaderVars.utilityTextureA, strata.mStratumMask0);

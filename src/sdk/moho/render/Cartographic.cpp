@@ -552,18 +552,11 @@ namespace
    * `CWldSplat.cpp`). It is deliberately identical to theirs so a later
    * consolidation pass can lift all four into one owning accessor.
    */
-  struct CWldTerrainResRuntimeView
-  {
-    const void* mVftable; // +0x00
-    moho::STIMap* mMap;   // +0x04
-  };
 
-  static_assert(offsetof(CWldTerrainResRuntimeView, mMap) == 0x04, "CWldTerrainResRuntimeView::mMap offset must be 0x04");
-  static_assert(sizeof(CWldTerrainResRuntimeView) == 0x08, "CWldTerrainResRuntimeView size must be 0x08");
 
   [[nodiscard]] moho::STIMap& CartographicTerrainMap(const moho::IWldTerrainRes& terrain) noexcept
   {
-    return *reinterpret_cast<const CWldTerrainResRuntimeView*>(&terrain)->mMap;
+    return *terrain.mMap;
   }
 
   /**
