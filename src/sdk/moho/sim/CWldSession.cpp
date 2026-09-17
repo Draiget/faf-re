@@ -15878,6 +15878,27 @@ namespace moho
                                                                         : 0u;
     const std::uint32_t liveSelectionSize = static_cast<std::uint32_t>(filteredSelection.size());
 
+    // 0x008944BE / 0x008944CE / 0x008944DB: the same three-way gate, and when
+    // any arm takes it the body does exactly one thing -- 0x008944E7
+    // `call ?SetSelection@CWldSession@Moho@@QAEXABV?$WeakSet@VUserEntity@Moho@@@2@@Z`.
+    // The whole function is `size`, the local-set init, the prune walk, `size`,
+    // `SetSelection`, then the local set's teardown; there is no second
+    // comparison, no in-place rebuild of `mSelection`, no driver sync-mask
+    // update and no `UI_EndCommandMode`.
+    //
+    // This used to rebuild `mSelection` by hand and then suppress the publish
+    // behind its own `AreEntitySetsEqual` check. `SetSelection` is what
+    // computes the added/removed sets and broadcasts `SSelectionEvent` to the
+    // listeners the UI is built on, so gating it on entity-set identity meant
+    // any change that keeps the same entities -- a transport whose cargo list
+    // changed underneath it -- never reached the UI, and the construction
+    // panel's `SetSecondaryDisplay('attached')` only re-ran when the player
+    // re-selected. `SetSelection` already skips its own broadcast when nothing
+    // actually changed, so the guard here was both wrong and redundant.
+    //
+    // The `UI_EndCommandMode()` this also used to run is worse: this function
+    // is called from the session beat, so it tore down whatever command mode
+    // was active every beat.
     if (!needsSelectionRefresh && !(previousSelectionSize < maxSelectionSize) && !(liveSelectionSize < previousSelectionSize
         )) {
       return;
