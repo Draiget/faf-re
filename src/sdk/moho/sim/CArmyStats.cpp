@@ -873,7 +873,7 @@ namespace moho
     std::string xml;
     AppendMsvcString(
       xml,
-      gpg::STR_Printf("%s<Army index=\"%d\" name=\"%s\">\n", indentText, army->ArmyId, army->PlayerName.c_str())
+      gpg::STR_Printf("%s<Army index=\"%d\" name=\"%s\">\n", indentText, army->mConstDat.mArmyIndex, army->mConstDat.mPlayerName.c_str())
     );
 
     CArmyStatItem* const unitsActive = GetItem("Units_Active");
@@ -1073,7 +1073,7 @@ namespace moho
     gpg::FileStream snapshotStream(snapshotPath.c_str(), gpg::Stream::ModeSend, 0u, 4096);
     gpg::TextWriter writer(&snapshotStream, 2);
 
-    gpg::Logf("********** DUMPING ARMY BUILT SUMMARY FOR ARMY (%d) **********", army->ArmyId);
+    gpg::Logf("********** DUMPING ARMY BUILT SUMMARY FOR ARMY (%d) **********", army->mConstDat.mArmyIndex);
 
     CArmyStatItem* const unitsActive = GetItem("Units_Active");
     CArmyStatItem* const unitsProduced = GetItem("Units_History");
@@ -1099,7 +1099,7 @@ namespace moho
     DumpCategorySums(writer, rules, unitsProduced, categoryNames, "%s: %d");
     writer.WriteNewline();
 
-    gpg::Logf("********** DUMPING ECONOMY STATS FOR ARMY (%d) **********", army->ArmyId);
+    gpg::Logf("********** DUMPING ECONOMY STATS FOR ARMY (%d) **********", army->mConstDat.mArmyIndex);
     for (const char* const* cursor = economyStatPaths; *cursor != nullptr; ++cursor) {
       const char* const statPath = *cursor;
       const float value = ReadRequiredFloatStat(*this, statPath);
@@ -1108,7 +1108,7 @@ namespace moho
     }
     writer.WriteNewline();
 
-    gpg::Logf("********** DUMPING ENEMY KILLED SUMMARY FOR ARMY (%d) **********", army->ArmyId);
+    gpg::Logf("********** DUMPING ENEMY KILLED SUMMARY FOR ARMY (%d) **********", army->mConstDat.mArmyIndex);
     CArmyStatItem* const enemiesKilled = GetItem("Enemies_Killed");
     gpg::Logf(" Enemies Killed: %i", enemiesKilled->GetInt(false));
     writer.Printf("Enemies Killed, %d\n\n", enemiesKilled->GetInt(false));

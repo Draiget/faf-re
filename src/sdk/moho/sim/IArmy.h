@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "../../gpg/core/utils/BoostWrappers.h"
@@ -32,6 +33,34 @@ namespace moho
   enum EAlliance : std::int32_t;
   struct ArmyPool;
 
+  /**
+   * The army's replicated state: one `SSTIArmyConstantData` and one
+   * `SSTIArmyVariableData`, and nothing else.
+   *
+   * This class is NOT polymorphic. Three independent pieces of binary evidence
+   * say so, and the tree had it wrong until 2026-09-17:
+   *
+   * - Its typeinfo size is 0x1E0 (FUN_00550B20), which is exactly
+   *   0x80 + 0x160 -- there is no room for a vfptr.
+   * - Every accessor reads its payload at `this + 0`. `IsCivilian`
+   *   (0x00707CA0) is `mov al, [eax+0x3C]`, `SetShowScoreFlag` (0x00707C90) is
+   *   `mov [eax+0x188], cl`, `IsEnemy` (0x005D5540) reads the enemy set at
+   *   `[edx+0x100]`.
+   * - `CArmyImpl`'s RTTI base-class array places it at mdisp=8, and every call
+   *   site adjusts for that: `CAiAttackerImpl::FindBestEnemy` loads the army
+   *   and does `add edx, 8` before `call 0x5D5540` (0x005D7C24).
+   *
+   * `SimArmy` introduces the vtable. Because `SEconTotals` holds two u64
+   * storage lanes this class is 8-byte aligned, so MSVC puts the base after
+   * `SimArmy`'s vfptr and four bytes of padding -- at +0x08, matching the BCA.
+   *
+   * Declaring the army interface's pure virtuals here instead made this class
+   * polymorphic, put it at +0x00, and moved every accessor's `this` eight bytes
+   * short of the payload. `IsEnemy` then read the tail of `mAllies`, returned
+   * false for every real enemy, and `FindBestEnemy` discarded every target --
+   * no unit ever auto-acquired, explicit attack orders were dropped on arrival,
+   * and structures were never targeted.
+   */
   class IArmy
   {
   public:
@@ -42,10 +71,20 @@ namespace moho
      * Address: 0x006FD520 (FUN_006FD520, Moho::IArmy::IArmy)
      *
      * What it does:
-     * Constructs the fixed serialized base lanes:
-     * `SSTIArmyConstantData` (+0x00) and `SSTIArmyVariableData` (+0x80).
+     * Constructs the two replicated payload members in declaration order:
+     * `SSTIArmyConstantData` (FUN_006FD330) then `SSTIArmyVariableData`
+     * (FUN_006FD390).
      */
     IArmy();
+
+    /**
+     * Address: 0x006FD570 (FUN_006FD570, Moho::IArmy::~IArmy)
+     *
+     * What it does:
+     * Destroys `mVarDat` then `mConstDat`. Non-virtual: reached only through
+     * `SimArmy`'s destructor (via 0x006FDB00).
+     */
+    ~IArmy();
 
     /**
      * Address: 0x005517A0 (FUN_005517A0, Moho::IArmy::MemberDeserialize)
@@ -138,133 +177,14 @@ namespace moho
      */
     [[nodiscard]] float GetHandicap() const;
 
-    /**
-     * Binary evidence summary:
-     * - Address: 0x00550B20 (FUN_00550B20): IArmy typeinfo size is 0x1E0.
-     * - Address: 0x00703E40 (FUN_00703E40): SimArmy registers IArmy as base at offset +0x08.
-     * - SimArmy's own vtable is abstract in RTTI/emit output (all `_purecall` slots except dtor).
-     *
-     * The slot addresses below are concrete FA binary bodies observed when this interface is
-     * implemented by the concrete army class vtable.
-     */
-    virtual ~IArmy() = 0;
-
-    // Address: 0x006FDC10 (FUN_006FDC10)
-    virtual Sim* GetSim() = 0;
-    // Address: 0x006FFC90 (FUN_006FFC90)
-    virtual bool IsHuman() = 0;
-    // Address: 0x006FDC20 (FUN_006FDC20)
-    virtual const char* GetArmyType() = 0;
-    // Address: 0x006FDC40 (FUN_006FDC40)
-    virtual void SetArmyPlans(const msvc8::string& armyPlans) = 0;
-    // Address: 0x006FDC60 (FUN_006FDC60)
-    virtual const char* GetArmyPlans() = 0;
-    // Address: 0x006FDC80 (FUN_006FDC80)
-    virtual CInfluenceMap* GetIGrid() = 0;
-    // Address: 0x006FDC90 (FUN_006FDC90)
-    virtual CAiBrain* GetArmyBrain() = 0;
-    // Address: 0x006FDCA0 (FUN_006FDCA0)
-    virtual CAiReconDBImpl* GetReconDB() = 0;
-    // Address: 0x006FDCB0 (FUN_006FDCB0)
-    virtual CSimArmyEconomyInfo* GetEconomy() = 0;
-    // Address: 0x006FFCB0 (FUN_006FFCB0)
-    virtual void GenerateArmyStart() = 0;
-    // Address: 0x006FDCC0 (FUN_006FDCC0)
-    virtual void SetArmyStart(const Wm3::Vector2f& startPosition) = 0;
-    // Address: 0x006FDCE0 (FUN_006FDCE0)
-    virtual void GetArmyStartPos(Wm3::Vector2f& outStartPosition) = 0;
-    // Address: 0x006FDF30 (FUN_006FDF30)
-    virtual void SetAlliance(std::uint32_t armyId, int relationIndex) = 0;
-    // Address: 0x00700FC0 (FUN_00700FC0)
-    virtual void OnCommandSourceTerminated(std::uint32_t sourceId) = 0;
-    // Address: 0x006FFD70 (FUN_006FFD70)
-    virtual void OnTick() = 0;
-    // Address: 0x00700080 (FUN_00700080)
-    virtual SSTIArmyConstantData* CopyArmyConstantData(SSTIArmyConstantData* outBuffer) = 0;
-    // Address: 0x00700240 (FUN_00700240)
-    virtual SSTIArmyVariableData* CopyArmyVariableData(SSTIArmyVariableData* outBuffer) = 0;
-    // Address: 0x006FDD50 (FUN_006FDD50)
-    virtual CArmyStats* GetArmyStats() = 0;
-    // Address: 0x006FDD60 (FUN_006FDD60)
-    virtual float GetArmyUnitCostTotal() = 0;
-    // Address: 0x006FDDE0 (FUN_006FDDE0)
-    virtual void* GetPathFinder() = 0;
-    // Address: 0x006FDDF0 (FUN_006FDDF0)
-    virtual boost::SharedPtrRaw<void>* SetUnknownSharedRef(boost::SharedPtrRaw<void>* value) = 0;
-    // Address: 0x006FDE40 (FUN_006FDE40)
-    virtual boost::SharedPtrRaw<void>* GetUnknownSharedRef(boost::SharedPtrRaw<void>* outValue) = 0;
-    // Address: 0x006FDE70 (FUN_006FDE70)
-    virtual std::uint32_t SetUnknownVectorWithMeta(const SArmyVectorWithMeta* value) = 0;
-    // Address: 0x006FDE90 (FUN_006FDE90)
-    virtual void GetPlatoonsList(ArmyPool& outPool) = 0;
-    // Address: 0x00700410 (FUN_00700410)
-    virtual CPlatoon* MakePlatoon(const char* platoonName, const char* aiPlan) = 0;
-    // Address: 0x00700470 (FUN_00700470)
-    virtual CPlatoon* GetPlatoonByName(const char* platoonName) = 0;
-    // Address: 0x007004E0 (FUN_007004E0)
-    virtual CPlatoon* GetPlatoonFor(int queryArg, ESquadClass* outSquadClass) = 0;
-    // Address: 0x007005F0 (FUN_007005F0)
-    virtual void DisbandPlatoonUniquelyNamed(const char* platoonName) = 0;
-    // Address: 0x00700540 (FUN_00700540)
-    virtual void DisbandPlatoon(CPlatoon* platoon) = 0;
-    /**
-     * Address: 0x007006C0 (FUN_007006C0)
-     *
-     * What it does:
-     * Clears the incoming unit set out of any current platoons, then assigns
-     * those units into the named platoon's unassigned squad lane.
-     */
-    virtual void AssignUnitsToPlatoon(const SEntitySetTemplateUnit* units, const char* platoonName) = 0;
-    // Address: 0x00700700 (FUN_00700700)
-    virtual void RemoveFromPlatoon(Unit* unit) = 0;
-    // Address: 0x00700730 (FUN_00700730)
-    virtual void RemoveUnitsFromPlatoons(const SEntitySetTemplateUnit* units) = 0;
-    // Address: 0x00700770 (FUN_00700770)
-    virtual int GetNumPlatoonsTemplateNamed(const char* templateName) = 0;
-    // Address: 0x007007C0 (FUN_007007C0)
-    virtual int GetNumPlatoonWithPlan(const char* planName) = 0;
-    // Address: 0x00700A00 (FUN_00700A00)
-    virtual int CountUnitsInBoundsXZ(
-      const Wm3::Vector3f& minBounds, const Wm3::Vector3f& maxBounds, const SEntitySetTemplateUnit& unitSet
-    ) = 0;
-    // Address: 0x00700A70 (FUN_00700A70)
-    virtual void UpdateAIDebugPlatoonStats(Unit* unit) = 0;
-    // Address: 0x00700E20 (FUN_00700E20)
-    virtual void AddUnitToCategorySet(Unit* unit) = 0;
-    // Address: 0x00700E70 (FUN_00700E70)
-    virtual bool ConsumeUnitFromCategorySet(Unit* unit) = 0;
-    // Address: 0x00700EB0 (FUN_00700EB0)
-    virtual void* GetUnits(void* outUnits, void* filterBuckets) = 0;
-    // Address: 0x006FE090 (FUN_006FE090)
-    virtual msvc8::vector<CArmyImpl*>* GetAlliedArmies(msvc8::vector<CArmyImpl*>* outArmyList) = 0;
-    // Address: 0x006FDD00 (FUN_006FDD00)
-    virtual float GetUnitCap() = 0;
-    // Address: 0x006FDD10 (FUN_006FDD10)
-    virtual void SetUnitCap(float unitCap) = 0;
-    // Address: 0x006FDD30 (FUN_006FDD30)
-    virtual bool IgnoreUnitCap() = 0;
-    // Address: 0x006FDD40 (FUN_006FDD40)
-    virtual void SetUseUnitCap(bool useUnitCap) = 0;
-    // Address: 0x006FDEC0 (FUN_006FDEC0)
-    virtual void SetIgnorePlayableRect(bool ignorePlayableRect) = 0;
-    // Address: 0x006FDED0 (FUN_006FDED0)
-    virtual bool UseWholeMap() = 0;
-    // Address: 0x006FE1B0 (FUN_006FE1B0)
-    virtual void AddBuildRestriction(void* restriction) = 0;
-    // Address: 0x006FE220 (FUN_006FE220)
-    virtual void RemoveBuildRestriction(void* restriction) = 0;
-    // Address: 0x006FE290 (FUN_006FE290)
-    virtual void SetNoRushTimer(float seconds) = 0;
-    // Address: 0x006FE2B0 (FUN_006FE2B0)
-    virtual void SetNoRushRadius(float radius) = 0;
-    // Address: 0x006FE2D0 (FUN_006FE2D0)
-    virtual void SetNoRushOffset(float offsetX, float offsetY) = 0;
-    // Address: 0x006FE2F0 (FUN_006FE2F0)
-    virtual std::int32_t GetPathcapLand() = 0;
-    // Address: 0x006FE300 (FUN_006FE300)
-    virtual std::int32_t GetPathcapSea() = 0;
-    // Address: 0x006FE310 (FUN_006FE310)
-    virtual std::int32_t GetPathcapBoth() = 0;
+  public:
+    SSTIArmyConstantData mConstDat; // +0x000
+    SSTIArmyVariableData mVarDat;   // +0x080
   };
+
+  static_assert(offsetof(IArmy, mConstDat) == 0x000, "IArmy::mConstDat offset must be 0x000");
+  static_assert(offsetof(IArmy, mVarDat) == 0x080, "IArmy::mVarDat offset must be 0x080");
+  static_assert(sizeof(IArmy) == 0x1E0, "IArmy size must be 0x1E0");
+  static_assert(alignof(IArmy) == 8, "IArmy must be 8-byte aligned so SimArmy places it at +0x08");
 
 } // namespace moho

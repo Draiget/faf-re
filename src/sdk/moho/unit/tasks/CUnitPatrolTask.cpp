@@ -633,8 +633,8 @@ namespace moho
     // `position.z` (entity+0xB4) from `StartPosition.Y + NoRushOffsetY` and
     // 0x0061C018 subtracts `position.x` (entity+0xAC) from
     // `StartPosition.X + NoRushOffsetX`.
-    const float noRushCenterX = army->StartPosition.X() + army->NoRushOffsetX;
-    const float noRushCenterZ = army->StartPosition.Y() + army->NoRushOffsetY;
+    const float noRushCenterX = army->mVarDat.mArmyStart.X() + army->mVarDat.mNoRushOffset.x;
+    const float noRushCenterZ = army->mVarDat.mArmyStart.Y() + army->mVarDat.mNoRushOffset.y;
 
     gpg::core::FastVectorN<CollisionResult, 10> collisions;
     Sim* const sim = unit->SimulationRef;
@@ -737,11 +737,11 @@ namespace moho
       }
 
       // Guard-return radius gate around the no-rush center.
-      if (army->NoRushTicks > 0) {
+      if (army->mVarDat.mNoRushTimer > 0) {
         const float ddz = noRushCenterZ - candidate->Position.z;
         const float ddx = noRushCenterX - candidate->Position.x;
         const float noRushDistance = std::sqrt(ddz * ddz + ddx * ddx);
-        if (noRushDistance > army->NoRushRadius) {
+        if (noRushDistance > army->mVarDat.mNoRushRadius) {
           continue;
         }
       }

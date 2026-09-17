@@ -491,7 +491,7 @@ namespace
   struct CPlatoonRuntimeView
   {
     std::uint8_t pad_0000_0038[0x38];
-    moho::IArmy* mArmy;
+    moho::SimArmy* mArmy;
     std::uint8_t pad_003C_0040[0x04];
     CSquadRuntimeView** mSquadStart;
     CSquadRuntimeView** mSquadEnd;
@@ -1591,7 +1591,7 @@ namespace moho
     ownerRef = {};
     SimArmy* army = nullptr;
     archive->ReadPointer_SimArmy(&army, &ownerRef);
-    mArmy = reinterpret_cast<IArmy*>(army);
+    mArmy = army;
 
     (void)ReadPlatoonSquadsFromArchive(archive, this);
     archive->ReadString(&mName);
@@ -2407,7 +2407,7 @@ namespace moho
    * What it does:
    * Returns this platoon's owning army lane.
    */
-  IArmy* CPlatoon::GetArmy() const
+  SimArmy* CPlatoon::GetArmy() const
   {
     return mArmy;
   }
@@ -2711,7 +2711,7 @@ namespace moho
     auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
     const CAiBrain* const brain = runtimeView.mArmy->GetArmyBrain();
 
-    lua_pushnumber(state->m_state, static_cast<float>(brain->mArmy->FactionIndex + 1));
+    lua_pushnumber(state->m_state, static_cast<float>(brain->mArmy->mVarDat.mFaction + 1));
     (void)lua_gettop(state->m_state);
     return 1;
   }
@@ -3204,7 +3204,7 @@ namespace moho
     CPlatoon* const platoon = SCR_FromLua_CPlatoon(platoonObject, state);
     auto& runtimeView = *reinterpret_cast<CPlatoonRuntimeView*>(platoon);
 
-    IArmy* const army = runtimeView.mArmy;
+    SimArmy* const army = runtimeView.mArmy;
     Sim* const sim = army ? army->GetSim() : nullptr;
 
     CSimConVarBase* const runOpponentAiConVar = GetAI_RunOpponentAI_SimConVarDef();

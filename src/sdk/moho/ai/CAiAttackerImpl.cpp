@@ -1291,7 +1291,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
     }
 
     const std::uint32_t candidateArmyId = (candidate->ArmyRef != nullptr)
-                                            ? static_cast<std::uint32_t>(candidate->ArmyRef->ArmyId)
+                                            ? static_cast<std::uint32_t>(candidate->ArmyRef->mConstDat.mArmyIndex)
                                             : static_cast<std::uint32_t>(-1);
     if (!army->IsEnemy(candidateArmyId)) {
       continue;

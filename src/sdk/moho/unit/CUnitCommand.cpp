@@ -168,7 +168,7 @@ namespace
   {
     Unit* const unit = queue.mUnit;
     const RUnitBlueprint* blueprint = unit->GetBlueprint();
-    const EntityCategorySet& armyBuildable = unit->ArmyRef->BuildCategoryFilterSet;
+    const EntityCategorySet& armyBuildable = unit->ArmyRef->mVarDat.mCategoryFilterSet;
     const EntityCategorySet& restrictions = unit->GetAttributes().restrictionCategory;
 
     EntityCategorySet reachable = BuildableAfterBecoming(*blueprint, armyBuildable, restrictions);

@@ -178,7 +178,7 @@ namespace
 
     const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 2));
     CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-    const std::int32_t armyIndex = army->ArmyId;
+    const std::int32_t armyIndex = army->mConstDat.mArmyIndex;
     const std::uint32_t reconFlags = blip->mReconDat[armyIndex].mReconFlags;
     lua_pushboolean(rawState, (reconFlags & flagMask) != 0u ? 1 : 0);
     (void)lua_gettop(rawState);
@@ -352,8 +352,8 @@ namespace
       return static_cast<EntId>(0);
     }
 
-    const std::uint32_t sourceArmyId = (sourceUnit && sourceUnit->ArmyRef && sourceUnit->ArmyRef->ArmyId >= 0)
-      ? static_cast<std::uint32_t>(sourceUnit->ArmyRef->ArmyId)
+    const std::uint32_t sourceArmyId = (sourceUnit && sourceUnit->ArmyRef && sourceUnit->ArmyRef->mConstDat.mArmyIndex >= 0)
+      ? static_cast<std::uint32_t>(sourceUnit->ArmyRef->mConstDat.mArmyIndex)
       : 0u;
     const std::uint32_t requestBits = (sourceArmyId | kReconEntityFamilyPrefix) << 20u;
     return static_cast<EntId>(sim->mEntityDB->DoReserveId(requestBits));
@@ -1441,7 +1441,7 @@ EReconFlags ReconBlip::GetFlags(const std::int32_t armyIndex) const
  */
 EReconFlags ReconBlip::GetFlags(CArmyImpl* const army) const
 {
-  return GetFlags(army->ArmyId);
+  return GetFlags(army->mConstDat.mArmyIndex);
 }
 
 /**

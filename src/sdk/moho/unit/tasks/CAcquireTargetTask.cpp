@@ -290,7 +290,7 @@ namespace
     Entity* const targetEntity = target.targetEntity.GetObjectPtr();
     if (targetEntity != nullptr && !unit->IsMobile()) {
       if (ReconBlip* const blip = targetEntity->IsReconBlip(); blip != nullptr) {
-        const std::int32_t armyIndex = unit->ArmyRef->ArmyId;
+        const std::int32_t armyIndex = unit->ArmyRef->mConstDat.mArmyIndex;
         if ((blip->mReconDat[static_cast<std::size_t>(armyIndex)].mReconFlags & 0x1Fu) == 0u) {
           return true;
         }

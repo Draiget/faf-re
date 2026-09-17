@@ -29,20 +29,6 @@ namespace
     }
   };
 
-  struct IArmySerializedView
-  {
-    moho::SSTIArmyConstantData mConstantData; // +0x000
-    moho::SSTIArmyVariableData mVariableData; // +0x080
-  };
-
-  static_assert(
-    offsetof(IArmySerializedView, mConstantData) == 0x000, "IArmySerializedView::mConstantData offset must be 0x000"
-  );
-  static_assert(
-    offsetof(IArmySerializedView, mVariableData) == 0x080, "IArmySerializedView::mVariableData offset must be 0x080"
-  );
-  static_assert(sizeof(IArmySerializedView) == 0x1E0, "IArmySerializedView size must be 0x1E0");
-
   gpg::RType* gSSTIArmyConstantDataType = nullptr;
   gpg::RType* gSSTIArmyVariableDataType = nullptr;
 
@@ -100,17 +86,16 @@ namespace moho
       return;
     }
 
-    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
     const gpg::RType* const constantType = ResolveSSTIArmyConstantDataType();
     const gpg::RType* const variableType = ResolveSSTIArmyVariableDataType();
     GPG_ASSERT(constantType != nullptr);
     GPG_ASSERT(variableType != nullptr);
 
     gpg::RRef constantOwnerRef{};
-    archive->Read(constantType, &view->mConstantData, constantOwnerRef);
+    archive->Read(constantType, &mConstDat, constantOwnerRef);
 
     gpg::RRef variableOwnerRef{};
-    archive->Read(variableType, &view->mVariableData, variableOwnerRef);
+    archive->Read(variableType, &mVarDat, variableOwnerRef);
   }
 
   /**
@@ -122,17 +107,16 @@ namespace moho
       return;
     }
 
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
     const gpg::RType* const constantType = ResolveSSTIArmyConstantDataType();
     const gpg::RType* const variableType = ResolveSSTIArmyVariableDataType();
     GPG_ASSERT(constantType != nullptr);
     GPG_ASSERT(variableType != nullptr);
 
     gpg::RRef constantOwnerRef{};
-    archive->Write(constantType, &view->mConstantData, constantOwnerRef);
+    archive->Write(constantType, &mConstDat, constantOwnerRef);
 
     gpg::RRef variableOwnerRef{};
-    archive->Write(variableType, &view->mVariableData, variableOwnerRef);
+    archive->Write(variableType, &mVarDat, variableOwnerRef);
   }
 
   /**
@@ -148,21 +132,19 @@ namespace moho
       return ALLIANCE_Neutral;
     }
 
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
-    const auto* const otherView = reinterpret_cast<const IArmySerializedView*>(other);
 
-    if (view->mConstantData.mArmyIndex == otherView->mConstantData.mArmyIndex) {
+    if (mConstDat.mArmyIndex == other->mConstDat.mArmyIndex) {
       return ALLIANCE_Ally;
     }
 
-    const std::uint32_t otherArmyIndex = static_cast<std::uint32_t>(otherView->mConstantData.mArmyIndex);
-    if (view->mVariableData.mNeutrals.Contains(otherArmyIndex)) {
+    const std::uint32_t otherArmyIndex = static_cast<std::uint32_t>(other->mConstDat.mArmyIndex);
+    if (mVarDat.mNeutrals.Contains(otherArmyIndex)) {
       return ALLIANCE_Neutral;
     }
-    if (view->mVariableData.mAllies.Contains(otherArmyIndex)) {
+    if (mVarDat.mAllies.Contains(otherArmyIndex)) {
       return ALLIANCE_Ally;
     }
-    if (view->mVariableData.mEnemies.Contains(otherArmyIndex)) {
+    if (mVarDat.mEnemies.Contains(otherArmyIndex)) {
       return ALLIANCE_Enemy;
     }
 
@@ -181,8 +163,7 @@ namespace moho
       return false;
     }
 
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
-    return view->mVariableData.mEnemies.Contains(armyIndex);
+    return mVarDat.mEnemies.Contains(armyIndex);
   }
 
   /**
@@ -190,8 +171,7 @@ namespace moho
    */
   void IArmy::SetPlayerColorBgra(const std::uint32_t playerColorBgra)
   {
-    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
-    view->mVariableData.mPlayerColorBgra = playerColorBgra;
+    mVarDat.mPlayerColorBgra = playerColorBgra;
   }
 
   /**
@@ -199,8 +179,7 @@ namespace moho
    */
   void IArmy::SetArmyColorBgra(const std::uint32_t armyColorBgra)
   {
-    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
-    view->mVariableData.mArmyColorBgra = armyColorBgra;
+    mVarDat.mArmyColorBgra = armyColorBgra;
   }
 
   /**
@@ -208,8 +187,7 @@ namespace moho
    */
   void IArmy::SetFactionIndex(const std::int32_t factionIndex)
   {
-    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
-    view->mVariableData.mFaction = factionIndex;
+    mVarDat.mFaction = factionIndex;
   }
 
   /**
@@ -217,8 +195,7 @@ namespace moho
    */
   void IArmy::SetShowScoreFlag(const bool enabled)
   {
-    auto* const view = reinterpret_cast<IArmySerializedView*>(this);
-    view->mVariableData.mShowScore = enabled ? 1u : 0u;
+    mVarDat.mShowScore = enabled ? 1u : 0u;
   }
 
   /**
@@ -226,8 +203,7 @@ namespace moho
    */
   bool IArmy::IsCivilian() const
   {
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
-    return view->mConstantData.mIsCivilian != 0u;
+    return mConstDat.mIsCivilian != 0u;
   }
 
   /**
@@ -235,8 +211,7 @@ namespace moho
    */
   bool IArmy::IsOutOfGame() const
   {
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
-    return view->mVariableData.mIsOutOfGame != 0u;
+    return mVarDat.mIsOutOfGame != 0u;
   }
 
   /**
@@ -244,9 +219,8 @@ namespace moho
    */
   float IArmy::GetHandicap() const
   {
-    const auto* const view = reinterpret_cast<const IArmySerializedView*>(this);
-    if (view->mVariableData.mHandicapValue != 0.0f) {
-      return view->mVariableData.mHandicapExtra;
+    if (mVarDat.mHandicapValue != 0.0f) {
+      return mVarDat.mHandicapExtra;
     }
     return 0.0f;
   }

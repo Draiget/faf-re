@@ -303,68 +303,9 @@ namespace moho
     void SerializePlatoons(gpg::WriteArchive* archive) const;
 
   public:
-    void* N000006B2;                                     // 0x0004
-    std::int32_t ArmyId;                                 // 0x0008
-    msvc8::string ArmyName;                              // 0x000C
-    msvc8::string PlayerName;                            // 0x0028
-    std::uint8_t IsCivilian;                             // 0x0044
-    char pad_0045[3];                                    // 0x0045
-    boost::shared_ptr<CIntelGrid> VisionReconGrid;       // 0x0048
-    boost::shared_ptr<CIntelGrid> WaterReconGrid;        // 0x0050
-    boost::shared_ptr<CIntelGrid> RadarReconGrid;        // 0x0058
-    boost::shared_ptr<CIntelGrid> SonarReconGrid;        // 0x0060
-    boost::shared_ptr<CIntelGrid> OmniReconGrid;         // 0x0068
-    boost::shared_ptr<CIntelGrid> RciReconGrid;         // 0x0070
-    boost::shared_ptr<CIntelGrid> SciReconGrid;          // 0x0078
-    boost::shared_ptr<CIntelGrid> VciReconGrid;          // 0x0080
-    float EnergyCurrent;                                 // 0x0088
-    float MassCurrent;                                   // 0x008C
-    float IncomeEnergy10x;                               // 0x0090
-    float IncomeMass10x;                                 // 0x0094
-    float ReclaimedEnergy10x;                            // 0x0098
-    float ReclaimedMass10x;                              // 0x009C
-    float RequestedEnergy10x;                            // 0x00A0
-    float RequestedMass10x;                              // 0x00A4
-    float ExpenseEnergy10x;                              // 0x00A8
-    float ExpenseMass10x;                                // 0x00AC
-    std::uint32_t EnergyCapacity;                        // 0x00B0
-    char pad_00B4[4];                                    // 0x00B4
-    std::uint32_t MassCapacity;                          // 0x00B8
-    char pad_00BC[4];                                    // 0x00BC
-    std::uint8_t IsResourceSharingEnabled;               // 0x00C0
-    char pad_00C1[7];                                    // 0x00C1
-    Set Neutrals;                                        // 0x00C8
-    Set Allies;                                          // 0x00E8
-    Set Enemies;                                         // 0x0108
-    std::uint8_t IsAlly;                                 // 0x0128 (FUN_006FDEE0 / SetCanSee)
-    char pad_0129[7];                                    // 0x0129
-    Set MohoSetValidCommandSources;                      // 0x0130
-    std::uint32_t PlayerColorBgra;                       // 0x0150
-    std::uint32_t ArmyColorBgra;                         // 0x0154
-    msvc8::string ArmyTypeText;                          // 0x0158
-    std::int32_t FactionIndex;                           // 0x0174
-    std::uint8_t UseWholeMapFlag;                        // 0x0178 (FUN_006FDEC0/FUN_006FDED0)
-    char pad_0179[3];                                    // 0x0179
-    SArmyVectorWithMeta RuntimeWordVectorWithMeta;       // 0x017C (FUN_006FDE70, FUN_00700280)
-    std::uint32_t UnknownVar98;                          // 0x0190 (FUN_00700280 / mVarDat.v98)
-    std::uint8_t ShowScoreFlag;                          // 0x0194 (FUN_00700280 / mVarDat.mShowScore)
-    char pad_0195[3];                                    // 0x0195
-    // The set of blueprints this army is still allowed to build. Seeded from
-    // the rules' "ALLUNITS" category in the constructor, then narrowed by
-    // AddBuildRestriction (0x006FE1B0, reads the bitset at +0x1A0) and widened
-    // again by RemoveBuildRestriction (0x006FE220, reads the whole set at
-    // +0x198). The 0x28-byte payload runs to 0x1C0, where IsOutOfGame starts.
-    EntityCategorySet BuildCategoryFilterSet;            // 0x0198 (FUN_006FE690, FUN_00700280 / mVarDat.v101-v105)
-    std::uint8_t IsOutOfGame;                            // 0x01C0
-    char pad_01C1[3];                                    // 0x01C1
-    Wm3::Vector2f StartPosition;                         // 0x01C4
-    std::int32_t NoRushTicks;                            // 0x01CC
-    float NoRushRadius;                                  // 0x01D0
-    float NoRushOffsetX;                                 // 0x01D4
-    float NoRushOffsetY;                                 // 0x01D8
-    float HasHandicap;                                   // 0x01DC
-    float Handicap;                                      // 0x01E0
-    char pad_01E4[4];                                    // 0x01E4
+    // +0x00 vfptr (SimArmy), +0x04 alignment padding, +0x08..+0x1E8 the
+    // replicated IArmy payload (mConstDat / mVarDat, see IArmy.h). This class's
+    // own state starts here.
     Sim* Simulation;                                     // 0x01E8
     CAiBrain* AiBrain;                                   // 0x01EC
     CAiReconDBImpl* AiReconDb;                           // 0x01F0
@@ -396,24 +337,11 @@ namespace moho
     char pad_0284[4];                                    // 0x0284
   };
 
-  static_assert(offsetof(CArmyImpl, UseWholeMapFlag) == 0x178, "CArmyImpl::UseWholeMapFlag offset must be 0x178");
-  static_assert(offsetof(CArmyImpl, ArmyId) == 0x08, "CArmyImpl::ArmyId offset must be 0x08");
-  static_assert(offsetof(CArmyImpl, EnergyCurrent) == 0x88, "CArmyImpl::EnergyCurrent offset must be 0x88");
-  static_assert(offsetof(CArmyImpl, IsAlly) == 0x128, "CArmyImpl::IsAlly offset must be 0x128");
-  // GenerateArmyStart (0x006FFCB0) stores the two lanes at 0x006FFD5B /
-  // 0x006FFD61 as `fstp dword ptr [esi+1C4h]` / `[esi+1C8h]`.
-  static_assert(offsetof(CArmyImpl, StartPosition) == 0x1C4, "CArmyImpl::StartPosition offset must be 0x1C4");
-  static_assert(
-    offsetof(CArmyImpl, RuntimeWordVectorWithMeta) == 0x17C, "CArmyImpl::RuntimeWordVectorWithMeta offset must be 0x17C"
-  );
-  static_assert(offsetof(CArmyImpl, UnknownVar98) == 0x190, "CArmyImpl::UnknownVar98 offset must be 0x190");
-  static_assert(offsetof(CArmyImpl, ShowScoreFlag) == 0x194, "CArmyImpl::ShowScoreFlag offset must be 0x194");
-  static_assert(
-    offsetof(CArmyImpl, BuildCategoryFilterSet) == 0x198, "CArmyImpl::BuildCategoryFilterSet offset must be 0x198"
-  );
-  static_assert(offsetof(CArmyImpl, IsOutOfGame) == 0x1C0, "CArmyImpl::IsOutOfGame offset must be 0x1C0");
-  static_assert(offsetof(CArmyImpl, NoRushTicks) == 0x1CC, "CArmyImpl::NoRushTicks offset must be 0x1CC");
-  static_assert(offsetof(CArmyImpl, HasHandicap) == 0x1DC, "CArmyImpl::HasHandicap offset must be 0x1DC");
+  // The IArmy payload ends at +0x1E8 (vfptr + padding + 0x1E0); this pins the
+  // base at +0x08 from the derived side. GenerateArmyStart (0x006FFCB0) stores
+  // mVarDat.mArmyStart at 0x006FFD5B / 0x006FFD61 as `fstp [esi+1C4h]` /
+  // `[esi+1C8h]`: 0x08 + 0x80 + 0x13C.
+  static_assert(offsetof(CArmyImpl, Simulation) == 0x1E8, "CArmyImpl::Simulation offset must be 0x1E8");
   static_assert(offsetof(CArmyImpl, ArmyPlans) == 0x1F8, "CArmyImpl::ArmyPlans offset must be 0x1F8");
   static_assert(offsetof(CArmyImpl, InfluenceMap) == 0x218, "CArmyImpl::InfluenceMap offset must be 0x218");
   static_assert(offsetof(CArmyImpl, PathFinder) == 0x21C, "CArmyImpl::PathFinder offset must be 0x21C");

@@ -191,29 +191,29 @@ namespace
   [[nodiscard]] moho::SSTIArmyConstantData* GetArmyConstantData(moho::CArmyImpl* army)
   {
     // Evidence: FUN_00700080 passes (this + 0x08) into the constant-data copier.
-    return reinterpret_cast<moho::SSTIArmyConstantData*>(&army->ArmyId);
+    return reinterpret_cast<moho::SSTIArmyConstantData*>(&army->mConstDat.mArmyIndex);
   }
 
   [[nodiscard]] const moho::SSTIArmyConstantData* GetArmyConstantData(const moho::CArmyImpl* army)
   {
-    return reinterpret_cast<const moho::SSTIArmyConstantData*>(&army->ArmyId);
+    return reinterpret_cast<const moho::SSTIArmyConstantData*>(&army->mConstDat.mArmyIndex);
   }
 
   [[nodiscard]] moho::SSTIArmyVariableData* GetArmyVariableData(moho::CArmyImpl* army)
   {
     // Evidence: FUN_00700240 copies/exports variable data from (this + 0x88).
-    return reinterpret_cast<moho::SSTIArmyVariableData*>(&army->EnergyCurrent);
+    return reinterpret_cast<moho::SSTIArmyVariableData*>(&army->mVarDat.mEconomyTotals.mStored.ENERGY);
   }
 
   [[nodiscard]] const moho::SSTIArmyVariableData* GetArmyVariableData(const moho::CArmyImpl* army)
   {
-    return reinterpret_cast<const moho::SSTIArmyVariableData*>(&army->EnergyCurrent);
+    return reinterpret_cast<const moho::SSTIArmyVariableData*>(&army->mVarDat.mEconomyTotals.mStored.ENERGY);
   }
 
   [[nodiscard]] moho::SArmyVectorWithMeta* GetRuntimeWordVectorWithMeta(moho::CArmyImpl* army)
   {
     // Evidence: FUN_006FDE70 targets (this + 0x17C), modeled as CArmyImpl::RuntimeWordVectorWithMeta.
-    return &army->RuntimeWordVectorWithMeta;
+    return &army->mVarDat.mRuntimeWordVectorWithMeta;
   }
 
   constexpr const char* kCAiBrainTypeNames[] = {"Moho::CAiBrain", "CAiBrain"};
@@ -533,7 +533,7 @@ namespace
       return;
     }
 
-    const std::uint32_t armyIndex = static_cast<std::uint32_t>(army.ArmyId);
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(army.mConstDat.mArmyIndex);
     moho::CEntityDbAllUnitsNode* node = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex);
     const moho::CEntityDbAllUnitsNode* const endNode = army.Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
@@ -883,24 +883,24 @@ namespace
     }
 
     const moho::SEconTotals& totals = economyInfo->economy;
-    army.EnergyCurrent = totals.mStored.ENERGY;
-    army.MassCurrent = totals.mStored.MASS;
+    army.mVarDat.mEconomyTotals.mStored.ENERGY = totals.mStored.ENERGY;
+    army.mVarDat.mEconomyTotals.mStored.MASS = totals.mStored.MASS;
 
-    army.IncomeEnergy10x = totals.mIncome.ENERGY;
-    army.IncomeMass10x = totals.mIncome.MASS;
+    army.mVarDat.mEconomyTotals.mIncome.ENERGY = totals.mIncome.ENERGY;
+    army.mVarDat.mEconomyTotals.mIncome.MASS = totals.mIncome.MASS;
 
-    army.ReclaimedEnergy10x = totals.mReclaimed.ENERGY;
-    army.ReclaimedMass10x = totals.mReclaimed.MASS;
+    army.mVarDat.mEconomyTotals.mReclaimed.ENERGY = totals.mReclaimed.ENERGY;
+    army.mVarDat.mEconomyTotals.mReclaimed.MASS = totals.mReclaimed.MASS;
 
-    army.RequestedEnergy10x = totals.mLastUseRequested.ENERGY;
-    army.RequestedMass10x = totals.mLastUseRequested.MASS;
+    army.mVarDat.mEconomyTotals.mLastUseRequested.ENERGY = totals.mLastUseRequested.ENERGY;
+    army.mVarDat.mEconomyTotals.mLastUseRequested.MASS = totals.mLastUseRequested.MASS;
 
-    army.ExpenseEnergy10x = totals.mLastUseActual.ENERGY;
-    army.ExpenseMass10x = totals.mLastUseActual.MASS;
+    army.mVarDat.mEconomyTotals.mLastUseActual.ENERGY = totals.mLastUseActual.ENERGY;
+    army.mVarDat.mEconomyTotals.mLastUseActual.MASS = totals.mLastUseActual.MASS;
 
-    army.EnergyCapacity = static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY);
-    army.MassCapacity = static_cast<std::uint32_t>(totals.mMaxStorage.MASS);
-    army.IsResourceSharingEnabled = economyInfo->isResourceSharingEnabled;
+    army.mVarDat.mEconomyTotals.mMaxStorage.ENERGY = static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY);
+    army.mVarDat.mEconomyTotals.mMaxStorage.MASS = static_cast<std::uint32_t>(totals.mMaxStorage.MASS);
+    army.mVarDat.mIsResourceSharingEnabled = economyInfo->isResourceSharingEnabled;
   }
 
   [[nodiscard]] LuaPlus::LuaObject LuaField(const LuaPlus::LuaObject& table, const char* const key)
@@ -1039,10 +1039,10 @@ namespace
       return;
     }
 
-    army.NoRushTicks = ResolveNoRushTicks(noRushObject.GetString());
-    army.NoRushRadius = ReadScenarioGlobalNumber(sim, "ScenarioInfo.norushradius", 100.0f);
+    army.mVarDat.mNoRushTimer = ResolveNoRushTicks(noRushObject.GetString());
+    army.mVarDat.mNoRushRadius = ReadScenarioGlobalNumber(sim, "ScenarioInfo.norushradius", 100.0f);
 
-    const char* const armyName = army.ArmyName.data();
+    const char* const armyName = army.mConstDat.mArmyName.data();
     char offsetXPath[128] = {};
     char offsetYPath[128] = {};
     std::snprintf(offsetXPath, sizeof(offsetXPath), "ScenarioInfo.norushoffsetX_%s", armyName);
@@ -1053,13 +1053,13 @@ namespace
     const float offsetX = ReadScenarioGlobalNumber(sim, offsetXPath, 0.0f, &hasOffsetX);
     const float offsetY = ReadScenarioGlobalNumber(sim, offsetYPath, 0.0f, &hasOffsetY);
     if (!hasOffsetX || !hasOffsetY) {
-      army.NoRushOffsetX = 0.0f;
-      army.NoRushOffsetY = 0.0f;
+      army.mVarDat.mNoRushOffset.x = 0.0f;
+      army.mVarDat.mNoRushOffset.y = 0.0f;
       return;
     }
 
-    army.NoRushOffsetX = offsetX;
-    army.NoRushOffsetY = offsetY;
+    army.mVarDat.mNoRushOffset.x = offsetX;
+    army.mVarDat.mNoRushOffset.y = offsetY;
   }
 
   void ApplyPathCapacityScenarioOptions(moho::CArmyImpl& army, moho::Sim* const sim, const int mapMaxExtent)
@@ -1105,14 +1105,14 @@ namespace
     //   slot +0x24 water  -> +0x50    slot +0x34 RCI  -> +0x70
     //   slot +0x28 radar  -> +0x58    slot +0x38 SCI  -> +0x78
     //   slot +0x2C sonar  -> +0x60    slot +0x3C VCI  -> +0x80
-    AssignRetainedReconGrid(army.RadarReconGrid, reconDb->ReconGetRadarGrid());
-    AssignRetainedReconGrid(army.SonarReconGrid, reconDb->ReconGetSonarGrid());
-    AssignRetainedReconGrid(army.VisionReconGrid, reconDb->ReconGetVisionGrid());
-    AssignRetainedReconGrid(army.WaterReconGrid, reconDb->ReconGetWaterGrid());
-    AssignRetainedReconGrid(army.OmniReconGrid, reconDb->ReconGetOmniGrid());
-    AssignRetainedReconGrid(army.RciReconGrid, reconDb->ReconGetRCIGrid());
-    AssignRetainedReconGrid(army.SciReconGrid, reconDb->ReconGetSCIGrid());
-    AssignRetainedReconGrid(army.VciReconGrid, reconDb->ReconGetVCIGrid());
+    AssignRetainedReconGrid(army.mConstDat.mRadarReconGrid, reconDb->ReconGetRadarGrid());
+    AssignRetainedReconGrid(army.mConstDat.mSonarReconGrid, reconDb->ReconGetSonarGrid());
+    AssignRetainedReconGrid(army.mConstDat.mVisionReconGrid, reconDb->ReconGetVisionGrid());
+    AssignRetainedReconGrid(army.mConstDat.mWaterReconGrid, reconDb->ReconGetWaterGrid());
+    AssignRetainedReconGrid(army.mConstDat.mOmniReconGrid, reconDb->ReconGetOmniGrid());
+    AssignRetainedReconGrid(army.mConstDat.mRciReconGrid, reconDb->ReconGetRCIGrid());
+    AssignRetainedReconGrid(army.mConstDat.mSciReconGrid, reconDb->ReconGetSCIGrid());
+    AssignRetainedReconGrid(army.mConstDat.mVciReconGrid, reconDb->ReconGetVCIGrid());
   }
   /**
    * Absorbs binary helpers:
@@ -1175,13 +1175,13 @@ namespace
   void AssignAllUnitsCategoryFilter(moho::CArmyImpl& army)
   {
     if (army.Simulation == nullptr || army.Simulation->mRules == nullptr) {
-      army.BuildCategoryFilterSet.ResetToEmpty(0u);
+      army.mVarDat.mCategoryFilterSet.ResetToEmpty(0u);
       return;
     }
 
     if (const moho::CategoryWordRangeView* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
         allUnits != nullptr) {
-      army.BuildCategoryFilterSet = *allUnits;
+      army.mVarDat.mCategoryFilterSet = *allUnits;
 
     } else {
       gpg::Logf("[ALLUNITS] GetEntityCategory(\"ALLUNITS\") returned null");
@@ -1448,29 +1448,29 @@ namespace moho
 
     GenerateArmyStart();
 
-    ArmyId = armyIndex;
-    ArmyName.assign_owned(GetLuaStringField(armySetup, "ArmyName"));
-    PlayerName.assign_owned(GetLuaStringField(armySetup, "PlayerName"));
-    IsCivilian = static_cast<std::uint8_t>(GetLuaBooleanField(armySetup, "Civilian") ? 1u : 0u);
+    mConstDat.mArmyIndex = armyIndex;
+    mConstDat.mArmyName.assign_owned(GetLuaStringField(armySetup, "ArmyName"));
+    mConstDat.mPlayerName.assign_owned(GetLuaStringField(armySetup, "PlayerName"));
+    mConstDat.mIsCivilian = static_cast<std::uint8_t>(GetLuaBooleanField(armySetup, "Civilian") ? 1u : 0u);
 
     const bool isHuman = GetLuaBooleanField(armySetup, "Human");
-    ArmyTypeText.assign_owned(isHuman ? "Human" : GetLuaStringField(armySetup, "AIPersonality"));
+    mVarDat.mArmyType.assign_owned(isHuman ? "Human" : GetLuaStringField(armySetup, "AIPersonality"));
 
-    if (IsCivilian != 0u) {
+    if (mConstDat.mIsCivilian != 0u) {
       const std::uint32_t civilianColor = GetCivilianArmyColor();
-      ArmyColorBgra = civilianColor;
-      PlayerColorBgra = civilianColor;
+      mVarDat.mArmyColorBgra = civilianColor;
+      mVarDat.mPlayerColorBgra = civilianColor;
     } else {
-      ArmyColorBgra = GetArmyColor(GetLuaIntegerField(armySetup, "ArmyColor") - 1);
-      PlayerColorBgra = GetPlayerColor(GetLuaIntegerField(armySetup, "PlayerColor") - 1);
+      mVarDat.mArmyColorBgra = GetArmyColor(GetLuaIntegerField(armySetup, "ArmyColor") - 1);
+      mVarDat.mPlayerColorBgra = GetPlayerColor(GetLuaIntegerField(armySetup, "PlayerColor") - 1);
     }
 
-    FactionIndex = GetLuaIntegerField(armySetup, "Faction") - 1;
+    mVarDat.mFaction = GetLuaIntegerField(armySetup, "Faction") - 1;
     ProcessArmyEconomyTick(*this);
 
-    IsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
-    (void)AsBVIntSet(Allies).Add(static_cast<std::uint32_t>(armyIndex));
-    AsBVIntSet(MohoSetValidCommandSources) = launchInfo.mUnitSources;
+    mVarDat.mIsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
+    (void)AsBVIntSet(mVarDat.mAllies).Add(static_cast<std::uint32_t>(armyIndex));
+    AsBVIntSet(mVarDat.mValidCommandSources) = launchInfo.mUnitSources;
     AssignAllUnitsCategoryFilter(*this);
 
     const int mapMaxExtent = ResolveMapMaxExtent(sim);
@@ -1590,7 +1590,7 @@ namespace moho
    */
   bool CArmyImpl::IsHuman()
   {
-    return ArmyTypeText.equals_no_case("Human");
+    return mVarDat.mArmyType.equals_no_case("Human");
   }
 
   /**
@@ -1598,7 +1598,7 @@ namespace moho
    */
   const char* CArmyImpl::GetArmyType()
   {
-    return ArmyTypeText.raw_data_unsafe();
+    return mVarDat.mArmyType.raw_data_unsafe();
   }
 
   /**
@@ -1848,8 +1848,8 @@ namespace moho
   void CArmyImpl::GenerateArmyStart()
   {
     if (!Simulation || !Simulation->mRngState) {
-      StartPosition.x = 0.0f;
-      StartPosition.y = 0.0f;
+      mVarDat.mArmyStart.x = 0.0f;
+      mVarDat.mArmyStart.y = 0.0f;
       return;
     }
 
@@ -1880,8 +1880,8 @@ namespace moho
     const float rx = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
     const float ry = (CMersenneTwister::ToUnitFloat(rng.NextUInt32()) * kStartFractionSpan) + kStartFractionMargin;
 
-    StartPosition.x = (width > 0) ? static_cast<float>(width - 1) * rx : 0.0f;
-    StartPosition.y = (height > 0) ? static_cast<float>(height - 1) * ry : 0.0f;
+    mVarDat.mArmyStart.x = (width > 0) ? static_cast<float>(width - 1) * rx : 0.0f;
+    mVarDat.mArmyStart.y = (height > 0) ? static_cast<float>(height - 1) * ry : 0.0f;
   }
 
   /**
@@ -1889,7 +1889,7 @@ namespace moho
    */
   void CArmyImpl::SetArmyStart(const Wm3::Vector2f& startPosition)
   {
-    StartPosition = startPosition;
+    mVarDat.mArmyStart = startPosition;
   }
 
   /**
@@ -1897,7 +1897,7 @@ namespace moho
    */
   void CArmyImpl::GetArmyStartPos(Wm3::Vector2f& outStartPosition)
   {
-    outStartPosition = StartPosition;
+    outStartPosition = mVarDat.mArmyStart;
   }
 
   /**
@@ -1905,7 +1905,7 @@ namespace moho
    */
   void CArmyImpl::SetAlliance(const std::uint32_t armyId, const int relationIndex)
   {
-    Set* relationSets[3] = {&Neutrals, &Allies, &Enemies};
+    Set* relationSets[3] = {&mVarDat.mNeutrals, &mVarDat.mAllies, &mVarDat.mEnemies};
 
     for (int i = 0; i < 3; ++i) {
       Set& relation = *relationSets[i];
@@ -1924,7 +1924,7 @@ namespace moho
     // CEntityDb::mAllUnits and relinks every unit whose ArmyRef == this at the
     // front of Sim::mCoordEntities; the army-keyed range yields exactly those
     // units in the same order.
-    const std::uint32_t armyIndex = static_cast<std::uint32_t>(ArmyId);
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(mConstDat.mArmyIndex);
     CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
     const CEntityDbAllUnitsNode* const endNode = Simulation->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
@@ -1946,11 +1946,11 @@ namespace moho
   void CArmyImpl::SetCanSee(const std::int32_t focusArmyIndex)
   {
     if (focusArmyIndex < 0) {
-      IsAlly = 1u;
+      mVarDat.mIsAlly = 1u;
       return;
     }
 
-    IsAlly = AsBVIntSet(Allies).Contains(static_cast<std::uint32_t>(focusArmyIndex)) ? 1u : 0u;
+    mVarDat.mIsAlly = AsBVIntSet(mVarDat.mAllies).Contains(static_cast<std::uint32_t>(focusArmyIndex)) ? 1u : 0u;
   }
 
   /**
@@ -1962,7 +1962,7 @@ namespace moho
    */
   void CArmyImpl::RenderDebugPlayableRect()
   {
-    if (Simulation == nullptr || UseWholeMapFlag != 0u) {
+    if (Simulation == nullptr || mVarDat.mUseWholeMap != 0u) {
       return;
     }
 
@@ -1971,7 +1971,7 @@ namespace moho
       return;
     }
 
-    if (Simulation->mSyncFilter.focusArmy != ArmyId) {
+    if (Simulation->mSyncFilter.focusArmy != mConstDat.mArmyIndex) {
       return;
     }
 
@@ -2052,8 +2052,8 @@ namespace moho
       Stats->mItem->ClearChildren(1);
     }
 
-    if (NoRushTicks > 0) {
-      --NoRushTicks;
+    if (mVarDat.mNoRushTimer > 0) {
+      --mVarDat.mNoRushTimer;
     }
 
     if (Simulation != nullptr) {
@@ -2078,7 +2078,7 @@ namespace moho
 
     if (
       Simulation != nullptr
-      && static_cast<std::uint32_t>(ArmyId) == (Simulation->mCurTick % 30u)
+      && static_cast<std::uint32_t>(mConstDat.mArmyIndex) == (Simulation->mCurTick % 30u)
       && InfluenceMap != nullptr
     ) {
       InfluenceMap->Update();
@@ -2289,8 +2289,8 @@ namespace moho
    */
   void CArmyImpl::OnCommandSourceTerminated(const std::uint32_t sourceId)
   {
-    MohoSetValidCommandSources.Remove(sourceId);
-    if (MohoSetValidCommandSources.items_begin == MohoSetValidCommandSources.items_end && AiBrain != nullptr) {
+    mVarDat.mValidCommandSources.Remove(sourceId);
+    if (mVarDat.mValidCommandSources.items_begin == mVarDat.mValidCommandSources.items_end && AiBrain != nullptr) {
       reinterpret_cast<CScriptObject*>(AiBrain)->CallbackStr("AbandonedByPlayer");
     }
   }
@@ -2319,19 +2319,19 @@ namespace moho
   {
     if (EconomyInfo != nullptr) {
       const SEconTotals& econ = EconomyInfo->economy;
-      EnergyCurrent = econ.mStored.ENERGY;
-      MassCurrent = econ.mStored.MASS;
-      IncomeEnergy10x = econ.mIncome.ENERGY;
-      IncomeMass10x = econ.mIncome.MASS;
-      ReclaimedEnergy10x = econ.mReclaimed.ENERGY;
-      ReclaimedMass10x = econ.mReclaimed.MASS;
-      RequestedEnergy10x = econ.mLastUseRequested.ENERGY;
-      RequestedMass10x = econ.mLastUseRequested.MASS;
-      ExpenseEnergy10x = econ.mLastUseActual.ENERGY;
-      ExpenseMass10x = econ.mLastUseActual.MASS;
-      EnergyCapacity = static_cast<std::uint32_t>(econ.mMaxStorage.ENERGY);
-      MassCapacity = static_cast<std::uint32_t>(econ.mMaxStorage.MASS);
-      IsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
+      mVarDat.mEconomyTotals.mStored.ENERGY = econ.mStored.ENERGY;
+      mVarDat.mEconomyTotals.mStored.MASS = econ.mStored.MASS;
+      mVarDat.mEconomyTotals.mIncome.ENERGY = econ.mIncome.ENERGY;
+      mVarDat.mEconomyTotals.mIncome.MASS = econ.mIncome.MASS;
+      mVarDat.mEconomyTotals.mReclaimed.ENERGY = econ.mReclaimed.ENERGY;
+      mVarDat.mEconomyTotals.mReclaimed.MASS = econ.mReclaimed.MASS;
+      mVarDat.mEconomyTotals.mLastUseRequested.ENERGY = econ.mLastUseRequested.ENERGY;
+      mVarDat.mEconomyTotals.mLastUseRequested.MASS = econ.mLastUseRequested.MASS;
+      mVarDat.mEconomyTotals.mLastUseActual.ENERGY = econ.mLastUseActual.ENERGY;
+      mVarDat.mEconomyTotals.mLastUseActual.MASS = econ.mLastUseActual.MASS;
+      mVarDat.mEconomyTotals.mMaxStorage.ENERGY = static_cast<std::uint32_t>(econ.mMaxStorage.ENERGY);
+      mVarDat.mEconomyTotals.mMaxStorage.MASS = static_cast<std::uint32_t>(econ.mMaxStorage.MASS);
+      mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
     }
 
     if (outBuffer == nullptr) {
@@ -2360,7 +2360,7 @@ namespace moho
       return 0.0f;
     }
 
-    const std::uint32_t armyIndex = static_cast<std::uint32_t>(ArmyId);
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(mConstDat.mArmyIndex);
 
     float currentCap = 0.0f;
     CEntityDbAllUnitsNode* node = Simulation->mEntityDB->AllUnitsEnd(armyIndex);
@@ -2666,19 +2666,19 @@ namespace moho
     // block, which is a no-op on the empty input this is always given.
     *outArmyList = msvc8::vector<CArmyImpl*>{};
 
-    if (Allies.items_begin == nullptr || Allies.items_end == nullptr) {
+    if (mVarDat.mAllies.items_begin == nullptr || mVarDat.mAllies.items_end == nullptr) {
       return outArmyList;
     }
 
-    const std::uint32_t wordCount = static_cast<std::uint32_t>(Allies.items_end - Allies.items_begin);
+    const std::uint32_t wordCount = static_cast<std::uint32_t>(mVarDat.mAllies.items_end - mVarDat.mAllies.items_begin);
     for (std::uint32_t wordOffset = 0; wordOffset < wordCount; ++wordOffset) {
       // moho::Set is a packed bitset of army IDs in 32-bit words.
-      const std::int32_t absoluteWord = Allies.baseWordIndex + static_cast<std::int32_t>(wordOffset);
+      const std::int32_t absoluteWord = mVarDat.mAllies.baseWordIndex + static_cast<std::int32_t>(wordOffset);
       if (absoluteWord < 0) {
         continue;
       }
 
-      std::uint32_t bits = Allies.items_begin[wordOffset];
+      std::uint32_t bits = mVarDat.mAllies.items_begin[wordOffset];
       for (std::uint32_t bit = 0; bit < 32; ++bit) {
         const std::uint32_t mask = (1u << bit);
         if ((bits & mask) == 0u) {
@@ -2689,7 +2689,7 @@ namespace moho
 
         // Army ID = (word index * 32) + bit position.
         const std::uint32_t armyIndex = (static_cast<std::uint32_t>(absoluteWord) << 5u) + bit;
-        if (armyIndex == static_cast<std::uint32_t>(ArmyId)) {
+        if (armyIndex == static_cast<std::uint32_t>(mConstDat.mArmyIndex)) {
           continue;
         }
 
@@ -2745,7 +2745,7 @@ namespace moho
    */
   void CArmyImpl::SetIgnorePlayableRect(const bool ignorePlayableRect)
   {
-    UseWholeMapFlag = static_cast<std::uint8_t>(ignorePlayableRect);
+    mVarDat.mUseWholeMap = static_cast<std::uint8_t>(ignorePlayableRect);
   }
 
   /**
@@ -2753,7 +2753,7 @@ namespace moho
    */
   bool CArmyImpl::UseWholeMap()
   {
-    return UseWholeMapFlag != 0;
+    return mVarDat.mUseWholeMap != 0;
   }
 
   /**
@@ -2770,7 +2770,7 @@ namespace moho
     }
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
-    CategoryWordRangeAsBitset(BuildCategoryFilterSet).RemoveAllFrom(&categorySet->Bits());
+    CategoryWordRangeAsBitset(mVarDat.mCategoryFilterSet).RemoveAllFrom(&categorySet->Bits());
     MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 
@@ -2788,7 +2788,7 @@ namespace moho
     }
 
     auto* const categorySet = static_cast<const EntityCategorySet*>(restriction);
-    (void)EntityCategory::Add(&BuildCategoryFilterSet, categorySet);
+    (void)EntityCategory::Add(&mVarDat.mCategoryFilterSet, categorySet);
     MarkAllArmyUnitsNeedSyncGameData(*this);
   }
 
@@ -2797,7 +2797,7 @@ namespace moho
    */
   void CArmyImpl::SetNoRushTimer(const float seconds)
   {
-    NoRushTicks = static_cast<std::int32_t>(seconds * 600.0f);
+    mVarDat.mNoRushTimer = static_cast<std::int32_t>(seconds * 600.0f);
   }
 
   /**
@@ -2805,7 +2805,7 @@ namespace moho
    */
   void CArmyImpl::SetNoRushRadius(const float radius)
   {
-    NoRushRadius = radius;
+    mVarDat.mNoRushRadius = radius;
   }
 
   /**
@@ -2813,8 +2813,8 @@ namespace moho
    */
   void CArmyImpl::SetNoRushOffset(const float offsetX, const float offsetY)
   {
-    NoRushOffsetX = offsetX;
-    NoRushOffsetY = offsetY;
+    mVarDat.mNoRushOffset.x = offsetX;
+    mVarDat.mNoRushOffset.y = offsetY;
   }
 
   /**

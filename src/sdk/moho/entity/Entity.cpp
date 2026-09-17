@@ -660,7 +660,7 @@ namespace
     if (entity == nullptr || entity->ArmyRef == nullptr) {
       return -1;
     }
-    return entity->ArmyRef->ArmyId + 1;
+    return entity->ArmyRef->mConstDat.mArmyIndex + 1;
   }
 
   [[nodiscard]] const char* ResolveEntityBlueprintId(const Entity* const entity) noexcept
@@ -3475,7 +3475,7 @@ namespace moho
    */
   int Entity::GetArmyIndex() const
   {
-    return (ArmyRef != nullptr) ? ArmyRef->ArmyId : -1;
+    return (ArmyRef != nullptr) ? ArmyRef->mConstDat.mArmyIndex : -1;
   }
 
   /**
@@ -5635,7 +5635,7 @@ namespace moho
         } else {
           const LuaPlus::LuaObject ownerLuaObject(ownerObject);
           Entity* const owner = SCR_FromLua_EntityOpt(ownerLuaObject);
-          armyIndex = (owner != nullptr) ? owner->ArmyRef->ArmyId : 255;
+          armyIndex = (owner != nullptr) ? owner->ArmyRef->mConstDat.mArmyIndex : 255;
         }
       } else if (lua_type(rawState, armyObject.m_stackIndex) != LUA_TNIL) {
         armyIndex = armyObject.GetInteger() - 1;
@@ -5902,7 +5902,7 @@ namespace moho
 
     int armyIndex = -1;
     if (entity != nullptr && entity->ArmyRef != nullptr) {
-      armyIndex = entity->ArmyRef->ArmyId;
+      armyIndex = entity->ArmyRef->mConstDat.mArmyIndex;
     }
     if (armyIndex != -1) {
       ++armyIndex;

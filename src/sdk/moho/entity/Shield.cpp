@@ -409,7 +409,7 @@ namespace moho
         const LuaPlus::LuaObject ownerObject(LuaPlus::LuaStackObject(state, ownerStackIndex));
         Entity* const ownerEntity = SCR_FromLua_EntityOpt(ownerObject);
         if (ownerEntity != nullptr && ownerEntity->ArmyRef != nullptr) {
-          armySourceIndex = static_cast<std::uint32_t>(ownerEntity->ArmyRef->ArmyId) & 0xFFu;
+          armySourceIndex = static_cast<std::uint32_t>(ownerEntity->ArmyRef->mConstDat.mArmyIndex) & 0xFFu;
         }
       }
     }

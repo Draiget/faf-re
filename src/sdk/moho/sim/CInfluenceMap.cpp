@@ -319,11 +319,11 @@ namespace
       return true;
     }
 
-    if (source->ArmyId < 0) {
+    if (source->mConstDat.mArmyIndex < 0) {
       return false;
     }
 
-    return owner->Allies.Contains(static_cast<std::uint32_t>(source->ArmyId));
+    return owner->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(source->mConstDat.mArmyIndex));
   }
 
   struct InfluenceMapMd5UpdateOwnerRuntime
@@ -3248,7 +3248,7 @@ namespace moho
             if (ReconBlip* const blip = entity->IsReconBlip()) {
               entry.sourceLayer = static_cast<std::int32_t>(entity->mCurrentLayer);
 
-              const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->ArmyId : -1;
+              const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->mConstDat.mArmyIndex : -1;
               if (sourceArmyIndex >= 0) {
                 const SPerArmyReconInfo* const sourceArmyRecon = blip->GetPerArmyReconInfo(sourceArmyIndex);
                 if (sourceArmyRecon) {
@@ -3264,7 +3264,7 @@ namespace moho
           }
         }
 
-        const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->ArmyId : -1;
+        const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->mConstDat.mArmyIndex : -1;
         if (
           sourceArmyIndex >= 0 && static_cast<std::size_t>(sourceArmyIndex) < cell->threats.size()
           && entry.sourceBlueprint != nullptr

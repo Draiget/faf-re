@@ -601,8 +601,8 @@ namespace moho
       const float armoredAmount = targetUnit->ProcessArmorOnDamage(damage.mAmount, damage.mType);
       CArmyImpl* const targetArmy = targetUnit->ArmyRef;
       float handicap = 0.0f;
-      if (targetArmy != nullptr && targetArmy->HasHandicap != 0.0f) {
-        handicap = targetArmy->Handicap;
+      if (targetArmy != nullptr && targetArmy->mVarDat.mHandicapValue != 0.0f) {
+        handicap = targetArmy->mVarDat.mHandicapExtra;
       }
       postArmorAmount = armoredAmount / (handicap + 1.0f);
       const float relativeDamage = postArmorAmount / damage.mAmount;
@@ -611,7 +611,7 @@ namespace moho
         if (Entity* const scriptInstigator = damage.mInstigator.GetObjectPtr();
             scriptInstigator != nullptr && scriptInstigator->ArmyRef != nullptr)
         {
-          const int instigatorArmyIndex = scriptInstigator->ArmyRef->ArmyId + 1;
+          const int instigatorArmyIndex = scriptInstigator->ArmyRef->mConstDat.mArmyIndex + 1;
           targetUnit->RunScriptInt("OnDamageBy", instigatorArmyIndex);
         }
       }
@@ -723,7 +723,7 @@ namespace moho
     if (army == nullptr || armyIndex == 0xFFFFFFFFu) {
       return false;
     }
-    const Set& allies = army->Allies;
+    const Set& allies = army->mVarDat.mAllies;
     if (allies.items_begin == nullptr || allies.items_end == nullptr) {
       return false;
     }
@@ -778,7 +778,7 @@ namespace moho
           if (shieldArmy != nullptr) {
             CArmyImpl* const instigatorArmy = instigator->ArmyRef;
             const std::uint32_t instigatorIndex =
-              instigatorArmy != nullptr ? static_cast<std::uint32_t>(instigatorArmy->ArmyId) : 0xFFFFFFFFu;
+              instigatorArmy != nullptr ? static_cast<std::uint32_t>(instigatorArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
             if (ArmyIsAlly(shieldArmy, instigatorIndex)) {
               continue;
             }
@@ -946,7 +946,7 @@ namespace moho
         if (instigatorArmy != nullptr) {
           CArmyImpl* const targetArmy = target->ArmyRef;
           const std::uint32_t targetIndex =
-            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->ArmyId) : 0xFFFFFFFFu;
+            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
           if (ArmyIsAlly(instigatorArmy, targetIndex)) {
             continue;
           }
@@ -1012,7 +1012,7 @@ namespace moho
         if (instigatorArmy != nullptr) {
           CArmyImpl* const targetArmy = target->ArmyRef;
           const std::uint32_t targetIndex =
-            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->ArmyId) : 0xFFFFFFFFu;
+            targetArmy != nullptr ? static_cast<std::uint32_t>(targetArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
           if (ArmyIsAlly(instigatorArmy, targetIndex)) {
             continue;
           }

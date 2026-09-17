@@ -194,11 +194,11 @@ namespace
       return true;
     }
 
-    if (owner->ArmyId < 0) {
+    if (owner->mConstDat.mArmyIndex < 0) {
       return false;
     }
 
-    return viewer->Allies.Contains(static_cast<std::uint32_t>(owner->ArmyId));
+    return viewer->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(owner->mConstDat.mArmyIndex));
   }
 
   [[nodiscard]] Unit* DecodeBlipSourceUnit(ReconBlip* const blip) noexcept
@@ -258,7 +258,7 @@ namespace
       return false;
     }
 
-    const std::int32_t viewerArmyId = owner->mArmy->ArmyId;
+    const std::int32_t viewerArmyId = owner->mArmy->mConstDat.mArmyIndex;
     if (viewerArmyId == -1) {
       return false;
     }
@@ -268,7 +268,7 @@ namespace
       return false;
     }
 
-    return blipArmy->Allies.Contains(static_cast<std::uint32_t>(viewerArmyId));
+    return blipArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(viewerArmyId));
   }
 
   [[nodiscard]] Wm3::Vec3f BlipProbePosition(ReconBlip* const blip) noexcept
@@ -373,7 +373,7 @@ namespace
       return;
     }
 
-    const std::int32_t armyIndex = owner->mArmy->ArmyId;
+    const std::int32_t armyIndex = owner->mArmy->mConstDat.mArmyIndex;
     PerArmyReconView* const recon = GetPerArmyReconSlot(blip, armyIndex);
     if (!recon) {
       return;
@@ -602,7 +602,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
   // 0x005C0C40 opens on the Logf and goes straight into the orphan loop at
   // 0x005C0CA5. There is no map re-seed here; seeding belongs to the two entry
   // points that can be reached with an empty map, not to the per-tick path.
-  mSim->Logf("ReconTick for army %d: %s [%s]\n", mArmy->ArmyId, mArmy->PlayerName.raw_data_unsafe(), mArmy->ArmyName.raw_data_unsafe());
+  mSim->Logf("ReconTick for army %d: %s [%s]\n", mArmy->mConstDat.mArmyIndex, mArmy->mConstDat.mPlayerName.raw_data_unsafe(), mArmy->mConstDat.mArmyName.raw_data_unsafe());
 
   for (auto it = mTempBlips.begin(); it != mTempBlips.end();) {
     ReconBlip* const blip = *it;
@@ -685,7 +685,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
           ClearPerArmyRecon(this, blip, true);
           blip->DestroyIfUnused();  // 0x005C0FBA
         } else {
-          PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->ArmyId);
+          PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
           if (recon) {
             recon->mReconFlags |= static_cast<std::uint32_t>(RECON_MaybeDead);
           }
@@ -734,7 +734,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
       if (rangeBegin != rangeEnd) {
         bool keepStaticLosBlip = false;
-        PerArmyReconView* const recon = GetPerArmyReconSlot(rangeBegin->second, mArmy->ArmyId);
+        PerArmyReconView* const recon = GetPerArmyReconSlot(rangeBegin->second, mArmy->mConstDat.mArmyIndex);
         if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_LOSEver)) != 0u && !unit->IsMobile()) {
           keepStaticLosBlip = true;
         }
@@ -882,7 +882,7 @@ ReconBlip* CAiReconDBImpl::FindOrCreateBlip(const SNewBlip& candidate)
     return nullptr;
   }
 
-  const std::int32_t armyIndex = mArmy->ArmyId;
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
   if (armyIndex < 0) {
     return nullptr;
   }
@@ -925,7 +925,7 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     return;
   }
 
-  const std::int32_t armyIndex = mArmy->ArmyId;
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
   if (armyIndex < 0) {
     return;
   }
@@ -985,7 +985,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
     return;
   }
 
-  const std::int32_t armyIndex = mArmy->ArmyId;
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
   PerArmyReconView* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
   if (!perArmy) {
     return;
@@ -1141,7 +1141,7 @@ void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
     return;
   }
 
-  const std::int32_t armyIndex = mArmy->ArmyId;
+  const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
   PerArmyReconView* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
   if (!perArmy) {
     return;
@@ -1315,12 +1315,12 @@ EReconFlags CAiReconDBImpl::GetReconFlags(
 {
   EReconFlags combined = GetNewReconFor(entity, pos, oldFlags, belowWater);
 
-  if (mSim && mArmy && mArmy->ArmyId >= 0) {
-    const std::uint32_t viewerArmyId = static_cast<std::uint32_t>(mArmy->ArmyId);
+  if (mSim && mArmy && mArmy->mConstDat.mArmyIndex >= 0) {
+    const std::uint32_t viewerArmyId = static_cast<std::uint32_t>(mArmy->mConstDat.mArmyIndex);
     const std::size_t armyCount = mSim->mArmiesList.size();
     for (std::size_t i = 0; i < armyCount; ++i) {
       CArmyImpl* const allyArmy = mSim->mArmiesList[i];
-      if (!allyArmy || !allyArmy->Allies.Contains(viewerArmyId)) {
+      if (!allyArmy || !allyArmy->mVarDat.mAllies.Contains(viewerArmyId)) {
         continue;
       }
 
@@ -1362,12 +1362,12 @@ EReconFlags CAiReconDBImpl::GetReconFlagsForRect(
 {
   EReconFlags combined = GetDetection(rect, oldFlags, isUnderwater);
 
-  if (mSim && mArmy && mArmy->ArmyId >= 0) {
-    const std::uint32_t viewerArmyId = static_cast<std::uint32_t>(mArmy->ArmyId);
+  if (mSim && mArmy && mArmy->mConstDat.mArmyIndex >= 0) {
+    const std::uint32_t viewerArmyId = static_cast<std::uint32_t>(mArmy->mConstDat.mArmyIndex);
     const std::size_t armyCount = mSim->mArmiesList.size();
     for (std::size_t i = 0; i < armyCount; ++i) {
       CArmyImpl* const allyArmy = mSim->mArmiesList[i];
-      if (!allyArmy || !allyArmy->Allies.Contains(viewerArmyId)) {
+      if (!allyArmy || !allyArmy->mVarDat.mAllies.Contains(viewerArmyId)) {
         continue;
       }
 
@@ -1814,7 +1814,7 @@ EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
       continue;
     }
 
-    PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->ArmyId);
+    PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
     if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_KnownFake)) == 0u) {
       out.Add(reinterpret_cast<Entity*>(blip));
     }

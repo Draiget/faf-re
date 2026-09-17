@@ -11674,7 +11674,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
 
   // 7) Allied-upgrade notification: record (from,to) ids in the Sim sync lane.
   Sim* const globalUserdata = lua_getglobaluserdata_typed(rawState);
-  if (dest->ArmyRef->IsAlly != 0 && globalUserdata != nullptr) {
+  if (dest->ArmyRef->mVarDat.mIsAlly != 0 && globalUserdata != nullptr) {
     const SUpgradeNotifyPair pair{
       static_cast<std::int32_t>(source->GetEntityId()),
       static_cast<std::int32_t>(dest->GetEntityId())
@@ -13334,7 +13334,7 @@ Unit::Unit(const SUnitConstructionParams& params)
       const_cast<REntityBlueprint*>(static_cast<const REntityBlueprint*>(params.mBlueprint)),
       params.mArmy->GetSim(),
       static_cast<EntId>(params.mArmy->GetSim()->mEntityDB->DoReserveId(
-        static_cast<std::uint32_t>(params.mArmy->ArmyId) << 20
+        static_cast<std::uint32_t>(params.mArmy->mConstDat.mArmyIndex) << 20
       )),
       ENTITYTYPE_Unit
     )
@@ -14600,7 +14600,7 @@ void Unit::UpdateVisibility()
 {
   Entity::UpdateVisibility();
   const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
-  mVisibilityState = static_cast<std::uint8_t>(focusArmy == -1 || focusArmy == ArmyRef->ArmyId);
+  mVisibilityState = static_cast<std::uint8_t>(focusArmy == -1 || focusArmy == ArmyRef->mConstDat.mArmyIndex);
 }
 
 /**
@@ -15292,13 +15292,13 @@ void Unit::UpdateBlipsInRange()
   // No-rush centre = army start position + configured no-rush offset; used to
   // reject blips outside the no-rush radius while the no-rush timer is active.
   CArmyImpl* const army = ArmyRef;
-  const float noRushOffsetX = army->NoRushOffsetX;
-  const float noRushOffsetY = army->NoRushOffsetY;
+  const float noRushOffsetX = army->mVarDat.mNoRushOffset.x;
+  const float noRushOffsetY = army->mVarDat.mNoRushOffset.y;
   Wm3::Vector2f armyStartPosition{};
   army->GetArmyStartPos(armyStartPosition);
   const float noRushCenterX = armyStartPosition.x + noRushOffsetX;
   const float noRushCenterZ = armyStartPosition.y + noRushOffsetY;
-  const float noRushRadius = army->NoRushRadius;
+  const float noRushRadius = army->mVarDat.mNoRushRadius;
 
   // Gather every unit within the scan radius of this unit's position.
   CollisionResultFastVectorN10 unitsInRange{};
@@ -15326,11 +15326,11 @@ void Unit::UpdateBlipsInRange()
 
     CArmyImpl* const candidateArmy = candidate->ArmyRef;
     const std::uint32_t candidateArmyIndex =
-      (candidateArmy != nullptr) ? static_cast<std::uint32_t>(candidateArmy->ArmyId) : 0xFFFFFFFFu;
+      (candidateArmy != nullptr) ? static_cast<std::uint32_t>(candidateArmy->mConstDat.mArmyIndex) : 0xFFFFFFFFu;
     // IArmy::IsAlly (FUN_005BD630) is shadowed on CArmyImpl by the same-named
     // cached byte field (+0x128); its body is the allies bit-set membership
     // test, replicated here via the shared `Set::Contains` helper.
-    if (army->Allies.Contains(candidateArmyIndex)) {
+    if (army->mVarDat.mAllies.Contains(candidateArmyIndex)) {
       continue;
     }
 
@@ -15340,7 +15340,7 @@ void Unit::UpdateBlipsInRange()
       continue;
     }
 
-    if (army->NoRushTicks > 0) {
+    if (army->mVarDat.mNoRushTimer > 0) {
       const float deltaX = noRushCenterX - candidate->Position.x;
       const float deltaZ = noRushCenterZ - candidate->Position.z;
       const float distance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
@@ -16696,7 +16696,7 @@ void Unit::Kill(Entity* const instigator, const gpg::StrArg reason, float excess
 
   CArmyImpl* const instigatorArmy = (instigator != nullptr) ? instigator->ArmyRef : nullptr;
   if (instigatorArmy == nullptr || ArmyRef == nullptr ||
-      !ArmyRef->IsEnemy(static_cast<std::uint32_t>(instigatorArmy->ArmyId))) {
+      !ArmyRef->IsEnemy(static_cast<std::uint32_t>(instigatorArmy->mConstDat.mArmyIndex))) {
     return;
   }
 

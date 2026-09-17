@@ -38,6 +38,7 @@ namespace moho
   class CSquad;
   class Entity;
   class IArmy;
+  class SimArmy;
   class Sim;
   class Unit;
   enum class ESquadClass : std::int32_t;
@@ -422,7 +423,7 @@ namespace moho
      * What it does:
      * Returns this platoon's owning army lane.
      */
-    [[nodiscard]] IArmy* GetArmy() const;
+    [[nodiscard]] SimArmy* GetArmy() const;
 
     /**
      * Address: 0x0072B7A0 (FUN_0072B7A0, Moho::CPlatoon::GetLifetimeStat1)
@@ -535,7 +536,7 @@ namespace moho
 
   public:
     Sim* mSim;                                  // +0x34
-    IArmy* mArmy;                               // +0x38
+    SimArmy* mArmy;                             // +0x38
     std::uint32_t mUnknown_0x03C;               // +0x3C
     gpg::fastvector_n<CSquad*, 8> mSquadList;   // +0x40
     msvc8::string mName;                        // +0x70
