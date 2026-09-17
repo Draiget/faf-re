@@ -4049,6 +4049,9 @@ public:
   virtual void EndDrawing() {} // slot 5 (+0x14)
   virtual void DrawObject() {} // slot 6 (+0x18)
   virtual void DrawLabel() {} // slot 7 (+0x1C)
+  // Real override is `wxDC::Clear` (this base stays the shape-only no-op
+  // interface, matching `DoDrawText`/`DoCrossHair`/`DoGetSizeMM`/
+  // `DoDrawPolygon` above).
   virtual void Clear() {} // slot 8 (+0x20)
   virtual void StartDoc() {} // slot 9 (+0x24)
   virtual void EndDoc() {} // slot 10 (+0x28)
@@ -4108,7 +4111,17 @@ public:
   // correctly; body intentionally left a no-op pending that evidence.
   virtual void CalcBoundingBox(std::int32_t x, std::int32_t y) { (void)x; (void)y; } // slot 41 (+0xA4)
   virtual void DoFloodFill() {} // slot 42 (+0xA8)
-  virtual void DoGetPixel() {} // slot 43 (+0xAC)
+  // Real wx: `virtual bool DoGetPixel(wxCoord x, wxCoord y, wxColour *col)
+  // const` (dc.h). Real override is `wxDC::DoGetPixel` (this base stays the
+  // shape-only no-op interface, matching `DoDrawText`/`DoCrossHair`/
+  // `DoGetSizeMM`/`DoDrawPolygon`/`Clear` above).
+  virtual bool DoGetPixel(std::int32_t x, std::int32_t y, wxColourRuntimeObject* col) const noexcept
+  {
+    (void)x;
+    (void)y;
+    (void)col;
+    return false;
+  } // slot 43 (+0xAC)
   virtual void DoDrawPoint() {} // slot 44 (+0xB0)
   // Real wx: `virtual void DoDrawLine(wxCoord x1, wxCoord y1, wxCoord x2,
   // wxCoord y2)` (dc.h). Both dispatches in `wxDCBase::DoDrawCheckMark`
@@ -4126,6 +4139,7 @@ public:
     (void)y2;
   } // slot 45 (+0xB4)
   virtual void DoDrawArc() {} // slot 46 (+0xB8)
+
   /**
    * Address: 0x009CFB20 (FUN_009CFB20)
    * Mangled: ?DoDrawCheckMark@wxDCBase@@MAEXHHHH@Z
@@ -4475,6 +4489,39 @@ public:
    * line for line.
    */
   void DoCrossHair(std::int32_t x, std::int32_t y) override;
+
+  /**
+   * Address: 0x009C8CA0 (FUN_009C8CA0)
+   *
+   * IDA signature:
+   * char __thiscall wxDC::DoGetPixel(HDC *this, int x, int y, wxColour *col);
+   *
+   * What it does:
+   * Reads the device pixel at `(x, y)` and stores it into `*col` via
+   * `wxColour::Set`, returning `false` without touching `*col` when `col` is
+   * null - matching `wxDC::DoGetPixel`
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:508-522), except this build's
+   * `XLOG2DEV`/`YLOG2DEV` macros are plain identity passthroughs
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:97-98: `#define XLOG2DEV(x)
+   * (x)`), so no logical-to-device transform is applied - confirmed against
+   * the raw disassembly, which reads `GetPixel(hdc, x, y)` directly.
+   */
+  bool DoGetPixel(std::int32_t x, std::int32_t y, wxColourRuntimeObject* col) const noexcept override;
+
+  /**
+   * Address: 0x009CA650 (FUN_009CA650)
+   *
+   * IDA signature:
+   * int __thiscall wxDC::Clear(wxDC *this);
+   *
+   * What it does:
+   * Fills the context's drawable extent (the canvas's client rect when one
+   * is attached, otherwise the selected bitmap's own extent) with the
+   * current background colour, then reinstates the MM_ANISOTROPIC mapping
+   * mode and its viewport/window extents and origins - matching `wxDC::Clear`
+   * (dependencies/wxWindows-2.4.2/src/msw/dc.cpp:435-474) line for line.
+   */
+  void Clear() override;
 
   /**
    * Address: 0x009CAC10 (FUN_009CAC10)
