@@ -846,7 +846,17 @@ IAiCommandDispatchImpl::IAiCommandDispatchImpl(Unit* const unit)
   , mCommandQueue(unit ? unit->CommandQueue : nullptr)
 {
   if (mSim != nullptr) {
-    (void)CTask::CreateTaskThread(static_cast<CTask*>(this), &mSim->mTaskStageA, false);
+    // 0x00598D70 `mov edi,[esi+20h]` / 0x00598D75 `add edi, 958h`: the command
+    // thread lives on the sim's +0x958 stage (mTaskStageB), which AdvanceBeat
+    // ticks BEFORE mTaskStageA (+0x930), where every entity's MotionTick runs.
+    // That ordering is load-bearing. A command task that sets a navigator goal
+    // (e.g. an unload's NewMoveTask) has to be followed by a motion tick in the
+    // same beat, so the next navigator pass -- army OnTick, ahead of all sim
+    // stages -- sees the unit already leaving (UMVE_Up, LAYER_Air). On stage A
+    // the goal was set after that beat's motion tick, the navigator read the
+    // stale landed-hover state, AtTarget() reported arrival from any distance,
+    // and a freshly loaded transport dropped its cargo where it stood.
+    (void)CTask::CreateTaskThread(static_cast<CTask*>(this), &mSim->mTaskStageB, false);
   }
 
   if (mCommandQueue != nullptr) {
