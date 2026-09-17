@@ -225,13 +225,22 @@ public:
   // Not itself tied to one decompiled address - this is the ordinary
   // from-components constructor (real wx: `wxColour(r, g, b)`, `Set()`)
   // used here only to seed the stock black/white colour constants
-  // `wxDCBase::wxDCBase` copy-constructs its text colours from.
+  // `wxDCBase::wxDCBase` copy-constructs its text colours from. The packed
+  // pixel uses the same `PALETTERGB` marker bit (`0x02000000`) as `Set()`
+  // below - real wx's constructor body is `m_pixel = PALETTERGB(m_red,
+  // m_green, m_blue);` (dependencies/wxWindows-2.4.2/src/msw/colour.cpp:46),
+  // not a plain `RGB()` pack.
   wxColourRuntimeObject(
     const std::uint8_t red,
     const std::uint8_t green,
     const std::uint8_t blue
   ) noexcept
-    : mPixel((static_cast<std::uint32_t>(blue) << 16) | (static_cast<std::uint32_t>(green) << 8) | red)
+    : mPixel(
+        0x02000000u
+        | (static_cast<std::uint32_t>(blue) << 16)
+        | (static_cast<std::uint32_t>(green) << 8)
+        | red
+      )
     , mIsInit(true)
     , mRed(red)
     , mBlue(blue)
@@ -247,6 +256,22 @@ public:
    * `other`; ref-data ownership is never shared, matching the binary.
    */
   wxColourRuntimeObject(const wxColourRuntimeObject& other) noexcept;
+
+  /**
+   * Address: 0x0096FBF0 (FUN_0096FBF0)
+   *
+   * IDA signature:
+   * int __thiscall wxColour::Set(wxColour *this, unsigned __int8 r, unsigned __int8 g, unsigned __int8 b);
+   *
+   * What it does:
+   * Stores the three colour component lanes, marks the colour initialized,
+   * and repacks `m_pixel` as `PALETTERGB(r, g, b)` - matching `wxColour::Set`
+   * (dependencies/wxWindows-2.4.2/src/msw/colour.cpp:92-99) line for line.
+   * Confirmed against the raw disassembly: the packed value carries the same
+   * `0x02000000` high marker byte the two constructors above do, not a plain
+   * `RGB()` triplet.
+   */
+  void Set(std::uint8_t red, std::uint8_t green, std::uint8_t blue) noexcept;
 
   [[nodiscard]] std::uint8_t Red() const noexcept { return mRed; }
   [[nodiscard]] std::uint8_t Green() const noexcept { return mGreen; }
@@ -287,8 +312,17 @@ public:
 };
 
 /**
- * Minimal recovered wxBitmap runtime lane (the default/"null" state only -
- * this project never constructs a populated bitmap through this lane).
+ * Minimal recovered wxBitmap runtime lane. This project's own constructor
+ * only ever builds the default/"null" state, but a real, externally-linked
+ * `wxDC::SelectObject`/`wxMemoryDC::SelectObject` call (`wxmsw.lib`) can
+ * still populate `mRefData` here in place - the shared class layout is what
+ * lets the library's write and this project's later reads agree. `IsOk`/
+ * `GetWidth`/`GetHeight` read that populated state, matching
+ * `wxGDIImage::Ok`/`GetWidth`/`GetHeight`
+ * (dependencies/wxWindows-2.4.2/include/wx/msw/gdiimage.h:164-167) and the
+ * `wxGDIImageRefData` field layout beneath them (same header, lines 35-65:
+ * `m_width`@+0x08, `m_height`@+0x0C, `m_depth`@+0x10, `m_handle`@+0x14 past
+ * the inherited `wxObjectRefData` vtable+refcount pair).
  */
 class wxBitmapRuntimeObject : public wxGDIImageRuntime
 {
@@ -305,6 +339,15 @@ public:
    * reproduced here; see FUN_00975AF0's own progress note.
    */
   wxBitmapRuntimeObject() noexcept;
+
+  // Real wx: `wxGDIImage::Ok/GetWidth/GetHeight` (inline, no dedicated
+  // binary address of their own - they compile straight into every call
+  // site). `Ok()` checks the *handle*, not just ref-data presence: a
+  // ref-counted bitmap with a still-zero `m_handle` (never `Create()`d) is
+  // not "ok" either.
+  [[nodiscard]] bool IsOk() const noexcept;
+  [[nodiscard]] std::int32_t GetWidth() const noexcept;
+  [[nodiscard]] std::int32_t GetHeight() const noexcept;
 };
 
 static_assert(sizeof(wxBitmapRuntimeObject) == 0xC, "wxBitmapRuntimeObject size must be 0xC");
@@ -332,7 +375,6 @@ inline constexpr int kWxPlatformWin32s = 19;               // wxWIN32S
 // GDI layer sits below that header and only needs the signature, so it is
 // forward-declared rather than pulling the whole wx runtime header in here.
 int wxGetOsVersion(int* majorVsn, int* minorVsn);
-
 
 /**
  * Minimal recovered wxBrush ref-data lane: the shared, ref-counted payload

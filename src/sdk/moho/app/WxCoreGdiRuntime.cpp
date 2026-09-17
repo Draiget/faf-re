@@ -254,6 +254,31 @@ wxColourRuntimeObject::wxColourRuntimeObject(const wxColourRuntimeObject& other)
 {}
 
 /**
+ * Address: 0x0096FBF0 (FUN_0096FBF0)
+ *
+ * What it does:
+ * Stores the three colour component lanes, marks the colour initialized,
+ * and repacks `m_pixel` as `PALETTERGB(r, g, b)` - matching `wxColour::Set`
+ * (dependencies/wxWindows-2.4.2/src/msw/colour.cpp:92-99) line for line.
+ */
+void wxColourRuntimeObject::Set(
+  const std::uint8_t red,
+  const std::uint8_t green,
+  const std::uint8_t blue
+) noexcept
+{
+  mRed = red;
+  mBlue = blue;
+  mGreen = green;
+  mIsInit = true;
+  mPixel =
+    0x02000000u
+    | (static_cast<std::uint32_t>(blue) << 16)
+    | (static_cast<std::uint32_t>(green) << 8)
+    | red;
+}
+
+/**
  * Address: 0x004F17A0 (FUN_004F17A0)
  * Mangled: ??0wxGDIImage@@QAE@@Z
  *
@@ -275,3 +300,48 @@ wxGDIImageRuntime::wxGDIImageRuntime() noexcept = default;
  * here; see FUN_00975AF0's own progress note.
  */
 wxBitmapRuntimeObject::wxBitmapRuntimeObject() noexcept = default;
+
+namespace
+{
+  // `wxGDIImageRefData` (dependencies/wxWindows-2.4.2/include/wx/msw/
+  // gdiimage.h:35-65): the inherited `wxObjectRefData` vtable+refcount pair,
+  // then `m_width`/`m_height`/`m_depth`/`m_handle` in declaration order.
+  // Cross-checked against `WxBitmapRefDataForBmpLoadRuntimeView`
+  // (WxRuntimeTypes.cpp), which reads the same four lanes off the same
+  // offsets from `wxBMPFileHandler::LoadFile`'s disassembly.
+  struct WxGdiImageRefDataRuntimeView
+  {
+    std::uint8_t reserved00_07[0x08]{};  // +0x00 (wxObjectRefData: vtable, refcount)
+    std::int32_t width = 0;              // +0x08
+    std::int32_t height = 0;             // +0x0C
+    std::int32_t depth = 0;              // +0x10
+    std::uintptr_t nativeHandle = 0;     // +0x14
+  };
+  static_assert(offsetof(WxGdiImageRefDataRuntimeView, width) == 0x08, "WxGdiImageRefDataRuntimeView::width offset must be 0x08");
+  static_assert(offsetof(WxGdiImageRefDataRuntimeView, height) == 0x0C, "WxGdiImageRefDataRuntimeView::height offset must be 0x0C");
+  static_assert(offsetof(WxGdiImageRefDataRuntimeView, nativeHandle) == 0x14, "WxGdiImageRefDataRuntimeView::nativeHandle offset must be 0x14");
+} // namespace
+
+bool wxBitmapRuntimeObject::IsOk() const noexcept
+{
+  if (mRefData == nullptr) {
+    return false;
+  }
+  return static_cast<const WxGdiImageRefDataRuntimeView*>(mRefData)->nativeHandle != 0;
+}
+
+std::int32_t wxBitmapRuntimeObject::GetWidth() const noexcept
+{
+  if (mRefData == nullptr) {
+    return 0;
+  }
+  return static_cast<const WxGdiImageRefDataRuntimeView*>(mRefData)->width;
+}
+
+std::int32_t wxBitmapRuntimeObject::GetHeight() const noexcept
+{
+  if (mRefData == nullptr) {
+    return 0;
+  }
+  return static_cast<const WxGdiImageRefDataRuntimeView*>(mRefData)->height;
+}
