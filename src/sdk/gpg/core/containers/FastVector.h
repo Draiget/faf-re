@@ -745,6 +745,24 @@ namespace gpg::core
     /** Destroys every element; keeps the storage. */
     void Clear() noexcept
     {
+      // An intrusive weak-ref slot cannot be dropped by a destructor pass: it
+      // is trivially destructible, so `DestroyRange` below is a no-op for it
+      // and every element would stay linked in its target's chain while this
+      // rewinds `end_` out from under them -- the same silent stranding the
+      // destructor carried until it was given an explicit unlink.
+      //
+      // The engine does not have a clearing lane for this element type; each
+      // site open-codes the unlink first and then rewinds, which is why
+      // `Unit::GetBlipsInRange` and
+      // `CUnitMotion::ProcessSurfaceCollisionFromLastMove` both call
+      // `UnlinkWeakPtrRangeWithoutClearing` before `ResetStorageToInline`.
+      // Reject the call here rather than corrupt a chain at runtime: unlink the
+      // range explicitly, then clear.
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "Clear() would strand intrusive weak-ref slots in their owners' chains; "
+        "unlink the range first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
+      );
       detail::DestroyRange(start_, end_);
       end_ = start_;
     }
