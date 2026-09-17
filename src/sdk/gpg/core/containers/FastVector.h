@@ -662,6 +662,15 @@ namespace gpg::core
 
     void resize(const size_t n)
     {
+      // Shrinking drops the truncated tail through DestroyRange, which is a
+      // no-op for an intrusive weak-ref slot -- so the dropped elements stay
+      // linked in their targets' chains while end_ moves out from under them.
+      // Same hole as Clear(); see the note there.
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "resize() would strand intrusive weak-ref slots in their owners' chains; "
+        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
+      );
       const size_t current = Size();
       if (n <= current) {
         T* const newEnd = ptr_at(start_, n);
@@ -687,6 +696,12 @@ namespace gpg::core
      */
     void resize(const size_t n, const value_type& value)
     {
+      // See resize(n) above: the shrink arm strands intrusive weak-ref slots.
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "resize() would strand intrusive weak-ref slots in their owners' chains; "
+        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
+      );
       const size_t current = Size();
       if (n <= current) {
         T* const newEnd = ptr_at(start_, n);
@@ -725,6 +740,20 @@ namespace gpg::core
      */
     iterator erase(iterator first, iterator last)
     {
+      // Worse than the Clear()/resize() hole: the compaction below is a
+      // move-assignment per slot, which for an intrusive weak-ref slot is a
+      // two-word byte copy that RELOCATES the node without re-splicing it, so
+      // the target's chain is left pointing at the vacated address; the tail is
+      // then dropped through DestroyRange, which does not unlink either. The
+      // binary has no erase lane for this element type -- it has
+      // UnlinkIntrusiveWeakRefRange (FUN_0061CA70) and the relinking
+      // copy/copy_backward pair (FUN_0061CA20 / FUN_0061CE90) instead.
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "erase() would relocate intrusive weak-ref slots without relinking them; "
+        "route through the relinking lanes (CopyIntrusiveWeakRefRangeRelink / "
+        "AssignIntrusiveWeakRefRangeBackwardRelink) and unlink the vacated tail"
+      );
       if (!first || !last || first < start_ || first > end_ || last < first || last > end_) {
         return end_;
       }
@@ -1553,6 +1582,13 @@ namespace gpg::core
      */
     void Resize(size_t newSize, const T& fill = T{})
     {
+      // See Clear(): the shrink arm below drops the tail through DestroyRange,
+      // which never unlinks an intrusive weak-ref slot.
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "Resize() would strand intrusive weak-ref slots in their owners' chains; "
+        "unlink the truncated tail first (detail::UnlinkIntrusiveWeakRefRange), as the engine does"
+      );
       const size_t sz = this->Size();
       if (newSize < sz) {
         T* const newEnd = this->start_ + newSize;
