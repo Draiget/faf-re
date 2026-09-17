@@ -2244,13 +2244,6 @@ namespace moho
     DestroyPathQueueImplBase(scratch);
   }
 
-  /**
-   * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
-   *
-   * What it does:
-   * Replaces one owner slot with a new queue pointer, then tears down and
-   * frees the previous queue payload when present.
-   */
   void PathQueue::QueueTraveler(IPathTraveler& traveller)
   {
     PathQueueIntrusiveNode& node = traveller.mPathQueueNode;
@@ -2265,6 +2258,13 @@ namespace moho
     node.mPrev->mNext = &node;
   }
 
+  /**
+   * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
+   *
+   * What it does:
+   * Replaces one owner slot with a new queue pointer, then tears down and
+   * frees the previous queue payload when present.
+   */
   void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
   {
     PathQueue* const previous = *slot;
