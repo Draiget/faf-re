@@ -1357,6 +1357,37 @@ namespace LuaPlus
 		obj->GetLuaObject().PushStack(L);
 	}
 
+	/**
+	 * The same rule for every other script object: push its `mLuaObj` peer.
+	 *
+	 * Only `Unit` declares `GetLuaObject()`, so the overload above was never
+	 * viable for `Entity*`, `Projectile*`, `Prop*`, `Shield*` and the rest --
+	 * and, exactly as described there, they fell through to `LuaPush(bool)` and
+	 * reached the script as the literal `true`. `Unit:OnCollisionCheck(self,
+	 * other)` then read `other.Army` off a boolean, the same-army test failed,
+	 * and it answered `true`: every projectile collided with its own side's
+	 * units and buildings, CollideFriendly notwithstanding. The binary hands the
+	 * object over (`Projectile::CheckCollision`'s hook calls the script with the
+	 * collided entity's and the projectile's Lua objects).
+	 *
+	 * Constrained to be mutually exclusive with the `GetLuaObject()` overload, so
+	 * `Unit*` keeps its existing binding.
+	 */
+	template <class T>
+		requires (!requires(T* p) {
+			{ p->GetLuaObject() } -> std::same_as<LuaPlus::LuaObject>;
+		}) && requires(T* p) {
+			{ p->mLuaObj } -> std::convertible_to<const LuaPlus::LuaObject&>;
+		}
+	inline void LuaPush(lua_State* L, T* obj)
+	{
+		if (obj == nullptr) {
+			lua_pushnil(L);
+			return;
+		}
+		obj->mLuaObj.PushStack(L);
+	}
+
 	template<class Ret = void>
 	class LuaFunction : public LuaObject
 	{
