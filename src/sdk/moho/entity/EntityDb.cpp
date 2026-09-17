@@ -2731,7 +2731,7 @@ namespace moho
     }
 
     CEntityDb* const entityDb = sim->mEntityDB;
-    const std::uint32_t sourceIndex = static_cast<std::uint32_t>(army->ArmyId);
+    const std::uint32_t sourceIndex = static_cast<std::uint32_t>(army->mConstDat.mArmyIndex);
     mItr = entityDb->AllUnitsEnd(sourceIndex);
     mEnd = entityDb->AllUnitsEnd(sourceIndex + 1u);
     if (mItr != mEnd) {

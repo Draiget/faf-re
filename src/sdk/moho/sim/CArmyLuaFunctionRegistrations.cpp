@@ -412,8 +412,8 @@ namespace moho
 
     const int colorIndex = static_cast<int>(lua_tonumber(rawState, 2));
     const std::uint32_t packedColor = GetPlayerColor(colorIndex);
-    army->PlayerColorBgra = packedColor;
-    army->ArmyColorBgra = packedColor;
+    army->mVarDat.mPlayerColorBgra = packedColor;
+    army->mVarDat.mArmyColorBgra = packedColor;
     return 0;
   }
 

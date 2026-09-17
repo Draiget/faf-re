@@ -561,8 +561,8 @@ namespace moho
     SEconValue banked = economy.mResources;
     if (const CArmyImpl* const army =
           economy.mSim != nullptr ? ArmyAtEconomyIndex(*economy.mSim, economy.mIndex) : nullptr;
-        army != nullptr && army->HasHandicap != 0.0f) {
-      const float handicapExtra = army->Handicap;
+        army != nullptr && army->mVarDat.mHandicapValue != 0.0f) {
+      const float handicapExtra = army->mVarDat.mHandicapExtra;
       if (handicapExtra != 0.0f) {
         const float multiplier = handicapExtra + 1.0f;
         banked.energy *= multiplier;

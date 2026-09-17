@@ -3849,7 +3849,7 @@ namespace moho
         Unit* const candidateUnit = (allyCheckEntity != nullptr) ? allyCheckEntity->IsUnit() : nullptr;
         if (candidateUnit != nullptr && candidateUnit->mCurrentLayer == LAYER_Air && ownerUnit->ArmyRef != nullptr) {
           const std::uint32_t candidateArmyIndex = (candidateUnit->ArmyRef != nullptr)
-            ? static_cast<std::uint32_t>(candidateUnit->ArmyRef->ArmyId)
+            ? static_cast<std::uint32_t>(candidateUnit->ArmyRef->mConstDat.mArmyIndex)
             : std::numeric_limits<std::uint32_t>::max();
           if (!ownerUnit->ArmyRef->IsEnemy(candidateArmyIndex)) {
             continue;

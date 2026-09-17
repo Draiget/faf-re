@@ -74,7 +74,7 @@ namespace
   {
     for (std::size_t allyIndex = observerIndex; allyIndex < armyCount; ++allyIndex) {
       CArmyImpl* const allyArmy = armiesBegin[allyIndex];
-      if (allyArmy && allyArmy->Allies.Contains(static_cast<std::uint32_t>(observerIndex))) {
+      if (allyArmy && allyArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(observerIndex))) {
         SetArmyVisibilityFlag(handle, allyIndex);
       }
     }
@@ -196,9 +196,9 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
   }
 
   if (sourceArmy != nullptr && handle->mInfo.mIsSplat != 0u) {
-    const bool sourceIsCivilian = sourceArmy->IsCivilian != 0u;
+    const bool sourceIsCivilian = sourceArmy->mConstDat.mIsCivilian != 0u;
     for (std::size_t i = 0; i < armyCount; ++i) {
-      if (sourceArmy->Allies.Contains(static_cast<std::uint32_t>(i)) || !sourceIsCivilian) {
+      if (sourceArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(i)) || !sourceIsCivilian) {
         SetArmyVisibilityFlag(*handle, i);
       }
     }
@@ -211,7 +211,7 @@ CDecalHandle* CDecalBuffer::CreateHandle(const SDecalInfo& info)
     }
 
     CArmyImpl* const observerArmy = armiesBegin[i];
-    if (!observerArmy || observerArmy->IsCivilian != 0u) {
+    if (!observerArmy || observerArmy->mConstDat.mIsCivilian != 0u) {
       continue;
     }
 
@@ -345,7 +345,7 @@ bool CDecalBuffer::IsDecalVisibleForArmy(
     return false;
   }
 
-  if (sourceArmy && observerArmy->Allies.Contains(static_cast<std::uint32_t>(sourceArmy->ArmyId))) {
+  if (sourceArmy && observerArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(sourceArmy->mConstDat.mArmyIndex))) {
     return true;
   }
 
@@ -403,7 +403,7 @@ void CDecalBuffer::CleanupTick()
     const std::uint32_t rotatingArmyIndex = curTick % static_cast<std::uint32_t>(armyCount);
     CArmyImpl* const rotatingArmy = armiesBegin[rotatingArmyIndex];
 
-    if (rotatingArmy && rotatingArmy->IsCivilian == 0u) {
+    if (rotatingArmy && rotatingArmy->mConstDat.mIsCivilian == 0u) {
       const std::int32_t focusArmy = mSim->mSyncFilter.focusArmy;
       const std::uint32_t rotatingArmyMask = rotatingArmyIndex < 32u ? (1u << rotatingArmyIndex) : 0u;
 
@@ -427,8 +427,8 @@ void CDecalBuffer::CleanupTick()
                   continue;
                 }
 
-                if (army->Allies.Contains(rotatingArmyIndex)) {
-                  const std::uint32_t armyIndex = static_cast<std::uint32_t>(army->ArmyId);
+                if (army->mVarDat.mAllies.Contains(rotatingArmyIndex)) {
+                  const std::uint32_t armyIndex = static_cast<std::uint32_t>(army->mConstDat.mArmyIndex);
                   if (armyIndex < 32u) {
                     handle->mArmyVisibilityFlags |= (1u << armyIndex);
                   }

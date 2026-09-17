@@ -103,7 +103,7 @@ namespace
   {
     std::int32_t sourceWord = -1;
     if (launcherWeapon != nullptr && launcherWeapon->mUnit != nullptr && launcherWeapon->mUnit->ArmyRef != nullptr) {
-      sourceWord = launcherWeapon->mUnit->ArmyRef->ArmyId;
+      sourceWord = launcherWeapon->mUnit->ArmyRef->mConstDat.mArmyIndex;
     }
 
     const std::uint32_t packedFamilySourceWord = static_cast<std::uint32_t>(sourceWord | kCollisionBeamFamilySourceBaseWord);

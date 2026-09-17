@@ -2964,7 +2964,7 @@ namespace
     // command arriving from that source is then dropped before it reaches a
     // unit. `Set::Add`/`Set::Remove` also keep the used-word window and the
     // empty-set case right, which the copy did not.
-    Set& validSources = army.MohoSetValidCommandSources;
+    Set& validSources = army.mVarDat.mValidCommandSources;
 
     const std::uint32_t source = static_cast<std::uint32_t>(sourceIndex);
     if (enabled) {
@@ -3065,7 +3065,7 @@ namespace
   [[nodiscard]] TIterator FindArmyByNameCursor(TIterator begin, const TIterator end, const std::string_view armyName)
   {
     return std::find_if(begin, end, [armyName](const CArmyImpl* const army) -> bool {
-      return army != nullptr && army->ArmyName.view() == armyName;
+      return army != nullptr && army->mConstDat.mArmyName.view() == armyName;
     });
   }
 
@@ -5398,13 +5398,13 @@ namespace
 
   [[nodiscard]] bool IsOutsideArmyNoRushRadius(const CArmyImpl* const army, const CAiTarget& target) noexcept
   {
-    if (army == nullptr || army->NoRushTicks <= 0 || target.targetType == EAiTargetType::AITARGET_None) {
+    if (army == nullptr || army->mVarDat.mNoRushTimer <= 0 || target.targetType == EAiTargetType::AITARGET_None) {
       return false;
     }
 
-    const float dx = (army->StartPosition.x + army->NoRushOffsetX) - target.position.x;
-    const float dz = (army->StartPosition.y + army->NoRushOffsetY) - target.position.z;
-    return std::sqrt((dx * dx) + (dz * dz)) > army->NoRushRadius;
+    const float dx = (army->mVarDat.mArmyStart.x + army->mVarDat.mNoRushOffset.x) - target.position.x;
+    const float dz = (army->mVarDat.mArmyStart.y + army->mVarDat.mNoRushOffset.y) - target.position.z;
+    return std::sqrt((dx * dx) + (dz * dz)) > army->mVarDat.mNoRushRadius;
   }
 
   /**
@@ -7352,7 +7352,7 @@ namespace
       }
 
       if (hasArmyFilters) {
-        const std::size_t armyIndex = static_cast<std::size_t>(unit->ArmyRef->ArmyId);
+        const std::size_t armyIndex = static_cast<std::size_t>(unit->ArmyRef->mConstDat.mArmyIndex);
         if (std::find(targetArmyIndices.begin(), targetArmyIndices.end(), armyIndex) == targetArmyIndices.end()) {
           return;
         }
@@ -9036,7 +9036,7 @@ void Sim::UpdateChecksum()
   Logf("Armies\n");
   for (auto it = mArmiesList.begin(); it != mArmiesList.end(); ++it) {
     CArmyImpl* const army = *it;
-    Logf("  \"%s\" [%s]\n", army->ArmyName.raw_data_unsafe(), army->ArmyTypeText.raw_data_unsafe());
+    Logf("  \"%s\" [%s]\n", army->mConstDat.mArmyName.raw_data_unsafe(), army->mVarDat.mArmyType.raw_data_unsafe());
 
     const SEconTotals& economy = army->GetEconomy()->economy;
     mContext.Update(&economy, sizeof(economy));
@@ -10551,8 +10551,8 @@ void Sim::CreateArmies(
       onCreateArmyBrain.Call_IntBrainStr2(
         static_cast<unsigned int>(armyIndex + 1),
         brain != nullptr ? &brain->mLuaObj : nullptr,
-        army->ArmyName.c_str(),
-        army->PlayerName.c_str()
+        army->mConstDat.mArmyName.c_str(),
+        army->mConstDat.mPlayerName.c_str()
       );
     } catch (const std::exception& ex) {
       gpg::Warnf("Error running OnCreateArmyBrain: %s", ex.what());
@@ -10581,14 +10581,14 @@ void Sim::PostInitialize(const LuaPlus::LuaObject& launchOptions)
   }
 
   for (CArmyImpl* const army : mArmiesList) {
-    if (army->IsCivilian != 0u) {
+    if (army->mConstDat.mIsCivilian != 0u) {
       continue;
     }
 
     const LuaPlus::LuaObject globals = mLuaState->GetGlobals();
     const LuaPlus::LuaFunction<> initializePrebuiltUnits(globals["InitializePrebuiltUnits"]);
     try {
-      initializePrebuiltUnits(army->ArmyName.c_str());
+      initializePrebuiltUnits(army->mConstDat.mArmyName.c_str());
     } catch (const std::exception& ex) {
       gpg::Warnf("Error running InitializePrebuiltUnits: %s", ex.what());
     }
@@ -10810,12 +10810,12 @@ bool Sim::OkayToMessWith(SimArmy* army)
     return CheatsEnabled();
   }
 
-  if (armyImpl->IsOutOfGame) {
+  if (armyImpl->mVarDat.mIsOutOfGame) {
     return false;
   }
 
   const uint32_t sourceId = static_cast<uint32_t>(mCurCommandSource);
-  if (sourceId != kInvalidCommandSource && armyImpl->MohoSetValidCommandSources.Contains(sourceId)) {
+  if (sourceId != kInvalidCommandSource && armyImpl->mVarDat.mValidCommandSources.Contains(sourceId)) {
     return true;
   }
 
@@ -10906,7 +10906,7 @@ void Sim::OnCommandSourceTerminated()
       continue;
     }
 
-    if (!army->MohoSetValidCommandSources.Contains(static_cast<uint32_t>(mCurCommandSource))) {
+    if (!army->mVarDat.mValidCommandSources.Contains(static_cast<uint32_t>(mCurCommandSource))) {
       continue;
     }
 
@@ -11368,7 +11368,7 @@ void Sim::CreateUnit(const uint32_t armyIndex, const RResId& blueprintId, const 
   }
 
   CArmyImpl* const army = mArmiesList[armyIndex];
-  if (!army || army->IsOutOfGame) {
+  if (!army || army->mVarDat.mIsOutOfGame) {
     return;
   }
 
@@ -12033,8 +12033,8 @@ int Sim::SetArmyColor(
     return 0;
   }
 
-  army->PlayerColorBgra = packedColor;
-  army->ArmyColorBgra = packedColor;
+  army->mVarDat.mPlayerColorBgra = packedColor;
+  army->mVarDat.mArmyColorBgra = packedColor;
   return 0;
 }
 
@@ -12663,8 +12663,8 @@ int Sim::BlingBling(
   (void)BuildSignedMaxStorageFloatPair(&grantedStorage, economyInfo->economy);
   economyInfo->economy.mStored.ENERGY += grantedStorage.ENERGY;
   economyInfo->economy.mStored.MASS += grantedStorage.MASS;
-  focusArmy->EnergyCurrent = economyInfo->economy.mStored.ENERGY;
-  focusArmy->MassCurrent = economyInfo->economy.mStored.MASS;
+  focusArmy->mVarDat.mEconomyTotals.mStored.ENERGY = economyInfo->economy.mStored.ENERGY;
+  focusArmy->mVarDat.mEconomyTotals.mStored.MASS = economyInfo->economy.mStored.MASS;
 
   return 0;
 }
@@ -16233,7 +16233,7 @@ int moho::cfunc_ChangeUnitArmyL(LuaPlus::LuaState* const state)
   }
 
   if (unit->ArmyRef == army) {
-    LuaPlus::LuaState::Error(state, "Unit already belongs to army %d", army->ArmyId);
+    LuaPlus::LuaState::Error(state, "Unit already belongs to army %d", army->mConstDat.mArmyIndex);
   }
 
   // Disabled-validation predicate: the shipped binary computes this guard but the
@@ -26664,7 +26664,7 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
   }
 
   CArmyImpl* const army = sim->mArmiesList[static_cast<std::size_t>(armyIndex)];
-  if (!army || !army->MohoSetValidCommandSources.items_begin) {
+  if (!army || !army->mVarDat.mValidCommandSources.items_begin) {
     return 0;
   }
 
@@ -26852,7 +26852,7 @@ int moho::ARMY_IndexFromLuaState(LuaPlus::LuaState* const state, const LuaPlus::
     }
 
     CArmyImpl* const army = *match;
-    return army ? army->ArmyId : -1;
+    return army ? army->mConstDat.mArmyIndex : -1;
   }
 
   return -1;
@@ -26957,7 +26957,7 @@ int moho::cfunc_ListArmiesL(LuaPlus::LuaState* const state)
   if (sim != nullptr) {
     for (std::size_t armyIndex = 0; armyIndex < sim->mArmiesList.size(); ++armyIndex) {
       CArmyImpl* const army = sim->mArmiesList[armyIndex];
-      const char* const armyName = (army && army->ArmyName.c_str()) ? army->ArmyName.c_str() : "";
+      const char* const armyName = (army && army->mConstDat.mArmyName.c_str()) ? army->mConstDat.mArmyName.c_str() : "";
       armiesTable.SetString(static_cast<std::int32_t>(armyIndex + 1u), armyName);
     }
   }
@@ -27341,7 +27341,7 @@ int moho::cfunc_IsAllySimL(LuaPlus::LuaState* const state)
   CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
 
   const bool isAlly = firstArmy != nullptr && secondArmy != nullptr &&
-    firstArmy->Allies.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+    firstArmy->mVarDat.mAllies.Contains(static_cast<std::uint32_t>(secondArmy->mConstDat.mArmyIndex));
   lua_pushboolean(rawState, isAlly ? 1 : 0);
   return 1;
 }
@@ -27400,7 +27400,7 @@ int moho::cfunc_IsEnemySimL(LuaPlus::LuaState* const state)
   CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
 
   const bool isEnemy = firstArmy != nullptr && secondArmy != nullptr &&
-    firstArmy->Enemies.Contains(static_cast<std::uint32_t>(secondArmy->ArmyId));
+    firstArmy->mVarDat.mEnemies.Contains(static_cast<std::uint32_t>(secondArmy->mConstDat.mArmyIndex));
   lua_pushboolean(rawState, isEnemy ? 1 : 0);
   return 1;
 }
@@ -27459,7 +27459,7 @@ int moho::cfunc_IsNeutralSimL(LuaPlus::LuaState* const state)
   CArmyImpl* const secondArmy = ARMY_FromLuaState(state, secondArmyObject);
 
   const bool isNeutral = firstArmy != nullptr && secondArmy != nullptr
-    && IsArmyMarkedNeutral(static_cast<std::uint32_t>(secondArmy->ArmyId), firstArmy->Neutrals);
+    && IsArmyMarkedNeutral(static_cast<std::uint32_t>(secondArmy->mConstDat.mArmyIndex), firstArmy->mVarDat.mNeutrals);
   lua_pushboolean(rawState, isNeutral ? 1 : 0);
   return 1;
 }
@@ -27514,7 +27514,7 @@ int moho::cfunc_ArmyIsCivilianL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  lua_pushboolean(rawState, (army != nullptr && army->IsCivilian != 0u) ? 1 : 0);
+  lua_pushboolean(rawState, (army != nullptr && army->mConstDat.mIsCivilian != 0u) ? 1 : 0);
   return 1;
 }
 
@@ -27575,7 +27575,7 @@ int moho::cfunc_SetArmyFactionIndexL(LuaPlus::LuaState* const state)
   }
 
   if (army != nullptr) {
-    army->FactionIndex = static_cast<std::int32_t>(lua_tonumber(rawState, 2));
+    army->mVarDat.mFaction = static_cast<std::int32_t>(lua_tonumber(rawState, 2));
   }
   return 0;
 }
@@ -27633,12 +27633,12 @@ int moho::cfunc_OkayToMessWithArmyL(LuaPlus::LuaState* const state)
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
 
   bool allowed = false;
-  if (army != nullptr && army->IsOutOfGame == 0u) {
+  if (army != nullptr && army->mVarDat.mIsOutOfGame == 0u) {
     Sim* const sim = army->GetSim();
     if (sim != nullptr) {
       const int commandSource = sim->mCurCommandSource;
       allowed = commandSource != static_cast<int>(kInvalidCommandSource) &&
-        army->MohoSetValidCommandSources.Contains(static_cast<std::uint32_t>(commandSource));
+        army->mVarDat.mValidCommandSources.Contains(static_cast<std::uint32_t>(commandSource));
       if (!allowed) {
         allowed = sim->CheatsEnabled();
       }
@@ -27699,7 +27699,7 @@ int moho::cfunc_ArmyIsOutOfGameL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
-  lua_pushboolean(rawState, (army != nullptr && army->IsOutOfGame != 0u) ? 1 : 0);
+  lua_pushboolean(rawState, (army != nullptr && army->mVarDat.mIsOutOfGame != 0u) ? 1 : 0);
   return 1;
 }
 
@@ -27754,7 +27754,7 @@ int moho::cfunc_SetArmyOutOfGameL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
   if (army != nullptr) {
-    army->IsOutOfGame = 1u;
+    army->mVarDat.mIsOutOfGame = 1u;
   }
   return 0;
 }
@@ -27824,10 +27824,10 @@ int moho::cfunc_SetAllianceL(LuaPlus::LuaState* const state)
   }
   SCR_GetEnum(state, allianceText, enumRef);
 
-  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->ArmyId) : 0u;
+  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->mConstDat.mArmyIndex) : 0u;
   firstArmy->SetAlliance(secondArmyId, static_cast<int>(alliance));
 
-  const std::uint32_t firstArmyId = firstArmy ? static_cast<std::uint32_t>(firstArmy->ArmyId) : 0u;
+  const std::uint32_t firstArmyId = firstArmy ? static_cast<std::uint32_t>(firstArmy->mConstDat.mArmyIndex) : 0u;
   secondArmy->SetAlliance(firstArmyId, static_cast<int>(alliance));
   return 0;
 }
@@ -27897,7 +27897,7 @@ int moho::cfunc_SetAllianceOneWayL(LuaPlus::LuaState* const state)
   }
   SCR_GetEnum(state, allianceText, enumRef);
 
-  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->ArmyId) : 0u;
+  const std::uint32_t secondArmyId = secondArmy ? static_cast<std::uint32_t>(secondArmy->mConstDat.mArmyIndex) : 0u;
   firstArmy->SetAlliance(secondArmyId, static_cast<int>(alliance));
   return 0;
 }
@@ -28004,8 +28004,8 @@ int moho::cfunc_ArmyGetHandicapL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject armyObject(LuaPlus::LuaStackObject(state, 1));
   CArmyImpl* const army = ARMY_FromLuaState(state, armyObject);
   float handicap = 0.0f;
-  if (army->HasHandicap != 0.0f) {
-    handicap = army->Handicap;
+  if (army->mVarDat.mHandicapValue != 0.0f) {
+    handicap = army->mVarDat.mHandicapExtra;
   }
   lua_pushnumber(state->m_state, handicap);
   return 1;
@@ -28266,7 +28266,7 @@ int moho::cfunc_SetArmyAIPersonalityL(LuaPlus::LuaState* const state)
   }
 
   if (personalityName[0] != '\0') {
-    army->ArmyTypeText.assign(personalityName, 0U, msvc8::string::npos);
+    army->mVarDat.mArmyType.assign(personalityName, 0U, msvc8::string::npos);
   }
   return 0;
 }
@@ -28351,7 +28351,7 @@ int moho::cfunc_SetArmyShowScoreL(LuaPlus::LuaState* const state)
   LuaPlus::LuaStackObject showScoreArg(state, 2);
   const bool showScore = showScoreArg.GetBoolean();
   if (army != nullptr) {
-    army->ShowScoreFlag = showScore ? 1u : 0u;
+    army->mVarDat.mShowScore = showScore ? 1u : 0u;
   }
   return 0;
 }
@@ -28496,8 +28496,8 @@ int moho::cfunc_SetArmyColorL(LuaPlus::LuaState* const state)
   const std::uint8_t green = ReadLuaColorByteArg<3>(state);
   const std::uint8_t blue = ReadLuaColorByteArg<4>(state);
   const std::uint32_t packedColor = PackOpaqueArmyColor(red, green, blue);
-  army->PlayerColorBgra = packedColor;
-  army->ArmyColorBgra = packedColor;
+  army->mVarDat.mPlayerColorBgra = packedColor;
+  army->mVarDat.mArmyColorBgra = packedColor;
   return 0;
 }
 

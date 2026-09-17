@@ -623,7 +623,7 @@ namespace moho
         const_cast<RProjectileBlueprint*>(blueprint),
         sim,
         static_cast<EntId>(sim->mEntityDB->DoReserveId(
-          ((static_cast<std::uint32_t>(army == nullptr ? 255 : army->ArmyId) | 0x100u) << kEntityIdSourceShift)
+          ((static_cast<std::uint32_t>(army == nullptr ? 255 : army->mConstDat.mArmyIndex) | 0x100u) << kEntityIdSourceShift)
         )),
         kProjectileCollisionBucketFlags
       )

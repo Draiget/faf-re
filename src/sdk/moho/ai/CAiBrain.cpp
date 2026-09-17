@@ -1004,7 +1004,7 @@ namespace
       return nullptr;
     }
 
-    const std::uint32_t armyIndex = static_cast<std::uint32_t>(brain->mArmy->ArmyId);
+    const std::uint32_t armyIndex = static_cast<std::uint32_t>(brain->mArmy->mConstDat.mArmyIndex);
     moho::CEntityDbAllUnitsNode* node = sim->mEntityDB->AllUnitsEnd(armyIndex);
     moho::CEntityDbAllUnitsNode* const endNode = sim->mEntityDB->AllUnitsEnd(armyIndex + 1u);
     while (node != endNode) {
@@ -3028,7 +3028,7 @@ int moho::cfunc_CAiBrainGetArmyIndexL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
-  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->ArmyId + 1));
+  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->mConstDat.mArmyIndex + 1));
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -3080,7 +3080,7 @@ int moho::cfunc_CAiBrainGetFactionIndexL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
-  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->FactionIndex + 1));
+  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->mVarDat.mFaction + 1));
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -7830,7 +7830,7 @@ int moho::cfunc_CAiBrainGetNoRushTicksL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject brainObject(LuaPlus::LuaStackObject(state, 1));
   CAiBrain* const brain = SCR_FromLua_CAiBrain(brainObject, state);
 
-  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->NoRushTicks));
+  lua_pushnumber(rawState, static_cast<float>(brain->mArmy->mVarDat.mNoRushTimer));
   (void)lua_gettop(rawState);
   return 1;
 }

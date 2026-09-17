@@ -9,18 +9,6 @@
 
 namespace moho
 {
-  namespace
-  {
-    struct IArmyConstructionView
-    {
-      SSTIArmyConstantData mConstDat; // +0x00
-      SSTIArmyVariableData mVarDat;   // +0x80
-    };
-
-    static_assert(offsetof(IArmyConstructionView, mConstDat) == 0x00, "IArmyConstructionView::mConstDat offset must be 0x00");
-    static_assert(offsetof(IArmyConstructionView, mVarDat) == 0x80, "IArmyConstructionView::mVarDat offset must be 0x80");
-  } // namespace
-
   gpg::RType* IArmy::sType = nullptr;
   gpg::RType* SimArmy::sType = nullptr;
   gpg::RType* SimArmy::sPointerType = nullptr;
@@ -37,14 +25,13 @@ namespace moho
    * Address: 0x006FD520 (FUN_006FD520, Moho::IArmy::IArmy)
    *
    * What it does:
-   * Constructs IArmy's serialized base payload lanes in-place.
+   * Constructs the two replicated payload members, constant data then
+   * variable data.
    */
   IArmy::IArmy()
-  {
-    auto* const view = reinterpret_cast<IArmyConstructionView*>(this);
-    ::new (&view->mConstDat) SSTIArmyConstantData();
-    ::new (&view->mVarDat) SSTIArmyVariableData();
-  }
+    : mConstDat()
+    , mVarDat()
+  {}
 
   gpg::RType* SimArmy::StaticGetClass()
   {
@@ -120,6 +107,9 @@ namespace moho
     archive->Write(type, base, owner);
   }
 
+  /**
+   * Address: 0x006FD570 (FUN_006FD570, Moho::IArmy::~IArmy)
+   */
   IArmy::~IArmy() = default;
 
   /**
