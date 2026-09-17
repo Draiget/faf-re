@@ -3279,8 +3279,21 @@ namespace moho
       0.0f,
     };
 
+    // 0x006BDBFA/0x006BDC02 hand the rotate `[esp+0x2c]` and the fresh turn
+    // quaternion; `[esp+0x2c]` is `referenceVector`, the airframe's CURRENT
+    // heading (0x006BD800 fills it from the incoming vector, 0x006BD964 scales
+    // the same lanes into `outForce`, and 0x006BDB1E feeds them to the second
+    // atan2 as the angle being turned *from*). Only the result's x and z are
+    // written back over `selectedVector` (0x006BDC1B / 0x006BDC2A); its y is
+    // left alone.
+    //
+    // Rotating `selectedVector` here instead - the direction the aircraft
+    // wants to go - asked the airframe to point a full turn-rate step PAST its
+    // target rather than one step TOWARDS it. On a 180-degree turn that lands
+    // about 90 degrees off, every tick, so the nose never converged: aircraft
+    // flew straight past their move order at cruise speed and never came back.
     Wm3::Vector3f rotatedSelectedVector = selectedVector;
-    const Wm3::Vector3f turnVector = RotateByQuaternion(selectedVector, turnQuaternion);
+    const Wm3::Vector3f turnVector = RotateByQuaternion(referenceVector, turnQuaternion);
     rotatedSelectedVector.x = turnVector.x;
     rotatedSelectedVector.z = turnVector.z;
     Wm3::Vector3f::Normalize(&rotatedSelectedVector);
