@@ -1291,37 +1291,30 @@ namespace
     return label;
   }
 
-  constexpr std::uintptr_t kGuardedByOwnerLinkOffset = 0x8u;
-
   [[nodiscard]] std::uintptr_t GuardedByOwnerSlotWord(const SGuardedByWeakOwnerSlot& slot) noexcept
   {
     return reinterpret_cast<std::uintptr_t>(slot.ownerLinkSlot);
   }
 
+  // `GuardedByList` is an entity set: each slot holds the guard's `Entity`
+  // subobject, which RTTI places at mdisp=8 inside `Unit` (`Unit : IUnit, Entity`,
+  // IUnit being 8 bytes). The add helper stores `lea edx,[ecx+8]` (0x0057DE03)
+  // and `cfunc_UnitGetGuardsL` recovers the unit with a null-guarded
+  // `lea ecx,[eax-8]` (0x006CD5C6) -- i.e. the two static_casts below.
   [[nodiscard]] SGuardedByWeakOwnerSlot EncodeGuardedByOwnerSlot(const Unit* const owner) noexcept
   {
     SGuardedByWeakOwnerSlot slot{};
-    if (owner == nullptr) {
-      slot.ownerLinkSlot = nullptr;
-      return slot;
-    }
-
-    slot.ownerLinkSlot = reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(owner) + kGuardedByOwnerLinkOffset);
+    slot.ownerLinkSlot = const_cast<Entity*>(static_cast<const Entity*>(owner));
     return slot;
   }
 
-  [[nodiscard]] Entity* DecodeGuardedByOwnerSlot(const SGuardedByWeakOwnerSlot slot) noexcept
+  // Returns the guarding UNIT, not its Entity subobject. This used to hand back
+  // the unit's address typed as `Entity*`, eight bytes short of the real Entity
+  // base, so `cfunc_UnitGetGuardsL` read `mLuaObj` out of the IUnit head and
+  // faulted the first time the AI asked a factory for its assisting engineers.
+  [[nodiscard]] Unit* DecodeGuardedByOwnerSlot(const SGuardedByWeakOwnerSlot slot) noexcept
   {
-    if (slot.ownerLinkSlot == nullptr) {
-      return nullptr;
-    }
-
-    const std::uintptr_t encoded = reinterpret_cast<std::uintptr_t>(slot.ownerLinkSlot);
-    if (encoded <= kGuardedByOwnerLinkOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<Entity*>(encoded - kGuardedByOwnerLinkOffset);
+    return static_cast<Unit*>(static_cast<Entity*>(slot.ownerLinkSlot));
   }
 
   [[nodiscard]] bool RemoveGuardedByOwner(SGuardedByRuntimeList& guardedByList, const Unit* const guardUnit) noexcept
@@ -4312,12 +4305,12 @@ int moho::cfunc_UnitGetGuardsL(LuaPlus::LuaState* const state)
 
   int guardIndex = 1;
   for (const SGuardedByWeakOwnerSlot& guardSlot : unit->GuardedByList.mSlots) {
-    Entity* const guardEntity = DecodeGuardedByOwnerSlot(guardSlot);
-    if (guardEntity == nullptr) {
+    Unit* const guardUnit = DecodeGuardedByOwnerSlot(guardSlot);
+    if (guardUnit == nullptr) {
       continue;
     }
 
-    LuaPlus::LuaObject guardObject = guardEntity->mLuaObj;
+    LuaPlus::LuaObject guardObject = guardUnit->mLuaObj;
     guardsTable.Insert(guardIndex, guardObject);
     ++guardIndex;
   }
@@ -11664,7 +11657,7 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
   // Snapshot the guard slots first: SetGuardedUnit mutates source->GuardedByList.
   msvc8::vector<Unit*> guards;
   for (const SGuardedByWeakOwnerSlot& slot : source->GuardedByList.mSlots) {
-    guards.push_back(reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(slot)));
+    guards.push_back(DecodeGuardedByOwnerSlot(slot));
   }
   for (Unit* const guard : guards) {
     if (guard != nullptr) {
@@ -12839,7 +12832,7 @@ namespace
       guardedByUnits.reserve(unit.GuardedByList.mSlots.Size());
 
       for (const SGuardedByWeakOwnerSlot& slot : unit.GuardedByList.mSlots) {
-        auto* const guardedByUnit = reinterpret_cast<Unit*>(DecodeGuardedByOwnerSlot(slot));
+        Unit* const guardedByUnit = DecodeGuardedByOwnerSlot(slot);
         if (guardedByUnit != nullptr) {
           guardedByUnits.push_back(guardedByUnit);
         }
