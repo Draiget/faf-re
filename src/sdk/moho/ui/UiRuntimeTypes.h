@@ -420,6 +420,24 @@ namespace moho
   extern bool ui_DragSelect2D;
 
   /**
+   * NOT IN THE BINARY -- a deliberate, switchable deviation from retail.
+   *
+   * Retail's `RULEUCC_Attack` order on bare ground (the no-hover arm of
+   * `SCommandModeData::HandleEvent`, 0x0081FDAD..0x0081FF48) splits the
+   * selection with 0x0081EB20: every mobile unit whose fire state is
+   * `FIRESTATE_ReturnFire` is sent `UNITCOMMAND_AggressiveMove` (attack-move)
+   * and only the rest get a ground `UNITCOMMAND_Attack`. FAF documents the same
+   * rule on its Ground Fire toggle ("Units will attack targeted positions
+   * rather than attack-move").
+   *
+   * When true (the default here), the order sends the whole selection a ground
+   * `UNITCOMMAND_Attack` regardless of fire state, so ordering tanks to attack
+   * a position makes them shell it. Set `ui_AttackGroundIgnoresFireState 0` in
+   * the console to get the retail split back.
+   */
+  extern bool ui_AttackGroundIgnoresFireState;
+
+  /**
    * Address: 0x00F57AA4 (?ui_KeyboardPanSpeed@Moho@@3MA)
    *
    * What it does:

@@ -18137,7 +18137,15 @@ namespace moho
           }
 
           if (hovered == nullptr) {
-            IssueAttackMoveToGround(session, selection, dragWorldPos, formationModifier, clearQueue);
+            // Deliberate deviation, on by default (ui_AttackGroundIgnoresFireState):
+            // retail sends Return Fire mobile units an attack-move here and only
+            // the rest a ground Attack. With the switch on, the whole selection
+            // attacks the position.
+            if (ui_AttackGroundIgnoresFireState) {
+              IssueOrderAtGround(selection, EUnitCommandType::UNITCOMMAND_Attack, dragWorldPos, clearQueue);
+            } else {
+              IssueAttackMoveToGround(session, selection, dragWorldPos, formationModifier, clearQueue);
+            }
             return;
           }
 
