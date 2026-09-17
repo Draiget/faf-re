@@ -134,4 +134,24 @@ namespace moho::scrdebug
     int style,
     const wchar_t* name
   );
+
+  /**
+   * Address: 0x00974B50 (wxAcceleratorTable::wxAcceleratorTable(int, const
+   * wxAcceleratorEntry*)), which builds the `ACCEL` array
+   * (`operator new(6 * cAccel)` at 0x00974B92), maps each entry's modifier
+   * bits to FALT/FSHIFT/FCONTROL|FVIRTKEY (0x00974BAB..0x00974BBC), calls
+   * `wxCharCodeWXToMSW` per key (0x00974BD1) and hands the result to
+   * `CreateAcceleratorTable` (0x00974C0E).
+   *
+   * `entries` points at an array of `wxAcceleratorEntry`: {flags, keyCode,
+   * command, menuItem}, four words per entry.
+   */
+  void* ConstructWxAcceleratorTable(int entryCount, const void* entries);
+
+  /**
+   * Address: 0x00974AB0 (wxAcceleratorTable::~wxAcceleratorTable), which
+   * tail-calls `wxObject::UnRef` (0x00977F40); the last reference destroys the
+   * ref-data block and with it the `HACCEL`.
+   */
+  void DestroyWxAcceleratorTable(void* acceleratorTable);
 } // namespace moho::scrdebug

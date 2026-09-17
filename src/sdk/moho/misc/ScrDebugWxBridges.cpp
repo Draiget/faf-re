@@ -308,4 +308,26 @@ namespace moho::scrdebug
       static_cast<long>(style), wxDefaultValidator, name_
     );
   }
+
+  /**
+   * Address: 0x00974B50 (wxAcceleratorTable::wxAcceleratorTable)
+   *
+   * What it does:
+   * Builds one accelerator table from the caller's entry array. Recovered by
+   * hand in ScrDebugWindow.cpp until now, over a pair of stand-in structs
+   * whose leading vtable lane stood in for the wx vtables that TU cannot
+   * name - so both were left null. Here the real class supplies them.
+   */
+  void* ConstructWxAcceleratorTable(const int entryCount, const void* const entries)
+  {
+    return new wxAcceleratorTable(entryCount, static_cast<const wxAcceleratorEntry*>(entries));
+  }
+
+  /**
+   * Address: 0x00974AB0 (wxAcceleratorTable::~wxAcceleratorTable)
+   */
+  void DestroyWxAcceleratorTable(void* const acceleratorTable)
+  {
+    delete static_cast<wxAcceleratorTable*>(acceleratorTable);
+  }
 } // namespace moho::scrdebug
