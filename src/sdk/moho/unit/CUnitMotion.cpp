@@ -752,7 +752,7 @@ namespace moho
 
     [[nodiscard]] bool IsRefuelVertEvent(const EUnitMotionVertEvent event) noexcept
     {
-      return event == UMVE_Top || event == UMVE_Hover;
+      return event == UMVE_Bottom || event == UMVE_Hover;
     }
 
     void DestroyEconomyRequestPointer(CEconRequest*& request) noexcept
@@ -848,7 +848,7 @@ namespace moho
     , mLayer(LAYER_None)
     , mMotionState(kUnitMotionStateNone)
     , mHorzEvent(kUnitMotionHorzEventStopped)
-    , mVertEvent(UMVE_None)
+    , mVertEvent(UMVE_Top)
     , mTurnEvent(static_cast<EUnitMotionTurnEvent>(0))
     , mCarrierEvent(static_cast<EUnitMotionCarrierEvent>(0))
     , mAlwaysUseTopSpeed(false)
@@ -980,7 +980,7 @@ namespace moho
 
     if (mUnit->mCurrentLayer == LAYER_Sub) {
       mSubElevation = mUnit->GetAttributes().spawnElevationOffset;
-      SetMotionVertEvent(UMVE_Top);
+      SetMotionVertEvent(UMVE_Bottom);
     }
 
     // Aircraft - but not pods, which dock rather than cruise - get a random
@@ -1848,7 +1848,7 @@ namespace moho
 
     if (targetTolerance < planarDistance) {
       if (mVertEvent != UMVE_Hover &&
-          (mVertEvent != UMVE_Top || mHeight == std::numeric_limits<float>::infinity())) {
+          (mVertEvent != UMVE_Bottom || mHeight == std::numeric_limits<float>::infinity())) {
         return false;
       }
     }
@@ -2643,7 +2643,7 @@ namespace moho
       if (newSubElevation == 0.0f) {
         mUnit->SetCurrentLayer(mLayer);
         mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
-        SetMotionVertEvent(UMVE_None);
+        SetMotionVertEvent(UMVE_Top);
       }
       return true;
     }
@@ -2656,7 +2656,7 @@ namespace moho
         mSubElevation = diveDepthLimit;
         mUnit->SetCurrentLayer(mLayer);
         mUnit->UnitStateMask &= ~(1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown));
-        SetMotionVertEvent(UMVE_Top);
+        SetMotionVertEvent(UMVE_Bottom);
       }
       return true;
     }
@@ -3959,7 +3959,7 @@ namespace moho
           if (mHeight == std::numeric_limits<float>::infinity()) {
             if (ShouldHoverInsteadOfLand() || mVertEvent == UMVE_Hover) {
               mNewElevation = air.TransportHoverHeight;
-            } else if (horizontalDistance < 0.5f || mVertEvent == UMVE_Top) {
+            } else if (horizontalDistance < 0.5f || mVertEvent == UMVE_Bottom) {
               mNewElevation = 0.0f;
             } else {
               mNewElevation = GetElevation() * 0.5f;
@@ -4064,7 +4064,7 @@ namespace moho
             unit->UnitStateMask &= ~(1ull << UNITSTATE_MovingDown);
 
             if (!ShouldHoverInsteadOfLand()) {
-              SetMotionVertEvent(UMVE_Top);
+              SetMotionVertEvent(UMVE_Bottom);
               mTargetPosition = unit->GetPosition();
               mPreviousVelocity = physBody->mVelocity;
               physBody->mVelocity = Wm3::Vector3f::ZERO;
@@ -4074,7 +4074,7 @@ namespace moho
             SetMotionVertEvent(UMVE_Hover);
           }
         } else {
-          if (mVertEvent == UMVE_Top || mVertEvent == UMVE_Hover) {
+          if (mVertEvent == UMVE_Bottom || mVertEvent == UMVE_Hover) {
             // 0x006BFC53: `or [eax+4A0h], 800h` -- low bit 11,
             // UNITSTATE_MovingUp. Coming off a deck or out of a hover is a
             // climb.
@@ -4169,10 +4169,10 @@ namespace moho
       } else if (unit->IsUnitState(UNITSTATE_MovingUp)) {
         SetMotionVertEvent(UMVE_Up);
       } else if (mVertEvent != UMVE_Hover) {
-        // 0x006BFFB9 is `xor eax, eax`, not a literal 1: the event is UMVE_None.
+        // 0x006BFFB9 is `xor eax, eax`, not a literal 1: the event is UMVE_Top.
         // Level flight has no vertical event, and the UMVE_Hover guard just above
         // is what keeps a deliberate hover from being cleared by it.
-        SetMotionVertEvent(UMVE_None);
+        SetMotionVertEvent(UMVE_Top);
       }
 
       if (horizontalDistance > air.StartTurnDistance || mAlwaysUseTopSpeed) {
@@ -4254,7 +4254,7 @@ namespace moho
     // touch at ANY horizontal distance latched `unit->mCurrentLayer = mLayer`.
     // That is the second disjunct of the arrival test above, so latching it
     // early lets a flier declare arrival without the elevation-convergence
-    // check and settle into UMVE_Top/UMVE_Hover -- and `AtTarget()` reports
+    // check and settle into UMVE_Bottom/UMVE_Hover -- and `AtTarget()` reports
     // true unconditionally while hovering, which makes every later navigator
     // goal arrive instantly.
     //
@@ -4296,7 +4296,7 @@ namespace moho
   {
     if (mUnit->IsBeingBuilt()) {
       if (mUnit->mCurrentLayer == LAYER_Sub) {
-        SetMotionVertEvent(UMVE_Top);
+        SetMotionVertEvent(UMVE_Bottom);
       }
       return TASKSTATUS_Wait;
     }

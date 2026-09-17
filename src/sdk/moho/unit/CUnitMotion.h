@@ -27,15 +27,30 @@ namespace moho
   struct SEntAttachInfo;
   struct SPhysBody;
   enum ELayer : std::int32_t;
+  /**
+   * Vertical-motion event, reported to Lua as `OnMotionVertEventChange`.
+   *
+   * The names are read out of the binary rather than guessed:
+   * `SetMotionVertEvent` (0x006B8F70) stores the value at `[ecx+0x80]` and then
+   * indexes a five-entry name table by it, `lea edx,[edx*4 + 0xF58360]`, whose
+   * pointers resolve to "Top", "Bottom", "Up", "Down", "Hover". The table is
+   * bounded by its neighbours -- the horz-event table at 0x00F58350 and the
+   * turn-event table at 0x00F58374 -- so it is exactly five wide.
+   *
+   * This used to read `UMVE_None = 0, UMVE_Top = 1, ...`, which named every
+   * value one place too high and invented a "None" the engine does not have.
+   * The numeric values in use were already right -- a LAYER_Sub unit is set to
+   * 1, which is "Bottom" (submerged), and CalcMoveAir's `xor eax,eax` at
+   * 0x006BFFB9 sets 0, which is "Top" (cruise altitude) -- so this rename is
+   * behaviour-preserving and only corrects the spelling.
+   */
   enum EUnitMotionVertEvent : std::int32_t
   {
-    UMVE_None = 0,
-    UMVE_Top = 1,
+    UMVE_Top = 0,
+    UMVE_Bottom = 1,
     UMVE_Up = 2,
     UMVE_Down = 3,
     UMVE_Hover = 4,
-    UMVE_Unknown2 = UMVE_Up,
-    UMVE_Unknown3 = UMVE_Down,
   };
   class Unit;
   struct VAxes3;
