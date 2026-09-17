@@ -2628,8 +2628,7 @@ namespace moho
    * leaves them.
    */
   CFormationInstance::CFormationInstance()
-    : mSharedCount(0)
-    , mState(nullptr)
+    : mState(nullptr)
     , mGamerules(nullptr)
     , mCommandType(EUnitCommandType::UNITCOMMAND_None)
   {
@@ -2826,8 +2825,7 @@ namespace moho
     const SCoordsVec2& coords,
     const Wm3::Quatf& orientation
   )
-    : mSharedCount(0)
-    , mState(state)
+    : mState(state)
     , mGamerules(rules)
     , mCommandType(commandType)
     , mUnits(units)

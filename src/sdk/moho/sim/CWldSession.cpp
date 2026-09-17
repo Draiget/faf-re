@@ -4317,13 +4317,15 @@ namespace moho
       return iconData.mBlueprint->mStrategicIconRest;
     }
 
+    /**
+     * The payload half of `sp_counted_impl_p<TPointee>`: boost's control-block
+     * base supplies the vptr and both counts, so the owned pointer lands at
+     * +0x0C without naming a vtable lane here.
+     */
     template <typename TPointee>
-    struct SpCountedImplOwnedPointeeStorage
+    struct SpCountedImplOwnedPointeeStorage : boost::detail::sp_counted_base
     {
-      void* mVftable;
-      std::int32_t mUseCount;
-      std::int32_t mWeakCount;
-      TPointee* mPointee;
+      TPointee* mPointee; // +0x0C
     };
 
     /**

@@ -560,9 +560,6 @@ namespace moho
      */
     void operator_delete(std::int32_t deleteFlags) override;
 
-    /// `Moho::CountedObject`'s reference count (RTTI base at mdisp 0);
-    /// zeroed by the `IFormationInstance` constructor (0x00569450).
-    std::int32_t mSharedCount;                                // +0x04
     /// `Broadcaster<EFormationdStatus>` (RTTI base at mdisp 8): the ring of
     /// `Listener<EFormationdStatus>` nodes `BroadcastEvent` fans out to, and
     /// the payload the reflected `Broadcaster<EFormationdStatus>` type

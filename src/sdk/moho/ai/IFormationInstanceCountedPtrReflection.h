@@ -104,8 +104,6 @@ namespace moho
     static void SerSave(gpg::WriteArchive* archive, int objectPtr, int version, gpg::RRef* ownerRef);
   };
 
-  static_assert(sizeof(IntrusiveRefCountView<moho::IFormationInstance>) == 0x08, "IntrusiveRefCountView<IFormationInstance> size must be 0x08");
-  static_assert(offsetof(IntrusiveRefCountView<moho::IFormationInstance>, mRefCount) == 0x04, "IntrusiveRefCountView<IFormationInstance>::mRefCount offset must be 0x04");
   static_assert(sizeof(RCountedPtrType<moho::IFormationInstance>) == 0x68, "RCountedPtrType<IFormationInstance> size must be 0x68");
 
   /**
