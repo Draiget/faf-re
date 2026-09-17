@@ -206,47 +206,6 @@ namespace
     return blacklist.begin();
   }
 
-  /**
-   * Address: 0x006DE7E0 (FUN_006DE7E0)
-   *
-   * What it does:
-   * Copy-assigns one contiguous blacklist range while preserving intrusive
-   * weak-owner chain semantics for each copied `mEntity` lane.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::SBlackListInfo* CopyBlacklistRangeAssignWeakLinks(
-    moho::SBlackListInfo* destination,
-    const moho::SBlackListInfo* const sourceBegin,
-    const moho::SBlackListInfo* const sourceEnd
-  ) noexcept
-  {
-    const moho::SBlackListInfo* source = sourceBegin;
-    while (source != sourceEnd) {
-      if (destination->mEntity.ownerLinkSlot != source->mEntity.ownerLinkSlot) {
-        if (destination->mEntity.ownerLinkSlot != nullptr) {
-          auto** ownerCursor = reinterpret_cast<moho::WeakPtr<moho::Entity>**>(destination->mEntity.ownerLinkSlot);
-          while (*ownerCursor != &destination->mEntity) {
-            ownerCursor = &(*ownerCursor)->nextInOwner;
-          }
-          *ownerCursor = destination->mEntity.nextInOwner;
-        }
-
-        destination->mEntity.ownerLinkSlot = source->mEntity.ownerLinkSlot;
-        if (source->mEntity.ownerLinkSlot == nullptr) {
-          destination->mEntity.nextInOwner = nullptr;
-        } else {
-          auto** const sourceHead = reinterpret_cast<moho::WeakPtr<moho::Entity>**>(source->mEntity.ownerLinkSlot);
-          destination->mEntity.nextInOwner = *sourceHead;
-          *sourceHead = &destination->mEntity;
-        }
-      }
-
-      destination->mValue = source->mValue;
-      ++source;
-      ++destination;
-    }
-
-    return destination;
-  }
 
   /**
    * The reflected reference is assembled from the userdata HEADER, not read out
