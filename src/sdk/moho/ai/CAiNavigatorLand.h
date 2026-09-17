@@ -64,7 +64,7 @@ namespace moho
      *
      * VFTable SLOT: 3
      */
-    void SetDestUnit(Unit* destinationUnit) override;
+    void SetDestUnit(Entity* destinationEntity) override;
 
     /**
      * Address: 0x005A4240 (FUN_005A4240)
@@ -173,14 +173,21 @@ namespace moho
     static gpg::RType* sType;
 
     CAiPathNavigator* mPathNavigator; // +0x68
-    WeakPtr<Unit> mDestinationUnit;   // +0x6C
+    /**
+     * What this navigator is chasing, if anything. Reflected as
+     * `WeakPtr<Entity>` (`.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`, 0x00F6B8A4,
+     * read at 0x005A8FCC) - a target seen only on radar is a `ReconBlip`
+     * rather than a `Unit`.
+     */
+    WeakPtr<Entity> mDestinationEntity; // +0x6C
     SAiNavigatorGoal mGoal;           // +0x74
   };
 
   static_assert(sizeof(CAiNavigatorLand) == 0x98, "CAiNavigatorLand size must be 0x98");
   static_assert(offsetof(CAiNavigatorLand, mPathNavigator) == 0x68, "CAiNavigatorLand::mPathNavigator offset must be 0x68");
   static_assert(
-    offsetof(CAiNavigatorLand, mDestinationUnit) == 0x6C, "CAiNavigatorLand::mDestinationUnit offset must be 0x6C"
+    offsetof(CAiNavigatorLand, mDestinationEntity) == 0x6C,
+    "CAiNavigatorLand::mDestinationEntity offset must be 0x6C"
   );
   static_assert(offsetof(CAiNavigatorLand, mGoal) == 0x74, "CAiNavigatorLand::mGoal offset must be 0x74");
 } // namespace moho

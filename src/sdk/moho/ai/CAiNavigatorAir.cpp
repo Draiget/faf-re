@@ -87,10 +87,10 @@ namespace
     return headSlot == nullptr || IsWeakSentinelSlot(const_cast<void*>(headSlot));
   }
 
-  [[nodiscard]] bool HasMovedSincePrev(const Unit& unit) noexcept
+  [[nodiscard]] bool HasMovedSincePrev(const Entity& entity) noexcept
   {
-    return unit.Position.x != unit.PrevPosition.x || unit.Position.y != unit.PrevPosition.y ||
-      unit.Position.z != unit.PrevPosition.z;
+    return entity.Position.x != entity.PrevPosition.x || entity.Position.y != entity.PrevPosition.y ||
+      entity.Position.z != entity.PrevPosition.z;
   }
 
   [[nodiscard]] Wm3::Vector3f EstimateAirAbortStopPosition(const Unit& unit) noexcept
@@ -108,11 +108,16 @@ namespace
     return CAiNavigatorImpl::sType;
   }
 
-  [[nodiscard]] gpg::RType* CachedWeakUnitType()
+  /**
+   * The reflected type of the destination lane. 0x005A912C reads its cached
+   * `RType` through the type descriptor at 0x00F6B8A4, whose name is
+   * `.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`.
+   */
+  [[nodiscard]] gpg::RType* CachedWeakEntityType()
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(WeakPtr<Unit>));
+      cached = gpg::LookupRType(typeid(WeakPtr<Entity>));
     }
     return cached;
   }
@@ -134,7 +139,7 @@ gpg::RType* CAiNavigatorAir::sType = nullptr;
  */
 CAiNavigatorAir::CAiNavigatorAir()
   : CAiNavigatorImpl()
-  , mDestinationUnitLink{}
+  , mDestinationEntity{}
   , mCurrentTargetPos(Wm3::Vector3f::Zero())
   , mGoalPos(Wm3::Vector3f::Zero())
   , mTrackFormationTarget(0)
@@ -146,7 +151,7 @@ CAiNavigatorAir::CAiNavigatorAir()
  */
 CAiNavigatorAir::CAiNavigatorAir(Unit* const unit)
   : CAiNavigatorImpl(unit)
-  , mDestinationUnitLink{}
+  , mDestinationEntity{}
   , mCurrentTargetPos(Wm3::Vector3f::Zero())
   , mGoalPos(Wm3::Vector3f::Zero())
   , mTrackFormationTarget(0)
@@ -158,7 +163,7 @@ CAiNavigatorAir::CAiNavigatorAir(Unit* const unit)
  */
 CAiNavigatorAir::~CAiNavigatorAir()
 {
-  mDestinationUnitLink.ResetFromObject(nullptr);
+  mDestinationEntity.ResetFromObject(nullptr);
 }
 
 /**
@@ -177,10 +182,10 @@ void CAiNavigatorAir::MemberDeserialize(CAiNavigatorAir* const object, gpg::Read
   const gpg::RRef ownerRef{};
   archive->Read(CachedCAiNavigatorImplType(), object, ownerRef);
 
-  WeakPtr<Unit> destination{};
+  WeakPtr<Entity> destination{};
   archive->Read(
-    CachedWeakUnitType(),
-    object ? static_cast<void*>(&object->mDestinationUnitLink) : static_cast<void*>(&destination),
+    CachedWeakEntityType(),
+    object ? static_cast<void*>(&object->mDestinationEntity) : static_cast<void*>(&destination),
     ownerRef
   );
 
@@ -221,10 +226,10 @@ void CAiNavigatorAir::MemberSerialize(const CAiNavigatorAir* const object, gpg::
   const gpg::RRef ownerRef{};
   archive->Write(CachedCAiNavigatorImplType(), object, ownerRef);
 
-  const WeakPtr<Unit> destination{};
+  const WeakPtr<Entity> destination{};
   archive->Write(
-    CachedWeakUnitType(),
-    object ? static_cast<const void*>(&object->mDestinationUnitLink) : static_cast<const void*>(&destination),
+    CachedWeakEntityType(),
+    object ? static_cast<const void*>(&object->mDestinationEntity) : static_cast<const void*>(&destination),
     ownerRef
   );
 
@@ -255,7 +260,7 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
   }
 
   mTrackFormationTarget = 0;
-  mDestinationUnitLink.ResetFromObject(nullptr);
+  mDestinationEntity.ResetFromObject(nullptr);
 
   mGoalPos = BuildGoalWorldPos(goal);
   mCurrentTargetPos = mGoalPos;
@@ -284,9 +289,9 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
 /**
  * Address: 0x005A4A70 (FUN_005A4A70)
  */
-void CAiNavigatorAir::SetDestUnit(Unit* const destinationUnit)
+void CAiNavigatorAir::SetDestUnit(Entity* const destinationEntity)
 {
-  mDestinationUnitLink.ResetFromObject(destinationUnit);
+  mDestinationEntity.ResetFromObject(destinationEntity);
   UpdateCurrentTargetFromDestinationEntity();
 }
 
@@ -442,8 +447,8 @@ int CAiNavigatorAir::Execute()
     return 1;
   }
 
-  Unit* const destinationUnit = mDestinationUnitLink.GetObjectPtr();
-  if (destinationUnit && destinationUnit->IsMobile() && HasMovedSincePrev(*destinationUnit) &&
+  Entity* const destinationEntity = mDestinationEntity.GetObjectPtr();
+  if (destinationEntity && destinationEntity->IsMobile() && HasMovedSincePrev(*destinationEntity) &&
       mUnit->IsInCategory("TARGETCHASER")) {
     UpdateCurrentTargetFromDestinationEntity();
     return 1;
@@ -491,7 +496,7 @@ int CAiNavigatorAir::Execute()
   if (mUnit->UnitMotion && mUnit->UnitMotion->AtTarget() &&
       static_cast<std::uint16_t>(currentTargetCellX) == static_cast<std::uint16_t>(goalCellX) &&
       static_cast<std::uint16_t>(currentTargetCellZ) == static_cast<std::uint16_t>(goalCellZ)) {
-    if (!mDestinationUnitLink.HasValue()) {
+    if (!mDestinationEntity.HasValue()) {
       mStatus = AINAVSTATUS_Idle;
       DispatchNavigatorEvent(AINAVEVENT_Succeeded);
       return 1;
@@ -588,15 +593,17 @@ void CAiNavigatorAir::ApplyCurrentTargetToMotion()
  */
 void CAiNavigatorAir::UpdateCurrentTargetFromDestinationEntity()
 {
-  Unit* const destinationUnit = mDestinationUnitLink.GetObjectPtr();
-  if (!destinationUnit) {
+  Entity* const destinationEntity = mDestinationEntity.GetObjectPtr();
+  if (!destinationEntity) {
     AbortMove();
     return;
   }
 
-  mCurrentTargetPos = destinationUnit->GetPosition();
+  // 0x005A4EC3 passes `&destination->Position` (Entity +0xAC) straight to
+  // motion and never writes `mCurrentTargetPos` - the chase target lives on
+  // the entity, so re-reading it each retarget is the point.
   if (mUnit && mUnit->UnitMotion) {
-    mUnit->UnitMotion->SetTarget(mCurrentTargetPos, Wm3::Vector3f::Zero(), LAYER_None);
+    mUnit->UnitMotion->SetTarget(destinationEntity->Position, Wm3::Vector3f::Zero(), LAYER_None);
   }
   mStatus = AINAVSTATUS_Steering;
 }

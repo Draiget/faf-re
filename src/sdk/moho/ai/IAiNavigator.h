@@ -22,6 +22,7 @@ namespace LuaPlus
 
 namespace moho
 {
+  class Entity;
   class Unit;
   class CAiPathNavigator;
 
@@ -180,8 +181,20 @@ namespace moho
      * Address: 0x005A4A70 (FUN_005A4A70, CAiNavigatorAir::SetDestUnit)
      *
      * VFTable SLOT: 3
+     *
+     * What it does:
+     * Points this navigator at a live entity instead of a fixed goal cell, so
+     * the mover keeps chasing it as it moves.
+     *
+     * The destination is an `Entity`, not a `Unit`: both implementations store
+     * it in a `WeakPtr<Entity>` (the serializers name the reflected type
+     * `.?AV?$WeakPtr@VEntity@Moho@@@Moho@@` at 0x00F6B8A4, read at 0x005A8FCC
+     * and 0x005A9000), and both read its position straight off `Entity` -
+     * 0x005A4191 loads `[dest+0xB4]`/`[dest+0xAC]`, which is `Entity::Position`.
+     * That is what lets a unit attack something it only sees on radar, because
+     * the thing the attack task hands over is then a `ReconBlip`, not a `Unit`.
      */
-    virtual void SetDestUnit(Unit* destinationUnit) = 0;
+    virtual void SetDestUnit(Entity* destinationEntity) = 0;
 
     /**
      * Address: 0x005A3750 (FUN_005A3750, CAiNavigatorImpl::AbortMove)

@@ -62,7 +62,7 @@ namespace moho
      *
      * VFTable SLOT: 3
      */
-    void SetDestUnit(Unit* destinationUnit) override;
+    void SetDestUnit(Entity* destinationEntity) override;
 
     /**
      * Address: 0x005A4F00 (FUN_005A4F00)
@@ -170,7 +170,8 @@ namespace moho
      * Address: 0x005A4EA0 (FUN_005A4EA0)
      *
      * What it does:
-     * Retargets motion to destination weak-link unit, or aborts when link is missing.
+     * Retargets motion at the destination entity, or aborts the move when that
+     * entity is gone.
      */
     void UpdateCurrentTargetFromDestinationEntity();
 
@@ -185,7 +186,13 @@ namespace moho
   public:
     static gpg::RType* sType;
 
-    WeakPtr<Unit> mDestinationUnitLink;  // +0x68
+    /**
+     * What this navigator is chasing, if anything. Reflected as
+     * `WeakPtr<Entity>` (`.?AV?$WeakPtr@VEntity@Moho@@@Moho@@`, 0x00F6B8A4)
+     * by both serializers - an attack order on something seen only on radar
+     * puts a `ReconBlip` in here, not a `Unit`.
+     */
+    WeakPtr<Entity> mDestinationEntity;  // +0x68
     Wm3::Vector3f mCurrentTargetPos;     // +0x70
     Wm3::Vector3f mGoalPos;              // +0x7C
     std::uint8_t mTrackFormationTarget;  // +0x88
@@ -194,8 +201,8 @@ namespace moho
 
   static_assert(sizeof(CAiNavigatorAir) == 0x8C, "CAiNavigatorAir size must be 0x8C");
   static_assert(
-    offsetof(CAiNavigatorAir, mDestinationUnitLink) == 0x68,
-    "CAiNavigatorAir::mDestinationUnitLink offset must be 0x68"
+    offsetof(CAiNavigatorAir, mDestinationEntity) == 0x68,
+    "CAiNavigatorAir::mDestinationEntity offset must be 0x68"
   );
   static_assert(
     offsetof(CAiNavigatorAir, mCurrentTargetPos) == 0x70, "CAiNavigatorAir::mCurrentTargetPos offset must be 0x70"

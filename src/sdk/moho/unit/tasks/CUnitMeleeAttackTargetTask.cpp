@@ -774,7 +774,7 @@ namespace moho
       return;
     }
 
-    navigator->SetDestUnit(static_cast<Unit*>(destinationEntity));
+    navigator->SetDestUnit(destinationEntity);
     if (destinationEntity == nullptr) {
       return;
     }

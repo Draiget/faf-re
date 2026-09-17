@@ -436,7 +436,7 @@ int moho::cfunc_CAiNavigatorImplSetDestUnitL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject destinationEntityObject(LuaPlus::LuaStackObject(state, 2));
   Entity* const destinationEntity = SCR_FromLua_Entity(destinationEntityObject, state);
-  navigator->SetDestUnit(static_cast<Unit*>(destinationEntity));
+  navigator->SetDestUnit(destinationEntity);
   return 0;
 }
 
