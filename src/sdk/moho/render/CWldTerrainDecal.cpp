@@ -250,7 +250,7 @@ namespace moho
    * database, and initializes the default scale/position/orientation lanes.
    */
   CWldTerrainDecal::CWldTerrainDecal(SpatialDB_MeshInstance* const spatialDbOwner, IWldTerrainRes* const terrainRes)
-    : mLinkHead(nullptr)
+    : WeakObject{}
     , mTerrainRes(terrainRes)
     , mEntry{}
     , mVecIndex(0)
@@ -292,8 +292,8 @@ namespace moho
    * Address: 0x0089CBF0 (FUN_0089CBF0, Moho::CWldTerrainDecal::~CWldTerrainDecal body)
    *
    * What it does:
-   * Releases the counted runtime reference lanes and clears spatial-db
-   * registration before object teardown.
+   * Releases the counted runtime reference lanes, clears spatial-db
+   * registration, and drops every weak observer still aimed at this decal.
    */
   CWldTerrainDecal::~CWldTerrainDecal()
   {
@@ -303,12 +303,11 @@ namespace moho
 
     mEntry.ClearRegistration();
 
-    while (mLinkHead != nullptr) {
-      CWldTerrainDecalLink* const nextLink = mLinkHead->mNext;
-      mLinkHead->mPrev = nullptr;
-      mLinkHead->mNext = nullptr;
-      mLinkHead = nextLink;
-    }
+    // 0x0089CC5C..0x0089CC7B: the same head-reloading drain
+    // `~CScriptObject` (0x004C7340) carries, over the `WeakObject` base at
+    // +0x04. It is what leaves `ScriptedDecal`/`SelectionDragger3D`'s decal
+    // lanes empty rather than dangling when the manager destroys a decal.
+    DetachAllWeakReferences();
   }
 
   /**

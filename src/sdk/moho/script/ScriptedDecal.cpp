@@ -12,13 +12,17 @@
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/SCR_FromLua.h"
+#include "moho/math/Vector3f.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/misc/ID3DDeviceResources.h"
+#include "moho/render/camera/CameraImpl.h"
+#include "moho/render/CWldTerrainDecal.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "Wm3Vector2.h"
 
 using namespace moho;
@@ -60,82 +64,6 @@ namespace
   constexpr const char* kScriptedDecalDestroyHelpText = "Kill it";
   constexpr const char* kScriptedDecalCreateDecalName = "_c_CreateDecal";
   constexpr const char* kScriptedDecalCreateDecalHelpText = "Create a decal in the user layer";
-
-  constexpr std::uintptr_t kDeletedRuntimeLinkTag = 0x4;
-
-  class IScriptedDecalWorldCamera
-  {
-  public:
-    virtual void Slot00() = 0;
-    virtual void Slot01() = 0;
-    virtual void Slot02() = 0;
-    virtual void Slot03() = 0;
-    virtual void Slot04() = 0;
-    virtual void Slot05() = 0;
-    virtual void Slot06() = 0;
-    virtual Wm3::Vector3f* CameraScreenToSurface(Wm3::Vector3f* outSurfacePoint, const Wm3::Vector2f* screenPoint) = 0;
-  };
-
-  class IDecalRuntimeEntry
-  {
-  public:
-    virtual void Slot00() = 0;
-    virtual void Slot01_SetTexturePath(const std::string& texturePath, std::int32_t lane) = 0;
-    virtual void Slot02() = 0;
-    virtual void Slot03_SetUnknown(std::int32_t value) = 0;
-    virtual void Slot04() = 0;
-    virtual void Slot05() = 0;
-    virtual void Slot06_CommitTransform() = 0;
-  };
-
-  struct ScriptedDecalRuntimeEntryView
-  {
-    IDecalRuntimeEntry* mVftable;          // +0x00
-    moho::ScriptedDecalRuntimeLink mLink;  // +0x04
-    moho::SpatialDB_MeshInstance mSpatialEntry; // +0x0C
-    std::uint8_t pad_0014_001C[0x1C - 0x14];
-    std::int32_t mDecalMode;               // +0x1C
-    std::int32_t mRuntimeFlags;            // +0x20
-    std::uint8_t pad_0024_005C[0x5C - 0x24];
-    float mScaleX;                         // +0x5C
-    float mScaleY;                         // +0x60
-    float mScaleZ;                         // +0x64
-    Wm3::Vector3f mWorldPosition;          // +0x68
-    std::uint8_t pad_0074_0080[0x80 - 0x74];
-    float mDissolveCutoff;                 // +0x80
-    float mDissolveFade;                   // +0x84
-  };
-
-  static_assert(offsetof(ScriptedDecalRuntimeEntryView, mLink) == 0x04, "ScriptedDecalRuntimeEntryView::mLink offset must be 0x04");
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mSpatialEntry) == 0x0C,
-    "ScriptedDecalRuntimeEntryView::mSpatialEntry offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mDecalMode) == 0x1C,
-    "ScriptedDecalRuntimeEntryView::mDecalMode offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mRuntimeFlags) == 0x20,
-    "ScriptedDecalRuntimeEntryView::mRuntimeFlags offset must be 0x20"
-  );
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mScaleX) == 0x5C,
-    "ScriptedDecalRuntimeEntryView::mScaleX offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mWorldPosition) == 0x68,
-    "ScriptedDecalRuntimeEntryView::mWorldPosition offset must be 0x68"
-  );
-  static_assert(
-    offsetof(ScriptedDecalRuntimeEntryView, mDissolveCutoff) == 0x80,
-    "ScriptedDecalRuntimeEntryView::mDissolveCutoff offset must be 0x80"
-  );
-
-  [[nodiscard]] bool IsValidWorldPosition(const Wm3::Vector3f& worldPosition) noexcept
-  {
-    return std::isfinite(worldPosition.x) && std::isfinite(worldPosition.y) && std::isfinite(worldPosition.z);
-  }
 
   /**
    * Address: 0x0087F010 (FUN_0087F010)
@@ -186,97 +114,6 @@ namespace
     return fallbackSet;
   }
 
-  [[nodiscard]] ScriptedDecalRuntimeEntryView*
-  RuntimeEntryFromLink(moho::ScriptedDecalRuntimeLink* const runtimeLink) noexcept
-  {
-    if (runtimeLink == nullptr) {
-      return nullptr;
-    }
-
-    const std::uintptr_t linkAddress = reinterpret_cast<std::uintptr_t>(runtimeLink);
-    if (linkAddress <= kDeletedRuntimeLinkTag) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<ScriptedDecalRuntimeEntryView*>(
-      linkAddress - offsetof(ScriptedDecalRuntimeEntryView, mLink)
-    );
-  }
-
-  /**
-   * Address: 0x008679E0 (FUN_008679E0, sub_8679E0)
-   *
-   * What it does:
-   * Relinks one scripted-decal runtime-link node into or out of the runtime
-   * owner chain (`runtimeOwner + 0x04` link lane).
-   */
-  moho::ScriptedDecalRuntimeLink*
-  RelinkRuntimeNode(moho::ScriptedDecalRuntimeLink* const linkNode, void* const runtimeOwner) noexcept
-  {
-    auto* const newHead = runtimeOwner
-      ? reinterpret_cast<moho::ScriptedDecalRuntimeLink*>(
-          reinterpret_cast<std::uintptr_t>(runtimeOwner) + sizeof(std::uint32_t)
-        )
-      : nullptr;
-
-    moho::ScriptedDecalRuntimeLink* const currentHead = linkNode->mHead;
-    if (newHead == currentHead) {
-      return linkNode;
-    }
-
-    if (currentHead != nullptr) {
-      moho::ScriptedDecalRuntimeLink* cursor = currentHead;
-      while (cursor->mHead != linkNode) {
-        cursor = reinterpret_cast<moho::ScriptedDecalRuntimeLink*>(
-          reinterpret_cast<std::uintptr_t>(cursor->mHead) + sizeof(std::uint32_t)
-        );
-      }
-      cursor->mHead = linkNode->mNext;
-    }
-
-    linkNode->mHead = newHead;
-    if (newHead != nullptr) {
-      linkNode->mNext = newHead->mHead;
-      newHead->mHead = linkNode;
-    } else {
-      linkNode->mNext = nullptr;
-    }
-
-    return linkNode;
-  }
-
-  /**
-   * `ScriptedDecal::ScriptedDecal` (0x0087EB60) fills its service lane from
-   * `session->mWldMap->mTerrainRes->GetDecalManager()`, which returns the
-   * engine's one `IDecalManager`.
-   *
-   * `IDecalRuntimeService` is a slot-shaped stand-in for that interface, and
-   * the three slots this file dispatches through line up with it exactly:
-   *
-   *   vtable +0x1C (slot 7)  Slot07               -> IDecalManager::LoadDecal
-   *   vtable +0x24 (slot 9)  RemoveRuntimeDecal   -> IDecalManager::DestroyDecal
-   *   vtable +0x48 (slot 18) Slot18_Commit...     -> IDecalManager::AddSplat
-   *
-   * `ScriptedDecalRuntimeEntryView` is likewise `CWldTerrainDecal`: the link
-   * node this file backs up four bytes from is `mLinkHead` (+0x04), and the
-   * lanes it writes are `mScale` (+0x5C), `mType` (+0x1C), `mFidelity`
-   * (+0x20), `mCutoffLOD` (+0x80) and `mNearCutoff` (+0x84). Collapsing both
-   * stand-ins onto the real types is follow-up work; this returns the real
-   * manager so the runtime entry actually gets created.
-   */
-  [[nodiscard]] IDecalRuntimeService* ResolveDecalService(CWldSession* const session) noexcept
-  {
-    if (session == nullptr || session->mWldMap == nullptr) {
-      return nullptr;
-    }
-
-    IWldTerrainRes* const terrainRes = session->mWldMap->mTerrainRes;
-    if (terrainRes == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<IDecalRuntimeService*>(terrainRes->GetDecalManager());
-  }
 } // namespace
 
 CScrLuaMetatableFactory<ScriptedDecal> CScrLuaMetatableFactory<ScriptedDecal>::sInstance{};
@@ -306,32 +143,35 @@ gpg::RType* ScriptedDecal::sType = nullptr;
  */
 ScriptedDecal::ScriptedDecal(CWldSession* const session, LuaPlus::LuaObject luaObject)
   : CScriptObject()
+  , mDecal{}
+  , mDynamicTexture{}
+  , mDecalManager(session->mWldMap->mTerrainRes->GetDecalManager())
+  , mWorldCamera(CAM_GetManager()->GetCamera("WorldCamera"))
+  , mScale{1.0f, 1.0f, 1.0f}
+  // The binary leaves the position lane uninitialized here (0x0087EB60 writes
+  // +0x34..+0x40 and +0x4C..+0x54 and nothing else), and `SetScale` reads it
+  // before any `SetPosition` supplies one - FAF's cursor decals are built as
+  // SetTexture/SetScale and only positioned on the next frame. Zeroing it
+  // keeps that first frame's decal at the map origin instead of at whatever
+  // the allocator left behind.
+  , mWorldPosition{}
 {
-  mRuntimeLink.mHead = nullptr;
-  mRuntimeLink.mNext = nullptr;
-  mDynamicTexture.reset();
-  mDecalService = nullptr;
-  mWorldCamera = nullptr;
-  mScaleX = 1.0f;
-  mScaleY = 1.0f;
-  mScaleZ = 1.0f;
-  mDecalService = ResolveDecalService(session);
-  mWorldCamera = CAM_GetManager()->GetCamera("WorldCamera");
-
   SetLuaObject(luaObject);
 }
 
 /**
  * Address: 0x0087EC20 (FUN_0087EC20, non-deleting body)
+ *
+ * What it does:
+ * Hands this decal's terrain decal back to the manager. The weak lane's own
+ * unlink, the texture release and the base teardown that follow it in the
+ * binary are compiler-emitted member/base destruction.
  */
 ScriptedDecal::~ScriptedDecal()
 {
-  ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead);
-  if (runtimeEntry && mDecalService) {
-    mDecalService->RemoveRuntimeDecal(runtimeEntry);
+  if (CWldTerrainDecal* const decal = mDecal.GetObjectPtr(); decal != nullptr) {
+    mDecalManager->DestroyDecal(decal);
   }
-
-  RelinkRuntimeNode(&mRuntimeLink, nullptr);
 }
 
 /**
@@ -415,110 +255,101 @@ int moho::cfunc__c_CreateDecalL(LuaPlus::LuaState* const state)
  * Address: 0x0087ECE0 (FUN_0087ECE0, Moho::ScriptedDecal::SetPosition)
  *
  * What it does:
- * Validates and stores one world-space position, then updates the linked
- * runtime decal entry.
+ * Stores one world-space position, shifts the decal quad half its own extent
+ * so it is centred on that point, and republishes the terrain decal's
+ * transform. A NaN position is dropped without touching any lane.
  */
-bool ScriptedDecal::SetPosition(const Wm3::Vector3f* const worldPosition)
+void ScriptedDecal::SetPosition(const Wm3::Vector3f& worldPosition)
 {
-  if (worldPosition == nullptr || !IsValidWorldPosition(*worldPosition)) {
-    return false;
+  if (!IsValidVector3f(worldPosition)) {
+    return;
   }
 
-  if (mDecalService) {
-    mDecalService->Slot27_NotifyRuntimeUpdate();
+  if (mDecalManager != nullptr) {
+    mDecalManager->MarkPendingChanges();
   }
 
-  mWorldPosition = *worldPosition;
-  mWorldPosition.x -= mScaleX * 0.5f;
-  mWorldPosition.z -= mScaleZ * 0.5f;
+  mWorldPosition = worldPosition;
+  mWorldPosition.x -= mScale.x * 0.5f;
+  mWorldPosition.z -= mScale.z * 0.5f;
 
-  if (ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead); runtimeEntry != nullptr) {
-    runtimeEntry->mWorldPosition = mWorldPosition;
-    runtimeEntry->mVftable->Slot06_CommitTransform();
+  // 0x0087ED43 dereferences the weak lane without a null test, so the binary
+  // faults here when no `SetTexture` call has built a decal yet. Skipping is
+  // the only divergence, and it only covers the case the original crashed in.
+  if (CWldTerrainDecal* const decal = mDecal.GetObjectPtr(); decal != nullptr) {
+    decal->mPosition = mWorldPosition;
+    decal->Update();
   }
-
-  return true;
 }
 
 /**
  * Address: 0x0087ED70 (FUN_0087ED70, Moho::ScriptedDecal::SetPositionByScreen)
  *
  * What it does:
- * Projects one screen-space point through the active world camera and applies
- * the resulting world-space position.
+ * Projects one screen-space point onto the terrain through the world camera
+ * and applies the resulting world-space position.
  */
-bool ScriptedDecal::SetPositionByScreen(const Wm3::Vector2f* const screenPoint)
+void ScriptedDecal::SetPositionByScreen(const Wm3::Vector2f& screenPoint)
 {
-  Wm3::Vector3f worldPoint{};
-  auto* const camera = reinterpret_cast<IScriptedDecalWorldCamera*>(mWorldCamera);
-  return SetPosition(camera->CameraScreenToSurface(&worldPoint, screenPoint));
+  SetPosition(mWorldCamera->CameraScreenToSurface(screenPoint));
 }
 
 /**
  * Address: 0x0087ED90 (FUN_0087ED90, Moho::ScriptedDecal::SetScale)
  *
  * What it does:
- * Updates local/runtime decal scale lanes and reapplies world positioning.
+ * Resizes this decal and the terrain decal it owns, then reapplies the current
+ * position so the quad stays centred on it.
  */
-bool ScriptedDecal::SetScale(const Wm3::Vector3f* const scale)
+void ScriptedDecal::SetScale(const Wm3::Vector3f& scale)
 {
-  mScaleX = scale->x;
-  mScaleY = scale->y;
-  mScaleZ = scale->z;
+  mScale = scale;
 
-  ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead);
-  runtimeEntry->mScaleX = scale->x;
-  runtimeEntry->mScaleY = scale->y;
-  runtimeEntry->mScaleZ = scale->z;
-  runtimeEntry->mVftable->Slot06_CommitTransform();
-  return SetPosition(&mWorldPosition);
+  // Same missing null test as `SetPosition` above, at 0x0087EDA4.
+  if (CWldTerrainDecal* const decal = mDecal.GetObjectPtr(); decal != nullptr) {
+    decal->mScale = scale;
+    decal->Update();
+  }
+
+  SetPosition(mWorldPosition);
 }
 
 /**
  * Address: 0x0087EDE0 (FUN_0087EDE0, Moho::ScriptedDecal::SetTexture)
  *
  * What it does:
- * Loads one dynamic texture sheet by path and refreshes this decal's
- * runtime decal-entry state.
+ * Loads one texture by path and rebuilds this decal's terrain decal around it.
+ * The previous decal is handed back to the manager, a fresh one is created
+ * with the texture in name slot 0 and both distance-fade cutoffs pushed out to
+ * FLT_MAX so the decal never fades with camera distance, and it is added to the
+ * manager's splat list. A texture that fails to load leaves this decal without
+ * a terrain decal, exactly as in the binary.
  */
-ScriptedDecal* ScriptedDecal::SetTexture(const char* const texturePath)
+void ScriptedDecal::SetTexture(const char* const texturePath)
 {
-  if (
-    mDecalService != nullptr && mRuntimeLink.mHead != nullptr &&
-    reinterpret_cast<std::uintptr_t>(mRuntimeLink.mHead) != kDeletedRuntimeLinkTag
-  ) {
-    if (ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead); runtimeEntry != nullptr) {
-      mDecalService->RemoveRuntimeDecal(runtimeEntry);
-    }
+  if (CWldTerrainDecal* const previousDecal = mDecal.GetObjectPtr(); previousDecal != nullptr) {
+    mDecalManager->DestroyDecal(previousDecal);
   }
 
   ID3DDeviceResources::TextureResourceHandle loadedTexture;
-  if (CD3DDevice* const device = D3D_GetDevice(); device != nullptr) {
-    if (ID3DDeviceResources* const resources = device->GetResources(); resources != nullptr) {
-      resources->GetTexture(loadedTexture, texturePath, 0, true);
-    }
-  }
+  D3D_GetDevice()->GetResources()->GetTexture(loadedTexture, texturePath, 0, true);
   mDynamicTexture = loadedTexture;
 
-  if (mDynamicTexture && mDecalService != nullptr) {
-    void* const runtimeOwner = mDecalService->Slot07(0);
-    RelinkRuntimeNode(&mRuntimeLink, runtimeOwner);
-
-    if (ScriptedDecalRuntimeEntryView* const runtimeEntry = RuntimeEntryFromLink(mRuntimeLink.mHead); runtimeEntry != nullptr) {
-      runtimeEntry->mRuntimeFlags = 0;
-      runtimeEntry->mDecalMode = 4;
-
-      const std::string safeTexturePath = (texturePath != nullptr) ? texturePath : "";
-      runtimeEntry->mVftable->Slot01_SetTexturePath(safeTexturePath, 0);
-      runtimeEntry->mDissolveFade = 0.0f;
-      runtimeEntry->mDissolveCutoff = std::numeric_limits<float>::max();
-      runtimeEntry->mSpatialEntry.UpdateDissolveCutoff(runtimeEntry->mDissolveCutoff);
-      runtimeEntry->mVftable->Slot03_SetUnknown(0);
-      mDecalService->Slot18_CommitRuntimeDecal(runtimeEntry);
-    }
+  if (!mDynamicTexture) {
+    return;
   }
 
-  return this;
+  CWldTerrainDecal* const decal = mDecalManager->LoadDecal(nullptr);
+  mDecal.Set(decal);
+
+  decal->mFidelity = 0;
+  decal->mType = WldTerrainDecalType_WaterAlbedo;
+  decal->SetName(texturePath, 0);
+  decal->mNearCutoff = 0.0f;
+  decal->mCutoffLOD = std::numeric_limits<float>::max();
+  decal->mEntry.UpdateDissolveCutoff(std::numeric_limits<float>::max());
+  decal->EnableFlatOptimization(false);
+  mDecalManager->AddSplat(decal);
 }
 
 /**
@@ -628,7 +459,7 @@ int moho::cfunc_ScriptedDecalSetScaleL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject scaleObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f scale = SCR_FromLuaCopy<Wm3::Vector3f>(scaleObject);
-  (void)decal->SetScale(&scale);
+  decal->SetScale(scale);
   return 0;
 }
 
@@ -688,7 +519,7 @@ int moho::cfunc_ScriptedDecalSetPositionByScreenL(LuaPlus::LuaState* const state
 
   const LuaPlus::LuaObject screenPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector2f screenPoint = SCR_FromLuaCopy<Wm3::Vector2f>(screenPointObject);
-  (void)decal->SetPositionByScreen(&screenPoint);
+  decal->SetPositionByScreen(screenPoint);
   return 0;
 }
 
@@ -739,10 +570,13 @@ int moho::cfunc_ScriptedDecalSetPositionL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject decalObject(LuaPlus::LuaStackObject(state, 1));
   ScriptedDecal* const decal = SCR_FromLua_ScriptedDecal(decalObject, state);
 
-  // Binary parity note (FUN_0087F860): argument lane is read from stack index 3.
-  const LuaPlus::LuaObject worldPointObject(LuaPlus::LuaStackObject(state, 3));
+  // 0x0087F8F7 stages the argument's stack index as 2, the same lane every
+  // other binder in this file reads. The previous "binary parity" note here
+  // claimed index 3, which is past the end of a `decal:SetPosition(pos)` call
+  // and fed the decal a junk position every frame.
+  const LuaPlus::LuaObject worldPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f worldPoint = SCR_FromLuaCopy<Wm3::Vector3f>(worldPointObject);
-  (void)decal->SetPosition(&worldPoint);
+  decal->SetPosition(worldPoint);
   return 0;
 }
 
