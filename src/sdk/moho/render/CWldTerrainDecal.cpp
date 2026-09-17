@@ -583,7 +583,9 @@ namespace moho
     CAnimTexture::FrameRef frame{};
     const float framePhase = ((static_cast<float>(frameSeed) + phaseOffset) * mFadeDistance * 0.1f) + mUnknown94;
     static_cast<const CAnimTexture*>(resource)->GetFrameAt(frame, framePhase);
-    return boost::SharedPtrFromRawRetained(frame);
+    // GetFrame already took the one reference the result owns (0x0089DB50 hands
+    // the (px, pi) pair straight back); adopt it rather than retaining again.
+    return boost::SharedPtrFromRawAdopt(frame);
   }
 
   /**
