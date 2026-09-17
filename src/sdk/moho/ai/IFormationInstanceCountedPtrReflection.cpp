@@ -108,12 +108,6 @@ namespace
     return reinterpret_cast<moho::IFormationInstance**>(obj);
   }
 
-  template <class TObject>
-  [[nodiscard]] moho::IntrusiveRefCountView<TObject>& RefCountView(TObject* object) noexcept
-  {
-    return *reinterpret_cast<moho::IntrusiveRefCountView<TObject>*>(object);
-  }
-
   [[nodiscard]] gpg::RRef MakeIFormationInstanceRef(moho::IFormationInstance* value)
   {
     gpg::RRef out{};
@@ -281,9 +275,9 @@ namespace moho
    * broadcaster node at `+0x08` to singleton links.
    */
   IFormationInstance::IFormationInstance()
+    : mSharedCount(0)
   {
     auto& view = *reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(this);
-    view.mBaseRuntimeWord = 0u;
     view.broadcaster.ListResetLinks();
   }
 
@@ -544,15 +538,14 @@ namespace moho
 
     if (oldValue != newValue) {
       if (oldValue) {
-        auto& oldView = RefCountView(oldValue);
-        if (--oldView.mRefCount == 0) {
+        if (--oldValue->mSharedCount == 0) {
           oldValue->operator_delete(1);
         }
       }
 
       *slot = newValue;
       if (newValue) {
-        ++RefCountView(newValue).mRefCount;
+        ++newValue->mSharedCount;
       }
     }
   }

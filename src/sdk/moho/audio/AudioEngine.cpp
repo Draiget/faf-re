@@ -129,17 +129,20 @@ boost::shared_ptr<moho::AudioEngine>* ConstructSharedAudioEngineFromRaw(
 
 namespace
 {
-  struct SpCountedImplAudioEngineRuntimeView
+  /**
+   * The payload half of `sp_counted_impl_p<AudioEngineImpl*>`. Deriving from
+   * boost's own control-block base puts the vptr and both counts exactly where
+   * boost puts them, so the owned-pointer slot lands at +0x0C without this
+   * file having to name a vtable lane of its own.
+   */
+  struct SpCountedImplAudioEngineBlock : boost::detail::sp_counted_base
   {
-    void* mVftable;                         // +0x00
-    std::int32_t mUseCount;                 // +0x04
-    std::int32_t mWeakCount;                // +0x08
-    moho::AudioEngineImpl** mOwnedSlot;     // +0x0C
+    moho::AudioEngineImpl** mOwnedSlot; // +0x0C
   };
 
   static_assert(
-    sizeof(SpCountedImplAudioEngineRuntimeView) == 0x10,
-    "SpCountedImplAudioEngineRuntimeView size must be 0x10"
+    sizeof(SpCountedImplAudioEngineBlock) == 0x10,
+    "SpCountedImplAudioEngineBlock size must be 0x10"
   );
 
   void DestroyAudioEngineImplOwnedSlotCore(moho::AudioEngineImpl** const ownedSlot) noexcept
@@ -166,7 +169,7 @@ namespace
  * pointed `AudioEngineImpl` and deleting the slot storage.
  */
 void DestroyAudioEngineImplOwnedByCountedBlock(
-  SpCountedImplAudioEngineRuntimeView* const countedBlock
+  SpCountedImplAudioEngineBlock* const countedBlock
 ) noexcept
 {
   if (countedBlock == nullptr) {
@@ -304,7 +307,6 @@ namespace
   public:
     explicit AudioWaveBankLoaderBase(moho::AudioEngineImpl* const engine)
       : mWaveBank(nullptr)
-      , mReserved08(0u)
       , mName()
       , mEngine(engine)
     {
@@ -315,39 +317,24 @@ namespace
     [[nodiscard]] virtual bool Load(gpg::StrArg waveBankPath) = 0;
 
     moho::IXACTWaveBank* mWaveBank; // +0x04
-    std::uint32_t mReserved08;      // +0x08
-    msvc8::string mName;            // +0x0C
+    msvc8::string mName;            // +0x08
     moho::AudioEngineImpl* mEngine; // +0x24
   };
 
-  struct AudioWaveBankLoaderBaseRuntimeView
-  {
-    void* mVftable;                 // +0x00
-    moho::IXACTWaveBank* mWaveBank; // +0x04
-    std::uint32_t mReserved08;      // +0x08
-    msvc8::string mName;            // +0x0C
-    moho::AudioEngineImpl* mEngine; // +0x24
-  };
-  static_assert(
-    sizeof(AudioWaveBankLoaderBaseRuntimeView) == sizeof(AudioWaveBankLoaderBase),
-    "AudioWaveBankLoaderBaseRuntimeView size must match AudioWaveBankLoaderBase"
-  );
-  static_assert(
-    offsetof(AudioWaveBankLoaderBaseRuntimeView, mWaveBank) == 0x04,
-    "AudioWaveBankLoaderBaseRuntimeView::mWaveBank offset must be 0x04"
-  );
-  static_assert(
-    offsetof(AudioWaveBankLoaderBaseRuntimeView, mName) == 0x0C,
-    "AudioWaveBankLoaderBaseRuntimeView::mName offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(AudioWaveBankLoaderBaseRuntimeView, mEngine) == offsetof(AudioWaveBankLoaderBase, mEngine),
-    "AudioWaveBankLoaderBaseRuntimeView::mEngine offset must match AudioWaveBankLoaderBase"
-  );
-  static_assert(
-    sizeof(AudioWaveBankLoaderBase) == sizeof(AudioWaveBankLoaderBaseRuntimeView),
-    "AudioWaveBankLoaderBase size must match AudioWaveBankLoaderBaseRuntimeView"
-  );
+  // The class carries a vtable, so its own fields start at +0x04. Asserting
+  // on it directly says that; the parallel struct this replaces carried a
+  // stand-in vtable lane and asserted only that the copy matched itself,
+  // which is how it kept an invented `mReserved08` at +0x08 and pushed every
+  // field after it four bytes late. The binary has no such lane:
+  // `RWaveBankResInMemory::Load` reads the engine at `[edi+0x24]` (0x004DAC5A)
+  // and the mapped buffer at `[edi+0x28]` (0x004DABEF), and
+  // `RWaveBankResStreaming::LoadBank` reads the same engine lane at
+  // `[esi+0x24]` (0x004DAE96) - which is where a 0x1C-byte `msvc8::string`
+  // starting at +0x08 ends.
+  static_assert(offsetof(AudioWaveBankLoaderBase, mWaveBank) == 0x04, "AudioWaveBankLoaderBase::mWaveBank offset must be 0x04");
+  static_assert(offsetof(AudioWaveBankLoaderBase, mName) == 0x08, "AudioWaveBankLoaderBase::mName offset must be 0x08");
+  static_assert(offsetof(AudioWaveBankLoaderBase, mEngine) == 0x24, "AudioWaveBankLoaderBase::mEngine offset must be 0x24");
+  static_assert(sizeof(AudioWaveBankLoaderBase) == 0x28, "AudioWaveBankLoaderBase size must be 0x28");
 
   class AudioStreamingWaveBankLoader final : public AudioWaveBankLoaderBase
   {
@@ -375,18 +362,9 @@ namespace
     HANDLE mFileHandle; // +0x28
   };
 
-  struct AudioStreamingWaveBankLoaderRuntimeView
-  {
-    AudioWaveBankLoaderBaseRuntimeView mBase; // +0x00
-    HANDLE mFileHandle;                       // +0x28
-  };
   static_assert(
-    offsetof(AudioStreamingWaveBankLoaderRuntimeView, mFileHandle) == offsetof(AudioStreamingWaveBankLoader, mFileHandle),
-    "AudioStreamingWaveBankLoaderRuntimeView::mFileHandle offset must match AudioStreamingWaveBankLoader"
-  );
-  static_assert(
-    sizeof(AudioStreamingWaveBankLoaderRuntimeView) == sizeof(AudioStreamingWaveBankLoader),
-    "AudioStreamingWaveBankLoaderRuntimeView size must match AudioStreamingWaveBankLoader"
+    offsetof(AudioStreamingWaveBankLoader, mFileHandle) == 0x28,
+    "AudioStreamingWaveBankLoader::mFileHandle offset must be 0x28"
   );
 
   class AudioInMemoryWaveBankLoader final : public AudioWaveBankLoaderBase
@@ -414,18 +392,9 @@ namespace
     gpg::MemBuffer<const char> mMappedBuffer; // +0x28
   };
 
-  struct AudioInMemoryWaveBankLoaderRuntimeView
-  {
-    AudioWaveBankLoaderBaseRuntimeView mBase; // +0x00
-    gpg::MemBuffer<const char> mMappedBuffer; // +0x28
-  };
   static_assert(
-    offsetof(AudioInMemoryWaveBankLoaderRuntimeView, mMappedBuffer) == offsetof(AudioInMemoryWaveBankLoader, mMappedBuffer),
-    "AudioInMemoryWaveBankLoaderRuntimeView::mMappedBuffer offset must match AudioInMemoryWaveBankLoader"
-  );
-  static_assert(
-    sizeof(AudioInMemoryWaveBankLoaderRuntimeView) == sizeof(AudioInMemoryWaveBankLoader),
-    "AudioInMemoryWaveBankLoaderRuntimeView size must match AudioInMemoryWaveBankLoader"
+    offsetof(AudioInMemoryWaveBankLoader, mMappedBuffer) == 0x28,
+    "AudioInMemoryWaveBankLoader::mMappedBuffer offset must be 0x28"
   );
 
   struct AudioStreamingWaveBankCreateParams

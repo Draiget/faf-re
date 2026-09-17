@@ -125,7 +125,22 @@ namespace moho
     virtual void SetOrientation(const Wm3::Quatf& orientation) = 0;                                       // slot 22
     virtual Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const = 0;                             // slot 23
     virtual EUnitCommandType GetCommandType() const = 0;                                                  // slot 24
+
+    /**
+     * Intrusive reference count, zeroed by the constructor (0x00569450) and
+     * stepped by the reflected counted-pointer type - `RCountedPtrType<
+     * IFormationInstance>::SerLoad` (0x006EA7B0) decrements `[obj+0x04]` and
+     * deletes at zero, `SerSave` increments it - through the interface, not
+     * through any derived class. It lived on `CFormationInstance` before, so
+     * every consumer that only had the interface reached it by laying a
+     * two-field view with a stand-in vtable lane over the object instead.
+     */
+    std::int32_t mSharedCount; // +0x04
   };
 
-  static_assert(sizeof(IFormationInstance) == 0x04, "IFormationInstance size must be 0x04");
+  static_assert(sizeof(IFormationInstance) == 0x08, "IFormationInstance size must be 0x08");
+  static_assert(
+    offsetof(IFormationInstance, mSharedCount) == 0x04,
+    "IFormationInstance::mSharedCount offset must be 0x04"
+  );
 } // namespace moho

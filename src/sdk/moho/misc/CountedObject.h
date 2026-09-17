@@ -96,13 +96,6 @@ namespace moho
     }
   };
 
-  template <class T>
-  struct IntrusiveRefCountView
-  {
-    void* mVftable;
-    std::int32_t mRefCount;
-  };
-
   class CountedObject
   {
   public:

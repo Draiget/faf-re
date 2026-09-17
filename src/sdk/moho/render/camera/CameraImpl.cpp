@@ -668,39 +668,18 @@ namespace
     return reinterpret_cast<CameraTransitionFlagView*>(camera);
   }
 
-  struct RuntimeCameraBaseView
-  {
-    void* mVftable = nullptr;          // +0x00
-    moho::Broadcaster mBroadcaster{};  // +0x04
-  };
-
-  static_assert(sizeof(RuntimeCameraBaseView) == 0x0C, "RuntimeCameraBaseView size must be 0x0C");
-  static_assert(
-    offsetof(RuntimeCameraBaseView, mVftable) == 0x00, "RuntimeCameraBaseView::mVftable offset must be 0x00"
-  );
-  static_assert(
-    offsetof(RuntimeCameraBaseView, mBroadcaster) == 0x04,
-    "RuntimeCameraBaseView::mBroadcaster offset must be 0x04"
-  );
-
-  [[nodiscard]] RuntimeCameraBaseView* AsRuntimeCameraBaseView(moho::CameraImpl* const camera) noexcept
-  {
-    return reinterpret_cast<RuntimeCameraBaseView*>(camera);
-  }
-
   /**
    * Address: 0x007A7DE0 (FUN_007A7DE0)
    *
    * What it does:
-   * Restores one runtime camera-base node to the self-linked broadcaster
-   * sentinel state after construction.
+   * Restores one camera's broadcaster node to the self-linked sentinel state
+   * after construction. The node is `RCamCamera`'s own `Broadcaster` base at
+   * +0x04 - `CameraImpl` reaches it as an ordinary base subobject, so nothing
+   * here needs a layout overlay.
    */
-  [[nodiscard]] RuntimeCameraBaseView* InitializeRuntimeCameraBaseLane(RuntimeCameraBaseView* const cameraBase) noexcept
+  void InitializeCameraBroadcasterLane(moho::Broadcaster& broadcaster) noexcept
   {
-    moho::Broadcaster& broadcaster = cameraBase->mBroadcaster;
-    broadcaster.mNext = &broadcaster;
-    broadcaster.mPrev = &broadcaster;
-    return cameraBase;
+    broadcaster.ListResetLinks();
   }
 
   [[nodiscard]] moho::CameraTrackingBroadcasterLink* AsCameraTrackingBroadcaster(moho::CameraImpl* const camera) noexcept
@@ -1445,7 +1424,7 @@ namespace moho
 
 [[nodiscard]] moho::Broadcaster* moho::CameraBroadcasterLink(moho::CameraImpl* const camera) noexcept
 {
-  return &AsRuntimeCameraBaseView(camera)->mBroadcaster;
+  return static_cast<moho::Broadcaster*>(camera);
 }
 
 /**
@@ -1534,7 +1513,7 @@ moho::CameraImpl::CameraImpl(const gpg::StrArg name, const STIMap& map, LuaPlus:
   // bases now and already fully constructed by the initializer list above.
   // Only the intrusive broadcaster sentinel still needs explicit seeding --
   // `Broadcaster`'s own default state does not self-link.
-  (void)InitializeRuntimeCameraBaseLane(AsRuntimeCameraBaseView(this));
+  InitializeCameraBroadcasterLane(*this);
 
   CameraImplRuntimeView* const runtime = AsRuntimeView(this);
 
