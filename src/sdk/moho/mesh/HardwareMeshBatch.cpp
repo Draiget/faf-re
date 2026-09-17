@@ -379,15 +379,17 @@ namespace moho
       staging.position[0] = source.mLocalPositionX;
       staging.position[1] = source.mLocalPositionY;
       staging.position[2] = source.mLocalPositionZ;
-      staging.vec7C[0] = source.mVec0C[0];
-      staging.vec7C[1] = source.mVec0C[1];
-      staging.vec7C[2] = source.mVec0C[2];
+      // 0x007E79B2..0x007E7A43 (staging record at [esp+0x4C]): SCM +0x0C ->
+      // staging +0x70, SCM +0x18 -> staging +0x88, SCM +0x24 -> staging +0x7C.
+      staging.vec70[0] = source.mVec0C[0];
+      staging.vec70[1] = source.mVec0C[1];
+      staging.vec70[2] = source.mVec0C[2];
       staging.vec88[0] = source.mVec18[0];
       staging.vec88[1] = source.mVec18[1];
       staging.vec88[2] = source.mVec18[2];
-      staging.vec70[0] = source.mVec24[0];
-      staging.vec70[1] = source.mVec24[1];
-      staging.vec70[2] = source.mVec24[2];
+      staging.vec7C[0] = source.mVec24[0];
+      staging.vec7C[1] = source.mVec24[1];
+      staging.vec7C[2] = source.mVec24[2];
       staging.texCoord0[0] = source.mTexCoord0[0];
       staging.texCoord0[1] = source.mTexCoord0[1];
       staging.texCoord1[0] = source.mTexCoord1[0];
