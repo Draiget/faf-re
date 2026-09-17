@@ -492,7 +492,7 @@ void moho::CUIManager::RenderFrames(const int head, CD3DPrimBatcher* const primB
   device->SelectFxFile("primbatcher");
   device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
 
-  CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+  primBatcher->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
     mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 1);
@@ -512,7 +512,7 @@ void moho::CUIManager::DrawUI(const int head, CD3DPrimBatcher* const primBatcher
   device->SelectFxFile("primbatcher");
   device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
 
-  CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+  primBatcher->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
     mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 4);
@@ -532,7 +532,7 @@ void moho::CUIManager::DrawHead(const int head, CD3DPrimBatcher* const primBatch
   device->SelectFxFile("primbatcher");
   device->SelectTechnique("TAlphaBlendLinearSampleNoDepth");
 
-  CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+  primBatcher->mRebuildComposite = 0;
 
   if (IsValidFrameIndex(*this, head) && mFrames[static_cast<std::size_t>(head)]) {
     mFrames[static_cast<std::size_t>(head)]->RenderChildControls(primBatcher, 8);

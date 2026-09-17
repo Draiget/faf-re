@@ -71824,7 +71824,7 @@ void moho::REN_DebugStuff(boost::shared_ptr<CD3DPrimBatcher> batcher, const int 
 
   // 0x007FA7C1..0x007FA7C5: clear the batcher's composite-rebuild flag (+0x11D)
   // so the screen-space HUD pass reuses the freshly set projection/view.
-  CD3DPrimBatcherRuntimeView::FromBatcher(primBatcher)->mRebuildComposite = 0;
+  primBatcher->mRebuildComposite = 0;
 
   // 0x007FA7CC..0x007FA7EA: active head pixel dimensions.
   const int headWidth = moho::D3D_GetDevice()->GetHeadWidth(head);   // v6

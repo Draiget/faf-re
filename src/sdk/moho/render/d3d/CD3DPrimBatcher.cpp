@@ -116,7 +116,7 @@ namespace
 
   template <typename TValue>
   [[nodiscard]] std::uint32_t LegacyVectorCount(
-    const moho::CD3DPrimBatcherRuntimeView::LegacyVector<TValue>& vector
+    const moho::CD3DPrimBatcher::LegacyVector<TValue>& vector
   ) noexcept
   {
     if (vector.mFirst == nullptr || vector.mLast == nullptr || vector.mLast < vector.mFirst) {
@@ -127,7 +127,7 @@ namespace
 
   template <typename TValue>
   [[nodiscard]] std::uint32_t LegacyVectorCapacity(
-    const moho::CD3DPrimBatcherRuntimeView::LegacyVector<TValue>& vector
+    const moho::CD3DPrimBatcher::LegacyVector<TValue>& vector
   ) noexcept
   {
     if (vector.mFirst == nullptr || vector.mEnd == nullptr || vector.mEnd < vector.mFirst) {
@@ -138,7 +138,7 @@ namespace
 
   template <typename TValue>
   void EnsureLegacyQueueCapacity(
-    moho::CD3DPrimBatcherRuntimeView::LegacyVector<TValue>& vector,
+    moho::CD3DPrimBatcher::LegacyVector<TValue>& vector,
     const std::uint32_t queueLimit
   )
   {
@@ -164,7 +164,7 @@ namespace
 
   template <typename TValue>
   TValue* PushBackLegacyQueue(
-    moho::CD3DPrimBatcherRuntimeView::LegacyVector<TValue>& vector,
+    moho::CD3DPrimBatcher::LegacyVector<TValue>& vector,
     const TValue& value,
     const std::uint32_t queueLimit
   )
@@ -184,7 +184,7 @@ namespace
 
   template <typename TPointee>
   [[nodiscard]] boost::SharedCountPair* AsSharedCountPair(
-    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>* const sharedHandle
+    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>* const sharedHandle
   ) noexcept
   {
     return reinterpret_cast<boost::SharedCountPair*>(sharedHandle);
@@ -197,12 +197,12 @@ namespace
   // of open-coding `use_count_` / `weak_count_` arithmetic here.
   template <typename TPointee>
   [[nodiscard]] boost::shared_ptr<TPointee>& AsSharedPtr(
-    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>& handle
+    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>& handle
   ) noexcept
   {
     static_assert(
       sizeof(boost::shared_ptr<TPointee>) ==
-        sizeof(moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>),
+        sizeof(moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>),
       "boost::shared_ptr<T> layout must match LegacySharedHandle<T>"
     );
     return reinterpret_cast<boost::shared_ptr<TPointee>&>(handle);
@@ -218,7 +218,7 @@ namespace
    */
   template <typename TPointee>
   void AssignSharedHandle(
-    moho::CD3DPrimBatcherRuntimeView::LegacySharedHandle<TPointee>& handle,
+    moho::CD3DPrimBatcher::LegacySharedHandle<TPointee>& handle,
     const boost::shared_ptr<TPointee>& sharedHandle
   ) noexcept
   {
@@ -244,7 +244,7 @@ namespace
   }
 
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex BuildTransformedVertex(
-    const moho::CD3DPrimBatcherRuntimeView& runtime,
+    const moho::CD3DPrimBatcher& runtime,
     const moho::CD3DPrimBatcher::Vertex& source
   ) noexcept
   {
@@ -288,7 +288,7 @@ namespace
   }
 
   void AppendPrimitiveIndex(
-    moho::CD3DPrimBatcherRuntimeView& runtime,
+    moho::CD3DPrimBatcher& runtime,
     const std::uint16_t index
   )
   {
@@ -329,7 +329,7 @@ namespace moho
    */
   CD3DPrimBatcher::CD3DPrimBatcher(CD3DTextureBatcher* const textureBatcher)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     runtime->mTextureBatcher = textureBatcher;
     runtime->mCurVertexSheet = 0;
@@ -392,7 +392,7 @@ namespace moho
    */
   CD3DPrimBatcher::~CD3DPrimBatcher()
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     for (CD3DVertexSheet* const sheet : runtime->mVertexSheets) {
       if (sheet != nullptr) {
@@ -439,7 +439,7 @@ namespace moho
     device->SelectFxFile("primbatcher");
     device->SelectTechnique(techniqueName);
 
-    CD3DPrimBatcherRuntimeView::FromBatcher(this)->mRebuildComposite = 0;
+    this->mRebuildComposite = 0;
     return this;
   }
 
@@ -452,7 +452,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetViewMatrix(const VMatrix4& matrix)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements()) {
       Flush();
     }
@@ -470,7 +470,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetProjectionMatrix(const VMatrix4& matrix)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements()) {
       Flush();
     }
@@ -488,7 +488,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetViewProjMatrix(const GeomCamera3& camera)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements()) {
       Flush();
     }
@@ -559,7 +559,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetTexture(const boost::shared_ptr<CD3DBatchTexture>& texture)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     const std::uint32_t atlasHalfWidth = static_cast<std::uint32_t>(runtime->mTextureBatcher->mWidth) >> 1u;
     const std::uint32_t atlasHalfHeight = static_cast<std::uint32_t>(runtime->mTextureBatcher->mHeight) >> 1u;
@@ -628,7 +628,7 @@ namespace moho
    */
   void CD3DPrimBatcher::SetTexture(boost::shared_ptr<ID3DTextureSheet> sheet)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     const boost::shared_ptr<CD3DDynamicTextureSheet> derivedSheet =
       boost::static_pointer_cast<CD3DDynamicTextureSheet>(sheet);
@@ -663,7 +663,7 @@ namespace moho
     const Vertex& bottomLeft
   )
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     if (runtime->mVertices.HasElements()) {
       const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
@@ -727,7 +727,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
@@ -753,7 +753,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
@@ -771,7 +771,7 @@ namespace moho
    */
   void CD3DPrimBatcher::DrawTri(const Vertex& v0, const Vertex& v1, const Vertex& v2)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     if (runtime->mVertices.HasElements()) {
       const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
@@ -810,7 +810,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
@@ -836,7 +836,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
       Flush();
     }
@@ -854,7 +854,7 @@ namespace moho
    */
   void CD3DPrimBatcher::DrawLine(const Vertex& start, const Vertex& end)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     if (runtime->mVertices.HasElements()) {
       const std::uint32_t vertexCount = LegacyVectorCount(runtime->mVertices);
@@ -890,7 +890,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
       Flush();
     }
@@ -912,7 +912,7 @@ namespace moho
     const std::uint32_t lineCount
   )
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kLineListPrimitiveType)) {
       Flush();
     }
@@ -930,7 +930,7 @@ namespace moho
    */
   void CD3DPrimBatcher::DrawPoint(const Vertex& vertex)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
 
     if (runtime->mVertices.HasElements()) {
       if (runtime->mMode != static_cast<std::uint32_t>(kTriangleListPrimitiveType)) {
@@ -969,7 +969,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
       Flush();
     }
@@ -996,7 +996,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (runtime->mVertices.HasElements() && runtime->mMode != static_cast<std::uint32_t>(kMode1PrimitiveType)) {
       Flush();
     }
@@ -1022,7 +1022,7 @@ namespace moho
       return;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     while (primitiveCount != 0u) {
       const std::uint32_t indicesPerPrimitive = (verticesPerPrimitive == 4u) ? 6u : verticesPerPrimitive;
       const std::uint32_t usedPrimitiveIndices = LegacyVectorCount(runtime->mPrimitives);
@@ -1077,7 +1077,7 @@ namespace moho
    */
   void CD3DPrimBatcher::AddVert(const Vertex& sourceVertex)
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     (void)PushBackLegacyQueue(
       runtime->mVertices,
       BuildTransformedVertex(*runtime, sourceVertex),
@@ -1103,7 +1103,7 @@ namespace moho
       return cachedIndex;
     }
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     const std::uint16_t mappedIndex = static_cast<std::uint16_t>(LegacyVectorCount(runtime->mVertices));
 
     (void)PushBackLegacyQueue(
@@ -1134,7 +1134,7 @@ namespace moho
     gpg::fastvector<std::uint16_t> remap{};
     InitializeIndexedVertexRemap(remap, sourceVertexCount);
 
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     while (primitiveCount != 0u) {
       const std::uint32_t indicesPerPrimitive = (verticesPerPrimitive == 4u) ? 6u : verticesPerPrimitive;
       const std::uint32_t usedPrimitiveIndices = LegacyVectorCount(runtime->mPrimitives);
@@ -1185,7 +1185,7 @@ namespace moho
    */
   void CD3DPrimBatcher::Flush()
   {
-    CD3DPrimBatcherRuntimeView* const runtime = CD3DPrimBatcherRuntimeView::FromBatcher(this);
+    auto* const runtime = this;
     if (!runtime->mVertices.HasElements()) {
       return;
     }
@@ -1830,6 +1830,6 @@ namespace moho
 
     SetProjectionMatrix(projection);
     SetViewMatrix(UI_IdentityMatrix());
-    CD3DPrimBatcherRuntimeView::FromBatcher(this)->mAlphaMultiplier = manager.mUIControlsAlpha;
+    this->mAlphaMultiplier = manager.mUIControlsAlpha;
   }
 } // namespace moho
