@@ -1543,7 +1543,6 @@ namespace moho
       return false;
     }
 
-    if (!mIgnoreMotionScaling) {
     // 0x0063FE34..0x0063FEF7: a directional animation runs backwards while the
     // goal unit moves against its own facing.
     float rate = mRate;
@@ -1562,6 +1561,7 @@ namespace moho
     // 0x0063FEF7..0x0063FFC5: advance by rate * 0.1 per tick; with a goal unit
     // attached the step is scaled by its speed over the blueprint's MaxSpeed
     // (times ten), floored at 0.25 while the unit is turning.
+    if (!mIgnoreMotionScaling) {
       Unit* const unit = mGoal.GetObjectPtr();
       if (unit == nullptr) {
         mAnimationTime += rate * 0.1f;
@@ -1592,18 +1592,94 @@ namespace moho
       mAnimationTime = clamped;
     }
 
-    const bool signaled = UpdateTriggeredState();
-    if (!(signaled && mDisableOnSignal)) {
-      float framePosition = 0.0f;
-      if (duration > 0.0f && clip->mFrameCount > 1u) {
-        framePosition = (static_cast<float>(clip->mFrameCount - 1u) / duration) * mAnimationTime;
-      }
-
-      mFrameChanged = (framePosition != mLastFramePosition);
-      mLastFramePosition = framePosition;
+    bool result = UpdateTriggeredState();
+    if (result && mDisableOnSignal) {
+      return result;
     }
 
-    return mFrameChanged;
+    // 0x00640006..0x0064035B: pick the two frames around the current time and
+    // blend every watched, unmasked bone into the owner's pose.
+    const std::uint32_t frameCount = clip->mFrameCount;
+    const float framePosition = (static_cast<float>(frameCount - 1u) / duration) * mAnimationTime;
+    std::int32_t frameIndex = 0;
+    if (duration != 0.0f) {
+      const float rounded = std::nearbyint(framePosition);
+      frameIndex = static_cast<std::int32_t>(rounded) + (framePosition < rounded ? -1 : 0);
+    }
+    std::int32_t nextFrameIndex = frameIndex + 1;
+    if (mLooping) {
+      nextFrameIndex = nextFrameIndex % static_cast<std::int32_t>(frameCount);
+    } else if (nextFrameIndex >= static_cast<std::int32_t>(frameCount) - 1) {
+      nextFrameIndex = static_cast<std::int32_t>(frameCount) - 1;
+    }
+    const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
+    const AnimationBoneKeyView* const keys0 = AnimationFrameKeys(*resource, boneTrackCount, frameIndex);
+    const AnimationBoneKeyView* const keys1 = AnimationFrameKeys(*resource, boneTrackCount, nextFrameIndex);
+
+    CAniPose* const pose = mOwnerActor->mPose.px;
+    const float poseScale = pose->mScale;
+    CAniPoseBone* const poseBones = pose->mBones.begin();
+    const std::uint32_t poseBoneCount = static_cast<std::uint32_t>(pose->mBones.end() - poseBones);
+    const float frac = framePosition - static_cast<float>(frameIndex);
+    const float invFrac = 1.0f - frac;
+
+    for (std::uint32_t track = 0u; track < boneTrackCount; ++track) {
+      const std::uint32_t boneIndex = static_cast<std::uint32_t>(mWatchBones[track].mBoneIndex);
+      if (boneIndex >= poseBoneCount || poseBones == nullptr) {
+        continue;
+      }
+      if (!mBoneMask.TestBit(boneIndex)) {
+        continue;
+      }
+      const AnimationBoneKeyView& key0 = keys0[track];
+      const AnimationBoneKeyView& key1 = keys1[track];
+      VTransform keyTransform{};
+      if (frac >= 0.001f) {
+        if (invFrac >= 0.001f) {
+          keyTransform.pos_.x = key0.mPosition[0] + (key1.mPosition[0] - key0.mPosition[0]) * frac;
+          keyTransform.pos_.y = key0.mPosition[1] + (key1.mPosition[1] - key0.mPosition[1]) * frac;
+          keyTransform.pos_.z = key0.mPosition[2] + (key1.mPosition[2] - key0.mPosition[2]) * frac;
+          Wm3::Quatf blended{};
+          (void)QuatLERP(
+            reinterpret_cast<const Wm3::Quatf*>(key1.mRotation),
+            reinterpret_cast<const Wm3::Quatf*>(key0.mRotation),
+            &blended,
+            frac
+          );
+          keyTransform.orient_ = blended;
+        } else {
+          std::memcpy(&keyTransform.pos_, key1.mPosition, sizeof(keyTransform.pos_));
+          std::memcpy(&keyTransform.orient_, key1.mRotation, sizeof(keyTransform.orient_));
+        }
+      } else {
+        std::memcpy(&keyTransform.pos_, key0.mPosition, sizeof(keyTransform.pos_));
+        std::memcpy(&keyTransform.orient_, key0.mRotation, sizeof(keyTransform.orient_));
+      }
+
+      CAniPoseBone& bone = poseBones[boneIndex];
+      if (!mOverwriteMode) {
+        // Relative mode: the key is expressed against the skeleton's rest
+        // transform, so strip that first and layer the result over the bone's
+        // current local transform (0x0054BD80).
+        const SAniSkelBone* const skeletonBone = SkeletonBoneForPoseBone(bone);
+        const VTransform restInverse = skeletonBone->mLocalTransform.Inverse();
+        VTransform relative = VTransform::Compose(keyTransform, restInverse);
+        relative.pos_.x *= poseScale;
+        relative.pos_.y *= poseScale;
+        relative.pos_.z *= poseScale;
+        bone.SetLocalTransform(VTransform::Compose(relative, bone.mLocalTransform));
+      } else {
+        keyTransform.pos_.x *= poseScale;
+        keyTransform.pos_.y *= poseScale;
+        keyTransform.pos_.z *= poseScale;
+        bone.SetLocalTransform(keyTransform);
+      }
+    }
+
+    result = framePosition != mLastFramePosition;
+    mFrameChanged = result;
+    mLastFramePosition = framePosition;
+    return result;
   }
 
   /**
@@ -1664,7 +1740,8 @@ namespace moho
     // for the false arm, 0x0063FB8B for the true one), and that is what drains
     // `mWaitLinks` and unstages the threads parked on this manipulator. Setting
     // the flag alone left every `WaitFor(animator)` in the sim suspended for
-    // good.
+    // good - which is why a factory's roll-off thread never reached its
+    // `DetachAll`, and the unit it had just finished stayed attached to it.
     EventSetSignaled(shouldSignal);
     return shouldSignal;
   }
@@ -1683,8 +1760,15 @@ namespace moho
       const std::uint32_t boneTrackCount = clip->mBoneTrackCount;
       const char* boneName = reinterpret_cast<const char*>(clip) + clip->mBoneNameTableOffset;
       ResetWatchBoneStorage();
+      for (std::uint32_t track = 0u; track < boneTrackCount; ++track) {
+        const std::int32_t resolved = skeleton->FindBoneIndex(boneName);
+        (void)AddWatchBone(resolved);
+        boneName += std::strlen(boneName) + 1u;
+      }
+    } else {
+      ResetWatchBoneStorage();
+      mAnimationRef.release();
     }
-
     mAnimationRef.assign_retain(resource);
     mAnimationTime = 0.0f;
     mLastFramePosition = -1.0f;
@@ -1775,6 +1859,7 @@ namespace moho
   {
     mOverwriteMode = enabled;
   }
+
   /**
    * Address: 0x0063EF90 (FUN_0063EF90)
    *
