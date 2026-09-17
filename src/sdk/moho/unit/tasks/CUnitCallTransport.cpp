@@ -242,6 +242,23 @@ namespace moho
           return 3;
         }
 
+        // TEMPORARY PROBE -- transport-load triage, delete when resolved.
+        // `loading` is the transport's kUnitStateMaskTransportLoading, set by
+        // the CUnitLoadUnits ctor; `holding` is the holding-pattern bit that
+        // CUnitLoadUnits' TASKSTATE_Preparing leaves set whenever it bails on a
+        // head-command mismatch. These four flags say exactly which half of the
+        // handshake is refusing to advance.
+        static int sCallTransportWaitProbe = 0;
+        if ((sCallTransportWaitProbe++ % 60) == 0) {
+          gpg::Warnf(
+            "[XPORTDIAG] CallTransport wait: unit=%p xport=%p loading=%d holding=%d headsMatch=%d assist=%d",
+            static_cast<void*>(mUnit), static_cast<void*>(transportUnit),
+            transportUnit->IsUnitState(UNITSTATE_TransportLoading) ? 1 : 0,
+            transportUnit->IsUnitState(UNITSTATE_HoldingPattern) ? 1 : 0,
+            commandHeadsMatch ? 1 : 0, transportAssistMoving ? 1 : 0
+          );
+        }
+
         return 10;
       }
 

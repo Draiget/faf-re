@@ -1,4 +1,5 @@
 #include "moho/terrain/splat/CWldSplat.h"
+#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
 
 #include <algorithm>
 #include <cstdio>
@@ -998,8 +999,10 @@ namespace moho
    */
   void CWldSplat::UpdateBatchTexture(CD3DTextureBatcher* const batcher)
   {
+    { static int sUb = 0; if (sUb < 6) { ++sUb; gpg::Warnf("[SPLATTEX] name=%s mTex=%p", mNames[0].c_str(), static_cast<void*>(mTex.get())); } } // TEMPORARY PROBE (do not commit)
     if (mTex) {
       const gpg::Rect2f* const uvRect = batcher->AddTexture(mTex);
+      { static int sUv = 0; if (sUv < 6) { ++sUv; gpg::Warnf("[SPLATTEX] uvRect=%p uv=(%.4f,%.4f)-(%.4f,%.4f)", static_cast<const void*>(uvRect), uvRect ? uvRect->x0 : -1.0f, uvRect ? uvRect->z0 : -1.0f, uvRect ? uvRect->x1 : -1.0f, uvRect ? uvRect->z1 : -1.0f); } } // TEMPORARY PROBE (do not commit)
       if (uvRect != nullptr) {
         mSplatVertices[0].mTexCoord.x = uvRect->x0;
         mSplatVertices[0].mTexCoord.y = uvRect->z0;

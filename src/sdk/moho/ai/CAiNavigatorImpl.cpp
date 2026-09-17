@@ -1,4 +1,5 @@
 #include "moho/ai/CAiNavigatorImpl.h"
+#include "gpg/core/utils/Logging.h"
 #include <cmath>
 
 #include <cstring>
@@ -486,6 +487,7 @@ int moho::cfunc_CAiNavigatorImplAbortMoveL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject navigatorObject(LuaPlus::LuaStackObject(state, 1));
   CAiNavigatorImpl* const navigator = SCR_FromLua_CAiNavigatorImpl(navigatorObject, state);
+  { static int c = 0; if (c++ < 5) gpg::Warnf("[NAVLAY] AbortMove resolved=%p vptr=%p", static_cast<void*>(navigator), navigator != nullptr ? *reinterpret_cast<void**>(navigator) : nullptr); } // TEMPORARY PROBE (do not commit)
   navigator->AbortMove();
   return 0;
 }

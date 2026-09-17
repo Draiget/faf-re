@@ -219,6 +219,33 @@ namespace moho
    */
   void CIntel::Update(const Wm3::Vec3f& position, const std::int32_t tick)
   {
+    // TEMPORARY PROBE -- delete once resolved. AddViz fires exactly once in a
+    // whole game, so vision is never stamped into the recon grids and every
+    // detection probe reads empty. PositionChanged and the AddViz gates are
+    // both verified correct, so this reports whether this per-tick updater runs
+    // at all and how many handles are actually armed (mEnabled).
+    {
+      static unsigned sCalls = 0, sHandles = 0, sEnabled = 0, sMoved = 0;
+      ++sCalls;
+      for (std::size_t k = 0; k < kHandleCount; ++k) {
+        if (mIntelHandles[k] != nullptr) {
+          ++sHandles;
+          if (mIntelHandles[k]->mEnabled != 0u) {
+            ++sEnabled;
+            if (PositionChanged(*mIntelHandles[k], position)) {
+              ++sMoved;
+            }
+          }
+        }
+      }
+      if ((sCalls % 2000u) == 0u) {
+        gpg::Warnf(
+          "[INTELUPD] calls=%u handles=%u enabled=%u moved=%u pos=(%.1f,%.1f)",
+          sCalls, sHandles, sEnabled, sMoved, position.x, position.z
+        );
+      }
+    }
+
     for (std::size_t i = 0; i < kHandleCount; ++i) {
       CIntelPosHandle* const handle = mIntelHandles[i];
       if (!handle) {

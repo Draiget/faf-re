@@ -604,6 +604,7 @@ namespace
      */
     bool InitContext(gpg::gal::DeviceContext* const context) override
     {
+      { static int sInitCount = 0; ++sInitCount; gpg::Warnf("[DEVRESET] CD3DDevice::InitContext #%d context=%p", sInitCount, static_cast<const void*>(context)); } // TEMPORARY PROBE (do not commit)
       if (context == nullptr) {
         return false;
       }
@@ -674,6 +675,7 @@ namespace
       }
 
       runtime->mInitialized = 1;
+      gpg::Warnf("[DEVRESET] CD3DDevice::InitContext done"); // TEMPORARY PROBE (do not commit)
       return runtime->mInitialized != 0;
     }
 

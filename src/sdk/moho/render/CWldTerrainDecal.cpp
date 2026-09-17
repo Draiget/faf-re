@@ -583,6 +583,11 @@ namespace moho
     CAnimTexture::FrameRef frame{};
     const float framePhase = ((static_cast<float>(frameSeed) + phaseOffset) * mFadeDistance * 0.1f) + mUnknown94;
     static_cast<const CAnimTexture*>(resource)->GetFrameAt(frame, framePhase);
+    { // TEMPORARY PROBE (do not commit): null frames bind NULL and draw opaque black
+      static int sNullFrameBudget = 12;
+      if (frame.px == nullptr && sNullFrameBudget > 0) { --sNullFrameBudget;
+        gpg::Warnf("[NULLFRAME] name=%s phase=%.3f seed=%d off=%.3f fade=%.3f u94=%.3f frames=%u", mNames[slot].c_str(), framePhase, frameSeed, phaseOffset, mFadeDistance, mUnknown94, static_cast<unsigned>(static_cast<const CAnimTexture*>(resource)->mFrames.size())); }
+    }
     // GetFrame already took the one reference the result owns (0x0089DB50 hands
     // the (px, pi) pair straight back); adopt it rather than retaining again.
     return boost::SharedPtrFromRawAdopt(frame);

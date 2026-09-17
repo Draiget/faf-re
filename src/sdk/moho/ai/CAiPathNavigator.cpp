@@ -1,3 +1,4 @@
+#include "gpg/core/utils/Logging.h"
 #include "moho/ai/CAiPathNavigator.h"
 
 #include <algorithm>
@@ -491,6 +492,8 @@ namespace
     if (consumeCount >= pathCount) {
       consumeCount = pathCount;
     }
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] ConsumePathPrefix requested=%d count=%d", requestedCount, pathCount);
     if (consumeCount < 0) {
       consumeCount = 0;
     }
@@ -1096,6 +1099,12 @@ bool CAiPathNavigator::OnEvent(const SNavPath& path)
 
   Unit* const unit = GetOwningUnit(*this);
   const std::int32_t incomingCount = path.CountInt();
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  gpg::Warnf("[NAVDIAG] PathNav::OnEvent state=%d incoming=%d first=(%d,%d) last=(%d,%d) cur=(%d,%d) goal=(%d,%d)-(%d,%d)",
+             static_cast<int>(mState), incomingCount,
+             incomingCount > 0 ? static_cast<int>(path.start[0].x) : -1, incomingCount > 0 ? static_cast<int>(path.start[0].z) : -1,
+             incomingCount > 0 ? static_cast<int>(path.finish[-1].x) : -1, incomingCount > 0 ? static_cast<int>(path.finish[-1].z) : -1,
+             static_cast<int>(mCurrentPos.x), static_cast<int>(mCurrentPos.z), mGoal.minX, mGoal.minZ, mGoal.maxX, mGoal.maxZ);
 
   if (mState == AIPATHNAVSTATE_PathEvent3) {
     mPath.AssignCopy(path);
@@ -1445,6 +1454,10 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
     : std::min(pathSize - 1, 1);
 
   std::int32_t selectedIndex = -1;
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  gpg::Warnf("[NAVDIAG] TryAdvance count=%d firstReachable=%d furthest=%d probe=%d cur=(%d,%d) p0=(%d,%d)", mPath.CountInt(),
+             firstReachableIndex, furthestCandidateIndex, static_cast<int>(mHasForwardProbe), static_cast<int>(mCurrentPos.x),
+             static_cast<int>(mCurrentPos.z), static_cast<int>(mPath.start[0].x), static_cast<int>(mPath.start[0].z));
   for (std::int32_t idx = furthestCandidateIndex; idx >= firstReachableIndex; --idx) {
     const SOCellPos candidate = mPath.start[idx];
     if (idx != firstReachableIndex && CellDistance(mCurrentPos, candidate) >= 50.0f) {
@@ -1485,6 +1498,8 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
   }
 
   if (mNoProgressTickCount <= 30 || selectedIndex > 0) {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] TryAdvance selected=%d", selectedIndex);
     SetTargetPoint(selectedIndex);
     mTargetWithinOneCell = 0;
     return true;
@@ -1534,6 +1549,8 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
   }
 
   if (mPath.CountInt() <= 0) {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] PathNav::Update path empty -> Failed cur=(%d,%d)", static_cast<int>(mCurrentPos.x), static_cast<int>(mCurrentPos.z));
     mState = AIPATHNAVSTATE_Failed;
     mPathRetryDelayFrames = 0;
     mTargetPos = mCurrentPos;
@@ -1542,6 +1559,9 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
 
   const SOCellPos pathTail = mPath.finish[-1];
   if (PackCell(mCurrentPos) == PackCell(pathTail)) {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    gpg::Warnf("[NAVDIAG] PathNav::Update at tail -> Idle cur=(%d,%d) tail=(%d,%d) count=%d", static_cast<int>(mCurrentPos.x),
+               static_cast<int>(mCurrentPos.z), static_cast<int>(pathTail.x), static_cast<int>(pathTail.z), mPath.CountInt());
     ResetPathContent(mPath);
     mState = AIPATHNAVSTATE_Idle;
     mPathRetryDelayFrames = 0;
@@ -1551,6 +1571,15 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
 
   if (!TryAdvanceTargetPoint()) {
     mTargetPos = mPath.start[0];
+  }
+  // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+  {
+    static int sCount = 0;
+    if ((sCount++ % 20) == 0) {
+      gpg::Warnf("[NAVDIAG] PathNav::Update cur=(%d,%d) target=(%d,%d) count=%d state=%d noProgress=%d n=%d",
+                 static_cast<int>(mCurrentPos.x), static_cast<int>(mCurrentPos.z), static_cast<int>(mTargetPos.x),
+                 static_cast<int>(mTargetPos.z), mPath.CountInt(), static_cast<int>(mState), mNoProgressTickCount, sCount);
+    }
   }
 
   Unit* const unit = GetOwningUnit(*this);

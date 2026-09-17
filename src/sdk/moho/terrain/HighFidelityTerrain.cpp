@@ -2,12 +2,19 @@
 #include <cstdio>
 
 #include <algorithm>
+#include "moho/animation/CAnimTexture.h"
+#include <set>
+#include <map>
 #include <cmath>
 #include <cstdint>
 #include <limits>
 
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
+#include "gpg/gal/backends/d3d9/TextureD3D9.hpp" // TEMPORARY PROBE (do not commit)
+extern "C" int FafProbeFrameSeq(); extern "C" int FafProbeFrameDiag(); // TEMPORARY PROBE (do not commit)
+namespace gpg::gal { long DebugSaveTextureToFileA(const char*, unsigned int, void*); } // TEMPORARY PROBE (do not commit)
+namespace gpg::gal { long DebugSaveSurfaceToFileA(const char*, unsigned int, void*); } // TEMPORARY PROBE (do not commit)
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/Stats.h"
 #include "moho/misc/StatItem.h"
@@ -58,6 +65,32 @@ namespace
   constexpr std::int32_t kTriangleListPrimitiveToken = 4;
   constexpr std::int32_t kSkirtMaxIndexCount = 199998;
   constexpr float kMinDecalAlpha = 0.0039215689f;
+
+  // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\<name>" exists => true.
+  // TEMPORARY PROBE (do not commit): describe a native IDirect3DTexture9 (level 0).
+  void ProbeLogTextureDesc(const char* const tag, void* const nativeTexture)
+  {
+    if (nativeTexture == nullptr) { gpg::Warnf("[TEXDESC] %s native=null", tag); return; }
+    struct SurfDesc { unsigned format, type, usage, pool, msType, msQuality, width, height; } desc{};
+    auto** const vt = *reinterpret_cast<void***>(nativeTexture);
+    using get_level_desc_fn = long(__stdcall*)(void*, unsigned, SurfDesc*);
+    using get_level_count_fn = unsigned long(__stdcall*)(void*);
+    const long hr = reinterpret_cast<get_level_desc_fn>(vt[17])(nativeTexture, 0U, &desc);
+    const unsigned long levels = reinterpret_cast<get_level_count_fn>(vt[13])(nativeTexture);
+    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08X pool=%u %ux%u levels=%lu",
+               tag, nativeTexture, hr, desc.format, desc.type, desc.usage, desc.pool, desc.width, desc.height, levels);
+  }
+  bool HighFidelityProbeToggle(const char* const name)
+  {
+    char dir[512] = {};
+    std::size_t length = 0;
+    if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") != 0 || length == 0u) {
+      return false;
+    }
+    char path[600];
+    (void)std::snprintf(path, sizeof(path), "%s\\%s", dir, name);
+    return ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+  }
   constexpr std::int32_t kMaxSplatsPerFrame = 2500;
   constexpr int kNoiseFillTextureFormat = 2;
 
@@ -699,9 +732,9 @@ namespace moho
       // texture. Report the flag and whether a texture is actually bound.
       {
         static int sShadowBudget = 0;
-        if (sShadowBudget < 4) {
-          ++sShadowBudget;
-          gpg::Warnf("[SHADOWDIAG] shadowsEnabled=%u shadowTexture=%08X",
+        ++sShadowBudget;
+        if (sShadowBudget <= 4 || (sShadowBudget % 600) == 0) {
+          gpg::Warnf("[SHADOWDIAG] shadowsEnabled=%u shadowTexture=%08X useSecondary=%d primary=%p secondary=%p n=%d",
                      shadowsEnabledBlob,
                      static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(shadowTexture.get())),
                      shadowContext->useSecondaryShadowTexture ? 1 : 0,
@@ -759,6 +792,20 @@ namespace moho
     if (!dirty) {
       dirty = mCamera->tranform.Compare(mTerrainTransform);
     }
+    // TEMPORARY PROBE (do not commit): does the terrain ever re-tessellate?
+    {
+      static int sDirtyCalls = 0;
+      static int sCloseBudget = 0;
+      ++sDirtyCalls;
+      const bool closeCamera = mCamera->tranform.pos_.y < 300.0f;
+      if (sDirtyCalls <= 20 || (sDirtyCalls % 300) == 0 || (closeCamera && (sCloseBudget++ < 6 || (sCloseBudget % 200) == 0))) {
+        gpg::Warnf("[TERRDIRTY] call=%d minimap=%d dirty=%d cam=(%.1f,%.1f,%.1f) invView3=(%.1f,%.1f,%.1f) last=(%.1f,%.1f,%.1f) genMesh=%d camObj=%p",
+                   sDirtyCalls, minimapPass ? 1 : 0, dirty ? 1 : 0, mCamera->tranform.pos_.x, mCamera->tranform.pos_.y,
+                   mCamera->tranform.pos_.z, mCamera->inverseView.r[3].x, mCamera->inverseView.r[3].y,
+                   mCamera->inverseView.r[3].z, mTerrainTransform.pos_.x, mTerrainTransform.pos_.y,
+                   mTerrainTransform.pos_.z, ren_GenerateMesh ? 1 : 0, static_cast<const void*>(mCamera));
+      }
+    }
 
     if (!minimapPass || ren_ForceUpdateMinimapTerrain || dirty) {
       mTerrainTransform = mCamera->tranform;
@@ -770,6 +817,7 @@ namespace moho
       }
 
       mShoreline.Update(*mCamera);
+      if (FafProbeFrameDiag() > 0) { gpg::Warnf("[FD] f=%d URC mini=%d dirty=%d decalsDirty=%d camY=%.1f cam=%p genMesh=%d", FafProbeFrameSeq(), minimapPass ? 1 : 0, dirty ? 1 : 0, decalsDirty ? 1 : 0, mCamera->tranform.pos_.y, static_cast<const void*>(mCamera), ren_GenerateMesh ? 1 : 0); } // TEMPORARY PROBE (do not commit)
 
       if (ren_GenerateMesh && (dirty || decalsDirty)) {
         mTesselator->Rebuild(mCamera, terrainRes);
@@ -796,7 +844,18 @@ namespace moho
 
         mPrimaryPatchData.ResetStorageToInline();
 
-        if (!minimapPass && ren_Decals) {
+        // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\nodecals.on" skips decals.
+        static const bool sNoDecalsToggle = [] {
+          char dir[512] = {};
+          std::size_t length = 0;
+          if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") != 0 || length == 0u) {
+            return false;
+          }
+          char path[600];
+          (void)std::snprintf(path, sizeof(path), "%s\\nodecals.on", dir);
+          return ::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES;
+        }();
+        if (!minimapPass && ren_Decals && !sNoDecalsToggle) {
           auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
 
           gpg::fastvector<UserEntity*> visibleDecals;
@@ -905,6 +964,7 @@ namespace moho
         auto& splatVertices = reinterpret_cast<HighFidelitySplatVertexLane&>(mSecondaryPatchData);
 
         std::int32_t splatBudget = 0;
+        { static int sSp = 0; if ((sSp++ % 40) == 0) { gpg::Warnf("[SPLATDIAG] collected=%d", static_cast<int>(visibleSplats.end() - visibleSplats.begin())); } } // TEMPORARY PROBE (do not commit)
         for (UserEntity* const entity : visibleSplats) {
           auto* const splat = reinterpret_cast<CWldSplat*>(entity);
 
@@ -933,6 +993,7 @@ namespace moho
             fadeAlpha = (fadeCeiling - nearFadeStart) / (splat->mNearCutoff - nearFadeStart);
           }
           const float bakedAlpha = fadeAlpha * splat->mCurrentAlpha;
+          { static int sA = 0; if (sA < 8) { ++sA; gpg::Warnf("[SPLATALPHA] baked=%.4f fade=%.4f cur=%.4f dist=%.2f cutoff=%.2f near=%.2f y=%.2f", bakedAlpha, fadeAlpha, splat->mCurrentAlpha, worldDistance, splat->mCutoffLOD, splat->mNearCutoff, firstVertex.mPosition.y); } } // TEMPORARY PROBE (do not commit)
 
           splat->UpdateBatchTexture(sHighFidelityTextureBatcher);
           splat->UpdateVertices();
@@ -979,6 +1040,51 @@ namespace moho
         std::memcpy(lockedIndices, mTesselator->GetCollisionIndexData(), sizeof(std::uint16_t) * collisionIndexCount);
         mTerrainIndexSheet->Unlock();
       }
+      // TEMPORARY PROBE (do not commit): terrain-geometry triage. Scan the main
+      // terrain triangles for abnormally long edges and report a few.
+      {
+        static int sGeomProbeCalls = 0;
+        static int sGeomCloseBudget = 0;
+        ++sGeomProbeCalls;
+        const bool closeCam = mCamera->tranform.pos_.y < 300.0f;
+        if (sGeomProbeCalls == 40 || (closeCam && sGeomCloseBudget++ < 3)) {
+          const std::uint16_t* const idx = mTesselator->GetCollisionIndexData();
+          const CTesselator::Rect16* const verts = mTesselator->GetRectCacheData();
+          const std::int32_t mainIndexCount = static_cast<std::int32_t>(mSkirtStartIndex);
+          int longCount = 0;
+          int reported = 0;
+          int badIndex = 0;
+          for (std::int32_t i = 0; i + 2 < mainIndexCount; i += 3) {
+            const std::uint16_t a = idx[i], b = idx[i + 1], c = idx[i + 2];
+            if (a >= rectCacheCount || b >= rectCacheCount || c >= rectCacheCount) {
+              ++badIndex;
+              continue;
+            }
+            const CTesselator::Rect16& va = verts[a];
+            const CTesselator::Rect16& vb = verts[b];
+            const CTesselator::Rect16& vc = verts[c];
+            const auto edge = [](const CTesselator::Rect16& p, const CTesselator::Rect16& q) {
+              const int dx = static_cast<int>(p.xPos) - static_cast<int>(q.xPos);
+              const int dz = static_cast<int>(p.zPos) - static_cast<int>(q.zPos);
+              return dx * dx + dz * dz;
+            };
+            const int longest = std::max({edge(va, vb), edge(vb, vc), edge(vc, va)});
+            if (longest > 48 * 48) {
+              ++longCount;
+              if (reported < 6) {
+                ++reported;
+                gpg::Warnf("[TERRGEOM] tri %d idx=(%u,%u,%u) a=(%u,%u,%u,%u) b=(%u,%u,%u,%u) c=(%u,%u,%u,%u) longestSq=%d",
+                           i / 3, a, b, c, va.xPos, va.xSize, va.zPos, va.zSize, vb.xPos, vb.xSize, vb.zPos, vb.zSize,
+                           vc.xPos, vc.xSize, vc.zPos, vc.zSize, longest);
+              }
+            }
+          }
+          gpg::Warnf("[TERRGEOM] call=%d cam=(%.1f,%.1f,%.1f) rects=%d mainIdx=%d skirtStart=%u skirtVert=%u collIdx=%d longTris=%d badIndex=%d",
+                     sGeomProbeCalls, mCamera->tranform.pos_.x, mCamera->tranform.pos_.y, mCamera->tranform.pos_.z,
+                     rectCacheCount, mainIndexCount, mSkirtStartIndex, mUnknown30, collisionIndexCount,
+                     longCount, badIndex);
+        }
+      }
     }
   }
 
@@ -1004,6 +1110,9 @@ namespace moho
   void HighFidelityTerrain::OverDrawDecals(const std::int32_t gameTick, const float deltaSeconds)
   {
     if (!ren_Decals) {
+      return;
+    }
+    if (HighFidelityProbeToggle("nonormaldecals.on")) { // TEMPORARY PROBE (do not commit)
       return;
     }
 
@@ -1128,6 +1237,7 @@ namespace moho
       msvc8::string{"normals"},
       msvc8::string{"TTerrainNormals"});
     device->SelectTechnique(technique.c_str());
+    if (FafProbeFrameDiag() > 0) { gpg::Warnf("[FD] f=%d DrawTerrainNormal camY=%.1f tech=%s", FafProbeFrameSeq(), mCamera ? mCamera->tranform.pos_.y : -1.0f, technique.c_str()); } // TEMPORARY PROBE (do not commit)
 
     LoadTerrainLighting(nullptr);
     LoadShaderVars({});
@@ -1158,6 +1268,7 @@ namespace moho
       }
     }
 
+    int sTileDrawn = 0, sTileSkipRange = 0, sTileSkipEmpty = 0; // TEMPORARY PROBE (do not commit)
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
       const SNormalMapInfo info = terrainRes->GetNormalMapInfo(tile);
 
@@ -1190,9 +1301,11 @@ namespace moho
         &maxValue);
 
       if (rangeStart + static_cast<std::int32_t>(rangeCount) >= kSkirtMaxIndexCount) {
+        ++sTileSkipRange; // TEMPORARY PROBE (do not commit)
         continue;
       }
       if (rangeCount == 0U || (rangeCount % 3U) != 0U) {
+        ++sTileSkipEmpty; // TEMPORARY PROBE (do not commit)
         continue;
       }
 
@@ -1210,7 +1323,9 @@ namespace moho
       vertexView.endVertex = maxValue;
 
       (void)D3D_GetDevice()->DrawTriangleList(&vertexView, &indexView, &primitiveType);
+      ++sTileDrawn; // TEMPORARY PROBE (do not commit)
     }
+    { static int sTileCalls = 0; ++sTileCalls; if (mCamera != nullptr && (sTileCalls % 20) == 0) { gpg::Warnf("[TILEDIAG] call=%d tiles=%d drawn=%d skipRange=%d skipEmpty=%d cam=(%.1f,%.1f,%.1f)", sTileCalls, normalMapCount, sTileDrawn, sTileSkipRange, sTileSkipEmpty, mCamera->tranform.pos_.x, mCamera->tranform.pos_.y, mCamera->tranform.pos_.z); } } // TEMPORARY PROBE (do not commit)
   }
 
   /**
@@ -1234,6 +1349,7 @@ namespace moho
     D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : techniqueName);
 
     const auto& decalCommands = reinterpret_cast<const HighFidelityDecalCommandLane&>(mPrimaryPatchData);
+    if (FafProbeFrameDiag() > 0) { int nType = 0, nAll = 0; for (const TerrainDecalDrawCommand& c : decalCommands) { ++nAll; if (static_cast<std::int32_t>(c.decal->mType) == decalType) ++nType; } gpg::Warnf("[FD] f=%d DrawDecalPass type=%d tech=%s n=%d/%d camY=%.1f", FafProbeFrameSeq(), decalType, techniqueName, nType, nAll, mCamera ? mCamera->tranform.pos_.y : -1.0f); } // TEMPORARY PROBE (do not commit)
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
       if (static_cast<std::int32_t>(decal.mType) != decalType) {
@@ -1244,10 +1360,152 @@ namespace moho
         shaderVars.decalMatrix.SetMatrix4x4(&decal.mTexMatrix);
       }
 
-      shaderVars.decalAlbedoTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(0, deltaSeconds, gameTick)));
-      shaderVars.decalSpecTexture.GetTexture(
-        boost::static_pointer_cast<CD3DDynamicTextureSheet>(decal.GetTexture(1, deltaSeconds, gameTick)));
+      const boost::shared_ptr<ID3DTextureSheet> albedoSheet = decal.GetTexture(0, deltaSeconds, gameTick);
+      const boost::shared_ptr<ID3DTextureSheet> specSheet = decal.GetTexture(1, deltaSeconds, gameTick);
+      // TEMPORARY PROBE (do not commit): black-triangle decal triage.
+      {
+        static int sDecalProbeBudget = 0;
+        if (sDecalProbeBudget < 16) {
+          ++sDecalProbeBudget;
+          ID3DTextureSheet::TextureHandle albedoHandle{};
+          if (albedoSheet != nullptr) {
+            albedoSheet->GetTexture(albedoHandle);
+          }
+          // TEMPORARY PROBE (do not commit): dump the bound decal albedo to disk (dumpdecal.on).
+          {
+            static int sDecalDumpCount = 0;
+            Wm3::Vector2i albedoDims{0, 0};
+            if (albedoSheet != nullptr) {
+              (void)albedoSheet->GetOriginalDimensions(&albedoDims);
+            }
+            { static int sDescBudget = 0; if (sDescBudget < 2 && albedoHandle.get() != nullptr) { ++sDescBudget; ProbeLogTextureDesc("decal-albedo", albedoHandle->GetTexture1()); } }
+          { static int sRefBudget = 0; if (sRefBudget < 4 && albedoHandle.get() != nullptr && albedoHandle->GetTexture1() != nullptr) { ++sRefBudget; void* const tex = albedoHandle->GetTexture1(); auto** const vt = *reinterpret_cast<void***>(tex); using ref_fn = unsigned long(__stdcall*)(void*); const unsigned long afterAdd = reinterpret_cast<ref_fn>(vt[1])(tex); const unsigned long afterRel = reinterpret_cast<ref_fn>(vt[2])(tex); gpg::Warnf("[DECALREF] tex=%p addref->%lu release->%lu sheet=%p resUse=%ld", tex, afterAdd, afterRel, static_cast<void*>(albedoSheet.get()), static_cast<long>(albedoSheet.use_count())); } } // TEMPORARY PROBE (do not commit)
+            if (sDecalDumpCount < 4 && albedoHandle.get() != nullptr && HighFidelityProbeToggle("dumpdecal.on")) {
+              char dir[512] = {};
+              std::size_t length = 0;
+              (void)::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR");
+              char path[600];
+              (void)std::snprintf(path, sizeof(path), "%s\\decal_albedo_%d.bmp", dir, sDecalDumpCount);
+              const long hr = gpg::gal::DebugSaveTextureToFileA(path, 0U, albedoHandle->GetTexture1());
+              { // mip-2 surface dump
+                void* const tex = albedoHandle->GetTexture1();
+                auto** const vt = *reinterpret_cast<void***>(tex);
+                using get_surface_level_fn = long(__stdcall*)(void*, unsigned, void**);
+                void* surf = nullptr;
+                for (unsigned lvl = 2U; lvl <= 8U; lvl += 2U) {
+                  void* surf = nullptr;
+                  const long sr = reinterpret_cast<get_surface_level_fn>(vt[18])(tex, lvl, &surf);
+                  char path2[600];
+                  (void)std::snprintf(path2, sizeof(path2), "%s/decal_albedo_%d_mip%u.bmp", dir, sDecalDumpCount, lvl);
+                  long hr2 = -1;
+                  if (sr >= 0 && surf != nullptr) {
+                    hr2 = gpg::gal::DebugSaveSurfaceToFileA(path2, 0U, surf);
+                    using release_fn = unsigned long(__stdcall*)(void*);
+                    reinterpret_cast<release_fn>((*reinterpret_cast<void***>(surf))[2])(surf);
+                  }
+                  gpg::Warnf("[DECALDUMP] mip%u sr=%08lX hr=%08lX %s", lvl, sr, hr2, path2);
+                }
+              }
+              gpg::Warnf("[DECALDUMP] %s hr=%08lX dims=%dx%d name='%s'", path, hr, albedoDims.X(), albedoDims.Y(), decal.mNames[0].c_str());
+              ++sDecalDumpCount;
+            }
+          }
+          gpg::Warnf("[DECALDIAG] type=%d name0='%s' res0=%p sheet0=%p tex0=%p spec=%p alpha=%.2f idx=%d+%d verts=%d..%d pos=(%.1f,%.1f,%.1f) scale=(%.1f,%.1f,%.1f) m00=%.3f m33=%.3f",
+                     static_cast<int>(decal.mType), decal.mNames[0].c_str(),
+                     static_cast<void*>(decal.mResourceRefs[0].tex), static_cast<void*>(albedoSheet.get()),
+                     static_cast<void*>(albedoHandle.get()), static_cast<void*>(specSheet.get()), command.alpha,
+                     command.startIndex, command.indexCount, command.startVertex, command.endVertex,
+                     decal.mPosition.x, decal.mPosition.y, decal.mPosition.z, decal.mScale.x, decal.mScale.y, decal.mScale.z,
+                     decal.mTexMatrix.r[0].x, decal.mTexMatrix.r[3].w);
+          {
+            const auto& m = decal.mTexMatrix;
+            gpg::Warnf("[DECALMAT] exists=%d | %.4f %.4f %.4f %.4f | %.4f %.4f %.4f %.4f | %.4f %.4f %.4f %.4f | %.4f %.4f %.4f %.4f",
+                       shaderVars.decalMatrix.Exists() ? 1 : 0,
+                       m.r[0].x, m.r[0].y, m.r[0].z, m.r[0].w, m.r[1].x, m.r[1].y, m.r[1].z, m.r[1].w,
+                       m.r[2].x, m.r[2].y, m.r[2].z, m.r[2].w, m.r[3].x, m.r[3].y, m.r[3].z, m.r[3].w);
+          }
+        }
+      }
+      if (HighFidelityProbeToggle("decalswap.on")) { // TEMPORARY PROBE (do not commit): bind the decal mask as albedo
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(mDecalMask)));
+      } else if (HighFidelityProbeToggle("decalswap2.on")) { // TEMPORARY PROBE (do not commit): bind the spec frame as albedo
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(specSheet));
+      } else if (HighFidelityProbeToggle("decalswap3.on") || HighFidelityProbeToggle("decalswap4.on") || HighFidelityProbeToggle("decalswap5.on")) { // TEMPORARY PROBE (do not commit): DXT1 layer vs DXT5 unit albedo
+        static ID3DDeviceResources::TextureResourceHandle sDxt1{};
+        static ID3DDeviceResources::TextureResourceHandle sDxt5{};
+        if (!sDxt1) { D3D_GetDevice()->GetResources()->GetTexture(sDxt1, "/env/evergreen2/layers/eg_dirt003_albedo.dds", nullptr, true); }
+        if (!sDxt5) { D3D_GetDevice()->GetResources()->GetTexture(sDxt5, "/units/uel0001/uel0001_albedo.dds", nullptr, true); }
+        static ID3DDeviceResources::TextureResourceHandle sFresh{};
+        if (!sFresh) { D3D_GetDevice()->GetResources()->GetTexture(sFresh, "/env/evergreen2/decals/eg_boulder005_albedo.dds", nullptr, true); }
+        const auto& pick = HighFidelityProbeToggle("decalswap3.on") ? sDxt1 : (HighFidelityProbeToggle("decalswap5.on") ? sFresh : sDxt5);
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(pick)));
+      } else if (HighFidelityProbeToggle("decalbyname.on")) { // TEMPORARY PROBE (do not commit): bind the manager's resource for this decal's name
+        static std::map<msvc8::string, ID3DDeviceResources::TextureResourceHandle> sByName;
+        auto it = sByName.find(decal.mNames[0]);
+        if (it == sByName.end()) { ID3DDeviceResources::TextureResourceHandle h{}; D3D_GetDevice()->GetResources()->GetTexture(h, decal.mNames[0].c_str(), nullptr, true); it = sByName.emplace(decal.mNames[0], h).first;
+          gpg::Warnf("[DECALBYNAME] name=%s anim=%s byName=%p frame=%p frameLoc=%s", decal.mNames[0].c_str(), decal.mResourceRefs[0].tex != nullptr ? static_cast<const CAnimTexture*>(decal.mResourceRefs[0].tex)->GetBaseTextureName().c_str() : "(null)", static_cast<void*>(it->second.get()), static_cast<void*>(albedoSheet.get()), albedoSheet ? static_cast<RD3DTextureResource*>(albedoSheet.get())->mContext.location_.c_str() : "(none)"); }
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(boost::static_pointer_cast<ID3DTextureSheet>(it->second)));
+      } else if (HighFidelityProbeToggle("decalprobe.on")) { // TEMPORARY PROBE (do not commit): per-object D3D state
+        static std::set<const void*> sProbed;
+        auto probeTex = [](const char* label, ID3DTextureSheet* sheet) {
+          if (sheet == nullptr || sProbed.count(sheet) != 0 || sProbed.size() > 12) { return; }
+          sProbed.insert(sheet);
+          ID3DTextureSheet::TextureHandle h{}; sheet->GetTexture(h);
+          void* const tex = (h && h->GetTexture1() != nullptr) ? h->GetTexture1() : nullptr;
+          if (tex == nullptr) { gpg::Warnf("[DECALPROBE] %s sheet=%p no native texture", label, static_cast<void*>(sheet)); return; }
+          auto** const vt = *reinterpret_cast<void***>(tex);
+          using get_dword_fn = unsigned long(__stdcall*)(void*);
+          using lock_fn = long(__stdcall*)(void*, unsigned, void*, const void*, unsigned long);
+          using unlock_fn = long(__stdcall*)(void*, unsigned);
+          struct LockedRect { int pitch; void* bits; } lr{};
+          const long lockHr = reinterpret_cast<lock_fn>(vt[19])(tex, 0U, &lr, nullptr, 0x10UL);
+          unsigned firstBytes = 0; if (lockHr >= 0 && lr.bits != nullptr) { firstBytes = *static_cast<unsigned*>(lr.bits); (void)reinterpret_cast<unlock_fn>(vt[20])(tex, 0U); }
+          gpg::Warnf("[DECALPROBE] %s sheet=%p loc=%s tex=%p lock0=%08lX pitch=%d first=%08X lod=%lu prio=%lu autogen=%lu levels=%lu", label, static_cast<void*>(sheet), static_cast<RD3DTextureResource*>(sheet)->mContext.location_.c_str(), tex, lockHr, lr.pitch, firstBytes,
+                     reinterpret_cast<get_dword_fn>(vt[12])(tex), reinterpret_cast<get_dword_fn>(vt[8])(tex), reinterpret_cast<get_dword_fn>(vt[15])(tex), reinterpret_cast<get_dword_fn>(vt[13])(tex));
+        };
+        probeTex(decal.mNames[0].c_str(), albedoSheet.get());
+        static ID3DDeviceResources::TextureResourceHandle sB5{}, sU1{};
+        if (!sB5) { D3D_GetDevice()->GetResources()->GetTexture(sB5, "/env/evergreen2/decals/eg_boulder005_albedo.dds", nullptr, true); probeTex("REF boulder005", sB5.get()); }
+        if (!sU1) { D3D_GetDevice()->GetResources()->GetTexture(sU1, "/units/uel0001/uel0001_albedo.dds", nullptr, true); probeTex("REF uel0001", sU1.get()); }
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      } else if (HighFidelityProbeToggle("decalreload.on")) { // TEMPORARY PROBE (do not commit): recreate the D3D texture now
+        static std::set<const void*> sReloaded;
+        if (albedoSheet != nullptr && sReloaded.count(albedoSheet.get()) == 0 && sReloaded.size() < 64) {
+          sReloaded.insert(albedoSheet.get());
+          auto* const res = static_cast<RD3DTextureResource*>(albedoSheet.get());
+          res->ReloadTexture();
+          ID3DTextureSheet::TextureHandle h{}; res->GetTexture(h);
+          gpg::Warnf("[DECALRELOAD] res=%p newTex=%p loc=%s", static_cast<void*>(res), h ? h->GetTexture1() : nullptr, res->mContext.location_.c_str());
+        }
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      } else if (HighFidelityProbeToggle("decaldirty.on")) { // TEMPORARY PROBE (do not commit): force a VRAM re-upload
+        ID3DTextureSheet::TextureHandle h{};
+        if (albedoSheet != nullptr) { albedoSheet->GetTexture(h); }
+        if (h && h->GetTexture1() != nullptr) {
+          void* const tex = h->GetTexture1();
+          auto** const vt = *reinterpret_cast<void***>(tex);
+          using add_dirty_fn = long(__stdcall*)(void*, const void*);
+          const long dr = reinterpret_cast<add_dirty_fn>(vt[21])(tex, nullptr);
+          static int sDirtyBudget = 0;
+          if (sDirtyBudget < 3) { ++sDirtyBudget; gpg::Warnf("[DECALDIRTY] tex=%p AddDirtyRect hr=%08lX", tex, dr); }
+        }
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      } else if (HighFidelityProbeToggle("decalpreload.on")) { // TEMPORARY PROBE (do not commit): force VRAM upload first
+        ID3DTextureSheet::TextureHandle h{};
+        if (albedoSheet != nullptr) { albedoSheet->GetTexture(h); }
+        if (h && h->GetTexture1() != nullptr) {
+          void* const tex = h->GetTexture1();
+          auto** const vt = *reinterpret_cast<void***>(tex);
+          using preload_fn = void(__stdcall*)(void*);
+          using get_lod_fn = unsigned long(__stdcall*)(void*);
+          reinterpret_cast<preload_fn>(vt[9])(tex);
+          static int sPreBudget = 0;
+          if (sPreBudget < 3) { ++sPreBudget; gpg::Warnf("[DECALPRE] tex=%p lod=%lu", tex, reinterpret_cast<get_lod_fn>(vt[12])(tex)); }
+        }
+        shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      } else
+      shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
+      shaderVars.decalSpecTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(specSheet));
 
       if (shaderVars.decalAlpha.Exists()) {
         shaderVars.decalAlpha.SetFloat(command.alpha);
@@ -1282,7 +1540,11 @@ namespace moho
   {
     const auto& splatVertices = reinterpret_cast<const HighFidelitySplatVertexLane&>(mSecondaryPatchData);
     const std::size_t splatVertexCount = splatVertices.size();
+    { static int sSd = 0; if ((sSd++ % 40) == 0) { gpg::Warnf("[SPLATDIAG] DrawSplatComposite verts=%d", static_cast<int>(splatVertexCount)); } } // TEMPORARY PROBE (do not commit)
     if (splatVertexCount == 0) {
+      return;
+    }
+    if (HighFidelityProbeToggle("nosplat.on")) { // TEMPORARY PROBE (do not commit)
       return;
     }
 
@@ -1297,6 +1559,7 @@ namespace moho
     shaderVars.decalAlbedoTexture.GetTexture(
       boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
     );
+    { static int sC = 0; if (sC < 4) { ++sC; auto ct = sHighFidelityTextureBatcher->GetCompositeTexture(); ID3DTextureSheet::TextureHandle h{}; if (ct) ct->GetTexture(h); gpg::Warnf("[SPLATTEX] composite=%p native=%p", static_cast<void*>(ct.get()), h ? h->GetTexture1() : nullptr); } } // TEMPORARY PROBE (do not commit)
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
@@ -1658,6 +1921,9 @@ namespace moho
     if (!ren_Terrain || !ren_Skirt) {
       return;
     }
+    if (HighFidelityProbeToggle("noskirt.on")) { // TEMPORARY PROBE (do not commit)
+      return;
+    }
 
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectTechnique("TTerrainSkirt");
@@ -1936,6 +2202,9 @@ namespace moho
   void HighFidelityTerrain::DrawShoreline(const Shoreline* const shoreline, const GeomCamera3* const camera)
   {
     if (!ren_Shoreline || shoreline->mShorelineTris == 0) {
+      return;
+    }
+    if (HighFidelityProbeToggle("noshore.on")) { // TEMPORARY PROBE (do not commit)
       return;
     }
 

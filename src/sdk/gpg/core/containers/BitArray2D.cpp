@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "BitArray2D.h"
 
 #include <cstddef>
@@ -68,6 +69,13 @@ BitArray2D* DestroyAndDeleteBitArray2D(BitArray2D* const bitArray)
  */
 void BitArray2D::Reset(const unsigned int newWidth, const unsigned int newHeight)
 {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    if (newWidth == 1024u) {
+        static int sCount = 0;
+        if (sCount++ < 12) {
+            try { throw std::runtime_error("BitArray2D::Reset probe"); } catch (const std::runtime_error&) {}
+        }
+    }
     const unsigned int wordCount = newWidth * ((newHeight + 31u) >> 5);
     auto* const newWords = static_cast<int32_t*>(operator new(sizeof(int32_t) * wordCount));
 
@@ -85,6 +93,13 @@ void BitArray2D::Reset(const unsigned int newWidth, const unsigned int newHeight
  */
 void BitArray2D::FillRect(int x0, int z0, const int rectWidth, const int rectHeight, const bool fill)
 {
+    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
+    if (fill && width == 1024) {
+        static int sCount = 0;
+        if (sCount++ < 4) {
+            try { throw std::runtime_error("BitArray2D::FillRect probe"); } catch (const std::runtime_error&) {}
+        }
+    }
     int x1 = x0 + rectWidth;
     int z1 = z0 + rectHeight;
 

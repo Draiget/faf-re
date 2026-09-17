@@ -1,5 +1,6 @@
 #include "moho/sim/CArmyLuaFunctionRegistrations.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <new>
@@ -515,9 +516,50 @@ namespace moho
     // ordinary build paths (factory, mobile build, upgrade, brain spawns), all
     // of which keep calling `CreateUnitForScript`; the scenario's initial unit
     // deliberately predates it.
+    // TEMPORARY PROBE -- records whether the unit-cap gate this path used to go
+    // through would have rejected the initial unit. Delete once attributed.
+    {
+      std::FILE* const sink = std::fopen("faf_diag.log", "a");
+      if (sink != nullptr) {
+        const bool ignoreCap = army->IgnoreUnitCap();
+        const float cap = army->GetUnitCap();
+        const float used = army->GetArmyUnitCostTotal();
+        // CapCost is not reachable here (RUnitBlueprint is incomplete in this
+        // TU); an ACU's is >= 1, so `used + 1 > cap` is a lower bound on
+        // whether the old capped path would have rejected it.
+        (void)std::fprintf(
+          sink,
+          "[CDRSPAWN] initial unit=%s ignoreCap=%d cap=%.2f used=%.2f "
+          "wouldRejectAtCapCost1=%d startPos=(%.1f,%.1f) hf=%dx%d\n",
+          blueprintId.name.c_str(), ignoreCap ? 1 : 0, cap, used,
+          (!ignoreCap && (used + 1.0f > cap)) ? 1 : 0, startPosition.x, startPosition.y,
+          (sim != nullptr && sim->mMapData != nullptr && sim->mMapData->mHeightField.get() != nullptr)
+            ? sim->mMapData->mHeightField.get()->Width() : -1,
+          (sim != nullptr && sim->mMapData != nullptr && sim->mMapData->mHeightField.get() != nullptr)
+            ? sim->mMapData->mHeightField.get()->Height() : -1
+        );
+        (void)std::fclose(sink);
+      }
+    }
+
     Unit* const unit = sim ? sim->CreateInitialArmyUnit(constructionParams) : nullptr;
     if (!unit) {
       LuaPlus::LuaState::Error(state, "SetArmyStart() failed");
+    }
+
+    // TEMPORARY PROBE -- is the Lua side actually receiving a unit? Delete once
+    // attributed.
+    {
+      std::FILE* const sink = std::fopen("faf_diag.log", "a");
+      if (sink != nullptr) {
+        (void)std::fprintf(
+          sink, "[CDRSPAWN] created unit=%p luaObjState=%p pos=(%.1f,%.1f,%.1f) id=0x%08X\n",
+          static_cast<void*>(unit), static_cast<void*>(unit->mLuaObj.GetActiveState()),
+          unit->GetPosition().x, unit->GetPosition().y, unit->GetPosition().z,
+          static_cast<unsigned>(unit->id_)
+        );
+        (void)std::fclose(sink);
+      }
     }
 
     unit->mLuaObj.PushStack(state);

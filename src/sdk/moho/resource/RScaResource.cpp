@@ -14,6 +14,7 @@
 #include <new>
 #include <typeinfo>
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
 
 namespace gpg
 {
@@ -589,6 +590,7 @@ gpg::RRef* GetScaResource(gpg::RRef* const outRef, const char* const path)
     outRef->mObj = nullptr;
   }
   outRef->mType = resourceType;
+  { static int sScaBudget = 12; if (sScaBudget > 0) { --sScaBudget; gpg::Warnf("[SCADIAG] path='%s' weakExpired=%d useCount=%ld obj=%p", path != nullptr ? path : "", weakResource.expired() ? 1 : 0, weakResource.use_count(), outRef->mObj); } } // TEMPORARY PROBE (do not commit)
   return outRef;
 }
 
@@ -639,7 +641,6 @@ namespace
       manager->DetachFactory(&ScaResourceFactorySingleton());
     }
   }
-
   struct RScaResourcePrefetchBootstrap
   {
     RScaResourcePrefetchBootstrap()

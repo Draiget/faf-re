@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstdarg>
+#include <cstdio>
 #include <cstddef>
 #include <cstdlib>
 #include <cstdint>
@@ -106,6 +108,23 @@
 namespace
 {
   static_assert(sizeof(moho::WeakObject::WeakLinkNodeView) == 0x8, "WeakLinkNodeView size must be 0x8");
+
+  // TEMPORARY PROBE SINK -- unload-subset triage, delete when resolved.
+  // gpg::Warnf reaches nothing unless `/log <name>` installed a target, so the
+  // drag-unload probes append here instead. The file lands beside the exe.
+  void UnloadDragDiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc('\n', sink);
+    (void)std::fclose(sink);
+  }
 
   /**
    * One formation-placement ghost: the preview mesh `MeshRenderer` handed back
@@ -15560,6 +15579,7 @@ namespace moho
    */
   void CWldSession::AddToExtraSelectList(UserEntity* const entity)
   {
+    UnloadDragDiagLine("[XSEL] Add entity=%p sizeBefore=%u", static_cast<void*>(entity), ExtraSelectionView().mSize);
     UICommandModeData commandModeData{};
     commandModeData.mMode = msvc8::string("order", 5u);
     commandModeData.mPayload.AssignNewTable(mState, 0, 0);
@@ -15568,6 +15588,7 @@ namespace moho
 
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
     (void)InsertSelectionEntity(extraSelection, entity);
+    UnloadDragDiagLine("[XSEL] Add done sizeAfter=%u", extraSelection.mSize);
   }
 
   /**
@@ -15580,6 +15601,7 @@ namespace moho
   void CWldSession::RemoveFromExtraSelectList(UserEntity* const entity)
   {
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
+    UnloadDragDiagLine("[XSEL] Remove entity=%p size=%u", static_cast<void*>(entity), extraSelection.mSize);
 
     // 0x00896844 `call sub_8676E0` -- the erase's result is pushed nowhere and
     // never tested. The emptiness re-check that follows is unconditional:
@@ -15612,6 +15634,7 @@ namespace moho
   void CWldSession::ClearExtraSelectList()
   {
     SSelectionSetUserEntity& extraSelection = ExtraSelectionView();
+    UnloadDragDiagLine("[XSEL] Clear size=%u", extraSelection.mSize);
     // 0x00896881-0x00896896: the emptiness test is `find(head->left) == head`,
     // not a raw `head->left == head` -- `find` walks past weak entries whose
     // target has died, so a set holding only dead nodes counts as empty here.
@@ -15620,6 +15643,7 @@ namespace moho
     }
 
     SSelectionNodeUserEntity* const head = extraSelection.mHead;
+
     SSelectionNodeUserEntity* node = head->mLeft;
     (void)extraSelection.EraseRange(&node, head->mLeft, head);
     extraSelection.mSizeMirrorOrUnused = extraSelection.mSize;
@@ -16831,6 +16855,31 @@ namespace moho
         AppendUnitUnique(outUnits, userUnit);
       }
     }
+
+    // TEMPORARY PROBE -- "clicking an enemy issues no command" triage.
+    // This is the engine side of that click: the UI Lua calls
+    // GetValidAttackingUnits() and issues nothing when it comes back empty, so
+    // the failure is silent and invisible from the sim logs. Reports whether a
+    // target was hovered at all, how many units were selected, and how many
+    // passed CanAttackTarget -- which separates "hover never resolved to an
+    // entity" from "hover resolved but every weapon rejected it".
+    // Delete once resolved.
+    {
+      static int sProbe = 0;
+      if (sProbe++ < 40) {
+        std::size_t selected = 0;
+        for (const SSelectionNodeUserEntity* n = head->mLeft; n && n != head; n = NextTreeNode(n)) {
+          ++selected;
+        }
+        gpg::Warnf(
+          "[CLICKDIAG] GetValidAttackingUnits hovered=%p hoveredIsUnit=%d selected=%u valid=%u",
+          static_cast<const void*>(hoveredTarget),
+          (hoveredTarget != nullptr && const_cast<UserEntity*>(hoveredTarget)->IsUserUnit() != nullptr) ? 1 : 0,
+          static_cast<unsigned>(selected),
+          static_cast<unsigned>(outUnits.size())
+        );
+      }
+    }
   }
 
   /**
@@ -17860,6 +17909,11 @@ namespace moho
         const EUnitCommandType unloadCommand = onlyPods
           ? EUnitCommandType::UNITCOMMAND_Move
           : EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits;
+        // TEMPORARY PROBE -- unload-subset triage, delete when resolved.
+        UnloadDragDiagLine(
+          "[UNLOADDRAG] specific-branch: extraSelectionEmpty=0 onlyPods=%d cmd=%d pos=(%.1f,%.1f)",
+          onlyPods ? 1 : 0, static_cast<int>(unloadCommand), dragWorldPos.x, dragWorldPos.z
+        );
         IssueOrderAtGround(unloadTargets, unloadCommand, dragWorldPos, clearQueue);
       } else {
         ScopedLocalSelectionSet airTransportGuard{};
@@ -17869,6 +17923,15 @@ namespace moho
         SplitSelectionForFerryCommand(selection, airTransports, landUnits);
 
         if (airTransports.IsEmptyFromHeadFind() || landUnits.IsEmptyFromHeadFind()) {
+          // TEMPORARY PROBE -- unload-subset triage, delete when resolved. This
+          // is the arm that unloads EVERYTHING; reaching it means the extra
+          // selection (the cargo the player picked) came back empty.
+          UnloadDragDiagLine(
+            "[UNLOADDRAG] unload-ALL branch: extraSelectionEmpty=1 airEmpty=%d landEmpty=%d pos=(%.1f,%.1f) "
+            "cloneSize=%u",
+            airTransports.IsEmptyFromHeadFind() ? 1 : 0, landUnits.IsEmptyFromHeadFind() ? 1 : 0,
+            dragWorldPos.x, dragWorldPos.z, extraSelection.mSize
+          );
           IssueOrderAtGround(
             selection, EUnitCommandType::UNITCOMMAND_TransportUnloadUnits, dragWorldPos, clearQueue
           );

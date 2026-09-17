@@ -15,6 +15,10 @@ namespace moho
   extern int ren_ClipDecalLevel;
   extern float ren_ShoreErrorCoeff;
   extern float ren_maxViewError;
+}
+#include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
+namespace moho
+{
   extern bool ren_ErrorCache;
 
   namespace
@@ -935,6 +939,19 @@ namespace moho
       (row1.z * testCorner.z) + (row1.y * testCorner.y) + (row1.x * testCorner.x) + row1.w;
 
     const float maxAllowedError = shoreErrorCoeff * projectedDepth * ren_maxViewError;
+    // TEMPORARY PROBE (do not commit): coarse-terrain triage.
+    {
+      static int sSplitProbeBudget = 0;
+      static unsigned sSplitProbeCalls = 0;
+      ++sSplitProbeCalls;
+      if (tier >= 4 && (sSplitProbeBudget < 12 || (sSplitProbeCalls % 5000u) == 0u)) {
+        ++sSplitProbeBudget;
+        gpg::Warnf("[TESSDIAG] tier=%d cell=(%d,%d) corner=(%.1f,%.1f,%.1f) row1=(%.4f,%.4f,%.4f,%.3f) lod=%.3f depth=%.2f tierErr=%.3f allowed=%.3f maxViewErr=%.4f -> %s",
+                   tier, cellX, cellZ, testCorner.X(), testCorner.Y(), testCorner.Z(), row1.x, row1.y, row1.z, row1.w,
+                   mCam->lodScale, projectedDepth, tierMaxError, maxAllowedError, ren_maxViewError,
+                   (tierMaxError < maxAllowedError) ? "accept" : "split");
+      }
+    }
     return (tierMaxError < maxAllowedError) ? kAccept : kSplit;
   }
 

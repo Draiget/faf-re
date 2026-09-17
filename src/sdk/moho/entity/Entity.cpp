@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <bit>
 #include <cmath>
+#include <cstdio>   // TEMPORARY PROBE (do not commit)
+#include <windows.h> // TEMPORARY PROBE (do not commit)
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
@@ -4185,6 +4187,8 @@ namespace moho
       varData.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
     }
 
+
+
     (void)QueueEntityVariableUpdate(syncData, id_, varData);
   }
 
@@ -5059,6 +5063,43 @@ namespace moho
   {
     const EntityTransformPayload previous = ReadEntityTransformPayload(Orientation, Position);
     const EntityTransformPayload current = ReadEntityTransformPayload(PendingOrientation, PendingPosition);
+
+    // TEMPORARY PROBE (do not commit). A flying transport's Entity::Position
+    // reads NaN -- its four engine emitters all report
+    // `[EFXATTACH] nan-transform ent=... bone=28..31 dead=0`. This is the commit
+    // that publishes it, so report the first ticks on which a non-finite
+    // pending transform arrives, and say whether the orientation went bad with
+    // the position (orientation math) or the position alone (the integrator).
+    {
+      const bool posBad = !(std::isfinite(current.posX) && std::isfinite(current.posY) && std::isfinite(current.posZ));
+      const bool orientBad =
+        !(std::isfinite(current.quatW) && std::isfinite(current.quatX) &&
+          std::isfinite(current.quatY) && std::isfinite(current.quatZ));
+      if (posBad || orientBad) {
+        static int sAdvanceProbeBudget = 0;
+        if (sAdvanceProbeBudget < 16) {
+          ++sAdvanceProbeBudget;
+          char probe[352];
+          const char* className = "?";
+          try {
+            className = typeid(*this).name();
+          } catch (...) {
+            className = "<rtti-failed>";
+          }
+          sprintf_s(probe, sizeof(probe),
+                    "[COORDNAN] ent=%08X cls=%.60s pos=%d orient=%d prevpos=(%.2f,%.2f,%.2f) "
+                    "newpos=(%.2f,%.2f,%.2f) newquat=(%.3f,%.3f,%.3f,%.3f) velScale=%.3f\n",
+                    static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(this)),
+                    className,
+                    posBad ? 1 : 0, orientBad ? 1 : 0,
+                    previous.posX, previous.posY, previous.posZ,
+                    current.posX, current.posY, current.posZ,
+                    current.quatW, current.quatX, current.quatY, current.quatZ,
+                    mPendingVelocityScale);
+          ::OutputDebugStringA(probe);
+        }
+      }
+    }
 
     WriteEntityTransformPayload(PrevOrientation, PrevPosition, previous);
     WriteEntityTransformPayload(Orientation, Position, current);

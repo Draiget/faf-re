@@ -511,11 +511,34 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
   mMapData = mSim ? mSim->mMapData : nullptr;
   mIMap = mArmy->GetIGrid();
 
-  if (mSim && mSim->mRules) {
-    const CategoryWordRangeView* const category = mSim->mRules->GetEntityCategory("VISIBLETORECON");
+  {
+    const CategoryWordRangeView* const category =
+      (mSim && mSim->mRules) ? mSim->mRules->GetEntityCategory("VISIBLETORECON") : nullptr;
     if (category) {
       mVisibleToReconCategory = *category;
     }
+
+    // TEMPORARY PROBE -- delete once resolved.
+    //
+    // ReconTick gates EVERY candidate on this set
+    // (`mVisibleToReconCategory.ContainsBit(bp->mCategoryBitIndex)`), and the
+    // set is captured here, once, at army construction. If "VISIBLETORECON" is
+    // not registered yet at this point -- categories come from Lua -- the set
+    // stays empty for the army's whole life, no blip is ever created, and every
+    // downstream symptom follows at once: nothing is ever seen (fog), nothing
+    // auto-acquires, attack-ground finds no target, and clicking an enemy
+    // issues nothing. ContainsBit itself is verified against the binary's
+    // `(ord>>5) - ordinalStart` / `ord & 0x1F` test, so an empty set is the
+    // only way this gate can reject everything.
+    gpg::Warnf(
+      "[RECONCAT] army=%d sim=%p rules=%p resolved=%d words=%u fog=%u",
+      static_cast<int>(mArmy->mConstDat.mArmyIndex),
+      static_cast<void*>(mSim),
+      static_cast<void*>(mSim ? mSim->mRules : nullptr),
+      (category != nullptr) ? 1 : 0,
+      static_cast<unsigned>(mVisibleToReconCategory.WordCount()),
+      static_cast<unsigned>(mFogOfWar)
+    );
   }
 
   boost::ResetSharedPtrRawOwning(mRadarGrid, MakeGrid(mMapData, 4));
@@ -698,16 +721,59 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
+  // TEMPORARY PROBE -- delete once resolved.
+  //
+  // Direct measurement of the gate every blip candidate must pass. The
+  // constructor probe never fires, which says this army's recon DB was built
+  // through the reflection default ctor + deserialize path rather than
+  // CAiReconDBImpl::Create, so the "VISIBLETORECON" set may never have been
+  // populated from the rules at all. words=0 here means ContainsBit rejects
+  // every unit, no blip is ever created, and the fog/auto-attack/attack-ground/
+  // enemy-click symptoms all follow from this one line.
+  {
+    // Periodic, not first-N: at game start the armies have not met yet, so an
+    // early blipMap=0 proves nothing. Sample every 300 ticks instead.
+    if ((mSim->mCurTick % 301u) == 0u) {
+      std::size_t entities = 0;
+      if (mSim->mEntityDB) {
+        for (Entity* const e : mSim->mEntityDB->Entities()) {
+          if (e) {
+            ++entities;
+          }
+        }
+      }
+      gpg::Warnf(
+        "[RECONGATE] army=%d words=%u fog=%u entities=%u blipMap=%u bblips=%u",
+        static_cast<int>(mArmy ? mArmy->mConstDat.mArmyIndex : -1),
+        static_cast<unsigned>(mVisibleToReconCategory.WordCount()),
+        static_cast<unsigned>(mFogOfWar),
+        static_cast<unsigned>(entities),
+        static_cast<unsigned>(mBlipMap.size()),
+        static_cast<unsigned>(mBblips.end() - mBblips.begin())
+      );
+    }
+  }
+
+  // TEMPORARY PROBE counters -- delete once resolved. The cumulative ones are
+  // what matter: sampling one tick in 301 cannot tell "never detects" from
+  // "the sampled tick happened to miss it".
+  std::size_t gTotal = 0, gUnit = 0, gBp = 0, gNotOwn = 0, gCat = 0, gDetect = 0;
+  static unsigned sEverDetect = 0, sEverPending = 0, sEverCreated = 0, sTicks = 0;
+  ++sTicks;
+
   msvc8::vector<SNewBlip> pendingNewBlips{};
   if (mSim->mEntityDB) {
     for (Entity* const entity : mSim->mEntityDB->Entities()) {
+      ++gTotal;
       Unit* const unit = entity ? entity->IsUnit() : nullptr;
       if (!unit || unit->DestroyQueued()) {
         continue;
       }
+      ++gUnit;
       if (!unit->BluePrint) {
         continue;
       }
+      ++gBp;
       // 0x005C107B `cmp eax,[esi+30h]` / `je` -- a POINTER-identity test against
       // this recon DB's own army, not an alliance test. Allied units do get
       // blips: that is how you see an ally's army at all, and `ReconCanDetect`
@@ -717,11 +783,17 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
       if (unit->ArmyRef == mArmy) {
         continue;
       }
+      ++gNotOwn;
       if (!mVisibleToReconCategory.ContainsBit(unit->BluePrint->mCategoryBitIndex)) {
         continue;
       }
+      ++gCat;
 
       const EReconFlags detectFlags = ReconCanDetectEntity(this, unit, unit->GetPositionWm3(), RECON_AnySense);
+      if (detectFlags != RECON_None) {
+        ++gDetect;
+        ++sEverDetect;
+      }
       auto [rangeBegin, rangeEnd] = FindReconBlipRange(this, unit);
       if (detectFlags != RECON_None) {
         if (rangeBegin == rangeEnd) {
@@ -748,9 +820,30 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     }
   }
 
+  sEverPending += static_cast<unsigned>(pendingNewBlips.size());
   GenerateNewBlips(pendingNewBlips);
+  sEverCreated = static_cast<unsigned>(mBlipMap.size()) > sEverCreated
+    ? static_cast<unsigned>(mBlipMap.size()) : sEverCreated;
   RebuildBlipListFromMapAndOrphans(this);
   TickAllReconGrids(this, dTicks);
+
+  // TEMPORARY PROBE -- delete once resolved. Per-gate survivor counts for the
+  // publish loop above, sampled periodically so it reports after the armies
+  // have actually met rather than only on the opening ticks.
+  if ((mSim->mCurTick % 301u) == 0u) {
+    gpg::Warnf(
+      "[RECONFUNNEL] army=%d db=%p visionGrid=%p fog=%u ticks=%u unit=%u cat=%u detect=%u | EVER detect=%u pending=%u maxBlipMap=%u",
+      static_cast<int>(mArmy ? mArmy->mConstDat.mArmyIndex : -1),
+      static_cast<const void*>(this),
+      static_cast<const void*>(mVisionGrid.px),
+      static_cast<unsigned>(mFogOfWar),
+      sTicks,
+      static_cast<unsigned>(gUnit),
+      static_cast<unsigned>(gCat),
+      static_cast<unsigned>(gDetect),
+      sEverDetect, sEverPending, sEverCreated
+    );
+  }
 }
 
 /**
@@ -1526,19 +1619,53 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
     return GetReconFlags(nullptr, pos, oldFlags, belowWater);
   }
 
+  // TEMPORARY PROBE -- delete once resolved. RECONFUNNEL proved every enemy
+  // candidate dies here (cat=14 -> detect=0), so this splits the two ways that
+  // happens: the playable-radius gate, or GetReconFlags finding nothing in the
+  // vision/radar/sonar/omni grids.
+  static unsigned sCalls = 0, sOutside = 0, sAllied = 0, sGridNone = 0, sGridHit = 0;
+  ++sCalls;
+
   if (mMapData && mArmy) {
     const bool useWholeMap = mArmy->UseWholeMap();
     if (!IsWithinPlayableMapRadius(mMapData, pos, 0.0f, useWholeMap)) {
+      ++sOutside;
+      if ((sCalls % 4000u) == 0u) {
+        gpg::Warnf(
+          "[RECONDETECT] calls=%u outsideRect=%u allied=%u gridNone=%u gridHit=%u "
+          "pos=(%.1f,%.1f,%.1f) rect=(%d,%d,%d,%d) wholeMap=%d",
+          sCalls, sOutside, sAllied, sGridNone, sGridHit, pos.x, pos.y, pos.z,
+          mMapData->mPlayableRect.x0, mMapData->mPlayableRect.z0,
+          mMapData->mPlayableRect.x1, mMapData->mPlayableRect.z1,
+          useWholeMap ? 1 : 0
+        );
+      }
       return RECON_None;
     }
   }
 
   if (IsAlliedOrSameArmy(mArmy, ent->ArmyRef)) {
+    ++sAllied;
     return oldFlags;
   }
 
   const bool belowWater = ent->mCurrentLayer == LAYER_Seabed || ent->mCurrentLayer == LAYER_Sub;
-  return GetReconFlags(ent, pos, oldFlags, belowWater);
+  const EReconFlags resolved = GetReconFlags(ent, pos, oldFlags, belowWater);
+  if (resolved == RECON_None) {
+    ++sGridNone;
+  } else {
+    ++sGridHit;
+  }
+  if ((sCalls % 4000u) == 0u) {
+    gpg::Warnf(
+      "[RECONDETECT] calls=%u outsideRect=%u allied=%u gridNone=%u gridHit=%u "
+      "pos=(%.1f,%.1f,%.1f) rect=(%d,%d,%d,%d)",
+      sCalls, sOutside, sAllied, sGridNone, sGridHit, pos.x, pos.y, pos.z,
+      mMapData ? mMapData->mPlayableRect.x0 : -1, mMapData ? mMapData->mPlayableRect.z0 : -1,
+      mMapData ? mMapData->mPlayableRect.x1 : -1, mMapData ? mMapData->mPlayableRect.z1 : -1
+    );
+  }
+  return resolved;
 }
 
 /**

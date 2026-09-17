@@ -21,6 +21,13 @@
 #include "moho/terrain/TerrainShaderVars.h"
 #include "moho/mesh/Mesh.h"
 #include "gpg/gal/RenderTargetContext.hpp"
+#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp" // TEMPORARY PROBE (do not commit)
+
+namespace gpg::gal
+{
+  // TEMPORARY PROBE (do not commit): defined in D3D9Interfaces.cpp.
+  long DebugSaveSurfaceToFileA(const char* filePath, unsigned int fileFormat, void* sourceSurface);
+}
 #include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
 
 // Declared the way gpg/gal/Matrix.cpp declares its D3DX entry points, rather
@@ -407,6 +414,20 @@ namespace moho
     mCamera.Init(identityTransform, lightViewProjection);
 
     mShadowCameraValid = true;
+    // TEMPORARY PROBE (do not commit): shadow-wedge triage.
+    {
+      static int sShadowCamBudget = 0;
+      ++sShadowCamBudget;
+      if (sShadowCamBudget <= 4 || (sShadowCamBudget % 600) == 0) {
+        gpg::Warnf("[SHADOWCAM] zoom=%.1f lod=%.1f coeff=%.2f vol=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f) ls=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f) near=%.1f far=%.1f eye=(%.0f,%.0f,%.0f) up=(%.2f,%.2f,%.2f) proj00=%.4f proj11=%.4f proj22=%.6f proj32=%.3f",
+                   zoom, ren_ShadowLOD, ren_ShadowCoeff,
+                   volume.Min.X(), volume.Min.Y(), volume.Min.Z(), volume.Max.X(), volume.Max.Y(), volume.Max.Z(),
+                   lightSpaceVolume.Min.X(), lightSpaceVolume.Min.Y(), lightSpaceVolume.Min.Z(),
+                   lightSpaceVolume.Max.X(), lightSpaceVolume.Max.Y(), lightSpaceVolume.Max.Z(),
+                   nearDepth, farDepth, eye.X(), eye.Y(), eye.Z(), lightUp.X(), lightUp.Y(), lightUp.Z(),
+                   lightProjection.r[0].x, lightProjection.r[1].y, lightProjection.r[2].z, lightProjection.r[3].z);
+      }
+    }
     return mShadowCameraValid;
   }
 
@@ -483,7 +504,24 @@ namespace moho
     device->SetRenderTarget1(mShadowMap.get(), mDepthStencil.get(), true, -1, 1.0f, 0);
     bindTargetWithBorder(mShadowMap);
 
-    terrain->DrawTerrainDepth(mCamera);
+    // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\noterraindepth.on" skips the terrain depth draw.
+    {
+      static int sSkipTerrainDepth = 0;
+      static unsigned sSkipTerrainDepthCalls = 0;
+      if ((sSkipTerrainDepthCalls++ % 60u) == 0u) {
+        char dir[512] = {};
+        std::size_t length = 0;
+        sSkipTerrainDepth = 0;
+        if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
+          char path[600];
+          (void)std::snprintf(path, sizeof(path), "%s\\noterraindepth.on", dir);
+          sSkipTerrainDepth = (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
+        }
+      }
+      if (sSkipTerrainDepth == 0) {
+        terrain->DrawTerrainDepth(mCamera);
+      }
+    }
 
     MeshRenderer* const meshRenderer = MeshRenderer::GetInstance();
     meshRenderer->Batch(REN_GetGameTick(), REN_GetSimDeltaSeconds(), mCamera, viewCamera.viewport.r[1]);
@@ -491,7 +529,47 @@ namespace moho
 
     restoreViewport();
 
+    // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\dumpshadow.on" writes the raw
+    // shadow map (and the blurred variance map when blur is on) to that directory once.
+    const auto dumpShadowTargets = [&](const bool includeBlur) {
+      static bool sDumped = false;
+      static unsigned sDumpCalls = 0;
+      if (sDumped || (sDumpCalls++ % 120u) != 60u) {
+        return;
+      }
+      char dir[512] = {};
+      std::size_t length = 0;
+      if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") != 0 || length == 0u) {
+        return;
+      }
+      char path[600];
+      (void)std::snprintf(path, sizeof(path), "%s\\dumpshadow.on", dir);
+      if (::GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES) {
+        return;
+      }
+      sDumped = true;
+      const auto dump = [&](const boost::shared_ptr<CD3DRenderTarget>& target, const char* const name) {
+        if (!target) {
+          return;
+        }
+        ID3DRenderTarget::SurfaceHandle surface{};
+        (void)target->GetSurface(surface);
+        if (!surface) {
+          return;
+        }
+        (void)std::snprintf(path, sizeof(path), "%s\\%s.bmp", dir, name);
+        const long hr = gpg::gal::DebugSaveSurfaceToFileA(path, 0U, surface->GetSurface());
+        gpg::Warnf("[SHADOWDUMP] %s -> %s hr=0x%08lX size=%d blur=%d valid=%d", name, path, hr, mShadowSize,
+                   mShadowBlurEnabled ? 1 : 0, mShadowCameraValid ? 1 : 0);
+      };
+      dump(mShadowMap, "shadow_raw");
+      if (includeBlur) {
+        dump(mBlurTargetB, "shadow_blurB");
+      }
+    };
+
     if (!mShadowBlurEnabled) {
+      dumpShadowTargets(false);
       return;
     }
 
@@ -524,6 +602,7 @@ namespace moho
 
     blurPass(mBlurTargetA, mShadowMap, "THorizontalBlurDepthToVariance");
     blurPass(mBlurTargetB, mBlurTargetA, "TVerticalBlurDepthToVariance");
+    dumpShadowTargets(true);
   }
 
   /**
@@ -544,6 +623,24 @@ namespace moho
   {
     if (!ren_Shadows) {
       return;
+    }
+    // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\noshadowpass.on" skips the whole pass.
+    {
+      static int sSkipPass = 0;
+      static unsigned sSkipPassCalls = 0;
+      if ((sSkipPassCalls++ % 60u) == 0u) {
+        char dir[512] = {};
+        std::size_t length = 0;
+        sSkipPass = 0;
+        if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
+          char path[600];
+          (void)std::snprintf(path, sizeof(path), "%s\\noshadowpass.on", dir);
+          sSkipPass = (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) ? 1 : 0;
+        }
+      }
+      if (sSkipPass != 0) {
+        return;
+      }
     }
 
     std::int32_t fidelity = std::min(shadow_Fidelity, shadow_FidelitySupported);
