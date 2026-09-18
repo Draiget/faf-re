@@ -216,6 +216,12 @@ namespace gpg::core
 
     /**
      * Address: 0x0061CA70 (FUN_0061CA70, weak-ref slot range unlink lane)
+     * Address: 0x007AF240 (FUN_007AF240, the same body emitted for
+     *          `moho::CameraUserEntityWeakRef`, used by the camera's three
+     *          frustum lanes)
+     * Address: inlined at 0x007EEB21..0x007EEB40 in `RangeRenderer::Render`
+     *          (FUN_007EEA00), where it is the unlink half of the stack
+     *          snapshot lane's destructor
      *
      * What it does:
      * Unlinks every intrusive weak-ref slot in `[begin, end)` from its owner's

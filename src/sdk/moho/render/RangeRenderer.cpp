@@ -86,11 +86,20 @@ namespace
    */
   struct CameraFrustumWeakRefSnapshotBuffer
   {
-    moho::CameraUserEntityWeakRef* mStart;                      // +0x00
-    moho::CameraUserEntityWeakRef* mFinish;                     // +0x04
-    moho::CameraUserEntityWeakRef* mCapacity;                   // +0x08
-    moho::CameraUserEntityWeakRef* mOriginalStart;               // +0x0C
-    moho::CameraUserEntityWeakRef mInlineStorage[40];            // +0x10
+    moho::CameraFrustumUserEntityList mView;           // +0x00
+    moho::CameraUserEntityWeakRef mInlineStorage[40];  // +0x10
+
+    /**
+     * Address: inlined at 0x007EEB13..0x007EEB52 in `RangeRenderer::Render`
+     * (FUN_007EEA00) - the detach walk followed by the guarded
+     * `operator delete[]` at 0x007EEB4D.
+     *
+     * Every snapshotted element is spliced into the intrusive weak-link chain
+     * of the entity it tracks. This buffer lives on `Render`'s stack, so those
+     * chains must be unspliced before the frame unwinds or the camera's next
+     * frustum-cache rebuild walks a chain into a dead stack frame.
+     */
+    ~CameraFrustumWeakRefSnapshotBuffer() noexcept { mView.DetachAndRelease(); }
   };
   static_assert(sizeof(CameraFrustumWeakRefSnapshotBuffer) == 0x150, "CameraFrustumWeakRefSnapshotBuffer size must be 0x150");
 
@@ -104,11 +113,10 @@ namespace
    * which relinks each copied weak-ref into the new storage's owner chains
    * and spills to heap when the source list exceeds inline capacity.
    *
-   * `CameraFrustumWeakRefSnapshotBuffer`'s first four fields are
-   * layout-identical to `CameraFrustumUserEntityList` (same `{begin, end,
-   * capacityEnd, inlineOrigin}` header, just named `mOriginalStart` here),
-   * so `AssignRange` -- and the `InsertRange`/`GrowAndInsertRange` machinery
-   * it calls on the grow path -- apply unchanged. A prior version of this
+   * The buffer holds a real `CameraFrustumUserEntityList` header followed by
+   * its inline element block - the same 0x150 shape the camera's own three
+   * frustum lanes use - so the lane's whole machinery applies to it unchanged,
+   * destructor included. A prior version of this
    * function used a raw `std::memcpy`, which is wrong for this element type:
    * each `CameraUserEntityWeakRef` is spliced into its tracked entity's
    * intrusive weak-link chain, and a byte copy leaves that chain still
@@ -126,17 +134,12 @@ namespace
 
     constexpr std::size_t kInlineCount = 40u;
     moho::CameraUserEntityWeakRef* const inlineStart = &destination->mInlineStorage[0];
-    destination->mStart = inlineStart;
-    destination->mFinish = inlineStart;
-    destination->mCapacity = inlineStart + kInlineCount;
-    destination->mOriginalStart = inlineStart;
+    destination->mView.mStart = inlineStart;
+    destination->mView.mFinish = inlineStart;
+    destination->mView.mCapacity = inlineStart + kInlineCount;
+    destination->mView.mInlineOrigin = inlineStart;
 
-    static_assert(
-      sizeof(moho::CameraFrustumUserEntityList) == 0x10,
-      "CameraFrustumWeakRefSnapshotBuffer's header must alias CameraFrustumUserEntityList's four pointer fields"
-    );
-    auto& destinationView = *reinterpret_cast<moho::CameraFrustumUserEntityList*>(destination);
-    auto* const assignedEnd = destinationView.AssignRange(source);
+    auto* const assignedEnd = destination->mView.AssignRange(source);
     (void)assignedEnd;
 
     return destination;
@@ -1026,7 +1029,9 @@ namespace moho
       if (frustumList != nullptr) {
         CameraFrustumWeakRefSnapshotBuffer candidateSnapshot{};
         (void)SnapshotCameraFrustumWeakRefs(&candidateSnapshot, *frustumList);
-        const SRangeProfileWeakRefCandidatePoolView candidatePool{candidateSnapshot.mStart, candidateSnapshot.mFinish};
+        const SRangeProfileWeakRefCandidatePoolView candidatePool{
+          candidateSnapshot.mView.mStart, candidateSnapshot.mView.mFinish
+        };
 
         for (SRangeRenderProfile& profile : mVisibleProfiles) {
           scratchPayload.clear();
