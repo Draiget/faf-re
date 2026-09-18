@@ -155,19 +155,9 @@ namespace moho
       return CompareLex(lhs.view(), rhs.view());
     }
 
-    struct RRuleGameRulesMapOwnerRuntimeView
-    {
-      std::uint32_t lane00 = 0u;           // +0x00
-      RRuleGameRulesBlueprintMap* map = nullptr; // +0x04
-    };
-    static_assert(
-      offsetof(RRuleGameRulesMapOwnerRuntimeView, map) == 0x04,
-      "RRuleGameRulesMapOwnerRuntimeView::map offset must be 0x04"
-    );
-
   } // namespace
 
-  // EntityCategoryLookupTableRuntimeView used to own a hand-rolled RB-tree
+  // EntityCategoryLookupTable used to own a hand-rolled RB-tree
   // reimplementation here (CategoryLookupNodeRuntimeView/
   // CategoryLookupMapRuntimeView, a per-TU duplicate of the exact same
   // hand-rolled-tree anti-pattern Sim.cpp's CategoryLookupMapView/
@@ -192,25 +182,6 @@ namespace moho
 
   namespace
   {
-    struct RRuleGameRulesCtorPrefixRuntimeView
-    {
-      std::uint32_t unknown04; // +0x00 (absolute +0x04 in RRuleGameRulesImpl)
-      CDiskWatchListener listener;
-    };
-    static_assert(
-      offsetof(RRuleGameRulesCtorPrefixRuntimeView, listener) == 0x04,
-      "RRuleGameRulesCtorPrefixRuntimeView::listener offset must be 0x04"
-    );
-    static_assert(
-      sizeof(RRuleGameRulesCtorPrefixRuntimeView) == 0x34,
-      "RRuleGameRulesCtorPrefixRuntimeView size must be 0x34"
-    );
-
-    [[nodiscard]] RRuleGameRulesCtorPrefixRuntimeView& RuleCtorPrefixView(RRuleGameRulesImpl& rules) noexcept
-    {
-      return *reinterpret_cast<RRuleGameRulesCtorPrefixRuntimeView*>(&rules.pad_0004[0]);
-    }
-
     // The rules keep their lock inline at +0x38, so it is stored as raw bytes
     // to preserve the layout and constructed in place by the constructor.
     static_assert(
@@ -500,7 +471,7 @@ namespace moho
       categoriesTable.AssignNewTable(targetState, 0, 0);
       globals.SetObject("categories", categoriesTable);
 
-      const EntityCategoryLookupTableRuntimeView* const categoryLookup = rules.mEntityCategoryLookup;
+      const EntityCategoryLookupTable* const categoryLookup = rules.mEntityCategoryLookup;
       if (categoryLookup == nullptr) {
         return;
       }
@@ -535,16 +506,16 @@ namespace moho
       return node;
     }
 
-    struct LuaTaskListContainerRuntimeView
+    struct LuaTaskList
     {
       void* allocProxy;         // +0x00
       LuaTaskListNode* head;    // +0x04
       std::uint32_t size;       // +0x08
     };
-    static_assert(sizeof(LuaTaskListContainerRuntimeView) == 0x0C, "LuaTaskListContainerRuntimeView size must be 0x0C");
+    static_assert(sizeof(LuaTaskList) == 0x0C, "LuaTaskList size must be 0x0C");
 
-    [[nodiscard]] LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainer(
-      LuaTaskListContainerRuntimeView* const container,
+    [[nodiscard]] LuaTaskList* InitializeLuaTaskListContainer(
+      LuaTaskList* const container,
       void* const allocProxy
     )
     {
@@ -565,9 +536,9 @@ namespace moho
      * Initializes one list-container runtime lane from an explicit allocator
      * proxy and self-links the sentinel task node.
      */
-    LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerWithProxy(
+    LuaTaskList* InitializeLuaTaskListContainerWithProxy(
       void* const allocProxy,
-      LuaTaskListContainerRuntimeView* const container
+      LuaTaskList* const container
     )
     {
       return InitializeLuaTaskListContainer(container, allocProxy);
@@ -580,8 +551,8 @@ namespace moho
      * Initializes one list-container runtime lane and self-links its sentinel
      * task node.
      */
-    LuaTaskListContainerRuntimeView* InitializeLuaTaskListContainerDefault(
-      LuaTaskListContainerRuntimeView* const container
+    LuaTaskList* InitializeLuaTaskListContainerDefault(
+      LuaTaskList* const container
     )
     {
       return InitializeLuaTaskListContainer(container, container->allocProxy);
@@ -595,7 +566,7 @@ namespace moho
      * sentinel node and returns that sentinel pointer.
      */
     [[nodiscard]] LuaTaskListNode* InitializeLuaTaskListContainerHeadLane(
-      LuaTaskListContainerRuntimeView* const container
+      LuaTaskList* const container
     )
     {
       container->head = CreateLuaTaskListNode();
@@ -1092,12 +1063,12 @@ namespace moho
   // runs only if construction throws after the category map is live but
   // before the word-range fallback is - it re-derives the same
   // `erase(first,last)`-then-`operator delete`-the-head tail
-  // `~EntityCategoryLookupTableRuntimeView`'s implicit destructor performs
+  // `~EntityCategoryLookupTable`'s implicit destructor performs
   // via `mCategoryMap`'s own real destructor (`RbTree.h`'s `erase_range`/
   // `~rb_tree` members). Per RULE ONE an unwind funclet target maps to no
   // source line of its own, so it is cited here rather than written as a
   // separate function.
-  EntityCategoryLookupTableRuntimeView::EntityCategoryLookupTableRuntimeView(
+  EntityCategoryLookupTable::EntityCategoryLookupTable(
     const RRuleGameRulesImpl* const owner
   ) noexcept
   {
@@ -1117,7 +1088,7 @@ namespace moho
     mWordUniverseHandle = ownerHandle;
   }
 
-  const CategoryWordRangeView* EntityCategoryLookupTableRuntimeView::TryFind(
+  const CategoryWordRangeView* EntityCategoryLookupTable::TryFind(
     const msvc8::string& categoryName
   ) const
   {
@@ -1125,7 +1096,7 @@ namespace moho
     return found == mCategoryMap.end() ? nullptr : &found->second;
   }
 
-  const CategoryWordRangeView* EntityCategoryLookupTableRuntimeView::FindOrFallback(
+  const CategoryWordRangeView* EntityCategoryLookupTable::FindOrFallback(
     const msvc8::string& categoryName
   ) const
   {
@@ -1159,7 +1130,7 @@ namespace moho
    * `__active_mods`, executes `/lua/RuleInit.lua`, and rebuilds category caches.
    */
   RRuleGameRulesImpl::RRuleGameRulesImpl(const msvc8::string& activeMods, CBackgroundTaskControl* const initHandler)
-    : pad_0004{}
+    : mUnknown04(0u)
     , mLockStorage{}
     , mLuaState(nullptr)
     , mMaps{}
@@ -1178,9 +1149,9 @@ namespace moho
   {
     (void)initialize_RRuleGameRulesCtorCounterLane(this);
 
-    RRuleGameRulesCtorPrefixRuntimeView& ctorPrefix = RuleCtorPrefixView(*this);
-    ctorPrefix.unknown04 = 0u;
-    new (&ctorPrefix.listener) CDiskWatchListener("*.bp");
+    // 0x00553... constructs the blueprint watcher in place; it has no default
+    // state, which is why it is built here rather than in the member list.
+    new (mDiskWatchListenerStorage) CDiskWatchListener("*.bp");
     new (&RuleMutexView(*this)) boost::mutex();
 
     mLuaState = new (std::nothrow) LuaPlus::LuaState(LuaPlus::LuaState::LIB_BASE);
@@ -1199,14 +1170,14 @@ namespace moho
     // head allocator.
 
     // Address: 0x00529120 (FUN_00529120) swap-old-value branch: allocates a
-    // fresh EntityCategoryLookupTableRuntimeView, swaps it into
+    // fresh EntityCategoryLookupTable, swaps it into
     // mEntityCategoryLookup, and destroys whatever was there before (always
     // null on first construction, but the binary performs the same
     // swap-delete unconditionally rather than special-casing "this is the
     // first call").
-    EntityCategoryLookupTableRuntimeView* const newCategoryLookup =
-      new (std::nothrow) EntityCategoryLookupTableRuntimeView(this);
-    EntityCategoryLookupTableRuntimeView* const oldCategoryLookup = mEntityCategoryLookup;
+    EntityCategoryLookupTable* const newCategoryLookup =
+      new (std::nothrow) EntityCategoryLookupTable(this);
+    EntityCategoryLookupTable* const oldCategoryLookup = mEntityCategoryLookup;
     mEntityCategoryLookup = newCategoryLookup;
     delete oldCategoryLookup;
     mPendingBlueprintReloadNext = &mPendingBlueprintReloadNext;
@@ -1360,7 +1331,7 @@ namespace moho
     sentinel->prev = sentinel;
 
     // Address: 0x00529700 (FUN_00529700) calls FUN_00533E20
-    // (EntityCategoryLookupTableRuntimeView's real destructor, see above)
+    // (EntityCategoryLookupTable's real destructor, see above)
     // directly, then `operator delete`s the block - exactly what a plain
     // typed `delete` compiles to.
     delete mEntityCategoryLookup;
@@ -1376,7 +1347,7 @@ namespace moho
     mLuaState = nullptr;
 
     RuleMutexView(*this).~mutex();
-    RuleCtorPrefixView(*this).listener.~CDiskWatchListener();
+    std::destroy_at(&DiskWatchListener());
 
     if (StatItem* const statItem = InstanceCounter<RRuleGameRules>::GetStatItem()) {
       float minusOne = -1.0f;
@@ -1754,7 +1725,7 @@ namespace moho
    * What it does:
    * Thin virtual wrapper. Forwards the category-lookup table
    * (`this->mEntityCategoryLookup`, +0xC4 - the real
-   * `EntityCategoryLookupTableRuntimeView` this class now owns, not the
+   * `EntityCategoryLookupTable` this class now owns, not the
    * absorbed `void*` it used to be) and the expression to the free function
    * `moho::ParseEntityCategory` (0x005552F0), which builds the result in
    * place, and returns it by value.

@@ -193,7 +193,7 @@ static_assert(sizeof(DNameHeapFrame) == 0x1004, "DNameHeapFrame size must be 0x1
 static_assert(offsetof(DNameHeapFrame, nextFrame) == 0x00, "DNameHeapFrame::nextFrame offset must be 0x00");
 static_assert(offsetof(DNameHeapFrame, payload) == 0x04, "DNameHeapFrame::payload offset must be 0x04");
 
-struct DNameHeapManagerRuntimeView
+struct DNameHeapManager
 {
   DNameHeapAllocator allocator = nullptr;  // +0x00
   std::uint32_t reservedWord = 0;          // +0x04
@@ -211,22 +211,22 @@ struct DNameHeapManagerRuntimeView
    */
   void* getMemory(std::size_t size, int onHeap) noexcept;
 };
-static_assert(sizeof(DNameHeapManagerRuntimeView) == 0x14, "DNameHeapManagerRuntimeView size must be 0x14");
+static_assert(sizeof(DNameHeapManager) == 0x14, "DNameHeapManager size must be 0x14");
 static_assert(
-  offsetof(DNameHeapManagerRuntimeView, allocator) == 0x00,
-  "DNameHeapManagerRuntimeView::allocator offset must be 0x00"
+  offsetof(DNameHeapManager, allocator) == 0x00,
+  "DNameHeapManager::allocator offset must be 0x00"
 );
 static_assert(
-  offsetof(DNameHeapManagerRuntimeView, firstFrame) == 0x08,
-  "DNameHeapManagerRuntimeView::firstFrame offset must be 0x08"
+  offsetof(DNameHeapManager, firstFrame) == 0x08,
+  "DNameHeapManager::firstFrame offset must be 0x08"
 );
 static_assert(
-  offsetof(DNameHeapManagerRuntimeView, frame) == 0x0C,
-  "DNameHeapManagerRuntimeView::frame offset must be 0x0C"
+  offsetof(DNameHeapManager, frame) == 0x0C,
+  "DNameHeapManager::frame offset must be 0x0C"
 );
 static_assert(
-  offsetof(DNameHeapManagerRuntimeView, roomLeft) == 0x10,
-  "DNameHeapManagerRuntimeView::roomLeft offset must be 0x10"
+  offsetof(DNameHeapManager, roomLeft) == 0x10,
+  "DNameHeapManager::roomLeft offset must be 0x10"
 );
 
 [[nodiscard]] void* AllocateUndecoratorHeapBytes(const std::size_t byteCount) noexcept
@@ -234,7 +234,7 @@ static_assert(
   return ::operator new(byteCount, std::nothrow);
 }
 
-DNameHeapManagerRuntimeView heapManager = {
+DNameHeapManager heapManager = {
   &AllocateUndecoratorHeapBytes,
   0,
   nullptr,
@@ -261,7 +261,7 @@ template<typename T, typename... Args>
  * frames when needed, and forwards direct heap requests through the allocator
  * callback lane.
  */
-void* DNameHeapManagerRuntimeView::getMemory(
+void* DNameHeapManager::getMemory(
   const std::size_t size,
   const int onHeap
 ) noexcept
@@ -304,26 +304,6 @@ void* DNameHeapManagerRuntimeView::getMemory(
   return frame->payload + roomLeft;
 }
 
-struct DNameTextNodeRuntimeView
-{
-  void* vtable;           // +0x00
-  DNameNode* nextNode;    // +0x04
-  const char* text;       // +0x08
-  std::int32_t textLength; // +0x0C
-};
-static_assert(sizeof(DNameTextNodeRuntimeView) == 0x10, "DNameTextNodeRuntimeView size must be 0x10");
-static_assert(offsetof(DNameTextNodeRuntimeView, nextNode) == 0x04, "DNameTextNodeRuntimeView::nextNode offset must be 0x04");
-static_assert(offsetof(DNameTextNodeRuntimeView, text) == 0x08, "DNameTextNodeRuntimeView::text offset must be 0x08");
-static_assert(offsetof(DNameTextNodeRuntimeView, textLength) == 0x0C, "DNameTextNodeRuntimeView::textLength offset must be 0x0C");
-
-struct DNameRuntimeView
-{
-  DNameNode* headNode;       // +0x00
-  std::uint32_t statusWord;  // +0x04
-};
-static_assert(sizeof(DNameRuntimeView) == 0x08, "DNameRuntimeView size must be 0x08");
-static_assert(offsetof(DNameRuntimeView, headNode) == 0x00, "DNameRuntimeView::headNode offset must be 0x00");
-static_assert(offsetof(DNameRuntimeView, statusWord) == 0x04, "DNameRuntimeView::statusWord offset must be 0x04");
 
 class DNameCharNode final : public DNameNode
 {
@@ -362,6 +342,11 @@ class DNamePcharNode final : public DNameNode
 {
 public:
   /**
+   * Address: 0x00AB17E9 (FUN_00AB17E9, `pcharNode::copyTo`) is this class's
+   * copy-out member below; it was recovered separately over a
+   * `DNameTextNodeRuntimeView` stand-in of this very layout (vtable, next
+   * node, text, length) with no caller (RULE ONE), removed 2026-09-18.
+   *
    * Address: 0x00AB1772 (FUN_00AB1772, pcharNode::pcharNode)
    * Mangled: ??0pcharNode@@QAE@PBDH@Z
    *
@@ -1355,35 +1340,12 @@ DNameNode* DNameNode::clone() noexcept
 
   auto* const nestedNameStorage = static_cast<DName*>(heapManager.getMemory(sizeof(DName), 0));
   if (nestedNameStorage != nullptr) {
-    auto* const nestedNameView = reinterpret_cast<DNameRuntimeView*>(nestedNameStorage);
-    nestedNameView->statusWord &= 0xFFFFF000u;
-    nestedNameView->headNode = this;
+    // The freshly allocated storage is a `DName`: keep its upper status bits
+    // and point it at this node, exactly as 0x00AB1... does.
+    nestedNameStorage->statusWord_ &= 0xFFFFF000u;
+    nestedNameStorage->headNode_ = this;
   }
 
   return new (pointerNodeStorage) DNamePointerNode(nestedNameStorage);
 }
 
-/**
- * Address: 0x00AB17E9 (FUN_00AB17E9)
- *
- * What it does:
- * Copies one pchar-node payload into `out` up to the node-text length cap and
- * the caller-provided `maxChars` cap.
- */
-[[maybe_unused]] char* DNameTextNodeCopyTo(
-  DNameTextNodeRuntimeView* const node,
-  char* const out,
-  const int maxChars
-) noexcept
-{
-  int charsToCopy = maxChars;
-  if (charsToCopy > node->textLength) {
-    charsToCopy = node->textLength;
-  }
-
-  if (node->text != nullptr && out != nullptr && charsToCopy != 0) {
-    return und_strncpy(out, node->text, static_cast<unsigned int>(charsToCopy));
-  }
-
-  return nullptr;
-}

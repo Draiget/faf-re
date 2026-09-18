@@ -14243,7 +14243,7 @@ namespace
   // `FUN_005555C0`/`FUN_005347A0`/`FUN_00529B30` addresses).
   // CategoryLookupValue/CategoryLookupMap/EntityCategoryLookupTableView used
   // to be defined here as a second, per-TU-only copy of the exact same
-  // binary object RRuleGameRules.cpp's `EntityCategoryLookupTableRuntimeView`
+  // binary object RRuleGameRules.cpp's `EntityCategoryLookupTable`
   // models (`RRuleGameRulesImpl::mEntityCategoryLookup`, +0xC4) -- this
   // anonymous namespace's version reached it read the same live object
   // through `ResolveEntityCategoryLookupTable`'s `reinterpret_cast` below.
@@ -14254,7 +14254,7 @@ namespace
   // re-verified against the raw decompiles during the RRuleGameRules.cpp
   // migration this promotion is part of) now lives once, in
   // `moho::CategoryLookupValue`/`moho::CategoryLookupMap`/
-  // `moho::EntityCategoryLookupTableRuntimeView` (RRuleGameRules.h), and
+  // `moho::EntityCategoryLookupTable` (RRuleGameRules.h), and
   // this file uses that shared definition directly instead of a
   // `reinterpret_cast`-punned twin. `RbTree.h`'s `insert_unique`/`insert_at`/
   // `buy_node`/`rb_decrement`/`find_node` citations for this instantiation
@@ -14347,9 +14347,9 @@ namespace
     }
   }
 
-  [[nodiscard]] EntityCategoryLookupTableRuntimeView* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept
+  [[nodiscard]] EntityCategoryLookupTable* ResolveEntityCategoryLookupTable(RRuleGameRulesImpl& rules) noexcept
   {
-    // `mEntityCategoryLookup` is already `EntityCategoryLookupTableRuntimeView*`
+    // `mEntityCategoryLookup` is already `EntityCategoryLookupTable*`
     // (RRuleGameRules.h) -- no cast needed now that this file shares that
     // type instead of reinterpret_casting its own separate duplicate.
     return rules.mEntityCategoryLookup;
@@ -14403,7 +14403,7 @@ namespace
    * is left for a pass that can verify it at runtime.
    */
   void AddCategoryMemberBit(
-    EntityCategoryLookupTableRuntimeView& lookup,
+    EntityCategoryLookupTable& lookup,
     const msvc8::string& categoryName,
     const unsigned int categoryBitIndex
   )
@@ -14498,7 +14498,7 @@ namespace
       return;
     }
 
-    EntityCategoryLookupTableRuntimeView* const lookup = ResolveEntityCategoryLookupTable(*rules);
+    EntityCategoryLookupTable* const lookup = ResolveEntityCategoryLookupTable(*rules);
     if (!lookup) {
       return;
     }
