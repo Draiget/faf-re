@@ -1623,7 +1623,11 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="legacy\containers\String.h" />
     <ClInclude Include="legacy\containers\Tree.h" />
     <ClInclude Include="legacy\containers\Vector.h" />
+    <ClInclude Include="legacy\exceptions\StdExcept.h" />
     <ClInclude Include="lua\LuaAssertion.h" />
+    <ClInclude Include="lua\LuaParser.h" />
+    <ClInclude Include="lua\LuaTypeInfoStorage.h" />
+    <ClInclude Include="lua\LuaUndump.h" />
     <ClInclude Include="lua\LuaObjectSerializer.h" />
     <ClInclude Include="lua\LuaObjectTypeInfo.h" />
     <ClInclude Include="lua\LuaStateConstruct.h" />
