@@ -39,6 +39,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
+#include "moho/sim/SFootprint.h"
 #include "moho/sim/VisibilityRect.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/UserUnit.h"
@@ -937,6 +938,122 @@ namespace
   }
 
   /**
+   * NOT A RECOVERED FUNCTION - there is no body for this in the shipped image
+   * and no `Address:` can be cited for it. Additive extension, gated on
+   * `range_RenderReclaimAtCursor`, which the loader leaves false.
+   *
+   * Draws the selection's *reclaim* reach at the cursor. This is deliberately
+   * not the build-range overlay radius: `CUnitReclaimTask`'s TASKSTATE_Waiting
+   * gate (CUnitReclaimTask.cpp:509-562) rejects a target when
+   *
+   *   rawDistance - MaxFootprintExtent(self) - MaxFootprintExtent(target)
+   *     > Economy.MaxBuildDistance
+   *
+   * and `MaxFootprintExtent` is `max(mSizeX, mSizeZ)` (same file, line 82) --
+   * the *whole* footprint, not its half-extent. Measured from its own centre a
+   * unit therefore reclaims out to `MaxBuildDistance + max(mSizeX, mSizeZ)`,
+   * so a 5x5 factory reaches 10 where a 1x1 engineer reaches 6 even though
+   * neither blueprint sets `MaxBuildDistance` and both take the engine default
+   * of 5 (RUnitBlueprint.cpp:558). Crediting the full footprint rather than
+   * half of it is original engine behaviour; it is reproduced here as-is and
+   * deliberately not corrected.
+   *
+   * The task credits the target's extent as well, but a bare cursor has no
+   * target, so the ring shows reach to a zero-size target - the smallest reach
+   * the unit really has, never an overstated one.
+   *
+   * The ring borrows the "Miscellaneous" / OVERLAYMISC profile, which the menu
+   * calls "Build Range", for its geometry and colour, so thickness still scales
+   * with zoom exactly as the engine's own rings do.
+   */
+  void RenderReclaimRingUnderCursor(
+    moho::CWldSession& session,
+    RangeExtractionPayloadVector& scratchPayload,
+    moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera,
+    const unsigned int headIndex
+  )
+  {
+    const moho::UserArmy* const focusArmy = session.GetFocusUserArmy();
+    if (focusArmy == nullptr) {
+      return;
+    }
+
+    msvc8::vector<moho::UserUnit*> selectedUnits;
+    session.GetSelectionUnits(selectedUnits);
+    if (selectedUnits.empty()) {
+      return;
+    }
+
+    const moho::SRangeRenderProfile* buildRangeProfile = nullptr;
+    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
+      if (profile.mExtractorName == "Miscellaneous") {
+        buildRangeProfile = &profile;
+        break;
+      }
+    }
+    if (buildRangeProfile == nullptr) {
+      return;
+    }
+
+    // Widest reach across the selection, so a mixed group shows the unit that
+    // reaches furthest rather than a stack of overlapping rings - same rule the
+    // selection pass above uses.
+    float widestReach = 0.0f;
+    for (moho::UserUnit* const unit : selectedUnits) {
+      if (unit == nullptr || unit->mArmy != focusArmy) {
+        continue;
+      }
+
+      const moho::RUnitBlueprint* const blueprint = static_cast<moho::IUnit*>(unit)->GetBlueprint();
+      if (blueprint == nullptr) {
+        continue;
+      }
+
+      // A unit with no build distance cannot reclaim at all; the task's own
+      // gate would reject every target.
+      const float maxBuildDistance = blueprint->Economy.MaxBuildDistance;
+      if (maxBuildDistance <= 0.0f) {
+        continue;
+      }
+
+      float footprintExtent = 0.0f;
+      if (const moho::SFootprint* const footprint = blueprint->Physics.ResolvedFootprint;
+          footprint != nullptr) {
+        footprintExtent = static_cast<float>(
+          (footprint->mSizeX >= footprint->mSizeZ)
+            ? static_cast<int>(footprint->mSizeX)
+            : static_cast<int>(footprint->mSizeZ)
+        );
+      }
+
+      const float reach = maxBuildDistance + footprintExtent;
+      if (reach > widestReach) {
+        widestReach = reach;
+      }
+    }
+
+    if (widestReach <= 0.0f) {
+      return;
+    }
+
+    const Wm3::Vector3f& cursorWorldPos = session.GetCursorInfo().mMouseWorldPos;
+
+    moho::SRangeExtractionPayload payload{};
+    payload.centerX = cursorWorldPos.x;
+    payload.centerZ = cursorWorldPos.z;
+    payload.innerRadius = 0.0f;
+    payload.outerRadius = widestReach;
+
+    scratchPayload.clear();
+    scratchPayload.push_back(payload);
+    RenderRingBatch(
+      buildRangeProfile->mOuterRingParams, camera, rangeRenderer, headIndex,
+      buildRangeProfile->mBuildRingColor, buildRangeProfile->mInnerRingParams, scratchPayload
+    );
+  }
+
+  /**
    * Address: 0x007EF280 (FUN_007EF280, sub_7EF280)
    *
    * IDA signature:
@@ -1273,6 +1390,15 @@ namespace moho
     // time gives two sets of rings for one answer.
     if (range_RenderSelectedAtCursor) {
       RenderSelectionRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
+      return;
+    }
+
+    // NOT IN THE ORIGINAL BINARY - additive, and false unless a mod sets it.
+    // Like the pass above this replaces the three per-unit passes rather than
+    // adding to them, so the reclaim reach is the only ring on screen while it
+    // is held.
+    if (range_RenderReclaimAtCursor) {
+      RenderReclaimRingUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
       return;
     }
 
