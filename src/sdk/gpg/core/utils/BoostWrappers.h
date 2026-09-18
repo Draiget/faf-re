@@ -665,9 +665,22 @@ namespace boost
      * Address: 0x00446030 (FUN_00446030)
      * Address: 0x004460C0 (FUN_004460C0)
      * Address: 0x00446170 (FUN_00446170)
+     * Address: 0x007FBE40 (FUN_007FBE40 -- the `sp_counted_impl_p<moho::IRenTerrain>::sp_counted_impl_p(IRenTerrain*)` this emits: `[this+4]=1`, `[this+8]=1`, `[this]=0x00E407E4` (the real vtable), `[this+0xC]=px`, `ret 4`; zero callers; formerly `InitializeSpCountedImplPIRenTerrainLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007FC150 (FUN_007FC150 -- the same constructor emitted for `sp_counted_impl_p<moho::CD3DTextureBatcher>`, vtable 0x00E407F8; zero callers; formerly `InitializeSpCountedImplPCD3DTextureBatcherLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007FBEA0 (FUN_007FBEA0 -- `mov dword ptr [eax], 0x00D42210; ret`: the base `sp_counted_base` vtable install MSVC emits inside the constructor/destructor chain. No source line produces it, so nothing calls it here; formerly `RebindSpCountedBaseVtableLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      *
      * What it does:
      * Constructs one `boost::detail::shared_count` from a raw pointee in caller-provided storage.
+     *
+     * The two per-type constructor emissions cited above are what this compiles
+     * to for those payloads: `shared_count(Y* p)` allocates
+     * `new sp_counted_impl_p<Y>(p)`, whose constructor sets `use_count_` and
+     * `weak_count_` to 1, installs the real per-`Y` vtable, and stores `px_` at
+     * +0x0C. The recovered copies in BoostWrappers.cpp had been writing the
+     * address of a one-byte dummy static in place of that vtable, so the first
+     * `dispose()`/`destroy()` dispatch through such a block would have jumped
+     * into unrelated data; they also had no caller at all, in the binary or in
+     * source.
      */
     template <class T>
     [[nodiscard]] inline detail::shared_count* ConstructSharedCountFromRaw(
