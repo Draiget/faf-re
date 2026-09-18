@@ -73094,6 +73094,36 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
       RenderCompositeTerrain(terrain);
     }
 
+    // Range-ring pass for the normal (non-cartographic) world view, between the
+    // terrain composite and the mesh batch. Binary 0x007F940E..0x007F944D:
+    //
+    //   0x007F940E  call [worldView + 0Ch]      ; IRenderWorldView slot 3, GetCamera
+    //   0x007F9417  mov  ecx, [esp+1Ch]         ; the cached sWldSession local
+    //   0x007F941D  test ecx, ecx / jz          ; no session -> skip
+    //   0x007F9421  test eax, eax / jz          ; no camera  -> skip
+    //   0x007F9423  cmp  ren_Ranges, 0 / jz     ; 0x00F57E4F
+    //   0x007F942C  cmp  ren_Ui, 0 / jz         ; 0x00F57DE7
+    //   0x007F9435  fld  sDeltaFrame            ; 0x010A6338
+    //   0x007F9444  lea  edx, [ebp+37Ch]        ; &WRenViewport::mRangeRenderer
+    //   0x007F944D  call RangeRenderer::Render
+    //
+    // Without this the range renderer only ever ran from `Cartographic::Render`,
+    // so every range overlay - build range, weapon ranges, intel - was visible
+    // in the minimap and in cartographic mode but never in the ordinary 3D view.
+    // The call target is FAF's `.exxt` replacement of `RangeRenderer::Render`
+    // (0x012910B7), which re-implements the build-ring and visible-profile
+    // passes and then jumps back into the shipped body at 0x007EEB55 for the
+    // selected/highlighted passes; the recovered `RangeRenderer::Render` already
+    // covers all of that, so it is called directly here.
+    if (moho::CWldSession* const rangeSession = moho::WLD_GetActiveSession(); rangeSession != nullptr) {
+      moho::CameraImpl* const rangeCamera = worldView->view->GetCamera();
+      if (rangeCamera != nullptr && moho::ren_Ranges && moho::ren_Ui) {
+        reinterpret_cast<WRenViewportDestroyRuntimeView*>(this)->mRangeRenderer.Render(
+          rangeSession, rangeCamera, static_cast<unsigned int>(head), moho::REN_GetSimDeltaSeconds()
+        );
+      }
+    }
+
     // Rebuild the global mesh-renderer batch map for this frame/view before the
     // mesh draw passes below. Binary (WRenViewport::Render @0x007F90D0, the
     // GetInstance+Batch pair at 0x007F9452..0x007F9478) invokes it as
