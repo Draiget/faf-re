@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/EAirCombatState.h"
@@ -11,6 +12,7 @@
 #include "moho/misc/WeakPtr.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/task/ETaskStatus.h"
+#include "moho/unit/core/Unit.h"
 #include "moho/unit/EUnitMotionEnums.h"
 #include "Wm3Quaternion.h"
 
@@ -773,7 +775,13 @@ namespace moho
     std::uint8_t mPad169[0x03];      // +0x169
     CEconRequest* mEconomyRequest;   // +0x16C
     SEconValue mRepairConsumption;   // +0x170
-    std::uint8_t mPad178[0x60];      // +0x178
+    /**
+     * Candidate raised platforms under this unit: the binary's inline
+     * small-buffer weak-pointer vector, a 0x10 header over ten 8-byte slots,
+     * driven by the same push_back/grow family (0x0061C5E0 / 0x0061C750) as
+     * `Unit::mBlipsInRange`.
+     */
+    gpg::core::FastVectorN<SWeakRefSlot, 10> mRaisedPlatformCandidates; // +0x178
   };
 
   static_assert(sizeof(CUnitMotion) == 0x1D8, "CUnitMotion size must be 0x1D8");
@@ -814,7 +822,14 @@ namespace moho
   // reads its begin/end at `[ebx+178h]`/`[ebx+17Ch]` (0x006B9055 / 0x006B904F)
   // and `FindIntersectingRaisedPlatform` at the same pair (0x006C2F33 /
   // 0x006C2F39), so the inline weak-slot vector starts at 0x178.
-  static_assert(offsetof(CUnitMotion, mPad178) == 0x178, "CUnitMotion::mPad178 offset must be 0x178");
+  static_assert(
+    offsetof(CUnitMotion, mRaisedPlatformCandidates) == 0x178,
+    "CUnitMotion::mRaisedPlatformCandidates offset must be 0x178"
+  );
+  static_assert(
+    sizeof(gpg::core::FastVectorN<SWeakRefSlot, 10>) == 0x60,
+    "CUnitMotion::mRaisedPlatformCandidates size must be 0x60"
+  );
   static_assert(offsetof(CUnitMotion, mLastTrans) == 0x120, "CUnitMotion::mLastTrans offset must be 0x120");
   static_assert(offsetof(CUnitMotion, mCurTrans) == 0x13C, "CUnitMotion::mCurTrans offset must be 0x13C");
   static_assert(offsetof(CUnitMotion, mReservation) == 0x158, "CUnitMotion::mReservation offset must be 0x158");

@@ -185,57 +185,6 @@ namespace moho
     // only adjustment is `add ecx, 4` -- Entity's `WeakObject` base, RTTI
     // mdisp=4). A candidate may therefore be a Prop as easily as a Unit, which
     // is why the consumer dispatches `Entity::IsUnit()` rather than casting.
-    struct CUnitMotionRaisedPlatformCandidatesRuntimeView
-    {
-      WeakPtr<Entity>* mBegin;
-      WeakPtr<Entity>* mEnd;
-      WeakPtr<Entity>* mCapacityEnd;
-      WeakPtr<Entity>* mInlineBegin;
-    };
-    static_assert(
-      sizeof(CUnitMotionRaisedPlatformCandidatesRuntimeView) == 0x10,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView size must be 0x10"
-    );
-    static_assert(
-      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mBegin) == 0x00,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mBegin offset must be 0x00"
-    );
-    static_assert(
-      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mEnd) == 0x04,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mEnd offset must be 0x04"
-    );
-    static_assert(
-      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mCapacityEnd) == 0x08,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mCapacityEnd offset must be 0x08"
-    );
-    static_assert(
-      offsetof(CUnitMotionRaisedPlatformCandidatesRuntimeView, mInlineBegin) == 0x0C,
-      "CUnitMotionRaisedPlatformCandidatesRuntimeView::mInlineBegin offset must be 0x0C"
-    );
-
-    [[nodiscard]] CUnitMotionRaisedPlatformCandidatesRuntimeView&
-    AsRaisedPlatformCandidatesRuntimeView(CUnitMotion& motion) noexcept
-    {
-      auto* const base = reinterpret_cast<std::uint8_t*>(&motion);
-      return *reinterpret_cast<CUnitMotionRaisedPlatformCandidatesRuntimeView*>(base + offsetof(CUnitMotion, mPad178));
-    }
-
-    // The raised-platform candidate lane (`mPad178`, 0x60 bytes) is the
-    // binary's inline small-buffer weak-pointer vector
-    // `gpg::fastvector_n<WeakPtr<Unit>, 10>` (0x10 header + 10 * 8-byte inline
-    // slots). It is manipulated through the same push_back/grow template family
-    // (FUN_0061C5E0 / FUN_0061C750) and WeakPtr ctor/dtor (FUN_005A6DB0 /
-    // FUN_005A6DE0) as `Unit::mBlipsInRange`, so expose it as the concrete
-    // FastVectorN type and drive it with the recovered container primitives.
-    using RaisedPlatformCandidateVector = gpg::core::FastVectorN<SWeakRefSlot, 10>;
-    static_assert(sizeof(RaisedPlatformCandidateVector) == 0x60, "raised-platform candidate lane must be 0x60 bytes");
-
-    [[nodiscard]] RaisedPlatformCandidateVector& AsRaisedPlatformCandidateVector(CUnitMotion& motion) noexcept
-    {
-      auto* const base = reinterpret_cast<std::uint8_t*>(&motion);
-      return *reinterpret_cast<RaisedPlatformCandidateVector*>(base + offsetof(CUnitMotion, mPad178));
-    }
-
     /**
      * Address: 0x00672B50 (FUN_00672B50, sub_672B50)
      *
@@ -772,20 +721,22 @@ namespace moho
       request = replacement;
     }
 
-    void DestroyRaisedPlatformCandidateStorage(CUnitMotionRaisedPlatformCandidatesRuntimeView& runtime) noexcept
+    void DestroyRaisedPlatformCandidateStorage(gpg::core::FastVectorN<moho::SWeakRefSlot, 10>& runtime) noexcept
     {
-      if (runtime.mBegin != nullptr && runtime.mEnd != nullptr && runtime.mEnd >= runtime.mBegin) {
-        for (WeakPtr<Entity>* lane = runtime.mBegin; lane != runtime.mEnd; ++lane) {
-          lane->ResetFromObject(nullptr);
+      // Drop each candidate's weak reference, then hand any grown block back
+      // and rebind the lane on its inline window.
+      if (runtime.start_ != nullptr && runtime.end_ != nullptr && runtime.end_ >= runtime.start_) {
+        for (moho::SWeakRefSlot* lane = runtime.start_; lane != runtime.end_; ++lane) {
+          lane->AsWeakPtr<Entity>().ResetFromObject(nullptr);
         }
       }
 
-      if (runtime.mBegin != nullptr && runtime.mBegin != runtime.mInlineBegin) {
-        ::operator delete[](static_cast<void*>(runtime.mBegin));
+      if (runtime.start_ != nullptr && runtime.start_ != runtime.originalVec_) {
+        ::operator delete[](static_cast<void*>(runtime.start_));
       }
 
-      runtime.mBegin = runtime.mInlineBegin;
-      runtime.mEnd = runtime.mBegin;
+      runtime.start_ = runtime.originalVec_;
+      runtime.end_ = runtime.start_;
     }
 
     [[nodiscard]] CEconRequest* CreateEconomyRequest(const SEconValue& requested, CSimArmyEconomyInfo* const economy)
@@ -894,12 +845,8 @@ namespace moho
     mCurTrans.orient_.y = 0.0f;
     mCurTrans.orient_.z = 0.0f;
 
-    CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
-    auto* const inlineBegin = reinterpret_cast<WeakPtr<Entity>*>(mPad178 + 0x10);
-    candidates.mBegin = inlineBegin;
-    candidates.mEnd = inlineBegin;
-    candidates.mCapacityEnd = reinterpret_cast<WeakPtr<Entity>*>(mPad178 + 0x60);
-    candidates.mInlineBegin = inlineBegin;
+    // Arm the candidate lane on its own inline window: an empty vector.
+    mRaisedPlatformCandidates.RebindInlineNoFree();
   }
 
   /**
@@ -1024,8 +971,7 @@ namespace moho
   CUnitMotion::~CUnitMotion()
   {
     DestroyEconomyRequestPointer(mEconomyRequest);
-    CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
-    DestroyRaisedPlatformCandidateStorage(candidates);
+    DestroyRaisedPlatformCandidateStorage(mRaisedPlatformCandidates);
 
     // The binary lane performs a second economy-request null-check after
     // raised-platform cleanup; keep the same no-op-safe shape.
@@ -2410,15 +2356,16 @@ namespace moho
   {
     mRaisedPlatformUnit.ResetFromObject(nullptr);
 
-    CUnitMotionRaisedPlatformCandidatesRuntimeView& candidates = AsRaisedPlatformCandidatesRuntimeView(*this);
-    if (candidates.mBegin == nullptr || candidates.mEnd == nullptr || candidates.mEnd < candidates.mBegin || mUnit == nullptr) {
+    auto& candidates = mRaisedPlatformCandidates;
+    if (candidates.start_ == nullptr || candidates.end_ == nullptr || candidates.end_ < candidates.start_
+        || mUnit == nullptr) {
       return;
     }
 
     const Wm3::Vector3f ownerPosition = mUnit->GetPosition();
     float nearestDistanceSq = std::numeric_limits<float>::infinity();
 
-    for (WeakPtr<Entity>* candidate = candidates.mBegin; candidate != candidates.mEnd; ++candidate) {
+    for (moho::SWeakRefSlot* candidate = candidates.start_; candidate != candidates.end_; ++candidate) {
       // The slot holds an Entity. Recover the unit through the virtual
       // downcast the binary uses -- Entity's vtable slot 4 (0x006C2F97
       // `mov edx, [ecx]` / 0x006C2F99 `mov eax, [edx+10h]` / 0x006C2F9C
@@ -2427,7 +2374,7 @@ namespace moho
       // staggered beat, and this null return is what filters them out;
       // casting the slot straight to `Unit*` instead type-confuses every
       // non-unit candidate and reads its blueprint through the wrong vtable.
-      Entity* const candidateEntity = candidate->GetObjectPtr();
+      Entity* const candidateEntity = candidate->AsWeakPtr<Entity>().GetObjectPtr();
       if (candidateEntity == nullptr) {
         continue;
       }
@@ -2479,7 +2426,7 @@ namespace moho
     // Clear the previous raised-platform candidate lane: unlink every weak node
     // from its owner chain, release escaped heap storage, and rebind to inline
     // storage (asm 0x6B9055-0x6B908A; sub_61CA70 + delete[] + reset-to-inline).
-    RaisedPlatformCandidateVector& candidates = AsRaisedPlatformCandidateVector(*this);
+    auto& candidates = mRaisedPlatformCandidates;
     UnlinkWeakPtrRangeWithoutClearing(
       reinterpret_cast<WeakPtr<void>*>(candidates.begin()),
       reinterpret_cast<WeakPtr<void>*>(candidates.end())
