@@ -373,6 +373,66 @@ namespace gpg
    */
   void UnGetByteChecked(Stream& stream, int value);
 
+  /**
+   * Line-oriented reader over a `Stream` - the read-side counterpart of
+   * `TextWriter` below.
+   *
+   * `mNormalizeCrAsLf` decides what a bare CR and a CR/LF pair decode to:
+   * set, both collapse to a single LF; clear, the CR is kept as written.
+   *
+   * The three members occupy one contiguous run at 0x00907000-0x009071BD,
+   * each taking `this` in ECX and reading `mStream` at +0x00 and
+   * `mNormalizeCrAsLf` at +0x04 - which is what fixes the layout below.
+   * Unlike `TextWriter`, which has three call sites, nothing in the binary
+   * calls any of them: the read side is retained but unreferenced.
+   */
+  class TextReader
+  {
+  public:
+    /**
+     * Address: 0x00907000 (FUN_00907000)
+     *
+     * IDA signature:
+     * TextReader *__thiscall TextReader::TextReader(TextReader *this@<ecx>, Stream *stream, bool normalizeCrAsLf);
+     *
+     * What it does:
+     * Binds the reader to one stream and records the CR normalization mode
+     * (`mov [eax], ecx` / `mov [eax+4], dl`, `ret 8`).
+     */
+    TextReader(Stream* stream, bool normalizeCrAsLf);
+
+    /**
+     * Address: 0x00907020 (FUN_00907020)
+     *
+     * What it does:
+     * Reads one byte, and when normalizing, turns a CR into an LF -
+     * swallowing the LF of a CR/LF pair and ungetting anything else.
+     */
+    [[nodiscard]] int ReadByte();
+
+    /**
+     * Address: 0x009070B0 (FUN_009070B0)
+     *
+     * IDA signature:
+     * msvc8::string *__thiscall TextReader::ReadLine(TextReader *this@<ecx>, msvc8::string *result);
+     *
+     * What it does:
+     * Accumulates bytes up to and including the line terminator and returns
+     * them. The terminator is kept in the result: an LF is appended as-is, a
+     * CR/LF pair as LF alone when normalizing and as CR LF otherwise, and a
+     * bare CR as LF when normalizing and as CR otherwise. End of input ends
+     * the line without appending anything. Returned by value through the
+     * hidden result pointer MSVC passes as the stack argument, which is why
+     * the binary ends `ret 4`.
+     */
+    [[nodiscard]] msvc8::string ReadLine();
+
+  private:
+    Stream* mStream{};
+    bool mNormalizeCrAsLf{};
+  };
+  static_assert(sizeof(TextReader) == 0x08, "gpg::TextReader size must be 0x08");
+
   class TextWriter
   {
   public:
