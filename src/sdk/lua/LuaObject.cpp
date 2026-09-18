@@ -5790,15 +5790,6 @@ namespace
 	static_assert(offsetof(WrapFile, stream) == 0x0, "WrapFile::stream offset must be 0x0");
 	static_assert(offsetof(WrapFile, closeEnabled) == 0x4, "WrapFile::closeEnabled offset must be 0x4");
 
-	struct WrapFileRuntimeView
-	{
-		std::FILE* stream;
-		std::uint8_t closeEnabled;
-		std::uint8_t reserved[3];
-	};
-	static_assert(offsetof(WrapFileRuntimeView, closeEnabled) == 0x4, "WrapFileRuntimeView::closeEnabled offset must be 0x4");
-	static_assert(sizeof(WrapFileRuntimeView) == sizeof(WrapFile), "WrapFileRuntimeView size must match WrapFile");
-
 	class WrapFileTypeInfo final : public gpg::RType
 	{
 	public:
@@ -5923,7 +5914,7 @@ namespace
 	 * then returns the wrapped file payload pointer; throws `BadRefCast` on
 	 * mismatch to match runtime cast-failure behavior.
 	 */
-	WrapFileRuntimeView* TryUpcastWrapFile(gpg::RRef* const reference)
+	WrapFile* TryUpcastWrapFile(gpg::RRef* const reference)
 	{
 		const char* sourceTypeName = "null";
 		if (reference != nullptr && reference->mType != nullptr) {
@@ -5935,7 +5926,7 @@ namespace
 			throw gpg::BadRefCast(nullptr, sourceTypeName, "WrapFile");
 		}
 
-		return static_cast<WrapFileRuntimeView*>(reference->mObj);
+		return static_cast<WrapFile*>(reference->mObj);
 	}
 
 	/**
@@ -5950,7 +5941,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 
 		if (wrapFile->closeEnabled == 0 || wrapFile->stream == nullptr) {
 			return 0;
@@ -6004,7 +5995,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 
 		if (wrapFile->stream == nullptr) {
 			luaL_error(state, "attempt to use a closed file");
@@ -6056,7 +6047,7 @@ namespace
 	}
 
 	bool ReadLine(std::FILE* const stream, lua_State* const state);
-	gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFileRuntimeView* const wrapFile);
+	gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFile* const wrapFile);
 
 	/**
 	 * Address: 0x00916020 (FUN_00916020, read_number)
@@ -6230,7 +6221,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, kLuaIoReadlineFileUpvalueIndex);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 
 		if (wrapFile->stream == nullptr) {
 			luaL_error(state, "attempt to use a closed file");
@@ -6265,7 +6256,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 		if (wrapFile->stream == nullptr) {
 			luaL_error(state, "attempt to use a closed file");
 		}
@@ -6285,11 +6276,11 @@ namespace
 	 * Allocates one WrapFile userdata lane, binds `FILE*` metatable, and sets
 	 * the close-enabled byte according to caller intent.
 	 */
-	WrapFileRuntimeView* NewFileUserdata(lua_State* const state, const bool closeEnabled)
+	WrapFile* NewFileUserdata(lua_State* const state, const bool closeEnabled)
 	{
 		gpg::RRef reference{};
 		lua_newuserdata_ref(&reference, state, CachedType<WrapFile>(gWrapFileType));
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 
 		luaL_getmetatable(state, "FILE*");
 		lua_setmetatable(state, -2);
@@ -6304,7 +6295,7 @@ namespace
 	 * Destroys one heap-allocated WrapFile storage lane, conditionally closing
 	 * the stream when close-enabled, then frees the payload block.
 	 */
-	void DestroyWrapFileStorage(WrapFileRuntimeView* const wrapFile)
+	void DestroyWrapFileStorage(WrapFile* const wrapFile)
 	{
 		if (wrapFile == nullptr) {
 			return;
@@ -6325,7 +6316,7 @@ namespace
 	 * Performs WrapFile close-on-destruct semantics in-place and clears the
 	 * stream lane, returning the raw x86 `EAX` result payload.
 	 */
-	std::intptr_t FinalizeWrapFileStorage(WrapFileRuntimeView* const wrapFile)
+	std::intptr_t FinalizeWrapFileStorage(WrapFile* const wrapFile)
 	{
 		std::intptr_t result = reinterpret_cast<std::intptr_t>(wrapFile->stream);
 		if (wrapFile->stream != nullptr && wrapFile->closeEnabled != 0u) {
@@ -6345,7 +6336,7 @@ namespace
 	 */
 	gpg::RRef* NewWrapFileStorageRef(gpg::RRef* const out)
 	{
-		auto* const wrapFile = static_cast<WrapFileRuntimeView*>(::operator new(sizeof(WrapFileRuntimeView), std::nothrow));
+		auto* const wrapFile = static_cast<WrapFile*>(::operator new(sizeof(WrapFile), std::nothrow));
 		if (wrapFile != nullptr) {
 			wrapFile->stream = nullptr;
 			wrapFile->closeEnabled = 1u;
@@ -6363,7 +6354,7 @@ namespace
 	 */
 	gpg::RRef* ConstructWrapFileStorageRef(
 		gpg::RRef* const out,
-		WrapFileRuntimeView* const wrapFile
+		WrapFile* const wrapFile
 	)
 	{
 		if (wrapFile != nullptr) {
@@ -6598,7 +6589,7 @@ namespace
 	 * derived-type cache branch is dead and the effective behavior is the
 	 * direct field assignment below).
 	 */
-	gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFileRuntimeView* const wrapFile)
+	gpg::RRef* BuildWrapFileRef(gpg::RRef* const out, WrapFile* const wrapFile)
 	{
 		out->mObj = wrapFile;
 		out->mType = CachedType<WrapFile>(gWrapFileType);
@@ -6621,7 +6612,7 @@ namespace
 	 * the same `(out->mObj = object; out->mType = CachedType<WrapFile>())`
 	 * assignment as the caller-pack entry at 0x00917100.
 	 */
-	gpg::RRef* RRefWrapFileImpl(gpg::RRef* const out, WrapFileRuntimeView* const object)
+	gpg::RRef* RRefWrapFileImpl(gpg::RRef* const out, WrapFile* const object)
 	{
 		if (out == nullptr) {
 			return nullptr;
@@ -6656,7 +6647,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, index);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 		if (wrapFile->stream == nullptr) {
 			luaL_error(state, "attempt to use a closed file");
 		}
@@ -6678,7 +6669,7 @@ namespace
 
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, -1);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 		if (wrapFile->stream == nullptr) {
 			luaL_error(state, "attempt to use a closed file");
 		}
@@ -6695,7 +6686,7 @@ namespace
 	 */
 	int LuaIoTmpFile(lua_State* const state)
 	{
-		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+		WrapFile* const wrapFile = NewFileUserdata(state, true);
 		wrapFile->stream = std::tmpfile();
 		if (wrapFile->stream != nullptr) {
 			return 1;
@@ -6780,7 +6771,7 @@ namespace
 	{
 		gpg::RRef reference{};
 		GetRRefFromUserdata(&reference, state, 1);
-		WrapFileRuntimeView* const wrapFile = TryUpcastWrapFile(&reference);
+		WrapFile* const wrapFile = TryUpcastWrapFile(&reference);
 
 		char description[128]{};
 		if (wrapFile->stream != nullptr) {
@@ -6837,7 +6828,7 @@ namespace
 		const char* const filePath = luaL_checklstring(state, 1, nullptr);
 		const char* const mode = luaL_optlstring(state, 2, "r", nullptr);
 
-		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+		WrapFile* const wrapFile = NewFileUserdata(state, true);
 		wrapFile->stream = std::fopen(filePath, mode);
 		if (wrapFile->stream != nullptr) {
 			return 1;
@@ -6858,7 +6849,7 @@ namespace
 		const char* const command = luaL_checklstring(state, 1, nullptr);
 		const char* const mode = luaL_optlstring(state, 2, "r", nullptr);
 
-		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+		WrapFile* const wrapFile = NewFileUserdata(state, true);
 		wrapFile->stream = ::_popen(command, mode);
 		if (wrapFile->stream != nullptr) {
 			return 1;
@@ -7036,7 +7027,7 @@ namespace
 			lua_pushstring(state, globalKey);
 
 			if (argument != nullptr) {
-				WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+				WrapFile* const wrapFile = NewFileUserdata(state, true);
 				wrapFile->stream = std::fopen(argument, mode);
 				if (wrapFile->stream == nullptr) {
 					const int errorCode = *_errno();
@@ -7272,7 +7263,7 @@ namespace
 		}
 
 		const char* const fileName = luaL_checklstring(state, 1, nullptr);
-		WrapFileRuntimeView* const wrapFile = NewFileUserdata(state, true);
+		WrapFile* const wrapFile = NewFileUserdata(state, true);
 		wrapFile->stream = std::fopen(fileName, "r");
 		if (wrapFile->stream == nullptr) {
 			luaL_argerror(state, 1, std::strerror(errno));
@@ -22240,6 +22231,6 @@ namespace gpg
 	 */
 	gpg::RRef* RRef_WrapFile(gpg::RRef* const out, void* const object)
 	{
-		return RRefWrapFileImpl(out, static_cast<WrapFileRuntimeView*>(object));
+		return RRefWrapFileImpl(out, static_cast<WrapFile*>(object));
 	}
 }
