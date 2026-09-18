@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitFireAtTask.h"
+#include "moho/unit/tasks/CUnitFireAtTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -17,42 +19,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitFireAtTaskRuntimeView final : moho::CCommandTask
-  {
-    moho::CCommandTask* mDispatchTask = nullptr;                       // +0x30
-    moho::EAiTargetType mTargetType = static_cast<moho::EAiTargetType>(0); // +0x34
-    moho::WeakPtr<moho::Entity> mTargetEntity{};                       // +0x38
-    std::uint8_t mTargetPositionBytes[0x0C];                           // +0x40 (left as-is by binary CtrRef lane)
-    std::int32_t mTargetPoint = -1;                                    // +0x4C
-    bool mTargetIsMobile = false;                                      // +0x50
-    std::uint8_t mTargetPad51_53[3] = {0, 0, 0};
-    moho::UnitWeapon* mWeapon = nullptr; // +0x54
-    std::int32_t mIsNuclear = 0;         // +0x58
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitFireAtTaskRuntimeView) == sizeof(moho::CUnitFireAtTask),
-    "CUnitFireAtTaskRuntimeView size must match CUnitFireAtTask"
-  );
-  static_assert(
-    offsetof(CUnitFireAtTaskRuntimeView, mDispatchTask) == offsetof(moho::CUnitFireAtTask, mDispatch),
-    "CUnitFireAtTaskRuntimeView::mDispatchTask offset must match CUnitFireAtTask"
-  );
-  static_assert(offsetof(CUnitFireAtTaskRuntimeView, mTargetType) == 0x34, "CUnitFireAtTaskRuntimeView::mTargetType offset must be 0x34");
-  static_assert(offsetof(CUnitFireAtTaskRuntimeView, mTargetPoint) == 0x4C, "CUnitFireAtTaskRuntimeView::mTargetPoint offset must be 0x4C");
-  static_assert(
-    offsetof(CUnitFireAtTaskRuntimeView, mWeapon) == offsetof(moho::CUnitFireAtTask, mWeapon),
-    "CUnitFireAtTaskRuntimeView::mWeapon offset must match CUnitFireAtTask"
-  );
-  static_assert(
-    offsetof(CUnitFireAtTaskRuntimeView, mIsNuclear) == offsetof(moho::CUnitFireAtTask, mIsNuclear),
-    "CUnitFireAtTaskRuntimeView::mIsNuclear offset must match CUnitFireAtTask"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -93,9 +60,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitFireAtTaskRef(CUnitFireAtTaskRuntimeView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitFireAtTaskRef(moho::CUnitFireAtTask* const object)
   {
-    return gpg::RRef{reinterpret_cast<moho::CUnitFireAtTask*>(object), CachedCUnitFireAtTaskType()};
+    return gpg::RRef{object, CachedCUnitFireAtTaskType()};
   }
 } // namespace
 
@@ -107,7 +74,7 @@ namespace moho
   CUnitFireAtTaskTypeInfo::CUnitFireAtTaskTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CUnitFireAtTask), this);
+    gpg::PreRegisterRType(typeid(moho::CUnitFireAtTask), this);
   }
 
   /**
@@ -120,7 +87,7 @@ namespace moho
    */
   const char* CUnitFireAtTaskTypeInfo::GetName() const
   {
-    return "CUnitFireAtTask";
+    return "moho::CUnitFireAtTask";
   }
 
   /**
@@ -128,7 +95,7 @@ namespace moho
    */
   void CUnitFireAtTaskTypeInfo::Init()
   {
-    size_ = sizeof(CUnitFireAtTask);
+    size_ = sizeof(moho::CUnitFireAtTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitFireAtTaskTypeInfo::NewRef,
@@ -162,7 +129,7 @@ namespace moho
    */
   gpg::RRef CUnitFireAtTaskTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitFireAtTaskRuntimeView();
+    auto* const object = new (std::nothrow) moho::CUnitFireAtTask();
     return MakeCUnitFireAtTaskRef(object);
   }
 
@@ -175,9 +142,9 @@ namespace moho
    */
   gpg::RRef CUnitFireAtTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitFireAtTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitFireAtTask*>(objectStorage);
     if (object) {
-      new (object) CUnitFireAtTaskRuntimeView();
+      new (object) moho::CUnitFireAtTask();
     }
     return MakeCUnitFireAtTaskRef(object);
   }
@@ -187,7 +154,7 @@ namespace moho
    */
   void CUnitFireAtTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitFireAtTaskRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitFireAtTask*>(objectStorage);
   }
 
   /**
@@ -195,12 +162,12 @@ namespace moho
    */
   void CUnitFireAtTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitFireAtTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitFireAtTask*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitFireAtTaskRuntimeView();
+    std::destroy_at(object);
   }
 
   int register_CUnitFireAtTaskTypeInfo()

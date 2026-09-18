@@ -2,11 +2,13 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitPodAssist.h"
+#include "moho/unit/tasks/CUnitPodAssist.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -16,29 +18,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitPodAssistRuntimeView final : moho::CCommandTask
-  {
-    moho::CCommandTask* mDispatchTask = nullptr; // +0x30
-    moho::WeakPtr<moho::Unit> mAssistTarget{};   // +0x34
 
-    int Execute() override
-    {
-      return 1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitPodAssistRuntimeView) == sizeof(moho::CUnitPodAssist),
-    "CUnitPodAssistRuntimeView size must match CUnitPodAssist"
-  );
-  static_assert(
-    offsetof(CUnitPodAssistRuntimeView, mDispatchTask) == 0x30,
-    "CUnitPodAssistRuntimeView::mDispatchTask offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CUnitPodAssistRuntimeView, mAssistTarget) == 0x34,
-    "CUnitPodAssistRuntimeView::mAssistTarget offset must be 0x34"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -83,7 +63,7 @@ namespace moho
   CUnitPodAssistTypeInfo::CUnitPodAssistTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CUnitPodAssist), this);
+    gpg::PreRegisterRType(typeid(moho::CUnitPodAssist), this);
   }
 
   /**
@@ -96,7 +76,7 @@ namespace moho
    */
   const char* CUnitPodAssistTypeInfo::GetName() const
   {
-    return "CUnitPodAssist";
+    return "moho::CUnitPodAssist";
   }
 
   /**
@@ -104,7 +84,7 @@ namespace moho
    */
   void CUnitPodAssistTypeInfo::Init()
   {
-    size_ = sizeof(CUnitPodAssist);
+    size_ = sizeof(moho::CUnitPodAssist);
     gpg::RType::Init();
     AddBase_CCommandTask(this);
     (void)gpg::BindRTypeLifecycleCallbacks(
@@ -138,8 +118,8 @@ namespace moho
    */
   gpg::RRef CUnitPodAssistTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitPodAssistRuntimeView();
-    return MakeCUnitPodAssistRef(reinterpret_cast<CUnitPodAssist*>(object));
+    auto* const object = new (std::nothrow) moho::CUnitPodAssist();
+    return MakeCUnitPodAssistRef(object);
   }
 
   /**
@@ -147,12 +127,12 @@ namespace moho
    */
   gpg::RRef CUnitPodAssistTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitPodAssistRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitPodAssist*>(objectStorage);
     if (object) {
-      new (object) CUnitPodAssistRuntimeView();
+      new (object) moho::CUnitPodAssist();
     }
 
-    return MakeCUnitPodAssistRef(reinterpret_cast<CUnitPodAssist*>(object));
+    return MakeCUnitPodAssistRef(object);
   }
 
   /**
@@ -160,7 +140,7 @@ namespace moho
    */
   void CUnitPodAssistTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitPodAssistRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitPodAssist*>(objectStorage);
   }
 
   /**
@@ -168,12 +148,12 @@ namespace moho
    */
   void CUnitPodAssistTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitPodAssistRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitPodAssist*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitPodAssistRuntimeView();
+    std::destroy_at(object);
   }
 
   /**

@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitWaitForFerryTask.h"
+#include "moho/unit/tasks/CUnitWaitForFerryTask.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -17,39 +19,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitWaitForFerryTaskRuntimeView final : moho::CCommandTask
-  {
-    std::uint32_t mUnknownWord0 = 0;  // +0x30
-    std::uint32_t mUnknownWord1 = 0;  // +0x34
-    std::uint32_t mUnknownWord2 = 0;  // +0x38
-    std::uint32_t mUnknownWord3 = 0;  // +0x3C
-    std::uint32_t mUnknownWord4 = 0;  // +0x40
-    std::uint32_t mUnknownWord5 = 0;  // +0x44
-    std::uint32_t mUnknownWord6 = 0;  // +0x48
-    std::uint32_t mUnknownWord7 = 0;  // +0x4C
-    std::uint32_t mUnknownWord8 = 0;  // +0x50
-    std::uint32_t mUnknownWord9 = 0;  // +0x54
-    std::uint32_t mUnknownWord10 = 0; // +0x58
-    std::uint32_t mUnknownWord11 = 0; // +0x5C
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitWaitForFerryTaskRuntimeView) == sizeof(moho::CUnitWaitForFerryTask),
-    "CUnitWaitForFerryTaskRuntimeView size must match CUnitWaitForFerryTask"
-  );
-  static_assert(
-    offsetof(CUnitWaitForFerryTaskRuntimeView, mUnknownWord0) == 0x30,
-    "CUnitWaitForFerryTaskRuntimeView::mUnknownWord0 offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CUnitWaitForFerryTaskRuntimeView, mUnknownWord11) == 0x5C,
-    "CUnitWaitForFerryTaskRuntimeView::mUnknownWord11 offset must be 0x5C"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -90,9 +60,9 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitWaitForFerryTaskRef(CUnitWaitForFerryTaskRuntimeView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitWaitForFerryTaskRef(moho::CUnitWaitForFerryTask* const object)
   {
-    return gpg::RRef{reinterpret_cast<moho::CUnitWaitForFerryTask*>(object), CachedCUnitWaitForFerryTaskType()};
+    return gpg::RRef{object, CachedCUnitWaitForFerryTaskType()};
   }
 } // namespace
 
@@ -104,7 +74,7 @@ namespace moho
   CUnitWaitForFerryTaskTypeInfo::CUnitWaitForFerryTaskTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CUnitWaitForFerryTask), this);
+    gpg::PreRegisterRType(typeid(moho::CUnitWaitForFerryTask), this);
   }
 
   /**
@@ -117,7 +87,7 @@ namespace moho
    */
   const char* CUnitWaitForFerryTaskTypeInfo::GetName() const
   {
-    return "CUnitWaitForFerryTask";
+    return "moho::CUnitWaitForFerryTask";
   }
 
   /**
@@ -125,7 +95,7 @@ namespace moho
    */
   void CUnitWaitForFerryTaskTypeInfo::Init()
   {
-    size_ = sizeof(CUnitWaitForFerryTask);
+    size_ = sizeof(moho::CUnitWaitForFerryTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitWaitForFerryTaskTypeInfo::NewRef,
@@ -159,7 +129,7 @@ namespace moho
    */
   gpg::RRef CUnitWaitForFerryTaskTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitWaitForFerryTaskRuntimeView();
+    auto* const object = new (std::nothrow) moho::CUnitWaitForFerryTask();
     return MakeCUnitWaitForFerryTaskRef(object);
   }
 
@@ -172,9 +142,9 @@ namespace moho
    */
   gpg::RRef CUnitWaitForFerryTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitWaitForFerryTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitWaitForFerryTask*>(objectStorage);
     if (object) {
-      new (object) CUnitWaitForFerryTaskRuntimeView();
+      new (object) moho::CUnitWaitForFerryTask();
     }
     return MakeCUnitWaitForFerryTaskRef(object);
   }
@@ -184,7 +154,7 @@ namespace moho
    */
   void CUnitWaitForFerryTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitWaitForFerryTaskRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitWaitForFerryTask*>(objectStorage);
   }
 
   /**
@@ -192,12 +162,12 @@ namespace moho
    */
   void CUnitWaitForFerryTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitWaitForFerryTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitWaitForFerryTask*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitWaitForFerryTaskRuntimeView();
+    std::destroy_at(object);
   }
 
   int register_CUnitWaitForFerryTaskTypeInfo()

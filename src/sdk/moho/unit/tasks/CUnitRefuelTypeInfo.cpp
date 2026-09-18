@@ -7,7 +7,8 @@
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitRefuel.h"
+#include "moho/unit/tasks/CUnitRefuel.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -17,35 +18,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitRefuelRuntimeView final : moho::CCommandTask
-  {
-    moho::WeakPtr<moho::Unit> mTargetUnit{}; // +0x30
-    bool mHasTransportReservation = false;    // +0x38
-    bool mIsCarrier = false;                  // +0x39
-    std::uint8_t mPad3A[2] = {0, 0};          // +0x3A
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitRefuelRuntimeView) == sizeof(moho::CUnitRefuel),
-    "CUnitRefuelRuntimeView size must match CUnitRefuel"
-  );
-  static_assert(
-    offsetof(CUnitRefuelRuntimeView, mTargetUnit) == 0x30,
-    "CUnitRefuelRuntimeView::mTargetUnit offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CUnitRefuelRuntimeView, mHasTransportReservation) == 0x38,
-    "CUnitRefuelRuntimeView::mHasTransportReservation offset must be 0x38"
-  );
-  static_assert(
-    offsetof(CUnitRefuelRuntimeView, mIsCarrier) == 0x39,
-    "CUnitRefuelRuntimeView::mIsCarrier offset must be 0x39"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -145,8 +118,8 @@ namespace moho
    */
   gpg::RRef CUnitRefuelTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitRefuelRuntimeView();
-    return MakeCUnitRefuelRef(reinterpret_cast<CUnitRefuel*>(object));
+    auto* const object = new (std::nothrow) CUnitRefuel();
+    return MakeCUnitRefuelRef(object);
   }
 
   /**
@@ -154,12 +127,12 @@ namespace moho
    */
   gpg::RRef CUnitRefuelTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitRefuelRuntimeView*>(objectStorage);
+    auto* const object = static_cast<CUnitRefuel*>(objectStorage);
     if (object) {
-      new (object) CUnitRefuelRuntimeView();
+      new (object) CUnitRefuel();
     }
 
-    return MakeCUnitRefuelRef(reinterpret_cast<CUnitRefuel*>(object));
+    return MakeCUnitRefuelRef(object);
   }
 
   /**
@@ -167,7 +140,7 @@ namespace moho
    */
   void CUnitRefuelTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitRefuelRuntimeView*>(objectStorage);
+    delete static_cast<CUnitRefuel*>(objectStorage);
   }
 
   /**
@@ -175,12 +148,12 @@ namespace moho
    */
   void CUnitRefuelTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitRefuelRuntimeView*>(objectStorage);
+    auto* const object = static_cast<CUnitRefuel*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitRefuelRuntimeView();
+    object->~CUnitRefuel();
   }
 
   /**

@@ -26,6 +26,17 @@ namespace moho
   class CUnitWaitForFerryTask : public CCommandTask
   {
   public:
+
+    /**
+     * Address: 0x0061037A-0x0061039B, inlined into
+     * `CUnitWaitForFerryTaskTypeInfo::NewRef` (0x00610340) and its `CtrRef`
+     * sibling: dispatch lane, ferry link and the whole move goal cleared to
+     * zero.
+     *
+     * What it does:
+     * Default-constructs one task for the reflection factory.
+     */
+    CUnitWaitForFerryTask();
     static gpg::RType* sType;
 
     /**

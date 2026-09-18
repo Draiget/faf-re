@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <typeinfo>
 
@@ -18,43 +19,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitTeleportTaskRuntimeView final : moho::CCommandTask
-  {
-    moho::EAiTargetType mTargetType = static_cast<moho::EAiTargetType>(0); // +0x30
-    moho::WeakPtr<moho::Entity> mTargetEntity{};                            // +0x34
-    std::uint8_t mTargetPositionBytes[0x0C];                                // +0x3C (left as-is by binary CtrRef lane)
-    std::int32_t mTargetPoint = -1;                                          // +0x48
-    bool mTargetIsMobile = false;                                            // +0x4C
-    std::uint8_t mTargetPad4D_4F[3] = {0, 0, 0};
-    moho::WeakPtr<moho::Unit> mTeleportBeaconUnit{}; // +0x50
-    Wm3::Quaternionf mOrientation;                    // +0x58
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitTeleportTaskRuntimeView) == sizeof(moho::CUnitTeleportTask),
-    "CUnitTeleportTaskRuntimeView size must match CUnitTeleportTask"
-  );
-  static_assert(
-    offsetof(CUnitTeleportTaskRuntimeView, mTargetType) == 0x30,
-    "CUnitTeleportTaskRuntimeView::mTargetType offset must be 0x30"
-  );
-  static_assert(
-    offsetof(CUnitTeleportTaskRuntimeView, mTargetPoint) == 0x48,
-    "CUnitTeleportTaskRuntimeView::mTargetPoint offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CUnitTeleportTaskRuntimeView, mTeleportBeaconUnit) == offsetof(moho::CUnitTeleportTask, mTeleportBeaconUnit),
-    "CUnitTeleportTaskRuntimeView::mTeleportBeaconUnit offset must match CUnitTeleportTask"
-  );
-  static_assert(
-    offsetof(CUnitTeleportTaskRuntimeView, mOrientation) == offsetof(moho::CUnitTeleportTask, mOrientation),
-    "CUnitTeleportTaskRuntimeView::mOrientation offset must match CUnitTeleportTask"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -86,10 +51,10 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitTeleportTaskRef(CUnitTeleportTaskRuntimeView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitTeleportTaskRef(moho::CUnitTeleportTask* const object)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitTeleportTask(&ref, reinterpret_cast<moho::CUnitTeleportTask*>(object));
+    (void)gpg::RRef_CUnitTeleportTask(&ref, object);
     return ref;
   }
 } // namespace
@@ -102,7 +67,7 @@ namespace moho
   CUnitTeleportTaskTypeInfo::CUnitTeleportTaskTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CUnitTeleportTask), this);
+    gpg::PreRegisterRType(typeid(moho::CUnitTeleportTask), this);
   }
 
   /**
@@ -115,7 +80,7 @@ namespace moho
    */
   const char* CUnitTeleportTaskTypeInfo::GetName() const
   {
-    return "CUnitTeleportTask";
+    return "moho::CUnitTeleportTask";
   }
 
   /**
@@ -123,7 +88,7 @@ namespace moho
    */
   void CUnitTeleportTaskTypeInfo::Init()
   {
-    size_ = sizeof(CUnitTeleportTask);
+    size_ = sizeof(moho::CUnitTeleportTask);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitTeleportTaskTypeInfo::NewRef,
@@ -157,7 +122,7 @@ namespace moho
    */
   gpg::RRef CUnitTeleportTaskTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitTeleportTaskRuntimeView();
+    auto* const object = new (std::nothrow) moho::CUnitTeleportTask();
     return MakeCUnitTeleportTaskRef(object);
   }
 
@@ -170,9 +135,9 @@ namespace moho
    */
   gpg::RRef CUnitTeleportTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitTeleportTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitTeleportTask*>(objectStorage);
     if (object) {
-      new (object) CUnitTeleportTaskRuntimeView();
+      new (object) moho::CUnitTeleportTask();
     }
     return MakeCUnitTeleportTaskRef(object);
   }
@@ -182,7 +147,7 @@ namespace moho
    */
   void CUnitTeleportTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitTeleportTaskRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitTeleportTask*>(objectStorage);
   }
 
   /**
@@ -190,12 +155,12 @@ namespace moho
    */
   void CUnitTeleportTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitTeleportTaskRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitTeleportTask*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitTeleportTaskRuntimeView();
+    std::destroy_at(object);
   }
 
   int register_CUnitTeleportTaskTypeInfo()

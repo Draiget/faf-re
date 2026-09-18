@@ -106,6 +106,22 @@ namespace moho
   gpg::RType* CUnitWaitForFerryTask::sType = nullptr;
 
   /**
+   * Address: 0x0061037A-0x0061039B, inlined into
+   * `CUnitWaitForFerryTaskTypeInfo::NewRef` (0x00610340) and its `CtrRef`
+   * sibling: dispatch lane, ferry link and the whole move goal cleared to
+   * zero.
+   *
+   * What it does:
+   * Default-constructs one task for the reflection factory.
+   */
+  CUnitWaitForFerryTask::CUnitWaitForFerryTask()
+  {
+    mDispatch = nullptr;
+    mFerryUnit = WeakPtr<Unit>{};
+    mMoveGoal = SNavGoal{};
+  }
+
+  /**
    * Address: 0x0060FAA0 (FUN_0060FAA0, Moho::CUnitWaitForFerryTask::CUnitWaitForFerryTask)
    * Mangled: ??0CUnitWaitForFerryTask@Moho@@QAE@@Z
    *
