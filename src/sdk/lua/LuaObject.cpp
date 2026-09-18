@@ -12637,24 +12637,41 @@ namespace
 		return value;
 	}
 
-	struct LuaCallFrameRuntimeView
+	/**
+	 * One prepared call to a Lua function - LuaPlus's own `LuaCall`, whose
+	 * declaration in LuaObject.h is these four members in this order:
+	 *
+	 *     LuaState* m_state;  LuaObject m_functionObj;
+	 *     int m_numArgs;      int m_startResults;
+	 *
+	 * and whose constructor is the same sequence the body below recovers:
+	 * copy the callable, zero the argument count, resolve the state from the
+	 * object, check it really is a function, record GetTop() + 1, push it.
+	 *
+	 * This fork's version is the stock one minus the _ALERT handler: LuaPlus
+	 * pushes _ALERT in the constructor and calls through PCall with it as the
+	 * error handler, where 0x00909A00 pushes nothing extra and 0x00907270
+	 * calls plain lua_call. Nothing here should be back-filled from the
+	 * vendored .inl on the strength of the layout matching.
+	 */
+	struct LuaCall
 	{
-		LuaState* state = nullptr;              // +0x00 (root-main-thread LuaState*)
-		LuaObject function{};                   // +0x04 (callable LuaObject, tracked on list)
-		int argumentCount = 0;                  // +0x18
-		int nextTopIndex = 0;                   // +0x1C
+		LuaState* m_state = nullptr;  // +0x00 thread the call is staged on
+		LuaObject m_functionObj{};    // +0x04 the callable, tracked on the live list
+		int m_numArgs = 0;            // +0x18 arguments pushed so far
+		int m_startResults = 0;       // +0x1C stack index the first result lands at
 	};
-	static_assert(offsetof(LuaCallFrameRuntimeView, state) == 0x00, "LuaCallFrameRuntimeView::state offset must be 0x00");
-	static_assert(offsetof(LuaCallFrameRuntimeView, function) == 0x04, "LuaCallFrameRuntimeView::function offset must be 0x04");
-	static_assert(offsetof(LuaCallFrameRuntimeView, argumentCount) == 0x18, "LuaCallFrameRuntimeView::argumentCount offset must be 0x18");
-	static_assert(offsetof(LuaCallFrameRuntimeView, nextTopIndex) == 0x1C, "LuaCallFrameRuntimeView::nextTopIndex offset must be 0x1C");
-	static_assert(sizeof(LuaCallFrameRuntimeView) == 0x20, "LuaCallFrameRuntimeView size must be 0x20");
+	static_assert(offsetof(LuaCall, m_state) == 0x00, "LuaCall::m_state offset must be 0x00");
+	static_assert(offsetof(LuaCall, m_functionObj) == 0x04, "LuaCall::m_functionObj offset must be 0x04");
+	static_assert(offsetof(LuaCall, m_numArgs) == 0x18, "LuaCall::m_numArgs offset must be 0x18");
+	static_assert(offsetof(LuaCall, m_startResults) == 0x1C, "LuaCall::m_startResults offset must be 0x1C");
+	static_assert(sizeof(LuaCall) == 0x20, "LuaCall size must be 0x20");
 
 	/**
 	 * Address: 0x00909A00 (FUN_00909A00)
 	 *
 	 * IDA signature:
-	 * int __thiscall sub_909A00(LuaCallFrameRuntimeView *this@<ecx>, const LuaObject *functionObject);
+	 * int __thiscall sub_909A00(LuaCall *this@<ecx>, const LuaObject *functionObject);
 	 *
 	 * What it does:
 	 * Constructs one Lua call-frame view from a caller-supplied function
@@ -12677,44 +12694,44 @@ namespace
 	 * silently does nothing -- which is how `LuaObject::Insert` stopped
 	 * filling the table `EntityCategoryGetUnitList` returns.
 	 */
-	LuaCallFrameRuntimeView* ConstructLuaCallFrame(
-		LuaCallFrameRuntimeView* const frame,
+	LuaCall* ConstructLuaCallFrame(
+		LuaCall* const frame,
 		LuaObject* const functionObject
 	)
 	{
-		frame->function.m_next = nullptr;
-		frame->function.m_prev = nullptr;
-		frame->function.m_state = nullptr;
-		frame->function.m_object.tt = 0;
-		frame->function.m_object.value.p = nullptr;
+		frame->m_functionObj.m_next = nullptr;
+		frame->m_functionObj.m_prev = nullptr;
+		frame->m_functionObj.m_state = nullptr;
+		frame->m_functionObj.m_object.tt = 0;
+		frame->m_functionObj.m_object.value.p = nullptr;
 
 		LuaState* const sourceState = functionObject->m_state;
 		if (sourceState != nullptr) {
-			frame->function.AddToUsedObjectList(sourceState, &functionObject->m_object);
+			frame->m_functionObj.AddToUsedObjectList(sourceState, &functionObject->m_object);
 		}
 
-		frame->argumentCount = 0;
-		LuaState* const boundState = frame->function.m_state;
-		frame->state = boundState->m_state->l_G->lstate->stateUserData;
+		frame->m_numArgs = 0;
+		LuaState* const boundState = frame->m_functionObj.m_state;
+		frame->m_state = boundState->m_state->l_G->lstate->stateUserData;
 
-		if (frame->function.m_state == nullptr) {
+		if (frame->m_functionObj.m_state == nullptr) {
 			throw LuaAssertion("m_state");
 		}
 
 		constexpr std::uint32_t kFunctionTagMask = 1u;
-		if ((static_cast<std::uint32_t>(frame->function.m_object.tt) | kFunctionTagMask) != 7u) {
+		if ((static_cast<std::uint32_t>(frame->m_functionObj.m_object.tt) | kFunctionTagMask) != 7u) {
 			luaG_typeerror(
-				frame->function.m_state->m_state->l_G->lstate,
-				&frame->function.m_object,
+				frame->m_functionObj.m_state->m_state->l_G->lstate,
+				&frame->m_functionObj.m_object,
 				"call"
 			);
 		}
 
-		lua_State* const rootLuaState = frame->state->m_state;
+		lua_State* const rootLuaState = frame->m_state->m_state;
 		const int currentTop = lua_gettop(rootLuaState);
-		frame->nextTopIndex = currentTop + 1;
+		frame->m_startResults = currentTop + 1;
 
-		(void)frame->function.PushStack(frame->state);
+		(void)frame->m_functionObj.PushStack(frame->m_state);
 		return frame;
 	}
 
@@ -12726,14 +12743,14 @@ namespace
 	 * materializes one stack-object view for the top result slot.
 	 */
 	LuaStackObject* InvokeLuaCallFrame(
-		LuaCallFrameRuntimeView* const frame,
+		LuaCall* const frame,
 		LuaStackObject* const outResult,
 		const int* const resultCount
 	)
 	{
-		lua_call(frame->state->m_state, frame->argumentCount, *resultCount);
-		outResult->m_state = frame->state;
-		outResult->m_stackIndex = frame->nextTopIndex - 1;
+		lua_call(frame->m_state->m_state, frame->m_numArgs, *resultCount);
+		outResult->m_state = frame->m_state;
+		outResult->m_stackIndex = frame->m_startResults - 1;
 		return outResult;
 	}
 
@@ -12763,14 +12780,14 @@ namespace
 	 * Pushes one LuaObject argument onto a prepared Lua call frame and bumps the
 	 * retained argument-count lane.
 	 */
-	LuaCallFrameRuntimeView* PushLuaObjectArgumentToCallFrame(
-		LuaCallFrameRuntimeView* const frame,
+	LuaCall* PushLuaObjectArgumentToCallFrame(
+		LuaCall* const frame,
 		LuaObject* const argument
 	)
 	{
-		const StkId pushed = argument->PushStack(frame->state);
+		const StkId pushed = argument->PushStack(frame->m_state);
 		(void)pushed;
-		++frame->argumentCount;
+		++frame->m_numArgs;
 		return frame;
 	}
 
@@ -21195,7 +21212,7 @@ LuaObject LuaObject::CreateTable(
 	return out;
 }
 
-// Reopen the same unnamed namespace that houses LuaCallFrameRuntimeView and the
+// Reopen the same unnamed namespace that houses LuaCall and the
 // three recovered frame primitives so we can build a typed `table.method()`
 // driver on top of them without duplicating their layout.
 namespace
@@ -21216,7 +21233,7 @@ namespace
 	{
 		(void)activeState;
 
-		LuaCallFrameRuntimeView frame{};
+		LuaCall frame{};
 		(void)ConstructLuaCallFrame(&frame, &methodFunction);
 
 		if (arg0 != nullptr) {
@@ -21227,8 +21244,8 @@ namespace
 			// 0x00909D9E: `lua_pushnumber(state->m_state, (float)key)` -- the
 			// number goes on the FRAME's thread, the same one every other
 			// argument and `lua_call` use, never on the caller's wrapper.
-			lua_pushnumber(frame.state->m_state, numericArg);
-			++frame.argumentCount;
+			lua_pushnumber(frame.m_state->m_state, numericArg);
+			++frame.m_numArgs;
 		}
 
 		if (arg2 != nullptr) {
