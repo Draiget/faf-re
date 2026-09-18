@@ -3369,6 +3369,18 @@
     <ClInclude Include="moho\script\ScriptedDecalTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="legacy\exceptions\StdExcept.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaTypeInfoStorage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="lua\LuaUndump.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="lua\LuaObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
