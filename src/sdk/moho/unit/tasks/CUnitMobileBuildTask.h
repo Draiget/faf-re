@@ -178,7 +178,7 @@ namespace moho
     /**
      * Address: 0x005F6EA0 (FUN_005F6EA0, sub_5F6EA0)
      *
-     * Box-queries ObstructsBuild props over the footprint; on a RebuildBonus id
+     * Box-queries OBSTRUCTSBUILDING props over the footprint; on a RebuildBonus id
      * match binds the pending-build entity (returns null), else returns the
      * nearest obstructing prop to reclaim.
      */
