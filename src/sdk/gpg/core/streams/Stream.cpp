@@ -12,16 +12,11 @@ constexpr int kCarriageReturnByte = 13;
 constexpr int kLineFeedByte = 10;
 constexpr int kEndOfFileByte = -1;
 
-struct TextReaderRuntimeView
-{
-  Stream* stream = nullptr;       // +0x00
-  bool normalizeCrAsLf = false;   // +0x04
-};
-static_assert(offsetof(TextReaderRuntimeView, stream) == 0x00, "TextReaderRuntimeView::stream offset must be 0x00");
-static_assert(offsetof(TextReaderRuntimeView, normalizeCrAsLf) == 0x04, "TextReaderRuntimeView::normalizeCrAsLf offset must be 0x04");
-static_assert(sizeof(TextReaderRuntimeView) == 0x08, "TextReaderRuntimeView size must be 0x08");
-
-[[nodiscard]] int ReadRawByteFromStreamRuntime(Stream& stream)
+// The read-buffer fast path `TextReader`'s two read members both open with:
+// take the next byte from the window when one is there, otherwise go through
+// the virtual `VirtRead` slot for a single byte. The binary inlines it at
+// each of its three use sites rather than calling it.
+[[nodiscard]] int ReadRawByte(Stream& stream)
 {
   if (stream.mReadHead != stream.mReadEnd) {
     const unsigned char value = static_cast<unsigned char>(*stream.mReadHead);
@@ -37,28 +32,87 @@ static_assert(sizeof(TextReaderRuntimeView) == 0x08, "TextReaderRuntimeView size
   return kEndOfFileByte;
 }
 
+} // namespace
+
+/**
+ * Address: 0x00907000 (FUN_00907000)
+ *
+ * What it does:
+ * Binds the reader to one stream and records the CR normalization mode.
+ */
+TextReader::TextReader(Stream* const stream, const bool normalizeCrAsLf)
+  : mStream(stream)
+  , mNormalizeCrAsLf(normalizeCrAsLf)
+{}
+
 /**
  * Address: 0x00907020 (FUN_00907020)
  *
  * What it does:
- * Reads one byte from a stream-backed text reader state and normalizes CR/LF
- * sequences to LF when enabled.
+ * Reads one byte and, when normalizing, reports a CR as an LF: the LF of a
+ * CR/LF pair is consumed, anything else is ungot so the next read sees it.
  */
-[[maybe_unused]] int ReadTextByteWithCrLfNormalizationRuntime(TextReaderRuntimeView& reader)
+int TextReader::ReadByte()
 {
-  int value = ReadRawByteFromStreamRuntime(*reader.stream);
-  if (!reader.normalizeCrAsLf || value != kCarriageReturnByte) {
+  const int value = ReadRawByte(*mStream);
+  if (!mNormalizeCrAsLf || value != kCarriageReturnByte) {
     return value;
   }
 
-  const int trailing = ReadRawByteFromStreamRuntime(*reader.stream);
+  const int trailing = ReadRawByte(*mStream);
   if (trailing != kLineFeedByte && trailing != kEndOfFileByte) {
-    reader.stream->UnGetByte(trailing);
+    mStream->UnGetByte(trailing);
   }
 
   return kLineFeedByte;
 }
-} // namespace
+
+/**
+ * Address: 0x009070B0 (FUN_009070B0)
+ *
+ * What it does:
+ * Reads one line, terminator included. See the header for the CR/LF decode
+ * table; end of input ends the line without appending anything.
+ */
+msvc8::string TextReader::ReadLine()
+{
+  msvc8::string line;
+
+  // Gate order follows the binary: end of input at 0x00907121, CR at
+  // 0x0090712A, then LF at 0x0090712F sharing the append with the ordinary
+  // byte at 0x00907136.
+  for (;;) {
+    const int value = ReadRawByte(*mStream);
+    if (value == kEndOfFileByte) {
+      return line;
+    }
+    if (value == kCarriageReturnByte) {
+      break;
+    }
+
+    line.append(1u, static_cast<char>(value));
+    if (value == kLineFeedByte) {
+      return line;
+    }
+  }
+
+  // A CR: one more byte decides whether this was a CR/LF pair.
+  const int trailing = ReadRawByte(*mStream);
+  if (trailing == kLineFeedByte) {
+    if (!mNormalizeCrAsLf) {
+      line.append(1u, static_cast<char>(kCarriageReturnByte));
+    }
+    line.append(1u, static_cast<char>(kLineFeedByte));
+    return line;
+  }
+
+  if (trailing != kEndOfFileByte) {
+    mStream->UnGetByte(trailing);
+  }
+
+  line.append(1u, static_cast<char>(mNormalizeCrAsLf ? kLineFeedByte : kCarriageReturnByte));
+  return line;
+}
 
 /**
  * Address: 0x00956DB0 (FUN_00956DB0)
