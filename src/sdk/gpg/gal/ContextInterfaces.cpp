@@ -24,40 +24,6 @@ namespace gpg::gal
 {
     namespace
     {
-        struct DepthStencilTargetOwnerRuntimeView final
-        {
-            void* vftable = nullptr;                      // +0x00
-            std::uint32_t lane04 = 0u;                   // +0x04
-            std::uint32_t width = 0u;                    // +0x08
-            std::uint32_t height = 0u;                   // +0x0C
-            std::uint32_t format = 0u;                   // +0x10
-            bool flag = false;                           // +0x14
-            std::uint8_t pad15_17[3]{};                  // +0x15
-            boost::detail::sp_counted_base* handle = nullptr; // +0x18
-        };
-        static_assert(
-            offsetof(DepthStencilTargetOwnerRuntimeView, width) == 0x08,
-            "DepthStencilTargetOwnerRuntimeView::width offset must be 0x08"
-        );
-        static_assert(
-            offsetof(DepthStencilTargetOwnerRuntimeView, handle) == 0x18,
-            "DepthStencilTargetOwnerRuntimeView::handle offset must be 0x18"
-        );
-        static_assert(sizeof(DepthStencilTargetOwnerRuntimeView) == 0x1C, "DepthStencilTargetOwnerRuntimeView size must be 0x1C");
-
-        struct IndexBufferOwnerRuntimeView final
-        {
-            void* vftable = nullptr;                      // +0x00
-            std::uint32_t lane04 = 0u;                   // +0x04
-            std::uint32_t format = 0u;                   // +0x08
-            std::uint32_t size = 0u;                     // +0x0C
-            std::uint32_t type = 0u;                     // +0x10
-            boost::detail::sp_counted_base* handle = nullptr; // +0x14
-        };
-        static_assert(offsetof(IndexBufferOwnerRuntimeView, format) == 0x08, "IndexBufferOwnerRuntimeView::format offset must be 0x08");
-        static_assert(offsetof(IndexBufferOwnerRuntimeView, handle) == 0x14, "IndexBufferOwnerRuntimeView::handle offset must be 0x14");
-        static_assert(sizeof(IndexBufferOwnerRuntimeView) == 0x18, "IndexBufferOwnerRuntimeView size must be 0x18");
-
         /**
          * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
          *
@@ -136,59 +102,6 @@ namespace gpg::gal
             }
 
             target = source;
-        }
-
-        /**
-         * Address: 0x008E7F80 (FUN_008E7F80)
-         *
-         * What it does:
-         * Releases one retained depth-stencil shared-control lane and resets
-         * the embedded depth-stencil context payload to default values.
-         */
-        [[maybe_unused]] void ResetDepthStencilTargetOwnerRuntime(
-            DepthStencilTargetOwnerRuntimeView* const owner
-        ) noexcept
-        {
-            if (owner == nullptr) {
-                return;
-            }
-
-            if (owner->handle != nullptr) {
-                owner->handle->release();
-            }
-            owner->handle = nullptr;
-
-            const DepthStencilTargetContext resetContext{};
-            owner->width = resetContext.width_;
-            owner->height = resetContext.height_;
-            owner->format = resetContext.format_;
-            owner->flag = resetContext.field0x10_;
-        }
-
-        /**
-         * Address: 0x008F4C30 (FUN_008F4C30)
-         *
-         * What it does:
-         * Releases one retained index-buffer shared-control lane and resets
-         * the embedded index-buffer context payload to default values.
-         */
-        [[maybe_unused]] void ResetIndexBufferOwnerRuntime(
-            IndexBufferOwnerRuntimeView* const owner
-        ) noexcept
-        {
-            if (owner == nullptr) {
-                return;
-            }
-
-            if (owner->handle != nullptr) {
-                owner->handle->release();
-            }
-            owner->handle = nullptr;
-
-            const IndexBufferContext resetContext{};
-            owner->format = resetContext.format_;
-            owner->size = resetContext.size_;
-            owner->type = resetContext.type_;
         }
 
         /**

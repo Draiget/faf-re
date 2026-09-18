@@ -48,6 +48,7 @@ namespace gpg::gal
 
         /**
          * Address: 0x008E8070 (FUN_008E8070, gpg::gal::DepthStencilTargetD3D9::SetSurface)
+         * Address: 0x008E7F80 (FUN_008E7F80 -- the reset-only half of this: release the surface through its COM vtable, null +0x18, then copy a default DepthStencilTargetContext over +0x04. Zero callers; formerly `ResetDepthStencilTargetOwnerRuntime` over a DepthStencilTargetOwnerRuntimeView in gpg/gal/ContextInterfaces.cpp, which had the +0x18 lane typed `boost::detail::sp_counted_base*` and called its `release()` -- the binary does `call [[handle]+8]` with `handle` pushed, which is `IUnknown::Release`, not the shared-count one. Removed 2026-09-18.)
          *
          * What it does:
          * Releases the previously retained depth-stencil surface (if any),
