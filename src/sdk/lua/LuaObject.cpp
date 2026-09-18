@@ -908,6 +908,28 @@ namespace
 	);
 	static_assert(offsetof(global_State, rootudata) == 0x14, "global_State::rootudata must be at +0x14");
 
+	/**
+	 * The metatable every fresh table starts with - the same array one slot
+	 * down, at `_defaultmetatypes[LUA_TTABLE].value`.
+	 *
+	 * `luaH_new` (0x00927320) reads it as `[ecx+100h]`, and 0xD4 + 5*8 + 4 is
+	 * 0x100, which pins LUA_TTABLE at tag 5 - consistent with the fork having
+	 * split `cfunction` out of `function` ahead of userdata's tag 8.
+	 */
+	[[nodiscard]] inline Table* DefaultTableMetatable(global_State* const globalState) noexcept
+	{
+		return static_cast<Table*>(globalState->_defaultmetatypes[LUA_TTABLE].value.p);
+	}
+	static_assert(
+		offsetof(global_State, _defaultmetatypes) + LUA_TTABLE * sizeof(LuaPlus::TObject)
+			+ offsetof(LuaPlus::TObject, value) == 0x100,
+		"default table metatable must live at global_State+0x100"
+	);
+	static_assert(
+		offsetof(global_State, allocationTrackingEnabled) == 0x150,
+		"global_State::allocationTrackingEnabled must be at +0x150"
+	);
+
 #if INTPTR_MAX == INT32_MAX
 	// Table's own offsets are asserted at its definition in LuaRuntimeTypes.h,
 	// where each one cites the instruction it was read from. They used to be
@@ -937,24 +959,6 @@ namespace
 	{
 		return static_cast<int>((instruction >> 6) & 0x3FFFFu) - 0x1FFFF;
 	}
-
-	struct LuaGlobalStateTableAllocRuntimeView
-	{
-		std::uint8_t reserved00[0x100];
-		Table* defaultTableMetatable;
-		std::uint8_t reserved104To14F[0x4C];
-		std::uint8_t allocationTrackingEnabled;
-	};
-#if INTPTR_MAX == INT32_MAX
-	static_assert(
-		offsetof(LuaGlobalStateTableAllocRuntimeView, defaultTableMetatable) == 0x100,
-		"LuaGlobalStateTableAllocRuntimeView::defaultTableMetatable offset must be 0x100 (x86)"
-	);
-	static_assert(
-		offsetof(LuaGlobalStateTableAllocRuntimeView, allocationTrackingEnabled) == 0x150,
-		"LuaGlobalStateTableAllocRuntimeView::allocationTrackingEnabled offset must be 0x150 (x86)"
-	);
-#endif
 
 	Table* LuaDebugGetSizesTable(lua_State* const state);
 }
@@ -4299,8 +4303,8 @@ extern "C"
 		Table* const table = static_cast<Table*>(luaM_realloc(state, nullptr, 0u, sizeof(Table)));
 		luaC_link(state, reinterpret_cast<GCObject*>(table), LUA_TTABLE);
 
-		auto* const globalStateView = reinterpret_cast<LuaGlobalStateTableAllocRuntimeView*>(state->l_G);
-		table->metatable = globalStateView->defaultTableMetatable;
+		global_State* const globalState = state->l_G;
+		table->metatable = DefaultTableMetatable(globalState);
 		table->flags = static_cast<std::int8_t>(-1);
 		table->array = nullptr;
 		table->sizearray = 0;
@@ -4310,7 +4314,7 @@ extern "C"
 		(void)setarrayvector(narray, table, state);
 		(void)setnodevector(state, table, lnhash);
 
-		if (globalStateView->allocationTrackingEnabled != 0) {
+		if (globalState->allocationTrackingEnabled != 0) {
 			LuaDebugTrackNewTableAllocation(state, table);
 		}
 
@@ -9129,42 +9133,6 @@ namespace
 		return (value + 7u) & ~static_cast<std::size_t>(7u);
 	}
 
-	struct LuaTableSizeRuntimeView
-	{
-		std::uint8_t reserved00[0x9];
-		lu_byte lsizenode;
-		std::uint8_t reserved0A[0x16];
-		int32_t sizearray;
-	};
-	static_assert(
-		offsetof(LuaTableSizeRuntimeView, lsizenode) == 0x9,
-		"LuaTableSizeRuntimeView::lsizenode offset must be 0x9"
-	);
-	static_assert(
-		offsetof(LuaTableSizeRuntimeView, sizearray) == 0x20,
-		"LuaTableSizeRuntimeView::sizearray offset must be 0x20"
-	);
-
-	struct LuaThreadSizeRuntimeView
-	{
-		std::uint8_t reserved00[0x20];
-		std::uint32_t lane20;
-		std::uint32_t lane24;
-		std::uint32_t lane28;
-	};
-	static_assert(
-		offsetof(LuaThreadSizeRuntimeView, lane20) == 0x20,
-		"LuaThreadSizeRuntimeView::lane20 offset must be 0x20"
-	);
-	static_assert(
-		offsetof(LuaThreadSizeRuntimeView, lane24) == 0x24,
-		"LuaThreadSizeRuntimeView::lane24 offset must be 0x24"
-	);
-	static_assert(
-		offsetof(LuaThreadSizeRuntimeView, lane28) == 0x28,
-		"LuaThreadSizeRuntimeView::lane28 offset must be 0x28"
-	);
-
 	void LuaDebugAppendGcObject(lua_State* const state, Table* const outputTable, int& nextIndex, GCObject* const object)
 	{
 		TObject* const slot = luaH_setnum(state, outputTable, ++nextIndex);
@@ -9288,35 +9256,23 @@ namespace
 		return 0;
 	}
 
-	struct LuaClosureHeaderRuntimeView
-	{
-		std::uint8_t reserved00[0x8];
-		std::uint8_t upvalueCount;
-	};
-	static_assert(
-		offsetof(LuaClosureHeaderRuntimeView, upvalueCount) == 0x8,
-		"LuaClosureHeaderRuntimeView::upvalueCount offset must be 0x8"
-	);
+	// The per-tag byte costs FUN_00912360 folds in. Each is the fixed header
+	// of the object, with the variable tail added separately below.
+	constexpr std::size_t kLuaTableFixedBytes = 0x24;     // sizeof(Table)
+	constexpr std::size_t kLuaCClosureFixedBytes = 0x40;  // CClosure, TObject upvalues
+	constexpr std::size_t kLuaLClosureFixedBytes = 0x1C;  // LClosure, UpVal* upvalues
+	constexpr std::size_t kLuaUdataFixedBytes = 0x10;     // sizeof(Udata)
+	constexpr std::size_t kLuaThreadFixedBytes = 0x48;    // sizeof(lua_State)
 
-	struct LuaUserdataTypeInfoRuntimeView
-	{
-		std::uint8_t reserved00[0x8];
-		std::uint32_t payloadSize;
-	};
-	static_assert(
-		offsetof(LuaUserdataTypeInfoRuntimeView, payloadSize) == 0x8,
-		"LuaUserdataTypeInfoRuntimeView::payloadSize offset must be 0x8"
-	);
-
-	struct LuaUserdataRuntimeView
-	{
-		std::uint8_t reserved00[0x0C];
-		LuaUserdataTypeInfoRuntimeView* typeInfo;
-	};
-	static_assert(
-		offsetof(LuaUserdataRuntimeView, typeInfo) == 0x0C,
-		"LuaUserdataRuntimeView::typeInfo offset must be 0x0C"
-	);
+	static_assert(sizeof(Table) == kLuaTableFixedBytes, "Table size must be 0x24");
+	static_assert(sizeof(Udata) == kLuaUdataFixedBytes, "Udata size must be 0x10");
+	static_assert(sizeof(lua_State) == kLuaThreadFixedBytes, "lua_State size must be 0x48");
+	static_assert(offsetof(CClosure, nupvalues) == 0x08, "CClosure::nupvalues must be at +0x08");
+	static_assert(offsetof(LClosure, nupvalues) == 0x08, "LClosure::nupvalues must be at +0x08");
+	static_assert(offsetof(LClosure, upvals) == kLuaLClosureFixedBytes, "LClosure::upvals must be at +0x1C");
+	static_assert(offsetof(lua_State, stacksize) == 0x20, "lua_State::stacksize must be at +0x20");
+	static_assert(offsetof(lua_State, end_ci) == 0x24, "lua_State::end_ci must be at +0x24");
+	static_assert(offsetof(lua_State, base_ci) == 0x28, "lua_State::base_ci must be at +0x28");
 
 	/**
 	 * Address: 0x00912360 (FUN_00912360, func_GetTObjectSize)
@@ -9340,49 +9296,63 @@ namespace
 			return AlignSizeToEight(stringObject->len + 0x15u);
 		}
 		case LUA_TTABLE: {
-			const auto* const tableObject = static_cast<const LuaTableSizeRuntimeView*>(object->value.p);
+			const auto* const tableObject = static_cast<const Table*>(object->value.p);
 			if (tableObject == nullptr) {
 				return 0;
 			}
 
+			// An empty table shares the global dummy node and owns no hash part.
 			const std::size_t hashBytes
-				= tableObject->lsizenode != 0u ? (static_cast<std::size_t>(20u) << tableObject->lsizenode) : 0u;
+				= tableObject->lsizenode != 0u ? (sizeof(Node) << tableObject->lsizenode) : 0u;
 			const std::size_t arrayBytes = static_cast<std::size_t>(tableObject->sizearray) * sizeof(TObject);
-			return AlignSizeToEight(hashBytes + arrayBytes + 0x24u);
+			return AlignSizeToEight(hashBytes + arrayBytes + kLuaTableFixedBytes);
 		}
 		case LUA_CFUNCTION: {
-			const auto* const closureHeader = static_cast<const LuaClosureHeaderRuntimeView*>(object->value.p);
-			if (closureHeader == nullptr) {
+			const auto* const closure = static_cast<const CClosure*>(object->value.p);
+			if (closure == nullptr) {
 				return 0;
 			}
-			return AlignSizeToEight(static_cast<std::size_t>(0x40u + (8u * closureHeader->upvalueCount)));
+			// A C closure stores its upvalues inline as TObjects.
+			return AlignSizeToEight(kLuaCClosureFixedBytes + sizeof(TObject) * closure->nupvalues);
 		}
 		case LUA_TFUNCTION: {
-			const auto* const closureHeader = static_cast<const LuaClosureHeaderRuntimeView*>(object->value.p);
-			if (closureHeader == nullptr) {
+			const auto* const closure = static_cast<const LClosure*>(object->value.p);
+			if (closure == nullptr) {
 				return 0;
 			}
-			return AlignSizeToEight(static_cast<std::size_t>(0x1Cu + (4u * closureHeader->upvalueCount)));
+			// A Lua closure stores pointers to shared UpVals instead.
+			return AlignSizeToEight(kLuaLClosureFixedBytes + sizeof(UpVal*) * closure->nupvalues);
 		}
 		case LUA_TUSERDATA: {
-			const auto* const userData = static_cast<const LuaUserdataRuntimeView*>(object->value.p);
-			if (userData == nullptr || userData->typeInfo == nullptr) {
+			const auto* const userData = static_cast<const Udata*>(object->value.p);
+			if (userData == nullptr) {
 				return 0;
 			}
 
-			return AlignSizeToEight(static_cast<std::size_t>(userData->typeInfo->payloadSize + 0x10u));
+			// This fork keeps the payload's RType in `len` rather than a byte
+			// count, so the size comes from the descriptor.
+			const auto* const payloadType = reinterpret_cast<const gpg::RType*>(userData->len);
+			if (payloadType == nullptr) {
+				return 0;
+			}
+
+			return AlignSizeToEight(static_cast<std::size_t>(payloadType->size_) + kLuaUdataFixedBytes);
 		}
 		case LUA_TTHREAD: {
-			const auto* const threadState = static_cast<const LuaThreadSizeRuntimeView*>(object->value.p);
+			const auto* const threadState = static_cast<const lua_State*>(object->value.p);
 			if (threadState == nullptr) {
 				return 0;
 			}
 
-			// Keep x86 lane arithmetic shape from FUN_00912360 exactly.
-			std::uint32_t rawSize = 0x48u + (threadState->lane20 * 8u);
-			rawSize -= threadState->lane28;
-			rawSize += threadState->lane24;
-			return AlignSizeToEight(static_cast<std::size_t>(rawSize));
+			// The CallInfo array is measured as the span between its ends
+			// rather than from size_ci, which is what FUN_00912360 does:
+			// 0x48 + stacksize*8, minus base_ci, plus end_ci.
+			const std::size_t stackBytes = static_cast<std::size_t>(threadState->stacksize) * sizeof(TObject);
+			const std::size_t callInfoBytes = static_cast<std::size_t>(
+				reinterpret_cast<const char*>(threadState->end_ci)
+				- reinterpret_cast<const char*>(threadState->base_ci)
+			);
+			return AlignSizeToEight(kLuaThreadFixedBytes + stackBytes + callInfoBytes);
 		}
 		case LUA_TPROTO: {
 			const auto* const proto = static_cast<const Proto*>(object->value.p);
