@@ -797,24 +797,6 @@ namespace
     return out;
   }
 
-  struct CEconStorageRuntimeView
-  {
-    std::uint8_t* economyRuntime; // +0x00
-    float amounts[4];             // +0x04
-  };
-
-  static_assert(
-    offsetof(CEconStorageRuntimeView, economyRuntime) == 0x00,
-    "CEconStorageRuntimeView::economyRuntime offset must be 0x00"
-  );
-  static_assert(offsetof(CEconStorageRuntimeView, amounts) == 0x04, "CEconStorageRuntimeView::amounts offset must be 0x04");
-
-  void ApplyEconStorageDelta(CEconStorageRuntimeView& storage, const std::int32_t direction)
-  {
-    auto* const econStorage = reinterpret_cast<moho::CEconStorage*>(&storage);
-    (void)econStorage->Chng(direction);
-  }
-
   struct UnitBuilderSubsystemView
   {
     std::uint8_t mPad0000To0553[0x554];
@@ -5508,11 +5490,11 @@ int moho::cfunc_CAiBrainGiveStorageL(LuaPlus::LuaState* const state)
   SelectResourceLane(newStorage, resource) = amount;
 
   CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
-  auto* const extraStorage = reinterpret_cast<CEconStorageRuntimeView*>(economyInfo->storageDelta);
-  ApplyEconStorageDelta(*extraStorage, -1);
-  extraStorage->amounts[0] = newStorage.ENERGY;
-  extraStorage->amounts[1] = newStorage.MASS;
-  ApplyEconStorageDelta(*extraStorage, 1);
+  CEconStorage* const extraStorage = economyInfo->storageDelta;
+  (void)extraStorage->Chng(-1);
+  extraStorage->mAmt.energy = newStorage.ENERGY;
+  extraStorage->mAmt.mass = newStorage.MASS;
+  (void)extraStorage->Chng(1);
   return 0;
 }
 

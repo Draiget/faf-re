@@ -136,6 +136,7 @@
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/EAllianceTypeInfo.h"
+#include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/SPhysConstants.h"
 #include "moho/sim/PathPreviewFinder.h"
@@ -3014,42 +3015,11 @@ namespace
     return false;
   }
 
-  struct CEconStorageRuntimeView
-  {
-    std::uint8_t* economyRuntime; // +0x00
-    float amounts[4];             // +0x04
-  };
-  static_assert(
-    offsetof(CEconStorageRuntimeView, economyRuntime) == 0x00,
-    "CEconStorageRuntimeView::economyRuntime offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CEconStorageRuntimeView, amounts) == 0x04,
-    "CEconStorageRuntimeView::amounts offset must be 0x04"
-  );
-
-  void ApplyEconStorageDelta(CEconStorageRuntimeView& storage, const std::int32_t direction)
-  {
-    if (storage.economyRuntime == nullptr) {
-      return;
-    }
-
-    const std::int64_t signedDirection = static_cast<std::int64_t>(direction);
-    constexpr std::size_t kAccumOffset = 0x40;
-    constexpr std::size_t kAccumCount = 4;
-    for (std::size_t i = 0; i < kAccumCount; ++i) {
-      auto* const accumulator =
-        reinterpret_cast<std::int64_t*>(storage.economyRuntime + kAccumOffset + (i * sizeof(std::int64_t)));
-      const std::int64_t delta = static_cast<std::int64_t>(storage.amounts[i]) * signedDirection;
-      *accumulator += delta;
-    }
-  }
-
   [[nodiscard]]
-  CEconStorageRuntimeView* GetArmyEconStorage(CArmyImpl& army) noexcept
+  CEconStorage* GetArmyEconStorage(CArmyImpl& army) noexcept
   {
     CSimArmyEconomyInfo* const economyInfo = army.GetEconomy();
-    return economyInfo != nullptr ? reinterpret_cast<CEconStorageRuntimeView*>(economyInfo->storageDelta) : nullptr;
+    return economyInfo != nullptr ? economyInfo->storageDelta : nullptr;
   }
 
   template <typename TInt>
@@ -12736,15 +12706,15 @@ int Sim::BlingBling(
   }
 
   CSimArmyEconomyInfo* const economyInfo = focusArmy->GetEconomy();
-  CEconStorageRuntimeView* const storage = GetArmyEconStorage(*focusArmy);
+  CEconStorage* const storage = GetArmyEconStorage(*focusArmy);
   if (economyInfo == nullptr || storage == nullptr) {
     return 0;
   }
 
-  ApplyEconStorageDelta(*storage, -1);
-  storage->amounts[0] += 10000.0f;
-  storage->amounts[1] += 10000.0f;
-  ApplyEconStorageDelta(*storage, 1);
+  (void)storage->Chng(-1);
+  storage->mAmt.energy += 10000.0f;
+  storage->mAmt.mass += 10000.0f;
+  (void)storage->Chng(1);
 
   SEconPair grantedStorage{};
   (void)BuildSignedMaxStorageFloatPair(&grantedStorage, economyInfo->economy);
@@ -12782,15 +12752,15 @@ int Sim::ZeroExtraStorage(
     return 0;
   }
 
-  CEconStorageRuntimeView* const storage = GetArmyEconStorage(*focusArmy);
+  CEconStorage* const storage = GetArmyEconStorage(*focusArmy);
   if (storage == nullptr) {
     return 0;
   }
 
-  ApplyEconStorageDelta(*storage, -1);
-  storage->amounts[0] = 0.0f;
-  storage->amounts[1] = 0.0f;
-  ApplyEconStorageDelta(*storage, 1);
+  (void)storage->Chng(-1);
+  storage->mAmt.energy = 0.0f;
+  storage->mAmt.mass = 0.0f;
+  (void)storage->Chng(1);
   return 0;
 }
 
