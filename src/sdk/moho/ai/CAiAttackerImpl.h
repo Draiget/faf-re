@@ -2,7 +2,12 @@
 // This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
+#include "legacy/containers/Vector.h"
+#include "moho/ai/CAiTarget.h"
+#include "moho/ai/EAiAttackerEvent.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/misc/WeakPtr.h"
+#include "moho/task/CTaskThread.h"
 #include "Wm3Vector3.h"
 
 #include <cstddef>
@@ -31,10 +36,9 @@ namespace moho
   struct SWeakRefSlot;
   struct WeaponExtraRefSubobject;
   struct RUnitBlueprintWeapon;
-  class CAiTarget;
+  class CAcquireTargetTask;
   class CollisionBeamEntity;
   class CScrLuaInitForm;
-  class CTaskStage;
   class Entity;
   class Projectile;
   class Unit;
@@ -44,15 +48,11 @@ namespace moho
    * VFTABLE: 0x00E1E9CC
    * COL:  0x00E75AF8
    *
-   * Layout: 0xA4 = 164 bytes total. See `CAiAttackerImplRuntimeView`
-   * in `CAiAttackerImpl.cpp` for the typed field offsets
-   * (mUnit@+0x40, mStage@+0x44, mWeapons@+0x58, mThread@+0x68,
-   * mTasks@+0x70, mDesiredTarget@+0x80, mReportingState@+0xA0).
-   * Fields are accessed through the runtime-view reinterpret pattern
-   * until the class members are typed in-place; until then the
-   * opaque `mLayoutPadding` keeps `sizeof(CAiAttackerImpl) == 0xA4`
-   * so heap allocations and placement-new operate on the correct
-   * binary-faithful storage footprint.
+   * Layout: 0xA4 = 164 bytes total. Everything from +0x40 on is a real
+   * typed member below, each pinned by an `offsetof` assertion; only
+   * +0x04..+0x40 stays opaque, because it covers the `IAiAttacker`
+   * intrusive-listener list head and the `CScriptObject` subobject, two
+   * bases this class does not model as bases.
    */
   class CAiAttackerImpl
   {
@@ -406,20 +406,37 @@ namespace moho
      */
     [[nodiscard]] static std::int32_t ReadExtraDataValue(const WeaponExtraRefSubobject* ref);
 
-  private:
+  public:
     /**
-     * Opaque storage to size the class to the binary-faithful 0xA4
-     * (164-byte) footprint. The first 4 bytes overlap the vftable
-     * pointer the implicit C++ vptr-init writes; the remaining
-     * 0xA0 bytes cover the IAiAttacker subobject's intrusive list
-     * (+0x04..+0x0C), the CScriptObject subobject (+0x0C..+0x40),
-     * mUnit (+0x40), mStage (+0x44..+0x58), mWeapons (+0x58),
-     * mThread (+0x68), mTasks (+0x70), mDesiredTarget (+0x80), and
-     * mReportingState (+0xA0). Field accesses go through the
-     * recovered `CAiAttackerImplRuntimeView` reinterpret pattern.
+     * +0x04..+0x40. The vftable pointer the implicit vptr-init writes sits at
+     * +0x00, ahead of this; what follows it is the IAiAttacker subobject's
+     * intrusive-listener list head (+0x04..+0x0C) and the CScriptObject
+     * subobject (+0x0C..+0x40). Neither is modelled as a base here - see the
+     * constructor for why the CScriptObject slot is left inert - so the bytes
+     * stay opaque and the constructor self-links the listener head by hand.
      */
-    std::uint8_t mLayoutPadding[0xA4 - sizeof(void*)] = {};
+    std::uint8_t mBaseSubobjects[0x40 - sizeof(void*)] = {};
+
+    Unit* mUnit = nullptr;                             // +0x40
+    CTaskStage mStage;                                 // +0x44
+    msvc8::vector<UnitWeapon*> mWeapons;               // +0x58
+    WeakPtr<CTaskThread> mThread;                      // +0x68
+    msvc8::vector<CAcquireTargetTask*> mTasks;         // +0x70
+    CAiTarget mDesiredTarget;                          // +0x80
+    EAiAttackerEvent mReportingState{};                // +0xA0
   };
+
+  static_assert(offsetof(CAiAttackerImpl, mUnit) == 0x40, "CAiAttackerImpl::mUnit offset must be 0x40");
+  static_assert(offsetof(CAiAttackerImpl, mStage) == 0x44, "CAiAttackerImpl::mStage offset must be 0x44");
+  static_assert(offsetof(CAiAttackerImpl, mWeapons) == 0x58, "CAiAttackerImpl::mWeapons offset must be 0x58");
+  static_assert(offsetof(CAiAttackerImpl, mThread) == 0x68, "CAiAttackerImpl::mThread offset must be 0x68");
+  static_assert(offsetof(CAiAttackerImpl, mTasks) == 0x70, "CAiAttackerImpl::mTasks offset must be 0x70");
+  static_assert(
+    offsetof(CAiAttackerImpl, mDesiredTarget) == 0x80, "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CAiAttackerImpl, mReportingState) == 0xA0, "CAiAttackerImpl::mReportingState offset must be 0xA0"
+  );
   static_assert(sizeof(CAiAttackerImpl) == 0xA4, "CAiAttackerImpl size must be 0xA4");
 
   /**
