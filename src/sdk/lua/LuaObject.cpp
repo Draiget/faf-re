@@ -2833,43 +2833,55 @@ extern "C"
 	 * Pushes one pattern-capture result to Lua stack (error for unfinished
 	 * capture, numeric position for position captures, or captured substring).
 	 */
-	struct CaptureRuntimeView
-	{
-		const char* init;
-		int len;
-	};
-	struct MatchStateRuntimeView
-	{
-		const char* srcInit;
-		const char* srcEnd;
-		lua_State* state;
-		int level;
-		CaptureRuntimeView captures[32];
-	};
-	static_assert(offsetof(CaptureRuntimeView, init) == 0x0, "CaptureRuntimeView::init offset must be 0x0");
-	static_assert(offsetof(CaptureRuntimeView, len) == 0x4, "CaptureRuntimeView::len offset must be 0x4");
-	static_assert(sizeof(CaptureRuntimeView) == 0x8, "CaptureRuntimeView size must be 0x8");
-	static_assert(offsetof(MatchStateRuntimeView, srcInit) == 0x0, "MatchStateRuntimeView::srcInit offset must be 0x0");
-	static_assert(offsetof(MatchStateRuntimeView, srcEnd) == 0x4, "MatchStateRuntimeView::srcEnd offset must be 0x4");
-	static_assert(offsetof(MatchStateRuntimeView, state) == 0x8, "MatchStateRuntimeView::state offset must be 0x8");
-	static_assert(offsetof(MatchStateRuntimeView, level) == 0xC, "MatchStateRuntimeView::level offset must be 0xC");
-	static_assert(
-		offsetof(MatchStateRuntimeView, captures) == 0x10,
-		"MatchStateRuntimeView::captures offset must be 0x10"
-	);
-	static_assert(sizeof(MatchStateRuntimeView) == 0x110, "MatchStateRuntimeView size must be 0x110");
+	/// Captures one pattern may hold open at once (upstream `MAXCAPTURES`).
+	/// `start_capture` raises "too many captures" on the 33rd.
+	constexpr int MAXCAPTURES = 32;
 
-	[[nodiscard]] const char* luaI_classend(const char* p, MatchStateRuntimeView* ms);
+	/// A capture that has been opened by `(` but not yet closed by `)`.
+	constexpr int CAP_UNFINISHED = -1;
+
+	/// A position capture, `()`, which yields an index rather than a slice.
+	constexpr int CAP_POSITION = -2;
+
+	/// The pattern matcher's working state, threaded through every `match*`
+	/// helper below - upstream's `MatchState` from lstrlib.c.
+	struct MatchState
+	{
+		/// Where one capture began, and how long it is - or one of the two
+		/// sentinels above, which is why `len` is signed.
+		struct Capture
+		{
+			const char* init; // +0x00
+			int len;          // +0x04
+		};
+
+		const char* srcInit;            // +0x00 start of the subject string
+		const char* srcEnd;             // +0x04 its terminating NUL
+		lua_State* state;               // +0x08
+		int level;                      // +0x0C captures open or finished
+		Capture captures[MAXCAPTURES];  // +0x10
+	};
+	static_assert(offsetof(MatchState::Capture, init) == 0x0, "MatchState::Capture::init offset must be 0x0");
+	static_assert(offsetof(MatchState::Capture, len) == 0x4, "MatchState::Capture::len offset must be 0x4");
+	static_assert(sizeof(MatchState::Capture) == 0x8, "MatchState::Capture size must be 0x8");
+	static_assert(offsetof(MatchState, srcInit) == 0x0, "MatchState::srcInit offset must be 0x0");
+	static_assert(offsetof(MatchState, srcEnd) == 0x4, "MatchState::srcEnd offset must be 0x4");
+	static_assert(offsetof(MatchState, state) == 0x8, "MatchState::state offset must be 0x8");
+	static_assert(offsetof(MatchState, level) == 0xC, "MatchState::level offset must be 0xC");
+	static_assert(offsetof(MatchState, captures) == 0x10, "MatchState::captures offset must be 0x10");
+	static_assert(sizeof(MatchState) == 0x110, "MatchState size must be 0x110");
+
+	[[nodiscard]] const char* luaI_classend(const char* p, MatchState* ms);
 	[[nodiscard]] int match_class(int c1, int cl1);
 	[[nodiscard]] int matchbracketclass(const char* p, int c, const char* ec);
 	[[nodiscard]] int luaI_singlematch(int c, const char* p, const char* ep);
-	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchStateRuntimeView* ms);
-	[[nodiscard]] const char* match_capture(int l, MatchStateRuntimeView* ms, const char* s);
-	[[nodiscard]] const char* max_expand(MatchStateRuntimeView* ms, const char* s, const char* p, const char* ep);
-	[[nodiscard]] const char* min_expand(const char* s, MatchStateRuntimeView* ms, const char* p, const char* ep);
-	[[nodiscard]] const char* start_capture(const char* s, MatchStateRuntimeView* ms, const char* p, int what);
-	[[nodiscard]] const char* end_capture(const char* s, MatchStateRuntimeView* ms, const char* p);
-	[[nodiscard]] const char* match(MatchStateRuntimeView* ms, const char* s, const char* p);
+	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchState* ms);
+	[[nodiscard]] const char* match_capture(int l, MatchState* ms, const char* s);
+	[[nodiscard]] const char* max_expand(MatchState* ms, const char* s, const char* p, const char* ep);
+	[[nodiscard]] const char* min_expand(const char* s, MatchState* ms, const char* p, const char* ep);
+	[[nodiscard]] const char* start_capture(const char* s, MatchState* ms, const char* p, int what);
+	[[nodiscard]] const char* end_capture(const char* s, MatchState* ms, const char* p);
+	[[nodiscard]] const char* match(MatchState* ms, const char* s, const char* p);
 
 	/**
 	 * Address: 0x00925920 (FUN_00925920, lmemfind)
@@ -2928,16 +2940,16 @@ extern "C"
 		}
 	}
 
-	void push_onecapture(const int captureIndex, MatchStateRuntimeView* const matchState)
+	void push_onecapture(const int captureIndex, MatchState* const matchState)
 	{
-		CaptureRuntimeView& capture = matchState->captures[captureIndex];
+		MatchState::Capture& capture = matchState->captures[captureIndex];
 		const int captureLength = capture.len;
-		if (captureLength == -1) {
+		if (captureLength == CAP_UNFINISHED) {
 			luaL_error(matchState->state, "unfinished capture");
 			return;
 		}
 
-		if (captureLength == -2) {
+		if (captureLength == CAP_POSITION) {
 			const int capturePosition = static_cast<int>(capture.init - matchState->srcInit + 1);
 			lua_pushnumber(matchState->state, static_cast<float>(capturePosition));
 			return;
@@ -2953,7 +2965,7 @@ extern "C"
 	 * Pushes all current pattern captures to Lua stack (or the full match slice
 	 * when there are no captures) and returns pushed value count.
 	 */
-	[[nodiscard]] int push_captures(const char* const sourceStart, const char* const sourceEnd, MatchStateRuntimeView* const ms)
+	[[nodiscard]] int push_captures(const char* const sourceStart, const char* const sourceEnd, MatchState* const ms)
 	{
 		luaL_checkstack(ms->state, ms->level, "too many captures");
 		if (ms->level == 0 && sourceStart != nullptr) {
@@ -2975,7 +2987,7 @@ extern "C"
 	 * Advances a pattern pointer to the end of the current class/range token,
 	 * raising Lua pattern syntax errors for truncated `%` or `[...]` forms.
 	 */
-	[[nodiscard]] const char* luaI_classend(const char* p, MatchStateRuntimeView* const ms)
+	[[nodiscard]] const char* luaI_classend(const char* p, MatchState* const ms)
 	{
 		const char token = *p++;
 		if (token == '%') {
@@ -3139,7 +3151,7 @@ extern "C"
 	 * Matches one balanced-pair pattern lane and advances to the matching
 	 * closing delimiter when nesting depth returns to zero.
 	 */
-	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchStateRuntimeView* const ms)
+	[[nodiscard]] const char* matchbalance(const char* p, const char* s, MatchState* const ms)
 	{
 		if (*p == '\0' || p[1] == '\0') {
 			luaL_error(ms->state, "unbalanced pattern");
@@ -3177,7 +3189,7 @@ extern "C"
 	 * pattern atom, then backtracks until the tail pattern succeeds.
 	 */
 	[[nodiscard]] const char* max_expand(
-		MatchStateRuntimeView* const ms,
+		MatchState* const ms,
 		const char* s,
 		const char* p,
 		const char* ep
@@ -3236,7 +3248,7 @@ extern "C"
 	 */
 	[[nodiscard]] const char* min_expand(
 		const char* s,
-		MatchStateRuntimeView* const ms,
+		MatchState* const ms,
 		const char* p,
 		const char* ep
 	)
@@ -3276,10 +3288,10 @@ extern "C"
 	 * Compares a captured substring lane against the current source lane and
 	 * advances when they match byte-for-byte.
 	 */
-	[[nodiscard]] const char* match_capture(const int l, MatchStateRuntimeView* const ms, const char* const s)
+	[[nodiscard]] const char* match_capture(const int l, MatchState* const ms, const char* const s)
 	{
 		const int captureIndex = l - '1';
-		if (captureIndex < 0 || captureIndex >= ms->level || ms->captures[captureIndex].len == -1) {
+		if (captureIndex < 0 || captureIndex >= ms->level || ms->captures[captureIndex].len == CAP_UNFINISHED) {
 			luaL_error(ms->state, "invalid capture index");
 			return nullptr;
 		}
@@ -3305,13 +3317,13 @@ extern "C"
 	 */
 	[[nodiscard]] const char* start_capture(
 		const char* s,
-		MatchStateRuntimeView* const ms,
+		MatchState* const ms,
 		const char* p,
 		const int what
 	)
 	{
 		const int level = ms->level;
-		if (level >= 32) {
+		if (level >= MAXCAPTURES) {
 			luaL_error(ms->state, "too many captures");
 			return nullptr;
 		}
@@ -3333,7 +3345,7 @@ extern "C"
 	 * Completes the most recent open capture lane, then re-enters matching and
 	 * rolls the capture back open if the tail fails.
 	 */
-	[[nodiscard]] const char* end_capture(const char* s, MatchStateRuntimeView* const ms, const char* p)
+	[[nodiscard]] const char* end_capture(const char* s, MatchState* const ms, const char* p)
 	{
 		int level = ms->level - 1;
 		if (level < 0) {
@@ -3341,7 +3353,7 @@ extern "C"
 			return nullptr;
 		}
 
-		while (ms->captures[level].len != -1) {
+		while (ms->captures[level].len != CAP_UNFINISHED) {
 			--level;
 			if (level < 0) {
 				luaL_error(ms->state, "invalid pattern capture");
@@ -3352,7 +3364,7 @@ extern "C"
 		ms->captures[level].len = static_cast<int>(s - ms->captures[level].init);
 		const char* const result = match(ms, s, p);
 		if (result == nullptr) {
-			ms->captures[level].len = -1;
+			ms->captures[level].len = CAP_UNFINISHED;
 		}
 		return result;
 	}
@@ -3364,7 +3376,7 @@ extern "C"
 	 * Evaluates one Lua pattern atom against the current source lane, handling
 	 * anchors, captures, frontier checks, balanced pairs, and quantifiers.
 	 */
-	[[nodiscard]] const char* match(MatchStateRuntimeView* const ms, const char* s, const char* p)
+	[[nodiscard]] const char* match(MatchState* const ms, const char* s, const char* p)
 	{
 		while (true) {
 			switch (*p) {
@@ -9772,7 +9784,7 @@ namespace
 		}
 
 		const char* searchCursor = sourceText + init;
-		MatchStateRuntimeView matchState{};
+		MatchState matchState{};
 		matchState.state = state;
 		matchState.srcInit = sourceText;
 		matchState.srcEnd = sourceText + sourceLength;
@@ -9807,7 +9819,7 @@ namespace
 		const size_t sourceLength = lua_strlen(state, lua_upvalueindex(1));
 		const char* const pattern = lua_tostring(state, lua_upvalueindex(2));
 
-		MatchStateRuntimeView matchState{};
+		MatchState matchState{};
 		matchState.state = state;
 		matchState.srcInit = sourceText;
 		matchState.srcEnd = sourceText + sourceLength;
@@ -9867,7 +9879,7 @@ namespace
 	 * string capture escapes (`%1`..`%9`) or calls replacement function/value.
 	 */
 	void add_s(
-		MatchStateRuntimeView* const matchState,
+		MatchState* const matchState,
 		luaL_Buffer* const buffer,
 		const char* const sourceStart,
 		const char* const sourceEnd
@@ -9884,7 +9896,7 @@ namespace
 					if (std::isdigit(replacementChar) != 0) {
 						const int captureIndex = static_cast<int>(replacement[replacementIndex] - '1');
 						if (captureIndex < 0 || captureIndex >= matchState->level
-							|| matchState->captures[captureIndex].len == -1) {
+							|| matchState->captures[captureIndex].len == CAP_UNFINISHED) {
 							luaL_error(matchState->state, "invalid capture index");
 						}
 
@@ -9958,7 +9970,7 @@ namespace
 		luaL_Buffer buffer{};
 		luaL_buffinit(state, &buffer);
 
-		MatchStateRuntimeView matchState{};
+		MatchState matchState{};
 		matchState.state = state;
 		matchState.srcInit = sourceCursor;
 		matchState.srcEnd = sourceCursor + sourceLength;
