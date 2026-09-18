@@ -13,6 +13,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/thread/tss.hpp>
 
+#include "moho/terrain/TerrainFactory.h"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
 #include "gpg/gal/backends/d3d10/EffectD3D10.hpp"
@@ -1565,37 +1566,6 @@ namespace boost
       delete self;
     }
 
-    struct VirtualDeleteTargetRuntimeView
-    {
-      void** vtable;
-    };
-
-    using VirtualDeleteOneCall = std::intptr_t(__thiscall*)(void* self, std::int32_t deleteFlag);
-
-    template <class TPointee>
-    void DisposeSpCountedImplPointeeViaVirtualDeleteSlot(
-      boost::SpCountedImplStorage<TPointee>* const countedImpl,
-      const std::size_t vtableSlot
-    ) noexcept
-    {
-      if (countedImpl == nullptr || countedImpl->px == nullptr) {
-        return;
-      }
-
-      auto* const runtime = reinterpret_cast<VirtualDeleteTargetRuntimeView*>(countedImpl->px);
-      const auto destroy = reinterpret_cast<VirtualDeleteOneCall>(runtime->vtable[vtableSlot]);
-      (void)destroy(static_cast<void*>(countedImpl->px), 1);
-      countedImpl->px = nullptr;
-    }
-
-    template <class TPointee>
-    void DisposeSpCountedImplPointeeViaVirtualDelete(
-      boost::SpCountedImplStorage<TPointee>* const countedImpl
-    ) noexcept
-    {
-      DisposeSpCountedImplPointeeViaVirtualDeleteSlot(countedImpl, 0u);
-    }
-
     template <class TPointee>
     [[nodiscard]] SpCountedImplStorage<TPointee>* SpCountedImplDeletingDtorLane(
       SpCountedImplStorage<TPointee>* const countedImpl,
@@ -1775,13 +1745,27 @@ namespace boost
    *
    * What it does:
    * Releases one owned `IRenTerrain` pointee through its scalar-deleting
-   * virtual destructor lane when present.
+   * destructor when present.
+   *
+   * The body is `mov ecx,[this+0x0C]; test ecx,ecx; je end; mov eax,[ecx];
+   * mov edx,[eax]; push 1; call edx` -- the pointee's scalar deleting
+   * destructor, vtable slot 0, free flag set. `moho::IRenTerrain` does not
+   * declare that virtual destructor yet (the class carries only static
+   * helpers even though its vftable at 0x00E41994 has fifteen slots), so this
+   * calls `IRenTerrain::DeleteWithFlag` -- the recovered 0x007FF8B0 body for
+   * exactly this operation -- rather than indexing the vtable by hand through
+   * a stand-in struct, which is what it used to do.
    */
   void SpCountedImplPDisposeIRenTerrain(
     SpCountedImplStorage<moho::IRenTerrain>* const countedImpl
   ) noexcept
   {
-    DisposeSpCountedImplPointeeViaVirtualDelete(countedImpl);
+    if (countedImpl == nullptr || countedImpl->px == nullptr) {
+      return;
+    }
+
+    (void)moho::IRenTerrain::DeleteWithFlag(countedImpl->px, 1u);
+    countedImpl->px = nullptr;
   }
 
   /**
