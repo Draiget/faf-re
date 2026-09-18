@@ -753,19 +753,25 @@ namespace
         IMAGEHLP_LINE64 line{};
         line.SizeOfStruct = sizeof(line);
         DWORD lineOffset = 0;
+        // `_TRUNCATE`, never `sprintf_s`: a decorated template name runs to
+        // `MaxNameLen` (255) and `line.FileName` is a full source path, so the
+        // two of them overflow `symbolText` routinely. `sprintf_s` treats that
+        // as an invalid parameter and aborts the process -- which is how a
+        // perfectly loggable access violation turned into a CRT assertion box
+        // with the real fault's stack already discarded.
         if (::SymGetLineFromAddr64(::GetCurrentProcess(), raw, &lineOffset, &line) != FALSE) {
-          (void)::sprintf_s(
-            symbolText, sizeof(symbolText), " %s+0x%llX (%s:%lu)",
+          (void)::_snprintf_s(
+            symbolText, sizeof(symbolText), _TRUNCATE, " %s+0x%llX (%s:%lu)",
             symbol->Name, symbolOffset, (line.FileName != nullptr) ? line.FileName : "?", line.LineNumber
           );
         } else {
-          (void)::sprintf_s(symbolText, sizeof(symbolText), " %s+0x%llX", symbol->Name, symbolOffset);
+          (void)::_snprintf_s(symbolText, sizeof(symbolText), _TRUNCATE, " %s+0x%llX", symbol->Name, symbolOffset);
         }
       }
     }
 
-    (void)::sprintf_s(
-      out, outBytes, "%08llX %s+0x%llX%s",
+    (void)::_snprintf_s(
+      out, outBytes, _TRUNCATE, "%08llX %s+0x%llX%s",
       raw, moduleName, (moduleBase != 0) ? (raw - moduleBase) : 0ull, symbolText
     );
   }
