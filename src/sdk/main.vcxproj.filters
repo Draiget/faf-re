@@ -555,6 +555,9 @@
     <ClCompile Include="legacy\containers\String.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="legacy\exceptions\StdExcept.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\core\containers\Array2D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

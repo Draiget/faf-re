@@ -5,12 +5,12 @@
  * Mangled: ??0lua_Error@lua@@Z_0
  *
  * What it does:
- * Constructs a `lua_Error` by forwarding `err` to `std::runtime_error`, then
+ * Constructs a `lua_Error` by forwarding `err` to `msvc8::runtime_error`, then
  * stores `lua_state` in `L` and `errcode` in `code`.  The vtable is set by
  * the usual C++ construction sequence.
  */
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const char* const err)
-  : std::runtime_error(err), L(lua_state), code(errcode)
+  : msvc8::runtime_error(err), L(lua_state), code(errcode)
 {
 }
 
@@ -24,7 +24,7 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode, const c
  * by a _TRACEBACK handler - is already sitting there.
  */
 lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
-  : std::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
+  : msvc8::runtime_error(luaL_checklstring(lua_state, -1, nullptr)), L(lua_state), code(errcode)
 {
 }
 
@@ -37,14 +37,14 @@ lua::lua_Error::lua_Error(lua_State* const lua_state, const int errcode)
  * `code` and `L` fields.
  */
 lua::lua_Error::lua_Error(const lua::lua_Error& error)
-  : std::runtime_error(error), L(error.L), code(error.code)
+  : msvc8::runtime_error(error), L(error.L), code(error.code)
 {
 }
 
 /**
  * What it does:
  * Implements base Lua error destruction by delegating to normal
- * `std::runtime_error` teardown.
+ * `msvc8::runtime_error` teardown.
  */
 lua::lua_Error::~lua_Error() = default;
 
