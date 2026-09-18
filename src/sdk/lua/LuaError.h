@@ -1,7 +1,8 @@
 #pragma once
 
-#include <stdexcept>
+#include <cstddef>
 
+#include "legacy/exceptions/StdExcept.h"
 #include "lua/LuaPrimitives.h"
 
 namespace lua
@@ -14,7 +15,7 @@ namespace lua
    * Wraps the Lua error message and stores the originating `lua_State*` and
    * numeric error code.
    */
-  class lua_Error : public std::runtime_error
+  class lua_Error : public msvc8::runtime_error
   {
   public:
     /**
@@ -25,8 +26,10 @@ namespace lua
      *
      * What it does:
      * Constructs a `lua_Error` from an error message string, stores the
-     * originating `lua_State` and numeric error code.  Inherits message
-     * storage from `std::runtime_error`.
+     * originating `lua_State` and numeric error code. Inherits message
+     * storage from `msvc8::runtime_error`; the `const char*` becomes the
+     * temporary `msvc8::string` the binary builds on the stack before the
+     * base call.
      */
     lua_Error(lua_State* lua_state, int errcode, const char* err);
 
@@ -56,7 +59,7 @@ namespace lua
     /**
      * What it does:
      * Destroys one base Lua error payload by delegating to the inherited
-     * `std::runtime_error` destruction lane.
+     * `msvc8::runtime_error` destruction lane.
      */
     ~lua_Error() override;
 
@@ -64,16 +67,14 @@ namespace lua
     int code;       // numeric lua error code (e.g. LUA_ERRMEM, LUA_ERRRUN)
   };
 
-  // Size in the shipped binary is 0x30. That figure is not reachable from this
-  // reconstruction and the assert is deliberately absent: MSVC8's
-  // std::runtime_error carried an embedded std::string, so the base subobject
-  // was 0x28 there (0x28 + lua_State* + int = 0x30), whereas the modern
-  // std::runtime_error this class derives from is 12 bytes. Matching the
-  // original byte-for-byte would mean re-deriving the whole hierarchy from
-  // msvc8::string, which is a separate piece of work. The member *order* -
-  // base, then L, then code - is what the recovered accessors depend on and is
-  // preserved.
-  // sizeof(lua_Error) is 0x30 in the binary; see the note above.
+  // 0x30 in the shipped binary, and now here: msvc8::runtime_error is the
+  // 0x28 base MSVC8 had (0x0C of std::exception plus an embedded 0x1C
+  // string), so L lands at +0x28 and code at +0x2C. The constructor at
+  // 0x009140D0 confirms both - `mov [esi+0x2Ch], eax` for code and
+  // `mov [esi+28h], edx` for L, either side of the vtable store.
+  static_assert(offsetof(lua_Error, L) == 0x28, "lua_Error::L offset must be 0x28");
+  static_assert(offsetof(lua_Error, code) == 0x2C, "lua_Error::code offset must be 0x2C");
+  static_assert(sizeof(lua_Error) == 0x30, "lua_Error size must be 0x30");
 } // namespace lua
 
 /**
@@ -107,7 +108,7 @@ public:
   ~lua_MemError() override;
 };
 
-// sizeof(lua_MemError) is 0x30 in the binary; see the note above.
+static_assert(sizeof(lua_MemError) == 0x30, "lua_MemError size must be 0x30");
 
 /**
  * VFTABLE: `lua_RuntimeError::`vftable''
@@ -139,7 +140,7 @@ public:
   ~lua_RuntimeError() override;
 };
 
-// sizeof(lua_RuntimeError) is 0x30 in the binary; see the note above.
+static_assert(sizeof(lua_RuntimeError) == 0x30, "lua_RuntimeError size must be 0x30");
 
 /**
  * VFTABLE: `lua_ErrorError::`vftable''
@@ -171,7 +172,7 @@ public:
   ~lua_ErrorError() override;
 };
 
-// sizeof(lua_ErrorError) is 0x30 in the binary; see the note above.
+static_assert(sizeof(lua_ErrorError) == 0x30, "lua_ErrorError size must be 0x30");
 
 /**
  * VFTABLE: `lua_SyntaxError::`vftable''
@@ -204,4 +205,4 @@ public:
   ~lua_SyntaxError() override;
 };
 
-// sizeof(lua_SyntaxError) is 0x30 in the binary; see the note above.
+static_assert(sizeof(lua_SyntaxError) == 0x30, "lua_SyntaxError size must be 0x30");

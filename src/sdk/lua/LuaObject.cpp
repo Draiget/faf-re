@@ -16747,18 +16747,14 @@ extern "C"
 			}
 		}
 
-		try {
-			StkId firstResult = luaD_precall(state, func);
-			if (firstResult == nullptr) {
-				firstResult = luaV_execute(state);
-			}
-
-			luaD_poscall(state, nResults, firstResult);
-		} catch (const std::exception& error) {
+		// Unwind this frame back to the depth it started at, planting the
+		// message where the caller expects it, then let the error continue
+		// outward. Shared by the two handlers below.
+		const auto unwindFrameForError = [&](const char* const message) {
 			StkId const errorSlot =
 				reinterpret_cast<StkId>(reinterpret_cast<char*>(state->stack) + funcOffset);
 			luaF_close(state, errorSlot);
-			(void)PushLuaStringAtStackSlot(state, errorSlot, error.what());
+			(void)PushLuaStringAtStackSlot(state, errorSlot, message);
 
 			state->ci = reinterpret_cast<CallInfo*>(
 				reinterpret_cast<char*>(state->base_ci) + frameOffset
@@ -16767,6 +16763,24 @@ extern "C"
 			state->nCcalls = savedNestedCalls;
 			state->l_G->allowhook = savedAllowHook;
 			(void)luaD_refreshstacklimit(state);
+		};
+
+		try {
+			StkId firstResult = luaD_precall(state, func);
+			if (firstResult == nullptr) {
+				firstResult = luaV_execute(state);
+			}
+
+			luaD_poscall(state, nResults, firstResult);
+		} catch (const msvc8::exception& error) {
+			// Every lua_Error arrives here: msvc8::exception is what MSVC8's
+			// std::exception was, and the original caught exactly that.
+			unwindFrameForError(error.what());
+			throw;
+		} catch (const std::exception& error) {
+			// Still needed while the rest of the tree sits on the modern
+			// hierarchy - CRT bad_alloc, gpg's own exception types.
+			unwindFrameForError(error.what());
 			throw;
 		}
 
