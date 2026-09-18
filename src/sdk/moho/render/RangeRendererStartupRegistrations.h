@@ -54,6 +54,29 @@ namespace moho
    */
   extern bool range_RenderSelectedAtCursor;
 
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * Additive extension, not a recovery. Draws the selection's *reclaim* reach
+   * at the cursor, which is a different radius from the build-range overlay:
+   * `CUnitReclaimTask` (0x006C1C10 lane, TASKSTATE_Waiting) rejects a target
+   * when
+   *
+   *   rawDistance - MaxFootprintExtent(self) - MaxFootprintExtent(target)
+   *     > Economy.MaxBuildDistance
+   *
+   * and `MaxFootprintExtent` is `max(mSizeX, mSizeZ)` - the *whole* footprint,
+   * not its half-extent. So measured from its own centre a unit reclaims out to
+   * `MaxBuildDistance + max(mSizeX, mSizeZ)`, which for a 5x5 factory is 10
+   * against an engineer's 6 even though both blueprints leave
+   * `MaxBuildDistance` at the engine default of 5. That inflation is original
+   * engine behaviour and is reproduced here deliberately rather than corrected.
+   *
+   * Default false, so an engine built without a mod touching it behaves exactly
+   * as the binary does.
+   */
+  extern bool range_RenderReclaimAtCursor;
+
   extern bool ren_Ranges;
 
   /**
