@@ -11280,8 +11280,14 @@ namespace
 	 * IEEE-specified, and which differ between AMD and Intel. This is the widest
 	 * exposure of that hazard in the engine, because sim scripts call
 	 * `math.sin`/`math.cos` far more often than the engine's own aiming math
-	 * does. Full analysis, and the lockstep desync it produces, is written up on
-	 * `CalculateFiringDirection` in `moho/ai/CAimManipulator.cpp`.
+	 * does.
+	 *
+	 * It was measured, and it is NOT a live desync vector: under the engine's
+	 * `_PC_24`, x87 `fsin`/`fcos` match the correctly-rounded result to zero ulp
+	 * over ~1.4M distinct floats, the near-pi region included. Method and
+	 * numbers are on `CalculateFiringDirection` in
+	 * `moho/ai/CAimManipulator.cpp`. Recorded because the hazard looks real and
+	 * gets re-proposed; the 24-bit precision control is what neutralises it.
 	 *
 	 * `std::sin` and friends here do not lower to `fsin`/`fcos`; the modern
 	 * toolchain calls the CRT's SSE2 software routines, which are vendor
