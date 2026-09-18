@@ -3,11 +3,13 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <memory>
 #include <new>
 #include <typeinfo>
 
 #include "moho/task/CCommandTask.h"
-#include "moho/unit/tasks/CUnitCarrierRetrieve.h"
+#include "moho/unit/tasks/CUnitCarrierRetrieve.h"
+
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
@@ -18,30 +20,7 @@ namespace
   alignas(TypeInfo) unsigned char gTypeInfoStorage[sizeof(TypeInfo)];
   bool gTypeInfoConstructed = false;
 
-  struct CUnitCarrierRetrieveRuntimeView final : moho::CCommandTask
-  {
-    bool mRetrievalComplete = false;              // +0x30
-    std::uint8_t mPad31_37[0x07] = {0, 0, 0, 0, 0, 0, 0}; // +0x31
-    moho::SEntitySetTemplateUnit mTrackedUnits{}; // +0x38
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitCarrierRetrieveRuntimeView) == sizeof(moho::CUnitCarrierRetrieve),
-    "CUnitCarrierRetrieveRuntimeView size must match CUnitCarrierRetrieve"
-  );
-  static_assert(
-    offsetof(CUnitCarrierRetrieveRuntimeView, mRetrievalComplete) == offsetof(moho::CUnitCarrierRetrieve, mRetrievalComplete),
-    "CUnitCarrierRetrieveRuntimeView::mRetrievalComplete offset must match CUnitCarrierRetrieve"
-  );
-  static_assert(
-    offsetof(CUnitCarrierRetrieveRuntimeView, mTrackedUnits) == offsetof(moho::CUnitCarrierRetrieve, mTrackedUnits),
-    "CUnitCarrierRetrieveRuntimeView::mTrackedUnits offset must match CUnitCarrierRetrieve"
-  );
 
   [[nodiscard]] TypeInfo& AcquireTypeInfo()
   {
@@ -73,10 +52,10 @@ namespace
     return type;
   }
 
-  [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(CUnitCarrierRetrieveRuntimeView* const object)
+  [[nodiscard]] gpg::RRef MakeCUnitCarrierRetrieveRef(moho::CUnitCarrierRetrieve* const object)
   {
     gpg::RRef ref{};
-    (void)gpg::RRef_CUnitCarrierRetrieve(&ref, reinterpret_cast<moho::CUnitCarrierRetrieve*>(object));
+    (void)gpg::RRef_CUnitCarrierRetrieve(&ref, object);
     return ref;
   }
 } // namespace
@@ -89,7 +68,7 @@ namespace moho
   CUnitCarrierRetrieveTypeInfo::CUnitCarrierRetrieveTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(CUnitCarrierRetrieve), this);
+    gpg::PreRegisterRType(typeid(moho::CUnitCarrierRetrieve), this);
   }
 
   /**
@@ -102,7 +81,7 @@ namespace moho
    */
   const char* CUnitCarrierRetrieveTypeInfo::GetName() const
   {
-    return "CUnitCarrierRetrieve";
+    return "moho::CUnitCarrierRetrieve";
   }
 
   /**
@@ -110,7 +89,7 @@ namespace moho
    */
   void CUnitCarrierRetrieveTypeInfo::Init()
   {
-    size_ = sizeof(CUnitCarrierRetrieve);
+    size_ = sizeof(moho::CUnitCarrierRetrieve);
     (void)gpg::BindRTypeLifecycleCallbacks(
       this,
       &CUnitCarrierRetrieveTypeInfo::NewRef,
@@ -144,7 +123,7 @@ namespace moho
    */
   gpg::RRef CUnitCarrierRetrieveTypeInfo::NewRef()
   {
-    auto* const object = new (std::nothrow) CUnitCarrierRetrieveRuntimeView();
+    auto* const object = new (std::nothrow) moho::CUnitCarrierRetrieve();
     return MakeCUnitCarrierRetrieveRef(object);
   }
 
@@ -157,9 +136,9 @@ namespace moho
    */
   gpg::RRef CUnitCarrierRetrieveTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitCarrierRetrieveRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
     if (object) {
-      new (object) CUnitCarrierRetrieveRuntimeView();
+      new (object) moho::CUnitCarrierRetrieve();
     }
     return MakeCUnitCarrierRetrieveRef(object);
   }
@@ -169,7 +148,7 @@ namespace moho
    */
   void CUnitCarrierRetrieveTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitCarrierRetrieveRuntimeView*>(objectStorage);
+    delete static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
   }
 
   /**
@@ -177,12 +156,12 @@ namespace moho
    */
   void CUnitCarrierRetrieveTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const object = static_cast<CUnitCarrierRetrieveRuntimeView*>(objectStorage);
+    auto* const object = static_cast<moho::CUnitCarrierRetrieve*>(objectStorage);
     if (!object) {
       return;
     }
 
-    object->~CUnitCarrierRetrieveRuntimeView();
+    std::destroy_at(object);
   }
 
   int register_CUnitCarrierRetrieveTypeInfo()

@@ -23,6 +23,18 @@ namespace moho
   class CUnitFireAtTask : public CCommandTask
   {
   public:
+
+    /**
+     * Address: 0x0060C0EA-0x0060C10C, inlined into
+     * `CUnitFireAtTaskTypeInfo::NewRef` (0x0060C0B0) and its `CtrRef` sibling:
+     * dispatch lane and target cleared, target point -1, not mobile, weapon and
+     * nuclear flag cleared. The target position triple at +0x40 is left as it
+     * lies, as in every one of these factories.
+     *
+     * What it does:
+     * Default-constructs one task for the reflection factory.
+     */
+    CUnitFireAtTask();
     static gpg::RType* sType;
 
     /**

@@ -23,6 +23,17 @@ namespace moho
   class CUnitPodAssist : public CCommandTask
   {
   public:
+
+    /**
+     * Address: 0x0061E5EA-0x0061E5F9, inlined into
+     * `CUnitPodAssistTypeInfo::NewRef` (0x0061E5B0) and its `CtrRef` sibling:
+     * the object is 0x3C bytes and only the dispatch lane at +0x30 and the
+     * assist link at +0x34 are written.
+     *
+     * What it does:
+     * Default-constructs one task for the reflection factory.
+     */
+    CUnitPodAssist();
     static gpg::RType* sType;
 
     /**

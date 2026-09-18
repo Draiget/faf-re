@@ -520,6 +520,22 @@ namespace moho
   }
 
   /**
+   * Address: 0x0060BF8A-0x0060BFA9 (inlined into
+   * `CUnitTeleportTaskTypeInfo::NewRef`, 0x0060BF50)
+   *
+   * What it does:
+   * Default-constructs one teleport task for the reflection factory.
+   */
+  CUnitTeleportTask::CUnitTeleportTask()
+  {
+    mTarget.targetType = static_cast<EAiTargetType>(0);
+    mTarget.targetEntity = WeakPtr<Entity>{};
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
+    mTeleportBeaconUnit = WeakPtr<Unit>{};
+  }
+
+  /**
    * Address: 0x0060AB20 (FUN_0060AB20, Moho::CUnitTeleportTask::CUnitTeleportTask)
    *
    * What it does:

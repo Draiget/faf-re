@@ -133,6 +133,27 @@ namespace moho
   gpg::RType* CUnitFireAtTask::sType = nullptr;
 
   /**
+   * Address: 0x0060C0EA-0x0060C10C, inlined into
+   * `CUnitFireAtTaskTypeInfo::NewRef` (0x0060C0B0) and its `CtrRef` sibling:
+   * dispatch lane and target cleared, target point -1, not mobile, weapon and
+   * nuclear flag cleared. The target position triple at +0x40 is left as it
+   * lies, as in every one of these factories.
+   *
+   * What it does:
+   * Default-constructs one task for the reflection factory.
+   */
+  CUnitFireAtTask::CUnitFireAtTask()
+  {
+    mDispatch = nullptr;
+    mTarget.targetType = static_cast<EAiTargetType>(0);
+    mTarget.targetEntity = WeakPtr<Entity>{};
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
+    mWeapon = nullptr;
+    mIsNuclear = 0;
+  }
+
+  /**
    * Address: 0x0060B800 (FUN_0060B800, ??1CUnitFireAtTask@Moho@@QAE@@Z)
    * Address: 0x0060B240 (FUN_0060B240, vtable-slot-2 scalar deleting
    * destructor: tail-calls the body below then conditionally frees the

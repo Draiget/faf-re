@@ -233,6 +233,21 @@ namespace moho
   gpg::RType* CUnitPodAssist::sType = nullptr;
 
   /**
+   * Address: 0x0061E5EA-0x0061E5F9, inlined into
+   * `CUnitPodAssistTypeInfo::NewRef` (0x0061E5B0) and its `CtrRef` sibling:
+   * the object is 0x3C bytes and only the dispatch lane at +0x30 and the
+   * assist link at +0x34 are written.
+   *
+   * What it does:
+   * Default-constructs one task for the reflection factory.
+   */
+  CUnitPodAssist::CUnitPodAssist()
+  {
+    mDispatchTask = nullptr;
+    mAssistTarget = WeakPtr<Unit>{};
+  }
+
+  /**
    * Address: 0x0061D3B0 (FUN_0061D3B0, ??0CUnitPodAssist@Moho@@QAE@@Z)
    */
   CUnitPodAssist::CUnitPodAssist(

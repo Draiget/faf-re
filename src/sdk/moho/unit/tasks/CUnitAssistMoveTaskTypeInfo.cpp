@@ -36,34 +36,7 @@ namespace
     gTypeInfoConstructed = false;
   }
 
-  struct CUnitAssistMoveTaskRuntimeView final : moho::CCommandTask
-  {
-    std::uint32_t mUnknown30 = 0;
-    std::uint32_t mUnknown34 = 0;
-    std::uint32_t mUnknown38 = 0;
-    std::uint32_t mUnknown3C = 0;
-    std::uint32_t mUnknown40 = 0;
-    std::uint32_t mUnknown44 = 0;
-    std::uint32_t mUnknown48 = 0;
-    std::uint32_t mUnknown4C = 0;
-    std::uint32_t mUnknown50 = 0;
-    std::uint32_t mUnknown54 = 0;
-    float mUnknown58 = 0.0f;
-    float mUnknown5C = 0.0f;
-    float mUnknown60 = 0.0f;
-    std::uint8_t mUnknown64 = 0;
-    std::uint8_t mPadding65_67[3] = {0, 0, 0};
 
-    int Execute() override
-    {
-      return -1;
-    }
-  };
-
-  static_assert(
-    sizeof(CUnitAssistMoveTaskRuntimeView) == sizeof(moho::CUnitAssistMoveTask),
-    "CUnitAssistMoveTaskRuntimeView size must match CUnitAssistMoveTask"
-  );
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
@@ -166,7 +139,7 @@ namespace moho
    */
   gpg::RRef CUnitAssistMoveTaskTypeInfo::NewRef()
   {
-    auto* const task = new (std::nothrow) CUnitAssistMoveTaskRuntimeView();
+    auto* const task = new (std::nothrow) CUnitAssistMoveTask();
     return MakeAssistMoveTaskRef(reinterpret_cast<CUnitAssistMoveTask*>(task));
   }
 
@@ -179,9 +152,9 @@ namespace moho
    */
   gpg::RRef CUnitAssistMoveTaskTypeInfo::CtrRef(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitAssistMoveTaskRuntimeView*>(objectStorage);
+    auto* const task = static_cast<CUnitAssistMoveTask*>(objectStorage);
     if (task) {
-      new (task) CUnitAssistMoveTaskRuntimeView();
+      new (task) CUnitAssistMoveTask();
     }
     return MakeAssistMoveTaskRef(reinterpret_cast<CUnitAssistMoveTask*>(task));
   }
@@ -194,7 +167,7 @@ namespace moho
    */
   void CUnitAssistMoveTaskTypeInfo::Delete(void* const objectStorage)
   {
-    delete static_cast<CUnitAssistMoveTaskRuntimeView*>(objectStorage);
+    delete static_cast<CUnitAssistMoveTask*>(objectStorage);
   }
 
   /**
@@ -206,11 +179,11 @@ namespace moho
    */
   void CUnitAssistMoveTaskTypeInfo::Destruct(void* const objectStorage)
   {
-    auto* const task = static_cast<CUnitAssistMoveTaskRuntimeView*>(objectStorage);
+    auto* const task = static_cast<CUnitAssistMoveTask*>(objectStorage);
     if (!task) {
       return;
     }
-    task->~CUnitAssistMoveTaskRuntimeView();
+    task->~CUnitAssistMoveTask();
   }
 
   /**

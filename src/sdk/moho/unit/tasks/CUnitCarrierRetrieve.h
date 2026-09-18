@@ -20,6 +20,18 @@ namespace moho
   class CUnitCarrierRetrieve : public CCommandTask
   {
   public:
+
+    /**
+     * Address: 0x00607A1E-0x00607A27, inlined into
+     * `CUnitCarrierRetrieveTypeInfo::NewRef` (0x006079E0) and its `CtrRef`
+     * sibling: the object is 0x60 bytes, and past the `CCommandTask` base only
+     * the completion flag at +0x30 is written; the tracked-unit set at +0x38
+     * constructs itself.
+     *
+     * What it does:
+     * Default-constructs one task for the reflection factory.
+     */
+    CUnitCarrierRetrieve();
     static gpg::RType* sType;
 
     /**

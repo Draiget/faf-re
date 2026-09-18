@@ -111,6 +111,15 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x0060BF8A-0x0060BFA9, inlined into
+     * `CUnitTeleportTaskTypeInfo::NewRef` (0x0060BF50) and its `CtrRef`
+     * sibling: the default construction the reflection factory needs. Target
+     * type and entity link cleared, point -1, not mobile, beacon link cleared;
+     * the position triple at +0x3C is deliberately left as it lies.
+     */
+    CUnitTeleportTask();
+
+    /**
      * Address: 0x0060AB20 (FUN_0060AB20, Moho::CUnitTeleportTask::CUnitTeleportTask)
      *
      * What it does:
