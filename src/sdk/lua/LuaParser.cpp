@@ -2,6 +2,7 @@
 
 #include "lua/LuaError.h"
 #include "lua/LuaParser.h"
+#include "lua/LuaUndump.h"
 
 #include <Windows.h>   // TEMPORARY PROBE (do not commit): OutputDebugStringA
 
@@ -25,52 +26,12 @@ namespace lua
   int enable_tailcalls = 1;
 } // namespace lua
 
-namespace LuaPlus
-{
-  // Shared binary-bytecode loader (lundump) state views. These mirror the
-  // definitions in LuaObject.cpp, where the chunk-header validator and the
-  // recursive proto reader are recovered alongside the sub-loaders. Both TUs
-  // must name the exact same `LuaPlus::LuaLoadStateRuntimeView` type so
-  // luaU_undump here can build the load state and hand it to those entry
-  // points. Layout matches the original ZIO / LoadState structs
-  // (FUN_009285C0 / FUN_00928ED0 / FUN_009290F0).
-  struct LuaZioRuntimeView
-  {
-    int remainingBytes; // ZIO::n
-    const char* cursor; // ZIO::p
-  };
-
-  struct LuaLoadStateRuntimeView
-  {
-    lua_State* state;          // LoadState::L    (+0x0)
-    LuaZioRuntimeView* stream; // LoadState::Z    (+0x4)
-    Mbuffer* scratchBuffer;    // LoadState::b    (+0x8)
-    int swapBytes;             // LoadState::swap (+0xC)
-    const char* chunkName;     // LoadState::name (+0x10)
-  };
-  static_assert(offsetof(LuaLoadStateRuntimeView, state) == 0x0, "LuaLoadStateRuntimeView::state offset must be 0x0");
-  static_assert(offsetof(LuaLoadStateRuntimeView, stream) == 0x4, "LuaLoadStateRuntimeView::stream offset must be 0x4");
-  static_assert(offsetof(LuaLoadStateRuntimeView, scratchBuffer) == 0x8, "LuaLoadStateRuntimeView::scratchBuffer offset must be 0x8");
-  static_assert(offsetof(LuaLoadStateRuntimeView, swapBytes) == 0xC, "LuaLoadStateRuntimeView::swapBytes offset must be 0xC");
-  static_assert(offsetof(LuaLoadStateRuntimeView, chunkName) == 0x10, "LuaLoadStateRuntimeView::chunkName offset must be 0x10");
-  static_assert(sizeof(LuaLoadStateRuntimeView) == 0x14, "LuaLoadStateRuntimeView size must be 0x14");
-
-  // Recovered binary-chunk loader entry points (defined in LuaObject.cpp).
-  void LuaLoadChunkHeader(LuaLoadStateRuntimeView* loadState);
-  Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
-}
-
 namespace
 {
-  struct LuaZioRuntimeView
-  {
-    std::int32_t remainingBytes;
-    const char* cursor;
-  };
 
   struct SParser
   {
-    void* z;
+    ZIO* z;
     Mbuffer buff;
     std::int32_t bin;
   };
@@ -96,15 +57,6 @@ namespace
   static_assert(offsetof(ConsControl, tostore) == 0x20, "ConsControl::tostore offset must be 0x20");
   static_assert(sizeof(ConsControl) == 0x24, "ConsControl size must be 0x24");
 
-  struct LuaUndumpZioRuntimeView
-  {
-    std::int32_t remainingBytes;
-    const char* cursor;
-    void* reader;
-    void* data;
-    const char* name;
-  };
-
   static_assert(offsetof(SParser, z) == 0x00, "SParser::z offset must be 0x00");
   static_assert(offsetof(SParser, buff) == 0x04, "SParser::buff offset must be 0x04");
   static_assert(offsetof(SParser, bin) == 0x0C, "SParser::bin offset must be 0x0C");
@@ -112,7 +64,6 @@ namespace
   static_assert(offsetof(LHS_assign, prev) == 0x00, "LHS_assign::prev offset must be 0x00");
   static_assert(offsetof(LHS_assign, v) == 0x04, "LHS_assign::v offset must be 0x04");
   static_assert(sizeof(LHS_assign) == 0x18, "LHS_assign size must be 0x18");
-  static_assert(offsetof(LuaUndumpZioRuntimeView, name) == 0x10, "LuaUndumpZioRuntimeView::name offset must be 0x10");
 
   constexpr std::int32_t NO_REG = 0xFF;
 
@@ -492,8 +443,8 @@ namespace
     Proto* luaF_newproto(lua_State* L);
     Table* luaH_new(lua_State* L, int narray, int lnhash);
     LClosure* luaF_newLclosure(lua_State* L, int nelems, LuaPlus::TObject* e);
-    Proto* luaU_undump(lua_State* state, LuaUndumpZioRuntimeView* stream, Mbuffer* buffer);
-    Proto* luaY_parser(lua_State* L, LuaUndumpZioRuntimeView* z, Mbuffer* buff);
+    Proto* luaU_undump(lua_State* state, ZIO* stream, Mbuffer* buffer);
+    Proto* luaY_parser(lua_State* L, ZIO* z, Mbuffer* buff);
     std::int32_t luaX_lex(LexState* ls, SemInfo* seminfo);
     std::int32_t indexupvalue(FuncState* fs, expdesc* value, TString* name);
     TString* str_checkname(LexState* ls);
@@ -505,7 +456,7 @@ namespace
     void constructor(expdesc* outExpression, LexState* ls);
     void body(LexState* ls, expdesc* outExpression, int needself, int line);
     void primaryexp(expdesc* outExpression, LexState* ls);
-    std::int32_t luaZ_fill(LuaZioRuntimeView* stream);
+    std::int32_t luaZ_fill(ZIO* stream);
     void luaO_chunkid(char* out, const char* source, int bufflen);
     int luaO_log2(unsigned int x);
     int luaO_str2d(const char* s, float* result);
@@ -521,7 +472,7 @@ namespace
     void luaY_index(LexState* ls, expdesc* v);
     void luaK_self(FuncState* fs, expdesc* e, expdesc* key);
     void luaK_patchlist(FuncState* fs, std::int32_t list, std::int32_t target);
-    void luaX_setinput(lua_State* L, LexState* ls, LuaUndumpZioRuntimeView* z, TString* source);
+    void luaX_setinput(lua_State* L, LexState* ls, ZIO* z, TString* source);
     void chunk(LexState* ls);
     void f_parser(SParser* parser, lua_State* state);
     int luaI_registerlocalvar(LexState* ls, TString* varname);
@@ -619,7 +570,7 @@ namespace
 
     case TK_STRING:
     case TK_NUMBER:
-      lasttoken = static_cast<Mbuffer*>(ls->buff)->buffer;
+      lasttoken = ls->buff->buffer;
       break;
 
     default:
@@ -665,8 +616,8 @@ namespace
 
   std::int32_t nextchar(LexState* const ls)
   {
-    auto* const z = static_cast<LuaZioRuntimeView*>(ls->z);
-    const std::uint32_t remaining = static_cast<std::uint32_t>(z->remainingBytes--);
+    auto* const z = ls->z;
+    const std::size_t remaining = z->remainingBytes--;
     ls->current = (remaining > 0u)
       ? static_cast<unsigned char>(*z->cursor++)
       : luaZ_fill(z);
@@ -688,7 +639,7 @@ namespace
    */
   void checkbuffer(LexState* const ls, const std::int32_t length)
   {
-    auto* const buff = static_cast<Mbuffer*>(ls->buff);
+    auto* const buff = ls->buff;
     if (static_cast<std::size_t>(length + 5) > buff->buffsize) {
       (void)luaZ_openspace(ls->L, buff, static_cast<std::size_t>(length + 32));
     }
@@ -696,7 +647,7 @@ namespace
 
   [[nodiscard]] char* lexbuffer(LexState* const ls) noexcept
   {
-    return static_cast<Mbuffer*>(ls->buff)->buffer;
+    return ls->buff->buffer;
   }
 
   /**
@@ -1353,7 +1304,7 @@ namespace
    */
   std::size_t ReadIdentifierName(const char firstCharacter, LexState* const lexState)
   {
-    auto* const buffer = static_cast<Mbuffer*>(lexState->buff);
+    auto* const buffer = lexState->buff;
     std::size_t length = 0;
 
     if (buffer->buffsize < 5u) {
@@ -1368,7 +1319,7 @@ namespace
       length = 1;
     }
 
-    auto* const stream = static_cast<LuaZioRuntimeView*>(lexState->z);
+    auto* const stream = lexState->z;
     for (;;) {
       if (length + 5u > buffer->buffsize) {
         (void)luaZ_openspace(lexState->L, buffer, length + 32u);
@@ -1378,9 +1329,9 @@ namespace
       ++length;
 
       std::int32_t nextCharacter = 0;
-      const std::int32_t remainingBeforeRead = stream->remainingBytes;
-      stream->remainingBytes = remainingBeforeRead - 1;
-      if (remainingBeforeRead == 0) {
+      const std::size_t remainingBeforeRead = stream->remainingBytes;
+      stream->remainingBytes = remainingBeforeRead - 1u;
+      if (remainingBeforeRead == 0u) {
         nextCharacter = luaZ_fill(stream);
       } else {
         nextCharacter = static_cast<unsigned char>(*stream->cursor);
@@ -2673,7 +2624,7 @@ namespace
    * parse finished or threw. Lives here rather than with the rest of ldo.c
    * because SParser and f_parser do.
    */
-  extern "C" std::int32_t luaD_protectedparser(lua_State* const L, LuaUndumpZioRuntimeView* const z, const int bin)
+  extern "C" std::int32_t luaD_protectedparser(lua_State* const L, ZIO* const z, const int bin)
   {
     SParser parser;
     parser.z = z;
@@ -3333,8 +3284,8 @@ namespace
     }
 
     Proto* const parsedProto = (parser->bin != 0)
-      ? luaU_undump(state, static_cast<LuaUndumpZioRuntimeView*>(parser->z), &parser->buff)
-      : luaY_parser(state, static_cast<LuaUndumpZioRuntimeView*>(parser->z), &parser->buff);
+      ? luaU_undump(state, parser->z, &parser->buff)
+      : luaY_parser(state, parser->z, &parser->buff);
 
     LClosure* const closure = luaF_newLclosure(state, 0, &state->_gt);
     const int closureTypeTag = static_cast<int>(reinterpret_cast<const CClosure*>(closure)->tt);
@@ -4402,7 +4353,7 @@ namespace
    * line is skipped, so a chunk can be a shell script.
    */
   extern "C" void
-  luaX_setinput(lua_State* const L, LexState* const ls, LuaUndumpZioRuntimeView* const z, TString* const source)
+  luaX_setinput(lua_State* const L, LexState* const ls, ZIO* const z, TString* const source)
   {
     ls->L = L;
     ls->linenumber = 1;
@@ -4427,14 +4378,14 @@ namespace
    * Compiles one chunk of Lua source into a prototype - the entry point the
    * loader calls once it has ruled out a precompiled chunk.
    */
-  extern "C" Proto* luaY_parser(lua_State* const L, LuaUndumpZioRuntimeView* const z, Mbuffer* const buff)
+  extern "C" Proto* luaY_parser(lua_State* const L, ZIO* const z, Mbuffer* const buff)
   {
     LexState lexstate;
     FuncState funcstate;
 
     lexstate.buff = buff;
     lexstate.nestlevel = 0;
-    luaX_setinput(L, &lexstate, z, luaS_newlstr(L, z->name, std::strlen(z->name)));
+    luaX_setinput(L, &lexstate, z, luaS_newlstr(L, z->chunkName, std::strlen(z->chunkName)));
 
     open_func(&lexstate, &funcstate);
     next(&lexstate); // read first token
@@ -4462,9 +4413,9 @@ extern "C"
    * validates the chunk header, and returns the top-level `Proto`. Delegates to
    * the recovered header validator and recursive proto reader in LuaObject.cpp.
    */
-  Proto* luaU_undump(lua_State* const state, LuaUndumpZioRuntimeView* const stream, Mbuffer* const buffer)
+  Proto* luaU_undump(lua_State* const state, ZIO* const stream, Mbuffer* const buffer)
   {
-    const char* sourceName = stream->name;
+    const char* sourceName = stream->chunkName;
     const char firstChar = *sourceName;
     if (firstChar == '@' || firstChar == '=') {
       ++sourceName;
@@ -4472,11 +4423,9 @@ extern "C"
       sourceName = "binary string";
     }
 
-    LuaPlus::LuaLoadStateRuntimeView loadState{};
+    LoadState loadState{};
     loadState.state = state;
-    // The ZIO object is shared; only its leading {n, p} pair is touched by the
-    // loader, which is layout-identical to LuaZioRuntimeView.
-    loadState.stream = reinterpret_cast<LuaPlus::LuaZioRuntimeView*>(stream);
+    loadState.stream = stream;
     loadState.scratchBuffer = buffer;
     loadState.chunkName = sourceName;
 
