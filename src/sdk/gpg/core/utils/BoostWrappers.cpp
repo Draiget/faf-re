@@ -1456,36 +1456,7 @@ namespace boost
 
   namespace
   {
-    struct BadPtrContainerOperationRuntimeView
-    {
-      void* vftable;
-      std::uint32_t stdExceptionWhat;
-      std::uint32_t stdExceptionDoFree;
-      const char* message;
-    };
-
-    static_assert(
-      offsetof(BadPtrContainerOperationRuntimeView, message) == 0x0C,
-      "BadPtrContainerOperationRuntimeView::message offset must be 0x0C"
-    );
   } // namespace
-
-  /**
-   * Address: 0x00491350 (FUN_00491350)
-   *
-   * What it does:
-   * Returns the pointer-container exception message lane used by both
-   * `boost::bad_ptr_container_operation` and `boost::bad_pointer`.
-   */
-  const char* GetBadPtrContainerMessage(const boost::bad_ptr_container_operation* const exceptionObject) noexcept
-  {
-    if (exceptionObject == nullptr) {
-      return nullptr;
-    }
-
-    const auto* const view = reinterpret_cast<const BadPtrContainerOperationRuntimeView*>(exceptionObject);
-    return view->message;
-  }
 
   /**
    * Address: 0x00491360 (FUN_00491360)
