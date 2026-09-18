@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "lua/LuaRuntimeTypes.h"
+#include "lua/LuaUndump.h"
 
 /**
  * Lua 5.0 parser and code-generator state, as this fork ships it.
@@ -147,9 +148,7 @@ static_assert(sizeof(Token) == 0x08, "Token size must be 0x08");
  * the back-pointer to the function currently being compiled.
  *
  * `z` is the `ZIO` the chunk is being read from and `buff` the `Mbuffer` the
- * lexer accumulates a token's text in. Both stay `void*` here because the
- * `luaX_*` bodies in `LuaParser.cpp` pass them straight through to the
- * reader helpers without ever dereferencing them at this type.
+ * lexer accumulates a token's text in.
  */
 struct LexState
 {
@@ -160,8 +159,8 @@ struct LexState
 	Token lookahead;         // +0x14 lookahead token
 	FuncState* fs;           // +0x1C function currently being compiled
 	lua_State* L;            // +0x20
-	void* z;                 // +0x24 input stream (ZIO)
-	void* buff;              // +0x28 token-text accumulator (Mbuffer)
+	ZIO* z;                  // +0x24 input stream
+	Mbuffer* buff;           // +0x28 token-text accumulator
 	TString* source;         // +0x2C chunk name, for error messages
 	std::int32_t nestlevel;  // +0x30 nested non-terminal depth
 };

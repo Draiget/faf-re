@@ -25,6 +25,7 @@
 #include "LuaError.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
+#include "LuaUndump.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ReadArchive.h"
@@ -4659,60 +4660,8 @@ extern "C"
 
 } // extern "C"
 
-namespace LuaPlus
-{
-	// Runtime views for the Lua binary-bytecode loader (lundump). Kept in the
-	// engine `LuaPlus` namespace (external linkage) so both the sub-loader
-	// definitions here in LuaObject.cpp and `luaU_undump` in LuaParser.cpp name
-	// the same layout. Field offsets mirror the original `ZIO` / `LoadState`
-	// structs as observed in FUN_009285C0 / FUN_00928ED0 / FUN_009290F0.
-	// The reader hands back a whole block at a time; `remainingBytes`/`cursor`
-	// walk it, and the tail three fields are what luaZ_init (FUN_0092BA10)
-	// writes: "mov [eax+8], ecx" (reader), "mov [eax+0Ch], edx" (data),
-	// "mov [eax+10h], ecx" (name), then zeroes +0x00 and +0x04.
-	// End-of-stream sentinel the reader lane returns (stock Lua's EOZ).
-	constexpr int kLuaEndOfStream = -1;
-
-	struct LuaZioRuntimeView
-	{
-		int remainingBytes;    // ZIO::n     +0x00
-		const char* cursor;    // ZIO::p     +0x04
-		lua_Chunkreader reader; // ZIO::reader +0x08
-		void* readerData;      // ZIO::data  +0x0C
-		const char* chunkName; // ZIO::name  +0x10
-	};
-	static_assert(offsetof(LuaZioRuntimeView, remainingBytes) == 0x0, "LuaZioRuntimeView::remainingBytes offset must be 0x0");
-	static_assert(offsetof(LuaZioRuntimeView, cursor) == 0x4, "LuaZioRuntimeView::cursor offset must be 0x4");
-	static_assert(offsetof(LuaZioRuntimeView, reader) == 0x8, "LuaZioRuntimeView::reader offset must be 0x8");
-	static_assert(offsetof(LuaZioRuntimeView, readerData) == 0xC, "LuaZioRuntimeView::readerData offset must be 0xC");
-	static_assert(offsetof(LuaZioRuntimeView, chunkName) == 0x10, "LuaZioRuntimeView::chunkName offset must be 0x10");
-
-	struct LuaLoadStateRuntimeView
-	{
-		lua_State* state;        // LoadState::L   (+0x0)
-		LuaZioRuntimeView* stream; // LoadState::Z (+0x4)
-		Mbuffer* scratchBuffer;  // LoadState::b   (+0x8)
-		int swapBytes;           // LoadState::swap(+0xC)
-		const char* chunkName;   // LoadState::name(+0x10)
-	};
-	static_assert(offsetof(LuaLoadStateRuntimeView, state) == 0x0, "LuaLoadStateRuntimeView::state offset must be 0x0");
-	static_assert(offsetof(LuaLoadStateRuntimeView, stream) == 0x4, "LuaLoadStateRuntimeView::stream offset must be 0x4");
-	static_assert(offsetof(LuaLoadStateRuntimeView, scratchBuffer) == 0x8, "LuaLoadStateRuntimeView::scratchBuffer offset must be 0x8");
-	static_assert(offsetof(LuaLoadStateRuntimeView, swapBytes) == 0xC, "LuaLoadStateRuntimeView::swapBytes offset must be 0xC");
-	static_assert(offsetof(LuaLoadStateRuntimeView, chunkName) == 0x10, "LuaLoadStateRuntimeView::chunkName offset must be 0x10");
-	static_assert(sizeof(LuaLoadStateRuntimeView) == 0x14, "LuaLoadStateRuntimeView size must be 0x14");
-
-	// Binary-chunk loader entry points, recovered in LuaObject.cpp alongside the
-	// file-private sub-loaders. External linkage so LuaParser.cpp's luaU_undump
-	// can invoke them by name.
-	void LuaLoadChunkHeader(LuaLoadStateRuntimeView* loadState);
-	Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* loadState, TString* fallbackSource);
-}
-
 namespace
 {
-	using LuaPlus::LuaZioRuntimeView;
-
 	extern "C"
 	{
 		const TObject* luaH_get(Table* t, const TObject* key);
@@ -4733,8 +4682,8 @@ namespace
 		int luaV_tostring(lua_State* L, TObject* obj);
 		const char* getobjname(int stackPos, CallInfo* callInfo, const char** nameOut);
 		void luaG_runerror(lua_State* L, const char* format, ...);
-		int luaZ_fill(LuaZioRuntimeView* stream);
-		size_t luaZ_read(LuaZioRuntimeView* stream, void* buffer, size_t size);
+		int luaZ_fill(ZIO* stream);
+		size_t luaZ_read(ZIO* stream, void* buffer, size_t size);
 		char* luaZ_openspace(lua_State* L, Mbuffer* buff, size_t n);
 		std::FILE* __cdecl __iob_func(void);
 		void luaO_chunkid(char* out, const char* source, int bufflen);
@@ -5896,15 +5845,6 @@ namespace
 		 */
 		void Init() override;
 	};
-
-	// The binary-bytecode loader state views (`LuaZioRuntimeView` /
-	// `LuaLoadStateRuntimeView`) live in `namespace LuaPlus` so the lundump
-	// entry points (`LuaLoadChunkHeader` / `LuaLoadProtoObject`) can share the
-	// exact same type with `luaU_undump` in LuaParser.cpp without duplicating
-	// the layout. Re-expose them unqualified for the file-private sub-loaders
-	// below that already reference them by simple name.
-	using LuaPlus::LuaZioRuntimeView;
-	using LuaPlus::LuaLoadStateRuntimeView;
 
 	constexpr int kLuaRefUserdataTypeTag = LUA_TUSERDATA;
 	constexpr int kLuaIoUpvalueEnvIndex = lua_upvalueindex(1);
@@ -7562,11 +7502,11 @@ namespace
 		return 1;
 	}
 
-	int ReadZioByte(LuaZioRuntimeView* const stream)
+	int ReadZioByte(ZIO* const stream)
 	{
-		const int available = stream->remainingBytes;
-		stream->remainingBytes = available - 1;
-		if (available <= 0) {
+		const std::size_t available = stream->remainingBytes;
+		stream->remainingBytes = available - 1u;
+		if (available == 0u) {
 			return luaZ_fill(stream);
 		}
 
@@ -7585,7 +7525,7 @@ namespace
 	void LuaLoadBlock(
 		const size_t size,
 		void* const destination,
-		LuaLoadStateRuntimeView* const loadState
+		LoadState* const loadState
 	)
 	{
 		if (loadState->swapBytes != 0) {
@@ -7615,7 +7555,7 @@ namespace
 	 */
 	void LuaLoadElementArray(
 		char* const destination,
-		LuaLoadStateRuntimeView* const loadState,
+		LoadState* const loadState,
 		int elementCount,
 		const int elementSize
 	)
@@ -7659,7 +7599,7 @@ namespace
 	 * Reads one size-prefixed Lua chunk string payload and interns it (without
 	 * trailing NUL) into the owner Lua state string table.
 	 */
-	[[nodiscard]] TString* LuaLoadTString(LuaLoadStateRuntimeView* const loadState)
+	[[nodiscard]] TString* LuaLoadTString(LoadState* const loadState)
 	{
 		std::uint32_t byteCount = 0u;
 		LuaLoadBlock(4u, &byteCount, loadState);
@@ -7682,7 +7622,7 @@ namespace
 	 * Reads proto bytecode instruction count, allocates `Proto::code`, and
 	 * loads one contiguous instruction vector from chunk stream.
 	 */
-	void LuaLoadProtoCode(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoCode(LoadState* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -7702,7 +7642,7 @@ namespace
 	 * Reads proto line-info count, allocates `Proto::lineinfo`, and loads one
 	 * contiguous source-line map vector from chunk stream.
 	 */
-	void LuaLoadProtoLineInfo(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoLineInfo(LoadState* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -7733,7 +7673,7 @@ namespace
 	 * instruction against this pre-existing recovered body, which
 	 * already matched exactly.
 	 */
-	[[nodiscard]] int LuaReadChunkByteOrThrow(LuaLoadStateRuntimeView* const loadState)
+	[[nodiscard]] int LuaReadChunkByteOrThrow(LoadState* const loadState)
 	{
 		const int byteValue = ReadZioByte(loadState->stream);
 		if (byteValue == -1) {
@@ -7755,7 +7695,7 @@ namespace
 	 * array with `{name,startpc,endpc}` entries.
 	 */
 	void LuaLoadProtoLocalVariableDebugInfo(
-		LuaLoadStateRuntimeView* const loadState,
+		LoadState* const loadState,
 		Proto* const proto
 	)
 	{
@@ -7801,7 +7741,7 @@ namespace
 	 * Reads upvalue-name count, validates it against `Proto::nups`, and fills
 	 * one `Proto::upvalues` string-pointer lane array.
 	 */
-	void LuaLoadProtoUpvalueNames(LuaLoadStateRuntimeView* const loadState, Proto* const proto)
+	void LuaLoadProtoUpvalueNames(LoadState* const loadState, Proto* const proto)
 	{
 		int count = 0;
 		LuaLoadBlock(4u, &count, loadState);
@@ -7837,7 +7777,7 @@ namespace
 	 * proto pointers (`Proto::p`) from the chunk stream.
 	 */
 	void LuaLoadProtoConstantsAndNestedProtos(
-		LuaLoadStateRuntimeView* const loadState,
+		LoadState* const loadState,
 		Proto* const proto
 	)
 	{
@@ -12982,7 +12922,7 @@ namespace LuaPlus
 	 * load stream; raises "unexpected end of file" on EOF and "bad signature" on
 	 * the first mismatching byte.
 	 */
-	void LuaLoadSignature(LuaLoadStateRuntimeView* const loadState)
+	void LuaLoadSignature(LoadState* const loadState)
 	{
 		const char* expected = "\x1BLua";
 		for (;;) {
@@ -13010,7 +12950,7 @@ namespace LuaPlus
 	 * expected `sizeof(<tname>)`; raises "virtual machine mismatch" on a size
 	 * disagreement (and "unexpected end of file" on EOF).
 	 */
-	void LuaTestTypeSize(const int expectedSize, LuaLoadStateRuntimeView* const loadState, const char* const typeName)
+	void LuaTestTypeSize(const int expectedSize, LoadState* const loadState, const char* const typeName)
 	{
 		const int readSize = LuaReadChunkByteOrThrow(loadState);
 		if (static_cast<unsigned char>(readSize) != expectedSize) {
@@ -13036,7 +12976,7 @@ namespace LuaPlus
 	 * eight type-size bytes (int/size_t/Instruction/OP/A/B/C/number), and the
 	 * `lua_Number` self-test value (must truncate to 31415926).
 	 */
-	void LuaLoadChunkHeader(LuaLoadStateRuntimeView* const loadState)
+	void LuaLoadChunkHeader(LoadState* const loadState)
 	{
 		LuaLoadSignature(loadState);
 
@@ -13098,7 +13038,7 @@ namespace LuaPlus
 	 * constant + nested-proto, and bytecode lanes via the sub-loaders. Validates
 	 * decoded bytecode with `luaG_checkcode`.
 	 */
-	Proto* LuaLoadProtoObject(LuaLoadStateRuntimeView* const loadState, TString* const fallbackSource)
+	Proto* LuaLoadProtoObject(LoadState* const loadState, TString* const fallbackSource)
 	{
 		Proto* const proto = luaF_newproto(loadState->state);
 
@@ -14322,7 +14262,7 @@ extern "C"
 	 * Binds a stream to its reader. The buffer starts empty, so the first read
 	 * pulls a block.
 	 */
-	void luaZ_init(LuaZioRuntimeView* const stream, const lua_Chunkreader reader, void* const data, const char* const name)
+	void luaZ_init(ZIO* const stream, const lua_Chunkreader reader, void* const data, const char* const name)
 	{
 		stream->reader = reader;
 		stream->readerData = data;
@@ -14341,7 +14281,7 @@ extern "C"
 	 * Pulls the next block from the reader and returns its first byte, already
 	 * consumed. An empty or absent block is end of stream.
 	 */
-	int luaZ_fill(LuaZioRuntimeView* const stream)
+	int luaZ_fill(ZIO* const stream)
 	{
 		size_t available = 0;
 		const char* const block = reinterpret_cast<const char*>(
@@ -14352,7 +14292,7 @@ extern "C"
 			return kLuaEndOfStream;
 		}
 
-		stream->remainingBytes = static_cast<int>(available - 1u);
+		stream->remainingBytes = available - 1u;
 		stream->cursor = block + 1;
 		return static_cast<unsigned char>(*block);
 	}
@@ -14368,7 +14308,7 @@ extern "C"
 	 * is pushed back - the binary inlines luaZ_fill here and open-codes that
 	 * same adjustment.
 	 */
-	int luaZ_lookahead(LuaZioRuntimeView* const stream)
+	int luaZ_lookahead(ZIO* const stream)
 	{
 		if (stream->remainingBytes == 0) {
 			if (luaZ_fill(stream) == kLuaEndOfStream) {
@@ -14452,7 +14392,7 @@ extern "C"
 	}
 
 	// Defined in LuaParser.cpp, alongside f_parser and SParser.
-	int luaD_protectedparser(lua_State* L, LuaZioRuntimeView* z, int bin);
+	int luaD_protectedparser(lua_State* L, ZIO* z, int bin);
 
 	/**
 	 * Address: 0x0090D5C0 (FUN_0090D5C0, lua_load)
@@ -14473,7 +14413,7 @@ extern "C"
 			chunkname = "?";
 		}
 
-		LuaZioRuntimeView stream;
+		ZIO stream;
 		luaZ_init(&stream, reader, data, chunkname);
 		const int first = luaZ_lookahead(&stream);
 		return luaD_protectedparser(state, &stream, first == kLuaSignatureFirstByte);
@@ -14656,7 +14596,7 @@ extern "C"
 	 * on success, or how many bytes were still wanted when the stream ended -
 	 * so a non-zero result is a short read, not a count.
 	 */
-	size_t luaZ_read(LuaZioRuntimeView* const stream, void* buffer, size_t n)
+	size_t luaZ_read(ZIO* const stream, void* buffer, size_t n)
 	{
 		while (n != 0u) {
 			if (stream->remainingBytes == 0) {
@@ -14668,11 +14608,11 @@ extern "C"
 				--stream->cursor;
 			}
 
-			const size_t chunk =
-				(n <= static_cast<size_t>(stream->remainingBytes)) ? n : static_cast<size_t>(stream->remainingBytes);
+			// Unsigned, as the binary's `cmp ebx, edi` / `ja` at 0x0092BA9D is.
+			const size_t chunk = (n <= stream->remainingBytes) ? n : stream->remainingBytes;
 			std::memcpy(buffer, stream->cursor, chunk);
 
-			stream->remainingBytes -= static_cast<int>(chunk);
+			stream->remainingBytes -= chunk;
 			stream->cursor += chunk;
 			buffer = static_cast<char*>(buffer) + chunk;
 			n -= chunk;
