@@ -269,116 +269,6 @@ namespace boost
     }
   } // namespace
 
-  template <typename PayloadT>
-  struct SpCountedImplPointerCtorRuntimeView
-  {
-    void* vtable = nullptr;      // +0x00
-    volatile LONG useCount = 0;  // +0x04
-    volatile LONG weakCount = 0; // +0x08
-    PayloadT* payload = nullptr; // +0x0C
-  };
-
-  static_assert(
-    sizeof(SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>) == 0x10,
-    "SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain> size must be 0x10"
-  );
-  static_assert(
-    sizeof(SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>) == 0x10,
-    "SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher> size must be 0x10"
-  );
-
-  template <typename PayloadT>
-  struct SharedControlPayloadRuntimeView
-  {
-    void* vtable = nullptr;      // +0x00
-    volatile LONG useCount = 0;  // +0x04
-    volatile LONG weakCount = 0; // +0x08
-    PayloadT* payload = nullptr; // +0x0C
-  };
-
-  static_assert(
-    offsetof(SharedControlPayloadRuntimeView<void>, payload) == 0x0C,
-    "SharedControlPayloadRuntimeView::payload offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(SharedControlPayloadRuntimeView<void>) == 0x10,
-    "SharedControlPayloadRuntimeView size must be 0x10"
-  );
-
-  template <typename PayloadT>
-  [[nodiscard]] inline PayloadT* ReadSharedControlPayloadLane(
-    detail::sp_counted_base* const control
-  ) noexcept
-  {
-    auto* const runtimeView = reinterpret_cast<SharedControlPayloadRuntimeView<PayloadT>*>(control);
-    return runtimeView->payload;
-  }
-
-  /**
-   * Address: 0x007FBEA0 (FUN_007FBEA0)
-   *
-   * What it does:
-   * Rebinds one control-block runtime lane to the base
-   * `boost::detail::sp_counted_base` vtable tag.
-   */
-  SpCountedBaseRuntimeView* RebindSpCountedBaseVtableLaneA(
-    SpCountedBaseRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sSpCountedBaseVtableTag = 0;
-    if (runtimeView != nullptr) {
-      runtimeView->vftable = &sSpCountedBaseVtableTag;
-    }
-    return runtimeView;
-  }
-
-  /**
-   * Address: 0x007FBE40 (FUN_007FBE40)
-   *
-   * What it does:
-   * Initializes one `sp_counted_impl_p<IRenTerrain>` runtime lane by setting
-   * use/weak counts to `1`, rebinding control vtable state, and storing payload
-   * ownership pointer.
-   */
-  SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>* InitializeSpCountedImplPIRenTerrainLaneA(
-    SpCountedImplPointerCtorRuntimeView<moho::IRenTerrain>* const runtimeView,
-    moho::IRenTerrain* const payload
-  ) noexcept
-  {
-    static std::uint8_t sSpCountedImplIRenTerrainVtableTag = 0;
-    if (runtimeView != nullptr) {
-      runtimeView->useCount = 1;
-      runtimeView->weakCount = 1;
-      runtimeView->vtable = &sSpCountedImplIRenTerrainVtableTag;
-      runtimeView->payload = payload;
-    }
-    return runtimeView;
-  }
-
-  /**
-   * Address: 0x007FC150 (FUN_007FC150)
-   *
-   * What it does:
-   * Initializes one `sp_counted_impl_p<CD3DTextureBatcher>` runtime lane by
-   * setting use/weak counts to `1`, rebinding control vtable state, and storing
-   * payload ownership pointer.
-   */
-  SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>*
-  InitializeSpCountedImplPCD3DTextureBatcherLaneA(
-    SpCountedImplPointerCtorRuntimeView<moho::CD3DTextureBatcher>* const runtimeView,
-    moho::CD3DTextureBatcher* const payload
-  ) noexcept
-  {
-    static std::uint8_t sSpCountedImplCD3DTextureBatcherVtableTag = 0;
-    if (runtimeView != nullptr) {
-      runtimeView->useCount = 1;
-      runtimeView->weakCount = 1;
-      runtimeView->vtable = &sSpCountedImplCD3DTextureBatcherVtableTag;
-      runtimeView->payload = payload;
-    }
-    return runtimeView;
-  }
-
   /**
    * Address: 0x0043D940 (FUN_0043D940)
    * Address: 0x0043EED0 (FUN_0043EED0)
@@ -713,20 +603,6 @@ namespace boost
   ) noexcept
   {
     return CopySharedPair(outPair, sourcePair);
-  }
-
-  /**
-   * Address: 0x0054A830 (FUN_0054A830)
-   *
-   * What it does:
-   * Reads one control payload pointer lane at `+0x0C` from the control block
-   * stored in one shared-pair `pi` lane.
-   */
-  void* ReadSharedPairControlPayloadLane(
-    const SharedCountPair* const sharedPair
-  ) noexcept
-  {
-    return ReadSharedControlPayloadLane<void>(sharedPair->pi);
   }
 
   /**
