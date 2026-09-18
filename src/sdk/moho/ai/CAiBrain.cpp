@@ -5567,9 +5567,28 @@ int moho::cfunc_CAiBrainTakeResourceL(LuaPlus::LuaState* const state)
   CSimArmyEconomyInfo* const economyInfo = brain->mArmy->GetEconomy();
   SEconPair& stored = economyInfo->economy.mStored;
 
+  // Spelled as `request > stored ? stored : request`, not the equivalent-looking
+  // `request <= stored ? request : stored`. The two differ on exactly one input:
+  // a NaN request. 0x005887A8 is `comiss xmm0, [eax+0x18]` followed at
+  // 0x005887B7 by `ja`, over a pointer that already defaults to `&stored`:
+  //
+  //   mov edx, ecx            ; edx = &stored
+  //   ja  0x5887bd            ; request > stored  -> keep &stored
+  //   lea edx, [esp+0x14]     ; otherwise         -> &request
+  //
+  // `comiss` reports NaN as unordered (CF=ZF=1), so `ja` is not taken and the
+  // NaN path falls through to `&request`. The binary therefore *propagates* a
+  // NaN request into `taken` -- and `taken` is what 0x0058881D loads back for
+  // the Lua return value. Writing the `<=` form instead selects `stored` on
+  // NaN and silently launders it, which is a behaviour change, not a tidy-up:
+  // FAF's GiveResourcesToPlayer guards only `data.Mass < 0`, and that test is
+  // false for NaN, so a NaN reaches here and the caller hands the result
+  // straight to GiveResource -- whose binary body (0x005883B7) is a bare
+  // `addss` with no clamp at all. The recipient's mStored then stays NaN for
+  // the rest of the match, and Sim::UpdateChecksum hashes SEconTotals raw.
   SEconPair taken{
-    request.ENERGY <= stored.ENERGY ? request.ENERGY : stored.ENERGY,
-    request.MASS <= stored.MASS ? request.MASS : stored.MASS,
+    request.ENERGY > stored.ENERGY ? stored.ENERGY : request.ENERGY,
+    request.MASS > stored.MASS ? stored.MASS : request.MASS,
   };
 
   const float updatedEnergy = stored.ENERGY - taken.ENERGY;
