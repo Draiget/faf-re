@@ -6,50 +6,22 @@
 #include <typeinfo>
 
 #include "lua/LuaObject.h"
+#include "lua/LuaTypeInfoStorage.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
 {
-  template <class TTypeInfo>
-  struct TypeInfoStorage
-  {
-    alignas(TTypeInfo) unsigned char bytes[sizeof(TTypeInfo)];
-    bool constructed;
-  };
-
-  template <class TTypeInfo>
-  [[nodiscard]] TTypeInfo& EnsureTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      new (storage.bytes) TTypeInfo();
-      storage.constructed = true;
-    }
-
-    return *reinterpret_cast<TTypeInfo*>(storage.bytes);
-  }
-
-  template <class TTypeInfo>
-  void DestroyTypeInfo(TypeInfoStorage<TTypeInfo>& storage) noexcept
-  {
-    if (!storage.constructed) {
-      return;
-    }
-
-    reinterpret_cast<TTypeInfo*>(storage.bytes)->~TTypeInfo();
-    storage.constructed = false;
-  }
-
-  TypeInfoStorage<LuaPlus::LuaObjectTypeInfo> gLuaObjectTypeInfoStorage{};
-  TypeInfoStorage<LuaPlus::LuaStateTypeInfo> gLuaStateTypeInfoStorage{};
+  lua::TypeInfoStorage<LuaPlus::LuaObjectTypeInfo> gLuaObjectTypeInfoStorage{};
+  lua::TypeInfoStorage<LuaPlus::LuaStateTypeInfo> gLuaStateTypeInfoStorage{};
 
   [[nodiscard]] LuaPlus::LuaObjectTypeInfo& GetLuaObjectTypeInfo() noexcept
   {
-    return EnsureTypeInfo(gLuaObjectTypeInfoStorage);
+    return lua::EnsureTypeInfo(gLuaObjectTypeInfoStorage);
   }
 
   [[nodiscard]] LuaPlus::LuaStateTypeInfo& GetLuaStateTypeInfo() noexcept
   {
-    return EnsureTypeInfo(gLuaStateTypeInfoStorage);
+    return lua::EnsureTypeInfo(gLuaStateTypeInfoStorage);
   }
 
   /**
@@ -60,7 +32,7 @@ namespace
    */
   void cleanup_LuaObjectTypeInfo()
   {
-    DestroyTypeInfo(gLuaObjectTypeInfoStorage);
+    lua::DestroyTypeInfo(gLuaObjectTypeInfoStorage);
   }
 
   /**
@@ -71,7 +43,7 @@ namespace
    */
   void cleanup_LuaStateTypeInfo()
   {
-    DestroyTypeInfo(gLuaStateTypeInfoStorage);
+    lua::DestroyTypeInfo(gLuaStateTypeInfoStorage);
   }
 
   /**
