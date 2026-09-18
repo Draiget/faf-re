@@ -42,6 +42,18 @@ namespace moho
   extern float range_OuterThicknessCoeff;
 
   /** Global: 0x00F57E4F. Master enable for the range-ring viewport pass. */
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * Additive extension, not a recovery: there is no console object for this in
+   * the shipped image and no `Address:` can be cited for it. It exists so a UI
+   * mod can ask for the engine's real ring geometry to be drawn at the cursor
+   * for the current selection, which the original only ever does for a
+   * building being placed (`range_RenderBuild`). Default false, so an engine
+   * built without a mod touching it behaves exactly as the binary does.
+   */
+  extern bool range_RenderSelectedAtCursor;
+
   extern bool ren_Ranges;
 
   /**

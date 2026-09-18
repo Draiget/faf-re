@@ -705,6 +705,121 @@ namespace
   }
 
   /**
+   * NOT A RECOVERED FUNCTION - there is no body for this in the shipped image
+   * and no `Address:` can be cited for it. Additive extension, gated on
+   * `range_RenderSelectedAtCursor`, which the loader leaves false.
+   *
+   * The engine already draws real ring geometry at the cursor, but only for a
+   * building being placed: `RenderBuildRingsUnderCursor` takes its blueprint
+   * from the build-preview command mode. This does the same for the current
+   * selection, so a UI mod can answer "what would this unit cover if it stood
+   * there" with the profile's own colours and zoom-scaled thickness.
+   *
+   * Exactly two rings are drawn, no matter how many profiles are registered:
+   *
+   *   attack - the widest of the concrete weapon profiles. The "AllMilitary"
+   *            combine profile cannot serve here: `CombinedMilitaryExtractor`
+   *            implements only `Extract` (entity) and its `Range` (blueprint +
+   *            centre) override returns false, so it yields nothing for a
+   *            position that has no unit on it.
+   *   assist - the "Miscellaneous" / OVERLAYMISC profile, which the menu calls
+   *            "Build Range".
+   *
+   * Across a multi-unit selection the widest payload in each class wins, so a
+   * mixed group shows the reach of whichever unit reaches furthest rather than
+   * a stack of overlapping rings.
+   */
+  void RenderSelectionRingsUnderCursor(
+    moho::CWldSession& session,
+    RangeExtractionPayloadVector& scratchPayload,
+    moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera,
+    const unsigned int headIndex
+  )
+  {
+    const moho::UserArmy* const focusArmy = session.GetFocusUserArmy();
+    if (focusArmy == nullptr) {
+      return;
+    }
+
+    msvc8::vector<moho::UserUnit*> selectedUnits;
+    session.GetSelectionUnits(selectedUnits);
+    if (selectedUnits.empty()) {
+      return;
+    }
+
+    const Wm3::Vector3f& cursorWorldPos = session.GetCursorInfo().mMouseWorldPos;
+
+    // Widest payload seen per class, with the profile whose colours and ring
+    // thickness should draw it.
+    const moho::SRangeRenderProfile* attackProfile = nullptr;
+    moho::SRangeExtractionPayload attackPayload{};
+    const moho::SRangeRenderProfile* assistProfile = nullptr;
+    moho::SRangeExtractionPayload assistPayload{};
+
+    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
+      const bool isAssist = profile.mExtractorName == "Miscellaneous";
+      const bool isAttack = profile.mExtractorName == "DirectFire"
+        || profile.mExtractorName == "IndirectFire"
+        || profile.mExtractorName == "AntiAir"
+        || profile.mExtractorName == "AntiNavy";
+      if (!isAssist && !isAttack) {
+        continue;
+      }
+
+      moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
+      if (extractor == nullptr) {
+        continue;
+      }
+
+      for (moho::UserUnit* const unit : selectedUnits) {
+        if (unit == nullptr || unit->mArmy != focusArmy) {
+          continue;
+        }
+
+        const moho::RUnitBlueprint* const blueprint = static_cast<moho::IUnit*>(unit)->GetBlueprint();
+        if (blueprint == nullptr) {
+          continue;
+        }
+        if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+          continue;
+        }
+
+        moho::SRangeExtractionPayload payload{};
+        if (!extractor->Range(&payload, blueprint, cursorWorldPos)) {
+          continue;
+        }
+
+        if (isAssist) {
+          if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
+            assistPayload = payload;
+            assistProfile = &profile;
+          }
+        } else if (attackProfile == nullptr || payload.outerRadius > attackPayload.outerRadius) {
+          attackPayload = payload;
+          attackProfile = &profile;
+        }
+      }
+    }
+
+    const auto draw = [&](const moho::SRangeRenderProfile* const profile,
+                          const moho::SRangeExtractionPayload& payload) {
+      if (profile == nullptr) {
+        return;
+      }
+      scratchPayload.clear();
+      scratchPayload.push_back(payload);
+      RenderRingBatch(
+        profile->mOuterRingParams, camera, rangeRenderer, headIndex, profile->mBuildRingColor,
+        profile->mInnerRingParams, scratchPayload
+      );
+    };
+
+    draw(attackProfile, attackPayload);
+    draw(assistProfile, assistPayload);
+  }
+
+  /**
    * Address: 0x007EF280 (FUN_007EF280, sub_7EF280)
    *
    * IDA signature:
@@ -1031,6 +1146,17 @@ namespace moho
 
     if (range_RenderBuild) {
       RenderBuildRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+    }
+
+    // NOT IN THE ORIGINAL BINARY - additive, and false unless a mod sets it.
+    //
+    // While this is on it *replaces* the three per-unit passes below rather
+    // than adding to them: the point of drawing at the cursor is to preview
+    // coverage at a position, and leaving the unit's own rings up at the same
+    // time gives two sets of rings for one answer.
+    if (range_RenderSelectedAtCursor) {
+      RenderSelectionRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+      return;
     }
 
     if (!mVisibleProfiles.empty()) {
