@@ -352,6 +352,27 @@ namespace moho
   void GatherUnmarkedUnitsInBox(COGrid& grid, const Wm3::AxisAlignedBox3f& box, CollisionResultFastVectorN10& into);
 
   /**
+   * Address: 0x007216D0 (FUN_007216D0, Moho::SweptPathBlockedByUnit)
+   *
+   * What it does:
+   * Sweeps `unit`'s footprint along the segment `fromCenter`..`toCenter` as an
+   * oriented box and reports whether any nearby mobile unit of a different
+   * formation layer, that is not an ignorable source unit, lies inside it.
+   *
+   * Two callers in the binary: `PathTransitionBlocked` (0x00721990), which
+   * sweeps between two cell centres, and `CanReachCellFromCurrent`
+   * (0x005AF62F), which sweeps from the unit's live world position to a target
+   * cell's world position.
+   */
+  [[nodiscard]] bool SweptPathBlockedByUnit(
+    COGrid& grid,
+    Unit* unit,
+    const Wm3::Vector3f& fromCenter,
+    const Wm3::Vector3f& toCenter,
+    int mode
+  );
+
+  /**
    * Address: 0x00721990 (FUN_00721990, Moho::PathTransitionBlocked)
    *
    * What it does:
