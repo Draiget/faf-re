@@ -25,6 +25,7 @@
 #include "LuaError.h"
 #include "LuaParser.h"
 #include "LuaTableIterator.h"
+#include "LuaTypeInfoStorage.h"
 #include "LuaUndump.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
@@ -6494,41 +6495,31 @@ namespace
 	 * so without an instance neither typeid ever reaches the reflection map.
 	 * The binary drives both from its CRT initializer table.
 	 */
-	alignas(WrapFileTypeInfo) unsigned char gWrapFileTypeInfoStorage[sizeof(WrapFileTypeInfo)];
-	alignas(TObjectTypeInfo) unsigned char gTObjectTypeInfoStorage[sizeof(TObjectTypeInfo)];
-	bool gWrapFileTypeInfoConstructed = false;
-	bool gTObjectTypeInfoConstructed = false;
+	// Both descriptors keep the shape lua::TypeInfoStorage<T> models: aligned
+	// bytes plus a construct-once flag. They stay registered for the life of
+	// the process, so teardown releases their field tables rather than running
+	// ~T() and leaving the reflection map pointing at freed memory.
+	lua::TypeInfoStorage<WrapFileTypeInfo> gWrapFileTypeInfoStorage{};
+	lua::TypeInfoStorage<TObjectTypeInfo> gTObjectTypeInfoStorage{};
 
 	void CleanupWrapFileTypeInfo()
 	{
-		if (!gWrapFileTypeInfoConstructed) {
-			return;
-		}
-		auto& ti = *reinterpret_cast<WrapFileTypeInfo*>(gWrapFileTypeInfoStorage);
-		ti.fields_ = msvc8::vector<gpg::RField>{};
-		ti.bases_ = msvc8::vector<gpg::RField>{};
+		lua::ReleaseTypeInfoFieldStorage(gWrapFileTypeInfoStorage);
 	}
 
 	void CleanupTObjectTypeInfo()
 	{
-		if (!gTObjectTypeInfoConstructed) {
-			return;
-		}
-		auto& ti = *reinterpret_cast<TObjectTypeInfo*>(gTObjectTypeInfoStorage);
-		ti.fields_ = msvc8::vector<gpg::RField>{};
-		ti.bases_ = msvc8::vector<gpg::RField>{};
+		lua::ReleaseTypeInfoFieldStorage(gTObjectTypeInfoStorage);
 	}
 
 	struct LuaObjectTypeInfoBootstrap
 	{
 		LuaObjectTypeInfoBootstrap()
 		{
-			new (gWrapFileTypeInfoStorage) WrapFileTypeInfo();
-			gWrapFileTypeInfoConstructed = true;
+			(void)lua::EnsureTypeInfo(gWrapFileTypeInfoStorage);
 			(void)std::atexit(&CleanupWrapFileTypeInfo);
 
-			new (gTObjectTypeInfoStorage) TObjectTypeInfo();
-			gTObjectTypeInfoConstructed = true;
+			(void)lua::EnsureTypeInfo(gTObjectTypeInfoStorage);
 			(void)std::atexit(&CleanupTObjectTypeInfo);
 		}
 	};
