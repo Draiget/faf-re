@@ -9408,28 +9408,57 @@ namespace
 		return argumentCount;
 	}
 
-	struct LuaProfileCountersRuntimeView
+	/**
+	 * The per-callable profiling record this fork embeds in both kinds of
+	 * callable object: at +0x18 inside a `CClosure` and at +0x48 inside a
+	 * `Proto`. `func_profiledata` (0x0091E080) selects between the two on the
+	 * GC tag - `lea eax, [ebp+48h]` for LUA_TPROTO, `lea ecx, [ebp+18h]` for
+	 * LUA_CFUNCTION - then skips any record whose first two words are both
+	 * zero (`mov ecx, [eax]` / `or ecx, [eax+4]`).
+	 *
+	 * `invocationCount` is one 64-bit counter, loaded whole by
+	 * `fild qword ptr [ecx+20h]` at 0x0091E1B7. It is the same counter
+	 * `luaD_precall` bumps on every C-closure call, which reaches it from the
+	 * other direction as `CClosure::upvalue_m1[0]` - the slot one before the
+	 * upvalue array, which is not an upvalue. The assert below is what keeps
+	 * those two descriptions of one field agreeing.
+	 */
+	struct LuaProfileRecord
 	{
-		std::uint32_t sampleCount;
-		std::uint32_t sampleCountAux;
-		std::uint8_t reserved08[0x18];
-		std::int64_t totalBytes;
+		std::uint32_t sampleCount;      // +0x00
+		std::uint32_t sampleCountAux;   // +0x04
+		std::uint8_t reserved08[0x18];  // +0x08 timing lanes; emitted as zero
+		std::int64_t invocationCount;   // +0x20
 	};
 	static_assert(
-		offsetof(LuaProfileCountersRuntimeView, totalBytes) == 0x20,
-		"LuaProfileCountersRuntimeView::totalBytes offset must be 0x20"
+		offsetof(LuaProfileRecord, invocationCount) == 0x20,
+		"LuaProfileRecord::invocationCount offset must be 0x20"
 	);
 
-	[[nodiscard]] const LuaProfileCountersRuntimeView* LuaDebugGetProfileCounters(const GCObject* const object)
+	/// Where the record sits inside each of the two callable objects.
+	constexpr std::size_t kCClosureProfileOffset = 0x18;
+	constexpr std::size_t kProtoProfileOffset = 0x48;
+
+	static_assert(
+		offsetof(Proto, reserved0) == kProtoProfileOffset,
+		"Proto's profile record must start at +0x48"
+	);
+	static_assert(
+		offsetof(CClosure, upvalue_m1)
+			== kCClosureProfileOffset + offsetof(LuaProfileRecord, invocationCount),
+		"CClosure::upvalue_m1[0] must be the profile record's invocation counter"
+	);
+
+	[[nodiscard]] const LuaProfileRecord* LuaDebugGetProfileRecord(const GCObject* const object)
 	{
 		if (object->gch.tt == LUA_CFUNCTION) {
-			return reinterpret_cast<const LuaProfileCountersRuntimeView*>(
-				reinterpret_cast<const std::uint8_t*>(object) + 0x18u
+			return reinterpret_cast<const LuaProfileRecord*>(
+				reinterpret_cast<const std::uint8_t*>(object) + kCClosureProfileOffset
 			);
 		}
 		if (object->gch.tt == LUA_TPROTO) {
-			return reinterpret_cast<const LuaProfileCountersRuntimeView*>(
-				reinterpret_cast<const std::uint8_t*>(object) + 0x48u
+			return reinterpret_cast<const LuaProfileRecord*>(
+				reinterpret_cast<const std::uint8_t*>(object) + kProtoProfileOffset
 			);
 		}
 
@@ -9456,7 +9485,7 @@ namespace
 
 		int outputIndex = 0;
 		for (GCObject* object = globalState->rootgc; object != nullptr; object = object->gch.next) {
-			const LuaProfileCountersRuntimeView* const counters = LuaDebugGetProfileCounters(object);
+			const LuaProfileRecord* const counters = LuaDebugGetProfileRecord(object);
 			if (counters == nullptr || (counters->sampleCount | counters->sampleCountAux) == 0u) {
 				continue;
 			}
@@ -9467,7 +9496,7 @@ namespace
 			LuaDebugAppendNumber(state, outputTable, outputIndex, 0.0f);
 			LuaDebugAppendNumber(state, outputTable, outputIndex, 0.0f);
 			LuaDebugAppendNumber(state, outputTable, outputIndex, 0.0f);
-			LuaDebugAppendNumber(state, outputTable, outputIndex, static_cast<float>(counters->totalBytes));
+			LuaDebugAppendNumber(state, outputTable, outputIndex, static_cast<float>(counters->invocationCount));
 		}
 
 		--globalState->gcTraversalLockDepth;
@@ -16654,7 +16683,10 @@ extern "C"
 
 		// The two words at upvalue_m1[0] are one 64-bit invocation counter this
 		// fork keeps per C closure - the binary increments the low half and
-		// carries into the high half.
+		// carries into the high half. It is the same field `func_profiledata`
+		// reports as LuaProfileRecord::invocationCount, reaching it as
+		// CClosure+0x18+0x20 instead; an assert there ties the two views of it
+		// together.
 		std::uint32_t& invocationsLow = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].tt);
 		std::uint32_t& invocationsHigh = reinterpret_cast<std::uint32_t&>(closure->c.upvalue_m1[0].value.b);
 		const std::uint32_t previousLow = invocationsLow++;
