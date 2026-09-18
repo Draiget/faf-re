@@ -668,6 +668,50 @@ namespace boost
      * Address: 0x007FBE40 (FUN_007FBE40 -- the `sp_counted_impl_p<moho::IRenTerrain>::sp_counted_impl_p(IRenTerrain*)` this emits: `[this+4]=1`, `[this+8]=1`, `[this]=0x00E407E4` (the real vtable), `[this+0xC]=px`, `ret 4`; zero callers; formerly `InitializeSpCountedImplPIRenTerrainLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x007FC150 (FUN_007FC150 -- the same constructor emitted for `sp_counted_impl_p<moho::CD3DTextureBatcher>`, vtable 0x00E407F8; zero callers; formerly `InitializeSpCountedImplPCD3DTextureBatcherLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x007FBEA0 (FUN_007FBEA0 -- `mov dword ptr [eax], 0x00D42210; ret`: the base `sp_counted_base` vtable install MSVC emits inside the constructor/destructor chain. No source line produces it, so nothing calls it here; formerly `RebindSpCountedBaseVtableLaneA` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x004DE730 (FUN_004DE730 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe0b724, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructAudioEngine` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x004DE790 (FUN_004DE790 -- `sp_counted_base`'s scalar deleting destructor: install the base vtable None, then `operator delete` when the flag is set; zero callers in the binary and none in source; formerly `SpCountedBaseDeletingDtorAudioEngine` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x004DE7B0 (FUN_004DE7B0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForAudioEngine` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0053A290 (FUN_0053A290 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForRScmResource` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0053B420 (FUN_0053B420 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForRScaResource` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0054EE20 (FUN_0054EE20 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForAniDefaultSkelDeleter` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x005CC7C0 (FUN_005CC7C0 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe1dbe0, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructStatsStatItem` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x005CC850 (FUN_005CC850 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForStatsStatItem` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00755FA0 (FUN_00755FA0 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe348ec, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructISimResources` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007560E0 (FUN_007560E0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForISimResources` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00765700 (FUN_00765700 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe35d90, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructPathPreviewFinder` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00765790 (FUN_00765790 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForPathPreviewFinder` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007FC1A0 (FUN_007FC1A0 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe4080c, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructCD3DPrimBatcher` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007FC230 (FUN_007FC230 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForCD3DTextureBatcher` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x007FC240 (FUN_007FC240 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForCD3DPrimBatcher` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008847F0 (FUN_008847F0 -- `sp_counted_impl_pd<T,D>::sp_counted_impl_pd(T*, D)`: counts to 1, real vtable 0xe49da0, `px_` at +0x0C, deleter at +0x10, `ret 8`; zero callers in the binary and none in source; formerly `SpCountedImplPdConstructSFileStarCloser` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00884890 (FUN_00884890 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForFileStarCloser` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089B840 (FUN_0089B840 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe4b35c, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructSSessionSaveData` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089B930 (FUN_0089B930 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForSSessionSaveData` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089BC70 (FUN_0089BC70 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe4b370, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructUICommandGraph` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089BCE0 (FUN_0089BCE0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForUICommandGraph` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008E8B10 (FUN_008E8B10 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForTextureD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9140 (FUN_008F9140 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9150 (FUN_008F9150 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForTextureD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9160 (FUN_008F9160 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForRenderTargetD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9170 (FUN_008F9170 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForCubeRenderTargetD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9180 (FUN_008F9180 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForDepthStencilTargetD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F9190 (FUN_008F9190 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForVertexFormatD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F91A0 (FUN_008F91A0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForVertexBufferD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F91B0 (FUN_008F91B0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForIndexBufferD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F93B0 (FUN_008F93B0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForPipelineStateD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00923700 (FUN_00923700 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xd47090, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructStdStringstreamChar` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00923730 (FUN_00923730 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForStdStringstreamChar` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00931EE0 (FUN_00931EE0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForClusterCacheImpl` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00941660 (FUN_00941660 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xd47d44, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructEffectTechniqueD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00941690 (FUN_00941690 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xd47d58, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructEffectVariableD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x009416C0 (FUN_009416C0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectTechniqueD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x009416D0 (FUN_009416D0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectVariableD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094B600 (FUN_0094B600 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xd4887c, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructEffectTechniqueD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094B630 (FUN_0094B630 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xd48890, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructEffectVariableD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094B660 (FUN_0094B660 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectTechniqueD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094B670 (FUN_0094B670 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectVariableD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094E070 (FUN_0094E070 -- `sp_counted_impl_pd<T,D>::sp_counted_impl_pd(T*, D)`: counts to 1, real vtable 0xd48a00, `px_` at +0x0C, deleter at +0x10, `ret 8`; zero callers in the binary and none in source; formerly `SpCountedImplPdConstructCharPointerFunctionDeleter` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0094E0E0 (FUN_0094E0E0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForCharPointerFunctionDeleter` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      *
      * What it does:
      * Constructs one `boost::detail::shared_count` from a raw pointee in caller-provided storage.
@@ -975,30 +1019,6 @@ namespace boost
     }
 
     /**
-     * Address: 0x005CC7C0 (FUN_005CC7C0, boost::detail::sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `Stats_StatItem`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::Stats_StatItem>* SpCountedImplPConstructStatsStatItem(
-        SpCountedImplStorage<moho::Stats_StatItem>* countedImpl,
-        moho::Stats_StatItem* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x00923700 (FUN_00923700, boost::detail::sp_counted_impl_p<std::basic_stringstream<char,std::char_traits<char>,std::allocator<char>>>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for one owned
-     * `std::basic_stringstream<char,...>` lane.
-     */
-    [[nodiscard]] SpCountedImplStorage<void>* SpCountedImplPConstructStdStringstreamChar(
-        SpCountedImplStorage<void>* countedImpl,
-        void* ownedPointee
-    ) noexcept;
-
-    /**
      * Address: 0x00931EB0 (FUN_00931EB0, boost::detail::sp_counted_impl_p<gpg::HaStar::ClusterCache::Impl>::sp_counted_impl_p)
      *
      * What it does:
@@ -1009,117 +1029,6 @@ namespace boost
         SpCountedImplStorage<void>* countedImpl,
         void* ownedPointee
     ) noexcept;
-
-    /**
-     * Address: 0x00941660 (FUN_00941660, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D9>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `EffectTechniqueD3D9`.
-     */
-    [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectTechniqueD3D9>* SpCountedImplPConstructEffectTechniqueD3D9(
-        SpCountedImplStorage<gpg::gal::EffectTechniqueD3D9>* countedImpl,
-        gpg::gal::EffectTechniqueD3D9* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x00941690 (FUN_00941690, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D9>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `EffectVariableD3D9`.
-     */
-    [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectVariableD3D9>* SpCountedImplPConstructEffectVariableD3D9(
-        SpCountedImplStorage<gpg::gal::EffectVariableD3D9>* countedImpl,
-        gpg::gal::EffectVariableD3D9* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x0094B600 (FUN_0094B600, boost::detail::sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `EffectTechniqueD3D10`.
-     */
-    [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectTechniqueD3D10>* SpCountedImplPConstructEffectTechniqueD3D10(
-        SpCountedImplStorage<gpg::gal::EffectTechniqueD3D10>* countedImpl,
-        gpg::gal::EffectTechniqueD3D10* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x0094B630 (FUN_0094B630, boost::detail::sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `EffectVariableD3D10`.
-     */
-    [[nodiscard]] SpCountedImplStorage<gpg::gal::EffectVariableD3D10>* SpCountedImplPConstructEffectVariableD3D10(
-        SpCountedImplStorage<gpg::gal::EffectVariableD3D10>* countedImpl,
-        gpg::gal::EffectVariableD3D10* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x0094E070 (FUN_0094E070, boost::detail::sp_counted_impl_pd<char*, void (__cdecl*)(void*)>::sp_counted_impl_pd)
-     *
-     * What it does:
-     * Initializes one recovered byte-pointer `sp_counted_impl_pd` control block
-     * with one owned `char*` lane and one raw-function deleter lane.
-     */
-    [[nodiscard]] SpCountedImplPdCharPointerStorage* SpCountedImplPdConstructCharPointerFunctionDeleter(
-        SpCountedImplPdCharPointerStorage* countedImpl,
-        char* ownedPointee,
-        SharedByteDeleterFn deleter
-    ) noexcept;
-
-    /**
-     * Address: 0x00755FA0 (FUN_00755FA0, boost::detail::sp_counted_impl_p<Moho::ISimResources>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for `ISimResources`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::ISimResources>* SpCountedImplPConstructISimResources(
-        SpCountedImplStorage<moho::ISimResources>* countedImpl,
-        moho::ISimResources* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x00765700 (FUN_00765700, boost::detail::sp_counted_impl_p<Moho::PathPreviewFinder>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `PathPreviewFinder`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::PathPreviewFinder>* SpCountedImplPConstructPathPreviewFinder(
-        SpCountedImplStorage<moho::PathPreviewFinder>* countedImpl,
-        moho::PathPreviewFinder* ownedPointee
-    ) noexcept;
-
-
-    /**
-     * Address: 0x007FC1A0 (FUN_007FC1A0, boost::detail::sp_counted_impl_p<Moho::CD3DPrimBatcher>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `CD3DPrimBatcher`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::CD3DPrimBatcher>* SpCountedImplPConstructCD3DPrimBatcher(
-        SpCountedImplStorage<moho::CD3DPrimBatcher>* countedImpl,
-        moho::CD3DPrimBatcher* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x008847F0 (FUN_008847F0, boost::detail::sp_counted_impl_pd<_iobuf*,Moho::SFileStarCloser>::sp_counted_impl_pd)
-     *
-     * What it does:
-     * Initializes one recovered file-closer `sp_counted_impl_pd` control block
-     * with one owned `FILE*` lane.
-     */
-    [[nodiscard]] SpCountedImplStorage<void>* SpCountedImplPdConstructSFileStarCloser(
-        SpCountedImplStorage<void>* countedImpl,
-        void* ownedPointee
-    ) noexcept;
-
-    /**
 
     /**
      * Address: 0x00883F60 (FUN_00883F60, boost::shared_ptr<Moho::LaunchInfoLoad>::shared_ptr)
@@ -1142,341 +1051,7 @@ namespace boost
     );
 
     /**
-     * Address: 0x0089B840 (FUN_0089B840, boost::detail::sp_counted_impl_p<Moho::SSessionSaveData>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `SSessionSaveData`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::SSessionSaveData>* SpCountedImplPConstructSSessionSaveData(
-        SpCountedImplStorage<moho::SSessionSaveData>* countedImpl,
-        moho::SSessionSaveData* ownedPointee
-    ) noexcept;
-
     /**
-     * Address: 0x0089BC70 (FUN_0089BC70, boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::sp_counted_impl_p)
-     *
-     * What it does:
-     * Initializes one recovered shared-count control block for
-     * `UICommandGraph`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::UICommandGraph>* SpCountedImplPConstructUICommandGraph(
-        SpCountedImplStorage<moho::UICommandGraph>* countedImpl,
-        moho::UICommandGraph* ownedPointee
-    ) noexcept;
-
-    /**
-     * Address: 0x005CC850 (FUN_005CC850)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `Stats_StatItem` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForStatsStatItem(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-    /**
-     * Address: 0x008E8B10 (FUN_008E8B10, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `TextureD3D9` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForTextureD3D9(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9140 (FUN_008F9140)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `EffectD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForEffectD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9150 (FUN_008F9150)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `TextureD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForTextureD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9160 (FUN_008F9160)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `RenderTargetD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForRenderTargetD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9170 (FUN_008F9170)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CubeRenderTargetD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCubeRenderTargetD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9180 (FUN_008F9180)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `DepthStencilTargetD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForDepthStencilTargetD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F9190 (FUN_008F9190)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `VertexFormatD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForVertexFormatD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F91A0 (FUN_008F91A0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `VertexBufferD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForVertexBufferD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F91B0 (FUN_008F91B0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `IndexBufferD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForIndexBufferD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x008F93B0 (FUN_008F93B0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `PipelineStateD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForPipelineStateD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00923730 (FUN_00923730)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `std::basic_stringstream<char,...>` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForStdStringstreamChar(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00931EE0 (FUN_00931EE0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `ClusterCache::Impl` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForClusterCacheImpl(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x009416C0 (FUN_009416C0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `EffectTechniqueD3D9` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForEffectTechniqueD3D9(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x009416D0 (FUN_009416D0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `EffectVariableD3D9` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForEffectVariableD3D9(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0094B660 (FUN_0094B660)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `EffectTechniqueD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForEffectTechniqueD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0094B670 (FUN_0094B670)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `EffectVariableD3D10` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForEffectVariableD3D10(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0094E0E0 (FUN_0094E0E0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `char*` function-deleter control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCharPointerFunctionDeleter(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x007FC230 (FUN_007FC230)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CD3DTextureBatcher` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCD3DTextureBatcher(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x007FC240 (FUN_007FC240)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CD3DPrimBatcher` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForCD3DPrimBatcher(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00884890 (FUN_00884890, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * file-closer `sp_counted_impl_pd` init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForFileStarCloser(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-
-    /**
-     * Address: 0x0089B930 (FUN_0089B930, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `SSessionSaveData` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForSSessionSaveData(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0089BCE0 (FUN_0089BCE0, boost::detail::sp_counted_base::sp_counted_base)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `UICommandGraph` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForUICommandGraph(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x007560E0 (FUN_007560E0)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `ISimResources` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForISimResources(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x00765790 (FUN_00765790)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `PathPreviewFinder` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForPathPreviewFinder(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-
-    /**
-     * Address: 0x0053A290 (FUN_0053A290)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `RScmResource` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForRScmResource(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-     * Address: 0x0053B420 (FUN_0053B420)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `RScaResource` control-block init path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForRScaResource(
-        detail::sp_counted_base* control
-    ) noexcept;
-
-    /**
-
-    /**
-     * Address: 0x0054EE20 (FUN_0054EE20)
-     *
-     * What it does:
-     * Restores one abstract `sp_counted_base` vtable lane used by the
-     * `CAniDefaultSkel` function-deleter control path.
-     */
-    [[nodiscard]] detail::sp_counted_base* InitializeSpCountedBaseLaneForAniDefaultSkelDeleter(
-        detail::sp_counted_base* control
-    ) noexcept;
 
     /**
 
