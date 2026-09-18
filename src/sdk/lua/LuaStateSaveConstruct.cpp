@@ -33,17 +33,6 @@ namespace LuaPlus
 
   namespace
   {
-    struct LClosureSaveConstructRuntimeView
-    {
-      std::uint8_t reserved00[0x08];
-      std::uint8_t upvalueCount;
-    };
-
-    static_assert(
-      offsetof(LClosureSaveConstructRuntimeView, upvalueCount) == 0x08,
-      "LClosureSaveConstructRuntimeView::upvalueCount offset must be 0x08"
-    );
-
     /**
      * Address: 0x00921500 (FUN_00921500, sub_921500)
      *
@@ -310,8 +299,7 @@ namespace LuaPlus
     gpg::SerSaveConstructArgsResult* const result
   )
   {
-    const auto* const closureView = reinterpret_cast<const LClosureSaveConstructRuntimeView*>(closure);
-    archive->WriteUByte(closureView->upvalueCount);
+    archive->WriteUByte(closure->nupvalues);
     result->SetOwned(0u);
   }
 

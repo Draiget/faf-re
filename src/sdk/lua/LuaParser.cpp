@@ -3247,27 +3247,6 @@ namespace
     check_match(ls, TK_END, TK_IF, line);
   }
 
-  struct LuaParserGlobalStateRuntimeView
-  {
-    std::uint8_t reserved00_24[0x24];
-    lu_mem gcThreshold; // +0x24
-    CFunction panic;    // +0x28
-    lu_mem totalBytes;  // +0x2C
-  };
-
-  static_assert(
-    offsetof(LuaParserGlobalStateRuntimeView, gcThreshold) == 0x24,
-    "LuaParserGlobalStateRuntimeView::gcThreshold offset must be 0x24"
-  );
-  static_assert(
-    offsetof(LuaParserGlobalStateRuntimeView, panic) == 0x28,
-    "LuaParserGlobalStateRuntimeView::panic offset must be 0x28"
-  );
-  static_assert(
-    offsetof(LuaParserGlobalStateRuntimeView, totalBytes) == 0x2C,
-    "LuaParserGlobalStateRuntimeView::totalBytes offset must be 0x2C"
-  );
-
   /**
    * Address: 0x00913F00 (FUN_00913F00, f_parser)
    *
@@ -3278,8 +3257,11 @@ namespace
    */
   extern "C" void f_parser(SParser* const parser, lua_State* const state)
   {
-    auto* const globalState = reinterpret_cast<LuaParserGlobalStateRuntimeView*>(state->l_G);
-    if (globalState->totalBytes >= globalState->gcThreshold && globalState->panic == nullptr) {
+    // 0x00913F06..0x00913F12: collect only when the heap has passed the
+    // threshold AND no debug traversal holds the GC lock. `jb` makes the
+    // first compare unsigned, which is what lu_mem is.
+    const global_State* const globalState = state->l_G;
+    if (globalState->nblocks >= globalState->GCthreshold && globalState->gcTraversalLockDepth == 0) {
       luaC_collectgarbage(state);
     }
 
