@@ -234,23 +234,6 @@ namespace
     "UserEntityUiFlagView::requestRefreshUi offset must be 0x72"
   );
 
-  struct UserUnitIntelRangeView
-  {
-    std::uint8_t pad_0000_0100[0x100];
-    std::uint32_t vision;       // +0x100
-    std::uint32_t waterVision;  // +0x104
-    std::uint32_t radar;        // +0x108
-    std::uint32_t sonar;        // +0x10C
-    std::uint32_t omni;         // +0x110
-    std::uint32_t radarStealth; // +0x114
-    std::uint32_t sonarStealth; // +0x118
-    std::uint32_t cloak;        // +0x11C
-  };
-  static_assert(
-    offsetof(UserUnitIntelRangeView, vision) == 0x100, "UserUnitIntelRangeView::vision offset must be 0x100"
-  );
-  static_assert(offsetof(UserUnitIntelRangeView, cloak) == 0x11C, "UserUnitIntelRangeView::cloak offset must be 0x11C");
-
   // The weapon snapshot the client reads here is the very `UnitWeaponInfo` the
   // sim publishes into `SSTIUnitVariableData::mWeaponInfo` (Unit.h), so it is
   // named directly rather than re-declared. A second byte-identical layout used
@@ -645,16 +628,6 @@ namespace
   // moho/command/UserCommandQueue.h so the layout is stated once instead of
   // living as a reinterpret view over an opaque forward declaration.
 
-  struct UserUnitVisionRuntimeView
-  {
-    std::uint8_t pad_0000_0018[0x18];
-    VisionDB::Handle* visionHandle; // +0x18
-  };
-  static_assert(
-    offsetof(UserUnitVisionRuntimeView, visionHandle) == 0x18,
-    "UserUnitVisionRuntimeView::visionHandle offset must be 0x18"
-  );
-
 } // namespace
 
 namespace moho
@@ -796,14 +769,17 @@ namespace
     return reinterpret_cast<const UserCommandQueueRangeView*>(queueVector);
   }
 
+  // `UserEntity::mVisionHandle` already sits at +0x18; the pad-struct that used
+  // to be cast over `UserUnit*` here declared the same pointer at the same
+  // offset.
   [[nodiscard]] VisionDB::Handle*& GetUserUnitVisionHandle(UserUnit* const self) noexcept
   {
-    return reinterpret_cast<UserUnitVisionRuntimeView*>(self)->visionHandle;
+    return self->mVisionHandle;
   }
 
   [[nodiscard]] const VisionDB::Handle* GetUserUnitVisionHandle(const UserUnit* const self) noexcept
   {
-    return reinterpret_cast<const UserUnitVisionRuntimeView*>(self)->visionHandle;
+    return self->mVisionHandle;
   }
 
   template <typename TNode>
@@ -3052,14 +3028,21 @@ namespace
     return userUnit->GetCommandQueue();
   }
 
-  [[nodiscard]] const UserUnitIntelRangeView& GetIntelRangeView(const UserUnit* const self) noexcept
+  /**
+   * The intel lanes the sim replicates into every entity. The pad-struct that
+   * used to stand here declared these eight `uint32`s at +0x100..+0x11C over a
+   * `UserUnit*`, which is `UserEntity::mVariableData` (+0x50) plus
+   * `SSTIEntityVariableData::mIntelAttributes` (+0xB0) - the same eight fields
+   * in the same order, already declared as `SSTIIntelAttributes`.
+   */
+  [[nodiscard]] const SSTIIntelAttributes& GetIntelRanges(const UserUnit* const self) noexcept
   {
-    return *reinterpret_cast<const UserUnitIntelRangeView*>(self);
+    return self->mVariableData.mIntelAttributes;
   }
 
   [[nodiscard]] std::uint32_t GetIntelRangeMagnitude(const UserUnit* const self, const UserUnitIntelLane intel) noexcept
   {
-    const auto& ranges = GetIntelRangeView(self);
+    const SSTIIntelAttributes& ranges = GetIntelRanges(self);
 
     // Binary parity with 0x005BD530 (EntityAttributes::GetRange):
     // enum ordinals are shifted relative to stored lanes.
@@ -4661,17 +4644,8 @@ void UserUnit::Tick(const std::int32_t seqNo)
   VisionDB::Handle*& visionHandle = GetUserUnitVisionHandle(this);
   if (visionRange != 0u && visionHandle == nullptr && !mUnitConstDat.mFake) {
     const Wm3::Vector2f zero(0.0f, 0.0f);
-    struct SessionVisionRuntimeView
-    {
-      std::uint8_t pad_0000_03C8[0x3C8];
-      VisionDB visionDb; // +0x3C8
-    };
-    static_assert(
-      offsetof(SessionVisionRuntimeView, visionDb) == 0x3C8,
-      "SessionVisionRuntimeView::visionDb offset must be 0x3C8"
-    );
-    VisionDB& visionDb = reinterpret_cast<SessionVisionRuntimeView*>(session)->visionDb;
-    visionHandle = visionDb.NewHandle(zero, zero);
+    // `CWldSession::mVisionDb` is that same lane at +0x3C8, already declared.
+    visionHandle = session->mVisionDb.NewHandle(zero, zero);
   }
 
   if (visionHandle == nullptr) {
