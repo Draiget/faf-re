@@ -357,13 +357,24 @@ namespace moho
   /**
    * Address: 0x005F6EA0 (FUN_005F6EA0, sub_5F6EA0)
    *
-   * Finds the nearest ObstructsBuild prop over the target footprint; on a
+   * Finds the nearest OBSTRUCTSBUILDING prop over the target footprint; on a
    * RebuildBonus id match (coincident) records the rebuild fraction + binds the
    * pending-build entity (returns null), else returns the nearest prop.
    */
   Entity* CUnitMobileBuildTask::FindObstructingPropToReclaim()
   {
-    const EntityCategorySet* const obstructsBuild = mSim->mRules->GetEntityCategory("ObstructsBuild");
+    // `OBSTRUCTSBUILDING`, spelled exactly as the binary pushes it: the string
+    // handed to GetEntityCategory at 0x005F6ED2 is a pointer to 0x01292A84,
+    // which holds "OBSTRUCTSBUILDING\0". Its neighbours in that block
+    // ("CANLANDONWATER", "LOWSELECTPRIO") confirm these registry names are
+    // uppercase. This had read "ObstructsBuild" - wrong in both spelling and
+    // case - so the lookup matched no registered category, every prop failed
+    // the filter below, and an engineer never reclaimed the footprint before
+    // starting a structure. The game data agrees: every obstructing prop
+    // blueprint carries 'OBSTRUCTSBUILDING', blueprints-props.lua inserts it
+    // and warns when it is missing, and StructureUnit.lua reads
+    // CategoriesHash['OBSTRUCTSBUILDING'].
+    const EntityCategorySet* const obstructsBuild = mSim->mRules->GetEntityCategory("OBSTRUCTSBUILDING");
 
     const std::uint8_t sizeX = mBlueprint->mFootprint.mSizeX;
     const std::uint8_t sizeZ = mBlueprint->mFootprint.mSizeZ;
