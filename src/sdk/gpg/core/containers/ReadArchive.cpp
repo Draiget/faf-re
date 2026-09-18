@@ -2382,27 +2382,6 @@ namespace
     return archive;
   }
 
-  struct TextReadArchiveRuntimeView
-  {
-    std::uint8_t pad_0000_0038[0x38];
-    std::istream* streamOwnerPx;              // +0x38 (boost::shared_ptr<std::istream>::px)
-    boost::detail::sp_counted_base* control;  // +0x3C (boost::shared_ptr<std::istream>::pn.pi_)
-    std::istream* stream;                     // +0x40 (raw cached copy for hot Read* paths)
-  };
-  static_assert(
-    offsetof(TextReadArchiveRuntimeView, streamOwnerPx) == 0x38,
-    "TextReadArchiveRuntimeView::streamOwnerPx offset must be 0x38"
-  );
-  static_assert(
-    offsetof(TextReadArchiveRuntimeView, control) == 0x3C,
-    "TextReadArchiveRuntimeView::control offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(TextReadArchiveRuntimeView, stream) == 0x40,
-    "TextReadArchiveRuntimeView::stream offset must be 0x40"
-  );
-  static_assert(sizeof(TextReadArchiveRuntimeView) == 0x44, "TextReadArchiveRuntimeView size must be 0x44");
-
   class TextReadArchive : public gpg::ReadArchive
   {
   public:
@@ -2423,43 +2402,25 @@ namespace
      * `std::ios_base::clear`.
      */
     explicit TextReadArchive(const boost::shared_ptr<std::istream>& stream)
-      : gpg::ReadArchive()
+      : mStream(stream)
+      , mCachedStream(stream.get())
     {
-      // `boost::shared_ptr<T>` has the same {px, pi} layout as this
-      // codebase's `SharedPtrRaw<T>` (see BoostWrappers.h) on this VC8-era
-      // Boost; reinterpret to pull the raw owning pointers into the
-      // already-established byte-offset fields the sibling `Read*` methods
-      // and destructor expect (see `TextReadArchiveRuntimeView`).
-      const auto& raw = reinterpret_cast<const boost::SharedPtrRaw<std::istream>&>(stream);
-      auto* const runtime = reinterpret_cast<TextReadArchiveRuntimeView*>(this);
-      runtime->streamOwnerPx = raw.px;
-      boost::detail::sp_counted_base* const control = raw.pi;
-      runtime->control = control;
-      if (control != nullptr) {
-        control->add_ref_copy();
-      }
-      runtime->stream = raw.px;
-      runtime->stream->clear();
+      mCachedStream->clear();
     }
 
     /**
      * Address: 0x00939700 (FUN_00939700, ??1TextReadArchive@@QAE@@Z)
      *
      * What it does:
-     * Releases the stream shared-control lane and then runs
-     * `gpg::ReadArchive` base destruction.
+     * Releases the stream shared-owner lane and then runs `gpg::ReadArchive`
+     * base destruction. Both halves are compiler-emitted, so the body is
+     * empty: 0x0093971E-0x00939755 is `boost::detail::shared_count::
+     * ~shared_count` inlined (`lock xadd [pi+4], -1`, then vtable slot 1
+     * `dispose()`, then `lock xadd [pi+8], -1`, then slot 2 `destroy()`) and
+     * the `call 0x952E40` at 0x00939761 is the `~ReadArchive` base chain.
+     * The binary writes no member null-outs on this path.
      */
-    ~TextReadArchive() override
-    {
-      auto* const runtime = reinterpret_cast<TextReadArchiveRuntimeView*>(this);
-      boost::detail::sp_counted_base* const control = runtime->control;
-      runtime->streamOwnerPx = nullptr;
-      runtime->stream = nullptr;
-      runtime->control = nullptr;
-      if (control != nullptr) {
-        control->release();
-      }
-    }
+    ~TextReadArchive() override = default;
 
     /**
      * Address: 0x0093E770 (FUN_0093E770, TextReadArchive::ReadDouble)
@@ -2469,7 +2430,7 @@ namespace
      */
     void ReadUInt64(unsigned __int64* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2480,7 +2441,7 @@ namespace
      */
     void ReadInt64(__int64* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2491,7 +2452,7 @@ namespace
      */
     void ReadULong(unsigned long* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2502,7 +2463,7 @@ namespace
      */
     void ReadLong(long* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2513,7 +2474,7 @@ namespace
      */
     void ReadUInt(unsigned int* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2524,7 +2485,7 @@ namespace
      */
     void ReadInt(int* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2535,7 +2496,7 @@ namespace
      */
     void ReadUShort(unsigned short* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2546,7 +2507,7 @@ namespace
      */
     void ReadShort(short* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2559,7 +2520,7 @@ namespace
     void ReadUByte(unsigned __int8* const value) override
     {
       int parsedValue = 0;
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> parsedValue;
+      (*mCachedStream) >> parsedValue;
       *value = static_cast<unsigned __int8>(parsedValue);
     }
 
@@ -2573,7 +2534,7 @@ namespace
     void ReadByte(__int8* const value) override
     {
       int parsedValue = 0;
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> parsedValue;
+      (*mCachedStream) >> parsedValue;
       *value = static_cast<__int8>(parsedValue);
     }
 
@@ -2585,7 +2546,7 @@ namespace
      */
     void ReadBool(bool* const value) override
     {
-      (*reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream) >> *value;
+      (*mCachedStream) >> *value;
     }
 
     /**
@@ -2597,7 +2558,7 @@ namespace
      */
     void ReadBytes(char* const bytes, const size_t byteCount) override
     {
-      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::istream& stream = *mCachedStream;
       std::string token;
       for (size_t index = 0; index < byteCount; ++index) {
         stream >> token;
@@ -2614,7 +2575,7 @@ namespace
      */
     void ReadFloat(float* const value) override
     {
-      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::istream& stream = *mCachedStream;
       std::string token;
       stream >> token;
       if (token != "1.#INF") {
@@ -2635,7 +2596,7 @@ namespace
      */
     void ReadString(msvc8::string* const out) override
     {
-      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::istream& stream = *mCachedStream;
       stream >> std::ws;
       if (stream.get() != '"') {
         ThrowSerializationError("Error detected in archive: malformed string primitive.");
@@ -2700,7 +2661,7 @@ namespace
      */
     int NextMarker() override
     {
-      std::istream& stream = *reinterpret_cast<TextReadArchiveRuntimeView*>(this)->stream;
+      std::istream& stream = *mCachedStream;
       char marker = 0;
       stream >> marker;
       switch (marker) {
@@ -2714,7 +2675,20 @@ namespace
             gpg::STR_Printf("Error detected in archive: invalid marker token 0x%02x", marker).c_str());
       }
     }
+
+    // The ctor at 0x00939330 fills three lanes in declaration order: the
+    // shared owner's `px` at +0x38 (0x0093935E) and `pn.pi_` at +0x3C
+    // (0x0093936E, retained by the `lock xadd [pi+4], 1` at 0x0093937B),
+    // then a plain duplicate of the same handle at +0x40 (0x00939381).
+    // Every read slot dereferences that duplicate rather than the smart
+    // pointer -- exactly as the sibling `BinaryReadArchive` caches its
+    // `std::FILE*`. Keeping it is what makes this class 0x44 rather than
+    // 0x40, which is the size `CreateTextReadArchive` allocates.
+    boost::shared_ptr<std::istream> mStream; // +0x38
+    std::istream* mCachedStream = nullptr;   // +0x40
   };
+
+  static_assert(sizeof(TextReadArchive) == 0x44, "TextReadArchive size must be 0x44");
 
   /**
    * Address: 0x009397E0 (FUN_009397E0, TextReadArchive::dtr)
@@ -2764,19 +2738,13 @@ namespace
  */
 ReadArchive* gpg::CreateTextReadArchive(const boost::shared_ptr<std::istream>& stream)
 {
-  // Binary: `push 44h` before `operator new` (0x00939816-0x00939818), not
-  // sizeof(TextReadArchive). TextReadArchive declares no fields of its own -
-  // every byte of its real state lives in TextReadArchiveRuntimeView, whose
-  // last field (`stream`) ends at +0x44 - while its base `gpg::ReadArchive`
-  // (and therefore TextReadArchive itself) is only 0x38 bytes. Allocating
-  // sizeof(TextReadArchive) here silently overflowed the block by 12 bytes on
-  // every text-archive construction, corrupting whatever the allocator handed
-  // out next to it.
-  void* const storage = ::operator new(0x44u, std::nothrow);
-  if (storage == nullptr) {
-    return nullptr;
-  }
-  return new (storage) TextReadArchive(stream);
+  // `push 44h` at 0x00939816 is sizeof(TextReadArchive) now that the class
+  // declares its own stream lanes, so the size comes from the type instead of
+  // a literal. The binary calls the plain `operator new` (??2@YAPAXI@Z) and
+  // MSVC8 emits its own null check at 0x00939823 before running the ctor,
+  // returning null on failure; `std::nothrow` is how that reads in C++20, and
+  // matches the sibling `CreateBinaryReadArchive`.
+  return new (std::nothrow) TextReadArchive(stream);
 }
 
 /**
