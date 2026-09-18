@@ -81,6 +81,15 @@ namespace gpg::gal
          * What it does:
          * Releases any previous native index-buffer handle, resets context lanes,
          * then assigns one new context + native buffer payload.
+         *
+         * Address: 0x008F4C30 (FUN_008F4C30 -- the reset-only half of this: release
+         * the native buffer through its COM vtable, null +0x14, then copy a default
+         * IndexBufferContext over +0x04. Zero callers; formerly
+         * `ResetIndexBufferOwnerRuntime` over an IndexBufferOwnerRuntimeView in
+         * gpg/gal/ContextInterfaces.cpp, which described only this class's first
+         * 0x18 bytes and had the +0x14 lane typed `boost::detail::sp_counted_base*`
+         * with a `release()` call -- the binary does `call [[handle]+8]` with
+         * `handle` pushed, which is `IUnknown::Release`. Removed 2026-09-18.)
          */
         std::uint32_t SetBuffer(const IndexBufferContext* context, void* d3dIndexBuffer);
 
