@@ -112,7 +112,7 @@ namespace moho
       return &kEmpty;
     }
 
-    const EntityCategoryLookupTableRuntimeView& lookup = *rules->mEntityCategoryLookup;
+    const EntityCategoryLookupTable& lookup = *rules->mEntityCategoryLookup;
     if (!categoryName) {
       return &lookup.mCategoryFallback;
     }
@@ -141,7 +141,7 @@ namespace moho
   CategoryWordRangeView*
   ParseEntityCategory(const void* const categoryLookup, CategoryWordRangeView* const out, const char* const categoryExpression)
   {
-    const auto* const lookupTable = static_cast<const EntityCategoryLookupTableRuntimeView*>(categoryLookup);
+    const auto* const lookupTable = static_cast<const EntityCategoryLookupTable*>(categoryLookup);
 
     // Binary seeds the out set to empty using the table's word-universe handle
     // (the decompiler labels the +0x38 lane `mHelper.mRules`).

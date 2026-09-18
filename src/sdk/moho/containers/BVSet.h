@@ -36,7 +36,7 @@ namespace moho
   /**
    * Eight-byte aligned, which is what makes `mReserved04` a hole rather than a
    * field and puts this record on an eight-byte boundary inside everything
-   * that embeds it. Read off `EntityCategoryLookupTableRuntimeView`
+   * that embeds it. Read off `EntityCategoryLookupTable`
    * (RRuleGameRules.h), whose fallback set follows a 0x0C-byte
    * `msvc8::map` at **+0x10**: `FindOrFallback` (0x005552C0) returns
    * `lea eax,[esi+10h]` on its miss path. The same alignment is why that

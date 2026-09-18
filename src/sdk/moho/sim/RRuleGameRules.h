@@ -9,6 +9,7 @@
 #include "legacy/containers/Tree.h"
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/misc/CDiskWatch.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
 namespace LuaPlus
@@ -40,7 +41,7 @@ namespace moho
   struct REffectBlueprint;
 
   // Forward declaration needed here (rather than only at its full definition
-  // further below) because `EntityCategoryLookupTableRuntimeView`'s
+  // further below) because `EntityCategoryLookupTable`'s
   // constructor takes a `const RRuleGameRulesImpl*` parameter -- a pointer
   // to an incomplete type is a legal declaration.
   class RRuleGameRulesImpl;
@@ -53,7 +54,7 @@ namespace moho
    * 8-aligned value type produces, and the alignment belongs to
    * `CategoryWordRangeView` itself:
    *
-   *   - `EntityCategoryLookupTableRuntimeView::FindOrFallback`
+   *   - `EntityCategoryLookupTable::FindOrFallback`
    *     (`FUN_005552C0`) returns `lea eax,[esi+10h]` on its miss path, so the
    *     plain `mCategoryFallback` **member** sits at +0x10 behind a 0x0C-byte
    *     map -- nothing to do with tree nodes, and only reachable if the type
@@ -101,7 +102,7 @@ namespace moho
    * `rb_max`/`rb_increment`/`rotate_left`/`rotate_right`/`erase_node`/
    * `destroy_subtree`/`erase_range`/`~rb_tree`/`clear` members
    * (construction/destruction side, reached from `RRuleGameRules.cpp`'s
-   * `EntityCategoryLookupTableRuntimeView` constructor and implicit
+   * `EntityCategoryLookupTable` constructor and implicit
    * destructor) in `RbTree.h`.
    *
    * `EntityCategoryLookupResolver.cpp` independently models the read-only
@@ -126,7 +127,7 @@ namespace moho
    * in its name here but that one didn't; both named the identical binary
    * object).
    */
-  struct EntityCategoryLookupTableRuntimeView
+  struct EntityCategoryLookupTable
   {
     CategoryLookupMap mCategoryMap; // +0x00 (0x0C: {proxy, head, size})
     // +0x0C is the alignment hole the 8-aligned fallback opens, not a field -
@@ -190,7 +191,7 @@ namespace moho
      * target maps to no source line of its own, so it is cited here rather
      * than written as a separate function.
      */
-    explicit EntityCategoryLookupTableRuntimeView(const RRuleGameRulesImpl* owner) noexcept;
+    explicit EntityCategoryLookupTable(const RRuleGameRulesImpl* owner) noexcept;
 
     /**
      * No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
@@ -210,24 +211,24 @@ namespace moho
      * the implicit one does not change behavior, it removes a
      * hand-transcription of compiler-emitted glue.
      */
-    EntityCategoryLookupTableRuntimeView(const EntityCategoryLookupTableRuntimeView&) = delete;
-    EntityCategoryLookupTableRuntimeView& operator=(const EntityCategoryLookupTableRuntimeView&) = delete;
+    EntityCategoryLookupTable(const EntityCategoryLookupTable&) = delete;
+    EntityCategoryLookupTable& operator=(const EntityCategoryLookupTable&) = delete;
   };
   static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, mCategoryMap) == 0x00,
-    "EntityCategoryLookupTableRuntimeView::mCategoryMap offset"
+    offsetof(EntityCategoryLookupTable, mCategoryMap) == 0x00,
+    "EntityCategoryLookupTable::mCategoryMap offset"
   );
   static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, mCategoryFallback) == 0x10,
-    "EntityCategoryLookupTableRuntimeView::mCategoryFallback offset"
+    offsetof(EntityCategoryLookupTable, mCategoryFallback) == 0x10,
+    "EntityCategoryLookupTable::mCategoryFallback offset"
   );
   static_assert(
-    offsetof(EntityCategoryLookupTableRuntimeView, mWordUniverseHandle) == 0x38,
-    "EntityCategoryLookupTableRuntimeView::mWordUniverseHandle offset"
+    offsetof(EntityCategoryLookupTable, mWordUniverseHandle) == 0x38,
+    "EntityCategoryLookupTable::mWordUniverseHandle offset"
   );
   static_assert(
-    sizeof(EntityCategoryLookupTableRuntimeView) == 0x40,
-    "EntityCategoryLookupTableRuntimeView size must be 0x40"
+    sizeof(EntityCategoryLookupTable) == 0x40,
+    "EntityCategoryLookupTable size must be 0x40"
   );
 
   struct RRuleGameRulesBlueprintNode : msvc8::Tree<RRuleGameRulesBlueprintNode>
@@ -708,7 +709,16 @@ namespace moho
     void SetupCategories();
 
   public:
-    std::uint8_t pad_0004[0x34];                      // +0x04
+    std::uint32_t mUnknown04;                         // +0x04
+    /// The blueprint file watcher the constructor builds in place with the
+    /// "*.bp" pattern and tears down by hand. It has no default state, so it
+    /// lives in raw storage exactly as the binary lays it out.
+    alignas(CDiskWatchListener) std::uint8_t mDiskWatchListenerStorage[sizeof(CDiskWatchListener)]; // +0x08
+
+    [[nodiscard]] CDiskWatchListener& DiskWatchListener() noexcept
+    {
+      return *reinterpret_cast<CDiskWatchListener*>(mDiskWatchListenerStorage);
+    }
     std::uint8_t mLockStorage[0x08];                  // +0x38
     LuaPlus::LuaState* mLuaState;                     // +0x40
     /**
@@ -772,7 +782,7 @@ namespace moho
     /**
      * Real ground-truth object is `Moho::EntityCategorySet`/`EntityCategory`
      * (the mangled ctor/dtor names differ - see the address block on
-     * `EntityCategoryLookupTableRuntimeView` in RRuleGameRules.cpp for why).
+     * `EntityCategoryLookupTable` in RRuleGameRules.cpp for why).
      * Field keeps its established source-level name: `EntityCategorySet` and
      * `EntityCategory` are both already taken in this codebase by unrelated
      * types, and this exact field name is referenced by name from
@@ -780,7 +790,7 @@ namespace moho
      * passes), so only the type changes here - `void*` to the real pointee -
      * not the identifier.
      */
-    EntityCategoryLookupTableRuntimeView* mEntityCategoryLookup; // +0xC4
+    EntityCategoryLookupTable* mEntityCategoryLookup; // +0xC4
     void* mPendingBlueprintReloadNext;                // +0xC8
     void* mPendingBlueprintReloadPrev;                // +0xCC
   };
