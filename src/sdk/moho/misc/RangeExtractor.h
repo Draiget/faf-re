@@ -89,7 +89,18 @@ namespace moho
       float innerRadius = 0.0f
     );
 
-    [[nodiscard]] static bool TryGetFactoryOverlayRadius(const UserUnit* userUnit, float* outRadius) noexcept;
+    /**
+     * The assist/build radius an `OVERLAYMISC` unit advertises, or false when
+     * the entity is not one. Both the gate and the two radii come from the
+     * binary's own sequence in `CombinedMilitaryExtractor::Extract`
+     * (0x007EC3C9 `GetBlueprint`, 0x007EC3E3 the "OVERLAYMISC" category test,
+     * then `[blueprint+0x468]` falling back to `[blueprint+0x460]`).
+     *
+     * An earlier pass read those two offsets off the unit's factory command
+     * queue through a layout stand-in; they are `RUnitBlueprint::AI` (+0x460)
+     * `.StagingPlatformScanRadius` (+0x08) and `.GuardScanRadius` (+0x00).
+     */
+    [[nodiscard]] static bool TryGetAssistOverlayRadius(const UserEntity* userEntity, float* outRadius) noexcept;
 
     [[nodiscard]] static bool
     TryGetIntelRanges(const UserEntity* userEntity, float* outOmniRange, float* outRadarRange, float* outSonarRange);

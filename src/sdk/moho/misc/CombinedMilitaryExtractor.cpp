@@ -7,7 +7,6 @@
 namespace
 {
   constexpr std::int32_t kWeaponRangeCategoryAll = 6;
-  constexpr char kOverlayMiscCategory[] = "OVERLAYMISC";
 
   struct ExtractorVtableOnlyRuntimeView
   {
@@ -62,15 +61,12 @@ namespace moho
       return false;
     }
 
-    const UserUnit* const userUnit = userEntity->IsUserUnit();
-    if (userUnit) {
-      const msvc8::string overlayMiscCategory(kOverlayMiscCategory, sizeof(kOverlayMiscCategory) - 1u);
-      if (userEntity->IsInCategory(overlayMiscCategory)) {
-        float factoryOverlayRadius = 0.0f;
-        if (TryGetFactoryOverlayRadius(userUnit, &factoryOverlayRadius)) {
-          return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, factoryOverlayRadius);
-        }
-      }
+    // An `OVERLAYMISC` unit reports its assist radius and nothing else; only
+    // when it has none does the binary fall through to the weapon ranges
+    // (0x007EC44C / 0x007EC46F both jump to the weapon path at 0x007EC4A3).
+    float assistRadius = 0.0f;
+    if (TryGetAssistOverlayRadius(userEntity, &assistRadius)) {
+      return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, assistRadius);
     }
 
     float innerRadius = 0.0f;
