@@ -23,6 +23,7 @@
 
 #include "LuaAssertion.h"
 #include "LuaError.h"
+#include "LuaParser.h"
 #include "LuaTableIterator.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
@@ -906,97 +907,6 @@ namespace
 	);
 	static_assert(offsetof(global_State, rootudata) == 0x14, "global_State::rootudata must be at +0x14");
 
-	struct LuaFuncStateCodegenRuntimeView
-	{
-		Proto* functionProto;
-		std::uint8_t reserved04To0B[0x08];
-		void* lexState;
-		std::uint8_t reserved10To23[0x14];
-		int freeRegister;
-	};
-
-	static_assert(
-		offsetof(LuaFuncStateCodegenRuntimeView, functionProto) == 0x00,
-		"LuaFuncStateCodegenRuntimeView::functionProto offset must be 0x00"
-	);
-	static_assert(
-		offsetof(LuaFuncStateCodegenRuntimeView, lexState) == 0x0C,
-		"LuaFuncStateCodegenRuntimeView::lexState offset must be 0x0C"
-	);
-	static_assert(
-		offsetof(LuaFuncStateCodegenRuntimeView, freeRegister) == 0x24,
-		"LuaFuncStateCodegenRuntimeView::freeRegister offset must be 0x24"
-	);
-
-	struct LuaFuncStateConstantRuntimeView
-	{
-		Proto* functionProto;      // +0x00
-		Table* constantLookupTable; // +0x04
-		std::uint8_t reserved08To0F[0x08];
-		lua_State* state;          // +0x10
-		std::uint8_t reserved14To27[0x14];
-		int constantCount;         // +0x28
-	};
-
-	static_assert(
-		offsetof(LuaFuncStateConstantRuntimeView, functionProto) == 0x00,
-		"LuaFuncStateConstantRuntimeView::functionProto offset must be 0x00"
-	);
-	static_assert(
-		offsetof(LuaFuncStateConstantRuntimeView, constantLookupTable) == 0x04,
-		"LuaFuncStateConstantRuntimeView::constantLookupTable offset must be 0x04"
-	);
-	static_assert(
-		offsetof(LuaFuncStateConstantRuntimeView, state) == 0x10,
-		"LuaFuncStateConstantRuntimeView::state offset must be 0x10"
-	);
-	static_assert(
-		offsetof(LuaFuncStateConstantRuntimeView, constantCount) == 0x28,
-		"LuaFuncStateConstantRuntimeView::constantCount offset must be 0x28"
-	);
-
-	struct LuaExpDescCodegenRuntimeView
-	{
-		int kind;
-		int info;
-		int aux;
-		int t;
-		int f;
-	};
-
-	static_assert(offsetof(LuaExpDescCodegenRuntimeView, kind) == 0x00, "LuaExpDescCodegenRuntimeView::kind offset must be 0x00");
-	static_assert(offsetof(LuaExpDescCodegenRuntimeView, info) == 0x04, "LuaExpDescCodegenRuntimeView::info offset must be 0x04");
-	static_assert(offsetof(LuaExpDescCodegenRuntimeView, aux) == 0x08, "LuaExpDescCodegenRuntimeView::aux offset must be 0x08");
-	static_assert(offsetof(LuaExpDescCodegenRuntimeView, t) == 0x0C, "LuaExpDescCodegenRuntimeView::t offset must be 0x0C");
-	static_assert(offsetof(LuaExpDescCodegenRuntimeView, f) == 0x10, "LuaExpDescCodegenRuntimeView::f offset must be 0x10");
-
-	struct LuaFuncStateUpvalueRuntimeView
-	{
-		Proto* functionProto;
-		std::uint8_t reserved04To0B[0x08];
-		void* lexState;
-		lua_State* state;
-		std::uint8_t reserved14To37[0x24];
-		LuaExpDescCodegenRuntimeView upvalues[0x20];
-	};
-
-	static_assert(
-		offsetof(LuaFuncStateUpvalueRuntimeView, functionProto) == 0x00,
-		"LuaFuncStateUpvalueRuntimeView::functionProto offset must be 0x00"
-	);
-	static_assert(
-		offsetof(LuaFuncStateUpvalueRuntimeView, lexState) == 0x0C,
-		"LuaFuncStateUpvalueRuntimeView::lexState offset must be 0x0C"
-	);
-	static_assert(
-		offsetof(LuaFuncStateUpvalueRuntimeView, state) == 0x10,
-		"LuaFuncStateUpvalueRuntimeView::state offset must be 0x10"
-	);
-	static_assert(
-		offsetof(LuaFuncStateUpvalueRuntimeView, upvalues) == 0x38,
-		"LuaFuncStateUpvalueRuntimeView::upvalues offset must be 0x38"
-	);
-
 #if INTPTR_MAX == INT32_MAX
 	// Table's own offsets are asserted at its definition in LuaRuntimeTypes.h,
 	// where each one cites the instruction it was read from. They used to be
@@ -1048,9 +958,6 @@ namespace
 	Table* LuaDebugGetSizesTable(lua_State* const state);
 }
 
-struct FuncState;
-struct expdesc;
-
 extern "C"
 {
 	void luaC_collectgarbage(lua_State* L);
@@ -1076,8 +983,8 @@ extern "C"
 	int luaK_codeABC(FuncState* fs, int o, int a, int b, int c);
 	void luaK_dischargevars(FuncState* fs, expdesc* e);
 	void luaK_nil(FuncState* fs, int from, int n);
-	void luaX_checklimit(void* ls, int v, int l, const char* what);
-	void luaX_syntaxerror(void* ls, const char* msg);
+	void luaX_checklimit(LexState* ls, int v, int l, const char* what);
+	void luaX_syntaxerror(LexState* ls, const char* msg);
 	TString* luaS_newlstr(lua_State* L, const char* str, size_t len);
 	// Lua nil sentinel TObject. The Lua VM core that originally owned this
 	// global is not part of the recovered link set, so it is defined here with
@@ -3912,12 +3819,11 @@ extern "C"
 	 */
 	extern "C" void luaK_fixjump(const int to, const int from, FuncState* const fs)
 	{
-		auto* const fsRuntime = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
-		Instruction* const jmp = &fsRuntime->functionProto->code[from];
+		Instruction* const jmp = &fs->f->code[from];
 		const int offset = to - (from + 1);
 		constexpr int kMaxArgSBx = 0x1FFFF;
 		if (offset > kMaxArgSBx || offset < -kMaxArgSBx) {
-			luaX_syntaxerror(fsRuntime->lexState, "control structure too long");
+			luaX_syntaxerror(fs->ls, "control structure too long");
 		}
 		*jmp = (*jmp & ~(static_cast<Instruction>(0x3FFFFu) << 6))
 			| ((static_cast<Instruction>(offset) + kMaxArgSBx) << 6);
@@ -3942,8 +3848,7 @@ extern "C"
 			return;
 		}
 
-		const auto* const fsRuntime = reinterpret_cast<const LuaFuncStateCodegenRuntimeView*>(fs);
-		const Instruction* const code = fsRuntime->functionProto->code;
+		const Instruction* const code = fs->f->code;
 		while (true) {
 			const int signedOffset = LuaInstructionSignedOffset(code[list]);
 			if (signedOffset == LUA_MULTRET) {
@@ -3970,16 +3875,15 @@ extern "C"
 	 */
 	int addk(TObject* const valueObject, FuncState* const functionState, TObject* const keyObject)
 	{
-		auto* const fsRuntime = reinterpret_cast<LuaFuncStateConstantRuntimeView*>(functionState);
-		const TObject* const lookupSlot = luaH_get(fsRuntime->constantLookupTable, keyObject);
+		const TObject* const lookupSlot = luaH_get(functionState->h, keyObject);
 		if (lookupSlot->tt == LUA_TNUMBER) {
 			return static_cast<int>(lookupSlot->value.n);
 		}
 
-		Proto* const functionProto = fsRuntime->functionProto;
-		if (fsRuntime->constantCount + 1 > functionProto->sizek) {
+		Proto* const functionProto = functionState->f;
+		if (functionState->nk + 1 > functionProto->sizek) {
 			functionProto->k = static_cast<TObject*>(luaM_growaux(
-				fsRuntime->state,
+				functionState->L,
 				functionProto->k,
 				&functionProto->sizek,
 				static_cast<int>(sizeof(TObject)),
@@ -3988,14 +3892,14 @@ extern "C"
 			));
 		}
 
-		functionProto->k[fsRuntime->constantCount] = *valueObject;
+		functionProto->k[functionState->nk] = *valueObject;
 
-		TObject* const insertedSlot = luaH_set(fsRuntime->state, fsRuntime->constantLookupTable, keyObject);
-		insertedSlot->value.n = static_cast<float>(fsRuntime->constantCount);
+		TObject* const insertedSlot = luaH_set(functionState->L, functionState->h, keyObject);
+		insertedSlot->value.n = static_cast<float>(functionState->nk);
 		insertedSlot->tt = LUA_TNUMBER;
 
-		const int constantIndex = fsRuntime->constantCount;
-		fsRuntime->constantCount = constantIndex + 1;
+		const int constantIndex = functionState->nk;
+		functionState->nk = constantIndex + 1;
 		return constantIndex;
 	}
 
@@ -4008,44 +3912,15 @@ extern "C"
 	 */
 	int nil_constant(FuncState* const functionState)
 	{
-		auto* const fsRuntime = reinterpret_cast<LuaFuncStateConstantRuntimeView*>(functionState);
-
 		TObject nilValue{};
 		nilValue.tt = LUA_TNIL;
 
 		TObject keyObject{};
-		keyObject.value.p = fsRuntime->constantLookupTable;
-		keyObject.tt = static_cast<int>(fsRuntime->constantLookupTable->tt);
+		keyObject.value.p = functionState->h;
+		keyObject.tt = static_cast<int>(functionState->h->tt);
 
 		return addk(&nilValue, functionState, &keyObject);
 	}
-
-	struct LuaDischargeExpdescRuntimeView
-	{
-		int k;
-		int info;
-		int aux;
-		int t;
-		int f;
-	};
-
-	struct LuaDischargeLexStateRuntimeView
-	{
-		int current;
-		int linenumber;
-		int lastline;
-	};
-
-	static_assert(offsetof(LuaDischargeExpdescRuntimeView, k) == 0x00, "LuaDischargeExpdescRuntimeView::k offset must be 0x00");
-	static_assert(offsetof(LuaDischargeExpdescRuntimeView, info) == 0x04, "LuaDischargeExpdescRuntimeView::info offset must be 0x04");
-	static_assert(offsetof(LuaDischargeExpdescRuntimeView, aux) == 0x08, "LuaDischargeExpdescRuntimeView::aux offset must be 0x08");
-	static_assert(offsetof(LuaDischargeExpdescRuntimeView, t) == 0x0C, "LuaDischargeExpdescRuntimeView::t offset must be 0x0C");
-	static_assert(offsetof(LuaDischargeExpdescRuntimeView, f) == 0x10, "LuaDischargeExpdescRuntimeView::f offset must be 0x10");
-	static_assert(sizeof(LuaDischargeExpdescRuntimeView) == 0x14, "LuaDischargeExpdescRuntimeView size must be 0x14");
-	static_assert(offsetof(LuaDischargeLexStateRuntimeView, current) == 0x00, "LuaDischargeLexStateRuntimeView::current offset must be 0x00");
-	static_assert(offsetof(LuaDischargeLexStateRuntimeView, linenumber) == 0x04, "LuaDischargeLexStateRuntimeView::linenumber offset must be 0x04");
-	static_assert(offsetof(LuaDischargeLexStateRuntimeView, lastline) == 0x08, "LuaDischargeLexStateRuntimeView::lastline offset must be 0x08");
-	static_assert(sizeof(LuaDischargeLexStateRuntimeView) == 0x0C, "LuaDischargeLexStateRuntimeView size must be 0x0C");
 
 	/**
 	 * Address: 0x00910970 (FUN_00910970, discharge2reg)
@@ -4056,58 +3931,55 @@ extern "C"
 	 */
 	extern "C" void discharge2reg(expdesc* const e, const int reg, FuncState* const fs)
 	{
-		constexpr int kExpKindNil = 1;
-		constexpr int kExpKindTrue = 2;
-		constexpr int kExpKindFalse = 3;
-		constexpr int kExpKindConstant = 4;
-		constexpr int kExpKindRelocatable = 10;
-		constexpr int kExpKindNonReloc = 11;
 		constexpr int kLuaOpMove = 0;
 		constexpr int kLuaOpLoadBool = 2;
-
-		auto* const expr = reinterpret_cast<LuaDischargeExpdescRuntimeView*>(e);
-		auto* const fsRuntime = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
+		constexpr int kLuaOpLoadK = 1;
 
 		luaK_dischargevars(fs, e);
 
-		switch (expr->k) {
-		case kExpKindNil:
+		switch (e->k) {
+		case VNIL:
 			luaK_nil(fs, reg, 1);
-			expr->info = reg;
-			expr->k = kExpKindNonReloc;
+			e->info = reg;
+			e->k = VNONRELOC;
 			break;
 
-		case kExpKindTrue:
-		case kExpKindFalse:
-			luaK_codeABC(fs, kLuaOpLoadBool, reg, expr->k == kExpKindTrue ? 1 : 0, 0);
-			expr->info = reg;
-			expr->k = kExpKindNonReloc;
+		case VTRUE:
+		case VFALSE:
+			luaK_codeABC(fs, kLuaOpLoadBool, reg, e->k == VTRUE ? 1 : 0, 0);
+			e->info = reg;
+			e->k = VNONRELOC;
 			break;
 
-		case kExpKindConstant:
+		case VK:
+			// OP_LOADK is iABx: A is the destination register, Bx the constant
+			// index. The original open-codes the pack rather than calling
+			// luaK_codeABx, and stamps the line from the last token consumed.
 			luaK_code(
 				fs,
-				static_cast<Instruction>(((expr->info | (reg << 18)) << 6) | 1),
-				static_cast<int>(reinterpret_cast<LuaDischargeLexStateRuntimeView*>(fsRuntime->lexState)->lastline)
+				static_cast<Instruction>(((e->info | (reg << 18)) << 6) | kLuaOpLoadK),
+				fs->ls->lastline
 			);
-			expr->info = reg;
-			expr->k = kExpKindNonReloc;
+			e->info = reg;
+			e->k = VNONRELOC;
 			break;
 
-		case kExpKindRelocatable:
-			fsRuntime->functionProto->code[expr->info] =
-				(reg << 24) | (static_cast<unsigned int>(fsRuntime->functionProto->code[expr->info]) & 0x00FFFFFFu);
-			expr->info = reg;
-			expr->k = kExpKindNonReloc;
+		case VRELOCABLE:
+			// The instruction at e->info was emitted with its A field blank;
+			// patch the destination register in without touching B/C.
+			fs->f->code[e->info] =
+				(reg << 24) | (static_cast<unsigned int>(fs->f->code[e->info]) & 0x00FFFFFFu);
+			e->info = reg;
+			e->k = VNONRELOC;
 			break;
 
-		case kExpKindNonReloc: {
-			const int info = expr->info;
+		case VNONRELOC: {
+			const int info = e->info;
 			if (reg != info) {
 				luaK_codeABC(fs, kLuaOpMove, reg, info, 0);
 			}
-			expr->info = reg;
-			expr->k = kExpKindNonReloc;
+			e->info = reg;
+			e->k = VNONRELOC;
 			break;
 		}
 
@@ -4719,24 +4591,24 @@ extern "C"
 	 */
 	void discharge2anyreg(FuncState* const fs, expdesc* const e)
 	{
-		constexpr int kExpKindNonReloc = 0x0B;
 		constexpr int kLuaMaxFunctionRegisterSlots = 0xFA;
 
-		auto* const fsView = reinterpret_cast<LuaFuncStateCodegenRuntimeView*>(fs);
-		const auto* const expView = reinterpret_cast<const LuaExpDescCodegenRuntimeView*>(e);
-		if (expView->kind == kExpKindNonReloc) {
+		if (e->k == VNONRELOC) {
 			return;
 		}
 
-		const int requiredRegisterCount = fsView->freeRegister + 1;
-		if (requiredRegisterCount > static_cast<int>(fsView->functionProto->maxstacksize)) {
+		// luaK_reserveregs(fs, 1) is inlined here, and with it luaK_checkstack:
+		// the stack only has to grow when the new register passes the high
+		// water mark, and MAXSTACK (0xFA) is the hard cap.
+		const int requiredRegisterCount = fs->freereg + 1;
+		if (requiredRegisterCount > static_cast<int>(fs->f->maxstacksize)) {
 			if (requiredRegisterCount >= kLuaMaxFunctionRegisterSlots) {
-				luaX_syntaxerror(fsView->lexState, "function or expression too complex");
+				luaX_syntaxerror(fs->ls, "function or expression too complex");
 			}
-			fsView->functionProto->maxstacksize = static_cast<lu_byte>(requiredRegisterCount);
+			fs->f->maxstacksize = static_cast<lu_byte>(requiredRegisterCount);
 		}
 
-		discharge2reg(e, fsView->freeRegister++, fs);
+		discharge2reg(e, fs->freereg++, fs);
 	}
 
 	/**
@@ -4749,30 +4621,27 @@ extern "C"
 	 */
 	int indexupvalue(FuncState* const fs, expdesc* const value, TString* const name)
 	{
-		constexpr int kLuaMaxUpvalues = 0x20;
 		constexpr int kLuaIntMaxMinusTwo = 0x7FFFFFFD;
 		constexpr int kUpvalueNameEntrySizeBytes = 4;
 
-		auto* const fsView = reinterpret_cast<LuaFuncStateUpvalueRuntimeView*>(fs);
-		Proto* const proto = fsView->functionProto;
-		const auto* const valueView = reinterpret_cast<const LuaExpDescCodegenRuntimeView*>(value);
+		Proto* const proto = fs->f;
 
 		int index = 0;
 		const int existingUpvalueCount = static_cast<int>(proto->nups);
 		while (index < existingUpvalueCount) {
-			const LuaExpDescCodegenRuntimeView& slot = fsView->upvalues[index];
-			if (slot.kind == valueView->kind && slot.info == valueView->info) {
+			const expdesc& slot = fs->upvalues[index];
+			if (slot.k == value->k && slot.info == value->info) {
 				return index;
 			}
 			++index;
 		}
 
-		luaX_checklimit(fsView->lexState, existingUpvalueCount + 1, kLuaMaxUpvalues, "upvalues");
+		luaX_checklimit(fs->ls, existingUpvalueCount + 1, MAXUPVALUES, "upvalues");
 		int& upvalueCapacity = proto->sizeupvalues;
 		if (existingUpvalueCount + 1 > upvalueCapacity) {
 			proto->upvalues = static_cast<TString**>(
 				luaM_growaux(
-					fsView->state,
+					fs->L,
 					proto->upvalues,
 					&upvalueCapacity,
 					kUpvalueNameEntrySizeBytes,
@@ -4783,7 +4652,7 @@ extern "C"
 		}
 
 		proto->upvalues[existingUpvalueCount] = name;
-		fsView->upvalues[existingUpvalueCount] = *valueView;
+		fs->upvalues[existingUpvalueCount] = *value;
 		proto->nups = static_cast<lu_byte>(existingUpvalueCount + 1);
 		return existingUpvalueCount;
 	}
