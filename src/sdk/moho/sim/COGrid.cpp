@@ -1230,7 +1230,7 @@ namespace moho
    * unit of a different formation-layer that is not an ignorable source unit
    * lies inside the swept volume.
    */
-  [[nodiscard]] static bool SweptPathBlockedByUnit(
+  [[nodiscard]] bool SweptPathBlockedByUnit(
     COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
   {
     if (!Wm3::Vector3f::Compare(&fromCenter, &toCenter)) {

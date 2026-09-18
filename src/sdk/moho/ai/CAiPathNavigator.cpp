@@ -761,11 +761,30 @@ namespace
       footprint.mSizeX,
       footprint.mSizeZ
     );
-    const Wm3::Vector3f& unitWorldPos = pathFinder->mUnit->GetPosition();
-    const bool hasSegment = Wm3::Vector3f::Compare(&unitWorldPos, &targetWorldPos);
+    // 0x005AF5B0 sweeps the unit's footprint along the *actual* segment from
+    // where the unit is standing to the target cell's world position, then
+    // tail-calls the same-cell transition test:
+    //
+    //   0x005AF611  cmp byte [nav+0x95], 0 / setne / add 1   ; mode = 1 or 2
+    //   0x005AF62A  call [unit vtable +0x14]                 ; GetPosition()
+    //   0x005AF62F  call 0x7216D0                            ; swept test
+    //   0x005AF636  jne -> 0x005AF657                        ; blocked -> false
+    //   0x005AF648  call 0x005AF670                          ; CanPathCellTransition(cell, cell)
+    //
+    // This had neither of those: the swept call was replaced by a
+    // `CanTraverseCell(targetCell)` endpoint test gated on a `hasSegment`
+    // comparison and a Manhattan-distance check, none of which the binary
+    // performs. The consequence is that the target-point advance was allowed
+    // to skip to a far path node without anything examining the ground between
+    // here and there, so a unit string-pulled straight across obstacles the
+    // path had routed around.
+    COGrid* const grid = const_cast<COGrid*>(GetPathingGrid(navigator));
+    if (grid == nullptr) {
+      return false;
+    }
 
-    if (hasSegment && ManhattanDistance(navigator.mCurrentPos, targetCell) > 1 &&
-        !pathFinder->CanTraverseCell(targetCell)) {
+    const int sweepMode = (navigator.mUseExtendedPathProbe != 0u) ? 2 : 1;
+    if (SweptPathBlockedByUnit(*grid, pathFinder->mUnit, pathFinder->mUnit->GetPosition(), targetWorldPos, sweepMode)) {
       return false;
     }
 
