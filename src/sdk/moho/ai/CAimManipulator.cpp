@@ -709,16 +709,22 @@ namespace
    * a 24-bit mantissa, which hides almost all of that -- which is exactly why a
    * lockstep match normally survives for hours before anything shows.
    *
-   * It is not a complete fix, and this is a live desync vector in the shipped
-   * game: turret aiming runs here every tick for every weapon, so one argument
-   * landing in a region where the two vendors differ by more than the 24-bit
-   * rounding hides is enough to flip a comparison on one machine only. That
-   * client then creates or destroys one effect entity out of step, which skews
-   * `EntityDB`'s per-family id free list, and `Sim::UpdateChecksum` hashes
-   * `Entity::id_` -- so the beat checksum diverges with no visible difference in
-   * unit state. Investigated against game 27801260 (see the desync report):
-   * sole desyncing client, reproduces bit-identically from that client's
-   * replay, and no NaN, denormal-flush or rounding-mode explanation survives.
+   * MEASURED, AND IT IS NOT A LIVE DESYNC VECTOR -- recorded here because it
+   * looks like one and will be re-proposed otherwise. Under `_PC_24`, x87
+   * `fsin`/`fcos` were compared against the correctly-rounded reference over
+   * ~1.4M *distinct* float values: 320,008 consecutive floats spanning 1*pi
+   * through 8*pi (where Intel's reduction is worst), 917,504 sampled
+   * exhaustively across exponent bands 2^0..2^7, and 160,004 around odd
+   * multiples of pi/2 for `cos`. Deviation was **zero ulp everywhere**. At
+   * 24-bit precision these instructions are correctly rounded, so any CPU
+   * accurate to better than half a float-ulp produces the identical `float` and
+   * the vendor difference cannot be observed. Note the earlier sweep that
+   * "confirmed" a difference was bogus: it stepped a `double` by 1e-8 and cast
+   * to `float`, so millions of samples collapsed onto a handful of distinct
+   * floats.
+   *
+   * So `_PC_24` is doing real work -- it is what makes the x87 transcendentals
+   * safe for lockstep, not merely tidy. That is the reason to keep it.
    *
    * `std::sin`/`std::cos` here do NOT lower to `fsin`/`fcos`; on the modern
    * toolchain they call the CRT's SSE2 software implementations, which are
