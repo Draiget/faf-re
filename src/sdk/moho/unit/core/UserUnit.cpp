@@ -243,57 +243,6 @@ namespace
   // have silently misread `layerMask`/`minRange`/`maxRange` here instead of
   // failing to compile.
 
-  struct UserUnitLuaRuntimeView
-  {
-    std::uint8_t pad_0000_0120[0x120];
-    UserArmy* army; // +0x120
-    std::uint8_t pad_0124_01A2[0x1A2 - 0x124];
-    std::uint8_t isBusy; // +0x1A2
-    std::uint8_t pad_01A3_01AC[0x1AC - 0x1A3];
-    std::int32_t stunTicks; // +0x1AC
-    std::uint8_t pad_01B0_01C0[0x1C0 - 0x1B0];
-    std::int32_t tacticalSiloBuildCount;      // +0x1C0
-    std::int32_t nukeSiloBuildCount;          // +0x1C4
-    std::int32_t tacticalSiloStorageCount;    // +0x1C8
-    std::int32_t nukeSiloStorageCount;        // +0x1CC
-    std::int32_t tacticalSiloMaxStorageCount; // +0x1D0
-    std::int32_t nukeSiloMaxStorageCount;     // +0x1D4
-    std::uint8_t pad_01D8_01DC[0x1DC - 0x1D8];
-    msvc8::string customName; // +0x1DC
-    float energyProducedPerSecond;  // +0x1F8
-    float massProducedPerSecond;    // +0x1FC
-    float energyConsumedPerSecond;  // +0x200
-    float massConsumedPerSecond;    // +0x204
-    float energyRequestedPerSecond; // +0x208
-    float massRequestedPerSecond;   // +0x20C
-    EntId focusEntityId;            // +0x210
-    EntId guardedEntityId;          // +0x214
-    std::uint8_t pad_0218_03C0[0x3C0 - 0x218];
-    std::uintptr_t creatorWeakOwnerSlot; // +0x3C0
-  };
-  static_assert(offsetof(UserUnitLuaRuntimeView, army) == 0x120, "UserUnitLuaRuntimeView::army offset must be 0x120");
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, isBusy) == 0x1A2, "UserUnitLuaRuntimeView::isBusy offset must be 0x1A2"
-  );
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, stunTicks) == 0x1AC, "UserUnitLuaRuntimeView::stunTicks offset must be 0x1AC"
-  );
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, customName) == 0x1DC, "UserUnitLuaRuntimeView::customName offset must be 0x1DC"
-  );
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, focusEntityId) == 0x210,
-    "UserUnitLuaRuntimeView::focusEntityId offset must be 0x210"
-  );
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, guardedEntityId) == 0x214,
-    "UserUnitLuaRuntimeView::guardedEntityId offset must be 0x214"
-  );
-  static_assert(
-    offsetof(UserUnitLuaRuntimeView, creatorWeakOwnerSlot) == 0x3C0,
-    "UserUnitLuaRuntimeView::creatorWeakOwnerSlot offset must be 0x3C0"
-  );
-
   struct UserUnitLuaObjectRuntimeView
   {
     std::uint8_t pad_0000_0170[0x170];
@@ -739,16 +688,6 @@ namespace
     const auto* const stateView = reinterpret_cast<const UserUnitIUnitStateBridgeView*>(bridge);
     const std::uint64_t stateMask = (std::uint64_t{1} << stateIndex);
     return (stateView->unitStates & stateMask) != 0u;
-  }
-
-  [[nodiscard]] const UserUnitLuaRuntimeView& GetLuaRuntimeView(const UserUnit* const self) noexcept
-  {
-    return *reinterpret_cast<const UserUnitLuaRuntimeView*>(self);
-  }
-
-  [[nodiscard]] UserUnitLuaRuntimeView& GetLuaRuntimeView(UserUnit* const self) noexcept
-  {
-    return *reinterpret_cast<UserUnitLuaRuntimeView*>(self);
   }
 
   [[nodiscard]] const UserUnitLuaObjectRuntimeView& GetUserUnitLuaObjectView(const UserUnit* const self) noexcept
@@ -1743,7 +1682,7 @@ namespace
    */
   [[nodiscard]] bool IsDockTargetQueueIdle(const UserUnit* const unit) noexcept
   {
-    if (unit == nullptr || GetLuaRuntimeView(unit).isBusy != 0u) {
+    if (unit == nullptr || unit->mUnitVarDat.mIsBusy != 0u) {
       return false;
     }
 
@@ -4141,7 +4080,7 @@ UserUnit::UserUnit(CWldSession* const session, const SCreateUnitParams& params)
 UserUnit::~UserUnit()
 {
   UserEntity* const entityView = this;
-  UserArmy* const army = GetLuaRuntimeView(this).army;
+  UserArmy* const army = this->mArmy;
   const IUnit* const iunitBridge = GetIUnitBridge(this);
 
   if (army != nullptr && iunitBridge != nullptr) {
@@ -4589,7 +4528,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
 
   UserEntity* const entityView = reinterpret_cast<UserEntity*>(this);
   const IUnit* const iunitBridge = GetIUnitBridge(this);
-  UserArmy* const army = GetLuaRuntimeView(this).army;
+  UserArmy* const army = this->mArmy;
   if (iunitBridge->IsDead()) {
     if (army != nullptr) {
       const RUnitBlueprint* const blueprint = iunitBridge->GetBlueprint();
@@ -4614,7 +4553,7 @@ void UserUnit::Tick(const std::int32_t seqNo)
     return;
   }
 
-  const bool isQueueEmpty = GetLuaRuntimeView(this).isBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
+  const bool isQueueEmpty = this->mUnitVarDat.mIsBusy == 0u && IsUserCommandManagerQueueEmpty(mManager);
   if (isQueueEmpty != mQueueEmptyCached) {
     if (army != nullptr) {
       if (mIsEngineer) {
@@ -7160,7 +7099,7 @@ int moho::cfunc_UserUnitIsStunnedL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  lua_pushboolean(rawState, GetLuaRuntimeView(userUnit).stunTicks != 0 ? 1 : 0);
+  lua_pushboolean(rawState, userUnit->mUnitVarDat.mStunTicks != 0 ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
 }
@@ -7212,7 +7151,7 @@ int moho::cfunc_UserUnitGetCustomNameL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
   if (userUnit != nullptr) {
-    const msvc8::string& customName = GetLuaRuntimeView(userUnit).customName;
+    const msvc8::string& customName = userUnit->mUnitVarDat.mCustomName;
     if (!customName.empty()) {
       lua_pushstring(rawState, customName.c_str());
       (void)lua_gettop(rawState);
@@ -7337,7 +7276,7 @@ int moho::cfunc_UserUnitIsIdleL(LuaPlus::LuaState* const state)
   UserUnit* const userUnit = GetUserUnitOptional(userUnitObject, state);
 
   bool isIdle = false;
-  if (userUnit != nullptr && GetLuaRuntimeView(userUnit).isBusy == 0u) {
+  if (userUnit != nullptr && userUnit->mUnitVarDat.mIsBusy == 0u) {
     const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetCommandQueue());
     if (commandRange == nullptr || commandRange->begin == commandRange->end) {
       isIdle = true;
@@ -7398,7 +7337,7 @@ int moho::cfunc_UserUnitGetFocusL(LuaPlus::LuaState* const state)
 
   UserEntity* const userEntity = ResolveUserEntityView(userUnit);
   UserEntity* const focusEntity =
-    FindSessionEntityById(userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(GetLuaRuntimeView(userUnit).focusEntityId));
+    FindSessionEntityById(userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(userUnit->mUnitVarDat.mFocusUnit));
 
   if (focusEntity != nullptr) {
     if (UserUnit* const focusUnit = focusEntity->IsUserUnit(); focusUnit != nullptr) {
@@ -7465,7 +7404,7 @@ int moho::cfunc_UserUnitGetGuardedEntityL(LuaPlus::LuaState* const state)
 
   UserEntity* const userEntity = ResolveUserEntityView(userUnit);
   UserEntity* const guardedEntity = FindSessionEntityById(
-    userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(GetLuaRuntimeView(userUnit).guardedEntityId)
+    userEntity ? userEntity->mSession : nullptr, static_cast<std::int32_t>(userUnit->mUnitVarDat.mGuardedUnit)
   );
 
   if (guardedEntity != nullptr) {
@@ -7530,7 +7469,7 @@ int moho::cfunc_UserUnitGetCreatorL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  const std::uintptr_t creatorOwnerSlot = GetLuaRuntimeView(userUnit).creatorWeakOwnerSlot;
+  const auto creatorOwnerSlot = reinterpret_cast<std::uintptr_t>(userUnit->mCreator.ownerLinkSlot);
   UserEntity* creatorEntity = nullptr;
   if (creatorOwnerSlot > kUserEntityWeakOwnerOffset) {
     creatorEntity = reinterpret_cast<UserEntity*>(creatorOwnerSlot - kUserEntityWeakOwnerOffset);
@@ -7652,7 +7591,7 @@ int moho::cfunc_UserUnitGetArmyL(LuaPlus::LuaState* const state)
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
   int armyIndex = -1;
-  if (const UserArmy* const army = GetLuaRuntimeView(userUnit).army; army != nullptr) {
+  if (const UserArmy* const army = userUnit->mArmy; army != nullptr) {
     armyIndex = static_cast<int>(army->mArmyIndex);
   }
   if (armyIndex != -1) {
@@ -7710,16 +7649,16 @@ int moho::cfunc_UserUnitGetEconDataL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  const UserUnitLuaRuntimeView& runtime = GetLuaRuntimeView(userUnit);
+  const SSTIUnitVariableData& runtime = userUnit->mUnitVarDat;
 
   LuaPlus::LuaObject econTable;
   econTable.AssignNewTable(state, 0, 0);
-  econTable.SetNumber(kEconEnergyConsumedKey, runtime.energyConsumedPerSecond * kEconomyPerSecondToUiRate);
-  econTable.SetNumber(kEconMassConsumedKey, runtime.massConsumedPerSecond * kEconomyPerSecondToUiRate);
-  econTable.SetNumber(kEconEnergyRequestedKey, runtime.energyRequestedPerSecond * kEconomyPerSecondToUiRate);
-  econTable.SetNumber(kEconMassRequestedKey, runtime.massRequestedPerSecond * kEconomyPerSecondToUiRate);
-  econTable.SetNumber(kEconEnergyProducedKey, runtime.energyProducedPerSecond * kEconomyPerSecondToUiRate);
-  econTable.SetNumber(kEconMassProducedKey, runtime.massProducedPerSecond * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconEnergyConsumedKey, runtime.mResourcesSpent.ENERGY * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconMassConsumedKey, runtime.mResourcesSpent.MASS * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconEnergyRequestedKey, runtime.mMaintainenceCost.ENERGY * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconMassRequestedKey, runtime.mMaintainenceCost.MASS * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconEnergyProducedKey, runtime.mProduced.ENERGY * kEconomyPerSecondToUiRate);
+  econTable.SetNumber(kEconMassProducedKey, runtime.mProduced.MASS * kEconomyPerSecondToUiRate);
   econTable.PushStack(state);
   return 1;
 }
@@ -7860,16 +7799,16 @@ int moho::cfunc_UserUnitGetMissileInfoL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
-  const UserUnitLuaRuntimeView& runtime = GetLuaRuntimeView(userUnit);
+  const SSTIUnitVariableData& runtime = userUnit->mUnitVarDat;
 
   LuaPlus::LuaObject missileInfoTable;
   missileInfoTable.AssignNewTable(state, 0, 0);
-  missileInfoTable.SetInteger(kMissileTacticalBuildCountKey, runtime.tacticalSiloBuildCount);
-  missileInfoTable.SetInteger(kMissileTacticalStorageCountKey, runtime.tacticalSiloStorageCount);
-  missileInfoTable.SetInteger(kMissileTacticalMaxStorageCountKey, runtime.tacticalSiloMaxStorageCount);
-  missileInfoTable.SetInteger(kMissileNukeBuildCountKey, runtime.nukeSiloBuildCount);
-  missileInfoTable.SetInteger(kMissileNukeStorageCountKey, runtime.nukeSiloStorageCount);
-  missileInfoTable.SetInteger(kMissileNukeMaxStorageCountKey, runtime.nukeSiloMaxStorageCount);
+  missileInfoTable.SetInteger(kMissileTacticalBuildCountKey, runtime.mTacticalSiloBuildCount);
+  missileInfoTable.SetInteger(kMissileTacticalStorageCountKey, runtime.mTacticalSiloStorageCount);
+  missileInfoTable.SetInteger(kMissileTacticalMaxStorageCountKey, runtime.mTacticalSiloMaxStorageCount);
+  missileInfoTable.SetInteger(kMissileNukeBuildCountKey, runtime.mNukeSiloBuildCount);
+  missileInfoTable.SetInteger(kMissileNukeStorageCountKey, runtime.mNukeSiloStorageCount);
+  missileInfoTable.SetInteger(kMissileNukeMaxStorageCountKey, runtime.mNukeSiloMaxStorageCount);
   missileInfoTable.PushStack(state);
   return 1;
 }
