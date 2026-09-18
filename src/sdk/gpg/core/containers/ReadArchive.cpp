@@ -8621,24 +8621,6 @@ ReadArchive& ReadArchive::TrackPointer(const RRef& objectRef)
 
 namespace
 {
-  struct TrackedPointerCopyLaneRuntimeView
-  {
-    void* objectLane = nullptr;                         // +0x00
-    gpg::RType* typeLane = nullptr;                     // +0x04
-    std::uint32_t stateLane = 0;                        // +0x08
-    boost::detail::sp_counted_base* sharedControlLane = nullptr; // +0x0C
-    void* sharedObjectLane = nullptr;                   // +0x10
-  };
-  static_assert(
-    offsetof(TrackedPointerCopyLaneRuntimeView, sharedControlLane) == 0x0C,
-    "TrackedPointerCopyLaneRuntimeView::sharedControlLane offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(TrackedPointerCopyLaneRuntimeView, sharedObjectLane) == 0x10,
-    "TrackedPointerCopyLaneRuntimeView::sharedObjectLane offset must be 0x10"
-  );
-  static_assert(sizeof(TrackedPointerCopyLaneRuntimeView) == 0x14, "TrackedPointerCopyLaneRuntimeView size must be 0x14");
-
   /**
    * Address: 0x009506C0 (FUN_009506C0)
    *
@@ -8678,61 +8660,6 @@ namespace
   {
     CopyConstructTypeHandleCountFromSingleSource(destinationBegin, repeatCount, sourceHandle);
   }
-
-  /**
-   * Address: 0x00950EA0 (FUN_00950EA0)
-   *
-   * What it does:
-   * Copies one tracked-pointer lane from `sourceLane` into each destination
-   * slot for `repeatCount` entries and retains copied shared-control lanes.
-   */
-  [[maybe_unused]] void CopyConstructTrackedPointerCountFromSingleSource(
-    TrackedPointerCopyLaneRuntimeView* const destinationBegin,
-    const std::int32_t repeatCount,
-    const TrackedPointerCopyLaneRuntimeView* const sourceLane
-  ) noexcept
-  {
-    std::uintptr_t destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
-    for (std::int32_t remaining = repeatCount; remaining > 0; --remaining) {
-      if (destinationAddress != 0u) {
-        auto* const destination = reinterpret_cast<TrackedPointerCopyLaneRuntimeView*>(destinationAddress);
-        destination->objectLane = sourceLane->objectLane;
-        destination->typeLane = sourceLane->typeLane;
-        destination->stateLane = sourceLane->stateLane;
-        destination->sharedControlLane = sourceLane->sharedControlLane;
-        if (destination->sharedControlLane != nullptr) {
-          destination->sharedControlLane->add_ref_copy();
-        }
-        destination->sharedObjectLane = sourceLane->sharedObjectLane;
-      }
-      destinationAddress += sizeof(TrackedPointerCopyLaneRuntimeView);
-    }
-  }
-
-  /**
-   * Address: 0x00951010 (FUN_00951010)
-   *
-   * What it does:
-   * Preserves one register-adapter lane for repeated tracked-pointer copy
-   * construction from a single source lane.
-   */
-  [[maybe_unused]] void CopyConstructTrackedPointerCountFromSingleSourceRegisterAdapterA(
-    TrackedPointerCopyLaneRuntimeView* const destinationBegin,
-    const std::int32_t repeatCount,
-    const TrackedPointerCopyLaneRuntimeView* const sourceLane
-  ) noexcept
-  {
-    CopyConstructTrackedPointerCountFromSingleSource(destinationBegin, repeatCount, sourceLane);
-  }
-
-  struct TrackedPointerVectorRuntimeView
-  {
-    void* proxyLane = nullptr;                 // +0x00
-    gpg::TrackedPointerInfo* beginLane = nullptr;    // +0x04
-    gpg::TrackedPointerInfo* endLane = nullptr;      // +0x08
-    gpg::TrackedPointerInfo* capacityLane = nullptr; // +0x0C
-  };
-  static_assert(offsetof(TrackedPointerVectorRuntimeView, endLane) == 0x08, "TrackedPointerVectorRuntimeView::endLane offset must be 0x08");
 
   /**
    * Address: 0x009506F0 (FUN_009506F0)
@@ -8884,32 +8811,6 @@ namespace
     ReleaseTrackedPointerInfoSharedRange(trackedBegin, trackedEnd);
   }
 
-  /**
-   * Address: 0x00951E40 (FUN_00951E40)
-   *
-   * What it does:
-   * Erases one tracked-pointer range from vector storage by moving the tail
-   * lane down, releasing detached shared-control lanes, and storing the output
-   * cursor at the erase-begin position.
-   */
-  [[maybe_unused]] gpg::TrackedPointerInfo** EraseTrackedPointerRangeAndStoreCursorRuntime(
-    TrackedPointerVectorRuntimeView* const trackedVector,
-    gpg::TrackedPointerInfo** const outCursor,
-    gpg::TrackedPointerInfo* const eraseFirst,
-    gpg::TrackedPointerInfo* const eraseLast
-  ) noexcept
-  {
-    if (eraseFirst != eraseLast) {
-      gpg::TrackedPointerInfo* const oldEnd = trackedVector->endLane;
-      gpg::TrackedPointerInfo* const newEnd =
-        MoveTrackedPointerRangeWithRetainedSharedOwners(eraseLast, oldEnd, eraseFirst);
-      ReleaseTrackedPointerInfoSharedRange(newEnd, oldEnd);
-      trackedVector->endLane = newEnd;
-    }
-
-    *outCursor = eraseFirst;
-    return outCursor;
-  }
 } // namespace
 
 /**

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace boost
 {
   template <class T>
@@ -88,14 +90,50 @@ namespace gpg
     Shared = 3,
   };
 
+  /**
+   * One entry in the archive's pointer-tracking table
+   * (`ReadArchive::mTrackedPtrs`, at +0x14 of the archive).
+   *
+   * The original field names survive in an assert string the binary still
+   * carries: 0x00884CE6 pushes "ptrinfo.mObj.GetRType()->mDelete" alongside
+   * the source path "c:\work\rts\main\code\src\libs\gpgcore/reflection/
+   * serializat...". So `{object, type}` was one embedded `RRef mObj`, and
+   * `{sharedObject, sharedControl}` was one `boost::shared_ptr<void>` whose
+   * copy/assign/destroy the emissions below are. The flat spelling kept here
+   * is what every recovered call site already reads; regrouping them into the
+   * two real sub-objects is a separate pass.
+   *
+   * The trailing three fields are ordered from four independent functions,
+   * because a duplicate of this layout in ReadArchive.cpp had disagreed with
+   * it and nothing was checking:
+   *   0x00953B30 (`TrackPointer`) builds one on the stack - [+0x08]=0,
+   *     [+0x0C]=0, [+0x10]=2 (`Owned`) - then runs the full
+   *     `sp_counted_base::release()` on [+0x0C] as the temporary dies.
+   *   0x00950EA0 copy-constructs n slots from one source - +0x00, +0x04 and
+   *     +0x08 plain, +0x0C `add_ref_copy()`, +0x10 plain, stride 0x14.
+   *   0x009506F0 copy-assigns a range - +0x0C takes the whole
+   *     add-ref-new / release-old / store dance, +0x08 and +0x10 plain.
+   *   0x00884C90 gates promote-to-shared on `cmp [edi+0x10], 1` (`Unowned`)
+   *     and writes 3 (`Shared`), and hands `this+0x08` to the shared-pointer
+   *     constructor as its `this`.
+   * `ReadArchive::EndSection` (0x00952BD0) agrees from a fifth site: it tests
+   * `cmp dword ptr [eax+esi+10h], 1` to pick the entries it may delete.
+   */
   struct TrackedPointerInfo
   {
-    void* object = nullptr;
-    RType* type = nullptr;
-    TrackedPointerState state = TrackedPointerState::Reserved;
-    void* sharedObject = nullptr;
-    boost::detail::sp_counted_base* sharedControl = nullptr;
+    void* object = nullptr;                                    // +0x00
+    RType* type = nullptr;                                     // +0x04
+    void* sharedObject = nullptr;                              // +0x08
+    boost::detail::sp_counted_base* sharedControl = nullptr;    // +0x0C
+    TrackedPointerState state = TrackedPointerState::Reserved;  // +0x10
   };
+  static_assert(
+    offsetof(TrackedPointerInfo, sharedObject) == 0x08, "TrackedPointerInfo::sharedObject offset must be 0x08"
+  );
+  static_assert(
+    offsetof(TrackedPointerInfo, sharedControl) == 0x0C, "TrackedPointerInfo::sharedControl offset must be 0x0C"
+  );
+  static_assert(offsetof(TrackedPointerInfo, state) == 0x10, "TrackedPointerInfo::state offset must be 0x10");
   static_assert(sizeof(TrackedPointerInfo) == 0x14, "TrackedPointerInfo size must be 0x14");
 
   struct TypeHandle
