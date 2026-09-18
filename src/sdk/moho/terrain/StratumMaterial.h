@@ -112,8 +112,12 @@ namespace moho
     std::uint8_t byte1{0};                       // +0x01
     std::uint8_t pad02_03[2]{};                  // +0x02
     msvc8::string mShaderName{};                 // +0x04
-    std::uint32_t v1{0};                         // +0x20
-    std::uint32_t v2{0};                         // +0x24
+    /// The stratum-mask textures' own dimensions, half the chart size:
+    /// `CWldTerrainRes::Reset` halves each axis (0x008A65AC/0x008A65B1) and
+    /// stores them here (0x008A65B3, 0x008A65B9) right before creating the
+    /// two masks below at that size.
+    std::uint32_t mStratumMaskWidth{0};          // +0x20
+    std::uint32_t mStratumMaskHeight{0};         // +0x24
     boost::SharedPtrRaw<RD3DTextureResource> mStratumMask0{}; // +0x28
     boost::SharedPtrRaw<RD3DTextureResource> mStratumMask1{}; // +0x30
     CStratumMaterial mLowerAlbedoTexture{};      // +0x38

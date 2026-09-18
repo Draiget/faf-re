@@ -95,41 +95,6 @@ namespace
   constexpr int kTerrainRawSheetFormat = 12;
   constexpr int kTerrainMaskSheetFormat = 2;
 
-  struct Stride76RangeRuntimeView
-  {
-    std::uint32_t lane00 = 0;
-    const std::uint8_t* begin = nullptr; // +0x04
-    const std::uint8_t* end = nullptr;   // +0x08
-  };
-  static_assert(
-    offsetof(Stride76RangeRuntimeView, begin) == 0x04,
-    "Stride76RangeRuntimeView::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(Stride76RangeRuntimeView, end) == 0x08,
-    "Stride76RangeRuntimeView::end offset must be 0x08"
-  );
-
-  /**
-   * Address: 0x00889FE0 (FUN_00889FE0)
-   *
-   * What it does:
-   * Returns the number of 76-byte records currently stored in one raw
-   * begin/end range lane.
-   */
-  [[maybe_unused]] std::int32_t CountStride76RecordsRuntime(
-    const Stride76RangeRuntimeView* const range
-  ) noexcept
-  {
-    const std::uint8_t* const begin = range != nullptr ? range->begin : nullptr;
-    if (begin == nullptr) {
-      return 0;
-    }
-
-    const std::uint8_t* const end = range->end;
-    return static_cast<std::int32_t>((end - begin) / 76);
-  }
-
   struct QuaternionLanes
   {
     float w;
@@ -138,380 +103,12 @@ namespace
     float z;
   };
 
-  struct ListIteratorProxyRuntimeView
-  {
-    void* mFirstIterator; // +0x00
-  };
-  static_assert(sizeof(ListIteratorProxyRuntimeView) == 0x04, "ListIteratorProxyRuntimeView size must be 0x04");
-
-  struct TerrainDirtyRectNodeRuntimeView
-  {
-    TerrainDirtyRectNodeRuntimeView* mNext; // +0x00
-    TerrainDirtyRectNodeRuntimeView* mPrev; // +0x04
-    gpg::Rect2i mValue;                     // +0x08
-  };
-  static_assert(sizeof(TerrainDirtyRectNodeRuntimeView) == 0x18, "TerrainDirtyRectNodeRuntimeView size must be 0x18");
-
-  struct TerrainDirtyRectListRuntimeView
-  {
-    ListIteratorProxyRuntimeView* mIteratorProxy; // +0x00
-    TerrainDirtyRectNodeRuntimeView* mHead;       // +0x04
-    std::uint32_t mSize;                          // +0x08
-  };
-  static_assert(sizeof(TerrainDirtyRectListRuntimeView) == 0x0C, "TerrainDirtyRectListRuntimeView size must be 0x0C");
-
-  using TerrainEditWordBufferRuntimeView = msvc8::detail::vector_bool_storage;
-  static_assert(sizeof(TerrainEditWordBufferRuntimeView) == 0x10, "TerrainEditWordBufferRuntimeView size must be 0x10");
-
   struct TerrainNormalEncodeBlock
   {
     std::uint8_t mNormalX[16]{};
     std::uint8_t mNormalZ[16]{};
   };
   static_assert(sizeof(TerrainNormalEncodeBlock) == 0x20, "TerrainNormalEncodeBlock size must be 0x20");
-
-  /**
-   * `CWldTerrainRes`'s environment-lookup cache: a genuine `std::map<
-   * std::string, TerrainEnvironmentLookupEntry>` in the shipped binary (not
-   * a `msvc8::`-namespace-shaped one at the source level), modeled here with
-   * this project's ABI-matching `msvc8::map` so the 12-byte map header and
-   * 0x50-byte node stay bit-for-bit where `TerrainVisualResourceRuntimeView`/
-   * `TerrainRuntimeView` (below) need them at fixed offset +0x9A4. All of the
-   * tree mechanics (lower-bound search, hinted insert, erase, in-order
-   * increment) are `msvc8::map`'s own canonical, address-cited template
-   * members (`legacy/containers/RbTree.h`/`Map.h`) for this `<msvc8::string,
-   * moho::TerrainEnvironmentLookupEntry>` instantiation -- see the
-   * instantiation-specific citations added there (isNil@+0x4D, value_type
-   * 0x24 bytes) -- rather than a bespoke per-field reimplementation.
-   */
-  using TerrainEnvironmentLookupMap = msvc8::map<msvc8::string, moho::TerrainEnvironmentLookupEntry>;
-  static_assert(sizeof(TerrainEnvironmentLookupMap) == 0x0C, "TerrainEnvironmentLookupMap size must be 0x0C");
-
-  struct TerrainVisualResourceRuntimeView
-  {
-    std::uint8_t mUnknown0000_095B[0x95C]{};
-    msvc8::string mBackgroundFile;                              // +0x95C
-    moho::ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
-    msvc8::string mSkycubeFile;                                 // +0x980
-    moho::ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
-    TerrainEnvironmentLookupMap mEnvLookup;                     // +0x9A4
-    TerrainEditWordBufferRuntimeView mEditWordBuffer;           // +0x9B0
-    boost::shared_ptr<moho::CD3DDynamicTextureSheet> mWaterMapTexture; // +0x9C0
-    std::uint8_t* mWaterFoam;                                   // +0x9C8
-    std::uint8_t* mWaterFlatness;                               // +0x9CC
-    std::uint8_t* mWaterDepthBias;                              // +0x9D0
-    gpg::BitArray2D* mDebugDirtyTerrain;                        // +0x9D4
-    TerrainDirtyRectListRuntimeView mDebugDirtyRects;           // +0x9D8
-    std::uint8_t mUnknown09E4_0C2F[0x24C]{};
-    moho::CDecalManager* mDecalManager;                         // +0xC30
-  };
-
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mBackgroundFile) == 0x95C,
-    "TerrainVisualResourceRuntimeView::mBackgroundFile offset must be 0x95C"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mBackgroundTexture) == 0x978,
-    "TerrainVisualResourceRuntimeView::mBackgroundTexture offset must be 0x978"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mSkycubeFile) == 0x980,
-    "TerrainVisualResourceRuntimeView::mSkycubeFile offset must be 0x980"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mSkycubeTexture) == 0x99C,
-    "TerrainVisualResourceRuntimeView::mSkycubeTexture offset must be 0x99C"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mEnvLookup) == 0x9A4,
-    "TerrainVisualResourceRuntimeView::mEnvLookup offset must be 0x9A4"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mEditWordBuffer) == 0x9B0,
-    "TerrainVisualResourceRuntimeView::mEditWordBuffer offset must be 0x9B0"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mEditWordBuffer) + offsetof(TerrainEditWordBufferRuntimeView, begin) == 0x9B4,
-    "TerrainVisualResourceRuntimeView::mEditWordBuffer.begin offset must be 0x9B4"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mWaterMapTexture) == 0x9C0,
-    "TerrainVisualResourceRuntimeView::mWaterMapTexture offset must be 0x9C0"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mWaterFoam) == 0x9C8,
-    "TerrainVisualResourceRuntimeView::mWaterFoam offset must be 0x9C8"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mWaterFlatness) == 0x9CC,
-    "TerrainVisualResourceRuntimeView::mWaterFlatness offset must be 0x9CC"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mWaterDepthBias) == 0x9D0,
-    "TerrainVisualResourceRuntimeView::mWaterDepthBias offset must be 0x9D0"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mDebugDirtyTerrain) == 0x9D4,
-    "TerrainVisualResourceRuntimeView::mDebugDirtyTerrain offset must be 0x9D4"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mDebugDirtyRects) == 0x9D8,
-    "TerrainVisualResourceRuntimeView::mDebugDirtyRects offset must be 0x9D8"
-  );
-  static_assert(
-    offsetof(TerrainVisualResourceRuntimeView, mDecalManager) == 0xC30,
-    "TerrainVisualResourceRuntimeView::mDecalManager offset must be 0xC30"
-  );
-
-  /**
-   * The per-tile normal-map sheets: `{begin, end, capacityEnd}` at +0x948 of
-   * the terrain resource, i.e. an `msvc8::vector` of texture handles. Its
-   * emissions (`_Tidy`, `size`, `capacity`, `reserve`, `_Copy_opt`, `erase`,
-   * `resize`) are cited on the Vector.h members. The release build strips the
-   * debug proxy for this lane, so the triple is 0x0C and the second template
-   * argument is `false`.
-   * `resize`) are cited on the Vector.h members.
-   */
-  using TerrainNormalMapHandleArray = msvc8::vector<boost::shared_ptr<moho::CD3DDynamicTextureSheet>, false>;
-  static_assert(sizeof(TerrainNormalMapHandleArray) == 0x0C, "TerrainNormalMapHandleArray size must be 0x0C");
-
-  struct TerrainNormalMapRuntimeView
-  {
-    TerrainNormalMapRuntimeView() = default;
-    ~TerrainNormalMapRuntimeView() {}
-
-    void* mVftable;               // +0x00
-    moho::STIMap* mMap;           // +0x04
-
-    union
-    {
-      struct
-      {
-        std::uint8_t mUnknown0008_04CB[0x4C4];      // +0x08
-        // The stratum-mask texture's own dimensions, half the chart size:
-        // `Reset` halves each axis at 0x008A65AC/0x008A65B1 and stores them
-        // here (0x008A65B3, 0x008A65B9) right before creating the two mask
-        // textures at that size. The whole-mask `UpdateStratumMask` overload
-        // reads them back as the update rectangle's far corner.
-        std::int32_t mStratumMaskWidth;             // +0x4CC
-        std::int32_t mStratumMaskHeight;            // +0x4D0
-        boost::shared_ptr<moho::CD3DDynamicTextureSheet> mStratumMask0; // +0x4D4
-        boost::shared_ptr<moho::CD3DDynamicTextureSheet> mStratumMask1; // +0x4DC
-        std::uint8_t mUnknown04E4_0947[0x464];      // +0x4E4
-      };
-      struct
-      {
-        std::uint8_t mUnknown0008_04AB[0x4A4];      // +0x08
-        moho::StratumMaterial mStrata;                // +0x4AC
-      };
-    };
-
-    TerrainNormalMapHandleArray mNormalMap; // +0x948
-    std::int32_t mNormalMapWidth;           // +0x954
-    std::int32_t mNormalMapHeight;          // +0x958
-  };
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mMap) == 0x04,
-    "TerrainNormalMapRuntimeView::mMap offset must be 0x04"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mStratumMaskWidth) == 0x4CC,
-    "TerrainNormalMapRuntimeView::mStratumMaskWidth offset must be 0x4CC"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mStratumMaskHeight) == 0x4D0,
-    "TerrainNormalMapRuntimeView::mStratumMaskHeight offset must be 0x4D0"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mStratumMask0) == 0x4D4,
-    "TerrainNormalMapRuntimeView::mStratumMask0 offset must be 0x4D4"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mStratumMask1) == 0x4DC,
-    "TerrainNormalMapRuntimeView::mStratumMask1 offset must be 0x4DC"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mStrata) == 0x4AC,
-    "TerrainNormalMapRuntimeView::mStrata offset must be 0x4AC"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mNormalMap) == 0x948,
-    "TerrainNormalMapRuntimeView::mNormalMap offset must be 0x948"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mNormalMapWidth) == 0x954,
-    "TerrainNormalMapRuntimeView::mNormalMapWidth offset must be 0x954"
-  );
-  static_assert(
-    offsetof(TerrainNormalMapRuntimeView, mNormalMapHeight) == 0x958,
-    "TerrainNormalMapRuntimeView::mNormalMapHeight offset must be 0x958"
-  );
-
-  [[nodiscard]] TerrainVisualResourceRuntimeView* AsTerrainVisualResourceRuntimeView(moho::IWldTerrainRes* terrainRes) noexcept
-  {
-    return reinterpret_cast<TerrainVisualResourceRuntimeView*>(terrainRes);
-  }
-
-  [[nodiscard]] const TerrainNormalMapRuntimeView* AsTerrainNormalMapRuntimeView(
-    const moho::IWldTerrainRes* const terrainRes
-  ) noexcept
-  {
-    return reinterpret_cast<const TerrainNormalMapRuntimeView*>(terrainRes);
-  }
-
-  [[nodiscard]] TerrainNormalMapRuntimeView* AsTerrainNormalMapRuntimeView(moho::IWldTerrainRes* terrainRes) noexcept
-  {
-    return reinterpret_cast<TerrainNormalMapRuntimeView*>(terrainRes);
-  }
-
-  struct TerrainRuntimeView
-  {
-    void* mVftable;                                                 // +0x000
-    moho::STIMap* mMap;                                             // +0x004
-    std::uint8_t mBool;                                             // +0x008
-    std::uint8_t mEditMode;                                         // +0x009
-    std::uint8_t mUnknown0A_0B[0x02]{};                             // +0x00A
-    moho::Cartographic mCartographic;                               // +0x00C
-    moho::SkyDome mSkyDome;                                         // +0x0B0
-    std::uint8_t mUnknown2D4_2D7[0x04]{};                           // +0x2D4
-    float mLightingMultiplier;                                      // +0x2D8
-    Wm3::Vector3f mSunDirection;                                    // +0x2DC
-    Wm3::Vector3f mSunAmbience;                                     // +0x2E8
-    Wm3::Vector3f mSunColor;                                        // +0x2F4
-    Wm3::Vector3f mShadowFillColor;                                 // +0x300
-    moho::Vector4f mSpecularColor;                                  // +0x30C
-    float mBloom;                                                   // +0x31C
-    union
-    {
-      moho::SFogInfo mFogInfo; // +0x320
-      struct
-      {
-        float mFogStartDistance;          // +0x320
-        float mFogCutoffDistance;         // +0x324
-        float mFogMinClamp;               // +0x328
-        float mFogMaxClamp;               // +0x32C
-        float mFogCurveExponent;          // +0x330
-        std::int32_t mTopographicSamples; // +0x334
-        std::uint32_t mHypsometricColor[5]; // +0x338
-        float mImagerElevationOffset;     // +0x34C
-      };
-    };
-    moho::CWaterShaderProperties mWaterShaderProperties;            // +0x350
-    moho::StratumMaterial mStrata;                                  // +0x4AC
-    std::uint8_t mUnknown944_947[0x04]{};                           // +0x944
-    TerrainNormalMapHandleArray mNormalMap;                         // +0x948
-    std::int32_t mNormalMapWidth;                                   // +0x954
-    std::int32_t mNormalMapHeight;                                  // +0x958
-    msvc8::string mBackgroundFile;                                  // +0x95C
-    moho::ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
-    msvc8::string mSkycubeFile;                                     // +0x980
-    moho::ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
-    TerrainEnvironmentLookupMap mEnvLookup;                         // +0x9A4
-    TerrainEditWordBufferRuntimeView mEditWordBuffer;               // +0x9B0
-    moho::ID3DDeviceResources::TextureResourceHandle mWaterMapTexture;    // +0x9C0
-    std::uint8_t* mWaterFoam;                                       // +0x9C8
-    std::uint8_t* mWaterFlatness;                                   // +0x9CC
-    std::uint8_t* mWaterDepthBias;                                  // +0x9D0
-    gpg::BitArray2D* mDebugDirtyTerrain;                            // +0x9D4
-    TerrainDirtyRectListRuntimeView mDebugDirtyRects;               // +0x9D8
-    std::uint8_t mUnknown9E4_9E7[0x04]{};                           // +0x9E4
-    moho::WaveSystem mWaveSystem;                                   // +0x9E8
-    moho::CDecalManager* mDecalManager;                             // +0xC30
-    std::uint8_t mUnknownC34_C37[0x04]{};                           // +0xC34
-  };
-
-  static_assert(sizeof(TerrainRuntimeView) == 0xC38, "TerrainRuntimeView size must be 0xC38");
-  static_assert(offsetof(TerrainRuntimeView, mBool) == 0x008, "TerrainRuntimeView::mBool offset must be 0x008");
-  static_assert(offsetof(TerrainRuntimeView, mEditMode) == 0x009, "TerrainRuntimeView::mEditMode offset must be 0x009");
-  static_assert(
-    offsetof(TerrainRuntimeView, mCartographic) == 0x00C, "TerrainRuntimeView::mCartographic offset must be 0x00C"
-  );
-  static_assert(offsetof(TerrainRuntimeView, mSkyDome) == 0x0B0, "TerrainRuntimeView::mSkyDome offset must be 0x0B0");
-  static_assert(
-    offsetof(TerrainRuntimeView, mLightingMultiplier) == 0x2D8,
-    "TerrainRuntimeView::mLightingMultiplier offset must be 0x2D8"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mSpecularColor) == 0x30C, "TerrainRuntimeView::mSpecularColor offset must be 0x30C"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mBloom) == 0x31C, "TerrainRuntimeView::mBloom offset must be 0x31C"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mFogInfo) == 0x320, "TerrainRuntimeView::mFogInfo offset must be 0x320"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mTopographicSamples) == 0x334,
-    "TerrainRuntimeView::mTopographicSamples offset must be 0x334"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mHypsometricColor) == 0x338,
-    "TerrainRuntimeView::mHypsometricColor offset must be 0x338"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mImagerElevationOffset) == 0x34C,
-    "TerrainRuntimeView::mImagerElevationOffset offset must be 0x34C"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mWaterShaderProperties) == 0x350,
-    "TerrainRuntimeView::mWaterShaderProperties offset must be 0x350"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mStrata) == 0x4AC, "TerrainRuntimeView::mStrata offset must be 0x4AC"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mNormalMap) == 0x948, "TerrainRuntimeView::mNormalMap offset must be 0x948"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mBackgroundTexture) == 0x978,
-    "TerrainRuntimeView::mBackgroundTexture offset must be 0x978"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mSkycubeTexture) == 0x99C,
-    "TerrainRuntimeView::mSkycubeTexture offset must be 0x99C"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mEnvLookup) == 0x9A4,
-    "TerrainRuntimeView::mEnvLookup offset must be 0x9A4"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mEditWordBuffer) == 0x9B0,
-    "TerrainRuntimeView::mEditWordBuffer offset must be 0x9B0"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mEditWordBuffer) + offsetof(TerrainEditWordBufferRuntimeView, begin) == 0x9B4,
-    "TerrainRuntimeView::mEditWordBuffer.begin offset must be 0x9B4"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mWaterMapTexture) == 0x9C0,
-    "TerrainRuntimeView::mWaterMapTexture offset must be 0x9C0"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mWaterFoam) == 0x9C8, "TerrainRuntimeView::mWaterFoam offset must be 0x9C8"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mWaterFlatness) == 0x9CC, "TerrainRuntimeView::mWaterFlatness offset must be 0x9CC"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mDebugDirtyTerrain) == 0x9D4,
-    "TerrainRuntimeView::mDebugDirtyTerrain offset must be 0x9D4"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mWaveSystem) == 0x9E8, "TerrainRuntimeView::mWaveSystem offset must be 0x9E8"
-  );
-  static_assert(
-    offsetof(TerrainRuntimeView, mDecalManager) == 0xC30, "TerrainRuntimeView::mDecalManager offset must be 0xC30"
-  );
-
-  [[nodiscard]] const TerrainRuntimeView* AsTerrainRuntimeView(const moho::IWldTerrainRes* const terrainRes) noexcept
-  {
-    return reinterpret_cast<const TerrainRuntimeView*>(terrainRes);
-  }
-
-  [[nodiscard]] TerrainRuntimeView* AsTerrainRuntimeView(moho::IWldTerrainRes* const terrainRes) noexcept
-  {
-    return reinterpret_cast<TerrainRuntimeView*>(terrainRes);
-  }
 
   /**
    * Adopt a device-resources texture-sheet handle into the water-map slot.
@@ -536,6 +133,45 @@ namespace
     reinterpreted.pi = sourceBorrow.pi;
 
     waterMap = boost::SharedPtrFromRawRetained(reinterpreted);
+  }
+
+  /**
+   * `StratumMaterial` declares the two stratum masks as
+   * `SharedPtrRaw<RD3DTextureResource>`, and this file drives them as dynamic
+   * texture sheets - one DDS sheet under two names, the same handoff
+   * `AdoptWaterMapSheetFromResource` performs for the water map. These three
+   * keep that reinterpretation in one place instead of spreading `{px, pi}`
+   * arithmetic across the terrain paths.
+   */
+  [[nodiscard]] moho::CD3DDynamicTextureSheet* AsDynamicSheet(
+    const boost::SharedPtrRaw<moho::RD3DTextureResource>& mask
+  ) noexcept
+  {
+    return reinterpret_cast<moho::CD3DDynamicTextureSheet*>(mask.px);
+  }
+
+  [[nodiscard]] boost::shared_ptr<moho::CD3DDynamicTextureSheet> ShareAsDynamicSheet(
+    const boost::SharedPtrRaw<moho::RD3DTextureResource>& mask
+  ) noexcept
+  {
+    boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> reinterpreted{};
+    reinterpreted.px = reinterpret_cast<moho::CD3DDynamicTextureSheet*>(mask.px);
+    reinterpreted.pi = mask.pi;
+    return boost::SharedPtrFromRawRetained(reinterpreted);
+  }
+
+  void AdoptDynamicSheetAsStratumMask(
+    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
+    const boost::shared_ptr<moho::CD3DDynamicTextureSheet>& sheet
+  ) noexcept
+  {
+    const boost::SharedPtrRaw<moho::CD3DDynamicTextureSheet> borrow =
+      boost::SharedPtrRawFromSharedBorrow(sheet);
+
+    boost::SharedPtrRaw<moho::RD3DTextureResource> reinterpreted{};
+    reinterpreted.px = reinterpret_cast<moho::RD3DTextureResource*>(borrow.px);
+    reinterpreted.pi = borrow.pi;
+    mask.assign_retain(reinterpreted);
   }
 
   /**
@@ -810,36 +446,6 @@ namespace
     return static_cast<std::int32_t>(std::ceil(static_cast<float>(coordinate) * 0.5f));
   }
 
-  /**
-   * Inlined block from FUN_008A5730 (0x008A576D..0x008A5793), the
-   * `mDebugDirtyRects.push_back(rect)` tail of `NotifyMapChange`.
-   *
-   * Node allocation and field stores are 0x005AB710; the size bump with its
-   * `0x0FFFFFFF` length check is 0x005AB760, which reads and writes only
-   * `_Mysize` at `+0x08`.
-   */
-  void AppendTerrainDirtyRect(TerrainDirtyRectListRuntimeView& list, const gpg::Rect2i& rect)
-  {
-    auto* const node = static_cast<TerrainDirtyRectNodeRuntimeView*>(::operator new(sizeof(TerrainDirtyRectNodeRuntimeView)));
-    node->mNext = list.mHead;
-    node->mPrev = list.mHead->mPrev;
-    node->mValue = rect;
-
-    if (list.mSize == 0x0FFFFFFFu) {
-      throw std::length_error("list<T> too long");
-    }
-    ++list.mSize;
-
-    // No iterator-proxy write here: 0x005AB760 is the whole of what the binary
-    // does between building the node and relinking it, and it touches nothing
-    // but the size word. The `mIteratorProxy->mFirstIterator = nullptr` this
-    // used to perform was invented, and the lane it dereferenced is never
-    // initialised -- it only stayed harmless while `NotifyMapChange`'s
-    // mis-guarded `Finalize()` kept this line unreachable.
-    list.mHead->mPrev = node;
-    node->mPrev->mNext = node;
-  }
-
   [[nodiscard]] bool ShouldSyncDirtyRectInCameraBounds(const gpg::Rect2i& dirtyRect, const gpg::Rect2i& cameraRect) noexcept
   {
     const bool fullyContained = dirtyRect.x0 >= cameraRect.x0
@@ -937,20 +543,8 @@ namespace
     return false;
   }
 
-  void EraseTerrainDirtyRectNode(TerrainDirtyRectListRuntimeView& list, TerrainDirtyRectNodeRuntimeView* const node) noexcept
-  {
-    if (node == list.mHead) {
-      return;
-    }
-
-    node->mPrev->mNext = node->mNext;
-    node->mNext->mPrev = node->mPrev;
-    ::operator delete(node);
-    --list.mSize;
-  }
-
   void EnsureTerrainEditWordCount(
-    TerrainEditWordBufferRuntimeView& editWordBuffer,
+    moho::TerrainEditWordBuffer& editWordBuffer,
     const std::size_t desiredWordCount,
     const std::uint32_t fillWord
   )
@@ -1044,11 +638,23 @@ namespace
     slot = replacement;
   }
 
+  /// `CloneTerrainDynamicTextureForEdit` for a stratum-mask lane.
+  void CloneStratumMaskForEdit(
+    boost::SharedPtrRaw<moho::RD3DTextureResource>& mask,
+    const bool archiveMode
+  )
+  {
+    boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet = ShareAsDynamicSheet(mask);
+    CloneTerrainDynamicTextureForEdit(sheet, archiveMode);
+    AdoptDynamicSheetAsStratumMask(mask, sheet);
+  }
+
+
   void RebuildWaterMapRect(moho::IWldTerrainRes& terrainRes, const gpg::Rect2i& updateRect)
   {
     constexpr float kNoWaterElevation = -10000.0f;
-    auto* const terrainView = AsTerrainNormalMapRuntimeView(&terrainRes);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(&terrainRes);
+    auto* const terrainView = (&terrainRes);
+    auto* const visualView = (&terrainRes);
     moho::STIMap* const map = terrainView->mMap;
     moho::CHeightField* const field = map->mHeightField.get();
 
@@ -1140,7 +746,7 @@ namespace
    *
    * What it does:
    * Constructs one terrain-resource object into the opaque 0xC38 block via the
-   * TerrainRuntimeView overlay: default sub-object construction (Cartographic,
+   * IWldTerrainRes overlay: default sub-object construction (Cartographic,
    * SkyDome, CWaterShaderProperties, StratumMaterial, WaveSystem), scalar
    * lighting/fog/hypsometric defaults, empty string/handle/container lanes, and
    * self-linked env-lookup map + debug dirty-rect list sentinel heads.
@@ -1148,7 +754,7 @@ namespace
    * The IWldTerrainRes base vtable + mMap lane are installed
    * by the base ctor at the factory before this fills the derived fields.
    */
-  void ConstructTerrainResFields(TerrainRuntimeView& view) noexcept
+  void ConstructTerrainResFields(moho::IWldTerrainRes& view) noexcept
   {
     view.mBool = 0;
     view.mEditMode = 0;
@@ -1180,7 +786,7 @@ namespace
     new (&view.mWaterShaderProperties) moho::CWaterShaderProperties();
     new (&view.mStrata) moho::StratumMaterial();
 
-    new (&view.mNormalMap) TerrainNormalMapHandleArray();
+    new (&view.mNormalMap) moho::TerrainNormalMapHandleArray();
 
     new (&view.mBackgroundFile) msvc8::string();
     new (&view.mBackgroundTexture) moho::ID3DDeviceResources::TextureResourceHandle();
@@ -1192,7 +798,7 @@ namespace
     // RbTree.h`; this instantiation's allocator half is FUN_008A9490,
     // cited there) -- the same allocate-and-self-link the binary performs
     // inline in this constructor.
-    new (&view.mEnvLookup) TerrainEnvironmentLookupMap();
+    new (&view.mEnvLookup) moho::TerrainEnvironmentLookupMap();
 
     view.mEditWordBuffer.begin = nullptr;
     view.mEditWordBuffer.end = nullptr;
@@ -1208,15 +814,9 @@ namespace
     // (sub_5AB3A0 == list-node-new self-linked; empty list, size 0). The +0x00
     // lane is `std::list`'s own `_Container_base::_Myfirstiter`, which that
     // base's constructor zeroes; leaving it as whatever the allocator handed
-    // back is what let `AppendTerrainDirtyRect` write through a garbage
+    // back is what let the dirty-rect append write through a garbage
     // pointer the first time a map change actually reached it.
-    auto* const dirtyRectHead =
-      static_cast<TerrainDirtyRectNodeRuntimeView*>(::operator new(sizeof(TerrainDirtyRectNodeRuntimeView)));
-    dirtyRectHead->mNext = dirtyRectHead;
-    dirtyRectHead->mPrev = dirtyRectHead;
-    view.mDebugDirtyRects.mIteratorProxy = nullptr;
-    view.mDebugDirtyRects.mHead = dirtyRectHead;
-    view.mDebugDirtyRects.mSize = 0u;
+    ::new (&view.mDebugDirtyRects) moho::TerrainDirtyRectList();
 
     new (&view.mWaveSystem) moho::WaveSystem();
     view.mDecalManager = nullptr;
@@ -1243,7 +843,7 @@ namespace
    * handles, strata/water-shader/skydome/cartographic sub-objects, then the
    * inlined base ~IWldTerrainRes tail (STIMap teardown).
    */
-  void DestroyTerrainResFields(TerrainRuntimeView& view) noexcept
+  void DestroyTerrainResFields(moho::IWldTerrainRes& view) noexcept
   {
     // mDecalManager: virtual scalar-deleting dtor dispatch (delete p).
     if (view.mDecalManager != nullptr) {
@@ -1255,21 +855,9 @@ namespace
 
     // Debug dirty-rect list: destroy all value nodes then free the sentinel
     // head (sub_5AAF60 + operator delete). gpg::Rect2i is trivial so no
-    // per-node value dtor is needed (matches the binary's plain delete walk).
-    {
-      TerrainDirtyRectNodeRuntimeView* const head = view.mDebugDirtyRects.mHead;
-      if (head != nullptr) {
-        TerrainDirtyRectNodeRuntimeView* node = head->mNext;
-        while (node != head) {
-          TerrainDirtyRectNodeRuntimeView* const next = node->mNext;
-          ::operator delete(node);
-          node = next;
-        }
-        ::operator delete(head);
-      }
-      view.mDebugDirtyRects.mHead = nullptr;
-      view.mDebugDirtyRects.mSize = 0u;
-    }
+    // per-node value dtor is needed (matches the binary's plain delete walk),
+    // and `msvc8::list`'s own destructor is that walk.
+    std::destroy_at(&view.mDebugDirtyRects);
 
     if (view.mDebugDirtyTerrain != nullptr) {
       view.mDebugDirtyTerrain->~BitArray2D();
@@ -1289,7 +877,7 @@ namespace
     view.mEditWordBuffer.end = nullptr;
     view.mEditWordBuffer.capacityEnd = nullptr;
 
-    view.mEnvLookup.~TerrainEnvironmentLookupMap();
+    std::destroy_at(&view.mEnvLookup);
 
     view.mSkycubeTexture.~shared_ptr();
     view.mSkycubeFile.~string();
@@ -1328,7 +916,7 @@ namespace
     if (terrainRes == nullptr) {
       return;
     }
-    DestroyTerrainResFields(*AsTerrainRuntimeView(terrainRes));
+    DestroyTerrainResFields(*terrainRes);
     delete terrainRes;
   }
 
@@ -1672,9 +1260,9 @@ namespace moho
    */
   IWldTerrainRes* WLD_CreateTerrainRes()
   {
-    static_assert(sizeof(TerrainRuntimeView) == 0xC38, "CWldTerrainRes storage must be 0xC38");
+    static_assert(sizeof(IWldTerrainRes) == 0xC38, "CWldTerrainRes storage must be 0xC38");
 
-    auto* const rawStorage = static_cast<TerrainRuntimeView*>(::operator new(sizeof(TerrainRuntimeView)));
+    auto* const rawStorage = static_cast<IWldTerrainRes*>(::operator new(sizeof(IWldTerrainRes)));
     if (rawStorage == nullptr) {
       return nullptr;
     }
@@ -2082,7 +1670,7 @@ namespace moho
    */
   bool IWldTerrainRes::IsInPlayableRect(const Wm3::Vec3f& worldPos)
   {
-    const STIMap* const map = AsTerrainRuntimeView(this)->mMap;
+    const STIMap* const map = mMap;
     const gpg::Rect2i& playableRect = map->mPlayableRect;
 
     return static_cast<float>(playableRect.x0) <= worldPos.x
@@ -2100,7 +1688,7 @@ namespace moho
    */
   void IWldTerrainRes::SetBackground(const msvc8::string& texturePath)
   {
-    auto* const view = AsTerrainVisualResourceRuntimeView(this);
+    auto* const view = this;
     view->mBackgroundFile = texturePath;
 
     ID3DDeviceResources::TextureResourceHandle texture{};
@@ -2122,7 +1710,7 @@ namespace moho
    */
   void IWldTerrainRes::SetSkycube(const msvc8::string& texturePath)
   {
-    auto* const view = AsTerrainVisualResourceRuntimeView(this);
+    auto* const view = this;
     view->mSkycubeFile = texturePath;
 
     ID3DDeviceResources::TextureResourceHandle texture{};
@@ -2143,7 +1731,7 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetBackground() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(AsTerrainRuntimeView(this)->mBackgroundTexture);
+    return boost::static_pointer_cast<ID3DTextureSheet>(mBackgroundTexture);
   }
 
   /**
@@ -2154,7 +1742,7 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetSkycube() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(AsTerrainRuntimeView(this)->mSkycubeTexture);
+    return boost::static_pointer_cast<ID3DTextureSheet>(mSkycubeTexture);
   }
 
   /**
@@ -2164,7 +1752,7 @@ namespace moho
    */
   const msvc8::string& IWldTerrainRes::GetBackgroundFile() const
   {
-    return AsTerrainRuntimeView(this)->mBackgroundFile;
+    return mBackgroundFile;
   }
 
   /**
@@ -2174,7 +1762,7 @@ namespace moho
    */
   const msvc8::string& IWldTerrainRes::GetSkycubeFile() const
   {
-    return AsTerrainRuntimeView(this)->mSkycubeFile;
+    return mSkycubeFile;
   }
 
   /**
@@ -2209,7 +1797,7 @@ namespace moho
       }
     }
 
-    TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
     map[environmentKey] = moho::TerrainEnvironmentLookupEntry(texturePath, texture);
   }
 
@@ -2222,7 +1810,7 @@ namespace moho
    */
   void IWldTerrainRes::RemoveEnvLookup(const msvc8::string& environmentKey)
   {
-    TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
     (void)map.erase(environmentKey);
   }
 
@@ -2235,9 +1823,9 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetEnvLookup(const msvc8::string& environmentKey) const
   {
-    const TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    const moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
 
-    TerrainEnvironmentLookupMap::const_iterator entry = map.find(environmentKey);
+    moho::TerrainEnvironmentLookupMap::const_iterator entry = map.find(environmentKey);
     if (entry == map.end()) {
       entry = map.find(msvc8::string("<default>"));
     }
@@ -2276,7 +1864,7 @@ namespace moho
   {
     (void)outPairs.erase(outPairs.begin(), outPairs.end());
 
-    const TerrainEnvironmentLookupMap& map = AsTerrainRuntimeView(this)->mEnvLookup;
+    const moho::TerrainEnvironmentLookupMap& map = mEnvLookup;
     for (const auto& [key, value] : map) {
       (void)AppendEnvironmentLookupPair(outPairs, moho::TerrainEnvironmentLookupPair{key, value.mEnvironmentName});
     }
@@ -2292,7 +1880,7 @@ namespace moho
    */
   void IWldTerrainRes::ClearEnvLookup()
   {
-    AsTerrainRuntimeView(this)->mEnvLookup.clear();
+    mEnvLookup.clear();
   }
 
   /**
@@ -2301,7 +1889,7 @@ namespace moho
    */
   CHeightField* IWldTerrainRes::GetHeightField() const
   {
-    return AsTerrainRuntimeView(this)->mMap->mHeightField.get();
+    return mMap->mHeightField.get();
   }
 
   /**
@@ -2310,7 +1898,7 @@ namespace moho
    */
   bool IWldTerrainRes::IsWaterEnabled() const
   {
-    return AsTerrainRuntimeView(this)->mMap->mWaterEnabled != 0;
+    return mMap->mWaterEnabled != 0;
   }
 
   /**
@@ -2319,7 +1907,7 @@ namespace moho
    */
   float IWldTerrainRes::GetWaterElevation() const
   {
-    return AsTerrainRuntimeView(this)->mMap->mWaterElevation;
+    return mMap->mWaterElevation;
   }
 
   /**
@@ -2330,7 +1918,7 @@ namespace moho
    */
   bool IWldTerrainRes::GetBool() const
   {
-    return AsTerrainRuntimeView(this)->mBool != 0;
+    return mBool != 0;
   }
 
   /**
@@ -2341,7 +1929,7 @@ namespace moho
    */
   Cartographic& IWldTerrainRes::GetCartographic()
   {
-    return AsTerrainRuntimeView(this)->mCartographic;
+    return mCartographic;
   }
 
   /**
@@ -2352,7 +1940,7 @@ namespace moho
    */
   const Cartographic& IWldTerrainRes::GetCartographic() const
   {
-    return AsTerrainRuntimeView(this)->mCartographic;
+    return mCartographic;
   }
 
   /**
@@ -2363,7 +1951,7 @@ namespace moho
    */
   SkyDome& IWldTerrainRes::GetSkyDome()
   {
-    return AsTerrainRuntimeView(this)->mSkyDome;
+    return mSkyDome;
   }
 
   /**
@@ -2374,7 +1962,7 @@ namespace moho
    */
   const SkyDome& IWldTerrainRes::GetSkyDome() const
   {
-    return AsTerrainRuntimeView(this)->mSkyDome;
+    return mSkyDome;
   }
 
   /**
@@ -2385,7 +1973,7 @@ namespace moho
    */
   void IWldTerrainRes::SetTopographicSamples(const std::int32_t sampleCount)
   {
-    AsTerrainRuntimeView(this)->mTopographicSamples = sampleCount;
+    mTopographicSamples = sampleCount;
   }
 
   /**
@@ -2396,7 +1984,7 @@ namespace moho
    */
   std::int32_t IWldTerrainRes::GetTopographicSamples() const
   {
-    return AsTerrainRuntimeView(this)->mTopographicSamples;
+    return mTopographicSamples;
   }
 
   /**
@@ -2408,7 +1996,7 @@ namespace moho
    */
   void IWldTerrainRes::SetHypsometricColor(const std::int32_t colorIndex, const std::uint32_t colorValue)
   {
-    AsTerrainRuntimeView(this)->mHypsometricColor[static_cast<std::size_t>(colorIndex)] = colorValue;
+    mHypsometricColor[static_cast<std::size_t>(colorIndex)] = colorValue;
   }
 
   /**
@@ -2420,7 +2008,7 @@ namespace moho
    */
   std::uint32_t IWldTerrainRes::GetHypsometricColor(const std::int32_t colorIndex) const
   {
-    return AsTerrainRuntimeView(this)->mHypsometricColor[static_cast<std::size_t>(colorIndex)];
+    return mHypsometricColor[static_cast<std::size_t>(colorIndex)];
   }
 
   /**
@@ -2431,7 +2019,7 @@ namespace moho
    */
   void IWldTerrainRes::SetImagerElevationOffset(const float elevationOffset)
   {
-    AsTerrainRuntimeView(this)->mImagerElevationOffset = elevationOffset;
+    mImagerElevationOffset = elevationOffset;
   }
 
   /**
@@ -2442,7 +2030,7 @@ namespace moho
    */
   float IWldTerrainRes::GetImagerElevationOffset() const
   {
-    return AsTerrainRuntimeView(this)->mImagerElevationOffset;
+    return mImagerElevationOffset;
   }
 
   /**
@@ -2453,7 +2041,7 @@ namespace moho
    */
   WaveSystem* IWldTerrainRes::GetWaveSystem()
   {
-    return &AsTerrainRuntimeView(this)->mWaveSystem;
+    return &mWaveSystem;
   }
 
   /**
@@ -2464,7 +2052,7 @@ namespace moho
    */
   boost::shared_ptr<ID3DTextureSheet> IWldTerrainRes::GetWaterMap() const
   {
-    return boost::static_pointer_cast<ID3DTextureSheet>(AsTerrainRuntimeView(this)->mWaterMapTexture);
+    return boost::static_pointer_cast<ID3DTextureSheet>(mWaterMapTexture);
   }
 
   /**
@@ -2476,7 +2064,7 @@ namespace moho
    */
   Wm3::Vector2f IWldTerrainRes::GetWaterMapSize() const
   {
-    const auto* const view = AsTerrainRuntimeView(this);
+    const auto* const view = this;
     const CHeightField* const field = view->mMap->mHeightField.get();
     const std::int32_t waterMapWidth = (field->width - 1) >> 1;
     const std::int32_t waterMapHeight = (field->height - 1) >> 1;
@@ -2491,7 +2079,7 @@ namespace moho
    */
   void IWldTerrainRes::UpdateWaveSystem(const GeomCamera3& camera, const float elapsedSeconds, const std::int32_t tick)
   {
-    AsTerrainRuntimeView(this)->mWaveSystem.Update(camera, elapsedSeconds, tick);
+    mWaveSystem.Update(camera, elapsedSeconds, tick);
   }
 
   /**
@@ -2502,7 +2090,7 @@ namespace moho
    */
   gpg::BitArray2D* IWldTerrainRes::GetDebugDirtyTerrain()
   {
-    return AsTerrainRuntimeView(this)->mDebugDirtyTerrain;
+    return mDebugDirtyTerrain;
   }
 
   /**
@@ -2513,8 +2101,7 @@ namespace moho
    */
   const msvc8::list<gpg::Rect2i>& IWldTerrainRes::GetDebugDirtyRects() const
   {
-    const TerrainDirtyRectListRuntimeView* const dirtyList = &AsTerrainRuntimeView(this)->mDebugDirtyRects;
-    return *reinterpret_cast<const msvc8::list<gpg::Rect2i>*>(dirtyList);
+    return mDebugDirtyRects;
   }
 
   /**
@@ -2525,7 +2112,7 @@ namespace moho
    */
   std::int32_t IWldTerrainRes::GetNormalMapCount()
   {
-    const auto* const view = AsTerrainRuntimeView(this);
+    const auto* const view = this;
     if (view->mNormalMap.begin() == nullptr) {
       return 0;
     }
@@ -2541,7 +2128,7 @@ namespace moho
    */
   float IWldTerrainRes::GetHeightAt(const std::int32_t x, const std::int32_t z) const
   {
-    const auto* const view = AsTerrainRuntimeView(this);
+    const auto* const view = this;
     const CHeightField* const field = view->mMap->mHeightField.get();
     return static_cast<float>(field->GetHeightAt(x, z)) * 0.0078125f;
   }
@@ -2570,9 +2157,9 @@ namespace moho
    */
   bool IWldTerrainRes::Reset(const SChartSize chartSize, LuaPlus::LuaState* const state)
   {
-    auto* const view = AsTerrainRuntimeView(this);
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+    auto* const view = this;
+    auto* const normalView = this;
+    auto* const visualView = this;
 
     // 0x008A625F: the single stack-resident progress handle is zeroed at entry
     // and reused for both `InitNormalMap` (0x008A658E) and `EnterEditMode`
@@ -2654,28 +2241,34 @@ namespace moho
 
     // 0x008A659A-0x008A65BF: stratum masks live at half chart resolution; both
     // lanes are recomputed from the arguments rather than reused.
-    normalView->mStrata.v1 = static_cast<std::uint32_t>(halfWidth);
-    normalView->mStrata.v2 = static_cast<std::uint32_t>(halfHeight);
+    normalView->mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(halfWidth);
+    normalView->mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(halfHeight);
 
     // 0x008A65BF-0x008A667E: stratum mask 0 - the returned handle is assigned into
     // the member, the temporary released, and only then is the member cleared.
     {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
-      normalView->mStratumMask0 = resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2);
+      AdoptDynamicSheetAsStratumMask(
+        normalView->mStrata.mStratumMask0,
+        resources->NewDynamicTextureSheet(sheet, halfWidth, halfHeight, 2)
+      );
     }
-    ClearTexture(normalView->mStratumMask0);
+    ClearTexture(ShareAsDynamicSheet(normalView->mStrata.mStratumMask0));
 
     // 0x008A667F-0x008A6748: stratum mask 1 - sized from the lanes just written.
     {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
-      normalView->mStratumMask1 = resources->NewDynamicTextureSheet(
-        sheet,
-        static_cast<int>(normalView->mStrata.v1),
-        static_cast<int>(normalView->mStrata.v2),
-        2
+      AdoptDynamicSheetAsStratumMask(
+        normalView->mStrata.mStratumMask1,
+        resources->NewDynamicTextureSheet(
+          sheet,
+          static_cast<int>(normalView->mStrata.mStratumMaskWidth),
+          static_cast<int>(normalView->mStrata.mStratumMaskHeight),
+          2
+        )
       );
     }
-    ClearTexture(normalView->mStratumMask1);
+    ClearTexture(ShareAsDynamicSheet(normalView->mStrata.mStratumMask1));
 
     // 0x008A674E-0x008A6814: water map, same half resolution.
     {
@@ -2766,7 +2359,7 @@ namespace moho
    */
   Wm3::AxisAlignedBox3f IWldTerrainRes::GetWorldBounds() const
   {
-    const auto* const view = AsTerrainRuntimeView(this);
+    const auto* const view = this;
     const CHeightField* const field = view->mMap->mHeightField.get();
     if (field == nullptr) {
       return Wm3::AxisAlignedBox3f{};
@@ -2787,7 +2380,7 @@ namespace moho
    */
   float IWldTerrainRes::GetLightingMultiplier() const
   {
-    return AsTerrainRuntimeView(this)->mLightingMultiplier;
+    return mLightingMultiplier;
   }
 
   /**
@@ -2798,7 +2391,7 @@ namespace moho
    */
   void IWldTerrainRes::SetLightingMultiplier(const float& multiplier)
   {
-    AsTerrainRuntimeView(this)->mLightingMultiplier = multiplier;
+    mLightingMultiplier = multiplier;
   }
 
   /**
@@ -2809,7 +2402,7 @@ namespace moho
    */
   Wm3::Vector3f IWldTerrainRes::GetSunDirection() const
   {
-    return AsTerrainRuntimeView(this)->mSunDirection;
+    return mSunDirection;
   }
 
   /**
@@ -2820,7 +2413,7 @@ namespace moho
    */
   void IWldTerrainRes::SetSunDirection(const Wm3::Vector3f& direction)
   {
-    AsTerrainRuntimeView(this)->mSunDirection = direction;
+    mSunDirection = direction;
   }
 
   /**
@@ -2831,7 +2424,7 @@ namespace moho
    */
   Wm3::Vector3f IWldTerrainRes::GetSunAmbience() const
   {
-    return AsTerrainRuntimeView(this)->mSunAmbience;
+    return mSunAmbience;
   }
 
   /**
@@ -2842,7 +2435,7 @@ namespace moho
    */
   void IWldTerrainRes::SetSunAmbience(const Wm3::Vector3f& ambience)
   {
-    AsTerrainRuntimeView(this)->mSunAmbience = ambience;
+    mSunAmbience = ambience;
   }
 
   /**
@@ -2853,7 +2446,7 @@ namespace moho
    */
   Vector4f IWldTerrainRes::GetSpecularColor() const
   {
-    return AsTerrainRuntimeView(this)->mSpecularColor;
+    return mSpecularColor;
   }
 
   /**
@@ -2864,7 +2457,7 @@ namespace moho
    */
   void IWldTerrainRes::SetSpecularColor(const Vector4f& color)
   {
-    AsTerrainRuntimeView(this)->mSpecularColor = color;
+    mSpecularColor = color;
   }
 
   /**
@@ -2875,7 +2468,7 @@ namespace moho
    */
   float IWldTerrainRes::GetBloom() const
   {
-    return AsTerrainRuntimeView(this)->mBloom;
+    return mBloom;
   }
 
   /**
@@ -2886,7 +2479,7 @@ namespace moho
    */
   void IWldTerrainRes::SetBloom(const float bloom)
   {
-    AsTerrainRuntimeView(this)->mBloom = bloom;
+    mBloom = bloom;
   }
 
   /**
@@ -2897,7 +2490,7 @@ namespace moho
    */
   const SFogInfo& IWldTerrainRes::GetFogInfo() const
   {
-    return AsTerrainRuntimeView(this)->mFogInfo;
+    return mFogInfo;
   }
 
   /**
@@ -2908,7 +2501,7 @@ namespace moho
    */
   void IWldTerrainRes::SetFogInfo(const SFogInfo& fogInfo)
   {
-    auto* const view = AsTerrainRuntimeView(this);
+    auto* const view = this;
     view->mFogInfo.mStartDistance = fogInfo.mStartDistance;
     view->mFogInfo.mCutoffDistance = fogInfo.mCutoffDistance;
     view->mFogInfo.mMinClamp = fogInfo.mMinClamp;
@@ -2924,7 +2517,7 @@ namespace moho
    */
   Wm3::Vector3f IWldTerrainRes::GetSunColor() const
   {
-    return AsTerrainRuntimeView(this)->mSunColor;
+    return mSunColor;
   }
 
   /**
@@ -2935,7 +2528,7 @@ namespace moho
    */
   void IWldTerrainRes::SetSunColor(const Wm3::Vector3f& color)
   {
-    AsTerrainRuntimeView(this)->mSunColor = color;
+    mSunColor = color;
   }
 
   /**
@@ -2946,7 +2539,7 @@ namespace moho
    */
   Wm3::Vector3f IWldTerrainRes::GetShadowFillColor() const
   {
-    return AsTerrainRuntimeView(this)->mShadowFillColor;
+    return mShadowFillColor;
   }
 
   /**
@@ -2957,7 +2550,7 @@ namespace moho
    */
   void IWldTerrainRes::SetShadowFillColor(const Wm3::Vector3f& color)
   {
-    AsTerrainRuntimeView(this)->mShadowFillColor = color;
+    mShadowFillColor = color;
   }
 
   /**
@@ -2968,7 +2561,7 @@ namespace moho
    */
   void IWldTerrainRes::WaterEnabled(const bool enabled)
   {
-    AsTerrainRuntimeView(this)->mMap->mWaterEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
+    mMap->mWaterEnabled = static_cast<std::uint8_t>(enabled ? 1u : 0u);
   }
 
   /**
@@ -2979,7 +2572,7 @@ namespace moho
    */
   void IWldTerrainRes::SetWaterElevation(const float elevation)
   {
-    AsTerrainRuntimeView(this)->mMap->mWaterElevation = elevation;
+    mMap->mWaterElevation = elevation;
   }
 
   /**
@@ -2990,7 +2583,7 @@ namespace moho
    */
   void IWldTerrainRes::SetWaterElevationDeep(const float elevation)
   {
-    AsTerrainRuntimeView(this)->mMap->mWaterElevationDeep = elevation;
+    mMap->mWaterElevationDeep = elevation;
   }
 
   /**
@@ -3001,7 +2594,7 @@ namespace moho
    */
   void IWldTerrainRes::SetWaterElevationAbyss(const float elevation)
   {
-    AsTerrainRuntimeView(this)->mMap->mWaterElevationAbyss = elevation;
+    mMap->mWaterElevationAbyss = elevation;
   }
 
   /**
@@ -3012,7 +2605,7 @@ namespace moho
    */
   void IWldTerrainRes::SetWaterShaderProperties(const CWaterShaderProperties& properties)
   {
-    auto* const view = AsTerrainRuntimeView(this);
+    auto* const view = this;
     if (&properties != &view->mWaterShaderProperties) {
       view->mWaterShaderProperties.~CWaterShaderProperties();
       new (&view->mWaterShaderProperties) CWaterShaderProperties(properties);
@@ -3027,7 +2620,7 @@ namespace moho
    */
   CWaterShaderProperties* IWldTerrainRes::GetWaterShaderProperties()
   {
-    return &AsTerrainRuntimeView(this)->mWaterShaderProperties;
+    return &mWaterShaderProperties;
   }
 
   /**
@@ -3038,7 +2631,7 @@ namespace moho
    */
   std::uint8_t* IWldTerrainRes::GetWaterFoam()
   {
-    return AsTerrainRuntimeView(this)->mWaterFoam;
+    return mWaterFoam;
   }
 
   /**
@@ -3049,7 +2642,7 @@ namespace moho
    */
   std::uint8_t* IWldTerrainRes::GetWaterFlatness()
   {
-    return AsTerrainRuntimeView(this)->mWaterFlatness;
+    return mWaterFlatness;
   }
 
   /**
@@ -3060,7 +2653,7 @@ namespace moho
    */
   std::uint8_t* IWldTerrainRes::GetWaterDepthBias()
   {
-    return AsTerrainRuntimeView(this)->mWaterDepthBias;
+    return mWaterDepthBias;
   }
 
   /**
@@ -3071,7 +2664,7 @@ namespace moho
    */
   bool IWldTerrainRes::IsInEditMode() const
   {
-    return AsTerrainRuntimeView(this)->mEditMode != 0;
+    return mEditMode != 0;
   }
 
   /**
@@ -3085,9 +2678,9 @@ namespace moho
   {
     (void)loadControl;
 
-    auto* const runtimeView = AsTerrainRuntimeView(this);
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+    auto* const runtimeView = this;
+    auto* const normalView = this;
+    auto* const visualView = this;
 
     runtimeView->mEditMode = 1;
 
@@ -3096,8 +2689,8 @@ namespace moho
     const std::size_t wordCount = cellCount > 0 ? static_cast<std::size_t>(cellCount >> 2) : 0u;
     EnsureTerrainEditWordCount(visualView->mEditWordBuffer, wordCount, 0u);
 
-    CloneTerrainDynamicTextureForEdit(normalView->mStratumMask0, false);
-    CloneTerrainDynamicTextureForEdit(normalView->mStratumMask1, false);
+    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask0, false);
+    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask1, false);
     CloneTerrainDynamicTextureForEdit(visualView->mWaterMapTexture, false);
 
     gpg::Rect2i fullRect{
@@ -3118,9 +2711,9 @@ namespace moho
    */
   void IWldTerrainRes::ExitEditMode()
   {
-    auto* const runtimeView = AsTerrainRuntimeView(this);
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+    auto* const runtimeView = this;
+    auto* const normalView = this;
+    auto* const visualView = this;
 
     UpdateTexture(visualView->mWaterMapTexture, visualView->mEditWordBuffer.begin);
 
@@ -3129,8 +2722,8 @@ namespace moho
       visualView->mEditWordBuffer.end = visualView->mEditWordBuffer.begin;
     }
 
-    CloneTerrainDynamicTextureForEdit(normalView->mStratumMask0, true);
-    CloneTerrainDynamicTextureForEdit(normalView->mStratumMask1, true);
+    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask0, true);
+    CloneStratumMaskForEdit(normalView->mStrata.mStratumMask1, true);
     CloneTerrainDynamicTextureForEdit(visualView->mWaterMapTexture, true);
   }
 
@@ -3164,7 +2757,7 @@ namespace moho
    */
   IDecalManager* IWldTerrainRes::GetDecalManager()
   {
-    return AsTerrainRuntimeView(this)->mDecalManager;
+    return mDecalManager;
   }
 
   /**
@@ -3177,7 +2770,7 @@ namespace moho
   void IWldTerrainRes::CreateWaterMasks(const std::int32_t width, const std::int32_t height)
   {
     const std::uint32_t maskSizeBytes = static_cast<std::uint32_t>(width * height);
-    auto* const view = AsTerrainVisualResourceRuntimeView(this);
+    auto* const view = this;
 
     auto* const newWaterFoam = static_cast<std::uint8_t*>(::operator new(maskSizeBytes));
     std::uint8_t* const oldWaterFoam = view->mWaterFoam;
@@ -3248,7 +2841,7 @@ namespace moho
    */
   void IWldTerrainRes::InitNormalMap(CBackgroundTaskControl& loadControl)
   {
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const normalView = this;
     CHeightField* const field = normalView->mMap->mHeightField.get();
 
     const std::int32_t widthMinusOne = field->width - 1;
@@ -3324,7 +2917,7 @@ namespace moho
       return;
     }
 
-    auto* const runtimeView = AsTerrainRuntimeView(this);
+    auto* const runtimeView = this;
     CHeightField* const field = runtimeView->mMap->mHeightField.get();
     const Wm3::AxisAlignedBox3f cameraAabb = field->ConvexIntersection(camera->CameraGetView().solid2);
 
@@ -3336,16 +2929,15 @@ namespace moho
 
     UserArmy* const focusArmy = WLD_GetActiveSession()->GetFocusArmy();
 
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
-    TerrainDirtyRectListRuntimeView& dirtyList = visualView->mDebugDirtyRects;
-    TerrainDirtyRectNodeRuntimeView* current = dirtyList.mHead->mNext;
+    auto* const visualView = this;
+    moho::TerrainDirtyRectList& dirtyList = visualView->mDebugDirtyRects;
+    auto current = dirtyList.begin();
 
     bool syncedAnyRect = false;
     gpg::Rect2i syncedBounds{};
 
-    while (current != dirtyList.mHead) {
-      TerrainDirtyRectNodeRuntimeView* const next = current->mNext;
-      const gpg::Rect2i dirtyRect = current->mValue;
+    while (current != dirtyList.end()) {
+      const gpg::Rect2i dirtyRect = *current;
 
       if (
         ShouldSyncDirtyRectInCameraBounds(dirtyRect, cameraRect)
@@ -3382,10 +2974,11 @@ namespace moho
           syncedAnyRect = true;
         }
 
-        EraseTerrainDirtyRectNode(dirtyList, current);
+        current = dirtyList.erase(current);
+        continue;
       }
 
-      current = next;
+      ++current;
     }
 
     if (syncedAnyRect) {
@@ -3415,7 +3008,7 @@ namespace moho
    */
   void IWldTerrainRes::UpdateNormalMap(CBackgroundTaskControl& loadControl, const gpg::Rect2i& rect)
   {
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const normalView = this;
     const std::int32_t tileWidth = normalView->mNormalMapWidth;
     const std::int32_t tileHeight = normalView->mNormalMapHeight;
     if (tileWidth <= 0 || tileHeight <= 0) {
@@ -3543,15 +3136,17 @@ namespace moho
 
     UpdateNormalMap(rect);
 
-    auto* const view = AsTerrainVisualResourceRuntimeView(this);
-    AppendTerrainDirtyRect(view->mDebugDirtyRects, rect);
+    // 0x008A576D..0x008A5793 is `mDebugDirtyRects.push_back(rect)`: the node
+    // purchase (0x005AB710) and the size bump with its 0x0FFFFFFF length check
+    // (0x005AB760) are what VC8 emits for that one line.
+    mDebugDirtyRects.push_back(rect);
 
     const std::int32_t halfX0 = FloorHalfCoordinate(rect.x0);
     const std::int32_t halfX1 = CeilHalfCoordinate(rect.x1);
     const std::int32_t halfZ0 = FloorHalfCoordinate(rect.z0);
     const std::int32_t halfZ1 = CeilHalfCoordinate(rect.z1);
 
-    view->mDebugDirtyTerrain->FillRect(halfX0, halfZ0, halfX1 - halfX0, halfZ1 - halfZ0, true);
+    mDebugDirtyTerrain->FillRect(halfX0, halfZ0, halfX1 - halfX0, halfZ1 - halfZ0, true);
   }
 
   /**
@@ -3752,10 +3347,11 @@ namespace moho
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
-    const auto* const view = AsTerrainNormalMapRuntimeView(this);
+    const auto* const view = this;
 
     const boost::shared_ptr<CD3DDynamicTextureSheet> targetTexture =
-      ((stratumIndex / 4) != 0) ? view->mStratumMask1 : view->mStratumMask0;
+      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(view->mStrata.mStratumMask1)
+                                : ShareAsDynamicSheet(view->mStrata.mStratumMask0);
 
     UpdateTextureChannel(
       rowStart,
@@ -3776,8 +3372,8 @@ namespace moho
    */
   void IWldTerrainRes::UpdateStratumMask(const std::int32_t stratumIndex, const std::uint8_t* const sourceMask)
   {
-    const auto* const view = AsTerrainNormalMapRuntimeView(this);
-    UpdateStratumMask(stratumIndex, sourceMask, 0, 0, view->mStratumMaskWidth, view->mStratumMaskHeight);
+    const auto* const view = this;
+    UpdateStratumMask(stratumIndex, sourceMask, 0, 0, view->mStrata.mStratumMaskWidth, view->mStrata.mStratumMaskHeight);
   }
 
   /**
@@ -3798,9 +3394,10 @@ namespace moho
     static constexpr std::uint32_t kChannelShift[4] = {16u, 8u, 0u, 24u};
 
     const std::int32_t channel = static_cast<std::int32_t>(static_cast<std::uint32_t>(stratumIndex) & 3u);
-    const auto* const view = AsTerrainNormalMapRuntimeView(this);
+    const auto* const view = this;
     const boost::shared_ptr<CD3DDynamicTextureSheet> sourceTexture =
-      ((stratumIndex / 4) != 0) ? view->mStratumMask1 : view->mStratumMask0;
+      ((stratumIndex / 4) != 0) ? ShareAsDynamicSheet(view->mStrata.mStratumMask1)
+                                : ShareAsDynamicSheet(view->mStrata.mStratumMask0);
 
     GetTextureChannel(sourceTexture, kChannelMask[channel], kChannelShift[channel], outMask);
   }
@@ -3816,7 +3413,7 @@ namespace moho
   {
     SNormalMapInfo outInfo{};
 
-    const auto* const view = AsTerrainNormalMapRuntimeView(this);
+    const auto* const view = this;
     const std::int32_t mapWidthMinusOne = view->mMap->mHeightField->width - 1;
     const std::int32_t mapHeightMinusOne = view->mMap->mHeightField->height - 1;
 
@@ -3869,7 +3466,7 @@ namespace moho
    */
   StratumMaterial& IWldTerrainRes::GetStratumMaterial()
   {
-    return AsTerrainNormalMapRuntimeView(this)->mStrata;
+    return mStrata;
   }
 
   /**
@@ -3881,7 +3478,7 @@ namespace moho
    */
   void IWldTerrainRes::SetStratumDefaults()
   {
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
+    auto* const normalView = this;
     normalView->mStrata = StratumMaterial{};
     normalView->mStrata.SetSizeTo(this);
   }
@@ -3907,8 +3504,8 @@ namespace moho
    */
   bool IWldTerrainRes::Save(gpg::BinaryWriter& writer)
   {
-    TerrainRuntimeView& view = *AsTerrainRuntimeView(this);
-    TerrainNormalMapRuntimeView& normalView = *AsTerrainNormalMapRuntimeView(this);
+    IWldTerrainRes& view = *this;
+    IWldTerrainRes& normalView = *this;
     STIMap& map = *view.mMap;
     const CHeightField& heightField = *map.mHeightField.get();
 
@@ -3995,15 +3592,15 @@ namespace moho
     writer.Write(view.mNormalMapWidth);
     writer.Write(view.mNormalMapHeight);
 
-    const TerrainNormalMapHandleArray& normalMap = normalView.mNormalMap;
+    const moho::TerrainNormalMapHandleArray& normalMap = normalView.mNormalMap;
     const std::int32_t normalMapSheetCount = static_cast<std::int32_t>(normalMap.size());
     writer.Write(normalMapSheetCount);
     for (std::int32_t sheetIndex = 0; sheetIndex < normalMapSheetCount; ++sheetIndex) {
       SaveTerrainSheetToArchive(writer, normalMap[sheetIndex].get(), kTerrainRawSheetFormat);
     }
 
-    SaveTerrainSheetToArchive(writer, normalView.mStratumMask0.get(), kTerrainMaskSheetFormat);
-    SaveTerrainSheetToArchive(writer, normalView.mStratumMask1.get(), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, AsDynamicSheet(normalView.mStrata.mStratumMask0), kTerrainMaskSheetFormat);
+    SaveTerrainSheetToArchive(writer, AsDynamicSheet(normalView.mStrata.mStratumMask1), kTerrainMaskSheetFormat);
 
     // 0x008A3D49: the water map is stored as a one-element sheet array.
     constexpr std::int32_t kWaterMapSheetCount = 1;
@@ -4041,7 +3638,7 @@ namespace moho
    */
   void IWldTerrainRes::SaveTexturing(gpg::BinaryWriter& writer)
   {
-    const StratumMaterial& strata = AsTerrainNormalMapRuntimeView(this)->mStrata;
+    const StratumMaterial& strata = mStrata;
 
     SaveStratumLayer(writer, strata.mLowerAlbedoTexture);
     SaveStratumLayer(writer, strata.mStratum0AlbedoTexture);
@@ -4063,7 +3660,7 @@ namespace moho
     SaveStratumLayer(writer, strata.mStratum6NormalTexture);
     SaveStratumLayer(writer, strata.mStratum7NormalTexture);
 
-    AsTerrainVisualResourceRuntimeView(this)->mDecalManager->Save(writer);
+    mDecalManager->Save(writer);
   }
 
   /**
@@ -4110,7 +3707,7 @@ namespace moho
    */
   void IWldTerrainRes::LoadTexturing(gpg::BinaryReader& reader, const std::uint32_t version)
   {
-    TerrainRuntimeView* const view = AsTerrainRuntimeView(this);
+    IWldTerrainRes* const view = this;
     StratumMaterial& strata = view->mStrata;
 
     if (version < 54) {
@@ -4226,8 +3823,8 @@ namespace moho
     CBackgroundTaskControl& loadControl
   )
   {
-    TerrainRuntimeView* const view = AsTerrainRuntimeView(this);
-    TerrainVisualResourceRuntimeView* const visualView = AsTerrainVisualResourceRuntimeView(this);
+    IWldTerrainRes* const view = this;
+    IWldTerrainRes* const visualView = this;
 
     // The stratum-mask utility sheets are resolved through the device-resources
     // object captured at entry (mirrors the SetBackground/SetSkycube idiom), not
@@ -4588,9 +4185,9 @@ namespace moho
    */
   bool IWldTerrainRes::Finalize()
   {
-    auto* const runtimeView = AsTerrainRuntimeView(this);
-    auto* const normalView = AsTerrainNormalMapRuntimeView(this);
-    auto* const visualView = AsTerrainVisualResourceRuntimeView(this);
+    auto* const runtimeView = this;
+    auto* const normalView = this;
+    auto* const visualView = this;
 
     runtimeView->mBool = 0;
 
@@ -4603,8 +4200,8 @@ namespace moho
     const std::int32_t maskTileX = (field->width - 1) >> 1;
     const std::int32_t maskTileY = (field->height - 1) >> 1;
 
-    runtimeView->mStrata.v1 = static_cast<std::uint32_t>(maskTileX);
-    runtimeView->mStrata.v2 = static_cast<std::uint32_t>(maskTileY);
+    runtimeView->mStrata.mStratumMaskWidth = static_cast<std::uint32_t>(maskTileX);
+    runtimeView->mStrata.mStratumMaskHeight = static_cast<std::uint32_t>(maskTileY);
 
     // Stratum mask 0: create a half-res dynamic sheet, blit the current mask
     // surface into it, then adopt it as the live mask.
@@ -4613,8 +4210,8 @@ namespace moho
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
-    D3D_GetDevice()->UpdateSurface(normalView->mStratumMask0.get(), newSheet.get(), nullptr, nullptr);
-    normalView->mStratumMask0 = newSheet;
+    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(normalView->mStrata.mStratumMask0), newSheet.get(), nullptr, nullptr);
+    AdoptDynamicSheetAsStratumMask(normalView->mStrata.mStratumMask0, newSheet);
 
     // Stratum mask 1: same pattern, reusing the temporary sheet slot.
     boost::shared_ptr<CD3DDynamicTextureSheet> spareSheet;
@@ -4624,8 +4221,8 @@ namespace moho
     if (newSheet.get() == nullptr) {
       throw gpg::gal::Error{};
     }
-    D3D_GetDevice()->UpdateSurface(normalView->mStratumMask1.get(), newSheet.get(), nullptr, nullptr);
-    normalView->mStratumMask1 = newSheet;
+    D3D_GetDevice()->UpdateSurface(AsDynamicSheet(normalView->mStrata.mStratumMask1), newSheet.get(), nullptr, nullptr);
+    AdoptDynamicSheetAsStratumMask(normalView->mStrata.mStratumMask1, newSheet);
     newSheet.reset();
 
     // Water map: create a full-res (format 12) dynamic sheet, blit the current

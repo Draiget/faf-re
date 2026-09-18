@@ -102,8 +102,8 @@ namespace moho
     byte0 = 0;
     byte1 = 0;
     mShaderName.assign("TTerrain");
-    v1 = 0;
-    v2 = 0;
+    mStratumMaskWidth = 0;
+    mStratumMaskHeight = 0;
     mStratumMask0 = {};
     mStratumMask1 = {};
 
@@ -161,8 +161,8 @@ namespace moho
     , byte1(source.byte1)
     , pad02_03{0, 0}
     , mShaderName(source.mShaderName)
-    , v1(source.v1)
-    , v2(source.v2)
+    , mStratumMaskWidth(source.mStratumMaskWidth)
+    , mStratumMaskHeight(source.mStratumMaskHeight)
     , mStratumMask0{}
     , mStratumMask1{}
     , mLowerAlbedoTexture(source.mLowerAlbedoTexture)

@@ -9,8 +9,15 @@
 #include "legacy/containers/List.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
+#include "legacy/containers/Map.h"
+#include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/render/Cartographic.h"
+#include "moho/render/SkyDome.h"
 #include "moho/sim/VisibilityRect.h"
+#include "moho/terrain/StratumMaterial.h"
+#include "moho/terrain/water/CWaterShaderProperties.h"
+#include "moho/terrain/water/WaveSystem.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
@@ -282,6 +289,43 @@ namespace moho
    * call in CWldMap.cpp (reached from `IWldTerrainRes::EnumerateEnvLookup`,
    * FUN_008A1500).
    */
+  /**
+   * The per-tile normal-map sheets at +0x948 of the terrain resource: an
+   * `msvc8::vector` of texture handles whose emissions (`_Tidy`, `size`,
+   * `capacity`, `reserve`, `_Copy_opt`, `erase`, `resize`) are cited on the
+   * Vector.h members. The release build strips the debug proxy for this lane,
+   * so the triple is 0x0C and the second template argument is `false`.
+   */
+  using TerrainNormalMapHandleArray = msvc8::vector<boost::shared_ptr<CD3DDynamicTextureSheet>, false>;
+  static_assert(sizeof(TerrainNormalMapHandleArray) == 0x0C, "TerrainNormalMapHandleArray size must be 0x0C");
+
+  /**
+   * The environment-lookup cache at +0x9A4: a `std::map<std::string, entry>`
+   * in the shipped binary, modeled with this project's ABI-matching
+   * `msvc8::map` so the 12-byte header and 0x50-byte node stay where the
+   * terrain resource needs them. Every tree mechanic (lower-bound search,
+   * hinted insert, erase, in-order increment) is `msvc8::map`'s own
+   * address-cited template member rather than a per-field reimplementation.
+   */
+  using TerrainEnvironmentLookupMap = msvc8::map<msvc8::string, TerrainEnvironmentLookupEntry>;
+  static_assert(sizeof(TerrainEnvironmentLookupMap) == 0x0C, "TerrainEnvironmentLookupMap size must be 0x0C");
+
+  /**
+   * The edit-mode word buffer at +0x9B0: the `{proxy, begin, end, capacity}`
+   * storage of a VC8 `std::vector<bool>`, which this tree models as
+   * `msvc8::detail::vector_bool_storage`.
+   */
+  using TerrainEditWordBuffer = msvc8::detail::vector_bool_storage;
+  static_assert(sizeof(TerrainEditWordBuffer) == 0x10, "TerrainEditWordBuffer size must be 0x10");
+
+  /**
+   * The debug dirty-rect list at +0x9D8. `{proxy, head, size}` with
+   * `{next, prev, value}` nodes is a VC8 `std::list`, i.e. `msvc8::list`:
+   * a 0x0C header and 0x18 nodes for a 0x10-byte `gpg::Rect2i`.
+   */
+  using TerrainDirtyRectList = msvc8::list<gpg::Rect2i>;
+  static_assert(sizeof(TerrainDirtyRectList) == 0x0C, "TerrainDirtyRectList size must be 0x0C");
+
   using TerrainEnvironmentLookupPair = std::pair<msvc8::string, msvc8::string>;
   using TerrainEnvironmentLookupPairs = msvc8::vector<TerrainEnvironmentLookupPair>;
   static_assert(sizeof(TerrainEnvironmentLookupPair) == 0x38, "TerrainEnvironmentLookupPair size must be 0x38");
@@ -1246,9 +1290,195 @@ namespace moho
      * - the cartographic view, the splat and clutter passes, the map imager,
      * the console's map queries - follows it straight into `STIMap`.
      */
-    STIMap* mMap; // 0x04
+    STIMap* mMap;                                          // +0x004
+    std::uint8_t mBool;                                    // +0x008
+    std::uint8_t mEditMode;                                // +0x009
+    std::uint8_t mUnknown00A_00B[0x02];                    // +0x00A
+    Cartographic mCartographic;                            // +0x00C
+    SkyDome mSkyDome;                                      // +0x0B0
+    std::uint8_t mUnknown2D4_2D7[0x04];                    // +0x2D4
+    float mLightingMultiplier;                             // +0x2D8
+    Wm3::Vector3f mSunDirection;                           // +0x2DC
+    Wm3::Vector3f mSunAmbience;                            // +0x2E8
+    Wm3::Vector3f mSunColor;                               // +0x2F4
+    Wm3::Vector3f mShadowFillColor;                        // +0x300
+    Vector4f mSpecularColor;                               // +0x30C
+    float mBloom;                                          // +0x31C
+
+    /**
+     * The fog block the reflected `SFogInfo` type serializes as one unit, and
+     * the lanes behind it that `SetTopographicSamples`, `SetHypsometricColor`
+     * and `SetImagerElevationOffset` write one at a time. Same bytes either
+     * way, which is why those accessors reach +0x334..+0x34C directly.
+     */
+    union
+    {
+      SFogInfo mFogInfo;                                   // +0x320
+      struct
+      {
+        float mFogStartDistance;                           // +0x320
+        float mFogCutoffDistance;                          // +0x324
+        float mFogMinClamp;                                // +0x328
+        float mFogMaxClamp;                                // +0x32C
+        float mFogCurveExponent;                           // +0x330
+        std::int32_t mTopographicSamples;                  // +0x334
+        std::uint32_t mHypsometricColor[5];                // +0x338
+        float mImagerElevationOffset;                      // +0x34C
+      };
+    };
+
+    CWaterShaderProperties mWaterShaderProperties;         // +0x350
+    StratumMaterial mStrata;                               // +0x4AC
+    std::uint8_t mUnknown944_947[0x04];                    // +0x944
+    TerrainNormalMapHandleArray mNormalMap;                // +0x948
+    std::int32_t mNormalMapWidth;                          // +0x954
+    std::int32_t mNormalMapHeight;                         // +0x958
+    msvc8::string mBackgroundFile;                         // +0x95C
+    ID3DDeviceResources::TextureResourceHandle mBackgroundTexture; // +0x978
+    msvc8::string mSkycubeFile;                            // +0x980
+    ID3DDeviceResources::TextureResourceHandle mSkycubeTexture;     // +0x99C
+    TerrainEnvironmentLookupMap mEnvLookup;                // +0x9A4
+    TerrainEditWordBuffer mEditWordBuffer;                 // +0x9B0
+    ID3DDeviceResources::DynamicTextureSheetHandle mWaterMapTexture; // +0x9C0
+    std::uint8_t* mWaterFoam;                              // +0x9C8
+    std::uint8_t* mWaterFlatness;                          // +0x9CC
+    std::uint8_t* mWaterDepthBias;                         // +0x9D0
+    gpg::BitArray2D* mDebugDirtyTerrain;                   // +0x9D4
+    TerrainDirtyRectList mDebugDirtyRects;                 // +0x9D8
+    std::uint8_t mUnknown9E4_9E7[0x04];                    // +0x9E4
+    WaveSystem mWaveSystem;                                // +0x9E8
+    CDecalManager* mDecalManager;                          // +0xC30
+    std::uint8_t mUnknownC34_C37[0x04];                    // +0xC34
   };
-  static_assert(sizeof(IWldTerrainRes) == 0x08, "IWldTerrainRes head size must be 0x08");
+
+  static_assert(
+    sizeof(IWldTerrainRes) == 0xC38,
+    "IWldTerrainRes size must be 0xC38"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mMap) == 0x004,
+    "IWldTerrainRes::mMap offset must be 0x004"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mBool) == 0x008,
+    "IWldTerrainRes::mBool offset must be 0x008"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mEditMode) == 0x009,
+    "IWldTerrainRes::mEditMode offset must be 0x009"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mCartographic) == 0x00C,
+    "IWldTerrainRes::mCartographic offset must be 0x00C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mSkyDome) == 0x0B0,
+    "IWldTerrainRes::mSkyDome offset must be 0x0B0"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mLightingMultiplier) == 0x2D8,
+    "IWldTerrainRes::mLightingMultiplier offset must be 0x2D8"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mSpecularColor) == 0x30C,
+    "IWldTerrainRes::mSpecularColor offset must be 0x30C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mBloom) == 0x31C,
+    "IWldTerrainRes::mBloom offset must be 0x31C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mFogInfo) == 0x320,
+    "IWldTerrainRes::mFogInfo offset must be 0x320"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mTopographicSamples) == 0x334,
+    "IWldTerrainRes::mTopographicSamples offset must be 0x334"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mHypsometricColor) == 0x338,
+    "IWldTerrainRes::mHypsometricColor offset must be 0x338"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mImagerElevationOffset) == 0x34C,
+    "IWldTerrainRes::mImagerElevationOffset offset must be 0x34C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaterShaderProperties) == 0x350,
+    "IWldTerrainRes::mWaterShaderProperties offset must be 0x350"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mStrata) == 0x4AC,
+    "IWldTerrainRes::mStrata offset must be 0x4AC"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mNormalMap) == 0x948,
+    "IWldTerrainRes::mNormalMap offset must be 0x948"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mNormalMapWidth) == 0x954,
+    "IWldTerrainRes::mNormalMapWidth offset must be 0x954"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mNormalMapHeight) == 0x958,
+    "IWldTerrainRes::mNormalMapHeight offset must be 0x958"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mBackgroundFile) == 0x95C,
+    "IWldTerrainRes::mBackgroundFile offset must be 0x95C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mBackgroundTexture) == 0x978,
+    "IWldTerrainRes::mBackgroundTexture offset must be 0x978"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mSkycubeFile) == 0x980,
+    "IWldTerrainRes::mSkycubeFile offset must be 0x980"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mSkycubeTexture) == 0x99C,
+    "IWldTerrainRes::mSkycubeTexture offset must be 0x99C"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mEnvLookup) == 0x9A4,
+    "IWldTerrainRes::mEnvLookup offset must be 0x9A4"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mEditWordBuffer) == 0x9B0,
+    "IWldTerrainRes::mEditWordBuffer offset must be 0x9B0"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaterMapTexture) == 0x9C0,
+    "IWldTerrainRes::mWaterMapTexture offset must be 0x9C0"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaterFoam) == 0x9C8,
+    "IWldTerrainRes::mWaterFoam offset must be 0x9C8"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaterFlatness) == 0x9CC,
+    "IWldTerrainRes::mWaterFlatness offset must be 0x9CC"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaterDepthBias) == 0x9D0,
+    "IWldTerrainRes::mWaterDepthBias offset must be 0x9D0"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mDebugDirtyTerrain) == 0x9D4,
+    "IWldTerrainRes::mDebugDirtyTerrain offset must be 0x9D4"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mDebugDirtyRects) == 0x9D8,
+    "IWldTerrainRes::mDebugDirtyRects offset must be 0x9D8"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mWaveSystem) == 0x9E8,
+    "IWldTerrainRes::mWaveSystem offset must be 0x9E8"
+  );
+  static_assert(
+    offsetof(IWldTerrainRes, mDecalManager) == 0xC30,
+    "IWldTerrainRes::mDecalManager offset must be 0xC30"
+  );
 
   /**
    * Recovered owning layout for CWldMap.

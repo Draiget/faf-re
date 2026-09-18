@@ -2643,6 +2643,7 @@ namespace msvc8
          * Address: 0x004A3300 (FUN_004A3300 -- iterator `==` for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AreUint32SlotsEqual` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A32A0 (FUN_004A32A0 -- an iterator's index slot assigned for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AssignUint32Slot` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A32E0 (FUN_004A32E0 -- a second emission of that slot assignment for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AssignUint32SlotDuplicate` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00889FE0 (FUN_00889FE0 -- `size()` for a 0x4C-byte element: `(last_ - first_) / 76` with a null-`first_` guard returning 0; one caller, 0x008895A0; formerly `CountStride76RecordsRuntime` in moho/sim/CWldMap.cpp over a `Stride76RangeRuntimeView` stand-in (RULE ONE), removed 2026-09-18.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
