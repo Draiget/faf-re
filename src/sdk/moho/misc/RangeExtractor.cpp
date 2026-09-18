@@ -107,6 +107,7 @@ namespace
    * Address: 0x007EDC00  base
    * Address: 0x007EDC10  base
    * Address: 0x007EDC20  base
+   * Address: 0x007EC390  Moho::CombinedMilitaryExtractor
    * Address: 0x007EC870  Moho::CountermeasureExtractor
    * Address: 0x007EDAB0  Moho::MiscellaneousExtractor
    * Address: 0x007EDAC0  Moho::IntelExtractor
