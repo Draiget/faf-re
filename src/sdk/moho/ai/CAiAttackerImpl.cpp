@@ -184,49 +184,6 @@ namespace
     offsetof(WeaponEmitterEntryView, extraRef) == 0xD0, "WeaponEmitterEntryView::extraRef offset must be 0xD0"
   );
 
-  struct CAiAttackerImplRuntimeView
-  {
-    std::uint8_t pad_00[0x40];
-    Unit* mUnit;                                   // +0x40
-    CTaskStage mStage;                             // +0x44
-    msvc8::vector<UnitWeapon*> mWeapons;           // +0x58
-    WeakPtr<CTaskThread> mThread;                  // +0x68
-    msvc8::vector<CAcquireTargetTask*> mTasks;     // +0x70
-    CAiTarget mDesiredTarget;       // +0x80
-    EAiAttackerEvent mReportingState; // +0xA0
-  };
-
-  static_assert(offsetof(CAiAttackerImplRuntimeView, mUnit) == 0x40, "CAiAttackerImpl::mUnit offset must be 0x40");
-  static_assert(offsetof(CAiAttackerImplRuntimeView, mStage) == 0x44, "CAiAttackerImpl::mStage offset must be 0x44");
-  static_assert(
-    offsetof(CAiAttackerImplRuntimeView, mWeapons) == 0x58, "CAiAttackerImpl::mWeapons offset must be 0x58"
-  );
-  static_assert(
-    offsetof(CAiAttackerImplRuntimeView, mThread) == 0x68, "CAiAttackerImpl::mThread offset must be 0x68"
-  );
-  static_assert(
-    offsetof(CAiAttackerImplRuntimeView, mTasks) == 0x70, "CAiAttackerImpl::mTasks offset must be 0x70"
-  );
-  static_assert(
-    offsetof(CAiAttackerImplRuntimeView, mDesiredTarget) == 0x80,
-    "CAiAttackerImpl::mDesiredTarget offset must be 0x80"
-  );
-  static_assert(
-    offsetof(CAiAttackerImplRuntimeView, mReportingState) == 0xA0,
-    "CAiAttackerImpl::mReportingState offset must be 0xA0"
-  );
-  static_assert(sizeof(CAiAttackerImplRuntimeView) == 0xA4, "CAiAttackerImpl runtime view size must be 0xA4");
-
-  [[nodiscard]] CAiAttackerImplRuntimeView* AsRuntimeView(CAiAttackerImpl* const object) noexcept
-  {
-    return reinterpret_cast<CAiAttackerImplRuntimeView*>(object);
-  }
-
-  [[nodiscard]] const CAiAttackerImplRuntimeView* AsRuntimeView(const CAiAttackerImpl* const object) noexcept
-  {
-    return reinterpret_cast<const CAiAttackerImplRuntimeView*>(object);
-  }
-
   [[nodiscard]] IAiAttacker* AsAiAttackerBase(CAiAttackerImpl* const object) noexcept
   {
     return reinterpret_cast<IAiAttacker*>(object);
@@ -690,7 +647,7 @@ namespace
  */
 CAiAttackerImpl::~CAiAttackerImpl()
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
 
   // Delete owned CAcquireTargetTask* entries via their virtual dtor.
   // For default-constructed CAiAttackerImpl (mTasks empty), this loop
@@ -719,24 +676,20 @@ CAiAttackerImpl::~CAiAttackerImpl()
     }
   }
 
-  // CAiTarget destructor unlinks `mDesiredTarget` from its owner
-  // weak-link chain. For default-constructed state (zero entity),
-  // the unlink is a no-op.
-  std::destroy_at(&view->mDesiredTarget);
-
-  // Release raw vector storage for mTasks and mWeapons. msvc8::vector
-  // destructor handles the null _Myfirst case safely.
-  std::destroy_at(&view->mTasks);
   // Unlink the mThread WeakPtr from the CTaskThread's weak-ref chain (binary
-  // 0x005D6C6A, between the mTasks and mWeapons storage frees). Self-guards and
-  // is a no-op if Destroy() above already nulled the weak lane.
+  // 0x005D6C6A, between the mTasks and mWeapons storage frees). `WeakPtr`'s
+  // destructor is `= default`, so this one really is a source line and has to
+  // stay. Self-guards, and is a no-op if `Destroy()` above already nulled the
+  // weak lane.
   view->mThread.UnlinkFromOwnerChain();
-  std::destroy_at(&view->mWeapons);
 
-  // CTaskStage destructor tears down the two embedded intrusive
-  // thread lists. For default-constructed state (lists self-linked
-  // and empty), the teardown is a structural reset.
-  std::destroy_at(&view->mStage);
+  // `mDesiredTarget`'s weak-link unlink, the two vectors' storage release and
+  // `mStage`'s intrusive-list teardown are *not* written here. They are members
+  // now, so MSVC emits each one after this body, in reverse declaration order -
+  // mDesiredTarget, mTasks, mWeapons, mStage - which is the order the binary
+  // tears them down in. Writing them out by hand as well would destroy each
+  // twice; that is exactly the double teardown that made `~CWldMap` fault in
+  // `rb_tree::leftmost` on a null header.
 
   // The CScriptObject subobject at +0x0C is deliberately NOT destroyed here.
   //
@@ -757,8 +710,8 @@ CAiAttackerImpl::~CAiAttackerImpl()
   // so there is no paired construction to undo. The binary's construct and
   // destruct are both part of the multi-base layout this class does not model,
   // and modelling only the destroy half is what produced the crash. The
-  // subobject's lanes are zeroed by the constructor's memset and inert, so
-  // there is nothing to release.
+  // subobject's lanes are zeroed by `mBaseSubobjects`' default member
+  // initialiser and inert, so there is nothing to release.
   auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
 
   // Unlink the IAiAttacker subobject's intrusive-listener list at
@@ -800,11 +753,17 @@ CAiAttackerImpl::~CAiAttackerImpl()
 CAiAttackerImpl::CAiAttackerImpl() noexcept
 {
   // Compiler-emitted vtable init has already written
-  // `&CAiAttackerImpl::vftable` at offset +0x00 before this body runs.
-  // Zero everything past the vtable pointer so unused/unrecovered
-  // field lanes start at a known state.
+  // `&CAiAttackerImpl::vftable` at offset +0x00 before this body runs, and the
+  // members from +0x40 on have already been default-constructed - `mStage`
+  // self-linked, both vectors and the WeakPtr zeroed, `mDesiredTarget` and
+  // `mReportingState` value-initialised. Only the opaque base-subobject bytes
+  // at +0x04..+0x40 are this body's to set up; `mBaseSubobjects`' default
+  // member initialiser has already zeroed them.
+  //
+  // This body used to `memset` everything past the vptr and then placement-new
+  // each field back over the top. With the fields typed that would wipe
+  // already-live members and start a second lifetime on each one.
   auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
-  std::memset(bytes + sizeof(void*), 0, sizeof(CAiAttackerImpl) - sizeof(void*));
 
   // IAiAttacker subobject's intrusive-listener list head at +0x04/+0x08.
   // Binary self-links so the list reads as empty: prev = next = &head.
@@ -824,38 +783,11 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   // through it (the runtime CScriptObject vtable/thunk setup belongs to the
   // not-yet-modeled multi-base inheritance and is out of scope here).
 
-  // Typed-view access for the remaining named fields.
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
-
-  // mUnit at +0x40 — explicit null is redundant after memset but
-  // makes the initialization order match the binary.
-  view->mUnit = nullptr;
-
-  // CTaskStage embedded at +0x44. CTaskStage's ctor self-links the
-  // two embedded intrusive thread lists and sets `mActive = true`,
-  // matching the binary's three writes at +0x44/+0x4C/+0x54.
-  ::new (&view->mStage) CTaskStage();
-
-  // Placement-new the embedded vector/WeakPtr objects so their
-  // lifetimes formally start; their default ctors are trivial
-  // (zero-init the begin/end/cap-end / owner-link / next pointers)
-  // so the post-memset bytes are already at the right state, and
-  // these placement-news are no-ops in optimized code while keeping
-  // the matching `std::destroy_at` calls in the dtor well-defined.
-  ::new (&view->mWeapons) msvc8::vector<UnitWeapon*>();
-  ::new (&view->mThread) WeakPtr<CTaskThread>();
-  ::new (&view->mTasks) msvc8::vector<CAcquireTargetTask*>();
-
-  // CAiTarget mDesiredTarget at +0x80. Default ctor leaves all
-  // fields zero-initialized; the binary additionally writes
-  // `targetPoint = -1` at +0x18 (overall +0x98) as a sentinel
-  // "no target selected" value.
-  ::new (&view->mDesiredTarget) CAiTarget();
-  view->mDesiredTarget.targetPoint = -1;
-
-  // mReportingState at +0xA0 — zero is the binary's default "no
-  // event in flight" sentinel value for EAiAttackerEvent.
-  view->mReportingState = static_cast<EAiAttackerEvent>(0);
+  // CAiTarget mDesiredTarget at +0x80. Its default constructor leaves every
+  // field zero; the binary additionally writes `targetPoint = -1` at +0x18
+  // (overall +0x98) as the "no target selected" sentinel, which is a real
+  // source line and so stays here.
+  mDesiredTarget.targetPoint = -1;
 }
 
 /**
@@ -868,7 +800,7 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
 CAiAttackerImpl::CAiAttackerImpl(Unit* const unit)
   : CAiAttackerImpl()
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   view->mUnit = unit;
   view->mReportingState = static_cast<EAiAttackerEvent>(State::AAS_CannotTarget);
 
@@ -940,7 +872,7 @@ std::int32_t CAiAttackerImpl::ReadExtraDataValue(const WeaponExtraRefSubobject* 
  */
 void CAiAttackerImpl::WeaponsOnDestroy()
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   for (UnitWeapon* const weapon : view->mWeapons) {
     if (weapon) {
       (void)weapon->RunScript("OnDestroy");
@@ -956,7 +888,7 @@ void CAiAttackerImpl::WeaponsOnDestroy()
  */
 Unit* CAiAttackerImpl::GetUnit()
 {
-  return AsRuntimeView(this)->mUnit;
+  return this->mUnit;
 }
 
 /**
@@ -967,7 +899,7 @@ Unit* CAiAttackerImpl::GetUnit()
  */
 bool CAiAttackerImpl::WeaponsBusy()
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   for (const UnitWeapon* const weapon : view->mWeapons) {
     if (weapon && weapon->mTarget.targetType != EAiTargetType::AITARGET_None) {
       return true;
@@ -984,7 +916,7 @@ bool CAiAttackerImpl::WeaponsBusy()
  */
 CTaskStage* CAiAttackerImpl::GetTaskStage()
 {
-  return &AsRuntimeView(this)->mStage;
+  return &this->mStage;
 }
 
 /**
@@ -996,7 +928,7 @@ CTaskStage* CAiAttackerImpl::GetTaskStage()
  */
 UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlueprint)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   const int weaponIndex = static_cast<int>(view->mWeapons.size());
 
   UnitWeapon* weapon = static_cast<UnitWeapon*>(::operator new(sizeof(UnitWeapon), std::nothrow));
@@ -1025,7 +957,7 @@ UnitWeapon* CAiAttackerImpl::CreateWeapon(RUnitBlueprintWeapon* const weaponBlue
  */
 int CAiAttackerImpl::GetWeaponCount()
 {
-  return static_cast<int>(AsRuntimeView(this)->mWeapons.size());
+  return static_cast<int>(this->mWeapons.size());
 }
 
 /**
@@ -1037,7 +969,7 @@ int CAiAttackerImpl::GetWeaponCount()
  */
 UnitWeapon* CAiAttackerImpl::GetWeapon(const int index)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   const unsigned int weaponCount = static_cast<unsigned int>(view->mWeapons.size());
   const unsigned int weaponIndex = static_cast<unsigned int>(index);
   if (weaponIndex >= weaponCount) {
@@ -1057,7 +989,7 @@ UnitWeapon* CAiAttackerImpl::GetWeapon(const int index)
  */
 void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   view->mDesiredTarget = (target != nullptr) ? *target : BuildClearedTarget();
 
   const CAiTarget clearedTarget = BuildClearedTarget();
@@ -1094,7 +1026,7 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
  */
 CAiTarget* CAiAttackerImpl::GetDesiredTarget()
 {
-  return &AsRuntimeView(this)->mDesiredTarget;
+  return &this->mDesiredTarget;
 }
 
 /**
@@ -1105,7 +1037,7 @@ CAiTarget* CAiAttackerImpl::GetDesiredTarget()
  */
 void CAiAttackerImpl::OnWeaponHaltFire()
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   for (UnitWeapon* const weapon : view->mWeapons) {
     if (weapon) {
       (void)weapon->RunScript("OnHaltFire");
@@ -1121,7 +1053,7 @@ void CAiAttackerImpl::OnWeaponHaltFire()
  */
 bool CAiAttackerImpl::CanAttackTarget(CAiTarget* const target)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
     return false;
   }
@@ -1144,7 +1076,7 @@ bool CAiAttackerImpl::CanAttackTarget(CAiTarget* const target)
  */
 bool CAiAttackerImpl::PickTarget(Entity* const targetEntity)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (targetEntity == nullptr || !view->mUnit || view->mUnit->IsBeingBuilt()) {
     return false;
   }
@@ -1239,7 +1171,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
     return nullptr;
   }
 
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   Unit* const unit = view->mUnit;
   if (unit == nullptr || unit->ArmyRef == nullptr || unit->SimulationRef == nullptr || unit->SimulationRef->mRules == nullptr) {
     return nullptr;
@@ -1435,7 +1367,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
  */
 UnitWeapon* CAiAttackerImpl::GetTargetWeapon(CAiTarget* const target)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
     return nullptr;
   }
@@ -1457,7 +1389,7 @@ UnitWeapon* CAiAttackerImpl::GetTargetWeapon(CAiTarget* const target)
  */
 UnitWeapon* CAiAttackerImpl::GetPrimaryWeapon()
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
     return nullptr;
   }
@@ -1480,7 +1412,7 @@ UnitWeapon* CAiAttackerImpl::GetPrimaryWeapon()
  */
 float CAiAttackerImpl::GetMaxWeaponRange()
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt()) {
     return 0.0f;
   }
@@ -1524,7 +1456,7 @@ float CAiAttackerImpl::GetMaxWeaponRange()
  */
 bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, const Wm3::Vector3f* const targetPos)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || !weapon || !targetPos) {
     return false;
   }
@@ -1549,7 +1481,7 @@ bool CAiAttackerImpl::VectorIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
  */
 bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targetPos)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || !targetPos) {
     return false;
   }
@@ -1585,7 +1517,7 @@ bool CAiAttackerImpl::VectorIsWithinAttackRange(const Wm3::Vector3f* const targe
  */
 bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, CAiTarget* const target)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || weapon == nullptr || target == nullptr || weapon->mEnabled == 0u) {
     return false;
   }
@@ -1613,7 +1545,7 @@ bool CAiAttackerImpl::TargetIsWithinWeaponAttackRange(UnitWeapon* const weapon, 
  */
 bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
     return false;
   }
@@ -1641,7 +1573,7 @@ bool CAiAttackerImpl::TargetIsWithinAttackRange(CAiTarget* const target)
  */
 bool CAiAttackerImpl::IsTooClose(CAiTarget* const target)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (!view->mUnit || view->mUnit->IsBeingBuilt() || target == nullptr) {
     return false;
   }
@@ -1678,7 +1610,7 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
     return false;
   }
 
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   Unit* const ownerUnit = view->mUnit;
   if (ownerUnit != nullptr && ownerUnit->CommandQueue != nullptr) {
     const msvc8::vector<WeakPtr<CUnitCommand>> commandSnapshot = ownerUnit->CommandQueue->mCommandVec;
@@ -1738,7 +1670,7 @@ bool CAiAttackerImpl::IsTargetExempt(Entity* const target)
  */
 CAiTarget* CAiAttackerImpl::HasSlavedTarget(UnitWeapon** const outWeapon)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   if (outWeapon) {
     *outWeapon = nullptr;
   }
@@ -1768,7 +1700,7 @@ CAiTarget* CAiAttackerImpl::HasSlavedTarget(UnitWeapon** const outWeapon)
  */
 void CAiAttackerImpl::ResetReportingState()
 {
-  AsRuntimeView(this)->mReportingState = static_cast<EAiAttackerEvent>(0);
+  this->mReportingState = static_cast<EAiAttackerEvent>(0);
 }
 
 /**
@@ -1780,7 +1712,7 @@ void CAiAttackerImpl::ResetReportingState()
  */
 void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Projectile* const projectile)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
   if (projectile == nullptr) {
     return;
@@ -1800,7 +1732,7 @@ void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Pr
  */
 void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, CollisionBeamEntity* const beam)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
   if (beam == nullptr) {
     return;
@@ -1819,7 +1751,7 @@ void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, Collisio
  */
 void CAiAttackerImpl::ForceEngage(Entity* const target)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   if (view->mUnit == nullptr) {
     return;
   }
@@ -1879,7 +1811,7 @@ void CAiAttackerImpl::Stop()
  */
 void CAiAttackerImpl::SetState(const State state)
 {
-  CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  auto* const view = this;
   const auto stateValue = static_cast<std::int32_t>(state);
   if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
     view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
@@ -1901,7 +1833,7 @@ void CAiAttackerImpl::SetState(const State state)
  */
 Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
 {
-  const CAiAttackerImplRuntimeView* const view = AsRuntimeView(this);
+  const auto* const view = this;
   Unit* const unit = view->mUnit;
 
   if (unit->AiAttacker == nullptr) {
