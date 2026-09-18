@@ -292,20 +292,24 @@ namespace
   constexpr std::uint32_t kDynamicVertexBatchLimit = 1000u;
 
   /**
-   * "range" effect shader-variable slot for the fill/burn ring color. Follows
-   * the same lazy-register idiom as `CRenFrame.cpp`'s `DEFINE_FRAME_SHADER_VAR_GETTER`
-   * family (register-on-first-use static, bound into the "frame" effect group -
-   * this is the same effect `CRenFrame::Render` selects for the "RangeMask" /
-   * "RangeFill" / "RangeBurn" technique passes below). The exact HLSL variable
-   * name is not independently byte-verified (IDA's own symbol for the binary
-   * global is `shaderVarFrameRangeColor`, matching this getter's naming
-   * convention); "RangeColor" is the best-evidence name given the surrounding
-   * `FrameTexture1..4`/`BlurScale`/`GlowCopyScale` siblings.
+   * The "frame" effect's shader-variable slot for the fill/burn ring color.
+   * Follows the same lazy-register idiom as `CRenFrame.cpp`'s
+   * `DEFINE_FRAME_SHADER_VAR_GETTER` family (register-on-first-use static,
+   * bound into the "frame" effect group - the effect `CRenFrame::Render`
+   * selects for the "RangeMask" / "RangeFill" / "RangeBurn" technique passes
+   * below).
+   *
+   * The name is `rangeColor`, spelled as `gamedata/effects/frame.fx` declares
+   * it (`float4 rangeColor = float4(0.2,0.2,0.2,0.2);`, line 25, consumed by
+   * `RangeBurn`'s `RangePS(rangeColor)`). A previous pass guessed "RangeColor"
+   * from the surrounding `FrameTexture1..4` siblings; shader variable lookup is
+   * case-sensitive, so that never resolved and every ring burned with the
+   * shader's own default instead of its profile color.
    */
   [[nodiscard]] moho::ShaderVar& GetFrameRangeColorShaderVar()
   {
     static moho::ShaderVar shaderVar{};
-    static const bool registered = (moho::RegisterShaderVar("RangeColor", &shaderVar, "frame"), true);
+    static const bool registered = (moho::RegisterShaderVar("rangeColor", &shaderVar, "frame"), true);
     (void)registered;
     return shaderVar;
   }
@@ -345,16 +349,19 @@ namespace
 
     boost::shared_ptr<gpg::gal::EffectD3D9> effect = AcquireRangeRingBaseEffect();
     boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> castTechnique = effect->SetTechnique("Cast");
-    [[maybe_unused]] boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar = effect->SetMatrix("viewMatrix");
+    boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar = effect->SetMatrix("viewMatrix");
     boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrixVar = effect->SetMatrix("projMatrix");
 
-    // The binary's OnReset dispatch (EffectD3D9 vtable slot 5, +0x14) passes
-    // `&cameraView.view` as an extra argument that the currently recovered
-    // `EffectD3D9::OnReset()` does not declare (0-arg). `EffectD3D9.hpp` is
-    // outside this file's ownership; calling the 0-arg form here is the best
-    // typed call available without reintroducing raw vtable dispatch. Flagged
-    // for a follow-up EffectD3D9 pass.
-    effect->OnReset();
+    // `range.fx` declares both `viewMatrix` and `projMatrix` as its own globals,
+    // so both have to be pushed - the device's matrices are a different effect's
+    // state and do not reach this one. The binary does exactly that at
+    // 0x007EFA4D..0x007EFA65: two calls through vtable slot 5 (+0x14) of the
+    // variable handles, `[camera+0x5C]` (GeomCamera3::view) first and
+    // `[camera+0x1C]` (::projection) second. An earlier pass read the first of
+    // those as `EffectD3D9::OnReset()` and dropped the view matrix, which left
+    // `viewMatrix` at whatever the effect loaded with and transformed every ring
+    // out of frame.
+    viewMatrixVar->SetMatrix4x4(&cameraView.view);
     projMatrixVar->SetMatrix4x4(&cameraView.projection);
 
     device->SetVertexDeclaration(rangeRenderer.mGeometry.mVertexFormat);
