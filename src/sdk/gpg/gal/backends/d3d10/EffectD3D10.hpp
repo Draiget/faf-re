@@ -86,9 +86,8 @@ namespace gpg::gal
     virtual void OnLost();
 
   public:
-    EffectContext context_{};         // +0x04
-    std::uint8_t contextPad_[0x60]{}; // +0x08 .. +0x67
-    void* dxEffect_ = nullptr;        // +0x68
+    EffectContext context_{};  // +0x04 .. +0x67
+    void* dxEffect_ = nullptr; // +0x68
   };
 
   static_assert(offsetof(EffectD3D10, context_) == 0x04, "EffectD3D10::context_ offset must be 0x04");
