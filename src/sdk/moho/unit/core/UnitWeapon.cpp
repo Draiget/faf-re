@@ -1,7 +1,9 @@
 #include "moho/unit/core/UnitWeapon.h"
 
 #include <algorithm>
+#include <cstdarg>
 #include <cstddef>
+#include <cstdio>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -367,6 +369,29 @@ namespace
   constexpr float kBombDropHeadingDotThreshold = 0.866f;
   constexpr std::uint32_t kBombDropInnerCircleDepth = 0xFFFF7F3Fu;
   constexpr std::uint32_t kBombDropOuterCircleDepth = 0xFF7F3F00u;
+
+  // TEMPORARY PROBE SINK -- bomber release-gate triage, delete when resolved.
+  // gpg::Warnf reaches nothing until `/log <name>` installs a target and the
+  // sessions that reproduce this run without one, so this appends to the log
+  // that is always opened. Bounded, because CanFire runs per weapon per tick.
+  void BombDiagLine(const char* const fmt, ...)
+  {
+    static int sCount = 0;
+    if (sCount++ >= 400) {
+      return;
+    }
+
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
 
   [[nodiscard]] bool ShouldRenderBombDropZone(moho::Sim* const sim)
   {
@@ -3148,6 +3173,12 @@ namespace moho
       const float velocityLane = velocityMagnitude * 10.0f;
       const float speedGate = ownerUnit->GetAttributes().moveSpeedMult * unitBlueprint->Air.MaxAirspeed * 0.25f;
       if (speedGate > velocityLane) {
+        // TEMPORARY PROBE
+        BombDiagLine(
+          "[BOMBDIAG] REJECT speedgate |v|=%.4f lane=%.4f gate=%.4f mult=%.3f maxAir=%.2f",
+          velocityMagnitude, velocityLane, speedGate,
+          ownerUnit->GetAttributes().moveSpeedMult, unitBlueprint->Air.MaxAirspeed
+        );
         return false;
       }
     }
@@ -3157,6 +3188,8 @@ namespace moho
     }
 
     if (!ownerUnit->IsUnitState(UNITSTATE_MakingAttackRun)) {
+      // TEMPORARY PROBE
+      BombDiagLine("[BOMBDIAG] REJECT not-in-attack-run");
       return false;
     }
 
@@ -3192,9 +3225,19 @@ namespace moho
 
     const float bombDropThreshold = weaponBlueprint->BombDropThreshold;
     if (bombDropThreshold >= bombDropDistance * 2.0f) {
+      // TEMPORARY PROBE
+      BombDiagLine("[BOMBDIAG] REJECT too-close dist=%.3f thr=%.3f", bombDropDistance, bombDropThreshold);
       return false;
     }
     if (bombDropThreshold < bombDropDistance) {
+      // TEMPORARY PROBE -- this arm returns WITHOUT any heading check, so a
+      // drop point further out than the threshold releases no matter which way
+      // the aircraft points. If the reported "bombs in any direction" is this
+      // arm, then bombDropDistance is the thing that needs explaining.
+      BombDiagLine(
+        "[BOMBDIAG] ACCEPT no-heading-check dist=%.3f thr=%.3f canFire=%u",
+        bombDropDistance, bombDropThreshold, static_cast<unsigned>(weapon->mCanFire)
+      );
       return weapon->mCanFire != 0u;
     }
 
@@ -3204,14 +3247,23 @@ namespace moho
     MultQuadVec(&forward, &forwardAxis, &ownerOrientation);
     const float releaseDot = ((bombDropPosition.z - unitPosition.z) * forward.z) + ((bombDropPosition.x - unitPosition.x) * forward.x);
     if (releaseDot > 0.0f) {
+      // TEMPORARY PROBE
+      BombDiagLine("[BOMBDIAG] REJECT release-dot=%.4f dist=%.3f", releaseDot, bombDropDistance);
       return false;
     }
 
     const float targetDot = ((targetPosition.z - unitPosition.z) * forward.z) + ((targetPosition.x - unitPosition.x) * forward.x);
     if (targetDot < kBombDropHeadingDotThreshold) {
+      // TEMPORARY PROBE
+      BombDiagLine("[BOMBDIAG] REJECT target-dot=%.4f thr=%.4f", targetDot, kBombDropHeadingDotThreshold);
       return false;
     }
 
+    // TEMPORARY PROBE
+    BombDiagLine(
+      "[BOMBDIAG] ACCEPT heading-checked dist=%.3f thr=%.3f releaseDot=%.4f targetDot=%.4f canFire=%u",
+      bombDropDistance, bombDropThreshold, releaseDot, targetDot, static_cast<unsigned>(weapon->mCanFire)
+    );
     return weapon->mCanFire != 0u;
   }
 
