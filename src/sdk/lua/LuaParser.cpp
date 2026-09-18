@@ -1,6 +1,7 @@
 #include "LuaRuntimeTypes.h"
 
 #include "lua/LuaError.h"
+#include "lua/LuaParser.h"
 
 #include <Windows.h>   // TEMPORARY PROBE (do not commit): OutputDebugStringA
 
@@ -61,35 +62,6 @@ namespace LuaPlus
 
 namespace
 {
-  struct FuncState;
-
-  union SemInfo
-  {
-    float r;
-    TString* ts;
-  };
-
-  struct Token
-  {
-    std::int32_t token;
-    SemInfo seminfo;
-  };
-
-  struct LexState
-  {
-    std::int32_t current;
-    std::int32_t linenumber;
-    std::int32_t lastline;
-    Token t;
-    Token lookahead;
-    FuncState* fs;
-    lua_State* L;
-    void* z;
-    void* buff;
-    TString* source;
-    std::int32_t nestlevel;
-  };
-
   struct LuaZioRuntimeView
   {
     std::int32_t remainingBytes;
@@ -101,15 +73,6 @@ namespace
     void* z;
     Mbuffer buff;
     std::int32_t bin;
-  };
-
-  struct expdesc
-  {
-    std::int32_t k;
-    std::int32_t info;
-    std::int32_t aux;
-    std::int32_t t;
-    std::int32_t f;
   };
 
   struct LHS_assign
@@ -133,52 +96,6 @@ namespace
   static_assert(offsetof(ConsControl, tostore) == 0x20, "ConsControl::tostore offset must be 0x20");
   static_assert(sizeof(ConsControl) == 0x24, "ConsControl size must be 0x24");
 
-  struct BlockCntRuntimeView
-  {
-    BlockCntRuntimeView* previous; // +0x00 enclosing block
-    std::int32_t breaklist;        // +0x04 jumps out of this loop
-    std::int32_t continuelist;     // +0x08 jumps back to this loop's step
-    std::int32_t nactvar;          // +0x0C actives outside the block
-    std::int32_t upval;            // +0x10 some local here is an upvalue
-    std::int32_t isbreakable;      // +0x14 block is a loop
-  };
-
-  struct FuncStateRuntimeView
-  {
-    Proto* f;              // +0x00
-    Table* h;              // +0x04
-    FuncState* prev;       // +0x08
-    void* lexState;        // +0x0C
-    lua_State* L;          // +0x10
-    BlockCntRuntimeView* bl; // +0x14
-    std::int32_t pc;       // +0x18
-    std::int32_t lasttarget; // +0x1C
-    std::int32_t jpc;      // +0x20
-    union
-    {
-      std::int32_t freeRegisterIndex;
-      std::int32_t freereg;
-    };                     // +0x24
-    std::int32_t nk;       // +0x28
-    union
-    {
-      std::int32_t nestedProtoCount;
-      std::int32_t np;
-    };                     // +0x2C
-    union
-    {
-      std::int32_t nlocvars;
-      std::int32_t localVariableCount;
-    };                     // +0x30
-    union
-    {
-      std::int32_t activeVariableCount;
-      std::int32_t nactvar;
-    };                     // +0x34
-    expdesc upvalues[0x20]; // +0x38
-    std::int32_t actvar[0xC8]; // +0x2B8
-  };
-
   struct LuaUndumpZioRuntimeView
   {
     std::int32_t remainingBytes;
@@ -188,86 +105,15 @@ namespace
     const char* name;
   };
 
-  static_assert(offsetof(Token, token) == 0x00, "Token::token offset must be 0x00");
-  static_assert(offsetof(Token, seminfo) == 0x04, "Token::seminfo offset must be 0x04");
-  static_assert(sizeof(Token) == 0x08, "Token size must be 0x08");
-  static_assert(offsetof(LexState, current) == 0x00, "LexState::current offset must be 0x00");
-  static_assert(offsetof(LexState, linenumber) == 0x04, "LexState::linenumber offset must be 0x04");
-  static_assert(offsetof(LexState, lastline) == 0x08, "LexState::lastline offset must be 0x08");
-  static_assert(offsetof(LexState, t) == 0x0C, "LexState::t offset must be 0x0C");
-  static_assert(offsetof(LexState, lookahead) == 0x14, "LexState::lookahead offset must be 0x14");
-  static_assert(offsetof(LexState, fs) == 0x1C, "LexState::fs offset must be 0x1C");
-  static_assert(offsetof(LexState, L) == 0x20, "LexState::L offset must be 0x20");
-  static_assert(offsetof(LexState, z) == 0x24, "LexState::z offset must be 0x24");
-  static_assert(offsetof(LexState, buff) == 0x28, "LexState::buff offset must be 0x28");
-  static_assert(offsetof(LexState, source) == 0x2C, "LexState::source offset must be 0x2C");
-  static_assert(offsetof(LexState, nestlevel) == 0x30, "LexState::nestlevel offset must be 0x30");
-  static_assert(sizeof(LexState) == 0x34, "LexState size must be 0x34");
   static_assert(offsetof(SParser, z) == 0x00, "SParser::z offset must be 0x00");
   static_assert(offsetof(SParser, buff) == 0x04, "SParser::buff offset must be 0x04");
   static_assert(offsetof(SParser, bin) == 0x0C, "SParser::bin offset must be 0x0C");
   static_assert(sizeof(SParser) == 0x10, "SParser size must be 0x10");
-  static_assert(offsetof(expdesc, k) == 0x00, "expdesc::k offset must be 0x00");
-  static_assert(offsetof(expdesc, info) == 0x04, "expdesc::info offset must be 0x04");
-  static_assert(offsetof(expdesc, aux) == 0x08, "expdesc::aux offset must be 0x08");
-  static_assert(offsetof(expdesc, t) == 0x0C, "expdesc::t offset must be 0x0C");
-  static_assert(offsetof(expdesc, f) == 0x10, "expdesc::f offset must be 0x10");
-  static_assert(sizeof(expdesc) == 0x14, "expdesc size must be 0x14");
   static_assert(offsetof(LHS_assign, prev) == 0x00, "LHS_assign::prev offset must be 0x00");
   static_assert(offsetof(LHS_assign, v) == 0x04, "LHS_assign::v offset must be 0x04");
   static_assert(sizeof(LHS_assign) == 0x18, "LHS_assign size must be 0x18");
-  static_assert(offsetof(BlockCntRuntimeView, previous) == 0x00, "BlockCntRuntimeView::previous offset must be 0x00");
-  static_assert(offsetof(BlockCntRuntimeView, breaklist) == 0x04, "BlockCntRuntimeView::breaklist offset must be 0x04");
-  static_assert(
-    offsetof(BlockCntRuntimeView, continuelist) == 0x08,
-    "BlockCntRuntimeView::continuelist offset must be 0x08"
-  );
-  static_assert(offsetof(BlockCntRuntimeView, nactvar) == 0x0C, "BlockCntRuntimeView::nactvar offset must be 0x0C");
-  static_assert(offsetof(BlockCntRuntimeView, upval) == 0x10, "BlockCntRuntimeView::upval offset must be 0x10");
-  static_assert(
-    offsetof(BlockCntRuntimeView, isbreakable) == 0x14,
-    "BlockCntRuntimeView::isbreakable offset must be 0x14"
-  );
-  static_assert(sizeof(BlockCntRuntimeView) == 0x18, "BlockCntRuntimeView size must be 0x18");
-  static_assert(offsetof(FuncStateRuntimeView, f) == 0x00, "FuncStateRuntimeView::f offset must be 0x00");
-  static_assert(offsetof(FuncStateRuntimeView, h) == 0x04, "FuncStateRuntimeView::h offset must be 0x04");
-  static_assert(offsetof(FuncStateRuntimeView, prev) == 0x08, "FuncStateRuntimeView::prev offset must be 0x08");
-  static_assert(offsetof(FuncStateRuntimeView, lexState) == 0x0C, "FuncStateRuntimeView::lexState offset must be 0x0C");
-  static_assert(offsetof(FuncStateRuntimeView, L) == 0x10, "FuncStateRuntimeView::L offset must be 0x10");
-  static_assert(offsetof(FuncStateRuntimeView, bl) == 0x14, "FuncStateRuntimeView::bl offset must be 0x14");
-  static_assert(offsetof(FuncStateRuntimeView, pc) == 0x18, "FuncStateRuntimeView::pc offset must be 0x18");
-  static_assert(offsetof(FuncStateRuntimeView, lasttarget) == 0x1C, "FuncStateRuntimeView::lasttarget offset must be 0x1C");
-  static_assert(offsetof(FuncStateRuntimeView, jpc) == 0x20, "FuncStateRuntimeView::jpc offset must be 0x20");
-  static_assert(
-    offsetof(FuncStateRuntimeView, freeRegisterIndex) == 0x24,
-    "FuncStateRuntimeView::freeRegisterIndex offset must be 0x24"
-  );
-  static_assert(offsetof(FuncStateRuntimeView, nk) == 0x28, "FuncStateRuntimeView::nk offset must be 0x28");
-  static_assert(offsetof(FuncStateRuntimeView, np) == 0x2C, "FuncStateRuntimeView::np offset must be 0x2C");
-  static_assert(offsetof(FuncStateRuntimeView, nlocvars) == 0x30, "FuncStateRuntimeView::nlocvars offset must be 0x30");
-  static_assert(
-    offsetof(FuncStateRuntimeView, activeVariableCount) == 0x34,
-    "FuncStateRuntimeView::activeVariableCount offset must be 0x34"
-  );
-  static_assert(offsetof(FuncStateRuntimeView, upvalues) == 0x38, "FuncStateRuntimeView::upvalues offset must be 0x38");
-  static_assert(offsetof(FuncStateRuntimeView, actvar) == 0x2B8, "FuncStateRuntimeView::actvar offset must be 0x2B8");
-  static_assert(sizeof(FuncStateRuntimeView) == 0x5D8, "FuncStateRuntimeView size must be 0x5D8");
   static_assert(offsetof(LuaUndumpZioRuntimeView, name) == 0x10, "LuaUndumpZioRuntimeView::name offset must be 0x10");
 
-  constexpr std::int32_t NO_JUMP = -1;
-  constexpr std::int32_t VVOID = 0x00;
-  constexpr std::int32_t VNIL = 0x01;
-  constexpr std::int32_t VTRUE = 0x02;
-  constexpr std::int32_t VFALSE = 0x03;
-  constexpr std::int32_t VK = 0x04;
-  constexpr std::int32_t VLOCAL = 0x05;
-  constexpr std::int32_t VUPVAL = 0x06;
-  constexpr std::int32_t VGLOBAL = 0x07;
-  constexpr std::int32_t VJMP = 0x09;
-  constexpr std::int32_t VRELOCABLE = 0x0A;
-  constexpr std::int32_t VNONRELOC = 0x0B;
-  constexpr std::int32_t VCALL = 0x0C;
-  constexpr std::int32_t VINDEXED = 0x08;
   constexpr std::int32_t NO_REG = 0xFF;
 
   // Opcode numbering for this build. It is stock Lua 5.0.2 with the four FAF
@@ -314,9 +160,7 @@ namespace
   constexpr std::int32_t LFIELDS_PER_FLUSH = 0x20;
 
   // Parser ceilings.
-  constexpr std::int32_t MAXVARS = 0xC8;            // locals per function
   constexpr std::int32_t MAXPARAMS = 0x64;          // declared parameters
-  constexpr std::int32_t MAXUPVALUES = 0x20;        // upvalues per closure
   constexpr std::int32_t MAXEXPWHILE = 0x64;        // instructions in a rotated `while' condition
   constexpr std::int32_t LUA_MAXPARSERLEVEL = 0xC8; // nested chunks
 
@@ -517,8 +361,7 @@ namespace
    */
   [[nodiscard]] Instruction* LuaResolveControllingInstruction(FuncState* const fs, const std::int32_t pc) noexcept
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    Instruction* controllingInstruction = &fsView->f->code[pc];
+    Instruction* controllingInstruction = &fs->f->code[pc];
     if (pc >= 1 && LuaOpcodeNeedsFollowingJump(*(controllingInstruction - 1))) {
       --controllingInstruction;
     }
@@ -570,9 +413,8 @@ namespace
    */
   void freereg(FuncState* const fs, const std::int32_t registerIndex)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    if (registerIndex >= fsView->nactvar && registerIndex < MAXSTACK) {
-      --fsView->freereg;
+    if (registerIndex >= fs->nactvar && registerIndex < MAXSTACK) {
+      --fs->freereg;
     }
   }
 
@@ -602,7 +444,7 @@ namespace
   void ifstat(LexState* ls, std::int32_t line);
   void funcstat(LexState* ls, int line);
   void exprstat(LexState* ls);
-  void enterblock(FuncState* fs, BlockCntRuntimeView* bl, std::int32_t isbreakable);
+  void enterblock(FuncState* fs, BlockCnt* bl, std::int32_t isbreakable);
   void leaveblock(FuncState* fs);
   void new_localvar(LexState* ls, TString* name, int n);
   void parlist(LexState* ls);
@@ -1473,13 +1315,13 @@ namespace
    */
   void adjustlocalvars(LexState* const ls, int nvars)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    fsView->nactvar += nvars;
+    FuncState* const fs = ls->fs;
+    fs->nactvar += nvars;
 
     while (nvars != 0) {
-      const int activeVariableIndex = fsView->nactvar - nvars;
-      const std::int32_t localVariableSlot = fsView->actvar[activeVariableIndex];
-      fsView->f->locvars[localVariableSlot].startpc = fsView->pc;
+      const int activeVariableIndex = fs->nactvar - nvars;
+      const std::int32_t localVariableSlot = fs->actvar[activeVariableIndex];
+      fs->f->locvars[localVariableSlot].startpc = fs->pc;
       --nvars;
     }
   }
@@ -1493,11 +1335,11 @@ namespace
    */
   extern "C" void removevars(LexState* const ls, const int tolevel)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    while (fsView->nactvar > tolevel) {
-      --fsView->nactvar;
-      const std::int32_t activeVarSlot = fsView->actvar[fsView->nactvar];
-      fsView->f->locvars[activeVarSlot].endpc = fsView->pc;
+    FuncState* const fs = ls->fs;
+    while (fs->nactvar > tolevel) {
+      --fs->nactvar;
+      const std::int32_t activeVarSlot = fs->actvar[fs->nactvar];
+      fs->f->locvars[activeVarSlot].endpc = fs->pc;
     }
   }
 
@@ -1571,7 +1413,7 @@ namespace
     if (constructorState->v.k == VCALL) {
       luaK_setcallreturns(functionState, &constructorState->v, LUA_MULTRET);
       (void)luaK_codeABx(functionState, 36, constructorState->t->info, constructorState->na - 1);
-      reinterpret_cast<FuncStateRuntimeView*>(functionState)->freeRegisterIndex = constructorState->t->info + 1;
+      functionState->freereg = constructorState->t->info + 1;
       return;
     }
 
@@ -1580,7 +1422,7 @@ namespace
     }
 
     (void)luaK_codeABx(functionState, 35, constructorState->t->info, constructorState->na - 1);
-    reinterpret_cast<FuncStateRuntimeView*>(functionState)->freeRegisterIndex = constructorState->t->info + 1;
+    functionState->freereg = constructorState->t->info + 1;
   }
 
   /**
@@ -1687,19 +1529,18 @@ namespace
       return;
     }
 
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    int localIndex = fsView->activeVariableCount - 1;
+    int localIndex = fs->nactvar - 1;
 
     while (localIndex >= 0) {
-      const std::int32_t activeVariableSlot = fsView->actvar[localIndex];
-      if (name == fsView->f->locvars[activeVariableSlot].varname) {
+      const std::int32_t activeVariableSlot = fs->actvar[localIndex];
+      if (name == fs->f->locvars[activeVariableSlot].varname) {
         outVariable->t = LUA_MULTRET;
         outVariable->f = LUA_MULTRET;
         outVariable->k = VLOCAL;
         outVariable->info = localIndex;
 
         if (base == 0) {
-          BlockCntRuntimeView* block = fsView->bl;
+          BlockCnt* block = fs->bl;
           if (block != nullptr) {
             while (block->nactvar > localIndex) {
               block = block->previous;
@@ -1716,7 +1557,7 @@ namespace
       --localIndex;
     }
 
-    singlevaraux(fsView->prev, name, outVariable, 0);
+    singlevaraux(fs->prev, name, outVariable, 0);
     if (outVariable->k == VGLOBAL) {
       if (base != 0) {
         outVariable->info = luaK_stringK(fs, name);
@@ -1737,7 +1578,7 @@ namespace
    */
   void adjust_assign(LexState* const ls, const int nvars, expdesc* const expression, const int nexps)
   {
-    auto* const functionState = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
+    FuncState* const fs = ls->fs;
     int extraRegisters = nvars - nexps;
 
     if (expression->k == VCALL) {
@@ -1756,7 +1597,7 @@ namespace
     }
 
     if (extraRegisters > 0) {
-      const int firstRegister = functionState->freeRegisterIndex;
+      const int firstRegister = fs->freereg;
       luaK_reserveregs(ls->fs, extraRegisters);
       luaK_nil(ls->fs, firstRegister, extraRegisters);
     }
@@ -1771,10 +1612,10 @@ namespace
    */
   void pushclosure(expdesc* const outExpression, LexState* const ls, FuncState* const childFunction)
   {
-    auto* const parentView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    Proto* const parentProto = parentView->f;
+    FuncState* const fs = ls->fs;
+    Proto* const parentProto = fs->f;
     int& parentProtoCapacity = parentProto->sizep;
-    if (parentView->nestedProtoCount + 1 > parentProtoCapacity) {
+    if (fs->np + 1 > parentProtoCapacity) {
       parentProto->p = static_cast<Proto**>(
         luaM_growaux(
           ls->L,
@@ -1787,8 +1628,7 @@ namespace
       );
     }
 
-    const auto* const childView = reinterpret_cast<const FuncStateRuntimeView*>(childFunction);
-    parentProto->p[parentView->nestedProtoCount++] = childView->f;
+    parentProto->p[fs->np++] = childFunction->f;
 
     outExpression->t = -1;
     outExpression->f = -1;
@@ -1797,12 +1637,12 @@ namespace
       ls->fs,
       OP_CLOSURE,
       0,
-      static_cast<unsigned int>(parentView->nestedProtoCount - 1)
+      static_cast<unsigned int>(fs->np - 1)
     );
 
-    const int upvalueCount = static_cast<int>(childView->f->nups);
+    const int upvalueCount = static_cast<int>(childFunction->f->nups);
     for (int index = 0; index < upvalueCount; ++index) {
-      const expdesc& upvalue = childView->upvalues[index];
+      const expdesc& upvalue = childFunction->upvalues[index];
       const std::int32_t opcode = (upvalue.k == VLOCAL) ? OP_MOVE : OP_GETUPVAL;
       luaK_codeABC(ls->fs, opcode, 0, upvalue.info, 0);
     }
@@ -1818,13 +1658,12 @@ namespace
   extern "C" std::int32_t
   luaK_condjump(const int a, FuncState* const fs, const int op, const int b, const int c)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
     const Instruction instruction = static_cast<Instruction>(op | ((c | ((b | (a << 9)) << 9)) << 6));
     luaK_code(fs, instruction, lexState->lastline);
 
-    const std::int32_t previousJpc = fsView->jpc;
-    fsView->jpc = NO_JUMP;
+    const std::int32_t previousJpc = fs->jpc;
+    fs->jpc = NO_JUMP;
 
     std::int32_t jumpList = luaK_code(fs, static_cast<Instruction>(0x7FFF98u), lexState->lastline);
     luaK_concat(fs, &jumpList, previousJpc);
@@ -1841,9 +1680,8 @@ namespace
   extern "C" std::int32_t
   code_label(const int a, FuncState* const fs, const int b, const int c)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
-    fsView->lasttarget = fsView->pc;
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
+    fs->lasttarget = fs->pc;
     const Instruction instruction = static_cast<Instruction>((((c | ((b | (a << 9)) << 9)) << 6) | 2));
     return luaK_code(fs, instruction, lexState->lastline);
   }
@@ -1893,8 +1731,7 @@ namespace
       return;
     }
 
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
     const Instruction instruction =
       CREATE_ABC(binaryOperator + OP_ADD, 0, leftOperand, rightOperand);
     const int opcodeIndex = luaK_code(fs, instruction, lexState->lastline);
@@ -1927,12 +1764,11 @@ namespace
    */
   extern "C" std::int32_t jumponcond(FuncState* const fs, const int cond, expdesc* const expression)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
 
     if (expression->k == VRELOCABLE) {
-      const Instruction instruction = fsView->f->code[expression->info];
+      const Instruction instruction = fs->f->code[expression->info];
       if ((instruction & 0x3Fu) == static_cast<Instruction>(OP_NOT)) {
-        --fsView->pc;
+        --fs->pc;
         return luaK_condjump(NO_REG, fs, 28, static_cast<int>((instruction >> 15) & 0x1FFu), cond == 0);
       }
     }
@@ -1956,8 +1792,7 @@ namespace
       return 0;
     }
 
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    Instruction* const code = fsView->f->code;
+    Instruction* const code = fs->f->code;
 
     while (true) {
       Instruction* const jumpInstruction = &code[list];
@@ -2104,8 +1939,7 @@ namespace
    */
   [[nodiscard]] std::int32_t getjump(FuncState* const fs, const std::int32_t pc) noexcept
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    const std::int32_t offset = GETARG_sBx(fsView->f->code[pc]);
+    const std::int32_t offset = GETARG_sBx(fs->f->code[pc]);
     if (offset == NO_JUMP) {
       return NO_JUMP;
     }
@@ -2162,9 +1996,8 @@ namespace
    */
   void luaK_dischargejpc(FuncState* const fs)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    patchlistaux(fs, fsView->jpc, fsView->pc, NO_REG, fsView->pc, NO_REG, fsView->pc);
-    fsView->jpc = NO_JUMP;
+    patchlistaux(fs, fs->jpc, fs->pc, NO_REG, fs->pc, NO_REG, fs->pc);
+    fs->jpc = NO_JUMP;
   }
 
   /**
@@ -2179,15 +2012,14 @@ namespace
    */
   extern "C" std::int32_t luaK_code(FuncState* const fs, const Instruction i, const int line)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    Proto* const f = fsView->f;
+    Proto* const f = fs->f;
 
     // `pc` will change, so resolve everything still waiting on it first.
     luaK_dischargejpc(fs);
 
-    if (fsView->pc + 1 > f->sizecode) {
+    if (fs->pc + 1 > f->sizecode) {
       f->code = static_cast<Instruction*>(luaM_growaux(
-        fsView->L,
+        fs->L,
         f->code,
         &f->sizecode,
         static_cast<int>(sizeof(Instruction)),
@@ -2195,11 +2027,11 @@ namespace
         "code size overflow"
       ));
     }
-    f->code[fsView->pc] = i;
+    f->code[fs->pc] = i;
 
-    if (fsView->pc + 1 > f->sizelineinfo) {
+    if (fs->pc + 1 > f->sizelineinfo) {
       f->lineinfo = static_cast<int*>(luaM_growaux(
-        fsView->L,
+        fs->L,
         f->lineinfo,
         &f->sizelineinfo,
         static_cast<int>(sizeof(int)),
@@ -2207,9 +2039,9 @@ namespace
         "code size overflow"
       ));
     }
-    f->lineinfo[fsView->pc] = line;
+    f->lineinfo[fs->pc] = line;
 
-    return fsView->pc++;
+    return fs->pc++;
   }
 
   /**
@@ -2222,8 +2054,7 @@ namespace
   extern "C" std::int32_t
   luaK_codeABC(FuncState* const fs, const int o, const int a, const int b, const int c)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
     return luaK_code(fs, CREATE_ABC(o, a, b, c), lexState->lastline);
   }
 
@@ -2237,8 +2068,7 @@ namespace
   extern "C" std::int32_t
   luaK_codeABx(FuncState* const fs, const int o, const int a, const unsigned int bc)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
     return luaK_code(fs, CREATE_ABx(o, a, bc), lexState->lastline);
   }
 
@@ -2250,8 +2080,7 @@ namespace
    */
   extern "C" void luaK_fixline(FuncState* const fs, const int line)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    fsView->f->lineinfo[fsView->pc - 1] = line;
+    fs->f->lineinfo[fs->pc - 1] = line;
   }
 
   /**
@@ -2263,9 +2092,8 @@ namespace
    */
   extern "C" std::int32_t luaK_getlabel(FuncState* const fs)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    fsView->lasttarget = fsView->pc;
-    return fsView->pc;
+    fs->lasttarget = fs->pc;
+    return fs->pc;
   }
 
   /**
@@ -2277,11 +2105,10 @@ namespace
    */
   extern "C" std::int32_t luaK_jump(FuncState* const fs)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
-    const std::int32_t jpc = fsView->jpc; // save list of jumps to here
-    fsView->jpc = NO_JUMP;
+    const std::int32_t jpc = fs->jpc; // save list of jumps to here
+    fs->jpc = NO_JUMP;
 
     std::int32_t j = luaK_code(
       fs,
@@ -2301,9 +2128,8 @@ namespace
    */
   extern "C" void luaK_patchtohere(FuncState* const fs, const std::int32_t list)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_getlabel(fs);
-    luaK_concat(fs, &fsView->jpc, list);
+    luaK_concat(fs, &fs->jpc, list);
   }
 
   /**
@@ -2315,8 +2141,7 @@ namespace
    */
   extern "C" void luaK_patchlist(FuncState* const fs, const std::int32_t list, const std::int32_t target)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    if (target == fsView->pc) {
+    if (target == fs->pc) {
       luaK_patchtohere(fs, list);
     } else {
       patchlistaux(fs, list, target, NO_REG, target, NO_REG, target);
@@ -2332,15 +2157,14 @@ namespace
    */
   extern "C" void luaK_checkstack(FuncState* const fs, const int n)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
-    const std::int32_t newstack = fsView->freereg + n;
-    if (newstack > fsView->f->maxstacksize) {
+    const std::int32_t newstack = fs->freereg + n;
+    if (newstack > fs->f->maxstacksize) {
       if (newstack >= MAXSTACK) {
         luaX_syntaxerror(lexState, "function or expression too complex");
       }
-      fsView->f->maxstacksize = static_cast<lu_byte>(newstack);
+      fs->f->maxstacksize = static_cast<lu_byte>(newstack);
     }
   }
 
@@ -2352,9 +2176,8 @@ namespace
    */
   extern "C" void luaK_reserveregs(FuncState* const fs, const int n)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_checkstack(fs, n);
-    fsView->freereg += n;
+    fs->freereg += n;
   }
 
   /**
@@ -2396,10 +2219,9 @@ namespace
    */
   extern "C" void luaK_nil(FuncState* const fs, const int from, const int n)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
 
-    if (fsView->pc > fsView->lasttarget) { // no jumps to current position?
-      Instruction* const previous = &fsView->f->code[fsView->pc - 1];
+    if (fs->pc > fs->lasttarget) { // no jumps to current position?
+      Instruction* const previous = &fs->f->code[fs->pc - 1];
       if (GET_OPCODE(*previous) == OP_LOADNIL) {
         const std::int32_t pfrom = GETARG_A(*previous);
         const std::int32_t pto = GETARG_B(*previous);
@@ -2429,8 +2251,7 @@ namespace
       return;
     }
 
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    Instruction* const call = &fsView->f->code[e->info];
+    Instruction* const call = &fs->f->code[e->info];
     SETARG_C(*call, nresults + 1);
     if (nresults == 1) { // `regular' expression?
       e->k = VNONRELOC;
@@ -2448,8 +2269,7 @@ namespace
    */
   extern "C" void luaK_dischargevars(FuncState* const fs, expdesc* const e)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
     switch (e->k) {
     case VLOCAL:
@@ -2530,11 +2350,10 @@ namespace
    */
   extern "C" void luaK_exp2nextreg(FuncState* const fs, expdesc* const e)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_dischargevars(fs, e);
     freeexp(e, fs);
     luaK_checkstack(fs, 1);
-    exp2reg(fs, e, fsView->freereg++);
+    exp2reg(fs, e, fs->freereg++);
   }
 
   /**
@@ -2546,14 +2365,13 @@ namespace
    */
   extern "C" std::int32_t luaK_exp2anyreg(FuncState* const fs, expdesc* const e)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_dischargevars(fs, e);
 
     if (e->k == VNONRELOC) {
       if (e->t == e->f) { // exp is not a test?
         return e->info;   // result is already in a register
       }
-      if (e->info >= fsView->nactvar) { // reg. is not a local?
+      if (e->info >= fs->nactvar) { // reg. is not a local?
         exp2reg(fs, e, e->info);        // put value on it
         return e->info;
       }
@@ -2588,11 +2406,10 @@ namespace
    */
   extern "C" std::int32_t luaK_exp2RK(FuncState* const fs, expdesc* const e)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     luaK_exp2val(fs, e);
 
     if (e->k == VNIL) {
-      if (fsView->nk + MAXSTACK <= MAXARG_C) { // constant fits in argC?
+      if (fs->nk + MAXSTACK <= MAXARG_C) { // constant fits in argC?
         e->info = nil_constant(fs);
         e->k = VK;
         return e->info + MAXSTACK;
@@ -2616,8 +2433,7 @@ namespace
    */
   extern "C" void luaK_storevar(FuncState* const fs, expdesc* const var, expdesc* const ex)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
     switch (var->k) {
     case VLOCAL:
@@ -2659,12 +2475,11 @@ namespace
    */
   extern "C" void luaK_self(FuncState* const fs, expdesc* const e, expdesc* const key)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
 
     luaK_exp2anyreg(fs, e);
     freeexp(e, fs);
 
-    const std::int32_t func = fsView->freereg;
+    const std::int32_t func = fs->freereg;
     luaK_reserveregs(fs, 2);
     const std::int32_t rkKey = luaK_exp2RK(fs, key);
     luaK_codeABC(fs, OP_SELF, func, e->info, rkKey);
@@ -2737,11 +2552,10 @@ namespace
       return;
     }
 
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
     luaK_exp2val(fs, e);
-    LuaPlus::TObject* const constants = fsView->f->k;
+    LuaPlus::TObject* const constants = fs->f->k;
     if (e->k == VK && constants[e->info].tt == LUA_TNUMBER) {
       e->info = luaK_numberK(fs, -constants[e->info].value.n);
       return;
@@ -2797,8 +2611,7 @@ namespace
   extern "C" void
   luaK_posfix(FuncState* const fs, const std::int32_t op, expdesc* const e1, expdesc* const e2)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    auto* const lexState = reinterpret_cast<LexState*>(fsView->lexState);
+    auto* const lexState = reinterpret_cast<LexState*>(fs->ls);
 
     switch (op) {
     case OPR_AND:
@@ -2821,7 +2634,7 @@ namespace
 
     case OPR_CONCAT: {
       luaK_exp2val(fs, e2);
-      Proto* const f = fsView->f;
+      Proto* const f = fs->f;
       if (e2->k == VRELOCABLE && GET_OPCODE(f->code[e2->info]) == OP_CONCAT) {
         // `e1 .. (a .. b)` - widen the existing run instead of nesting.
         freeexp(e1, fs);
@@ -2990,8 +2803,7 @@ namespace
   extern "C" void recfield(LexState* const ls, ConsControl* const cc)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    const std::int32_t reg = fsView->freereg;
+    const std::int32_t reg = fs->freereg;
 
     expdesc key;
     expdesc val;
@@ -3011,7 +2823,7 @@ namespace
     const std::int32_t rkKey = luaK_exp2RK(fs, &key);
     luaK_codeABC(fs, OP_SETTABLE, cc->t->info, rkKey, rkValue);
 
-    fsView->freereg = reg; // free registers
+    fs->freereg = reg; // free registers
   }
 
   /**
@@ -3033,7 +2845,6 @@ namespace
   extern "C" void constructor(expdesc* const t, LexState* const ls)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     const int line = ls->linenumber;
     const int pc = luaK_codeABC(fs, OP_NEWTABLE, 0, 0, 0);
 
@@ -3090,7 +2901,7 @@ namespace
         if (cc.tostore == LFIELDS_PER_FLUSH) {
           luaK_codeABx(fs, OP_SETLIST, cc.t->info, static_cast<std::uint32_t>(cc.na - 1));
           cc.tostore = 0; // no more items pending
-          fsView->freereg = cc.t->info + 1; // free registers
+          fs->freereg = cc.t->info + 1; // free registers
         }
       }
 
@@ -3128,7 +2939,7 @@ namespace
       cc.nh = forcedHashSize;
     }
 
-    Instruction* const newTable = &fsView->f->code[pc];
+    Instruction* const newTable = &fs->f->code[pc];
     if (cc.na > 0) {
       SETARG_B(*newTable, static_cast<std::int32_t>(luaO_int2fb(static_cast<unsigned int>(cc.na))));
     }
@@ -3177,7 +2988,6 @@ namespace
   extern "C" void funcargs(LexState* const ls, expdesc* const f)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     const std::int32_t line = ls->linenumber;
 
     expdesc args;
@@ -3218,7 +3028,7 @@ namespace
       if (args.k != VVOID) {
         luaK_exp2nextreg(fs, &args); // close last argument
       }
-      nparams = fsView->freereg - (base + 1);
+      nparams = fs->freereg - (base + 1);
     }
 
     f->info = luaK_codeABC(fs, OP_CALL, base, nparams + 1, 2);
@@ -3226,7 +3036,7 @@ namespace
     f->f = NO_JUMP;
     f->k = VCALL;
     luaK_fixline(fs, line); // call `instruction' uses the line where it was called
-    fsView->freereg = base + 1; // call removes function and arguments and leaves (unless changed) one result
+    fs->freereg = base + 1; // call removes function and arguments and leaves (unless changed) one result
   }
 
   /**
@@ -3553,8 +3363,8 @@ namespace
   {
     constexpr std::int32_t VINDEXED = 0x08;
 
-    auto* const funcState = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    const std::int32_t extraRegister = funcState->freereg;
+    FuncState* const fs = ls->fs;
+    const std::int32_t extraRegister = fs->freereg;
     bool hasConflict = false;
 
     for (LHS_assign* node = lhs; node != nullptr; node = node->prev) {
@@ -3575,7 +3385,7 @@ namespace
     }
 
     if (hasConflict) {
-      luaK_codeABC(ls->fs, OP_MOVE, funcState->freereg, value->info, 0);
+      luaK_codeABC(ls->fs, OP_MOVE, fs->freereg, value->info, 0);
       luaK_reserveregs(ls->fs, 1);
     }
   }
@@ -3639,26 +3449,25 @@ namespace
    */
   [[maybe_unused]] void open_func(LexState* const ls, FuncState* const fs)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     Proto* const functionProto = luaF_newproto(ls->L);
 
-    fsView->f = functionProto;
-    fsView->prev = ls->fs;
-    fsView->lexState = ls;
-    fsView->L = ls->L;
+    fs->f = functionProto;
+    fs->prev = ls->fs;
+    fs->ls = ls;
+    fs->L = ls->L;
     ls->fs = fs;
 
-    fsView->pc = 0;
-    fsView->lasttarget = 0;
-    fsView->jpc = LUA_MULTRET;
-    fsView->freeRegisterIndex = 0;
-    fsView->nk = 0;
-    fsView->np = 0;
-    fsView->nlocvars = 0;
-    fsView->nactvar = 0;
-    fsView->bl = nullptr;
+    fs->pc = 0;
+    fs->lasttarget = 0;
+    fs->jpc = LUA_MULTRET;
+    fs->freereg = 0;
+    fs->nk = 0;
+    fs->np = 0;
+    fs->nlocvars = 0;
+    fs->nactvar = 0;
+    fs->bl = nullptr;
 
-    fsView->h = luaH_new(ls->L, 0, 0);
+    fs->h = luaH_new(ls->L, 0, 0);
     functionProto->source = ls->source;
     functionProto->maxstacksize = 2;
   }
@@ -3674,8 +3483,7 @@ namespace
   FuncState* close_func(LexState* const ls)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    Proto* const f = fsView->f;
+    Proto* const f = fs->f;
 
     removevars(ls, 0);
     luaK_codeABC(fs, OP_RETURN, 0, 1, 0);
@@ -3685,40 +3493,40 @@ namespace
         ls->L,
         f->code,
         static_cast<lu_mem>(sizeof(Instruction) * f->sizecode),
-        static_cast<lu_mem>(sizeof(Instruction) * fsView->pc)
+        static_cast<lu_mem>(sizeof(Instruction) * fs->pc)
       )
     );
-    f->sizecode = fsView->pc;
+    f->sizecode = fs->pc;
 
     f->lineinfo = static_cast<int*>(
       luaM_realloc(
         ls->L,
         f->lineinfo,
         static_cast<lu_mem>(sizeof(int) * f->sizelineinfo),
-        static_cast<lu_mem>(sizeof(int) * fsView->pc)
+        static_cast<lu_mem>(sizeof(int) * fs->pc)
       )
     );
-    f->sizelineinfo = fsView->pc;
+    f->sizelineinfo = fs->pc;
 
     f->k = static_cast<LuaPlus::TObject*>(
       luaM_realloc(
         ls->L,
         f->k,
         static_cast<lu_mem>(sizeof(LuaPlus::TObject) * f->sizek),
-        static_cast<lu_mem>(sizeof(LuaPlus::TObject) * fsView->nk)
+        static_cast<lu_mem>(sizeof(LuaPlus::TObject) * fs->nk)
       )
     );
-    f->sizek = fsView->nk;
+    f->sizek = fs->nk;
 
     f->p = static_cast<Proto**>(
       luaM_realloc(
         ls->L,
         f->p,
         static_cast<lu_mem>(sizeof(Proto*) * f->sizep),
-        static_cast<lu_mem>(sizeof(Proto*) * fsView->np)
+        static_cast<lu_mem>(sizeof(Proto*) * fs->np)
       )
     );
-    f->sizep = fsView->np;
+    f->sizep = fs->np;
 
     // TEMPORARY PROBE (do not commit). close_func shrink is the one place a
     // LIVE Proto's locvars array is released (luaM_realloc to a smaller size
@@ -3731,10 +3539,10 @@ namespace
         ls->L,
         f->locvars,
         static_cast<lu_mem>(sizeof(LocVar) * f->sizelocvars),
-        static_cast<lu_mem>(sizeof(LocVar) * fsView->nlocvars)
+        static_cast<lu_mem>(sizeof(LocVar) * fs->nlocvars)
       )
     );
-    f->sizelocvars = fsView->nlocvars;
+    f->sizelocvars = fs->nlocvars;
 
     // TEMPORARY PROBE (do not commit)
     if (probeOldLocvars != f->locvars) {
@@ -3747,7 +3555,7 @@ namespace
                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f)),
                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(probeOldLocvars)),
                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(f->locvars)),
-                  fsView->nlocvars);
+                  fs->nlocvars);
         ::OutputDebugStringA(probe);
       }
     }
@@ -3762,8 +3570,8 @@ namespace
     );
     f->sizeupvalues = f->nups;
 
-    ls->fs = fsView->prev;
-    return fsView->prev;
+    ls->fs = fs->prev;
+    return fs->prev;
   }
   // ---------------------------------------------------------------------
   // lparser.c - blocks, statements and the parser entry point.
@@ -3778,16 +3586,15 @@ namespace
    * Pushes one lexical block onto the FuncState chain, remembering how many
    * locals were active outside it.
    */
-  void enterblock(FuncState* const fs, BlockCntRuntimeView* const bl, const std::int32_t isbreakable)
+  void enterblock(FuncState* const fs, BlockCnt* const bl, const std::int32_t isbreakable)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     bl->breaklist = NO_JUMP;
     bl->continuelist = NO_JUMP;
     bl->isbreakable = isbreakable;
-    bl->nactvar = fsView->nactvar;
+    bl->nactvar = fs->nactvar;
     bl->upval = 0;
-    bl->previous = fsView->bl;
-    fsView->bl = bl;
+    bl->previous = fs->bl;
+    fs->bl = bl;
   }
 
   /**
@@ -3797,15 +3604,14 @@ namespace
    */
   void leaveblock(FuncState* const fs)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    BlockCntRuntimeView* const bl = fsView->bl;
+    BlockCnt* const bl = fs->bl;
 
-    fsView->bl = bl->previous;
-    removevars(reinterpret_cast<LexState*>(fsView->lexState), bl->nactvar);
+    fs->bl = bl->previous;
+    removevars(reinterpret_cast<LexState*>(fs->ls), bl->nactvar);
     if (bl->upval != 0) {
       luaK_codeABC(fs, OP_CLOSE, bl->nactvar, 0, 0);
     }
-    fsView->freereg = fsView->nactvar; // free registers
+    fs->freereg = fs->nactvar; // free registers
     luaK_patchtohere(fs, bl->breaklist);
   }
 
@@ -3836,7 +3642,7 @@ namespace
   extern "C" void block(LexState* const ls)
   {
     FuncState* const fs = ls->fs;
-    BlockCntRuntimeView bl;
+    BlockCnt bl;
     enterblock(fs, &bl, 0);
     chunk(ls);
     leaveblock(fs);
@@ -3854,15 +3660,15 @@ namespace
    */
   extern "C" int luaI_registerlocalvar(LexState* const ls, TString* const varname)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    Proto* const f = fsView->f;
+    FuncState* const fs = ls->fs;
+    Proto* const f = fs->f;
 
-    if (fsView->nlocvars + 1 > f->sizelocvars) {
+    if (fs->nlocvars + 1 > f->sizelocvars) {
       f->locvars = static_cast<LocVar*>(luaM_growaux(
         ls->L, f->locvars, &f->sizelocvars, static_cast<int>(sizeof(LocVar)), MAX_INT, ""));
     }
-    f->locvars[fsView->nlocvars].varname = varname;
-    return fsView->nlocvars++;
+    f->locvars[fs->nlocvars].varname = varname;
+    return fs->nlocvars++;
   }
 
   /**
@@ -3872,9 +3678,9 @@ namespace
    */
   void new_localvar(LexState* const ls, TString* const name, const int n)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
-    luaX_checklimit(ls, fsView->nactvar + n + 1, MAXVARS, "local variables");
-    fsView->actvar[fsView->nactvar + n] = luaI_registerlocalvar(ls, name);
+    FuncState* const fs = ls->fs;
+    luaX_checklimit(ls, fs->nactvar + n + 1, MAXVARS, "local variables");
+    fs->actvar[fs->nactvar + n] = luaI_registerlocalvar(ls, name);
   }
 
   /**
@@ -3906,17 +3712,17 @@ namespace
    */
   extern "C" void code_params(LexState* const ls, const int nparams, const int dots)
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(ls->fs);
+    FuncState* const fs = ls->fs;
 
     adjustlocalvars(ls, nparams);
-    luaX_checklimit(ls, fsView->nactvar, MAXPARAMS, "parameters");
-    fsView->f->numparams = static_cast<lu_byte>(fsView->nactvar);
-    fsView->f->is_vararg = static_cast<lu_byte>(dots);
+    luaX_checklimit(ls, fs->nactvar, MAXPARAMS, "parameters");
+    fs->f->numparams = static_cast<lu_byte>(fs->nactvar);
+    fs->f->is_vararg = static_cast<lu_byte>(dots);
     if (dots != 0) {
       new_localvarstr("arg", ls, 0);
       adjustlocalvars(ls, 1);
     }
-    luaK_reserveregs(ls->fs, fsView->nactvar); // reserve register for parameters
+    luaK_reserveregs(ls->fs, fs->nactvar); // reserve register for parameters
   }
 
   /**
@@ -3958,9 +3764,8 @@ namespace
    */
   extern "C" void body(LexState* const ls, expdesc* const e, const int needself, const int line)
   {
-    FuncStateRuntimeView new_fs;
-    auto* const newFuncState = reinterpret_cast<FuncState*>(&new_fs);
-    open_func(ls, newFuncState);
+    FuncState new_fs;
+    open_func(ls, &new_fs);
     new_fs.f->lineDefined = line;
 
     check(ls, '(');
@@ -3973,7 +3778,7 @@ namespace
     chunk(ls);
     check_match(ls, TK_END, TK_FUNCTION, line);
     close_func(ls);
-    pushclosure(e, ls, newFuncState);
+    pushclosure(e, ls, &new_fs);
   }
 
   /**
@@ -4018,10 +3823,9 @@ namespace
   extern "C" void whilestat(LexState* const ls, const std::int32_t line)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     Instruction codeexp[MAXEXPWHILE];
     expdesc v;
-    BlockCntRuntimeView bl;
+    BlockCnt bl;
 
     next(ls); // skip WHILE
 
@@ -4033,17 +3837,17 @@ namespace
     }
     const std::int32_t lineexp = ls->linenumber;
     luaK_goiffalse(fs, &v);
-    luaK_concat(fs, &v.f, fsView->jpc);
-    fsView->jpc = NO_JUMP;
+    luaK_concat(fs, &v.f, fs->jpc);
+    fs->jpc = NO_JUMP;
 
-    const std::int32_t sizeexp = fsView->pc - expinit; // size of expression code
+    const std::int32_t sizeexp = fs->pc - expinit; // size of expression code
     if (sizeexp > MAXEXPWHILE) {
       luaX_syntaxerror(ls, "`while' condition too complex");
     }
     for (std::int32_t i = 0; i < sizeexp; ++i) { // save `exp' code
-      codeexp[i] = fsView->f->code[expinit + i];
+      codeexp[i] = fs->f->code[expinit + i];
     }
-    fsView->pc = expinit; // remove `exp' code
+    fs->pc = expinit; // remove `exp' code
 
     enterblock(fs, &bl, 1);
     check(ls, TK_DO);
@@ -4054,10 +3858,10 @@ namespace
 
     // move `exp' back to code
     if (v.t != NO_JUMP) {
-      v.t += fsView->pc - expinit;
+      v.t += fs->pc - expinit;
     }
     if (v.f != NO_JUMP) {
-      v.f += fsView->pc - expinit;
+      v.f += fs->pc - expinit;
     }
     for (std::int32_t i = 0; i < sizeexp; ++i) {
       luaK_code(fs, codeexp[i], lineexp);
@@ -4081,7 +3885,7 @@ namespace
     FuncState* const fs = ls->fs;
     const std::int32_t repeat_init = luaK_getlabel(fs);
     expdesc v;
-    BlockCntRuntimeView bl;
+    BlockCnt bl;
 
     enterblock(fs, &bl, 1);
     next(ls); // skip REPEAT
@@ -4109,7 +3913,7 @@ namespace
   forbody(LexState* const ls, const int base, const int line, const int nvars, const int isnum)
   {
     FuncState* const fs = ls->fs;
-    BlockCntRuntimeView bl;
+    BlockCnt bl;
 
     adjustlocalvars(ls, nvars); // scope for all variables
     check(ls, TK_DO);
@@ -4139,8 +3943,7 @@ namespace
   extern "C" void fornum(LexState* const ls, TString* const varname, const std::int32_t line)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    const int base = fsView->freereg;
+    const int base = fs->freereg;
     expdesc v;
 
     new_localvar(ls, varname, 0);
@@ -4158,11 +3961,11 @@ namespace
       subexpr(ls, &v, -1); // optional step
       luaK_exp2nextreg(ls->fs, &v);
     } else { // default step = 1
-      luaK_codeABx(fs, OP_LOADK, fsView->freereg, static_cast<std::uint32_t>(luaK_numberK(fs, 1.0f)));
+      luaK_codeABx(fs, OP_LOADK, fs->freereg, static_cast<std::uint32_t>(luaK_numberK(fs, 1.0f)));
       luaK_reserveregs(fs, 1);
     }
 
-    luaK_codeABC(fs, OP_SUB, fsView->freereg - 3, fsView->freereg - 3, fsView->freereg - 1);
+    luaK_codeABC(fs, OP_SUB, fs->freereg - 3, fs->freereg - 3, fs->freereg - 1);
     luaK_jump(fs);
     forbody(ls, base, line, 3, 1);
   }
@@ -4177,8 +3980,7 @@ namespace
   extern "C" void forlist(LexState* const ls, TString* const indexname)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
-    const int base = fsView->freereg;
+    const int base = fs->freereg;
     expdesc e;
 
     new_localvarstr("(for generator)", ls, 0);
@@ -4209,7 +4011,7 @@ namespace
   extern "C" void forstat(LexState* const ls, const std::int32_t line)
   {
     FuncState* const fs = ls->fs;
-    BlockCntRuntimeView bl;
+    BlockCnt bl;
     enterblock(fs, &bl, 0); // scope for loop and control variables
 
     next(ls); // skip `for'
@@ -4244,13 +4046,12 @@ namespace
   extern "C" void localfunc(LexState* const ls)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     expdesc v;
     expdesc b;
 
     new_localvar(ls, str_checkname(ls), 0);
     v.k = VLOCAL;
-    v.info = fsView->freereg;
+    v.info = fs->freereg;
     v.t = NO_JUMP;
     v.f = NO_JUMP;
     luaK_reserveregs(fs, 1);
@@ -4260,7 +4061,7 @@ namespace
     luaK_storevar(fs, &v, &b);
 
     // debug information will only see the variable after this point
-    fsView->f->locvars[fsView->actvar[fsView->nactvar - 1]].startpc = fsView->pc;
+    fs->f->locvars[fs->actvar[fs->nactvar - 1]].startpc = fs->pc;
   }
 
   /**
@@ -4302,7 +4103,6 @@ namespace
   extern "C" void retstat(LexState* const ls)
   {
     FuncState* const fs = ls->fs;
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     expdesc e;
 
     next(ls); // skip RETURN
@@ -4314,16 +4114,16 @@ namespace
       if (e.k == VCALL) {
         luaK_setcallreturns(fs, &e, LUA_MULTRET);
         if (lua::enable_tailcalls != 0 && nret == 1) { // tail call?
-          Instruction& call = fsView->f->code[e.info];
+          Instruction& call = fs->f->code[e.info];
           call = (call & ~static_cast<Instruction>(0x3Fu)) | static_cast<Instruction>(OP_TAILCALL);
         }
-        first = fsView->nactvar;
+        first = fs->nactvar;
         nret = LUA_MULTRET; // return all values
       } else if (nret == 1) { // only one single value?
         first = luaK_exp2anyreg(fs, &e);
       } else {
         luaK_exp2nextreg(fs, &e); // values must go to the `stack'
-        first = fsView->nactvar;  // return all `active' values
+        first = fs->nactvar;  // return all `active' values
       }
     }
 
@@ -4338,17 +4138,16 @@ namespace
    */
   struct LoopExitTarget
   {
-    BlockCntRuntimeView* loop;      // the loop reached, or null
-    BlockCntRuntimeView* lastLoop;  // the loop reached one level in
+    BlockCnt* loop;      // the loop reached, or null
+    BlockCnt* lastLoop;  // the loop reached one level in
     std::int32_t upvalAtLevel;      // upvalues seen before the final level
   };
 
   [[nodiscard]] LoopExitTarget FindEnclosingLoop(FuncState* const fs, std::int32_t levels) noexcept
   {
-    auto* const fsView = reinterpret_cast<FuncStateRuntimeView*>(fs);
     LoopExitTarget target{nullptr, nullptr, 0};
 
-    BlockCntRuntimeView* bl = fsView->bl;
+    BlockCnt* bl = fs->bl;
     std::int32_t upval = 0;
     for (;;) {
       --levels;
@@ -4482,7 +4281,7 @@ namespace
         adjust_assign(ls, nvars, &e, nexps);
         if (nexps > nvars) {
           // remove extra values
-          reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg -= nexps - nvars;
+          ls->fs->freereg -= nexps - nvars;
         }
       } else {
         luaK_setcallreturns(ls->fs, &e, 1); // close last expression
@@ -4493,7 +4292,7 @@ namespace
 
     // default assignment
     e.k = VNONRELOC;
-    e.info = reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg - 1;
+    e.info = ls->fs->freereg - 1;
     e.t = NO_JUMP;
     e.f = NO_JUMP;
     luaK_storevar(ls->fs, &lh->v, &e);
@@ -4584,8 +4383,8 @@ namespace
 
       // statements only produce values through their side effects, so every
       // register above the active locals is free again
-      reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->freereg =
-        reinterpret_cast<FuncStateRuntimeView*>(ls->fs)->nactvar;
+      ls->fs->freereg =
+        ls->fs->nactvar;
 
       if (islast != 0) {
         break;
@@ -4631,13 +4430,13 @@ namespace
   extern "C" Proto* luaY_parser(lua_State* const L, LuaUndumpZioRuntimeView* const z, Mbuffer* const buff)
   {
     LexState lexstate;
-    FuncStateRuntimeView funcstate;
+    FuncState funcstate;
 
     lexstate.buff = buff;
     lexstate.nestlevel = 0;
     luaX_setinput(L, &lexstate, z, luaS_newlstr(L, z->name, std::strlen(z->name)));
 
-    open_func(&lexstate, reinterpret_cast<FuncState*>(&funcstate));
+    open_func(&lexstate, &funcstate);
     next(&lexstate); // read first token
     chunk(&lexstate);
     if (lexstate.t.token != TK_EOS) {
