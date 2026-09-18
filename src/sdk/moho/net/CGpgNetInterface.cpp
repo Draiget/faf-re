@@ -2155,9 +2155,18 @@ int moho::cfunc_LaunchGPGNetL(LuaPlus::LuaState* const state)
 
   const BOOL launched = ShellExecuteExW(&execInfo);
 
-  // ShellExecuteExW can perturb the x87 FPU control word; restore the engine's
-  // preferred precision/rounding configuration before returning to Lua.
-  _controlfp(_PC_64, _MCW_PC);
+  // ShellExecuteExW runs shell extensions in-process, and those routinely leave
+  // the x87 control word on their own setting. Restore the engine-wide 24-bit
+  // precision contract before returning to Lua: every float result in this
+  // process has to round the same way it does on every other machine in the
+  // game, or the simulation diverges and the session desyncs.
+  //
+  // `.asm`-confirmed at 0x007BA56C: `push 30000h; push 20000h; call
+  // __imp__controlfp` -- i.e. `_controlfp(_PC_24, _MCW_PC)`, the same pair all
+  // six call sites in the binary use (0x004F2241, 0x0070C587, 0x0073D456,
+  // 0x007BA56C, 0x007F57A3, 0x00885E0D). The binary never selects _PC_64
+  // anywhere; a previous recovery pass read this one as _PC_64.
+  _controlfp(_PC_24, _MCW_PC);
 
   lua_pushboolean(rawState, launched ? 1 : 0);
   (void)lua_gettop(rawState);
