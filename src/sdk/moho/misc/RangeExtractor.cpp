@@ -169,22 +169,6 @@ namespace
     return GetBlueprintExtractorRegistryPointer();
   }
 
-  struct FactoryCommandQueueRangeView
-  {
-    std::uint8_t pad_0000_0460[0x460];
-    float guardScanRadius;           // +0x460
-    float guardReturnRadius;         // +0x464
-    float stagingPlatformScanRadius; // +0x468
-  };
-
-  static_assert(
-    offsetof(FactoryCommandQueueRangeView, guardScanRadius) == 0x460,
-    "FactoryCommandQueueRangeView::guardScanRadius offset must be 0x460"
-  );
-  static_assert(
-    offsetof(FactoryCommandQueueRangeView, stagingPlatformScanRadius) == 0x468,
-    "FactoryCommandQueueRangeView::stagingPlatformScanRadius offset must be 0x468"
-  );
 }
 
 namespace moho
@@ -237,20 +221,31 @@ namespace moho
     return true;
   }
 
-  bool RangeExtractor::TryGetFactoryOverlayRadius(const UserUnit* const userUnit, float* const outRadius) noexcept
+  bool RangeExtractor::TryGetAssistOverlayRadius(const UserEntity* const userEntity, float* const outRadius) noexcept
   {
-    if (!userUnit || !outRadius) {
+    if (!userEntity || !outRadius) {
       return false;
     }
 
-    const UserCommandQueue* const factoryQueue = userUnit->GetFactoryCommandQueue();
-    if (factoryQueue == nullptr) {
-      *outRadius = 0.0f;
+    const UserUnit* const userUnit = userEntity->IsUserUnit();
+    if (userUnit == nullptr) {
       return false;
     }
 
-    const auto* const commandQueue = reinterpret_cast<const FactoryCommandQueueRangeView*>(factoryQueue);
-    const float radius = ResolvePositiveRadius(commandQueue->stagingPlatformScanRadius, commandQueue->guardScanRadius);
+    const RUnitBlueprint* const unitBlueprint = static_cast<const IUnit*>(userUnit)->GetBlueprint();
+    if (unitBlueprint == nullptr) {
+      return false;
+    }
+
+    // `CombinedMilitaryExtractor::Extract` (0x007EC3E1..0x007EC419) builds the
+    // literal "OVERLAYMISC" and asks the entity, not the blueprint, whether it
+    // is in that category; only then does it read the radius.
+    if (!userEntity->IsInCategory(msvc8::string("OVERLAYMISC"))) {
+      return false;
+    }
+
+    const float radius =
+      ResolvePositiveRadius(unitBlueprint->AI.StagingPlatformScanRadius, unitBlueprint->AI.GuardScanRadius);
     *outRadius = radius;
     return radius > 0.0f;
   }

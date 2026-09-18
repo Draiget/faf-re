@@ -4,11 +4,16 @@
 
 #include "moho/entity/UserEntity.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
+#include "moho/unit/core/IUnit.h"
+#include "moho/unit/core/UserUnit.h"
 #include "moho/unit/core/WeaponExtractor.h"
 
 namespace
 {
   constexpr std::int32_t kCountermeasureRangeCategory = static_cast<std::int32_t>(moho::UWRC_Countermeasure);
+
+  /// 0x00E4F724, the multiplier applied to `Defense.Shield.ShieldSize`.
+  constexpr float kShieldDiameterToRadius = 0.5f;
 }
 
 namespace moho
@@ -56,11 +61,20 @@ namespace moho
       return false;
     }
 
-    const UserUnit* const userUnit = userEntity->IsUserUnit();
-    if (userUnit) {
-      float factoryOverlayRadius = 0.0f;
-      if (TryGetFactoryOverlayRadius(userUnit, &factoryOverlayRadius)) {
-        return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, factoryOverlayRadius);
+    // The countermeasure overlay's first ring is the shield bubble, not an
+    // assist radius: 0x007EC89F reads `[blueprint+0x458]` - `Defense.Shield`
+    // (+0x38 inside Defense at +0x420) `.ShieldSize` - and halves it with the
+    // 0.5f at 0x00E4F724, a diameter turned into a radius. Only a
+    // non-positive result falls through to the weapon ranges (0x007EC8BC).
+    // An earlier pass had this branch reading a factory command queue through
+    // a layout stand-in instead.
+    if (const UserUnit* const userUnit = userEntity->IsUserUnit(); userUnit != nullptr) {
+      if (const RUnitBlueprint* const unitBlueprint = static_cast<const IUnit*>(userUnit)->GetBlueprint();
+          unitBlueprint != nullptr) {
+        const float shieldRadius = unitBlueprint->Defense.Shield.ShieldSize * kShieldDiameterToRadius;
+        if (shieldRadius > 0.0f) {
+          return StoreRangeAtEntity(outRange, *userEntity, interpolationAlpha, shieldRadius);
+        }
       }
     }
 
