@@ -368,13 +368,6 @@ namespace moho
 namespace
 {
 
-  struct UserCommandQueueRangeView
-  {
-    UserCommandQueueEntry* begin;            // +0x00
-    UserCommandQueueEntry* end;              // +0x04
-  };
-  static_assert(sizeof(UserCommandQueueRangeView) == 0x08, "UserCommandQueueRangeView size must be 0x08");
-
   // The factory build-queue row type and the published queue itself are owned by
   // `moho/ui/UiRuntimeTypes.{h,cpp}` (`moho::FactoryQueueDisplayItem`,
   // `moho::sCurrentBuildQueue`). The queue-rebuild and Lua-table workers below
@@ -382,6 +375,18 @@ namespace
   // `ebx` at 0x00835DF0 and in `esi` at 0x00836080 - so this translation unit
   // keeps no build-queue global of its own.
 
+  /**
+   * The head of one pending issue-queue block. `AdvanceUserCommandManagerBySeq`
+   * reads the first `int32` of the block and compares it against the sim
+   * sequence (0x008B7372 `mov ecx,[eax]` then `sub ecx,esi`), which is why it
+   * is named for that here.
+   *
+   * It is deliberately NOT merged into `UserManagerHelperEntry`: that type is
+   * 0x10 bytes with `commandType` at +0x00, and `PushUserManagerIssue` writes a
+   * command tag into that same first word. Both readings cannot be right, and
+   * settling which needs `PushUserManagerIssue`'s own disassembly rather than a
+   * layout match, so the two stay separate until someone does that work.
+   */
   struct UserCommandManagerPendingSlotView
   {
     std::int32_t dueSeqNo; // +0x00
@@ -392,58 +397,6 @@ namespace
     "UserCommandManagerPendingSlotView::dueSeqNo offset must be 0x00"
   );
 
-  struct UserCommandManagerRuntimeView
-  {
-    std::uint8_t pad_0000_0008[0x08];
-    UserCommandQueueRangeView primaryRange;      // +0x08
-    std::uint8_t pad_0010_002C[0x1C];
-    UserCommandManagerPendingSlotView** pendingIssueSlots; // +0x2C
-    std::uint32_t pendingSlotCount;              // +0x30
-    std::uint32_t pendingCursor;                 // +0x34
-    std::uint32_t pendingIssueCount;             // +0x38
-    std::uint8_t pad_003C_0040[0x04];
-    UserCommandQueueRangeView resolvedRange;     // +0x40
-    UserCommandQueueEntry* resolvedRangeEndStorage; // +0x48
-    UserCommandQueueEntry** resolvedRangeInlineStorage; // +0x4C
-    std::uint8_t pad_0050_0060[0x10];
-    std::uint8_t resolvedRangeDirty; // +0x60
-  };
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, primaryRange) == 0x08,
-    "UserCommandManagerRuntimeView::primaryRange offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, pendingIssueSlots) == 0x2C,
-    "UserCommandManagerRuntimeView::pendingIssueSlots offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, pendingSlotCount) == 0x30,
-    "UserCommandManagerRuntimeView::pendingSlotCount offset must be 0x30"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, pendingCursor) == 0x34,
-    "UserCommandManagerRuntimeView::pendingCursor offset must be 0x34"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, pendingIssueCount) == 0x38,
-    "UserCommandManagerRuntimeView::pendingIssueCount offset must be 0x38"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, resolvedRange) == 0x40,
-    "UserCommandManagerRuntimeView::resolvedRange offset must be 0x40"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, resolvedRangeEndStorage) == 0x48,
-    "UserCommandManagerRuntimeView::resolvedRangeEndStorage offset must be 0x48"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, resolvedRangeInlineStorage) == 0x4C,
-    "UserCommandManagerRuntimeView::resolvedRangeInlineStorage offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(UserCommandManagerRuntimeView, resolvedRangeDirty) == 0x60,
-    "UserCommandManagerRuntimeView::resolvedRangeDirty offset must be 0x60"
-  );
 
   // UserCommandIssueWeakSetRuntimeView / UserCommandIssueCellVectorRuntimeView /
   // UserCommandIssueLocalEventRuntimeView moved to UserUnit.h (moho namespace)
@@ -655,15 +608,16 @@ namespace
 
   [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserCommandQueue* managerPtr) noexcept;
 
-  [[nodiscard]] const UserCommandQueueRangeView* ResolveUserCommandQueueRange(const UserCommandQueue* const queue) noexcept
+  [[nodiscard]] const UserCommandQueueLinkVector* ResolveUserCommandQueueRange(
+    const UserCommandQueue* const queue
+  ) noexcept
   {
     UserCommandQueue* const manager = const_cast<UserCommandQueue*>(queue);
     if (manager == nullptr) {
       return nullptr;
     }
 
-    const UserCommandQueueLinkVector* const queueVector = RebuildAndGetUserUnitManagerQueue(manager);
-    return reinterpret_cast<const UserCommandQueueRangeView*>(queueVector);
+    return RebuildAndGetUserUnitManagerQueue(manager);
   }
 
   // `UserEntity::mVisionHandle` already sits at +0x18; the pad-struct that used
@@ -1595,7 +1549,7 @@ namespace
    */
   [[nodiscard]] bool IsUserCommandManagerQueueEmpty(const UserCommandQueue* const manager) noexcept
   {
-    const UserCommandQueueRangeView* const queueRange =
+    const UserCommandQueueLinkVector* const queueRange =
       ResolveUserCommandQueueRange(manager);
     return queueRange == nullptr || queueRange->begin == queueRange->end;
   }
@@ -1644,7 +1598,7 @@ namespace
       return false;
     }
 
-    const UserCommandQueueRangeView* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue());
+    const UserCommandQueueLinkVector* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue());
     return queueRange != nullptr && queueRange->begin == queueRange->end;
   }
 
@@ -2570,44 +2524,43 @@ namespace
    */
   void AdvanceUserCommandManagerBySeq(UserCommandQueue* const managerPtr, const std::int32_t seqNo) noexcept
   {
-    auto* const manager = reinterpret_cast<UserCommandManagerRuntimeView*>(managerPtr);
-
-    while (manager->pendingIssueCount != 0u) {
-      std::uint32_t queueIndex = manager->pendingCursor;
-      if (manager->pendingSlotCount <= queueIndex) {
-        queueIndex -= manager->pendingSlotCount;
+    while (managerPtr->issueQueue.size != 0u) {
+      std::uint32_t queueIndex = managerPtr->issueQueue.startOffset;
+      if (managerPtr->issueQueue.blockCount <= queueIndex) {
+        queueIndex -= managerPtr->issueQueue.blockCount;
       }
 
-      const UserCommandManagerPendingSlotView* const slot = manager->pendingIssueSlots[queueIndex];
+      const auto* const slot =
+        reinterpret_cast<const UserCommandManagerPendingSlotView*>(managerPtr->issueQueue.blocks[queueIndex]);
       if (slot == nullptr || (slot->dueSeqNo - seqNo) > 0) {
         break;
       }
 
-      manager->pendingCursor += 1u;
-      if (manager->pendingSlotCount <= manager->pendingCursor) {
-        manager->pendingCursor = 0u;
+      managerPtr->issueQueue.startOffset += 1u;
+      if (managerPtr->issueQueue.blockCount <= managerPtr->issueQueue.startOffset) {
+        managerPtr->issueQueue.startOffset = 0u;
       }
 
-      manager->pendingIssueCount -= 1u;
-      if (manager->pendingIssueCount == 0u) {
-        manager->pendingCursor = 0u;
+      managerPtr->issueQueue.size -= 1u;
+      if (managerPtr->issueQueue.size == 0u) {
+        managerPtr->issueQueue.startOffset = 0u;
       }
-      manager->resolvedRangeDirty = 1u;
+      managerPtr->resolvedLinksDirty = 1u;
     }
 
-    if (manager->resolvedRangeDirty == 0u) {
+    if (managerPtr->resolvedLinksDirty == 0u) {
       return;
     }
 
-    UnlinkResolvedQueueOwnerLinks(manager->resolvedRange.begin, manager->resolvedRange.end);
-    if (manager->resolvedRange.begin != reinterpret_cast<UserCommandQueueEntry*>(manager->resolvedRangeInlineStorage)) {
-      ::operator delete[](manager->resolvedRange.begin);
-      manager->resolvedRange.begin = reinterpret_cast<UserCommandQueueEntry*>(manager->resolvedRangeInlineStorage);
-      manager->resolvedRangeEndStorage = manager->resolvedRangeInlineStorage != nullptr
-        ? *manager->resolvedRangeInlineStorage
+    UnlinkResolvedQueueOwnerLinks(managerPtr->resolvedLinks.begin, managerPtr->resolvedLinks.end);
+    if (managerPtr->resolvedLinks.begin != reinterpret_cast<UserCommandQueueEntry*>(managerPtr->resolvedLinks.inlineBase)) {
+      ::operator delete[](managerPtr->resolvedLinks.begin);
+      managerPtr->resolvedLinks.begin = reinterpret_cast<UserCommandQueueEntry*>(managerPtr->resolvedLinks.inlineBase);
+      managerPtr->resolvedLinks.capacityEnd = managerPtr->resolvedLinks.inlineBase != nullptr
+        ? *managerPtr->resolvedLinks.inlineBase
         : nullptr;
     }
-    manager->resolvedRange.end = manager->resolvedRange.begin;
+    managerPtr->resolvedLinks.end = managerPtr->resolvedLinks.begin;
   }
 
   [[nodiscard]] UserEntity* DecodeWeakOwnerUserEntity(const UserEntityWeakLinkView& weakEntityLink) noexcept
@@ -7235,7 +7188,7 @@ int moho::cfunc_UserUnitIsIdleL(LuaPlus::LuaState* const state)
 
   bool isIdle = false;
   if (userUnit != nullptr && userUnit->mUnitVarDat.mIsBusy == 0u) {
-    const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(userUnit->GetCommandQueue());
+    const UserCommandQueueLinkVector* const commandRange = ResolveUserCommandQueueRange(userUnit->GetCommandQueue());
     if (commandRange == nullptr || commandRange->begin == commandRange->end) {
       isIdle = true;
     }
@@ -7670,7 +7623,7 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 1));
   UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(SelectActiveQueue(userUnit));
+  const UserCommandQueueLinkVector* const commandRange = ResolveUserCommandQueueRange(SelectActiveQueue(userUnit));
   if (commandRange == nullptr) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
@@ -7844,7 +7797,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
       // 0x00835ECB republishes the current factory from the incoming link.
       sCurrentBuildFactory.ResetFromOwnerLinkSlot(factoryLink.ownerLinkSlot);
 
-      const UserCommandQueueRangeView* const commandRange = ResolveUserCommandQueueRange(commandQueue);
+      const UserCommandQueueLinkVector* const commandRange = ResolveUserCommandQueueRange(commandQueue);
       if (commandRange != nullptr) {
         for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
           const UserCommandIssueHelperRuntimeView* const helper = entry->helper;
