@@ -58,22 +58,24 @@ namespace moho
     return sType;
   }
 
-  // Address: 0x0052B490 (FUN_0052B490, sub_52B490) -- tiny 2-instruction
-  // `mov eax,[ecx+0x5Ch]; retn` accessor. Byte-identical to (ICF twin of)
-  // FUN_005281C0 (`gpg::RType::dtr_func_t`'s own offset, +0x5C, happens to
-  // match this canonical twin's unrelated field): the canonical body is
-  // already recovered as `ReadAuxiliaryRuntimeWord` in
-  // `src/sdk/lua/LuaObject.cpp` (`AuxiliaryWordRuntimeView::mAuxiliaryWord`,
-  // a Lua userdata runtime lane, not `gpg::RType::dtrFunc_`). This address
-  // has zero callsite evidence of its own anywhere in the binary (no code
-  // caller, no data/vtable xref, unreachable per the enriched callgraph
-  // index) -- the real "read dtrFunc_ back and invoke it" mechanism is
-  // already recovered and wired at `LuaObject.cpp:16870`
-  // (`type->dtrFunc_(...)`), which compiles to a different instruction
-  // shape (a call through the slot, not a bare load-and-return). No
-  // registration or dispatch site anywhere in `src/sdk/**` needs a
-  // dedicated named getter for `dtrFunc_` -- so this address intentionally
-  // has no dedicated recovered function here.
+  // Address: 0x0052B490 (FUN_0052B490, sub_52B490) -- not a function, and
+  // deliberately not recovered here. The four bytes are `8B 40 5C C3`,
+  // `mov eax,[eax+0x5Ch]; ret`: the object arrives in EAX, which is no x86
+  // calling convention, so this is a basic block lifted out of the middle of
+  // some larger routine by the capstone scan that replaced the lost IDA
+  // database, not a callable body. It has zero evidence of its own - no code
+  // caller, no data or vtable xref, unreachable per the enriched index.
+  //
+  // The same four bytes appear again at FUN_005281C0, with the same SHA. That
+  // is the confirmation rather than a coincidence: /OPT:ICF would have folded
+  // two byte-identical COMDATs onto one address, so two addresses means
+  // neither is a COMDAT. Both were previously recovered as a named getter
+  // (`ReadAuxiliaryRuntimeWord`, over an invented `AuxiliaryWordRuntimeView`);
+  // that body has been deleted and both tokens marked skip.
+  //
+  // The real "read dtrFunc_ back and invoke it" mechanism is recovered and
+  // wired in LuaObject.cpp as `type->dtrFunc_(...)`, which compiles to a call
+  // through the slot rather than a bare load-and-return.
 
   /**
    * Address: 0x0052B4A0 (FUN_0052B4A0, Moho::RRuleGameRulesTypeInfo::RRuleGameRulesTypeInfo)
