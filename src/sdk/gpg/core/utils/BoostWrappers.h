@@ -1810,14 +1810,14 @@ namespace boost
      */
     void EnsurePtrContainerPushBackInputNotNull(const void* inputPointer);
 
-    /**
-     * Address: 0x00491350 (FUN_00491350)
-     *
-     * What it does:
-     * Returns the pointer-container exception message lane used by both
-     * `boost::bad_ptr_container_operation` and `boost::bad_pointer`.
-     */
-    [[nodiscard]] const char* GetBadPtrContainerMessage(const boost::bad_ptr_container_operation* exceptionObject) noexcept;
+    // Address: 0x00491350 (FUN_00491350 -- `mov eax, [ecx+0x0C]; ret`: the body
+    // of `boost::bad_ptr_container_operation::what()`, which boost 1.34.1
+    // defines inline in ptr_container/exception.hpp as `return what_;` over the
+    // `const char*` that follows the 0x0C `std::exception` sub-object. Zero
+    // callers in the binary and none in source; formerly
+    // `GetBadPtrContainerMessage` reading through a
+    // BadPtrContainerOperationRuntimeView copy of that same layout (RULE ONE),
+    // removed 2026-09-18. Call `what()` on the exception instead.)
 
     /**
      * Address: 0x00491360 (FUN_00491360)
