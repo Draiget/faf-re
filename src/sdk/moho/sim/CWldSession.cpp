@@ -8706,16 +8706,6 @@ namespace moho
       selection.mSizeMirrorOrUnused = selection.mSize;
     }
 
-    struct CWldSessionSelectionStatsRuntimeView
-    {
-      std::uint8_t pad_0000_04AC[0x4AC];
-      std::int32_t maxSelectionSize; // +0x4AC
-    };
-    static_assert(
-      offsetof(CWldSessionSelectionStatsRuntimeView, maxSelectionSize) == 0x4AC,
-      "CWldSessionSelectionStatsRuntimeView::maxSelectionSize offset must be 0x4AC"
-    );
-
     void BuildSelectionSyncMask(const SSelectionSetUserEntity& selection, SSyncFilterMaskBlock& outMask)
     {
       BVIntSet selectionIds{};
@@ -15898,8 +15888,9 @@ namespace moho
       }
     }
 
-    const std::int32_t maxSelectionSizeRuntime =
-      reinterpret_cast<const CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize;
+    // `mSelection`'s own +0x0C lane (absolute +0x4AC): the selection set is a
+    // 12-byte `WeakSet<UserEntity>` header plus this mirror of its size.
+    const auto maxSelectionSizeRuntime = static_cast<std::int32_t>(mSelection.mSizeMirrorOrUnused);
     const std::uint32_t maxSelectionSize = maxSelectionSizeRuntime > 0 ? static_cast<std::uint32_t>(maxSelectionSizeRuntime)
                                                                         : 0u;
     const std::uint32_t liveSelectionSize = static_cast<std::uint32_t>(filteredSelection.size());
@@ -18774,7 +18765,7 @@ namespace moho
       (void)CloneSelectionTreeFromStorage(&mSelection, incomingSelection);
     }
 
-    reinterpret_cast<CWldSessionSelectionStatsRuntimeView*>(this)->maxSelectionSize = mSelection.size();
+    mSelection.mSizeMirrorOrUnused = static_cast<std::uint32_t>(mSelection.size());
 
     if (selectionChanged) {
       if (ISTIDriver* const activeDriver = SIM_GetActiveDriver(); activeDriver != nullptr) {
