@@ -757,6 +757,23 @@ namespace
     const moho::SRangeRenderProfile* assistProfile = nullptr;
     moho::SRangeExtractionPayload assistPayload{};
 
+    // The attack ring is styled from "AllMilitary" - the combine-military
+    // profile, whose colour is the red players read as "attack range"
+    // (NormalColor ff2c2c in rangeoverlayparams.lua). Only its *styling* is
+    // borrowed: it cannot supply the radius, because
+    // `CombinedMilitaryExtractor::Range` returns false. Without this the ring
+    // took the colour of whichever weapon profile happened to be widest, so a
+    // unit with both direct and indirect fire drew its attack ring in
+    // IndirectFire's colour rather than red.
+    const moho::SRangeRenderProfile* militaryStyle = nullptr;
+
+    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
+      if (profile.mExtractorName == "AllMilitary") {
+        militaryStyle = &profile;
+        break;
+      }
+    }
+
     for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
       const bool isAssist = profile.mExtractorName == "Miscellaneous";
       const bool isAttack = profile.mExtractorName == "DirectFire"
@@ -790,6 +807,11 @@ namespace
           continue;
         }
 
+        // Drop the minimum-range circle. `WeaponExtractor::Range` stores
+        // `(outerRadius, innerRadius)`, so a weapon with a minimum range would
+        // otherwise draw a second, smaller ring inside the one being asked for.
+        payload.innerRadius = 0.0f;
+
         if (isAssist) {
           if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
             assistPayload = payload;
@@ -803,8 +825,9 @@ namespace
     }
 
     const auto draw = [&](const moho::SRangeRenderProfile* const profile,
-                          const moho::SRangeExtractionPayload& payload) {
-      if (profile == nullptr) {
+                          const moho::SRangeExtractionPayload& payload,
+                          const bool havePayload) {
+      if (profile == nullptr || !havePayload) {
         return;
       }
       scratchPayload.clear();
@@ -815,8 +838,8 @@ namespace
       );
     };
 
-    draw(attackProfile, attackPayload);
-    draw(assistProfile, assistPayload);
+    draw((militaryStyle != nullptr) ? militaryStyle : attackProfile, attackPayload, attackProfile != nullptr);
+    draw(assistProfile, assistPayload, assistProfile != nullptr);
   }
 
   /**
