@@ -4,6 +4,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "Wm3Vector3.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/ai/EAiAttackerEvent.h"
 #include "moho/misc/Listener.h"
 #include "moho/task/CCommandTask.h"
@@ -95,13 +96,11 @@ namespace moho
       bool enableOverchargeWeapon
     );
 
-  protected:
-    /// +0x50..+0x8F. The two siblings keep their own fields here and reach them
-    /// through their file-local runtime views; nothing addresses this directly.
-    unsigned char mPadding[0x90 - 0x50];
   };
 
-  static_assert(sizeof(CAttackTargetTask) == 0x90, "CAttackTargetTask size must be 0x90");
+  // The base ends here, at +0x50: what used to be 0x40 bytes of padding is the
+  // two siblings' own fields, and they now declare them.
+  static_assert(sizeof(CAttackTargetTask) == 0x50, "CAttackTargetTask size must be 0x50");
 
   /**
    * Minimal recovered layout owner for attack-target task lanes.
@@ -305,7 +304,39 @@ namespace moho
      * the attacker event-list lane when the entity target changed.
      */
     [[nodiscard]] bool UpdateAttacker(CAiTarget* desiredTarget);
+  public:
+    // +0x00..+0x4F are the bases: `CCommandTaskWithListenerSlot`, the
+    // attacker-event listener and the command-event listener.
+    CCommandTask* mDispatchTask;      // +0x50
+    CUnitCommand* mCommand;           // +0x54
+    CAiFormationInstance* mFormation; // +0x58
+    UnitWeapon* mWeapon;              // +0x5C
+    CAiTarget mTarget;                // +0x60
+    Wm3::Vector3f mTargetPosition;    // +0x80
+    std::uint8_t mHasMobileTarget;    // +0x8C
+    std::uint8_t mIgnoreFormationUpdates; // +0x8D
+    std::uint8_t mIsGrounded;         // +0x8E
+    std::uint8_t mPad008F;            // +0x8F
   };
+
+  static_assert(
+    offsetof(CUnitAttackTargetTask, mDispatchTask) == 0x50,
+    "CUnitAttackTargetTask::mDispatchTask offset must be 0x50"
+  );
+  static_assert(
+    offsetof(CUnitAttackTargetTask, mWeapon) == 0x5C, "CUnitAttackTargetTask::mWeapon offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(CUnitAttackTargetTask, mTarget) == 0x60, "CUnitAttackTargetTask::mTarget offset must be 0x60"
+  );
+  static_assert(
+    offsetof(CUnitAttackTargetTask, mTargetPosition) == 0x80,
+    "CUnitAttackTargetTask::mTargetPosition offset must be 0x80"
+  );
+  static_assert(
+    offsetof(CUnitAttackTargetTask, mHasMobileTarget) == 0x8C,
+    "CUnitAttackTargetTask::mHasMobileTarget offset must be 0x8C"
+  );
 
   static_assert(sizeof(CUnitAttackTargetTask) == 0x90, "CUnitAttackTargetTask size must be 0x90");
 } // namespace moho

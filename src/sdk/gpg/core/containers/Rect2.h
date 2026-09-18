@@ -4,7 +4,15 @@ namespace gpg
 {
 	class RType;
 
-	template<class T>
+	/**
+	 * Address: 0x00610EB0 (FUN_00610EB0 -- the implicit copy of one `Rect2i`
+	 * into caller storage, four dwords wide: `SNavGoal::mPos2` handed out by a
+	 * guard-task accessor. Zero callers, unreachable; formerly
+	 * `CopySNavGoalTailDwordQuad` over a `SNavGoalTailDwordQuadRuntimeView`
+	 * stand-in in moho/unit/tasks/CUnitGuardTask.cpp (RULE ONE), removed
+	 * 2026-09-18.)
+	 */
+	template <typename T>
 	struct Rect2
 	{
 		inline static RType* sType = nullptr;

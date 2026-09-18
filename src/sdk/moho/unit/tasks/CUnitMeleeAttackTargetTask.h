@@ -4,7 +4,9 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ai/CAiTarget.h"
 #include "moho/ai/EAiAttackerEvent.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/unit/ECommandEvent.h"
 #include "moho/unit/tasks/CUnitAttackTargetTask.h"
 
@@ -290,7 +292,41 @@ namespace moho
      * vtable, installed at +0x44 by the constructor at 0x00615690.
      */
     void OnEvent(ECommandEvent event) override { HandleCommandEvent(event); }
+  public:
+    // +0x00..+0x4F are the bases: `CCommandTaskWithListenerSlot`, the
+    // attacker-event listener and the command-event listener.
+    CCommandTask* mDispatchTask;      // +0x50
+    CUnitCommand* mCommand;           // +0x54
+    CAiFormationInstance* mFormation; // +0x58
+    CAiTarget mTarget;                // +0x5C
+    Wm3::Vector3f mTargetPosition;    // +0x7C
+    SOCellPos mDestination;           // +0x88
+    bool mHasMobileTarget;            // +0x8C
+    bool mIgnoreFormationUpdates;     // +0x8D
+    bool mNeedsNavigatorGoalUpdate;   // +0x8E
+    bool mPlanted;                    // +0x8F
   };
+
+  static_assert(
+    offsetof(CUnitMeleeAttackTargetTask, mDispatchTask) == 0x50,
+    "CUnitMeleeAttackTargetTask::mDispatchTask offset must be 0x50"
+  );
+  static_assert(
+    offsetof(CUnitMeleeAttackTargetTask, mTarget) == 0x5C,
+    "CUnitMeleeAttackTargetTask::mTarget offset must be 0x5C"
+  );
+  static_assert(
+    offsetof(CUnitMeleeAttackTargetTask, mTargetPosition) == 0x7C,
+    "CUnitMeleeAttackTargetTask::mTargetPosition offset must be 0x7C"
+  );
+  static_assert(
+    offsetof(CUnitMeleeAttackTargetTask, mDestination) == 0x88,
+    "CUnitMeleeAttackTargetTask::mDestination offset must be 0x88"
+  );
+  static_assert(
+    offsetof(CUnitMeleeAttackTargetTask, mHasMobileTarget) == 0x8C,
+    "CUnitMeleeAttackTargetTask::mHasMobileTarget offset must be 0x8C"
+  );
 
   static_assert(sizeof(CUnitMeleeAttackTargetTask) == 0x90, "CUnitMeleeAttackTargetTask size must be 0x90");
 

@@ -44,102 +44,7 @@ namespace moho
 
 namespace
 {
-  struct CUnitMeleeAttackTargetTaskRuntimeView
-  {
-    std::uint8_t mCommandTaskStorage[sizeof(moho::CCommandTask)]{}; // +0x00
-    std::uint32_t mUnknown0030{};                                    // +0x30
-    std::uint32_t mAiAttackerListenerVftable{};                      // +0x34
-    moho::Broadcaster mAiAttackerListenerLink{};                     // +0x38
-    std::uint32_t mUnknown0040{};                                    // +0x40
-    std::uint32_t mCommandEventListenerVftable{};                    // +0x44
-    moho::Broadcaster mCommandEventListenerLink{};                   // +0x48
-    moho::CCommandTask* mDispatchTask{};                             // +0x50
-    moho::CUnitCommand* mCommand{};                                  // +0x54
-    moho::CAiFormationInstance* mFormation{};                        // +0x58
-    moho::CAiTarget mTarget{};                                       // +0x5C
-    Wm3::Vector3f mTargetPosition{};                                 // +0x7C
-    moho::SOCellPos mDestination{};                                  // +0x88
-    bool mHasMobileTarget{};                                         // +0x8C
-    bool mIgnoreFormationUpdates{};                                  // +0x8D
-    bool mNeedsNavigatorGoalUpdate{};                                // +0x8E
-    bool mPlanted{};                                                 // +0x8F
-  };
 
-  static_assert(
-    sizeof(CUnitMeleeAttackTargetTaskRuntimeView) == sizeof(moho::CUnitMeleeAttackTargetTask),
-    "CUnitMeleeAttackTargetTaskRuntimeView size must match CUnitMeleeAttackTargetTask"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mCommandTaskStorage) == 0x00,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mCommandTaskStorage offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mAiAttackerListenerVftable) == 0x34,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mAiAttackerListenerVftable offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mUnknown0040) == 0x40,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mUnknown0040 offset must be 0x40"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mCommandEventListenerVftable) == 0x44,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mCommandEventListenerVftable offset must be 0x44"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mCommandEventListenerLink) == 0x48,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mCommandEventListenerLink offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mDispatchTask) == 0x50,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mDispatchTask offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mCommand) == 0x54,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mCommand offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mFormation) == 0x58,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mFormation offset must be 0x58"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mTarget) == 0x5C,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mTarget offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mTargetPosition) == 0x7C,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mTargetPosition offset must be 0x7C"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mDestination) == 0x88,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mDestination offset must be 0x88"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mHasMobileTarget) == 0x8C,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mHasMobileTarget offset must be 0x8C"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mIgnoreFormationUpdates) == 0x8D,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mIgnoreFormationUpdates offset must be 0x8D"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mNeedsNavigatorGoalUpdate) == 0x8E,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mNeedsNavigatorGoalUpdate offset must be 0x8E"
-  );
-  static_assert(
-    offsetof(CUnitMeleeAttackTargetTaskRuntimeView, mPlanted) == 0x8F,
-    "CUnitMeleeAttackTargetTaskRuntimeView::mPlanted offset must be 0x8F"
-  );
-
-  [[nodiscard]] CUnitMeleeAttackTargetTaskRuntimeView* AsRuntimeView(moho::CUnitMeleeAttackTargetTask* const task
-  ) noexcept
-  {
-    return reinterpret_cast<CUnitMeleeAttackTargetTaskRuntimeView*>(task);
-  }
-
-  [[nodiscard]] moho::CCommandTask* AsCommandTask(CUnitMeleeAttackTargetTaskRuntimeView* const runtime) noexcept
-  {
-    return reinterpret_cast<moho::CCommandTask*>(runtime->mCommandTaskStorage);
-  }
 
   [[nodiscard]] gpg::RType* CachedCUnitMeleeAttackTargetTaskType()
   {
@@ -469,30 +374,29 @@ namespace moho
   CUnitMeleeAttackTargetTask::CUnitMeleeAttackTargetTask()
     : CAttackTargetTask()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
-    runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerLink.ListResetLinks();
-    runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerLink.ListResetLinks();
+    CCommandTaskWithListenerSlot::mListenerPad = 0;
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
+    AiAttackerListenerWithSlot::mListenerPad = 0;
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
-    runtime->mDispatchTask = nullptr;
-    runtime->mCommand = nullptr;
-    runtime->mFormation = nullptr;
+    mDispatchTask = nullptr;
+    mCommand = nullptr;
+    mFormation = nullptr;
 
-    runtime->mTarget.targetType = EAiTargetType::AITARGET_Entity;
-    runtime->mTarget.targetEntity.ClearLinkState();
-    runtime->mTarget.targetPoint = -1;
-    runtime->mTarget.targetIsMobile = false;
-    runtime->mTarget.PickTargetPoint();
+    mTarget.targetType = EAiTargetType::AITARGET_Entity;
+    mTarget.targetEntity.ClearLinkState();
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
+    mTarget.PickTargetPoint();
 
-    runtime->mTargetPosition = Wm3::Vector3f::Zero();
-    runtime->mDestination.x = static_cast<std::int16_t>(-0x8000);
-    runtime->mDestination.z = static_cast<std::int16_t>(-0x8000);
-    runtime->mHasMobileTarget = false;
-    runtime->mIgnoreFormationUpdates = false;
-    runtime->mNeedsNavigatorGoalUpdate = true;
-    runtime->mPlanted = false;
+    mTargetPosition = Wm3::Vector3f::Zero();
+    mDestination.x = static_cast<std::int16_t>(-0x8000);
+    mDestination.z = static_cast<std::int16_t>(-0x8000);
+    mHasMobileTarget = false;
+    mIgnoreFormationUpdates = false;
+    mNeedsNavigatorGoalUpdate = true;
+    mPlanted = false;
   }
 
   /**
@@ -510,68 +414,67 @@ namespace moho
   )
     : CAttackTargetTask(dispatchTask)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
-    runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerLink.ListResetLinks();
-    runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerLink.ListResetLinks();
+    CCommandTaskWithListenerSlot::mListenerPad = 0;
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
+    AiAttackerListenerWithSlot::mListenerPad = 0;
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
-    runtime->mDispatchTask = dispatchTask;
-    runtime->mCommand = nullptr;
-    runtime->mFormation = formation;
+    mDispatchTask = dispatchTask;
+    mCommand = nullptr;
+    mFormation = formation;
 
-    runtime->mTarget.targetType = EAiTargetType::AITARGET_None;
-    runtime->mTarget.targetEntity.ClearLinkState();
-    runtime->mTarget.position = Wm3::Vector3f::Zero();
-    runtime->mTarget.targetPoint = -1;
-    runtime->mTarget.targetIsMobile = false;
+    mTarget.targetType = EAiTargetType::AITARGET_None;
+    mTarget.targetEntity.ClearLinkState();
+    mTarget.position = Wm3::Vector3f::Zero();
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
     if (target != nullptr) {
-      runtime->mTarget.targetType = target->targetType;
-      runtime->mTarget.targetEntity.ResetFromOwnerLinkSlot(target->targetEntity.ownerLinkSlot);
-      runtime->mTarget.position = target->position;
-      runtime->mTarget.targetPoint = target->targetPoint;
-      runtime->mTarget.targetIsMobile = target->targetIsMobile;
+      mTarget.targetType = target->targetType;
+      mTarget.targetEntity.ResetFromOwnerLinkSlot(target->targetEntity.ownerLinkSlot);
+      mTarget.position = target->position;
+      mTarget.targetPoint = target->targetPoint;
+      mTarget.targetIsMobile = target->targetIsMobile;
     }
 
-    runtime->mTargetPosition = Wm3::Vector3f::Zero();
-    runtime->mDestination.x = static_cast<std::int16_t>(-0x8000);
-    runtime->mDestination.z = static_cast<std::int16_t>(-0x8000);
-    runtime->mHasMobileTarget = false;
-    runtime->mIgnoreFormationUpdates = ignoreFormation;
-    runtime->mNeedsNavigatorGoalUpdate = true;
-    runtime->mPlanted = false;
+    mTargetPosition = Wm3::Vector3f::Zero();
+    mDestination.x = static_cast<std::int16_t>(-0x8000);
+    mDestination.z = static_cast<std::int16_t>(-0x8000);
+    mHasMobileTarget = false;
+    mIgnoreFormationUpdates = ignoreFormation;
+    mNeedsNavigatorGoalUpdate = true;
+    mPlanted = false;
 
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit != nullptr) {
       unit->UnitStateMask |= (1ull << UNITSTATE_Attacking);
 
-      if (!runtime->mIgnoreFormationUpdates) {
+      if (!mIgnoreFormationUpdates) {
         if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
           navigator->IgnoreFormation(true);
         }
       }
 
-      runtime->mCommand = GetCurrentCommand(unit);
-      if (CUnitCommand* const command = runtime->mCommand; command != nullptr) {
+      mCommand = GetCurrentCommand(unit);
+      if (CUnitCommand* const command = mCommand; command != nullptr) {
         command->mUnknownFlag154 = true;
         if (Broadcaster* const commandListenerHead = CommandEventListenerHead(command); commandListenerHead != nullptr) {
-          runtime->mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
+          Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
         }
       }
 
       if (!unit->IsMobile()) {
-        runtime->mFormation = nullptr;
+        mFormation = nullptr;
       }
 
       CAiAttackerImpl* const attacker = unit->AiAttacker;
       if (attacker != nullptr) {
-        runtime->mAiAttackerListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
       }
 
-      runtime->mHasMobileTarget =
-        runtime->mTarget.targetEntity.GetObjectPtr() != nullptr && runtime->mTarget.targetIsMobile;
+      mHasMobileTarget =
+        mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile;
 
       UpdatePosition();
 
@@ -604,13 +507,12 @@ namespace moho
    */
   CUnitMeleeAttackTargetTask::~CUnitMeleeAttackTargetTask()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
 
-    if (runtime->mPlanted && unit != nullptr) {
+    if (mPlanted && unit != nullptr) {
       unit->FreeOgridRect();
-      runtime->mPlanted = false;
+      mPlanted = false;
     }
 
     if (unit != nullptr) {
@@ -623,7 +525,7 @@ namespace moho
       unit->NeedSyncGameData = true;
     }
 
-    runtime->mCommandEventListenerLink.ListUnlink();
+    Listener<ECommandEvent>::mListenerLink.ListUnlink();
 
     if (unit != nullptr) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -631,13 +533,13 @@ namespace moho
       }
 
       if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-        runtime->mAiAttackerListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
         attacker->Stop();
       }
 
-      if (runtime->mPlanted) {
+      if (mPlanted) {
         unit->FreeOgridRect();
-        runtime->mPlanted = false;
+        mPlanted = false;
       }
 
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -645,10 +547,10 @@ namespace moho
       }
     }
 
-    runtime->mTarget.targetEntity.UnlinkFromOwnerChain();
-    runtime->mTarget.targetEntity.ClearLinkState();
-    runtime->mCommandEventListenerLink.ListResetLinks();
-    runtime->mAiAttackerListenerLink.ListResetLinks();
+    mTarget.targetEntity.UnlinkFromOwnerChain();
+    mTarget.targetEntity.ClearLinkState();
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
 
     // The base slice is a real `CCommandTask` base now, not raw storage, so the
     // compiler chains its destructor. Calling it here as well would run it
@@ -697,8 +599,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::SetDestinationCellGoal(const SOCellPos& destinationCell)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
       return;
     }
@@ -712,7 +613,7 @@ namespace moho
     goal.mLayer = static_cast<ELayer>(0);
     navigator->SetGoal(goal);
 
-    runtime->mDestination = destinationCell;
+    mDestination = destinationCell;
   }
 
   /**
@@ -724,13 +625,12 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::RefreshDestinationCellGoal()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
       return;
     }
 
-    const SOCellPos& destinationCell = runtime->mDestination;
+    const SOCellPos& destinationCell = mDestination;
     SAiNavigatorGoal goal{};
     goal.mPos1.x0 = static_cast<std::int32_t>(destinationCell.x);
     goal.mPos1.z0 = static_cast<std::int32_t>(destinationCell.z);
@@ -750,8 +650,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::SetDestinationGoalFromWorldPosition(const Wm3::Vector3f& worldPosition)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    const SFootprint& footprint = AsCommandTask(runtime)->mUnit->GetFootprint();
+    const SFootprint& footprint = static_cast<moho::CCommandTask*>(this)->mUnit->GetFootprint();
 
     SOCellPos destinationCell{};
     destinationCell.x = RoundToCellCoord(worldPosition.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
@@ -768,8 +667,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::SetDestUnit(Entity* const destinationEntity)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
       return;
     }
@@ -785,7 +683,7 @@ namespace moho
       RoundToCellCoord(destinationEntity->Position.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
     destinationCell.z =
       RoundToCellCoord(destinationEntity->Position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
-    runtime->mDestination = destinationCell;
+    mDestination = destinationCell;
   }
 
   /**
@@ -797,29 +695,28 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::UpdateTarget()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (runtime->mFormation != nullptr) {
-      const Wm3::Vector3f targetPos = runtime->mTarget.GetTargetPosGun(false);
+    if (mFormation != nullptr) {
+      const Wm3::Vector3f targetPos = mTarget.GetTargetPosGun(false);
       SCoordsVec2 formationCenter{};
       formationCenter.x = targetPos.x;
       formationCenter.z = targetPos.z;
-      runtime->mFormation->SetCoords(formationCenter);
+      mFormation->SetCoords(formationCenter);
 
       SOCellPos adjustedPosition{};
-      runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, AsCommandTask(runtime)->mUnit, nullptr);
+      mFormation->GetAdjustedFormationPosition(&adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr);
       SetDestinationCellGoal(adjustedPosition);
       return;
     }
 
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       return;
     }
 
-    if (runtime->mTarget.targetEntity.ownerLinkSlot == nullptr || runtime->mTarget.targetEntity.IsSentinel()) {
+    if (mTarget.targetEntity.ownerLinkSlot == nullptr || mTarget.targetEntity.IsSentinel()) {
       return;
     }
 
-    SetDestUnit(runtime->mTarget.targetEntity.GetObjectPtr());
+    SetDestUnit(mTarget.targetEntity.GetObjectPtr());
   }
 
   /**
@@ -831,13 +728,12 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::UpdatePosition()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (runtime->mTarget.HasTarget()) {
-      runtime->mTargetPosition = runtime->mTarget.GetTargetPosGun(false);
+    if (mTarget.HasTarget()) {
+      mTargetPosition = mTarget.GetTargetPosGun(false);
     }
 
-    if (!IsValidVector3f(runtime->mTargetPosition)) {
-      runtime->mTargetPosition = AsCommandTask(runtime)->mUnit->GetPosition();
+    if (!IsValidVector3f(mTargetPosition)) {
+      mTargetPosition = static_cast<moho::CCommandTask*>(this)->mUnit->GetPosition();
     }
   }
 
@@ -850,19 +746,18 @@ namespace moho
    */
   bool CUnitMeleeAttackTargetTask::InRange()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    Unit* const unit = AsCommandTask(runtime)->mUnit;
+    Unit* const unit = static_cast<moho::CCommandTask*>(this)->mUnit;
     const Wm3::Vector3f unitPosition = unit->GetPosition();
 
     float deltaX = 0.0f;
     float deltaZ = 0.0f;
-    if (runtime->mTarget.HasTarget()) {
-      const Wm3::Vector3f targetPosition = runtime->mTarget.GetTargetPosGun(false);
+    if (mTarget.HasTarget()) {
+      const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
       deltaX = unitPosition.x - targetPosition.x;
       deltaZ = unitPosition.z - targetPosition.z;
     } else {
-      deltaX = unitPosition.x - runtime->mTargetPosition.x;
-      deltaZ = unitPosition.z - runtime->mTargetPosition.z;
+      deltaX = unitPosition.x - mTargetPosition.x;
+      deltaZ = unitPosition.z - mTargetPosition.z;
     }
 
     const float planarDistance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
@@ -878,12 +773,11 @@ namespace moho
    */
   bool CUnitMeleeAttackTargetTask::HasFormationLeadDesiredTarget()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (!runtime->mIgnoreFormationUpdates || runtime->mFormation == nullptr) {
+    if (!mIgnoreFormationUpdates || mFormation == nullptr) {
       return false;
     }
 
-    Unit* const formationLead = AsCommandTask(runtime)->mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
+    Unit* const formationLead = static_cast<moho::CCommandTask*>(this)->mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
     if (formationLead == nullptr) {
       return false;
     }
@@ -905,11 +799,10 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::FreeSpot()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    Unit* const unit = AsCommandTask(runtime)->mUnit;
-    if (runtime->mPlanted) {
+    Unit* const unit = static_cast<moho::CCommandTask*>(this)->mUnit;
+    if (mPlanted) {
       unit->FreeOgridRect();
-      runtime->mPlanted = false;
+      mPlanted = false;
     }
 
     if (unit->AiNavigator != nullptr) {
@@ -926,18 +819,17 @@ namespace moho
    */
   bool CUnitMeleeAttackTargetTask::IsDestinationCellInMeleeContactRange()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       return false;
     }
 
-    Entity* const targetEntity = runtime->mTarget.GetEntity();
+    Entity* const targetEntity = mTarget.GetEntity();
     Unit* const targetUnit = targetEntity ? targetEntity->IsUnit() : nullptr;
     if (targetUnit == nullptr) {
       return false;
     }
 
-    Unit* const ownerUnit = AsCommandTask(runtime)->mUnit;
+    Unit* const ownerUnit = static_cast<moho::CCommandTask*>(this)->mUnit;
     const SFootprint& ownerFootprint = ownerUnit->GetFootprint();
     const SFootprint& targetFootprint = targetEntity->GetFootprint();
 
@@ -950,9 +842,9 @@ namespace moho
       }
 
       const Wm3::Vector3f destinationCenter{
-        static_cast<float>(runtime->mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
+        static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
         0.0f,
-        static_cast<float>(runtime->mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
+        static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
       };
       const float halfSizeX = static_cast<float>(ownerFootprint.mSizeX) * 0.5f;
       const float halfSizeZ = static_cast<float>(ownerFootprint.mSizeZ) * 0.5f;
@@ -981,9 +873,9 @@ namespace moho
 
     SCoordsVec2 destinationCenterXZ{};
     destinationCenterXZ.x =
-      static_cast<float>(runtime->mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f);
+      static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f);
     destinationCenterXZ.z =
-      static_cast<float>(runtime->mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f);
+      static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f);
 
     gpg::Rect2i destinationRect{};
     COORDS_ToGridRect(&destinationRect, destinationCenterXZ, ownerFootprint);
@@ -999,8 +891,7 @@ namespace moho
    */
   bool CUnitMeleeAttackTargetTask::UpdateDesiredTarget(CAiTarget* const desiredTarget)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CAiAttackerImpl* const attacker = AsCommandTask(runtime)->mUnit->AiAttacker;
+    CAiAttackerImpl* const attacker = static_cast<moho::CCommandTask*>(this)->mUnit->AiAttacker;
     if (attacker == nullptr) {
       return false;
     }
@@ -1051,8 +942,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::RelinkAiAttackerListener(Broadcaster* const attackerListenerHead)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    runtime->mAiAttackerListenerLink.ListLinkBefore(attackerListenerHead);
+    Listener<EAiAttackerEvent>::mListenerLink.ListLinkBefore(attackerListenerHead);
   }
 
   /**
@@ -1064,8 +954,7 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::RefreshMeleeNavigationGoal()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
 
     // Clear desired target while unpacking so attacker lanes do not hold stale target payload.
@@ -1079,55 +968,55 @@ namespace moho
       unit->AiAttacker->SetDesiredTarget(&desiredTarget);
     }
 
-    if (runtime->mFormation != nullptr) {
-      if (runtime->mHasMobileTarget) {
+    if (mFormation != nullptr) {
+      if (mHasMobileTarget) {
         UpdatePosition();
-        const Wm3::Vector3f targetPos = runtime->mTarget.GetTargetPosGun(false);
-        runtime->mFormation->SetCoords(SCoordsVec2{targetPos.x, targetPos.z});
+        const Wm3::Vector3f targetPos = mTarget.GetTargetPosGun(false);
+        mFormation->SetCoords(SCoordsVec2{targetPos.x, targetPos.z});
       } else {
-        if (!runtime->mFormation->Contains(unit, true)) {
+        if (!mFormation->Contains(unit, true)) {
           gpg::Warnf(" formation does not contain attackin unit! ");
           gpg::Warnf(" -- Unit id = (%d) -- ", unit->id_);
         }
 
         const SFootprint& footprint = unit->GetFootprint();
         SOCellPos adjustedPosition{};
-        runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
-        runtime->mTargetPosition = COORDS_ToWorldPos(
+        mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
+        mTargetPosition = COORDS_ToWorldPos(
           unit->SimulationRef->mMapData,
           adjustedPosition,
           static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
           static_cast<int>(footprint.mSizeX),
           static_cast<int>(footprint.mSizeZ)
         );
-        if (!IsValidVector3f(runtime->mTargetPosition)) {
-          runtime->mTargetPosition = unit->GetPosition();
+        if (!IsValidVector3f(mTargetPosition)) {
+          mTargetPosition = unit->GetPosition();
         }
       }
 
-      if (runtime->mNeedsNavigatorGoalUpdate) {
+      if (mNeedsNavigatorGoalUpdate) {
         SOCellPos adjustedPosition{};
-        runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
+        mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
         SetDestinationCellGoal(adjustedPosition);
-        runtime->mNeedsNavigatorGoalUpdate = false;
+        mNeedsNavigatorGoalUpdate = false;
         return;
       }
     } else {
       UpdatePosition();
-      if (runtime->mNeedsNavigatorGoalUpdate) {
-        SetDestinationGoalFromWorldPosition(runtime->mTargetPosition);
-        runtime->mNeedsNavigatorGoalUpdate = false;
+      if (mNeedsNavigatorGoalUpdate) {
+        SetDestinationGoalFromWorldPosition(mTargetPosition);
+        mNeedsNavigatorGoalUpdate = false;
         return;
       }
     }
 
-    if (runtime->mTarget.HasTarget() && runtime->mPlanted) {
+    if (mTarget.HasTarget() && mPlanted) {
       RefreshDestinationCellGoal();
     } else {
-      SetDestinationGoalFromWorldPosition(runtime->mTargetPosition);
+      SetDestinationGoalFromWorldPosition(mTargetPosition);
     }
 
-    runtime->mNeedsNavigatorGoalUpdate = false;
+    mNeedsNavigatorGoalUpdate = false;
   }
 
   /**
@@ -1143,9 +1032,8 @@ namespace moho
       return;
     }
 
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
-    runtime->mTarget = runtime->mCommand->mTarget;
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    mTarget = mCommand->mTarget;
     commandTask->mTaskState = TASKSTATE_Starting;
     WakeOwnerThreadForImmediateTick(commandTask);
   }
@@ -1160,11 +1048,10 @@ namespace moho
    */
   void CUnitMeleeAttackTargetTask::HandleAiAttackerEvent(const EAiAttackerEvent event)
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
 
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       commandTask->mTaskState = TASKSTATE_Waiting;
       WakeOwnerThreadForImmediateTick(commandTask);
       return;
@@ -1194,20 +1081,20 @@ namespace moho
             SOCellPos candidateDestination = targetFootprint.ToCellPos(targetUnit->AiNavigator->GetGoalPos());
 
             if (QueryMeleeSpaceForTarget(*unit, *targetUnit, &candidateDestination)) {
-              runtime->mDestination = candidateDestination;
+              mDestination = candidateDestination;
               FreeSpot();
 
               CAiTarget updatedTarget{};
               (void)updatedTarget.UpdateTarget(unit->GetFocusEntity());
-              runtime->mTarget = updatedTarget;
+              mTarget = updatedTarget;
 
               const Wm3::Vector3f reserveCenter =
-                COORDS_ToWorldPos(unit->SimulationRef->mMapData, runtime->mDestination, unit->GetFootprint());
+                COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
               const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
               gpg::Rect2i reserveRect{};
               COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
               unit->ReserveOgridRect(reserveRect);
-              runtime->mPlanted = true;
+              mPlanted = true;
 
               RefreshMeleeNavigationGoal();
               commandTask->mTaskState = TASKSTATE_Complete;
@@ -1239,8 +1126,7 @@ namespace moho
       *outHasImmediateMeleeSpace = false;
     }
 
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const ownerUnit = commandTask->mUnit;
     if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
       return nullptr;
@@ -1286,7 +1172,7 @@ namespace moho
         continue;
       }
 
-      if (ownerAttacker != nullptr && !ownerAttacker->CanAttackTarget(&runtime->mTarget)) {
+      if (ownerAttacker != nullptr && !ownerAttacker->CanAttackTarget(&mTarget)) {
         continue;
       }
 
@@ -1318,7 +1204,7 @@ namespace moho
       float weightedScore = (dx * dx) + (dz * dz);
 
       if (candidateUnit->IsUnitState(UNITSTATE_Attacking) && candidateUnit->GetFocusEntity() != nullptr) {
-        if (runtime->mTarget.HasTarget() && candidateEntity == runtime->mTarget.GetEntity()) {
+        if (mTarget.HasTarget() && candidateEntity == mTarget.GetEntity()) {
           weightedScore = 0.0f;
         } else {
           Entity* const focusedEntity = const_cast<Entity*>(candidateUnit->GetFocusEntity());
@@ -1340,7 +1226,7 @@ namespace moho
 
         if (QueryMeleeSpaceForTarget(*ownerUnit, *candidateUnit, &candidateDestination)) {
           bestReachableEntity = candidateEntity;
-          runtime->mDestination = candidateDestination;
+          mDestination = candidateDestination;
           bestReachableScore = weightedScore;
         }
       }
@@ -1386,8 +1272,7 @@ namespace moho
    */
   int CUnitMeleeAttackTargetTask::TaskTick()
   {
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return -1;
@@ -1395,7 +1280,7 @@ namespace moho
 
     IAiNavigator* const navigator = unit->AiNavigator;
 
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       CUnitCommandQueue* const commandQueue = unit->CommandQueue;
       if (commandQueue != nullptr && commandQueue->mCommandVec.size() >= 2u) {
         if (CUnitCommand* const nextCommand = commandQueue->mCommandVec[1].GetObjectPtr(); nextCommand != nullptr) {
@@ -1406,7 +1291,7 @@ namespace moho
 
     switch (commandTask->mTaskState) {
       case TASKSTATE_Preparing: {
-        CUnitCommand* const command = runtime->mCommand;
+        CUnitCommand* const command = mCommand;
         if (command == nullptr) {
           return -1;
         }
@@ -1419,9 +1304,9 @@ namespace moho
       }
 
       case TASKSTATE_Waiting: {
-        if (runtime->mPlanted) {
+        if (mPlanted) {
           unit->FreeOgridRect();
-          runtime->mPlanted = false;
+          mPlanted = false;
         }
 
         bool hasImmediateMeleeSpace = false;
@@ -1431,7 +1316,7 @@ namespace moho
           return 1;
         }
 
-        (void)runtime->mTarget.UpdateTarget(static_cast<Entity*>(selectedTarget));
+        (void)mTarget.UpdateTarget(static_cast<Entity*>(selectedTarget));
         if (!hasImmediateMeleeSpace) {
           RefreshMeleeNavigationGoal();
           SetUnitFocusEntity(*unit, nullptr);
@@ -1440,12 +1325,12 @@ namespace moho
         }
 
         const Wm3::Vector3f reserveCenter =
-          COORDS_ToWorldPos(unit->SimulationRef->mMapData, runtime->mDestination, unit->GetFootprint());
+          COORDS_ToWorldPos(unit->SimulationRef->mMapData, mDestination, unit->GetFootprint());
         const SCoordsVec2 reserveCenterXZ{reserveCenter.x, reserveCenter.z};
         gpg::Rect2i reserveRect{};
         COORDS_ToGridRect(&reserveRect, reserveCenterXZ, unit->GetFootprint());
         unit->ReserveOgridRect(reserveRect);
-        runtime->mPlanted = true;
+        mPlanted = true;
 
         RefreshMeleeNavigationGoal();
         SetUnitFocusEntity(*unit, static_cast<Entity*>(selectedTarget));
@@ -1469,12 +1354,12 @@ namespace moho
         return 1;
 
       case TASKSTATE_Processing: {
-        if (runtime->mFormation != nullptr) {
+        if (mFormation != nullptr) {
           Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
-          if (formationLead != unit && runtime->mIgnoreFormationUpdates) {
+          if (formationLead != unit && mIgnoreFormationUpdates) {
             if (HasFormationLeadDesiredTarget()) {
-              runtime->mFormation = nullptr;
-              runtime->mIgnoreFormationUpdates = false;
+              mFormation = nullptr;
+              mIgnoreFormationUpdates = false;
               if (navigator != nullptr) {
                 navigator->IgnoreFormation(true);
               }
@@ -1487,11 +1372,11 @@ namespace moho
 
         if (!InRange()) {
           if (navigator == nullptr || navigator->GetStatus() != AINAVSTATUS_Idle) {
-            if (runtime->mHasMobileTarget && runtime->mTarget.HasTarget()) {
-              const Wm3::Vector3f targetPos = runtime->mTarget.GetTargetPosGun(false);
-              const float dx = runtime->mTargetPosition.x - targetPos.x;
-              const float dy = runtime->mTargetPosition.y - targetPos.y;
-              const float dz = runtime->mTargetPosition.z - targetPos.z;
+            if (mHasMobileTarget && mTarget.HasTarget()) {
+              const Wm3::Vector3f targetPos = mTarget.GetTargetPosGun(false);
+              const float dx = mTargetPosition.x - targetPos.x;
+              const float dy = mTargetPosition.y - targetPos.y;
+              const float dz = mTargetPosition.z - targetPos.z;
               if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) > 10.0f) {
                 UpdateTarget();
                 UpdatePosition();
@@ -1504,8 +1389,8 @@ namespace moho
           return 1;
         }
 
-        runtime->mFormation = nullptr;
-        runtime->mIgnoreFormationUpdates = false;
+        mFormation = nullptr;
+        mIgnoreFormationUpdates = false;
         if (navigator != nullptr) {
           navigator->IgnoreFormation(true);
         }
@@ -1516,14 +1401,14 @@ namespace moho
       case TASKSTATE_Complete: {
         const SFootprint& ownerFootprint = unit->GetFootprint();
         const Wm3::Vector3f destinationCenter{
-          static_cast<float>(runtime->mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
+          static_cast<float>(mDestination.x) + (static_cast<float>(ownerFootprint.mSizeX) * 0.5f),
           0.0f,
-          static_cast<float>(runtime->mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
+          static_cast<float>(mDestination.z) + (static_cast<float>(ownerFootprint.mSizeZ) * 0.5f),
         };
 
         if (IsDestinationCellInMeleeContactRange()) {
           if (IsAtFootprintOriginCell(*unit, destinationCenter)) {
-            (void)UpdateDesiredTarget(&runtime->mTarget);
+            (void)UpdateDesiredTarget(&mTarget);
             commandTask->mTaskState = TASKSTATE_5;
           }
         } else {
@@ -1552,7 +1437,7 @@ namespace moho
         gpg::Rect2i reserveRect{};
         COORDS_ToGridRect(&reserveRect, centerXZ, unit->GetFootprint());
         unit->ReserveOgridRect(reserveRect);
-        runtime->mPlanted = true;
+        mPlanted = true;
 
         SetDestinationGoalFromWorldPosition(currentPosition);
         commandTask->mTaskState = TASKSTATE_7;
@@ -1582,38 +1467,37 @@ namespace moho
       return;
     }
 
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
     archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
-    archive->ReadPointer_CCommandTask(&runtime->mDispatchTask, &ownerRef);
-    archive->ReadPointer_CUnitCommand(&runtime->mCommand, &ownerRef);
+    archive->ReadPointer_CCommandTask(&mDispatchTask, &ownerRef);
+    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
 
-    IFormationInstance* formationBase = static_cast<IFormationInstance*>(runtime->mFormation);
+    IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
     archive->ReadPointer_IFormationInstance(&formationBase, &ownerRef);
-    runtime->mFormation = static_cast<CAiFormationInstance*>(formationBase);
+    mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
-    archive->Read(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
-    archive->Read(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
+    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Read(CachedVector3fType(), &mTargetPosition, ownerRef);
 
-    bool hasMobileTarget = runtime->mHasMobileTarget;
+    bool hasMobileTarget = mHasMobileTarget;
     archive->ReadBool(&hasMobileTarget);
-    runtime->mHasMobileTarget = hasMobileTarget;
+    mHasMobileTarget = hasMobileTarget;
 
-    bool ignoreFormationUpdates = runtime->mIgnoreFormationUpdates;
+    bool ignoreFormationUpdates = mIgnoreFormationUpdates;
     archive->ReadBool(&ignoreFormationUpdates);
-    runtime->mIgnoreFormationUpdates = ignoreFormationUpdates;
+    mIgnoreFormationUpdates = ignoreFormationUpdates;
 
-    bool needsNavigatorGoalUpdate = runtime->mNeedsNavigatorGoalUpdate;
+    bool needsNavigatorGoalUpdate = mNeedsNavigatorGoalUpdate;
     archive->ReadBool(&needsNavigatorGoalUpdate);
-    runtime->mNeedsNavigatorGoalUpdate = needsNavigatorGoalUpdate;
+    mNeedsNavigatorGoalUpdate = needsNavigatorGoalUpdate;
 
-    archive->Read(CachedSOCellPosType(), &runtime->mDestination, ownerRef);
+    archive->Read(CachedSOCellPosType(), &mDestination, ownerRef);
 
-    bool planted = runtime->mPlanted;
+    bool planted = mPlanted;
     archive->ReadBool(&planted);
-    runtime->mPlanted = planted;
+    mPlanted = planted;
   }
 
   /**
@@ -1629,29 +1513,28 @@ namespace moho
       return;
     }
 
-    CUnitMeleeAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
     archive->Write(CachedCCommandTaskType(), commandTask, ownerRef);
 
     gpg::RRef pointerRef{};
-    (void)gpg::RRef_CCommandTask(&pointerRef, runtime->mDispatchTask);
+    (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_CUnitCommand(&pointerRef, runtime->mCommand);
+    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(runtime->mFormation));
+    (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(mFormation));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
-    archive->Write(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
-    archive->WriteBool(runtime->mHasMobileTarget);
-    archive->WriteBool(runtime->mIgnoreFormationUpdates);
-    archive->WriteBool(runtime->mNeedsNavigatorGoalUpdate);
-    archive->Write(CachedSOCellPosType(), &runtime->mDestination, ownerRef);
-    archive->WriteBool(runtime->mPlanted);
+    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Write(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->WriteBool(mHasMobileTarget);
+    archive->WriteBool(mIgnoreFormationUpdates);
+    archive->WriteBool(mNeedsNavigatorGoalUpdate);
+    archive->Write(CachedSOCellPosType(), &mDestination, ownerRef);
+    archive->WriteBool(mPlanted);
   }
 
   /**

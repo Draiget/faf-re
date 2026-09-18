@@ -180,15 +180,6 @@ namespace
 {
   constexpr std::uint64_t kUnitStateMoveAbortMask = 0x80000000ull;
 
-  struct SNavGoalTailDwordQuadRuntimeView
-  {
-    std::int32_t maxX; // +0x00
-    std::int32_t maxZ; // +0x04
-    std::int32_t aux0; // +0x08
-    std::int32_t aux1; // +0x0C
-  };
-  static_assert(sizeof(SNavGoalTailDwordQuadRuntimeView) == 0x10, "SNavGoalTailDwordQuadRuntimeView size must be 0x10");
-
   /**
    * Address: 0x00610E60 (FUN_00610E60)
    *
@@ -206,29 +197,6 @@ namespace
 
     *outWord = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(guardTask->mPrimaryCommandRef.ownerLinkSlot));
     return outWord;
-  }
-
-  /**
-   * Address: 0x00610EB0 (FUN_00610EB0)
-   *
-   * What it does:
-   * Copies one four-dword `SNavGoal` tail lane (`maxX/maxZ/aux0/aux1`) into
-   * caller-provided storage.
-   */
-  [[maybe_unused]] [[nodiscard]] SNavGoalTailDwordQuadRuntimeView* CopySNavGoalTailDwordQuad(
-    SNavGoalTailDwordQuadRuntimeView* const outGoalTail,
-    const moho::SNavGoal* const sourceGoal
-  ) noexcept
-  {
-    if (outGoalTail == nullptr || sourceGoal == nullptr) {
-      return outGoalTail;
-    }
-
-    outGoalTail->maxX = sourceGoal->maxX;
-    outGoalTail->maxZ = sourceGoal->maxZ;
-    outGoalTail->aux0 = sourceGoal->aux0;
-    outGoalTail->aux1 = sourceGoal->aux1;
-    return outGoalTail;
   }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()

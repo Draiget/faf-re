@@ -140,25 +140,15 @@ namespace
     return type;
   }
 
-  struct CUnitCommandEventBroadcasterRuntimeView
-  {
-    std::byte mPad00_33[0x34];
-    moho::Broadcaster mEventBroadcaster;
-  };
-
-  static_assert(
-    offsetof(CUnitCommandEventBroadcasterRuntimeView, mEventBroadcaster) == 0x34,
-    "CUnitCommandEventBroadcasterRuntimeView::mEventBroadcaster offset must be 0x34"
-  );
-
   [[nodiscard]] moho::Broadcaster* ResolveCommandEventBroadcaster(moho::CUnitCommand* const command)
   {
     if (command == nullptr) {
       return nullptr;
     }
 
-    auto* const runtimeView = reinterpret_cast<CUnitCommandEventBroadcasterRuntimeView*>(command);
-    return &runtimeView->mEventBroadcaster;
+    // `CUnitCommand : CScriptObject, Broadcaster` - the event ring at +0x34 is
+    // the `Broadcaster` base subobject, not a lane to be found by offset.
+    return static_cast<moho::Broadcaster*>(command);
   }
 
   [[nodiscard]] moho::CUnitCommand* ResolveQueueHeadCommand(moho::Unit* const unit)

@@ -48,103 +48,7 @@ namespace moho
 
 namespace
 {
-  struct CUnitAttackTargetTaskRuntimeView
-  {
-    std::uint8_t mCommandTaskStorage[sizeof(moho::CCommandTask)]{}; // +0x00
-    std::uint32_t mUnknown0030{};                                    // +0x30
-    std::uint32_t mAiAttackerListenerVftable{};                      // +0x34
-    moho::Broadcaster mAiAttackerListenerLink{};                     // +0x38
-    std::uint32_t mUnknown0040{};                                    // +0x40
-    std::uint32_t mCommandEventListenerVftable{};                    // +0x44
-    moho::Broadcaster mCommandEventListenerLink{};                   // +0x48
-    moho::CCommandTask* mDispatchTask{};                             // +0x50
-    moho::CUnitCommand* mCommand{};                                  // +0x54
-    moho::CAiFormationInstance* mFormation{};                        // +0x58
-    moho::UnitWeapon* mWeapon{};                                     // +0x5C
-    moho::CAiTarget mTarget{};                                       // +0x60
-    Wm3::Vector3f mTargetPosition{};                                 // +0x80
-    std::uint8_t mHasMobileTarget{};                                 // +0x8C
-    std::uint8_t mIgnoreFormationUpdates{};                          // +0x8D
-    std::uint8_t mIsGrounded{};                                      // +0x8E
-    std::uint8_t mPad008F{};                                         // +0x8F
-  };
 
-  static_assert(
-    sizeof(CUnitAttackTargetTaskRuntimeView) == sizeof(moho::CUnitAttackTargetTask),
-    "CUnitAttackTargetTaskRuntimeView size must match CUnitAttackTargetTask"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mCommandTaskStorage) == 0x00,
-    "CUnitAttackTargetTaskRuntimeView::mCommandTaskStorage offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mAiAttackerListenerVftable) == 0x34,
-    "CUnitAttackTargetTaskRuntimeView::mAiAttackerListenerVftable offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mCommandEventListenerVftable) == 0x44,
-    "CUnitAttackTargetTaskRuntimeView::mCommandEventListenerVftable offset must be 0x44"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mDispatchTask) == 0x50,
-    "CUnitAttackTargetTaskRuntimeView::mDispatchTask offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mCommand) == 0x54,
-    "CUnitAttackTargetTaskRuntimeView::mCommand offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mFormation) == 0x58,
-    "CUnitAttackTargetTaskRuntimeView::mFormation offset must be 0x58"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mWeapon) == 0x5C,
-    "CUnitAttackTargetTaskRuntimeView::mWeapon offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mTarget) == 0x60,
-    "CUnitAttackTargetTaskRuntimeView::mTarget offset must be 0x60"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mTargetPosition) == 0x80,
-    "CUnitAttackTargetTaskRuntimeView::mTargetPosition offset must be 0x80"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mHasMobileTarget) == 0x8C,
-    "CUnitAttackTargetTaskRuntimeView::mHasMobileTarget offset must be 0x8C"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mIgnoreFormationUpdates) == 0x8D,
-    "CUnitAttackTargetTaskRuntimeView::mIgnoreFormationUpdates offset must be 0x8D"
-  );
-  static_assert(
-    offsetof(CUnitAttackTargetTaskRuntimeView, mIsGrounded) == 0x8E,
-    "CUnitAttackTargetTaskRuntimeView::mIsGrounded offset must be 0x8E"
-  );
-
-  [[nodiscard]] CUnitAttackTargetTaskRuntimeView* AsRuntimeView(
-    moho::CUnitAttackTargetTask* const task
-  ) noexcept
-  {
-    return reinterpret_cast<CUnitAttackTargetTaskRuntimeView*>(task);
-  }
-
-  [[nodiscard]] const CUnitAttackTargetTaskRuntimeView* AsRuntimeView(
-    const moho::CUnitAttackTargetTask* const task
-  ) noexcept
-  {
-    return reinterpret_cast<const CUnitAttackTargetTaskRuntimeView*>(task);
-  }
-
-  [[nodiscard]] moho::CCommandTask* AsCommandTask(CUnitAttackTargetTaskRuntimeView* const runtime) noexcept
-  {
-    return reinterpret_cast<moho::CCommandTask*>(runtime->mCommandTaskStorage);
-  }
-
-  [[nodiscard]] const moho::CCommandTask* AsCommandTask(const CUnitAttackTargetTaskRuntimeView* const runtime) noexcept
-  {
-    return reinterpret_cast<const moho::CCommandTask*>(runtime->mCommandTaskStorage);
-  }
 
   [[nodiscard]] gpg::RType* CachedCCommandTaskType()
   {
@@ -448,29 +352,28 @@ namespace moho
   CUnitAttackTargetTask::CUnitAttackTargetTask()
     : CAttackTargetTask()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
-    runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerLink.ListResetLinks();
-    runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerLink.ListResetLinks();
+    CCommandTaskWithListenerSlot::mListenerPad = 0;
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
+    AiAttackerListenerWithSlot::mListenerPad = 0;
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
-    runtime->mDispatchTask = nullptr;
-    runtime->mCommand = nullptr;
-    runtime->mFormation = nullptr;
-    runtime->mWeapon = nullptr;
+    mDispatchTask = nullptr;
+    mCommand = nullptr;
+    mFormation = nullptr;
+    mWeapon = nullptr;
 
-    runtime->mTarget.targetType = EAiTargetType::AITARGET_Entity;
-    runtime->mTarget.targetEntity.ClearLinkState();
-    runtime->mTarget.targetPoint = -1;
-    runtime->mTarget.targetIsMobile = false;
-    runtime->mTarget.PickTargetPoint();
+    mTarget.targetType = EAiTargetType::AITARGET_Entity;
+    mTarget.targetEntity.ClearLinkState();
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
+    mTarget.PickTargetPoint();
 
-    runtime->mTargetPosition = Wm3::Vector3f::Zero();
-    runtime->mHasMobileTarget = 0u;
-    runtime->mIgnoreFormationUpdates = 0u;
-    runtime->mIsGrounded = 1u;
-    runtime->mPad008F = 0u;
+    mTargetPosition = Wm3::Vector3f::Zero();
+    mHasMobileTarget = 0u;
+    mIgnoreFormationUpdates = 0u;
+    mIsGrounded = 1u;
+    mPad008F = 0u;
   }
 
   /**
@@ -489,34 +392,33 @@ namespace moho
   )
     : CAttackTargetTask(dispatchTask)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
 
-    runtime->mUnknown0030 = 0;
-    runtime->mAiAttackerListenerLink.ListResetLinks();
-    runtime->mUnknown0040 = 0;
-    runtime->mCommandEventListenerLink.ListResetLinks();
+    CCommandTaskWithListenerSlot::mListenerPad = 0;
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
+    AiAttackerListenerWithSlot::mListenerPad = 0;
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
 
-    runtime->mDispatchTask = dispatchTask;
-    runtime->mCommand = nullptr;
-    runtime->mFormation = formation;
-    runtime->mWeapon = nullptr;
+    mDispatchTask = dispatchTask;
+    mCommand = nullptr;
+    mFormation = formation;
+    mWeapon = nullptr;
 
-    runtime->mTarget.targetType = EAiTargetType::AITARGET_None;
-    runtime->mTarget.targetEntity.ClearLinkState();
-    runtime->mTarget.position = Wm3::Vector3f::Zero();
-    runtime->mTarget.targetPoint = -1;
-    runtime->mTarget.targetIsMobile = false;
+    mTarget.targetType = EAiTargetType::AITARGET_None;
+    mTarget.targetEntity.ClearLinkState();
+    mTarget.position = Wm3::Vector3f::Zero();
+    mTarget.targetPoint = -1;
+    mTarget.targetIsMobile = false;
     if (target != nullptr) {
-      runtime->mTarget = *target;
+      mTarget = *target;
     }
 
-    runtime->mTargetPosition = Wm3::Vector3f::Zero();
-    runtime->mHasMobileTarget = 0u;
-    runtime->mIgnoreFormationUpdates = ignoreFormation ? 1u : 0u;
-    runtime->mIsGrounded = 1u;
-    runtime->mPad008F = 0u;
+    mTargetPosition = Wm3::Vector3f::Zero();
+    mHasMobileTarget = 0u;
+    mIgnoreFormationUpdates = ignoreFormation ? 1u : 0u;
+    mIsGrounded = 1u;
+    mPad008F = 0u;
 
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       commandTask->mTaskState = TASKSTATE_Preparing;
@@ -525,16 +427,16 @@ namespace moho
 
     unit->UnitStateMask |= (1ull << UNITSTATE_Attacking);
 
-    if (runtime->mIgnoreFormationUpdates == 0u) {
+    if (mIgnoreFormationUpdates == 0u) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
         navigator->IgnoreFormation(true);
       }
     }
 
     if (CUnitCommandQueue* const commandQueue = unit->CommandQueue; commandQueue != nullptr) {
-      runtime->mCommand = commandQueue->GetCurrentCommand();
+      mCommand = commandQueue->GetCurrentCommand();
     }
-    if (runtime->mCommand != nullptr) {
+    if (mCommand != nullptr) {
       // 0x005F2AE7 `mov byte ptr [eax+0x154], 1` -- the command's
       // coordination-ready flag (`mUnknownFlag154`), not the factory-command
       // flag at +0x142. `CUnitCommand::IsDone` (0x006E90A0) reads exactly
@@ -558,31 +460,31 @@ namespace moho
       // `cmp byte ptr [eax+0x142], 0`) is what reads it - so every command a
       // ranged attack task started on was left mislabelled as factory-issued
       // for any move task constructed under it afterwards.
-      runtime->mCommand->mUnknownFlag154 = true;
-      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(runtime->mCommand); commandListenerHead != nullptr)
+      mCommand->mUnknownFlag154 = true;
+      if (Broadcaster* const commandListenerHead = CommandEventListenerHead(mCommand); commandListenerHead != nullptr)
       {
-        runtime->mCommandEventListenerLink.ListLinkBefore(commandListenerHead);
+        Listener<ECommandEvent>::mListenerLink.ListLinkBefore(commandListenerHead);
       }
     }
 
     if (!unit->IsMobile()) {
-      runtime->mFormation = nullptr;
+      mFormation = nullptr;
     }
 
     if (unit->IsInCategory("TARGETCHASER")) {
-      runtime->mFormation = nullptr;
+      mFormation = nullptr;
     }
 
     CAiAttackerImpl* const attacker = unit->AiAttacker;
     if (attacker != nullptr) {
-      runtime->mAiAttackerListenerLink.ListUnlink();
+      Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
 
       if (enableOverchargeWeapon) {
         const int weaponCount = attacker->GetWeaponCount();
         for (int weaponIndex = 0; weaponIndex < weaponCount; ++weaponIndex) {
           UnitWeapon* const weapon = attacker->GetWeapon(weaponIndex);
           if (weapon != nullptr && weapon->mWeaponBlueprint != nullptr && weapon->mWeaponBlueprint->OverChargeWeapon != 0u) {
-            runtime->mWeapon = weapon;
+            mWeapon = weapon;
             (void)weapon->RunScript("OnEnableWeapon");
             break;
           }
@@ -590,8 +492,8 @@ namespace moho
       }
     }
 
-    runtime->mHasMobileTarget =
-      (runtime->mTarget.targetEntity.GetObjectPtr() != nullptr && runtime->mTarget.targetIsMobile) ? 1u : 0u;
+    mHasMobileTarget =
+      (mTarget.targetEntity.GetObjectPtr() != nullptr && mTarget.targetIsMobile) ? 1u : 0u;
 
     UpdatePos();
 
@@ -602,7 +504,7 @@ namespace moho
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
     if (blueprint != nullptr && blueprint->Air.CanFly != 0u) {
-      runtime->mIsGrounded = 0u;
+      mIsGrounded = 0u;
     }
 
     commandTask->mTaskState = TASKSTATE_Preparing;
@@ -621,15 +523,14 @@ namespace moho
    */
   CUnitAttackTargetTask::~CUnitAttackTargetTask()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
 
     if (unit != nullptr) {
       unit->UnitStateMask &= ~(1ull << UNITSTATE_Attacking);
     }
 
-    runtime->mCommandEventListenerLink.ListUnlink();
+    Listener<ECommandEvent>::mListenerLink.ListUnlink();
 
     if (unit != nullptr) {
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
@@ -637,13 +538,13 @@ namespace moho
       }
     }
 
-    if (runtime->mWeapon != nullptr) {
-      (void)runtime->mWeapon->RunScript("OnDisableWeapon");
+    if (mWeapon != nullptr) {
+      (void)mWeapon->RunScript("OnDisableWeapon");
     }
 
     if (unit != nullptr) {
       if (CAiAttackerImpl* const attacker = unit->AiAttacker; attacker != nullptr) {
-        runtime->mAiAttackerListenerLink.ListUnlink();
+        Listener<EAiAttackerEvent>::mListenerLink.ListUnlink();
         attacker->Stop();
       }
 
@@ -653,9 +554,9 @@ namespace moho
       }
     }
 
-    runtime->mTarget.targetEntity.UnlinkFromOwnerChain();
-    runtime->mCommandEventListenerLink.ListResetLinks();
-    runtime->mAiAttackerListenerLink.ListResetLinks();
+    mTarget.targetEntity.UnlinkFromOwnerChain();
+    Listener<ECommandEvent>::mListenerLink.ListResetLinks();
+    Listener<EAiAttackerEvent>::mListenerLink.ListResetLinks();
 
     // The base slice is a real `CCommandTask` base now, not raw storage, so the
     // compiler chains its destructor. Calling it here as well would run it
@@ -673,8 +574,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::SetWeaponGoal(const Wm3::Vector3f& targetPosition, UnitWeapon* const weapon)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr || weapon == nullptr || weapon->mWeaponBlueprint == nullptr) {
       return;
     }
@@ -704,8 +604,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::SetPosGoal(const SOCellPos& targetCell)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
       return;
     }
@@ -729,13 +628,12 @@ namespace moho
    */
   void CUnitAttackTargetTask::UpdatePos()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (runtime->mTarget.HasTarget()) {
-      runtime->mTargetPosition = runtime->mTarget.GetTargetPosGun(false);
+    if (mTarget.HasTarget()) {
+      mTargetPosition = mTarget.GetTargetPosGun(false);
     }
 
-    if (!IsValidVector3f(runtime->mTargetPosition)) {
-      runtime->mTargetPosition = AsCommandTask(runtime)->mUnit->GetPosition();
+    if (!IsValidVector3f(mTargetPosition)) {
+      mTargetPosition = static_cast<moho::CCommandTask*>(this)->mUnit->GetPosition();
     }
   }
 
@@ -748,8 +646,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::SetPosGoalFromWorldPosition(const Wm3::Vector3f& position)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    const SFootprint& footprint = AsCommandTask(runtime)->mUnit->GetFootprint();
+    const SFootprint& footprint = static_cast<moho::CCommandTask*>(this)->mUnit->GetFootprint();
 
     SOCellPos targetCell{};
     targetCell.x = static_cast<std::int16_t>(std::lrintf(position.x - (static_cast<float>(footprint.mSizeX) * 0.5f)));
@@ -766,18 +663,17 @@ namespace moho
    */
   bool CUnitAttackTargetTask::IsWithinHorizontalDistance(const float distance) const
   {
-    const CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    const Wm3::Vector3f unitPos = AsCommandTask(runtime)->mUnit->GetPosition();
+    const Wm3::Vector3f unitPos = static_cast<const moho::CCommandTask*>(this)->mUnit->GetPosition();
 
     float deltaX = 0.0f;
     float deltaZ = 0.0f;
-    if (runtime->mTarget.HasTarget()) {
-      const Wm3::Vector3f targetPos = const_cast<moho::CAiTarget&>(runtime->mTarget).GetTargetPosGun(false);
+    if (mTarget.HasTarget()) {
+      const Wm3::Vector3f targetPos = const_cast<moho::CAiTarget&>(mTarget).GetTargetPosGun(false);
       deltaX = unitPos.x - targetPos.x;
       deltaZ = unitPos.z - targetPos.z;
     } else {
-      deltaX = unitPos.x - runtime->mTargetPosition.x;
-      deltaZ = unitPos.z - runtime->mTargetPosition.z;
+      deltaX = unitPos.x - mTargetPosition.x;
+      deltaZ = unitPos.z - mTargetPosition.z;
     }
 
     const float horizontalDistance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
@@ -793,12 +689,11 @@ namespace moho
    */
   bool CUnitAttackTargetTask::HasFormationLeadDesiredTarget() const
   {
-    const CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (runtime->mIgnoreFormationUpdates == 0u || runtime->mFormation == nullptr) {
+    if (mIgnoreFormationUpdates == 0u || mFormation == nullptr) {
       return false;
     }
 
-    const Unit* const owner = AsCommandTask(runtime)->mUnit;
+    const Unit* const owner = static_cast<const moho::CCommandTask*>(this)->mUnit;
     if (owner == nullptr) {
       return false;
     }
@@ -825,27 +720,26 @@ namespace moho
    */
   void CUnitAttackTargetTask::RefreshNavigationGoal()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       return;
     }
 
-    if (runtime->mFormation != nullptr) {
+    if (mFormation != nullptr) {
       SCoordsVec2 targetCoords{};
-      const Wm3::Vector3f targetPosition = runtime->mTarget.GetTargetPosGun(false);
+      const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
       targetCoords.x = targetPosition.x;
       targetCoords.z = targetPosition.z;
-      runtime->mFormation->SetCoords(targetCoords);
+      mFormation->SetCoords(targetCoords);
 
       SOCellPos adjustedPosition{};
-      runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, AsCommandTask(runtime)->mUnit, nullptr);
+      mFormation->GetAdjustedFormationPosition(&adjustedPosition, static_cast<moho::CCommandTask*>(this)->mUnit, nullptr);
       SetPosGoal(adjustedPosition);
       return;
     }
 
-    if (runtime->mWeapon != nullptr) {
-      if (Unit* const unit = AsCommandTask(runtime)->mUnit; unit != nullptr && unit->AiAttacker != nullptr) {
-        (void)unit->AiAttacker->TargetIsWithinWeaponAttackRange(runtime->mWeapon, &runtime->mTarget);
+    if (mWeapon != nullptr) {
+      if (Unit* const unit = static_cast<moho::CCommandTask*>(this)->mUnit; unit != nullptr && unit->AiAttacker != nullptr) {
+        (void)unit->AiAttacker->TargetIsWithinWeaponAttackRange(mWeapon, &mTarget);
       }
     }
   }
@@ -858,8 +752,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::AbortNavigation()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    IAiNavigator* const navigator = AsCommandTask(runtime)->mUnit->AiNavigator;
+    IAiNavigator* const navigator = static_cast<moho::CCommandTask*>(this)->mUnit->AiNavigator;
     if (navigator == nullptr) {
       return;
     }
@@ -877,8 +770,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::Update()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return;
@@ -892,26 +784,26 @@ namespace moho
       attacker->SetDesiredTarget(&clearTarget);
     }
 
-    if (runtime->mFormation != nullptr) {
-      if (runtime->mHasMobileTarget != 0u) {
+    if (mFormation != nullptr) {
+      if (mHasMobileTarget != 0u) {
         UpdatePos();
 
-        const Wm3::Vector3f targetPosition = runtime->mTargetPosition;
+        const Wm3::Vector3f targetPosition = mTargetPosition;
         SCoordsVec2 formationCenter{};
         formationCenter.x = targetPosition.x;
         formationCenter.z = targetPosition.z;
-        runtime->mFormation->SetCoords(formationCenter);
+        mFormation->SetCoords(formationCenter);
       } else {
-        if (!runtime->mFormation->Contains(unit, true)) {
+        if (!mFormation->Contains(unit, true)) {
           gpg::Warnf(" formation does not contain attackin unit! ");
           gpg::Warnf(" -- Unit id = (%d) -- ", unit->id_);
         }
 
         SOCellPos adjustedPosition{};
-        runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
+        mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
 
         const SFootprint& footprint = unit->GetFootprint();
-        runtime->mTargetPosition = COORDS_ToWorldPos(
+        mTargetPosition = COORDS_ToWorldPos(
           unit->SimulationRef->mMapData,
           adjustedPosition,
           static_cast<ELayer>(static_cast<std::uint8_t>(footprint.mOccupancyCaps)),
@@ -919,50 +811,50 @@ namespace moho
           static_cast<int>(footprint.mSizeZ)
         );
 
-        if (!IsValidVector3f(runtime->mTargetPosition)) {
-          runtime->mTargetPosition = unit->GetPosition();
+        if (!IsValidVector3f(mTargetPosition)) {
+          mTargetPosition = unit->GetPosition();
         }
       }
 
-      if (runtime->mIsGrounded != 0u) {
+      if (mIsGrounded != 0u) {
         if (attacker != nullptr) {
-          UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&runtime->mTarget);
+          UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&mTarget);
           if (targetWeapon != nullptr) {
             SCoordsVec2 formationPosition{};
-            runtime->mFormation->GetFormationPosition(&formationPosition, unit, nullptr);
+            mFormation->GetFormationPosition(&formationPosition, unit, nullptr);
 
             const Wm3::Vector3f weaponGoalPosition{formationPosition.x, 0.0f, formationPosition.z};
             SetWeaponGoal(weaponGoalPosition, targetWeapon);
           } else {
             SOCellPos adjustedPosition{};
-            runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
+            mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
             SetPosGoal(adjustedPosition);
           }
         } else {
           SOCellPos adjustedPosition{};
-          runtime->mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
+          mFormation->GetAdjustedFormationPosition(&adjustedPosition, unit, nullptr);
           SetPosGoal(adjustedPosition);
         }
       } else {
-        const Wm3::Vector3f targetPosition = runtime->mTarget.HasTarget() ? runtime->mTarget.GetTargetPosGun(false)
-                                                                           : runtime->mTargetPosition;
+        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false)
+                                                                           : mTargetPosition;
         SetPosGoalFromWorldPosition(targetPosition);
       }
     } else {
       UpdatePos();
 
-      if (runtime->mIsGrounded != 0u && attacker != nullptr) {
-        UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&runtime->mTarget);
+      if (mIsGrounded != 0u && attacker != nullptr) {
+        UnitWeapon* const targetWeapon = attacker->GetTargetWeapon(&mTarget);
         if (targetWeapon != nullptr) {
-          SetWeaponGoal(runtime->mTarget.GetTargetPosGun(false), targetWeapon);
-          runtime->mIsGrounded = 0u;
+          SetWeaponGoal(mTarget.GetTargetPosGun(false), targetWeapon);
+          mIsGrounded = 0u;
           return;
         }
       }
 
-      if (runtime->mHasMobileTarget == 0u) {
-        const Wm3::Vector3f targetPosition = runtime->mTarget.HasTarget() ? runtime->mTarget.GetTargetPosGun(false)
-                                                                           : runtime->mTargetPosition;
+      if (mHasMobileTarget == 0u) {
+        const Wm3::Vector3f targetPosition = mTarget.HasTarget() ? mTarget.GetTargetPosGun(false)
+                                                                           : mTargetPosition;
         SetPosGoalFromWorldPosition(targetPosition);
       } else {
         // 0x005F32EF tests `CAiTarget::HasTarget` *before* looking at the entity
@@ -991,20 +883,20 @@ namespace moho
         // of the blip and then dispatched through whatever those bytes held.
         // That is the T1-bomber-versus-engineer crash: `0x38343031`, the ASCII
         // text "1048", reached as a vtable.
-        if (!runtime->mTarget.HasTarget()) {
-          SetPosGoalFromWorldPosition(runtime->mTargetPosition);
-        } else if (Entity* const destinationEntity = runtime->mTarget.targetEntity.GetObjectPtr();
+        if (!mTarget.HasTarget()) {
+          SetPosGoalFromWorldPosition(mTargetPosition);
+        } else if (Entity* const destinationEntity = mTarget.targetEntity.GetObjectPtr();
                    destinationEntity != nullptr) {
           if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
             navigator->SetDestUnit(destinationEntity);
           }
         } else {
-          SetPosGoalFromWorldPosition(runtime->mTargetPosition);
+          SetPosGoalFromWorldPosition(mTargetPosition);
         }
       }
     }
 
-    runtime->mIsGrounded = 0u;
+    mIsGrounded = 0u;
   }
 
   /**
@@ -1017,8 +909,7 @@ namespace moho
    */
   void CUnitAttackTargetTask::HandleAiAttackerEvent(const EAiAttackerEvent event)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     if (commandTask->mTaskState == TASKSTATE_5) {
       return;
     }
@@ -1027,7 +918,7 @@ namespace moho
       return IsOwnerAttackTaskStateReady(commandTask->mUnit);
     };
 
-    if (runtime->mTarget.HasTarget()) {
+    if (mTarget.HasTarget()) {
       switch (static_cast<std::int32_t>(event)) {
         case 1:
           commandTask->mTaskState = TASKSTATE_Complete;
@@ -1095,9 +986,8 @@ namespace moho
    */
   void CUnitAttackTargetTask::HandleCommandEvent(const ECommandEvent)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
-    if (runtime->mCommand == nullptr) {
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
+    if (mCommand == nullptr) {
       commandTask->mTaskState = TASKSTATE_5;
       WakeOwnerThreadForImmediateTick(commandTask);
       return;
@@ -1123,20 +1013,20 @@ namespace moho
       return target.targetEntity.ownerLinkSlot != nullptr && !target.targetEntity.IsSentinel();
     };
 
-    const bool commandHasLiveEntityTarget = hasLiveEntity(runtime->mCommand->mTarget);
-    const bool taskHeldLiveEntityTarget = hasLiveEntity(runtime->mTarget);
+    const bool commandHasLiveEntityTarget = hasLiveEntity(mCommand->mTarget);
+    const bool taskHeldLiveEntityTarget = hasLiveEntity(mTarget);
     if (!commandHasLiveEntityTarget && taskHeldLiveEntityTarget) {
       commandTask->mTaskState = TASKSTATE_5;
       WakeOwnerThreadForImmediateTick(commandTask);
       return;
     }
 
-    runtime->mTarget = runtime->mCommand->mTarget;
+    mTarget = mCommand->mTarget;
 
     // 0x005F4062 re-reads the same task+0x64 slot, now holding the freshly
     // copied command target: a live entity refreshes the attacker's goal, a
     // ground/cleared one halts fire and drops the desired target.
-    const bool newTargetHasLiveEntity = hasLiveEntity(runtime->mTarget);
+    const bool newTargetHasLiveEntity = hasLiveEntity(mTarget);
 
     Unit* const unit = commandTask->mUnit;
     CAiAttackerImpl* const attacker = (unit != nullptr) ? unit->AiAttacker : nullptr;
@@ -1144,7 +1034,7 @@ namespace moho
       if (newTargetHasLiveEntity) {
         CAiTarget* const desiredTarget = attacker->GetDesiredTarget();
         if (desiredTarget != nullptr && desiredTarget->HasTarget()) {
-          (void)UpdateAttacker(&runtime->mTarget);
+          (void)UpdateAttacker(&mTarget);
         }
       } else {
         attacker->OnWeaponHaltFire();
@@ -1171,8 +1061,7 @@ namespace moho
    */
   bool CUnitAttackTargetTask::UpdateAttacker(CAiTarget* const desiredTarget)
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CAiAttackerImpl* const attacker = AsCommandTask(runtime)->mUnit->AiAttacker;
+    CAiAttackerImpl* const attacker = static_cast<moho::CCommandTask*>(this)->mUnit->AiAttacker;
     if (attacker == nullptr) {
       return false;
     }
@@ -1194,7 +1083,7 @@ namespace moho
 
     attacker->SetDesiredTarget(desiredTarget);
     if (Broadcaster* const listenerHead = AiAttackerListenerHead(attacker); listenerHead != nullptr) {
-      runtime->mAiAttackerListenerLink.ListLinkBefore(listenerHead);
+      Listener<EAiAttackerEvent>::mListenerLink.ListLinkBefore(listenerHead);
     }
     return true;
   }
@@ -1212,33 +1101,32 @@ namespace moho
       return;
     }
 
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
     archive->Read(CachedCCommandTaskType(), commandTask, ownerRef);
-    archive->ReadPointer_CCommandTask(&runtime->mDispatchTask, &ownerRef);
-    archive->ReadPointer_CUnitCommand(&runtime->mCommand, &ownerRef);
+    archive->ReadPointer_CCommandTask(&mDispatchTask, &ownerRef);
+    archive->ReadPointer_CUnitCommand(&mCommand, &ownerRef);
 
-    IFormationInstance* formationBase = static_cast<IFormationInstance*>(runtime->mFormation);
+    IFormationInstance* formationBase = static_cast<IFormationInstance*>(mFormation);
     archive->ReadPointer_IFormationInstance(&formationBase, &ownerRef);
-    runtime->mFormation = static_cast<CAiFormationInstance*>(formationBase);
+    mFormation = static_cast<CAiFormationInstance*>(formationBase);
 
-    archive->ReadPointer_UnitWeapon(&runtime->mWeapon, &ownerRef);
-    archive->Read(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
-    archive->Read(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
+    archive->ReadPointer_UnitWeapon(&mWeapon, &ownerRef);
+    archive->Read(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Read(CachedVector3fType(), &mTargetPosition, ownerRef);
 
-    bool hasMobileTarget = (runtime->mHasMobileTarget != 0u);
+    bool hasMobileTarget = (mHasMobileTarget != 0u);
     archive->ReadBool(&hasMobileTarget);
-    runtime->mHasMobileTarget = hasMobileTarget ? 1u : 0u;
+    mHasMobileTarget = hasMobileTarget ? 1u : 0u;
 
-    bool ignoreFormationUpdates = (runtime->mIgnoreFormationUpdates != 0u);
+    bool ignoreFormationUpdates = (mIgnoreFormationUpdates != 0u);
     archive->ReadBool(&ignoreFormationUpdates);
-    runtime->mIgnoreFormationUpdates = ignoreFormationUpdates ? 1u : 0u;
+    mIgnoreFormationUpdates = ignoreFormationUpdates ? 1u : 0u;
 
-    bool grounded = (runtime->mIsGrounded != 0u);
+    bool grounded = (mIsGrounded != 0u);
     archive->ReadBool(&grounded);
-    runtime->mIsGrounded = grounded ? 1u : 0u;
+    mIsGrounded = grounded ? 1u : 0u;
   }
 
   /**
@@ -1257,32 +1145,31 @@ namespace moho
     // MemberSerialize only reads through the runtime view below (never
     // writes any of this object's own state) -- const_cast is safe here and
     // avoids touching the pre-existing (already flagged elsewhere as
-    // technical debt) CUnitAttackTargetTaskRuntimeView/AsRuntimeView
+    // technical debt) CUnitAttackTargetTask/AsRuntimeView
     // machinery just to add a const overload.
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(const_cast<CUnitAttackTargetTask*>(this));
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     const gpg::RRef ownerRef{};
 
     archive->Write(CachedCCommandTaskType(), commandTask, ownerRef);
 
     gpg::RRef pointerRef{};
-    (void)gpg::RRef_CCommandTask(&pointerRef, runtime->mDispatchTask);
+    (void)gpg::RRef_CCommandTask(&pointerRef, mDispatchTask);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_CUnitCommand(&pointerRef, runtime->mCommand);
+    (void)gpg::RRef_CUnitCommand(&pointerRef, mCommand);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(runtime->mFormation));
+    (void)gpg::RRef_IFormationInstance(&pointerRef, static_cast<IFormationInstance*>(mFormation));
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    (void)gpg::RRef_UnitWeapon(&pointerRef, runtime->mWeapon);
+    (void)gpg::RRef_UnitWeapon(&pointerRef, mWeapon);
     gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-    archive->Write(CachedCAiTargetType(), &runtime->mTarget, ownerRef);
-    archive->Write(CachedVector3fType(), &runtime->mTargetPosition, ownerRef);
-    archive->WriteBool(runtime->mHasMobileTarget != 0u);
-    archive->WriteBool(runtime->mIgnoreFormationUpdates != 0u);
-    archive->WriteBool(runtime->mIsGrounded != 0u);
+    archive->Write(CachedCAiTargetType(), &mTarget, ownerRef);
+    archive->Write(CachedVector3fType(), &mTargetPosition, ownerRef);
+    archive->WriteBool(mHasMobileTarget != 0u);
+    archive->WriteBool(mIgnoreFormationUpdates != 0u);
+    archive->WriteBool(mIsGrounded != 0u);
   }
 
   /**
@@ -1306,8 +1193,7 @@ namespace moho
    */
   int CUnitAttackTargetTask::TaskTick()
   {
-    CUnitAttackTargetTaskRuntimeView* const runtime = AsRuntimeView(this);
-    CCommandTask* const commandTask = AsCommandTask(runtime);
+    CCommandTask* const commandTask = const_cast<CCommandTask*>(static_cast<const CCommandTask*>(this));
     Unit* const unit = commandTask->mUnit;
     if (unit == nullptr) {
       return -1;
@@ -1316,9 +1202,9 @@ namespace moho
     CAiAttackerImpl* const attacker = unit->AiAttacker;
     IAiNavigator* const navigator = unit->AiNavigator;
 
-    UnitWeapon* weapon = runtime->mWeapon;
+    UnitWeapon* weapon = mWeapon;
     if (weapon == nullptr && attacker != nullptr) {
-      weapon = attacker->GetTargetWeapon(&runtime->mTarget);
+      weapon = attacker->GetTargetWeapon(&mTarget);
     }
 
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
@@ -1328,7 +1214,7 @@ namespace moho
 
     const bool directFireCategory = unit->IsInCategory("DIRECTFIRE");
 
-    if (!runtime->mTarget.HasTarget()) {
+    if (!mTarget.HasTarget()) {
       CUnitCommandQueue* const commandQueue = unit->CommandQueue;
       if (commandQueue != nullptr && commandQueue->mCommandVec.size() >= 2u) {
         CUnitCommand* const nextCommand = commandQueue->mCommandVec[1].GetObjectPtr();
@@ -1338,13 +1224,13 @@ namespace moho
       }
     }
 
-    if (weapon == nullptr && runtime->mIgnoreFormationUpdates == 0u && !directFireCategory && !autoSurfaceAttackMode) {
+    if (weapon == nullptr && mIgnoreFormationUpdates == 0u && !directFireCategory && !autoSurfaceAttackMode) {
       return -1;
     }
 
     switch (commandTask->mTaskState) {
       case TASKSTATE_Preparing: {
-        CUnitCommand* const command = runtime->mCommand;
+        CUnitCommand* const command = mCommand;
         if (command == nullptr) {
           return -1;
         }
@@ -1359,8 +1245,8 @@ namespace moho
 
       case TASKSTATE_Waiting:
         if (unit->IsMobile()) {
-          const bool noTarget = runtime->mTarget.NoTarget();
-          if (autoSurfaceAttackMode && weapon == nullptr && runtime->mTarget.HasTarget() && !noTarget) {
+          const bool noTarget = mTarget.NoTarget();
+          if (autoSurfaceAttackMode && weapon == nullptr && mTarget.HasTarget() && !noTarget) {
             if (!unit->IsAutoSurfaceMode()) {
               return -1;
             }
@@ -1378,7 +1264,7 @@ namespace moho
           return 0;
         }
 
-        (void)UpdateAttacker(&runtime->mTarget);
+        (void)UpdateAttacker(&mTarget);
         commandTask->mTaskState = TASKSTATE_Complete;
         return 0;
 
@@ -1387,20 +1273,20 @@ namespace moho
           return -1;
         }
 
-        if (!attacker->IsTooClose(&runtime->mTarget)) {
+        if (!attacker->IsTooClose(&mTarget)) {
           Update();
           commandTask->mTaskState = TASKSTATE_Processing;
           return 0;
         }
 
         {
-          const Wm3::Vector3f targetPosition = runtime->mTarget.GetTargetPosGun(false);
+          const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
           Wm3::Vector3f moveOffset = unit->GetPosition() - targetPosition;
           if (blueprint != nullptr) {
             (void)VecSetLength(&moveOffset, blueprint->AI.GuardScanRadius);
           }
 
-          Wm3::Vector3f movePosition = runtime->mTarget.GetTargetPosGun(false) + moveOffset;
+          Wm3::Vector3f movePosition = mTarget.GetTargetPosGun(false) + moveOffset;
           gpg::Rect2f moveSkirt{};
           const bool useWholeMap = (unit->ArmyRef != nullptr) ? unit->ArmyRef->UseWholeMap() : false;
           (void)PrepareMove(0, unit, &movePosition, &moveSkirt, useWholeMap);
@@ -1419,15 +1305,15 @@ namespace moho
         return 10;
 
       case TASKSTATE_Processing: {
-        if (runtime->mFormation != nullptr) {
+        if (mFormation != nullptr) {
           Unit* const formationLead = unit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
-          if (formationLead != unit && runtime->mIgnoreFormationUpdates != 0u) {
+          if (formationLead != unit && mIgnoreFormationUpdates != 0u) {
             if (!HasFormationLeadDesiredTarget()) {
               return 1;
             }
 
-            runtime->mFormation = nullptr;
-            runtime->mIgnoreFormationUpdates = 0u;
+            mFormation = nullptr;
+            mIgnoreFormationUpdates = 0u;
             if (navigator != nullptr) {
               navigator->IgnoreFormation(true);
             }
@@ -1437,9 +1323,9 @@ namespace moho
           }
         }
 
-        const bool noTarget = runtime->mTarget.NoTarget();
-        if (!runtime->mTarget.HasTarget() || noTarget) {
-          if (navigator == nullptr || (attacker != nullptr && attacker->VectorIsWithinAttackRange(&runtime->mTargetPosition))) {
+        const bool noTarget = mTarget.NoTarget();
+        if (!mTarget.HasTarget() || noTarget) {
+          if (navigator == nullptr || (attacker != nullptr && attacker->VectorIsWithinAttackRange(&mTargetPosition))) {
             return -1;
           }
 
@@ -1450,11 +1336,11 @@ namespace moho
         }
 
         const bool targetInWeaponRange =
-          attacker != nullptr && attacker->TargetIsWithinWeaponAttackRange(weapon, &runtime->mTarget);
+          attacker != nullptr && attacker->TargetIsWithinWeaponAttackRange(weapon, &mTarget);
         const float engageDistance = (blueprint != nullptr) ? blueprint->Air.EngageDistance : 0.0f;
 
         if (!targetInWeaponRange && !IsWithinHorizontalDistance(engageDistance)) {
-          if (attacker != nullptr && attacker->IsTooClose(&runtime->mTarget)) {
+          if (attacker != nullptr && attacker->IsTooClose(&mTarget)) {
             commandTask->mTaskState = TASKSTATE_Starting;
             return 1;
           }
@@ -1464,16 +1350,16 @@ namespace moho
             return 1;
           }
 
-          if (runtime->mHasMobileTarget != 0u) {
-            const Wm3::Vector3f targetPosition = runtime->mTarget.GetTargetPosGun(false);
-            const float deltaX = runtime->mTargetPosition.x - targetPosition.x;
-            const float deltaY = runtime->mTargetPosition.y - targetPosition.y;
-            const float deltaZ = runtime->mTargetPosition.z - targetPosition.z;
+          if (mHasMobileTarget != 0u) {
+            const Wm3::Vector3f targetPosition = mTarget.GetTargetPosGun(false);
+            const float deltaX = mTargetPosition.x - targetPosition.x;
+            const float deltaY = mTargetPosition.y - targetPosition.y;
+            const float deltaZ = mTargetPosition.z - targetPosition.z;
             const float distance = std::sqrt((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
             const float threshold = (blueprint != nullptr && blueprint->Air.CanFly != 0u) ? 2.0f : 10.0f;
 
             if (distance > threshold) {
-              const Wm3::Vector3f candidatePosition = runtime->mTarget.GetTargetPosGun(false);
+              const Wm3::Vector3f candidatePosition = mTarget.GetTargetPosGun(false);
               if (!UnitWontFitAt(candidatePosition, unit)) {
                 RefreshNavigationGoal();
                 UpdatePos();
@@ -1495,23 +1381,23 @@ namespace moho
           return 1;
         }
 
-        if (!attacker->CanAttackTarget(&runtime->mTarget)) {
+        if (!attacker->CanAttackTarget(&mTarget)) {
           return -1;
         }
 
-        runtime->mFormation = nullptr;
-        runtime->mIgnoreFormationUpdates = 0u;
+        mFormation = nullptr;
+        mIgnoreFormationUpdates = 0u;
         if (navigator != nullptr) {
           navigator->IgnoreFormation(true);
         }
 
-        (void)UpdateAttacker(&runtime->mTarget);
+        (void)UpdateAttacker(&mTarget);
 
-        if (runtime->mWeapon == nullptr) {
+        if (mWeapon == nullptr) {
           return -2;
         }
 
-        runtime->mWeapon->SetTarget(&runtime->mTarget);
+        mWeapon->SetTarget(&mTarget);
         commandTask->mTaskState = TASKSTATE_Complete;
         return 1;
       }
@@ -1521,14 +1407,14 @@ namespace moho
           AbortNavigation();
         }
 
-        if (blueprint != nullptr && blueprint->AI.AttackAngle > 0.0f && runtime->mTarget.HasTarget()) {
+        if (blueprint != nullptr && blueprint->AI.AttackAngle > 0.0f && mTarget.HasTarget()) {
           const VTransform& transform = unit->GetTransform();
           const float forwardX = ((transform.orient_.w * transform.orient_.y) + (transform.orient_.z * transform.orient_.x))
             * 2.0f;
           const float forwardZ =
             1.0f - (((transform.orient_.z * transform.orient_.z) + (transform.orient_.y * transform.orient_.y)) * 2.0f);
 
-          Wm3::Vector3f toTarget = runtime->mTarget.GetTargetPosGun(false) - unit->GetPosition();
+          Wm3::Vector3f toTarget = mTarget.GetTargetPosGun(false) - unit->GetPosition();
           (void)Wm3::Vector3f::Normalize(&toTarget);
 
           float rollRadians = blueprint->AI.AttackAngle * 0.017453292f;
@@ -1548,22 +1434,22 @@ namespace moho
           return 10;
         }
 
-        if (runtime->mWeapon == nullptr) {
+        if (mWeapon == nullptr) {
           return -2;
         }
 
-        if (!runtime->mWeapon->RunScriptBool("CanWeaponFire")) {
+        if (!mWeapon->RunScriptBool("CanWeaponFire")) {
           return 10;
         }
 
-        if (HasEntityMoved(*unit) && unit->IsMobile() && runtime->mWeapon->mCanFire == 0u) {
+        if (HasEntityMoved(*unit) && unit->IsMobile() && mWeapon->mCanFire == 0u) {
           Update();
           commandTask->mTaskState = TASKSTATE_Processing;
           return 1;
         }
 
-        if (runtime->mWeapon->mEnabled != 0u && UnitWeapon::CanFire(runtime->mWeapon, &runtime->mTarget)) {
-          runtime->mWeapon->Fire();
+        if (mWeapon->mEnabled != 0u && UnitWeapon::CanFire(mWeapon, &mTarget)) {
+          mWeapon->Fire();
           commandTask->mTaskState = TASKSTATE_5;
           return 10;
         }
