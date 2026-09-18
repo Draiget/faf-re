@@ -243,16 +243,6 @@ namespace
   // have silently misread `layerMask`/`minRange`/`maxRange` here instead of
   // failing to compile.
 
-  struct UserUnitLuaObjectRuntimeView
-  {
-    std::uint8_t pad_0000_0170[0x170];
-    LuaPlus::LuaObject luaObject; // +0x170
-  };
-  static_assert(
-    offsetof(UserUnitLuaObjectRuntimeView, luaObject) == 0x170,
-    "UserUnitLuaObjectRuntimeView::luaObject offset must be 0x170"
-  );
-
   // UserEntityWeakLinkView / UserTargetType / UserCommandTargetView moved to
   // UserUnit.h (moho namespace) so Moho::ISSUE_SetCommandTarget (Sim.cpp) and
   // func_ProcessCommandDrag (CWldSession.cpp) can construct/pass them.
@@ -605,33 +595,6 @@ namespace
     "UserUnitIUnitStateBridgeView::unitStates offset must be 0x268"
   );
 
-  struct IUnitBridgeLuaObjectRuntimeView
-  {
-    std::uint8_t pad_0000_0028[0x28];
-    LuaPlus::LuaObject luaObject; // +0x28
-  };
-  static_assert(
-    offsetof(IUnitBridgeLuaObjectRuntimeView, luaObject) == 0x28,
-    "IUnitBridgeLuaObjectRuntimeView::luaObject offset must be 0x28"
-  );
-
-  /**
-   * Address: 0x008BEF60 (FUN_008BEF60, Moho::IUnit_UserUnit::GetLuaObject)
-   *
-   * What it does:
-   * Copy-constructs one Lua object result lane from the UserUnit IUnit-bridge
-   * Lua-object payload at `+0x28`.
-   */
-  [[maybe_unused]] LuaPlus::LuaObject* IUnitBridgeCopyLuaObjectToOut(
-    const IUnit* const bridge,
-    LuaPlus::LuaObject* const outLuaObject
-  ) noexcept
-  {
-    const auto* const bridgeView = reinterpret_cast<const IUnitBridgeLuaObjectRuntimeView*>(bridge);
-    new (outLuaObject) LuaPlus::LuaObject(bridgeView->luaObject);
-    return outLuaObject;
-  }
-
   /**
    * Address: 0x008BEF80 (FUN_008BEF80, Moho::IUnit_UserUnit::CalcTransportLoadFactor)
    *
@@ -688,11 +651,6 @@ namespace
     const auto* const stateView = reinterpret_cast<const UserUnitIUnitStateBridgeView*>(bridge);
     const std::uint64_t stateMask = (std::uint64_t{1} << stateIndex);
     return (stateView->unitStates & stateMask) != 0u;
-  }
-
-  [[nodiscard]] const UserUnitLuaObjectRuntimeView& GetUserUnitLuaObjectView(const UserUnit* const self) noexcept
-  {
-    return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(self);
   }
 
   [[nodiscard]] UserCommandQueueLinkVector* RebuildAndGetUserUnitManagerQueue(UserCommandQueue* managerPtr) noexcept;
@@ -7341,7 +7299,7 @@ int moho::cfunc_UserUnitGetFocusL(LuaPlus::LuaState* const state)
 
   if (focusEntity != nullptr) {
     if (UserUnit* const focusUnit = focusEntity->IsUserUnit(); focusUnit != nullptr) {
-      GetUserUnitLuaObjectView(focusUnit).luaObject.PushStack(state);
+      focusUnit->mLuaObj.PushStack(state);
     } else {
       lua_pushnil(rawState);
       (void)lua_gettop(rawState);
@@ -7409,7 +7367,7 @@ int moho::cfunc_UserUnitGetGuardedEntityL(LuaPlus::LuaState* const state)
 
   if (guardedEntity != nullptr) {
     if (UserUnit* const guardedUnit = guardedEntity->IsUserUnit(); guardedUnit != nullptr) {
-      GetUserUnitLuaObjectView(guardedUnit).luaObject.PushStack(state);
+      guardedUnit->mLuaObj.PushStack(state);
     } else {
       lua_pushnil(rawState);
       (void)lua_gettop(rawState);
@@ -7477,7 +7435,7 @@ int moho::cfunc_UserUnitGetCreatorL(LuaPlus::LuaState* const state)
 
   if (creatorEntity != nullptr) {
     if (UserUnit* const creatorUnit = creatorEntity->IsUserUnit(); creatorUnit != nullptr) {
-      GetUserUnitLuaObjectView(creatorUnit).luaObject.PushStack(state);
+      creatorUnit->mLuaObj.PushStack(state);
     } else {
       lua_pushnil(rawState);
       (void)lua_gettop(rawState);
