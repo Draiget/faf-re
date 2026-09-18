@@ -965,10 +965,29 @@ void CAiPathFinder::QueueSearch()
   SOCellPos anchorCell{};
   anchorCell.x = static_cast<std::int16_t>(static_cast<int>(std::lrintf(position.x - static_cast<float>(footprint.mSizeX) * 0.5f)));
   anchorCell.z = static_cast<std::int16_t>(static_cast<int>(std::lrintf(position.z - static_cast<float>(footprint.mSizeZ) * 0.5f)));
-  mHasOccupancyMask =
-    (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY)) != 0u)
-      ? 1u
-      : 0u;
+  const EOccupancyCaps anchorFitCaps =
+    OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY);
+  mHasOccupancyMask = (static_cast<std::uint8_t>(anchorFitCaps) != 0u) ? 1u : 0u;
+
+  // TEMPORARY PROBE -- navigation triage (units ignore buildings/props/slope).
+  // `mHasOccupancyMask` is the single gate that decides whether CanTraverseCell
+  // consults the occupancy grid and the slope test at all.
+  {
+    static int sCount = 0;
+    if (sCount++ < 250) {
+      const gpg::Rect2i probeOuter = GoalOuterRect(mGoal);
+      const gpg::Rect2i probeInner = GoalInnerRect(mGoal);
+      gpg::Warnf(
+        "[NAVGATE] QueueSearch finder=%p mask=%u anchorCaps=0x%X fp=%dx%d fpCaps=0x%X maxSlope=%.3f flags=0x%X "
+        "anchor=(%d,%d) search=%d outer=(%d,%d)-(%d,%d) inner=(%d,%d)-(%d,%d) layer=%d",
+        static_cast<const void*>(this), static_cast<unsigned>(mHasOccupancyMask), static_cast<unsigned>(anchorFitCaps),
+        static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ),
+        static_cast<unsigned>(footprint.mOccupancyCaps), footprint.mMaxSlope,
+        static_cast<unsigned>(footprint.mFlags), static_cast<int>(anchorCell.x), static_cast<int>(anchorCell.z),
+        static_cast<int>(mSearchType), probeOuter.x0, probeOuter.z0, probeOuter.x1, probeOuter.z1, probeInner.x0,
+        probeInner.z0, probeInner.x1, probeInner.z1, static_cast<int>(mGoal.aux4));
+    }
+  }
 
   if (mSearchType == AIPATHSEARCH_None) {
     ClearRectHistory();
@@ -1020,6 +1039,25 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
 {
   const SOCellPos cell{cellPos.x, cellPos.z};
 
+  // TEMPORARY PROBE -- navigation triage. Counts how often the occupancy/slope
+  // gate is bypassed and how often it actually rejects a cell.
+  struct NavGateStats
+  {
+    long calls;
+    long maskOff;
+    long rejectFit;
+    long rejectBlocked;
+  };
+  static NavGateStats sStats{};
+  ++sStats.calls;
+  if (!mHasOccupancyMask) {
+    ++sStats.maskOff;
+  }
+  if ((sStats.calls % 4000) == 0) {
+    gpg::Warnf("[NAVGATE] CanTraverse calls=%ld maskOff=%ld rejFit=%ld rejBlocked=%ld", sStats.calls, sStats.maskOff,
+               sStats.rejectFit, sStats.rejectBlocked);
+  }
+
   if (!mUseGoalBoundaryProbe) {
     if (mHasOccupancyMask) {
       const SFootprint& footprint = mUnit->GetFootprint();
@@ -1029,6 +1067,7 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
           static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
       }
       if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) == 0u) {
+        ++sStats.rejectFit;
         return false;
       }
     }
@@ -1039,7 +1078,11 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
       return true;
     }
     const int mode = (mSearchType == AIPATHSEARCH_Leader) ? 2 : 1;
-    return !COGrid::UnitIsBlocked(cell, *mOGrid, mUnit, mode);
+    const bool blocked = COGrid::UnitIsBlocked(cell, *mOGrid, mUnit, mode);
+    if (blocked) {
+      ++sStats.rejectBlocked;
+    }
+    return !blocked;
   }
 
   // Goal-boundary-probe branch: evaluate a structure-ignoring copy of the
@@ -1174,20 +1217,42 @@ bool CAiPathFinder::ShouldSearchRect(const gpg::Rect2i& rect) const
     return false;
   }
 
+  // Both of the first two tests fall THROUGH to the goal test when they fail -
+  // neither one is the whole answer. 0x005AA860 threads them that way: the
+  // `mSearchType == 0` / probe arm at 0x005AA8D5 jumps to the goal arm at
+  // 0x005AA8F0 on each of its four misses (0x005AA8DF, 0x005AA8E4, 0x005AA8E9)
+  // and only returns true at 0x005AA8EE, and the history walk likewise drops
+  // into 0x005AA8F0 once it runs off the end of the ring (0x005AA8C7).
+  //
+  // Returning the anchor test's result directly - which is what this did -
+  // meant that on an idle-type search, which is what every *initial* path
+  // request is (`BeginThinking` sets `mPathRequestMode = 0`, confirmed at
+  // 0x005ADBAB), level-0 refinement was permitted only on the unit's own cell
+  // and never anywhere near the goal. The search then had no way to finish: it
+  // flooded the cluster graph and ran the open set dry short of the goal
+  // (measured: 81 level-0 expansions against 11610 cluster edges, failing 8.9
+  // cells out). The unit followed the partial path into whatever stood in the
+  // way and wedged there.
   if (mSearchType == AIPATHSEARCH_None || mUseGoalBoundaryProbe != 0u) {
     const SOCellPos anchor{
       static_cast<std::int16_t>(mAnchorCell.x),
       static_cast<std::int16_t>(mAnchorCell.z),
     };
-    return CellInRectInclusiveExclusive(anchor, rect);
-  }
-
-  if (RectHistoryIntersects(rect)) {
+    if (CellInRectInclusiveExclusive(anchor, rect)) {
+      return true;
+    }
+  } else if (RectHistoryIntersects(rect)) {
     return true;
   }
 
   const gpg::Rect2i goalOuter = GoalOuterRect(mGoal);
   if (!RectsOverlapStrict(rect, goalOuter)) {
+    return false;
+  }
+
+  // 0x005AA917 / 0x005AA91B: a degenerate goal rectangle answers false rather
+  // than falling into the inner-rect comparison.
+  if (!IsStrictRect(goalOuter)) {
     return false;
   }
 
