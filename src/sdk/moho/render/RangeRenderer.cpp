@@ -734,6 +734,7 @@ namespace
     RangeExtractionPayloadVector& scratchPayload,
     moho::RangeRenderer& rangeRenderer,
     const moho::CameraImpl& camera,
+    const float alpha,
     const unsigned int headIndex
   )
   {
@@ -802,44 +803,89 @@ namespace
           continue;
         }
 
+        // `Extract` (live entity), not `Range` (blueprint). The blueprint lists
+        // every weapon the unit *could* have, including unbuilt upgrades: a UEF
+        // ACU's blueprint carries TacMissile and TacNukeMissile at
+        // MaxRadius 256 - the full width of a 256-cell map - beside its actual
+        // 22-range gun. Reading the blueprint therefore drew a ring over the
+        // whole map for a commander that cannot fire a missile at all. The
+        // stock per-unit passes use `Extract` for exactly this reason;
+        // `Range` is only right for a building being placed, which has no live
+        // weapons yet.
+        //
+        // The centre is then moved to the cursor, which is the whole point of
+        // this pass: same radii the unit's own rings would show, drawn where
+        // the unit would be standing.
         moho::SRangeExtractionPayload payload{};
-        if (!extractor->Range(&payload, blueprint, cursorWorldPos)) {
+        if (!extractor->Extract(&payload, unit, alpha)) {
           continue;
         }
+        payload.centerX = cursorWorldPos.x;
+        payload.centerZ = cursorWorldPos.z;
 
-        // Drop the minimum-range circle. `WeaponExtractor::Range` stores
-        // `(outerRadius, innerRadius)`, so a weapon with a minimum range would
-        // otherwise draw a second, smaller ring inside the one being asked for.
-        payload.innerRadius = 0.0f;
+        // The payload's inner/outer are the ring *band*, not two independent
+        // circles: `BuildRingPayloadEntry` emits the inner edge ring
+        // unconditionally and only special-cases `innerRadius <= 0` for the
+        // fill. Left exactly as the extractor built it.
 
         if (isAssist) {
           if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
             assistPayload = payload;
             assistProfile = &profile;
           }
-        } else if (attackProfile == nullptr || payload.outerRadius > attackPayload.outerRadius) {
+          continue;
+        }
+
+        // Direct fire wins outright when the unit has any, because that is what
+        // a player means by "attack range"; otherwise the widest of the
+        // remaining categories stands in, so an artillery piece or a pure AA
+        // unit still gets a ring.
+        const bool isDirect = profile.mExtractorName == "DirectFire";
+        const bool haveDirect = attackProfile != nullptr && attackProfile->mExtractorName == "DirectFire";
+        if (attackProfile == nullptr
+            || (isDirect && !haveDirect)
+            || (isDirect == haveDirect && payload.outerRadius > attackPayload.outerRadius)) {
           attackPayload = payload;
           attackProfile = &profile;
         }
       }
     }
 
+    // Ring geometry comes from the profile that produced the radius; only the
+    // colour is borrowed, so thickness stays paired with its own profile.
     const auto draw = [&](const moho::SRangeRenderProfile* const profile,
-                          const moho::SRangeExtractionPayload& payload,
-                          const bool havePayload) {
-      if (profile == nullptr || !havePayload) {
+                          const moho::SRangeRenderProfile* const colorFrom,
+                          const moho::SRangeExtractionPayload& payload) {
+      if (profile == nullptr) {
         return;
       }
+      const moho::SRangeRenderProfile& style = (colorFrom != nullptr) ? *colorFrom : *profile;
       scratchPayload.clear();
       scratchPayload.push_back(payload);
       RenderRingBatch(
-        profile->mOuterRingParams, camera, rangeRenderer, headIndex, profile->mBuildRingColor,
+        profile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
         profile->mInnerRingParams, scratchPayload
       );
     };
 
-    draw((militaryStyle != nullptr) ? militaryStyle : attackProfile, attackPayload, attackProfile != nullptr);
-    draw(assistProfile, assistPayload, assistProfile != nullptr);
+    // TEMPORARY PROBE -- the attack ring reads far too large on screen and the
+    // blueprint resolver cannot explain it, so log what is actually drawn.
+    {
+      static int sCount = 0;
+      if (sCount++ < 40) {
+        gpg::Warnf(
+          "[RINGDIAG] cursor=(%.1f,%.1f,%.1f) attack=%s inner=%.1f outer=%.1f | assist=%s inner=%.1f outer=%.1f",
+          cursorWorldPos.x, cursorWorldPos.y, cursorWorldPos.z,
+          (attackProfile != nullptr) ? attackProfile->mExtractorName.c_str() : "none",
+          attackPayload.innerRadius, attackPayload.outerRadius,
+          (assistProfile != nullptr) ? assistProfile->mExtractorName.c_str() : "none",
+          assistPayload.innerRadius, assistPayload.outerRadius
+        );
+      }
+    }
+
+    draw(attackProfile, militaryStyle, attackPayload);
+    draw(assistProfile, nullptr, assistPayload);
   }
 
   /**
@@ -1178,7 +1224,7 @@ namespace moho
     // coverage at a position, and leaving the unit's own rings up at the same
     // time gives two sets of rings for one answer.
     if (range_RenderSelectedAtCursor) {
-      RenderSelectionRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+      RenderSelectionRingsUnderCursor(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
       return;
     }
 
