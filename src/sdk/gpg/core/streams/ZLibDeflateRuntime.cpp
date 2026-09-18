@@ -6,6 +6,9 @@
 
 #include <zlib.h>
 
+#include "zlib/ZLibDeflate.h"
+#include "zlib/ZLibInflate.h"
+
 namespace
 {
   constexpr std::uint32_t kDeflateMinMatch = 3u;
@@ -72,295 +75,6 @@ namespace
 
   constexpr std::array<std::uint8_t, 256> kLengthCode = BuildLengthCodeTable();
   constexpr std::array<std::uint8_t, 512> kDistanceCode = BuildDistanceCodeTable();
-
-  struct DeflateConfigurationRuntimeEntry
-  {
-    std::uint16_t goodLength = 0;
-    std::uint16_t maxLazy = 0;
-    std::uint16_t niceLength = 0;
-    std::uint16_t maxChain = 0;
-  };
-  static_assert(sizeof(DeflateConfigurationRuntimeEntry) == 0x08, "DeflateConfigurationRuntimeEntry size must be 0x08");
-
-  // Mirrors zlib 1.2.3 deflate configuration_table good/max_lazy/nice/max_chain lanes.
-  constexpr std::array<DeflateConfigurationRuntimeEntry, 10> kDeflateConfigurationTable{
-    DeflateConfigurationRuntimeEntry{0, 0, 0, 0},
-    DeflateConfigurationRuntimeEntry{4, 4, 8, 4},
-    DeflateConfigurationRuntimeEntry{4, 5, 16, 8},
-    DeflateConfigurationRuntimeEntry{4, 6, 32, 32},
-    DeflateConfigurationRuntimeEntry{4, 4, 16, 16},
-    DeflateConfigurationRuntimeEntry{8, 16, 32, 32},
-    DeflateConfigurationRuntimeEntry{8, 16, 128, 128},
-    DeflateConfigurationRuntimeEntry{8, 32, 128, 256},
-    DeflateConfigurationRuntimeEntry{32, 128, 258, 1024},
-    DeflateConfigurationRuntimeEntry{32, 258, 258, 4096}
-  };
-
-  struct DeflateLmInitStateRuntimeView
-  {
-    std::uint8_t reserved00_2B[0x2C]{};
-    std::uint32_t windowWordSize = 0;         // +0x2C
-    std::uint8_t reserved30_3B[0x0C]{};
-    std::uint32_t windowSize = 0;             // +0x3C
-    std::uint8_t reserved40_43[0x04]{};
-    std::uint16_t* hashHead = nullptr;        // +0x44
-    std::uint32_t insertHash = 0;             // +0x48
-    std::uint32_t hashSize = 0;               // +0x4C
-    std::uint8_t reserved50_5B[0x0C]{};
-    std::int32_t blockStart = 0;              // +0x5C
-    std::uint32_t matchLength = 0;            // +0x60
-    std::uint8_t reserved64_67[0x04]{};
-    std::uint32_t matchAvailable = 0;         // +0x68
-    std::uint32_t stringStart = 0;            // +0x6C
-    std::uint8_t reserved70_73[0x04]{};
-    std::uint32_t lookahead = 0;              // +0x74
-    std::uint32_t previousLength = 0;         // +0x78
-    std::uint32_t maxChainLength = 0;         // +0x7C
-    std::uint32_t maxLazyMatch = 0;           // +0x80
-    std::int32_t compressionLevel = 0;        // +0x84
-    std::uint8_t reserved88_8B[0x04]{};
-    std::uint32_t goodMatch = 0;              // +0x8C
-    std::uint32_t niceMatch = 0;              // +0x90
-  };
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, windowWordSize) == 0x2C,
-    "DeflateLmInitStateRuntimeView::windowWordSize offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, windowSize) == 0x3C,
-    "DeflateLmInitStateRuntimeView::windowSize offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, hashHead) == 0x44,
-    "DeflateLmInitStateRuntimeView::hashHead offset must be 0x44"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, insertHash) == 0x48,
-    "DeflateLmInitStateRuntimeView::insertHash offset must be 0x48"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, hashSize) == 0x4C,
-    "DeflateLmInitStateRuntimeView::hashSize offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, blockStart) == 0x5C,
-    "DeflateLmInitStateRuntimeView::blockStart offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, matchLength) == 0x60,
-    "DeflateLmInitStateRuntimeView::matchLength offset must be 0x60"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, matchAvailable) == 0x68,
-    "DeflateLmInitStateRuntimeView::matchAvailable offset must be 0x68"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, stringStart) == 0x6C,
-    "DeflateLmInitStateRuntimeView::stringStart offset must be 0x6C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, lookahead) == 0x74,
-    "DeflateLmInitStateRuntimeView::lookahead offset must be 0x74"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, previousLength) == 0x78,
-    "DeflateLmInitStateRuntimeView::previousLength offset must be 0x78"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, maxChainLength) == 0x7C,
-    "DeflateLmInitStateRuntimeView::maxChainLength offset must be 0x7C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, maxLazyMatch) == 0x80,
-    "DeflateLmInitStateRuntimeView::maxLazyMatch offset must be 0x80"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, compressionLevel) == 0x84,
-    "DeflateLmInitStateRuntimeView::compressionLevel offset must be 0x84"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, goodMatch) == 0x8C,
-    "DeflateLmInitStateRuntimeView::goodMatch offset must be 0x8C"
-  );
-  static_assert(
-    offsetof(DeflateLmInitStateRuntimeView, niceMatch) == 0x90,
-    "DeflateLmInitStateRuntimeView::niceMatch offset must be 0x90"
-  );
-
-  struct InflateSyncStateRuntimeView
-  {
-    std::int32_t mode = 0;                    // +0x00
-    std::uint8_t reserved04_37[0x34]{};       // +0x04
-    std::uint32_t bitBuffer = 0;              // +0x38
-    std::uint32_t bitCount = 0;               // +0x3C
-    std::uint8_t reserved40_67[0x28]{};       // +0x40
-    std::uint32_t markerState = 0;            // +0x68
-  };
-  static_assert(offsetof(InflateSyncStateRuntimeView, mode) == 0x00, "InflateSyncStateRuntimeView::mode offset must be 0x00");
-  static_assert(
-    offsetof(InflateSyncStateRuntimeView, bitBuffer) == 0x38,
-    "InflateSyncStateRuntimeView::bitBuffer offset must be 0x38"
-  );
-  static_assert(
-    offsetof(InflateSyncStateRuntimeView, bitCount) == 0x3C,
-    "InflateSyncStateRuntimeView::bitCount offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(InflateSyncStateRuntimeView, markerState) == 0x68,
-    "InflateSyncStateRuntimeView::markerState offset must be 0x68"
-  );
-
-  struct DeflateSetDictionaryStateRuntimeView
-  {
-    void* streamLane = nullptr;               // +0x00
-    std::int32_t methodOrWrap = 0;            // +0x04
-    std::uint8_t reserved08_17[0x10]{};       // +0x08
-    std::int32_t status = 0;                  // +0x18
-    std::uint8_t reserved1C_2B[0x10]{};       // +0x1C
-    std::uint32_t windowSize = 0;             // +0x2C
-    std::uint8_t reserved30_33[0x04]{};       // +0x30
-    std::uint32_t windowMask = 0;             // +0x34
-    std::uint8_t* window = nullptr;           // +0x38
-    std::uint8_t reserved3C_3F[0x04]{};       // +0x3C
-    std::uint16_t* previous = nullptr;        // +0x40
-    std::uint16_t* head = nullptr;            // +0x44
-    std::uint32_t insertHash = 0;             // +0x48
-    std::uint32_t hashSize = 0;               // +0x4C
-    std::uint8_t reserved50_53[0x04]{};       // +0x50
-    std::uint32_t hashMask = 0;               // +0x54
-    std::uint32_t hashShift = 0;              // +0x58
-    std::uint32_t blockStart = 0;             // +0x5C
-    std::uint8_t reserved60_6B[0x0C]{};       // +0x60
-    std::uint32_t stringStart = 0;            // +0x6C
-  };
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, status) == 0x18,
-    "DeflateSetDictionaryStateRuntimeView::status offset must be 0x18"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, windowSize) == 0x2C,
-    "DeflateSetDictionaryStateRuntimeView::windowSize offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, window) == 0x38,
-    "DeflateSetDictionaryStateRuntimeView::window offset must be 0x38"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, previous) == 0x40,
-    "DeflateSetDictionaryStateRuntimeView::previous offset must be 0x40"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, head) == 0x44,
-    "DeflateSetDictionaryStateRuntimeView::head offset must be 0x44"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, insertHash) == 0x48,
-    "DeflateSetDictionaryStateRuntimeView::insertHash offset must be 0x48"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, hashMask) == 0x54,
-    "DeflateSetDictionaryStateRuntimeView::hashMask offset must be 0x54"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, hashShift) == 0x58,
-    "DeflateSetDictionaryStateRuntimeView::hashShift offset must be 0x58"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, blockStart) == 0x5C,
-    "DeflateSetDictionaryStateRuntimeView::blockStart offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(DeflateSetDictionaryStateRuntimeView, stringStart) == 0x6C,
-    "DeflateSetDictionaryStateRuntimeView::stringStart offset must be 0x6C"
-  );
-
-  struct DeflateCopyStateRuntimeView
-  {
-    z_stream* stream = nullptr;               // +0x00
-    std::uint8_t reserved04_07[0x04]{};       // +0x04
-    std::uint8_t* pendingBuffer = nullptr;    // +0x08
-    std::uint32_t pendingBufferSize = 0;      // +0x0C
-    std::uint8_t* pendingOut = nullptr;       // +0x10
-    std::uint32_t pending = 0;                // +0x14
-    std::uint8_t reserved18_2B[0x14]{};       // +0x18
-    std::uint32_t windowSize = 0;             // +0x2C
-    std::uint8_t reserved30_33[0x04]{};       // +0x30
-    std::uint32_t windowMask = 0;             // +0x34
-    std::uint8_t* window = nullptr;           // +0x38
-    std::uint8_t reserved3C_3F[0x04]{};       // +0x3C
-    std::uint16_t* previous = nullptr;        // +0x40
-    std::uint16_t* head = nullptr;            // +0x44
-    std::uint8_t reserved48_4B[0x04]{};       // +0x48
-    std::uint32_t hashSize = 0;               // +0x4C
-    std::uint8_t reserved50_B17[0xAC8]{};     // +0x50
-    DeflateCtDataRuntime* lDescDynTree = nullptr;  // +0xB18
-    std::uint8_t reservedB1C_B23[0x08]{};     // +0xB1C
-    DeflateCtDataRuntime* dDescDynTree = nullptr;  // +0xB24
-    std::uint8_t reservedB28_B2F[0x08]{};     // +0xB28
-    DeflateCtDataRuntime* blDescDynTree = nullptr; // +0xB30
-    std::uint8_t reservedB34_1697[0xB64]{};   // +0xB34
-    std::uint8_t* literalBuffer = nullptr;    // +0x1698
-    std::uint32_t litBufSize = 0;             // +0x169C
-    std::uint8_t reserved16A0_16A3[0x04]{};   // +0x16A0
-    std::uint8_t* distanceBuffer = nullptr;   // +0x16A4
-  };
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, pendingBuffer) == 0x08,
-    "DeflateCopyStateRuntimeView::pendingBuffer offset must be 0x08"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, pendingBufferSize) == 0x0C,
-    "DeflateCopyStateRuntimeView::pendingBufferSize offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, pendingOut) == 0x10,
-    "DeflateCopyStateRuntimeView::pendingOut offset must be 0x10"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, windowSize) == 0x2C,
-    "DeflateCopyStateRuntimeView::windowSize offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, window) == 0x38,
-    "DeflateCopyStateRuntimeView::window offset must be 0x38"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, previous) == 0x40,
-    "DeflateCopyStateRuntimeView::previous offset must be 0x40"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, head) == 0x44,
-    "DeflateCopyStateRuntimeView::head offset must be 0x44"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, hashSize) == 0x4C,
-    "DeflateCopyStateRuntimeView::hashSize offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, lDescDynTree) == 0xB18,
-    "DeflateCopyStateRuntimeView::lDescDynTree offset must be 0xB18"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, dDescDynTree) == 0xB24,
-    "DeflateCopyStateRuntimeView::dDescDynTree offset must be 0xB24"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, blDescDynTree) == 0xB30,
-    "DeflateCopyStateRuntimeView::blDescDynTree offset must be 0xB30"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, literalBuffer) == 0x1698,
-    "DeflateCopyStateRuntimeView::literalBuffer offset must be 0x1698"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, litBufSize) == 0x169C,
-    "DeflateCopyStateRuntimeView::litBufSize offset must be 0x169C"
-  );
-  static_assert(
-    offsetof(DeflateCopyStateRuntimeView, distanceBuffer) == 0x16A4,
-    "DeflateCopyStateRuntimeView::distanceBuffer offset must be 0x16A4"
-  );
-  static_assert(sizeof(DeflateCopyStateRuntimeView) == 0x16A8, "DeflateCopyStateRuntimeView size must be 0x16A8");
 
   void SendBits(
     DeflateStateRuntimePrefix* const state,
@@ -455,39 +169,39 @@ extern "C" int __cdecl inflateSync(
     return Z_STREAM_ERROR;
   }
 
-  auto* const state = reinterpret_cast<InflateSyncStateRuntimeView*>(stream->state);
+  auto* const state = reinterpret_cast<zlib::InflateState*>(stream->state);
   if (state == nullptr) {
     return Z_STREAM_ERROR;
   }
 
-  if (stream->avail_in == 0u && state->bitCount < 8u) {
+  if (stream->avail_in == 0u && state->bits < 8u) {
     return Z_BUF_ERROR;
   }
 
   if (state->mode != 0x1D) {
-    const std::uint32_t remainderBits = state->bitCount & 0x7u;
-    state->bitBuffer <<= remainderBits;
-    state->bitCount -= remainderBits;
+    const std::uint32_t remainderBits = state->bits & 0x7u;
+    state->hold <<= remainderBits;
+    state->bits -= remainderBits;
     state->mode = 0x1D;
 
     std::array<std::uint8_t, 4> bufferedBytes{};
     unsigned int bufferedCount = 0u;
-    while (state->bitCount >= 8u) {
-      bufferedBytes[bufferedCount++] = static_cast<std::uint8_t>(state->bitBuffer & 0xFFu);
-      state->bitBuffer >>= 8u;
-      state->bitCount -= 8u;
+    while (state->bits >= 8u) {
+      bufferedBytes[bufferedCount++] = static_cast<std::uint8_t>(state->hold & 0xFFu);
+      state->hold >>= 8u;
+      state->bits -= 8u;
     }
 
-    state->markerState = 0u;
-    (void)InflateSyncMarkerScan(&state->markerState, bufferedBytes.data(), bufferedCount);
+    state->have = 0u;
+    (void)InflateSyncMarkerScan(&state->have, bufferedBytes.data(), bufferedCount);
   }
 
-  const unsigned int consumed = InflateSyncMarkerScan(&state->markerState, stream->next_in, stream->avail_in);
+  const unsigned int consumed = InflateSyncMarkerScan(&state->have, stream->next_in, stream->avail_in);
   stream->total_in += consumed;
   stream->avail_in -= consumed;
   stream->next_in += consumed;
 
-  if (state->markerState != 4u) {
+  if (state->have != 4u) {
     return Z_DATA_ERROR;
   }
 
@@ -517,41 +231,45 @@ extern "C" int __cdecl deflateSetDictionary(
     return Z_STREAM_ERROR;
   }
 
-  auto* const state = reinterpret_cast<DeflateSetDictionaryStateRuntimeView*>(stream->state);
+  auto* const state = reinterpret_cast<zlib::DeflateState*>(stream->state);
   if (state == nullptr) {
     return Z_STREAM_ERROR;
   }
 
-  const int status = state->status;
-  if (status == 2 || (status == 1 && state->methodOrWrap != 42)) {
+  // The stand-in this used to read through had the two lanes named the wrong
+  // way round: +0x04 is `status` and +0x18 is `wrap`, so what it called
+  // `status` was the wrap mode. The offsets it used were right, so the gate
+  // below is unchanged - it just reads as zlib writes it now.
+  const int wrap = state->wrap;
+  if (wrap == 2 || (wrap == 1 && state->status != zlib::kDeflateInitState)) {
     return Z_STREAM_ERROR;
   }
 
-  if (status != 0) {
+  if (wrap != 0) {
     stream->adler = adler32(stream->adler, dictionary, dictionaryLength);
   }
 
   if (dictionaryLength >= 3u) {
     unsigned int copyLength = dictionaryLength;
     const std::uint8_t* dictionaryTail = dictionary;
-    const unsigned int maxDictionaryBytes = state->windowSize - 262u;
+    const unsigned int maxDictionaryBytes = state->w_size - 262u;
     if (dictionaryLength > maxDictionaryBytes) {
       copyLength = maxDictionaryBytes;
       dictionaryTail = dictionary + (dictionaryLength - maxDictionaryBytes);
     }
 
     std::memcpy(state->window, dictionaryTail, copyLength);
-    state->stringStart = copyLength;
-    state->blockStart = copyLength;
+    state->strstart = copyLength;
+    state->block_start = static_cast<std::int32_t>(copyLength);
 
-    state->insertHash = state->window[0];
-    state->insertHash = ((state->insertHash << state->hashShift) ^ state->window[1]) & state->hashMask;
+    state->ins_h = state->window[0];
+    state->ins_h = ((state->ins_h << state->hash_shift) ^ state->window[1]) & state->hash_mask;
 
     const unsigned int lastInsertIndex = copyLength - 3u;
     for (unsigned int index = 0u; index <= lastInsertIndex; ++index) {
-      state->insertHash = ((state->insertHash << state->hashShift) ^ state->window[index + 2u]) & state->hashMask;
-      state->previous[index & state->windowMask] = state->head[state->insertHash];
-      state->head[state->insertHash] = static_cast<std::uint16_t>(index);
+      state->ins_h = ((state->ins_h << state->hash_shift) ^ state->window[index + 2u]) & state->hash_mask;
+      state->prev[index & state->w_mask] = state->head[state->ins_h];
+      state->head[state->ins_h] = static_cast<std::uint16_t>(index);
     }
   }
 
@@ -574,49 +292,52 @@ extern "C" int __cdecl deflateCopy(
     return Z_STREAM_ERROR;
   }
 
-  auto* const sourceState = reinterpret_cast<DeflateCopyStateRuntimeView*>(source->state);
+  auto* const sourceState = reinterpret_cast<zlib::DeflateState*>(source->state);
   if (sourceState == nullptr) {
     return Z_STREAM_ERROR;
   }
 
   std::memcpy(destination, source, sizeof(z_stream));
-  auto* const copiedState = static_cast<DeflateCopyStateRuntimeView*>(
-    destination->zalloc(destination->opaque, 1u, static_cast<uInt>(sizeof(DeflateStateRuntime)))
+  auto* const copiedState = static_cast<zlib::DeflateState*>(
+    destination->zalloc(destination->opaque, 1u, static_cast<uInt>(sizeof(zlib::DeflateState)))
   );
   if (copiedState == nullptr) {
     return Z_MEM_ERROR;
   }
 
   destination->state = reinterpret_cast<internal_state*>(copiedState);
-  std::memcpy(copiedState, sourceState, sizeof(DeflateStateRuntime));
-  copiedState->stream = destination;
+  std::memcpy(copiedState, sourceState, sizeof(zlib::DeflateState));
+  copiedState->strm = destination;
 
-  copiedState->window = static_cast<std::uint8_t*>(destination->zalloc(destination->opaque, sourceState->windowSize, 2u));
-  copiedState->previous = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->windowSize, 2u));
-  copiedState->head = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->hashSize, 2u));
-  copiedState->pendingBuffer = static_cast<std::uint8_t*>(
-    destination->zalloc(destination->opaque, sourceState->litBufSize, 4u)
+  copiedState->window = static_cast<std::uint8_t*>(destination->zalloc(destination->opaque, sourceState->w_size, 2u));
+  copiedState->prev = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->w_size, 2u));
+  copiedState->head = static_cast<std::uint16_t*>(destination->zalloc(destination->opaque, sourceState->hash_size, 2u));
+  copiedState->pending_buf = static_cast<std::uint8_t*>(
+    destination->zalloc(destination->opaque, sourceState->lit_bufsize, 4u)
   );
 
   if (
-    copiedState->window == nullptr || copiedState->previous == nullptr || copiedState->head == nullptr ||
-    copiedState->pendingBuffer == nullptr
+    copiedState->window == nullptr || copiedState->prev == nullptr || copiedState->head == nullptr ||
+    copiedState->pending_buf == nullptr
   ) {
     (void)deflateEnd(destination);
     return Z_MEM_ERROR;
   }
 
-  std::memcpy(copiedState->window, sourceState->window, 2u * static_cast<std::size_t>(sourceState->windowSize));
-  std::memcpy(copiedState->previous, sourceState->previous, 2u * static_cast<std::size_t>(sourceState->windowSize));
-  std::memcpy(copiedState->head, sourceState->head, 2u * static_cast<std::size_t>(sourceState->hashSize));
-  std::memcpy(copiedState->pendingBuffer, sourceState->pendingBuffer, sourceState->pendingBufferSize);
+  std::memcpy(copiedState->window, sourceState->window, 2u * static_cast<std::size_t>(sourceState->w_size));
+  std::memcpy(copiedState->prev, sourceState->prev, 2u * static_cast<std::size_t>(sourceState->w_size));
+  std::memcpy(copiedState->head, sourceState->head, 2u * static_cast<std::size_t>(sourceState->hash_size));
+  std::memcpy(copiedState->pending_buf, sourceState->pending_buf, sourceState->pending_buf_size);
 
-  copiedState->pendingOut = copiedState->pendingBuffer + (sourceState->pendingOut - sourceState->pendingBuffer);
-  copiedState->distanceBuffer = copiedState->pendingBuffer + 2u * (sourceState->litBufSize >> 1u);
-  copiedState->literalBuffer = copiedState->pendingBuffer + sourceState->litBufSize + 2u * sourceState->litBufSize;
-  copiedState->dDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0x988u);
-  copiedState->lDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0x94u);
-  copiedState->blDescDynTree = reinterpret_cast<DeflateCtDataRuntime*>(reinterpret_cast<std::uint8_t*>(copiedState) + 0xA7Cu);
+  copiedState->pending_out = copiedState->pending_buf + (sourceState->pending_out - sourceState->pending_buf);
+  copiedState->d_buf =
+    reinterpret_cast<std::uint16_t*>(copiedState->pending_buf + 2u * (sourceState->lit_bufsize >> 1u));
+  copiedState->l_buf = copiedState->pending_buf + sourceState->lit_bufsize + 2u * sourceState->lit_bufsize;
+  // 0x94 / 0x988 / 0xA7C are dyn_ltree / dyn_dtree / bl_tree, so these are
+  // zlib's own three lines rather than offset arithmetic off the block base.
+  copiedState->d_desc.dyn_tree = copiedState->dyn_dtree;
+  copiedState->l_desc.dyn_tree = copiedState->dyn_ltree;
+  copiedState->bl_desc.dyn_tree = copiedState->bl_tree;
   return Z_OK;
 }
 
@@ -880,25 +601,25 @@ extern "C" DeflateStateRuntimePrefix* __cdecl putShortMSB(
  * pending/output counters, and rewinds `pendingOut` to `pendingBuffer` when
  * all pending bytes are drained.
  */
-[[maybe_unused]] DeflateCopyStateRuntimeView* DeflateFlushPendingToOutput(
+[[maybe_unused]] zlib::DeflateState* DeflateFlushPendingToOutput(
   z_stream* const stream
 ) noexcept
 {
-  auto* const state = reinterpret_cast<DeflateCopyStateRuntimeView*>(stream->state);
+  auto* const state = reinterpret_cast<zlib::DeflateState*>(stream->state);
   unsigned int pendingBytes = state->pending;
   if (pendingBytes > stream->avail_out) {
     pendingBytes = stream->avail_out;
   }
 
   if (pendingBytes != 0u) {
-    std::memcpy(stream->next_out, state->pendingOut, pendingBytes);
+    std::memcpy(stream->next_out, state->pending_out, pendingBytes);
     stream->next_out += pendingBytes;
-    state->pendingOut += pendingBytes;
+    state->pending_out += pendingBytes;
     stream->total_out += pendingBytes;
     stream->avail_out -= pendingBytes;
     state->pending -= pendingBytes;
     if (state->pending == 0u) {
-      state->pendingOut = state->pendingBuffer;
+      state->pending_out = state->pending_buf;
     }
   }
 
@@ -913,28 +634,28 @@ extern "C" DeflateStateRuntimePrefix* __cdecl putShortMSB(
  * level-tuned configuration parameters, and resetting start/lookahead state.
  */
 [[maybe_unused]] void DeflateInitializeMatchFinderState(
-  DeflateLmInitStateRuntimeView* const state
+  zlib::DeflateState* const state
 ) noexcept
 {
-  state->windowSize = state->windowWordSize * 2u;
+  state->window_size = state->w_size * 2u;
 
-  state->hashHead[state->hashSize - 1u] = 0u;
-  std::memset(state->hashHead, 0, state->hashSize * 2u - 2u);
+  state->head[state->hash_size - 1u] = 0u;
+  std::memset(state->head, 0, state->hash_size * 2u - 2u);
 
-  const DeflateConfigurationRuntimeEntry& configuration =
-    kDeflateConfigurationTable[static_cast<std::size_t>(state->compressionLevel)];
+  const zlib::DeflateConfig& configuration =
+    zlib::kConfigurationTable[static_cast<std::size_t>(state->level)];
 
-  state->maxLazyMatch = configuration.maxLazy;
-  state->goodMatch = configuration.goodLength;
-  state->niceMatch = configuration.niceLength;
-  state->stringStart = 0u;
-  state->blockStart = 0;
+  state->max_lazy_match = configuration.max_lazy;
+  state->good_match = configuration.good_length;
+  state->nice_match = configuration.nice_length;
+  state->strstart = 0u;
+  state->block_start = 0;
   state->lookahead = 0u;
-  state->matchAvailable = 0u;
-  state->insertHash = 0u;
-  state->maxChainLength = configuration.maxChain;
-  state->previousLength = 2u;
-  state->matchLength = 2u;
+  state->match_available = 0;
+  state->ins_h = 0u;
+  state->max_chain_length = configuration.max_chain;
+  state->prev_length = 2u;
+  state->match_length = 2u;
 }
 
 /**
