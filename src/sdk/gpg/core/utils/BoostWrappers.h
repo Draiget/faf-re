@@ -463,6 +463,17 @@ namespace boost
      * `_InterlockedExchangeAdd(&pi->weak_count_, 1)` shape as the
      * same-type case; the type difference only changes which `px` is
      * stored, not the refcount mechanics.)
+     * Address: 0x00796EE0 (FUN_00796EE0 -- another per-T emission of the same
+     * constructor: `weak_count(shared_count const&)` on the `pn` at +0x04
+     * (call 0x00447030), then the `px` copy at +0x00. Zero callers in the
+     * binary and none in source; formerly `ConstructWeakCountFromSharedTailLane`
+     * in gpg/core/utils/BoostWrappers.cpp, where a stand-in had the +0x00 lane
+     * named `control` and typed `sp_counted_base*` although it is the pointee
+     * `px` (RULE ONE), removed 2026-09-18.)
+     * Address: 0x008F3930 (FUN_008F3930 -- the `ret 4` register-shape sibling
+     * of that emission; zero callers, unreachable; formerly
+     * `ConstructWeakCountFromSharedTailLaneAdapterA` in
+     * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      *
      * What it does:
      * Per-T binding of `boost::weak_ptr<TWeak>`'s converting constructor
@@ -1672,7 +1683,7 @@ namespace boost
      * What it does:
      * Atomically increments one weak-count lane and returns the previous value.
      */
-    [[nodiscard]] std::int32_t SpCountedBaseWeakAddRef(detail::sp_counted_base* control) noexcept;
+    void SpCountedBaseWeakAddRef(detail::sp_counted_base* control) noexcept;
 
     /**
      * Address: 0x00446F80 (FUN_00446F80)
