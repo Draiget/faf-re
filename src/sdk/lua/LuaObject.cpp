@@ -11272,6 +11272,21 @@ namespace
 	 * What it does:
 	 * Computes `sin(arg1)` after Lua numeric argument validation and pushes
 	 * one Lua numeric result.
+	 *
+	 * DETERMINISM NOTE, covering this whole trig cluster (`math_sin`,
+	 * `math_cos`, `math_tan`, `math_asin`, `math_acos`, `math_atan`,
+	 * `math_atan2`): the binary reaches these through the x87 transcendental
+	 * instructions, whose low-order bits are implementation defined rather than
+	 * IEEE-specified, and which differ between AMD and Intel. This is the widest
+	 * exposure of that hazard in the engine, because sim scripts call
+	 * `math.sin`/`math.cos` far more often than the engine's own aiming math
+	 * does. Full analysis, and the lockstep desync it produces, is written up on
+	 * `CalculateFiringDirection` in `moho/ai/CAimManipulator.cpp`.
+	 *
+	 * `std::sin` and friends here do not lower to `fsin`/`fcos`; the modern
+	 * toolchain calls the CRT's SSE2 software routines, which are vendor
+	 * independent. Same deliberate trade as the engine sites: deterministic
+	 * across CPUs, not bit-identical to the binary.
 	 */
 	int math_sin(lua_State* const state)
 	{
