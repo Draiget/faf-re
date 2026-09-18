@@ -7991,7 +7991,6 @@ namespace gpg::gal
    */
   EffectD3D10::EffectD3D10(EffectContext* const context, void* const dxEffect)
     : context_()
-    , contextPad_{}
     , dxEffect_(nullptr)
   {
     InitializeEffectD3D10Object(this);

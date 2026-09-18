@@ -97,9 +97,8 @@ namespace gpg::gal
 
     public:
         boost::weak_ptr<EffectD3D9> selfWeak_{}; // +0x04 .. +0x0B
-        EffectContext effectContext_{};         // +0x0C
-        std::uint8_t effectContextPad_[0x60]{}; // +0x10 .. +0x6F (pending full EffectContext lift)
-        void* dxEffect_ = nullptr;              // +0x70
+        EffectContext effectContext_{};          // +0x0C .. +0x6F
+        void* dxEffect_ = nullptr;               // +0x70
     };
 
     static_assert(offsetof(EffectD3D9, selfWeak_) == 0x04, "EffectD3D9::selfWeak_ offset must be 0x04");

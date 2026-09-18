@@ -58,31 +58,6 @@ namespace gpg::gal
         static_assert(offsetof(IndexBufferOwnerRuntimeView, handle) == 0x14, "IndexBufferOwnerRuntimeView::handle offset must be 0x14");
         static_assert(sizeof(IndexBufferOwnerRuntimeView) == 0x18, "IndexBufferOwnerRuntimeView size must be 0x18");
 
-        struct EffectContextRuntimeView final
-        {
-            void* vftable = nullptr;                                 // +0x00
-            std::uint32_t sourceType = 0U;                           // +0x04
-            std::uint8_t useCache = 0U;                              // +0x08
-            std::uint8_t pad09_0B[3]{};                              // +0x09 .. +0x0B
-            msvc8::string sourcePath;                                // +0x0C
-            msvc8::string cachePath;                                 // +0x28
-            std::uint32_t sourceBufferBytes = 0U;                    // +0x44
-            boost::detail::sp_counted_base* sourceBufferCount = nullptr; // +0x48
-            std::uint32_t sourceBufferBegin = 0U;                    // +0x4C
-            std::uint32_t sourceBufferEnd = 0U;                      // +0x50
-            msvc8::vector<EffectMacro> macros;                       // +0x54
-        };
-
-        static_assert(offsetof(EffectContextRuntimeView, sourcePath) == 0x0C, "EffectContextRuntimeView::sourcePath offset must be 0x0C");
-        static_assert(offsetof(EffectContextRuntimeView, cachePath) == 0x28, "EffectContextRuntimeView::cachePath offset must be 0x28");
-        static_assert(
-            offsetof(EffectContextRuntimeView, sourceBufferCount) == 0x48,
-            "EffectContextRuntimeView::sourceBufferCount offset must be 0x48"
-        );
-        static_assert(offsetof(EffectContextRuntimeView, macros) == 0x54, "EffectContextRuntimeView::macros offset must be 0x54");
-        static_assert(sizeof(msvc8::vector<EffectMacro>) == 0x10, "msvc8::vector<EffectMacro> size must be 0x10");
-        static_assert(sizeof(EffectContextRuntimeView) == 0x64, "EffectContextRuntimeView size must be 0x64");
-
         /**
          * Address: 0x0093F650 (FUN_0093F650, effect-macro key-range search lane)
          *
@@ -705,22 +680,9 @@ namespace gpg::gal
      * metadata, and macro vector storage to their default empty state.
      */
     EffectContext::EffectContext()
-    {
-        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
-
-        runtime->sourceType = 0U;
-        runtime->useCache = 0U;
-
-        ::new (static_cast<void*>(&runtime->sourcePath)) msvc8::string();
-        ::new (static_cast<void*>(&runtime->cachePath)) msvc8::string();
-
-        runtime->sourceBufferBytes = 0U;
-        runtime->sourceBufferCount = nullptr;
-        runtime->sourceBufferBegin = 0U;
-        runtime->sourceBufferEnd = 0U;
-
-        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
-    }
+        : mSourceType(0U)
+        , mUseCache(false)
+    {}
 
     /**
      * Address: 0x008FE7E0 (FUN_008FE7E0, gpg::gal::EffectContext::EffectContext)
@@ -730,58 +692,13 @@ namespace gpg::gal
      * and effect-macro vector storage from one source context.
      */
     EffectContext::EffectContext(const EffectContext& other)
-    {
-        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
-        const auto* const sourceRuntime = reinterpret_cast<const EffectContextRuntimeView*>(&other);
-
-        runtime->sourceType = sourceRuntime->sourceType;
-        runtime->useCache = sourceRuntime->useCache;
-
-        runtime->sourceBufferBytes = 0U;
-        runtime->sourceBufferCount = nullptr;
-        runtime->sourceBufferBegin = 0U;
-        runtime->sourceBufferEnd = 0U;
-        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
-
-        ::new (static_cast<void*>(&runtime->sourcePath)) msvc8::string();
-        try
-        {
-            runtime->sourcePath.assign(sourceRuntime->sourcePath, 0U, msvc8::string::npos);
-
-            ::new (static_cast<void*>(&runtime->cachePath)) msvc8::string();
-            try
-            {
-                runtime->cachePath.assign(sourceRuntime->cachePath, 0U, msvc8::string::npos);
-
-                runtime->sourceBufferBytes = sourceRuntime->sourceBufferBytes;
-                runtime->sourceBufferCount = sourceRuntime->sourceBufferCount;
-                if (runtime->sourceBufferCount != nullptr)
-                {
-                    runtime->sourceBufferCount->add_ref_copy();
-                }
-                runtime->sourceBufferBegin = sourceRuntime->sourceBufferBegin;
-                runtime->sourceBufferEnd = sourceRuntime->sourceBufferEnd;
-
-                ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>(sourceRuntime->macros);
-            }
-            catch (...)
-            {
-                if (runtime->sourceBufferCount != nullptr)
-                {
-                    runtime->sourceBufferCount->release();
-                    runtime->sourceBufferCount = nullptr;
-                }
-
-                runtime->cachePath.tidy(true, 0U);
-                throw;
-            }
-        }
-        catch (...)
-        {
-            runtime->sourcePath.tidy(true, 0U);
-            throw;
-        }
-    }
+        : mSourceType(other.mSourceType)
+        , mUseCache(other.mUseCache)
+        , mSourcePath(other.mSourcePath)
+        , mCachePath(other.mCachePath)
+        , mSourceBuffer(other.mSourceBuffer)
+        , mMacros(other.mMacros)
+    {}
 
     /**
      * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
@@ -797,59 +714,13 @@ namespace gpg::gal
         const gpg::MemBuffer<char>& sourceBuffer,
         const msvc8::vector<EffectMacro>& macros
     )
-    {
-        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
-
-        runtime->sourceType = 2U;
-        runtime->useCache = useCachePayload ? 1U : 0U;
-
-        runtime->sourceBufferBytes = 0U;
-        runtime->sourceBufferCount = nullptr;
-        runtime->sourceBufferBegin = 0U;
-        runtime->sourceBufferEnd = 0U;
-        ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>();
-
-        const char* const sourcePathText = (sourcePath != nullptr) ? sourcePath : "";
-        const char* const cachePathText = (cachePath != nullptr) ? cachePath : "";
-
-        ::new (static_cast<void*>(&runtime->sourcePath))
-            msvc8::string(sourcePathText, static_cast<unsigned int>(std::strlen(sourcePathText)));
-        try
-        {
-            ::new (static_cast<void*>(&runtime->cachePath))
-                msvc8::string(cachePathText, static_cast<unsigned int>(std::strlen(cachePathText)));
-            try
-            {
-                const boost::SharedPtrRaw<char> retainedBufferOwner =
-                    boost::SharedPtrRawFromSharedRetained(sourceBuffer.mData);
-
-                runtime->sourceBufferBytes = static_cast<std::uint32_t>(
-                    reinterpret_cast<std::uintptr_t>(retainedBufferOwner.px)
-                );
-                runtime->sourceBufferCount = static_cast<boost::detail::sp_counted_base*>(retainedBufferOwner.pi);
-                runtime->sourceBufferBegin = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mBegin));
-                runtime->sourceBufferEnd = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(sourceBuffer.mEnd));
-
-                ::new (static_cast<void*>(&runtime->macros)) msvc8::vector<EffectMacro>(macros);
-            }
-            catch (...)
-            {
-                if (runtime->sourceBufferCount != nullptr)
-                {
-                    runtime->sourceBufferCount->release();
-                    runtime->sourceBufferCount = nullptr;
-                }
-
-                runtime->cachePath.tidy(true, 0U);
-                throw;
-            }
-        }
-        catch (...)
-        {
-            runtime->sourcePath.tidy(true, 0U);
-            throw;
-        }
-    }
+        : mSourceType(2U)
+        , mUseCache(useCachePayload)
+        , mSourcePath((sourcePath != nullptr) ? sourcePath : "")
+        , mCachePath((cachePath != nullptr) ? cachePath : "")
+        , mSourceBuffer(sourceBuffer)
+        , mMacros(macros)
+    {}
 
     /**
      * Address: 0x0093F950 (FUN_0093F950, gpg::gal::EffectContext::~EffectContext)
@@ -859,22 +730,7 @@ namespace gpg::gal
      * Releases effect-macro vector storage, decrements source-buffer shared
      * count ownership, and resets both path string lanes to empty state.
      */
-    EffectContext::~EffectContext()
-    {
-        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
-
-        // `~vector<EffectMacro>`: destroy the macros, free the block, null the triple.
-        runtime->macros.~vector();
-
-        if (runtime->sourceBufferCount != nullptr)
-        {
-            runtime->sourceBufferCount->release();
-            runtime->sourceBufferCount = nullptr;
-        }
-
-        runtime->cachePath.tidy(true, 0U);
-        runtime->sourcePath.tidy(true, 0U);
-    }
+    EffectContext::~EffectContext() = default;
 
     /**
      * Address: 0x009402D0 (FUN_009402D0, gpg::gal::EffectContext::DefineMacro)
@@ -893,8 +749,6 @@ namespace gpg::gal
      */
     void EffectContext::DefineMacro(const char* const name, const char* const value)
     {
-        auto* const runtime = reinterpret_cast<EffectContextRuntimeView*>(this);
-
         const char* const nameText = (name != nullptr) ? name : "";
         const char* const valueText = (value != nullptr) ? value : "";
 
@@ -909,14 +763,14 @@ namespace gpg::gal
                 nameText, static_cast<unsigned int>(std::strlen(nameText))
             );
 
-            EffectMacro* foundPosition = runtime->macros.end();
+            EffectMacro* foundPosition = mMacros.end();
             (void)FindEffectMacroByKeyInRange(
                 &foundPosition,
-                runtime->macros.begin(),
-                runtime->macros.end(),
+                mMacros.begin(),
+                mMacros.end(),
                 needleKey
             );
-            isDuplicate = (foundPosition != runtime->macros.end());
+            isDuplicate = (foundPosition != mMacros.end());
         }
 
         if (isDuplicate)
@@ -931,7 +785,7 @@ namespace gpg::gal
         const EffectMacro newMacro(nameText, valueText);
         // `msvc8::vector<EffectMacro>::push_back` (0x00940230, cited on Vector.h);
         // its capacity-full path is the single-value `insert` 0x009401C0.
-        runtime->macros.push_back(newMacro);
+        mMacros.push_back(newMacro);
     }
 
     /**

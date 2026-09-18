@@ -9021,7 +9021,6 @@ namespace { // TEMPORARY PROBE (do not commit)
     EffectD3D9::EffectD3D9(EffectContext* const context, void* const dxEffect)
         : selfWeak_(),
           effectContext_(),
-          effectContextPad_{},
           dxEffect_(nullptr)
     {
         InitializeEffectD3D9ConstructionLanes(this);
