@@ -6331,9 +6331,17 @@ namespace moho
   {
     PrepareForRebuild();
 
-    // Inline capacity 100 - the binary's local is a 400-byte stack buffer that
-    // only spills to the heap on a map with more than 100 units on screen.
-    gpg::fastvector_n<UserEntity*, 100> entities;
+    // Heap-backed on purpose, like every other `Collect` site - see the note in
+    // `DoBeat` for the full reasoning. The binary's local here really is a
+    // 400-byte inline stack buffer, but `Collect` takes its destination by the
+    // `gpg::fastvector<T>` base, and the base's grow path frees `start_`
+    // unconditionally because it has no `originalVec_` word to test against.
+    // An inline `FastVectorN` therefore hands `operator delete` a stack address
+    // the first time more than 100 units are on screen - observed as
+    // push_back -> PushBack -> Reserve -> FreeElements -> free faulting while
+    // the Shift command graph rebuilt its nodes. The inline lane can come back
+    // once the binary's per-vector-type collect template is restored.
+    gpg::fastvector<UserEntity*> entities;
     (void)reinterpret_cast<SpatialDB_MeshInstance*>(&mSession->mEntitySpatialDbStorage[0])
       ->Collect(entities, ENTITYTYPE_Unit);
 
