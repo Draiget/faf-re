@@ -951,6 +951,11 @@ namespace gpg::core
      * derived struct owns the storage (`FastVectorN<T, N>::inlineVec_`, or the
      * slot run an engine struct declares after this head), so binding is the
      * only thing this level can do about it.
+     *
+     * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00553500 (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0065A350 (FUN_0065A350 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 2 (`lea edx,[ecx+8]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      */
     void BindInlineStorage(T* const storage, const size_type count) noexcept
     {
@@ -1211,6 +1216,11 @@ namespace gpg::core
      * Address: 0x0080F1B0 (FUN_0080F1B0 -- inline-storage constructor for a ? element; Initializes one fastvector runtime view from caller-provided inline origin storage and sets capacity to `inlineOrigin+0x4E200`.)
      * Address: 0x0059C890 (FUN_0059C890 -- `fastvector_n<CAiFormationInstance*, 10>` default constructor. Zero callers, no xrefs, unreachable: the live instantiation is inlined into `CAiFormationDBImpl`'s constructor (visible in `CAiFormationDBImplTypeInfo::NewRef` 0x0059D390). Formerly `InitializeFormationInstanceInlineStorage` in moho/ai/CAiFormationDBImplTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0059CEB0 (FUN_0059CEB0 -- the inline-arming step of that constructor (`start_ = end_ = originalVec_ = inline; capacity_ = inline + 10`). Zero callers, no xrefs, unreachable. Formerly `BindFormationInstanceInlineRuntimeView`, removed 2026-09-10.)
+     * Address: 0x00552C40 (FUN_00552C40 -- `FastVectorN<unsigned int, 2>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+8]` -- inline block at this+0x10, capacity 2 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00552CE0 (FUN_00552CE0 -- `FastVectorN<unsigned int, 2>()`: an ICF-identical second emission of the same 2-word constructor, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineUIntScratchViewLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x00659980 (FUN_00659980 -- `FastVectorN<unsigned int, 26>()`: `lea ecx,[eax+0x10]; lea edx,[ecx+0x68]` -- 0x68 is 26 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x006599A0 (FUN_006599A0 -- `FastVectorN<unsigned int, 2>()`: the 2-word emission in that same run, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x006599C0 (FUN_006599C0 -- `FastVectorN<unsigned int, 14>()`: `lea edx,[ecx+0x38]` -- 0x38 is 14 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity14` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0063C070 (FUN_0063C070 -- `FastVectorN<T, N>()` -- arm the lane on its inline window for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `InitializeWatchBoneStorageInline` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
      */
     FastVectorN()
