@@ -2,8 +2,10 @@
 
 #include <array>
 #include <cmath>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <new>
 #include <stdexcept>
@@ -704,6 +706,24 @@ namespace
     }
   }
 
+  // TEMPORARY PROBE SINK -- cursor-ring triage, delete when resolved.
+  // gpg::Warnf reaches nothing until `/log <name>` installs a target, and the
+  // sessions that reproduce this run without one, so the probe appends here
+  // instead. The file lands beside the executable.
+  void RangeDiagLine(const char* const fmt, ...)
+  {
+    std::FILE* const sink = std::fopen("faf_diag.log", "a");
+    if (sink == nullptr) {
+      return;
+    }
+    std::va_list args;
+    va_start(args, fmt);
+    (void)std::vfprintf(sink, fmt, args);
+    va_end(args);
+    (void)std::fputc(0x0A, sink);
+    (void)std::fclose(sink);
+  }
+
   /**
    * NOT A RECOVERED FUNCTION - there is no body for this in the shipped image
    * and no `Address:` can be cited for it. Additive extension, gated on
@@ -823,6 +843,22 @@ namespace
         payload.centerX = cursorWorldPos.x;
         payload.centerZ = cursorWorldPos.z;
 
+        // TEMPORARY PROBE -- one line per accepted (profile, unit) extraction,
+        // so the profile responsible for an over-wide ring names itself instead
+        // of being inferred from the screen.
+        {
+          static int sExtractCount = 0;
+          if (sExtractCount++ < 120) {
+            RangeDiagLine(
+              "[RINGDIAG] extract profile=%s bp=%s inner=%.2f outer=%.2f",
+              profile.mExtractorName.c_str(),
+              blueprint->mBlueprintId.c_str(),
+              payload.innerRadius,
+              payload.outerRadius
+            );
+          }
+        }
+
         // The payload's inner/outer are the ring *band*, not two independent
         // circles: `BuildRingPayloadEntry` emits the inner edge ring
         // unconditionally and only special-cases `innerRadius <= 0` for the
@@ -868,14 +904,26 @@ namespace
       );
     };
 
-    // TEMPORARY PROBE -- the attack ring reads far too large on screen and the
-    // blueprint resolver cannot explain it, so log what is actually drawn.
+    // TEMPORARY PROBE -- which payloads actually reach the ring batcher, with
+    // the playable span so a radius can be read as a fraction of the map. A
+    // ring whose outer radius approaches the span covers the whole board, which
+    // is the reported symptom.
     {
       static int sCount = 0;
       if (sCount++ < 40) {
-        gpg::Warnf(
-          "[RINGDIAG] cursor=(%.1f,%.1f,%.1f) attack=%s inner=%.1f outer=%.1f | assist=%s inner=%.1f outer=%.1f",
-          cursorWorldPos.x, cursorWorldPos.y, cursorWorldPos.z,
+        float diagSpan = 0.0f;
+        if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes(); terrainRes != nullptr) {
+          moho::VisibilityRect diagRect{};
+          (void)terrainRes->GetPlayableMapRect(diagRect);
+          const std::int32_t diagWidth = diagRect.maxX - diagRect.minX;
+          const std::int32_t diagHeight = diagRect.maxZ - diagRect.minZ;
+          diagSpan = static_cast<float>(diagWidth < diagHeight ? diagHeight : diagWidth);
+        }
+        RangeDiagLine(
+          "[RINGDIAG] span=%.0f cursor=(%.1f,%.1f) attack=%s inner=%.2f outer=%.2f"
+          " | assist=%s inner=%.2f outer=%.2f",
+          diagSpan,
+          cursorWorldPos.x, cursorWorldPos.z,
           (attackProfile != nullptr) ? attackProfile->mExtractorName.c_str() : "none",
           attackPayload.innerRadius, attackPayload.outerRadius,
           (assistProfile != nullptr) ? assistProfile->mExtractorName.c_str() : "none",
