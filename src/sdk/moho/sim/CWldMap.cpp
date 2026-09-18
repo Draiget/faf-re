@@ -745,11 +745,17 @@ namespace
    * Moho::CWldTerrainRes *__thiscall Moho::CWldTerrainRes::CWldTerrainRes(Moho::CWldTerrainRes *this);
    *
    * What it does:
-   * Constructs one terrain-resource object into the opaque 0xC38 block via the
-   * IWldTerrainRes overlay: default sub-object construction (Cartographic,
-   * SkyDome, CWaterShaderProperties, StratumMaterial, WaveSystem), scalar
-   * lighting/fog/hypsometric defaults, empty string/handle/container lanes, and
-   * self-linked env-lookup map + debug dirty-rect list sentinel heads.
+   * Fills the terrain-resource object's scalar lighting/fog/hypsometric
+   * defaults and nulls its raw owning-pointer lanes.
+   *
+   * Sub-object construction (Cartographic, SkyDome, CWaterShaderProperties,
+   * StratumMaterial, WaveSystem, the two strings, the texture handles, the
+   * env-lookup map's self-linked sentinel head and the debug dirty-rect list's)
+   * is *not* written here: those are members of `IWldTerrainRes`, so MSVC emits
+   * their default construction as part of `IWldTerrainRes()`, which
+   * `WLD_CreateTerrainRes` has already run over this storage. An earlier pass
+   * placement-new'd each of them a second time, which leaked every sentinel
+   * head the implicit construction had just allocated.
    *
    * The IWldTerrainRes base vtable + mMap lane are installed
    * by the base ctor at the factory before this fills the derived fields.
@@ -758,9 +764,6 @@ namespace
   {
     view.mBool = 0;
     view.mEditMode = 0;
-
-    new (&view.mCartographic) moho::Cartographic();
-    new (&view.mSkyDome) moho::SkyDome();
 
     view.mLightingMultiplier = 1.5f;
     view.mSunDirection.x = 0.70700002f;
@@ -783,42 +786,15 @@ namespace
     view.mTopographicSamples = 20;
     view.mImagerElevationOffset = 0.0f;
 
-    new (&view.mWaterShaderProperties) moho::CWaterShaderProperties();
-    new (&view.mStrata) moho::StratumMaterial();
-
-    new (&view.mNormalMap) moho::TerrainNormalMapHandleArray();
-
-    new (&view.mBackgroundFile) msvc8::string();
-    new (&view.mBackgroundTexture) moho::ID3DDeviceResources::TextureResourceHandle();
-    new (&view.mSkycubeFile) msvc8::string();
-    new (&view.mSkycubeTexture) moho::ID3DDeviceResources::TextureResourceHandle();
-
-    // Env-lookup map: `msvc8::map`'s own default ctor allocates the
-    // self-linked, nil sentinel head (`buy_head()`, `legacy/containers/
-    // RbTree.h`; this instantiation's allocator half is FUN_008A9490,
-    // cited there) -- the same allocate-and-self-link the binary performs
-    // inline in this constructor.
-    new (&view.mEnvLookup) moho::TerrainEnvironmentLookupMap();
-
     view.mEditWordBuffer.begin = nullptr;
     view.mEditWordBuffer.end = nullptr;
     view.mEditWordBuffer.capacityEnd = nullptr;
 
-    new (&view.mWaterMapTexture) moho::ID3DDeviceResources::TextureResourceHandle();
     view.mWaterFoam = nullptr;
     view.mWaterFlatness = nullptr;
     view.mWaterDepthBias = nullptr;
     view.mDebugDirtyTerrain = nullptr;
 
-    // Debug dirty-rect list: allocate the self-linked sentinel head node
-    // (sub_5AB3A0 == list-node-new self-linked; empty list, size 0). The +0x00
-    // lane is `std::list`'s own `_Container_base::_Myfirstiter`, which that
-    // base's constructor zeroes; leaving it as whatever the allocator handed
-    // back is what let the dirty-rect append write through a garbage
-    // pointer the first time a map change actually reached it.
-    ::new (&view.mDebugDirtyRects) moho::TerrainDirtyRectList();
-
-    new (&view.mWaveSystem) moho::WaveSystem();
     view.mDecalManager = nullptr;
 
     view.mHypsometricColor[0] = 0xFF0E3EFFu;
@@ -836,12 +812,23 @@ namespace
    * void __thiscall Moho::CWldTerrainRes::~CWldTerrainRes(Moho::CWldTerrainRes *this);
    *
    * What it does:
-   * Tears down the terrain-resource object in reverse construction order via the
-   * overlay: decal-manager virtual delete, WaveSystem, debug dirty-rect list,
-   * debug dirty-terrain bitmap, water mask buffers, water-map texture, edit-word
-   * buffer, env-lookup map, skycube/background texture+string lanes, normal-map
-   * handles, strata/water-shader/skydome/cartographic sub-objects, then the
-   * inlined base ~IWldTerrainRes tail (STIMap teardown).
+   * Releases the terrain-resource object's raw owning-pointer lanes: the decal
+   * manager's virtual delete, the debug dirty-terrain bitmap, the three water
+   * mask buffers and the edit-word buffer's block. None of those is a member
+   * with a destructor, so none of them is emitted for us.
+   *
+   * Every *member* teardown the binary's `~CWldTerrainRes` performs -
+   * WaveSystem, the debug dirty-rect list, the water-map/skycube/background
+   * texture handles, the env-lookup map, the two strings, the normal-map handle
+   * array, and the strata/water-shader/skydome/cartographic sub-objects - is
+   * emitted by MSVC as part of `~IWldTerrainRes`, which `DestroyTerrainRes`'s
+   * `delete` runs immediately after this. Writing them out here as well
+   * destroyed each of them twice: `~rb_tree()` nulls `head_` on its first run,
+   * so the second `std::destroy_at(&view.mEnvLookup)` reached
+   * `erase_range(leftmost(), header())` with a null header and faulted
+   * (0xC0000005 reading 0x00000000 in `rb_tree::leftmost`) on every exit from a
+   * loaded map. The owned `STIMap` is likewise `~IWldTerrainRes`'s own body
+   * (`delete mMap`), not this function's.
    */
   void DestroyTerrainResFields(moho::IWldTerrainRes& view) noexcept
   {
@@ -850,14 +837,6 @@ namespace
       delete view.mDecalManager;
       view.mDecalManager = nullptr;
     }
-
-    view.mWaveSystem.~WaveSystem();
-
-    // Debug dirty-rect list: destroy all value nodes then free the sentinel
-    // head (sub_5AAF60 + operator delete). gpg::Rect2i is trivial so no
-    // per-node value dtor is needed (matches the binary's plain delete walk),
-    // and `msvc8::list`'s own destructor is that walk.
-    std::destroy_at(&view.mDebugDirtyRects);
 
     if (view.mDebugDirtyTerrain != nullptr) {
       view.mDebugDirtyTerrain->~BitArray2D();
@@ -868,39 +847,12 @@ namespace
     ::operator delete[](view.mWaterFlatness);
     ::operator delete[](view.mWaterFoam);
 
-    view.mWaterMapTexture.~shared_ptr();
-
     if (view.mEditWordBuffer.begin != nullptr) {
       ::operator delete(view.mEditWordBuffer.begin);
     }
     view.mEditWordBuffer.begin = nullptr;
     view.mEditWordBuffer.end = nullptr;
     view.mEditWordBuffer.capacityEnd = nullptr;
-
-    std::destroy_at(&view.mEnvLookup);
-
-    view.mSkycubeTexture.~shared_ptr();
-    view.mSkycubeFile.~string();
-    view.mBackgroundTexture.~shared_ptr();
-    view.mBackgroundFile.~string();
-
-    // Normal-map handle array: destroy each shared_ptr element (sub_424DC0)
-    // then free the backing storage.
-    view.mNormalMap.tidy();
-
-    view.mStrata.~StratumMaterial();
-    view.mWaterShaderProperties.~CWaterShaderProperties();
-    view.mSkyDome.~SkyDome();
-    view.mCartographic.~Cartographic();
-
-    // Inlined base ~IWldTerrainRes tail: destroy the owned STIMap. The binary
-    // resets the base vftable here; the base dtor (run after this teardown by
-    // DestroyTerrainRes' delete) reinstalls it, so no explicit vptr poke.
-    if (view.mMap != nullptr) {
-      view.mMap->~STIMap();
-      ::operator delete(view.mMap);
-      view.mMap = nullptr;
-    }
   }
 
   /**
