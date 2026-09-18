@@ -192,40 +192,6 @@ namespace boost
 
   namespace
   {
-    struct SpCountedBaseRuntimeView
-    {
-      void* vftable;
-      volatile LONG useCount;
-      volatile LONG weakCount;
-    };
-
-    static_assert(sizeof(SpCountedBaseRuntimeView) == 0x0C, "SpCountedBaseRuntimeView size must be 0x0C");
-
-    struct SharedCountWithTailLaneView
-    {
-      detail::sp_counted_base* control;
-      detail::shared_count tailSharedCount;
-    };
-    static_assert(
-      offsetof(SharedCountWithTailLaneView, tailSharedCount) == 0x04,
-      "SharedCountWithTailLaneView::tailSharedCount offset must be 0x04"
-    );
-
-    struct WeakCountWithTailLaneView
-    {
-      detail::sp_counted_base* control;
-      detail::weak_count tailWeakCount;
-    };
-    static_assert(
-      offsetof(WeakCountWithTailLaneView, tailWeakCount) == 0x04,
-      "WeakCountWithTailLaneView::tailWeakCount offset must be 0x04"
-    );
-
-    [[nodiscard]] inline SpCountedBaseRuntimeView* AsRuntimeView(detail::sp_counted_base* const control) noexcept
-    {
-      return reinterpret_cast<SpCountedBaseRuntimeView*>(control);
-    }
-
     // NOTE (2026-08-20 audit): despite the "Weak" name inherited from the public
     // wrappers below, FUN_0043D940 (one of the addresses backing this core, see
     // `AssignWeakPairFromShared`) proves both lanes are ordinary strong
@@ -1166,29 +1132,6 @@ namespace boost
     return **source;
   }
 
-  struct ByteFlagOffset4RuntimeView
-  {
-    std::uint8_t pad_00_04[0x04];
-    std::uint8_t flagAtOffset4;
-  };
-  static_assert(
-    offsetof(ByteFlagOffset4RuntimeView, flagAtOffset4) == 0x04,
-    "ByteFlagOffset4RuntimeView::flagAtOffset4 offset must be 0x04"
-  );
-
-  /**
-   * Address: 0x004DEA90 (FUN_004DEA90)
-   *
-   * What it does:
-   * Reads and returns one byte-flag lane at object offset `+0x04`.
-   */
-  std::uint8_t LoadByteFlagAtOffset4(
-    const ByteFlagOffset4RuntimeView* const objectView
-  ) noexcept
-  {
-    return objectView->flagAtOffset4;
-  }
-
   /**
    * Address: 0x00446F30 (FUN_00446F30)
    *
@@ -1205,16 +1148,22 @@ namespace boost
    * Address: 0x00446F70 (FUN_00446F70)
    *
    * What it does:
-   * Atomically increments one weak-count lane and returns the previous value.
+   * Atomically increments one weak-count lane.
+   *
+   * The body is `add ecx, 8; mov eax, 1; lock xadd [ecx], eax; ret` - the
+   * BOOST_INTERLOCKED_INCREMENT(&weak_count_) that `sp_counted_base::
+   * weak_add_ref()` compiles to, with `weak_count_` at +0x08. The old value
+   * left in EAX is the xadd's register residue, not a return: boost's
+   * `weak_add_ref()` is void, and none of this function's callers ever read
+   * it. So it dispatches to the member instead of reaching past it.
    */
-  std::int32_t SpCountedBaseWeakAddRef(detail::sp_counted_base* const control) noexcept
+  void SpCountedBaseWeakAddRef(detail::sp_counted_base* const control) noexcept
   {
     if (control == nullptr) {
-      return 0;
+      return;
     }
 
-    SpCountedBaseRuntimeView* const runtime = AsRuntimeView(control);
-    return static_cast<std::int32_t>(InterlockedExchangeAdd(&runtime->weakCount, 1));
+    control->weak_add_ref();
   }
 
   /**
@@ -1397,40 +1346,6 @@ namespace boost
     (void)SpCountedBaseWeakConstructFromSharedOrThrow(&outPair->pi, &sourcePair->pi);
     outPair->px = sourcePair->px;
     return outPair;
-  }
-
-  /**
-   * Address: 0x00796EE0 (FUN_00796EE0)
-   *
-   * What it does:
-   * Constructs one `boost::detail::weak_count` tail lane from one source
-   * `boost::detail::shared_count` tail lane, then copies the leading
-   * control-pointer lane.
-   */
-  WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLane(
-    WeakCountWithTailLaneView* const outWeakCount,
-    const SharedCountWithTailLaneView* const sourceSharedCount
-  )
-  {
-    ::new (static_cast<void*>(&outWeakCount->tailWeakCount))
-      detail::weak_count(sourceSharedCount->tailSharedCount);
-    outWeakCount->control = sourceSharedCount->control;
-    return outWeakCount;
-  }
-
-  /**
-   * Address: 0x008F3930 (FUN_008F3930)
-   *
-   * What it does:
-   * Forwarding lane that builds one weak-count tail from one shared-count tail
-   * and copies the leading control-pointer lane.
-   */
-  WeakCountWithTailLaneView* ConstructWeakCountFromSharedTailLaneAdapterA(
-    WeakCountWithTailLaneView* const outWeakCount,
-    const SharedCountWithTailLaneView* const sourceSharedCount
-  )
-  {
-    return ConstructWeakCountFromSharedTailLane(outWeakCount, sourceSharedCount);
   }
 
   /**
