@@ -693,6 +693,40 @@ namespace
    * What it does:
    * Builds one normalized firing direction vector from start/end points and
    * selected ballistic pitch.
+   *
+   * DETERMINISM NOTE -- deliberate divergence from the binary, shared by every
+   * `std::sin`/`std::cos`/`std::atan2` in this file's sim paths
+   * (`CalculateFiringPitch` 0x005D6310, `CheckTracking` 0x006309F0, `Rotate1`
+   * 0x00631190, `Rotate2` 0x00631220).
+   *
+   * The binary computes these with the x87 transcendental instructions -- this
+   * function is `fcos` at 0x005D644F and `fsin` at 0x005D647E, and the
+   * `CAimManipulator` rotations are the same pair. Those instructions are NOT
+   * exactly specified by IEEE 754: their low-order bits are implementation
+   * defined, and AMD and Intel genuinely disagree (Intel's `fsin` argument
+   * reduction uses a 66-bit pi and is badly wrong near multiples of pi, where
+   * AMD's is not). The engine's `_controlfp(_PC_24, _MCW_PC)` rounds results to
+   * a 24-bit mantissa, which hides almost all of that -- which is exactly why a
+   * lockstep match normally survives for hours before anything shows.
+   *
+   * It is not a complete fix, and this is a live desync vector in the shipped
+   * game: turret aiming runs here every tick for every weapon, so one argument
+   * landing in a region where the two vendors differ by more than the 24-bit
+   * rounding hides is enough to flip a comparison on one machine only. That
+   * client then creates or destroys one effect entity out of step, which skews
+   * `EntityDB`'s per-family id free list, and `Sim::UpdateChecksum` hashes
+   * `Entity::id_` -- so the beat checksum diverges with no visible difference in
+   * unit state. Investigated against game 27801260 (see the desync report):
+   * sole desyncing client, reproduces bit-identically from that client's
+   * replay, and no NaN, denormal-flush or rounding-mode explanation survives.
+   *
+   * `std::sin`/`std::cos` here do NOT lower to `fsin`/`fcos`; on the modern
+   * toolchain they call the CRT's SSE2 software implementations, which are
+   * vendor independent. So this recovery is deterministic across CPUs where the
+   * binary was not -- but it is correspondingly NOT bit-identical to the binary
+   * for these calls. That trade is intentional: the two properties cannot both
+   * hold, and a lockstep simulation is worth more than matching a defect. Do
+   * not "restore fidelity" by reaching for `fsin`/`fcos` inline asm.
    */
   Wm3::Vector3f* CalculateFiringDirection(
     Wm3::Vector3f* const outDirection,
