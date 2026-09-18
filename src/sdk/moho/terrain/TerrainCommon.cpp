@@ -5,33 +5,33 @@
 
 namespace moho
 {
-  namespace
-  {
-    /**
-     * Address: 0x007FF7C0 (FUN_007FF7C0, IRenTerrain base-vtable reset lane)
-     *
-     * What it does:
-     * Represents the compiler-emitted base-vtable reset lane executed before
-     * terrain-base member initialization.
-     */
-    void ResetIRenTerrainBaseVtable(TerrainCommon* const object)
-    {
-      // Recovered C++ constructor prologues already perform this vtable install.
-      (void)object;
-    }
-  } // namespace
-
   /**
    * Address: 0x007FF840 (FUN_007FF840, ??0TerrainCommon@Moho@@QAE@@Z)
+   * Address: 0x007FF7C0 (FUN_007FF7C0, ??0IRenTerrain@Moho@@QAE@@Z)
+   * Address: 0x007FF7D0 (FUN_007FF7D0, the same body with `this` in eax)
    *
    * What it does:
-   * Initializes the vtable and loads the shared decal mask texture from the
-   * active D3D device resource manager.
+   * Loads the shared decal mask texture from the active D3D device resource
+   * manager. The vtable install is compiler-emitted, not a source statement.
+   *
+   * The two base-ctor addresses are MSVC's emission of `IRenTerrain::
+   * IRenTerrain()`, which is nothing but `mov [this], offset
+   * ??_7IRenTerrain@Moho@@6B@ (0x00E41994); ret` -- 0x007FF7C0 takes `this` in
+   * ecx and 0x007FF7D0 in eax, so they are register-allocation twins of one
+   * body. `TerrainCommon.h` models the pure interface and `TerrainCommon` as a
+   * single class (all 15 IRenTerrain slots are `_purecall`), so neither has a
+   * source-level home here -- and neither needs one: this constructor never
+   * calls them in the binary either. At 0x007FF865 it stores its own vftable
+   * 0x00E419D4 straight into `[esi]`, because MSVC elides a base constructor
+   * whose only effect is a vtable the derived constructor overwrites on the
+   * next instruction.
+   *
+   * Previously the body opened with `ResetIRenTerrainBaseVtable(this)`, an
+   * empty file-static standing in for that elided glue -- a call the binary
+   * does not make, to a function that did nothing.
    */
   TerrainCommon::TerrainCommon()
   {
-    ResetIRenTerrainBaseVtable(this);
-
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     resources->GetTexture(mDecalMask, "/textures/engine/decalMask.dds", 0, true);
   }
