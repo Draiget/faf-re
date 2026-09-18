@@ -37,6 +37,20 @@ namespace moho
     virtual void OnEvent(TEvent event) = 0;
 
   public:
+    /**
+     * The listener's own intrusive node, and the one every
+     * `Listener<T>`-shaped owner links through. The compiler emits its
+     * unlink/relink pair per instantiation:
+     *
+     * Address: 0x005F42F0, 0x005F4340 (unlink and self-link the node)
+     * Address: 0x005F42C0, 0x005F4310 (unlink, then relink before an anchor)
+     * Address: 0x005F4560 (the same relink reached through the owner pointer)
+     *
+     * All five were hand-written in moho/unit/Broadcaster.cpp over a
+     * `BroadcasterOwnerNodeOffset4RuntimeView` stand-in - which is this class,
+     * a vtable and a node at +0x04 - with no callers (RULE ONE), removed
+     * 2026-09-18.
+     */
     Broadcaster mListenerLink; // +0x04
   };
 

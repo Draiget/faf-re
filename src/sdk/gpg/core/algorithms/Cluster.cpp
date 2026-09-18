@@ -65,50 +65,7 @@ namespace
         return false;
     }
 
-    struct SharedCountOwnerRuntimeView
-    {
-        void* payload;
-        SharedCountControl* control;
-    };
-    static_assert(sizeof(SharedCountOwnerRuntimeView) == 0x8, "SharedCountOwnerRuntimeView size must be 0x8");
-    static_assert(
-      offsetof(SharedCountOwnerRuntimeView, control) == 0x4,
-      "SharedCountOwnerRuntimeView::control offset must be 0x4"
-    );
 
-    /**
-     * Address: 0x008E34E0 (FUN_008E34E0)
-     *
-     * What it does:
-     * Releases one shared/weak control block referenced from owner offset
-     * `+0x4`, invoking control vtable lanes when reference counters reach zero.
-     */
-    volatile long* ReleaseOwnerSharedCountControlLane(
-      SharedCountOwnerRuntimeView* const owner
-    )
-    {
-      SharedCountControl* const control = owner->control;
-      volatile long* result = nullptr;
-      if (control == nullptr) {
-        return result;
-      }
-
-      result = &control->useCount;
-      if (_InterlockedExchangeAdd(&control->useCount, -1) == 1) {
-        using ControlFn = void(__thiscall*)(SharedCountControl*);
-        auto* const disposeFn = reinterpret_cast<ControlFn>(control->vtable[1]);
-        disposeFn(control);
-
-        result = &control->weakCount;
-        if (_InterlockedExchangeAdd(&control->weakCount, -1) == 1) {
-          auto* const destroyFn = reinterpret_cast<ControlFn>(control->vtable[2]);
-          destroyFn(control);
-          result = reinterpret_cast<volatile long*>(control);
-        }
-      }
-
-      return result;
-    }
 
     constexpr std::uint8_t kClusterSizeLog2ByLevel[] = { 0u, 3u, 5u, 7u };
     constexpr std::size_t kClusterSizeLog2Count = sizeof(kClusterSizeLog2ByLevel) / sizeof(kClusterSizeLog2ByLevel[0]);
@@ -116,12 +73,6 @@ namespace
     constexpr std::size_t kClusterSizeCount = sizeof(kClusterSizeByLevel) / sizeof(kClusterSizeByLevel[0]);
 
     constexpr std::uint32_t kOccupationKeySalt = 0x7BEF2693u;
-
-    struct IOccupationSourceRuntimeView
-    {
-        void* mVtable = nullptr;
-    };
-    static_assert(sizeof(IOccupationSourceRuntimeView) == 0x04, "IOccupationSourceRuntimeView size must be 0x04");
 
     class OccupationSourceVTableProbe final : public gpg::HaStar::IOccupationSource
     {
@@ -139,8 +90,10 @@ namespace
 
     [[nodiscard]] gpg::HaStar::IOccupationSource* WriteOccupationSourceVTable(gpg::HaStar::IOccupationSource* const source)
     {
-        auto& runtimeView = reinterpret_cast<IOccupationSourceRuntimeView&>(*source);
-        runtimeView.mVtable = RecoveredOccupationSourceVTable();
+        // The vptr is the object's first word; `IOccupationSource` is
+        // polymorphic, so this writes through the interface itself rather than
+        // through a one-field stand-in for it.
+        *reinterpret_cast<void**>(source) = RecoveredOccupationSourceVTable();
         return source;
     }
 

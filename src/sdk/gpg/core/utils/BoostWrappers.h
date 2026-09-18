@@ -348,6 +348,13 @@ namespace boost
          * on last use, and clears the borrowed raw-ptr lanes.
          * Address: 0x007FAD40 (FUN_007FAD40 -- `shared_ptr<T>::reset()` (`px = 0; pn.release()`) as emitted for WRenViewport's device-resource handles (0x007F70F0); callers 0x007F70F0; formerly `ClearSharedOwnershipPairLaneA` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
          * Address: 0x007FADB0 (FUN_007FADB0 -- `shared_ptr<T>::reset()` (`px = 0; pn.release()`), the second handle type of 0x007F70F0; callers 0x007F70F0; formerly `ClearSharedOwnershipPairLaneB` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+         * Address: 0x008E34E0 (FUN_008E34E0 -- `shared_ptr<T>::~shared_ptr()`
+         * reached through the owning object: the control block at owner +0x04
+         * is dropped, `dispose()` runs at use-count zero and `destroy()` at
+         * weak-count zero. Zero callers, unreachable; formerly
+         * `ReleaseOwnerSharedCountControlLane` over a
+         * `SharedCountOwnerRuntimeView` stand-in in
+         * gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-18.)
          */
         void release() noexcept {
             detail::sp_counted_base* const control = pi;

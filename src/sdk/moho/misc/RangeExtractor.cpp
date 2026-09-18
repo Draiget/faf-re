@@ -76,32 +76,6 @@ namespace
     RegisterExtractor(registry, "CounterIntel", new moho::CounterIntelExtractor());
   }
 
-  struct ExtractorVtableOnlyRuntimeView
-  {
-    void* vtable = nullptr; // +0x00
-  };
-  static_assert(sizeof(ExtractorVtableOnlyRuntimeView) == 0x04, "ExtractorVtableOnlyRuntimeView size must be 0x04");
-
-  struct WeaponExtractorCtorRuntimeView
-  {
-    void* vtable = nullptr;         // +0x00
-    std::int32_t rangeCategory = 0; // +0x04
-  };
-  static_assert(sizeof(WeaponExtractorCtorRuntimeView) == 0x08, "WeaponExtractorCtorRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(WeaponExtractorCtorRuntimeView, rangeCategory) == 0x04,
-    "WeaponExtractorCtorRuntimeView::rangeCategory offset must be 0x04"
-  );
-
-  template <typename RuntimeViewT>
-  [[nodiscard]] RuntimeViewT* RebindExtractorVtable(RuntimeViewT* const runtimeView, void* const vtableTag) noexcept
-  {
-    if (runtimeView != nullptr) {
-      runtimeView->vtable = vtableTag;
-    }
-    return runtimeView;
-  }
-
   [[nodiscard]] BlueprintExtractorRegistry* GetBlueprintExtractorRegistryPointer() noexcept
   {
     return &GetBlueprintExtractorRegistry();
@@ -140,52 +114,14 @@ namespace
    * Address: 0x007EDAE0  Moho::SonarExtractor
    * Address: 0x007EDAF0  Moho::OmniExtractor
    * Address: 0x007EDB00  Moho::CounterIntelExtractor
-   */
-  [[maybe_unused]] ExtractorVtableOnlyRuntimeView* RebindRangeExtractorBaseVtableLaneA(
-    ExtractorVtableOnlyRuntimeView* const runtimeView
-  ) noexcept
-  {
-    static std::uint8_t sRangeExtractorVtableTag = 0;
-    return RebindExtractorVtable(runtimeView, &sRangeExtractorVtableTag);
-  }
-
-
-
-  /**
-   * Address: 0x007EC5A0 (FUN_007EC5A0)
+   * Address: 0x007EC590  base, the lane the two stand-in structs served
+   * Address: 0x007EC5A0  Moho::WeaponExtractor, which also stores its
+   *                      range category at +0x04
    *
-   * What it does:
-   * Initializes one weapon-extractor runtime lane by rebinding vtable state and
-   * storing the weapon-range category lane at `+0x04`.
+   * The `ExtractorVtableOnlyRuntimeView` / `WeaponExtractorCtorRuntimeView`
+   * stand-ins these were written over are gone with them (RULE ONE):
+   * a vptr fixup has no source line to model an object for.
    */
-  [[maybe_unused]] WeaponExtractorCtorRuntimeView* InitializeWeaponExtractorRangeCategoryLaneA(
-    WeaponExtractorCtorRuntimeView* const runtimeView,
-    const std::int32_t rangeCategory
-  ) noexcept
-  {
-    static std::uint8_t sWeaponExtractorVtableTag = 0;
-    auto* const initialized = RebindExtractorVtable(runtimeView, &sWeaponExtractorVtableTag);
-    if (initialized != nullptr) {
-      initialized->rangeCategory = rangeCategory;
-    }
-    return initialized;
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   /**
    * Address: 0x007F1CB0 (FUN_007F1CB0)
    *

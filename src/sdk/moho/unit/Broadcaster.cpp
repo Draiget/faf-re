@@ -431,139 +431,6 @@ namespace
     return node;
   }
 
-  struct BroadcasterOwnerNodeOffset4RuntimeView
-  {
-    std::uint32_t ownerWord; // +0x00
-    moho::Broadcaster node;  // +0x04
-  };
-  static_assert(
-    offsetof(BroadcasterOwnerNodeOffset4RuntimeView, node) == 0x04,
-    "BroadcasterOwnerNodeOffset4RuntimeView::node offset must be 0x04"
-  );
-  static_assert(
-    sizeof(BroadcasterOwnerNodeOffset4RuntimeView) == 0x0C,
-    "BroadcasterOwnerNodeOffset4RuntimeView size must be 0x0C"
-  );
-
-  /**
-   * Address: 0x005F4560 (FUN_005F4560)
-   *
-   * What it does:
-   * Adjusts one owner pointer to its embedded broadcaster node at `+0x04`
-   * and dispatches to the canonical intrusive relink lane.
-   */
-  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4NodeDispatchToCanonicalRelink(
-    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
-    moho::Broadcaster* const anchor
-  ) noexcept
-  {
-    moho::Broadcaster* node = nullptr;
-    if (owner != nullptr) {
-      node = &owner->node;
-    }
-    return RelinkBroadcasterNodeBeforeAnchor(node, anchor);
-  }
-
-  /**
-   * Address: 0x005F4360 (FUN_005F4360)
-   *
-   * What it does:
-   * Resets one broadcaster link node to singleton self-links.
-   */
-  [[maybe_unused]] moho::Broadcaster* ResetBroadcasterNodeSelfLinks(moho::Broadcaster* const node) noexcept
-  {
-    node->mPrev = node;
-    node->mNext = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x005F4370 (FUN_005F4370)
-   * Address: 0x005F4590 (FUN_005F4590)
-   *
-   * What it does:
-   * Unlinks one broadcaster node from its current intrusive ring and restores
-   * singleton self-links.
-   */
-  [[maybe_unused]] moho::Broadcaster* UnlinkBroadcasterNodeSelfLinkAlias(moho::Broadcaster* const node) noexcept
-  {
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x005F4610 (FUN_005F4610)
-   *
-   * What it does:
-   * Unlinks one broadcaster node from its current ring and relinks it
-   * directly before `anchor`.
-   */
-  [[maybe_unused]] moho::Broadcaster* RelinkBroadcasterNodeBeforeAnchorAlias(
-    moho::Broadcaster* const node,
-    moho::Broadcaster* const anchor
-  ) noexcept
-  {
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-
-    node->mPrev = anchor->mPrev;
-    node->mNext = anchor;
-    anchor->mPrev = node;
-    node->mPrev->mNext = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x005F42F0 (FUN_005F42F0)
-   * Address: 0x005F4340 (FUN_005F4340)
-   *
-   * What it does:
-   * Unlinks the owner node at offset `+0x04` and returns that node lane after
-   * singleton self-link reset.
-   */
-  [[maybe_unused]] moho::Broadcaster* UnlinkOwnerOffset4BroadcasterNodeAndReturnNode(
-    BroadcasterOwnerNodeOffset4RuntimeView* const owner
-  ) noexcept
-  {
-    moho::Broadcaster* const node = &owner->node;
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x005F42C0 (FUN_005F42C0)
-   * Address: 0x005F4310 (FUN_005F4310)
-   *
-   * What it does:
-   * Unlinks the owner node at offset `+0x04`, resets it to singleton links,
-   * and relinks it directly before `anchor`.
-   */
-  [[maybe_unused]] moho::Broadcaster* RelinkOwnerOffset4BroadcasterNodeBeforeAnchor(
-    BroadcasterOwnerNodeOffset4RuntimeView* const owner,
-    moho::Broadcaster* const anchor
-  ) noexcept
-  {
-    moho::Broadcaster* const node = &owner->node;
-    node->mNext->mPrev = node->mPrev;
-    node->mPrev->mNext = node->mNext;
-    node->mPrev = node;
-    node->mNext = node;
-
-    node->mPrev = anchor->mPrev;
-    node->mNext = anchor;
-    anchor->mPrev = node;
-    node->mPrev->mNext = node;
-    return node;
-  }
-
   /**
    * Address: 0x006EA7A0 (FUN_006EA7A0, Moho::RBroadcasterRType_ECommandEvent::SerLoad)
    *
@@ -763,22 +630,16 @@ namespace
 
 namespace moho
 {
-  namespace
-  {
-    struct CommandEventBroadcasterOwnerRuntimeView
-    {
-      std::byte lane00_33[0x34]{};
-      Broadcaster commandEventBroadcaster; // +0x34
-    };
-    static_assert(
-      offsetof(CommandEventBroadcasterOwnerRuntimeView, commandEventBroadcaster) == 0x34,
-      "CommandEventBroadcasterOwnerRuntimeView::commandEventBroadcaster offset must be 0x34"
-    );
-  } // namespace
-
   /**
    * Address: 0x006E94A0 (FUN_006E94A0,
    * ?BroadcastEvent@?$Broadcaster@W4ECommandEvent@Moho@@@Moho@@IAEXW4ECommandEvent@2@@Z)
+   * Address: 0x006E9110 (FUN_006E9110 -- the same broadcast reached through an
+   * owner pointer: `CUnitCommand : CScriptObject, Broadcaster` puts this ring
+   * at +0x34, so `command->BroadcastEvent(event)` compiles to a base
+   * adjustment and this call. Zero callers, unreachable; formerly
+   * `BroadcastEmbeddedCommandEventLane` over a
+   * `CommandEventBroadcasterOwnerRuntimeView` stand-in (RULE ONE), removed
+   * 2026-09-18.)
    *
    * What it does:
    * Broadcasts one command event to linked listeners while preserving
@@ -810,21 +671,6 @@ namespace moho
 
     detached.mNext->mPrev = detached.mPrev;
     detached.mPrev->mNext = detached.mNext;
-  }
-
-  /**
-   * Address: 0x006E9110 (FUN_006E9110)
-   *
-   * What it does:
-   * Resolves one embedded broadcaster lane at owner offset `+0x34` and
-   * forwards one command-event broadcast into that lane.
-   */
-  [[maybe_unused]] void BroadcastEmbeddedCommandEventLane(
-    CommandEventBroadcasterOwnerRuntimeView* const ownerRuntime,
-    const ECommandEvent event
-  )
-  {
-    ownerRuntime->commandEventBroadcaster.BroadcastEvent(event);
   }
 
   /**
