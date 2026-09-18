@@ -1466,6 +1466,14 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
 
     const bool canTraverse = CanPathCellTransition(*this, mCurrentPos, candidate);
     const bool canReach = CanReachCellFromCurrent(*this, candidate);
+    // TEMPORARY PROBE -- navigation triage, NAVOBS zone only: does the
+    // string-pull skip a node whose straight line crosses the factory?
+    if (mCurrentPos.x >= 164 && mCurrentPos.x <= 177 && mCurrentPos.z >= 70 && mCurrentPos.z <= 110) {
+      gpg::Warnf("[NAVPULL] cur=(%d,%d) idx=%d cand=(%d,%d) traverse=%d reach=%d probe=%d count=%d noprog=%d",
+                 static_cast<int>(mCurrentPos.x), static_cast<int>(mCurrentPos.z), idx,
+                 static_cast<int>(candidate.x), static_cast<int>(candidate.z), canTraverse ? 1 : 0,
+                 canReach ? 1 : 0, static_cast<int>(mHasForwardProbe), mPath.CountInt(), mNoProgressTickCount);
+    }
     if (canTraverse && canReach) {
       mHasForwardProbe = 1;
       selectedIndex = idx;
@@ -1594,9 +1602,23 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
     return;
   }
 
+  // The exempt state is UNITSTATE_Immobile (1), not UNITSTATE_Moving (2).
+  // 0x005AEB10 pushes 1 into `IsUnitState` (vtable +0x3C) and resets the
+  // counter at 0x005AEB20 when it answers true, incrementing at 0x005AEB1A
+  // otherwise; the position test ahead of it is
+  // `Vector3f::Compare(Position, PrevPosition)` at 0x005AEB02, whose non-zero
+  // "they differ" result also resets.
+  //
+  // Testing `UNITSTATE_Moving` inverted the meaning of the whole gate. A unit
+  // wedged against a building or a slope it cannot climb still *has* a move
+  // order, so it sits in UNITSTATE_Moving with zero velocity - which reset the
+  // counter on every tick, so `mNoProgressTickCount > 30` never fired and none
+  // of the recovery below it (drop the path and go idle, repath, or back off
+  // because the destination is occupied) could ever run. The unit pressed into
+  // the obstacle and stayed there with its order still queued.
   const bool hasMoved = (unit->Position.x != unit->PrevPosition.x) || (unit->Position.y != unit->PrevPosition.y) ||
     (unit->Position.z != unit->PrevPosition.z);
-  if (!hasMoved && !unit->IsUnitState(UNITSTATE_Moving)) {
+  if (!hasMoved && !unit->IsUnitState(UNITSTATE_Immobile)) {
     ++mNoProgressTickCount;
   } else {
     mNoProgressTickCount = 0;
