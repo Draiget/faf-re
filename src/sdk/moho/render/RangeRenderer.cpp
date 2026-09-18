@@ -616,22 +616,23 @@ namespace
    * + `EntityCategory::HasBlueprint` pair, which matches the surrounding
    * category-membership semantics exactly.
    */
-  [[nodiscard]] bool BlueprintPassesRangeVisibilityGate(
-    const moho::CWldSession& session, const moho::RUnitBlueprint& blueprint
-  ) noexcept
+  [[nodiscard]] bool ProfileParticipatesInPerUnitPasses(const moho::SRangeRenderProfile& profile) noexcept
   {
-    const moho::EntityCategoryLookupResolver* const resolver = session.GetCategoryLookupResolver();
-    if (resolver == nullptr) {
-      return false;
-    }
-
-    const moho::CategoryWordRangeView* const allMilitary = resolver->GetEntityCategory("AllMilitary");
-    if (allMilitary == nullptr || !moho::EntityCategory::HasBlueprint(&blueprint, allMilitary)) {
-      return false;
-    }
-
-    const moho::CategoryWordRangeView* const allIntel = resolver->GetEntityCategory("AllIntel");
-    return allIntel != nullptr && moho::EntityCategory::HasBlueprint(&blueprint, allIntel);
+    // The two combination profiles ("Combine Military" / "Combine Intel") are
+    // aggregates of the other profiles' categories: they exist for the
+    // frustum-wide pass and must not draw a second ring over a unit that its
+    // own profile already covered.
+    //
+    // The binary tests exactly this, once per profile and before it touches
+    // the selection at all: `std::string::compare(0, npos, "AllMilitary", 11)`
+    // at 0x007EF2C9 and `("AllIntel", 8)` at 0x007EF2E5, both on the profile's
+    // own name at `[profile+0x14]`, each jumping to the function's exit when
+    // the compare returns equal. An earlier pass read those two as category
+    // membership tests against the *blueprint* and required a unit to be in
+    // both AllMilitary and AllIntel at once - which essentially nothing is, so
+    // every per-unit pass rejected every unit and no selected-unit or
+    // hovered-unit ring was ever drawn.
+    return profile.mExtractorName != "AllMilitary" && profile.mExtractorName != "AllIntel";
   }
 
   /**
@@ -682,7 +683,7 @@ namespace
       if (extractor == nullptr) {
         continue;
       }
-      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
+      if (!ProfileParticipatesInPerUnitPasses(profile)) {
         continue;
       }
       if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
@@ -735,6 +736,10 @@ namespace
       return;
     }
 
+    if (!ProfileParticipatesInPerUnitPasses(profile)) {
+      return;
+    }
+
     moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
     if (extractor == nullptr) {
       return;
@@ -756,9 +761,6 @@ namespace
       auto* const iunit = static_cast<moho::IUnit*>(unit);
       const moho::RUnitBlueprint* const blueprint = iunit->GetBlueprint();
       if (blueprint == nullptr) {
-        continue;
-      }
-      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
         continue;
       }
       if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
@@ -833,7 +835,7 @@ namespace
       if (extractor == nullptr) {
         continue;
       }
-      if (!BlueprintPassesRangeVisibilityGate(session, *blueprint)) {
+      if (!ProfileParticipatesInPerUnitPasses(profile)) {
         continue;
       }
       if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
