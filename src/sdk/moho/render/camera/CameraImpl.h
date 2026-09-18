@@ -131,6 +131,25 @@ namespace moho
      * exercised when `other` is also empty in every observed call site.
      */
     CameraUserEntityWeakRef* AssignRange(const CameraFrustumUserEntityList& other);
+    /**
+     * Address: inlined - emitted at 0x007EEB13..0x007EEB52 inside
+     * `RangeRenderer::Render` (FUN_007EEA00), and again in the lane teardown
+     * `CameraImpl::~CameraImpl` and `CameraImpl::CacheCameraFrustumUnits` run.
+     *
+     * The destruction half of this lane, and the one operation it was missing.
+     * Every element is spliced into its tracked entity's intrusive weak-link
+     * chain, so the storage cannot simply be released: each node must first
+     * rewire the chain slot pointing back at it (FUN_007AF240), and only then
+     * is heap-grown storage handed to `operator delete[]`. Skipping this
+     * leaves the entity chains pointing into memory the lane no longer owns,
+     * which is fatal for a stack-allocated lane - the next walk of that chain
+     * dereferences a dead frame.
+     *
+     * Leaves `mStart`/`mFinish` as they were: the binary's inlined copy is a
+     * dying object's destructor. Callers that go on to reuse the lane restore
+     * the inline sentinel state themselves.
+     */
+    void DetachAndRelease() noexcept;
   };
 
   static_assert(sizeof(CameraFrustumUserEntityList) == 0x10, "CameraFrustumUserEntityList size must be 0x10");

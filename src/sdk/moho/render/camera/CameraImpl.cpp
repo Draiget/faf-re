@@ -1214,50 +1214,22 @@ namespace
   }
 
   /**
-   * Address: 0x007AF240 (FUN_007AF240)
-   *
-   * Detach every still-attached `CameraUserEntityWeakRef` lane in `[begin, end)`
-   * from the tracked owner's intrusive next-back-link chain. For each lane,
-   * walks the owner's chain (starting at `*mOwnerLinkSlot`) until finding the
-   * slot that points back to this lane and rewires that slot to skip over us
-   * by storing this lane's saved `mNextOwnerRef` value. This is the typed
-   * mirror of FUN_007AF240 operating over `CameraImpl`'s 8-byte inline
-   * weak-ref pair lanes. Reached from `TeardownCameraFrustumStorageLane`,
-   * itself called from `CameraImpl::~CameraImpl` (0x007A7F00) for all three
-   * frustum lanes.
-   */
-  void DetachCameraFrustumWeakRefRange(
-    moho::CameraUserEntityWeakRef* begin, moho::CameraUserEntityWeakRef* const end
-  ) noexcept
-  {
-    for (; begin != end; ++begin) {
-      auto* ownerChainSlot = static_cast<std::uintptr_t*>(begin->mOwnerLinkSlot);
-      if (ownerChainSlot == nullptr) {
-        continue;
-      }
-
-      const auto laneSelfMarker = reinterpret_cast<std::uintptr_t>(begin);
-      while (*ownerChainSlot != laneSelfMarker) {
-        ownerChainSlot = reinterpret_cast<std::uintptr_t*>(*ownerChainSlot + sizeof(void*));
-      }
-      *ownerChainSlot = reinterpret_cast<std::uintptr_t>(begin->mNextOwnerRef);
-    }
-  }
-
-  /**
    * Walk one runtime camera frustum-weak-vector lane, unlink every tracked
-   * weak entity ref through `DetachCameraFrustumWeakRefRange`, release any
-   * heap-grown storage with `operator delete[]`, and restore the lane to its
-   * post-construction inline sentinel state (`mView.mStart ==
-   * mView.mInlineOrigin`).
+   * weak entity ref and release any heap-grown storage (the lane's own
+   * `DetachAndRelease`), then restore it to the post-construction inline
+   * sentinel state (`mView.mStart == mView.mInlineOrigin`) so it can be
+   * refilled.
    */
   void TeardownCameraFrustumStorageLane(CameraFrustumUserEntityStorage& storage) noexcept
   {
     moho::CameraFrustumUserEntityList& view = storage.mView;
-    DetachCameraFrustumWeakRefRange(view.mStart, view.mFinish);
+    const bool hadHeapStorage = (view.mStart != view.mInlineOrigin);
 
-    if (view.mStart != view.mInlineOrigin) {
-      ::operator delete[](view.mStart);
+    // Same unlink-then-release the lane's own destructor performs; this caller
+    // additionally rearms the lane, because it is about to be refilled.
+    view.DetachAndRelease();
+
+    if (hadHeapStorage) {
       view.mStart = view.mInlineOrigin;
       // Restore the SBO "capacity end" cache the binary maintains by reading
       // the first word stored at the inline origin (the post-construction
@@ -2361,7 +2333,10 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::GrowAndInsertR
   // Every relocated element was just relinked into the NEW addresses above;
   // the OLD addresses are now stale duplicate links still spliced into the
   // same owner chains, so detach them before releasing the old storage.
-  DetachCameraFrustumWeakRefRange(mStart, mFinish);
+  gpg::core::detail::UnlinkIntrusiveWeakRefRange(
+    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mStart),
+    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
+  );
 
   if (mStart == mInlineOrigin) {
     // Abandoning the inline block without freeing it - stash its capacity
@@ -2512,6 +2487,31 @@ moho::CameraUserEntityWeakRef* moho::CameraFrustumUserEntityList::AssignRange(
   (void)insertedEnd;
 
   return mStart;
+}
+
+/**
+ * Address: inlined - emitted at 0x007EEB13..0x007EEB52 inside
+ * `RangeRenderer::Render` (FUN_007EEA00), where the compiler expanded this
+ * lane's destructor for the stack snapshot that function builds.
+ *
+ * What it does:
+ * Unlinks every element from the intrusive weak-link chain of the entity it
+ * tracks, then releases the storage if it had outgrown the inline buffer. The
+ * unlink walk at 0x007EEB21..0x007EEB40 is the shared container-home body
+ * (`UnlinkIntrusiveWeakRefRange`, FUN_0061CA70) instruction for instruction:
+ * skip a null owner slot, otherwise follow the owner's chain until the slot
+ * pointing back at this node is found and rewire it past us.
+ */
+void moho::CameraFrustumUserEntityList::DetachAndRelease() noexcept
+{
+  gpg::core::detail::UnlinkIntrusiveWeakRefRange(
+    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mStart),
+    reinterpret_cast<gpg::core::IntrusiveWeakLinkNode*>(mFinish)
+  );
+
+  if (mStart != mInlineOrigin) {
+    ::operator delete[](mStart);
+  }
 }
 
 /**
