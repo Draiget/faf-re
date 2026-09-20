@@ -273,18 +273,28 @@ void CClientBase::Process(CMessage& msg)
       mManager->ProcessClients(ackMessage);
     }
 
-    // The whole append goes through `VirtWrite`, which takes the pipe's own
-    // lock. The tempting shortcut - test `mWriteEnd - mWriteHead` and memcpy
-    // straight into the window when the message fits - is the inlined shape of
-    // `Stream::Write`, and it is safe for every stream that belongs to one
-    // thread. `mPipe` does not: the issue thread appends here while the
-    // dispatch thread drains it, and an append that grows the pipe swaps in a
-    // fresh 4KB chunk. A writer that already loaded the old `mWriteHead` then
-    // stores `head + wireBytes` back over the new one, leaving `mWriteHead` in
-    // the retired chunk and `mWriteEnd` in the current one. Every later append
-    // measures the window across two chunks, believes it has megabytes of room,
-    // and runs off the end of the retired chunk into whatever the allocator
-    // handed out next.
+    // The binary does NOT route this append through `VirtWrite`. At 0x0053C0A6
+    // it uses the inlined `Stream::Write` fast path: raw loads of `mWriteHead`
+    // (0x0053C0AB) and `mWriteEnd` (0x0053C0AE), a `memcpy` (0x0053C0BF), and a
+    // non-atomic `mWriteHead += n` (0x0053C0C7), falling back to the locking
+    // virtual (vtable +0x1C) only when the message does not fit the chunk.
+    //
+    // An earlier note here claimed that shortcut races the dispatch thread and
+    // can walk off a retired 4KB chunk. That race cannot occur: every path into
+    // this function already holds `mManager->mLock`, which is also held across
+    // the `UpdateState` drain loop in `CClientManagerImpl::UpdateStates`.
+    // Verified in the binary, not just in this tree -- `CNetClient::
+    // ReceiveMessage` (0x0053DE70) loads `mManager` from `this+0x28`, takes
+    // `mManager+0x40C` at 0x0053DEA5, calls this function at 0x0053DEF5, and
+    // releases at 0x0053DF04; `CLocalClient::Process` (0x0053D190) and
+    // `CReplayClient::Process` (0x0053D900) have the same shape. The mutex is
+    // recursive, so the marshaller's re-entrant `ProcessClients` during
+    // `Dispatch` is covered too.
+    //
+    // `VirtWrite` is kept because, under that lock, it is behaviourally
+    // identical to the inlined form and the lock makes the difference
+    // unobservable. Do not cite the stale race note as evidence of a
+    // sim-dispatch/issue-thread data race -- it was not one.
     mPipe.VirtWrite(msg.mBuff.start_, msg.mBuff.Size());
     return;
   }
@@ -528,16 +538,45 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;
         } else {
+          // `hasCommandSource` is deliberately NOT restored here, and that is
+          // not a recovery slip. The binary's authorized branch
+          // (0x0053C705..0x0053C72E) writes `mCommandSourceId` at 0x0053C711,
+          // emits the message at 0x0053C714, then jumps straight to the next
+          // message. It never touches the flag's stack slot, [esp+0x16]. That
+          // slot is written non-zero exactly once, at entry (0x0053C598, from
+          // `mCommandSourceId != kInvalidCommandSource`); the only other writes
+          // to it anywhere in the function clear it (0x0053C7CC).
+          //
+          // The consequence is a real engine defect. Once a
+          // `CMDST_CommandSourceTerminated` clears the flag and parks
+          // `mCommandSourceId` at 0xFF, the `if (hasCommandSource)` gate below
+          // silently discards every payload op for the rest of this call and
+          // for the whole of the next one -- no log line, nothing. The call
+          // after that re-derives the flag from the `mCommandSourceId` stored
+          // here, so exactly one beat of commands is lost and the stream heals.
+          //
+          // Live sessions never see it: each player owns a `CClientBase`, so a
+          // terminate only poisons the leaver's object, and the leaver issues
+          // nothing afterwards. A replay funnels every command source through
+          // the single `CReplayClient` that `CClientManagerImpl::
+          // CreateReplayClient` installs at `mClients[0]`, so the beat after
+          // any player's departure also loses everyone else's commands. That is
+          // the long-standing "replay desyncs one tick after someone leaves".
+          //
+          // Do not "fix" this by restoring the flag. Doing so stops the engine
+          // reproducing a playback divergence we are actively measuring against.
           mCommandSourceId = claimedSource;
           WriteSetCommandSourceMessage(claimedSource, outPipe, &lastEmittedSource);
-          hasCommandSource = true;
         }
 
         continue;
       }
 
       if (hasCommandSource) {
-        WriteSetCommandSourceMessage(static_cast<std::uint8_t>(mCommandSourceId), outPipe, &lastEmittedSource);
+        // No `WriteSetCommandSourceMessage` here: 0x0053C756 falls straight
+        // through to the pipe append. The source was already emitted either at
+        // entry or by the branch above, so the dedup made the extra call a
+        // no-op -- but it is not in the binary.
         outPipe->Write(message.mBuff.start_, message.mBuff.Size());
 
         if (op == ECmdStreamOp::CMDST_CommandSourceTerminated) {
