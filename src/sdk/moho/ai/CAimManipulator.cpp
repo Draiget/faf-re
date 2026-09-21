@@ -144,9 +144,9 @@ namespace
    * `Moho::runtime` glue at 0x00632C10 and this class's Lua metatable factory
    * `Create` at 0x00632C40. The other two copies of the same body are
    * `IAniManipulator::StaticGetClass` (0x0062FC10) and the virtual
-   * `IAniManipulator::GetClass` (0x0062FC30), both of which the binary names.
-   * No caller calls any of them -- `GetClass` goes through the vtable and the
-   * reflection paths inlined the rest.
+   * `IAniManipulator::GetClass` (0x0062FC30). No caller calls any of them --
+   * `GetClass` goes through the vtable and the reflection paths inlined the
+   * rest.
    */
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
@@ -1385,7 +1385,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
 
 /**
  * Address: 0x00631190 (FUN_00631190, labelled `Moho::CAimManipulator::Rotate1`
- * by hand in the lost IDA database; no mangled symbol backs that name)
+ * in the lost IDA database -- an annotation, not a symbol; this image has no
+ * function names in it at all)
  *
  * What it does:
  * Turns watched bone 0 -- the turret -- to the tracked heading, about the Y
@@ -1414,7 +1415,7 @@ void moho::CAimManipulator::RotateHeadingBone(const bool recomputeFromAngle)
 
 /**
  * Address: 0x00631220 (FUN_00631220, labelled `Moho::CAimManipulator::Rotate2`
- * by hand in the lost IDA database; no mangled symbol backs that name)
+ * in the lost IDA database -- likewise an annotation, not a symbol)
  *
  * What it does:
  * Turns watched bone 1 -- the barrel -- to the tracked pitch, about the X

@@ -290,9 +290,11 @@ namespace moho
      * What it does:
      * Creates the metatable for `T` through `SCR_CreateSimpleMetatable`
      * (0x004D22D0). One out-of-line body per instantiation; the emission
-     * above is identified by the slot it occupies in
-     * `??_7?$CScrLuaMetatableFactory@VIAniManipulator@Moho@@@Moho@@6B@` at
-     * 0x00E213E8, which is its only reference.
+     * above is identified by the slot it occupies in the vtable at
+     * 0x00E213E8, which is its only reference. That vtable's identity is real
+     * binary evidence rather than an annotation: the image carries the RTTI
+     * type descriptor `.?AV?$CScrLuaMetatableFactory@VIAniManipulator@Moho@@@Moho@@`,
+     * so the instantiation is named by the data the runtime itself uses.
      *
      * The body carries nothing type-specific -- the metatable name comes from
      * the registration site, not from here -- so every instantiation is the

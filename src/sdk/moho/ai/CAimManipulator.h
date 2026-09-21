@@ -141,7 +141,13 @@ namespace moho
     [[nodiscard]] gpg::RRef GetDerivedObjectRef();
 
     /**
-     * Address: 0x006306A0 (FUN_006306A0, Moho::CAniManipulator::~CAniManipulator)
+     * Address: 0x006306A0 (FUN_006306A0; the lost IDA database spells this
+     * `??1CAniManipulator@Moho@@QAE@@Z` -- note `CAni`, which is a typo in
+     * that annotation, not a second class. The image contains no occurrence of
+     * `CAniManipulator@Moho@@` at all, while the RTTI type descriptor
+     * `.?AVCAimManipulator@Moho@@` is present exactly once, and this body
+     * writes `CAimManipulator`'s own vtable at 0x00E213C0 and tears down its
+     * `mWeapon` at +0x88 and `mLabel` at +0x90.)
      *
      * What it does:
      * Clears weak owner links and label storage before running
@@ -335,8 +341,15 @@ namespace moho
 
     /**
      * Address: 0x00631190 (FUN_00631190; the lost IDA database labelled this
-     * `Moho::CAimManipulator::Rotate1`, by hand -- there is no mangled symbol
-     * for it, so the name here is taken from the behaviour instead)
+     * `Moho::CAimManipulator::Rotate1`)
+     *
+     * That label is somebody's annotation, not a recovered symbol. This image
+     * is a release build with no function symbols at all -- it carries 1467
+     * RTTI type descriptors (`.?AV...@Moho@@`, which is why *class* names are
+     * trustworthy) and no function name table, so every `FUN_` name in the
+     * database was typed by a person. `Rotate1`/`Rotate2` read as placeholders
+     * and the behaviour is unambiguous, so the names here come from the
+     * behaviour.
      *
      * What it does:
      * Turns watched bone 0 -- the turret -- to the tracked heading, by
@@ -354,9 +367,9 @@ namespace moho
     void RotateHeadingBone(bool recomputeFromAngle);
 
     /**
-     * Address: 0x00631220 (FUN_00631220; likewise labelled
-     * `Moho::CAimManipulator::Rotate2` by hand in the lost database, with no
-     * mangled symbol behind it)
+     * Address: 0x00631220 (FUN_00631220; labelled
+     * `Moho::CAimManipulator::Rotate2` in the lost database -- see the note on
+     * the heading twin above for why that is not evidence)
      *
      * What it does:
      * Turns watched bone 1 -- the barrel -- to the tracked pitch, by rotating

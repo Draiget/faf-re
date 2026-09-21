@@ -75,8 +75,8 @@ namespace moho
     ~IAniManipulator() override;
 
     /**
-     * Address: 0x0062FC10 (FUN_0062FC10,
-     * ?StaticGetClass@IAniManipulator@Moho@@SAPAVRType@gpg@@XZ)
+     * Address: 0x0062FC10 (FUN_0062FC10; the lost IDA database spells this
+     * `?StaticGetClass@IAniManipulator@Moho@@SAPAVRType@gpg@@XZ`)
      *
      * What it does:
      * Returns the cached reflection type for `IAniManipulator`, resolving it
@@ -87,6 +87,15 @@ namespace moho
      * 0x00F71B60, `gpg::LookupRType` at 0x008E0750). Neither has a caller:
      * `GetClass` is reached through the vtable, and every use of this one was
      * inlined.
+     *
+     * The mangled spelling above is an annotation, not a recovered symbol --
+     * this image has no function names in it at all, only 1467 RTTI type
+     * descriptors. What actually places this address here is that the body is
+     * `IAniManipulator`'s cached-type lookup, that address locality is
+     * unanimous for this file, and that it mirrors the
+     * `StaticGetClass`/`GetClass` pair `CAimManipulator` has at
+     * 0x0062FDF0/0x0062FE10. The annotation agrees with all three, which is
+     * why it is quoted, not relied on.
      */
     [[nodiscard]] static gpg::RType* StaticGetClass();
 
