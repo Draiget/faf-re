@@ -232,7 +232,7 @@ namespace moho
     const bool checkCollision = (argumentCount >= 3) ? LuaPlus::LuaStackObject(state, 3).GetBoolean() : true;
     beamEntity->mEffect.ResetFromObject(beamEmitter);
 
-    if (checkCollision && beamEntity->mLauncher.GetObject() != nullptr) {
+    if (checkCollision && beamEntity->mLauncher.GetObjectPtr() != nullptr) {
       beamEntity->CheckCollision();
     }
 
@@ -371,7 +371,7 @@ namespace moho
     const LuaPlus::LuaObject beamObject(LuaPlus::LuaStackObject(state, 1));
     const CollisionBeamEntity* const beamEntity = SCR_FromLua_CollisionBeamEntity(beamObject, state);
 
-    const UnitWeapon* const launcherWeapon = beamEntity->mLauncher.GetObject();
+    const UnitWeapon* const launcherWeapon = beamEntity->mLauncher.GetObjectPtr();
     Unit* const launcherUnit = launcherWeapon ? launcherWeapon->mUnit : nullptr;
     if (launcherUnit != nullptr) {
       LuaPlus::LuaObject launcherObject = launcherUnit->GetLuaObject();
