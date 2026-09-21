@@ -263,6 +263,57 @@ namespace moho
      */
     void PickNewTargetAimSpot();
 
+    // -----------------------------------------------------------------------
+    // Four inline setters whose out-of-line copies the linker kept with zero
+    // references, next to `CAimManipulator`'s own -- because `CAimManipulator`
+    // is where every call site is, and every one of them inlined. See the
+    // matching note on `CAimManipulator`'s accessors for why the register
+    // contract (object in EAX) means these cannot be read as free functions.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Address: 0x0062FD60 (FUN_0062FD60, `mov [eax+0xA8], ecx; ret`)
+     *
+     * What it does:
+     * Rebinds the weapon to a skeleton bone. Inlined into the muzzle-bone
+     * override in `ManipulatorLuaFunctionThunks.cpp`.
+     */
+    void SetBone(const std::int32_t boneIndex) noexcept { mBone = boneIndex; }
+
+    /**
+     * Address: 0x0062FDD0 (FUN_0062FDD0, `mov [eax+0xF0], cl; ret`)
+     *
+     * What it does:
+     * Raises or drops the can-fire latch the firing task gates on. Inlined
+     * three times into `CAimManipulator` -- cleared on construction, raised on
+     * destruction, and set from the on-target flag each update.
+     */
+    void SetCanFire(const bool canFire) noexcept { mCanFire = canFire ? 1u : 0u; }
+
+    /**
+     * Address: 0x0062FDA0 (FUN_0062FDA0, `mov [eax+0x174], cl; ret`)
+     *
+     * What it does:
+     * Marks whether the current target still has a usable firing solution.
+     * `CAimManipulator::ManipulatorUpdate` raises it at the top of every tick
+     * and drops it only when `Aim` fails to produce a valid direction;
+     * `CAcquireTargetTask` raises it again whenever it installs a fresh target,
+     * and reads it back at 0x00589E5F to decide whether the target must be
+     * given up. The flag keeps its `mUnknown174` field spelling for now --
+     * renaming the member reaches five files and is its own change.
+     */
+    void SetAimReachable(const bool reachable) noexcept { mUnknown174 = reachable ? 1u : 0u; }
+
+    /**
+     * Address: 0x0062FDB0 (FUN_0062FDB0, three `fld [eax+N]` / `fstp
+     * [ecx+0x178+N]` pairs; source in EAX, object in ECX)
+     *
+     * What it does:
+     * Publishes the direction this weapon is currently aiming along, for the
+     * firing and targeting paths to read back.
+     */
+    void SetAimingAt(const Wm3::Vector3f& direction) noexcept { mAimingAt = direction; }
+
     /**
      * Address: 0x006D64E0 (FUN_006D64E0, Moho::UnitWeapon::CreateProjectile)
      *

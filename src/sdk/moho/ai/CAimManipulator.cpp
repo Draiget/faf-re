@@ -100,187 +100,6 @@ namespace
   constexpr const char* kInvalidMuzzleBoneWarningFormat =
     "Using non-existant muzzle bone in aim manipulator for unit %s";
 
-  struct CAimManipulatorBaseRuntimeView
-  {
-    std::uint8_t mUnresolved00_03[0x04];
-    bool mTaskEventTriggered;                     // +0x04
-    std::uint8_t mUnresolved05_4B[0x47];
-    bool mBaseEnabled;                            // +0x4C
-    std::uint8_t mUnresolved4D_4F[0x03];
-    moho::CAniActor* mOwnerActor;                 // +0x50
-    moho::Sim* mOwnerSim;                         // +0x54
-    std::int32_t mPrecedence;                     // +0x58
-    std::uint32_t mUnknown5C;                     // +0x5C
-    moho::SAniManipBindingStorage mWatchBones;    // +0x60
-  };
-
-  static_assert(
-    offsetof(CAimManipulatorBaseRuntimeView, mTaskEventTriggered) == 0x04,
-    "CAimManipulatorBaseRuntimeView::mTaskEventTriggered offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CAimManipulatorBaseRuntimeView, mOwnerActor) == 0x50,
-    "CAimManipulatorBaseRuntimeView::mOwnerActor offset must be 0x50"
-  );
-  static_assert(
-    offsetof(CAimManipulatorBaseRuntimeView, mOwnerSim) == 0x54,
-    "CAimManipulatorBaseRuntimeView::mOwnerSim offset must be 0x54"
-  );
-  static_assert(
-    offsetof(CAimManipulatorBaseRuntimeView, mWatchBones) == 0x60,
-    "CAimManipulatorBaseRuntimeView::mWatchBones offset must be 0x60"
-  );
-  static_assert(sizeof(CAimManipulatorBaseRuntimeView) == 0x80, "CAimManipulatorBaseRuntimeView size must be 0x80");
-
-  struct CAimManipulatorRuntimeView
-  {
-    std::uint8_t mUnresolved00_7F[0x80];
-    moho::WeakPtr<moho::Unit> mUnit;             // +0x80
-    moho::WeakPtr<moho::UnitWeapon> mWeapon;     // +0x88
-    msvc8::string mLabel;                        // +0x90
-    moho::RUnitBlueprintWeapon* mUnitWepBlueprint; // +0xAC
-    moho::RProjectileBlueprintPhysics* mProjPhysBlueprint; // +0xB0
-    bool mEnabled; // +0xB4
-    std::uint8_t mUnresolvedB5_B7[0x03];
-    float mHeading; // +0xB8
-    float mPitch;   // +0xBC
-    std::int32_t mMuzzleBone; // +0xC0
-    bool mIsTracking;         // +0xC4
-    std::uint8_t mUnresolvedC5_C7[0x03];
-    float mMinHeading;     // +0xC8
-    float mMaxHeading;     // +0xCC
-    float mHeadingMaxSlew; // +0xD0
-    float mMinPitch;       // +0xD4
-    float mMaxPitch;       // +0xD8
-    float mPitchMaxSlew;   // +0xDC
-    bool mOnTarget;     // +0xE0
-    bool mUnknownBoolE1; // +0xE1
-    std::uint8_t mUnresolvedE2_E3[0x02];
-    std::int32_t mResetPoseTime; // +0xE4
-    std::int32_t mResetTime; // +0xE8
-    Wm3::Quaternionf mBone0Rot; // +0xEC
-    Wm3::Quaternionf mBone1Rot; // +0xFC
-    float mHeadingOffset; // +0x10C
-  };
-
-  static_assert(offsetof(CAimManipulatorRuntimeView, mUnit) == 0x80, "CAimManipulatorRuntimeView::mUnit offset must be 0x80");
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mWeapon) == 0x88,
-    "CAimManipulatorRuntimeView::mWeapon offset must be 0x88"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mLabel) == 0x90,
-    "CAimManipulatorRuntimeView::mLabel offset must be 0x90"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mUnitWepBlueprint) == 0xAC,
-    "CAimManipulatorRuntimeView::mUnitWepBlueprint offset must be 0xAC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mProjPhysBlueprint) == 0xB0,
-    "CAimManipulatorRuntimeView::mProjPhysBlueprint offset must be 0xB0"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mEnabled) == 0xB4,
-    "CAimManipulatorRuntimeView::mEnabled offset must be 0xB4"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mHeading) == 0xB8,
-    "CAimManipulatorRuntimeView::mHeading offset must be 0xB8"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mPitch) == 0xBC,
-    "CAimManipulatorRuntimeView::mPitch offset must be 0xBC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mMuzzleBone) == 0xC0,
-    "CAimManipulatorRuntimeView::mMuzzleBone offset must be 0xC0"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mIsTracking) == 0xC4,
-    "CAimManipulatorRuntimeView::mIsTracking offset must be 0xC4"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mMinHeading) == 0xC8,
-    "CAimManipulatorRuntimeView::mMinHeading offset must be 0xC8"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mMaxHeading) == 0xCC,
-    "CAimManipulatorRuntimeView::mMaxHeading offset must be 0xCC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mHeadingMaxSlew) == 0xD0,
-    "CAimManipulatorRuntimeView::mHeadingMaxSlew offset must be 0xD0"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mMinPitch) == 0xD4,
-    "CAimManipulatorRuntimeView::mMinPitch offset must be 0xD4"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mMaxPitch) == 0xD8,
-    "CAimManipulatorRuntimeView::mMaxPitch offset must be 0xD8"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mPitchMaxSlew) == 0xDC,
-    "CAimManipulatorRuntimeView::mPitchMaxSlew offset must be 0xDC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mOnTarget) == 0xE0,
-    "CAimManipulatorRuntimeView::mOnTarget offset must be 0xE0"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mUnknownBoolE1) == 0xE1,
-    "CAimManipulatorRuntimeView::mUnknownBoolE1 offset must be 0xE1"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mResetPoseTime) == 0xE4,
-    "CAimManipulatorRuntimeView::mResetPoseTime offset must be 0xE4"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mResetTime) == 0xE8,
-    "CAimManipulatorRuntimeView::mResetTime offset must be 0xE8"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mBone0Rot) == 0xEC,
-    "CAimManipulatorRuntimeView::mBone0Rot offset must be 0xEC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mBone1Rot) == 0xFC,
-    "CAimManipulatorRuntimeView::mBone1Rot offset must be 0xFC"
-  );
-  static_assert(
-    offsetof(CAimManipulatorRuntimeView, mHeadingOffset) == 0x10C,
-    "CAimManipulatorRuntimeView::mHeadingOffset offset must be 0x10C"
-  );
-
-  // A view that reinterpret_casts over an object must never be larger than the
-  // object: every field past `sizeof(CAimManipulator)` would be a write off the
-  // end of the block. This held only once `CAimManipulator` declared the whole
-  // 0x80..0x110 run the binary allocates for it.
-  static_assert(
-    sizeof(CAimManipulatorRuntimeView) <= sizeof(moho::CAimManipulator),
-    "CAimManipulatorRuntimeView overruns CAimManipulator"
-  );
-
-  /**
-   * Address: 0x0062FEB0 (FUN_0062FEB0)
-   *
-   * What it does:
-   * Stores one heading-offset scalar in radians (`degrees * pi/180`) into the
-   * runtime lane at `+0x10C`.
-   */
-  [[nodiscard]] CAimManipulatorRuntimeView* ApplyAimHeadingOffsetDegrees(
-    CAimManipulatorRuntimeView* const runtimeView,
-    const float headingOffsetDegrees
-  ) noexcept
-  {
-    if (runtimeView == nullptr) {
-      return nullptr;
-    }
-
-    runtimeView->mHeadingOffset = headingOffsetDegrees * kDegreesToRadians;
-    return runtimeView;
-  }
 
   [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
   {
@@ -434,28 +253,6 @@ namespace
     return angleRadians;
   }
 
-  [[nodiscard]] CAimManipulatorBaseRuntimeView* AimManipulatorBaseView(moho::CAimManipulator* const manipulator) noexcept
-  {
-    return reinterpret_cast<CAimManipulatorBaseRuntimeView*>(manipulator);
-  }
-
-  [[nodiscard]] const CAimManipulatorBaseRuntimeView*
-  AimManipulatorBaseView(const moho::CAimManipulator* const manipulator) noexcept
-  {
-    return reinterpret_cast<const CAimManipulatorBaseRuntimeView*>(manipulator);
-  }
-
-  [[nodiscard]] CAimManipulatorRuntimeView* AimManipulatorRuntimeView(moho::CAimManipulator* const manipulator) noexcept
-  {
-    return reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
-  }
-
-  [[nodiscard]] const CAimManipulatorRuntimeView*
-  AimManipulatorRuntimeView(const moho::CAimManipulator* const manipulator) noexcept
-  {
-    return reinterpret_cast<const CAimManipulatorRuntimeView*>(manipulator);
-  }
-
   [[nodiscard]] moho::CAniPoseBone* ResolvePoseBone(moho::CAniActor* const actor, const int boneIndex) noexcept
   {
     if (actor == nullptr || actor->mPose.px == nullptr || boneIndex < 0) {
@@ -481,12 +278,11 @@ namespace
     moho::CAimManipulator* const manipulator, const std::size_t watchIndex
   ) noexcept
   {
-    CAimManipulatorBaseRuntimeView* const baseView = AimManipulatorBaseView(manipulator);
-    if (baseView->mWatchBones.begin() == nullptr) {
+    if (manipulator->mWatchBones.begin() == nullptr) {
       return nullptr;
     }
 
-    return ResolvePoseBone(baseView->mOwnerActor, baseView->mWatchBones[watchIndex].mBoneIndex);
+    return ResolvePoseBone(manipulator->mOwnerActor, manipulator->mWatchBones[watchIndex].mBoneIndex);
   }
 
   [[nodiscard]] std::string ToStdString(const msvc8::string& value)
@@ -767,40 +563,39 @@ namespace
  */
 moho::CAimManipulator::CAimManipulator()
 {
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
-  runtimeView->mUnit.ClearLinkState();
-  runtimeView->mWeapon.ClearLinkState();
+  this->mUnit.ClearLinkState();
+  this->mWeapon.ClearLinkState();
 
-  runtimeView->mLabel.clear();
-  runtimeView->mUnitWepBlueprint = nullptr;
-  runtimeView->mProjPhysBlueprint = nullptr;
-  runtimeView->mEnabled = false;
-  runtimeView->mMuzzleBone = 0;
-  runtimeView->mIsTracking = false;
-  runtimeView->mOnTarget = false;
-  runtimeView->mUnknownBoolE1 = false;
-  runtimeView->mResetPoseTime = 0;
-  runtimeView->mResetTime = 0;
-  runtimeView->mHeading = 0.0f;
-  runtimeView->mPitch = 0.0f;
-  runtimeView->mMinHeading = 0.0f;
-  runtimeView->mMaxHeading = 0.0f;
-  runtimeView->mHeadingMaxSlew = 0.0f;
-  runtimeView->mMinPitch = 0.0f;
-  runtimeView->mMaxPitch = 0.0f;
-  runtimeView->mPitchMaxSlew = 0.0f;
+  this->mLabel.clear();
+  this->mUnitWepBlueprint = nullptr;
+  this->mProjPhysBlueprint = nullptr;
+  this->mEnabled = false;
+  this->mMuzzleBone = 0;
+  this->mIsTracking = false;
+  this->mOnTarget = false;
+  this->mUnknownBoolE1 = false;
+  this->mResetPoseTime = 0;
+  this->mResetTime = 0;
+  this->mHeading = 0.0f;
+  this->mPitch = 0.0f;
+  this->mMinHeading = 0.0f;
+  this->mMaxHeading = 0.0f;
+  this->mHeadingMaxSlew = 0.0f;
+  this->mMinPitch = 0.0f;
+  this->mMaxPitch = 0.0f;
+  this->mPitchMaxSlew = 0.0f;
 
-  runtimeView->mBone0Rot.w = 1.0f;
-  runtimeView->mBone0Rot.x = 0.0f;
-  runtimeView->mBone0Rot.y = 0.0f;
-  runtimeView->mBone0Rot.z = 0.0f;
+  this->mBone0Rot.w = 1.0f;
+  this->mBone0Rot.x = 0.0f;
+  this->mBone0Rot.y = 0.0f;
+  this->mBone0Rot.z = 0.0f;
 
-  runtimeView->mBone1Rot.w = 1.0f;
-  runtimeView->mBone1Rot.x = 0.0f;
-  runtimeView->mBone1Rot.y = 0.0f;
-  runtimeView->mBone1Rot.z = 0.0f;
+  this->mBone1Rot.w = 1.0f;
+  this->mBone1Rot.x = 0.0f;
+  this->mBone1Rot.y = 0.0f;
+  this->mBone1Rot.z = 0.0f;
 
-  runtimeView->mHeadingOffset = 0.0f;
+  this->mHeadingOffset = 0.0f;
 }
 
 /**
@@ -831,48 +626,47 @@ moho::CAimManipulator::CAimManipulator(
 {
   Unit* const ownerUnit = weapon->mUnit;
 
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
 
   // Head-insert the intrusive weak links (owning unit + weapon). Both nodes are
   // freshly constructed and known-unlinked, so bind-then-head-insert mirrors the
   // binary's open-coded list insert (no prior-link scan).
-  (void)new (static_cast<void*>(&runtimeView->mUnit)) moho::WeakPtr<moho::Unit>();
-  runtimeView->mUnit.BindObjectUnlinked(ownerUnit);
-  (void)runtimeView->mUnit.LinkIntoOwnerChainHeadUnlinked();
+  (void)new (static_cast<void*>(&this->mUnit)) moho::WeakPtr<moho::Unit>();
+  this->mUnit.BindObjectUnlinked(ownerUnit);
+  (void)this->mUnit.LinkIntoOwnerChainHeadUnlinked();
 
-  (void)new (static_cast<void*>(&runtimeView->mWeapon)) moho::WeakPtr<moho::UnitWeapon>();
-  runtimeView->mWeapon.BindObjectUnlinked(weapon);
-  (void)runtimeView->mWeapon.LinkIntoOwnerChainHeadUnlinked();
+  (void)new (static_cast<void*>(&this->mWeapon)) moho::WeakPtr<moho::UnitWeapon>();
+  this->mWeapon.BindObjectUnlinked(weapon);
+  (void)this->mWeapon.LinkIntoOwnerChainHeadUnlinked();
 
   // Label.
-  (void)new (static_cast<void*>(&runtimeView->mLabel)) msvc8::string(label, std::strlen(label));
+  (void)new (static_cast<void*>(&this->mLabel)) msvc8::string(label, std::strlen(label));
 
   // Field defaults (firing arc, tracking state, identity bone quaternions).
-  runtimeView->mMaxHeading = 3.1415927f;
-  runtimeView->mHeadingMaxSlew = 0.062831849f;
-  runtimeView->mMinPitch = 15.0f;
-  runtimeView->mMaxPitch = 30.0f;
-  runtimeView->mPitchMaxSlew = 0.061086524f;
-  runtimeView->mUnitWepBlueprint = weapon->mWeaponBlueprint;
-  runtimeView->mProjPhysBlueprint = nullptr;
-  runtimeView->mEnabled = true;
-  runtimeView->mHeading = 0.0f;
-  runtimeView->mPitch = 0.0f;
-  runtimeView->mIsTracking = false;
-  runtimeView->mMinHeading = 0.0f;
-  runtimeView->mOnTarget = false;
-  runtimeView->mUnknownBoolE1 = false;
-  runtimeView->mResetPoseTime = 0;
-  runtimeView->mResetTime = 0;
-  runtimeView->mBone0Rot.w = 1.0f;
-  runtimeView->mBone0Rot.x = 0.0f;
-  runtimeView->mBone0Rot.y = 0.0f;
-  runtimeView->mBone0Rot.z = 0.0f;
-  runtimeView->mBone1Rot.w = 1.0f;
-  runtimeView->mBone1Rot.x = 0.0f;
-  runtimeView->mBone1Rot.y = 0.0f;
-  runtimeView->mBone1Rot.z = 0.0f;
-  runtimeView->mHeadingOffset = 0.0f;
+  this->mMaxHeading = 3.1415927f;
+  this->mHeadingMaxSlew = 0.062831849f;
+  this->mMinPitch = 15.0f;
+  this->mMaxPitch = 30.0f;
+  this->mPitchMaxSlew = 0.061086524f;
+  this->mUnitWepBlueprint = weapon->mWeaponBlueprint;
+  this->mProjPhysBlueprint = nullptr;
+  this->mEnabled = true;
+  this->mHeading = 0.0f;
+  this->mPitch = 0.0f;
+  this->mIsTracking = false;
+  this->mMinHeading = 0.0f;
+  this->mOnTarget = false;
+  this->mUnknownBoolE1 = false;
+  this->mResetPoseTime = 0;
+  this->mResetTime = 0;
+  this->mBone0Rot.w = 1.0f;
+  this->mBone0Rot.x = 0.0f;
+  this->mBone0Rot.y = 0.0f;
+  this->mBone0Rot.z = 0.0f;
+  this->mBone1Rot.w = 1.0f;
+  this->mBone1Rot.x = 0.0f;
+  this->mBone1Rot.y = 0.0f;
+  this->mBone1Rot.z = 0.0f;
+  this->mHeadingOffset = 0.0f;
 
   // Materialize the Lua script object through the CAimManipulator metatable
   // factory (FUN_00633050).
@@ -888,7 +682,7 @@ moho::CAimManipulator::CAimManipulator(
   // Resolve the projectile physics sub-blueprint from the weapon's projectile
   // blueprint (typed navigation of the binary's weapon->blueprint->physics chain).
   if (RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint; projectileBlueprint != nullptr) {
-    runtimeView->mProjPhysBlueprint = &projectileBlueprint->Physics;
+    this->mProjPhysBlueprint = &projectileBlueprint->Physics;
   }
 
   // Read the owner actor skeleton (RAII shared_ptr; released at scope end).
@@ -907,7 +701,7 @@ moho::CAimManipulator::CAimManipulator(
       muzzleBone = static_cast<std::int32_t>(boneA);
     }
   }
-  runtimeView->mMuzzleBone = muzzleBone;
+  this->mMuzzleBone = muzzleBone;
 
   // Seed the heading arc from the turret (boneA) bone local orientation quaternion.
   const SAniSkelBone* const bonesBegin = skel != nullptr ? skel->mBones.begin() : nullptr;
@@ -917,24 +711,26 @@ moho::CAimManipulator::CAimManipulator(
       const SAniSkelBone& bone = bonesBegin[boneA];
       const Wm3::Quaternionf& ori = bone.mBoneTransform.orient_;
 
-      const RUnitBlueprintWeapon* const weaponBlueprint = runtimeView->mUnitWepBlueprint;
-      runtimeView->mMinHeading =
+      const RUnitBlueprintWeapon* const weaponBlueprint = this->mUnitWepBlueprint;
+      this->mMinHeading =
         std::atan2(
           ((ori.w * ori.y) + (ori.x * ori.z)) * 2.0f,
           1.0f - (((ori.x * ori.x) + (ori.y * ori.y)) * 2.0f)
         )
         + weaponBlueprint->HeadingArcCenter * kDegreesToRadians;
-      runtimeView->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
+      this->mMaxHeading = weaponBlueprint->HeadingArcRange * kDegreesToRadians;
 
       if (std::fabs(((ori.w * ori.z) - (ori.y * ori.x)) * 2.0f) > 0.70700002f) {
-        runtimeView->mUnknownBoolE1 = true;
+        this->mUnknownBoolE1 = true;
       }
     }
   }
 
-  // Clear the weapon's can-fire latch and the base task-event triggered flag.
-  weapon->mCanFire = 0u;
-  AimManipulatorBaseView(this)->mTaskEventTriggered = false;
+  // Clear the weapon's can-fire latch, then drop the task-event signal so a
+  // freshly built manipulator is not already signalled to anything waiting on
+  // it (`mov byte [eax+0xF0], bl` / `mov byte [ebp+4], bl`, 0x00630677).
+  weapon->SetCanFire(false);
+  this->EventSetSignaled(false);
 }
 
 /**
@@ -980,19 +776,25 @@ gpg::RRef moho::CAimManipulator::GetDerivedObjectRef()
  */
 moho::CAimManipulator::~CAimManipulator()
 {
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
-  if (UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr(); weapon != nullptr) {
-    weapon->mCanFire = 1u;
+  if (UnitWeapon* const weapon = this->mWeapon.GetObjectPtr(); weapon != nullptr) {
+    weapon->SetCanFire(true);
   }
 
-  AimManipulatorBaseView(this)->mBaseEnabled = false;
+  // 0x006306D3 is `mov byte [edi+4], 0` -- offset 0x04 is `CTaskEvent::
+  // mTriggered`, reached as `EventSetSignaled(false)` (its false path at
+  // 0x00406E17 is exactly this one store). The destructor has no store to
+  // 0x4C at all, so the `IAniManipulator::mEnabled = false` that used to
+  // stand here was both a write the binary never makes and a dropped
+  // de-signal: anything still parked on this manipulator's event stayed
+  // latched as the object died.
+  this->EventSetSignaled(false);
 
   // `mLabel` is a real member now, so the compiler emits `~msvc8::string`
   // after this body -- the same teardown the binary runs, and the one the
   // 2007 source never wrote down. Tidying it here as well would release the
   // storage twice.
-  runtimeView->mWeapon.UnlinkFromOwnerChain();
-  runtimeView->mUnit.UnlinkFromOwnerChain();
+  this->mWeapon.UnlinkFromOwnerChain();
+  this->mUnit.UnlinkFromOwnerChain();
 
   // IAniManipulator is now a real base, so its destructor runs automatically
   // via ordinary base-destructor chaining after this body returns - calling
@@ -1037,8 +839,7 @@ void moho::CAimManipulator::operator_delete(const std::int32_t deleteFlags)
  */
 bool moho::CAimManipulator::ManipulatorUpdate()
 {
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
-  Unit* const unit = runtimeView->mUnit.GetObjectPtr();
+  Unit* const unit = this->mUnit.GetObjectPtr();
   if (unit == nullptr) {
     return false;
   }
@@ -1048,37 +849,36 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   }
 
   const bool aimsStraightOnDisable =
-    runtimeView->mUnitWepBlueprint != nullptr && runtimeView->mUnitWepBlueprint->AimsStraightOnDisable != 0u;
-  if (!runtimeView->mEnabled && !aimsStraightOnDisable) {
+    this->mUnitWepBlueprint != nullptr && this->mUnitWepBlueprint->AimsStraightOnDisable != 0u;
+  if (!this->mEnabled && !aimsStraightOnDisable) {
     return false;
   }
 
-  auto* const taskEvent = reinterpret_cast<CTaskEvent*>(this);
-  UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr();
+  UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
   if (weapon == nullptr || unit->IsDead() || unit->StunnedState != 0) {
-    runtimeView->mOnTarget = false;
+    this->mOnTarget = false;
     if (CAniPoseBone* const watchBone0 = ResolveWatchBone(this, 0u); watchBone0 != nullptr) {
-      watchBone0->Rotate(runtimeView->mBone0Rot);
+      watchBone0->Rotate(this->mBone0Rot);
     }
     if (CAniPoseBone* const watchBone1 = ResolveWatchBone(this, 1u); watchBone1 != nullptr) {
-      watchBone1->Rotate(runtimeView->mBone1Rot);
+      watchBone1->Rotate(this->mBone1Rot);
     }
-    taskEvent->EventSetSignaled(false);
+    this->EventSetSignaled(false);
     return false;
   }
 
-  weapon->mUnknown174 = 1u;
-  weapon->mAimingAt = InvalidAimVector();
+  weapon->SetAimReachable(true);
+  weapon->SetAimingAt(InvalidAimVector());
 
-  const bool shouldTrackTarget = runtimeView->mEnabled || !aimsStraightOnDisable;
+  const bool shouldTrackTarget = this->mEnabled || !aimsStraightOnDisable;
   CAiTarget* const target = &weapon->mTarget;
   if (target->targetType != EAiTargetType::AITARGET_None && shouldTrackTarget) {
     if (!target->HasTarget()) {
-      runtimeView->mOnTarget = false;
+      this->mOnTarget = false;
       Rotate1(true);
       Rotate2(true);
     } else {
-      if (runtimeView->mResetPoseTime <= 0) {
+      if (this->mResetPoseTime <= 0) {
         std::int32_t resetTime = 1;
         if (weapon->mWeaponBlueprint != nullptr) {
           resetTime = static_cast<std::int32_t>(std::lround(weapon->mWeaponBlueprint->TargetCheckInterval * 10.0f));
@@ -1086,52 +886,52 @@ bool moho::CAimManipulator::ManipulatorUpdate()
             resetTime = 1;
           }
         }
-        runtimeView->mResetTime = resetTime;
+        this->mResetTime = resetTime;
       } else {
-        runtimeView->mResetTime = runtimeView->mResetPoseTime;
+        this->mResetTime = this->mResetPoseTime;
       }
 
       Wm3::Vector3f aimDirection{};
-      Aim(&aimDirection, target);
+      (void)Aim(&aimDirection, target);
       if (!IsAimVectorValid(aimDirection)) {
-        weapon->mUnknown174 = 0u;
-        runtimeView->mOnTarget = false;
+        weapon->SetAimReachable(false);
+        this->mOnTarget = false;
         Rotate1(true);
         Rotate2(true);
       } else {
-        runtimeView->mOnTarget = Track(aimDirection, 0u);
-        weapon->mAimingAt = aimDirection;
+        this->mOnTarget = Track(aimDirection, 0u);
+        weapon->SetAimingAt(aimDirection);
       }
     }
   } else {
-    if (runtimeView->mResetTime <= 0) {
+    if (this->mResetTime <= 0) {
       const Wm3::Vector3f forwardDirection{0.0f, 0.0f, 1.0f};
       (void)Track(forwardDirection, kTrackingModeWorldSpace);
     } else {
-      --runtimeView->mResetTime;
+      --this->mResetTime;
       Rotate1(true);
       Rotate2(true);
     }
-    runtimeView->mOnTarget = false;
+    this->mOnTarget = false;
   }
 
   bool isWeaponLabelMatch = false;
   if (weapon != nullptr) {
     msvc8::string weaponLabel;
     (void)weapon->GetLabel(&weaponLabel);
-    isWeaponLabelMatch = (_stricmp(weaponLabel.c_str(), runtimeView->mLabel.c_str()) == 0);
+    isWeaponLabelMatch = (_stricmp(weaponLabel.c_str(), this->mLabel.c_str()) == 0);
   }
 
   if (isWeaponLabelMatch) {
-    weapon->mCanFire = runtimeView->mOnTarget ? 1u : 0u;
+    weapon->SetCanFire(this->mOnTarget);
   }
 
-  if (runtimeView->mOnTarget) {
-    taskEvent->EventSetSignaled(true);
+  if (this->mOnTarget) {
+    this->EventSetSignaled(true);
     return false;
   }
 
-  taskEvent->EventSetSignaled(false);
+  this->EventSetSignaled(false);
   return false;
 }
 
@@ -1144,27 +944,25 @@ bool moho::CAimManipulator::ManipulatorUpdate()
  */
 Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAiTarget* const target)
 {
-  auto* const baseView = AimManipulatorBaseView(this);
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
-  UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr();
+  UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
   RUnitBlueprintWeapon* const weaponBlueprint = (weapon != nullptr) ? weapon->mWeaponBlueprint : nullptr;
 
   Wm3::Vector3f aimDirection = InvalidAimVector();
 
   CAniPoseBone* muzzleBone = nullptr;
-  if (baseView->mOwnerActor != nullptr && baseView->mOwnerActor->mPriorPose.px != nullptr) {
-    CAniPose* const priorPose = baseView->mOwnerActor->mPriorPose.px;
+  if (this->mOwnerActor != nullptr && this->mOwnerActor->mPriorPose.px != nullptr) {
+    CAniPose* const priorPose = this->mOwnerActor->mPriorPose.px;
     CAniPoseBone* const boneBegin = priorPose->mBones.begin();
     CAniPoseBone* const boneEnd = priorPose->mBones.end();
-    if (boneBegin != nullptr && boneEnd != nullptr && boneBegin < boneEnd && runtimeView->mMuzzleBone >= 0) {
+    if (boneBegin != nullptr && boneEnd != nullptr && boneBegin < boneEnd && this->mMuzzleBone >= 0) {
       const std::ptrdiff_t boneCount = boneEnd - boneBegin;
-      if (runtimeView->mMuzzleBone < boneCount) {
-        muzzleBone = &boneBegin[runtimeView->mMuzzleBone];
+      if (this->mMuzzleBone < boneCount) {
+        muzzleBone = &boneBegin[this->mMuzzleBone];
       }
     }
   }
 
-  Unit* const unit = runtimeView->mUnit.GetObjectPtr();
+  Unit* const unit = this->mUnit.GetObjectPtr();
   if (muzzleBone == nullptr) {
     const RUnitBlueprint* const unitBlueprint = (unit != nullptr) ? unit->GetBlueprint() : nullptr;
     const char* const unitBlueprintId = (unitBlueprint != nullptr) ? unitBlueprint->mBlueprintId.c_str() : "<null>";
@@ -1227,7 +1025,7 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
       targetVelocity.y * kAimVelocityScale,
       targetVelocity.z * kAimVelocityScale,
     };
-    const RProjectileBlueprintPhysics* const projPhys = runtimeView->mProjPhysBlueprint;
+    const RProjectileBlueprintPhysics* const projPhys = this->mProjPhysBlueprint;
     if (projPhys != nullptr && projPhys->TrackTarget != 0u) {
       (void)PredictInterceptPointConstantSpeed(
         &predictedImpact,
@@ -1256,16 +1054,16 @@ Wm3::Vector3f* moho::CAimManipulator::Aim(Wm3::Vector3f* const outDirection, CAi
     }
   }
 
-  const RProjectileBlueprintPhysics* const projPhys = runtimeView->mProjPhysBlueprint;
+  const RProjectileBlueprintPhysics* const projPhys = this->mProjPhysBlueprint;
   if (projPhys != nullptr && projPhys->TrackTarget == 0u && projPhys->UseGravity != 0u) {
-    Sim* const sim = baseView->mOwnerSim;
+    Sim* const sim = this->mOwnerSim;
     float highArc = 0.0f;
     float lowArc = 0.0f;
     if (sim != nullptr && sim->mPhysConstants != nullptr &&
         CalculateFiringPitch(&highArc, muzzlePosition, predictedImpact, *sim->mPhysConstants, projectileSpeed, &lowArc))
     {
       const float selectedArc =
-        (runtimeView->mUnitWepBlueprint != nullptr && runtimeView->mUnitWepBlueprint->BallisticArc == RULEUBA_HighArc)
+        (this->mUnitWepBlueprint != nullptr && this->mUnitWepBlueprint->BallisticArc == RULEUBA_HighArc)
           ? highArc
           : lowArc;
       (void)CalculateFiringDirection(&aimDirection, predictedImpact, muzzlePosition, selectedArc);
@@ -1422,15 +1220,14 @@ int moho::cfunc_CAimManipulatorSetFiringArcL(LuaPlus::LuaState* const state)
  */
 void moho::CAimManipulator::SetFiringArc(const CAimFiringArc arc)
 {
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(this);
 
-  runtimeView->mMinHeading = NormalizeCenteredAngle(arc.mMinHeading, arc.mMaxHeading);
-  runtimeView->mHeadingMaxSlew = arc.mHeadingMaxSlew;
-  runtimeView->mMaxHeading = std::fabs(arc.mMaxHeading - arc.mMinHeading) * kHalfScale;
+  this->mMinHeading = NormalizeCenteredAngle(arc.mMinHeading, arc.mMaxHeading);
+  this->mHeadingMaxSlew = arc.mHeadingMaxSlew;
+  this->mMaxHeading = std::fabs(arc.mMaxHeading - arc.mMinHeading) * kHalfScale;
 
-  runtimeView->mMinPitch = NormalizeCenteredAngle(arc.mMinPitch, arc.mMaxPitch);
-  runtimeView->mPitchMaxSlew = arc.mPitchMaxSlew;
-  runtimeView->mMaxPitch = std::fabs(arc.mMaxPitch - arc.mMinPitch) * kHalfScale;
+  this->mMinPitch = NormalizeCenteredAngle(arc.mMinPitch, arc.mMaxPitch);
+  this->mPitchMaxSlew = arc.mPitchMaxSlew;
+  this->mMaxPitch = std::fabs(arc.mMaxPitch - arc.mMinPitch) * kHalfScale;
 }
 
 /**
@@ -1464,7 +1261,6 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
     return 0u;
   }
 
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
   Wm3::Vector3f transformedTarget = targetDirection;
 
   if ((trackingModeFlags & kTrackingModeWorldSpace) == 0u) {
@@ -1482,8 +1278,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
   float desiredAngle = 0.0f;
   float* currentAngleLane = nullptr;
   if ((trackingModeFlags & kTrackingModeHeading) != 0u) {
-    currentAngleLane = &runtimeView->mHeading;
-    desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z) + runtimeView->mHeadingOffset;
+    currentAngleLane = &this->mHeading;
+    desiredAngle = std::atan2(transformedTarget.x, transformedTarget.z) + this->mHeadingOffset;
   } else {
     const float halfCenter = minAngleCenter * kHalfScale;
     // The four consecutive stack floats handed to `MultQuadVec` as the
@@ -1498,7 +1294,7 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
 
     Wm3::Vector3f pitchSpaceTarget{};
     MultQuadVec(&pitchSpaceTarget, &transformedTarget, &pitchBasis);
-    currentAngleLane = &runtimeView->mPitch;
+    currentAngleLane = &this->mPitch;
     // 0x00630B04 calls `Moho::COORDS_Pitch(Wm3::Vector3<float> const&)` (0x0050B710),
     // which returns `acos(y/|v|) - pi/2` -- the NEGATED elevation. A local
     // `atan2(y, hypot(x, z))` re-implementation stood here and returned `+asin(y/|v|)`
@@ -1537,8 +1333,8 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
 
   const bool skipToleranceForPitchOnly =
     ((trackingModeFlags & kTrackingModePitch) != 0u) &&
-    runtimeView->mUnitWepBlueprint != nullptr &&
-    runtimeView->mUnitWepBlueprint->YawOnlyOnTarget != 0u;
+    this->mUnitWepBlueprint != nullptr &&
+    this->mUnitWepBlueprint->YawOnlyOnTarget != 0u;
 
   if (!skipToleranceForPitchOnly) {
     const float toleranceDelta = NormalizeAngleRadians(nextAngle - desiredAngle);
@@ -1558,21 +1354,20 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
  */
 void moho::CAimManipulator::Rotate1(const bool reset)
 {
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
   CAniPoseBone* const watchBone = ResolveWatchBone(this, 0u);
   if (watchBone == nullptr) {
     return;
   }
 
   if (reset) {
-    const float halfHeading = runtimeView->mHeading * kHalfScale;
-    runtimeView->mBone0Rot.w = std::cos(halfHeading);
-    runtimeView->mBone0Rot.x = 0.0f;
-    runtimeView->mBone0Rot.y = std::sin(halfHeading);
-    runtimeView->mBone0Rot.z = 0.0f;
+    const float halfHeading = this->mHeading * kHalfScale;
+    this->mBone0Rot.w = std::cos(halfHeading);
+    this->mBone0Rot.x = 0.0f;
+    this->mBone0Rot.y = std::sin(halfHeading);
+    this->mBone0Rot.z = 0.0f;
   }
 
-  watchBone->Rotate(runtimeView->mBone0Rot);
+  watchBone->Rotate(this->mBone0Rot);
 }
 
 /**
@@ -1583,21 +1378,20 @@ void moho::CAimManipulator::Rotate1(const bool reset)
  */
 void moho::CAimManipulator::Rotate2(const bool reset)
 {
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
   CAniPoseBone* const watchBone = ResolveWatchBone(this, 1u);
   if (watchBone == nullptr) {
     return;
   }
 
   if (reset) {
-    const float halfPitch = (-runtimeView->mPitch) * kHalfScale;
-    runtimeView->mBone1Rot.w = std::cos(halfPitch);
-    runtimeView->mBone1Rot.x = std::sin(halfPitch);
-    runtimeView->mBone1Rot.y = 0.0f;
-    runtimeView->mBone1Rot.z = 0.0f;
+    const float halfPitch = (-this->mPitch) * kHalfScale;
+    this->mBone1Rot.w = std::cos(halfPitch);
+    this->mBone1Rot.x = std::sin(halfPitch);
+    this->mBone1Rot.y = 0.0f;
+    this->mBone1Rot.z = 0.0f;
   }
 
-  watchBone->Rotate(runtimeView->mBone1Rot);
+  watchBone->Rotate(this->mBone1Rot);
 }
 
 /**
@@ -1609,9 +1403,7 @@ void moho::CAimManipulator::Rotate2(const bool reset)
  */
 bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const std::uint8_t trackingModeFlags)
 {
-  auto* const baseView = AimManipulatorBaseView(this);
-  auto* const runtimeView = AimManipulatorRuntimeView(this);
-  UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr();
+  UnitWeapon* const weapon = this->mWeapon.GetObjectPtr();
   if (weapon == nullptr) {
     return false;
   }
@@ -1623,18 +1415,18 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
   const float toleranceRadians = firingTolerance * kFiringToleranceToRadians;
 
   std::uint8_t trackingResult = 0u;
-  const bool useSharedBoneTracking = baseView->mWatchBones.begin() != nullptr &&
-                                     baseView->mWatchBones[1].mBoneIndex == baseView->mWatchBones[0].mBoneIndex &&
-                                     runtimeView->mUnknownBoolE1;
+  const bool useSharedBoneTracking = this->mWatchBones.begin() != nullptr &&
+                                     this->mWatchBones[1].mBoneIndex == this->mWatchBones[0].mBoneIndex &&
+                                     this->mUnknownBoolE1;
 
   if (useSharedBoneTracking) {
     if (CAniPoseBone* const sharedBone = ResolveWatchBone(this, 0u); sharedBone != nullptr) {
       const std::uint8_t pitchResult = CheckTracking(
         targetDirection,
         sharedBone,
-        runtimeView->mMinPitch,
-        runtimeView->mMaxPitch,
-        runtimeView->mPitchMaxSlew,
+        this->mMinPitch,
+        this->mMaxPitch,
+        this->mPitchMaxSlew,
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModePitch)
       );
@@ -1643,9 +1435,9 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
       const std::uint8_t headingResult = CheckTracking(
         targetDirection,
         sharedBone,
-        runtimeView->mMinHeading,
-        runtimeView->mMaxHeading,
-        runtimeView->mHeadingMaxSlew,
+        this->mMinHeading,
+        this->mMaxHeading,
+        this->mHeadingMaxSlew,
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModeHeading)
       );
@@ -1657,9 +1449,9 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
       trackingResult |= CheckTracking(
         targetDirection,
         headingBone,
-        runtimeView->mMinHeading,
-        runtimeView->mMaxHeading,
-        runtimeView->mHeadingMaxSlew,
+        this->mMinHeading,
+        this->mMaxHeading,
+        this->mHeadingMaxSlew,
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModeHeading)
       );
@@ -1670,9 +1462,9 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
       trackingResult |= CheckTracking(
         targetDirection,
         pitchBone,
-        runtimeView->mMinPitch,
-        runtimeView->mMaxPitch,
-        runtimeView->mPitchMaxSlew,
+        this->mMinPitch,
+        this->mMaxPitch,
+        this->mPitchMaxSlew,
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModePitch)
       );
@@ -1683,13 +1475,13 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
   const bool onTarget = (trackingResult & kTrackingResultOutsideTolerance) == 0u;
   const bool shouldBeTracking = (trackingResult & kTrackingResultHeadingMotion) != 0u;
   if (shouldBeTracking) {
-    if (!runtimeView->mIsTracking) {
-      weapon->CallString("OnStartTracking", ToStdString(runtimeView->mLabel));
-      runtimeView->mIsTracking = true;
+    if (!this->mIsTracking) {
+      weapon->CallString("OnStartTracking", ToStdString(this->mLabel));
+      this->mIsTracking = true;
     }
-  } else if (runtimeView->mIsTracking) {
-    weapon->CallString("OnStopTracking", ToStdString(runtimeView->mLabel));
-    runtimeView->mIsTracking = false;
+  } else if (this->mIsTracking) {
+    weapon->CallString("OnStopTracking", ToStdString(this->mLabel));
+    this->mIsTracking = false;
   }
 
   return onTarget;
@@ -1755,8 +1547,7 @@ int moho::cfunc_CAimManipulatorSetResetPoseTimeL(LuaPlus::LuaState* const state)
     resetTimeArg.TypeError("number");
   }
 
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
-  runtimeView->mResetPoseTime = static_cast<int>(lua_tonumber(rawState, 2) * 10.0);
+  manipulator->SetResetPoseTime(static_cast<std::int32_t>(lua_tonumber(rawState, 2) * 10.0));
   return 0;
 }
 
@@ -1808,8 +1599,7 @@ int moho::cfunc_CAimManipulatorOnTargetL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
 
-  const auto* const runtimeView = reinterpret_cast<const CAimManipulatorRuntimeView*>(manipulator);
-  lua_pushboolean(rawState, runtimeView->mOnTarget ? 1 : 0);
+  lua_pushboolean(rawState, manipulator->OnTarget() ? 1 : 0);
   lua_gettop(rawState);
   return 1;
 }
@@ -1864,9 +1654,7 @@ int moho::cfunc_CAimManipulatorSetEnabledL(LuaPlus::LuaState* const state)
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
 
   const LuaPlus::LuaStackObject enabledArg(state, 2);
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
-  runtimeView->mEnabled = enabledArg.GetBoolean();
-  runtimeView->mOnTarget = false;
+  manipulator->SetEnabled(enabledArg.GetBoolean());
   return 0;
 }
 
@@ -1918,10 +1706,9 @@ int moho::cfunc_CAimManipulatorGetHeadingPitchL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject manipObject(LuaPlus::LuaStackObject(state, 1));
   CAimManipulator* const manipulator = moho::SCR_FromLua_CAimManipulator(manipObject, state);
 
-  const auto* const runtimeView = reinterpret_cast<const CAimManipulatorRuntimeView*>(manipulator);
-  lua_pushnumber(rawState, runtimeView->mHeading);
+  lua_pushnumber(rawState, manipulator->GetHeading());
   lua_gettop(rawState);
-  lua_pushnumber(rawState, runtimeView->mPitch);
+  lua_pushnumber(rawState, manipulator->GetPitch());
   lua_gettop(rawState);
   return 2;
 }
@@ -1987,9 +1774,7 @@ int moho::cfunc_CAimManipulatorSetHeadingPitchL(LuaPlus::LuaState* const state)
   }
   const float heading = static_cast<float>(lua_tonumber(rawState, 2));
 
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
-  runtimeView->mHeading = heading;
-  runtimeView->mPitch = pitch;
+  manipulator->SetHeadingPitch(heading, pitch);
   return 0;
 }
 
@@ -2052,9 +1837,8 @@ int moho::cfunc_CAimManipulatorSetAimHeadingOffsetL(LuaPlus::LuaState* const sta
     headingOffsetArg.TypeError("number");
   }
 
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(manipulator);
   const float headingOffsetDegrees = static_cast<float>(lua_tonumber(rawState, 2));
-  (void)ApplyAimHeadingOffsetDegrees(runtimeView, headingOffsetDegrees);
+  manipulator->SetAimHeadingOffset(headingOffsetDegrees);
   return 0;
 }
 
@@ -2070,42 +1854,41 @@ void moho::CAimManipulator::MemberDeserialize(CAimManipulator* const object, gpg
     return;
   }
 
-  auto* const runtimeView = reinterpret_cast<CAimManipulatorRuntimeView*>(object);
   const gpg::RRef ownerRef = NullOwnerRef();
 
   archive->Read(CachedIAniManipulatorType(), object, ownerRef);
-  archive->Read(CachedWeakPtrUnitType(), &runtimeView->mUnit, ownerRef);
-  archive->Read(CachedWeakPtrUnitWeaponType(), &runtimeView->mWeapon, ownerRef);
-  archive->ReadString(&runtimeView->mLabel);
+  archive->Read(CachedWeakPtrUnitType(), &object->mUnit, ownerRef);
+  archive->Read(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
+  archive->ReadString(&object->mLabel);
 
-  archive->ReadPointer_RUnitBlueprintWeapon(&runtimeView->mUnitWepBlueprint, &ownerRef);
+  archive->ReadPointer_RUnitBlueprintWeapon(&object->mUnitWepBlueprint, &ownerRef);
 
-  if (UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr(); weapon != nullptr) {
+  if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* projectileBlueprint = weapon->mProjectileBlueprint;
     archive->ReadPointer_RProjectileBlueprint(&projectileBlueprint, &ownerRef);
     if (projectileBlueprint != nullptr) {
-      runtimeView->mProjPhysBlueprint = &projectileBlueprint->Physics;
+      object->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
 
-  archive->ReadBool(&runtimeView->mEnabled);
-  archive->ReadFloat(&runtimeView->mHeading);
-  archive->ReadFloat(&runtimeView->mPitch);
-  archive->ReadInt(&runtimeView->mMuzzleBone);
-  archive->ReadBool(&runtimeView->mIsTracking);
-  archive->ReadFloat(&runtimeView->mMinHeading);
-  archive->ReadFloat(&runtimeView->mMaxHeading);
-  archive->ReadFloat(&runtimeView->mHeadingMaxSlew);
-  archive->ReadFloat(&runtimeView->mMinPitch);
-  archive->ReadFloat(&runtimeView->mMaxPitch);
-  archive->ReadFloat(&runtimeView->mPitchMaxSlew);
-  archive->ReadBool(&runtimeView->mOnTarget);
-  archive->ReadBool(&runtimeView->mUnknownBoolE1);
-  archive->ReadInt(&runtimeView->mResetPoseTime);
-  archive->ReadInt(&runtimeView->mResetTime);
-  archive->Read(CachedQuaternionfType(), &runtimeView->mBone0Rot, ownerRef);
-  archive->Read(CachedQuaternionfType(), &runtimeView->mBone1Rot, ownerRef);
-  archive->ReadFloat(&runtimeView->mHeadingOffset);
+  archive->ReadBool(&object->mEnabled);
+  archive->ReadFloat(&object->mHeading);
+  archive->ReadFloat(&object->mPitch);
+  archive->ReadInt(&object->mMuzzleBone);
+  archive->ReadBool(&object->mIsTracking);
+  archive->ReadFloat(&object->mMinHeading);
+  archive->ReadFloat(&object->mMaxHeading);
+  archive->ReadFloat(&object->mHeadingMaxSlew);
+  archive->ReadFloat(&object->mMinPitch);
+  archive->ReadFloat(&object->mMaxPitch);
+  archive->ReadFloat(&object->mPitchMaxSlew);
+  archive->ReadBool(&object->mOnTarget);
+  archive->ReadBool(&object->mUnknownBoolE1);
+  archive->ReadInt(&object->mResetPoseTime);
+  archive->ReadInt(&object->mResetTime);
+  archive->Read(CachedQuaternionfType(), &object->mBone0Rot, ownerRef);
+  archive->Read(CachedQuaternionfType(), &object->mBone1Rot, ownerRef);
+  archive->ReadFloat(&object->mHeadingOffset);
 }
 
 /**
@@ -2120,48 +1903,51 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
     return;
   }
 
-  auto* const runtimeView = const_cast<CAimManipulatorRuntimeView*>(
-    reinterpret_cast<const CAimManipulatorRuntimeView*>(object)
-  );
   const gpg::RRef ownerRef = NullOwnerRef();
 
+  // The save path is declared const by the reflection contract but is not one:
+  // the binary hands `mLabel` to the non-const `WriteString` and refreshes
+  // `mProjPhysBlueprint` from the weapon's current projectile blueprint before
+  // writing it out. Name that aliasing once here instead of casting per site.
+  CAimManipulator* const self = const_cast<CAimManipulator*>(object);
+
   archive->Write(CachedIAniManipulatorType(), object, ownerRef);
-  archive->Write(CachedWeakPtrUnitType(), &runtimeView->mUnit, ownerRef);
-  archive->Write(CachedWeakPtrUnitWeaponType(), &runtimeView->mWeapon, ownerRef);
-  archive->WriteString(&runtimeView->mLabel);
+  archive->Write(CachedWeakPtrUnitType(), &object->mUnit, ownerRef);
+  archive->Write(CachedWeakPtrUnitWeaponType(), &object->mWeapon, ownerRef);
+  archive->WriteString(&self->mLabel);
 
   gpg::RRef unitWeaponBlueprintRef{};
-  gpg::RRef_RUnitBlueprintWeapon(&unitWeaponBlueprintRef, runtimeView->mUnitWepBlueprint);
+  gpg::RRef_RUnitBlueprintWeapon(&unitWeaponBlueprintRef, object->mUnitWepBlueprint);
   gpg::WriteRawPointer(archive, unitWeaponBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
 
-  if (UnitWeapon* const weapon = runtimeView->mWeapon.GetObjectPtr(); weapon != nullptr) {
+  if (UnitWeapon* const weapon = object->mWeapon.GetObjectPtr(); weapon != nullptr) {
     RProjectileBlueprint* const projectileBlueprint = weapon->mProjectileBlueprint;
     gpg::RRef projectileBlueprintRef{};
     gpg::RRef_RProjectileBlueprint(&projectileBlueprintRef, projectileBlueprint);
     gpg::WriteRawPointer(archive, projectileBlueprintRef, gpg::TrackedPointerState::Unowned, ownerRef);
     if (projectileBlueprint != nullptr) {
-      runtimeView->mProjPhysBlueprint = &projectileBlueprint->Physics;
+      self->mProjPhysBlueprint = &projectileBlueprint->Physics;
     }
   }
 
-  archive->WriteBool(runtimeView->mEnabled);
-  archive->WriteFloat(runtimeView->mHeading);
-  archive->WriteFloat(runtimeView->mPitch);
-  archive->WriteInt(runtimeView->mMuzzleBone);
-  archive->WriteBool(runtimeView->mIsTracking);
-  archive->WriteFloat(runtimeView->mMinHeading);
-  archive->WriteFloat(runtimeView->mMaxHeading);
-  archive->WriteFloat(runtimeView->mHeadingMaxSlew);
-  archive->WriteFloat(runtimeView->mMinPitch);
-  archive->WriteFloat(runtimeView->mMaxPitch);
-  archive->WriteFloat(runtimeView->mPitchMaxSlew);
-  archive->WriteBool(runtimeView->mOnTarget);
-  archive->WriteBool(runtimeView->mUnknownBoolE1);
-  archive->WriteInt(runtimeView->mResetPoseTime);
-  archive->WriteInt(runtimeView->mResetTime);
-  archive->Write(CachedQuaternionfType(), &runtimeView->mBone0Rot, ownerRef);
-  archive->Write(CachedQuaternionfType(), &runtimeView->mBone1Rot, ownerRef);
-  archive->WriteFloat(runtimeView->mHeadingOffset);
+  archive->WriteBool(object->mEnabled);
+  archive->WriteFloat(object->mHeading);
+  archive->WriteFloat(object->mPitch);
+  archive->WriteInt(object->mMuzzleBone);
+  archive->WriteBool(object->mIsTracking);
+  archive->WriteFloat(object->mMinHeading);
+  archive->WriteFloat(object->mMaxHeading);
+  archive->WriteFloat(object->mHeadingMaxSlew);
+  archive->WriteFloat(object->mMinPitch);
+  archive->WriteFloat(object->mMaxPitch);
+  archive->WriteFloat(object->mPitchMaxSlew);
+  archive->WriteBool(object->mOnTarget);
+  archive->WriteBool(object->mUnknownBoolE1);
+  archive->WriteInt(object->mResetPoseTime);
+  archive->WriteInt(object->mResetTime);
+  archive->Write(CachedQuaternionfType(), &object->mBone0Rot, ownerRef);
+  archive->Write(CachedQuaternionfType(), &object->mBone1Rot, ownerRef);
+  archive->WriteFloat(object->mHeadingOffset);
 }
 
 namespace gpg

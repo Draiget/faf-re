@@ -1136,7 +1136,7 @@ namespace moho
         effectiveMuzzleBone = static_cast<int>(turretBone);
       }
     }
-    weapon->mBone = effectiveMuzzleBone;
+    weapon->SetBone(effectiveMuzzleBone);
 
     // `CAimManipulator` now declares the whole 0x110-byte run the binary
     // allocates here (`operator new(110h)`), so this is the plain `new` the

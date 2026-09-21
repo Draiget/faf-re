@@ -61,6 +61,10 @@ namespace moho
   );
   static_assert(sizeof(CAimFiringArc) == 0x18, "CAimFiringArc size must be 0x18");
 
+  /// The `pi/180` constant at 0x00DFF090, which every degree-taking aim path in
+  /// this subsystem multiplies by (0x0062FEB4, 0x006305FB, 0x00632B87, ...).
+  inline constexpr float kAimDegreesToRadians = 0.017453292f;
+
   /**
    * VFTABLE: 0x00E213C0
    * COL:  0x00E7AC30
@@ -193,6 +197,105 @@ namespace moho
      * extents for runtime aiming.
      */
     void SetFiringArc(CAimFiringArc arc);
+
+    // -----------------------------------------------------------------------
+    // The seven script-facing properties.
+    //
+    // Each one is an out-of-line COMDAT in the binary that *nothing* references
+    // -- no call, no jmp, no pointer, in any section. They survive because
+    // every real call site inlined them: `cfunc_CAimManipulatorOnTargetL` reads
+    // `[esi+0xE0]` directly, `cfunc_CAimManipulatorSetAimHeadingOffsetL` does
+    // its own `fmul`/`fstp` into `[esi+0x10C]` at 0x00632B85, and so on for all
+    // seven. That is what an inline accessor looks like after the optimiser has
+    // had it, so an inline accessor is what it was.
+    //
+    // The kept copies use a non-standard register contract (object in EAX,
+    // float in XMM0, SSE in a translation unit that is otherwise x87), which is
+    // how whole-program optimisation spells a body it believes it owns
+    // completely. It is also why these must not be read as free functions
+    // taking a pointer -- there is no calling convention under which they are.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Address: 0x0062FE70 (FUN_0062FE70, `movss xmm0, [eax+0xB8]; ret`)
+     *
+     * What it does:
+     * Reads the current heading in radians. Inlined into
+     * `cfunc_CAimManipulatorGetHeadingPitchL`.
+     */
+    [[nodiscard]] float GetHeading() const noexcept { return mHeading; }
+
+    /**
+     * Address: 0x0062FE80 (FUN_0062FE80, `movss xmm0, [eax+0xBC]; ret`)
+     *
+     * What it does:
+     * Reads the current pitch in radians. Inlined into
+     * `cfunc_CAimManipulatorGetHeadingPitchL`.
+     */
+    [[nodiscard]] float GetPitch() const noexcept { return mPitch; }
+
+    /**
+     * Address: 0x0062FE90 (FUN_0062FE90, `movss [eax+0xB8], xmm0;
+     * movss xmm0, [esp+4]; movss [eax+0xBC], xmm0; ret 4`)
+     *
+     * What it does:
+     * Writes both aim angles in radians. Inlined into
+     * `cfunc_CAimManipulatorSetHeadingPitchL`.
+     */
+    void SetHeadingPitch(const float heading, const float pitch) noexcept
+    {
+      mHeading = heading;
+      mPitch = pitch;
+    }
+
+    /**
+     * Address: 0x0062FEB0 (FUN_0062FEB0, `mulss xmm0, [0x00DFF090];
+     * movss [eax+0x10C], xmm0; ret`)
+     *
+     * What it does:
+     * Stores the heading offset, converting degrees to radians against the same
+     * `0x00DFF090` constant the inlined copy at 0x00632B85 multiplies by.
+     */
+    void SetAimHeadingOffset(const float degrees) noexcept
+    {
+      mHeadingOffset = degrees * kAimDegreesToRadians;
+    }
+
+    /**
+     * Address: 0x0062FE50 (FUN_0062FE50, `mov al, [eax+0xE0]; ret`)
+     *
+     * What it does:
+     * Reports whether the last tracking step ended inside firing tolerance.
+     * Inlined into `cfunc_CAimManipulatorOnTargetL`.
+     */
+    [[nodiscard]] bool OnTarget() const noexcept { return mOnTarget; }
+
+    /**
+     * Address: 0x0062FE60 (FUN_0062FE60, `mov [eax+0xE4], ecx; ret`)
+     *
+     * What it does:
+     * Sets how many ticks the manipulator holds its pose before resetting.
+     * Inlined into `cfunc_CAimManipulatorSetResetPoseTimeL`, which scales the
+     * Lua seconds argument by 10 first.
+     */
+    void SetResetPoseTime(const std::int32_t ticks) noexcept { mResetPoseTime = ticks; }
+
+    /**
+     * Address: 0x00630750 (FUN_00630750, `mov [eax+0xB4], cl;
+     * mov byte [eax+0xE0], 0; ret`)
+     *
+     * What it does:
+     * Enables or disables aiming and drops the on-target latch in the same
+     * step -- a disabled manipulator must not report a firing solution. Note
+     * this is `CAimManipulator::mEnabled` at +0xB4, not the `IAniManipulator`
+     * flag of the same name at +0x4C. Inlined into
+     * `cfunc_CAimManipulatorSetEnabledL`.
+     */
+    void SetEnabled(const bool enabled) noexcept
+    {
+      mEnabled = enabled;
+      mOnTarget = false;
+    }
 
   private:
     /**
