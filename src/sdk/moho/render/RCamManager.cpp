@@ -167,10 +167,13 @@ namespace moho
   )
   {
     CameraImpl* camera = nullptr;
-    // 0x007AA9C0 allocates `operator new(0x858u)`. `sizeof(CameraImpl)` is one
-    // pointer - the class is thin and its state lives behind runtime views - so
-    // sizing the block by it hands the constructor four bytes and lets it write
-    // 0x854 past the end, straight through whatever the allocator placed next.
+    // 0x007AA9C0 allocates `operator new(0x858u)`, which `CameraImpl` now is
+    // exactly -- a static_assert in its header ties the two together. The
+    // explicit size survives because it is the binary's own constant and the
+    // assert is what proves the class still matches it; it used to be load
+    // bearing, back when the class was a thin shell whose state lived behind
+    // runtime views and sizing the block by it would have handed the
+    // constructor four bytes to write 0x854 past.
     CameraImpl* const storage = static_cast<CameraImpl*>(::operator new(kCameraImplRuntimeSize, std::nothrow));
     if (storage != nullptr) {
       try {
