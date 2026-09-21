@@ -75,6 +75,22 @@ namespace moho
     ~IAniManipulator() override;
 
     /**
+     * Address: 0x0062FC10 (FUN_0062FC10,
+     * ?StaticGetClass@IAniManipulator@Moho@@SAPAVRType@gpg@@XZ)
+     *
+     * What it does:
+     * Returns the cached reflection type for `IAniManipulator`, resolving it
+     * from RTTI on first use.
+     *
+     * The binary keeps this and the virtual `GetClass` below as two separate
+     * out-of-line copies of the same body (cache 0x010C738C, type descriptor
+     * 0x00F71B60, `gpg::LookupRType` at 0x008E0750). Neither has a caller:
+     * `GetClass` is reached through the vtable, and every use of this one was
+     * inlined.
+     */
+    [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
      * Address: 0x0062FC30 (FUN_0062FC30, ?GetClass@IAniManipulator@Moho@@UBEPAVRType@gpg@@XZ)
      *
      * VFTable SLOT: 1 (CScriptObject subobject)

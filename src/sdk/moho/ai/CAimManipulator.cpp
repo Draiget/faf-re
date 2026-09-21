@@ -142,10 +142,11 @@ namespace
    * One emission per translation unit that needs it. This is this file's
    * copy: 0x00632C20 sits inside `CAimManipulator`'s own COMDAT run, between
    * `Moho::runtime` glue at 0x00632C10 and this class's Lua metatable factory
-   * `Create` at 0x00632C40. `IAniManipulator.cpp` has its own at 0x0062FC10,
-   * and the virtual `IAniManipulator::GetClass` at 0x0062FC30 is a third copy
-   * of the same body reached through the vtable. No caller calls any of them
-   * -- the reflection paths that need the type inlined it.
+   * `Create` at 0x00632C40. The other two copies of the same body are
+   * `IAniManipulator::StaticGetClass` (0x0062FC10) and the virtual
+   * `IAniManipulator::GetClass` (0x0062FC30), both of which the binary names.
+   * No caller calls any of them -- `GetClass` goes through the vtable and the
+   * reflection paths inlined the rest.
    */
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
