@@ -16,7 +16,6 @@
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
-#include "moho/terrain/water/WaterShaderRuntimeView.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
 namespace
@@ -316,7 +315,7 @@ namespace moho
     GetWater2ReflectionMapShaderVar().SetRenderTargetTexture(reflectionTexture);
     GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
 
-    const WaterShaderRuntimeView& shaderState = AsWaterShaderRuntimeView(*shaderProperties);
+    const WaterShaderNumericState& shaderState = shaderProperties->mNumericState;
     if (mCachedFresnelBias != shaderState.mFresnelBias || mCachedFresnelPower != shaderState.mFresnelPower ||
         mCachedSunShininess != shaderState.mSunShininess ||
         mCachedSunReflectionAmount != shaderState.mSunReflectionAmount || mFresnelLookupTexture.px == nullptr) {

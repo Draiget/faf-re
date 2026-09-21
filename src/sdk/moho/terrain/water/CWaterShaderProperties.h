@@ -17,59 +17,61 @@ namespace moho
   class CD3DDynamicTextureSheet;
   class ID3DTextureSheet;
 
-  struct WaterDirectionVector
-  {
-    float x{};
-    float y{};
-    float z{};
-  };
-  static_assert(sizeof(WaterDirectionVector) == 0x0C,
-                "WaterDirectionVector size must be 0x0C");
-
   /**
-   * Typed placeholder for unrecovered numeric shader lanes in
-   * CWaterShaderProperties (+0x04..+0x83).
+   * The `water2` effect's parameter block, held on `CWaterShaderProperties` at
+   * +0x04 and bound lane-for-lane by `HighFidelityWater`/`LowFidelityWater`.
+   *
+   * Every name here is pinned by three independent sources that agree:
+   *
+   * - the effect-variable strings the renderers look each lane up by
+   *   (`"WaterColor"`, `"NormalRepeatRate"`, `"SunDirection"`, ... -- see
+   *   `WaterShaderVars.cpp`), and the float count each `SetShaderVarMem` call
+   *   passes, which is what makes the array members arrays;
+   * - the defaults the constructor at 0x0089F600 seeds, which are the stock
+   *   map water settings verbatim -- `SunDirection` normalises to
+   *   (0.0999, -0.9626, 0.2519) and `SunColor` to (0.8127, 0.4741, 0.3387);
+   * - the archive order of `Save`/`Load` (0x0089FEA0 / 0x008A03C0), which is
+   *   the `.scmap` water-settings block field for field.
+   *
+   * `mSunStrength` is the one lane no render path binds: it round-trips
+   * through the archive and is otherwise unread, which is why the earlier
+   * placeholder layout had nothing to hang a name on.
    */
   struct WaterShaderNumericState
   {
-    /**
-     * The first archive lane, not a flags word. `CWaterShaderProperties::Load`
-     * (0x008A03C0) stores its very first `BinaryReader::Read(&buf, 4)` here
-     * with `movss dword ptr [ebp+4], xmm0` at 0x008A03FB - a float store to
-     * class +0x04, which is this member. Nothing reads it as flags.
-     */
-    float scalarLead{}; // +0x00
-
-    float scalar00{}; // +0x04
-    float scalar01{}; // +0x08
-    float scalar02{}; // +0x0C
-    float scalar03{}; // +0x10
-    float scalar04{}; // +0x14
-    float scalar05{}; // +0x18
-    float scalar06{}; // +0x1C
-    float scalar07{}; // +0x20
-    float scalar08{}; // +0x24
-    float scalar09{}; // +0x28
-    float scalar10{}; // +0x2C
-    float scalar11{}; // +0x30
-    float scalar12{}; // +0x34
-    float scalar13{}; // +0x38
-    float scalar14{}; // +0x3C
-    float scalar15{}; // +0x40
-    float scalar16{}; // +0x44
-    float scalar17{}; // +0x48
-    float scalar18{}; // +0x4C
-    float scalar19{}; // +0x50
-    float scalar20{}; // +0x54
-    float scalar21{}; // +0x58
-    float scalar22{}; // +0x5C
-
-    WaterDirectionVector directionPrimary{};   // +0x60
-    WaterDirectionVector directionSecondary{}; // +0x6C
-
-    float scalar29{}; // +0x78
-    float scalar30{}; // +0x7C
+    float mWaterColor[3]{};        // +0x00  "WaterColor",           3 floats
+    float mWaterLerp[2]{};         // +0x0C  "WaterLerp",            2 floats
+    float mRefractionScale{};      // +0x14  "RefractionScale"
+    float mFresnelBias{};          // +0x18  "FresnelBias"
+    float mFresnelPower{};         // +0x1C  "FresnelPower"
+    float mUnitReflectionAmount{}; // +0x20  "UnitReflectionAmount"
+    float mSkyReflectionAmount{};  // +0x24  "SkyReflectionAmount"
+    float mNormalRepeatRate[4]{};  // +0x28  "NormalRepeatRate",     4 floats
+    float mNormal1Movement[2]{};   // +0x38  "Normal1Movement",      2 floats
+    float mNormal2Movement[2]{};   // +0x40  "Normal2Movement",      2 floats
+    float mNormal3Movement[2]{};   // +0x48  "Normal3Movement",      2 floats
+    float mNormal4Movement[2]{};   // +0x50  "Normal4Movement",      2 floats
+    float mSunShininess{};         // +0x58  "SunShininess"
+    float mSunStrength{};          // +0x5C  archive-only, bound by nothing
+    float mSunDirection[3]{};      // +0x60  "SunDirection",         3 floats
+    float mSunColor[3]{};          // +0x6C  "SunColor",             3 floats
+    float mSunReflectionAmount{};  // +0x78  "SunReflectionAmount"
+    float mSunGlow{};              // +0x7C  "SunGlow"
   };
+  static_assert(offsetof(WaterShaderNumericState, mWaterLerp) == 0x0C,
+                "WaterShaderNumericState::mWaterLerp offset must be 0x0C");
+  static_assert(offsetof(WaterShaderNumericState, mNormalRepeatRate) == 0x28,
+                "WaterShaderNumericState::mNormalRepeatRate offset must be 0x28");
+  static_assert(offsetof(WaterShaderNumericState, mNormal1Movement) == 0x38,
+                "WaterShaderNumericState::mNormal1Movement offset must be 0x38");
+  static_assert(offsetof(WaterShaderNumericState, mSunShininess) == 0x58,
+                "WaterShaderNumericState::mSunShininess offset must be 0x58");
+  static_assert(offsetof(WaterShaderNumericState, mSunDirection) == 0x60,
+                "WaterShaderNumericState::mSunDirection offset must be 0x60");
+  static_assert(offsetof(WaterShaderNumericState, mSunColor) == 0x6C,
+                "WaterShaderNumericState::mSunColor offset must be 0x6C");
+  static_assert(offsetof(WaterShaderNumericState, mSunGlow) == 0x7C,
+                "WaterShaderNumericState::mSunGlow offset must be 0x7C");
   static_assert(sizeof(WaterShaderNumericState) == 0x80,
                 "WaterShaderNumericState size must be 0x80");
 

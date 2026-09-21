@@ -1305,10 +1305,7 @@ float CAiAttackerImpl::GetMaxWeaponRange()
       continue;
     }
 
-    float weaponRange = weapon->mAttributes.mMaxRadius;
-    if (weaponRange < 0.0f && weapon->mAttributes.mBlueprint) {
-      weaponRange = weapon->mAttributes.mBlueprint->MaxRadius;
-    }
+    const float weaponRange = weapon->mAttributes.GetMaxRadius();
 
     if (weaponRange > maxRange) {
       maxRange = weaponRange;
@@ -1742,12 +1739,12 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   const Wm3::Vector3f unitPosition = unit->GetPosition();
 
   // Effective search radius: tracking radius scaled by the weapon max radius,
-  // floored by the raw max radius.
-  const float maxRadius =
-    (weapon->mAttributes.mMaxRadius >= 0.0f) ? weapon->mAttributes.mMaxRadius : weapon->mAttributes.mBlueprint->MaxRadius;
-  const float scaledRadius =
-    (weapon->mAttributes.mMaxRadius < 0.0f) ? weapon->mAttributes.mBlueprint->MaxRadius : weapon->mAttributes.mMaxRadius;
-  float searchRadius = weaponBlueprint->TrackingRadius * scaledRadius;
+  // floored by the raw max radius. The binary expands `GetMaxRadius` twice
+  // here (0x005D80E9 and 0x005D8100) rather than reusing the first result --
+  // MSVC cannot fold the second read across the aliasing blueprint load on the
+  // fallback path. One local is the same value either way.
+  const float maxRadius = weapon->mAttributes.GetMaxRadius();
+  float searchRadius = weaponBlueprint->TrackingRadius * maxRadius;
   if (maxRadius > searchRadius) {
     searchRadius = maxRadius;
   }

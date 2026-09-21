@@ -13,7 +13,6 @@
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
-#include "moho/terrain/water/WaterShaderRuntimeView.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
 namespace moho
@@ -211,7 +210,7 @@ namespace moho
     GetWater2WaterElevationShaderVar().SetFloat(mWaterElevation);
     GetWater2TimeShaderVar().SetFloat(static_cast<float>(tick) + tickLerp);
 
-    const WaterShaderRuntimeView& shaderState = AsWaterShaderRuntimeView(*shaderProperties);
+    const WaterShaderNumericState& shaderState = shaderProperties->mNumericState;
 
     SetShaderVarMem(GetWater2WaterColorShaderVar(), 3U, shaderState.mWaterColor);
     SetShaderVarMem(GetWater2WaterLerpShaderVar(), 2U, shaderState.mWaterLerp);

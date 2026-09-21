@@ -13,18 +13,17 @@
 
 namespace
 {
-void NormalizeVector3(moho::WaterDirectionVector& direction)
+void NormalizeVector3(float (&vector)[3])
 {
-  const float lengthSquared = (direction.x * direction.x) + (direction.y * direction.y) +
-    (direction.z * direction.z);
+  const float lengthSquared = (vector[0] * vector[0]) + (vector[1] * vector[1]) + (vector[2] * vector[2]);
   if (lengthSquared <= 0.0f) {
     return;
   }
 
   const float invLength = 1.0f / std::sqrt(lengthSquared);
-  direction.x *= invLength;
-  direction.y *= invLength;
-  direction.z *= invLength;
+  vector[0] *= invLength;
+  vector[1] *= invLength;
+  vector[2] *= invLength;
 }
 
 void WriteFloat(gpg::BinaryWriter& writer, const float value)
@@ -51,42 +50,46 @@ namespace moho
 CWaterShaderProperties::CWaterShaderProperties()
 {
   WaterShaderNumericState& state = mNumericState;
-  state.scalarLead = 0.0f;
-  state.scalar00 = 0.7f;
-  state.scalar01 = 1.5f;
-  state.scalar02 = 0.064f;
-  state.scalar03 = 0.119f;
-  state.scalar04 = 0.375f;
-  state.scalar05 = 0.15f;
-  state.scalar06 = 1.5f;
-  state.scalar07 = 0.5f;
-  state.scalar08 = 1.5f;
-  state.scalar09 = 0.0009f;
-  state.scalar10 = 0.009f;
-  state.scalar11 = 0.05f;
-  state.scalar12 = 0.5f;
-  state.scalar21 = 50.0f;
-  state.scalar22 = 10.0f;
-  state.directionPrimary.x = 0.1f;
-  state.directionPrimary.y = -0.967f;
-  state.directionPrimary.z = 0.253f;
-  state.directionSecondary.x = 1.2f;
-  state.directionSecondary.y = 0.7f;
-  state.directionSecondary.z = 0.5f;
-  state.scalar29 = 5.0f;
-  state.scalar30 = 0.1f;
+  state.mWaterColor[0] = 0.0f;
+  state.mWaterColor[1] = 0.7f;
+  state.mWaterColor[2] = 1.5f;
+  state.mWaterLerp[0] = 0.064f;
+  state.mWaterLerp[1] = 0.119f;
+  state.mRefractionScale = 0.375f;
+  state.mFresnelBias = 0.15f;
+  state.mFresnelPower = 1.5f;
+  state.mUnitReflectionAmount = 0.5f;
+  state.mSkyReflectionAmount = 1.5f;
+  state.mNormalRepeatRate[0] = 0.0009f;
+  state.mNormalRepeatRate[1] = 0.009f;
+  state.mNormalRepeatRate[2] = 0.05f;
+  state.mNormalRepeatRate[3] = 0.5f;
+  state.mSunShininess = 50.0f;
+  state.mSunStrength = 10.0f;
+  state.mSunDirection[0] = 0.1f;
+  state.mSunDirection[1] = -0.967f;
+  state.mSunDirection[2] = 0.253f;
+  state.mSunColor[0] = 1.2f;
+  state.mSunColor[1] = 0.7f;
+  state.mSunColor[2] = 0.5f;
+  state.mSunReflectionAmount = 5.0f;
+  state.mSunGlow = 0.1f;
 
-  NormalizeVector3(state.directionPrimary);
-  NormalizeVector3(state.directionSecondary);
+  // Both are stored pre-normalised: the sun direction becomes the stock unit
+  // vector (0.0999, -0.9626, 0.2519) and the sun colour the stock warm tint
+  // (0.8127, 0.4741, 0.3387), which is how the seeds above are recognisable
+  // as the shipped map defaults at all.
+  NormalizeVector3(state.mSunDirection);
+  NormalizeVector3(state.mSunColor);
 
-  state.scalar13 = 0.5f;
-  state.scalar14 = -0.95f;
-  state.scalar15 = 0.05f;
-  state.scalar16 = -0.095f;
-  state.scalar17 = 0.01f;
-  state.scalar18 = 0.03f;
-  state.scalar19 = 0.0005f;
-  state.scalar20 = 0.0009f;
+  state.mNormal1Movement[0] = 0.5f;
+  state.mNormal1Movement[1] = -0.95f;
+  state.mNormal2Movement[0] = 0.05f;
+  state.mNormal2Movement[1] = -0.095f;
+  state.mNormal3Movement[0] = 0.01f;
+  state.mNormal3Movement[1] = 0.03f;
+  state.mNormal4Movement[0] = 0.0005f;
+  state.mNormal4Movement[1] = 0.0009f;
 
   for (auto& wave : mShaderNames) {
     wave.assign("/textures/engine/waves.dds");
@@ -159,50 +162,44 @@ void CWaterShaderProperties::Save(gpg::BinaryWriter& writer) const
   // +0x5C +0x60 +0x64 +0x68 +0x6C +0x70 +0x74 +0x78 +0x7C +0x80, then the two
   // paths, then +0x2C +0x30 +0x34 +0x38, then the wave entries. Same 20/4
   // split as FUN_008A03C0, so the two round-trip.
-  WriteFloat(writer, state.scalarLead);
-  WriteFloat(writer, state.scalar00);
-  WriteFloat(writer, state.scalar01);
-  WriteFloat(writer, state.scalar02);
-  WriteFloat(writer, state.scalar03);
-  WriteFloat(writer, state.scalar04);
-  WriteFloat(writer, state.scalar05);
-  WriteFloat(writer, state.scalar06);
-  WriteFloat(writer, state.scalar07);
-  WriteFloat(writer, state.scalar08);
-  WriteFloat(writer, state.scalar21);
-  WriteFloat(writer, state.scalar22);
-  WriteFloat(writer, state.directionPrimary.x);
-  WriteFloat(writer, state.directionPrimary.y);
-  WriteFloat(writer, state.directionPrimary.z);
-  WriteFloat(writer, state.directionSecondary.x);
-  WriteFloat(writer, state.directionSecondary.y);
-  WriteFloat(writer, state.directionSecondary.z);
-  WriteFloat(writer, state.scalar29);
-  WriteFloat(writer, state.scalar30);
+  WriteFloat(writer, state.mWaterColor[0]);
+  WriteFloat(writer, state.mWaterColor[1]);
+  WriteFloat(writer, state.mWaterColor[2]);
+  WriteFloat(writer, state.mWaterLerp[0]);
+  WriteFloat(writer, state.mWaterLerp[1]);
+  WriteFloat(writer, state.mRefractionScale);
+  WriteFloat(writer, state.mFresnelBias);
+  WriteFloat(writer, state.mFresnelPower);
+  WriteFloat(writer, state.mUnitReflectionAmount);
+  WriteFloat(writer, state.mSkyReflectionAmount);
+  WriteFloat(writer, state.mSunShininess);
+  WriteFloat(writer, state.mSunStrength);
+  WriteFloat(writer, state.mSunDirection[0]);
+  WriteFloat(writer, state.mSunDirection[1]);
+  WriteFloat(writer, state.mSunDirection[2]);
+  WriteFloat(writer, state.mSunColor[0]);
+  WriteFloat(writer, state.mSunColor[1]);
+  WriteFloat(writer, state.mSunColor[2]);
+  WriteFloat(writer, state.mSunReflectionAmount);
+  WriteFloat(writer, state.mSunGlow);
 
   writer.WriteString(mWaterCubemap);
   writer.WriteString(mWaterRamp);
 
-  WriteFloat(writer, state.scalar09);
-  WriteFloat(writer, state.scalar10);
-  WriteFloat(writer, state.scalar11);
-  WriteFloat(writer, state.scalar12);
+  WriteFloat(writer, state.mNormalRepeatRate[0]);
+  WriteFloat(writer, state.mNormalRepeatRate[1]);
+  WriteFloat(writer, state.mNormalRepeatRate[2]);
+  WriteFloat(writer, state.mNormalRepeatRate[3]);
 
-  const float* const firstLane[4] = {
-    &state.scalar13,
-    &state.scalar15,
-    &state.scalar17,
-    &state.scalar19,
-  };
-  const float* const secondLane[4] = {
-    &state.scalar14,
-    &state.scalar16,
-    &state.scalar18,
-    &state.scalar20,
+  const float* const waveMovement[4] = {
+    state.mNormal1Movement,
+    state.mNormal2Movement,
+    state.mNormal3Movement,
+    state.mNormal4Movement,
   };
   for (std::size_t index = 0; index < 4u; ++index) {
-    WriteFloat(writer, *firstLane[index]);
-    WriteFloat(writer, *secondLane[index]);
+    WriteFloat(writer, waveMovement[index][0]);
+    WriteFloat(writer, waveMovement[index][1]);
     writer.WriteString(mShaderNames[index]);
   }
 }
@@ -244,50 +241,44 @@ void CWaterShaderProperties::Load(const unsigned int version, gpg::BinaryReader&
   // cubemap loaded as "<2 junk bytes>(>/textures/environment/skycube_*.dds"
   // and the first wave texture as "\n<junk>#</textures/engine/waves.dds",
   // which is what the "Can't find texture" warnings were.
-  ReadFloat(reader, state.scalarLead);
-  ReadFloat(reader, state.scalar00);
-  ReadFloat(reader, state.scalar01);
-  ReadFloat(reader, state.scalar02);
-  ReadFloat(reader, state.scalar03);
-  ReadFloat(reader, state.scalar04);
-  ReadFloat(reader, state.scalar05);
-  ReadFloat(reader, state.scalar06);
-  ReadFloat(reader, state.scalar07);
-  ReadFloat(reader, state.scalar08);
-  ReadFloat(reader, state.scalar21);
-  ReadFloat(reader, state.scalar22);
-  ReadFloat(reader, state.directionPrimary.x);
-  ReadFloat(reader, state.directionPrimary.y);
-  ReadFloat(reader, state.directionPrimary.z);
-  ReadFloat(reader, state.directionSecondary.x);
-  ReadFloat(reader, state.directionSecondary.y);
-  ReadFloat(reader, state.directionSecondary.z);
-  ReadFloat(reader, state.scalar29);
-  ReadFloat(reader, state.scalar30);
+  ReadFloat(reader, state.mWaterColor[0]);
+  ReadFloat(reader, state.mWaterColor[1]);
+  ReadFloat(reader, state.mWaterColor[2]);
+  ReadFloat(reader, state.mWaterLerp[0]);
+  ReadFloat(reader, state.mWaterLerp[1]);
+  ReadFloat(reader, state.mRefractionScale);
+  ReadFloat(reader, state.mFresnelBias);
+  ReadFloat(reader, state.mFresnelPower);
+  ReadFloat(reader, state.mUnitReflectionAmount);
+  ReadFloat(reader, state.mSkyReflectionAmount);
+  ReadFloat(reader, state.mSunShininess);
+  ReadFloat(reader, state.mSunStrength);
+  ReadFloat(reader, state.mSunDirection[0]);
+  ReadFloat(reader, state.mSunDirection[1]);
+  ReadFloat(reader, state.mSunDirection[2]);
+  ReadFloat(reader, state.mSunColor[0]);
+  ReadFloat(reader, state.mSunColor[1]);
+  ReadFloat(reader, state.mSunColor[2]);
+  ReadFloat(reader, state.mSunReflectionAmount);
+  ReadFloat(reader, state.mSunGlow);
 
   reader.ReadString(&mWaterCubemap);
   reader.ReadString(&mWaterRamp);
 
-  ReadFloat(reader, state.scalar09);
-  ReadFloat(reader, state.scalar10);
-  ReadFloat(reader, state.scalar11);
-  ReadFloat(reader, state.scalar12);
+  ReadFloat(reader, state.mNormalRepeatRate[0]);
+  ReadFloat(reader, state.mNormalRepeatRate[1]);
+  ReadFloat(reader, state.mNormalRepeatRate[2]);
+  ReadFloat(reader, state.mNormalRepeatRate[3]);
 
-  float* const firstLane[4] = {
-    &state.scalar13,
-    &state.scalar15,
-    &state.scalar17,
-    &state.scalar19,
-  };
-  float* const secondLane[4] = {
-    &state.scalar14,
-    &state.scalar16,
-    &state.scalar18,
-    &state.scalar20,
+  float* const waveMovement[4] = {
+    state.mNormal1Movement,
+    state.mNormal2Movement,
+    state.mNormal3Movement,
+    state.mNormal4Movement,
   };
   for (std::size_t index = 0; index < 4u; ++index) {
-    ReadFloat(reader, *firstLane[index]);
-    ReadFloat(reader, *secondLane[index]);
+    ReadFloat(reader, waveMovement[index][0]);
+    ReadFloat(reader, waveMovement[index][1]);
     reader.ReadString(&mShaderNames[index]);
   }
 }

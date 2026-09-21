@@ -4,6 +4,10 @@
 #include <cstdint>
 
 #include "legacy/containers/String.h"
+// `GetMaxRadius` below reads `RUnitBlueprintWeapon::MaxRadius` and has to stay
+// inline -- the binary kept no out-of-line copy of it -- so the full blueprint
+// definition is needed here, not a forward declaration.
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 
 namespace gpg
 {
@@ -12,8 +16,6 @@ namespace gpg
 
 namespace moho
 {
-  struct RUnitBlueprintWeapon;
-
   /**
    * Recovered `CWeaponAttributes` layout.
    *
@@ -135,6 +137,30 @@ namespace moho
      * radius when local cache is unset.
      */
     [[nodiscard]] float GetMinRadiusSq();
+
+    /**
+     * Inline-only member -- the linker kept no out-of-line copy because every
+     * call site expanded it. Three independent expansions carry the same three
+     * instructions, `movss xmm, [this+0x10]` / `comiss` against zero /
+     * `mov reg, [this+0x00]; movss xmm, [reg+0x5C]`:
+     *
+     * - `CAiAttackerImpl::GetMaxWeaponRange` (0x005D6E80) at 0x005D6EE3 and
+     *   again at 0x005D6EFD -- once per loop iteration, twice per weapon;
+     * - `CAiAttackerImpl::TrackToTarget` (0x005D8000) at 0x005D80E9 and
+     *   0x005D8100;
+     * - `RDebugWeapons::OnTick` (0x00652E00) at 0x00652F63.
+     *
+     * What it does:
+     * Returns the effective maximum weapon radius: the local override when one
+     * has been set, otherwise the backing blueprint's. Unlike the other
+     * override getters in this class it does *not* guard `mBlueprint` -- none
+     * of the three expansions tests it, so the fallback path dereferences it
+     * unconditionally.
+     */
+    [[nodiscard]] float GetMaxRadius() const noexcept
+    {
+      return (mMaxRadius < 0.0f) ? mBlueprint->MaxRadius : mMaxRadius;
+    }
 
     /**
      * Address: 0x006D3410 (FUN_006D3410)
