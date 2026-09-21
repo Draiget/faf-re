@@ -12,7 +12,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/ui/SDebugWorldText.h"
 #include "moho/unit/core/Unit.h"
-#include "moho/unit/core/UnitWeaponRuntimeView.h"
+#include "moho/unit/core/UnitWeapon.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
@@ -24,6 +24,8 @@ namespace moho
 namespace
 {
   constexpr std::uint32_t kWeaponCirclePrecision = 0x20u;
+  // 0x00652F7A loads this from the shared 1.0f pool at 0x00DFEC20.
+  constexpr float kDefaultWeaponRadius = 1.0f;
   constexpr float kWeaponLabelAngleStep = 0.39269909f;
   constexpr float kWeaponLabelPitch = -0.7853981852531433f;
   constexpr std::int32_t kWeaponLabelStyle = 8;
@@ -186,8 +188,11 @@ namespace moho
         const std::size_t weaponBlueprintCount = blueprint ? blueprint->Weapons.WeaponBlueprints.size() : 0u;
 
         for (int weaponIndex = 0; weaponIndex < weaponCount; ++weaponIndex) {
-          const UnitWeapon* const weapon = reinterpret_cast<UnitWeapon*>(attacker->GetWeapon(weaponIndex));
-          const float radius = ResolveDebugWeaponRadius(AsUnitWeaponRuntimeView(weapon));
+          // 0x00652F4B branches on the weapon pointer only; the radius read at
+          // 0x00652F63 is the unguarded `GetMaxRadius` expansion, so the
+          // fallback constant belongs here rather than inside the getter.
+          const UnitWeapon* const weapon = attacker->GetWeapon(weaponIndex);
+          const float radius = (weapon != nullptr) ? weapon->mAttributes.GetMaxRadius() : kDefaultWeaponRadius;
           const Wm3::Vector3f unitPosition = unit->GetPosition();
           debugCanvas->AddWireCircle(upAxis, unitPosition, radius, depth, kWeaponCirclePrecision);
 

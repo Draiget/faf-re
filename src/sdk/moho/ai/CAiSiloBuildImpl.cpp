@@ -14,11 +14,11 @@
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/entity/Entity.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
+#include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/core/UnitWeapon.h"
-#include "moho/unit/core/UnitWeaponRuntimeView.h"
 
 using namespace moho;
 
@@ -445,26 +445,26 @@ void CAiSiloBuildImpl::SiloUpdateProjectileBlueprint()
 
     const int weaponCount = mUnit->AiAttacker->GetWeaponCount();
     for (int weaponIndex = 0; weaponIndex < weaponCount; ++weaponIndex) {
-      auto* const weapon = AsUnitWeaponRuntimeView(reinterpret_cast<UnitWeapon*>(mUnit->AiAttacker->GetWeapon(weaponIndex)));
-      if (!weapon || !weapon->mWeaponInfo) {
+      UnitWeapon* const weapon = mUnit->AiAttacker->GetWeapon(weaponIndex);
+      if (!weapon || !weapon->mWeaponBlueprint) {
         continue;
       }
 
-      if (!WeaponSupportsSiloBuild(weapon)) {
+      if (weapon->mWeaponBlueprint->CountedProjectile == 0u) {
         continue;
       }
       if (!weapon->mProjectileBlueprint) {
         continue;
       }
 
-      const bool isNukeWeapon = WeaponIsNukeClass(weapon);
+      const bool isNukeWeapon = weapon->mWeaponBlueprint->NukeWeapon != 0u;
       const bool expectedNukeFlag = (slotIndex == ToSiloIndex(SILOTYPE_Nuke));
       if (isNukeWeapon != expectedNukeFlag) {
         continue;
       }
 
-      slot.mWeapon = reinterpret_cast<UnitWeapon*>(weapon);
-      slot.mMaxStorageCount = WeaponSiloMaxStorageCount(weapon);
+      slot.mWeapon = weapon;
+      slot.mMaxStorageCount = weapon->mWeaponBlueprint->MaxProjectileStorage;
     }
   }
 
@@ -536,7 +536,7 @@ void CAiSiloBuildImpl::SiloAdjustStorageCount(const ESiloType type, const std::i
  */
 bool CAiSiloBuildImpl::SiloAddBuild(const ESiloType type)
 {
-  auto* const weapon = AsUnitWeaponRuntimeView(mSiloInfo[ToSiloIndex(type)].mWeapon);
+  const UnitWeapon* const weapon = mSiloInfo[ToSiloIndex(type)].mWeapon;
   if (!weapon || weapon->mEnabled == 0u || SiloIsFull(type)) {
     return false;
   }
@@ -653,9 +653,9 @@ void CAiSiloBuildImpl::SiloTick()
 
     const ESiloType queuedType = mSiloTypes.front();
     UnitWeapon* const queuedWeapon = mSiloInfo[ToSiloIndex(queuedType)].mWeapon;
-    auto* const weaponView = AsUnitWeaponRuntimeView(queuedWeapon);
-    RProjectileBlueprint* const projectileBlueprint = weaponView ? weaponView->mProjectileBlueprint : nullptr;
-    if (!weaponView || !projectileBlueprint) {
+    RProjectileBlueprint* const projectileBlueprint =
+      queuedWeapon ? queuedWeapon->mProjectileBlueprint : nullptr;
+    if (!queuedWeapon || !projectileBlueprint) {
       mSiloTypes.pop_front();
       mState = SBS_Idle;
       return;

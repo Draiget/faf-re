@@ -5229,9 +5229,6 @@
     <ClInclude Include="moho\unit\core\RDebugWeaponsTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\unit\core\UnitWeaponRuntimeView.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\mesh\MeshBatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
