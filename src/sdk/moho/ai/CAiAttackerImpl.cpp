@@ -425,16 +425,6 @@ namespace
     return nullptr;
   }
 
-  [[nodiscard]] Listener<EAiAttackerEvent>* ListenerFromBroadcasterLink(Broadcaster* const node) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<Listener<EAiAttackerEvent>*>(bytePtr - offsetof(Listener<EAiAttackerEvent>, mListenerLink));
-  }
-
   /**
    * Address: 0x005DB480 (FUN_005DB480, broadcaster dispatch helper)
    *
@@ -466,7 +456,7 @@ namespace
       Broadcaster* const listenerLink = static_cast<Broadcaster*>(detached.mPrev);
       listenerLink->ListLinkAfter(&broadcaster);
 
-      if (Listener<EAiAttackerEvent>* const listener = ListenerFromBroadcasterLink(listenerLink); listener != nullptr) {
+      if (auto* const listener = Listener<EAiAttackerEvent>::FromListenerLink(listenerLink); listener != nullptr) {
         listener->OnEvent(event);
       }
     }

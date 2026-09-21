@@ -66,22 +66,6 @@ namespace
     return type;
   }
 
-  /// Recovers the owning listener from its ring link node; the binary spells
-  /// this as `node - 4`, which is `offsetof(Listener<EFormationdStatus>, mListenerLink)`.
-  [[nodiscard]] moho::Listener<moho::EFormationdStatus>* ListenerFromEFormationdStatusLinkNode(
-    moho::Broadcaster* const node
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<moho::Listener<moho::EFormationdStatus>*>(
-      bytePtr - offsetof(moho::Listener<moho::EFormationdStatus>, mListenerLink)
-    );
-  }
-
   /**
    * Address: 0x0056DCA0 (FUN_0056DCA0, Moho::RBroadcasterRType_EFormationdStatus::SerLoad)
    *
@@ -150,7 +134,7 @@ namespace
       node != broadcaster;
       node = static_cast<moho::Broadcaster*>(node->mNext)
     ) {
-      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, ListenerFromEFormationdStatusLinkNode(node));
+      (void)gpg::RRef_Listener_EFormationdStatus(&pointerRef, moho::Listener<moho::EFormationdStatus>::FromListenerLink(node));
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
@@ -1841,7 +1825,7 @@ namespace moho
       auto* const listenerLink = static_cast<Broadcaster*>(detached.mNext);
       listenerLink->ListLinkBefore(this);
 
-      if (Listener<EFormationdStatus>* const listener = ListenerFromEFormationdStatusLinkNode(listenerLink)) {
+      if (Listener<EFormationdStatus>* const listener = moho::Listener<moho::EFormationdStatus>::FromListenerLink(listenerLink)) {
         listener->OnEvent(event);
       }
     }
