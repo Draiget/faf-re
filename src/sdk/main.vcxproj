@@ -2602,7 +2602,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
   
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="gpg\gal\AppRuntimeView.h" />
     <ClInclude Include="moho\ai\CAiPathSpline.h" />
     <ClInclude Include="moho\ai\EAiAttackerEvent.h" />
     <ClInclude Include="moho\ai\EAiResult.h" />

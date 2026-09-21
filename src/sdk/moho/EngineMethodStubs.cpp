@@ -8,7 +8,6 @@
 // object should be moved out of this stub TU and recovered properly.
 
 #include "gpg/core/reflection/Reflection.h"
-#include "gpg/gal/AppRuntimeView.h"
 #include "moho/effects/rendering/CEfxEmitterTypeInfo.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CFactoryBuildTask.h"
@@ -41,21 +40,15 @@ namespace moho
 // ReadPointerOwned, weak refs, primitives, econ events, blip/recon vectors), in
 // the exact binary field order. The no-op stubs here are removed.
 
+// ===== gpg::gal device/head accessors =====
+// `DeviceAppView` / `DeviceContextAppView` / `HeadAppView` were a duplicate of
+// `gpg::gal::Device`, `DeviceContext` and `Head`, all three of which are
+// recovered with real bodies -- `Device::IsReady` (0x008E6720),
+// `Device::GetInstance` (0x008E6730) and `DeviceContext::GetHead`
+// (0x008E69C0 / 0x008E6A90) in `gpg/gal/Device.cpp`. The stubs here returned
+// `false` / `nullptr` / a shared zero head, so the one caller --
+// `CScApp::AppDoSuppressWindowsKeys` (0x008CE1D0) -- could never return true
+// and Windows-key suppression never engaged. It now calls the real singleton,
+// and `AppRuntimeView.h` is gone.
+
 } // namespace moho
-
-namespace gpg::gal
-{
-// ===== DeviceAppView static accessors =====
-bool DeviceAppView::IsReady()                { return false; }
-DeviceAppView* DeviceAppView::GetInstance()  { return nullptr; }
-
-// ===== DeviceContextAppView head accessor =====
-// Returns a reference to a shared zero-init `HeadAppView` placeholder. The
-// recovered CScApp path calls this to probe the current head's state; with
-// this stub, all probes see the default-constructed head (no flags set).
-const HeadAppView& DeviceContextAppView::GetHead(unsigned) const
-{
-    static const HeadAppView kEmpty{};
-    return kEmpty;
-}
-} // namespace gpg::gal

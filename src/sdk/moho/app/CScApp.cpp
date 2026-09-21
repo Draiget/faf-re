@@ -16,7 +16,6 @@
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Global.h"
-#include "gpg/gal/AppRuntimeView.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Error.hpp"
@@ -1484,21 +1483,17 @@ bool CScApp::CreateAppFrame(
  */
 bool CScApp::AppDoSuppressWindowsKeys() const
 {
-  if (!gpg::gal::DeviceAppView::IsReady()) {
+  // 0x008CE1D3 is the only guard the binary has: `Device::IsReady` gates the
+  // singleton, and the singleton pointer it tests is the one `GetInstance`
+  // returns, so a second null check on it would be dead. The device context
+  // (slot 2, dispatched at 0x008CE1EA) and `GetHead(0)` (0x008CE1F0) are both
+  // taken unguarded -- an out-of-range head throws out of `GetHead` rather
+  // than reading past the vector.
+  if (!gpg::gal::Device::IsReady()) {
     return false;
   }
 
-  auto* const device = gpg::gal::DeviceAppView::GetInstance();
-  if (device == nullptr) {
-    return false;
-  }
-
-  auto* const context = device->GetDeviceContext();
-  if (context == nullptr) {
-    return false;
-  }
-
-  if (!context->GetHead(0).windowed) {
+  if (!gpg::gal::Device::GetInstance()->GetDeviceContext()->GetHead(0u).mWindowed) {
     return false;
   }
 

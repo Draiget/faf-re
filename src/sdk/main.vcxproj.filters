@@ -6130,9 +6130,6 @@
     <None Include="moho\render\d3d\D3DResUnreachableStubs.cpp"><Filter>Source Files</Filter></None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="gpg\gal\AppRuntimeView.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\ai\CAiPathSpline.h">
       <Filter>Header Files</Filter>
     </ClInclude>
