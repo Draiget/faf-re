@@ -550,10 +550,27 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           // The consequence is a real engine defect. Once a
           // `CMDST_CommandSourceTerminated` clears the flag and parks
           // `mCommandSourceId` at 0xFF, the `if (hasCommandSource)` gate below
-          // silently discards every payload op for the rest of this call and
-          // for the whole of the next one -- no log line, nothing. The call
-          // after that re-derives the flag from the `mCommandSourceId` stored
-          // here, so exactly one beat of commands is lost and the stream heals.
+          // silently discards every payload op that follows -- no log line,
+          // nothing, unlike the neighbouring "not authorized" case.
+          //
+          // How MANY beats that costs is not fixed, and this is the part that
+          // matters. The outer beat loop drains as far as `beat`: 0x0053C825
+          // (`js 0x53c5f6`) jumps back to the loop BODY top, not to the entry,
+          // and the flag's only non-zero write is at 0x0053C598, outside the
+          // loop. So a call that is several beats behind processes them all
+          // under one stale flag, and every beat after the terminate in that
+          // batch is dropped. If the terminate lands in the batch's final beat,
+          // the call ends with `mCommandSourceId` at 0xFF and the whole of the
+          // next call drops too. Only a call that starts with a valid
+          // `mCommandSourceId` recovers.
+          //
+          // Batch depth is dispatch lag, which is a property of the machine and
+          // its load. Two clients replaying the same stream therefore need not
+          // lose the same commands. That makes this a timing-dependent,
+          // per-machine divergence in what the sim is even told about -- not
+          // merely in when it is told. It is distinct from beat pacing, where
+          // the beat stamp travels with the command and the command still
+          // arrives.
           //
           // Live sessions never see it: each player owns a `CClientBase`, so a
           // terminate only poisons the leaver's object, and the leaver issues
