@@ -4761,7 +4761,7 @@ int moho::cfunc_UnitGetCommandQueueL(LuaPlus::LuaState* const state)
   const int commandCount = static_cast<int>(commandSnapshot.size());
   queueArray.AssignNewTable(state, commandCount, 0u);
   for (const WeakPtr<CUnitCommand>& commandWeakPtr : commandSnapshot) {
-    CUnitCommand* const command = commandWeakPtr.GetObject();
+    CUnitCommand* const command = commandWeakPtr.GetObjectPtr();
     if (command == nullptr) {
       continue;
     }

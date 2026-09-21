@@ -328,12 +328,14 @@ namespace moho
       return ownerLinkSlot != nullptr && !IsSentinel();
     }
 
-#if !defined(GetObject)
-    [[nodiscard]] T* GetObject() const noexcept
-    {
-      return GetObjectPtr();
-    }
-#endif
+    // There used to be a `GetObject()` alias for `GetObjectPtr()` here, behind
+    // `#if !defined(GetObject)`. That guard protects the *declaration* and
+    // nothing else: a translation unit that reaches this header before
+    // <windows.h> gets the method declared, and then every later call site
+    // expands through the GDI macro to `GetObjectW`/`GetObjectA` and fails to
+    // compile. `CollisionBeamEntityLuaFunctionThunks.cpp` broke exactly that
+    // way. `GetObjectPtr()` is the real accessor and has no such exposure, so
+    // the alias is gone rather than re-guarded.
 
     /**
      * @warning This faults today once projectile impact scripts actually run.
