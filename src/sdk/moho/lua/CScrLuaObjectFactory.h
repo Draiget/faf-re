@@ -283,6 +283,24 @@ namespace moho
     }
 
   protected:
+    /**
+     * Address: 0x00632C70 (FUN_00632C70, `T = moho::IAniManipulator`,
+     * ?Create@?$CScrLuaMetatableFactory@VIAniManipulator@Moho@@@Moho@@MAE?AVLuaObject@LuaPlus@@PAVLuaState@4@@Z)
+     *
+     * What it does:
+     * Creates the metatable for `T` through `SCR_CreateSimpleMetatable`
+     * (0x004D22D0). One out-of-line body per instantiation; the emission
+     * above is identified by the slot it occupies in
+     * `??_7?$CScrLuaMetatableFactory@VIAniManipulator@Moho@@@Moho@@6B@` at
+     * 0x00E213E8, which is its only reference.
+     *
+     * The body carries nothing type-specific -- the metatable name comes from
+     * the registration site, not from here -- so every instantiation is the
+     * same 35 bytes and differs only in the call's rel32. That is why
+     * `/OPT:ICF` did not fold this one into the hand-specialised
+     * `CScrLuaMetatableFactory<CAimManipulator>::Create` at 0x00632C40, which
+     * is byte-identical apart from that displacement.
+     */
     LuaPlus::LuaObject Create(LuaPlus::LuaState* state) override
     {
       return SCR_CreateSimpleMetatable(state);
