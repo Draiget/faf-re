@@ -37,19 +37,16 @@ namespace moho
   class Unit;
   enum EAlliance : std::int32_t;
 
-  struct SBuildResourceInfoLink
-  {
-    SBuildResourceInfoLink** mOwnerSlot; // +0x00
-    SBuildResourceInfoLink* mNext;       // +0x04
-  };
-  static_assert(sizeof(SBuildResourceInfoLink) == 0x08, "SBuildResourceInfoLink size must be 0x08");
-
-  struct SBuildResourceInfo
-  {
-    SBuildResourceInfoLink mPlacementLink;  // +0x00
-    SBuildResourceInfoLink mResourceLink;   // +0x08
-  };
-  static_assert(sizeof(SBuildResourceInfo) == 0x10, "SBuildResourceInfo size must be 0x10");
+  // `SBuildResourceInfoLink` (`{SBuildResourceInfoLink** mOwnerSlot;
+  // SBuildResourceInfoLink* mNext;}`) and `SBuildResourceInfo` (two of them)
+  // used to stand here. The first is `moho::WeakPtr<T>` field for field -- the
+  // same `{ownerLinkSlot@0x00, nextInOwner@0x04}` node, the same head-insert on
+  // bind and chain-walk on unbind -- and the second is `SBuildReserveInfo`
+  // (moho/serialization/SBuildReserveInfo.h), which is what this map already
+  // stores: `{WeakPtr<Unit> mUnit@0x00, WeakPtr<CUnitCommand> mCom@0x08}`.
+  // CAiBrain.cpp reinterpret_cast'ed between the two at every use, and one site
+  // cast the "links" straight back to `WeakPtr<Unit>`/`WeakPtr<CUnitCommand>` to
+  // call `Set()` on them.
 
   /**
    * `CAiBrain`'s outstanding build reservations, keyed by grid cell.
@@ -68,16 +65,15 @@ namespace moho
   using SBuildStructurePositionMap = msvc8::map<Wm3::Vector2i, SBuildReserveInfo>;
   static_assert(sizeof(SBuildStructurePositionMap) == 0x0C, "SBuildStructurePositionMap size must be 0x0C");
 
-  struct SAiAttackVectorDebug
-  {
-    Wm3::Vector3f mOrigin;     // +0x00
-    Wm3::Vector3f mDirection;  // +0x0C
-  };
-  static_assert(sizeof(SAiAttackVectorDebug) == 0x18, "SAiAttackVectorDebug size must be 0x18");
-  static_assert(offsetof(SAiAttackVectorDebug, mOrigin) == 0x00, "SAiAttackVectorDebug::mOrigin offset must be 0x00");
-  static_assert(
-    offsetof(SAiAttackVectorDebug, mDirection) == 0x0C, "SAiAttackVectorDebug::mDirection offset must be 0x0C"
-  );
+  // `SAiAttackVectorDebug` (`{Wm3::Vector3f mOrigin@0x00, mDirection@0x0C}`,
+  // 0x18) used to stand here too. It is `moho::SPointVector`
+  // (moho/ai/SPointVector.h) under a second name: same two `Vector3<float>`
+  // lanes at the same offsets, and the binary itself settles it -- the
+  // reflected type this brain registers for `mAttackVectors` is literally
+  // named `"std::vector<Moho::SPointVector>"` (CAiBrain.cpp's
+  // `RVectorType_SPointVector` alias table), and the Lua getter already
+  // rebuilt an `SPointVector` field by field from every element before
+  // handing it to `SCR_ToLua<SPointVector>`.
 
   /**
    * VFTABLE: 0x00E19900
@@ -260,7 +256,7 @@ namespace moho
     CArmyImpl* mCurrentEnemy;                      // +0x38
     CAiPersonality* mPersonality;                  // +0x3C
     msvc8::string mCurrentPlan;                    // +0x40
-    msvc8::vector<SAiAttackVectorDebug> mAttackVectors; // +0x5C
+    msvc8::vector<SPointVector> mAttackVectors;  // +0x5C
     std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
     CategoryWordRangeView mBuildCategoryRange;     // +0x70
     SBuildStructurePositionMap mBuildStructureMap; // +0x98
