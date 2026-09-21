@@ -1483,17 +1483,40 @@ bool CAiPathNavigator::TryAdvanceTargetPoint()
       continue;
     }
 
-    const bool canTraverse = CanPathCellTransition(*this, mCurrentPos, candidate);
-    const bool canReach = CanReachCellFromCurrent(*this, candidate);
-    // TEMPORARY PROBE -- navigation triage, NAVOBS zone only: does the
-    // string-pull skip a node whose straight line crosses the factory?
-    if (mCurrentPos.x >= 164 && mCurrentPos.x <= 177 && mCurrentPos.z >= 70 && mCurrentPos.z <= 110) {
-      gpg::Warnf("[NAVPULL] cur=(%d,%d) idx=%d cand=(%d,%d) traverse=%d reach=%d probe=%d count=%d noprog=%d",
-                 static_cast<int>(mCurrentPos.x), static_cast<int>(mCurrentPos.z), idx,
-                 static_cast<int>(candidate.x), static_cast<int>(candidate.z), canTraverse ? 1 : 0,
-                 canReach ? 1 : 0, static_cast<int>(mHasForwardProbe), mPath.CountInt(), mNoProgressTickCount);
-    }
-    if (canTraverse && canReach) {
+    // 0x005AF8F1..0x005AF908 gates every candidate on
+    // `CanOccupyTargetCell(mCurrentPos, candidate)` and saves the result in a
+    // local (`mov byte [esp+13h], al`) before the step test runs; 0x005AF96A
+    // tests that saved flag and 0x005AF971 the step result, so a candidate is
+    // accepted only when *both* hold. This call was missing entirely.
+    //
+    // It is the only static-obstacle test in this loop, and losing it is what
+    // let a unit drive into a building. For a step longer than one cell
+    // 0x005AF4E0 takes its long-step arm and walks the unit's footprint along
+    // the whole segment against the occupancy grid
+    // (`IsCellStepClearForUnit` -> `OCCUPY_FootprintFits` per cell). Neither of
+    // the two step tests below can stand in for it: both bottom out in
+    // `SweptPathBlockedByUnit`, which asks `func_IsSourceUnit`, and that returns
+    // "skip" for any candidate failing `IsMobile()` - so a structure is
+    // invisible to them by construction. With nothing looking at the ground in
+    // between, this loop would string-pull straight across a factory the path
+    // search had carefully routed around, take the far node as its target, and
+    // drive into it.
+    const bool canOccupy = CanOccupyTargetCell(*this, mCurrentPos, candidate);
+
+    // 0x005AF93B `cmp ecx, 1` / 0x005AF944 `jg 0x5af964`: the step test is
+    // either/or on the Manhattan distance, never both. A step longer than one
+    // cell sweeps from where the unit is actually standing (0x005AF5B0); a step
+    // of one cell or less only asks whether the candidate cell itself is
+    // blocked - 0x005AF946 loads `mPath.start[idx]` and passes it as *both*
+    // cells, which `PathTransitionBlocked` answers through
+    // `COGrid::UnitIsBlocked`. The recovered form ran both unconditionally and
+    // handed the short-step test `mCurrentPos` as its from-cell, which made it
+    // a second swept mobile-unit test rather than the endpoint test it is.
+    const bool stepClear = (ManhattanDistance(mCurrentPos, candidate) > 1)
+      ? CanReachCellFromCurrent(*this, candidate)
+      : CanPathCellTransition(*this, candidate, candidate);
+
+    if (canOccupy && stepClear) {
       mHasForwardProbe = 1;
       selectedIndex = idx;
       break;
