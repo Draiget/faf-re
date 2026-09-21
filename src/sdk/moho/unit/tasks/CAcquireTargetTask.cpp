@@ -303,36 +303,11 @@ namespace
 
 namespace moho
 {
-  gpg::RType* ManyToOneListener_EProjectileImpactEvent::sType = nullptr;
-  gpg::RType* ManyToOneListener_ECollisionBeamEvent::sType = nullptr;
+  // Both listener subobjects' `sType` lanes and their weak-link-clearing
+  // constructors (0x005D88F0 and 0x005D8930) are `ManyToOneListener<TEvent>`'s
+  // own, in moho/misc/ManyToOneBroadcaster.h, rather than two copies here.
   gpg::RType* CAcquireTargetTask::sType = nullptr;
   gpg::RType* CAcquireTargetTask::sPointerType = nullptr;
-
-  /**
-   * Address: 0x005D88F0 (FUN_005D88F0)
-   *
-   * What it does:
-   * Initializes projectile-impact listener weak-link storage to an empty owner
-   * chain.
-   */
-  ManyToOneListener_EProjectileImpactEvent::ManyToOneListener()
-    : WeakObject()
-  {
-    weakLinkHead_ = 0u;
-  }
-
-  /**
-   * Address: 0x005D8930 (FUN_005D8930)
-   *
-   * What it does:
-   * Initializes collision-beam listener weak-link storage to an empty owner
-   * chain.
-   */
-  ManyToOneListener_ECollisionBeamEvent::ManyToOneListener()
-    : WeakObject()
-  {
-    weakLinkHead_ = 0u;
-  }
 
   /**
    * Address: 0x005DCDF0 (FUN_005DCDF0, Moho::CAcquireTargetTask::GetPointerType)
@@ -395,8 +370,11 @@ namespace moho
     , mUpdateAttackerState(0u)
   {
     AddStatCounter(InstanceCounter<CAcquireTargetTask>::GetStatItem(), 1);
-    static_cast<ManyToOneListener_EProjectileImpactEvent&>(*this).weakLinkHead_ = 0u;
-    static_cast<ManyToOneListener_ECollisionBeamEvent&>(*this).weakLinkHead_ = 0u;
+    // Both listener bases arrive with an empty weak-link chain already:
+    // `ManyToOneListener<TEvent>`'s constructor (0x005D88F0 / 0x005D8930) clears
+    // `weakLinkHead_`, and MSVC emits those two base constructions ahead of this
+    // body. The two `static_cast<...>(*this).weakLinkHead_ = 0u` lines that used
+    // to stand here restated that glue as source.
   }
 
   /**
@@ -799,26 +777,26 @@ namespace moho
   /**
    * Address: 0x005D9830 (FUN_005D9830, listener callback lane)
    */
-  int CAcquireTargetTask::HandleCollisionBeamListenerState(const int action)
+  int CAcquireTargetTask::OnEvent(const ECollisionBeamEvent event)
   {
     if (mWeapon == nullptr || mWeapon->mWeaponBlueprint == nullptr) {
-      return action;
+      return event;
     }
     if (mWeapon->mWeaponBlueprint->AutoInitiateAttackCommand == 0u) {
-      return action;
+      return event;
     }
 
-    if (action == 1) {
+    if (event == CollisionBeamEvent_MissTarget) {
       HandleRetargetProbeOnListenerTick();
-      return action;
+      return event;
     }
 
-    if (action == 0 || action == 2) {
+    if (event == CollisionBeamEvent_HitTarget || event == CollisionBeamEvent_Irrelavent) {
       mTargetCooldown = 0;
       mWeapon->mUnknown170 = 0;
     }
 
-    return action;
+    return event;
   }
 
   /**

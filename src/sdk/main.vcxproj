@@ -2639,6 +2639,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\misc\CZipFile.h" />
     <ClInclude Include="moho\misc\ID3DDepthStencil.h" />
     <ClInclude Include="moho\misc\Listener.h" />
+    <ClInclude Include="moho\misc\ManyToOneBroadcaster.h" />
     <ClInclude Include="moho\misc\ScrDebugWindow.h" />
     <ClInclude Include="moho\misc\ScrDebugWxBridges.h" />
     <ClInclude Include="moho\misc\ScrGotoDialog.h" />

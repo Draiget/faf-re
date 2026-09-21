@@ -3719,15 +3719,14 @@ namespace
    */
   void SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    const moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>* broadcaster
   )
   {
-    moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;
-    if (intrusiveListHeadSlot != nullptr && *intrusiveListHeadSlot != 0u) {
-      listener = reinterpret_cast<moho::ManyToOneListener<moho::EProjectileImpactEvent>*>(
-        *intrusiveListHeadSlot - sizeof(std::uint32_t)
-      );
-    }
+    // `slot - 4` back to the listener that owns the weak-link head the
+    // broadcaster points at; `GetListener()` is that decode, and it also folds
+    // in the null/sentinel cases the open-coded form tested by hand.
+    moho::ManyToOneListener<moho::EProjectileImpactEvent>* const listener =
+      (broadcaster != nullptr) ? broadcaster->GetListener() : nullptr;
 
     gpg::RRef listenerRef{};
     (void)gpg::RRef_ManyToOneListener_EProjectileImpactEvent(&listenerRef, listener);
@@ -4499,15 +4498,14 @@ namespace
    */
   void SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(
     gpg::WriteArchive* archive,
-    std::uint32_t* intrusiveListHeadSlot
+    const moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>* broadcaster
   )
   {
-    moho::ManyToOneListener<moho::ECollisionBeamEvent>* listener = nullptr;
-    if (intrusiveListHeadSlot != nullptr && *intrusiveListHeadSlot != 0u) {
-      listener = reinterpret_cast<moho::ManyToOneListener<moho::ECollisionBeamEvent>*>(
-        *intrusiveListHeadSlot - sizeof(std::uint32_t)
-      );
-    }
+    // `slot - 4` back to the listener that owns the weak-link head the
+    // broadcaster points at; `GetListener()` is that decode, and it also folds
+    // in the null/sentinel cases the open-coded form tested by hand.
+    moho::ManyToOneListener<moho::ECollisionBeamEvent>* const listener =
+      (broadcaster != nullptr) ? broadcaster->GetListener() : nullptr;
 
     gpg::RRef listenerRef{};
     (void)gpg::RRef_ManyToOneListener_ECollisionBeamEvent(&listenerRef, listener);
@@ -7099,7 +7097,7 @@ namespace gpg
   )
   {
     ::SaveUnownedRawPointerFromManyToOneListener_EProjectileImpactEventIntrusiveHeadLane1_Impl(
-      archive, intrusiveListHeadSlot
+      archive, reinterpret_cast<const moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>*>(intrusiveListHeadSlot)
     );
   }
 
@@ -7124,7 +7122,7 @@ namespace gpg
   )
   {
     ::SaveUnownedRawPointerFromManyToOneListener_ECollisionBeamEventIntrusiveHeadLane1_Impl(
-      archive, intrusiveListHeadSlot
+      archive, reinterpret_cast<const moho::ManyToOneBroadcaster<moho::ECollisionBeamEvent>*>(intrusiveListHeadSlot)
     );
   }
 

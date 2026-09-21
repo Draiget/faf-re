@@ -1,7 +1,7 @@
 #pragma once
 
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/misc/WeakObject.h"
+#include "moho/misc/ManyToOneBroadcaster.h"
 
 namespace moho
 {
@@ -28,32 +28,17 @@ namespace moho
   };
 
   /**
-   * Address: 0x005D88F0 (FUN_005D88F0, ManyToOneListener_EProjectileImpactEvent ctor)
+   * Single-listener sink for projectile impact events, and the broadcaster node
+   * that binds to it. Both come from the one template pair in
+   * `moho/misc/ManyToOneBroadcaster.h`.
    *
-   * Single-listener sink for projectile impact events.
-   *
-   * Canonical definition. This specialization was previously defined twice -
-   * in ProjectileStartupRegistrations.h without the WeakObject base, and in
-   * CAcquireTargetTask.h with it - an ODR violation that broke the build
-   * outright (C2766). The two models were layout-identical: WeakObject is
-   * 4 bytes with no vtable, so adding a virtual here puts the vptr at +0x00
-   * and the owner link at +0x04 either way.
-   *
-   * Slot 0 takes the event: Projectile::Impact dispatches it with
-   * `mov edx,[ecx]; mov eax,[edx]; call eax` at 0x0069E10E.
+   * The listener half used to be an explicit specialization spelled out here,
+   * and a second, WeakObject-less copy of it in ProjectileStartupRegistrations.h
+   * - an ODR violation that broke the build outright (C2766). The broadcaster
+   * half was a third hand-written copy in that same header. All three were
+   * layout-identical to what the template emits.
    */
-  template <class TEvent>
-  class ManyToOneListener;
-
-  template <>
-  class ManyToOneListener<EProjectileImpactEvent> : public WeakObject
-  {
-  public:
-    static gpg::RType* sType;
-
-    ManyToOneListener();
-
-    virtual int OnEvent(EProjectileImpactEvent event) = 0;
-  };
+  using ManyToOneListener_EProjectileImpactEvent = ManyToOneListener<EProjectileImpactEvent>;
+  using ManyToOneBroadcaster_EProjectileImpactEvent = ManyToOneBroadcaster<EProjectileImpactEvent>;
 } // namespace moho
 

@@ -344,15 +344,6 @@ namespace
 #endif
   }
 
-  void UnlinkImpactBroadcaster(moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>& broadcaster) noexcept
-  {
-    // The broadcaster's {ownerLinkSlot@0, nextInOwner@4} pair is the same
-    // intrusive prev/next owner-chain shape a WeakPtr link uses; the projectile
-    // dtor detaches it from its owner chain (asm 0x0069E144-0x0069E163).
-    auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(broadcaster);
-    weakLink.UnlinkFromOwnerChain();
-  }
-
   // Pops (and, when not auto-owned, destroys) the top task off the entity's own
   // CTask-subobject owner thread. Mirrors the inline teardown the projectile ctor
   // performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C and
@@ -518,7 +509,6 @@ namespace moho
     : Entity(sim, kProjectileCollisionBucketFlags)
   {
     auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
-    view.mImpactEventBroadcaster = {};
 
     AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), 1L);
 
@@ -629,9 +619,6 @@ namespace moho
       )
   {
     auto& view = *reinterpret_cast<ProjectileDeserializeRuntimeView*>(this);
-
-    // Impact-broadcaster storage (+0x270) cleared to two null dwords.
-    view.mImpactEventBroadcaster = {};
 
     AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), 1L);
 
@@ -990,7 +977,12 @@ namespace moho
     view.mLauncherWeak.UnlinkFromOwnerChain();
 
     AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), -1L);
-    UnlinkImpactBroadcaster(view.mImpactEventBroadcaster);
+    // `mImpactEventBroadcaster` detaches itself: it is a `WeakPtr` node now, so
+    // MSVC emits its unlink (asm 0x0069E144-0x0069E163) after this body, which
+    // is where the binary runs it. The hand-written `UnlinkImpactBroadcaster`
+    // call that used to close this body restated that glue as source, over a
+    // `reinterpret_cast<WeakPtr<void>&>` reach-in into the broadcaster's raw
+    // link pair.
   }
 
   /**
@@ -1398,7 +1390,7 @@ namespace moho
       // single chained listener via its slot-0 OnEvent with the selected code.
       // The intrusive link->owner downcast lives in GetListener(); the empty
       // check there mirrors the `[this+0x270] == 0` skip in the binary.
-      if (auto* const listener = view.mImpactEventBroadcaster.GetListener()) {
+      if (auto* const listener = mImpactEventBroadcaster.GetListener()) {
         listener->OnEvent(static_cast<EProjectileImpactEvent>(eventCode));
       }
     }
@@ -2027,7 +2019,7 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     archive->Read(CachedEntityType(), this, ownerRef);
-    archive->Read(CachedImpactBroadcasterType(), &view.mImpactEventBroadcaster, ownerRef);
+    archive->Read(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
     archive->Read(CachedWeakEntityType(), &view.mLauncherWeak, ownerRef);
     archive->Read(CachedVector3fType(), &view.mVelocity, ownerRef);
     archive->Read(CachedVector3fType(), &view.mLocalAngularVelocity, ownerRef);
@@ -2089,7 +2081,7 @@ namespace moho
     const gpg::RRef ownerRef{};
 
     archive->Write(CachedEntityType(), this, ownerRef);
-    archive->Write(CachedImpactBroadcasterType(), &view.mImpactEventBroadcaster, ownerRef);
+    archive->Write(CachedImpactBroadcasterType(), &mImpactEventBroadcaster, ownerRef);
     archive->Write(CachedWeakEntityType(), &view.mLauncherWeak, ownerRef);
     archive->Write(CachedVector3fType(), &view.mVelocity, ownerRef);
     archive->Write(CachedVector3fType(), &view.mLocalAngularVelocity, ownerRef);

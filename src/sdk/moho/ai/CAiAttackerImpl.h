@@ -34,7 +34,6 @@ namespace gpg
 namespace moho
 {
   struct SWeakRefSlot;
-  struct WeaponExtraRefSubobject;
   struct RUnitBlueprintWeapon;
   class CAcquireTargetTask;
   class CollisionBeamEntity;
@@ -390,21 +389,13 @@ namespace moho
      */
     static void SerializePointerVectors(gpg::WriteArchive* archive, const CAiAttackerImpl* object);
 
-    struct WeaponExtraData
-    {
-      std::int32_t key;
-      WeaponExtraRefSubobject* ref;
-    };
-
-    /**
-     * Reads key/ref payload used by Unit::GetExtraData from weapon emitter entry.
-     */
-    [[nodiscard]] bool TryGetWeaponExtraData(int index, WeaponExtraData& out) const;
-
-    /**
-     * Decodes packed value from a weapon extra-data ref (returns 0xF0000000 when missing).
-     */
-    [[nodiscard]] static std::int32_t ReadExtraDataValue(const WeaponExtraRefSubobject* ref);
+    // `WeaponExtraData` / `TryGetWeaponExtraData` / `ReadExtraDataValue` used to
+    // sit here, reading a weapon through a `WeaponEmitterEntryView` reach-in
+    // whose `extraKey` (+0xA8) and `extraRef` (+0xD0) were `UnitWeapon::mBone`
+    // and the first word of `UnitWeapon::mTarget.targetEntity` all along, and
+    // whose `extraValue` (+0x64 off that "ref") was `Entity::id_` reached
+    // through the weak node's owner-link slot. `Unit::GetExtraData`, their only
+    // caller, now reads those two typed fields directly.
 
   public:
     /**

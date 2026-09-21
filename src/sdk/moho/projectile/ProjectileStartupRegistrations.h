@@ -23,99 +23,12 @@ namespace moho
 {
   class CScrLuaInitForm;
 
-  template <class TEvent>
-  class ManyToOneBroadcaster
-  {
-  public:
-    inline static gpg::RType* sType = nullptr;
-  };
-
-  /**
-   * One-to-one variant of the intrusive `Listener<TEvent>` node used by the
-   * projectile impact chain. Mirrors `moho::Listener<TEvent>::OnEvent`
-   * (Listener.h:37): the notify entry is a slot-0 virtual.
-   *
-   * Layout: `{ vtable@0x00; ownerLink@0x04 }` (0x08). The broadcaster's
-   * `ownerLinkSlot` (v0) points at this node's `ownerLink` field (v1 @+0x04);
-   * see `ManyToOneBroadcaster<...>::BroadcastEvent` (FUN_005DC230) which sets
-   * `broadcaster.v0 = &listener->v1`.
-   */
-
-  template <>
-  class ManyToOneBroadcaster<EProjectileImpactEvent>
-  {
-  public:
-    static gpg::RType* sType;
-
-    void* ownerLinkSlot; // +0x00
-    void* nextInOwner;   // +0x04
-
-    /**
-     * Address: 0x005DC230 (FUN_005DC230, Moho::ManyToOneBroadcaster_EProjectileImpactEvent::BroadcastEvent)
-     *
-     * What it does:
-     * Rebinds this projectile-impact broadcaster node to the supplied listener
-     * chain head while preserving intrusive owner-chain integrity.
-     */
-    void BroadcastEvent(ManyToOneListener<EProjectileImpactEvent>* listener);
-
-    /**
-     * Intrusive link->owner downcast for the chained impact listener.
-     *
-     * `ownerLinkSlot` (v0) points at the listener node's `ownerLink` field
-     * (v1 @+0x04), so the owning listener is `ownerLinkSlot - 0x04`. Returns
-     * nullptr when no listener is linked. Reconstructed from
-     * `Projectile::Impact` (FUN_0069DEC0, asm 0x0069E0E6-0x0069E10A):
-     *   `eax = [this+0x270]; if (eax == 0) skip;`
-     *   `ecx = eax - 4;      if (ecx == 0) skip;`
-     * Mirrors `ListenerFromCommandEventLinkNode` in Broadcaster.cpp.
-     */
-    [[nodiscard]] ManyToOneListener<EProjectileImpactEvent>* GetListener() const noexcept
-    {
-      if (ownerLinkSlot == nullptr) {
-        return nullptr;
-      }
-      auto* const listener = reinterpret_cast<ManyToOneListener<EProjectileImpactEvent>*>(
-        reinterpret_cast<std::uint8_t*>(ownerLinkSlot) -
-        offsetof(ManyToOneListener<EProjectileImpactEvent>, weakLinkHead_)
-      );
-      if (listener == nullptr) {
-        return nullptr;
-      }
-      return listener;
-    }
-  };
-
-  template <class TEvent>
-  class ManyToOneListener
-  {
-  public:
-    inline static gpg::RType* sType = nullptr;
-  };
-
-  using ManyToOneBroadcaster_EProjectileImpactEvent = ManyToOneBroadcaster<EProjectileImpactEvent>;
-  using ManyToOneListener_EProjectileImpactEvent = ManyToOneListener<EProjectileImpactEvent>;
-
-  static_assert(
-    sizeof(ManyToOneListener_EProjectileImpactEvent) == 0x08,
-    "ManyToOneListener<EProjectileImpactEvent> size must be 0x08"
-  );
-  static_assert(
-    offsetof(ManyToOneListener_EProjectileImpactEvent, weakLinkHead_) == 0x04,
-    "ManyToOneListener<EProjectileImpactEvent> weak-link slot offset must be 0x04"
-  );
-  static_assert(
-    sizeof(ManyToOneBroadcaster_EProjectileImpactEvent) == 0x08,
-    "ManyToOneBroadcaster<EProjectileImpactEvent> size must be 0x08"
-  );
-  static_assert(
-    offsetof(ManyToOneBroadcaster_EProjectileImpactEvent, ownerLinkSlot) == 0x00,
-    "ManyToOneBroadcaster<EProjectileImpactEvent>::ownerLinkSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(ManyToOneBroadcaster_EProjectileImpactEvent, nextInOwner) == 0x04,
-    "ManyToOneBroadcaster<EProjectileImpactEvent>::nextInOwner offset must be 0x04"
-  );
+  // `ManyToOneBroadcaster<EProjectileImpactEvent>` and
+  // `ManyToOneListener<EProjectileImpactEvent>`, plus the size/offset guards
+  // that pinned them, used to be spelled out here as hand-written explicit
+  // specializations. They now come from the one template pair in
+  // `moho/misc/ManyToOneBroadcaster.h`, aliased in
+  // `moho/projectile/EProjectileImpactEvent.h`, which this header includes.
 
   class EProjectileImpactEventTypeInfo final : public gpg::REnumType
   {

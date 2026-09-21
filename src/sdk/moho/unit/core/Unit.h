@@ -235,8 +235,13 @@ namespace moho
    */
   struct SExtraUnitDataPair
   {
-    std::int32_t key;   // weapon/slot discriminator
-    std::int32_t value; // payload id / marker
+    // For an attacker unit, one pair per weapon: `key` is that weapon's
+    // `UnitWeapon::mBone` and `value` is its target entity's id, or
+    // `EEntityIdSentinel::Invalid` when it has none. For a transport carrying a
+    // teleport beacon, a single pair of `{-1, beacon id}`. See
+    // `Unit::GetExtraData` (0x006ACB20), which is what fills these.
+    std::int32_t key;
+    std::int32_t value;
   };
   static_assert(sizeof(SExtraUnitDataPair) == 0x08, "SExtraUnitDataPair size must be 0x08");
 
