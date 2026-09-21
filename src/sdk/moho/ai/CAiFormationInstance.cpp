@@ -1808,30 +1808,7 @@ namespace moho
    */
   void Broadcaster::BroadcastEvent(const EFormationdStatus event)
   {
-    Broadcaster detached{};
-
-    if (mNext == this) {
-      return;
-    }
-
-    detached.mNext = mNext;
-    detached.mPrev = mPrev;
-    detached.mPrev->mNext = &detached;
-    detached.mNext->mPrev = &detached;
-    mNext = this;
-    mPrev = this;
-
-    while (detached.mNext != &detached) {
-      auto* const listenerLink = static_cast<Broadcaster*>(detached.mNext);
-      listenerLink->ListLinkBefore(this);
-
-      if (Listener<EFormationdStatus>* const listener = moho::Listener<moho::EFormationdStatus>::FromListenerLink(listenerLink)) {
-        listener->OnEvent(event);
-      }
-    }
-
-    detached.mPrev->mNext = detached.mNext;
-    detached.mNext->mPrev = detached.mPrev;
+    DispatchToListeners<Listener<EFormationdStatus>>(event);
   }
 
   /**

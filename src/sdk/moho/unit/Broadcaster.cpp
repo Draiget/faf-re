@@ -358,31 +358,6 @@ namespace
     return sType;
   }
 
-  [[nodiscard]] moho::Listener<moho::EUnitCommandQueueStatus>* ListenerFromLinkNode(moho::Broadcaster* const node) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<moho::Listener<moho::EUnitCommandQueueStatus>*>(
-      bytePtr - offsetof(moho::Listener<moho::EUnitCommandQueueStatus>, mListenerLink)
-    );
-  }
-
-  [[nodiscard]] moho::Listener<moho::ECommandEvent>* ListenerFromCommandEventLinkNode(moho::Broadcaster* const node
-  ) noexcept
-  {
-    if (node == nullptr) {
-      return nullptr;
-    }
-
-    auto* const bytePtr = reinterpret_cast<std::uint8_t*>(node);
-    return reinterpret_cast<moho::Listener<moho::ECommandEvent>*>(
-      bytePtr - offsetof(moho::Listener<moho::ECommandEvent>, mListenerLink)
-    );
-  }
-
   /**
    * Address: 0x006E8190 (FUN_006E8190)
    *
@@ -493,7 +468,7 @@ namespace
       node != broadcaster;
       node = static_cast<moho::Broadcaster*>(node->mNext)
     ) {
-      (void)gpg::RRef_Listener_ECommandEvent(&pointerRef, ListenerFromCommandEventLinkNode(node));
+      (void)gpg::RRef_Listener_ECommandEvent(&pointerRef, moho::Listener<moho::ECommandEvent>::FromListenerLink(node));
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 
@@ -647,30 +622,7 @@ namespace moho
    */
   void Broadcaster::BroadcastEvent(const ECommandEvent event)
   {
-    Broadcaster detached{};
-
-    if (mPrev == this) {
-      return;
-    }
-
-    detached.mPrev = mPrev;
-    detached.mNext = mNext;
-    detached.mNext->mPrev = &detached;
-    detached.mPrev->mNext = &detached;
-    mPrev = this;
-    mNext = this;
-
-    while (detached.mPrev != &detached) {
-      auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
-      listenerLink->ListLinkAfter(this);
-
-      if (Listener<ECommandEvent>* const listener = ListenerFromCommandEventLinkNode(listenerLink)) {
-        listener->OnEvent(event);
-      }
-    }
-
-    detached.mNext->mPrev = detached.mPrev;
-    detached.mPrev->mNext = detached.mNext;
+    DispatchToListeners<Listener<ECommandEvent>>(event);
   }
 
   /**
@@ -683,30 +635,7 @@ namespace moho
    */
   void Broadcaster::BroadcastEvent(const EUnitCommandQueueStatus event)
   {
-    Broadcaster detached{};
-
-    if (mPrev == this) {
-      return;
-    }
-
-    detached.mPrev = mPrev;
-    detached.mNext = mNext;
-    detached.mNext->mPrev = &detached;
-    detached.mPrev->mNext = &detached;
-    mPrev = this;
-    mNext = this;
-
-    while (detached.mPrev != &detached) {
-      auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
-      listenerLink->ListLinkAfter(this);
-
-      if (Listener<EUnitCommandQueueStatus>* const listener = ListenerFromLinkNode(listenerLink)) {
-        listener->OnEvent(event);
-      }
-    }
-
-    detached.mNext->mPrev = detached.mPrev;
-    detached.mPrev->mNext = detached.mNext;
+    DispatchToListeners<Listener<EUnitCommandQueueStatus>>(event);
   }
 
   /**
@@ -842,7 +771,7 @@ namespace gpg
       node != broadcaster;
       node = static_cast<moho::Broadcaster*>(node->mNext)
     ) {
-      (void)gpg::RRef_Listener_EUnitCommandQueueStatus(&pointerRef, ListenerFromLinkNode(node));
+      (void)gpg::RRef_Listener_EUnitCommandQueueStatus(&pointerRef, moho::Listener<moho::EUnitCommandQueueStatus>::FromListenerLink(node));
       gpg::WriteRawPointer(archive, pointerRef, gpg::TrackedPointerState::Unowned, nullOwner);
     }
 

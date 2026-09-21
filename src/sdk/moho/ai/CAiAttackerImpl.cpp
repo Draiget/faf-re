@@ -425,46 +425,6 @@ namespace
     return nullptr;
   }
 
-  /**
-   * Address: 0x005DB480 (FUN_005DB480, broadcaster dispatch helper)
-   *
-   * What it does:
-   * Dispatches one attacker event to current listeners while preserving
-   * iteration safety for listeners that relink/unlink during callbacks.
-   */
-  void BroadcastAiAttackerEvent(CAiAttackerImpl* const attacker, const EAiAttackerEvent event)
-  {
-    if (attacker == nullptr) {
-      return;
-    }
-
-    Broadcaster& broadcaster = AsAiAttackerBase(attacker)->mListeners;
-    Broadcaster detached{};
-
-    if (broadcaster.mPrev == &broadcaster) {
-      return;
-    }
-
-    detached.mPrev = broadcaster.mPrev;
-    detached.mNext = broadcaster.mNext;
-    detached.mNext->mPrev = &detached;
-    detached.mPrev->mNext = &detached;
-    broadcaster.mPrev = &broadcaster;
-    broadcaster.mNext = &broadcaster;
-
-    while (detached.mPrev != &detached) {
-      Broadcaster* const listenerLink = static_cast<Broadcaster*>(detached.mPrev);
-      listenerLink->ListLinkAfter(&broadcaster);
-
-      if (auto* const listener = Listener<EAiAttackerEvent>::FromListenerLink(listenerLink); listener != nullptr) {
-        listener->OnEvent(event);
-      }
-    }
-
-    detached.mNext->mPrev = detached.mPrev;
-    detached.mPrev->mNext = detached.mNext;
-  }
-
   template <CScrLuaInitForm* (*Target)()>
   [[nodiscard]] CScrLuaInitForm* ForwardAiAttackerLuaThunk() noexcept
   {
@@ -555,6 +515,32 @@ namespace
 
   [[maybe_unused]] CAiAttackerImplLuaFunctionThunksBootstrap gCAiAttackerImplLuaFunctionThunksBootstrap;
 } // namespace
+
+/**
+ * Address: 0x005DB480 (FUN_005DB480,
+ * `Broadcaster<EAiAttackerEvent>::BroadcastEvent`)
+ *
+ * IDA signature:
+ * void __usercall sub_5DB480(Broadcaster *this@<esi>, EAiAttackerEvent event@<edi>);
+ *
+ * What it does:
+ * Broadcasts one attacker event to all linked listeners. Defined here because
+ * this is where the `Listener<EAiAttackerEvent>` overrides its slot-0 dispatch
+ * resolves to live; the ring mechanic itself is `DispatchToListeners`
+ * (moho/unit/Broadcaster.h), shared with the four sibling event types.
+ *
+ * This was a free `BroadcastAiAttackerEvent(CAiAttackerImpl*, EAiAttackerEvent)`
+ * in this file's anonymous namespace, taking the attacker rather than the ring
+ * and carrying its own copy of the detach/dispatch/relink loop. The lost
+ * database left 0x005DB480 unnamed, but it is byte-shaped identically to the
+ * four named `?BroadcastEvent@?$Broadcaster@...` emissions and is reached the
+ * same way -- as `mListeners` on the attacker -- from `SetState` (0x005D7320),
+ * `SetDesiredTarget` (0x005D75B0) and `ForceEngage` (0x005D8650).
+ */
+void moho::Broadcaster::BroadcastEvent(const EAiAttackerEvent event)
+{
+  DispatchToListeners<Listener<EAiAttackerEvent>>(event);
+}
 
 /**
  * Address: 0x005D6BC0 (FUN_005D6BC0, Moho::CAiAttackerImpl::~CAiAttackerImpl
@@ -905,7 +891,7 @@ void CAiAttackerImpl::SetDesiredTarget(CAiTarget* const target)
 
   if (view->mReportingState != static_cast<EAiAttackerEvent>(0)) {
     view->mReportingState = kAiAttackerEventCannotTarget;
-    BroadcastAiAttackerEvent(this, kAiAttackerEventCannotTarget);
+    AsAiAttackerBase(this)->mListeners.BroadcastEvent(kAiAttackerEventCannotTarget);
   }
 }
 
@@ -1660,7 +1646,7 @@ void CAiAttackerImpl::ForceEngage(Entity* const target)
   }
 
   view->mUnit->NeedSyncGameData = true;
-  BroadcastAiAttackerEvent(this, kAiAttackerEventCanTarget);
+  AsAiAttackerBase(this)->mListeners.BroadcastEvent(kAiAttackerEventCanTarget);
 }
 
 /**
@@ -1713,7 +1699,7 @@ void CAiAttackerImpl::SetState(const State state)
   const auto stateValue = static_cast<std::int32_t>(state);
   if (stateValue != static_cast<std::int32_t>(view->mReportingState)) {
     view->mReportingState = static_cast<EAiAttackerEvent>(stateValue);
-    BroadcastAiAttackerEvent(this, static_cast<EAiAttackerEvent>(stateValue));
+    AsAiAttackerBase(this)->mListeners.BroadcastEvent(static_cast<EAiAttackerEvent>(stateValue));
   }
 }
 
