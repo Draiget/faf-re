@@ -25,6 +25,9 @@ namespace moho
 
   // NOT IN THE ORIGINAL BINARY - see the header. Additive, defaults off.
   bool range_RenderReclaimAtCursor = false;
+
+  // NOT IN THE ORIGINAL BINARY - see the header. Additive, defaults off.
+  bool range_RenderHoveredAttack = false;
 } // namespace moho
 
 namespace
@@ -82,6 +85,18 @@ namespace
     "range_RenderReclaimAtCursor",
     kRangeConVarNoDescription,
     &moho::range_RenderReclaimAtCursor
+  );
+
+  /**
+   * NOT IN THE ORIGINAL BINARY - additive extension, see the header. No
+   * console object for this exists in the shipped image, so there is no
+   * address to cite. Registered the same way as the recovered family so a mod
+   * can drive it with `ConExecute`.
+   */
+  moho::TConVar<bool> gTConVar_range_RenderHoveredAttack(
+    "range_RenderHoveredAttack",
+    kRangeConVarNoDescription,
+    &moho::range_RenderHoveredAttack
   );
 
   /** Console object: 0x00F5A840. */
@@ -209,6 +224,24 @@ namespace moho
   }
 
   /**
+   * NOT IN THE ORIGINAL BINARY - additive extension, see the header. Shaped
+   * like the recovered pairs so teardown behaves identically; `std::atexit`
+   * must be handed a real function, never nullptr.
+   */
+  void cleanup_TConVar_range_RenderHoveredAttack()
+  {
+    CleanupStartupConCommand(gTConVar_range_RenderHoveredAttack);
+  }
+
+  /** NOT IN THE ORIGINAL BINARY - additive extension, see the header. */
+  void register_TConVar_range_RenderHoveredAttack()
+  {
+    RegisterStartupConVar(
+      gTConVar_range_RenderHoveredAttack, &cleanup_TConVar_range_RenderHoveredAttack
+    );
+  }
+
+  /**
    * Address: 0x00BE0B50 (FUN_00BE0B50, register_TConVar_range_RenderBuild)
    *
    * What it does:
@@ -332,6 +365,7 @@ namespace
       // NOT IN THE ORIGINAL BINARY - additive, see the header.
       moho::register_TConVar_range_RenderSelectedAtCursor();
       moho::register_TConVar_range_RenderReclaimAtCursor();
+      moho::register_TConVar_range_RenderHoveredAttack();
       moho::register_TConVar_range_Fill();
       moho::register_TConVar_range_InnerThicknessCoeff();
       moho::register_TConVar_range_OuterThicknessCoeff();
