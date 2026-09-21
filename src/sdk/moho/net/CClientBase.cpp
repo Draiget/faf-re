@@ -506,12 +506,19 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
  *     `(int)(a - b) < 0` (decompile line 71). Differs only on signed overflow
  *     of the beat counter.
  *
- * Invented here previously and now REMOVED, recorded so it is not re-added: a
- * `hasCommandSource = true;` in the authorized `CMDST_SetCommandSource` branch
- * (the binary's `v30` is set once at decompile line 48 and only ever cleared
- * at line 162), and a `WriteSetCommandSourceMessage` call ahead of the payload
- * append. The first silently repaired a real engine defect and hid it from
- * anyone reading this file; see the block comments at both sites.
+ * Deliberate DIVERGENCE (tagged [DELIBERATE-FIX] at its site): we restore
+ * `hasCommandSource` in the authorized `CMDST_SetCommandSource` branch. The
+ * binary does not -- its `v30` is set once at decompile line 48, cleared at
+ * line 162, read at line 174, and never re-set. Leaving it unrestored loses a
+ * dispatch-lag-sized run of commands after every
+ * `CMDST_CommandSourceTerminated`, which is the "replay desyncs one tick after
+ * someone leaves" bug. We take the fix over bit-fidelity here because the
+ * defect corrupts playback; delete that one line to go back to
+ * bug-compatible.
+ *
+ * Also removed and not restored: a redundant `WriteSetCommandSourceMessage`
+ * ahead of the payload append, which the binary does not have (0x0053C756
+ * falls straight through to the write).
  */
 void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::PipeStream* const outPipe)
 {
@@ -600,8 +607,12 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           hasCommandSource = false;
           mCommandSourceId = kInvalidCommandSource;
         } else {
-          // `hasCommandSource` is deliberately NOT restored here, and that is
-          // not a recovery slip. The binary's authorized branch
+          // THE BINARY DOES NOT RESTORE `hasCommandSource` HERE. We do, at the
+          // bottom of this branch, as a deliberate fix -- see [DELIBERATE-FIX]
+          // below. What follows is the evidence that the omission is real and
+          // what it costs.
+          //
+          // The binary's authorized branch
           // (0x0053C705..0x0053C72E) writes `mCommandSourceId` at 0x0053C711,
           // emits the message at 0x0053C714, then jumps straight to the next
           // message. It never touches the flag's stack slot, [esp+0x16]. That
@@ -642,10 +653,19 @@ void CClientBase::UpdateState(const int beat, CMarshaller* const update, gpg::Pi
           // any player's departure also loses everyone else's commands. That is
           // the long-standing "replay desyncs one tick after someone leaves".
           //
-          // Do not "fix" this by restoring the flag. Doing so stops the engine
-          // reproducing a playback divergence we are actively measuring against.
           mCommandSourceId = claimedSource;
           WriteSetCommandSourceMessage(claimedSource, outPipe, &lastEmittedSource);
+
+          // [DELIBERATE-FIX] The line below is NOT in the binary. Everything
+          // above in this branch matches 0x0053C705..0x0053C72E exactly, and
+          // the binary then jumps to the next message at 0x0053C72E without
+          // ever restoring the gate flag. We restore it on purpose, because
+          // not restoring it is an engine defect that loses commands.
+          //
+          // Revert by deleting this one line; nothing else in the gating path
+          // deviates, so that alone restores bug-compatible playback if a
+          // historical desync ever needs reproducing.
+          hasCommandSource = true;
         }
 
         continue;
