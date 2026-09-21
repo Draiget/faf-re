@@ -616,6 +616,18 @@ namespace moho
           return -1;
         }
         if (!Sim::LocationIsFree(mSim, mUnit, &mBuildRect, 0)) {
+          // Two of the four sides, and this is faithful - do not "fix" it into
+          // the symmetric grow the `PrepareMove` site above uses. 0x005F7B43
+          // reads `rect.x0` into eax, 0x005F7B4C/50 do `sub [rect+4], 1` and
+          // `add [rect+8], 1` (z0 and x1 per gpg::Rect2's {x0,z0,x1,z1}), and
+          // then 0x005F7B54/56 do `sub eax,1` immediately followed by
+          // `add eax,1` before storing eax back to `rect.x0` - a net no-op, and
+          // `rect.z1` is never touched at all. A register round-trip like that
+          // is what MSVC emits when the source names one member twice, so the
+          // original almost certainly meant to write `z1` on its third line and
+          // wrote `x0` again. The evacuation rect is consequently lopsided in
+          // the shipped game, and a unit sitting just off the -X or +Z edge is
+          // not asked to move.
           gpg::Rect2i footprintRect = mBlueprint->GetFootprintRect(buildCoords);
           footprintRect.z0 -= 1;
           footprintRect.x1 += 1;
