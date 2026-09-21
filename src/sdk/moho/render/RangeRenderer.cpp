@@ -2,10 +2,8 @@
 
 #include <array>
 #include <cmath>
-#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
 #include <cstring>
 #include <new>
 #include <stdexcept>
@@ -707,22 +705,74 @@ namespace
     }
   }
 
-  // TEMPORARY PROBE SINK -- cursor-ring triage, delete when resolved.
-  // gpg::Warnf reaches nothing until `/log <name>` installs a target, and the
-  // sessions that reproduce this run without one, so the probe appends here
-  // instead. The file lands beside the executable.
-  void RangeDiagLine(const char* const fmt, ...)
+  /**
+   * The concrete weapon profiles that together make up what a player reads as
+   * "attack range".
+   *
+   * "AllMilitary" is deliberately not one of them. It is a combine profile and
+   * `CombinedMilitaryExtractor` implements only `Extract`; its `Range`
+   * (blueprint + centre) override returns false, so it yields nothing for a
+   * position that has no unit on it. Its *colours* are still the red the
+   * range-overlay menu gives military ranges - see `FindMilitaryStyleProfile`.
+   */
+  [[nodiscard]] bool IsAttackRangeProfile(const moho::SRangeRenderProfile& profile)
   {
-    std::FILE* const sink = std::fopen("faf_diag.log", "a");
-    if (sink == nullptr) {
-      return;
+    return profile.mExtractorName == "DirectFire"
+      || profile.mExtractorName == "IndirectFire"
+      || profile.mExtractorName == "AntiAir"
+      || profile.mExtractorName == "AntiNavy";
+  }
+
+  /**
+   * The "AllMilitary" profile, whose colours are the red players read as
+   * "attack range" (`NormalColor` ff2c2c in `rangeoverlayparams.lua`).
+   *
+   * Only its styling is ever borrowed: the radius and the ring geometry always
+   * come from the concrete weapon profile that produced them, so thickness
+   * stays paired with its own profile. Without this an attack ring took the
+   * colour of whichever weapon profile happened to be widest, and a unit with
+   * both direct and indirect fire drew its attack ring in IndirectFire's
+   * colour rather than red.
+   */
+  [[nodiscard]] const moho::SRangeRenderProfile* FindMilitaryStyleProfile(
+    const moho::RangeRenderer& rangeRenderer
+  )
+  {
+    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
+      if (profile.mExtractorName == "AllMilitary") {
+        return &profile;
+      }
     }
-    std::va_list args;
-    va_start(args, fmt);
-    (void)std::vfprintf(sink, fmt, args);
-    va_end(args);
-    (void)std::fputc(0x0A, sink);
-    (void)std::fclose(sink);
+    return nullptr;
+  }
+
+  /**
+   * Keeps whichever of the running best and the candidate is the better answer
+   * to "what is this unit's attack range".
+   *
+   * Direct fire wins outright when the unit has any, because that is what a
+   * player means by the phrase; otherwise the widest of the remaining
+   * categories stands in, so an artillery piece or a pure AA unit still gets a
+   * ring. That is a strict weak ordering, so the winner does not depend on the
+   * order candidates are offered in - which is what lets the multi-unit pass
+   * walk profile-major and the single-unit pass walk profile-only.
+   */
+  void KeepWiderAttackRing(
+    const moho::SRangeRenderProfile*& bestProfile,
+    moho::SRangeExtractionPayload& bestPayload,
+    const moho::SRangeRenderProfile& candidateProfile,
+    const moho::SRangeExtractionPayload& candidatePayload
+  )
+  {
+    const bool candidateIsDirect = candidateProfile.mExtractorName == "DirectFire";
+    const bool bestIsDirect = bestProfile != nullptr && bestProfile->mExtractorName == "DirectFire";
+
+    if (bestProfile == nullptr
+        || (candidateIsDirect && !bestIsDirect)
+        || (candidateIsDirect == bestIsDirect && candidatePayload.outerRadius > bestPayload.outerRadius)) {
+      bestProfile = &candidateProfile;
+      bestPayload = candidatePayload;
+    }
   }
 
   /**
@@ -779,29 +829,11 @@ namespace
     const moho::SRangeRenderProfile* assistProfile = nullptr;
     moho::SRangeExtractionPayload assistPayload{};
 
-    // The attack ring is styled from "AllMilitary" - the combine-military
-    // profile, whose colour is the red players read as "attack range"
-    // (NormalColor ff2c2c in rangeoverlayparams.lua). Only its *styling* is
-    // borrowed: it cannot supply the radius, because
-    // `CombinedMilitaryExtractor::Range` returns false. Without this the ring
-    // took the colour of whichever weapon profile happened to be widest, so a
-    // unit with both direct and indirect fire drew its attack ring in
-    // IndirectFire's colour rather than red.
-    const moho::SRangeRenderProfile* militaryStyle = nullptr;
-
-    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
-      if (profile.mExtractorName == "AllMilitary") {
-        militaryStyle = &profile;
-        break;
-      }
-    }
+    const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
 
     for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
       const bool isAssist = profile.mExtractorName == "Miscellaneous";
-      const bool isAttack = profile.mExtractorName == "DirectFire"
-        || profile.mExtractorName == "IndirectFire"
-        || profile.mExtractorName == "AntiAir"
-        || profile.mExtractorName == "AntiNavy";
+      const bool isAttack = IsAttackRangeProfile(profile);
       if (!isAssist && !isAttack) {
         continue;
       }
@@ -844,22 +876,6 @@ namespace
         payload.centerX = cursorWorldPos.x;
         payload.centerZ = cursorWorldPos.z;
 
-        // TEMPORARY PROBE -- one line per accepted (profile, unit) extraction,
-        // so the profile responsible for an over-wide ring names itself instead
-        // of being inferred from the screen.
-        {
-          static int sExtractCount = 0;
-          if (sExtractCount++ < 120) {
-            RangeDiagLine(
-              "[RINGDIAG] extract profile=%s bp=%s inner=%.2f outer=%.2f",
-              profile.mExtractorName.c_str(),
-              blueprint->mBlueprintId.c_str(),
-              payload.innerRadius,
-              payload.outerRadius
-            );
-          }
-        }
-
         // The payload's inner/outer are the ring *band*, not two independent
         // circles: `BuildRingPayloadEntry` emits the inner edge ring
         // unconditionally and only special-cases `innerRadius <= 0` for the
@@ -873,18 +889,7 @@ namespace
           continue;
         }
 
-        // Direct fire wins outright when the unit has any, because that is what
-        // a player means by "attack range"; otherwise the widest of the
-        // remaining categories stands in, so an artillery piece or a pure AA
-        // unit still gets a ring.
-        const bool isDirect = profile.mExtractorName == "DirectFire";
-        const bool haveDirect = attackProfile != nullptr && attackProfile->mExtractorName == "DirectFire";
-        if (attackProfile == nullptr
-            || (isDirect && !haveDirect)
-            || (isDirect == haveDirect && payload.outerRadius > attackPayload.outerRadius)) {
-          attackPayload = payload;
-          attackProfile = &profile;
-        }
+        KeepWiderAttackRing(attackProfile, attackPayload, profile, payload);
       }
     }
 
@@ -904,34 +909,6 @@ namespace
         profile->mInnerRingParams, scratchPayload
       );
     };
-
-    // TEMPORARY PROBE -- which payloads actually reach the ring batcher, with
-    // the playable span so a radius can be read as a fraction of the map. A
-    // ring whose outer radius approaches the span covers the whole board, which
-    // is the reported symptom.
-    {
-      static int sCount = 0;
-      if (sCount++ < 40) {
-        float diagSpan = 0.0f;
-        if (moho::IWldTerrainRes* const terrainRes = moho::REN_GetTerrainRes(); terrainRes != nullptr) {
-          moho::VisibilityRect diagRect{};
-          (void)terrainRes->GetPlayableMapRect(diagRect);
-          const std::int32_t diagWidth = diagRect.maxX - diagRect.minX;
-          const std::int32_t diagHeight = diagRect.maxZ - diagRect.minZ;
-          diagSpan = static_cast<float>(diagWidth < diagHeight ? diagHeight : diagWidth);
-        }
-        RangeDiagLine(
-          "[RINGDIAG] span=%.0f cursor=(%.1f,%.1f) attack=%s inner=%.2f outer=%.2f"
-          " | assist=%s inner=%.2f outer=%.2f",
-          diagSpan,
-          cursorWorldPos.x, cursorWorldPos.z,
-          (attackProfile != nullptr) ? attackProfile->mExtractorName.c_str() : "none",
-          attackPayload.innerRadius, attackPayload.outerRadius,
-          (assistProfile != nullptr) ? assistProfile->mExtractorName.c_str() : "none",
-          assistPayload.innerRadius, assistPayload.outerRadius
-        );
-      }
-    }
 
     draw(attackProfile, militaryStyle, attackPayload);
     draw(assistProfile, nullptr, assistPayload);
@@ -1050,6 +1027,114 @@ namespace
     RenderRingBatch(
       buildRangeProfile->mOuterRingParams, camera, rangeRenderer, headIndex,
       buildRangeProfile->mBuildRingColor, buildRangeProfile->mInnerRingParams, scratchPayload
+    );
+  }
+
+  /**
+   * NOT A RECOVERED FUNCTION - there is no body for this in the shipped image
+   * and no `Address:` can be cited for it. Additive extension, gated on
+   * `range_RenderHoveredAttack`, which the loader leaves false.
+   *
+   * Draws the attack range of whatever unit the cursor is over, at that unit's
+   * own position. It is the hover counterpart of the selection pass above: that
+   * one answers "what would my selection cover if it stood here", this one
+   * answers "how far does *that* thing shoot".
+   *
+   * Two deliberate differences from the engine's own hovered-unit pass
+   * (`RenderHighlightedUnitRange`, 0x007EF420), which this does not replace and
+   * does not change:
+   *
+   *  - **One ring, not one per profile.** The retail pass draws every profile
+   *    the hovered unit matches, so a unit with direct fire, AA and intel puts
+   *    three or four rings up at once. This picks the single widest weapon
+   *    profile (`KeepWiderAttackRing`) and draws only that, because it is meant
+   *    to be readable while a modifier is held.
+   *  - **Any army, not just the focus army.** The retail pass returns early
+   *    unless `GetFocusUserArmy() == hoveredEntity->mArmy`. A player hovering a
+   *    unit they have not selected is usually asking about a threat, so that
+   *    filter is not applied here. Nothing is revealed that the client cannot
+   *    already see: an entity the player has no intel on is not hovered in the
+   *    first place, and the radius comes from the unit's *live* weapons via
+   *    `Extract`. Restoring the retail restriction is a one-line change - see
+   *    the commented gate below.
+   *
+   * The centre is the unit's own, straight from the extractor, and is not moved
+   * to the cursor: the unit is under the cursor already, and its real ring is
+   * the truthful one.
+   */
+  void RenderHoveredUnitAttackRange(
+    moho::CWldSession& session,
+    RangeExtractionPayloadVector& scratchPayload,
+    moho::RangeRenderer& rangeRenderer,
+    const moho::CameraImpl& camera,
+    const float alpha,
+    const unsigned int headIndex
+  )
+  {
+    moho::UserEntity* const hoveredEntity = session.GetHoveredUserEntity();
+    if (hoveredEntity == nullptr) {
+      return;
+    }
+
+    moho::UserUnit* const hoveredUnit = hoveredEntity->IsUserUnit();
+    if (hoveredUnit == nullptr) {
+      return;
+    }
+
+    // Retail's own hovered pass gates on ownership here:
+    //   if (session.GetFocusUserArmy() != hoveredEntity->mArmy) { return; }
+    // Deliberately absent - see the block comment above.
+
+    const moho::RUnitBlueprint* const blueprint = static_cast<moho::IUnit*>(hoveredUnit)->GetBlueprint();
+    if (blueprint == nullptr) {
+      return;
+    }
+
+    const moho::SRangeRenderProfile* attackProfile = nullptr;
+    moho::SRangeExtractionPayload attackPayload{};
+
+    for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
+      if (!IsAttackRangeProfile(profile)) {
+        continue;
+      }
+
+      moho::RangeExtractor* const extractor = moho::GetRangeExtractor(profile.mExtractorName);
+      if (extractor == nullptr) {
+        continue;
+      }
+      if (!moho::EntityCategory::HasBlueprint(blueprint, &profile.mCategoryFilter)) {
+        continue;
+      }
+
+      // `Extract` (live entity), not `Range` (blueprint), for the same reason
+      // the selection pass gives: a blueprint lists every weapon the unit
+      // *could* have, upgrades included, so a UEF ACU would draw its unbuilt
+      // TacNukeMissile's MaxRadius 256 - the full width of a 256-cell map -
+      // instead of the 22-range gun it actually carries.
+      moho::SRangeExtractionPayload payload{};
+      if (!extractor->Extract(&payload, hoveredEntity, alpha)) {
+        continue;
+      }
+
+      KeepWiderAttackRing(attackProfile, attackPayload, profile, payload);
+    }
+
+    if (attackProfile == nullptr) {
+      return;
+    }
+
+    // Geometry from the profile that produced the radius, colour from
+    // "AllMilitary" so the ring reads as attack range whichever weapon category
+    // won. The rollover colour rather than the normal one, because this is a
+    // hover ring and that is the lane the range-overlay menu styles for hover.
+    const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
+    const moho::SRangeRenderProfile& style = (militaryStyle != nullptr) ? *militaryStyle : *attackProfile;
+
+    scratchPayload.clear();
+    scratchPayload.push_back(attackPayload);
+    RenderRingBatch(
+      attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mHighlightedRingColor,
+      attackProfile->mInnerRingParams, scratchPayload
     );
   }
 
@@ -1393,12 +1478,22 @@ namespace moho
       return;
     }
 
-    // NOT IN THE ORIGINAL BINARY - additive, and false unless a mod sets it.
-    // Like the pass above this replaces the three per-unit passes rather than
-    // adding to them, so the reclaim reach is the only ring on screen while it
-    // is held.
-    if (range_RenderReclaimAtCursor) {
-      RenderReclaimRingUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+    // NOT IN THE ORIGINAL BINARY - additive, and both false unless a mod sets
+    // them. Like the pass above these replace the three per-unit passes rather
+    // than adding to them, so what a held modifier puts up is the only thing on
+    // screen while it is held.
+    //
+    // The two are independent flags and compose: a mod that raises both - which
+    // is what "Alt, with something selected" does - gets the selection's reclaim
+    // reach at the cursor *and* the attack range of the unit under it, which are
+    // answers to two different questions and are drawn in two different colours.
+    if (range_RenderReclaimAtCursor || range_RenderHoveredAttack) {
+      if (range_RenderReclaimAtCursor) {
+        RenderReclaimRingUnderCursor(*worldSession, scratchPayload, *this, *camera, viewportHeadIndex);
+      }
+      if (range_RenderHoveredAttack) {
+        RenderHoveredUnitAttackRange(*worldSession, scratchPayload, *this, *camera, alpha, viewportHeadIndex);
+      }
       return;
     }
 

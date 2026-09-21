@@ -77,6 +77,26 @@ namespace moho
    */
   extern bool range_RenderReclaimAtCursor;
 
+  /**
+   * NOT PRESENT IN THE ORIGINAL BINARY.
+   *
+   * Additive extension, not a recovery. Draws the attack range of the unit
+   * under the cursor - one ring, the widest weapon profile that unit actually
+   * carries, in the military red - so a modifier key can answer "how far does
+   * that thing shoot" without selecting it.
+   *
+   * This is not `range_RenderHighlighted`, which it neither replaces nor
+   * changes. That flag drives the engine's own hovered-unit pass
+   * (`sub_7EF420`), which draws *every* profile the hovered unit matches and
+   * only for the focus army's own units. This one draws a single ring and does
+   * not filter by army, because a player hovering something they have not
+   * selected is usually asking about a threat.
+   *
+   * Default false, so an engine built without a mod touching it behaves exactly
+   * as the binary does.
+   */
+  extern bool range_RenderHoveredAttack;
+
   extern bool ren_Ranges;
 
   /**
@@ -138,6 +158,12 @@ namespace moho
    * Address: 0x00BE0C10 (FUN_00BE0C10, register_TConVar_range_OuterThicknessCoeff)
    */
   void register_TConVar_range_OuterThicknessCoeff();
+
+  /** NOT IN THE ORIGINAL BINARY - additive extension, see above. */
+  void cleanup_TConVar_range_RenderHoveredAttack();
+
+  /** NOT IN THE ORIGINAL BINARY - additive extension, see above. */
+  void register_TConVar_range_RenderHoveredAttack();
 
   /**
    * Address: 0x00C046F0 (FUN_00C046F0, ??1TConVar_ren_Ranges@Moho@@QAE@@Z)
