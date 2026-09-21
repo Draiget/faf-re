@@ -35,7 +35,10 @@ namespace moho
   float gCollisionBeamConeSine = 0.0f;
   float gCollisionBeamConeAxisScaleY = 0.0f;
 
-  gpg::RType* ManyToOneBroadcaster_ECollisionBeamEvent::sType = nullptr;
+  // `ManyToOneBroadcaster_ECollisionBeamEvent::sType` and its listener twin are
+  // `inline static` on the templates in moho/misc/ManyToOneBroadcaster.h now,
+  // one per instantiation as the binary has it; this file only registers and
+  // clears them.
 } // namespace moho
 
 namespace
@@ -436,7 +439,7 @@ namespace gpg
 
     moho::ManyToOneListener<moho::ECollisionBeamEvent>* listener = nullptr;
     (void)archive->ReadPointer_ManyToOneListener_ECollisionBeamEvent(&listener, ownerRef);
-    broadcaster->BroadcastEvent(listener);
+    broadcaster->SetListener(listener);
   }
 } // namespace gpg
 

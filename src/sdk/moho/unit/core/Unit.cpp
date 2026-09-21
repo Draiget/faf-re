@@ -16925,7 +16925,30 @@ void Unit::KillCleanup()
  * Address: 0x006ACB20 (FUN_006ACB20)
  *
  * What it does:
- * Appends unit-side sync extra-data records into the provided output buffer.
+ * Appends this unit's sync extra-data records into `out`: one `{bone, target
+ * entity id}` pair per weapon for an attacker, or a single `{-1, beacon id}`
+ * pair for a transport holding a teleport beacon.
+ *
+ * The weapon loop used to run through `CAiAttackerImpl::TryGetWeaponExtraData`
+ * and `ReadExtraDataValue` over a `WeaponEmitterEntryView` / `WeaponExtraRefSubobject`
+ * pair of reach-in structs. Reading 0x006ACB9A-0x006ACBDC says what those
+ * anonymous offsets are:
+ *
+ *     mov  ecx, [esi+0D0h]   ; weapon->mTarget.targetEntity.ownerLinkSlot
+ *     test ecx,ecx / je      ;   (mTarget is at +0xCC, the weak node at +0x04)
+ *     add  ecx, -4           ; WeakPtr<Entity>::DecodeOwnerObject
+ *     mov  edx, [esi+0A8h]   ; weapon->mBone
+ *     mov  [eax], edx        ; pair.key
+ *     je   no_entity
+ *     mov  ecx, [ecx+68h]    ; Entity::id_
+ *   ...
+ *     mov  [esp+10h], 0F0000000h   ; no_entity: the missing-id sentinel
+ *
+ * so `extraKey` was the weapon's bone index, `extraRef` was the raw owner-link
+ * slot of its target weak node, and `extraValue` at +0x64 off that slot was the
+ * target entity's id (0x04 + 0x64 == 0x68). `GetObjectPtr()` also treats the
+ * bare slot value 4 as an unbound sentinel, which the binary walks into; no
+ * caller can produce it and the guard only turns a fault into the null path.
  */
 void Unit::GetExtraData(SExtraUnitData* out) const
 {
@@ -16936,14 +16959,13 @@ void Unit::GetExtraData(SExtraUnitData* out) const
   if (AiAttacker) {
     const int count = AiAttacker->GetWeaponCount();
     for (int i = 0; i < count; ++i) {
-      CAiAttackerImpl::WeaponExtraData weaponExtra{};
-      if (!AiAttacker->TryGetWeaponExtraData(i, weaponExtra)) {
-        continue;
-      }
+      const UnitWeapon* const weapon = AiAttacker->GetWeapon(i);
 
       SExtraUnitDataPair pair{};
-      pair.key = weaponExtra.key;
-      pair.value = CAiAttackerImpl::ReadExtraDataValue(weaponExtra.ref);
+      pair.key = weapon->mBone;
+      const Entity* const targetEntity = weapon->mTarget.targetEntity.GetObjectPtr();
+      pair.value = (targetEntity != nullptr) ? static_cast<std::int32_t>(targetEntity->id_)
+                                             : static_cast<std::int32_t>(ToRaw(EEntityIdSentinel::Invalid));
       out->pairs.PushBack(pair);
     }
   } else if (AiTransport) {

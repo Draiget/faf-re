@@ -120,18 +120,6 @@ namespace
     return static_cast<moho::EntId>(BuildCollisionBeamFamilySourceBits(nullptr) | 1u);
   }
 
-  void ResetCollisionBeamListenerLink(moho::ManyToOneBroadcaster_ECollisionBeamEvent& listener) noexcept
-  {
-    listener.ownerLinkSlot = nullptr;
-    listener.nextInOwner = nullptr;
-  }
-
-  void UnlinkCollisionBeamListenerLink(moho::ManyToOneBroadcaster_ECollisionBeamEvent& listener) noexcept
-  {
-    auto& weakLink = reinterpret_cast<moho::WeakPtr<void>&>(listener);
-    weakLink.UnlinkFromOwnerChain();
-  }
-
 } // namespace
 
 namespace moho
@@ -156,41 +144,13 @@ namespace moho
     return type;
   }
 
-  /**
-   * Address: 0x005DC340 (FUN_005DC340, Moho::ManyToOneBroadcaster_ECollisionBeamEvent::BroadcastEvent)
-   *
-   * What it does:
-   * Rebinds one collision-beam broadcaster node to the supplied listener chain
-   * head while preserving intrusive owner-chain integrity.
-   */
-  void ManyToOneBroadcaster<ECollisionBeamEvent>::BroadcastEvent(
-    ManyToOneListener<ECollisionBeamEvent>* const listener
-  )
-  {
-    void** const newOwnerLinkSlot = listener != nullptr
-      ? reinterpret_cast<void**>(reinterpret_cast<WeakObject*>(listener)->WeakLinkHeadSlot())
-      : nullptr;
-    void** const currentOwnerLinkSlot = static_cast<void**>(ownerLinkSlot);
-    if (newOwnerLinkSlot == currentOwnerLinkSlot) {
-      return;
-    }
-
-    if (currentOwnerLinkSlot != nullptr) {
-      void** cursor = currentOwnerLinkSlot;
-      while (static_cast<ManyToOneBroadcaster<ECollisionBeamEvent>*>(*cursor) != this) {
-        cursor = &static_cast<ManyToOneBroadcaster<ECollisionBeamEvent>*>(*cursor)->nextInOwner;
-      }
-      *cursor = nextInOwner;
-    }
-
-    ownerLinkSlot = newOwnerLinkSlot;
-    if (newOwnerLinkSlot != nullptr) {
-      nextInOwner = *newOwnerLinkSlot;
-      *newOwnerLinkSlot = this;
-    } else {
-      nextInOwner = nullptr;
-    }
-  }
+  // 0x005DC340 - the collision-beam emission of
+  // `ManyToOneBroadcaster<TEvent>::SetListener` - used to be hand-written here
+  // over the broadcaster's raw `{ownerLinkSlot, nextInOwner}` pair. It is
+  // `WeakPtr<T>::ResetFromOwnerLinkSlot` instruction for instruction, so it now
+  // lives on the template in moho/misc/ManyToOneBroadcaster.h, which cites the
+  // address; the projectile-impact emission at 0x005DC230 is the same body at a
+  // different event type and was likewise a separate hand-written copy.
 
   /**
    * Address: 0x00675070 (FUN_00675070, Moho::InstanceCounter<Moho::CollisionBeamEntity>::GetStatItem)
@@ -238,7 +198,6 @@ namespace moho
     , mCollisionCheckTickCounter(0)
     , mPad29C_29F{0u, 0u, 0u, 0u}
   {
-    ResetCollisionBeamListenerLink(mListener);
     (void)IncrementCollisionBeamInstanceCounterAndReturn(this);
 
     mCoordNode.ListUnlink();
@@ -267,7 +226,6 @@ namespace moho
     , mCollisionCheckTickCounter(0)
     , mPad29C_29F{0u, 0u, 0u, 0u}
   {
-    ResetCollisionBeamListenerLink(mListener);
     AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), 1L);
   }
 
@@ -279,7 +237,10 @@ namespace moho
     mLauncher.UnlinkFromOwnerChain();
     mEffect.UnlinkFromOwnerChain();
     AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), -1L);
-    UnlinkCollisionBeamListenerLink(mListener);
+    // `mListener` detaches itself: it is a `WeakPtr` node now, so MSVC emits
+    // its unlink after this body, last in reverse declaration order - which is
+    // where the binary puts it. The hand-written call that used to close this
+    // body restated that glue as source.
   }
 
   /**
@@ -491,7 +452,7 @@ namespace moho
       } else {
         eventCode = CollisionBeamEvent_MissTarget;
       }
-      listener->HandleCollisionBeamListenerState(eventCode);
+      listener->OnEvent(eventCode);
     }
 
     if (dbg_CollisionBeam) {

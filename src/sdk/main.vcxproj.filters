@@ -3153,6 +3153,9 @@
     <ClInclude Include="moho\misc\WeakObject.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\misc\ManyToOneBroadcaster.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\serialization\SSavedGameArmyInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>

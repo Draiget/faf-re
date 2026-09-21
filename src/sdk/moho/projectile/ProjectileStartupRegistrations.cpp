@@ -45,12 +45,11 @@ namespace moho
 {
   bool dbg_Projectile = false;
   gpg::RType* CProjectileAttributes::sType = nullptr;
-  gpg::RType* ManyToOneBroadcaster<EProjectileImpactEvent>::sType = nullptr;
-  // The listener half's storage belongs to CAcquireTargetTask.cpp, alongside
-  // ManyToOneListener_ECollisionBeamEvent::sType -- this file only registers and
-  // clears it (register_/cleanup_ManyToOneListener_EProjectileImpactEvent_TypeInfo,
-  // 0x00BD64E0 / 0x00BFD760), exactly as CollisionBeamStartupRegistrations.cpp
-  // does for its own twin while defining only the broadcaster.
+  // Both halves' `sType` storage is `inline static` on the templates in
+  // moho/misc/ManyToOneBroadcaster.h now, one per instantiation as the binary
+  // has it; this file only registers and clears them
+  // (register_/cleanup_ManyToOne{Broadcaster,Listener}_EProjectileImpactEvent_TypeInfo,
+  // 0x00BD64C0 / 0x00BFD7C0 and 0x00BD64E0 / 0x00BFD760).
   CScrLuaMetatableFactory<Projectile> CScrLuaMetatableFactory<Projectile>::sInstance{};
 } // namespace moho
 
@@ -703,41 +702,13 @@ namespace
 
 } // namespace
 
-/**
- * Address: 0x005DC230 (FUN_005DC230, Moho::ManyToOneBroadcaster_EProjectileImpactEvent::BroadcastEvent)
- *
- * What it does:
- * Rebinds one projectile-impact broadcaster node to the supplied listener
- * chain head while preserving intrusive owner-chain integrity.
- */
-void moho::ManyToOneBroadcaster<moho::EProjectileImpactEvent>::BroadcastEvent(
-  moho::ManyToOneListener_EProjectileImpactEvent* const listener
-)
-{
-  void** const newOwnerLinkSlot = listener != nullptr
-    ? reinterpret_cast<void**>(static_cast<moho::WeakObject*>(listener)->WeakLinkHeadSlot())
-    : nullptr;
-  void** const currentOwnerLinkSlot = static_cast<void**>(ownerLinkSlot);
-  if (newOwnerLinkSlot == currentOwnerLinkSlot) {
-    return;
-  }
-
-  if (currentOwnerLinkSlot != nullptr) {
-    void** cursor = currentOwnerLinkSlot;
-    while (static_cast<moho::ManyToOneBroadcaster_EProjectileImpactEvent*>(*cursor) != this) {
-      cursor = &static_cast<moho::ManyToOneBroadcaster_EProjectileImpactEvent*>(*cursor)->nextInOwner;
-    }
-    *cursor = nextInOwner;
-  }
-
-  ownerLinkSlot = newOwnerLinkSlot;
-  if (newOwnerLinkSlot != nullptr) {
-    nextInOwner = *newOwnerLinkSlot;
-    *newOwnerLinkSlot = this;
-  } else {
-    nextInOwner = nullptr;
-  }
-}
+// 0x005DC230 - the projectile-impact emission of
+// `ManyToOneBroadcaster<TEvent>::SetListener` - used to be hand-written here
+// over the broadcaster's raw `{ownerLinkSlot, nextInOwner}` pair. It is
+// `WeakPtr<T>::ResetFromOwnerLinkSlot` instruction for instruction, so it now
+// lives on the template in moho/misc/ManyToOneBroadcaster.h, which cites the
+// address; the collision-beam emission at 0x005DC340 was a second copy of the
+// same body in CollisionBeamEntity.cpp.
 
 namespace
 {
@@ -3286,6 +3257,6 @@ namespace gpg
 
     moho::ManyToOneListener<moho::EProjectileImpactEvent>* listener = nullptr;
     (void)archive->ReadPointer_ManyToOneListener_EProjectileImpactEvent(&listener, ownerRef);
-    broadcaster->BroadcastEvent(listener);
+    broadcaster->SetListener(listener);
   }
 } // namespace gpg

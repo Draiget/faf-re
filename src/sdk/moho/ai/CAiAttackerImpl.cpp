@@ -9,6 +9,7 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/misc/Listener.h"
+#include "moho/projectile/Projectile.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/script/CScriptEvent.h"
@@ -55,17 +56,6 @@ using namespace moho;
 
 namespace moho
 {
-  struct WeaponExtraRefSubobject
-  {
-    std::uint8_t pad_00[0x64];
-    std::int32_t extraValue; // +0x64 (subobject-relative payload word)
-  };
-
-  static_assert(
-    offsetof(WeaponExtraRefSubobject, extraValue) == 0x64,
-    "WeaponExtraRefSubobject::extraValue offset must be 0x64"
-  );
-
   int cfunc_CAiAttackerImplGetUnit(lua_State* luaState);
   int cfunc_CAiAttackerImplGetUnitL(LuaPlus::LuaState* state);
   int cfunc_CAiAttackerImplAttackerWeaponsBusy(lua_State* luaState);
@@ -170,20 +160,6 @@ namespace
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormPrev_off_F59A00 = nullptr;
   moho::CScrLuaInitForm* gRecoveredSimLuaInitFormAnchor_off_F599F0 = nullptr;
 
-  struct WeaponEmitterEntryView
-  {
-    std::uint8_t pad_00[0xA8];
-    std::int32_t extraKey; // +0xA8
-    std::uint8_t pad_AC[0x24];
-    WeaponExtraRefSubobject* extraRef; // +0xD0 (secondary-subobject pointer)
-  };
-  static_assert(
-    offsetof(WeaponEmitterEntryView, extraKey) == 0xA8, "WeaponEmitterEntryView::extraKey offset must be 0xA8"
-  );
-  static_assert(
-    offsetof(WeaponEmitterEntryView, extraRef) == 0xD0, "WeaponEmitterEntryView::extraRef offset must be 0xD0"
-  );
-
   [[nodiscard]] IAiAttacker* AsAiAttackerBase(CAiAttackerImpl* const object) noexcept
   {
     return reinterpret_cast<IAiAttacker*>(object);
@@ -198,17 +174,6 @@ namespace
   {
     return reinterpret_cast<CScriptObject*>(reinterpret_cast<std::uint8_t*>(object) + 0x0C);
   }
-
-  struct ProjectileImpactBroadcasterRuntimeView
-  {
-    std::uint8_t pad_00[0x270];
-    WeakPtr<void> mImpactBroadcaster; // +0x270
-  };
-
-  static_assert(
-    offsetof(ProjectileImpactBroadcasterRuntimeView, mImpactBroadcaster) == 0x270,
-    "Projectile impact broadcaster offset must be 0x270"
-  );
 
   enum class WeaponTargetRangeStatus : std::int32_t
   {
@@ -447,22 +412,6 @@ namespace
     if (ownerThread->mStaged) {
       ownerThread->Unstage();
     }
-  }
-
-  template <class TBroadcaster, class TListener>
-  void BindManyToOneListener(TBroadcaster* const broadcaster, TListener* const listener) noexcept
-  {
-    if (broadcaster == nullptr) {
-      return;
-    }
-
-    auto& weakLink = reinterpret_cast<WeakPtr<void>&>(*broadcaster);
-    const void* const ownerLinkSlot = (listener != nullptr)
-                                        ? reinterpret_cast<const void*>(
-                                            reinterpret_cast<std::uintptr_t>(listener) + WeakPtr<void>::kOwnerLinkOffset
-                                          )
-                                        : nullptr;
-    weakLink.ResetFromOwnerLinkSlot(const_cast<void*>(ownerLinkSlot));
   }
 
   [[nodiscard]] CAcquireTargetTask*
@@ -712,22 +661,15 @@ CAiAttackerImpl::~CAiAttackerImpl()
   // and modelling only the destroy half is what produced the crash. The
   // subobject's lanes are zeroed by `mBaseSubobjects`' default member
   // initialiser and inert, so there is nothing to release.
-  auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
 
-  // Unlink the IAiAttacker subobject's intrusive-listener list at
-  // +0x04 (head.next) and +0x08 (head.prev). The binary unconditionally
-  // splices the head out of whatever chain it ended up in and resets
-  // to self-link sentinel state.
-  void** const listenerNext = reinterpret_cast<void**>(bytes + 0x04);
-  void** const listenerPrev = reinterpret_cast<void**>(bytes + 0x08);
-  void** const successor = reinterpret_cast<void**>(*listenerNext);
-  void** const predecessor = reinterpret_cast<void**>(*listenerPrev);
-  // successor->prev = *listenerPrev; predecessor->next = *listenerNext.
-  successor[1] = *listenerPrev;
-  predecessor[0] = *listenerNext;
-  // Re-self-link the head sentinel.
-  *listenerNext = bytes + 0x04;
-  *listenerPrev = bytes + 0x04;
+  // Unlink the IAiAttacker subobject's own listener-ring head at +0x04: the
+  // binary unconditionally lets the head's two neighbours adopt each other and
+  // then self-links it back to the empty sentinel, which is
+  // `TDatListItem::ListUnlinkSelf()`. It used to be open-coded here over
+  // `void**` cursors at `this+0x04`/`this+0x08` and a `successor[1]` /
+  // `predecessor[0]` index pair -- and with `mPrev` at +0x00 and `mNext` at
+  // +0x04, those two locals had their names the wrong way round.
+  (void)AsAiAttackerBase(this)->mListeners.ListUnlinkSelf();
 }
 
 /**
@@ -763,14 +705,12 @@ CAiAttackerImpl::CAiAttackerImpl() noexcept
   // This body used to `memset` everything past the vptr and then placement-new
   // each field back over the top. With the fields typed that would wipe
   // already-live members and start a second lifetime on each one.
-  auto* const bytes = reinterpret_cast<std::uint8_t*>(this);
 
-  // IAiAttacker subobject's intrusive-listener list head at +0x04/+0x08.
-  // Binary self-links so the list reads as empty: prev = next = &head.
-  void** const listenerNext = reinterpret_cast<void**>(bytes + 0x04);
-  void** const listenerPrev = reinterpret_cast<void**>(bytes + 0x08);
-  *listenerNext = bytes + 0x04;
-  *listenerPrev = bytes + 0x04;
+  // IAiAttacker subobject's listener-ring head at +0x04. The binary self-links
+  // it so the ring reads as empty (`mPrev = mNext = &head`), which is
+  // `TDatListItem::ListResetLinks()`; it was open-coded here over two `void**`
+  // cursors into `this+0x04` and `this+0x08`.
+  AsAiAttackerBase(this)->mListeners.ListResetLinks();
 
   // CScriptObject base subobject at +0x0C. The binary constructs it here and
   // overrides the slot with the `??_7CAiAttackerImpl@@6BCScriptObject@@@`
@@ -823,45 +763,6 @@ CAiAttackerImpl::CAiAttackerImpl(Unit* const unit)
 moho::CAiAttackerImpl* moho::AI_CreateAttacker(Unit* const unit)
 {
   return new CAiAttackerImpl(unit);
-}
-
-bool CAiAttackerImpl::TryGetWeaponExtraData(const int index, WeaponExtraData& out) const
-{
-  out.key = 0;
-  out.ref = nullptr;
-
-  if (index < 0) {
-    return false;
-  }
-
-  auto* self = const_cast<CAiAttackerImpl*>(this);
-  if (!self) {
-    return false;
-  }
-
-  const int count = self->GetWeaponCount();
-  if (index >= count) {
-    return false;
-  }
-
-  const void* rawWeapon = self->GetWeapon(index);
-  if (!rawWeapon) {
-    return false;
-  }
-
-  const auto* entry = reinterpret_cast<const WeaponEmitterEntryView*>(rawWeapon);
-  out.key = entry->extraKey;
-  out.ref = entry->extraRef;
-  return true;
-}
-
-std::int32_t CAiAttackerImpl::ReadExtraDataValue(const WeaponExtraRefSubobject* const ref)
-{
-  if (!ref) {
-    return kExtraDataMissingValue;
-  }
-
-  return ref->extraValue;
 }
 
 /**
@@ -1707,39 +1608,46 @@ void CAiAttackerImpl::ResetReportingState()
  * Address: 0x005D7800 (FUN_005D7800, Moho::CAiAttackerImpl::TransmitProjectileImpactEvent)
  *
  * What it does:
- * Finds the acquire-target task for `weapon` and binds projectile impact
- * broadcaster ownership to that task's projectile-impact listener lane.
+ * Points the projectile's impact broadcaster at the acquire-target task that
+ * drives `weapon`, so the task hears where that shot lands. Unbinds it when no
+ * task owns the weapon.
+ *
+ * The binary's `lea ecx,[edx+18h]` and `add eax,270h` (0x005D7840-0x005D7848)
+ * are the two implicit subobject adjustments this reads as: the task's
+ * `ManyToOneListener<EProjectileImpactEvent>` base sits at mdisp=24 and the
+ * projectile's `ManyToOneBroadcaster<EProjectileImpactEvent>` lane at 0x270.
+ * This used to go through a `ProjectileImpactBroadcasterRuntimeView` - 0x270
+ * pad bytes and a bare `WeakPtr<void>` - plus a `BindManyToOneListener`
+ * template that `reinterpret_cast`ed the broadcaster to `WeakPtr<void>&` and
+ * open-coded the `listener + kOwnerLinkOffset` encoding.
  */
 void CAiAttackerImpl::TransmitProjectileImpactEvent(UnitWeapon* const weapon, Projectile* const projectile)
 {
-  auto* const view = this;
-  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
+  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
   if (projectile == nullptr) {
     return;
   }
 
-  auto* const projectileView = reinterpret_cast<ProjectileImpactBroadcasterRuntimeView*>(projectile);
-  auto* const listener = (task != nullptr) ? static_cast<ManyToOneListener_EProjectileImpactEvent*>(task) : nullptr;
-  BindManyToOneListener(&projectileView->mImpactBroadcaster, listener);
+  projectile->mImpactEventBroadcaster.SetListener(task);
 }
 
 /**
  * Address: 0x005D7870 (FUN_005D7870, Moho::CAiAttackerImpl::TransmitBeamImpactEvent)
  *
  * What it does:
- * Finds the acquire-target task for `weapon` and binds collision-beam
- * broadcaster ownership to that task's collision-beam listener lane.
+ * The collision-beam twin of `TransmitProjectileImpactEvent` above: points the
+ * beam's broadcaster at the acquire-target task driving `weapon`, or unbinds it
+ * when there is none. The task's `ManyToOneListener<ECollisionBeamEvent>` base
+ * sits at mdisp=32, its second listener subobject.
  */
 void CAiAttackerImpl::TransmitBeamImpactEvent(UnitWeapon* const weapon, CollisionBeamEntity* const beam)
 {
-  auto* const view = this;
-  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(view->mTasks, weapon);
+  CAcquireTargetTask* const task = FindAcquireTaskForWeapon(this->mTasks, weapon);
   if (beam == nullptr) {
     return;
   }
 
-  auto* const listener = (task != nullptr) ? static_cast<ManyToOneListener_ECollisionBeamEvent*>(task) : nullptr;
-  BindManyToOneListener(&beam->mListener, listener);
+  beam->mListener.SetListener(task);
 }
 
 /**

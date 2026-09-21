@@ -186,9 +186,20 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
   public:
-    // Single-listener impact-event notifier. Fired from Impact() by
-    // virtual-dispatching the chained listener's slot-0 OnEvent with the
-    // per-category event code (asm 0x0069E0E6-0x0069E112).
+    // Single-listener impact-event notifier: one intrusive weak node aimed at
+    // the `CAcquireTargetTask` that fired this projectile, bound by
+    // `CAiAttackerImpl::TransmitProjectileImpactEvent` and read back by
+    // `Impact()`, which virtual-dispatches the chained listener's slot-0 OnEvent
+    // with the per-category event code (asm 0x0069E0E6-0x0069E112).
+    //
+    // RTTI declares this a *base* rather than a member -
+    // `.?AV?$ManyToOneBroadcaster@W4EProjectileImpactEvent@Moho@@@Moho@@` at
+    // mdisp=624 (dumps/rtti_dump_all.hpp:63981), with
+    // `InstanceCounter<Projectile>` at mdisp=632 right after it. Modelling it as
+    // the first member is layout-identical, because `sizeof(Entity)` is 0x270,
+    // so the base would land exactly here; the distinction is recorded rather
+    // than acted on because flipping it also moves `InstanceCounter<Projectile>`
+    // into the base list, and that one is empty-base-optimised.
     ManyToOneBroadcaster<EProjectileImpactEvent> mImpactEventBroadcaster; // +0x270
     std::uint8_t mUnknown0278[0x14];   // +0x278
     Wm3::Vector3f mLocalAngularVelocity; // +0x28C

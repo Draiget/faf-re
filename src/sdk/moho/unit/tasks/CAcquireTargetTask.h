@@ -15,32 +15,6 @@
 
 namespace moho
 {
-  template <class TEvent>
-  class ManyToOneListener;
-
-
-  template <>
-  class ManyToOneListener<ECollisionBeamEvent> : public WeakObject
-  {
-  public:
-    /**
-     * Address: 0x005D8930 (FUN_005D8930)
-     *
-     * What it does:
-     * Initializes collision-beam listener weak-link storage to an empty owner
-     * chain.
-     */
-    ManyToOneListener();
-
-    virtual int HandleCollisionBeamListenerState(int action) = 0;
-
-  public:
-    static gpg::RType* sType;
-  };
-
-  using ManyToOneListener_EProjectileImpactEvent = ManyToOneListener<EProjectileImpactEvent>;
-  using ManyToOneListener_ECollisionBeamEvent = ManyToOneListener<ECollisionBeamEvent>;
-
   /**
    * VFTABLE: 0x00E1E86C
    * COL: 0x00E75F24
@@ -106,9 +80,12 @@ namespace moho
      *
      * What it does:
      * Dispatches listener action handling for collision-beam callbacks:
-     * retarget probe on action==1, reset/counter-clear on action==0/2.
+     * retarget probe on event==1, reset/counter-clear on event==0/2. Slot 0 of
+     * the `ECollisionBeamEvent` listener subobject at +0x20, the sibling of the
+     * `EProjectileImpactEvent` override above at +0x18; the two bases are the
+     * same template at two event types, so the overrides are one overload set.
      */
-    int HandleCollisionBeamListenerState(int action);
+    int OnEvent(ECollisionBeamEvent event) override;
 
   private:
 
