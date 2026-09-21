@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #include "gpg/core/containers/String.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/math/Vector2f.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/script/CScriptEvent.h"
+#include "moho/sim/WeakEntitySet.h"
 #include "moho/unit/Broadcaster.h"
 #include "Wm3AxisAlignedBox3.h"
 #include "Wm3Vector3.h"
@@ -185,6 +187,28 @@ namespace moho
    */
   [[nodiscard]] UserEntity* DecodeCameraFrustumWeakRef(const CameraUserEntityWeakRef& weakRef) noexcept;
 
+  /**
+   * One frustum weak-entity lane: a `gpg::fastvector_n<WeakPtr<UserEntity>, 40>`
+   * -- the four-pointer view followed by its own 40-slot inline buffer, which
+   * the view's `mInlineOrigin` points at until the lane outgrows it. `CameraImpl`
+   * holds three of these back to back at +0x460, +0x5B0 and +0x700.
+   */
+  struct CameraFrustumUserEntityStorage
+  {
+    CameraFrustumUserEntityList mView;             // +0x00
+    CameraUserEntityWeakRef mInlineStorage[40]{};  // +0x10
+  };
+
+  static_assert(sizeof(CameraFrustumUserEntityStorage) == 0x150, "CameraFrustumUserEntityStorage size must be 0x150");
+  static_assert(
+    offsetof(CameraFrustumUserEntityStorage, mView) == 0x00,
+    "CameraFrustumUserEntityStorage::mView offset must be 0x00"
+  );
+  static_assert(
+    offsetof(CameraFrustumUserEntityStorage, mInlineStorage) == 0x10,
+    "CameraFrustumUserEntityStorage::mInlineStorage offset must be 0x10"
+  );
+
   struct SCamShakeParams
   {
     Wm3::Vec3f mCenter{};         // +0x00
@@ -233,6 +257,78 @@ namespace moho
     offsetof(SCamFollowParams, mTargetTimeLeft) == 0x08,
     "SCamFollowParams::mTargetTimeLeft offset must be 0x08"
   );
+
+  /**
+   * The live shake a camera is playing: the `SCamShakeParams` payload the
+   * producer in `Entity.cpp` hands over, plus the two lanes only the camera
+   * keeps. Deriving means there is one declaration of the payload and the
+   * offsets cannot drift apart again -- which is how the old duplicate's
+   * `mMinMagnitude`/`mMaxMagnitude` spelling came to disagree with the
+   * producer in the first place.
+   */
+  struct SCamShakeState : SCamShakeParams
+  {
+    float mElapsed = 0.0f; // +0x1C
+    float mScale = 0.0f;   // +0x20
+  };
+
+  static_assert(sizeof(SCamShakeState) == 0x24, "SCamShakeState size must be 0x24");
+  static_assert(offsetof(SCamShakeState, mElapsed) == 0x1C, "SCamShakeState::mElapsed offset must be 0x1C");
+  static_assert(offsetof(SCamShakeState, mScale) == 0x20, "SCamShakeState::mScale offset must be 0x20");
+
+  /**
+   * One node of `CameraImpl::mTargetEntities`. The `{next, prev, value}` shape
+   * over a 0x0C `{proxy, head, size}` head is the MSVC8 `std::list` node; the
+   * value is a weak reference that splices itself into the target entity's
+   * owner chain, which is why the node is created and destroyed through the
+   * helpers in `CameraImpl.cpp` rather than by a plain allocator.
+   */
+  struct CameraTargetEntityNode
+  {
+    CameraTargetEntityNode* mNext = nullptr; // +0x00
+    CameraTargetEntityNode* mPrev = nullptr; // +0x04
+    SSelectionWeakRefUserEntity mWeakRef{};  // +0x08
+  };
+
+  static_assert(sizeof(CameraTargetEntityNode) == 0x10, "CameraTargetEntityNode size must be 0x10");
+  static_assert(
+    offsetof(CameraTargetEntityNode, mWeakRef) == 0x08,
+    "CameraTargetEntityNode::mWeakRef offset must be 0x08"
+  );
+
+  /**
+   * The head of that list: allocator proxy, self-linked sentinel node, count.
+   * Byte-identical to `msvc8::list<SSelectionWeakRefUserEntity>`, whose
+   * `_Container_base` proxy sits at +0x00 with `_Myhead` at +0x04 and
+   * `_Mysize` at +0x08.
+   */
+  struct CameraTargetEntityList
+  {
+    void* mAllocProxy = nullptr;             // +0x00
+    CameraTargetEntityNode* mHead = nullptr; // +0x04
+    std::int32_t mSize = 0;                  // +0x08
+  };
+
+  static_assert(sizeof(CameraTargetEntityList) == 0x0C, "CameraTargetEntityList size must be 0x0C");
+  static_assert(offsetof(CameraTargetEntityList, mHead) == 0x04, "CameraTargetEntityList::mHead offset must be 0x04");
+  static_assert(offsetof(CameraTargetEntityList, mSize) == 0x08, "CameraTargetEntityList::mSize offset must be 0x08");
+
+  /**
+   * Abstract time source behind `CameraImpl::mTimeSources`. Two concrete
+   * implementations live in `CameraImpl.cpp` and are heap-allocated into the
+   * two slots: system time at index 0, game time at index 1.
+   */
+  class CameraTimeSourceRuntime
+  {
+  public:
+    /// VTable slot 0, queried as `mTimeSources[mTimeSource]->Time()`.
+    virtual float Time() = 0;
+
+    /// VTable slot 1: the scalar-deleting destructor the `eh vector destructor
+    /// iterator` lane in `CameraImpl::~CameraImpl` dispatches through
+    /// (FUN_007AE630).
+    virtual ~CameraTimeSourceRuntime() = default;
+  };
 
   /**
    * Byte size of a live `CameraImpl`.
@@ -1152,8 +1248,168 @@ namespace moho
      */
     void SetTimeSource(ECamTimeSource timeSource);
 
+    // -------------------------------------------------------------------------
+    // Layout. These lanes were reached through a `CameraImplRuntimeView`
+    // reinterpret_cast until 2026-09-21; they are the class's own state and
+    // are declared here, with the offsets that cast asserted.
+    //
+    // The two bases fill +0x00..+0x4F exactly: `RCamCamera` is 0x0C and
+    // `CScriptEvent` is 0x44. That also accounts for the `LuaObject` the old
+    // view carried at +0x3C -- it is `CScriptObject::mLuaObj`, inherited, at
+    // 0x0C (CScriptEvent base) + 0x10 (CScriptObject base) + 0x20.
+    // -------------------------------------------------------------------------
 
+    msvc8::string mName{};                                     // +0x050
+    STIMap* mTerrainMap = nullptr;                             // +0x06C
+    GeomCamera3 mCam{};                                        // +0x070
+    float mVerticalZoomMetricScale = 0.0f;                     // +0x338
+    std::uint8_t mIsOrtho = 0;                                 // +0x33C
+    std::uint8_t mIsRotated = 0;                               // +0x33D
+    std::uint8_t mRevertRotation = 0;                          // +0x33E
+    std::uint8_t mPadding0x33F_ = 0;                           // +0x33F
+    float mFarFov = 0.0f;                                      // +0x340
+    float mFarPitch = 0.0f;                                    // +0x344
+    float mCurrentPitch = 0.0f;                                // +0x348
+    float mHeading = 0.0f;                                     // +0x34C
+    float mHeadingZoom = 0.0f;                                 // +0x350
+    float mTargetZoom = 0.0f;                                  // +0x354
+    float mNearZoom = 0.0f;                                    // +0x358
+    float mZoom = 0.0f;                                        // +0x35C
+    Wm3::Vec3f mOffset{};                                      // +0x360
+    Wm3::Vector2f mPivot{};                                    // +0x36C
+    float mHeadingRate = 0.0f;                                 // +0x374
+    float mZoomRate = 0.0f;                                    // +0x378
+    std::int32_t mTargetType = 0;                              // +0x37C
+    Wm3::Vec3f mTargetLocation{};                              // +0x380
+    Wm3::AxisAlignedBox3f mTargetBox{};                        // +0x38C
+    CameraTargetEntityList mTargetEntities{};                  // +0x3A4
+    CameraTargetEntityNode* mActiveTargetEntityNode = nullptr; // +0x3B0
+    float mTargetTimeLeft = 0.0f;                              // +0x3B4
+    std::uint8_t mTargetTime = 0;                              // +0x3B8
+    std::uint8_t mPadding0x3B9_[3]{};                          // +0x3B9
+    std::int32_t mTimeSource = 0;                              // +0x3BC
+    CameraTimeSourceRuntime* mTimeSources[2]{};                // +0x3C0 (System=0, Game=1)
+    float mLastFrameTime = 0.0f;                               // +0x3C8
+    std::uint8_t mEnableEaseInOut = 0;                         // +0x3CC
+    std::uint8_t mPadding0x3CD_[3]{};                          // +0x3CD
+    float mNoseCamPitchAdjust = 0.0f;                          // +0x3D0
+    Wm3::Vec3f mTimedMoveOffset{};                             // +0x3D4
+    float mTimedMoveZoom = 0.0f;                               // +0x3E0
+    float mTimedMoveDuration = 0.0f;                           // +0x3E4
+    float mTimedMoveTransitionParam = 0.0f;                    // +0x3E8
+    float mTimedMoveStartTime = 0.0f;                          // +0x3EC
+    float mTimedMovePitch = 0.0f;                              // +0x3F0
+    float mTimedMoveHeading = 0.0f;                            // +0x3F4
+    Wm3::Vec3f mHermiteOffsetStartDelta{};                     // +0x3F8
+    Wm3::Vec3f mHermiteOffsetEndDelta{};                       // +0x404
+    float mHermiteHeadingStartDelta = 0.0f;                    // +0x410
+    float mHermiteHeadingEndDelta = 0.0f;                      // +0x414
+    float mHermitePitchStartDelta = 0.0f;                      // +0x418
+    float mHermitePitchEndDelta = 0.0f;                        // +0x41C
+    float mHermiteZoomStartDelta = 0.0f;                       // +0x420
+    float mHermiteZoomEndDelta = 0.0f;                         // +0x424
+    SCamShakeState mCamShakeParams{};                          // +0x428
+    std::uint8_t mCanShake = 0;                                // +0x44C
+    std::uint8_t mPadding0x44D_[3]{};                          // +0x44D
+    std::int32_t mAccType = 0;                                 // +0x450
+    float mFrustumCacheTimer = 0.0f;                           // +0x454
+    float mFrustumCacheZoomMark = 0.0f;                        // +0x458
+    std::uint8_t mPadding0x45C_[4]{};                          // +0x45C
+
+    // The three frustum weak-entity lanes. The constructor at 0x007A7950
+    // points each lane's `mView` at its own `mInlineStorage[0]` sentinel; the
+    // destructor at 0x007A7F00 walks each lane in reverse and detaches every
+    // still-tracked weak entity owner before releasing heap-grown storage.
+    // They are plain aggregates, so the compiler emits neither construction
+    // nor destruction for them and that explicit wiring is real source.
+    CameraFrustumUserEntityStorage mFrustumLaneA{};        // +0x460
+    CameraFrustumUserEntityStorage mFrustumLaneB{};        // +0x5B0
+    CameraFrustumUserEntityStorage mArmyUnitsInFrustum{};  // +0x700
+    float mMaxZoomMult = 0.0f;                             // +0x850
+    std::uint8_t mPadding0x854_[4]{};                      // +0x854
   };
+
+  static_assert(offsetof(CameraImpl, mName) == 0x050, "CameraImpl::mName offset must be 0x050");
+  static_assert(offsetof(CameraImpl, mTerrainMap) == 0x06C, "CameraImpl::mTerrainMap offset must be 0x06C");
+  static_assert(offsetof(CameraImpl, mCam) == 0x070, "CameraImpl::mCam offset must be 0x070");
+  static_assert(
+    offsetof(CameraImpl, mVerticalZoomMetricScale) == 0x338,
+    "CameraImpl::mVerticalZoomMetricScale offset must be 0x338"
+  );
+  static_assert(offsetof(CameraImpl, mIsOrtho) == 0x33C, "CameraImpl::mIsOrtho offset must be 0x33C");
+  static_assert(offsetof(CameraImpl, mIsRotated) == 0x33D, "CameraImpl::mIsRotated offset must be 0x33D");
+  static_assert(offsetof(CameraImpl, mRevertRotation) == 0x33E, "CameraImpl::mRevertRotation offset must be 0x33E");
+  static_assert(offsetof(CameraImpl, mFarFov) == 0x340, "CameraImpl::mFarFov offset must be 0x340");
+  static_assert(offsetof(CameraImpl, mFarPitch) == 0x344, "CameraImpl::mFarPitch offset must be 0x344");
+  static_assert(offsetof(CameraImpl, mCurrentPitch) == 0x348, "CameraImpl::mCurrentPitch offset must be 0x348");
+  static_assert(offsetof(CameraImpl, mHeading) == 0x34C, "CameraImpl::mHeading offset must be 0x34C");
+  static_assert(offsetof(CameraImpl, mHeadingZoom) == 0x350, "CameraImpl::mHeadingZoom offset must be 0x350");
+  static_assert(offsetof(CameraImpl, mTargetZoom) == 0x354, "CameraImpl::mTargetZoom offset must be 0x354");
+  static_assert(offsetof(CameraImpl, mNearZoom) == 0x358, "CameraImpl::mNearZoom offset must be 0x358");
+  static_assert(offsetof(CameraImpl, mZoom) == 0x35C, "CameraImpl::mZoom offset must be 0x35C");
+  static_assert(offsetof(CameraImpl, mOffset) == 0x360, "CameraImpl::mOffset offset must be 0x360");
+  static_assert(offsetof(CameraImpl, mPivot) == 0x36C, "CameraImpl::mPivot offset must be 0x36C");
+  static_assert(offsetof(CameraImpl, mHeadingRate) == 0x374, "CameraImpl::mHeadingRate offset must be 0x374");
+  static_assert(offsetof(CameraImpl, mZoomRate) == 0x378, "CameraImpl::mZoomRate offset must be 0x378");
+  static_assert(offsetof(CameraImpl, mTargetType) == 0x37C, "CameraImpl::mTargetType offset must be 0x37C");
+  static_assert(offsetof(CameraImpl, mTargetLocation) == 0x380, "CameraImpl::mTargetLocation offset must be 0x380");
+  static_assert(offsetof(CameraImpl, mTargetBox) == 0x38C, "CameraImpl::mTargetBox offset must be 0x38C");
+  static_assert(offsetof(CameraImpl, mTargetEntities) == 0x3A4, "CameraImpl::mTargetEntities offset must be 0x3A4");
+  static_assert(
+    offsetof(CameraImpl, mActiveTargetEntityNode) == 0x3B0,
+    "CameraImpl::mActiveTargetEntityNode offset must be 0x3B0"
+  );
+  static_assert(offsetof(CameraImpl, mTargetTimeLeft) == 0x3B4, "CameraImpl::mTargetTimeLeft offset must be 0x3B4");
+  static_assert(offsetof(CameraImpl, mTargetTime) == 0x3B8, "CameraImpl::mTargetTime offset must be 0x3B8");
+  static_assert(offsetof(CameraImpl, mTimeSource) == 0x3BC, "CameraImpl::mTimeSource offset must be 0x3BC");
+  static_assert(offsetof(CameraImpl, mTimeSources) == 0x3C0, "CameraImpl::mTimeSources offset must be 0x3C0");
+  static_assert(offsetof(CameraImpl, mLastFrameTime) == 0x3C8, "CameraImpl::mLastFrameTime offset must be 0x3C8");
+  static_assert(offsetof(CameraImpl, mEnableEaseInOut) == 0x3CC, "CameraImpl::mEnableEaseInOut offset must be 0x3CC");
+  static_assert(
+    offsetof(CameraImpl, mNoseCamPitchAdjust) == 0x3D0,
+    "CameraImpl::mNoseCamPitchAdjust offset must be 0x3D0"
+  );
+  static_assert(offsetof(CameraImpl, mTimedMoveOffset) == 0x3D4, "CameraImpl::mTimedMoveOffset offset must be 0x3D4");
+  static_assert(offsetof(CameraImpl, mTimedMoveZoom) == 0x3E0, "CameraImpl::mTimedMoveZoom offset must be 0x3E0");
+  static_assert(
+    offsetof(CameraImpl, mTimedMoveStartTime) == 0x3EC,
+    "CameraImpl::mTimedMoveStartTime offset must be 0x3EC"
+  );
+  static_assert(
+    offsetof(CameraImpl, mTimedMoveHeading) == 0x3F4,
+    "CameraImpl::mTimedMoveHeading offset must be 0x3F4"
+  );
+  static_assert(
+    offsetof(CameraImpl, mHermiteOffsetStartDelta) == 0x3F8,
+    "CameraImpl::mHermiteOffsetStartDelta offset must be 0x3F8"
+  );
+  static_assert(
+    offsetof(CameraImpl, mHermiteOffsetEndDelta) == 0x404,
+    "CameraImpl::mHermiteOffsetEndDelta offset must be 0x404"
+  );
+  static_assert(
+    offsetof(CameraImpl, mHermiteZoomEndDelta) == 0x424,
+    "CameraImpl::mHermiteZoomEndDelta offset must be 0x424"
+  );
+  static_assert(offsetof(CameraImpl, mCamShakeParams) == 0x428, "CameraImpl::mCamShakeParams offset must be 0x428");
+  static_assert(offsetof(CameraImpl, mCanShake) == 0x44C, "CameraImpl::mCanShake offset must be 0x44C");
+  static_assert(offsetof(CameraImpl, mAccType) == 0x450, "CameraImpl::mAccType offset must be 0x450");
+  static_assert(
+    offsetof(CameraImpl, mFrustumCacheTimer) == 0x454,
+    "CameraImpl::mFrustumCacheTimer offset must be 0x454"
+  );
+  static_assert(
+    offsetof(CameraImpl, mFrustumCacheZoomMark) == 0x458,
+    "CameraImpl::mFrustumCacheZoomMark offset must be 0x458"
+  );
+  static_assert(offsetof(CameraImpl, mFrustumLaneA) == 0x460, "CameraImpl::mFrustumLaneA offset must be 0x460");
+  static_assert(offsetof(CameraImpl, mFrustumLaneB) == 0x5B0, "CameraImpl::mFrustumLaneB offset must be 0x5B0");
+  static_assert(
+    offsetof(CameraImpl, mArmyUnitsInFrustum) == 0x700,
+    "CameraImpl::mArmyUnitsInFrustum offset must be 0x700"
+  );
+  static_assert(offsetof(CameraImpl, mMaxZoomMult) == 0x850, "CameraImpl::mMaxZoomMult offset must be 0x850");
+  static_assert(sizeof(CameraImpl) == 0x858, "CameraImpl size must be 0x858");
 
   /**
    * The camera's own broadcaster ring node, at `camera+0x04` - the lane every
@@ -1850,12 +2106,12 @@ namespace moho
 
   static_assert(sizeof(RCamCamera) == 0x0Cu, "RCamCamera size must be 0x0C (vtable + Broadcaster prev/next)");
   static_assert(
-    sizeof(CameraImpl) == 0x0Cu + sizeof(CScriptEvent),
-    "CameraImpl must be exactly its two real bases, RCamCamera then CScriptEvent, back to back with no padding"
+    offsetof(CameraImpl, mName) == 0x0Cu + sizeof(CScriptEvent),
+    "CameraImpl's two real bases, RCamCamera then CScriptEvent, must sit back to back with no padding"
   );
   static_assert(
-    sizeof(CameraImpl) <= kCameraImplRuntimeSize,
-    "CameraImpl's real base subobjects must fit inside the 0x858-byte block RCamManager::CreateCamera allocates"
+    sizeof(CameraImpl) == kCameraImplRuntimeSize,
+    "CameraImpl must be exactly the 0x858-byte block RCamManager::CreateCamera allocates"
   );
 
   /**
