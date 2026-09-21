@@ -978,9 +978,9 @@ namespace
    * the reach a player actually gets. An earlier version credited only the
    * reclaimer and so understated every real order - the target term is never
    * zero in practice, because the gate substitutes `FallbackReclaimFootprint()`
-   * (2x2, CUnitReclaimTask.cpp:87-97) when it has no target entity at all. With
-   * a unit under the cursor the term is that unit's own extent and the ring is
-   * exact; over bare ground it is the engine's own 2, not zero.
+   * (2x2, CUnitReclaimTask.cpp:87-97) when it has no target entity at all. That
+   * 2 is what this ring credits, as a constant - see the comment at the term
+   * itself for why it is not read from whatever is under the cursor.
    *
    * One term of the gate is deliberately not modelled: while the reclaimer is
    * in `UNITSTATE_Patrolling` the limit widens to
@@ -1022,13 +1022,23 @@ namespace
       return;
     }
 
-    // The target half of the gate's two footprint credits. A unit under the
-    // cursor makes it exact; bare ground gets the engine's own no-target
-    // fallback rather than zero.
-    float targetExtent = kFallbackReclaimFootprintExtent;
-    if (const moho::UserEntity* const hoveredEntity = session.GetHoveredUserEntity(); hoveredEntity != nullptr) {
-      targetExtent = ReclaimFootprintExtentOf(*hoveredEntity);
-    }
+    // The target half of the gate's two footprint credits, held at the engine's
+    // own no-target value rather than read from whatever is under the cursor.
+    //
+    // Reading the hovered entity made this term exact for that one target, but
+    // the ring is a property of the *selection*, and sizing it from the cursor
+    // made it pulse: every tree swept over has its own footprint, most of them
+    // smaller than the 2x2 the gate falls back to, so crossing a forest made the
+    // ring shrink and grow for reclaims nobody had asked about. Resting on the
+    // very factory that was selected was worse still - it credited that
+    // factory's own 5x5 for an order TASKSTATE_Preparing rejects outright
+    // (`targetEntity == mUnit`, CUnitReclaimTask.cpp:517-522).
+    //
+    // `FallbackReclaimFootprint()` is the honest constant here: it is exactly
+    // what the gate measures against for "reclaim at this position", which is
+    // what a bare cursor is. A real target adds its own extent on top of this at
+    // order time, so the ring never overstates a reclaim that can happen.
+    const float targetExtent = kFallbackReclaimFootprintExtent;
 
     // Widest reach across the selection, so a mixed group shows the unit that
     // reaches furthest rather than a stack of overlapping rings - same rule the
