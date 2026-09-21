@@ -444,7 +444,7 @@ namespace
    */
   void AddIAniManipulatorBase(gpg::RType* const typeInfo)
   {
-    gpg::RType* const baseType = CachedIAniManipulatorType();
+    gpg::RType* const baseType = moho::IAniManipulator::StaticGetClass();
     gpg::RField baseField{};
     baseField.mName = baseType->GetName();
     baseField.mType = baseType;
@@ -668,25 +668,23 @@ namespace
   }
 
   /**
-   * Address: 0x0062FC10 (FUN_0062FC10)
+   * The shared body behind `IAniManipulator::StaticGetClass` (0x0062FC10) and
+   * `IAniManipulator::GetClass` (0x0062FC30), which are two out-of-line copies
+   * of exactly this: read the cache at 0x010C738C, and on a miss pass the type
+   * descriptor at 0x00F71B60 to `gpg::LookupRType` (0x008E0750). It carries no
+   * address of its own for that reason -- the addresses belong to the two
+   * members, the same way `CachedCAimManipulatorType` relates to
+   * `CAimManipulator`'s pair.
    *
-   * What it does:
-   * Resolves and caches the reflected runtime type for `IAniManipulator`,
-   * reading the cache at 0x010C738C and passing the type descriptor at
-   * 0x00F71B60 to `gpg::LookupRType` (0x008E0750).
+   * `CAimManipulator.cpp` has its own separate emission of this body at
+   * 0x00632C20, because it is a file-static there too and its serializers call
+   * it rather than inlining it.
    *
-   * This file's emission, not `CAimManipulator.cpp`'s: 0x0062FC10 sits
-   * immediately before `IAniManipulator::GetClass` (0x0062FC30) and
-   * `GetDerivedObjectRef` (0x0062FC50) in this class's own COMDAT run, and
-   * locality is unanimous for this file. `CAimManipulator.cpp` carries the
-   * other copy at 0x00632C20 -- which this block used to claim -- and
-   * `GetClass` at 0x0062FC30 is a third copy of the same body, reached
-   * through the vtable rather than by name.
-   *
-   * None of the three has a caller. The reflection paths that need the type
-   * inlined it, including the two per-TypeInfo registrations at 0x00635310
-   * (`CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator`) and
-   * 0x0063A150 (`CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator`).
+   * No copy has a caller in the binary: `GetClass` is reached through the
+   * vtable, and everything else inlined it -- including the two per-TypeInfo
+   * registrations at 0x00635310
+   * (`CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator`) and 0x0063A150
+   * (`CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator`).
    */
   gpg::RType* CachedIAniManipulatorType()
   {
@@ -1950,6 +1948,15 @@ namespace moho
   /**
    * Address: 0x0062FC30 (FUN_0062FC30, ?GetClass@IAniManipulator@Moho@@UBEPAVRType@gpg@@XZ)
    */
+  /**
+   * Address: 0x0062FC10 (FUN_0062FC10,
+   * ?StaticGetClass@IAniManipulator@Moho@@SAPAVRType@gpg@@XZ)
+   */
+  gpg::RType* IAniManipulator::StaticGetClass()
+  {
+    return CachedIAniManipulatorType();
+  }
+
   gpg::RType* IAniManipulator::GetClass() const
   {
     return CachedIAniManipulatorType();
