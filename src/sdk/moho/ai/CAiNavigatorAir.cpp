@@ -19,38 +19,6 @@ using namespace moho;
 
 namespace
 {
-  struct UnitNavigatorAirRuntimeView
-  {
-    std::uint8_t pad_0000_0584[0x584];
-    void* mFollowTargetOwnerSlot;     // +0x584
-    std::uint8_t pad_0588_059C[0x14];
-    Wm3::Vector3f mCurrentMoveTarget; // +0x59C
-  };
-
-  static_assert(
-    offsetof(UnitNavigatorAirRuntimeView, mFollowTargetOwnerSlot) == 0x584,
-    "UnitNavigatorAirRuntimeView::mFollowTargetOwnerSlot offset must be 0x584"
-  );
-  static_assert(
-    offsetof(UnitNavigatorAirRuntimeView, mCurrentMoveTarget) == 0x59C,
-    "UnitNavigatorAirRuntimeView::mCurrentMoveTarget offset must be 0x59C"
-  );
-
-  [[nodiscard]] bool IsWeakSentinelSlot(void* const slot) noexcept
-  {
-    return reinterpret_cast<std::uintptr_t>(slot) == sizeof(void*);
-  }
-
-  template <typename T>
-  [[nodiscard]] T* DecodeWeakOwnerSlot(void* const slot) noexcept
-  {
-    if (!slot || IsWeakSentinelSlot(slot)) {
-      return nullptr;
-    }
-    const auto raw = reinterpret_cast<std::uintptr_t>(slot);
-    return reinterpret_cast<T*>(raw - sizeof(void*));
-  }
-
   [[nodiscard]] std::int16_t GridCellCoord(const float worldCoord, const std::uint8_t footprintAxisSize) noexcept
   {
     return static_cast<std::int16_t>(std::lround(worldCoord - (static_cast<float>(footprintAxisSize) * 0.5f)));
@@ -83,8 +51,10 @@ namespace
       return true;
     }
 
-    const void* const headSlot = begin->ownerLinkSlot;
-    return headSlot == nullptr || IsWeakSentinelSlot(const_cast<void*>(headSlot));
+    // The queue holds `WeakPtr<CUnitCommand>`; a head command whose node is no
+    // longer in its owner's chain is a detached command, which is what the
+    // binary's `slot == 0 || slot == 4` pair tests for.
+    return !begin->IsLinkedInOwnerChain();
   }
 
   [[nodiscard]] bool HasMovedSincePrev(const Entity& entity) noexcept
@@ -281,8 +251,8 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
   mStatus = AINAVSTATUS_Steering;
 
   if (mIgnoreFormation == 0u) {
-    const auto* const unitView = reinterpret_cast<const UnitNavigatorAirRuntimeView*>(mUnit);
-    mTrackFormationTarget = static_cast<std::uint8_t>(DecodeWeakOwnerSlot<Unit>(unitView->mFollowTargetOwnerSlot) != nullptr);
+    mTrackFormationTarget =
+      static_cast<std::uint8_t>(mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>() != nullptr);
   }
 }
 
@@ -384,8 +354,7 @@ bool CAiNavigatorAir::FollowingLeader() const
     return false;
   }
 
-  const auto* const unitView = reinterpret_cast<const UnitNavigatorAirRuntimeView*>(mUnit);
-  Unit* const leaderUnit = DecodeWeakOwnerSlot<Unit>(unitView->mFollowTargetOwnerSlot);
+  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
   if (leaderUnit) {
     return leaderUnit != mUnit;
   }
@@ -507,7 +476,23 @@ int CAiNavigatorAir::Execute()
   }
 
   if (mUnit->IsUnitState(UNITSTATE_Refueling)) {
-    Unit* const focusUnit = DecodeWeakOwnerSlot<Unit>(mUnit->FocusEntityRef.valueWithTag);
+    // `FocusEntityRef` is an *entity* weak ref, so the decoded pointer is an
+    // `Entity*` and has to be narrowed before any `Unit` member is touched.
+    // 0x005A52F9 does exactly that: it decodes the slot to `slot - 4` and then
+    // dispatches vtable +0x10 - `Entity::IsUnit`, the first virtual Entity adds
+    // after CScriptObject's four - with no arguments, and uses the *returned*
+    // pointer for everything that follows.
+    //
+    // The previous form decoded the slot straight to `Unit*`. That is a
+    // different pointer: `Unit` is `IUnit, Entity`, so the Entity subobject
+    // sits at +0x08 and `IsUnit()` adjusts by that much. Skipping the call left
+    // every member access eight bytes low, against IUnit's vtable rather than
+    // its own. The formation lead a few lines down genuinely does not need this
+    // - its chain is a `WeakPtr<Unit>` (Unit.cpp:15770) and 0x005A4DCE
+    // dispatches slot 0 on `slot - 4` directly - which is why only this site
+    // narrows.
+    Entity* const focusEntity = mUnit->FocusEntityRef.ResolveObjectPtr<Entity>();
+    Unit* const focusUnit = (focusEntity != nullptr) ? focusEntity->IsUnit() : nullptr;
     if (focusUnit && focusUnit->IsMobile() &&
         (focusUnit->IsDead() || focusUnit->DestroyQueued() || !IsUnitIdleState(*focusUnit) ||
          focusUnit->IsUnitState(UNITSTATE_MovingUp) || focusUnit->IsUnitState(UNITSTATE_MovingDown))) {
@@ -617,10 +602,9 @@ void CAiNavigatorAir::UpdateCurrentTargetFromFormation()
     return;
   }
 
-  const auto* const unitView = reinterpret_cast<const UnitNavigatorAirRuntimeView*>(mUnit);
-  Unit* const leaderUnit = DecodeWeakOwnerSlot<Unit>(unitView->mFollowTargetOwnerSlot);
+  Unit* const leaderUnit = mUnit->mInfoCache.mFormationLeadRef.ResolveObjectPtr<Unit>();
   if (leaderUnit && leaderUnit != mUnit && leaderUnit->AiNavigator && leaderUnit->AiNavigator->HasGoodPath()) {
-    mCurrentTargetPos = unitView->mCurrentMoveTarget;
+    mCurrentTargetPos = mUnit->mInfoCache.mFormationHeadingHint;
     ApplyCurrentTargetToMotion();
     return;
   }
