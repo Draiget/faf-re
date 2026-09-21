@@ -24,6 +24,7 @@
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCategoryReflection.h"
+#include "moho/entity/REntityBlueprint.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/RangeExtractor.h"
@@ -724,27 +725,81 @@ namespace
   }
 
   /**
-   * The "AllMilitary" profile, whose colours are the red players read as
-   * "attack range" (`NormalColor` ff2c2c in `rangeoverlayparams.lua`).
+   * The profile whose colours are the red players read as "attack range":
+   * "AllMilitary", falling back to "DirectFire".
    *
-   * Only its styling is ever borrowed: the radius and the ring geometry always
-   * come from the concrete weapon profile that produced them, so thickness
-   * stays paired with its own profile. Without this an attack ring took the
-   * colour of whichever weapon profile happened to be widest, and a unit with
-   * both direct and indirect fire drew its attack ring in IndirectFire's
-   * colour rather than red.
+   * Both carry the same `NormalColor` ff2c2c (`rangeoverlayparams.lua` lines 56
+   * and 105), so the fallback is the same red rather than an approximation of
+   * it. It exists because the combine profiles are the ones a UI mod is most
+   * likely to have re-registered, and without it a missing "AllMilitary" sent
+   * the ring to whichever weapon profile happened to win - IndirectFire's
+   * yellow f2f029, AntiAir's cyan 29def2 or AntiNavy's green 7af229.
+   *
+   * Only styling is ever borrowed: the radius and the ring geometry always come
+   * from the concrete weapon profile that produced them, so thickness stays
+   * paired with its own profile.
    */
   [[nodiscard]] const moho::SRangeRenderProfile* FindMilitaryStyleProfile(
     const moho::RangeRenderer& rangeRenderer
   )
   {
+    const moho::SRangeRenderProfile* directFire = nullptr;
     for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
       if (profile.mExtractorName == "AllMilitary") {
         return &profile;
       }
+      if (profile.mExtractorName == "DirectFire") {
+        directFire = &profile;
+      }
     }
-    return nullptr;
+    return directFire;
   }
+
+  /**
+   * The reclaim gate's own footprint measure: the *whole* footprint rather than
+   * its half-extent, exactly as `MaxFootprintExtent` in
+   * `CUnitReclaimTask.cpp:82` computes it.
+   */
+  [[nodiscard]] float MaxFootprintExtent(const moho::SFootprint& footprint) noexcept
+  {
+    return static_cast<float>(
+      (footprint.mSizeX >= footprint.mSizeZ) ? static_cast<int>(footprint.mSizeX)
+                                             : static_cast<int>(footprint.mSizeZ)
+    );
+  }
+
+  /**
+   * One entity's footprint extent, read from the same place the gate reads it.
+   *
+   * `Entity::GetFootprint` (0x00678880) returns `BluePrint->mFootprint` - an
+   * `SFootprint` held **by value** on the *entity* blueprint (+0xD8), so it can
+   * never be absent. `RUnitBlueprint::Physics.ResolvedFootprint` is a different
+   * thing and is genuinely null for real units: probing a live session, the
+   * selected `MaxBuildDistance = 5` unit resolved it to `nullptr`, which
+   * silently dropped the entire self-extent term and understated the ring by a
+   * whole footprint. Reading the entity blueprint fixes that and costs nothing.
+   *
+   * It also means props and wrecks measure correctly - they carry an
+   * `REntityBlueprint` but no `RUnitBlueprint` - which matters because a wreck
+   * is what a reclaim order usually targets.
+   *
+   * The one thing this cannot see is the gate's alt-footprint swap
+   * (`mUseAltFootprint`, Entity.h:1478): those flags live on the sim `Entity`,
+   * not on the client mirror this pass runs against. It affects only units that
+   * carry a second footprint at all, and it is the default footprint that is
+   * wrong to omit.
+   */
+  [[nodiscard]] float ReclaimFootprintExtentOf(const moho::UserEntity& entity) noexcept
+  {
+    const moho::REntityBlueprint* const entityBlueprint = entity.mParams.mBlueprint;
+    return (entityBlueprint != nullptr) ? MaxFootprintExtent(entityBlueprint->mFootprint) : 0.0f;
+  }
+
+  /**
+   * `FallbackReclaimFootprint()`'s 2x2 (`CUnitReclaimTask.cpp:87-97`): the
+   * footprint the reclaim gate measures against when it has no target entity.
+   */
+  constexpr float kFallbackReclaimFootprintExtent = 2.0f;
 
   /**
    * Keeps whichever of the running best and the candidate is the better answer
@@ -927,17 +982,30 @@ namespace
    *     > Economy.MaxBuildDistance
    *
    * and `MaxFootprintExtent` is `max(mSizeX, mSizeZ)` (same file, line 82) --
-   * the *whole* footprint, not its half-extent. Measured from its own centre a
-   * unit therefore reclaims out to `MaxBuildDistance + max(mSizeX, mSizeZ)`,
-   * so a 5x5 factory reaches 10 where a 1x1 engineer reaches 6 even though
-   * neither blueprint sets `MaxBuildDistance` and both take the engine default
-   * of 5 (RUnitBlueprint.cpp:558). Crediting the full footprint rather than
-   * half of it is original engine behaviour; it is reproduced here as-is and
-   * deliberately not corrected.
+   * the *whole* footprint, not its half-extent. Measured centre to centre the
+   * reach is therefore
    *
-   * The task credits the target's extent as well, but a bare cursor has no
-   * target, so the ring shows reach to a zero-size target - the smallest reach
-   * the unit really has, never an overstated one.
+   *   MaxBuildDistance + selfExtent + targetExtent
+   *
+   * so a 5x5 factory reaches 10 before the target is even counted, where a 1x1
+   * engineer reaches 6, even though neither blueprint sets `MaxBuildDistance`
+   * and both take the engine default of 5 (RUnitBlueprint.cpp:558). Crediting
+   * two whole footprints rather than two half-extents is original engine
+   * behaviour; it is reproduced here as-is and deliberately not corrected.
+   *
+   * **Both** extents are credited, which is the difference between this ring and
+   * the reach a player actually gets. An earlier version credited only the
+   * reclaimer and so understated every real order - the target term is never
+   * zero in practice, because the gate substitutes `FallbackReclaimFootprint()`
+   * (2x2, CUnitReclaimTask.cpp:87-97) when it has no target entity at all. With
+   * a unit under the cursor the term is that unit's own extent and the ring is
+   * exact; over bare ground it is the engine's own 2, not zero.
+   *
+   * One term of the gate is deliberately not modelled: while the reclaimer is
+   * in `UNITSTATE_Patrolling` the limit widens to
+   * `max(MaxBuildDistance, AI.GuardScanRadius)` (CUnitReclaimTask.cpp:556-559).
+   * That is auto-reclaim on a patrol route, not an order a player places by
+   * cursor, and the unit-state bit is not on the client mirror this pass reads.
    *
    * The ring borrows the "Miscellaneous" / OVERLAYMISC profile, which the menu
    * calls "Build Range", for its geometry and colour, so thickness still scales
@@ -973,6 +1041,14 @@ namespace
       return;
     }
 
+    // The target half of the gate's two footprint credits. A unit under the
+    // cursor makes it exact; bare ground gets the engine's own no-target
+    // fallback rather than zero.
+    float targetExtent = kFallbackReclaimFootprintExtent;
+    if (const moho::UserEntity* const hoveredEntity = session.GetHoveredUserEntity(); hoveredEntity != nullptr) {
+      targetExtent = ReclaimFootprintExtentOf(*hoveredEntity);
+    }
+
     // Widest reach across the selection, so a mixed group shows the unit that
     // reaches furthest rather than a stack of overlapping rings - same rule the
     // selection pass above uses.
@@ -994,17 +1070,7 @@ namespace
         continue;
       }
 
-      float footprintExtent = 0.0f;
-      if (const moho::SFootprint* const footprint = blueprint->Physics.ResolvedFootprint;
-          footprint != nullptr) {
-        footprintExtent = static_cast<float>(
-          (footprint->mSizeX >= footprint->mSizeZ)
-            ? static_cast<int>(footprint->mSizeX)
-            : static_cast<int>(footprint->mSizeZ)
-        );
-      }
-
-      const float reach = maxBuildDistance + footprintExtent;
+      const float reach = maxBuildDistance + ReclaimFootprintExtentOf(*unit) + targetExtent;
       if (reach > widestReach) {
         widestReach = reach;
       }
@@ -1125,15 +1191,28 @@ namespace
 
     // Geometry from the profile that produced the radius, colour from
     // "AllMilitary" so the ring reads as attack range whichever weapon category
-    // won. The rollover colour rather than the normal one, because this is a
-    // hover ring and that is the lane the range-overlay menu styles for hover.
+    // won.
+    //
+    // The *normal* colour lane, ff2c2c - not the rollover lane's ff6363. The
+    // three lanes are not three shades of one colour to pick freely between:
+    // `RangeBurn` writes `rangeColor` into the target verbatim
+    // (`gamedata/effects/frame.fx`: `RangePS` returns its uniform, and the pass
+    // is `SrcBlend = one; DestBlend = zero`), so the lane chosen *is* the pixel.
+    // Dumped from a live "AllMilitary" profile, the two lanes decode to
+    // (1.000, 0.173, 0.173) and (1.000, 0.388, 0.388) - RGB(255,44,44) against
+    // RGB(255,99,99), which is the difference between a red ring and a pink one.
+    // Rollover exists to brighten a ring the per-unit pass has already drawn in
+    // the normal colour; this ring is on its own while a modifier is held, so
+    // lightening it had nothing to lighten and only washed the red out to a
+    // salmon pink. The sibling cursor pass above already draws its attack ring
+    // from `mBuildRingColor` for the same reason.
     const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
     const moho::SRangeRenderProfile& style = (militaryStyle != nullptr) ? *militaryStyle : *attackProfile;
 
     scratchPayload.clear();
     scratchPayload.push_back(attackPayload);
     RenderRingBatch(
-      attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mHighlightedRingColor,
+      attackProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
       attackProfile->mInnerRingParams, scratchPayload
     );
   }
