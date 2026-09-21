@@ -841,19 +841,20 @@ namespace
    * selection, so a UI mod can answer "what would this unit cover if it stood
    * there" with the profile's own colours and zoom-scaled thickness.
    *
-   * Exactly two rings are drawn, no matter how many profiles are registered:
+   * Exactly one ring is drawn, no matter how many profiles are registered: the
+   * "Miscellaneous" / OVERLAYMISC profile, which the menu calls "Build Range".
    *
-   *   attack - the widest of the concrete weapon profiles. The "AllMilitary"
-   *            combine profile cannot serve here: `CombinedMilitaryExtractor`
-   *            implements only `Extract` (entity) and its `Range` (blueprint +
-   *            centre) override returns false, so it yields nothing for a
-   *            position that has no unit on it.
-   *   assist - the "Miscellaneous" / OVERLAYMISC profile, which the menu calls
-   *            "Build Range".
+   * It used to draw the selection's widest weapon ring alongside it. That was
+   * wrong: this pass is what the Shift modifier raises, and Shift's whole job is
+   * the build/assist radius - weapon range belongs to Alt, which has its own two
+   * passes. The stray attack ring put a red circle under the cursor whenever
+   * Shift was held over an armed selection, including the tiny red dot a unit
+   * with a minimum range draws at its inner edge, and there was no way to ask
+   * for the assist radius without it.
    *
-   * Across a multi-unit selection the widest payload in each class wins, so a
-   * mixed group shows the reach of whichever unit reaches furthest rather than
-   * a stack of overlapping rings.
+   * Across a multi-unit selection the widest payload wins, so a mixed group
+   * shows the reach of whichever unit reaches furthest rather than a stack of
+   * overlapping rings.
    */
   void RenderSelectionRingsUnderCursor(
     moho::CWldSession& session,
@@ -877,19 +878,13 @@ namespace
 
     const Wm3::Vector3f& cursorWorldPos = session.GetCursorInfo().mMouseWorldPos;
 
-    // Widest payload seen per class, with the profile whose colours and ring
+    // Widest assist payload seen, with the profile whose colours and ring
     // thickness should draw it.
-    const moho::SRangeRenderProfile* attackProfile = nullptr;
-    moho::SRangeExtractionPayload attackPayload{};
     const moho::SRangeRenderProfile* assistProfile = nullptr;
     moho::SRangeExtractionPayload assistPayload{};
 
-    const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
-
     for (const auto& [extractorName, profile] : rangeRenderer.mRangeProfiles) {
-      const bool isAssist = profile.mExtractorName == "Miscellaneous";
-      const bool isAttack = IsAttackRangeProfile(profile);
-      if (!isAssist && !isAttack) {
+      if (profile.mExtractorName != "Miscellaneous") {
         continue;
       }
 
@@ -936,37 +931,23 @@ namespace
         // unconditionally and only special-cases `innerRadius <= 0` for the
         // fill. Left exactly as the extractor built it.
 
-        if (isAssist) {
-          if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
-            assistPayload = payload;
-            assistProfile = &profile;
-          }
-          continue;
+        if (assistProfile == nullptr || payload.outerRadius > assistPayload.outerRadius) {
+          assistPayload = payload;
+          assistProfile = &profile;
         }
-
-        KeepWiderAttackRing(attackProfile, attackPayload, profile, payload);
       }
     }
 
-    // Ring geometry comes from the profile that produced the radius; only the
-    // colour is borrowed, so thickness stays paired with its own profile.
-    const auto draw = [&](const moho::SRangeRenderProfile* const profile,
-                          const moho::SRangeRenderProfile* const colorFrom,
-                          const moho::SRangeExtractionPayload& payload) {
-      if (profile == nullptr) {
-        return;
-      }
-      const moho::SRangeRenderProfile& style = (colorFrom != nullptr) ? *colorFrom : *profile;
-      scratchPayload.clear();
-      scratchPayload.push_back(payload);
-      RenderRingBatch(
-        profile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
-        profile->mInnerRingParams, scratchPayload
-      );
-    };
+    if (assistProfile == nullptr) {
+      return;
+    }
 
-    draw(attackProfile, militaryStyle, attackPayload);
-    draw(assistProfile, nullptr, assistPayload);
+    scratchPayload.clear();
+    scratchPayload.push_back(assistPayload);
+    RenderRingBatch(
+      assistProfile->mOuterRingParams, camera, rangeRenderer, headIndex, assistProfile->mBuildRingColor,
+      assistProfile->mInnerRingParams, scratchPayload
+    );
   }
 
   /**
@@ -1088,11 +1069,25 @@ namespace
     payload.innerRadius = 0.0f;
     payload.outerRadius = widestReach;
 
+    // Geometry from the "Miscellaneous" profile, so thickness still scales with
+    // zoom exactly as every other ring does - but the military red for the
+    // colour, not that profile's own b09200.
+    //
+    // This is an Alt ring, and Alt's two rings are one answer: how far this
+    // selection reaches, and how far the thing under it shoots. Drawing the
+    // reach in the "Build Range" yellow made it read as the Shift ring instead,
+    // and with a factory selected it is the *only* ring Alt puts up - a factory
+    // carries no weapons, so the hovered-attack pass has nothing to draw
+    // alongside it.
+    const moho::SRangeRenderProfile* const militaryStyle = FindMilitaryStyleProfile(rangeRenderer);
+    const moho::SRangeRenderProfile& style =
+      (militaryStyle != nullptr) ? *militaryStyle : *buildRangeProfile;
+
     scratchPayload.clear();
     scratchPayload.push_back(payload);
     RenderRingBatch(
-      buildRangeProfile->mOuterRingParams, camera, rangeRenderer, headIndex,
-      buildRangeProfile->mBuildRingColor, buildRangeProfile->mInnerRingParams, scratchPayload
+      buildRangeProfile->mOuterRingParams, camera, rangeRenderer, headIndex, style.mBuildRingColor,
+      buildRangeProfile->mInnerRingParams, scratchPayload
     );
   }
 
