@@ -13893,11 +13893,71 @@ void Sim::AdvanceBeat(const int amt)
  */
 void Sim::Shutdown()
 {
-  ForEachAllArmyUnit(mEntityDB, [](Unit* const unit) {
-    if (unit != nullptr) {
-      static_cast<Entity&>(*unit).Destroy();
+  // 0x007457F3..0x00745827 walks `mAllUnits` - the id-keyed tree every entity
+  // registers itself in through `Entity::StandardInit` - and calls
+  // `Entity::Destroy` on each node's value, with no type filter and no null
+  // test:
+  //
+  //   0x007457F3  mov ecx, [esi+984h]   ; mEntityDB
+  //   0x007457F9  mov eax, [ecx+4]      ; mAllUnits._Myhead  (the map is at +0)
+  //   0x007457FC  mov eax, [eax]        ; _Myhead->_Left, i.e. begin()
+  //   0x00745810  mov eax, [eax+10h]    ; node->second, the Entity*
+  //   0x00745813  call 0x679AF0         ; Entity::Destroy
+  //   0x0074581C  call 0x5C87A0         ; ++it
+  //   0x00745825  cmp eax, edi / jne    ; until end()
+  //
+  // This walked `CEntityDb::Entities()` instead.
+  //
+  // `Entities()` is not a recovered structure. It is a process-global side
+  // table (`gRuntimeEntityLists`, keyed by `CEntityDb*`) that this recovery
+  // maintains by hand because the shipped all-entity walk was not recovered,
+  // and its own declaration names the hazard: an entity that dies without its
+  // id being released, or whose id was reassigned first, leaves a raw pointer
+  // behind for the next walk to dereference. Reaching it here was worse than a
+  // stale read - the stale pointer was handed to `Entity::Destroy`, which
+  // pushed it onto `mDeletionQueue`, and the drain below then dispatched
+  // `OnDestroy` through its dead vtable. `mAllUnits` carries no such exposure:
+  // `~Entity` -> `ReleaseId` erases the node, so the tree cannot outlive its
+  // entries.
+  //
+  // `Destroy()` only sets a flag, pushes to the deletion queue and relinks the
+  // coord node - it never erases from `mAllUnits` - so walking the tree while
+  // calling it is safe, which is why the binary does exactly that.
+  //
+  // KNOWN DIVERGENCE, deliberate: the `IsUnit()` filter below is ours, not the
+  // binary's. 0x00745810/13 destroys every value in the tree; dropping the
+  // filter to match was tried and backed out, because it kills the process on
+  // the way out somewhere else entirely:
+  //
+  //   ACCESS_VIOLATION reading 15E0E345 (a MEM_RESERVE page, Protect=0)
+  //   #00 IsSpatialMapSentinel        moho/mesh/Mesh.cpp:734
+  //   #01 SpatialMapNextNode          moho/mesh/Mesh.cpp:755
+  //   #02 EraseSpatialMapRange        moho/mesh/Mesh.cpp:1081
+  //   #03 DestroySpatialMapTree       moho/mesh/Mesh.cpp:1149
+  //   #04 SpatialShardData::~SpatialShardData   moho/mesh/Mesh.cpp:3054
+  //   #06 SpatialShard::~SpatialShard          moho/mesh/Mesh.cpp:2896
+  //   #10 DestroySpatialDbMeshStorage          moho/mesh/Mesh.cpp:2468
+  //   #11 SpatialDB_MeshInstance::DestroyStorage moho/mesh/Mesh.cpp:3491
+  //   #12 CWldSession::~CWldSession    moho/sim/CWldSession.cpp:14931
+  //   #16 WLD_Teardown                 moho/sim/CWldSession.cpp:22126
+  //
+  // Queueing props, projectiles and effects here retires their mesh instances
+  // before `~CWldSession` tears the spatial DB down, and that walk then runs
+  // off its tree. That is a defect in the spatial map, not a reason the
+  // binary's shutdown is wrong - but it has to be fixed before this filter can
+  // come off, so the filter stays and this note records why.
+  if (mEntityDB != nullptr) {
+    for (auto& entry : mEntityDB->mAllUnits) {
+      // `DoReserveId` (0x00684480) inserts `{id, nullptr}` before
+      // `StandardInit` fills the slot in, so a reserved-but-unbuilt id can
+      // still be in the tree. The binary does not test for it; this does,
+      // because it costs one compare and the alternative is a null `this`.
+      Entity* const entity = entry.second;
+      if (entity != nullptr && entity->IsUnit() != nullptr) {
+        entity->Destroy();
+      }
     }
-  });
+  }
 
   while (!mDeletionQueue.empty()) {
     void* const queuedObject = mDeletionQueue.front();
