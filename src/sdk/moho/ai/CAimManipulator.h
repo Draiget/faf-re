@@ -334,20 +334,39 @@ namespace moho
     );
 
     /**
-     * Address: 0x00631190 (FUN_00631190, Moho::CAimManipulator::Rotate1)
+     * Address: 0x00631190 (FUN_00631190; the lost IDA database labelled this
+     * `Moho::CAimManipulator::Rotate1`, by hand -- there is no mangled symbol
+     * for it, so the name here is taken from the behaviour instead)
      *
      * What it does:
-     * Applies first-axis (heading) bone rotation using tracked quaternion lane.
+     * Turns watched bone 0 -- the turret -- to the tracked heading, by
+     * rotating it about the Y axis: the quaternion it applies is
+     * `{w = cos(heading/2), x = 0, y = sin(heading/2), z = 0}`, stored in
+     * `mHeadingRot` and then handed to `CAniPoseBone::Rotate` (0x0054BC00).
+     *
+     * `recomputeFromAngle` false re-applies whatever `mHeadingRot` already
+     * holds without rebuilding it from `mHeading` (the `cmp byte [ebp+8], 0`
+     * at 0x006311C7 skips straight to the `Rotate` call). All eight call sites
+     * in the binary push 1, so that path is never taken there -- but the
+     * parameter is real, it is in the signature (`ret 4`), and the recovered
+     * source keeps it.
      */
-    void Rotate1(bool reset);
+    void RotateHeadingBone(bool recomputeFromAngle);
 
     /**
-     * Address: 0x00631220 (FUN_00631220, Moho::CAimManipulator::Rotate2)
+     * Address: 0x00631220 (FUN_00631220; likewise labelled
+     * `Moho::CAimManipulator::Rotate2` by hand in the lost database, with no
+     * mangled symbol behind it)
      *
      * What it does:
-     * Applies second-axis (pitch) bone rotation using tracked quaternion lane.
+     * Turns watched bone 1 -- the barrel -- to the tracked pitch, by rotating
+     * it about the X axis: `{w = cos(-pitch/2), x = sin(-pitch/2), y = 0,
+     * z = 0}`, stored in `mPitchRot`. The pitch is negated because the bone's
+     * X axis runs opposite to the sign convention `mPitch` is tracked in.
+     *
+     * `recomputeFromAngle` behaves as on the heading twin above.
      */
-    void Rotate2(bool reset);
+    void RotatePitchBone(bool recomputeFromAngle);
 
   public:
     // -----------------------------------------------------------------------
@@ -385,8 +404,12 @@ namespace moho
     std::uint8_t mPadE2ToE3[0x2]{};
     std::int32_t mResetPoseTime = 0;                       // +0xE4
     std::int32_t mResetTime = 0;                           // +0xE8
-    Wm3::Quaternionf mBone0Rot{};                          // +0xEC
-    Wm3::Quaternionf mBone1Rot{};                          // +0xFC
+    // The two bone rotations, cached so a tick that does not recompute them
+    // can re-apply the last one. `mHeadingRot` turns watched bone 0 about Y,
+    // `mPitchRot` turns watched bone 1 about X; both are seeded to identity by
+    // each constructor.
+    Wm3::Quaternionf mHeadingRot{};                        // +0xEC
+    Wm3::Quaternionf mPitchRot{};                          // +0xFC
     float mHeadingOffset = 0.0f;                           // +0x10C
   };
 
@@ -401,8 +424,8 @@ namespace moho
   static_assert(offsetof(CAimManipulator, mHeading) == 0xB8, "CAimManipulator::mHeading offset must be 0xB8");
   static_assert(offsetof(CAimManipulator, mMinHeading) == 0xC8, "CAimManipulator::mMinHeading offset must be 0xC8");
   static_assert(offsetof(CAimManipulator, mResetPoseTime) == 0xE4, "CAimManipulator::mResetPoseTime offset must be 0xE4");
-  static_assert(offsetof(CAimManipulator, mBone0Rot) == 0xEC, "CAimManipulator::mBone0Rot offset must be 0xEC");
-  static_assert(offsetof(CAimManipulator, mBone1Rot) == 0xFC, "CAimManipulator::mBone1Rot offset must be 0xFC");
+  static_assert(offsetof(CAimManipulator, mHeadingRot) == 0xEC, "CAimManipulator::mHeadingRot offset must be 0xEC");
+  static_assert(offsetof(CAimManipulator, mPitchRot) == 0xFC, "CAimManipulator::mPitchRot offset must be 0xFC");
   static_assert(
     offsetof(CAimManipulator, mHeadingOffset) == 0x10C,
     "CAimManipulator::mHeadingOffset offset must be 0x10C"

@@ -529,8 +529,8 @@ namespace
    *
    * DETERMINISM NOTE -- deliberate divergence from the binary, shared by every
    * `std::sin`/`std::cos`/`std::atan2` in this file's sim paths
-   * (`CalculateFiringPitch` 0x005D6310, `CheckTracking` 0x006309F0, `Rotate1`
-   * 0x00631190, `Rotate2` 0x00631220).
+   * (`CalculateFiringPitch` 0x005D6310, `CheckTracking` 0x006309F0,
+   * `RotateHeadingBone` 0x00631190, `RotatePitchBone` 0x00631220).
    *
    * The binary computes these with the x87 transcendental instructions -- this
    * function is `fcos` at 0x005D644F and `fsin` at 0x005D647E, and the
@@ -622,15 +622,15 @@ moho::CAimManipulator::CAimManipulator()
   this->mMaxPitch = 0.0f;
   this->mPitchMaxSlew = 0.0f;
 
-  this->mBone0Rot.w = 1.0f;
-  this->mBone0Rot.x = 0.0f;
-  this->mBone0Rot.y = 0.0f;
-  this->mBone0Rot.z = 0.0f;
+  this->mHeadingRot.w = 1.0f;
+  this->mHeadingRot.x = 0.0f;
+  this->mHeadingRot.y = 0.0f;
+  this->mHeadingRot.z = 0.0f;
 
-  this->mBone1Rot.w = 1.0f;
-  this->mBone1Rot.x = 0.0f;
-  this->mBone1Rot.y = 0.0f;
-  this->mBone1Rot.z = 0.0f;
+  this->mPitchRot.w = 1.0f;
+  this->mPitchRot.x = 0.0f;
+  this->mPitchRot.y = 0.0f;
+  this->mPitchRot.z = 0.0f;
 
   this->mHeadingOffset = 0.0f;
 }
@@ -695,14 +695,14 @@ moho::CAimManipulator::CAimManipulator(
   this->mUnknownBoolE1 = false;
   this->mResetPoseTime = 0;
   this->mResetTime = 0;
-  this->mBone0Rot.w = 1.0f;
-  this->mBone0Rot.x = 0.0f;
-  this->mBone0Rot.y = 0.0f;
-  this->mBone0Rot.z = 0.0f;
-  this->mBone1Rot.w = 1.0f;
-  this->mBone1Rot.x = 0.0f;
-  this->mBone1Rot.y = 0.0f;
-  this->mBone1Rot.z = 0.0f;
+  this->mHeadingRot.w = 1.0f;
+  this->mHeadingRot.x = 0.0f;
+  this->mHeadingRot.y = 0.0f;
+  this->mHeadingRot.z = 0.0f;
+  this->mPitchRot.w = 1.0f;
+  this->mPitchRot.x = 0.0f;
+  this->mPitchRot.y = 0.0f;
+  this->mPitchRot.z = 0.0f;
   this->mHeadingOffset = 0.0f;
 
   // Materialize the Lua script object through the CAimManipulator metatable
@@ -895,10 +895,10 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   if (weapon == nullptr || unit->IsDead() || unit->StunnedState != 0) {
     this->mOnTarget = false;
     if (CAniPoseBone* const watchBone0 = ResolveWatchBone(this, 0u); watchBone0 != nullptr) {
-      watchBone0->Rotate(this->mBone0Rot);
+      watchBone0->Rotate(this->mHeadingRot);
     }
     if (CAniPoseBone* const watchBone1 = ResolveWatchBone(this, 1u); watchBone1 != nullptr) {
-      watchBone1->Rotate(this->mBone1Rot);
+      watchBone1->Rotate(this->mPitchRot);
     }
     this->EventSetSignaled(false);
     return false;
@@ -912,8 +912,8 @@ bool moho::CAimManipulator::ManipulatorUpdate()
   if (target->targetType != EAiTargetType::AITARGET_None && shouldTrackTarget) {
     if (!target->HasTarget()) {
       this->mOnTarget = false;
-      Rotate1(true);
-      Rotate2(true);
+      RotateHeadingBone(true);
+      RotatePitchBone(true);
     } else {
       if (this->mResetPoseTime <= 0) {
         std::int32_t resetTime = 1;
@@ -933,8 +933,8 @@ bool moho::CAimManipulator::ManipulatorUpdate()
       if (!IsAimVectorValid(aimDirection)) {
         weapon->SetAimReachable(false);
         this->mOnTarget = false;
-        Rotate1(true);
-        Rotate2(true);
+        RotateHeadingBone(true);
+        RotatePitchBone(true);
       } else {
         this->mOnTarget = Track(aimDirection, 0u);
         weapon->SetAimingAt(aimDirection);
@@ -946,8 +946,8 @@ bool moho::CAimManipulator::ManipulatorUpdate()
       (void)Track(forwardDirection, kTrackingModeWorldSpace);
     } else {
       --this->mResetTime;
-      Rotate1(true);
-      Rotate2(true);
+      RotateHeadingBone(true);
+      RotatePitchBone(true);
     }
     this->mOnTarget = false;
   }
@@ -1384,51 +1384,59 @@ std::uint8_t moho::CAimManipulator::CheckTracking(
 }
 
 /**
- * Address: 0x00631190 (FUN_00631190, Moho::CAimManipulator::Rotate1)
+ * Address: 0x00631190 (FUN_00631190, labelled `Moho::CAimManipulator::Rotate1`
+ * by hand in the lost IDA database; no mangled symbol backs that name)
  *
  * What it does:
- * Applies first-axis (heading) bone rotation using tracked quaternion lane.
+ * Turns watched bone 0 -- the turret -- to the tracked heading, about the Y
+ * axis. The FPU sequence at 0x006311CD..0x00631202 is `fld [mHeading]`,
+ * `fmul 0.5`, then `fcos`/`fsin` stored to +0xEC and +0xF4 with +0xF0 and
+ * +0xF8 zeroed, i.e. `{cos(h/2), 0, sin(h/2), 0}` over a `{w,x,y,z}`
+ * quaternion.
  */
-void moho::CAimManipulator::Rotate1(const bool reset)
+void moho::CAimManipulator::RotateHeadingBone(const bool recomputeFromAngle)
 {
   CAniPoseBone* const watchBone = ResolveWatchBone(this, 0u);
   if (watchBone == nullptr) {
     return;
   }
 
-  if (reset) {
+  if (recomputeFromAngle) {
     const float halfHeading = this->mHeading * kHalfScale;
-    this->mBone0Rot.w = std::cos(halfHeading);
-    this->mBone0Rot.x = 0.0f;
-    this->mBone0Rot.y = std::sin(halfHeading);
-    this->mBone0Rot.z = 0.0f;
+    this->mHeadingRot.w = std::cos(halfHeading);
+    this->mHeadingRot.x = 0.0f;
+    this->mHeadingRot.y = std::sin(halfHeading);
+    this->mHeadingRot.z = 0.0f;
   }
 
-  watchBone->Rotate(this->mBone0Rot);
+  watchBone->Rotate(this->mHeadingRot);
 }
 
 /**
- * Address: 0x00631220 (FUN_00631220, Moho::CAimManipulator::Rotate2)
+ * Address: 0x00631220 (FUN_00631220, labelled `Moho::CAimManipulator::Rotate2`
+ * by hand in the lost IDA database; no mangled symbol backs that name)
  *
  * What it does:
- * Applies second-axis (pitch) bone rotation using tracked quaternion lane.
+ * Turns watched bone 1 -- the barrel -- to the tracked pitch, about the X
+ * axis, negating `mPitch` because the bone's X axis runs opposite to the sign
+ * convention the pitch lane is tracked in.
  */
-void moho::CAimManipulator::Rotate2(const bool reset)
+void moho::CAimManipulator::RotatePitchBone(const bool recomputeFromAngle)
 {
   CAniPoseBone* const watchBone = ResolveWatchBone(this, 1u);
   if (watchBone == nullptr) {
     return;
   }
 
-  if (reset) {
+  if (recomputeFromAngle) {
     const float halfPitch = (-this->mPitch) * kHalfScale;
-    this->mBone1Rot.w = std::cos(halfPitch);
-    this->mBone1Rot.x = std::sin(halfPitch);
-    this->mBone1Rot.y = 0.0f;
-    this->mBone1Rot.z = 0.0f;
+    this->mPitchRot.w = std::cos(halfPitch);
+    this->mPitchRot.x = std::sin(halfPitch);
+    this->mPitchRot.y = 0.0f;
+    this->mPitchRot.z = 0.0f;
   }
 
-  watchBone->Rotate(this->mBone1Rot);
+  watchBone->Rotate(this->mPitchRot);
 }
 
 /**
@@ -1467,7 +1475,7 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModePitch)
       );
-      Rotate2(true);
+      RotatePitchBone(true);
 
       const std::uint8_t headingResult = CheckTracking(
         targetDirection,
@@ -1478,7 +1486,7 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModeHeading)
       );
-      Rotate1(true);
+      RotateHeadingBone(true);
       trackingResult = static_cast<std::uint8_t>(pitchResult | headingResult);
     }
   } else {
@@ -1492,7 +1500,7 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModeHeading)
       );
-      Rotate1(true);
+      RotateHeadingBone(true);
     }
 
     if (CAniPoseBone* const pitchBone = ResolveWatchBone(this, 1u); pitchBone != nullptr) {
@@ -1505,7 +1513,7 @@ bool moho::CAimManipulator::Track(const Wm3::Vector3f& targetDirection, const st
         toleranceRadians,
         static_cast<std::uint8_t>(trackingModeFlags | kTrackingModePitch)
       );
-      Rotate2(true);
+      RotatePitchBone(true);
     }
   }
 
@@ -1923,8 +1931,8 @@ void moho::CAimManipulator::MemberDeserialize(CAimManipulator* const object, gpg
   archive->ReadBool(&object->mUnknownBoolE1);
   archive->ReadInt(&object->mResetPoseTime);
   archive->ReadInt(&object->mResetTime);
-  archive->Read(CachedQuaternionfType(), &object->mBone0Rot, ownerRef);
-  archive->Read(CachedQuaternionfType(), &object->mBone1Rot, ownerRef);
+  archive->Read(CachedQuaternionfType(), &object->mHeadingRot, ownerRef);
+  archive->Read(CachedQuaternionfType(), &object->mPitchRot, ownerRef);
   archive->ReadFloat(&object->mHeadingOffset);
 }
 
@@ -1982,8 +1990,8 @@ void moho::CAimManipulator::MemberSerialize(const CAimManipulator* const object,
   archive->WriteBool(object->mUnknownBoolE1);
   archive->WriteInt(object->mResetPoseTime);
   archive->WriteInt(object->mResetTime);
-  archive->Write(CachedQuaternionfType(), &object->mBone0Rot, ownerRef);
-  archive->Write(CachedQuaternionfType(), &object->mBone1Rot, ownerRef);
+  archive->Write(CachedQuaternionfType(), &object->mHeadingRot, ownerRef);
+  archive->Write(CachedQuaternionfType(), &object->mPitchRot, ownerRef);
   archive->WriteFloat(object->mHeadingOffset);
 }
 
