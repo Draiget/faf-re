@@ -12,6 +12,7 @@ namespace gpg
 
 namespace moho
 {
+  enum EAiAttackerEvent : std::int32_t;
   enum ECommandEvent : int;
   enum EFormationdStatus : std::int32_t;
   enum EUnitCommandQueueStatus : int;
@@ -20,6 +21,77 @@ namespace moho
   class Broadcaster : public TDatList<Broadcaster, void>
   {
   public:
+    /**
+     * The ring mechanic every `BroadcastEvent` below is built on, written once.
+     *
+     * A listener is free to unlink or relink itself from inside its own
+     * callback, so the ring cannot be walked in place. Instead the whole ring is
+     * moved onto a local sentinel, and each listener is moved back onto the live
+     * head *before* it is told the event — so a callback that unlinks sees a
+     * consistent ring, and one that relinks lands on the head rather than on the
+     * sentinel that is about to die.
+     *
+     * Every emission is the same instruction sequence, and reads slot `+0x04`
+     * throughout: `empty()` tests it (`mov eax,[esi+4]; cmp eax,esi`),
+     * `pop_front()` takes it, and `push_back()` writes `mov [node+4], head` /
+     * `mov [head], node`. Note that slot `+0x04` is `mNext` *by name* in this
+     * tree and the *prev* link in the binary — see the warning on
+     * `TDatListItem`; the two views agree by slot, which is what matters here.
+     *
+     * `pop_front()` then `push_back()` unlinks the node twice, the second time
+     * on an already-self-linked node. That is not an oversight: the binary emits
+     * both unlink sequences (0x006E9500-0x006E9518 and 0x006E9523-0x006E9534 in
+     * the `ECommandEvent` emission), which is what pins the source to this pair
+     * of calls rather than a single splice.
+     *
+     * Four of the five hand-written copies this replaces walked the ring the
+     * other way — slot `+0x00` and `ListLinkAfter` instead of `+0x04` and
+     * `ListLinkBefore`. Those two mistakes are mirror images, so the ring was
+     * left in the right order and nothing crashed; what they got wrong is the
+     * order listeners are *notified* in, which came out reversed. Only
+     * `Broadcaster::BroadcastEvent(EFormationdStatus)` had it right.
+     *
+     * The binary additionally inlines `~TDatList` on the local sentinel, on both
+     * the early-return and the loop-exit path. `TDatList` carries no destructor
+     * in this tree, so nothing is emitted for it here; both copies are pure
+     * self-assignment on an already-empty node, so no behaviour rides on it.
+     */
+    template <class TListener, class TEvent>
+    void DispatchToListeners(const TEvent& event)
+    {
+      Broadcaster pending{};
+
+      if (empty()) {
+        return;
+      }
+
+      move_nodes_to(pending);
+
+      while (!pending.empty()) {
+        auto* const link = static_cast<Broadcaster*>(pending.pop_front());
+        push_back(link);
+
+        if (TListener* const listener = TListener::FromListenerLink(link); listener != nullptr) {
+          (void)listener->OnEvent(event);
+        }
+      }
+    }
+
+    /**
+     * Address: 0x005DB480 (FUN_005DB480,
+     * `Broadcaster<EAiAttackerEvent>::BroadcastEvent` — unnamed in the lost
+     * database, but instruction-for-instruction the same body as the four
+     * overloads below, reached as `attacker->mListeners` from
+     * `CAiAttackerImpl::SetState` (0x005D7320), `SetDesiredTarget` (0x005D75B0)
+     * and `ForceEngage` (0x005D8650))
+     *
+     * What it does:
+     * Broadcasts one attacker event to all linked listeners. The definition
+     * lives in CAiAttackerImpl.cpp beside the `Listener<EAiAttackerEvent>`
+     * overrides its dispatch resolves to.
+     */
+    void BroadcastEvent(EAiAttackerEvent event);
+
     /**
      * Address: 0x0056B070 (FUN_0056B070,
      * ?BroadcastEvent@?$Broadcaster@W4EFormationdStatus@Moho@@@Moho@@IAEXW4EFormationdStatus@2@@Z)

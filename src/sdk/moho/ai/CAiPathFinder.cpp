@@ -1514,30 +1514,7 @@ void CAiPathFinder::PushRectHistory(const gpg::Rect2i& rect)
  */
 void moho::Broadcaster::BroadcastEvent(const SNavPath& event)
 {
-  Broadcaster detached{};
-
-  if (mPrev == this) {
-    return;
-  }
-
-  detached.mPrev = mPrev;
-  detached.mNext = mNext;
-  detached.mNext->mPrev = &detached;
-  detached.mPrev->mNext = &detached;
-  mPrev = this;
-  mNext = this;
-
-  while (detached.mPrev != &detached) {
-    auto* const listenerLink = reinterpret_cast<Broadcaster*>(detached.mPrev);
-    listenerLink->ListLinkAfter(this);
-
-    if (CAiPathNavigator* const navigator = CAiPathNavigator::FromListenerLink(listenerLink)) {
-      (void)navigator->OnEvent(event);
-    }
-  }
-
-  detached.mNext->mPrev = detached.mPrev;
-  detached.mPrev->mNext = detached.mNext;
+  DispatchToListeners<CAiPathNavigator>(event);
 }
 
 void CAiPathFinder::UpdatePlayableRectGate()
