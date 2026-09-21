@@ -3467,7 +3467,7 @@ namespace msvc8
          *
          * Address: 0x00443300 (FUN_00443300)
          * Address: 0x00443420 (FUN_00443420)
-         * Address: 0x0057D820 (FUN_0057D820, msvc8::vector<SAiAttackVectorDebug>::push_back)
+         * Address: 0x0057D820 (FUN_0057D820, msvc8::vector<SPointVector>::push_back)
          * Address: 0x007C8F30 (FUN_007C8F30, msvc8::vector<Moho::LaunchPlayerOptionEntry>::push_back)
          * Address: 0x007E3850 (FUN_007E3850, msvc8::vector<Moho::MeshLOD*>::push_back — Mesh::CreateLOD lods.push_back)
          * Address: 0x0075F1A0 (FUN_0075F1A0, msvc8::vector<Moho::Sim::DumpUnitsCountEntry>::push_back
@@ -4916,7 +4916,7 @@ namespace msvc8
          * reached from `CDebugCanvas::AddWorldText`'s `worldText.push_back(text)`
          * (Sim.cpp).)
          * Address: 0x0057EDB0 (FUN_0057EDB0,
-         * msvc8::vector<moho::SAiAttackVectorDebug>::insert(iterator, const T&)
+         * msvc8::vector<moho::SPointVector>::insert(iterator, const T&)
          * for the 0x18-byte element -- recovers the insertion index via
          * `(pos - mFirst) / 24` *before* the insert, tail-calls the `_Insert_n`
          * body at 0x00580150 (already `skip`-classified as this template's
@@ -8345,14 +8345,14 @@ namespace msvc8
          * this same `WeakEntitySetUserEntity` specialization.)
          *
          * Address: 0x00583180 (FUN_00583180, `msvc8::vector<
-         * SAiAttackVectorDebug>::uninit_fill_n` for the 24-byte (6-float)
+         * SPointVector>::uninit_fill_n` for the 24-byte (6-float)
          * element -- broadcasts the single source struct into `count` slots,
          * counting down from the incoming count in `eax`. Reached from
          * `push_back`'s (`FUN_0057D820`, already recovered above)
          * capacity-full path, whose `insert(end(), 1, value)` fallback calls
          * this with `n=1`.)
          * Address: 0x0057EEF0 (FUN_0057EEF0, the advance-returning `_Ufill`
-         * adapter around FUN_00583180 for this same `SAiAttackVectorDebug`
+         * adapter around FUN_00583180 for this same `SPointVector`
          * specialization -- `int __userpurge sub_57EEF0(dest@ecx, gapPtr@edi,
          * count@esi, value) { uninit_fill_n(value, count, gapPtr); return
          * gapPtr + 24*count; }`, matching the `_Ufill` adapter shape already

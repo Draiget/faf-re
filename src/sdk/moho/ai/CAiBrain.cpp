@@ -492,60 +492,25 @@ namespace
     return (row.mOccupancyWords[wordIndex] & (1 << (column & 0x1F))) != 0;
   }
 
-  struct CSquadUnitsRuntimeView
-  {
-    std::uint8_t pad_0000_0010[0x10];
-    void** mUnitSlotsStart; // +0x10
-    void** mUnitSlotsEnd;   // +0x14
-  };
-  static_assert(
-    offsetof(CSquadUnitsRuntimeView, mUnitSlotsStart) == 0x10, "CSquadUnitsRuntimeView::mUnitSlotsStart offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CSquadUnitsRuntimeView, mUnitSlotsEnd) == 0x14, "CSquadUnitsRuntimeView::mUnitSlotsEnd offset must be 0x14"
-  );
-
-  struct CPlatoonLuaRuntimeView
-  {
-    std::uint8_t pad_0000_0020[0x20];
-    LuaPlus::LuaObject mLuaObj; // +0x20
-    std::uint8_t pad_0034_0040[0x0C];
-    CSquadUnitsRuntimeView** mSquadStart; // +0x40
-    CSquadUnitsRuntimeView** mSquadEnd;   // +0x44
-    std::uint8_t pad_0048_00AC[0x64];
-    msvc8::string mUniqueName; // +0xAC
-  };
-  static_assert(offsetof(CPlatoonLuaRuntimeView, mLuaObj) == 0x20, "CPlatoonLuaRuntimeView::mLuaObj offset must be 0x20");
-  static_assert(
-    offsetof(CPlatoonLuaRuntimeView, mSquadStart) == 0x40, "CPlatoonLuaRuntimeView::mSquadStart offset must be 0x40"
-  );
-  static_assert(offsetof(CPlatoonLuaRuntimeView, mSquadEnd) == 0x44, "CPlatoonLuaRuntimeView::mSquadEnd offset must be 0x44");
-  static_assert(
-    offsetof(CPlatoonLuaRuntimeView, mUniqueName) == 0xAC, "CPlatoonLuaRuntimeView::mUniqueName offset must be 0xAC"
-  );
-
-  [[nodiscard]] std::int32_t CountSquadUnits(const CSquadUnitsRuntimeView* const squad) noexcept
-  {
-    if (squad == nullptr || squad->mUnitSlotsStart == nullptr || squad->mUnitSlotsEnd == nullptr
-        || squad->mUnitSlotsEnd < squad->mUnitSlotsStart) {
-      return 0;
-    }
-
-    return static_cast<std::int32_t>(squad->mUnitSlotsEnd - squad->mUnitSlotsStart);
-  }
-
-  [[nodiscard]] std::int32_t CountPlatoonUnits(const CPlatoonLuaRuntimeView& platoon) noexcept
-  {
-    if (platoon.mSquadStart == nullptr || platoon.mSquadEnd == nullptr || platoon.mSquadEnd < platoon.mSquadStart) {
-      return 0;
-    }
-
-    std::int32_t unitCount = 0;
-    for (CSquadUnitsRuntimeView* const* squadIt = platoon.mSquadStart; squadIt != platoon.mSquadEnd; ++squadIt) {
-      unitCount += CountSquadUnits(*squadIt);
-    }
-    return unitCount;
-  }
+  // `CSquadUnitsRuntimeView` (0x10 pad bytes then `void** mUnitSlotsStart/End`
+  // at +0x10/+0x14) and `CPlatoonLuaRuntimeView` (`mLuaObj` at +0x20, a squad
+  // pointer pair at +0x40/+0x44, `mUniqueName` at +0xAC) used to stand here,
+  // together with a `CountSquadUnits`/`CountPlatoonUnits` pair that walked
+  // them. Every one of those offsets names a field `CSquad`/`CPlatoon` already
+  // has:
+  //
+  //   +0x10/+0x14  `CSquad::mUnits.mVec`'s `start_`/`end_` -- `mUnits` is a
+  //                `SEntitySetTemplateUnit` at +0x08 whose `gpg::fastvector_n<
+  //                Entity*, 4> mVec` sits at +0x08 inside it.
+  //   +0x20        `CScriptObject::mLuaObj`, inherited.
+  //   +0x40/+0x44  `CPlatoon::mSquadList`'s `start_`/`end_`
+  //                (`gpg::fastvector_n<CSquad*, 8>`).
+  //   +0xA8        `CPlatoon::mUniqueName` -- and the view said 0xAC, which was
+  //                wrong and is the reason it is gone. See
+  //                `cfunc_CAiBrainGetPlatoonsListL` below for the asm.
+  //
+  // The two counting helpers are `CPlatoon::CountAllSquadUnitSlots()`
+  // (0x00725840), the same loop with the same per-squad `end_ - start_`.
 
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
@@ -797,25 +762,15 @@ namespace
     return out;
   }
 
-  struct UnitBuilderSubsystemView
-  {
-    std::uint8_t mPad0000To0553[0x554];
-    void* mBuilderSubsystem; // +0x554
-  };
-
-  static_assert(
-    offsetof(UnitBuilderSubsystemView, mBuilderSubsystem) == 0x554,
-    "UnitBuilderSubsystemView::mBuilderSubsystem offset must be 0x554"
-  );
-
+  /**
+   * `mov eax, [ecx+0x554]` at 0x0057B0D5 is `Unit::AiBuilder`, the unit's
+   * builder sidecar -- the field is already declared at exactly that offset.
+   * A `UnitBuilderSubsystemView` of 0x554 pad bytes plus a `void*` used to
+   * stand in for it here.
+   */
   [[nodiscard]] bool UnitHasBuilderSubsystem(const Unit* const unit) noexcept
   {
-    if (unit == nullptr) {
-      return false;
-    }
-
-    const auto* const view = reinterpret_cast<const UnitBuilderSubsystemView*>(unit);
-    return view->mBuilderSubsystem != nullptr;
+    return unit != nullptr && unit->AiBuilder != nullptr;
   }
 
   /**
@@ -1148,88 +1103,44 @@ namespace
     return CreateCAiBrainLuaObject(state);
   }
 
-  [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinkNoReset(SBuildResourceInfoLink& link) noexcept
-  {
-    SBuildResourceInfoLink** cursor = link.mOwnerSlot;
-    if (!cursor) {
-      return nullptr;
-    }
-
-    while (*cursor != &link) {
-      if (!*cursor) {
-        return cursor;
-      }
-      cursor = &(*cursor)->mNext;
-    }
-
-    *cursor = link.mNext;
-    return cursor;
-  }
-
-  void UnlinkBuildResourceInfoLink(SBuildResourceInfoLink& link)
-  {
-    (void)UnlinkBuildResourceInfoLinkNoReset(link);
-    link.mOwnerSlot = nullptr;
-    link.mNext = nullptr;
-  }
-
   /**
    * Address: 0x0057CAF0 (FUN_0057CAF0, sub_57CAF0)
    *
    * What it does:
-   * Unlinks both intrusive lanes in one `SBuildResourceInfo` in binary order
-   * (resource lane first, placement lane second) without rewriting local
-   * link fields.
+   * Drops one reservation out of both owners' weak chains, command lane first
+   * and unit lane second, which is the order the binary uses.
+   *
+   * Each lane is `~WeakPtr<T>`'s own body: splice the node out of the chain its
+   * `ownerLinkSlot` names, and leave the node's two words alone because the
+   * storage is about to go. `UnlinkFromOwnerChain()` is that splice plus a
+   * clear of the node, which is what the callers here want -- the entry either
+   * dies with its map node or is a stack temporary the caller reuses.
+   *
+   * Four hand-written copies of `WeakPtr<T>`'s mechanics used to live here --
+   * `UnlinkBuildResourceInfoLinkNoReset`, `UnlinkBuildResourceInfoLink`,
+   * `UnlinkBuildResourceInfoLinksNoReset` and
+   * `RebindBuildResourceInfoLinkToOwnerSlot`/`RebindBuildResourceInfoLinks` --
+   * over an `SBuildResourceInfo` stand-in that every caller reinterpret_cast
+   * an `SBuildReserveInfo` into.
    */
-  [[nodiscard]] SBuildResourceInfoLink** UnlinkBuildResourceInfoLinksNoReset(
-    SBuildResourceInfo& info
-  ) noexcept
+  void UnlinkBuildReservation(SBuildReserveInfo& reservation) noexcept
   {
-    (void)UnlinkBuildResourceInfoLinkNoReset(info.mResourceLink);
-    return UnlinkBuildResourceInfoLinkNoReset(info.mPlacementLink);
-  }
-
-  void RebindBuildResourceInfoLinkToOwnerSlot(
-    SBuildResourceInfoLink& link,
-    SBuildResourceInfoLink** const newOwnerSlot
-  ) noexcept
-  {
-    if (link.mOwnerSlot == newOwnerSlot) {
-      return;
-    }
-
-    if (SBuildResourceInfoLink** cursor = link.mOwnerSlot; cursor != nullptr) {
-      while (*cursor != &link) {
-        cursor = &(*cursor)->mNext;
-      }
-      *cursor = link.mNext;
-    }
-
-    link.mOwnerSlot = newOwnerSlot;
-    if (newOwnerSlot != nullptr) {
-      link.mNext = *newOwnerSlot;
-      *newOwnerSlot = &link;
-      return;
-    }
-
-    link.mNext = nullptr;
+    reservation.mCom.UnlinkFromOwnerChain();
+    reservation.mUnit.UnlinkFromOwnerChain();
   }
 
   /**
    * Address: 0x0057CB30 (FUN_0057CB30)
    *
    * What it does:
-   * Rebinds both intrusive-link lanes in one `SBuildResourceInfo` to the
-   * owner-slot heads from another link-pair, preserving list-head insertion
-   * and unlink ordering for each lane.
+   * Moves one reservation's two weak lanes onto the owners `source` names,
+   * unlinking each from whatever chain it is in first -- `WeakPtr<T>::operator=`
+   * on each lane, i.e. `ResetFromOwnerLinkSlot(source-lane's slot)`.
    */
-  void RebindBuildResourceInfoLinks(
-    SBuildResourceInfo& destination,
-    const SBuildResourceInfo& source
-  ) noexcept
+  void RebindBuildReservation(SBuildReserveInfo& destination, const SBuildReserveInfo& source) noexcept
   {
-    RebindBuildResourceInfoLinkToOwnerSlot(destination.mPlacementLink, source.mPlacementLink.mOwnerSlot);
-    RebindBuildResourceInfoLinkToOwnerSlot(destination.mResourceLink, source.mResourceLink.mOwnerSlot);
+    destination.mUnit = source.mUnit;
+    destination.mCom = source.mCom;
   }
 
   /**
@@ -1246,7 +1157,7 @@ namespace
     const SBuildStructurePositionMap::iterator position
   ) noexcept
   {
-    (void)UnlinkBuildResourceInfoLinksNoReset(reinterpret_cast<SBuildResourceInfo&>(position->second));
+    UnlinkBuildReservation(position->second);
     return map.erase(position);
   }
 
@@ -1263,7 +1174,7 @@ namespace
   void DestroyBuildStructureMap(SBuildStructurePositionMap& map) noexcept
   {
     for (auto& entry : map) {
-      (void)UnlinkBuildResourceInfoLinksNoReset(reinterpret_cast<SBuildResourceInfo&>(entry.second));
+      UnlinkBuildReservation(entry.second);
     }
     map.erase(map.begin(), map.end());
   }
@@ -1482,11 +1393,8 @@ namespace
         // owners' chains, so the map entry takes them over by rebinding rather
         // than by copying the raw link fields - the same hand-off
         // `func_ScheduleBuildStructure` performs from its staging pair.
-        auto& entryLinks = reinterpret_cast<SBuildResourceInfo&>((*mapObject)[key]);
-        auto& readLinks = reinterpret_cast<SBuildResourceInfo&>(value);
-        RebindBuildResourceInfoLinks(entryLinks, readLinks);
-        UnlinkBuildResourceInfoLink(readLinks.mResourceLink);
-        UnlinkBuildResourceInfoLink(readLinks.mPlacementLink);
+        RebindBuildReservation((*mapObject)[key], value);
+        UnlinkBuildReservation(value);
       }
     }
 
@@ -2105,11 +2013,11 @@ namespace moho
     (void)matchingSquad->GetCenter(&squadCenter);
 
     // Iterate this brain's attack vectors (origin + direction).
-    for (const SAiAttackVectorDebug& attackVector : mAttackVectors) {
+    for (const SPointVector& attackVector : mAttackVectors) {
       const Wm3::Vector3f candidatePoint{
-        attackVector.mOrigin.x + attackVector.mDirection.x,
-        attackVector.mOrigin.y + attackVector.mDirection.y,
-        attackVector.mOrigin.z + attackVector.mDirection.z
+        attackVector.point.x + attackVector.vector.x,
+        attackVector.point.y + attackVector.vector.y,
+        attackVector.point.z + attackVector.vector.z
       };
 
       if (!matchingSquad->FitsAt(candidatePoint)) {
@@ -2141,7 +2049,7 @@ namespace moho
           }
           if (bestScore > score || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
-            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
+            bestVector = attackVector;
             bestScore = score;
           }
           break;
@@ -2159,7 +2067,7 @@ namespace moho
           }
           if (score > bestScore || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
-            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
+            bestVector = attackVector;
             bestScore = score;
           }
           break;
@@ -2189,7 +2097,7 @@ namespace moho
           }
           if (keep) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
-            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
+            bestVector = attackVector;
             bestScore = score;
           }
           break;
@@ -2203,7 +2111,7 @@ namespace moho
 
           if (score > bestScore || bestScore < 0.0f) {
             // `SPointVector::operator=` (0x0057C9F0, the compiler-generated copy).
-            bestVector = *reinterpret_cast<const SPointVector*>(&attackVector);
+            bestVector = attackVector;
             bestScore = score;
           }
           break;
@@ -2579,7 +2487,7 @@ bool CAiBrain::BuildUnit(const char* const blueprintId, CAiBrain* const brain, U
  * (`grid`, one `SAttackVectorGridRow` per row). A second pass walks every
  * cell whose bit is clear (no enemy presence) and, for each of its up-to-3x3
  * edge-clamped neighbor cells whose bit IS set, appends one
- * `SAiAttackVectorDebug` arrow that starts at the empty cell and points
+ * `SPointVector` arrow that starts at the empty cell and points
  * toward the enemy-occupied neighbor -- the visual "attack vector" frontier
  * between the enemy's grid presence and the surrounding empty cells.
  */
@@ -2654,13 +2562,13 @@ void CAiBrain::ProcessAttackVectors()
 
           const float neighborX = halfCell + static_cast<float>(kAiDebugGridStep * neighborCol);
 
-          SAiAttackVectorDebug debugVector{};
-          debugVector.mOrigin.x = emptyX;
-          debugVector.mOrigin.y = 0.0f;
-          debugVector.mOrigin.z = emptyZ;
-          debugVector.mDirection.x = neighborX - emptyX;
-          debugVector.mDirection.y = 0.0f;
-          debugVector.mDirection.z = neighborZ - emptyZ;
+          SPointVector debugVector{};
+          debugVector.point.x = emptyX;
+          debugVector.point.y = 0.0f;
+          debugVector.point.z = emptyZ;
+          debugVector.vector.x = neighborX - emptyX;
+          debugVector.vector.y = 0.0f;
+          debugVector.vector.z = neighborZ - emptyZ;
 
           mAttackVectors.push_back(debugVector);
         }
@@ -2730,20 +2638,20 @@ CAiBrain* CAiBrain::DrawDebug(CAiBrain* const brain)
   }
 
   const Wm3::Vector3f upAxis{0.0f, 1.0f, 0.0f};
-  for (const SAiAttackVectorDebug& attackVector : brain->mAttackVectors) {
+  for (const SPointVector& attackVector : brain->mAttackVectors) {
     debugCanvas->AddWireCircle(
       upAxis,
-      attackVector.mOrigin,
+      attackVector.point,
       kAiDebugAttackRingRadius,
       kAiDebugAttackRingDepth,
       kAiDebugAttackRingPrecision
     );
 
     SDebugLine line{};
-    line.p0 = attackVector.mOrigin;
-    line.p1.x = attackVector.mOrigin.x + attackVector.mDirection.x;
-    line.p1.y = attackVector.mOrigin.y + attackVector.mDirection.y;
-    line.p1.z = attackVector.mOrigin.z + attackVector.mDirection.z;
+    line.p0 = attackVector.point;
+    line.p1.x = attackVector.point.x + attackVector.vector.x;
+    line.p1.y = attackVector.point.y + attackVector.vector.y;
+    line.p1.z = attackVector.point.z + attackVector.vector.z;
     line.depth0 = kAiDebugAttackLineDepth;
     line.depth1 = kAiDebugAttackLineDepth;
     debugCanvas->DebugDrawLine(line);
@@ -4934,12 +4842,8 @@ int moho::cfunc_CAiBrainGetAttackVectorsL(LuaPlus::LuaState* const state)
   outVectors.AssignNewTable(state, static_cast<std::int32_t>(brain->mAttackVectors.size()), 0u);
 
   std::int32_t luaIndex = 1;
-  for (const SAiAttackVectorDebug& attackVector : brain->mAttackVectors) {
-    SPointVector pointVector{};
-    pointVector.point = attackVector.mOrigin;
-    pointVector.vector = attackVector.mDirection;
-
-    const LuaPlus::LuaObject vectorObject = SCR_ToLua<SPointVector>(state, pointVector);
+  for (const SPointVector& attackVector : brain->mAttackVectors) {
+    const LuaPlus::LuaObject vectorObject = SCR_ToLua<SPointVector>(state, attackVector);
     outVectors.Insert(luaIndex, vectorObject);
     ++luaIndex;
   }
@@ -5949,18 +5853,14 @@ void moho::func_ScheduleBuildStructure(
   const Wm3::Vector2i where
 )
 {
-  SBuildResourceInfo pendingReservation{};
-  reinterpret_cast<WeakPtr<Unit>&>(pendingReservation.mPlacementLink).Set(builder);
-  reinterpret_cast<WeakPtr<CUnitCommand>&>(pendingReservation.mResourceLink).Set(command);
+  SBuildReserveInfo pendingReservation{};
+  pendingReservation.mUnit.Set(builder);
+  pendingReservation.mCom.Set(command);
 
-  SBuildReserveInfo& reserveEntry = brain->mBuildStructureMap[where];
-  auto& reserveEntryLinks = reinterpret_cast<SBuildResourceInfo&>(reserveEntry);
-
-  RebindBuildResourceInfoLinks(reserveEntryLinks, pendingReservation);
+  RebindBuildReservation(brain->mBuildStructureMap[where], pendingReservation);
 
   // Binary cleanup order: command lane first, then unit lane.
-  UnlinkBuildResourceInfoLink(pendingReservation.mResourceLink);
-  UnlinkBuildResourceInfoLink(pendingReservation.mPlacementLink);
+  UnlinkBuildReservation(pendingReservation);
 }
 
 /**
@@ -7591,13 +7491,12 @@ int moho::cfunc_CAiBrainGetPlatoonsListL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    const auto& platoonView = *reinterpret_cast<const CPlatoonLuaRuntimeView*>(platoon);
-    if (platoonView.mUniqueName.equals_no_case("ArmyPool")) {
+    if (platoon->mUniqueName.equals_no_case("ArmyPool")) {
       continue;
     }
 
-    if (CountPlatoonUnits(platoonView) > 0) {
-      outPlatoons.Insert(platoonLuaIndex, platoonView.mLuaObj);
+    if (platoon->CountAllSquadUnitSlots() > 0) {
+      outPlatoons.Insert(platoonLuaIndex, platoon->mLuaObj);
       ++platoonLuaIndex;
     }
   }
@@ -7773,8 +7672,7 @@ int moho::cfunc_CAiBrainGetPlatoonUniquelyNamedL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject platoonNameObject(LuaPlus::LuaStackObject(state, 2));
   if (platoonNameObject.IsString() && brain != nullptr && brain->mArmy != nullptr) {
     if (const CPlatoon* const platoon = brain->mArmy->GetPlatoonByName(platoonNameObject.GetString()); platoon != nullptr) {
-      const auto& platoonView = *reinterpret_cast<const CPlatoonLuaRuntimeView*>(platoon);
-      platoonView.mLuaObj.PushStack(state);
+      platoon->mLuaObj.PushStack(state);
       return 1;
     }
   }
