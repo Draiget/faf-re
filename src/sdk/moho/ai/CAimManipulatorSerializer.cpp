@@ -49,12 +49,23 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD2290 (FUN_00BD2290, dynamic initializer for the global
-   * `CAimManipulatorSerializer` singleton)
+   * Address: 0x00630060 (FUN_00630060,
+   * ??0CAimManipulatorSerializer@Moho@@QAE@XZ)
+   *
+   * IDA signature:
+   * Moho::CAimManipulatorSerializer *__thiscall
+   * Moho::CAimManipulatorSerializer::CAimManipulatorSerializer(void);
    *
    * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
-   * into `sNewHelpers`) and binds the load/save callback fields.
+   * Default-constructs the `gpg::SerHelperBase` base (0x009501D0 -- self-links
+   * and splices into `sNewHelpers`), binds the load/save callback fields to
+   * `Deserialize` (0x00630030) and `Serialize` (0x00630040), stamps the
+   * vtable at 0x00E21420, and returns `this`.
+   *
+   * The dynamic initializer that runs it for the singleton is a separate body
+   * at 0x00BD2290: it inlines this constructor over the object at 0x010B2148
+   * and additionally pushes the destructor at 0x00BFA960 for `atexit`, which
+   * is the part no source line here expresses.
    */
   CAimManipulatorSerializer::CAimManipulatorSerializer()
     : mDeserialize(&CAimManipulatorSerializer::Deserialize)
@@ -67,6 +78,14 @@ namespace moho
    * What it does:
    * Unlinks this helper node from whatever intrusive list it currently sits
    * in and restores a self-linked sentinel state.
+   *
+   * 0x00BFA960 is the copy the dynamic initializer registers with `atexit`
+   * (pushed at 0x00BD229A). Two byte-identical siblings survive in this
+   * translation unit's run at 0x00630090 and 0x006300C0 with no reference of
+   * any kind; all three hard-code the singleton at 0x010B214C rather than
+   * taking `this`, so they are the static-destructor emission rather than the
+   * class destructor proper. The two extras are recorded as ICF twins of this
+   * one.
    */
   CAimManipulatorSerializer::~CAimManipulatorSerializer()
   {

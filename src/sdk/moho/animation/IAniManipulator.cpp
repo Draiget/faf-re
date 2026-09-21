@@ -668,14 +668,25 @@ namespace
   }
 
   /**
-   * Address: 0x00632C20 (FUN_00632C20)
+   * Address: 0x0062FC10 (FUN_0062FC10)
    *
    * What it does:
-   * Resolves and caches the reflected runtime type for `IAniManipulator`.
+   * Resolves and caches the reflected runtime type for `IAniManipulator`,
+   * reading the cache at 0x010C738C and passing the type descriptor at
+   * 0x00F71B60 to `gpg::LookupRType` (0x008E0750).
    *
-   * Serves both per-TypeInfo emissions of this registration:
-   * 0x00635310 (CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator) and
-   * 0x0063A150 (CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator).
+   * This file's emission, not `CAimManipulator.cpp`'s: 0x0062FC10 sits
+   * immediately before `IAniManipulator::GetClass` (0x0062FC30) and
+   * `GetDerivedObjectRef` (0x0062FC50) in this class's own COMDAT run, and
+   * locality is unanimous for this file. `CAimManipulator.cpp` carries the
+   * other copy at 0x00632C20 -- which this block used to claim -- and
+   * `GetClass` at 0x0062FC30 is a third copy of the same body, reached
+   * through the vtable rather than by name.
+   *
+   * None of the three has a caller. The reflection paths that need the type
+   * inlined it, including the two per-TypeInfo registrations at 0x00635310
+   * (`CBoneEntityManipulatorTypeInfo::AddBase_IAniManipulator`) and
+   * 0x0063A150 (`CFootPlantManipulatorTypeInfo::AddBase_IAniManipulator`).
    */
   gpg::RType* CachedIAniManipulatorType()
   {

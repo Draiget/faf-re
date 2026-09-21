@@ -101,6 +101,26 @@ namespace
     "Using non-existant muzzle bone in aim manipulator for unit %s";
 
 
+  // ---------------------------------------------------------------------
+  // The helpers below carry no `Address:` block on purpose: the binary has no
+  // out-of-line body for them, because every call site inlined them. The two
+  // big bodies in this file are where they went -- `Aim` is 1896 bytes / 468
+  // instructions at 0x006317B0 and `ManipulatorUpdate` 989 / 284 at
+  // 0x00630DB0. Enumerating every function the binary places in this
+  // translation unit's address run (0x0062FC00..0x00634400, 124 of them)
+  // accounts for all of them without a candidate for any helper here, so
+  // their absence is a fact about the binary rather than a missing
+  // annotation.
+  //
+  // `CachedCAimManipulatorType` is the exception that proves it: it *is* a
+  // real body, emitted twice, but both copies already carry their address on
+  // the methods that are nothing but this body --
+  // `CAimManipulator::StaticGetClass` (0x0062FDF0) and
+  // `CAimManipulator::GetClass` (0x0062FE10), each 28 bytes / 8 instructions
+  // reading the cache at 0x010C7390 and passing the type descriptor at
+  // 0x00F71B3C to `gpg::LookupRType` (0x008E0750).
+  // ---------------------------------------------------------------------
+
   [[nodiscard]] gpg::RType* CachedCAimManipulatorType()
   {
     gpg::RType* type = moho::CAimManipulator::sType;
@@ -111,6 +131,22 @@ namespace
     return type;
   }
 
+  /**
+   * Address: 0x00632C20 (FUN_00632C20)
+   *
+   * What it does:
+   * Resolves and caches the reflected runtime type for `IAniManipulator`,
+   * reading the cache at 0x010C738C and passing the type descriptor at
+   * 0x00F71B60 to `gpg::LookupRType` (0x008E0750).
+   *
+   * One emission per translation unit that needs it. This is this file's
+   * copy: 0x00632C20 sits inside `CAimManipulator`'s own COMDAT run, between
+   * `Moho::runtime` glue at 0x00632C10 and this class's Lua metatable factory
+   * `Create` at 0x00632C40. `IAniManipulator.cpp` has its own at 0x0062FC10,
+   * and the virtual `IAniManipulator::GetClass` at 0x0062FC30 is a third copy
+   * of the same body reached through the vtable. No caller calls any of them
+   * -- the reflection paths that need the type inlined it.
+   */
   [[nodiscard]] gpg::RType* CachedIAniManipulatorType()
   {
     gpg::RType* type = moho::IAniManipulator::sType;
