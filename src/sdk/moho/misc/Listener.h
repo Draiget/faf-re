@@ -36,6 +36,30 @@ namespace moho
 
     virtual void OnEvent(TEvent event) = 0;
 
+    /**
+     * The intrusive link -> owner downcast for this ring: a node in a
+     * broadcaster's list is some listener's `mListenerLink`, so the listener is
+     * `node - 0x04`. Every walk of such a ring in the binary spells it as a bare
+     * `sub reg, 4` on the node it just stepped to -- `BroadcastAiAttackerEvent`
+     * (0x005DB480) and `RBroadcasterRType_EFormationdStatus::SerLoad`
+     * (0x0056DCA0) among them -- and both used to carry their own copy of this
+     * three-line helper, one per event type, differing only in the `offsetof`
+     * they named.
+     *
+     * The mirror of `ManyToOneBroadcaster<TEvent>::GetListener()`
+     * (moho/misc/ManyToOneBroadcaster.h), which does the same decode for the
+     * one-listener case over a weak-link slot instead of a ring node.
+     */
+    [[nodiscard]] static Listener<TEvent>* FromListenerLink(Broadcaster* const node) noexcept
+    {
+      if (node == nullptr) {
+        return nullptr;
+      }
+
+      auto* const bytes = reinterpret_cast<std::uint8_t*>(node);
+      return reinterpret_cast<Listener<TEvent>*>(bytes - offsetof(Listener<TEvent>, mListenerLink));
+    }
+
   public:
     /**
      * The listener's own intrusive node, and the one every
