@@ -1552,7 +1552,7 @@ namespace moho
     // 0x0A6D..0x0A6F: padding (int32 alignment)
     // Sync packing reservation counters captured from the previous frame.
     // Used by helper calls from Sim::Sync (0x00560A00 / 0x00560940).
-    int32_t mSyncReserveCounts[5]; // 0x0A70..0x0A83 (elements at +0x0A70,+0x0A74,+0x0A78,+0x0A7C,+0x0A80)
+    SSyncSizes mSyncSizes; // 0x0A70: the last packet's lane sizes, reserved on the next one
     int32_t mSyncReserveUnused;    // 0x0A84 (observed initialized, not yet referenced)
     SSyncFilter mSyncFilter;       // 0x0A88..0x0AF7
   };
@@ -7279,7 +7279,7 @@ namespace moho
   );
   static_assert(offsetof(Sim, mSyncArmy) == 0x0A68, "Sim::mSyncArmy offset must be 0x0A68");
   static_assert(offsetof(Sim, mDidSync) == 0x0A6C, "Sim::mDidSync offset must be 0x0A6C");
-  static_assert(offsetof(Sim, mSyncReserveCounts) == 0x0A70, "Sim::mSyncReserveCounts offset must be 0x0A70");
+  static_assert(offsetof(Sim, mSyncSizes) == 0x0A70, "Sim::mSyncSizes offset must be 0x0A70");
   static_assert(offsetof(Sim, mSyncReserveUnused) == 0x0A84, "Sim::mSyncReserveUnused offset must be 0x0A84");
   static_assert(offsetof(Sim, mSyncFilter) == 0x0A88, "Sim::mSyncFilter offset must be 0x0A88");
   static_assert(offsetof(Sim, mFormationDB) == 0x0980, "Sim::mFormationDB offset must be 0x0980");
