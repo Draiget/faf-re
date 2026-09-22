@@ -30,6 +30,26 @@ namespace moho
   {
     static gpg::RType* sType;
 
+    /**
+     * Address: 0x0065DD90 (FUN_0065DD90)
+     *
+     * IDA signature:
+     * Moho::SEfxCurve *__usercall SEfxCurve@<eax>(Moho::SEfxCurve *this@<eax>);
+     *
+     * What it does:
+     * Arms `mKeys` on its own two-slot inline window and leaves the two bounds
+     * lanes alone -- `lea ecx,[this+0x20]; lea edx,[ecx+0x18]` then
+     * `start_ = end_ = originalVec_ = ecx`, `capacity_ = edx`, which is the
+     * defaulted default constructor of a struct whose only non-trivial member
+     * is the vector at `+0x10`. Nothing writes `+0x00..+0x0F`, so a
+     * default-constructed curve's bounds are indeterminate until
+     * `BuildEmitterCurveFromBlueprint` or `RecomputeEmitterCurveYBounds` sets
+     * them; `CEfxEmitter`'s blueprint constructor copies exactly such a curve
+     * into all 21 emitter lanes.
+     *
+     * Zero callers and no xrefs: every use site inlined it and the linker kept
+     * the COMDAT. See the matching note on `gpg::core::FastVectorN<T, N>()`.
+     */
     SEfxCurve() = default;
     SEfxCurve(const SEfxCurve& other);
     SEfxCurve& operator=(const SEfxCurve& other);

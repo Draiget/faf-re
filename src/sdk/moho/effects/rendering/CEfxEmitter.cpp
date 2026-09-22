@@ -70,49 +70,14 @@ namespace
     return static_cast<int>(rounded) - (value < rounded ? 1 : 0);
   }
 
-  struct EmbeddedDwordVectorHeaderOffset10RuntimeView
-  {
-    std::byte pad00_0F[0x10];
-    std::uint32_t* begin = nullptr; // +0x10
-    std::uint32_t* end = nullptr; // +0x14
-    std::uint32_t* capacityEnd = nullptr; // +0x18
-    std::uint32_t* metadata = nullptr; // +0x1C
-  };
-  static_assert(
-    offsetof(EmbeddedDwordVectorHeaderOffset10RuntimeView, begin) == 0x10,
-    "EmbeddedDwordVectorHeaderOffset10RuntimeView::begin offset must be 0x10"
-  );
-  static_assert(
-    offsetof(EmbeddedDwordVectorHeaderOffset10RuntimeView, end) == 0x14,
-    "EmbeddedDwordVectorHeaderOffset10RuntimeView::end offset must be 0x14"
-  );
-  static_assert(
-    offsetof(EmbeddedDwordVectorHeaderOffset10RuntimeView, capacityEnd) == 0x18,
-    "EmbeddedDwordVectorHeaderOffset10RuntimeView::capacityEnd offset must be 0x18"
-  );
-  static_assert(
-    offsetof(EmbeddedDwordVectorHeaderOffset10RuntimeView, metadata) == 0x1C,
-    "EmbeddedDwordVectorHeaderOffset10RuntimeView::metadata offset must be 0x1C"
-  );
-
-  /**
-   * Address: 0x0065DD90 (FUN_0065DD90)
-   *
-   * What it does:
-   * Initializes one embedded dword-vector header at offset `+0x10` with inline
-   * storage at `+0x20` and 6-word capacity.
-   */
-  [[maybe_unused]] EmbeddedDwordVectorHeaderOffset10RuntimeView* InitializeEmbeddedDwordVectorHeaderOffset10Capacity6(
-    EmbeddedDwordVectorHeaderOffset10RuntimeView* const outView
-  ) noexcept
-  {
-    auto* const inlineStorage = reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::byte*>(outView) + 0x20u);
-    outView->begin = inlineStorage;
-    outView->end = inlineStorage;
-    outView->capacityEnd = inlineStorage + 6u;
-    outView->metadata = inlineStorage;
-    return outView;
-  }
+  // 0x0065DD90 is `moho::SEfxCurve::SEfxCurve()` -- the `{start_, end_,
+  // capacity_, originalVec_}` head it writes at `+0x10` is `mKeys`, a
+  // `gpg::fastvector_n<Wm3::Vector3f, 2>`, and the 0x18 it adds for the
+  // capacity is two 12-byte keys, not six dwords. It is cited on the container
+  // (gpg/core/containers/FastVector.h) and on the curve (SEfxCurve.h); the
+  // `EmbeddedDwordVectorHeaderOffset10RuntimeView` that used to stand in for
+  // `SEfxCurve` here, and the `[[maybe_unused]]` initializer written over it,
+  // are gone.
 
   void RecomputeCurveYBoundsFromKeys(moho::SEfxCurve* const curve) noexcept
   {
@@ -213,24 +178,22 @@ namespace moho
    *
    *   - publishes the `CEfxEmitter` vftable (handled by the C++ ctor chain);
    *   - zeros `mEmitterType` and the `mPad194` reserved gap;
-   *   - binds `mCurves` as an empty inline-buffer fastvector over the 21-slot
-   *     `mInlineCurveStorage` lane (mFirst/mLast/mOriginalStorage point at
-   *     buffer start, mEnd at `&mBlueprint` = inline-buffer capacity-end);
+   *   - arms `mCurves` empty on its own inline window;
    *   - resets blueprint pointer, emission count, lifetime;
    *   - default-constructs the embedded `mParticle` (`SWorldParticle`);
    *   - zero-initializes mValid + curve mask + max-lifetime + visible + last-
    *     update + position.
    *
-   * The inline-buffer base address is `&mInlineCurveStorage[0]` which the
-   * binary computes as `this + 0x1A8`; the capacity-end is `&mBlueprint`
-   * (= `this + 0x640` = inline-buffer-start + 21*sizeof(SEfxCurve)).
+   * The four curve-vector stores at 0x0065B9F0 are the inlined
+   * `fastvector_n<SEfxCurve, 21>` constructor, not source: `lea eax,[esi+0x1A8]`
+   * is the inline window and `lea ecx,[eax+0x498]` its capacity-end, 21 slots
+   * of 0x38 later -- which is also `&mBlueprint`, the next member.
    */
   CEfxEmitter::CEfxEmitter()
     : CEffectImpl()
     , mEmitterType(static_cast<EmitterType>(0))
     , mPad194{}
     , mCurves{}
-    , mInlineCurveStorage{}
     , mBlueprint(nullptr)
     , mTotalEmissions(0.0f)
     , mLife(0u)
@@ -244,11 +207,6 @@ namespace moho
     , mLastUpdate(0u)
     , mPos{0.0f, 0.0f, 0.0f}
   {
-    auto* const inlineCurveBase = reinterpret_cast<SEfxCurve*>(&mInlineCurveStorage[0]);
-    mCurves.mFirst = inlineCurveBase;
-    mCurves.mLast = inlineCurveBase;
-    mCurves.mEnd = reinterpret_cast<SEfxCurve*>(&mBlueprint);
-    mCurves.mOriginalStorage = inlineCurveBase;
   }
 
   /**
@@ -261,8 +219,8 @@ namespace moho
    *
    * What it does:
    * Blueprint-driven emitter constructor. Chains the manager-bound `CEffectImpl`
-   * base ctor, binds `mCurves` to its inline buffer and fills its 21 default
-   * curves, sizes the param/texture/string lanes, seeds the emit position plus
+   * base ctor, fills `mCurves` with 21 default curves, sizes the
+   * param/texture/string lanes, seeds the emit position plus
    * three fixed defaults, and (when a blueprint is present) rebuilds the 21
    * emitter curves and publishes the 20 blueprint scalar params + two texture
    * names. Ends by interpolating the initial attachment transform. The binary's
@@ -279,7 +237,6 @@ namespace moho
     , mEmitterType(static_cast<EmitterType>(0))
     , mPad194{}
     , mCurves{}
-    , mInlineCurveStorage{}
     , mBlueprint(nullptr)
     , mTotalEmissions(0.0f)
     , mLife(0u)
@@ -293,18 +250,17 @@ namespace moho
     , mLastUpdate(0u)
     , mPos{0.0f, 0.0f, 0.0f}
   {
-    // Bind mCurves to the 21-slot inline buffer (mEnd = &mBlueprint sentinel).
-    auto* const inlineCurveBase = reinterpret_cast<SEfxCurve*>(&mInlineCurveStorage[0]);
-    mCurves.mFirst = inlineCurveBase;
-    mCurves.mEnd = reinterpret_cast<SEfxCurve*>(&mBlueprint);
-    mCurves.mOriginalStorage = inlineCurveBase;
-
-    // Fill the inline buffer with 21 default curves (binary: fastvector<SEfxCurve>
-    // resize(21, defaultCurve); capacity is exactly 21 so no heap growth occurs).
-    for (std::size_t i = 0; i < kInlineCurveCapacity; ++i) {
-      new (&inlineCurveBase[i]) SEfxCurve();
-    }
-    mCurves.mLast = inlineCurveBase + kInlineCurveCapacity;
+    // 21 default curves, one per EEmitterCurve lane. 0x0065BB41 passes the
+    // vector in EDX, 21 in ECX and a stack-built `SEfxCurve` as the fill value,
+    // then destroys that temporary at 0x0065BB4B: this is `resize(n, value)`,
+    // not a placement-new loop. The temporary is default-initialized, not
+    // value-initialized -- the binary writes only its `mKeys` head at
+    // [esp+0x20..0x2C] and leaves the two bounds lanes at [esp+0x10..0x1F]
+    // untouched, so all 21 curves start with indeterminate bounds and get them
+    // from the blueprint below. Capacity is exactly 21, so the fill never
+    // leaves the inline window.
+    const SEfxCurve defaultCurve;
+    mCurves.resize(kEmitterCurveCount, defaultCurve);
 
     // Size the effect runtime lanes.
     mParams.resize(EFFECT_LASTPARAM, 0.0f);   // 26 param floats
@@ -322,7 +278,7 @@ namespace moho
 
     mBlueprint = const_cast<REmitterBlueprint*>(blueprint);
     if (blueprint != nullptr) {
-      SEfxCurve* const curves = mCurves.begin();
+      CEfxEmitterCurveArray& curves = mCurves;
       BuildEmitterCurveFromBlueprint(curves[EMITTER_XDIR_CURVE], blueprint->XDirectionCurve);
       BuildEmitterCurveFromBlueprint(curves[EMITTER_YDIR_CURVE], blueprint->YDirectionCurve);
       BuildEmitterCurveFromBlueprint(curves[EMITTER_ZDIR_CURVE], blueprint->ZDirectionCurve);
@@ -379,29 +335,24 @@ namespace moho
    * Address: 0x0065DE10 (FUN_0065DE10, Moho::CEfxEmitter::~CEfxEmitter body)
    *
    * What it does:
-   * Tears down one emitter: destroys any live `SEfxCurve` entries in the
-   * `mCurves` range, then releases the heap-grown curve storage when the
-   * vector escaped its inline buffer (the binary compares
-   * `mCurves.mFirst != mCurves.mOriginalStorage`). Member dtor for
-   * `mParticle` runs automatically via the C++ destructor chain, as does
-   * the `CEffectImpl` base dtor.
+   * Nothing of its own. The body is the member and base teardown MSVC emits,
+   * in reverse declaration order and exactly as declared:
    *
-   * Note: the binary additionally re-reads `*mOriginalStorage` into
-   * `mCurves.mEnd` after the delete. This is meaningless after the dtor
-   * since the object is being destroyed; we elide it.
+   *   0x0065DE2B  `~SWorldParticle` on `mParticle` (`this + 0x64C`)
+   *   0x0065DE3F  `~fastvector_n<SEfxCurve, 21>` on `mCurves` (`this + 0x198`):
+   *               `_Destroy_range` over the live range (0x0065F750), then
+   *               `ResetInline_` -- free only when `start_ != originalVec_`,
+   *               restore `capacity_` from the sentinel the grow path saved in
+   *               the window's first word, `end_ = start_`
+   *   0x0065DE90  `~CEffectImpl`
+   *
+   * There is no source line here (CLAUDE.md RULE ONE: member destructors and
+   * base-class chaining are compiler output). This used to be transcribed as a
+   * hand-written destroy loop plus `::operator delete[]` over the
+   * `CEfxCurveVectorRuntime` pointer head, with a note apologising for
+   * "eliding" the capacity restore -- which is simply what `ResetInline_` does.
    */
-  CEfxEmitter::~CEfxEmitter()
-  {
-    for (SEfxCurve* curve = mCurves.mFirst; curve != mCurves.mLast; ++curve) {
-      curve->~SEfxCurve();
-    }
-
-    if (mCurves.mFirst != mCurves.mOriginalStorage) {
-      ::operator delete[](mCurves.mFirst);
-      mCurves.mFirst = mCurves.mOriginalStorage;
-    }
-    mCurves.mLast = mCurves.mFirst;
-  }
+  CEfxEmitter::~CEfxEmitter() = default;
 
   /**
    * Address: 0x006593E0 (FUN_006593E0, Moho::CEfxEmitter::InterpolatePosition)
@@ -570,9 +521,8 @@ namespace moho
   {
     mZCurveMask = 0u;
 
-    SEfxCurve* const curves = mCurves.begin();
-    for (std::uint32_t bitIndex = 0u; bitIndex < 21u; ++bitIndex) {
-      SEfxCurve& curve = curves[bitIndex];
+    for (std::uint32_t bitIndex = 0u; bitIndex < kEmitterCurveCount; ++bitIndex) {
+      const SEfxCurve& curve = mCurves[bitIndex];
       if ((curve.mKeys.end() - curve.mKeys.begin()) != 1) {
         continue;
       }
@@ -599,7 +549,7 @@ namespace moho
   void CEfxEmitter::SetCurveParam(const std::int32_t paramIndex, const void* const curveData)
   {
     const auto* const sourceCurve = static_cast<const SEfxCurve*>(curveData);
-    SEfxCurve& destinationCurve = mCurves.begin()[static_cast<std::size_t>(paramIndex)];
+    SEfxCurve& destinationCurve = mCurves[static_cast<std::size_t>(paramIndex)];
     destinationCurve.mBoundsMin = sourceCurve->mBoundsMin;
     destinationCurve.mBoundsMax = sourceCurve->mBoundsMax;
 
@@ -858,7 +808,7 @@ namespace moho
   {
     UpdateCurveMask();
 
-    SEfxCurve* const curves = mCurves.begin();
+    CEfxEmitterCurveArray& curves = mCurves;
     const float* const params = mParams.start_;
     const float scale = params[EFFECT_SCALE];
 
@@ -990,7 +940,7 @@ namespace moho
       ratePhase += repeatTime;
     }
 
-    mTotalEmissions = mCurves.begin()[EMITTER_EMITRATE_CURVE].GetValue(ratePhase) + mTotalEmissions;
+    mTotalEmissions = mCurves[EMITTER_EMITRATE_CURVE].GetValue(ratePhase) + mTotalEmissions;
     // Whole emission count = floor(mTotalEmissions); the same whole part is then
     // consumed from the accumulator (the binary computes floor twice on the
     // identical value).
@@ -1026,9 +976,9 @@ namespace moho
       if ((mZCurveMask & 0x3800u) == 0x3800u) {
         localOffset = mParticle.mPos;
       } else {
-        localOffset.x = mCurves.begin()[EMITTER_X_POSITION_CURVE].GetValue(curvePhase) * scale;
-        localOffset.y = mCurves.begin()[EMITTER_Y_POSITION_CURVE].GetValue(curvePhase) * scale;
-        localOffset.z = mCurves.begin()[EMITTER_Z_POSITION_CURVE].GetValue(curvePhase) * scale;
+        localOffset.x = mCurves[EMITTER_X_POSITION_CURVE].GetValue(curvePhase) * scale;
+        localOffset.y = mCurves[EMITTER_Y_POSITION_CURVE].GetValue(curvePhase) * scale;
+        localOffset.z = mCurves[EMITTER_Z_POSITION_CURVE].GetValue(curvePhase) * scale;
       }
 
       if (params[EFFECT_INTERPOLATE_EMISSION] > 0.0f) {
@@ -1077,7 +1027,7 @@ namespace moho
       }
 
       if (!skipEmission) {
-        const float sizeSample = mCurves.begin()[EMITTER_SIZE_CURVE].GetValue(curvePhase) * scale;
+        const float sizeSample = mCurves[EMITTER_SIZE_CURVE].GetValue(curvePhase) * scale;
 
         const float rand0 = static_cast<float>(MathGlobalRandomUnitSafe());
         const float rand1 = static_cast<float>(MathGlobalRandomUnitSafe());
@@ -1094,9 +1044,9 @@ namespace moho
         particle.mPos.z = (scatter.z * scatterMag) + worldZ;
 
         if ((mZCurveMask & 0x1C0u) != 0x1C0u) {
-          particle.mAccel.x = mCurves.begin()[EMITTER_X_ACCEL_CURVE].GetValue(curvePhase) * scale;
-          particle.mAccel.y = mCurves.begin()[EMITTER_Y_ACCEL_CURVE].GetValue(curvePhase) * scale;
-          particle.mAccel.z = mCurves.begin()[EMITTER_Z_ACCEL_CURVE].GetValue(curvePhase) * scale;
+          particle.mAccel.x = mCurves[EMITTER_X_ACCEL_CURVE].GetValue(curvePhase) * scale;
+          particle.mAccel.y = mCurves[EMITTER_Y_ACCEL_CURVE].GetValue(curvePhase) * scale;
+          particle.mAccel.z = mCurves[EMITTER_Z_ACCEL_CURVE].GetValue(curvePhase) * scale;
         }
 
         float accelY = particle.mAccel.y;
@@ -1113,9 +1063,9 @@ namespace moho
         particle.mAccel.y = accelY - (mParams.start_[EFFECT_USE_GRAVITY] * 0.02f);
 
         if ((mZCurveMask & 0x7u) != 0x7u) {
-          particle.mDir.x = mCurves.begin()[EMITTER_XDIR_CURVE].GetValue(curvePhase) * scale;
-          particle.mDir.y = mCurves.begin()[EMITTER_YDIR_CURVE].GetValue(curvePhase) * scale;
-          particle.mDir.z = mCurves.begin()[EMITTER_ZDIR_CURVE].GetValue(curvePhase) * scale;
+          particle.mDir.x = mCurves[EMITTER_XDIR_CURVE].GetValue(curvePhase) * scale;
+          particle.mDir.y = mCurves[EMITTER_YDIR_CURVE].GetValue(curvePhase) * scale;
+          particle.mDir.z = mCurves[EMITTER_ZDIR_CURVE].GetValue(curvePhase) * scale;
         }
         if (mParams.start_[EFFECT_USE_LOCAL_VELOCITY] > 0.0f) {
           const float dirY = ((particle.mDir.y * attachMatrix.r[1].y)
@@ -1127,37 +1077,37 @@ namespace moho
           particle.mDir.y = dirY;
           particle.mDir.z = dirZ;
         }
-        const float velocity = mCurves.begin()[EMITTER_VELOCITY_CURVE].GetValue(curvePhase);
+        const float velocity = mCurves[EMITTER_VELOCITY_CURVE].GetValue(curvePhase);
         particle.mDir.x *= velocity;
         particle.mDir.y *= velocity;
         particle.mDir.z *= velocity;
 
-        particle.mResistance = mCurves.begin()[EMITTER_RESISTANCE_CURVE].GetValue(curvePhase);
+        particle.mResistance = mCurves[EMITTER_RESISTANCE_CURVE].GetValue(curvePhase);
         particle.mInterop = emissionCursor - tickFloat;
 
         if ((mZCurveMask & 0x10u) == 0u) {
-          const float lifetime = mCurves.begin()[EMITTER_LIFETIME_CURVE].GetValue(curvePhase);
+          const float lifetime = mCurves[EMITTER_LIFETIME_CURVE].GetValue(curvePhase);
           particle.mLifetime = (lifetime > 0.0f) ? lifetime : 0.0f;
         }
         if ((mZCurveMask & 0x4000u) == 0u) {
-          particle.mBeginSize = mCurves.begin()[EMITTER_BEGINSIZE_CURVE].GetValue(curvePhase) * scale;
+          particle.mBeginSize = mCurves[EMITTER_BEGINSIZE_CURVE].GetValue(curvePhase) * scale;
         }
         if ((mZCurveMask & 0x8000u) == 0u) {
-          particle.mEndSize = mCurves.begin()[EMITTER_ENDSIZE_CURVE].GetValue(curvePhase) * scale;
+          particle.mEndSize = mCurves[EMITTER_ENDSIZE_CURVE].GetValue(curvePhase) * scale;
         }
         if ((mZCurveMask & 0x100000u) == 0u) {
-          particle.mRampSelection = mCurves.begin()[EMITTER_RAMPSELECTION_CURVE].GetValue(curvePhase);
+          particle.mRampSelection = mCurves[EMITTER_RAMPSELECTION_CURVE].GetValue(curvePhase);
         }
         if ((mZCurveMask & 0x40000u) == 0u) {
-          particle.mFramerate = mCurves.begin()[EMITTER_FRAMERATE_CURVE].GetValue(curvePhase);
+          particle.mFramerate = mCurves[EMITTER_FRAMERATE_CURVE].GetValue(curvePhase);
         }
         if ((mZCurveMask & 0x80000u) == 0u) {
-          const float texSel = mCurves.begin()[EMITTER_TEXTURESELECTION_CURVE].GetValue(curvePhase);
+          const float texSel = mCurves[EMITTER_TEXTURESELECTION_CURVE].GetValue(curvePhase);
           particle.mTextureSelection = std::floor(texSel) * particle.mValue3;
         }
 
         if (mParams.start_[EFFECT_ALIGN_TO_BONE] <= 0.0f) {
-          particle.mAngle = mCurves.begin()[EMITTER_ROTATION_CURVE].GetValue(curvePhase) * 0.017453292f;
+          particle.mAngle = mCurves[EMITTER_ROTATION_CURVE].GetValue(curvePhase) * 0.017453292f;
         } else {
           Wm3::Vec3f boneAxis{ attachMatrix.r[2].x, attachMatrix.r[2].y, attachMatrix.r[2].z };
           if (mParams.start_[EFFECT_FLAT] > 0.0f) {
@@ -1171,7 +1121,7 @@ namespace moho
         }
 
         if ((mZCurveMask & 0x20000u) == 0u) {
-          particle.mRotationCurve = mCurves.begin()[EMITTER_ROTATION_RATE_CURVE].GetValue(curvePhase) * 0.017453292f;
+          particle.mRotationCurve = mCurves[EMITTER_ROTATION_RATE_CURVE].GetValue(curvePhase) * 0.017453292f;
         }
 
         Sim* const sim = mManager->GetSim();

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/Vector.h"
 #include "moho/effects/rendering/CEffectImpl.h"
@@ -15,42 +16,31 @@ namespace moho
 {
   struct GeomCamera3;
   struct REmitterBlueprint;
+  /// One emitter curve per `EEmitterCurve` lane; also the inline capacity.
+  inline constexpr std::size_t kEmitterCurveCount = 21u;
+
   /**
-   * Inline-buffer fastvector wrapper for `SEfxCurve` entries used as
-   * `CEfxEmitter::mCurves`. Matches the binary's 4-pointer layout:
-   * `mFirst`/`mLast` track the live range, `mEnd` is the capacity-end of
-   * the inline buffer, and `mOriginalStorage` records the inline buffer
-   * start for dtor-side heap-vs-inline detection.
+   * `CEfxEmitter::mCurves`: a `0x10` `{start_, end_, capacity_, originalVec_}`
+   * head at `+0x198` followed immediately by its own `21 * 0x38` inline window
+   * at `+0x1A8`, which ends exactly where `mBlueprint` begins (`+0x640`).
+   *
+   * Both constructors arm it with the four stores at 0x0065B9F0 / 0x0065BAC7
+   * (`start_ = end_ = originalVec_ = this + 0x1A8`, `capacity_ = that + 0x498`),
+   * `~CEfxEmitter` releases it at 0x0065DE3F through the `ResetInline_` shape,
+   * and a blueprint emitter fills it with `resize(21, SEfxCurve{})` at
+   * 0x0065BB41. Capacity is exactly the fill count, so a well-formed emitter
+   * never leaves the inline window -- the destructor's heap arm is dead in
+   * practice and stays only because the container cannot know that.
+   *
+   * Formerly modelled as a hand-written `CEfxCurveVectorRuntime` four-pointer
+   * head plus a separate `std::uint8_t mInlineCurveStorage[21 * 0x38]` byte
+   * lane, with both constructors writing the four pointers by hand and
+   * `mEnd` spelled `reinterpret_cast<SEfxCurve*>(&mBlueprint)` -- the
+   * capacity-end of the window happens to be the address of the next member.
    */
-  struct CEfxCurveVectorRuntime
-  {
-    SEfxCurve* mFirst;          // +0x00
-    SEfxCurve* mLast;           // +0x04
-    SEfxCurve* mEnd;            // +0x08
-    SEfxCurve* mOriginalStorage; // +0x0C
+  using CEfxEmitterCurveArray = gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>;
 
-    [[nodiscard]] SEfxCurve* begin() noexcept
-    {
-      return mFirst;
-    }
-
-    [[nodiscard]] SEfxCurve* end() noexcept
-    {
-      return mLast;
-    }
-
-    [[nodiscard]] const SEfxCurve* begin() const noexcept
-    {
-      return mFirst;
-    }
-
-    [[nodiscard]] const SEfxCurve* end() const noexcept
-    {
-      return mLast;
-    }
-  };
-
-  static_assert(sizeof(CEfxCurveVectorRuntime) == 0x10, "CEfxCurveVectorRuntime size must be 0x10");
+  static_assert(sizeof(CEfxEmitterCurveArray) == 0x4A8, "CEfxEmitterCurveArray size must be 0x4A8");
 
   /**
    * VFTABLE: 0x00E240B4
@@ -75,8 +65,8 @@ namespace moho
      * Address: 0x0065C290 (FUN_0065C290, Moho::CEfxEmitter::UpdateCurveMask)
      *
      * What it does:
-     * Rebuilds the packed bitmask for Z-flat curves by probing every second
-     * emitter curve lane and testing one-key Z magnitude against epsilon.
+     * Rebuilds the packed bitmask for Z-flat curves by probing every emitter
+     * curve lane and testing one-key Z magnitude against epsilon.
      */
     void UpdateCurveMask();
 
@@ -206,10 +196,11 @@ namespace moho
      *
      * What it does:
      * Default-constructs one emitter: invokes the `CEffectImpl` base ctor,
-     * publishes the `CEfxEmitter` vftable, zeroes the emitter type, binds
-     * the embedded `mCurves` fastvector to the inline `mInlineCurveStorage`
-     * buffer (21-entry capacity), default-constructs the particle slot, and
-     * zero-initializes the remaining emitter-state fields.
+     * publishes the `CEfxEmitter` vftable, zeroes the emitter type, arms the
+     * embedded `mCurves` fastvector on its own 21-entry inline window,
+     * default-constructs the particle slot, and zero-initializes the remaining
+     * emitter-state fields. The curve vector is left empty -- only the
+     * blueprint constructor fills it.
      */
     CEfxEmitter();
 
@@ -218,7 +209,7 @@ namespace moho
      *
      * What it does:
      * Blueprint-driven emitter ctor. Chains the manager-bound `CEffectImpl` base
-     * ctor, binds the inline `mCurves` buffer and fills its 21 default curves,
+     * ctor, fills `mCurves` with 21 default curves,
      * sizes the param/texture/string lanes, seeds the emit position and three
      * fixed defaults (tick-increment=1, tick-count=0, scale=1), and -- when a
      * blueprint is supplied -- rebuilds all 21 emitter curves from the blueprint
@@ -237,14 +228,10 @@ namespace moho
   private:
     friend struct CEfxEmitterLayoutVerifier;
 
-    /// Number of SEfxCurve slots in the inline curve buffer (matches binary).
-    static constexpr std::size_t kInlineCurveCapacity = 21u;
-
-    EmitterType mEmitterType;                                       // +0x190
-    std::uint8_t mPad194[0x04];                                     // +0x194
-    CEfxCurveVectorRuntime mCurves;                                 // +0x198 (16 bytes)
-    std::uint8_t mInlineCurveStorage[kInlineCurveCapacity * 0x38];  // +0x1A8 (1176 bytes)
-    REmitterBlueprint* mBlueprint;                                  // +0x640
+    EmitterType mEmitterType;               // +0x190
+    std::uint8_t mPad194[0x04];             // +0x194
+    CEfxEmitterCurveArray mCurves;          // +0x198 (0x10 head + 21 * 0x38 window)
+    REmitterBlueprint* mBlueprint;          // +0x640
     float mTotalEmissions;                  // +0x644
     std::uint32_t mLife;                    // +0x648
     SWorldParticle mParticle;               // +0x64C
@@ -262,7 +249,9 @@ namespace moho
   {
     static_assert(offsetof(CEfxEmitter, mEmitterType) == 0x190, "CEfxEmitter::mEmitterType offset must be 0x190");
     static_assert(offsetof(CEfxEmitter, mCurves) == 0x198, "CEfxEmitter::mCurves offset must be 0x198");
-    static_assert(offsetof(CEfxEmitter, mInlineCurveStorage) == 0x1A8, "CEfxEmitter::mInlineCurveStorage offset must be 0x1A8");
+    static_assert(
+      offsetof(CEfxEmitter, mCurves.inlineVec_) == 0x1A8, "CEfxEmitter::mCurves inline window offset must be 0x1A8"
+    );
     static_assert(offsetof(CEfxEmitter, mBlueprint) == 0x640, "CEfxEmitter::mBlueprint offset must be 0x640");
     static_assert(offsetof(CEfxEmitter, mTotalEmissions) == 0x644, "CEfxEmitter::mTotalEmissions offset must be 0x644");
     static_assert(offsetof(CEfxEmitter, mLife) == 0x648, "CEfxEmitter::mLife offset must be 0x648");

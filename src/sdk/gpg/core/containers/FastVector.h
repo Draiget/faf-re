@@ -322,6 +322,15 @@ namespace gpg::core
      */
     /**
      * Address: 0x00711B80 (FUN_00711B80 -- `_Destroy_range` for `gpg::fastvector_n<moho::SCondition, 2>` (`STrigger::mConditions`, element 0x38): each `~SCondition` releases the category set's word storage; reached from `~STrigger` (0x00711A90) through `ResetStorageToInline`.)
+     * Address: 0x0065F750 (FUN_0065F750 -- `_Destroy_range` for
+     * `gpg::fastvector_n<moho::SEfxCurve, 21>` (`CEfxEmitter::mCurves`, element
+     * 0x38): per element the inlined `~SEfxCurve`, which is `mKeys`'
+     * `ResetInline_` at `+0x10` -- free when `start_ != originalVec_`, restore
+     * `capacity_` from the saved sentinel, then `end_ = start_`. Reached from
+     * `~CEfxEmitter` (0x0065DE4B) and from both emitter constructors'
+     * `resize(21, value)`. Previously tagged `external_dependency` as an
+     * "all-external-callees thunk"; its one external callee is
+     * `::operator delete`, and the body is this template.)
      */
     template <class T>
     inline void DestroyRange(T* first, T* const last) noexcept
@@ -1222,6 +1231,29 @@ namespace gpg::core
      * Address: 0x006599A0 (FUN_006599A0 -- `FastVectorN<unsigned int, 2>()`: the 2-word emission in that same run, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity2` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x006599C0 (FUN_006599C0 -- `FastVectorN<unsigned int, 14>()`: `lea edx,[ecx+0x38]` -- 0x38 is 14 words, so `start_ = end_ = originalVec_ = inline` and `capacity_ = inline + N`. Zero callers, unreachable; formerly `InitializeInlineDwordVectorHeaderCapacity14` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0063C070 (FUN_0063C070 -- `FastVectorN<T, N>()` -- arm the lane on its inline window for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); zero callers, unreachable; formerly `InitializeWatchBoneStorageInline` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x0065DD90 (FUN_0065DD90 -- `moho::SEfxCurve::SEfxCurve()`, whose
+     * only non-trivial member is `fastvector_n<Wm3::Vector3f, 2> mKeys` at
+     * `+0x10`: `lea ecx,[eax+0x20]; lea edx,[ecx+0x18]` then the four stores at
+     * `+0x10/+0x14/+0x18/+0x1C`. Zero callers, no xrefs: every use site inlined
+     * it -- `CEfxEmitter`'s two constructors inline it for the stack-built fill
+     * value at 0x0065BAE6, and `resize(21, value)` copy-constructs the rest.
+     * Formerly `InitializeEmbeddedDwordVectorHeaderOffset10Capacity6` over an
+     * `EmbeddedDwordVectorHeaderOffset10RuntimeView` in
+     * moho/effects/rendering/CEfxEmitter.cpp (RULE ONE), removed 2026-09-22.)
+     *
+     * The inline-capacity sentinel is NOT written here. Every emission of this
+     * constructor in the binary is exactly four stores plus `ret` -- 0x00552C40
+     * and 0x006599A0 (`N=2`), 0x005FBC10 (`N=5`), 0x006599C0 (`N=14`),
+     * 0x00659980 (`N=26`), 0x0063C070 and 0x0065DD90 -- and the two inlined
+     * copies in `CEfxEmitter`'s constructors (0x0065B9F0, 0x0065BAC7) agree.
+     * `capacity_` is already correct while the lane sits on its own window, so
+     * the sentinel only has to exist once the lane abandons that window: every
+     * grow path writes it on the way out (`if (start_ == originalVec_)
+     * SaveInlineCapacity_()`), and `ResetInline_` reads it back only inside the
+     * `start_ != originalVec_` arm. Writing it here additionally stamped a
+     * pointer over the first four bytes of slot 0 of every inline-backed vector
+     * in the engine -- harmless while `end_ == start_`, but not what the
+     * shipped container does.
      */
     FastVectorN()
     {
@@ -1229,7 +1261,6 @@ namespace gpg::core
       this->end_ = InlineStorage();
       this->capacity_ = InlineStorage() + N;
       this->originalVec_ = InlineStorage();
-      this->SaveInlineCapacity_();
     }
 
     /**
