@@ -140,6 +140,13 @@ namespace msvc8
          * destructor 0x008B4800), then every node from the top of the map
          * down, then the map; `UserCommandIssueHelper::~UserCommandIssueHelper`
          * 0x008B3F80 runs it on `mLocalQueue`.)
+         * Address: 0x0074DF10 (FUN_0074DF10 -- `~deque` for `msvc8::deque<void*>`,
+         * `Sim::mDeletionQueue` (+0xA48): the same `pop_back` drain (a no-op
+         * element destructor, so only `_Mysize`/`_Myoff` move), the nodes from
+         * the top down, then the map. Reached from `Sim::~Sim` 0x007458E0.)
+         * Address: 0x0074C940 (FUN_0074C940 -- a one-instruction `jmp` thunk to
+         * 0x0074DF10, reached from `Sim::Sim`'s unwind path 0x007434D0 and from
+         * `Sim::~Sim`.)
          */
         ~deque()
         {
