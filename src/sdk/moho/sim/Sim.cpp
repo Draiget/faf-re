@@ -5202,6 +5202,32 @@ namespace moho
 } // namespace moho
 
 /**
+ * Address: 0x00560940 (FUN_00560940)
+ */
+SSyncSizes SSyncData::GetSizes() const
+{
+  SSyncSizes sizes{};
+  sizes.mAudioRequests = static_cast<std::int32_t>(mAudioRequests.Size());
+  sizes.mArmyUpdates = static_cast<std::int32_t>(mArmyUpdates.size());
+  sizes.mEntityUpdates = static_cast<std::int32_t>(mEntityUpdates.size());
+  sizes.mUnitUpdates = static_cast<std::int32_t>(mUnitUpdates.size());
+  sizes.mCommandPackets = static_cast<std::int32_t>(mPublishedCommandPackets.size());
+  return sizes;
+}
+
+/**
+ * Address: 0x00560A00 (FUN_00560A00, Moho::SSyncData::ReserveSizes)
+ */
+void SSyncData::ReserveSizes(const SSyncSizes& sizes)
+{
+  mAudioRequests.Reserve(static_cast<std::size_t>(sizes.mAudioRequests));
+  mArmyUpdates.reserve(static_cast<std::size_t>(sizes.mArmyUpdates));
+  mEntityUpdates.reserve(static_cast<std::size_t>(sizes.mEntityUpdates));
+  mUnitUpdates.reserve(static_cast<std::size_t>(sizes.mUnitUpdates));
+  mPublishedCommandPackets.reserve(static_cast<std::size_t>(sizes.mCommandPackets));
+}
+
+/**
  * Address: 0x00745020 (FUN_00745020, ?SerMapData@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
  *
  * What it does:
@@ -5740,142 +5766,6 @@ CSimConVarInstanceBase* Sim::GetSimVar(CSimConVarBase* var)
 
 namespace
 {
-  struct SyncReserveCountsRuntimeView
-  {
-    std::int32_t mAudioRequests = 0; // +0x00
-    std::int32_t mArmyData = 0; // +0x04
-    std::int32_t mEntityData = 0; // +0x08
-    std::int32_t mUnitData = 0; // +0x0C
-    std::int32_t mCommandData = 0; // +0x10
-  };
-  static_assert(sizeof(SyncReserveCountsRuntimeView) == 0x14, "SyncReserveCountsRuntimeView size must be 0x14");
-
-  struct LegacyFastVectorRuntimeSlot
-  {
-    std::uint32_t mProxyWord = 0; // +0x00
-    std::uint8_t* mFirst = nullptr; // +0x04
-    std::uint8_t* mLast = nullptr; // +0x08
-    std::uint8_t* mEnd = nullptr; // +0x0C
-  };
-  static_assert(sizeof(LegacyFastVectorRuntimeSlot) == 0x10, "LegacyFastVectorRuntimeSlot size must be 0x10");
-  static_assert(
-    offsetof(LegacyFastVectorRuntimeSlot, mFirst) == 0x04,
-    "LegacyFastVectorRuntimeSlot::mFirst offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyFastVectorRuntimeSlot, mLast) == 0x08,
-    "LegacyFastVectorRuntimeSlot::mLast offset must be 0x08"
-  );
-  static_assert(
-    offsetof(LegacyFastVectorRuntimeSlot, mEnd) == 0x0C,
-    "LegacyFastVectorRuntimeSlot::mEnd offset must be 0x0C"
-  );
-
-  struct SSyncDataReserveLaneRuntimeView
-  {
-    std::uint8_t pad_0000_0014[0x14]{}; // +0x000
-    LegacyFastVectorRuntimeSlot mAudioRequests; // +0x014
-    std::uint8_t pad_0024_0118[0xF4]{}; // +0x024
-    LegacyFastVectorRuntimeSlot mArmyUpdates; // +0x118
-    std::uint8_t pad_0128_0148[0x20]{}; // +0x128
-    LegacyFastVectorRuntimeSlot mEntityUpdates; // +0x148
-    LegacyFastVectorRuntimeSlot mUnitUpdates; // +0x158
-    std::uint8_t pad_0168_0198[0x30]{}; // +0x168
-    LegacyFastVectorRuntimeSlot mCommandUpdates; // +0x198
-  };
-  static_assert(
-    offsetof(SSyncDataReserveLaneRuntimeView, mAudioRequests) == 0x14,
-    "SSyncDataReserveLaneRuntimeView::mAudioRequests offset must be 0x14"
-  );
-  static_assert(
-    offsetof(SSyncDataReserveLaneRuntimeView, mArmyUpdates) == 0x118,
-    "SSyncDataReserveLaneRuntimeView::mArmyUpdates offset must be 0x118"
-  );
-  static_assert(
-    offsetof(SSyncDataReserveLaneRuntimeView, mEntityUpdates) == 0x148,
-    "SSyncDataReserveLaneRuntimeView::mEntityUpdates offset must be 0x148"
-  );
-  static_assert(
-    offsetof(SSyncDataReserveLaneRuntimeView, mUnitUpdates) == 0x158,
-    "SSyncDataReserveLaneRuntimeView::mUnitUpdates offset must be 0x158"
-  );
-  static_assert(
-    offsetof(SSyncDataReserveLaneRuntimeView, mCommandUpdates) == 0x198,
-    "SSyncDataReserveLaneRuntimeView::mCommandUpdates offset must be 0x198"
-  );
-
-  [[nodiscard]] std::int32_t CountFastVectorLaneElements(
-    const LegacyFastVectorRuntimeSlot& lane,
-    const std::size_t elementStride
-  ) noexcept
-  {
-    if (lane.mFirst == nullptr || lane.mLast == nullptr || lane.mLast < lane.mFirst || elementStride == 0u) {
-      return 0;
-    }
-
-    const std::size_t bytes = static_cast<std::size_t>(lane.mLast - lane.mFirst);
-    return static_cast<std::int32_t>(bytes / elementStride);
-  }
-
-  /**
-   * Address: 0x00560940 (FUN_00560940)
-   *
-   * What it does:
-   * Calculates five sync payload reservation counts from the previous packet's
-   * fastvector lanes and writes them into Sim's reserve cache.
-   */
-  void SnapshotSyncReserveCounts(
-    const SSyncData& data,
-    SyncReserveCountsRuntimeView& outCounts
-  ) noexcept
-  {
-    const auto& lanes = reinterpret_cast<const SSyncDataReserveLaneRuntimeView&>(data);
-    outCounts.mAudioRequests = CountFastVectorLaneElements(lanes.mAudioRequests, 0x1Cu);
-    outCounts.mArmyData = CountFastVectorLaneElements(lanes.mArmyUpdates, 0x160u);
-    outCounts.mEntityData = CountFastVectorLaneElements(lanes.mEntityUpdates, 0xD8u);
-    outCounts.mUnitData = CountFastVectorLaneElements(lanes.mUnitUpdates, 0x238u);
-    outCounts.mCommandData = CountFastVectorLaneElements(lanes.mCommandUpdates, 0x78u);
-  }
-
-  /**
-   * Address: 0x00560A00 (FUN_00560A00, Moho::SSyncData::ReserveSizes)
-   *
-   * IDA signature:
-   * void __stdcall Moho::SSyncData::ReserveSizes(struct_SyncSizes *a1, Moho::SSyncData *a2);
-   *
-   * What it does:
-   * Pre-reserves every per-beat sync vector to the element counts
-   * `SnapshotSyncReserveCounts` captured from the previous packet, so the
-   * fill loops later in `Sim::Sync` do not pay for a grow-reallocation on
-   * the common case where this beat's counts match the last one's.
-   *
-   * Field mapping confirmed from `SSyncDataReserveLaneRuntimeView`'s offsets
-   * (cited on `SnapshotSyncReserveCounts` above): the binary's
-   * `mCommandUpdates` lane is `SSyncData::mPublishedCommandPackets` (+0x198,
-   * element stride 0x78) -- there is no field literally named
-   * `mCommandUpdates` in the recovered layout, the two names refer to the
-   * same +0x198 vector.
-   *
-   * `mAudioRequests` reserves through `gpg::core::FastVectorN::Reserve`
-   * (0x00561460, already recovered as the shared inline-capacity grow
-   * lane); the other four reserve through `msvc8::vector<T>::reserve`
-   * (legacy/containers/Vector.h) -- `mArmyUpdates` via FUN_00560D60,
-   * `mEntityUpdates` via FUN_00560EB0 (both cited there), `mUnitUpdates`
-   * via FUN_00561000, and `mPublishedCommandPackets` via FUN_00561160
-   * (verified: the 0x78-byte `SSyncPublishedCommandPacket` element's
-   * `reserve()` grow chain -- max_size guard FUN_00561900, allocator
-   * FUN_00562850, uninit-copy FUN_005634F0 -- all cited on their
-   * respective `Vector.h` template members).
-   */
-  void ReserveSyncDataSizes(const SyncReserveCountsRuntimeView& sizes, SSyncData& syncData) noexcept
-  {
-    syncData.mAudioRequests.Reserve(static_cast<std::size_t>(sizes.mAudioRequests));
-    syncData.mArmyUpdates.reserve(static_cast<std::size_t>(sizes.mArmyData));
-    syncData.mEntityUpdates.reserve(static_cast<std::size_t>(sizes.mEntityData));
-    syncData.mUnitUpdates.reserve(static_cast<std::size_t>(sizes.mUnitData));
-    syncData.mPublishedCommandPackets.reserve(static_cast<std::size_t>(sizes.mCommandData));
-  }
-
   void AppendLegacyStringToStd(std::string& out, const msvc8::string& value)
   {
     out.append(value.c_str(), value.size());
@@ -5948,6 +5838,8 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
 
   delete outSyncData;
   outSyncData = new SSyncData{};
+  // 0x00747605: pre-size the packet from the previous beat's.
+  outSyncData->ReserveSizes(mSyncSizes);
   // The four scalars the client reads its clocks off. Without `mCurTick` the
   // session's `mGameTick` never moves, which is what froze the game clock.
   outSyncData->mCurBeat = static_cast<int32_t>(mCurBeat);
@@ -6047,11 +5939,6 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
     mSoundManager->DrainRequests(outSyncData->mAudioRequests);
   }
 
-  SnapshotSyncReserveCounts(
-    *outSyncData,
-    *reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts)
-  );
-  ReserveSyncDataSizes(*reinterpret_cast<SyncReserveCountsRuntimeView*>(mSyncReserveCounts), *outSyncData);
 
   // 0x00747A54: the army roster is published exactly once, on the first sync.
   // `CWldSession::DoBeat` turns each entry into a `UserArmy` and files it by
@@ -6317,6 +6204,9 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   FlushLog();
   mAdvancedThisTick = false;
   mGameOver = mGameEnded;
+
+  // 0x00748341: remember this packet's sizes for the next beat's reserve.
+  mSyncSizes = outSyncData->GetSizes();
 }
 
 /**
@@ -7344,9 +7234,7 @@ Sim::Sim(LaunchInfoBase* const info)
   // POD lanes the compiler does not default-init are cleared here to match the
   // binary's explicit member zeroing.
   mSyncReserveUnused = 0;
-  for (std::int32_t& reserveCount : mSyncReserveCounts) {
-    reserveCount = 0;
-  }
+  mSyncSizes = SSyncSizes{};
   mContext.Reset();
 
   // Seed the command-source vector from the launch info block, then mark the

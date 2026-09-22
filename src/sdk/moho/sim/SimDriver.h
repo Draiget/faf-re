@@ -202,6 +202,21 @@ namespace moho
   );
 
   /**
+   * How many elements the last beat's packet carried in each of its five
+   * large lanes (IDA `struct_SyncSizes`). `Sim` keeps one (`mSyncSizes`,
+   * +0xA70) and pre-sizes the next packet from it.
+   */
+  struct SSyncSizes
+  {
+    std::int32_t mAudioRequests = 0;  // +0x00
+    std::int32_t mArmyUpdates = 0;    // +0x04
+    std::int32_t mEntityUpdates = 0;  // +0x08
+    std::int32_t mUnitUpdates = 0;    // +0x0C
+    std::int32_t mCommandPackets = 0; // +0x10
+  };
+  static_assert(sizeof(SSyncSizes) == 0x14, "SSyncSizes size must be 0x14");
+
+  /**
    * Sync publication payload exchanged from sim thread to driver consumers.
    *
    * Recovered size/layout from FA `SSyncData` usage in publish/remove paths.
@@ -291,6 +306,33 @@ namespace moho
      * and the owned stream pointer.
      */
     ~SSyncData();
+
+    /**
+     * Address: 0x00560940 (FUN_00560940)
+     *
+     * IDA signature:
+     * struct_SyncSizes *__usercall sub_560940@<eax>(Moho::SSyncData *this@<ecx>,
+     *     struct_SyncSizes *out@<edi>);
+     *
+     * What it does:
+     * Returns the element counts of the five large lanes: the audio request
+     * fastvector (+0x18, 0x1C stride) and the army (0x160), entity (0xD8),
+     * unit (0x238) and published command-packet (0x78) vectors. `Sim::Sync`
+     * stores it as the last thing it does (0x00748341).
+     */
+    [[nodiscard]] SSyncSizes GetSizes() const;
+
+    /**
+     * Address: 0x00560A00 (FUN_00560A00, Moho::SSyncData::ReserveSizes)
+     *
+     * IDA signature:
+     * void __stdcall Moho::SSyncData::ReserveSizes(struct_SyncSizes *a1, Moho::SSyncData *a2);
+     *
+     * What it does:
+     * Reserves each of those five lanes to the given counts. `Sim::Sync` calls
+     * it on the fresh packet with the previous beat's sizes (0x00747605).
+     */
+    void ReserveSizes(const SSyncSizes& sizes);
 
     void QueuePendingCommandEventRemoval(CmdId commandId);
   };
