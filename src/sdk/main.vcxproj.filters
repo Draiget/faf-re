@@ -5481,6 +5481,9 @@
     <ClInclude Include="moho\command\SSTITarget.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\command\UserTarget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\ai\EAiTargetType.h">
       <Filter>Header Files</Filter>
     </ClInclude>

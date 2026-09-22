@@ -133,6 +133,14 @@ namespace msvc8
         {
         }
 
+        /**
+         * Address: 0x008B5210 (FUN_008B5210 -- `~deque` for
+         * `msvc8::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte element,
+         * block size 1): `pop_back` until empty (each event's implicit
+         * destructor 0x008B4800), then every node from the top of the map
+         * down, then the map; `UserCommandIssueHelper::~UserCommandIssueHelper`
+         * 0x008B3F80 runs it on `mLocalQueue`.)
+         */
         ~deque()
         {
             clear();
@@ -191,13 +199,13 @@ namespace msvc8
          */
         void clear()
         {
-            // Destroy all elements in logical order
-            for (size_type i = 0; i < _Mysize; ++i)
+            // `_Tidy`'s `while (!empty()) pop_back();`: last element first.
+            while (_Mysize != 0)
             {
-                ptr_at(i)->~T();
+                ptr_at(_Mysize - 1)->~T();
+                if (--_Mysize == 0)
+                    _Myoff = 0;
             }
-            _Mysize = 0;
-            _Myoff = 0;
             // Keep nodes and map for capacity, as Dinkumware typically did
         }
 
@@ -224,10 +232,25 @@ namespace msvc8
          *          type. Reached from `PushBackQueuedCommand`
          *          (CGpgNetInterface.cpp), itself called from
          *          `CGpgNetInterface::EnqueueCommand`.)
+         * Address: 0x008B4E80 (FUN_008B4E80 -- `push_back` for
+         *          `msvc8::deque<Moho::UserCommandIssueLocalEvent>` (0x50-byte
+         *          element, block size 1, so the `% _DEQUESIZ` test folds away
+         *          and the grow test is `_Mapsize <= _Mysize + 1`); the slot is
+         *          bought through the checked one-element allocator 0x008B55D0
+         *          and the event copy-constructed into it (0x008B56F0). Reached
+         *          from the six local-edit queueing bodies 0x008B4720,
+         *          0x008B4880, 0x008B49D0, 0x008B4A40, 0x008B4AC0.)
+         * Address: 0x008B55D0 (FUN_008B55D0 -- that instantiation's one-element
+         *          node allocator: `0xFFFFFFFF / n < 0x50` throws `bad_alloc`,
+         *          else `operator new(0x50 * n)`; `allocate_node` here.)
          */
         void push_back(const T& v)
         {
-            grow_if_full(1);
+            // VC8: `if ((_Myoff + _Mysize) % _DEQUESIZ == 0 &&
+            //          _Mapsize <= (_Mysize + _DEQUESIZ) / _DEQUESIZ) _Growmap(1);`
+            // (0x007408FD..0x0074090E, 0x008B4E83..0x008B4E8F).
+            if ((_Myoff + _Mysize) % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
+                grow_map();
             ensure_node_for_write(_Mysize); // element at logical index = size()
             T* p = ptr_at(_Mysize);
             ::new (static_cast<void*>(p)) T(v);
@@ -246,7 +269,8 @@ namespace msvc8
          */
         void push_front(const T& v)
         {
-            grow_if_full(1);
+            if (_Myoff % kBlockSize == 0 && _Mapsize <= (_Mysize + kBlockSize) / kBlockSize)
+                grow_map();
             const size_type newOff = (_Myoff == 0) ? capacity() - 1 : _Myoff - 1;
             const size_type nodeIdx = node_index_from_global(newOff, _Mapsize);
             if (_Map[nodeIdx] == nullptr)
@@ -406,12 +430,12 @@ namespace msvc8
         {
             if (_Map)
             {
-                for (size_type i = 0; i < _Mapsize; ++i)
+                for (size_type i = _Mapsize; i != 0; --i)
                 {
-                    if (_Map[i])
+                    if (_Map[i - 1])
                     {
-                        deallocate_node(_Map[i]);
-                        _Map[i] = nullptr;
+                        deallocate_node(_Map[i - 1]);
+                        _Map[i - 1] = nullptr;
                     }
                 }
                 ::operator delete(static_cast<void*>(_Map));
@@ -421,18 +445,14 @@ namespace msvc8
             _Myoff = _Mysize = 0;
         }
 
-        // Grow map capacity if total elements would exceed capacity.
-        void grow_if_full(size_type to_add)
-        {
-            const size_type need = _Mysize + to_add;
-            if (need <= capacity())
-                return;
-
-            grow_map();
-        }
-
         /**
          * Address: 0x007BB920 (FUN_007BB920, msvc8::deque<Moho::SNetCommand>::_Growmap)
+         * Address: 0x008B50A0 (FUN_008B50A0 -- `_Growmap` for
+         *          `msvc8::deque<Moho::UserCommandIssueLocalEvent>`, block size
+         *          1; its map allocator is 0x008B5690.)
+         * Address: 0x008B5410 (FUN_008B5410 -- that instantiation's `_Xlen`,
+         *          `throw length_error("deque<T> too long")` once the map
+         *          reaches `kMaxSlots` (0x3333333 for the 0x50-byte element).)
          * Address: 0x00741030 (FUN_00741030, msvc8::deque<Moho::SSyncData*>::
          *          _Growmap -- confirms the same body for a 4-byte T /
          *          kBlockSize==4 instantiation; sole caller is

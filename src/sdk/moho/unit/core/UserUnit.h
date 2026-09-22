@@ -7,6 +7,7 @@
 #include "legacy/containers/Set.h"
 #include "legacy/containers/String.h"
 #include "moho/command/CmdDefs.h"
+#include "moho/command/UserTarget.h"
 #include "moho/command/UserCommandQueue.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
@@ -855,47 +856,6 @@ namespace moho
   [[nodiscard]] UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept;
 
   /**
-   * The UI-side command-target payload MSVC8 mangled names as
-   * `Moho::UserTarget` (see `?ISSUE_SetCommandTarget@Moho@@YAXPAVUserCommand@1@ABVUserTarget@1@@Z`
-   * on the `Moho::ISSUE_SetCommandTarget` linker symbol at 0x008B0EE0). Named
-   * `UserCommandTargetView` here to match this file's existing `*RuntimeView`
-   * convention for byte-precise cross-TU payload shapes.
-   *
-   * Layout evidence: `sub_8BECD0` (0x008BECD0), `sub_8BED50` (0x008BED50) and
-   * `sub_8BEE30` (0x008BEE30) all read this exact 0x18-byte shape
-   * (type@0/link@4/position@0xC) from the raw command-target pointer
-   * `func_ProcessCommandDrag` (CWldSession.cpp) and `Moho::ISSUE_SetCommandTarget`
-   * (Sim.cpp) pass around.
-   */
-  enum class UserTargetType : std::int32_t
-  {
-    None = 0,
-    Entity = 1,
-    Position = 2,
-  };
-
-  struct UserEntityWeakLinkView
-  {
-    std::uintptr_t ownerLinkSlot;        // +0x00
-    UserEntityWeakLinkView* nextInOwner; // +0x04
-  };
-  static_assert(sizeof(UserEntityWeakLinkView) == 0x08, "UserEntityWeakLinkView size must be 0x08");
-
-  struct UserCommandTargetView
-  {
-    UserTargetType targetType;           // +0x00
-    UserEntityWeakLinkView targetEntity; // +0x04
-    Wm3::Vector3<float> position;        // +0x0C
-  };
-  static_assert(
-    offsetof(UserCommandTargetView, targetEntity) == 0x04, "UserCommandTargetView::targetEntity offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandTargetView, position) == 0x0C, "UserCommandTargetView::position offset must be 0x0C"
-  );
-  static_assert(sizeof(UserCommandTargetView) == 0x18, "UserCommandTargetView size must be 0x18");
-
-  /**
    * Address: 0x008BED50 (FUN_008BED50, sub_8BED50)
    *
    * What it does:
@@ -905,7 +865,7 @@ namespace moho
    * Defined in UserUnit.cpp; declared here so `Moho::ISSUE_SetCommandTarget`
    * (Sim.cpp) can resolve the drag-target world position it publishes.
    */
-  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserCommandTargetView& target) noexcept;
+  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserTarget& target) noexcept;
 
   /**
    * Address: 0x008BEE30 (FUN_008BEE30)
@@ -917,106 +877,7 @@ namespace moho
    * (Sim.cpp) can resolve the transport/ferry-beacon category checks its own
    * body runs against the drag target.
    */
-  [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(const UserCommandTargetView* target) noexcept;
-
-  /**
-   * Local command-issue ring-queue event payload, as read by the helper-side
-   * (UserUnit.cpp) teardown lane. Byte-compatible with
-   * `moho::CommandIssueUpdateEventRuntimeView` (Sim.cpp, CommandIssueHelper.h-typed
-   * `CAiTarget target` member) - both describe the same 0x50-byte
-   * `UserCommandIssueLocalEvent` binary object (CommandIssueHelper.h
-   * forward-declares the canonical name); this is the flatter view
-   * UserUnit.cpp's own teardown lane already used before that fully-typed
-   * model existed. `targetEntityWeak` sits at the same absolute offset
-   * (+0x1C) as `CommandIssueUpdateEventRuntimeView::target.targetEntity`
-   * (CAiTarget's own +0x04 field, at target's own +0x18 base).
-   */
-  struct UserCommandIssueWeakSetRuntimeView
-  {
-    void* allocatorProxy;           // +0x00
-    SSelectionNodeUserEntity* head; // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(
-    offsetof(UserCommandIssueWeakSetRuntimeView, head) == 0x04,
-    "UserCommandIssueWeakSetRuntimeView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueWeakSetRuntimeView, size) == 0x08,
-    "UserCommandIssueWeakSetRuntimeView::size offset must be 0x08"
-  );
-  static_assert(
-    sizeof(UserCommandIssueWeakSetRuntimeView) == 0x0C, "UserCommandIssueWeakSetRuntimeView size must be 0x0C"
-  );
-
-  struct UserCommandIssueCellVectorRuntimeView
-  {
-    void* begin;       // +0x00
-    void* end;         // +0x04
-    void* capacityEnd; // +0x08
-    void** inlineBase; // +0x0C
-    std::uint8_t pad_0010_0018[0x08];
-  };
-  static_assert(
-    offsetof(UserCommandIssueCellVectorRuntimeView, end) == 0x04,
-    "UserCommandIssueCellVectorRuntimeView::end offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCellVectorRuntimeView, capacityEnd) == 0x08,
-    "UserCommandIssueCellVectorRuntimeView::capacityEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCellVectorRuntimeView, inlineBase) == 0x0C,
-    "UserCommandIssueCellVectorRuntimeView::inlineBase offset must be 0x0C"
-  );
-  static_assert(
-    sizeof(UserCommandIssueCellVectorRuntimeView) == 0x18, "UserCommandIssueCellVectorRuntimeView size must be 0x18"
-  );
-
-  struct UserCommandIssueLocalEventRuntimeView
-  {
-    CmdId commandId;                              // +0x00
-    std::uint32_t eventType;                      // +0x04
-    UserCommandIssueWeakSetRuntimeView entitySet; // +0x08
-    std::int32_t countDelta;                      // +0x14
-    std::uint8_t pad_0018_001C[0x04];
-    SSelectionWeakRefUserEntity targetEntityWeak; // +0x1C
-    std::uint8_t pad_0024_0038[0x14];
-    UserCommandIssueCellVectorRuntimeView cells;  // +0x38
-  };
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, entitySet) == 0x08,
-    "UserCommandIssueLocalEventRuntimeView::entitySet offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, countDelta) == 0x14,
-    "UserCommandIssueLocalEventRuntimeView::countDelta offset must be 0x14"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, targetEntityWeak) == 0x1C,
-    "UserCommandIssueLocalEventRuntimeView::targetEntityWeak offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalEventRuntimeView, cells) == 0x38,
-    "UserCommandIssueLocalEventRuntimeView::cells offset must be 0x38"
-  );
-  static_assert(
-    sizeof(UserCommandIssueLocalEventRuntimeView) == 0x50, "UserCommandIssueLocalEventRuntimeView size must be 0x50"
-  );
-
-  /**
-   * Address: 0x008B4800 (FUN_008B4800)
-   *
-   * What it does:
-   * Releases dynamic command-cell storage back to inline capacity, detaches
-   * target weak-owner linkage, and destroys the local weak-entity set lane.
-   * Defined in UserUnit.cpp; declared here so the Sim.cpp local command-issue
-   * update-event keystone can destroy its local event through the same
-   * canonical teardown the binary uses (byte-compatible with
-   * `CommandIssueUpdateEventRuntimeView`, see the type's own doc comment
-   * above).
-   */
-  void DestroyCommandIssueLocalEvent(UserCommandIssueLocalEventRuntimeView& event) noexcept;
+  [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(const UserTarget* target) noexcept;
 
   /**
    * Address: 0x008B6F60 (struct_UserUnitManager::Get) plus the first-live scan

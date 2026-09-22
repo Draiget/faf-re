@@ -3,13 +3,17 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/core/containers/FastVector.h"
+#include "legacy/containers/Deque.h"
+#include "moho/command/CmdDefs.h"
 #include "moho/command/SSTICommandConstantData.h"
 #include "moho/command/SSTICommandVariableData.h"
+#include "moho/command/UserTarget.h"
+#include "moho/sim/SOCellPos.h"
+#include "moho/sim/WeakEntitySet.h"
 
 namespace moho
 {
-  struct SSelectionNodeUserEntity;
-  struct UserCommandIssueLocalEvent;
 
   struct CommandIssueObserverLink
   {
@@ -33,33 +37,75 @@ namespace moho
   };
   static_assert(sizeof(CommandIssueObserverChain) == 0x04, "CommandIssueObserverChain size must be 0x04");
 
-  struct CommandIssueLocalQueue
+  /**
+   * Kind of one local command-issue event. The values are the literals the
+   * queueing bodies pass to the event constructor (`mov ecx, N` before the
+   * call to 0x008B3DC0): 0 at 0x008B4720, 1 at 0x008B4960, 2 at 0x008B49D0,
+   * 3 at 0x008B48F1, 4 at 0x008B4A5F, 5 at 0x008B4AE3.
+   */
+  enum class ECommandIssueEvent : std::uint32_t
   {
-    std::uint32_t mAllocatorProxy;       // +0x00
-    UserCommandIssueLocalEvent** mSlots; // +0x04
-    std::uint32_t mCapacity;             // +0x08
-    std::uint32_t mReadIndex;            // +0x0C
-    std::uint32_t mCount;                // +0x10
+    SelectUnit = 0,
+    IncreaseCount = 1,
+    DecreaseCount = 2,
+    DeselectUnit = 3,
+    SetTarget = 4,
+    SetCommandType = 5,
   };
-  static_assert(sizeof(CommandIssueLocalQueue) == 0x14, "CommandIssueLocalQueue size must be 0x14");
-  static_assert(offsetof(CommandIssueLocalQueue, mSlots) == 0x04, "CommandIssueLocalQueue::mSlots offset must be 0x04");
-  static_assert(
-    offsetof(CommandIssueLocalQueue, mCapacity) == 0x08, "CommandIssueLocalQueue::mCapacity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CommandIssueLocalQueue, mReadIndex) == 0x0C, "CommandIssueLocalQueue::mReadIndex offset must be 0x0C"
-  );
-  static_assert(offsetof(CommandIssueLocalQueue, mCount) == 0x10, "CommandIssueLocalQueue::mCount offset must be 0x10");
 
-  struct CommandIssueWeakSet
+  /**
+   * One edit the UI made to a command before the sim confirmed it: the
+   * helper keeps these in `mLocalQueue` and replays them over the last
+   * replicated command state until the sim's beat catches up
+   * (`UserCommandIssueHelper::AdvanceLocalEventsToBeat`, 0x008B4C20).
+   *
+   * Both special members the binary emits out of line are the implicit ones:
+   *
+   * Address: 0x008B56F0 (FUN_008B56F0 -- the implicit copy constructor:
+   * member-wise, the unit set through its range constructor 0x00831310,
+   * `mTarget` through 0x008B40F0, `mCells` through 0x00552C90; `+0x34` is
+   * padding and is not copied. Reached from `msvc8::deque::push_back`
+   * 0x008B4E80.)
+   * Address: 0x008B4800 (FUN_008B4800 -- the implicit destructor, members in
+   * reverse: `mCells` back to inline storage, `mTarget`'s weak link unlinked,
+   * `mUnits` erased (0x007B33B0) and its head freed.)
+   */
+  struct UserCommandIssueLocalEvent
   {
-    void* mAllocatorProxy;           // +0x00
-    SSelectionNodeUserEntity* mHead; // +0x04
-    std::uint32_t mSize;             // +0x08
+    CmdId mCmdId;                           // +0x00: the sim beat the edit is due on
+    ECommandIssueEvent mType;               // +0x04
+    WeakUnitSetUserUnit mUnits;             // +0x08: SelectUnit / DeselectUnit
+    std::int32_t mCount;                    // +0x14: IncreaseCount / DecreaseCount
+    UserTarget mTarget;                     // +0x18: SetTarget
+    EUnitCommandType mCommandType;          // +0x30: SetCommandType
+    std::uint8_t mPad34[0x04];              // +0x34
+    gpg::fastvector_n<SOCellPos, 2> mCells; // +0x38
+
+    /**
+     * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
+     *
+     * IDA signature:
+     * Moho::UserCommandIssueLocalEvent *__userpurge sub_8B3DC0@<eax>(
+     *     Moho::UserCommandIssueLocalEvent *this@<esi>, int type@<ecx>, int cmdId);
+     *
+     * What it does:
+     * Stores the beat and kind, brings the unit set up empty (head sentinel
+     * through 0x007B4640), zeroes the count and the target's type and weak
+     * link, and points the cell vector at its inline storage. The target
+     * position, `mCommandType` and the padding are left unwritten.
+     */
+    UserCommandIssueLocalEvent(CmdId cmdId, ECommandIssueEvent type);
   };
-  static_assert(sizeof(CommandIssueWeakSet) == 0x0C, "CommandIssueWeakSet size must be 0x0C");
-  static_assert(offsetof(CommandIssueWeakSet, mHead) == 0x04, "CommandIssueWeakSet::mHead offset must be 0x04");
-  static_assert(offsetof(CommandIssueWeakSet, mSize) == 0x08, "CommandIssueWeakSet::mSize offset must be 0x08");
+
+  static_assert(offsetof(UserCommandIssueLocalEvent, mType) == 0x04, "UserCommandIssueLocalEvent::mType offset must be 0x04");
+  static_assert(offsetof(UserCommandIssueLocalEvent, mUnits) == 0x08, "UserCommandIssueLocalEvent::mUnits offset must be 0x08");
+  static_assert(offsetof(UserCommandIssueLocalEvent, mCount) == 0x14, "UserCommandIssueLocalEvent::mCount offset must be 0x14");
+  static_assert(offsetof(UserCommandIssueLocalEvent, mTarget) == 0x18, "UserCommandIssueLocalEvent::mTarget offset must be 0x18");
+  static_assert(
+    offsetof(UserCommandIssueLocalEvent, mCommandType) == 0x30, "UserCommandIssueLocalEvent::mCommandType offset must be 0x30"
+  );
+  static_assert(offsetof(UserCommandIssueLocalEvent, mCells) == 0x38, "UserCommandIssueLocalEvent::mCells offset must be 0x38");
+  static_assert(sizeof(UserCommandIssueLocalEvent) == 0x50, "UserCommandIssueLocalEvent size must be 0x50");
 
   struct UserCommandIssueHelper
   {
@@ -72,8 +118,12 @@ namespace moho
     std::uint8_t mVariableDataDirty;          // +0x0B2
     std::uint8_t mReservedB3;                 // +0x0B3
     std::int32_t mDueSeqNo;                   // +0x0B4
-    CommandIssueLocalQueue mLocalQueue;       // +0x0B8
-    CommandIssueWeakSet mCursorEntitySet;     // +0x0CC
+    /// Local edits not yet confirmed by the sim, oldest first. Block size 1
+    /// (0x50-byte element), so each map slot owns one event.
+    msvc8::deque<UserCommandIssueLocalEvent> mLocalQueue; // +0x0B8
+    /// Entities the command applies to, rebuilt from `mVariableData.mEntIds`
+    /// plus the queued select/deselect edits (`GetEntitiesUnderCursor`, 0x008B43F0).
+    WeakEntitySetUserEntity mCursorEntitySet;             // +0x0CC
 
     /**
      * Address: 0x008B3EC0 (FUN_008B3EC0, struct_CommandIssueHelper::struct_CommandIssueHelper)

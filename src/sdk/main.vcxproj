@@ -1696,6 +1696,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\command\SSTICommandIssueData.h" />
     <ClInclude Include="moho\command\SSTICommandVariableData.h" />
     <ClInclude Include="moho\command\SSTITarget.h" />
+    <ClInclude Include="moho\command\UserTarget.h" />
     <ClInclude Include="moho\console\CConAlias.h" />
     <ClInclude Include="moho\console\CConFunc.h" />
     <ClInclude Include="moho\console\CConCommand.h" />

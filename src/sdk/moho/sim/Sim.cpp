@@ -2191,115 +2191,6 @@ namespace
     return msvc8::string{};
   }
 
-  struct CommandIssueWeakSetNode
-  {
-    CommandIssueWeakSetNode* left;   // +0x00
-    CommandIssueWeakSetNode* parent; // +0x04
-    CommandIssueWeakSetNode* right;  // +0x08
-    std::uint32_t key;               // +0x0C
-    WeakPtr<UserEntity> value;       // +0x10
-    std::uint8_t color;              // +0x18
-    std::uint8_t isNil;              // +0x19
-    std::uint8_t pad_1A_1B[2];       // +0x1A
-  };
-  static_assert(sizeof(CommandIssueWeakSetNode) == 0x1C, "CommandIssueWeakSetNode size must be 0x1C");
-  static_assert(offsetof(CommandIssueWeakSetNode, key) == 0x0C, "CommandIssueWeakSetNode::key offset must be 0x0C");
-  static_assert(
-    offsetof(CommandIssueWeakSetNode, value) == 0x10, "CommandIssueWeakSetNode::value offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CommandIssueWeakSetNode, isNil) == 0x19, "CommandIssueWeakSetNode::isNil offset must be 0x19"
-  );
-
-  struct CommandIssueWeakSetRuntimeView
-  {
-    void* proxy;                    // +0x00
-    CommandIssueWeakSetNode* head;  // +0x04
-    std::uint32_t size;             // +0x08
-  };
-  static_assert(sizeof(CommandIssueWeakSetRuntimeView) == 0x0C, "CommandIssueWeakSetRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(CommandIssueWeakSetRuntimeView, head) == 0x04, "CommandIssueWeakSetRuntimeView::head offset must be 0x04"
-  );
-
-  struct CommandIssueUpdateEventRuntimeView
-  {
-    CmdId commandId;                              // +0x00
-    std::uint32_t eventType;                      // +0x04
-    CommandIssueWeakSetRuntimeView entitySet;     // +0x08
-    std::int32_t count;                           // +0x14
-    CAiTarget target;                             // +0x18
-    gpg::fastvector_n<SOCellPos, 2> cells;       // +0x38
-  };
-  static_assert(sizeof(gpg::fastvector_n<SOCellPos, 2>) == 0x18, "gpg::fastvector_n<SOCellPos,2> size must be 0x18");
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, commandId) == 0x00,
-    "CommandIssueUpdateEventRuntimeView::commandId offset must be 0x00"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, eventType) == 0x04,
-    "CommandIssueUpdateEventRuntimeView::eventType offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, entitySet) == 0x08,
-    "CommandIssueUpdateEventRuntimeView::entitySet offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, count) == 0x14,
-    "CommandIssueUpdateEventRuntimeView::count offset must be 0x14"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, target) == 0x18,
-    "CommandIssueUpdateEventRuntimeView::target offset must be 0x18"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateEventRuntimeView, cells) == 0x38,
-    "CommandIssueUpdateEventRuntimeView::cells offset must be 0x38"
-  );
-  static_assert(sizeof(CommandIssueUpdateEventRuntimeView) == 0x50, "CommandIssueUpdateEventRuntimeView size must be 0x50");
-
-  struct CommandIssueUpdateQueueRuntimeView
-  {
-    std::uint32_t proxy;                           // +0x00
-    CommandIssueUpdateEventRuntimeView** slots;    // +0x04
-    std::uint32_t capacity;                        // +0x08
-    std::uint32_t readIndex;                       // +0x0C
-    std::uint32_t count;                           // +0x10
-  };
-  static_assert(sizeof(CommandIssueUpdateQueueRuntimeView) == 0x14, "CommandIssueUpdateQueueRuntimeView size must be 0x14");
-  static_assert(
-    offsetof(CommandIssueUpdateQueueRuntimeView, slots) == 0x04,
-    "CommandIssueUpdateQueueRuntimeView::slots offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateQueueRuntimeView, capacity) == 0x08,
-    "CommandIssueUpdateQueueRuntimeView::capacity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateQueueRuntimeView, readIndex) == 0x0C,
-    "CommandIssueUpdateQueueRuntimeView::readIndex offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(CommandIssueUpdateQueueRuntimeView, count) == 0x10,
-    "CommandIssueUpdateQueueRuntimeView::count offset must be 0x10"
-  );
-
-  struct CommandIssueHelperRuntimeView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    CmdId commandId;                                // +0x04 (mDat.mCmdId)
-    std::uint8_t pad_0008_00B8[0xB0];
-    CommandIssueUpdateQueueRuntimeView localQueue;  // +0xB8
-  };
-  static_assert(
-    offsetof(CommandIssueHelperRuntimeView, commandId) == 0x04,
-    "CommandIssueHelperRuntimeView::commandId offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CommandIssueHelperRuntimeView, localQueue) == 0xB8,
-    "CommandIssueHelperRuntimeView::localQueue offset must be 0xB8"
-  );
-
   static_assert(sizeof(CommandManager) == 0xCC0, "CommandManager size must be 0xCC0");
 
   static_assert(
@@ -2332,7 +2223,7 @@ namespace
    * `msvc8::map<CmdId, UserCommandIssueHelper*> CommandManager::mCommands`
    * (`CommandManager.h`) member instead of calling it.
    */
-  [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelperInManager(
+  [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelperInManager(
     CommandManager* const commandManager,
     const CmdId cmdId
   ) noexcept
@@ -2346,10 +2237,10 @@ namespace
       return nullptr;
     }
 
-    return reinterpret_cast<CommandIssueHelperRuntimeView*>(it->second);
+    return it->second;
   }
 
-  [[nodiscard]] CommandIssueHelperRuntimeView* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
+  [[nodiscard]] UserCommandIssueHelper* FindCommandIssueHelper(CWldSession* const session, const CmdId cmdId)
   {
     if (!session || !session->mCommandManager) {
       return nullptr;
@@ -2399,437 +2290,12 @@ namespace moho
 namespace
 {
 
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeIncreaseCount = 1u;
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeDecreaseCount = 2u;
-  constexpr std::uint8_t kCommandIssueTreeBlack = 1u;
-  constexpr std::uint32_t kCommandIssueQueueMaxCapacity = 53687091u;
-
-  /**
-   * Address: 0x008B5410 (FUN_008B5410, sub_8B5410)
-   *
-   * IDA signature:
-   * void __noreturn sub_8B5410();
-   *
-   * What it does:
-   * MSVC8 std::deque<T>::_Xlen for the command-issue update ring: throws
-   * std::length_error("deque<T> too long") when the block map would exceed its
-   * maximum size (kCommandIssueQueueMaxCapacity). Never returns.
-   */
-  [[noreturn]] void ThrowCommandIssueQueueTooLong()
-  {
-    throw std::length_error("deque<T> too long");
-  }
-
-  /**
-   * Address: 0x008B5690 (FUN_008B5690, sub_8B5690)
-   *
-   * IDA signature:
-   * void *__fastcall sub_8B5690(unsigned int a1);
-   *
-   * What it does:
-   * MSVC8 std::allocator<CommandIssueUpdateEventRuntimeView*>::allocate for the
-   * command-issue ring's block map: rejects an element count that would overflow
-   * the byte size (0xFFFFFFFF / n < 4) by throwing std::bad_alloc, otherwise
-   * returns operator new(4 * n) raw storage for `n` slot pointers.
-   */
-  [[nodiscard]] CommandIssueUpdateEventRuntimeView** AllocateCommandIssueUpdateMap(std::uint32_t slotCount)
-  {
-    if (0xFFFFFFFFu / slotCount < sizeof(CommandIssueUpdateEventRuntimeView*)) {
-      throw std::bad_alloc();
-    }
-    return static_cast<CommandIssueUpdateEventRuntimeView**>(
-      ::operator new(sizeof(CommandIssueUpdateEventRuntimeView*) * static_cast<std::size_t>(slotCount)));
-  }
-
-  [[nodiscard]] CommandIssueWeakSetNode* AllocateCommandIssueWeakSetHead()
-  {
-    auto* const head = static_cast<CommandIssueWeakSetNode*>(::operator new(sizeof(CommandIssueWeakSetNode)));
-    head->left = head;
-    head->parent = head;
-    head->right = head;
-    head->key = 0u;
-    head->value.ownerLinkSlot = nullptr;
-    head->value.nextInOwner = nullptr;
-    head->color = kCommandIssueTreeBlack;
-    head->isNil = 1u;
-    head->pad_1A_1B[0] = 0u;
-    head->pad_1A_1B[1] = 0u;
-    return head;
-  }
-
-  void InitializeCommandIssueWeakSetEmpty(CommandIssueWeakSetRuntimeView& set)
-  {
-    set.proxy = nullptr;
-    set.head = AllocateCommandIssueWeakSetHead();
-    set.size = 0u;
-  }
-
-  [[nodiscard]] CommandIssueWeakSetNode*
-  CommandIssueWeakSetMinNode(CommandIssueWeakSetNode* node, CommandIssueWeakSetNode* const head) noexcept
-  {
-    while (node->left != head) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  [[nodiscard]] CommandIssueWeakSetNode*
-  CommandIssueWeakSetMaxNode(CommandIssueWeakSetNode* node, CommandIssueWeakSetNode* const head) noexcept
-  {
-    while (node->right != head) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  void DestroyCommandIssueWeakSetNodes(CommandIssueWeakSetNode* const node, CommandIssueWeakSetNode* const head)
-  {
-    if (node == nullptr || node == head) {
-      return;
-    }
-
-    DestroyCommandIssueWeakSetNodes(node->left, head);
-    DestroyCommandIssueWeakSetNodes(node->right, head);
-    node->value.ResetFromObject(nullptr);
-    ::operator delete(node);
-  }
-
-  void DestroyCommandIssueWeakSet(CommandIssueWeakSetRuntimeView& set)
-  {
-    if (set.head == nullptr) {
-      set.proxy = nullptr;
-      set.size = 0u;
-      return;
-    }
-
-    if (set.head->parent != set.head) {
-      DestroyCommandIssueWeakSetNodes(set.head->parent, set.head);
-    }
-
-    ::operator delete(set.head);
-    set.proxy = nullptr;
-    set.head = nullptr;
-    set.size = 0u;
-  }
-
-  [[nodiscard]] CommandIssueWeakSetNode* CloneCommandIssueWeakSetNode(
-    const CommandIssueWeakSetNode* const sourceNode,
-    const CommandIssueWeakSetNode* const sourceHead,
-    CommandIssueWeakSetNode* const destinationHead,
-    CommandIssueWeakSetNode* const parent
-  )
-  {
-    if (sourceNode == nullptr || sourceNode == sourceHead) {
-      return destinationHead;
-    }
-
-    auto* const destinationNode = static_cast<CommandIssueWeakSetNode*>(::operator new(sizeof(CommandIssueWeakSetNode)));
-    destinationNode->left = destinationHead;
-    destinationNode->parent = parent;
-    destinationNode->right = destinationHead;
-    destinationNode->key = sourceNode->key;
-    destinationNode->value.ownerLinkSlot = nullptr;
-    destinationNode->value.nextInOwner = nullptr;
-    destinationNode->value.ResetFromOwnerLinkSlot(sourceNode->value.ownerLinkSlot);
-    destinationNode->color = sourceNode->color;
-    destinationNode->isNil = sourceNode->isNil;
-    destinationNode->pad_1A_1B[0] = sourceNode->pad_1A_1B[0];
-    destinationNode->pad_1A_1B[1] = sourceNode->pad_1A_1B[1];
-
-    destinationNode->left =
-      CloneCommandIssueWeakSetNode(sourceNode->left, sourceHead, destinationHead, destinationNode);
-    destinationNode->right =
-      CloneCommandIssueWeakSetNode(sourceNode->right, sourceHead, destinationHead, destinationNode);
-    return destinationNode;
-  }
-
-  void CopyCommandIssueWeakSet(
-    CommandIssueWeakSetRuntimeView& destination,
-    const CommandIssueWeakSetRuntimeView& source
-  )
-  {
-    if (&destination == &source) {
-      return;
-    }
-
-    DestroyCommandIssueWeakSet(destination);
-    destination.proxy = source.proxy;
-    if (source.head == nullptr) {
-      destination.head = nullptr;
-      destination.size = 0u;
-      return;
-    }
-
-    destination.head = AllocateCommandIssueWeakSetHead();
-    destination.size = source.size;
-    if (source.head->parent == source.head || source.size == 0u) {
-      destination.head->left = destination.head;
-      destination.head->parent = destination.head;
-      destination.head->right = destination.head;
-      return;
-    }
-
-    destination.head->parent = CloneCommandIssueWeakSetNode(
-      source.head->parent,
-      source.head,
-      destination.head,
-      destination.head
-    );
-    destination.head->parent->parent = destination.head;
-    destination.head->left = CommandIssueWeakSetMinNode(destination.head->parent, destination.head);
-    destination.head->right = CommandIssueWeakSetMaxNode(destination.head->parent, destination.head);
-  }
-
-  void InitializeCommandIssueTarget(CAiTarget& target)
-  {
-    target.targetType = EAiTargetType::AITARGET_None;
-    target.targetEntity.ResetFromObject(nullptr);
-    target.position = Wm3::Vec3f{0.0f, 0.0f, 0.0f};
-    target.targetPoint = 0;
-    target.targetIsMobile = false;
-  }
-
-  /**
-   * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
-   *
-   * What it does:
-   * Initializes one command-issue local queue event with command id, event type,
-   * empty weak-set payload, empty target payload, and inline cell-vector lanes.
-   */
-  void InitializeCommandIssueUpdateEvent(
-    CommandIssueUpdateEventRuntimeView& event,
-    const CmdId commandId,
-    const std::uint32_t eventType
-  )
-  {
-    event.commandId = commandId;
-    event.eventType = eventType;
-    InitializeCommandIssueWeakSetEmpty(event.entitySet);
-    event.count = 0;
-    InitializeCommandIssueTarget(event.target);
-    gpg::FastVectorN2InitInlineNoHeader(event.cells);
-  }
-
-  void DestroyCommandIssueUpdateEvent(CommandIssueUpdateEventRuntimeView& event)
-  {
-    event.target.targetEntity.ResetFromObject(nullptr);
-    event.cells.ResetStorageToInline();
-    DestroyCommandIssueWeakSet(event.entitySet);
-  }
-
-  /**
-   * Address: 0x008B56F0 (FUN_008B56F0, sub_8B56F0)
-   *
-   * What it does:
-   * Copy-constructs one command-issue local queue event: command id and event
-   * type by value, the weak-set entity payload via CopyCommandIssueWeakSet,
-   * count, target, and the inline cell-vector lanes via
-   * gpg::FastVectorN2RebindAndCopy. Reached unconditionally from
-   * EnqueueCommandIssueUpdateEvent (0x008B4E80) once that function has
-   * already guaranteed the destination slot is non-null -- the binary's
-   * sub_8B52C0 null-check wrapper around this body is therefore always-true
-   * at its only real call site and is correctly elided here rather than
-   * modeled as a separate function.
-   */
-  void CopyCommandIssueUpdateEvent(
-    CommandIssueUpdateEventRuntimeView& destination,
-    const CommandIssueUpdateEventRuntimeView& source
-  )
-  {
-    if (&destination == &source) {
-      return;
-    }
-
-    destination.commandId = source.commandId;
-    destination.eventType = source.eventType;
-    CopyCommandIssueWeakSet(destination.entitySet, source.entitySet);
-    destination.count = source.count;
-    destination.target = source.target;
-    destination.target.targetPoint = source.target.targetPoint;
-    destination.cells.ResetStorageToInline();
-    gpg::FastVectorN2RebindAndCopy<SOCellPos>(&destination.cells, &source.cells);
-  }
-
-  /**
-   * Address: 0x008B55D0 (FUN_008B55D0, checked allocator for
-   * CommandIssueUpdateEventRuntimeView, elementSize=0x50, reached from
-   * EnqueueCommandIssueUpdateEvent via this function)
-   *
-   * The binary routes the allocation through a checked `_Allocate(count,
-   * elementSize)`-shaped wrapper (`0xFFFFFFFF/count < 0x50` throws
-   * `std::bad_alloc`, else `operator new(0x50*count)`) called with count=1;
-   * for a hardcoded count of 1 this is behaviorally identical to the plain
-   * `::operator new` below (the guard cannot be reached), so no separate
-   * checked-allocator call is introduced here.
-   */
-  [[nodiscard]] CommandIssueUpdateEventRuntimeView* AllocateCommandIssueUpdateSlot()
-  {
-    auto* const storage = static_cast<CommandIssueUpdateEventRuntimeView*>(::operator new(sizeof(CommandIssueUpdateEventRuntimeView)));
-    new (storage) CommandIssueUpdateEventRuntimeView{};
-    InitializeCommandIssueUpdateEvent(*storage, 0, 0u);
-    return storage;
-  }
-
-  /**
-   * Address: 0x008B50A0 (FUN_008B50A0, sub_8B50A0)
-   *
-   * IDA signature:
-   * char *__usercall sub_8B50A0@<eax>(int this@<esi>);  // this = deque map struct
-   *
-   * What it does:
-   * MSVC8 std::deque<CommandIssueUpdateEventRuntimeView>::_Growmap for the
-   * command-issue helper's local ring (block size 1). Enlarges the block-pointer
-   * map by growth = clamp(oldCapacity/2, min 8) capped so oldCapacity+growth does
-   * not exceed kCommandIssueQueueMaxCapacity (throws std::length_error otherwise).
-   * Allocates a new map (checked allocator, or bare operator new when the new size
-   * is 0), then relocates the wrapped contents preserving the ABSOLUTE readIndex
-   * (_Myoff) position: the tail [readIndex..oldCapacity) stays in place; the front
-   * segment [0..readIndex) is split across the newly-added high slots and the low
-   * slots depending on whether readIndex <= growth, with the vacated slots zeroed.
-   * Frees the old map, then sets capacity += growth and slots = newMap. readIndex
-   * and count are left unchanged. Returns the new map (caller ignores the result).
-   */
-  CommandIssueUpdateEventRuntimeView** GrowCommandIssueUpdateQueue(CommandIssueUpdateQueueRuntimeView& queue)
-  {
-    const std::uint32_t oldCapacity = queue.capacity;
-
-    // deque map-size overflow guard (0x3333333 - mapsize < 1 == mapsize maxed out).
-    if ((kCommandIssueQueueMaxCapacity - oldCapacity) < 1u) {
-      ThrowCommandIssueQueueTooLong();
-    }
-
-    std::uint32_t growth = 1u;
-    std::uint32_t halfCapacity = oldCapacity >> 1u;
-    if (halfCapacity < 8u) {
-      halfCapacity = 8u;
-    }
-    if (oldCapacity <= (kCommandIssueQueueMaxCapacity - halfCapacity)) {
-      growth = halfCapacity;
-    }
-
-    const std::uint32_t newCapacity = oldCapacity + growth;
-    const std::uint32_t readIndex = queue.readIndex;
-
-    CommandIssueUpdateEventRuntimeView** const newSlots =
-      (newCapacity != 0u)
-        ? AllocateCommandIssueUpdateMap(newCapacity)
-        : static_cast<CommandIssueUpdateEventRuntimeView**>(::operator new(0));
-
-    constexpr std::size_t slotBytes = sizeof(CommandIssueUpdateEventRuntimeView*);
-    CommandIssueUpdateEventRuntimeView** const oldSlots = queue.slots;
-
-    // Tail: new[readIndex..oldCapacity) = old[readIndex..oldCapacity).
-    const std::uint32_t tailCount = oldCapacity - readIndex;
-    if (tailCount != 0u) {
-      ::memmove_s(newSlots + readIndex, tailCount * slotBytes,
-                  oldSlots + readIndex, tailCount * slotBytes);
-    }
-
-    if (readIndex > growth) {
-      // Front [0..readIndex) wraps past the newly added slots.
-      // Head-copy: new[oldCapacity..oldCapacity+growth) = old[0..growth).
-      if (growth != 0u) {
-        ::memmove_s(newSlots + oldCapacity, growth * slotBytes,
-                    oldSlots, growth * slotBytes);
-      }
-      // Mid-copy: new[0..readIndex-growth) = old[growth..readIndex).
-      const std::uint32_t midCount = readIndex - growth;
-      if (midCount != 0u) {
-        ::memmove_s(newSlots, midCount * slotBytes,
-                    oldSlots + growth, midCount * slotBytes);
-      }
-      // Zero the slots vacated by the wrap: new[readIndex-growth..readIndex).
-      if (growth != 0u) {
-        std::memset(newSlots + (readIndex - growth), 0, growth * slotBytes);
-      }
-    } else {
-      // Front fits within the added slots.
-      // Head-copy: new[oldCapacity..oldCapacity+readIndex) = old[0..readIndex).
-      if (readIndex != 0u) {
-        ::memmove_s(newSlots + oldCapacity, readIndex * slotBytes,
-                    oldSlots, readIndex * slotBytes);
-      }
-      // Zero the freshly grown remainder: new[oldCapacity+readIndex..newCapacity).
-      if (growth != readIndex) {
-        std::memset(newSlots + (oldCapacity + readIndex), 0,
-                    (growth - readIndex) * slotBytes);
-      }
-      // Zero the low slots the front vacated: new[0..readIndex).
-      if (readIndex != 0u) {
-        std::memset(newSlots, 0, readIndex * slotBytes);
-      }
-    }
-
-    if (oldSlots != nullptr) {
-      ::operator delete(oldSlots);
-    }
-
-    queue.capacity = oldCapacity + growth;
-    queue.slots = newSlots;
-    return newSlots;
-  }
-
-  /**
-   * Address: 0x008B4E80 (FUN_008B4E80, sub_8B4E80)
-   *
-   * What it does:
-   * Enqueues one local command-issue update event into the helper ring queue,
-   * growing slot storage and slot-event storage on demand.
-   */
-  void EnqueueCommandIssueUpdateEvent(
-    CommandIssueUpdateQueueRuntimeView& queue,
-    const CommandIssueUpdateEventRuntimeView& event
-  )
-  {
-    if (queue.capacity <= (queue.count + 1u)) {
-      GrowCommandIssueUpdateQueue(queue);
-    }
-
-    std::uint32_t writeIndex = queue.readIndex + queue.count;
-    if (writeIndex >= queue.capacity) {
-      writeIndex -= queue.capacity;
-    }
-
-    if (queue.slots[writeIndex] == nullptr) {
-      queue.slots[writeIndex] = AllocateCommandIssueUpdateSlot();
-    }
-
-    CopyCommandIssueUpdateEvent(*queue.slots[writeIndex], event);
-    ++queue.count;
-  }
-
-  /**
-   * Address: 0x008B3E50 (FUN_008B3E50, sub_8B3E50)
-   *
-   * What it does:
-   * Relocate-copies a UI-side command target's type/entity-link/position
-   * lanes (the first 0x18 bytes of `moho::UserTarget`, see
-   * `UserCommandTargetView`'s own doc comment in UserUnit.h) into a sim-side
-   * `CAiTarget`, relinking the destination's weak-entity chain membership to
-   * the source's when they differ and leaving `targetPoint`/`targetIsMobile`
-   * untouched (matches `CAiTarget::CopyFromLinkedTarget`'s own field split,
-   * just against a different source type). Sole caller is `sub_8B4A40`
-   * (0x008B4A68: eax=dest=localEvent+0x18, esi=source=sub_8B4A40's own 3rd
-   * stack arg).
-   */
-  CAiTarget& CopyUserCommandTargetIntoAiTarget(
-    CAiTarget& destination, const UserCommandTargetView& source
-  ) noexcept
-  {
-    destination.targetType = static_cast<EAiTargetType>(source.targetType);
-    if (reinterpret_cast<std::uintptr_t>(destination.targetEntity.ownerLinkSlot) != source.targetEntity.ownerLinkSlot) {
-      destination.targetEntity.ResetFromOwnerLinkSlot(reinterpret_cast<void*>(source.targetEntity.ownerLinkSlot));
-    }
-    destination.position = source.position;
-    return destination;
-  }
-
   /**
    * Address: 0x008BECD0 (FUN_008BECD0, sub_8BECD0)
    *
    * What it does:
-   * Converts one UI-side command target (`moho::UserTarget`, see
-   * `UserCommandTargetView` in UserUnit.h) into the sim-side network payload
+   * Converts one UI-side command target (`moho::UserTarget`,
+   * moho/command/UserTarget.h) into the sim-side network payload
    * `SSTITarget`. `Entity` targets resolve the owning `UserEntity`'s stable
    * id (`SCreateEntityParams::mEntityId` at `UserEntity::mParams`, decoded
    * through the same `ownerLinkSlot - 8` weak-owner convention used
@@ -2839,7 +2305,7 @@ namespace
    * `AITARGET_None` with the sentinel id. Sole caller is
    * `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
    */
-  [[nodiscard]] SSTITarget ConvertUserCommandTargetToSSTITarget(const UserCommandTargetView& source) noexcept
+  [[nodiscard]] SSTITarget ConvertUserCommandTargetToSSTITarget(const UserTarget& source) noexcept
   {
     constexpr std::uint32_t kUnresolvedTargetEntityId = 0xF0000000u;
 
@@ -2847,9 +2313,7 @@ namespace
     if (source.targetType == UserTargetType::Entity) {
       result.mType = EAiTargetType::AITARGET_Entity;
       result.mEntityId = kUnresolvedTargetEntityId;
-      if (source.targetEntity.ownerLinkSlot != 0u && source.targetEntity.ownerLinkSlot != 8u) {
-        const auto* const entity =
-          reinterpret_cast<const UserEntity*>(source.targetEntity.ownerLinkSlot - 8u);
+      if (const UserEntity* const entity = source.targetEntity.GetObjectPtr(); entity != nullptr) {
         result.mEntityId = entity->mParams.mEntityId;
       }
     } else if (source.targetType == UserTargetType::Position) {
@@ -2863,39 +2327,20 @@ namespace
     return result;
   }
 
-  // Local command-issue update event type used for "set target" events
-  // (0x008B4A5F: `mov ecx, 4` feeding InitializeCommandIssueUpdateEvent).
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeSetTarget = 4u;
-
   /**
    * Address: 0x008B4A40 (FUN_008B4A40, sub_8B4A40)
    *
    * What it does:
-   * Builds one local "set-target" command-issue update event (command id
-   * `commandId`, target payload relocate-copied from `targetPayload` via
-   * `CopyUserCommandTargetIntoAiTarget`), enqueues it into the helper's
-   * local ring queue, then destroys the local event. Sole caller is
-   * `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
-   *
-   * The destroy step calls the real `sub_8B4800` (`DestroyCommandIssueLocalEvent`,
-   * UserUnit.cpp) rather than this file's own unaddressed
-   * `DestroyCommandIssueUpdateEvent` symmetry helper - the binary call site
-   * (0x008B4A9E) resolves to 0x008B4800 specifically. `UserCommandIssueLocalEventRuntimeView`
-   * and `CommandIssueUpdateEventRuntimeView` are proven byte-compatible for
-   * every field both name (see the former's doc comment in UserUnit.h), so
-   * the cast below is a same-object dual-view bridge, not a layout guess.
+   * Queues one local "set target" edit on the helper: the event is built
+   * (0x008B3DC0), its target assigned from `target` (`UserTarget`'s implicit
+   * copy assignment, 0x008B3E50), pushed (0x008B4E80) and destroyed
+   * (0x008B4800). Sole caller is `Moho::ISSUE_SetCommandTarget` (0x008B0EE0).
    */
-  void QueueCommandIssueSetTargetEvent(
-    CommandIssueHelperRuntimeView& commandIssueHelper,
-    const CmdId commandId,
-    const UserCommandTargetView& targetPayload
-  )
+  void QueueCommandIssueSetTargetEvent(UserCommandIssueHelper& helper, const CmdId cmdId, const UserTarget& target)
   {
-    CommandIssueUpdateEventRuntimeView localEvent{};
-    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSetTarget);
-    CopyUserCommandTargetIntoAiTarget(localEvent.target, targetPayload);
-    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
-    DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
+    UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::SetTarget);
+    event.mTarget = target;
+    helper.mLocalQueue.push_back(event);
   }
 
 } // namespace
@@ -2929,10 +2374,8 @@ namespace moho
    * publishes it through the active sim driver, then queues the matching
    * local "set-target" update event via `QueueCommandIssueSetTargetEvent`.
    */
-  void ISSUE_SetCommandTarget(UserCommandIssueHelper* const helper, const UserCommandTargetView& target)
+  void ISSUE_SetCommandTarget(UserCommandIssueHelper* const helper, const UserTarget& target)
   {
-    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(*helper);
-
     CWldSession* const session = WLD_GetActiveSession();
     auto* const playableMap = session->mWldMap->mTerrainRes->mMap;
 
@@ -2970,8 +2413,7 @@ namespace moho
     // entity in one of the three transport-ish categories below. Every other
     // command type retargets unconditionally.
     if (ResolveCommandIssueHelperCommandType(*helper) == static_cast<EUnitCommandType>(22)) {
-      if (target.targetType == UserTargetType::Entity && target.targetEntity.ownerLinkSlot != 0u &&
-          target.targetEntity.ownerLinkSlot != 8u) {
+      if (target.targetType == UserTargetType::Entity && target.targetEntity.HasValue()) {
         UserEntity* const targetEntity = DecodeEntityFromCommandTargetIfEntity(&target);
         const bool isEligibleEntity = targetEntity->IsInCategory(msvc8::string("FERRYBEACON", 11u)) ||
           targetEntity->IsInCategory(msvc8::string("TRANSPORTATION", 14u)) ||
@@ -3005,20 +2447,16 @@ namespace moho
     // which is the same shape `ISSUE_DecreaseCommandCount` already uses for
     // its own `resultCookie`. Passing the command id instead put a command id
     // where the drain expects a beat.
-    CmdId resultCookie = helperView.commandId;
+    CmdId resultCookie = helper->mConstantData.cmd;
     if (ISTIDriver* const simDriver = SIM_GetActiveDriver()) {
-      resultCookie = simDriver->SetCommandTarget(helperView.commandId, ConvertUserCommandTargetToSSTITarget(target));
+      resultCookie = simDriver->SetCommandTarget(helper->mConstantData.cmd, ConvertUserCommandTargetToSSTITarget(target));
     }
-    QueueCommandIssueSetTargetEvent(helperView, resultCookie, target);
+    QueueCommandIssueSetTargetEvent(*helper, resultCookie, target);
   }
 } // namespace moho
 
 namespace
 {
-
-  // Local command-issue update event type used for "set command type" events
-  // (0x008B4AE3: `mov ecx, 5` feeding InitializeCommandIssueUpdateEvent).
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeSetType = 5u;
 
   /**
    * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)
@@ -3027,189 +2465,55 @@ namespace
    * void __stdcall sub_8B4AC0(int arg0, int a2, int a3);
    *
    * What it does:
-   * Builds one local "set-type" command-issue update event (command id
-   * `commandId`), packs `newCommandType` into the target payload's
-   * `targetPoint` slot (0x008B4AF8: `mov [eax+30h], ecx` - the same
-   * union-style tag-data reuse `QueueCommandIssueSetTargetEvent`'s sibling
-   * events use for their own payload data), enqueues it into the helper's
-   * local ring queue, then destroys the local event. Sole caller is
-   * `Moho::ReissueCommandIssueEntryAsType` below.
+   * Queues one local "set command type" edit (`mCommandType` at event+0x30,
+   * 0x008B4AF8). Sole caller is `Moho::ReissueCommandIssueEntryAsType`.
    */
   void QueueCommandIssueSetTypeEvent(
-    CommandIssueHelperRuntimeView& commandIssueHelper,
-    const CmdId commandId,
-    const EUnitCommandType newCommandType
+    UserCommandIssueHelper& helper, const CmdId cmdId, const EUnitCommandType newCommandType
   )
   {
-    CommandIssueUpdateEventRuntimeView localEvent{};
-    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSetType);
-    localEvent.target.targetPoint = static_cast<std::int32_t>(newCommandType);
-    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
-    DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
-  }
-
-  /**
-   * Address: 0x008B4960 (FUN_008B4960, sub_8B4960)
-   *
-   * What it does:
-   * Builds one `IncreaseCommandCount` local update event and appends it into
-   * the command-issue helper's local ring queue.
-   */
-  [[maybe_unused]] void QueueCommandIssueIncreaseCountEvent(
-    CommandIssueHelperRuntimeView& commandIssueHelper,
-    const CmdId commandId,
-    const std::int32_t deltaCount
-  )
-  {
-    CommandIssueUpdateEventRuntimeView localEvent{};
-    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeIncreaseCount);
-    localEvent.count = deltaCount;
-    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
-    DestroyCommandIssueUpdateEvent(localEvent);
+    UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::SetCommandType);
+    event.mCommandType = newCommandType;
+    helper.mLocalQueue.push_back(event);
   }
 
   /**
    * Address: 0x008B49D0 (FUN_008B49D0, sub_8B49D0)
    *
    * What it does:
-   * Builds one `DecreaseCommandCount` local update event and appends it into
-   * the command-issue helper's local ring queue.
+   * Queues one local "decrease count" edit of `deltaCount`.
+   *
+   * Address: 0x008B4960 (FUN_008B4960 -- the "increase count" sibling, the same
+   * body with kind 1; zero callers and no references in the image, a
+   * linker-retained copy nothing runs.)
    */
-  void QueueCommandIssueDecreaseCountEvent(
-    CommandIssueHelperRuntimeView& commandIssueHelper,
-    const CmdId commandId,
-    const std::int32_t deltaCount
-  )
+  void QueueCommandIssueDecreaseCountEvent(UserCommandIssueHelper& helper, const CmdId cmdId, const std::int32_t deltaCount)
   {
-    CommandIssueUpdateEventRuntimeView localEvent{};
-    InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeDecreaseCount);
-    localEvent.count = deltaCount;
-    EnqueueCommandIssueUpdateEvent(commandIssueHelper.localQueue, localEvent);
-    DestroyCommandIssueUpdateEvent(localEvent);
-  }
-
-  // Local command-issue update event type used for "select this unit" events
-  // (the ring's default event kind whose weak set `WeakSet<UserUnit>::Add` fills).
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeSelectUnit = 0u;
-
-  // Computes the ring index of the most-recently-enqueued (last) event.
-  // Binary form (0x008B474D-0x008B4762): index = readIndex + count - 1, with a
-  // single-step wrap when it reaches/exceeds the ring capacity.
-  [[nodiscard]] std::uint32_t LastCommandIssueEventIndex(const CommandIssueUpdateQueueRuntimeView& queue)
-  {
-    std::uint32_t index = queue.readIndex + queue.count - 1u;
-    if (queue.capacity <= index) {
-      index -= queue.capacity;
-    }
-    return index;
+    UserCommandIssueLocalEvent event(cmdId, ECommandIssueEvent::DecreaseCount);
+    event.mCount = deltaCount;
+    helper.mLocalQueue.push_back(event);
   }
 
   /**
-   * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
-   *
-   * IDA signature:
-   * int __userpurge sub_8B4720@<eax>(_DWORD *ebx0@<ebx>, int a2, unsigned int a3);
-   *   ebx = UserCommandIssueHelper*, a2 = CmdId, a3 = UserUnit*
-   *
-   * What it does:
-   * Appends a "select unit" local update event into the helper's local ring
-   * queue when the queue is empty, or when the last event is not already a
-   * select-event (eventType != 0) for this command id, then inserts `unit`
-   * into that last event's weak-set. The freshly-built temp event is created
-   * via InitializeCommandIssueUpdateEvent, enqueued (deep-copied into the ring)
-   * via EnqueueCommandIssueUpdateEvent, and torn down via
-   * DestroyCommandIssueUpdateEvent; the binary wraps that teardown in an SEH
-   * frame so the temp is released on both the normal and throwing paths, which
-   * is modeled here with an RAII scope guard.
+   * The shared body of `QueueCommandIssueSelectUnitEvent` (0x008B4720) and
+   * `QueueCommandIssueDeselectUnitEvent` (0x008B4880), which differ only in
+   * the event kind. Adds `unit` to the newest local edit when that edit is already a
+   * `kind` edit for `cmdId` (the back of the deque, index `off + size - 1`
+   * wrapped once at 0x008B474D..0x008B4762); otherwise queues a fresh empty
+   * one first. The unit goes in through `WeakSet<UserUnit>::Add` (0x00822270).
    */
-  void QueueCommandIssueSelectUnitEventImpl(
-    UserCommandIssueHelper& helper,
-    const CmdId commandId,
-    UserUnit* const unit
+  void QueueCommandIssueUnitEvent(
+    UserCommandIssueHelper& helper, const CmdId cmdId, const ECommandIssueEvent kind, UserUnit* const unit
   )
   {
-    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(helper);
-    CommandIssueUpdateQueueRuntimeView& queue = helperView.localQueue;
-
-    bool needNewEvent = true;
-    if (queue.count != 0u) {
-      const CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
-      if (lastEvent->eventType == kCommandIssueUpdateEventTypeSelectUnit && lastEvent->commandId == commandId) {
-        needNewEvent = false;
-      }
+    msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    if (events.empty() || events.back().mType != kind || events.back().mCmdId != cmdId) {
+      const UserCommandIssueLocalEvent event(cmdId, kind);
+      events.push_back(event);
     }
 
-    if (needNewEvent) {
-      CommandIssueUpdateEventRuntimeView localEvent{};
-      InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeSelectUnit);
-      struct LocalEventScopeGuard
-      {
-        CommandIssueUpdateEventRuntimeView* event;
-        ~LocalEventScopeGuard() { DestroyCommandIssueUpdateEvent(*event); }
-      } guard{&localEvent};
-      EnqueueCommandIssueUpdateEvent(queue, localEvent);
-    }
-
-    CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
-    // entitySet is the 0x0C {proxy, head@+4, size} weak-set at event+0x08 - the
-    // same `WeakSet<UserUnit>` header `WeakSet<UserUnit>::Add` (0x00822270)
-    // takes, which is why the binary reaches it here with no adjustment at all.
-    WeakUnitSetUserUnit::AddResult selectedUnitAdd{};
-    (void)WeakUnitSetUserUnit::Add(
-      &selectedUnitAdd, reinterpret_cast<WeakUnitSetUserUnit*>(&lastEvent->entitySet), unit
-    );
-  }
-
-  // Local command-issue update event type used for "deselect unit" events
-  // (0x008B48F1: `mov ecx, 3` feeding InitializeCommandIssueUpdateEvent) -
-  // the DeselectUnit complement of kCommandIssueUpdateEventTypeSelectUnit.
-  constexpr std::uint32_t kCommandIssueUpdateEventTypeDeselectUnit = 3u;
-
-  /**
-   * Address: 0x008B4880 (FUN_008B4880, sub_8B4880)
-   *
-   * What it does:
-   * Structural mirror of QueueCommandIssueSelectUnitEventImpl (FUN_008B4720)
-   * with eventType=3 instead of 0: appends a "deselect unit" local update
-   * event into the helper's local ring queue when the queue is empty, or
-   * when the last event is not already a deselect-event (eventType != 3)
-   * for this command id, then inserts `unit` into that last event's
-   * weak-set. Unlike its select-unit sibling, the binary's own rebuild path
-   * (0x008B491D) tears the temporary down through the real
-   * `DestroyCommandIssueLocalEvent` (0x008B4800, UserUnit.h) rather than
-   * this file's own `DestroyCommandIssueUpdateEvent` symmetry helper -
-   * matched here exactly like `QueueCommandIssueSetTargetEvent` does for
-   * the same reason.
-   */
-  void QueueCommandIssueDeselectUnitEventImpl(
-    UserCommandIssueHelper& helper,
-    const CmdId commandId,
-    UserUnit* const unit
-  )
-  {
-    auto& helperView = reinterpret_cast<CommandIssueHelperRuntimeView&>(helper);
-    CommandIssueUpdateQueueRuntimeView& queue = helperView.localQueue;
-
-    bool needNewEvent = true;
-    if (queue.count != 0u) {
-      const CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
-      if (lastEvent->eventType == kCommandIssueUpdateEventTypeDeselectUnit && lastEvent->commandId == commandId) {
-        needNewEvent = false;
-      }
-    }
-
-    if (needNewEvent) {
-      CommandIssueUpdateEventRuntimeView localEvent{};
-      InitializeCommandIssueUpdateEvent(localEvent, commandId, kCommandIssueUpdateEventTypeDeselectUnit);
-      EnqueueCommandIssueUpdateEvent(queue, localEvent);
-      DestroyCommandIssueLocalEvent(reinterpret_cast<UserCommandIssueLocalEventRuntimeView&>(localEvent));
-    }
-
-    CommandIssueUpdateEventRuntimeView* const lastEvent = queue.slots[LastCommandIssueEventIndex(queue)];
-    WeakUnitSetUserUnit::AddResult deselectedUnitAdd{};
-    (void)WeakUnitSetUserUnit::Add(
-      &deselectedUnitAdd, reinterpret_cast<WeakUnitSetUserUnit*>(&lastEvent->entitySet), unit
-    );
+    WeakUnitSetUserUnit::AddResult added{};
+    (void)WeakUnitSetUserUnit::Add(&added, &events.back().mUnits, unit);
   }
 
   CUnitCommand* FindCommandById(CCommandDb* commandDb, const CmdId cmdId)
@@ -3460,7 +2764,7 @@ namespace moho
   ) noexcept
   {
     QueueCommandIssueSetTypeEvent(
-      reinterpret_cast<CommandIssueHelperRuntimeView&>(helper), newCmdId, newCommandType
+      helper, newCmdId, newCommandType
     );
   }
 
@@ -4518,23 +3822,17 @@ namespace
     entity->Warp(transform);
   }
 
-  struct RUnitBlueprintIdView
-  {
-    msvc8::string id;
-  };
-
-  static_assert(
-    sizeof(RUnitBlueprintIdView) == sizeof(msvc8::string), "RUnitBlueprintIdView layout must match msvc8::string"
-  );
-
+  /**
+   * `REntityBlueprint::mBlueprintId` (+0x08) of the entity's blueprint:
+   * `[bp+0x20]` capacity test, `[bp+0x0C]` buffer (0x0074A9FE, 0x0068BF9A).
+   */
   const char* ResolveBlueprintIdCString(const Entity* entity)
   {
     if (!entity || !entity->BluePrint) {
       return "";
     }
 
-    const auto* blueprint = reinterpret_cast<const RUnitBlueprintIdView*>(entity->BluePrint);
-    return blueprint->id.raw_data_unsafe();
+    return entity->BluePrint->mBlueprintId.raw_data_unsafe();
   }
 
   /**
@@ -6132,28 +5430,28 @@ namespace moho
    * Address: 0x008B4720 (FUN_008B4720, sub_8B4720)
    *
    * What it does:
-   * Public entry point (declared in UserUnit.h) that appends a "select unit"
-   * local update event into `helper`'s ring queue when needed, then inserts
-   * `unit` into that event's weak-set. Forwards to
-   * QueueCommandIssueSelectUnitEventImpl.
+   * IDA signature:
+   * int __userpurge sub_8B4720@<eax>(_DWORD *ebx0@<ebx>, int a2, unsigned int a3);
+   *   ebx = UserCommandIssueHelper*, a2 = CmdId, a3 = UserUnit*
+   *
+   * What it does:
+   * Adds `unit` to the helper's newest "select unit" edit for `cmdId`,
+   * queueing a fresh one first when the newest edit is anything else.
    */
   void QueueCommandIssueSelectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
   {
-    ::QueueCommandIssueSelectUnitEventImpl(*helper, cmdId, unit);
+    ::QueueCommandIssueUnitEvent(*helper, cmdId, ECommandIssueEvent::SelectUnit, unit);
   }
 
   /**
    * Address: 0x008B4880 (FUN_008B4880, sub_8B4880)
    *
    * What it does:
-   * Public entry point (declared in UserUnit.h) that appends a "deselect
-   * unit" local update event into `helper`'s ring queue when needed, then
-   * inserts `unit` into that event's weak-set. Forwards to
-   * QueueCommandIssueDeselectUnitEventImpl.
+   * The "deselect unit" twin of `QueueCommandIssueSelectUnitEvent`.
    */
   void QueueCommandIssueDeselectUnitEvent(UserCommandIssueHelper* const helper, const CmdId cmdId, UserUnit* const unit)
   {
-    ::QueueCommandIssueDeselectUnitEventImpl(*helper, cmdId, unit);
+    ::QueueCommandIssueUnitEvent(*helper, cmdId, ECommandIssueEvent::DeselectUnit, unit);
   }
 } // namespace moho
 
@@ -20444,7 +19742,7 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  CommandIssueHelperRuntimeView* const commandIssue = FindCommandIssueHelper(session, commandId);
+  UserCommandIssueHelper* const commandIssue = FindCommandIssueHelper(session, commandId);
   if (!commandIssue) {
     return 0;
   }
@@ -20453,7 +19751,7 @@ int moho::cfunc_DeleteCommandL(LuaPlus::LuaState* const state)
     // The driver marshals the decrement and returns the resulting command
     // cookie; the event is queued with that cookie (FUN_00843FA0 passes the
     // DecreaseCommandCount result, not the input command id).
-    const CmdId resultCookie = activeDriver->DecreaseCommandCount(commandIssue->commandId, 1);
+    const CmdId resultCookie = activeDriver->DecreaseCommandCount(commandIssue->mConstantData.cmd, 1);
     QueueCommandIssueDecreaseCountEvent(*commandIssue, resultCookie, 1);
   }
 
@@ -20510,12 +19808,12 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
   for (const CmdId* cursor = commandEnd; cursor != commandBegin; --cursor) {
     const CmdId commandId = *(cursor - 1);
 
-    CommandIssueHelperRuntimeView* const helper = FindCommandIssueHelper(session, commandId);
+    UserCommandIssueHelper* const helper = FindCommandIssueHelper(session, commandId);
     if (helper == nullptr) {
       continue;
     }
 
-    const std::int32_t available = QueuedBuildCommandCount(reinterpret_cast<const UserCommandIssueHelper&>(*helper));
+    const std::int32_t available = QueuedBuildCommandCount(*helper);
     std::int32_t take = remaining;
     if (remaining <= available) {
       remaining = 0;
@@ -20527,7 +19825,7 @@ int moho::cfunc_DecreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
     // The driver marshals the decrement and returns the resulting command cookie;
     // the local event is queued with that cookie (not the input command id).
     ISTIDriver* const activeDriver = SIM_GetActiveDriver();
-    const CmdId resultCookie = activeDriver->DecreaseCommandCount(helper->commandId, take);
+    const CmdId resultCookie = activeDriver->DecreaseCommandCount(helper->mConstantData.cmd, take);
     QueueCommandIssueDecreaseCountEvent(*helper, resultCookie, take);
 
     if (remaining <= 0) {
@@ -20590,15 +19888,15 @@ int moho::cfunc_IncreaseBuildCountInQueueL(LuaPlus::LuaState* const state)
   for (const CmdId* cursor = commandEnd; cursor != commandBegin; --cursor) {
     const CmdId commandId = *(cursor - 1);
 
-    CommandIssueHelperRuntimeView* const helper = FindCommandIssueHelper(session, commandId);
+    UserCommandIssueHelper* const helper = FindCommandIssueHelper(session, commandId);
     if (helper == nullptr) {
       continue;
     }
 
-    if (ResolveCommandIssueHelperCommandType(reinterpret_cast<const UserCommandIssueHelper&>(*helper))
+    if (ResolveCommandIssueHelperCommandType(*helper)
           == EUnitCommandType::UNITCOMMAND_BuildFactory
         && count > 0) {
-      ISSUE_IncreaseCommandCount(reinterpret_cast<UserCommandIssueHelper*>(helper), count);
+      ISSUE_IncreaseCommandCount(helper, count);
       break;
     }
   }
@@ -27895,9 +27193,7 @@ namespace moho
   {
     ISTIDriver* const simDriver = SIM_GetActiveDriver();
     const CmdId resultCookie = simDriver->DecreaseCommandCount(helper->mConstantData.cmd, count);
-    QueueCommandIssueDecreaseCountEvent(
-      reinterpret_cast<CommandIssueHelperRuntimeView&>(*helper), resultCookie, count
-    );
+    QueueCommandIssueDecreaseCountEvent(*helper, resultCookie, count);
   }
 
   /**
