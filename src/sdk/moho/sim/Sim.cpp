@@ -4163,16 +4163,6 @@ namespace
     return moho::console::SimPathTimeoutPreviewConVar();
   }
 
-  struct PathPreviewFinderQueueOwnerRuntimeView
-  {
-    std::uint8_t mPad00_03[0x4];
-    TDatListItem<void, void> mQueueHead; // +0x04, owned by CArmyImpl's still-unresolved PathQueue lane
-  };
-  static_assert(
-    offsetof(PathPreviewFinderQueueOwnerRuntimeView, mQueueHead) == 0x4,
-    "PathPreviewFinderQueueOwnerRuntimeView::mQueueHead offset"
-  );
-
 } // namespace
 
 // `Moho::PathPreviewFinder` is forward-declared at real `moho::` scope in
@@ -4242,7 +4232,7 @@ namespace moho
     CArmyImpl* mOwnerContext;         // +0x0C
     Sim* mSim;                        // +0x10
     COGrid* mOGrid;                   // +0x14
-    void* mPathPreviewCallbackOwner;  // +0x18 (CArmyImpl::GetPathFinder() result; still-unresolved PathQueue owner)
+    PathQueue* mPathQueue;            // +0x18: the owning army's path queue (`CArmyImpl::PathFinder`)
     SOCellPos mStartCell;             // +0x1C
     SOCellPos mGoalCell;              // +0x20
     const SFootprint* mFootprint;     // +0x24
@@ -4252,7 +4242,7 @@ namespace moho
   static_assert(offsetof(PathPreviewFinder, mOwnerContext) == 0x0C, "PathPreviewFinder::mOwnerContext offset");
   static_assert(offsetof(PathPreviewFinder, mSim) == 0x10, "PathPreviewFinder::mSim offset");
   static_assert(offsetof(PathPreviewFinder, mOGrid) == 0x14, "PathPreviewFinder::mOGrid offset");
-  static_assert(offsetof(PathPreviewFinder, mPathPreviewCallbackOwner) == 0x18, "PathPreviewFinder::mPathPreviewCallbackOwner offset");
+  static_assert(offsetof(PathPreviewFinder, mPathQueue) == 0x18, "PathPreviewFinder::mPathQueue offset");
   static_assert(offsetof(PathPreviewFinder, mStartCell) == 0x1C, "PathPreviewFinder::mStartCell offset");
   static_assert(offsetof(PathPreviewFinder, mGoalCell) == 0x20, "PathPreviewFinder::mGoalCell offset");
   static_assert(offsetof(PathPreviewFinder, mFootprint) == 0x24, "PathPreviewFinder::mFootprint offset");
@@ -4264,7 +4254,7 @@ namespace moho
     , mOwnerContext(owningArmy)
     , mSim(owningArmy->GetSim())
     , mOGrid(mSim->mOGrid)
-    , mPathPreviewCallbackOwner(owningArmy->GetPathFinder())
+    , mPathQueue(static_cast<PathQueue*>(owningArmy->GetPathFinder()))
     , mStartCell{0, 0}
     , mGoalCell{0, 0}
     , mFootprint(nullptr)
@@ -4494,11 +4484,9 @@ namespace moho
     mStartCellIsTraversable =
       static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, mStartCell, *footprint, EOccupancyCaps::OC_ANY)) != 0u;
 
-    mPathQueueNode.ListUnlink();
-    auto* const ownerSlot = reinterpret_cast<PathPreviewFinderQueueOwnerRuntimeView**>(mPathPreviewCallbackOwner);
-    if (ownerSlot != nullptr && *ownerSlot != nullptr) {
-      mPathQueueNode.ListLinkAfter(&(*ownerSlot)->mQueueHead);
-    }
+    // `PathQueue::QueueTraveler`, inlined (0x007648BC..0x007648EF): unlink,
+    // self-link, append before the queue's pending sentinel.
+    mPathQueue->QueueTraveler(*this);
   }
 
   void PathPreviewFinder::ResetQueuedFootprint()
@@ -4514,29 +4502,6 @@ namespace moho
 
 namespace
 {
-  struct PathPreviewUnitSetRuntimeView
-  {
-    std::uint8_t mPad00_07[0x8];
-    void** mUnitBegin;
-    void** mUnitEnd;
-  };
-  static_assert(offsetof(PathPreviewUnitSetRuntimeView, mUnitBegin) == 0x8, "PathPreviewUnitSetRuntimeView::mUnitBegin");
-  static_assert(offsetof(PathPreviewUnitSetRuntimeView, mUnitEnd) == 0xC, "PathPreviewUnitSetRuntimeView::mUnitEnd");
-  static_assert(offsetof(SEntitySetTemplateUnit, mVec) == 0x08, "SEntitySetTemplateUnit::mVec offset must alias PathPreviewUnitSetRuntimeView::mUnitBegin");
-
-  [[nodiscard]] Unit* PathPreviewUnitFromSetHandle(void* const handle)
-  {
-    if (!handle) {
-      return nullptr;
-    }
-
-    // Unit-set handles retain an interior pointer; binary lane normalizes by -8.
-    // (Not `SEntitySetTemplateUnit::UnitFromEntry`'s `IsUnit()` dispatch: the
-    // asm at 0x00764B9A-0x00764BA6 does the raw pointer-minus-8 directly.)
-    auto* const bytes = reinterpret_cast<std::uint8_t*>(handle);
-    return reinterpret_cast<Unit*>(bytes - 0x8);
-  }
-
   /**
    * Address: 0x00764B90 (FUN_00764B90)
    *
@@ -4550,17 +4515,12 @@ namespace
       return nullptr;
     }
 
-    const auto* const view = reinterpret_cast<const PathPreviewUnitSetRuntimeView*>(unitSet);
-    void** unitIt = view->mUnitBegin;
-    if (unitIt == view->mUnitEnd) {
-      return nullptr;
-    }
-
     Unit* bestUnit = nullptr;
     float bestSizeZ = 0.0f;
-    while (unitIt != view->mUnitEnd) {
-      Unit* const unit = PathPreviewUnitFromSetHandle(*unitIt);
-      ++unitIt;
+    for (Entity* const entry : unitSet->mVec) {
+      // The set stores the units' `Entity` bases (+0x08); the binary steps back
+      // with a plain pointer adjust (0x00764B9A..0x00764BA6), no `IsUnit()`.
+      Unit* const unit = static_cast<Unit*>(entry);
       if (!unit) {
         continue;
       }
@@ -4579,100 +4539,42 @@ namespace
     return bestUnit;
   }
 
-  struct PathPreviewUnitRuntimeView
-  {
-    std::uint8_t mPad00_4B3[0x4B4];
-    CUnitCommandQueue* mCommandQueue;
-    std::uint8_t mPad4B8_553[0x9C];
-    void* mPreviewTargetProvider;
-  };
-  static_assert(offsetof(PathPreviewUnitRuntimeView, mCommandQueue) == 0x4B4, "PathPreviewUnitRuntimeView::mCommandQueue");
+  static_assert(offsetof(CUnitCommandQueue, mCommandVec) == 0x0C, "CUnitCommandQueue::mCommandVec offset must be 0x0C");
   static_assert(
-    offsetof(PathPreviewUnitRuntimeView, mPreviewTargetProvider) == 0x554,
-    "PathPreviewUnitRuntimeView::mPreviewTargetProvider"
+    offsetof(CUnitCommand, mVarDat) + offsetof(SSTICommandVariableData, mCmdType) == 0x98,
+    "CUnitCommand's command type must sit at +0x98 (0x00764C80)"
   );
+  static_assert(offsetof(CUnitCommand, mTarget) == 0x11C, "CUnitCommand::mTarget offset must be 0x11C (0x00764CCE)");
 
-  struct PathPreviewTargetEntryRuntimeView
+  /**
+   * The command list a path preview ends on: a factory's own build queue when
+   * it has one (`IAiBuilder` slot 8, 0x00764C2B), otherwise the unit's command
+   * queue (`Unit::CommandQueue` +0x4B4, list at +0x0C).
+   */
+  [[nodiscard]] const msvc8::vector<WeakPtr<CUnitCommand>>* PathPreviewCommandList(Unit& unit)
   {
-    void* mTargetHandle;
-    void* mPad04;
-  };
-  static_assert(sizeof(PathPreviewTargetEntryRuntimeView) == 0x8, "PathPreviewTargetEntryRuntimeView size must be 0x8");
-
-  struct PathPreviewTargetQueueRuntimeView
-  {
-    void* mProxy;
-    PathPreviewTargetEntryRuntimeView* mBegin;
-    PathPreviewTargetEntryRuntimeView* mEnd;
-  };
-  static_assert(sizeof(PathPreviewTargetQueueRuntimeView) == 0x0C, "PathPreviewTargetQueueRuntimeView size must be 0x0C");
-
-  struct PathPreviewTargetProviderRuntimeView;
-  struct PathPreviewTargetProviderVTableRuntimeView
-  {
-    void* mSlots00_1C[0x8];
-    PathPreviewTargetQueueRuntimeView* (__thiscall* GetTargetQueue)(PathPreviewTargetProviderRuntimeView* owner);
-  };
-  static_assert(
-    offsetof(PathPreviewTargetProviderVTableRuntimeView, GetTargetQueue) == 0x20,
-    "PathPreviewTargetProviderVTableRuntimeView::GetTargetQueue offset"
-  );
-
-  struct PathPreviewTargetProviderRuntimeView
-  {
-    PathPreviewTargetProviderVTableRuntimeView* mVTable;
-  };
-
-  struct PathPreviewTargetRuntimeView
-  {
-    std::uint8_t mPad00_97[0x98];
-    std::int32_t mTargetTypeIndex;
-    std::uint8_t mPad9C_11B[0x80];
-    CAiTarget mTarget;
-  };
-  static_assert(offsetof(PathPreviewTargetRuntimeView, mTargetTypeIndex) == 0x98, "PathPreviewTargetRuntimeView::mTargetTypeIndex");
-  static_assert(offsetof(PathPreviewTargetRuntimeView, mTarget) == 0x11C, "PathPreviewTargetRuntimeView::mTarget");
-
-  [[nodiscard]] PathPreviewTargetRuntimeView* PathPreviewTargetFromHandle(void* const handle)
-  {
-    if (!handle) {
-      return nullptr;
-    }
-
-    auto* const bytes = reinterpret_cast<std::uint8_t*>(handle);
-    return reinterpret_cast<PathPreviewTargetRuntimeView*>(bytes - 0x4);
-  }
-
-  [[nodiscard]] bool PathPreviewTargetTypeFiltered(const std::int32_t targetTypeIndex)
-  {
-    if (targetTypeIndex < 0 || targetTypeIndex >= 32) {
-      return true;
-    }
-
-    constexpr std::uint32_t kFilteredTargetMask = 0xD80000EAu;
-    return (kFilteredTargetMask & (1u << targetTypeIndex)) != 0u;
-  }
-
-  [[nodiscard]] const PathPreviewTargetQueueRuntimeView* PathPreviewResolveTargetQueue(const Unit* const unit)
-  {
-    const auto* const unitView = reinterpret_cast<const PathPreviewUnitRuntimeView*>(unit);
-    if (unitView->mPreviewTargetProvider) {
-      auto* const provider = reinterpret_cast<PathPreviewTargetProviderRuntimeView*>(unitView->mPreviewTargetProvider);
-      auto* const providerVTable = provider->mVTable;
-      if (providerVTable && providerVTable->GetTargetQueue) {
-        PathPreviewTargetQueueRuntimeView* const queue = providerVTable->GetTargetQueue(provider);
-        if (queue && queue->mBegin && queue->mBegin != queue->mEnd) {
-          return queue;
-        }
+    if (IAiBuilder* const builder = unit.AiBuilder; builder != nullptr) {
+      const msvc8::vector<WeakPtr<CUnitCommand>>& factoryQueue = builder->BuilderGetFactoryCommandQueue();
+      if (!factoryQueue.empty()) {
+        return &factoryQueue;
       }
     }
 
-    if (!unitView->mCommandQueue) {
-      return nullptr;
-    }
+    return unit.CommandQueue != nullptr ? &unit.CommandQueue->mCommandVec : nullptr;
+  }
 
-    const auto* const commandQueueBytes = reinterpret_cast<const std::uint8_t*>(unitView->mCommandQueue);
-    return reinterpret_cast<const PathPreviewTargetQueueRuntimeView*>(commandQueueBytes + 0x0C);
+  /**
+   * Commands the preview looks past: bit `type` of the 64-bit mask
+   * 0x2'D80000EA (`_allshl` 0x00B57F00, then `and eax, 0D80000EAh` /
+   * `and edx, 2` at 0x00764C92). A shift of 64 or more clears the bit, as
+   * `_allshl` does.
+   */
+  [[nodiscard]] bool PathPreviewSkipsCommand(const EUnitCommandType commandType) noexcept
+  {
+    constexpr std::uint64_t kSkippedCommandMask = 0x2D80000EAull;
+    const auto shift = static_cast<std::uint32_t>(commandType);
+    const std::uint64_t bit = shift < 64u ? (std::uint64_t{1} << shift) : 0u;
+    return (bit & kSkippedCommandMask) != 0u;
   }
 
   /**
@@ -4684,21 +4586,16 @@ namespace
    */
   Wm3::Vector3f* PathPreviewResolveEndPosition(Wm3::Vector3f* const outPos, Unit* const unit)
   {
-    const PathPreviewTargetQueueRuntimeView* const targetQueue = PathPreviewResolveTargetQueue(unit);
-    if (targetQueue && targetQueue->mBegin && targetQueue->mBegin != targetQueue->mEnd) {
-      auto* entry = targetQueue->mEnd;
-      while (entry != targetQueue->mBegin) {
-        --entry;
-        PathPreviewTargetRuntimeView* const targetRuntime = PathPreviewTargetFromHandle(entry->mTargetHandle);
-        if (!targetRuntime) {
+    if (const msvc8::vector<WeakPtr<CUnitCommand>>* const commands = PathPreviewCommandList(*unit); commands != nullptr) {
+      // Newest first. The binary dereferences each command without a null
+      // test (`[esi+98h]` at 0x00764C80), so a dead entry is not skipped here.
+      for (std::size_t index = commands->size(); index != 0u; --index) {
+        CUnitCommand* const command = (*commands)[index - 1u].GetObjectPtr();
+        if (PathPreviewSkipsCommand(command->mVarDat.mCmdType)) {
           continue;
         }
 
-        if (PathPreviewTargetTypeFiltered(targetRuntime->mTargetTypeIndex)) {
-          continue;
-        }
-
-        const Wm3::Vec3f targetPos = targetRuntime->mTarget.GetTargetPosGun(false);
+        const Wm3::Vec3f targetPos = command->mTarget.GetTargetPosGun(false);
         outPos->x = targetPos.x;
         outPos->y = targetPos.y;
         outPos->z = targetPos.z;
