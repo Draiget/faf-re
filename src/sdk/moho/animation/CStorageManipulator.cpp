@@ -297,9 +297,15 @@ namespace moho
     }
     SCR_GetEnum(state, resourceName, resourceRef);
 
-    // The binary allocates before validating the six coordinate args (leaking on
-    // a Lua type error, which longjmps).
-    void* const rawStorage = ::operator new(sizeof(CStorageManipulator));
+    // Storage is acquired here and the object built from it further down, at
+    // the bottom of this function. That split is the binary's, and it is load
+    // bearing: `::operator new` runs at 0x00649622 and the constructor at
+    // 0x0064984B, with the six coordinate reads in between, each of which can
+    // leave through `LuaStackObject::TypeError` -> `longjmp`. Writing it as one
+    // `new CStorageManipulator(...)` expression would move the allocation past
+    // those reads and silently drop the leak the original has on a bad
+    // argument.
+    auto* const storage = static_cast<CStorageManipulator*>(::operator new(sizeof(CStorageManipulator)));
 
     const auto readNumberArg = [&](const int stackIndex) -> float {
       LuaPlus::LuaStackObject numberArg(state, stackIndex);
@@ -319,8 +325,8 @@ namespace moho
 
     const Wm3::Vector3f minOffset{coord7, coord8, coord9};
     const Wm3::Vector3f maxOffset{coord4, coord5, coord6};
-    auto* const manipulator =
-      new (rawStorage) CStorageManipulator(unit, boneIndex, minOffset, maxOffset, resourceType);
+    CStorageManipulator* const manipulator =
+      std::construct_at(storage, unit, boneIndex, minOffset, maxOffset, resourceType);
 
     manipulator->mLuaObj.PushStack(state);
     return 1;
@@ -480,10 +486,15 @@ namespace moho
      * Address: 0x006499C0 (FUN_006499C0, Moho::CStorageManipulatorTypeInfo::NewRef)
      *
      * What it does:
-     * Allocates one `CStorageManipulator`, default-constructs it, and returns
-     * its reflected `RRef`. The `unique_ptr` is the binary's own EH funclet
-     * (0x00BB9C1B): the allocation goes back to `::operator delete` if the
-     * constructor throws.
+     * `new CStorageManipulator()`, handed to the reflected-reference builder.
+     *
+     * Everything else in the binary body is that expression's own codegen:
+     * `mov [esp], eax` parks the raw pointer for the unwind funclet at
+     * 0x00BB9C1B (which returns it to `::operator delete` if the constructor
+     * throws), `mov [esp+0x10], 0` sets the EH state, and `test eax, eax` /
+     * `je` is MSVC8 skipping the constructor when `operator new` returns null,
+     * which that CRT still did. None of it is source, so the `unique_ptr` and
+     * release that used to stand in for the funclet are gone.
      */
     [[nodiscard]] static gpg::RRef NewRef();
 
@@ -540,20 +551,8 @@ namespace moho
    */
   gpg::RRef CStorageManipulatorTypeInfo::NewRef()
   {
-    auto releaseStorage = [](CStorageManipulator* const storage) noexcept {
-      ::operator delete(static_cast<void*>(storage));
-    };
-    std::unique_ptr<CStorageManipulator, decltype(releaseStorage)> ownedStorage(nullptr, releaseStorage);
-
-    auto* const rawStorage = static_cast<CStorageManipulator*>(::operator new(sizeof(CStorageManipulator)));
-    ownedStorage.reset(rawStorage);
-
-    CStorageManipulator* const manipulator =
-      rawStorage ? new (static_cast<void*>(rawStorage)) CStorageManipulator() : nullptr;
-
     gpg::RRef reflected{};
-    (void)gpg::RRef_CStorageManipulator(&reflected, manipulator);
-    ownedStorage.release();
+    (void)gpg::RRef_CStorageManipulator(&reflected, new CStorageManipulator());
     return reflected;
   }
 
@@ -562,8 +561,12 @@ namespace moho
    */
   gpg::RRef CStorageManipulatorTypeInfo::CtrRef(void* const objectStorage)
   {
+    // MSVC8 compiles `new (p) T` to `if (p) T::T(p)`, yielding null otherwise;
+    // that is the `test esi, esi` / `je` around the constructor call at
+    // 0x00649A83. Current compilers do not emit that test, so it is written out
+    // to keep the original's tolerance of a null destination.
     CStorageManipulator* const manipulator =
-      objectStorage ? new (objectStorage) CStorageManipulator() : nullptr;
+      objectStorage ? std::construct_at(static_cast<CStorageManipulator*>(objectStorage)) : nullptr;
 
     gpg::RRef reflected{};
     (void)gpg::RRef_CStorageManipulator(&reflected, manipulator);
@@ -747,35 +750,6 @@ namespace moho
     return object;
   }
 
-  /**
-   * Address: 0x00649BB0 (FUN_00649BB0)
-   *
-   * What it does:
-   * Rebinds the startup metatable-factory index lane for
-   * `CScrLuaMetatableFactory<CStorageManipulator>` and returns that singleton.
-   *
-   * Seven instructions, and all seven are a constructor: `[0x010A63A8] += 1`
-   * is `CScrLuaObjectFactory::AllocateFactoryObjectIndex`, and the two stores
-   * that follow put that index at `[0xF8D768]` and the instantiation's vftable
-   * 0xE2307C at `[0xF8D764]` -- i.e. `+0x04` and `+0x00` of the singleton at
-   * 0xF8D764, which is then returned. So this is
-   * `CScrLuaMetatableFactory<CStorageManipulator>::CScrLuaMetatableFactory()`,
-   * emitted out of line and inlined into its `.CRT$XCL` provider
-   * (`register_CScrLuaMetatableFactory_CStorageManipulator_Index`, 0x00BD36B0,
-   * in ManipulatorStartupRegistrations.cpp), which is why it has zero callers.
-   *
-   * It stays `[[maybe_unused]]` here on purpose: the address belongs on the
-   * template's constructor in the `CScrLuaMetatableFactory` header, and ~40
-   * manipulator families carry the identical stand-in. Moving one without the
-   * rest would be the per-type copy RULE ONE forbids.
-   */
-  [[maybe_unused]] CScrLuaMetatableFactory<CStorageManipulator>*
-  startup_CScrLuaMetatableFactory_CStorageManipulator_Index()
-  {
-    auto& instance = CScrLuaMetatableFactory<CStorageManipulator>::Instance();
-    instance.SetFactoryObjectIndexForRecovery(CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-    return &instance;
-  }
 } // namespace moho
 
 namespace
@@ -800,7 +774,7 @@ namespace
     }
   };
 
-  [[maybe_unused]] CStorageManipulatorTypeInfoStartupBootstrap gCStorageManipulatorTypeInfoStartupBootstrap;
+  CStorageManipulatorTypeInfoStartupBootstrap gCStorageManipulatorTypeInfoStartupBootstrap;
 } // namespace
 
 // Phase-1 pre-registration: run this descriptor registration ahead of every

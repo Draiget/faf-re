@@ -309,6 +309,35 @@ namespace moho
     }
 
   private:
+    /**
+     * Address: 0x00649BB0 (FUN_00649BB0, `T = moho::CStorageManipulator`)
+     *
+     * What it does:
+     * Chains to `CScrLuaObjectFactory`, which claims the next factory-object
+     * index, then installs this instantiation's vftable.
+     *
+     * Seven instructions, and all seven are this: `[0x010A63A8] += 1` is
+     * `++CScrLuaObjectFactory::sNumIds`, the store to `[0xF8D768]` is
+     * `mFactoryObjectIndex` at +0x04 of the singleton at 0xF8D764, the store
+     * of 0xE2307C to `[0xF8D764]` is that object's vptr, and the object's own
+     * address comes back in EAX. MSVC folded `this` to the singleton's address
+     * because `Instance()` is the only construction site.
+     *
+     * It has no callers because the `.CRT$XCL` initializer for the singleton
+     * (`register_CScrLuaMetatableFactory_CStorageManipulator_Index`,
+     * 0x00BD36B0, ManipulatorStartupRegistrations.cpp) inlines it and drops
+     * the vptr store -- a namespace-scope object gets its vptr from the
+     * initialized data image, so only the counter bump survives to run time.
+     * The linker keeps this copy anyway; `Instance()` is what instantiates it,
+     * and `func_CreateLuaCStorageManipulator` (CStorageManipulator.cpp) calls
+     * `Instance()`.
+     *
+     * CStorageManipulator.cpp carried this address as a free
+     * `startup_CScrLuaMetatableFactory_CStorageManipulator_Index` marked
+     * `[[maybe_unused]]` -- a per-type copy of a template member, which is the
+     * shape RULE ONE exists to stop. Roughly forty sibling instantiations
+     * still carry their own; each belongs on this line as it is touched.
+     */
     CScrLuaMetatableFactory() = default;
   };
 
