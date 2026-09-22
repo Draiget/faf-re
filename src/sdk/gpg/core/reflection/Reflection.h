@@ -6902,6 +6902,7 @@ namespace gpg
    * Address: 0x00632D30 (FUN_00632D30)
    * Address: 0x006350F0 (FUN_006350F0)
    * Address: 0x00638690 (FUN_00638690)
+   * Address: 0x0064B100 (FUN_0064B100, Moho::CThrustManipulatorTypeInfo lane)
    * Address: 0x0064E270 (FUN_0064E270)
    * Address: 0x0064E2B0 (FUN_0064E2B0)
    * Address: 0x00650B90 (FUN_00650B90)

@@ -932,4 +932,92 @@ namespace moho
     outMatrix[2].z = 1.0f - (yy + xx);
     return outMatrix;
   }
+
+  namespace
+  {
+    /**
+     * Address: 0x0050D140 (FUN_0050D140, fabs)
+     *
+     * What it does:
+     * Returns one float absolute-value lane through the x87-compatible scalar
+     * path. Its only caller in the binary is `BuildTiltShortestArcDelta`
+     * below, which is why it travelled with it out of `Entity.cpp`.
+     */
+    [[nodiscard]] double CoordsAbsFloat(const float value) noexcept
+    {
+      return std::fabs(static_cast<double>(value));
+    }
+
+    /**
+     * Address: 0x0050D150 (FUN_0050D150, inv_sqrt)
+     *
+     * What it does:
+     * Returns one reciprocal-square-root lane through the scalar math path.
+     * Same single caller as `CoordsAbsFloat`.
+     */
+    [[nodiscard]] double CoordsInvSqrt(const float value) noexcept
+    {
+      return 1.0 / std::sqrt(static_cast<double>(value));
+    }
+  } // namespace
+
+  /**
+   * Address: 0x0050CB50 (FUN_0050CB50, sub_50CB50)
+   *
+   * What it does:
+   * Builds the shortest-arc delta rotating `currentUp` onto `targetNormal`.
+   *
+   * Lifted out of `Entity.cpp`'s anonymous namespace, which is where the body
+   * was recovered and where its `.w`-scalar lane order was established from
+   * `FUN_0050CB50.c` plus both callers' `Wm3::Quaternionf::Multiply` sites.
+   * `CThrustManipulator.cpp` carried a second copy of it that wrote the
+   * scalar to `.x` and cycled the three cross-product terms onto `.y/.z/.w` --
+   * the same value set, one field out. Two callers in two files means one
+   * definition, here.
+   *
+   * The `double` promotions in the degenerate branch are the binary's: the
+   * reciprocal square root and the two magnitude comparisons run at x87
+   * precision before the result is narrowed back to `float`.
+   */
+  Wm3::Quaternionf* BuildTiltShortestArcDelta(
+    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp
+  ) noexcept
+  {
+    if (outDelta == nullptr) {
+      return nullptr;
+    }
+
+    Wm3::Vector3f halfAxis{
+      currentUp.x + targetNormal.x,
+      currentUp.y + targetNormal.y,
+      currentUp.z + targetNormal.z,
+    };
+    (void)Wm3::Vector3f::Normalize(&halfAxis);
+
+    const float scalar = (currentUp.x * halfAxis.x) + (currentUp.y * halfAxis.y) + (currentUp.z * halfAxis.z);
+    outDelta->w = scalar;
+    if (scalar == 0.0f) {
+      // Exactly opposed: the half-vector is degenerate, so pick an axis
+      // perpendicular to whichever of the x/y lanes is shorter.
+      const double upAbsX = CoordsAbsFloat(currentUp.x);
+      const double upAbsY = CoordsAbsFloat(currentUp.y);
+      if (upAbsX < upAbsY) {
+        const double inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
+        outDelta->x = 0.0f;
+        outDelta->y = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
+        outDelta->z = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
+      } else {
+        const double inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
+        outDelta->y = 0.0f;
+        outDelta->x = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
+        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
+      }
+      return outDelta;
+    }
+
+    outDelta->x = (currentUp.y * halfAxis.z) - (currentUp.z * halfAxis.y);
+    outDelta->y = (currentUp.z * halfAxis.x) - (currentUp.x * halfAxis.z);
+    outDelta->z = (currentUp.x * halfAxis.y) - (currentUp.y * halfAxis.x);
+    return outDelta;
+  }
 } // namespace moho

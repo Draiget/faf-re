@@ -17,6 +17,7 @@
 #include "moho/ai/CAimManipulator.h"
 #include "moho/ai/CBuilderArmManipulator.h"
 #include "moho/animation/CRotateManipulator.h"
+#include "moho/animation/CThrustManipulator.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -558,30 +559,6 @@ namespace
     return Target();
   }
 
-  struct ThrustCapVector3f
-  {
-    float x;
-    float y;
-    float z;
-  };
-
-  struct CThrustManipulatorLuaRuntimeView
-  {
-    std::byte preCapStorage[0xAC];
-    ThrustCapVector3f mCapMin;
-    ThrustCapVector3f mCapMax;
-    float mTurnForceMult;
-    float mTurnSpeed;
-  };
-
-  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mCapMin) == 0xAC, "mCapMin offset must be 0xAC");
-  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mCapMax) == 0xB8, "mCapMax offset must be 0xB8");
-  static_assert(
-    offsetof(CThrustManipulatorLuaRuntimeView, mTurnForceMult) == 0xC4,
-    "mTurnForceMult offset must be 0xC4"
-  );
-  static_assert(offsetof(CThrustManipulatorLuaRuntimeView, mTurnSpeed) == 0xC8, "mTurnSpeed offset must be 0xC8");
-
   struct ManipulatorLuaFunctionThunksBootstrap
   {
     ManipulatorLuaFunctionThunksBootstrap()
@@ -853,16 +830,14 @@ namespace moho
     const float yCapMin = ReadRequiredLuaNumber(state, 4);
     const float xCapMin = ReadRequiredLuaNumber(state, 2);
 
-    CThrustManipulatorLuaRuntimeView* const runtimeView =
-      reinterpret_cast<CThrustManipulatorLuaRuntimeView*>(manipulator);
-    runtimeView->mCapMin.x = xCapMin;
-    runtimeView->mCapMin.y = yCapMin;
-    runtimeView->mCapMin.z = zCapMin;
-    runtimeView->mCapMax.x = xCapMax;
-    runtimeView->mCapMax.y = yCapMax;
-    runtimeView->mCapMax.z = zCapMax;
-    runtimeView->mTurnForceMult = turnForceMult;
-    runtimeView->mTurnSpeed = turnSpeed;
+    manipulator->mCapMin.x = xCapMin;
+    manipulator->mCapMin.y = yCapMin;
+    manipulator->mCapMin.z = zCapMin;
+    manipulator->mCapMax.x = xCapMax;
+    manipulator->mCapMax.y = yCapMax;
+    manipulator->mCapMax.z = zCapMax;
+    manipulator->mTurnForceMult = turnForceMult;
+    manipulator->mTurnSpeed = turnSpeed;
     return 0;
   }
 
