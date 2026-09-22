@@ -293,22 +293,6 @@ namespace
     return candidate;
   }
 
-  [[nodiscard]] moho::Entity* FindEntityById(moho::CEntityDb* const entityDb, const std::int32_t id) noexcept
-  {
-    if (!entityDb) {
-      return nullptr;
-    }
-
-    for (auto it = entityDb->Entities().begin(); it != entityDb->Entities().end(); ++it) {
-      moho::Entity* const entity = *it;
-      if (entity && entity->id_ == id) {
-        return entity;
-      }
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] bool IsAlliedOrSameArmy(const moho::CArmyImpl* const owner, const moho::CArmyImpl* const source) noexcept
   {
     if (!owner || !source) {
@@ -3243,7 +3227,7 @@ namespace moho
         }
 
         if (!IsAlliedOrSameArmy(mArmy, entry.sourceArmy) && sim && sim->mEntityDB) {
-          Entity* const entity = FindEntityById(sim->mEntityDB, static_cast<std::int32_t>(entry.entityId));
+          Entity* const entity = sim->mEntityDB->FindEntityById(static_cast<std::uint32_t>(entry.entityId));
           if (entity) {
             if (ReconBlip* const blip = entity->IsReconBlip()) {
               entry.sourceLayer = static_cast<std::int32_t>(entity->mVarDat.mLayerMask);

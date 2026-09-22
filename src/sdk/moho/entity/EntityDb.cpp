@@ -201,7 +201,6 @@ namespace
     return type;
   }
 
-  std::unordered_map<const moho::CEntityDb*, msvc8::list<moho::Entity*>> gRuntimeEntityLists;
   moho::EntityDBSerializer gEntityDBSerializer;
   constexpr std::uint32_t kEntityIdInvalidSentinel = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
   constexpr std::size_t kBoundedPropQueueMaxSize = 1000u;
@@ -332,36 +331,6 @@ namespace
   [[nodiscard]] gpg::RRef NullOwnerRef() noexcept
   {
     return {};
-  }
-
-  [[nodiscard]] bool ContainsEntityPointer(const msvc8::list<moho::Entity*>& entities, const moho::Entity* const entity) noexcept
-  {
-    for (const moho::Entity* const current : entities) {
-      if (current == entity) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void TrackEntityPointer(msvc8::list<moho::Entity*>& entities, moho::Entity* const entity)
-  {
-    if (!entity || ContainsEntityPointer(entities, entity)) {
-      return;
-    }
-    entities.push_back(entity);
-  }
-
-  void RemoveTrackedEntityById(msvc8::list<moho::Entity*>& entities, const std::uint32_t releasedId) noexcept
-  {
-    for (auto it = entities.begin(); it != entities.end();) {
-      const moho::Entity* const entity = *it;
-      if (entity != nullptr && static_cast<std::uint32_t>(entity->id_) == releasedId) {
-        it = entities.erase(it);
-      } else {
-        ++it;
-      }
-    }
   }
 
   [[nodiscard]] gpg::RRef MakeObjectRef(void* const object, gpg::RType* const type) noexcept
@@ -920,16 +889,6 @@ namespace
 
 
 
-  [[nodiscard]] moho::CEntityDbListHead* AllocateEntityListHeadNode()
-  {
-    auto* const head = static_cast<moho::CEntityDbListHead*>(::operator new(sizeof(moho::CEntityDbListHead)));
-    head->next = head;
-    head->prev = head;
-    return head;
-  }
-
-  void ClearEntityListNodes(moho::CEntityDbListHead* const head) noexcept;
-
   struct BackRefListNodeRuntime
   {
     BackRefListNodeRuntime* next;
@@ -980,67 +939,6 @@ namespace
     *outIterator = iterator->mItr;
     iterator->Next();
     return outIterator;
-  }
-
-  /**
-   * Address: 0x006874E0 (FUN_006874E0, sub_6874E0)
-   *
-   * IDA signature:
-   * _DWORD *__usercall sub_6874E0@<eax>(int a1@<esi>);
-   *
-   * What it does:
-   * Releases every tracked node in `mEntityList`'s sentinel-headed circular
-   * list, self-links the sentinel back to empty, and clears the size lane.
-   * Does not free the sentinel head itself -- the caller (`~CEntityDb`)
-   * does that separately, matching the shipped body: `sub_6874E0(&mEntList)`
-   * followed directly by `operator delete(mEntList._Myhead)`.
-   *
-   * DB-integrity fix: this pair was previously mis-cited to `0x00684310`,
-   * which is a *different* function -- `CEntityDb::CEntityDb`'s SEH unwind
-   * funclet for `mIdPoolTree` (now correctly cited on `rb_tree::~rb_tree()`
-   * in `legacy/containers/RbTree.h`; it does not reference `mEntityList` at
-   * all). The real `0x006874E0` was independently (and correctly, in shape)
-   * recovered a second time as `ClearLinearTreeStorageRuntime` over a
-   * generic, untyped `LinearTreeStorageRuntime` reach-in in
-   * `SimRecoveryRuntime.cpp` -- removed there in the same pass as this fix,
-   * since this typed pair is `mEntityList`'s real, evidenced owner.
-   *
-   * Node value fields: `Purge()`'s own body (0x00684560) walks the same
-   * list through a differently-typed `_List_nod_Entity::_Node` (`{_Next,
-   * _Prev, _Myval}`) to reach each entry's `Entity*` for `dtr_Entity`, so
-   * real (non-sentinel) `mEntityList` nodes carry a third field this walk
-   * never reads. `ClearEntityListNodes` only ever touches `next`/`prev`
-   * (a valid common prefix, matching `sub_6874E0`'s own field-agnostic
-   * walk-and-delete shape), so the narrower `CEntityDbListHead` header is
-   * sufficient here; modelling the value field is `Purge()`'s own recovery
-   * question, not this pair's.
-   */
-  void DestroyEntityListRuntime(moho::CEntityDbEntityListRuntime& entityList) noexcept
-  {
-    if (!entityList.head) {
-      return;
-    }
-
-    ClearEntityListNodes(entityList.head);
-    ::operator delete(entityList.head);
-    entityList.head = nullptr;
-    entityList.size = 0u;
-  }
-
-  void ClearEntityListNodes(moho::CEntityDbListHead* const head) noexcept
-  {
-    if (!head) {
-      return;
-    }
-
-    for (moho::CEntityDbListHead* node = head->next; node && node != head;) {
-      moho::CEntityDbListHead* const next = node->next;
-      ::operator delete(node);
-      node = next;
-    }
-
-    head->next = head;
-    head->prev = head;
   }
 
   using RegisteredEntitySetList = moho::TDatList<moho::EntitySetBase, void>;
@@ -1669,9 +1567,6 @@ namespace moho
 
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
 
-    mEntityList.head = AllocateEntityListHeadNode();
-    mEntityList.size = 0u;
-
     // mBoundedProps (Address: 0x00685980, FUN_00685980) starts empty via its
     // own default member initialization -- see the constructor citation on
     // `CEntityDbBoundedPropQueueRuntime` in EntityDb.h.
@@ -1713,16 +1608,11 @@ namespace moho
   {
     mBoundedProps.Reset();
 
-    DestroyEntityListRuntime(mEntityList);
-
     if (mRegisteredEntitySets.next && mRegisteredEntitySets.prev) {
       mRegisteredEntitySets.prev->next = mRegisteredEntitySets.next;
       mRegisteredEntitySets.next->prev = mRegisteredEntitySets.prev;
     }
     (void)ResetEntityDbListHeadToSelf(&mRegisteredEntitySets);
-
-
-    gRuntimeEntityLists.erase(this);
   }
 
   /**
@@ -1753,51 +1643,14 @@ namespace moho
   {
     PurgeRegisteredEntitySets(*this);
 
-    // Ground truth (0x00684560, lines 54-74 of its pseudocode) drains the
-    // pending-destroy queue and nothing else:
-    //
-    //     Next = mEntList._Myhead->_Next;
-    //     while (Next != _Myhead) {
-    //       Myval = Next->_Myval;
-    //       v11   = Next->_Next;
-    //       Next->_Prev->_Next = v11;          // unlink
-    //       Next->_Next->_Prev = Next->_Prev;
-    //       operator delete(Next);             // free the node
-    //       --mEntList._Mysize;
-    //       Next = v11;                        // advance BEFORE destroying
-    //       if (Myval) Myval->dtr_Entity(Myval, 1);
-    //     }
-    //
-    // The value and the successor are both read out of the node before the
-    // node is freed, and the entity is destroyed only after the walk has
-    // moved on - `~Entity` releases the entity's id, which reaches back into
-    // this DB, so it must not run while the cursor still points at a node
-    // that call could touch.
-    //
-    // This previously destroyed every entity in the `Entities()` tracking
-    // list instead, which was wrong twice over. It destroyed live entities
-    // the binary keeps (only queued ones are meant to die), and it deleted
-    // them while iterating the very list `~Entity` -> `ReleaseId` ->
-    // `RemoveTrackedEntityById` erases from, so the loop's own iterator could
-    // be freed underneath it. The node lane was then separately released
-    // through `ClearEntityListNodes`, leaking or double-freeing depending on
-    // which list an entity was in.
-    if (CEntityDbListHead* const head = mEntityList.head; head != nullptr) {
-      for (CEntityDbListHead* node = head->next; node != head;) {
-        auto* const entry = reinterpret_cast<CEntityDbEntityListNode*>(node);
-        Entity* const queuedEntity = entry->entity;
-        CEntityDbListHead* const next = node->next;
-
-        node->prev->next = next;
-        next->prev = node->prev;
-        ::operator delete(node);
-        if (mEntityList.size != 0u) {
-          --mEntityList.size;
-        }
-
-        node = next;
-        delete queuedEntity;
-      }
+    // 0x00684560 drains the pending-destroy queue and nothing else. The value
+    // and the successor both come out of the node before it is freed, and the
+    // entity is destroyed only after the walk has moved on: `~Entity` releases
+    // the entity's id, which reaches back into this DB.
+    for (auto it = mEntList.begin(); it != mEntList.end();) {
+      Entity* const queuedEntity = *it;
+      it = mEntList.erase(it);
+      delete queuedEntity;
     }
 
     AdvanceRuntimeIdPools(*this);
@@ -2007,16 +1860,15 @@ namespace moho
    * Mangled: ?ReleaseId@EntityDB@Moho@@QAEXVEntId@2@@Z
    *
    * What it does:
-   * Releases one packed entity id, updates entity-count stats, removes runtime
-   * entity tracking lanes for that id, and adds the serial lane back to the
-   * family/source reuse set.
+   * Releases one packed entity id: updates entity-count stats, erases the id
+   * from `mAllUnits`, and queues the serial for reuse in its family/source
+   * pool.
    */
   BVIntSetAddResult CEntityDb::ReleaseId(const std::uint32_t releasedId)
   {
     UpdateEntityCountStats(releasedId, static_cast<std::uint32_t>(-1));
 
     (void)mAllUnits.erase(mAllUnits.find(releasedId));
-    RemoveTrackedEntityById(Entities(), releasedId);
 
     IdPool& pool = mIdPoolTree[releasedId & kEntityIdFamilySourceMaskRaw];
     return pool.QueueReleasedLowId(releasedId & kEntityIdSerialMask);
@@ -2301,69 +2153,6 @@ namespace moho
     mBoundedProps.PopAt(heapIndex);
   }
 
-  msvc8::list<Entity*>& CEntityDb::Entities() noexcept
-  {
-    return gRuntimeEntityLists[this];
-  }
-
-  void CEntityDb::UntrackEntity(const Entity* const entity) noexcept
-  {
-    if (entity == nullptr) {
-      return;
-    }
-
-    const auto tracked = gRuntimeEntityLists.find(this);
-    if (tracked == gRuntimeEntityLists.end()) {
-      return;
-    }
-
-    msvc8::list<Entity*>& entities = tracked->second;
-    for (auto it = entities.begin(); it != entities.end();) {
-      if (*it == entity) {
-        it = entities.erase(it);
-      } else {
-        ++it;
-      }
-    }
-  }
-
-  const msvc8::list<Entity*>& CEntityDb::Entities() const noexcept
-  {
-    const auto it = gRuntimeEntityLists.find(this);
-    if (it != gRuntimeEntityLists.end()) {
-      return it->second;
-    }
-
-    static const msvc8::list<Entity*> kEmpty{};
-    return kEmpty;
-  }
-
-  void CEntityDb::QueueEntityForDestroy(Entity* const entity)
-  {
-    if (entity == nullptr) {
-      return;
-    }
-
-    CEntityDbListHead* const head = mEntityList.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    // `_Incsize`'s overflow guard, shared by every MSVC8 `std::list` lane.
-    if (mEntityList.size == 0x3FFFFFFFu) {
-      throw std::length_error("list<T> too long");
-    }
-
-    auto* const node = static_cast<CEntityDbEntityListNode*>(::operator new(sizeof(CEntityDbEntityListNode)));
-    node->links.next = head;
-    node->links.prev = head->prev;
-    node->entity = entity;
-
-    ++mEntityList.size;
-    head->prev = &node->links;
-    node->links.prev->next = &node->links;
-  }
-
   void CEntityDb::RegisterEntitySet(SEntitySetTemplateUnit& set) noexcept
   {
     LinkSetNodeToFront(mRegisteredEntitySets, reinterpret_cast<CEntityDbListHead*>(&set));
@@ -2388,7 +2177,8 @@ namespace moho
       return;
     }
 
-    msvc8::list<Entity*>& entities = Entities();
+    // 0x00684AA0: `(EntId, owned Entity*)` pairs up to the invalid-id
+    // terminator, each inserted into `mAllUnits` (0x00685350, insert_unique).
     for (;;) {
       std::uint32_t entityId = kEntityIdInvalidSentinel;
       archive->Read(entIdType, &entityId, NullOwnerRef());
@@ -2397,12 +2187,7 @@ namespace moho
       }
 
       Entity* const entity = ReadOwnedEntityPointer(archive);
-      if (!entity) {
-        continue;
-      }
-
-      entity->id_ = static_cast<EntId>(entityId);
-      TrackEntityPointer(entities, entity);
+      (void)mAllUnits.insert({entityId, entity});
     }
   }
 
@@ -2421,12 +2206,9 @@ namespace moho
       return;
     }
 
-    for (Entity* const entity : Entities()) {
-      if (!entity) {
-        continue;
-      }
-
-      const std::uint32_t entityId = static_cast<std::uint32_t>(entity->id_);
+    // 0x006849C0 walks `mAllUnits` in id order: the node key (+0x0C) as the
+    // `EntId`, then the node value (+0x10) as an owned pointer.
+    for (const auto& [entityId, entity] : mAllUnits) {
       archive->Write(entIdType, &entityId, NullOwnerRef());
       gpg::WriteRawPointer(
         archive,
@@ -2519,14 +2301,7 @@ namespace moho
     // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
     // use the dedicated resolver rather than the by-name fallback.
     if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
-      msvc8::list<Entity*> serializedEntities;
-      archive->Read(entityListType, &serializedEntities, NullOwnerRef());
-
-      msvc8::list<Entity*>& runtimeEntities = Entities();
-      runtimeEntities.clear();
-      for (Entity* const entity : serializedEntities) {
-        TrackEntityPointer(runtimeEntities, entity);
-      }
+      archive->Read(entityListType, &mEntList, NullOwnerRef());
     }
   }
 
@@ -2558,15 +2333,9 @@ namespace moho
 
     // Same cached-`typeid` shape in the binary (`std::list_Entity::sType`) --
     // use the dedicated resolver rather than the by-name fallback.
+    // 0x00689876: the pending-destroy list itself, `this + 0x20`.
     if (gpg::RType* const entityListType = ResolveLegacyEntityDbEntityListType()) {
-      msvc8::list<Entity*> serializedEntities;
-      for (Entity* const entity : Entities()) {
-        if (!entity) {
-          continue;
-        }
-        serializedEntities.push_back(entity);
-      }
-      archive->Write(entityListType, &serializedEntities, NullOwnerRef());
+      archive->Write(entityListType, &mEntList, NullOwnerRef());
     }
   }
 

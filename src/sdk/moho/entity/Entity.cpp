@@ -1118,21 +1118,6 @@ namespace
     return &sim->mOGrid->mEntityOccupationManager;
   }
 
-  void RegisterEntityInDbIfMissing(moho::Sim* sim, moho::Entity* entity)
-  {
-    if (!sim || !entity || !sim->mEntityDB) {
-      return;
-    }
-
-    auto& entities = sim->mEntityDB->Entities();
-    for (auto it = entities.begin(); it != entities.end(); ++it) {
-      if (*it == entity) {
-        return;
-      }
-    }
-    entities.push_back(entity);
-  }
-
   [[nodiscard]] std::uint8_t ComputeFootprintOccupancyMask(
     const moho::Entity* entity, const moho::SFootprint& footprint, const Wm3::Vec3f&
   ) noexcept
@@ -1700,28 +1685,6 @@ namespace
     return out;
   }
 
-  /**
-   * Address: 0x00679B80 (FUN_00679B80, Moho::Entity::OnDestroy destroy-queue lane)
-   * Address: 0x0067DE00 (FUN_0067DE00, MSVC8 `std::list<Entity*>::_Buynode`
-   *                      allocator+init — allocates one 12-byte `{prev, next,
-   *                      value}` list node and initializes all three words)
-   * Address: 0x0067DE40 (deleting-destructor twin of FUN_0067DE00)
-   *
-   * What it does:
-   * Appends the entity to the entity DB's pending-destroy queue. The source
-   * line is `mEntList.push_back(entity)`; the node-buy, size bump and splice
-   * above are the bodies MSVC8 emits for it, and they now live on their owning
-   * container as `CEntityDb::QueueEntityForDestroy` rather than being
-   * open-coded here and again in Prop.cpp.
-   */
-  void QueueEntityForDestroy(moho::Entity* const entity)
-  {
-    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mEntityDB) {
-      return;
-    }
-
-    entity->SimulationRef->mEntityDB->QueueEntityForDestroy(entity);
-  }
 } // namespace
 
 namespace moho
@@ -2455,11 +2418,6 @@ namespace moho
   {
     if (SimulationRef != nullptr && SimulationRef->mEntityDB != nullptr) {
       (void)SimulationRef->mEntityDB->ReleaseId(static_cast<std::uint32_t>(id_));
-      // ReleaseId untracks by id, which misses an entity whose id no longer
-      // matches (or was never released). The runtime entity list is a side
-      // structure this recovery maintains by hand, so drop the pointer on the
-      // one event that is always true - see CEntityDb::UntrackEntity.
-      SimulationRef->mEntityDB->UntrackEntity(this);
     }
 
     delete mMotor;
@@ -2876,7 +2834,6 @@ namespace moho
     // 0x00678370: `std::map_EntId_Entity::find(&node, sim->mEntityDB, &id); node->second = this;`
     // -- the id node was inserted (null payload) by `EntityDB::DoReserveId`.
     sim->mEntityDB->mAllUnits.find(entityId)->second = this;
-    RegisterEntityInDbIfMissing(sim, this);
 
     // 0x00678477: this is what makes an entity run at all. The binary pushes
     // the CTask subobject (`lea esi, [ebp+34h]`, matching RTTI's mdisp=52) onto
@@ -4102,16 +4059,18 @@ namespace moho
   }
 
   /**
-    * Alias of FUN_00679B80 (non-canonical helper lane).
+   * Address: 0x00679B80 (FUN_00679B80, ?OnDestroy@Entity@Moho@@...)
    *
    * What it does:
-   * Marks destroy dispatch, queues this entity in Sim destroy queue, emits script
-   * callback, detaches from parent, and notifies attached children.
+   * Marks destroy dispatch, appends this entity to the entity DB's
+   * pending-destroy list (`SimulationRef->mEntityDB->mEntList`, no null
+   * checks), emits the script callback, detaches from the parent, and
+   * notifies attached children.
    */
   void Entity::OnDestroy()
   {
     mOnDestroyDispatched = 1;
-    QueueEntityForDestroy(this);
+    SimulationRef->mEntityDB->mEntList.push_back(this);
     CallbackStr("OnDestroy");
 
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();

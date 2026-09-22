@@ -7149,26 +7149,15 @@ namespace
     pathTables->UpdateBackground(&pathBudget);
   }
 
+  // `CUnitIterAllArmies` (0x006B6AA0 ctor, 0x005C87A0 step): the unit-family
+  // range of `EntityDB::mAllUnits`, every army.
   template <typename Fn>
-  void ForEachAllArmyUnit(CEntityDb* entityDb, Fn&& fn)
+  void ForEachAllArmyUnit(Sim* const sim, Fn&& fn)
   {
-    if (!entityDb) {
-      return;
-    }
-
-    // 0x006B6AA0 / 0x005C87A0 iterate all army units in retail.
-    // In source we walk the typed entity DB and keep only Unit owners.
-    for (Entity* entity : entityDb->Entities()) {
-      if (!entity) {
-        continue;
+    for (CUnitIterAllArmies iter(sim); iter.mItr != iter.mEnd; iter.Next()) {
+      if (Unit* const unit = iter.mCur; unit != nullptr) {
+        fn(unit);
       }
-
-      Unit* unit = entity->IsUnit();
-      if (!unit) {
-        continue;
-      }
-
-      fn(unit);
     }
   }
 
@@ -7226,7 +7215,7 @@ namespace
       }
     }
 
-    ForEachAllArmyUnit(sim->mEntityDB, [&](Unit* const unit) {
+    ForEachAllArmyUnit(sim, [&](Unit* const unit) {
       if (!unit || !unit->ArmyRef) {
         return;
       }
@@ -8599,7 +8588,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   // because `Entity::Sync` unlinks the node it was reached through.
   std::int32_t syncedEntityCount = 0;
   if (focusArmyChanged) {
-    ForEachAllArmyUnit(mEntityDB, [&](Unit* const unit) {
+    ForEachAllArmyUnit(this, [&](Unit* const unit) {
       unit->Sync(outSyncData);
       ++syncedEntityCount;
     });
@@ -12751,8 +12740,7 @@ int Sim::Purge(
   }
 
   std::vector<Entity*> targets;
-  const msvc8::list<Entity*>& entities = sim->mEntityDB->Entities();
-  for (Entity* const entity : entities) {
+  for (const auto& [entityId, entity] : sim->mEntityDB->mAllUnits) {
     if (!entity) {
       continue;
     }
@@ -13597,7 +13585,7 @@ void Sim::AdvanceBeat(const int amt)
       UpdatePaths(mPathTables, pathBudget);
     }
 
-    ForEachAllArmyUnit(mEntityDB, [](Unit* unit) {
+    ForEachAllArmyUnit(this, [](Unit* unit) {
       if (!unit || unit->IsDead()) {
         return;
       }
@@ -13688,7 +13676,7 @@ void Sim::AdvanceBeat(const int amt)
     TickEffectManager(mEffectManager);
     UpdateFormationDb(mFormationDB);
 
-    ForEachAllArmyUnit(mEntityDB, [](Unit* unit) {
+    ForEachAllArmyUnit(this, [](Unit* unit) {
       if (unit->NeedsKillCleanup()) {
         unit->KillCleanup();
       }
@@ -13779,19 +13767,9 @@ void Sim::Shutdown()
   //   0x0074581C  call 0x5C87A0         ; ++it
   //   0x00745825  cmp eax, edi / jne    ; until end()
   //
-  // This walked `CEntityDb::Entities()` instead.
-  //
-  // `Entities()` is not a recovered structure. It is a process-global side
-  // table (`gRuntimeEntityLists`, keyed by `CEntityDb*`) that this recovery
-  // maintains by hand because the shipped all-entity walk was not recovered,
-  // and its own declaration names the hazard: an entity that dies without its
-  // id being released, or whose id was reassigned first, leaves a raw pointer
-  // behind for the next walk to dereference. Reaching it here was worse than a
-  // stale read - the stale pointer was handed to `Entity::Destroy`, which
-  // pushed it onto `mDeletionQueue`, and the drain below then dispatched
-  // `OnDestroy` through its dead vtable. `mAllUnits` carries no such exposure:
-  // `~Entity` -> `ReleaseId` erases the node, so the tree cannot outlive its
-  // entries.
+  // This used to walk `CEntityDb::Entities()`, a hand-kept side table of
+  // entity pointers that could outlive its entries; it was removed
+  // 2026-09-22. `mAllUnits` cannot: `~Entity` -> `ReleaseId` erases the node.
   //
   // `Destroy()` only sets a flag, pushes to the deletion queue and relinks the
   // coord node - it never erases from `mAllUnits` - so walking the tree while

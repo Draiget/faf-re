@@ -173,23 +173,38 @@ namespace moho
   RDebugCollision::~RDebugCollision() = default;
 
   /**
-   * Address: 0x0064C500 (FUN_0064C500)
+   * Address: 0x0064C500 (FUN_0064C500, Moho::RDebugCollision::Tick)
+   *
+   * What it does:
+   * Draws every entity's collision primitive on the sim's debug canvas in red:
+   * walks `mEntityDB->mAllUnits` (head at +0x04, value at node +0x10), and for
+   * each entity with `CollisionExtents` (+0x178) draws its box through
+   * `AddWireBox` (0x00450520) when the extents have one (vtable +0x08), or
+   * else its sphere through `AddWireSphere` (0x00450110) around the world up
+   * axis, each only when the primitive's centre is a valid vector
+   * (0x005657F0). This used to walk a hand-kept side list of entities and
+   * draw nothing.
    */
   void RDebugCollision::Tick(Sim* const sim)
   {
-    if (!sim || !sim->mEntityDB) {
-      return;
-    }
+    constexpr std::uint32_t kCollisionColour = 0xFF0000FFu;
 
-    // Draw-API lift (FUN_00450110 / FUN_00450520) is still pending.
-    // Keep the typed collision-primitive scan path in place.
-    for (Entity* const entity : sim->mEntityDB->Entities()) {
-      if (!entity || !entity->CollisionExtents) {
+    CDebugCanvas* const canvas = sim->GetDebugCanvas();
+    for (const auto& [entityId, entity] : sim->mEntityDB->mAllUnits) {
+      EntityCollisionUpdater* const extents = entity->CollisionExtents;
+      if (extents == nullptr) {
         continue;
       }
 
-      (void)entity->CollisionExtents->GetBox();
-      (void)entity->CollisionExtents->GetSphere();
+      if (const Wm3::Box3f* const box = extents->GetBox(); box != nullptr) {
+        if (IsValidVector3f(box->Center)) {
+          canvas->AddWireBox(*box, kCollisionColour);
+        }
+      } else if (const Wm3::Sphere3f* const sphere = extents->GetSphere(); sphere != nullptr) {
+        if (IsValidVector3f(sphere->Center)) {
+          canvas->AddWireSphere(sphere->Center, Wm3::Vector3f{0.0f, 1.0f, 0.0f}, sphere->Radius, kCollisionColour);
+        }
+      }
     }
   }
 

@@ -48,28 +48,6 @@ namespace moho
   );
   static_assert(sizeof(CEntityDbAllUnitsNode) == 0x18, "CEntityDbAllUnitsNode size must be 0x18");
 
-  struct CEntityDbEntityListRuntime
-  {
-    std::uint32_t iteratorProxy; // +0x00
-    CEntityDbListHead* head;     // +0x04
-    std::uint32_t size;          // +0x08
-  };
-  static_assert(sizeof(CEntityDbEntityListRuntime) == 0x0C, "CEntityDbEntityListRuntime size must be 0x0C");
-
-  /**
-   * A non-sentinel node of `CEntityDb::mEntityList`. The sentinel is a bare
-   * `CEntityDbListHead`; real nodes carry the queued entity in a third word,
-   * which is the `_Myval` `EntityDB::Purge` (0x00684560) reads back before
-   * calling the entity's deleting destructor.
-   */
-  struct CEntityDbEntityListNode
-  {
-    CEntityDbListHead links; // +0x00
-    Entity* entity;          // +0x08
-  };
-  static_assert(offsetof(CEntityDbEntityListNode, entity) == 0x08, "CEntityDbEntityListNode::entity offset must be 0x08");
-  static_assert(sizeof(CEntityDbEntityListNode) == 0x0C, "CEntityDbEntityListNode size must be 0x0C");
-
   /**
    * Binary layout of `gpg::PriorityQueue<Moho::SPropPriorityInfo,
    * Moho::WeakPtr<Moho::Prop>>` as used by `EntityDB::mBoundedProps`: a
@@ -378,41 +356,8 @@ namespace moho
      */
     [[nodiscard]] Entity* FindEntityById(std::uint32_t entityId) const noexcept;
 
-    [[nodiscard]] msvc8::list<Entity*>& Entities() noexcept;
-    [[nodiscard]] const msvc8::list<Entity*>& Entities() const noexcept;
 
-    /**
-     * Drops one entity from the runtime entity list by pointer.
-     *
-     * Not a binary function: `Entities()` is a side list this recovery keeps
-     * because the shipped all-entity walk (0x006B6AA0 / 0x005C87A0) has not
-     * been recovered yet, and a side list has to be maintained by hand.
-     * `ReleaseId` already untracks by id, but that only works while the
-     * entity's `id_` still matches - anything that dies without its id being
-     * released, or whose id was reassigned first, leaves the raw pointer
-     * behind, and the next `AdvanceBeat` walk dereferences it. `~Entity`
-     * calls this so the pointer leaves the list on the one event that is
-     * always true: the object going away.
-     */
-    void UntrackEntity(const Entity* entity) noexcept;
 
-    /**
-     * Address: 0x00679B80 (FUN_00679B80, the `Moho::Entity::OnDestroy` lane),
-     * node buy at 0x0067DE00 (`std::list<Entity*>::_Buynode`), size bump at
-     * `std::list::_Incsize`.
-     *
-     * What it does:
-     * Appends one entity to the pending-destroy queue - the source line is
-     * `mEntList.push_back(entity)`, and the three emitted bodies above are what
-     * MSVC8 produces for it. `EntityDB::Purge` (0x00684560) is the consumer: it
-     * walks this list, unlinks and frees each node, decrements the size, and
-     * calls each queued entity's deleting destructor.
-     *
-     * This lives on the owning class because both `Entity::OnDestroy` and
-     * `Prop`'s reclaim lane push here; they previously each carried their own
-     * copy of the splice.
-     */
-    void QueueEntityForDestroy(Entity* entity);
 
     /**
      * What it does:
@@ -497,7 +442,12 @@ namespace moho
     // members, not reimplemented here (RULE ONE).
     msvc8::map<std::uint32_t, IdPool> mIdPoolTree;  // +0x0C
     CEntityDbListHead mRegisteredEntitySets;        // +0x18
-    CEntityDbEntityListRuntime mEntityList;         // +0x20
+    // `std::list<Moho::Entity*>` (`Moho::EntityDB::mEntList`): the entities
+    // waiting for `Purge` to destroy them. `Entity::OnDestroy` (0x00679B80)
+    // appends with `push_back`, `Purge` (0x00684560) drains it, and
+    // `MemberSerialize` (0x006897F0) writes it whole at `this + 0x20`. Every
+    // live entity is in `mAllUnits`, not here.
+    msvc8::list<Entity*> mEntList;                  // +0x20
     CEntityDbBoundedPropQueueRuntime mBoundedProps; // +0x2C
   };
 
@@ -507,7 +457,7 @@ namespace moho
   static_assert(
     offsetof(CEntityDb, mRegisteredEntitySets) == 0x18, "CEntityDb::mRegisteredEntitySets offset must be 0x18"
   );
-  static_assert(offsetof(CEntityDb, mEntityList) == 0x20, "CEntityDb::mEntityList offset must be 0x20");
+  static_assert(offsetof(CEntityDb, mEntList) == 0x20, "CEntityDb::mEntList offset must be 0x20");
   static_assert(offsetof(CEntityDb, mBoundedProps) == 0x2C, "CEntityDb::mBoundedProps offset must be 0x2C");
   static_assert(sizeof(CEntityDb) == 0x50, "CEntityDb size must be 0x50");
 

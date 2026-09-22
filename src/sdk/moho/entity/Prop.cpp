@@ -67,22 +67,6 @@ namespace
     return cache;
   }
 
-  /**
-   * What it does:
-   * Appends the entity to the entity DB's pending-destroy queue without running
-   * the script-side destroy callback. Same `mEntList.push_back(entity)` source
-   * line as `Entity::OnDestroy`'s lane, so it goes through the same owning
-   * container method rather than a second open-coded copy of the splice.
-   */
-  void QueueEntityForDestroyNoCallback(moho::Entity* const entity)
-  {
-    if (!entity || !entity->SimulationRef || !entity->SimulationRef->mEntityDB) {
-      return;
-    }
-
-    entity->SimulationRef->mEntityDB->QueueEntityForDestroy(entity);
-  }
-
   void QueuePropReclaimDelete(moho::Prop& prop)
   {
     if (prop.DestroyQueuedFlag != 0u) {
@@ -90,7 +74,7 @@ namespace
     }
 
     prop.DestroyQueuedFlag = 1u;
-    QueueEntityForDestroyNoCallback(&prop);
+    prop.SimulationRef->mEntityDB->mEntList.push_back(&prop);
 
     if (prop.SimulationRef) {
       prop.mCoordNode.ListLinkAfter(&prop.SimulationRef->mCoordEntities);
