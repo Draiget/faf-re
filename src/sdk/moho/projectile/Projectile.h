@@ -8,7 +8,10 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/entity/Entity.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
+#include "moho/misc/WeakPtr.h"
+#include "moho/projectile/CProjectileAttributes.h"
 #include "moho/projectile/ProjectileStartupRegistrations.h"
+#include "moho/sim/EImpactTypeTypeInfo.h"
 #include "Wm3Vector3.h"
 
 namespace gpg
@@ -201,24 +204,111 @@ namespace moho
     // than acted on because flipping it also moves `InstanceCounter<Projectile>`
     // into the base list, and that one is empty-base-optimised.
     ManyToOneBroadcaster<EProjectileImpactEvent> mImpactEventBroadcaster; // +0x270
-    std::uint8_t mUnknown0278[0x14];   // +0x278
+
+    /** The entity that fired this projectile, or the parent projectile's launcher for a child. */
+    WeakPtr<Entity> mLauncherWeak; // +0x278
+
+    /** World-space velocity in units per tick; integrated every `MotionTick`. */
+    Wm3::Vector3f mVelocity;             // +0x280
     Wm3::Vector3f mLocalAngularVelocity; // +0x28C
-    Wm3::Vector3f mScaleVelocity;      // +0x298
-    std::uint8_t mUnknown02A4[0x24];   // +0x2A4
-    float mDamage;                   // +0x2C8
-    float mDamageRadius;             // +0x2CC
-    msvc8::string mDamageTypeName;   // +0x2D0
-    CAiTarget mTargetPosData;        // +0x2EC
-    std::uint8_t mUnknown030C[0x74]; // +0x30C
+    Wm3::Vector3f mScaleVelocity;        // +0x298
+
+    /**
+     * Fraction of the current tick's swept segment at which the earliest hit
+     * found by `CheckCollision` occurred; 1.0 means "no hit this tick".
+     */
+    float mImpactInterpolation; // +0x2A4
+
+    // The eight blueprint physics flags, one byte each, in blueprint order.
+    bool mCollideSurface;   // +0x2A8
+    bool mDoCollision;      // +0x2A9
+    bool mTrackTarget;      // +0x2AA
+    bool mVelocityAlign;    // +0x2AB
+    bool mStayUpright;      // +0x2AC
+    bool mLeadTarget;       // +0x2AD
+    bool mStayUnderwater;   // +0x2AE
+    bool mDestroyOnWater;   // +0x2AF
+
+    float mTurnRateDegrees;                 // +0x2B0
+    float mMaxSpeed;                        // +0x2B4
+    float mAcceleration;                    // +0x2B8
+    Wm3::Vector3f mBallisticAcceleration;   // +0x2BC
+
+    float mDamage;                 // +0x2C8
+    float mDamageRadius;           // +0x2CC
+    msvc8::string mDamageTypeName; // +0x2D0
+    CAiTarget mTargetPosData;      // +0x2EC
+
+    /**
+     * Cached homing aim point, written by `GetTargetPosGun` while a live target
+     * exists. `mKeepLastAimLatch` is set in the launch constructor for ground
+     * targets (non-Air/Sub layer); while it is set, `UpdateTracking` keeps
+     * steering toward this point after the live target is lost rather than
+     * giving up.
+     */
+    Wm3::Vector3f mCachedAimPoint;          // +0x30C
+    bool mKeepLastAimLatch;                 // +0x318
+    std::uint8_t pad_0319_031B[0x03];       // +0x319
+
+    /** Earliest hit found this tick, and what it hit; both reset by `Impact()`. */
+    Wm3::Vector3f mImpactPosition;          // +0x31C
+    WeakPtr<Entity> mCollidedEntityWeak;    // +0x328
+
+    std::uint32_t mLifetimeEnd;             // +0x330
+    bool mBelowWater;                       // +0x334
+    std::uint8_t pad_0335_0337[0x03];       // +0x335
+    std::int32_t mBounceLimit;              // +0x338
+
+    /** Terrain-bounce state: the tick the projectile met the ground, and the bounce normal. */
+    std::int32_t mGroundTick;               // +0x33C
+    bool mDirectAwayFromGround;             // +0x340
+    std::uint8_t pad_0341_0343[0x03];       // +0x341
+    Wm3::Vector3f mGroundDirection;         // +0x344
+    float mBounceVelocityDamping;           // +0x350
+
+    /** Zig-zag jitter applied by `UpdateTracking`, re-rolled when the tick is reached. */
+    std::int32_t mZigZagNextTick;           // +0x354
+    Wm3::Vector3f mZigZagRandomOffset;      // +0x358
+
+    EImpactType mImpactType;                // +0x364
+    CProjectileAttributes mAttributes;      // +0x368
+    bool mIsChildProjectile;                // +0x37C
+    std::uint8_t pad_037D_037F[0x03];       // +0x37D
   };
 
+  // Offsets read directly by `Projectile::Impact` (0x0069DEC0): [edi+270h],
+  // [edi+278h], [edi+2A4h], [edi+2ECh], [edi+2F0h], [edi+31Ch], [edi+320h],
+  // [edi+324h], [edi+328h] and [edi+364h].
   static_assert(offsetof(Projectile, mImpactEventBroadcaster) == 0x270, "Projectile::mImpactEventBroadcaster offset must be 0x270");
+  static_assert(offsetof(Projectile, mLauncherWeak) == 0x278, "Projectile::mLauncherWeak offset must be 0x278");
+  static_assert(offsetof(Projectile, mVelocity) == 0x280, "Projectile::mVelocity offset must be 0x280");
   static_assert(offsetof(Projectile, mLocalAngularVelocity) == 0x28C, "Projectile::mLocalAngularVelocity offset must be 0x28C");
   static_assert(offsetof(Projectile, mScaleVelocity) == 0x298, "Projectile::mScaleVelocity offset must be 0x298");
+  static_assert(offsetof(Projectile, mImpactInterpolation) == 0x2A4, "Projectile::mImpactInterpolation offset must be 0x2A4");
+  static_assert(offsetof(Projectile, mDestroyOnWater) == 0x2AF, "Projectile::mDestroyOnWater offset must be 0x2AF");
+  static_assert(offsetof(Projectile, mTurnRateDegrees) == 0x2B0, "Projectile::mTurnRateDegrees offset must be 0x2B0");
+  static_assert(offsetof(Projectile, mAcceleration) == 0x2B8, "Projectile::mAcceleration offset must be 0x2B8");
+  static_assert(offsetof(Projectile, mBallisticAcceleration) == 0x2BC, "Projectile::mBallisticAcceleration offset must be 0x2BC");
   static_assert(offsetof(Projectile, mDamage) == 0x2C8, "Projectile::mDamage offset must be 0x2C8");
   static_assert(offsetof(Projectile, mDamageRadius) == 0x2CC, "Projectile::mDamageRadius offset must be 0x2CC");
   static_assert(offsetof(Projectile, mDamageTypeName) == 0x2D0, "Projectile::mDamageTypeName offset must be 0x2D0");
   static_assert(offsetof(Projectile, mTargetPosData) == 0x2EC, "Projectile::mTargetPosData offset must be 0x2EC");
+  static_assert(offsetof(Projectile, mCachedAimPoint) == 0x30C, "Projectile::mCachedAimPoint offset must be 0x30C");
+  static_assert(offsetof(Projectile, mKeepLastAimLatch) == 0x318, "Projectile::mKeepLastAimLatch offset must be 0x318");
+  static_assert(offsetof(Projectile, mImpactPosition) == 0x31C, "Projectile::mImpactPosition offset must be 0x31C");
+  static_assert(offsetof(Projectile, mCollidedEntityWeak) == 0x328, "Projectile::mCollidedEntityWeak offset must be 0x328");
+  static_assert(offsetof(Projectile, mLifetimeEnd) == 0x330, "Projectile::mLifetimeEnd offset must be 0x330");
+  static_assert(offsetof(Projectile, mBelowWater) == 0x334, "Projectile::mBelowWater offset must be 0x334");
+  static_assert(offsetof(Projectile, mBounceLimit) == 0x338, "Projectile::mBounceLimit offset must be 0x338");
+  static_assert(offsetof(Projectile, mGroundTick) == 0x33C, "Projectile::mGroundTick offset must be 0x33C");
+  static_assert(offsetof(Projectile, mDirectAwayFromGround) == 0x340, "Projectile::mDirectAwayFromGround offset must be 0x340");
+  static_assert(offsetof(Projectile, mGroundDirection) == 0x344, "Projectile::mGroundDirection offset must be 0x344");
+  static_assert(offsetof(Projectile, mBounceVelocityDamping) == 0x350, "Projectile::mBounceVelocityDamping offset must be 0x350");
+  static_assert(offsetof(Projectile, mZigZagNextTick) == 0x354, "Projectile::mZigZagNextTick offset must be 0x354");
+  static_assert(offsetof(Projectile, mZigZagRandomOffset) == 0x358, "Projectile::mZigZagRandomOffset offset must be 0x358");
+  static_assert(offsetof(Projectile, mImpactType) == 0x364, "Projectile::mImpactType offset must be 0x364");
+  static_assert(offsetof(Projectile, mAttributes) == 0x368, "Projectile::mAttributes offset must be 0x368");
+  static_assert(offsetof(Projectile, mIsChildProjectile) == 0x37C, "Projectile::mIsChildProjectile offset must be 0x37C");
   static_assert(sizeof(Projectile) == 0x380, "Projectile size must be 0x380");
 
   /**

@@ -104,43 +104,6 @@ namespace
   using moho::Sim;
   using moho::StatItem;
 
-  struct EntityWeakBoundsProbe
-  {
-    std::uint32_t mUnknown0000;
-    void* mOwnerLinkSlot;
-  };
-
-  static_assert(
-    offsetof(EntityWeakBoundsProbe, mOwnerLinkSlot) == 0x04,
-    "EntityWeakBoundsProbe::mOwnerLinkSlot offset must be 0x04"
-  );
-  static_assert(sizeof(EntityWeakBoundsProbe) == 0x08, "EntityWeakBoundsProbe size must be 0x08");
-
-  /**
-   * Address: 0x0062CB90 (FUN_0062CB90)
-   *
-   * What it does:
-   * Decodes one weak-entity owner-link slot from a prefixed 8-byte probe lane
-   * and checks that entity's current world position against map bounds.
-   */
-  [[maybe_unused]] bool IsEntityWeakBoundsProbeWithin(
-    const EntityWeakBoundsProbe* const probe,
-    const bool wholeMap,
-    const float border
-  ) noexcept
-  {
-    if (probe == nullptr) {
-      return false;
-    }
-
-    Entity* const entity = moho::WeakPtr<Entity>::DecodeOwnerObject(probe->mOwnerLinkSlot);
-    if (entity == nullptr) {
-      return false;
-    }
-
-    return entity->SimulationRef->mMapData->IsWithin(entity->Position, border, wholeMap);
-  }
-
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kEntityAttachBoneToHelpText = "Entity:AttachBoneTo(selfbone, entity, bone)";
   constexpr const char* kEntityAttachFailureError = "Failed to attach entity %s to %s on bone %d";
@@ -272,22 +235,6 @@ namespace
     return (range != 0u) ? (range | kEntityAttributeEnabledMask) : 0u;
   }
 
-  struct EntityProjectileVelocityRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x280];
-    Wm3::Vector3f mVelocity; // +0x280
-  };
-
-  static_assert(
-    offsetof(EntityProjectileVelocityRuntimeView, mVelocity) == 0x280,
-    "EntityProjectileVelocityRuntimeView::mVelocity offset must be 0x280"
-  );
-
-  [[nodiscard]] Wm3::Vector3f& AccessProjectileVelocity(moho::Projectile& projectile) noexcept
-  {
-    return reinterpret_cast<EntityProjectileVelocityRuntimeView*>(&projectile)->mVelocity;
-  }
-
   enum class TextureScrollerMode : std::int32_t
   {
     None = 0,
@@ -298,37 +245,6 @@ namespace
 
   using TextureScrollerDefinition = moho::SScroller;
   using TextureScrollerRuntimeView = moho::CTextureScroller;
-
-  struct EntityLuaBindingRuntimeView
-  {
-    std::uint8_t mUnknown0000[0x1F0];
-    TextureScrollerRuntimeView* mTextureScroller; // +0x1F0
-    moho::SPhysBody* mPhysBody; // +0x1F4
-  };
-
-  static_assert(
-    offsetof(EntityLuaBindingRuntimeView, mTextureScroller) == 0x1F0,
-    "EntityLuaBindingRuntimeView::mTextureScroller offset must be 0x1F0"
-  );
-  static_assert(
-    offsetof(EntityLuaBindingRuntimeView, mPhysBody) == 0x1F4,
-    "EntityLuaBindingRuntimeView::mPhysBody offset must be 0x1F4"
-  );
-
-  [[nodiscard]] EntityLuaBindingRuntimeView& AccessEntityLuaBindingRuntime(moho::Entity& entity) noexcept
-  {
-    return *reinterpret_cast<EntityLuaBindingRuntimeView*>(&entity);
-  }
-
-  [[nodiscard]] moho::SPhysBody*& AccessEntityPhysBody(moho::Entity& entity) noexcept
-  {
-    return AccessEntityLuaBindingRuntime(entity).mPhysBody;
-  }
-
-  [[nodiscard]] TextureScrollerRuntimeView*& AccessEntityTextureScrollerSlot(moho::Entity& entity) noexcept
-  {
-    return AccessEntityLuaBindingRuntime(entity).mTextureScroller;
-  }
 
   /**
    * Address: 0x0067B6F0 (FUN_0067B6F0)
@@ -555,11 +471,10 @@ namespace
 
   [[nodiscard]] TextureScrollerRuntimeView* EnsureEntityTextureScroller(moho::Entity& entity)
   {
-    TextureScrollerRuntimeView*& scroller = AccessEntityTextureScrollerSlot(entity);
-    if (scroller == nullptr) {
-      scroller = new TextureScrollerRuntimeView(&entity);
+    if (entity.mScroller == nullptr) {
+      entity.mScroller = new TextureScrollerRuntimeView(&entity);
     }
-    return scroller;
+    return entity.mScroller;
   }
 
   [[nodiscard]] float ReadLuaNumberArgument(LuaPlus::LuaState* const state, const int stackIndex)
@@ -2725,11 +2640,11 @@ namespace moho
     mShooters.ListUnlink();
     mUniqueName = msvc8::string{};
 
-    auto*& physBody = AccessEntityPhysBody(*this);
+    auto*& physBody = mPhysBody;
     delete physBody;
     physBody = nullptr;
 
-    auto*& scroller = AccessEntityTextureScrollerSlot(*this);
+    auto*& scroller = mScroller;
     delete scroller;
     scroller = nullptr;
 
@@ -3620,7 +3535,7 @@ namespace moho
    */
   void Entity::ChangeScroller(const SScroller& definition)
   {
-    CTextureScroller*& textureScrollerSlot = AccessEntityTextureScrollerSlot(*this);
+    CTextureScroller*& textureScrollerSlot = mScroller;
     if (textureScrollerSlot == nullptr) {
       CTextureScroller* const replacementScroller = new CTextureScroller(this);
       CTextureScroller* const previousScroller = textureScrollerSlot;
@@ -3751,7 +3666,7 @@ namespace moho
    */
   int Entity::TaskTick()
   {
-    if (CTextureScroller* const scroller = AccessEntityTextureScrollerSlot(*this); scroller != nullptr) {
+    if (CTextureScroller* const scroller = mScroller; scroller != nullptr) {
       scroller->Tick();
     }
 
@@ -3939,7 +3854,7 @@ namespace moho
   {
     (void)unusedFlag;
 
-    SPhysBody*& cachedBody = AccessEntityPhysBody(*this);
+    SPhysBody*& cachedBody = mPhysBody;
     if (cachedBody != nullptr) {
       return cachedBody;
     }
@@ -3984,7 +3899,7 @@ namespace moho
    */
   void Entity::AddWorldImpulse(const Wm3::Vec3f& impulse, const Wm3::Vec3f& worldPoint)
   {
-    SPhysBody* const body = AccessEntityPhysBody(*this);
+    SPhysBody* const body = mPhysBody;
     if (body == nullptr) {
       return;
     }
@@ -4002,7 +3917,7 @@ namespace moho
    */
   void Entity::AddLocalImpulse(const Wm3::Vec3f& localImpulse, const Wm3::Vec3f& localPoint)
   {
-    SPhysBody* const body = AccessEntityPhysBody(*this);
+    SPhysBody* const body = mPhysBody;
     if (body == nullptr) {
       return;
     }
@@ -5514,10 +5429,9 @@ namespace moho
       true
     );
 
-    Wm3::Vector3f& projectileVelocity = AccessProjectileVelocity(*projectile);
-    projectileVelocity.x = launchDirection.x * launchSpeed;
-    projectileVelocity.y = launchDirection.y * launchSpeed;
-    projectileVelocity.z = launchDirection.z * launchSpeed;
+    projectile->mVelocity.x = launchDirection.x * launchSpeed;
+    projectile->mVelocity.y = launchDirection.y * launchSpeed;
+    projectile->mVelocity.z = launchDirection.z * launchSpeed;
     projectile->mLuaObj.PushStack(state);
     return 1;
   }
@@ -7670,7 +7584,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    moho::SPhysBody* const body = AccessEntityPhysBody(*entity);
+    moho::SPhysBody* const body = entity->mPhysBody;
     if (body != nullptr) {
       const Wm3::Vector3f localImpulse{
         ReadLuaNumberArgument(state, 2),
