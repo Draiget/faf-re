@@ -46,7 +46,7 @@ namespace moho
   // The `Moho::UserTarget` command-target payload (UserUnit.h). Only used
   // as an incomplete by-const-ref parameter type here; ISSUE_SetCommandTarget's
   // definition (Sim.cpp) and its callers need the full UserUnit.h include.
-  struct UserCommandTargetView;
+  struct UserTarget;
   // Opaque cross-TU handle to the runtime command-graph anchor-history object
   // (see UserUnit.h). Only used as an incomplete pointer by the dock worker bridge.
   struct QueuedUserCommandRecord;
@@ -1908,13 +1908,13 @@ namespace moho
    * Client/UI-side command-target keystone, the `ISSUE_Command` family's
    * counterpart for redirecting a command already in flight. See the full
    * doc comment on the definition (Sim.cpp) for the no-rush gate and the
-   * pickup-command category restriction. `UserCommandTargetView` is
+   * pickup-command category restriction. `UserTarget` is
    * `UserUnit.h`'s name for the `Moho::UserTarget` payload this mangles to
    * (only forward-declared here to avoid a CWldSession.h <-> UserUnit.h
    * include cycle; callers need `moho/unit/core/UserUnit.h` for the
    * complete type). Defined in Sim.cpp.
    */
-  void ISSUE_SetCommandTarget(UserCommandIssueHelper* helper, const UserCommandTargetView& target);
+  void ISSUE_SetCommandTarget(UserCommandIssueHelper* helper, const UserTarget& target);
 
   /**
    * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)

@@ -10977,26 +10977,10 @@ namespace moho
     }
 
     /**
-     * Shared entity weak-link insert/remove, matching `LinkWeakEntityOwner`/
-     * `UnlinkWeakEntityOwner` (UserUnit.cpp, internal linkage there - not
-     * reachable from this TU) field-for-field. Used below by both
-     * `ResolveCommandTargetEntityFromAnchorHistory`'s transient-sample
-     * teardown and `ProcessCommandDrag`'s new-target construction.
+     * Unlinks one weak entity reference from its owner's chain, matching
+     * `UnlinkWeakEntityOwner` (UserUnit.cpp) field-for-field. Used by
+     * `ResolveCommandTargetEntityFromAnchorHistory`'s transient-sample teardown.
      */
-    void LinkEntityWeakRef(UserEntity* const entity, SSelectionWeakRefUserEntity& weakRef) noexcept
-    {
-      weakRef.mOwnerLinkSlot = nullptr;
-      weakRef.mNextOwner = nullptr;
-      if (entity == nullptr) {
-        return;
-      }
-
-      auto** const ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
-      weakRef.mOwnerLinkSlot = ownerLinkSlot;
-      weakRef.mNextOwner = *ownerLinkSlot;
-      *ownerLinkSlot = &weakRef;
-    }
-
     void UnlinkEntityWeakRef(SSelectionWeakRefUserEntity& weakRef) noexcept
     {
       auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
@@ -11403,11 +11387,10 @@ namespace moho
                    static_cast<void*>(cachedTargetEntity), static_cast<void*>(closest),
                    static_cast<unsigned>(candidates.size()), clampedPos.x, clampedPos.y, clampedPos.z);
         if (closest != nullptr) {
-          UserCommandTargetView entityTarget{};
+          UserTarget entityTarget{};
           entityTarget.targetType = UserTargetType::Entity;
-          LinkEntityWeakRef(closest, reinterpret_cast<SSelectionWeakRefUserEntity&>(entityTarget.targetEntity));
+          entityTarget.targetEntity.ResetFromObject(closest);
           ISSUE_SetCommandTarget(helper, entityTarget);
-          UnlinkEntityWeakRef(reinterpret_cast<SSelectionWeakRefUserEntity&>(entityTarget.targetEntity));
         }
         return;
       }
@@ -11438,7 +11421,7 @@ namespace moho
         // landed off the structure they belonged to.
         const Wm3::Vector3f worldPos = COORDS_ToWorldPos(map, cell, footprint);
 
-        UserCommandTargetView positionTarget{};
+        UserTarget positionTarget{};
         positionTarget.targetType = UserTargetType::Position;
         positionTarget.position = worldPos;
         ISSUE_SetCommandTarget(helper, positionTarget);
@@ -11446,7 +11429,7 @@ namespace moho
       }
 
       // Default: issue the clamped cursor position as a `Position` target.
-      UserCommandTargetView positionTarget{};
+      UserTarget positionTarget{};
       positionTarget.targetType = UserTargetType::Position;
       positionTarget.position = clampedPos;
       gpg::Warnf("[DRAGDIAG] default arm: mouse=(%.1f,%.1f,%.1f) clamped=(%.1f,%.1f,%.1f) rect=(%d,%d)-(%d,%d) map=%p",

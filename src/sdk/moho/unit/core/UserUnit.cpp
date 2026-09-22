@@ -189,10 +189,6 @@ namespace
   constexpr const char* kIncorrectGameObjectTypeError =
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr float kEconomyPerSecondToUiRate = 10.0f;
-  constexpr std::uint32_t kCommandIssueEventIncreaseCount = 1u;
-  constexpr std::uint32_t kCommandIssueEventDecreaseCount = 2u;
-  constexpr std::uint32_t kCommandIssueEventSetTarget = 4u;
-  constexpr std::uint32_t kCommandIssueEventSetType = 5u;
   constexpr std::uintptr_t kUserEntityWeakOwnerOffset = 0x08u;
 
   enum class UserUnitIntelLane : std::int32_t
@@ -243,123 +239,13 @@ namespace
   // have silently misread `layerMask`/`minRange`/`maxRange` here instead of
   // failing to compile.
 
-  // UserEntityWeakLinkView / UserTargetType / UserCommandTargetView moved to
-  // UserUnit.h (moho namespace) so Moho::ISSUE_SetCommandTarget (Sim.cpp) and
-  // func_ProcessCommandDrag (CWldSession.cpp) can construct/pass them.
-
-  struct UserCommandRawTargetView
-  {
-    UserTargetType targetType;             // +0x00
-    std::int32_t entityId;                 // +0x04
-    Wm3::Vector3<float> position;          // +0x08
-  };
-  static_assert(
-    offsetof(UserCommandRawTargetView, entityId) == 0x04, "UserCommandRawTargetView::entityId offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandRawTargetView, position) == 0x08, "UserCommandRawTargetView::position offset must be 0x08"
-  );
-  static_assert(sizeof(UserCommandRawTargetView) == 0x14, "UserCommandRawTargetView size must be 0x14");
-
-  struct UserCommandIssueEventRuntimeView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    std::uint32_t eventType;              // +0x04
-    std::uint8_t pad_0008_0014[0x0C];
-    std::int32_t countDelta;              // +0x14
-    UserCommandTargetView target;         // +0x18
-    std::int32_t commandType;             // +0x30
-  };
-  static_assert(
-    offsetof(UserCommandIssueEventRuntimeView, eventType) == 0x04,
-    "UserCommandIssueEventRuntimeView::eventType offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueEventRuntimeView, countDelta) == 0x14,
-    "UserCommandIssueEventRuntimeView::countDelta offset must be 0x14"
-  );
-  static_assert(
-    offsetof(UserCommandIssueEventRuntimeView, target) == 0x18,
-    "UserCommandIssueEventRuntimeView::target offset must be 0x18"
-  );
-  static_assert(
-    offsetof(UserCommandIssueEventRuntimeView, commandType) == 0x30,
-    "UserCommandIssueEventRuntimeView::commandType offset must be 0x30"
-  );
-
-  struct UserCommandIssueHelperRuntimeView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    CmdId commandId;                                    // +0x04
-    std::uint8_t pad_0008_0020[0x18];
-    const RBlueprint* buildBlueprint;                   // +0x20
-    std::uint8_t pad_0024_0058[0x34];
-    EUnitCommandType commandType;                       // +0x58
-    UserCommandRawTargetView defaultTarget;             // +0x5C
-    std::uint8_t pad_0070_00A4[0x34];
-    std::int32_t baseCount;                             // +0xA4
-    std::uint8_t pad_00A8_00BC[0x14];
-    UserCommandIssueEventRuntimeView** eventSlots;      // +0xBC
-    std::uint32_t eventWrapBase;                        // +0xC0
-    std::uint32_t eventStart;                           // +0xC4
-    std::uint32_t eventCount;                           // +0xC8
-  };
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, commandId) == 0x04,
-    "UserCommandIssueHelperRuntimeView::commandId offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, buildBlueprint) == 0x20,
-    "UserCommandIssueHelperRuntimeView::buildBlueprint offset must be 0x20"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, commandType) == 0x58,
-    "UserCommandIssueHelperRuntimeView::commandType offset must be 0x58"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, defaultTarget) == 0x5C,
-    "UserCommandIssueHelperRuntimeView::defaultTarget offset must be 0x5C"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, baseCount) == 0xA4,
-    "UserCommandIssueHelperRuntimeView::baseCount offset must be 0xA4"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, eventSlots) == 0xBC,
-    "UserCommandIssueHelperRuntimeView::eventSlots offset must be 0xBC"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, eventWrapBase) == 0xC0,
-    "UserCommandIssueHelperRuntimeView::eventWrapBase offset must be 0xC0"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, eventStart) == 0xC4,
-    "UserCommandIssueHelperRuntimeView::eventStart offset must be 0xC4"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelperRuntimeView, eventCount) == 0xC8,
-    "UserCommandIssueHelperRuntimeView::eventCount offset must be 0xC8"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelper, mConstantData) == offsetof(UserCommandIssueHelperRuntimeView, commandId),
-    "UserCommandIssueHelper/UserCommandIssueHelperRuntimeView command-id lane mismatch"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelper, mLocalQueue) == 0xB8,
-    "UserCommandIssueHelper local queue lane must stay at +0xB8"
-  );
-  static_assert(
-    offsetof(UserCommandIssueHelper, mCursorEntitySet) == 0xCC,
-    "UserCommandIssueHelper cursor weak-set lane must stay at +0xCC"
-  );
-
 } // namespace
 
 namespace moho
 {
   struct UserCommandQueueEntry
   {
-    UserCommandIssueHelperRuntimeView* helper;   // +0x00
+    UserCommandIssueHelper* helper;              // +0x00
     void* link;                                  // +0x04
   };
   static_assert(sizeof(UserCommandQueueEntry) == 0x08, "UserCommandQueueEntry size must be 0x08");
@@ -397,107 +283,6 @@ namespace
     "UserCommandManagerPendingSlotView::dueSeqNo offset must be 0x00"
   );
 
-
-  // UserCommandIssueWeakSetRuntimeView / UserCommandIssueCellVectorRuntimeView /
-  // UserCommandIssueLocalEventRuntimeView moved to UserUnit.h (moho namespace)
-  // so the Sim.cpp local command-issue update-event keystone can destroy its
-  // local event through DestroyCommandIssueLocalEvent (see the type's own
-  // doc comment there).
-
-  struct UserCommandIssueLocalQueueRuntimeView
-  {
-    std::uint32_t allocatorProxy;                        // +0x00
-    UserCommandIssueLocalEventRuntimeView** slots;       // +0x04
-    std::uint32_t capacity;                              // +0x08
-    std::uint32_t readIndex;                             // +0x0C
-    std::uint32_t count;                                 // +0x10
-  };
-  static_assert(
-    offsetof(UserCommandIssueLocalQueueRuntimeView, slots) == 0x04,
-    "UserCommandIssueLocalQueueRuntimeView::slots offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalQueueRuntimeView, capacity) == 0x08,
-    "UserCommandIssueLocalQueueRuntimeView::capacity offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalQueueRuntimeView, readIndex) == 0x0C,
-    "UserCommandIssueLocalQueueRuntimeView::readIndex offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(UserCommandIssueLocalQueueRuntimeView, count) == 0x10,
-    "UserCommandIssueLocalQueueRuntimeView::count offset must be 0x10"
-  );
-  static_assert(sizeof(UserCommandIssueLocalQueueRuntimeView) == 0x14, "UserCommandIssueLocalQueueRuntimeView size must be 0x14");
-
-  struct UserCommandIssueEventEntitySetRuntimeView
-  {
-    std::uint8_t pad_0000_0004[0x04];
-    std::uint32_t eventType;                          // +0x04
-    UserCommandIssueWeakSetRuntimeView entitySet;     // +0x08
-    std::int32_t countDelta;                          // +0x14
-    std::uint8_t pad_0018_0034[0x1C];
-  };
-  static_assert(
-    offsetof(UserCommandIssueEventEntitySetRuntimeView, eventType) == 0x04,
-    "UserCommandIssueEventEntitySetRuntimeView::eventType offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserCommandIssueEventEntitySetRuntimeView, entitySet) == 0x08,
-    "UserCommandIssueEventEntitySetRuntimeView::entitySet offset must be 0x08"
-  );
-  static_assert(
-    offsetof(UserCommandIssueEventEntitySetRuntimeView, countDelta) == 0x14,
-    "UserCommandIssueEventEntitySetRuntimeView::countDelta offset must be 0x14"
-  );
-  static_assert(sizeof(UserCommandIssueEventEntitySetRuntimeView) == 0x34, "UserCommandIssueEventEntitySetRuntimeView size must be 0x34");
-
-  struct UserCommandIssueCursorEntityCacheRuntimeView
-  {
-    std::uint8_t pad_0000_0040[0x40];
-    EntId* cursorEntityIdsBegin;                                  // +0x40
-    EntId* cursorEntityIdsEnd;                                    // +0x44
-    std::uint8_t pad_0048_00B2[0x6A];
-    std::uint8_t cursorEntityCacheDirty;                          // +0xB2
-    std::uint8_t pad_00B3_00BC[0x09];
-    UserCommandIssueEventEntitySetRuntimeView** eventSlots;       // +0xBC
-    std::uint32_t eventWrapBase;                                  // +0xC0
-    std::uint32_t eventStart;                                     // +0xC4
-    std::uint32_t eventCount;                                     // +0xC8
-    UserCommandIssueWeakSetRuntimeView cursorEntitySet;           // +0xCC
-  };
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityIdsBegin) == 0x40,
-    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityIdsBegin offset must be 0x40"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityIdsEnd) == 0x44,
-    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityIdsEnd offset must be 0x44"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntityCacheDirty) == 0xB2,
-    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntityCacheDirty offset must be 0xB2"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventSlots) == 0xBC,
-    "UserCommandIssueCursorEntityCacheRuntimeView::eventSlots offset must be 0xBC"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventWrapBase) == 0xC0,
-    "UserCommandIssueCursorEntityCacheRuntimeView::eventWrapBase offset must be 0xC0"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventStart) == 0xC4,
-    "UserCommandIssueCursorEntityCacheRuntimeView::eventStart offset must be 0xC4"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, eventCount) == 0xC8,
-    "UserCommandIssueCursorEntityCacheRuntimeView::eventCount offset must be 0xC8"
-  );
-  static_assert(
-    offsetof(UserCommandIssueCursorEntityCacheRuntimeView, cursorEntitySet) == 0xCC,
-    "UserCommandIssueCursorEntityCacheRuntimeView::cursorEntitySet offset must be 0xCC"
-  );
 
 } // namespace
 
@@ -702,7 +487,7 @@ namespace
 
   /**
    * The helper's cursor list IS an engine weak-entity set:
-   * `UserCommandIssueWeakSetRuntimeView` and `WeakEntitySetUserEntity` are the
+   * `mCursorEntitySet` is a `WeakEntitySetUserEntity`: the
    * same 12-byte `{proxy, head, size}` header, and `func_GetEntitiesUnderCursor`
    * (0x008B43F0) hands `&helper->cursorEntitySet` (`v1 + 17`, the object at
    * `helper+0xCC`) straight to the weak-set tidy and insert lanes.
@@ -718,9 +503,9 @@ namespace
    * reference: the helper's set is the bare 12-byte header (the helper is 0xD8
    * bytes and the set ends it), so that word belongs to whatever follows.
    */
-  [[nodiscard]] SSelectionSetUserEntity& IssueCursorWeakSet(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  [[nodiscard]] SSelectionSetUserEntity& IssueCursorWeakSet(WeakEntitySetUserEntity& set) noexcept
   {
-    return *reinterpret_cast<SSelectionSetUserEntity*>(&set);
+    return static_cast<SSelectionSetUserEntity&>(set);
   }
 
   [[nodiscard]] UserEntity* DecodeSelectionWeakOwnerUserEntity(
@@ -735,7 +520,7 @@ namespace
     return reinterpret_cast<UserEntity*>(ownerLinkSlot - kUserEntityWeakOwnerOffset);
   }
 
-  void ClearIssueWeakSetKeepHead(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  void ClearIssueWeakSetKeepHead(WeakEntitySetUserEntity& set) noexcept
   {
     SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
     if (tree.mHead == nullptr) {
@@ -746,7 +531,7 @@ namespace
     (void)tree.EraseRange(&eraseCursor, tree.mHead->mLeft, tree.mHead);
   }
 
-  void PruneIssueWeakSetTombstones(UserCommandIssueWeakSetRuntimeView& set) noexcept
+  void PruneIssueWeakSetTombstones(WeakEntitySetUserEntity& set) noexcept
   {
     SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
     if (tree.mHead == nullptr) {
@@ -761,7 +546,7 @@ namespace
     }
   }
 
-  void AddIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
+  void AddIssueWeakSetEntity(WeakEntitySetUserEntity& set, UserEntity* const entity) noexcept
   {
     SSelectionSetUserEntity& tree = IssueCursorWeakSet(set);
     if (entity == nullptr || tree.mHead == nullptr) {
@@ -772,7 +557,7 @@ namespace
     (void)SSelectionSetUserEntity::Add(&addResult, &tree, entity);
   }
 
-  void EraseIssueWeakSetEntity(UserCommandIssueWeakSetRuntimeView& set, UserEntity* const entity) noexcept
+  void EraseIssueWeakSetEntity(WeakEntitySetUserEntity& set, UserEntity* const entity) noexcept
   {
     if (entity == nullptr) {
       return;
@@ -800,8 +585,8 @@ namespace
   }
 
   void MergeIssueWeakSetEntities(
-    UserCommandIssueWeakSetRuntimeView& destination,
-    UserCommandIssueWeakSetRuntimeView& source
+    WeakEntitySetUserEntity& destination,
+    WeakEntitySetUserEntity& source
   ) noexcept
   {
     SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
@@ -822,8 +607,8 @@ namespace
   }
 
   void EraseIssueWeakSetEntities(
-    UserCommandIssueWeakSetRuntimeView& destination,
-    UserCommandIssueWeakSetRuntimeView& source
+    WeakEntitySetUserEntity& destination,
+    WeakEntitySetUserEntity& source
   ) noexcept
   {
     SSelectionSetUserEntity& sourceTree = IssueCursorWeakSet(source);
@@ -843,83 +628,6 @@ namespace
     }
   }
 
-  void DestroyCommandIssueWeakSetNodes(
-    SSelectionNodeUserEntity* const node,
-    SSelectionNodeUserEntity* const head
-  ) noexcept
-  {
-    if (node == nullptr || node == head || node->mIsSentinel != 0u) {
-      return;
-    }
-
-    DestroyCommandIssueWeakSetNodes(node->mLeft, head);
-    DestroyCommandIssueWeakSetNodes(node->mRight, head);
-    UnlinkWeakEntityOwner(node->mEnt);
-    ::operator delete(node);
-  }
-
-  void DestroyCommandIssueWeakSet(UserCommandIssueWeakSetRuntimeView& set) noexcept
-  {
-    SSelectionNodeUserEntity* const head = set.head;
-    if (head == nullptr) {
-      return;
-    }
-
-    SSelectionNodeUserEntity* const root = head->mParent;
-    if (root != nullptr && root != head && root->mIsSentinel == 0u) {
-      DestroyCommandIssueWeakSetNodes(root, head);
-    }
-
-    ::operator delete(head);
-    set.head = nullptr;
-    set.size = 0u;
-  }
-
-  void UnlinkCommandIssueTargetWeakOwnerNoReset(SSelectionWeakRefUserEntity& weakRef) noexcept
-  {
-    auto** ownerLinkSlot = reinterpret_cast<SSelectionWeakRefUserEntity**>(weakRef.mOwnerLinkSlot);
-    if (ownerLinkSlot == nullptr) {
-      return;
-    }
-
-    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-      ownerLinkSlot = &(*ownerLinkSlot)->mNextOwner;
-    }
-
-    if (*ownerLinkSlot == &weakRef) {
-      *ownerLinkSlot = weakRef.mNextOwner;
-    }
-  }
-
-} // namespace
-
-namespace moho
-{
-  /**
-   * Address: 0x008B4800 (FUN_008B4800)
-   *
-   * What it does:
-   * Releases dynamic command-cell storage back to inline capacity, detaches
-   * target weak-owner linkage, and destroys the local weak-entity set lane.
-   * Exposed (declared in UserUnit.h) so the Sim.cpp local command-issue
-   * update-event keystone can invoke the canonical teardown by name.
-   */
-  void DestroyCommandIssueLocalEvent(UserCommandIssueLocalEventRuntimeView& event) noexcept
-  {
-    if (event.cells.begin != event.cells.inlineBase) {
-      ::operator delete[](event.cells.begin);
-      event.cells.begin = event.cells.inlineBase;
-      event.cells.capacityEnd = (event.cells.inlineBase != nullptr) ? *event.cells.inlineBase : nullptr;
-    }
-    event.cells.end = event.cells.begin;
-
-    UnlinkCommandIssueTargetWeakOwnerNoReset(event.targetEntityWeak);
-    DestroyCommandIssueWeakSet(event.entitySet);
-  }
-} // namespace moho
-
-namespace
-{
   [[nodiscard]] SSelectionNodeUserEntity*
   FindWeakEntitySetNodeByKey(const WeakEntitySetUserEntity& selection, const std::uint32_t key) noexcept
   {
@@ -1561,7 +1269,7 @@ namespace
    * Resolves one command-manager queue view and returns the most recent
    * non-null helper entry, scanning backward from the logical tail.
    */
-  [[nodiscard]] UserCommandIssueHelperRuntimeView* GetLastQueuedUserCommandHelper(
+  [[nodiscard]] UserCommandIssueHelper* GetLastQueuedUserCommandHelper(
     UserCommandQueue* const managerPtr
   ) noexcept
   {
@@ -1600,62 +1308,6 @@ namespace
 
     const UserCommandQueueLinkVector* const queueRange = ResolveUserCommandQueueRange(unit->GetCommandQueue());
     return queueRange != nullptr && queueRange->begin == queueRange->end;
-  }
-
-  /**
-   * Address: 0x008B5210 (FUN_008B5210)
-   *
-   * What it does:
-   * Destroys every live local command-issue event from one helper ring queue,
-   * releases per-slot event storage, then frees queue slot-map storage and
-   * clears queue slot-capacity lanes.
-   */
-  [[maybe_unused]] void DestroyCommandIssueLocalQueue(UserCommandIssueLocalQueueRuntimeView* const queuePtr) noexcept
-  {
-    auto& queue = *queuePtr;
-    while (queue.count != 0u) {
-      std::uint32_t slot = queue.count + queue.readIndex - 1u;
-      if (queue.capacity <= slot) {
-        slot -= queue.capacity;
-      }
-
-      UserCommandIssueLocalEventRuntimeView* const event = queue.slots[slot];
-      if (event != nullptr) {
-        DestroyCommandIssueLocalEvent(*event);
-      }
-
-      queue.count -= 1u;
-      if (queue.count == 0u) {
-        queue.readIndex = 0u;
-      }
-    }
-
-    for (std::uint32_t slot = queue.capacity; slot != 0u; --slot) {
-      if (queue.slots == nullptr) {
-        break;
-      }
-
-      UserCommandIssueLocalEventRuntimeView* const event = queue.slots[slot - 1u];
-      if (event != nullptr) {
-        ::operator delete(event);
-      }
-    }
-
-    if (queue.slots != nullptr) {
-      ::operator delete(queue.slots);
-    }
-    queue.slots = nullptr;
-    queue.capacity = 0u;
-  }
-
-  void DestroyCommandIssueLocalQueue(CommandIssueLocalQueue& queue) noexcept
-  {
-    DestroyCommandIssueLocalQueue(reinterpret_cast<UserCommandIssueLocalQueueRuntimeView*>(&queue));
-  }
-
-  void DestroyCommandIssueWeakSet(CommandIssueWeakSet& set) noexcept
-  {
-    DestroyCommandIssueWeakSet(reinterpret_cast<UserCommandIssueWeakSetRuntimeView&>(set));
   }
 
   /**
@@ -2047,7 +1699,7 @@ namespace
    * `project_commanddbmapnoderuntime_handrolled_tree` memory note). This
    * file now calls `mCommands` directly, same as `Sim.cpp` does.
    */
-  [[nodiscard]] UserCommandIssueHelperRuntimeView*
+  [[nodiscard]] UserCommandIssueHelper*
   FindSessionCommandIssueHelperById(CWldSession* const session, const CmdId commandId) noexcept
   {
     if (session == nullptr || session->mCommandManager == nullptr) {
@@ -2060,7 +1712,7 @@ namespace
       return nullptr;
     }
 
-    return reinterpret_cast<UserCommandIssueHelperRuntimeView*>(it->second);
+    return it->second;
   }
 
   /**
@@ -2141,7 +1793,7 @@ namespace
     for (UserCommandQueueEntry* entry = manager.primaryLinks.begin;
          entry != manager.primaryLinks.end;
          ++entry) {
-      UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+      UserCommandIssueHelper* const helper = entry->helper;
       if (helper == nullptr) {
         continue;
       }
@@ -2178,8 +1830,8 @@ namespace
       }
 
       if (pending->commandType == 2) {
-        UserCommandIssueHelperRuntimeView* const helperToRemove =
-          reinterpret_cast<UserCommandIssueHelperRuntimeView*>(pending->subject);
+        UserCommandIssueHelper* const helperToRemove =
+          static_cast<UserCommandIssueHelper*>(pending->subject);
         if (helperToRemove == nullptr) {
           continue;
         }
@@ -2201,7 +1853,7 @@ namespace
       const std::uint32_t encodedCommandId = static_cast<std::uint32_t>(pending->sequenceOrCount);
       if ((encodedCommandId & 0xFF000000u) != 0xFF000000u) {
         CWldSession* const activeSession = WLD_GetActiveSession();
-        UserCommandIssueHelperRuntimeView* const helperToInsert =
+        UserCommandIssueHelper* const helperToInsert =
           FindSessionCommandIssueHelperById(activeSession, static_cast<CmdId>(pending->sequenceOrCount));
         if (helperToInsert == nullptr) {
           continue;
@@ -2231,8 +1883,8 @@ namespace
         continue;
       }
 
-      UserCommandIssueHelperRuntimeView* const helperToAppend =
-        reinterpret_cast<UserCommandIssueHelperRuntimeView*>(pending->subject);
+      UserCommandIssueHelper* const helperToAppend =
+        static_cast<UserCommandIssueHelper*>(pending->subject);
       if (helperToAppend == nullptr) {
         continue;
       }
@@ -2490,7 +2142,7 @@ namespace
         }
       }
 
-      auto* const helperView = reinterpret_cast<UserCommandIssueHelperRuntimeView*>(liveHelper);
+      auto* const helperView = liveHelper;
       UserCommandQueueEntry* const lane = queue->primaryLinks.begin + index;
       if (lane->helper == helperView) {
         continue;
@@ -2563,16 +2215,6 @@ namespace
     managerPtr->resolvedLinks.end = managerPtr->resolvedLinks.begin;
   }
 
-  [[nodiscard]] UserEntity* DecodeWeakOwnerUserEntity(const UserEntityWeakLinkView& weakEntityLink) noexcept
-  {
-    const std::uintptr_t rawOwnerSlot = weakEntityLink.ownerLinkSlot;
-    if (rawOwnerSlot <= kUserEntityWeakOwnerOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<UserEntity*>(rawOwnerSlot - kUserEntityWeakOwnerOffset);
-  }
-
 } // namespace
 
 namespace moho
@@ -2588,14 +2230,10 @@ namespace moho
    * body runs against the drag target.
    */
   [[nodiscard]] UserEntity* DecodeEntityFromCommandTargetIfEntity(
-    const UserCommandTargetView* const target
+    const UserTarget* const target
   ) noexcept
   {
-    if (target->targetType == UserTargetType::Entity && target->targetEntity.ownerLinkSlot != 0u) {
-      return reinterpret_cast<UserEntity*>(target->targetEntity.ownerLinkSlot - kUserEntityWeakOwnerOffset);
-    }
-
-    return nullptr;
+    return target->targetType == UserTargetType::Entity ? target->targetEntity.GetObjectPtr() : nullptr;
   }
 } // namespace moho
 
@@ -2621,14 +2259,14 @@ namespace moho
    * Exposed (declared in UserUnit.h) so `Moho::ISSUE_SetCommandTarget`
    * (Sim.cpp) can resolve the drag-target world position it publishes.
    */
-  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserCommandTargetView& target) noexcept
+  [[nodiscard]] Wm3::Vector3<float> ResolvePositionFromTarget(const UserTarget& target) noexcept
   {
     if (target.targetType == UserTargetType::Position) {
       return target.position;
     }
 
     if (target.targetType == UserTargetType::Entity) {
-      if (UserEntity* const targetEntity = DecodeWeakOwnerUserEntity(target.targetEntity); targetEntity != nullptr) {
+      if (UserEntity* const targetEntity = target.targetEntity.GetObjectPtr(); targetEntity != nullptr) {
         return targetEntity->mVariableData.mCurTransform.pos_;
       }
     }
@@ -2640,14 +2278,15 @@ namespace moho
 namespace
 {
   [[nodiscard]] Wm3::Vector3<float>
-  ResolvePositionFromRawTarget(const UserCommandRawTargetView& target, CWldSession* const session) noexcept
+  ResolvePositionFromRawTarget(const SSTITarget& target, CWldSession* const session) noexcept
   {
-    if (target.targetType == UserTargetType::Position) {
-      return target.position;
+    if (target.mType == EAiTargetType::AITARGET_Ground) {
+      return target.mPos;
     }
 
-    if (target.targetType == UserTargetType::Entity) {
-      if (UserEntity* const targetEntity = FindSessionEntityById(session, target.entityId); targetEntity != nullptr) {
+    if (target.mType == EAiTargetType::AITARGET_Entity) {
+      if (UserEntity* const targetEntity = FindSessionEntityById(session, static_cast<std::int32_t>(target.mEntityId));
+          targetEntity != nullptr) {
         return targetEntity->mVariableData.mCurTransform.pos_;
       }
     }
@@ -2655,27 +2294,15 @@ namespace
     return InvalidCommandQueuePosition();
   }
 
-  [[nodiscard]] const UserCommandIssueEventRuntimeView*
-  FindLatestIssueEvent(const UserCommandIssueHelperRuntimeView& helper, const std::uint32_t eventType) noexcept
+  [[nodiscard]] const UserCommandIssueLocalEvent*
+  FindLatestIssueEvent(const UserCommandIssueHelper& helper, const ECommandIssueEvent type) noexcept
   {
-    if (helper.eventSlots == nullptr) {
-      return nullptr;
-    }
-
-    std::uint32_t cursor = helper.eventCount + helper.eventStart;
-    while (cursor != helper.eventStart) {
-      const std::uint32_t scan = cursor - 1u;
-      std::uint32_t slot = scan;
-      if (helper.eventWrapBase <= scan) {
-        slot = scan - helper.eventWrapBase;
+    const msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    for (std::size_t index = events.size(); index != 0u; --index) {
+      const UserCommandIssueLocalEvent& event = events[index - 1u];
+      if (event.mType == type) {
+        return &event;
       }
-
-      const UserCommandIssueEventRuntimeView* const event = helper.eventSlots[slot];
-      if (event != nullptr && event->eventType == eventType) {
-        return event;
-      }
-
-      cursor = scan;
     }
 
     return nullptr;
@@ -2689,14 +2316,14 @@ namespace
    * recent explicit command-type override; otherwise returns helper baseline
    * command type.
    */
-  [[nodiscard]] EUnitCommandType ResolveHelperCommandType(const UserCommandIssueHelperRuntimeView& helper) noexcept
+  [[nodiscard]] EUnitCommandType ResolveHelperCommandType(const UserCommandIssueHelper& helper) noexcept
   {
-    if (const UserCommandIssueEventRuntimeView* const event = FindLatestIssueEvent(helper, kCommandIssueEventSetType);
+    if (const UserCommandIssueLocalEvent* const event = FindLatestIssueEvent(helper, ECommandIssueEvent::SetCommandType);
         event != nullptr) {
-      return static_cast<EUnitCommandType>(event->commandType);
+      return event->mCommandType;
     }
 
-    return helper.commandType;
+    return helper.mVariableData.mCmdType;
   }
 
   /**
@@ -2707,59 +2334,41 @@ namespace
    * seeds from stored cursor entity-id lanes, then replays queued issue events
    * (`type 0` merge, `type 3` erase) into the cache and returns that set.
    */
-  [[nodiscard]] UserCommandIssueWeakSetRuntimeView* GetEntitiesUnderCursor(
-    UserCommandIssueCursorEntityCacheRuntimeView* const helper
-  ) noexcept
+  [[nodiscard]] WeakEntitySetUserEntity* GetEntitiesUnderCursor(UserCommandIssueHelper& helper) noexcept
   {
-    if (helper == nullptr) {
-      return nullptr;
-    }
+    if (helper.mVariableDataDirty != 0u) {
+      helper.mVariableDataDirty = 0u;
+      ClearIssueWeakSetKeepHead(helper.mCursorEntitySet);
 
-    if (helper->cursorEntityCacheDirty != 0u) {
-      helper->cursorEntityCacheDirty = 0u;
-      ClearIssueWeakSetKeepHead(helper->cursorEntitySet);
-
-      for (EntId* entityIdCursor = helper->cursorEntityIdsBegin; entityIdCursor != helper->cursorEntityIdsEnd;
-           ++entityIdCursor) {
-        UserEntity* const entity =
-          FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(*entityIdCursor));
-        AddIssueWeakSetEntity(helper->cursorEntitySet, entity);
+      for (const EntId entityId : helper.mVariableData.mEntIds) {
+        UserEntity* const entity = FindSessionEntityById(WLD_GetActiveSession(), static_cast<std::int32_t>(entityId));
+        AddIssueWeakSetEntity(helper.mCursorEntitySet, entity);
       }
 
-      const std::uint32_t eventEnd = helper->eventStart + helper->eventCount;
-      for (std::uint32_t eventCursor = helper->eventStart; eventCursor != eventEnd; ++eventCursor) {
-        std::uint32_t eventSlot = eventCursor;
-        if (helper->eventWrapBase <= eventCursor) {
-          eventSlot = eventCursor - helper->eventWrapBase;
-        }
-
-        UserCommandIssueEventEntitySetRuntimeView* const event =
-          (helper->eventSlots != nullptr) ? helper->eventSlots[eventSlot] : nullptr;
-        if (event == nullptr) {
-          continue;
-        }
-
-        if (event->eventType == 3u) {
-          EraseIssueWeakSetEntities(helper->cursorEntitySet, event->entitySet);
-        } else if (event->eventType == 0u) {
-          PruneIssueWeakSetTombstones(helper->cursorEntitySet);
-          MergeIssueWeakSetEntities(helper->cursorEntitySet, event->entitySet);
+      msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+      for (std::size_t index = 0; index != events.size(); ++index) {
+        UserCommandIssueLocalEvent& event = events[index];
+        if (event.mType == ECommandIssueEvent::DeselectUnit) {
+          EraseIssueWeakSetEntities(helper.mCursorEntitySet, event.mUnits);
+        } else if (event.mType == ECommandIssueEvent::SelectUnit) {
+          PruneIssueWeakSetTombstones(helper.mCursorEntitySet);
+          MergeIssueWeakSetEntities(helper.mCursorEntitySet, event.mUnits);
         }
       }
     }
 
-    return &helper->cursorEntitySet;
+    return &helper.mCursorEntitySet;
   }
 
   [[nodiscard]] Wm3::Vector3<float>
-  ResolveHelperTargetPosition(const UserCommandIssueHelperRuntimeView& helper, CWldSession* const session) noexcept
+  ResolveHelperTargetPosition(const UserCommandIssueHelper& helper, CWldSession* const session) noexcept
   {
-    if (const UserCommandIssueEventRuntimeView* const event = FindLatestIssueEvent(helper, kCommandIssueEventSetTarget);
+    if (const UserCommandIssueLocalEvent* const event = FindLatestIssueEvent(helper, ECommandIssueEvent::SetTarget);
         event != nullptr) {
-      return ResolvePositionFromTarget(event->target);
+      return ResolvePositionFromTarget(event->mTarget);
     }
 
-    return ResolvePositionFromRawTarget(helper.defaultTarget, session);
+    return ResolvePositionFromRawTarget(helper.mVariableData.mTarget1, session);
   }
 
   [[nodiscard]] bool IsFactoryQueueCommandType(const EUnitCommandType commandType) noexcept
@@ -2776,30 +2385,17 @@ namespace
    * Resolves one effective queued-build count from helper baseline count and
    * queued increase/decrease issue events.
    */
-  [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelperRuntimeView& helper) noexcept
+  [[nodiscard]] std::int32_t ResolveHelperBuildCount(const UserCommandIssueHelper& helper) noexcept
   {
-    std::int32_t count = helper.baseCount;
-    const std::uint32_t end = helper.eventStart + helper.eventCount;
-    for (std::uint32_t cursor = helper.eventStart; cursor != end; ++cursor) {
-      if (helper.eventSlots == nullptr) {
-        break;
-      }
-
-      std::uint32_t slot = cursor;
-      if (helper.eventWrapBase <= cursor) {
-        slot = cursor - helper.eventWrapBase;
-      }
-
-      const UserCommandIssueEventRuntimeView* const event = helper.eventSlots[slot];
-      if (event == nullptr) {
-        continue;
-      }
-
-      if (event->eventType == kCommandIssueEventDecreaseCount) {
-        if (event->countDelta == -1) {
+    std::int32_t count = helper.mVariableData.mCount;
+    const msvc8::deque<UserCommandIssueLocalEvent>& events = helper.mLocalQueue;
+    for (std::size_t index = 0; index != events.size(); ++index) {
+      const UserCommandIssueLocalEvent& event = events[index];
+      if (event.mType == ECommandIssueEvent::DecreaseCount) {
+        if (event.mCount == -1) {
           count = 0;
         } else {
-          count -= event->countDelta;
+          count -= event.mCount;
           if (count < 0) {
             count = 0;
           }
@@ -2807,8 +2403,8 @@ namespace
         continue;
       }
 
-      if (event->eventType == kCommandIssueEventIncreaseCount && event->countDelta > 0) {
-        const std::int32_t updatedCount = count + event->countDelta;
+      if (event.mType == ECommandIssueEvent::IncreaseCount && event.mCount > 0) {
+        const std::int32_t updatedCount = count + event.mCount;
         count = (updatedCount < 0) ? 0 : updatedCount;
       }
     }
@@ -3176,7 +2772,7 @@ namespace moho
    */
   std::int32_t QueuedBuildCommandCount(const UserCommandIssueHelper& helper) noexcept
   {
-    return ResolveHelperBuildCount(reinterpret_cast<const UserCommandIssueHelperRuntimeView&>(helper));
+    return ResolveHelperBuildCount(helper);
   }
 
   /**
@@ -3246,7 +2842,7 @@ namespace moho
     }
 
     for (UserCommandQueueEntry* entry = queue->begin; entry != queue->end; ++entry) {
-      UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+      UserCommandIssueHelper* const helper = entry->helper;
       if (helper == nullptr) {
         continue;
       }
@@ -3258,7 +2854,7 @@ namespace moho
       gpg::RRef entityRef{};
       (void)gpg::RRef_REntityBlueprint(
         &entityRef,
-        reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
+        helper->mConstantData.blueprint
       );
       // The reference `RRef_REntityBlueprint` builds describes the blueprint
       // *object*, and `upcast.mObj` is used as one below, so the target is the
@@ -3450,6 +3046,26 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B3DC0 (FUN_008B3DC0, sub_8B3DC0)
+   *
+   * What it does:
+   * See the declaration in CommandIssueHelper.h. The binary leaves the unit
+   * set's allocator proxy (+0x08) unwritten; the default member state here
+   * zeroes it, which is not observable.
+   */
+  UserCommandIssueLocalEvent::UserCommandIssueLocalEvent(const CmdId cmdId, const ECommandIssueEvent type)
+    : mCmdId(cmdId)
+    , mType(type)
+    , mUnits()
+    , mCount(0)
+    , mTarget()
+    , mCells()
+  {
+    mUnits.mHead = AllocateWeakEntitySetHead();
+    mUnits.mSize = 0u;
+  }
+
+  /**
    * Address: 0x008B3EC0 (FUN_008B3EC0, struct_CommandIssueHelper::struct_CommandIssueHelper)
    *
    * What it does:
@@ -3473,19 +3089,7 @@ namespace moho
     , mLocalQueue{}
     , mCursorEntitySet{}
   {
-    auto* const head = static_cast<SSelectionNodeUserEntity*>(::operator new(sizeof(SSelectionNodeUserEntity)));
-    head->mLeft = head;
-    head->mParent = head;
-    head->mRight = head;
-    head->mKey = 0u;
-    head->mEnt.mOwnerLinkSlot = nullptr;
-    head->mEnt.mNextOwner = nullptr;
-    head->mColor = 1u;
-    head->mIsSentinel = 1u;
-    head->pad_1A[0] = 0u;
-    head->pad_1A[1] = 0u;
-
-    mCursorEntitySet.mHead = head;
+    mCursorEntitySet.mHead = AllocateWeakEntitySetHead();
     mCursorEntitySet.mSize = 0u;
     { static int c = 0; if (c++ < 200) gpg::Warnf("[HELPER] ctor cmd=0x%08X delWhenDue=%u dueSeq=%d this=%p", static_cast<unsigned>(constantData.cmd), static_cast<unsigned>(deleteWhenDue), dueSeqNo, static_cast<void*>(this)); } // TEMPORARY PROBE (do not commit)
   }
@@ -3509,29 +3113,16 @@ namespace moho
       return;
     }
 
-    auto& queue = reinterpret_cast<UserCommandIssueLocalQueueRuntimeView&>(mLocalQueue);
-    while (queue.count != 0u) {
-      std::uint32_t slot = queue.readIndex;
-      if (queue.capacity <= slot) {
-        slot -= queue.capacity;
-      }
-
-      UserCommandIssueLocalEventRuntimeView* const event = queue.slots[slot];
+    // Every edit the sim has now confirmed is dropped from the front.
+    while (!mLocalQueue.empty()) {
       const auto eventDelta = static_cast<std::int32_t>(
-        static_cast<std::uint32_t>(event->commandId) - static_cast<std::uint32_t>(beat)
+        static_cast<std::uint32_t>(mLocalQueue.front().mCmdId) - static_cast<std::uint32_t>(beat)
       );
       if (eventDelta > 0) {
         break;
       }
 
-      DestroyCommandIssueLocalEvent(*event);
-      ++queue.readIndex;
-      if (queue.capacity <= queue.readIndex) {
-        queue.readIndex = 0u;
-      }
-      if (queue.count-- == 1u) {
-        queue.readIndex = 0u;
-      }
+      mLocalQueue.pop_front();
       mVariableDataDirty = 1u;
     }
   }
@@ -3548,25 +3139,22 @@ namespace moho
   UserCommandIssueHelper::~UserCommandIssueHelper() noexcept
   {
     DiscardActiveSessionCommandIssueHelper(*this);
-    DestroyCommandIssueWeakSet(mCursorEntitySet);
-    DestroyCommandIssueLocalQueue(mLocalQueue);
+    // `mCursorEntitySet`, then `mLocalQueue` (0x008B5210), are destroyed as members.
   }
 
   UserCommandIssueHelper* FindCommandIssueHelperInSession(CWldSession* const session, const CmdId commandId) noexcept
   {
-    return reinterpret_cast<UserCommandIssueHelper*>(FindSessionCommandIssueHelperById(session, commandId));
+    return FindSessionCommandIssueHelperById(session, commandId);
   }
 
   EUnitCommandType ResolveCommandIssueHelperCommandType(const UserCommandIssueHelper& helper) noexcept
   {
-    return ResolveHelperCommandType(reinterpret_cast<const UserCommandIssueHelperRuntimeView&>(helper));
+    return ResolveHelperCommandType(helper);
   }
 
   SSelectionSetUserEntity* ResolveCommandIssueCursorEntities(UserCommandIssueHelper& helper) noexcept
   {
-    UserCommandIssueWeakSetRuntimeView* const cursorSet =
-      GetEntitiesUnderCursor(reinterpret_cast<UserCommandIssueCursorEntityCacheRuntimeView*>(&helper));
-    return reinterpret_cast<SSelectionSetUserEntity*>(cursorSet);
+    return static_cast<SSelectionSetUserEntity*>(GetEntitiesUnderCursor(helper));
   }
 
   /**
@@ -3595,7 +3183,7 @@ namespace moho
       return false;
     }
 
-    const auto* const helperView = reinterpret_cast<const UserCommandIssueHelperRuntimeView*>(helper);
+    const auto* const helperView = helper;
     for (const UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
       if (entry->helper == helperView) {
         return true;
@@ -3607,7 +3195,7 @@ namespace moho
 
   UserEntity* ResolveWeakEntitySetNodeEntity(const SSelectionNodeUserEntity& node) noexcept
   {
-    return DecodeWeakOwnerUserEntity(*reinterpret_cast<const UserEntityWeakLinkView*>(&node.mEnt));
+    return WeakPtr<UserEntity>::DecodeOwnerObject(node.mEnt.mOwnerLinkSlot);
   }
 
   UserCommandIssueHelper* ResolveUserUnitFrontCommandIssueHelper(UserCommandQueue* const manager) noexcept
@@ -3625,7 +3213,7 @@ namespace moho
     // retired order leaves its slot behind rather than compacting the range.
     for (const UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
       if (entry->helper != nullptr) {
-        return reinterpret_cast<UserCommandIssueHelper*>(entry->helper);
+        return entry->helper;
       }
     }
 
@@ -3642,7 +3230,7 @@ namespace moho
       return nullptr;
     }
 
-    return reinterpret_cast<UserCommandIssueHelper*>(GetLastQueuedUserCommandHelper(manager));
+    return GetLastQueuedUserCommandHelper(manager);
   }
 
   /**
@@ -3664,12 +3252,12 @@ namespace moho
     const SOCellPos dragCell = candidateBlueprint->mFootprint.ToCellPos(dragPosition);
 
     for (UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
-      UserCommandIssueHelperRuntimeView* const entryHelper = entry->helper;
+      UserCommandIssueHelper* const entryHelper = entry->helper;
       if (entryHelper == nullptr) {
         continue;
       }
 
-      auto* const queuedHelper = reinterpret_cast<UserCommandIssueHelper*>(entryHelper);
+      auto* const queuedHelper = entryHelper;
       if (queuedHelper->mConstantData.blueprint != candidateBlueprint) {
         continue;
       }
@@ -3690,7 +3278,7 @@ namespace moho
       return nullptr;
     }
 
-    return reinterpret_cast<UserCommandIssueHelper*>(queueVector->end[-1].helper);
+    return queueVector->end[-1].helper;
   }
 
   /**
@@ -3737,19 +3325,19 @@ namespace moho
 
     bool foundHelper = false;
     for (UserCommandQueueEntry* entry = queueVector->begin; entry != queueVector->end; ++entry) {
-      UserCommandIssueHelperRuntimeView* const entryHelper = entry->helper;
+      UserCommandIssueHelper* const entryHelper = entry->helper;
       if (entryHelper == nullptr) {
         continue;
       }
 
-      if (reinterpret_cast<UserCommandIssueHelper*>(entryHelper) == helper) {
+      if (entryHelper == helper) {
         foundHelper = true;
       }
       if (!foundHelper || ResolveHelperCommandType(*entryHelper) != matchCommandType) {
         continue;
       }
 
-      auto& queuedHelper = *reinterpret_cast<UserCommandIssueHelper*>(entryHelper);
+      auto& queuedHelper = *entryHelper;
       CmdId newCmdId = queuedHelper.mConstantData.cmd;
       if (ISTIDriver* const simDriver = SIM_GetActiveDriver(); simDriver != nullptr) {
         newCmdId = simDriver->SetCommandType(newCmdId, restartCommandType);
@@ -5253,7 +4841,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
   }
 
   for (const auto& [issueCommandId, issueHelper] : commandManager->mCommands) {
-    auto* const helper = reinterpret_cast<UserCommandIssueHelperRuntimeView*>(issueHelper);
+    auto* const helper = issueHelper;
     if (helper == nullptr || ResolveHelperCommandType(*helper) != EUnitCommandType::UNITCOMMAND_BuildMobile) {
       continue;
     }
@@ -5265,7 +4853,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
     gpg::RRef buildBlueprintRef{};
     (void)gpg::RRef_REntityBlueprint(
       &buildBlueprintRef,
-      reinterpret_cast<REntityBlueprint*>(const_cast<RBlueprint*>(helper->buildBlueprint))
+      helper->mConstantData.blueprint
     );
     // Object reference in, object pointer out (it is handed to `GetSkirtRect`
     // below), so the upcast target is the class descriptor - the same one
@@ -7568,14 +7156,14 @@ int moho::cfunc_UserUnitGetCommandQueueL(LuaPlus::LuaState* const state)
 
   int tableIndex = 1;
   for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
-    UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+    UserCommandIssueHelper* const helper = entry->helper;
     if (helper == nullptr) {
       continue;
     }
 
     LuaPlus::LuaObject row;
     row.AssignNewTable(state, 0, 0);
-    row.SetInteger(kCommandQueueIdKey, static_cast<int>(helper->commandId));
+    row.SetInteger(kCommandQueueIdKey, static_cast<int>(helper->mConstantData.cmd));
 
     EUnitCommandType commandTypeValue = ResolveHelperCommandType(*helper);
     gpg::RRef commandTypeRef{};
@@ -7730,7 +7318,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
       const UserCommandQueueLinkVector* const commandRange = ResolveUserCommandQueueRange(commandQueue);
       if (commandRange != nullptr) {
         for (UserCommandQueueEntry* entry = commandRange->begin; entry != commandRange->end; ++entry) {
-          const UserCommandIssueHelperRuntimeView* const helper = entry->helper;
+          const UserCommandIssueHelper* const helper = entry->helper;
           if (helper == nullptr) {
             continue;
           }
@@ -7740,7 +7328,7 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
             continue;
           }
 
-          const RBlueprint* const blueprint = helper->buildBlueprint;
+          const REntityBlueprint* const blueprint = helper->mConstantData.blueprint;
           if (blueprint == nullptr || blueprint->mBlueprintId.empty()) {
             continue;
           }
@@ -7750,12 +7338,12 @@ void moho::RebuildFactoryQueueDisplaySnapshot(
           if (!queue.empty() && queue.back().blueprintId == blueprint->mBlueprintId) {
             FactoryQueueDisplayItem& tail = queue.back();
             tail.count += ResolveHelperBuildCount(*helper);
-            tail.commands.push_back(helper->commandId);
+            tail.commands.push_back(helper->mConstantData.cmd);
             continue;
           }
 
           FactoryQueueDisplayItem item(blueprint->mBlueprintId, ResolveHelperBuildCount(*helper));
-          item.commands.push_back(helper->commandId);
+          item.commands.push_back(helper->mConstantData.cmd);
           AppendFactoryQueueDisplayItem(queue, item);
         }
       }
