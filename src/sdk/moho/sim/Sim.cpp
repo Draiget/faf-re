@@ -220,12 +220,6 @@ namespace moho
 
   static_assert(sizeof(CRefTreeItemData) == 0x34, "CRefTreeItemData size must be 0x34");
 
-  struct RFieldVectorRuntimeView
-  {
-    void* mProxy = nullptr;
-    gpg::RField* mFirst = nullptr;
-  };
-
   /**
    * Reflection debug dialog that visualizes and edits `gpg::RRef` trees.
    */
@@ -362,23 +356,6 @@ namespace
   [[nodiscard]] wxStringRuntime BorrowUtf8AsWxString(const msvc8::string& text)
   {
     return BorrowUtf8AsWxString(text.c_str());
-  }
-
-  /**
-   * Address: 0x004A4870 (FUN_004A4870)
-   *
-   * What it does:
-   * Returns one indexed `RField` lane from a vector-like runtime field view.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RField* ResolveFieldVectorElement(
-    moho::RFieldVectorRuntimeView* const fieldVector,
-    const int index
-  ) noexcept
-  {
-    if (fieldVector == nullptr || fieldVector->mFirst == nullptr || index < 0) {
-      return nullptr;
-    }
-    return fieldVector->mFirst + index;
   }
 } // namespace
 
@@ -573,15 +550,8 @@ void moho::WRefEditDialog::PopulateRefChildren(const gpg::RRef& ref, const wxTre
   if (ref.mType != nullptr) {
     const int fieldCount = ref.GetNumFields();
     if (fieldCount > 0) {
-      RFieldVectorRuntimeView fieldView{};
-      fieldView.mFirst = ref.mType->fields_.begin();
-
       for (int fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
-        gpg::RField* const field = ResolveFieldVectorElement(&fieldView, fieldIndex);
-        if (field == nullptr) {
-          continue;
-        }
-
+        const gpg::RField* const field = &ref.mType->fields_[fieldIndex];
         const gpg::RRef fieldRef = ref.GetField(fieldIndex);
         const char* const fieldName = field->mName != nullptr ? field->mName : "";
         const bool fieldEditable = (field->v4 & 0x3) == 0x3;
@@ -1274,9 +1244,6 @@ namespace
     "Incorrect type of game object.  (Did you call with '.' instead of ':'?)";
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaInvalidBoolWarning = "%s\n  invalid argument %d, use as boolean";
-  constexpr std::uint32_t kIntelRadiusMagnitudeMask = 0x7FFFFFFFu;
-  constexpr std::uint32_t kIntelEnabledFlagMask = ~kIntelRadiusMagnitudeMask;
-  constexpr std::size_t kEntityIntelAttributesOffset = 0x128u;
   constexpr std::size_t kDiscardClientSlotCount = 17u;
   // FAF-patch global (BSS byte at 0x011FD23F in the shipped exe, read by
   // cfunc_SimCallbackL 0x008BA770 and cfunc_SetPausedL 0x008BC100). It is a
@@ -1286,144 +1253,19 @@ namespace
   // original image's address, which in this process is unmapped memory.
   bool gLuaSimCallbackDispatchBlocked = false;
 
-  struct EntityIntelAttributeRangesView
+  /**
+   * `EEntityAttribute` lane of one `EIntel` value: the binary computes it as
+   * `intel - 1` and range-checks it against 12 (`lea edx,[eax-1]; cmp edx,0Ch;
+   * ja` at 0x0068E76A / 0x0068E946 / 0x0068ECE7 / 0x0068E1FA).
+   */
+  [[nodiscard]] constexpr moho::EEntityAttribute IntelAttributeLane(const moho::EIntel intelType) noexcept
   {
-    std::uint32_t vision;       // +0x00
-    std::uint32_t waterVision;  // +0x04
-    std::uint32_t radar;        // +0x08
-    std::uint32_t sonar;        // +0x0C
-    std::uint32_t omni;         // +0x10
-    std::uint32_t radarStealth; // +0x14
-    std::uint32_t sonarStealth; // +0x18
-    std::uint32_t cloak;        // +0x1C
-  };
-
-  static_assert(sizeof(EntityIntelAttributeRangesView) == 0x20, "EntityIntelAttributeRangesView size must be 0x20");
-  static_assert(
-    offsetof(EntityIntelAttributeRangesView, vision) == 0x00, "EntityIntelAttributeRangesView::vision offset must be 0x00"
-  );
-  static_assert(
-    offsetof(EntityIntelAttributeRangesView, cloak) == 0x1C, "EntityIntelAttributeRangesView::cloak offset must be 0x1C"
-  );
-
-  [[nodiscard]] const EntityIntelAttributeRangesView& GetEntityIntelAttributeRanges(const moho::Entity& entity) noexcept
-  {
-    const auto* const bytes = reinterpret_cast<const std::uint8_t*>(&entity);
-    const auto* const ranges = reinterpret_cast<const EntityIntelAttributeRangesView*>(bytes + kEntityIntelAttributesOffset);
-    return *ranges;
+    return static_cast<moho::EEntityAttribute>(static_cast<std::int32_t>(intelType) - 1);
   }
 
-  [[nodiscard]] EntityIntelAttributeRangesView& GetEntityIntelAttributeRangesMutable(moho::Entity& entity) noexcept
+  [[nodiscard]] constexpr bool IsIntelAttributeLane(const moho::EIntel intelType) noexcept
   {
-    auto* const bytes = reinterpret_cast<std::uint8_t*>(&entity);
-    auto* const ranges = reinterpret_cast<EntityIntelAttributeRangesView*>(bytes + kEntityIntelAttributesOffset);
-    return *ranges;
-  }
-
-  void SetIntelEnabledBit(std::uint32_t& lane, const bool enabled) noexcept
-  {
-    if (enabled) {
-      lane |= kIntelEnabledFlagMask;
-    } else {
-      lane &= kIntelRadiusMagnitudeMask;
-    }
-  }
-
-  void SetEntityAttributeRangePreserveEnabledBit(
-    EntityIntelAttributeRangesView& ranges, const std::int32_t attributeLane, const std::uint32_t radius
-  ) noexcept
-  {
-    const auto setLane = [radius](std::uint32_t& lane) {
-      lane = (lane & kIntelEnabledFlagMask) | (radius & kIntelRadiusMagnitudeMask);
-    };
-
-    switch (attributeLane) {
-    case 0:
-      setLane(ranges.vision);
-      return;
-    case 1:
-      setLane(ranges.waterVision);
-      return;
-    case 2:
-      setLane(ranges.radar);
-      return;
-    case 3:
-      setLane(ranges.sonar);
-      return;
-    case 4:
-      setLane(ranges.omni);
-      return;
-    case 10:
-      setLane(ranges.cloak);
-      return;
-    case 11:
-      setLane(ranges.radarStealth);
-      return;
-    case 12:
-      setLane(ranges.sonarStealth);
-      return;
-    default:
-      return;
-    }
-  }
-
-  void SetEntityIntelEnabledAttributeBit(moho::Entity& entity, const moho::EIntel intelType, const bool enabled) noexcept
-  {
-    EntityIntelAttributeRangesView& ranges = GetEntityIntelAttributeRangesMutable(entity);
-    switch (intelType) {
-    case moho::INTEL_Vision:
-      SetIntelEnabledBit(ranges.vision, enabled);
-      return;
-    case moho::INTEL_WaterVision:
-      SetIntelEnabledBit(ranges.waterVision, enabled);
-      return;
-    case moho::INTEL_Radar:
-      SetIntelEnabledBit(ranges.radar, enabled);
-      return;
-    case moho::INTEL_Sonar:
-      SetIntelEnabledBit(ranges.sonar, enabled);
-      return;
-    case moho::INTEL_Omni:
-      SetIntelEnabledBit(ranges.omni, enabled);
-      return;
-    case moho::INTEL_Cloak:
-      SetIntelEnabledBit(ranges.cloak, enabled);
-      return;
-    case moho::INTEL_RadarStealth:
-      SetIntelEnabledBit(ranges.radarStealth, enabled);
-      return;
-    case moho::INTEL_SonarStealth:
-      SetIntelEnabledBit(ranges.sonarStealth, enabled);
-      return;
-    default:
-      return;
-    }
-  }
-
-  [[nodiscard]] std::uint32_t GetEntityAttributeRangeMagnitude(
-    const EntityIntelAttributeRangesView& ranges, const std::int32_t attributeLane
-  ) noexcept
-  {
-    switch (attributeLane) {
-    case 0:
-      return ranges.vision & kIntelRadiusMagnitudeMask;
-    case 1:
-      return ranges.waterVision & kIntelRadiusMagnitudeMask;
-    case 2:
-      return ranges.radar & kIntelRadiusMagnitudeMask;
-    case 3:
-      return ranges.sonar & kIntelRadiusMagnitudeMask;
-    case 4:
-      return ranges.omni & kIntelRadiusMagnitudeMask;
-    case 10:
-      return ranges.cloak & kIntelRadiusMagnitudeMask;
-    case 11:
-      return ranges.radarStealth & kIntelRadiusMagnitudeMask;
-    case 12:
-      return ranges.sonarStealth & kIntelRadiusMagnitudeMask;
-    default:
-      return 0u;
-    }
+    return static_cast<std::uint32_t>(IntelAttributeLane(intelType)) <= static_cast<std::uint32_t>(moho::ENTATTR_SonarStealth);
   }
 
   [[nodiscard]] gpg::RRef MakeEAllianceRef(moho::EAlliance* const allianceType)
@@ -2174,16 +2016,6 @@ namespace
 
   static_assert(sizeof(PropCreateTransformWords) == 0x1C, "PropCreateTransformWords size must be 0x1C");
 
-  struct UnitTrackStatsRuntimeView
-  {
-    std::uint8_t pad_0000[0x200];
-    bool trackingEnabled;
-  };
-  static_assert(
-    offsetof(UnitTrackStatsRuntimeView, trackingEnabled) == 0x200,
-    "UnitTrackStatsRuntimeView::trackingEnabled offset must be 0x200"
-  );
-
   bool ParseBoolLiteral(const char* text, bool& outValue)
   {
     if (gpg::STR_EqualsNoCase(text, "true")) {
@@ -2358,530 +2190,6 @@ namespace
     }
     return msvc8::string{};
   }
-
-  struct SpecialFilesLegacyStringRuntimeView
-  {
-    union
-    {
-      char inlineStorage[16];
-      char* heapStorage;
-    };
-    std::uint32_t size;      // +0x10
-    std::uint32_t capacity;  // +0x14
-  };
-  static_assert(sizeof(SpecialFilesLegacyStringRuntimeView) == 0x18, "SpecialFilesLegacyStringRuntimeView size must be 0x18");
-  static_assert(
-    offsetof(SpecialFilesLegacyStringRuntimeView, size) == 0x10,
-    "SpecialFilesLegacyStringRuntimeView::size offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SpecialFilesLegacyStringRuntimeView, capacity) == 0x14,
-    "SpecialFilesLegacyStringRuntimeView::capacity offset must be 0x14"
-  );
-
-  struct SpecialFilesMapNodeRuntimeView
-  {
-    SpecialFilesMapNodeRuntimeView* left;    // +0x00
-    SpecialFilesMapNodeRuntimeView* parent;  // +0x04
-    SpecialFilesMapNodeRuntimeView* right;   // +0x08
-    std::uint32_t lane0C;                    // +0x0C
-    SpecialFilesLegacyStringRuntimeView key; // +0x10
-    std::string* filesBegin;                 // +0x28
-    std::string* filesEnd;                   // +0x2C
-    std::string* filesCapacityEnd;           // +0x30
-    std::uint32_t lane34;                    // +0x34
-    std::uint8_t color;                      // +0x38
-    std::uint8_t isNil;                      // +0x39
-    std::uint8_t pad3A[2];                   // +0x3A
-  };
-  static_assert(sizeof(SpecialFilesMapNodeRuntimeView) == 0x3C, "SpecialFilesMapNodeRuntimeView size must be 0x3C");
-  static_assert(offsetof(SpecialFilesMapNodeRuntimeView, key) == 0x10, "SpecialFilesMapNodeRuntimeView::key offset must be 0x10");
-  static_assert(
-    offsetof(SpecialFilesMapNodeRuntimeView, filesBegin) == 0x28,
-    "SpecialFilesMapNodeRuntimeView::filesBegin offset must be 0x28"
-  );
-  static_assert(
-    offsetof(SpecialFilesMapNodeRuntimeView, isNil) == 0x39,
-    "SpecialFilesMapNodeRuntimeView::isNil offset must be 0x39"
-  );
-
-  struct SpecialFilesMapStorageRuntimeView
-  {
-    void* proxy;                            // +0x00
-    SpecialFilesMapNodeRuntimeView* head;  // +0x04
-    std::uint32_t size;                    // +0x08
-  };
-  static_assert(sizeof(SpecialFilesMapStorageRuntimeView) == 0x0C, "SpecialFilesMapStorageRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(SpecialFilesMapStorageRuntimeView, head) == 0x04,
-    "SpecialFilesMapStorageRuntimeView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SpecialFilesMapStorageRuntimeView, size) == 0x08,
-    "SpecialFilesMapStorageRuntimeView::size offset must be 0x08"
-  );
-
-  constexpr std::uint8_t kSpecialFilesMapRed = 0u;
-  constexpr std::uint8_t kSpecialFilesMapBlack = 1u;
-
-  void DestroySpecialFilesStringRange(std::string* begin, std::string* const end) noexcept
-  {
-    while (begin != end) {
-      begin->~basic_string<char>();
-      ++begin;
-    }
-  }
-
-  void ResetSpecialFilesLegacyStringStorage(SpecialFilesLegacyStringRuntimeView& storage) noexcept
-  {
-    if (storage.capacity >= 0x10u) {
-      ::operator delete(static_cast<void*>(storage.heapStorage));
-    }
-
-    storage.size = 0u;
-    storage.capacity = 0x0Fu;
-    storage.inlineStorage[0] = '\0';
-  }
-
-  [[nodiscard]] SpecialFilesMapNodeRuntimeView* SpecialFilesMapTreeMin(
-    SpecialFilesMapNodeRuntimeView* node,
-    SpecialFilesMapNodeRuntimeView* const head
-  ) noexcept
-  {
-    while (node->left != head) {
-      node = node->left;
-    }
-    return node;
-  }
-
-  [[nodiscard]] SpecialFilesMapNodeRuntimeView* SpecialFilesMapTreeMax(
-    SpecialFilesMapNodeRuntimeView* node,
-    SpecialFilesMapNodeRuntimeView* const head
-  ) noexcept
-  {
-    while (node->right != head) {
-      node = node->right;
-    }
-    return node;
-  }
-
-  [[nodiscard]] std::uint8_t SpecialFilesMapNodeColor(
-    const SpecialFilesMapNodeRuntimeView* const node,
-    const SpecialFilesMapNodeRuntimeView* const head
-  ) noexcept
-  {
-    if (node == nullptr || node == head) {
-      return kSpecialFilesMapBlack;
-    }
-    return node->color;
-  }
-
-  /**
-   * Address: 0x00849D40 (FUN_00849D40)
-   *
-   * What it does:
-   * Left-rotates one node of the special-files map, relinking the pivot's
-   * left subtree, parent pointer, and the parent's child slot.
-   */
-
-  void RotateSpecialFilesMapLeft(
-    SpecialFilesMapStorageRuntimeView& map,
-    SpecialFilesMapNodeRuntimeView* const node
-  ) noexcept
-  {
-    SpecialFilesMapNodeRuntimeView* const head = map.head;
-    SpecialFilesMapNodeRuntimeView* const pivot = node->right;
-
-    node->right = pivot->left;
-    if (pivot->left != head) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void RotateSpecialFilesMapRight(
-    SpecialFilesMapStorageRuntimeView& map,
-    SpecialFilesMapNodeRuntimeView* const node
-  ) noexcept
-  {
-    // Address: 0x00849DB0 (FUN_00849DB0) -- right-rotates one node of the
-    // special-files map, the mirror of RotateSpecialFilesMapLeft above.
-    SpecialFilesMapNodeRuntimeView* const head = map.head;
-    SpecialFilesMapNodeRuntimeView* const pivot = node->left;
-
-    node->left = pivot->right;
-    if (pivot->right != head) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->right) {
-      node->parent->right = pivot;
-    } else {
-      node->parent->left = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void ReplaceSpecialFilesMapSubtree(
-    SpecialFilesMapStorageRuntimeView& map,
-    SpecialFilesMapNodeRuntimeView* const oldNode,
-    SpecialFilesMapNodeRuntimeView* const newNode
-  ) noexcept
-  {
-    SpecialFilesMapNodeRuntimeView* const head = map.head;
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (newNode != head) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  /**
-   * Address: 0x008497C0 (FUN_008497C0)
-   *
-   * What it does:
-   * Advances one special-files map iterator node to its in-order successor
-   * (leftmost of the right subtree, or the nearest ancestor this node is not
-   * the right child of).
-   */
-  [[nodiscard]] SpecialFilesMapNodeRuntimeView* AdvanceSpecialFilesMapIteratorNode(
-    SpecialFilesMapNodeRuntimeView* node,
-    SpecialFilesMapNodeRuntimeView* const head
-  ) noexcept
-  {
-    if (node->isNil != 0u) {
-      return node;
-    }
-
-    if (node->right->isNil == 0u) {
-      node = node->right;
-      while (node->left->isNil == 0u) {
-        node = node->left;
-      }
-      return node;
-    }
-
-    SpecialFilesMapNodeRuntimeView* parent = node->parent;
-    while (parent->isNil == 0u && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent;
-  }
-
-  void FixupSpecialFilesMapErase(
-    SpecialFilesMapStorageRuntimeView& map,
-    SpecialFilesMapNodeRuntimeView* node,
-    SpecialFilesMapNodeRuntimeView* nodeParent
-  ) noexcept
-  {
-    SpecialFilesMapNodeRuntimeView* const head = map.head;
-
-    while (node != head->parent && SpecialFilesMapNodeColor(node, head) == kSpecialFilesMapBlack) {
-      if (node == nodeParent->left) {
-        SpecialFilesMapNodeRuntimeView* sibling = nodeParent->right;
-        if (SpecialFilesMapNodeColor(sibling, head) == kSpecialFilesMapRed) {
-          sibling->color = kSpecialFilesMapBlack;
-          nodeParent->color = kSpecialFilesMapRed;
-          RotateSpecialFilesMapLeft(map, nodeParent);
-          sibling = nodeParent->right;
-        }
-
-        if (sibling == head) {
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (
-          SpecialFilesMapNodeColor(sibling->left, head) == kSpecialFilesMapBlack
-          && SpecialFilesMapNodeColor(sibling->right, head) == kSpecialFilesMapBlack
-        ) {
-          sibling->color = kSpecialFilesMapRed;
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (SpecialFilesMapNodeColor(sibling->right, head) == kSpecialFilesMapBlack) {
-          if (sibling->left != head) {
-            sibling->left->color = kSpecialFilesMapBlack;
-          }
-          sibling->color = kSpecialFilesMapRed;
-          RotateSpecialFilesMapRight(map, sibling);
-          sibling = nodeParent->right;
-        }
-
-        sibling->color = nodeParent->color;
-        nodeParent->color = kSpecialFilesMapBlack;
-        if (sibling->right != head) {
-          sibling->right->color = kSpecialFilesMapBlack;
-        }
-        RotateSpecialFilesMapLeft(map, nodeParent);
-      } else {
-        SpecialFilesMapNodeRuntimeView* sibling = nodeParent->left;
-        if (SpecialFilesMapNodeColor(sibling, head) == kSpecialFilesMapRed) {
-          sibling->color = kSpecialFilesMapBlack;
-          nodeParent->color = kSpecialFilesMapRed;
-          RotateSpecialFilesMapRight(map, nodeParent);
-          sibling = nodeParent->left;
-        }
-
-        if (sibling == head) {
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (
-          SpecialFilesMapNodeColor(sibling->right, head) == kSpecialFilesMapBlack
-          && SpecialFilesMapNodeColor(sibling->left, head) == kSpecialFilesMapBlack
-        ) {
-          sibling->color = kSpecialFilesMapRed;
-          node = nodeParent;
-          nodeParent = nodeParent->parent;
-          continue;
-        }
-
-        if (SpecialFilesMapNodeColor(sibling->left, head) == kSpecialFilesMapBlack) {
-          if (sibling->right != head) {
-            sibling->right->color = kSpecialFilesMapBlack;
-          }
-          sibling->color = kSpecialFilesMapRed;
-          RotateSpecialFilesMapLeft(map, sibling);
-          sibling = nodeParent->left;
-        }
-
-        sibling->color = nodeParent->color;
-        nodeParent->color = kSpecialFilesMapBlack;
-        if (sibling->left != head) {
-          sibling->left->color = kSpecialFilesMapBlack;
-        }
-        RotateSpecialFilesMapRight(map, nodeParent);
-      }
-
-      node = head->parent;
-      break;
-    }
-
-    if (node != head) {
-      node->color = kSpecialFilesMapBlack;
-    }
-  }
-
-  /**
-   * Address: 0x0084A690 (FUN_0084A690)
-   *
-   * What it does:
-   * Destroys one special-files map node payload (vector-of-strings + key
-   * string storage) without freeing the node itself.
-   */
-  [[maybe_unused]] void DestroySpecialFilesMapNodePayload(SpecialFilesMapNodeRuntimeView* const node) noexcept
-  {
-    if (node->filesBegin != nullptr) {
-      DestroySpecialFilesStringRange(node->filesBegin, node->filesEnd);
-      ::operator delete(static_cast<void*>(node->filesBegin));
-    }
-
-    node->filesBegin = nullptr;
-    node->filesEnd = nullptr;
-    node->filesCapacityEnd = nullptr;
-    ResetSpecialFilesLegacyStringStorage(node->key);
-  }
-
-  /**
-   * Address: 0x00849CB0 (FUN_00849CB0)
-   *
-   * What it does:
-   * Recursively destroys one subtree of special-files map nodes, including
-   * string/vector payloads, then frees each node.
-   */
-  [[maybe_unused]] void DestroySpecialFilesMapSubtree(
-    SpecialFilesMapStorageRuntimeView* const owner,
-    SpecialFilesMapNodeRuntimeView* node
-  ) noexcept
-  {
-    (void)owner;
-    while (node != nullptr && node->isNil == 0u) {
-      DestroySpecialFilesMapSubtree(owner, node->right);
-
-      SpecialFilesMapNodeRuntimeView* const current = node;
-      node = node->left;
-
-      DestroySpecialFilesMapNodePayload(current);
-      ::operator delete(static_cast<void*>(current));
-    }
-  }
-
-  /**
-   * Address: 0x00849900 (FUN_00849900)
-   *
-   * What it does:
-   * Erases one special-files map node, restores RB-tree invariants, and writes
-   * the next in-order iterator node into the output slot.
-   */
-  [[maybe_unused]] [[nodiscard]] SpecialFilesMapNodeRuntimeView** EraseSpecialFilesMapNodeAndAdvance(
-    SpecialFilesMapStorageRuntimeView* const map,
-    SpecialFilesMapNodeRuntimeView** const outNextNode,
-    SpecialFilesMapNodeRuntimeView* const erasedNode
-  )
-  {
-    SpecialFilesMapNodeRuntimeView* const head = map->head;
-    if (erasedNode == nullptr || erasedNode->isNil != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    SpecialFilesMapNodeRuntimeView* const next = AdvanceSpecialFilesMapIteratorNode(erasedNode, head);
-
-    SpecialFilesMapNodeRuntimeView* spliceNode = erasedNode;
-    SpecialFilesMapNodeRuntimeView* fixNode = head;
-    SpecialFilesMapNodeRuntimeView* fixParent = head;
-    std::uint8_t removedColor = spliceNode->color;
-
-    if (erasedNode->left == head) {
-      fixNode = erasedNode->right;
-      fixParent = erasedNode->parent;
-      ReplaceSpecialFilesMapSubtree(*map, erasedNode, erasedNode->right);
-    } else if (erasedNode->right == head) {
-      fixNode = erasedNode->left;
-      fixParent = erasedNode->parent;
-      ReplaceSpecialFilesMapSubtree(*map, erasedNode, erasedNode->left);
-    } else {
-      spliceNode = SpecialFilesMapTreeMin(erasedNode->right, head);
-      removedColor = spliceNode->color;
-      fixNode = spliceNode->right;
-      if (spliceNode->parent == erasedNode) {
-        fixParent = spliceNode;
-      } else {
-        fixParent = spliceNode->parent;
-        ReplaceSpecialFilesMapSubtree(*map, spliceNode, spliceNode->right);
-        spliceNode->right = erasedNode->right;
-        spliceNode->right->parent = spliceNode;
-      }
-
-      ReplaceSpecialFilesMapSubtree(*map, erasedNode, spliceNode);
-      spliceNode->left = erasedNode->left;
-      spliceNode->left->parent = spliceNode;
-      spliceNode->color = erasedNode->color;
-    }
-
-    if (removedColor == kSpecialFilesMapBlack) {
-      FixupSpecialFilesMapErase(*map, fixNode, fixParent);
-    }
-
-    if (head->parent != head && head->parent->isNil == 0u) {
-      head->left = SpecialFilesMapTreeMin(head->parent, head);
-      head->right = SpecialFilesMapTreeMax(head->parent, head);
-    } else {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-    }
-
-    DestroySpecialFilesMapNodePayload(erasedNode);
-    ::operator delete(static_cast<void*>(erasedNode));
-    if (map->size != 0u) {
-      --map->size;
-    }
-
-    *outNextNode = next;
-    return outNextNode;
-  }
-
-  /**
-   * Address: 0x00849670 (FUN_00849670)
-   *
-   * What it does:
-   * Erases one `[first,last)` range from the special-files map and returns the
-   * first node that remains at the end of the erased range.
-   */
-  [[maybe_unused]] [[nodiscard]] SpecialFilesMapNodeRuntimeView** EraseSpecialFilesMapRange(
-    SpecialFilesMapStorageRuntimeView* const map,
-    SpecialFilesMapNodeRuntimeView** const outNode,
-    SpecialFilesMapNodeRuntimeView* first,
-    SpecialFilesMapNodeRuntimeView* const last
-  )
-  {
-    SpecialFilesMapNodeRuntimeView* const head = map->head;
-    if (first == head->left && last == head) {
-      DestroySpecialFilesMapSubtree(map, head->parent);
-      head->parent = head;
-      map->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNode = head->left;
-      return outNode;
-    }
-
-    while (first != last && first != nullptr && first != head) {
-      SpecialFilesMapNodeRuntimeView* next = first;
-      (void)EraseSpecialFilesMapNodeAndAdvance(map, &next, first);
-      first = next;
-    }
-
-    *outNode = first;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00844510 (FUN_00844510)
-   *
-   * What it does:
-   * Releases one special-files map head allocation after erasing all nodes and
-   * clears the map head/size lanes.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t ReleaseSpecialFilesMapStorage(
-    SpecialFilesMapStorageRuntimeView* const map
-  )
-  {
-    SpecialFilesMapNodeRuntimeView* cursor = nullptr;
-    (void)EraseSpecialFilesMapRange(map, &cursor, map->head->left, map->head);
-    ::operator delete(static_cast<void*>(map->head));
-    map->head = nullptr;
-    map->size = 0u;
-    return 0;
-  }
-
-  struct CMauiControlLuaObjectView
-  {
-    std::uint8_t reserved00[0x20];
-    LuaPlus::LuaObject luaObject; // +0x20
-
-    [[nodiscard]] static CMauiControlLuaObjectView* FromControl(CMauiControl* const control) noexcept
-    {
-      return reinterpret_cast<CMauiControlLuaObjectView*>(control);
-    }
-
-    [[nodiscard]] static const CMauiControlLuaObjectView* FromControl(const CMauiControl* const control) noexcept
-    {
-      return reinterpret_cast<const CMauiControlLuaObjectView*>(control);
-    }
-  };
-  static_assert(
-    offsetof(CMauiControlLuaObjectView, luaObject) == 0x20, "CMauiControlLuaObjectView::luaObject offset must be 0x20"
-  );
 
   struct CommandIssueWeakSetNode
   {
@@ -11573,8 +10881,8 @@ int Sim::TrackStats(
         return;
       }
 
-      auto* const trackStatsView = reinterpret_cast<UnitTrackStatsRuntimeView*>(&unit);
-      trackStatsView->trackingEnabled = enableTracking;
+      // 0x0075EE21: the byte at unit+0x200, i.e. Entity+0x1F8.
+      unit.RealtimeStatsEnabled = enableTracking ? 1u : 0u;
     });
     return 0;
   }
@@ -18966,12 +18274,11 @@ int moho::cfunc_GetFrameL(LuaPlus::LuaState* const state)
     return 0;
   }
 
-  const CMauiControlLuaObjectView* const frameView = CMauiControlLuaObjectView::FromControl(frame);
-  if (frameView->luaObject.m_state != state->m_rootState) {
+  if (frame->mLuaObj.m_state != state->m_rootState) {
     return 0;
   }
 
-  frameView->luaObject.PushStack(state);
+  frame->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -24932,7 +24239,7 @@ int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
     }
   }
 
-  SetEntityIntelEnabledAttributeBit(*entity, intelType, true);
+  entity->mVarDat.mIntelAttributes.SetEnabled(IntelAttributeLane(intelType), true);
   RequeueEntityCoordUpdate(*entity);
   return 0;
 }
@@ -25015,7 +24322,7 @@ int moho::cfunc_EntityDisableIntelL(LuaPlus::LuaState* const state)
     }
   }
 
-  SetEntityIntelEnabledAttributeBit(*entity, intelType, false);
+  entity->mVarDat.mIntelAttributes.SetEnabled(IntelAttributeLane(intelType), false);
   RequeueEntityCoordUpdate(*entity);
   return 0;
 }
@@ -25100,11 +24407,8 @@ int moho::cfunc_EntitySetIntelRadiusL(LuaPlus::LuaState* const state)
     }
   }
 
-  const int attributeLane = static_cast<int>(intelType) - 1;
-  if (attributeLane >= 0 && attributeLane <= 12) {
-    SetEntityAttributeRangePreserveEnabledBit(
-      GetEntityIntelAttributeRangesMutable(*entity), attributeLane, static_cast<std::uint32_t>(newRadius)
-    );
+  if (IsIntelAttributeLane(intelType)) {
+    entity->mVarDat.mIntelAttributes.SetIntelRadius(IntelAttributeLane(intelType), newRadius);
   }
 
   RequeueEntityCoordUpdate(*entity);
@@ -25177,11 +24481,9 @@ int moho::cfunc_EntityGetIntelRadiusL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kEntityGetIntelRadiusInitWarning);
   }
 
-  const std::int32_t attributeLane = static_cast<std::int32_t>(intelType) - 1;
   std::uint32_t radius = 0u;
-  if (attributeLane >= 0 && attributeLane <= 12) {
-    const auto& ranges = GetEntityIntelAttributeRanges(*entity);
-    radius = GetEntityAttributeRangeMagnitude(ranges, attributeLane);
+  if (IsIntelAttributeLane(intelType)) {
+    radius = entity->mVarDat.mIntelAttributes.GetRange(IntelAttributeLane(intelType));
   }
 
   lua_pushnumber(rawState, static_cast<float>(radius));
@@ -25299,11 +24601,8 @@ int moho::cfunc_EntityInitIntelL(LuaPlus::LuaState* const state)
     }
   }
 
-  const std::int32_t attributeLane = static_cast<std::int32_t>(intelType) - 1;
-  if (attributeLane >= 0 && attributeLane <= 12) {
-    SetEntityAttributeRangePreserveEnabledBit(
-      GetEntityIntelAttributeRangesMutable(*entity), attributeLane, static_cast<std::uint32_t>(radius)
-    );
+  if (IsIntelAttributeLane(intelType)) {
+    entity->mVarDat.mIntelAttributes.SetIntelRadius(IntelAttributeLane(intelType), static_cast<int>(radius));
   }
 
   RequeueEntityCoordUpdate(*entity);

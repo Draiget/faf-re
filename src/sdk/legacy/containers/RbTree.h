@@ -942,6 +942,7 @@ namespace msvc8
          * member rather than a call to it.
          */
         /**
+         * Address: 0x008497C0 (FUN_008497C0 -- `rb_increment` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from this instantiation's `erase_node` 0x00849900.)
          * Address: 0x004DDC90 (FUN_004DDC90, sub_4DDC90) -- `msvc8::map<
          * std::uint16_t, float>::rb_increment` -- `Moho::AudioEngineImpl::
          * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
@@ -2625,6 +2626,7 @@ namespace msvc8
              * deleted by this migration).
              */
             /**
+             * Address: 0x00844510 (FUN_00844510 -- `~rb_tree` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39): `erase_range(begin, end)` then `operator delete(head)`; the local map's destructor at the end of `cfunc_GetSpecialFilesL` 0x00844120.)
              * Address: 0x004DA250 (FUN_004DA250, sub_4DA250) -- `msvc8::map<
              * std::uint16_t, float>::~rb_tree()` -- `Moho::AudioEngineImpl::
              * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
@@ -5044,6 +5046,7 @@ namespace msvc8
              * `RemoveDecalFromManagerAndReturnNextSlot` (`CWldSplat.cpp`).
              */
             /**
+             * Address: 0x00849900 (FUN_00849900 -- `erase_node` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); calls `rb_increment` 0x008497C0, the two rotations 0x00849D40/0x00849DB0 and the node-value destructor 0x0084A690; reached from `erase_range` 0x00849670.)
              * Address: 0x004DC850 (FUN_004DC850, sub_4DC850) --
              * `msvc8::set<msvc8::string>::erase_node` -- `Moho::
              * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
@@ -5818,6 +5821,7 @@ namespace msvc8
              * deleted by this migration).
              */
             /**
+             * Address: 0x00849670 (FUN_00849670 -- `erase_range` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `~rb_tree` 0x00844510 and from `cfunc_GetSpecialFilesL`'s unwind.)
              * Address: 0x004DCEA0 (FUN_004DCEA0, sub_4DCEA0) -- `msvc8::map<
              * std::uint16_t, float>::erase_range` -- `Moho::AudioEngineImpl::
              * mCategoryVolumes` (`AudioEngine.h`), isNil@+0x15. Matches this
@@ -7866,6 +7870,7 @@ namespace msvc8
              * which reaches this member indirectly through `clear()`).
              */
             /**
+             * Address: 0x00849CB0 (FUN_00849CB0 -- `destroy_subtree` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_range` 0x00849670's whole-tree fast path.)
              * Address: 0x004DD320 (FUN_004DD320, sub_4DD320) --
              * `msvc8::set<msvc8::string>::destroy_subtree` -- `Moho::
              * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`).
@@ -8335,6 +8340,7 @@ namespace msvc8
              * cited on `erase_node` below).
              */
             /**
+             * Address: 0x00849D40 (FUN_00849D40 -- `rotate_left` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_node` 0x00849900.)
              * Address: 0x004DCBE0 (FUN_004DCBE0, sub_4DCBE0) --
              * `msvc8::set<msvc8::string>::rotate_left` -- `Moho::
              * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),
@@ -8642,6 +8648,7 @@ namespace msvc8
              * unambiguous body.
              */
             /**
+             * Address: 0x00849DB0 (FUN_00849DB0 -- `rotate_right` for `msvc8::map<msvc8::string, msvc8::vector<msvc8::string>>` (the profile->files map `cfunc_GetSpecialFilesL` 0x00844120 fills through `USER_GetSpecialFiles`; node 0x3C, isNil@+0x39); reached from `erase_node` 0x00849900.)
              * Address: 0x004DCC40 (FUN_004DCC40, sub_4DCC40) --
              * `msvc8::set<msvc8::string>::rotate_right` -- `Moho::
              * AudioEngineImpl::mPausedCategoryNames` (`AudioEngine.h`),

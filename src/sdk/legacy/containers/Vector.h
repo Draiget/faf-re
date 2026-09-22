@@ -2724,6 +2724,7 @@ namespace msvc8
         }
         /**
          * Address: 0x00549090 (FUN_00549090 -- out-of-line `operator[]` for a 4-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x004A4870 (FUN_004A4870 -- out-of-line `&first_[i]` for the 20-byte `gpg::RField` (`msvc8::vector<RField>`, `RType::fields_`): `lea eax,[eax+eax*4]; lea eax,[ecx+eax*4]`, `ret 4`; zero callers, no xrefs, and byte-identical twins at 0x008D8870/0x0094EAA0 that /OPT:ICF did not fold: a linker-retained copy nothing runs. Formerly `ResolveFieldVectorElement` over `RFieldVectorRuntimeView` in moho/sim/Sim.cpp (RULE THREE), removed 2026-09-22.)
          * Address: 0x00547730 (FUN_00547730 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00547740 (FUN_00547740 -- out-of-line `&first_[i]` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x00A724E0 (FUN_00A724E0 -- `_SECURE_SCL` checked `operator[]` (owner and bounds validated through `_invalid_parameter`) for an 8-/16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
