@@ -1619,7 +1619,7 @@ bool CAiTransportImpl::TransportDetachUnit(Unit* const unit)
     }
   }
 
-  if (mUnit->mCurrentLayer == LAYER_Air) {
+  if (mUnit->mVarDat.mLayerMask == LAYER_Air) {
     const Sim* const sim = mUnit->SimulationRef;
     if (!sim || !sim->mOGrid) {
       return false;
@@ -1665,7 +1665,7 @@ EntitySetTemplate<Unit> CAiTransportImpl::TransportDetachAllUnits(const bool cle
     return detached;
   }
 
-  const bool requiresAirFitCheck = !clearReservations && (mUnit->mCurrentLayer == LAYER_Air);
+  const bool requiresAirFitCheck = !clearReservations && (mUnit->mVarDat.mLayerMask == LAYER_Air);
   Sim* const sim = mUnit->SimulationRef;
   COGrid* const oGrid = sim ? sim->mOGrid : nullptr;
 

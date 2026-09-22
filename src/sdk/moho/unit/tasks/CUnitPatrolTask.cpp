@@ -395,7 +395,7 @@ namespace moho
     // approximate match, and the binary branches to `AbortMove` on nonzero).
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       navigator->IgnoreFormation(false);
-      if (Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+      if (Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
         navigator->AbortMove();
       }
     }
@@ -534,7 +534,7 @@ namespace moho
     const std::ptrdiff_t blipCount = blips.end() - blips.begin();
     for (std::ptrdiff_t i = 0; i < blipCount; ++i) {
       Entity* const blip = unit->mBlipsInRange.begin()[i].ResolveObjectPtr<Entity>();
-      if (blip == nullptr || blip->Dead || blip->DestroyQueuedFlag) {
+      if (blip == nullptr || blip->mVarDat.mIsDead || blip->DestroyQueuedFlag) {
         continue;
       }
 
@@ -562,8 +562,8 @@ namespace moho
     Entity* const bestEnemy = attacker->FindBestEnemy(primaryWeapon, &overlappingBlips, guardScanRadius, 0);
     if (bestEnemy != nullptr) {
       const Wm3::Vec3f& selfPos = unit->GetPosition();
-      const float dz = bestEnemy->Position.z - selfPos.z;
-      const float dx = bestEnemy->Position.x - selfPos.x;
+      const float dz = bestEnemy->mVarDat.mCurTransform.pos_.z - selfPos.z;
+      const float dx = bestEnemy->mVarDat.mCurTransform.pos_.x - selfPos.x;
       const float distance = std::sqrt(dz * dz + dx * dx);
       if (distance > unit->GetBlueprint()->AI.GuardScanRadius) {
         return nullptr;
@@ -704,10 +704,10 @@ namespace moho
         if (candidateUnit == unit) {
           continue;
         }
-        if (Wm3::Vector3f::Compare(&candidate->PrevPosition, &candidate->Position)) {
+        if (Wm3::Vector3f::Compare(&candidate->mVarDat.mLastTransform.pos_, &candidate->mVarDat.mCurTransform.pos_)) {
           continue; // stationary — already at rest, ignore
         }
-        if (candidate->mCurrentLayer == LAYER_Air) {
+        if (candidate->mVarDat.mLayerMask == LAYER_Air) {
           continue;
         }
 
@@ -723,7 +723,7 @@ namespace moho
         } else {
           // Allied damaged unit, but only while both stores are near full.
           if (!energyStorageNearFull || !massStorageNearFull
-              || candidate->Health >= (candidate->MaxHealth * 0.9f)
+              || candidate->mVarDat.mHealth >= (candidate->mVarDat.mMaxHealth * 0.9f)
               || candidateUnit->IsUnitState(UNITSTATE_BeingReclaimed)) {
             continue;
           }
@@ -732,14 +732,14 @@ namespace moho
       }
 
       const bool wholeMap = army->UseWholeMap();
-      if (!candidate->SimulationRef->mMapData->IsWithin(candidate->Position, 1.0f, wholeMap)) {
+      if (!candidate->SimulationRef->mMapData->IsWithin(candidate->mVarDat.mCurTransform.pos_, 1.0f, wholeMap)) {
         continue;
       }
 
       // Guard-return radius gate around the no-rush center.
       if (army->mVarDat.mNoRushTimer > 0) {
-        const float ddz = noRushCenterZ - candidate->Position.z;
-        const float ddx = noRushCenterX - candidate->Position.x;
+        const float ddz = noRushCenterZ - candidate->mVarDat.mCurTransform.pos_.z;
+        const float ddx = noRushCenterX - candidate->mVarDat.mCurTransform.pos_.x;
         const float noRushDistance = std::sqrt(ddz * ddz + ddx * ddx);
         if (noRushDistance > army->mVarDat.mNoRushRadius) {
           continue;
@@ -748,9 +748,9 @@ namespace moho
 
       // Weighted squared distance from this unit to the candidate; keep nearest.
       const Wm3::Vec3f& selfPos = unit->GetPosition();
-      const float dx = selfPos.x - candidate->Position.x;
-      const float dy = selfPos.y - candidate->Position.y;
-      const float dz = selfPos.z - candidate->Position.z;
+      const float dx = selfPos.x - candidate->mVarDat.mCurTransform.pos_.x;
+      const float dy = selfPos.y - candidate->mVarDat.mCurTransform.pos_.y;
+      const float dz = selfPos.z - candidate->mVarDat.mCurTransform.pos_.z;
       const float weightedDistanceSq = (dx * dx + dy * dy + dz * dz) * weight;
       if (bestWeightedDistanceSq > weightedDistanceSq) {
         bestWeightedDistanceSq = weightedDistanceSq;

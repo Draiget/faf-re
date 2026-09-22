@@ -122,8 +122,8 @@ namespace moho
   void CSimSoundManager::AddEntitySound(Entity* entity, CSndParams* params)
   {
     SAudioRequest request{};
-    request.position = entity->Position;
-    request.layer = entity->mCurrentLayer;
+    request.position = entity->mVarDat.mCurTransform.pos_;
+    request.layer = entity->mVarDat.mLayerMask;
     request.params = params;
     request.sound = nullptr;
     request.requestType = EAudioRequestType::EntitySound;

@@ -323,7 +323,7 @@ namespace moho
     }
 
     if (
-      targetEntity->ArmyRef == nullptr || targetEntity->mCurrentLayer == LAYER_Air
+      targetEntity->ArmyRef == nullptr || targetEntity->mVarDat.mLayerMask == LAYER_Air
       || targetEntity->ArmyRef->GetAllianceWith(mUnit->ArmyRef) == ALLIANCE_Ally
     ) {
       *mDispatchResult = static_cast<EAiResult>(2);

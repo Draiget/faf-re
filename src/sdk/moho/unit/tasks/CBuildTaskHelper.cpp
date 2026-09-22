@@ -271,10 +271,10 @@ namespace moho
         return false;
       }
 
-      mFractionComplete = focusUnit->FractionCompleted;
-      ownerUnit->WorkProgress = focusUnit->FractionCompleted;
+      mFractionComplete = focusUnit->mVarDat.mFractionComplete;
+      ownerUnit->WorkProgress = focusUnit->mVarDat.mFractionComplete;
 
-      if (!ownerUnit->IsUnitState(UNITSTATE_Repairing) && focusUnit->FractionCompleted >= 1.0f) {
+      if (!ownerUnit->IsUnitState(UNITSTATE_Repairing) && focusUnit->mVarDat.mFractionComplete >= 1.0f) {
         return true;
       }
 
@@ -342,7 +342,7 @@ namespace moho
     }
 
     float buildProgressDelta = ComputeBuildProgressDelta(focusBlueprint, ownerUnit->GetAttributes(), resourceConsumed);
-    const bool focusUnitIsDamaged = focusUnit->MaxHealth > focusUnit->Health;
+    const bool focusUnitIsDamaged = focusUnit->mVarDat.mMaxHealth > focusUnit->mVarDat.mHealth;
 
     if (focusUnit->IsInCategory("SHIELD")) {
       Entity* const shieldEntity = focusUnit->GetFocusEntity();
@@ -351,7 +351,7 @@ namespace moho
           return true;
         }
 
-        if (shieldEntity->MaxHealth > shieldEntity->Health) {
+        if (shieldEntity->mVarDat.mMaxHealth > shieldEntity->mVarDat.mHealth) {
           const float buildRate = ownerUnit->GetAttributes().buildRate;
           const float regenRate = shieldEntity->GetLuaValue("RegenRate") * kTickBuildScale;
           float regenAssistMult = focusBlueprint->Defense.Shield.RegenAssistMult;
@@ -379,8 +379,8 @@ namespace moho
 
     const bool isRepairAction = mActionName.equals_no_case("Repair");
     if (isRepairAction && !focusUnit->IsBeingBuilt()) {
-      if (focusUnit->MaxHealth > 0.0f) {
-        ownerUnit->WorkProgress = focusUnit->Health / focusUnit->MaxHealth;
+      if (focusUnit->mVarDat.mMaxHealth > 0.0f) {
+        ownerUnit->WorkProgress = focusUnit->mVarDat.mHealth / focusUnit->mVarDat.mMaxHealth;
       } else {
         ownerUnit->WorkProgress = 1.0f;
       }
@@ -402,10 +402,10 @@ namespace moho
         return true;
       }
 
-      return shieldEntity->Health == shieldEntity->MaxHealth;
+      return shieldEntity->mVarDat.mHealth == shieldEntity->mVarDat.mMaxHealth;
     }
 
-    const float currentFraction = focusUnit->FractionCompleted;
+    const float currentFraction = focusUnit->mVarDat.mFractionComplete;
     if (DidCrossBuildProgressBand(mFractionComplete, currentFraction)) {
       ownerUnit->RunScriptOnBuildProgress(mFocus, mFractionComplete, currentFraction);
       focusUnit->RunScriptOnBeingBuiltProgress(ownerUnit, mFractionComplete, currentFraction);

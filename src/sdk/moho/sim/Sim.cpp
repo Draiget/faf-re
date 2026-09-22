@@ -5454,7 +5454,7 @@ namespace
     }
 
     if (commandIssueData.mTarget.mType != EAiTargetType::AITARGET_None) {
-      const Wm3::Vec3f targetPosition = targetEntity != nullptr ? targetEntity->Position : commandIssueData.mTarget.mPos;
+      const Wm3::Vec3f targetPosition = targetEntity != nullptr ? targetEntity->mVarDat.mCurTransform.pos_ : commandIssueData.mTarget.mPos;
       CArmyImpl* const army = unit->ArmyRef;
 
       if (sim->mMapData != nullptr && army != nullptr && !sim->mMapData->IsWithin(targetPosition, 0.0f, army->UseWholeMap())) {
@@ -5552,7 +5552,7 @@ namespace
 
         if (targetEntity != nullptr && !targetEntity->IsBeingBuilt()) {
           if (targetEntity->BluePrint == nullptr || !targetEntity->IsInCategory("RECLAIMABLE")
-              || targetEntity->mCurrentLayer == LAYER_Air) {
+              || targetEntity->mVarDat.mLayerMask == LAYER_Air) {
             return false;
           }
 
@@ -5621,7 +5621,7 @@ namespace
           return true;
         }
 
-        if ((targetUnit != unit && !HasCommandCap(unit, RULEUCC_CallTransport)) || targetUnit->mCurrentLayer == LAYER_Seabed) {
+        if ((targetUnit != unit && !HasCommandCap(unit, RULEUCC_CallTransport)) || targetUnit->mVarDat.mLayerMask == LAYER_Seabed) {
           return false;
         }
 
@@ -5683,7 +5683,7 @@ namespace
             continue;
           }
 
-          if (candidate->mCurrentLayer == LAYER_Seabed) {
+          if (candidate->mVarDat.mLayerMask == LAYER_Seabed) {
             return false;
           }
 
@@ -5697,7 +5697,7 @@ namespace
       }
       case EUnitCommandType::UNITCOMMAND_TransportUnloadUnits:
       case EUnitCommandType::UNITCOMMAND_TransportUnloadSpecificUnits:
-        return unit->mCurrentLayer != LAYER_Seabed && (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
+        return unit->mVarDat.mLayerMask != LAYER_Seabed && (unit->AiTransport != nullptr || GetTransportedBy(unit) != nullptr);
       case EUnitCommandType::UNITCOMMAND_Upgrade: {
         const RUnitBlueprint* const upgradeBlueprint = commandIssueData.mBlueprint;
         const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
@@ -5740,7 +5740,7 @@ namespace
           }
         }
 
-        unit->DirtySyncState = 1;
+        unit->mVarDat.mRequestRefreshUI = 1;
         CUnitCommand* const lastCommand = queue != nullptr ? queue->GetLastCommand() : nullptr;
         if (lastCommand != nullptr && lastCommand->mVarDat.mCmdType == commandIssueData.mCommandType) {
           const REntityBlueprint* const lastBlueprint = lastCommand->mConstDat.blueprint;
@@ -7438,7 +7438,7 @@ namespace
 
   [[nodiscard]] bool ShouldDestroyEntityForPurge(const Entity& entity) noexcept
   {
-    return entity.Dead == 0u && entity.DestroyQueuedFlag == 0u && entity.mOnDestroyDispatched == 0u;
+    return entity.mVarDat.mIsDead == 0u && entity.DestroyQueuedFlag == 0u && entity.mOnDestroyDispatched == 0u;
   }
 
   void TickEffectManager(CEffectManagerImpl* effectManager)
@@ -9086,7 +9086,7 @@ void Sim::UpdateChecksum()
       logChecksumDigest();
     }
 
-    const float health = entity->Health;
+    const float health = entity->mVarDat.mHealth;
     mContext.Update(&health, sizeof(health));
     if (mLog) {
       Logf("    health: %.1f 0x%08x\n", health, FloatBits(health));
@@ -9100,10 +9100,10 @@ void Sim::UpdateChecksum()
       logChecksumDigest();
     }
 
-    mContext.Update(&entity->Orientation, 0x1Cu);
+    mContext.Update(&entity->mVarDat.mCurTransform.orient_, 0x1Cu);
     if (mLog) {
-      const float* const pos = reinterpret_cast<const float*>(&entity->Position);
-      const float* const rot = reinterpret_cast<const float*>(&entity->Orientation);
+      const float* const pos = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.pos_);
+      const float* const rot = reinterpret_cast<const float*>(&entity->mVarDat.mCurTransform.orient_);
       Logf(
         "    pos: <%7.2f,%7.2f,%7.2f> [0x%08x 0x%08x 0x%08x]\n",
         pos[0],
@@ -11261,7 +11261,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
       continue;
     }
     Unit* const child = attachedEntity->IsUnit();
-    if (!child || !attachedEntity->IsMobile() || attachedEntity->Dead || attachedEntity->DestroyQueuedFlag) {
+    if (!child || !attachedEntity->IsMobile() || attachedEntity->mVarDat.mIsDead || attachedEntity->DestroyQueuedFlag) {
       continue;
     }
     detachedChildren.push_back(attachedEntity->IsUnit());
@@ -11282,7 +11282,7 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
   }
 
   // --- Phase F: construct the replacement unit under the new army ---
-  const ELayer sourceLayer = unit->mCurrentLayer;
+  const ELayer sourceLayer = unit->mVarDat.mLayerMask;
   const VTransform sourceTransform = unit->GetTransform();
   const RUnitBlueprint* const sourceBlueprint = unit->GetBlueprint();
 
@@ -11312,8 +11312,8 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
   // --- Phase G: migrate pose, health, and custom name onto the replacement ---
   newUnit->SetPoses(unit->AniActor->GetPriorPoseShared(), unit->AniActor->GetPoseShared());
 
-  if (unit->Health != newUnit->Health) {
-    newUnit->SetHealth(unit->Health);
+  if (unit->mVarDat.mHealth != newUnit->mVarDat.mHealth) {
+    newUnit->SetHealth(unit->mVarDat.mHealth);
   }
 
   newUnit->SetCustomName(unit->GetCustomName());
@@ -11497,7 +11497,7 @@ void Sim::ProcessInfoPair(void* id, const char* key, const char* val)
 {
   const EntId entityId = static_cast<EntId>(reinterpret_cast<std::uintptr_t>(id));
   Entity* const entity = FindEntityById(mEntityDB, entityId);
-  if (!entity || !OkayToMessWith(entity) || entity->Dead != 0u) {
+  if (!entity || !OkayToMessWith(entity) || entity->mVarDat.mIsDead != 0u) {
     return;
   }
 
@@ -26951,7 +26951,7 @@ void Sim::FlattenMapRect(const gpg::Rect2i& rect, const float elevation)
     if (unit->IsDead() || unit->DestroyQueued()) {
       continue;
     }
-    if (unit->mCurrentLayer != LAYER_Land && unit->mCurrentLayer != LAYER_Seabed) {
+    if (unit->mVarDat.mLayerMask != LAYER_Land && unit->mVarDat.mLayerMask != LAYER_Seabed) {
       continue;
     }
 
@@ -29773,9 +29773,9 @@ void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFast
     // name here rather than through the export's mis-sized offsets.
     const Wm3::Vec3f& candidatePos = candidate->GetPosition();
     Wm3::Vector3f pushDir{};
-    pushDir.x = owner->PrevPosition.x - candidatePos.x;
+    pushDir.x = owner->mVarDat.mLastTransform.pos_.x - candidatePos.x;
     pushDir.y = 0.0f;
-    pushDir.z = owner->PrevPosition.z - candidatePos.z;
+    pushDir.z = owner->mVarDat.mLastTransform.pos_.z - candidatePos.z;
 
     // Coincident units get a random XZ jitter so they can still separate
     // (asm 0x597F73-0x597FD5).
@@ -29895,7 +29895,7 @@ bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const 
       }
     }
 
-    if (unit->mCurrentLayer == LAYER_Air) {
+    if (unit->mVarDat.mLayerMask == LAYER_Air) {
       continue;
     }
 
@@ -29962,7 +29962,7 @@ namespace
 
     const SOCellPos cellPos{static_cast<std::int16_t>(x0), static_cast<std::int16_t>(z0)};
     EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *sim.mMapData, cellPos);
-    if (blocker.mCurrentLayer == LAYER_Water) {
+    if (blocker.mVarDat.mLayerMask == LAYER_Water) {
       caps = static_cast<EOccupancyCaps>(
         static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
     }
@@ -30101,8 +30101,8 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
       continue;
     }
     const bool airOrAtRest =
-      unit->mIsAir || (Wm3::Vector3f::Compare(&unit->Position, &unit->PrevPosition) == 0);
-    if (!airOrAtRest || unit->mCurrentLayer == LAYER_Air || unit->IsDead()) {
+      unit->mIsAir || (Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_) == 0);
+    if (!airOrAtRest || unit->mVarDat.mLayerMask == LAYER_Air || unit->IsDead()) {
       continue;
     }
     if (unit->ArmyRef != army) {

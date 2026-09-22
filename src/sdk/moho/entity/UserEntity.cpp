@@ -601,10 +601,8 @@ namespace moho
         mMeshInstance->scale = mVariableData.mScale;
       }
 
-      mMeshInstance->scroll1.x = variableData.mScroll0U;
-      mMeshInstance->scroll1.y = variableData.mScroll0V;
-      mMeshInstance->scroll2.x = variableData.mScroll1U;
-      mMeshInstance->scroll2.y = variableData.mScroll1V;
+      mMeshInstance->scroll1 = variableData.mScrollBeatStart;
+      mMeshInstance->scroll2 = variableData.mScrollBeatEnd;
 
       if (mMeshInstance->isStaticPose != 0u) {
         mMeshInstance->SetStance(
@@ -711,11 +709,11 @@ namespace moho
     const float clampedAlpha = ClampUnitInterval(mVariableData.mCurImpactValue * interpolationAlpha);
 
     if (outScrollU != nullptr) {
-      *outScrollU = mVariableData.mScroll0U + ((mVariableData.mScroll1U - mVariableData.mScroll0U) * clampedAlpha);
+      *outScrollU = mVariableData.mScrollBeatStart.x + ((mVariableData.mScrollBeatEnd.x - mVariableData.mScrollBeatStart.x) * clampedAlpha);
     }
 
     if (outScrollV != nullptr) {
-      *outScrollV = mVariableData.mScroll0V + ((mVariableData.mScroll1V - mVariableData.mScroll0V) * clampedAlpha);
+      *outScrollV = mVariableData.mScrollBeatStart.y + ((mVariableData.mScrollBeatEnd.y - mVariableData.mScrollBeatStart.y) * clampedAlpha);
     }
 
     return this;

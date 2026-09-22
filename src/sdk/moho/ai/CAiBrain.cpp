@@ -1686,7 +1686,7 @@ namespace moho
     );
 
     for (Entity* const candidateEntity : gatheredEntities) {
-      if (candidateEntity == nullptr || candidateEntity->Dead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
+      if (candidateEntity == nullptr || candidateEntity->mVarDat.mIsDead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
         continue;
       }
 
@@ -1744,7 +1744,7 @@ namespace moho
 
     for (const CollisionResult& hit : gatheredEntities) {
       Entity* const candidateEntity = hit.sourceEntity;
-      if (candidateEntity == nullptr || candidateEntity->Dead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
+      if (candidateEntity == nullptr || candidateEntity->mVarDat.mIsDead != 0u || candidateEntity->DestroyQueuedFlag != 0u) {
         continue;
       }
 

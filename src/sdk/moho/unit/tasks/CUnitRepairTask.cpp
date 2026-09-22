@@ -357,7 +357,7 @@ namespace moho
 
     if (target->IsInCategory("SHIELD")) {
       if (Entity* const focus = target->FocusEntityRef.ResolveObjectPtr<Entity>(); focus != nullptr) {
-        if (focus->MaxHealth > focus->Health) {
+        if (focus->mVarDat.mMaxHealth > focus->mVarDat.mHealth) {
           return false;
         }
       }
@@ -385,13 +385,13 @@ namespace moho
     }
 
     // Fully healed: if nothing else keeps us busy and CanRepair() clears us, stop.
-    if (target->Health == target->MaxHealth) {
+    if (target->mVarDat.mHealth == target->mVarDat.mMaxHealth) {
       if (mGuardAssistMode) {
         if (mTaskState < TASKSTATE_Complete && !mIsSilo &&
             !target->IsUnitState(UNITSTATE_Upgrading) && CanRepair()) {
           return -1;
         }
-      } else if ((!target->IsBeingBuilt() || target->FractionCompleted == 1.0f) && CanRepair()) {
+      } else if ((!target->IsBeingBuilt() || target->mVarDat.mFractionComplete == 1.0f) && CanRepair()) {
         return -1;
       }
     }
@@ -399,10 +399,10 @@ namespace moho
     // Grounded / being-built targets that have not moved this frame are idle;
     // an airborne flyer on the AIR layer cannot be repaired in place.
     if (!target->GetBlueprint()->Air.CanFly || target->IsBeingBuilt()) {
-      if (Wm3::Vector3f::Compare(&target->Position, &target->PrevPosition)) {
+      if (Wm3::Vector3f::Compare(&target->mVarDat.mCurTransform.pos_, &target->mVarDat.mLastTransform.pos_)) {
         return -1;
       }
-    } else if (target->mCurrentLayer == LAYER_Air) {
+    } else if (target->mVarDat.mLayerMask == LAYER_Air) {
       return -1;
     }
 

@@ -1569,8 +1569,8 @@ namespace moho
         const Wm3::Vec3f velocity = unit->GetVelocity();
         const float speed = std::sqrt(velocity.x * velocity.x + velocity.y * velocity.y + velocity.z * velocity.z);
         const float speedFraction = speed / unit->GetBlueprint()->Physics.MaxSpeed;
-        const Vector4f& orientation = unit->Orientation;
-        const Vector4f& prevOrientation = unit->PrevOrientation;
+        const Wm3::Quatf& orientation = unit->mVarDat.mCurTransform.orient_;
+        const Wm3::Quatf& prevOrientation = unit->mVarDat.mLastTransform.orient_;
         const bool turning = orientation.x != prevOrientation.x || orientation.y != prevOrientation.y
                           || orientation.z != prevOrientation.z || orientation.w != prevOrientation.w;
         float motionScale = speedFraction * 10.0f;

@@ -132,7 +132,7 @@ namespace moho
     const CategoryWordRangeView* const catPodStagingPlatform = rules->GetEntityCategory("PODSTAGINGPLATFORM");
 
     const SFootprint& footprint = moveUnit->GetFootprint();
-    const ELayer moveLayer = moveUnit->mCurrentLayer;
+    const ELayer moveLayer = moveUnit->mVarDat.mLayerMask;
     const bool moveUnitHasStorage = moveUnit->AiTransport != nullptr;
 
     // Footprint-sized query box: horizontal side = max(sizeX, sizeZ); Y spans
@@ -171,7 +171,7 @@ namespace moho
 
       // Layer filter: air occupants never block ground movement, and a sub mover
       // is only blocked by occupants sharing its exact layer.
-      const ELayer curLayer = curUnit->mCurrentLayer;
+      const ELayer curLayer = curUnit->mVarDat.mLayerMask;
       if (curLayer == LAYER_Air || (moveLayer != curLayer && moveLayer == LAYER_Sub)) {
         continue;
       }
@@ -199,7 +199,7 @@ namespace moho
       bool blockOccupant = false;
 
       if (blockedByTransport) {
-        if (curUnit->mCurrentLayer == LAYER_Air) {
+        if (curUnit->mVarDat.mLayerMask == LAYER_Air) {
           continue;
         }
         if (disallowAttached) {
@@ -217,7 +217,7 @@ namespace moho
         const Wm3::Vec3f kZeroVelocity{0.0f, 0.0f, 0.0f};
         const bool isMoving = std::memcmp(&curVel, &kZeroVelocity, sizeof(Wm3::Vec3f)) != 0;
 
-        if (curUnit->mCurrentLayer == LAYER_Air) {
+        if (curUnit->mVarDat.mLayerMask == LAYER_Air) {
           continue;
         }
 
@@ -297,7 +297,7 @@ namespace moho
     const SOCellPos cellPos = footprint.ToCellPos(worldPosition);
 
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, mapData, cellPos);
-    if (unit->mCurrentLayer == LAYER_Water) {
+    if (unit->mVarDat.mLayerMask == LAYER_Water) {
       occupancyCaps = static_cast<EOccupancyCaps>(
         static_cast<std::uint8_t>(occupancyCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
       );
@@ -3325,7 +3325,7 @@ int moho::cfunc_UnitGetHealthL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   const Unit* const unit = SCR_FromLua_Unit(unitObject);
-  lua_pushnumber(rawState, unit->Health);
+  lua_pushnumber(rawState, unit->mVarDat.mHealth);
   return 1;
 }
 
@@ -3906,7 +3906,7 @@ int moho::cfunc_GetIsSubmergedL(LuaPlus::LuaState* const state)
       UserUnit* const userUnit = SCR_FromLua_UserUnit(unitObject, state);
       Unit* const unit = ResolveUnitBridge(userUnit);
       const std::int32_t unitState =
-        (unit != nullptr && unit->mCurrentLayer == LAYER_Sub) ? static_cast<std::int32_t>(-1) : static_cast<std::int32_t>(1);
+        (unit != nullptr && unit->mVarDat.mLayerMask == LAYER_Sub) ? static_cast<std::int32_t>(-1) : static_cast<std::int32_t>(1);
 
       if (unitIndex == 1) {
         submergedState = unitState;
@@ -8455,7 +8455,7 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
 
   CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   (void)EntityCategory::Add(&restrictionWords, categorySet);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8513,7 +8513,7 @@ int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
 
   CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   AsCategoryWordBitset(restrictionWords).RemoveAllFrom(&categorySet->Bits());
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8567,7 +8567,7 @@ int moho::cfunc_UnitRestoreBuildRestrictionsL(LuaPlus::LuaState* const state)
 
   CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   ResetCategoryWordRange(restrictionWords);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8598,7 +8598,7 @@ int moho::cfunc_UnitAddCommandCapL(LuaPlus::LuaState* const state)
 
   SCR_GetEnum(state, capName, enumRef);
   unit->GetAttributes().commandCapsMask |= static_cast<std::uint32_t>(commandCap);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8660,7 +8660,7 @@ int moho::cfunc_UnitRemoveCommandCapL(LuaPlus::LuaState* const state)
 
   SCR_GetEnum(state, capName, enumRef);
   unit->GetAttributes().commandCapsMask &= ~static_cast<std::uint32_t>(commandCap);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8714,7 +8714,7 @@ int moho::cfunc_UnitRestoreCommandCapsL(LuaPlus::LuaState* const state)
 
   const RUnitBlueprint* const blueprint = unit->GetBlueprint();
   unit->GetAttributes().commandCapsMask = static_cast<std::uint32_t>(blueprint->General.CommandCaps);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8776,7 +8776,7 @@ int moho::cfunc_UnitAddToggleCapL(LuaPlus::LuaState* const state)
 
   SCR_GetEnum(state, capName, enumRef);
   unit->GetAttributes().toggleCapsMask |= static_cast<std::uint32_t>(toggleCap);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8837,7 +8837,7 @@ int moho::cfunc_UnitRemoveToggleCapL(LuaPlus::LuaState* const state)
 
   SCR_GetEnum(state, capName, enumRef);
   unit->GetAttributes().toggleCapsMask &= ~static_cast<std::uint32_t>(toggleCap);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -8891,7 +8891,7 @@ int moho::cfunc_UnitRestoreToggleCapsL(LuaPlus::LuaState* const state)
 
   const RUnitBlueprint* const blueprint = unit->GetBlueprint();
   unit->GetAttributes().toggleCapsMask = static_cast<std::uint32_t>(blueprint->General.ToggleCaps);
-  unit->DirtySyncState = 1;
+  unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
 }
 
@@ -10325,7 +10325,7 @@ int moho::cfunc_UnitGetCurrentLayerL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  const ELayer layer = unit->mCurrentLayer;
+  const ELayer layer = unit->mVarDat.mLayerMask;
   const char* const layerName =
     (static_cast<std::uint32_t>(layer) <= static_cast<std::uint32_t>(LAYER_Orbit)) ? Entity::LayerToString(layer) : "";
   lua_pushstring(rawState, layerName);
@@ -10599,7 +10599,7 @@ int moho::cfunc_UnitIsMovingL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  const bool isMoving = Wm3::Vector3f::Compare(&unit->Position, &unit->PrevPosition) != 0;
+  const bool isMoving = Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_) != 0;
   lua_pushboolean(rawState, isMoving ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;
@@ -11677,11 +11677,11 @@ int moho::cfunc_NotifyUpgradeL(LuaPlus::LuaState* const state)
     dest->RunScript("OnStopRepeatQueue");
   }
   dest->RepeatQueueEnabled = sourceRepeat;
-  dest->DirtySyncState = 1;
+  dest->mVarDat.mRequestRefreshUI = 1;
 
   // 5) Health ratio transfer.
-  const float scaledHealth = dest->MaxHealth * (source->Health / source->MaxHealth);
-  if (scaledHealth != dest->Health) {
+  const float scaledHealth = dest->mVarDat.mMaxHealth * (source->mVarDat.mHealth / source->mVarDat.mMaxHealth);
+  if (scaledHealth != dest->mVarDat.mHealth) {
     dest->SetHealth(scaledHealth);
   }
 
@@ -13016,7 +13016,7 @@ void Unit::HandleResourceManagement()
     mBeatResourceAccumulators.resourcesSpentMass += withdrawn.mass;
   }
 
-  if (BeingBuilt || IsDead() || !ProductionActive) {
+  if (mVarDat.mIsBeingBuilt || IsDead() || !ProductionActive) {
     DestroyUnitExtraStorage(mExtraStorage);
     return;
   }
@@ -13180,8 +13180,8 @@ int Unit::MotionTick()
 
   mIsBusy = mAttachInfo.HasAttachTarget();
 
-  if (!BeingBuilt) {
-    if (MaxHealth > Health && GetAttributes().regenRate > 0.0f) {
+  if (!mVarDat.mIsBeingBuilt) {
+    if (mVarDat.mMaxHealth > mVarDat.mHealth && GetAttributes().regenRate > 0.0f) {
       AdjustHealth(this, GetAttributes().regenRate * 0.1f);
     }
   } else if (static_cast<std::int32_t>(SimulationRef->mCurTick - mCreationTick) > 1) {
@@ -13191,7 +13191,7 @@ int Unit::MotionTick()
 
     if (buildTime > 0.0f) {
       Materialize(-0.1f / buildTime);
-      if (Health <= 0.0f) {
+      if (mVarDat.mHealth <= 0.0f) {
         RunScript("OnDecayed");
       }
     }
@@ -13472,11 +13472,11 @@ Unit::Unit(const SUnitConstructionParams& params)
   mQueueRelinkBlocked = 1u;
 
   // --- blueprint-derived health and attributes ---------------------------
-  MaxHealth = blueprint.Defense.MaxHealth;
-  Health = params.mComplete != 0 ? blueprint.Defense.Health : 1.0f;
-  FractionCompleted = static_cast<float>(params.mComplete);
-  BeingBuilt = 0;
-  IntelAttributes.Initialize(&blueprint);
+  mVarDat.mMaxHealth = blueprint.Defense.MaxHealth;
+  mVarDat.mHealth = params.mComplete != 0 ? blueprint.Defense.Health : 1.0f;
+  mVarDat.mFractionComplete = static_cast<float>(params.mComplete);
+  mVarDat.mIsBeingBuilt = 0;
+  mVarDat.mIntelAttributes.Initialize(&blueprint);
 
   VarDat().mCreator = params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->id_ : kNoCreatorEntityId;
   // Constructed in place over the unit's own attribute lane (unit+0x428),
@@ -13526,9 +13526,8 @@ Unit::Unit(const SUnitConstructionParams& params)
     placeholderMesh = sim->mRules->GetMeshBlueprint(placeholderId);
   }
 
-  // `mMeshRef` aliases the entity's borrowed RScmResource handle; a null object
-  // word means nothing has claimed the mesh lane yet.
-  if (mMeshRef.mObj == nullptr) {
+  // A null pointee means nothing has claimed the mesh lane yet.
+  if (!boost::HasSharedResource(mVarDat.mScmResource)) {
     SetMesh(blueprint.Display.MeshBlueprint, placeholderMesh, true);
   }
 
@@ -13537,7 +13536,7 @@ Unit::Unit(const SUnitConstructionParams& params)
   UpdateTerrainType(spawnTransform.pos_);
   if (params.mFixElevation == 0) {
     spawnTransform.pos_.y =
-      IUnit::CalcSpawnElevation(sim->mMapData, mCurrentLayer, spawnTransform, VarDat().mAttributes);
+      IUnit::CalcSpawnElevation(sim->mMapData, mVarDat.mLayerMask, spawnTransform, VarDat().mAttributes);
   }
 
   // Lane-for-lane copy (0x006A5BF9..0x006A5C23 stores the transform's four
@@ -13570,7 +13569,7 @@ Unit::Unit(const SUnitConstructionParams& params)
     UnitMotion = new CUnitMotion(this);
     AiNavigator =
       motionType == RULEUMT_Air ? AI_CreateAirNavigator(this) : AI_CreatePathingNavigator(this);
-    AiSteering = AI_CreateSteering(this, UnitMotion, mCurrentLayer);
+    AiSteering = AI_CreateSteering(this, UnitMotion, mVarDat.mLayerMask);
   } else {
     // Immobile units claim their footprint at spawn. Ferry beacons and in-place
     // upgrades are the exceptions: both sit on ground another unit already owns.
@@ -13636,13 +13635,13 @@ Unit::Unit(const SUnitConstructionParams& params)
 
   // --- being-built vs finished -------------------------------------------
   CArmyStats* const armyStats = ArmyRef->GetArmyStats();
-  const char* const layerName = LayerToString(mCurrentLayer);
+  const char* const layerName = LayerToString(mVarDat.mLayerMask);
   const LuaPlus::LuaObject creatorObject =
     params.mLinkSourceUnit != nullptr ? params.mLinkSourceUnit->GetLuaObject() : GetLuaObject();
 
   if (params.mComplete == 0) {
     UnitStateMask |= kUnitStateBeingBuilt;
-    BeingBuilt = 1;
+    mVarDat.mIsBeingBuilt = 1;
     if (armyStats != nullptr) {
       IncrementArmyBlueprintFloatStat(armyStats, "Units_BeingBuilt", &blueprint, 1.0f);
     }
@@ -14154,7 +14153,7 @@ void Unit::SetMesh(const RResId& meshResId, RMeshBlueprint* const meshBlueprint,
   }
 
   boost::shared_ptr<const CAniSkel> skeleton;
-  if (auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj); scmResource != nullptr) {
+  if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
     skeleton = scmResource->GetSkeleton();
   }
 
@@ -14449,7 +14448,7 @@ float Unit::CalcTransportLoadFactor() const
 // 0x006A49F0
 bool Unit::IsDead() const
 {
-  return Dead != 0;
+  return mVarDat.mIsDead != 0;
 }
 
 // 0x006A4A00
@@ -14467,7 +14466,7 @@ bool Unit::IsMobile() const
 // 0x006A4A20
 bool Unit::IsBeingBuilt() const
 {
-  return BeingBuilt != 0;
+  return mVarDat.mIsBeingBuilt != 0;
 }
 
 /**
@@ -14491,16 +14490,16 @@ float Unit::GetUniformScale() const
  */
 Wm3::Vec3f Unit::GetVelocity() const
 {
-  if (UnitMotion != nullptr && mCurrentLayer != LAYER_Air) {
+  if (UnitMotion != nullptr && mVarDat.mLayerMask != LAYER_Air) {
     Wm3::Vec3f velocity{};
     (void)UnitMotion->GetVelocity(&velocity);
     return velocity;
   }
 
   Wm3::Vec3f velocity{};
-  velocity.x = (Position.x - PrevPosition.x) * mVelocityScale;
-  velocity.y = (Position.y - PrevPosition.y) * mVelocityScale;
-  velocity.z = (Position.z - PrevPosition.z) * mVelocityScale;
+  velocity.x = (mVarDat.mCurTransform.pos_.x - mVarDat.mLastTransform.pos_.x) * mVarDat.mCurImpactValue;
+  velocity.y = (mVarDat.mCurTransform.pos_.y - mVarDat.mLastTransform.pos_.y) * mVarDat.mCurImpactValue;
+  velocity.z = (mVarDat.mCurTransform.pos_.z - mVarDat.mLastTransform.pos_.z) * mVarDat.mCurImpactValue;
   return velocity;
 }
 
@@ -14583,9 +14582,9 @@ void Unit::HandleTerranEffects()
     return;
   }
 
-  const float delta = healthEffect.GetNumber() * MaxHealth;
+  const float delta = healthEffect.GetNumber() * mVarDat.mMaxHealth;
   AdjustHealth(nullptr, delta);
-  if (Health <= 0.0f) {
+  if (mVarDat.mHealth <= 0.0f) {
     Kill(nullptr, "", 0.0f);
   }
 }
@@ -14604,7 +14603,7 @@ void Unit::UpdateCollision()
     return;
   }
 
-  const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
+  const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
   CollisionExtents->SetTransform(current);
 
   if (const Wm3::Box3f* const existingBox = CollisionExtents->GetBox(); existingBox != nullptr) {
@@ -14636,7 +14635,7 @@ void Unit::UpdateVisibility()
 {
   Entity::UpdateVisibility();
   const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
-  mVisibilityState = static_cast<std::uint8_t>(focusArmy == -1 || focusArmy == ArmyRef->mConstDat.mArmyIndex);
+  mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(focusArmy == -1 || focusArmy == ArmyRef->mConstDat.mArmyIndex);
 }
 
 /**
@@ -14872,9 +14871,9 @@ float Unit::Materialize(const float delta)
     return 0.0f;
   }
 
-  const float stepped = FractionCompleted + delta;
+  const float stepped = mVarDat.mFractionComplete + delta;
   if (delta <= 0.0f) {
-    FractionCompleted = std::clamp(stepped, 0.0f, 1.0f);
+    mVarDat.mFractionComplete = std::clamp(stepped, 0.0f, 1.0f);
   } else {
     float progressed = (stepped < 1.0f) ? stepped : 1.0f;
     if (progressed < 0.0f) {
@@ -14882,22 +14881,22 @@ float Unit::Materialize(const float delta)
     }
     // Never report less complete than the health already implies - health runs
     // ahead of the fraction when a part-built unit is repaired.
-    const float healthRatio = Health / MaxHealth;
-    FractionCompleted = (healthRatio > progressed) ? healthRatio : progressed;
+    const float healthRatio = mVarDat.mHealth / mVarDat.mMaxHealth;
+    mVarDat.mFractionComplete = (healthRatio > progressed) ? healthRatio : progressed;
   }
 
-  AdjustHealth(nullptr, MaxHealth * delta);
+  AdjustHealth(nullptr, mVarDat.mMaxHealth * delta);
 
-  if (BeingBuilt == 0u || FractionCompleted != 1.0f) {
+  if (mVarDat.mIsBeingBuilt == 0u || mVarDat.mFractionComplete != 1.0f) {
     return 0.0f;
   }
 
   VarDat().mUnitStates &= ~(1ull << UNITSTATE_BeingBuilt);
-  BeingBuilt = 0u;
+  mVarDat.mIsBeingBuilt = 0u;
 
-  const char* const layerName = (static_cast<unsigned int>(mCurrentLayer) > LAYER_Orbit)
+  const char* const layerName = (static_cast<unsigned int>(mVarDat.mLayerMask) > LAYER_Orbit)
                                   ? ""
-                                  : Entity::LayerToString(mCurrentLayer);
+                                  : Entity::LayerToString(mVarDat.mLayerMask);
   RunScriptOnStopBeingBuilt(CreatorRef.AsWeakPtr<Unit>(), layerName);
 
   const RUnitBlueprint* const blueprint = GetBlueprint();
@@ -15007,7 +15006,7 @@ bool Unit::NeedsPickup(const CUnitAssistMoveTask* const task) const
   const float taskDistance = std::sqrt((taskDx * taskDx) + (taskDz * taskDz));
 
   float pickupEta = ((taskDistance + goalDistance) / assistedMaxSpeed) + 5.0f;
-  if (assistedUnit->mCurrentLayer == LAYER_Air || taskDistance > selfBlueprint->AI.GuardScanRadius) {
+  if (assistedUnit->mVarDat.mLayerMask == LAYER_Air || taskDistance > selfBlueprint->AI.GuardScanRadius) {
     pickupEta += 4.0f;
   } else {
     pickupEta += taskDistance / selfMaxSpeed;
@@ -15079,8 +15078,8 @@ Unit* Unit::FindPlatform()
   }
   // Need repair: threshold ratio exceeds (maxHealth / health).
   if (!needsService) {
-    const float health = Health;
-    const float maxHealth = MaxHealth;
+    const float health = mVarDat.mHealth;
+    const float maxHealth = mVarDat.mMaxHealth;
     if (CSimConVarBase* const needRepairDef = GetNeedRepairThresholdRatioSimConVarDef();
         needRepairDef != nullptr) {
       if (CSimConVarInstanceBase* const needRepair = SimulationRef->GetSimVar(needRepairDef);
@@ -15127,7 +15126,7 @@ Unit* Unit::FindPlatform()
     if (!platform->IsIdleState()) {
       continue;
     }
-    const ELayer platformLayer = platform->mCurrentLayer;
+    const ELayer platformLayer = platform->mVarDat.mLayerMask;
     if (platformLayer == LAYER_Seabed || platformLayer == LAYER_Sub) {
       continue;
     }
@@ -15351,7 +15350,7 @@ void Unit::UpdateBlipsInRange()
 
   for (const CollisionResult& hit : unitsInRange) {
     Entity* const candidate = hit.sourceEntity;
-    if (candidate == nullptr || candidate->Dead != 0u) {
+    if (candidate == nullptr || candidate->mVarDat.mIsDead != 0u) {
       continue;
     }
 
@@ -15377,8 +15376,8 @@ void Unit::UpdateBlipsInRange()
     }
 
     if (army->mVarDat.mNoRushTimer > 0) {
-      const float deltaX = noRushCenterX - candidate->Position.x;
-      const float deltaZ = noRushCenterZ - candidate->Position.z;
+      const float deltaX = noRushCenterX - candidate->mVarDat.mCurTransform.pos_.x;
+      const float deltaZ = noRushCenterZ - candidate->mVarDat.mCurTransform.pos_.z;
       const float distance = std::sqrt((deltaX * deltaX) + (deltaZ * deltaZ));
       if (distance > noRushRadius) {
         continue;
@@ -15866,12 +15865,12 @@ bool Unit::IsHigherPriorityThan(const Unit* const other) const
   }
 
   if (const RUnitBlueprint* const blueprint = GetBlueprint()) {
-    if (blueprint->Air.CanFly && mCurrentLayer != LAYER_Air) {
+    if (blueprint->Air.CanFly && mVarDat.mLayerMask != LAYER_Air) {
       return true;
     }
   }
   if (const RUnitBlueprint* const blueprint = other->GetBlueprint()) {
-    if (blueprint->Air.CanFly && other->mCurrentLayer != LAYER_Air) {
+    if (blueprint->Air.CanFly && other->mVarDat.mLayerMask != LAYER_Air) {
       return false;
     }
   }
@@ -15959,7 +15958,7 @@ bool Unit::PrepareMove(
   const std::uint8_t footprintSearchSide = FootprintMaxSide(footprint);
   const int searchStep = (moveFlags > 0) ? moveFlags : static_cast<int>(footprintSearchSide) * 2;
 
-  const ELayer moveLayer = mCurrentLayer;
+  const ELayer moveLayer = mVarDat.mLayerMask;
   const RUnitBlueprint* const blueprint = GetBlueprint();
   if (blueprint != nullptr && blueprint->Air.CanFly) {
     const std::uint8_t adjustedCaps = static_cast<std::uint8_t>(
@@ -16130,7 +16129,7 @@ bool Unit::HasMeleeSpaceAroundSmallTarget(Unit* const target, SOCellPos* const i
 
   const SFootprint& moverFootprint = GetFootprint();
   const SFootprint& targetFootprint = target->GetFootprint();
-  const ELayer moveLayer = mCurrentLayer;
+  const ELayer moveLayer = mVarDat.mLayerMask;
   const bool useWholeMap = (ArmyRef != nullptr) ? ArmyRef->UseWholeMap() : false;
   const float mapBorder = static_cast<float>(FootprintMaxSide(moverFootprint));
 
@@ -16219,7 +16218,7 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
   const STIMap& mapData = *sim->mMapData;
 
   const SFootprint& moverFootprint = GetFootprint();
-  const ELayer moveLayer = mCurrentLayer;
+  const ELayer moveLayer = mVarDat.mLayerMask;
   const bool useWholeMap = (ArmyRef != nullptr) ? ArmyRef->UseWholeMap() : false;
   const float mapBorder = static_cast<float>(FootprintMaxSide(moverFootprint));
 
@@ -16321,6 +16320,18 @@ void Unit::ExecuteOccupyGround()
     return;
   }
   const EOccupancyCaps occupancyCaps = footprint.mOccupancyCaps;
+
+  // TEMPORARY PROBE -- navigation triage. Separate tag from [OCCDIAG] because
+  // the map's props exhaust that probe's budget before any structure lands.
+  {
+    static int sCount = 0;
+    if (sCount++ < 60) {
+      gpg::Warnf("[NAVGATE] UnitOccupy caps=0x%X fp=%dx%d rects=%d motion=%d bp=%s",
+                 static_cast<unsigned>(occupancyCaps), static_cast<int>(footprint.mSizeX),
+                 static_cast<int>(footprint.mSizeZ), static_cast<int>(blueprint->Physics.OccupyRects.size()),
+                 static_cast<int>(blueprint->Physics.MotionType), blueprint->mBlueprintId.c_str());
+    }
+  }
 
   const auto& occupyRects = blueprint->Physics.OccupyRects;
   if (occupyRects.empty()) {
@@ -16606,7 +16617,7 @@ SEntitySetTemplateUnit* Unit::CollectAllOverlapping(SEntitySetTemplateUnit* cons
     if (other == unit) {
       continue;
     }
-    if (other->mCurrentLayer != unit->mCurrentLayer) {
+    if (other->mVarDat.mLayerMask != unit->mVarDat.mLayerMask) {
       continue;
     }
     if (!unit->OverlapsWith(other)) {
@@ -16846,7 +16857,7 @@ void Unit::OnDestroy()
     }
 
     RunScriptUnit("SetDead", this);
-    Dead = 1u;
+    mVarDat.mIsDead = 1u;
 
     if (Unit* const transportOwner = GetTransportedBy(); transportOwner != nullptr && !transportOwner->IsDead()) {
       (void)transportOwner->AiTransport->TransportDetachUnit(this);

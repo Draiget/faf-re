@@ -548,9 +548,9 @@ namespace moho
     }
 
     const float uniformScale = blueprint->Display.UniformScale;
-    mDrawScaleX = uniformScale;
-    mDrawScaleY = uniformScale;
-    mDrawScaleZ = uniformScale;
+    mVarDat.mScale.x = uniformScale;
+    mVarDat.mScale.y = uniformScale;
+    mVarDat.mScale.z = uniformScale;
 
     // Entity orientation lanes are stored as (w,x,y,z) in Vector4f::x/y/z/w slots.
     PendingOrientation.x = transform.orient_.w;
@@ -571,7 +571,7 @@ namespace moho
     // +0x90 is `mVarDat.mHealth`, not `mMaxHealth` at +0x94. Props keep a zero
     // `MaxHealth`, which is what makes `UserEntity`'s health fraction fall back to
     // 1.0f instead of computing `0 / health`.
-    Health = blueprint->Defense.Health;
+    mVarDat.mHealth = blueprint->Defense.Health;
     mReclaimMass = blueprint->Economy.ReclaimMassMax;
     mReclaimEnergy = blueprint->Economy.ReclaimEnergyMax;
 
@@ -581,8 +581,8 @@ namespace moho
     // the matching viz channel -- so both hold VIZMODE_Always. It was spelled
     // `LAYER_Seabed` here, which is the same number for an unrelated enum.
     mVizToNeutrals = VIZMODE_Always;
-    mFootprintLayer = static_cast<std::int32_t>(VIZMODE_Always);
-    mVisibilityState = 1u;
+    mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(VIZMODE_Always);
+    mVarDat.mVisibilityHidden = 1u;
 
     SetMesh(blueprint->Display.MeshBlueprint, nullptr, true);
     RunScript("OnCreate");
@@ -637,8 +637,8 @@ namespace moho
       const auto* const blueprint = static_cast<const RPropBlueprint*>(BluePrint);
       const SFootprint& footprint = blueprint->mFootprint;
 
-      const int originX = static_cast<int>(std::lrintf(Position.x - static_cast<float>(footprint.mSizeX) * 0.5f));
-      const int originZ = static_cast<int>(std::lrintf(Position.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
+      const int originX = static_cast<int>(std::lrintf(mVarDat.mCurTransform.pos_.x - static_cast<float>(footprint.mSizeX) * 0.5f));
+      const int originZ = static_cast<int>(std::lrintf(mVarDat.mCurTransform.pos_.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
 
       gpg::Rect2i rect{};
       rect.x0 = originX;
@@ -746,9 +746,9 @@ namespace moho
       const SAniSkelBone& bone = bonesBegin[i];
 
       VTransform invTransform = bone.mBoneTransform.Inverse();
-      const float scaleX = original->mDrawScaleX;
-      const float scaleY = original->mDrawScaleY;
-      const float scaleZ = original->mDrawScaleZ;
+      const float scaleX = original->mVarDat.mScale.x;
+      const float scaleY = original->mVarDat.mScale.y;
+      const float scaleZ = original->mVarDat.mScale.z;
       invTransform.pos_.x *= scaleX;
       invTransform.pos_.y *= scaleY;
       invTransform.pos_.z *= scaleZ;
@@ -817,9 +817,9 @@ namespace moho
 
         // Store the child's draw-scale and relink its coord node at the tail of
         // sim->mCoordEntities (inlined; matches SetEntityDrawScaleAndRelinkCoordNode).
-        child->mDrawScaleX = childScale.x;
-        child->mDrawScaleY = childScale.y;
-        child->mDrawScaleZ = childScale.z;
+        child->mVarDat.mScale.x = childScale.x;
+        child->mVarDat.mScale.y = childScale.y;
+        child->mVarDat.mScale.z = childScale.z;
         TDatListItem<Entity, void>* const node = &child->mCoordNode;
         TDatListItem<Entity, void>* const head = &child->SimulationRef->mCoordEntities;
         node->ListUnlink();
@@ -908,9 +908,9 @@ namespace moho
     }
 
     const bool samePosition =
-      Position.x == PrevPosition.x && Position.y == PrevPosition.y && Position.z == PrevPosition.z;
-    const bool sameOrientation = Orientation.x == PrevOrientation.x && Orientation.y == PrevOrientation.y &&
-      Orientation.z == PrevOrientation.z && Orientation.w == PrevOrientation.w;
+      mVarDat.mCurTransform.pos_.x == mVarDat.mLastTransform.pos_.x && mVarDat.mCurTransform.pos_.y == mVarDat.mLastTransform.pos_.y && mVarDat.mCurTransform.pos_.z == mVarDat.mLastTransform.pos_.z;
+    const bool sameOrientation = mVarDat.mCurTransform.orient_.x == mVarDat.mLastTransform.orient_.x && mVarDat.mCurTransform.orient_.y == mVarDat.mLastTransform.orient_.y &&
+      mVarDat.mCurTransform.orient_.z == mVarDat.mLastTransform.orient_.z && mVarDat.mCurTransform.orient_.w == mVarDat.mLastTransform.orient_.w;
     if (samePosition && sameOrientation) {
       mCoordNode.ListUnlink();
     }
@@ -950,7 +950,7 @@ namespace moho
       mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
     }
 
-    const float previous = FractionCompleted;
+    const float previous = mVarDat.mFractionComplete;
     if (reclaimDelta <= 0.0f) {
       float next = previous + reclaimDelta;
       if (next > 1.0f) {
@@ -959,7 +959,7 @@ namespace moho
       if (next < 0.0f) {
         next = 0.0f;
       }
-      FractionCompleted = next;
+      mVarDat.mFractionComplete = next;
     } else {
       float next = previous + reclaimDelta;
       if (next > 1.0f) {
@@ -969,19 +969,19 @@ namespace moho
         next = 0.0f;
       }
 
-      if (MaxHealth > 0.0f) {
-        const float minFractionFromHealth = Health / MaxHealth;
+      if (mVarDat.mMaxHealth > 0.0f) {
+        const float minFractionFromHealth = mVarDat.mHealth / mVarDat.mMaxHealth;
         if (next < minFractionFromHealth) {
           next = minFractionFromHealth;
         }
       }
-      FractionCompleted = next;
+      mVarDat.mFractionComplete = next;
     }
 
-    const float applied = FractionCompleted - previous;
+    const float applied = mVarDat.mFractionComplete - previous;
     CallbackStr("BeingReclaimed");
 
-    if (FractionCompleted == 0.0f && reclaimDelta < 0.0f) {
+    if (mVarDat.mFractionComplete == 0.0f && reclaimDelta < 0.0f) {
       CallbackStr("OnReclaimed");
       mReclaimTerminated = true;
       QueuePropReclaimDelete(*this);

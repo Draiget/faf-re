@@ -186,7 +186,7 @@ namespace moho
       return -1;
     }
 
-    if (platformUnit->mCurrentLayer == LAYER_Seabed) {
+    if (platformUnit->mVarDat.mLayerMask == LAYER_Seabed) {
       return -1;
     }
 

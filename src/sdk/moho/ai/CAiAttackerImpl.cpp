@@ -980,7 +980,7 @@ bool moho::AI_TestForTerrainBlockage(
   const ERuleBPUnitWeaponBallisticArc ballisticArc
 )
 {
-  if (unit == nullptr || unit->mCurrentLayer == LAYER_Air || unit->SimulationRef == nullptr) {
+  if (unit == nullptr || unit->mVarDat.mLayerMask == LAYER_Air || unit->SimulationRef == nullptr) {
     return false;
   }
 
@@ -1073,7 +1073,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
   for (const SWeakRefSlot& slot : *entities) {
     std::uint32_t closestSeenCategory = 9999u;
     Entity* const candidate = slot.ResolveObjectPtr<Entity>();
-    if (candidate == nullptr || candidate->Dead != 0u || candidate->DestroyQueuedFlag != 0u) {
+    if (candidate == nullptr || candidate->mVarDat.mIsDead != 0u || candidate->DestroyQueuedFlag != 0u) {
       continue;
     }
 
@@ -1091,7 +1091,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       continue;
     }
 
-    const Wm3::Vector3f candidatePosition = candidate->Position;
+    const Wm3::Vector3f candidatePosition = candidate->mVarDat.mCurTransform.pos_;
     const float xDistance = unitPosition.x - candidatePosition.x;
     const float zDistance = unitPosition.z - candidatePosition.z;
     float distanceSq = (xDistance * xDistance) + (zDistance * zDistance);
@@ -1115,7 +1115,7 @@ Entity* CAiAttackerImpl::FindBestEnemy(
       continue;
     }
 
-    const bool isAirLayer = candidate->mCurrentLayer == LAYER_Air;
+    const bool isAirLayer = candidate->mVarDat.mLayerMask == LAYER_Air;
     const bool isBeingBuilt = candidate->IsBeingBuilt();
     if ((candidate->mAttachInfo.GetAttachTargetEntity() != nullptr && (isAirLayer || isBeingBuilt))
         || (isAirLayer && isBeingBuilt)) {
@@ -1760,7 +1760,7 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
     if (candidate == nullptr || candidate->IsProjectile() == nullptr) {
       continue;
     }
-    if (candidate->Dead != 0u) {
+    if (candidate->mVarDat.mIsDead != 0u) {
       continue;
     }
 
@@ -1773,9 +1773,9 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
     }
 
     const ELayer layerCaps = weapon->mFireTargetLayerCaps;
-    const float projectileX = projectile->Position.x;
-    const float projectileY = projectile->Position.y;
-    const float projectileZ = projectile->Position.z;
+    const float projectileX = projectile->mVarDat.mCurTransform.pos_.x;
+    const float projectileY = projectile->mVarDat.mCurTransform.pos_.y;
+    const float projectileZ = projectile->mVarDat.mCurTransform.pos_.z;
 
     // Layer/height caps: bit 0x08 permits below-water, bit 0x10 permits above-water.
     const bool belowWaterOk = (layerCaps & 8) != 0 || waterElevation < projectileY;

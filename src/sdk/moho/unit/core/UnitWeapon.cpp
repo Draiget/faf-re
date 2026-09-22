@@ -460,7 +460,7 @@ namespace
       return false;
     }
 
-    const moho::ELayer targetLayer = targetEntity->mCurrentLayer;
+    const moho::ELayer targetLayer = targetEntity->mVarDat.mLayerMask;
     if ((weapon->mFireTargetLayerCaps & targetLayer) == 0) {
       return false;
     }
@@ -1248,7 +1248,7 @@ namespace moho
         damage.mAmount = weapon.mAttributes.GetDamage();
         damage.mType.assign(weapon.mAttributes.GetName(), 0, msvc8::string::npos);
         const Wm3::Vec3f& firingPosition = firingUnit->GetPosition();
-        const Wm3::Vec3f& impactPosition = impactEntity->Position;
+        const Wm3::Vec3f& impactPosition = impactEntity->mVarDat.mCurTransform.pos_;
         damage.mVector.x = firingPosition.x - impactPosition.x;
         damage.mVector.y = firingPosition.y - impactPosition.y;
         damage.mVector.z = firingPosition.z - impactPosition.z;
@@ -3137,7 +3137,7 @@ namespace moho
 
     if (ownerUnit->VarDat().mStunTicks != 0
         || ownerUnit->IsUnitState(UNITSTATE_Busy)
-        || (unitBlueprint->Air.CanFly != 0u && ownerUnit->mCurrentLayer != LAYER_Air)) {
+        || (unitBlueprint->Air.CanFly != 0u && ownerUnit->mVarDat.mLayerMask != LAYER_Air)) {
       return false;
     }
 
@@ -3575,7 +3575,7 @@ namespace moho
         // The original tests whether the blacklisted entity moved this tick by
         // comparing its current world position against its previous-tick world
         // position. `Wm3::Vector3f::Compare` returns true when the vectors DIFFER.
-        entityMoved = Wm3::Vector3f::Compare(&blacklistedEntity->Position, &blacklistedEntity->PrevPosition);
+        entityMoved = Wm3::Vector3f::Compare(&blacklistedEntity->mVarDat.mCurTransform.pos_, &blacklistedEntity->mVarDat.mLastTransform.pos_);
       }
 
       if (entityGone || entityMoved || row.mValue <= 0) {
@@ -3787,7 +3787,7 @@ namespace moho
 
     // Drop this unit from the previous target entity's shooter set.
     if (Entity* const previousTargetEntity = mTarget.GetEntity(); previousTargetEntity != nullptr) {
-      if (previousTargetEntity->Dead == 0u && previousTargetEntity->DestroyQueuedFlag == 0u) {
+      if (previousTargetEntity->mVarDat.mIsDead == 0u && previousTargetEntity->DestroyQueuedFlag == 0u) {
         if (mUnit != nullptr) {
           previousTargetEntity->RemoveShooter(static_cast<Entity*>(mUnit));
         }
@@ -3802,7 +3802,7 @@ namespace moho
 
     // Add this unit to the new target entity's shooter set.
     if (Entity* const newTargetEntity = mTarget.GetEntity(); newTargetEntity != nullptr) {
-      if (newTargetEntity->Dead == 0u && newTargetEntity->DestroyQueuedFlag == 0u) {
+      if (newTargetEntity->mVarDat.mIsDead == 0u && newTargetEntity->DestroyQueuedFlag == 0u) {
         Entity* const ownerEntity = (mUnit != nullptr) ? static_cast<Entity*>(mUnit) : nullptr;
         newTargetEntity->AddShooter(ownerEntity);
       }
@@ -3899,7 +3899,7 @@ namespace moho
         // not the value loaded ahead of it.
         Entity* const allyCheckEntity = collisions->begin()[index].entity;
         Unit* const candidateUnit = (allyCheckEntity != nullptr) ? allyCheckEntity->IsUnit() : nullptr;
-        if (candidateUnit != nullptr && candidateUnit->mCurrentLayer == LAYER_Air && ownerUnit->ArmyRef != nullptr) {
+        if (candidateUnit != nullptr && candidateUnit->mVarDat.mLayerMask == LAYER_Air && ownerUnit->ArmyRef != nullptr) {
           const std::uint32_t candidateArmyIndex = (candidateUnit->ArmyRef != nullptr)
             ? static_cast<std::uint32_t>(candidateUnit->ArmyRef->mConstDat.mArmyIndex)
             : std::numeric_limits<std::uint32_t>::max();
@@ -4204,7 +4204,7 @@ namespace moho
         if (boundEntity != nullptr && (static_cast<std::uint32_t>(boundEntity->id_) & 0xF0000000u) == 0x40000000u) {
           referencePoint = closest->contactPoint;
         } else if (boundEntity != nullptr && boundEntity->IsUnit() == nullptr) {
-          referencePoint = boundEntity->Position;
+          referencePoint = boundEntity->mVarDat.mCurTransform.pos_;
         } else if (boundEntity != nullptr) {
           referencePoint = boundEntity->GetBoneWorldTransform(-1).pos_;
         }

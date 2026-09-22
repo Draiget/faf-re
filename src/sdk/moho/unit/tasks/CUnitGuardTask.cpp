@@ -274,7 +274,7 @@ namespace
     }
 
     moho::Entity* const shieldEntity = unit->GetFocusEntity();
-    return shieldEntity != nullptr && shieldEntity->Health < shieldEntity->MaxHealth;
+    return shieldEntity != nullptr && shieldEntity->mVarDat.mHealth < shieldEntity->mVarDat.mMaxHealth;
   }
 
   [[nodiscard]] bool NeedsAssistOrRepairDispatch(moho::Unit* const unit)
@@ -283,7 +283,7 @@ namespace
       return false;
     }
 
-    if (unit->IsBeingBuilt() || unit->Health < unit->MaxHealth) {
+    if (unit->IsBeingBuilt() || unit->mVarDat.mHealth < unit->mVarDat.mMaxHealth) {
       return true;
     }
 
@@ -761,7 +761,7 @@ namespace moho
 
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
         // Issue one navigator-side abort iff the unit moved this tick.
-        if (Wm3::Vector3f::Compare(&unit->Position, &unit->PrevPosition)) {
+        if (Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_)) {
           navigator->AbortMove();
         }
         unit->UpdateSpeedThroughStatus();
@@ -1137,7 +1137,7 @@ namespace moho
     const bool engineerWithGuardedUnit = mUnit->IsInCategory("ENGINEER") && guardedUnit != nullptr;
     if (engineerWithGuardedUnit) {
       const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-      const bool guardedUnitMoving = Wm3::Vector3f::Compare(&guardedUnit->Position, &guardedUnit->PrevPosition);
+      const bool guardedUnitMoving = Wm3::Vector3f::Compare(&guardedUnit->mVarDat.mCurTransform.pos_, &guardedUnit->mVarDat.mLastTransform.pos_);
       const bool hasReservedAnchor = Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero);
       const Wm3::Vector3f guardedPosition = guardedUnit->GetPosition();
 
@@ -1486,8 +1486,8 @@ namespace moho
         return nullptr;
       }
 
-      if (!Wm3::Vector3f::Compare(&guardedUnit->Position, &guardedUnit->PrevPosition)) {
-        if (guardedUnit->Health < guardedUnit->MaxHealth) {
+      if (!Wm3::Vector3f::Compare(&guardedUnit->mVarDat.mCurTransform.pos_, &guardedUnit->mVarDat.mLastTransform.pos_)) {
+        if (guardedUnit->mVarDat.mHealth < guardedUnit->mVarDat.mMaxHealth) {
           return guardedUnit;
         }
 
@@ -1561,15 +1561,15 @@ namespace moho
         continue;
       }
 
-      if (!candidate->SimulationRef->mMapData->IsWithin(candidate->Position, 1.0f, mUnit->ArmyRef->UseWholeMap())) {
+      if (!candidate->SimulationRef->mMapData->IsWithin(candidate->mVarDat.mCurTransform.pos_, 1.0f, mUnit->ArmyRef->UseWholeMap())) {
         continue;
       }
 
-      if (Wm3::Vector3f::Compare(&candidate->Position, &candidate->PrevPosition)) {
+      if (Wm3::Vector3f::Compare(&candidate->mVarDat.mCurTransform.pos_, &candidate->mVarDat.mLastTransform.pos_)) {
         continue;
       }
 
-      if (candidate->mCurrentLayer == LAYER_Air) {
+      if (candidate->mVarDat.mLayerMask == LAYER_Air) {
         continue;
       }
 
@@ -1633,11 +1633,11 @@ namespace moho
 
     if (isAlliedTarget) {
       bool shouldIssueRepairTask = true;
-      if (targetUnit->MaxHealth <= targetUnit->Health && !targetUnit->IsUnitState(UNITSTATE_Enhancing)) {
+      if (targetUnit->mVarDat.mMaxHealth <= targetUnit->mVarDat.mHealth && !targetUnit->IsUnitState(UNITSTATE_Enhancing)) {
         bool focusNeedsRepair = false;
         if (targetUnit->RunScriptBool("ShieldIsOn") && targetUnit->IsInCategory("SHIELD")) {
           if (Entity* const focusEntity = targetUnit->GetFocusEntity(); focusEntity != nullptr) {
-            focusNeedsRepair = focusEntity->MaxHealth > focusEntity->Health;
+            focusNeedsRepair = focusEntity->mVarDat.mMaxHealth > focusEntity->mVarDat.mHealth;
           }
         }
         if (!focusNeedsRepair) {

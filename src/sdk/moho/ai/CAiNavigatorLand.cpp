@@ -350,7 +350,7 @@ void CAiNavigatorLand::SetDestUnit(Entity* const destinationEntity)
   // 0x005A4191/0x005A4199 read `Entity::Position` (+0xAC/+0xB4) off the
   // argument directly, which is why this takes an `Entity` and works for a
   // recon blip as well as a unit.
-  const Wm3::Vector3f& targetPos = destinationEntity->Position;
+  const Wm3::Vector3f& targetPos = destinationEntity->mVarDat.mCurTransform.pos_;
   const std::int32_t cellX = static_cast<std::int32_t>(targetPos.x - 0.5f);
   const std::int32_t cellZ = static_cast<std::int32_t>(targetPos.z - 0.5f);
   SetGoal(BuildSingleCellGoal(cellX, cellZ));

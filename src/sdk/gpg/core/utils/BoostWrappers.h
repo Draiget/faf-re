@@ -539,6 +539,25 @@ namespace boost
     ) noexcept;
 
     /**
+     * Typed facade over the lane above, for callers that hold real
+     * `boost::shared_ptr<moho::RScmResource>` objects rather than raw `(px,pi)`
+     * pairs. The `(px,pi)` reinterpretation lives here, in the ABI shim, behind
+     * the layout `static_assert` this header already carries -- not in the
+     * subsystem sources, which say what they mean:
+     * `AssignSharedResource(entity.mVarDat.mScmResource, blueprint->GetMesh())`.
+     */
+    void AssignSharedResource(
+        boost::shared_ptr<moho::RScmResource>& destination,
+        const boost::shared_ptr<moho::RScmResource>& source
+    ) noexcept;
+
+    /** True when `resource` owns a pointee; the `px != nullptr` test, typed. */
+    [[nodiscard]] bool HasSharedResource(const boost::shared_ptr<moho::RScmResource>& resource) noexcept;
+
+    /** Releases `resource`'s control block and clears its pointee lane. */
+    void ReleaseSharedResource(boost::shared_ptr<moho::RScmResource>& resource) noexcept;
+
+    /**
      * Address: 0x0055FBD0 (FUN_0055FBD0, Moho::WeakPtr_RScmResource::WeakPtr_RScmResource)
      *
      * What it does:

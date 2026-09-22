@@ -178,7 +178,7 @@ namespace
     if (shield != nullptr) {
       moho::EntityCollisionUpdater* const collisionShape = shield->CollisionExtents;
       if (collisionShape != nullptr) {
-        return collisionShape->PointInShape(&entity->Position);
+        return collisionShape->PointInShape(&entity->mVarDat.mCurTransform.pos_);
       }
     }
 
@@ -545,7 +545,7 @@ namespace moho
     if (sim_ShowDamage) {
       CDebugCanvas* const debugCanvas = sim->GetDebugCanvas();
       if (targetEntity != nullptr && debugCanvas != nullptr) {
-        const Wm3::Vec3f& targetPosition = targetEntity->Position;
+        const Wm3::Vec3f& targetPosition = targetEntity->mVarDat.mCurTransform.pos_;
         SDebugLine debugLine{};
         debugLine.p0 = targetPosition;
         debugLine.p1.x = targetPosition.x - damage.mVector.x;
@@ -1184,7 +1184,7 @@ namespace moho
       if (targetEntity == nullptr) {
         return;
       }
-      if (!targetEntity->Dead) {
+      if (!targetEntity->mVarDat.mIsDead) {
         SIM_DoDamagePoint(sim, damage);
       }
       return;

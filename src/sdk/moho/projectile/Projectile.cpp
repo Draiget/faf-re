@@ -519,7 +519,7 @@ namespace moho
     mLauncherWeak.Set(resolvedLauncher);
 
     mQueueRelinkBlocked = 1;   // v3a (Entity+0x1B8)
-    mVisibilityState = 1;      // mVarDat.mNotVisibility (Entity+0x110)
+    mVarDat.mVisibilityHidden = 1;      // mVarDat.mNotVisibility (Entity+0x110)
     this->RunScript("OnPreCreate");
 
     // Bounce count uniform pick in [MinBounceCount, MaxBounceCount).
@@ -562,9 +562,9 @@ namespace moho
         // to the launcher, preserving the inherited speed. The Y lane is left
         // untouched (steer vector's Y is forced to 0 before VecSetLength).
         Wm3::Vector3f steerHorizontal{
-          aimPoint.x - launcherEntity->Position.x,
+          aimPoint.x - launcherEntity->mVarDat.mCurTransform.pos_.x,
           0.0f,
-          aimPoint.z - launcherEntity->Position.z,
+          aimPoint.z - launcherEntity->mVarDat.mCurTransform.pos_.z,
         };
         const float inheritedSpeed = std::sqrt(
           (mVelocity.x * mVelocity.x) +
@@ -624,9 +624,9 @@ namespace moho
     {
       const float scale =
         RandomSymmetricAround(rng, blueprint->Display.UniformScale, blueprint->Display.MeshScaleRange);
-      mDrawScaleX = scale;
-      mDrawScaleY = scale;
-      mDrawScaleZ = scale;
+      mVarDat.mScale.x = scale;
+      mVarDat.mScale.y = scale;
+      mVarDat.mScale.z = scale;
     }
 
     // Splice the coord node into Sim::mCoordEntities at the FRONT: the binary
@@ -643,20 +643,16 @@ namespace moho
     }
 
     // Write current / previous / pending transforms verbatim from the launch
-    // transform. Orientation is copied as the raw quaternion tuple (m_afTuple order
-    // w,x,y,z) to match the binary's straight 4-float lane copy.
-    const Vector4f launchOrientation{
-      launchTransform.orient_[0],
-      launchTransform.orient_[1],
-      launchTransform.orient_[2],
-      launchTransform.orient_[3],
-    };
+    // transform. Every orientation lane is a `Wm3::Quatf` now, so this is the
+    // straight 4-float copy the binary does rather than a tuple-order rebuild
+    // through a `moho::Vector4f`.
+    const Wm3::Quatf& launchOrientation = launchTransform.orient_;
     PendingOrientation = launchOrientation;
     PendingPosition = launchTransform.pos_;
-    Orientation = launchOrientation;
-    Position = launchTransform.pos_;
-    PrevOrientation = launchOrientation;
-    PrevPosition = launchTransform.pos_;
+    mVarDat.mCurTransform.orient_ = launchOrientation;
+    mVarDat.mCurTransform.pos_ = launchTransform.pos_;
+    mVarDat.mLastTransform.orient_ = launchOrientation;
+    mVarDat.mLastTransform.pos_ = launchTransform.pos_;
 
     bool skipLayerAndMesh = false;
     if (mTrackTarget) {
@@ -665,7 +661,7 @@ namespace moho
         // Air (0x10) or Sub (0x04).
         Entity* const trackedEntity = mTargetPosData.targetEntity.GetObjectPtr();
         if (trackedEntity != nullptr) {
-          const ELayer trackedLayer = trackedEntity->mCurrentLayer;
+          const ELayer trackedLayer = trackedEntity->mVarDat.mLayerMask;
           if (trackedLayer != LAYER_Air && trackedLayer != LAYER_Sub) {
             mKeepLastAimLatch = true;
           }
@@ -685,10 +681,10 @@ namespace moho
       const float currentHeight = launchTransform.pos_.y;
       STIMap* const mapData = SimulationRef->mMapData;
       const float waterElevation = mapData->mWaterEnabled ? mapData->mWaterElevation : -10000.0f;
-      const ELayer previousLayer = mCurrentLayer;
+      const ELayer previousLayer = mVarDat.mLayerMask;
 
       if (waterElevation <= currentHeight) {
-        mCurrentLayer = LAYER_Air;
+        mVarDat.mLayerMask = LAYER_Air;
         if (previousLayer != LAYER_Air) {
           const char* newLayerName = Entity::LayerToString(LAYER_Air);
           const char* oldLayerName = Entity::LayerToString(previousLayer);
@@ -696,7 +692,7 @@ namespace moho
         }
       } else {
         mBelowWater = true;
-        mCurrentLayer = LAYER_Water;
+        mVarDat.mLayerMask = LAYER_Water;
         if (previousLayer != LAYER_Water) {
           const char* newLayerName = Entity::LayerToString(LAYER_Water);
           const char* oldLayerName = Entity::LayerToString(previousLayer);
@@ -873,14 +869,14 @@ namespace moho
     // is copied as the raw 4-float tuple (matches the binary's lane copy; the
     // ctor uses the same straight copy convention).
     VTransform tran;
-    tran.orient_ = Wm3::Quatf{Orientation.x, Orientation.y, Orientation.z, Orientation.w};
-    tran.pos_ = Position;
+    tran.orient_ = Wm3::Quatf{mVarDat.mCurTransform.orient_.x, mVarDat.mCurTransform.orient_.y, mVarDat.mCurTransform.orient_.z, mVarDat.mCurTransform.orient_.w};
+    tran.pos_ = mVarDat.mCurTransform.pos_;
 
     // Advance mesh draw-scale by scale velocity (per-tick).
     const Wm3::Vector3f startVelocity = mVelocity;
-    mDrawScaleX += mScaleVelocity.x * kProjectileTickSeconds;
-    mDrawScaleY += mScaleVelocity.y * kProjectileTickSeconds;
-    mDrawScaleZ += mScaleVelocity.z * kProjectileTickSeconds;
+    mVarDat.mScale.x += mScaleVelocity.x * kProjectileTickSeconds;
+    mVarDat.mScale.y += mScaleVelocity.y * kProjectileTickSeconds;
+    mVarDat.mScale.z += mScaleVelocity.z * kProjectileTickSeconds;
 
     // Relink the coord node at the FRONT of the Sim coord list: the binary
     // unlinks then inserts immediately after the sentinel (node.prev=sentinel,
@@ -1025,12 +1021,12 @@ namespace moho
       const Wm3::Quaternionf drawOrient{tran.orient_.x, tran.orient_.y, tran.orient_.z, tran.orient_.w};
       canvas->AddWireCoords(tran.pos_, drawOrient, 1.0f);
       if (mImpactInterpolation >= 0.0f) {
-        canvas->AddLine(mImpactPosition, Position, 0xFF00FF00u);
+        canvas->AddLine(mImpactPosition, mVarDat.mCurTransform.pos_, 0xFF00FF00u);
         canvas->AddLine(PendingPosition, mImpactPosition, 0xFFFF0000u);
         const Wm3::Quaternionf kIdentity{1.0f, 0.0f, 0.0f, 0.0f};
         canvas->AddWireCoords(mImpactPosition, kIdentity, 1.0f);
       } else {
-        canvas->AddLine(PendingPosition, Position, 0xFF00FF00u);
+        canvas->AddLine(PendingPosition, mVarDat.mCurTransform.pos_, 0xFF00FF00u);
       }
     }
 
@@ -1074,7 +1070,7 @@ namespace moho
 
       const float pendingScale = (interp <= 0.001f) ? 1000.0f : (1.0f / interp);
       Wm3::Quaternionf lerped;
-      const Wm3::Quaternionf currentOrient{Orientation.x, Orientation.y, Orientation.z, Orientation.w};
+      const Wm3::Quaternionf currentOrient{mVarDat.mCurTransform.orient_.x, mVarDat.mCurTransform.orient_.y, mVarDat.mCurTransform.orient_.z, mVarDat.mCurTransform.orient_.w};
       const Wm3::Quaternionf pendingOrient{PendingOrientation.x, PendingOrientation.y, PendingOrientation.z,
                                            PendingOrientation.w};
       moho::QuatLERP(&pendingOrient, &currentOrient, &lerped, mImpactInterpolation);
@@ -1425,7 +1421,7 @@ namespace moho
   {
 
     // Swept segment this tick: current world position -> pending position.
-    const Wm3::Vector3f& curPos = Position;
+    const Wm3::Vector3f& curPos = mVarDat.mCurTransform.pos_;
     const Wm3::Vector3f& nextPos = PendingPosition;
 
     // Two-endpoint segment (Origin=midpoint, Direction=normalized, Extent=half
@@ -1521,10 +1517,10 @@ namespace moho
       if (target != nullptr && target->IsProjectile() != nullptr &&
           target->CollisionExtents == nullptr) {
         // Closest point on the swept segment to the target's world position, and
-        // its squared distance (asm 0x0069D66C: DistVector3Segment3(target->Position,
+        // its squared distance (asm 0x0069D66C: DistVector3Segment3(target->mVarDat.mCurTransform.pos_,
         // segment); 0x0069D692: GetSquared; 0x0069D706: GetEndPoint).
         Wm3::Vector3f closestOnSegment{};
-        const float distSq = DistPointToSegmentSquared(target->Position, segment, &closestOnSegment);
+        const float distSq = DistPointToSegmentSquared(target->mVarDat.mCurTransform.pos_, segment, &closestOnSegment);
 
         // Hit radius squared = |target velocity|^2 + 0.5 (asm 0x0069D69B: target
         // GetVelocity() via vtable slot 15 (+0x3C); 0x0069D6D4: + flt_E4F724 == 0.5).
@@ -1659,7 +1655,7 @@ namespace moho
             // Filter E (asm 0x0069DBFD-0x0069DC2D): a child projectile only
             // collides with ENEMY air-layer candidates (skips friendly air units).
             if (mIsChildProjectile && projectileArmy != nullptr &&
-                candidate->mCurrentLayer == LAYER_Air) {
+                candidate->mVarDat.mLayerMask == LAYER_Air) {
               if (!projectileArmy->IsEnemy(static_cast<std::uint32_t>(candidate->GetArmyIndex()))) {
                 continue;
               }

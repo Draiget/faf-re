@@ -59,8 +59,8 @@ namespace
 
   [[nodiscard]] bool HasMovedSincePrev(const Entity& entity) noexcept
   {
-    return entity.Position.x != entity.PrevPosition.x || entity.Position.y != entity.PrevPosition.y ||
-      entity.Position.z != entity.PrevPosition.z;
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y ||
+      entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
   [[nodiscard]] Wm3::Vector3f EstimateAirAbortStopPosition(const Unit& unit) noexcept
@@ -242,7 +242,7 @@ void CAiNavigatorAir::SetGoal(const SAiNavigatorGoal& goal)
       if (blueprint && blueprint->Air.CanFly != 0u) {
         targetLayer = LAYER_Air;
       } else {
-        targetLayer = mUnit->mCurrentLayer;
+        targetLayer = mUnit->mVarDat.mLayerMask;
       }
     }
     mUnit->UnitMotion->SetTarget(mCurrentTargetPos, Wm3::Vector3f::Zero(), targetLayer);
@@ -453,7 +453,7 @@ int CAiNavigatorAir::Execute()
         "[XPORTARRIVE] atTarget=%d vert=%d curLayer=%d tgtLayer=%d dist=%.1f cells=(%d,%d)vs(%d,%d)",
         (motion != nullptr && motion->AtTarget()) ? 1 : 0,
         motion != nullptr ? static_cast<int>(motion->mVertEvent) : -1,
-        static_cast<int>(mUnit->mCurrentLayer),
+        static_cast<int>(mUnit->mVarDat.mLayerMask),
         motion != nullptr ? static_cast<int>(motion->mLayer) : -1,
         std::sqrt((dx * dx) + (dz * dz)),
         static_cast<int>(currentTargetCellX), static_cast<int>(currentTargetCellZ),
@@ -564,7 +564,7 @@ void CAiNavigatorAir::ApplyCurrentTargetToMotion()
     return;
   }
 
-  ELayer targetLayer = mUnit->mCurrentLayer;
+  ELayer targetLayer = mUnit->mVarDat.mLayerMask;
   const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
   if (blueprint && blueprint->Air.CanFly != 0u) {
     targetLayer = LAYER_Air;
@@ -588,7 +588,7 @@ void CAiNavigatorAir::UpdateCurrentTargetFromDestinationEntity()
   // motion and never writes `mCurrentTargetPos` - the chase target lives on
   // the entity, so re-reading it each retarget is the point.
   if (mUnit && mUnit->UnitMotion) {
-    mUnit->UnitMotion->SetTarget(destinationEntity->Position, Wm3::Vector3f::Zero(), LAYER_None);
+    mUnit->UnitMotion->SetTarget(destinationEntity->mVarDat.mCurTransform.pos_, Wm3::Vector3f::Zero(), LAYER_None);
   }
   mStatus = AINAVSTATUS_Steering;
 }

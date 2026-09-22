@@ -755,7 +755,7 @@ void CUnitCommandQueue::SetCommandCount(const unsigned int index, const unsigned
  */
 void CUnitCommandQueue::SetCommandTarget(const unsigned int index, Entity* const targetEntity)
 {
-  if (targetEntity == nullptr || targetEntity->Dead != 0u) {
+  if (targetEntity == nullptr || targetEntity->mVarDat.mIsDead != 0u) {
     return;
   }
 

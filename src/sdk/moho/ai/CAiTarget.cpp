@@ -432,7 +432,7 @@ bool CAiTarget::HasTarget() const
       }
 
       if (ReconBlip* const reconBlip = entity->IsReconBlip(); reconBlip != nullptr) {
-        return reconBlip->Dead == 0u;
+        return reconBlip->mVarDat.mIsDead == 0u;
       }
 
       return true;
@@ -480,7 +480,7 @@ bool CAiTarget::NoTarget() const
   }
 
   Entity* const entity = GetEntity();
-  return entity == nullptr || entity->Dead != 0u;
+  return entity == nullptr || entity->mVarDat.mIsDead != 0u;
 }
 
 /**
@@ -493,7 +493,7 @@ bool CAiTarget::NoTarget() const
 bool moho::CAiTargetEntityIsAirLayer(const CAiTarget& target) noexcept
 {
   Entity* const entity = target.GetEntity();
-  return entity != nullptr && entity->mCurrentLayer == LAYER_Air;
+  return entity != nullptr && entity->mVarDat.mLayerMask == LAYER_Air;
 }
 
 /**

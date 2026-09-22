@@ -86,17 +86,17 @@ namespace
   [[nodiscard]] Wm3::Box3f BuildCollisionBeamDebugBox(const moho::CollisionBeamEntity& entity)
   {
     const Wm3::Quaternionf orientation{
-      entity.Orientation.x,
-      entity.Orientation.y,
-      entity.Orientation.z,
-      entity.Orientation.w,
+      entity.mVarDat.mCurTransform.orient_.x,
+      entity.mVarDat.mCurTransform.orient_.y,
+      entity.mVarDat.mCurTransform.orient_.z,
+      entity.mVarDat.mCurTransform.orient_.w,
     };
 
     const Wm3::Vector3f axisX = orientation.Rotate(Wm3::Vector3f{1.0f, 0.0f, 0.0f});
     const Wm3::Vector3f axisY = orientation.Rotate(Wm3::Vector3f{0.0f, 1.0f, 0.0f});
     const Wm3::Vector3f axisZ = orientation.Rotate(Wm3::Vector3f{0.0f, 0.0f, 1.0f});
     const Wm3::Vector3f extents{1.0f, 1.0f, 1.0f};
-    return Wm3::Box3f(entity.Position, axisX, axisY, axisZ, extents);
+    return Wm3::Box3f(entity.mVarDat.mCurTransform.pos_, axisX, axisY, axisZ, extents);
   }
 
   [[nodiscard]] std::uint32_t BuildCollisionBeamFamilySourceBits(const moho::UnitWeapon* const launcherWeapon) noexcept
@@ -323,13 +323,13 @@ namespace moho
   VTransform CollisionBeamEntity::GetBoneWorldTransform(const int boneIndex) const
   {
     VTransform result{};
-    result.orient_.w = Orientation.x;
-    result.orient_.x = Orientation.y;
-    result.orient_.y = Orientation.z;
-    result.orient_.z = Orientation.w;
-    result.pos_.x = Position.x;
-    result.pos_.y = Position.y;
-    result.pos_.z = Position.z;
+    result.orient_.w = mVarDat.mCurTransform.orient_.x;
+    result.orient_.x = mVarDat.mCurTransform.orient_.y;
+    result.orient_.y = mVarDat.mCurTransform.orient_.z;
+    result.orient_.z = mVarDat.mCurTransform.orient_.w;
+    result.pos_.x = mVarDat.mCurTransform.pos_.x;
+    result.pos_.y = mVarDat.mCurTransform.pos_.y;
+    result.pos_.z = mVarDat.mCurTransform.pos_.z;
 
     if (boneIndex != 0) {
       const float orientationW = result.orient_.w;

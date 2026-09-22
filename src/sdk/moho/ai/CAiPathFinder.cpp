@@ -174,7 +174,7 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] std::uint8_t ReadUnitAltFootprintFlag(const moho::Unit* const unit) noexcept
   {
-    return unit ? unit->mUseAltFootprint : 0u;
+    return unit ? unit->mVarDat.mUsingAltFootprint : 0u;
   }
 
   /**
@@ -1062,7 +1062,7 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
     if (mHasOccupancyMask) {
       const SFootprint& footprint = mUnit->GetFootprint();
       EOccupancyCaps caps = OCCUPY_MobileCheck(footprint, *mOGrid->sim->mMapData, cell);
-      if (mUnit->mCurrentLayer == LAYER_Water) {
+      if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
         caps = static_cast<EOccupancyCaps>(
           static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
       }
@@ -1093,7 +1093,7 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
     static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures));
 
   EOccupancyCaps caps = OCCUPY_MobileCheck(probeFootprint, *mOGrid->sim->mMapData, cell);
-  if (mUnit->mCurrentLayer == LAYER_Water) {
+  if (mUnit->mVarDat.mLayerMask == LAYER_Water) {
     caps = static_cast<EOccupancyCaps>(
       static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
   }

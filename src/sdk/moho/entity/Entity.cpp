@@ -277,120 +277,6 @@ namespace
   }
 
   /**
-   * `Entity` +0x78..+0x147 *is* an `SSTIEntityVariableData`: the binary hands
-   * `&this->mVarDat` to that type's constructor, destructor and `operator=`
-   * (`lea eax, [edi+78h]` at 0x0067A3AD in `Entity::SyncInterface`). This tree
-   * still spells the block out as flat `Entity` members, so the one place that
-   * needs the whole block at once has to say so -- and this is that place:
-   * `Entity::SyncInterface` ships the block to the client verbatim.
-   *
-   * The cross-checks below pin the two spellings together so neither can drift
-   * while the duplicate stands. Folding the block into a real `mVarDat` member
-   * retires this alias for good; see the reconstruction report for the field
-   * map and the lanes whose types disagree.
-   */
-  [[nodiscard]] moho::SSTIEntityVariableData& EntityVariableDataBlock(moho::Entity& entity) noexcept
-  {
-    return *reinterpret_cast<moho::SSTIEntityVariableData*>(reinterpret_cast<std::uint8_t*>(&entity) + 0x78);
-  }
-
-  constexpr bool BlockLaneMatches(const std::size_t entityOffset, const std::size_t blockOffset) noexcept
-  {
-    return entityOffset == blockOffset + 0x78u;
-  }
-
-  static_assert(BlockLaneMatches(offsetof(moho::Entity, mMeshRef), offsetof(moho::SSTIEntityVariableData, mScmResource)));
-  static_assert(BlockLaneMatches(offsetof(moho::Entity, Health), offsetof(moho::SSTIEntityVariableData, mHealth)));
-  static_assert(BlockLaneMatches(offsetof(moho::Entity, Orientation), offsetof(moho::SSTIEntityVariableData, mCurTransform)));
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, PrevOrientation), offsetof(moho::SSTIEntityVariableData, mLastTransform))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, mAttachParentId), offsetof(moho::SSTIEntityVariableData, mAttachmentParentRef))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, mAttachedEntityIds), offsetof(moho::SSTIEntityVariableData, mAuxValueVector))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, mScrollBeatStart), offsetof(moho::SSTIEntityVariableData, mScroll0U))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, mScrollBeatEnd), offsetof(moho::SSTIEntityVariableData, mScroll1U))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, mAmbientSound), offsetof(moho::SSTIEntityVariableData, mAmbientSound))
-  );
-  static_assert(
-    BlockLaneMatches(offsetof(moho::Entity, IntelAttributes), offsetof(moho::SSTIEntityVariableData, mIntelAttributes))
-  );
-
-  /**
-   * Applies the defaults `SSTIEntityVariableData::SSTIEntityVariableData`
-   * (0x00558760) gives the lanes between +0xDC and +0x108 of the variable-data
-   * block the engine flattened into `Entity` at +0x78. Every binary `Entity`
-   * constructor gets them by calling that block's constructor outright
-   * (`Moho::SSTIEntityVariableData::SSTIEntityVariableData(&this->mVarDat)`);
-   * this reconstruction spells the rest of the block out as named `Entity`
-   * fields but leaves this run as a raw byte span, so nothing initialised it:
-   * the attachment-parent reference, the inline auxiliary-id vector and the four
-   * texture-scroll floats all started as whatever the allocator handed back.
-   * `UserEntity::Sync` copies those scroll floats straight into the mesh
-   * instance, and `Entity::SyncInterface` resizes the auxiliary vector through
-   * pointers that have to be the inline ones on the first call.
-   */
-  void ResetEntityVariableDataDefaults(moho::Entity& entity) noexcept
-  {
-    entity.mAttachParentId = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
-
-    entity.mAttachedEntityIds.mInlineStorage0 =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&entity.mAttachedEntityIds.mInlineStorage1));
-    entity.mAttachedEntityIds.mInlineStorage1 = 0u;
-    entity.mAttachedEntityIds.ResetToInlineStorage();
-
-    entity.mScrollBeatStart = Wm3::Vector2f{0.0f, 0.0f};
-    entity.mScrollBeatEnd = Wm3::Vector2f{0.0f, 0.0f};
-
-    // The block's tail, named as `Entity` fields here but the same words the
-    // binary's constructor writes at 0x00558801..0x0055882F.
-    //
-    // The two sound lanes are the ones that mattered: nothing initialised them,
-    // so every entity whose ambient sound is never set from Lua carried
-    // whatever the allocator left at +0x108. `Entity::SyncInterface` ships the
-    // whole block to the client, `UserEntity::UpdateEntityData` copies it into
-    // `mAmbientLoop.mParams`, and the sound beat then dereferences a pointer
-    // that was never a `CSndParams` -- committed memory, absent from the
-    // descriptor registry, with junk where `mResolvePolicy` and the engine
-    // weak_ptr should be.
-    entity.mAmbientSound = nullptr; // +0x90 (entity +0x108), `mov [eax+90h], ecx`
-    entity.mRumbleSound = nullptr;  // +0x94 (entity +0x10C), `mov [eax+94h], ecx`
-    entity.mVisibilityState = 0u;   // +0x98 (entity +0x110)
-
-    // +0x9C (entity +0x114) is the visibility mode, and its default is
-    // `MapPlayableRect`, not zero: `mov dword ptr [eax+9Ch], 2` at 0x00558813.
-    // Zero is not a value the enum has. An entity left holding it is neither
-    // `ReconGrid` nor anything else the client tests for, so
-    // `UserEntity::UpdateEntityData` never registers it for visibility updates
-    // and every consumer that switches on the mode falls out of its cases.
-    entity.mFootprintLayer = static_cast<std::int32_t>(moho::EUserEntityVisibilityMode::MapPlayableRect);
-
-    entity.mCurrentLayer = moho::LAYER_None; // +0xA0 (entity +0x118)
-    entity.mUseAltFootprint = 0u;            // +0xA4 (entity +0x11C)
-    entity.mUseAltFootprintSecondary = 0u;
-
-    // +0xB0..+0xCC (entity +0x128..+0x144): the eight intel lanes. `Unit`
-    // overwrites them from its blueprint, but a plain `Entity` never did, and
-    // the recon grid reads them for every entity.
-    entity.IntelAttributes.vision = 0u;
-    entity.IntelAttributes.waterVision = 0u;
-    entity.IntelAttributes.radar = 0u;
-    entity.IntelAttributes.sonar = 0u;
-    entity.IntelAttributes.omni = 0u;
-    entity.IntelAttributes.radarStealth = 0u;
-    entity.IntelAttributes.sonarStealth = 0u;
-    entity.IntelAttributes.cloak = 0u;
-  }
-
-  /**
    * Address: 0x00558EC0 (FUN_00558EC0, sub_558EC0) + 0x00559190 grow lane
    *
    * What it does:
@@ -1356,10 +1242,8 @@ namespace
     return h0 + (h1 - h0) * fracZ;
   }
 
-  [[nodiscard]] Wm3::Vector3f RotateVectorByQuaternion(const moho::Vector4f& q, const Wm3::Vector3f& v) noexcept
+  [[nodiscard]] Wm3::Vector3f RotateVectorByQuaternion(const Wm3::Quatf& quaternion, const Wm3::Vector3f& v) noexcept
   {
-    // Entity orientation is packed as (w,x,y,z) in Vector4f::x/y/z/w slots.
-    const Wm3::Quatf quaternion{q.x, q.y, q.z, q.w};
     Wm3::Vector3f out{};
     // Ground truth (FUN_00679CE0.c) rotates via
     // Moho::MultQuadVec(&v13, &v12, &this->mVarDat.mCurTransform.orient), not
@@ -1674,7 +1558,7 @@ namespace
       return;
     }
 
-    const moho::EntityTransformPayload current = moho::ReadEntityTransformPayload(entity.Orientation, entity.Position);
+    const moho::EntityTransformPayload current = moho::ReadEntityTransformPayload(entity.mVarDat.mCurTransform.orient_, entity.mVarDat.mCurTransform.pos_);
     entity.CollisionExtents->SetTransform(current);
     RelinkSpanFromCollisionPrimitive(entity.mCollisionCellSpan, entity.CollisionExtents);
     RefreshCollisionBoundsSnapshot(entity);
@@ -2308,7 +2192,7 @@ namespace moho
     archive->Read(CachedConstantDataType(), &id_, owner);
     archive->Read(CachedScriptObjectTypeForEntity(), static_cast<CScriptObject*>(this), owner);
     archive->Read(CachedTaskType(), static_cast<CTask*>(this), owner);
-    archive->Read(CachedVariableDataType(), &mMeshRef, owner);
+    archive->Read(CachedVariableDataType(), &mVarDat.mScmResource, owner);
 
     // Owning army (UNOWNED).
     auto* army = static_cast<SimArmy*>(ArmyRef);
@@ -2404,7 +2288,7 @@ namespace moho
     archive->Write(CachedTaskType(), static_cast<const CTask*>(this), owner);
 
     // Variable-data sub-object (+0x78); modeled flat, first field is mMeshRef.
-    archive->Write(CachedVariableDataType(), &mMeshRef, owner);
+    archive->Write(CachedVariableDataType(), &mVarDat.mScmResource, owner);
 
     // Owning army pointer (UNOWNED). CArmyImpl derives from SimArmy.
     gpg::RRef armyRef{};
@@ -2685,7 +2569,7 @@ namespace moho
     // does not already tear down through a named `Entity` member is the inline
     // auxiliary-id vector, which leaks its heap buffer once
     // `Entity::SyncInterface` has grown it past the inline capacity.
-    mAttachedEntityIds.ReleaseDynamicStorage();
+    mVarDat.mAuxValueVector.ReleaseDynamicStorage();
 
     // Decrement the Entity instance-count stat (binary FUN_006785D0 line 73:
     // _InterlockedExchangeAdd(&InstanceCounter<Entity>::GetStatItem()->mCounter, -1)).
@@ -2728,8 +2612,6 @@ namespace moho
     : CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
-    std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -2750,42 +2632,12 @@ namespace moho
     mTickCreated = 0u;
     mReserved74 = 0u;
 
-    mMeshRef = {};
-    mMeshTypeClassId = 0;
-
-    mDrawScaleX = 1.0f;
-    mDrawScaleY = 1.0f;
-    mDrawScaleZ = 1.0f;
-
-    Health = 0.0f;
-    MaxHealth = 0.0f;
-    BeingBuilt = 0u;
-    Dead = 0u;
-    DirtySyncState = 0u;
-    mDestroyedByKill = 0u;
-
-    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    Position = {0.0f, 0.0f, 0.0f};
-    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PrevPosition = {0.0f, 0.0f, 0.0f};
-    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
-    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
-    // The binary reaches them through that block's own constructor (0x00558760,
-    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
-    // body stores to either offset directly. Because this reconstruction spells
-    // the block out as individual `Entity` fields, no such constructor runs here
-    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
-    // zero pinned every entity's inter-tick interpolation alpha at the start
-    // transform, and it drove the per-instance `parameter` vertex lane --
-    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
-    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
-    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
-    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
-    // alone.
-    mVelocityScale = 1.0f;
-    FractionCompleted = 1.0f;
-
-    ResetEntityVariableDataDefaults(*this);
+    // +0x78 is `mVarDat`, and its own constructor (0x00558760) writes every
+    // default this body used to write by hand -- the unit scale, the 1.0f
+    // interpolation and fraction-complete lanes, the invalid attachment-parent
+    // sentinel, the inline auxiliary-id vector, `MapPlayableRect` and the
+    // zeroed intel lanes. The binary calls it from here too; MSVC emits the
+    // call from the member list, so there is no source line for it.
 
     SimulationRef = sim;
     ArmyRef = nullptr;
@@ -2845,8 +2697,6 @@ namespace moho
     : CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
-    std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -2867,42 +2717,12 @@ namespace moho
     mTickCreated = 0u;
     mReserved74 = 0u;
 
-    mMeshRef = {};
-    mMeshTypeClassId = 0;
-
-    mDrawScaleX = 1.0f;
-    mDrawScaleY = 1.0f;
-    mDrawScaleZ = 1.0f;
-
-    Health = 0.0f;
-    MaxHealth = 0.0f;
-    BeingBuilt = 0u;
-    Dead = 0u;
-    DirtySyncState = 0u;
-    mDestroyedByKill = 0u;
-
-    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    Position = {0.0f, 0.0f, 0.0f};
-    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PrevPosition = {0.0f, 0.0f, 0.0f};
-    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
-    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
-    // The binary reaches them through that block's own constructor (0x00558760,
-    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
-    // body stores to either offset directly. Because this reconstruction spells
-    // the block out as individual `Entity` fields, no such constructor runs here
-    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
-    // zero pinned every entity's inter-tick interpolation alpha at the start
-    // transform, and it drove the per-instance `parameter` vertex lane --
-    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
-    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
-    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
-    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
-    // alone.
-    mVelocityScale = 1.0f;
-    FractionCompleted = 1.0f;
-
-    ResetEntityVariableDataDefaults(*this);
+    // +0x78 is `mVarDat`, and its own constructor (0x00558760) writes every
+    // default this body used to write by hand -- the unit scale, the 1.0f
+    // interpolation and fraction-complete lanes, the invalid attachment-parent
+    // sentinel, the inline auxiliary-id vector, `MapPlayableRect` and the
+    // zeroed intel lanes. The binary calls it from here too; MSVC emits the
+    // call from the member list, so there is no source line for it.
 
     SimulationRef = nullptr;
     ArmyRef = nullptr;
@@ -2945,8 +2765,6 @@ namespace moho
     : CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
-    std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -2973,42 +2791,12 @@ namespace moho
     mTickCreated = 0u;
     mReserved74 = 0u;
 
-    mMeshRef = {};
-    mMeshTypeClassId = 0;
-
-    mDrawScaleX = 1.0f;
-    mDrawScaleY = 1.0f;
-    mDrawScaleZ = 1.0f;
-
-    Health = 0.0f;
-    MaxHealth = 0.0f;
-    BeingBuilt = 0u;
-    Dead = 0u;
-    DirtySyncState = 0u;
-    mDestroyedByKill = 0u;
-
-    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    Position = {0.0f, 0.0f, 0.0f};
-    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PrevPosition = {0.0f, 0.0f, 0.0f};
-    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
-    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
-    // The binary reaches them through that block's own constructor (0x00558760,
-    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
-    // body stores to either offset directly. Because this reconstruction spells
-    // the block out as individual `Entity` fields, no such constructor runs here
-    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
-    // zero pinned every entity's inter-tick interpolation alpha at the start
-    // transform, and it drove the per-instance `parameter` vertex lane --
-    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
-    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
-    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
-    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
-    // alone.
-    mVelocityScale = 1.0f;
-    FractionCompleted = 1.0f;
-
-    ResetEntityVariableDataDefaults(*this);
+    // +0x78 is `mVarDat`, and its own constructor (0x00558760) writes every
+    // default this body used to write by hand -- the unit scale, the 1.0f
+    // interpolation and fraction-complete lanes, the invalid attachment-parent
+    // sentinel, the inline auxiliary-id vector, `MapPlayableRect` and the
+    // zeroed intel lanes. The binary calls it from here too; MSVC emits the
+    // call from the member list, so there is no source line for it.
 
     SimulationRef = nullptr;
     ArmyRef = nullptr;
@@ -3057,8 +2845,6 @@ namespace moho
     : CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
-    std::memset(pad_011E, 0, sizeof(pad_011E));
-    std::memset(&IntelAttributes, 0, sizeof(IntelAttributes));
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -3079,42 +2865,12 @@ namespace moho
     mTickCreated = 0u;
     mReserved74 = 0u;
 
-    mMeshRef = {};
-    mMeshTypeClassId = 0;
-
-    mDrawScaleX = 1.0f;
-    mDrawScaleY = 1.0f;
-    mDrawScaleZ = 1.0f;
-
-    Health = 0.0f;
-    MaxHealth = 0.0f;
-    BeingBuilt = 0u;
-    Dead = 0u;
-    DirtySyncState = 0u;
-    mDestroyedByKill = 0u;
-
-    Orientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    Position = {0.0f, 0.0f, 0.0f};
-    PrevOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PrevPosition = {0.0f, 0.0f, 0.0f};
-    // +0xD4 and +0xD8 are the `mCurImpactValue` / `mFractionComplete` lanes of the
-    // `SSTIEntityVariableData` block the engine flattened into `Entity` at +0x78.
-    // The binary reaches them through that block's own constructor (0x00558760,
-    // `movss [eax+5Ch]` and `[eax+60h]`, both from 1.0f) -- no `Entity::Entity`
-    // body stores to either offset directly. Because this reconstruction spells
-    // the block out as individual `Entity` fields, no such constructor runs here
-    // and the two defaults have to be written by hand. They are 1.0f, not 0.0f:
-    // zero pinned every entity's inter-tick interpolation alpha at the start
-    // transform, and it drove the per-instance `parameter` vertex lane --
-    // `material.g` in mesh.fx, which every `*Alpha` technique multiplies into its
-    // alpha-test value -- to zero, so alpha-tested meshes (props: trees, rocks)
-    // failed `AlphaFunc = Greater, AlphaRef = 0x80` on every pixel and drew
-    // nothing while still casting shadows, `DepthPS` clipping on albedo alpha
-    // alone.
-    mVelocityScale = 1.0f;
-    FractionCompleted = 1.0f;
-
-    ResetEntityVariableDataDefaults(*this);
+    // +0x78 is `mVarDat`, and its own constructor (0x00558760) writes every
+    // default this body used to write by hand -- the unit scale, the 1.0f
+    // interpolation and fraction-complete lanes, the invalid attachment-parent
+    // sentinel, the inline auxiliary-id vector, `MapPlayableRect` and the
+    // zeroed intel lanes. The binary calls it from here too; MSVC emits the
+    // call from the member list, so there is no source line for it.
 
     SimulationRef = nullptr;
     ArmyRef = nullptr;
@@ -3162,8 +2918,8 @@ namespace moho
     mTickCreated = sim ? sim->mCurTick : 0u;
     mReserved74 = 0u;
 
-    Dead = 0u;
-    mCurrentLayer = LAYER_None;
+    mVarDat.mIsDead = 0u;
+    mVarDat.mLayerMask = LAYER_None;
     mPendingVelocityScale = 1.0f;
     mLastTickProcessed = 0u;
     mQueueRelinkBlocked = 0u;
@@ -3323,7 +3079,7 @@ namespace moho
    */
   int Entity::GetBoneCount() const
   {
-    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    auto* const scmResource = mVarDat.mScmResource.get();
     if (scmResource == nullptr) {
       return 0;
     }
@@ -3346,7 +3102,7 @@ namespace moho
    */
   const char* Entity::GetBoneName(const std::uint32_t boneIndex) const
   {
-    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    auto* const scmResource = mVarDat.mScmResource.get();
     if (scmResource == nullptr) {
       return nullptr;
     }
@@ -3370,7 +3126,7 @@ namespace moho
    */
   boost::SharedPtrRaw<RScmResource> Entity::GetMesh() const
   {
-    const auto* const source = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&mMeshRef);
+    const auto* const source = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&mVarDat.mScmResource);
     boost::SharedPtrRaw<RScmResource> result{};
     result.px = source->px;
     result.pi = source->pi;
@@ -3389,7 +3145,7 @@ namespace moho
    */
   bool Entity::IsInBounds(const bool wholeMap, const float border) const
   {
-    return SimulationRef->mMapData->IsWithin(Position, border, wholeMap);
+    return SimulationRef->mMapData->IsWithin(mVarDat.mCurTransform.pos_, border, wholeMap);
   }
 
   /**
@@ -3412,7 +3168,7 @@ namespace moho
    */
   int Entity::ResolveBoneIndex(const char* const boneName) const
   {
-    auto* const scmResource = static_cast<RScmResource*>(mMeshRef.mObj);
+    auto* const scmResource = mVarDat.mScmResource.get();
     if (scmResource == nullptr) {
       return -1;
     }
@@ -3431,7 +3187,7 @@ namespace moho
    */
   bool Entity::IsBeingBuilt() const
   {
-    return BeingBuilt != 0u;
+    return mVarDat.mIsBeingBuilt != 0u;
   }
 
   /**
@@ -3444,7 +3200,7 @@ namespace moho
   {
     UpdateVisibility();
 
-    if (mOnDestroyDispatched != 0u || mVisibilityState == 0u) {
+    if (mOnDestroyDispatched != 0u || mVarDat.mVisibilityHidden == 0u) {
       if (mInterfaceCreated != 0u) {
         DestroyInterface(syncData);
       }
@@ -3455,7 +3211,7 @@ namespace moho
       SyncInterface(syncData);
     }
 
-    DirtySyncState = 0u;
+    mVarDat.mRequestRefreshUI = 0u;
 
     if (mQueueRelinkBlocked == 0u) {
       mCoordNode.ListUnlink();
@@ -3486,12 +3242,9 @@ namespace moho
   {
     static_cast<void>(allowExplicitPlaceholder);
 
-    auto& meshSharedLane = *reinterpret_cast<boost::SharedPtrRaw<RScmResource>*>(&mMeshRef);
-    auto& meshBlueprintSlot = *reinterpret_cast<RMeshBlueprint**>(&mMeshTypeClassId);
-
     if (meshResId.name.empty()) {
-      meshSharedLane.release();
-      meshBlueprintSlot = nullptr;
+      boost::ReleaseSharedResource(mVarDat.mScmResource);
+      mVarDat.mMeshBlueprint = nullptr;
       return;
     }
 
@@ -3501,26 +3254,18 @@ namespace moho
       return;
     }
 
-    {
-      const boost::shared_ptr<RScmResource> resolvedMesh = meshBlueprint->GetMesh();
-      const auto& sourceLane =
-        *reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&resolvedMesh);
-      meshSharedLane.assign_retain(sourceLane);
-    }
+    boost::AssignSharedResource(mVarDat.mScmResource, meshBlueprint->GetMesh());
 
-    if (meshSharedLane.px != nullptr) {
-      meshBlueprintSlot = meshBlueprint;
+    if (boost::HasSharedResource(mVarDat.mScmResource)) {
+      mVarDat.mMeshBlueprint = meshBlueprint;
       return;
     }
 
     if (explicitPlaceholder != nullptr) {
-      const boost::shared_ptr<RScmResource> placeholderMesh = explicitPlaceholder->GetMesh();
-      const auto& placeholderLane =
-        *reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&placeholderMesh);
-      (void)boost::AssignSharedPtrRScmResourceWeak(&placeholderLane, &meshSharedLane);
+      boost::AssignSharedResource(mVarDat.mScmResource, explicitPlaceholder->GetMesh());
 
-      if (meshSharedLane.px != nullptr) {
-        meshBlueprintSlot = explicitPlaceholder;
+      if (boost::HasSharedResource(mVarDat.mScmResource)) {
+        mVarDat.mMeshBlueprint = explicitPlaceholder;
         return;
       }
 
@@ -3562,8 +3307,8 @@ namespace moho
    */
   void Entity::UpdateScrollPos(const Wm3::Vec2f& scrollPosition)
   {
-    mScrollBeatStart = scrollPosition;
-    mScrollBeatEnd = scrollPosition;
+    mVarDat.mScrollBeatStart = scrollPosition;
+    mVarDat.mScrollBeatEnd = scrollPosition;
   }
 
   /**
@@ -3575,10 +3320,10 @@ namespace moho
    */
   void Entity::UpdateScroll(const Wm3::Vec2f& scrollDelta)
   {
-    const Wm3::Vec2f beatEnd = mScrollBeatEnd;
-    mScrollBeatStart = beatEnd;
-    mScrollBeatEnd.x = beatEnd.x + scrollDelta.x;
-    mScrollBeatEnd.y = beatEnd.y + scrollDelta.y;
+    const Wm3::Vec2f beatEnd = mVarDat.mScrollBeatEnd;
+    mVarDat.mScrollBeatStart = beatEnd;
+    mVarDat.mScrollBeatEnd.x = beatEnd.x + scrollDelta.x;
+    mVarDat.mScrollBeatEnd.y = beatEnd.y + scrollDelta.y;
   }
 
   /**
@@ -3589,7 +3334,7 @@ namespace moho
    */
   void Entity::StopScroll()
   {
-    mScrollBeatEnd = mScrollBeatStart;
+    mVarDat.mScrollBeatEnd = mVarDat.mScrollBeatStart;
   }
 
   /**
@@ -3601,9 +3346,9 @@ namespace moho
    */
   void Entity::SetAnimScroll(const float scrollX, const float scrollY)
   {
-    mScrollBeatStart = mScrollBeatEnd;
-    mScrollBeatEnd.x = scrollX;
-    mScrollBeatEnd.y = scrollY;
+    mVarDat.mScrollBeatStart = mVarDat.mScrollBeatEnd;
+    mVarDat.mScrollBeatEnd.x = scrollX;
+    mVarDat.mScrollBeatEnd.y = scrollY;
   }
 
   /**
@@ -3614,8 +3359,8 @@ namespace moho
    */
   void Entity::SetAmbientSound(CSndParams* const detailSound, CSndParams* const rumbleSound)
   {
-    mAmbientSound = detailSound;
-    mRumbleSound = rumbleSound;
+    mVarDat.mAmbientSound = detailSound;
+    mVarDat.mRumbleSound = rumbleSound;
   }
 
   /**
@@ -3635,9 +3380,9 @@ namespace moho
   Wm3::Vec3f Entity::GetVelocity() const
   {
     Wm3::Vec3f velocity{};
-    velocity.x = (Position.x - PrevPosition.x) * mVelocityScale;
-    velocity.y = (Position.y - PrevPosition.y) * mVelocityScale;
-    velocity.z = (Position.z - PrevPosition.z) * mVelocityScale;
+    velocity.x = (mVarDat.mCurTransform.pos_.x - mVarDat.mLastTransform.pos_.x) * mVarDat.mCurImpactValue;
+    velocity.y = (mVarDat.mCurTransform.pos_.y - mVarDat.mLastTransform.pos_.y) * mVarDat.mCurImpactValue;
+    velocity.z = (mVarDat.mCurTransform.pos_.z - mVarDat.mLastTransform.pos_.z) * mVarDat.mCurImpactValue;
     return velocity;
   }
 
@@ -3695,7 +3440,7 @@ namespace moho
    */
   VTransform Entity::GetBoneWorldTransform(const int boneIndex) const
   {
-    VTransform result = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(Orientation, Position));
+    VTransform result = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_));
 
     if (boneIndex != -1 || !BluePrint) {
       return result;
@@ -3706,7 +3451,7 @@ namespace moho
       BluePrint->mCollisionOffsetY + BluePrint->mSizeY * 0.5f,
       BluePrint->mCollisionOffsetZ,
     };
-    const Wm3::Vector3f rotatedOffset = RotateVectorByQuaternion(Orientation, localAnchor);
+    const Wm3::Vector3f rotatedOffset = RotateVectorByQuaternion(mVarDat.mCurTransform.orient_, localAnchor);
     result.pos_.x += rotatedOffset.x;
     result.pos_.y += rotatedOffset.y;
     result.pos_.z += rotatedOffset.z;
@@ -3816,7 +3561,7 @@ namespace moho
     auto& shooters = mShooters.mVec;
     for (Entity** it = shooters.begin(); it != shooters.end();) {
       Entity* const shooter = *it;
-      if (shooter == nullptr || shooter->DestroyQueuedFlag != 0u || shooter->Dead != 0u) {
+      if (shooter == nullptr || shooter->DestroyQueuedFlag != 0u || shooter->mVarDat.mIsDead != 0u) {
         it = shooters.erase(it, it + 1);
       } else {
         ++it;
@@ -3838,9 +3583,9 @@ namespace moho
     }
 
     const Wm3::Vec3f probePosition{
-      Position.x,
-      Position.y + 1.0f,
-      Position.z,
+      mVarDat.mCurTransform.pos_.x,
+      mVarDat.mCurTransform.pos_.y + 1.0f,
+      mVarDat.mCurTransform.pos_.z,
     };
     mIntelManager->Update(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
   }
@@ -3885,7 +3630,7 @@ namespace moho
     delete oldBody;
 
     if (cachedBody != nullptr) {
-      const VTransform transform = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(Orientation, Position));
+      const VTransform transform = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_));
       cachedBody->SetTransform(transform);
     }
 
@@ -3941,7 +3686,7 @@ namespace moho
     AdvanceCoords();
 
     if (mIntelManager && SimulationRef) {
-      const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
+      const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
       const Wm3::Vec3f probePosition{
         current.posX,
         current.posY + 1.0f,
@@ -4095,17 +3840,18 @@ namespace moho
     constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
 
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();
-    mAttachParentId = parent ? parent->id_ : kInvalidEntityId;
+    mVarDat.mAttachmentParentRef = parent ? parent->id_ : kInvalidEntityId;
 
-    ResizeAndFillAuxValueVector(mAttachedEntityIds, mAttachedEntities.size(), kInvalidEntityId);
+    ResizeAndFillAuxValueVector(mVarDat.mAuxValueVector, mAttachedEntities.size(), kInvalidEntityId);
     for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
       Entity* const child = mAttachedEntities[i];
-      mAttachedEntityIds.mBegin[i] = child ? child->id_ : kInvalidEntityId;
+      mVarDat.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
     }
 
-    // The whole block goes to the client verbatim; this is the one place that
-    // needs it as an `SSTIEntityVariableData` rather than as named lanes.
-    (void)QueueEntityVariableUpdate(syncData, id_, EntityVariableDataBlock(*this));
+    // The whole block goes to the client verbatim. It is a plain member now, so
+    // this is an ordinary argument rather than the `(char*)this + 0x78` cast the
+    // flattened spelling forced.
+    (void)QueueEntityVariableUpdate(syncData, id_, mVarDat);
   }
 
   /**
@@ -4266,7 +4012,7 @@ namespace moho
       return 0.0f;
     }
 
-    const float previousFraction = FractionCompleted;
+    const float previousFraction = mVarDat.mFractionComplete;
     float nextFraction = previousFraction + delta;
     float healthFloor = 0.0f;
 
@@ -4281,14 +4027,14 @@ namespace moho
       if (nextFraction < 0.0f) {
         nextFraction = 0.0f;
       }
-      healthFloor = Health / MaxHealth;
+      healthFloor = mVarDat.mHealth / mVarDat.mMaxHealth;
     }
 
     if (healthFloor > nextFraction) {
       nextFraction = healthFloor;
     }
 
-    FractionCompleted = nextFraction;
+    mVarDat.mFractionComplete = nextFraction;
     return nextFraction - previousFraction;
   }
 
@@ -4307,11 +4053,11 @@ namespace moho
     // The binary divides by MaxHealth unconditionally -- there is no MaxHealth<=0
     // guard in the original; callers guarantee a positive MaxHealth for a live
     // entity. The two health fractions are quantized to 0.25 steps via floor().
-    const float invMaxHealth = 1.0f / MaxHealth;
+    const float invMaxHealth = 1.0f / mVarDat.mMaxHealth;
     const float nextBucket = std::floor(invMaxHealth * newHealth * 4.0f) * 0.25f;
-    const float prevBucket = std::floor(invMaxHealth * Health * 4.0f) * 0.25f;
+    const float prevBucket = std::floor(invMaxHealth * mVarDat.mHealth * 4.0f) * 0.25f;
 
-    Health = newHealth;
+    mVarDat.mHealth = newHealth;
 
     SimulationRef->Logf(
       "Entity[0x%08x]->SetHealth(%.1f [0x%08x])\n",
@@ -4357,13 +4103,13 @@ namespace moho
     // binary at 0x006798A4-0x006798DB.
     CSimConVarInstanceBase* const noDamageVar = SimulationRef->GetSimVar(GetNoDamageSimConVar());
     const bool noDamage = *static_cast<const std::uint8_t*>(noDamageVar->GetValueStorage()) != 0;
-    if ((noDamage && delta < 0.0f) || (Dead && delta > 0.0f)) {
+    if ((noDamage && delta < 0.0f) || (mVarDat.mIsDead && delta > 0.0f)) {
       return;
     }
 
-    float next = Health + delta;
-    if (next > MaxHealth) {
-      next = MaxHealth;
+    float next = mVarDat.mHealth + delta;
+    if (next > mVarDat.mMaxHealth) {
+      next = mVarDat.mMaxHealth;
     }
     if (next < 0.0f) {
       next = 0.0f;
@@ -4373,10 +4119,10 @@ namespace moho
       if (delta < 0.0f && sAdjProbe++ < 40) {
         gpg::Warnf("[DMGDIAG] AdjustHealth this=%p isUnit=%d health=%.2f maxHealth=%.2f delta=%.2f next=%.2f willSet=%d",
                    static_cast<void*>(this), (IsUnit() != nullptr) ? 1 : 0,
-                   Health, MaxHealth, delta, next, (next != Health) ? 1 : 0);
+                   mVarDat.mHealth, mVarDat.mMaxHealth, delta, next, (next != mVarDat.mHealth) ? 1 : 0);
       }
     }
-    if (next != Health) {
+    if (next != mVarDat.mHealth) {
       SetHealth(next);
     }
   }
@@ -4411,8 +4157,8 @@ namespace moho
       }
     }
 
-    DirtySyncState = 1;
-    Dead = 1;
+    mVarDat.mRequestRefreshUI = 1;
+    mVarDat.mIsDead = 1;
   }
 
   /**
@@ -4503,7 +4249,7 @@ namespace moho
     }
 
     auto* collision = CollisionExtents;
-    const EntityTransformPayload current = ReadEntityTransformPayload(Orientation, Position);
+    const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
     collision->SetTransform(current);
     RelinkSpanFromCollisionPrimitive(mCollisionCellSpan, collision);
     UpdateAABox();
@@ -4694,7 +4440,7 @@ namespace moho
 
   void Entity::MarkNeedsSyncGameData() noexcept
   {
-    DirtySyncState = 1;
+    mVarDat.mRequestRefreshUI = 1;
   }
 
 
@@ -4709,9 +4455,9 @@ namespace moho
     const Entity* const entity
   ) noexcept
   {
-    outScale->x = entity->mDrawScaleX;
-    outScale->y = entity->mDrawScaleY;
-    outScale->z = entity->mDrawScaleZ;
+    outScale->x = entity->mVarDat.mScale.x;
+    outScale->y = entity->mVarDat.mScale.y;
+    outScale->z = entity->mVarDat.mScale.z;
     return outScale;
   }
 
@@ -4727,9 +4473,9 @@ namespace moho
     const Wm3::Vector3f* const drawScale
   ) noexcept
   {
-    entity->mDrawScaleX = drawScale->x;
-    entity->mDrawScaleY = drawScale->y;
-    entity->mDrawScaleZ = drawScale->z;
+    entity->mVarDat.mScale.x = drawScale->x;
+    entity->mVarDat.mScale.y = drawScale->y;
+    entity->mVarDat.mScale.z = drawScale->z;
 
     TDatListItem<Entity, void>* const node = &entity->mCoordNode;
     TDatListItem<Entity, void>* const head = &entity->SimulationRef->mCoordEntities;
@@ -4811,7 +4557,7 @@ namespace moho
       throw std::runtime_error("Attempt to get footprint on nameless entity");
     }
 
-    const bool useAlt = (mUseAltFootprint != 0u) || (mUseAltFootprintSecondary != 0u);
+    const bool useAlt = (mVarDat.mUsingAltFootprint != 0u) || (mVarDat.mUsingAltFootprintSecondary != 0u);
     return useAlt ? BluePrint->mAltFootprint : BluePrint->mFootprint;
   }
 
@@ -4823,8 +4569,8 @@ namespace moho
    */
   void Entity::SetCurrentLayer(const ELayer newLayer)
   {
-    const ELayer oldLayer = mCurrentLayer;
-    mCurrentLayer = newLayer;
+    const ELayer oldLayer = mVarDat.mLayerMask;
+    mVarDat.mLayerMask = newLayer;
     if (newLayer == oldLayer) {
       return;
     }
@@ -4874,7 +4620,7 @@ namespace moho
   void Entity::SetStrategicUnderlay(const RResId& underlayId)
   {
     if (underlayId.name.empty()) {
-      mStrategicUnderlayTexture.reset();
+      mVarDat.mUnderlayTexture.reset();
       return;
     }
 
@@ -4887,7 +4633,7 @@ namespace moho
     underlayPath.append(underlayName, std::strlen(underlayName));
     underlayPath.append("_rest.dds", 9u);
 
-    mStrategicUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
+    mVarDat.mUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
 
     mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
@@ -4902,11 +4648,11 @@ namespace moho
    */
   void Entity::SetStrategicUnderlay(boost::shared_ptr<CD3DBatchTexture> underlayTexture)
   {
-    if (mStrategicUnderlayTexture.get() == underlayTexture.get()) {
+    if (mVarDat.mUnderlayTexture.get() == underlayTexture.get()) {
       return;
     }
 
-    mStrategicUnderlayTexture = underlayTexture;
+    mVarDat.mUnderlayTexture = underlayTexture;
   }
 
   /**
@@ -4918,17 +4664,17 @@ namespace moho
    */
   boost::shared_ptr<CD3DBatchTexture> Entity::GetStrategicUnderlay() const
   {
-    return mStrategicUnderlayTexture;
+    return mVarDat.mUnderlayTexture;
   }
 
   Wm3::Vec3f const& Entity::GetPositionWm3() const noexcept
   {
-    return *reinterpret_cast<Wm3::Vec3f const*>(&Position);
+    return *reinterpret_cast<Wm3::Vec3f const*>(&mVarDat.mCurTransform.pos_);
   }
 
   VTransform const& Entity::GetTransformWm3() const noexcept
   {
-    return *reinterpret_cast<VTransform const*>(&Orientation);
+    return *reinterpret_cast<VTransform const*>(&mVarDat.mCurTransform.orient_);
   }
 
   /**
@@ -4977,7 +4723,7 @@ namespace moho
    */
   void Entity::AdvanceCoords()
   {
-    const EntityTransformPayload previous = ReadEntityTransformPayload(Orientation, Position);
+    const EntityTransformPayload previous = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
     const EntityTransformPayload current = ReadEntityTransformPayload(PendingOrientation, PendingPosition);
 
     // TEMPORARY PROBE (do not commit). A flying transport's Entity::Position
@@ -5017,9 +4763,9 @@ namespace moho
       }
     }
 
-    WriteEntityTransformPayload(PrevOrientation, PrevPosition, previous);
-    WriteEntityTransformPayload(Orientation, Position, current);
-    mVelocityScale = mPendingVelocityScale;
+    WriteEntityTransformPayload(mVarDat.mLastTransform.orient_, mVarDat.mLastTransform.pos_, previous);
+    WriteEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_, current);
+    mVarDat.mCurImpactValue = mPendingVelocityScale;
 
     if (mPositionHistory) {
       RecordEntityPositionHistory(*mPositionHistory, previous, current);
@@ -5071,8 +4817,8 @@ namespace moho
     // This comment used to say "flagged not-visible" while the code beside it
     // set 1. The code was right.
     if (ArmyRef == nullptr) {
-      mFootprintLayer = mVizToNeutrals;
-      mVisibilityState = 1;
+      mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToNeutrals);
+      mVarDat.mVisibilityHidden = 1;
       return;
     }
 
@@ -5094,12 +4840,12 @@ namespace moho
 
       switch (ArmyRef->GetAllianceWith(focusArmyImpl)) {
         case ALLIANCE_Neutral:
-          mFootprintLayer = mVizToNeutrals;
-          mVisibilityState = static_cast<std::uint8_t>(mVizToNeutrals != VIZMODE_Never);
+          mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToNeutrals);
+          mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToNeutrals != VIZMODE_Never);
           return;
         case ALLIANCE_Ally:
-          mFootprintLayer = mVizToAllies;
-          mVisibilityState = static_cast<std::uint8_t>(mVizToAllies != VIZMODE_Never);
+          mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(mVizToAllies);
+          mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(mVizToAllies != VIZMODE_Never);
           return;
         case ALLIANCE_Enemy:
           viz = mVizToEnemies;
@@ -5113,8 +4859,8 @@ namespace moho
       }
     }
 
-    mFootprintLayer = viz;
-    mVisibilityState = static_cast<std::uint8_t>(viz != VIZMODE_Never);
+    mVarDat.mVisibilityMode = static_cast<EUserEntityVisibilityMode>(viz);
+    mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(viz != VIZMODE_Never);
   }
 
   /**
@@ -5516,7 +5262,7 @@ namespace moho
     Sim* const sim = lua_getglobaluserdata(rawState);
     if (sim != nullptr) {
       moho::SCamShakeParams request{};
-      request.mCenter = entity->Position;
+      request.mCenter = entity->mVarDat.mCurTransform.pos_;
       request.mMaxRange = radius;
       request.mMagnitudeAtCenter = maxIntensity;
       request.mMagnitudeAtMaxRange = minIntensity;
@@ -6172,7 +5918,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    entity->DirtySyncState = 1;
+    entity->mVarDat.mRequestRefreshUI = 1;
     return 0;
   }
 
@@ -6541,8 +6287,8 @@ namespace moho
       rumbleSound = *func_GetCObj_CSndParams(rumbleObject);
     }
 
-    entity->mAmbientSound = ambientSound;
-    entity->mRumbleSound = rumbleSound;
+    entity->mVarDat.mAmbientSound = ambientSound;
+    entity->mVarDat.mRumbleSound = rumbleSound;
     return 0;
   }
 
@@ -6592,7 +6338,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    lua_pushnumber(rawState, entity->FractionCompleted);
+    lua_pushnumber(rawState, entity->mVarDat.mFractionComplete);
     return 1;
   }
 
@@ -6714,7 +6460,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    lua_pushnumber(rawState, entity->Health);
+    lua_pushnumber(rawState, entity->mVarDat.mHealth);
     return 1;
   }
 
@@ -6764,7 +6510,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    lua_pushnumber(rawState, entity->MaxHealth);
+    lua_pushnumber(rawState, entity->mVarDat.mMaxHealth);
     return 1;
   }
 
@@ -6827,7 +6573,7 @@ namespace moho
       healthArg.TypeError("number");
     }
     const float targetHealth = static_cast<float>(lua_tonumber(rawState, 3));
-    entity->AdjustHealth(instigator, targetHealth - entity->Health);
+    entity->AdjustHealth(instigator, targetHealth - entity->mVarDat.mHealth);
     return 0;
   }
 
@@ -6882,7 +6628,7 @@ namespace moho
     if (lua_type(rawState, 2) != LUA_TNUMBER) {
       maxHealthArg.TypeError("number");
     }
-    entity->MaxHealth = static_cast<float>(lua_tonumber(rawState, 2));
+    entity->mVarDat.mMaxHealth = static_cast<float>(lua_tonumber(rawState, 2));
     return 0;
   }
 
@@ -7408,7 +7154,7 @@ namespace moho
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
-    const EntityTransformPayload current = ReadEntityTransformPayload(entity->Orientation, entity->Position);
+    const EntityTransformPayload current = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
     Wm3::Quaternionf orientation{};
     orientation.w = current.quatW;
     orientation.x = current.quatX;
@@ -7467,7 +7213,7 @@ namespace moho
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
-    const EntityTransformPayload current = ReadEntityTransformPayload(entity->Orientation, entity->Position);
+    const EntityTransformPayload current = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
     const float numerator = 2.0f * ((current.quatW * current.quatY) + (current.quatX * current.quatZ));
     const float denominator = 1.0f - (2.0f * ((current.quatZ * current.quatZ) + (current.quatY * current.quatY)));
     const double heading = std::atan2(static_cast<double>(numerator), static_cast<double>(denominator));
@@ -7735,7 +7481,7 @@ namespace moho
       meshResourceId.name = normalizedPath;
       entity->SetMesh(meshResourceId, nullptr, allowExplicitPlaceholder);
 
-      if (!meshResourcePath.empty() && entity->mMeshRef.mObj == nullptr) {
+      if (!meshResourcePath.empty() && !boost::HasSharedResource(entity->mVarDat.mScmResource)) {
         LuaPlus::LuaState::Error(state, "SetMesh failed with %s", meshResourcePath.raw_data_unsafe());
       }
     }
@@ -8259,7 +8005,7 @@ namespace moho
       excessDamageRatio = static_cast<float>(lua_tonumber(rawState, 4));
     }
 
-    if (entity != nullptr && entity->Dead != 0u) {
+    if (entity != nullptr && entity->mVarDat.mIsDead != 0u) {
       return 0;
     }
 

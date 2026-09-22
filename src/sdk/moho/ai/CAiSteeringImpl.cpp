@@ -243,19 +243,19 @@ namespace
     const float lateralExtent = (sizeX + sizeZ) * 0.25f;
     const float forwardExtent = inflatedLength * 0.5f;
 
-    const Vector4f& q = unit.Orientation;
-    const float qx = q.x;
-    const float qy = q.y;
-    const float qz = q.z;
-    const float qw = q.w;
+    // The rotation matrix's third and first columns, flattened to the XZ plane.
+    // These four locals used to be named qx/qy/qz/qw while holding, in order,
+    // w/x/y/z -- the orientation lane was typed `moho::Vector4f` over
+    // `Wm3::Quatf` bytes. The arithmetic was right; only the names were not.
+    const Wm3::Quatf& q = unit.mVarDat.mCurTransform.orient_;
 
     const Wm3::Vector2f forward = Wm3::Vector2f::NormalizeOrZero({
-      ((qx * qz) + (qw * qy)) * 2.0f,
-      1.0f - ((qz * qz + qy * qy) * 2.0f),
+      ((q.x * q.z) + (q.w * q.y)) * 2.0f,
+      1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f),
     });
     const Wm3::Vector2f right = Wm3::Vector2f::NormalizeOrZero({
-      1.0f - ((qw * qw + qz * qz) * 2.0f),
-      ((qw * qy) - (qx * qz)) * 2.0f,
+      1.0f - (((q.y * q.y) + (q.z * q.z)) * 2.0f),
+      ((q.z * q.x) - (q.w * q.y)) * 2.0f,
     });
 
     CollisionObb2D out{};
@@ -625,7 +625,7 @@ namespace
         continue;
       }
 
-      if (candidate->mCurrentLayer == owner->mCurrentLayer && !owner->IsHigherPriorityThan(candidate)) {
+      if (candidate->mVarDat.mLayerMask == owner->mVarDat.mLayerMask && !owner->IsHigherPriorityThan(candidate)) {
         deferred.PushBack(candidate);
         continue;
       }
@@ -857,7 +857,7 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
 {
   if (!candidate || candidate->IsDead() || candidate->DestroyQueued() || candidate == &owner ||
       !candidate->IsMobile() ||
-      (mode == 1 && Wm3::Vector3f::Compare(&candidate->Position, &candidate->PrevPosition))) {
+      (mode == 1 && Wm3::Vector3f::Compare(&candidate->mVarDat.mCurTransform.pos_, &candidate->mVarDat.mLastTransform.pos_))) {
     return true;
   }
 
@@ -865,11 +865,11 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
     return true;
   }
 
-  if (owner.mCurrentLayer != candidate->mCurrentLayer || (owner.mIsNaval && !candidate->mIsNaval)) {
+  if (owner.mVarDat.mLayerMask != candidate->mVarDat.mLayerMask || (owner.mIsNaval && !candidate->mIsNaval)) {
     return true;
   }
 
-  if (candidate->mIsAir && (candidate->mCurrentLayer == LAYER_Air || candidate->AiTransport != nullptr)) {
+  if (candidate->mIsAir && (candidate->mVarDat.mLayerMask == LAYER_Air || candidate->AiTransport != nullptr)) {
     return true;
   }
 
@@ -1410,7 +1410,7 @@ void CAiSteeringImpl::CheckCollisions()
   }
 
   if (mOwnerUnit->IsDead() || mOwnerUnit->DestroyQueued() || mOwnerUnit->IsBeingBuilt() ||
-      mOwnerUnit->mCurrentLayer == LAYER_Sub) {
+      mOwnerUnit->mVarDat.mLayerMask == LAYER_Sub) {
     return;
   }
 

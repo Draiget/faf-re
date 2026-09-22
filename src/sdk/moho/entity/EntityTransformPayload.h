@@ -8,6 +8,9 @@ namespace Wm3
   template <class T>
   class Vector3;
   using Vector3f = Vector3<float>;
+  template <class T>
+  class Quaternion;
+  using Quatf = Quaternion<float>;
 } // namespace Wm3
 
 namespace gpg
@@ -31,10 +34,15 @@ namespace moho
    */
   struct EntityTransformPayload
   {
-    float quatW; // Entity::Vector4f.x lane
-    float quatX; // Entity::Vector4f.y lane
-    float quatY; // Entity::Vector4f.z lane
-    float quatZ; // Entity::Vector4f.w lane
+    // `Wm3::Quatf` stores (w, x, y, z), so these are its four words in order.
+    // They used to be documented as `Entity::Vector4f.x/.y/.z/.w`, because the
+    // orientation lanes were typed `moho::Vector4f` -- which stores (x, y, z, w)
+    // -- over quaternion bytes. Folding the variable-data block gave them their
+    // real type and this rotation went away.
+    float quatW;
+    float quatX;
+    float quatY;
+    float quatZ;
     float posX;
     float posY;
     float posZ;
@@ -107,7 +115,7 @@ namespace moho
    */
   [[nodiscard]]
   EntityTransformPayload
-  ReadEntityTransformPayload(const Vector4f& orientation, const Wm3::Vector3f& position) noexcept;
+  ReadEntityTransformPayload(const Wm3::Quatf& orientation, const Wm3::Vector3f& position) noexcept;
 
   /**
     * Alias of FUN_00678E90 (non-canonical helper lane).
@@ -116,7 +124,7 @@ namespace moho
    * Writes packed transform lanes back to entity orientation/position storage.
    */
   void WriteEntityTransformPayload(
-    Vector4f& orientation, Wm3::Vector3f& position, const EntityTransformPayload& payload
+    Wm3::Quatf& orientation, Wm3::Vector3f& position, const EntityTransformPayload& payload
   ) noexcept;
 
   /**

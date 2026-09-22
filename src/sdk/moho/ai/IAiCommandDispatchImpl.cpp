@@ -343,7 +343,7 @@ namespace
       }
 
       case EUnitCommandType::UNITCOMMAND_Dive: {
-        const ELayer layer = unit->mCurrentLayer;
+        const ELayer layer = unit->mVarDat.mLayerMask;
         const SFootprint& footprint = unit->GetFootprint();
         const SOCellPos cell = footprint.ToCellPos(unit->GetPosition());
         SNavGoal goal(cell);
@@ -721,7 +721,7 @@ namespace
           return;
         }
         if (target->IsBeingBuilt() || target->IsUnitState(UNITSTATE_Upgrading) ||
-            target->MaxHealth > target->Health) {
+            target->mVarDat.mMaxHealth > target->mVarDat.mHealth) {
           CUnitSacrificeTask::Create(dispatch, target);
         } else if (target->IsUnitState(UNITSTATE_Building)) {
           if (Entity* const focusEntity = target->GetFocusEntity();

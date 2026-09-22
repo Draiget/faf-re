@@ -156,19 +156,13 @@ namespace moho
      */
     void ApplyEntityWorldPositionToEffect(CEffectImpl& effect, const Entity& entity)
     {
-      struct EntityTransformStackLane
-      {
-        Vector4f orientation;   // +0x00
-        Wm3::Vector3f position; // +0x10
-      };
-      static_assert(sizeof(EntityTransformStackLane) == 0x1C, "EntityTransformStackLane size must be 0x1C");
-      static_assert(
-        offsetof(EntityTransformStackLane, position) == 0x10,
-        "EntityTransformStackLane::position offset must be 0x10"
-      );
+      // A quaternion followed by a position, 0x1C bytes: that is `VTransform`,
+      // which is also exactly what `entity.mVarDat.mCurTransform` already is.
+      static_assert(sizeof(VTransform) == 0x1C, "VTransform size must be 0x1C");
+      static_assert(offsetof(VTransform, pos_) == 0x10, "VTransform::pos_ offset must be 0x10");
 
-      const EntityTransformStackLane stackLane{entity.Orientation, entity.Position};
-      effect.SetNParam(0, &stackLane.position.x, 3);
+      const VTransform& stackLane = entity.mVarDat.mCurTransform;
+      effect.SetNParam(0, &stackLane.pos_.x, 3);
       effect.Interpolate();
     }
 

@@ -281,12 +281,29 @@ namespace moho
       return Wm3::Vector3f{axis.x * scale, axis.y * scale, axis.z * scale};
     }
 
-    [[nodiscard]] Wm3::Vector3f ForwardVectorFromOrientation(const moho::Vector4f& orientation) noexcept
+    /**
+     * The third column of the rotation matrix `q` describes, i.e. the direction
+     * the entity faces.
+     *
+     * This took a `moho::Vector4f` while the storage it was handed is a
+     * `Wm3::Quatf`, whose words are (w, x, y, z) rather than (x, y, z, w). Two
+     * of the three lanes were wrong as a result: against
+     * `CUnitMotion::NotifyDetached` (0x006B9570), which computes this inline
+     * over the four words at `Entity` +0x9C..+0xA8,
+     *
+     *   0x006B95A1  out.x = 2 * (word0*word2 + word3*word1)   = 2 * (wy + zx)
+     *   0x006B95AD  out.y = 2 * (word3*word2 - word0*word1)   = 2 * (yz - wx)
+     *   0x006B95EF  out.z = 1 - 2 * (word2*word2 + word1*word1)
+     *
+     * only `out.x` matched; `out.y` read `2 * (x*y - z*w)` and `out.z`
+     * subtracted `w*w` where the binary subtracts `y*y`.
+     */
+    [[nodiscard]] Wm3::Vector3f ForwardVectorFromOrientation(const Wm3::Quatf& q) noexcept
     {
       Wm3::Vector3f out{};
-      out.x = ((orientation.x * orientation.z) + (orientation.w * orientation.y)) * 2.0f;
-      out.y = ((orientation.y * orientation.z) - (orientation.w * orientation.x)) * 2.0f;
-      out.z = 1.0f - (((orientation.x * orientation.x) + (orientation.y * orientation.y)) * 2.0f);
+      out.x = ((q.x * q.z) + (q.w * q.y)) * 2.0f;
+      out.y = ((q.y * q.z) - (q.w * q.x)) * 2.0f;
+      out.z = 1.0f - (((q.x * q.x) + (q.y * q.y)) * 2.0f);
       return out;
     }
 
@@ -925,7 +942,7 @@ namespace moho
     }
     mTargetElevation = surfaceElevation;
 
-    if (mUnit->mCurrentLayer == LAYER_Sub) {
+    if (mUnit->mVarDat.mLayerMask == LAYER_Sub) {
       mSubElevation = mUnit->GetAttributes().spawnElevationOffset;
       SetMotionVertEvent(UMVE_Bottom);
     }
@@ -1359,7 +1376,7 @@ namespace moho
   void CUnitMotion::SetNewTargetLayer(const ELayer newLayer)
   {
     Unit* const unit = mUnit;
-    const ELayer oldLayer = unit->mCurrentLayer;
+    const ELayer oldLayer = unit->mVarDat.mLayerMask;
 
     if (oldLayer == LAYER_Sub) {
       if (newLayer == LAYER_Water) {
@@ -1449,7 +1466,7 @@ namespace moho
     // warped position and rebuilding the raised-platform candidate list.
     ProcessSurfaceCollisionFromLastMove();
 
-    if (mUnit->mCurrentLayer == LAYER_Land) {
+    if (mUnit->mVarDat.mLayerMask == LAYER_Land) {
       mProcessSurfaceCollision = true;
     }
   }
@@ -1722,7 +1739,7 @@ namespace moho
    */
   void CUnitMotion::NotifyDetached(Entity* const detachedFromEntity, const bool skipBallistic)
   {
-    const Wm3::Vector3f detachForward = ForwardVectorFromOrientation(detachedFromEntity->Orientation);
+    const Wm3::Vector3f detachForward = ForwardVectorFromOrientation(detachedFromEntity->mVarDat.mCurTransform.orient_);
 
     Unit* const unit = mUnit;
     const Wm3::Vector3f unitPosition = unit->GetPosition();
@@ -1760,8 +1777,8 @@ namespace moho
       }
     }
 
-    const ELayer oldLayer = unit->mCurrentLayer;
-    unit->mCurrentLayer = LAYER_Air;
+    const ELayer oldLayer = unit->mVarDat.mLayerMask;
+    unit->mVarDat.mLayerMask = LAYER_Air;
     if (oldLayer != LAYER_Air) {
       const char* newLayerName = Entity::LayerToString(LAYER_Air);
       const char* oldLayerName =
@@ -1785,7 +1802,7 @@ namespace moho
   bool CUnitMotion::AtTarget() const
   {
     const Unit* const unit = mUnit;
-    if (mLayer != LAYER_None && unit->mCurrentLayer != mLayer) {
+    if (mLayer != LAYER_None && unit->mVarDat.mLayerMask != mLayer) {
       return false;
     }
 
@@ -1875,7 +1892,7 @@ namespace moho
   bool CUnitMotion::IsOnValidLayer() const
   {
     const ERuleBPUnitMovementType motionType = mUnit->GetBlueprint()->Physics.MotionType;
-    switch (mUnit->mCurrentLayer) {
+    switch (mUnit->mVarDat.mLayerMask) {
       case LAYER_Land:
         return motionType == RULEUMT_Land || motionType == RULEUMT_AmphibiousFloating || motionType == RULEUMT_Amphibious
                || motionType == RULEUMT_Biped || motionType == RULEUMT_Hover;
@@ -2198,7 +2215,7 @@ namespace moho
     const float waterElevation = waterEnabled ? mapData->mWaterElevation : kNoWaterElevation;
     const float groundElevationAtCurrentPos = mapData->GetHeightField()->GetElevation(currentPos.x, currentPos.z);
 
-    const ELayer oldLayer = unit->mCurrentLayer;
+    const ELayer oldLayer = unit->mVarDat.mLayerMask;
 
     Wm3::Vec3f newPos = predictedPos;
     float moveDistanceFraction = 1.0f;
@@ -2226,8 +2243,8 @@ namespace moho
         // write plus a hand-inlined OnLayerChange callback, matching the
         // binary exactly (every OTHER transition in this function goes
         // through the virtual setter).
-        const ELayer previousLayer = unit->mCurrentLayer;
-        unit->mCurrentLayer = LAYER_Land;
+        const ELayer previousLayer = unit->mVarDat.mLayerMask;
+        unit->mVarDat.mLayerMask = LAYER_Land;
         if (previousLayer != LAYER_Land) {
           const char* oldLayerName =
             (static_cast<std::uint32_t>(previousLayer) > static_cast<std::uint32_t>(LAYER_Orbit))
@@ -2239,7 +2256,7 @@ namespace moho
     }
 
     // Everything below only runs on the tick the layer actually changed.
-    if (oldLayer != unit->mCurrentLayer) {
+    if (oldLayer != unit->mVarDat.mLayerMask) {
       if (!unit->IsDead()) {
         const SFootprint& footprint = unit->GetFootprint();
         SOCellPos cellPos{};
@@ -2248,7 +2265,7 @@ namespace moho
 
         COGrid* const oGrid = unit->SimulationRef->mOGrid;
         EOccupancyCaps mobileCaps = OCCUPY_MobileCheck(footprint, *mapData, cellPos);
-        if (unit->mCurrentLayer == LAYER_Water) {
+        if (unit->mVarDat.mLayerMask == LAYER_Water) {
           mobileCaps = static_cast<EOccupancyCaps>(
             static_cast<std::uint8_t>(mobileCaps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB)
           );
@@ -2258,7 +2275,7 @@ namespace moho
         bool shouldKill = (fitCaps == static_cast<EOccupancyCaps>(0));
         if (!shouldKill) {
           const gpg::Rect2i& playableRect = mapData->mPlayableRect;
-          const Wm3::Vec3f& entityPos = unit->Position;
+          const Wm3::Vec3f& entityPos = unit->mVarDat.mCurTransform.pos_;
           const Wm3::Quaternionf& liveOrient = unit->GetTransform().orient_;
           const float uprightCosine =
             1.0f - (2.0f * ((liveOrient.x * liveOrient.x) + (liveOrient.z * liveOrient.z)));
@@ -2283,7 +2300,7 @@ namespace moho
           unit->CallbackStr("OnMotionStateChange", &newStateName, &oldStateName);
         }
       } else {
-        const char* impactSurface = (unit->mCurrentLayer == LAYER_Land) ? "Terrain" : "Water";
+        const char* impactSurface = (unit->mVarDat.mLayerMask == LAYER_Land) ? "Terrain" : "Water";
         unit->CallbackStr("OnImpact", &impactSurface);
 
         const EUnitMotionState currentState = mMotionState;
@@ -2436,7 +2453,7 @@ namespace moho
     // Only land/water surface units re-snap here: skip air, submerged, dead,
     // being-built, attached, can-fly, and actively-pushed units
     // (asm 0x6B908D-0x6B90F0).
-    const ELayer layer = mUnit->mCurrentLayer;
+    const ELayer layer = mUnit->mVarDat.mLayerMask;
     if (layer == LAYER_Air || layer == LAYER_Sub || mUnit->IsDead() || mUnit->IsBeingBuilt() ||
         mUnit->IsUnitState(UNITSTATE_Attached) || blueprint->Air.CanFly != 0u || mIsBeingPushed) {
       return;
@@ -2672,7 +2689,7 @@ namespace moho
   {
     Unit* const unit = mUnit;
     const VTransform currentTransform = unit->GetTransform();
-    const ELayer currentLayer = unit->mCurrentLayer;
+    const ELayer currentLayer = unit->mVarDat.mLayerMask;
     const RUnitBlueprintPhysics& physics = unit->GetBlueprint()->Physics;
     const ERuleBPUnitMovementType motionType = physics.MotionType;
 
@@ -2834,9 +2851,9 @@ namespace moho
     }
 
     if (!IsOnValidLayer()) {
-      const float damage = -(static_cast<Entity*>(unit)->MaxHealth * kCommonMoveTickScale);
+      const float damage = -(static_cast<Entity*>(unit)->mVarDat.mMaxHealth * kCommonMoveTickScale);
       unit->AdjustHealth(nullptr, damage);
-      if (static_cast<Entity*>(unit)->Health <= 0.0f) {
+      if (static_cast<Entity*>(unit)->mVarDat.mHealth <= 0.0f) {
         unit->Kill(nullptr, "", 0.0f);
       }
       return false;
@@ -3071,7 +3088,7 @@ namespace moho
                                      : mapData->GetElevation(sampleX, sampleZ);
 
     if (Entity* const targetEntity = target.GetEntity();
-        targetEntity != nullptr && targetEntity->mCurrentLayer == LAYER_Air) {
+        targetEntity != nullptr && targetEntity->mVarDat.mLayerMask == LAYER_Air) {
       float targetElevation = 0.0f;
       if (Unit* const targetUnit = targetEntity->IsUnit(); targetUnit != nullptr) {
         targetElevation = targetUnit->GetBlueprint()->Physics.Elevation + sampledElevation;
@@ -3087,7 +3104,7 @@ namespace moho
     }
 
     if (Entity* const targetEntity = target.GetEntity();
-        targetEntity != nullptr && targetEntity->mCurrentLayer == LAYER_Air) {
+        targetEntity != nullptr && targetEntity->mVarDat.mLayerMask == LAYER_Air) {
       return 0.0f;
     }
 
@@ -3368,8 +3385,8 @@ namespace moho
 
     if (focusEntity != nullptr
         && (mUnit->IsUnitState(UNITSTATE_Building) || mUnit->IsUnitState(UNITSTATE_Repairing))) {
-      targetX = focusEntity->Position.x;
-      targetZ = focusEntity->Position.z;
+      targetX = focusEntity->mVarDat.mCurTransform.pos_.x;
+      targetZ = focusEntity->mVarDat.mCurTransform.pos_.z;
     } else if (target.HasTarget()) {
       if (mUnit->AiAttacker != nullptr) {
         const Wm3::Vec3f targetPosGun = target.GetTargetPosGun(false);
@@ -3385,7 +3402,7 @@ namespace moho
           steerRadius = maxRadius * mUnknownFloat98;
 
           Entity* const targetEntity = target.GetEntity();
-          if (targetEntity != nullptr && targetEntity->mCurrentLayer == LAYER_Air) {
+          if (targetEntity != nullptr && targetEntity->mVarDat.mLayerMask == LAYER_Air) {
             steerRadius = air.CirclingRadiusVsAirMult * steerRadius;
           }
         }
@@ -3564,8 +3581,8 @@ namespace moho
       useDockingBlend = dockFocusEntity != nullptr;
       if (useDockingBlend) {
         const Wm3::Vec3f& unitPos = mUnit->GetPosition();
-        const float dz = unitPos.z - dockFocusEntity->Position.z;
-        const float dx = unitPos.x - dockFocusEntity->Position.x;
+        const float dz = unitPos.z - dockFocusEntity->mVarDat.mCurTransform.pos_.z;
+        const float dx = unitPos.x - dockFocusEntity->mVarDat.mCurTransform.pos_.x;
         useDockingBlend = std::sqrt((dz * dz) + (dx * dx)) < kCarrierDockDistance;
       }
     }
@@ -3685,7 +3702,7 @@ namespace moho
 
     bool skipDecision = false;
     if (combatState == ACS_ReturnToMap) {
-      if (!sim->mMapData->IsWithin(unit->Position, 5.0f, useWholeMap)) {
+      if (!sim->mMapData->IsWithin(unit->mVarDat.mCurTransform.pos_, 5.0f, useWholeMap)) {
         skipDecision = true;
       }
     }
@@ -3703,8 +3720,8 @@ namespace moho
       isHeadingAlignedWithTarget = horzHeadingDot > alignThreshold;
 
       if (Entity* const resolvedForLayerCheck = const_cast<CAiTarget&>(target).GetEntity();
-          resolvedForLayerCheck != nullptr && resolvedForLayerCheck->mCurrentLayer == LAYER_Air) {
-        if (!sim->mMapData->IsWithin(unit->Position, 0.0f, useWholeMap)) {
+          resolvedForLayerCheck != nullptr && resolvedForLayerCheck->mVarDat.mLayerMask == LAYER_Air) {
+        if (!sim->mMapData->IsWithin(unit->mVarDat.mCurTransform.pos_, 0.0f, useWholeMap)) {
           mCombatState = ACS_ReturnToMap;
           skipDecision = true;
         }
@@ -3759,7 +3776,7 @@ namespace moho
           mCombatState = ACS_Combat;
           if (CAiTargetEntityIsAirLayer(target)) {
             Entity* const rawTargetEntity = target.targetEntity.GetObjectPtr();
-            if (Wm3::Vector3f::Compare(&rawTargetEntity->Position, &rawTargetEntity->PrevPosition)) {
+            if (Wm3::Vector3f::Compare(&rawTargetEntity->mVarDat.mCurTransform.pos_, &rawTargetEntity->mVarDat.mLastTransform.pos_)) {
               // Entity::Orientation is declared as a plain (x,y,z,w) Vector4f,
               // but the bytes it stores are a w-first quaternion (matching
               // Wm3::Quaternionf's own FAF-mod memory layout) - relabel the
@@ -3767,10 +3784,10 @@ namespace moho
               // reinterpret_cast across the two (differently-named-but-same-
               // layout) types.
               const Wm3::Quaternionf targetOrientation{
-                rawTargetEntity->Orientation.x,
-                rawTargetEntity->Orientation.y,
-                rawTargetEntity->Orientation.z,
-                rawTargetEntity->Orientation.w
+                rawTargetEntity->mVarDat.mCurTransform.orient_.x,
+                rawTargetEntity->mVarDat.mCurTransform.orient_.y,
+                rawTargetEntity->mVarDat.mCurTransform.orient_.z,
+                rawTargetEntity->mVarDat.mCurTransform.orient_.w
               };
               const Wm3::Vector3f targetForward = VAxes3(targetOrientation).vZ;
               const float facingDot = (targetForward.x * currentHeading.x) + (targetForward.z * currentHeading.z)
@@ -3794,7 +3811,7 @@ namespace moho
         if (rawTargetEntity != nullptr && target.targetIsMobile) {
           if (Entity* const resolvedEntity = const_cast<CAiTarget&>(target).GetEntity(); resolvedEntity != nullptr) {
             float precision = 1.0f;
-            if (air.PredictAheadForBombDrop > 0.0f && resolvedEntity->mCurrentLayer != LAYER_Air) {
+            if (air.PredictAheadForBombDrop > 0.0f && resolvedEntity->mVarDat.mLayerMask != LAYER_Air) {
               precision = air.PredictAheadForBombDrop;
             }
             Unit* const targetAsUnit = resolvedEntity->IsUnit();
@@ -3816,7 +3833,7 @@ namespace moho
         float speedLimit = maxAirSpeed;
         if (mCombatState == ACS_NormalTurn && CAiTargetEntityIsAirLayer(target)) {
           Entity* const rawEntity2 = target.targetEntity.GetObjectPtr();
-          if (!Wm3::Vector3f::Compare(&rawEntity2->Position, &rawEntity2->PrevPosition)) {
+          if (!Wm3::Vector3f::Compare(&rawEntity2->mVarDat.mCurTransform.pos_, &rawEntity2->mVarDat.mLastTransform.pos_)) {
             speedLimit = (air.MinAirspeed > targetDist) ? air.MinAirspeed : targetDist;
           }
         }
@@ -3948,7 +3965,7 @@ namespace moho
     // 0x006BF150 `mov ecx,[ebp+0]` / `cmp [ecx+120h], esi` -- the guard reads
     // the UNIT's layer, not the motion's. Unit's Entity base sits at +0x08 and
     // Entity::mCurrentLayer at +0x118, so +0x120 from a Unit* is that field.
-    if (!unit->IsDead() || (unit->mCurrentLayer != LAYER_Air && !ShouldHoverInsteadOfLand())) {
+    if (!unit->IsDead() || (unit->mVarDat.mLayerMask != LAYER_Air && !ShouldHoverInsteadOfLand())) {
       if (horizontalDistance <= air.StartTurnDistance || mCarrierEvent == kCarrierEventDescendToDeck) {
         enteredLandingPhase = (mLayer != LAYER_None && mLayer != LAYER_Air);
         const auto autoLandTicks = static_cast<std::int32_t>(air.AutoLandTime * 10.0f);
@@ -4112,7 +4129,7 @@ namespace moho
       if (mCombatState == ACS_None) {
         if (enteredLandingPhase
             && (mNewElevation == 0.0f || mHeight != std::numeric_limits<float>::infinity() || ShouldHoverInsteadOfLand())) {
-          if (horizontalDistance < 0.5f && ((mCurElevation - mNewElevation) < 0.1f || unit->mCurrentLayer == mLayer)) {
+          if (horizontalDistance < 0.5f && ((mCurElevation - mNewElevation) < 0.1f || unit->mVarDat.mLayerMask == mLayer)) {
             mReservation = gpg::Rect2i{};
             unit->FreeOgridRect();
             unit->SetCurrentLayer(mLayer);
@@ -4248,13 +4265,13 @@ namespace moho
       // ---- Dead / not-flying: force LAYER_Air + UMS_Ballistic tumble -------
       // 0x006BF16D `mov eax,[edx+120h]` then 0x006BF178 `mov [edx+118h], esi`
       // with edx advanced to the Entity subobject at +0x08 -- both halves are
-      // `unit->mCurrentLayer`, not the motion's `mLayer`. An exhaustive scan
+      // `unit->mVarDat.mLayerMask`, not the motion's `mLayer`. An exhaustive scan
       // for writes to `mLayer` ([ebp+0x74]) finds exactly three, all in the
       // preparation block, so this branch never touches it. Writing `mLayer`
       // here both fabricated that write and dropped the real one, and `mLayer`
       // is one half of the landing arrival test.
-      const ELayer previousLayer = unit->mCurrentLayer;
-      unit->mCurrentLayer = LAYER_Air;
+      const ELayer previousLayer = unit->mVarDat.mLayerMask;
+      unit->mVarDat.mLayerMask = LAYER_Air;
       if (previousLayer != LAYER_Air) {
         const char* oldLayerName =
           (static_cast<std::uint32_t>(previousLayer) > static_cast<std::uint32_t>(LAYER_Orbit)) ? "" : Entity::LayerToString(previousLayer);
@@ -4368,7 +4385,7 @@ namespace moho
     // comiss xmm0,[esp+44h] / jbe`). What stood here had neither a
     // landing-phase term nor a distance term: `mLayer` and `mReservation`
     // both persist across ticks from an earlier landing attempt, so a ground
-    // touch at ANY horizontal distance latched `unit->mCurrentLayer = mLayer`.
+    // touch at ANY horizontal distance latched `unit->mVarDat.mLayerMask = mLayer`.
     // That is the second disjunct of the arrival test above, so latching it
     // early lets a flier declare arrival without the elevation-convergence
     // check and settle into UMVE_Bottom/UMVE_Hover -- and `AtTarget()` reports
@@ -4387,8 +4404,8 @@ namespace moho
     if (groundHit && enteredLandingPhase && horizontalDistance < 0.5f) {
       unit->SetCurrentLayer(mLayer);
     } else if (mVertEvent != UMVE_Hover) {
-      const ELayer previousLayer2 = unit->mCurrentLayer;
-      unit->mCurrentLayer = LAYER_Air;
+      const ELayer previousLayer2 = unit->mVarDat.mLayerMask;
+      unit->mVarDat.mLayerMask = LAYER_Air;
       if (previousLayer2 != LAYER_Air) {
         const char* oldLayerName =
           (static_cast<std::uint32_t>(previousLayer2) > static_cast<std::uint32_t>(LAYER_Orbit)) ? "" : Entity::LayerToString(previousLayer2);
@@ -4421,7 +4438,7 @@ namespace moho
       }
     }
     if (mUnit->IsBeingBuilt()) {
-      if (mUnit->mCurrentLayer == LAYER_Sub) {
+      if (mUnit->mVarDat.mLayerMask == LAYER_Sub) {
         SetMotionVertEvent(UMVE_Bottom);
       }
       return TASKSTATUS_Wait;
@@ -4460,7 +4477,7 @@ namespace moho
           Entity* const attachTargetEntity = mUnit->mAttachInfo.GetAttachTargetEntity();
           Unit* const attachTargetUnit = attachTargetEntity->IsUnit();
           if (attachTargetUnit == nullptr || attachTargetUnit->GetFocusEntity() != static_cast<Entity*>(mUnit)) {
-            mUnit->SetCurrentLayer(attachTargetEntity->mCurrentLayer);
+            mUnit->SetCurrentLayer(attachTargetEntity->mVarDat.mLayerMask);
           }
           return TASKSTATUS_Wait;
         }
@@ -4519,7 +4536,7 @@ namespace moho
           return TASKSTATUS_Wait;
         }
 
-        if (mUnit->mCurrentLayer == LAYER_Land || mUnit->mCurrentLayer == LAYER_Seabed) {
+        if (mUnit->mVarDat.mLayerMask == LAYER_Land || mUnit->mVarDat.mLayerMask == LAYER_Seabed) {
           CalcMoveLand(transform, &moveTimeFraction);
         } else {
           CalcMoveWater(transform, &moveTimeFraction);
@@ -4799,7 +4816,7 @@ namespace moho
     if (IsRefuelVertEvent(mVertEvent)) {
       const RUnitBlueprint* const unitBlueprint = unit->GetBlueprint();
       float fuelDelta = (unitBlueprint->Physics.FuelRechargeRate / mFuelUseTime) * kFuelTickScale;
-      const bool needsRepair = unit->MaxHealth > unit->Health;
+      const bool needsRepair = unit->mVarDat.mMaxHealth > unit->mVarDat.mHealth;
       Unit* const stagingPlatform = unit->GetStagingPlatform();
 
       if (stagingPlatform != nullptr) {

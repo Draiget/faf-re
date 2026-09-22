@@ -265,8 +265,8 @@ namespace
 
   [[nodiscard]] bool HasEntityMoved(const moho::Entity& entity) noexcept
   {
-    return entity.Position.x != entity.PrevPosition.x || entity.Position.y != entity.PrevPosition.y
-      || entity.Position.z != entity.PrevPosition.z;
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y
+      || entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
   constexpr const char* kAttackTaskAssertText = "Reached the supposably unreachable.";
@@ -1210,7 +1210,7 @@ namespace moho
     const RUnitBlueprint* const blueprint = unit->GetBlueprint();
     const bool autoSurfaceAttackMode =
       blueprint != nullptr && blueprint->AI.AutoSurfaceToAttack != 0u
-      && blueprint->Physics.MotionType == RULEUMT_SurfacingSub && unit->mCurrentLayer == LAYER_Sub;
+      && blueprint->Physics.MotionType == RULEUMT_SurfacingSub && unit->mVarDat.mLayerMask == LAYER_Sub;
 
     const bool directFireCategory = unit->IsInCategory("DIRECTFIRE");
 
