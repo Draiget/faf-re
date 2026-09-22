@@ -824,7 +824,7 @@ namespace moho
     , mWobbleVelocity{}
     , mWobbleTarget{}
     , mForce{}
-    , mVector108{}
+    , mTorque{}
     , mRaisedPlatformUnit{}
     , mLayerTransitionTicks(0.0f)
     , mLastTrans{}
@@ -1041,7 +1041,7 @@ namespace moho
     ReadTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
     ReadTypedValue(*archive, motion->mWobbleTarget, ownerRef);
     ReadTypedValue(*archive, motion->mForce, ownerRef);
-    ReadTypedValue(*archive, motion->mVector108, ownerRef);
+    ReadTypedValue(*archive, motion->mTorque, ownerRef);
     ReadTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
     archive->ReadFloat(&motion->mLayerTransitionTicks);
@@ -1127,7 +1127,7 @@ namespace moho
     WriteTypedValue(*archive, motion->mWobbleVelocity, ownerRef);
     WriteTypedValue(*archive, motion->mWobbleTarget, ownerRef);
     WriteTypedValue(*archive, motion->mForce, ownerRef);
-    WriteTypedValue(*archive, motion->mVector108, ownerRef);
+    WriteTypedValue(*archive, motion->mTorque, ownerRef);
     WriteTypedValue(*archive, motion->mRaisedPlatformUnit, ownerRef);
 
     archive->WriteFloat(motion->mLayerTransitionTicks);
@@ -1554,7 +1554,7 @@ namespace moho
       // Moho::MultQuadVec(&v42, &v41, &v6->mOrientation), not the generic
       // Wm3::MultiplyQuaternionVector -- same quaternion-convention mismatch
       // as the other mOrientation/orient_-consuming sites.
-      MultQuadVec(&mVector108, &localAngularImpulse, &body->mOrientation);
+      MultQuadVec(&mTorque, &localAngularImpulse, &body->mOrientation);
 
       unit->SetCurrentLayer(LAYER_Air);
       SetMotionState(kUnitMotionStateBallistic);
@@ -2149,9 +2149,9 @@ namespace moho
 
     // Physics-body free-fall/spin step, gated on a stored angular impulse -
     // Wm3::Vector3f::Compare (FAF-mod) returns true when the operands
-    // DIFFER, so this only runs when mVector108 != 0.
-    if (Wm3::Vector3f::Compare(&mVector108, &Wm3::Vector3f::ZERO)) {
-      physBody->IntegrateFreefallStep(Wm3::Vector3f::ZERO, kSpinIntegrationDt, mVector108);
+    // DIFFER, so this only runs when mTorque != 0.
+    if (Wm3::Vector3f::Compare(&mTorque, &Wm3::Vector3f::ZERO)) {
+      physBody->IntegrateFreefallStep(Wm3::Vector3f::ZERO, kSpinIntegrationDt, mTorque);
       transform.orient_ = physBody->mOrientation;
     }
 
@@ -3628,7 +3628,7 @@ namespace moho
     out->torque = torqueWorld;
 
     mForce = force;
-    mVector108 = Wm3::Vector3f{torqueXRaw, torqueYRaw, torqueZRaw};
+    mTorque = Wm3::Vector3f{torqueXRaw, torqueYRaw, torqueZRaw};
   }
 
   /**
@@ -3903,10 +3903,10 @@ namespace moho
     // 0x006BF20D-0x006BF24A zeroes all six floats of the local SControlOutput
     // before either branch runs, and the shared tail integrates from *this*
     // local (force at frame 0x94/0x98/0x9C, torque at 0xA0) - never from
-    // `mForce`/`mVector108`. That distinction matters: `ComputeAirControl`
+    // `mForce`/`mTorque`. That distinction matters: `ComputeAirControl`
     // writes `out->torque` as the inertia-scaled, world-space torque, while it
-    // stashes the raw body-local torque in `mVector108` for
-    // `CalcMoveBallistic`. Feeding `mVector108` to the angular integrator
+    // stashes the raw body-local torque in `mTorque` for
+    // `CalcMoveBallistic`. Feeding `mTorque` to the angular integrator
     // spins the airframe on an unscaled body-local axis.
     SControlOutput control{};
 
@@ -4272,7 +4272,7 @@ namespace moho
 
       // Random per-axis torque impulse, clamped to [0.25, 4.0] against
       // 1/mInvInertiaTensor, rotated by the current orientation, and stashed
-      // as mVector108 for CalcMoveBallistic's later impulse step.
+      // as mTorque for CalcMoveBallistic's later impulse step.
       CRandomStream& randomStream = *sim->mRngState;
       const auto clampAxis = [](const float invInertia) {
         return std::clamp(std::min(invInertia, 4.0f), 0.25f, 4.0f);
@@ -4288,13 +4288,13 @@ namespace moho
         RandomUniformIntRange(static_cast<int>(-halfRangeZ * 1000.0f), static_cast<int>(halfRangeZ * 1000.0f), randomStream)
           / (1000.0f * physBody->mInvInertiaTensor.z),
       };
-      MultQuadVec(&mVector108, &randomAngularAccel, &physBody->mOrientation);
+      MultQuadVec(&mTorque, &randomAngularAccel, &physBody->mOrientation);
     }
 
     // ---- Shared tail: physics integration + layer/collision + writeback ----
     // 0x006C0073-0x006C0186: both branches land here, and the dead/ballistic
     // one arrives with `control` still zeroed - it contributes no force and no
-    // torque this beat, having handed its tumble to `mVector108` for
+    // torque this beat, having handed its tumble to `mTorque` for
     // `CalcMoveBallistic` to pick up on the next.
     //
     // 0x006C0073-0x006C0093 copies the pre-integration velocity into

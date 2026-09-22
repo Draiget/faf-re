@@ -513,7 +513,7 @@ namespace moho
      * What it does:
      * Runs one ballistic (free-fall) motion step. Integrates gravity into the
      * owner's velocity and predicts a new position; if a stored angular
-     * impulse (`mVector108`) is non-zero, also steps the physics body's
+     * impulse (`mTorque`) is non-zero, also steps the physics body's
      * linear/angular state and copies the result into `transform.orient_`.
      * Ray-casts the predicted move segment against terrain (amphibious
      * units) or the water surface (everyone else) and reclassifies the
@@ -646,7 +646,7 @@ namespace moho
      * deck-descend, blends in a tighter velocity-cancelling term instead of
      * the normal movement-damping factor. Caches the output force into
      * `mForce` and the pre-inertia-scaled body-local torque into
-     * `mVector108` for `CalcMoveBallistic`'s later impulse step.
+     * `mTorque` for `CalcMoveBallistic`'s later impulse step.
      */
     void ComputeAirControl(
       const SPhysBody& body,
@@ -751,8 +751,26 @@ namespace moho
     Wm3::Vector3f mWobbleOffset;          // +0xD8
     Wm3::Vector3f mWobbleVelocity;        // +0xE4
     Wm3::Vector3f mWobbleTarget;          // +0xF0
+    // The force/torque pair this beat produced, written together by
+    // `ComputeAirControl` as `out->force`/`out->torque`'s unrotated siblings.
     Wm3::Vector3f mForce;                 // +0xFC
-    Wm3::Vector3f mVector108;             // +0x108
+    // Careful: the frame depends on which path last wrote it, and the binary
+    // is not consistent about it.
+    //   - `ComputeAirControl` stores the **body-local, pre-inertia-scaled**
+    //     torque (`torqueXRaw/Y/Z`), i.e. the term before the
+    //     `/ mInvInertiaTensor` and the `MultQuadVec` by `mOrientation` that
+    //     produce the `out->torque` actually applied. `CThrustManipulator`
+    //     reads lane `.y` off this -- the yaw torque -- to swing its nozzle
+    //     bone into the turn.
+    //   - The two tumble seeds (ballistic launch 0x006B8AC0, and the
+    //     dead/ballistic branch of `CalcMoveAir`) instead store a
+    //     **world-space** angular impulse: a random per-axis value scaled by
+    //     inertia and then rotated by `mOrientation`.
+    // Nothing reconciles the two, but nothing has to: both seeds run exactly
+    // on entry to the ballistic state, so the only reader that treats it as
+    // world-space -- `CalcMoveBallistic`'s `IntegrateFreefallStep` -- always
+    // sees a value one of them just wrote.
+    Wm3::Vector3f mTorque;                // +0x108
     WeakPtr<Unit> mRaisedPlatformUnit;    // +0x114
     // Elapsed ticks of the in-progress layer transition; TransitionBetweenLayers
     // divides it by Physics.LayerTransitionDuration for the blend factor,

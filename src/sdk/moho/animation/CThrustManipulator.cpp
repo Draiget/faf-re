@@ -244,10 +244,13 @@ namespace moho
 
     Wm3::Vector3f desiredDirection = unit->UnitMotion->mForce;
 
-    // The unit's roll displaces the nozzle bone; the thrust has to account for
-    // where the bone is being swung to, scaled by mTurnForceMult.
-    Wm3::Quaternionf rollRotation{};
-    (void)EulerRollToQuat(&kWorldUp, &rollRotation, unit->UnitMotion->mVector108.y);
+    // The unit's yaw swings the nozzle bone through an arc; the thrust has to
+    // account for where the bone is being swung to, scaled by mTurnForceMult.
+    // `mTorque.y` is the body-local yaw lane `ComputeAirControl` stashes
+    // before inertia scaling -- see the field's comment in CUnitMotion.h, the
+    // frame it carries depends on who wrote it last.
+    Wm3::Quaternionf yawRotation{};
+    (void)EulerRollToQuat(&kWorldUp, &yawRotation, unit->UnitMotion->mTorque.y);
 
     const VTransform& unitTransform = unit->GetTransform();
     const VTransform boneWorldTransform = unit->GetBoneWorldTransform(mThrustBoneIndex);
@@ -257,11 +260,11 @@ namespace moho
       boneWorldTransform.pos_.z - unitTransform.pos_.z,
     };
 
-    Wm3::Vector3f rolledOffset{};
-    (void)MultQuadVec(&rolledOffset, &boneOffset, &rollRotation);
-    desiredDirection.x += (rolledOffset.x - boneOffset.x) * mTurnForceMult;
-    desiredDirection.y += (rolledOffset.y - boneOffset.y) * mTurnForceMult;
-    desiredDirection.z += (rolledOffset.z - boneOffset.z) * mTurnForceMult;
+    Wm3::Vector3f swungOffset{};
+    (void)MultQuadVec(&swungOffset, &boneOffset, &yawRotation);
+    desiredDirection.x += (swungOffset.x - boneOffset.x) * mTurnForceMult;
+    desiredDirection.y += (swungOffset.y - boneOffset.y) * mTurnForceMult;
+    desiredDirection.z += (swungOffset.z - boneOffset.z) * mTurnForceMult;
 
     // Into bone-local space, where the caps are expressed.
     const VTransform& compositeTransform = watchedBone->GetCompositeTransform();
