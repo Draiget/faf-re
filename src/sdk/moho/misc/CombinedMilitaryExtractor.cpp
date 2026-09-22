@@ -1,8 +1,6 @@
 #include "moho/misc/CombinedMilitaryExtractor.h"
-
-#include <cstdint>
-
 #include "moho/entity/UserEntity.h"
+#include <cstdint>
 
 namespace
 {
@@ -32,7 +30,9 @@ namespace moho
    * Address: 0x007EC3A0 (FUN_007EC3A0, Moho::CombinedMilitaryExtractor::Extract)
    */
   bool CombinedMilitaryExtractor::Extract(
-    SRangeExtractionPayload* const outRange, const UserEntity* const userEntity, const float interpolationAlpha
+    SRangeExtractionPayload* const outRange,
+    const UserEntity* const userEntity,
+    const float interpolationAlpha
   ) const
   {
     if (!outRange || !userEntity) {
