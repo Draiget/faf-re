@@ -3092,83 +3092,13 @@ namespace
     return reinterpret_cast<UserEntity*>(userUnit);
   }
 
-  struct SessionEntityMapNodeView
-  {
-    SessionEntityMapNodeView* left;   // +0x00
-    SessionEntityMapNodeView* parent; // +0x04
-    SessionEntityMapNodeView* right;  // +0x08
-    std::int32_t key;                 // +0x0C
-    UserEntity* value;                // +0x10
-    std::uint8_t color;               // +0x14
-    std::uint8_t isNil;               // +0x15
-    std::uint8_t pad_0016_0017[0x02];
-  };
-  static_assert(offsetof(SessionEntityMapNodeView, key) == 0x0C, "SessionEntityMapNodeView::key offset must be 0x0C");
-  static_assert(
-    offsetof(SessionEntityMapNodeView, value) == 0x10, "SessionEntityMapNodeView::value offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SessionEntityMapNodeView, isNil) == 0x15, "SessionEntityMapNodeView::isNil offset must be 0x15"
-  );
-  static_assert(sizeof(SessionEntityMapNodeView) == 0x18, "SessionEntityMapNodeView size must be 0x18");
-
-  struct SessionEntityMapView
-  {
-    void* allocProxy;             // +0x00
-    SessionEntityMapNodeView* head; // +0x04
-    std::uint32_t size;           // +0x08
-  };
-  static_assert(offsetof(SessionEntityMapView, head) == 0x04, "SessionEntityMapView::head offset must be 0x04");
-  static_assert(offsetof(SessionEntityMapView, size) == 0x08, "SessionEntityMapView::size offset must be 0x08");
-  static_assert(sizeof(SessionEntityMapView) == 0x0C, "SessionEntityMapView size must be 0x0C");
-  static_assert(offsetof(CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
-
-  [[nodiscard]] const SessionEntityMapView& GetSessionEntityMapView(const CWldSession* const session) noexcept
-  {
-    return *reinterpret_cast<const SessionEntityMapView*>(
-      reinterpret_cast<const std::uint8_t*>(session) + offsetof(CWldSession, mUnknownOwner44)
-    );
-  }
-
-  [[nodiscard]] const SessionEntityMapNodeView*
-  FindSessionEntityNode(const SessionEntityMapView& map, const std::int32_t entityId) noexcept
-  {
-    const SessionEntityMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const SessionEntityMapNodeView* result = head;
-    const SessionEntityMapNodeView* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= entityId) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || entityId < result->key) {
-      return head;
-    }
-
-    return result;
-  }
-
   [[nodiscard]] UserEntity* FindSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
   {
     if (session == nullptr) {
       return nullptr;
     }
 
-    const SessionEntityMapView& entityMap = GetSessionEntityMapView(session);
-    const SessionEntityMapNodeView* const node = FindSessionEntityNode(entityMap, entityId);
-    if (node == nullptr || node == entityMap.head) {
-      return nullptr;
-    }
-
-    return node->value;
+    return session->LookupEntityId(entityId);
   }
 
   [[nodiscard]] const UserUnit* ResolveAttachmentParentUserUnit(UserUnit* const userUnit) noexcept

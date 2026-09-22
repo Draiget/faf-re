@@ -16,6 +16,7 @@
 #include "lua/LuaObject.h"
 #include "moho/vision/VisionDB.h"
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
+#include "legacy/containers/Map.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/ISessionListener.h"
 #include "moho/sim/SSTICommandSource.h"
@@ -1452,9 +1453,25 @@ namespace moho
     CWldMap* mWldMap;                                       // 0x001C
     boost::shared_ptr<LaunchInfoBase> mLaunchInfo;          // 0x0020
     msvc8::string mMapName;                                 // 0x0028
-    void* mUnknownOwner44;                                  // 0x0044
-    void* mSaveSourceTreeHead;                              // 0x0048
-    std::uint32_t mSaveSourceTreeSize;                      // 0x004C
+    /**
+     * Every live `UserEntity` in the session, by entity id. `AddEntity` /
+     * `RemoveEntity` / `OrphanEntity` maintain it and `LookupEntityId` reads
+     * it.
+     *
+     * The constructor (0x00893160) buys its head node at 0x008931E1, sets
+     * `_Isnil` at head+0x15 and links the head to itself -- `msvc8::map`'s own
+     * constructor -- and `find` (0x00898DC0) compares the key at node+0x0C
+     * with `jae`/`jb`, so the key is unsigned and the node is 0x18 bytes with
+     * the mapped `UserEntity*` at +0x10.
+     *
+     * This was `void* mUnknownOwner44; void* mSaveSourceTreeHead;
+     * std::uint32_t mSaveSourceTreeSize;`, reached through five private copies
+     * of the node layout in five files, three of which put `_Isnil` at +0x19;
+     * CWldSession.cpp carried a complete hand-written red-black tree over
+     * 0x1C-byte nodes of its own to maintain it, and the constructor set the
+     * head to null instead of buying one.
+     */
+    msvc8::map<std::uint32_t, UserEntity*> mEntities;       // 0x0044
     std::uint8_t mEntitySpatialDbStorage[0xA0];             // 0x0050
     SBuildTemplateBuffer mBuildTemplates;                   // 0x00F0 (inline-buffer vector-style storage)
     float mBuildTemplateArg1;                               // 0x03C0
@@ -1567,9 +1584,8 @@ namespace moho
   static_assert(offsetof(CWldSession, head1) == 0x08, "CWldSession::head1 offset must be 0x08");
   static_assert(offsetof(CWldSession, mWldMap) == 0x1C, "CWldSession::mWldMap offset must be 0x1C");
   static_assert(offsetof(CWldSession, mLaunchInfo) == 0x20, "CWldSession::mLaunchInfo offset must be 0x20");
-  static_assert(
-    offsetof(CWldSession, mSaveSourceTreeHead) == 0x48, "CWldSession::mSaveSourceTreeHead offset must be 0x48"
-  );
+  static_assert(offsetof(CWldSession, mEntities) == 0x44, "CWldSession::mEntities offset must be 0x44");
+  static_assert(sizeof(msvc8::map<std::uint32_t, UserEntity*>) == 0x0C, "entity map size must be 0x0C");
   static_assert(
     offsetof(CWldSession, mEntitySpatialDbStorage) == 0x50, "CWldSession::mEntitySpatialDbStorage offset must be 0x50"
   );

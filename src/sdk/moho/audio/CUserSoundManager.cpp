@@ -328,45 +328,6 @@ namespace
     record->mOwnerNextInChain = nullptr;
   }
 
-  struct UserSessionEntityMapNodeView
-  {
-    UserSessionEntityMapNodeView* left;   // +0x00
-    UserSessionEntityMapNodeView* parent; // +0x04
-    UserSessionEntityMapNodeView* right;  // +0x08
-    std::int32_t key;                     // +0x0C
-    moho::UserEntity* value;              // +0x10
-    std::uint8_t color;                   // +0x14
-    std::uint8_t isNil;                   // +0x15
-    std::uint8_t pad_16_17[0x02];
-  };
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, key) == 0x0C, "UserSessionEntityMapNodeView::key offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, value) == 0x10,
-    "UserSessionEntityMapNodeView::value offset must be 0x10"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, isNil) == 0x15,
-    "UserSessionEntityMapNodeView::isNil offset must be 0x15"
-  );
-  static_assert(sizeof(UserSessionEntityMapNodeView) == 0x18, "UserSessionEntityMapNodeView size must be 0x18");
-
-  struct UserSessionEntityMapView
-  {
-    void* allocatorProxy;                // +0x00
-    UserSessionEntityMapNodeView* head;  // +0x04
-    std::uint32_t size;                  // +0x08
-  };
-  static_assert(
-    offsetof(UserSessionEntityMapView, head) == 0x04, "UserSessionEntityMapView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapView, size) == 0x08, "UserSessionEntityMapView::size offset must be 0x08"
-  );
-  static_assert(sizeof(UserSessionEntityMapView) == 0x0C, "UserSessionEntityMapView size must be 0x0C");
-  static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
-
   /**
    * Address: 0x008AA340 (FUN_008AA340)
    *
@@ -921,39 +882,6 @@ namespace
     return (kHalfPi - ComputePitchRadians(delta)) * kRadToDeg;
   }
 
-  [[nodiscard]] const UserSessionEntityMapView&
-  GetUserSessionEntityMapView(const moho::CWldSession* const session) noexcept
-  {
-    return *reinterpret_cast<const UserSessionEntityMapView*>(
-      reinterpret_cast<const std::uint8_t*>(session) + offsetof(moho::CWldSession, mUnknownOwner44)
-    );
-  }
-
-  [[nodiscard]] const UserSessionEntityMapNodeView*
-  FindUserSessionEntityNode(const UserSessionEntityMapView& map, const std::int32_t entityId) noexcept
-  {
-    const UserSessionEntityMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const UserSessionEntityMapNodeView* result = head;
-    const UserSessionEntityMapNodeView* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= entityId) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || entityId < result->key) {
-      return head;
-    }
-    return result;
-  }
-
   [[nodiscard]] moho::UserEntity*
   FindUserSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId) noexcept
   {
@@ -961,12 +889,7 @@ namespace
       return nullptr;
     }
 
-    const UserSessionEntityMapView& entityMap = GetUserSessionEntityMapView(session);
-    const UserSessionEntityMapNodeView* const node = FindUserSessionEntityNode(entityMap, entityId);
-    if (node == nullptr || node == entityMap.head) {
-      return nullptr;
-    }
-    return node->value;
+    return session->LookupEntityId(entityId);
   }
 
   /**

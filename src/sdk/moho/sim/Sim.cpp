@@ -2509,45 +2509,6 @@ namespace
     return static_cast<std::int64_t>(view->scriptBitMask);
   }
 
-  struct UserSessionEntityMapNodeView
-  {
-    UserSessionEntityMapNodeView* left;   // +0x00
-    UserSessionEntityMapNodeView* parent; // +0x04
-    UserSessionEntityMapNodeView* right;  // +0x08
-    std::int32_t key;                     // +0x0C
-    UserEntity* value;                    // +0x10
-    std::uint8_t color;                   // +0x14
-    std::uint8_t isNil;                   // +0x15
-    std::uint8_t pad_0016_0017[0x02];
-  };
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, key) == 0x0C, "UserSessionEntityMapNodeView::key offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, value) == 0x10,
-    "UserSessionEntityMapNodeView::value offset must be 0x10"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapNodeView, isNil) == 0x15,
-    "UserSessionEntityMapNodeView::isNil offset must be 0x15"
-  );
-  static_assert(sizeof(UserSessionEntityMapNodeView) == 0x18, "UserSessionEntityMapNodeView size must be 0x18");
-
-  struct UserSessionEntityMapView
-  {
-    void* allocatorProxy;                // +0x00
-    UserSessionEntityMapNodeView* head;  // +0x04
-    std::uint32_t size;                  // +0x08
-  };
-  static_assert(
-    offsetof(UserSessionEntityMapView, head) == 0x04, "UserSessionEntityMapView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserSessionEntityMapView, size) == 0x08, "UserSessionEntityMapView::size offset must be 0x08"
-  );
-  static_assert(sizeof(UserSessionEntityMapView) == 0x0C, "UserSessionEntityMapView size must be 0x0C");
-  static_assert(offsetof(CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
-
   struct UserUnitLuaObjectRuntimeView
   {
     std::uint8_t pad_0000_0170[0x170];
@@ -2558,39 +2519,6 @@ namespace
     "UserUnitLuaObjectRuntimeView::luaObject offset must be 0x170"
   );
 
-  [[nodiscard]] const UserSessionEntityMapView& GetUserSessionEntityMapView(const CWldSession* const session) noexcept
-  {
-    return *reinterpret_cast<const UserSessionEntityMapView*>(
-      reinterpret_cast<const std::uint8_t*>(session) + offsetof(CWldSession, mUnknownOwner44)
-    );
-  }
-
-  [[nodiscard]] const UserSessionEntityMapNodeView*
-  FindUserSessionEntityNode(const UserSessionEntityMapView& map, const std::int32_t entityId) noexcept
-  {
-    const UserSessionEntityMapNodeView* const head = map.head;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    const UserSessionEntityMapNodeView* result = head;
-    const UserSessionEntityMapNodeView* node = head->parent;
-    while (node != nullptr && node != head && node->isNil == 0u) {
-      if (node->key >= entityId) {
-        result = node;
-        node = node->left;
-      } else {
-        node = node->right;
-      }
-    }
-
-    if (result == head || entityId < result->key) {
-      return head;
-    }
-
-    return result;
-  }
-
   [[nodiscard]] UserEntity*
   FindUserSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
   {
@@ -2598,12 +2526,7 @@ namespace
       return nullptr;
     }
 
-    const UserSessionEntityMapView& entityMap = GetUserSessionEntityMapView(session);
-    const UserSessionEntityMapNodeView* const node = FindUserSessionEntityNode(entityMap, entityId);
-    if (node == nullptr || node == entityMap.head) {
-      return nullptr;
-    }
-    return node->value;
+    return session->LookupEntityId(entityId);
   }
 
   [[nodiscard]] UserUnit* ResolveSelectableTransportAttachmentParent(UserUnit* const unit) noexcept
@@ -2644,54 +2567,6 @@ namespace
     if (std::find(selectionUnits.begin(), selectionUnits.end(), unit) == selectionUnits.end()) {
       selectionUnits.push_back(unit);
     }
-  }
-
-  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapMinNode(
-    UserSessionEntityMapNodeView* node,
-    UserSessionEntityMapNodeView* const head
-  ) noexcept
-  {
-    while (node != nullptr && node != head && node->left != head) {
-      node = node->left;
-    }
-    return node != nullptr ? node : head;
-  }
-
-  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapFirstNode(const UserSessionEntityMapView& map) noexcept
-  {
-    UserSessionEntityMapNodeView* const head = map.head;
-    if (head == nullptr || head->isNil == 0u) {
-      return nullptr;
-    }
-
-    UserSessionEntityMapNodeView* const root = head->parent;
-    if (root == nullptr || root == head || root->isNil != 0u) {
-      return head;
-    }
-
-    return UserSessionEntityMapMinNode(root, head);
-  }
-
-  [[nodiscard]] UserSessionEntityMapNodeView* UserSessionEntityMapNextNode(
-    UserSessionEntityMapNodeView* node,
-    UserSessionEntityMapNodeView* const head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr || node == head) {
-      return head;
-    }
-
-    if (node->right != head) {
-      return UserSessionEntityMapMinNode(node->right, head);
-    }
-
-    UserSessionEntityMapNodeView* parent = node->parent;
-    while (parent != nullptr && parent != head && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-
-    return parent != nullptr ? parent : head;
   }
 
   [[nodiscard]] const UserUnitLuaObjectRuntimeView& GetUserUnitLuaObjectView(const UserUnit* const userUnit) noexcept
@@ -18919,7 +18794,6 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
 
   std::set<UserUnit*> emittedUnits{};
   std::int32_t resultIndex = 1;
-  const UserSessionEntityMapView& entityMap = GetUserSessionEntityMapView(session);
 
   const int sourceCount = sourceUnitsObject.GetCount();
   for (int sourceIndex = 1; sourceIndex <= sourceCount; ++sourceIndex) {
@@ -18940,10 +18814,11 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
       continue;
     }
 
-    for (UserSessionEntityMapNodeView* node = UserSessionEntityMapFirstNode(entityMap);
-         node != nullptr && node != entityMap.head;
-         node = UserSessionEntityMapNextNode(node, entityMap.head)) {
-      UserEntity* const entity = node->value;
+    // Every entity in the session. The private walker this replaced returned
+    // null unless the map head's `_Isnil` byte was set at +0x15, and the
+    // session's own hand-written tree kept that flag at +0x19, so this loop
+    // never ran and the query always came back empty.
+    for (const auto& [entityId, entity] : session->mEntities) {
       if (entity == nullptr) {
         continue;
       }
