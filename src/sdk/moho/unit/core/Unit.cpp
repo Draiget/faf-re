@@ -13540,15 +13540,13 @@ Unit::Unit(const SUnitConstructionParams& params)
   }
 
   // Lane-for-lane copy (0x006A5BF9..0x006A5C23 stores the transform's four
-  // orientation dwords straight into PendingOrientation). Entity keeps the
-  // orientation as a Vector4f whose lane 0 is the scalar, so the copy must be
-  // by memory lane, not by name: `.x = orient_.X()` put the imaginary x into
-  // lane 0 and rotated the whole quaternion, which flipped every spawned unit
-  // upside-down on the user side (its skinned mesh drew as an unlit black blob).
-  PendingOrientation.x = spawnTransform.orient_.W();
-  PendingOrientation.y = spawnTransform.orient_.X();
-  PendingOrientation.z = spawnTransform.orient_.Y();
-  PendingOrientation.w = spawnTransform.orient_.Z();
+  // orientation dwords straight into PendingOrientation). Getting this wrong by
+  // one lane rotates the whole quaternion and flips every spawned unit
+  // upside-down on the user side (its skinned mesh draws as an unlit black
+  // blob), which is what the spelling below did while `PendingOrientation` was
+  // a `moho::Vector4f` naming (x,y,z,w) over the quaternion's (w,x,y,z) words.
+  // It is a `Wm3::Quatf` now, same as `orient_`, so the copy is the assignment.
+  PendingOrientation = spawnTransform.orient_;
   PendingPosition = spawnTransform.pos_;
   // Twice, as the binary does: the first call publishes the spawn pose into the
   // current lane and the second copies it into the previous-frame lane, so the

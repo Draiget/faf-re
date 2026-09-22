@@ -3777,18 +3777,11 @@ namespace moho
           if (CAiTargetEntityIsAirLayer(target)) {
             Entity* const rawTargetEntity = target.targetEntity.GetObjectPtr();
             if (Wm3::Vector3f::Compare(&rawTargetEntity->mVarDat.mCurTransform.pos_, &rawTargetEntity->mVarDat.mLastTransform.pos_)) {
-              // Entity::Orientation is declared as a plain (x,y,z,w) Vector4f,
-              // but the bytes it stores are a w-first quaternion (matching
-              // Wm3::Quaternionf's own FAF-mod memory layout) - relabel the
-              // four lanes into their real quaternion roles rather than
-              // reinterpret_cast across the two (differently-named-but-same-
-              // layout) types.
-              const Wm3::Quaternionf targetOrientation{
-                rawTargetEntity->mVarDat.mCurTransform.orient_.x,
-                rawTargetEntity->mVarDat.mCurTransform.orient_.y,
-                rawTargetEntity->mVarDat.mCurTransform.orient_.z,
-                rawTargetEntity->mVarDat.mCurTransform.orient_.w
-              };
+              // The entity's own orientation quaternion. This used to be
+              // rebuilt lane by lane, because the lane was declared a plain
+              // (x,y,z,w) `moho::Vector4f` over the w-first quaternion words it
+              // actually stores; it is a `Wm3::Quatf` now.
+              const Wm3::Quaternionf& targetOrientation = rawTargetEntity->mVarDat.mCurTransform.orient_;
               const Wm3::Vector3f targetForward = VAxes3(targetOrientation).vZ;
               const float facingDot = (targetForward.x * currentHeading.x) + (targetForward.z * currentHeading.z)
                 + (targetForward.y * currentHeading.y);
