@@ -101,8 +101,9 @@ namespace moho
      * preserving iteration safety when listeners relink/unlink during
      * callback. Same intrusive-broadcast shape as the overloads below
      * (distinct per-T body, not ICF-folded); the definition lives in
-     * CAiFormationInstance.cpp beside its only broadcaster,
-     * `CFormationInstance::mStatusListeners`.
+     * CAiFormationInstance.cpp beside its only broadcaster, which is the
+     * `BroadcasterEventTag<EFormationdStatus>` base `IFormationInstance`
+     * carries at mdisp 8.
      */
     void BroadcastEvent(EFormationdStatus event);
 

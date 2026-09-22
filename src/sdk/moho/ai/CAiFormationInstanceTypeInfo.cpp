@@ -187,11 +187,7 @@ gpg::RRef CAiFormationInstanceTypeInfo::CtrRef(void* const objectStorage)
  */
 void CAiFormationInstanceTypeInfo::Delete(void* const objectStorage)
 {
-  auto* const object = static_cast<CAiFormationInstance*>(objectStorage);
-  if (!object) {
-    return;
-  }
-  object->operator_delete(1);
+  delete static_cast<CAiFormationInstance*>(objectStorage);
 }
 
 /**
@@ -199,7 +195,10 @@ void CAiFormationInstanceTypeInfo::Delete(void* const objectStorage)
  */
 void CAiFormationInstanceTypeInfo::Destruct(void* const objectStorage)
 {
-  static_cast<CAiFormationInstance*>(objectStorage)->operator_delete(0);
+  // `p->~T()` on a virtual destructor is a slot-0 dispatch with the free bit
+  // clear -- `mov eax,[ecx]; mov edx,[eax]; push 0; call edx`, which is this
+  // whole function.
+  static_cast<CAiFormationInstance*>(objectStorage)->~CAiFormationInstance();
 }
 
 /**

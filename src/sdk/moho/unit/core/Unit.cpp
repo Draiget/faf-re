@@ -1369,9 +1369,7 @@ namespace
 
     IFormationInstance* const guardFormation = unit->GuardFormation;
     unit->GuardFormation = nullptr;
-    if (guardFormation != nullptr) {
-      guardFormation->operator_delete(1);
-    }
+    delete guardFormation;
   }
 
   [[nodiscard]] CAniPoseBone* ResolveUnitPoseBone(Unit& unit, const int boneIndex) noexcept
@@ -13095,9 +13093,7 @@ void Unit::UpdateGuardFormation()
 
   IFormationInstance* const previousFormation = GuardFormation;
   GuardFormation = newFormation;
-  if (previousFormation != nullptr) {
-    previousFormation->operator_delete(1);
-  }
+  delete previousFormation;
 
   newFormation->SetScale(1.0f);
 }
@@ -17895,9 +17891,7 @@ void Unit::MemberDeserialize(gpg::ReadArchive* const archive, Unit* const unit, 
     archive->ReadPointerOwned_IFormationInstance(&formation, &ownerRef);
     IFormationInstance* const prior = unit->GuardFormation;
     unit->GuardFormation = static_cast<CAiFormationInstance*>(formation);
-    if (prior) {
-      prior->operator_delete(1);
-    }
+    delete prior;
   }
 
   archive->ReadBool(&unit->mNeedsKillCleanup);

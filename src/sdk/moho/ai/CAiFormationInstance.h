@@ -419,12 +419,12 @@ namespace moho
    * `IFormationInstance` (mdisp 0), `Moho::CountedObject` (mdisp 0) and
    * `Broadcaster<EFormationdStatus>` (mdisp 8): the two words right after the
    * vtable are the counted-object reference count and the status-listener
-   * ring. `IFormationInstance` is still modelled as the bare 4-byte vtable
-   * carrier, so those two live here as `mSharedCount` and `mStatusListeners`
-   * until that base is split out.
+   * ring, and both belong to `IFormationInstance`'s own two bases. This class
+   * therefore starts at +0x10, which is exactly what
+   * `offsetof(.., mState) == 0x10` below re-checks from the far side.
    *
    * Member names follow the shipped symbol set the FAF IDB carries for this
-   * class (`mSharedCount`, `mState`, `mGamerules`, `mUnits`, `mOffsetInfo`,
+   * class (`mState`, `mGamerules`, `mUnits`, `mOffsetInfo`,
    * `mSlots`, `mOrientation`, `mPlanUpdate`, `mMaxSize`); the caches, the
    * forward vector and the scale carry names taken from their proven
    * readers and writers instead of the IDB's `mMap1`/`mPos1`/`mVal2`
@@ -539,32 +539,6 @@ namespace moho
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;
 
-    /**
-     * Address: 0x00569430 (FUN_00569430, Moho::CFormationInstance::operator delete)
-     * Slot: 0
-     *
-     * IDA signature:
-     * Moho::CFormationInstance *__thiscall Moho::CFormationInstance::operator delete(
-     *     Moho::CFormationInstance *this, char deleteFlags);
-     *
-     * What it does:
-     * Runs the destructor, then frees storage when bit0 of `deleteFlags` is
-     * set -- the real, distinct vtable slot-0 implementation for this class
-     * (not inherited from `CAiFormationInstance`'s own slot-0 override,
-     * `0x0059BD60`; `CFormationInstance`'s own vtable, `??_7CFormationInstance@Moho@@6B@`
-     * at 0xE18E0C, carries its own copy of this slot). This is what makes
-     * `CFormationInstance` a concrete, instantiable class in the binary --
-     * `CFormationInstance::Create` (0x0056A920) allocates exactly
-     * `sizeof(CFormationInstance)` (0x328) and placement-constructs a bare
-     * `CFormationInstance`, not a `CAiFormationInstance`.
-     */
-    void operator_delete(std::int32_t deleteFlags) override;
-
-    /// `Broadcaster<EFormationdStatus>` (RTTI base at mdisp 8): the ring of
-    /// `Listener<EFormationdStatus>` nodes `BroadcastEvent` fans out to, and
-    /// the payload the reflected `Broadcaster<EFormationdStatus>` type
-    /// serializes at `IFormationInstance + 0x08`.
-    BroadcasterEventTag<EFormationdStatus> mStatusListeners;  // +0x08
     LuaPlus::LuaState* mState;                                // +0x10
     RRuleGameRules* mGamerules;                               // +0x14
     EUnitCommandType mCommandType;                            // +0x18
@@ -944,12 +918,23 @@ namespace moho
 
     /**
      * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
+     * Address: 0x00569430 (FUN_00569430, `??_GCFormationInstance@Moho@@UAEPAXI@Z`
+     *   -- the scalar deleting destructor MSVC parks in slot 0 of this class's
+     *   own vtable, `??_7CFormationInstance@Moho@@6B@` at 0xE18E0C: `call
+     *   0x569880` then the conditional `::operator delete`. `CFormationInstance`
+     *   is a concrete, instantiable class in the binary, so it carries its own
+     *   copy of the slot rather than inheriting `CAiFormationInstance`'s
+     *   (0x0059BD60) -- `CFormationInstance::Create` (0x0056A920) allocates
+     *   exactly `sizeof(CFormationInstance)` (0x328) and placement-constructs a
+     *   bare `CFormationInstance`.)
+     *
+     * VFTable SLOT: 0
      *
      * What it does:
      * Resets the transient formation plan, then lets the members and the
      * IFormationInstance base tear themselves down.
      */
-    ~CFormationInstance();
+    ~CFormationInstance() override;
 
   private:
     /**
@@ -1018,19 +1003,14 @@ namespace moho
      * What it does:
      * Resets the transient plan, unregisters this instance from the owning
      * formation DB, then lets `~CFormationInstance` tear the members down.
-     */
-    ~CAiFormationInstance();
-
-    /**
-     * Address: 0x0059BD60 (FUN_0059BD60, ??3CAiFormationInstance@Moho@@QAE@@Z)
      *
-     * What it does:
-     * Runs `CAiFormationInstance` teardown and frees storage when bit0 in
-     * `deleteFlags` is set.
+     * Address: 0x0059BD60 (FUN_0059BD60, `??_GCAiFormationInstance@Moho@@UAEPAXI@Z`
+     *   -- the scalar deleting destructor in slot 0 of 0xE1B47C: `call
+     *   0x59A500` then the conditional `::operator delete`)
      *
-     * Slot: 0
+     * VFTable SLOT: 0
      */
-    void operator_delete(std::int32_t deleteFlags) override;
+    ~CAiFormationInstance() override;
 
     /**
      * Address: 0x0059E950 (FUN_0059E950, Moho::CAiFormationInstance::MemberDeserialize)
@@ -1125,10 +1105,10 @@ namespace moho
     std::uint32_t mUnknown_0x32C;                 // +0x32C
   };
 
-  static_assert(offsetof(CAiFormationInstance, mSharedCount) == 0x04, "CAiFormationInstance::mSharedCount offset must be 0x04");
-  static_assert(
-    offsetof(CAiFormationInstance, mStatusListeners) == 0x08, "CAiFormationInstance::mStatusListeners offset must be 0x08"
-  );
+  // The reference count at +0x04 and the listener ring at +0x08 are
+  // `IFormationInstance`'s two base subobjects now, so `offsetof` cannot name
+  // them here; `sizeof(IFormationInstance) == 0x10` guards them instead, and
+  // this first own-member assert re-checks the far edge.
   static_assert(offsetof(CAiFormationInstance, mState) == 0x10, "CAiFormationInstance::mState offset must be 0x10");
   static_assert(offsetof(CAiFormationInstance, mGamerules) == 0x14, "CAiFormationInstance::mGamerules offset must be 0x14");
   static_assert(

@@ -57,11 +57,17 @@ namespace
   [[nodiscard]] gpg::RType* CachedSAssignedLocInfoType();
   [[nodiscard]] gpg::RType* CachedIFormationInstanceType();
 
+  /**
+   * The binary keeps a single global for this descriptor (`0x010C6F84`), read
+   * and filled in place by every consumer, so this uses the instantiation's
+   * own `sType` lane rather than a second function-local cache.
+   */
   [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
   {
-    static gpg::RType* type = nullptr;
+    gpg::RType* type = moho::BroadcasterEventTag<moho::EFormationdStatus>::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EFormationdStatus>));
+      moho::BroadcasterEventTag<moho::EFormationdStatus>::sType = type;
     }
     return type;
   }
@@ -2649,6 +2655,12 @@ namespace moho
 
   /**
    * Address: 0x0059A500 (FUN_0059A500, ??1CAiFormationInstance@Moho@@QAE@@Z)
+   * Address: 0x0059BD60 (FUN_0059BD60, `??_GCAiFormationInstance@Moho@@UAEPAXI@Z`,
+   *   slot 0 of 0xE1B47C -- `call 0x59A500` then `test [esp+8], 1` /
+   *   `call ::operator delete`. That is MSVC's scalar deleting destructor,
+   *   emitted from the body below because the destructor is virtual; it used
+   *   to be hand-written here as an `operator_delete(std::int32_t)` virtual,
+   *   which put a 26th slot in a 25-slot interface.)
    * Mangled: ??1CAiFormationInstance@Moho@@QAE@@Z
    *
    * What it does:
@@ -2659,21 +2671,6 @@ namespace moho
   {
     CleanupFormation();
     mSim->mFormationDB->RemoveFormation(this);
-  }
-
-  /**
-   * Address: 0x0059BD60 (FUN_0059BD60, ??3CAiFormationInstance@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Executes CAiFormationInstance teardown and conditionally frees this object
-   * when `deleteFlags & 1` is set.
-   */
-  void CAiFormationInstance::operator_delete(const std::int32_t deleteFlags)
-  {
-    this->~CAiFormationInstance();
-    if ((deleteFlags & 1) != 0) {
-      ::operator delete(this);
-    }
   }
 
   /**
@@ -2847,6 +2844,10 @@ namespace moho
 
   /**
    * Address: 0x00569880 (FUN_00569880, Moho::CFormationInstance::~CFormationInstance)
+   * Address: 0x00569430 (FUN_00569430, `??_GCFormationInstance@Moho@@UAEPAXI@Z`,
+   *   slot 0 of this class's own vtable 0xE18E0C -- `call 0x569880` then the
+   *   conditional `::operator delete`, MSVC's scalar deleting destructor for
+   *   the virtual destructor below.)
    *
    * IDA signature:
    * void __stdcall Moho::CFormationInstance::~CFormationInstance(Moho::CFormationInstance *a1);
@@ -2863,21 +2864,6 @@ namespace moho
   CFormationInstance::~CFormationInstance()
   {
     CleanupFormation();
-  }
-
-  /**
-   * Address: 0x00569430 (FUN_00569430, Moho::CFormationInstance::operator delete)
-   * Slot: 0
-   *
-   * What it does:
-   * Runs the destructor, then frees storage when bit0 of `deleteFlags` is set.
-   */
-  void CFormationInstance::operator_delete(const std::int32_t deleteFlags)
-  {
-    this->~CFormationInstance();
-    if ((deleteFlags & 1) != 0) {
-      ::operator delete(this);
-    }
   }
 
   /**
@@ -3367,7 +3353,7 @@ namespace moho
       MergeOverlappingOffsetInfos(*this);
     }
 
-    mStatusListeners.BroadcastEvent(FORMATIONSTATUS_FormationUpdated);
+    BroadcastEvent(FORMATIONSTATUS_FormationUpdated);
   }
 
   /**
@@ -4188,7 +4174,7 @@ namespace moho
 
         if (inFormation) {
           group.mInFormation = true;
-          mStatusListeners.BroadcastEvent(FORMATIONSTATUS_FormationAtGoal);
+          BroadcastEvent(FORMATIONSTATUS_FormationAtGoal);
         }
       }
     }

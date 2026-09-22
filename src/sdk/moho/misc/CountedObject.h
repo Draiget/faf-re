@@ -34,9 +34,13 @@ namespace moho
    * because this template has one, so the counting belongs here and `SParticle`
    * declares no destructor of its own.
    *
-   * Not every instantiation is refcounted -- `CountedPtr<IFormationInstance>`
-   * holds a type with no reference count at all -- so the ownership operations
-   * are constrained and degrade to plain pointer copies for such payloads.
+   * Every instantiation in the tree (`CParticleTexture`, `IFormationInstance`,
+   * `CountedObject` itself) derives from `CountedObject`, so the constraints
+   * below are satisfied throughout; they remain as the statement of what this
+   * template needs from `T`. Note that a slot the binary hands to
+   * `RCountedPtrType<T>` is not automatically a `CountedPtr<T>` object --
+   * `CUnitCommand`'s two formation slots are bare pointer words with no
+   * retain/release around them, and are typed that way.
    */
   template <class T>
   struct CountedPtr

@@ -5,6 +5,9 @@
 #include "Wm3Quaternion.h"
 #include "Wm3Vector3.h"
 
+#include "moho/misc/CountedObject.h"
+#include "moho/unit/Broadcaster.h"
+
 namespace gpg
 {
   class RType;
@@ -21,16 +24,41 @@ namespace moho
   class Unit;
 
   /**
-   * Minimal formation-instance interface view used by transport/runtime callers.
+   * The interface every formation object is reached through.
    *
-   * Address ownership:
-   * - `CAiFormationInstance` slot-0 implementation: 0x0059BD60 (`FUN_0059BD60`)
+   * VFTABLE: 0x00E18D74
    *
-   * What it does:
-   * Invokes instance destructor and optionally frees storage when bit0 of
-   * `deleteFlags` is set.
+   * Bases, from the RTTI hierarchy descriptor of
+   * `.?AVIFormationInstance@Moho@@` (HierarchyAttribs 0x1 -- multiple
+   * inheritance):
+   *
+   *   base: Moho::CountedObject                                   mdisp=0
+   *   base: Moho::Broadcaster<EFormationdStatus>                  mdisp=8
+   *
+   * The constructor at 0x00569450 is the whole proof in six instructions:
+   *
+   *   lea ecx, [eax + 8]          ; &(the broadcaster base)
+   *   mov dword [eax + 4], 0      ; CountedObject::mRefCount
+   *   mov dword [ecx + 4], ecx    ; the node self-links -- TDatListItem()
+   *   mov dword [ecx], ecx
+   *   mov dword [eax], 0xE18D74   ; this class's own vftable, published last
+   *
+   * -- i.e. `CountedObject()` inlined (its vftable store elided because the
+   * derived one overwrites it), then the broadcaster node's own constructor,
+   * then the vptr. The destructor (0x00565C70) runs the same layout
+   * backwards: vptr, the node's unlink at +0x08, then `mov [ecx], 0xE01810`,
+   * which is `~CountedObject` inlined. `~CFormationInstance` (0x00569880)
+   * ends with that identical eight-instruction tail, which is what pins the
+   * unlink to this class rather than to its owner.
+   *
+   * Both of those lanes used to be reached through a two-field
+   * `IFormationInstanceSerializationRuntimeView` laid over the object with a
+   * stand-in vtable word, because this class was modelled as a bare 4-byte
+   * vtable carrier that declared the reference count as its own
+   * `mSharedCount` member and left the broadcaster on `CFormationInstance` as
+   * `mStatusListeners`.
    */
-  class IFormationInstance
+  class IFormationInstance : public CountedObject, public BroadcasterEventTag<EFormationdStatus>
   {
   public:
     inline static gpg::RType* sType = nullptr;
@@ -40,19 +68,25 @@ namespace moho
      * Address: 0x00569450 (FUN_00569450, Moho::IFormationInstance::IFormationInstance)
      *
      * What it does:
-     * Initializes the base runtime lane and self-links the embedded
-     * formation-status broadcaster node.
+     * Nothing of its own -- the cleared reference count and the self-linked
+     * listener ring are the two base constructors, and the vftable store is
+     * the compiler's.
      */
     IFormationInstance();
 
     /**
      * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
+     * Address: 0x00565CA0 (FUN_00565CA0, `??_GIFormationInstance@Moho@@UAEPAXI@Z`,
+     *   the scalar deleting destructor MSVC parks in slot 0: the body below
+     *   followed by the conditional `::operator delete`)
+     *
+     * VFTable SLOT: 0 (overriding `CountedObject`'s own slot-0 destructor,
+     * 0x004228E0)
      *
      * What it does:
-     * Unlinks the embedded formation-status broadcaster lane from its
-     * intrusive listener list.
+     * Unlinks the broadcaster base from whatever listener ring it is in.
      */
-    ~IFormationInstance();
+    ~IFormationInstance() override;
 
     /**
      * Address: 0x0059D010 (FUN_0059D010, Moho::IFormationInstance::GetPointerType)
@@ -78,8 +112,6 @@ namespace moho
      * Saves reflected formation-status broadcaster payload for this instance.
      */
     static void MemberSerialize(const IFormationInstance* object, gpg::WriteArchive* archive);
-
-    virtual void operator_delete(std::int32_t deleteFlags) = 0;
 
     /**
      * Slots 1-24 of `??_7IFormationInstance@Moho@@6B@` (0x00E18D74) are all
@@ -125,22 +157,14 @@ namespace moho
     virtual void SetOrientation(const Wm3::Quatf& orientation) = 0;                                       // slot 22
     virtual Wm3::Quatf* GetOrientation(Wm3::Quatf* outOrientation) const = 0;                             // slot 23
     virtual EUnitCommandType GetCommandType() const = 0;                                                  // slot 24
-
-    /**
-     * Intrusive reference count, zeroed by the constructor (0x00569450) and
-     * stepped by the reflected counted-pointer type - `RCountedPtrType<
-     * IFormationInstance>::SerLoad` (0x006EA7B0) decrements `[obj+0x04]` and
-     * deletes at zero, `SerSave` increments it - through the interface, not
-     * through any derived class. It lived on `CFormationInstance` before, so
-     * every consumer that only had the interface reached it by laying a
-     * two-field view with a stand-in vtable lane over the object instead.
-     */
-    std::int32_t mSharedCount; // +0x04
   };
 
-  static_assert(sizeof(IFormationInstance) == 0x08, "IFormationInstance size must be 0x08");
-  static_assert(
-    offsetof(IFormationInstance, mSharedCount) == 0x04,
-    "IFormationInstance::mSharedCount offset must be 0x04"
-  );
+  /**
+   * `CountedObject` (0x08, its own size assert) then the broadcaster node
+   * (0x08, likewise) -- which is the mdisp 0 / mdisp 8 pair the RTTI names,
+   * and also what `CAiFormationInstance`'s `offsetof(.., mState) == 0x10`
+   * pins from the far side. `offsetof` cannot name either base subobject, so
+   * the three size asserts together are the layout guard.
+   */
+  static_assert(sizeof(IFormationInstance) == 0x10, "IFormationInstance size must be 0x10");
 } // namespace moho

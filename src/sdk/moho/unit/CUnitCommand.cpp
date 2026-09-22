@@ -1484,9 +1484,16 @@ void CUnitCommand::MemberDeserialize(gpg::ReadArchive* const archive, CUnitComma
   }
 
   if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
-    CountedPtr<IFormationInstance> formation{};
+    // The reflected descriptor is `RCountedPtrType<IFormationInstance>`, but
+    // the slot handed to it here is one bare pointer word of stack: neither
+    // `CUnitCommand::MemberDeserialize` (0x006ECB80) nor `MemberSerialize`
+    // (0x006ECE20) contains a single `add [reg + 4], +-1`, so no `CountedPtr`
+    // temporary is constructed or destroyed around either call. The reference
+    // `RCountedPtrType::SerLoad` takes is the one that transfers straight into
+    // `mFormationInstance`.
+    IFormationInstance* formation = nullptr;
     archive->Read(formationType, &formation, ownerRef);
-    command->mFormationInstance = static_cast<CAiFormationInstance*>(formation.tex);
+    command->mFormationInstance = static_cast<CAiFormationInstance*>(formation);
   }
 
   if (gpg::RType* const targetType = ResolveCachedType<CAiTarget>()) {
@@ -1562,8 +1569,9 @@ void CUnitCommand::MemberSerialize(CUnitCommand* const command, gpg::WriteArchiv
     archive->Write(unitSetType, &serializedUnitSet, ownerRef);
   }
 
-  CountedPtr<IFormationInstance> formation{};
-  formation.tex = static_cast<IFormationInstance*>(command->mFormationInstance);
+  // Bare pointer slot, as on the load side above -- the save path takes no
+  // reference either.
+  IFormationInstance* formation = command->mFormationInstance;
   if (gpg::RType* const formationType = ResolveCountedPtrIFormationInstanceType()) {
     archive->Write(formationType, &formation, ownerRef);
   }
