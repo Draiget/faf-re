@@ -4087,157 +4087,6 @@ namespace
     return tableObject;
   }
 
-  struct Rect2iVectorRuntimeView
-  {
-    void* allocatorProxy;
-    gpg::Rect2i* first;
-    gpg::Rect2i* last;
-    gpg::Rect2i* end;
-  };
-  static_assert(sizeof(Rect2iVectorRuntimeView) == 0x10, "Rect2iVectorRuntimeView size must be 0x10");
-  static_assert(offsetof(Rect2iVectorRuntimeView, first) == 0x04, "Rect2iVectorRuntimeView::first offset must be 0x04");
-  static_assert(offsetof(Rect2iVectorRuntimeView, last) == 0x08, "Rect2iVectorRuntimeView::last offset must be 0x08");
-  static_assert(offsetof(Rect2iVectorRuntimeView, end) == 0x0C, "Rect2iVectorRuntimeView::end offset must be 0x0C");
-
-  struct SimSerMapDataRuntimeView
-  {
-    std::uint8_t reserved0000_08CB[0x8CC];
-    STIMap* mapData;
-    std::uint8_t reserved08D0_09F7[0x128];
-    Rect2iVectorRuntimeView cachedMapRects;
-    Rect2iVectorRuntimeView loadedMapRects;
-  };
-  static_assert(offsetof(SimSerMapDataRuntimeView, mapData) == 0x8CC, "Sim::mMapData offset must be 0x8CC");
-  static_assert(
-    offsetof(SimSerMapDataRuntimeView, cachedMapRects) == 0x9F8, "Sim cached map-rect vector offset must be 0x9F8"
-  );
-  static_assert(
-    offsetof(SimSerMapDataRuntimeView, loadedMapRects) == 0xA08, "Sim loaded map-rect vector offset must be 0xA08"
-  );
-
-  struct PointerSlotCollectionRuntimeView
-  {
-    std::uint32_t reserved00;      // +0x00
-    void** slots;                  // +0x04
-    std::uint32_t slotCount;       // +0x08
-    std::uint32_t ownerRefOrState; // +0x0C
-    std::uint32_t pendingRefCount; // +0x10
-  };
-  static_assert(sizeof(PointerSlotCollectionRuntimeView) == 0x14, "PointerSlotCollectionRuntimeView size must be 0x14");
-  static_assert(offsetof(PointerSlotCollectionRuntimeView, slots) == 0x04, "PointerSlotCollectionRuntimeView::slots offset must be 0x04");
-  static_assert(
-    offsetof(PointerSlotCollectionRuntimeView, slotCount) == 0x08,
-    "PointerSlotCollectionRuntimeView::slotCount offset must be 0x08"
-  );
-  static_assert(
-    offsetof(PointerSlotCollectionRuntimeView, ownerRefOrState) == 0x0C,
-    "PointerSlotCollectionRuntimeView::ownerRefOrState offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(PointerSlotCollectionRuntimeView, pendingRefCount) == 0x10,
-    "PointerSlotCollectionRuntimeView::pendingRefCount offset must be 0x10"
-  );
-
-  /**
-   * Address: 0x0074DF10 (FUN_0074DF10, sub_74DF10)
-   *
-   * What it does:
-   * Drains one pending-ref counter lane to zero (clearing owner lane at zero),
-   * then deletes every non-null slot payload and frees the slot table storage.
-   */
-  // Invoked by ~Sim to drain the deletion-queue pending-ref lane.
-  void DrainPendingRefsAndReleasePointerSlots(PointerSlotCollectionRuntimeView* const runtime) noexcept
-  {
-    while (runtime->pendingRefCount != 0u) {
-      std::uint32_t count = runtime->pendingRefCount;
-      if (count != 0u) {
-        --count;
-        runtime->pendingRefCount = count;
-        if (count == 0u) {
-          runtime->ownerRefOrState = 0u;
-        }
-      }
-    }
-
-    std::uint32_t index = runtime->slotCount;
-    while (index > 0u) {
-      --index;
-      void* const slotPayload = runtime->slots[index];
-      if (slotPayload != nullptr) {
-        ::operator delete(slotPayload);
-      }
-    }
-
-    if (runtime->slots != nullptr) {
-      ::operator delete(runtime->slots);
-    }
-
-    runtime->slots = nullptr;
-    runtime->slotCount = 0u;
-  }
-
-  /**
-   * Address: 0x0074C940 (FUN_0074C940, sub_74C940)
-   *
-   * What it does:
-   * Jump-thunk lane that forwards directly to `DrainPendingRefsAndReleasePointerSlots`.
-   */
-  [[maybe_unused]] void DrainPendingRefsAndReleasePointerSlotsThunk(PointerSlotCollectionRuntimeView* const runtime) noexcept
-  {
-    DrainPendingRefsAndReleasePointerSlots(runtime);
-  }
-
-  struct IntrusiveListNodeRuntimeView
-  {
-    IntrusiveListNodeRuntimeView* next; // +0x00
-    IntrusiveListNodeRuntimeView* prev; // +0x04
-  };
-  static_assert(sizeof(IntrusiveListNodeRuntimeView) == 0x08, "IntrusiveListNodeRuntimeView size must be 0x08");
-
-  struct IntrusiveListStorageRuntimeView
-  {
-    std::uint32_t reserved00;            // +0x00
-    IntrusiveListNodeRuntimeView* head;  // +0x04
-    std::uint32_t size;                  // +0x08
-  };
-  static_assert(sizeof(IntrusiveListStorageRuntimeView) == 0x0C, "IntrusiveListStorageRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(IntrusiveListStorageRuntimeView, head) == 0x04,
-    "IntrusiveListStorageRuntimeView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(IntrusiveListStorageRuntimeView, size) == 0x08,
-    "IntrusiveListStorageRuntimeView::size offset must be 0x08"
-  );
-
-  /**
-   * Address: 0x00739F50 (FUN_00739F50, sub_739F50)
-   *
-   * What it does:
-   * Resets one intrusive-list sentinel (`head->next=head`, `head->prev=head`),
-   * clears size to zero, then deletes each former node until sentinel reached.
-   */
-  [[maybe_unused]] IntrusiveListNodeRuntimeView* ClearIntrusiveListAndResetHead(
-    IntrusiveListStorageRuntimeView* const listRuntime
-  ) noexcept
-  {
-    IntrusiveListNodeRuntimeView* const head = listRuntime->head;
-    IntrusiveListNodeRuntimeView* node = head->next;
-    head->next = head;
-    head->prev = head;
-    listRuntime->size = 0u;
-
-    if (node != head) {
-      do {
-        IntrusiveListNodeRuntimeView* const next = node->next;
-        ::operator delete(node);
-        node = next;
-      } while (node != head);
-    }
-
-    return node;
-  }
-
   [[nodiscard]] gpg::RType* ResolveRect2iRType()
   {
     gpg::RType* rectType = gpg::Rect2i::sType;
@@ -5455,122 +5304,13 @@ namespace moho
   }
 } // namespace moho
 
-extern "C" gpg::Rect2i* Rect2CopyRange(const gpg::Rect2i* first, const gpg::Rect2i* last, gpg::Rect2i* destination);
-
-/**
- * Address: 0x0074D930 (FUN_0074D930, sub_74D930)
- *
- * What it does:
- * Resizes one `Rect2i` vector-runtime lane to `count` elements:
- * - shrinks by moving the logical end lane when current size is larger;
- * - grows by appending `defaultValue` rectangles, allocating/reallocating
- *   backing storage when capacity is insufficient.
- */
-extern "C" void Rect2VectorResizeDefault(
-  const std::uint32_t count,
-  void* const vectorStorage,
-  const gpg::Rect2i* const defaultValue,
-  const int /*reserved0*/,
-  const int /*reserved1*/,
-  const int /*reserved2*/
-)
-{
-  auto* const runtime = static_cast<Rect2iVectorRuntimeView*>(vectorStorage);
-  gpg::Rect2i* const begin = runtime->first;
-  const std::uint32_t currentCount =
-    (begin != nullptr) ? static_cast<std::uint32_t>(runtime->last - begin) : 0u;
-
-  if (currentCount >= count) {
-    if (begin != nullptr && count < currentCount) {
-      runtime->last = begin + count;
-    }
-    return;
-  }
-
-  const gpg::Rect2i fillValue = (defaultValue != nullptr) ? *defaultValue : gpg::Rect2i{};
-  const std::uint32_t appendCount = count - currentCount;
-
-  if (begin == nullptr) {
-    if (count == 0u) {
-      runtime->last = runtime->first;
-      runtime->end = runtime->first;
-      return;
-    }
-
-    auto* const storage = static_cast<gpg::Rect2i*>(::operator new(static_cast<std::size_t>(count) * sizeof(gpg::Rect2i)));
-    for (std::uint32_t index = 0u; index < count; ++index) {
-      storage[index] = fillValue;
-    }
-
-    runtime->first = storage;
-    runtime->last = storage + count;
-    runtime->end = storage + count;
-    return;
-  }
-
-  const std::uint32_t capacityCount = static_cast<std::uint32_t>(runtime->end - runtime->first);
-  if (count > capacityCount) {
-    std::uint32_t newCapacity = capacityCount + (capacityCount >> 1u);
-    if (newCapacity < count) {
-      newCapacity = count;
-    }
-
-    auto* const newStorage =
-      static_cast<gpg::Rect2i*>(::operator new(static_cast<std::size_t>(newCapacity) * sizeof(gpg::Rect2i)));
-    (void)Rect2CopyRange(runtime->first, runtime->last, newStorage);
-    ::operator delete(runtime->first);
-
-    runtime->first = newStorage;
-    runtime->last = newStorage + currentCount;
-    runtime->end = newStorage + newCapacity;
-  }
-
-  gpg::Rect2i* cursor = runtime->last;
-  for (std::uint32_t index = 0u; index < appendCount; ++index, ++cursor) {
-    *cursor = fillValue;
-  }
-  runtime->last = cursor;
-}
-
-/**
- * Address: 0x0074BFA0 (FUN_0074BFA0)
- *
- * What it does:
- * Stdcall adapter lane that forwards `(vectorStorage, count)` into
- * `Rect2VectorResizeDefault` with null default-fill and zeroed reserved lanes.
- */
-[[maybe_unused]] void __stdcall Rect2VectorResizeDefaultStdcallAdapter(
-  void* const vectorStorage,
-  const std::uint32_t count
-)
-{
-  Rect2VectorResizeDefault(count, vectorStorage, nullptr, 0, 0, 0);
-}
-
-extern "C"
-/**
- * Address: 0x00753860 (FUN_00753860, sub_753860)
- *
- * What it does:
- * Copies one contiguous half-open `Rect2i` range `[first,last)` into
- * `destination` and returns one-past the copied destination cursor.
- */
-gpg::Rect2i* Rect2CopyRange(const gpg::Rect2i* first, const gpg::Rect2i* last, gpg::Rect2i* destination)
-{
-  gpg::Rect2i* cursor = destination;
-  for (const gpg::Rect2i* source = first; source != last; ++source, ++cursor) {
-    *cursor = *source;
-  }
-  return cursor;
-}
-
 /**
  * Address: 0x00745020 (FUN_00745020, ?SerMapData@Sim@Moho@@AAEXAAVWriteArchive@gpg@@H@Z)
  *
  * What it does:
  * Serializes map playable-rect state by writing:
  * - one `Rect2i` copied from `mMapData->mPlayableRect`;
- * - loaded map-rect vector count (`+0x0A08` lane);
+ * - the size of `mLoadedMapRects` (+0x0A08);
  * - each loaded `Rect2i` element.
  */
 void Sim::SerMapData(gpg::WriteArchive* const archive)
@@ -5579,26 +5319,14 @@ void Sim::SerMapData(gpg::WriteArchive* const archive)
     return;
   }
 
-  auto* const runtime = reinterpret_cast<SimSerMapDataRuntimeView*>(this);
-
-  const gpg::Rect2i playableRect = runtime->mapData->mPlayableRect;
+  const gpg::Rect2i playableRect = mMapData->mPlayableRect;
   gpg::RRef nullOwnerRef{};
   archive->Write(ResolveRect2iRType(), &playableRect, nullOwnerRef);
 
-  std::uint32_t rectCount = 0;
-  if (runtime->loadedMapRects.first != nullptr) {
-    rectCount = static_cast<std::uint32_t>(runtime->loadedMapRects.last - runtime->loadedMapRects.first);
-  }
-  WriteArchiveUIntCompat(archive, rectCount);
-
-  for (std::uint32_t index = 0; index < rectCount; ++index) {
-    gpg::Rect2i* const loadedRects = runtime->loadedMapRects.first;
-    if (loadedRects == nullptr) {
-      break;
-    }
-
+  WriteArchiveUIntCompat(archive, static_cast<std::uint32_t>(mLoadedMapRects.size()));
+  for (gpg::Rect2i& loadedRect : mLoadedMapRects) {
     gpg::RRef elementOwnerRef{};
-    archive->Write(ResolveRect2iRType(), &loadedRects[index], elementOwnerRef);
+    archive->Write(ResolveRect2iRType(), &loadedRect, elementOwnerRef);
   }
 }
 
@@ -5606,8 +5334,14 @@ void Sim::SerMapData(gpg::WriteArchive* const archive)
  * Address: 0x00745120 (FUN_00745120, ?SerMapData@Sim@Moho@@AAEXAAVReadArchive@gpg@@H@Z)
  *
  * What it does:
- * Deserializes one playable rectangle lane, applies it to `mMapData`, then
- * loads and mirrors the archive `Rect2i` cache vectors used by Sim map lanes.
+ * Reads the playable rectangle and applies it to `mMapData`, reads the loaded
+ * map-rect list into `mLoadedMapRects`, then makes `mCachedMapRects` a copy of
+ * it (`resize` 0x0074D930 + `std::copy` 0x00753860).
+ *
+ * The cached list is resized even when the archive held no rectangles
+ * (0x00745258..0x00745261 run unconditionally), so a load always leaves it the
+ * same length as the loaded list. The overlay version skipped both steps for
+ * an empty list and kept whatever the cache held before the load.
  */
 void Sim::SerMapData(gpg::ReadArchive* const archive)
 {
@@ -5615,37 +5349,22 @@ void Sim::SerMapData(gpg::ReadArchive* const archive)
     return;
   }
 
-  auto* const runtime = reinterpret_cast<SimSerMapDataRuntimeView*>(this);
-
   gpg::Rect2i playableRect{};
   gpg::RRef ownerRef{};
   archive->Read(ResolveRect2iRType(), &playableRect, ownerRef);
-  (void)runtime->mapData->SetPlayableMapRect(playableRect);
+  (void)mMapData->SetPlayableMapRect(playableRect);
 
   std::uint32_t rectCount = 0;
   archive->ReadUInt(&rectCount);
 
-  const gpg::Rect2i zeroRect{};
-  Rect2VectorResizeDefault(rectCount, &runtime->loadedMapRects, &zeroRect, 0, 0, 0);
-  for (std::uint32_t index = 0; index < rectCount; ++index) {
+  mLoadedMapRects.resize(rectCount, gpg::Rect2i{});
+  for (gpg::Rect2i& loadedRect : mLoadedMapRects) {
     gpg::RRef elementOwnerRef{};
-    archive->Read(ResolveRect2iRType(), &runtime->loadedMapRects.first[index], elementOwnerRef);
+    archive->Read(ResolveRect2iRType(), &loadedRect, elementOwnerRef);
   }
 
-  if (runtime->loadedMapRects.first != nullptr) {
-    const std::ptrdiff_t loadedCount = runtime->loadedMapRects.last - runtime->loadedMapRects.first;
-    if (loadedCount > 0) {
-      Rect2VectorResizeDefault(
-        static_cast<std::uint32_t>(loadedCount),
-        &runtime->cachedMapRects,
-        &zeroRect,
-        0,
-        0,
-        0
-      );
-      (void)Rect2CopyRange(runtime->loadedMapRects.first, runtime->loadedMapRects.last, runtime->cachedMapRects.first);
-    }
-  }
+  mCachedMapRects.resize(mLoadedMapRects.size(), gpg::Rect2i{});
+  (void)std::copy(mLoadedMapRects.begin(), mLoadedMapRects.end(), mCachedMapRects.begin());
 }
 
 /**
@@ -8276,12 +7995,9 @@ Sim::~Sim()
   // the binary ordering).
   Sim::sInstance = nullptr;
 
-  // Drain the deletion-queue pending-ref slot lane. `mDeletionQueue` (an
-  // msvc8::deque) is layout-identical to PointerSlotCollectionRuntimeView
-  // (_Map/_Mapsize/_Myoff/_Mysize map to slots/slotCount/ownerRefOrState/
-  // pendingRefCount), which is what the binary's sub_74DF10 drains at +0xA48.
-  DrainPendingRefsAndReleasePointerSlots(
-    reinterpret_cast<PointerSlotCollectionRuntimeView*>(&mDeletionQueue));
+  // `mDeletionQueue`'s destructor (0x0074DF10, +0xA48), at its place in the
+  // member teardown order this body spells out.
+  mDeletionQueue.clear_and_release();
 
   // Physics constants (raw storage).
   if (mPhysConstants) {
