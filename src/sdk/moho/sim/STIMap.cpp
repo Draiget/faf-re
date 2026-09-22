@@ -1261,6 +1261,28 @@ namespace moho
   }
 
   /**
+   * Address: 0x0064CF00 (FUN_0064CF00)
+   *
+   * What it does:
+   * Returns `{x, clampedSample / 128.0f, z}` -- the world-space corner point
+   * the debug overlays build their decal quads from.
+   */
+  Wm3::Vec3f CHeightField::GetClampedSamplePoint(const std::int32_t x, const std::int32_t z) const
+  {
+    const std::int32_t clampedX = std::clamp(x, 0, width - 1);
+    const std::int32_t clampedZ = std::clamp(z, 0, height - 1);
+    const std::uint16_t sample =
+      data[static_cast<std::size_t>(clampedZ) * static_cast<std::size_t>(width)
+           + static_cast<std::size_t>(clampedX)];
+
+    Wm3::Vec3f point{};
+    point.x = static_cast<float>(x);
+    point.y = static_cast<float>(sample) * kHeightWordScale;
+    point.z = static_cast<float>(z);
+    return point;
+  }
+
+  /**
    * Address: 0x00478470 (FUN_00478470, Moho::CHeightField::GetArrayAt)
    *
    * What it does:

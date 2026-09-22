@@ -174,6 +174,30 @@ namespace moho
     std::uint16_t GetHeightAt(std::int32_t x, std::int32_t z) const;
 
     /**
+     * Address: 0x0064CF00 (FUN_0064CF00)
+     *
+     * IDA signature:
+     * Wm3::Vector3f *__usercall Moho::CHeightField::GetClampedSamplePoint@<eax>(
+     *   Wm3::Vector3f *result@<eax>, int x@<ebx>, Moho::CHeightField *this@<esi>, int z);
+     *
+     * What it does:
+     * Builds the world-space point for integer sample coordinates `(x, z)`.
+     * `x` and `z` pass through *unclamped* into the result's X and Z lanes;
+     * only the elevation lookup is clamped, to
+     * `(clamp(x, 0, width-1), clamp(z, 0, height-1))`, and scaled by 1/128
+     * (`ds:flt_E4F6DC`).
+     *
+     * This is the corner-sampling step of the debug overlays' decal quads:
+     * `RDebugGrid`'s occupancy cells and `RDebugRadar`'s recon-coverage cells
+     * both build all four `SDebugDecal` corners with it, which is why it was
+     * emitted out of line once and inlined at every site. Unlike `GetHeightAt`
+     * it carries no null/empty-grid guard -- its callers are already walking
+     * a live field.
+     */
+    [[nodiscard]]
+    Wm3::Vec3f GetClampedSamplePoint(std::int32_t x, std::int32_t z) const;
+
+    /**
      * Address: 0x00478470 (FUN_00478470, Moho::CHeightField::GetArrayAt)
      *
      * int x, int z

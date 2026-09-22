@@ -20,194 +20,15 @@
 
 namespace
 {
-  struct GridHeightSamplesView
-  {
-    const std::uint16_t* samples = nullptr;
-    int width = 0;
-    int height = 0;
-  };
-
-  struct ByteMaskGridRuntimeView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    const std::int8_t* samples = nullptr; // +0x04
-    std::uint32_t width = 0u; // +0x08
-    std::uint32_t height = 0u; // +0x0C
-  };
-  static_assert(sizeof(ByteMaskGridRuntimeView) == 0x10, "ByteMaskGridRuntimeView size must be 0x10");
-  static_assert(offsetof(ByteMaskGridRuntimeView, samples) == 0x04, "ByteMaskGridRuntimeView::samples offset must be 0x04");
-  static_assert(offsetof(ByteMaskGridRuntimeView, width) == 0x08, "ByteMaskGridRuntimeView::width offset must be 0x08");
-  static_assert(offsetof(ByteMaskGridRuntimeView, height) == 0x0C, "ByteMaskGridRuntimeView::height offset must be 0x0C");
-
-  struct ByteMaskSelectionRuntimeView
-  {
-    const ByteMaskGridRuntimeView* grid = nullptr; // +0x00
-    std::uint32_t lane04 = 0u; // +0x04
-    std::int32_t selectedValue = 0; // +0x08
-  };
-  static_assert(sizeof(ByteMaskSelectionRuntimeView) == 0x0C, "ByteMaskSelectionRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(ByteMaskSelectionRuntimeView, selectedValue) == 0x08,
-    "ByteMaskSelectionRuntimeView::selectedValue offset must be 0x08"
-  );
-
-  struct Stride712CursorRuntimeView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uintptr_t baseAddress = 0u; // +0x04
-  };
-  static_assert(sizeof(Stride712CursorRuntimeView) == 0x08, "Stride712CursorRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(Stride712CursorRuntimeView, baseAddress) == 0x04,
-    "Stride712CursorRuntimeView::baseAddress offset must be 0x04"
-  );
-
-  struct Stride72RangeRuntimeView
-  {
-    std::uint32_t lane00 = 0u; // +0x00
-    std::uintptr_t beginAddress = 0u; // +0x04
-    std::uint32_t lane08 = 0u; // +0x08
-    std::uintptr_t endAddress = 0u; // +0x0C
-  };
-  static_assert(sizeof(Stride72RangeRuntimeView) == 0x10, "Stride72RangeRuntimeView size must be 0x10");
-  static_assert(
-    offsetof(Stride72RangeRuntimeView, beginAddress) == 0x04,
-    "Stride72RangeRuntimeView::beginAddress offset must be 0x04"
-  );
-  static_assert(offsetof(Stride72RangeRuntimeView, endAddress) == 0x0C, "Stride72RangeRuntimeView::endAddress offset must be 0x0C");
-
-  /**
-   * Address: 0x0064CFA0 (FUN_0064CFA0)
-   *
-   * What it does:
-   * Returns one signed byte-mask sample at `(x, y)` when indices are in-range;
-   * otherwise returns zero.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t SampleSignedByteMaskAt(
-    const ByteMaskGridRuntimeView* const grid,
-    const std::uint32_t x,
-    const std::uint32_t y
-  ) noexcept
-  {
-    if (grid == nullptr || grid->samples == nullptr) {
-      return 0;
-    }
-    if (x >= grid->width || y >= grid->height) {
-      return 0;
-    }
-
-    const std::size_t sampleIndex = static_cast<std::size_t>(x + (y * grid->width));
-    return static_cast<std::int32_t>(grid->samples[sampleIndex]);
-  }
-
-  /**
-   * Address: 0x0064CFD0 (FUN_0064CFD0)
-   *
-   * What it does:
-   * Returns one selector payload when the byte-mask lane at `(x, y)` is set;
-   * otherwise returns zero.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t ResolveSelectionValueForByteMask(
-    const std::uint32_t x,
-    const ByteMaskSelectionRuntimeView* const selection,
-    const std::uint32_t y
-  ) noexcept
-  {
-    if (selection == nullptr || selection->grid == nullptr || selection->grid->samples == nullptr) {
-      return 0;
-    }
-    if (x >= selection->grid->width || y >= selection->grid->height) {
-      return 0;
-    }
-
-    const std::size_t sampleIndex = static_cast<std::size_t>(x + (y * selection->grid->width));
-    return selection->grid->samples[sampleIndex] != 0 ? selection->selectedValue : 0;
-  }
-
-  /**
-   * Address: 0x0064D1F0 (FUN_0064D1F0)
-   *
-   * What it does:
-   * Maps one debug-grid mode selector to packed ARGB color lanes.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uint32_t ResolveDebugGridColorByMode(const std::int32_t mode) noexcept
-  {
-    switch (mode) {
-      case 0:
-        return 0xFFFFFFFFu;
-      case 1:
-        return 0xFFFF0000u;
-      case 2:
-        return 0xFF00FF00u;
-      default:
-        return 0xFF0000FFu;
-    }
-  }
-
-  /**
-   * Address: 0x0064E240 (FUN_0064E240)
-   *
-   * What it does:
-   * Returns one `base + index * 0x2C8` address lane from a stride-712 view.
-   */
-  [[maybe_unused]] [[nodiscard]] std::uintptr_t ResolveStride712ElementAddress(
-    const std::int32_t index,
-    const Stride712CursorRuntimeView* const view
-  ) noexcept
-  {
-    return view->baseAddress + (static_cast<std::uintptr_t>(index) * 0x2C8u);
-  }
-
-  /**
-   * Address: 0x0064E2D0 (FUN_0064E2D0)
-   *
-   * What it does:
-   * Returns element count for one stride-72 pointer range, or zero when the
-   * begin lane is null.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t CountStride72Elements(const Stride72RangeRuntimeView* const view) noexcept
-  {
-    if (view == nullptr || view->beginAddress == 0u) {
-      return 0;
-    }
-
-    const std::intptr_t byteSpan =
-      static_cast<std::intptr_t>(view->endAddress) - static_cast<std::intptr_t>(view->beginAddress);
-    return static_cast<std::int32_t>(byteSpan / 72);
-  }
-
-  /**
-   * Address: 0x0064CF00 (FUN_0064CF00)
-   *
-   * What it does:
-   * Clamps one `(x,z)` index pair into the valid 16-bit sample grid and
-   * returns world-space point `{x, sample/128.0f, z}`.
-   */
-  [[maybe_unused]] [[nodiscard]] Wm3::Vector3f BuildClampedGridSamplePoint(
-    const GridHeightSamplesView& grid,
-    const int x,
-    const int z
-  ) noexcept
-  {
-    Wm3::Vector3f out{};
-    out.x = static_cast<float>(x);
-    out.z = static_cast<float>(z);
-    out.y = 0.0f;
-
-    if (grid.samples == nullptr || grid.width <= 0 || grid.height <= 0) {
-      return out;
-    }
-
-    const int clampedX = std::clamp(x, 0, grid.width - 1);
-    const int clampedZ = std::clamp(z, 0, grid.height - 1);
-    const std::size_t sampleIndex = static_cast<std::size_t>(clampedX + (clampedZ * grid.width));
-    const std::uint16_t sample = grid.samples[sampleIndex];
-    out.y = static_cast<float>(sample) * (1.0f / 128.0f);
-    return out;
-  }
-
   /**
    * Address: 0x0064D000 (FUN_0064D000)
+   * Address: 0x0064E250 (FUN_0064E250 -- the second emission of this same
+   * inline cache. Both bodies read `[0x010C73F4]`, and on a miss push
+   * `&typeid(RDebugGrid)` (`0x00F73CA4`) into `gpg::LookupRType` and store the
+   * result back; they differ only in the relative displacement of that one
+   * `call`, which is why `/OPT:ICF` could not fold them. Formerly transcribed
+   * a second time as `ResolveRDebugGridTypeCacheSecondary`, `[[maybe_unused]]`
+   * with zero callers.)
    *
    * What it does:
    * Resolves and caches the reflected runtime type for `RDebugGrid`.
@@ -222,62 +43,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x0064E250 (FUN_0064E250)
-   *
-   * What it does:
-   * Secondary duplicate lane that resolves/caches `RDebugGrid` reflection
-   * type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveRDebugGridTypeCacheSecondary()
-  {
-    gpg::RType* type = moho::RDebugGrid::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugGrid));
-      moho::RDebugGrid::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0064D1C0 (FUN_0064D1C0)
-   *
-   * What it does:
-   * Returns one debug-grid distance lane by selector:
-   * `0 -> 75.0f`, `1 -> 500.0f`, otherwise `+inf`.
-   *
-   * Orphan: zero xrefs at this address in the IDA export, zero callers in
-   * the callgraph index, and no other reference to it in src/sdk. No sibling
-   * inline use of the `75.0f`/`500.0f` selector pair was found elsewhere in
-   * this file to redirect to instead.
-   */
-  [[maybe_unused]] float ResolveRDebugGridDistanceBySelector(const int selector) noexcept
-  {
-    if (selector == 0) {
-      return 75.0f;
-    }
-    if (selector == 1) {
-      return 500.0f;
-    }
-    return std::numeric_limits<float>::infinity();
-  }
-
-  /**
-   * Address: 0x0064EDB0 (FUN_0064EDB0, Moho::RDebugGrid non-deleting dtor body)
-   *
-   * What it does:
-   * Runs the typed debug-overlay intrusive unlink lane for one `RDebugGrid`
-   * instance and restores singleton link state.
-   */
-  [[maybe_unused]] void DestroyRDebugGridNonDeletingBody(moho::RDebugGrid* const overlay) noexcept
-  {
-    if (overlay == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
-    node->ListUnlinkSelf();
-  }
 
   // Height-sample word scale (1/128) applied when converting stored 16-bit
   // terrain samples into world-space elevation. Matches ds:flt_E4F6DC.
@@ -443,21 +208,6 @@ namespace
     const int cellZ0 = bounds.zMin / stride;
     const int cellZ1 = (bounds.zMax + stride - 1) / stride;
 
-    const int maxSampleX = hf->width - 1;
-    const int maxSampleZ = hf->height - 1;
-    const std::uint16_t* const samples = hf->data;
-
-    const auto clampSampleX = [maxSampleX](int value) noexcept {
-      return std::clamp(value, 0, maxSampleX);
-    };
-    const auto clampSampleZ = [maxSampleZ](int value) noexcept {
-      return std::clamp(value, 0, maxSampleZ);
-    };
-    const auto elevationAt = [&](int sampleX, int sampleZ) noexcept {
-      return static_cast<float>(samples[clampSampleX(sampleX) + clampSampleZ(sampleZ) * hf->width])
-        * kHeightSampleScale;
-    };
-
     for (int cellZ = cellZ0; cellZ < cellZ1; ++cellZ) {
       const int worldZ = stride * cellZ;
       const int worldZNext = worldZ + stride;
@@ -473,22 +223,10 @@ namespace
         const int worldXNext = worldX + stride;
 
         moho::SDebugDecal decal{};
-        // corner0 : (worldX+stride, worldZ)
-        decal.corner0.x = static_cast<float>(worldXNext);
-        decal.corner0.y = elevationAt(worldXNext, worldZ);
-        decal.corner0.z = static_cast<float>(worldZ);
-        // corner1 : (worldX+stride, worldZ+stride)
-        decal.corner1.x = static_cast<float>(worldXNext);
-        decal.corner1.y = elevationAt(worldXNext, worldZNext);
-        decal.corner1.z = static_cast<float>(worldZNext);
-        // corner2 : (worldX, worldZ+stride)
-        decal.corner2.x = static_cast<float>(worldX);
-        decal.corner2.y = elevationAt(worldX, worldZNext);
-        decal.corner2.z = static_cast<float>(worldZNext);
-        // corner3 : (worldX, worldZ)
-        decal.corner3.x = static_cast<float>(worldX);
-        decal.corner3.y = elevationAt(worldX, worldZ);
-        decal.corner3.z = static_cast<float>(worldZ);
+        decal.corner0 = hf->GetClampedSamplePoint(worldXNext, worldZ);
+        decal.corner1 = hf->GetClampedSamplePoint(worldXNext, worldZNext);
+        decal.corner2 = hf->GetClampedSamplePoint(worldX, worldZNext);
+        decal.corner3 = hf->GetClampedSamplePoint(worldX, worldZ);
         decal.color = static_cast<std::uint32_t>(color);
 
         canvas->decals.push_back(decal);
@@ -496,9 +234,21 @@ namespace
     }
   }
 
-  // Maps a debug-grid subdivision-depth selector to its ARGB color:
-  // 0 -> white, 1 -> red, 2 -> green, otherwise blue. Matches the inline
-  // color ladders in FUN_0064D3A0 (values are negative ARGB constants).
+  /**
+   * Address: 0x0064D1F0 (FUN_0064D1F0)
+   *
+   * What it does:
+   * Maps a debug-grid subdivision-depth selector to its ARGB color:
+   * 0 -> white, 1 -> red, 2 -> green, otherwise blue.
+   *
+   * `FUN_0064D1F0` is this function's own out-of-line COMDAT (`sub eax,0 /
+   * sub eax,1 / sub eax,1` over `0xFFFFFFFF`, `0xFFFF0000`, `0xFF00FF00`,
+   * `0xFF0000FF`), which nothing calls because every use site inlined it --
+   * `FUN_0064D3A0` carries the identical ladder twice, at 0x0064D617 over
+   * `depthZ` (`[ebp+0x18]`) and at 0x0064D672 over `depthX` (`[ebp+0x14]`),
+   * in that order. It had been transcribed here a second time as
+   * `ResolveDebugGridColorByMode`.
+   */
   [[nodiscard]] std::int32_t ResolveGridDepthColor(unsigned int selector) noexcept
   {
     switch (selector) {
@@ -513,17 +263,33 @@ namespace
     }
   }
 
-  // Distance threshold (in world units) at which a grid subdivision level stops
-  // subdividing and starts drawing: 0 -> 75, 1 -> 500, otherwise +inf.
-  [[nodiscard]] float ResolveGridSubdivisionDistance(unsigned int selector) noexcept
+  /**
+   * Address: 0x0064D1C0 (FUN_0064D1C0)
+   *
+   * What it does:
+   * Distance threshold (in world units) at which a grid subdivision *level*
+   * stops subdividing and starts drawing: level 0 -> 75, level 1 -> 500,
+   * deeper -> +inf (draw immediately).
+   *
+   * The level is `depth - 1`, not `depth`. `FUN_0064D1C0` is this function's
+   * own out-of-line COMDAT and its switch is normalised on 0 (`sub eax,0 /
+   * je 75.0f` at `ds:0x00E4F700`, `sub eax,1 / je 500.0f` at
+   * `ds:0x00E4F704`); the inlined copy inside `FUN_0064D3A0` does the
+   * decrement first -- `add edx,-1` at 0x0064D521, then the same two
+   * compares at 0x0064D526/0x0064D543. Passing `depth` and testing 1/2 is
+   * behaviourally identical but emits the subtraction in the wrong place,
+   * so the argument is spelled as the binary spells it.
+   */
+  [[nodiscard]] float ResolveGridSubdivisionDistance(unsigned int level) noexcept
   {
-    if (selector == 1u) {
-      return 75.0f;
+    switch (level) {
+      case 0u:
+        return 75.0f;
+      case 1u:
+        return 500.0f;
+      default:
+        return std::numeric_limits<float>::infinity();
     }
-    if (selector == 2u) {
-      return 500.0f;
-    }
-    return std::numeric_limits<float>::infinity();
   }
 
   /**
@@ -588,7 +354,7 @@ namespace
     }
 
     if (depth != 0u) {
-      const float subdivideDistance = ResolveGridSubdivisionDistance(depth);
+      const float subdivideDistance = ResolveGridSubdivisionDistance(depth - 1u);
 
       // Screen-projected size heuristic: viewport matrix row 1 applied to the
       // cell center. GeomCamera3::viewport is a VMatrix4 (+0x284); the binary
