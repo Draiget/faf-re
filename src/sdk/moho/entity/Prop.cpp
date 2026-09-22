@@ -18,6 +18,7 @@
 #include "moho/path/PathTables.h"
 #include "moho/resource/blueprints/RPropBlueprint.h"
 #include "moho/sim/COGrid.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/Sim.h"
 #include "moho/sim/SimDebugCommandRegistrations.h"
 #include "moho/sim/SimDriver.h"
@@ -96,38 +97,35 @@ namespace
     }
   }
 
-  struct OccupancyFootprintRuntimeView
-  {
-    std::uint8_t widthCells = 0;         // +0x00
-    std::uint8_t heightCells = 0;        // +0x01
-    std::uint8_t occupancyCapsBits = 0;  // +0x02
-  };
-  static_assert(sizeof(OccupancyFootprintRuntimeView) == 0x03, "OccupancyFootprintRuntimeView size must be 0x03");
-
   /**
    * Address: 0x00721AF0 (FUN_00721AF0)
    *
+   * IDA signature:
+   * void __usercall sub_721AF0(const SFootprint *footprint@<eax>, const SOCellPos *origin@<edx>);
+   *
    * What it does:
-   * Converts one footprint lane (`width/height/caps`) and top-left occupancy
-   * cell origin into a `Rect2i`, then forwards to `COGrid::ExecuteOccupy`.
+   * Marks the footprint's cell rectangle at `origin` occupied with the
+   * footprint's own occupancy caps: `movzx [eax]` / `[eax+1]` are
+   * `mSizeX` / `mSizeZ`, `mov al, [eax+2]` is `mOccupancyCaps`, and the two
+   * `movsx word` loads off `edx` are the origin cell.
+   *
+   * This took an invented 3-byte `OccupancyFootprintRuntimeView` that the
+   * caller filled by copying those same three bytes out of
+   * `blueprint->mFootprint`, and two loose `int16_t` origin lanes. It takes the
+   * footprint and the `SOCellPos` it always read.
    */
-  void LoadOccupancyFromFootprintCellRuntime(
-    const OccupancyFootprintRuntimeView& footprint,
-    const std::int16_t originX,
-    const std::int16_t originZ,
-    moho::COGrid* const grid
-  )
+  void OccupyFootprintAt(const moho::SFootprint& footprint, const moho::SOCellPos& origin, moho::COGrid* const grid)
   {
     if (grid == nullptr) {
       return;
     }
 
     gpg::Rect2i rect{};
-    rect.x0 = static_cast<int>(originX);
-    rect.z0 = static_cast<int>(originZ);
-    rect.x1 = rect.x0 + static_cast<int>(footprint.widthCells);
-    rect.z1 = rect.z0 + static_cast<int>(footprint.heightCells);
-    grid->ExecuteOccupy(static_cast<moho::EOccupancyCaps>(footprint.occupancyCapsBits), rect);
+    rect.x0 = static_cast<int>(origin.x);
+    rect.z0 = static_cast<int>(origin.z);
+    rect.x1 = rect.x0 + static_cast<int>(footprint.mSizeX);
+    rect.z1 = rect.z0 + static_cast<int>(footprint.mSizeZ);
+    grid->ExecuteOccupy(footprint.mOccupancyCaps, rect);
   }
 
   /**
@@ -594,17 +592,8 @@ namespace moho
         const int originX = static_cast<int>(std::lrintf(transform.pos_.x - static_cast<float>(blueprint->mFootprint.mSizeX) * 0.5f));
         const int originZ = static_cast<int>(std::lrintf(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
 
-        const OccupancyFootprintRuntimeView footprint{
-          static_cast<std::uint8_t>(blueprint->mFootprint.mSizeX),
-          static_cast<std::uint8_t>(blueprint->mFootprint.mSizeZ),
-          static_cast<std::uint8_t>(blueprint->mFootprint.mOccupancyCaps)
-        };
-        LoadOccupancyFromFootprintCellRuntime(
-          footprint,
-          static_cast<std::int16_t>(originX),
-          static_cast<std::int16_t>(originZ),
-          sim->mOGrid
-        );
+        const SOCellPos origin{static_cast<std::int16_t>(originX), static_cast<std::int16_t>(originZ)};
+        OccupyFootprintAt(blueprint->mFootprint, origin, sim->mOGrid);
       }
     }
   }

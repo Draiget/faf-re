@@ -218,72 +218,6 @@ namespace
     return (variableData.mIntelAttributes.vision & kIntelEnabledBit) != 0u;
   }
 
-  struct SessionEntityMapNodeRuntimeView
-  {
-    SessionEntityMapNodeRuntimeView* mLeft;   // +0x00
-    SessionEntityMapNodeRuntimeView* mParent; // +0x04
-    SessionEntityMapNodeRuntimeView* mRight;  // +0x08
-    std::uint32_t mEntityId;                  // +0x0C
-    moho::UserEntity* mEntity;                // +0x10
-    std::uint8_t pad_14_17[0x04];
-    std::uint8_t mColor;      // +0x18
-    std::uint8_t mIsSentinel; // +0x19
-    std::uint8_t pad_1A[0x02];
-  };
-
-  static_assert(sizeof(SessionEntityMapNodeRuntimeView) == 0x1C, "SessionEntityMapNodeRuntimeView size must be 0x1C");
-  static_assert(
-    offsetof(SessionEntityMapNodeRuntimeView, mEntityId) == 0x0C,
-    "SessionEntityMapNodeRuntimeView::mEntityId offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SessionEntityMapNodeRuntimeView, mEntity) == 0x10,
-    "SessionEntityMapNodeRuntimeView::mEntity offset must be 0x10"
-  );
-
-  struct SessionEntityMapRuntimeView
-  {
-    void* mAllocProxy;                      // +0x00
-    SessionEntityMapNodeRuntimeView* mHead; // +0x04
-    std::uint32_t mSize;                    // +0x08
-  };
-
-  static_assert(sizeof(SessionEntityMapRuntimeView) == 0x0C, "SessionEntityMapRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(SessionEntityMapRuntimeView, mHead) == 0x04,
-    "SessionEntityMapRuntimeView::mHead offset must be 0x04"
-  );
-
-  [[nodiscard]] SessionEntityMapRuntimeView* GetSessionEntityMapRuntimeView(moho::CWldSession* const session) noexcept
-  {
-    static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
-    return reinterpret_cast<SessionEntityMapRuntimeView*>(&session->mUnknownOwner44);
-  }
-
-  [[nodiscard]] SessionEntityMapNodeRuntimeView*
-  FindSessionEntityMapNodeById(SessionEntityMapRuntimeView& map, const std::uint32_t entityId) noexcept
-  {
-    SessionEntityMapNodeRuntimeView* const head = map.mHead;
-    if (head == nullptr) {
-      return nullptr;
-    }
-
-    SessionEntityMapNodeRuntimeView* node = head->mParent;
-    while (node != nullptr && node != head) {
-      if (entityId < node->mEntityId) {
-        node = node->mLeft;
-        continue;
-      }
-      if (node->mEntityId < entityId) {
-        node = node->mRight;
-        continue;
-      }
-      return node;
-    }
-
-    return nullptr;
-  }
-
   [[nodiscard]] float ClampUnitInterval(const float value) noexcept
   {
     return std::clamp(value, 0.0f, 1.0f);
@@ -893,13 +827,12 @@ namespace moho
       return nullptr;
     }
 
-    SessionEntityMapRuntimeView* const entityMap = GetSessionEntityMapRuntimeView(mSession);
-    if (entityMap == nullptr || entityMap->mHead == nullptr) {
-      return nullptr;
-    }
-
-    SessionEntityMapNodeRuntimeView* const node = FindSessionEntityMapNodeById(*entityMap, mVariableData.mAttachmentParentRef);
-    return node != nullptr ? node->mEntity : nullptr;
+    // 0x00838042..0x0083805D: `find` on the session's entity map (0x00898DC0),
+    // compare against `end()`, return the mapped `UserEntity*` -- which is what
+    // `CWldSession::LookupEntityId` is. This used to walk the tree itself
+    // through a private copy of the map's node layout cast onto
+    // `CWldSession::mUnknownOwner44`.
+    return mSession->LookupEntityId(static_cast<EntId>(mVariableData.mAttachmentParentRef));
   }
 
   /**
