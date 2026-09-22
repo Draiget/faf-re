@@ -7601,80 +7601,12 @@ namespace moho
 
   namespace
   {
-    struct SessionSaveSourceNode
-    {
-      SessionSaveSourceNode* mLeft;   // +0x00
-      SessionSaveSourceNode* mParent; // +0x04
-      SessionSaveSourceNode* mRight;  // +0x08
-      std::uint32_t mCommandSourceId; // +0x0C
-      void* mProvider;                // +0x10
-      std::uint8_t mColor;            // +0x14
-      std::uint8_t mIsSentinel;       // +0x15
-      std::uint8_t pad_16[2];
-    };
-
-    static_assert(sizeof(SessionSaveSourceNode) == 0x18, "SessionSaveSourceNode size must be 0x18");
-    static_assert(
-      offsetof(SessionSaveSourceNode, mCommandSourceId) == 0x0C,
-      "SessionSaveSourceNode::mCommandSourceId offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(SessionSaveSourceNode, mProvider) == 0x10, "SessionSaveSourceNode::mProvider offset must be 0x10"
-    );
-    static_assert(
-      offsetof(SessionSaveSourceNode, mIsSentinel) == 0x15, "SessionSaveSourceNode::mIsSentinel offset must be 0x15"
-    );
-
-    struct SessionEntityMapNode
-    {
-      SessionEntityMapNode* mLeft;   // +0x00
-      SessionEntityMapNode* mParent; // +0x04
-      SessionEntityMapNode* mRight;  // +0x08
-      std::uint32_t mEntityId;       // +0x0C
-      UserEntity* mEntity;           // +0x10
-      std::uint8_t pad_14_17[4];     // +0x14
-      std::uint8_t mColor;           // +0x18
-      std::uint8_t mIsSentinel;      // +0x19
-      std::uint8_t pad_1A[2];
-    };
-
-    static_assert(sizeof(SessionEntityMapNode) == 0x1C, "SessionEntityMapNode size must be 0x1C");
-    static_assert(
-      offsetof(SessionEntityMapNode, mEntityId) == 0x0C,
-      "SessionEntityMapNode::mEntityId offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(SessionEntityMapNode, mEntity) == 0x10,
-      "SessionEntityMapNode::mEntity offset must be 0x10"
-    );
-    static_assert(
-      offsetof(SessionEntityMapNode, mIsSentinel) == 0x19,
-      "SessionEntityMapNode::mIsSentinel offset must be 0x19"
-    );
-
-    struct SessionEntityMap
-    {
-      void* mAllocProxy;            // +0x00
-      SessionEntityMapNode* mHead;  // +0x04
-      std::uint32_t mSize;          // +0x08
-    };
-
-    static_assert(sizeof(SessionEntityMap) == 0x0C, "SessionEntityMap size must be 0x0C");
-    static_assert(offsetof(SessionEntityMap, mHead) == 0x04, "SessionEntityMap::mHead offset must be 0x04");
-    static_assert(offsetof(SessionEntityMap, mSize) == 0x08, "SessionEntityMap::mSize offset must be 0x08");
-
     struct CWldSessionOrphanRuntimeView
     {
-      std::uint8_t pad_0000_0043[0x44];
-      SessionEntityMap mEntityMap;                // +0x44
-      std::uint8_t pad_0050_042B[0x3DC];
+      std::uint8_t pad_0000_042B[0x42C];
       SSelectionSetUserEntity mPendingOrphanSet;  // +0x42C
     };
 
-    static_assert(
-      offsetof(CWldSessionOrphanRuntimeView, mEntityMap) == 0x44,
-      "CWldSessionOrphanRuntimeView::mEntityMap offset must be 0x44"
-    );
     static_assert(
       offsetof(CWldSessionOrphanRuntimeView, mPendingOrphanSet) == 0x42C,
       "CWldSessionOrphanRuntimeView::mPendingOrphanSet offset must be 0x42C"
@@ -7751,43 +7683,6 @@ namespace moho
     {
       return *reinterpret_cast<const MouseInfo*>(&AccessCursorInfoRuntime(session));
     }
-
-    struct SessionSaveTagNode
-    {
-      SessionSaveTagNode* mLeft;   // +0x00
-      SessionSaveTagNode* mParent; // +0x04
-      SessionSaveTagNode* mRight;  // +0x08
-      msvc8::string mTagName;      // +0x0C
-      std::uint8_t mColor;         // +0x28
-      std::uint8_t mIsSentinel;    // +0x29
-      std::uint8_t pad_2A[2];
-    };
-
-    static_assert(sizeof(SessionSaveTagNode) == 0x2C, "SessionSaveTagNode size must be 0x2C");
-    static_assert(offsetof(SessionSaveTagNode, mTagName) == 0x0C, "SessionSaveTagNode::mTagName offset must be 0x0C");
-    static_assert(
-      offsetof(SessionSaveTagNode, mIsSentinel) == 0x29, "SessionSaveTagNode::mIsSentinel offset must be 0x29"
-    );
-
-    struct SessionSaveNodeOwnerView
-    {
-      std::uint8_t pad_0000[0x3D4];
-      SessionSaveTagNode* mTagTreeHead; // +0x3D4
-    };
-
-    static_assert(
-      offsetof(SessionSaveNodeOwnerView, mTagTreeHead) == 0x3D4,
-      "SessionSaveNodeOwnerView::mTagTreeHead offset must be 0x3D4"
-    );
-
-    class ISessionSaveSourceProvider
-    {
-    public:
-      virtual ~ISessionSaveSourceProvider() = default;
-      virtual void* Slot04() = 0;
-      virtual void* Slot08() = 0;
-      virtual void* GetSaveNodeOwner() = 0; // vtable +0x0C
-    };
 
     template <typename TNode>
     [[nodiscard]] bool IsSentinelNode(const TNode* const node)
@@ -11706,25 +11601,6 @@ namespace moho
       weakRef.mNextOwner = nullptr;
     }
 
-    [[nodiscard]] SessionSaveSourceNode* GetSaveSourceTreeHead(const CWldSession* const session)
-    {
-      return static_cast<SessionSaveSourceNode*>(session->mSaveSourceTreeHead);
-    }
-
-    [[nodiscard]] SessionEntityMap& GetSessionEntityMap(CWldSession* const session)
-    {
-      static_assert(offsetof(CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must be 0x44");
-      static_assert(
-        offsetof(CWldSession, mSaveSourceTreeHead) == 0x48,
-        "CWldSession::mSaveSourceTreeHead offset must be 0x48"
-      );
-      static_assert(
-        offsetof(CWldSession, mSaveSourceTreeSize) == 0x4C,
-        "CWldSession::mSaveSourceTreeSize offset must be 0x4C"
-      );
-      return *reinterpret_cast<SessionEntityMap*>(&session->mUnknownOwner44);
-    }
-
     struct CommandIssueOwnerRuntimeView
     {
       std::uint8_t mUnknown00_20F[0x210];
@@ -11754,494 +11630,6 @@ namespace moho
       return session->LookupEntityId(ownerView->mEntityId);
     }
 
-    [[nodiscard]] bool IsSessionEntityNodeNil(
-      const SessionEntityMapNode* const node,
-      const SessionEntityMapNode* const head
-    ) noexcept
-    {
-      return node == nullptr || node == head || node->mIsSentinel != 0u;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* SessionEntityTreeMin(
-      SessionEntityMapNode* node,
-      SessionEntityMapNode* const head
-    ) noexcept
-    {
-      while (!IsSessionEntityNodeNil(node, head) && !IsSessionEntityNodeNil(node->mLeft, head)) {
-        node = node->mLeft;
-      }
-      return IsSessionEntityNodeNil(node, head) ? head : node;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* SessionEntityTreeMax(
-      SessionEntityMapNode* node,
-      SessionEntityMapNode* const head
-    ) noexcept
-    {
-      while (!IsSessionEntityNodeNil(node, head) && !IsSessionEntityNodeNil(node->mRight, head)) {
-        node = node->mRight;
-      }
-      return IsSessionEntityNodeNil(node, head) ? head : node;
-    }
-
-    void RecomputeSessionEntityMapExtrema(SessionEntityMap& map) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      if (head == nullptr) {
-        return;
-      }
-
-      SessionEntityMapNode* const root = head->mParent;
-      if (IsSessionEntityNodeNil(root, head)) {
-        head->mParent = head;
-        head->mLeft = head;
-        head->mRight = head;
-        return;
-      }
-
-      head->mLeft = SessionEntityTreeMin(root, head);
-      head->mRight = SessionEntityTreeMax(root, head);
-    }
-
-    void DestroySessionEntityMapIteratorRange(
-      SessionEntityMapNode* node,
-      SessionEntityMapNode* const head
-    ) noexcept
-    {
-      while (!IsSessionEntityNodeNil(node, head)) {
-        SessionEntityMapNode* const eraseNode = node;
-        node = NextTreeNode(node);
-        ::operator delete(eraseNode);
-      }
-    }
-
-    /**
-     * Address: 0x008939D0 (FUN_008939D0, sub_8939D0)
-     *
-     * What it does:
-     * Destroys one full session-entity tree rooted under `map.mHead`, releases
-     * the sentinel head node, and clears retained head/size lanes.
-     */
-    void DestroySessionEntityMapStorage(SessionEntityMap& map) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      if (head != nullptr) {
-        DestroySessionEntityMapIteratorRange(head->mLeft, head);
-        ::operator delete(head);
-      }
-
-      map.mHead = nullptr;
-      map.mSize = 0u;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* FindSessionEntityMapNodeById(
-      SessionEntityMap& map,
-      const std::uint32_t entityId
-    ) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      if (head == nullptr) {
-        return nullptr;
-      }
-
-      SessionEntityMapNode* node = head->mParent;
-      while (!IsSessionEntityNodeNil(node, head)) {
-        if (entityId < node->mEntityId) {
-          node = node->mLeft;
-          continue;
-        }
-        if (node->mEntityId < entityId) {
-          node = node->mRight;
-          continue;
-        }
-        return node;
-      }
-
-      return head;
-    }
-
-    void RotateSessionEntityLeft(SessionEntityMap& map, SessionEntityMapNode* const node) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      SessionEntityMapNode* const pivot = node->mRight;
-      node->mRight = pivot->mLeft;
-      if (!IsSessionEntityNodeNil(pivot->mLeft, head)) {
-        pivot->mLeft->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node->mParent == head) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mLeft) {
-        node->mParent->mLeft = pivot;
-      } else {
-        node->mParent->mRight = pivot;
-      }
-
-      pivot->mLeft = node;
-      node->mParent = pivot;
-    }
-
-    void RotateSessionEntityRight(SessionEntityMap& map, SessionEntityMapNode* const node) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      SessionEntityMapNode* const pivot = node->mLeft;
-      node->mLeft = pivot->mRight;
-      if (!IsSessionEntityNodeNil(pivot->mRight, head)) {
-        pivot->mRight->mParent = node;
-      }
-
-      pivot->mParent = node->mParent;
-      if (node->mParent == head) {
-        head->mParent = pivot;
-      } else if (node == node->mParent->mRight) {
-        node->mParent->mRight = pivot;
-      } else {
-        node->mParent->mLeft = pivot;
-      }
-
-      pivot->mRight = node;
-      node->mParent = pivot;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* AllocateSessionEntityMapNode()
-    {
-      SessionEntityMapNode* const node =
-        static_cast<SessionEntityMapNode*>(::operator new(sizeof(SessionEntityMapNode)));
-      node->mLeft = nullptr;
-      node->mParent = nullptr;
-      node->mRight = nullptr;
-      node->mEntityId = 0u;
-      node->mEntity = nullptr;
-      node->pad_14_17[0] = 0u;
-      node->pad_14_17[1] = 0u;
-      node->pad_14_17[2] = 0u;
-      node->pad_14_17[3] = 0u;
-      node->mColor = 0u;
-      node->mIsSentinel = 0u;
-      node->pad_1A[0] = 0u;
-      node->pad_1A[1] = 0u;
-      return node;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* CreateSessionEntityMapHead()
-    {
-      SessionEntityMapNode* const head = AllocateSessionEntityMapNode();
-      head->mColor = 1u;
-      head->mIsSentinel = 1u;
-      head->mLeft = head;
-      head->mParent = head;
-      head->mRight = head;
-      return head;
-    }
-
-    [[nodiscard]] SessionEntityMapNode* EnsureSessionEntityMapHead(SessionEntityMap& map)
-    {
-      if (map.mHead == nullptr) {
-        map.mHead = CreateSessionEntityMapHead();
-        map.mSize = 0u;
-      }
-      return map.mHead;
-    }
-
-    void FixupAfterSessionEntityInsert(SessionEntityMap& map, SessionEntityMapNode* node) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      while (node->mParent->mColor == 0u) {
-        SessionEntityMapNode* const parent = node->mParent;
-        SessionEntityMapNode* const grand = parent->mParent;
-        if (parent == grand->mLeft) {
-          SessionEntityMapNode* const uncle = grand->mRight;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mRight) {
-              node = parent;
-              RotateSessionEntityLeft(map, node);
-            }
-            node->mParent->mColor = 1u;
-            node->mParent->mParent->mColor = 0u;
-            RotateSessionEntityRight(map, node->mParent->mParent);
-          }
-        } else {
-          SessionEntityMapNode* const uncle = grand->mLeft;
-          if (uncle->mColor == 0u) {
-            parent->mColor = 1u;
-            uncle->mColor = 1u;
-            grand->mColor = 0u;
-            node = grand;
-          } else {
-            if (node == parent->mLeft) {
-              node = parent;
-              RotateSessionEntityRight(map, node);
-            }
-            node->mParent->mColor = 1u;
-            node->mParent->mParent->mColor = 0u;
-            RotateSessionEntityLeft(map, node->mParent->mParent);
-          }
-        }
-      }
-
-      head->mParent->mColor = 1u;
-    }
-
-    /**
-     * Address: 0x00898A50 (FUN_00898A50, std::map<Moho::EntId,Moho::UserEntity*>::insert)
-     *
-     * What it does:
-     * BST-descends `SessionEntityMap` by `entityId`, returns immediately on an
-     * existing key (matching `std::map::insert`'s "keeps the existing value"
-     * semantics), otherwise allocates and links a fresh node then red-black
-     * rebalances from it. The binary's own decompile splits find-position and
-     * link+rebalance across this function and a `sub_899490` tail; both phases
-     * are faithfully present here in one method rather than split further.
-     */
-    void InsertSessionEntityMapEntry(
-      SessionEntityMap& map,
-      const std::uint32_t entityId,
-      UserEntity* const entity
-    ) noexcept
-    {
-      SessionEntityMapNode* const head = EnsureSessionEntityMapHead(map);
-      SessionEntityMapNode* parent = head;
-      SessionEntityMapNode* current = head->mParent;
-      bool insertLeft = true;
-
-      while (!IsSessionEntityNodeNil(current, head)) {
-        parent = current;
-        if (entityId < current->mEntityId) {
-          insertLeft = true;
-          current = current->mLeft;
-          continue;
-        }
-        if (current->mEntityId < entityId) {
-          insertLeft = false;
-          current = current->mRight;
-          continue;
-        }
-
-        // std::map::insert keeps the existing value when key already exists.
-        return;
-      }
-
-      SessionEntityMapNode* const node = AllocateSessionEntityMapNode();
-      node->mEntityId = entityId;
-      node->mEntity = entity;
-      node->mLeft = head;
-      node->mRight = head;
-      node->mParent = parent;
-
-      ++map.mSize;
-      if (parent == head) {
-        head->mParent = node;
-        head->mLeft = node;
-        head->mRight = node;
-      } else if (insertLeft) {
-        parent->mLeft = node;
-        if (parent == head->mLeft) {
-          head->mLeft = node;
-        }
-      } else {
-        parent->mRight = node;
-        if (parent == head->mRight) {
-          head->mRight = node;
-        }
-      }
-
-      FixupAfterSessionEntityInsert(map, node);
-    }
-
-    void TransplantSessionEntityNode(
-      SessionEntityMap& map,
-      SessionEntityMapNode* const source,
-      SessionEntityMapNode* const replacement
-    ) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      if (source->mParent == head) {
-        head->mParent = replacement;
-      } else if (source == source->mParent->mLeft) {
-        source->mParent->mLeft = replacement;
-      } else {
-        source->mParent->mRight = replacement;
-      }
-
-      if (replacement != head) {
-        replacement->mParent = source->mParent;
-      }
-    }
-
-    void FixupAfterSessionEntityErase(
-      SessionEntityMap& map,
-      SessionEntityMapNode* node,
-      SessionEntityMapNode* nodeParent
-    ) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      SessionEntityMapNode* parent = !IsSessionEntityNodeNil(node, head) ? node->mParent : nodeParent;
-
-      while (node != head->mParent && (IsSessionEntityNodeNil(node, head) || node->mColor == 1u)) {
-        if (parent == nullptr) {
-          break;
-        }
-
-        if (node == parent->mLeft) {
-          SessionEntityMapNode* sibling = parent->mRight;
-          if (sibling == head) {
-            break;
-          }
-
-          if (sibling->mColor == 0u) {
-            sibling->mColor = 1u;
-            parent->mColor = 0u;
-            RotateSessionEntityLeft(map, parent);
-            sibling = parent->mRight;
-          }
-
-          const bool siblingLeftBlack = (sibling->mLeft == head) || (sibling->mLeft->mColor == 1u);
-          const bool siblingRightBlack = (sibling->mRight == head) || (sibling->mRight->mColor == 1u);
-          if (siblingLeftBlack && siblingRightBlack) {
-            sibling->mColor = 0u;
-            node = parent;
-            parent = node->mParent;
-          } else {
-            if ((sibling->mRight == head) || (sibling->mRight->mColor == 1u)) {
-              if (sibling->mLeft != head) {
-                sibling->mLeft->mColor = 1u;
-              }
-              sibling->mColor = 0u;
-              RotateSessionEntityRight(map, sibling);
-              sibling = parent->mRight;
-            }
-
-            sibling->mColor = parent->mColor;
-            parent->mColor = 1u;
-            if (sibling->mRight != head) {
-              sibling->mRight->mColor = 1u;
-            }
-            RotateSessionEntityLeft(map, parent);
-            node = head->mParent;
-            break;
-          }
-        } else {
-          SessionEntityMapNode* sibling = parent->mLeft;
-          if (sibling == head) {
-            break;
-          }
-
-          if (sibling->mColor == 0u) {
-            sibling->mColor = 1u;
-            parent->mColor = 0u;
-            RotateSessionEntityRight(map, parent);
-            sibling = parent->mLeft;
-          }
-
-          const bool siblingRightBlack = (sibling->mRight == head) || (sibling->mRight->mColor == 1u);
-          const bool siblingLeftBlack = (sibling->mLeft == head) || (sibling->mLeft->mColor == 1u);
-          if (siblingRightBlack && siblingLeftBlack) {
-            sibling->mColor = 0u;
-            node = parent;
-            parent = node->mParent;
-          } else {
-            if ((sibling->mLeft == head) || (sibling->mLeft->mColor == 1u)) {
-              if (sibling->mRight != head) {
-                sibling->mRight->mColor = 1u;
-              }
-              sibling->mColor = 0u;
-              RotateSessionEntityLeft(map, sibling);
-              sibling = parent->mLeft;
-            }
-
-            sibling->mColor = parent->mColor;
-            parent->mColor = 1u;
-            if (sibling->mLeft != head) {
-              sibling->mLeft->mColor = 1u;
-            }
-            RotateSessionEntityRight(map, parent);
-            node = head->mParent;
-            break;
-          }
-        }
-      }
-
-      if (!IsSessionEntityNodeNil(node, head)) {
-        node->mColor = 1u;
-      }
-    }
-
-    /**
-     * Address: 0x00898B10 (FUN_00898B10, std::map<Moho::EntId,Moho::UserEntity*>::erase)
-     *
-     * What it does:
-     * Splices `node` out of `SessionEntityMap`'s red-black tree and red-black
-     * rebalances from the splice point, mirroring the standard `_Tree::erase`
-     * unlink/rebalance shape.
-     *
-     * Known simplification: the binary throws `std::out_of_range("invalid
-     * map/set<T> iterator")` when `node` is the nil sentinel; this recovery
-     * treats that case as a silent no-op instead. Every real caller
-     * (`CWldSession::RemoveEntity`/`OrphanEntity`) already guards
-     * `mapNode != nullptr && mapNode != entityMap.mHead` before calling this,
-     * so the divergence is unreachable from any currently-recovered call
-     * site — left as a documented gap rather than silently claimed identical.
-     */
-    void EraseSessionEntityMapNode(SessionEntityMap& map, SessionEntityMapNode* const node) noexcept
-    {
-      SessionEntityMapNode* const head = map.mHead;
-      if (head == nullptr || IsSessionEntityNodeNil(node, head)) {
-        return;
-      }
-
-      SessionEntityMapNode* splice = node;
-      std::uint8_t removedColor = splice->mColor;
-      SessionEntityMapNode* fixNode = head;
-      SessionEntityMapNode* fixParent = nullptr;
-
-      if (node->mLeft == head) {
-        fixNode = node->mRight;
-        fixParent = node->mParent;
-        TransplantSessionEntityNode(map, node, node->mRight);
-      } else if (node->mRight == head) {
-        fixNode = node->mLeft;
-        fixParent = node->mParent;
-        TransplantSessionEntityNode(map, node, node->mLeft);
-      } else {
-        splice = SessionEntityTreeMin(node->mRight, head);
-        removedColor = splice->mColor;
-        fixNode = splice->mRight;
-        if (splice->mParent == node) {
-          fixParent = splice;
-          if (fixNode != head) {
-            fixNode->mParent = splice;
-          }
-        } else {
-          TransplantSessionEntityNode(map, splice, splice->mRight);
-          splice->mRight = node->mRight;
-          splice->mRight->mParent = splice;
-          fixParent = splice->mParent;
-        }
-
-        TransplantSessionEntityNode(map, node, splice);
-        splice->mLeft = node->mLeft;
-        splice->mLeft->mParent = splice;
-        splice->mColor = node->mColor;
-      }
-
-      ::operator delete(node);
-      if (map.mSize > 0u) {
-        --map.mSize;
-      }
-
-      if (removedColor == 1u) {
-        FixupAfterSessionEntityErase(map, fixNode, fixParent);
-      }
-
-      RecomputeSessionEntityMapExtrema(map);
-    }
-
     void CollectSessionUserUnits(CWldSession* const session, msvc8::vector<UserUnit*>& outUnits)
     {
       outUnits.clear();
@@ -12249,14 +11637,7 @@ namespace moho
         return;
       }
 
-      SessionEntityMap& entityMap = GetSessionEntityMap(session);
-      SessionEntityMapNode* const head = entityMap.mHead;
-      if (head == nullptr || head->mLeft == head) {
-        return;
-      }
-
-      for (SessionEntityMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
-        UserEntity* const entity = node->mEntity;
+      for (const auto& [entityId, entity] : session->mEntities) {
         if (entity == nullptr) {
           continue;
         }
@@ -14573,9 +13954,6 @@ namespace moho
     mLaunchInfo = sessionInfo.mLaunchInfo;
 
     mMapName = sessionInfo.mMapName;
-    mUnknownOwner44 = nullptr;
-    mSaveSourceTreeHead = nullptr;
-    mSaveSourceTreeSize = 0u;
 
     std::memset(mEntitySpatialDbStorage, 0, sizeof(mEntitySpatialDbStorage));
     // 0x00893160 line 84: `SpatialDB_MeshInstance::SpatialDB_MeshInstance(&mSpatialDB)`
@@ -14929,7 +14307,8 @@ namespace moho
     // runs after the extra-selection set is torn down and before the entity
     // map's storage is released.
     static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->DestroyStorage();
-    DestroySessionEntityMapStorage(GetSessionEntityMap(this));
+    // The entity map's storage goes with the member (~map); 0x00893A60 frees it
+    // here, after the spatial DB, because that is reverse declaration order.
 
     InitSessionPauseCallbackHead(head0);
     InitSessionPauseCallbackHead(head1);
@@ -15715,8 +15094,7 @@ namespace moho
       return;
     }
 
-    SessionEntityMap& entityMap = GetSessionEntityMap(this);
-    InsertSessionEntityMapEntry(entityMap, static_cast<std::uint32_t>(entity->mParams.mEntityId), entity);
+    (void)mEntities.insert({static_cast<std::uint32_t>(entity->mParams.mEntityId), entity});
   }
 
   /**
@@ -15731,14 +15109,7 @@ namespace moho
       return;
     }
 
-    SessionEntityMap& entityMap = GetSessionEntityMap(this);
-    SessionEntityMapNode* const mapNode = FindSessionEntityMapNodeById(
-      entityMap,
-      static_cast<std::uint32_t>(entity->mParams.mEntityId)
-    );
-    if (mapNode != nullptr && mapNode != entityMap.mHead) {
-      EraseSessionEntityMapNode(entityMap, mapNode);
-    }
+    (void)mEntities.erase(static_cast<std::uint32_t>(entity->mParams.mEntityId));
   }
 
   /**
@@ -15755,14 +15126,7 @@ namespace moho
     }
 
     auto* const runtimeView = reinterpret_cast<CWldSessionOrphanRuntimeView*>(this);
-    SessionEntityMap& entityMap = runtimeView->mEntityMap;
-    SessionEntityMapNode* const mapNode = FindSessionEntityMapNodeById(
-      entityMap,
-      static_cast<std::uint32_t>(entity->mParams.mEntityId)
-    );
-    if (mapNode != nullptr && mapNode != entityMap.mHead) {
-      EraseSessionEntityMapNode(entityMap, mapNode);
-    }
+    (void)mEntities.erase(static_cast<std::uint32_t>(entity->mParams.mEntityId));
 
     // The flag is what keeps the render side from treating the entity as live
     // while it finishes its death animation; 0x008941FA writes it right before
@@ -18683,22 +18047,10 @@ namespace moho
    */
   UserEntity* CWldSession::LookupEntityId(const EntId entityId)
   {
-    SessionEntityMap& entityMap = GetSessionEntityMap(this);
-    SessionEntityMapNode* const head = entityMap.mHead;
-    SessionEntityMapNode* probe = head->mParent;
-    const std::uint32_t key = static_cast<std::uint32_t>(entityId);
-
-    while (probe != nullptr && probe != head && probe->mIsSentinel == 0u) {
-      if (key < probe->mEntityId) {
-        probe = probe->mLeft;
-      } else if (probe->mEntityId < key) {
-        probe = probe->mRight;
-      } else {
-        return probe->mEntity;
-      }
-    }
-
-    return nullptr;
+    // 0x00894282..0x0089429C: `find`, compare against `end()` (+0x48), return
+    // the mapped value.
+    const auto it = mEntities.find(static_cast<std::uint32_t>(entityId));
+    return it != mEntities.end() ? it->second : nullptr;
   }
 
   /**
@@ -19036,14 +18388,7 @@ namespace moho
       (void)ApplyTerrainPlayableRect(mWldMap->mTerrainRes, playableRect);
     }
 
-    SessionEntityMap& entityMap = GetSessionEntityMap(this);
-    SessionEntityMapNode* const head = entityMap.mHead;
-    if (head == nullptr || head->mLeft == head) {
-      return;
-    }
-
-    for (SessionEntityMapNode* node = head->mLeft; node != nullptr && node != head; node = NextTreeNode(node)) {
-      UserEntity* const entity = node->mEntity;
+    for (const auto& [entityId, entity] : mEntities) {
       if (entity == nullptr) {
         continue;
       }
@@ -19068,27 +18413,20 @@ namespace moho
   boost::shared_ptr<SSessionSaveData> CWldSession::GetSaveData() const
   {
     boost::shared_ptr<SSessionSaveData> saveData{new SSessionSaveData()};
-    SessionSaveSourceNode* const sourceHead = GetSaveSourceTreeHead(this);
-    if (!sourceHead) {
-      return saveData;
-    }
-
-    for (SessionSaveSourceNode* sourceNode = sourceHead->mLeft; sourceNode && sourceNode != sourceHead;
-         sourceNode = NextTreeNode(sourceNode)) {
-      auto* const provider = static_cast<ISessionSaveSourceProvider*>(sourceNode->mProvider);
-      if (!provider) {
+    // Every unit's named selection sets, keyed by the unit's entity id. This
+    // walked the entity map through a third private node layout, called
+    // vtable +0x0C through an invented `ISessionSaveSourceProvider` -- that
+    // slot is `UserEntity::IsUserUnit` -- and read a tree head at +0x3D4 of the
+    // result through `SessionSaveNodeOwnerView`, which is
+    // `UserUnit::mSelectionSets` (+0x3D0, head at +0x3D4, 0x2C string nodes).
+    for (const auto& [entityId, entity] : mEntities) {
+      UserUnit* const unit = entity != nullptr ? entity->IsUserUnit() : nullptr;
+      if (unit == nullptr) {
         continue;
       }
 
-      auto* const owner = static_cast<SessionSaveNodeOwnerView*>(provider->GetSaveNodeOwner());
-      if (!owner || !owner->mTagTreeHead) {
-        continue;
-      }
-
-      SessionSaveTagNode* const tagHead = owner->mTagTreeHead;
-      for (SessionSaveTagNode* tagNode = tagHead->mLeft; tagNode && tagNode != tagHead;
-           tagNode = NextTreeNode(tagNode)) {
-        saveData->InsertNodeLabel(sourceNode->mCommandSourceId, tagNode->mTagName);
+      for (const msvc8::string& selectionSet : unit->mSelectionSets) {
+        saveData->InsertNodeLabel(entityId, selectionSet);
       }
     }
 

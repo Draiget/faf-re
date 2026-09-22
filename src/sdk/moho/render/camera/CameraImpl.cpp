@@ -533,58 +533,6 @@ namespace
   // in `moho/sim/CWldSession.h`: `moho::ScopedLocalSelectionSet` owns the head
   // sentinel and tears the set down through the engine's own `EraseRange`.
 
-  struct SessionEntityMapNodeView
-  {
-    SessionEntityMapNodeView* mLeft = nullptr;   // +0x00
-    SessionEntityMapNodeView* mParent = nullptr; // +0x04
-    SessionEntityMapNodeView* mRight = nullptr;  // +0x08
-    std::uint32_t mEntityId = 0;                 // +0x0C
-    moho::UserEntity* mEntity = nullptr;         // +0x10
-    std::uint8_t mPad14_17[0x04]{};              // +0x14
-    std::uint8_t mColor = 0;                     // +0x18
-    std::uint8_t mIsSentinel = 0;                // +0x19
-    std::uint8_t mPad1A_1B[0x02]{};              // +0x1A
-  };
-
-  static_assert(sizeof(SessionEntityMapNodeView) == 0x1C, "SessionEntityMapNodeView size must be 0x1C");
-  static_assert(
-    offsetof(SessionEntityMapNodeView, mEntityId) == 0x0C,
-    "SessionEntityMapNodeView::mEntityId offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(SessionEntityMapNodeView, mEntity) == 0x10,
-    "SessionEntityMapNodeView::mEntity offset must be 0x10"
-  );
-  static_assert(
-    offsetof(SessionEntityMapNodeView, mIsSentinel) == 0x19,
-    "SessionEntityMapNodeView::mIsSentinel offset must be 0x19"
-  );
-
-  struct SessionEntityMapView
-  {
-    void* mAllocProxy = nullptr;          // +0x00
-    SessionEntityMapNodeView* mHead = nullptr; // +0x04
-    std::uint32_t mSize = 0;              // +0x08
-  };
-
-  static_assert(sizeof(SessionEntityMapView) == 0x0C, "SessionEntityMapView size must be 0x0C");
-  static_assert(offsetof(SessionEntityMapView, mHead) == 0x04, "SessionEntityMapView::mHead offset must be 0x04");
-  static_assert(offsetof(SessionEntityMapView, mSize) == 0x08, "SessionEntityMapView::mSize offset must be 0x08");
-
-  [[nodiscard]] SessionEntityMapView* GetSessionEntityMap(moho::CWldSession* const session) noexcept
-  {
-    if (session == nullptr) {
-      return nullptr;
-    }
-
-    static_assert(offsetof(moho::CWldSession, mUnknownOwner44) == 0x44, "CWldSession::mUnknownOwner44 offset must stay 0x44");
-    static_assert(
-      offsetof(moho::CWldSession, mSaveSourceTreeHead) == 0x48,
-      "CWldSession::mSaveSourceTreeHead offset must stay 0x48"
-    );
-    return reinterpret_cast<SessionEntityMapView*>(&session->mUnknownOwner44);
-  }
-
   [[nodiscard]] moho::UserEntity* FindSessionEntityById(moho::CWldSession* const session, const std::int32_t entityId)
   {
     return session != nullptr ? session->LookupEntityId(static_cast<moho::EntId>(entityId)) : nullptr;
