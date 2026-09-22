@@ -66,7 +66,24 @@ namespace moho
    */
   struct ParticleRenderBucketRuntime
   {
-    bool stateByte = false;                                    // +0x00
+    /**
+     * Address: 0x00493AE0 (FUN_00493AE0, func_ParticleSelectTechnique2)
+     *
+     * IDA signature:
+     * void __thiscall sub_493AE0(ParticleRenderBucketRuntime *this);
+     *
+     * What it does:
+     * Publishes this bucket's drag flag and two textures to their shader
+     * variables, then selects `tag` + the blend-mode suffix as the active
+     * technique. Six suffixes here against the trail path's five: a particle
+     * bucket can also be `_REFRACT`.
+     *
+     * Reads `[this+0]`, `[this+4]`, `[this+0xC]`, `[this+0x14]` and
+     * `[this+0x30]` -- this object, not a copy of its prefix.
+     */
+    void SelectTechnique() const;
+
+    bool dragEnabled = false;                                  // +0x00  SWorldParticle::mDragEnabled
     std::uint8_t statePadding01_03[0x03]{};                    // +0x01
     CParticleTexture::TextureResourceHandle texture0;          // +0x04
     CParticleTexture::TextureResourceHandle texture1;          // +0x0C
@@ -79,8 +96,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(ParticleRenderBucketRuntime, stateByte) == 0x00,
-    "ParticleRenderBucketRuntime::stateByte offset must be 0x00"
+    offsetof(ParticleRenderBucketRuntime, dragEnabled) == 0x00,
+    "ParticleRenderBucketRuntime::dragEnabled offset must be 0x00"
   );
   static_assert(
     offsetof(ParticleRenderBucketRuntime, texture0) == 0x04,
@@ -120,6 +137,23 @@ namespace moho
    */
   struct TrailRenderBucketRuntime
   {
+    /**
+     * Address: 0x00494740 (FUN_00494740, func_ParticleSelectTechnique)
+     *
+     * IDA signature:
+     * void __thiscall sub_494740(TrailRenderBucketRuntime *this);
+     *
+     * What it does:
+     * Publishes this bucket's two textures to their shader variables, then
+     * selects `tag` + the blend-mode suffix as the active technique. Same body
+     * as the particle bucket's, without the drag flag and without `_REFRACT`.
+     *
+     * Reads `[this+0]`, `[this+8]`, `[this+0x10]` and `[this+0x2C]`;
+     * `RenderTrailBucket` reaches it as `mov ecx, edi; call 0x494740` at
+     * 0x0049488F, `edi` being the bucket itself.
+     */
+    void SelectTechnique() const;
+
     CParticleTexture::TextureResourceHandle texture0;         // +0x00
     CParticleTexture::TextureResourceHandle texture1;         // +0x08
     msvc8::string tag;                                        // +0x10

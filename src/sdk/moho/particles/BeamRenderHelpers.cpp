@@ -24,6 +24,7 @@
 #include "moho/render/d3d/D3DSingletonCleanup.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/particles/CWorldParticles.h"
+#include "moho/particles/ParticleRenderBuckets.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/CParticleTexture.h"
 
@@ -350,15 +351,17 @@ namespace moho
    * Address: 0x00494740 (FUN_00494740, func_ParticleSelectTechnique)
    *
    * What it does:
-   * Binds particle textures and selects particle technique suffix by blend mode.
+   * Binds this trail bucket's two textures and selects its technique suffix by
+   * blend mode. Declared on the bucket (ParticleRenderBuckets.h); defined here
+   * because the shader-variable accessors and the suffix table are this file's.
    */
-  void SelectParticleTechnique(const ParticleTechniqueSelectionRuntime& selection)
+  void TrailRenderBucketRuntime::SelectTechnique() const
   {
-    BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), selection.texture0);
-    BindBeamTextureShaderVar(GetParticleTexture1ShaderVar(), selection.texture1);
+    BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), texture0);
+    BindBeamTextureShaderVar(GetParticleTexture1ShaderVar(), texture1);
 
-    std::string techniqueName(selection.techniqueBaseName.data(), selection.techniqueBaseName.size());
-    techniqueName += ResolveParticleTechniqueSuffix(selection.blendMode, false, kParticleSelectTechniqueAssertLine);
+    std::string techniqueName(tag.data(), tag.size());
+    techniqueName += ResolveParticleTechniqueSuffix(blendMode, false, kParticleSelectTechniqueAssertLine);
 
     CD3DDevice* const device = D3D_GetDevice();
     if (device != nullptr) {
@@ -370,22 +373,23 @@ namespace moho
    * Address: 0x00493AE0 (FUN_00493AE0, func_ParticleSelectTechnique2)
    *
    * What it does:
-   * Binds drag-enabled flag and particle textures, then selects particle
-   * technique suffix (including refraction lane).
+   * As above for a particle bucket, plus the drag flag -- which the shader
+   * variable takes as a 4-byte payload even though the lane is one byte -- and
+   * the extra `_REFRACT` suffix.
    */
-  void SelectParticleTechniqueWithDrag(const ParticleTechniqueSelectionWithDragRuntime& selection)
+  void ParticleRenderBucketRuntime::SelectTechnique() const
   {
-    const bool dragEnabled = selection.dragEnabled;
+    const bool drag = dragEnabled;
     ShaderVar& dragEnabledShaderVar = GetParticleDragEnabledShaderVar();
     if (dragEnabledShaderVar.Exists()) {
-      dragEnabledShaderVar.mEffectVariable->SetPtr(&dragEnabled, 4U);
+      dragEnabledShaderVar.mEffectVariable->SetPtr(&drag, 4U);
     }
 
-    BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), selection.texture0);
-    BindBeamTextureShaderVar(GetParticleTexture1ShaderVar(), selection.texture1);
+    BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), texture0);
+    BindBeamTextureShaderVar(GetParticleTexture1ShaderVar(), texture1);
 
-    std::string techniqueName(selection.techniqueBaseName.data(), selection.techniqueBaseName.size());
-    techniqueName += ResolveParticleTechniqueSuffix(selection.blendMode, true, kParticleSelectTechniqueWithDragAssertLine);
+    std::string techniqueName(tag.data(), tag.size());
+    techniqueName += ResolveParticleTechniqueSuffix(blendMode, true, kParticleSelectTechniqueWithDragAssertLine);
 
     CD3DDevice* const device = D3D_GetDevice();
     if (device != nullptr) {
@@ -612,8 +616,8 @@ namespace moho
       return lhs.sortScalar > rhs.sortScalar;
     }
 
-    if (lhs.stateByte != rhs.stateByte) {
-      return rhs.stateByte < lhs.stateByte;
+    if (lhs.dragEnabled != rhs.dragEnabled) {
+      return rhs.dragEnabled < lhs.dragEnabled;
     }
 
     if (lhs.blendMode != rhs.blendMode) {
@@ -643,7 +647,7 @@ namespace moho
   bool AreParticleBucketKeysEquivalent(const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs) noexcept
   {
     return lhs.sortScalar == rhs.sortScalar &&
-           lhs.stateByte == rhs.stateByte &&
+           lhs.dragEnabled == rhs.dragEnabled &&
            lhs.blendMode == rhs.blendMode &&
            lhs.zMode == rhs.zMode &&
            AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
@@ -668,7 +672,7 @@ namespace moho
     }
 
     destination->sortScalar = source->sortScalar;
-    destination->stateByte = source->stateByte;
+    destination->dragEnabled = source->dragEnabled;
 
     boost::AssignWeakPairFromShared(
       reinterpret_cast<boost::SharedCountPair*>(&destination->texture0),
@@ -860,17 +864,17 @@ namespace moho
    * int __usercall sub_43C3D0@<eax>(_DWORD *a1@<esi>);
    *
    * What it does:
-   * Locks the first vertex stream of `context.sheet` for exclusive
+   * Locks the first vertex stream of `sheet` for exclusive
    * write access over the full requested vertex count, stores the
    * returned map pointer into the context write cursor, and resets
    * the running quad count to zero.
    */
-  void BeamDrawContextBeginMap(BeamDrawContextRuntime& context)
+  void BeamDrawContext::BeginMap()
   {
-    ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
-    void* const mapped = stream->Lock(0, context.maxVertexCount, true, true);
-    context.writeCursor = static_cast<float*>(mapped);
-    context.quadCount = 0;
+    ID3DVertexStream* const stream = FetchPrimaryVertexStream(sheet);
+    void* const mapped = stream->Lock(0, maxVertexCount, true, true);
+    writeCursor = static_cast<float*>(mapped);
+    quadCount = 0;
   }
 
   /**
@@ -881,14 +885,14 @@ namespace moho
    *
    * What it does:
    * If the context currently holds a live write cursor, unlocks the
-   * first vertex stream of `context.sheet` and clears the cursor.
+   * first vertex stream of `sheet` and clears the cursor.
    */
-  void BeamDrawContextEndMap(BeamDrawContextRuntime& context)
+  void BeamDrawContext::EndMap()
   {
-    if (context.writeCursor != nullptr) {
-      ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
+    if (writeCursor != nullptr) {
+      ID3DVertexStream* const stream = FetchPrimaryVertexStream(sheet);
       stream->Unlock();
-      context.writeCursor = nullptr;
+      writeCursor = nullptr;
     }
   }
 
@@ -904,12 +908,12 @@ namespace moho
    * `deleteFlag = 1`, matching the binary) and nulls the sheet
    * pointer so the context is safe to reinitialize.
    */
-  void BeamDrawContextTeardown(BeamDrawContextRuntime& context)
+  void BeamDrawContext::Teardown()
   {
-    BeamDrawContextEndMap(context);
-    if (context.sheet != nullptr) {
-      delete context.sheet;
-      context.sheet = nullptr;
+    EndMap();
+    if (sheet != nullptr) {
+      delete sheet;
+      sheet = nullptr;
     }
   }
 
@@ -931,8 +935,7 @@ namespace moho
    * The cursor is then advanced by 48 bytes (four 3-float vertices)
    * and the running quad count is bumped.
    */
-  float* BeamDrawContextWriteTranslatedQuad(
-    BeamDrawContextRuntime& context,
+  float* BeamDrawContext::WriteTranslatedQuad(
     const float* const boxCorners,
     const float dx,
     const float dy,
@@ -945,28 +948,28 @@ namespace moho
     const float boxY1 = boxCorners[4];
     const float boxZ1 = boxCorners[5];
 
-    float* v0 = context.writeCursor;
+    float* v0 = writeCursor;
     v0[0] = boxX0 + dx;
     v0[1] = boxY1 + dy;
     v0[2] = boxZ0 + dz;
 
-    float* v1 = context.writeCursor + 3;
+    float* v1 = writeCursor + 3;
     v1[0] = boxX1 + dx;
     v1[1] = boxY1 + dy;
     v1[2] = boxZ0 + dz;
 
-    float* v2 = context.writeCursor + 6;
+    float* v2 = writeCursor + 6;
     v2[0] = boxX1 + dx;
     v2[1] = boxY0 + dy;
     v2[2] = boxZ1 + dz;
 
-    float* v3 = context.writeCursor + 9;
+    float* v3 = writeCursor + 9;
     v3[0] = boxX0 + dx;
     v3[1] = boxY0 + dy;
     v3[2] = boxZ1 + dz;
 
-    context.writeCursor += 12;
-    ++context.quadCount;
+    writeCursor += 12;
+    ++quadCount;
     return v3;
   }
 
@@ -981,21 +984,19 @@ namespace moho
    * `packedQuad` into the active write cursor, advances the cursor
    * by 48 bytes, and bumps the running quad count.
    */
-  const float* BeamDrawContextWritePackedQuad(
-    BeamDrawContextRuntime& context,
-    const float* const packedQuad)
+  const float* BeamDrawContext::WritePackedQuad(const float* const packedQuad)
   {
     for (std::size_t i = 0; i < 12; ++i) {
-      context.writeCursor[i] = packedQuad[i];
+      writeCursor[i] = packedQuad[i];
     }
-    context.writeCursor += 12;
-    ++context.quadCount;
+    writeCursor += 12;
+    ++quadCount;
     return packedQuad;
   }
 
   namespace
   {
-    [[nodiscard]] bool FlushBeamQuadDrawImpl(BeamDrawContextRuntime& context, const int quadCount)
+    [[nodiscard]] bool FlushBeamQuadDrawImpl(moho::BeamDrawContext& context, const int quadCount)
     {
       if (context.writeCursor != nullptr) {
         ID3DVertexStream* const stream = FetchPrimaryVertexStream(context.sheet);
@@ -1031,12 +1032,12 @@ namespace moho
    * What it does:
    * Ends any pending write session on the context (unlocking the
    * vertex stream when mapped) and submits one indexed triangle-list
-   * draw covering `context.quadCount` quads through the shared
+   * draw covering `quadCount` quads through the shared
    * `sIndexSheet`.
    */
-  bool BeamDrawContextFlushQuadDraw(BeamDrawContextRuntime& context)
+  bool BeamDrawContext::FlushQuadDraw()
   {
-    return FlushBeamQuadDrawImpl(context, context.quadCount);
+    return FlushBeamQuadDrawImpl(*this, quadCount);
   }
 
   /**
@@ -1046,13 +1047,13 @@ namespace moho
    * int __usercall sub_43C610@<eax>(int a1@<edi>, _DWORD *a2@<esi>);
    *
    * What it does:
-   * Same as `BeamDrawContextFlushQuadDraw` but uses a caller-supplied
+   * Same as `FlushQuadDraw` but uses a caller-supplied
    * `quadCount` for the view bounds instead of the context's own
    * running count.
    */
-  bool BeamDrawContextFlushQuadDrawWithCount(BeamDrawContextRuntime& context, const int quadCount)
+  bool BeamDrawContext::FlushQuadDraw(const int quadCountOverride)
   {
-    return FlushBeamQuadDrawImpl(context, quadCount);
+    return FlushBeamQuadDrawImpl(*this, quadCountOverride);
   }
 
   /**
@@ -1067,10 +1068,10 @@ namespace moho
    * `func_CreateSharedVertexStream` on first miss), then builds one
    * new vertex sheet from the `[nullptr, sVertexStream]` stream pair
    * and the fetched format through `ID3DDeviceResources::Func6`. The
-   * new sheet replaces `context.sheet`; the previous sheet (when
+   * new sheet replaces `sheet`; the previous sheet (when
    * different and non-null) is released through its deleting dtor.
    */
-  CD3DVertexSheet* BeamDrawContextCreateVertexSheet(BeamDrawContextRuntime& context)
+  CD3DVertexSheet* BeamDrawContext::CreateVertexSheet()
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
@@ -1085,15 +1086,15 @@ namespace moho
     ID3DDeviceResources* const resources2 = device2->GetResources();
     CD3DVertexSheet* const newSheet = resources2->Func6(
       1u,
-      context.maxVertexCount,
+      maxVertexCount,
       vertexFormat,
       streamArray);
 
-    CD3DVertexSheet* const oldSheet = context.sheet;
+    CD3DVertexSheet* const oldSheet = sheet;
     if (newSheet != oldSheet && oldSheet != nullptr) {
       delete oldSheet;
     }
-    context.sheet = newSheet;
+    sheet = newSheet;
     return oldSheet;
   }
 
@@ -1108,15 +1109,15 @@ namespace moho
    * the quad-count / vertex-count / cursor lanes, builds the shared
    * vertex sheet, and primes the shared index sheet.
    */
-  void BeamDrawContextInitialize(BeamDrawContextRuntime& context, const int quadCount)
+  void BeamDrawContext::Initialize(const int quadCapacity)
   {
-    if (context.sheet != nullptr) {
+    if (sheet != nullptr) {
       return;
     }
-    context.field_0x04 = quadCount;
-    context.maxVertexCount = 4 * quadCount;
-    context.writeCursor = nullptr;
-    (void)BeamDrawContextCreateVertexSheet(context);
+    maxQuadCount = quadCapacity;
+    maxVertexCount = 4 * quadCapacity;
+    writeCursor = nullptr;
+    (void)CreateVertexSheet();
     func_InitSharedIndexSheet();
   }
 } // namespace moho

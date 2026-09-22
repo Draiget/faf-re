@@ -518,7 +518,7 @@ namespace
   ) noexcept
   {
     destination.sortScalar = source.sortScalar;
-    destination.stateByte = source.stateByte;
+    destination.dragEnabled = source.dragEnabled;
     boost::AssignWeakPairFromShared(
       reinterpret_cast<boost::SharedCountPair*>(&destination.texture0),
       reinterpret_cast<const boost::SharedCountPair*>(&source.texture0)
@@ -609,7 +609,7 @@ namespace
     key->tag = msvc8::string{};
 
     key->sortScalar = particle.mReserved54;
-    key->stateByte = particle.mEnabled ? 1U : 0U;
+    key->dragEnabled = particle.mDragEnabled;
 
     moho::CParticleTexture::TextureResourceHandle texture0{};
     if (particle.mTexture.tex != nullptr) {

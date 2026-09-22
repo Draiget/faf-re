@@ -49,7 +49,7 @@ namespace moho
    * blend/z modes, texture lanes, and army-index sentinel.
    */
   SWorldParticle::SWorldParticle()
-    : mEnabled(false)
+    : mDragEnabled(false)
     , mPadding01{}
     , mResistance(0.07f)
     , mPos{0.0f, 0.0f, 0.0f}
@@ -85,7 +85,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->ReadBool(&mEnabled);
+    archive->ReadBool(&mDragEnabled);
     archive->ReadFloat(&mResistance);
     archive->Read(ResolveVector3fType(), &mPos, nullOwner);
     archive->Read(ResolveVector3fType(), &mDir, nullOwner);
@@ -120,7 +120,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->WriteBool(mEnabled);
+    archive->WriteBool(mDragEnabled);
     archive->WriteFloat(mResistance);
     archive->Write(ResolveVector3fType(), &mPos, nullOwner);
     archive->Write(ResolveVector3fType(), &mDir, nullOwner);

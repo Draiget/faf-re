@@ -338,7 +338,7 @@ namespace moho
     bucket.activeWorkItems.clear();
     bucket.owner = owner;
 
-    bucket.stateByte = particle.mEnabled;
+    bucket.dragEnabled = particle.mDragEnabled;
 
     CParticleTexture::TextureResourceHandle texture0{};
     if (particle.mTexture.tex != nullptr) {
@@ -669,13 +669,7 @@ namespace moho
       return false;
     }
 
-    ParticleTechniqueSelectionWithDragRuntime selection{};
-    selection.dragEnabled = bucket.stateByte;
-    selection.texture0 = bucket.texture0;
-    selection.texture1 = bucket.texture1;
-    selection.techniqueBaseName.assign(bucket.tag, 0U, msvc8::string::npos);
-    selection.blendMode = bucket.blendMode;
-    SelectParticleTechniqueWithDrag(selection);
+    bucket.SelectTechnique();
 
     for (std::size_t index = activeWorkItemCount; index > 0U; --index) {
       ParticleRenderWorkItemRuntime* const workItem = bucket.activeWorkItems[index - 1U];
@@ -882,12 +876,7 @@ namespace moho
       return false;
     }
 
-    ParticleTechniqueSelectionRuntime selection{};
-    selection.texture0 = bucket.texture0;
-    selection.texture1 = bucket.texture1;
-    selection.techniqueBaseName.assign(bucket.tag, 0U, msvc8::string::npos);
-    selection.blendMode = bucket.blendMode;
-    SelectParticleTechnique(selection);
+    bucket.SelectTechnique();
 
     for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
