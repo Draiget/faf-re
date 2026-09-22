@@ -142,7 +142,7 @@ namespace msvc8
          * this sweep) beyond this member's own generic API surface, which
          * every range-for loop over `commands` in `CCommandDb.cpp` now
          * uses.)
-         * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00495AC0 (FUN_00495AC0 -- `begin()` -- the header's left link for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapBeginIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AD1F0 (FUN_004AD1F0 -- `begin()` written through a caller-supplied iterator slot for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant1` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AD5D0 (FUN_004AD5D0 -- the second emission of that same `begin()` export for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`; pair 0x08, node 0x18, colour@+0x14, isNil@+0x15); zero callers, unreachable; formerly `CopyTreeHeadLeftmostNodeVariant2` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00432430 (FUN_00432430 -- `begin()` -- the header's left link for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeBegin` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
@@ -155,7 +155,7 @@ namespace msvc8
         [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
 
         /**
-         * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00495AD0 (FUN_00495AD0 -- `end()` -- the header sentinel itself for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `GetBeamBucketMapEndIterator` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00432440 (FUN_00432440 -- `end()` -- the header sentinel itself for the technique-implementation annotation maps -- `msvc8::map<msvc8::string, std::int32_t>` (`mIntegerAnnotations` at +0x20, node 0x30, value at node+0x28, colour/nil at +0x2C/+0x2D) and `msvc8::map<msvc8::string, msvc8::string>` (`mStringAnnotations` at +0x2C, node 0x48, colour/nil at +0x44/+0x45); zero callers, unreachable; formerly `GetIntAnnotationTreeHead` in moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0059FF80 (FUN_0059FF80 -- `end()` written through a caller-supplied iterator slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterA` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005A00F0 (FUN_005A00F0 -- a second emission of that `end()` store for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `CopyBuilderLane04ToOutAdapterB` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
@@ -309,6 +309,26 @@ namespace msvc8
          * Address: 0x005A14E0 (FUN_005A14E0 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `BuildRebuildInsertResultLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005A14C0 (FUN_005A14C0 -- that same `pair<iterator, bool>` zeroed before the insert runs for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); zero callers, unreachable; formerly `ClearRebuildInsertResultNodeLane` in moho/ai/CAiBuilderImplTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0077B830 (FUN_0077B830 -- `insert`'s `std::pair<iterator, bool>` return, built in the caller's slot for `msvc8::map<std::uint32_t, moho::CDecalBucketSet>` (`CDecalBuffer::mStartTickBuckets` at +0x0CC0; the start-tick map's node is 0x20 with the key at node+0x0C and the 0x0C bucket-set head at node+0x10, and the bucket set's own node is 0x14 with the handle at node+0x0C, colour/nil at +0x10/+0x11); zero callers, unreachable; formerly `WriteDwordByteLanePair` in moho/render/CDecalBuffer.cpp (RULE ONE), removed 2026-09-11.)
+         */
+        /**
+         * Address: 0x0049EE50 (FUN_0049EE50 -- the `value_type` copy constructor
+         * MSVC emits for this insert, for `msvc8::map<moho::SParticleBucketKey,
+         * moho::SParticleRenderBucket*>` (`CWorldParticles::mParticleBuckets` and
+         * `mRefractingParticleBuckets`; pair 0x40, key 0x3C, bucket pointer at
+         * pair+0x3C). Formerly `CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot`
+         * in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x0049E0B0 (FUN_0049E0B0 -- the same copy with the source key's
+         * resources released after the transfer, i.e. the move-shaped emission of it;
+         * zero callers, unreachable. Formerly
+         * `CopyConstructParticleBucketKeyValueAndReleaseSource`, removed 2026-09-22.)
+         * Address: 0x0049EE80 (FUN_0049EE80 -- the same `value_type` copy for
+         * `msvc8::map<moho::STrailBucketKey, moho::STrailRenderBucket*>`
+         * (`CWorldParticles::mTrailBuckets`; pair 0x38, key 0x34, bucket pointer at
+         * pair+0x34). Formerly `CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot`,
+         * removed 2026-09-22.)
+         * Address: 0x0049E1F0 (FUN_0049E1F0 -- its release-source emission; zero
+         * callers, unreachable. Formerly
+         * `CopyConstructTrailBucketKeyValueAndReleaseSource`, removed 2026-09-22.)
          */
         std::pair<iterator, bool> insert(const value_type& v)
         {
@@ -508,7 +528,7 @@ namespace msvc8
          * (`CWldSplat.cpp`).
          * Address: 0x0056B6C0 (FUN_0056B6C0, sub_56B6C0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SCoordsVec2>` (`CFormationInstance::mFormationPosCache`/`mOffsetPosCache`, node 0x1C, isNil@+0x19): the cache stores in `CFormationInstance::GetFormationPosition`/`GetOffsetPosition`.)
          * Address: 0x0056AAF0 (FUN_0056AAF0, sub_56AAF0 -- `operator[]` for `msvc8::map<moho::EntId, moho::SUnitOffsetInfo>` (`SOffsetInfo::mUnitOffsets`, node 0x44, isNil@+0x41): `group.mUnitOffsets[entityId] = info` in `CFormationInstance::RunScript` (0x00567E06 / 0x00567F9A).)
-         * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00495AE0 (FUN_00495AE0 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindOrInsertBeamBucketEntryByKey` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004AC460 (FUN_004AC460 -- `operator[]` -- lower_bound, then insert-at-hint when the key is not equivalent for `msvc8::map<std::uint32_t, moho::ResourceFactoryBase*>` (`CResourceManager::mActiveFactoryRegistrationsByKey`, node 0x18); callers 0x004A9F30, 0x004AA090; formerly `FindOrInsertFactoryRegistrationKey` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007F00A0 (FUN_007F00A0 -- `operator[]` -- the find half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007ED4B0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)
          * Address: 0x007F0960 (FUN_007F0960 -- `operator[]`'s insert-on-miss half for `msvc8::map<msvc8::string, moho::RangeExtractor*>` (`Moho::sBlueprintExtractors`, node 0x30: the key's `_Bx` at node+0x10 and `_Myres` at node+0x24, the extractor pointer at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x007F00A0; the source line is `registry[name] = extractor` in `RegisterExtractor` (moho/misc/RangeExtractor.cpp), called twelve times from `InitializeBlueprintExtractors`.)

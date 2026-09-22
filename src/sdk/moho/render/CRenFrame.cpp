@@ -313,7 +313,7 @@ namespace moho
       viewPort.mEffectVariable->SetMem(4U, viewportRect);
     }
 
-    CD3DVertexSheetViewRuntime quadView{};
+    SD3DVertexRange quadView{};
     quadView.sheet = mVertexSheet;
     quadView.startVertex = 0;
     quadView.baseVertex = 0;

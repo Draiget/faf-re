@@ -34,10 +34,10 @@ namespace moho
    */
   struct TerrainDecalDrawCommand
   {
-    std::int32_t startIndex;   // +0x00 -> CD3DIndexSheetViewRuntime::startIndex
-    std::int32_t indexCount;   // +0x04 -> CD3DIndexSheetViewRuntime::indexCount
-    std::int32_t startVertex;  // +0x08 -> CD3DVertexSheetViewRuntime::startVertex (min referenced vertex)
-    std::int32_t endVertex;    // +0x0C -> CD3DVertexSheetViewRuntime::endVertex
+    std::int32_t startIndex;   // +0x00 -> SD3DIndexRange::startIndex
+    std::int32_t indexCount;   // +0x04 -> SD3DIndexRange::indexCount
+    std::int32_t startVertex;  // +0x08 -> SD3DVertexRange::startVertex (min referenced vertex)
+    std::int32_t endVertex;    // +0x0C -> SD3DVertexRange::endVertex
     float alpha;               // +0x10 -> DecalAlpha shader-var value
     CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)
   };

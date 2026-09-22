@@ -1153,12 +1153,12 @@ namespace moho
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       indexView.sheet = mTerrainIndexSheet;
       indexView.startIndex = command.startIndex;
       indexView.indexCount = command.indexCount;
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = mTerrainVertexSheet;
       vertexView.startVertex = command.startVertex;
       vertexView.baseVertex = 0;
@@ -1311,12 +1311,12 @@ namespace moho
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       indexView.sheet = mTerrainIndexSheet;
       indexView.startIndex = rangeStart;
       indexView.indexCount = static_cast<std::int32_t>(rangeCount);
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = mTerrainVertexSheet;
       vertexView.startVertex = minValue;
       vertexView.baseVertex = 0;
@@ -1513,12 +1513,12 @@ namespace moho
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       indexView.sheet = mTerrainIndexSheet;
       indexView.startIndex = command.startIndex;
       indexView.indexCount = command.indexCount;
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = mTerrainVertexSheet;
       vertexView.startVertex = command.startVertex;
       vertexView.baseVertex = 0;
@@ -1563,12 +1563,12 @@ namespace moho
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-    CD3DIndexSheetViewRuntime indexView{};
+    SD3DIndexRange indexView{};
     indexView.sheet = mDynamicIndexSheet;
     indexView.startIndex = 0;
     indexView.indexCount = 6 * (static_cast<std::int32_t>(splatVertexCount) / 4);
 
-    CD3DVertexSheetViewRuntime vertexView{};
+    SD3DVertexRange vertexView{};
     vertexView.sheet = mDynamicVertexSheet;
     vertexView.startVertex = 0;
     vertexView.baseVertex = 0;
@@ -1615,12 +1615,12 @@ namespace moho
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       indexView.sheet = mTerrainIndexSheet;
       indexView.startIndex = command.startIndex;
       indexView.indexCount = command.indexCount;
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = mTerrainVertexSheet;
       vertexView.startVertex = command.startVertex;
       vertexView.baseVertex = 0;
@@ -1796,12 +1796,12 @@ namespace moho
 
       std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       indexView.sheet = mTerrainIndexSheet;
       indexView.startIndex = command.startIndex;
       indexView.indexCount = command.indexCount;
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = mTerrainVertexSheet;
       vertexView.startVertex = command.startVertex;
       vertexView.baseVertex = 0;
@@ -1941,12 +1941,12 @@ namespace moho
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-    CD3DIndexSheetViewRuntime indexView{};
+    SD3DIndexRange indexView{};
     indexView.sheet = mTerrainIndexSheet;
     indexView.startIndex = static_cast<std::int32_t>(mSkirtStartIndex);
     indexView.indexCount = indexCount;
 
-    CD3DVertexSheetViewRuntime vertexView{};
+    SD3DVertexRange vertexView{};
     vertexView.sheet = mTerrainVertexSheet;
     // 0x0080157F..0x0080159F: the view's start lane is the lowest vertex the
     // skirt indices touch (`mSkirtBaseVertex`, the D3D MinIndex hint) and the
@@ -1995,12 +1995,12 @@ namespace moho
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
-    CD3DIndexSheetViewRuntime indexView{};
+    SD3DIndexRange indexView{};
     indexView.sheet = mTerrainIndexSheet;
     indexView.startIndex = 0;
     indexView.indexCount = indexCount;
 
-    CD3DVertexSheetViewRuntime vertexView{};
+    SD3DVertexRange vertexView{};
     vertexView.sheet = mTerrainVertexSheet;
     vertexView.startVertex = 0;
     vertexView.baseVertex = 0;
@@ -2226,7 +2226,7 @@ namespace moho
     const float waterElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : kDisabledWaterElevation;
     GetWater2WaterElevationTShorelineShaderVar().SetFloat(waterElevation);
 
-    CD3DVertexSheetViewRuntime shorelineView{};
+    SD3DVertexRange shorelineView{};
     shorelineView.sheet = shoreline->mVertexSheet.get();
     shorelineView.startVertex = 0;
     shorelineView.baseVertex = 0;

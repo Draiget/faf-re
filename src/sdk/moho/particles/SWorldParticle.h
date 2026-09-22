@@ -68,7 +68,7 @@ namespace moho
      * Air drag, from `REmitterBlueprint::ParticleResistance`. Not an "is this
      * particle alive" flag: `CEfxEmitter::UpdateCurve` fills it from the
      * blueprint's resistance switch, the render bucket keys on it, and
-     * `ParticleRenderBucketRuntime::SelectTechnique` publishes it to the
+     * `SParticleRenderBucket::SelectTechnique` publishes it to the
      * particle shader's drag-enabled variable.
      */
     bool mDragEnabled = false;                        // +0x00

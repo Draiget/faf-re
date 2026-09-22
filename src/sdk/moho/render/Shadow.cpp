@@ -589,7 +589,7 @@ namespace moho
       (void)shaderVars.shadowSize.SetFloat(static_cast<float>(mShadowSize));
       (void)shaderVars.shadowTexture.SetRenderTargetTexture(source);
 
-      CD3DVertexSheetViewRuntime quadView{};
+      SD3DVertexRange quadView{};
       quadView.sheet = mQuadVertexSheet.get();
       quadView.startVertex = 0;
       quadView.baseVertex = 0;

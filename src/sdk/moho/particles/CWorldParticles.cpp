@@ -425,9 +425,9 @@ namespace
    * each node as it goes; with a real container the node teardown belongs to
    * the container, so only the owned payloads are released here.
    */
-  void ReleaseTrailSegmentPoolBuffers(moho::TrailSegmentPoolRuntime& poolRuntime) noexcept
+  void ReleaseTrailSegmentPoolBuffers(moho::TrailSegmentPool& pool) noexcept
   {
-    for (moho::TrailSegmentBufferRuntime* const segmentBuffer : poolRuntime) {
+    for (moho::STrailSegmentBuffer* const segmentBuffer : pool) {
       if (segmentBuffer == nullptr) {
         continue;
       }
@@ -438,151 +438,7 @@ namespace
     }
   }
 
-  /**
-   * What it does:
-   * Compact `(key pointer, mapped bucket pointer)` lane exported from one
-   * particle-bucket map node iterator.
-   */
-  struct ParticleBucketNodeKeyValuePairRuntime
-  {
-    const moho::ParticleBucketKeyRuntime* key = nullptr; // +0x00
-    moho::ParticleRenderBucketRuntime* bucket = nullptr; // +0x04
-  };
-
-  static_assert(
-    offsetof(ParticleBucketNodeKeyValuePairRuntime, key) == 0x00,
-    "ParticleBucketNodeKeyValuePairRuntime::key offset must be 0x00"
-  );
-  static_assert(
-    offsetof(ParticleBucketNodeKeyValuePairRuntime, bucket) == 0x04,
-    "ParticleBucketNodeKeyValuePairRuntime::bucket offset must be 0x04"
-  );
-  static_assert(
-    sizeof(ParticleBucketNodeKeyValuePairRuntime) == 0x08,
-    "ParticleBucketNodeKeyValuePairRuntime size must be 0x08"
-  );
-
-  /**
-   * What it does:
-   * Compact pointer+flag pair lane used by adjacent helper-thunk wrappers.
-   */
-  struct PointerFlagPairRuntime
-  {
-    void* pointer = nullptr;      // +0x00
-    std::uint32_t flag = 0U;      // +0x04
-  };
-
-  static_assert(
-    offsetof(PointerFlagPairRuntime, pointer) == 0x00,
-    "PointerFlagPairRuntime::pointer offset must be 0x00"
-  );
-  static_assert(
-    offsetof(PointerFlagPairRuntime, flag) == 0x04,
-    "PointerFlagPairRuntime::flag offset must be 0x04"
-  );
-  static_assert(sizeof(PointerFlagPairRuntime) == 0x08, "PointerFlagPairRuntime size must be 0x08");
-
-  /**
-   * What it does:
-   * Compact pointer+byte pair lane used by adjacent insert-result thunks.
-   */
-  struct PointerByteFlagPairRuntime
-  {
-    void* pointer = nullptr;             // +0x00
-    std::uint8_t flag = 0U;              // +0x04
-    std::uint8_t padding05_07[0x03]{};   // +0x05
-  };
-
-  static_assert(
-    offsetof(PointerByteFlagPairRuntime, pointer) == 0x00,
-    "PointerByteFlagPairRuntime::pointer offset must be 0x00"
-  );
-  static_assert(
-    offsetof(PointerByteFlagPairRuntime, flag) == 0x04,
-    "PointerByteFlagPairRuntime::flag offset must be 0x04"
-  );
-  static_assert(sizeof(PointerByteFlagPairRuntime) == 0x08, "PointerByteFlagPairRuntime size must be 0x08");
-
   constexpr std::uint32_t kLegacyDwordVectorMaxCount = 0x3FFFFFFFU;
-
-  /**
-   * Address: 0x004990B0 (FUN_004990B0, sub_4990B0)
-   *
-   * What it does:
-   * Copy-constructs one particle-bucket key lane, preserving weak-handle
-   * control-state increments and string payload ownership.
-   */
-  moho::ParticleBucketKeyRuntime* CopyConstructParticleBucketKey(
-    const moho::ParticleBucketKeyRuntime& source,
-    moho::ParticleBucketKeyRuntime& destination
-  ) noexcept
-  {
-    destination.sortScalar = source.sortScalar;
-    destination.dragEnabled = source.dragEnabled;
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination.texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&source.texture0)
-    );
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination.texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&source.texture1)
-    );
-    destination.tag = msvc8::string{};
-    destination.tag.assign(source.tag, 0U, msvc8::string::npos);
-    destination.blendMode = source.blendMode;
-    destination.zMode = source.zMode;
-    return &destination;
-  }
-
-
-  /**
-   * Address: 0x00499180 (FUN_00499180, sub_499180)
-   *
-   * What it does:
-   * Copy-constructs one trail-bucket key lane, preserving weak-handle
-   * control-state increments and string payload ownership.
-   */
-  moho::TrailBucketKeyRuntime* CopyConstructTrailBucketKey(
-    const moho::TrailBucketKeyRuntime& source,
-    moho::TrailBucketKeyRuntime& destination
-  ) noexcept
-  {
-    destination.sortScalar = source.sortScalar;
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination.texture0),
-      reinterpret_cast<const boost::SharedCountPair*>(&source.texture0)
-    );
-    boost::AssignWeakPairFromShared(
-      reinterpret_cast<boost::SharedCountPair*>(&destination.texture1),
-      reinterpret_cast<const boost::SharedCountPair*>(&source.texture1)
-    );
-    destination.tag = msvc8::string{};
-    destination.tag.assign(source.tag, 0U, msvc8::string::npos);
-    destination.blendMode = source.blendMode;
-    return &destination;
-  }
-
-
-  /**
-   * What it does:
-   * Compact 3-dword lane used by adjacent slot-export helper thunks.
-   */
-  struct LegacyTripleDwordRuntime
-  {
-    std::uint32_t value0 = 0U; // +0x00
-    std::uint32_t value1 = 0U; // +0x04
-    std::uint32_t value2 = 0U; // +0x08
-  };
-
-  static_assert(
-    offsetof(LegacyTripleDwordRuntime, value1) == 0x04,
-    "LegacyTripleDwordRuntime::value1 offset must be 0x04"
-  );
-  static_assert(
-    offsetof(LegacyTripleDwordRuntime, value2) == 0x08,
-    "LegacyTripleDwordRuntime::value2 offset must be 0x08"
-  );
-  static_assert(sizeof(LegacyTripleDwordRuntime) == 0x0C, "LegacyTripleDwordRuntime size must be 0x0C");
 
   /**
    * Address: 0x0049C670 (FUN_0049C670, sub_49C670)
@@ -595,8 +451,8 @@ namespace
     return 0x3FFFFFFFU;
   }
 
-  [[nodiscard]] moho::ParticleBucketKeyRuntime* InitializeParticleBucketKeyFromWorldParticle(
-    moho::ParticleBucketKeyRuntime* const key,
+  [[nodiscard]] moho::SParticleBucketKey* InitializeParticleBucketKeyFromWorldParticle(
+    moho::SParticleBucketKey* const key,
     const moho::SWorldParticle& particle
   )
   {
@@ -635,62 +491,15 @@ namespace
     return key;
   }
 
-  /**
-   * What it does:
-   * Temporary `(particle-bucket-key, mapped-bucket)` lane used by ptr-map
-   * insert copy-wrapper helpers.
-   */
-  struct ParticleBucketKeyValueRuntime
-  {
-    moho::ParticleBucketKeyRuntime key{};           // +0x00
-    moho::ParticleRenderBucketRuntime* bucket = nullptr; // +0x3C
-  };
-
-  static_assert(
-    offsetof(ParticleBucketKeyValueRuntime, bucket) == 0x3C,
-    "ParticleBucketKeyValueRuntime::bucket offset must be 0x3C"
-  );
-  static_assert(sizeof(ParticleBucketKeyValueRuntime) == 0x40, "ParticleBucketKeyValueRuntime size must be 0x40");
-
-  /**
-   * Address: 0x0049EE50 (FUN_0049EE50, sub_49EE50)
-   *
-   * What it does:
-   * Copy-constructs one particle-bucket key/value lane from source key and
-   * bucket slot pointers.
-   */
-  ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot(
-    const moho::ParticleBucketKeyRuntime& sourceKey,
-    ParticleBucketKeyValueRuntime* const destination,
-    moho::ParticleRenderBucketRuntime* const* const bucketSlot
-  ) noexcept
-  {
-    (void)CopyConstructParticleBucketKey(sourceKey, destination->key);
-    destination->bucket = *bucketSlot;
-    return destination;
-  }
-
-  /**
-   * Address: 0x0049E0B0 (FUN_0049E0B0, sub_49E0B0)
-   *
-   * What it does:
-   * Copy-constructs one particle-bucket key/value temporary lane and releases
-   * source key resources after transfer.
-   */
-  ParticleBucketKeyValueRuntime* CopyConstructParticleBucketKeyValueAndReleaseSource(
-    ParticleBucketKeyValueRuntime* const destination,
-    ParticleBucketKeyValueRuntime& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    ::new (static_cast<void*>(&destination->key)) moho::ParticleBucketKeyRuntime{};
-    (void)CopyConstructParticleBucketKeyValueFromKeyAndBucketSlot(source.key, destination, &source.bucket);
-    moho::ResetParticleBucketKeyResources(source.key);
-    return destination;
-  }
+  // 0x0049EE50 / 0x0049E0B0 (particle) and 0x0049EE80 / 0x0049E1F0 (trail) are
+  // the copy constructors MSVC emits for `msvc8::map<Key, Bucket*>::value_type`
+  // on the insert path -- a `std::pair<const Key, Bucket*>` whose first member
+  // is the 0x3C / 0x34 bucket key. They were transcribed here as
+  // `ParticleBucketKeyValueRuntime` / `TrailBucketKeyValueRuntime` plus four
+  // free `CopyConstruct*` helpers, two of which had no caller at all. Cited on
+  // `msvc8::map::insert(const value_type&)` (legacy/containers/Map.h) and
+  // removed; the source line that produces them is the `buckets[key] = bucket`
+  // in `CWorldParticles`.
 
   /**
    * Address: 0x0049E1E0 (FUN_0049E1E0, sub_49E1E0)
@@ -705,63 +514,6 @@ namespace
   {
     *outValueSlot = value;
     return outValueSlot;
-  }
-
-  /**
-   * What it does:
-   * Temporary `(trail-bucket-key, mapped-bucket)` lane used by ptr-map insert
-   * copy-wrapper helpers.
-   */
-  struct TrailBucketKeyValueRuntime
-  {
-    moho::TrailBucketKeyRuntime key{};           // +0x00
-    moho::TrailRenderBucketRuntime* bucket = nullptr; // +0x34
-  };
-
-  static_assert(
-    offsetof(TrailBucketKeyValueRuntime, bucket) == 0x34,
-    "TrailBucketKeyValueRuntime::bucket offset must be 0x34"
-  );
-  static_assert(sizeof(TrailBucketKeyValueRuntime) == 0x38, "TrailBucketKeyValueRuntime size must be 0x38");
-
-  /**
-   * Address: 0x0049EE80 (FUN_0049EE80, sub_49EE80)
-   *
-   * What it does:
-   * Copy-constructs one trail-bucket key/value lane from source key and bucket
-   * slot pointers.
-   */
-  TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot(
-    const moho::TrailBucketKeyRuntime& sourceKey,
-    TrailBucketKeyValueRuntime* const destination,
-    moho::TrailRenderBucketRuntime* const* const bucketSlot
-  ) noexcept
-  {
-    (void)CopyConstructTrailBucketKey(sourceKey, destination->key);
-    destination->bucket = *bucketSlot;
-    return destination;
-  }
-
-  /**
-   * Address: 0x0049E1F0 (FUN_0049E1F0, sub_49E1F0)
-   *
-   * What it does:
-   * Copy-constructs one trail-bucket key/value temporary lane and releases
-   * source key resources after transfer.
-   */
-  TrailBucketKeyValueRuntime* CopyConstructTrailBucketKeyValueAndReleaseSource(
-    TrailBucketKeyValueRuntime* const destination,
-    TrailBucketKeyValueRuntime& source
-  )
-  {
-    if (destination == nullptr) {
-      return nullptr;
-    }
-
-    ::new (static_cast<void*>(&destination->key)) moho::TrailBucketKeyRuntime{};
-    (void)CopyConstructTrailBucketKeyValueFromKeyAndBucketSlot(source.key, destination, &source.bucket);
-    moho::ResetTrailBucketKeyResources(source.key);
-    return destination;
   }
 
   /**
@@ -796,7 +548,7 @@ namespace
    * Destroys one particle-bucket payload lane and releases the owning heap
    * block when present.
    */
-  void DestroyAndDeleteParticleRenderBucket(moho::ParticleRenderBucketRuntime* const bucket) noexcept
+  void DestroyAndDeleteParticleRenderBucket(moho::SParticleRenderBucket* const bucket) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -813,7 +565,7 @@ namespace
    * Destroys one trail-bucket payload lane and releases the owning heap block
    * when present.
    */
-  void DestroyAndDeleteTrailRenderBucket(moho::TrailRenderBucketRuntime* const bucket) noexcept
+  void DestroyAndDeleteTrailRenderBucket(moho::STrailRenderBucket* const bucket) noexcept
   {
     if (bucket == nullptr) {
       return;
@@ -831,8 +583,8 @@ namespace
    * predicate.
    */
   [[nodiscard]] bool CompareParticleBucketKeysThunk(
-    const moho::ParticleBucketKeyRuntime& lhs,
-    const moho::ParticleBucketKeyRuntime& rhs
+    const moho::SParticleBucketKey& lhs,
+    const moho::SParticleBucketKey& rhs
   ) noexcept
   {
     return moho::IsParticleBucketKeyRhsLessThanLhs(lhs, rhs);
@@ -846,8 +598,8 @@ namespace
    * predicate.
    */
   [[nodiscard]] bool CompareTrailBucketKeysThunk(
-    const moho::TrailBucketKeyRuntime& lhs,
-    const moho::TrailBucketKeyRuntime& rhs
+    const moho::STrailBucketKey& lhs,
+    const moho::STrailBucketKey& rhs
   ) noexcept
   {
     return moho::IsTrailBucketKeyRhsLessThanLhs(lhs, rhs);
@@ -887,59 +639,13 @@ namespace
   }
 
   /**
-   * Address: 0x0049DAF0 (FUN_0049DAF0, sub_49DAF0)
-   *
-   * What it does:
-   * Returns one fixed legacy map helper constant (`0x04924924`).
-   */
-  std::uint32_t GetLegacyMapHelperConstant_0x04924924_DuplicateA() noexcept
-  {
-    return 0x04924924U;
-  }
-
-  /**
-   * Address: 0x0049EF50 (FUN_0049EF50, sub_49EF50)
-   *
-   * What it does:
-   * Returns whether one legacy string equals one NUL-terminated C-string by
-   * exact length+payload comparison.
-   */
-  bool IsMsvc8StringEqualToCStringExact(const msvc8::string& lhs, const char* const rhs)
-  {
-    const std::size_t rhsLength = std::strlen(rhs);
-    if (lhs.size() != rhsLength) {
-      return false;
-    }
-
-    return rhsLength == 0U || std::memcmp(lhs.data(), rhs, rhsLength) == 0;
-  }
-
-  void DestroyWorldParticleForVectorTailLocal(moho::SWorldParticle& particle) noexcept;
-
-  struct PointerWithFieldAt3CRuntime
-  {
-    std::uint8_t padding00_3B[0x3C];
-    std::uint32_t field3C;
-  };
-
-  static_assert(sizeof(PointerWithFieldAt3CRuntime) == 0x40, "PointerWithFieldAt3CRuntime size must be 0x40");
-
-  struct PointerWithFieldAt34Runtime
-  {
-    std::uint8_t padding00_33[0x34];
-    std::uint32_t field34;
-  };
-
-  static_assert(sizeof(PointerWithFieldAt34Runtime) == 0x38, "PointerWithFieldAt34Runtime size must be 0x38");
-
-  /**
    * Address: 0x0049FA70 (FUN_0049FA70, sub_49FA70)
    *
    * What it does:
    * Duplicate particle-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteParticleRenderBucketDuplicateA(
-    moho::ParticleRenderBucketRuntime* const bucket
+    moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteParticleRenderBucket(bucket);
@@ -952,7 +658,7 @@ namespace
    * Duplicate trail-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteTrailRenderBucketDuplicateA(
-    moho::TrailRenderBucketRuntime* const bucket
+    moho::STrailRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteTrailRenderBucket(bucket);
@@ -965,7 +671,7 @@ namespace
    * Duplicate particle-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteParticleRenderBucketDuplicateB(
-    moho::ParticleRenderBucketRuntime* const bucket
+    moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteParticleRenderBucket(bucket);
@@ -978,7 +684,7 @@ namespace
    * Duplicate trail-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteTrailRenderBucketDuplicateB(
-    moho::TrailRenderBucketRuntime* const bucket
+    moho::STrailRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteTrailRenderBucket(bucket);
@@ -991,7 +697,7 @@ namespace
    * Duplicate particle-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteParticleRenderBucketDuplicateC(
-    moho::ParticleRenderBucketRuntime* const bucket
+    moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteParticleRenderBucket(bucket);
@@ -1004,7 +710,7 @@ namespace
    * Duplicate trail-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteTrailRenderBucketDuplicateC(
-    moho::TrailRenderBucketRuntime* const bucket
+    moho::STrailRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteTrailRenderBucket(bucket);
@@ -1017,7 +723,7 @@ namespace
    * Duplicate particle-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteParticleRenderBucketDuplicateD(
-    moho::ParticleRenderBucketRuntime* const bucket
+    moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteParticleRenderBucket(bucket);
@@ -1030,7 +736,7 @@ namespace
    * Duplicate trail-bucket destroy+delete thunk.
    */
   void DestroyAndDeleteTrailRenderBucketDuplicateD(
-    moho::TrailRenderBucketRuntime* const bucket
+    moho::STrailRenderBucket* const bucket
   ) noexcept
   {
     DestroyAndDeleteTrailRenderBucket(bucket);
@@ -1043,8 +749,8 @@ namespace
    * Destroys and deletes one particle-bucket payload and returns the input
    * pointer.
    */
-  moho::ParticleRenderBucketRuntime* DestroyAndDeleteParticleRenderBucketAndReturnInput(
-    moho::ParticleRenderBucketRuntime* const bucket
+  moho::SParticleRenderBucket* DestroyAndDeleteParticleRenderBucketAndReturnInput(
+    moho::SParticleRenderBucket* const bucket
   ) noexcept
   {
     moho::DestroyParticleRenderBucket(*bucket);
@@ -1059,8 +765,8 @@ namespace
    * Destroys and deletes one trail-bucket payload and returns the input
    * pointer.
    */
-  moho::TrailRenderBucketRuntime* DestroyAndDeleteTrailRenderBucketAndReturnInput(
-    moho::TrailRenderBucketRuntime* const bucket
+  moho::STrailRenderBucket* DestroyAndDeleteTrailRenderBucketAndReturnInput(
+    moho::STrailRenderBucket* const bucket
   ) noexcept
   {
     moho::DestroyTrailRenderBucket(*bucket);
@@ -1225,7 +931,7 @@ namespace moho
     // built by their member constructors: the binary buys the two list heads
     // through 0x00497D00 (`_Buy_head`) and the set head through 0x0049C620
     // before this body runs.
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
 
     // The three bucket maps live inside this object's raw storage, reached
     // through the runtime view, so their constructors (which buy the header
@@ -1234,9 +940,9 @@ namespace moho
     new (&runtime.refractingParticleBuckets) ParticleBucketMap();
     new (&runtime.trailBuckets) TrailBucketMap();
 
-    new (&runtime.particleBucketLookupKey) ParticleBucketKeyRuntime{};
+    new (&runtime.particleBucketLookupKey) SParticleBucketKey{};
     runtime.cachedParticleBucket = nullptr;
-    new (&runtime.trailBucketLookupKey) TrailBucketKeyRuntime{};
+    new (&runtime.trailBucketLookupKey) STrailBucketKey{};
     runtime.cachedTrailBucket = nullptr;
 
     mBeatsSincePause = 0;
@@ -1255,7 +961,7 @@ namespace moho
    */
   CWorldParticles::~CWorldParticles()
   {
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
 
     DestroyWorldParticlesSingleton();
 
@@ -1302,7 +1008,7 @@ namespace moho
    * Takes the lowest-addressed pooled trail-segment buffer out of
    * `mTrailSegmentPool`; `nullptr` when the pool is empty.
    */
-  TrailSegmentBufferRuntime* CWorldParticles::AcquireTrailSegmentBuffer()
+  STrailSegmentBuffer* CWorldParticles::AcquireTrailSegmentBuffer()
   {
     if (mTrailSegmentPool.empty()) {
       return nullptr;
@@ -1311,7 +1017,7 @@ namespace moho
     // The binary takes the leftmost node, keeps its buffer and erases it,
     // discarding the successor the erase hands back.
     const auto first = mTrailSegmentPool.begin();
-    TrailSegmentBufferRuntime* const segmentBuffer = *first;
+    STrailSegmentBuffer* const segmentBuffer = *first;
     (void)mTrailSegmentPool.erase(first);
     return segmentBuffer;
   }
@@ -1323,7 +1029,7 @@ namespace moho
    * Returns one trail-segment buffer to `mTrailSegmentPool`
    * (`set::insert`, 0x00496000 on RbTree.h).
    */
-  void CWorldParticles::ReleaseTrailSegmentBuffer(TrailSegmentBufferRuntime* const segmentBuffer)
+  void CWorldParticles::ReleaseTrailSegmentBuffer(STrailSegmentBuffer* const segmentBuffer)
   {
     (void)mTrailSegmentPool.insert(segmentBuffer);
   }
@@ -1349,7 +1055,7 @@ namespace moho
    */
   void CWorldParticles::AddWorldParticle(
     const SWorldParticle& particle,
-    ParticleRenderBucketRuntime** const bucketCacheSlot
+    SParticleRenderBucket** const bucketCacheSlot
   )
   {
     if (mBeatsSincePause > 5) {
@@ -1362,8 +1068,8 @@ namespace moho
       return;
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
-    ParticleBucketKeyRuntime lookupKey{};
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
+    SParticleBucketKey lookupKey{};
     (void)InitializeParticleBucketKeyFromWorldParticle(&lookupKey, particle);
 
     if (static_cast<std::int32_t>(particle.mBlendMode) == 5) {
@@ -1373,7 +1079,7 @@ namespace moho
         // shared_ptr texture handles, an msvc8::string and two vectors, and
         // InitializeParticleRenderBucketFromWorldParticle's first act is to
         // `reset()` those handles.
-        auto* const newBucket = new ParticleRenderBucketRuntime();
+        auto* const newBucket = new SParticleRenderBucket();
         (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
         bucketEntry = runtime.refractingParticleBuckets.insert({lookupKey, newBucket}).first;
       }
@@ -1392,12 +1098,12 @@ namespace moho
 
     auto bucketEntry = runtime.particleBuckets.find(lookupKey);
     if (bucketEntry == runtime.particleBuckets.end()) {
-      auto* const newBucket = new ParticleRenderBucketRuntime();
+      auto* const newBucket = new SParticleRenderBucket();
       (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
       bucketEntry = runtime.particleBuckets.insert({lookupKey, newBucket}).first;
     }
 
-    ParticleRenderBucketRuntime* const bucket = bucketEntry->second;
+    SParticleRenderBucket* const bucket = bucketEntry->second;
     bucket->pendingParticles.push_back(particle);
     (void)CopyParticleBucketKey(&runtime.particleBucketLookupKey, &lookupKey);
     runtime.cachedParticleBucket = bucket;
@@ -1418,7 +1124,7 @@ namespace moho
    */
   void CWorldParticles::AddTrail(
     const SWorldTrail& trail,
-    TrailRenderBucketRuntime** const bucketCacheSlot
+    STrailRenderBucket** const bucketCacheSlot
   )
   {
     if (mBeatsSincePause > 5) {
@@ -1431,8 +1137,8 @@ namespace moho
       return;
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
-    TrailBucketKeyRuntime lookupKey{};
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
+    STrailBucketKey lookupKey{};
     (void)InitializeTrailBucketKeyFromTrail(&lookupKey, trail);
 
     if (runtime.cachedTrailBucket != nullptr &&
@@ -1444,12 +1150,12 @@ namespace moho
 
     auto bucketEntry = runtime.trailBuckets.find(lookupKey);
     if (bucketEntry == runtime.trailBuckets.end()) {
-      auto* const newBucket = new TrailRenderBucketRuntime();
+      auto* const newBucket = new STrailRenderBucket();
       (void)InitializeTrailRenderBucketFromTrail(*newBucket, trail, this);
       bucketEntry = runtime.trailBuckets.insert({lookupKey, newBucket}).first;
     }
 
-    TrailRenderBucketRuntime* const bucket = bucketEntry->second;
+    STrailRenderBucket* const bucket = bucketEntry->second;
     bucket->pendingTrails.push_back(trail);
     (void)CopyTrailBucketKey(&runtime.trailBucketLookupKey, &lookupKey);
     runtime.cachedTrailBucket = bucket;
@@ -1528,7 +1234,7 @@ namespace moho
       device->SetColorWriteState(true, false);
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
     char renderResult = 0;
     const auto renderAboveSurface = renderWaterSurface == 0;
     const float waterSurface = efx_ParticleWaterSurface;
@@ -1594,7 +1300,7 @@ namespace moho
       shaderVarParticleBackgroundTexture.SetRenderTargetTexture(backgroundTexture);
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(*this);
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
     for (const auto& [bucketKey, bucket] : runtime.refractingParticleBuckets) {
       (void)bucketKey;
       if (bucket != nullptr) {
@@ -1634,10 +1340,10 @@ namespace moho
     }
 
     for (int bufferIndex = 0; bufferIndex < kPooledTrailSegmentBufferCount; ++bufferIndex) {
-      auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(
-        ::operator new(sizeof(TrailSegmentBufferRuntime))
+      auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(
+        ::operator new(sizeof(STrailSegmentBuffer))
       );
-      std::memset(segmentBuffer, 0, sizeof(TrailSegmentBufferRuntime));
+      std::memset(segmentBuffer, 0, sizeof(STrailSegmentBuffer));
 
       segmentBuffer->maxSegments = kTrailSegmentCapacity;
       segmentBuffer->vertexSheet = resources->NewVertexSheet(
@@ -1672,7 +1378,7 @@ namespace moho
   void CWorldParticles::ClearRenderBuckets()
   {
     CWorldParticles& worldParticles = *this;
-    auto& runtime = reinterpret_cast<CWorldParticlesRuntimeView&>(worldParticles);
+    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(worldParticles);
 
     // Each entry owns its bucket, so the payload goes before the node.
     for (const auto& [bucketKey, bucket] : runtime.particleBuckets) {

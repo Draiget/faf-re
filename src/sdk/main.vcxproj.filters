@@ -762,7 +762,7 @@
     <ClCompile Include="moho\particles\ParticleRenderBuckets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\particles\ParticleRenderWorkItemRuntime.cpp">
+    <ClCompile Include="moho\particles\ParticleRenderWorkItem.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\particles\SParticleBuffer.cpp">
@@ -3975,7 +3975,7 @@
     <ClInclude Include="moho\particles\ParticleRenderBuckets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\particles\ParticleRenderWorkItemRuntime.h">
+    <ClInclude Include="moho\particles\ParticleRenderWorkItem.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\particles\SParticleBuffer.h">

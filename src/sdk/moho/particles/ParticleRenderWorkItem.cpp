@@ -1,4 +1,4 @@
-#include "moho/particles/ParticleRenderWorkItemRuntime.h"
+#include "moho/particles/ParticleRenderWorkItem.h"
 
 #include <new>
 
@@ -11,14 +11,14 @@ namespace moho
    * What it does:
    * Releases interval storage owned by one work-item, then frees the work-item.
    */
-  ParticleRenderWorkItemRuntime* DestroyParticleRenderWorkItem(ParticleRenderWorkItemRuntime* const workItem)
+  SParticleRenderWorkItem* DestroyParticleRenderWorkItem(SParticleRenderWorkItem* const workItem)
   {
     if (workItem == nullptr) {
       return nullptr;
     }
 
     ResetParticleRenderWorkItemIntervals(*workItem);
-    ParticleRenderWorkItemRuntime* const destroyedWorkItem = workItem;
+    SParticleRenderWorkItem* const destroyedWorkItem = workItem;
     ::operator delete(workItem);
     return destroyedWorkItem;
   }
@@ -30,9 +30,9 @@ namespace moho
    * What it does:
    * Releases interval storage owned by one work-item and resets interval lanes.
    */
-  void ResetParticleRenderWorkItemIntervals(ParticleRenderWorkItemRuntime& workItem)
+  void ResetParticleRenderWorkItemIntervals(SParticleRenderWorkItem& workItem)
   {
-    // `msvc8::vector<ParticleRenderIntervalRuntime>::_Tidy` (cited on Vector.h).
+    // `msvc8::vector<SParticleRenderInterval>::_Tidy` (cited on Vector.h).
     workItem.mIntervals.tidy();
   }
 
@@ -42,13 +42,13 @@ namespace moho
    * What it does:
    * Initializes one render work-item with particle-buffer owner and interval cap.
    */
-  ParticleRenderWorkItemRuntime* InitializeParticleRenderWorkItem(
-    ParticleRenderWorkItemRuntime& workItem,
+  SParticleRenderWorkItem* InitializeParticleRenderWorkItem(
+    SParticleRenderWorkItem& workItem,
     const std::uint32_t intervalCapacityHint,
     void* const particleBuffer
   )
   {
-    ::new (static_cast<void*>(&workItem.mIntervals)) msvc8::vector<ParticleRenderIntervalRuntime>();
+    ::new (static_cast<void*>(&workItem.mIntervals)) msvc8::vector<SParticleRenderInterval>();
     workItem.mIntervalCapacityHint = intervalCapacityHint;
     workItem.mParticleBuffer = particleBuffer;
     workItem.mRenderStartIndex = 0U;
@@ -63,9 +63,9 @@ namespace moho
    * Advances interval cursor while intervals are expired for the current frame.
    * Returns true when no active interval remains.
    */
-  bool AdvanceParticleRenderWorkItemCursorToFrame(ParticleRenderWorkItemRuntime& workItem, const float frameValue)
+  bool AdvanceParticleRenderWorkItemCursorToFrame(SParticleRenderWorkItem& workItem, const float frameValue)
   {
-    const ParticleRenderIntervalRuntime* interval = workItem.mIntervals.begin() + workItem.mIntervalCursor;
+    const SParticleRenderInterval* interval = workItem.mIntervals.begin() + workItem.mIntervalCursor;
     if (interval == workItem.mIntervals.end()) {
       return true;
     }
@@ -88,7 +88,7 @@ namespace moho
    * Appends one trail payload to the trailing trail-vector in a trail bucket
    * entry.
    */
-  void AppendTrailToBucketEntry(const SWorldTrail& trail, TrailBucketEntryRuntime& bucketEntry)
+  void AppendTrailToBucketEntry(const SWorldTrail& trail, STrailBucketEntry& bucketEntry)
   {
     bucketEntry.mTrails.push_back(trail);
   }

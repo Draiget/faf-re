@@ -485,7 +485,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\serialization\serializers\SWorldParticleSerializer.cpp" />
     <ClCompile Include="moho\particles\BeamRenderHelpers.cpp" />
     <ClCompile Include="moho\particles\ParticleRenderBuckets.cpp" />
-    <ClCompile Include="moho\particles\ParticleRenderWorkItemRuntime.cpp" />
+    <ClCompile Include="moho\particles\ParticleRenderWorkItem.cpp" />
     <ClCompile Include="moho\particles\SParticleBuffer.cpp">
       <ObjectFileName>$(IntDir)particles\SParticleBuffer.obj</ObjectFileName>
     </ClCompile>
@@ -2246,7 +2246,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\particles\CWorldParticles.h" />
     <ClInclude Include="moho\particles\BeamRenderHelpers.h" />
     <ClInclude Include="moho\particles\ParticleRenderBuckets.h" />
-    <ClInclude Include="moho\particles\ParticleRenderWorkItemRuntime.h" />
+    <ClInclude Include="moho\particles\ParticleRenderWorkItem.h" />
     <ClInclude Include="moho\particles\SParticleBuffer.h" />
     <ClInclude Include="moho\particles\SWorldBeam.h" />
     <ClInclude Include="moho\particles\SWorldParticle.h" />

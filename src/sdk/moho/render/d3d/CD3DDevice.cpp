@@ -375,7 +375,7 @@ namespace
    */
   void ResetWorldParticleBuffers()
   {
-    auto& runtime = reinterpret_cast<moho::CWorldParticlesRuntimeView&>(moho::sWorldParticles);
+    auto& runtime = reinterpret_cast<moho::CWorldParticlesLayout&>(moho::sWorldParticles);
     for (moho::ParticleBuffer* const particleBuffer : runtime.allParticleBuffers) {
       if (particleBuffer != nullptr) {
         particleBuffer->Reset();
@@ -1525,7 +1525,7 @@ namespace moho
    * non-indexed primitive draw per pass.
    */
   bool CD3DDevice::DrawPrimitiveList(
-    const CD3DVertexSheetViewRuntime* const vertexSheetView, std::int32_t* const primitiveType
+    const SD3DVertexRange* const vertexSheetView, std::int32_t* const primitiveType
   )
   {
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
@@ -1560,8 +1560,8 @@ namespace moho
    * indexed primitive draw per pass.
    */
   bool CD3DDevice::DrawTriangleList(
-    const CD3DVertexSheetViewRuntime* const vertexSheetView,
-    const CD3DIndexSheetViewRuntime* const indexSheetView,
+    const SD3DVertexRange* const vertexSheetView,
+    const SD3DIndexRange* const indexSheetView,
     std::int32_t* const primitiveType
   )
   {
