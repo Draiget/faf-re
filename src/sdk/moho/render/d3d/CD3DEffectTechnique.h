@@ -228,7 +228,7 @@ namespace moho
      * Console command handler that forwards one integer sample count to the
      * active D3D device anti-aliasing slot.
      */
-    static void CON_d3d_AntiAliasingSamples(void* commandArgs);
+    static void CON_d3d_AntiAliasingSamples(const msvc8::vector<msvc8::string>& args);
 
     /**
      * Address: 0x0042C650 (FUN_0042C650, ?InitEffectFromFile@CD3DEffect@Moho@@QAE_NPBD@Z)

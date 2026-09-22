@@ -39,9 +39,9 @@ void moho::CConFunc::InitializeRecovered(const char* description, const char* na
  * What it does:
  * Loads callback pointer from +0x0C payload storage and invokes it with command args.
  */
-void moho::CConFunc::Handle(void* commandArgs)
+void moho::CConFunc::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  GetCallback()(commandArgs);
+  GetCallback()(args);
 }
 
 moho::CConFunc::Callback moho::CConFunc::GetCallback() const noexcept

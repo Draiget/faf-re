@@ -31688,7 +31688,7 @@ msvc8::scoped_string moho::IN_DescribeKeyBinding(
  * `end()`-or-greater equivalence check. Both are `msvc8::map`'s already.
  */
 void moho::IN_DumpKeyBindings(
-  void* const /*commandArgs*/
+  const msvc8::vector<msvc8::string>& /*args*/
 )
 {
   for (const auto& binding : gUiKeyActionMap) {
@@ -31709,7 +31709,7 @@ void moho::IN_DumpKeyBindings(
  * here.
  */
 void moho::IN_DumpKeyNames(
-  void* const /*commandArgs*/
+  const msvc8::vector<msvc8::string>& /*args*/
 )
 {
   for (int index = 0; index < 256; ++index) {
@@ -31934,16 +31934,15 @@ int moho::IN_ParseKeyModifiers(
  * result reports the original key token and leaves the map unchanged.
  */
 void moho::IN_BindKey(
-  void* const commandArgs
+  const msvc8::vector<msvc8::string>& args
 )
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 3u) {
+  if (args.size() < 3u) {
     CON_Printf("Syntax: IN_BindKey [key sequence] [console command]");
     return;
   }
 
-  const msvc8::string* const keyBindingSpec = args.At(1u);
+  const msvc8::string* const keyBindingSpec = ConCommandArg(args, 1u);
   const int parsedKeyMask = IN_ParseKeyModifiers(*keyBindingSpec);
   if (parsedKeyMask == 0) {
     CON_Printf("Unrecognized key sequence: %s", keyBindingSpec->c_str());
@@ -31951,8 +31950,8 @@ void moho::IN_BindKey(
   }
 
   msvc8::scoped_string actionText{};
-  for (std::size_t argumentIndex = 2u; argumentIndex < args.Count(); ++argumentIndex) {
-    const msvc8::string* const argument = args.At(argumentIndex);
+  for (std::size_t argumentIndex = 2u; argumentIndex < args.size(); ++argumentIndex) {
+    const msvc8::string* const argument = ConCommandArg(args, argumentIndex);
     AppendLegacyStringOrThrow(actionText, argument->c_str(), argument->size());
     AppendLegacyStringOrThrow(actionText, 1u, ' ');
   }
@@ -31973,23 +31972,22 @@ void moho::IN_BindKey(
  * case-insensitively via `IN_FindKeyNameIndexCi`) or reports the collision.
  */
 void moho::IN_SetKeyName(
-  void* const commandArgs
+  const msvc8::vector<msvc8::string>& args
 )
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 3u) {
+  if (args.size() < 3u) {
     CON_Printf("Syntax: IN_SetKeyName keyCodeHex nameString");
     return;
   }
 
-  const msvc8::string* const keyCodeArg = args.At(1u);
+  const msvc8::string* const keyCodeArg = ConCommandArg(args, 1u);
   const unsigned int keyCode = gpg::STR_Xtoi(keyCodeArg->c_str());
   if (keyCode > 0xFFu) {
     CON_Printf("Invalid key code %02X, must be between 0x00 and 0xFF", keyCode);
     return;
   }
 
-  const msvc8::string* const nameArg = args.At(2u);
+  const msvc8::string* const nameArg = ConCommandArg(args, 2u);
   if (IN_FindKeyNameIndexCi(*nameArg) == -1) {
     in_keyNames[keyCode].assign_owned(std::string_view{nameArg->c_str(), nameArg->size()});
     CON_Printf("Key code %02X name is %s", keyCode, in_keyNames[keyCode].c_str());

@@ -42,7 +42,7 @@ namespace moho
      * What it does:
      * Executes the alias text and appends escaped runtime command arguments.
      */
-    void Handle(void* commandArgs) override;
+    void Handle(const msvc8::vector<msvc8::string>& args) override;
 
     [[nodiscard]] const msvc8::string& AliasCommandText() const noexcept;
 

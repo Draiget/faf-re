@@ -1383,7 +1383,7 @@ namespace moho
    * `"<chord> :: <console command> :: repeat = <true|false>"`. Takes no
    * command arguments, matching the binary's `CConFunc::Callback` shape.
    */
-  void IN_DumpKeyBindings(void* commandArgs);
+  void IN_DumpKeyBindings(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00839EE0 (FUN_00839EE0, Moho::IN_DumpKeyNames)
@@ -1394,7 +1394,7 @@ namespace moho
    * command arguments (the incoming pointer is unused, matching the
    * binary's `CConFunc::Callback` shape).
    */
-  void IN_DumpKeyNames(void* commandArgs);
+  void IN_DumpKeyNames(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00838C70 (FUN_00838C70, Moho::IN_InitKeyHandler)
@@ -1459,7 +1459,7 @@ namespace moho
    * (0x00BE4850) takes this function's address when it registers the command,
    * which is why the declaration has to be visible from `CConCommand.cpp`.
    */
-  void IN_BindKey(void* commandArgs);
+  void IN_BindKey(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x0083A080 (FUN_0083A080, sub_83A080)
@@ -1477,7 +1477,7 @@ namespace moho
    * address when it registers the command, which is why the declaration
    * has to be visible from `CConCommand.cpp`.
    */
-  void IN_SetKeyName(void* commandArgs);
+  void IN_SetKeyName(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x008365B0 (FUN_008365B0, cfunc_ClearCurrentFactoryForQueueDisplay)

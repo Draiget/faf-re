@@ -769,9 +769,9 @@ namespace
    * read from the PE `.data` initializer of `stru_F5B518`
    * ("UI_ExpandCurrentSelection").
    */
-  void UI_ExpandCurrentSelection(void* const commandArgs)
+  void UI_ExpandCurrentSelection(const msvc8::vector<msvc8::string>& args)
   {
-    (void)commandArgs;
+    (void)args;
 
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
@@ -835,7 +835,7 @@ namespace
    * read from the PE `.data` initializer of `stru_F5B528`
    * ("UI_SelectByCategory").
    */
-  void UI_SelectByCategory(void* const commandArgs)
+  void UI_SelectByCategory(const msvc8::vector<msvc8::string>& args)
   {
     moho::CWldSession* const session = moho::WLD_GetActiveSession();
     if (session == nullptr) {
@@ -844,8 +844,7 @@ namespace
       return;
     }
 
-    const moho::ConCommandArgsView args = moho::GetConCommandArgsView(commandArgs);
-    if (args.Count() < 2u) {
+    if (args.size() < 2u) {
       moho::CON_Printf(
         "UI_SelectByCategory [+add] [+nearest] [+idle] [+goto] categoryExpression\n"
         "Select a set of units with the following parameters....\n"
@@ -867,8 +866,8 @@ namespace
     bool excludeEngineerCommand = false;
     std::string categoryExpr;
 
-    for (std::size_t index = 1u; index < args.Count(); ++index) {
-      const msvc8::string* const token = args.At(index);
+    for (std::size_t index = 1u; index < args.size(); ++index) {
+      const msvc8::string* const token = moho::ConCommandArg(args, index);
       if (token == nullptr) {
         continue;
       }

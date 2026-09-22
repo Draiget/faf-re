@@ -8776,7 +8776,7 @@ namespace moho
    * message. Registered as the `WxInputBox` startup console command by
    * `register_CConFunc_WxInputBox`.
    */
-  void CON_WxInputBox(void* commandArgs);
+  void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
 
   // Main owner window used by WinMain lifecycle paths (`WIN_OkBox`,
   // crash handling, and startup viewport bootstrap).
@@ -9468,8 +9468,29 @@ namespace moho
    */
   struct WWinManagedDialog : wxWindowBase
   {
-    std::uint8_t mUnknown04To16F[0x16C];
+    std::uint8_t mUnknown04ToCB[0xC8];
+    /**
+     * wx 2.4.2's `wxWindowBase` state bitfield, packed as
+     * `m_autoLayout:1, m_isShown:1, m_isEnabled:1, m_isBeingDeleted:1,
+     * m_hasBgCol:1, m_hasFgCol:1, ...` (`wx/window.h:939`). `IsShown()` is
+     * inline there, so the shipped code reads the bit rather than calling
+     * anything -- `WIN_ToggleLogDialog` (0x004F3C45) does
+     * `movzx edx, byte [ecx+0xCC] / shr dl, 1 / not dl / and edx, 1`.
+     *
+     * Named here rather than resolved through the vendored header because this
+     * hierarchy hangs off the local four-byte `wxWindowBase` stub above, so the
+     * real wx members have no declarations to reach; giving that base its true
+     * layout is the standing wx ODR job.
+     */
+    std::uint8_t mWindowStateFlags = 0; // +0xCC
+    std::uint8_t mUnknownCDTo16F[0xA3];
     ManagedWindowSlot* mManagedSlotsHead = nullptr;
+
+    /** `wxWindowBase::IsShown()` -- bit 1 of the state bitfield. */
+    [[nodiscard]] bool IsShown() const noexcept
+    {
+      return (mWindowStateFlags & 0x02u) != 0u;
+    }
 
     static WWinManagedDialog* FromManagedSlotHeadLink(ManagedWindowSlot** ownerHeadLink) noexcept;
     static ManagedWindowSlot** NullManagedSlotHeadLinkSentinel() noexcept;
@@ -9510,6 +9531,10 @@ namespace moho
     static void DestroyManagedOwners(msvc8::vector<ManagedWindowSlot>& slots);
   };
 
+  static_assert(
+    offsetof(WWinManagedDialog, mWindowStateFlags) == 0xCC,
+    "moho::WWinManagedDialog::mWindowStateFlags offset must be 0xCC"
+  );
   static_assert(
     offsetof(WWinManagedDialog, mManagedSlotsHead) == 0x170,
     "moho::WWinManagedDialog::mManagedSlotsHead offset must be 0x170"

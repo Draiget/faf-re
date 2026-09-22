@@ -449,14 +449,13 @@ namespace
    * Registrar: FUN_00BE9700 (`__xc_a` lane), data-xref
    * `dword_F5BEFC = offset sub_8D4260` is the callsite evidence.
    */
-  void SC_StartMemoryLog(void* const commandArgs)
+  void SC_StartMemoryLog(const msvc8::vector<msvc8::string>& args)
   {
-    const moho::ConCommandArgsView args = moho::GetConCommandArgsView(commandArgs);
-    if (args.Count() != 2u) {
+    if (args.size() != 2u) {
       return;
     }
 
-    const msvc8::string* const pathToken = args.At(1u);
+    const msvc8::string* const pathToken = moho::ConCommandArg(args, 1u);
     if (pathToken == nullptr) {
       return;
     }
@@ -476,9 +475,9 @@ namespace
    * Registrar: FUN_00BE9740 (`__xc_a` lane), data-xref
    * `dword_F5BF0C = offset sub_8D42B0` is the callsite evidence.
    */
-  void SC_StopMemoryLog(void* const commandArgs)
+  void SC_StopMemoryLog(const msvc8::vector<msvc8::string>& args)
   {
-    (void)commandArgs;
+    (void)args;
     func_CleanupAllocLoc();
   }
 

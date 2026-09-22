@@ -125,7 +125,7 @@ namespace moho
    * Console callback that expects exactly two tokens and adds the requested
    * border mesh blueprint to the active viewport's MapImager.
    */
-  void REN_MapBorderAdd(void* commandArgs);
+  void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x007F65B0 (FUN_007F65B0, Moho::REN_MapBorderClear)
@@ -134,7 +134,7 @@ namespace moho
    * Console callback that clears the active viewport's MapImager border
    * decoration meshes when a viewport is present.
    */
-  void REN_MapBorderClear(void* commandArgs);
+  void REN_MapBorderClear(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x007FA1E0 (FUN_007FA1E0, sub_7FA1E0)

@@ -14,7 +14,7 @@ namespace moho
   class CConFunc final : public CConCommand
   {
   public:
-    using Callback = void(__cdecl*)(void* commandArgs);
+    using Callback = void(__cdecl*)(const msvc8::vector<msvc8::string>& args);
 
     CConFunc() noexcept;
 
@@ -45,7 +45,7 @@ namespace moho
      * What it does:
      * Forwards command args to callback stored at payload offset +0x0C.
      */
-    void Handle(void* commandArgs) override;
+    void Handle(const msvc8::vector<msvc8::string>& args) override;
 
     [[nodiscard]] Callback GetCallback() const noexcept;
   };

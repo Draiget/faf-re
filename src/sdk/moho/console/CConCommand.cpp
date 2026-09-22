@@ -76,7 +76,7 @@ using namespace moho;
 
 namespace moho
 {
-  void CON_WxInputBox(void* commandArgs);
+  void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
   extern bool sPathDebuggerEnabled;
   extern CWinLogTarget sLogWindowTarget;
 }
@@ -187,64 +187,6 @@ namespace
   {
     return *reinterpret_cast<ConVar_con_TestVarUByte*>(gConVar_con_TestVarUByteStorage);
   }
-
-  struct ConCommandArgsWireView
-  {
-    void* vftable;
-    msvc8::string* begin;
-    msvc8::string* end;
-    msvc8::string* cap;
-  };
-
-  struct CameraImplDumpRuntimeView
-  {
-    std::uint8_t mUnknown00To343[0x344]{};
-    float mFarPitch = 0.0f; // +0x344
-    std::uint8_t mUnknown348To34B[0x4]{};
-    float mHeading = 0.0f; // +0x34C
-    std::uint8_t mUnknown350To353[0x4]{};
-    float mTargetZoom = 0.0f; // +0x354
-    std::uint8_t mUnknown358To37F[0x28]{};
-    Wm3::Vec3f mTargetLocation{}; // +0x380
-
-    [[nodiscard]] static const CameraImplDumpRuntimeView* FromCamera(const moho::CameraImpl* const camera) noexcept
-    {
-      return reinterpret_cast<const CameraImplDumpRuntimeView*>(camera);
-    }
-  };
-
-  static_assert(
-    offsetof(CameraImplDumpRuntimeView, mFarPitch) == 0x344,
-    "CameraImplDumpRuntimeView::mFarPitch offset must be 0x344"
-  );
-  static_assert(
-    offsetof(CameraImplDumpRuntimeView, mHeading) == 0x34C,
-    "CameraImplDumpRuntimeView::mHeading offset must be 0x34C"
-  );
-  static_assert(
-    offsetof(CameraImplDumpRuntimeView, mTargetZoom) == 0x354,
-    "CameraImplDumpRuntimeView::mTargetZoom offset must be 0x354"
-  );
-  static_assert(
-    offsetof(CameraImplDumpRuntimeView, mTargetLocation) == 0x380,
-    "CameraImplDumpRuntimeView::mTargetLocation offset must be 0x380"
-  );
-
-  struct WWinLogWindowVisibilityRuntimeView
-  {
-    std::uint8_t mUnknown00ToCB[0xCC]{};
-    std::uint8_t mBitfields = 0;
-
-    [[nodiscard]] bool IsShown() const noexcept
-    {
-      return (mBitfields & 0x02u) != 0u;
-    }
-  };
-
-  static_assert(
-    offsetof(WWinLogWindowVisibilityRuntimeView, mBitfields) == 0xCC,
-    "WWinLogWindowVisibilityRuntimeView::mBitfields offset must be 0xCC"
-  );
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
@@ -493,30 +435,25 @@ namespace
   }
 
   [[nodiscard]]
-  msvc8::string JoinConCommandTokens(const ConCommandArgsView& args, const std::size_t firstTokenIndex)
+  msvc8::string JoinConCommandTokens(const msvc8::vector<msvc8::string>& args, const std::size_t firstTokenIndex)
   {
-    if (args.begin == nullptr || args.end == nullptr || args.end < args.begin) {
-      return {};
-    }
-
-    const std::size_t count = args.Count();
+    const std::size_t count = args.size();
     if (firstTokenIndex >= count) {
       return {};
     }
 
-    const msvc8::string* const start = args.begin + firstTokenIndex;
-    return AppendJoinedStringRange(start, args.end, " ");
+    return AppendJoinedStringRange(args.data() + firstTokenIndex, args.data() + count, " ");
   }
 
   template <typename TValue, typename ParseFn>
-  void ApplyIntegralConVarCommand(const ConCommandArgsView& args, TValue* value, ParseFn parseFn)
+  void ApplyIntegralConVarCommand(const msvc8::vector<msvc8::string>& args, TValue* value, ParseFn parseFn)
   {
     if (value == nullptr) {
       return;
     }
 
-    const msvc8::string* const op = args.At(1);
-    const msvc8::string* const rhs = args.At(2);
+    const msvc8::string* const op = ConCommandArg(args, 1);
+    const msvc8::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = static_cast<TValue>(parseFn(rhs));
@@ -580,20 +517,20 @@ namespace
    * What it does:
    * Parses bool convar commands (`=`, on/off/true/false/show/tog, numeric fallback).
    */
-  void HandleBoolConVarCommand(const ConCommandArgsView& args, const char* name, bool* value)
+  void HandleBoolConVarCommand(const msvc8::vector<msvc8::string>& args, const char* name, bool* value)
   {
     if (value == nullptr) {
       return;
     }
 
-    if (args.Count() < 2) {
+    if (args.size() < 2) {
       *value = !*value;
       gpg::Logf("toggled %s is now %s", name ? name : "", *value ? "on" : "off");
       return;
     }
 
-    const msvc8::string* const op = args.At(1);
-    const msvc8::string* const rhs = args.At(2);
+    const msvc8::string* const op = ConCommandArg(args, 1);
+    const msvc8::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = ParseIntToken(rhs) != 0;
@@ -626,7 +563,7 @@ namespace
    * What it does:
    * Parses int convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleIntConVarCommand(const ConCommandArgsView& args, int* value)
+  void HandleIntConVarCommand(const msvc8::vector<msvc8::string>& args, int* value)
   {
     ApplyIntegralConVarCommand<int>(args, value, ParseIntToken);
   }
@@ -638,7 +575,7 @@ namespace
    * What it does:
    * Parses uint8 convar commands with arithmetic/bitwise operators and aliases.
    */
-  void HandleUInt8ConVarCommand(const ConCommandArgsView& args, std::uint8_t* value)
+  void HandleUInt8ConVarCommand(const msvc8::vector<msvc8::string>& args, std::uint8_t* value)
   {
     ApplyIntegralConVarCommand<std::uint8_t>(args, value, ParseIntToken);
   }
@@ -650,7 +587,7 @@ namespace
    * What it does:
    * Parses uint32 convar commands; supports decimal and `0x` numeric formats.
    */
-  void HandleUInt32ConVarCommand(const ConCommandArgsView& args, std::uint32_t* value)
+  void HandleUInt32ConVarCommand(const msvc8::vector<msvc8::string>& args, std::uint32_t* value)
   {
     ApplyIntegralConVarCommand<std::uint32_t>(args, value, ParseUInt32Token);
   }
@@ -662,14 +599,14 @@ namespace
    * What it does:
    * Parses float convar commands (`=`, `+=`, `-=`, `*=`, `/=`, direct numeric).
    */
-  void HandleFloatConVarCommand(const ConCommandArgsView& args, float* value)
+  void HandleFloatConVarCommand(const msvc8::vector<msvc8::string>& args, float* value)
   {
     if (value == nullptr) {
       return;
     }
 
-    const msvc8::string* const op = args.At(1);
-    const msvc8::string* const rhs = args.At(2);
+    const msvc8::string* const op = ConCommandArg(args, 1);
+    const msvc8::string* const rhs = ConCommandArg(args, 2);
 
     if (TokenEq(op, "=") && rhs != nullptr) {
       *value = ParseFloatToken(rhs);
@@ -702,15 +639,15 @@ namespace
    * What it does:
    * Parses string convar commands (`= value` or direct assignment); prints current value when no args.
    */
-  void HandleStringConVarCommand(const ConCommandArgsView& args, const char* name, msvc8::string* value)
+  void HandleStringConVarCommand(const msvc8::vector<msvc8::string>& args, const char* name, msvc8::string* value)
   {
     if (value == nullptr) {
       return;
     }
 
-    if (args.Count() >= 2) {
-      const msvc8::string* const op = args.At(1);
-      const msvc8::string* const rhs = args.At(2);
+    if (args.size() >= 2) {
+      const msvc8::string* const op = ConCommandArg(args, 1);
+      const msvc8::string* const rhs = ConCommandArg(args, 2);
 
       if (TokenEq(op, "=") && rhs != nullptr) {
         *value = TokenDataOrEmpty(rhs);
@@ -1041,35 +978,6 @@ namespace
   }
 } // namespace
 
-std::size_t moho::ConCommandArgsView::Count() const noexcept
-{
-  if (begin == nullptr || end == nullptr || end < begin) {
-    return 0;
-  }
-
-  return static_cast<std::size_t>(end - begin);
-}
-
-const msvc8::string* moho::ConCommandArgsView::At(const std::size_t index) const noexcept
-{
-  const auto count = Count();
-  if (index >= count) {
-    return nullptr;
-  }
-
-  return begin + index;
-}
-
-moho::ConCommandArgsView moho::GetConCommandArgsView(const void* commandArgs) noexcept
-{
-  if (commandArgs == nullptr) {
-    return {};
-  }
-
-  const auto& raw = *static_cast<const ConCommandArgsWireView*>(commandArgs);
-  return {raw.begin, raw.end};
-}
-
 /**
  * Address: 0x0041E580 (FUN_0041E580)
  *
@@ -1337,12 +1245,7 @@ void moho::ExecuteConsoleCommandText(const char* commandText)
     if (!parsedTokens.empty()) {
       CConCommand* const command = CON_FindCommand(parsedTokens[0].c_str());
       if (command != nullptr) {
-        ConCommandArgsWireView wireArgs{};
-        wireArgs.vftable = nullptr;
-        wireArgs.begin = parsedTokens.data();
-        wireArgs.end = parsedTokens.data() + parsedTokens.size();
-        wireArgs.cap = wireArgs.end;
-        command->Handle(&wireArgs);
+        command->Handle(parsedTokens);
       } else {
         msvc8::string easterEgg("ipdlfz");
         DecStringChars(easterEgg);
@@ -1443,16 +1346,15 @@ void moho::CON_ExecuteLastCommand()
  * What it does:
  * Emits joined command arguments (`arg1..argN`) through console output.
  */
-void moho::CON_Echo(void* const commandArgs)
+void moho::CON_Echo(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
-  std::string text(args.At(1)->view());
-  for (std::size_t index = 2; index < args.Count(); ++index) {
-    const msvc8::string* const token = args.At(index);
+  std::string text(ConCommandArg(args, 1)->view());
+  for (std::size_t index = 2; index < args.size(); ++index) {
+    const msvc8::string* const token = ConCommandArg(args, index);
     if (token == nullptr) {
       continue;
     }
@@ -1470,9 +1372,9 @@ void moho::CON_Echo(void* const commandArgs)
  * What it does:
  * Emits one formatted line per registered command.
  */
-void moho::CON_ListCommands(void* const commandArgs)
+void moho::CON_ListCommands(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   msvc8::vector<msvc8::string> lines;
   {
@@ -1503,9 +1405,9 @@ void moho::CON_ListCommands(void* const commandArgs)
  * What it does:
  * Prints the current engine-version string to console output.
  */
-void moho::CON_GetVersion(void* const commandArgs)
+void moho::CON_GetVersion(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
   const msvc8::string engineVersion = moho::GetEngineVersion();
   CON_Printf("%s", engineVersion.c_str());
 }
@@ -1516,9 +1418,9 @@ void moho::CON_GetVersion(void* const commandArgs)
  * What it does:
  * Iterates all registered Lua init-form sets and dumps their binder docs.
  */
-void moho::CON_LUADOC(void* const commandArgs)
+void moho::CON_LUADOC(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   for (CScrLuaInitFormSet* initSet = CScrLuaInitFormSet::sSets; initSet != nullptr; initSet = initSet->mNextSet) {
     initSet->DumpDocs();
@@ -1532,10 +1434,9 @@ void moho::CON_LUADOC(void* const commandArgs)
  * Joins command tokens from index 1 into one Lua chunk, echoes it to console,
  * and executes it in the user Lua state.
  */
-void moho::CON_LUA(void* const commandArgs)
+void moho::CON_LUA(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
@@ -1551,9 +1452,9 @@ void moho::CON_LUA(void* const commandArgs)
  * Joins command tokens from index 1 with spaces and emits one info-severity
  * log line.
  */
-void moho::CON_Log(void* const commandArgs)
+void moho::CON_Log(const msvc8::vector<msvc8::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(GetConCommandArgsView(commandArgs), 1u);
+  const msvc8::string message = JoinConCommandTokens(args, 1u);
   gpg::Logf("%s", message.c_str());
 }
 
@@ -1564,9 +1465,9 @@ void moho::CON_Log(void* const commandArgs)
  * Joins command tokens from index 1 with spaces and emits one warn-severity
  * log line.
  */
-void moho::CON_Debug_Warn(void* const commandArgs)
+void moho::CON_Debug_Warn(const msvc8::vector<msvc8::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(GetConCommandArgsView(commandArgs), 1u);
+  const msvc8::string message = JoinConCommandTokens(args, 1u);
   gpg::Warnf("%s", message.c_str());
 }
 
@@ -1577,9 +1478,9 @@ void moho::CON_Debug_Warn(void* const commandArgs)
  * Joins command tokens from index 1 with spaces and terminates through
  * `gpg::Die("%s", ...)`.
  */
-void moho::CON_Debug_Error(void* const commandArgs)
+void moho::CON_Debug_Error(const msvc8::vector<msvc8::string>& args)
 {
-  const msvc8::string message = JoinConCommandTokens(GetConCommandArgsView(commandArgs), 1u);
+  const msvc8::string message = JoinConCommandTokens(args, 1u);
   gpg::Die("%s", message.c_str());
 }
 
@@ -1589,9 +1490,9 @@ void moho::CON_Debug_Error(void* const commandArgs)
  * What it does:
  * Debug no-op callback slot.
  */
-void moho::CON_Debug_Assert(void* const commandArgs)
+void moho::CON_Debug_Assert(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 }
 
 /**
@@ -1600,9 +1501,9 @@ void moho::CON_Debug_Assert(void* const commandArgs)
  * What it does:
  * Intentionally crashes by writing zero to absolute address 0.
  */
-void moho::CON_Debug_Crash(void* const commandArgs)
+void moho::CON_Debug_Crash(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
   *reinterpret_cast<volatile std::uint32_t*>(0) = 0u;
 }
 
@@ -1612,9 +1513,9 @@ void moho::CON_Debug_Crash(void* const commandArgs)
  * What it does:
  * Throws `std::exception` with fixed debug text.
  */
-void moho::CON_Debug_Throw(void* const commandArgs)
+void moho::CON_Debug_Throw(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
   throw std::exception("Hope you really wanted to do this...");
 }
 
@@ -1625,13 +1526,12 @@ void moho::CON_Debug_Throw(void* const commandArgs)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_Edit(void* const commandArgs)
+void moho::CON_p4_Edit(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const msvc8::string* const commandToken = args.At(0u);
+  const msvc8::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
 
-  if (commandToken != nullptr && args.Count() >= 2u) {
+  if (commandToken != nullptr && args.size() >= 2u) {
     CON_Printf("No P4 support in this build.");
     return;
   }
@@ -1646,13 +1546,12 @@ void moho::CON_p4_Edit(void* const commandArgs)
  * Emits one no-support line when called with a filespec argument; otherwise
  * prints command usage.
  */
-void moho::CON_p4_IsOpenedForEdit(void* const commandArgs)
+void moho::CON_p4_IsOpenedForEdit(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const msvc8::string* const commandToken = args.At(0u);
+  const msvc8::string* const commandToken = ConCommandArg(args, 0u);
   GPG_ASSERT(commandToken != nullptr);
 
-  if (commandToken != nullptr && args.Count() >= 2u) {
+  if (commandToken != nullptr && args.size() >= 2u) {
     CON_Printf("No P4 support in this build.");
     return;
   }
@@ -1667,15 +1566,14 @@ void moho::CON_p4_IsOpenedForEdit(void* const commandArgs)
  * Parses `cam_SetLOD <cameraName> <lodScale>` and applies the parsed LOD
  * scale to the named camera view lane.
  */
-void moho::CAM_SetLOD(void* const commandArgs)
+void moho::CAM_SetLOD(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 3u) {
+  if (args.size() < 3u) {
     return;
   }
 
-  const msvc8::string* const cameraName = args.At(1u);
-  const msvc8::string* const lodScaleToken = args.At(2u);
+  const msvc8::string* const cameraName = ConCommandArg(args, 1u);
+  const msvc8::string* const lodScaleToken = ConCommandArg(args, 2u);
   if (cameraName == nullptr || lodScaleToken == nullptr) {
     return;
   }
@@ -1697,9 +1595,9 @@ void moho::CAM_SetLOD(void* const commandArgs)
  * Logs active world-camera target position, heading/far-pitch orientation,
  * and target zoom.
  */
-void moho::CON_DumpCamera(void* const commandArgs)
+void moho::CON_DumpCamera(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   RCamManager* const cameraManager = CAM_GetManager();
   CameraImpl* const camera = cameraManager != nullptr ? cameraManager->GetCamera("WorldCamera") : nullptr;
@@ -1709,11 +1607,10 @@ void moho::CON_DumpCamera(void* const commandArgs)
 
   gpg::Logf("Camera:");
 
-  const CameraImplDumpRuntimeView* const cameraView = CameraImplDumpRuntimeView::FromCamera(camera);
-  const msvc8::string targetPositionText = moho::ToString(cameraView->mTargetLocation);
+  const msvc8::string targetPositionText = moho::ToString(camera->mTargetLocation);
   gpg::Logf("  TargetPos: %s", targetPositionText.c_str());
-  gpg::Logf("  Orientation: %f, %f, 0.0", cameraView->mHeading, cameraView->mFarPitch);
-  gpg::Logf("  Zoom: %f", cameraView->mTargetZoom);
+  gpg::Logf("  Orientation: %f, %f, 0.0", camera->mHeading, camera->mFarPitch);
+  gpg::Logf("  Zoom: %f", camera->mTargetZoom);
 }
 
 /**
@@ -1723,7 +1620,7 @@ void moho::CON_DumpCamera(void* const commandArgs)
  * Imports `uiutil.lua` and invokes `SetCurrentSkin(name)` when a second
  * command token is present.
  */
-void moho::CON_UI_SetSkin(void* const commandArgs)
+void moho::CON_UI_SetSkin(const msvc8::vector<msvc8::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -1731,8 +1628,7 @@ void moho::CON_UI_SetSkin(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
@@ -1740,7 +1636,7 @@ void moho::CON_UI_SetSkin(void* const commandArgs)
   LuaPlus::LuaObject setCurrentSkinObject = uiUtilModule["SetCurrentSkin"];
   LuaPlus::LuaFunction<void> setCurrentSkin(setCurrentSkinObject);
 
-  const msvc8::string* const skinToken = args.At(1);
+  const msvc8::string* const skinToken = ConCommandArg(args, 1);
   setCurrentSkin(skinToken != nullptr ? skinToken->c_str() : "");
 }
 
@@ -1751,7 +1647,7 @@ void moho::CON_UI_SetSkin(void* const commandArgs)
  * Imports `uiutil.lua` and invokes `RotateSkin(direction)` where `direction`
  * defaults to `"+"` when no argument token is provided.
  */
-void moho::UI_RotateSkin(void* const commandArgs)
+void moho::UI_RotateSkin(const msvc8::vector<msvc8::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -1764,8 +1660,7 @@ void moho::UI_RotateSkin(void* const commandArgs)
   LuaPlus::LuaFunction<void> rotateSkin(rotateSkinObject);
 
   msvc8::string direction("+");
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (const msvc8::string* const argDirection = args.At(1); argDirection != nullptr) {
+  if (const msvc8::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
     direction.assign_owned(argDirection->c_str());
   }
 
@@ -1779,7 +1674,7 @@ void moho::UI_RotateSkin(void* const commandArgs)
  * Imports `uiutil.lua` and invokes `RotateLayout(direction)` where
  * `direction` defaults to `"+"` when no argument token is provided.
  */
-void moho::UI_RotateLayout(void* const commandArgs)
+void moho::UI_RotateLayout(const msvc8::vector<msvc8::string>& args)
 {
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -1792,8 +1687,7 @@ void moho::UI_RotateLayout(void* const commandArgs)
   LuaPlus::LuaFunction<void> rotateLayout(rotateLayoutObject);
 
   msvc8::string direction("+");
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (const msvc8::string* const argDirection = args.At(1); argDirection != nullptr) {
+  if (const msvc8::string* const argDirection = ConCommandArg(args, 1); argDirection != nullptr) {
     direction.assign_owned(argDirection->c_str());
   }
 
@@ -1806,9 +1700,9 @@ void moho::UI_RotateLayout(void* const commandArgs)
  * What it does:
  * Imports `gamemain.lua` and invokes `HideGameUI()` with no arguments.
  */
-void moho::CON_UI_ToggleGamePanels(void* const commandArgs)
+void moho::CON_UI_ToggleGamePanels(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -1829,7 +1723,7 @@ void moho::CON_UI_ToggleGamePanels(void* const commandArgs)
  * Validates one selection-set name argument and calls
  * `/lua/ui/game/selection.lua:AddCurrentSelectionSet(name)`.
  */
-void moho::UI_MakeSelectionSet(void* const commandArgs)
+void moho::UI_MakeSelectionSet(const msvc8::vector<msvc8::string>& args)
 {
   if (WLD_GetActiveSession() == nullptr) {
     const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
@@ -1837,8 +1731,7 @@ void moho::UI_MakeSelectionSet(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     CON_Printf("%s", kUIMakeSelectionSetUsageText);
     return;
   }
@@ -1852,7 +1745,7 @@ void moho::UI_MakeSelectionSet(void* const commandArgs)
   LuaPlus::LuaObject addCurrentSelectionSet = selectionModule["AddCurrentSelectionSet"];
   LuaPlus::LuaFunction<void> addCurrentSelectionSetFn(addCurrentSelectionSet);
 
-  const msvc8::string* const setName = args.At(1);
+  const msvc8::string* const setName = ConCommandArg(args, 1);
   addCurrentSelectionSetFn(setName != nullptr ? setName->c_str() : "");
 }
 
@@ -1863,7 +1756,7 @@ void moho::UI_MakeSelectionSet(void* const commandArgs)
  * Validates one selection-set name argument and calls
  * `/lua/ui/game/selection.lua:ApplySelectionSet(name)`.
  */
-void moho::UI_ApplySelectionSet(void* const commandArgs)
+void moho::UI_ApplySelectionSet(const msvc8::vector<msvc8::string>& args)
 {
   if (WLD_GetActiveSession() == nullptr) {
     const msvc8::string noSessionText = Loc(USER_GetLuaState(), kNoSessionLocToken);
@@ -1871,8 +1764,7 @@ void moho::UI_ApplySelectionSet(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     CON_Printf("%s", kUIApplySelectionSetUsageText);
     return;
   }
@@ -1888,7 +1780,7 @@ void moho::UI_ApplySelectionSet(void* const commandArgs)
   LuaPlus::LuaFunction<void> applySelectionSetFn(applySelectionSet);
 
   msvc8::string selectionSetName;
-  if (const msvc8::string* const setName = args.At(1); setName != nullptr) {
+  if (const msvc8::string* const setName = ConCommandArg(args, 1); setName != nullptr) {
     selectionSetName.assign_owned(setName->c_str());
   }
   applySelectionSetFn(selectionSetName.c_str());
@@ -1904,7 +1796,7 @@ void moho::UI_ApplySelectionSet(void* const commandArgs)
  * selection afterward; the other three do not (matches the binary's own
  * asymmetry - not a recovery oversight).
  */
-void moho::CON_IssueCommand(void* const commandArgs)
+void moho::CON_IssueCommand(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -1913,12 +1805,11 @@ void moho::CON_IssueCommand(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
-  const msvc8::string* const subCommand = args.At(1);
+  const msvc8::string* const subCommand = ConCommandArg(args, 1);
   const char* const subCommandText = subCommand != nullptr ? subCommand->c_str() : "";
 
   if (_stricmp(subCommandText, "Stop") == 0) {
@@ -1956,9 +1847,9 @@ void moho::CON_IssueCommand(void* const commandArgs)
  * What it does:
  * Imports `multihead.lua` and invokes `CreateSecondView()`.
  */
-void moho::CON_UI_CreateHead1Map(void* const commandArgs)
+void moho::CON_UI_CreateHead1Map(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager != nullptr ? uiManager->mLuaState : nullptr;
@@ -1978,9 +1869,9 @@ void moho::CON_UI_CreateHead1Map(void* const commandArgs)
  * What it does:
  * Shows the escape dialog through UI main callback lane.
  */
-void moho::UI_Quit(void* const commandArgs)
+void moho::UI_Quit(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
   (void)ShowEscapeDialog(false);
 }
 
@@ -1991,10 +1882,9 @@ void moho::UI_Quit(void* const commandArgs)
  * Resolves each camera-name token from argument index 1 onward and resets
  * each camera that exists in the current camera manager.
  */
-void moho::UI_ResetView(void* const commandArgs)
+void moho::UI_ResetView(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() <= 1u) {
+  if (args.size() <= 1u) {
     return;
   }
 
@@ -2003,8 +1893,8 @@ void moho::UI_ResetView(void* const commandArgs)
     return;
   }
 
-  for (std::size_t index = 1u; index < args.Count(); ++index) {
-    const msvc8::string* const cameraName = args.At(index);
+  for (std::size_t index = 1u; index < args.size(); ++index) {
+    const msvc8::string* const cameraName = ConCommandArg(args, index);
     if (cameraName == nullptr) {
       continue;
     }
@@ -2023,13 +1913,12 @@ void moho::UI_ResetView(void* const commandArgs)
  * Parses one focus-army index argument and requests focus update on active
  * world session; otherwise prints syntax/no-session feedback.
  */
-void moho::SetFocusArmy(void* const commandArgs)
+void moho::SetFocusArmy(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() == 2u) {
+  if (args.size() == 2u) {
     CWldSession* const session = WLD_GetActiveSession();
     if (session != nullptr) {
-      session->RequestFocusArmy(ParseIntToken(args.At(1)));
+      session->RequestFocusArmy(ParseIntToken(ConCommandArg(args, 1)));
       return;
     }
 
@@ -2038,7 +1927,7 @@ void moho::SetFocusArmy(void* const commandArgs)
     return;
   }
 
-  const msvc8::string* const commandNameToken = args.At(0);
+  const msvc8::string* const commandNameToken = ConCommandArg(args, 0);
   const char* const commandName = commandNameToken != nullptr ? commandNameToken->c_str() : "SetFocusArmy";
   CON_Printf("syntax: %s <zero based army index or -1>", commandName);
 }
@@ -2050,10 +1939,9 @@ void moho::SetFocusArmy(void* const commandArgs)
  * Joins command tokens from index 1 and executes the Lua text in the active
  * UI manager state.
  */
-void moho::UI_Lua(void* const commandArgs)
+void moho::UI_Lua(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
@@ -2112,9 +2000,9 @@ void moho::UI_ShowRenameDialog()
  * What it does:
  * Walks each root UI frame and logs every control via depth-first traversal.
  */
-void moho::UI_DumpControls(void* const commandArgs)
+void moho::UI_DumpControls(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   if (uiManager == nullptr) {
@@ -2141,9 +2029,9 @@ void moho::UI_DumpControls(void* const commandArgs)
  * Dispatches `DumpControlsUnderMouse()` on the active UI manager when one is
  * available.
  */
-void moho::UI_DumpControlsUnderCursor(void* const commandArgs)
+void moho::UI_DumpControlsUnderCursor(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   IUIManager* const uiManager = UI_GetManager();
   if (uiManager != nullptr) {
@@ -2177,8 +2065,11 @@ void moho::WIN_ToggleLogDialog()
     dialog = sLogWindowTarget.dialog;
   }
 
-  const auto* const dialogView = reinterpret_cast<const WWinLogWindowVisibilityRuntimeView*>(dialog);
-  dialog->Show(!dialogView->IsShown());
+  // `wxWindowBase::IsShown()` is inline, so 0x004F3C45 reads the flag directly:
+  // `movzx edx, byte [ecx+0xCC] / shr dl, 1 / not dl / and edx, 1` -- bit 1 of
+  // the state bitfield, which wx 2.4.2 packs as `m_autoLayout:1, m_isShown:1,
+  // m_isEnabled:1, ...`. `Show` is the virtual at `[vptr+0x7C]`.
+  dialog->Show(!dialog->IsShown());
 }
 
 /**
@@ -2188,14 +2079,13 @@ void moho::WIN_ToggleLogDialog()
  * Parses one boolean visibility token (`"true"` => show, otherwise hide),
  * ensures the log-window runtime exists, and forwards the visibility toggle.
  */
-void moho::WIN_ShowLogDialog(void* const commandArgs)
+void moho::WIN_ShowLogDialog(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
-  const msvc8::string* const showToken = args.At(1u);
+  const msvc8::string* const showToken = ConCommandArg(args, 1u);
   if (showToken == nullptr) {
     return;
   }
@@ -2237,9 +2127,9 @@ void moho::CON_ExecutePasteBuffer()
  * Opens Lua create-unit dialog at current cursor screen coordinates, or prints
  * localized no-session text when no world session is active.
  */
-void moho::CON_PopupCreateUnitMenu(void* const commandArgs)
+void moho::CON_PopupCreateUnitMenu(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2266,9 +2156,9 @@ void moho::CON_PopupCreateUnitMenu(void* const commandArgs)
  * Imports path debugger UI module and toggles between `CreateUI` and
  * `DestroyUI` based on persisted enable state.
  */
-void moho::CON_PathDebug(void* const commandArgs)
+void moho::CON_PathDebug(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CUIManager* const uiManager = static_cast<CUIManager*>(UI_GetManager());
   LuaPlus::LuaState* const state = uiManager->mLuaState;
@@ -2295,7 +2185,7 @@ void moho::CON_PathDebug(void* const commandArgs)
  * placeholder path), lowercases it, and dispatches prop creation at active
  * world-session cursor position.
  */
-void moho::CON_CreateProp(void* const commandArgs)
+void moho::CON_CreateProp(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2304,8 +2194,7 @@ void moho::CON_CreateProp(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const msvc8::string* const blueprintToken = args.At(1u);
+  const msvc8::string* const blueprintToken = ConCommandArg(args, 1u);
 
   const char* const blueprintPath =
     blueprintToken != nullptr ? blueprintToken->c_str() : "/props/rplaceholder/rplaceholder_prop";
@@ -2334,7 +2223,7 @@ void moho::CON_CreateProp(void* const commandArgs)
  * and asks the sim driver to spawn the unit. An unresolvable blueprint id plays
  * the UI error cue instead.
  */
-void moho::CON_CreateUnit(void* const commandArgs)
+void moho::CON_CreateUnit(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2342,8 +2231,7 @@ void moho::CON_CreateUnit(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const std::size_t tokenCount = args.Count();
+  const std::size_t tokenCount = args.size();
   if (tokenCount < 2u) {
     return;
   }
@@ -2352,13 +2240,13 @@ void moho::CON_CreateUnit(void* const commandArgs)
 
   // The binary gates the explicit-screen-point path on `tokenCount >= 4` while
   // reading tokens 3 *and* 4, so a four-token invocation reads one past the
-  // argument vector. `ConCommandArgsView::At` is bounds-checked and yields an
+  // argument vector. `ConCommandArg` is bounds-checked and yields an
   // absent token there, which `ParseIntToken` turns into 0 - the same value the
   // out-of-bounds read produced for every well-formed argument vector.
   if (tokenCount >= 4u) {
     const Wm3::Vector2f screenPoint{
-      static_cast<float>(ParseIntToken(args.At(3u))),
-      static_cast<float>(ParseIntToken(args.At(4u)))
+      static_cast<float>(ParseIntToken(ConCommandArg(args, 3u))),
+      static_cast<float>(ParseIntToken(ConCommandArg(args, 4u)))
     };
 
     if (cmp_LastMouseScreenPos(screenPoint) != 0) {
@@ -2372,7 +2260,7 @@ void moho::CON_CreateUnit(void* const commandArgs)
 
   int armyIndex = 0;
   if (tokenCount >= 3u) {
-    armyIndex = ParseIntToken(args.At(2u));
+    armyIndex = ParseIntToken(ConCommandArg(args, 2u));
 
     const std::size_t armyCount = session->userArmies.size();
     if (static_cast<std::size_t>(armyIndex) >= armyCount) {
@@ -2392,7 +2280,7 @@ void moho::CON_CreateUnit(void* const commandArgs)
   }
 
   msvc8::string requestedBlueprint;
-  requestedBlueprint.assign_owned(TokenDataOrEmpty(args.At(1u)));
+  requestedBlueprint.assign_owned(TokenDataOrEmpty(ConCommandArg(args, 1u)));
 
   RResId requestedBlueprintId{};
   (void)gpg::STR_CopyFilename(&requestedBlueprintId.name, &requestedBlueprint);
@@ -2430,7 +2318,7 @@ void moho::CON_CreateUnit(void* const commandArgs)
  * cells, sampling terrain elevation at each cell center and lifting the spawn to
  * the water plane where the map's water sits above the terrain.
  */
-void moho::CON_LotsOfProps(void* const commandArgs)
+void moho::CON_LotsOfProps(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2438,11 +2326,10 @@ void moho::CON_LotsOfProps(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
   msvc8::string propBlueprintPath;
-  if (args.Count() >= 2u) {
-    propBlueprintPath.assign_owned(TokenDataOrEmpty(args.At(1u)));
+  if (args.size() >= 2u) {
+    propBlueprintPath.assign_owned(TokenDataOrEmpty(ConCommandArg(args, 1u)));
 
     // The binary lowercases the freshly copied path in place through the same
     // transform helper rather than building a second buffer.
@@ -2453,8 +2340,8 @@ void moho::CON_LotsOfProps(void* const commandArgs)
   }
 
   int propCount = kLotsOfPropsDefaultCount;
-  if (args.Count() >= 3u) {
-    propCount = ParseIntToken(args.At(2u));
+  if (args.size() >= 3u) {
+    propCount = ParseIntToken(ConCommandArg(args, 2u));
   }
 
   const STIMap* const terrainMap = ResolveSessionTerrainMap(session);
@@ -2489,9 +2376,9 @@ void moho::CON_LotsOfProps(void* const commandArgs)
  * death sequence. Prints localized "no session" feedback when no world session
  * is active.
  */
-void moho::CON_KillSelectedUnits(void* const commandArgs)
+void moho::CON_KillSelectedUnits(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2512,9 +2399,9 @@ void moho::CON_KillSelectedUnits(void* const commandArgs)
  * than killing them. Prints localized "no session" feedback when no world
  * session is active.
  */
-void moho::CON_DestroySelectedUnits(void* const commandArgs)
+void moho::CON_DestroySelectedUnits(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2636,9 +2523,9 @@ namespace
  * so this uses the established wrapper for consistency with every sibling
  * command in this file.
  */
-void moho::CON_CopySelectedUnitsToClipboard(void* const commandArgs)
+void moho::CON_CopySelectedUnitsToClipboard(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2737,7 +2624,7 @@ void moho::CON_CopySelectedUnitsToClipboard(void* const commandArgs)
  * is no active session; silently does nothing when the session has no
  * terrain resource or decal manager.
  */
-void moho::CON_AddSplat(void* const commandArgs)
+void moho::CON_AddSplat(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2747,11 +2634,10 @@ void moho::CON_AddSplat(void* const commandArgs)
 
   msvc8::string texturePath = "/env/common/splats/tank_treads_albedo.dds";
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const std::size_t tokenCount = args.Count();
+  const std::size_t tokenCount = args.size();
   for (std::size_t i = 1u; i < tokenCount; ++i) {
-    if (const msvc8::string* const token = args.At(i); token != nullptr && *token == "texture") {
-      if (const msvc8::string* const path = args.At(i + 1u); path != nullptr) {
+    if (const msvc8::string* const token = ConCommandArg(args, i); token != nullptr && *token == "texture") {
+      if (const msvc8::string* const path = ConCommandArg(args, i + 1u); path != nullptr) {
         texturePath = *path;
       }
     }
@@ -2782,7 +2668,7 @@ void moho::CON_AddSplat(void* const commandArgs)
  * before honouring an info pair. Prints localized "no session" feedback when no
  * world session is active, and silently ignores short argument vectors.
  */
-void moho::CON_ProcessInfoPair(void* const commandArgs)
+void moho::CON_ProcessInfoPair(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2790,8 +2676,7 @@ void moho::CON_ProcessInfoPair(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 3u) {
+  if (args.size() < 3u) {
     return;
   }
 
@@ -2800,8 +2685,8 @@ void moho::CON_ProcessInfoPair(void* const commandArgs)
   msvc8::vector<UserUnit*> selectedUnits;
   session->GetSelectionUnits(selectedUnits);
 
-  const char* const infoKey = TokenDataOrEmpty(args.At(1u));
-  const char* const infoValue = TokenDataOrEmpty(args.At(2u));
+  const char* const infoKey = TokenDataOrEmpty(ConCommandArg(args, 1u));
+  const char* const infoValue = TokenDataOrEmpty(ConCommandArg(args, 2u));
 
   for (UserUnit* const selectedUnit : selectedUnits) {
     UserEntity* const entityView = ResolveUserEntityView(selectedUnit);
@@ -2830,7 +2715,7 @@ void moho::CON_ProcessInfoPair(void* const commandArgs)
  * otherwise it starts tracking the whole selection at the camera's current
  * target zoom with a zero-second transition.
  */
-void moho::UI_TrackUnit(void* const commandArgs)
+void moho::UI_TrackUnit(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2838,8 +2723,7 @@ void moho::UI_TrackUnit(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  const std::size_t tokenCount = args.Count();
+  const std::size_t tokenCount = args.size();
   if (tokenCount <= 1u) {
     return;
   }
@@ -2847,7 +2731,7 @@ void moho::UI_TrackUnit(void* const commandArgs)
   SSelectionSetUserEntity& selection = session->mSelection;
 
   for (std::size_t tokenIndex = 1u; tokenIndex < tokenCount; ++tokenIndex) {
-    CameraImpl* const camera = CAM_GetManager()->GetCamera(TokenDataOrEmpty(args.At(tokenIndex)));
+    CameraImpl* const camera = CAM_GetManager()->GetCamera(TokenDataOrEmpty(ConCommandArg(args, tokenIndex)));
     if (camera == nullptr) {
       continue;
     }
@@ -2881,7 +2765,7 @@ void moho::UI_TrackUnit(void* const commandArgs)
  * info pair through the sim driver. Requires exactly one selected user-unit and
  * prints the matching localized rejection otherwise.
  */
-void moho::RenameUnit(void* const commandArgs)
+void moho::RenameUnit(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2908,8 +2792,7 @@ void moho::RenameUnit(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() == 1u) {
+  if (args.size() == 1u) {
     const msvc8::string& currentName = CustomNameStorage(selectedUnit);
     if (currentName.empty()) {
       PrintLocalizedConsoleLine(kRenameUnitNoCustomNameLocToken);
@@ -2955,7 +2838,7 @@ void moho::RenameUnit(void* const commandArgs)
  *     `UI_StartCommandMode` with the new mode data when a matching unit is
  *     found.
  */
-void moho::CON_StartCommandMode(void* const commandArgs)
+void moho::CON_StartCommandMode(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -2963,8 +2846,7 @@ void moho::CON_StartCommandMode(void* const commandArgs)
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 3u) {
+  if (args.size() < 3u) {
     return;
   }
 
@@ -2979,8 +2861,8 @@ void moho::CON_StartCommandMode(void* const commandArgs)
   // below. Feeding the mode token to `SetLexical` leaves the caps mask at
   // zero, the selection scan then matches nothing and the command mode never
   // starts -- which is every order hotkey silently doing nothing.
-  const msvc8::string* const modeToken = args.At(1u);
-  const msvc8::string* const nameToken = args.At(2u);
+  const msvc8::string* const modeToken = ConCommandArg(args, 1u);
+  const msvc8::string* const nameToken = ConCommandArg(args, 2u);
   if (modeToken == nullptr || nameToken == nullptr) {
     return;
   }
@@ -3048,9 +2930,9 @@ void moho::CON_StartCommandMode(void* const commandArgs)
  * Generates build templates from current selection when a world session is
  * active; otherwise prints localized "no session" feedback.
  */
-void moho::CON_DebugGenerateBuildTemplateFromSelection(void* const commandArgs)
+void moho::CON_DebugGenerateBuildTemplateFromSelection(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
     (void)session;
@@ -3068,9 +2950,9 @@ void moho::CON_DebugGenerateBuildTemplateFromSelection(void* const commandArgs)
  * Clears build-template state when a world session is active; otherwise prints
  * localized "no session" feedback.
  */
-void moho::CON_DebugClearBuildTemplates(void* const commandArgs)
+void moho::CON_DebugClearBuildTemplates(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   if (CWldSession* const session = WLD_GetActiveSession(); session != nullptr) {
     (void)session;
@@ -3088,9 +2970,9 @@ void moho::CON_DebugClearBuildTemplates(void* const commandArgs)
  * Teleports currently selected units owned by the focused army to cursor world
  * position, preserving orientation and applying spawn-elevation correction.
  */
-void moho::CON_TeleportSelectedUnits(void* const commandArgs)
+void moho::CON_TeleportSelectedUnits(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -3149,9 +3031,9 @@ void moho::CON_TeleportSelectedUnits(void* const commandArgs)
  * command validation in UI") are the struct's `.data` initializers, read
  * directly from the shipped PE.
  */
-void moho::SkipUIChecks(void* const commandArgs)
+void moho::SkipUIChecks(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -3176,9 +3058,9 @@ void moho::SkipUIChecks(void* const commandArgs)
  * / "Restart rendering the current beat.") read from the PE `.data`
  * initializers of `stru_F5B7B4`/`dword_F5B7C0`.
  */
-void moho::WLD_RestartBeat(void* const commandArgs)
+void moho::WLD_RestartBeat(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -3201,9 +3083,9 @@ void moho::WLD_RestartBeat(void* const commandArgs)
  * / "Advance the sim one beat.") read from the PE `.data` initializers of
  * `stru_F5B7C4`/`dword_F5B7D0`.
  */
-void moho::WLD_AdvanceBeat(void* const commandArgs)
+void moho::WLD_AdvanceBeat(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
@@ -3230,9 +3112,9 @@ void moho::WLD_AdvanceBeat(void* const commandArgs)
  * ("WLD_SingleStep" / "Single-step the sim one tick.") read from the PE
  * `.data` initializers of `stru_F5B734`/`dword_F5B740`.
  */
-void moho::WLD_SingleStep(void* const commandArgs)
+void moho::WLD_SingleStep(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   ISTIDriver* const simDriver = SIM_GetActiveDriver();
   if (simDriver == nullptr) {
@@ -3258,10 +3140,9 @@ void moho::WLD_SingleStep(void* const commandArgs)
  * / "Set a new game speed") read from the PE `.data` initializers of
  * `stru_F5B744`/`dword_F5B750`.
  */
-void moho::WLD_GameSpeed(void* const commandArgs)
+void moho::WLD_GameSpeed(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() != 2u) {
+  if (args.size() != 2u) {
     CON_Printf("WLD_GameSpeed <int> - set current game speed");
     return;
   }
@@ -3271,7 +3152,7 @@ void moho::WLD_GameSpeed(void* const commandArgs)
     return;
   }
 
-  const msvc8::string* const rateToken = args.At(1u);
+  const msvc8::string* const rateToken = ConCommandArg(args, 1u);
   int requestedSpeed = static_cast<int>(std::atof(TokenDataOrEmpty(rateToken)));
   if (requestedSpeed > 50) {
     requestedSpeed = 50;
@@ -3307,21 +3188,20 @@ void moho::WLD_GameSpeed(void* const commandArgs)
  * from the PE `.data` initializer of `stru_F5BEA0` ("FindUnit"); the
  * description string sits in the same struct.
  */
-void moho::CON_FindUnit(void* const commandArgs)
+void moho::CON_FindUnit(const msvc8::vector<msvc8::string>& args)
 {
   CWldSession* const session = WLD_GetActiveSession();
   if (session == nullptr) {
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() < 2u) {
+  if (args.size() < 2u) {
     return;
   }
 
   msvc8::vector<msvc8::string> searchTermsLower;
-  for (std::size_t index = 1u; index < args.Count(); ++index) {
-    searchTermsLower.push_back(gpg::STR_ToLower(TokenDataOrEmpty(args.At(index))));
+  for (std::size_t index = 1u; index < args.size(); ++index) {
+    searchTermsLower.push_back(gpg::STR_ToLower(TokenDataOrEmpty(ConCommandArg(args, index))));
   }
 
   RRuleGameRulesImpl* const rules = session->mRules;
@@ -3371,9 +3251,9 @@ void moho::CON_FindUnit(void* const commandArgs)
  * `dword_F5BEDC = offset sub_8D4150` is the callsite evidence. Name is read
  * from the PE `.data` initializer of `stru_F5BED0` ("SC_LuaDebugger").
  */
-void moho::SC_LuaDebugger(void* const commandArgs)
+void moho::SC_LuaDebugger(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   LuaPlus::LuaState* const userLuaState = USER_GetLuaState();
   if (userLuaState == nullptr) {
@@ -3424,10 +3304,9 @@ void moho::SC_LuaDebugger(void* const commandArgs)
  * `dword_F5B760 = offset sub_88E440` is the callsite evidence. Name is read
  * from the PE `.data` initializer of `stru_F5B754` ("DoSimCommand").
  */
-void moho::DoSimCommand(void* const commandArgs)
+void moho::DoSimCommand(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() <= 1u) {
+  if (args.size() <= 1u) {
     CON_Printf("usage: DoSimCommand command args...");
     return;
   }
@@ -3457,8 +3336,8 @@ void moho::DoSimCommand(void* const commandArgs)
     focusArmy = static_cast<std::uint32_t>(session->FocusArmy);
   }
 
-  for (std::size_t index = 1u; index < args.Count(); ++index) {
-    if (const msvc8::string* const token = args.At(index); token != nullptr) {
+  for (std::size_t index = 1u; index < args.size(); ++index) {
+    if (const msvc8::string* const token = ConCommandArg(args, index); token != nullptr) {
       remainingArgs.push_back(*token);
     }
   }
@@ -3475,14 +3354,13 @@ void moho::DoSimCommand(void* const commandArgs)
  * two command tokens are present, forwards token `0` to
  * `d3d_AntiAliasingSamples`.
  */
-void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(void* const commandArgs)
+void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() != 2u) {
+  if (args.size() != 2u) {
     return;
   }
 
-  const msvc8::string* const sampleToken = args.At(0u);
+  const msvc8::string* const sampleToken = ConCommandArg(args, 0u);
   if (sampleToken == nullptr) {
     return;
   }
@@ -3497,10 +3375,9 @@ void moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken(void* const commandArgs
  * Parses one `ren_MipSkipLevels` value argument and applies clamped
  * non-negative mip-skip state to active D3D device resources.
  */
-void moho::CON_ren_MipSkipLevels(void* const commandArgs)
+void moho::CON_ren_MipSkipLevels(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() != 2u) {
+  if (args.size() != 2u) {
     return;
   }
 
@@ -3514,7 +3391,7 @@ void moho::CON_ren_MipSkipLevels(void* const commandArgs)
     return;
   }
 
-  const int requestedMipSkip = ParseIntToken(args.At(1));
+  const int requestedMipSkip = ParseIntToken(ConCommandArg(args, 1));
   resources->SetSkipMipLevels(requestedMipSkip >= 0 ? requestedMipSkip : 0);
 }
 
@@ -3525,9 +3402,9 @@ void moho::CON_ren_MipSkipLevels(void* const commandArgs)
  * Opens `PreloadedTextures.txt`, asks active D3D resources to dump preloaded
  * texture state into it, then closes the stream.
  */
-void moho::CON_DumpPreloadedTextures(void* const commandArgs)
+void moho::CON_DumpPreloadedTextures(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   CD3DDevice* const device = D3D_GetDevice();
   if (device == nullptr) {
@@ -3564,16 +3441,15 @@ namespace gpg::gal
  * `mesh_Rebatch <allowInstancing> <allowFloat16>` console command - see the
  * declaration.
  */
-void moho::CON_mesh_Rebatch(void* const commandArgs)
+void moho::CON_mesh_Rebatch(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() != 3u) {
+  if (args.size() != 3u) {
     CON_Printf("usage: mesh_Rebatch [allowInstancing] [allowFloat16]");
     return;
   }
 
-  gpg::gal::sMeshAllowInstancing = TokenEq(args.At(1), "true") ? 1U : 0U;
-  gpg::gal::sMeshAllowFloat16 = TokenEq(args.At(2), "true") ? 1U : 0U;
+  gpg::gal::sMeshAllowInstancing = TokenEq(ConCommandArg(args, 1), "true") ? 1U : 0U;
+  gpg::gal::sMeshAllowFloat16 = TokenEq(ConCommandArg(args, 2), "true") ? 1U : 0U;
 
   REN_ResetHardwareVertexFormatter();
   MeshRenderer::GetInstance()->Reset();
@@ -3695,7 +3571,7 @@ namespace
  * other combination opens the free-standing editor at the same cursor world
  * position.
  */
-void moho::EFX_CreateEmitterWindow(void* const commandArgs)
+void moho::EFX_CreateEmitterWindow(const msvc8::vector<msvc8::string>& args)
 {
   // 0x00669EDF: the binary loads the active-session global and dereferences it
   // straight away - this command is only reachable from an in-session console.
@@ -3704,10 +3580,9 @@ void moho::EFX_CreateEmitterWindow(void* const commandArgs)
   const Wm3::Vector3f spawnPosition = session.CursorWorldPos;
   UserEntity* const attachEntity = FirstLiveSelectedUserEntity(session.mSelection);
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
-  WEmitterWx* const editor = (args.Count() > 1u && attachEntity != nullptr)
-    ? new WEmitterWx(attachEntity, spawnPosition, args.At(1u)->c_str())
+  WEmitterWx* const editor = (args.size() > 1u && attachEntity != nullptr)
+    ? new WEmitterWx(attachEntity, spawnPosition, ConCommandArg(args, 1u)->c_str())
     : new WEmitterWx(nullptr, spawnPosition, nullptr);
 
   const ScopedManagedFrameHandle editorHandle(editor);
@@ -3947,9 +3822,9 @@ void moho::register_console_command_buffer()
  * Dispatches bool convar command parsing and mutation.
  */
 template <>
-void moho::TConVar<bool>::Handle(void* commandArgs)
+void moho::TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  HandleBoolConVarCommand(GetConCommandArgsView(commandArgs), mName, ValuePtr());
+  HandleBoolConVarCommand(args, mName, ValuePtr());
 }
 
 /**
@@ -3960,15 +3835,14 @@ void moho::TConVar<bool>::Handle(void* commandArgs)
  * Handles int convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<int>::Handle(void* commandArgs)
+void moho::TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args)
 {
   int* const value = ValuePtr();
   if (value == nullptr) {
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() >= 2) {
+  if (args.size() >= 2) {
     HandleIntConVarCommand(args, value);
   } else {
     gpg::Logf("int %s == %d", mName ? mName : "", *value);
@@ -3983,15 +3857,14 @@ void moho::TConVar<int>::Handle(void* commandArgs)
  * Handles uint8 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint8_t>::Handle(void* commandArgs)
+void moho::TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& args)
 {
   std::uint8_t* const value = ValuePtr();
   if (value == nullptr) {
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() >= 2) {
+  if (args.size() >= 2) {
     HandleUInt8ConVarCommand(args, value);
   } else {
     gpg::Logf("uint8 %s == %d", mName ? mName : "", static_cast<int>(*value));
@@ -4006,15 +3879,14 @@ void moho::TConVar<std::uint8_t>::Handle(void* commandArgs)
  * Handles float convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<float>::Handle(void* commandArgs)
+void moho::TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args)
 {
   float* const value = ValuePtr();
   if (value == nullptr) {
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() >= 2) {
+  if (args.size() >= 2) {
     HandleFloatConVarCommand(args, value);
   } else {
     gpg::Logf("float %s == %.4f", mName ? mName : "", *value);
@@ -4029,15 +3901,14 @@ void moho::TConVar<float>::Handle(void* commandArgs)
  * Handles uint32 convar command; prints current value when no RHS command args are provided.
  */
 template <>
-void moho::TConVar<std::uint32_t>::Handle(void* commandArgs)
+void moho::TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& args)
 {
   std::uint32_t* const value = ValuePtr();
   if (value == nullptr) {
     return;
   }
 
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() >= 2) {
+  if (args.size() >= 2) {
     HandleUInt32ConVarCommand(args, value);
   } else {
     CON_Printf("uint32 %s == %u (%x)", mName ? mName : "", *value, *value);
@@ -4052,9 +3923,9 @@ void moho::TConVar<std::uint32_t>::Handle(void* commandArgs)
  * Handles string convar command assignment and value display.
  */
 template <>
-void moho::TConVar<msvc8::string>::Handle(void* commandArgs)
+void moho::TConVar<msvc8::string>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  HandleStringConVarCommand(GetConCommandArgsView(commandArgs), mName, ValuePtr());
+  HandleStringConVarCommand(args, mName, ValuePtr());
 }
 
 namespace

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
+
 namespace moho
 {
   /**
@@ -29,7 +32,7 @@ namespace moho
    * `sDeviceLock` is held for the duration so device-context readers never
    * observe a half-updated head while the resize is in flight.
    */
-  void SC_PrimaryAdapter(void* commandArgs);
+  void SC_PrimaryAdapter(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE9480 (FUN_00BE9480, register_CConFunc_SC_PrimaryAdapter)
@@ -56,7 +59,7 @@ namespace moho
    * parsed value afterward - the reset is gated only on argument *count*,
    * not on what the argument says.
    */
-  void SC_VerticalSync(void* commandArgs);
+  void SC_VerticalSync(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE9580 (FUN_00BE9580, register_CConFunc_SC_VerticalSync)
@@ -83,7 +86,7 @@ namespace moho
    * has exactly one head, and that head is windowed - otherwise this is a
    * no-op. More than one argument is a no-op.
    */
-  void SC_ToggleCursorClip(void* commandArgs);
+  void SC_ToggleCursorClip(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE96C0 (FUN_00BE96C0, register_CConFunc_SC_ToggleCursorClip)
@@ -109,7 +112,7 @@ namespace moho
    * (StartupHelpers.cpp), which republishes the secondary-adapter Lua
    * options-menu state.
    */
-  void SC_SecondaryAdapter(void* commandArgs);
+  void SC_SecondaryAdapter(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE94C0 (FUN_00BE94C0, register_CConFunc_SC_SecondaryAdapter)
