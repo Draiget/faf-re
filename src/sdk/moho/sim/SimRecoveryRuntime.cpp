@@ -1590,18 +1590,6 @@ namespace
   static_assert(offsetof(IntrusiveOwnerAnchorRuntime, head) == 0x04, "IntrusiveOwnerAnchorRuntime::head offset must be 0x04");
 #endif
 
-  struct AssistingUnitListOwnerRuntime
-  {
-    std::byte pad00[0x3C0];
-    void* ownerLinkSlot;
-  };
-#if INTPTR_MAX == INT32_MAX
-  static_assert(
-    offsetof(AssistingUnitListOwnerRuntime, ownerLinkSlot) == 0x3C0,
-    "AssistingUnitListOwnerRuntime::ownerLinkSlot offset must be 0x3C0"
-  );
-#endif
-
   struct MeshThumbnailListNodeRuntime
   {
     MeshThumbnailListNodeRuntime* next;
@@ -3743,36 +3731,6 @@ void ReleaseLegacyBufferTripleRuntimeF(
 )
 {
   ReleaseLegacyBufferTripleRuntime(owner);
-}
-
-/**
- * Address: 0x0086DB30 (FUN_0086DB30)
- *
- * What it does:
- * Resolves one owner pointer from an assisting-unit owner-slot lane
- * (`ownerLinkSlot - 8`), returning null when no slot is linked.
- *
- * Real caller, not yet wired: the callgraph index cites this address's sole
- * caller as `cfunc_GetAssistingUnitsListL` (FUN_008BC820, recovered at
- * moho/sim/Sim.cpp). The currently recovered `cfunc_GetAssistingUnitsListL`
- * answers "who assists sourceUnit" with an O(n) scan of every entity in the
- * session's entity map, testing `ResolveAssistTargetUnit(candidate) ==
- * sourceUnit` per entity - a different, unrelated field
- * (`UserUnit+0x3C0`/`assistTargetLink`) from this function's
- * `ownerLinkSlot - 8`, which reads as an intrusive "list of units currently
- * assisting me" walk instead. The real binary likely walks that intrusive
- * list directly rather than scanning every session entity; recovering that
- * list's head/iteration shape (and rewriting `cfunc_GetAssistingUnitsListL`
- * to use it) is a separate, standalone recovery from this orphan audit.
- */
-[[maybe_unused]] void* ResolveAssistingUnitOwnerRuntime(
-  const AssistingUnitListOwnerRuntime* const owner
-) noexcept
-{
-  if (owner == nullptr || owner->ownerLinkSlot == nullptr) {
-    return nullptr;
-  }
-  return static_cast<void*>(static_cast<std::byte*>(owner->ownerLinkSlot) - 8u);
 }
 
 /**

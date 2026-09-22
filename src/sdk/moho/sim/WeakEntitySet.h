@@ -5,10 +5,15 @@
 #include <new>
 
 #include "legacy/containers/Vector.h"
+#include "moho/misc/WeakPtr.h"
 
 namespace moho
 {
   class UserEntity;
+  class UserUnit;
+
+  template <class T>
+  class WeakSetIterator;
 
   /**
    * One intrusive weak reference to a `UserEntity`, as stored inside a
@@ -92,6 +97,25 @@ namespace moho
      */
     WeakEntitySetUserEntity() = default;
 
+    /** Forward iterator over the live entries; see `WeakSetIterator`. */
+    using iterator = WeakSetIterator<UserEntity>;
+
+    /**
+     * Address: 0x00831310 (FUN_00831310, sub_831310)
+     *
+     * What it does:
+     * Range constructor `WeakSet(first, last)`: builds a fresh head sentinel,
+     * then adds every entity in `[first, last)`. Advancing the source iterator
+     * prunes the source's tombstones, so the copy only ever holds live units.
+     * `this` and both `{set, node}` iterators are passed on the stack
+     * (`ret 14h`).
+     *
+     * Reached from `UserArmy::GetIdleEngineers`/`GetIdleFactories`
+     * (0x008B2550/0x008B25C0), `EstimateEdgeTravelTicks` (0x00826C50) and
+     * `ISSUE_IncreaseCommandCount` (0x008B0C80).
+     */
+    WeakEntitySetUserEntity(iterator first, iterator last);
+
     /**
      * Address: 0x00868DB0 (FUN_00868DB0, `msvc8::vector<WeakSet<UserEntity>>::
      * uninit_fill_n`'s per-element copy) + 0x00822210 (FUN_00822210,
@@ -127,6 +151,16 @@ namespace moho
     WeakEntitySetUserEntity& operator=(const WeakEntitySetUserEntity& other);
 
     /**
+     * Address: 0x007B2530 (FUN_007B2530, `map<uint, WeakPtr<UserEntity>>::~map`)
+     * Address: 0x007B2650 (FUN_007B2650, the same body emitted a second time)
+     *
+     * Both are `EraseRange(begin, end)` (0x007B33B0) followed by
+     * `operator delete(mHead)` and `{mHead, mSize} = {0, 0}`: the destructor of a
+     * local weak set. 0x007B2530 is reached from 24 callers, among them the
+     * pruned copy `EstimateEdgeTravelTicks` (0x00826C50) builds; 0x007B2650
+     * from the range constructor's unwind path (0x00831310). The Lua idle-unit
+     * queries inline the same two steps (0x008BD0BB, 0x007B33B0 + delete).
+     *
      * Address: 0x00868E50 (FUN_00868E50, `sub_868E50`) - same body as
      * `ReleaseSelectionWeakSetStorageCompat`'s null-head-checked branch,
      * generalized onto the owning type itself: erases every node and frees the
@@ -280,6 +314,30 @@ namespace moho
      */
     [[nodiscard]] bool IsEmptyAfterPrune();
 
+    /** First live entry (`First`, 0x0066A060); prunes leading tombstones. */
+    [[nodiscard]] iterator begin();
+
+    /** The head sentinel. */
+    [[nodiscard]] iterator end();
+
+    /**
+     * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
+     *
+     * IDA signature:
+     * int __usercall sub_838AE0@<eax>(Moho::WeakSet_UserEntity *set@<eax>);
+     *
+     * What it does:
+     * Counts the live entries by walking the set from `begin()` to `end()`.
+     * The walk erases every tombstone it passes (0x007B30D0), so `mSize` is
+     * exact again afterwards; `mSize` alone still counts dead units.
+     *
+     * Callers: `CFormation::ChooseFormation` (0x008384C0),
+     * `ISSUE_IncreaseCommandCount` (0x008B0C80), and the user Lua functions
+     * `GetIdleEngineers` (0x008BCEF0), `GetIdleFactories` (0x008BD180) and
+     * `GetValidAttackingUnits` (0x008BD410).
+     */
+    [[nodiscard]] std::int32_t Count();
+
     /**
      * Address: 0x007ABDE0 (FUN_007ABDE0, sub_7ABDE0)
      * Address: 0x007ABE10 (FUN_007ABE10, sub_7ABE10)
@@ -316,6 +374,65 @@ namespace moho
   static_assert(
     offsetof(WeakEntitySetUserEntity, mSize) == 0x08, "WeakEntitySetUserEntity::mSize offset must be 0x08"
   );
+
+  /**
+   * `WeakSet<T>::iterator`: the `{set, node}` cursor every weak-set walk keeps
+   * on the stack, with the element type the set was instantiated for.
+   *
+   * `++` is `WeakEntitySetUserEntity::Next` (0x007F0490): the red-black
+   * successor step (0x007B4D90) followed by tombstone pruning against the
+   * cursor's own set, so a walk only ever sees live entries. `*` decodes the
+   * node's weak reference: owner-link slot minus the `WeakObject` offset (8
+   * for both `UserEntity` and `UserUnit`).
+   */
+  template <class T>
+  class WeakSetIterator
+  {
+  public:
+    WeakSetIterator() = default;
+
+    explicit WeakSetIterator(const WeakEntitySetUserEntity::FindResult& cursor) noexcept
+      : mCursor(cursor)
+    {}
+
+    [[nodiscard]] T* operator*() const noexcept
+    {
+      return WeakPtr<T>::DecodeOwnerObject(mCursor.mRes->mEnt.mOwnerLinkSlot);
+    }
+
+    WeakSetIterator& operator++()
+    {
+      (void)WeakEntitySetUserEntity::Next(&mCursor);
+      return *this;
+    }
+
+    [[nodiscard]] bool operator==(const WeakSetIterator& other) const noexcept
+    {
+      return mCursor.mRes == other.mCursor.mRes;
+    }
+
+    [[nodiscard]] const WeakEntitySetUserEntity::FindResult& Cursor() const noexcept
+    {
+      return mCursor;
+    }
+
+  private:
+    WeakEntitySetUserEntity::FindResult mCursor{};
+  };
+
+  static_assert(sizeof(WeakSetIterator<UserEntity>) == 0x08, "WeakSetIterator size must be 0x08");
+
+  inline WeakEntitySetUserEntity::iterator WeakEntitySetUserEntity::begin()
+  {
+    FindResult first{};
+    (void)First(&first);
+    return iterator(first);
+  }
+
+  inline WeakEntitySetUserEntity::iterator WeakEntitySetUserEntity::end()
+  {
+    return iterator(FindResult{this, mHead});
+  }
 
   /**
    * Builds one weak-set head sentinel through the shared 28-byte node
@@ -374,8 +491,6 @@ namespace moho
     set.mSize = 0u;
   }
 
-  class UserUnit;
-
   /**
    * `WeakSet<UserUnit>` — the engine's second weak-set instantiation.
    *
@@ -416,6 +531,27 @@ namespace moho
    */
   struct WeakUnitSetUserUnit : WeakEntitySetUserEntity
   {
+    using iterator = WeakSetIterator<UserUnit>;
+
+    WeakUnitSetUserUnit() = default;
+
+    /** Range constructor; the shared body is 0x00831310 on the base. */
+    WeakUnitSetUserUnit(const iterator first, const iterator last)
+      : WeakEntitySetUserEntity(
+          WeakEntitySetUserEntity::iterator(first.Cursor()), WeakEntitySetUserEntity::iterator(last.Cursor())
+        )
+    {}
+
+    [[nodiscard]] iterator begin()
+    {
+      return iterator(WeakEntitySetUserEntity::begin().Cursor());
+    }
+
+    [[nodiscard]] iterator end()
+    {
+      return iterator(FindResult{this, mHead});
+    }
+
     /** One `{owning set, tree node}` iterator pair. */
     struct Index
     {

@@ -251,6 +251,23 @@ namespace moho
     /** Address: 0x008BEF60 - IUnit slot 8. Copies out the script object's Lua handle. */
     [[nodiscard]] LuaPlus::LuaObject GetLuaObject() override;
 
+    /**
+     * Address: 0x0086DB30 (FUN_0086DB30)
+     *
+     * IDA signature:
+     * Moho::UserEntity *__usercall sub_86DB30@<eax>(Moho::UserUnit *this@<eax>);
+     *
+     * What it does:
+     * Returns the entity `mCreator` (+0x3C0) refers to, or null: the owner-link
+     * slot minus the `WeakObject` offset. Emitted out of line; its one caller is
+     * `cfunc_GetAssistingUnitsListL` (0x008BCADF), which keeps a candidate
+     * whose creator is the queried unit.
+     */
+    [[nodiscard]] UserEntity* GetCreator() const noexcept
+    {
+      return mCreator.GetObjectPtr();
+    }
+
     /** Address: 0x008BEF80 - IUnit slot 9. The UI never scales transport load; always 1. */
     [[nodiscard]] float CalcTransportLoadFactor() const override;
 
