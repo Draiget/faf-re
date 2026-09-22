@@ -1334,6 +1334,14 @@ namespace moho
      */
     [[nodiscard]] static const char* LayerToString(const ELayer layer) noexcept;
 
+    /**
+     * The entity that owns `span` as its `mCollisionCellSpan` (+0x4C). The
+     * occupancy grid links and gathers these spans, and every consumer steps
+     * back to the entity with `add reg, -4Ch` (e.g. 0x0075B0E3 in
+     * `GetUnitsInRect`).
+     */
+    [[nodiscard]] static Entity* FromCollisionCellSpan(EntityCollisionCellSpan* span) noexcept;
+
     // Entity data begins after CScriptObject(+0x34) and CTask(+0x18) subobjects.
     EntityCollisionCellSpan mCollisionCellSpan; // 0x004C
 
@@ -2599,6 +2607,11 @@ namespace moho
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
   static_assert(offsetof(Entity, mCollisionCellSpan) == 0x4C, "Entity::mCollisionCellSpan offset must be 0x4C");
+
+  inline Entity* Entity::FromCollisionCellSpan(EntityCollisionCellSpan* const span) noexcept
+  {
+    return reinterpret_cast<Entity*>(reinterpret_cast<std::uint8_t*>(span) - offsetof(Entity, mCollisionCellSpan));
+  }
   static_assert(offsetof(Entity, mCoordNode) == 0x60, "Entity::mCoordNode offset must be 0x60");
   static_assert(offsetof(Entity, id_) == 0x68, "Entity::id_ offset must be 0x68");
   static_assert(offsetof(Entity, BluePrint) == 0x6C, "Entity::BluePrint offset must be 0x6C");
