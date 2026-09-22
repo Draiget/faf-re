@@ -23,150 +23,123 @@ namespace moho
   class CD3DVertexSheet;
 
   /**
-   * Runtime view over one stack-allocated beam/particle draw context
-   * used by the quad-emit helpers around 0x0043C3D0..0x0043C610.
+   * One batching quad writer over a `CD3DVertexSheet`: reserve a sheet sized
+   * for `maxQuadCount` quads, map its first vertex stream, append quads through
+   * the write cursor, then flush one indexed triangle-list draw for everything
+   * appended since the map. A 5-dword block in the binary, passed as `this`.
    *
-   * The binary treats this as a 5-dword block passed via `esi`:
-   *   +0x00: owning `CD3DVertexSheet*` whose first vertex stream
-   *          is locked/unlocked for writing.
-   *   +0x04: scratch integer lane (not touched by the recovered
-   *          members; semantics not yet pinned down).
-   *   +0x08: maximum vertex count requested at `Lock` time.
-   *   +0x0C: running quad count, bumped once per emitted quad.
-   *   +0x10: active write cursor into the locked vertex buffer;
-   *          null before `BeginMap` / after `EndMap`.
-   *
-   * Kept as a typed view rather than a first-class class because the
-   * owning allocator and the surrounding render pass have not yet
-   * been recovered.
+   * The nine members below are out-of-line COMDATs at 0x0043C360..0x0043C760
+   * with no callers and no xrefs -- every use site inlined them -- so the class
+   * that owns an instance is still unidentified and nothing in `src/sdk`
+   * constructs one yet. That is a research task on the owner, not on this
+   * object: its own shape is fully determined by the nine bodies.
    */
-  struct BeamDrawContextRuntime
+  struct BeamDrawContext
   {
     CD3DVertexSheet* sheet = nullptr; // +0x00
-    std::int32_t field_0x04 = 0;       // +0x04 - unproven
-    std::int32_t maxVertexCount = 0;   // +0x08
-    std::int32_t quadCount = 0;        // +0x0C
-    float* writeCursor = nullptr;      // +0x10
+    std::int32_t maxQuadCount = 0;    // +0x04
+    std::int32_t maxVertexCount = 0;  // +0x08  always 4 * maxQuadCount
+    std::int32_t quadCount = 0;       // +0x0C  appended since the last BeginMap
+    float* writeCursor = nullptr;     // +0x10  null outside a map session
+
+    /**
+     * Address: 0x0043C360 (FUN_0043C360, sub_43C360)
+     *
+     * What it does:
+     * Lazy first-use setup, a no-op once a sheet exists: records the quad
+     * capacity, derives the vertex capacity as `4 * quadCount`
+     * (`add eax,eax; add eax,eax` at 0x0043C36B -- which is what identifies
+     * `+0x04` as the quad count and `+0x08` as the vertex count), clears the
+     * cursor, builds the shared vertex sheet and primes the shared index sheet.
+     */
+    void Initialize(int quadCount);
+
+    /**
+     * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
+     *
+     * What it does:
+     * Locks the sheet's first vertex stream for exclusive write access over the
+     * full vertex capacity, seats the write cursor on the mapped pointer and
+     * resets the running quad count.
+     */
+    void BeginMap();
+
+    /**
+     * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
+     *
+     * What it does:
+     * Unlocks the vertex stream and clears the cursor, if a map session is live.
+     */
+    void EndMap();
+
+    /**
+     * Address: 0x0043C390 (FUN_0043C390, sub_43C390)
+     *
+     * What it does:
+     * Ends any map session, then releases the vertex sheet through its
+     * deleting-destructor thunk and nulls it, leaving the context reusable.
+     */
+    void Teardown();
+
+    /**
+     * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
+     *
+     * What it does:
+     * Appends one axis-aligned quad built from a 6-float min/max box and a
+     * translation, in the winding the binary emits:
+     *   v0 = (box[0]+dx, box[4]+dy, box[2]+dz)
+     *   v1 = (box[3]+dx, box[4]+dy, box[2]+dz)
+     *   v2 = (box[3]+dx, box[1]+dy, box[5]+dz)
+     *   v3 = (box[0]+dx, box[1]+dy, box[5]+dz)
+     */
+    float* WriteTranslatedQuad(const float* boxCorners, float dx, float dy, float dz);
+
+    /**
+     * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
+     *
+     * What it does:
+     * Appends one already-packed quad: twelve floats copied straight through.
+     */
+    const float* WritePackedQuad(const float* packedQuad);
+
+    /**
+     * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
+     *
+     * What it does:
+     * Ends any map session, then submits one indexed triangle-list draw
+     * covering the quads appended since `BeginMap`, through the shared
+     * forward-filled index sheet.
+     */
+    bool FlushQuadDraw();
+
+    /**
+     * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
+     *
+     * What it does:
+     * The same flush with caller-supplied view bounds; the running count is not
+     * consulted.
+     */
+    bool FlushQuadDraw(int quadCount);
+
+    /**
+     * Address: 0x0043C760 (FUN_0043C760, sub_43C760)
+     *
+     * What it does:
+     * Builds a fresh vertex sheet for the current vertex capacity from vertex
+     * format 3 and the shared vertex stream, installs it and releases the one
+     * it replaced. Returns the old sheet.
+     */
+    CD3DVertexSheet* CreateVertexSheet();
   };
 
-  static_assert(offsetof(BeamDrawContextRuntime, sheet) == 0x00, "BeamDrawContextRuntime::sheet offset must be 0x00");
-  static_assert(offsetof(BeamDrawContextRuntime, field_0x04) == 0x04, "BeamDrawContextRuntime::field_0x04 offset must be 0x04");
-  static_assert(offsetof(BeamDrawContextRuntime, maxVertexCount) == 0x08, "BeamDrawContextRuntime::maxVertexCount offset must be 0x08");
-  static_assert(offsetof(BeamDrawContextRuntime, quadCount) == 0x0C, "BeamDrawContextRuntime::quadCount offset must be 0x0C");
-  static_assert(offsetof(BeamDrawContextRuntime, writeCursor) == 0x10, "BeamDrawContextRuntime::writeCursor offset must be 0x10");
-  static_assert(sizeof(BeamDrawContextRuntime) == 0x14, "BeamDrawContextRuntime size must be 0x14");
-
-  /**
-   * Address: 0x0043C3D0 (FUN_0043C3D0, sub_43C3D0)
-   *
-   * What it does:
-   * Locks the first vertex stream of `context.sheet` for writing the
-   * full requested vertex count, stores the returned map pointer into
-   * `context.writeCursor`, and resets `context.quadCount` to zero.
-   */
-  void BeamDrawContextBeginMap(BeamDrawContextRuntime& context);
-
-  /**
-   * Address: 0x0043C400 (FUN_0043C400, sub_43C400)
-   *
-   * What it does:
-   * If the context currently holds a live map pointer, unlocks the
-   * first vertex stream of `context.sheet` and clears the write
-   * cursor.
-   */
-  void BeamDrawContextEndMap(BeamDrawContextRuntime& context);
-
-  /**
-   * Address: 0x0043C390 (FUN_0043C390, sub_43C390)
-   *
-   * What it does:
-   * Ends any active map session, then releases the owning vertex
-   * sheet through its vtable-0 slot (deleting dtor thunk) and nulls
-   * the sheet pointer.
-   */
-  void BeamDrawContextTeardown(BeamDrawContextRuntime& context);
-
-  /**
-   * Address: 0x0043C430 (FUN_0043C430, sub_43C430)
-   *
-   * What it does:
-   * Reads four corner offsets from the caller's 6-float "unit quad"
-   * box (`boxCorners[0..5]`), adds a per-call XYZ translation to each
-   * corner, writes four consecutive 3-float vertices into the
-   * active write cursor, advances the cursor by 48 bytes, and bumps
-   * `quadCount`.
-   */
-  float* BeamDrawContextWriteTranslatedQuad(
-    BeamDrawContextRuntime& context,
-    const float* boxCorners,
-    float dx,
-    float dy,
-    float dz);
-
-  /**
-   * Address: 0x0043C510 (FUN_0043C510, sub_43C510)
-   *
-   * What it does:
-   * Copies four packed 3-float vertices (12 floats) from `packedQuad`
-   * into the active write cursor, advances the cursor by 48 bytes,
-   * and bumps `quadCount`.
-   */
-  const float* BeamDrawContextWritePackedQuad(
-    BeamDrawContextRuntime& context,
-    const float* packedQuad);
-
-  /**
-   * Address: 0x0043C580 (FUN_0043C580, sub_43C580)
-   *
-   * What it does:
-   * Flushes any pending write session on the context (unlocking the
-   * vertex stream when still mapped), then submits one indexed
-   * triangle-list draw covering `context.quadCount` quads. The call
-   * builds the vertex-sheet view from the context's sheet and quad
-   * count (4 vertices per quad), the index-sheet view from the
-   * shared `sIndexSheet` singleton (6 indices per quad), and issues
-   * the call through `CD3DDevice::DrawTriangleList` with primitive
-   * type 4 (D3DPT_TRIANGLELIST).
-   */
-  bool BeamDrawContextFlushQuadDraw(BeamDrawContextRuntime& context);
-
-  /**
-   * Address: 0x0043C610 (FUN_0043C610, sub_43C610)
-   *
-   * What it does:
-   * Same flush/draw shape as `BeamDrawContextFlushQuadDraw` but uses
-   * a caller-supplied quad count instead of the context's own
-   * running count. The context's `quadCount` field is not read for
-   * view bounds on this path.
-   */
-  bool BeamDrawContextFlushQuadDrawWithCount(BeamDrawContextRuntime& context, int quadCount);
-
-  /**
-   * Address: 0x0043C760 (FUN_0043C760, sub_43C760)
-   *
-   * What it does:
-   * Fetches vertex format 3 from the device resources, ensures the
-   * shared `sVertexStream` singleton is initialized, then calls
-   * `ID3DDeviceResources::Func6` to build a new vertex sheet from
-   * the `[null, sVertexStream]` stream pair and the format, stores
-   * the returned sheet into `context.sheet`, and releases the prior
-   * sheet (if different and non-null) through its deleting dtor
-   * thunk.
-   */
-  CD3DVertexSheet* BeamDrawContextCreateVertexSheet(BeamDrawContextRuntime& context);
-
-  /**
-   * Address: 0x0043C360 (FUN_0043C360, sub_43C360)
-   *
-   * What it does:
-   * Lazy first-use initializer for a beam draw context: when the
-   * context's sheet slot is empty, records the caller-supplied quad
-   * count into `field_0x04`, derives `maxVertexCount` as `4 *
-   * quadCount`, clears the write cursor, builds one shared vertex
-   * sheet through `BeamDrawContextCreateVertexSheet`, and ensures
-   * the shared index sheet is live through `func_InitSharedIndexSheet`.
-   */
-  void BeamDrawContextInitialize(BeamDrawContextRuntime& context, int quadCount);
+  static_assert(offsetof(BeamDrawContext, sheet) == 0x00, "BeamDrawContext::sheet offset must be 0x00");
+  static_assert(offsetof(BeamDrawContext, maxQuadCount) == 0x04, "BeamDrawContext::maxQuadCount offset must be 0x04");
+  static_assert(
+    offsetof(BeamDrawContext, maxVertexCount) == 0x08, "BeamDrawContext::maxVertexCount offset must be 0x08"
+  );
+  static_assert(offsetof(BeamDrawContext, quadCount) == 0x0C, "BeamDrawContext::quadCount offset must be 0x0C");
+  static_assert(offsetof(BeamDrawContext, writeCursor) == 0x10, "BeamDrawContext::writeCursor offset must be 0x10");
+  static_assert(sizeof(BeamDrawContext) == 0x14, "BeamDrawContext size must be 0x14");
 
   using TextureSheetHandle = boost::shared_ptr<ID3DTextureSheet>;
 
@@ -259,12 +232,15 @@ namespace moho
 
   /**
    * What it does:
-   * Runtime key lane used for world-particle render buckets.
+   * Map key for world-particle render buckets: the bucket's whole identity --
+   * everything `ParticleRenderBucketRuntime` carries before its pending-work
+   * lanes, in the same order -- with the sort scalar prepended so the map
+   * orders by draw order first.
    */
   struct ParticleBucketKeyRuntime
   {
     float sortScalar = 0.0f;              // +0x00
-    std::uint8_t stateByte = 0U;          // +0x04
+    bool dragEnabled = false;             // +0x04  SWorldParticle::mDragEnabled
     std::uint8_t statePadding[0x03]{};    // +0x05
     TextureSheetHandle texture0;          // +0x08
     TextureSheetHandle texture1;          // +0x10
@@ -277,7 +253,7 @@ namespace moho
     offsetof(ParticleBucketKeyRuntime, sortScalar) == 0x00, "ParticleBucketKeyRuntime::sortScalar offset must be 0x00"
   );
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, stateByte) == 0x04, "ParticleBucketKeyRuntime::stateByte offset must be 0x04"
+    offsetof(ParticleBucketKeyRuntime, dragEnabled) == 0x04, "ParticleBucketKeyRuntime::dragEnabled offset must be 0x04"
   );
   static_assert(
     offsetof(ParticleBucketKeyRuntime, texture0) == 0x08, "ParticleBucketKeyRuntime::texture0 offset must be 0x08"
@@ -294,7 +270,10 @@ namespace moho
 
   /**
    * What it does:
-   * Runtime key lane used for world-trail render buckets.
+   * Map key for world-trail render buckets: the same shape as
+   * `ParticleBucketKeyRuntime` minus the two lanes a trail has no use for (the
+   * drag flag and the z mode), and again the bucket's own identity with the
+   * sort scalar prepended.
    */
   struct TrailBucketKeyRuntime
   {
@@ -318,74 +297,16 @@ namespace moho
   static_assert(offsetof(TrailBucketKeyRuntime, blendMode) == 0x30, "TrailBucketKeyRuntime::blendMode offset must be 0x30");
   static_assert(sizeof(TrailBucketKeyRuntime) == 0x34, "TrailBucketKeyRuntime size must be 0x34");
 
-  /**
-   * What it does:
-   * Runtime view used by particle-technique selection helper paths.
-   */
-  struct ParticleTechniqueSelectionRuntime
-  {
-    CParticleTexture::TextureResourceHandle texture0; // +0x00
-    CParticleTexture::TextureResourceHandle texture1; // +0x08
-    msvc8::string techniqueBaseName;                     // +0x10
-    std::int32_t blendMode = 0;                          // +0x2C
-  };
-
-  static_assert(
-    offsetof(ParticleTechniqueSelectionRuntime, texture0) == 0x00,
-    "ParticleTechniqueSelectionRuntime::texture0 offset must be 0x00"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionRuntime, texture1) == 0x08,
-    "ParticleTechniqueSelectionRuntime::texture1 offset must be 0x08"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionRuntime, techniqueBaseName) == 0x10,
-    "ParticleTechniqueSelectionRuntime::techniqueBaseName offset must be 0x10"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionRuntime, blendMode) == 0x2C,
-    "ParticleTechniqueSelectionRuntime::blendMode offset must be 0x2C"
-  );
-  static_assert(sizeof(ParticleTechniqueSelectionRuntime) == 0x30, "ParticleTechniqueSelectionRuntime size must be 0x30");
-
-  /**
-   * What it does:
-   * Runtime view used by drag-aware particle-technique selection helper paths.
-   */
-  struct ParticleTechniqueSelectionWithDragRuntime
-  {
-    bool dragEnabled = false;                            // +0x00
-    std::uint8_t padding01_03[0x03]{};                  // +0x01
-    CParticleTexture::TextureResourceHandle texture0; // +0x04
-    CParticleTexture::TextureResourceHandle texture1; // +0x0C
-    msvc8::string techniqueBaseName;                     // +0x14
-    std::int32_t blendMode = 0;                          // +0x30
-  };
-
-  static_assert(
-    offsetof(ParticleTechniqueSelectionWithDragRuntime, dragEnabled) == 0x00,
-    "ParticleTechniqueSelectionWithDragRuntime::dragEnabled offset must be 0x00"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionWithDragRuntime, texture0) == 0x04,
-    "ParticleTechniqueSelectionWithDragRuntime::texture0 offset must be 0x04"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionWithDragRuntime, texture1) == 0x0C,
-    "ParticleTechniqueSelectionWithDragRuntime::texture1 offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionWithDragRuntime, techniqueBaseName) == 0x14,
-    "ParticleTechniqueSelectionWithDragRuntime::techniqueBaseName offset must be 0x14"
-  );
-  static_assert(
-    offsetof(ParticleTechniqueSelectionWithDragRuntime, blendMode) == 0x30,
-    "ParticleTechniqueSelectionWithDragRuntime::blendMode offset must be 0x30"
-  );
-  static_assert(
-    sizeof(ParticleTechniqueSelectionWithDragRuntime) == 0x34,
-    "ParticleTechniqueSelectionWithDragRuntime size must be 0x34"
-  );
+  // The two `ParticleTechniqueSelection*Runtime` structs that used to sit here
+  // were not types. They duplicated, field for field, the leading 0x30 / 0x34
+  // bytes of `TrailRenderBucketRuntime` and `ParticleRenderBucketRuntime`, so
+  // that the two technique selectors could be spelled as free functions taking
+  // a copy. The binary passes the bucket itself -- `RenderTrailBucket` does
+  // `mov ecx, edi; call 0x494740` at 0x0049488F with `edi` the same pointer it
+  // reads `activeWorkItems` from at `[edi+0x48]`. Both selectors are now
+  // `SelectTechnique()` members on the buckets (ParticleRenderBuckets.h), which
+  // also retires a per-bucket, per-frame copy of an `msvc8::string` and two
+  // texture handle retains.
 
   /**
    * Address: 0x00491440 (FUN_00491440, func_NewVertexSheet)
@@ -404,23 +325,6 @@ namespace moho
    * into the matching texture/blend bucket.
    */
   void AddBeamToTextureBuckets(BeamTextureBucketMapRuntime& buckets, const SWorldBeam& beam);
-
-  /**
-   * Address: 0x00494740 (FUN_00494740, func_ParticleSelectTechnique)
-   *
-   * What it does:
-   * Binds particle textures and selects particle technique suffix by blend mode.
-   */
-  void SelectParticleTechnique(const ParticleTechniqueSelectionRuntime& selection);
-
-  /**
-   * Address: 0x00493AE0 (FUN_00493AE0, func_ParticleSelectTechnique2)
-   *
-   * What it does:
-   * Binds drag-enabled flag and particle textures, then selects particle
-   * technique suffix (including refraction lane).
-   */
-  void SelectParticleTechniqueWithDrag(const ParticleTechniqueSelectionWithDragRuntime& selection);
 
   /**
    * Address: 0x00491760 (FUN_00491760, sub_491760)

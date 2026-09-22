@@ -827,8 +827,9 @@ namespace moho
     }
     mMaxLifetime = CeilByRint(lifetimePeak);
 
-    // mEnabled (byte @+0x00) carries the blueprint resistance flag (NOT mResistance).
-    mParticle.mEnabled = (mBlueprint != nullptr) && (mBlueprint->ParticleResistance != 0);
+    // The +0x00 byte is the drag flag, from the blueprint's resistance switch
+    // -- not `mResistance`, which is the resistance curve's value below.
+    mParticle.mDragEnabled = (mBlueprint != nullptr) && (mBlueprint->ParticleResistance != 0);
 
     // mResistance (@+0x04) comes from the resistance curve only when masked.
     if ((mZCurveMask & (1u << EMITTER_RESISTANCE_CURVE)) != 0u) {

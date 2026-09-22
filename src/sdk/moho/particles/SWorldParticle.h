@@ -64,7 +64,14 @@ namespace moho
      * Address: 0x004A0610 (FUN_004A0610 -- the implicit destructor of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x004A0710 (FUN_004A0710 -- the implicit destructor of `SWorldParticle` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyWorldParticleInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
      */
-    bool mEnabled = false;                            // +0x00
+    /**
+     * Air drag, from `REmitterBlueprint::ParticleResistance`. Not an "is this
+     * particle alive" flag: `CEfxEmitter::UpdateCurve` fills it from the
+     * blueprint's resistance switch, the render bucket keys on it, and
+     * `ParticleRenderBucketRuntime::SelectTechnique` publishes it to the
+     * particle shader's drag-enabled variable.
+     */
+    bool mDragEnabled = false;                        // +0x00
     std::uint8_t mPadding01[3]{};                     // +0x01
     float mResistance = 0.0f;                         // +0x04
     Wm3::Vector3<float> mPos;                         // +0x08
@@ -106,7 +113,7 @@ namespace moho
     void MemberSerialize(gpg::WriteArchive* archive) const;
   };
 
-  static_assert(offsetof(SWorldParticle, mEnabled) == 0x00, "SWorldParticle::mEnabled offset must be 0x00");
+  static_assert(offsetof(SWorldParticle, mDragEnabled) == 0x00, "SWorldParticle::mDragEnabled offset must be 0x00");
   static_assert(offsetof(SWorldParticle, mResistance) == 0x04, "SWorldParticle::mResistance offset must be 0x04");
   static_assert(offsetof(SWorldParticle, mPos) == 0x08, "SWorldParticle::mPos offset must be 0x08");
   static_assert(offsetof(SWorldParticle, mDir) == 0x14, "SWorldParticle::mDir offset must be 0x14");
