@@ -374,13 +374,9 @@ namespace
       return out;
     }
 
-    const auto* const sourceMesh = reinterpret_cast<const boost::SharedPtrRaw<RScmResource>*>(&source->mMeshRef);
-    out.px = sourceMesh->px;
-    out.pi = sourceMesh->pi;
-    if (out.pi != nullptr) {
-      out.pi->add_ref_copy();
-    }
-
+    boost::AssignSharedResource(
+      *reinterpret_cast<boost::shared_ptr<RScmResource>*>(&out), source->mVarDat.mScmResource
+    );
     return out;
   }
 
@@ -1104,16 +1100,14 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
   } else {
     mJamOffset = {};
     if (sourceUnit) {
-      const boost::SharedPtrRaw<RScmResource> sourceMesh = CopyEntityMeshSharedRetained(sourceUnit);
-      mMeshRef.mObj = sourceMesh.px;
-      mMeshRef.mType = reinterpret_cast<gpg::RType*>(sourceMesh.pi);
-      mMeshTypeClassId = sourceUnit->mMeshTypeClassId;
+      boost::AssignSharedResource(mVarDat.mScmResource, sourceUnit->mVarDat.mScmResource);
+      mVarDat.mMeshBlueprint = sourceUnit->mVarDat.mMeshBlueprint;
     }
   }
 
   if (sourceUnit) {
     BluePrint = const_cast<REntityBlueprint*>(reinterpret_cast<const REntityBlueprint*>(sourceUnit->GetBlueprint()));
-    mCurrentLayer = sourceUnit->mCurrentLayer;
+    mVarDat.mLayerMask = sourceUnit->mVarDat.mLayerMask;
   }
   mUnitConstDat.mFake = static_cast<std::uint8_t>(fake ? 1u : 0u);
 
@@ -1303,10 +1297,10 @@ void ReconBlip::Refresh()
   }
 
   const EntityTransformPayload sourceTransform = ReadEntityTransformPayload(sourceUnit->GetTransform());
-  Orientation = {sourceTransform.quatW, sourceTransform.quatX, sourceTransform.quatY, sourceTransform.quatZ};
-  Position = {sourceTransform.posX + mJamOffset.x, sourceTransform.posY + mJamOffset.y, sourceTransform.posZ + mJamOffset.z};
-  mVelocityScale = sourceUnit->mVelocityScale;
-  SetCurrentLayer(sourceUnit->mCurrentLayer);
+  mVarDat.mCurTransform.orient_ = {sourceTransform.quatW, sourceTransform.quatX, sourceTransform.quatY, sourceTransform.quatZ};
+  mVarDat.mCurTransform.pos_ = {sourceTransform.posX + mJamOffset.x, sourceTransform.posY + mJamOffset.y, sourceTransform.posZ + mJamOffset.z};
+  mVarDat.mCurImpactValue = sourceUnit->mVarDat.mCurImpactValue;
+  SetCurrentLayer(sourceUnit->mVarDat.mLayerMask);
 
   // Copy the source unit's strategic-underlay icon onto the blip. The binary
   // reads the unit's underlay (Entity::GetStrategicUnderlay) and installs it on
@@ -1322,7 +1316,7 @@ void ReconBlip::Refresh()
   const UnitAttributes& sourceAttributes = sourceUnit->GetAttributes();
   mUnitVarDat.mAttributes.mReclaimable = sourceAttributes.mReclaimable;
   mUnitVarDat.mAttributes.mCapturable = sourceAttributes.mCapturable;
-  BeingBuilt = sourceUnit->IsBeingBuilt() ? 1u : 0u;
+  mVarDat.mIsBeingBuilt = sourceUnit->IsBeingBuilt() ? 1u : 0u;
 }
 
 /**
@@ -1631,8 +1625,8 @@ void ReconBlip::SyncInterface(SSyncData* const syncData)
     // creator's Entity subobject +0x128) and `lea eax, [this+128h]` at
     // 0x005BF01F are both Entity::IntelAttributes.
     const std::uint32_t creatorVisionRange =
-      static_cast<Entity*>(creator)->IntelAttributes.GetRange(ENTATTR_Vision);
-    IntelAttributes.SetIntelRadius(ENTATTR_Vision, static_cast<int>(creatorVisionRange));
+      static_cast<Entity*>(creator)->mVarDat.mIntelAttributes.GetRange(ENTATTR_Vision);
+    mVarDat.mIntelAttributes.SetIntelRadius(ENTATTR_Vision, static_cast<int>(creatorVisionRange));
   }
 
   SSTIUnitVariableData& varData = mUnitVarDat;
@@ -1677,7 +1671,7 @@ void ReconBlip::UpdateVisibility()
 {
   Entity::UpdateVisibility();
   const std::int32_t focusArmy = SimulationRef->mSyncFilter.focusArmy;
-  mVisibilityState = static_cast<std::uint8_t>(
+  mVarDat.mVisibilityHidden = static_cast<std::uint8_t>(
     focusArmy != -1 && mReconDat[static_cast<std::size_t>(focusArmy)].mNeedsFlush != 0u
   );
 }

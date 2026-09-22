@@ -184,7 +184,7 @@ namespace moho
     case TASKSTATE_Starting: {
       // Hold while a submerged carrier surfaces; the deck height is not known
       // until it is on the surface.
-      if (carrier->mCurrentLayer == LAYER_Sub || carrier->mCurrentLayer == LAYER_Seabed) {
+      if (carrier->mVarDat.mLayerMask == LAYER_Sub || carrier->mVarDat.mLayerMask == LAYER_Seabed) {
         return 5;
       }
 

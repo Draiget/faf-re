@@ -108,7 +108,7 @@ namespace moho
     }
 
     if (entity->IsUnit() != nullptr) {
-      return (entity->mCurrentLayer == LAYER_Air) ? IMPACT_UnitAir : IMPACT_Unit;
+      return (entity->mVarDat.mLayerMask == LAYER_Air) ? IMPACT_UnitAir : IMPACT_Unit;
     }
 
     if (entity->IsProjectile() != nullptr) {

@@ -477,7 +477,7 @@ namespace moho
         return -1;
       }
 
-      if (!targetEntity->IsBeingBuilt() && targetEntity->mCurrentLayer == LAYER_Air) {
+      if (!targetEntity->IsBeingBuilt() && targetEntity->mVarDat.mLayerMask == LAYER_Air) {
         *mDispatchResult = kAiResultRetryOrRetarget;
         return -1;
       }
@@ -615,12 +615,12 @@ namespace moho
         mUnit->UnitStateMask |= kUnitStateReclaimingMask;
         mUnit->SetFocusEntity(targetEntity);
 
-        float reclaimHealthDelta = targetEntity->MaxHealth / reclaimCosts.reclaimTime;
+        float reclaimHealthDelta = targetEntity->mVarDat.mMaxHealth / reclaimCosts.reclaimTime;
         if (targetUnit->GetAttributes().regenRate > 0.0f) {
           reclaimHealthDelta += targetUnit->GetAttributes().regenRate * 0.1f;
         }
 
-        if (targetEntity->Health <= reclaimHealthDelta) {
+        if (targetEntity->mVarDat.mHealth <= reclaimHealthDelta) {
           if (!mUnit->IsUnitState(UNITSTATE_Guarding) && !mUnit->IsUnitState(UNITSTATE_AssistingCommander)) {
             targetEntity->RunScriptUnit(kOnReclaimedScript, mUnit);
 
@@ -673,8 +673,8 @@ namespace moho
           mTaskState = NextTaskState(mTaskState);
           mUnit->UnitStateMask |= kUnitStateReclaimingMask;
 
-          const float previousFraction = targetEntity->FractionCompleted;
-          const float completionFromHealth = targetEntity->Health / targetEntity->MaxHealth;
+          const float previousFraction = targetEntity->mVarDat.mFractionComplete;
+          const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
           const float clampedCompletion = std::min(completionFromHealth, previousFraction);
           (void)targetEntity->UpdateFractionComplete(clampedCompletion - previousFraction);
           return 1;
@@ -705,14 +705,14 @@ namespace moho
         if (targetUnit != nullptr) {
           appliedFractionDelta = targetEntity->Materialize(mReclaimRate * limitingRate);
 
-          const float completionFromHealth = targetEntity->Health / targetEntity->MaxHealth;
-          const float clampedCompletion = std::min(targetEntity->FractionCompleted, completionFromHealth);
-          const float clampedHealth = targetEntity->MaxHealth * clampedCompletion;
-          if (clampedHealth != targetEntity->Health) {
+          const float completionFromHealth = targetEntity->mVarDat.mHealth / targetEntity->mVarDat.mMaxHealth;
+          const float clampedCompletion = std::min(targetEntity->mVarDat.mFractionComplete, completionFromHealth);
+          const float clampedHealth = targetEntity->mVarDat.mMaxHealth * clampedCompletion;
+          if (clampedHealth != targetEntity->mVarDat.mHealth) {
             targetEntity->SetHealth(clampedHealth);
           }
 
-          reclaimWorkProgress = 1.0f - targetEntity->FractionCompleted;
+          reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
         } else if (targetEntity != nullptr) {
           if (Prop* const propTarget = targetEntity->IsProp(); propTarget != nullptr) {
             if (mUnit->IsPaused) {
@@ -725,7 +725,7 @@ namespace moho
             }
 
             appliedFractionDelta = propTarget->Materialize(mReclaimRate * limitingRate);
-            reclaimWorkProgress = 1.0f - targetEntity->FractionCompleted;
+            reclaimWorkProgress = 1.0f - targetEntity->mVarDat.mFractionComplete;
           }
         }
 

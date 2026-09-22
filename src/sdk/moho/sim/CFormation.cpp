@@ -85,7 +85,7 @@ namespace
     while (node != selection.mHead) {
       moho::UserEntity* const entity = DecodeSelectionEntity(node->mEnt);
       moho::Unit* const unit = ResolveSelectionUnit(entity);
-      if (unit != nullptr && unit->mCurrentLayer == moho::LAYER_Air) {
+      if (unit != nullptr && unit->mVarDat.mLayerMask == moho::LAYER_Air) {
         hasAirUnits = true;
       } else {
         hasSurfaceUnits = true;

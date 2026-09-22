@@ -498,7 +498,7 @@ namespace moho
       std::cos(mFallDirectionRadians) * sinTilt,
     };
 
-    const EntityTransformPayload currentPayload = ReadEntityTransformPayload(entity->Orientation, entity->Position);
+    const EntityTransformPayload currentPayload = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
     VTransform pendingTransform = BuildVTransformFromEntityTransformPayload(currentPayload);
 
     const Wm3::Vec3f currentAxis = BuildCurrentFallAxis(pendingTransform.orient_);

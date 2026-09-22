@@ -350,7 +350,7 @@ namespace moho
       case RULEUMT_Land:
       case RULEUMT_Biped: {
         EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
-        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mCurrentLayer);
+        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mVarDat.mLayerMask);
         const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
         if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_LAND)) == 0u) {
           return false;
@@ -361,7 +361,7 @@ namespace moho
       case RULEUMT_Water:
       case RULEUMT_SurfacingSub: {
         EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *occupancyGrid->sim->mMapData, cellPos);
-        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mCurrentLayer);
+        occupancyCaps = ClearSubCapsForWaterLayer(occupancyCaps, unit->mVarDat.mLayerMask);
         const EOccupancyCaps fitCaps = OCCUPY_FootprintFits(*occupancyGrid, cellPos, footprint, occupancyCaps);
         if ((static_cast<std::uint8_t>(fitCaps) & static_cast<std::uint8_t>(EOccupancyCaps::OC_WATER)) == 0u) {
           return false;
@@ -376,7 +376,7 @@ namespace moho
           cellPos,
           *occupancyGrid,
           footprint,
-          static_cast<EOccupancyCaps>(static_cast<std::uint8_t>(unit->mCurrentLayer))
+          static_cast<EOccupancyCaps>(static_cast<std::uint8_t>(unit->mVarDat.mLayerMask))
         );
         if (static_cast<std::uint8_t>(fitCaps) == 0u) {
           return false;

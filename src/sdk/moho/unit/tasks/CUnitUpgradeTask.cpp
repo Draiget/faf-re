@@ -327,7 +327,7 @@ int CUnitUpgradeTask::TaskTick()
 
     switch (mTaskState) {
       case TASKSTATE_Preparing:
-        if (mUnit != nullptr && mUnit->IsMobile() && Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+        if (mUnit != nullptr && mUnit->IsMobile() && Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
           if (mUnit->AiNavigator != nullptr) {
             mUnit->AiNavigator->AbortMove();
             return 1;
@@ -376,7 +376,7 @@ int CUnitUpgradeTask::TaskTick()
     mUnit->UnitStateMask |= kUpgradeOwnerHighMask;
 
     SUnitConstructionParams params(
-      static_cast<std::int32_t>(mUnit->mCurrentLayer),
+      static_cast<std::int32_t>(mUnit->mVarDat.mLayerMask),
       mUnit->GetPosition(),
       mUnit->ArmyRef,
       mToBlueprint,

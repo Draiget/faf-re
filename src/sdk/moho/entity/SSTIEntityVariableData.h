@@ -5,11 +5,14 @@
 
 #include "boost/shared_ptr.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/entity/EntityAttributes.h"
 #include "moho/render/camera/VTransform.h"
+#include "Wm3Vector2.h"
 #include "Wm3Vector3.h"
 
 namespace moho
 {
+  class CD3DBatchTexture;
   class CSndParams;
   struct RMeshBlueprint;
   struct REntityBlueprint;
@@ -68,18 +71,6 @@ namespace moho
   };
 
   inline constexpr std::uint32_t kUserEntityUnderwaterLayerMaskBits = 0x6u;
-
-  struct SSTIIntelAttributes
-  {
-    std::uint32_t vision;
-    std::uint32_t waterVision;
-    std::uint32_t radar;
-    std::uint32_t sonar;
-    std::uint32_t omni;
-    std::uint32_t radarStealth;
-    std::uint32_t sonarStealth;
-    std::uint32_t cloak;
-  };
 
   struct SSTIInlineUIntVector
   {
@@ -204,17 +195,22 @@ namespace moho
     std::uint8_t mIsBeingBuilt;                   // 0x20
     std::uint8_t mIsDead;                         // 0x21
     std::uint8_t mRequestRefreshUI;               // 0x22
-    std::uint8_t pad_0023;                        // 0x23
+    /** Set by `Entity::Kill` so the client can tell a kill from an ordinary death. */
+    std::uint8_t mDestroyedByKill;                // 0x23
     VTransform mCurTransform;                     // 0x24
     VTransform mLastTransform;                    // 0x40
     float mCurImpactValue;                        // 0x5C
     float mFractionComplete;                      // 0x60
     std::uint32_t mAttachmentParentRef;           // 0x64
     SSTIInlineUIntVector mAuxValueVector;         // 0x68
-    float mScroll0U;                              // 0x80
-    float mScroll0V;                              // 0x84
-    float mScroll1U;                              // 0x88
-    float mScroll1V;                              // 0x8C
+    /**
+     * Texture-scroll UV at the start and at the end of the beat.
+     * `UserEntity::GetInterpolatedScroll` renders
+     * `start + (end - start) * alpha`, which is why every `Entity` mutator
+     * shifts the end lane into the start lane before writing a new end.
+     */
+    Wm3::Vector2f mScrollBeatStart;               // 0x80
+    Wm3::Vector2f mScrollBeatEnd;                 // 0x88
     CSndParams* mAmbientSound;                    // 0x90
     CSndParams* mRumbleSound;                     // 0x94
     // FUN_00558760 names this lane as "mNotVisibility"; semantics are still
@@ -222,11 +218,12 @@ namespace moho
     std::uint8_t mVisibilityHidden; // 0x98
     std::uint8_t pad_0099_009B[0x03];
     EUserEntityVisibilityMode mVisibilityMode; // 0x9C
-    std::uint32_t mLayerMask;                  // 0xA0
+    ELayer mLayerMask;                         // 0xA0
     std::uint8_t mUsingAltFootprint;           // 0xA4
-    std::uint8_t pad_00A5_00A7[0x03];
-    boost::shared_ptr<void> mUnderlayTexture; // 0xA8
-    SSTIIntelAttributes mIntelAttributes;     // 0xB0
+    std::uint8_t mUsingAltFootprintSecondary;  // 0xA5
+    std::uint8_t pad_00A6_00A7[0x02];
+    boost::shared_ptr<CD3DBatchTexture> mUnderlayTexture; // 0xA8
+    EntityAttributes mIntelAttributes;                    // 0xB0
   };
 
   /**
@@ -350,7 +347,8 @@ namespace moho
     "SSTIEntityVariableData::mRequestRefreshUI offset must be 0x22"
   );
   static_assert(
-    offsetof(SSTIEntityVariableData, pad_0023) == 0x23, "SSTIEntityVariableData::pad_0023 offset must be 0x23"
+    offsetof(SSTIEntityVariableData, mDestroyedByKill) == 0x23,
+    "SSTIEntityVariableData::mDestroyedByKill offset must be 0x23"
   );
   static_assert(
     offsetof(SSTIEntityVariableData, mCurTransform) == 0x24, "SSTIEntityVariableData::mCurTransform offset must be 0x24"
@@ -376,16 +374,12 @@ namespace moho
     "SSTIEntityVariableData::mAuxValueVector offset must be 0x68"
   );
   static_assert(
-    offsetof(SSTIEntityVariableData, mScroll0U) == 0x80, "SSTIEntityVariableData::mScroll0U offset must be 0x80"
+    offsetof(SSTIEntityVariableData, mScrollBeatStart) == 0x80,
+    "SSTIEntityVariableData::mScrollBeatStart offset must be 0x80"
   );
   static_assert(
-    offsetof(SSTIEntityVariableData, mScroll0V) == 0x84, "SSTIEntityVariableData::mScroll0V offset must be 0x84"
-  );
-  static_assert(
-    offsetof(SSTIEntityVariableData, mScroll1U) == 0x88, "SSTIEntityVariableData::mScroll1U offset must be 0x88"
-  );
-  static_assert(
-    offsetof(SSTIEntityVariableData, mScroll1V) == 0x8C, "SSTIEntityVariableData::mScroll1V offset must be 0x8C"
+    offsetof(SSTIEntityVariableData, mScrollBeatEnd) == 0x88,
+    "SSTIEntityVariableData::mScrollBeatEnd offset must be 0x88"
   );
   static_assert(
     offsetof(SSTIEntityVariableData, mAmbientSound) == 0x90, "SSTIEntityVariableData::mAmbientSound offset must be 0x90"

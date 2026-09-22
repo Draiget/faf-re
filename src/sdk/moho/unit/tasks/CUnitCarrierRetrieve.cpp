@@ -299,7 +299,7 @@ namespace moho
 
         const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
         if (blueprint->Physics.MotionType == RULEUMT_SurfacingSub
-            && mUnit->mCurrentLayer == LAYER_Sub) {
+            && mUnit->mVarDat.mLayerMask == LAYER_Sub) {
           // Surfacing-submarine carrier waiting underwater: convert the
           // carrier's world position into footprint-anchored cell coords
           // (only the cell is consumed by SNavGoal), aim the motion lane at
@@ -327,7 +327,7 @@ namespace moho
       case TASKSTATE_Waiting: {
         // Wait for the surfacing/landing motion to bring the carrier onto
         // a transport-friendly layer before dropping pickup reservations.
-        const ELayer layer = mUnit->mCurrentLayer;
+        const ELayer layer = mUnit->mVarDat.mLayerMask;
         if (layer == LAYER_Water || layer == LAYER_Air) {
           mUnit->AiTransport->TransportResetReservation();
           mTaskState = TASKSTATE_Starting;

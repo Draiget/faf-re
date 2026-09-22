@@ -445,6 +445,38 @@ namespace boost
   }
 
   /**
+   * Typed facade over `AssignSharedPtrRScmResourceWeak` for callers holding
+   * real `boost::shared_ptr` objects. `SharedPtrRaw<T>` is that pointer's
+   * `(px, pi)` layout, which this header asserts elsewhere, so the
+   * reinterpretation is an ABI statement and belongs in this shim rather than
+   * in the subsystem sources that used to spell it out at every call site.
+   */
+  void AssignSharedResource(
+    boost::shared_ptr<moho::RScmResource>& destination,
+    const boost::shared_ptr<moho::RScmResource>& source
+  ) noexcept
+  {
+    static_assert(
+      sizeof(boost::shared_ptr<moho::RScmResource>) == sizeof(SharedPtrRaw<moho::RScmResource>),
+      "boost::shared_ptr<RScmResource> layout must match the (px,pi) pair"
+    );
+    (void)AssignSharedPtrRScmResourceWeak(
+      reinterpret_cast<const SharedPtrRaw<moho::RScmResource>*>(&source),
+      reinterpret_cast<SharedPtrRaw<moho::RScmResource>*>(&destination)
+    );
+  }
+
+  bool HasSharedResource(const boost::shared_ptr<moho::RScmResource>& resource) noexcept
+  {
+    return reinterpret_cast<const SharedPtrRaw<moho::RScmResource>*>(&resource)->px != nullptr;
+  }
+
+  void ReleaseSharedResource(boost::shared_ptr<moho::RScmResource>& resource) noexcept
+  {
+    reinterpret_cast<SharedPtrRaw<moho::RScmResource>*>(&resource)->release();
+  }
+
+  /**
    * Address: 0x0055FBD0 (FUN_0055FBD0, Moho::WeakPtr_RScmResource::WeakPtr_RScmResource)
    *
    * NOTE (2026-08-20 audit): FUN_0055FBD0 is its own independent inlined copy

@@ -444,7 +444,7 @@ namespace moho
     }
 
     // Clear the target blacklist whenever the unit has moved this tick.
-    if (Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+    if (Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
       WeaponResetBlacklist(*weapon);
     }
 
@@ -823,9 +823,9 @@ namespace moho
       Entity* const desiredEntity = desiredTarget->GetEntity();
       if (
         desiredEntity != nullptr && mUnit->IsMobile()
-        && PositionUnchanged(mUnit->Position, mUnit->PrevPosition)
-        && desiredEntity->mCurrentLayer != LAYER_Air
-        && PositionUnchanged(desiredEntity->Position, desiredEntity->PrevPosition)
+        && PositionUnchanged(mUnit->mVarDat.mCurTransform.pos_, mUnit->mVarDat.mLastTransform.pos_)
+        && desiredEntity->mVarDat.mLayerMask != LAYER_Air
+        && PositionUnchanged(desiredEntity->mVarDat.mCurTransform.pos_, desiredEntity->mVarDat.mLastTransform.pos_)
       ) {
         ++mWeapon->mUnknown170;
         if (mWeapon->mUnknown170 > kAcquireTargetRetargetReprobeThresholdPrimary) {
@@ -841,9 +841,9 @@ namespace moho
     Entity* const currentTargetEntity = currentWeaponTarget->GetEntity();
     if (
       currentTargetEntity != nullptr
-      && PositionUnchanged(mUnit->Position, mUnit->PrevPosition)
-      && currentTargetEntity->mCurrentLayer != LAYER_Air
-      && PositionUnchanged(currentTargetEntity->Position, currentTargetEntity->PrevPosition)
+      && PositionUnchanged(mUnit->mVarDat.mCurTransform.pos_, mUnit->mVarDat.mLastTransform.pos_)
+      && currentTargetEntity->mVarDat.mLayerMask != LAYER_Air
+      && PositionUnchanged(currentTargetEntity->mVarDat.mCurTransform.pos_, currentTargetEntity->mVarDat.mLastTransform.pos_)
     ) {
       ++mWeapon->mUnknown170;
       if (mWeapon->mUnknown170 > kAcquireTargetRetargetReprobeThresholdSecondary) {
@@ -951,7 +951,7 @@ namespace moho
         Entity* const focusEntity = commandTarget.GetEntity();
         if (
           commandTarget.targetType == EAiTargetType::AITARGET_Entity
-          && (focusEntity == nullptr || focusEntity->Dead != 0u || focusEntity->DestroyQueuedFlag != 0u)
+          && (focusEntity == nullptr || focusEntity->mVarDat.mIsDead != 0u || focusEntity->DestroyQueuedFlag != 0u)
         ) {
           return true;
         }

@@ -868,25 +868,24 @@ namespace moho
     , mIsBeingBuilt(0)
     , mIsDead(0)
     , mRequestRefreshUI(0)
-    , pad_0023(0)
+    , mDestroyedByKill(0)
     , mCurTransform()
     , mLastTransform()
     , mCurImpactValue(1.0f)
     , mFractionComplete(1.0f)
     , mAttachmentParentRef(kAttachmentParentSentinel)
     , mAuxValueVector()
-    , mScroll0U(0.0f)
-    , mScroll0V(0.0f)
-    , mScroll1U(0.0f)
-    , mScroll1V(0.0f)
+    , mScrollBeatStart{0.0f, 0.0f}
+    , mScrollBeatEnd{0.0f, 0.0f}
     , mAmbientSound(nullptr)
     , mRumbleSound(nullptr)
     , mVisibilityHidden(0)
     , pad_0099_009B{0, 0, 0}
     , mVisibilityMode(kDefaultVisibilityMode)
-    , mLayerMask(0)
+    , mLayerMask(LAYER_None)
     , mUsingAltFootprint(0)
-    , pad_00A5_00A7{0, 0, 0}
+    , mUsingAltFootprintSecondary(0)
+    , pad_00A6_00A7{0, 0}
     , mUnderlayTexture()
     , mIntelAttributes{0, 0, 0, 0, 0, 0, 0, 0}
   {
@@ -909,17 +908,15 @@ namespace moho
     , mIsBeingBuilt(rhs.mIsBeingBuilt)
     , mIsDead(rhs.mIsDead)
     , mRequestRefreshUI(rhs.mRequestRefreshUI)
-    , pad_0023(0)
+    , mDestroyedByKill(0)
     , mCurTransform(rhs.mCurTransform)
     , mLastTransform(rhs.mLastTransform)
     , mCurImpactValue(rhs.mCurImpactValue)
     , mFractionComplete(rhs.mFractionComplete)
     , mAttachmentParentRef(rhs.mAttachmentParentRef)
     , mAuxValueVector()
-    , mScroll0U(rhs.mScroll0U)
-    , mScroll0V(rhs.mScroll0V)
-    , mScroll1U(rhs.mScroll1U)
-    , mScroll1V(rhs.mScroll1V)
+    , mScrollBeatStart(rhs.mScrollBeatStart)
+    , mScrollBeatEnd(rhs.mScrollBeatEnd)
     , mAmbientSound(rhs.mAmbientSound)
     , mRumbleSound(rhs.mRumbleSound)
     , mVisibilityHidden(rhs.mVisibilityHidden)
@@ -927,7 +924,8 @@ namespace moho
     , mVisibilityMode(rhs.mVisibilityMode)
     , mLayerMask(rhs.mLayerMask)
     , mUsingAltFootprint(rhs.mUsingAltFootprint)
-    , pad_00A5_00A7{0, 0, 0}
+    , mUsingAltFootprintSecondary(0)
+    , pad_00A6_00A7{0, 0}
     , mUnderlayTexture(rhs.mUnderlayTexture)
     , mIntelAttributes(rhs.mIntelAttributes)
   {
@@ -976,10 +974,8 @@ namespace moho
     mFractionComplete = rhs.mFractionComplete;
     mAttachmentParentRef = rhs.mAttachmentParentRef;
     mAuxValueVector.AssignFrom(rhs.mAuxValueVector);
-    mScroll0U = rhs.mScroll0U;
-    mScroll0V = rhs.mScroll0V;
-    mScroll1U = rhs.mScroll1U;
-    mScroll1V = rhs.mScroll1V;
+    mScrollBeatStart = rhs.mScrollBeatStart;
+    mScrollBeatEnd = rhs.mScrollBeatEnd;
     mAmbientSound = rhs.mAmbientSound;
     mRumbleSound = rhs.mRumbleSound;
     mVisibilityHidden = rhs.mVisibilityHidden;
@@ -1018,10 +1014,8 @@ namespace moho
     destination->mFractionComplete = mFractionComplete;
     destination->mAttachmentParentRef = mAttachmentParentRef;
     destination->mAuxValueVector.AssignFrom(mAuxValueVector);
-    destination->mScroll0U = mScroll0U;
-    destination->mScroll0V = mScroll0V;
-    destination->mScroll1U = mScroll1U;
-    destination->mScroll1V = mScroll1V;
+    destination->mScrollBeatStart = mScrollBeatStart;
+    destination->mScrollBeatEnd = mScrollBeatEnd;
     destination->mAmbientSound = mAmbientSound;
     destination->mRumbleSound = mRumbleSound;
     destination->mVisibilityHidden = mVisibilityHidden;
@@ -1078,10 +1072,10 @@ namespace moho
     GPG_ASSERT(attachInfoType != nullptr);
     archive->Read(attachInfoType, &mAuxValueVector, ownerRef);
 
-    archive->ReadFloat(&mScroll0U);
-    archive->ReadFloat(&mScroll0V);
-    archive->ReadFloat(&mScroll1U);
-    archive->ReadFloat(&mScroll1V);
+    archive->ReadFloat(&mScrollBeatStart.x);
+    archive->ReadFloat(&mScrollBeatStart.y);
+    archive->ReadFloat(&mScrollBeatEnd.x);
+    archive->ReadFloat(&mScrollBeatEnd.y);
 
     (void)archive->ReadPointer_CSndParams2(&mAmbientSound, &ownerRef);
     (void)archive->ReadPointer_CSndParams2(&mRumbleSound, &ownerRef);
@@ -1154,10 +1148,10 @@ namespace moho
     GPG_ASSERT(attachInfoType != nullptr);
     archive->Write(attachInfoType, &mAuxValueVector, ownerRef);
 
-    archive->WriteFloat(mScroll0U);
-    archive->WriteFloat(mScroll0V);
-    archive->WriteFloat(mScroll1U);
-    archive->WriteFloat(mScroll1V);
+    archive->WriteFloat(mScrollBeatStart.x);
+    archive->WriteFloat(mScrollBeatStart.y);
+    archive->WriteFloat(mScrollBeatEnd.x);
+    archive->WriteFloat(mScrollBeatEnd.y);
 
     gpg::RRef ambientRef{};
     (void)gpg::RRef_CSndParams(&ambientRef, mAmbientSound);
@@ -1191,7 +1185,7 @@ namespace moho
 
   void SSTIEntityVariableData::SetVisibilityGridMask(const std::uint32_t gridMask) noexcept
   {
-    mLayerMask = gridMask;
+    mLayerMask = static_cast<ELayer>(gridMask);
   }
 
   bool SSTIEntityVariableData::UsesUnderwaterReconGrid() const noexcept

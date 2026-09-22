@@ -160,8 +160,8 @@ namespace
 
   [[nodiscard]] bool HasPositionChanged(const moho::Entity& entity) noexcept
   {
-    return entity.Position.x != entity.PrevPosition.x || entity.Position.y != entity.PrevPosition.y
-      || entity.Position.z != entity.PrevPosition.z;
+    return entity.mVarDat.mCurTransform.pos_.x != entity.mVarDat.mLastTransform.pos_.x || entity.mVarDat.mCurTransform.pos_.y != entity.mVarDat.mLastTransform.pos_.y
+      || entity.mVarDat.mCurTransform.pos_.z != entity.mVarDat.mLastTransform.pos_.z;
   }
 
   constexpr const char* kOnAssignedFocusEntityScript = "OnAssignedFocusEntity";
@@ -680,9 +680,9 @@ namespace moho
     const SFootprint& footprint = destinationEntity->GetFootprint();
     SOCellPos destinationCell{};
     destinationCell.x =
-      RoundToCellCoord(destinationEntity->Position.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
+      RoundToCellCoord(destinationEntity->mVarDat.mCurTransform.pos_.x - (static_cast<float>(footprint.mSizeX) * 0.5f));
     destinationCell.z =
-      RoundToCellCoord(destinationEntity->Position.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
+      RoundToCellCoord(destinationEntity->mVarDat.mCurTransform.pos_.z - (static_cast<float>(footprint.mSizeZ) * 0.5f));
     mDestination = destinationCell;
   }
 

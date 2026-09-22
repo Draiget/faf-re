@@ -56,7 +56,7 @@ namespace
       return;
     }
 
-    if (entity != nullptr && entity->Dead == 0u) {
+    if (entity != nullptr && entity->mVarDat.mIsDead == 0u) {
       entity->mLuaObj.PushStack(state);
       return;
     }
@@ -205,9 +205,9 @@ namespace moho
 
     Entity* const damageTarget = damage.mTarget.GetObjectPtr();
     if (damageTarget != nullptr) {
-      damage.mVector.x = damageTarget->Position.x - damage.mOrigin.x;
-      damage.mVector.y = damageTarget->Position.y - damage.mOrigin.y;
-      damage.mVector.z = damageTarget->Position.z - damage.mOrigin.z;
+      damage.mVector.x = damageTarget->mVarDat.mCurTransform.pos_.x - damage.mOrigin.x;
+      damage.mVector.y = damageTarget->mVarDat.mCurTransform.pos_.y - damage.mOrigin.y;
+      damage.mVector.z = damageTarget->mVarDat.mCurTransform.pos_.z - damage.mOrigin.z;
     }
 
     if (damage.mAmount == 0.0f) {

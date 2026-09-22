@@ -45,13 +45,13 @@ namespace moho
    * What it does:
    * Reads packed transform lanes from entity orientation/position storage.
    */
-  EntityTransformPayload ReadEntityTransformPayload(const Vector4f& orientation, const Wm3::Vector3f& position) noexcept
+  EntityTransformPayload ReadEntityTransformPayload(const Wm3::Quatf& orientation, const Wm3::Vector3f& position) noexcept
   {
     EntityTransformPayload payload{};
-    payload.quatW = orientation.x;
-    payload.quatX = orientation.y;
-    payload.quatY = orientation.z;
-    payload.quatZ = orientation.w;
+    payload.quatW = orientation.w;
+    payload.quatX = orientation.x;
+    payload.quatY = orientation.y;
+    payload.quatZ = orientation.z;
     payload.posX = position.x;
     payload.posY = position.y;
     payload.posZ = position.z;
@@ -65,13 +65,13 @@ namespace moho
    * Writes packed transform lanes back to entity orientation/position storage.
    */
   void WriteEntityTransformPayload(
-    Vector4f& orientation, Wm3::Vector3f& position, const EntityTransformPayload& payload
+    Wm3::Quatf& orientation, Wm3::Vector3f& position, const EntityTransformPayload& payload
   ) noexcept
   {
-    orientation.x = payload.quatW;
-    orientation.y = payload.quatX;
-    orientation.z = payload.quatY;
-    orientation.w = payload.quatZ;
+    orientation.w = payload.quatW;
+    orientation.x = payload.quatX;
+    orientation.y = payload.quatY;
+    orientation.z = payload.quatZ;
     position.x = payload.posX;
     position.y = payload.posY;
     position.z = payload.posZ;

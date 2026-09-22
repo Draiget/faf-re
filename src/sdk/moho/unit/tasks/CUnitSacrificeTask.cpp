@@ -340,7 +340,7 @@ namespace moho
     // A recipient that vanished, died, or took to the air can no longer be
     // sacrificed into.
     Unit* const target = mTargetUnit.GetObjectPtr();
-    if (target == nullptr || target->mCurrentLayer == LAYER_Air || target->IsDead()) {
+    if (target == nullptr || target->mVarDat.mLayerMask == LAYER_Air || target->IsDead()) {
       return -1;
     }
 

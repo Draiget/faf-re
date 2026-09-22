@@ -3246,7 +3246,7 @@ namespace moho
           Entity* const entity = FindEntityById(sim->mEntityDB, static_cast<std::int32_t>(entry.entityId));
           if (entity) {
             if (ReconBlip* const blip = entity->IsReconBlip()) {
-              entry.sourceLayer = static_cast<std::int32_t>(entity->mCurrentLayer);
+              entry.sourceLayer = static_cast<std::int32_t>(entity->mVarDat.mLayerMask);
 
               const std::int32_t sourceArmyIndex = entry.sourceArmy ? entry.sourceArmy->mConstDat.mArmyIndex : -1;
               if (sourceArmyIndex >= 0) {

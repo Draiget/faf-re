@@ -209,7 +209,7 @@ namespace
       return nullptr;
     }
 
-    unit->mUseAltFootprint = enabled;
+    unit->mVarDat.mUsingAltFootprint = enabled;
     return unit;
   }
 
@@ -584,7 +584,7 @@ namespace
       static_cast<float>(toCell.z) + probeOffsetZ
     );
 
-    const ELayer unitLayer = unit.mCurrentLayer;
+    const ELayer unitLayer = unit.mVarDat.mLayerMask;
     const SFootprint& footprint = unit.GetFootprint();
 
     // Post-tested walk: the starting cell is always probed, even when the
@@ -699,7 +699,7 @@ namespace
 
     const SFootprint& footprint = pathFinder->mUnit->GetFootprint();
     EOccupancyCaps occupancyCaps = OCCUPY_MobileCheck(footprint, *sim->mMapData, toCell);
-    if (pathFinder->mUnit->mCurrentLayer == LAYER_Water) {
+    if (pathFinder->mUnit->mVarDat.mLayerMask == LAYER_Water) {
       const std::uint8_t masked = static_cast<std::uint8_t>(occupancyCaps) &
         ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB);
       occupancyCaps = static_cast<EOccupancyCaps>(masked);
@@ -1658,8 +1658,8 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
   // of the recovery below it (drop the path and go idle, repath, or back off
   // because the destination is occupied) could ever run. The unit pressed into
   // the obstacle and stayed there with its order still queued.
-  const bool hasMoved = (unit->Position.x != unit->PrevPosition.x) || (unit->Position.y != unit->PrevPosition.y) ||
-    (unit->Position.z != unit->PrevPosition.z);
+  const bool hasMoved = (unit->mVarDat.mCurTransform.pos_.x != unit->mVarDat.mLastTransform.pos_.x) || (unit->mVarDat.mCurTransform.pos_.y != unit->mVarDat.mLastTransform.pos_.y) ||
+    (unit->mVarDat.mCurTransform.pos_.z != unit->mVarDat.mLastTransform.pos_.z);
   if (!hasMoved && !unit->IsUnitState(UNITSTATE_Immobile)) {
     ++mNoProgressTickCount;
   } else {

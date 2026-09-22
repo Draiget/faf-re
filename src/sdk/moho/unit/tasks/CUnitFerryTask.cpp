@@ -906,7 +906,7 @@ namespace moho
     const float deltaX = ownerPos.x - mPos.x;
     const float distance = std::sqrt((deltaZ * deltaZ) + (deltaX * deltaX));
 
-    if (mUnit->mCurrentLayer == LAYER_Land
+    if (mUnit->mVarDat.mLayerMask == LAYER_Land
         && distance <= mUnit->GetBlueprint()->Air.StartTurnDistance) {
       mTaskState = TASKSTATE_Preparing;
       return;
@@ -1026,7 +1026,7 @@ namespace moho
           return 1;
         }
 
-        if (mUnit->mCurrentLayer == LAYER_Air) {
+        if (mUnit->mVarDat.mLayerMask == LAYER_Air) {
           SNavGoal goal(mUnit->GetFootprint().ToCellPos(mPos));
           goal.mLayer = LAYER_Land;
           NewMoveTask(goal, mDispatch, 0, nullptr, 1);

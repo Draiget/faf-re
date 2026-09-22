@@ -49,7 +49,7 @@ namespace moho
     std::uint32_t mReconFlags;                  // +0x04
     union
     {
-      std::int32_t mMeshTypeClassId;            // +0x08
+      const RMeshBlueprint* mMeshTypeClassId;   // +0x08
       RMeshBlueprint* mStiMesh;                 // +0x08
     };
     boost::SharedPtrRaw<RScmResource> mMesh;    // +0x0C

@@ -448,7 +448,7 @@ namespace moho
         gpg::Warnf("Failed to get valid rebuild bonus from the script");
         return nullptr;
       }
-      const float fractionComplete = nearest->FractionCompleted;
+      const float fractionComplete = nearest->mVarDat.mFractionComplete;
       const float rebuildBonus = static_cast<float>(results.begin()->ToNumber());
       mBuildHelper.mUnknown18 = rebuildBonus * fractionComplete;
       mPendingBuildEntity.Set(nearest);
@@ -660,7 +660,7 @@ namespace moho
         const bool instaBuild =
           instaBuildStorage != nullptr && (*reinterpret_cast<const std::uint8_t*>(instaBuildStorage) != 0u);
 
-        const std::int32_t layer = mUnit->mCurrentLayer;
+        const std::int32_t layer = mUnit->mVarDat.mLayerMask;
         const VTransform spawnTransform{mBuildPosition, mBuildOrientation};
         SUnitConstructionParams params(layer, spawnTransform, mUnit->ArmyRef, spawnBlueprint, mUnit, instaBuild);
         Unit* const newUnit = mSim->CreateUnitForScript(params, true);

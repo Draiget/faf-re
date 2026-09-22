@@ -273,7 +273,7 @@ namespace moho
         if (
           blueprint != nullptr
           && blueprint->Physics.MotionType == RULEUMT_SurfacingSub
-          && mUnit->mCurrentLayer == LAYER_Sub
+          && mUnit->mVarDat.mLayerMask == LAYER_Sub
         ) {
           SNavGoal surfacingGoal(mUnit->GetFootprint().ToCellPos(mUnit->GetPosition()));
           surfacingGoal.mLayer = LAYER_Water;
@@ -289,7 +289,7 @@ namespace moho
       }
 
       case TASKSTATE_Waiting:
-        if (mUnit->mCurrentLayer != LAYER_Water) {
+        if (mUnit->mVarDat.mLayerMask != LAYER_Water) {
           return 1;
         }
         mTaskState = TASKSTATE_Starting;

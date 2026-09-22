@@ -450,7 +450,7 @@ namespace moho
       return -1;
     }
 
-    if (platform->mCurrentLayer == LAYER_Seabed || platform->mCurrentLayer == LAYER_Sub) {
+    if (platform->mVarDat.mLayerMask == LAYER_Seabed || platform->mVarDat.mLayerMask == LAYER_Sub) {
       // The platform submerged. This is the one abort path that releases an
       // already-attached unit before tearing the task down.
       if (unit->IsUnitState(UNITSTATE_Attached) && platform->AiTransport != nullptr) {
@@ -492,7 +492,7 @@ namespace moho
           return -1;
         }
 
-        if (unit->FuelRatio <= kRefuelCompleteFuelRatio || unit->Health != unit->MaxHealth) {
+        if (unit->FuelRatio <= kRefuelCompleteFuelRatio || unit->mVarDat.mHealth != unit->mVarDat.mMaxHealth) {
           return 10;
         }
 
@@ -602,7 +602,7 @@ namespace moho
       }
 
       const float alignment = DotProduct(attachFacing, OrientationForwardAxis(unit->GetTransform().orient_));
-      if (alignment > kAttachFacingAlignment || unit->mCurrentLayer == LAYER_Land) {
+      if (alignment > kAttachFacingAlignment || unit->mVarDat.mLayerMask == LAYER_Land) {
         if (unit->UnitMotion != nullptr) {
           unit->UnitMotion->SetFacing(Wm3::Vec3f{0.0f, 0.0f, 0.0f});
           unit->UnitMotion->mHeight = std::numeric_limits<float>::infinity();
@@ -620,7 +620,7 @@ namespace moho
       // Docked and refuelling. This is the only place the engine undocks a
       // repaired, refuelled aircraft: once both conditions hold the pad
       // detaches it and a move task lifts it back into the air layer.
-      if (unit->FuelRatio > kRefuelCompleteFuelRatio && unit->Health == unit->MaxHealth) {
+      if (unit->FuelRatio > kRefuelCompleteFuelRatio && unit->mVarDat.mHealth == unit->mVarDat.mMaxHealth) {
         if (transport != nullptr) {
           transport->TransportDetachUnit(unit);
         }

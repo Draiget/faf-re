@@ -294,7 +294,7 @@ namespace
   {
     const auto blipId = static_cast<std::uint32_t>(blipEntity->id_);
     const RUnitBlueprint* const blueprint = static_cast<const RUnitBlueprint*>(blipEntity->BluePrint);
-    influenceMap->UpdateBlipPosition(blipId, blipEntity->Position, blueprint);
+    influenceMap->UpdateBlipPosition(blipId, blipEntity->mVarDat.mCurTransform.pos_, blueprint);
   }
 
   [[nodiscard]] bool DoesBlipSourceCollideBox(ReconBlip* const blip, const Wm3::Box3f& box) noexcept
@@ -1032,7 +1032,7 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     // 0x005C1BD5 `mov eax, [ebx+88h]` / `mov [edi+8], eax`: the source unit's
     // mesh-blueprint lane (Entity +0x80 == SSTIEntityVariableData +0x08) into
     // `SPerArmyReconInfo::mStiMesh` -- the same union slot this field names.
-    perArmy->mMeshTypeClassId = sourceUnit->mMeshTypeClassId;
+    perArmy->mMeshTypeClassId = sourceUnit->mVarDat.mMeshBlueprint;
 
     // 0x005C1BE5 `Entity::GetMesh()` returns a retained
     // `shared_ptr<RScmResource>`; the snapshot takes its own owner on the
@@ -1059,9 +1059,9 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
       perArmy->mPose.release();
     }
 
-    perArmy->mHealth = sourceUnit->Health;
-    perArmy->mMaxHealth = sourceUnit->MaxHealth;
-    perArmy->mFractionComplete = sourceUnit->FractionCompleted;
+    perArmy->mHealth = sourceUnit->mVarDat.mHealth;
+    perArmy->mMaxHealth = sourceUnit->mVarDat.mMaxHealth;
+    perArmy->mFractionComplete = sourceUnit->mVarDat.mFractionComplete;
   }
 
   if ((perArmy->mReconFlags & static_cast<std::uint32_t>(RECON_AnySense)) != 0u) {
@@ -1098,7 +1098,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
   const std::uint32_t oldFlags = perArmy->mReconFlags;
   if (blip->IsFake()) {
     Entity* const sourceEntity = sourceUnit ? static_cast<Entity*>(sourceUnit) : nullptr;
-    newFlags = static_cast<std::uint32_t>(ReconCanDetectEntity(this, sourceEntity, blip->Position, RECON_AnySense));
+    newFlags = static_cast<std::uint32_t>(ReconCanDetectEntity(this, sourceEntity, blip->mVarDat.mCurTransform.pos_, RECON_AnySense));
   }
 
   newFlags |= (oldFlags & 0x30u);
@@ -1130,7 +1130,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
       const float maxFootprint = static_cast<float>(std::max(footprint.mSizeX, footprint.mSizeZ));
       STIMap* const map = sourceUnit->SimulationRef ? sourceUnit->SimulationRef->mMapData : nullptr;
       const bool useWholeMap = mArmy->UseWholeMap();
-      if (!IsWithinPlayableMapRadius(map, blip->Position, maxFootprint, useWholeMap)) {
+      if (!IsWithinPlayableMapRadius(map, blip->mVarDat.mCurTransform.pos_, maxFootprint, useWholeMap)) {
         markKnownFake = true;
       }
     }
@@ -1151,7 +1151,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
 
   if (mIMap) {
     mIMap->UpdateBlipPosition(
-      static_cast<std::uint32_t>(blip->id_), blip->Position, static_cast<const RUnitBlueprint*>(blip->GetBlueprint())
+      static_cast<std::uint32_t>(blip->id_), blip->mVarDat.mCurTransform.pos_, static_cast<const RUnitBlueprint*>(blip->GetBlueprint())
     );
   }
   CheckIntelEvents(blip, static_cast<int>(oldFlags), static_cast<int>(refreshedFlags));
@@ -1315,9 +1315,9 @@ EReconFlags CAiReconDBImpl::GetNewReconFor(
 
   bool sonarEligible = belowWater;
   if (unit) {
-    sonarEligible = sonarEligible || UsesWaterSenseLane(unit->mCurrentLayer);
+    sonarEligible = sonarEligible || UsesWaterSenseLane(unit->mVarDat.mLayerMask);
   } else if (blip) {
-    sonarEligible = sonarEligible || UsesWaterSenseLane(blip->mCurrentLayer);
+    sonarEligible = sonarEligible || UsesWaterSenseLane(blip->mVarDat.mLayerMask);
   }
 
   if (sonarEligible && HasFlag(oldFlags, RECON_Sonar) && IsGridVisibleAtPoint(mSonarGrid.px, pos)) {
@@ -1649,7 +1649,7 @@ EReconFlags CAiReconDBImpl::ReconCanDetect(
     return oldFlags;
   }
 
-  const bool belowWater = ent->mCurrentLayer == LAYER_Seabed || ent->mCurrentLayer == LAYER_Sub;
+  const bool belowWater = ent->mVarDat.mLayerMask == LAYER_Seabed || ent->mVarDat.mLayerMask == LAYER_Sub;
   const EReconFlags resolved = GetReconFlags(ent, pos, oldFlags, belowWater);
   if (resolved == RECON_None) {
     ++sGridNone;
@@ -1976,7 +1976,7 @@ void CAiReconDBImpl::ReconFlushBlipsInRect(const moho::Rect2<int>& rect)
       continue;
     }
 
-    const ELayer layer = entity->mCurrentLayer;
+    const ELayer layer = entity->mVarDat.mLayerMask;
     if (layer == LAYER_None || layer == LAYER_Sub) {
       continue;
     }

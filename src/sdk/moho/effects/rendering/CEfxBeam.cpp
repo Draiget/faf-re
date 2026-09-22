@@ -132,14 +132,14 @@ namespace
   [[nodiscard]] moho::VTransform ReadCurrentTransform(const moho::Entity& entity) noexcept
   {
     return moho::BuildVTransformFromEntityTransformPayload(
-      moho::ReadEntityTransformPayload(entity.Orientation, entity.Position)
+      moho::ReadEntityTransformPayload(entity.mVarDat.mCurTransform.orient_, entity.mVarDat.mCurTransform.pos_)
     );
   }
 
   [[nodiscard]] moho::VTransform ReadPreviousTransform(const moho::Entity& entity) noexcept
   {
     return moho::BuildVTransformFromEntityTransformPayload(
-      moho::ReadEntityTransformPayload(entity.PrevOrientation, entity.PrevPosition)
+      moho::ReadEntityTransformPayload(entity.mVarDat.mLastTransform.orient_, entity.mVarDat.mLastTransform.pos_)
     );
   }
 
@@ -584,11 +584,11 @@ namespace moho
         static_cast<int>(focusArmy->mConstDat.mArmyIndex), mBeam.mCurStart.pos_.x, mBeam.mCurStart.pos_.y,
         mBeam.mCurStart.pos_.z, startVisible ? 1 : 0, anySense,
         static_cast<const void*>(probeSource), mEntityInfo.mParentBoneIndex,
-        (probeSource != nullptr) ? static_cast<int>(probeSource->Dead) : -1,
+        (probeSource != nullptr) ? static_cast<int>(probeSource->mVarDat.mIsDead) : -1,
         (probeSource != nullptr) ? static_cast<int>(probeSource->DestroyQueuedFlag) : -1,
-        (probeSource != nullptr) ? probeSource->Position.x : 0.0f,
-        (probeSource != nullptr) ? probeSource->Position.y : 0.0f,
-        (probeSource != nullptr) ? probeSource->Position.z : 0.0f,
+        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.x : 0.0f,
+        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.y : 0.0f,
+        (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.z : 0.0f,
         (probeSource != nullptr) ? probeSource->PendingPosition.x : 0.0f,
         (probeSource != nullptr) ? probeSource->PendingPosition.y : 0.0f,
         (probeSource != nullptr) ? probeSource->PendingPosition.z : 0.0f,

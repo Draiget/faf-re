@@ -634,7 +634,7 @@ namespace moho
       }
     }
 
-    if (mUnit->mCurrentLayer == LAYER_Seabed) {
+    if (mUnit->mVarDat.mLayerMask == LAYER_Seabed) {
       return -1;
     }
 
@@ -728,7 +728,7 @@ namespace moho
           // the unit is still travelling. A stationary transport advances
           // straight to the next state with its navigator untouched.
           IAiNavigator* const navigator = mUnit->AiNavigator;
-          if (navigator != nullptr && Wm3::Vector3f::Compare(&mUnit->Position, &mUnit->PrevPosition)) {
+          if (navigator != nullptr && Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
             navigator->AbortMove();
           }
 
@@ -738,7 +738,7 @@ namespace moho
 
         RunUnitScript(mUnit, "OnTransportOrdered");
 
-        if (mUnit->mCurrentLayer != LAYER_Air && !mUnit->IsUnitState(UNITSTATE_AssistMoving)) {
+        if (mUnit->mVarDat.mLayerMask != LAYER_Air && !mUnit->IsUnitState(UNITSTATE_AssistMoving)) {
           const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
           if (blueprint != nullptr) {
             const Wm3::Vector3f& ownerPos = mUnit->GetPosition();

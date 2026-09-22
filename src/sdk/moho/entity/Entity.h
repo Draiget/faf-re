@@ -72,112 +72,6 @@ namespace moho
   struct SFootprint;
   struct SSyncData;
 
-  enum EEntityAttribute : std::int32_t
-  {
-    ENTATTR_Vision = 0,
-    ENTATTR_WaterVision = 1,
-    ENTATTR_Radar = 2,
-    ENTATTR_Sonar = 3,
-    ENTATTR_Omni = 4,
-    ENTATTR_RadarStealthField = 5,
-    ENTATTR_SonarStealthField = 6,
-    ENTATTR_CloakField = 7,
-    ENTATTR_Jammer = 8,
-    ENTATTR_Spoof = 9,
-    ENTATTR_Cloak = 10,
-    ENTATTR_RadarStealth = 11,
-    ENTATTR_SonarStealth = 12,
-  };
-
-  static_assert(sizeof(EEntityAttribute) == 0x04, "EEntityAttribute size must be 0x04");
-
-  /**
-   * Reflected payload wrapper for the engine's entity-intel attribute lanes.
-   *
-   * The binary exposes this shape through RTTI as `Moho::EntityAttributes`
-   * while the project currently stores the fields in `SSTIIntelAttributes`.
-   * The wrapper keeps the recovered behavior typed without reintroducing any
-   * raw offset access.
-   */
-  struct EntityAttributes : SSTIIntelAttributes
-  {
-    inline static gpg::RType* sType = nullptr;
-
-    /**
-     * Address: 0x005BD530 (FUN_005BD530, Moho::EntityAttributes::GetRange)
-     *
-     * What it does:
-     * Returns the masked intel range magnitude for a stored attribute lane,
-     * or zero for the field/jammer/spoof lanes that do not carry a range.
-     */
-    [[nodiscard]] std::uint32_t GetRange(EEntityAttribute attribute) const noexcept;
-
-    /**
-     * Address: 0x005BD470 (FUN_005BD470, Moho::EntityAttributes::SetIntelRadius)
-     *
-     * What it does:
-     * Stores a new intel radius magnitude in the selected lane while preserving
-     * the lane's sign bit. The field/jammer/spoof lanes are ignored.
-     */
-    void SetIntelRadius(EEntityAttribute attribute, int radius) noexcept;
-
-    /**
-     * Address: 0x008B8330 (FUN_008B8330, Moho::EntityAttributes::IsEnabled)
-     *
-     * What it does:
-     * Returns the sign-bit enable flag for intel-bearing attributes; field and
-     * jammer/spoof lanes always report disabled.
-     */
-    [[nodiscard]] bool IsEnabled(EEntityAttribute attribute) const noexcept;
-
-    /**
-     * Address: 0x00689DC0 (FUN_00689DC0, Moho::EntityAttributes::SetEnabled)
-     *
-     * What it does:
-     * Writes the sign-bit enable flag for one intel-bearing lane while
-     * preserving the stored radius payload.
-     */
-    void SetEnabled(EEntityAttribute attribute, bool enabled) noexcept;
-
-    /**
-     * Address: 0x00559350 (FUN_00559350, Moho::EntityAttributes::MemberDeserialize)
-     *
-     * What it does:
-     * Loads all eight intel payload lanes from archive storage in field order.
-     */
-    void MemberDeserialize(gpg::ReadArchive* archive);
-
-    /**
-     * Address: 0x005593D0 (FUN_005593D0, Moho::EntityAttributes::MemberSerialize)
-     *
-     * What it does:
-     * Stores all eight intel payload lanes to archive storage in field order.
-     */
-    void MemberSerialize(gpg::WriteArchive* archive) const;
-
-    /**
-     * Address: 0x006A46A0 (FUN_006A46A0, Moho::EntityAttributes::Initialize)
-     *
-     * What it does:
-     * Seeds intel lanes from unit-blueprint intel radii, setting the enable
-     * sign bit for non-zero ranges.
-     */
-    void Initialize(const RUnitBlueprint* blueprint);
-  };
-
-  static_assert(sizeof(EntityAttributes) == sizeof(SSTIIntelAttributes), "EntityAttributes size must match payload");
-
-  enum ELayer : std::int32_t
-  {
-    LAYER_None = 0,
-    LAYER_Land = 1,
-    LAYER_Seabed = 2,
-    LAYER_Sub = 4,
-    LAYER_Water = 8,
-    LAYER_Air = 16,
-    LAYER_Orbit = 32,
-  };
-
   struct EntityCollisionCellSpan;
 
   struct EntityCollisionCellNode
@@ -1449,66 +1343,43 @@ namespace moho
     REntityBlueprint* BluePrint;   // 0x006C
     std::uint32_t mTickCreated;    // 0x0070
     std::uint32_t mReserved74;     // 0x0074
-    gpg::RRef mMeshRef;            // 0x0078
-    std::int32_t mMeshTypeClassId; // 0x0080
-    float mDrawScaleX;             // 0x0084
-    float mDrawScaleY;             // 0x0088
-    float mDrawScaleZ;             // 0x008C
-    float Health;                  // 0x0090
-    float MaxHealth;               // 0x0094
-    std::uint8_t BeingBuilt;       // 0x0098
-    std::uint8_t Dead;             // 0x0099
-    std::uint8_t DirtySyncState;   // 0x009A: set by Unit state mutators for sync replication
-    std::uint8_t mDestroyedByKill; // 0x009B
-    // Current world transform payload (quaternion xyzw + position), split to preserve ABI layout.
-    Vector4f Orientation;   // 0x009C
-    Wm3::Vector3f Position; // 0x00AC
-    // Previous frame transform payload, same split layout.
-    Vector4f PrevOrientation;                  // 0x00B8
-    Wm3::Vector3f PrevPosition;                // 0x00C8
-    float mVelocityScale;                      // 0x00D4
-    float FractionCompleted;                   // 0x00D8
-
     /**
-     * The replicated mirror of this entity's attachment state: the parent's id
-     * (or `EEntityIdSentinel::Invalid`), and one id per attached child.
-     * `Entity::SyncInterface` rewrites both from the live `mAttachInfo` (+0x18C)
-     * and `mAttachedEntities` (+0x17C) lanes every sync, because `UserEntity`
-     * rebuilds its bone attachments from them on the client.
+     * The replicated variable-data block, +0x78 through +0x147.
+     *
+     * This is a real member in the binary, not a coincidence of layout: every
+     * `Entity` constructor calls `SSTIEntityVariableData::SSTIEntityVariableData`
+     * on `&this->mVarDat` (0x00558760), `~Entity` calls its destructor
+     * (FUN_006785D0), and `Entity::SyncInterface` hands `lea eax, [edi+78h]` to
+     * `SSTIEntityVariableData::operator=` at 0x0067A3AD before shipping it to
+     * the client.
+     *
+     * This tree used to spell the block out as twenty-odd flat `Entity` members
+     * with a `std::uint8_t pad_00DC_0108[0x2C]` over the lanes it had no name
+     * for, plus a `reinterpret_cast<SSTIEntityVariableData*>((char*)this + 0x78)`
+     * for the one caller that needed the whole thing. Four of those lanes were
+     * also typed wrongly, because nothing forced them to agree with the block:
+     *
+     *   - `mMeshRef` was a `gpg::RRef`, and four call sites cast it back to
+     *     `boost::SharedPtrRaw<RScmResource>` to use it;
+     *   - `mMeshTypeClassId` was a `std::int32_t` holding an `RMeshBlueprint*`,
+     *     cast at its one real use;
+     *   - `Orientation` was a `moho::Vector4f`, which stores `{x,y,z,w}`, over
+     *     bytes that are a `Wm3::Quatf`, which stores `{w,x,y,z}` -- so every
+     *     read of a single lane by name was off by one, and
+     *     `CEfxEmitter::InterpolatePosition` rotated them back by hand;
+     *   - `mFootprintLayer` was not a footprint layer at all but the visibility
+     *     mode, whose default is `MapPlayableRect` rather than zero.
      */
-    std::uint32_t mAttachParentId;             // 0x00DC (variable data +0x64)
-    SSTIInlineUIntVector mAttachedEntityIds;   // 0x00E0 (variable data +0x68)
-
-    /**
-     * Texture-scroll UV at the start and at the end of the current beat.
-     * `UserEntity::GetInterpolatedScroll` renders
-     * `start + (end - start) * alpha`, so every mutator shifts the end lane
-     * into the start lane before writing a new end -- that is all
-     * `UpdateScroll`, `SetAnimScroll` and `StopScroll` are doing.
-     */
-    Wm3::Vector2f mScrollBeatStart;            // 0x00F8 (variable data +0x80)
-    Wm3::Vector2f mScrollBeatEnd;              // 0x0100 (variable data +0x88)
-
-    CSndParams* mAmbientSound;                 // 0x0108
-    CSndParams* mRumbleSound;                  // 0x010C
-    std::uint8_t mVisibilityState;             // 0x0110
-    char pad_0111[3];                          // 0x0111
-    std::int32_t mFootprintLayer;              // 0x0114
-    ELayer mCurrentLayer;                      // 0x0118
-    std::uint8_t mUseAltFootprint;             // 0x011C
-    std::uint8_t mUseAltFootprintSecondary;    // 0x011D
-    char pad_011E[2];                          // 0x011E
-    boost::shared_ptr<CD3DBatchTexture> mStrategicUnderlayTexture; // 0x0120
-    // 0x006A46A0 (`EntityAttributes::Initialize`) is called on this lane from
-    // the Unit gameplay ctor at entity+0x128, and it runs to +0x148 where
-    // SimulationRef starts - exactly one EntityAttributes.
-    EntityAttributes IntelAttributes;                            // 0x0128
+    SSTIEntityVariableData mVarDat; // 0x0078 .. 0x0147
     Sim* SimulationRef;                        // 0x0148
     // +0x014C is the owning army pointer in constructor/init and callsite evidence.
     // Attachment parent linkage is represented by mAttachInfo (+0x018C).
     CArmyImpl* ArmyRef;                           // 0x014C
     // Pending transform payload (equivalent logical role to VTransform: orientation + position).
-    Vector4f PendingOrientation;                   // 0x0150
+    // A quaternion, like the two in `mVarDat`: `Wm3::Quatf` stores (w, x, y, z),
+    // and the identity this is seeded with is {1, 0, 0, 0}, the same four words
+    // the old `moho::Vector4f` spelling wrote.
+    Wm3::Quatf PendingOrientation;                 // 0x0150
     Wm3::Vector3f PendingPosition;                 // 0x0160
     PositionHistory* mPositionHistory;             // 0x016C
     float mPendingVelocityScale;                   // 0x0170
@@ -2733,26 +2604,51 @@ namespace moho
   static_assert(offsetof(Entity, BluePrint) == 0x6C, "Entity::BluePrint offset must be 0x6C");
   static_assert(offsetof(Entity, mTickCreated) == 0x70, "Entity::mTickCreated offset must be 0x70");
   static_assert(offsetof(Entity, mReserved74) == 0x74, "Entity::mReserved74 offset must be 0x74");
-  static_assert(offsetof(Entity, Health) == 0x90, "Entity::Health offset must be 0x90");
-  static_assert(offsetof(Entity, MaxHealth) == 0x94, "Entity::MaxHealth offset must be 0x94");
-  static_assert(offsetof(Entity, BeingBuilt) == 0x98, "Entity::BeingBuilt offset must be 0x98");
-  static_assert(offsetof(Entity, Orientation) == 0x9C, "Entity::Orientation offset must be 0x9C");
-  static_assert(offsetof(Entity, Position) == 0xAC, "Entity::Position offset must be 0xAC");
-  static_assert(offsetof(Entity, PrevOrientation) == 0xB8, "Entity::PrevOrientation offset must be 0xB8");
-  static_assert(offsetof(Entity, PrevPosition) == 0xC8, "Entity::PrevPosition offset must be 0xC8");
-  static_assert(offsetof(Entity, FractionCompleted) == 0xD8, "Entity::FractionCompleted offset must be 0xD8");
-  static_assert(offsetof(Entity, mAmbientSound) == 0x108, "Entity::mAmbientSound offset must be 0x108");
-  static_assert(offsetof(Entity, mRumbleSound) == 0x10C, "Entity::mRumbleSound offset must be 0x10C");
-  static_assert(offsetof(Entity, mVisibilityState) == 0x110, "Entity::mVisibilityState offset must be 0x110");
-  static_assert(offsetof(Entity, mFootprintLayer) == 0x114, "Entity::mFootprintLayer offset must be 0x114");
-  static_assert(offsetof(Entity, mCurrentLayer) == 0x118, "Entity::mCurrentLayer offset must be 0x118");
-  static_assert(offsetof(Entity, mUseAltFootprint) == 0x11C, "Entity::mUseAltFootprint offset must be 0x11C");
-  static_assert(
-    offsetof(Entity, mUseAltFootprintSecondary) == 0x11D, "Entity::mUseAltFootprintSecondary offset must be 0x11D"
-  );
-  static_assert(
-    offsetof(Entity, mStrategicUnderlayTexture) == 0x120, "Entity::mStrategicUnderlayTexture offset must be 0x120"
-  );
+  static_assert(offsetof(Entity, mVarDat) == 0x78, "Entity::mVarDat offset must be 0x78");
+
+  /**
+   * Every lane the flattened spelling used to assert directly, now expressed
+   * through the block that owns it. These are the same numbers the old asserts
+   * carried, so the fold is checked field by field rather than only at the
+   * block's base.
+   */
+  struct EntityVariableDataLayoutVerifier
+  {
+    static constexpr std::size_t kBlock = offsetof(Entity, mVarDat);
+
+    template <std::size_t kLane, std::size_t kExpected>
+    struct Lane
+    {
+      static_assert(kBlock + kLane == kExpected, "Entity variable-data lane sits at the wrong offset");
+    };
+
+    Lane<offsetof(SSTIEntityVariableData, mScmResource), 0x78> mMeshResource;
+    Lane<offsetof(SSTIEntityVariableData, mMeshBlueprint), 0x80> mMeshBlueprint;
+    Lane<offsetof(SSTIEntityVariableData, mScale), 0x84> mScale;
+    Lane<offsetof(SSTIEntityVariableData, mHealth), 0x90> mHealth;
+    Lane<offsetof(SSTIEntityVariableData, mMaxHealth), 0x94> mMaxHealth;
+    Lane<offsetof(SSTIEntityVariableData, mIsBeingBuilt), 0x98> mIsBeingBuilt;
+    Lane<offsetof(SSTIEntityVariableData, mIsDead), 0x99> mIsDead;
+    Lane<offsetof(SSTIEntityVariableData, mRequestRefreshUI), 0x9A> mRequestRefreshUI;
+    Lane<offsetof(SSTIEntityVariableData, mDestroyedByKill), 0x9B> mDestroyedByKill;
+    Lane<offsetof(SSTIEntityVariableData, mCurTransform), 0x9C> mCurTransform;
+    Lane<offsetof(SSTIEntityVariableData, mLastTransform), 0xB8> mLastTransform;
+    Lane<offsetof(SSTIEntityVariableData, mCurImpactValue), 0xD4> mCurImpactValue;
+    Lane<offsetof(SSTIEntityVariableData, mFractionComplete), 0xD8> mFractionComplete;
+    Lane<offsetof(SSTIEntityVariableData, mAttachmentParentRef), 0xDC> mAttachmentParentRef;
+    Lane<offsetof(SSTIEntityVariableData, mAuxValueVector), 0xE0> mAuxValueVector;
+    Lane<offsetof(SSTIEntityVariableData, mScrollBeatStart), 0xF8> mScrollBeatStart;
+    Lane<offsetof(SSTIEntityVariableData, mScrollBeatEnd), 0x100> mScrollBeatEnd;
+    Lane<offsetof(SSTIEntityVariableData, mAmbientSound), 0x108> mAmbientSound;
+    Lane<offsetof(SSTIEntityVariableData, mRumbleSound), 0x10C> mRumbleSound;
+    Lane<offsetof(SSTIEntityVariableData, mVisibilityHidden), 0x110> mVisibilityHidden;
+    Lane<offsetof(SSTIEntityVariableData, mVisibilityMode), 0x114> mVisibilityMode;
+    Lane<offsetof(SSTIEntityVariableData, mLayerMask), 0x118> mLayerMask;
+    Lane<offsetof(SSTIEntityVariableData, mUsingAltFootprint), 0x11C> mUsingAltFootprint;
+    Lane<offsetof(SSTIEntityVariableData, mUsingAltFootprintSecondary), 0x11D> mUsingAltFootprintSecondary;
+    Lane<offsetof(SSTIEntityVariableData, mUnderlayTexture), 0x120> mUnderlayTexture;
+    Lane<offsetof(SSTIEntityVariableData, mIntelAttributes), 0x128> mIntelAttributes;
+  };
   static_assert(offsetof(Entity, SimulationRef) == 0x148, "Entity::SimulationRef offset must be 0x148");
   static_assert(offsetof(Entity, ArmyRef) == 0x14C, "Entity::ArmyRef offset must be 0x14C");
   static_assert(offsetof(Entity, PendingOrientation) == 0x150, "Entity::PendingOrientation offset must be 0x150");

@@ -383,8 +383,8 @@ namespace moho
       static int sAttachProbeBudget = 0;
       const bool lostParent = (attachedEntity == nullptr) && effect->mEntityInfo.mParentBoneIndex != -1;
       const bool badTransform = (attachedEntity != nullptr) &&
-        !(std::isfinite(attachedEntity->Position.x) && std::isfinite(attachedEntity->Position.y) &&
-          std::isfinite(attachedEntity->Position.z));
+        !(std::isfinite(attachedEntity->mVarDat.mCurTransform.pos_.x) && std::isfinite(attachedEntity->mVarDat.mCurTransform.pos_.y) &&
+          std::isfinite(attachedEntity->mVarDat.mCurTransform.pos_.z));
       if ((lostParent || badTransform) && sAttachProbeBudget < 24) {
         ++sAttachProbeBudget;
         char probe[320];
@@ -395,11 +395,11 @@ namespace moho
                   static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(attachedEntity)),
                   (attachedEntity != nullptr) ? typeid(*attachedEntity).name() : "<null>",
                   effect->mEntityInfo.mParentBoneIndex,
-                  (attachedEntity != nullptr) ? static_cast<int>(attachedEntity->Dead) : -1,
+                  (attachedEntity != nullptr) ? static_cast<int>(attachedEntity->mVarDat.mIsDead) : -1,
                   (attachedEntity != nullptr) ? static_cast<int>(attachedEntity->DestroyQueuedFlag) : -1,
-                  (attachedEntity != nullptr) ? attachedEntity->Position.x : 0.0f,
-                  (attachedEntity != nullptr) ? attachedEntity->Position.y : 0.0f,
-                  (attachedEntity != nullptr) ? attachedEntity->Position.z : 0.0f);
+                  (attachedEntity != nullptr) ? attachedEntity->mVarDat.mCurTransform.pos_.x : 0.0f,
+                  (attachedEntity != nullptr) ? attachedEntity->mVarDat.mCurTransform.pos_.y : 0.0f,
+                  (attachedEntity != nullptr) ? attachedEntity->mVarDat.mCurTransform.pos_.z : 0.0f);
         ::OutputDebugStringA(probe);
       }
     }
@@ -424,11 +424,11 @@ namespace moho
       // across by matching field NAME rotates all four lanes; the copy has to
       // go lane for lane, exactly as CollisionBeamEntity::GetBoneWorldTransform
       // and Prop's write-back already do.
-      currentTransform.orient_.w = attachedEntity->Orientation.x;
-      currentTransform.orient_.x = attachedEntity->Orientation.y;
-      currentTransform.orient_.y = attachedEntity->Orientation.z;
-      currentTransform.orient_.z = attachedEntity->Orientation.w;
-      currentTransform.pos_ = attachedEntity->Position;
+      currentTransform.orient_.w = attachedEntity->mVarDat.mCurTransform.orient_.x;
+      currentTransform.orient_.x = attachedEntity->mVarDat.mCurTransform.orient_.y;
+      currentTransform.orient_.y = attachedEntity->mVarDat.mCurTransform.orient_.z;
+      currentTransform.orient_.z = attachedEntity->mVarDat.mCurTransform.orient_.w;
+      currentTransform.pos_ = attachedEntity->mVarDat.mCurTransform.pos_;
 
       previousOrientation.w = attachedEntity->PendingOrientation.x;
       previousOrientation.x = attachedEntity->PendingOrientation.y;

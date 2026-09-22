@@ -139,11 +139,11 @@ namespace
       return false;
     }
 
-    if (!candidateUnit->SimulationRef->mMapData->IsWithin(candidateUnit->Position, 1.0f, ownerUnit->ArmyRef->UseWholeMap())) {
+    if (!candidateUnit->SimulationRef->mMapData->IsWithin(candidateUnit->mVarDat.mCurTransform.pos_, 1.0f, ownerUnit->ArmyRef->UseWholeMap())) {
       return false;
     }
 
-    if (Wm3::Vector3f::Compare(&candidateUnit->Position, &candidateUnit->PrevPosition) != 0) {
+    if (Wm3::Vector3f::Compare(&candidateUnit->mVarDat.mCurTransform.pos_, &candidateUnit->mVarDat.mLastTransform.pos_) != 0) {
       return false;
     }
 
@@ -159,7 +159,7 @@ namespace
     }
 
     if (!candidateUnit->IsUnitState(moho::UNITSTATE_BeingReclaimed)) {
-      if (!candidateUnit->IsBeingBuilt() && candidateUnit->Health >= candidateUnit->MaxHealth) {
+      if (!candidateUnit->IsBeingBuilt() && candidateUnit->mVarDat.mHealth >= candidateUnit->mVarDat.mMaxHealth) {
         if (moho::Unit* const focusUnit = ResolveFocusUnit(candidateUnit); focusUnit != nullptr) {
           return focusUnit;
         }
@@ -390,7 +390,7 @@ namespace moho
       // Keep flying until the pod is on the bone (or has settled onto land).
       const Wm3::Vec3f& unitPos = unit->GetPosition();
       const float distanceToBone = std::sqrt(DistanceSquared(attachPos, unitPos));
-      if (distanceToBone >= kAttachContactDistance && unit->mCurrentLayer != LAYER_Land) {
+      if (distanceToBone >= kAttachContactDistance && unit->mVarDat.mLayerMask != LAYER_Land) {
         return 1;
       }
 

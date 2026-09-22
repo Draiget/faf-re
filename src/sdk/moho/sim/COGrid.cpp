@@ -1150,7 +1150,7 @@ namespace moho
         continue;
       }
 
-      const ELayer candidateLayer = candidate->mCurrentLayer;
+      const ELayer candidateLayer = candidate->mVarDat.mLayerMask;
       if (candidateLayer == LAYER_Land) {
         // Land candidate: skip only when the query ignores structures but the
         // candidate does not (asymmetric ignore); otherwise run the pair test.
@@ -1273,7 +1273,7 @@ namespace moho
       if (candidate == nullptr) {
         continue;
       }
-      const ELayer candidateLayer = candidate->mCurrentLayer;
+      const ELayer candidateLayer = candidate->mVarDat.mLayerMask;
       if (candidateLayer == LAYER_Air || candidateLayer == LAYER_Sub) {
         continue;
       }
@@ -1665,8 +1665,8 @@ namespace moho
 
     CollisionResult hit{};
     for (Entity* const entity : gatheredEntities) {
-      const float deltaX = entity->Position.x - center.x;
-      const float deltaZ = entity->Position.z - center.z;
+      const float deltaX = entity->mVarDat.mCurTransform.pos_.x - center.x;
+      const float deltaZ = entity->mVarDat.mCurTransform.pos_.z - center.z;
       if (radiusSquared <= (deltaX * deltaX) + (deltaZ * deltaZ)) {
         continue;
       }

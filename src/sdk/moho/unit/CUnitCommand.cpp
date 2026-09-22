@@ -2012,7 +2012,7 @@ void CUnitCommand::DecreaseCount(const int amount)
 
     if (commandType == EUnitCommandType::UNITCOMMAND_Upgrade) {
       PruneQueuedCommandsInvalidatedByUpgradeChange(*unit->CommandQueue);
-      unit->DirtySyncState = 1;
+      unit->mVarDat.mRequestRefreshUI = 1;
     }
   }
 }
@@ -2150,7 +2150,7 @@ void CUnitCommand::RefreshPublishedCommandEvent(const bool forceRefresh, SSyncDa
     }
 
     Unit* const unit = SCommandUnitSet::UnitFromEntry(entry);
-    if (!unit || unit->mVisibilityState == 0u) {
+    if (!unit || unit->mVarDat.mVisibilityHidden == 0u) {
       continue;
     }
 
