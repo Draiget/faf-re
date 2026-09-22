@@ -5523,6 +5523,9 @@
     <ClInclude Include="moho\animation\CRotateManipulator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\animation\CStorageManipulator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\animation\CSlideManipulator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
