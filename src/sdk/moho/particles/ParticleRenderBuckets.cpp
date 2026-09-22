@@ -12,7 +12,7 @@
 #include "moho/particles/BeamRenderHelpers.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/particles/CWorldParticles.h"
-#include "moho/particles/ParticleRenderWorkItemRuntime.h"
+#include "moho/particles/ParticleRenderWorkItem.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/particles/SWorldParticle.h"
 #include "moho/particles/SWorldTrail.h"
@@ -29,7 +29,7 @@ namespace
   constexpr std::int32_t kSharedTrailQuadCapacity = 0x4000;
   constexpr std::int32_t kTriangleListPrimitiveType = 4;
 
-  struct ParticleInstanceRuntime
+  struct SParticleInstance
   {
     float posX = 0.0f;                 // +0x00
     float posY = 0.0f;                 // +0x04
@@ -56,7 +56,7 @@ namespace
     float inverseResistanceSq = 0.0f;  // +0x58
   };
 
-  static_assert(sizeof(ParticleInstanceRuntime) == 0x5C, "ParticleInstanceRuntime size must be 0x5C");
+  static_assert(sizeof(SParticleInstance) == 0x5C, "SParticleInstance size must be 0x5C");
 
   /**
    * Address: 0x00496710 (FUN_00496710, sub_496710)
@@ -66,7 +66,7 @@ namespace
    * render buffer.
    */
   [[nodiscard]] std::uint32_t GetTrailSegmentBufferMaxSegments(
-    const moho::TrailSegmentBufferRuntime& segmentBuffer
+    const moho::STrailSegmentBuffer& segmentBuffer
   ) noexcept
   {
     return segmentBuffer.maxSegments;
@@ -106,7 +106,7 @@ namespace
    * stores the mapped pointer on the pooled segment buffer lane.
    */
   void* LockTrailSegmentVertexRangeFromStart(
-    moho::TrailSegmentBufferRuntime& segmentBuffer,
+    moho::STrailSegmentBuffer& segmentBuffer,
     const std::int32_t segmentCount
   )
   {
@@ -124,7 +124,7 @@ namespace
    * pointer on the pooled segment buffer lane.
    */
   void* LockTrailSegmentVertexRangeSubspan(
-    moho::TrailSegmentBufferRuntime& segmentBuffer,
+    moho::STrailSegmentBuffer& segmentBuffer,
     const std::int32_t startSegmentIndex,
     const std::int32_t segmentCount
   )
@@ -143,7 +143,7 @@ namespace
    * binding shared quad indices and issuing one triangle-list draw call.
    */
   void DrawTrailSegmentBatch(
-    const moho::TrailSegmentBufferRuntime& segmentBuffer,
+    const moho::STrailSegmentBuffer& segmentBuffer,
     const std::int32_t segmentCount,
     const std::int32_t startSegmentIndex
   )
@@ -158,14 +158,14 @@ namespace
       return;
     }
 
-    moho::CD3DVertexSheetViewRuntime vertexSheetView{};
+    moho::SD3DVertexRange vertexSheetView{};
     vertexSheetView.sheet = segmentBuffer.vertexSheet;
     // Binary (0x004967E0): +0x04 (BaseVertexIndex) = 4 * startSegment, +0x08 (MinIndex) = 0.
     vertexSheetView.startVertex = 0;
     vertexSheetView.baseVertex = kTrailVerticesPerSegment * startSegmentIndex;
     vertexSheetView.endVertex = (kTrailVerticesPerSegment * segmentCount) - 1;
 
-    moho::CD3DIndexSheetViewRuntime indexSheetView{};
+    moho::SD3DIndexRange indexSheetView{};
     indexSheetView.sheet = sharedTrailIndexSheet;
     indexSheetView.startIndex = kTrailIndicesPerSegment * (kSharedTrailQuadCapacity - segmentCount);
     indexSheetView.indexCount = kTrailIndicesPerSegment * segmentCount;
@@ -174,30 +174,16 @@ namespace
     (void)device->DrawTriangleList(&vertexSheetView, &indexSheetView, &primitiveType);
   }
 
-  /**
-   * What it does:
-   * Small two-dword lane used by scalar helper-thunk copies.
-   */
-  struct TwoUInt32Runtime
-  {
-    std::uint32_t first = 0U;  // +0x00
-    std::uint32_t second = 0U; // +0x04
-  };
-
-  static_assert(offsetof(TwoUInt32Runtime, first) == 0x00, "TwoUInt32Runtime::first offset must be 0x00");
-  static_assert(offsetof(TwoUInt32Runtime, second) == 0x04, "TwoUInt32Runtime::second offset must be 0x04");
-  static_assert(sizeof(TwoUInt32Runtime) == 0x08, "TwoUInt32Runtime size must be 0x08");
-
   constexpr std::uint8_t kTrailSegmentPoolColorRed = 0U;
   constexpr std::uint8_t kTrailSegmentPoolColorBlack = 1U;
 
 
   [[nodiscard]] bool AppendInterval(
-    moho::ParticleRenderWorkItemRuntime& workItem, const float beginFrame, const float lifeFrames
+    moho::SParticleRenderWorkItem& workItem, const float beginFrame, const float lifeFrames
   )
   {
-    // `msvc8::vector<ParticleRenderIntervalRuntime>::push_back` (0x00496950, cited on Vector.h).
-    const moho::ParticleRenderIntervalRuntime intervalValue{beginFrame, lifeFrames};
+    // `msvc8::vector<SParticleRenderInterval>::push_back` (0x00496950, cited on Vector.h).
+    const moho::SParticleRenderInterval intervalValue{beginFrame, lifeFrames};
     workItem.mIntervals.push_back(intervalValue);
     return true;
   }
@@ -209,7 +195,7 @@ namespace
    * sides of the ribbon, which the two sides distinguish by the sign of
    * `tangent` and by `texV`.
    */
-  struct TrailSegmentPackedVertexRuntime
+  struct STrailVertex
   {
     Wm3::Vector3<float> position;   // +0x00  the ribbon end this vertex sits on
     Wm3::Vector3<float> tangent;    // +0x0C  that end's tangent, negated on one side
@@ -222,7 +208,7 @@ namespace
     float emitterAge = 0.0f;        // +0x30  SWorldTrail::mEmitterAge
   };
 
-  static_assert(sizeof(TrailSegmentPackedVertexRuntime) == 0x34, "TrailSegmentPackedVertexRuntime size must be 0x34");
+  static_assert(sizeof(STrailVertex) == 0x34, "STrailVertex size must be 0x34");
 
   /// Vertices emitted per trail segment: two ribbon ends, two sides each.
   inline constexpr std::size_t kTrailSegmentVertexCount = 4U;
@@ -241,7 +227,7 @@ namespace
    * so the shader offsets each vertex along `tangent x view` by `size` and
    * interpolates `texU` between the ends.
    */
-  void PackTrailSegmentQuadVertices(TrailSegmentPackedVertexRuntime* const outVertices, const moho::SWorldTrail& trail)
+  void PackTrailSegmentQuadVertices(STrailVertex* const outVertices, const moho::SWorldTrail& trail)
   {
     const auto emit = [&trail, outVertices](
       const std::size_t index,
@@ -251,7 +237,7 @@ namespace
       const float texU,
       const float texV
     ) noexcept {
-      TrailSegmentPackedVertexRuntime& vertex = outVertices[index];
+      STrailVertex& vertex = outVertices[index];
       vertex.position = position;
       vertex.tangent = tangent;
       vertex.age = age;
@@ -275,27 +261,6 @@ namespace
   }
 
 
-
-  /**
-   * What it does:
-   * One packed dword+byte lane used by legacy pointer/flag helper thunks.
-   */
-  struct DwordAndByteRuntime
-  {
-    std::uint32_t value = 0U;         // +0x00
-    std::uint8_t flag = 0U;           // +0x04
-    std::uint8_t padding05_07[0x03]{}; // +0x05
-  };
-
-  static_assert(
-    offsetof(DwordAndByteRuntime, value) == 0x00,
-    "DwordAndByteRuntime::value offset must be 0x00"
-  );
-  static_assert(
-    offsetof(DwordAndByteRuntime, flag) == 0x04,
-    "DwordAndByteRuntime::flag offset must be 0x04"
-  );
-  static_assert(sizeof(DwordAndByteRuntime) == 0x08, "DwordAndByteRuntime size must be 0x08");
 
   /**
    * Address: 0x00497C70 (FUN_00497C70, sub_497C70)
@@ -323,8 +288,8 @@ namespace moho
    * Initializes one particle render bucket key/runtime lane from one world
    * particle payload and stores owner context.
    */
-  ParticleRenderBucketRuntime* InitializeParticleRenderBucketFromWorldParticle(
-    ParticleRenderBucketRuntime& bucket,
+  SParticleRenderBucket* InitializeParticleRenderBucketFromWorldParticle(
+    SParticleRenderBucket& bucket,
     const SWorldParticle& particle,
     CWorldParticles* const owner
   )
@@ -365,8 +330,8 @@ namespace moho
    * Initializes one trail render bucket key/runtime lane from one trail payload
    * and stores owner context.
    */
-  TrailRenderBucketRuntime* InitializeTrailRenderBucketFromTrail(
-    TrailRenderBucketRuntime& bucket,
+  STrailRenderBucket* InitializeTrailRenderBucketFromTrail(
+    STrailRenderBucket& bucket,
     const SWorldTrail& trail,
     CWorldParticles* const owner
   )
@@ -405,7 +370,7 @@ namespace moho
    * work-item instance stream for the current frame.
    */
   bool UploadPendingParticlesIntoWorkItem(
-    ParticleRenderWorkItemRuntime& workItem,
+    SParticleRenderWorkItem& workItem,
     const float frameDelta,
     msvc8::vector<SWorldParticle>& pendingParticles
   )
@@ -458,7 +423,7 @@ namespace moho
       particle.mInterop += frameDelta;
       (void)AppendInterval(workItem, particle.mInterop, particle.mLifetime);
 
-      auto* const instance = reinterpret_cast<ParticleInstanceRuntime*>(
+      auto* const instance = reinterpret_cast<SParticleInstance*>(
         reinterpret_cast<std::uint8_t*>(lockedInstances) + (index * sizeof(ParticleBuffer::Instanced))
       );
 
@@ -500,9 +465,9 @@ namespace moho
    * Returns active particle work-item buffers to the owner pool and destroys
    * the work-item objects.
    */
-  void RecycleAndDestroyParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket)
+  void RecycleAndDestroyParticleBucketWorkItems(SParticleRenderBucket& bucket)
   {
-    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
+    for (SParticleRenderWorkItem* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr) {
         continue;
       }
@@ -519,7 +484,7 @@ namespace moho
    * Releases one particle render bucket runtime lane including key state,
    * pending payload lanes, and active work-item lanes.
    */
-  void DestroyParticleRenderBucket(ParticleRenderBucketRuntime& bucket)
+  void DestroyParticleRenderBucket(SParticleRenderBucket& bucket)
   {
     RecycleAndDestroyParticleBucketWorkItems(bucket);
     // The two vectors' `_Tidy` (0x004972E0 for the particles, cited on Vector.h).
@@ -538,14 +503,14 @@ namespace moho
    * Returns active trail work-item segment buffers to the owner pool and
    * destroys the work-item objects.
    */
-  void RecycleAndDestroyTrailBucketWorkItems(TrailRenderBucketRuntime& bucket)
+  void RecycleAndDestroyTrailBucketWorkItems(STrailRenderBucket& bucket)
   {
-    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
+    for (SParticleRenderWorkItem* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr) {
         continue;
       }
       if (bucket.owner != nullptr && workItem->mParticleBuffer != nullptr) {
-        auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer);
+        auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(workItem->mParticleBuffer);
         bucket.owner->ReleaseTrailSegmentBuffer(segmentBuffer);
       }
 
@@ -562,7 +527,7 @@ namespace moho
    * Releases one trail render bucket runtime lane including key state,
    * pending trail payload lanes, and active work-item lanes.
    */
-  void DestroyTrailRenderBucket(TrailRenderBucketRuntime& bucket)
+  void DestroyTrailRenderBucket(STrailRenderBucket& bucket)
   {
     RecycleAndDestroyTrailBucketWorkItems(bucket);
     // The two vectors' `_Tidy` (0x00497490 for the trails: each trail's
@@ -582,14 +547,14 @@ namespace moho
    * Advances active particle work items to the target frame and compacts the
    * active lane while recycling expired entries.
    */
-  void PruneExpiredParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket, const float frameValue)
+  void PruneExpiredParticleBucketWorkItems(SParticleRenderBucket& bucket, const float frameValue)
   {
     if (bucket.activeWorkItems.empty()) {
       return;
     }
-    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin();
-    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
-      ParticleRenderWorkItemRuntime* const workItem = *readIt;
+    SParticleRenderWorkItem** writeIt = bucket.activeWorkItems.begin();
+    for (SParticleRenderWorkItem** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
+      SParticleRenderWorkItem* const workItem = *readIt;
       if (workItem == nullptr) {
         continue;
       }
@@ -615,11 +580,11 @@ namespace moho
    * Ensures active work items exist for pending particle payload and uploads
    * data batches until payload is consumed or pool capacity is exhausted.
    */
-  bool EnsureAndFillParticleBucketWorkItems(ParticleRenderBucketRuntime& bucket, const float frameDelta)
+  bool EnsureAndFillParticleBucketWorkItems(SParticleRenderBucket& bucket, const float frameDelta)
   {
     const std::size_t workItemCount = bucket.activeWorkItems.size();
     if (workItemCount != 0U) {
-      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.back();
+      SParticleRenderWorkItem* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
         (void)UploadPendingParticlesIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingParticles);
       }
@@ -633,7 +598,7 @@ namespace moho
         return false;
       }
 
-      auto* const newWorkItem = static_cast<ParticleRenderWorkItemRuntime*>(::operator new(sizeof(ParticleRenderWorkItemRuntime)));
+      auto* const newWorkItem = static_cast<SParticleRenderWorkItem*>(::operator new(sizeof(SParticleRenderWorkItem)));
       (void)InitializeParticleRenderWorkItem(
         *newWorkItem,
         static_cast<std::uint32_t>(pooledBuffer->mMaxParticles),
@@ -655,7 +620,7 @@ namespace moho
    * Selects the particle technique, then renders active particle work items in
    * reverse order when the current bucket is allowed to draw.
    */
-  bool RenderParticleBucket(ParticleRenderBucketRuntime& bucket, const float frameValue, const bool onlyTLight)
+  bool RenderParticleBucket(SParticleRenderBucket& bucket, const float frameValue, const bool onlyTLight)
   {
     PruneExpiredParticleBucketWorkItems(bucket, frameValue);
     (void)EnsureAndFillParticleBucketWorkItems(bucket, frameValue);
@@ -672,7 +637,7 @@ namespace moho
     bucket.SelectTechnique();
 
     for (std::size_t index = activeWorkItemCount; index > 0U; --index) {
-      ParticleRenderWorkItemRuntime* const workItem = bucket.activeWorkItems[index - 1U];
+      SParticleRenderWorkItem* const workItem = bucket.activeWorkItems[index - 1U];
       if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
         continue;
       }
@@ -697,7 +662,7 @@ namespace moho
    * instance stream for the current frame.
    */
   bool UploadPendingTrailsIntoWorkItem(
-    ParticleRenderWorkItemRuntime& workItem,
+    SParticleRenderWorkItem& workItem,
     const float frameDelta,
     msvc8::vector<SWorldTrail>& pendingTrails
   )
@@ -721,7 +686,7 @@ namespace moho
       return pendingCount != 0U;
     }
 
-    auto* const segmentBuffer = static_cast<TrailSegmentBufferRuntime*>(workItem.mParticleBuffer);
+    auto* const segmentBuffer = static_cast<STrailSegmentBuffer*>(workItem.mParticleBuffer);
     if (segmentBuffer == nullptr) {
       pendingTrails.clear();
       workItem.mIntervalCursor = 0U;
@@ -749,7 +714,7 @@ namespace moho
       return false;
     }
 
-    auto* out = static_cast<TrailSegmentPackedVertexRuntime*>(lockedVertices);
+    auto* out = static_cast<STrailVertex*>(lockedVertices);
     SWorldTrail* const trailEnd = pendingTrails.begin() + maxUploadCount;
 
     for (SWorldTrail* trail = pendingTrails.begin(); trail != trailEnd; ++trail) {
@@ -791,21 +756,21 @@ namespace moho
    * Advances active trail work items to the target frame and compacts the
    * active lane while recycling expired entries.
    */
-  void PruneExpiredTrailBucketWorkItems(TrailRenderBucketRuntime& bucket, const float frameValue)
+  void PruneExpiredTrailBucketWorkItems(STrailRenderBucket& bucket, const float frameValue)
   {
     if (bucket.activeWorkItems.empty()) {
       return;
     }
-    ParticleRenderWorkItemRuntime** writeIt = bucket.activeWorkItems.begin();
-    for (ParticleRenderWorkItemRuntime** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
-      ParticleRenderWorkItemRuntime* const workItem = *readIt;
+    SParticleRenderWorkItem** writeIt = bucket.activeWorkItems.begin();
+    for (SParticleRenderWorkItem** readIt = bucket.activeWorkItems.begin(); readIt != bucket.activeWorkItems.end(); ++readIt) {
+      SParticleRenderWorkItem* const workItem = *readIt;
       if (workItem == nullptr) {
         continue;
       }
 
       if (AdvanceParticleRenderWorkItemCursorToFrame(*workItem, frameValue)) {
         if (bucket.owner != nullptr && workItem->mParticleBuffer != nullptr) {
-          bucket.owner->ReleaseTrailSegmentBuffer(static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer));
+          bucket.owner->ReleaseTrailSegmentBuffer(static_cast<STrailSegmentBuffer*>(workItem->mParticleBuffer));
         }
 
         (void)DestroyParticleRenderWorkItem(workItem);
@@ -827,24 +792,24 @@ namespace moho
    * Ensures active trail work items exist for pending trail payloads and uploads
    * data batches until payload is consumed or pool capacity is exhausted.
    */
-  bool EnsureAndFillTrailBucketWorkItems(TrailRenderBucketRuntime& bucket, const float frameDelta)
+  bool EnsureAndFillTrailBucketWorkItems(STrailRenderBucket& bucket, const float frameDelta)
   {
     const std::size_t workItemCount = bucket.activeWorkItems.size();
     if (workItemCount != 0U) {
-      ParticleRenderWorkItemRuntime* const tailWorkItem = bucket.activeWorkItems.back();
+      SParticleRenderWorkItem* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
         (void)UploadPendingTrailsIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingTrails);
       }
     }
 
     while (!bucket.pendingTrails.empty()) {
-      TrailSegmentBufferRuntime* const pooledBuffer = bucket.owner->AcquireTrailSegmentBuffer();
+      STrailSegmentBuffer* const pooledBuffer = bucket.owner->AcquireTrailSegmentBuffer();
       if (pooledBuffer == nullptr) {
         gpg::Logf("Wow!  Ran out of segment buffers from the pool, discarding segments!\n");
         bucket.pendingTrails.clear();
         return false;
       }
-      auto* const newWorkItem = static_cast<ParticleRenderWorkItemRuntime*>(::operator new(sizeof(ParticleRenderWorkItemRuntime)));
+      auto* const newWorkItem = static_cast<SParticleRenderWorkItem*>(::operator new(sizeof(SParticleRenderWorkItem)));
       (void)InitializeParticleRenderWorkItem(
         *newWorkItem,
         GetTrailSegmentBufferMaxSegments(*pooledBuffer),
@@ -866,7 +831,7 @@ namespace moho
    * Selects the trail technique, then renders active trail work items in order
    * when the current bucket is allowed to draw.
    */
-  bool RenderTrailBucket(TrailRenderBucketRuntime& bucket, const float frameValue, const bool onlyTLight)
+  bool RenderTrailBucket(STrailRenderBucket& bucket, const float frameValue, const bool onlyTLight)
   {
     PruneExpiredTrailBucketWorkItems(bucket, frameValue);
     (void)EnsureAndFillTrailBucketWorkItems(bucket, frameValue);
@@ -878,7 +843,7 @@ namespace moho
 
     bucket.SelectTechnique();
 
-    for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {
+    for (SParticleRenderWorkItem* const workItem : bucket.activeWorkItems) {
       if (workItem == nullptr || workItem->mParticleBuffer == nullptr) {
         continue;
       }
@@ -891,7 +856,7 @@ namespace moho
       }
 
       DrawTrailSegmentBatch(
-        *static_cast<TrailSegmentBufferRuntime*>(workItem->mParticleBuffer),
+        *static_cast<STrailSegmentBuffer*>(workItem->mParticleBuffer),
         static_cast<std::int32_t>(segmentCount),
         static_cast<std::int32_t>(startIndex)
       );

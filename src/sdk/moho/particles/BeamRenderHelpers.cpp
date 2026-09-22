@@ -118,7 +118,7 @@ namespace
     return out;
   }
 
-  [[nodiscard]] moho::BeamRenderVertexRuntime BuildBeamRenderVertex(
+  [[nodiscard]] moho::SBeamVertex BuildBeamRenderVertex(
     const Wm3::Vector3<float>& worldPosition,
     const Wm3::Vector3<float>& axis,
     const float width,
@@ -129,7 +129,7 @@ namespace
     const float vShift
   ) noexcept
   {
-    moho::BeamRenderVertexRuntime vertex{};
+    moho::SBeamVertex vertex{};
     vertex.worldPosition = worldPosition;
     vertex.axis = axis;
     vertex.width = width;
@@ -263,8 +263,8 @@ namespace moho
 {
   bool ren_Beams = true;
 
-  bool BeamTextureBucketKeyLess::operator()(
-    const BeamTextureBucketKeyRuntime& lhs, const BeamTextureBucketKeyRuntime& rhs
+  bool BeamBucketKeyLess::operator()(
+    const SBeamBucketKey& lhs, const SBeamBucketKey& rhs
   ) const noexcept
   {
     if (lhs.blendMode != rhs.blendMode) {
@@ -317,13 +317,13 @@ namespace moho
    * Resolves beam textures into one bucket key and appends the beam payload
    * into the matching texture/blend bucket.
    */
-  void AddBeamToTextureBuckets(BeamTextureBucketMapRuntime& buckets, const SWorldBeam& beam)
+  void AddBeamToTextureBuckets(BeamBucketMap& buckets, const SWorldBeam& beam)
   {
     if (!ren_Beams) {
       return;
     }
 
-    BeamTextureBucketKeyRuntime bucketKey{};
+    SBeamBucketKey bucketKey{};
 
     CParticleTexture::TextureResourceHandle texture0{};
     if (beam.mTexture1.tex != nullptr) {
@@ -355,7 +355,7 @@ namespace moho
    * blend mode. Declared on the bucket (ParticleRenderBuckets.h); defined here
    * because the shader-variable accessors and the suffix table are this file's.
    */
-  void TrailRenderBucketRuntime::SelectTechnique() const
+  void STrailRenderBucket::SelectTechnique() const
   {
     BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), texture0);
     BindBeamTextureShaderVar(GetParticleTexture1ShaderVar(), texture1);
@@ -377,7 +377,7 @@ namespace moho
    * variable takes as a 4-byte payload even though the lane is one byte -- and
    * the extra `_REFRACT` suffix.
    */
-  void ParticleRenderBucketRuntime::SelectTechnique() const
+  void SParticleRenderBucket::SelectTechnique() const
   {
     const bool drag = dragEnabled;
     ShaderVar& dragEnabledShaderVar = GetParticleDragEnabledShaderVar();
@@ -405,7 +405,7 @@ namespace moho
    * form one billboarded beam quad.
    */
   void EmitInterpolatedBeamQuadVertices(
-    const SWorldBeam& beam, const float frameAlpha, BeamRenderVertexArrayRuntime& outVertices
+    const SWorldBeam& beam, const float frameAlpha, BeamVertexArray& outVertices
   )
   {
     const float interpolation = std::min(beam.mLastInterpolation * frameAlpha, 1.0f);
@@ -474,7 +474,7 @@ namespace moho
    * Renders the active beam buckets into the shared vertex/index sheets using
    * beam-technique selection and 1000-vertex batching.
    */
-  [[nodiscard]] bool DrawBeamParticle(BeamBucketContainerRuntime& beams, const float frameAlpha, const bool disable)
+  [[nodiscard]] bool DrawBeamParticle(SBeamBucketContainer& beams, const float frameAlpha, const bool disable)
   {
     if (!ren_Beams || disable) {
       return false;
@@ -518,10 +518,10 @@ namespace moho
     }
 
     bool didDraw = false;
-    BeamRenderVertexArrayRuntime vertices{};
+    BeamVertexArray vertices{};
 
     for (auto bucketIt = beams.mBuckets.begin(); bucketIt != beams.mBuckets.end(); ++bucketIt) {
-      const BeamTextureBucketKeyRuntime& bucketKey = bucketIt->first;
+      const SBeamBucketKey& bucketKey = bucketIt->first;
       const msvc8::vector<SWorldBeam>& beamList = bucketIt->second;
       if (beamList.empty()) {
         continue;
@@ -551,7 +551,7 @@ namespace moho
       );
       device->SelectTechnique(techniqueName.c_str());
 
-      const BeamRenderVertexRuntime* const sourceVertices = vertices.empty() ? nullptr : &vertices[0];
+      const SBeamVertex* const sourceVertices = vertices.empty() ? nullptr : &vertices[0];
       std::int32_t remainingVertices = totalVertices;
       std::int32_t vertexOffset = 0;
 
@@ -575,17 +575,17 @@ namespace moho
         std::memcpy(
           mappedVertices,
           sourceVertices + vertexOffset,
-          static_cast<std::size_t>(batchVertices) * sizeof(BeamRenderVertexRuntime)
+          static_cast<std::size_t>(batchVertices) * sizeof(SBeamVertex)
         );
         vertexStream->Unlock();
 
-        CD3DVertexSheetViewRuntime vertexSheetView{};
+        SD3DVertexRange vertexSheetView{};
         vertexSheetView.sheet = beams.mVertexSheet;
         vertexSheetView.startVertex = 0;
         vertexSheetView.baseVertex = 0;
         vertexSheetView.endVertex = batchVertices - 1;
 
-        CD3DIndexSheetViewRuntime indexSheetView{};
+        SD3DIndexRange indexSheetView{};
         indexSheetView.sheet = sharedIndexSheet;
         indexSheetView.startIndex = 0;
         indexSheetView.indexCount = 6 * quadCount;
@@ -609,7 +609,7 @@ namespace moho
    * Strict-weak ordering comparator for world-particle bucket keys.
    */
   bool IsParticleBucketKeyRhsLessThanLhs(
-    const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs
+    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
   ) noexcept
   {
     if (lhs.sortScalar != rhs.sortScalar) {
@@ -644,7 +644,7 @@ namespace moho
    * What it does:
    * Equality comparator for world-particle bucket keys.
    */
-  bool AreParticleBucketKeysEquivalent(const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs) noexcept
+  bool AreParticleBucketKeysEquivalent(const SParticleBucketKey& lhs, const SParticleBucketKey& rhs) noexcept
   {
     return lhs.sortScalar == rhs.sortScalar &&
            lhs.dragEnabled == rhs.dragEnabled &&
@@ -662,9 +662,9 @@ namespace moho
    * Copies one world-particle bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  ParticleBucketKeyRuntime* CopyParticleBucketKey(
-    ParticleBucketKeyRuntime* const destination,
-    const ParticleBucketKeyRuntime* const source
+  SParticleBucketKey* CopyParticleBucketKey(
+    SParticleBucketKey* const destination,
+    const SParticleBucketKey* const source
   ) noexcept
   {
     if (destination == nullptr || source == nullptr) {
@@ -695,7 +695,7 @@ namespace moho
    * What it does:
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
-  TrailBucketKeyRuntime* InitializeTrailBucketKeyFromTrail(TrailBucketKeyRuntime* const key, const SWorldTrail& trail)
+  STrailBucketKey* InitializeTrailBucketKeyFromTrail(STrailBucketKey* const key, const SWorldTrail& trail)
   {
     if (key == nullptr) {
       return nullptr;
@@ -737,7 +737,7 @@ namespace moho
    * Strict-weak ordering comparator for trail bucket keys.
    */
   bool IsTrailBucketKeyRhsLessThanLhs(
-    const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs
+    const STrailBucketKey& lhs, const STrailBucketKey& rhs
   ) noexcept
   {
     if (lhs.sortScalar != rhs.sortScalar) {
@@ -766,7 +766,7 @@ namespace moho
    * What it does:
    * Equality comparator for trail bucket keys.
    */
-  bool AreTrailBucketKeysEquivalent(const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs) noexcept
+  bool AreTrailBucketKeysEquivalent(const STrailBucketKey& lhs, const STrailBucketKey& rhs) noexcept
   {
     return lhs.sortScalar == rhs.sortScalar &&
            lhs.blendMode == rhs.blendMode &&
@@ -782,9 +782,9 @@ namespace moho
    * Copies one world-trail bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  TrailBucketKeyRuntime* CopyTrailBucketKey(
-    TrailBucketKeyRuntime* const destination,
-    const TrailBucketKeyRuntime* const source
+  STrailBucketKey* CopyTrailBucketKey(
+    STrailBucketKey* const destination,
+    const STrailBucketKey* const source
   ) noexcept
   {
     if (destination == nullptr || source == nullptr) {
@@ -811,7 +811,7 @@ namespace moho
    * What it does:
    * Releases one world-particle bucket key resource lane.
    */
-  void ResetParticleBucketKeyResources(ParticleBucketKeyRuntime& key)
+  void ResetParticleBucketKeyResources(SParticleBucketKey& key)
   {
     key.tag.tidy(true, 0U);
     key.texture1.reset();
@@ -824,7 +824,7 @@ namespace moho
    * What it does:
    * Releases one world-trail bucket key resource lane.
    */
-  void ResetTrailBucketKeyResources(TrailBucketKeyRuntime& key)
+  void ResetTrailBucketKeyResources(STrailBucketKey& key)
   {
     key.tag.tidy(true, 0U);
     key.texture1.reset();
@@ -1004,13 +1004,13 @@ namespace moho
         context.writeCursor = nullptr;
       }
 
-      CD3DVertexSheetViewRuntime vertexView{};
+      SD3DVertexRange vertexView{};
       vertexView.sheet = context.sheet;
       vertexView.startVertex = 0;
       vertexView.baseVertex = 0;
       vertexView.endVertex = (4 * quadCount) - 1;
 
-      CD3DIndexSheetViewRuntime indexView{};
+      SD3DIndexRange indexView{};
       // 0x0043C580 reads the forward-filled `sIndexSheet` singleton, not the
       // back-to-front trail sheet - same distinction as `DrawBeamParticle`.
       indexView.sheet = func_GetSharedIndexSheet();

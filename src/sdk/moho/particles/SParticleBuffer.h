@@ -34,8 +34,6 @@ namespace moho
     msvc8::vector<SWorldBeam> mBeams;         // +0x20
   };
 
-  using ParticleSubmitBufferRuntimeView = SParticleBuffer;
-
   static_assert(offsetof(SParticleBuffer, mParticles) == 0x00, "SParticleBuffer::mParticles offset must be 0x00");
   static_assert(offsetof(SParticleBuffer, mTrails) == 0x10, "SParticleBuffer::mTrails offset must be 0x10");
   static_assert(offsetof(SParticleBuffer, mBeams) == 0x20, "SParticleBuffer::mBeams offset must be 0x20");

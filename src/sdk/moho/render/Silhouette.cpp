@@ -134,7 +134,7 @@ namespace moho
     device->SelectFxFile("frame");
     device->SelectTechnique("TSilhouette");
 
-    CD3DVertexSheetViewRuntime quadView{};
+    SD3DVertexRange quadView{};
     quadView.sheet = mQuadVertexSheet.get();
     quadView.startVertex = 0;
     quadView.baseVertex = 0;

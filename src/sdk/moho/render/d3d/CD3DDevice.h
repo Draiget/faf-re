@@ -32,8 +32,8 @@ namespace Wm3
 namespace moho
 {
   class CD3DDepthStencil;
-  struct CD3DIndexSheetViewRuntime;
-  struct CD3DVertexSheetViewRuntime;
+  struct SD3DIndexRange;
+  struct SD3DVertexRange;
   class CD3DDynamicTextureSheet;
   class CD3DEffect;
   class ID3DDeviceResources;
@@ -48,7 +48,7 @@ namespace moho
    * What it does:
    * Carries one indexed draw view over a vertex-sheet source lane.
    */
-  struct CD3DVertexSheetViewRuntime
+  struct SD3DVertexRange
   {
     ID3DVertexSheet* sheet = nullptr; // +0x00
     std::int32_t baseVertex = 0;      // +0x04 D3D BaseVertexIndex (FUN_0042FA10 pushes [+4] as baseVertIndex)
@@ -57,15 +57,15 @@ namespace moho
   };
 
   static_assert(
-    sizeof(CD3DVertexSheetViewRuntime) == 0x10,
-    "CD3DVertexSheetViewRuntime size must be 0x10"
+    sizeof(SD3DVertexRange) == 0x10,
+    "SD3DVertexRange size must be 0x10"
   );
 
   /**
    * What it does:
    * Carries one indexed draw view over an index-sheet source lane.
    */
-  struct CD3DIndexSheetViewRuntime
+  struct SD3DIndexRange
   {
     ID3DIndexSheet* sheet = nullptr; // +0x00
     std::int32_t startIndex = 0;     // +0x04
@@ -73,8 +73,8 @@ namespace moho
   };
 
   static_assert(
-    sizeof(CD3DIndexSheetViewRuntime) == 0x0C,
-    "CD3DIndexSheetViewRuntime size must be 0x0C"
+    sizeof(SD3DIndexRange) == 0x0C,
+    "SD3DIndexRange size must be 0x0C"
   );
 
   /**
@@ -305,8 +305,8 @@ namespace moho
      * sheet views.
      */
     virtual bool DrawTriangleList(
-      const CD3DVertexSheetViewRuntime* vertexSheetView,
-      const CD3DIndexSheetViewRuntime* indexSheetView,
+      const SD3DVertexRange* vertexSheetView,
+      const SD3DIndexRange* indexSheetView,
       std::int32_t* primitiveType
     );
 
@@ -322,7 +322,7 @@ namespace moho
      * view.
      */
     virtual bool DrawPrimitiveList(
-      const CD3DVertexSheetViewRuntime* vertexSheetView, std::int32_t* primitiveType
+      const SD3DVertexRange* vertexSheetView, std::int32_t* primitiveType
     );
 
     /**

@@ -1231,12 +1231,12 @@ namespace moho
     std::memcpy(lockedPrimitives, runtime->mPrimitives.mFirst, sizeof(std::int16_t) * primitiveCount);
     runtime->mIndexSheet->Unlock();
 
-    CD3DIndexSheetViewRuntime indexSheetView{};
+    SD3DIndexRange indexSheetView{};
     indexSheetView.sheet = runtime->mIndexSheet;
     indexSheetView.startIndex = 0;
     indexSheetView.indexCount = static_cast<std::int32_t>(primitiveCount);
 
-    CD3DVertexSheetViewRuntime vertexSheetView{};
+    SD3DVertexRange vertexSheetView{};
     vertexSheetView.sheet = runtime->mVertexSheets[runtime->mCurVertexSheet];
     vertexSheetView.startVertex = 0;
     vertexSheetView.baseVertex = 0;

@@ -17,7 +17,7 @@
 
 namespace moho
 {
-  struct BeamBucketContainerRuntime;
+  struct SBeamBucketContainer;
   class ID3DTextureSheet;
   class CD3DVertexFormat;
   class CD3DVertexSheet;
@@ -145,10 +145,11 @@ namespace moho
 
   /**
    * What it does:
-   * Runtime key lane used by beam texture/render buckets.
-   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
+   * Map key for the beam render buckets: the two texture sheets a beam draws
+   * with, plus its blend mode.
+   * Address: 0x004921D0 (FUN_004921D0 -- the key's implicit default constructor -- both `TextureSheetHandle` members start empty for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); zero callers, unreachable; formerly `InitializeBeamTextureBucketKeyHandles` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
    */
-  struct BeamTextureBucketKeyRuntime
+  struct SBeamBucketKey
   {
     TextureSheetHandle texture0;   // +0x00
     TextureSheetHandle texture1;   // +0x08
@@ -156,33 +157,33 @@ namespace moho
   };
 
   static_assert(
-    offsetof(BeamTextureBucketKeyRuntime, texture0) == 0x00, "BeamTextureBucketKeyRuntime::texture0 offset must be 0x00"
+    offsetof(SBeamBucketKey, texture0) == 0x00, "SBeamBucketKey::texture0 offset must be 0x00"
   );
   static_assert(
-    offsetof(BeamTextureBucketKeyRuntime, texture1) == 0x08, "BeamTextureBucketKeyRuntime::texture1 offset must be 0x08"
+    offsetof(SBeamBucketKey, texture1) == 0x08, "SBeamBucketKey::texture1 offset must be 0x08"
   );
   static_assert(
-    offsetof(BeamTextureBucketKeyRuntime, blendMode) == 0x10, "BeamTextureBucketKeyRuntime::blendMode offset must be 0x10"
+    offsetof(SBeamBucketKey, blendMode) == 0x10, "SBeamBucketKey::blendMode offset must be 0x10"
   );
-  static_assert(sizeof(BeamTextureBucketKeyRuntime) == 0x14, "BeamTextureBucketKeyRuntime size must be 0x14");
+  static_assert(sizeof(SBeamBucketKey) == 0x14, "SBeamBucketKey size must be 0x14");
 
   /**
    * What it does:
-   * Comparator lane for `BeamTextureBucketKeyRuntime`, matching binary ordering:
+   * Comparator lane for `SBeamBucketKey`, matching binary ordering:
    * blend mode first, then texture ownership lanes.
    */
-  struct BeamTextureBucketKeyLess
+  struct BeamBucketKeyLess
   {
     [[nodiscard]] bool operator()(
-      const BeamTextureBucketKeyRuntime& lhs, const BeamTextureBucketKeyRuntime& rhs
+      const SBeamBucketKey& lhs, const SBeamBucketKey& rhs
     ) const noexcept;
   };
 
   // Binary-facing layout: the MSVC8 tree header is 0x0C bytes, which `std::map`
   // only measures under `_ITERATOR_DEBUG_LEVEL=2`. Using the legacy tree keeps
   // `CWorldParticles` at 0xDC in every build configuration.
-  using BeamTextureBucketMapRuntime =
-    msvc8::map<BeamTextureBucketKeyRuntime, msvc8::vector<SWorldBeam>, BeamTextureBucketKeyLess>;
+  using BeamBucketMap =
+    msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>, BeamBucketKeyLess>;
 
   /**
    * What it does:
@@ -191,14 +192,14 @@ namespace moho
   /**
    * Address: 0x0049C0E0 (FUN_0049C0E0 -- the compiler-generated copy of this
    * 0x38-byte vertex record, emitted out of line for
-   * `msvc8::vector<BeamRenderVertexRuntime>`'s copy steps. Formerly transcribed
+   * `msvc8::vector<SBeamVertex>`'s copy steps. Formerly transcribed
    * as `CopyBeamRenderVertexLanePacked` in BeamRenderHelpers.cpp, removed
    * 2026-09-10.)
-   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `BeamRenderVertexRuntime` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x0049FEF0 (FUN_0049FEF0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A0040 (FUN_004A0040 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
+   * Address: 0x004A06B0 (FUN_004A06B0 -- the compiler-generated copy constructor (placement copy into a raw slot) of `SBeamVertex` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopySingleFifteenFloatLaneIfDestinationPresentDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
    */
-  struct BeamRenderVertexRuntime
+  struct SBeamVertex
   {
     Wm3::Vector3<float> worldPosition;   // +0x00
     Wm3::Vector3<float> axis;            // +0x0C
@@ -211,34 +212,41 @@ namespace moho
   };
 
   static_assert(
-    offsetof(BeamRenderVertexRuntime, worldPosition) == 0x00,
-    "BeamRenderVertexRuntime::worldPosition offset must be 0x00"
+    offsetof(SBeamVertex, worldPosition) == 0x00,
+    "SBeamVertex::worldPosition offset must be 0x00"
   );
-  static_assert(offsetof(BeamRenderVertexRuntime, axis) == 0x0C, "BeamRenderVertexRuntime::axis offset must be 0x0C");
-  static_assert(offsetof(BeamRenderVertexRuntime, width) == 0x18, "BeamRenderVertexRuntime::width offset must be 0x18");
-  static_assert(offsetof(BeamRenderVertexRuntime, color) == 0x1C, "BeamRenderVertexRuntime::color offset must be 0x1C");
+  static_assert(offsetof(SBeamVertex, axis) == 0x0C, "SBeamVertex::axis offset must be 0x0C");
+  static_assert(offsetof(SBeamVertex, width) == 0x18, "SBeamVertex::width offset must be 0x18");
+  static_assert(offsetof(SBeamVertex, color) == 0x1C, "SBeamVertex::color offset must be 0x1C");
   static_assert(
-    offsetof(BeamRenderVertexRuntime, sideSign) == 0x2C, "BeamRenderVertexRuntime::sideSign offset must be 0x2C"
+    offsetof(SBeamVertex, sideSign) == 0x2C, "SBeamVertex::sideSign offset must be 0x2C"
   );
   static_assert(
-    offsetof(BeamRenderVertexRuntime, repeatCoord) == 0x30,
-    "BeamRenderVertexRuntime::repeatCoord offset must be 0x30"
+    offsetof(SBeamVertex, repeatCoord) == 0x30,
+    "SBeamVertex::repeatCoord offset must be 0x30"
   );
-  static_assert(offsetof(BeamRenderVertexRuntime, uShift) == 0x34, "BeamRenderVertexRuntime::uShift offset must be 0x34");
-  static_assert(offsetof(BeamRenderVertexRuntime, vShift) == 0x38, "BeamRenderVertexRuntime::vShift offset must be 0x38");
-  static_assert(sizeof(BeamRenderVertexRuntime) == 0x3C, "BeamRenderVertexRuntime size must be 0x3C");
+  static_assert(offsetof(SBeamVertex, uShift) == 0x34, "SBeamVertex::uShift offset must be 0x34");
+  static_assert(offsetof(SBeamVertex, vShift) == 0x38, "SBeamVertex::vShift offset must be 0x38");
+  static_assert(sizeof(SBeamVertex) == 0x3C, "SBeamVertex size must be 0x3C");
 
-  using BeamRenderVertexArrayRuntime = msvc8::vector<BeamRenderVertexRuntime>;
+  using BeamVertexArray = msvc8::vector<SBeamVertex>;
 
   /**
    * What it does:
    * Map key for world-particle render buckets: the bucket's whole identity --
-   * everything `ParticleRenderBucketRuntime` carries before its pending-work
+   * everything `SParticleRenderBucket` carries before its pending-work
    * lanes, in the same order -- with the sort scalar prepended so the map
    * orders by draw order first.
    */
-  struct ParticleBucketKeyRuntime
+  struct SParticleBucketKey
   {
+    /**
+     * Address: 0x004990B0 (FUN_004990B0 -- the implicit copy constructor, as
+     * emitted for this key's `msvc8::map` instantiation: the scalar lanes, then
+     * both texture handles through the weak-pair retain, then the tag. Formerly
+     * transcribed as `CopyConstructParticleBucketKey` in
+     * moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-22.)
+     */
     float sortScalar = 0.0f;              // +0x00
     bool dragEnabled = false;             // +0x04  SWorldParticle::mDragEnabled
     std::uint8_t statePadding[0x03]{};    // +0x05
@@ -250,33 +258,39 @@ namespace moho
   };
 
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, sortScalar) == 0x00, "ParticleBucketKeyRuntime::sortScalar offset must be 0x00"
+    offsetof(SParticleBucketKey, sortScalar) == 0x00, "SParticleBucketKey::sortScalar offset must be 0x00"
   );
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, dragEnabled) == 0x04, "ParticleBucketKeyRuntime::dragEnabled offset must be 0x04"
+    offsetof(SParticleBucketKey, dragEnabled) == 0x04, "SParticleBucketKey::dragEnabled offset must be 0x04"
   );
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, texture0) == 0x08, "ParticleBucketKeyRuntime::texture0 offset must be 0x08"
+    offsetof(SParticleBucketKey, texture0) == 0x08, "SParticleBucketKey::texture0 offset must be 0x08"
   );
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, texture1) == 0x10, "ParticleBucketKeyRuntime::texture1 offset must be 0x10"
+    offsetof(SParticleBucketKey, texture1) == 0x10, "SParticleBucketKey::texture1 offset must be 0x10"
   );
-  static_assert(offsetof(ParticleBucketKeyRuntime, tag) == 0x18, "ParticleBucketKeyRuntime::tag offset must be 0x18");
+  static_assert(offsetof(SParticleBucketKey, tag) == 0x18, "SParticleBucketKey::tag offset must be 0x18");
   static_assert(
-    offsetof(ParticleBucketKeyRuntime, blendMode) == 0x34, "ParticleBucketKeyRuntime::blendMode offset must be 0x34"
+    offsetof(SParticleBucketKey, blendMode) == 0x34, "SParticleBucketKey::blendMode offset must be 0x34"
   );
-  static_assert(offsetof(ParticleBucketKeyRuntime, zMode) == 0x38, "ParticleBucketKeyRuntime::zMode offset must be 0x38");
-  static_assert(sizeof(ParticleBucketKeyRuntime) == 0x3C, "ParticleBucketKeyRuntime size must be 0x3C");
+  static_assert(offsetof(SParticleBucketKey, zMode) == 0x38, "SParticleBucketKey::zMode offset must be 0x38");
+  static_assert(sizeof(SParticleBucketKey) == 0x3C, "SParticleBucketKey size must be 0x3C");
 
   /**
    * What it does:
    * Map key for world-trail render buckets: the same shape as
-   * `ParticleBucketKeyRuntime` minus the two lanes a trail has no use for (the
+   * `SParticleBucketKey` minus the two lanes a trail has no use for (the
    * drag flag and the z mode), and again the bucket's own identity with the
    * sort scalar prepended.
    */
-  struct TrailBucketKeyRuntime
+  struct STrailBucketKey
   {
+    /**
+     * Address: 0x00499180 (FUN_00499180 -- the implicit copy constructor, as
+     * emitted for this key's `msvc8::map` instantiation. Formerly
+     * `CopyConstructTrailBucketKey` in moho/particles/CWorldParticles.cpp
+     * (RULE ONE), removed 2026-09-22.)
+     */
     float sortScalar = 0.0f;              // +0x00
     TextureSheetHandle texture0;          // +0x04
     TextureSheetHandle texture1;          // +0x0C
@@ -290,16 +304,16 @@ namespace moho
     std::int32_t blendMode = 0;           // +0x30
   };
 
-  static_assert(offsetof(TrailBucketKeyRuntime, sortScalar) == 0x00, "TrailBucketKeyRuntime::sortScalar offset must be 0x00");
-  static_assert(offsetof(TrailBucketKeyRuntime, texture0) == 0x04, "TrailBucketKeyRuntime::texture0 offset must be 0x04");
-  static_assert(offsetof(TrailBucketKeyRuntime, texture1) == 0x0C, "TrailBucketKeyRuntime::texture1 offset must be 0x0C");
-  static_assert(offsetof(TrailBucketKeyRuntime, tag) == 0x14, "TrailBucketKeyRuntime::tag offset must be 0x14");
-  static_assert(offsetof(TrailBucketKeyRuntime, blendMode) == 0x30, "TrailBucketKeyRuntime::blendMode offset must be 0x30");
-  static_assert(sizeof(TrailBucketKeyRuntime) == 0x34, "TrailBucketKeyRuntime size must be 0x34");
+  static_assert(offsetof(STrailBucketKey, sortScalar) == 0x00, "STrailBucketKey::sortScalar offset must be 0x00");
+  static_assert(offsetof(STrailBucketKey, texture0) == 0x04, "STrailBucketKey::texture0 offset must be 0x04");
+  static_assert(offsetof(STrailBucketKey, texture1) == 0x0C, "STrailBucketKey::texture1 offset must be 0x0C");
+  static_assert(offsetof(STrailBucketKey, tag) == 0x14, "STrailBucketKey::tag offset must be 0x14");
+  static_assert(offsetof(STrailBucketKey, blendMode) == 0x30, "STrailBucketKey::blendMode offset must be 0x30");
+  static_assert(sizeof(STrailBucketKey) == 0x34, "STrailBucketKey size must be 0x34");
 
   // The two `ParticleTechniqueSelection*Runtime` structs that used to sit here
   // were not types. They duplicated, field for field, the leading 0x30 / 0x34
-  // bytes of `TrailRenderBucketRuntime` and `ParticleRenderBucketRuntime`, so
+  // bytes of `STrailRenderBucket` and `SParticleRenderBucket`, so
   // that the two technique selectors could be spelled as free functions taking
   // a copy. The binary passes the bucket itself -- `RenderTrailBucket` does
   // `mov ecx, edi; call 0x494740` at 0x0049488F with `edi` the same pointer it
@@ -324,7 +338,7 @@ namespace moho
    * Resolves beam textures into one bucket key and appends the beam payload
    * into the matching texture/blend bucket.
    */
-  void AddBeamToTextureBuckets(BeamTextureBucketMapRuntime& buckets, const SWorldBeam& beam);
+  void AddBeamToTextureBuckets(BeamBucketMap& buckets, const SWorldBeam& beam);
 
   /**
    * Address: 0x00491760 (FUN_00491760, sub_491760)
@@ -333,7 +347,7 @@ namespace moho
    * Interpolates one beam segment and emits four packed render vertices that
    * form one billboarded beam quad.
    */
-  void EmitInterpolatedBeamQuadVertices(const SWorldBeam& beam, float frameAlpha, BeamRenderVertexArrayRuntime& outVertices);
+  void EmitInterpolatedBeamQuadVertices(const SWorldBeam& beam, float frameAlpha, BeamVertexArray& outVertices);
 
   /**
    * Address: 0x00491E40 (FUN_00491E40, func_DrawBeamParticle)
@@ -342,7 +356,7 @@ namespace moho
    * Renders the active beam buckets into the shared vertex/index sheets using
    * beam-technique selection and 1000-vertex batching.
    */
-  [[nodiscard]] bool DrawBeamParticle(BeamBucketContainerRuntime& beams, float frameAlpha, bool disable);
+  [[nodiscard]] bool DrawBeamParticle(SBeamBucketContainer& beams, float frameAlpha, bool disable);
 
   /**
    * Address: 0x00492290 (FUN_00492290, sub_492290)
@@ -351,7 +365,7 @@ namespace moho
    * Strict-weak ordering comparator for world-particle bucket keys.
    */
   [[nodiscard]] bool IsParticleBucketKeyRhsLessThanLhs(
-    const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs
+    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
   ) noexcept;
 
   /**
@@ -361,7 +375,7 @@ namespace moho
    * Equality comparator for world-particle bucket keys.
    */
   [[nodiscard]] bool AreParticleBucketKeysEquivalent(
-    const ParticleBucketKeyRuntime& lhs, const ParticleBucketKeyRuntime& rhs
+    const SParticleBucketKey& lhs, const SParticleBucketKey& rhs
   ) noexcept;
 
   /**
@@ -371,9 +385,9 @@ namespace moho
    * Copies one world-particle bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  ParticleBucketKeyRuntime* CopyParticleBucketKey(
-    ParticleBucketKeyRuntime* destination,
-    const ParticleBucketKeyRuntime* source
+  SParticleBucketKey* CopyParticleBucketKey(
+    SParticleBucketKey* destination,
+    const SParticleBucketKey* source
   ) noexcept;
 
   /**
@@ -382,8 +396,8 @@ namespace moho
    * What it does:
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
-  TrailBucketKeyRuntime* InitializeTrailBucketKeyFromTrail(
-    TrailBucketKeyRuntime* key, const SWorldTrail& trail
+  STrailBucketKey* InitializeTrailBucketKeyFromTrail(
+    STrailBucketKey* key, const SWorldTrail& trail
   );
 
   /**
@@ -393,7 +407,7 @@ namespace moho
    * Strict-weak ordering comparator for trail bucket keys.
    */
   [[nodiscard]] bool IsTrailBucketKeyRhsLessThanLhs(
-    const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs
+    const STrailBucketKey& lhs, const STrailBucketKey& rhs
   ) noexcept;
 
   /**
@@ -403,7 +417,7 @@ namespace moho
    * Equality comparator for trail bucket keys.
    */
   [[nodiscard]] bool AreTrailBucketKeysEquivalent(
-    const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs
+    const STrailBucketKey& lhs, const STrailBucketKey& rhs
   ) noexcept;
 
   /**
@@ -413,9 +427,9 @@ namespace moho
    * Copies one world-trail bucket key into destination storage while
    * preserving weak-handle control semantics for both texture lanes.
    */
-  TrailBucketKeyRuntime* CopyTrailBucketKey(
-    TrailBucketKeyRuntime* destination,
-    const TrailBucketKeyRuntime* source
+  STrailBucketKey* CopyTrailBucketKey(
+    STrailBucketKey* destination,
+    const STrailBucketKey* source
   ) noexcept;
 
   /**
@@ -424,7 +438,7 @@ namespace moho
    * What it does:
    * Releases one world-particle bucket key resource lane.
    */
-  void ResetParticleBucketKeyResources(ParticleBucketKeyRuntime& key);
+  void ResetParticleBucketKeyResources(SParticleBucketKey& key);
 
   /**
    * Address: 0x00492FC0 (FUN_00492FC0, sub_492FC0)
@@ -432,5 +446,5 @@ namespace moho
    * What it does:
    * Releases one world-trail bucket key resource lane.
    */
-  void ResetTrailBucketKeyResources(TrailBucketKeyRuntime& key);
+  void ResetTrailBucketKeyResources(STrailBucketKey& key);
 } // namespace moho
