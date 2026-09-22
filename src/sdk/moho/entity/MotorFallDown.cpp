@@ -85,12 +85,12 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
-    if (!moho::EntityMotor::sType) {
-      moho::EntityMotor::sType = gpg::LookupRType(typeid(moho::EntityMotor));
+    if (!moho::Motor::sType) {
+      moho::Motor::sType = gpg::LookupRType(typeid(moho::Motor));
     }
 
-    GPG_ASSERT(moho::EntityMotor::sType != nullptr);
-    return moho::EntityMotor::sType;
+    GPG_ASSERT(moho::Motor::sType != nullptr);
+    return moho::Motor::sType;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -265,7 +265,7 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedMotorType(), static_cast<moho::EntityMotor*>(object), nullOwner);
+    archive->Read(CachedMotorType(), static_cast<moho::Motor*>(object), nullOwner);
     archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(object), nullOwner);
     archive->ReadFloat(&object->mFallDirectionRadians);
     archive->ReadFloat(&object->mFallAngleRadians);
@@ -283,7 +283,7 @@ namespace
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedMotorType(), static_cast<const moho::EntityMotor*>(object), nullOwner);
+    archive->Write(CachedMotorType(), static_cast<const moho::Motor*>(object), nullOwner);
     archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(object), nullOwner);
     archive->WriteFloat(object->mFallDirectionRadians);
     archive->WriteFloat(object->mFallAngleRadians);
@@ -391,7 +391,7 @@ namespace moho
    * Address: 0x00694CF0 (FUN_00694CF0, default ctor lane)
    */
   MotorFallDown::MotorFallDown()
-    : EntityMotor()
+    : Motor()
     , CScriptObject()
     , mFallDirectionRadians(0.0f)
     , mFallAngleRadians(0.0f)
@@ -405,7 +405,7 @@ namespace moho
    * Address: 0x00694BD0 (FUN_00694BD0, Lua ctor lane)
    */
   MotorFallDown::MotorFallDown(LuaPlus::LuaState* const state)
-    : EntityMotor()
+    : Motor()
     , CScriptObject(
         GetMotorFallDownLuaFactoryObject(state), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}
       )

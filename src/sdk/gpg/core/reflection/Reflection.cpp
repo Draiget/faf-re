@@ -69,7 +69,7 @@
 #include "moho/debug/RDebugNavWaypoints.h"
 #include "moho/debug/RDebugRadar.h"
 #include "moho/entity/EntityCollisionUpdater.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Entity.h"
@@ -9435,16 +9435,16 @@ gpg::RRef* RRef_CColPrimitiveBase(RRef* const out, moho::CColPrimitiveBase* cons
  * Address: 0x006839C0 (FUN_006839C0, gpg::RRef_Motor)
  *
  * What it does:
- * Builds a reflection reference for `moho::EntityMotor` using
- * `EntityMotor::sType` cache and derived-type normalization.
+ * Builds a reflection reference for `moho::Motor` using
+ * `Motor::sType` cache and derived-type normalization.
  */
-gpg::RRef* RRef_Motor(RRef* const out, moho::EntityMotor* const value)
+gpg::RRef* RRef_Motor(RRef* const out, moho::Motor* const value)
 {
-  return BuildTypedRefWithCache<moho::EntityMotor>(
+  return BuildTypedRefWithCache<moho::Motor>(
     out,
     value,
-    typeid(moho::EntityMotor),
-    moho::EntityMotor::sType,
+    typeid(moho::Motor),
+    moho::Motor::sType,
     gMotorRRefCache
   );
 }

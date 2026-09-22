@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/misc/InstanceCounter.h"
 #include "moho/script/CScriptObject.h"
@@ -30,7 +30,7 @@ namespace moho
    * Motor implementation that integrates tree sway/fall state and applies
    * a pending entity transform each update.
    */
-  class MotorFallDown final : public EntityMotor, public CScriptObject
+  class MotorFallDown final : public Motor, public CScriptObject
   {
   public:
     static gpg::RType* sType;

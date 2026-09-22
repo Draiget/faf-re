@@ -185,7 +185,7 @@ namespace moho
   class RDebugNavSteering;
   class RDebugWeapons;
   class EntityCollisionUpdater;
-  class EntityMotor;
+  class Motor;
   class Entity;
   class CollisionBeamEntity;
   class CEntityDb;
@@ -3564,10 +3564,10 @@ namespace gpg
    * Address: 0x006839C0 (FUN_006839C0, gpg::RRef_Motor)
    *
    * What it does:
-   * Builds a reflected reference for a `moho::EntityMotor` object pointer with
+   * Builds a reflected reference for a `moho::Motor` object pointer with
    * derived-type normalization.
    */
-  RRef* RRef_Motor(RRef* out, moho::EntityMotor* value);
+  RRef* RRef_Motor(RRef* out, moho::Motor* value);
 
   /**
    * Address: 0x005CE540 (FUN_005CE540, gpg::RRef_CInfluenceMap)

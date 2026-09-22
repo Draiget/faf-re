@@ -1,5 +1,6 @@
 ﻿#include "Entity.h"
 
+#include <utility>
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -27,7 +28,7 @@
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/EntityDb.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/entity/SSTIEntityConstantData.h"
 #include "moho/entity/Prop.h"
 #include "moho/entity/UserEntity.h"
@@ -309,18 +310,6 @@ namespace
       *slot = fillValue;
     }
     vector.mEnd = newEnd;
-  }
-
-  /**
-   * The inline every scroller binding opens with (0x006911F7 and its three
-   * siblings): allocate a `CTextureScroller` owned by the entity if it has none.
-   */
-  [[nodiscard]] moho::CTextureScroller* EnsureEntityTextureScroller(moho::Entity& entity)
-  {
-    if (entity.mScroller == nullptr) {
-      entity.mScroller = new moho::CTextureScroller(&entity);
-    }
-    return entity.mScroller;
   }
 
   [[nodiscard]] float ReadLuaNumberArgument(LuaPlus::LuaState* const state, const int stackIndex)
@@ -2484,13 +2473,11 @@ namespace moho
     mShooters.ListUnlink();
     mUniqueName = msvc8::string{};
 
-    auto*& physBody = mPhysBody;
-    delete physBody;
-    physBody = nullptr;
+    delete mPhysBody;
+    mPhysBody = nullptr;
 
-    auto*& scroller = mScroller;
-    delete scroller;
-    scroller = nullptr;
+    delete mScroller;
+    mScroller = nullptr;
 
     delete mIntelManager;
     mIntelManager = nullptr;
@@ -3235,20 +3222,21 @@ namespace moho
    * Address: 0x0067A8B0 (FUN_0067A8B0, ?ChangeScroller@Entity@Moho@@QAEXABUSScroller@2@@Z)
    *
    * What it does:
-   * Ensures one texture-scroller runtime object exists, then applies one
-   * scroller-definition payload.
+   * Creates the entity's texture scroller on first use, then installs
+   * `definition` on it. Every `Entity:Add*Scroller` / `RemoveScroller` Lua
+   * binding inlines this whole body (e.g. 0x006911F7..0x0069123D in
+   * `AddManualScroller`), after reading its arguments.
    */
   void Entity::ChangeScroller(const SScroller& definition)
   {
-    CTextureScroller*& textureScrollerSlot = mScroller;
-    if (textureScrollerSlot == nullptr) {
-      CTextureScroller* const replacementScroller = new CTextureScroller(this);
-      CTextureScroller* const previousScroller = textureScrollerSlot;
-      textureScrollerSlot = replacementScroller;
-      delete previousScroller;
+    if (mScroller == nullptr) {
+      // The binary stores the new scroller before deleting the old pointer
+      // (0x0067A8C9..0x0067A8E3) -- a reset whose delete is dead here, since
+      // the slot was just tested null.
+      delete std::exchange(mScroller, new CTextureScroller(this));
     }
 
-    textureScrollerSlot->SetScroller(definition);
+    mScroller->SetScroller(definition);
   }
 
   /**
@@ -3692,10 +3680,10 @@ namespace moho
    * Replaces entity motor from auto_ptr handoff storage, then wakes the task
    * thread so the new motor actually gets ticked.
    */
-  void Entity::SetMotor(msvc8::auto_ptr<EntityMotor>& motor)
+  void Entity::SetMotor(msvc8::auto_ptr<Motor>& motor)
   {
-    EntityMotor* const newMotor = motor.release();
-    EntityMotor* oldMotor = mMotor;
+    Motor* const newMotor = motor.release();
+    Motor* oldMotor = mMotor;
     mMotor = newMotor;
 
     if (oldMotor) {
@@ -7580,13 +7568,11 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
-
     SScroller definition;
     definition.mType = SCROLLTYPE_Manual;
     definition.mFloat04 = ReadLuaNumberArgument(state, 2);
     definition.mFloat08 = ReadLuaNumberArgument(state, 3);
-    scroller->SetScroller(definition);
+    entity->ChangeScroller(definition);
 
     return 1;
   }
@@ -7638,13 +7624,11 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
-
     SScroller definition;
     definition.mType = SCROLLTYPE_MotionDerived;
     definition.mFloat24 = ReadLuaNumberArgument(state, 2);
     definition.mFloat28 = ReadLuaNumberArgument(state, 3);
-    scroller->SetScroller(definition);
+    entity->ChangeScroller(definition);
 
     return 1;
   }
@@ -7696,8 +7680,6 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
-
     SScroller definition;
     definition.mType = SCROLLTYPE_PingPong;
     definition.mFloat04 = ReadLuaNumberArgument(state, 3);
@@ -7708,7 +7690,7 @@ namespace moho
     definition.mScroll1.y = ReadLuaNumberArgument(state, 6);
     definition.mScroll2.x = ReadLuaNumberArgument(state, 4);
     definition.mScroll2.y = ReadLuaNumberArgument(state, 8);
-    scroller->SetScroller(definition);
+    entity->ChangeScroller(definition);
 
     return 1;
   }
@@ -7759,7 +7741,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    EnsureEntityTextureScroller(*entity)->SetScroller(SScroller{});
+    entity->ChangeScroller(SScroller{});
     return 1;
   }
 
@@ -8083,7 +8065,7 @@ namespace moho
     MotorFallDown* const motor = new MotorFallDown(state);
     motor->mLuaObj.PushStack(state);
 
-    msvc8::auto_ptr<EntityMotor> motorOwnership(motor);
+    msvc8::auto_ptr<Motor> motorOwnership(motor);
     entity->SetMotor(motorOwnership);
     return 1;
   }
@@ -8169,7 +8151,7 @@ namespace moho
     MotorSinkAway* const motor = new MotorSinkAway(state, sinkDeltaY);
     motor->mLuaObj.PushStack(state);
 
-    msvc8::auto_ptr<EntityMotor> motorOwnership(motor);
+    msvc8::auto_ptr<Motor> motorOwnership(motor);
     entity->SetMotor(motorOwnership);
     return 1;
   }

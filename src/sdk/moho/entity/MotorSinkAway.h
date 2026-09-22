@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
 #include "moho/script/CScriptObject.h"
 
@@ -25,7 +25,7 @@ namespace moho
    * What it does:
    * Concrete entity motor that keeps one sink-speed lane and exposes script-object behavior.
    */
-  class MotorSinkAway final : public EntityMotor, public CScriptObject
+  class MotorSinkAway final : public Motor, public CScriptObject
   {
   public:
     static gpg::RType* sType;
@@ -65,7 +65,7 @@ namespace moho
      * Address: 0x00697200 (FUN_00697200, Moho::MotorSinkAway::MemberDeserialize)
      *
      * What it does:
-     * Loads `EntityMotor` and `CScriptObject` base state, then the sink-speed
+     * Loads `Motor` and `CScriptObject` base state, then the sink-speed
      * scalar.
      */
     void MemberDeserialize(gpg::ReadArchive* archive);
@@ -74,7 +74,7 @@ namespace moho
      * Address: 0x00697290 (FUN_00697290, Moho::MotorSinkAway::MemberSerialize)
      *
      * What it does:
-     * Saves `EntityMotor` and `CScriptObject` base state, then the sink-speed
+     * Saves `Motor` and `CScriptObject` base state, then the sink-speed
      * scalar.
      */
     void MemberSerialize(gpg::WriteArchive* archive) const;

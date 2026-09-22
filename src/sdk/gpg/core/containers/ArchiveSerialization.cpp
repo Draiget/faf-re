@@ -43,7 +43,7 @@
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/entity/ECollisionBeamEvent.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
 #include "moho/entity/Shield.h"
@@ -4823,13 +4823,13 @@ namespace
    * and destroys/deletes the replaced motor object.
    */
   gpg::ReadArchive* ReadOwnedRawPointerFromMotorSlotLaneLegacyA(
-    const gpg::RRef* const ownerRef, gpg::ReadArchive* const archive, moho::EntityMotor** const valueSlot
+    const gpg::RRef* const ownerRef, gpg::ReadArchive* const archive, moho::Motor** const valueSlot
   )
   {
-    moho::EntityMotor* loadedValue = nullptr;
+    moho::Motor* loadedValue = nullptr;
     archive->ReadPointerOwned_Motor(&loadedValue, ownerRef);
 
-    moho::EntityMotor* const previousValue = *valueSlot;
+    moho::Motor* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
     if (previousValue != nullptr) {
       delete previousValue;

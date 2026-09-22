@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 
 namespace gpg
 {
@@ -67,7 +67,7 @@ namespace moho
    *  - Deserialize(): 0x00694940
    *  - Serialize(): 0x00694950
    */
-  using MotorSerializer = gpg::SerSaveLoadHelper<EntityMotor>;
+  using MotorSerializer = gpg::SerSaveLoadHelper<Motor>;
 
   /**
    * Address: 0x00BD5910 (FUN_00BD5910, register_MotorTypeInfo)

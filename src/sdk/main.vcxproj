@@ -1025,12 +1025,12 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\projectile\ProjectileStartupRegistrations.cpp" />
     <ClCompile Include="moho\entity\Prop.cpp" />
     <ClCompile Include="moho\entity\EntityDb.cpp" />
-    <ClCompile Include="moho\entity\EntityMotor.cpp" />
+    <ClCompile Include="moho\entity\Motor.cpp" />
     <ClCompile Include="moho\entity\EntityLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\entity\REntityBlueprint.cpp" />
     <ClCompile Include="moho\entity\EntitySetReflection.cpp" />
     <ClCompile Include="moho\entity\EntityTransformPayload.cpp" />
-    <ClCompile Include="moho\entity\EntityMotorReflection.cpp" />
+    <ClCompile Include="moho\entity\MotorReflection.cpp" />
     <ClCompile Include="moho\entity\MotorFallDown.cpp" />
     <ClCompile Include="moho\entity\MotorSinkAway.cpp" />
     <ClCompile Include="moho\math\Vector2f.cpp" />
@@ -1717,8 +1717,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\EntityCategoryLookupResolver.h" />
     <ClInclude Include="moho\entity\EntityCategoryReflection.h" />
     <ClInclude Include="moho\entity\EntityCollisionUpdater.h" />
-    <ClInclude Include="moho\entity\EntityMotor.h" />
-    <ClInclude Include="moho\entity\EntityMotorReflection.h" />
+    <ClInclude Include="moho\entity\Motor.h" />
+    <ClInclude Include="moho\entity\MotorReflection.h" />
     <ClInclude Include="moho\entity\EntityFastVectorReflection.h" />
     <ClInclude Include="moho\entity\EntitySetReflection.h" />
     <ClInclude Include="moho\entity\EntityPositionWatchEntry.h" />
