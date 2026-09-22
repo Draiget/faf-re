@@ -87,16 +87,17 @@ namespace moho
    * Address: 0x007623F0 (FUN_007623F0)
    *
    * What it does:
-   * Deleting-teardown callback: dispatches through `ISoundManager::Destroy`
-   * (vtable slot 5) with the deleting flag set, when the object pointer is
-   * non-null.
+   * Deleting-teardown callback registered as the reflected type's
+   * `deleteFunc_`: deletes the object through its `ISoundManager` base, which
+   * is the vtable slot-5 dispatch the binary performs.
    */
   void CSimSoundManagerConstruct::Deconstruct(void* const objectPtr)
   {
-    auto* const soundManager = static_cast<ISoundManager*>(objectPtr);
-    if (soundManager != nullptr) {
-      (void)soundManager->Destroy(1u);
-    }
+    // Through the base pointer, so the `delete` dispatches slot 5 as the binary
+    // does (`mov edx, [eax+0x14] / push 1 / call edx`) instead of binding the
+    // final overrider directly; its own null test is the leading
+    // `test ecx, ecx / je`.
+    delete static_cast<ISoundManager*>(objectPtr);
   }
 
   /**

@@ -46,9 +46,9 @@ namespace moho
      * Address: 0x007623F0 (FUN_007623F0)
      *
      * What it does:
-     * Deleting-teardown callback: dispatches through `ISoundManager::Destroy`
-     * (vtable slot 5) with the deleting flag set, when the object pointer is
-     * non-null.
+     * Deleting-teardown callback registered as the reflected type's
+     * `deleteFunc_`: deletes the object through its `ISoundManager` base, which
+     * is the vtable slot-5 dispatch the binary performs.
      */
     static void Deconstruct(void* objectPtr);
 
