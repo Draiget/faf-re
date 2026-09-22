@@ -41,16 +41,59 @@ namespace
   constexpr std::uint32_t kSciGridColor = 0x80FF00FFu;    // magenta
   constexpr std::uint32_t kVciGridColor = 0x80FF80FFu;    // pink
 
-  // One recon-coverage decal pass: the intel grid whose per-cell coverage byte
-  // selects set/clear, and the ARGB color used when a cell is covered. Mirrors
-  // the three-word `{grid, controlBlock, color}` stack block FUN_0064D9F0 hands
-  // to FUN_0064F400 (only the grid pointer and the color are consumed here; the
-  // control-block word only keeps the grid alive for the duration of the draw).
+  /**
+   * One recon-coverage decal pass: the intel-grid handle whose per-cell
+   * coverage byte selects set/clear, and the ARGB color used when a cell is
+   * covered. This is the three-word stack block `FUN_0064D9F0` builds and
+   * hands to `FUN_0064F400` -- a whole `boost::shared_ptr<CIntelGrid>` (its
+   * `{px, pi}` pair, which is what keeps the grid alive across the draw)
+   * followed by the color at +0x08.
+   */
   struct ReconCoverageDecalPass
   {
-    const moho::CIntelGrid* grid = nullptr;
-    std::uint32_t color = 0u;
+    boost::SharedPtrRaw<moho::CIntelGrid> grid{}; // +0x00 {px, pi}
+    std::uint32_t color = 0u;                     // +0x08
+
+    /**
+     * Address: 0x0064CFA0 (FUN_0064CFA0)
+     *
+     * What it does:
+     * Reads one cell's signed coverage count out of the pass's grid, or 0
+     * when the cell lies outside the grid. `CIntelGrid::Raster` applies +/-1
+     * per covering source, so the stored byte is a count, not a flag -- which
+     * is why the binary widens it with `movsx` instead of a `setne`.
+     *
+     * The bounds test is the unsigned pair `x >= mWidth || z >= mHeight`, and
+     * the index is `mGrid[z * mWidth + x]`, both exactly as
+     * `CIntelGrid::IsVisible(const Wm3::Vector2i&)` (0x005BE180) spells them.
+     * Zero callers: every use site inlined it and the linker kept the COMDAT.
+     */
+    [[nodiscard]] std::int8_t CoverageAt(const std::uint32_t cellX, const std::uint32_t cellZ) const noexcept
+    {
+      const moho::CIntelGrid* const intelGrid = grid.px;
+      if (cellX >= intelGrid->mWidth || cellZ >= intelGrid->mHeight) {
+        return 0;
+      }
+      return intelGrid->mGrid[cellZ * intelGrid->mWidth + cellX];
+    }
+
+    /**
+     * Address: 0x0064CFD0 (FUN_0064CFD0)
+     *
+     * What it does:
+     * This pass's color for one cell: the pass color where the cell is
+     * covered, otherwise zero (whose zero alpha byte makes the rasterizer
+     * skip the quad). Same body as `CoverageAt` plus a `cmp byte, 0` and the
+     * `[pass+8]` color load -- which is how the color's offset in the stack
+     * block is known.
+     */
+    [[nodiscard]] std::uint32_t ColorAt(const std::uint32_t cellX, const std::uint32_t cellZ) const noexcept
+    {
+      return CoverageAt(cellX, cellZ) != 0 ? color : 0u;
+    }
   };
+  static_assert(sizeof(ReconCoverageDecalPass) == 0x0C, "ReconCoverageDecalPass size must be 0x0C");
+  static_assert(offsetof(ReconCoverageDecalPass, color) == 0x08, "ReconCoverageDecalPass::color offset must be 0x08");
 
   /**
    * Address: 0x0064F400 (FUN_0064F400, sub_64F400)
@@ -75,29 +118,13 @@ namespace
     moho::CDebugCanvas* const canvas
   ) noexcept
   {
-    const moho::CIntelGrid* const grid = pass.grid;
-    const int cellSize = static_cast<int>(grid->mGridSize);
+    const int cellSize = static_cast<int>(pass.grid.px->mGridSize);
 
     // Whole-field cell range in grid units (ceil-divide the far edges).
     const int cellX0 = static_cast<int>(hf->width) / cellSize;
     const int cellX1 = (static_cast<int>(hf->width) + cellSize - 1) / cellSize;
     const int cellZ0 = static_cast<int>(hf->height) / cellSize;
     const int cellZ1 = (static_cast<int>(hf->height) + cellSize - 1) / cellSize;
-
-    const int maxSampleX = hf->width - 1;
-    const int maxSampleZ = hf->height - 1;
-    const std::uint16_t* const samples = hf->data;
-
-    const auto clampSampleX = [maxSampleX](int value) noexcept {
-      return std::clamp(value, 0, maxSampleX);
-    };
-    const auto clampSampleZ = [maxSampleZ](int value) noexcept {
-      return std::clamp(value, 0, maxSampleZ);
-    };
-    const auto elevationAt = [&](int sampleX, int sampleZ) noexcept {
-      return static_cast<float>(samples[clampSampleX(sampleX) + clampSampleZ(sampleZ) * hf->width])
-        * kHeightSampleScale;
-    };
 
     // Iterate cells in `x`-major order; the binary tracks both the grid index
     // and the world-space start of each cell (index * cellSize).
@@ -106,15 +133,8 @@ namespace
       for (int cellZ = cellZ0; cellZ < cellZ1; ++cellZ) {
         const int worldZ = cellSize * cellZ;
 
-        // Coverage lookup: byte grid indexed `[cellZ * grid->mWidth + cellX]`,
-        // bounds-checked against the grid extents.
-        bool covered = false;
-        if (static_cast<std::uint32_t>(cellX) < grid->mWidth
-            && static_cast<std::uint32_t>(cellZ) < grid->mHeight) {
-          covered = grid->mGrid[cellZ * static_cast<int>(grid->mWidth) + cellX] != 0;
-        }
-
-        const std::uint32_t color = covered ? pass.color : 0u;
+        const std::uint32_t color =
+          pass.ColorAt(static_cast<std::uint32_t>(cellX), static_cast<std::uint32_t>(cellZ));
         if ((color & 0xFF000000u) == 0u) {
           continue;
         }
@@ -123,22 +143,10 @@ namespace
         const int worldZNext = worldZ + cellSize;
 
         moho::SDebugDecal decal{};
-        // corner0 : (worldX+cellSize, worldZ)
-        decal.corner0.x = static_cast<float>(worldXNext);
-        decal.corner0.y = elevationAt(worldXNext, worldZ);
-        decal.corner0.z = static_cast<float>(worldZ);
-        // corner1 : (worldX+cellSize, worldZ+cellSize)
-        decal.corner1.x = static_cast<float>(worldXNext);
-        decal.corner1.y = elevationAt(worldXNext, worldZNext);
-        decal.corner1.z = static_cast<float>(worldZNext);
-        // corner2 : (worldX, worldZ+cellSize)
-        decal.corner2.x = static_cast<float>(worldX);
-        decal.corner2.y = elevationAt(worldX, worldZNext);
-        decal.corner2.z = static_cast<float>(worldZNext);
-        // corner3 : (worldX, worldZ)
-        decal.corner3.x = static_cast<float>(worldX);
-        decal.corner3.y = elevationAt(worldX, worldZ);
-        decal.corner3.z = static_cast<float>(worldZ);
+        decal.corner0 = hf->GetClampedSamplePoint(worldXNext, worldZ);
+        decal.corner1 = hf->GetClampedSamplePoint(worldXNext, worldZNext);
+        decal.corner2 = hf->GetClampedSamplePoint(worldX, worldZNext);
+        decal.corner3 = hf->GetClampedSamplePoint(worldX, worldZ);
         decal.color = color;
 
         canvas->decals.push_back(decal);
@@ -165,7 +173,7 @@ namespace
     boost::SharedPtrRaw<moho::CIntelGrid> grid = (reconDB->*accessor)();
     if (grid.px != nullptr) {
       ReconCoverageDecalPass pass{};
-      pass.grid = grid.px;
+      pass.grid = grid;
       pass.color = color;
       DrawReconCoverageDecalQuads(pass, hf, canvas);
     }
@@ -267,6 +275,12 @@ namespace
 
   /**
    * Address: 0x0064D860 (FUN_0064D860)
+   * Address: 0x0064E290 (FUN_0064E290 -- the second emission of this same
+   * inline cache, differing only in the relative displacement of its one
+   * `call gpg::LookupRType`, which is why `/OPT:ICF` could not fold the two.
+   * Formerly transcribed a second time as
+   * `ResolveRDebugRadarTypeCacheSecondary`, `[[maybe_unused]]` with zero
+   * callers.)
    *
    * What it does:
    * Resolves and caches the reflected runtime type for `RDebugRadar`.
@@ -281,39 +295,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x0064E290 (FUN_0064E290)
-   *
-   * What it does:
-   * Secondary duplicate lane that resolves/caches `RDebugRadar` reflection
-   * type.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveRDebugRadarTypeCacheSecondary()
-  {
-    gpg::RType* type = moho::RDebugRadar::sType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::RDebugRadar));
-      moho::RDebugRadar::sType = type;
-    }
-    return type;
-  }
-
-  /**
-   * Address: 0x0064EDE0 (FUN_0064EDE0, Moho::RDebugRadar non-deleting dtor body)
-   *
-   * What it does:
-   * Runs the typed debug-overlay intrusive unlink lane for one `RDebugRadar`
-   * instance and restores singleton link state.
-   */
-  [[maybe_unused]] void DestroyRDebugRadarNonDeletingBody(moho::RDebugRadar* const overlay) noexcept
-  {
-    if (overlay == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
-    node->ListUnlinkSelf();
-  }
 } // namespace
 
 namespace moho

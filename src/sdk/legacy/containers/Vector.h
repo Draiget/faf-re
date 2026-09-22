@@ -2702,6 +2702,19 @@ namespace msvc8
          * Address: 0x007C9180 (FUN_007C9180 -- `vector<T>::capacity()` for a 36-byte element; zero callers, unreachable; formerly `CountElement36VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x007C97B0 (FUN_007C97B0 -- `vector<T>::capacity()` for a 24-byte element; zero callers, unreachable; formerly `CountElement24VectorCapacityRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A3290 (FUN_004A3290 -- `capacity()` for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); zero callers, unreachable; formerly `GetLegacyByteVectorCapacityBytes` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x0064E2D0 (FUN_0064E2D0 -- `capacity()` for
+         * `msvc8::vector<moho::SDebugScreenText>`, `CDebugCanvas::screenText`:
+         * `mov eax,[ecx+4] / test eax,eax / jne` then `[ecx+0xC] - first_`
+         * folded by 0x38E38E39 `>> 4` = `/ 0x48`, the same null-guarded
+         * `(end_ - first_) / sizeof(T)` shape as `FUN_008F5D90` and
+         * `FUN_0092BCA0` above. Element size and address neighbourhood both
+         * put it in the same instantiation set as that vector's `push_back`
+         * (`FUN_0064E120`), `insert` (`FUN_0064E2F0`) and `_Insert_n`
+         * (`FUN_0064E490`) already cited on this file. Zero callers,
+         * unreachable; formerly `CountStride72Elements` in
+         * moho/debug/RDebugGrid.cpp over a `Stride72RangeRuntimeView`
+         * stand-in whose `beginAddress`/`endAddress` lanes were this
+         * container's `first_`/`end_` (RULE ONE), removed 2026-09-22.)
          */
         [[nodiscard]] std::size_t capacity() const noexcept {
 	        return static_cast<std::size_t>(end_ - first_);
@@ -2718,6 +2731,17 @@ namespace msvc8
          * Address: 0x00496C80 (FUN_00496C80 -- `operator[]` for `msvc8::vector<ParticleRenderIntervalRuntime>`; zero callers.)
          * Address: 0x004970A0 (FUN_004970A0 -- a second copy of that subscript; zero callers.)
          * Address: 0x0049B3F0 (FUN_0049B3F0 -- `operator[]` for the particle buckets' `msvc8::vector<std::uint32_t>`; zero callers.)
+         * Address: 0x0064E240 (FUN_0064E240 -- `operator[]` for
+         * `msvc8::vector<moho::GeomCamera3>`, `SSyncFilter::geoCams`:
+         * `imul eax, eax, 0x2C8 / add eax,[ecx+4]` -- `first_ + i` for the
+         * 712-byte element (`sizeof(GeomCamera3) == 0x2C8`,
+         * `GeomCamera3.h`), reading `first_` at +0x04 past the empty
+         * allocator's dword pad. Same instantiation set as that vector's
+         * `~vector` (`FUN_00740700`) and its nine `uninit_copy_n` emissions
+         * already cited on this file. Zero callers, unreachable; formerly
+         * `ResolveStride712ElementAddress` in moho/debug/RDebugGrid.cpp over
+         * a `Stride712CursorRuntimeView` stand-in whose `baseAddress` lane
+         * was this container's `first_` (RULE ONE), removed 2026-09-22.)
          * Address: 0x0049BAF0 (FUN_0049BAF0 -- a second copy of that subscript; zero callers.)
          */
         T& operator[](std::size_t i) const noexcept {

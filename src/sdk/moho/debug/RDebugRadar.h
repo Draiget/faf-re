@@ -46,6 +46,17 @@ namespace moho
     /**
      * Address: 0x0064ED70 (FUN_0064ED70, Moho::RDebugRadar::dtr)
      * Slot: 2
+     * Address: 0x0064EDE0 (FUN_0064EDE0 -- the non-deleting `??1` half of the same
+     * destructor; the `??_G` above is `test byte [esp+4],1` wrapped around
+     * this body plus `::operator delete`. Neither is source: `~RDebugRadar` is
+     * trivial, so the whole body is the compiler chaining into
+     * `~RDebugOverlay` -- latch `RDebugOverlay`'s vtable (0x00E2346C), unlink
+     * the intrusive node, latch `gpg::RObject`'s (0x00D4145C). Eight of these
+     * bodies are byte-identical (0x0064C1B0, 0x0064C8A0, 0x0064EDB0,
+     * 0x0064EDE0, 0x00650FC0, 0x00650FF0, 0x00651020, 0x00653820) because
+     * every overlay class's destructor is equally trivial; the other seven
+     * belong to those classes, not to this one. Formerly transcribed as
+     * `DestroyRDebugRadarNonDeletingBody`, `[[maybe_unused]]` with zero callers.)
      */
     ~RDebugRadar() override;
 
