@@ -235,16 +235,6 @@ namespace
     return (range != 0u) ? (range | kEntityAttributeEnabledMask) : 0u;
   }
 
-  enum class TextureScrollerMode : std::int32_t
-  {
-    None = 0,
-    PingPong = 1,
-    Manual = 2,
-    Thread = 3,
-  };
-
-  using TextureScrollerDefinition = moho::SScroller;
-  using TextureScrollerRuntimeView = moho::CTextureScroller;
 
   /**
    * Address: 0x0067B6F0 (FUN_0067B6F0)
@@ -322,51 +312,13 @@ namespace
   }
 
   /**
-   * Address: 0x00777690 (FUN_00777690, Moho::Entity::AddScroller)
-   *
-   * What it does:
-   * Copies one incoming `SScroller` payload into runtime storage, then applies
-   * mode-specific fixups for none/thread lanes exactly as the binary helper.
+   * The inline every scroller binding opens with (0x006911F7 and its three
+   * siblings): allocate a `CTextureScroller` owned by the entity if it has none.
    */
-  std::int32_t ApplyTextureScrollerDefinition(
-    TextureScrollerRuntimeView& scroller,
-    const TextureScrollerDefinition& definition
-  ) noexcept
-  {
-    scroller.mScroller = definition;
-    const std::int32_t scrollerType = scroller.mScroller.mType;
-
-    if (scrollerType == static_cast<std::int32_t>(TextureScrollerMode::None)) {
-      scroller.mEntity->StopScroll();
-      return scrollerType;
-    }
-
-    if (scrollerType == static_cast<std::int32_t>(TextureScrollerMode::Thread)) {
-      scroller.mDir[0] = 0u;
-      scroller.mDir[1] = 0u;
-      scroller.mSpeed[0] = 0;
-      scroller.mSpeed[1] = 0;
-    }
-
-    return scrollerType;
-  }
-
-  void InitializeTextureScrollerRuntime(TextureScrollerRuntimeView& scroller, moho::Entity* const owner) noexcept
-  {
-    TextureScrollerDefinition definition{};
-    definition.mType = static_cast<std::int32_t>(TextureScrollerMode::None);
-    scroller.mEntity = owner;
-    ApplyTextureScrollerDefinition(scroller, definition);
-    scroller.mDir[0] = 0u;
-    scroller.mDir[1] = 0u;
-    scroller.mSpeed[0] = 0;
-    scroller.mSpeed[1] = 0;
-  }
-
-  [[nodiscard]] TextureScrollerRuntimeView* EnsureEntityTextureScroller(moho::Entity& entity)
+  [[nodiscard]] moho::CTextureScroller* EnsureEntityTextureScroller(moho::Entity& entity)
   {
     if (entity.mScroller == nullptr) {
-      entity.mScroller = new TextureScrollerRuntimeView(&entity);
+      entity.mScroller = new moho::CTextureScroller(&entity);
     }
     return entity.mScroller;
   }
@@ -3296,7 +3248,7 @@ namespace moho
       delete previousScroller;
     }
 
-    static_cast<void>(ApplyTextureScrollerDefinition(*textureScrollerSlot, definition));
+    textureScrollerSlot->SetScroller(definition);
   }
 
   /**
@@ -7628,15 +7580,13 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    TextureScrollerRuntimeView* const scroller = EnsureEntityTextureScroller(*entity);
+    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
 
-    TextureScrollerDefinition definition{};
-    definition.mType = static_cast<std::int32_t>(TextureScrollerMode::Manual);
+    SScroller definition;
+    definition.mType = SCROLLTYPE_Manual;
     definition.mFloat04 = ReadLuaNumberArgument(state, 2);
     definition.mFloat08 = ReadLuaNumberArgument(state, 3);
-    definition.mFloat24 = 1.0f;
-    definition.mFloat28 = 1.0f;
-    ApplyTextureScrollerDefinition(*scroller, definition);
+    scroller->SetScroller(definition);
 
     return 1;
   }
@@ -7688,13 +7638,13 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    TextureScrollerRuntimeView* const scroller = EnsureEntityTextureScroller(*entity);
+    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
 
-    TextureScrollerDefinition definition{};
-    definition.mType = static_cast<std::int32_t>(TextureScrollerMode::Thread);
+    SScroller definition;
+    definition.mType = SCROLLTYPE_MotionDerived;
     definition.mFloat24 = ReadLuaNumberArgument(state, 2);
     definition.mFloat28 = ReadLuaNumberArgument(state, 3);
-    ApplyTextureScrollerDefinition(*scroller, definition);
+    scroller->SetScroller(definition);
 
     return 1;
   }
@@ -7746,10 +7696,10 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    TextureScrollerRuntimeView* const scroller = EnsureEntityTextureScroller(*entity);
+    CTextureScroller* const scroller = EnsureEntityTextureScroller(*entity);
 
-    TextureScrollerDefinition definition{};
-    definition.mType = static_cast<std::int32_t>(TextureScrollerMode::PingPong);
+    SScroller definition;
+    definition.mType = SCROLLTYPE_PingPong;
     definition.mFloat04 = ReadLuaNumberArgument(state, 3);
     definition.mFloat08 = ReadLuaNumberArgument(state, 5);
     definition.mFloat0C = ReadLuaNumberArgument(state, 7);
@@ -7758,9 +7708,7 @@ namespace moho
     definition.mScroll1.y = ReadLuaNumberArgument(state, 6);
     definition.mScroll2.x = ReadLuaNumberArgument(state, 4);
     definition.mScroll2.y = ReadLuaNumberArgument(state, 8);
-    definition.mFloat24 = 1.0f;
-    definition.mFloat28 = 1.0f;
-    ApplyTextureScrollerDefinition(*scroller, definition);
+    scroller->SetScroller(definition);
 
     return 1;
   }
@@ -7811,8 +7759,7 @@ namespace moho
 
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-    TextureScrollerRuntimeView* const scroller = EnsureEntityTextureScroller(*entity);
-    InitializeTextureScrollerRuntime(*scroller, entity);
+    EnsureEntityTextureScroller(*entity)->SetScroller(SScroller{});
     return 1;
   }
 
