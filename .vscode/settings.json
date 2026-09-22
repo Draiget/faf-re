@@ -90,7 +90,19 @@
     "xtree": "cpp",
     "xutility": "cpp"
   },
+  // `.claude/worktrees/` holds one full checkout of this repo per background
+  // agent -- 26 of them at the time of writing. Without these three excludes
+  // the explorer, quick-open, global search and IntelliSense all index every
+  // copy, so a file deleted on master still opens (from a July checkout) and
+  // every symbol has ~26 definitions.
+  "files.exclude": {
+    "**/.claude/worktrees": true
+  },
+  "search.exclude": {
+    "**/.claude/worktrees/**": true
+  },
   "C_Cpp.files.exclude": {
+    "**/.claude/worktrees/**": true,
     "**/bin/**": true,
     "**/buildstage/**": true,
     "**/dependencies/**": true,
