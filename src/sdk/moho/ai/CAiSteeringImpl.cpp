@@ -601,7 +601,7 @@ namespace
     const float radiusSq = radius * radius;
     const Wm3::Vector3f& ownerPosition = owner->GetPosition();
 
-    for (Entity* entity : owner->SimulationRef->mEntityDB->Entities()) {
+    for (const auto& [entityId, entity] : owner->SimulationRef->mEntityDB->mAllUnits) {
       Unit* const candidate = entity ? entity->IsUnit() : nullptr;
       if (!candidate) {
         continue;

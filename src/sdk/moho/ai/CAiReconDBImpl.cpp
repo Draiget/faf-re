@@ -735,7 +735,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
     if ((mSim->mCurTick % 301u) == 0u) {
       std::size_t entities = 0;
       if (mSim->mEntityDB) {
-        for (Entity* const e : mSim->mEntityDB->Entities()) {
+        for (const auto& [entityId, e] : mSim->mEntityDB->mAllUnits) {
           if (e) {
             ++entities;
           }
@@ -762,7 +762,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
   msvc8::vector<SNewBlip> pendingNewBlips{};
   if (mSim->mEntityDB) {
-    for (Entity* const entity : mSim->mEntityDB->Entities()) {
+    for (const auto& [entityId, entity] : mSim->mEntityDB->mAllUnits) {
       ++gTotal;
       Unit* const unit = entity ? entity->IsUnit() : nullptr;
       if (!unit || unit->DestroyQueued()) {
