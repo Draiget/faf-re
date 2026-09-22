@@ -7122,6 +7122,13 @@ namespace msvc8
          * Address: 0x007F39E0 (FUN_007F39E0 -- `destroy_range` -- each profile's extractor string tidied and its category words rebound to inline storage; nine callers for `msvc8::vector<moho::SRangeRenderProfile>` (`RangeRenderer::mVisibleProfiles` at +0x10; the 8-aligned 0x88 element owns an extractor string and an inline category-word set); callers 0x007EDD60, 0x007EDE50, 0x007EE950; formerly `DestroyRangeRenderProfileTransientStateRange` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x007F1470 (FUN_007F1470 -- a `__thiscall` trampoline into that destroy for `msvc8::vector<moho::SRangeRenderProfile>` (`RangeRenderer::mVisibleProfiles` at +0x10; the 8-aligned 0x88 element owns an extractor string and an inline category-word set); callers 0x007F1490; formerly `DestroyRangeRenderProfileTransientStateRange` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005EE360 (FUN_005EE360 -- `destroy_range` -- one `~SAiReservedTransportBone` (0x005E8230) per slot for `msvc8::vector<moho::SAiReservedTransportBone>` (the 0x1C element owns an inner `msvc8::vector<int>` and a `WeakPtr<Unit>` that unlinks itself); callers 0x005E5300, 0x005E5670, 0x005E5C10; formerly `DestroyReservedTransportBoneRange` in moho/ai/SAiReservedTransportBoneSerializer.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x005616A0 (FUN_005616A0 -- `destroy_range` for the 0xD8-byte
+         * `moho::SEntityVariableUpdateEntry` (`SSyncData::mEntityUpdates`): one
+         * `~SSTIEntityVariableData` (0x00560310) per element at +0x08; callers
+         * 0x00560EB0 and 0x0067D320, both cited above. Formerly
+         * `DestroySSTIEntityVariableDataSlotPayloadRange` over a duplicate
+         * `SSTIEntityVariableDataSlotRuntime` in
+         * moho/entity/SSTIEntityVariableData.cpp (RULE ONE), removed 2026-09-22.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -8146,6 +8153,31 @@ namespace msvc8
          * name here -- MSVC emits this body for whichever `T` the vector is
          * instantiated with, and the recovery is this citation plus the template
          * above, not a hand-written per-type copy helper.)
+         * Address: 0x00563380 (FUN_00563380 -- `_Uninit_copy` over [first, last)
+         * for the 0xD8-byte `moho::SEntityVariableUpdateEntry`
+         * (`SSyncData::mEntityUpdates`): per element the id word is copied and
+         * the payload copy-constructed through 0x00560150, with the constructed
+         * prefix destroyed on unwind. Called from 0x00560EB0 (cited above) and
+         * from the three bridges below.)
+         * Address: 0x00562B40 (FUN_00562B40 -- a forwarding bridge into
+         * 0x00563380; zero callers.)
+         * Address: 0x00563030 (FUN_00563030 -- a second such bridge; zero callers.)
+         * Address: 0x00563220 (FUN_00563220 -- a third; zero callers.)
+         * Address: 0x00562650 (FUN_00562650 -- a register-shape bridge that turns
+         * [first, last) into a count for 0x00680970; zero callers.)
+         * Address: 0x00680970 (FUN_00680970 -- the counted `uninit_copy_n` for the
+         * same element; callers 0x0067B780 and 0x0067D320, both cited above, and
+         * the two bridges below.)
+         * Address: 0x0067F750 (FUN_0067F750 -- a register-shape bridge into
+         * 0x00680970; zero callers.)
+         * Address: 0x0067C7C0 (FUN_0067C7C0 -- a second one; reached from
+         * 0x0067D320.)
+         * All seven were hand-written as `CopySSTIEntityVariableDataSlotRange*`
+         * free functions over a duplicate `SSTIEntityVariableDataSlotRuntime` in
+         * moho/entity/SSTIEntityVariableData.cpp, none of them called by any
+         * source line (RULE ONE), removed 2026-09-22. The source that produces
+         * them is `SSyncData::mEntityUpdates.push_back(...)` in
+         * `QueueEntityVariableUpdate`.
          */
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {

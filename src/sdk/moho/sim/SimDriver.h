@@ -180,7 +180,16 @@ namespace moho
    */
   struct SEntityVariableUpdateEntry
   {
-    EntId mEntityId = 0;                       // +0x00
+    /**
+     * Address: 0x00676AC0 (FUN_00676AC0 -- this record's default constructor,
+     * as emitted out of line for the vector: `mov dword ptr [esi], 0xF0000000`
+     * then `SSTIEntityVariableData::SSTIEntityVariableData` on `esi+8`. Zero
+     * callers; every real use inlines it. Formerly
+     * `ConstructSSTIEntityVariableDataSlotRuntime` over a duplicate
+     * `SSTIEntityVariableDataSlotRuntime` layout in
+     * moho/entity/SSTIEntityVariableData.cpp (RULE ONE), removed 2026-09-22.)
+     */
+    EntId mEntityId = static_cast<EntId>(0xF0000000u); // +0x00, EEntityIdSentinel::Invalid
     std::uint32_t mReserved04 = 0;             // +0x04
     SSTIEntityVariableData mVariableData{};    // +0x08
   };

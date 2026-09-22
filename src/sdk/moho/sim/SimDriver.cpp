@@ -375,9 +375,7 @@ SEntityVariableUpdateEntry* moho::QueueEntityVariableUpdate(
     return nullptr;
   }
 
-  SEntityVariableUpdateEntry defaultEntry{};
-  defaultEntry.mEntityId = ToRaw(EEntityIdSentinel::Invalid);
-  syncData->mEntityUpdates.push_back(defaultEntry);
+  syncData->mEntityUpdates.push_back(SEntityVariableUpdateEntry{});
   if (syncData->mEntityUpdates.empty()) {
     return nullptr;
   }
