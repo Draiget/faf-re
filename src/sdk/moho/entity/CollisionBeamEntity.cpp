@@ -68,29 +68,22 @@ namespace
     (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
   }
 
-  // This braced init is a straight lane-for-lane copy, which is what is
-  // wanted. `Entity::Orientation` is a `Vector4f`, so its `.x/.y/.z/.w` are
-  // memory lanes 0-3, and the 4-arg `Quaternion` ctor is `(fW, fX, fY, fZ)`,
-  // which writes its arguments into memory in that same order - so lane 0
-  // stays in lane 0 and the scalar stays put.
+  // The entity's orientation is the quaternion this rotates by, used as it is
+  // stored. It used to be spelled out as a four-argument `Quaternion` init,
+  // because `Entity::Orientation` was a `moho::Vector4f` naming (x,y,z,w) over
+  // the quaternion's (w,x,y,z) words, and only a lane-for-lane init kept the
+  // scalar in lane 0. The lane is a `Wm3::Quatf` now.
   //
-  // An earlier note here described this as a deliberate scalar-first ->
+  // An earlier note here described that init as a deliberate scalar-first ->
   // native-`.w`-scalar conversion. That convention does not exist in this
-  // binary (`QuatToMatrix` at 0x00452FD0 and `VMatrix4::Set` at 0x004EE980
-  // compute no `ww` term at all), and reading the init as a lane rotation
-  // rather than a copy is what made it look like one.
+  // binary: `QuatToMatrix` at 0x00452FD0 and `VMatrix4::Set` at 0x004EE980
+  // compute no `ww` term at all.
   //
-  // `orientation.Rotate()` below is WildMagic's own scalar-first rotate, so
-  // it now agrees with `Moho::MultQuadVec` on the same input; either spelling
-  // is correct here.
+  // `orientation.Rotate()` below is WildMagic's own scalar-first rotate, so it
+  // agrees with `Moho::MultQuadVec` on the same input; either spelling works.
   [[nodiscard]] Wm3::Box3f BuildCollisionBeamDebugBox(const moho::CollisionBeamEntity& entity)
   {
-    const Wm3::Quaternionf orientation{
-      entity.mVarDat.mCurTransform.orient_.x,
-      entity.mVarDat.mCurTransform.orient_.y,
-      entity.mVarDat.mCurTransform.orient_.z,
-      entity.mVarDat.mCurTransform.orient_.w,
-    };
+    const Wm3::Quaternionf& orientation = entity.mVarDat.mCurTransform.orient_;
 
     const Wm3::Vector3f axisX = orientation.Rotate(Wm3::Vector3f{1.0f, 0.0f, 0.0f});
     const Wm3::Vector3f axisY = orientation.Rotate(Wm3::Vector3f{0.0f, 1.0f, 0.0f});
@@ -322,14 +315,10 @@ namespace moho
    */
   VTransform CollisionBeamEntity::GetBoneWorldTransform(const int boneIndex) const
   {
-    VTransform result{};
-    result.orient_.w = mVarDat.mCurTransform.orient_.x;
-    result.orient_.x = mVarDat.mCurTransform.orient_.y;
-    result.orient_.y = mVarDat.mCurTransform.orient_.z;
-    result.orient_.z = mVarDat.mCurTransform.orient_.w;
-    result.pos_.x = mVarDat.mCurTransform.pos_.x;
-    result.pos_.y = mVarDat.mCurTransform.pos_.y;
-    result.pos_.z = mVarDat.mCurTransform.pos_.z;
+    // The whole transform, word for word. The orientation used to be copied
+    // lane by lane against `moho::Vector4f`'s (x,y,z,w) names over the
+    // quaternion's (w,x,y,z) words; both sides are `Wm3::Quatf` now.
+    VTransform result = mVarDat.mCurTransform;
 
     if (boneIndex != 0) {
       const float orientationW = result.orient_.w;

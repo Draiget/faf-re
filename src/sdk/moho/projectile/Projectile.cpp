@@ -865,11 +865,13 @@ namespace moho
       mDirectAwayFromGround = false;
     }
 
-    // Snapshot the current world transform into a working VTransform. Orientation
-    // is copied as the raw 4-float tuple (matches the binary's lane copy; the
-    // ctor uses the same straight copy convention).
+    // Snapshot the current world transform into a working VTransform, word for
+    // word, as the binary's lane copy does. The orientation used to be rebuilt
+    // through a four-argument `Quatf` init because the lane was spelled
+    // `moho::Vector4f` -- (x,y,z,w) names over the quaternion's (w,x,y,z)
+    // words -- and only that init kept the scalar in lane 0.
     VTransform tran;
-    tran.orient_ = Wm3::Quatf{mVarDat.mCurTransform.orient_.x, mVarDat.mCurTransform.orient_.y, mVarDat.mCurTransform.orient_.z, mVarDat.mCurTransform.orient_.w};
+    tran.orient_ = mVarDat.mCurTransform.orient_;
     tran.pos_ = mVarDat.mCurTransform.pos_;
 
     // Advance mesh draw-scale by scale velocity (per-tick).
@@ -1070,11 +1072,17 @@ namespace moho
 
       const float pendingScale = (interp <= 0.001f) ? 1000.0f : (1.0f / interp);
       Wm3::Quaternionf lerped;
-      const Wm3::Quaternionf currentOrient{mVarDat.mCurTransform.orient_.x, mVarDat.mCurTransform.orient_.y, mVarDat.mCurTransform.orient_.z, mVarDat.mCurTransform.orient_.w};
-      const Wm3::Quaternionf pendingOrient{PendingOrientation.x, PendingOrientation.y, PendingOrientation.z,
-                                           PendingOrientation.w};
+      // Both lanes are `Wm3::Quatf`; these used to be rebuilt lane by lane
+      // against the old `moho::Vector4f` spelling of the same words.
+      const Wm3::Quaternionf& currentOrient = mVarDat.mCurTransform.orient_;
+      const Wm3::Quaternionf& pendingOrient = PendingOrientation;
       moho::QuatLERP(&pendingOrient, &currentOrient, &lerped, mImpactInterpolation);
-      tran.orient_ = Wm3::Quatf{lerped.x, lerped.y, lerped.z, lerped.w};
+      // `QuatLERP` blends all four lanes symmetrically, so its result carries
+      // the same convention as the two inputs and is stored as it is. Rebuilding
+      // it as `Quatf{lerped.x, lerped.y, lerped.z, lerped.w}` rotated the
+      // quaternion by one lane; that predates the variable-data fold, since both
+      // sides of that init were already `Wm3::Quaternionf`.
+      tran.orient_ = lerped;
       tran.pos_ = mImpactPosition;
       this->SetPendingTransform(tran, pendingScale);
     }

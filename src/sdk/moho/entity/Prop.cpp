@@ -534,14 +534,12 @@ namespace moho
     mVarDat.mScale.y = uniformScale;
     mVarDat.mScale.z = uniformScale;
 
-    // Entity orientation lanes are stored as (w,x,y,z) in Vector4f::x/y/z/w slots.
-    PendingOrientation.x = transform.orient_.w;
-    PendingOrientation.y = transform.orient_.x;
-    PendingOrientation.z = transform.orient_.y;
-    PendingOrientation.w = transform.orient_.z;
-    PendingPosition.x = transform.pos_.x;
-    PendingPosition.y = transform.pos_.y;
-    PendingPosition.z = transform.pos_.z;
+    // 0x006F9E5A..0x006F9E75: four `fld`/`fstp` pairs copy the caller's
+    // quaternion word for word into +0x150. Both sides are `Wm3::Quatf` now, so
+    // this is the assignment; it used to be written lane by lane against
+    // `moho::Vector4f`'s (x,y,z,w) names over the same (w,x,y,z) words.
+    PendingOrientation = transform.orient_;
+    PendingPosition = transform.pos_;
 
     const ELayer startingLayer = GetStartingLayer(transform.pos_, LAYER_Land);
     SetCurrentLayer(startingLayer);

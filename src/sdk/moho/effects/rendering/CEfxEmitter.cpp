@@ -419,21 +419,14 @@ namespace moho
         interp = 1.0f;
       }
 
-      // Entity::Orientation is a Vector4f, so its `.x` is memory lane 0 - the
-      // scalar - whereas Wm3::Quaternionf spells lane 0 `.w`. Copying these
-      // across by matching field NAME rotates all four lanes; the copy has to
-      // go lane for lane, exactly as CollisionBeamEntity::GetBoneWorldTransform
-      // and Prop's write-back already do.
-      currentTransform.orient_.w = attachedEntity->mVarDat.mCurTransform.orient_.x;
-      currentTransform.orient_.x = attachedEntity->mVarDat.mCurTransform.orient_.y;
-      currentTransform.orient_.y = attachedEntity->mVarDat.mCurTransform.orient_.z;
-      currentTransform.orient_.z = attachedEntity->mVarDat.mCurTransform.orient_.w;
+      // Both entity lanes are `Wm3::Quatf` now, so these are plain copies. They
+      // were written lane by lane while the entity spelled its orientation
+      // `moho::Vector4f` -- naming (x,y,z,w) over the quaternion's (w,x,y,z)
+      // words -- where copying by field name would have rotated all four lanes.
+      currentTransform.orient_ = attachedEntity->mVarDat.mCurTransform.orient_;
       currentTransform.pos_ = attachedEntity->mVarDat.mCurTransform.pos_;
 
-      previousOrientation.w = attachedEntity->PendingOrientation.x;
-      previousOrientation.x = attachedEntity->PendingOrientation.y;
-      previousOrientation.y = attachedEntity->PendingOrientation.z;
-      previousOrientation.z = attachedEntity->PendingOrientation.w;
+      previousOrientation = attachedEntity->PendingOrientation;
       previousPosition = attachedEntity->PendingPosition;
     } else {
       const VTransform& previousHistory = attachedEntity->GetPositionHistory(tick - 1);
