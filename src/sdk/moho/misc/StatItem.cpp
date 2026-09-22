@@ -1421,13 +1421,12 @@ namespace moho
   /**
    * Address: 0x004162C0 (FUN_004162C0, Moho::CON_ClearStats)
    */
-  void CON_ClearStats(void* const commandArgs)
+  void CON_ClearStats(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
     const msvc8::string* targetPath = nullptr;
-    if (args.Count() >= 2u) {
-      targetPath = args.At(1u);
+    if (args.size() >= 2u) {
+      targetPath = ConCommandArg(args, 1u);
     }
 
     const char* const statPath = targetPath ? targetPath->c_str() : "";
@@ -1437,14 +1436,13 @@ namespace moho
   /**
    * Address: 0x004163A0 (FUN_004163A0, Moho::CON_BeginLoggingStats)
    */
-  void CON_BeginLoggingStats(void* const commandArgs)
+  void CON_BeginLoggingStats(const msvc8::vector<msvc8::string>& args)
   {
     EngineStats* const engineStats = GetEngineStats();
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
     const msvc8::string* requestedPath = nullptr;
-    if (args.Count() >= 2u) {
-      requestedPath = args.At(1u);
+    if (args.size() >= 2u) {
+      requestedPath = ConCommandArg(args, 1u);
     } else {
       requestedPath = &engineStats->mLogFileName;
     }
@@ -1511,7 +1509,7 @@ namespace moho
    * Populates one debug stats subtree with representative values and emits a
    * recursive text dump to the log sink.
    */
-  void CON_PrintStats(void* const /*commandArgs*/)
+  void CON_PrintStats(const msvc8::vector<msvc8::string>& /*args*/)
   {
     if (!sPrintStatsBoogers) {
       sPrintStatsBoogers = GetEngineStats()->GetItem("Boogers", true);
@@ -1628,7 +1626,7 @@ namespace moho
   /**
    * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
    */
-  void ShowStats(void* const commandArgs)
+  void ShowStats(const msvc8::vector<msvc8::string>& args)
   {
     CUIManager* const uiManager = g_UIManager;
     if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
@@ -1642,9 +1640,8 @@ namespace moho
     }
 
     msvc8::string mode = "all";
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() > 1u) {
-      if (const msvc8::string* const requestedMode = args.At(1u); requestedMode != nullptr) {
+    if (args.size() > 1u) {
+      if (const msvc8::string* const requestedMode = ConCommandArg(args, 1u); requestedMode != nullptr) {
         mode.assign(*requestedMode, 0, msvc8::string::npos);
       }
     }
@@ -1657,7 +1654,7 @@ namespace moho
   /**
    * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
    */
-  void ShowArmyStats(void* const commandArgs)
+  void ShowArmyStats(const msvc8::vector<msvc8::string>& args)
   {
     CUIManager* const uiManager = g_UIManager;
     if (!uiManager || uiManager->mFrames.Empty() || !uiManager->mFrames[0]) {
@@ -1681,16 +1678,15 @@ namespace moho
     }
 
     int armyIndex = static_cast<int>(focusArmy->mArmyIndex);
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() > 1u) {
-      if (const msvc8::string* const requestedArmy = args.At(1u); requestedArmy != nullptr) {
+    if (args.size() > 1u) {
+      if (const msvc8::string* const requestedArmy = ConCommandArg(args, 1u); requestedArmy != nullptr) {
         armyIndex = std::atoi(requestedArmy->c_str());
       }
     }
 
     msvc8::string mode = "all";
-    if (args.Count() > 2u) {
-      if (const msvc8::string* const requestedMode = args.At(2u); requestedMode != nullptr) {
+    if (args.size() > 2u) {
+      if (const msvc8::string* const requestedMode = ConCommandArg(args, 2u); requestedMode != nullptr) {
         mode.assign(*requestedMode, 0, msvc8::string::npos);
       }
     }
@@ -1703,7 +1699,7 @@ namespace moho
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
    */
-  void CON_EndLoggingStats(void* const /*commandArgs*/)
+  void CON_EndLoggingStats(const msvc8::vector<msvc8::string>& /*args*/)
   {
     (void)GetEngineStats()->EndLogging();
   }

@@ -203,7 +203,7 @@ namespace moho
    * Clears a stats subtree selected from the console argument vector and
    * forwards to the engine stats delete path.
    */
-  void CON_ClearStats(void* commandArgs);
+  void CON_ClearStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x004163A0 (FUN_004163A0, Moho::CON_BeginLoggingStats)
@@ -212,7 +212,7 @@ namespace moho
    * Selects a logging file name from console args, resets the logging frame
    * counter, and enables stats logging.
    */
-  void CON_BeginLoggingStats(void* commandArgs);
+  void CON_BeginLoggingStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00415EC0 (FUN_00415EC0, Moho::CON_PrintStats)
@@ -220,7 +220,7 @@ namespace moho
    * What it does:
    * Exercises and prints a debug stats subtree from the console command lane.
    */
-  void CON_PrintStats(void* commandArgs);
+  void CON_PrintStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00834F90 (FUN_00834F90, Moho::ShowStats)
@@ -229,7 +229,7 @@ namespace moho
    * Imports `/lua/debug/EngineStats.lua` and calls its `Toggle` entry with
    * the requested stats mode token (default `"all"`).
    */
-  void ShowStats(void* commandArgs);
+  void ShowStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00835160 (FUN_00835160, Moho::ShowArmyStats)
@@ -238,7 +238,7 @@ namespace moho
    * Imports `/lua/debug/ArmyStats.lua` and calls its `Show` entry with army
    * index + display mode from console args (defaults: focused army + `"all"`).
    */
-  void ShowArmyStats(void* commandArgs);
+  void ShowArmyStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00416480 (FUN_00416480, Moho::CON_EndLoggingStats)
@@ -246,7 +246,7 @@ namespace moho
    * What it does:
    * Console end-logging entry that finalizes the active stats log.
    */
-  void CON_EndLoggingStats(void* commandArgs);
+  void CON_EndLoggingStats(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00416490 (FUN_00416490, cfunc_BeginLoggingStats)

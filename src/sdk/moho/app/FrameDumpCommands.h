@@ -1,6 +1,7 @@
 #pragma once
 
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 
 namespace moho
 {
@@ -62,7 +63,7 @@ namespace moho
    * means stop and report the frame reached, stopped means prompt for a
    * directory and arm an unbounded dump.
    */
-  void DUMP_Frames(void* commandArgs);
+  void DUMP_Frames(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x007F5840 (FUN_007F5840, Moho::DUMP_Frame)
@@ -75,7 +76,7 @@ namespace moho
    * directory from the one optional argument, from the previous directory when
    * that argument is `.`, or from the user's screenshot directory otherwise.
    */
-  void DUMP_Frame(void* commandArgs);
+  void DUMP_Frame(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE0F50 (FUN_00BE0F50, register_CConFunc_dump_Frames)

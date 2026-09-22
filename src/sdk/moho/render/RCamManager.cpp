@@ -410,14 +410,13 @@ namespace moho
    * the initial `atoi`-selected float, so all four commands carry the same
    * selected LOD value.
    */
-  void SC_CameraScaleLOD(void* const commandArgs)
+  void SC_CameraScaleLOD(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() != 2) {
+    if (args.size() != 2) {
       return;
     }
 
-    const int lodIndex = std::atoi(args.At(1)->c_str());
+    const int lodIndex = std::atoi(ConCommandArg(args, 1)->c_str());
     const float lodValues[3] = {cam_LowLOD, cam_MediumLOD, cam_HighLOD};
     const float selectedLod = lodValues[lodIndex];
 

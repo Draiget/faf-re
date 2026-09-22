@@ -293,10 +293,9 @@ void REN_RenderShadowDebugOverlay()
  * Console callback that expects exactly two tokens and adds the requested
  * border mesh blueprint to the active viewport's MapImager.
  */
-void REN_MapBorderAdd(void* const commandArgs)
+void REN_MapBorderAdd(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-  if (args.Count() != 2u) {
+  if (args.size() != 2u) {
     return;
   }
 
@@ -304,7 +303,7 @@ void REN_MapBorderAdd(void* const commandArgs)
     return;
   }
 
-  ActiveViewportMapImager()->AddBorder(*args.At(1));
+  ActiveViewportMapImager()->AddBorder(*ConCommandArg(args, 1));
 }
 
 /**
@@ -314,9 +313,9 @@ void REN_MapBorderAdd(void* const commandArgs)
  * Console callback that clears the active viewport's MapImager border
  * decoration meshes when a viewport is present.
  */
-void REN_MapBorderClear(void* const commandArgs)
+void REN_MapBorderClear(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
   ClearActiveViewportMapBorder();
 }
 

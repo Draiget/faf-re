@@ -42,13 +42,13 @@ namespace
   }
 
   [[nodiscard]]
-  std::string BuildAliasArgumentSuffix(const moho::ConCommandArgsView& args)
+  std::string BuildAliasArgumentSuffix(const msvc8::vector<msvc8::string>& args)
   {
     std::string suffix;
-    const std::size_t count = args.Count();
+    const std::size_t count = args.size();
 
     for (std::size_t index = 1; index < count; ++index) {
-      const msvc8::string* const token = args.At(index);
+      const msvc8::string* const token = moho::ConCommandArg(args, index);
       if (token == nullptr) {
         continue;
       }
@@ -117,12 +117,11 @@ void moho::CConAlias::ShutdownRecovered()
  * What it does:
  * Builds expanded alias command text and forwards it into console command execution.
  */
-void moho::CConAlias::Handle(void* commandArgs)
+void moho::CConAlias::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
   std::string expandedCommand{AliasCommandStorage().view()};
-  if (args.Count() > 1) {
+  if (args.size() > 1) {
     expandedCommand.push_back(' ');
     expandedCommand.append(BuildAliasArgumentSuffix(args));
   }

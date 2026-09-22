@@ -148,7 +148,7 @@ namespace moho
    * What it does:
    * The `SC_CameraScaleLOD <index>` debug console command. See definition.
    */
-  void SC_CameraScaleLOD(void* commandArgs);
+  void SC_CameraScaleLOD(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x00BE9540 (FUN_00BE9540, skip -- xc_a static initializer lane)

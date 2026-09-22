@@ -71047,9 +71047,9 @@ bool moho::WxInputBox(
  * when dismissed) through `Moho::CON_Printf`. Used as a smoke-test
  * command for the dialog plumbing.
  */
-void moho::CON_WxInputBox(void* const commandArgs)
+void moho::CON_WxInputBox(const msvc8::vector<msvc8::string>& args)
 {
-  (void)commandArgs;
+  (void)args;
 
   msvc8::string enteredText;
   if (WxInputBox("What?", "default", "Type your answer below.", &enteredText)) {

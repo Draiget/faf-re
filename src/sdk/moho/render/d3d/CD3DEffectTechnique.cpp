@@ -414,14 +414,13 @@ namespace moho
    * What it does:
    * Parses one sample-count argument and forwards it to the active D3D device.
    */
-  void CD3DEffect::CON_d3d_AntiAliasingSamples(void* const commandArgs)
+  void CD3DEffect::CON_d3d_AntiAliasingSamples(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() != 2U) {
+    if (args.size() != 2U) {
       return;
     }
 
-    const msvc8::string* const sampleCountText = args.At(1U);
+    const msvc8::string* const sampleCountText = ConCommandArg(args, 1U);
     if (sampleCountText == nullptr) {
       return;
     }

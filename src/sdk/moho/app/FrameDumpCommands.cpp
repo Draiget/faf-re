@@ -114,7 +114,7 @@ namespace moho
    *
    * The binary reads no command arguments here.
    */
-  void DUMP_Frames(void* const /*commandArgs*/)
+  void DUMP_Frames(const msvc8::vector<msvc8::string>& /*args*/)
   {
     if (dump_frameRate != 0) {
       dump_frameRate = 0;
@@ -146,12 +146,11 @@ namespace moho
    * The `.` test is the binary's `compare(0, size, ".", 1)` at 0x007F589F,
    * which is simply "this token is not exactly a dot".
    */
-  void DUMP_Frame(void* const commandArgs)
+  void DUMP_Frame(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
 
-    if (args.Count() == 2u) {
-      const msvc8::string& directoryToken = *args.At(1);
+    if (args.size() == 2u) {
+      const msvc8::string& directoryToken = *ConCommandArg(args, 1);
 
       if (directoryToken.view() != ".") {
         dump_frameDumpName.assign(directoryToken, 0, msvc8::string::npos);

@@ -2098,7 +2098,7 @@ namespace moho
    * Console-command callback that requests world-session exit when frame
    * dispatch is currently active.
    */
-  void CON_WLD_RequestEndSession(void* commandArgs);
+  void CON_WLD_RequestEndSession(const msvc8::vector<msvc8::string>& args);
 
   /**
    * Address: 0x0088BE80 (FUN_0088BE80, ?WLD_IsSessionActive@Moho@@YA_NXZ)

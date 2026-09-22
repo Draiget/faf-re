@@ -63,7 +63,7 @@ namespace
 
 namespace moho
 {
-  void SC_PrimaryAdapter(void* const commandArgs)
+  void SC_PrimaryAdapter(const msvc8::vector<msvc8::string>& args)
   {
     gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
     CD3DDevice* const device = D3D_GetDevice();
@@ -78,13 +78,12 @@ namespace moho
 
     sDeviceLock = true;
 
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    const msvc8::string* const valueToken = args.At(1);
+    const msvc8::string* const valueToken = ConCommandArg(args, 1);
 
     // `overridden` is a sentinel meaning some other path already applied an
     // explicit resolution override; this invocation is then a no-op beyond
     // the device-lock toggle.
-    if (args.Count() == 2u && valueToken != nullptr && valueToken->view() != "overridden") {
+    if (args.size() == 2u && valueToken != nullptr && valueToken->view() != "overridden") {
       auto* const mainWindow = reinterpret_cast<WD3DViewport*>(sMainWindow);
 
       // 0x008D35AA-0x008D35B4: `head.mWindowed` is set from the *inverse* of
@@ -185,7 +184,7 @@ namespace moho
    * also never null-checked by the binary before the initial
    * `GetDeviceContext()` dereference, matching what this recovery keeps.
    */
-  void SC_VerticalSync(void* const commandArgs)
+  void SC_VerticalSync(const msvc8::vector<msvc8::string>& args)
   {
     gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
     CD3DDevice* const device = D3D_GetDevice();
@@ -193,8 +192,7 @@ namespace moho
 
     sDeviceLock = true;
 
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() == 2u) {
+    if (args.size() == 2u) {
       device->Clear();
       (void)device->InitContext(&deviceContext);
     }
@@ -232,14 +230,13 @@ namespace moho
    * "0"`; equal releases the clip, anything else attempts to clip to the
    * primary window's rect under the guards described in the header.
    */
-  void SC_ToggleCursorClip(void* const commandArgs)
+  void SC_ToggleCursorClip(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() > 2u) {
+    if (args.size() > 2u) {
       return;
     }
 
-    const msvc8::string* const modeToken = args.At(1u);
+    const msvc8::string* const modeToken = ConCommandArg(args, 1u);
     if (modeToken != nullptr && modeToken->view() == "0") {
       ::ClipCursor(nullptr);
       return;
@@ -295,14 +292,13 @@ namespace moho
    * `args[1].compare(0, args[1].size(), "true", 4) == 0`, i.e. `*args[1] ==
    * "true"`.
    */
-  void SC_SecondaryAdapter(void* const commandArgs)
+  void SC_SecondaryAdapter(const msvc8::vector<msvc8::string>& args)
   {
-    const ConCommandArgsView args = GetConCommandArgsView(commandArgs);
-    if (args.Count() != 2u) {
+    if (args.size() != 2u) {
       return;
     }
 
-    const msvc8::string* const modeToken = args.At(1u);
+    const msvc8::string* const modeToken = ConCommandArg(args, 1u);
     const bool adapterNotCommandLineOverridden = modeToken != nullptr && modeToken->view() == "true";
     SetupSecondaryAdapterSettings(adapterNotCommandLineOverridden);
   }
