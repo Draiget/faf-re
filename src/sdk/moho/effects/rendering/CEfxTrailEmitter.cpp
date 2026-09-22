@@ -435,54 +435,47 @@ namespace moho
     direction.z = curZ - prevZ;
     const float newLength = Wm3::Vector3f::Normalize(&direction) + mLength;
 
-    TrailRuntimeView trail{};
-    trail.sortScalar = mTrailBlueprint->SortOrder;
+    SWorldTrail trail{};
+    trail.mSortOrder = mTrailBlueprint->SortOrder;
 
-    // Retain the repeat texture (mParticleTextures[0]) into texture0 and the
-    // ramp texture (mParticleTextures[1]) into texture1: the counted handles'
-    // release-old / retain-new assignment (both are empty here, so only the
-    // retains fire).
-    (void)AssignCountedParticleTexturePtr(&trail.texture0, mParticleTextures.start_[0]);
-    (void)AssignCountedParticleTexturePtr(&trail.texture1, mParticleTextures.start_[1]);
+    // Retain the repeat texture (mParticleTextures[0]) and the ramp texture
+    // (mParticleTextures[1]): the counted handles' release-old / retain-new
+    // assignment (both are empty here, so only the retains fire).
+    (void)AssignCountedParticleTexturePtr(&trail.mTexture, mParticleTextures.start_[0]);
+    (void)AssignCountedParticleTexturePtr(&trail.mRampTexture, mParticleTextures.start_[1]);
 
-    // Endpoints; emit position is the fresh direction on the first tick, else
-    // the persisted trail position.
+    // The ribbon's two ends, and the tangent at each: the start end carries the
+    // previous segment's direction, which on the emitter's first tick is this
+    // segment's own.
     const bool firstTick = !mCreated;
-    const Wm3::Vector3f& emitPosition = firstTick ? direction : mSerializedTrailPosition;
-    trail.prevPosX = prevX;
-    trail.prevPosY = prevY;
-    trail.prevPosZ = prevZ;
-    trail.curPosX = curX;
-    trail.curPosY = curY;
-    trail.curPosZ = curZ;
-    trail.emitPosX = emitPosition.x;
-    trail.emitPosY = emitPosition.y;
-    trail.emitPosZ = emitPosition.z;
-    trail.dirX = direction.x;
-    trail.dirY = direction.y;
-    trail.dirZ = direction.z;
+    const Wm3::Vector3f& startTangent = firstTick ? direction : mSerializedTrailPosition;
+    trail.mStartPos.x = prevX;
+    trail.mStartPos.y = prevY;
+    trail.mStartPos.z = prevZ;
+    trail.mEndPos.x = curX;
+    trail.mEndPos.y = curY;
+    trail.mEndPos.z = curZ;
+    trail.mStartTangent = startTangent;
+    trail.mEndTangent = direction;
 
     // Advance running trail state to the new segment endpoint.
     const float previousLength = mLength;
     mLength = newLength;
-    mSerializedTrailPosition.x = direction.x;
-    mSerializedTrailPosition.y = direction.y;
-    mSerializedTrailPosition.z = direction.z;
+    mSerializedTrailPosition = direction;
     mCreated = true;
 
     const RTrailBlueprint* const bp = mTrailBlueprint;
-    trail.textureRepeatRateX = bp->TextureRepeatRate * previousLength;
-    trail.textureRepeatRateZ = bp->TextureRepeatRate * newLength;
-    trail.endOffset = static_cast<float>(-1 - tick);
-    trail.impactOffset = trail.endOffset + interpScale;
-    trail.trailLength = bp->TrailLength;
+    trail.mTexCoordStart = bp->TextureRepeatRate * previousLength;
+    trail.mTexCoordEnd = bp->TextureRepeatRate * newLength;
+    trail.mStartAge = static_cast<float>(-1 - tick);
+    trail.mEndAge = trail.mStartAge + interpScale;
+    trail.mLifetime = bp->TrailLength;
 
     const float life = mLife;
-    trail.lifeOffset = -life;
-    trail.size = bp->StartSize;
-    trail.tag = "TPolyTrail";
-    // 0x5C lane carries the blueprint blend mode as a raw dword.
-    std::memcpy(&trail.uvScalar, &bp->BlendMode, sizeof(trail.uvScalar));
+    trail.mEmitterAge = -life;
+    trail.mSize = bp->StartSize;
+    trail.mTypeTag = "TPolyTrail";
+    trail.mBlendMode = bp->BlendMode;
     mLife = life + 1.0f;
 
     Sim* const sim = mManager->GetSim();

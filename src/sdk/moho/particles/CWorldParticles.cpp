@@ -558,7 +558,7 @@ namespace
     );
     destination.tag = msvc8::string{};
     destination.tag.assign(source.tag, 0U, msvc8::string::npos);
-    destination.uvScalar = source.uvScalar;
+    destination.blendMode = source.blendMode;
     return &destination;
   }
 
@@ -1417,7 +1417,7 @@ namespace moho
    * its pending vector.
    */
   void CWorldParticles::AddTrail(
-    const TrailRuntimeView& trail,
+    const SWorldTrail& trail,
     TrailRenderBucketRuntime** const bucketCacheSlot
   )
   {
@@ -1475,7 +1475,7 @@ namespace moho
       AddWorldParticle(particle, nullptr);
     }
 
-    for (const TrailRuntimeView& trail : batch.mTrails) {
+    for (const SWorldTrail& trail : batch.mTrails) {
       AddTrail(trail, nullptr);
     }
 

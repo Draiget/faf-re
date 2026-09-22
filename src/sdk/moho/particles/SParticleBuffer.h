@@ -7,6 +7,7 @@
 #include "moho/particles/BeamRenderHelpers.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/particles/SWorldParticle.h"
+#include "moho/particles/SWorldTrail.h"
 
 namespace moho
 {
@@ -29,7 +30,7 @@ namespace moho
     SParticleBuffer();
 
     msvc8::vector<SWorldParticle> mParticles; // +0x00
-    msvc8::vector<TrailRuntimeView> mTrails;  // +0x10
+    msvc8::vector<SWorldTrail> mTrails;  // +0x10
     msvc8::vector<SWorldBeam> mBeams;         // +0x20
   };
 

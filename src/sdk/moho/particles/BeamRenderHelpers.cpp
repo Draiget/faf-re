@@ -691,7 +691,7 @@ namespace moho
    * What it does:
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
-  TrailBucketKeyRuntime* InitializeTrailBucketKeyFromTrail(TrailBucketKeyRuntime* const key, const TrailRuntimeView& trail)
+  TrailBucketKeyRuntime* InitializeTrailBucketKeyFromTrail(TrailBucketKeyRuntime* const key, const SWorldTrail& trail)
   {
     if (key == nullptr) {
       return nullptr;
@@ -701,11 +701,11 @@ namespace moho
     key->texture1.reset();
     key->tag = msvc8::string{};
 
-    key->sortScalar = trail.sortScalar;
+    key->sortScalar = trail.mSortOrder;
 
     CParticleTexture::TextureResourceHandle texture0{};
-    if (trail.texture0.tex != nullptr) {
-      trail.texture0.tex->GetTexture(texture0);
+    if (trail.mTexture.tex != nullptr) {
+      trail.mTexture.tex->GetTexture(texture0);
     }
     boost::AssignSharedPairRetain(
       reinterpret_cast<boost::SharedCountPair*>(&key->texture0),
@@ -713,16 +713,16 @@ namespace moho
     );
 
     CParticleTexture::TextureResourceHandle texture1{};
-    if (trail.texture1.tex != nullptr) {
-      trail.texture1.tex->GetTexture(texture1);
+    if (trail.mRampTexture.tex != nullptr) {
+      trail.mRampTexture.tex->GetTexture(texture1);
     }
     boost::AssignSharedPairRetain(
       reinterpret_cast<boost::SharedCountPair*>(&key->texture1),
       reinterpret_cast<const boost::SharedCountPair*>(&texture1)
     );
 
-    key->tag.assign_owned(trail.tag != nullptr ? trail.tag : "");
-    key->uvScalar = trail.uvScalar;
+    key->tag.assign_owned(trail.mTypeTag != nullptr ? trail.mTypeTag : "");
+    key->blendMode = trail.mBlendMode;
     return key;
   }
 
@@ -740,8 +740,10 @@ namespace moho
       return lhs.sortScalar > rhs.sortScalar;
     }
 
-    if (lhs.uvScalar != rhs.uvScalar) {
-      return rhs.uvScalar < lhs.uvScalar;
+    // Signed integer compare, as 0x0049253F spells it (`mov`/`cmp`/`setl`) --
+    // not the float compare the sort scalar above gets at 0x00492528.
+    if (lhs.blendMode != rhs.blendMode) {
+      return rhs.blendMode < lhs.blendMode;
     }
 
     if (AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0)) {
@@ -763,7 +765,7 @@ namespace moho
   bool AreTrailBucketKeysEquivalent(const TrailBucketKeyRuntime& lhs, const TrailBucketKeyRuntime& rhs) noexcept
   {
     return lhs.sortScalar == rhs.sortScalar &&
-           lhs.uvScalar == rhs.uvScalar &&
+           lhs.blendMode == rhs.blendMode &&
            AreSharedHandlesEquivalentForBucket(lhs.texture0, rhs.texture0) &&
            AreSharedHandlesEquivalentForBucket(lhs.texture1, rhs.texture1) &&
            lhs.tag == rhs.tag;
@@ -795,7 +797,7 @@ namespace moho
       reinterpret_cast<const boost::SharedCountPair*>(&source->texture1)
     );
     destination->tag = source->tag;
-    destination->uvScalar = source->uvScalar;
+    destination->blendMode = source->blendMode;
     return destination;
   }
 
