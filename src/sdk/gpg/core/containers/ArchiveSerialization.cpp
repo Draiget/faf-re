@@ -3345,9 +3345,7 @@ namespace
 
     moho::ISoundManager* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
-    if (previousValue != nullptr) {
-      previousValue->Destroy(1);
-    }
+    delete previousValue;
     return archive;
   }
 

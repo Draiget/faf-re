@@ -14,7 +14,7 @@ namespace moho
    * VFTABLE: 0x00E35A50
    * COL:     0x00E8F1B8
    */
-  class CSimSoundManager final : public ISoundManager
+  class CSimSoundManager : public ISoundManager
   {
   public:
     /**
@@ -111,33 +111,26 @@ namespace moho
     void Shutdown() override;
 
     /**
-     * Address: 0x00760EF0 (FUN_00760EF0)
-     * Slot: 5
-     *
-     * std::uint8_t deleteFlags
-     *
-     * IDA signature:
-     * void *__thiscall sub_760EF0(void *this, char deleteFlags);
-     *
-     * What it does:
-     * Executes deleting-style teardown: resets active-loop list and request
-     * queue, then conditionally frees `this`.
-     */
-    ISoundManager* Destroy(std::uint8_t flags) override;
-
-  private:
-    /**
      * Address: 0x00761520 (FUN_00761520)
+     * Slot: 5 -- held by the compiler-generated scalar deleting destructor
+     *   `??_GCSimSoundManager@Moho@@UAEPAXI@Z` at 0x00760EF0, which is the
+     *   ordinary `??_G` thunk over this body and is not source:
+     *     push esi / mov esi, ecx / call 0x00761520
+     *     test byte [esp+8], 1 / je / push esi / call ::operator delete
+     *     mov eax, esi / ret 4
      *
      * IDA signature:
      * Moho::SAudioRequest *__usercall sub_761520@<eax>(Moho::CSimSoundManager *this@<esi>);
      *
      * What it does:
-     * Non-deleting teardown helper used by slot-5 destroy wrapper.
+     * Unlinks the active-loop ring. The rest of 0x00761520 is compiler glue:
+     * the leading `mov [esi], 0xE35A50` vptr latch, the inlined
+     * `~fastvector_n` teardown of `mRequests` (the same body the linker kept
+     * standalone at 0x00401DE0), and the closing `mov [esi], 0xE359B0` that is
+     * `~ISoundManager` -- members in reverse declaration order, then the base.
      */
-    void TeardownNonDeleting();
+    ~CSimSoundManager() override;
 
-  public:
     Sim* mOwnerSim;                                 // +0x04
     gpg::fastvector_n<SAudioRequest, 64> mRequests; // +0x08
     TDatList<HSound, void> mActiveLoops;            // +0x718

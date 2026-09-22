@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <new>
 
 #include "moho/entity/Entity.h"
 
@@ -82,15 +81,6 @@ namespace
     return &destination;
   }
 
-  void ResetRequestQueueInline(moho::CSimSoundManager& manager)
-  {
-    manager.mRequests.ResetStorageToInline();
-  }
-
-  void ResetLoopList(LoopList& loops)
-  {
-    loops.ListUnlink();
-  }
 } // namespace
 
 namespace moho
@@ -160,7 +150,7 @@ namespace moho
     // The binary calls the copy helper unconditionally; the same-lane guard
     // lives inside it.
     (void)CopyRequests(outRequests, mRequests);
-    ResetRequestQueueInline(*this);
+    mRequests.ResetStorageToInline();
   }
 
   /**
@@ -257,32 +247,13 @@ namespace moho
    * Moho::SAudioRequest *__usercall sub_761520@<eax>(Moho::CSimSoundManager *this@<esi>);
    *
    * What it does:
-   * Non-deleting teardown helper used by slot-5 destroy wrapper.
+   * Unlinks the loop ring so no `HSound` is left naming the sentinel this
+   * object is about to take with it. Destroying `mRequests` and the
+   * `ISoundManager` base is the compiler's half of 0x00761520 and says nothing
+   * here -- see the note on the declaration.
    */
-  void CSimSoundManager::TeardownNonDeleting()
+  CSimSoundManager::~CSimSoundManager()
   {
-    ResetLoopList(mActiveLoops);
-    ResetRequestQueueInline(*this);
-  }
-
-  /**
-   * Address: 0x00760EF0 (FUN_00760EF0)
-   *
-   * std::uint8_t deleteFlags
-   *
-   * IDA signature:
-   * void *__thiscall sub_760EF0(void *this, char deleteFlags);
-   *
-   * What it does:
-   * Performs deleting-style destruction and optional free.
-   */
-  ISoundManager* CSimSoundManager::Destroy(const std::uint8_t flags)
-  {
-    TeardownNonDeleting();
-
-    if ((flags & 1u) != 0u) {
-      operator delete(this);
-    }
-    return this;
+    mActiveLoops.ListUnlink();
   }
 } // namespace moho
