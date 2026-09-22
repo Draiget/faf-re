@@ -124,6 +124,42 @@ namespace moho
      */
     [[nodiscard]] bool CanSeePoint(const Wm3::Vec3f& worldPos, EReconGridMask gridMask) const;
 
+    /**
+     * Address: 0x008B2500 (FUN_008B2500)
+     *
+     * IDA signature:
+     * msvc8::vector<WeakPtr<UserUnit>> *__usercall sub_8B2500@<eax>(
+     *     Moho::UserArmy *this@<ecx>, msvc8::vector<WeakPtr<UserUnit>> *out@<esi>);
+     *
+     * What it does:
+     * Returns a copy of `mAvatars` (the vector copy constructor, 0x008B2640).
+     * `cfunc_GetArmyAvatarsL` (0x008BCD48) walks the copy.
+     */
+    [[nodiscard]] msvc8::vector<WeakPtr<UserUnit>> GetAvatars() const;
+
+    /**
+     * Address: 0x008B2550 (FUN_008B2550)
+     *
+     * IDA signature:
+     * Moho::WeakSet_UserUnit *__userpurge sub_8B2550@<eax>(
+     *     Moho::UserArmy *this@<eax>, Moho::WeakSet_UserUnit *out);
+     *
+     * What it does:
+     * Returns a pruned copy of the idle-engineer registry: `begin()` over
+     * `mEngineers` (0x007B29C0) feeds the range constructor (0x00831310).
+     * `cfunc_GetIdleEngineersL` (0x008BCF89) walks the copy.
+     */
+    [[nodiscard]] WeakUnitSetUserUnit GetIdleEngineers();
+
+    /**
+     * Address: 0x008B25C0 (FUN_008B25C0)
+     *
+     * What it does:
+     * The same body as `GetIdleEngineers` over `mFactories` (+0x204).
+     * `cfunc_GetIdleFactoriesL` (0x008BD219) walks the copy.
+     */
+    [[nodiscard]] WeakUnitSetUserUnit GetIdleFactories();
+
   public:
     // 0x00..0x80 is the inherited `SSTIArmyConstantData` payload.
     SSTIArmyVariableData mVarDat; // 0x80
@@ -140,11 +176,11 @@ namespace moho
 
     /// Idle-engineer registry, populated from `UserUnit::Tick` (FUN_008B2520)
     /// and read by `GetIdleEngineers` (FUN_008BCEF0).
-    WeakEntitySetUserEntity mEngineers; // 0x1F8
+    WeakUnitSetUserUnit mEngineers; // 0x1F8
 
     /// Idle-factory registry, populated from `UserUnit::Tick` (FUN_008B2590)
     /// and read by `GetIdleFactories` (FUN_008BD180).
-    WeakEntitySetUserEntity mFactories; // 0x204
+    WeakUnitSetUserUnit mFactories; // 0x204
   };
 
   /**

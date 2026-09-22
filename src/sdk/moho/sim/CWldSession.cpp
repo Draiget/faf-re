@@ -9681,43 +9681,6 @@ namespace moho
     }
 
     /**
-     * Address: 0x00831310 (FUN_00831310, sub_831310)
-     *
-     * What it does:
-     * Initializes one destination weak-set from one source iterator range while
-     * pruning source tombstone nodes (`nullptr`/`(void*)8` owner-link lanes) on
-     * each iterator advance.
-     */
-    [[nodiscard]] SSelectionSetUserEntity* InitSelectionSetFromIteratorRangePruningSourceTombstones(
-      SSelectionSetUserEntity* const destination,
-      SSelectionSetUserEntity* const source,
-      SSelectionNodeUserEntity* first,
-      SSelectionNodeUserEntity* const last
-    )
-    {
-      if (destination == nullptr) {
-        return nullptr;
-      }
-
-      InitializeSelectionSetHeadStorage(destination);
-      if (source == nullptr || source->mHead == nullptr) {
-        return destination;
-      }
-
-      while (first != nullptr && first != last) {
-        if (UserEntity* const entity = DecodeSelectedUserEntity(first->mEnt); entity != nullptr) {
-          SSelectionSetUserEntity::AddResult addResult{};
-          (void)SSelectionSetUserEntity::Add(&addResult, destination, entity);
-        }
-
-        SSelectionSetUserEntity::Iterator_inc(&first);
-        (void)source->PruneTombstonesAndFindLive(&first, first);
-      }
-
-      return destination;
-    }
-
-    /**
      * Address: 0x00822210 (FUN_00822210, sub_822210)
      *
      * What it does:
@@ -11255,37 +11218,24 @@ namespace moho
     SSelectionSetUserEntity* const targeted = ResolveCommandIssueCursorEntities(*helper);
 
     // The walk runs over a pruned *copy* rather than the helper's live cache:
-    // the range constructor drops the source's tombstones as it reads, so the
-    // loop below never re-checks them. The guard's teardown is the binary's
-    // erase-range + `operator delete(mHead)` pair at 0x00826E6D/0x00826EC0,
-    // which runs on both the answered and the gave-up exit.
-    ScopedCopiedSelectionSet liveTargetsGuard{};
-    SSelectionSetUserEntity& liveTargets = liveTargetsGuard.get();
-    {
-      SSelectionNodeUserEntity* firstLive = nullptr;
-      (void)targeted->PruneTombstonesAndFindLive(&firstLive, targeted->mHead->mLeft);
-      (void)InitSelectionSetFromIteratorRangePruningSourceTombstones(
-        &liveTargets, targeted, firstLive, targeted->mHead
-      );
-    }
+    // the range constructor (0x00831310) drops the source's tombstones as it
+    // reads. The copy's destructor is the binary's erase-range +
+    // `operator delete(mHead)` pair at 0x00826E6D/0x00826EC0, which runs on
+    // both the answered and the gave-up exit.
+    WeakEntitySetUserEntity liveTargets(targeted->begin(), targeted->end());
 
     float slowestSpeed = std::numeric_limits<float>::max();
-    SSelectionNodeUserEntity* node = nullptr;
-    (void)liveTargets.PruneTombstonesAndFindLive(&node, liveTargets.mHead->mLeft);
-    while (node != liveTargets.mHead) {
+    for (UserEntity* const entity : liveTargets) {
+      auto* const unit = static_cast<UserUnit*>(entity);
       // Air units are held to their airspeed and everything else to its ground
       // speed. A unit with no positive speed of either kind is skipped rather
       // than making the whole orderline infinitely slow.
-      auto* const unit = static_cast<UserUnit*>(ResolveWeakEntitySetNodeEntity(*node));
       const RUnitBlueprint* const blueprint = GetIUnitBridge(unit)->GetBlueprint();
       const float unitSpeed =
         (blueprint->Air.CanFly != 0u) ? blueprint->Air.MaxAirspeed : blueprint->Physics.MaxSpeed;
       if (unitSpeed > 0.0f && slowestSpeed > unitSpeed) {
         slowestSpeed = unitSpeed;
       }
-
-      SSelectionSetUserEntity::Iterator_inc(&node);
-      (void)liveTargets.PruneTombstonesAndFindLive(&node, node);
     }
 
     // A set with nothing movable in it leaves the seed untouched, and the
@@ -13882,6 +13832,32 @@ namespace moho
     SSelectionSetUserEntity::Iterator_inc(&cursor->mRes);
     cursor->mRes = SSelectionSetUserEntity::find(cursor->mSet, cursor->mRes, &cursor->mRes);
     return cursor;
+  }
+
+  /**
+   * Address: 0x00831310 (FUN_00831310, sub_831310)
+   *
+   * What it does:
+   * Range constructor. Each source entity is added through `Add`, which
+   * brackets the tree insert (0x00822420) with a stack weak guard on the
+   * entity, exactly as the binary does at 0x0083137A..0x008313E1.
+   */
+  WeakEntitySetUserEntity::WeakEntitySetUserEntity(iterator first, const iterator last)
+  {
+    InitWeakEntitySetHead(*this);
+    for (; first != last; ++first) {
+      AddResult added{};
+      (void)Add(&added, this, *first);
+    }
+  }
+
+  std::int32_t WeakEntitySetUserEntity::Count()
+  {
+    std::int32_t count = 0;
+    for (iterator it = begin(); it != end(); ++it) {
+      ++count;
+    }
+    return count;
   }
 
   /**

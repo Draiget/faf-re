@@ -116,6 +116,30 @@ namespace moho
   }
 
   /**
+   * Address: 0x008B2500 (FUN_008B2500)
+   */
+  msvc8::vector<WeakPtr<UserUnit>> UserArmy::GetAvatars() const
+  {
+    return mAvatars;
+  }
+
+  /**
+   * Address: 0x008B2550 (FUN_008B2550)
+   */
+  WeakUnitSetUserUnit UserArmy::GetIdleEngineers()
+  {
+    return WeakUnitSetUserUnit(mEngineers.begin(), mEngineers.end());
+  }
+
+  /**
+   * Address: 0x008B25C0 (FUN_008B25C0)
+   */
+  WeakUnitSetUserUnit UserArmy::GetIdleFactories()
+  {
+    return WeakUnitSetUserUnit(mFactories.begin(), mFactories.end());
+  }
+
+  /**
    * Address: 0x008B14D0 (FUN_008B14D0, Moho::UserArmy::GetExploredReconGrid)
    */
   boost::shared_ptr<CIntelGrid> UserArmy::GetExploredReconGrid() const

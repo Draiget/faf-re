@@ -1827,697 +1827,11 @@ namespace
     return unit ? static_cast<const IUnit*>(unit) : nullptr;
   }
 
-  struct UserEntityWeakRefRuntimeView
-  {
-    void* ownerLinkSlot;                          // +0x00
-    UserEntityWeakRefRuntimeView* nextOwnerLink;  // +0x04
-  };
-  static_assert(sizeof(UserEntityWeakRefRuntimeView) == 0x08, "UserEntityWeakRefRuntimeView size must be 0x08");
-  static_assert(
-    offsetof(UserEntityWeakRefRuntimeView, ownerLinkSlot) == 0x00,
-    "UserEntityWeakRefRuntimeView::ownerLinkSlot offset must be 0x00"
-  );
-  static_assert(
-    offsetof(UserEntityWeakRefRuntimeView, nextOwnerLink) == 0x04,
-    "UserEntityWeakRefRuntimeView::nextOwnerLink offset must be 0x04"
-  );
-
-  struct UserEntityWeakSetNodeRuntimeView
-  {
-    UserEntityWeakSetNodeRuntimeView* left;        // +0x00
-    UserEntityWeakSetNodeRuntimeView* parent;      // +0x04
-    UserEntityWeakSetNodeRuntimeView* right;       // +0x08
-    std::uint32_t key;                             // +0x0C
-    UserEntityWeakRefRuntimeView weakEntityLink;   // +0x10
-    std::uint8_t color;                            // +0x18
-    std::uint8_t isNil;                            // +0x19
-    std::uint8_t pad_001A_001B[0x02];
-  };
-  static_assert(sizeof(UserEntityWeakSetNodeRuntimeView) == 0x1C, "UserEntityWeakSetNodeRuntimeView size must be 0x1C");
-  static_assert(
-    offsetof(UserEntityWeakSetNodeRuntimeView, weakEntityLink) == 0x10,
-    "UserEntityWeakSetNodeRuntimeView::weakEntityLink offset must be 0x10"
-  );
-  static_assert(
-    offsetof(UserEntityWeakSetNodeRuntimeView, isNil) == 0x19,
-    "UserEntityWeakSetNodeRuntimeView::isNil offset must be 0x19"
-  );
-
-  struct UserEntityWeakSetRuntimeView
-  {
-    void* allocatorProxy;                           // +0x00
-    UserEntityWeakSetNodeRuntimeView* head;         // +0x04
-    std::uint32_t size;                             // +0x08
-  };
-  static_assert(sizeof(UserEntityWeakSetRuntimeView) == 0x0C, "UserEntityWeakSetRuntimeView size must be 0x0C");
-  static_assert(
-    offsetof(UserEntityWeakSetRuntimeView, head) == 0x04,
-    "UserEntityWeakSetRuntimeView::head offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserEntityWeakSetRuntimeView, size) == 0x08,
-    "UserEntityWeakSetRuntimeView::size offset must be 0x08"
-  );
-
-  struct UserArmyAvatarVectorRuntimeView
-  {
-    void* allocatorProxy;                            // +0x00
-    UserEntityWeakRefRuntimeView* begin;             // +0x04
-    UserEntityWeakRefRuntimeView* end;               // +0x08
-    UserEntityWeakRefRuntimeView* capacityEnd;       // +0x0C
-  };
-  static_assert(sizeof(UserArmyAvatarVectorRuntimeView) == 0x10, "UserArmyAvatarVectorRuntimeView size must be 0x10");
-  static_assert(
-    offsetof(UserArmyAvatarVectorRuntimeView, begin) == 0x04,
-    "UserArmyAvatarVectorRuntimeView::begin offset must be 0x04"
-  );
-  static_assert(
-    offsetof(UserArmyAvatarVectorRuntimeView, end) == 0x08, "UserArmyAvatarVectorRuntimeView::end offset must be 0x08"
-  );
-
-  struct UserArmyAvatarRuntimeView
-  {
-    std::uint8_t pad_0000_01E8[0x1E8];
-    UserArmyAvatarVectorRuntimeView avatarWeakRefs;  // +0x1E8
-  };
-  static_assert(
-    offsetof(UserArmyAvatarRuntimeView, avatarWeakRefs) == 0x1E8,
-    "UserArmyAvatarRuntimeView::avatarWeakRefs offset must be 0x1E8"
-  );
-
-  struct UserArmyIdleSetsRuntimeView
-  {
-    std::uint8_t pad_0000_01F8[0x1F8];
-    UserEntityWeakSetRuntimeView idleEngineerUnits;  // +0x1F8
-    UserEntityWeakSetRuntimeView idleFactoryUnits;   // +0x204
-  };
-  static_assert(
-    offsetof(UserArmyIdleSetsRuntimeView, idleEngineerUnits) == 0x1F8,
-    "UserArmyIdleSetsRuntimeView::idleEngineerUnits offset must be 0x1F8"
-  );
-  static_assert(
-    offsetof(UserArmyIdleSetsRuntimeView, idleFactoryUnits) == 0x204,
-    "UserArmyIdleSetsRuntimeView::idleFactoryUnits offset must be 0x204"
-  );
-
-  [[nodiscard]] UserArmy* ResolveFocusArmy(CWldSession* const session) noexcept
-  {
-    if (session == nullptr || session->FocusArmy < 0) {
-      return nullptr;
-    }
-
-    const std::size_t focusArmyIndex = static_cast<std::size_t>(session->FocusArmy);
-    if (focusArmyIndex >= session->userArmies.size()) {
-      return nullptr;
-    }
-
-    return session->userArmies[focusArmyIndex];
-  }
-
-  [[nodiscard]] UserEntity* DecodeLinkedUserEntity(const UserEntityWeakRefRuntimeView& weakRef) noexcept
-  {
-    if (weakRef.ownerLinkSlot == nullptr) {
-      return nullptr;
-    }
-
-    constexpr std::uintptr_t kOwnerLinkOffset = offsetof(UserEntity, mIUnitChainHead);
-    const std::uintptr_t rawOwnerLink = reinterpret_cast<std::uintptr_t>(weakRef.ownerLinkSlot);
-    if (rawOwnerLink <= kOwnerLinkOffset) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<UserEntity*>(rawOwnerLink - kOwnerLinkOffset);
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetMinNode(
-    UserEntityWeakSetNodeRuntimeView* node,
-    UserEntityWeakSetNodeRuntimeView* const head
-  ) noexcept
-  {
-    while (node != nullptr && node != head && node->left != head) {
-      node = node->left;
-    }
-    return node != nullptr ? node : head;
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetFirstNode(const UserEntityWeakSetRuntimeView& set) noexcept
-  {
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    if (head == nullptr || head->isNil == 0u) {
-      return nullptr;
-    }
-
-    UserEntityWeakSetNodeRuntimeView* const root = head->parent;
-    if (root == nullptr || root == head || root->isNil != 0u) {
-      return head;
-    }
-
-    return WeakSetMinNode(root, head);
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetNextNode(
-    UserEntityWeakSetNodeRuntimeView* node,
-    UserEntityWeakSetNodeRuntimeView* const head
-  ) noexcept
-  {
-    if (node == nullptr || head == nullptr || node == head) {
-      return head;
-    }
-
-    if (node->right != head) {
-      return WeakSetMinNode(node->right, head);
-    }
-
-    UserEntityWeakSetNodeRuntimeView* parent = node->parent;
-    while (parent != nullptr && parent != head && node == parent->right) {
-      node = parent;
-      parent = parent->parent;
-    }
-    return parent != nullptr ? parent : head;
-  }
-
-  [[nodiscard]] bool WeakSetNodeHasLiveOwner(const UserEntityWeakSetNodeRuntimeView* const node) noexcept
-  {
-    return node != nullptr
-      && node->isNil == 0u
-      && node->weakEntityLink.ownerLinkSlot != nullptr
-      && node->weakEntityLink.ownerLinkSlot != reinterpret_cast<void*>(8);
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetTreeMaxNode(
-    UserEntityWeakSetNodeRuntimeView* node,
-    UserEntityWeakSetNodeRuntimeView* const head
-  ) noexcept
-  {
-    while (node != nullptr && node != head && node->right != head) {
-      node = node->right;
-    }
-    return node != nullptr ? node : head;
-  }
-
-  void WeakSetRecomputeExtrema(UserEntityWeakSetRuntimeView& set) noexcept
-  {
-    if (set.head == nullptr) {
-      return;
-    }
-
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    UserEntityWeakSetNodeRuntimeView* const root = head->parent;
-    if (root == nullptr || root == head || root->isNil != 0u) {
-      head->parent = head;
-      head->left = head;
-      head->right = head;
-      return;
-    }
-
-    head->left = WeakSetMinNode(root, head);
-    head->right = WeakSetTreeMaxNode(root, head);
-  }
-
-  void WeakSetReplaceSubtree(
-    UserEntityWeakSetRuntimeView& set,
-    UserEntityWeakSetNodeRuntimeView* const oldNode,
-    UserEntityWeakSetNodeRuntimeView* const newNode
-  ) noexcept
-  {
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    if (oldNode->parent == head) {
-      head->parent = newNode;
-    } else if (oldNode == oldNode->parent->left) {
-      oldNode->parent->left = newNode;
-    } else {
-      oldNode->parent->right = newNode;
-    }
-
-    if (newNode != nullptr && newNode->isNil == 0u) {
-      newNode->parent = oldNode->parent;
-    }
-  }
-
-  void WeakSetRotateLeft(UserEntityWeakSetRuntimeView& set, UserEntityWeakSetNodeRuntimeView* const node) noexcept
-  {
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    UserEntityWeakSetNodeRuntimeView* const pivot = node->right;
-    node->right = pivot->left;
-    if (pivot->left != nullptr && pivot->left->isNil == 0u) {
-      pivot->left->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->left = node;
-    node->parent = pivot;
-  }
-
-  void WeakSetRotateRight(UserEntityWeakSetRuntimeView& set, UserEntityWeakSetNodeRuntimeView* const node) noexcept
-  {
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    UserEntityWeakSetNodeRuntimeView* const pivot = node->left;
-    node->left = pivot->right;
-    if (pivot->right != nullptr && pivot->right->isNil == 0u) {
-      pivot->right->parent = node;
-    }
-
-    pivot->parent = node->parent;
-    if (node->parent == head) {
-      head->parent = pivot;
-    } else if (node == node->parent->left) {
-      node->parent->left = pivot;
-    } else {
-      node->parent->right = pivot;
-    }
-
-    pivot->right = node;
-    node->parent = pivot;
-  }
-
-  void WeakSetUnlinkOwnerRef(UserEntityWeakRefRuntimeView& weakRef) noexcept
-  {
-    auto** ownerLinkSlot = reinterpret_cast<UserEntityWeakRefRuntimeView**>(weakRef.ownerLinkSlot);
-    if (ownerLinkSlot == nullptr) {
-      return;
-    }
-
-    while (*ownerLinkSlot != nullptr && *ownerLinkSlot != &weakRef) {
-      ownerLinkSlot = &(*ownerLinkSlot)->nextOwnerLink;
-    }
-
-    if (*ownerLinkSlot == &weakRef) {
-      *ownerLinkSlot = weakRef.nextOwnerLink;
-    }
-
-    weakRef.ownerLinkSlot = nullptr;
-    weakRef.nextOwnerLink = nullptr;
-  }
-
-  void WeakSetFixupAfterErase(
-    UserEntityWeakSetRuntimeView& set,
-    UserEntityWeakSetNodeRuntimeView* node,
-    UserEntityWeakSetNodeRuntimeView* nodeParent
-  ) noexcept
-  {
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    UserEntityWeakSetNodeRuntimeView* parent = node != nullptr && node->isNil == 0u ? node->parent : nodeParent;
-    while (node != head->parent && (node == nullptr || node->isNil != 0u || node->color == 1u)) {
-      if (parent == nullptr) {
-        break;
-      }
-
-      if (node == parent->left) {
-        UserEntityWeakSetNodeRuntimeView* sibling = parent->right;
-        if (sibling == head) {
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-        if (sibling->color == 0u) {
-          sibling->color = 1u;
-          parent->color = 0u;
-          WeakSetRotateLeft(set, parent);
-          sibling = parent->right;
-        }
-
-        const bool leftBlack = sibling->left == nullptr || sibling->left->isNil != 0u || sibling->left->color == 1u;
-        const bool rightBlack = sibling->right == nullptr || sibling->right->isNil != 0u || sibling->right->color == 1u;
-        if (leftBlack && rightBlack) {
-          sibling->color = 0u;
-          node = parent;
-          parent = node->parent;
-          continue;
-        }
-
-        if (sibling->right == nullptr || sibling->right->isNil != 0u || sibling->right->color == 1u) {
-          if (sibling->left != nullptr && sibling->left->isNil == 0u) {
-            sibling->left->color = 1u;
-          }
-          sibling->color = 0u;
-          WeakSetRotateRight(set, sibling);
-          sibling = parent->right;
-        }
-
-        sibling->color = parent->color;
-        parent->color = 1u;
-        if (sibling->right != nullptr && sibling->right->isNil == 0u) {
-          sibling->right->color = 1u;
-        }
-        WeakSetRotateLeft(set, parent);
-        node = head->parent;
-        break;
-      }
-
-      UserEntityWeakSetNodeRuntimeView* sibling = parent->left;
-      if (sibling == head) {
-        node = parent;
-        parent = node->parent;
-        continue;
-      }
-      if (sibling->color == 0u) {
-        sibling->color = 1u;
-        parent->color = 0u;
-        WeakSetRotateRight(set, parent);
-        sibling = parent->left;
-      }
-
-      const bool rightBlack = sibling->right == nullptr || sibling->right->isNil != 0u || sibling->right->color == 1u;
-      const bool leftBlack = sibling->left == nullptr || sibling->left->isNil != 0u || sibling->left->color == 1u;
-      if (rightBlack && leftBlack) {
-        sibling->color = 0u;
-        node = parent;
-        parent = node->parent;
-        continue;
-      }
-
-      if (sibling->left == nullptr || sibling->left->isNil != 0u || sibling->left->color == 1u) {
-        if (sibling->right != nullptr && sibling->right->isNil == 0u) {
-          sibling->right->color = 1u;
-        }
-        sibling->color = 0u;
-        WeakSetRotateLeft(set, sibling);
-        sibling = parent->left;
-      }
-
-      sibling->color = parent->color;
-      parent->color = 1u;
-      if (sibling->left != nullptr && sibling->left->isNil == 0u) {
-        sibling->left->color = 1u;
-      }
-      WeakSetRotateRight(set, parent);
-      node = head->parent;
-      break;
-    }
-
-    if (node != nullptr && node->isNil == 0u) {
-      node->color = 1u;
-    }
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetEraseNodeAndAdvance(
-    UserEntityWeakSetRuntimeView& set,
-    UserEntityWeakSetNodeRuntimeView* const node
-  )
-  {
-    if (set.head == nullptr || node == nullptr || node->isNil != 0u) {
-      throw std::out_of_range("invalid map/set<T> iterator");
-    }
-
-    UserEntityWeakSetNodeRuntimeView* const head = set.head;
-    UserEntityWeakSetNodeRuntimeView* const next = WeakSetNextNode(node, head);
-
-    UserEntityWeakSetNodeRuntimeView* removed = node;
-    UserEntityWeakSetNodeRuntimeView* spliceTarget = node;
-    std::uint8_t removedColor = spliceTarget->color;
-    UserEntityWeakSetNodeRuntimeView* fixNode = head;
-    UserEntityWeakSetNodeRuntimeView* fixParent = head;
-
-    if (node->left == nullptr || node->left->isNil != 0u) {
-      fixNode = node->right;
-      fixParent = node->parent;
-      WeakSetReplaceSubtree(set, node, node->right);
-    } else if (node->right == nullptr || node->right->isNil != 0u) {
-      fixNode = node->left;
-      fixParent = node->parent;
-      WeakSetReplaceSubtree(set, node, node->left);
-    } else {
-      spliceTarget = WeakSetMinNode(node->right, head);
-      removedColor = spliceTarget->color;
-      fixNode = spliceTarget->right;
-      if (spliceTarget->parent == node) {
-        fixParent = spliceTarget;
-        if (fixNode != nullptr && fixNode->isNil == 0u) {
-          fixNode->parent = spliceTarget;
-        }
-      } else {
-        fixParent = spliceTarget->parent;
-        WeakSetReplaceSubtree(set, spliceTarget, spliceTarget->right);
-        spliceTarget->right = node->right;
-        spliceTarget->right->parent = spliceTarget;
-      }
-
-      WeakSetReplaceSubtree(set, node, spliceTarget);
-      spliceTarget->left = node->left;
-      spliceTarget->left->parent = spliceTarget;
-      spliceTarget->color = node->color;
-    }
-
-    WeakSetUnlinkOwnerRef(removed->weakEntityLink);
-    ::operator delete(removed);
-
-    if (set.size > 0u) {
-      --set.size;
-    }
-    if (removedColor == 1u) {
-      WeakSetFixupAfterErase(set, fixNode, fixParent);
-    }
-
-    WeakSetRecomputeExtrema(set);
-    return next;
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetPruneTombstonesAndFindLive(
-    UserEntityWeakSetRuntimeView& set,
-    UserEntityWeakSetNodeRuntimeView* const start
-  );
-
-  void WeakSetDestroySubtree(UserEntityWeakSetNodeRuntimeView* const node)
-  {
-    UserEntityWeakSetNodeRuntimeView* cursor = node;
-    while (cursor != nullptr && cursor->isNil == 0u) {
-      WeakSetDestroySubtree(cursor->right);
-
-      UserEntityWeakSetNodeRuntimeView* const left = cursor->left;
-      WeakSetUnlinkOwnerRef(cursor->weakEntityLink);
-      ::operator delete(cursor);
-      cursor = left;
-    }
-  }
-
-  /**
-   * Address: 0x007B33B0 (FUN_007B33B0, std::map_uint_WeakPtr_UserEntity::erase)
-   *
-   * What it does:
-   * Erases one half-open weak-set node range and preserves the binary iterator
-   * contract by returning the first node that remains after the range.
-   */
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView** EraseUserEntityWeakSetRange(
-    UserEntityWeakSetRuntimeView* const set,
-    UserEntityWeakSetNodeRuntimeView** const outNode,
-    UserEntityWeakSetNodeRuntimeView* const first,
-    UserEntityWeakSetNodeRuntimeView* const last
-  )
-  {
-    if (set == nullptr || set->head == nullptr) {
-      *outNode = nullptr;
-      return outNode;
-    }
-
-    UserEntityWeakSetNodeRuntimeView* node = first;
-    UserEntityWeakSetNodeRuntimeView* const head = set->head;
-    if (first == head->left && last == head) {
-      WeakSetDestroySubtree(head->parent);
-      head->parent = head;
-      set->size = 0u;
-      head->left = head;
-      head->right = head;
-      *outNode = head->left;
-      return outNode;
-    }
-
-    while (node != last && node != nullptr && node != head) {
-      node = WeakSetEraseNodeAndAdvance(*set, node);
-    }
-
-    *outNode = node;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x007B2530 (FUN_007B2530, std::map_uint_WeakPtr_UserEntity::~map)
-   *
-   * What it does:
-   * Releases one weak-set tree object, clears its head slot, and zeroes the
-   * live element count after full-range teardown.
-   */
-  [[nodiscard]] std::int32_t ReleaseUserEntityWeakSetStorage(UserEntityWeakSetRuntimeView* const set)
-  {
-    if (set == nullptr) {
-      return 0;
-    }
-
-    UserEntityWeakSetNodeRuntimeView* cursor = nullptr;
-    (void)EraseUserEntityWeakSetRange(set, &cursor, set->head != nullptr ? set->head->left : nullptr, set->head);
-    if (set->head != nullptr) {
-      ::operator delete(set->head);
-      set->head = nullptr;
-    }
-    set->size = 0u;
-    return 0;
-  }
-
-  /**
-   * Address: 0x007B2650 (FUN_007B2650, sub_7B2650)
-   *
-   * What it does:
-   * Releases one weak-set map storage lane by erasing all nodes, deleting the
-   * head sentinel, and zeroing `{head,size}`.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t ReleaseUserEntityWeakSetStorageCompat(UserEntityWeakSetRuntimeView* const set)
-  {
-    return ReleaseUserEntityWeakSetStorage(set);
-  }
-
-  /**
-   * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
-   *
-   * What it does:
-   * Counts live weak-set entries, pruning tombstone nodes along the way so the
-   * iterator walk matches the binary's pruning-and-count loop.
-   */
-  [[nodiscard]] std::int32_t CountLiveUserEntityWeakSetEntriesAndPrune(UserEntityWeakSetRuntimeView* const set)
-  {
-    if (set == nullptr || set->head == nullptr) {
-      return 0;
-    }
-
-    UserEntityWeakSetNodeRuntimeView* node = WeakSetPruneTombstonesAndFindLive(*set, set->head->left);
-    if (node == nullptr || node == set->head) {
-      return 0;
-    }
-
-    std::int32_t count = 0;
-    do {
-      ++count;
-      node = WeakSetNextNode(node, set->head);
-      if (node != set->head) {
-        node = WeakSetPruneTombstonesAndFindLive(*set, node);
-      }
-    } while (node != nullptr && node != set->head);
-
-    return count;
-  }
-
-  [[nodiscard]] UserEntityWeakSetNodeRuntimeView* WeakSetPruneTombstonesAndFindLive(
-    UserEntityWeakSetRuntimeView& set,
-    UserEntityWeakSetNodeRuntimeView* const start
-  )
-  {
-    UserEntityWeakSetNodeRuntimeView* node = start;
-    if (set.head == nullptr) {
-      return nullptr;
-    }
-
-    while (node != set.head) {
-      if (WeakSetNodeHasLiveOwner(node)) {
-        break;
-      }
-
-      node = WeakSetEraseNodeAndAdvance(set, node);
-    }
-
-    return node;
-  }
-
-  void AppendEntityUnitLuaObject(
-    LuaPlus::LuaObject& resultTable,
-    std::int32_t& luaIndex,
-    UserEntity* const entity
-  )
-  {
-    if (entity == nullptr) {
-      return;
-    }
-
-    UserUnit* const userUnit = entity->IsUserUnit();
-    IUnit* const iunitBridge = ResolveIUnitBridge(userUnit);
-    if (iunitBridge == nullptr) {
-      return;
-    }
-
-    LuaPlus::LuaObject unitObject = iunitBridge->GetLuaObject();
-    resultTable.SetObject(luaIndex, unitObject);
-    ++luaIndex;
-  }
-
-  [[nodiscard]] UserEntityWeakSetRuntimeView* ResolveIdleUnitSetView(
-    UserArmy* const army,
-    const bool useFactorySet
-  ) noexcept
-  {
-    if (army == nullptr) {
-      return nullptr;
-    }
-
-    auto* const runtimeView = reinterpret_cast<UserArmyIdleSetsRuntimeView*>(army);
-    return useFactorySet ? &runtimeView->idleFactoryUnits : &runtimeView->idleEngineerUnits;
-  }
-
-  [[nodiscard]] const UserArmyAvatarVectorRuntimeView& ResolveArmyAvatarVectorView(const UserArmy* const army) noexcept
-  {
-    return reinterpret_cast<const UserArmyAvatarRuntimeView*>(army)->avatarWeakRefs;
-  }
-
-  struct UserUnitAssistTargetRuntimeView
-  {
-    std::uint8_t pad_0000_03C0[0x3C0];
-    UserEntityWeakRefRuntimeView assistTargetLink; // +0x3C0
-  };
-  static_assert(
-    offsetof(UserUnitAssistTargetRuntimeView, assistTargetLink) == 0x3C0,
-    "UserUnitAssistTargetRuntimeView::assistTargetLink offset must be 0x3C0"
-  );
-
-  [[nodiscard]] UserUnit* ResolveAssistTargetUnit(const UserUnit* const unit) noexcept
-  {
-    if (unit == nullptr) {
-      return nullptr;
-    }
-
-    const auto* const runtime = reinterpret_cast<const UserUnitAssistTargetRuntimeView*>(unit);
-    UserEntity* const assistEntity = DecodeLinkedUserEntity(runtime->assistTargetLink);
-    return assistEntity ? assistEntity->IsUserUnit() : nullptr;
-  }
-
-  struct UserUnitScriptBitRuntimeView
-  {
-    std::uint8_t pad_0000_03A8[0x3A8];
-    std::int32_t scriptBitMask; // +0x3A8
-  };
-  static_assert(
-    offsetof(UserUnitScriptBitRuntimeView, scriptBitMask) == 0x3A8,
-    "UserUnitScriptBitRuntimeView::scriptBitMask offset must be 0x3A8"
-  );
-
   [[nodiscard]] std::int64_t BuildScriptBitMask(const int bitIndex) noexcept
   {
     const std::uint32_t bitShift = static_cast<std::uint32_t>(bitIndex);
     return bitShift < 64u ? static_cast<std::int64_t>(1ull << bitShift) : 0;
   }
-
-  [[nodiscard]] std::int64_t GetUserUnitScriptBitMask(const UserUnit* const userUnit) noexcept
-  {
-    if (userUnit == nullptr) {
-      return 0;
-    }
-
-    const auto* const view = reinterpret_cast<const UserUnitScriptBitRuntimeView*>(userUnit);
-    return static_cast<std::int64_t>(view->scriptBitMask);
-  }
-
-  struct UserUnitLuaObjectRuntimeView
-  {
-    std::uint8_t pad_0000_0170[0x170];
-    LuaPlus::LuaObject luaObject; // +0x170
-  };
-  static_assert(
-    offsetof(UserUnitLuaObjectRuntimeView, luaObject) == 0x170,
-    "UserUnitLuaObjectRuntimeView::luaObject offset must be 0x170"
-  );
 
   [[nodiscard]] UserEntity*
   FindUserSessionEntityById(CWldSession* const session, const std::int32_t entityId) noexcept
@@ -2567,11 +1881,6 @@ namespace
     if (std::find(selectionUnits.begin(), selectionUnits.end(), unit) == selectionUnits.end()) {
       selectionUnits.push_back(unit);
     }
-  }
-
-  [[nodiscard]] const UserUnitLuaObjectRuntimeView& GetUserUnitLuaObjectView(const UserUnit* const userUnit) noexcept
-  {
-    return *reinterpret_cast<const UserUnitLuaObjectRuntimeView*>(userUnit);
   }
 
   /**
@@ -4823,27 +4132,6 @@ namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
-   *
-   * What it does:
-   * Bridge for the recovered Sim.cpp-local `CountLiveUserEntityWeakSetEntriesAndPrune`
-   * worker: counts live weak-set entries in `set`, pruning tombstone nodes along
-   * the way, for callers outside Sim.cpp (`CFormation::ChooseFormation`'s own
-   * participant-tracking set). `WeakEntitySetUserEntity` and the Sim.cpp-local
-   * `UserEntityWeakSetRuntimeView` share the identical 12-byte
-   * `{allocProxy,head,size}` binary layout (both size/offset-asserted), so the
-   * reinterpret is a same-shape view, not a layout guess.
-   */
-  std::int32_t CountLiveUserEntityWeakSetEntriesAndPrune(WeakEntitySetUserEntity& set)
-  {
-    static_assert(
-      sizeof(WeakEntitySetUserEntity) == sizeof(UserEntityWeakSetRuntimeView),
-      "WeakEntitySetUserEntity and UserEntityWeakSetRuntimeView must share the same 12-byte layout"
-    );
-    return CountLiveUserEntityWeakSetEntriesAndPrune(reinterpret_cast<UserEntityWeakSetRuntimeView*>(&set));
-  }
-
   /**
    * Address: 0x008B4AC0 (FUN_008B4AC0, sub_8B4AC0)
    *
@@ -18397,8 +17685,9 @@ int moho::cfunc_ToggleScriptBitL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      const bool scriptBitStateMatches =
-        (GetUserUnitScriptBitMask(userUnit) & BuildScriptBitMask(bitIndex)) != 0;
+      // `cdq` at 0x008BBFE9: the bits are widened as a signed 32-bit value.
+      const auto scriptBits = static_cast<std::int64_t>(static_cast<std::int32_t>(userUnit->mUnitVarDat.mScriptbits));
+      const bool scriptBitStateMatches = (scriptBits & BuildScriptBitMask(bitIndex)) != 0;
       if (scriptBitStateMatches != currentState) {
         continue;
       }
@@ -18815,8 +18104,8 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
         continue;
       }
 
-      const UserUnit* const assistTarget = ResolveAssistTargetUnit(candidateUnit);
-      if (candidateUnit != sourceUnit && assistTarget != sourceUnit) {
+      // 0x008BCADF: kept when the candidate is the source or was built by it.
+      if (candidateUnit != sourceUnit && candidateUnit->GetCreator() != sourceUnit) {
         continue;
       }
 
@@ -18877,8 +18166,7 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
   }
 
   CWldSession* const session = WLD_GetActiveSession();
-  UserArmy* const focusArmy = ResolveFocusArmy(session);
-  if (focusArmy == nullptr) {
+  if (session == nullptr || session->GetFocusArmy() == nullptr) {
     return 0;
   }
 
@@ -18888,21 +18176,23 @@ int moho::cfunc_GetArmyAvatarsL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetArmyAvatarsHelpText, 0, argumentCount);
   }
 
-  const UserArmyAvatarVectorRuntimeView& avatarRefs = ResolveArmyAvatarVectorView(focusArmy);
-
-  if (avatarRefs.begin == nullptr || avatarRefs.end == nullptr || avatarRefs.end <= avatarRefs.begin) {
+  const msvc8::vector<WeakPtr<UserUnit>> avatars = session->GetFocusArmy()->GetAvatars();
+  if (avatars.empty()) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
-  const int tableCapacity = static_cast<int>(avatarRefs.end - avatarRefs.begin);
   LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, tableCapacity, 0u);
+  resultTable.AssignNewTable(state, static_cast<std::int32_t>(avatars.size()), 0u);
 
   std::int32_t luaIndex = 1;
-  for (const UserEntityWeakRefRuntimeView* weakRef = avatarRefs.begin; weakRef < avatarRefs.end; ++weakRef) {
-    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(*weakRef));
+  for (const WeakPtr<UserUnit>& avatar : avatars) {
+    if (UserUnit* const unit = avatar.GetObjectPtr(); unit != nullptr) {
+      LuaPlus::LuaObject unitObject = unit->GetLuaObject();
+      resultTable.SetObject(luaIndex, unitObject);
+      ++luaIndex;
+    }
   }
 
   resultTable.PushStack(state);
@@ -18952,8 +18242,7 @@ int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
   }
 
   CWldSession* const session = WLD_GetActiveSession();
-  UserArmy* const focusArmy = ResolveFocusArmy(session);
-  if (focusArmy == nullptr) {
+  if (session == nullptr || session->GetFocusArmy() == nullptr) {
     return 0;
   }
 
@@ -18963,22 +18252,23 @@ int moho::cfunc_GetIdleEngineersL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleEngineersHelpText, 0, argumentCount);
   }
 
-  UserEntityWeakSetRuntimeView* const idleSet = ResolveIdleUnitSetView(focusArmy, false);
-  const int liveUnitCount = CountLiveUserEntityWeakSetEntriesAndPrune(idleSet);
-  if (idleSet == nullptr || idleSet->head == nullptr || liveUnitCount <= 0) {
+  WeakUnitSetUserUnit idleUnits = session->GetFocusArmy()->GetIdleEngineers();
+  if (idleUnits.Count() == 0) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
   LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, liveUnitCount, 0u);
+  resultTable.AssignNewTable(state, idleUnits.Count(), 0u);
 
   std::int32_t luaIndex = 1;
-  for (UserEntityWeakSetNodeRuntimeView* node = WeakSetFirstNode(*idleSet);
-       node != nullptr && node != idleSet->head;
-       node = WeakSetNextNode(node, idleSet->head)) {
-    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(node->weakEntityLink));
+  for (UserUnit* const unit : idleUnits) {
+    if (unit != nullptr) {
+      LuaPlus::LuaObject unitObject = unit->GetLuaObject();
+      resultTable.SetObject(luaIndex, unitObject);
+      ++luaIndex;
+    }
   }
 
   resultTable.PushStack(state);
@@ -19028,8 +18318,7 @@ int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
   }
 
   CWldSession* const session = WLD_GetActiveSession();
-  UserArmy* const focusArmy = ResolveFocusArmy(session);
-  if (focusArmy == nullptr) {
+  if (session == nullptr || session->GetFocusArmy() == nullptr) {
     return 0;
   }
 
@@ -19039,22 +18328,23 @@ int moho::cfunc_GetIdleFactoriesL(LuaPlus::LuaState* const state)
     LuaPlus::LuaState::Error(state, kLuaExpectedArgsWarning, kGetIdleFactoriesHelpText, 0, argumentCount);
   }
 
-  UserEntityWeakSetRuntimeView* const idleSet = ResolveIdleUnitSetView(focusArmy, true);
-  const int liveUnitCount = CountLiveUserEntityWeakSetEntriesAndPrune(idleSet);
-  if (idleSet == nullptr || idleSet->head == nullptr || liveUnitCount <= 0) {
+  WeakUnitSetUserUnit idleUnits = session->GetFocusArmy()->GetIdleFactories();
+  if (idleUnits.Count() == 0) {
     lua_pushnil(rawState);
     (void)lua_gettop(rawState);
     return 1;
   }
 
   LuaPlus::LuaObject resultTable(state);
-  resultTable.AssignNewTable(state, liveUnitCount, 0u);
+  resultTable.AssignNewTable(state, idleUnits.Count(), 0u);
 
   std::int32_t luaIndex = 1;
-  for (UserEntityWeakSetNodeRuntimeView* node = WeakSetFirstNode(*idleSet);
-       node != nullptr && node != idleSet->head;
-       node = WeakSetNextNode(node, idleSet->head)) {
-    AppendEntityUnitLuaObject(resultTable, luaIndex, DecodeLinkedUserEntity(node->weakEntityLink));
+  for (UserUnit* const unit : idleUnits) {
+    if (unit != nullptr) {
+      LuaPlus::LuaObject unitObject = unit->GetLuaObject();
+      resultTable.SetObject(luaIndex, unitObject);
+      ++luaIndex;
+    }
   }
 
   resultTable.PushStack(state);
@@ -23017,7 +22307,7 @@ int moho::cfunc_GetUnitByIdUserL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  GetUserUnitLuaObjectView(userUnit).luaObject.PushStack(state);
+  userUnit->mLuaObj.PushStack(state);
   return 1;
 }
 

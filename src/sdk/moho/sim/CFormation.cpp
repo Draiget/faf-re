@@ -370,7 +370,7 @@ namespace moho
       (void)PruneTombstonesAndFindLive(selection, &node, node);
     }
 
-    const std::int32_t participantCount = CountLiveUserEntityWeakSetEntriesAndPrune(mParticipants);
+    const std::int32_t participantCount = mParticipants.Count();
     if (participantCount == 0) {
       constexpr float kFltMax = 3.4028235e38f;
       mStart = Wm3::Vector3f(kFltMax, kFltMax, kFltMax);

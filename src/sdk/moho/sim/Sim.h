@@ -135,20 +135,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x00838AE0 (FUN_00838AE0, sub_838AE0)
-   *
-   * What it does:
-   * Bridge for the Sim.cpp-local `CountLiveUserEntityWeakSetEntriesAndPrune`
-   * worker: counts live weak-set entries in `set`, pruning tombstone nodes
-   * along the way, for callers outside Sim.cpp (`CFormation::ChooseFormation`'s
-   * own participant-tracking set). `WeakEntitySetUserEntity`
-   * (moho/sim/WeakEntitySet.h) and the Sim.cpp-local `UserEntityWeakSetRuntimeView`
-   * share the identical 12-byte `{allocProxy,head,size}` binary layout (both
-   * size/offset-asserted), so the bridge is a same-shape view, not a layout guess.
-   */
-  [[nodiscard]] std::int32_t CountLiveUserEntityWeakSetEntriesAndPrune(WeakEntitySetUserEntity& set);
-
-  /**
    * One pending allied-upgrade notification: the pre-upgrade (source) and
    * post-upgrade (destination) unit ids. Accumulated in the Sim's allied
    * upgrade-notify sync lane (`Sim::mAllyUpgradeNotifications`, +0x9D8) by
