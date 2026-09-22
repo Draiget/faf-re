@@ -118,6 +118,20 @@ namespace moho
     // 0x00684480 uses this as sequential low-id allocator in the `(*v3)++` branch.
     int32_t mNextLowId; // +0x00
     int32_t mReserved04;
+    /**
+     * Address: 0x006E7A30 (FUN_006E7A30 -- `Count` on a `BVIntSet` embedded at
+     *   `+0x08`)
+     * Address: 0x006D1940 (FUN_006D1940 -- `RemoveAllFrom` between two sets
+     *   embedded at `+0x08`)
+     *
+     * Both zero-caller and unreachable, and both equally consistent with
+     * `BVSet<T,U>`'s identical `{lane, gap, BVIntSet@+0x08}` shape -- the
+     * bodies never touch the lanes ahead of the set, so the owner is not
+     * decidable from them. Cited on both types; see the fuller note on
+     * `BVSet<T,U>::Bits()` in moho/containers/BVSet.h. Formerly transcribed as
+     * free functions over a reach-in view in moho/containers/BVIntSet.cpp
+     * (RULE ONE), removed 2026-09-22.
+     */
     BVIntSet mReleasedLows; // +0x08
     SimSubRes2 mSubRes2;    // +0x28
 
