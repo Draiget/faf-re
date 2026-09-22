@@ -164,13 +164,38 @@ namespace moho
      */
     [[nodiscard]] static gpg::RType* GetPointerType();
 
+    /**
+     * Every field below had a matching one-line accessor emitted out of line by
+     * MSVC, and the whole set was recovered as free functions over an
+     * `IAniManipulatorBaseRuntimeView` -- a byte-for-byte restatement of this
+     * class as `std::uint8_t mScriptEventPrefix[0x44]` plus these members.
+     * The view and its accessors are gone (RULE ONE, 2026-09-22); the addresses
+     * stay here, on the fields they read. All have zero callers and are
+     * unreachable: the engine inlines every use, and these are the leftover
+     * out-of-line COMDATs.
+     *
+     * Address: 0x0062FDE0 (FUN_0062FDE0 -- returns `mActorOrderLink`'s `+0x44`
+     *   link word; formerly `GetActorOrderNextLink`.)
+     */
     TDatListItem<IAniManipulator, void> mActorOrderLink; // +0x44
+    /**
+     * Address: 0x0063A710 (FUN_0063A710 -- writes it; formerly `SetRuntimeEnabledFlag`.)
+     * Address: 0x0063A720 (FUN_0063A720 -- reads it; formerly `GetRuntimeEnabledFlag`.)
+     */
     bool mEnabled;                                       // +0x4C
     std::uint8_t mEnabledPad[3]{};                       // +0x4D
+    /// Address: 0x0062FD00 (FUN_0062FD00; formerly `GetRuntimeOwnerActor`.)
     CAniActor* mOwnerActor;                              // +0x50
+    /// Address: 0x0062FD10 (FUN_0062FD10; formerly `GetRuntimeOwnerSim`.)
     Sim* mOwnerSim;                                      // +0x54
+    /// Address: 0x0063A700 (FUN_0063A700; formerly `GetRuntimePrecedence`.)
     std::int32_t mPrecedence;                            // +0x58
     std::uint32_t mUnknown5C;                            // +0x5C
+    /**
+     * Address: 0x0063B960 (FUN_0063B960 -- linear scan of `[begin, end)` for a
+     *   binding whose `mBoneIndex` matches, returning bool; formerly
+     *   `HasWatchedBoneIndex` over an `IAniManipulatorWatchBoneRuntimeView`.)
+     */
     SAniManipBindingStorage mWatchBones;                 // +0x60
   };
 
@@ -387,6 +412,14 @@ namespace moho
     WeakPtr<Unit> mGoalUnit;           // +0x80
     WeakPtr<Entity> mTargetEntity;     // +0x88
     std::int32_t mReferenceBoneIndex;  // +0x90
+    /**
+     * Address: 0x006346E0 (FUN_006346E0 -- a three-float copy into this field;
+     *   formerly `CopyRuntimeVectorToSlot94`, written over an
+     *   `IAniManipulatorScalarPairRuntimeView` whose `+0x94` lane was a bare
+     *   `{float x, y, z}` struct. That one view was laid over two unrelated
+     *   classes at once: this `mPivot`, and `CBuilderArmManipulator`'s
+     *   `mHeading`/`mPitch` at `+0x88`/`+0x8C`. Zero callers, unreachable.)
+     */
     Wm3::Vector3f mPivot;              // +0x94
 
   private:

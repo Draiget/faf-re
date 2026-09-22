@@ -528,6 +528,15 @@ namespace moho
 
     /**
      * Address: 0x00836BD0 (FUN_00836BD0 -- `WeakPtr<T>::ResetFromObject` (the owner's weak-link head at +0x08); `UserUnit::UpdateUnitData` 0x008C0750; callers 0x008C0750; formerly `RelinkIntrusiveNodeViaOwnerOffset08` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+     * Address: 0x00632CA0 (FUN_00632CA0 -- the `WeakPtr<UnitWeapon>` emission,
+     *   identified by its owner-link offset: the body's `add ecx, 0x14` is
+     *   `EncodeOwnerLinkSlot`'s `kOwnerLinkOffset`, and
+     *   `WeakPtrOwnerLinkOffset<UnitWeapon>::value` is the only 0x14
+     *   specialization. The rest matches `ResetFromOwnerLinkSlot` instruction
+     *   for instruction, including the null-slot branch that writes
+     *   `nextInOwner = nullptr`. Zero callers, unreachable; formerly
+     *   `AttachNodeToOwnerHead` over an `IntrusiveOwnerHeadRuntimeView` in
+     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      */
     void ResetFromObject(T* object) noexcept
     {
