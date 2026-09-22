@@ -96,6 +96,27 @@ namespace moho
 
     ~BVSet() = default;
 
+    /**
+     * Address: 0x006E7A30 (FUN_006E7A30 -- `add ecx,8 / jmp BVIntSet::Count`,
+     *   a `__thiscall` forwarder that counts the set embedded at `+0x08`.)
+     * Address: 0x006D1940 (FUN_006D1940 -- the two-operand sibling:
+     *   `mov edi,eax / add edi,8 / lea esi,[ebx+8] / call
+     *   BVIntSet::RemoveAllFrom`, differencing one owner's embedded set against
+     *   another's and handing back the source.)
+     *
+     * Both are zero-caller and unreachable, and both were transcribed as free
+     * functions over a `BVIntSetEmbeddedOwnerRuntimeView` reach-in in
+     * moho/containers/BVIntSet.cpp (RULE ONE), removed 2026-09-22.
+     *
+     * The `{4-byte lane, 4-byte gap, BVIntSet at +0x08}` shape they operate on
+     * is this record's -- but it is also `moho::IdPool`'s
+     * (`{mNextLowId, mReserved04, mReleasedLows}`, moho/sim/IdPool.h), and the
+     * two cannot be told apart from these bodies alone: neither reads the lanes
+     * ahead of the set. The addresses are recorded on both, and neither type
+     * grows a member for them, because adding an uncalled `Count()` here would
+     * relocate the orphan rather than retire it. `Bits().Count()` and
+     * `Bits().RemoveAllFrom(...)` are what a caller writes.
+     */
     [[nodiscard]] const BVIntSet& Bits() const noexcept { return mBits; }
     [[nodiscard]] BVIntSet& Bits() noexcept { return mBits; }
 
