@@ -18,21 +18,10 @@ namespace
   constexpr unsigned int kWordShift = 5u;
   constexpr unsigned int kWordBitMask = kBitsPerWord - 1u;
 
-  struct BVIntSetWordRange
-  {
-    unsigned int mStartWord;
-    unsigned int mEndWord;
-  };
-
   [[nodiscard]] const gpg::RRef& NullOwnerRef()
   {
     static const gpg::RRef kNullOwner{nullptr, nullptr};
     return kNullOwner;
-  }
-
-  [[nodiscard]] BVIntSetWordRange GetWordRange(const BVIntSet& set) noexcept
-  {
-    return {set.mFirstWordIndex, set.mFirstWordIndex + static_cast<unsigned int>(set.Buckets())};
   }
 
   template <typename WordOp>
@@ -45,8 +34,8 @@ namespace
     WordOp&& op
   )
   {
-    const BVIntSetWordRange lhsRange = GetWordRange(lhs);
-    const BVIntSetWordRange rhsRange = GetWordRange(rhs);
+    const BVIntSetWordRange lhsRange = lhs.WordRange();
+    const BVIntSetWordRange rhsRange = rhs.WordRange();
 
     out->mFirstWordIndex = outStartWord;
     out->mWords.ResetStorageToInline();
@@ -72,8 +61,8 @@ namespace
     const BVIntSet& lhs, const BVIntSet& rhs, BVIntSet* const out, CombineFn&& combine
   )
   {
-    const BVIntSetWordRange lhsRange = GetWordRange(lhs);
-    const BVIntSetWordRange rhsRange = GetWordRange(rhs);
+    const BVIntSetWordRange lhsRange = lhs.WordRange();
+    const BVIntSetWordRange rhsRange = rhs.WordRange();
     const unsigned int overlapStart = std::max(lhsRange.mStartWord, rhsRange.mStartWord);
     unsigned int overlapEnd = std::min(lhsRange.mEndWord, rhsRange.mEndWord);
 
@@ -160,29 +149,34 @@ BVIntSet& BVIntSet::operator=(const BVIntSet& set)
   return *this;
 }
 
-size_t BVIntSet::Buckets() const
+size_t BVIntSet::WordCount() const
 {
   return mWords.Size();
 }
 
-size_t BVIntSet::BucketFor(const size_t val) const
+BVIntSetWordRange BVIntSet::WordRange() const noexcept
+{
+  return {mFirstWordIndex, mFirstWordIndex + static_cast<unsigned int>(WordCount())};
+}
+
+size_t BVIntSet::WordIndexFor(const size_t val) const
 {
   return (val >> kWordShift) - mFirstWordIndex;
 }
 
-size_t BVIntSet::FromBucket(const size_t bucket) const
+size_t BVIntSet::FirstValueInWord(const size_t wordIndex) const
 {
-  return (mFirstWordIndex + bucket) << kWordShift;
+  return (mFirstWordIndex + wordIndex) << kWordShift;
 }
 
 unsigned int BVIntSet::Min() const
 {
-  return static_cast<unsigned int>(FromBucket(0));
+  return static_cast<unsigned int>(FirstValueInWord(0));
 }
 
 unsigned int BVIntSet::Max() const
 {
-  return static_cast<unsigned int>(FromBucket(Buckets()));
+  return static_cast<unsigned int>(FirstValueInWord(WordCount()));
 }
 
 /**
@@ -224,29 +218,29 @@ void BVIntSet::AddFrom(const BVIntSet* from, const unsigned int lower, const uns
   EnsureBounds(lower, upper);
 
   const int deltaStart = static_cast<int>(from->mFirstWordIndex) - static_cast<int>(mFirstWordIndex);
-  const size_t firstBucket = BucketFor(lower);
-  const size_t endBucket = BucketFor(upper);
+  const size_t firstWordIndex = WordIndexFor(lower);
+  const size_t endWordIndex = WordIndexFor(upper);
   const unsigned int lowerBit = (lower & kWordBitMask);
   const unsigned int upperBit = (upper & kWordBitMask);
-  const auto sourceBucketFor = [deltaStart](const size_t dstBucket) -> size_t {
-    return static_cast<size_t>(static_cast<int>(dstBucket) - deltaStart);
+  const auto sourceWordFor = [deltaStart](const size_t destWordIndex) -> size_t {
+    return static_cast<size_t>(static_cast<int>(destWordIndex) - deltaStart);
   };
 
-  if (firstBucket == endBucket) {
+  if (firstWordIndex == endWordIndex) {
     const unsigned int mask = MaskRange(lowerBit, upperBit);
     if (mask != 0u) {
-      mWords[firstBucket] |= (from->mWords[sourceBucketFor(firstBucket)] & mask);
+      mWords[firstWordIndex] |= (from->mWords[sourceWordFor(firstWordIndex)] & mask);
     }
     return;
   }
 
-  mWords[firstBucket] |= (from->mWords[sourceBucketFor(firstBucket)] & MaskRange(lowerBit, kBitsPerWord));
-  for (size_t bucket = firstBucket + 1; bucket < endBucket; ++bucket) {
-    mWords[bucket] |= from->mWords[sourceBucketFor(bucket)];
+  mWords[firstWordIndex] |= (from->mWords[sourceWordFor(firstWordIndex)] & MaskRange(lowerBit, kBitsPerWord));
+  for (size_t wordIndex = firstWordIndex + 1; wordIndex < endWordIndex; ++wordIndex) {
+    mWords[wordIndex] |= from->mWords[sourceWordFor(wordIndex)];
   }
 
   if (upperBit != 0u) {
-    mWords[endBucket] |= (from->mWords[sourceBucketFor(endBucket)] & MaskRange(0, upperBit));
+    mWords[endWordIndex] |= (from->mWords[sourceWordFor(endWordIndex)] & MaskRange(0, upperBit));
   }
 }
 
@@ -261,22 +255,22 @@ BVIntSetIndex BVIntSet::ClearRange(const BVIntSetIndex lower, const BVIntSetInde
 {
   const unsigned int lowerValue = lower.mValue;
   const unsigned int upperValue = upper.mValue;
-  const size_t lowerBucket = BucketFor(lowerValue);
-  const size_t upperBucket = BucketFor(upperValue);
+  const size_t lowerWordIndex = WordIndexFor(lowerValue);
+  const size_t upperWordIndex = WordIndexFor(upperValue);
   const unsigned int lowerBit = (lowerValue & kWordBitMask);
   const unsigned int upperBit = (upperValue & kWordBitMask);
 
-  if (lowerBucket == upperBucket) {
+  if (lowerWordIndex == upperWordIndex) {
     if (upperBit != lowerBit) {
-      mWords[lowerBucket] &= (MaskRange(upperBit, kBitsPerWord) | MaskRange(0, lowerBit));
+      mWords[lowerWordIndex] &= (MaskRange(upperBit, kBitsPerWord) | MaskRange(0, lowerBit));
     }
   } else {
-    mWords[lowerBucket] &= MaskRange(0, lowerBit);
-    for (size_t bucket = lowerBucket + 1; bucket < upperBucket; ++bucket) {
-      mWords[bucket] = 0u;
+    mWords[lowerWordIndex] &= MaskRange(0, lowerBit);
+    for (size_t wordIndex = lowerWordIndex + 1; wordIndex < upperWordIndex; ++wordIndex) {
+      mWords[wordIndex] = 0u;
     }
     if (upperBit != 0u) {
-      mWords[upperBucket] &= MaskRange(upperBit, kBitsPerWord);
+      mWords[upperWordIndex] &= MaskRange(upperBit, kBitsPerWord);
     }
   }
 
@@ -294,7 +288,7 @@ BVIntSetIndex BVIntSet::ClearRange(const BVIntSetIndex lower, const BVIntSetInde
  * Address: 0x10001440
  *
  * What it does:
- * Returns the number of set bits in the current bucket span.
+ * Returns the number of set bits in the current wordIndex span.
  */
 unsigned int BVIntSet::Count() const
 {
@@ -353,17 +347,17 @@ unsigned int BVIntSet::GetNext(const unsigned int val) const
     current = startValue;
   }
 
-  size_t bucket = BucketFor(current);
-  if (bucket >= Buckets()) {
+  size_t wordIndex = WordIndexFor(current);
+  if (wordIndex >= WordCount()) {
     return Max();
   }
 
-  unsigned int bits = mWords[bucket] >> (current & kWordBitMask);
+  unsigned int bits = mWords[wordIndex] >> (current & kWordBitMask);
   if (bits == 0u) {
-    while (++bucket < Buckets()) {
-      bits = mWords[bucket];
+    while (++wordIndex < WordCount()) {
+      bits = mWords[wordIndex];
       if (bits != 0u) {
-        current = static_cast<unsigned int>(FromBucket(bucket));
+        current = static_cast<unsigned int>(FirstValueInWord(wordIndex));
         break;
       }
     }
@@ -380,7 +374,7 @@ unsigned int BVIntSet::GetNext(const unsigned int val) const
  * Address: 0x00401830 (FUN_00401830)
  *
  * What it does:
- * Finds the previous set bit before `val` by walking backward across bucket storage.
+ * Finds the previous set bit before `val` by walking backward across wordIndex storage.
  */
 unsigned int BVIntSet::GetPrev(const unsigned int val) const
 {
@@ -417,7 +411,7 @@ unsigned int BVIntSet::GetPrev(const unsigned int val) const
 void BVIntSet::Finalize()
 {
   size_t first = 0;
-  size_t last = Buckets();
+  size_t last = WordCount();
   if (last != 0) {
     while (first < last && mWords[first] == 0u) {
       ++first;
@@ -429,7 +423,7 @@ void BVIntSet::Finalize()
     }
   }
 
-  if (first == 0 && last == Buckets()) {
+  if (first == 0 && last == WordCount()) {
     return;
   }
 
@@ -454,7 +448,7 @@ void BVIntSet::Finalize()
  * Address: 0x10001690
  *
  * What it does:
- * Ensures bucket coverage for [lower, upper) by prepending/appending zero words as needed.
+ * Ensures wordIndex coverage for [lower, upper) by prepending/appending zero words as needed.
  */
 void BVIntSet::EnsureBounds(const unsigned int lower, const unsigned int upper)
 {
@@ -470,7 +464,7 @@ void BVIntSet::EnsureBounds(const unsigned int lower, const unsigned int upper)
     return;
   }
 
-  const size_t currentWords = Buckets();
+  const size_t currentWords = WordCount();
   const unsigned int currentStart = mFirstWordIndex;
   const unsigned int currentEnd = currentStart + static_cast<unsigned int>(currentWords);
 
@@ -529,12 +523,12 @@ void BVIntSet::RemoveAllFrom(const BVIntSet* from)
   const unsigned int thisStart = mFirstWordIndex;
   const unsigned int fromStart = from->mFirstWordIndex;
   const unsigned int overlapStart = std::max(thisStart, fromStart);
-  const unsigned int thisEnd = thisStart + static_cast<unsigned int>(Buckets());
-  const unsigned int fromEnd = fromStart + static_cast<unsigned int>(from->Buckets());
+  const unsigned int thisEnd = thisStart + static_cast<unsigned int>(WordCount());
+  const unsigned int fromEnd = fromStart + static_cast<unsigned int>(from->WordCount());
   const unsigned int overlapEnd = std::min(thisEnd, fromEnd);
 
-  for (unsigned int bucketWord = overlapStart; bucketWord < overlapEnd; ++bucketWord) {
-    mWords[bucketWord - thisStart] &= ~from->mWords[bucketWord - fromStart];
+  for (unsigned int word = overlapStart; word < overlapEnd; ++word) {
+    mWords[word - thisStart] &= ~from->mWords[word - fromStart];
   }
 
   Finalize();
@@ -557,8 +551,8 @@ void BVIntSet::IntersectWith(const BVIntSet* other)
   const unsigned int thisStart = mFirstWordIndex;
   const unsigned int otherStart = other->mFirstWordIndex;
   const unsigned int overlapStart = std::max(thisStart, otherStart);
-  const unsigned int thisEnd = thisStart + static_cast<unsigned int>(Buckets());
-  const unsigned int otherEnd = otherStart + static_cast<unsigned int>(other->Buckets());
+  const unsigned int thisEnd = thisStart + static_cast<unsigned int>(WordCount());
+  const unsigned int otherEnd = otherStart + static_cast<unsigned int>(other->WordCount());
   unsigned int overlapEnd = std::min(thisEnd, otherEnd);
 
   if (overlapStart >= overlapEnd) {
@@ -583,8 +577,8 @@ void BVIntSet::IntersectWith(const BVIntSet* other)
   }
 
   while (overlapEnd > firstNonZero) {
-    const unsigned int bucketWord = overlapEnd - 1u;
-    const unsigned int bits = mWords[bucketWord - thisStart] & other->mWords[bucketWord - otherStart];
+    const unsigned int word = overlapEnd - 1u;
+    const unsigned int bits = mWords[word - thisStart] & other->mWords[word - otherStart];
     if (bits != 0u) {
       break;
     }
@@ -592,8 +586,8 @@ void BVIntSet::IntersectWith(const BVIntSet* other)
   }
 
   std::size_t dst = 0u;
-  for (unsigned int bucketWord = firstNonZero; bucketWord < overlapEnd; ++bucketWord, ++dst) {
-    mWords[dst] = mWords[bucketWord - thisStart] & other->mWords[bucketWord - otherStart];
+  for (unsigned int word = firstNonZero; word < overlapEnd; ++word, ++dst) {
+    mWords[dst] = mWords[word - thisStart] & other->mWords[word - otherStart];
   }
 
   mFirstWordIndex = firstNonZero;
@@ -617,8 +611,8 @@ bool BVIntSet::Equals(const BVIntSet* other) const
     return false;
   }
 
-  const std::size_t words = Buckets();
-  if (words != other->Buckets()) {
+  const std::size_t words = WordCount();
+  if (words != other->WordCount()) {
     return false;
   }
 
@@ -650,8 +644,8 @@ bool moho::operator!=(const BVIntSet& lhs, const BVIntSet& rhs) noexcept
  */
 BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
 {
-  const BVIntSetWordRange lhsRange = GetWordRange(*this);
-  const BVIntSetWordRange rhsRange = GetWordRange(*rhs);
+  const BVIntSetWordRange lhsRange = WordRange();
+  const BVIntSetWordRange rhsRange = rhs->WordRange();
   const unsigned int outStartWord = std::min(lhsRange.mStartWord, rhsRange.mStartWord);
   const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
 
@@ -675,8 +669,8 @@ BVIntSet* BVIntSet::Union(BVIntSet* const out, const BVIntSet* const rhs) const
  */
 BVIntSet* BVIntSet::ExclusiveOr(BVIntSet* const out, const BVIntSet* const rhs) const
 {
-  const BVIntSetWordRange lhsRange = GetWordRange(*this);
-  const BVIntSetWordRange rhsRange = GetWordRange(*rhs);
+  const BVIntSetWordRange lhsRange = WordRange();
+  const BVIntSetWordRange rhsRange = rhs->WordRange();
   const unsigned int outStartWord = std::min(lhsRange.mStartWord, rhsRange.mStartWord);
   const unsigned int outWordCount = std::max(lhsRange.mEndWord, rhsRange.mEndWord) - outStartWord;
 
@@ -720,7 +714,7 @@ BVIntSet* BVIntSet::Intersect(BVIntSet* const out, const BVIntSet* const rhs) co
  */
 BVIntSet* BVIntSet::Subtract(BVIntSet* const out, const BVIntSet* const rhs) const
 {
-  const BVIntSetWordRange lhsRange = GetWordRange(*this);
+  const BVIntSetWordRange lhsRange = WordRange();
   CopyAndApplyOverlap(
     *this,
     *rhs,
@@ -752,10 +746,10 @@ BVIntSetAddResult BVIntSet::Add(const unsigned int val)
 {
   EnsureBounds(val, val + 1u);
 
-  const size_t bucket = BucketFor(val);
+  const size_t wordIndex = WordIndexFor(val);
   const unsigned int shift = (val & kWordBitMask);
-  const unsigned int previousWord = mWords[bucket];
-  mWords[bucket] = previousWord | (1u << shift);
+  const unsigned int previousWord = mWords[wordIndex];
+  mWords[wordIndex] = previousWord | (1u << shift);
 
   const bool wasInserted = ((previousWord >> shift) & 1u) == 0u;
   return BVIntSetAddResult{{this, val}, wasInserted};
@@ -769,14 +763,14 @@ BVIntSetAddResult BVIntSet::Add(const unsigned int val)
  */
 bool BVIntSet::Remove(const unsigned int val)
 {
-  const size_t bucket = BucketFor(val);
-  if (bucket >= Buckets()) {
+  const size_t wordIndex = WordIndexFor(val);
+  if (wordIndex >= WordCount()) {
     return false;
   }
 
   const unsigned int shift = (val & kWordBitMask);
-  const unsigned int previousWord = mWords[bucket];
-  mWords[bucket] = previousWord & ~(1u << shift);
+  const unsigned int previousWord = mWords[wordIndex];
+  mWords[wordIndex] = previousWord & ~(1u << shift);
 
   Finalize();
   return ((previousWord >> shift) & 1u) != 0u;
