@@ -705,9 +705,7 @@ namespace moho
     auto& spanVector = reinterpret_cast<CollisionSpanVector&>(outEntities);
     const int count = GatherUnmarkedUnitsInRect(spanVector, rect, flags);
     for (int index = 0; index < count; ++index) {
-      outEntities.start_[index] = reinterpret_cast<Entity*>(
-        reinterpret_cast<std::uint8_t*>(outEntities.start_[index]) - 0x4Cu
-      );
+      outEntities.start_[index] = Entity::FromCollisionCellSpan(spanVector.start_[index]);
     }
     return count;
   }
@@ -1583,8 +1581,7 @@ namespace moho
         continue;
       }
 
-      auto* const rawSpan = reinterpret_cast<std::uint8_t*>(spanPtr) - offsetof(Entity, mCollisionCellSpan);
-      Entity* const ownerEntity = reinterpret_cast<Entity*>(rawSpan);
+      Entity* const ownerEntity = Entity::FromCollisionCellSpan(spanPtr);
 
       Unit* const ownerUnit = ownerEntity->IsUnit();
       if (ownerUnit == nullptr) {

@@ -11256,6 +11256,11 @@ RRef RRef::GetField(const int ind) const
   return out;
 }
 
+/**
+ * Address: 0x004A48A0 (FUN_004A48A0 -- an out-of-line copy of this body in the
+ * Sim reflection-debug object, `RRef` in `ecx`, index in `eax`; zero callers and
+ * no references, a linker-retained copy nothing runs.)
+ */
 const char* RRef::GetFieldName(const int ind) const
 {
   return mType->fields_.begin()[ind].mName;

@@ -681,25 +681,6 @@ namespace
     std::fprintf(traceFile, "%s[%u]:\n", indent.c_str(), index);
   }
 
-  /**
-   * Address: 0x004A48A0 (FUN_004A48A0)
-   *
-   * What it does:
-   * Returns one indexed reflected field descriptor from `RType::fields_`.
-   */
-  [[nodiscard]] gpg::RField* ResolveTypeFieldByIndex(gpg::RType* const type, const int index) noexcept
-  {
-    if (type == nullptr || index < 0) {
-      return nullptr;
-    }
-
-    gpg::RField* const firstField = type->fields_.begin();
-    if (firstField == nullptr) {
-      return nullptr;
-    }
-
-    return firstField + index;
-  }
 
   /**
    * Address: 0x004A4E10 (FUN_004A4E10)
@@ -875,16 +856,9 @@ void moho::REF_UpdateMD5(
 
   const std::size_t fieldCount = refType->fields_.size();
   for (std::size_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
-    gpg::RField* const field = ResolveTypeFieldByIndex(refType, static_cast<int>(fieldIndex));
-    if (field == nullptr) {
-      continue;
-    }
+    PrintMd5TraceFieldPrefix(traceFile, indentDepth, refType->fields_[fieldIndex].mName);
 
-    PrintMd5TraceFieldPrefix(traceFile, indentDepth, field->mName);
-
-    gpg::RRef fieldRef{};
-    fieldRef.mObj = reinterpret_cast<std::uint8_t*>(ref->mObj) + field->mOffset;
-    fieldRef.mType = field->mType;
+    gpg::RRef fieldRef = ref->GetField(static_cast<int>(fieldIndex));
     REF_UpdateMD5(md5, &fieldRef, traceFile, indentDepth + 1u);
   }
 
@@ -4655,17 +4629,11 @@ namespace moho
 
     Unit* const unit = PathPreviewSelectLargestUnit(selectedUnits);
     if (unit != nullptr) {
-      // Binary logs/hashes a still-unresolved Unit diagnostic dword at +0x70
-      // (asm: `mov ecx, [esi+70h]` at 0x00764D7C) as "unit=0x%08x".
-      struct PreviewUnitDiagnosticView
-      {
-        std::uint8_t mPad00_6F[0x70];
-        std::uint32_t field_0x70;
-      };
-      static_assert(offsetof(PreviewUnitDiagnosticView, field_0x70) == 0x70, "PreviewUnitDiagnosticView::field_0x70 offset");
-      const std::uint32_t unitDiagnostic = reinterpret_cast<const PreviewUnitDiagnosticView*>(unit)->field_0x70;
-      sim->mContext.Update(&unitDiagnostic, sizeof(unitDiagnostic));
-      sim->Logf("  unit=0x%08x\n", unitDiagnostic);
+      // `mov ecx, [esi+70h]` at 0x00764D7C: the unit's entity id (Entity+0x68,
+      // the Entity base sitting at Unit+0x08) is hashed and logged.
+      const EntId unitId = unit->id_;
+      sim->mContext.Update(&unitId, sizeof(unitId));
+      sim->Logf("  unit=0x%08x\n", static_cast<std::uint32_t>(unitId));
 
       if (!previewFinder) {
         previewFinder = boost::shared_ptr<PathPreviewFinder>(new PathPreviewFinder(focusArmy));
@@ -11536,22 +11504,6 @@ namespace
   // `buy_node`/`rb_decrement`/`find_node` citations for this instantiation
   // (below, on `AddCategoryMemberBit`) are unaffected -- same type, same
   // addresses, just one definition instead of two.
-
-  struct BlueprintNodeIdPayloadView
-  {
-    msvc8::string mBlueprintId; // +0x00
-    void* mBlueprint;           // +0x1C
-  };
-
-  static_assert(sizeof(BlueprintNodeIdPayloadView) == 0x20, "BlueprintNodeIdPayloadView size must be 0x20");
-  static_assert(
-    offsetof(BlueprintNodeIdPayloadView, mBlueprintId) == 0x00,
-    "BlueprintNodeIdPayloadView::mBlueprintId offset must be 0x00"
-  );
-  static_assert(
-    offsetof(BlueprintNodeIdPayloadView, mBlueprint) == 0x1C,
-    "BlueprintNodeIdPayloadView::mBlueprint offset must be 0x1C"
-  );
 
   /**
    * Address: 0x005347A0 (FUN_005347A0, msvc8::vector<Moho::RBlueprint*>::push_back)
@@ -21039,8 +20991,7 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
-    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
     const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
@@ -21160,8 +21111,7 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
-    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
     Unit* const unit = entity != nullptr ? entity->IsUnit() : nullptr;
     if (unit == nullptr) {
       continue;
@@ -21297,8 +21247,7 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    auto* const rawSpan = reinterpret_cast<std::uint8_t*>(gatheredSpans[index]) - 0x4Cu;
-    Entity* const entity = reinterpret_cast<Entity*>(rawSpan);
+    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
     const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
