@@ -1146,7 +1146,7 @@ namespace
    * What it does:
    * Destroys one contiguous range of audio sound-bank loader pointers.
    */
-  void DestroyAudioSoundBankLoaderRange(void** const first, void** const last) noexcept
+  void DeleteSoundBankLoaders(void** const first, void** const last) noexcept
   {
     if (first == nullptr || last == nullptr) {
       return;
@@ -1168,28 +1168,32 @@ namespace
    * Address: 0x004DDF10 (FUN_004DDF10)
    *
    * What it does:
-   * Destroys one contiguous range of audio runtime handle objects through
-   * their deleting-destructor vtable lane.
+   * Deletes every wave-bank loader in a range. `mHandles` only ever receives
+   * `AudioWaveBankLoaderBase*` -- 0x004DA2xx pushes an
+   * `AudioStreamingWaveBankLoader` or an `AudioInMemoryWaveBankLoader` -- and
+   * that base declares `virtual ~AudioWaveBankLoaderBase()`, so a plain
+   * `delete` is exactly what produces the loop body:
+   *
+   *   0x004DDF20: mov ecx, [esi]      ; the element
+   *   0x004DDF22: test ecx, ecx / je  ; delete's own null test
+   *   0x004DDF26: mov eax, [ecx]      ; vptr
+   *   0x004DDF28: mov edx, [eax]      ; slot 0, MSVC's ??_G deleting dtor
+   *   0x004DDF2A: push 1 / call edx
+   *
+   * This was hand-written as `reinterpret_cast<DeletingDtorFn>(vtable[0])`,
+   * which is the vtable magic the reconstruction contract forbids, and it
+   * carried two things the binary does not do: a `vtable[0] == nullptr` guard,
+   * and a `*cursor = nullptr` writeback. There is no `mov [esi], 0` anywhere
+   * in the body -- the caller clears the vector on the next line.
    */
-  void DestroyAudioRuntimeHandleRange(void** const first, void** const last) noexcept
+  void DeleteWaveBankLoaders(void** const first, void** const last) noexcept
   {
     if (first == nullptr || last == nullptr) {
       return;
     }
 
     for (void** cursor = first; cursor != last; ++cursor) {
-      if (*cursor == nullptr) {
-        continue;
-      }
-
-      auto* const vtable = *reinterpret_cast<void***>(*cursor);
-      if (vtable == nullptr || vtable[0] == nullptr) {
-        continue;
-      }
-
-      using DeletingDtorFn = void(__thiscall*)(void*, std::uint8_t);
-      reinterpret_cast<DeletingDtorFn>(vtable[0])(*cursor, 1u);
-      *cursor = nullptr;
+      delete static_cast<AudioWaveBankLoaderBase*>(*cursor);
     }
   }
 
@@ -1380,35 +1384,23 @@ namespace moho
    */
   const char* func_SoundErrorCodeToMsg(int errorCode);
 
-  /// Receives what `IXACTEngine::GetFinalMixFormat` writes, which is a full
-  /// `WAVEFORMATEXTENSIBLE`: `WAVEFORMATEX` (0x12) plus the `Samples` union
-  /// (0x02), then `dwChannelMask` at 0x14, then the 16-byte `SubFormat` GUID -
-  /// 0x28 bytes in total.
+  /// What `IXACTEngine::GetFinalMixFormat` writes is a `WAVEFORMATEXTENSIBLE`,
+  /// and `<mmreg.h>` is already included above, so this is the platform's own
+  /// struct rather than a local restatement of it.
   ///
-  /// The binary reserves exactly that: `func_AudioInitialize` subtracts 0x2C,
-  /// puts the buffer at `ebp-0x28` and reads the speaker mask from `ebp-0x14`.
-  /// IDA splits it into `char v7[20]` plus a separate `SpeakerChannelMask`
-  /// local, but both name one buffer.
-  ///
-  /// This view was 0x18 bytes, so XACT wrote the trailing GUID 16 bytes past
-  /// the end of the stack object. `/RTC` caught it as "Run-Time Check Failure
-  /// #2 - Stack around the variable 'finalMixFormat' was corrupted" and startup
-  /// stopped on a modal CRT dialog.
-  struct AudioFinalMixFormatRuntimeView
-  {
-    std::array<std::uint8_t, 0x14> mWaveFormat{};    // +0x00 WAVEFORMATEX + Samples
-    std::uint32_t mSpeakerChannelMask = 0;           // +0x14 dwChannelMask
-    std::array<std::uint8_t, 0x10> mSubFormatGuid{}; // +0x18 SubFormat GUID
-  };
-  static_assert(
-    offsetof(AudioFinalMixFormatRuntimeView, mSpeakerChannelMask) == 0x14,
-    "AudioFinalMixFormatRuntimeView::mSpeakerChannelMask offset must be 0x14"
-  );
-  static_assert(
-    offsetof(AudioFinalMixFormatRuntimeView, mSubFormatGuid) == 0x18,
-    "AudioFinalMixFormatRuntimeView::mSubFormatGuid offset must be 0x18"
-  );
-  static_assert(sizeof(AudioFinalMixFormatRuntimeView) == 0x28, "AudioFinalMixFormatRuntimeView size must be 0x28");
+  /// The binary reserves exactly its 0x28 bytes: `func_AudioInitialize`
+  /// subtracts 0x2C, puts the buffer at `ebp-0x28` and reads the speaker mask
+  /// from `ebp-0x14`. IDA splits that into `char v7[20]` plus a separate
+  /// `SpeakerChannelMask` local, but both name one buffer -- which is how the
+  /// hand-written stand-in that used to sit here came to be 0x18 bytes, one
+  /// `Samples` union and one `SubFormat` GUID short. XACT wrote the trailing
+  /// GUID sixteen bytes past the end of the stack object, and `/RTC` stopped
+  /// startup on "Run-Time Check Failure #2 - Stack around the variable
+  /// 'finalMixFormat' was corrupted". The asserts below are kept because that
+  /// is the failure they catch.
+  static_assert(offsetof(WAVEFORMATEXTENSIBLE, dwChannelMask) == 0x14, "WAVEFORMATEXTENSIBLE::dwChannelMask offset must be 0x14");
+  static_assert(offsetof(WAVEFORMATEXTENSIBLE, SubFormat) == 0x18, "WAVEFORMATEXTENSIBLE::SubFormat offset must be 0x18");
+  static_assert(sizeof(WAVEFORMATEXTENSIBLE) == 0x28, "WAVEFORMATEXTENSIBLE size must be 0x28");
 
   /**
    * Address: 0x004D8170 (FUN_004D8170, func_AudioInitialize)
@@ -1430,13 +1422,13 @@ namespace moho
       return result;
     }
 
-    AudioFinalMixFormatRuntimeView finalMixFormat{};
+    WAVEFORMATEXTENSIBLE finalMixFormat{};
     result = engine->GetFinalMixFormat(&finalMixFormat);
     if (result < 0) {
       return result;
     }
 
-    X3DAudioInitialize(finalMixFormat.mSpeakerChannelMask, speedOfSound, audioHandle);
+    X3DAudioInitialize(finalMixFormat.dwChannelMask, speedOfSound, audioHandle);
     return result;
   }
 
@@ -2495,10 +2487,10 @@ namespace moho
     // both through the destroy-range helper, then an `erase(begin(), end())`
     // that only walks the end iterator back -- and reaches the engine
     // teardown at 0x004DA360 with both already empty.
-    DestroyAudioSoundBankLoaderRange(mBanks.begin(), mBanks.end());
+    DeleteSoundBankLoaders(mBanks.begin(), mBanks.end());
     mBanks.clear();
 
-    DestroyAudioRuntimeHandleRange(mHandles.begin(), mHandles.end());
+    DeleteWaveBankLoaders(mHandles.begin(), mHandles.end());
     mHandles.clear();
 
     if (mInstance != nullptr) {
