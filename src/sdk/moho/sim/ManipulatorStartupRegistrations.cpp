@@ -15,6 +15,7 @@
 #include "moho/ai/CAimManipulatorSerializer.h"
 #include "moho/ai/CAimManipulatorTypeInfo.h"
 #include "moho/animation/CSlideManipulator.h"
+#include "moho/animation/CStorageManipulator.h"
 #include "moho/console/CConCommand.h"
 #include "moho/containers/BitStorage32.h"
 #include "legacy/containers/Vector.h"
