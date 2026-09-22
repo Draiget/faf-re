@@ -96,6 +96,16 @@ namespace moho
    */
   [[nodiscard]] bool BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIndex& rhs) noexcept;
 
+  /**
+   * Half-open range of absolute word indices, as returned by
+   * `BVIntSet::WordRange()`.
+   */
+  struct BVIntSetWordRange
+  {
+    unsigned int mStartWord;
+    unsigned int mEndWord;
+  };
+
   struct BVIntSet
   {
     static gpg::RType* sType;
@@ -116,27 +126,54 @@ namespace moho
     BVIntSet& operator=(const BVIntSet& set);
 
     /**
-     * Number of buckets currently allocated.
+     * Words currently allocated for the window. Was `Buckets()`: nothing here
+     * hashes, and every other name in this file already says "word".
      */
-    [[nodiscard]] size_t Buckets() const;
+    [[nodiscard]] size_t WordCount() const;
 
     /**
-     * Compute bucket index for the given value. Requires EnsureBounds/containment.
+     * Window-relative index of the word holding `val`,
+     * `(val >> 5) - mFirstWordIndex`. The caller must have established
+     * containment (`EnsureBounds`) first -- the subtraction underflows for a
+     * value below the window. Was `BucketFor()`.
      */
-    [[nodiscard]] size_t BucketFor(size_t val) const;
+    [[nodiscard]] size_t WordIndexFor(size_t val) const;
 
     /**
-     * Convert bucket index to the minimal value in that bucket.
+     * First value representable by window-relative word `wordIndex`,
+     * `(mFirstWordIndex + wordIndex) << 5`. Was `FromBucket()`.
      */
-    [[nodiscard]] size_t FromBucket(size_t bucket) const;
+    [[nodiscard]] size_t FirstValueInWord(size_t wordIndex) const;
 
     /**
-     * Minimal representable value in current storage (inclusive).
+     * The window as a half-open range of absolute word indices,
+     * `[mFirstWordIndex, mFirstWordIndex + WordCount())`. Set algebra needs
+     * both operands' windows to find their overlap.
+     *
+     * Was a free `GetWordRange(const BVIntSet&)` in BVIntSet.cpp's anonymous
+     * namespace, called nine times -- five of them from members passing
+     * `*this`.
+     */
+    [[nodiscard]] BVIntSetWordRange WordRange() const noexcept;
+
+    /**
+     * First value the **window** can represent, `mFirstWordIndex << 5` -- not
+     * the smallest member. A set whose only element is 70 still reports 0 here
+     * when its window starts at word 0. `GetNext` uses it as a floor.
+     *
+     * The name says "minimum element" and means "window floor"; renaming it
+     * `WindowBegin()` is deferred only because `Max()` below has ~15 call
+     * sites across eight files and the pair should move together.
      */
     [[nodiscard]] unsigned int Min() const;
 
     /**
-     * Max sentinel (exclusive upper bound); returned when search fails.
+     * One past the last value the **window** can represent,
+     * `(mFirstWordIndex + WordCount()) << 5` -- the end sentinel `GetNext`
+     * returns when no further member exists, not the largest member. Every
+     * caller in the tree already binds it to a local named `sentinel`, `end`,
+     * `endOfSet` or `endOrdinalExclusive`, which is what it is; `WindowEnd()`
+     * would say so directly.
      */
     [[nodiscard]] unsigned int Max() const;
 
@@ -275,7 +312,7 @@ namespace moho
      * Address: 0x00401C50 (FUN_00401C50)
      *
      * What it does:
-     * Returns true when start index and bucket payload match exactly.
+     * Returns true when start index and wordIndex payload match exactly.
      */
     [[nodiscard]] bool Equals(const BVIntSet* other) const;
 
