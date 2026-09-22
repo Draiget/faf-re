@@ -1194,6 +1194,20 @@ namespace moho
   }
 
   /**
+   * Address: 0x00662570 (FUN_00662570, nullsub_1719)
+   *
+   * What it does:
+   * The last entry of the curve editor's `wxEventTableEntry` array
+   * (0x00F59D54: event-type global 0x00F8F4B0, id -1, userData 0) points
+   * here, a handler that swallows the event and does nothing (`ret 4`).
+   * Formerly `LegacyNoOpRuntimeStdCallOneArgLaneBeta` in
+   * moho/misc/WinApiImportThunks.cpp, removed 2026-09-22.
+   */
+  void WCurveEditor::IgnoreEvent(wxEventRuntime&) noexcept
+  {
+  }
+
+  /**
    * Address: 0x00661100 (FUN_00661100)
    *
    * IDA signature:
@@ -2041,6 +2055,7 @@ namespace moho
       void (WCurveEditor::*onPaint)();
       void (WCurveEditor::*onMouseDown)(wxEventRuntime&);
       void (WCurveEditor::*onCurveKeyEdit)(wxEventRuntime&);
+      void (WCurveEditor::*onIgnoredEvent)(wxEventRuntime&) noexcept;
     };
 
     const WCurveEditorEventTableBindings kWCurveEditorEventTableBindings = {
@@ -2048,6 +2063,7 @@ namespace moho
       &WCurveEditor::OnPaint,
       &WCurveEditor::OnMouseDown,
       &WCurveEditor::OnCurveKeyEdit,
+      &WCurveEditor::IgnoreEvent,
     };
 
     using CurvePanelFieldSinkFnPtr = void (WCurveEditorPanel::*)(wxEventRuntime&);

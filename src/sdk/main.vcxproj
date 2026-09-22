@@ -1377,7 +1377,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\unit\core\UserUnitTypeInfo.cpp" />
     <ClCompile Include="moho\sim\ESpecialFileTypeTypeInfo.cpp" />
     <ClCompile Include="moho\sim\IdPool.cpp" />
-    <ClCompile Include="moho\misc\WinApiImportThunks.cpp" />
     <ClCompile Include="gpg\core\utils\Global.cpp" />
     <ClCompile Include="gpg\core\utils\Logging.cpp" />
     <ClCompile Include="..\..\dependencies\boost_1_34_1\libs\thread\src\barrier.cpp">

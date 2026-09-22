@@ -743,6 +743,32 @@ namespace boost
      * Address: 0x0094E070 (FUN_0094E070 -- `sp_counted_impl_pd<T,D>::sp_counted_impl_pd(T*, D)`: counts to 1, real vtable 0xd48a00, `px_` at +0x0C, deleter at +0x10, `ret 8`; zero callers in the binary and none in source; formerly `SpCountedImplPdConstructCharPointerFunctionDeleter` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0094E0E0 (FUN_0094E0E0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForCharPointerFunctionDeleter` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      *
+     * The `sp_counted_impl_p<Y>` virtuals below are reached only through the
+     * vtable that constructor installs: slot 1 is `dispose()` (`delete px_`
+     * through the pointee's virtual deleting destructor, `push 1; call
+     * [vtbl+N]`, skipped for null), slot 3 is `get_deleter()` (`xor eax,eax;
+     * ret 4`). Each was formerly a `Legacy*Runtime*Slot*` transcription in
+     * moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.
+     * Address: 0x00797060 (FUN_00797060, sp_counted_impl_p<Moho::CMauiFrame>::dispose, vtable 0x00E39A8C slot 1)
+     * Address: 0x008F9F50 (FUN_008F9F50, sp_counted_impl_p<gpg::gal::TextureD3D10>::dispose, vtable 0x00D430D8 slot 1)
+     * Address: 0x008F9F70 (FUN_008F9F70, sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D10>::dispose, vtable 0x00D43100 slot 1)
+     * Address: 0x008F9F80 (FUN_008F9F80, sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D10>::dispose, vtable 0x00D43114 slot 1)
+     * Address: 0x008F9F90 (FUN_008F9F90, sp_counted_impl_p<gpg::gal::VertexFormatD3D10>::dispose, vtable 0x00D43128 slot 1)
+     * Address: 0x008F9FA0 (FUN_008F9FA0, sp_counted_impl_p<gpg::gal::VertexBufferD3D10>::dispose, vtable 0x00D4313C slot 1)
+     * Address: 0x005CC800 (FUN_005CC800, sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::get_deleter, vtable 0x00E1DBE0 slot 3)
+     * Address: 0x007146B0 (FUN_007146B0, sp_counted_impl_p<Moho::STrigger>::get_deleter, vtable 0x00E312EC slot 3)
+     * Address: 0x00797080 (FUN_00797080, sp_counted_impl_p<Moho::CMauiFrame>::get_deleter, vtable 0x00E39A8C slot 3)
+     * Address: 0x007E6960 (FUN_007E6960, sp_counted_impl_p<Moho::RMeshBlueprintLOD>::get_deleter, vtable 0x00E3F4E4 slot 3)
+     * Address: 0x008E8A10 (FUN_008E8A10, sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D9>::get_deleter, vtable 0x00D42318 slot 3)
+     * Address: 0x008F9010 (FUN_008F9010, sp_counted_impl_p<gpg::gal::TextureD3D10>::get_deleter, vtable 0x00D430D8 slot 3)
+     * Address: 0x008F9070 (FUN_008F9070, sp_counted_impl_p<gpg::gal::CubeRenderTargetD3D10>::get_deleter, vtable 0x00D43100 slot 3)
+     * Address: 0x008F90A0 (FUN_008F90A0, sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D10>::get_deleter, vtable 0x00D43114 slot 3)
+     * Address: 0x008F90D0 (FUN_008F90D0, sp_counted_impl_p<gpg::gal::VertexFormatD3D10>::get_deleter, vtable 0x00D43128 slot 3)
+     * Address: 0x008F9100 (FUN_008F9100, sp_counted_impl_p<gpg::gal::VertexBufferD3D10>::get_deleter, vtable 0x00D4313C slot 3)
+     * Address: 0x008F9130 (FUN_008F9130, sp_counted_impl_p<gpg::gal::IndexBufferD3D10>::get_deleter, vtable 0x00D43150 slot 3)
+     * Address: 0x0094B620 (FUN_0094B620, sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::get_deleter, vtable 0x00D4887C slot 3)
+     * Address: 0x0094B650 (FUN_0094B650, sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::get_deleter, vtable 0x00D48890 slot 3)
+     *
      * What it does:
      * Constructs one `boost::detail::shared_count` from a raw pointee in caller-provided storage.
      *

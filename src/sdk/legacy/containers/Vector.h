@@ -2603,6 +2603,7 @@ namespace msvc8
          * Address: 0x007198B0 (FUN_007198B0 -- `size()` for a 56-byte element (`CInfluenceMap`).)
          * Address: 0x008A8A60 (FUN_008A8A60 -- `size()` for a 56-byte element (`CInfluenceMap`).)
          * Address: 0x006859D0 (FUN_006859D0 -- `size()` for the 20-byte `moho::CEntityDbBoundedPropQueueNode` (`imul 0x66666667; sar 3` is the divide by 20), with a null-`first` early out; zero callers, no pointer or jump to it anywhere in the image. Formerly `CountQueueNodeRangeEntries` over a `QueueNodeRangeLaneView` in moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
+         * Address: 0x004D4200 (FUN_004D4200 -- `size()` for the 0x54-byte three-`msvc8::string` record vector that 0x004D45B0 inserts into (`(last - first) / 84` with a null-`first` early out); caller 0x004D45B0; formerly `LegacyCountStride84ElementsFromRangeRuntimeLeafBatchDelta01` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          * Address: 0x0074C5C0 (FUN_0074C5C0 -- `size()` for the 36-byte `SNetCommandArg` (`cfunc_SessionGetCommandSourceNamesL`).)
          * Address: 0x00523090 (FUN_00523090 -- `size()` for the 388-byte `RUnitBlueprintWeapon` (`CPlatoon::FindClosestUnitToPos`, the weapon vector reflection).)
          * Address: 0x0054C0F0 (FUN_0054C0F0 -- `size()` for an 88-byte element.)
@@ -7132,6 +7133,10 @@ namespace msvc8
          * `DestroySSTIEntityVariableDataSlotPayloadRange` over a duplicate
          * `SSTIEntityVariableDataSlotRuntime` in
          * moho/entity/SSTIEntityVariableData.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x00510980 (FUN_00510980 -- `destroy_range` for `msvc8::vector<moho::REmitterCurveKey>`
+         * (`REmitterBlueprintCurve::Keys`; the 0x10 element is a reflected object, so each step is its
+         * deleting destructor through vtable +0x08 with flag 0); first in ESI, last in EDI; callers
+         * 0x00516310 (`reserve`), 0x00516970 (`insert`); formerly `LegacyInvokeVirtualSlot8AcrossStride16RangeRuntimeLaneAlpha` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -8181,6 +8186,15 @@ namespace msvc8
          * source line (RULE ONE), removed 2026-09-22. The source that produces
          * them is `SSyncData::mEntityUpdates.push_back(...)` in
          * `QueueEntityVariableUpdate`.
+         * Address: 0x00541250 (FUN_00541250 -- `uninit_copy_n` for `msvc8::vector<moho::SEjectRequest>`
+         * (8-byte element; placement copy behind a null test on the destination); callers 0x00540330
+         * (`_Insert_n`) and the three adapters below; formerly `LegacyCopyTwoDwordPairRangeIntoOutRuntimeSlot1` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x00540BD0 (FUN_00540BD0 -- the source-first argument-order adapter over that copy;
+         * caller 0x00540330; formerly `LegacyCopyTwoDwordPairRangeIntoOutRuntimeSlot1RegisterAdapter` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x00540F60 (FUN_00540F60 -- a second such adapter; no decoded caller.)
+         * Address: 0x005410C0 (FUN_005410C0 -- a third such adapter; no decoded caller.)
+         * Address: 0x0054FF00 (FUN_0054FF00 -- `uninit_copy_n` for `msvc8::vector<moho::SAniSkelBoneNameIndex>`
+         * (8-byte element); callers 0x0054D440 (`_Insert_n`), 0x0054E140, 0x0054E9B0, 0x0054F730; formerly `LegacyCopyTwoDwordPairRangeIntoOutRuntimeSlot2` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          */
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -9302,6 +9316,12 @@ namespace msvc8
          * Address: 0x007F0D20 (FUN_007F0D20 -- a by-reference bridge into it; caller 0x007F1D50 for `msvc8::vector<moho::SRangeExtractionPayload>` (the ring payload vectors `RangeRenderer::Render` and `func_ExtractRanges` fill; the element is four floats); callers 0x007F1D50; formerly `FillRangeExtractionPayloadSpanLaneB` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00950EA0 (FUN_00950EA0 -- `uninit_fill_n` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14; the 0x14 element is an `RRef` plus a `boost::shared_ptr<void>` plus a state word, so every slot copy bumps the control block at +0x0C). Reached from this template's own `push_back` emission 0x00953610, which is what `ReadArchive::TrackPointer` compiles to; callers 0x00951010, 0x00951270, 0x00953610; formerly `CopyConstructTrackedPointerCountFromSingleSource` in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-18.)
          * Address: 0x00951010 (FUN_00951010 -- the register-shape adapter over that same fill for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14); zero callers, unreachable; formerly `CopyConstructTrackedPointerCountFromSingleSourceRegisterAdapterA` in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-18.)
+         * Address: 0x00540E80 (FUN_00540E80 -- `uninit_fill_n` for `msvc8::vector<moho::SEjectRequest>`
+         * (8-byte element); callers 0x0053FC90 (`push_back`), 0x00540330 (`_Insert_n`); formerly `LegacyRepeatFixedTwoDwordPairIntoOutRuntimeSlot1` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x006D2730 (FUN_006D2730 -- `uninit_fill_n` for `msvc8::vector<moho::SUpgradeNotifyPair>`
+         * (8-byte element); callers 0x006D1960 (`push_back`), 0x006D1A90 (`_Insert_n`); formerly `LegacyRepeatFixedTwoDwordPairIntoOutRuntimeSlot2` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+         * Address: 0x00733C40 (FUN_00733C40 -- `uninit_fill_n` for `msvc8::vector<PlatoonUnitSearchEntry>`
+         * (8-byte `{Unit*, float}` element, CPlatoon.cpp); callers 0x00733480, 0x007336C0 (`insert`); formerly `LegacyRepeatFixedTwoDwordPairIntoOutRuntimeSlot3` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;

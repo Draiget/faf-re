@@ -1434,11 +1434,12 @@ namespace moho
    * void __cdecl sub_724920(gpg::SerConstructResult *a1);
    *
    * What it does:
-   * Serializer construct callback for CSquad: allocates one 0x60-byte squad
-   * (sizeof(CSquad)), builds a reflected RRef for it and stores that as the
-   * unowned result. The ctor call the binary makes on the fresh storage is
-   * folded with an identity thunk (0x00723E00), so the allocation carries no
-   * separate construction step.
+   * Serializer construct callback for CSquad: `new CSquad()` (operator new
+   * 0x00A825B9, then the default constructor 0x00723E00), `RRef_CSquad`
+   * (0x0072AF00) on it, and `SetUnowned` (0x0094F630) into the result.
+   * This recovery used to open-code the constructor's member initialisation
+   * on `nothrow` storage, write the +0x04 word the binary never touches, and
+   * skip the store when `result` was null; none of that is in the binary.
    */
   void ConstructCSquadForSerializer(
     gpg::ReadArchive* const,
@@ -1447,25 +1448,9 @@ namespace moho
     gpg::SerConstructResult* const result
   )
   {
-    void* const storage = ::operator new(sizeof(CSquad), std::nothrow);
-    CSquad* squad = nullptr;
-    if (storage != nullptr) {
-      squad = static_cast<CSquad*>(storage);
-      squad->mSim = nullptr;
-      squad->mPad_0x04 = 0u;
-      ::new (&squad->mUnits) SEntitySetTemplateUnit();
-      squad->mSquadClass = ESquadClass::Unassigned;
-      ::new (&squad->mName) msvc8::string();
-      ::new (&squad->mCats) msvc8::vector<EntityCategorySet>();
-    }
-
-    if (result == nullptr) {
-      return;
-    }
-
+    CSquad* const squad = new CSquad();
     gpg::RRef objectRef{};
-    objectRef.mObj = squad;
-    objectRef.mType = CachedCSquadType();
+    gpg::RRef_CSquad(&objectRef, squad);
     result->SetUnowned(objectRef, 0u);
   }
 

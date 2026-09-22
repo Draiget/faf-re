@@ -46,6 +46,25 @@ namespace moho
   } // namespace
 
   /**
+   * Address: 0x00723E00 (FUN_00723E00, Moho::CSquad::CSquad)
+   *
+   * What it does:
+   * `this` arrives on the stack (`ret 4`). Stores `mSim = 0`, links the
+   * `mUnits` ring onto itself (+0x08/+0x0C) and points its fastvector at the
+   * inline buffer (+0x20..+0x30), stores `mSquadClass = 0` (+0x30), leaves
+   * `mName` empty (+0x38 = 0, +0x48 = 0, +0x4C = 15) and `mCats` empty
+   * (+0x54..+0x5C = 0). +0x04 is never written. Formerly transcribed as an
+   * "identity" function (`LegacyIdentityIntRuntimeSlot223`) in
+   * moho/misc/WinApiImportThunks.cpp, while the serializer open-coded each
+   * member's placement construction instead of calling it; removed
+   * 2026-09-22.
+   */
+  CSquad::CSquad()
+    : mSim(nullptr), mSquadClass(ESquadClass::Unassigned)
+  {
+  }
+
+  /**
    * Address: 0x00723E70 (FUN_00723E70, Moho::CSquad::CSquad)
    *
    * IDA signature:

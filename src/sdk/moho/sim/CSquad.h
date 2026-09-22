@@ -52,6 +52,16 @@ namespace moho
     static gpg::RType* sType;
 
     /**
+     * Address: 0x00723E00 (FUN_00723E00, Moho::CSquad::CSquad)
+     *
+     * What it does:
+     * Default construction for the serializer: null sim, unassigned class,
+     * empty unit set (self-linked ring, inline storage), empty name and
+     * category vector. +0x04 is left untouched, as in the binary.
+     */
+    CSquad();
+
+    /**
      * Address: 0x00723E70 (FUN_00723E70, Moho::CSquad::CSquad)
      *
      * What it does:

@@ -127,6 +127,7 @@ namespace moho
   enum ERuleBPUnitToggleCaps : std::int32_t;
   enum ESpecialFileType : std::int32_t;
   class CPlatoon;
+  class CSquad;
   class CTaskThread;
   struct SPhysConstants;
   struct SPhysBody;
@@ -3855,6 +3856,14 @@ namespace gpg
    * derived-type normalization.
    */
   RRef* RRef_CPlatoon(RRef* out, moho::CPlatoon* value);
+
+  /**
+   * Address: 0x0072AF00 (FUN_0072AF00, gpg::RRef_CSquad)
+   *
+   * What it does:
+   * Builds a reflected reference for a `moho::CSquad` pointer.
+   */
+  RRef* RRef_CSquad(RRef* outRef, moho::CSquad* value);
 
   /**
    * Address: 0x0072AC80 (FUN_0072AC80, sub_72AC80)

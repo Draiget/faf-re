@@ -8300,6 +8300,15 @@ namespace moho
     void ZoomValueAxisByWheel(const wxEventRuntime& wheelEvent) noexcept;
 
     /**
+     * Address: 0x00662570 (FUN_00662570, nullsub_1719)
+     *
+     * What it does:
+     * The curve editor's last event-table entry (0x00F59D54, event-type
+     * global 0x00F8F4B0, id -1): an empty handler, `ret 4`.
+     */
+    void IgnoreEvent(wxEventRuntime& event) noexcept;
+
+    /**
      * Address: 0x00661100 (FUN_00661100)
      *
      * What it does:
