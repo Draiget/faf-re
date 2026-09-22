@@ -142,7 +142,20 @@ namespace moho
 
   public:
     WeakPtr<Unit> mGoalUnit;        // +0x80
+    /**
+     * The pair the `CBuilderArmManipulatorGetHeadingPitch` /
+     * `SetHeadingPitch` Lua binders read and write. MSVC emitted an
+     * out-of-line accessor for each, and all three were recovered as free
+     * functions over an `IAniManipulatorScalarPairRuntimeView` -- a pad to
+     * `+0x88` plus two floats, laid over this class and over
+     * `CBoneEntityManipulator` at the same time. Removed 2026-09-22 (RULE
+     * ONE); all three have zero callers and are unreachable.
+     *
+     * Address: 0x00635950 (FUN_00635950 -- reads `mHeading`; formerly `GetRuntimeScalar88`.)
+     * Address: 0x00635970 (FUN_00635970 -- writes both; formerly `SetRuntimeScalars88And8C`.)
+     */
     float mHeading;                 // +0x88
+    /// Address: 0x00635960 (FUN_00635960 -- reads it; formerly `GetRuntimeScalar8C`.)
     float mPitch;                   // +0x8C
     std::int32_t mReferenceBoneIdx; // +0x90
     bool mTrackingScriptActive;     // +0x94

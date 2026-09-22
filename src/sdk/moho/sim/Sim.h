@@ -1543,7 +1543,18 @@ namespace moho
     /// pointer: the emission strides `add ebx, 20h` over this vector at
     /// Sim+0x0A28 (0x00749F40, around 0x0074A363).
     msvc8::vector<SExtraUnitData> mSyncSerializeGroup2; // 0x0A28
-    SPhysConstants* mPhysConstants;
+    /**
+     * Address: 0x0062FBF0 (FUN_0062FBF0 -- `mov eax, [eax+0xA38]; ret`, the
+     *   out-of-line emission of this field's inline getter. 0x0A28 + 0x10
+     *   puts `mPhysConstants` at 0x0A38, and `CUnitMotion::CalcMoveBallistic`
+     *   (0x006C02D6) reaches it as `[[unit+0x150]+0xA38]` then reads three
+     *   floats off it and scales them by the tick dt -- `mGravity`. Zero
+     *   callers, unreachable; formerly `GetRuntimeValueA38`, typed
+     *   `std::uint32_t` over an `IAniManipulatorLargeRuntimeSlotA38View` in
+     *   moho/animation/IAniManipulator.cpp -- wrong owner and wrong type
+     *   (RULE ONE), removed 2026-09-22.)
+     */
+    SPhysConstants* mPhysConstants; // 0x0A38
     msvc8::list<Shield*> mShields;
     msvc8::deque<void*> mDeletionQueue;
     // 0x0A5C..0x0A63 intrusive list head (`mPrev` @ 0x0A5C, `mNext` @ 0x0A60).

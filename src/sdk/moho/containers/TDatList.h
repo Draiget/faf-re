@@ -66,6 +66,11 @@ namespace moho
      * Address: 0x0063C060 (FUN_0063C060, typed-instantiation lane)
      * Address: 0x004856F0 (FUN_004856F0, typed-instantiation lane)
      * Address: 0x00485780 (FUN_00485780, typed-instantiation lane)
+     * Address: 0x0063BFF0 (FUN_0063BFF0 -- the `moho::TDatListItem<IAniManipulator, void>`
+     *   emission; ICF twin of 0x00442DA0/0x00443020/0x00443230 above, which is
+     *   what identifies it. Zero callers, unreachable; formerly
+     *   `InitializeNodeSelfLinks` over an `IntrusiveNodeRuntimeView` in
+     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      *
      * What it does:
      * Resets one intrusive node to a self-linked singleton state.
@@ -196,6 +201,13 @@ namespace moho
      * restoring singleton self-links.
      * Address: 0x005A7690 (FUN_005A7690 -- `ListUnlinkSelf` -- neighbours adopt each other, then self-link, handing this node back for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNode` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x005A7A90 (FUN_005A7A90 -- a second emission of that unlink for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNodeAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00632DF0 (FUN_00632DF0 -- the `moho::TDatListItem<IAniManipulator, void>`
+     *   emission, with a twenty-strong ICF family (0x00406C50, 0x00407690,
+     *   0x00409930, 0x0040A860, 0x0040A990, 0x0040AC20, 0x00431E90 ...) that is
+     *   what identifies it as one template body rather than twenty hand-written
+     *   unlinks; zero callers, unreachable; formerly
+     *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNodeRuntimeView` in
+     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      */
     item_t* ListUnlinkSelf() noexcept
     {
@@ -238,6 +250,16 @@ namespace moho
      * What it does:
      * Unlinks this node from its current ring and inserts it directly before `that`.
      * Address: 0x00761CE0 (FUN_00761CE0 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for `moho::TDatListItem<moho::HSound, void>` (`HSound::mSimLoopLink`, the sound manager's active-loop ring); callers 0x008AB2B0; formerly `AppendSoundToList` in moho/audio/CUserSoundManager.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x0063C030 (FUN_0063C030 -- the
+     *   `moho::TDatListItem<IAniManipulator, void>` emission, reached as
+     *   `IAniManipulator::mActorOrderLink`, the actor's precedence-ordered
+     *   manipulator ring; zero callers, unreachable; formerly
+     *   `LinkManipulatorOrderBeforeNode` in moho/animation/IAniManipulator.cpp
+     *   (RULE ONE), removed 2026-09-22.)
+     * Address: 0x0063C100 (FUN_0063C100 -- the same emission reached through a
+     *   caller-held anchor slot rather than an anchor pointer; zero callers,
+     *   unreachable; formerly `RelinkManipulatorOrderBeforeSlot` in the same
+     *   file, removed 2026-09-22.)
      */
     item_t* ListLinkBefore(item_t* that) noexcept
     {

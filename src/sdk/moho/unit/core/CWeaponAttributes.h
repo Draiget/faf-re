@@ -26,6 +26,18 @@ namespace moho
   struct CWeaponAttributes
   {
     RUnitBlueprintWeapon* mBlueprint; // +0x00
+    /**
+     * Negative means "not overridden": the getter falls back to the
+     * blueprint's own value.
+     *
+     * Address: 0x0062FD40 (FUN_0062FD40 -- `movss xmm0, [eax+4]` / `comiss`
+     *   against zero / on negative `mov eax, [eax]` and `movss xmm0,
+     *   [eax+0x78]`, which is `RUnitBlueprintWeapon::FiringTolerance`. Zero
+     *   callers, unreachable; formerly `ReadOverrideOrFallbackScalar` over a
+     *   `RuntimeOverrideFloatLaneView` / `RuntimeFallbackFloatVTableView` pair
+     *   in moho/animation/IAniManipulator.cpp, which mis-named the blueprint
+     *   pointer a vtable (RULE ONE), removed 2026-09-22.)
+     */
     float mFiringTolerance;           // +0x04
     float mRateOfFire;                // +0x08
     float mMinRadius;                 // +0x0C
