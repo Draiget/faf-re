@@ -169,9 +169,11 @@ namespace
       moho::RBlueprint* const blueprint = rules->GetBlueprintFromOrdinal(static_cast<int>(position));
       const auto mappedOrdinal = static_cast<unsigned int>(blueprint->mBlueprintOrdinal);
 
-      outBits.EnsureBounds(mappedOrdinal, mappedOrdinal + 1u);
-      const unsigned int relativeWord = (mappedOrdinal >> 5u) - outBits.mFirstWordIndex;
-      outBits.mWords.start_[relativeWord] |= (1u << (mappedOrdinal & 0x1Fu));
+      // Inlined at 0x0053333A..0x00533365: `EnsureBounds` (0x00401980), then
+      // `WordIndexFor` (`shr 5` / `sub [ebx]`), the `previousWord` load, the
+      // bit-OR and the store back -- `Add`'s body with its `BVIntSetAddResult`
+      // return dead-code-eliminated because nothing reads it.
+      (void)outBits.Add(mappedOrdinal);
 
       position = sourceBits.GetNext(position);
     } while (position != endOrdinalExclusive);

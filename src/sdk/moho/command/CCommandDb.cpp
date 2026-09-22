@@ -317,13 +317,13 @@ namespace moho
         pool.mNextLowId = static_cast<std::int32_t>(nextLowId + 1u);
       } else {
         nextLowId = releasedLowIds.GetNext(std::numeric_limits<unsigned int>::max());
-
-        const unsigned int wordIndex = (nextLowId >> 5u) - releasedLowIds.mFirstWordIndex;
-        const std::size_t wordCount = releasedLowIds.mWords.Size();
-        if (static_cast<std::size_t>(wordIndex) < wordCount) {
-          releasedLowIds.mWords[wordIndex] &= ~(1u << (nextLowId & 0x1Fu));
-          releasedLowIds.Finalize();
-        }
+        // Inlined at 0x006E1479..0x006E14AA, which is why this read as open-coded
+        // word arithmetic: `WordIndexFor` (`shr 5` / `sub [edi]`), the
+        // `>= WordCount()` early-out (`sar ecx,2` / `jae`), the read-modify-write
+        // of `mWords[wordIndex]` through a `previousWord` temp only the discarded
+        // `bool` needs, then `Finalize` (0x004018A0). `Remove` has its own
+        // out-of-line body at 0x00403650 with eight other callers.
+        (void)releasedLowIds.Remove(nextLowId);
       }
 
       const CmdId commandId = static_cast<CmdId>(nextLowId | 0x80000000u);
