@@ -8585,9 +8585,6 @@ namespace moho
     return &binder;
   }
 
-  [[nodiscard]] static Wm3::Quaternionf* BuildTiltShortestArcDelta(
-    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* outDelta, const Wm3::Vector3f& currentUp);
-
   /**
    * Address: 0x006FCA80 (FUN_006FCA80, cfunc_EntityPushOver)
    *
@@ -8956,90 +8953,6 @@ namespace moho
     const float polynomial =
       clamped * (((clamped * -0.018729299f) + 0.074261002f) * clamped - 0.21211439f) + 1.5707288f;
     return 1.5707963f - (rootTerm * polynomial);
-  }
-
-  /**
-   * Address: 0x0050D140 (FUN_0050D140, fabs)
-   *
-   * What it does:
-   * Returns one float absolute-value lane through the x87-compatible scalar path.
-   */
-  [[nodiscard]] static double CoordsAbsFloat(const float value) noexcept
-  {
-    return std::fabs(static_cast<double>(value));
-  }
-
-  /**
-   * Address: 0x0050D150 (FUN_0050D150, inv_sqrt)
-   *
-   * What it does:
-   * Returns one reciprocal-square-root lane through scalar math path.
-   */
-  [[nodiscard]] static double CoordsInvSqrt(const float value) noexcept
-  {
-    return 1.0 / std::sqrt(static_cast<double>(value));
-  }
-
-  /**
-   * Address: 0x0050CB50 (FUN_0050CB50, sub_50CB50)
-   *
-   * What it does:
-   * Builds the shortest-arc tilt delta from `currentUp` toward `targetNormal`,
-   * including the anti-parallel fallback axis selection used by COORDS_Tilt.
-   *
-   * Ground truth (`FUN_0050CB50.c`) writes the dot-product scalar term to
-   * raw offset 0 of the output quaternion and the three cross-product/
-   * fallback-axis terms to offsets 4/8/12 in that order. This engine's
-   * `Wm3::Quaternion` stores `.w` at offset 0 and `.x/.y/.z` at offsets
-   * 4/8/12 (`Wm3Quaternion.h`'s declared union order) -- so this
-   * construction is one of the rare cases (like `RotateQuatByAngle`) that
-   * genuinely produces a native `.w`-scalar result, unlike the scalar-first
-   * convention every *engine orientation* quaternion uses. The previous body
-   * here wrote the scalar to `.x` and cyclically shifted the three
-   * cross-product terms onto `.y/.z/.w`, silently relabelling the same
-   * correct value set onto the wrong fields (the exact failure mode RULE ONE
-   * warns about) -- confirmed by cross-checking both callers' `Wm3::
-   * Quaternionf::Multiply(tiltDelta, orientation)` sites against their own
-   * ground truth (`FUN_006FCB00.c`, `FUN_0050B820.c`), both of which only
-   * balance term-by-term once `tiltDelta.w` (not `.x`) holds the scalar.
-   */
-  [[nodiscard]] static Wm3::Quaternionf*
-  BuildTiltShortestArcDelta(const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* const outDelta, const Wm3::Vector3f& currentUp)
-  {
-    if (outDelta == nullptr) {
-      return nullptr;
-    }
-
-    Wm3::Vector3f halfAxis{
-      currentUp.x + targetNormal.x,
-      currentUp.y + targetNormal.y,
-      currentUp.z + targetNormal.z,
-    };
-    (void)Wm3::Vector3f::Normalize(&halfAxis);
-
-    const float scalar = (currentUp.x * halfAxis.x) + (currentUp.y * halfAxis.y) + (currentUp.z * halfAxis.z);
-    outDelta->w = scalar;
-    if (scalar == 0.0f) {
-      const double upAbsX = CoordsAbsFloat(currentUp.x);
-      const double upAbsY = CoordsAbsFloat(currentUp.y);
-      if (upAbsX < upAbsY) {
-        const double inverseLength = CoordsInvSqrt((currentUp.y * currentUp.y) + (currentUp.z * currentUp.z));
-        outDelta->x = 0.0f;
-        outDelta->y = static_cast<float>(inverseLength * static_cast<double>(currentUp.z));
-        outDelta->z = static_cast<float>(-inverseLength * static_cast<double>(currentUp.y));
-      } else {
-        const double inverseLength = CoordsInvSqrt((currentUp.x * currentUp.x) + (currentUp.z * currentUp.z));
-        outDelta->y = 0.0f;
-        outDelta->x = static_cast<float>(-inverseLength * static_cast<double>(currentUp.z));
-        outDelta->z = static_cast<float>(inverseLength * static_cast<double>(currentUp.x));
-      }
-      return outDelta;
-    }
-
-    outDelta->x = (currentUp.y * halfAxis.z) - (currentUp.z * halfAxis.y);
-    outDelta->y = (currentUp.z * halfAxis.x) - (currentUp.x * halfAxis.z);
-    outDelta->z = (currentUp.x * halfAxis.y) - (currentUp.y * halfAxis.x);
-    return outDelta;
   }
 
   /**

@@ -1652,6 +1652,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\animation\IAniManipulator.h" />
     <ClInclude Include="moho\animation\CRotateManipulator.h" />
     <ClInclude Include="moho\animation\CStorageManipulator.h" />
+    <ClInclude Include="moho\animation\CThrustManipulator.h" />
     <ClInclude Include="moho\animation\CSlideManipulator.h" />
     <ClInclude Include="moho\animation\CSlaveManipulator.h" />
     <ClInclude Include="moho\animation\CAnimationManipulator.h" />

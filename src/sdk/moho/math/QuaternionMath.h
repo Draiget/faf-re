@@ -256,6 +256,30 @@ namespace moho
   Wm3::Quaternionf MultiplyQuat(const Wm3::Quaternionf& a, const Wm3::Quaternionf& b) noexcept;
 
   /**
+   * Address: 0x0050CB50 (FUN_0050CB50, sub_50CB50)
+   *
+   * What it does:
+   * Builds the shortest-arc delta that rotates `currentUp` onto
+   * `targetNormal`, including the anti-parallel fallback axis selection: when
+   * the two are exactly opposed the half-vector degenerates, so the axis is
+   * taken perpendicular to whichever of `currentUp`'s x/y lanes is smaller.
+   *
+   * This writes a genuine `.w`-scalar quaternion -- the dot-product term goes
+   * to offset 0 and the three cross-product/fallback lanes to 4/8/12 -- unlike
+   * the scalar-first convention every *engine orientation* quaternion in this
+   * binary uses. Getting that backwards relabels a correct value set onto the
+   * wrong fields, which is exactly what the copy in `CThrustManipulator.cpp`
+   * did before it was folded into this one.
+   *
+   * Callers: `COORDS_Tilt` (0x0050B820) and `cfunc_EntityPushOver`'s tilt lane
+   * in `Entity.cpp`, and both of `CThrustManipulator`'s seeding sites -- its
+   * constructor (0x0064A71D) and `ManipulatorUpdate` (0x0064AAD3).
+   */
+  Wm3::Quaternionf* BuildTiltShortestArcDelta(
+    const Wm3::Vector3f& targetNormal, Wm3::Quaternionf* outDelta, const Wm3::Vector3f& currentUp
+  ) noexcept;
+
+  /**
    * Ordinary scalar-first conjugate: keeps `.w`, negates `.x`/`.y`/`.z`.
    * Transcribed from `VTransform::Inverse` (0x0046FBF0), which copies
    * `[eax+0]` verbatim and negates `[eax+4]`/`[eax+8]`/`[eax+0Ch]`.
