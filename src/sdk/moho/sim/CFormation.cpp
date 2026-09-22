@@ -208,9 +208,7 @@ namespace moho
   {
     IFormationInstance* const curInstance = mCurInstance;
     mCurInstance = nullptr;
-    if (curInstance != nullptr) {
-      curInstance->operator_delete(1);
-    }
+    delete curInstance;
 
     SSelectionNodeUserEntity* const nodeHead = mParticipants.mHead;
     if (nodeHead != nullptr) {
@@ -236,9 +234,7 @@ namespace moho
 
     IFormationInstance* const curInstance = mCurInstance;
     mCurInstance = nullptr;
-    if (curInstance != nullptr) {
-      curInstance->operator_delete(1);
-    }
+    delete curInstance;
 
     mReady = false;
     mType = 2;
@@ -424,9 +420,7 @@ namespace moho
   {
     IFormationInstance* const previousInstance = mCurInstance;
     mCurInstance = nullptr;
-    if (previousInstance != nullptr) {
-      previousInstance->operator_delete(1);
-    }
+    delete previousInstance;
 
     if (mBestFormation < 0) {
       return;
@@ -480,9 +474,7 @@ namespace moho
 
     IFormationInstance* const staleInstance = mCurInstance;
     mCurInstance = newInstance;
-    if (staleInstance != nullptr) {
-      staleInstance->operator_delete(1);
-    }
+    delete staleInstance;
 
     mLastUpdate = gpg::time::GetSystemTimer().ElapsedSeconds();
   }

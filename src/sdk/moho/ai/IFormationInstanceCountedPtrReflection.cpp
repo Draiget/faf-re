@@ -54,29 +54,23 @@ namespace
     return CachedRType<moho::IFormationInstance>();
   }
 
-  struct IFormationInstanceSerializationRuntimeView
-  {
-    std::uint8_t reserved00_03[0x4];
-    std::uint32_t mBaseRuntimeWord;
-    moho::BroadcasterEventTag<moho::EFormationdStatus> broadcaster;
-  };
+  using FormationStatusBroadcaster = moho::BroadcasterEventTag<moho::EFormationdStatus>;
 
-  static_assert(
-    offsetof(IFormationInstanceSerializationRuntimeView, mBaseRuntimeWord) == 0x4,
-    "IFormationInstanceSerializationRuntimeView::mBaseRuntimeWord offset must be 0x4"
-  );
-  static_assert(
-    offsetof(IFormationInstanceSerializationRuntimeView, broadcaster) == 0x8,
-    "IFormationInstanceSerializationRuntimeView::broadcaster offset must be 0x8"
-  );
-
-  [[nodiscard]] gpg::RType* CachedBroadcasterEFormationdStatusType()
+  /**
+   * The binary keeps one global for this descriptor -- `0x010C6F84`, which
+   * both serializers below read, test for null, fill from
+   * `LookupRType(0x00F68650)` and store back. That global is the
+   * instantiation's own `sType` lane, so this reads and writes it rather than
+   * caching a second copy in a function-local static.
+   */
+  [[nodiscard]] gpg::RType* ResolveBroadcasterEFormationdStatusType()
   {
-    static gpg::RType* cached = nullptr;
-    if (!cached) {
-      cached = gpg::LookupRType(typeid(moho::BroadcasterEventTag<moho::EFormationdStatus>));
+    gpg::RType* type = FormationStatusBroadcaster::sType;
+    if (!type) {
+      type = gpg::LookupRType(typeid(FormationStatusBroadcaster));
+      FormationStatusBroadcaster::sType = type;
     }
-    return cached;
+    return type;
   }
 
   // NOTE: 0x00570F10 (Moho::AddIFormationInstanceBaseField-shaped helper) is
@@ -271,34 +265,33 @@ namespace moho
    * Address: 0x00569450 (FUN_00569450, Moho::IFormationInstance::IFormationInstance)
    *
    * What it does:
-   * Initializes the base runtime word at `+0x04` and resets the embedded
-   * broadcaster node at `+0x08` to singleton links.
+   * Nothing of its own. `mov [eax+4], 0` is `CountedObject()`, the
+   * `lea ecx, [eax+8]` plus two self-link stores are the broadcaster base's
+   * own constructor, and the vftable store at the end is the compiler's.
    */
-  IFormationInstance::IFormationInstance()
-    : mSharedCount(0)
-  {
-    auto& view = *reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(this);
-    view.broadcaster.ListResetLinks();
-  }
+  IFormationInstance::IFormationInstance() = default;
 
   /**
    * Address: 0x00565C70 (FUN_00565C70, Moho::IFormationInstance::~IFormationInstance)
-   * Address: 0x00565CA0 (FUN_00565CA0, vtable-slot-2 scalar deleting
-   * destructor: the full compiler-emitted picture -- sets this object's own
-   * vftable, performs the same intrusive-list unlink as the body below
-   * (`ListUnlink()`), transitions the vftable down to `CountedObject` for
-   * base-class teardown, then conditionally frees the object)
+   * Address: 0x00565CA0 (FUN_00565CA0, the slot-0 scalar deleting destructor
+   *   MSVC emits from this body: same vftable store, same unlink, same
+   *   `mov [esi], 0xE01810` handover to `~CountedObject`, then the
+   *   conditional `::operator delete`)
    *
    * What it does:
-   * Unlinks the embedded `Broadcaster<EFormationdStatus>` lane from its
-   * intrusive listener list.
+   * Unlinks the `Broadcaster<EFormationdStatus>` base from its listener ring.
+   * The two vftable stores that bracket it are the compiler's, and the trailing
+   * one is `~CountedObject` inlined -- the same eight-instruction tail
+   * `~CFormationInstance` (0x00569880) ends with, which is what proves the
+   * unlink belongs here and not to its owner.
+   *
+   * `TDatList` carries no destructor in this tree, so the unlink is spelled
+   * out; giving one to `Broadcaster` instead would emit it into every
+   * broadcaster owner in the engine, which the binary does not do.
    */
   IFormationInstance::~IFormationInstance()
   {
-    auto* const view = reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(this);
-    if (view != nullptr) {
-      view->broadcaster.ListUnlink();
-    }
+    FormationStatusBroadcaster::ListUnlink();
   }
 
   namespace
@@ -375,7 +368,12 @@ namespace moho
    *
    * What it does:
    * Loads reflected `Broadcaster<EFormationdStatus>` payload from archive into
-   * this instance's broadcaster subobject lane.
+   * this instance's broadcaster base subobject.
+   *
+   * The `xor ecx, ecx` / `cmp eax, ecx` / `lea esi, [eax + 8]` at the head is
+   * not a hand-written guard: it is exactly what MSVC emits for an upcast to
+   * a non-primary base, which is why the +8 and the null test arrive
+   * together.
    */
   void IFormationInstance::MemberDeserialize(
     IFormationInstance* const object,
@@ -386,11 +384,10 @@ namespace moho
       return;
     }
 
-    auto* const view = reinterpret_cast<IFormationInstanceSerializationRuntimeView*>(object);
     const gpg::RRef ownerRef{};
     archive->Read(
-      CachedBroadcasterEFormationdStatusType(),
-      view != nullptr ? static_cast<void*>(&view->broadcaster) : nullptr,
+      ResolveBroadcasterEFormationdStatusType(),
+      static_cast<FormationStatusBroadcaster*>(object),
       ownerRef
     );
   }
@@ -400,7 +397,8 @@ namespace moho
    *
    * What it does:
    * Saves reflected `Broadcaster<EFormationdStatus>` payload from this
-   * instance's broadcaster subobject lane into archive.
+   * instance's broadcaster base subobject into archive. Same base upcast as
+   * `MemberDeserialize`, emitted identically at 0x00570DD3-0x00570DDF.
    */
   void IFormationInstance::MemberSerialize(
     const IFormationInstance* const object,
@@ -411,11 +409,10 @@ namespace moho
       return;
     }
 
-    const auto* const view = reinterpret_cast<const IFormationInstanceSerializationRuntimeView*>(object);
     const gpg::RRef ownerRef{};
     archive->Write(
-      CachedBroadcasterEFormationdStatusType(),
-      view != nullptr ? static_cast<const void*>(&view->broadcaster) : nullptr,
+      ResolveBroadcasterEFormationdStatusType(),
+      static_cast<const FormationStatusBroadcaster*>(object),
       ownerRef
     );
   }
@@ -519,6 +516,18 @@ namespace moho
 
   /**
    * Address: 0x006EAAC0 (FUN_006EAAC0, Moho::RCountedPtrType<Moho::IFormationInstance>::SerLoad)
+   *
+   * What it does:
+   * Reads the referenced instance, and when it differs from the one already
+   * in the slot, drops a reference on the outgoing object and takes one on
+   * the incoming one.
+   *
+   * The counting is `CountedObject`'s non-atomic pair, not the atomic one:
+   * 0x006EAAE8 is a plain `add dword [ecx + 4], -1` with `jne` off its own
+   * flags, and the delete at zero is `mov edx,[ecx]` / `mov eax,[edx]` /
+   * `push 1` / `call eax` -- `delete this` through the slot-0 deleting
+   * destructor, which is precisely `ReleaseReference()`'s body. 0x006EAAFC is
+   * the matching `add dword [esi + 4], 1`.
    */
   void RCountedPtrType<moho::IFormationInstance>::SerLoad(
     gpg::ReadArchive* archive,
@@ -538,14 +547,12 @@ namespace moho
 
     if (oldValue != newValue) {
       if (oldValue) {
-        if (--oldValue->mSharedCount == 0) {
-          oldValue->operator_delete(1);
-        }
+        (void)oldValue->ReleaseReference();
       }
 
       *slot = newValue;
       if (newValue) {
-        ++newValue->mSharedCount;
+        newValue->AddReference();
       }
     }
   }

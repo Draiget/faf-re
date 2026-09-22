@@ -1102,7 +1102,7 @@ void CAiTransportImpl::TransportGenerateWaitingFormationForUnits(const EntitySet
 void CAiTransportImpl::TransportClearWaitingFormation()
 {
   if (mWaitingFormation) {
-    mWaitingFormation->operator_delete(1);
+    delete mWaitingFormation;
     mWaitingFormation = nullptr;
   }
 

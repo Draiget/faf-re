@@ -4931,9 +4931,7 @@ namespace
 
     moho::IFormationInstance* const previousValue = *valueSlot;
     *valueSlot = loadedValue;
-    if (previousValue != nullptr) {
-      previousValue->operator_delete(1);
-    }
+    delete previousValue;
     return archive;
   }
 

@@ -681,10 +681,12 @@ namespace moho
       // `push unit` -- `IFormationInstance` slot 16, `Contains(unit, true)`.
       // On success 0x006182E5 `lea ecx, [eax + 8]` / 0x006182E8
       // `lea eax, [ebp + 0x44]` splices the `Listener<EFormationdStatus>`
-      // node (+0x44) into `CAiFormationInstance::mStatusListeners` (+0x08).
+      // node (+0x44) into the formation's `Broadcaster<EFormationdStatus>`
+      // base, which `IFormationInstance`'s RTTI puts at mdisp 8 -- so the
+      // `+ 8` is the base upcast, exactly like the `+ 0x34` above.
       if (CAiFormationInstance* const formation = command->mFormationInstance;
           formation != nullptr && formation->Contains(mUnit, true)) {
-        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(&formation->mStatusListeners);
+        Listener<EFormationdStatus>::mListenerLink.ListLinkBefore(static_cast<Broadcaster*>(formation));
       }
 
       // 0x00618318 seeds one candidate destination with the zero vector and
