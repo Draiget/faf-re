@@ -899,7 +899,7 @@ namespace
     return commands.front().GetObjectPtr() != nullptr;
   }
 
-  void SubtractCategoryWordRange(CategoryWordRangeView& lhs, const CategoryWordRangeView& rhs)
+  void SubtractCategoryWordRange(EntityCategorySet& lhs, const EntityCategorySet& rhs)
   {
     const std::size_t lhsCount = lhs.WordCount();
     const std::size_t rhsCount = rhs.WordCount();
@@ -2673,10 +2673,10 @@ SEntitySetTemplateUnit* CAiBrain::GetAvailableFactories(
   const float maxDistance
 )
 {
-  const CategoryWordRangeView* const mobileCategory = mSim->mRules->GetEntityCategory("MOBILE");
-  const CategoryWordRangeView* const factoryCategory = mSim->mRules->GetEntityCategory("FACTORY");
+  const EntityCategorySet* const mobileCategory = mSim->mRules->GetEntityCategory("MOBILE");
+  const EntityCategorySet* const factoryCategory = mSim->mRules->GetEntityCategory("FACTORY");
 
-  CategoryWordRangeView candidateCategory{};
+  EntityCategorySet candidateCategory{};
   if (factoryCategory != nullptr) {
     candidateCategory = *factoryCategory;
     if (mobileCategory != nullptr) {
@@ -2763,10 +2763,10 @@ moho::Unit* moho::FindAvailableFactory(
   // If caller didn't pre-populate `candidateList`, harvest all static
   // factories owned by this brain's army into the local std::vector copy.
   if (candidates.empty()) {
-    const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
-    const CategoryWordRangeView* const factoryCategory = rules->GetEntityCategory("FACTORY");
+    const EntityCategorySet* const mobileCategory = rules->GetEntityCategory("MOBILE");
+    const EntityCategorySet* const factoryCategory = rules->GetEntityCategory("FACTORY");
 
-    CategoryWordRangeView staticFactoryCategory{};
+    EntityCategorySet staticFactoryCategory{};
     if (factoryCategory != nullptr) {
       staticFactoryCategory = *factoryCategory;
       if (mobileCategory != nullptr) {
@@ -4320,7 +4320,7 @@ int moho::cfunc_CAiBrainCreateResourceBuildingNearestL(LuaPlus::LuaState* const 
   }
 
   // Hydrocarbon buildings sit on kHydrocarbon deposits; everything else on kMass.
-  const CategoryWordRangeView* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
+  const EntityCategorySet* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
   const EDepositType wantedDeposit =
     EntityCategory::HasBlueprint(structureBlueprint, hydrocarbonCategory) ? kHydrocarbon : kMass;
 
@@ -4543,7 +4543,7 @@ int moho::cfunc_CAiBrainFindPlaceToBuildL(LuaPlus::LuaState* const state)
       startingPos.z = overridePos.z;
     }
 
-    const CategoryWordRangeView* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
+    const EntityCategorySet* const hydrocarbonCategory = sim->mRules->GetEntityCategory("HYDROCARBON");
     const EDepositType wantedDeposit =
       EntityCategory::HasBlueprint(structureBp, hydrocarbonCategory) ? kHydrocarbon : kMass;
 
@@ -7204,10 +7204,10 @@ int moho::cfunc_CAiBrainIsAnyEngineerBuildingL(LuaPlus::LuaState* const state)
 
   bool foundMatch = false;
   if (brain != nullptr && brain->mArmy != nullptr && brain->mSim != nullptr && brain->mSim->mRules != nullptr) {
-    const CategoryWordRangeView* const engineerCategory = brain->mSim->mRules->GetEntityCategory(kEngineerCategoryName);
+    const EntityCategorySet* const engineerCategory = brain->mSim->mRules->GetEntityCategory(kEngineerCategoryName);
 
     SEntitySetTemplateUnit engineerUnits{};
-    brain->mArmy->GetUnits(&engineerUnits, const_cast<CategoryWordRangeView*>(engineerCategory));
+    brain->mArmy->GetUnits(&engineerUnits, const_cast<EntityCategorySet*>(engineerCategory));
 
     for (Entity* const* it = engineerUnits.mVec.begin(); it != engineerUnits.mVec.end(); ++it) {
       Unit* const unit = SEntitySetTemplateUnit::UnitFromEntry(*it);
@@ -7753,8 +7753,8 @@ Wm3::Vec3f* moho::CAiBrain::CenterOfArmy(Wm3::Vec3f* const outPosition)
   }
 
   RRuleGameRules* const rules = mSim->mRules;
-  const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
-  const CategoryWordRangeView* const structureCategory = rules->GetEntityCategory("STRUCTURE");
+  const EntityCategorySet* const mobileCategory = rules->GetEntityCategory("MOBILE");
+  const EntityCategorySet* const structureCategory = rules->GetEntityCategory("STRUCTURE");
 
   EntityCategorySet mobileMinusStructure{};
   EntityCategory::Sub(&mobileMinusStructure, mobileCategory, structureCategory);
@@ -7850,8 +7850,8 @@ int moho::cfunc_CAiBrainSetUpAttackVectorsToArmyL(LuaPlus::LuaState* const state
     brain->mBuildCategoryRange = *explicitCategory;
   } else {
     RRuleGameRules* const rules = brain->mSim->mRules;
-    const CategoryWordRangeView* const mobileCategory = rules->GetEntityCategory("MOBILE");
-    const CategoryWordRangeView* const structureCategory = rules->GetEntityCategory("STRUCTURE");
+    const EntityCategorySet* const mobileCategory = rules->GetEntityCategory("MOBILE");
+    const EntityCategorySet* const structureCategory = rules->GetEntityCategory("STRUCTURE");
 
     EntityCategorySet defaultCategory{};
     EntityCategory::Sub(&defaultCategory, mobileCategory, structureCategory);
@@ -7936,7 +7936,7 @@ int moho::cfunc_CAiBrainFindClosestArmyWithBaseL(LuaPlus::LuaState* const state)
     return 1;
   }
 
-  const CategoryWordRangeView* const structureCategory = brain->mSim->mRules->GetEntityCategory("STRUCTURE");
+  const EntityCategorySet* const structureCategory = brain->mSim->mRules->GetEntityCategory("STRUCTURE");
 
   const msvc8::vector<ReconBlip*>& blips = reconDB->ReconGetBlips();
   for (ReconBlip* const blip : blips) {

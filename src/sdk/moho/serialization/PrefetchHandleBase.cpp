@@ -38,16 +38,14 @@ namespace
     return gPrefetchTypeMap;
   }
 
-  using CPrefetchSetRuntime = moho::CPrefetchSet;
-
 #if defined(_M_IX86)
-  static_assert(sizeof(CPrefetchSetRuntime) == 0x10, "CPrefetchSetRuntime size must be 0x10");
+  static_assert(sizeof(moho::CPrefetchSet) == 0x10, "moho::CPrefetchSet size must be 0x10");
 #endif
 
   [[nodiscard]] gpg::RType* ResolvePrefetchSetRuntimeType()
   {
     if (moho::CPrefetchSet::sType == nullptr) {
-      moho::CPrefetchSet::sType = gpg::LookupRType(typeid(CPrefetchSetRuntime));
+      moho::CPrefetchSet::sType = gpg::LookupRType(typeid(moho::CPrefetchSet));
     }
     return moho::CPrefetchSet::sType;
   }
@@ -76,7 +74,7 @@ namespace
   {
     // msvc8::vector's default constructor already null-initialises all three
     // lanes; the binary's explicit zeroing here IS that constructor inlined.
-    CPrefetchSetRuntime* const object = new (std::nothrow) CPrefetchSetRuntime();
+    moho::CPrefetchSet* const object = new (std::nothrow) moho::CPrefetchSet();
     return gpg::RRef(object, ResolvePrefetchSetRuntimeType());
   }
 
@@ -89,11 +87,11 @@ namespace
    */
   [[nodiscard]] gpg::RRef ConstructPrefetchSetRuntimeRef(void* const objectStorage)
   {
-    auto* const object = static_cast<CPrefetchSetRuntime*>(objectStorage);
+    auto* const object = static_cast<moho::CPrefetchSet*>(objectStorage);
     if (object != nullptr) {
       // Placement-new runs msvc8::vector's default constructor, which is what
       // the binary's explicit lane zeroing right after it is.
-      new (object) CPrefetchSetRuntime();
+      new (object) moho::CPrefetchSet();
     }
     return gpg::RRef(object, ResolvePrefetchSetRuntimeType());
   }
@@ -107,7 +105,7 @@ namespace
    */
   void DeletePrefetchSetRuntime(void* const objectStorage)
   {
-    auto* const object = static_cast<CPrefetchSetRuntime*>(objectStorage);
+    auto* const object = static_cast<moho::CPrefetchSet*>(objectStorage);
     if (object == nullptr) {
       return;
     }
@@ -128,7 +126,7 @@ namespace
    */
   void DestructPrefetchSetRuntime(void* const objectStorage)
   {
-    auto* const object = static_cast<CPrefetchSetRuntime*>(objectStorage);
+    auto* const object = static_cast<moho::CPrefetchSet*>(objectStorage);
     if (object == nullptr) {
       return;
     }
@@ -174,7 +172,7 @@ namespace
      */
     void Init() override
     {
-      size_ = static_cast<int>(sizeof(CPrefetchSetRuntime));
+      size_ = static_cast<int>(sizeof(moho::CPrefetchSet));
       gpg::RType::Init();
       (void)BindCPrefetchSetLifecycleCallbacks(this);
       Finish();
@@ -209,7 +207,7 @@ namespace
   [[nodiscard]] gpg::RType* EnsurePrefetchSetTypeRegistered()
   {
     static const bool kRegistered = []() {
-      gpg::PreRegisterRType(typeid(CPrefetchSetRuntime), &gPrefetchSetTypeInfoRuntime);
+      gpg::PreRegisterRType(typeid(moho::CPrefetchSet), &gPrefetchSetTypeInfoRuntime);
       moho::CPrefetchSet::sType = &gPrefetchSetTypeInfoRuntime;
       return true;
     }();

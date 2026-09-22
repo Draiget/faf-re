@@ -12744,7 +12744,7 @@ namespace moho
      */
     [[nodiscard]] bool AllSelectedAreFactories(SSelectionSetUserEntity* const selection, CWldSession* const session)
     {
-      const CategoryWordRangeView* const factoryCategory =
+      const EntityCategorySet* const factoryCategory =
         static_cast<RRuleGameRules*>(session->mRules)->GetEntityCategory("FACTORY");
 
       SSelectionNodeUserEntity* node = selection->mHead->mLeft;
@@ -12831,9 +12831,9 @@ namespace moho
 
     // Engineers and factories are the two things that can pour build power into
     // an order, so the walk below tests membership of their union once per unit.
-    const CategoryWordRangeView* const factoryCategory =
+    const EntityCategorySet* const factoryCategory =
       graph.mSession->mRules->GetEntityCategory("FACTORY");
-    const CategoryWordRangeView* const engineerCategory =
+    const EntityCategorySet* const engineerCategory =
       graph.mSession->mRules->GetEntityCategory("ENGINEER");
     EntityCategorySet assistingCategory{};
     (void)func_EntityCategoryAdd(engineerCategory, &assistingCategory, factoryCategory);
@@ -20044,7 +20044,7 @@ namespace moho
     device->SelectTechnique(kProjectileIconTechnique);
     primBatcher->mRebuildComposite = 0;
 
-    const CategoryWordRangeView* const projectileCategory = mRules->GetEntityCategory("PROJECTILE");
+    const EntityCategorySet* const projectileCategory = mRules->GetEntityCategory("PROJECTILE");
     UserArmy* const focusArmy = GetFocusArmy();
 
     // The binary collects into a stack fastvector with a large inline buffer;

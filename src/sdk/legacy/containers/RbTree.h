@@ -2405,7 +2405,7 @@ namespace msvc8
              * The raw decompile shows an additional leading block releasing
              * `mCat.mSet.mUsed`'s heap array (`operator delete[]` when it
              * differs from the SBO's `originalvec`) ahead of this tail --
-             * that is `CategoryWordRangeView::~CategoryWordRangeView()`'s
+             * that is `EntityCategorySet::~EntityCategorySet()`'s
              * own body (the `EntityCategoryLookupTable::
              * mCategoryFallback` member immediately preceding `mCategoryMap`
              * in declaration order... reversed at destruction, so it runs
@@ -3442,7 +3442,7 @@ namespace msvc8
              * Address: 0x00495C10 (FUN_00495C10 -- `find` (lower_bound plus the equivalence check) for `msvc8::map<SBeamBucketKey, msvc8::vector<SWorldBeam>>` (`CWorldParticles::mBeams.mBuckets`; pair 0x24, node 0x34, colour@+0x30, isNil@+0x31); callers 0x00491540; formerly `FindBeamBucketEquivalentOrEnd` in moho/particles/BeamRenderHelpers.cpp (RULE ONE), removed 2026-09-10.)
              * Address: 0x0045B160 (FUN_0045B160 -- `find` -- that lower bound plus the equivalence check for `msvc8::map<msvc8::string, moho::SDiskFileInfo>` (`FWaitHandleSet::mFileInfo` at +0x40; pair 0x30 because the 8-aligned record leaves a hole after the key, node 0x48, key at node+0x10, record at node+0x30, colour/nil at +0x40/+0x41); callers 0x00458D30; formerly `FileInfoFind` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x0045AF50 (FUN_0045AF50 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::FWHSEntry>` (`FWaitHandleSet::mZipEntries` at +0x34; pair 0x24, node 0x34, key at node+0x0C, entry at node+0x28, colour/nil at +0x30/+0x31); callers 0x00458D30, 0x00459100, 0x00459300; formerly `ZipEntryFind` in moho/misc/FileWaitHandleSet.cpp (RULE ONE), removed 2026-09-11.)
-             * Address: 0x00556220 (FUN_00556220 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::CategoryWordRangeView>` (`EntityCategoryLookupTable::mCategories`; pair 0x48 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x28 category set -- node 0x60, key at node+0x10, set at node+0x30, colour/nil at +0x58/+0x59); callers 0x0052B1E0, 0x00555290, 0x005552C0; formerly `FindCategoryNodeOrHead` in moho/entity/EntityCategoryLookupResolver.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x00556220 (FUN_00556220 -- `find` -- that lower bound plus the `key < candidate` check, returning the header on a miss for `msvc8::map<msvc8::string, moho::EntityCategorySet>` (`EntityCategoryLookupTable::mCategories`; pair 0x48 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x28 category set -- node 0x60, key at node+0x10, set at node+0x30, colour/nil at +0x58/+0x59); callers 0x0052B1E0, 0x00555290, 0x005552C0; formerly `FindCategoryNodeOrHead` in moho/entity/EntityCategoryLookupResolver.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x0046D960 (FUN_0046D960 -- `find` -- the lower-bound descent plus the `_stricmp` equivalence check, returning the header on a miss for `msvc8::map<msvc8::string, std::uint32_t, moho::ZipEntryNameLess>` (`CZipFile::mEntryByCanonicalPath` at +0x2C; pair 0x20, node 0x30, key at node+0x0C, index at node+0x28, colour/nil at +0x2C/+0x2D; every descent ends in `_stricmp`); callers 0x0046D2F0; the zip name index's emission for this member; formerly hand-written in moho/misc/CZipFile.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x00463D50 (FUN_00463D50 -- `find` -- the lower-bound descent plus the equivalence check, returning the header on a miss for `msvc8::map<msvc8::string, moho::CDiskDirWatch*>` (`CDiskWatch::mDirWatchMap` at +0x18; pair 0x20, node 0x30, key at node+0x0C, watcher at node+0x28, colour/nil at +0x2C/+0x2D); callers 0x00462AC0, 0x00462DD0; formerly hand-written in moho/misc/CDiskWatch.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A0400 (FUN_005A0400 -- `find` -- the lower-bound descent plus the equivalence check, returning the header on a miss for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x0059F6C0; formerly `FindRebuildNodeForEraseOrHead` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
@@ -7728,14 +7728,14 @@ namespace msvc8
              * (RRuleGameRules.h/.cpp). Recurse-right-then-iterate-left shape
              * matching this member exactly; per node, tears down the value's
              * inline-SBO bit-vector (`_Myval.helper.second.mSet.mUsed`,
-             * `CategoryWordRangeView`'s own heap-release when it grew past
+             * `EntityCategorySet`'s own heap-release when it grew past
              * the SBO) and the key's capacity (`_Myval.helper.first`,
              * `msvc8::string`'s own release) before `operator delete`ing the
              * node -- both inlined directly by the compiler rather than
-             * calling separate `~CategoryWordRangeView`/`~string` symbols,
+             * calling separate `~EntityCategorySet`/`~string` symbols,
              * confirmed against the raw decompile (IDA's own `helper`
              * struct naming is this instantiation's `pair<const
-             * msvc8::string, CategoryWordRangeView>` value_type, `.first`
+             * msvc8::string, EntityCategorySet>` value_type, `.first`
              * the key / `.second` the value). This member's generic
              * `n->value.~value_type()` in `free_node` (called by
              * `erase_node` above, not by this member directly -- see that

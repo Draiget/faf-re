@@ -377,7 +377,7 @@ namespace moho
      */
     void InsertEntry(std::uint32_t blipId, const Wm3::Vec3f& position, const RUnitBlueprint* sourceBlueprint);
 
-    [[nodiscard]] static bool IsInCategory(const CategoryWordRangeView* category, std::uint32_t categoryBitIndex);
+    [[nodiscard]] static bool IsInCategory(const EntityCategorySet* category, std::uint32_t categoryBitIndex);
 
   public:
     /**

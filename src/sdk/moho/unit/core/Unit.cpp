@@ -128,8 +128,8 @@ namespace moho
 
     // Movement-rule category sets, resolved once up front (order preserved).
     RRuleGameRules* const rules = moveUnit->SimulationRef->mRules;
-    const CategoryWordRangeView* const catFerryBeacon = rules->GetEntityCategory("FERRYBEACON");
-    const CategoryWordRangeView* const catPodStagingPlatform = rules->GetEntityCategory("PODSTAGINGPLATFORM");
+    const EntityCategorySet* const catFerryBeacon = rules->GetEntityCategory("FERRYBEACON");
+    const EntityCategorySet* const catPodStagingPlatform = rules->GetEntityCategory("PODSTAGINGPLATFORM");
 
     const SFootprint& footprint = moveUnit->GetFootprint();
     const ELayer moveLayer = moveUnit->mVarDat.mLayerMask;
@@ -1934,7 +1934,7 @@ namespace
   struct UnitAttributesBuildRestrictionRuntimeView
   {
     std::uint8_t mUnresolved00[0x08];
-    CategoryWordRangeView mBuildRestrictionCategorySet; // +0x08
+    EntityCategorySet mBuildRestrictionCategorySet; // +0x08
   };
   static_assert(
     offsetof(UnitAttributesBuildRestrictionRuntimeView, mBuildRestrictionCategorySet) == 0x08,
@@ -1945,7 +1945,7 @@ namespace
   struct CArmyBuildCategoryFilterRuntimeView
   {
     std::uint8_t mUnresolved00[0x198];
-    CategoryWordRangeView mBuildCategoryFilterSet; // +0x198
+    EntityCategorySet mBuildCategoryFilterSet; // +0x198
   };
   static_assert(
     offsetof(CArmyBuildCategoryFilterRuntimeView, mBuildCategoryFilterSet) == 0x198,
@@ -1953,37 +1953,37 @@ namespace
   );
 
   // RUnitBlueprintEconomyCategoryCache is a flat-field view of the same 0x28
-  // BVSet payload that backs CategoryWordRangeView. Cross-check the binary
+  // BVSet payload that backs EntityCategorySet. Cross-check the binary
   // offsets via the canonical BVSet field path so the duplicate flat-view
   // type stays in lockstep with the canonical BVSet layout.
   static_assert(
-    sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(CategoryWordRangeView),
-    "RUnitBlueprintEconomyCategoryCache layout must match CategoryWordRangeView size"
+    sizeof(RUnitBlueprintEconomyCategoryCache) == sizeof(EntityCategorySet),
+    "RUnitBlueprintEconomyCategoryCache layout must match EntityCategorySet size"
   );
   static_assert(
     offsetof(RUnitBlueprintEconomyCategoryCache, RuntimeWord08)
-      == offsetof(CategoryWordRangeView, mBits) + offsetof(BVIntSet, mFirstWordIndex),
+      == offsetof(EntityCategorySet, mBits) + offsetof(BVIntSet, mFirstWordIndex),
     "RUnitBlueprintEconomyCategoryCache::RuntimeWord08 offset must match BVSet::mBits.mFirstWordIndex"
   );
 
-  [[nodiscard]] const CategoryWordRangeView&
+  [[nodiscard]] const EntityCategorySet&
   AsCategoryWordRange(const RUnitBlueprintEconomyCategoryCache& categoryCache) noexcept
   {
-    return reinterpret_cast<const CategoryWordRangeView&>(categoryCache);
+    return reinterpret_cast<const EntityCategorySet&>(categoryCache);
   }
 
-  [[nodiscard]] BVIntSet& AsCategoryWordBitset(CategoryWordRangeView& range) noexcept
+  [[nodiscard]] BVIntSet& AsCategoryWordBitset(EntityCategorySet& range) noexcept
   {
     return range.mBits;
   }
 
-  [[nodiscard]] CategoryWordRangeView& UnitBuildRestrictionCategoryWords(Unit& unit) noexcept
+  [[nodiscard]] EntityCategorySet& UnitBuildRestrictionCategoryWords(Unit& unit) noexcept
   {
     auto& runtimeView = reinterpret_cast<UnitAttributesBuildRestrictionRuntimeView&>(unit.GetAttributes());
     return runtimeView.mBuildRestrictionCategorySet;
   }
 
-  void ResetCategoryWordRange(CategoryWordRangeView& range) noexcept
+  void ResetCategoryWordRange(EntityCategorySet& range) noexcept
   {
     range.mBits = BVIntSet{};
   }
@@ -8453,7 +8453,7 @@ int moho::cfunc_UnitAddBuildRestrictionL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
   const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
 
-  CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   (void)EntityCategory::Add(&restrictionWords, categorySet);
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -8511,7 +8511,7 @@ int moho::cfunc_UnitRemoveBuildRestrictionL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject categoryObject(LuaPlus::LuaStackObject(state, 2));
   const EntityCategorySet* const categorySet = ResolveEntityCategorySetFromLuaObject(categoryObject);
 
-  CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   AsCategoryWordBitset(restrictionWords).RemoveAllFrom(&categorySet->Bits());
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -8565,7 +8565,7 @@ int moho::cfunc_UnitRestoreBuildRestrictionsL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  CategoryWordRangeView& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
+  EntityCategorySet& restrictionWords = UnitBuildRestrictionCategoryWords(*unit);
   ResetCategoryWordRange(restrictionWords);
   unit->mVarDat.mRequestRefreshUI = 1;
   return 0;
@@ -14217,7 +14217,7 @@ bool Unit::CanBuild(const RUnitBlueprint* const blueprint) const
 {
   const auto& armyBuildCategories =
     reinterpret_cast<const CArmyBuildCategoryFilterRuntimeView&>(*ArmyRef).mBuildCategoryFilterSet;
-  const CategoryWordRangeView& unitBlueprintBuildCategories = AsCategoryWordRange(GetBlueprint()->Economy.CategoryCache);
+  const EntityCategorySet& unitBlueprintBuildCategories = AsCategoryWordRange(GetBlueprint()->Economy.CategoryCache);
   const auto& unitBuildRestrictions = reinterpret_cast<const UnitAttributesBuildRestrictionRuntimeView&>(GetAttributes())
                                         .mBuildRestrictionCategorySet;
 
@@ -16649,13 +16649,13 @@ void Unit::LookForStructureRebuilder()
     return;
   }
 
-  const CategoryWordRangeView* const rebuilderCategory = SimulationRef->mRules->GetEntityCategory("REBUILDER");
+  const EntityCategorySet* const rebuilderCategory = SimulationRef->mRules->GetEntityCategory("REBUILDER");
   if (rebuilderCategory == nullptr) {
     return;
   }
 
   SEntitySetTemplateUnit rebuilderUnits{};
-  (void)ArmyRef->GetUnits(&rebuilderUnits, const_cast<CategoryWordRangeView*>(rebuilderCategory));
+  (void)ArmyRef->GetUnits(&rebuilderUnits, const_cast<EntityCategorySet*>(rebuilderCategory));
 
   for (Entity* const entry : rebuilderUnits.mVec) {
     Unit* const rebuilder = SEntitySetTemplateUnit::UnitFromEntry(entry);

@@ -156,7 +156,7 @@ namespace
 
   [[nodiscard]] gpg::RType* ResolveVisibleToReconCategoryType()
   {
-    return CachedType<CategoryWordRangeView>(gVisibleToReconCategoryType);
+    return CachedType<EntityCategorySet>(gVisibleToReconCategoryType);
   }
 
   struct ReflectedObjectDeleter

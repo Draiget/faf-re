@@ -26,7 +26,6 @@ namespace
 {
   using TypeInfo = moho::SInfoCacheTypeInfo;
   using Serializer = moho::SInfoCacheSerializer;
-  using SInfoCacheView = moho::SInfoCache;
 
   alignas(TypeInfo) unsigned char gSInfoCacheTypeInfoStorage[sizeof(TypeInfo)];
   bool gSInfoCacheTypeInfoConstructed = false;
@@ -163,14 +162,14 @@ namespace
     gpg::WriteRawPointer(archive, objectRef, state, ownerRef);
   }
 
-  [[nodiscard]] SInfoCacheView* AsSInfoCacheView(int objectPtr) noexcept
+  [[nodiscard]] moho::SInfoCache* AsSInfoCacheView(int objectPtr) noexcept
   {
-    return reinterpret_cast<SInfoCacheView*>(objectPtr);
+    return reinterpret_cast<moho::SInfoCache*>(objectPtr);
   }
 
-  [[nodiscard]] const SInfoCacheView* AsConstSInfoCacheView(int objectPtr) noexcept
+  [[nodiscard]] const moho::SInfoCache* AsConstSInfoCacheView(int objectPtr) noexcept
   {
-    return reinterpret_cast<const SInfoCacheView*>(objectPtr);
+    return reinterpret_cast<const moho::SInfoCache*>(objectPtr);
   }
 
   /**
@@ -285,7 +284,7 @@ namespace moho
   SInfoCacheTypeInfo::SInfoCacheTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(SInfoCacheView), this);
+    gpg::PreRegisterRType(typeid(moho::SInfoCache), this);
   }
 
   /**
@@ -310,7 +309,7 @@ namespace moho
    */
   void SInfoCacheTypeInfo::Init()
   {
-    size_ = sizeof(SInfoCacheView);
+    size_ = sizeof(moho::SInfoCache);
     gpg::RType::Init();
     Finish();
   }

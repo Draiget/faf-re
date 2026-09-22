@@ -2853,7 +2853,7 @@ namespace
       return false;
     }
 
-    const CategoryWordRangeView* const showQueueCategory =
+    const EntityCategorySet* const showQueueCategory =
       session->mRules->GetEntityCategory(kShowQueueCategoryName);
     if (showQueueCategory == nullptr) {
       return false;

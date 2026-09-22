@@ -258,7 +258,7 @@ namespace moho
     msvc8::string mCurrentPlan;                    // +0x40
     msvc8::vector<SPointVector> mAttackVectors;  // +0x5C
     std::uint32_t mAttackVectorMeta6C;             // +0x6C (unknown; written/used outside recovered scope)
-    CategoryWordRangeView mBuildCategoryRange;     // +0x70
+    EntityCategorySet mBuildCategoryRange;     // +0x70
     SBuildStructurePositionMap mBuildStructureMap; // +0x98
     Sim* mSim;                                     // +0xA4
     CTaskStage* mAiThreadStage;                    // +0xA8

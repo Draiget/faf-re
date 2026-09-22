@@ -164,7 +164,7 @@ namespace moho
      * Resolves category text to a precomputed category-word range view from
      * RRuleGameRulesImpl category lookup map.
      */
-    virtual const CategoryWordRangeView* GetEntityCategory(const char*) const;
+    virtual const EntityCategorySet* GetEntityCategory(const char*) const;
 
     /**
      * VTable slot: 23
@@ -177,7 +177,7 @@ namespace moho
      * What it does:
      * Parses category expression into a category-word range set.
      */
-    virtual CategoryWordRangeView ParseEntityCategory(const char*) const = 0;
+    virtual EntityCategorySet ParseEntityCategory(const char*) const = 0;
 
     /**
      * Address: 0x0052B2B0 (FUN_0052B2B0)
@@ -200,7 +200,7 @@ namespace moho
    * `RRuleGameRulesImpl::mEntityCategoryLookup` handle (+0xC4); `out` is an
    * uninitialized category set built in place and returned for chaining.
    */
-  CategoryWordRangeView* ParseEntityCategory(
-    const void* categoryLookup, CategoryWordRangeView* out, const char* categoryExpression
+  EntityCategorySet* ParseEntityCategory(
+    const void* categoryLookup, EntityCategorySet* out, const char* categoryExpression
   );
 } // namespace moho

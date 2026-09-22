@@ -3207,10 +3207,10 @@ namespace moho
   void CInfluenceMap::Update()
   {
     Sim* const sim = mArmy ? mArmy->GetSim() : nullptr;
-    const CategoryWordRangeView* commandCategory = nullptr;
-    const CategoryWordRangeView* experimentalCategory = nullptr;
-    const CategoryWordRangeView* artilleryCategory = nullptr;
-    const CategoryWordRangeView* massExtractorCategory = nullptr;
+    const EntityCategorySet* commandCategory = nullptr;
+    const EntityCategorySet* experimentalCategory = nullptr;
+    const EntityCategorySet* artilleryCategory = nullptr;
+    const EntityCategorySet* massExtractorCategory = nullptr;
     if (sim && sim->mRules) {
       commandCategory = sim->mRules->GetEntityCategory("COMMAND");
       experimentalCategory = sim->mRules->GetEntityCategory("EXPERIMENTAL");
@@ -3458,7 +3458,7 @@ namespace moho
     RemoveBlipCell(blipId);
   }
 
-  bool CInfluenceMap::IsInCategory(const CategoryWordRangeView* const category, const std::uint32_t categoryBitIndex)
+  bool CInfluenceMap::IsInCategory(const EntityCategorySet* const category, const std::uint32_t categoryBitIndex)
   {
     return category && category->ContainsBit(categoryBitIndex);
   }

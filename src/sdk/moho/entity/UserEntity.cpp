@@ -960,7 +960,7 @@ namespace moho
     }
 
     const char* const categoryName = category.raw_data_unsafe();
-    const CategoryWordRangeView* const range = resolver->GetEntityCategory(categoryName);
+    const EntityCategorySet* const range = resolver->GetEntityCategory(categoryName);
     if (!range) {
       return false;
     }

@@ -11229,8 +11229,6 @@ namespace moho::runtime
   };
   static_assert(offsetof(RuntimeFilebufCharDispatch, overflow) == 0x04, "RuntimeFilebufCharDispatch::overflow offset must be 0x04");
 
-  using RuntimeCodecvtCharFacet = std::codecvt<char, char, std::mbstate_t>;
-
   struct RuntimeFilebufCharView
   {
     RuntimeFilebufCharDispatch* dispatch = nullptr; // +0x00
@@ -11244,7 +11242,7 @@ namespace moho::runtime
     std::int32_t* inputCount = nullptr;             // +0x30
     std::int32_t* outputCount = nullptr;            // +0x34
     std::uint8_t reserved38_3B[0x04]{};             // +0x38
-    const RuntimeCodecvtCharFacet* codecvtFacet = nullptr; // +0x3C
+    const std::codecvt<char, char, std::mbstate_t>* codecvtFacet = nullptr; // +0x3C
     std::uint8_t reserved40 = 0;                    // +0x40
     std::uint8_t wroteSome = 0;                     // +0x41
     std::uint8_t reserved42_43[0x02]{};             // +0x42
@@ -11321,7 +11319,7 @@ namespace moho::runtime
 
   std::intptr_t RuntimeFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* filebuf,
-    const RuntimeCodecvtCharFacet* codecvtFacet
+    const std::codecvt<char, char, std::mbstate_t>* codecvtFacet
   );
 
   RuntimeLockitState* RuntimeLockitConstruct(RuntimeLockitState* object, int requestedSlot);
@@ -11339,7 +11337,7 @@ namespace moho::runtime
    */
   [[maybe_unused]] std::intptr_t RuntimeFilebufApplyCodecvtFacet(
     RuntimeFilebufCharView* const filebuf,
-    const RuntimeCodecvtCharFacet* const codecvtFacet
+    const std::codecvt<char, char, std::mbstate_t>* const codecvtFacet
   )
   {
     if (codecvtFacet->always_noconv()) {

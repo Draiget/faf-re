@@ -3237,7 +3237,7 @@ namespace msvc8
          * Address: 0x0092FC60 (FUN_0092FC60, sub_92FC60, IDA-named
          * `std::vector_MapNode::resize`) -- `msvc8::vector<iterator>::
          * resize(n, val)` for `ClusterInternalCache<gpg::HaStar::
-         * OccupationData>::mVec` (`OccupationCacheRuntimeMap`,
+         * OccupationData>::mVec` (`OccupationCacheMap`,
          * `gpg/core/algorithms/Cluster.cpp`) -- same 4-byte `list<pair<const
          * OccupationCacheKey, Cluster::Data*>>::iterator` element as
          * `insert`'s `FUN_0092F9E0` above. Grows via that
@@ -4118,7 +4118,7 @@ namespace msvc8
          * `mBuckets.assign(9, mListHead)` emission, UICommandGraph::PrepareForRebuild)
          * Address: 0x009303F0 (FUN_009303F0, sub_9303F0) -- `msvc8::
          * vector<iterator>::assign(count, value)` for `ClusterInternalCache<
-         * gpg::HaStar::OccupationData>::mVec` (`OccupationCacheRuntimeMap`,
+         * gpg::HaStar::OccupationData>::mVec` (`OccupationCacheMap`,
          * `gpg/core/algorithms/Cluster.cpp`) -- same 4-byte `iterator`
          * element as `insert`'s `FUN_0092F9E0` above. Builds `localValue`
          * from the by-ref value param exactly like this member's own
@@ -6242,7 +6242,7 @@ namespace msvc8
          * vector<iterator>::insert(pos, count, value)` for `msvc8::hash_map<
          * OccupationCacheKey, gpg::HaStar::Cluster::Data*, hash_compare<
          * OccupationCacheKey, OccupationKeyOrder>>::mVec`
-         * (`OccupationCacheRuntimeMap`, `ClusterInternalCache<gpg::HaStar::
+         * (`OccupationCacheMap`, `ClusterInternalCache<gpg::HaStar::
          * OccupationData>::mVec`, `gpg/core/algorithms/Cluster.cpp`) -- the
          * bucket-index vector whose element is `msvc8::list<std::pair<const
          * OccupationCacheKey, Cluster::Data*>>::iterator`, a single 4-byte
@@ -6278,7 +6278,7 @@ namespace msvc8
          * `std::hash_map_unk_unk::insert`, `_Grow()` inlined) when the load
          * factor is exceeded -- the source-level trigger is
          * `ClusterInternalCache<OccupationData>::Fetch`'s
-         * `mVec.insert(OccupationCacheRuntimeMap::value_type(key,
+         * `mVec.insert(OccupationCacheMap::value_type(key,
          * built.mData))`, `Cluster.cpp:3687`, already recovered. Also
          * reached from `assign(count, value)`'s `insert(first_, count,
          * localValue)` call (`FUN_009303F0`, cited below on `assign`),
@@ -6287,7 +6287,7 @@ namespace msvc8
          * default constructor (`FUN_00930810`, thunk) and `clear()`
          * (`FUN_00930B40`, IDA-named `std::hash_map_unk_unk::clear`).
          * `FUN_00933950`/`0x00934130` cited above are this template's
-         * sibling emission for `SubclusterCacheRuntimeMap`
+         * sibling emission for `SubclusterCacheMap`
          * (`ClusterInternalCache<SubclusterData>::mVec`) -- a distinct C++
          * `iterator` type (different `Key` in `list<pair<const Key,T>>`)
          * with the identical 4-byte-trivial shape, not ICF-folded across
@@ -8727,7 +8727,7 @@ namespace msvc8
          * Address: 0x0092EA50 (FUN_0092EA50, sub_92EA50) -- the
          * advance-returning `_Ufill` adapter for this instantiation's
          * `uninit_fill_n` (`ClusterInternalCache<gpg::HaStar::
-         * OccupationData>::mVec`, `OccupationCacheRuntimeMap`, 4-byte
+         * OccupationData>::mVec`, `OccupationCacheMap`, 4-byte
          * `iterator` element -- same instantiation as `insert`'s
          * `FUN_0092F9E0` above): `int __stdcall sub_92EA50(dest, count,
          * srcValue) { sub_92DF90(dest, count, srcValue); return dest +
@@ -9060,7 +9060,7 @@ namespace msvc8
          * Address: 0x009324E0 (FUN_009324E0, `msvc8::vector<iterator>::
          * uninit_fill_n` for the 4-byte `_Nodeptr`-wrapper element -- the
          * HaStar cluster-cache bucket vector instantiation sibling to
-         * `FUN_0092F9E0`'s `OccupationCacheRuntimeMap` above, this one for
+         * `FUN_0092F9E0`'s `OccupationCacheMap` above, this one for
          * `FUN_00933950` (cited above on `insert`). `[begin,end)`
          * pointer-pair fill loop, verified against the `.asm`; reached from
          * that `_Insert_n` core's in-place gap-fill branch. DB-integrity fix:
@@ -9767,7 +9767,7 @@ namespace msvc8
          * Address: 0x0092ED90 (FUN_0092ED90, sub_92ED90) -- the `__stdcall`
          * calling-convention entry `insert`'s in-place branches call for
          * this instantiation's `uninit_move_n` (`ClusterInternalCache<
-         * gpg::HaStar::OccupationData>::mVec`, `OccupationCacheRuntimeMap`,
+         * gpg::HaStar::OccupationData>::mVec`, `OccupationCacheMap`,
          * 4-byte `iterator` element -- same instantiation as `insert`'s
          * `FUN_0092F9E0` above). Forwards straight into the shared 4-byte-
          * stride forward-copy primitive `FUN_0092D810` (already `skip`, an
@@ -11066,7 +11066,7 @@ namespace msvc8
          * `GrowAndInsertInputCaptureWeakRef` (`FUN_007A5A70`).)
          * Address: 0x0092F0D0 (FUN_0092F0D0, sub_92F0D0) -- the
          * `throw_too_long` emission for `ClusterInternalCache<gpg::HaStar::
-         * OccupationData>::mVec` (`OccupationCacheRuntimeMap`, 4-byte
+         * OccupationData>::mVec` (`OccupationCacheMap`, 4-byte
          * `iterator` element -- same instantiation as `insert`'s
          * `FUN_0092F9E0` above). Builds `std::length_error("vector<T> too
          * long")` the same way as this member's other emissions (a

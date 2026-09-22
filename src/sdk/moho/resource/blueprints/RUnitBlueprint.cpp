@@ -818,7 +818,7 @@ namespace moho
          ++it) {
       // The binary parses through the free function directly (a1 =
       // rules->mEntityCategoryLookup at +0xC4), not the virtual dispatch.
-      CategoryWordRangeView parsedCategory;
+      EntityCategorySet parsedCategory;
       (void)moho::ParseEntityCategory(rules->mEntityCategoryLookup, &parsedCategory, it->c_str());
 
       // Then folds the parsed clause bits into the runtime economy cache via the

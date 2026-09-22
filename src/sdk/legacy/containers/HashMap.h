@@ -453,7 +453,7 @@ namespace msvc8
         /**
          * Address: 0x009303F0 (FUN_009303F0), reached from the constructor
          * (`FUN_00930810`) and `clear()` (`FUN_00930B40`) for the
-         * `OccupationCacheRuntimeMap` instantiation
+         * `OccupationCacheMap` instantiation
          * (`gpg::HaStar::ClusterInternalCache<gpg::HaStar::OccupationData>`,
          * `gpg/core/algorithms/Cluster.cpp`) -- see
          * `msvc8::vector<T>::assign(count, value)`'s `Address:` block

@@ -30,7 +30,7 @@ namespace moho
    * copyable type that names the universe lane (e.g. EntityCategoryHelper,
    * EntIdUniverse, uint32_t).
    *
-   * Convenience accessors below mirror the legacy CategoryWordRangeView API
+   * Convenience accessors below mirror the legacy EntityCategorySet API
    * so all category/word-range call sites operate on a single canonical type.
    */
   /**
@@ -131,7 +131,7 @@ namespace moho
       mBits.ForEachValue(std::forward<F>(fn));
     }
 
-    // ---- legacy CategoryWordRangeView API surface (delegated to mBits) ----
+    // ---- legacy EntityCategorySet API surface (delegated to mBits) ----
 
     void ResetToEmpty(const U& universe) noexcept
     {

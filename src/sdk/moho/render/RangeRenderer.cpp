@@ -1643,7 +1643,7 @@ namespace moho
    */
   void ApplyRangeProfileFilterToRenderer(
     const std::uint32_t highlightedColorPacked,
-    const CategoryWordRangeView* const categoryFilter,
+    const EntityCategorySet* const categoryFilter,
     RangeRenderer* const rangeRenderer,
     const std::string_view extractorName,
     const std::uint32_t buildColorPacked,

@@ -2099,7 +2099,7 @@ namespace
      * `ClusterInternalCache<OccupationData>::Fetch` publishes `node + 8` as the
      * eviction key at 0x0093506A.
      */
-    using OccupationCacheRuntimeMap =
+    using OccupationCacheMap =
         msvc8::hash_map<
             OccupationCacheKey,
             gpg::HaStar::Cluster::Data*,
@@ -2123,7 +2123,7 @@ namespace
      * `clear()` (`push 9` at 0x00934EDB) are the same `min_buckets + 1` this
      * container seeds `mVec` with.
      */
-    using SubclusterCacheRuntimeMap =
+    using SubclusterCacheMap =
         msvc8::hash_map<
             SubclusterCacheKey,
             gpg::HaStar::Cluster::Data*,
@@ -2359,7 +2359,7 @@ namespace
          */
         void Evict(const void* key) override;
 
-        OccupationCacheRuntimeMap mVec;
+        OccupationCacheMap mVec;
     };
     static_assert(sizeof(ClusterInternalCache<gpg::HaStar::OccupationData>) == 0x2C,
         "ClusterInternalCache<OccupationData> size must be 0x2C");
@@ -2399,7 +2399,7 @@ namespace
         }
 
         gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(occupationData);
-        const auto inserted = mVec.insert(OccupationCacheRuntimeMap::value_type(key, built.mData));
+        const auto inserted = mVec.insert(OccupationCacheMap::value_type(key, built.mData));
         if (!inserted.second) {
             gpg::HandleAssertFailure(
                 "ins.second",
@@ -2467,7 +2467,7 @@ namespace
          */
         void Evict(const void* key) override;
 
-        SubclusterCacheRuntimeMap mVec;
+        SubclusterCacheMap mVec;
     };
     static_assert(sizeof(ClusterInternalCache<gpg::HaStar::SubclusterData>) == 0x2C,
         "ClusterInternalCache<SubclusterData> size must be 0x2C");
@@ -2507,7 +2507,7 @@ namespace
         }
 
         gpg::HaStar::Cluster built = gpg::HaStar::ClusterBuild(subclusterData);
-        const auto inserted = mVec.insert(SubclusterCacheRuntimeMap::value_type(key, built.mData));
+        const auto inserted = mVec.insert(SubclusterCacheMap::value_type(key, built.mData));
         if (!inserted.second) {
             gpg::HandleAssertFailure(
                 "ins.second",

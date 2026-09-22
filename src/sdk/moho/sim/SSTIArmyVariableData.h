@@ -95,7 +95,7 @@ namespace moho
     SArmyVectorWithMeta mRuntimeWordVectorWithMeta; // 0x0F4
     std::uint8_t mShowScore;                        // 0x108
     std::uint8_t mRuntimePad_0109_0110[0x07]{};
-    CategoryWordRangeView mCategoryFilterSet; // 0x110
+    EntityCategorySet mCategoryFilterSet; // 0x110
     std::uint8_t mIsOutOfGame;                // 0x138
     std::uint8_t mPad_0139_013C[0x03]{};
     Wm3::Vector2f mArmyStart;    // 0x13C

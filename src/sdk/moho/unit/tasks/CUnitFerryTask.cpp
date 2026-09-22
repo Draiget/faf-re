@@ -201,9 +201,9 @@ namespace
     moho::SEntitySetTemplateUnit& outUnits
   )
   {
-    const moho::CategoryWordRangeView* const category =
+    const moho::EntityCategorySet* const category =
       ownerUnit.SimulationRef->mRules->GetEntityCategory(categoryName);
-    (void)ownerUnit.ArmyRef->GetUnits(&outUnits, const_cast<moho::CategoryWordRangeView*>(category));
+    (void)ownerUnit.ArmyRef->GetUnits(&outUnits, const_cast<moho::EntityCategorySet*>(category));
   }
 }
 

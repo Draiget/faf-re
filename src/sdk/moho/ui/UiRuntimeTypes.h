@@ -1283,7 +1283,7 @@ namespace moho
      * Models the compiled `CUIKeyHandler` event table's dispatch role
      * directly (two rows: `wxEVT_KEY_UP` -> `OnKeyUp`, `wxEVT_KEY_DOWN` ->
      * `OnKeyDown`, binary table at `0x00F5B150`), the same approach
-     * `CMauiWxEventMapperRuntime::ProcessWxEvent` uses for its own
+     * `CMauiWxEventMapper::ProcessWxEvent` uses for its own
      * keyboard rows.
      */
     bool ProcessWxEvent(void* event) override;

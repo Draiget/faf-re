@@ -118,8 +118,6 @@ struct DeflateStateRuntime
   std::int32_t bi_valid = 0;                   // +0x16BC
 };
 
-using DeflateStateRuntimePrefix = DeflateStateRuntime;
-
 static_assert(offsetof(DeflateStateRuntime, pending_buf) == 0x08, "DeflateStateRuntime::pending_buf offset must be 0x08");
 static_assert(offsetof(DeflateStateRuntime, pending) == 0x14, "DeflateStateRuntime::pending offset must be 0x14");
 static_assert(offsetof(DeflateStateRuntime, w_size) == 0x2C, "DeflateStateRuntime::w_size offset must be 0x2C");

@@ -480,7 +480,7 @@ namespace moho
       // the same `head->left` / `head` walk this loop used to do by hand,
       // now through the real container's own iterator (RbTree.h `rb_iterator`).
       for (const auto& [categoryName, categoryValue] : categoryLookup->mCategoryMap) {
-        CategoryWordRangeView categoryValueCopy = categoryValue;
+        EntityCategorySet categoryValueCopy = categoryValue;
         LuaPlus::LuaObject categoryLuaObject{};
         (void)func_NewEntityCategory(targetState, &categoryLuaObject, &categoryValueCopy);
         categoriesTable.SetObject(categoryName.c_str(), categoryLuaObject);
@@ -1088,7 +1088,7 @@ namespace moho
     mWordUniverseHandle = ownerHandle;
   }
 
-  const CategoryWordRangeView* EntityCategoryLookupTable::TryFind(
+  const EntityCategorySet* EntityCategoryLookupTable::TryFind(
     const msvc8::string& categoryName
   ) const
   {
@@ -1096,23 +1096,23 @@ namespace moho
     return found == mCategoryMap.end() ? nullptr : &found->second;
   }
 
-  const CategoryWordRangeView* EntityCategoryLookupTable::FindOrFallback(
+  const EntityCategorySet* EntityCategoryLookupTable::FindOrFallback(
     const msvc8::string& categoryName
   ) const
   {
-    const CategoryWordRangeView* const found = TryFind(categoryName);
+    const EntityCategorySet* const found = TryFind(categoryName);
     return found != nullptr ? found : &mCategoryFallback;
   }
 
   // No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
-  // CategoryLookupValue>`) and `mCategoryFallback` (`CategoryWordRangeView`)
+  // CategoryLookupValue>`) and `mCategoryFallback` (`EntityCategorySet`)
   // are both real typed members, so implicit member destruction already runs
   // their own real destructors in reverse declaration order - exactly
   // matching FUN_00533E20's (`Moho::EntityCategory::~EntityCategory`) two
   // real pieces of work: `mCategoryMap`'s teardown is `RbTree.h`'s
   // `~rb_tree()` emission for this instantiation (cited there, erase_range +
   // free the head), and the leading `mSet.mUsed` inline-vector release the
-  // raw decompile shows ahead of it is `CategoryWordRangeView`'s own
+  // raw decompile shows ahead of it is `EntityCategorySet`'s own
   // destructor body, inlined into FUN_00533E20 by the compiler - not
   // hand-written source of this class at all (RULE ONE: "member
   // destructors... the source body says nothing; MSVC emits it"). A prior
@@ -1708,7 +1708,7 @@ namespace moho
    * What it does:
    * Delegates category-name lookup to the shared resolver implementation.
    */
-  const CategoryWordRangeView* RRuleGameRulesImpl::GetEntityCategory(const char* categoryName) const
+  const EntityCategorySet* RRuleGameRulesImpl::GetEntityCategory(const char* categoryName) const
   {
     const auto* const resolver = reinterpret_cast<const EntityCategoryLookupResolver*>(this);
     return resolver->EntityCategoryLookupResolver::GetEntityCategory(categoryName);
@@ -1730,9 +1730,9 @@ namespace moho
    * `moho::ParseEntityCategory` (0x005552F0), which builds the result in
    * place, and returns it by value.
    */
-  CategoryWordRangeView RRuleGameRulesImpl::ParseEntityCategory(const char* categoryExpression) const
+  EntityCategorySet RRuleGameRulesImpl::ParseEntityCategory(const char* categoryExpression) const
   {
-    CategoryWordRangeView out;
+    EntityCategorySet out;
     (void)moho::ParseEntityCategory(mEntityCategoryLookup, &out, categoryExpression);
     return out;
   }

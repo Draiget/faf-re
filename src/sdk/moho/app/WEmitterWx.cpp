@@ -257,7 +257,7 @@ namespace
   );
 
   /**
-   * The three `wxDC` vtable slots the curve editor paints through. `wxDCRuntime`
+   * The three `wxDC` vtable slots the curve editor paints through. `wxDC`
    * in `WxRuntimeTypes.h` is a field projection that models no vtable, so the
    * slots are reached through this local overlay rather than by widening that
    * shared type. Offsets are read off FUN_00661B90: `+0x38` takes a pen,
