@@ -18,6 +18,12 @@ namespace moho
   public:
     /**
      * Address: 0x005989F0 (FUN_005989F0, ??0IAiCommandDispatch@Moho@@QAE@XZ)
+     * Address: 0x00599110 (FUN_00599110, the same constructor emitted with
+     *   `this` in EAX rather than ECX -- `mov [eax], 0xE1B360` against
+     *   `mov [ecx], 0xE1B360`. One byte apart in the ModRM register field, so
+     *   /OPT:ICF could not fold them. Both have zero callers because every
+     *   derived constructor inlines this body; `IAiCommandDispatchImpl` names
+     *   it in its initializer list, which is what instantiates it.)
      *
      * What it does:
      * Initializes one AI-command-dispatch base object with interface vtable

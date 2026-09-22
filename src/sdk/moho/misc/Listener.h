@@ -26,6 +26,13 @@ namespace moho
      * Address: 0x00618E40 (FUN_00618E40, Listener<EAiNavigatorEvent> ctor lane)
      * Address: 0x00618E50 (FUN_00618E50, Listener<EFormationdStatus> ctor lane)
      * Address: 0x00869A40 (FUN_00869A40, Listener<SPauseEvent> ctor lane)
+     * Address: 0x00599120 (FUN_00599120, Listener<EUnitCommandQueueStatus> ctor
+     *   lane, `this` in EAX -- the whole body is this constructor:
+     *   `lea ecx, [eax+4]` takes `&mListenerLink`, the two stores self-link it,
+     *   and `mov [eax], 0xE1B374` installs the instantiation's vtable. It has
+     *   zero callers because every derived constructor inlines it;
+     *   `IAiCommandDispatchImpl` is the one that instantiates this
+     *   specialisation, naming it in its own initializer list.)
      *
      * What it does:
      * Initializes one listener lane with a self-linked broadcaster node.
