@@ -7142,8 +7142,10 @@ namespace msvc8
              *
              * Address: 0x004E31F0 (FUN_004E31F0, sub_4E31F0) --
              * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::buy_node`
-             * -- the sound subsystem's `sSndParamsCache`
-             * (`moho/audio/SoundSubsystemBootstrap.cpp`). `__userpurge`
+             * -- the sound subsystem's shared-ambient-loop cache
+             * (`gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`; not `sSndParamsCache`, which is the
+             * `multimap<uint32_t, CSndParams*>` at 0x010A9288). `__userpurge`
              * with `this`=esi=hidden-left/parent/right triple (its caller
              * passes `where`/`where`/`where` or `head_`/`where`/`head_`
              * depending on branch, the same "compiler optimisation, not a
@@ -7159,8 +7161,8 @@ namespace msvc8
              * note already documents why: its `msvc8::map<CSndParams*,
              * HSndEntityLoop*>::_Insert` role is fulfilled by the modern
              * `unordered_map` find/emplace path with RAII via
-             * `unique_ptr` instead, the same elision `TeardownSoundStructs`
-             * documents for this tree's erase/clear family. Re-homed here
+             * `unique_ptr` instead, the same elision the run's destructor
+             * group (0x004DF0E0) documents for this tree's erase/clear family. Re-homed here
              * from the false `CrtRuntimeHelpers.cpp` DB-integrity
              * contamination; this catalog is the real home.)
              *
@@ -7752,21 +7754,20 @@ namespace msvc8
              *
              * Address: 0x004E45E0 (FUN_004E45E0, sub_4E45E0) -- `destroy_subtree`
              * for one of the sound subsystem's three rb-tree caches
-             * (`sSndParamsCache` / `stru_10A9298` / `dword_10A92A4`,
-             * `moho/audio/SoundSubsystemBootstrap.cpp`; the exact one of the
-             * three is not pinned down in this pass). `void __stdcall(node)`
+             * (`gSndParamsHashCache` @ 0x010A9288 and
+             * `gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`, `gSndVarNameCache` @ 0x010A9294 in
+             * `moho/audio/CSndVar.cpp`; the exact one of the three is not
+             * pinned down in this pass). `void __stdcall(node)`
              * recursing right (`sub_4E45E0(node->right)`) then walking left
              * with `operator delete` per node, matching this member's
              * recurse-right/iterate-left shape exactly; `isNil` tested at
              * `+0x15` (matching `FUN_004E31F0`'s `buy_node` citation above,
              * an 8-byte value_type). Reached from this instantiation's
-             * `erase_range`/`clear` emission (`FUN_004E2C80`) -- which
-             * `TeardownSoundStructs` (0x004DF0E0, `SoundSubsystemBootstrap.cpp`)
-             * already documents as provably a no-op at every real call site
-             * (the mirror trees are always empty; real cache inserts/erases
-             * go through the modern `EnsureSharedAmbientLoopMapEntry`/
-             * `unordered_map` path instead) -- elided there for that reason,
-             * same as `FUN_004E2C80` itself. Cited here so it is not mistaken
+             * `erase_range`/`clear` emission (`FUN_004E2C80`), reached in
+             * turn from the run's destructor group (0x004DF0E0), which is
+             * compiler-generated and has no source of its own -- the tree's
+             * definition in `moho/audio/CSndParams.cpp` is what emits it. Cited here so it is not mistaken
              * for an orphan.
              * Address: 0x004E4690 (FUN_004E4690, sub_4E4690) -- byte-distinct
              * sibling emission of the same `destroy_subtree` shape (differs
@@ -7798,8 +7799,8 @@ namespace msvc8
              * path (`sub_A3E800`, cited below) for this instantiation.
              *
              * Address: 0x004E4530 (FUN_004E4530, sub_4E4530) --
-             * `sSndParamsCache`'s (`moho/audio/SoundSubsystemBootstrap.cpp`)
-             * own `destroy_subtree` -- the third of this file's three
+             * `sSndParamsCache`'s (`gSndParamsHashCache` @ 0x010A9288 in
+             * `moho/audio/CSndParams.cpp`) own `destroy_subtree` -- the third of this file's three
              * sSndParamsCache-family addresses (see 0x004E45E0/0x004E4690
              * above for the other two sibling caches); confirmed by its
              * caller `FUN_004E3A30`, which names `sSndParamsCache.
@@ -7807,11 +7808,9 @@ namespace msvc8
              * `sSndParamsCache._Myfirstiter->_Mynextiter` -- unambiguously
              * this specific tree's teardown, not one of the other two.
              * Recurse-right/iterate-left shape matches this member exactly.
-             * Reached the same way as its siblings: elided at
-             * `TeardownSoundStructs` (0x004DF0E0, already recovered) since
-             * every real call site finds this mirror tree empty (real
-             * inserts/erases go through the modern `unordered_map` path
-             * instead) -- cited here so it is not mistaken for an orphan.
+             * Reached the same way as its siblings, through the run's
+             * compiler-generated destructor group (0x004DF0E0) -- cited here
+             * so it is not mistaken for an orphan.
              *
              * Address: 0x006AEF60 (FUN_006AEF60, sub_6AEF60) -- `msvc8::
              * map<msvc8::string, float>::destroy_subtree` -- `Unit::
@@ -8932,8 +8931,9 @@ namespace msvc8
              *
              * Address: 0x004E22B0 (FUN_004E22B0, sub_4E22B0) --
              * `msvc8::map<Moho::CSndParams*, Moho::HSndEntityLoop*>::
-             * insert_at` for the sound subsystem's `sSndParamsCache`
-             * (`moho/audio/SoundSubsystemBootstrap.cpp`), sibling of
+             * insert_at` for the sound subsystem's shared-ambient-loop
+             * cache (`gSharedAmbientLoopsByParams` @ 0x010A92A0 in
+             * `moho/audio/CSndParams.cpp`), sibling of
              * `buy_node`'s `FUN_004E31F0` citation above (same 8-byte
              * value_type). `(unsigned)size_ >= 0x1FFFFFFEu` guard is this
              * member's `max_size() - 1u <= size_` for the 8-byte
@@ -9317,18 +9317,18 @@ namespace msvc8
              * modeling it does not change observable behavior.
              *
              * Address: 0x004E3A30 (FUN_004E3A30, sub_4E3A30) -- the sound
-             * subsystem's `sSndParamsCache` (`moho/audio/
-             * SoundSubsystemBootstrap.cpp`) checked-iterator orphan-all step:
+             * subsystem's `sSndParamsCache` (`gSndParamsHashCache` @
+             * 0x010A9288 in `moho/audio/CSndParams.cpp`) checked-iterator
+             * orphan-all step:
              * walks `_Myfirstiter`'s linked list of live `_Iterator_base12`
              * nodes via `sub_4E4530` then self-links the proxy's iterator
              * list back to empty and clears `_Myhead`. Reached from this
              * instantiation's `clear()`/dtor emission as the `_SECURE_SCL`
              * checked-iterator side effect of destroying/clearing the tree --
              * the same debug-only machinery this field's comment documents
-             * as deliberately unmodeled. `TeardownSoundStructs` (0x004DF0E0)
-             * already documents why the whole erase/clear family for this
-             * tree is elided at its call site (mirror trees are always
-             * empty). Cited here, not modeled as a member, so it is not
+             * as deliberately unmodeled. The whole erase/clear family for this
+             * tree hangs off the run's compiler-generated destructor group
+             * (0x004DF0E0). Cited here, not modeled as a member, so it is not
              * mistaken for an orphan.
              * Address: 0x004E3A80 (FUN_004E3A80, sub_4E3A80) -- the
              * `_Iterator_base12` list-splice step `FUN_004E3A30` calls
