@@ -57,7 +57,7 @@ namespace moho
   class CD3DBatchTexture;
   class VTransform;
   class CIntel;
-  class EntityMotor;
+  class Motor;
   class EntityCollisionUpdater;
   class CArmyImpl;
   class CSndParams;
@@ -957,7 +957,7 @@ namespace moho
      *
      * std::auto_ptr<Moho::Motor>&
      */
-    virtual void SetMotor(msvc8::auto_ptr<EntityMotor>&);
+    virtual void SetMotor(msvc8::auto_ptr<Motor>&);
 
     /**
      * Address: 0x005BDC10 (FUN_005BDC10)
@@ -1408,7 +1408,7 @@ namespace moho
     Wm3::Vector3f mCollisionBoundsMin;     // 0x0240
     Wm3::Vector3f mCollisionBoundsMax;     // 0x024C
     LuaPlus::LuaObject mLuaPositionCache;  // 0x0258 (cached `Entity:GetPosition()` vector table)
-    EntityMotor* mMotor;                   // 0x026C
+    Motor* mMotor;                   // 0x026C
   };
 
   /**

@@ -79,12 +79,12 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
-    if (!moho::EntityMotor::sType) {
-      moho::EntityMotor::sType = gpg::LookupRType(typeid(moho::EntityMotor));
+    if (!moho::Motor::sType) {
+      moho::Motor::sType = gpg::LookupRType(typeid(moho::Motor));
     }
 
-    GPG_ASSERT(moho::EntityMotor::sType != nullptr);
-    return moho::EntityMotor::sType;
+    GPG_ASSERT(moho::Motor::sType != nullptr);
+    return moho::Motor::sType;
   }
 
   [[nodiscard]] gpg::RType* CachedCScriptObjectType()
@@ -295,7 +295,7 @@ namespace moho
    * Address: 0x00696500 (FUN_00696500, default ctor)
    */
   MotorSinkAway::MotorSinkAway()
-    : EntityMotor()
+    : Motor()
     , CScriptObject()
     , mSinkDeltaY(0.0f)
   {
@@ -306,7 +306,7 @@ namespace moho
    * Address: 0x006963F0 (FUN_006963F0, Lua ctor lane)
    */
   MotorSinkAway::MotorSinkAway(LuaPlus::LuaState* const state, const float sinkDeltaY)
-    : EntityMotor()
+    : Motor()
     , CScriptObject(GetMotorSinkAwayLuaFactoryObject(state), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
     , mSinkDeltaY(sinkDeltaY)
   {
@@ -451,7 +451,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Read(CachedMotorType(), static_cast<moho::EntityMotor*>(this), nullOwner);
+    archive->Read(CachedMotorType(), static_cast<moho::Motor*>(this), nullOwner);
     archive->Read(CachedCScriptObjectType(), static_cast<moho::CScriptObject*>(this), nullOwner);
     archive->ReadFloat(&mSinkDeltaY);
   }
@@ -466,7 +466,7 @@ namespace moho
     }
 
     const gpg::RRef nullOwner{};
-    archive->Write(CachedMotorType(), static_cast<const moho::EntityMotor*>(this), nullOwner);
+    archive->Write(CachedMotorType(), static_cast<const moho::Motor*>(this), nullOwner);
     archive->Write(CachedCScriptObjectType(), static_cast<const moho::CScriptObject*>(this), nullOwner);
     archive->WriteFloat(mSinkDeltaY);
   }

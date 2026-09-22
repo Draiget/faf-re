@@ -1,4 +1,4 @@
-#include "moho/entity/EntityMotorReflection.h"
+#include "moho/entity/MotorReflection.h"
 
 #include <cstdlib>
 #include <new>
@@ -16,7 +16,7 @@ namespace
 
   // Address: 0x00BD5930 (FUN_00BD5930, register_MotorSerializer) -- MSVC's
   // own compiler-generated dynamic initializer for this global runs the real
-  // `gpg::SerSaveLoadHelper<EntityMotor>` ctor (self-links into `sNewHelpers`,
+  // `gpg::SerSaveLoadHelper<Motor>` ctor (self-links into `sNewHelpers`,
   // binds `mLoadCallback`/`mSaveCallback` to the template's `Deserialize`/
   // `Serialize`, installs the vtable) and registers the real destructor
   // (0x00BFCF60, no recovered mangled name; body confirmed via raw asm to
@@ -42,10 +42,10 @@ namespace
    */
   [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyMotorAliasType()
   {
-    gpg::RType* type = moho::EntityMotor::sType;
+    gpg::RType* type = moho::Motor::sType;
     if (!type) {
       type = gpg::LookupRType(typeid(moho::Motor));
-      moho::EntityMotor::sType = type;
+      moho::Motor::sType = type;
     }
     return type;
   }
@@ -58,13 +58,13 @@ namespace
 
     GetMotorTypeInfo().~MotorTypeInfo();
     gMotorTypeInfoConstructed = false;
-    moho::EntityMotor::sType = nullptr;
+    moho::Motor::sType = nullptr;
   }
 } // namespace
 
 namespace moho
 {
-  gpg::RType* EntityMotor::sType = nullptr;
+  gpg::RType* Motor::sType = nullptr;
 
   /**
    * Address: 0x00694800 (FUN_00694800, Moho::MotorTypeInfo::MotorTypeInfo)
@@ -72,7 +72,7 @@ namespace moho
   MotorTypeInfo::MotorTypeInfo()
     : gpg::RType()
   {
-    gpg::PreRegisterRType(typeid(EntityMotor), this);
+    gpg::PreRegisterRType(typeid(Motor), this);
   }
 
   /**
@@ -113,7 +113,7 @@ namespace moho
    */
   void MotorTypeInfo::Init()
   {
-    size_ = sizeof(EntityMotor);
+    size_ = sizeof(Motor);
     gpg::RType::Init();
     Finish();
   }
@@ -133,7 +133,7 @@ namespace moho
    * What it does:
    * Forces this translation unit's global `MotorSerializer` instance to link
    * into the reflection bootstrap sequence. See the Doxygen comment on the
-   * declaration (EntityMotorReflection.h) and on `gMotorSerializer` above for
+   * declaration (MotorReflection.h) and on `gMotorSerializer` above for
    * why this function's body has no field-setting logic of its own.
    */
   void register_MotorSerializer()

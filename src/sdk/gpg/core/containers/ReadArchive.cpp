@@ -43,7 +43,7 @@
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/command/CCommandDb.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityMotor.h"
+#include "moho/entity/Motor.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Shield.h"
 #include "moho/entity/REntityBlueprint.h"
@@ -603,10 +603,10 @@ namespace
 
   [[nodiscard]] gpg::RType* CachedMotorType()
   {
-    gpg::RType* type = moho::EntityMotor::sType;
+    gpg::RType* type = moho::Motor::sType;
     if (!type) {
-      type = gpg::LookupRType(typeid(moho::EntityMotor));
-      moho::EntityMotor::sType = type;
+      type = gpg::LookupRType(typeid(moho::Motor));
+      moho::Motor::sType = type;
     }
     return type;
   }
@@ -7152,9 +7152,9 @@ ReadArchive* ReadArchive::ReadPointerOwned_SPhysBody(moho::SPhysBody** const out
  *
  * What it does:
  * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
- * transition, and upcasts the pointee to `moho::EntityMotor`.
+ * transition, and upcasts the pointee to `moho::Motor`.
  */
-ReadArchive* ReadArchive::ReadPointerOwned_Motor(moho::EntityMotor** const outValue, const RRef* const ownerRef)
+ReadArchive* ReadArchive::ReadPointerOwned_Motor(moho::Motor** const outValue, const RRef* const ownerRef)
 {
   if (!outValue) {
     return this;

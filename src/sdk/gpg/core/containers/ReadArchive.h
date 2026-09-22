@@ -107,7 +107,7 @@ namespace moho
   class IAiTransport;
   class IFormationInstance;
   class ISoundManager;
-  class EntityMotor;
+  class Motor;
   class EntityCollisionUpdater;
   class IAiSteering;
   using CColPrimitiveBase = EntityCollisionUpdater;
@@ -1189,9 +1189,9 @@ namespace gpg
      *
      * What it does:
      * Reads one tracked pointer lane, enforces `UNOWNED -> OWNED` ownership
-     * transition, and upcasts the pointee to `moho::EntityMotor`.
+     * transition, and upcasts the pointee to `moho::Motor`.
      */
-    ReadArchive* ReadPointerOwned_Motor(moho::EntityMotor** outValue, const gpg::RRef* ownerRef);
+    ReadArchive* ReadPointerOwned_Motor(moho::Motor** outValue, const gpg::RRef* ownerRef);
 
     /**
      * Address: 0x006829F0 (FUN_006829F0, gpg::ReadArchive::ReadPointerOwned_PositionHistory)
