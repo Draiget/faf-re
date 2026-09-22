@@ -41,6 +41,34 @@ namespace moho
     CEntityDbBoundedPropQueueNode() noexcept = default;
 
     /**
+     * Address: 0x00687A30 (FUN_00687A30 -- the copy constructor, emitted out
+     * of line with the source in ESI and the destination in EAX: two words,
+     * then `mOwnerLink` copy-linked into the same prop's weak chain, then
+     * `mHandleId`. Zero callers, no pointer or jump to it anywhere in the
+     * image. Formerly `CopyEmbeddedBackLinkLane` over an
+     * `EmbeddedBackLinkLaneView` overlay of this struct (RULE THREE),
+     * removed 2026-09-22.)
+     * Address: 0x006896E0 (FUN_006896E0 -- the same copy behind a null test on
+     * the destination, i.e. placement construction; zero callers.)
+     * Address: 0x00689AC0 (FUN_00689AC0 -- a second such emission; zero
+     * callers.)
+     */
+    CEntityDbBoundedPropQueueNode(const CEntityDbBoundedPropQueueNode&) noexcept = default;
+
+    /**
+     * Address: 0x00689720 (FUN_00689720 -- the destructor, emitted out of line
+     * with `this` in ECX: unlinks `mOwnerLink` (+0x08) from its prop's weak
+     * chain. Zero callers, no pointer or jump to it anywhere in the image.
+     * Formerly `UnlinkEmbeddedBackLinkHookOwnerSlot`, removed 2026-09-22.)
+     * Address: 0x00689B00 (FUN_00689B00 -- a second emission; zero callers.)
+     * Address: 0x00689B20 (FUN_00689B20 -- the same with `this` in EAX; zero
+     * callers. Formerly `UnlinkEmbeddedBackLinkLaneAndReturnSelf`.)
+     */
+    ~CEntityDbBoundedPropQueueNode() noexcept = default;
+
+    CEntityDbBoundedPropQueueNode& operator=(const CEntityDbBoundedPropQueueNode&) noexcept = default;
+
+    /**
      * Address: 0x00686D70 (FUN_00686D70)
      *
      * IDA signature:
@@ -93,6 +121,13 @@ namespace moho
     }
 
     /**
+     * Address: 0x00683C70 (FUN_00683C70 -- this comparison emitted out of line
+     * with `lhs` in ESI and `rhs` in EDX: signed `jge`/`jl` on `mPriority`,
+     * then on `mBoundedTick`. Zero callers, no pointer or jump to it anywhere
+     * in the image. Formerly `IsSecondEntityIdPairBeforeFirst`, whose
+     * argument order was reversed, removed 2026-09-22.)
+     *
+     * What it does:
      * Binary min-heap comparator: lexicographic on `(mPriority, mBoundedTick)`.
      */
     [[nodiscard]] static bool IsLowerPriority(
@@ -131,1003 +166,8 @@ namespace
   constexpr std::uint32_t kAllUnitsLateFamilyBoundaryKey = 0x60000000u;
   constexpr std::uint32_t kEntityIdFamilyNibbleMask = 0xF0000000u;
 
-  struct EntityIdWordLaneView
-  {
-    std::uint32_t value;
-  };
-  static_assert(sizeof(EntityIdWordLaneView) == 0x04, "EntityIdWordLaneView size must be 0x04");
-
-  struct EntityIdPairWordLaneView
-  {
-    std::uint32_t high;
-    std::uint32_t low;
-  };
-  static_assert(sizeof(EntityIdPairWordLaneView) == 0x08, "EntityIdPairWordLaneView size must be 0x08");
-
-  struct DwordQuadLaneView
-  {
-    std::uint32_t lane0;
-    std::uint32_t lane4;
-    std::uint32_t lane8;
-    std::uint32_t laneC;
-  };
-  static_assert(sizeof(DwordQuadLaneView) == 0x10, "DwordQuadLaneView size must be 0x10");
-
-  struct PointerBaseLaneView
-  {
-    std::uint32_t base;
-  };
-  static_assert(sizeof(PointerBaseLaneView) == 0x04, "PointerBaseLaneView size must be 0x04");
-
-  struct ListHeadProxyLaneView
-  {
-    std::uint32_t proxy;
-    moho::CEntityDbListHead* head;
-  };
-  static_assert(offsetof(ListHeadProxyLaneView, head) == 0x04, "ListHeadProxyLaneView::head offset must be 0x04");
-  static_assert(sizeof(ListHeadProxyLaneView) == 0x08, "ListHeadProxyLaneView size must be 0x08");
-
-  struct QueueNodeRangeLaneView
-  {
-    std::uint32_t proxy;
-    moho::CEntityDbBoundedPropQueueNode* begin;
-    moho::CEntityDbBoundedPropQueueNode* end;
-  };
-  static_assert(offsetof(QueueNodeRangeLaneView, begin) == 0x04, "QueueNodeRangeLaneView::begin offset must be 0x04");
-  static_assert(offsetof(QueueNodeRangeLaneView, end) == 0x08, "QueueNodeRangeLaneView::end offset must be 0x08");
-  static_assert(sizeof(QueueNodeRangeLaneView) == 0x0C, "QueueNodeRangeLaneView size must be 0x0C");
-
-  struct Offset8WordLaneView
-  {
-    std::uint32_t lane0;
-    std::uint32_t lane4;
-    std::uint32_t lane8;
-  };
-  static_assert(sizeof(Offset8WordLaneView) == 0x0C, "Offset8WordLaneView size must be 0x0C");
-
-  struct EntityDbWindowLaneView
-  {
-    std::uint8_t pad000_27B[0x27C];
-    std::uint32_t windowBegin; // +0x27C
-    std::uint32_t windowEnd;   // +0x280
-    std::uint32_t windowCursor; // +0x284
-  };
-  static_assert(offsetof(EntityDbWindowLaneView, windowBegin) == 0x27C, "EntityDbWindowLaneView::windowBegin offset must be 0x27C");
-  static_assert(offsetof(EntityDbWindowLaneView, windowEnd) == 0x280, "EntityDbWindowLaneView::windowEnd offset must be 0x280");
-  static_assert(offsetof(EntityDbWindowLaneView, windowCursor) == 0x284, "EntityDbWindowLaneView::windowCursor offset must be 0x284");
-
-  struct WindowPairLaneView
-  {
-    std::uint32_t first;
-    std::uint32_t second;
-  };
-  static_assert(sizeof(WindowPairLaneView) == 0x08, "WindowPairLaneView size must be 0x08");
-
-  struct DualWordLaneView
-  {
-    std::uint32_t lane0;
-    std::uint32_t lane4;
-  };
-  static_assert(sizeof(DualWordLaneView) == 0x08, "DualWordLaneView size must be 0x08");
-
-  struct WordAndByteLaneView
-  {
-    std::uint32_t lane0;
-    std::uint8_t lane4;
-  };
-  static_assert(offsetof(WordAndByteLaneView, lane4) == 0x04, "WordAndByteLaneView::lane4 offset must be 0x04");
-
-  struct ForwardLinkNodeRuntime
-  {
-    ForwardLinkNodeRuntime* next;
-  };
-  static_assert(sizeof(ForwardLinkNodeRuntime) == 0x04, "ForwardLinkNodeRuntime size must be 0x04");
-
-  struct BackLinkNodeRuntime
-  {
-    BackLinkNodeRuntime** backRef;
-    BackLinkNodeRuntime* next;
-  };
-  static_assert(sizeof(BackLinkNodeRuntime) == 0x08, "BackLinkNodeRuntime size must be 0x08");
-  static_assert(offsetof(BackLinkNodeRuntime, backRef) == 0x00, "BackLinkNodeRuntime::backRef offset must be 0x00");
-  static_assert(offsetof(BackLinkNodeRuntime, next) == 0x04, "BackLinkNodeRuntime::next offset must be 0x04");
-
-  struct BackLinkOwnerLaneView
-  {
-    std::uint32_t proxy;
-    BackLinkNodeRuntime* head;
-  };
-  static_assert(sizeof(BackLinkOwnerLaneView) == 0x08, "BackLinkOwnerLaneView size must be 0x08");
-  static_assert(offsetof(BackLinkOwnerLaneView, head) == 0x04, "BackLinkOwnerLaneView::head offset must be 0x04");
-
-  struct EmbeddedBackLinkLaneView
-  {
-    std::uint32_t lane0;
-    std::uint32_t lane4;
-    BackLinkNodeRuntime hook; // +0x08
-    std::uint32_t lane10;
-  };
-  static_assert(offsetof(EmbeddedBackLinkLaneView, hook) == 0x08, "EmbeddedBackLinkLaneView::hook offset must be 0x08");
-  static_assert(offsetof(EmbeddedBackLinkLaneView, lane10) == 0x10, "EmbeddedBackLinkLaneView::lane10 offset must be 0x10");
-  static_assert(sizeof(EmbeddedBackLinkLaneView) == 0x14, "EmbeddedBackLinkLaneView size must be 0x14");
-
-  [[nodiscard]] std::uint32_t* SwapWordLane(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    const std::uint32_t tmp = *lhs;
-    *lhs = *rhs;
-    *rhs = tmp;
-    return lhs;
-  }
-
-  [[nodiscard]] DwordQuadLaneView* SwapTailThreeWordLanes(
-    DwordQuadLaneView* const lhs, DwordQuadLaneView* const rhs
-  ) noexcept
-  {
-    std::swap(lhs->lane4, rhs->lane4);
-    std::swap(lhs->lane8, rhs->lane8);
-    std::swap(lhs->laneC, rhs->laneC);
-    return lhs;
-  }
-
-  [[nodiscard]] std::uint32_t* StoreStride4AddressFromBaseLane(
-    std::uint32_t* const outAddress,
-    const PointerBaseLaneView* const baseLane,
-    const std::uint32_t index
-  ) noexcept
-  {
-    *outAddress = baseLane->base + (index * 4u);
-    return outAddress;
-  }
-
-  [[nodiscard]] std::uint32_t* StoreStride12AddressFromBaseLane(
-    std::uint32_t* const outAddress,
-    const PointerBaseLaneView* const baseLane,
-    const std::uint32_t index
-  ) noexcept
-  {
-    *outAddress = baseLane->base + (index * 12u);
-    return outAddress;
-  }
-
-  [[nodiscard]] std::uint32_t LoadIndirectBaseWithOffset(
-    const PointerBaseLaneView* const baseLane, const std::uint32_t byteOffset
-  ) noexcept
-  {
-    return baseLane->base + byteOffset;
-  }
-
-  /**
-   * Address: 0x0067CC90 (FUN_0067CC90)
-   *
-   * What it does:
-   * Swaps one dword lane between two pointers and returns the first pointer.
-   */
-  std::uint32_t* SwapWordLanePrimary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067CCA0 (FUN_0067CCA0)
-   *
-   * What it does:
-   * Secondary swap lane for one dword pointer pair.
-   */
-  std::uint32_t* SwapWordLaneSecondary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067CCB0 (FUN_0067CCB0)
-   *
-   * What it does:
-   * Tertiary swap lane for one dword pointer pair.
-   */
-  std::uint32_t* SwapWordLaneTertiary(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067CCC0 (FUN_0067CCC0)
-   *
-   * What it does:
-   * Mirror swap lane for one dword pointer pair.
-   */
-  std::uint32_t* SwapWordLaneMirrorA(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067CCD0 (FUN_0067CCD0)
-   *
-   * What it does:
-   * Mirror swap lane for one dword pointer pair.
-   */
-  std::uint32_t* SwapWordLaneMirrorB(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067CCE0 (FUN_0067CCE0)
-   *
-   * What it does:
-   * Mirror swap lane for one dword pointer pair.
-   */
-  std::uint32_t* SwapWordLaneMirrorC(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067E160 (FUN_0067E160)
-   *
-   * What it does:
-   * Stores `base + index * 4` into output address storage.
-   */
-  std::uint32_t* StoreStride4AddressPrimary(
-    std::uint32_t* const outAddress,
-    const PointerBaseLaneView* const baseLane,
-    const std::uint32_t index
-  ) noexcept
-  {
-    return StoreStride4AddressFromBaseLane(outAddress, baseLane, index);
-  }
-
-  /**
-   * Address: 0x0067E270 (FUN_0067E270)
-   *
-   * What it does:
-   * Stores `base + index * 12` into output address storage.
-   */
-  std::uint32_t* StoreStride12AddressPrimary(
-    std::uint32_t* const outAddress,
-    const PointerBaseLaneView* const baseLane,
-    const std::uint32_t index
-  ) noexcept
-  {
-    return StoreStride12AddressFromBaseLane(outAddress, baseLane, index);
-  }
-
-  /**
-   * Address: 0x0067E2E0 (FUN_0067E2E0)
-   *
-   * What it does:
-   * Mirror lane that stores `base + index * 4` into output address storage.
-   */
-  std::uint32_t* StoreStride4AddressSecondary(
-    std::uint32_t* const outAddress,
-    const PointerBaseLaneView* const baseLane,
-    const std::uint32_t index
-  ) noexcept
-  {
-    return StoreStride4AddressFromBaseLane(outAddress, baseLane, index);
-  }
-
-  /**
-   * Address: 0x0067F8C0 (FUN_0067F8C0)
-   *
-   * What it does:
-   * Swaps tail dword lanes (`+0x4/+0x8/+0xC`) between two 16-byte records.
-   */
-  DwordQuadLaneView* SwapTailThreeWordLanesPrimary(
-    DwordQuadLaneView* const lhs, DwordQuadLaneView* const rhs
-  ) noexcept
-  {
-    return SwapTailThreeWordLanes(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x0067FED0 (FUN_0067FED0)
-   *
-   * What it does:
-   * Mirror lane that swaps tail dword lanes (`+0x4/+0x8/+0xC`) between two 16-byte records.
-   */
-  DwordQuadLaneView* SwapTailThreeWordLanesSecondary(
-    DwordQuadLaneView* const lhs, DwordQuadLaneView* const rhs
-  ) noexcept
-  {
-    return SwapTailThreeWordLanes(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x00680FA0 (FUN_00680FA0)
-   *
-   * What it does:
-   * Additional dword-lane swap adapter.
-   */
-  std::uint32_t* SwapWordLaneAdapter(std::uint32_t* const lhs, std::uint32_t* const rhs) noexcept
-  {
-    return SwapWordLane(lhs, rhs);
-  }
-
-  /**
-   * Address: 0x00683BD0 (FUN_00683BD0)
-   *
-   * What it does:
-   * Returns true when the entity-id family nibble is zero (`0x0`).
-   */
-  bool IsUnitFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
-  {
-    return (id->value & kEntityIdFamilyNibbleMask) == 0u;
-  }
-
-  /**
-   * Address: 0x00683BE0 (FUN_00683BE0)
-   *
-   * What it does:
-   * Returns true when the entity-id family nibble is `0x1`.
-   */
-  bool IsPropFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
-  {
-    return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsUnitTypeBoundaryKey;
-  }
-
-  /**
-   * Address: 0x00683C00 (FUN_00683C00)
-   *
-   * What it does:
-   * Returns true when the entity-id family nibble is `0x2`.
-   */
-  bool IsProjectileFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
-  {
-    return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsHighFamilyBoundaryKey;
-  }
-
-  /**
-   * Address: 0x00683C20 (FUN_00683C20)
-   *
-   * What it does:
-   * Returns true when the entity-id family nibble is `0x3`.
-   */
-  bool IsShieldFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
-  {
-    return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsMidFamilyBoundaryKey;
-  }
-
-  /**
-   * Address: 0x00683C40 (FUN_00683C40)
-   *
-   * What it does:
-   * Returns true when the entity-id family nibble is `0x5`.
-   */
-  bool IsOtherFamilyEntityId(const EntityIdWordLaneView* const id) noexcept
-  {
-    return (id->value & kEntityIdFamilyNibbleMask) == kAllUnitsOtherFamilyBoundaryKey;
-  }
-
-  /**
-   * Address: 0x00683C70 (FUN_00683C70)
-   *
-   * What it does:
-   * Lexicographically compares two `(high, low)` key pairs and returns true
-   * when `second` sorts before `first`.
-   */
-  bool IsSecondEntityIdPairBeforeFirst(
-    const EntityIdPairWordLaneView* const first,
-    const EntityIdPairWordLaneView* const second
-  ) noexcept
-  {
-    return (second->high < first->high) || (second->high == first->high && second->low < first->low);
-  }
-
-  /**
-   * Address: 0x00684000 (FUN_00684000)
-   *
-   * What it does:
-   * Copies a two-word window range (`+0x27C/+0x280`) into output storage.
-   */
-  WindowPairLaneView* StoreWindowPairFromRuntime(
-    WindowPairLaneView* const outPair, const EntityDbWindowLaneView* const runtime
-  ) noexcept
-  {
-    outPair->first = runtime->windowBegin;
-    outPair->second = runtime->windowEnd;
-    return outPair;
-  }
-
-  /**
-   * Address: 0x00684020 (FUN_00684020)
-   *
-   * What it does:
-   * Writes the window cursor lane at offset `+0x284`.
-   */
-  EntityDbWindowLaneView* SetWindowCursorLane(
-    EntityDbWindowLaneView* const runtime, const std::uint32_t value
-  ) noexcept
-  {
-    runtime->windowCursor = value;
-    return runtime;
-  }
-
-  /**
-   * Address: 0x00684720 (FUN_00684720)
-   *
-   * What it does:
-   * Unlinks one intrusive set-node and inserts it at the front of
-   * `CEntityDb::mRegisteredEntitySets`.
-   */
-  moho::CEntityDbListHead* RelinkNodeIntoRegisteredEntitySetFront(
-    moho::CEntityDbListHead* const node,
-    moho::CEntityDb* const entityDb
-  ) noexcept
-  {
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-
-    node->next = node;
-    node->prev = node;
-
-    moho::CEntityDbListHead& head = entityDb->mRegisteredEntitySets;
-    node->next = head.next;
-    node->prev = &head;
-    head.next = node;
-    node->next->prev = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x00685340 (FUN_00685340)
-   *
-   * What it does:
-   * Returns true when the lane at offset `+0x8` is null.
-   */
-  bool IsOffset8LaneNull(const Offset8WordLaneView* const runtime) noexcept
-  {
-    return runtime->lane8 == 0u;
-  }
-
-  /**
-   * Address: 0x00685880 (FUN_00685880)
-   *
-   * What it does:
-   * Stores `head->next` from one `(+0x4)` list-head proxy lane.
-   */
-  moho::CEntityDbListHead** StoreListHeadNextPrimary(
-    moho::CEntityDbListHead** const outNode,
-    const ListHeadProxyLaneView* const runtime
-  ) noexcept
-  {
-    *outNode = runtime->head->next;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x006858D0 (FUN_006858D0)
-   *
-   * What it does:
-   * Unlinks one intrusive node, restores self-links, then inserts it at the
-   * front of the provided list head.
-   */
-  moho::CEntityDbListHead* RelinkNodeIntoListHeadFront(
-    moho::CEntityDbListHead* const node,
-    moho::CEntityDbListHead* const head
-  ) noexcept
-  {
-    node->next->prev = node->prev;
-    node->prev->next = node->next;
-
-    node->next = node;
-    node->prev = node;
-
-    node->next = head->next;
-    node->prev = head;
-    head->next = node;
-    node->next->prev = node;
-    return node;
-  }
-
-  /**
-   * Address: 0x00685940 (FUN_00685940)
-   *
-   * What it does:
-   * Secondary lane that stores `head->next` from one `(+0x4)` list-head proxy lane.
-   */
-  moho::CEntityDbListHead** StoreListHeadNextSecondary(
-    moho::CEntityDbListHead** const outNode,
-    const ListHeadProxyLaneView* const runtime
-  ) noexcept
-  {
-    *outNode = runtime->head->next;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x006859D0 (FUN_006859D0)
-   *
-   * What it does:
-   * Returns the node-count lane from `[begin,end)` queue storage where each
-   * element is `CEntityDbBoundedPropQueueNode` (`0x14` bytes).
-   */
-  int CountQueueNodeRangeEntries(const QueueNodeRangeLaneView* const queue) noexcept
-  {
-    if (queue->begin == nullptr) {
-      return 0;
-    }
-    return static_cast<int>(queue->end - queue->begin);
-  }
-
-  /**
-   * Address: 0x00685B80 (FUN_00685B80)
-   *
-   * What it does:
-   * Decodes current all-armies iterator payload (`node->unitListNode - 0x8`)
-   * into `Unit*`, or returns null when payload is null.
-   */
-  moho::Unit* DecodeCurrentAllArmiesIteratorUnit(
-    const moho::CUnitIterAllArmies* const iterator
-  ) noexcept
-  {
-    void* const encodedPayload = iterator->mItr->unitListNode;
-    if (encodedPayload == nullptr) {
-      return nullptr;
-    }
-    return reinterpret_cast<moho::Unit*>(reinterpret_cast<std::uintptr_t>(encodedPayload) - 0x8u);
-  }
-
-  /**
-   * Address: 0x00685BD0 (FUN_00685BD0)
-   *
-   * What it does:
-   * Returns current raw all-armies iterator payload pointer (`node->unitListNode`).
-   */
-  void* GetCurrentAllArmiesIteratorRawPayloadPrimary(
-    const moho::CUnitIterAllArmies* const iterator
-  ) noexcept
-  {
-    return iterator->mItr->unitListNode;
-  }
-
-  /**
-   * Address: 0x00685C10 (FUN_00685C10)
-   *
-   * What it does:
-   * Secondary lane that returns current raw all-armies iterator payload pointer.
-   */
-  void* GetCurrentAllArmiesIteratorRawPayloadSecondary(
-    const moho::CUnitIterAllArmies* const iterator
-  ) noexcept
-  {
-    return iterator->mItr->unitListNode;
-  }
-
-  /**
-   * Address: 0x00685F20 (FUN_00685F20)
-   *
-   * What it does:
-   * Copies one dword from each source slot into a 2-lane output record.
-   */
-  DualWordLaneView* CopyDualWordLaneFromSeparateSlots(
-    DualWordLaneView* const outValue,
-    const std::uint32_t* const firstSlot,
-    const std::uint32_t* const secondSlot
-  ) noexcept
-  {
-    outValue->lane0 = *firstSlot;
-    outValue->lane4 = *secondSlot;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00685F70 (FUN_00685F70)
-   *
-   * What it does:
-   * Loads one indirect base lane and returns `base + 0x8`.
-   */
-  std::uint32_t LoadIndirectBasePlus8Primary(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x8u);
-  }
-
-  /**
-   * Address: 0x00685F90 (FUN_00685F90)
-   *
-   * What it does:
-   * Loads one indirect base lane and returns `base + 0x10`.
-   */
-  std::uint32_t LoadIndirectBasePlus16Primary(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x10u);
-  }
-
-  [[nodiscard]] gpg::RRef NewEntityDbTypeLaneRef()
-  {
-    moho::CEntityDb* entityDb = nullptr;
-    if (void* const storage = ::operator new(sizeof(moho::CEntityDb), std::nothrow); storage != nullptr) {
-      entityDb = new (storage) moho::CEntityDb();
-    }
-
-    gpg::RRef out{};
-    (void)gpg::RRef_EntityDB(&out, entityDb);
-    return out;
-  }
-
-  [[nodiscard]] gpg::RRef CtorEntityDbTypeLaneRef(void* const objectStorage)
-  {
-    moho::CEntityDb* entityDb = nullptr;
-    if (objectStorage != nullptr) {
-      entityDb = new (objectStorage) moho::CEntityDb();
-    }
-
-    gpg::RRef out{};
-    (void)gpg::RRef_EntityDB(&out, entityDb);
-    return out;
-  }
-
-  void DeleteEntityDbTypeLane(void* const objectStorage)
-  {
-    if (objectStorage == nullptr) {
-      return;
-    }
-
-    auto* const entityDb = static_cast<moho::CEntityDb*>(objectStorage);
-    entityDb->~CEntityDb();
-    ::operator delete(entityDb);
-  }
-
-  void DestructEntityDbTypeLane(void* const objectStorage)
-  {
-    if (objectStorage == nullptr) {
-      return;
-    }
-
-    auto* const entityDb = static_cast<moho::CEntityDb*>(objectStorage);
-    entityDb->~CEntityDb();
-  }
-
-  /**
-   * Address: 0x00685FC0 (FUN_00685FC0)
-   *
-   * What it does:
-   * Binds one `EntityDB` type-info lifecycle callback set (`newRef`,
-   * `ctorRef`, `delete`, `destruct`) into one destination `RType` lane.
-   */
-  gpg::RType* BindEntityDbTypeLifecycleCallbacks(gpg::RType* const typeInfo) noexcept
-  {
-    typeInfo->newRefFunc_ = &NewEntityDbTypeLaneRef;
-    typeInfo->ctorRefFunc_ = &CtorEntityDbTypeLaneRef;
-    typeInfo->deleteFunc_ = &DeleteEntityDbTypeLane;
-    typeInfo->dtrFunc_ = &DestructEntityDbTypeLane;
-    return typeInfo;
-  }
-
-  /**
-   * Address: 0x00686080 (FUN_00686080)
-   *
-   * What it does:
-   * Initializes one back-link node from one owner lane (`owner + 0x4`) and
-   * inserts it at the owner head slot.
-   */
-  BackLinkNodeRuntime* LinkBackLinkNodeFromOwnerLane(
-    BackLinkNodeRuntime* const node,
-    BackLinkOwnerLaneView* const owner
-  ) noexcept
-  {
-    BackLinkNodeRuntime** const headSlot = owner != nullptr ? &owner->head : nullptr;
-    node->backRef = headSlot;
-    if (headSlot != nullptr) {
-      node->next = *headSlot;
-      *headSlot = node;
-    } else {
-      node->next = nullptr;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x006860D0 (FUN_006860D0)
-   *
-   * What it does:
-   * Returns owner base pointer (`backRef - 0x4`) for one linked node, or
-   * null when node is unlinked.
-   *
-   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
-   * callers, and no inline `backRef - 4`-shaped duplicate of this
-   * computation was found elsewhere in this file to redirect instead.
-   */
-  [[maybe_unused]] BackLinkOwnerLaneView* ResolveBackLinkNodeOwner(const BackLinkNodeRuntime* const node) noexcept
-  {
-    BackLinkNodeRuntime** const backRef = node->backRef;
-    if (backRef == nullptr) {
-      return nullptr;
-    }
-
-    auto* const ownerLane = reinterpret_cast<std::uint8_t*>(backRef) - 0x4u;
-    return reinterpret_cast<BackLinkOwnerLaneView*>(ownerLane);
-  }
-
-  struct NextBackRefNodeRuntime
-  {
-    NextBackRefNodeRuntime* next;
-    NextBackRefNodeRuntime** backRef;
-  };
-  static_assert(sizeof(NextBackRefNodeRuntime) == 0x08, "NextBackRefNodeRuntime size must be 0x08");
-
-  /**
-   * Address: 0x006866A0 (FUN_006866A0)
-   *
-   * What it does:
-   * Unlinks one `(next, backRef)` intrusive node from its current list,
-   * rewires it to self-links, then inserts it at one target head slot.
-   */
-  NextBackRefNodeRuntime* RelinkNextBackRefNodeToHead(
-    NextBackRefNodeRuntime* const node,
-    NextBackRefNodeRuntime** const headSlot
-  ) noexcept
-  {
-    node->next->backRef = node->backRef;
-    *node->backRef = node->next;
-
-    node->next = node;
-    node->backRef = reinterpret_cast<NextBackRefNodeRuntime**>(node);
-
-    node->next = *headSlot;
-    node->backRef = headSlot;
-    *headSlot = node;
-    node->next->backRef = &node->next;
-    return node;
-  }
-
-  /**
-   * Address: 0x00686C70 (FUN_00686C70)
-   * Address: 0x00688740 (FUN_00688740)
-   *
-   * What it does:
-   * Copies one dword lane and one byte lane into output storage.
-   */
-  WordAndByteLaneView* CopyWordAndByteLane(
-    WordAndByteLaneView* const outValue,
-    const std::uint32_t* const wordSlot,
-    const std::uint8_t* const byteSlot
-  ) noexcept
-  {
-    outValue->lane0 = *wordSlot;
-    outValue->lane4 = *byteSlot;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00686C90 (FUN_00686C90)
-   *
-   * What it does:
-   * Pops one singly-linked forward node from head storage into output lane.
-   */
-  ForwardLinkNodeRuntime** PopForwardLinkNode(
-    ForwardLinkNodeRuntime** const outNode,
-    ForwardLinkNodeRuntime** const headSlot
-  ) noexcept
-  {
-    ForwardLinkNodeRuntime* const head = *headSlot;
-    *outNode = head;
-    *headSlot = head->next;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00686CA0 (FUN_00686CA0)
-   *
-   * What it does:
-   * Loads one indirect base lane and returns `base + 0x8`.
-   */
-  std::uint32_t LoadIndirectBasePlus8Secondary(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x8u);
-  }
-
-  /**
-   * Address: 0x00686CD0 (FUN_00686CD0)
-   *
-   * What it does:
-   * Loads one indirect base lane and returns `base + 0x10`.
-   */
-  std::uint32_t LoadIndirectBasePlus16Secondary(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x10u);
-  }
-
-  /**
-   * Address: 0x00686D50 (FUN_00686D50)
-   *
-   * What it does:
-   * Initializes one back-link node from one externally provided back-ref slot
-   * lane and inserts it at that slot head.
-   */
-  BackLinkNodeRuntime* LinkBackLinkNodeFromBackRefOwner(
-    BackLinkNodeRuntime* const node,
-    BackLinkNodeRuntime** const* const backRefOwner
-  ) noexcept
-  {
-    BackLinkNodeRuntime** const backRef = *backRefOwner;
-    node->backRef = backRef;
-    if (backRef != nullptr) {
-      node->next = *backRef;
-      *backRef = node;
-    } else {
-      node->next = nullptr;
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x006878A0 (FUN_006878A0)
-   *
-   * What it does:
-   * Tertiary lane that loads one indirect base and returns `base + 0x10`.
-   */
-  std::uint32_t LoadIndirectBasePlus16Tertiary(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x10u);
-  }
-
-  /**
-   * Address: 0x006878B0 (FUN_006878B0)
-   *
-   * What it does:
-   * Mirror lane that loads one indirect base and returns `base + 0x10`.
-   */
-  std::uint32_t LoadIndirectBasePlus16Mirror(const PointerBaseLaneView* const baseLane) noexcept
-  {
-    return LoadIndirectBaseWithOffset(baseLane, 0x10u);
-  }
-
-  /**
-   * Address: 0x00687A30 (FUN_00687A30)
-   * Address: 0x006896E0 (FUN_006896E0)
-   * Address: 0x00689AC0 (FUN_00689AC0)
-   *
-   * What it does:
-   * Copies one embedded back-link runtime lane and relinks the copied hook
-   * into the same intrusive back-ref slot chain.
-   */
-  EmbeddedBackLinkLaneView* CopyEmbeddedBackLinkLane(
-    EmbeddedBackLinkLaneView* const outValue,
-    const EmbeddedBackLinkLaneView* const source
-  ) noexcept
-  {
-    if (outValue == nullptr) {
-      return nullptr;
-    }
-
-    outValue->lane0 = source->lane0;
-    outValue->lane4 = source->lane4;
-
-    BackLinkNodeRuntime** const backRef = source->hook.backRef;
-    outValue->hook.backRef = backRef;
-    if (backRef != nullptr) {
-      outValue->hook.next = *backRef;
-      *backRef = &outValue->hook;
-    } else {
-      outValue->hook.next = nullptr;
-    }
-
-    outValue->lane10 = source->lane10;
-    return outValue;
-  }
-
-  /**
-   * Address: 0x00689720 (FUN_00689720)
-   * Address: 0x00689B00 (FUN_00689B00)
-   *
-   * What it does:
-   * Unlinks one embedded back-link hook (`+0x08`) from its current owner-slot
-   * chain and returns the slot that previously referenced that hook.
-   */
-  BackLinkNodeRuntime** UnlinkEmbeddedBackLinkHookOwnerSlot(
-    EmbeddedBackLinkLaneView* const value
-  ) noexcept
-  {
-    BackLinkNodeRuntime** slot = value->hook.backRef;
-    BackLinkNodeRuntime* const hookNode = &value->hook;
-    if (slot != nullptr) {
-      while (*slot != hookNode) {
-        slot = &((*slot)->next);
-      }
-      *slot = hookNode->next;
-    }
-    return slot;
-  }
-
-  /**
-   * Address: 0x00689B20 (FUN_00689B20)
-   *
-   * What it does:
-   * Unlinks one embedded back-link hook (`+0x08`) from its owner-slot chain
-   * and returns the original lane pointer.
-   */
-  EmbeddedBackLinkLaneView* UnlinkEmbeddedBackLinkLaneAndReturnSelf(
-    EmbeddedBackLinkLaneView* const value
-  ) noexcept
-  {
-    (void)UnlinkEmbeddedBackLinkHookOwnerSlot(value);
-    return value;
-  }
-
-  /**
-   * Address: 0x006886D0 (FUN_006886D0)
-   *
-   * What it does:
-   * Rebinds one back-link node from its current back-ref slot chain to a new
-   * target back-ref slot owner.
-   */
-  BackLinkNodeRuntime* RebindBackLinkNode(
-    BackLinkNodeRuntime* const node,
-    BackLinkNodeRuntime** const* const backRefOwner
-  ) noexcept
-  {
-    BackLinkNodeRuntime** const targetBackRef = *backRefOwner;
-    if (targetBackRef != node->backRef) {
-      BackLinkNodeRuntime** oldBackRef = node->backRef;
-      if (oldBackRef != nullptr) {
-        BackLinkNodeRuntime** cursor = oldBackRef;
-        while (cursor != nullptr && *cursor != node) {
-          cursor = (*cursor != nullptr) ? &((*cursor)->next) : nullptr;
-        }
-        if (cursor != nullptr) {
-          *cursor = node->next;
-        }
-      }
-
-      node->backRef = targetBackRef;
-      if (targetBackRef == nullptr) {
-        node->next = nullptr;
-      } else {
-        node->next = *targetBackRef;
-        *targetBackRef = node;
-      }
-    }
-    return node;
-  }
-
-  /**
-   * Address: 0x005BE2B0 (FUN_005BE2B0)
-   *
-   * What it does:
-   * Packs one `(familyNibble, sourceIndex)` pair into EntityId family/source
-   * bits (`[31..28]` family, `[27..20]` source), reserves an id through
-   * `EntityDB::DoReserveId`, and writes the result into `outEntityId`.
-   */
-  std::uint32_t* ReserveEntityIdFromFamilyAndSourceLanes(
-    const std::uint32_t familyNibble,
-    std::uint32_t* const outEntityId,
-    moho::CEntityDb* const entityDb,
-    const std::uint32_t sourceIndex
-  )
-  {
-    const std::uint32_t packedFamilySource = (sourceIndex | (familyNibble << 8u)) << kEntityIdSourceShift;
-    *outEntityId = entityDb->DoReserveId(packedFamilySource);
-    return outEntityId;
-  }
-
-  gpg::RType* gLegacyEntityDbType = nullptr;
   gpg::RType* gLegacyEntityDbIdPoolMapType = nullptr;
   gpg::RType* gLegacyEntityDbEntityListType = nullptr;
-
-  /**
-   * Address: 0x00686DD0 (FUN_00686DD0)
-   *
-   * What it does:
-   * Resolves and caches RTTI for one `EntityDB` object lane.
-   *
-   * Orphan: zero xrefs at this address in the IDA export, zero callgraph
-   * callers, and `gLegacyEntityDbType` (its only writer) is never read
-   * anywhere else in this file. Unlike its two siblings below
-   * (`ResolveLegacyEntityDbIdPoolMapType`/`ResolveLegacyEntityDbEntityListType`,
-   * now wired into `CEntityDb::MemberSerialize`/`MemberDeserialize`), no
-   * caller needing `CEntityDb`'s own reflected type (as opposed to a member's)
-   * was found in this file.
-   */
-  [[maybe_unused]] [[nodiscard]] gpg::RType* ResolveLegacyEntityDbType()
-  {
-    gpg::RType* type = gLegacyEntityDbType;
-    if (!type) {
-      type = gpg::LookupRType(typeid(moho::CEntityDb));
-      gLegacyEntityDbType = type;
-    }
-    return type;
-  }
 
   /**
    * Address: 0x00689D30 (FUN_00689D30)
@@ -2059,16 +1099,48 @@ namespace
      */
     [[nodiscard]] static gpg::RRef CtrRef(void* objectStorage);
 
+    /**
+     * Address: 0x00687990 (FUN_00687990, Moho::EntityDBTypeInfo::Delete)
+     *
+     * What it does:
+     * Destroys and frees one heap `CEntityDb`.
+     */
+    static void Delete(void* objectStorage);
+
+    /**
+     * Address: 0x00687A20 (FUN_00687A20, Moho::EntityDBTypeInfo::Destruct)
+     *
+     * What it does:
+     * Destroys one `CEntityDb` in place without freeing its storage.
+     */
+    static void Destruct(void* objectStorage);
+
     [[nodiscard]] const char* GetName() const override
     {
       return "EntityDB";
     }
 
+    /**
+     * Address: 0x00684810 (FUN_00684810, Moho::EntityDBTypeInfo::Init)
+     * Address: 0x00685FC0 (FUN_00685FC0 -- the four callback stores below,
+     * emitted out of line with the type in EAX; zero callers, no pointer or
+     * jump to it anywhere in the image. Formerly
+     * `BindEntityDbTypeLifecycleCallbacks`, removed 2026-09-22.)
+     *
+     * What it does:
+     * `size_ = 0x50`, then `NewRef` (+0x48), `CtrRef` (+0x54), `Delete`
+     * (+0x50) and `Destruct` (+0x5C), then `RType::Init` (0x008D8680) and a
+     * tail-call through vtable +0x28 (`Finish`). This recovery used to install
+     * only the first two, leaving an EntityDB that reflection could create
+     * but not delete or destruct.
+     */
     void Init() override
     {
+      size_ = sizeof(moho::CEntityDb);
       newRefFunc_ = &EntityDbTypeInfo::NewRef;
       ctorRefFunc_ = &EntityDbTypeInfo::CtrRef;
-      size_ = sizeof(moho::CEntityDb);
+      deleteFunc_ = &EntityDbTypeInfo::Delete;
+      dtrFunc_ = &EntityDbTypeInfo::Destruct;
       gpg::RType::Init();
       Finish();
     }
@@ -2133,6 +1205,28 @@ namespace
     gpg::RRef out{};
     (void)gpg::RRef_EntityDB(&out, entityDb);
     return out;
+  }
+
+  /**
+   * Address: 0x00687990 (FUN_00687990, Moho::EntityDBTypeInfo::Delete)
+   *
+   * What it does:
+   * `~EntityDB` (0x006843B0) then `operator delete`, skipped for null.
+   */
+  void EntityDbTypeInfo::Delete(void* const objectStorage)
+  {
+    delete static_cast<moho::CEntityDb*>(objectStorage);
+  }
+
+  /**
+   * Address: 0x00687A20 (FUN_00687A20, Moho::EntityDBTypeInfo::Destruct)
+   *
+   * What it does:
+   * Runs `~EntityDB` (0x006843B0) on caller-owned storage.
+   */
+  void EntityDbTypeInfo::Destruct(void* const objectStorage)
+  {
+    static_cast<moho::CEntityDb*>(objectStorage)->~CEntityDb();
   }
 
   extern msvc8::string gEntityDbIdPoolMapTypeName;
