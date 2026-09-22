@@ -3987,6 +3987,9 @@
     <ClInclude Include="moho\particles\SWorldParticle.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\particles\SWorldTrail.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\math\VMatrix4.h">
       <Filter>Header Files</Filter>
     </ClInclude>

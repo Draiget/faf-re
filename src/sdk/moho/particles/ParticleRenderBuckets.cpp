@@ -15,6 +15,7 @@
 #include "moho/particles/ParticleRenderWorkItemRuntime.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/particles/SWorldParticle.h"
+#include "moho/particles/SWorldTrail.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/ID3DVertexSheet.h"
 #include "moho/render/ID3DVertexStream.h"
@@ -203,82 +204,74 @@ namespace
 
   /**
    * What it does:
-   * Packed vertex lane emitted by trail work-item upload paths.
+   * One vertex of a trail ribbon quad, 13 floats wide. Four of these are
+   * emitted per `SWorldTrail`: the two ribbon ends, each duplicated for the two
+   * sides of the ribbon, which the two sides distinguish by the sign of
+   * `tangent` and by `texV`.
    */
   struct TrailSegmentPackedVertexRuntime
   {
-    float lane[13]{}; // 13 floats = 0x34 bytes, matching the recovered stream write width.
+    Wm3::Vector3<float> position;   // +0x00  the ribbon end this vertex sits on
+    Wm3::Vector3<float> tangent;    // +0x0C  that end's tangent, negated on one side
+    float age = 0.0f;               // +0x18  that end's age in frames
+    float lifetime = 0.0f;          // +0x1C  SWorldTrail::mLifetime
+    float texU = 0.0f;              // +0x20  that end's texture coordinate
+    float size = 0.0f;              // +0x24  SWorldTrail::mSize
+    float reserved = 0.0f;          // +0x28  always zero
+    float texV = 0.0f;              // +0x2C  1 on the negated side, 0 on the other
+    float emitterAge = 0.0f;        // +0x30  SWorldTrail::mEmitterAge
   };
 
   static_assert(sizeof(TrailSegmentPackedVertexRuntime) == 0x34, "TrailSegmentPackedVertexRuntime size must be 0x34");
 
+  /// Vertices emitted per trail segment: two ribbon ends, two sides each.
+  inline constexpr std::size_t kTrailSegmentVertexCount = 4U;
+
   /**
    * What it does:
-   * Packs one trail payload into four consecutive trail-segment vertices using
-   * the recovered binary field shuffle.
+   * Expands one trail segment into its four ribbon vertices. The binary writes
+   * the 52 floats one by one out of the record read as `float[20]`; every index
+   * it uses is a named field, and the pattern is two ends x two sides:
+   *
+   *   vertex 0 : start end, negated tangent, texV 1
+   *   vertex 1 : end end,   negated tangent, texV 1
+   *   vertex 2 : end end,   plain tangent,   texV 0
+   *   vertex 3 : start end, plain tangent,   texV 0
+   *
+   * so the shader offsets each vertex along `tangent x view` by `size` and
+   * interpolates `texU` between the ends.
    */
-  void PackTrailSegmentQuadVertices(
-    float* const outVertices,
-    const float* const trailFloats
-  )
+  void PackTrailSegmentQuadVertices(TrailSegmentPackedVertexRuntime* const outVertices, const moho::SWorldTrail& trail)
   {
-    const float* const trail = trailFloats;
+    const auto emit = [&trail, outVertices](
+      const std::size_t index,
+      const Wm3::Vector3<float>& position,
+      const Wm3::Vector3<float>& tangent,
+      const float age,
+      const float texU,
+      const float texV
+    ) noexcept {
+      TrailSegmentPackedVertexRuntime& vertex = outVertices[index];
+      vertex.position = position;
+      vertex.tangent = tangent;
+      vertex.age = age;
+      vertex.lifetime = trail.mLifetime;
+      vertex.texU = texU;
+      vertex.size = trail.mSize;
+      vertex.reserved = 0.0f;
+      vertex.texV = texV;
+      vertex.emitterAge = trail.mEmitterAge;
+    };
 
-    outVertices[0] = trail[0];
-    outVertices[1] = trail[1];
-    outVertices[2] = trail[2];
-    outVertices[3] = -trail[6];
-    outVertices[4] = -trail[7];
-    outVertices[5] = -trail[8];
-    outVertices[6] = trail[12];
-    outVertices[7] = trail[14];
-    outVertices[8] = trail[16];
-    outVertices[9] = trail[19];
-    outVertices[10] = 0.0f;
-    outVertices[11] = 1.0f;
-    outVertices[12] = trail[15];
+    const Wm3::Vector3<float> startTangent = trail.mStartTangent;
+    const Wm3::Vector3<float> endTangent = trail.mEndTangent;
+    const Wm3::Vector3<float> negatedStartTangent{-startTangent.x, -startTangent.y, -startTangent.z};
+    const Wm3::Vector3<float> negatedEndTangent{-endTangent.x, -endTangent.y, -endTangent.z};
 
-    outVertices[13] = trail[3];
-    outVertices[14] = trail[4];
-    outVertices[15] = trail[5];
-    outVertices[16] = -trail[9];
-    outVertices[17] = -trail[10];
-    outVertices[18] = -trail[11];
-    outVertices[19] = trail[13];
-    outVertices[20] = trail[14];
-    outVertices[21] = trail[17];
-    outVertices[22] = trail[19];
-    outVertices[23] = 0.0f;
-    outVertices[24] = 1.0f;
-    outVertices[25] = trail[15];
-
-    outVertices[26] = trail[3];
-    outVertices[27] = trail[4];
-    outVertices[28] = trail[5];
-    outVertices[29] = trail[9];
-    outVertices[30] = trail[10];
-    outVertices[31] = trail[11];
-    outVertices[32] = trail[13];
-    outVertices[33] = trail[14];
-    outVertices[34] = trail[17];
-    outVertices[35] = trail[19];
-    outVertices[36] = 0.0f;
-    outVertices[37] = 0.0f;
-    outVertices[38] = trail[15];
-
-    outVertices[39] = trail[0];
-    outVertices[40] = trail[1];
-    outVertices[41] = trail[2];
-    outVertices[42] = trail[6];
-    outVertices[43] = trail[7];
-    outVertices[44] = trail[8];
-    outVertices[45] = trail[12];
-    outVertices[46] = trail[14];
-    outVertices[47] = trail[16];
-    outVertices[48] = trail[19];
-    outVertices[49] = 0.0f;
-    outVertices[50] = 0.0f;
-    outVertices[51] = trail[15];
+    emit(0U, trail.mStartPos, negatedStartTangent, trail.mStartAge, trail.mTexCoordStart, 1.0f);
+    emit(1U, trail.mEndPos, negatedEndTangent, trail.mEndAge, trail.mTexCoordEnd, 1.0f);
+    emit(2U, trail.mEndPos, endTangent, trail.mEndAge, trail.mTexCoordEnd, 0.0f);
+    emit(3U, trail.mStartPos, startTangent, trail.mStartAge, trail.mTexCoordStart, 0.0f);
   }
 
 
@@ -374,33 +367,33 @@ namespace moho
    */
   TrailRenderBucketRuntime* InitializeTrailRenderBucketFromTrail(
     TrailRenderBucketRuntime& bucket,
-    const TrailRuntimeView& trail,
+    const SWorldTrail& trail,
     CWorldParticles* const owner
   )
   {
     bucket.texture0.reset();
     bucket.texture1.reset();
     bucket.tag = msvc8::string{};
-    bucket.uvScalar = 0.0f;
+    bucket.blendMode = 0;
     bucket.renderStartIndex = 0U;
     bucket.pendingTrails.clear();
     bucket.activeWorkItems.clear();
     bucket.owner = owner;
 
     CParticleTexture::TextureResourceHandle texture0{};
-    if (trail.texture0.tex != nullptr) {
-      trail.texture0.tex->GetTexture(texture0);
+    if (trail.mTexture.tex != nullptr) {
+      trail.mTexture.tex->GetTexture(texture0);
     }
     bucket.texture0 = texture0;
 
     CParticleTexture::TextureResourceHandle texture1{};
-    if (trail.texture1.tex != nullptr) {
-      trail.texture1.tex->GetTexture(texture1);
+    if (trail.mRampTexture.tex != nullptr) {
+      trail.mRampTexture.tex->GetTexture(texture1);
     }
     bucket.texture1 = texture1;
 
-    bucket.tag.assign_owned(trail.tag != nullptr ? trail.tag : "");
-    bucket.uvScalar = trail.uvScalar;
+    bucket.tag.assign_owned(trail.mTypeTag != nullptr ? trail.mTypeTag : "");
+    bucket.blendMode = trail.mBlendMode;
     return &bucket;
   }
 
@@ -712,7 +705,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     const float frameDelta,
-    msvc8::vector<TrailRuntimeView>& pendingTrails
+    msvc8::vector<SWorldTrail>& pendingTrails
   )
   {
     const std::size_t pendingCount = pendingTrails.size();
@@ -762,26 +755,25 @@ namespace moho
       return false;
     }
 
-    auto* const outVertices = static_cast<float*>(lockedVertices);
-    TrailRuntimeView* currentTrail = pendingTrails.begin();
-    TrailRuntimeView* const trailEnd = pendingTrails.begin() + maxUploadCount;
-    float* out = outVertices;
+    auto* out = static_cast<TrailSegmentPackedVertexRuntime*>(lockedVertices);
+    SWorldTrail* const trailEnd = pendingTrails.begin() + maxUploadCount;
 
-    while (currentTrail != trailEnd) {
-      float* const trailFloats = reinterpret_cast<float*>(currentTrail);
-      float* const trailState = trailFloats + 5;
-
-      const float beginFrame = std::max(trailState[7], trailState[8]) + frameDelta;
-      const float lifeFrames = trailState[9] + 1.0f;
+    for (SWorldTrail* trail = pendingTrails.begin(); trail != trailEnd; ++trail) {
+      // The work-item interval opens at the older of the two ends and runs for
+      // one frame past the segment's lifetime.
+      const float beginFrame = std::max(trail->mStartAge, trail->mEndAge) + frameDelta;
+      const float lifeFrames = trail->mLifetime + 1.0f;
       (void)AppendInterval(workItem, beginFrame, lifeFrames);
 
-      trailState[7] = trailState[7] + frameDelta + 1.0f;
-      trailState[8] = trailState[8] + frameDelta + 1.0f;
-      trailState[10] = trailState[10] + frameDelta + 1.0f;
+      // Age the segment by this frame before it is packed: both ribbon ends and
+      // the emitter-age lane, but not the lifetime.
+      const float frameStep = frameDelta + 1.0f;
+      trail->mStartAge += frameStep;
+      trail->mEndAge += frameStep;
+      trail->mEmitterAge += frameStep;
 
-      PackTrailSegmentQuadVertices(out, trailFloats);
-      out += 4U * 13U;
-      ++currentTrail;
+      PackTrailSegmentQuadVertices(out, *trail);
+      out += kTrailSegmentVertexCount;
     }
 
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
@@ -894,7 +886,7 @@ namespace moho
     selection.texture0 = bucket.texture0;
     selection.texture1 = bucket.texture1;
     selection.techniqueBaseName.assign(bucket.tag, 0U, msvc8::string::npos);
-    std::memcpy(&selection.blendMode, &bucket.uvScalar, sizeof(selection.blendMode));
+    selection.blendMode = bucket.blendMode;
     SelectParticleTechnique(selection);
 
     for (ParticleRenderWorkItemRuntime* const workItem : bucket.activeWorkItems) {

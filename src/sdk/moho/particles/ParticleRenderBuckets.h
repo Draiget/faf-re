@@ -15,7 +15,7 @@ namespace moho
   struct ParticleRenderWorkItemRuntime;
   struct SWorldParticle;
   struct SWorldBeam;
-  struct TrailRuntimeView;
+  struct SWorldTrail;
 
   /**
    * What it does:
@@ -123,9 +123,9 @@ namespace moho
     CParticleTexture::TextureResourceHandle texture0;         // +0x00
     CParticleTexture::TextureResourceHandle texture1;         // +0x08
     msvc8::string tag;                                        // +0x10
-    float uvScalar = 0.0f;                                    // +0x2C
+    std::int32_t blendMode = 0;                               // +0x2C  blueprint BlendMode
     std::uint32_t renderStartIndex = 0U;                      // +0x30
-    msvc8::vector<TrailRuntimeView> pendingTrails; // +0x34
+    msvc8::vector<SWorldTrail> pendingTrails; // +0x34
     msvc8::vector<ParticleRenderWorkItemRuntime*> activeWorkItems; // +0x44
     CWorldParticles* owner = nullptr;                         // +0x54
   };
@@ -140,8 +140,8 @@ namespace moho
   );
   static_assert(offsetof(TrailRenderBucketRuntime, tag) == 0x10, "TrailRenderBucketRuntime::tag offset must be 0x10");
   static_assert(
-    offsetof(TrailRenderBucketRuntime, uvScalar) == 0x2C,
-    "TrailRenderBucketRuntime::uvScalar offset must be 0x2C"
+    offsetof(TrailRenderBucketRuntime, blendMode) == 0x2C,
+    "TrailRenderBucketRuntime::blendMode offset must be 0x2C"
   );
   static_assert(
     offsetof(TrailRenderBucketRuntime, renderStartIndex) == 0x30,
@@ -180,7 +180,7 @@ namespace moho
    */
   TrailRenderBucketRuntime* InitializeTrailRenderBucketFromTrail(
     TrailRenderBucketRuntime& bucket,
-    const TrailRuntimeView& trail,
+    const SWorldTrail& trail,
     CWorldParticles* owner
   );
 
@@ -203,7 +203,7 @@ namespace moho
   bool UploadPendingTrailsIntoWorkItem(
     ParticleRenderWorkItemRuntime& workItem,
     float frameDelta,
-    msvc8::vector<TrailRuntimeView>& pendingTrails
+    msvc8::vector<SWorldTrail>& pendingTrails
   );
 
   /**

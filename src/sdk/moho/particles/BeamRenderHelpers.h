@@ -10,6 +10,7 @@
 #include "moho/math/Vector4f.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
+#include "moho/particles/SWorldTrail.h"
 #include "moho/particles/SWorldParticle.h"
 #include "moho/resource/CParticleTexture.h"
 #include "Wm3Vector3.h"
@@ -301,83 +302,21 @@ namespace moho
     TextureSheetHandle texture0;          // +0x04
     TextureSheetHandle texture1;          // +0x0C
     msvc8::string tag;                    // +0x14
-    float uvScalar = 0.0f;                // +0x30
+    /**
+     * Blueprint `BlendMode`, copied straight out of `SWorldTrail::mBlendMode`.
+     * A `std::int32_t`, not a float: `IsTrailBucketKeyRhsLessThanLhs`
+     * (0x0049253F) loads this lane with `mov`/`cmp`/`setl`, a signed integer
+     * compare, where it loads `sortScalar` at +0x00 with `movss`/`ucomiss`.
+     */
+    std::int32_t blendMode = 0;           // +0x30
   };
 
   static_assert(offsetof(TrailBucketKeyRuntime, sortScalar) == 0x00, "TrailBucketKeyRuntime::sortScalar offset must be 0x00");
   static_assert(offsetof(TrailBucketKeyRuntime, texture0) == 0x04, "TrailBucketKeyRuntime::texture0 offset must be 0x04");
   static_assert(offsetof(TrailBucketKeyRuntime, texture1) == 0x0C, "TrailBucketKeyRuntime::texture1 offset must be 0x0C");
   static_assert(offsetof(TrailBucketKeyRuntime, tag) == 0x14, "TrailBucketKeyRuntime::tag offset must be 0x14");
-  static_assert(offsetof(TrailBucketKeyRuntime, uvScalar) == 0x30, "TrailBucketKeyRuntime::uvScalar offset must be 0x30");
+  static_assert(offsetof(TrailBucketKeyRuntime, blendMode) == 0x30, "TrailBucketKeyRuntime::blendMode offset must be 0x30");
   static_assert(sizeof(TrailBucketKeyRuntime) == 0x34, "TrailBucketKeyRuntime size must be 0x34");
-
-  /**
-   * What it does:
-   * Typed runtime view for one `STrail` payload lane used by key construction.
-   */
-  struct TrailRuntimeView
-  {
-    // Float lanes 0x00..0x44, written by CEfxTrailEmitter::Tick (FUN_00671850)
-    // and block-copied by the trail bucket-copy helpers. Offsets are
-    // triple-verified: the Tick writer stores (frame anchor = push_back /
-    // ~STrail pointer arg), the ~STrail destructor (FUN_0049BE90), and the
-    // bucket-key reader (FUN_00492390) all agree with the 0x60 layout.
-    float prevPosX = 0.0f;              // +0x00  previous-frame trail endpoint (world)
-    float prevPosY = 0.0f;              // +0x04
-    float prevPosZ = 0.0f;              // +0x08
-    float curPosX = 0.0f;               // +0x0C  current-frame trail endpoint (world)
-    float curPosY = 0.0f;               // +0x10
-    float curPosZ = 0.0f;               // +0x14
-    float emitPosX = 0.0f;              // +0x18  emit position (mSerializedTrailPosition or fresh dir)
-    float emitPosY = 0.0f;              // +0x1C
-    float emitPosZ = 0.0f;              // +0x20
-    float dirX = 0.0f;                  // +0x24  normalized segment direction
-    float dirY = 0.0f;                  // +0x28
-    float dirZ = 0.0f;                  // +0x2C
-    float endOffset = 0.0f;             // +0x30  (float)(-1 - tick)
-    float impactOffset = 0.0f;          // +0x34  endOffset + interpolation scale
-    float trailLength = 0.0f;           // +0x38  blueprint TrailLength
-    float lifeOffset = 0.0f;            // +0x3C  -emitter life
-    float textureRepeatRateX = 0.0f;    // +0x40  blueprint TextureRepeatRate * prev length
-    float textureRepeatRateZ = 0.0f;    // +0x44  blueprint TextureRepeatRate * new length
-    float sortScalar = 0.0f;            // +0x48  blueprint SortOrder
-    float size = 0.0f;                  // +0x4C  blueprint StartSize
-    /**
-     * Address: 0x0049BDD0 (FUN_0049BDD0 -- the compiler-generated copy of this
-     * 0x60-byte trail record: the float block, then both counted texture
-     * handles retained through `CountedPtr`'s copy, then `tag`/`uvScalar`;
-     * emitted out of line for `msvc8::vector<TrailRuntimeView>`'s copy steps.
-     * Formerly transcribed as `CopyTrailRuntimeViewForVectorMove` in
-     * ParticleRenderBuckets.cpp, removed 2026-09-10.)
-     * Address: 0x0049BE90 (FUN_0049BE90, `??1STrail@Moho@@QAE@@Z` -- the implicit
-     * destructor: both `CountedPtr` handles release their texture. Formerly
-     * `DestroyTrailRuntimeViewForVectorTail`, removed.)
-     * Address: 0x0049FBF0 (FUN_0049FBF0 -- the compiler-generated copy assignment of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; callers 0x00495850, 0x0049DE60, 0x0049E4E0; formerly `CopyAssignTrailRuntimeAndReturnDestination` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFB0 (FUN_0049FFB0 -- the compiler-generated copy assignment of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyAssignTrailRuntimeIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0049FFC0 (FUN_0049FFC0 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlace` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0620 (FUN_004A0620 -- the compiler-generated copy constructor (placement copy into a raw slot) of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `CopyConstructTrailRuntimeIfDestinationPresent` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0630 (FUN_004A0630 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceDuplicateA` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x004A0720 (FUN_004A0720 -- the implicit destructor of `TrailRuntimeView` as emitted for its `msvc8::vector` instantiation; zero callers, unreachable; formerly `DestroyTrailRuntimeInPlaceAndReturnSelf` in moho/particles/CWorldParticles.cpp (RULE ONE), removed 2026-09-10.)
-     */
-    CountedPtr_CParticleTexture texture0; // +0x50
-    CountedPtr_CParticleTexture texture1; // +0x54
-    const char* tag = nullptr;            // +0x58
-    float uvScalar = 0.0f;                // +0x5C  blueprint BlendMode (raw dword, memcpy'd to key)
-  };
-
-  static_assert(offsetof(TrailRuntimeView, prevPosX) == 0x00, "TrailRuntimeView::prevPosX offset must be 0x00");
-  static_assert(offsetof(TrailRuntimeView, curPosX) == 0x0C, "TrailRuntimeView::curPosX offset must be 0x0C");
-  static_assert(offsetof(TrailRuntimeView, emitPosX) == 0x18, "TrailRuntimeView::emitPosX offset must be 0x18");
-  static_assert(offsetof(TrailRuntimeView, dirX) == 0x24, "TrailRuntimeView::dirX offset must be 0x24");
-  static_assert(offsetof(TrailRuntimeView, endOffset) == 0x30, "TrailRuntimeView::endOffset offset must be 0x30");
-  static_assert(offsetof(TrailRuntimeView, textureRepeatRateX) == 0x40, "TrailRuntimeView::textureRepeatRateX offset must be 0x40");
-  static_assert(offsetof(TrailRuntimeView, sortScalar) == 0x48, "TrailRuntimeView::sortScalar offset must be 0x48");
-  static_assert(offsetof(TrailRuntimeView, size) == 0x4C, "TrailRuntimeView::size offset must be 0x4C");
-  static_assert(offsetof(TrailRuntimeView, texture0) == 0x50, "TrailRuntimeView::texture0 offset must be 0x50");
-  static_assert(offsetof(TrailRuntimeView, texture1) == 0x54, "TrailRuntimeView::texture1 offset must be 0x54");
-  static_assert(offsetof(TrailRuntimeView, tag) == 0x58, "TrailRuntimeView::tag offset must be 0x58");
-  static_assert(offsetof(TrailRuntimeView, uvScalar) == 0x5C, "TrailRuntimeView::uvScalar offset must be 0x5C");
-  static_assert(sizeof(TrailRuntimeView) == 0x60, "TrailRuntimeView size must be 0x60");
 
   /**
    * What it does:
@@ -540,7 +479,7 @@ namespace moho
    * Builds one trail bucket key from one `STrail` runtime payload.
    */
   TrailBucketKeyRuntime* InitializeTrailBucketKeyFromTrail(
-    TrailBucketKeyRuntime* key, const TrailRuntimeView& trail
+    TrailBucketKeyRuntime* key, const SWorldTrail& trail
   );
 
   /**

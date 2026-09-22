@@ -313,7 +313,7 @@ namespace moho
      * payload into the bucket pending vector.
      */
     virtual void AddTrail(
-      const TrailRuntimeView& trail,
+      const SWorldTrail& trail,
       TrailRenderBucketRuntime** bucketCacheSlot
     );
 

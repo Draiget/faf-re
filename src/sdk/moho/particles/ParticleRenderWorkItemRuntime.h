@@ -75,7 +75,7 @@ namespace moho
   struct TrailBucketEntryRuntime
   {
     std::uint8_t mKeyLane[0x34]{};               // +0x00
-    msvc8::vector<TrailRuntimeView> mTrails;     // +0x34
+    msvc8::vector<SWorldTrail> mTrails;     // +0x34
   };
 
   static_assert(
@@ -130,5 +130,5 @@ namespace moho
    * Appends one trail payload to the trailing trail-vector in a trail bucket
    * entry.
    */
-  void AppendTrailToBucketEntry(const TrailRuntimeView& trail, TrailBucketEntryRuntime& bucketEntry);
+  void AppendTrailToBucketEntry(const SWorldTrail& trail, TrailBucketEntryRuntime& bucketEntry);
 } // namespace moho

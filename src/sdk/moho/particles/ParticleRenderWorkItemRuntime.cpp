@@ -88,7 +88,7 @@ namespace moho
    * Appends one trail payload to the trailing trail-vector in a trail bucket
    * entry.
    */
-  void AppendTrailToBucketEntry(const TrailRuntimeView& trail, TrailBucketEntryRuntime& bucketEntry)
+  void AppendTrailToBucketEntry(const SWorldTrail& trail, TrailBucketEntryRuntime& bucketEntry)
   {
     bucketEntry.mTrails.push_back(trail);
   }

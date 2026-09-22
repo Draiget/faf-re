@@ -2250,6 +2250,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\particles\SParticleBuffer.h" />
     <ClInclude Include="moho\particles\SWorldBeam.h" />
     <ClInclude Include="moho\particles\SWorldParticle.h" />
+    <ClInclude Include="moho\particles\SWorldTrail.h" />
     <ClInclude Include="moho\resource\CSimResources.h" />
     <ClInclude Include="moho\resource\CSimResourcesSerializer.h" />
     <ClInclude Include="moho\resource\CSimResourcesTypeInfo.h" />
