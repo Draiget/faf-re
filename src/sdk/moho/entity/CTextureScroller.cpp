@@ -18,29 +18,6 @@
 
 namespace
 {
-  enum class TextureScrollerMode : std::int32_t
-  {
-    None = 0,
-    PingPong = 1,
-    Manual = 2,
-    Thread = 3,
-  };
-
-  struct EntityTextureRuntimeView
-  {
-    std::uint8_t mPad0000_009B[0x9C];
-    moho::VTransform mCurTransform;  // +0x9C
-    moho::VTransform mLastTransform; // +0xB8
-    std::uint8_t mPad00D4_00F7[0x24];
-    Wm3::Vector2f mScroll1; // +0xF8
-    Wm3::Vector2f mScroll2; // +0x100
-  };
-
-  static_assert(offsetof(EntityTextureRuntimeView, mCurTransform) == 0x9C, "EntityTextureRuntimeView::mCurTransform offset must be 0x9C");
-  static_assert(offsetof(EntityTextureRuntimeView, mLastTransform) == 0xB8, "EntityTextureRuntimeView::mLastTransform offset must be 0xB8");
-  static_assert(offsetof(EntityTextureRuntimeView, mScroll1) == 0xF8, "EntityTextureRuntimeView::mScroll1 offset must be 0xF8");
-  static_assert(offsetof(EntityTextureRuntimeView, mScroll2) == 0x100, "EntityTextureRuntimeView::mScroll2 offset must be 0x100");
-
   constexpr const char* kSerializationHeaderPath =
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
 
@@ -120,11 +97,6 @@ namespace
   [[maybe_unused]] void UnlinkSScrollerSerializerNodeVariantB() noexcept
   {
     gSScrollerSerializerHelper.ResetLinks();
-  }
-
-  [[nodiscard]] EntityTextureRuntimeView& AccessEntityTextureRuntime(moho::Entity& entity) noexcept
-  {
-    return *reinterpret_cast<EntityTextureRuntimeView*>(&entity);
   }
 
   [[nodiscard]] gpg::RType* CachedScrollerType()
@@ -587,20 +559,17 @@ namespace moho
    * Seeds one scroller payload with mode `None`, zero timing/scroll lanes,
    * and unit scale factors for both UV channels.
    */
-  void SScroller::InitializeDefaults() noexcept
-  {
-    mType = static_cast<std::int32_t>(TextureScrollerMode::None);
-    mFloat04 = 0.0f;
-    mFloat08 = 0.0f;
-    mFloat0C = 0.0f;
-    mFloat10 = 0.0f;
-    mScroll1.x = 0.0f;
-    mScroll1.y = 0.0f;
-    mScroll2.x = 0.0f;
-    mScroll2.y = 0.0f;
-    mFloat24 = 1.0f;
-    mFloat28 = 1.0f;
-  }
+  SScroller::SScroller() noexcept
+    : mType(SCROLLTYPE_None)
+    , mFloat04(0.0f)
+    , mFloat08(0.0f)
+    , mFloat0C(0.0f)
+    , mFloat10(0.0f)
+    , mScroll1{0.0f, 0.0f}
+    , mScroll2{0.0f, 0.0f}
+    , mFloat24(1.0f)
+    , mFloat28(1.0f)
+  {}
 
   /**
    * Address: 0x00676BA0 (FUN_00676BA0, ??0CTextureScroller@Moho@@QAE@@Z)
@@ -619,14 +588,37 @@ namespace moho
   CTextureScroller::CTextureScroller(Entity* const owner)
     : mEntity(owner)
   {
-    mScroller.InitializeDefaults();
-
     mDir[0] = 0u;
     mDir[1] = 0u;
     mPad32[0] = 0u;
     mPad32[1] = 0u;
     mSpeed[0] = 0;
     mSpeed[1] = 0;
+  }
+
+  /**
+   * Address: 0x00777690 (FUN_00777690)
+   *
+   * What it does:
+   * Copies one scroller payload in, then applies the mode's reset: `None`
+   * snaps the owner's scroll lanes together, `PingPong` clears its direction
+   * flags and phase countdowns.
+   */
+  void CTextureScroller::SetScroller(const SScroller& scroller) noexcept
+  {
+    mScroller = scroller;
+
+    if (mScroller.mType == SCROLLTYPE_None) {
+      mEntity->StopScroll();
+      return;
+    }
+
+    if (mScroller.mType == SCROLLTYPE_PingPong) {
+      mDir[0] = 0u;
+      mDir[1] = 0u;
+      mSpeed[0] = 0;
+      mSpeed[1] = 0;
+    }
   }
 
   /**
@@ -642,9 +634,9 @@ namespace moho
       return;
     }
 
-    EntityTextureRuntimeView& entityRuntime = AccessEntityTextureRuntime(*mEntity);
-    switch (static_cast<TextureScrollerMode>(mScroller.mType)) {
-    case TextureScrollerMode::PingPong: {
+    SSTIEntityVariableData& entityData = mEntity->mVarDat;
+    switch (mScroller.mType) {
+    case SCROLLTYPE_PingPong: {
       bool changed = false;
 
       for (std::int32_t axis = 0; axis < 2; ++axis) {
@@ -673,30 +665,30 @@ namespace moho
 
       const float scrollX = (mDir[0] != 0u) ? mScroller.mScroll1.x : mScroller.mScroll2.x;
       const float scrollY = (mDir[1] != 0u) ? mScroller.mScroll1.y : mScroller.mScroll2.y;
-      entityRuntime.mScroll1.x = scrollX;
-      entityRuntime.mScroll1.y = scrollY;
-      entityRuntime.mScroll2.x = scrollX;
-      entityRuntime.mScroll2.y = scrollY;
+      entityData.mScrollBeatStart.x = scrollX;
+      entityData.mScrollBeatStart.y = scrollY;
+      entityData.mScrollBeatEnd.x = scrollX;
+      entityData.mScrollBeatEnd.y = scrollY;
       return;
     }
 
-    case TextureScrollerMode::Manual: {
-      const float currentX = entityRuntime.mScroll2.x;
-      const float currentY = entityRuntime.mScroll2.y;
-      entityRuntime.mScroll1.x = currentX;
-      entityRuntime.mScroll1.y = currentY;
-      entityRuntime.mScroll2.x = currentX + mScroller.mFloat04;
-      entityRuntime.mScroll2.y = currentY + mScroller.mFloat08;
+    case SCROLLTYPE_Manual: {
+      const float currentX = entityData.mScrollBeatEnd.x;
+      const float currentY = entityData.mScrollBeatEnd.y;
+      entityData.mScrollBeatStart.x = currentX;
+      entityData.mScrollBeatStart.y = currentY;
+      entityData.mScrollBeatEnd.x = currentX + mScroller.mFloat04;
+      entityData.mScrollBeatEnd.y = currentY + mScroller.mFloat08;
       return;
     }
 
-    case TextureScrollerMode::Thread: {
-      if (!Wm3::Vector3f::Compare(&entityRuntime.mCurTransform.pos_, &entityRuntime.mLastTransform.pos_)) {
+    case SCROLLTYPE_MotionDerived: {
+      if (!Wm3::Vector3f::Compare(&entityData.mCurTransform.pos_, &entityData.mLastTransform.pos_)) {
         return;
       }
 
-      const VTransform curTransform(entityRuntime.mCurTransform);
-      const VTransform lastTransform(entityRuntime.mLastTransform);
+      const VTransform curTransform(entityData.mCurTransform);
+      const VTransform lastTransform(entityData.mLastTransform);
 
       const auto& cur = curTransform.orient_;
       const auto& last = lastTransform.orient_;
@@ -738,12 +730,12 @@ namespace moho
       const float scrollDeltaX = ((avgBasisY * leadDeltaZ) + (avgBasisZ * leadDeltaY) + (avgBasisX * leadDeltaX)) * scrollScale;
       const float scrollDeltaY = ((avgBasisX * trailDeltaX) + (avgBasisY * trailDeltaZ) + (avgBasisZ * trailDeltaY)) * scrollScale;
 
-      const float currentX = entityRuntime.mScroll2.x;
-      const float currentY = entityRuntime.mScroll2.y;
-      entityRuntime.mScroll1.x = currentX;
-      entityRuntime.mScroll1.y = currentY;
-      entityRuntime.mScroll2.x = currentX + scrollDeltaX;
-      entityRuntime.mScroll2.y = currentY + scrollDeltaY;
+      const float currentX = entityData.mScrollBeatEnd.x;
+      const float currentY = entityData.mScrollBeatEnd.y;
+      entityData.mScrollBeatStart.x = currentX;
+      entityData.mScrollBeatStart.y = currentY;
+      entityData.mScrollBeatEnd.x = currentX + scrollDeltaX;
+      entityData.mScrollBeatEnd.y = currentY + scrollDeltaY;
       return;
     }
 

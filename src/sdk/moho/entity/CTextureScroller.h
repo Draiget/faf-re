@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/core/reflection/Reflection.h"
+#include "moho/ui/EScrollTypeTypeInfo.h"
 #include "Wm3Vector2.h"
 
 namespace gpg
@@ -24,15 +25,19 @@ namespace moho
     static gpg::RType* sType;
 
     /**
-     * Address: 0x00676B50 (FUN_00676B50, Moho::SScroller::SScroller defaults lane)
+     * Address: 0x00676B50 (FUN_00676B50, Moho::SScroller::SScroller)
      *
      * What it does:
      * Seeds one scroller payload with mode `None`, zero timing/scroll lanes,
      * and unit scale factors for both UV channels.
+     *
+     * This was an `InitializeDefaults()` method, so a Lua binding that wrote
+     * `SScroller definition{};` got zeroed scale lanes, and each binding had to
+     * restore the two 1.0f defaults by hand -- `RemoveScroller` never did.
      */
-    void InitializeDefaults() noexcept;
+    SScroller() noexcept;
 
-    std::int32_t mType; // +0x00
+    EScrollType mType; // +0x00
     float mFloat04;     // +0x04
     float mFloat08;     // +0x08
     float mFloat0C;     // +0x0C
@@ -72,6 +77,29 @@ namespace moho
      * payload with zero direction/speed lanes.
      */
     explicit CTextureScroller(Entity* owner);
+
+    /**
+     * Address: 0x00777690 (FUN_00777690)
+     *
+     * IDA signature:
+     * int __usercall sub_777690@<eax>(CTextureScroller *this@<edx>, const SScroller *scroller);
+     *
+     * What it does:
+     * Copies one scroller payload in (`rep movsd`, 0x0B dwords into this+0x04),
+     * then applies the mode's reset: `None` snaps the owning entity's scroll
+     * lanes together (0x007776AC: +0xF8 -> +0x100, i.e. `Entity::StopScroll`),
+     * and `PingPong` clears its direction flags and phase countdowns
+     * (0x007776C9: `cmp eax, 1`, then `+0x30`, `+0x31`, `+0x34`, `+0x38`).
+     *
+     * IDA named this `Moho::Entity::AddScroller`, but every access is off
+     * `edx`, which holds the scroller: `lea eax, [edx+4]` is `mScroller`,
+     * `mov edx, [edx]` is `mEntity`. It was recovered as a free function
+     * `ApplyTextureScrollerDefinition` in moho/entity/Entity.cpp, which reset
+     * the countdowns for mode 3 (`MotionDerived`) instead of mode 1 -- so a
+     * ping-pong scroller replacing another one started from the previous
+     * scroller's phase, and a motion-derived one lost state it never uses.
+     */
+    void SetScroller(const SScroller& scroller) noexcept;
 
     /**
      * Address: 0x00777730 (FUN_00777730, Moho::CTextureScroller::Tick)
