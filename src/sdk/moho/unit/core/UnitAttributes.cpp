@@ -149,7 +149,7 @@ namespace moho
   {
     blueprint = unitBlueprint;
 
-    const CategoryWordRangeView* const emptyCategory = rules->GetEntityCategory("");
+    const EntityCategorySet* const emptyCategory = rules->GetEntityCategory("");
     restrictionCategory.mUniverse = emptyCategory->mUniverse;
     restrictionCategory.mBits.mFirstWordIndex = emptyCategory->mBits.mFirstWordIndex;
 

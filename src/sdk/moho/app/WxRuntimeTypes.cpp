@@ -5612,13 +5612,12 @@ namespace {
   // wxTextFile embeds a wxFile: `int m_fd` at +0x00 and `bool m_error` at
   // +0x04, eight bytes with padding - which is what this lane used to
   // re-declare so it could be reinterpret_cast to one.
-  using WxTextFileFileLaneRuntimeView = wxFile;
-  static_assert(sizeof(WxTextFileFileLaneRuntimeView) == 0x8, "wxFile size must be 0x8");
+  static_assert(sizeof(wxFile) == 0x8, "wxFile size must be 0x8");
 
   struct WxTextFileRuntimeView
   {
     WxTextBufferRuntimeView textBuffer{};
-    WxTextFileFileLaneRuntimeView fileLane{}; // +0x2C
+    wxFile fileLane{}; // +0x2C
   };
   static_assert(
     offsetof(WxTextFileRuntimeView, textBuffer) == 0x00,
@@ -44743,7 +44742,7 @@ void moho::WD3DViewport::RenderPreviewImage(const bool forceRegenerate)
 /**
  * Address: 0x0042BB30 (FUN_0042BB30)
  */
-moho::WPreviewImageRuntime moho::WD3DViewport::GetPreviewImage() const
+boost::shared_ptr<moho::ID3DTextureSheet> moho::WD3DViewport::GetPreviewImage() const
 {
   return {};
 }
@@ -44795,7 +44794,7 @@ namespace
   constexpr std::uint16_t kClientHitTestCode = 1u;
 
   void DrawBackgroundFill(
-    moho::wxDCRuntime& deviceContext
+    wxDC& deviceContext
   )
   {
     std::int32_t width = 0;
@@ -44824,7 +44823,7 @@ namespace
  * Fills the viewport paint DC with a solid black rectangle.
  */
 void moho::WD3DViewport::DrawBackgroundImage(
-  wxDCRuntime& deviceContext
+  wxDC& deviceContext
 )
 {
   DrawBackgroundFill(deviceContext);
@@ -71073,7 +71072,7 @@ void moho::CON_WxInputBox(const msvc8::vector<msvc8::string>& args)
  *   `shared_ptr<CD3DDynamicTextureSheet>` -> `shared_ptr<ID3DTextureSheet>`
  *   constructor performs the identical increment through boost's own code.
  */
-moho::WPreviewImageRuntime moho::WRenViewport::GetPreviewImage() const
+boost::shared_ptr<moho::ID3DTextureSheet> moho::WRenViewport::GetPreviewImage() const
 {
   const auto* const runtime = reinterpret_cast<const WRenViewportDestroyRuntimeView*>(this);
   return runtime->mDynamicTextureSheet;
@@ -72643,7 +72642,7 @@ void moho::WRenViewport::RenderAllHeads()
  *   pair), so it recreates the destination sheet fresh on every call instead
  *   of reusing one across frames.
  * - `GetPreviewImage()`'s real declared signature takes no arguments and
- *   returns `WPreviewImageRuntime` (== `boost::shared_ptr<ID3DTextureSheet>`)
+ *   returns `boost::shared_ptr<moho::ID3DTextureSheet>`
  *   by value through a hidden return pointer; the raw decompile's apparent
  *   second argument is that hidden pointer, not a real parameter.
  */
@@ -72747,7 +72746,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
   moho::CD3DDynamicTextureSheet* const resolvedSheet = previewSheet.get();
 
   const RECT sourceRect{0, 0, 256, 256};
-  const moho::WPreviewImageRuntime previewImage = GetPreviewImage();
+  const boost::shared_ptr<moho::ID3DTextureSheet> previewImage = GetPreviewImage();
   device->UpdateSurface(
     resolvedSheet, static_cast<moho::CD3DDynamicTextureSheet*>(previewImage.get()), &sourceRect, nullptr
   );

@@ -247,7 +247,7 @@ namespace
 
   [[nodiscard]] bool BlueprintBelongsToCategory(
     const RUnitBlueprint* const blueprint,
-    const CategoryWordRangeView* const category
+    const EntityCategorySet* const category
   ) noexcept
   {
     if (!blueprint || !category) {
@@ -568,14 +568,14 @@ CAiTransportImpl::CAiTransportImpl(Unit* const unit)
 
   if (sim->mRules) {
     const RUnitBlueprint* const blueprint = mUnit->GetBlueprint();
-    const CategoryWordRangeView* const airStagingCategory = sim->mRules->GetEntityCategory("AIRSTAGINGPLATFORM");
-    const CategoryWordRangeView* const podStagingCategory = sim->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
+    const EntityCategorySet* const airStagingCategory = sim->mRules->GetEntityCategory("AIRSTAGINGPLATFORM");
+    const EntityCategorySet* const podStagingCategory = sim->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
     const bool isStagingTransport =
       BlueprintBelongsToCategory(blueprint, airStagingCategory) ||
       BlueprintBelongsToCategory(blueprint, podStagingCategory);
     mStagingPlatform = static_cast<std::uint8_t>(isStagingTransport ? 1u : 0u);
 
-    const CategoryWordRangeView* const teleportCategory = sim->mRules->GetEntityCategory("TELEPORTATION");
+    const EntityCategorySet* const teleportCategory = sim->mRules->GetEntityCategory("TELEPORTATION");
     mTeleportation = static_cast<std::uint8_t>(BlueprintBelongsToCategory(blueprint, teleportCategory) ? 1u : 0u);
   }
 
@@ -1255,7 +1255,7 @@ bool CAiTransportImpl::TransportValidateType(const RUnitBlueprint* const unitBlu
     return false;
   }
 
-  const CategoryWordRangeView* const category = sim->mRules->GetEntityCategory("TRANSPORTATION");
+  const EntityCategorySet* const category = sim->mRules->GetEntityCategory("TRANSPORTATION");
   if (!category) {
     return false;
   }

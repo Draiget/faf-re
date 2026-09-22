@@ -556,7 +556,7 @@ namespace
     }
 
     // Parse the category expression once (RRuleGameRules slot 23).
-    const moho::CategoryWordRangeView parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
+    const moho::EntityCategorySet parsedCategory = session->mRules->ParseEntityCategory(categoryExpr);
 
     // Result set: start empty, optionally seed with the current selection.
     moho::ScopedLocalSelectionSet resultGuard{};
@@ -2862,8 +2862,8 @@ namespace moho
 
             const char* const bpId = targetBp->mBlueprintId.c_str();
             if (bpId != nullptr) {
-              const CategoryWordRangeView* const rulesCat = session->mRules->GetEntityCategory(bpId);
-              const_cast<CategoryWordRangeView*>(rulesCat)->mBits.RemoveAllFrom(&perUnit.mBits);
+              const EntityCategorySet* const rulesCat = session->mRules->GetEntityCategory(bpId);
+              const_cast<EntityCategorySet*>(rulesCat)->mBits.RemoveAllFrom(&perUnit.mBits);
             }
           }
         }

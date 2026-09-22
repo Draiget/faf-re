@@ -298,8 +298,8 @@ namespace moho
     const RUnitBlueprint* const unitBlueprint = mUnit->GetBlueprint();
     const float guardScanRadius = (unitBlueprint != nullptr) ? unitBlueprint->AI.GuardScanRadius : 0.0f;
 
-    const CategoryWordRangeView* const landCategory = mSim->mRules->GetEntityCategory("LAND");
-    const CategoryWordRangeView* const mobileCategory = mUnit->SimulationRef->mRules->GetEntityCategory("MOBILE");
+    const EntityCategorySet* const landCategory = mSim->mRules->GetEntityCategory("LAND");
+    const EntityCategorySet* const mobileCategory = mUnit->SimulationRef->mRules->GetEntityCategory("MOBILE");
     if (landCategory == nullptr || mobileCategory == nullptr) {
       return outUnits;
     }

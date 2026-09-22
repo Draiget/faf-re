@@ -2991,7 +2991,7 @@ namespace
     "WxWindowCaptureRuntimeView::mWindowHandle offset must be 0x108"
   );
 
-  class CMauiWxEventMapperRuntime final : public moho::wxEvtHandlerRuntime
+  class CMauiWxEventMapper final : public moho::wxEvtHandlerRuntime
   {
   public:
     std::uint8_t mUnknown04To27[0x24]{};
@@ -3007,7 +3007,7 @@ namespace
      * clears mouse-capture state, and then runs the wxEvtHandler base
      * destructor lane.
      */
-    ~CMauiWxEventMapperRuntime() override;
+    ~CMauiWxEventMapper() override;
 
     /**
      * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
@@ -3061,17 +3061,15 @@ namespace
     bool ProcessWxEvent(void* event) override;
   };
 
-  using CMauiWxEventMapperRuntimeView = CMauiWxEventMapperRuntime;
-
   static_assert(
-    offsetof(CMauiWxEventMapperRuntimeView, mWindowRuntime) == 0x28,
-    "CMauiWxEventMapperRuntimeView::mWindowRuntime offset must be 0x28"
+    offsetof(CMauiWxEventMapper, mWindowRuntime) == 0x28,
+    "CMauiWxEventMapper::mWindowRuntime offset must be 0x28"
   );
   static_assert(
-    offsetof(CMauiWxEventMapperRuntimeView, mFrame) == 0x2C,
-    "CMauiWxEventMapperRuntimeView::mFrame offset must be 0x2C"
+    offsetof(CMauiWxEventMapper, mFrame) == 0x2C,
+    "CMauiWxEventMapper::mFrame offset must be 0x2C"
   );
-  static_assert(sizeof(CMauiWxEventMapperRuntimeView) == 0x30, "CMauiWxEventMapperRuntimeView size must be 0x30");
+  static_assert(sizeof(CMauiWxEventMapper) == 0x30, "CMauiWxEventMapper size must be 0x30");
 
   struct CMauiFrameDraggerRuntimeView
   {
@@ -3291,7 +3289,7 @@ namespace
     moho::wxEvtHandlerRuntime* const eventMapper
   ) noexcept
   {
-    auto* const mapperView = reinterpret_cast<CMauiWxEventMapperRuntimeView*>(eventMapper);
+    auto* const mapperView = static_cast<CMauiWxEventMapper*>(eventMapper);
     auto* const windowView = mapperView->mWindowRuntime;
     return windowView->mWindowHandle;
   }
@@ -10115,8 +10113,8 @@ void moho::UIBuildDragger::ReleaseDrag(
   // binary copies (mUniverse, mBits.mFirstWordIndex, mBits.mWords) into a
   // local BVSet so the per-bit lookup below operates on stable storage even
   // if the rules-owned source set mutates concurrently.
-  const CategoryWordRangeView* const dragBuildCategory = mWldSession->mRules->GetEntityCategory("DRAGBUILD");
-  CategoryWordRangeView dragBuildSnapshot;
+  const EntityCategorySet* const dragBuildCategory = mWldSession->mRules->GetEntityCategory("DRAGBUILD");
+  EntityCategorySet dragBuildSnapshot;
   dragBuildSnapshot = *dragBuildCategory;
 
   if (commandMode.mBlueprint != nullptr) {
@@ -11741,7 +11739,7 @@ static DraggerLink* func_UnlinkCurrentDraggerLink()
  * `gCurrentMouseOverControlLink`) and clears the global mouse-capture flag so
  * the next mapper instance starts with a clean tracking state.
  */
-CMauiWxEventMapperRuntime::~CMauiWxEventMapperRuntime()
+CMauiWxEventMapper::~CMauiWxEventMapper()
 {
   // Unlink the mouse-over sentinel from whatever control it currently tracks.
   // When the link is in the "dead weak-owner" state (`mPrev == 4`), clear
@@ -11767,8 +11765,8 @@ CMauiWxEventMapperRuntime::~CMauiWxEventMapperRuntime()
   const char deleteFlags
 )
 {
-  auto* const typedMapper = static_cast<CMauiWxEventMapperRuntime*>(eventMapper);
-  typedMapper->~CMauiWxEventMapperRuntime();
+  auto* const typedMapper = static_cast<CMauiWxEventMapper*>(eventMapper);
+  typedMapper->~CMauiWxEventMapper();
   if ((deleteFlags & 1) != 0) {
     ::operator delete(typedMapper);
   }
@@ -12244,7 +12242,7 @@ namespace
  *     and notifies the previous keyboard-focus owner via
  *     `LosingKeyboardFocus`).
  */
-void CMauiWxEventMapperRuntime::OnMouseMove(
+void CMauiWxEventMapper::OnMouseMove(
   wxEventRuntime& mouseEventRef
 )
 {
@@ -12555,7 +12553,7 @@ namespace
  * `MET_KeyUp` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void CMauiWxEventMapperRuntime::OnKeyUp(
+void CMauiWxEventMapper::OnKeyUp(
   wxEventRuntime& keyEvent
 )
 {
@@ -12570,7 +12568,7 @@ void CMauiWxEventMapperRuntime::OnKeyUp(
  * `MET_KeyDown` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void CMauiWxEventMapperRuntime::OnKeyDown(
+void CMauiWxEventMapper::OnKeyDown(
   wxEventRuntime& keyEvent
 )
 {
@@ -12625,7 +12623,7 @@ namespace
  * One row covers every mouse event: `OnMouseMove` is the single mouse sink for
  * the whole family and reads the specific type back out of the event itself.
  */
-bool CMauiWxEventMapperRuntime::ProcessWxEvent(
+bool CMauiWxEventMapper::ProcessWxEvent(
   void* const event
 )
 {
@@ -12664,7 +12662,7 @@ bool CMauiWxEventMapperRuntime::ProcessWxEvent(
   }
 }
 
-void CMauiWxEventMapperRuntime::OnChar(
+void CMauiWxEventMapper::OnChar(
   wxEventRuntime& keyEvent
 )
 {
@@ -12679,14 +12677,14 @@ void CMauiWxEventMapperRuntime::OnChar(
 // `BEGIN_EVENT_TABLE` / `EVT_*` macros around the `CMauiWxEventMapper` class.
 //
 // Recovered source stores the member-fn pointer here so the linker keeps
-// `CMauiWxEventMapperRuntime::OnMouseMove` addressable from this TU, mirroring
+// `CMauiWxEventMapper::OnMouseMove` addressable from this TU, mirroring
 // the compiler-emitted event-table data block. The mapper publish helper
 // `PublishCMauiWxEventMapperEventTableBindings` returns the address of the
 // const bindings struct so a real call site (`CMauiFrame::CMauiFrame`) keeps
 // the table alive.
 namespace
 {
-  using CMauiWxEventMapperMouseEventFnPtr = void (CMauiWxEventMapperRuntime::*)(wxEventRuntime&);
+  using CMauiWxEventMapperMouseEventFnPtr = void (CMauiWxEventMapper::*)(wxEventRuntime&);
 
   struct CMauiWxEventMapperEventTableBindings
   {
@@ -12697,10 +12695,10 @@ namespace
   };
 
   const CMauiWxEventMapperEventTableBindings kCMauiWxEventMapperEventTableBindings = {
-    &CMauiWxEventMapperRuntime::OnMouseMove,
-    &CMauiWxEventMapperRuntime::OnKeyUp,
-    &CMauiWxEventMapperRuntime::OnKeyDown,
-    &CMauiWxEventMapperRuntime::OnChar,
+    &CMauiWxEventMapper::OnMouseMove,
+    &CMauiWxEventMapper::OnKeyUp,
+    &CMauiWxEventMapper::OnKeyDown,
+    &CMauiWxEventMapper::OnChar,
   };
 
   [[nodiscard]] const void* PublishCMauiWxEventMapperEventTableBindings() noexcept
@@ -28174,11 +28172,11 @@ moho::CMauiFrame::CMauiFrame(
   frameView->mTargetHead = 0;
 
   // Anchor the static wxEventTable bindings for `CMauiWxEventMapper` so the
-  // linker preserves `CMauiWxEventMapperRuntime::OnMouseMove`, mirroring the
+  // linker preserves `CMauiWxEventMapper::OnMouseMove`, mirroring the
   // compiler-emitted event-table data block at binary `0x00F5A488`.
   (void)PublishCMauiWxEventMapperEventTableBindings();
 
-  auto* const eventMapper = new (std::nothrow) CMauiWxEventMapperRuntime{};
+  auto* const eventMapper = new (std::nothrow) CMauiWxEventMapper{};
   if (eventMapper != nullptr) {
     eventMapper->mWindowRuntime = nullptr;
     eventMapper->mFrame = this;
@@ -32077,7 +32075,7 @@ void moho::CUIKeyHandlerRuntime::OnKeyUp(
  * Models the compiled `CUIKeyHandler` event table's dispatch role directly
  * (binary table at `0x00F5B150`: row 1 `wxEVT_KEY_UP` -> `OnKeyUp`, row 2
  * `wxEVT_KEY_DOWN` -> `OnKeyDown`), the same approach
- * `CMauiWxEventMapperRuntime::ProcessWxEvent` uses for its own keyboard rows.
+ * `CMauiWxEventMapper::ProcessWxEvent` uses for its own keyboard rows.
  */
 bool moho::CUIKeyHandlerRuntime::ProcessWxEvent(
   void* const event
@@ -32149,7 +32147,7 @@ void moho::SetMauiEventMapperWindow(
   wxWindowBase* const window
 )
 {
-  if (auto* const mapper = dynamic_cast<CMauiWxEventMapperRuntime*>(handler); mapper != nullptr) {
+  if (auto* const mapper = dynamic_cast<CMauiWxEventMapper*>(handler); mapper != nullptr) {
     mapper->mWindowRuntime = reinterpret_cast<WxWindowCaptureRuntimeView*>(window);
   }
 }

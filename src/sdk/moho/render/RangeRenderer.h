@@ -54,7 +54,7 @@ namespace moho
   {
     msvc8::string mExtractorName;                  // +0x00
     std::uint32_t mReserved1C = 0u;                // +0x1C
-    CategoryWordRangeView mCategoryFilter;         // +0x20
+    EntityCategorySet mCategoryFilter;         // +0x20
     RangeRingColor mBuildRingColor;                // +0x48
     RangeRingColor mSelectedRingColor;             // +0x58
     RangeRingColor mHighlightedRingColor;          // +0x68
@@ -83,7 +83,7 @@ namespace moho
    * the key comparison as `this` and reads `_Mysize` at `this+0x14`, which is
    * the 0x1C `msvc8::string` layout. The value therefore starts four bytes
    * past the end of the key, and the node four past the end of the links -
-   * `SRangeRenderProfile` is 8-aligned, because `CategoryWordRangeView` is.
+   * `SRangeRenderProfile` is 8-aligned, because `EntityCategorySet` is.
    */
   using SRangeRenderProfileMap = msvc8::map<msvc8::string, SRangeRenderProfile>;
   static_assert(sizeof(SRangeRenderProfileMap) == 0x0C, "SRangeRenderProfileMap size must be 0x0C");
@@ -204,7 +204,7 @@ namespace moho
    */
   void ApplyRangeProfileFilterToRenderer(
     std::uint32_t highlightedColorPacked,
-    const CategoryWordRangeView* categoryFilter,
+    const EntityCategorySet* categoryFilter,
     RangeRenderer* rangeRenderer,
     std::string_view extractorName,
     std::uint32_t buildColorPacked,

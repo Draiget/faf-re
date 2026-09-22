@@ -522,7 +522,7 @@ namespace
     DestroyArmyEconomyInfo(prior);
   }
 
-  [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::CategoryWordRangeView& range) noexcept
+  [[nodiscard]] moho::BVIntSet& CategoryWordRangeAsBitset(moho::EntityCategorySet& range) noexcept
   {
     return range.mBits;
   }
@@ -1179,7 +1179,7 @@ namespace
       return;
     }
 
-    if (const moho::CategoryWordRangeView* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
+    if (const moho::EntityCategorySet* const allUnits = army.Simulation->mRules->GetEntityCategory("ALLUNITS");
         allUnits != nullptr) {
       army.mVarDat.mCategoryFilterSet = *allUnits;
 

@@ -10,7 +10,7 @@
 
 namespace
 {
-  void IntersectCategoryWordRanges(moho::CategoryWordRangeView& lhs, const moho::CategoryWordRangeView& rhs)
+  void IntersectCategoryWordRanges(moho::EntityCategorySet& lhs, const moho::EntityCategorySet& rhs)
   {
     lhs.mBits.IntersectWith(&rhs.mBits);
   }
@@ -100,7 +100,7 @@ namespace moho
    * Looks up category text in RRuleGameRulesImpl category map and returns
    * either mapped range or fallback range stored in lookup table.
    */
-  const CategoryWordRangeView* EntityCategoryLookupResolver::GetEntityCategory(const char* categoryName) const
+  const EntityCategorySet* EntityCategoryLookupResolver::GetEntityCategory(const char* categoryName) const
   {
     // `RRuleGameRulesImpl` is the only class the binary dispatches slot 22 on,
     // and it does not derive from this synthetic interface, so reaching its
@@ -108,7 +108,7 @@ namespace moho
     // the cast -- but to the real class, not to a padded stand-in for it.
     const auto* const rules = reinterpret_cast<const RRuleGameRulesImpl*>(this);
     if (!rules->mEntityCategoryLookup) {
-      static const CategoryWordRangeView kEmpty{};
+      static const EntityCategorySet kEmpty{};
       return &kEmpty;
     }
 
@@ -138,8 +138,8 @@ namespace moho
    * built in place, seeded to empty with the table's word-universe handle, and
    * returned for chaining.
    */
-  CategoryWordRangeView*
-  ParseEntityCategory(const void* const categoryLookup, CategoryWordRangeView* const out, const char* const categoryExpression)
+  EntityCategorySet*
+  ParseEntityCategory(const void* const categoryLookup, EntityCategorySet* const out, const char* const categoryExpression)
   {
     const auto* const lookupTable = static_cast<const EntityCategoryLookupTable*>(categoryLookup);
 
@@ -155,7 +155,7 @@ namespace moho
     const char* clauseStart = nullptr;
     const char* clauseEnd = nullptr;
     while (NextSegmentToken(clauseCursor, ',', clauseStart, clauseEnd)) {
-      CategoryWordRangeView clauseAccum;
+      EntityCategorySet clauseAccum;
       clauseAccum.ResetToEmpty(lookupTable->mWordUniverseHandle);
       bool hasResolvedClauseTerm = false;
 
@@ -164,7 +164,7 @@ namespace moho
       const char* termEnd = nullptr;
       while (NextBoundedToken(termCursor, clauseEnd, ' ', termStart, termEnd)) {
         const msvc8::string termToken(termStart, termEnd);
-        const CategoryWordRangeView* const range = lookupTable->TryFind(termToken);
+        const EntityCategorySet* const range = lookupTable->TryFind(termToken);
         if (range == nullptr) {
           continue;
         }

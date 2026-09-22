@@ -8797,18 +8797,6 @@ namespace moho
    */
 
   /**
-   * `WRenViewport::GetPreviewImage` (0x007F65D0) mangles to
-   * `?GetPreviewImage@WRenViewport@Moho@@UAE?AV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@XZ`,
-   * i.e. its real return type is `boost::shared_ptr<Moho::ID3DTextureSheet>`
-   * by value - not a bespoke two-pointer view struct. The retained field this
-   * wraps (`WRenViewportDestroyRuntimeView::mDynamicTextureSheet`, +0x2194 in
-   * WxRuntimeTypes.cpp) is already modelled as a real
-   * `boost::shared_ptr<CD3DDynamicTextureSheet>`, which converts to this alias
-   * through boost's own compatible-pointer constructor.
-   */
-  using WPreviewImageRuntime = boost::shared_ptr<ID3DTextureSheet>;
-
-  /**
    * WARNING -- allocation size trap, read before adding a constructor.
    *
    * The real binary allocates this class at `sizeof == 0x21A8` (8616 bytes;
@@ -9005,7 +8993,7 @@ namespace moho
      * Returns one retained preview-image shared-pointer lane from viewport
      * runtime storage.
      */
-    [[nodiscard]] virtual WPreviewImageRuntime GetPreviewImage() const;
+    [[nodiscard]] virtual boost::shared_ptr<moho::ID3DTextureSheet> GetPreviewImage() const;
 
     /**
      * Address: 0x007F7400 (FUN_007F7400, ?RenderPreviewImage@WRenViewport@Moho@@UAEX_N@Z)
@@ -9220,7 +9208,6 @@ namespace moho
   // There is one device context, not two: this used to be a second, unrelated
   // stand-in with a do-nothing DoDrawRectangle, so the viewport background it
   // was asked to paint never appeared.
-  using wxDCRuntime = ::wxDC;
 
   /**
    * Mangled: ??0wxPaintDC@@QAE@PAVwxWindow@@@Z / ??1wxPaintDC@@UAE@XZ
@@ -9247,8 +9234,6 @@ namespace moho
     PAINTSTRUCT mPaintStruct{};
     bool mOwnsPaint = false;
   };
-
-  static_assert(sizeof(WPreviewImageRuntime) == 0x8, "moho::WPreviewImageRuntime size must be 0x8");
 
   struct WD3DViewport : WRenViewport
   {
@@ -9319,7 +9304,7 @@ namespace moho
     /**
      * Address: 0x0042BB30 (FUN_0042BB30)
      */
-    [[nodiscard]] WPreviewImageRuntime GetPreviewImage() const override;
+    [[nodiscard]] boost::shared_ptr<moho::ID3DTextureSheet> GetPreviewImage() const override;
 
     /**
      * Address: 0x0042BB50 (FUN_0042BB50)
@@ -9343,7 +9328,7 @@ namespace moho
      * What it does:
      * Draws a solid black background over the viewport DC extents.
      */
-    void DrawBackgroundImage(wxDCRuntime& deviceContext);
+    void DrawBackgroundImage(wxDC& deviceContext);
 
     /**
      * Address: 0x00430B70 (FUN_00430B70)
@@ -9816,8 +9801,6 @@ namespace moho
   static_assert(sizeof(WWinManagedFrame) == 0x17C, "moho::WWinManagedFrame size must be 0x17C");
 
   // Compatibility aliases while older call sites transition to owning names.
-  using WWinManagedDialogRuntime = WWinManagedDialog;
-  using WWinManagedFrameRuntime = WWinManagedFrame;
 
   // 0x010A9B94 family in FA.
   extern msvc8::vector<ManagedWindowSlot> managedWindows;

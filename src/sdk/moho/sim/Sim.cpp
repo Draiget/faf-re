@@ -2746,7 +2746,7 @@ namespace
     return entity ? entity->BluePrint : nullptr;
   }
 
-  [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(const CategoryWordRangeView& range) noexcept
+  [[nodiscard]] const BVIntSet& CategoryWordRangeAsBVIntSet(const EntityCategorySet& range) noexcept
   {
     return range.mBits;
   }
@@ -2979,8 +2979,6 @@ namespace
     return packedValue != nullptr ? (*packedValue & 0x00FFFFFFu) : 0u;
   }
 
-  using SpecialFileTypeRuntime = moho::ESpecialFileType;
-
   [[noreturn]] void ThrowInvalidSpecialFileType(const char* const lexical)
   {
     throw std::runtime_error(gpg::STR_Printf("Invalid special file type %s", lexical != nullptr ? lexical : "").to_std());
@@ -2988,7 +2986,7 @@ namespace
 
   [[nodiscard]] bool TryParseSpecialFileType(
     const char* const lexical,
-    SpecialFileTypeRuntime& outType
+    moho::ESpecialFileType& outType
   ) noexcept
   {
     if (lexical == nullptr) {
@@ -2997,56 +2995,56 @@ namespace
 
     const std::string_view text(lexical);
     if (text == "SaveGame" || text == "SFT_SaveGame") {
-      outType = SpecialFileTypeRuntime::SaveGame;
+      outType = moho::ESpecialFileType::SaveGame;
       return true;
     }
     if (text == "Replay" || text == "SFT_Replay") {
-      outType = SpecialFileTypeRuntime::Replay;
+      outType = moho::ESpecialFileType::Replay;
       return true;
     }
     if (text == "Screenshot" || text == "SFT_Screenshot") {
-      outType = SpecialFileTypeRuntime::Screenshot;
+      outType = moho::ESpecialFileType::Screenshot;
       return true;
     }
     if (text == "CampaignSave" || text == "SFT_CampaignSave") {
-      outType = SpecialFileTypeRuntime::CampaignSave;
+      outType = moho::ESpecialFileType::CampaignSave;
       return true;
     }
 
     char* end = nullptr;
     const long numericValue = std::strtol(lexical, &end, 10);
     if (end != lexical && end != nullptr && *end == '\0' && numericValue >= 0 && numericValue <= 3) {
-      outType = static_cast<SpecialFileTypeRuntime>(numericValue);
+      outType = static_cast<moho::ESpecialFileType>(numericValue);
       return true;
     }
 
     return false;
   }
 
-  [[nodiscard]] msvc8::string BuildSpecialFilePathDirectory(const SpecialFileTypeRuntime type)
+  [[nodiscard]] msvc8::string BuildSpecialFilePathDirectory(const moho::ESpecialFileType type)
   {
     switch (type) {
-      case SpecialFileTypeRuntime::SaveGame:
-      case SpecialFileTypeRuntime::CampaignSave:
+      case moho::ESpecialFileType::SaveGame:
+      case moho::ESpecialFileType::CampaignSave:
         return USER_GetSaveGameDir();
-      case SpecialFileTypeRuntime::Replay:
+      case moho::ESpecialFileType::Replay:
         return USER_GetReplayDir();
-      case SpecialFileTypeRuntime::Screenshot:
+      case moho::ESpecialFileType::Screenshot:
         return USER_GetScreenshotDir();
     }
     return msvc8::string{};
   }
 
-  [[nodiscard]] msvc8::string BuildSpecialFilePathExtension(const SpecialFileTypeRuntime type)
+  [[nodiscard]] msvc8::string BuildSpecialFilePathExtension(const moho::ESpecialFileType type)
   {
     switch (type) {
-      case SpecialFileTypeRuntime::SaveGame:
+      case moho::ESpecialFileType::SaveGame:
         return USER_GetSaveGameExt();
-      case SpecialFileTypeRuntime::Replay:
+      case moho::ESpecialFileType::Replay:
         return USER_GetReplayExt();
-      case SpecialFileTypeRuntime::Screenshot:
+      case moho::ESpecialFileType::Screenshot:
         return msvc8::string("bmp");
-      case SpecialFileTypeRuntime::CampaignSave:
+      case moho::ESpecialFileType::CampaignSave:
         return USER_GetCampaignSaveExt();
     }
     return msvc8::string{};
@@ -5157,8 +5155,8 @@ namespace
       return false;
     }
 
-    const auto& lhsCategories = reinterpret_cast<const CategoryWordRangeView&>(lhsBlueprint->Economy.CategoryCache);
-    const auto& rhsCategories = reinterpret_cast<const CategoryWordRangeView&>(rhsBlueprint->Economy.CategoryCache);
+    const auto& lhsCategories = reinterpret_cast<const EntityCategorySet&>(lhsBlueprint->Economy.CategoryCache);
+    const auto& rhsCategories = reinterpret_cast<const EntityCategorySet&>(rhsBlueprint->Economy.CategoryCache);
     const BVIntSet& lhsBits = CategoryWordRangeAsBVIntSet(lhsCategories);
     const BVIntSet& rhsBits = CategoryWordRangeAsBVIntSet(rhsCategories);
 
@@ -5177,7 +5175,7 @@ namespace
       return false;
     }
 
-    const CategoryWordRangeView* const categoryRange = sim->mRules->GetEntityCategory(categoryName);
+    const EntityCategorySet* const categoryRange = sim->mRules->GetEntityCategory(categoryName);
     const EntityCategorySet* const categorySet =
       categoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(categoryRange) : nullptr;
     return categorySet != nullptr && EntityCategory::HasBlueprint(blueprint, categorySet);
@@ -14275,7 +14273,7 @@ namespace
    * `rb_tree::insert_unique`, RbTree.h), then sets this blueprint's bit in
    * that node's `BVIntSet`. The binary reaches the set as `node + 56`,
    * which is `it->second.Bits()` here (`CategoryLookupValue` inherits
-   * `CategoryWordRangeView::Bits()`).
+   * `EntityCategorySet::Bits()`).
    *
    * FUN_00556320's role (previously unresolved): it is the compiler-emitted
    * 2-argument converting constructor of `CategoryLookupMap::value_type`
@@ -18780,8 +18778,8 @@ int moho::cfunc_GetAssistingUnitsListL(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject resultTable(state);
   resultTable.AssignNewTable(state, 0, 0u);
 
-  const CategoryWordRangeView* const podStagingCategoryRange = session->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
-  const CategoryWordRangeView* const podCategoryRange = session->mRules->GetEntityCategory("POD");
+  const EntityCategorySet* const podStagingCategoryRange = session->mRules->GetEntityCategory("PODSTAGINGPLATFORM");
+  const EntityCategorySet* const podCategoryRange = session->mRules->GetEntityCategory("POD");
   const EntityCategorySet* const podStagingCategory =
     podStagingCategoryRange != nullptr ? reinterpret_cast<const EntityCategorySet*>(podStagingCategoryRange) : nullptr;
   const EntityCategorySet* const podCategory =
@@ -22088,7 +22086,7 @@ int moho::cfunc_GetSpecialFilesL(LuaPlus::LuaState* const state)
     typeArg.TypeError("string");
   }
 
-  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  moho::ESpecialFileType specialFileType = moho::ESpecialFileType::SaveGame;
   if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
     ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22191,7 +22189,7 @@ int moho::cfunc_GetSpecialFilePathL(LuaPlus::LuaState* const state)
     typeArg.TypeError("string");
   }
 
-  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  moho::ESpecialFileType specialFileType = moho::ESpecialFileType::SaveGame;
   if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
     ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22259,7 +22257,7 @@ int moho::cfunc_GetSpecialFolderL(LuaPlus::LuaState* const state)
     typeArg.TypeError("string");
   }
 
-  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  moho::ESpecialFileType specialFileType = moho::ESpecialFileType::SaveGame;
   if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
     ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22324,7 +22322,7 @@ int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
     typeArg.TypeError("string");
   }
 
-  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  moho::ESpecialFileType specialFileType = moho::ESpecialFileType::SaveGame;
   if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
     ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22332,19 +22330,19 @@ int moho::cfunc_RemoveSpecialFileL(LuaPlus::LuaState* const state)
   msvc8::string directory;
   msvc8::string extension;
   switch (specialFileType) {
-    case SpecialFileTypeRuntime::SaveGame:
+    case moho::ESpecialFileType::SaveGame:
       directory = USER_GetSaveGameDir();
       extension = USER_GetSaveGameExt();
       break;
-    case SpecialFileTypeRuntime::Replay:
+    case moho::ESpecialFileType::Replay:
       directory = USER_GetReplayDir();
       extension = USER_GetReplayExt();
       break;
-    case SpecialFileTypeRuntime::CampaignSave:
+    case moho::ESpecialFileType::CampaignSave:
       directory = USER_GetSaveGameDir();
       extension = USER_GetCampaignSaveExt();
       break;
-    case SpecialFileTypeRuntime::Screenshot:
+    case moho::ESpecialFileType::Screenshot:
     default:
       ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22421,7 +22419,7 @@ int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
     typeArg.TypeError("string");
   }
 
-  SpecialFileTypeRuntime specialFileType = SpecialFileTypeRuntime::SaveGame;
+  moho::ESpecialFileType specialFileType = moho::ESpecialFileType::SaveGame;
   if (!TryParseSpecialFileType(specialFileTypeLexical, specialFileType)) {
     ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }
@@ -22429,19 +22427,19 @@ int moho::cfunc_GetSpecialFileInfoL(LuaPlus::LuaState* const state)
   msvc8::string directory;
   msvc8::string extension;
   switch (specialFileType) {
-    case SpecialFileTypeRuntime::SaveGame:
+    case moho::ESpecialFileType::SaveGame:
       directory = USER_GetSaveGameDir();
       extension = USER_GetSaveGameExt();
       break;
-    case SpecialFileTypeRuntime::Replay:
+    case moho::ESpecialFileType::Replay:
       directory = USER_GetReplayDir();
       extension = USER_GetReplayExt();
       break;
-    case SpecialFileTypeRuntime::CampaignSave:
+    case moho::ESpecialFileType::CampaignSave:
       directory = USER_GetSaveGameDir();
       extension = USER_GetCampaignSaveExt();
       break;
-    case SpecialFileTypeRuntime::Screenshot:
+    case moho::ESpecialFileType::Screenshot:
     default:
       ThrowInvalidSpecialFileType(specialFileTypeLexical);
   }

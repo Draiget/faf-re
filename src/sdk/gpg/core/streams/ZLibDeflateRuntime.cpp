@@ -77,7 +77,7 @@ namespace
   constexpr std::array<std::uint8_t, 512> kDistanceCode = BuildDistanceCodeTable();
 
   void SendBits(
-    DeflateStateRuntimePrefix* const state,
+    DeflateStateRuntime* const state,
     const unsigned int value,
     const int bitCount
   )
@@ -96,7 +96,7 @@ namespace
   }
 
   void SendCode(
-    DeflateStateRuntimePrefix* const state,
+    DeflateStateRuntime* const state,
     const int symbol,
     const DeflateCtDataRuntime* const tree
   )
@@ -522,8 +522,8 @@ namespace
  * Flushes any pending bit-accumulator bytes into `pending_buf`, then clears
  * the bit-buffer validity lanes.
  */
-extern "C" DeflateStateRuntimePrefix* __cdecl bi_windup(
-  DeflateStateRuntimePrefix* const state
+extern "C" DeflateStateRuntime* __cdecl bi_windup(
+  DeflateStateRuntime* const state
 )
 {
   if (state->bi_valid <= 8) {
@@ -551,7 +551,7 @@ extern "C" DeflateStateRuntimePrefix* __cdecl bi_windup(
  * header, then appends `len` payload bytes into the pending output buffer.
  */
 extern "C" void __cdecl copy_block(
-  DeflateStateRuntimePrefix* state,
+  DeflateStateRuntime* state,
   int len,
   const std::uint8_t* buffer,
   const int header
@@ -582,8 +582,8 @@ extern "C" void __cdecl copy_block(
  * What it does:
  * Emits one 16-bit short to the pending output lane in big-endian order.
  */
-extern "C" DeflateStateRuntimePrefix* __cdecl putShortMSB(
-  DeflateStateRuntimePrefix* const state,
+extern "C" DeflateStateRuntime* __cdecl putShortMSB(
+  DeflateStateRuntime* const state,
   const std::int16_t value
 )
 {
@@ -667,7 +667,7 @@ extern "C" DeflateStateRuntimePrefix* __cdecl putShortMSB(
  */
 extern "C" unsigned int __cdecl longest_match(
   unsigned int cur_match,
-  DeflateStateRuntimePrefix* const state
+  DeflateStateRuntime* const state
 )
 {
   std::uint32_t maxChainLength = state->max_chain_length;
@@ -763,7 +763,7 @@ extern "C" unsigned int __cdecl longest_match(
  * match length or `2` when no usable 3+ byte match is present.
  */
 extern "C" int __cdecl longest_match_fast(
-  DeflateStateRuntimePrefix* const state,
+  DeflateStateRuntime* const state,
   const int cur_match
 )
 {
@@ -891,7 +891,7 @@ unsigned int compressBoundRuntime(const unsigned int sourceLength)
  */
 extern "C" void __cdecl init_block(
   const int dead,
-  DeflateStateRuntimePrefix* const state
+  DeflateStateRuntime* const state
 )
 {
   (void)dead;
@@ -934,8 +934,8 @@ extern "C" void __cdecl init_block(
  * Builds code lengths for one dynamic Huffman tree from parent-depth lanes,
  * updates bit-length histograms, and accumulates opt/static encoded lengths.
  */
-extern "C" DeflateStateRuntimePrefix* __cdecl gen_bitlen(
-  DeflateStateRuntimePrefix* const state,
+extern "C" DeflateStateRuntime* __cdecl gen_bitlen(
+  DeflateStateRuntime* const state,
   DeflateTreeDescriptorRuntime* const descriptor
 )
 {
@@ -1022,8 +1022,8 @@ extern "C" DeflateStateRuntimePrefix* __cdecl gen_bitlen(
  * Restores the Huffman min-heap ordering from `heapIndex` using the dynamic
  * tree frequency lane and `depth` tie-break ordering.
  */
-extern "C" DeflateStateRuntimePrefix* __cdecl pqdownheap(
-  DeflateStateRuntimePrefix* const state,
+extern "C" DeflateStateRuntime* __cdecl pqdownheap(
+  DeflateStateRuntime* const state,
   DeflateTreeDescriptorRuntime* const descriptor,
   int heapIndex
 )
@@ -1064,7 +1064,7 @@ extern "C" DeflateStateRuntimePrefix* __cdecl pqdownheap(
 extern "C" void __cdecl scan_tree(
   DeflateCtDataRuntime* const tree,
   const int maxCode,
-  DeflateStateRuntimePrefix* const state
+  DeflateStateRuntime* const state
 )
 {
   int nextLength = static_cast<int>(tree->dl.len);
@@ -1134,7 +1134,7 @@ extern "C" void __cdecl scan_tree(
  * writes the resulting bits into the pending deflate bitstream.
  */
 extern "C" void __cdecl send_tree(
-  DeflateStateRuntimePrefix* const state,
+  DeflateStateRuntime* const state,
   DeflateCtDataRuntime* const tree,
   const int maxCode
 )
@@ -1239,7 +1239,7 @@ extern "C" int __cdecl _tr_tally(
  */
 extern "C" void __cdecl set_data_type(
   const int dead,
-  DeflateStateRuntimePrefix* const state
+  DeflateStateRuntime* const state
 )
 {
   (void)dead;

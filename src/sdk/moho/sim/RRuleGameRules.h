@@ -52,7 +52,7 @@ namespace moho
    * and colour/isNil at `node+0x58`/`node+0x59`, with the node allocator
    * (`FUN_005579D0`) handing out `0x60` bytes apiece. That is what an
    * 8-aligned value type produces, and the alignment belongs to
-   * `CategoryWordRangeView` itself:
+   * `EntityCategorySet` itself:
    *
    *   - `EntityCategoryLookupTable::FindOrFallback`
    *     (`FUN_005552C0`) returns `lea eax,[esi+10h]` on its miss path, so the
@@ -72,10 +72,10 @@ namespace moho
    *     `_Myval.helper.first` (the `msvc8::string` key) and
    *     `_Myval.helper.second.mSet.mUsed` (the value's inline bit-vector) --
    *     IDA's `helper` naming is this instantiation's
-   *     `pair<const msvc8::string, CategoryWordRangeView>` value_type.
+   *     `pair<const msvc8::string, EntityCategorySet>` value_type.
    *
    * The alignment now lives on `moho::BVSet` itself (BVSet.h), which is what
-   * `CategoryWordRangeView` is. It is not on the `BVIntSet` that record
+   * `EntityCategorySet` is. It is not on the `BVIntSet` that record
    * embeds at +0x08: `SoundHandleIdPool` is `{BVIntSet, std::uint32_t}` at
    * 0x24 (CUserSoundManager.h), so the set alone rounds nothing up to eight.
    * `rb_node<V>` and `rb_tree<Traits>` reproduce the whole
@@ -87,7 +87,7 @@ namespace moho
    * had not been found yet and the type looked 4-aligned everywhere else. It
    * is a plain alias now; `Sim.cpp` still spells it.
    */
-  using CategoryLookupValue = CategoryWordRangeView;
+  using CategoryLookupValue = EntityCategorySet;
   static_assert(sizeof(CategoryLookupValue) == 0x28, "CategoryLookupValue size must be 0x28");
   static_assert(alignof(CategoryLookupValue) == 8, "CategoryLookupValue alignment must be 8");
 
@@ -132,7 +132,7 @@ namespace moho
     CategoryLookupMap mCategoryMap; // +0x00 (0x0C: {proxy, head, size})
     // +0x0C is the alignment hole the 8-aligned fallback opens, not a field -
     // see the evidence block above. The tail beyond +0x3C is the same.
-    CategoryWordRangeView mCategoryFallback; // +0x10
+    EntityCategorySet mCategoryFallback; // +0x10
     std::uint32_t mWordUniverseHandle;       // +0x38
 
     /**
@@ -142,7 +142,7 @@ namespace moho
      * The word range recorded for `categoryName`, or null when the name is
      * not in the table.
      */
-    [[nodiscard]] const CategoryWordRangeView* TryFind(const msvc8::string& categoryName) const;
+    [[nodiscard]] const EntityCategorySet* TryFind(const msvc8::string& categoryName) const;
 
     /**
      * Address: 0x005552C0 (FUN_005552C0, sub_5552C0)
@@ -152,7 +152,7 @@ namespace moho
      * range when the name is not in the table. This is the whole body of
      * `RRuleGameRulesImpl::GetEntityCategory`.
      */
-    [[nodiscard]] const CategoryWordRangeView* FindOrFallback(const msvc8::string& categoryName) const;
+    [[nodiscard]] const EntityCategorySet* FindOrFallback(const msvc8::string& categoryName) const;
 
     /**
      * Address: 0x005551F0 (FUN_005551F0, Moho::EntityCategorySet::EntityCategorySet)
@@ -163,7 +163,7 @@ namespace moho
      *
      * What it does:
      * In-place constructs the (empty, sentinel-headed) category-name map and
-     * the fallback `CategoryWordRangeView`, seeding both the fallback's
+     * the fallback `EntityCategorySet`, seeding both the fallback's
      * universe lane and the trailing `mWordUniverseHandle` with `owner`
      * reinterpreted as a 4-byte handle - the same raw pointer value the
      * binary writes to +0x10 and +0x38 (IDA types both writes as the plain
@@ -195,14 +195,14 @@ namespace moho
 
     /**
      * No explicit destructor: `mCategoryMap` (`msvc8::map<msvc8::string,
-     * CategoryLookupValue>`) and `mCategoryFallback` (`CategoryWordRangeView`)
+     * CategoryLookupValue>`) and `mCategoryFallback` (`EntityCategorySet`)
      * are both real typed members now, so implicit member destruction runs
      * their own real destructors automatically - exactly matching
      * `FUN_00533E20`'s (`Moho::EntityCategory::~EntityCategory`) two real
      * pieces of work: `mCategoryMap`'s teardown is `RbTree.h`'s `~rb_tree()`
      * emission for this instantiation (cited there), and the leading
      * `mSet.mUsed` inline-vector release the raw decompile shows ahead of it
-     * is `CategoryWordRangeView::~CategoryWordRangeView()`'s own body,
+     * is `EntityCategorySet::~EntityCategorySet()`'s own body,
      * inlined into this destructor by the compiler - not hand-written
      * source of this class at all (RULE ONE: "member destructors... the
      * source body says nothing; MSVC emits it"). A prior recovery pass
@@ -526,13 +526,13 @@ namespace moho
      * Address: 0x0052B1E0 (FUN_0052B1E0)
      * Slot: 22
      */
-    virtual const CategoryWordRangeView* GetEntityCategory(const char*) const = 0;
+    virtual const EntityCategorySet* GetEntityCategory(const char*) const = 0;
 
     /**
      * Address: 0x0052B280 (FUN_0052B280)
      * Slot: 23
      */
-    virtual CategoryWordRangeView ParseEntityCategory(const char*) const = 0;
+    virtual EntityCategorySet ParseEntityCategory(const char*) const = 0;
 
     /**
      * Address: 0x0052B2B0 (FUN_0052B2B0)
@@ -687,12 +687,12 @@ namespace moho
     /**
      * Address: 0x0052B1E0 (FUN_0052B1E0)
      */
-    const CategoryWordRangeView* GetEntityCategory(const char* categoryName) const override;
+    const EntityCategorySet* GetEntityCategory(const char* categoryName) const override;
 
     /**
      * Address: 0x0052B280 (FUN_0052B280)
      */
-    CategoryWordRangeView ParseEntityCategory(const char* categoryExpression) const override;
+    EntityCategorySet ParseEntityCategory(const char* categoryExpression) const override;
 
     /**
      * Address: 0x0052B2B0 (FUN_0052B2B0)

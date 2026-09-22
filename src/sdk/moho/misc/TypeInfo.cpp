@@ -8,7 +8,7 @@ namespace moho
    * What it does:
    * Returns canonical runtime type name.
    */
-  const char* RuntimeTypeName(const RuntimeTypeInfo& typeInfo) noexcept
+  const char* RuntimeTypeName(const std::type_info& typeInfo) noexcept
   {
     return typeInfo.name();
   }
@@ -19,7 +19,7 @@ namespace moho
    * What it does:
    * Compares canonical runtime type descriptors for equality.
    */
-  bool RuntimeTypeEquals(const RuntimeTypeInfo& lhs, const RuntimeTypeInfo& rhs) noexcept
+  bool RuntimeTypeEquals(const std::type_info& lhs, const std::type_info& rhs) noexcept
   {
     return lhs == rhs;
   }
@@ -30,7 +30,7 @@ namespace moho
    * What it does:
    * Compares optional runtime type pointers with identity/null short-circuiting.
    */
-  bool RuntimeTypePtrEquals(const RuntimeTypeInfo* const lhs, const RuntimeTypeInfo* const rhs) noexcept
+  bool RuntimeTypePtrEquals(const std::type_info* const lhs, const std::type_info* const rhs) noexcept
   {
     if (lhs == rhs) {
       return true;
@@ -47,7 +47,7 @@ namespace moho
    * What it does:
    * Defines strict weak ordering between runtime type descriptors.
    */
-  bool RuntimeTypeBefore(const RuntimeTypeInfo& lhs, const RuntimeTypeInfo& rhs) noexcept
+  bool RuntimeTypeBefore(const std::type_info& lhs, const std::type_info& rhs) noexcept
   {
     return lhs.before(rhs);
   }

@@ -4546,7 +4546,7 @@ namespace moho
       return false;
     }
 
-    const CategoryWordRangeView* const range = SimulationRef->mRules->GetEntityCategory(categoryName);
+    const EntityCategorySet* const range = SimulationRef->mRules->GetEntityCategory(categoryName);
     if (!range) {
       return false;
     }

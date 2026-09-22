@@ -552,7 +552,7 @@ namespace moho
     boost::SharedPtrRaw<CIntelGrid> mRCIGrid;    // +0x68
     boost::SharedPtrRaw<CIntelGrid> mSCIGrid;    // +0x70
     boost::SharedPtrRaw<CIntelGrid> mVCIGrid;    // +0x78
-    CategoryWordRangeView mVisibleToReconCategory; // +0x80
+    EntityCategorySet mVisibleToReconCategory; // +0x80
     std::uint8_t mFogOfWar;              // +0xA8
     std::uint8_t mPadA9[0x07];           // +0xA9
   };

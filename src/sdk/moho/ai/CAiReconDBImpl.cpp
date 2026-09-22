@@ -31,7 +31,6 @@ using namespace moho;
 
 namespace
 {
-  using PerArmyReconView = SPerArmyReconInfo;
 
 
 
@@ -211,7 +210,7 @@ namespace
     return blip && blip->IsFake();
   }
 
-  [[nodiscard]] PerArmyReconView* GetPerArmyReconSlot(
+  [[nodiscard]] SPerArmyReconInfo* GetPerArmyReconSlot(
     ReconBlip* const blip, const std::int32_t armyIndex
   ) noexcept
   {
@@ -374,7 +373,7 @@ namespace
     }
 
     const std::int32_t armyIndex = owner->mArmy->mConstDat.mArmyIndex;
-    PerArmyReconView* const recon = GetPerArmyReconSlot(blip, armyIndex);
+    SPerArmyReconInfo* const recon = GetPerArmyReconSlot(blip, armyIndex);
     if (!recon) {
       return;
     }
@@ -512,7 +511,7 @@ CAiReconDBImpl::CAiReconDBImpl(CArmyImpl* const army, const bool fogOfWar) :
   mIMap = mArmy->GetIGrid();
 
   {
-    const CategoryWordRangeView* const category =
+    const EntityCategorySet* const category =
       (mSim && mSim->mRules) ? mSim->mRules->GetEntityCategory("VISIBLETORECON") : nullptr;
     if (category) {
       mVisibleToReconCategory = *category;
@@ -708,7 +707,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
           ClearPerArmyRecon(this, blip, true);
           blip->DestroyIfUnused();  // 0x005C0FBA
         } else {
-          PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
+          SPerArmyReconInfo* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
           if (recon) {
             recon->mReconFlags |= static_cast<std::uint32_t>(RECON_MaybeDead);
           }
@@ -806,7 +805,7 @@ void CAiReconDBImpl::ReconTick(const int dTicks)
 
       if (rangeBegin != rangeEnd) {
         bool keepStaticLosBlip = false;
-        PerArmyReconView* const recon = GetPerArmyReconSlot(rangeBegin->second, mArmy->mConstDat.mArmyIndex);
+        SPerArmyReconInfo* const recon = GetPerArmyReconSlot(rangeBegin->second, mArmy->mConstDat.mArmyIndex);
         if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_LOSEver)) != 0u && !unit->IsMobile()) {
           keepStaticLosBlip = true;
         }
@@ -986,7 +985,7 @@ ReconBlip* CAiReconDBImpl::FindOrCreateBlip(const SNewBlip& candidate)
       continue;
     }
 
-    PerArmyReconView* const perArmy = existing->GetPerArmyReconInfo(armyIndex);
+    SPerArmyReconInfo* const perArmy = existing->GetPerArmyReconInfo(armyIndex);
     if (!perArmy || perArmy->mNeedsFlush != 0u) {
       continue;
     }
@@ -1003,7 +1002,7 @@ ReconBlip* CAiReconDBImpl::FindOrCreateBlip(const SNewBlip& candidate)
   }
 
   sourceUnit->mReconBlips.push_back(created);
-  if (PerArmyReconView* const perArmy = created->GetPerArmyReconInfo(armyIndex)) {
+  if (SPerArmyReconInfo* const perArmy = created->GetPerArmyReconInfo(armyIndex)) {
     perArmy->mNeedsFlush = 1u;
   }
   return created;
@@ -1023,7 +1022,7 @@ void CAiReconDBImpl::RefreshBlip(ReconBlip* const blip, Unit* const sourceUnit)
     return;
   }
 
-  PerArmyReconView* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
+  SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
   if (!perArmy) {
     return;
   }
@@ -1079,7 +1078,7 @@ void CAiReconDBImpl::UpdateBlip(ReconBlip* const blip, Unit* const sourceUnit, s
   }
 
   const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
-  PerArmyReconView* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
+  SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
   if (!perArmy) {
     return;
   }
@@ -1235,7 +1234,7 @@ void CAiReconDBImpl::DeleteBlip(ReconBlip* const blip)
   }
 
   const std::int32_t armyIndex = mArmy->mConstDat.mArmyIndex;
-  PerArmyReconView* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
+  SPerArmyReconInfo* const perArmy = blip->GetPerArmyReconInfo(armyIndex);
   if (!perArmy) {
     return;
   }
@@ -1941,7 +1940,7 @@ EntitySetTemplate<Entity> CAiReconDBImpl::ReconGetJamingBlips(Unit* const unit)
       continue;
     }
 
-    PerArmyReconView* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
+    SPerArmyReconInfo* const recon = GetPerArmyReconSlot(blip, mArmy->mConstDat.mArmyIndex);
     if (recon && (recon->mReconFlags & static_cast<std::uint32_t>(RECON_KnownFake)) == 0u) {
       out.Add(reinterpret_cast<Entity*>(blip));
     }

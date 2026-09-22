@@ -637,7 +637,7 @@ void CAiTarget::UpdateTargetIsMobile(Sim* const sim)
     return;
   }
 
-  const CategoryWordRangeView* const mobileRange = sim->mRules->GetEntityCategory("MOBILE");
+  const EntityCategorySet* const mobileRange = sim->mRules->GetEntityCategory("MOBILE");
   if (!mobileRange || mobileRange->Empty()) {
     return;
   }
