@@ -574,7 +574,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\audio\AudioReflectionHelpers.cpp" />
     <ClCompile Include="moho\audio\SParamKeyTypeInfo.cpp" />
     <ClCompile Include="moho\audio\SParamKeySerializer.cpp" />
-    <ClCompile Include="moho\audio\SoundSubsystemBootstrap.cpp" />
     <ClCompile Include="moho\audio\CSndParams.cpp" />
     <ClCompile Include="moho\audio\CSndVarTypeInfo.cpp" />
     <ClCompile Include="moho\audio\CSndParamsTypeInfo.cpp" />

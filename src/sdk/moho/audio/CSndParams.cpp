@@ -55,23 +55,111 @@ namespace
   constexpr int kSndParamsUnreachableLine = 387;
   constexpr const char* kSndParamsSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\SndParams.cpp";
 
+  /**
+   * Address: 0x004DFC80 (FUN_004DFC80) -- the constructor group for the sound
+   *   subsystem's seven file-scope globals, which occupy one contiguous
+   *   0x50-byte run at 0x010A9288..0x010A92D7. Five `_Tree::_Init()` /
+   *   `_List::_Init()` expansions in declaration order, then the three
+   *   `HSndEntityLoop` dwords, then `boost::mutex::mutex` (0x00AC1A60);
+   *   returns `&gSndParamsHashCache`, the lowest global in the run, and
+   *   carries an EH funclet at 0x00BA114C so a later ctor throwing unwinds
+   *   the earlier ones.
+   * Address: 0x004DF0E0 (FUN_004DF0E0) -- the matching destructor group.
+   * Address: 0x00BC68A0 (FUN_00BC68A0) -- the `??__E` dynamic initializer that
+   *   drives both: `call 0x004DFC80` then `atexit(&0x00BF0E80)`.
+   * Address: 0x00BF0E80 (FUN_00BF0E80) -- the `??__F` thunk it registers,
+   *   `jmp 0x004DF0E0`.
+   *
+   * None of those four is source. They are what the definitions below compile
+   * to, and they were formerly transcribed by hand as `InitSoundStructs` /
+   * `TeardownSoundStructs` in moho/audio/SoundSubsystemBootstrap.cpp, over six
+   * reach-in structs restating `std::_Tree::_Node` and `std::_List::_Node`
+   * (RULE ONE) -- that file allocated six mirror blocks at startup that
+   * nothing ever read, and freed them at exit. Removed 2026-09-22.
+   *
+   * Each container in the run is 0x0C: the empty allocator/comparator pair
+   * padded to a dword, then `_Myhead`, then `_Mysize`. Each tree node is 0x18
+   * (`_Left` +0x00, `_Parent` +0x04, `_Right` +0x08, the 8-byte value at
+   * +0x0C, `_Color` +0x14, `_Isnil` +0x15) and each list node 0x0C (`_Next`
+   * +0x00, `_Prev` +0x04, value +0x08); `_Buynode` leaves `_Color = _Black`
+   * and `_Isnil = 0`, and `_Init` then sets `_Isnil = 1` and self-links.
+   *
+   * The original held all seven in one translation unit -- the binary carries
+   * its path as `c:\work\rts\main\code\src\core\SndParams.cpp`. This tree
+   * splits them, so the two `CSndVar` lanes (0x010A9294 and 0x010A92B8) are
+   * documented in CSndVar.cpp instead.
+   */
+
+  /**
+   * The shipped subsystem guards all seven globals with the single
+   * `boost::mutex` at 0x010A92D0 below, which every one of the eight accessors
+   * takes -- including this file's `RegisterSndParamsInstance` (0x004DFA50)
+   * and CSndVar.cpp's three lanes. This second lock has no counterpart in the
+   * binary; see the note on `gSharedAmbientLoopMutex`.
+   */
   std::recursive_mutex gSndParamsRegistryMutex;
+
+  /**
+   * Address: 0x010A92AC (`msvc8::list<CSndParams*>`; `_Myhead` 0x010A92B0,
+   *   `_Mysize` 0x010A92B4). Node `_Buynode` 0x004E2530 over
+   *   `allocator<_Node>::allocate` 0x004E4F70 (0x0C bytes), self-linked by the
+   *   constructor group at 0x004DFD2F. Reached only by
+   *   `RegisterSndParamsInstance` (0x004DFA50).
+   */
   msvc8::list<moho::CSndParams*> gSndParamsRegistry;
-  // Keyed on the salted parameter hash, and a multimap: the shipped insert
-  // (0x004E1FD0) descends `key < node->key ? left : right` with no
-  // equivalence probe at all before linking, which is `insert_equal`. Node
-  // 0x18, key at node+0x0C, the descriptor pointer at node+0x10, colour/nil
-  // at +0x14/+0x15 -- read off that insert and off `_Lbound` (0x004E2030).
+
+  /**
+   * Address: 0x010A9288 (`msvc8::multimap<std::uint32_t, CSndParams*>`, the
+   *   shipped `Moho::sSndParamsCache`; `_Myhead` 0x010A928C, `_Mysize`
+   *   0x010A9290). Node `_Buynode` 0x004E3B50 over `allocator<_Node>::allocate`
+   *   0x004E5160 (0x18 bytes), initialised by the constructor group at
+   *   0x004DFCA0. Reached by `FindOrCreateSndParamsByKey` (0x004DF790).
+   *
+   * Keyed on the salted parameter hash, and a multimap: the shipped insert
+   * (0x004E1FD0) descends `key < node->key ? left : right` with no
+   * equivalence probe at all before linking, which is `insert_equal`. Key at
+   * node+0x0C, the descriptor pointer at node+0x10.
+   */
   msvc8::multimap<std::uint32_t, moho::CSndParams*> gSndParamsHashCache;
-  // The shipped cache is an RB-tree keyed on the descriptor pointer: node
-  // 0x18, the mapped handle at node+0x10 and the colour/nil pair at +0x14/+0x15
-  // (0x004DF2B0 reads `[found+0x10]` and compares the result against the
-  // header). The lock beside it is a `boost::mutex`, taken through
-  // `boost::mutex::do_lock` at 0x004DF2FB.
+
+  // The shipped cache is an RB-tree keyed on the descriptor pointer: the
+  // mapped handle sits at node+0x10 (0x004DF2B0 reads `[found+0x10]` and
+  // compares the result against the header).
   using SharedAmbientLoopMap = msvc8::map<moho::CSndParams*, moho::HSndEntityLoop*>;
 
+  /**
+   * Address: 0x010A92D0 (`boost::mutex`) -- constructed by the constructor
+   *   group at 0x004DFD74 through `boost::mutex::mutex` (0x00AC1A60), which
+   *   sets `m_critical_section = true` and stores a fresh CRITICAL_SECTION, so
+   *   `do_lock` (0x00AC1AB0) takes the `EnterCriticalSection` branch.
+   *
+   * This one lock guards the whole run in the shipped binary: all eight
+   * accessors take it, and it is genuinely re-entered -- `SND_FindOrCreateVariable`
+   * (0x004DF390) locks at 0x004DF3C7, constructs a `CSndVar` at 0x004DF479,
+   * and that constructor (0x004E02B0) calls `RegisterSndVarInstance`
+   * (0x004DF990) which locks again before the outer unlock at 0x004DF482.
+   * Only the CRITICAL_SECTION backing makes that legal, which is why this tree
+   * models the two registry lanes with `std::recursive_mutex` instead. Folding
+   * the three locks back into this one is a lock-topology change that wants
+   * its own pass.
+   */
   boost::mutex gSharedAmbientLoopMutex;
+
+  /**
+   * Address: 0x010A92A0 (`msvc8::map<CSndParams*, HSndEntityLoop*>`; `_Myhead`
+   *   0x010A92A4, `_Mysize` 0x010A92A8). Node `_Buynode` 0x004E4340 over
+   *   `allocator<_Node>::allocate` 0x004E50A0 (0x18 bytes), initialised by the
+   *   constructor group at 0x004DFD00. Reached by
+   *   `GetOrCreateSharedAmbientLoop` (0x004DF2B0).
+   */
   SharedAmbientLoopMap gSharedAmbientLoopsByParams{};
+
+  /**
+   * Address: 0x010A92C4 (`HSndEntityLoop`) -- three dwords the constructor
+   *   group stores directly at 0x004DFD54..0x004DFD64 as `{0, -1, 0}`, no
+   *   allocation. Read by `GetOrCreateSharedAmbientLoop` (0x004DF2B0) and
+   *   0x008B85E0.
+   */
   moho::HSndEntityLoop gDefaultSharedAmbientLoop{nullptr, -1, nullptr};
 
   struct CSndParamsTemp

@@ -37,13 +37,47 @@ namespace
 {
   constexpr std::uint32_t kSndVarHashSalt = 0x7BEF2693u;
 
+  /**
+   * The two globals below are the `CSndVar` half of the sound subsystem's
+   * seven-global run at 0x010A9288..0x010A92D7. The whole run shares one
+   * constructor group (0x004DFC80) and one destructor group (0x004DF0E0),
+   * driven by the `??__E` initializer at 0x00BC68A0 -- so in the shipped build
+   * all seven lived in one translation unit, and CSndParams.cpp carries the
+   * full account of that run and of the node layouts.
+   *
+   * The lock that guards both of these in the binary is the single
+   * `boost::mutex` at 0x010A92D0, defined in CSndParams.cpp as
+   * `gSharedAmbientLoopMutex`; `gSndVarRegistryMutex` below has no counterpart
+   * there.
+   */
+
   std::recursive_mutex gSndVarRegistryMutex;
+
+  /**
+   * Address: 0x010A92B8 (`msvc8::list<CSndVar*>`; `_Myhead` 0x010A92BC,
+   *   `_Mysize` 0x010A92C0). Node `_Buynode` 0x004E2610 over
+   *   `allocator<_Node>::allocate` 0x004E4FF0 (0x0C bytes: `_Next` +0x00,
+   *   `_Prev` +0x04, the `CSndVar*` at +0x08), self-linked by the constructor
+   *   group at 0x004DFD44. Reached by `RegisterSndVarInstance` (0x004DF990),
+   *   `UnregisterSndVarInstance` (0x004DFA20) and `LookupSndVarNameById`
+   *   (0x004DFAE0).
+   */
   msvc8::list<moho::CSndVar*> gSndVarRegistry;
-  // A multimap, and the shipped insert (0x004E2110) is the proof: it descends
-  // `key < node->key ? left : right` and links, then returns `{node, true}` --
-  // that is `_Tree::insert`'s `if (_Multi)` branch, which never probes for an
-  // equivalent key. Node 0x18, key at node+0x0C, the variable pointer at
-  // node+0x10, colour/nil at +0x14/+0x15.
+
+  /**
+   * Address: 0x010A9294 (`msvc8::multimap<std::uint32_t, CSndVar*>`; `_Myhead`
+   *   0x010A9298, `_Mysize` 0x010A929C). Node `_Buynode` 0x004E3FD0 over
+   *   `allocator<_Node>::allocate` 0x004E51F0 (0x18 bytes), initialised by the
+   *   constructor group at 0x004DFCD2. `SND_FindOrCreateVariable` (0x004DF390)
+   *   is its only reader, and reaches it by the container's base address
+   *   rather than by `_Myhead` -- which is why a search for 0x010A9298 alone
+   *   finds nothing but the constructor and destructor groups.
+   *
+   * A multimap, and the shipped insert (0x004E2110) is the proof: it descends
+   * `key < node->key ? left : right` and links, then returns `{node, true}` --
+   * that is `_Tree::insert`'s `if (_Multi)` branch, which never probes for an
+   * equivalent key. Key at node+0x0C, the variable pointer at node+0x10.
+   */
   msvc8::multimap<std::uint32_t, moho::CSndVar*> gSndVarNameCache;
 
   [[nodiscard]] std::uint32_t HashSndVarName(const msvc8::string& name)
