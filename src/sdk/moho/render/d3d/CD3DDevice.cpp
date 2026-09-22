@@ -375,8 +375,7 @@ namespace
    */
   void ResetWorldParticleBuffers()
   {
-    auto& runtime = reinterpret_cast<moho::CWorldParticlesLayout&>(moho::sWorldParticles);
-    for (moho::ParticleBuffer* const particleBuffer : runtime.allParticleBuffers) {
+    for (moho::ParticleBuffer* const particleBuffer : moho::sWorldParticles.PooledBuffers()) {
       if (particleBuffer != nullptr) {
         particleBuffer->Reset();
       }

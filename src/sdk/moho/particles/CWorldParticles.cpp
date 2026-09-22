@@ -927,24 +927,12 @@ namespace moho
    */
   CWorldParticles::CWorldParticles()
   {
-    // mParticleBuffers, mAvailableParticleBuffers and mTrailSegmentPool are
-    // built by their member constructors: the binary buys the two list heads
-    // through 0x00497D00 (`_Buy_head`) and the set head through 0x0049C620
-    // before this body runs.
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
-
-    // The three bucket maps live inside this object's raw storage, reached
-    // through the runtime view, so their constructors (which buy the header
-    // sentinel) have to run explicitly -- the binary inlines exactly that.
-    new (&runtime.particleBuckets) ParticleBucketMap();
-    new (&runtime.refractingParticleBuckets) ParticleBucketMap();
-    new (&runtime.trailBuckets) TrailBucketMap();
-
-    new (&runtime.particleBucketLookupKey) SParticleBucketKey{};
-    runtime.cachedParticleBucket = nullptr;
-    new (&runtime.trailBucketLookupKey) STrailBucketKey{};
-    runtime.cachedTrailBucket = nullptr;
-
+    // Every member above is built by its own constructor before this body runs
+    // -- the two list heads through 0x00497D00 (`_Buy_head`), the set head
+    // through 0x0049C620, the three bucket maps' header sentinels likewise, and
+    // the two lookup keys' string and handle lanes. The binary inlines all of
+    // it here, which is what it looks like when a constructor's member list is
+    // the whole story.
     mBeatsSincePause = 0;
     mInstantiated = false;
     mBeams.mVertexSheet = nullptr;
@@ -961,16 +949,14 @@ namespace moho
    */
   CWorldParticles::~CWorldParticles()
   {
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
-
     DestroyWorldParticlesSingleton();
 
-    ResetTrailBucketKeyResources(runtime.trailBucketLookupKey);
-    ResetParticleBucketKeyResources(runtime.particleBucketLookupKey);
-
-    runtime.trailBuckets.~TrailBucketMap();
-    runtime.refractingParticleBuckets.~ParticleBucketMap();
-    runtime.particleBuckets.~ParticleBucketMap();
+    // What followed here -- release the trail lookup key, then the particle
+    // lookup key, then the three bucket maps -- is reverse declaration order,
+    // so it is the member teardown MSVC emits, not a source line
+    // (CLAUDE.md RULE ONE). `ResetParticleBucketKeyResources` (0x00492EF0) and
+    // its trail twin (0x00492FC0) are those keys' implicit destructors; they
+    // stay named because the scratch-key lookups below call them deliberately.
     // mBeams (0x00493090), mTrailSegmentPool (`erase(begin(), end())`
     // 0x0049A6C0 + head free), mAvailableParticleBuffers and mParticleBuffers
     // (`_Tidy` 0x00495F30 + head free) are destroyed by their member
@@ -1068,20 +1054,19 @@ namespace moho
       return;
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
     SParticleBucketKey lookupKey{};
     (void)InitializeParticleBucketKeyFromWorldParticle(&lookupKey, particle);
 
     if (static_cast<std::int32_t>(particle.mBlendMode) == 5) {
-      auto bucketEntry = runtime.refractingParticleBuckets.find(lookupKey);
-      if (bucketEntry == runtime.refractingParticleBuckets.end()) {
+      auto bucketEntry = mRefractingParticleBuckets.find(lookupKey);
+      if (bucketEntry == mRefractingParticleBuckets.end()) {
         // Must be constructed, not just allocated: the bucket owns two
         // shared_ptr texture handles, an msvc8::string and two vectors, and
         // InitializeParticleRenderBucketFromWorldParticle's first act is to
         // `reset()` those handles.
         auto* const newBucket = new SParticleRenderBucket();
         (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
-        bucketEntry = runtime.refractingParticleBuckets.insert({lookupKey, newBucket}).first;
+        bucketEntry = mRefractingParticleBuckets.insert({lookupKey, newBucket}).first;
       }
 
       bucketEntry->second->pendingParticles.push_back(particle);
@@ -1089,24 +1074,24 @@ namespace moho
       return;
     }
 
-    if (runtime.cachedParticleBucket != nullptr &&
-        AreParticleBucketKeysEquivalent(runtime.particleBucketLookupKey, lookupKey)) {
-      runtime.cachedParticleBucket->pendingParticles.push_back(particle);
+    if (mCachedParticleBucket != nullptr &&
+        AreParticleBucketKeysEquivalent(mParticleBucketLookupKey, lookupKey)) {
+      mCachedParticleBucket->pendingParticles.push_back(particle);
       ResetParticleBucketKeyResources(lookupKey);
       return;
     }
 
-    auto bucketEntry = runtime.particleBuckets.find(lookupKey);
-    if (bucketEntry == runtime.particleBuckets.end()) {
+    auto bucketEntry = mParticleBuckets.find(lookupKey);
+    if (bucketEntry == mParticleBuckets.end()) {
       auto* const newBucket = new SParticleRenderBucket();
       (void)InitializeParticleRenderBucketFromWorldParticle(*newBucket, particle, this);
-      bucketEntry = runtime.particleBuckets.insert({lookupKey, newBucket}).first;
+      bucketEntry = mParticleBuckets.insert({lookupKey, newBucket}).first;
     }
 
     SParticleRenderBucket* const bucket = bucketEntry->second;
     bucket->pendingParticles.push_back(particle);
-    (void)CopyParticleBucketKey(&runtime.particleBucketLookupKey, &lookupKey);
-    runtime.cachedParticleBucket = bucket;
+    (void)CopyParticleBucketKey(&mParticleBucketLookupKey, &lookupKey);
+    mCachedParticleBucket = bucket;
 
     if (bucketCacheSlot != nullptr) {
       *bucketCacheSlot = bucket;
@@ -1137,28 +1122,27 @@ namespace moho
       return;
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
     STrailBucketKey lookupKey{};
     (void)InitializeTrailBucketKeyFromTrail(&lookupKey, trail);
 
-    if (runtime.cachedTrailBucket != nullptr &&
-        AreTrailBucketKeysEquivalent(runtime.trailBucketLookupKey, lookupKey)) {
-      runtime.cachedTrailBucket->pendingTrails.push_back(trail);
+    if (mCachedTrailBucket != nullptr &&
+        AreTrailBucketKeysEquivalent(mTrailBucketLookupKey, lookupKey)) {
+      mCachedTrailBucket->pendingTrails.push_back(trail);
       ResetTrailBucketKeyResources(lookupKey);
       return;
     }
 
-    auto bucketEntry = runtime.trailBuckets.find(lookupKey);
-    if (bucketEntry == runtime.trailBuckets.end()) {
+    auto bucketEntry = mTrailBuckets.find(lookupKey);
+    if (bucketEntry == mTrailBuckets.end()) {
       auto* const newBucket = new STrailRenderBucket();
       (void)InitializeTrailRenderBucketFromTrail(*newBucket, trail, this);
-      bucketEntry = runtime.trailBuckets.insert({lookupKey, newBucket}).first;
+      bucketEntry = mTrailBuckets.insert({lookupKey, newBucket}).first;
     }
 
     STrailRenderBucket* const bucket = bucketEntry->second;
     bucket->pendingTrails.push_back(trail);
-    (void)CopyTrailBucketKey(&runtime.trailBucketLookupKey, &lookupKey);
-    runtime.cachedTrailBucket = bucket;
+    (void)CopyTrailBucketKey(&mTrailBucketLookupKey, &lookupKey);
+    mCachedTrailBucket = bucket;
 
     if (bucketCacheSlot != nullptr) {
       *bucketCacheSlot = bucket;
@@ -1234,12 +1218,11 @@ namespace moho
       device->SetColorWriteState(true, false);
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
     char renderResult = 0;
     const auto renderAboveSurface = renderWaterSurface == 0;
     const float waterSurface = efx_ParticleWaterSurface;
 
-    for (const auto& [bucketKey, bucket] : runtime.particleBuckets) {
+    for (const auto& [bucketKey, bucket] : mParticleBuckets) {
       if (renderAboveSurface) {
         if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
           (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), suppressTLight != 0);
@@ -1254,7 +1237,7 @@ namespace moho
       }
     }
 
-    for (const auto& [bucketKey, bucket] : runtime.trailBuckets) {
+    for (const auto& [bucketKey, bucket] : mTrailBuckets) {
       if (renderAboveSurface) {
         if (bucketKey.sortScalar >= waterSurface && bucket != nullptr) {
           renderResult = static_cast<char>(
@@ -1300,8 +1283,7 @@ namespace moho
       shaderVarParticleBackgroundTexture.SetRenderTargetTexture(backgroundTexture);
     }
 
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(*this);
-    for (const auto& [bucketKey, bucket] : runtime.refractingParticleBuckets) {
+    for (const auto& [bucketKey, bucket] : mRefractingParticleBuckets) {
       (void)bucketKey;
       if (bucket != nullptr) {
         (void)moho::RenderParticleBucket(*bucket, static_cast<float>(tick), false);
@@ -1378,34 +1360,34 @@ namespace moho
   void CWorldParticles::ClearRenderBuckets()
   {
     CWorldParticles& worldParticles = *this;
-    auto& runtime = reinterpret_cast<CWorldParticlesLayout&>(worldParticles);
+    CWorldParticles& runtime = worldParticles;
 
     // Each entry owns its bucket, so the payload goes before the node.
-    for (const auto& [bucketKey, bucket] : runtime.particleBuckets) {
+    for (const auto& [bucketKey, bucket] : mParticleBuckets) {
       (void)bucketKey;
       DestroyParticleRenderBucket(*bucket);
       ::operator delete(bucket);
     }
-    runtime.particleBuckets.clear();
+    mParticleBuckets.clear();
 
-    for (const auto& [bucketKey, bucket] : runtime.refractingParticleBuckets) {
+    for (const auto& [bucketKey, bucket] : mRefractingParticleBuckets) {
       (void)bucketKey;
       DestroyParticleRenderBucket(*bucket);
       ::operator delete(bucket);
     }
-    runtime.refractingParticleBuckets.clear();
+    mRefractingParticleBuckets.clear();
 
-    for (const auto& [bucketKey, bucket] : runtime.trailBuckets) {
+    for (const auto& [bucketKey, bucket] : mTrailBuckets) {
       (void)bucketKey;
       DestroyTrailRenderBucket(*bucket);
       ::operator delete(bucket);
     }
-    runtime.trailBuckets.clear();
+    mTrailBuckets.clear();
 
-    runtime.cachedParticleBucket = nullptr;
-    runtime.cachedTrailBucket = nullptr;
-    ResetParticleBucketKeyResources(runtime.particleBucketLookupKey);
-    ResetTrailBucketKeyResources(runtime.trailBucketLookupKey);
+    mCachedParticleBucket = nullptr;
+    mCachedTrailBucket = nullptr;
+    ResetParticleBucketKeyResources(mParticleBucketLookupKey);
+    ResetTrailBucketKeyResources(mTrailBucketLookupKey);
     worldParticles.mBeams.mBuckets.clear();
   }
 

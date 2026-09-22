@@ -106,79 +106,6 @@ namespace moho
 
   static_assert(sizeof(TrailBucketMap) == 0x0C, "TrailBucketMap size must be 0x0C");
 
-  /**
-   * What it does:
-   * Typed constructor/init runtime view for `CWorldParticles` lanes through
-   * offset `+0xC8`.
-   */
-  struct CWorldParticlesLayout
-  {
-    void* vtable = nullptr;                                 // +0x00
-    msvc8::list<ParticleBuffer*> allParticleBuffers;       // +0x04
-    msvc8::list<ParticleBuffer*> availableParticleBuffers; // +0x10
-    TrailSegmentPool trailSegmentPool;               // +0x1C
-    ParticleBucketMap particleBuckets;                      // +0x28
-    ParticleBucketMap refractingParticleBuckets;            // +0x34
-    TrailBucketMap trailBuckets;                            // +0x40
-    SParticleBucketKey particleBucketLookupKey;       // +0x4C
-    SParticleRenderBucket* cachedParticleBucket = nullptr; // +0x88
-    STrailBucketKey trailBucketLookupKey;             // +0x8C
-    STrailRenderBucket* cachedTrailBucket = nullptr;  // +0xC0
-    std::int32_t beatsSincePause = 0;                       // +0xC4
-    bool instantiated = false;                              // +0xC8
-    std::uint8_t paddingC9_CB[0x03]{};                      // +0xC9
-  };
-
-  static_assert(
-    offsetof(CWorldParticlesLayout, allParticleBuffers) == 0x04,
-    "CWorldParticlesLayout::allParticleBuffers offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, availableParticleBuffers) == 0x10,
-    "CWorldParticlesLayout::availableParticleBuffers offset must be 0x10"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, trailSegmentPool) == 0x1C,
-    "CWorldParticlesLayout::trailSegmentPool offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, particleBuckets) == 0x28,
-    "CWorldParticlesLayout::particleBuckets offset must be 0x28"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, refractingParticleBuckets) == 0x34,
-    "CWorldParticlesLayout::refractingParticleBuckets offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, trailBuckets) == 0x40,
-    "CWorldParticlesLayout::trailBuckets offset must be 0x40"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, particleBucketLookupKey) == 0x4C,
-    "CWorldParticlesLayout::particleBucketLookupKey offset must be 0x4C"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, cachedParticleBucket) == 0x88,
-    "CWorldParticlesLayout::cachedParticleBucket offset must be 0x88"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, trailBucketLookupKey) == 0x8C,
-    "CWorldParticlesLayout::trailBucketLookupKey offset must be 0x8C"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, cachedTrailBucket) == 0xC0,
-    "CWorldParticlesLayout::cachedTrailBucket offset must be 0xC0"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, beatsSincePause) == 0xC4,
-    "CWorldParticlesLayout::beatsSincePause offset must be 0xC4"
-  );
-  static_assert(
-    offsetof(CWorldParticlesLayout, instantiated) == 0xC8,
-    "CWorldParticlesLayout::instantiated offset must be 0xC8"
-  );
-  static_assert(sizeof(CWorldParticlesLayout) == 0xCC, "CWorldParticlesLayout size must be 0xCC");
-
   class CWorldParticles
   {
   public:
@@ -369,8 +296,19 @@ namespace moho
      */
     virtual void AdvancementBeat();
 
+    /**
+     * Every pooled particle buffer, including the ones currently bound to a
+     * render work item. The D3D device's reset path walks this to drop every
+     * buffer's GPU handles (inlined there, at 0x0042E252).
+     */
+    [[nodiscard]] const msvc8::list<ParticleBuffer*>& PooledBuffers() const noexcept
+    {
+      return mParticleBuffers;
+    }
+
   private:
     friend void DestroyWorldParticlesSingleton();
+    friend struct CWorldParticlesLayoutVerifier;
 
     /**
      * Every pooled particle buffer (IDA: `mParticleBuffers`) and the subset not
@@ -381,12 +319,64 @@ namespace moho
     msvc8::list<ParticleBuffer*> mParticleBuffers;            // +0x04
     msvc8::list<ParticleBuffer*> mAvailableParticleBuffers;   // +0x10
     /** Pooled trail-segment vertex buffers (head bought through 0x0049C620). */
-    msvc8::set<STrailSegmentBuffer*> mTrailSegmentPool; // +0x1C
-    std::uint8_t mUnknown28_C3[0x9C]{};     // +0x28  bucket maps + lookup keys, see CWorldParticlesLayout
-    std::int32_t mBeatsSincePause = 0;      // +0xC4
-    bool mInstantiated = false;             // +0xC8
-    std::uint8_t mPaddingC9_CB[0x03]{};     // +0xC9
-    SBeamBucketContainer mBeams;      // +0xCC
+    msvc8::set<STrailSegmentBuffer*> mTrailSegmentPool;      // +0x1C
+
+    /**
+     * The three render-bucket maps, and beside each the scratch key the lookup
+     * builds and the bucket that key last resolved to -- so a run of particles
+     * sharing one key skips the tree walk entirely.
+     *
+     * These seven sat behind a `std::uint8_t mUnknown28_C3[0x9C]` blob, with a
+     * duplicate `CWorldParticlesLayout` declaring them for real and eight
+     * `reinterpret_cast<CWorldParticlesLayout&>(*this)` sites reaching in. The
+     * blob is why `CWorldParticles`'s constructor had to placement-new five of
+     * them and its destructor had to destroy five by hand; both are ordinary
+     * member construction now.
+     */
+    ParticleBucketMap mParticleBuckets;                      // +0x28
+    ParticleBucketMap mRefractingParticleBuckets;            // +0x34
+    TrailBucketMap mTrailBuckets;                            // +0x40
+    SParticleBucketKey mParticleBucketLookupKey;             // +0x4C
+    SParticleRenderBucket* mCachedParticleBucket = nullptr;  // +0x88
+    STrailBucketKey mTrailBucketLookupKey;                   // +0x8C
+    STrailRenderBucket* mCachedTrailBucket = nullptr;        // +0xC0
+
+    std::int32_t mBeatsSincePause = 0;                       // +0xC4
+    bool mInstantiated = false;                              // +0xC8
+    std::uint8_t mPaddingC9_CB[0x03]{};                      // +0xC9
+    SBeamBucketContainer mBeams;                             // +0xCC
+  };
+
+  struct CWorldParticlesLayoutVerifier
+  {
+    static_assert(offsetof(CWorldParticles, mParticleBuffers) == 0x04, "CWorldParticles::mParticleBuffers offset must be 0x04");
+    static_assert(
+      offsetof(CWorldParticles, mAvailableParticleBuffers) == 0x10,
+      "CWorldParticles::mAvailableParticleBuffers offset must be 0x10"
+    );
+    static_assert(offsetof(CWorldParticles, mTrailSegmentPool) == 0x1C, "CWorldParticles::mTrailSegmentPool offset must be 0x1C");
+    static_assert(offsetof(CWorldParticles, mParticleBuckets) == 0x28, "CWorldParticles::mParticleBuckets offset must be 0x28");
+    static_assert(
+      offsetof(CWorldParticles, mRefractingParticleBuckets) == 0x34,
+      "CWorldParticles::mRefractingParticleBuckets offset must be 0x34"
+    );
+    static_assert(offsetof(CWorldParticles, mTrailBuckets) == 0x40, "CWorldParticles::mTrailBuckets offset must be 0x40");
+    static_assert(
+      offsetof(CWorldParticles, mParticleBucketLookupKey) == 0x4C,
+      "CWorldParticles::mParticleBucketLookupKey offset must be 0x4C"
+    );
+    static_assert(
+      offsetof(CWorldParticles, mCachedParticleBucket) == 0x88,
+      "CWorldParticles::mCachedParticleBucket offset must be 0x88"
+    );
+    static_assert(
+      offsetof(CWorldParticles, mTrailBucketLookupKey) == 0x8C,
+      "CWorldParticles::mTrailBucketLookupKey offset must be 0x8C"
+    );
+    static_assert(offsetof(CWorldParticles, mCachedTrailBucket) == 0xC0, "CWorldParticles::mCachedTrailBucket offset must be 0xC0");
+    static_assert(offsetof(CWorldParticles, mBeatsSincePause) == 0xC4, "CWorldParticles::mBeatsSincePause offset must be 0xC4");
+    static_assert(offsetof(CWorldParticles, mInstantiated) == 0xC8, "CWorldParticles::mInstantiated offset must be 0xC8");
+    static_assert(offsetof(CWorldParticles, mBeams) == 0xCC, "CWorldParticles::mBeams offset must be 0xCC");
   };
 
   extern CWorldParticles sWorldParticles;
