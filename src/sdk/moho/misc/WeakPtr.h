@@ -207,6 +207,11 @@ namespace moho
      * Address: 0x0056AA00 (FUN_0056AA00, Moho::WeakPtr_IUnit::WeakPtr_IUnit)
      * Address: 0x005A6DB0 (FUN_005A6DB0)
      * Address: 0x0057D560 (FUN_0057D560)
+     * Address: 0x00686080 (FUN_00686080 -- this constructor emitted out of line
+     * with the node in EAX and the object in ECX: `slot = object ? object + 4 : 0`,
+     * push-front on that slot. Zero callers, no pointer or jump to it anywhere
+     * in the image. Formerly `LinkBackLinkNodeFromOwnerLane` in
+     * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      *
      * What it does:
      * Initializes one weak-pointer node from an owner object pointer and links
@@ -248,6 +253,11 @@ namespace moho
      * counterpart to `operator=` below, and the shape every relinking
      * copy lane in this header (`FillConstructRange`,
      * `CopyWeakPtrPayloadRangeCore`, ...) is a vectorised emission of.
+     *
+     * Address: 0x00686D50 (FUN_00686D50 -- this constructor emitted out of line,
+     * node in EAX, source in ECX; zero callers, no pointer or jump to it anywhere
+     * in the image. Formerly `LinkBackLinkNodeFromBackRefOwner` in
+     * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
     WeakPtr(const WeakPtr<T>& other) noexcept
       : ownerLinkSlot(other.ownerLinkSlot)
@@ -268,6 +278,10 @@ namespace moho
      * i.e. exactly `ResetFromOwnerLinkSlot(other.ownerLinkSlot)`, which is
      * why the two share one body in the binary.
      * Address: 0x00836B90 (FUN_00836B90 -- `WeakPtr<T>::operator=` (unlink from the old owner chain, relink at `other.ownerLinkSlot`), 48-byte element; `RebuildFactoryQueueDisplaySnapshot` 0x00835DF0; callers 0x00835DF0; formerly `RelinkIntrusiveNodeViaIndirectOwner` in moho/containers/LegacyContainerRuntime.cpp (RULE ONE), file removed 2026-09-10.)
+     * Address: 0x006886D0 (FUN_006886D0 -- `operator=`, node in EAX, source in
+     * EDX; zero callers, no pointer or jump to it anywhere in the image. Formerly
+     * `RebindBackLinkNode` in moho/entity/EntityDb.cpp (RULE THREE), removed
+     * 2026-09-22.)
      */
     WeakPtr<T>& operator=(const WeakPtr<T>& other) noexcept
     {
@@ -298,6 +312,10 @@ namespace moho
      * What it does:
      * Decodes one weak owner-link slot back to the owning object pointer
      * (`slot - kOwnerLinkOffset`), returning null for empty/sentinel lanes.
+     * Address: 0x006860D0 (FUN_006860D0 -- this accessor emitted out of line,
+     * node in EAX: `slot ? slot - 4 : 0`; zero callers, no pointer or jump to it
+     * anywhere in the image. Formerly `ResolveBackLinkNodeOwner` in
+     * moho/entity/EntityDb.cpp (RULE THREE), removed 2026-09-22.)
      */
     [[nodiscard]] static T* DecodeOwnerObject(void* slot) noexcept
     {
