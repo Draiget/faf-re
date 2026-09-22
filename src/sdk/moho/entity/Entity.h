@@ -1468,7 +1468,27 @@ namespace moho
     Wm3::Vector3f PrevPosition;                // 0x00C8
     float mVelocityScale;                      // 0x00D4
     float FractionCompleted;                   // 0x00D8
-    std::uint8_t pad_00DC_0108[0x108 - 0x0DC]; // 0x00DC
+
+    /**
+     * The replicated mirror of this entity's attachment state: the parent's id
+     * (or `EEntityIdSentinel::Invalid`), and one id per attached child.
+     * `Entity::SyncInterface` rewrites both from the live `mAttachInfo` (+0x18C)
+     * and `mAttachedEntities` (+0x17C) lanes every sync, because `UserEntity`
+     * rebuilds its bone attachments from them on the client.
+     */
+    std::uint32_t mAttachParentId;             // 0x00DC (variable data +0x64)
+    SSTIInlineUIntVector mAttachedEntityIds;   // 0x00E0 (variable data +0x68)
+
+    /**
+     * Texture-scroll UV at the start and at the end of the current beat.
+     * `UserEntity::GetInterpolatedScroll` renders
+     * `start + (end - start) * alpha`, so every mutator shifts the end lane
+     * into the start lane before writing a new end -- that is all
+     * `UpdateScroll`, `SetAnimScroll` and `StopScroll` are doing.
+     */
+    Wm3::Vector2f mScrollBeatStart;            // 0x00F8 (variable data +0x80)
+    Wm3::Vector2f mScrollBeatEnd;              // 0x0100 (variable data +0x88)
+
     CSndParams* mAmbientSound;                 // 0x0108
     CSndParams* mRumbleSound;                  // 0x010C
     std::uint8_t mVisibilityState;             // 0x0110

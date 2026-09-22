@@ -276,40 +276,53 @@ namespace
     return &syncData->mNewEntities.back();
   }
 
-  struct EntityTextureScrollRuntimeView
-  {
-    std::uint8_t pad_0000_00F8[0xF8];
-    Wm3::Vector2f mScroll1; // +0xF8
-    Wm3::Vector2f mScroll2; // +0x100
-  };
-  static_assert(
-    offsetof(EntityTextureScrollRuntimeView, mScroll1) == 0xF8,
-    "EntityTextureScrollRuntimeView::mScroll1 offset must be 0xF8"
-  );
-  static_assert(
-    offsetof(EntityTextureScrollRuntimeView, mScroll2) == 0x100,
-    "EntityTextureScrollRuntimeView::mScroll2 offset must be 0x100"
-  );
-  static_assert(sizeof(EntityTextureScrollRuntimeView) == 0x108, "EntityTextureScrollRuntimeView size must be 0x108");
-
-  [[nodiscard]] EntityTextureScrollRuntimeView& AccessEntityTextureScrollRuntime(moho::Entity& entity) noexcept
-  {
-    return *reinterpret_cast<EntityTextureScrollRuntimeView*>(&entity);
-  }
-
   /**
-   * Typed overlay onto the entity's replicated variable-data block, which the
-   * engine flattened into `Entity` starting at +0x78 (the shared_ptr / mesh /
-   * health / transform lanes at Entity +0x78.. mirror `SSTIEntityVariableData`
-   * field-for-field). `Entity::SyncInterface` (FUN_0067A290) reads/writes this
-   * block: `lea eax, [edi+78h]` (0x0067A3AD) hands the payload to
-   * `SSTIEntityVariableData::operator=`, and the attachment lanes it mutates sit
-   * at +0x64 (`mAttachmentParentRef`) and +0x68 (`mAuxValueVector`).
+   * `Entity` +0x78..+0x147 *is* an `SSTIEntityVariableData`: the binary hands
+   * `&this->mVarDat` to that type's constructor, destructor and `operator=`
+   * (`lea eax, [edi+78h]` at 0x0067A3AD in `Entity::SyncInterface`). This tree
+   * still spells the block out as flat `Entity` members, so the one place that
+   * needs the whole block at once has to say so -- and this is that place:
+   * `Entity::SyncInterface` ships the block to the client verbatim.
+   *
+   * The cross-checks below pin the two spellings together so neither can drift
+   * while the duplicate stands. Folding the block into a real `mVarDat` member
+   * retires this alias for good; see the reconstruction report for the field
+   * map and the lanes whose types disagree.
    */
-  [[nodiscard]] moho::SSTIEntityVariableData& EntityVariableData(moho::Entity& entity) noexcept
+  [[nodiscard]] moho::SSTIEntityVariableData& EntityVariableDataBlock(moho::Entity& entity) noexcept
   {
     return *reinterpret_cast<moho::SSTIEntityVariableData*>(reinterpret_cast<std::uint8_t*>(&entity) + 0x78);
   }
+
+  constexpr bool BlockLaneMatches(const std::size_t entityOffset, const std::size_t blockOffset) noexcept
+  {
+    return entityOffset == blockOffset + 0x78u;
+  }
+
+  static_assert(BlockLaneMatches(offsetof(moho::Entity, mMeshRef), offsetof(moho::SSTIEntityVariableData, mScmResource)));
+  static_assert(BlockLaneMatches(offsetof(moho::Entity, Health), offsetof(moho::SSTIEntityVariableData, mHealth)));
+  static_assert(BlockLaneMatches(offsetof(moho::Entity, Orientation), offsetof(moho::SSTIEntityVariableData, mCurTransform)));
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, PrevOrientation), offsetof(moho::SSTIEntityVariableData, mLastTransform))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, mAttachParentId), offsetof(moho::SSTIEntityVariableData, mAttachmentParentRef))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, mAttachedEntityIds), offsetof(moho::SSTIEntityVariableData, mAuxValueVector))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, mScrollBeatStart), offsetof(moho::SSTIEntityVariableData, mScroll0U))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, mScrollBeatEnd), offsetof(moho::SSTIEntityVariableData, mScroll1U))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, mAmbientSound), offsetof(moho::SSTIEntityVariableData, mAmbientSound))
+  );
+  static_assert(
+    BlockLaneMatches(offsetof(moho::Entity, IntelAttributes), offsetof(moho::SSTIEntityVariableData, mIntelAttributes))
+  );
 
   /**
    * Applies the defaults `SSTIEntityVariableData::SSTIEntityVariableData`
@@ -327,19 +340,15 @@ namespace
    */
   void ResetEntityVariableDataDefaults(moho::Entity& entity) noexcept
   {
-    moho::SSTIEntityVariableData& varData = EntityVariableData(entity);
+    entity.mAttachParentId = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
 
-    varData.mAttachmentParentRef = moho::ToRaw(moho::EEntityIdSentinel::Invalid);
+    entity.mAttachedEntityIds.mInlineStorage0 =
+      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&entity.mAttachedEntityIds.mInlineStorage1));
+    entity.mAttachedEntityIds.mInlineStorage1 = 0u;
+    entity.mAttachedEntityIds.ResetToInlineStorage();
 
-    varData.mAuxValueVector.mInlineStorage0 =
-      static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(&varData.mAuxValueVector.mInlineStorage1));
-    varData.mAuxValueVector.mInlineStorage1 = 0u;
-    varData.mAuxValueVector.ResetToInlineStorage();
-
-    varData.mScroll0U = 0.0f;
-    varData.mScroll0V = 0.0f;
-    varData.mScroll1U = 0.0f;
-    varData.mScroll1V = 0.0f;
+    entity.mScrollBeatStart = Wm3::Vector2f{0.0f, 0.0f};
+    entity.mScrollBeatEnd = Wm3::Vector2f{0.0f, 0.0f};
 
     // The block's tail, named as `Entity` fields here but the same words the
     // binary's constructor writes at 0x00558801..0x0055882F.
@@ -442,8 +451,7 @@ namespace
     const std::int32_t scrollerType = scroller.mScroller.mType;
 
     if (scrollerType == static_cast<std::int32_t>(TextureScrollerMode::None)) {
-      EntityTextureScrollRuntimeView& entityScrollRuntime = AccessEntityTextureScrollRuntime(*scroller.mEntity);
-      entityScrollRuntime.mScroll2 = entityScrollRuntime.mScroll1;
+      scroller.mEntity->StopScroll();
       return scrollerType;
     }
 
@@ -2677,7 +2685,7 @@ namespace moho
     // does not already tear down through a named `Entity` member is the inline
     // auxiliary-id vector, which leaks its heap buffer once
     // `Entity::SyncInterface` has grown it past the inline capacity.
-    EntityVariableData(*this).mAuxValueVector.ReleaseDynamicStorage();
+    mAttachedEntityIds.ReleaseDynamicStorage();
 
     // Decrement the Entity instance-count stat (binary FUN_006785D0 line 73:
     // _InterlockedExchangeAdd(&InstanceCounter<Entity>::GetStatItem()->mCounter, -1)).
@@ -3554,9 +3562,8 @@ namespace moho
    */
   void Entity::UpdateScrollPos(const Wm3::Vec2f& scrollPosition)
   {
-    EntityTextureScrollRuntimeView& scrollRuntime = AccessEntityTextureScrollRuntime(*this);
-    scrollRuntime.mScroll1 = scrollPosition;
-    scrollRuntime.mScroll2 = scrollPosition;
+    mScrollBeatStart = scrollPosition;
+    mScrollBeatEnd = scrollPosition;
   }
 
   /**
@@ -3568,11 +3575,10 @@ namespace moho
    */
   void Entity::UpdateScroll(const Wm3::Vec2f& scrollDelta)
   {
-    EntityTextureScrollRuntimeView& scrollRuntime = AccessEntityTextureScrollRuntime(*this);
-    const Wm3::Vec2f currentScroll = scrollRuntime.mScroll2;
-    scrollRuntime.mScroll1 = currentScroll;
-    scrollRuntime.mScroll2.x = currentScroll.x + scrollDelta.x;
-    scrollRuntime.mScroll2.y = currentScroll.y + scrollDelta.y;
+    const Wm3::Vec2f beatEnd = mScrollBeatEnd;
+    mScrollBeatStart = beatEnd;
+    mScrollBeatEnd.x = beatEnd.x + scrollDelta.x;
+    mScrollBeatEnd.y = beatEnd.y + scrollDelta.y;
   }
 
   /**
@@ -3583,8 +3589,7 @@ namespace moho
    */
   void Entity::StopScroll()
   {
-    EntityTextureScrollRuntimeView& scrollRuntime = AccessEntityTextureScrollRuntime(*this);
-    scrollRuntime.mScroll2 = scrollRuntime.mScroll1;
+    mScrollBeatEnd = mScrollBeatStart;
   }
 
   /**
@@ -3596,11 +3601,9 @@ namespace moho
    */
   void Entity::SetAnimScroll(const float scrollX, const float scrollY)
   {
-    EntityTextureScrollRuntimeView& scrollRuntime = AccessEntityTextureScrollRuntime(*this);
-    const Wm3::Vec2f previousScroll = scrollRuntime.mScroll2;
-    scrollRuntime.mScroll1 = previousScroll;
-    scrollRuntime.mScroll2.x = scrollX;
-    scrollRuntime.mScroll2.y = scrollY;
+    mScrollBeatStart = mScrollBeatEnd;
+    mScrollBeatEnd.x = scrollX;
+    mScrollBeatEnd.y = scrollY;
   }
 
   /**
@@ -4091,20 +4094,18 @@ namespace moho
   {
     constexpr std::uint32_t kInvalidEntityId = ToRaw(EEntityIdSentinel::Invalid);
 
-    SSTIEntityVariableData& varData = EntityVariableData(*this);
-
     Entity* const parent = mAttachInfo.GetAttachTargetEntity();
-    varData.mAttachmentParentRef = parent ? parent->id_ : kInvalidEntityId;
+    mAttachParentId = parent ? parent->id_ : kInvalidEntityId;
 
-    ResizeAndFillAuxValueVector(varData.mAuxValueVector, mAttachedEntities.size(), kInvalidEntityId);
+    ResizeAndFillAuxValueVector(mAttachedEntityIds, mAttachedEntities.size(), kInvalidEntityId);
     for (std::size_t i = 0; i < mAttachedEntities.size(); ++i) {
       Entity* const child = mAttachedEntities[i];
-      varData.mAuxValueVector.mBegin[i] = child ? child->id_ : kInvalidEntityId;
+      mAttachedEntityIds.mBegin[i] = child ? child->id_ : kInvalidEntityId;
     }
 
-
-
-    (void)QueueEntityVariableUpdate(syncData, id_, varData);
+    // The whole block goes to the client verbatim; this is the one place that
+    // needs it as an `SSTIEntityVariableData` rather than as named lanes.
+    (void)QueueEntityVariableUpdate(syncData, id_, EntityVariableDataBlock(*this));
   }
 
   /**
