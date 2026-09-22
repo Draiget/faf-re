@@ -536,6 +536,35 @@ Wm3::Vec3f CAiTarget::GetTargetPosGun(const bool useActualPos)
 }
 
 /**
+ * Address: 0x0062CB90 (FUN_0062CB90)
+ *
+ * What it does:
+ * Tests this target's entity against the simulation map bounds; false when the
+ * weak target link no longer resolves.
+ *
+ * Every call site in the shipped binary inlined this, so only the out-of-line
+ * COMDAT survives and no `call 0x62cb90` appears anywhere in the image. The
+ * linker placed that COMDAT immediately after `Entity::IsInBounds`
+ * (0x0062CB60), whose body it repeats verbatim after the weak-link decode.
+ *
+ * This lived in `moho/entity/Entity.cpp` as a free function
+ * `IsEntityWeakBoundsProbeWithin` over an invented 8-byte
+ * `EntityWeakBoundsProbe { std::uint32_t mUnknown0000; void* mOwnerLinkSlot; }`.
+ * That shape is `CAiTarget`'s first two members -- `targetType` at +0x00 and
+ * `targetEntity.ownerLinkSlot` at +0x04 -- and `CAiTarget` is the only type in
+ * the tree carrying a `WeakPtr<Entity>` at +0x04.
+ */
+bool CAiTarget::IsInBounds(const bool wholeMap, const float border) const
+{
+  const Entity* const entity = targetEntity.GetObjectPtr();
+  if (entity == nullptr) {
+    return false;
+  }
+
+  return entity->IsInBounds(wholeMap, border);
+}
+
+/**
  * Address: 0x005E2CE0 (FUN_005E2CE0, Moho::CAiTarget::GetEntity)
  *
  * What it does:

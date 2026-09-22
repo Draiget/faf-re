@@ -121,6 +121,26 @@ namespace moho
     [[nodiscard]] Entity* GetEntity() const;
 
     /**
+     * Address: 0x0062CB90 (FUN_0062CB90)
+     *
+     * IDA signature:
+     * char __usercall sub_62CB90@<al>(CAiTarget *this@<eax>, bool wholeMap@<ecx>, float border);
+     *
+     * What it does:
+     * Tests this target's entity against the simulation map bounds, the same
+     * test `Entity::IsInBounds` runs, and answers false when the target does not
+     * resolve to a live entity.
+     *
+     * The body is `Entity::IsInBounds` (0x0062CB60) instruction for instruction
+     * behind a weak-link decode: `mov eax, [eax+4]` reads `targetEntity`'s owner
+     * slot, `add eax, -4` turns it back into the `Entity*` and the `je` after it
+     * is the `slot == kOwnerLinkOffset` sentinel test -- i.e. exactly
+     * `targetEntity.GetObjectPtr()`, not `GetEntity()`, so a recon blip is
+     * tested where it sits rather than at its source unit.
+     */
+    [[nodiscard]] bool IsInBounds(bool wholeMap, float border) const;
+
+    /**
      * Address: 0x0062A900 (FUN_0062A900, Moho::CAiTarget::ImpactDidHitEntity)
      *
      * What it does:
