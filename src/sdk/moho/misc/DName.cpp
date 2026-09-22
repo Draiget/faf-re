@@ -313,6 +313,15 @@ public:
   {
   }
 
+  /**
+   * Address: 0x00AB12B0 (FUN_00AB12B0, charNode::length -- vtable
+   * `??_7charNode@@6B@` 0x00D7CED4 slot 0; formerly
+   * `LegacyOneResultRuntimeSlot57` in moho/misc/WinApiImportThunks.cpp,
+   * removed 2026-09-22)
+   *
+   * What it does:
+   * A one-character node is always one character long.
+   */
   int length() override
   {
     return 1;
@@ -357,6 +366,15 @@ public:
    */
   DNamePcharNode(const char* text, int textLength) noexcept;
 
+  /**
+   * Address: 0x00AB12D3 (FUN_00AB12D3, pcharNode::length -- vtable
+   * `??_7pcharNode@@6B@` 0x00D7CF04 slot 0: `mov eax,[ecx+0Ch]; ret`;
+   * formerly `LegacyLoadDwordFromThisPlus12RuntimeSlot37` in
+   * moho/misc/WinApiImportThunks.cpp, removed 2026-09-22)
+   *
+   * What it does:
+   * Returns the stored text length (+0x0C).
+   */
   int length() override
   {
     return textLength_;

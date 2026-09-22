@@ -1833,9 +1833,6 @@
     <ClCompile Include="moho\misc\StrSafeRuntime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\misc\WinApiImportThunks.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\misc\SessionStartup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

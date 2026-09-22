@@ -48,6 +48,14 @@ namespace moho
     inline static gpg::RType* sType = nullptr;
     T* tex = nullptr;
 
+    /**
+     * Address: 0x0089E530 (FUN_0089E530 -- `CountedPtr<CountedObject>::CountedPtr()`
+     * emitted out of line, `mov eax,ecx; mov [eax],0; ret`, as the element
+     * constructor `CWldTerrainDecal::CWldTerrainDecal` (0x0089CB11) hands to the
+     * array-construct iterator 0x00A83FC5 for `mResourceRefs[2]`. Formerly
+     * `LegacyZeroDwordAtThisAndReturnThisRuntimeLaneAlpha` in
+     * moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
+     */
     CountedPtr() noexcept = default;
 
     CountedPtr(const CountedPtr& other) noexcept : tex(other.tex)
@@ -74,6 +82,13 @@ namespace moho
       return *this;
     }
 
+    /**
+     * Address: 0x00423870 (FUN_00423870 -- `CountedPtr<T>::~CountedPtr` emitted
+     * out of line: `--[tex+4]`, on zero a delete through vtable slot 0 with
+     * flag 1, then `tex = 0`. Called from `CAnimTexture::FromFile` (0x00422E50)
+     * and `CWldTerrainDecal::SetName` (0x0089D1F0), and pushed as the element
+     * destructor for `CWldTerrainDecal::mResourceRefs[2]` (0x0089CAFD).)
+     */
     ~CountedPtr()
     {
       Release(tex);
