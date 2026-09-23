@@ -6,8 +6,8 @@
 #include <new>
 
 #include "gpg/gal/Error.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DRenderTarget.h"
@@ -224,8 +224,8 @@ namespace moho
    * Ensures this shader-var is attached to one loaded effect, resolves the
    * effect-variable lane on first attach, and reports availability.
    *
-   * Fidelity note: the binary's own lookup (`EffectD3D9::SetMatrix`, really
-   * a by-name parameter resolver -- FUN_00941D70) unconditionally throws
+   * Fidelity note: the binary's own lookup (`EffectD3D9::GetVariable`,
+   * FUN_00941D70) unconditionally throws
    * `gpg::gal::Error` when the named parameter is absent from the bound
    * effect (confirmed from its raw .asm: `cmp edi, ebx` / `jnz` on the
    * returned handle, no null-tolerant path). `ShaderVar::Exists()` itself
@@ -287,9 +287,9 @@ namespace moho
       return false;
     }
 
-    boost::shared_ptr<gpg::gal::EffectD3D9> baseEffect = effect->GetBaseEffect();
+    boost::shared_ptr<gpg::gal::Effect> baseEffect = effect->GetBaseEffect();
     try {
-      mEffectVariable = baseEffect->SetMatrix(mVariableName.c_str());
+      mEffectVariable = baseEffect->GetVariable(mVariableName.c_str());
     } catch (const gpg::gal::Error&) {
       return false;
     }
@@ -368,10 +368,10 @@ namespace moho
    * Guards on `Exists()` and forwards one 4x4 matrix pointer to the bound
    * effect variable.
    */
-  ShaderVar* ShaderVar::SetMatrix4x4(const void* const matrix4x4)
+  ShaderVar* ShaderVar::SetMatrix4x4(const gpg::gal::Matrix* const matrix)
   {
     if (Exists()) {
-      mEffectVariable->SetMatrix4x4(matrix4x4);
+      mEffectVariable->SetMatrix4x4(matrix);
     }
     return this;
   }
@@ -501,7 +501,7 @@ namespace moho
    * which is a different thing entirely. `terrain.fx` (effects.nx2) declares
    * the parameter as `float HeightScale;` with no prefix, confirming this by
    * the shipped asset too. The stale key made `ShaderVar::Exists()` throw
-   * uncaught on every terrain render (`EffectD3D9::SetMatrix`/
+   * uncaught on every terrain render (`EffectD3D9::GetVariable`/
    * `GetParameterByName` finds nothing and calls `ThrowGalError`), crashing
    * the process on the first painted frame.
    */

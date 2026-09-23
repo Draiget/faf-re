@@ -5,6 +5,7 @@
 #include <typeinfo>
 #include <new>
 
+#include "boost/enable_shared_from_this.h"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 
@@ -286,6 +287,11 @@ namespace boost
         /**
          * Address: 0x00446FC0 (FUN_00446FC0, backing `SpCountedBaseWeakReleaseFromSlot`
          * in BoostWrappers.cpp)
+         * Address: 0x00941730 (FUN_00941730 -- `~weak_ptr<gpg::gal::EffectD3D9>`: the
+         * weak release on `pn` at +0x04, `destroy()` through vtable +0x08 at zero.
+         * It is the `enable_shared_from_this<EffectD3D9>` base's weak-this, so the
+         * effect constructors' unwind funclets reach it on `this + 4` (0x00B5DD86,
+         * 0x00B5DF62, 0x00B5DF96); the destructor inlines it.)
          *
          * NOTE (2026-08-20 audit): 0x004229B0 was historically cited here and is
          * WRONG - that address decrements `use_count_` at +0x04 first and calls
@@ -348,6 +354,29 @@ namespace boost
          * branch-for-branch identical -- 31 total twins for this body,
          * canonical=FUN_004260B0. Reached from
          * Moho::CGpgNetInterface::SendNatPacket (0x007B8BC0).)
+         * Address: 0x008F38E0 (FUN_008F38E0 -- `~shared_ptr<gpg::gal::EffectD3D9>`, the
+         * same body out of line: the lock every EffectTechniqueD3D9/EffectVariableD3D9
+         * entry point takes on its effect is released through it on return (twelve
+         * direct calls 0x008F3E7A .. 0x00944F58) and on unwind. Formerly described on
+         * `LockWeakEffectD3D9` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp, removed
+         * 2026-09-24.)
+         * Address: 0x0042C240 (FUN_0042C240 -- `~shared_ptr<gpg::gal::Effect>`: the
+         * `GetBaseEffect()` temporary `ShaderVar::Exists` releases at 0x00437FE1, and
+         * EH funclets across the renderers.)
+         * Address: 0x0042C280 (FUN_0042C280 -- `~shared_ptr<gpg::gal::EffectVariable>`:
+         * the `GetVariable()` temporaries of `ShaderVar::Exists` (0x00437FD0),
+         * `SkyDome::RenderDecals` (0x00819E70 ..) and the mesh renderer (0x007D5263 ..).)
+         * Address: 0x0042C4E0 (FUN_0042C4E0 -- `~shared_ptr<gpg::gal::EffectTechnique>`:
+         * `CD3DEffect::SetTechnique` (0x0042D3C1, 0x0042D413) and `EffectD3D10::GetTechniques`
+         * (0x0094BE7D) release their temporaries through it.)
+         * Address: 0x0042C330 (FUN_0042C330 -- the same body for a gal handle whose
+         * element the callers do not pin down yet: `REN_MaybeDumpFrame` 0x007F5B98,
+         * `RWldMapPreviewChunk::Save` 0x00890B67, 0x0043DB57, 0x007D5A73.)
+         * Address: 0x0042C370 (FUN_0042C370 -- likewise, called three times from
+         * 0x007FEEA0.)
+         * These five were listed as an "Address family" on `ReleaseSharedHandle` in
+         * moho/render/d3d/CD3DEffectTechnique.cpp -- prose, not anchors -- removed
+         * 2026-09-24 with the `SharedHandle` overlay.
          *
          * What it does:
          * Releases one shared owner from the control block, disposes the pointee
@@ -375,6 +404,11 @@ namespace boost
          * Address: 0x00422A70 (FUN_00422A70, boost::detail::shared_count::operator=)
          * Address: 0x00424EF0 (FUN_00424EF0)
          * Address: 0x004260F0 (FUN_004260F0, boost::shared_ptr_CD3DBatchTexture copy lane)
+         * Address: 0x0042D500 (FUN_0042D500 -- `shared_ptr<gpg::gal::EffectTechnique>::operator=`:
+         * `px` first, then retain the incoming count and release the old one through
+         * 0x004229B0. `CD3DEffect::SetTechnique`'s `mCurrentTechnique = ...` (0x0042D3AD,
+         * 0x0042D3FF); formerly `AssignTechniqueHandle` in
+         * moho/render/d3d/CD3DEffectTechnique.cpp (RULE ONE), removed 2026-09-24.)
          *
          * What it does:
          * Rebinds this borrowed shared-ptr view to another control block while
@@ -494,6 +528,45 @@ namespace boost
     void AssignWeakFromShared(boost::weak_ptr<TWeak>& destination, const boost::shared_ptr<TShared>& source)
     {
         destination = source;
+    }
+
+    /**
+     * Address: 0x008F3950 (FUN_008F3950 -- `weak_ptr<gpg::gal::EffectD3D9>::lock()`: an
+     * empty result when `pn` is null or its use count is zero, otherwise
+     * `shared_count(weak_count const&)` into the result and `px` copied. Every
+     * EffectTechniqueD3D9/EffectVariableD3D9 entry point calls it on its
+     * `effect_` (24 call sites, 0x008F3CDF .. 0x00944DB8); formerly
+     * `LockWeakEffectD3D9` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE
+     * ONE), removed 2026-09-24.)
+     *
+     * What it does:
+     * `boost::weak_ptr<T>::lock()`, per T: a retained `shared_ptr` while an owner
+     * is alive, an empty one after. Named for the same reason as
+     * `AssignWeakFromShared` above.
+     */
+    template <class T>
+    [[nodiscard]] inline boost::shared_ptr<T> LockWeak(const boost::weak_ptr<T>& weak) noexcept
+    {
+        return weak.lock();
+    }
+
+    /**
+     * Address: 0x00941B90 (FUN_00941B90 --
+     * `enable_shared_from_this<gpg::gal::EffectD3D9>::shared_from_this()`: `shared_ptr<T>
+     * p(_internal_weak_this)`, so `pn(weak.pn)` first -- 0x00447030, which throws
+     * `bad_weak_ptr` once the owner is gone -- then `px`. `EffectD3D9::GetVariable`
+     * (0x00941F04), `GetTechnique` (0x009420F3) and `GetTechniques` (0x00942A36)
+     * build each wrapper's by-value effect argument with it; formerly
+     * `CreateWeakEffectReference` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp,
+     * which described it as a weak_ptr construction (RULE ONE), removed 2026-09-24.)
+     *
+     * What it does:
+     * `boost::enable_shared_from_this<T>::shared_from_this()`, per T.
+     */
+    template <class T>
+    [[nodiscard]] inline boost::shared_ptr<T> SharedFromThis(boost::enable_shared_from_this<T>& object)
+    {
+        return object.shared_from_this();
     }
 
     struct SharedControlTriplet
@@ -640,6 +713,22 @@ namespace boost
      * Address: 0x008FA4F0 (FUN_008FA4F0, shared_ptr<VertexBuffer>(VertexBufferD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008FA520 (FUN_008FA520, shared_ptr<IndexBuffer>(IndexBufferD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008FA5F0 (FUN_008FA5F0, shared_ptr<PipelineStateD3D10>(PipelineStateD3D10*), formerly in D3D10Interfaces.cpp)
+     *
+     * The effect family: the backends write `boost::shared_ptr<Effect>(new
+     * EffectD3D9(...))` and the like, and the technique and variable lookups
+     * inline the outer constructor around the `shared_count(Y*)` emission, so
+     * only the effect's own copy is ever called. Each was a per-type
+     * `ConstructSharedEffect*FromRaw` free function (RULE ONE), removed 2026-09-24.
+     * Address: 0x008E9F20 (FUN_008E9F20, shared_ptr<Effect>(EffectD3D9*) -- the one
+     * with a real `sp_enable_shared_from_this` step: `EffectD3D9` derives from
+     * `enable_shared_from_this`, so after `pn` it assigns the weak-this at p+4.
+     * `DeviceD3D9`'s builders call it (0x008F0F34, 0x008F12A1); the old helper did
+     * that assignment by hand into a `selfWeak_` member the class never had.)
+     * Address: 0x008FA3D0 (FUN_008FA3D0, shared_ptr<Effect>(EffectD3D10*); zero callers, `DeviceD3D10::CreateEffect` inlines it)
+     * Address: 0x00941A60 (FUN_00941A60, shared_ptr<EffectTechnique>(EffectTechniqueD3D9*); zero callers)
+     * Address: 0x00941A90 (FUN_00941A90, shared_ptr<EffectVariable>(EffectVariableD3D9*); zero callers)
+     * Address: 0x0094B840 (FUN_0094B840, shared_ptr<EffectTechnique>(EffectTechniqueD3D10*); zero callers)
+     * Address: 0x0094B870 (FUN_0094B870, shared_ptr<EffectVariable>(EffectVariableD3D10*); zero callers)
      *
      * What it does:
      * Constructs one `boost::shared_ptr<T>` from a raw pointee in caller-provided storage.
@@ -838,6 +927,12 @@ namespace boost
      * Address: 0x008F9DD0 (FUN_008F9DD0, shared_count(VertexBufferD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008F9E60 (FUN_008F9E60, shared_count(IndexBufferD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008FA0E0 (FUN_008FA0E0, shared_count(PipelineStateD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008E9690 (FUN_008E9690, shared_count(EffectD3D9*) - from the shared_ptr<Effect> constructor 0x008E9F20; formerly `ConstructSharedCountEffectD3D9FromRaw` in D3D9Interfaces.cpp)
+     * Address: 0x009417B0 (FUN_009417B0, shared_count(EffectTechniqueD3D9*) - `EffectD3D9::GetTechnique` 0x00942122 and `GetTechniques` 0x00942A69; formerly in D3D9Interfaces.cpp)
+     * Address: 0x00941840 (FUN_00941840, shared_count(EffectVariableD3D9*) - `EffectD3D9::GetVariable` 0x00941F33; formerly in D3D9Interfaces.cpp)
+     * Address: 0x008F9A70 (FUN_008F9A70, shared_count(EffectD3D10*) - `DeviceD3D10::CreateEffect` 0x008FEF8F; formerly in D3D10Interfaces.cpp)
+     * Address: 0x0094B6C0 (FUN_0094B6C0, shared_count(EffectTechniqueD3D10*) - `EffectD3D10::GetTechnique` 0x0094BC32 and `GetTechniques` 0x0094BE42; formerly in D3D10Interfaces.cpp)
+     * Address: 0x0094B750 (FUN_0094B750, shared_count(EffectVariableD3D10*) - `EffectD3D10::GetVariable` 0x0094BA52; formerly in D3D10Interfaces.cpp)
      *
      * `boost::checked_delete<Y>` as that catch path emits it for the D3D10
      * backend types (`if (p) p->~Y()` through the deleting destructor,
@@ -894,8 +989,8 @@ namespace boost
      * also runs `sp_enable_shared_from_this(this, p, p)` after `pi_(p)`,
      * which this bypasses. None of the current per-type callers derive
      * from it (confirmed per-type at each call site); a type that does
-     * must bind its weak-this manually after calling this, the way
-     * `ConstructSharedEffectD3D9FromRaw` already does for `selfWeak_`.
+     * should be built with boost's own constructor instead, the way the
+     * `EffectD3D9` builders now write `shared_ptr<Effect>(new EffectD3D9(...))`.
      */
     template <class T>
     [[nodiscard]] inline boost::shared_ptr<T>* ConstructSharedFromRawViaCountCtor(

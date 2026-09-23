@@ -99,7 +99,7 @@ namespace gpg::gal
          *
          * What it does:
          * Returns the texture at `this+0x18`. Its single caller is
-         * `EffectVariableD3D9::Func3`, which hands it straight to
+         * `EffectVariableD3D9::SetRenderTarget`, which hands it straight to
          * `ID3DXEffect::SetTexture` - the texture, not the surface derived
          * from it.
          */

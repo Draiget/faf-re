@@ -11,7 +11,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DRenderTarget.h"
@@ -310,7 +310,7 @@ namespace moho
       static_cast<float>(viewport.Height),
     };
     if (ShaderVar& viewPort = GetFrameViewPortShaderVar(); viewPort.Exists()) {
-      viewPort.mEffectVariable->SetMem(4U, viewportRect);
+      viewPort.mEffectVariable->SetFloatArray(4U, viewportRect);
     }
 
     SD3DVertexRange quadView{};

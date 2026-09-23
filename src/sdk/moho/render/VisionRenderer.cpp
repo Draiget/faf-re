@@ -13,9 +13,9 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -136,7 +136,7 @@ namespace moho
    * Resolves one `"vision"` D3D effect from device resources and returns its
    * base GAL effect handle.
    */
-  boost::shared_ptr<gpg::gal::EffectD3D9> AcquireVisionBaseEffect()
+  boost::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect()
   {
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     CD3DEffect* const effect = resources->FindEffect("vision");
@@ -323,8 +323,8 @@ namespace moho
     auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
 
-    const boost::shared_ptr<gpg::gal::EffectD3D9> effect = AcquireVisionBaseEffect();
-    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("CastVision");
+    const boost::shared_ptr<gpg::gal::Effect> effect = AcquireVisionBaseEffect();
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("CastVision");
 
     VisionDB& visionDb = session.mVisionDb;
     const CHeightField* const heightField = session.GetSTIMap()->mHeightField.get();
@@ -359,8 +359,8 @@ namespace moho
 
     device->Clear(false, false, true, 0xFFFFFFFFu, 1.0f, 0);
 
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrix = effect->SetMatrix("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrix = effect->SetMatrix("projMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
     viewMatrix->SetMatrix4x4(&camera.view);
     projMatrix->SetMatrix4x4(&camera.projection);
 

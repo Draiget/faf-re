@@ -3,208 +3,214 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3dx9effect.h>
+
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
+#include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
 
 namespace gpg::gal
 {
-    class CubeRenderTarget;
     class EffectD3D9;
-    class RenderTarget;
-    class Texture;
 
     /**
      * VFTABLE: 0x00D47E94
      * COL:  0x00E5340C
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\EffectVariableD3D9.cpp
+     *
+     * One effect parameter. Like the technique wrapper it holds its effect
+     * weakly and locks it on every call.
      */
-    class EffectVariableD3D9
+    class EffectVariableD3D9 : public EffectVariable
     {
     public:
         /**
          * Address: 0x00943060 (FUN_00943060)
          *
          * What it does:
-         * Stores variable name/effect weak-reference/parameter handle and validates effect liveness.
+         * Keeps `name`, a weak reference to `effect` and the parameter handle;
+         * throws "invalid effect specified" (line 37) when the effect is
+         * already gone.
          */
-        EffectVariableD3D9(const char* variableName, const boost::weak_ptr<EffectD3D9>& effect, void* handle);
+        EffectVariableD3D9(const char* name, boost::shared_ptr<EffectD3D9> effect, D3DXHANDLE handle);
 
         /**
-         * Address: 0x00943040 (FUN_00943040)
+         * Address: 0x00942FC0 (FUN_00942FC0)
+         * Address: 0x00943040 (FUN_00943040, the scalar deleting destructor)
+         * Slot: 0
          *
          * What it does:
-         * Owns the deleting-destructor path and delegates to `FUN_00942FC0` body semantics.
+         * Nothing of its own: the weak effect reference and the name go as
+         * members, then the `EffectVariable` base.
          */
-        virtual ~EffectVariableD3D9();
+        ~EffectVariableD3D9() override;
 
         /**
          * Address: 0x00942F80 (FUN_00942F80)
          * Slot: 1
-         * Demangled: gpg::gal::EffectVariableD3D9::Func1
          *
          * What it does:
-         * Returns the local variable-name string lane.
+         * Returns the parameter name.
          */
-        virtual msvc8::string* Func1();
+        msvc8::string* GetName() override;
 
         /**
          * Address: 0x00944630 (FUN_00944630)
          * Slot: 2
          *
          * What it does:
-         * Binds a cube render target's texture to this effect parameter
-         * (null target unbinds it).
+         * Binds a cube render target's texture to this parameter (a null
+         * target unbinds it).
          */
-        virtual void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget);
+        void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
 
         /**
          * Address: 0x00944420 (FUN_00944420)
          * Slot: 3
          *
          * What it does:
-         * Binds a colour render target's texture to this effect parameter
-         * (null target unbinds it).
+         * Binds a colour render target's texture to this parameter (a null
+         * target unbinds it).
          */
-        virtual void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget);
+        void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
 
         /**
          * Address: 0x009441A0 (FUN_009441A0)
          * Slot: 4
-         * Demangled: gpg::gal::EffectVariableD3D9::SetTexture
          *
          * What it does:
-         * Binds a texture wrapper lane (2D/volume/cube) to the backing D3DX effect parameter.
+         * Binds a texture (2D, volume or cube) to this parameter.
          */
-        virtual void SetTexture(boost::shared_ptr<Texture> texture);
+        void SetTexture(boost::shared_ptr<Texture> texture) override;
 
         /**
          * Address: 0x00943E10 (FUN_00943E10)
          * Slot: 5
-         * Demangled: gpg::gal::EffectVariableD3D9::SetMatrix4x4
+         *
+         * What it does:
+         * `ID3DXEffect::SetMatrix` on this parameter.
          */
-        virtual void SetMatrix4x4(const void* matrix4x4);
+        void SetMatrix4x4(const Matrix* matrix) override;
 
         /**
          * Address: 0x00943A90 (FUN_00943A90)
          * Slot: 6
-         * Demangled: gpg::gal::EffectVariableD3D9::SetMem
+         *
+         * What it does:
+         * `ID3DXEffect::SetFloatArray` on this parameter.
          */
-        virtual void SetMem(std::uint32_t floatCount, const float* values);
+        void SetFloatArray(std::uint32_t count, const float* values) override;
 
         /**
          * Address: 0x00943710 (FUN_00943710)
          * Slot: 7
-         * Demangled: gpg::gal::EffectVariableD3D9::Func4
          *
          * What it does:
-         * Writes a single vector4 payload into the backing D3DX effect variable handle.
+         * `ID3DXEffect::SetVector` on this parameter.
          */
-        virtual void Func4(const void* vector4);
+        void SetVector(const float* vector4) override;
 
         /**
          * Address: 0x00943C50 (FUN_00943C50)
          * Slot: 8
-         * Demangled: gpg::gal::EffectVariableD3D9::SetPtr
+         *
+         * What it does:
+         * `ID3DXEffect::SetValue` on this parameter.
          */
-        virtual void SetPtr(const void* data, std::uint32_t byteCount);
+        void SetValue(const void* data, std::uint32_t byteCount) override;
 
         /**
          * Address: 0x00943550 (FUN_00943550)
          * Slot: 9
-         * Demangled: gpg::gal::EffectVariableD3D9::SetFloat
+         *
+         * What it does:
+         * `ID3DXEffect::SetFloat` on this parameter.
          */
-        virtual void SetFloat(float value);
+        void SetFloat(float value) override;
 
         /**
          * Address: 0x009433A0 (FUN_009433A0)
          * Slot: 10
-         * Demangled: gpg::gal::EffectVariableD3D9::Func6
          *
          * What it does:
-         * Writes one integer parameter into the backing D3DX effect variable handle.
+         * `ID3DXEffect::SetInt` on this parameter.
          */
-        virtual void Func6(int value);
+        void SetInt(int value) override;
 
         /**
          * Address: 0x009431E0 (FUN_009431E0)
          * Slot: 11
-         * Demangled: gpg::gal::EffectVariableD3D9::Func7
          *
          * What it does:
-         * Writes one boolean parameter into the backing D3DX effect variable handle.
+         * `ID3DXEffect::SetBool` on this parameter.
          */
-        virtual void Func7(bool value);
+        void SetBool(bool value) override;
 
         /**
          * Address: 0x00943FD0 (FUN_00943FD0)
          * Slot: 12
-         * Demangled: gpg::gal::EffectVariableD3D9::Func8
          *
          * What it does:
-         * Writes a matrix-array payload into the backing D3DX effect variable handle.
+         * `ID3DXEffect::SetMatrixArray` on this parameter.
          */
-        virtual void Func8(std::uint32_t matrixCount, const void* matrices4x4);
+        void SetMatrixArray(std::uint32_t count, const Matrix* matrices) override;
 
         /**
          * Address: 0x009438D0 (FUN_009438D0)
          * Slot: 13
-         * Demangled: gpg::gal::EffectVariableD3D9::Func9
          *
          * What it does:
-         * Writes a vector-array payload into the backing D3DX effect variable handle.
+         * `ID3DXEffect::SetVectorArray` on this parameter -- handed the address
+         * of the `vectors4` parameter itself, not its value (see the body).
          */
-        virtual void Func9(std::uint32_t vectorCount, const void* vectors4);
+        void SetVectorArray(std::uint32_t count, const float* vectors4) override;
 
         /**
          * Address: 0x00944840 (FUN_00944840)
          * Slot: 14
-         * Demangled: gpg::gal::EffectVariableD3D9::Func10
          *
          * What it does:
-         * Retrieves a boolean annotation from this parameter handle by name.
+         * Reads the parameter's bool annotation `annotationName`.
          */
-        virtual bool Func10(bool* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x00944A10 (FUN_00944A10)
          * Slot: 15
-         * Demangled: gpg::gal::EffectVariableD3D9::Func11
          *
          * What it does:
-         * Retrieves an integer annotation from this parameter handle by name.
+         * Reads the parameter's int annotation `annotationName`.
          */
-        virtual bool Func11(int* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x00944BD0 (FUN_00944BD0)
          * Slot: 16
-         * Demangled: gpg::gal::EffectVariableD3D9::Func12
          *
          * What it does:
-         * Retrieves a float annotation from this parameter handle by name.
+         * Reads the parameter's float annotation `annotationName`.
          */
-        virtual bool Func12(float* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x00944D90 (FUN_00944D90)
          * Slot: 17
-         * Demangled: gpg::gal::EffectVariableD3D9::Func13
          *
          * What it does:
-         * Retrieves a string annotation from this parameter handle by name.
+         * Reads the parameter's string annotation `annotationName`.
          */
-        virtual bool Func13(msvc8::string* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
 
     public:
-        msvc8::string name_{};                 // +0x04
-        boost::weak_ptr<EffectD3D9> effect_{}; // +0x20
-        void* handle_ = nullptr;               // +0x28
+        msvc8::string name_;                 // +0x04
+        boost::weak_ptr<EffectD3D9> effect_; // +0x20
+        D3DXHANDLE handle_ = nullptr;        // +0x28
     };
 
     static_assert(offsetof(EffectVariableD3D9, name_) == 0x04, "EffectVariableD3D9::name_ offset must be 0x04");
     static_assert(offsetof(EffectVariableD3D9, effect_) == 0x20, "EffectVariableD3D9::effect_ offset must be 0x20");
     static_assert(offsetof(EffectVariableD3D9, handle_) == 0x28, "EffectVariableD3D9::handle_ offset must be 0x28");
     static_assert(sizeof(EffectVariableD3D9) == 0x2C, "EffectVariableD3D9 size must be 0x2C");
-}
+} // namespace gpg::gal

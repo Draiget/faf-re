@@ -23,8 +23,8 @@
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -227,8 +227,8 @@ namespace
   void ResetResourcesForContextTransition(moho::CD3DDeviceResources& resources, const bool destroyEffects)
   {
     for (moho::CD3DEffect* const effect : resources.mEffects) {
-      if (effect != nullptr && effect->mEffect.px != nullptr) {
-        (void)effect->mEffect.px->OnLost();
+      if (effect != nullptr && effect->mEffect) {
+        effect->mEffect->OnLost();
       }
     }
 
@@ -1382,7 +1382,7 @@ namespace moho
     vertexSheet->Func9();
     indexSheet->SetBufferIndices();
 
-    gpg::gal::EffectTechniqueD3D9* const technique = GetCurEffect()->mCurrentTechnique.px;
+    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
@@ -1419,7 +1419,7 @@ namespace moho
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
     vertexSheetView->sheet->Func9();
 
-    gpg::gal::EffectTechniqueD3D9* const technique = GetCurEffect()->mCurrentTechnique.px;
+    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
@@ -1461,7 +1461,7 @@ namespace moho
     vertexSheetView->sheet->Func9();
     indexSheetView->sheet->SetBufferIndices();
 
-    gpg::gal::EffectTechniqueD3D9* const technique = GetCurEffect()->mCurrentTechnique.px;
+    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));

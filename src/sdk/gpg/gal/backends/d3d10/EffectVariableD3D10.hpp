@@ -4,21 +4,18 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
+#include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
 
 namespace gpg::gal
 {
-    class CubeRenderTargetD3D10;
-    class RenderTargetD3D10;
-    class Texture;
-
     /**
      * VFTABLE: 0x00D488DC
      * COL:  0x00E538F8
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\EffectVariableD3D10.cpp
      */
-    class EffectVariableD3D10
+    class EffectVariableD3D10 : public EffectVariable
     {
     public:
         /**
@@ -27,164 +24,176 @@ namespace gpg::gal
          * char const *,void *,void *
          *
          * What it does:
-         * Initializes a D3D10 effect-variable wrapper and retains one reference on
-         * the backing effect interface.
+         * Keeps the variable name and handles and AddRefs the native effect;
+         * throws "invalid effect specified" when there is no effect.
          */
         EffectVariableD3D10(const char* name, void* dxEffect, void* variableHandle);
 
         /**
-         * Address: 0x0094C1D0 (FUN_0094C1D0)
+         * Address: 0x0094C150 (FUN_0094C150)
+         * Address: 0x0094C1D0 (FUN_0094C1D0, the scalar deleting destructor)
+         * Slot: 0
          *
          * What it does:
-         * Owns the deleting-destructor thunk path and delegates to `FUN_0094C150`.
+         * Releases the native effect; the name then goes as a member.
          */
-        virtual ~EffectVariableD3D10();
+        ~EffectVariableD3D10() override;
 
         /**
          * Address: 0x0094C0E0 (FUN_0094C0E0)
+         * Slot: 1
          *
          * What it does:
-         * Returns the local variable-name string lane.
+         * Returns the variable name.
          */
-        virtual msvc8::string* GetName();
+        msvc8::string* GetName() override;
 
         /**
          * Address: 0x0094C0F0 (FUN_0094C0F0)
+         * Slot: 2
          *
          * What it does:
-         * D3D10 cube render-target slot keeps an empty body and only owns by-value
-         * `shared_ptr` release semantics.
+         * Nothing: D3D10 has no cube render targets to bind. The by-value
+         * `shared_ptr` is released on return.
          */
-        virtual void Func2(boost::shared_ptr<CubeRenderTargetD3D10> cubeRenderTarget);
+        void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget) override;
 
         /**
          * Address: 0x0094CD00 (FUN_0094CD00)
+         * Slot: 3
          *
          * What it does:
-         * Binds a render-target-backed shader-resource view into this effect slot.
+         * Binds a render target's shader-resource view to this variable.
          */
-        virtual void Func3(boost::shared_ptr<RenderTargetD3D10> renderTarget);
+        void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget) override;
 
         /**
          * Address: 0x0094CBB0 (FUN_0094CBB0)
+         * Slot: 4
          *
          * What it does:
-         * Binds a texture shader-resource view into this effect slot.
+         * Binds a texture's shader-resource view to this variable.
          */
-        virtual void SetTexture(boost::shared_ptr<Texture> texture);
+        void SetTexture(boost::shared_ptr<Texture> texture) override;
 
         /**
          * Address: 0x0094C9B0 (FUN_0094C9B0)
+         * Slot: 5
          *
          * What it does:
-         * Converts to matrix lane and writes one matrix payload.
+         * `AsMatrix()->SetMatrix` on this variable.
          */
-        virtual void SetMatrix4x4(const void* matrix4x4);
+        void SetMatrix4x4(const Matrix* matrix) override;
 
         /**
          * Address: 0x0094C7D0 (FUN_0094C7D0)
-         *
-         * int,void const *
+         * Slot: 6
          *
          * What it does:
-         * Writes raw value payload bytes (`floatCount * 4`) from caller memory.
+         * Writes `count` floats as raw bytes (`SetRawValue`, `count * 4`).
          */
-        virtual void SetMem(int floatCount, const void* values);
+        void SetFloatArray(std::uint32_t count, const float* values) override;
 
         /**
          * Address: 0x0094C5E0 (FUN_0094C5E0)
+         * Slot: 7
          *
          * What it does:
-         * Converts to vector lane and writes one vector payload.
+         * `AsVector()->SetFloatVector` on this variable.
          */
-        virtual void SetVector(const void* value);
+        void SetVector(const float* vector4) override;
 
         /**
          * Address: 0x0094C8C0 (FUN_0094C8C0)
-         *
-         * void const *,int
+         * Slot: 8
          *
          * What it does:
-         * Writes raw value payload bytes from caller memory (`byteCount`).
+         * Writes `byteCount` raw bytes (`SetRawValue`).
          */
-        virtual void SetPtr(const void* data, int byteCount);
+        void SetValue(const void* data, std::uint32_t byteCount) override;
 
         /**
          * Address: 0x0094C4F0 (FUN_0094C4F0)
+         * Slot: 9
          *
          * What it does:
-         * Converts to scalar lane and writes a float value.
+         * `AsScalar()->SetFloat` on this variable.
          */
-        virtual void SetFloat(float value);
+        void SetFloat(float value) override;
 
         /**
          * Address: 0x0094C400 (FUN_0094C400)
+         * Slot: 10
          *
          * What it does:
-         * Converts to scalar lane and writes an integer value.
+         * `AsScalar()->SetInt` on this variable.
          */
-        virtual void SetInt(int value);
+        void SetInt(int value) override;
 
         /**
          * Address: 0x0094C310 (FUN_0094C310)
+         * Slot: 11
          *
          * What it does:
-         * Converts to scalar lane and writes a boolean value.
+         * `AsScalar()->SetBool` on this variable.
          */
-        virtual void SetBool(bool value);
+        void SetBool(bool value) override;
 
         /**
          * Address: 0x0094CAA0 (FUN_0094CAA0)
-         *
-         * int,void const *
+         * Slot: 12
          *
          * What it does:
-         * Writes count-based matrix/float payload through matrix lane with
-         * raw-value fallback.
+         * `AsMatrix()->SetMatrixArray`, falling back to raw bytes when that
+         * fails (see the body for the argument it passes).
          */
-        virtual void Func8(int valueCount, const void* values);
+        void SetMatrixArray(std::uint32_t count, const Matrix* matrices) override;
 
         /**
          * Address: 0x0094C6D0 (FUN_0094C6D0)
-         *
-         * int,unsigned int
+         * Slot: 13
          *
          * What it does:
-         * Writes vector-lane payload bytes using one 32-bit value lane.
+         * `AsVector()->SetFloatVectorArray` (see the body for the argument it
+         * passes).
          */
-        virtual void Func9(int valueCount, std::uint32_t value);
+        void SetVectorArray(std::uint32_t count, const float* vectors4) override;
 
         /**
          * Address: 0x0094CE50 (FUN_0094CE50)
+         * Slot: 14
          *
          * What it does:
-         * Reads a boolean annotation by name from this variable handle.
+         * Reads the variable's bool annotation `annotationName`.
          */
-        virtual bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x0094CFE0 (FUN_0094CFE0)
+         * Slot: 15
          *
          * What it does:
-         * Reads an integer annotation by name from this variable handle.
+         * Reads the variable's int annotation `annotationName`.
          */
-        virtual bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x0094D150 (FUN_0094D150)
+         * Slot: 16
          *
          * What it does:
-         * Reads a float annotation by name from this variable handle.
+         * Reads the variable's float annotation `annotationName`.
          */
-        virtual bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x0094D2C0 (FUN_0094D2C0)
+         * Slot: 17
          *
          * What it does:
-         * Reads a string annotation by name from this variable handle.
+         * Reads the variable's string annotation `annotationName`.
          */
-        virtual bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
 
     public:
         msvc8::string name_{};           // +0x04
@@ -196,4 +205,4 @@ namespace gpg::gal
     static_assert(offsetof(EffectVariableD3D10, dxEffect_) == 0x20, "EffectVariableD3D10::dxEffect_ offset must be 0x20");
     static_assert(offsetof(EffectVariableD3D10, variableHandle_) == 0x24, "EffectVariableD3D10::variableHandle_ offset must be 0x24");
     static_assert(sizeof(EffectVariableD3D10) == 0x28, "EffectVariableD3D10 size must be 0x28");
-}
+} // namespace gpg::gal

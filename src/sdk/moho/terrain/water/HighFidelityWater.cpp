@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdint>
 
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/core/utils/Global.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DVertexStream.h"
@@ -74,14 +74,14 @@ namespace moho
     void SetShaderVarMem(ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
     {
       if (shaderVar.Exists()) {
-        shaderVar.mEffectVariable->SetMem(floatCount, values);
+        shaderVar.mEffectVariable->SetFloatArray(floatCount, values);
       }
     }
 
     void SetShaderVarRawData(ShaderVar& shaderVar, const void* const data, const std::uint32_t byteCount)
     {
       if (shaderVar.Exists()) {
-        shaderVar.mEffectVariable->SetPtr(data, byteCount);
+        shaderVar.mEffectVariable->SetValue(data, byteCount);
       }
     }
 

@@ -20,9 +20,9 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "legacy/containers/String.h"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
@@ -124,20 +124,6 @@ namespace
     return CopyConstructCartographicDecalBatchIfPresent(destination, source);
   }
 
-  struct CartographicEffectAliasDeleter
-  {
-    explicit CartographicEffectAliasDeleter(const boost::shared_ptr<gpg::gal::EffectD3D9>& ownerEffect)
-      : owner(ownerEffect)
-    {
-    }
-
-    void operator()(gpg::gal::Effect*) const
-    {
-    }
-
-    boost::shared_ptr<gpg::gal::EffectD3D9> owner;
-  };
-
   constexpr std::array<float, 8> kCartographicQuadVertices{
     -1.0f, 1.0f,
     -1.0f, -1.0f,
@@ -160,10 +146,11 @@ namespace
    * Address: 0x007D5B50 (FUN_007D5B50, sub_7D5B50)
    *
    * What it does:
-   * Resolves the `"cartographic"` effect from device resources and returns its
-   * base D3D9 GAL effect handle.
+   * Resolves the `"cartographic"` effect from the device resources and returns
+   * its gal effect -- the same body as `Cartographic::GetEffect` (0x007D1E50),
+   * emitted a second time for the decal renderer (called at 0x007D5126).
    */
-  [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> GetCartographicBaseEffectD3D9()
+  [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetCartographicEffect()
   {
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
     moho::ID3DDeviceResources* const resources = device->GetResources();
@@ -749,25 +736,6 @@ namespace
   // Head viewport depth range used by both `SetViewport` payloads.
   constexpr float kCartographicViewportMinDepth = 0.0f;
   constexpr float kCartographicViewportMaxDepth = 1.0f;
-
-  /**
-   * `Cartographic::GetEffect` (0x007D1E50) hands the cartographic effect back
-   * through the abstract `gpg::gal::Effect` handle, which it builds by
-   * aliasing the very `EffectD3D9` the device resources own (see
-   * `Cartographic::GetEffect` further down this file). The GAL headers in this
-   * tree still model `Effect` and `EffectD3D9` as two unrelated skeletons, so
-   * reading the technique/variable interface back out of that handle needs the
-   * matching inverse alias. Both `RenderTerrainStage0` (0x007D2EEE) and
-   * `RenderTerrainStage1` (0x007D371E) call `GetEffect` and then dispatch
-   * through `EffectD3D9` slot 3 (`SetMatrix`, +0x0C) and slot 4
-   * (`SetTechnique`, +0x10) on the returned pointer.
-   */
-  [[nodiscard]] gpg::gal::EffectD3D9& CartographicEffectInterface(
-    const boost::shared_ptr<gpg::gal::Effect>& effect
-  ) noexcept
-  {
-    return *reinterpret_cast<gpg::gal::EffectD3D9*>(effect.get());
-  }
 
   /**
    * Builds the screen-space quad `RenderTerrainStage1` composites the
@@ -1459,17 +1427,17 @@ namespace moho
     UploadDecalVerticesIfDirty();
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = GetCartographicBaseEffectD3D9();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique(mTechniqueName.c_str());
+    boost::shared_ptr<gpg::gal::Effect> effect = GetCartographicEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(mTechniqueName.c_str());
 
     device->SetVertexDeclaration(mVertexFormat);
     device->SetVertexBuffer(0U, mQuadVertexBuffer, decalCount, 0);
     device->SetVertexBuffer(1U, mInstanceVertexBuffer, 1, 0);
     device->SetBufferIndices(mIndexBuffer);
 
-    effect->SetMatrix("viewMatrix")->SetMatrix4x4(&camera.view);
-    effect->SetMatrix("projMatrix")->SetMatrix4x4(&camera.projection);
-    effect->SetMatrix("decalTexture")->SetTexture(mDecalTexture);
+    effect->GetVariable("viewMatrix")->SetMatrix4x4(&camera.view);
+    effect->GetVariable("projMatrix")->SetMatrix4x4(&camera.projection);
+    effect->GetVariable("decalTexture")->SetTexture(mDecalTexture);
 
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
@@ -1491,16 +1459,11 @@ namespace moho
    * Address: 0x007D1E50 (FUN_007D1E50, ?GetEffect@Cartographic@Moho@@AAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
    *
    * What it does:
-   * Looks up the `"cartographic"` D3D effect from the active device resources
-   * and aliases its base effect handle into the public GAL effect type.
+   * Returns the gal effect of the device resources' `"cartographic"` effect.
    */
   boost::shared_ptr<gpg::gal::Effect> Cartographic::GetEffect()
   {
-    boost::shared_ptr<gpg::gal::EffectD3D9> baseEffect = GetCartographicBaseEffectD3D9();
-    return boost::shared_ptr<gpg::gal::Effect>(
-      reinterpret_cast<gpg::gal::Effect*>(baseEffect.get()),
-      CartographicEffectAliasDeleter(baseEffect)
-    );
+    return D3D_GetDevice()->GetResources()->FindEffect("cartographic")->GetBaseEffect();
   }
 
   /**
@@ -1965,9 +1928,9 @@ namespace moho
     ID3DDeviceResources* const resources = device->GetResources();
     CD3DEffect* const meshEffect = resources->FindEffect("mesh");
 
-    const boost::shared_ptr<gpg::gal::EffectD3D9> meshBaseEffect = meshEffect->GetBaseEffect();
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> hypsometricTextureVar =
-      meshBaseEffect->SetMatrix("hypsometricTexture");
+    const boost::shared_ptr<gpg::gal::Effect> meshBaseEffect = meshEffect->GetBaseEffect();
+    const boost::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
+      meshBaseEffect->GetVariable("hypsometricTexture");
     hypsometricTextureVar->SetTexture(mHypsometricTexture);
 
     (void)device->SetCurEffect(meshEffect);
@@ -2016,37 +1979,37 @@ namespace moho
     );
 
     const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
-    gpg::gal::EffectD3D9& cartographicEffect = CartographicEffectInterface(effect);
+    gpg::gal::Effect& cartographicEffect = *effect;
 
-    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique =
-      cartographicEffect.SetTechnique("Terrain_Stage0");
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique =
+      cartographicEffect.GetTechnique("Terrain_Stage0");
 
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar =
-      cartographicEffect.SetMatrix("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrixVar =
-      cartographicEffect.SetMatrix("projMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> gridSizeCoeffVar =
-      cartographicEffect.SetMatrix("gridSizeCoeff");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> terrainSizeCoeffVar =
-      cartographicEffect.SetMatrix("terrainSizeCoeff");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> terrainHeightScaleVar =
-      cartographicEffect.SetMatrix("terrainHeightScale");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevMaximumVar =
-      cartographicEffect.SetMatrix("elevMaximum");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevMinimumVar =
-      cartographicEffect.SetMatrix("elevMinimum");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> elevTextureVar =
-      cartographicEffect.SetMatrix("elevTexture");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> hypsometricTextureVar =
-      cartographicEffect.SetMatrix("hypsometricTexture");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> topographicTextureVar =
-      cartographicEffect.SetMatrix("topographicTexture");
+    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar =
+      cartographicEffect.GetVariable("viewMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrixVar =
+      cartographicEffect.GetVariable("projMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> gridSizeCoeffVar =
+      cartographicEffect.GetVariable("gridSizeCoeff");
+    const boost::shared_ptr<gpg::gal::EffectVariable> terrainSizeCoeffVar =
+      cartographicEffect.GetVariable("terrainSizeCoeff");
+    const boost::shared_ptr<gpg::gal::EffectVariable> terrainHeightScaleVar =
+      cartographicEffect.GetVariable("terrainHeightScale");
+    const boost::shared_ptr<gpg::gal::EffectVariable> elevMaximumVar =
+      cartographicEffect.GetVariable("elevMaximum");
+    const boost::shared_ptr<gpg::gal::EffectVariable> elevMinimumVar =
+      cartographicEffect.GetVariable("elevMinimum");
+    const boost::shared_ptr<gpg::gal::EffectVariable> elevTextureVar =
+      cartographicEffect.GetVariable("elevTexture");
+    const boost::shared_ptr<gpg::gal::EffectVariable> hypsometricTextureVar =
+      cartographicEffect.GetVariable("hypsometricTexture");
+    const boost::shared_ptr<gpg::gal::EffectVariable> topographicTextureVar =
+      cartographicEffect.GetVariable("topographicTexture");
 
     viewMatrixVar->SetMatrix4x4(&camera.view);
     projMatrixVar->SetMatrix4x4(&camera.projection);
     // Slot 7 (+0x1C) binds a `float4`; both coefficient lanes are four floats.
-    gridSizeCoeffVar->Func4(mGridSizeCoeff);
-    terrainSizeCoeffVar->Func4(mTerrainSizeCoeff);
+    gridSizeCoeffVar->SetVector(mGridSizeCoeff);
+    terrainSizeCoeffVar->SetVector(mTerrainSizeCoeff);
     terrainHeightScaleVar->SetFloat(mTerrainHeightScale);
     elevMaximumVar->SetFloat(mElevMaximum);
     elevMinimumVar->SetFloat(mElevMinimum);
@@ -2128,16 +2091,16 @@ namespace moho
     (void)mFrameVertexBuffer->Unlock();
 
     const boost::shared_ptr<gpg::gal::Effect> effect = GetEffect();
-    gpg::gal::EffectD3D9& cartographicEffect = CartographicEffectInterface(effect);
+    gpg::gal::Effect& cartographicEffect = *effect;
 
-    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique =
-      cartographicEffect.SetTechnique("Terrain_Stage1");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameWidthVar =
-      cartographicEffect.SetMatrix("frameWidth");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameHeightVar =
-      cartographicEffect.SetMatrix("frameHeight");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> frameTextureVar =
-      cartographicEffect.SetMatrix("frameTexture");
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique =
+      cartographicEffect.GetTechnique("Terrain_Stage1");
+    const boost::shared_ptr<gpg::gal::EffectVariable> frameWidthVar =
+      cartographicEffect.GetVariable("frameWidth");
+    const boost::shared_ptr<gpg::gal::EffectVariable> frameHeightVar =
+      cartographicEffect.GetVariable("frameHeight");
+    const boost::shared_ptr<gpg::gal::EffectVariable> frameTextureVar =
+      cartographicEffect.GetVariable("frameTexture");
 
     device->SetVertexDeclaration(mFrameVertexFormat);
     device->SetVertexBuffer(0U, mFrameVertexBuffer, 1, 0);

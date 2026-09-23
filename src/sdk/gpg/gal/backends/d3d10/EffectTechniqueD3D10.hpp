@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/gal/EffectTechnique.hpp"
 #include "legacy/containers/String.h"
 
 namespace gpg::gal
@@ -13,7 +14,7 @@ namespace gpg::gal
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\EffectTechniqueD3D10.cpp
      */
-    class EffectTechniqueD3D10
+    class EffectTechniqueD3D10 : public EffectTechnique
     {
     public:
         /**
@@ -22,90 +23,101 @@ namespace gpg::gal
          * char const *,void *,void *
          *
          * What it does:
-         * Initializes a D3D10 technique wrapper from name/effect/technique handles and
-         * retains one reference on the backing effect interface.
+         * Keeps the technique name and handles and AddRefs the native effect;
+         * throws "invalid effect specified" when there is no effect.
          */
         EffectTechniqueD3D10(const char* name, void* dxEffect, void* techniqueHandle);
 
         /**
-         * Address: 0x00900FD0 (FUN_00900FD0)
+         * Address: 0x00900F50 (FUN_00900F50)
+         * Address: 0x00900FD0 (FUN_00900FD0, the scalar deleting destructor)
+         * Slot: 0
          *
          * What it does:
-         * Owns the deleting-destructor thunk path and releases retained effect/name state.
+         * Releases the native effect; the name then goes as a member.
          */
-        virtual ~EffectTechniqueD3D10();
+        ~EffectTechniqueD3D10() override;
 
         /**
          * Address: 0x00900EF0 (FUN_00900EF0)
+         * Slot: 1
          *
          * What it does:
-         * Returns the local technique-name string lane.
+         * Returns the technique name.
          */
-        virtual msvc8::string* GetName();
+        msvc8::string* GetName() override;
 
         /**
          * Address: 0x00901110 (FUN_00901110)
+         * Slot: 2
          *
          * What it does:
-         * Begins this technique on the active device and returns pass count from technique desc.
+         * Begins this technique on the active device and returns its pass count.
          */
-        virtual int BeginTechnique();
+        int BeginTechnique() override;
 
         /**
          * Address: 0x00901290 (FUN_00901290)
+         * Slot: 3
          *
          * What it does:
-         * Ends the active technique lane and clears begin/end tracking state.
+         * Ends the technique and clears the begin/end tracking.
          */
-        virtual void EndTechnique();
+        void EndTechnique() override;
 
         /**
          * Address: 0x00901360 (FUN_00901360)
+         * Slot: 4
          *
          * What it does:
-         * Applies the selected technique pass on the active technique.
+         * Applies pass `pass` of the technique.
          */
-        virtual void BeginPass(int pass);
+        void BeginPass(int pass) override;
 
         /**
          * Address: 0x009014D0 (FUN_009014D0)
+         * Slot: 5
          *
          * What it does:
-         * Validates begin/end pass sequencing for the active technique.
+         * Checks the begin/end sequencing; D3D10 has nothing to end per pass.
          */
-        virtual void EndPass();
+        void EndPass() override;
 
         /**
          * Address: 0x00901580 (FUN_00901580)
+         * Slot: 6
          *
          * What it does:
-         * Reads a boolean annotation by name from the active technique handle.
+         * Reads the technique's bool annotation `annotationName`.
          */
-        virtual bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationBool(bool* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x00901710 (FUN_00901710)
+         * Slot: 7
          *
          * What it does:
-         * Reads an integer annotation by name from the active technique handle.
+         * Reads the technique's int annotation `annotationName`.
          */
-        virtual bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationInt(int* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x00901880 (FUN_00901880)
+         * Slot: 8
          *
          * What it does:
-         * Reads a float annotation by name from the active technique handle.
+         * Reads the technique's float annotation `annotationName`.
          */
-        virtual bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationFloat(float* outValue, const msvc8::string& annotationName) override;
 
         /**
          * Address: 0x009019F0 (FUN_009019F0)
+         * Slot: 9
          *
          * What it does:
-         * Reads a string annotation by name from the active technique handle.
+         * Reads the technique's string annotation `annotationName`.
          */
-        virtual bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName);
+        bool GetAnnotationString(msvc8::string* outValue, const msvc8::string& annotationName) override;
 
     public:
         msvc8::string name_{};              // +0x04
@@ -120,4 +132,4 @@ namespace gpg::gal
     static_assert(offsetof(EffectTechniqueD3D10, techniqueHandle_) == 0x24, "EffectTechniqueD3D10::techniqueHandle_ offset must be 0x24");
     static_assert(offsetof(EffectTechniqueD3D10, beginEndActive_) == 0x28, "EffectTechniqueD3D10::beginEndActive_ offset must be 0x28");
     static_assert(sizeof(EffectTechniqueD3D10) == 0x2C, "EffectTechniqueD3D10 size must be 0x2C");
-}
+} // namespace gpg::gal

@@ -10,7 +10,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/BoostWrappers.h"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/console/CConCommand.h"
 #include "moho/render/camera/GeomCamera3.h"

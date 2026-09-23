@@ -10,7 +10,7 @@
 #include <stdexcept>
 
 #include "gpg/core/utils/BoostWrappers.h"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/ID3DIndexSheet.h"
 #include "moho/render/ID3DTextureSheet.h"

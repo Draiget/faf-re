@@ -1,5 +1,5 @@
 #include "moho/terrain/water/WaterShaderVars.h"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 
 namespace
 {
@@ -60,7 +60,7 @@ namespace moho
   {
     ShaderVar& shaderVar = GetWater2TerrainScaleShaderVar();
     if (shaderVar.Exists()) {
-      shaderVar.mEffectVariable->SetPtr(terrainScaleData, 16U);
+      shaderVar.mEffectVariable->SetValue(terrainScaleData, 16U);
     }
     return &shaderVar;
   }

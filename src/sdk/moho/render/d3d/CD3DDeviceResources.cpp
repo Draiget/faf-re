@@ -14,7 +14,7 @@
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
 #include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
@@ -947,7 +947,7 @@ namespace moho
       DevResInitResources();
     } else {
       for (CD3DEffect* const effect : mEffects) {
-        effect->mEffect.px->OnReset();
+        effect->mEffect->OnReset();
       }
     }
   }

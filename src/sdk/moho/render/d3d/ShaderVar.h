@@ -6,11 +6,12 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "legacy/containers/String.h"
+#include "gpg/gal/Matrix.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 
 namespace gpg::gal
 {
-  class EffectVariableD3D9;
+  class EffectVariable;
   class Texture;
 } // namespace gpg::gal
 
@@ -98,13 +99,13 @@ namespace moho
      * If the shader-var has a bound effect variable, writes one 4x4 matrix
      * pointer into it through the effect-variable virtual dispatch.
      */
-    ShaderVar* SetMatrix4x4(const void* matrix4x4);
+    ShaderVar* SetMatrix4x4(const gpg::gal::Matrix* matrix);
 
   public:
     msvc8::string mVariableName{};                             // +0x00
     msvc8::string mEffectFileName{};                           // +0x1C
     CD3DEffect::AttachedLink mEffectLink{};                    // +0x38
-    boost::shared_ptr<gpg::gal::EffectVariableD3D9> mEffectVariable{}; // +0x40
+    boost::shared_ptr<gpg::gal::EffectVariable> mEffectVariable{}; // +0x40
   };
 
   static_assert(offsetof(ShaderVar, mVariableName) == 0x00, "moho::ShaderVar::mVariableName offset must be 0x00");

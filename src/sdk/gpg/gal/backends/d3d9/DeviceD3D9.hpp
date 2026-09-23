@@ -136,13 +136,11 @@ namespace gal {
        * Demangled: gpg::gal::DeviceD3D9::CreateEffect
        *
        * What it does:
-       * Dispatches `Func1` and chooses source-compile vs cached-binary effect
-       * creation based on `EffectContext::useCache`.
+       * Runs the `Func1` pre-hook, then builds the effect from the compiled
+       * cache (`CreateEffectFromCachedBinary`) when `context.mUseCache` is set
+       * and from source (`CreateEffectFromSourceBuffer`) otherwise.
        */
-      boost::shared_ptr<Effect>* CreateEffect(
-          boost::shared_ptr<Effect>* outEffect,
-          EffectContext* context
-       ) override;
+      boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
       /**
        * Address: 0x008EACC0 (FUN_008EACC0)
        * Slot: 10
@@ -636,6 +634,27 @@ namespace gal {
        * and updates shader/capability profile lanes.
        */
       int BuildDeviceCapabilities(const DeviceContext* context);
+
+      /**
+       * Address: 0x008F09A0 (FUN_008F09A0)
+       *
+       * What it does:
+       * Compiles the context's source with its macros, creates the D3DX effect,
+       * points it at the pipeline state's state manager, writes the compiled
+       * bytes to the cache path when it can open it, and wraps the result in
+       * an `EffectD3D9`.
+       */
+      boost::shared_ptr<Effect> CreateEffectFromSourceBuffer(const EffectContext& context);
+
+      /**
+       * Address: 0x008F0F90 (FUN_008F0F90)
+       *
+       * What it does:
+       * Loads the compiled bytes from the context's cache path, creates the
+       * D3DX effect from them, points it at the pipeline state's state manager
+       * and wraps the result in an `EffectD3D9`.
+       */
+      boost::shared_ptr<Effect> CreateEffectFromCachedBinary(const EffectContext& context);
 
     public:
       int mCurThreadId = 0;                                    // +0x24 thread that ran Setup

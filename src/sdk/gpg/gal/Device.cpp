@@ -357,20 +357,6 @@ namespace gpg::gal
         *outContext = outputContext_;
     }
 
-    /**
-     * Slot 9 on the base is _purecall in the binary - only a backend ever
-     * answers it. The declaration exists here so DeviceD3D9 and DeviceD3D10
-     * override rather than append; reaching this body would mean the active
-     * device is the base class, which never happens.
-     */
-    boost::shared_ptr<Effect>* Device::CreateEffect(
-        boost::shared_ptr<Effect>* const outEffect,
-        EffectContext* const /*context*/
-    )
-    {
-        return outEffect;
-    }
-
     void Device::GetTexture2D(
         const void* const /*sourceData*/,
         const std::uint32_t /*sourceBytes*/,

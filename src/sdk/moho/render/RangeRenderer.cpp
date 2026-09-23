@@ -10,9 +10,9 @@
 #include <string_view>
 
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/Device.hpp"
@@ -63,7 +63,7 @@ namespace
    * Resolves one `"range"` D3D effect from device resources and returns
    * its base GAL effect handle.
    */
-  [[nodiscard, maybe_unused]] boost::shared_ptr<gpg::gal::EffectD3D9> AcquireRangeRingBaseEffect()
+  [[nodiscard, maybe_unused]] boost::shared_ptr<gpg::gal::Effect> AcquireRangeRingBaseEffect()
   {
     moho::ID3DDeviceResources* const resources = moho::D3D_GetDevice()->GetResources();
     moho::CD3DEffect* const effect = resources->FindEffect("range");
@@ -348,10 +348,10 @@ namespace
   {
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
 
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = AcquireRangeRingBaseEffect();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> castTechnique = effect->SetTechnique("Cast");
-    boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrixVar = effect->SetMatrix("viewMatrix");
-    boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrixVar = effect->SetMatrix("projMatrix");
+    boost::shared_ptr<gpg::gal::Effect> effect = AcquireRangeRingBaseEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> castTechnique = effect->GetTechnique("Cast");
+    boost::shared_ptr<gpg::gal::EffectVariable> viewMatrixVar = effect->GetVariable("viewMatrix");
+    boost::shared_ptr<gpg::gal::EffectVariable> projMatrixVar = effect->GetVariable("projMatrix");
 
     // `range.fx` declares both `viewMatrix` and `projMatrix` as its own globals,
     // so both have to be pushed - the device's matrices are a different effect's
@@ -521,7 +521,7 @@ namespace
     }
 
     if (GetFrameRangeColorShaderVar().Exists()) {
-      GetFrameRangeColorShaderVar().mEffectVariable->SetMem(4u, &ringColor.r);
+      GetFrameRangeColorShaderVar().mEffectVariable->SetFloatArray(4u, &ringColor.r);
     }
 
     rangeRenderer.mFrame.mName.assign_owned("RangeBurn");

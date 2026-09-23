@@ -36,6 +36,7 @@ namespace gal {
     class VertexBufferContext;
     class CubeRenderTargetD3D10;
     class DepthStencilTargetD3D10;
+    class Effect;
     class EffectD3D10;
     class PipelineStateD3D10;
     class IndexBufferD3D10;
@@ -142,13 +143,11 @@ namespace gal {
        * Demangled: gpg::gal::DeviceD3D10::CreateEffect
        *
        * What it does:
-       * Compiles one effect from source memory with recovered macro-injection lanes
-       * and returns a wrapped D3D10 effect handle.
+       * Compiles the context's source with the D3D10 state macros added and
+       * wraps the result in an `EffectD3D10`, constructed straight into the
+       * caller's return slot.
        */
-      virtual boost::shared_ptr<EffectD3D10>* CreateEffect(
-          boost::shared_ptr<EffectD3D10>* outEffect,
-          EffectContext* context
-      );
+      virtual boost::shared_ptr<Effect> CreateEffect(const EffectContext& context);
       /**
        * Address: 0x008FAD20 (FUN_008FAD20)
        * Slot: 10

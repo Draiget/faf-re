@@ -9,7 +9,7 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexFormat.hpp"
@@ -194,7 +194,7 @@ namespace moho
     drawContext.vertexCount_ = kParticleQuadVertexCount;
     drawContext.indexCount_ = kParticleQuadIndexCount;
 
-    gpg::gal::EffectTechniqueD3D9* const technique = effect->mCurrentTechnique.px;
+    gpg::gal::EffectTechnique* const technique = effect->mCurrentTechnique.get();
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));

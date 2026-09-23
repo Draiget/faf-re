@@ -18,7 +18,7 @@ namespace gpg::gal
 {
   class Effect;
   class EffectTechnique;
-  class EffectTechniqueD3D9;
+  class EffectTechnique;
   class Texture;
   class IndexBuffer;
   class VertexBuffer;
@@ -339,7 +339,7 @@ namespace moho
      * typed as the concrete `EffectTechniqueD3D9` (the base `gpg::gal::EffectTechnique`
      * is the pure-virtual skeleton and its inheritance is not yet recovered).
      */
-    void RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique);
+    void RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique);
 
   public:
     // --- Layout from constructor ASM evidence ---

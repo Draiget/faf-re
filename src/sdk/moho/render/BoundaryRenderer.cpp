@@ -8,9 +8,9 @@
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
 #include "moho/render/VisionRenderer.h"
 #include "moho/render/camera/GeomCamera3.h"
@@ -85,14 +85,14 @@ namespace
     // overwritten by the effect lookup at 0x007D0914 before it is ever read.
     static_cast<void>(device->GetDeviceContext()->GetHead(headIndex));
 
-    const boost::shared_ptr<gpg::gal::EffectD3D9> effect = moho::AcquireVisionBaseEffect();
+    const boost::shared_ptr<gpg::gal::Effect> effect = moho::AcquireVisionBaseEffect();
 
-    const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique =
-      effect->SetTechnique(techniqueName.c_str());
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> viewMatrix = effect->SetMatrix("viewMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> projMatrix = effect->SetMatrix("projMatrix");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> boxCenter = effect->SetMatrix("boxCenter");
-    const boost::shared_ptr<gpg::gal::EffectVariableD3D9> boxExtent = effect->SetMatrix("boxExtent");
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique =
+      effect->GetTechnique(techniqueName.c_str());
+    const boost::shared_ptr<gpg::gal::EffectVariable> viewMatrix = effect->GetVariable("viewMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> projMatrix = effect->GetVariable("projMatrix");
+    const boost::shared_ptr<gpg::gal::EffectVariable> boxCenter = effect->GetVariable("boxCenter");
+    const boost::shared_ptr<gpg::gal::EffectVariable> boxExtent = effect->GetVariable("boxExtent");
 
     const float center[3] = {
       (volume.Min.x + volume.Max.x) * 0.5f,
@@ -107,8 +107,8 @@ namespace
 
     viewMatrix->SetMatrix4x4(&camera.view);
     projMatrix->SetMatrix4x4(&camera.projection);
-    boxCenter->SetMem(3u, center);
-    boxExtent->SetMem(3u, halfExtent);
+    boxCenter->SetFloatArray(3u, center);
+    boxExtent->SetFloatArray(3u, halfExtent);
 
     device->SetVertexDeclaration(body.mGeometry.mVertexFormat);
     device->SetVertexBuffer(0u, body.mGeometry.mVertexBuffer, 1, 0);

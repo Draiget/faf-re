@@ -10,7 +10,7 @@
 
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/ID3DTextureSheet.h"
@@ -382,7 +382,7 @@ namespace moho
     const bool drag = dragEnabled;
     ShaderVar& dragEnabledShaderVar = GetParticleDragEnabledShaderVar();
     if (dragEnabledShaderVar.Exists()) {
-      dragEnabledShaderVar.mEffectVariable->SetPtr(&drag, 4U);
+      dragEnabledShaderVar.mEffectVariable->SetValue(&drag, 4U);
     }
 
     BindBeamTextureShaderVar(GetParticleTexture0ShaderVar(), texture0);

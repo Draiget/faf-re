@@ -11,9 +11,8 @@
 
 namespace gpg::gal
 {
-  class EffectD3D9;
-  class EffectTechniqueD3D9;
-  class EffectVariableD3D9;
+  class Effect;
+  class EffectTechnique;
 } // namespace gpg::gal
 
 namespace moho
@@ -24,15 +23,6 @@ namespace moho
   class CD3DEffect
   {
   public:
-    template <typename T>
-    struct SharedHandle
-    {
-      T* px;                                  // +0x00
-      boost::detail::sp_counted_base* pi;     // +0x04
-    };
-
-    static_assert(sizeof(SharedHandle<void>) == 0x08, "CD3DEffect::SharedHandle size must be 0x08");
-
     struct AttachedLink
     {
       AttachedLink* mLinkLane; // +0x00
@@ -323,9 +313,9 @@ namespace moho
      * Address: 0x00437E90 (FUN_00437E90, ?GetBaseEffect@CD3DEffect@Moho@@QAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
      *
      * What it does:
-     * Returns a shared handle copy of the current base GAL effect lane.
+     * Returns a new reference to the gal effect.
      */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> GetBaseEffect();
+    [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> GetBaseEffect();
 
     /**
      * Address: 0x0042DA30 (FUN_0042DA30, ?SetTexture@CD3DEffect@Moho@@QAEXPBDV?$shared_ptr@VID3DTextureSheet@Moho@@@boost@@@Z)
@@ -341,8 +331,8 @@ namespace moho
     TechniqueSet mTechniques;     // +0x04
     msvc8::string mName;          // +0x10
     msvc8::string mFile;          // +0x2C
-    SharedHandle<gpg::gal::EffectD3D9> mEffect;                     // +0x48
-    SharedHandle<gpg::gal::EffectTechniqueD3D9> mCurrentTechnique;  // +0x50
+    boost::shared_ptr<gpg::gal::Effect> mEffect;                    // +0x48
+    boost::shared_ptr<gpg::gal::EffectTechnique> mCurrentTechnique; // +0x50
   };
 
   static_assert(offsetof(CD3DEffect::Technique::Implementation, mName) == 0x04, "CD3DEffect::Technique::Implementation::mName offset must be 0x04");

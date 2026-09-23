@@ -1824,20 +1824,6 @@ namespace gpg::gal
       return loadInfo;
     }
 
-    /**
-     * Address: 0x00900F50 (FUN_00900F50)
-     *
-     * What it does:
-     * Executes non-deleting destructor body lanes for `EffectTechniqueD3D10`.
-     */
-    void DestroyEffectTechniqueD3D10Body(EffectTechniqueD3D10* const technique) noexcept
-    {
-      ReleaseComLike(technique->dxEffect_);
-      technique->techniqueHandle_ = nullptr;
-      technique->name_.tidy(true, 0U);
-      technique->beginEndActive_ = false;
-    }
-
     int MapDxgiToGalRenderTargetFormat(const int dxgiFormat)
     {
       for (const DXGIFormatPair& pair : kRenderTargetDxgiGalPairs) {
@@ -2120,117 +2106,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x0094B750 (FUN_0094B750)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `EffectVariableD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountEffectVariableD3D10FromRaw(
-      boost::detail::shared_count* const outCount, EffectVariableD3D10* const effectVariable
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, effectVariable);
-    }
-
-    /**
-     * Address: 0x0094B6C0 (FUN_0094B6C0)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `EffectTechniqueD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountEffectTechniqueD3D10FromRaw(
-      boost::detail::shared_count* const outCount, EffectTechniqueD3D10* const effectTechnique
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, effectTechnique);
-    }
-
-    /**
-     * Address: 0x008F9A70 (FUN_008F9A70, boost::detail::shared_count_EffectD3D10::shared_count_EffectD3D10)
-     *
-     * What it does:
-     * Allocates one 0x10-byte `sp_counted_impl_p<EffectD3D10>` control
-     * block, publishes its vtable, sets use/weak count to one, and stores
-     * the owned raw pointer - the control-block half of constructing one
-     * `shared_ptr<EffectD3D10>`.
-     */
-    boost::detail::shared_count* ConstructSharedCountEffectD3D10FromRaw(
-      boost::detail::shared_count* const outCount, EffectD3D10* const effect
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, effect);
-    }
-
-    /**
-     * Address: 0x008FA3D0 (FUN_008FA3D0, boost::shared_ptr_EffectD3D10::shared_ptr_EffectD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<EffectD3D10>` from one raw pointer lane.
-     * FUN_008FA3D0's own disassembly publishes `px` ("effect") first, then
-     * builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9A70 above - a real, separately-emitted call, not
-     * inlined - also reached the same way from `DeviceD3D10::CreateEffect`'s
-     * `reset()`) before a no-op `sp_enable_shared_from_this` (`EffectD3D10`
-     * does not derive from `enable_shared_from_this`); reproduced
-     * explicitly here instead of relying on boost's own converting
-     * constructor.
-     */
-    boost::shared_ptr<EffectD3D10>* ConstructSharedEffectD3D10FromRaw(
-      boost::shared_ptr<EffectD3D10>* const outEffect, EffectD3D10* const effect
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(outEffect, effect, ConstructSharedCountEffectD3D10FromRaw);
-    }
-
-    /**
-     * Address: 0x0094B840 (FUN_0094B840, boost::shared_ptr_EffectTechniqueD3D10::shared_ptr_EffectTechniqueD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<EffectTechniqueD3D10>` from one raw
-     * pointer lane. FUN_0094B840's own disassembly publishes `px` first,
-     * then builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_0094B6C0 above, `ConstructSharedCountEffectTechniqueD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`EffectTechniqueD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<EffectTechniqueD3D10>* ConstructSharedEffectTechniqueD3D10FromRaw(
-      boost::shared_ptr<EffectTechniqueD3D10>* const outEffectTechnique,
-      EffectTechniqueD3D10* const effectTechnique
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outEffectTechnique, effectTechnique, ConstructSharedCountEffectTechniqueD3D10FromRaw
-      );
-    }
-
-    /**
-     * Address: 0x0094B870 (FUN_0094B870, boost::shared_ptr_EffectVariableD3D10::shared_ptr_EffectVariableD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<EffectVariableD3D10>` from one raw
-     * pointer lane. FUN_0094B870's own disassembly publishes `px` first,
-     * then builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_0094B750 above, `ConstructSharedCountEffectVariableD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`EffectVariableD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<EffectVariableD3D10>* ConstructSharedEffectVariableD3D10FromRaw(
-      boost::shared_ptr<EffectVariableD3D10>* const outEffectVariable,
-      EffectVariableD3D10* const effectVariable
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outEffectVariable, effectVariable, ConstructSharedCountEffectVariableD3D10FromRaw
-      );
-    }
-
-    /**
      * Address: 0x008FAA50 (FUN_008FAA50)
      *
      * What it does:
@@ -2355,19 +2230,6 @@ namespace gpg::gal
         ThrowVectorTooLongLengthErrorB,
         AllocateStride04Array
       );
-    }
-
-    /**
-     * Address: 0x0094C150 (FUN_0094C150)
-     *
-     * What it does:
-     * Executes non-deleting destructor body lanes for `EffectVariableD3D10`.
-     */
-    void DestroyEffectVariableD3D10Body(EffectVariableD3D10* const variable) noexcept
-    {
-      ReleaseComLike(variable->dxEffect_);
-      variable->variableHandle_ = nullptr;
-      variable->name_.tidy(true, 0U);
     }
 
     /**
@@ -4858,107 +4720,72 @@ namespace gpg::gal
 
   /**
    * Address: 0x008FEA00 (FUN_008FEA00)
-   *
-   * boost::shared_ptr<EffectD3D10> *,EffectContext *
+   * Slot: 9
    *
    * What it does:
-   * Copy-constructs one local `EffectContext`, injects 20 D3D10-specific
-   * effect-macro pairs via `EffectContext::DefineMacro` (which throws
-   * `gpg::gal::Error` on a duplicate key), compiles the shader source
-   * from the local context's macro lane, and returns a wrapped D3D10
-   * effect handle.
+   * Copies the context and defines the 20 D3D10 state macros on the copy
+   * (`EffectContext::DefineMacro`, which throws on a duplicate key), then
+   * compiles the caller's source with the copy's macros. The copy and the
+   * error text go out of scope before the effect is wrapped (0x008FEF4D, then
+   * `new` at 0x008FEF5A), and the define array is never freed -- the binary
+   * has no `delete[]` for it on any path, the same as the D3D9 builder's.
    */
-  boost::shared_ptr<EffectD3D10>*
-  DeviceD3D10::CreateEffect(boost::shared_ptr<EffectD3D10>* const outEffect, EffectContext* const context)
+  boost::shared_ptr<Effect> DeviceD3D10::CreateEffect(const EffectContext& context)
   {
-    // The binary allocates `EffectContext v27` on its own stack and
-    // copy-constructs from the inbound argument. The public class
-    // currently declares `sizeof(EffectContext) == 0x4`, so the actual
-    // 0x64-byte payload is reserved via aligned storage (matching the
-    // same workaround used by `EffectD3D10::context_`).
-    struct ScopedLocalEffectContext final
-    {
-      using Storage = std::aligned_storage_t<0x64, alignof(void*)>;
-
-      ~ScopedLocalEffectContext()
-      {
-        if (context != nullptr) {
-          context->~EffectContext();
-          context = nullptr;
-        }
-      }
-
-      Storage storage{};
-      EffectContext* context = nullptr;
-    };
-
-    ScopedLocalEffectContext localContextScope{};
-    localContextScope.context =
-      ::new (static_cast<void*>(&localContextScope.storage)) EffectContext(*context);
-    EffectContext* const localContext = localContextScope.context;
-
-    for (std::size_t i = 0U; i < kDeviceCreateEffectInjectedMacroCount; ++i) {
-      localContext->DefineMacro(
-        kDeviceCreateEffectInjectedMacros[i].key,
-        kDeviceCreateEffectInjectedMacros[i].value
-      );
-    }
-
-    // Per binary order: macro lane comes from the modified local copy,
-    // but every other context lane (sourceType, sourcePath, source-byte
-    // window) is read from the inbound caller-owned context — the local
-    // copy is consumed for DefineMacro side effects only.
-    const std::size_t totalMacroCount = localContext->mMacros.size();
-    D3D10_SHADER_MACRO* defines = nullptr;
-    if (totalMacroCount != 0U) {
-      defines = new D3D10_SHADER_MACRO[totalMacroCount + 1U];
-
-      std::size_t writeIndex = 0U;
-      for (const EffectMacro& macro : localContext->mMacros) {
-        defines[writeIndex].Name = macro.keyText_.c_str();
-        defines[writeIndex].Definition = macro.valueText_.c_str();
-        ++writeIndex;
-      }
-
-      defines[writeIndex].Name = nullptr;
-      defines[writeIndex].Definition = nullptr;
-    }
-
-    if (context->mSourceType != 2U) {
-      delete[] defines;
-      ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
-    }
-
-    const char* const sourceBegin = context->mSourceBuffer.mBegin;
-    const char* const sourceEnd = context->mSourceBuffer.mEnd;
-    const void* const sourceData = sourceBegin;
-    const std::uint32_t sourceBytes =
-      (sourceEnd >= sourceBegin) ? static_cast<std::uint32_t>(sourceEnd - sourceBegin) : 0U;
-
     ID3D10Effect* dxEffect = nullptr;
-    void* errorBlob = nullptr;
-    const HRESULT result =
-      InvokeCreateEffectFromMemoryApi(this, sourceData, sourceBytes, defines, &dxEffect, &errorBlob);
-    delete[] defines;
+    {
+      EffectContext localContext(context);
+      for (std::size_t i = 0U; i < kDeviceCreateEffectInjectedMacroCount; ++i) {
+        localContext.DefineMacro(
+          kDeviceCreateEffectInjectedMacros[i].key,
+          kDeviceCreateEffectInjectedMacros[i].value
+        );
+      }
 
-    msvc8::string reason("unknown error");
-    if ((result < 0) && (errorBlob != nullptr)) {
-      const char* const errorText = reinterpret_cast<const char*>(GetReadbackData(errorBlob));
-      reason.assign_owned((errorText != nullptr) ? errorText : "unknown error");
+      const std::size_t macroCount = localContext.mMacros.size();
+      D3D10_SHADER_MACRO* defines = nullptr;
+      if (macroCount != 0U) {
+        defines = new D3D10_SHADER_MACRO[macroCount + 1U];
+
+        std::size_t index = 0U;
+        for (const EffectMacro& macro : localContext.mMacros) {
+          defines[index].Name = macro.keyText_.c_str();
+          defines[index].Definition = macro.valueText_.c_str();
+          ++index;
+        }
+
+        defines[macroCount].Name = nullptr;
+        defines[macroCount].Definition = nullptr;
+      }
+
+      void* errorBlob = nullptr;
+      if (context.mSourceType != 2U) {
+        ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
+      }
+
+      const char* const sourceData = context.mSourceBuffer.mBegin;
+      const std::uint32_t sourceBytes =
+        static_cast<std::uint32_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
+      const HRESULT result =
+        InvokeCreateEffectFromMemoryApi(this, sourceData, sourceBytes, defines, &dxEffect, &errorBlob);
+
+      msvc8::string reason("unknown error");
+      if ((result < 0) && (errorBlob != nullptr)) {
+        reason.assign_owned(reinterpret_cast<const char*>(GetReadbackData(errorBlob)));
+      }
+
+      ReleaseComLike(errorBlob);
+
+      if (result < 0) {
+        msvc8::string message("unable to create effect: ");
+        message = message + context.mSourcePath;
+        message = message + " reason: ";
+        message = message + reason;
+        ThrowGalError("DeviceD3D10.cpp", 828, message.c_str());
+      }
     }
 
-    ReleaseComLike(errorBlob);
-
-    if (result < 0) {
-      msvc8::string message("unable to create effect: ");
-      message = message + context->mSourcePath;
-      message = message + " reason: ";
-      message = message + reason;
-      ThrowGalError("DeviceD3D10.cpp", 828, message.c_str());
-    }
-
-    outEffect->reset(new EffectD3D10(context, dxEffect));
-    return outEffect;
+    return boost::shared_ptr<Effect>(new EffectD3D10(context, dxEffect));
   }
 
   /**
@@ -6233,13 +6060,12 @@ namespace gpg::gal
    * EffectContext const &,void *
    *
    * What it does:
-   * Initializes EffectD3D10 context storage, then binds caller context/effect state.
+   * Starts from an empty context and a null effect, then adopts the caller's
+   * through `SetEffect`.
    */
-  EffectD3D10::EffectD3D10(EffectContext* const context, void* const dxEffect)
-    : context_()
-    , dxEffect_(nullptr)
+  EffectD3D10::EffectD3D10(const EffectContext& context, void* const dxEffect)
   {
-    AssignState(context, dxEffect);
+    SetEffect(context, dxEffect);
   }
 
   /**
@@ -6248,7 +6074,7 @@ namespace gpg::gal
    * What it does:
    * Releases the native effect and assigns a fresh context over `context_`.
    */
-  void EffectD3D10::ResetState()
+  void EffectD3D10::Reset()
   {
     ReleaseComLike(dxEffect_);
     context_ = EffectContext();
@@ -6258,14 +6084,14 @@ namespace gpg::gal
    * Address: 0x0094BFE0 (FUN_0094BFE0)
    *
    * What it does:
-   * Resets, copies `source` into `context_`, adopts `dxEffect`, then empties the
-   * copied source buffer (the four words at this+0x48..+0x54, releasing the
-   * shared owner at +0x4C first).
+   * Resets, copies `context` into `context_`, adopts `dxEffect`, then empties
+   * the copied source buffer (the four words at this+0x48..+0x54, releasing
+   * the shared owner at +0x4C first).
    */
-  void EffectD3D10::AssignState(const EffectContext* const source, void* const dxEffect)
+  void EffectD3D10::SetEffect(const EffectContext& context, void* const dxEffect)
   {
-    ResetState();
-    context_ = *source;
+    Reset();
+    context_ = context;
     dxEffect_ = dxEffect;
     context_.mSourceBuffer.Reset();
   }
@@ -6275,13 +6101,11 @@ namespace gpg::gal
    * Address: 0x0094C050 (FUN_0094C050, the scalar deleting destructor)
    *
    * What it does:
-   * Resets the state; `context_` is then destroyed once, as a member
-   * (0x0093F950). This body used to tear `context_` down by hand as well, so
-   * the member destructor that followed ran over it a second time.
+   * `Reset()`; `context_` is then destroyed once, as a member (0x0093F950).
    */
   EffectD3D10::~EffectD3D10()
   {
-    ResetState();
+    Reset();
   }
 
   /**
@@ -6298,13 +6122,15 @@ namespace gpg::gal
   /**
    * Address: 0x0094BC60 (FUN_0094BC60)
    *
-   * msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechniqueD3D10>> &
+   * msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> &
    *
    * What it does:
-   * Enumerates valid D3D10 techniques from the retained effect and appends wrapped
-   * `EffectTechniqueD3D10` objects into the output vector.
+   * Walks the techniques by index and appends a wrapper for every valid one:
+   * the same `push_back` emission as the D3D9 backend (0x00942860, called at
+   * 0x0094BE69), on a temporary whose constructor the binary inlines around
+   * `shared_count(EffectTechniqueD3D10*)` 0x0094B6C0.
    */
-  void EffectD3D10::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechniqueD3D10>>& outTechniques)
+  void EffectD3D10::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 52, "invalid effect");
@@ -6329,9 +6155,7 @@ namespace gpg::gal
       }
 
       outTechniques.push_back(
-        boost::shared_ptr<EffectTechniqueD3D10>(
-          new EffectTechniqueD3D10(techniqueDesc.Name, dxEffect_, techniqueHandle)
-        )
+        boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueDesc.Name, dxEffect_, techniqueHandle))
       );
     }
   }
@@ -6342,9 +6166,10 @@ namespace gpg::gal
    * char const *
    *
    * What it does:
-   * Looks up an effect variable by name and returns a wrapped variable handle.
+   * Wraps the effect variable called `variableName`; throws when the effect
+   * or the variable is missing.
    */
-  boost::shared_ptr<EffectVariableD3D10> EffectD3D10::SetMatrix(const char* const variableName)
+  boost::shared_ptr<EffectVariable> EffectD3D10::GetVariable(const char* const variableName)
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 79, "invalid effect");
@@ -6359,13 +6184,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 82, message);
     }
 
-    boost::shared_ptr<EffectVariableD3D10> effectVariable;
-    static_cast<void>(
-      ConstructSharedEffectVariableD3D10FromRaw(
-        &effectVariable, new EffectVariableD3D10(variableName, dxEffect_, variableHandle)
-      )
-    );
-    return effectVariable;
+    return boost::shared_ptr<EffectVariable>(new EffectVariableD3D10(variableName, dxEffect_, variableHandle));
   }
 
   /**
@@ -6374,9 +6193,10 @@ namespace gpg::gal
    * char const *
    *
    * What it does:
-   * Looks up an effect technique by name and returns a wrapped technique handle.
+   * Wraps the technique called `techniqueName`; throws when the effect or
+   * the technique is missing.
    */
-  boost::shared_ptr<EffectTechniqueD3D10> EffectD3D10::SetTechnique(const char* const techniqueName)
+  boost::shared_ptr<EffectTechnique> EffectD3D10::GetTechnique(const char* const techniqueName)
   {
     if (dxEffect_ == nullptr) {
       ThrowGalError("EffectD3D10.cpp", 89, "invalid effect");
@@ -6394,13 +6214,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 92, message);
     }
 
-    boost::shared_ptr<EffectTechniqueD3D10> effectTechnique;
-    static_cast<void>(
-      ConstructSharedEffectTechniqueD3D10FromRaw(
-        &effectTechnique, new EffectTechniqueD3D10(techniqueName, dxEffect_, techniqueHandle)
-      )
-    );
-    return effectTechnique;
+    return boost::shared_ptr<EffectTechnique>(new EffectTechniqueD3D10(techniqueName, dxEffect_, techniqueHandle));
   }
 
   /**
@@ -6429,14 +6243,16 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x00900FD0 (FUN_00900FD0)
+   * Address: 0x00900F50 (FUN_00900F50)
+   * Address: 0x00900FD0 (FUN_00900FD0, the scalar deleting destructor)
    *
    * What it does:
-   * Owns the deleting-destructor thunk path and tears down retained technique state.
+   * Releases the native effect. The name then goes as a member; the technique
+   * handle and the begin/end flag are left as they are.
    */
   EffectTechniqueD3D10::~EffectTechniqueD3D10()
   {
-    DestroyEffectTechniqueD3D10Body(this);
+    ReleaseComLike(dxEffect_);
   }
 
   /**
@@ -6653,14 +6469,16 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x0094C1D0 (FUN_0094C1D0)
+   * Address: 0x0094C150 (FUN_0094C150)
+   * Address: 0x0094C1D0 (FUN_0094C1D0, the scalar deleting destructor)
    *
    * What it does:
-   * Owns deleting-destructor behavior and delegates body lanes to `FUN_0094C150`.
+   * Releases the native effect. The name then goes as a member; the variable
+   * handle is left as it is.
    */
   EffectVariableD3D10::~EffectVariableD3D10()
   {
-    DestroyEffectVariableD3D10Body(this);
+    ReleaseComLike(dxEffect_);
   }
 
   /**
@@ -6681,9 +6499,9 @@ namespace gpg::gal
    * D3D10 cube render-target slot keeps an empty body and only owns by-value
    * `shared_ptr` release semantics.
    */
-  void EffectVariableD3D10::Func2(boost::shared_ptr<CubeRenderTargetD3D10> cubeRenderTarget)
+  void EffectVariableD3D10::SetCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget> cubeTarget)
   {
-    (void)cubeRenderTarget;
+    static_cast<void>(cubeTarget);
   }
 
   /**
@@ -6692,11 +6510,12 @@ namespace gpg::gal
    * What it does:
    * Binds a render-target-backed shader-resource view into this effect slot.
    */
-  void EffectVariableD3D10::Func3(boost::shared_ptr<RenderTargetD3D10> renderTarget)
+  void EffectVariableD3D10::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
   {
     void* const shaderResourceVariable = InvokeVariableAsShaderResource(variableHandle_);
-    void* const shaderResourceView =
-      (renderTarget.get() != nullptr) ? renderTarget->GetShaderResourceViewOrThrow() : nullptr;
+    void* const shaderResourceView = (renderTarget.get() != nullptr)
+      ? static_cast<RenderTargetD3D10*>(renderTarget.get())->GetShaderResourceViewOrThrow()
+      : nullptr;
     const HRESULT result = InvokeShaderResourceSetResource(shaderResourceVariable, shaderResourceView);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 144, result);
@@ -6726,10 +6545,10 @@ namespace gpg::gal
    * What it does:
    * Converts to matrix lane and writes one matrix payload.
    */
-  void EffectVariableD3D10::SetMatrix4x4(const void* const matrix4x4)
+  void EffectVariableD3D10::SetMatrix4x4(const Matrix* const matrix)
   {
     void* const matrixValue = InvokeVariableAsMatrix(variableHandle_);
-    const HRESULT result = InvokeMatrixSetMatrix(matrixValue, matrix4x4);
+    const HRESULT result = InvokeMatrixSetMatrix(matrixValue, matrix);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 110, result);
     }
@@ -6786,7 +6605,7 @@ namespace gpg::gal
    * What it does:
    * Converts to vector lane and writes one vector payload.
    */
-  void EffectVariableD3D10::SetVector(const void* const value)
+  void EffectVariableD3D10::SetVector(const float* const value)
   {
     void* const vectorValue = InvokeVariableAsVector(variableHandle_);
     const HRESULT result = InvokeVectorSetFloatVector(vectorValue, value);
@@ -6801,11 +6620,11 @@ namespace gpg::gal
    * void const *,int
    *
    * What it does:
-   * Writes raw value payload bytes from caller memory (`byteCount`).
+   * Writes `byteCount` raw bytes to the variable.
    */
-  void EffectVariableD3D10::SetPtr(const void* const data, const int byteCount)
+  void EffectVariableD3D10::SetValue(const void* const data, const std::uint32_t byteCount)
   {
-    const HRESULT result = InvokeVariableSetRawValue(variableHandle_, data, 0U, static_cast<unsigned int>(byteCount));
+    const HRESULT result = InvokeVariableSetRawValue(variableHandle_, data, 0U, byteCount);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 103, result);
     }
@@ -6817,12 +6636,11 @@ namespace gpg::gal
    * int,void const *
    *
    * What it does:
-   * Writes raw variable bytes from caller memory (`floatCount * 4`).
+   * Writes `count` floats as raw bytes (`count * 4`).
    */
-  void EffectVariableD3D10::SetMem(const int floatCount, const void* const values)
+  void EffectVariableD3D10::SetFloatArray(const std::uint32_t count, const float* const values)
   {
-    const HRESULT result =
-      InvokeVariableSetRawValue(variableHandle_, values, 0U, static_cast<unsigned int>(floatCount * 4));
+    const HRESULT result = InvokeVariableSetRawValue(variableHandle_, values, 0U, count * 4U);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 96, result);
     }
@@ -6834,15 +6652,18 @@ namespace gpg::gal
    * int,void const *
    *
    * What it does:
-   * Writes count-based matrix/float payload through matrix lane with
-   * raw-value fallback.
+   * `AsMatrix()->SetMatrixArray`, handed the address of the `matrices`
+   * parameter itself rather than its value (`lea edx, [esp+0xA8]` at
+   * 0x0094CAD8; the D3D9 twin passes the pointer). When that fails it falls
+   * back to `SetRawValue` with the pointer, but sized as `count` floats
+   * (`count * 4` bytes), not `count` matrices. Kept as the binary has it.
    */
-  void EffectVariableD3D10::Func8(const int valueCount, const void* const values)
+  void EffectVariableD3D10::SetMatrixArray(const std::uint32_t count, const Matrix* const matrices)
   {
     void* const matrixValue = InvokeVariableAsMatrix(variableHandle_);
-    HRESULT result = InvokeMatrixSetMatrixArray(matrixValue, &values, 0U, static_cast<unsigned int>(valueCount));
+    HRESULT result = InvokeMatrixSetMatrixArray(matrixValue, &matrices, 0U, count);
     if (result < 0) {
-      result = InvokeVariableSetRawValue(variableHandle_, values, 0U, static_cast<unsigned int>(valueCount * 4));
+      result = InvokeVariableSetRawValue(variableHandle_, matrices, 0U, count * 4U);
       if (result < 0) {
         ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 121, result);
       }
@@ -6855,12 +6676,15 @@ namespace gpg::gal
    * int,unsigned int
    *
    * What it does:
-   * Writes vector-lane payload bytes using one 32-bit value lane.
+   * `AsVector()->SetFloatVectorArray`, handed the address of the `vectors4`
+   * parameter itself rather than its value (`lea edx, [esp+0xA0]` at
+   * 0x0094C704) -- the same slip as the D3D9 twin. Nothing in the binary
+   * calls the slot.
    */
-  void EffectVariableD3D10::Func9(const int valueCount, const std::uint32_t value)
+  void EffectVariableD3D10::SetVectorArray(const std::uint32_t count, const float* const vectors4)
   {
     void* const vectorValue = InvokeVariableAsVector(variableHandle_);
-    const HRESULT result = InvokeVectorSetArray(vectorValue, &value, 0U, static_cast<unsigned int>(valueCount));
+    const HRESULT result = InvokeVectorSetArray(vectorValue, &vectors4, 0U, count);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 88, result);
     }

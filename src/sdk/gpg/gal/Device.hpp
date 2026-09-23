@@ -221,23 +221,11 @@ namespace gpg::gal
      * Demangled: _purecall
      *
      * What it does:
-     * Creates one backend effect from `context` and hands it back through
-     * `outEffect`. Pure in the binary - only a backend ever answers it - but
-     * carried here with a body so `Device` stays instantiable like its 45
-     * siblings.
-     *
-     * The signature has to live on the base. It used to be declared
-     * `purecall9()` with no arguments, which meant DeviceD3D9::CreateEffect
-     * did not override it - C++ appended the backend's method as a new slot
-     * past the base's, so slot 9 still held this stub. Effect::Create pushes
-     * two arguments and expects a __thiscall callee to pop 8; the stub popped
-     * 0, and the debug CRT's _RTC_CheckEsp trapped the moment the first
-     * effect was compiled.
+     * Builds the backend effect `context` describes. `Effect::Create`
+     * (0x0093F5B0) forwards its own return slot to it, so the backend
+     * constructs straight into the caller's `shared_ptr`.
      */
-    virtual boost::shared_ptr<Effect>* CreateEffect(
-      boost::shared_ptr<Effect>* outEffect,
-      EffectContext* context
-    );
+    virtual boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) = 0;
     /**
      * Slot: 10 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *

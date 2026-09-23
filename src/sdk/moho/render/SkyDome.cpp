@@ -15,9 +15,9 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/Effect.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -820,7 +820,7 @@ void SkyDome::Destroy()
      * need. The base/derived `Effect`/`EffectD3D9` relationship is not yet
      * recovered; once it is, these passes can call `GetEffect()` by name.
      */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> ResolveSkyEffect()
+    [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> ResolveSkyEffect()
     {
       moho::CD3DEffect* const skyEffect = moho::D3D_GetDevice()->GetResources()->FindEffect("sky");
       return skyEffect->GetBaseEffect();
@@ -842,10 +842,10 @@ void SkyDome::Destroy()
    * object), because the base `gpg::gal::EffectTechnique` is the pure-virtual
    * skeleton whose inheritance from `EffectTechniqueD3D9` is not yet recovered.
    */
-  void SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique)
+  void SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique)
   {
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    gpg::gal::EffectTechniqueD3D9* const techniqueImpl = technique.get();
+    gpg::gal::EffectTechnique* const techniqueImpl = technique.get();
 
     device->SetVertexDeclaration(mDomeFormat->mFormat);
     device->SetVertexBuffer(0u, mDomeVertBuf, 1, 0);
@@ -876,18 +876,18 @@ void SkyDome::Destroy()
    */
   void SkyDome::RenderAtmosphere(const GeomCamera3& cam)
   {
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Atmosphere");
+    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Atmosphere");
 
     const Vector4f& cameraPosition = cam.inverseView.r[3];
     const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
-    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
-    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
-    effect->SetMatrix("horizonBegin")->SetFloat(mDomeShapeParams.x);
-    effect->SetMatrix("horizonEnd")->SetFloat(mHorizonSize + mDomeShapeParams.x);
-    effect->SetMatrix("horizonColor")->SetPtr(&mHorizonColor, sizeof(mHorizonColor));
-    effect->SetMatrix("skyColor")->SetPtr(&mSkyColor, sizeof(mSkyColor));
-    effect->SetMatrix("horizonLookup")->SetTexture(mHorizonLookupTex);
+    effect->GetVariable("viewPosition")->SetValue(viewPosition, sizeof(viewPosition));
+    effect->GetVariable("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->GetVariable("horizonBegin")->SetFloat(mDomeShapeParams.x);
+    effect->GetVariable("horizonEnd")->SetFloat(mHorizonSize + mDomeShapeParams.x);
+    effect->GetVariable("horizonColor")->SetValue(&mHorizonColor, sizeof(mHorizonColor));
+    effect->GetVariable("skyColor")->SetValue(&mSkyColor, sizeof(mSkyColor));
+    effect->GetVariable("horizonLookup")->SetTexture(mHorizonLookupTex);
 
     RenderDomeUsing(technique);
   }
@@ -906,23 +906,23 @@ void SkyDome::Destroy()
    */
   void SkyDome::RenderCirrus(const int tick, const float interpolant, const GeomCamera3& cam)
   {
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Cirrus");
+    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cirrus");
 
-    effect->SetMatrix("tick")->Func6(tick);
-    effect->SetMatrix("interpolant")->SetFloat(interpolant);
+    effect->GetVariable("tick")->SetInt(tick);
+    effect->GetVariable("interpolant")->SetFloat(interpolant);
 
     const Vector4f& cameraPosition = cam.inverseView.r[3];
     const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
-    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
-    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
-    effect->SetMatrix("cirrusMultiplier")->SetFloat(mCirrusMultiplier);
-    effect->SetMatrix("cirrusColor")->SetPtr(&mCirrusColor_R, 3 * sizeof(float));
+    effect->GetVariable("viewPosition")->SetValue(viewPosition, sizeof(viewPosition));
+    effect->GetVariable("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->GetVariable("cirrusMultiplier")->SetFloat(mCirrusMultiplier);
+    effect->GetVariable("cirrusColor")->SetValue(&mCirrusColor_R, 3 * sizeof(float));
     // 0x00819971: `mov eax, [ebp+214h]` / `mov eax, [ebp+218h]` — the
     // "cirrusTexture" sampler is fed from the +0x214 lane (mCirrusTex, loaded
     // by CreateTextures from mCirrusTexPath), not the +0x21C lane.
-    effect->SetMatrix("cirrusTexture")->SetTexture(mCirrusTex);
-    effect->SetMatrix("aCirrus")->SetPtr(mCirrusData, sizeof(mCirrusData));
+    effect->GetVariable("cirrusTexture")->SetTexture(mCirrusTex);
+    effect->GetVariable("aCirrus")->SetValue(mCirrusData, sizeof(mCirrusData));
 
     RenderDomeUsing(technique);
   }
@@ -960,8 +960,8 @@ void SkyDome::Destroy()
     }
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Cumulus");
+    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cumulus");
 
     // Upload the per-cloud instance records into the instanced cumulus stream.
     void* const instanceData = mDecalVertBuf3->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
@@ -974,19 +974,19 @@ void SkyDome::Destroy()
     device->SetBufferIndices(mDecalIndexBuf);
 
     const float viewRightVec[3] = {cam.view.r[0].x, cam.view.r[1].x, cam.view.r[2].x};
-    effect->SetMatrix("viewRight")->SetPtr(viewRightVec, sizeof(viewRightVec));
+    effect->GetVariable("viewRight")->SetValue(viewRightVec, sizeof(viewRightVec));
 
     const float viewUpVec[3] = {cam.view.r[0].y, cam.view.r[1].y, cam.view.r[2].y};
-    effect->SetMatrix("viewUp")->SetPtr(viewUpVec, sizeof(viewUpVec));
+    effect->GetVariable("viewUp")->SetValue(viewUpVec, sizeof(viewUpVec));
 
     const Vector4f& cameraPosition = cam.inverseView.r[3];
     const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
-    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
-    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->GetVariable("viewPosition")->SetValue(viewPosition, sizeof(viewPosition));
+    effect->GetVariable("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
 
-    effect->SetMatrix("cumulusDispersionRamp")->SetTexture(mDecalTex2);
-    effect->SetMatrix("cumulusLightRamp")->SetTexture(mDecalTex1);
-    effect->SetMatrix("cumulusTexture")->SetTexture(mDecalTex3);
+    effect->GetVariable("cumulusDispersionRamp")->SetTexture(mDecalTex2);
+    effect->GetVariable("cumulusLightRamp")->SetTexture(mDecalTex1);
+    effect->GetVariable("cumulusTexture")->SetTexture(mDecalTex3);
 
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int pass = 0; pass < passCount; ++pass) {
@@ -1019,8 +1019,8 @@ void SkyDome::Destroy()
     UpdateDecalBuffer();
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    boost::shared_ptr<gpg::gal::EffectD3D9> effect = ResolveSkyEffect();
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique("Decal");
+    boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
+    boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Decal");
 
     device->SetVertexDeclaration(mDecalFormat1->mFormat);
     device->SetVertexBuffer(0u, mDecalVertBuf1, static_cast<int>(mDecalUploads.size()), 0);
@@ -1028,18 +1028,18 @@ void SkyDome::Destroy()
     device->SetBufferIndices(mDecalIndexBuf);
 
     const float viewRightVec[3] = {cam.view.r[0].x, cam.view.r[1].x, cam.view.r[2].x};
-    effect->SetMatrix("viewRight")->SetPtr(viewRightVec, sizeof(viewRightVec));
+    effect->GetVariable("viewRight")->SetValue(viewRightVec, sizeof(viewRightVec));
 
     const float viewUpVec[3] = {cam.view.r[0].y, cam.view.r[1].y, cam.view.r[2].y};
-    effect->SetMatrix("viewUp")->SetPtr(viewUpVec, sizeof(viewUpVec));
+    effect->GetVariable("viewUp")->SetValue(viewUpVec, sizeof(viewUpVec));
 
     const Vector4f& cameraPosition = cam.inverseView.r[3];
     const float viewPosition[3] = {cameraPosition.x, cameraPosition.y, cameraPosition.z};
-    effect->SetMatrix("viewPosition")->SetPtr(viewPosition, sizeof(viewPosition));
-    effect->SetMatrix("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
-    effect->SetMatrix("decalGlowMultiplier")->SetFloat(mHorizonBlend);
-    effect->SetMatrix("decalAlbedoTexture")->SetTexture(mAtmosphereTex);
-    effect->SetMatrix("decalGlowTexture")->SetTexture(mAtmosphereTex2);
+    effect->GetVariable("viewPosition")->SetValue(viewPosition, sizeof(viewPosition));
+    effect->GetVariable("viewProjMatrix")->SetMatrix4x4(&cam.viewProjection);
+    effect->GetVariable("decalGlowMultiplier")->SetFloat(mHorizonBlend);
+    effect->GetVariable("decalAlbedoTexture")->SetTexture(mAtmosphereTex);
+    effect->GetVariable("decalGlowTexture")->SetTexture(mAtmosphereTex2);
 
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int pass = 0; pass < passCount; ++pass) {

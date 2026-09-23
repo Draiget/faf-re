@@ -10,7 +10,7 @@
 
 namespace gpg::gal
 {
-  class EffectD3D9;
+  class Effect;
 }
 
 namespace moho
@@ -97,7 +97,7 @@ namespace moho
    * fog-of-war overlay (`RenderFogOfWar`, 0x0081C6A9), which live in two
    * different translation units - hence the external linkage.
    */
-  [[nodiscard]] boost::shared_ptr<gpg::gal::EffectD3D9> AcquireVisionBaseEffect();
+  [[nodiscard]] boost::shared_ptr<gpg::gal::Effect> AcquireVisionBaseEffect();
 
   /**
    * Address: 0x0081C660 (FUN_0081C660, func_ren_FogOfWar)

@@ -15,9 +15,8 @@
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
-#include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -80,46 +79,6 @@ namespace moho
       return lane.mName.mySize != 0U;
     }
 
-    template <typename T>
-    [[nodiscard]] boost::shared_ptr<T>& SharedHandleAsBoost(CD3DEffect::SharedHandle<T>& handle) noexcept
-    {
-      static_assert(
-        sizeof(CD3DEffect::SharedHandle<T>) == sizeof(boost::shared_ptr<T>),
-        "CD3DEffect::SharedHandle<T> layout must match boost::shared_ptr<T>"
-      );
-      return *reinterpret_cast<boost::shared_ptr<T>*>(&handle);
-    }
-
-    template <typename T>
-    [[nodiscard]] const boost::shared_ptr<T>& SharedHandleAsBoost(
-      const CD3DEffect::SharedHandle<T>& handle
-    ) noexcept
-    {
-      static_assert(
-        sizeof(CD3DEffect::SharedHandle<T>) == sizeof(boost::shared_ptr<T>),
-        "CD3DEffect::SharedHandle<T> layout must match boost::shared_ptr<T>"
-      );
-      return *reinterpret_cast<const boost::shared_ptr<T>*>(&handle);
-    }
-
-    /**
-     * Address family:
-     * - 0x0042C240 (FUN_0042C240)
-     * - 0x0042C280 (FUN_0042C280)
-     * - 0x0042C330 (FUN_0042C330)
-     * - 0x0042C370 (FUN_0042C370)
-     * - 0x0042C4E0 (FUN_0042C4E0)
-     *
-     * What it does:
-     * Releases one shared-handle lane and clears ownership.
-     */
-    template <typename T>
-    int ReleaseSharedHandle(CD3DEffect::SharedHandle<T>* const handle) noexcept
-    {
-      SharedHandleAsBoost(*handle).reset();
-      return 0;
-    }
-
 
 
     /**
@@ -155,21 +114,6 @@ namespace moho
     [[nodiscard]] std::int32_t ResolveGraphicsFidelityIndex()
     {
       return graphics_Fidelity;
-    }
-
-    /**
-     * Address: 0x0042D500 (FUN_0042D500)
-     *
-     * What it does:
-     * Assigns one technique shared-handle lane, preserving shared-count semantics.
-     */
-    CD3DEffect::SharedHandle<gpg::gal::EffectTechniqueD3D9>& AssignTechniqueHandle(
-      CD3DEffect::SharedHandle<gpg::gal::EffectTechniqueD3D9>& destination,
-      const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9>& source
-    )
-    {
-      SharedHandleAsBoost(destination) = source;
-      return destination;
     }
 
   } // namespace
@@ -392,8 +336,14 @@ namespace moho
    */
   CD3DEffect::~CD3DEffect()
   {
-    (void)ReleaseSharedHandle(&mCurrentTechnique);
-    (void)ReleaseSharedHandle(&mEffect);
+    // The binary releases these first, then the strings, the technique set
+    // and finally the attached links -- plain member destruction with the
+    // link walk last, which says the owner-link head is a base or first
+    // member with a destructor of its own (`WeakObject`). Until that head is
+    // modelled, the walk stays in this body and the handles are dropped here
+    // to keep them ahead of it.
+    mCurrentTechnique.reset();
+    mEffect.reset();
 
     mFile.tidy(true, 0U);
     mName.tidy(true, 0U);
@@ -443,24 +393,8 @@ namespace moho
    */
   bool CD3DEffect::InitEffectFromFile(const char* const effectFilePath)
   {
-    struct ScopedEffectContext final
-    {
-      using Storage = std::aligned_storage_t<0x64, alignof(void*)>;
-
-      ~ScopedEffectContext()
-      {
-        if (context != nullptr) {
-          context->~EffectContext();
-          context = nullptr;
-        }
-      }
-
-      Storage storage{};
-      gpg::gal::EffectContext* context = nullptr;
-    };
-
     const msvc8::string engineVersion = GetEngineVersion();
-    SharedHandleAsBoost(mEffect).reset();
+    mEffect.reset();
 
     try {
       gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
@@ -515,34 +449,8 @@ namespace moho
       }
 
       msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
-      ScopedEffectContext scopedContext{};
-      scopedContext.context = ::new (&scopedContext.storage) gpg::gal::EffectContext(
-        useCachePayload,
-        mFile.c_str(),
-        cachePath.c_str(),
-        mergedBuffer,
-        effectMacros
-      );
-
-      boost::shared_ptr<gpg::gal::Effect> createdEffect = gpg::gal::Effect::Create(*scopedContext.context);
-      struct EffectAliasDeleter
-      {
-        explicit EffectAliasDeleter(const boost::shared_ptr<gpg::gal::Effect>& ownerEffect)
-          : owner(ownerEffect)
-        {}
-
-        void operator()(gpg::gal::EffectD3D9*) const
-        {
-        }
-
-        boost::shared_ptr<gpg::gal::Effect> owner;
-      };
-
-      boost::shared_ptr<gpg::gal::EffectD3D9> effectHandle(
-        reinterpret_cast<gpg::gal::EffectD3D9*>(createdEffect.get()),
-        EffectAliasDeleter(createdEffect)
-      );
-      SharedHandleAsBoost(mEffect) = effectHandle;
+      const gpg::gal::EffectContext context(useCachePayload, mFile.c_str(), cachePath.c_str(), mergedBuffer, effectMacros);
+      mEffect = gpg::gal::Effect::Create(context);
 
       mTechniques.clear();
 
@@ -630,10 +538,10 @@ namespace moho
    */
   void CD3DEffect::EnumerateValidTechniques(msvc8::vector<msvc8::string>& outTechniqueNames)
   {
-    msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechniqueD3D9>> techniques{};
-    (void)SharedHandleAsBoost(mEffect)->GetTechniques(techniques);
+    msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>> techniques{};
+    mEffect->GetTechniques(techniques);
 
-    for (const boost::shared_ptr<gpg::gal::EffectTechniqueD3D9>& technique : techniques) {
+    for (const boost::shared_ptr<gpg::gal::EffectTechnique>& technique : techniques) {
       outTechniqueNames.push_back(*technique->GetName());
     }
   }
@@ -651,9 +559,8 @@ namespace moho
     const Technique lookupTechnique(lookupName);
     const TechniqueSet::iterator definition = GetFidelityDefinitions(lookupTechnique);
 
-    auto& effect = SharedHandleAsBoost(mEffect);
     auto selectAndWarnInvalid = [&]() {
-      AssignTechniqueHandle(mCurrentTechnique, effect->SetTechnique(techniqueName));
+      mCurrentTechnique = mEffect->GetTechnique(techniqueName);
       gpg::Debugf(
         "technique %s in effect %s has an invalid fidelity definition",
         techniqueName,
@@ -674,7 +581,7 @@ namespace moho
       return;
     }
 
-    AssignTechniqueHandle(mCurrentTechnique, effect->SetTechnique(selectedLane.mName.c_str()));
+    mCurrentTechnique = mEffect->GetTechnique(selectedLane.mName.c_str());
   }
 
   /**
@@ -690,8 +597,7 @@ namespace moho
     const msvc8::string& annotationName
   )
   {
-    const auto& effect = SharedHandleAsBoost(mEffect);
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique(implementationName.c_str());
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
     if (!technique) {
       return false;
     }
@@ -715,8 +621,7 @@ namespace moho
     (void)defaultValue;
     std::int32_t resolvedValue = 0;
 
-    const auto& effect = SharedHandleAsBoost(mEffect);
-    if (!effect) {
+    if (!mEffect) {
       gpg::Warnf("attempt to retrieve annotation from invalid effect");
       return resolvedValue;
     }
@@ -751,8 +656,7 @@ namespace moho
     const msvc8::string& annotationName
   )
   {
-    const auto& effect = SharedHandleAsBoost(mEffect);
-    boost::shared_ptr<gpg::gal::EffectTechniqueD3D9> technique = effect->SetTechnique(implementationName.c_str());
+    const boost::shared_ptr<gpg::gal::EffectTechnique> technique = mEffect->GetTechnique(implementationName.c_str());
     if (!technique) {
       return false;
     }
@@ -776,8 +680,7 @@ namespace moho
     msvc8::string resolvedValue{};
     resolvedValue.assign(defaultValue, 0U, msvc8::string::npos);
 
-    const auto& effect = SharedHandleAsBoost(mEffect);
-    if (!effect) {
+    if (!mEffect) {
       gpg::Warnf("attempt to retrieve annotation from invalid effect");
       return resolvedValue;
     }
@@ -803,11 +706,11 @@ namespace moho
    * Address: 0x00437E90 (FUN_00437E90, ?GetBaseEffect@CD3DEffect@Moho@@QAE?AV?$shared_ptr@VEffect@gal@gpg@@@boost@@XZ)
    *
    * What it does:
-   * Returns a shared handle copy of the current base GAL effect lane.
+   * Returns a new reference to the gal effect.
    */
-  boost::shared_ptr<gpg::gal::EffectD3D9> CD3DEffect::GetBaseEffect()
+  boost::shared_ptr<gpg::gal::Effect> CD3DEffect::GetBaseEffect()
   {
-    return SharedHandleAsBoost(mEffect);
+    return mEffect;
   }
 
   /**
@@ -819,8 +722,7 @@ namespace moho
    */
   void CD3DEffect::SetTexture(const char* const variableName, boost::shared_ptr<ID3DTextureSheet> texture)
   {
-    const auto& effect = SharedHandleAsBoost(mEffect);
-    boost::shared_ptr<gpg::gal::EffectVariableD3D9> variable = effect->SetMatrix(variableName);
+    const boost::shared_ptr<gpg::gal::EffectVariable> variable = mEffect->GetVariable(variableName);
 
     if (texture) {
       ID3DTextureSheet::TextureHandle textureHandle{};

@@ -1,6 +1,6 @@
 #include "moho/terrain/TerrainShaderVars.h"
 
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "moho/render/ID3DTextureSheet.h"
 #include "moho/render/d3d/RD3DTextureResource.h"
 
@@ -127,14 +127,14 @@ namespace moho
   void SetShaderVarMem(ShaderVar& shaderVar, const std::uint32_t floatCount, const float* const values)
   {
     if (shaderVar.Exists()) {
-      shaderVar.mEffectVariable->SetMem(floatCount, values);
+      shaderVar.mEffectVariable->SetFloatArray(floatCount, values);
     }
   }
 
   void SetShaderVarPtr(ShaderVar& shaderVar, const void* const data, const std::uint32_t byteCount)
   {
     if (shaderVar.Exists()) {
-      shaderVar.mEffectVariable->SetPtr(data, byteCount);
+      shaderVar.mEffectVariable->SetValue(data, byteCount);
     }
   }
 } // namespace moho

@@ -15,7 +15,7 @@
 #include "moho/animation/CAniSkel.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/VMatrix4.h"
-#include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
+#include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
@@ -23,7 +23,7 @@
 #include "gpg/gal/MeshVertex.h"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
+#include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/backends/d3d9/Float16HardwareVertexFormatterD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
@@ -760,7 +760,7 @@ namespace moho
     drawContext.vertexCount_ = mVertexCount;
     drawContext.indexCount_ = mIndexCount;
 
-    gpg::gal::EffectTechniqueD3D9* const technique = effect->mCurrentTechnique.px;
+    gpg::gal::EffectTechnique* const technique = effect->mCurrentTechnique.get();
 
     const int passCount = technique->BeginTechnique();
     for (int pass = 0; pass < passCount; ++pass) {
@@ -945,13 +945,13 @@ namespace moho
     mDynamicVertexBuffer->Unlock();
 
     if (transPaletteVar.Exists()) {
-      transPaletteVar.mEffectVariable->SetPtr(
+      transPaletteVar.mEffectVariable->SetValue(
         transPaletteVar.mPalette.begin(),
         static_cast<std::uint32_t>(transPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
       );
     }
     if (rotPaletteVar.Exists()) {
-      rotPaletteVar.mEffectVariable->SetPtr(
+      rotPaletteVar.mEffectVariable->SetValue(
         rotPaletteVar.mPalette.begin(),
         static_cast<std::uint32_t>(rotPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
       );

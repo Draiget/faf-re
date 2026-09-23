@@ -73,13 +73,23 @@ namespace { // TEMPORARY PROBE (do not commit)
 }
 
     /**
-     * Address: 0x008F3810 (FUN_008F3810)
      * Address: 0x008F3820 (FUN_008F3820)
      *
      * What it does:
-     * Initializes one base `EffectTechnique` lane.
+     * Installs the abstract technique vtable.
      */
     EffectTechnique::EffectTechnique() = default;
+
+    /**
+     * Address: 0x008F3810 (FUN_008F3810)
+     *
+     * What it does:
+     * Reinstalls the abstract technique vtable (`mov [ecx], 0x00D42CA0;
+     * ret`). Both backend destructors inline it; this out-of-line copy is
+     * what the backend constructors' unwind funclets jump to (0x00B5A083,
+     * 0x00B5A0AE, 0x00B5B453, 0x00B5B476).
+     */
+    EffectTechnique::~EffectTechnique() = default;
 
     /**
      * Address: 0x008F4B80 (FUN_008F4B80)
@@ -161,34 +171,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
     namespace
     {
-        using effect_compiler_compile_effect_fn = HRESULT(__stdcall*)(void*, unsigned int, void**, void**);
-        using effect_get_parameter_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
-        using effect_get_annotation_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
-        using effect_get_technique_by_name_fn = void*(__stdcall*)(void*, const char*);
-        using effect_find_next_valid_technique_fn = HRESULT(__stdcall*)(void*, void*, void**);
-        using effect_set_technique_fn = HRESULT(__stdcall*)(void*, void*);
-        using effect_set_value_fn = HRESULT(__stdcall*)(void*, void*, const void*, unsigned int);
-        using effect_set_bool_fn = HRESULT(__stdcall*)(void*, void*, int);
-        using effect_set_int_fn = HRESULT(__stdcall*)(void*, void*, int);
-        using effect_set_float_fn = HRESULT(__stdcall*)(void*, void*, float);
-        using effect_set_float_array_fn = HRESULT(__stdcall*)(void*, void*, const float*, unsigned int);
-        using effect_set_vector_fn = HRESULT(__stdcall*)(void*, void*, const void*);
-        using effect_set_vector_array_fn = HRESULT(__stdcall*)(void*, void*, const void*, unsigned int);
-        using effect_set_matrix_fn = HRESULT(__stdcall*)(void*, void*, const void*);
-        using effect_set_matrix_array_fn = HRESULT(__stdcall*)(void*, void*, const void*, unsigned int);
-        using effect_set_texture_fn = HRESULT(__stdcall*)(void*, void*, void*);
-        using effect_get_technique_desc_fn = HRESULT(__stdcall*)(void*, void*, void*);
-        using effect_begin_technique_fn = HRESULT(__stdcall*)(void*, unsigned int*, unsigned int);
-        using effect_end_technique_fn = HRESULT(__stdcall*)(void*);
-        using effect_begin_pass_fn = HRESULT(__stdcall*)(void*, unsigned int);
-        using effect_end_pass_fn = HRESULT(__stdcall*)(void*);
-        using effect_get_bool_fn = HRESULT(__stdcall*)(void*, void*, int*);
-        using effect_get_int_fn = HRESULT(__stdcall*)(void*, void*, int*);
-        using effect_get_float_fn = HRESULT(__stdcall*)(void*, void*, float*);
-        using effect_get_string_fn = HRESULT(__stdcall*)(void*, void*, const char**);
-        using effect_set_state_manager_fn = HRESULT(__stdcall*)(void*, void*);
-        using effect_on_reset_device_fn = HRESULT(__stdcall*)(void*);
-        using effect_on_lost_device_fn = HRESULT(__stdcall*)(void*);
 
         constexpr std::uint32_t kVertexShaderModel20 = 0xFFFE0200U;
         constexpr std::uint32_t kVertexShaderModel30 = 0xFFFE0300U;
@@ -272,234 +254,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             default:
                 return 0U;
             }
-        }
-
-        HRESULT InvokeEffectCompilerCompileEffect(
-            void* const effectCompiler,
-            const unsigned int flags,
-            void** const outCompiledEffectBuffer,
-            void** const outCompilationErrors
-        )
-        {
-            // ID3DXEffectCompiler::CompileEffect is slot 59, not 3. Slot 3 is
-            // ID3DXBaseEffect::GetDesc, which takes a single out-pointer, so
-            // the call wrote through `flags` and faulted inside D3DX the first
-            // time an effect was compiled from source. The binary reads
-            // `[ecx+0ECh]` at 0x008F0C13, and 0xEC/4 is 59; the sibling
-            // helpers here already use ID3DXBaseEffect numbering
-            // (GetTechniqueByName 13, GetAnnotationByName 19), which is the
-            // same base this index counts from.
-            auto** const vtable = *reinterpret_cast<void***>(effectCompiler);
-            auto* const compileEffect = reinterpret_cast<effect_compiler_compile_effect_fn>(vtable[59]);
-            return compileEffect(effectCompiler, flags, outCompiledEffectBuffer, outCompilationErrors);
-        }
-
-        void* InvokeEffectGetAnnotationByName(void* const effect, void* const handle, const char* const name)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getAnnotationByName = reinterpret_cast<effect_get_annotation_by_name_fn>(vtable[19]);
-            return getAnnotationByName(effect, handle, name);
-        }
-
-        void* InvokeEffectGetTechniqueByName(void* const effect, const char* const name)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getTechniqueByName = reinterpret_cast<effect_get_technique_by_name_fn>(vtable[13]);
-            return getTechniqueByName(effect, name);
-        }
-
-        void* InvokeEffectGetParameterByName(void* const effect, void* const parentHandle, const char* const name)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getParameterByName = reinterpret_cast<effect_get_parameter_by_name_fn>(vtable[9]);
-            return getParameterByName(effect, parentHandle, name);
-        }
-
-        HRESULT InvokeEffectFindNextValidTechnique(void* const effect, void* const techniqueHandle, void** const outNextTechniqueHandle)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const findNextValidTechnique = reinterpret_cast<effect_find_next_valid_technique_fn>(vtable[61]);
-            return findNextValidTechnique(effect, techniqueHandle, outNextTechniqueHandle);
-        }
-
-        HRESULT InvokeEffectGetTechniqueDesc(
-            void* const effect,
-            void* const techniqueHandle,
-            D3DXTECHNIQUE_DESC* const outDesc
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getTechniqueDesc = reinterpret_cast<effect_get_technique_desc_fn>(vtable[5]);
-            return getTechniqueDesc(effect, techniqueHandle, outDesc);
-        }
-
-        HRESULT InvokeEffectSetTechnique(void* const effect, void* const techniqueHandle)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setTechnique = reinterpret_cast<effect_set_technique_fn>(vtable[58]);
-            return setTechnique(effect, techniqueHandle);
-        }
-
-        HRESULT InvokeEffectSetValue(void* const effect, void* const parameterHandle, const void* const value, const unsigned int byteCount)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setValue = reinterpret_cast<effect_set_value_fn>(vtable[20]);
-            return setValue(effect, parameterHandle, value, byteCount);
-        }
-
-        HRESULT InvokeEffectSetBool(void* const effect, void* const parameterHandle, const bool value)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setBool = reinterpret_cast<effect_set_bool_fn>(vtable[22]);
-            return setBool(effect, parameterHandle, value ? 1 : 0);
-        }
-
-        HRESULT InvokeEffectSetInt(void* const effect, void* const parameterHandle, const int value)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setInt = reinterpret_cast<effect_set_int_fn>(vtable[26]);
-            return setInt(effect, parameterHandle, value);
-        }
-
-        HRESULT InvokeEffectSetFloat(void* const effect, void* const parameterHandle, const float value)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setFloat = reinterpret_cast<effect_set_float_fn>(vtable[30]);
-            return setFloat(effect, parameterHandle, value);
-        }
-
-        HRESULT InvokeEffectSetFloatArray(
-            void* const effect,
-            void* const parameterHandle,
-            const float* const values,
-            const unsigned int floatCount
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setFloatArray = reinterpret_cast<effect_set_float_array_fn>(vtable[32]);
-            return setFloatArray(effect, parameterHandle, values, floatCount);
-        }
-
-        HRESULT InvokeEffectSetMatrix(void* const effect, void* const parameterHandle, const void* const matrix4x4)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setMatrix = reinterpret_cast<effect_set_matrix_fn>(vtable[38]);
-            return setMatrix(effect, parameterHandle, matrix4x4);
-        }
-
-        HRESULT InvokeEffectSetVector(void* const effect, void* const parameterHandle, const void* const vector4)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setVector = reinterpret_cast<effect_set_vector_fn>(vtable[34]);
-            return setVector(effect, parameterHandle, vector4);
-        }
-
-        HRESULT InvokeEffectSetVectorArray(
-            void* const effect,
-            void* const parameterHandle,
-            const void* const vectors4,
-            const unsigned int vectorCount
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setVectorArray = reinterpret_cast<effect_set_vector_array_fn>(vtable[36]);
-            return setVectorArray(effect, parameterHandle, vectors4, vectorCount);
-        }
-
-        HRESULT InvokeEffectSetMatrixArray(
-            void* const effect,
-            void* const parameterHandle,
-            const void* const matrices4x4,
-            const unsigned int matrixCount
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setMatrixArray = reinterpret_cast<effect_set_matrix_array_fn>(vtable[40]);
-            return setMatrixArray(effect, parameterHandle, matrices4x4, matrixCount);
-        }
-
-        HRESULT InvokeEffectSetTexture(void* const effect, void* const parameterHandle, void* const texture)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setTexture = reinterpret_cast<effect_set_texture_fn>(vtable[52]);
-            return setTexture(effect, parameterHandle, texture);
-        }
-
-        HRESULT InvokeEffectBeginTechnique(void* const effect, unsigned int* const outPassCount, const unsigned int flags)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const beginTechnique = reinterpret_cast<effect_begin_technique_fn>(vtable[63]);
-            return beginTechnique(effect, outPassCount, flags);
-        }
-
-        HRESULT InvokeEffectEndTechnique(void* const effect)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const endTechnique = reinterpret_cast<effect_end_technique_fn>(vtable[67]);
-            return endTechnique(effect);
-        }
-
-        HRESULT InvokeEffectBeginPass(void* const effect, const unsigned int pass)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const beginPass = reinterpret_cast<effect_begin_pass_fn>(vtable[64]);
-            return beginPass(effect, pass);
-        }
-
-        HRESULT InvokeEffectEndPass(void* const effect)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const endPass = reinterpret_cast<effect_end_pass_fn>(vtable[66]);
-            return endPass(effect);
-        }
-
-        HRESULT InvokeEffectGetBool(void* const effect, void* const annotationHandle, int* const outValue)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getBool = reinterpret_cast<effect_get_bool_fn>(vtable[23]);
-            return getBool(effect, annotationHandle, outValue);
-        }
-
-        HRESULT InvokeEffectGetInt(void* const effect, void* const annotationHandle, int* const outValue)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getInt = reinterpret_cast<effect_get_int_fn>(vtable[27]);
-            return getInt(effect, annotationHandle, outValue);
-        }
-
-        HRESULT InvokeEffectGetFloat(void* const effect, void* const annotationHandle, float* const outValue)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getFloat = reinterpret_cast<effect_get_float_fn>(vtable[31]);
-            return getFloat(effect, annotationHandle, outValue);
-        }
-
-        HRESULT InvokeEffectGetString(void* const effect, void* const annotationHandle, const char** const outValue)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const getString = reinterpret_cast<effect_get_string_fn>(vtable[51]);
-            return getString(effect, annotationHandle, outValue);
-        }
-
-        HRESULT InvokeEffectSetStateManager(void* const effect, void* const stateManager)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const setStateManager = reinterpret_cast<effect_set_state_manager_fn>(vtable[71]);
-            return setStateManager(effect, stateManager);
-        }
-
-        HRESULT InvokeEffectOnResetDevice(void* const effect)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const onResetDevice = reinterpret_cast<effect_on_reset_device_fn>(vtable[70]);
-            return onResetDevice(effect);
-        }
-
-        HRESULT InvokeEffectOnLostDevice(void* const effect)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(effect);
-            auto* const onLostDevice = reinterpret_cast<effect_on_lost_device_fn>(vtable[69]);
-            return onLostDevice(effect);
         }
 
         /**
@@ -815,149 +569,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
 
             return destinationEnd;
-        }
-
-        /**
-         * Address: 0x009417B0 (FUN_009417B0, boost::detail::shared_count_EffectTechniqueD3D9::shared_count_EffectTechniqueD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<EffectTechniqueD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<EffectTechniqueD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountEffectTechniqueD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            EffectTechniqueD3D9* const technique
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, technique);
-        }
-
-        /**
-         * Address: 0x00941A60 (FUN_00941A60, boost::shared_ptr_EffectTechniqueD3D9::shared_ptr_EffectTechniqueD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<EffectTechniqueD3D9>` from one raw
-         * pointer lane. FUN_00941A60's own disassembly publishes `px`
-         * ("tech") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_009417B0 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `EffectD3D9::SetTechnique` and `EffectD3D9::GetTechniques`)
-         * before a no-op `sp_enable_shared_from_this`
-         * (`EffectTechniqueD3D9` does not derive from
-         * `enable_shared_from_this`); reproduced explicitly here instead of
-         * relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<EffectTechniqueD3D9>* ConstructSharedEffectTechniqueD3D9FromRaw(
-            boost::shared_ptr<EffectTechniqueD3D9>* const outTechnique,
-            EffectTechniqueD3D9* const technique
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outTechnique, technique, ConstructSharedCountEffectTechniqueD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x00941840 (FUN_00941840, boost::detail::shared_count_EffectVariableD3D9::shared_count_EffectVariableD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<EffectVariableD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<EffectVariableD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountEffectVariableD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            EffectVariableD3D9* const variable
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, variable);
-        }
-
-        /**
-         * Address: 0x00941A90 (FUN_00941A90, boost::shared_ptr_EffectVariableD3D9::shared_ptr_EffectVariableD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<EffectVariableD3D9>` from one raw
-         * pointer lane. FUN_00941A90's own disassembly publishes `px`
-         * ("var") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_00941840 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `EffectD3D9::SetMatrix`) before a no-op
-         * `sp_enable_shared_from_this` (`EffectVariableD3D9` does not
-         * derive from `enable_shared_from_this`); reproduced explicitly
-         * here instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<EffectVariableD3D9>* ConstructSharedEffectVariableD3D9FromRaw(
-            boost::shared_ptr<EffectVariableD3D9>* const outVariable,
-            EffectVariableD3D9* const variable
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outVariable, variable, ConstructSharedCountEffectVariableD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E9690 (FUN_008E9690, boost::detail::shared_count_EffectD3D9::shared_count_EffectD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<EffectD3D9>` control
-         * block, publishes its vtable, sets use/weak count to one, and
-         * stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<EffectD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountEffectD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            EffectD3D9* const effect
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, effect);
-        }
-
-        /**
-         * Address: 0x008E9F20 (FUN_008E9F20)
-         *
-         * IDA signature:
-         * boost::shared_ptr<EffectD3D9>* __thiscall ??4shared_ptr_EffectD3D9@boost@@QAE@@Z(
-         *     boost::shared_ptr<EffectD3D9>* this, EffectD3D9* a2);
-         *
-         * What it does:
-         * Placement-new constructs one `shared_ptr<EffectD3D9>` over an
-         * uninitialized output slot from one raw effect pointer (binds
-         * `enable_shared_from_this`-style ownership through
-         * `EffectD3D9::selfWeak_`). Engine-instantiated boost templated ctor
-         * emission, kept as a recoverable engine helper. FUN_008E9F20's own
-         * disassembly publishes `px` ("eff") first, then builds the control
-         * block through one discrete `shared_count(T*)` call (FUN_008E9690
-         * above - a real, separately-emitted call, not inlined) before the
-         * manual weak-self dance below; `EffectD3D9` does not derive from
-         * `enable_shared_from_this`, so that dance - not boost's
-         * `sp_enable_shared_from_this` - is what actually publishes
-         * `selfWeak_`.
-         */
-        boost::shared_ptr<EffectD3D9>* ConstructSharedEffectD3D9FromRaw(
-            boost::shared_ptr<EffectD3D9>* const outEffect,
-            EffectD3D9* const effect
-        )
-        {
-            (void)boost::ConstructSharedFromRawViaCountCtor(outEffect, effect, ConstructSharedCountEffectD3D9FromRaw);
-
-            // Bind the weak self-reference, which is the whole point of this
-            // emission. EffectD3D9 keeps its weak_this at +0x04 but does not
-            // derive from boost::enable_shared_from_this, so boost's
-            // shared_ptr(Y*) constructor has nothing to hook and left it empty.
-            // GetTechniques, GetTechniqueByName and GetVariableByName all
-            // resolve their owner through it, so every one of them threw
-            // "invalid effect" - which is what stopped DevResInitResources on
-            // the first effect it loaded.
-            if (effect != nullptr) {
-                effect->selfWeak_ = *outEffect;
-            }
-
-            return outEffect;
         }
 
         /**
@@ -1574,42 +1185,17 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x008F3950 (FUN_008F3950,
-         *   Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9)
-         * Address: 0x008F38E0 (FUN_008F38E0, Moho::WeakPtr_EffectD3D9::~WeakPtr_EffectD3D9)
-         *
-         * IDA signature:
-         * _DWORD *__thiscall Moho::WeakPtr_EffectD3D9::WeakPtr_EffectD3D9(
-         *     boost::shared_ptr_EffectD3D9 *this, boost::shared_ptr_EffectD3D9 *a2);
-         *
-         * What it does:
-         * `boost::weak_ptr<EffectD3D9>::lock()` - hands back a retained shared
-         * pointer when the control block still has live owners, and an empty
-         * one otherwise. The binary emits this out of line for EffectD3D9 and
-         * calls it from all twenty-four EffectTechniqueD3D9/EffectVariableD3D9
-         * entry points, by way of the two Lock*OrThrow helpers below.
-         *
-         * `0x008F38E0` is the matching `~shared_ptr<EffectD3D9>()` release body
-         * (decrement `use_count_`, `dispose()` at zero, decrement
-         * `weak_count_`, `destroy()` at zero) - a template-emission lane
-         * reached wherever a `boost::shared_ptr<EffectD3D9>` local/temporary
-         * (e.g. the `effect` locals in `LockEffectOrThrow`/
-         * `LockEffectVariableOrThrow` below) goes out of scope, not called
-         * directly.
+         * The lock-and-check every `EffectTechniqueD3D9` entry point opens
+         * with: the out-of-line `weak_ptr<EffectD3D9>::lock` emission (cited on
+         * `boost::LockWeak`), then "attempt to use invalid effect" from the
+         * caller's line when the effect is gone.
          */
-        [[nodiscard]] boost::shared_ptr<EffectD3D9> LockWeakEffectD3D9(
-            const boost::weak_ptr<EffectD3D9>& weakEffect
-        )
-        {
-            return weakEffect.lock();
-        }
-
         boost::shared_ptr<EffectD3D9> LockEffectOrThrow(
             const boost::weak_ptr<EffectD3D9>& weakEffect,
             const int line
         )
         {
-            boost::shared_ptr<EffectD3D9> effect = LockWeakEffectD3D9(weakEffect);
+            boost::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
             if (!effect)
             {
                 ThrowGalError("EffectTechniqueD3D9.cpp", line, "attempt to use invalid effect");
@@ -1618,55 +1204,21 @@ namespace { // TEMPORARY PROBE (do not commit)
             return effect;
         }
 
+        /**
+         * The same lock-and-check for the `EffectVariableD3D9` entry points.
+         */
         boost::shared_ptr<EffectD3D9> LockEffectVariableOrThrow(
             const boost::weak_ptr<EffectD3D9>& weakEffect,
             const int line
         )
         {
-            boost::shared_ptr<EffectD3D9> effect = LockWeakEffectD3D9(weakEffect);
+            boost::shared_ptr<EffectD3D9> effect = boost::LockWeak(weakEffect);
             if (!effect)
             {
                 ThrowGalError("EffectVariableD3D9.cpp", line, "attempt to use invalid effect");
             }
 
             return effect;
-        }
-
-        /**
-         * Address: 0x00941B90 (FUN_00941B90)
-         *
-         * What it does:
-         * Constructs one weak effect reference from a live shared effect handle.
-         */
-        boost::weak_ptr<EffectD3D9> CreateWeakEffectReference(
-            const boost::shared_ptr<EffectD3D9>& effect
-        )
-        {
-            return boost::weak_ptr<EffectD3D9>(effect);
-        }
-
-        boost::shared_ptr<EffectTechniqueD3D9> CreateEffectTechniqueWrapper(
-            const char* const name,
-            const boost::shared_ptr<EffectD3D9>& effect,
-            void* const handle
-        )
-        {
-            auto* const rawTechnique = new EffectTechniqueD3D9(name, CreateWeakEffectReference(effect), handle);
-            boost::shared_ptr<EffectTechniqueD3D9> technique;
-            (void)ConstructSharedEffectTechniqueD3D9FromRaw(&technique, rawTechnique);
-            return technique;
-        }
-
-        boost::shared_ptr<EffectVariableD3D9> CreateEffectVariableWrapper(
-            const char* const name,
-            const boost::shared_ptr<EffectD3D9>& effect,
-            void* const handle
-        )
-        {
-            auto* const rawVariable = new EffectVariableD3D9(name, CreateWeakEffectReference(effect), handle);
-            boost::shared_ptr<EffectVariableD3D9> variable;
-            (void)ConstructSharedEffectVariableD3D9FromRaw(&variable, rawVariable);
-            return variable;
         }
 
         unsigned int ToIndexBufferLockFlags(const MohoD3DLockFlags flags)
@@ -1894,788 +1446,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return 0U;
         }
 
-        using EffectTechniqueSharedRef = boost::shared_ptr<EffectTechniqueD3D9>;
-
-        struct EffectTechniqueSharedRefRawRuntime final
-        {
-            EffectTechniqueD3D9* object = nullptr;                    // +0x00
-            boost::detail::sp_counted_base* sharedCount = nullptr;    // +0x04
-        };
-        static_assert(
-            offsetof(EffectTechniqueSharedRefRawRuntime, sharedCount) == 0x04,
-            "EffectTechniqueSharedRefRawRuntime::sharedCount offset must be 0x04"
-        );
-        static_assert(sizeof(EffectTechniqueSharedRefRawRuntime) == 0x08, "EffectTechniqueSharedRefRawRuntime size must be 0x08");
-
-        struct EffectContextLane54Runtime final
-        {
-            void* proxy = nullptr;          // +0x00
-            EffectMacro* first = nullptr;   // +0x04
-            EffectMacro* last = nullptr;    // +0x08
-            EffectMacro* end = nullptr;     // +0x0C
-        };
-
-        struct EffectTechniqueVectorRuntime final
-        {
-            void* proxy = nullptr;                     // +0x00
-            EffectTechniqueSharedRef* first = nullptr; // +0x04
-            EffectTechniqueSharedRef* last = nullptr;  // +0x08
-            EffectTechniqueSharedRef* end = nullptr;   // +0x0C
-        };
-
-        struct EffectContextRuntime final
-        {
-            void* vftable = nullptr;                               // +0x00
-            std::uint32_t field04 = 0U;                           // +0x04
-            std::uint8_t field08 = 0U;                            // +0x08
-            std::uint8_t pad09_0B[3]{};                           // +0x09 .. +0x0B
-            msvc8::string field0C{};                              // +0x0C
-            msvc8::string field28{};                              // +0x28
-            std::uint32_t field44 = 0U;                           // +0x44
-            boost::detail::sp_counted_base* sharedCount48 = nullptr; // +0x48
-            std::uint32_t field4C = 0U;                           // +0x4C
-            std::uint32_t field50 = 0U;                           // +0x50
-            EffectContextLane54Runtime lane54{};                  // +0x54
-        };
-
-        static_assert(offsetof(EffectContextRuntime, field04) == 0x04, "EffectContextRuntime::field04 offset must be 0x04");
-        static_assert(offsetof(EffectContextRuntime, field08) == 0x08, "EffectContextRuntime::field08 offset must be 0x08");
-        static_assert(offsetof(EffectContextRuntime, field0C) == 0x0C, "EffectContextRuntime::field0C offset must be 0x0C");
-        static_assert(offsetof(EffectContextRuntime, field28) == 0x28, "EffectContextRuntime::field28 offset must be 0x28");
-        static_assert(offsetof(EffectContextRuntime, field44) == 0x44, "EffectContextRuntime::field44 offset must be 0x44");
-        static_assert(offsetof(EffectContextRuntime, sharedCount48) == 0x48, "EffectContextRuntime::sharedCount48 offset must be 0x48");
-        static_assert(offsetof(EffectContextRuntime, field4C) == 0x4C, "EffectContextRuntime::field4C offset must be 0x4C");
-        static_assert(offsetof(EffectContextRuntime, field50) == 0x50, "EffectContextRuntime::field50 offset must be 0x50");
-        static_assert(offsetof(EffectContextRuntime, lane54) == 0x54, "EffectContextRuntime::lane54 offset must be 0x54");
-        static_assert(sizeof(EffectTechniqueSharedRef) == 0x08, "EffectTechniqueSharedRef size must be 0x08");
-        static_assert(sizeof(EffectContextLane54Runtime) == 0x10, "EffectContextLane54Runtime size must be 0x10");
-        static_assert(sizeof(EffectTechniqueVectorRuntime) == 0x10, "EffectTechniqueVectorRuntime size must be 0x10");
-        static_assert(sizeof(EffectContextRuntime) == 0x64, "EffectContextRuntime size must be 0x64");
-
-        EffectContextRuntime* AsEffectContextRuntime(EffectD3D9* const effect) noexcept
-        {
-            return reinterpret_cast<EffectContextRuntime*>(&effect->effectContext_);
-        }
-
-        const EffectContextRuntime* AsEffectContextRuntime(const EffectContext* const context) noexcept
-        {
-            return reinterpret_cast<const EffectContextRuntime*>(context);
-        }
-
-        void ReleaseSharedCount(boost::detail::sp_counted_base*& sharedCount) noexcept
-        {
-            if (sharedCount != nullptr)
-            {
-                sharedCount->release();
-                sharedCount = nullptr;
-            }
-        }
-
-        void AssignSharedCount(
-            boost::detail::sp_counted_base*& destination,
-            boost::detail::sp_counted_base* const source
-        ) noexcept
-        {
-            if (source != nullptr)
-            {
-                source->add_ref_copy();
-            }
-
-            ReleaseSharedCount(destination);
-            destination = source;
-        }
-
-        /**
-         * Address: 0x008E8400 (FUN_008E8400)
-         *
-         * What it does:
-         * Returns the active `EffectMacro` element count from one legacy
-         * `(proxy, first, last, end)` vector runtime lane.
-         */
-        std::size_t EffectMacroCount(const EffectContextLane54Runtime& runtime) noexcept
-        {
-            if (runtime.first == nullptr)
-            {
-                return 0U;
-            }
-
-            return static_cast<std::size_t>(runtime.last - runtime.first);
-        }
-
-        std::size_t EffectMacroCapacity(const EffectContextLane54Runtime& runtime) noexcept
-        {
-            if (runtime.first == nullptr)
-            {
-                return 0U;
-            }
-
-            return static_cast<std::size_t>(runtime.end - runtime.first);
-        }
-
-        void DestroyEffectMacroRange(EffectMacro* first, EffectMacro* last) noexcept
-        {
-            while (first != last)
-            {
-                first->~EffectMacro();
-                ++first;
-            }
-        }
-
-        /**
-         * Address: 0x00432290 (FUN_00432290, shared vector tear-down helper)
-         * Also emitted at: 0x00942380 lane in d3d9 runtime
-         *
-         * What it does:
-         * Destroys all `EffectMacro` elements, frees vector storage, and clears
-         * first/last/end pointers.
-         */
-        void DestroyEffectMacroStorage(EffectContextLane54Runtime& runtime) noexcept
-        {
-            if (runtime.first != nullptr)
-            {
-                DestroyEffectMacroRange(runtime.first, runtime.last);
-                ::operator delete(static_cast<void*>(runtime.first));
-            }
-
-            runtime.first = nullptr;
-            runtime.last = nullptr;
-            runtime.end = nullptr;
-        }
-
-        [[noreturn]] void ThrowEffectMacroVectorLengthError()
-        {
-            throw std::length_error("effect-macro vector too long");
-        }
-
-        /**
-         * Address: 0x00432240 (FUN_00432240, shared vector reserve helper)
-         * Also emitted at: 0x00942330 lane in d3d9 runtime
-         *
-         * What it does:
-         * Reserves contiguous `EffectMacro` storage for `elementCount` entries
-         * and initializes first/last/end pointers.
-         */
-        bool TryReserveEffectMacroStorage(
-            EffectContextLane54Runtime& runtime,
-            const std::size_t elementCount
-        )
-        {
-            if (elementCount == 0U)
-            {
-                runtime.first = nullptr;
-                runtime.last = nullptr;
-                runtime.end = nullptr;
-                return false;
-            }
-
-            if (elementCount > 0x04444444U)
-            {
-                ThrowEffectMacroVectorLengthError();
-            }
-
-            try
-            {
-                auto* const storage = static_cast<EffectMacro*>(::operator new(sizeof(EffectMacro) * elementCount));
-                runtime.first = storage;
-                runtime.last = storage;
-                runtime.end = storage + elementCount;
-                return true;
-            }
-            catch (...)
-            {
-                runtime.first = nullptr;
-                runtime.last = nullptr;
-                runtime.end = nullptr;
-                return false;
-            }
-        }
-
-        /**
-         * Address: 0x00942440 (FUN_00942440)
-         *
-         * What it does:
-         * Performs element-wise copy-assignment over `[sourceFirst,sourceLast)` for
-         * `EffectMacro` lanes using string `assign` on both text fields.
-         */
-        EffectMacro* CopyAssignEffectMacroRange(
-            EffectMacro* sourceFirst,
-            EffectMacro* sourceLast,
-            EffectMacro* destinationFirst
-        )
-        {
-            EffectMacro* read = sourceFirst;
-            EffectMacro* write = destinationFirst;
-            while (read != sourceLast)
-            {
-                write->keyText_.assign(read->keyText_, 0U, msvc8::string::npos);
-                write->valueText_.assign(read->valueText_, 0U, msvc8::string::npos);
-                ++read;
-                ++write;
-            }
-
-            return write;
-        }
-
-        /**
-         * Address: 0x00942770 (FUN_00942770)
-         *
-         * What it does:
-         * Thin bridge wrapper for `CopyAssignEffectMacroRange(...)`.
-         */
-        EffectMacro* CopyAssignEffectMacroRangeBridge(
-            EffectMacro* sourceFirst,
-            EffectMacro* sourceLast,
-            EffectMacro* destinationFirst
-        )
-        {
-            return CopyAssignEffectMacroRange(sourceFirst, sourceLast, destinationFirst);
-        }
-
-        /**
-         * Address: 0x009428F0 (FUN_009428F0)
-         *
-         * What it does:
-         * Copy-constructs `EffectMacro` objects into uninitialized destination storage.
-         */
-        EffectMacro* UninitializedCopyEffectMacroRange(
-            const EffectMacro* sourceFirst,
-            const EffectMacro* sourceLast,
-            EffectMacro* destinationFirst
-        )
-        {
-            const EffectMacro* read = sourceFirst;
-            EffectMacro* write = destinationFirst;
-            while (read != sourceLast)
-            {
-                ::new (static_cast<void*>(write)) EffectMacro(*read);
-                ++read;
-                ++write;
-            }
-
-            return write;
-        }
-
-        /**
-         * Address: 0x009427F0 (FUN_009427F0)
-         *
-         * What it does:
-         * Erases `[first,last)` from lane-54 storage by compacting tail elements left
-         * and destroying vacated objects.
-         */
-        EffectMacro** EraseEffectMacroTailRange(
-            EffectContextLane54Runtime& runtime,
-            EffectMacro** outResult,
-            EffectMacro* first,
-            EffectMacro* last
-        )
-        {
-            EffectMacro* result = first;
-            if (first != last)
-            {
-                EffectMacro* const compactedEnd = CopyAssignEffectMacroRange(last, runtime.last, first);
-                DestroyEffectMacroRange(compactedEnd, runtime.last);
-                runtime.last = compactedEnd;
-                result = first;
-            }
-
-            *outResult = result;
-            return outResult;
-        }
-
-        std::size_t EffectTechniqueCount(const EffectTechniqueVectorRuntime& runtime) noexcept
-        {
-            if (runtime.first == nullptr)
-            {
-                return 0U;
-            }
-
-            return static_cast<std::size_t>(runtime.last - runtime.first);
-        }
-
-        std::size_t EffectTechniqueCapacity(const EffectTechniqueVectorRuntime& runtime) noexcept
-        {
-            if (runtime.first == nullptr)
-            {
-                return 0U;
-            }
-
-            return static_cast<std::size_t>(runtime.end - runtime.first);
-        }
-
-        /**
-         * Address: 0x00941AC0 (FUN_00941AC0)
-         *
-         * What it does:
-         * Copy-assigns one initialized raw effect-technique shared-ref range
-         * `[destinationFirst, destinationLast)` from `sourceFirst`, retaining
-         * incoming shared counts and releasing previously bound counts per slot.
-         */
-        EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetain(
-            EffectTechniqueSharedRefRawRuntime* destinationFirst,
-            EffectTechniqueSharedRefRawRuntime* const destinationLast,
-            const EffectTechniqueSharedRefRawRuntime* sourceFirst
-        ) noexcept
-        {
-            EffectTechniqueSharedRefRawRuntime* write = destinationFirst;
-            const EffectTechniqueSharedRefRawRuntime* read = sourceFirst;
-            while (write != destinationLast)
-            {
-                write->object = read->object;
-
-                boost::detail::sp_counted_base* const incomingSharedCount = read->sharedCount;
-                if (incomingSharedCount != write->sharedCount)
-                {
-                    if (incomingSharedCount != nullptr)
-                    {
-                        incomingSharedCount->add_ref_copy();
-                    }
-                    if (write->sharedCount != nullptr)
-                    {
-                        write->sharedCount->release();
-                    }
-                    write->sharedCount = incomingSharedCount;
-                }
-
-                ++read;
-                ++write;
-            }
-
-            return write;
-        }
-
-        /**
-         * Address: 0x00941BC0 (FUN_00941BC0)
-         *
-         * What it does:
-         * Jump-only adapter lane that forwards one initialized raw
-         * effect-technique shared-ref range copy to the canonical retain helper.
-         */
-        EffectTechniqueSharedRefRawRuntime* CopyAssignEffectTechniqueSharedRefRawRangeRetainDispatchLaneA(
-            EffectTechniqueSharedRefRawRuntime* const destinationFirst,
-            EffectTechniqueSharedRefRawRuntime* const destinationLast,
-            const EffectTechniqueSharedRefRawRuntime* const sourceFirst
-        ) noexcept
-        {
-            return CopyAssignEffectTechniqueSharedRefRawRangeRetain(destinationFirst, destinationLast, sourceFirst);
-        }
-
-        /**
-         * Address: 0x00941C00 (FUN_00941C00)
-         *
-         * What it does:
-         * Copy-assigns one `EffectTechnique` shared-pointer range into destination
-         * storage and returns the resulting end pointer.
-         */
-        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRange(
-            const EffectTechniqueSharedRef* sourceFirst,
-            const EffectTechniqueSharedRef* sourceLast,
-            EffectTechniqueSharedRef* destinationFirst
-        )
-        {
-            const std::ptrdiff_t elementCount = sourceLast - sourceFirst;
-            auto* const rawDestinationFirst = reinterpret_cast<EffectTechniqueSharedRefRawRuntime*>(destinationFirst);
-            auto* const rawDestinationLast = rawDestinationFirst + elementCount;
-            const auto* const rawSourceFirst = reinterpret_cast<const EffectTechniqueSharedRefRawRuntime*>(sourceFirst);
-            auto* const rawResult =
-                CopyAssignEffectTechniqueSharedRefRawRangeRetain(rawDestinationFirst, rawDestinationLast, rawSourceFirst);
-            return reinterpret_cast<EffectTechniqueSharedRef*>(rawResult);
-        }
-
-        /**
-         * Address: 0x00941C80 (FUN_00941C80)
-         *
-         * What it does:
-         * Adapter lane forwarding one `EffectTechnique` shared-pointer range
-         * copy-assignment to the canonical helper.
-         */
-        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneA(
-            const EffectTechniqueSharedRef* const sourceFirst,
-            const EffectTechniqueSharedRef* const sourceLast,
-            EffectTechniqueSharedRef* const destinationFirst
-        )
-        {
-            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
-        }
-
-        /**
-         * Address: 0x00941CE0 (FUN_00941CE0)
-         *
-         * What it does:
-         * Secondary adapter lane forwarding one `EffectTechnique`
-         * shared-pointer range copy-assignment.
-         */
-        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneB(
-            const EffectTechniqueSharedRef* const sourceFirst,
-            const EffectTechniqueSharedRef* const sourceLast,
-            EffectTechniqueSharedRef* const destinationFirst
-        )
-        {
-            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
-        }
-
-        /**
-         * Address: 0x00941C40 (FUN_00941C40)
-         *
-         * What it does:
-         * Copies `repeatCount` raw shared-ref lanes from one fixed source lane
-         * into destination storage and retains each copied shared-control block.
-         */
-        EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCount(
-            EffectTechniqueSharedRefRawRuntime* destination,
-            const std::int32_t repeatCount,
-            const EffectTechniqueSharedRefRawRuntime* const source
-        ) noexcept
-        {
-            if (repeatCount <= 0)
-            {
-                return destination;
-            }
-
-            EffectTechniqueSharedRefRawRuntime* write = destination;
-            for (std::int32_t remaining = repeatCount; remaining > 0; --remaining)
-            {
-                if (write != nullptr)
-                {
-                    write->object = source != nullptr ? source->object : nullptr;
-                    write->sharedCount = source != nullptr ? source->sharedCount : nullptr;
-                    if (write->sharedCount != nullptr)
-                    {
-                        write->sharedCount->add_ref_copy();
-                    }
-                }
-                ++write;
-            }
-
-            return write;
-        }
-
-        /**
-         * Address: 0x00941CB0 (FUN_00941CB0)
-         *
-         * What it does:
-         * Adapter lane forwarding one counted raw shared-ref copy loop to the
-         * canonical helper.
-         */
-        EffectTechniqueSharedRefRawRuntime* CopyConstructEffectTechniqueSharedRefCountDispatchLaneA(
-            EffectTechniqueSharedRefRawRuntime* const destination,
-            const std::int32_t repeatCount,
-            const EffectTechniqueSharedRefRawRuntime* const source
-        ) noexcept
-        {
-            return CopyConstructEffectTechniqueSharedRefCount(destination, repeatCount, source);
-        }
-
-        /**
-         * Address: 0x00941D40 (FUN_00941D40)
-         *
-         * What it does:
-         * Tertiary adapter lane forwarding one `EffectTechnique` shared-pointer
-         * range copy-assignment.
-         */
-        EffectTechniqueSharedRef* CopyAssignEffectTechniqueSharedRefRangeDispatchLaneC(
-            const EffectTechniqueSharedRef* const sourceFirst,
-            const EffectTechniqueSharedRef* const sourceLast,
-            EffectTechniqueSharedRef* const destinationFirst
-        )
-        {
-            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
-        }
-
-        /**
-         * Address: 0x00942410 (FUN_00942410)
-         *
-         * What it does:
-         * Copy-assigns a `boost::shared_ptr<EffectTechniqueD3D9>` range into
-         * destination storage and returns the resulting end pointer.
-         */
-        EffectTechniqueSharedRef* CopyAssignEffectTechniqueRange(
-            EffectTechniqueSharedRef* sourceFirst,
-            EffectTechniqueSharedRef* sourceLast,
-            EffectTechniqueSharedRef* destinationFirst
-        )
-        {
-            return CopyAssignEffectTechniqueSharedRefRange(sourceFirst, sourceLast, destinationFirst);
-        }
-
-        [[noreturn]] void ThrowEffectTechniqueVectorLengthError()
-        {
-            throw std::length_error("effect-technique vector too long");
-        }
-
-        /**
-         * Address: 0x00942490 (FUN_00942490)
-         *
-         * What it does:
-         * Inserts `insertCount` copies of `value` at `insertPosition` in the
-         * effect-technique shared-pointer vector runtime.
-         */
-        void InsertEffectTechniqueCopies(
-            EffectTechniqueVectorRuntime& runtime,
-            EffectTechniqueSharedRef* insertPosition,
-            const std::uint32_t insertCount,
-            const EffectTechniqueSharedRef& value
-        )
-        {
-            if (insertCount == 0U)
-            {
-                return;
-            }
-
-            auto& vector = *reinterpret_cast<msvc8::vector<EffectTechniqueSharedRef>*>(&runtime);
-            const std::size_t currentSize = vector.size();
-            const std::size_t insertSize = static_cast<std::size_t>(insertCount);
-            if ((0x1FFFFFFFU - currentSize) < insertSize)
-            {
-                ThrowEffectTechniqueVectorLengthError();
-            }
-
-            std::size_t insertIndex = 0U;
-            if (vector.begin() != nullptr && insertPosition != nullptr)
-            {
-                insertIndex = static_cast<std::size_t>(insertPosition - vector.begin());
-            }
-
-            const std::size_t newSize = currentSize + insertSize;
-            const std::size_t currentCapacity = vector.capacity();
-            std::size_t grownCapacity = currentCapacity + (currentCapacity >> 1U);
-            if (grownCapacity < newSize)
-            {
-                grownCapacity = newSize;
-            }
-
-            msvc8::vector<EffectTechniqueSharedRef> rebuilt{};
-            rebuilt.reserve(grownCapacity);
-            rebuilt.resize(newSize);
-
-            EffectTechniqueSharedRef* const sourceBegin = vector.begin();
-            EffectTechniqueSharedRef* const rebuiltBegin = rebuilt.begin();
-            if (sourceBegin != nullptr && insertIndex > 0U)
-            {
-                static_cast<void>(
-                    CopyAssignEffectTechniqueRange(sourceBegin, sourceBegin + insertIndex, rebuiltBegin)
-                );
-            }
-
-            for (std::size_t index = 0; index < insertSize; ++index)
-            {
-                rebuiltBegin[insertIndex + index] = value;
-            }
-
-            if (sourceBegin != nullptr && insertIndex < currentSize)
-            {
-                static_cast<void>(
-                    CopyAssignEffectTechniqueRange(
-                        sourceBegin + insertIndex,
-                        sourceBegin + currentSize,
-                        rebuiltBegin + insertIndex + insertSize
-                    )
-                );
-            }
-
-            vector = std::move(rebuilt);
-        }
-
-        /**
-         * Address: 0x00942860 (FUN_00942860)
-         *
-         * What it does:
-         * Appends one effect-technique shared-pointer entry to the caller vector.
-         */
-        EffectTechniqueSharedRef* AppendEffectTechniqueSharedRef(
-            msvc8::vector<EffectTechniqueSharedRef>& vector,
-            const EffectTechniqueSharedRef& value
-        )
-        {
-            auto& runtime = *reinterpret_cast<EffectTechniqueVectorRuntime*>(&vector);
-
-            const std::size_t size = EffectTechniqueCount(runtime);
-            const std::size_t capacity = EffectTechniqueCapacity(runtime);
-            if (runtime.first == nullptr || size >= capacity)
-            {
-                InsertEffectTechniqueCopies(runtime, runtime.last, 1U, value);
-                return runtime.last - 1;
-            }
-
-            EffectTechniqueSharedRef* const slot = runtime.last;
-            ::new (static_cast<void*>(slot)) EffectTechniqueSharedRef(value);
-            runtime.last = slot + 1;
-            return slot;
-        }
-
-        /**
-         * Address: 0x00942B60 (FUN_00942B60)
-         *
-         * What it does:
-         * Assigns the trailing context lane rooted at `EffectContext+0x54`.
-         */
-        void AssignEffectContextLane54(
-            EffectContextLane54Runtime& destination,
-            const EffectContextLane54Runtime& source
-        )
-        {
-            if (&destination == &source)
-            {
-                return;
-            }
-
-            const std::size_t sourceCount = EffectMacroCount(source);
-            if (sourceCount == 0U)
-            {
-                EffectMacro* eraseResult = destination.first;
-                EraseEffectMacroTailRange(destination, &eraseResult, destination.first, destination.last);
-                return;
-            }
-
-            const std::size_t destinationSize = EffectMacroCount(destination);
-            if (sourceCount > destinationSize)
-            {
-                const std::size_t destinationCapacity = EffectMacroCapacity(destination);
-                if (sourceCount <= destinationCapacity)
-                {
-                    EffectMacro* const splitSource = source.first + destinationSize;
-                    CopyAssignEffectMacroRangeBridge(source.first, splitSource, destination.first);
-                    destination.last = UninitializedCopyEffectMacroRange(splitSource, source.last, destination.last);
-                    return;
-                }
-
-                DestroyEffectMacroStorage(destination);
-                if (TryReserveEffectMacroStorage(destination, sourceCount))
-                {
-                    destination.last = UninitializedCopyEffectMacroRange(source.first, source.last, destination.first);
-                }
-                return;
-            }
-
-            EffectMacro* const compactedEnd = CopyAssignEffectMacroRange(source.first, source.last, destination.first);
-            DestroyEffectMacroRange(compactedEnd, destination.last);
-            destination.last = destination.first + sourceCount;
-        }
-
-        /**
-         * A hand copy of `EffectContext::operator=` (0x00942CF0), which is where
-         * that address is recovered; the D3D10 backend already calls the operator.
-         * This one stays until the D3D9 side drops its `EffectContextRuntime`
-         * overlay, because its macro-vector copy goes through the local
-         * `AssignEffectContextLane54` rather than `msvc8::vector::operator=`, and
-         * the two have not been checked against each other.
-         */
-        EffectContextRuntime* CopyEffectContextRuntime(
-            EffectContextRuntime* const destination,
-            const EffectContextRuntime* const source
-        )
-        {
-            if (destination == source)
-            {
-                return destination;
-            }
-
-            destination->field04 = source->field04;
-            destination->field08 = source->field08;
-            destination->field0C.assign(source->field0C, 0U, msvc8::string::npos);
-            destination->field28.assign(source->field28, 0U, msvc8::string::npos);
-            destination->field44 = source->field44;
-            AssignSharedCount(destination->sharedCount48, source->sharedCount48);
-            destination->field4C = source->field4C;
-            destination->field50 = source->field50;
-            AssignEffectContextLane54(destination->lane54, source->lane54);
-            return destination;
-        }
-
-        void InitializeEffectContextRuntimeStorage(EffectContextRuntime& context)
-        {
-            context.field04 = 0U;
-            context.field08 = 0U;
-            context.pad09_0B[0] = 0U;
-            context.pad09_0B[1] = 0U;
-            context.pad09_0B[2] = 0U;
-            ::new (static_cast<void*>(&context.field0C)) msvc8::string();
-            ::new (static_cast<void*>(&context.field28)) msvc8::string();
-            context.field44 = 0U;
-            context.sharedCount48 = nullptr;
-            context.field4C = 0U;
-            context.field50 = 0U;
-            context.lane54 = {};
-        }
-
-        /**
-         * Address: 0x009419E0 (FUN_009419E0)
-         *
-         * What it does:
-         * Initializes base EffectD3D9 construction lanes: clears weak-self,
-         * initializes embedded effect-context runtime storage, and resets the
-         * retained native effect handle.
-         */
-        void InitializeEffectD3D9ConstructionLanes(EffectD3D9* const effect)
-        {
-            effect->selfWeak_.reset();
-            InitializeEffectContextRuntimeStorage(*AsEffectContextRuntime(effect));
-            effect->dxEffect_ = nullptr;
-        }
-
-        void DestroyEffectContextRuntimeStorage(EffectContextRuntime& context) noexcept
-        {
-            ReleaseSharedCount(context.sharedCount48);
-            DestroyEffectMacroStorage(context.lane54);
-            context.field0C.tidy(true, 0U);
-            context.field28.tidy(true, 0U);
-            context.field44 = 0U;
-            context.field4C = 0U;
-            context.field50 = 0U;
-            context.lane54.proxy = nullptr;
-        }
-
-        /**
-         * Address: 0x00942D60 (FUN_00942D60)
-         *
-         * What it does:
-         * Releases retained effect resources and resets the embedded context state.
-         */
-        void DestroyEffectD3D9State(EffectD3D9* const effect)
-        {
-            SafeRelease(effect->dxEffect_);
-
-            const EffectContextRuntime resetContext{};
-            EffectContextRuntime* const runtime = AsEffectContextRuntime(effect);
-            CopyEffectContextRuntime(runtime, &resetContext);
-        }
-
-        /**
-         * Address: 0x00942E50 (FUN_00942E50)
-         *
-         * What it does:
-         * Rebuilds effect state from caller-provided context/effect handles.
-         */
-        void InitializeEffectD3D9State(
-            EffectD3D9* const effect,
-            const EffectContext* const sourceContext,
-            ID3DXEffect* const dxEffect
-        )
-        {
-            DestroyEffectD3D9State(effect);
-
-            EffectContextRuntime* const runtime = AsEffectContextRuntime(effect);
-            CopyEffectContextRuntime(runtime, AsEffectContextRuntime(sourceContext));
-            effect->dxEffect_ = dxEffect;
-
-            runtime->field44 = 0U;
-            ReleaseSharedCount(runtime->sharedCount48);
-            runtime->field4C = 0U;
-            runtime->field50 = 0U;
-        }
-
-        /**
-         * Address: 0x00942DD0 (FUN_00942DD0)
-         *
-         * What it does:
-         * Executes the recovered non-deleting destructor body lanes for `EffectD3D9`.
-         */
-        void DestroyEffectD3D9Body(EffectD3D9* const effect)
-        {
-            DestroyEffectD3D9State(effect);
-            DestroyEffectContextRuntimeStorage(*AsEffectContextRuntime(effect));
-            effect->selfWeak_.reset();
-        }
-
         [[nodiscard]] msvc8::string ReadD3DXErrorText(ID3DXBuffer* const errors)
         {
             const char* const errorText =
@@ -2689,12 +1459,12 @@ namespace { // TEMPORARY PROBE (do not commit)
         [[nodiscard]]
         msvc8::string BuildEffectCreationMessage(
             const char* const prefix,
-            const EffectContextRuntime& contextRuntime,
+            const EffectContext& context,
             const msvc8::string& reason
         )
         {
             msvc8::string message(prefix != nullptr ? prefix : "");
-            message = message + contextRuntime.field0C;
+            message = message + context.mSourcePath;
             message = message + " reason: ";
             message = message + reason;
             return message;
@@ -2706,9 +1476,9 @@ namespace { // TEMPORARY PROBE (do not commit)
          * (0x008F0A81) allocates it with `new[]` and never frees it; the
          * array points into the context's strings.
          */
-        [[nodiscard]] D3DXMACRO* BuildD3DXMacroDefines(const EffectContextLane54Runtime& macros)
+        [[nodiscard]] D3DXMACRO* BuildD3DXMacroDefines(const msvc8::vector<EffectMacro>& macros)
         {
-            const std::size_t macroCount = EffectMacroCount(macros);
+            const std::size_t macroCount = macros.size();
             if (macroCount == 0U)
             {
                 return nullptr;
@@ -2716,10 +1486,11 @@ namespace { // TEMPORARY PROBE (do not commit)
 
             D3DXMACRO* const defines = new D3DXMACRO[macroCount + 1U];
             std::size_t index = 0U;
-            for (EffectMacro* macro = macros.first; macro != macros.last; ++macro, ++index)
+            for (const EffectMacro& macro : macros)
             {
-                defines[index].Name = macro->keyText_.c_str();
-                defines[index].Definition = macro->valueText_.c_str();
+                defines[index].Name = macro.keyText_.c_str();
+                defines[index].Definition = macro.valueText_.c_str();
+                ++index;
             }
 
             defines[index].Name = nullptr;
@@ -2765,103 +1536,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x008F09A0 (FUN_008F09A0)
-         *
-         * What it does:
-         * Compiles one effect from source-memory + macro lanes, builds a D3D9
-         * effect object, installs the active pipeline state-manager, and emits
-         * the compiled bytecode to cache-path when the file can be opened.
-         */
-        boost::shared_ptr<EffectD3D9>* CreateEffectFromSourceBuffer(
-            DeviceD3D9* const device,
-            boost::shared_ptr<EffectD3D9>* const outEffect,
-            EffectContext* const context
-        )
-        {
-            const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
-            if (contextRuntime->field04 != 2U)
-            {
-                ThrowGalError("DeviceD3D9.cpp", 1514, "");
-            }
-
-            const D3DXMACRO* const defines = BuildD3DXMacroDefines(contextRuntime->lane54);
-
-            ID3DXEffectCompiler* effectCompiler = nullptr;
-            ID3DXBuffer* compiledEffect = nullptr;
-            ID3DXEffect* effect = nullptr;
-            ID3DXBuffer* errors = nullptr;
-            try
-            {
-                const char* const sourceData =
-                    reinterpret_cast<const char*>(static_cast<std::uintptr_t>(contextRuntime->field4C));
-                const unsigned int sourceBytes = contextRuntime->field50 - contextRuntime->field4C;
-
-                HRESULT result = D3DXCreateEffectCompiler(
-                    sourceData, sourceBytes, defines, nullptr, D3DXSHADER_DEBUG | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,
-                    &effectCompiler, &errors
-                );
-                if (FAILED(result))
-                {
-                    const msvc8::string message =
-                        BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, ReadD3DXErrorText(errors));
-                    ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
-                }
-                SafeRelease(errors);
-
-                result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG, &compiledEffect, &errors);
-                if (FAILED(result))
-                {
-                    const msvc8::string message =
-                        BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, ReadD3DXErrorText(errors));
-                    ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
-                }
-                SafeRelease(errors);
-                SafeRelease(effectCompiler);
-
-                result = D3DXCreateEffect(
-                    device->mDevice, compiledEffect->GetBufferPointer(), compiledEffect->GetBufferSize(), defines,
-                    nullptr, D3DXSHADER_DEBUG, nullptr, &effect, &errors
-                );
-                if (FAILED(result))
-                {
-                    const msvc8::string message =
-                        BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, ReadD3DXErrorText(errors));
-                    ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
-                }
-                SafeRelease(errors);
-
-                result = effect->SetStateManager(device->mPipelineState->GetStateManager());
-                if (FAILED(result))
-                {
-                    ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1580, result);
-                }
-
-                std::ofstream compiledCache(contextRuntime->field28.c_str(), std::ios::binary);
-                if (compiledCache.is_open())
-                {
-                    WriteRawByteLaneToStream(
-                        compiledCache,
-                        compiledEffect->GetBufferPointer(),
-                        static_cast<std::size_t>(compiledEffect->GetBufferSize())
-                    );
-                    compiledCache.close();
-                }
-                SafeRelease(compiledEffect);
-            }
-            catch (...)
-            {
-                SafeRelease(effectCompiler);
-                SafeRelease(compiledEffect);
-                SafeRelease(effect);
-                SafeRelease(errors);
-                throw;
-            }
-
-            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, effect));
-            return outEffect;
-        }
-
-        /**
          * Address: 0x008E8F70 (FUN_008E8F70)
          *
          * What it does:
@@ -2883,121 +1557,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
 
             return streamBuffer->pubseekoff(0, std::ios_base::cur, std::ios_base::in);
-        }
-
-        /**
-         * Address: 0x008F0F90 (FUN_008F0F90)
-         *
-         * What it does:
-         * Loads one cached compiled-effect payload from `cachePath`, creates the
-         * native D3D9 effect, and installs the active pipeline state-manager.
-         */
-        boost::shared_ptr<EffectD3D9>* CreateEffectFromCachedBinary(
-            DeviceD3D9* const device,
-            boost::shared_ptr<EffectD3D9>* const outEffect,
-            EffectContext* const context
-        )
-        {
-            const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
-            if (contextRuntime->field04 != 2U)
-            {
-                ThrowGalError("DeviceD3D9.cpp", 1609, "");
-            }
-
-            std::ifstream compiledCache(contextRuntime->field28.c_str(), std::ios::binary);
-            if (!compiledCache.is_open())
-            {
-                ThrowGalError("DeviceD3D9.cpp", 1612, "");
-            }
-
-            ID3DXBuffer* errors = nullptr;
-            ID3DXEffect* effect = nullptr;
-            char* compiledBytes = nullptr;
-            try
-            {
-                compiledCache.seekg(0, std::ios::end);
-                const std::size_t compiledSize = static_cast<std::size_t>(QueryCurrentInputPosition(compiledCache));
-                compiledCache.seekg(0, std::ios::beg);
-
-                compiledBytes = new char[compiledSize];
-                // Address: 0x008F0230 (FUN_008F0230) -- std::basic_istream<char>::read(),
-                // a genuine CRT/STL <istream> body (sentry guard, virtual
-                // streambuf::_Sgetn_s dispatch, std::ios_base::clear on short read,
-                // std::_Mutex::_Unlock) with zero engine-specific behavior. Not a
-                // recovery target; this call is its real, already-wired invocation.
-                compiledCache.read(compiledBytes, static_cast<std::streamsize>(compiledSize));
-
-                HRESULT result = D3DXCreateEffect(
-                    device->mDevice, compiledBytes, static_cast<UINT>(compiledSize), nullptr, nullptr, 0U, nullptr,
-                    &effect, &errors
-                );
-                if (FAILED(result))
-                {
-                    const msvc8::string message =
-                        BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, ReadD3DXErrorText(errors));
-                    ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
-                }
-                SafeRelease(errors);
-                // The binary leaves the pointer dangling here, so a failing
-                // SetStateManager below deletes the bytes a second time in the
-                // handler. Clearing it keeps that path defined.
-                delete[] compiledBytes;
-                compiledBytes = nullptr;
-
-                result = effect->SetStateManager(device->mPipelineState->GetStateManager());
-                if (FAILED(result))
-                {
-                    ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1646, result);
-                }
-            }
-            catch (...)
-            {
-                SafeRelease(errors);
-                SafeRelease(effect);
-                delete[] compiledBytes;
-                throw;
-            }
-
-            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, effect));
-            return outEffect;
-        }
-
-        /**
-         * Address: 0x00942FC0 (FUN_00942FC0)
-         *
-         * What it does:
-         * Executes the recovered `EffectVariableD3D9` destructor-body lanes.
-         */
-        void DestroyEffectVariableD3D9Body(EffectVariableD3D9* const effectVariable) noexcept
-        {
-            effectVariable->effect_.reset();
-            effectVariable->name_.tidy(true, 0U);
-        }
-
-        /**
-         * Address: 0x00942F60 (FUN_00942F60)
-         *
-         * What it does:
-         * Models the tiny base-vftable unwind helper lane used by SEH tails.
-         */
-        void ApplyEffectVariableBaseVftableLane([[maybe_unused]] EffectVariableD3D9* const effectVariable) noexcept
-        {
-            // Modeled implicitly by normal C++ destruction; no explicit runtime write needed here.
-        }
-
-        /**
-         * Address: 0x008F3A20 (FUN_008F3A20)
-         * Mangled: ??1EffectTechniqueD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Releases weak-control ownership and clears the local technique-name string.
-         */
-        void DestroyEffectTechniqueD3D9Body(EffectTechniqueD3D9* const technique) noexcept
-        {
-            technique->effect_.reset();
-            technique->handle_ = nullptr;
-            technique->beginEndActive_ = false;
-            technique->name_.tidy(true, 0U);
         }
 
         /**
@@ -3717,40 +2276,185 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008F13D0 (FUN_008F13D0)
+     * Address: 0x008F09A0 (FUN_008F09A0)
      *
      * What it does:
-     * Dispatches effect creation through cache-binary or source-compile paths
-     * based on `EffectContext::useCache`.
+     * Compiles one effect from source-memory + macro lanes, builds a D3D9
+     * effect object, installs the active pipeline state-manager, and emits
+     * the compiled bytecode to cache-path when the file can be opened.
      */
-    boost::shared_ptr<Effect>*
-    DeviceD3D9::CreateEffect(boost::shared_ptr<Effect>* const outEffect, EffectContext* const context)
+    boost::shared_ptr<Effect> DeviceD3D9::CreateEffectFromSourceBuffer(const EffectContext& context)
+    {
+        if (context.mSourceType != 2U)
+        {
+            ThrowGalError("DeviceD3D9.cpp", 1514, "");
+        }
+
+        const D3DXMACRO* const defines = BuildD3DXMacroDefines(context.mMacros);
+
+        ID3DXEffectCompiler* effectCompiler = nullptr;
+        ID3DXBuffer* compiledEffect = nullptr;
+        ID3DXEffect* effect = nullptr;
+        ID3DXBuffer* errors = nullptr;
+        try
+        {
+            const char* const sourceData = context.mSourceBuffer.mBegin;
+            const unsigned int sourceBytes =
+                static_cast<unsigned int>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
+
+            HRESULT result = D3DXCreateEffectCompiler(
+                sourceData, sourceBytes, defines, nullptr, D3DXSHADER_DEBUG | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,
+                &effectCompiler, &errors
+            );
+            if (FAILED(result))
+            {
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to compile effect: ", context, ReadD3DXErrorText(errors));
+                ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
+            }
+            SafeRelease(errors);
+
+            result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG, &compiledEffect, &errors);
+            if (FAILED(result))
+            {
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to compile effect: ", context, ReadD3DXErrorText(errors));
+                ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
+            }
+            SafeRelease(errors);
+            SafeRelease(effectCompiler);
+
+            result = D3DXCreateEffect(
+                mDevice, compiledEffect->GetBufferPointer(), compiledEffect->GetBufferSize(), defines,
+                nullptr, D3DXSHADER_DEBUG, nullptr, &effect, &errors
+            );
+            if (FAILED(result))
+            {
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to create effect: ", context, ReadD3DXErrorText(errors));
+                ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
+            }
+            SafeRelease(errors);
+
+            result = effect->SetStateManager(mPipelineState->GetStateManager());
+            if (FAILED(result))
+            {
+                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1580, result);
+            }
+
+            std::ofstream compiledCache(context.mCachePath.c_str(), std::ios::binary);
+            if (compiledCache.is_open())
+            {
+                WriteRawByteLaneToStream(
+                    compiledCache,
+                    compiledEffect->GetBufferPointer(),
+                    static_cast<std::size_t>(compiledEffect->GetBufferSize())
+                );
+                compiledCache.close();
+            }
+            SafeRelease(compiledEffect);
+        }
+        catch (...)
+        {
+            SafeRelease(effectCompiler);
+            SafeRelease(compiledEffect);
+            SafeRelease(effect);
+            SafeRelease(errors);
+            throw;
+        }
+
+        return boost::shared_ptr<Effect>(new EffectD3D9(context, effect));
+    }
+
+    /**
+     * Address: 0x008F0F90 (FUN_008F0F90)
+     *
+     * What it does:
+     * Loads one cached compiled-effect payload from `cachePath`, creates the
+     * native D3D9 effect, and installs the active pipeline state-manager.
+     */
+    boost::shared_ptr<Effect> DeviceD3D9::CreateEffectFromCachedBinary(const EffectContext& context)
+    {
+        if (context.mSourceType != 2U)
+        {
+            ThrowGalError("DeviceD3D9.cpp", 1609, "");
+        }
+
+        std::ifstream compiledCache(context.mCachePath.c_str(), std::ios::binary);
+        if (!compiledCache.is_open())
+        {
+            ThrowGalError("DeviceD3D9.cpp", 1612, "");
+        }
+
+        ID3DXBuffer* errors = nullptr;
+        ID3DXEffect* effect = nullptr;
+        char* compiledBytes = nullptr;
+        try
+        {
+            compiledCache.seekg(0, std::ios::end);
+            const std::size_t compiledSize = static_cast<std::size_t>(QueryCurrentInputPosition(compiledCache));
+            compiledCache.seekg(0, std::ios::beg);
+
+            compiledBytes = new char[compiledSize];
+            // Address: 0x008F0230 (FUN_008F0230) -- std::basic_istream<char>::read(),
+            // a genuine CRT/STL <istream> body (sentry guard, virtual
+            // streambuf::_Sgetn_s dispatch, std::ios_base::clear on short read,
+            // std::_Mutex::_Unlock) with zero engine-specific behavior. Not a
+            // recovery target; this call is its real, already-wired invocation.
+            compiledCache.read(compiledBytes, static_cast<std::streamsize>(compiledSize));
+
+            HRESULT result = D3DXCreateEffect(
+                mDevice, compiledBytes, static_cast<UINT>(compiledSize), nullptr, nullptr, 0U, nullptr,
+                &effect, &errors
+            );
+            if (FAILED(result))
+            {
+                const msvc8::string message =
+                    BuildEffectCreationMessage("unable to create effect: ", context, ReadD3DXErrorText(errors));
+                ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
+            }
+            SafeRelease(errors);
+            // The binary leaves the pointer dangling here, so a failing
+            // SetStateManager below deletes the bytes a second time in the
+            // handler. Clearing it keeps that path defined.
+            delete[] compiledBytes;
+            compiledBytes = nullptr;
+
+            result = effect->SetStateManager(mPipelineState->GetStateManager());
+            if (FAILED(result))
+            {
+                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1646, result);
+            }
+        }
+        catch (...)
+        {
+            SafeRelease(errors);
+            SafeRelease(effect);
+            delete[] compiledBytes;
+            throw;
+        }
+
+        return boost::shared_ptr<Effect>(new EffectD3D9(context, effect));
+    }
+
+    /**
+     * Address: 0x008F13D0 (FUN_008F13D0)
+     * Slot: 9
+     *
+     * What it does:
+     * Runs the `Func1` pre-hook, then builds the effect from the compiled
+     * cache when the context asks for it and from source otherwise. Both
+     * builders construct straight into this call's return slot.
+     */
+    boost::shared_ptr<Effect> DeviceD3D9::CreateEffect(const EffectContext& context)
     {
         Func1();
-
-        // The binary has one effect type: EffectD3D9 derives from Effect, so
-        // the backend writes straight into the caller's shared_ptr and no
-        // conversion happens. This reconstruction has not modelled that
-        // inheritance yet - gal::Effect is still a wall of pure `purecallN`
-        // slots that EffectD3D9 does not implement, so deriving from it would
-        // make the backend abstract - and boost 1.34 predates the aliasing
-        // constructor that would otherwise bridge the two. The layouts are
-        // identical and it is the same object either way, so the builders are
-        // pointed at the caller's slot directly. Remove this cast once Effect
-        // carries its real virtual signatures, the way Device now does.
-        auto* const backendSlot = reinterpret_cast<boost::shared_ptr<EffectD3D9>*>(outEffect);
-
-        const EffectContextRuntime* const contextRuntime = AsEffectContextRuntime(context);
-        if (contextRuntime->field08 != 0U)
+        if (context.mUseCache)
         {
-            (void)CreateEffectFromCachedBinary(this, backendSlot, context);
-        }
-        else
-        {
-            (void)CreateEffectFromSourceBuffer(this, backendSlot, context);
+            return CreateEffectFromCachedBinary(context);
         }
 
-        return outEffect;
+        return CreateEffectFromSourceBuffer(context);
     }
 
     /**
@@ -6082,36 +4786,36 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F3AC0 (FUN_008F3AC0, ??0EffectTechniqueD3D9@gal@gpg@@QAE@@Z)
      *
      * What it does:
-     * Stores technique-name/effect-handle lanes and validates that the
-     * referenced effect is still live; throws `gpg::gal::Error` with the
-     * legacy `EffectTechniqueD3D9.cpp:36` "invalid effect specified"
-     * payload if the weak effect reference has no live owner.
+     * Keeps `name`, a weak reference to `effect` and the technique handle;
+     * throws "invalid effect specified" (EffectTechniqueD3D9.cpp:36) when the
+     * effect has already expired. The name is taken as given: the binary
+     * runs `strlen` on it without a null check.
      */
     EffectTechniqueD3D9::EffectTechniqueD3D9(
-        const char* const techniqueName,
-        const boost::weak_ptr<EffectD3D9>& effect,
-        void* const handle
+        const char* const name,
+        const boost::shared_ptr<EffectD3D9> effect,
+        const D3DXHANDLE handle
     )
-        : name_(techniqueName != nullptr ? techniqueName : "", (techniqueName != nullptr) ? std::strlen(techniqueName) : 0U),
+        : name_(name),
           effect_(effect),
           handle_(handle)
     {
-        if (effect_.use_count() <= 0)
+        if (effect_.expired())
         {
             ThrowGalError("EffectTechniqueD3D9.cpp", 36, "invalid effect specified");
         }
     }
 
     /**
-     * Address: 0x008F3AA0 (FUN_008F3AA0)
+     * Address: 0x008F3A20 (FUN_008F3A20, ??1EffectTechniqueD3D9@gal@gpg@@QAE@XZ)
+     * Address: 0x008F3AA0 (FUN_008F3AA0, the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_008F3A20` body semantics.
+     * Nothing of its own. The weak effect reference and the name go as
+     * members, then the `EffectTechnique` base; the handle and the begin/end
+     * flag are left as they are.
      */
-    EffectTechniqueD3D9::~EffectTechniqueD3D9()
-    {
-        DestroyEffectTechniqueD3D9Body(this);
-    }
+    EffectTechniqueD3D9::~EffectTechniqueD3D9() = default;
 
     /**
      * Address: 0x008F3850 (FUN_008F3850)
@@ -6138,8 +4842,8 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 53);
-        void* const dxEffect = effect->GetDxEffect();
-        const HRESULT setTechniqueResult = InvokeEffectSetTechnique(dxEffect, handle_);
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const HRESULT setTechniqueResult = dxEffect->SetTechnique(handle_);
         if (setTechniqueResult < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 58, setTechniqueResult);
@@ -6148,7 +4852,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         ActiveDeviceD3D9().BeginTechnique();
 
         unsigned int passCount = 0U;
-        const HRESULT beginResult = InvokeEffectBeginTechnique(dxEffect, &passCount, 1U);
+        const HRESULT beginResult = dxEffect->Begin(&passCount, 1U);
         if (beginResult < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 67, beginResult);
@@ -6172,7 +4876,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 79);
-        const HRESULT result = InvokeEffectEndTechnique(effect->GetDxEffect());
+        const HRESULT result = effect->GetDxEffect()->End();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 84, result);
@@ -6186,26 +4890,54 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00942EE0 (FUN_00942EE0)
      *
      * What it does:
-     * Initializes weak-self/context/effect lanes and binds caller-provided context/effect state.
+     * Starts from an empty context (0x0093FBE0) and a null effect, then
+     * adopts `context` and `effect` through `SetEffect`.
      */
-    EffectD3D9::EffectD3D9(EffectContext* const context, ID3DXEffect* const dxEffect)
-        : selfWeak_(),
-          effectContext_(),
-          dxEffect_(nullptr)
+    EffectD3D9::EffectD3D9(const EffectContext& context, ID3DXEffect* const effect)
     {
-        InitializeEffectD3D9ConstructionLanes(this);
-        InitializeEffectD3D9State(this, context, dxEffect);
+        SetEffect(context, effect);
     }
 
     /**
-     * Address: 0x00942EC0 (FUN_00942EC0)
+     * Address: 0x00942DD0 (FUN_00942DD0)
+     * Address: 0x00942EC0 (FUN_00942EC0, the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates teardown to `FUN_00942DD0` body lanes.
+     * `Reset()`. The context then goes as a member (0x0093F950), and the
+     * `Effect` base and the weak-this as bases.
      */
     EffectD3D9::~EffectD3D9()
     {
-        DestroyEffectD3D9Body(this);
+        Reset();
+    }
+
+    /**
+     * Address: 0x00942D60 (FUN_00942D60)
+     *
+     * What it does:
+     * Releases the D3DX effect and assigns an empty context over the current
+     * one: a temporary `EffectContext` (0x0093FBE0), `operator=` (0x00942CF0),
+     * and the temporary's destructor (0x0093F950).
+     */
+    void EffectD3D9::Reset()
+    {
+        SafeRelease(dxEffect_);
+        effectContext_ = EffectContext();
+    }
+
+    /**
+     * Address: 0x00942E50 (FUN_00942E50)
+     *
+     * What it does:
+     * Resets, copies `context` (0x00942CF0), adopts `effect`, then empties the
+     * copied source buffer -- the effect keeps the settings but not the bytes.
+     */
+    void EffectD3D9::SetEffect(const EffectContext& context, ID3DXEffect* const effect)
+    {
+        Reset();
+        effectContext_ = context;
+        dxEffect_ = effect;
+        effectContext_.mSourceBuffer.Reset();
     }
 
     /**
@@ -6239,59 +4971,52 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00942920 (FUN_00942920)
      *
      * What it does:
-     * Enumerates valid D3DX techniques and appends wrapped technique objects.
+     * Walks the valid techniques (`FindNextValidTechnique`) and appends a
+     * wrapper for each -- `push_back` 0x00942860 on the temporary
+     * `shared_ptr<EffectTechnique>`, whose constructor the binary inlines
+     * around `shared_count(EffectTechniqueD3D9*)` 0x009417B0.
      */
-    HRESULT EffectD3D9::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechniqueD3D9>>& outTechniques)
+    void EffectD3D9::GetTechniques(msvc8::vector<boost::shared_ptr<EffectTechnique>>& outTechniques)
     {
         if (dxEffect_ == nullptr)
         {
             ThrowGalError("EffectD3D9.cpp", 58, "invalid effect");
         }
 
-        void* techniqueHandle = nullptr;
-        HRESULT result = InvokeEffectFindNextValidTechnique(dxEffect_, nullptr, &techniqueHandle);
-        while (result >= 0)
+        D3DXHANDLE technique = nullptr;
+        HRESULT result = dxEffect_->FindNextValidTechnique(nullptr, &technique);
+        while (SUCCEEDED(result) && technique != nullptr)
         {
-            if (techniqueHandle == nullptr)
-            {
-                break;
-            }
-
-            D3DXTECHNIQUE_DESC techniqueDesc{};
-            result = InvokeEffectGetTechniqueDesc(dxEffect_, techniqueHandle, &techniqueDesc);
-            if (result < 0)
+            D3DXTECHNIQUE_DESC description{};
+            result = dxEffect_->GetTechniqueDesc(technique, &description);
+            if (FAILED(result))
             {
                 ThrowGalErrorFromHresult("EffectD3D9.cpp", 66, result);
             }
 
-            const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
-            if (!effect)
-            {
-                ThrowGalError("EffectD3D9.cpp", 67, "invalid effect");
-            }
-            const EffectTechniqueSharedRef wrapper =
-                CreateEffectTechniqueWrapper(techniqueDesc.Name, effect, techniqueHandle);
-            static_cast<void>(AppendEffectTechniqueSharedRef(outTechniques, wrapper));
-            result = InvokeEffectFindNextValidTechnique(dxEffect_, techniqueHandle, &techniqueHandle);
+            outTechniques.push_back(boost::shared_ptr<EffectTechnique>(
+                new EffectTechniqueD3D9(description.Name, boost::SharedFromThis(*this), technique)
+            ));
+            result = dxEffect_->FindNextValidTechnique(technique, &technique);
         }
-
-        return result;
     }
 
     /**
      * Address: 0x00941D70 (FUN_00941D70)
      *
      * What it does:
-     * Looks up an effect parameter by name and returns a wrapped effect-variable object.
+     * Wraps the effect parameter called `variableName`, handing the wrapper
+     * `shared_from_this()` (0x00941B90) as its effect; throws when the effect
+     * or the parameter is missing.
      */
-    boost::shared_ptr<EffectVariableD3D9> EffectD3D9::SetMatrix(const char* const variableName)
+    boost::shared_ptr<EffectVariable> EffectD3D9::GetVariable(const char* const variableName)
     {
         if (dxEffect_ == nullptr)
         {
             ThrowGalError("EffectD3D9.cpp", 76, "invalid effect");
         }
 
-        void* const parameterHandle = InvokeEffectGetParameterByName(dxEffect_, nullptr, variableName);
+        const D3DXHANDLE parameterHandle = dxEffect_->GetParameterByName(nullptr, variableName);
         if (parameterHandle == nullptr)
         {
             char message[512] = {};
@@ -6304,28 +5029,27 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("EffectD3D9.cpp", 79, message);
         }
 
-        const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
-        if (!effect)
-        {
-            ThrowGalError("EffectD3D9.cpp", 80, "invalid effect");
-        }
-        return CreateEffectVariableWrapper(variableName, effect, parameterHandle);
+        return boost::shared_ptr<EffectVariable>(
+            new EffectVariableD3D9(variableName, boost::SharedFromThis(*this), parameterHandle)
+        );
     }
 
     /**
      * Address: 0x00941F60 (FUN_00941F60)
      *
      * What it does:
-     * Looks up a technique by name and returns a wrapped technique handle.
+     * Wraps the technique called `techniqueName`, handing the wrapper
+     * `shared_from_this()` as its effect; throws when the effect or the
+     * technique is missing.
      */
-    boost::shared_ptr<EffectTechniqueD3D9> EffectD3D9::SetTechnique(const char* const techniqueName)
+    boost::shared_ptr<EffectTechnique> EffectD3D9::GetTechnique(const char* const techniqueName)
     {
         if (dxEffect_ == nullptr)
         {
             ThrowGalError("EffectD3D9.cpp", 86, "invalid effect");
         }
 
-        void* const techniqueHandle = InvokeEffectGetTechniqueByName(dxEffect_, techniqueName);
+        const D3DXHANDLE techniqueHandle = dxEffect_->GetTechniqueByName(techniqueName);
         if (techniqueHandle == nullptr)
         {
             char message[512] = {};
@@ -6338,12 +5062,9 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("EffectD3D9.cpp", 89, message);
         }
 
-        const boost::shared_ptr<EffectD3D9> effect = selfWeak_.lock();
-        if (!effect)
-        {
-            ThrowGalError("EffectD3D9.cpp", 90, "invalid effect");
-        }
-        return CreateEffectTechniqueWrapper(techniqueName, effect, techniqueHandle);
+        return boost::shared_ptr<EffectTechnique>(
+            new EffectTechniqueD3D9(techniqueName, boost::SharedFromThis(*this), techniqueHandle)
+        );
     }
 
     /**
@@ -6362,8 +5083,8 @@ namespace { // TEMPORARY PROBE (do not commit)
         const boost::shared_ptr<PipelineState> pipelineState = Device::GetInstance()->GetPipelineState();
 
         StateManagerD3D9* const stateManager = static_cast<PipelineStateD3D9*>(pipelineState.get())->GetStateManager();
-        static_cast<void>(InvokeEffectSetStateManager(dxEffect_, stateManager));
-        static_cast<void>(InvokeEffectOnResetDevice(dxEffect_));
+        static_cast<void>(dxEffect_->SetStateManager(stateManager));
+        static_cast<void>(dxEffect_->OnResetDevice());
     }
 
     /**
@@ -6372,56 +5093,56 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Forwards device-lost notification to the retained D3DX effect.
      */
-    HRESULT EffectD3D9::OnLost()
+    void EffectD3D9::OnLost()
     {
         if (dxEffect_ == nullptr)
         {
             ThrowGalError("EffectD3D9.cpp", 108, "invalid effect");
         }
 
-        return InvokeEffectOnLostDevice(dxEffect_);
+        static_cast<void>(dxEffect_->OnLostDevice());
     }
 
     /**
      * Address: 0x00943060 (FUN_00943060)
      *
      * What it does:
-     * Stores variable-name/effect-handle lanes and validates weak-effect liveness.
+     * Keeps `name`, a weak reference to `effect` and the parameter handle;
+     * throws "invalid effect specified" (EffectVariableD3D9.cpp:37) when the
+     * effect has already expired.
      */
     EffectVariableD3D9::EffectVariableD3D9(
-        const char* const variableName,
-        const boost::weak_ptr<EffectD3D9>& effect,
-        void* const handle
+        const char* const name,
+        const boost::shared_ptr<EffectD3D9> effect,
+        const D3DXHANDLE handle
     )
-        : name_(variableName != nullptr ? variableName : "", (variableName != nullptr) ? std::strlen(variableName) : 0U),
+        : name_(name),
           effect_(effect),
           handle_(handle)
     {
-        if (effect_.use_count() <= 0)
+        if (effect_.expired())
         {
             ThrowGalError("EffectVariableD3D9.cpp", 37, "invalid effect specified");
         }
     }
 
     /**
-     * Address: 0x00943040 (FUN_00943040)
+     * Address: 0x00942FC0 (FUN_00942FC0)
+     * Address: 0x00943040 (FUN_00943040, the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_00942FC0` body semantics.
+     * Nothing of its own: the weak effect reference and the name go as
+     * members, then the `EffectVariable` base.
      */
-    EffectVariableD3D9::~EffectVariableD3D9()
-    {
-        DestroyEffectVariableD3D9Body(this);
-        ApplyEffectVariableBaseVftableLane(this);
-    }
+    EffectVariableD3D9::~EffectVariableD3D9() = default;
 
     /**
      * Address: 0x00942F80 (FUN_00942F80)
      *
      * What it does:
-     * Returns the local variable-name string lane.
+     * Returns the parameter name.
      */
-    msvc8::string* EffectVariableD3D9::Func1()
+    msvc8::string* EffectVariableD3D9::GetName()
     {
         return &name_;
     }
@@ -6432,10 +5153,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes one boolean parameter into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::Func7(const bool value)
+    void EffectVariableD3D9::SetBool(const bool value)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 52);
-        const HRESULT result = InvokeEffectSetBool(effect->GetDxEffect(), handle_, value);
+        const HRESULT result = effect->GetDxEffect()->SetBool(handle_, value ? TRUE : FALSE);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 57, result);
@@ -6448,10 +5169,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes one integer parameter into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::Func6(const int value)
+    void EffectVariableD3D9::SetInt(const int value)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 63);
-        const HRESULT result = InvokeEffectSetInt(effect->GetDxEffect(), handle_, value);
+        const HRESULT result = effect->GetDxEffect()->SetInt(handle_, value);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 68, result);
@@ -6464,10 +5185,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes a single vector4 payload into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::Func4(const void* const vector4)
+    void EffectVariableD3D9::SetVector(const float* const vector4)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 85);
-        const HRESULT result = InvokeEffectSetVector(effect->GetDxEffect(), handle_, vector4);
+        const HRESULT result = effect->GetDxEffect()->SetVector(handle_, reinterpret_cast<const D3DXVECTOR4*>(vector4));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 90, result);
@@ -6478,12 +5199,17 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x009438D0 (FUN_009438D0)
      *
      * What it does:
-     * Writes a vector-array payload into the backing D3DX effect variable handle.
+     * `ID3DXEffect::SetVectorArray` on this parameter, with the address of the
+     * `vectors4` parameter itself as the data (`lea edx, [esp+0xA8]` at
+     * 0x00943990, where slots 6, 7 and 12 load their pointer). D3DX therefore
+     * reads the pointer and the stack above it, not the caller's vectors. The
+     * D3D10 twin makes the same slip; nothing in the binary calls the slot.
      */
-    void EffectVariableD3D9::Func9(const std::uint32_t vectorCount, const void* const vectors4)
+    void EffectVariableD3D9::SetVectorArray(const std::uint32_t count, const float* const vectors4)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 96);
-        const HRESULT result = InvokeEffectSetVectorArray(effect->GetDxEffect(), handle_, vectors4, vectorCount);
+        const HRESULT result =
+            effect->GetDxEffect()->SetVectorArray(handle_, reinterpret_cast<const D3DXVECTOR4*>(&vectors4), count);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 101, result);
@@ -6499,7 +5225,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void EffectVariableD3D9::SetFloat(const float value)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 74);
-        const HRESULT result = InvokeEffectSetFloat(effect->GetDxEffect(), handle_, value);
+        const HRESULT result = effect->GetDxEffect()->SetFloat(handle_, value);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 79, result);
@@ -6512,10 +5238,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes a float-array payload into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::SetMem(const std::uint32_t floatCount, const float* const values)
+    void EffectVariableD3D9::SetFloatArray(const std::uint32_t count, const float* const values)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 107);
-        const HRESULT result = InvokeEffectSetFloatArray(effect->GetDxEffect(), handle_, values, floatCount);
+        const HRESULT result = effect->GetDxEffect()->SetFloatArray(handle_, values, count);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 112, result);
@@ -6528,10 +5254,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes an untyped byte payload into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::SetPtr(const void* const data, const std::uint32_t byteCount)
+    void EffectVariableD3D9::SetValue(const void* const data, const std::uint32_t byteCount)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 118);
-        const HRESULT result = InvokeEffectSetValue(effect->GetDxEffect(), handle_, data, byteCount);
+        const HRESULT result = effect->GetDxEffect()->SetValue(handle_, data, byteCount);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 123, result);
@@ -6544,10 +5270,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes a 4x4 matrix payload into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::SetMatrix4x4(const void* const matrix4x4)
+    void EffectVariableD3D9::SetMatrix4x4(const Matrix* const matrix)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 129);
-        const HRESULT result = InvokeEffectSetMatrix(effect->GetDxEffect(), handle_, matrix4x4);
+        const HRESULT result = effect->GetDxEffect()->SetMatrix(handle_, reinterpret_cast<const D3DXMATRIX*>(matrix));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 134, result);
@@ -6560,10 +5286,11 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Writes a matrix-array payload into the backing D3DX effect variable handle.
      */
-    void EffectVariableD3D9::Func8(const std::uint32_t matrixCount, const void* const matrices4x4)
+    void EffectVariableD3D9::SetMatrixArray(const std::uint32_t count, const Matrix* const matrices)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 140);
-        const HRESULT result = InvokeEffectSetMatrixArray(effect->GetDxEffect(), handle_, matrices4x4, matrixCount);
+        const HRESULT result =
+            effect->GetDxEffect()->SetMatrixArray(handle_, reinterpret_cast<const D3DXMATRIX*>(matrices), count);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 145, result);
@@ -6579,7 +5306,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void EffectVariableD3D9::SetTexture(const boost::shared_ptr<Texture> texture)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 151);
-        void* textureHandle = nullptr;
+        IDirect3DBaseTexture9* textureHandle = nullptr;
 
         if (texture)
         {
@@ -6596,17 +5323,15 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         if (ProbeTexSetArmed() && gProbeTexSetBudget > 0) { // TEMPORARY PROBE (do not commit)
-            struct ProbeParamDesc { const char* name; const char* semantic; unsigned cls, type, rows, cols, elems, annots, members, flags, bytes; } desc{};
-            void* const dx = effect->GetDxEffect();
-            auto** const vt = *reinterpret_cast<void***>(dx);
-            using get_param_desc_fn = HRESULT(STDMETHODCALLTYPE*)(void*, void*, ProbeParamDesc*);
-            const HRESULT dr = reinterpret_cast<get_param_desc_fn>(vt[4])(dx, handle_, &desc);
-            if (dr >= 0 && desc.name != nullptr && std::strstr(desc.name, "Decal") != nullptr) {
+            D3DXPARAMETER_DESC desc{};
+            ID3DXEffect* const dx = effect->GetDxEffect();
+            const HRESULT dr = dx->GetParameterDesc(handle_, &desc);
+            if (dr >= 0 && desc.Name != nullptr && std::strstr(desc.Name, "Decal") != nullptr) {
                 --gProbeTexSetBudget;
-                ::gpg::Warnf("[TEXSET] tech='%s' name='%s' native=%p", gProbeCurrentTechnique, desc.name, textureHandle);
+                ::gpg::Warnf("[TEXSET] tech='%s' name='%s' native=%p", gProbeCurrentTechnique, desc.Name, static_cast<void*>(textureHandle));
             }
         }
-        const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
+        const HRESULT result = effect->GetDxEffect()->SetTexture(handle_, textureHandle);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 183, result);
@@ -6623,10 +5348,10 @@ namespace { // TEMPORARY PROBE (do not commit)
     void EffectVariableD3D9::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 189);
-        void* const textureHandle =
+        IDirect3DTexture9* const textureHandle =
             (renderTarget.get() != nullptr) ? static_cast<RenderTargetD3D9*>(renderTarget.get())->GetTexture() : nullptr;
 
-        const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
+        const HRESULT result = effect->GetDxEffect()->SetTexture(handle_, textureHandle);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 201, result);
@@ -6644,10 +5369,10 @@ namespace { // TEMPORARY PROBE (do not commit)
     void EffectVariableD3D9::SetCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget> cubeTarget)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 207);
-        void* const textureHandle =
+        IDirect3DCubeTexture9* const textureHandle =
             (cubeTarget.get() != nullptr) ? static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture() : nullptr;
 
-        const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
+        const HRESULT result = effect->GetDxEffect()->SetTexture(handle_, textureHandle);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 219, result);
@@ -6660,18 +5385,18 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Retrieves a boolean annotation from this parameter handle by name.
      */
-    bool EffectVariableD3D9::Func10(bool* const outValue, const msvc8::string& annotationName)
+    bool EffectVariableD3D9::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 225);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
         int rawValue = 0;
-        const HRESULT result = InvokeEffectGetBool(dxEffect, annotationHandle, &rawValue);
+        const HRESULT result = dxEffect->GetBool(annotationHandle, &rawValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 235, result);
@@ -6687,17 +5412,17 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Retrieves an integer annotation from this parameter handle by name.
      */
-    bool EffectVariableD3D9::Func11(int* const outValue, const msvc8::string& annotationName)
+    bool EffectVariableD3D9::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 245);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
-        const HRESULT result = InvokeEffectGetInt(dxEffect, annotationHandle, outValue);
+        const HRESULT result = dxEffect->GetInt(annotationHandle, outValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 254, result);
@@ -6712,17 +5437,17 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Retrieves a float annotation from this parameter handle by name.
      */
-    bool EffectVariableD3D9::Func12(float* const outValue, const msvc8::string& annotationName)
+    bool EffectVariableD3D9::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 262);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
-        const HRESULT result = InvokeEffectGetFloat(dxEffect, annotationHandle, outValue);
+        const HRESULT result = dxEffect->GetFloat(annotationHandle, outValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 271, result);
@@ -6737,18 +5462,18 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Retrieves a string annotation from this parameter handle by name.
      */
-    bool EffectVariableD3D9::Func13(msvc8::string* const outValue, const msvc8::string& annotationName)
+    bool EffectVariableD3D9::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 279);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
         const char* annotationText = nullptr;
-        const HRESULT result = InvokeEffectGetString(dxEffect, annotationHandle, &annotationText);
+        const HRESULT result = dxEffect->GetString(annotationHandle, &annotationText);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectVariableD3D9.cpp", 289, result);
@@ -6773,7 +5498,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 97);
         std::strncpy(gProbeCurrentTechnique, name_.c_str(), 63); gProbeCurrentTechnique[63] = 0; // TEMPORARY PROBE (do not commit)
-        const HRESULT result = InvokeEffectBeginPass(effect->GetDxEffect(), static_cast<unsigned int>(pass));
+        const HRESULT result = effect->GetDxEffect()->BeginPass(static_cast<unsigned int>(pass));
         if (std::strcmp(gProbeCurrentTechnique, "TDecals") == 0) { // TEMPORARY PROBE (do not commit): force no mip filtering on decal samplers
             static unsigned sMipCalls = 0; static int sMipLevel = -1;
             if ((sMipCalls++ % 64u) == 0u) {
@@ -6907,7 +5632,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 110);
-        const HRESULT result = InvokeEffectEndPass(effect->GetDxEffect());
+        const HRESULT result = effect->GetDxEffect()->EndPass();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 115, result);
@@ -6923,15 +5648,15 @@ namespace { // TEMPORARY PROBE (do not commit)
     bool EffectTechniqueD3D9::GetAnnotationBool(bool* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 121);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
         int rawValue = 0;
-        const HRESULT result = InvokeEffectGetBool(dxEffect, annotationHandle, &rawValue);
+        const HRESULT result = dxEffect->GetBool(annotationHandle, &rawValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 131, result);
@@ -6950,14 +5675,14 @@ namespace { // TEMPORARY PROBE (do not commit)
     bool EffectTechniqueD3D9::GetAnnotationInt(int* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 141);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
-        const HRESULT result = InvokeEffectGetInt(dxEffect, annotationHandle, outValue);
+        const HRESULT result = dxEffect->GetInt(annotationHandle, outValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 150, result);
@@ -6975,14 +5700,14 @@ namespace { // TEMPORARY PROBE (do not commit)
     bool EffectTechniqueD3D9::GetAnnotationFloat(float* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 158);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
-        const HRESULT result = InvokeEffectGetFloat(dxEffect, annotationHandle, outValue);
+        const HRESULT result = dxEffect->GetFloat(annotationHandle, outValue);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 167, result);
@@ -7000,15 +5725,15 @@ namespace { // TEMPORARY PROBE (do not commit)
     bool EffectTechniqueD3D9::GetAnnotationString(msvc8::string* const outValue, const msvc8::string& annotationName)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 175);
-        void* const dxEffect = effect->GetDxEffect();
-        void* const annotationHandle = InvokeEffectGetAnnotationByName(dxEffect, handle_, annotationName.c_str());
+        ID3DXEffect* const dxEffect = effect->GetDxEffect();
+        const D3DXHANDLE annotationHandle = dxEffect->GetAnnotationByName(handle_, annotationName.c_str());
         if (annotationHandle == nullptr)
         {
             return false;
         }
 
         const char* annotationText = nullptr;
-        const HRESULT result = InvokeEffectGetString(dxEffect, annotationHandle, &annotationText);
+        const HRESULT result = dxEffect->GetString(annotationHandle, &annotationText);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 185, result);
@@ -7248,7 +5973,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      *
      * What it does:
      * Returns the texture behind the surface, for
-     * `EffectVariableD3D9::Func3` to bind through `ID3DXEffect::SetTexture`.
+     * `EffectVariableD3D9::SetRenderTarget` to bind through `ID3DXEffect::SetTexture`.
      */
     IDirect3DTexture9* RenderTargetD3D9::GetTexture()
     {
