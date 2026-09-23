@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
@@ -29,24 +30,8 @@ namespace moho
       0x00030002u,
     };
 
-    constexpr std::uint32_t kParticleTopologyTriangleList = 4U;
     constexpr std::uint32_t kParticleQuadVertexCount = 4U;
-    constexpr std::uint32_t kParticleQuadPrimitiveCountInput = 6U;
-
-    struct DrawIndexedPrimitiveContextRuntime final
-    {
-      std::uint32_t pad00 = 0U;               // +0x00
-      std::uint32_t topologyToken = 0U;       // +0x04
-      std::uint32_t minVertexIndex = 0U;      // +0x08
-      std::uint32_t vertexCount = 0U;         // +0x0C
-      std::uint32_t primitiveCountInput = 0U; // +0x10
-      std::uint32_t startIndex = 0U;          // +0x14
-      std::int32_t baseVertexIndex = 0;       // +0x18
-    };
-    static_assert(
-      sizeof(DrawIndexedPrimitiveContextRuntime) == 0x1C,
-      "DrawIndexedPrimitiveContextRuntime size must be 0x1C"
-    );
+    constexpr std::uint32_t kParticleQuadIndexCount = 6U;
   } // namespace
 
   /**
@@ -157,7 +142,7 @@ namespace moho
     return static_cast<Instanced*>(mInstanceVertexBuffer->Lock(
       static_cast<unsigned int>(offsetBytes),
       static_cast<unsigned int>(sizeBytes),
-      gpg::gal::MohoD3DLockFlags::ReadOnly
+      gpg::gal::MohoD3DLockFlags::NoOverwrite
     ));
   }
 
@@ -204,10 +189,10 @@ namespace moho
     device->SetVertexBuffer(1U, mInstanceVertexBuffer, 1, startIndex);
     device->SetBufferIndices(mQuadIndexBuffer);
 
-    DrawIndexedPrimitiveContextRuntime drawContext{};
-    drawContext.topologyToken = kParticleTopologyTriangleList;
-    drawContext.vertexCount = kParticleQuadVertexCount;
-    drawContext.primitiveCountInput = kParticleQuadPrimitiveCountInput;
+    gpg::gal::DrawIndexedContext drawContext;
+    drawContext.topology_ = gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST;
+    drawContext.vertexCount_ = kParticleQuadVertexCount;
+    drawContext.indexCount_ = kParticleQuadIndexCount;
 
     gpg::gal::EffectTechniqueD3D9* const technique = effect->mCurrentTechnique.px;
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());

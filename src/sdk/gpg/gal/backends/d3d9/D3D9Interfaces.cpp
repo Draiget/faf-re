@@ -28,11 +28,15 @@
 #include "gpg/gal/PipelineState.hpp"
 #include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/CursorContext.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/utils/BoostWrappers.h"
+
+#include <d3d9.h>
+#include <d3dx9.h>
 
 #include <bit>
 #include <cstddef>
@@ -47,7 +51,6 @@
 
 namespace gpg::gal
 {
-#include <d3d9caps.h>
 // TEMPORARY PROBE (do not commit): current technique name for the state-manager log.
 char gProbeCurrentTechnique[64] = {}; // already inside namespace gpg::gal
 int gProbeFrameSeq = 0; int gProbeFrameDiagLeft = 0; // TEMPORARY PROBE (do not commit)
@@ -158,97 +161,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
     namespace
     {
-        using release_fn = unsigned long(__stdcall*)(void*);
-        using lock_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void**, unsigned int);
-        using unlock_fn = HRESULT(__stdcall*)(void*);
-        using lock_rect_fn = HRESULT(__stdcall*)(void*, int, void*, const RECT*, unsigned int);
-        using unlock_rect_fn = HRESULT(__stdcall*)(void*, int);
-        using get_surface_level_fn = HRESULT(__stdcall*)(void*, unsigned int, void**);
-        using get_cube_map_surface_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void**);
-        using d3dx_create_buffer_fn = HRESULT(WINAPI*)(unsigned int, void**);
-        using d3dx_save_surface_to_file_in_memory_fn = HRESULT(WINAPI*)(void**, unsigned int, void*, const void*, const RECT*);
-        using d3dx_save_surface_to_file_a_fn = HRESULT(WINAPI*)(const char*, unsigned int, void*, const void*, const RECT*);
-        using d3dx_save_texture_to_file_a_fn = HRESULT(WINAPI*)(const char*, unsigned int, void*, const void*);
-        using d3dx_load_surface_from_surface_fn =
-            HRESULT(WINAPI*)(void*, const void*, const RECT*, void*, const void*, const RECT*, unsigned int, std::uint32_t);
-        using d3dx_float32_to16_array_fn = std::uint16_t*(WINAPI*)(std::uint16_t*, const float*, unsigned int);
-        using d3dx_get_image_info_from_file_in_memory_fn = HRESULT(WINAPI*)(const void*, unsigned int, void*);
-        using d3dx_create_texture_fn = HRESULT(WINAPI*)(void*, unsigned int, unsigned int, unsigned int, unsigned int, std::uint32_t, D3DPOOL, void**);
-        using d3dx_create_texture_from_file_in_memory_ex_fn = HRESULT(WINAPI*)(
-            void*,
-            const void*,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            D3DPOOL,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            const void*,
-            void*,
-            void**
-        );
-        using d3dx_create_volume_texture_from_file_in_memory_ex_fn = HRESULT(WINAPI*)(
-            void*,
-            const void*,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            D3DPOOL,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            const void*,
-            void*,
-            void**
-        );
-        using d3dx_create_cube_texture_from_file_in_memory_ex_fn = HRESULT(WINAPI*)(
-            void*,
-            const void*,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            D3DPOOL,
-            unsigned int,
-            unsigned int,
-            std::uint32_t,
-            const void*,
-            void*,
-            void**
-        );
-        using d3dx_get_vertex_shader_profile_fn = const char*(WINAPI*)(void*);
-        using d3dx_get_pixel_shader_profile_fn = const char*(WINAPI*)(void*);
-        using d3dx_create_effect_fn = HRESULT(WINAPI*)(
-            void*,
-            const void*,
-            unsigned int,
-            const void*,
-            void*,
-            unsigned int,
-            void*,
-            void**,
-            void**
-        );
-        using d3dx_create_effect_compiler_fn = HRESULT(WINAPI*)(
-            const char*,
-            unsigned int,
-            const void*,
-            void*,
-            unsigned int,
-            void**,
-            void**
-        );
-        using d3dx_buffer_get_pointer_fn = void*(__stdcall*)(void*);
-        using d3dx_buffer_get_size_fn = unsigned int(__stdcall*)(void*);
         using effect_compiler_compile_effect_fn = HRESULT(__stdcall*)(void*, unsigned int, void**, void**);
         using effect_get_parameter_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
         using effect_get_annotation_by_name_fn = void*(__stdcall*)(void*, void*, const char*);
@@ -277,86 +189,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         using effect_set_state_manager_fn = HRESULT(__stdcall*)(void*, void*);
         using effect_on_reset_device_fn = HRESULT(__stdcall*)(void*);
         using effect_on_lost_device_fn = HRESULT(__stdcall*)(void*);
-        using d3d9_device_show_cursor_fn = int(__stdcall*)(void*, int);
-        using d3d9_device_create_texture_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, unsigned int, std::uint32_t, D3DPOOL, void**, void*);
-        using d3d9_device_create_cube_texture_fn =
-            HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, std::uint32_t, D3DPOOL, void**, void*);
-        using d3d9_device_create_depth_stencil_surface_fn =
-            HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, unsigned int, unsigned int, int, void**, void*);
-        using d3d9_device_get_back_buffer_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, void**);
-        using d3d9_device_reset_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_get_device_caps_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_create_query_fn = HRESULT(__stdcall*)(void*, unsigned int, void**);
-        using d3d9_device_set_render_state_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int);
-        using d3d9_device_create_vertex_declaration_fn = HRESULT(__stdcall*)(void*, const void*, void**);
-        using d3d9_device_create_vertex_buffer_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, D3DPOOL, void**, void*);
-        using d3d9_device_create_index_buffer_fn =
-            HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, D3DPOOL, void**, void*);
-        using d3d9_device_get_render_target_data_fn = HRESULT(__stdcall*)(void*, void*, void*);
-        using d3d9_device_stretch_rect_fn = HRESULT(__stdcall*)(void*, void*, const RECT*, void*, const RECT*, unsigned int);
-        using d3d9_device_test_cooperative_level_fn = HRESULT(__stdcall*)(void*);
-        using d3d9_device_begin_scene_fn = HRESULT(__stdcall*)(void*);
-        using d3d9_device_end_scene_fn = HRESULT(__stdcall*)(void*);
-        using d3d9_device_present_fn = HRESULT(__stdcall*)(void*, const RECT*, const RECT*, void*, const void*);
-        using d3d9_device_set_cursor_properties_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void*);
-        using d3d9_device_set_viewport_fn = HRESULT(__stdcall*)(void*, const void*);
-        using d3d9_device_get_viewport_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_get_render_target_fn = HRESULT(__stdcall*)(void*, unsigned int, void**);
-        using d3d9_device_set_render_target_fn = HRESULT(__stdcall*)(void*, unsigned int, void*);
-        using d3d9_device_get_depth_stencil_surface_fn = HRESULT(__stdcall*)(void*, void**);
-        using d3d9_device_set_depth_stencil_surface_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_clear_fn = HRESULT(__stdcall*)(void*, unsigned int, const void*, unsigned int, std::uint32_t, float, unsigned int);
-        using d3d9_device_set_vertex_declaration_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_set_stream_source_fn = HRESULT(__stdcall*)(void*, unsigned int, void*, unsigned int, unsigned int);
-        using d3d9_device_set_stream_source_freq_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int);
-        using d3d9_device_set_indices_fn = HRESULT(__stdcall*)(void*, void*);
-        using d3d9_device_draw_primitive_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, unsigned int);
-        using d3d9_device_draw_indexed_primitive_fn =
-            HRESULT(__stdcall*)(void*, unsigned int, int, unsigned int, unsigned int, unsigned int, unsigned int);
-        using surface_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
-        using surface_lock_rect_fn = HRESULT(__stdcall*)(void*, void*, const RECT*, unsigned int);
-        using surface_unlock_rect_fn = HRESULT(__stdcall*)(void*);
-        using surface_get_dc_fn = HRESULT(__stdcall*)(void*, void**);
-        using query_issue_fn = HRESULT(__stdcall*)(void*, unsigned int);
-        using query_get_data_fn = HRESULT(__stdcall*)(void*, void*, unsigned int, unsigned int);
-        using texture_get_level_desc_fn = HRESULT(__stdcall*)(void*, unsigned int, void*);
-        using texture_get_level_count_fn = unsigned int(__stdcall*)(void*);
-        using d3d9_check_device_format_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, unsigned int, unsigned int, std::uint32_t);
-        using d3d9_check_device_multisample_type_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, int, unsigned int, unsigned int*);
-        using d3d9_get_adapter_identifier_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void*);
-        using d3d9_get_adapter_count_fn = unsigned int(__stdcall*)(void*);
-        using d3d9_get_adapter_mode_count_fn = unsigned int(__stdcall*)(void*, unsigned int, std::uint32_t);
-        using d3d9_enum_adapter_modes_fn = HRESULT(__stdcall*)(void*, unsigned int, std::uint32_t, unsigned int, void*);
-        using d3d9_create_device_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, HWND, unsigned int, void*, void**);
-        using direct3d_create9_fn = void*(WINAPI*)(unsigned int);
 
-        constexpr unsigned int kD3DLockNoOverwrite = 0x10U;
-        constexpr unsigned int kD3DLockReadOnly = 0x1000U;
-        constexpr unsigned int kD3DLockDiscard = 0x2000U;
-        constexpr unsigned int kD3DSurfaceLockReadOnly = 0x10U;
-        constexpr unsigned int kD3DXIFFDDS = 4U;
-        constexpr unsigned int kD3DXDefault = 0xFFFFFFFFU;
-        /**
-         * `D3DX_DEFAULT_NONPOW2` - take the dimension from the file and keep it
-         * even when it is not a power of two. `D3DX_DEFAULT` (-1) would rescale
-         * such an image up to the next power of two, which silently changes the
-         * size every UI control derives its layout from.
-         */
-        constexpr unsigned int kD3DXDefaultNonPow2 = 0xFFFFFFFEU;
-        /** `D3DX_FILTER_NONE` - copy the image through unfiltered. */
-        constexpr unsigned int kD3DXFilterNone = 1U;
-        constexpr unsigned int kD3DTexFilterPoint = 1U;
-        constexpr unsigned int kD3DTexFilterLinear = 2U;
-        constexpr unsigned int kD3DDevTypeHal = 1U;
-        constexpr unsigned int kD3DBackBufferTypeMono = 0U;
-        constexpr unsigned int kD3DSwapEffectDiscard = 1U;
-        constexpr unsigned int kD3DRenderStatePointSize = 0x9AU;
-        constexpr unsigned int kD3DRTypeSurface = 1U;
-        constexpr unsigned int kD3DRTypeTexture = 3U;
-        constexpr std::uint32_t kD3DFormatUnknown = 0U;
-        constexpr std::uint32_t kD3DFormatA8R8G8B8 = 0x15U;
-        constexpr std::uint32_t kD3DFormatX8R8G8B8 = 0x16U;
-        constexpr std::uint32_t kD3DFormatD24S8 = 0x4BU;
         constexpr std::uint32_t kVertexShaderModel20 = 0xFFFE0200U;
         constexpr std::uint32_t kVertexShaderModel30 = 0xFFFE0300U;
         constexpr std::uint32_t kPixelShaderModel20 = 0xFFFF0200U;
@@ -367,39 +200,8 @@ namespace { // TEMPORARY PROBE (do not commit)
         constexpr std::uint32_t kAtiDeviceRadeonX800 = 10626U;
         constexpr std::uint32_t kAtiDeviceRadeonX850 = 10658U;
         constexpr std::uint32_t kAtiDeviceRadeonX1650 = 10754U;
-        constexpr std::uint32_t kInstancingFourCC = 0x54534E49U; // 'TSNI'
-        constexpr std::uint32_t kPresentIntervalImmediate = 0x80000000U;
-        constexpr std::uint32_t kD3DFormatDXT5 = 0x35545844U;
-        constexpr unsigned int kD3DQueryIssueBegin = 1U;
-        constexpr unsigned int kD3DGetDataFlush = 1U;
-        constexpr unsigned int kD3DQueryTypeEvent = 8U;
-        constexpr unsigned int kD3DClearTarget = 0x1U;
-        constexpr unsigned int kD3DClearZBuffer = 0x2U;
-        constexpr unsigned int kD3DClearStencil = 0x4U;
-        constexpr unsigned int kD3DStreamSourceIndexedData = 0x40000000U;
-        constexpr unsigned int kD3DStreamSourceInstancedData = 0x80000000U;
-        constexpr unsigned int kD3DTransformProjection = 3U;
-        constexpr unsigned int kD3DFillMode = 0x08U;
-        constexpr unsigned int kD3DFillModeWireframe = 2U;
-        constexpr unsigned int kD3DFillModeSolid = 3U;
-        constexpr unsigned int kD3DRenderStateAlphaBlendEnable = 0x1BU;
-        constexpr unsigned int kD3DRenderStateFogEnable = 0x1CU;
-        constexpr unsigned int kD3DRenderStateFogColor = 0x22U;
-        constexpr unsigned int kD3DRenderStateFogTableMode = 0x23U;
-        constexpr unsigned int kD3DRenderStateFogStart = 0x24U;
-        constexpr unsigned int kD3DRenderStateFogEnd = 0x25U;
-        constexpr unsigned int kD3DRenderStateRangeFogEnable = 0x30U;
-        constexpr unsigned int kD3DRenderStateStencilEnable = 0x34U;
-        constexpr unsigned int kD3DRenderStateZEnable = 0x07U;
-        constexpr unsigned int kD3DRenderStateZFunc = 0x17U;
-        constexpr unsigned int kD3DRenderStateAlphaTestEnable = 0x0FU;
-        constexpr unsigned int kD3DRenderStateZWriteEnable = 0x0EU;
-        constexpr unsigned int kD3DRenderStateColorWriteEnable = 0xA8U;
-        constexpr unsigned int kD3DRenderStateDepthBias = 0xC3U;
-        constexpr unsigned int kD3DRenderStateCullMode = 0x16U;
-        constexpr unsigned int kD3DCullCounterClockwise = 1U;
-        constexpr unsigned int kD3DCmpLessEqual = 4U;
-        constexpr unsigned int kD3DFogModeLinear = 3U;
+        // ATI's instancing switch: a surface format check for FOURCC 'INST'.
+        constexpr D3DFORMAT kInstancingFourCC = static_cast<D3DFORMAT>(MAKEFOURCC('I', 'N', 'S', 'T'));
         constexpr int kCubeFaceCount = 6;
         constexpr unsigned int kCubeFaceByIndex[kCubeFaceCount] = {
             0U,
@@ -409,24 +211,17 @@ namespace { // TEMPORARY PROBE (do not commit)
             4U,
             5U,
         };
-        constexpr std::uint32_t kD3DDeviceLost = 0x88760868U;
-        constexpr std::uint32_t kD3DDeviceNotReset = 0x88760869U;
-        constexpr HRESULT kMissingD3DXCall = static_cast<HRESULT>(0x80004005L);
         constexpr std::uint32_t kFloat16VertexStrideTableDefault[2] = {0x2CU, 0x44U};  // Address: 0x00F3275C
         constexpr std::uint32_t kFloat16VertexStrideTableCompact[2] = {0x2CU, 0x08U}; // Address: 0x00F32764
-        // Address: 0x00D421CC (DAT_00D421CC)
-        constexpr unsigned int kPrimitiveTypeByToken[11] = {
-            1U,
-            1U,
-            2U,
-            3U,
-            4U,
-            5U,
-            0U,
-            1U,
-            2U,
-            3U,
-            4U,
+        // Address: 0x00D421CC - indexed by `DrawContext::TOPOLOGY` with no
+        // bounds check (zero is rejected before the lookup).
+        constexpr D3DPRIMITIVETYPE kTopologyPrimitiveTypes[6] = {
+            D3DPT_POINTLIST,
+            D3DPT_POINTLIST,
+            D3DPT_LINELIST,
+            D3DPT_LINESTRIP,
+            D3DPT_TRIANGLELIST,
+            D3DPT_TRIANGLESTRIP,
         };
 
         /**
@@ -440,148 +235,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             return static_cast<int>(kCubeFaceByIndex[faceIndex]);
         }
 
-        struct DrawPrimitiveContextRuntime final
-        {
-            std::uint32_t pad00 = 0U;                // +0x00
-            std::uint32_t topologyToken = 0U;        // +0x04
-            std::uint32_t primitiveCountInput = 0U;  // +0x08
-            std::uint32_t startVertex = 0U;          // +0x0C
-        };
-
-        struct DrawIndexedPrimitiveContextRuntime final
-        {
-            std::uint32_t pad00 = 0U;                // +0x00
-            std::uint32_t topologyToken = 0U;        // +0x04
-            std::uint32_t minVertexIndex = 0U;       // +0x08
-            std::uint32_t vertexCount = 0U;          // +0x0C
-            std::uint32_t primitiveCountInput = 0U;  // +0x10
-            std::uint32_t startIndex = 0U;           // +0x14
-            std::int32_t baseVertexIndex = 0;        // +0x18
-        };
-
-        static_assert(
-            offsetof(DrawPrimitiveContextRuntime, topologyToken) == 0x04,
-            "DrawPrimitiveContextRuntime::topologyToken offset must be 0x04"
-        );
-        static_assert(
-            offsetof(DrawPrimitiveContextRuntime, primitiveCountInput) == 0x08,
-            "DrawPrimitiveContextRuntime::primitiveCountInput offset must be 0x08"
-        );
-        static_assert(
-            offsetof(DrawPrimitiveContextRuntime, startVertex) == 0x0C,
-            "DrawPrimitiveContextRuntime::startVertex offset must be 0x0C"
-        );
-        static_assert(sizeof(DrawPrimitiveContextRuntime) == 0x10, "DrawPrimitiveContextRuntime size must be 0x10");
-        static_assert(
-            offsetof(DrawIndexedPrimitiveContextRuntime, topologyToken) == 0x04,
-            "DrawIndexedPrimitiveContextRuntime::topologyToken offset must be 0x04"
-        );
-        static_assert(
-            offsetof(DrawIndexedPrimitiveContextRuntime, primitiveCountInput) == 0x10,
-            "DrawIndexedPrimitiveContextRuntime::primitiveCountInput offset must be 0x10"
-        );
-        static_assert(
-            offsetof(DrawIndexedPrimitiveContextRuntime, startIndex) == 0x14,
-            "DrawIndexedPrimitiveContextRuntime::startIndex offset must be 0x14"
-        );
-        static_assert(
-            offsetof(DrawIndexedPrimitiveContextRuntime, baseVertexIndex) == 0x18,
-            "DrawIndexedPrimitiveContextRuntime::baseVertexIndex offset must be 0x18"
-        );
-        static_assert(
-            sizeof(DrawIndexedPrimitiveContextRuntime) == 0x1C,
-            "DrawIndexedPrimitiveContextRuntime size must be 0x1C"
-        );
-
         msvc8::vector<msvc8::string> gD3D9LogStorage{};
-
-        // D3DXTECHNIQUE_DESC as D3DX9 writes it - three fields, 12 bytes. Only
-        // the name was modelled, so ID3DXBaseEffect::GetTechniqueDesc wrote
-        // eight bytes past the caller's local and the debug CRT's
-        // _RTC_CheckStackVars trapped on the way out of GetTechniques.
-        struct D3DXTechniqueDescRuntime final
-        {
-            const char* name = nullptr;      // +0x00
-            unsigned int passes = 0U;        // +0x04
-            unsigned int annotations = 0U;   // +0x08
-        };
-        static_assert(sizeof(D3DXTechniqueDescRuntime) == 0x0C, "D3DXTECHNIQUE_DESC is 12 bytes");
-
-        struct D3DXMacroRuntime final
-        {
-            const char* name = nullptr;       // +0x00
-            const char* definition = nullptr; // +0x04
-        };
-
-        struct D3DXImageInfoRuntime final
-        {
-            unsigned int width = 0U;      // +0x00
-            unsigned int height = 0U;     // +0x04
-            unsigned int depth = 0U;      // +0x08
-            unsigned int mipLevels = 0U;  // +0x0C
-            std::uint32_t format = 0U;    // +0x10
-            unsigned int resourceType = 0U; // +0x14
-            unsigned int imageFileFormat = 0U; // +0x18
-        };
-
-        struct D3DSurfaceDescRuntime final
-        {
-            std::uint32_t format = 0U;       // +0x00
-            unsigned int resourceType = 0U;  // +0x04
-            unsigned int usage = 0U;         // +0x08
-            D3DPOOL pool = D3DPOOL_DEFAULT;  // +0x0C
-            unsigned int multisampleType = 0U; // +0x10
-            unsigned int multisampleQuality = 0U; // +0x14
-            unsigned int width = 0U;         // +0x18
-            unsigned int height = 0U;        // +0x1C
-        };
-
-        struct D3DPresentParametersRuntime final
-        {
-            unsigned int backBufferWidth = 0U;           // +0x00
-            unsigned int backBufferHeight = 0U;          // +0x04
-            std::uint32_t backBufferFormat = 0U;         // +0x08
-            unsigned int backBufferCount = 0U;           // +0x0C
-            unsigned int multiSampleType = 0U;           // +0x10
-            unsigned int multiSampleQuality = 0U;        // +0x14
-            unsigned int swapEffect = 0U;                // +0x18
-            void* deviceWindow = nullptr;                // +0x1C
-            int windowed = 0;                            // +0x20
-            int enableAutoDepthStencil = 0;             // +0x24
-            std::uint32_t autoDepthStencilFormat = 0U;  // +0x28
-            unsigned int flags = 0U;                    // +0x2C
-            unsigned int fullScreenRefreshRateInHz = 0U;// +0x30
-            unsigned int presentationInterval = 0U;     // +0x34
-        };
-
-        static_assert(sizeof(D3DPresentParametersRuntime) == 0x38, "D3DPresentParametersRuntime size must be 0x38");
-
-        struct D3DLockedRectRuntime final
-        {
-            int pitch = 0;    // +0x00
-            void* bits = nullptr; // +0x04
-        };
-
-        static_assert(sizeof(D3DLockedRectRuntime) == 0x08, "D3DLockedRectRuntime size must be 0x08");
-
-        struct D3DXExports final
-        {
-            d3dx_create_buffer_fn createBuffer = nullptr;
-            d3dx_save_surface_to_file_in_memory_fn saveSurfaceToFileInMemory = nullptr;
-            d3dx_save_surface_to_file_a_fn saveSurfaceToFileA = nullptr;
-            d3dx_save_texture_to_file_a_fn saveTextureToFileA = nullptr;
-            d3dx_load_surface_from_surface_fn loadSurfaceFromSurface = nullptr;
-            d3dx_float32_to16_array_fn float32To16Array = nullptr;
-            d3dx_get_image_info_from_file_in_memory_fn getImageInfoFromFileInMemory = nullptr;
-            d3dx_create_texture_fn createTexture = nullptr;
-            d3dx_create_texture_from_file_in_memory_ex_fn createTextureFromFileInMemoryEx = nullptr;
-            d3dx_create_volume_texture_from_file_in_memory_ex_fn createVolumeTextureFromFileInMemoryEx = nullptr;
-            d3dx_create_cube_texture_from_file_in_memory_ex_fn createCubeTextureFromFileInMemoryEx = nullptr;
-            d3dx_get_vertex_shader_profile_fn getVertexShaderProfile = nullptr;
-            d3dx_get_pixel_shader_profile_fn getPixelShaderProfile = nullptr;
-            d3dx_create_effect_fn createEffect = nullptr;
-            d3dx_create_effect_compiler_fn createEffectCompiler = nullptr;
-        };
 
         /**
          * Address: 0x0094ABF0 (FUN_0094ABF0)
@@ -618,730 +272,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             default:
                 return 0U;
             }
-        }
-
-        /**
-         * Address: 0x008E8710 (FUN_008E8710)
-         * Address: 0x0094AC70 (FUN_0094AC70)
-         *
-         * What it does:
-         * Releases one COM-like pointer lane when present and nulls the slot.
-         */
-        [[nodiscard]] std::uint32_t ReleaseComPointerSlotAndReturnReleaseCode(void** const slot) noexcept
-        {
-            std::uint32_t result = 0U;
-            if (slot != nullptr)
-            {
-                void* const object = *slot;
-                if (object != nullptr)
-                {
-                    auto** const vtable = *reinterpret_cast<void***>(object);
-                    auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-                    result = release(object);
-                }
-                *slot = nullptr;
-            }
-            return result;
-        }
-
-        /**
-         * Address: 0x008E8730 (FUN_008E8730)
-         *
-         * What it does:
-         * Releases one COM-like pointer slot via vtable `Release` lane and
-         * always clears that slot to `nullptr`.
-         */
-        [[nodiscard]] std::uint32_t ReleaseComPointerSlotAndClear(void** const slot) noexcept
-        {
-            return ReleaseComPointerSlotAndReturnReleaseCode(slot);
-        }
-
-        /**
-         * Address: 0x008E8710 (FUN_008E8710)
-         * Address: 0x0094AC70 (FUN_0094AC70)
-         *
-         * What it does:
-         * Releases one COM-like pointer lane when present and nulls the slot.
-         */
-        void ReleaseComPointerSlot(void** const slot) noexcept
-        {
-            (void)ReleaseComPointerSlotAndReturnReleaseCode(slot);
-        }
-
-        /**
-         * Address: 0x008E8750 (FUN_008E8750)
-         *
-         * What it does:
-         * Releases one COM-like interface pointer when present and always
-         * clears the caller-owned slot to `nullptr`.
-         */
-        void ReleaseComLike(void*& object) noexcept;
-
-        class ComObjectScope final
-        {
-        public:
-            ComObjectScope() noexcept = default;
-
-            ~ComObjectScope()
-            {
-                ReleaseComLike(pointer_);
-            }
-
-            ComObjectScope(const ComObjectScope&) = delete;
-            ComObjectScope& operator=(const ComObjectScope&) = delete;
-
-            void* get() const noexcept
-            {
-                return pointer_;
-            }
-
-            void** out() noexcept
-            {
-                return &pointer_;
-            }
-
-            void* release() noexcept
-            {
-                void* const released = pointer_;
-                pointer_ = nullptr;
-                return released;
-            }
-
-            void reset(void* const pointer = nullptr) noexcept
-            {
-                ReleaseComLike(pointer_);
-                pointer_ = pointer;
-            }
-
-        private:
-            void* pointer_ = nullptr;
-        };
-
-        /**
-         * Address: 0x008E8750 (FUN_008E8750)
-         *
-         * What it does:
-         * Releases one COM-like interface pointer when present and always
-         * clears the caller-owned slot to `nullptr`.
-         */
-        void ReleaseComLike(void*& object) noexcept
-        {
-            ReleaseComPointerSlot(&object);
-        }
-
-        HRESULT InvokeLock(
-            void* const object,
-            const unsigned int offset,
-            const unsigned int size,
-            void** const outData,
-            const unsigned int lockFlags
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(object);
-            auto* const lock = reinterpret_cast<lock_fn>(vtable[11]);
-            return lock(object, offset, size, outData, lockFlags);
-        }
-
-        HRESULT InvokeUnlock(void* const object)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(object);
-            auto* const unlock = reinterpret_cast<unlock_fn>(vtable[12]);
-            return unlock(object);
-        }
-
-        HRESULT InvokeLockRect(
-            void* const texture,
-            const int level,
-            void* const outLockedRect,
-            const RECT* const rect,
-            const unsigned int flags
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(texture);
-            auto* const lockRect = reinterpret_cast<lock_rect_fn>(vtable[19]);
-            return lockRect(texture, level, outLockedRect, rect, flags);
-        }
-
-        HRESULT InvokeUnlockRect(void* const texture, const int level)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(texture);
-            auto* const unlockRect = reinterpret_cast<unlock_rect_fn>(vtable[20]);
-            return unlockRect(texture, level);
-        }
-
-        D3DXExports ResolveD3DXExports() noexcept
-        {
-            D3DXExports exports{};
-
-#if defined(_WIN32)
-            d3dx_float32_to16_array_fn fallbackFloat32To16Array = nullptr;
-            constexpr const char* kD3dxCandidates[] = {
-                "d3dx9_43.dll",
-                "d3dx9_42.dll",
-                "d3dx9_41.dll",
-                "d3dx9_40.dll",
-                "d3dx9_39.dll",
-                "d3dx9_38.dll",
-                "d3dx9_37.dll",
-                "d3dx9_36.dll",
-                "d3dx9_35.dll",
-                "d3dx9_34.dll",
-                "d3dx9_33.dll",
-                "d3dx9_32.dll",
-                "d3dx9_31.dll",
-                "d3dx9_30.dll",
-                "d3dx9_29.dll",
-                "d3dx9_28.dll",
-                "d3dx9_27.dll",
-                "d3dx9_26.dll",
-                "d3dx9_25.dll",
-                "d3dx9_24.dll",
-            };
-
-            for (const char* const candidate : kD3dxCandidates)
-            {
-                HMODULE module = ::GetModuleHandleA(candidate);
-                if (module == nullptr)
-                {
-                    module = ::LoadLibraryA(candidate);
-                }
-
-                if (module == nullptr)
-                {
-                    continue;
-                }
-
-                exports.createBuffer = reinterpret_cast<d3dx_create_buffer_fn>(::GetProcAddress(module, "D3DXCreateBuffer"));
-                exports.saveSurfaceToFileInMemory = reinterpret_cast<d3dx_save_surface_to_file_in_memory_fn>(
-                    ::GetProcAddress(module, "D3DXSaveSurfaceToFileInMemory")
-                );
-                exports.saveSurfaceToFileA = reinterpret_cast<d3dx_save_surface_to_file_a_fn>(
-                    ::GetProcAddress(module, "D3DXSaveSurfaceToFileA")
-                );
-                exports.saveTextureToFileA = reinterpret_cast<d3dx_save_texture_to_file_a_fn>(
-                    ::GetProcAddress(module, "D3DXSaveTextureToFileA")
-                );
-                exports.loadSurfaceFromSurface = reinterpret_cast<d3dx_load_surface_from_surface_fn>(
-                    ::GetProcAddress(module, "D3DXLoadSurfaceFromSurface")
-                );
-                exports.float32To16Array = reinterpret_cast<d3dx_float32_to16_array_fn>(
-                    ::GetProcAddress(module, "D3DXFloat32To16Array")
-                );
-                exports.getImageInfoFromFileInMemory =
-                    reinterpret_cast<d3dx_get_image_info_from_file_in_memory_fn>(
-                        ::GetProcAddress(module, "D3DXGetImageInfoFromFileInMemory")
-                    );
-                exports.createTexture =
-                    reinterpret_cast<d3dx_create_texture_fn>(::GetProcAddress(module, "D3DXCreateTexture"));
-                exports.createTextureFromFileInMemoryEx =
-                    reinterpret_cast<d3dx_create_texture_from_file_in_memory_ex_fn>(
-                        ::GetProcAddress(module, "D3DXCreateTextureFromFileInMemoryEx")
-                    );
-                exports.createVolumeTextureFromFileInMemoryEx =
-                    reinterpret_cast<d3dx_create_volume_texture_from_file_in_memory_ex_fn>(
-                        ::GetProcAddress(module, "D3DXCreateVolumeTextureFromFileInMemoryEx")
-                    );
-                exports.createCubeTextureFromFileInMemoryEx =
-                    reinterpret_cast<d3dx_create_cube_texture_from_file_in_memory_ex_fn>(
-                        ::GetProcAddress(module, "D3DXCreateCubeTextureFromFileInMemoryEx")
-                    );
-                exports.getVertexShaderProfile = reinterpret_cast<d3dx_get_vertex_shader_profile_fn>(
-                    ::GetProcAddress(module, "D3DXGetVertexShaderProfile")
-                );
-                exports.getPixelShaderProfile = reinterpret_cast<d3dx_get_pixel_shader_profile_fn>(
-                    ::GetProcAddress(module, "D3DXGetPixelShaderProfile")
-                );
-                exports.createEffect =
-                    reinterpret_cast<d3dx_create_effect_fn>(::GetProcAddress(module, "D3DXCreateEffect"));
-                exports.createEffectCompiler =
-                    reinterpret_cast<d3dx_create_effect_compiler_fn>(::GetProcAddress(module, "D3DXCreateEffectCompiler"));
-                if ((fallbackFloat32To16Array == nullptr) && (exports.float32To16Array != nullptr))
-                {
-                    fallbackFloat32To16Array = exports.float32To16Array;
-                }
-
-                if ((exports.createBuffer != nullptr) && (exports.saveSurfaceToFileInMemory != nullptr))
-                {
-                    if (exports.float32To16Array == nullptr)
-                    {
-                        exports.float32To16Array = fallbackFloat32To16Array;
-                    }
-                    return exports;
-                }
-
-                exports = D3DXExports{};
-            }
-
-            exports.float32To16Array = fallbackFloat32To16Array;
-#endif
-
-            return exports;
-        }
-
-        const D3DXExports& GetD3DXExports() noexcept
-        {
-            static const D3DXExports exports = ResolveD3DXExports();
-            return exports;
-        }
-
-        HRESULT InvokeD3DXCreateBuffer(const unsigned int size, void** const outBuffer)
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createBuffer == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createBuffer(size, outBuffer);
-        }
-
-        HRESULT InvokeD3DXSaveSurfaceToFileInMemoryEx(
-            void** const outBuffer,
-            const unsigned int fileFormat,
-            void* const sourceSurface
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.saveSurfaceToFileInMemory == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.saveSurfaceToFileInMemory(outBuffer, fileFormat, sourceSurface, nullptr, nullptr);
-        }
-
-        HRESULT InvokeD3DXSaveSurfaceToFileInMemory(void** const outBuffer, void* const sourceSurface)
-        {
-            return InvokeD3DXSaveSurfaceToFileInMemoryEx(outBuffer, kD3DXIFFDDS, sourceSurface);
-        }
-
-        HRESULT InvokeD3DXSaveSurfaceToFileA(
-            const char* const filePath,
-            const unsigned int fileFormat,
-            void* const sourceSurface
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.saveSurfaceToFileA == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.saveSurfaceToFileA(filePath, fileFormat, sourceSurface, nullptr, nullptr);
-        }
-
-        HRESULT InvokeD3DXSaveTextureToFileA(
-            const char* const filePath,
-            const unsigned int fileFormat,
-            void* const sourceTexture
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.saveTextureToFileA == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.saveTextureToFileA(filePath, fileFormat, sourceTexture, nullptr);
-        }
-
-        HRESULT InvokeD3DXLoadSurfaceFromSurface(
-            void* const destinationSurface,
-            const RECT* const destinationRect,
-            void* const sourceSurface,
-            const RECT* const sourceRect,
-            const unsigned int filter,
-            const std::uint32_t colorKey
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.loadSurfaceFromSurface == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.loadSurfaceFromSurface(
-                destinationSurface,
-                nullptr,
-                destinationRect,
-                sourceSurface,
-                nullptr,
-                sourceRect,
-                filter,
-                colorKey
-            );
-        }
-
-        HRESULT InvokeD3DXGetImageInfoFromFileInMemory(
-            const void* const sourceData,
-            const unsigned int sourceSize,
-            D3DXImageInfoRuntime* const outInfo
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.getImageInfoFromFileInMemory == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.getImageInfoFromFileInMemory(sourceData, sourceSize, outInfo);
-        }
-
-        HRESULT InvokeD3DXCreateTexture(
-            void* const nativeDevice,
-            const unsigned int width,
-            const unsigned int height,
-            const unsigned int mipLevels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            void** const outTexture
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createTexture == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createTexture(nativeDevice, width, height, mipLevels, usage, format, pool, outTexture);
-        }
-
-        HRESULT InvokeD3DXCreateTextureFromFileInMemoryEx(
-            void* const nativeDevice,
-            const void* const sourceData,
-            const unsigned int sourceSize,
-            const unsigned int width,
-            const unsigned int height,
-            const unsigned int mipLevels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            const unsigned int filter,
-            const unsigned int mipFilter,
-            const std::uint32_t colorKey,
-            const D3DXImageInfoRuntime* const sourceInfo,
-            void* const palette,
-            void** const outTexture
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createTextureFromFileInMemoryEx == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createTextureFromFileInMemoryEx(
-                nativeDevice,
-                sourceData,
-                sourceSize,
-                width,
-                height,
-                mipLevels,
-                usage,
-                format,
-                pool,
-                filter,
-                mipFilter,
-                colorKey,
-                sourceInfo,
-                palette,
-                outTexture
-            );
-        }
-
-        HRESULT InvokeD3DXCreateVolumeTextureFromFileInMemoryEx(
-            void* const nativeDevice,
-            const void* const sourceData,
-            const unsigned int sourceSize,
-            const unsigned int width,
-            const unsigned int height,
-            const unsigned int depth,
-            const unsigned int mipLevels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            const unsigned int filter,
-            const unsigned int mipFilter,
-            const std::uint32_t colorKey,
-            const D3DXImageInfoRuntime* const sourceInfo,
-            void* const palette,
-            void** const outTexture
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createVolumeTextureFromFileInMemoryEx == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createVolumeTextureFromFileInMemoryEx(
-                nativeDevice,
-                sourceData,
-                sourceSize,
-                width,
-                height,
-                depth,
-                mipLevels,
-                usage,
-                format,
-                pool,
-                filter,
-                mipFilter,
-                colorKey,
-                sourceInfo,
-                palette,
-                outTexture
-            );
-        }
-
-        HRESULT InvokeD3DXCreateCubeTextureFromFileInMemoryEx(
-            void* const nativeDevice,
-            const void* const sourceData,
-            const unsigned int sourceSize,
-            const unsigned int edgeLength,
-            const unsigned int mipLevels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            const unsigned int filter,
-            const unsigned int mipFilter,
-            const std::uint32_t colorKey,
-            const D3DXImageInfoRuntime* const sourceInfo,
-            void* const palette,
-            void** const outTexture
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createCubeTextureFromFileInMemoryEx == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createCubeTextureFromFileInMemoryEx(
-                nativeDevice,
-                sourceData,
-                sourceSize,
-                edgeLength,
-                mipLevels,
-                usage,
-                format,
-                pool,
-                filter,
-                mipFilter,
-                colorKey,
-                sourceInfo,
-                palette,
-                outTexture
-            );
-        }
-
-        HRESULT InvokeD3DXCreateEffectCompiler(
-            const char* const sourceData,
-            const unsigned int sourceBytes,
-            const D3DXMacroRuntime* const defines,
-            void* const include,
-            const unsigned int flags,
-            void** const outEffectCompiler,
-            void** const outParseErrors
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createEffectCompiler == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createEffectCompiler(
-                sourceData,
-                sourceBytes,
-                defines,
-                include,
-                flags,
-                outEffectCompiler,
-                outParseErrors
-            );
-        }
-
-        HRESULT InvokeD3DXCreateEffect(
-            void* const nativeDevice,
-            const void* const sourceData,
-            const unsigned int sourceBytes,
-            const D3DXMacroRuntime* const defines,
-            void* const include,
-            const unsigned int flags,
-            void* const effectPool,
-            void** const outEffect,
-            void** const outCompilationErrors
-        )
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.createEffect == nullptr)
-            {
-                return kMissingD3DXCall;
-            }
-
-            return exports.createEffect(
-                nativeDevice,
-                sourceData,
-                sourceBytes,
-                defines,
-                include,
-                flags,
-                effectPool,
-                outEffect,
-                outCompilationErrors
-            );
-        }
-
-        const char* InvokeD3DXGetVertexShaderProfile(void* const nativeDevice) noexcept
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.getVertexShaderProfile == nullptr)
-            {
-                return nullptr;
-            }
-
-            return exports.getVertexShaderProfile(nativeDevice);
-        }
-
-        const char* InvokeD3DXGetPixelShaderProfile(void* const nativeDevice) noexcept
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.getPixelShaderProfile == nullptr)
-            {
-                return nullptr;
-            }
-
-            return exports.getPixelShaderProfile(nativeDevice);
-        }
-
-        std::uint16_t FallbackFloat32To16(const float value)
-        {
-            std::uint32_t bits = 0U;
-            static_assert(sizeof(bits) == sizeof(value), "float/uint32_t size mismatch");
-            std::memcpy(&bits, &value, sizeof(bits));
-
-            const std::uint32_t sign = (bits >> 16U) & 0x8000U;
-            std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
-            std::uint32_t mantissa = bits & 0x007FFFFFU;
-
-            if (exponent <= 0)
-            {
-                if (exponent < -10)
-                {
-                    return static_cast<std::uint16_t>(sign);
-                }
-
-                mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
-                return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
-            }
-
-            if (exponent >= 31)
-            {
-                return static_cast<std::uint16_t>(sign | 0x7C00U);
-            }
-
-            return static_cast<std::uint16_t>(sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U));
-        }
-
-        void InvokeD3DXFloat32To16Array(std::uint16_t* const outValues, const float* const inValues, const unsigned int count)
-        {
-            const D3DXExports& exports = GetD3DXExports();
-            if (exports.float32To16Array != nullptr)
-            {
-                static_cast<void>(exports.float32To16Array(outValues, inValues, count));
-                return;
-            }
-
-            for (unsigned int index = 0U; index < count; ++index)
-            {
-                outValues[index] = FallbackFloat32To16(inValues[index]);
-            }
-        }
-
-        HRESULT InvokeGetSurfaceLevel(void* const texture, const unsigned int level, void** const outSurface)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(texture);
-            auto* const getSurfaceLevel = reinterpret_cast<get_surface_level_fn>(vtable[18]);
-            return getSurfaceLevel(texture, level, outSurface);
-        }
-
-        HRESULT InvokeGetCubeMapSurface(
-            void* const cubeTexture,
-            const unsigned int cubeFace,
-            const unsigned int level,
-            void** const outSurface
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(cubeTexture);
-            auto* const getCubeMapSurface = reinterpret_cast<get_cube_map_surface_fn>(vtable[18]);
-            return getCubeMapSurface(cubeTexture, cubeFace, level, outSurface);
-        }
-
-        HRESULT InvokeTextureGetLevelDesc(
-            void* const texture,
-            const unsigned int level,
-            D3DSurfaceDescRuntime* const outSurfaceDesc
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(texture);
-            auto* const getLevelDesc = reinterpret_cast<texture_get_level_desc_fn>(vtable[17]);
-            return getLevelDesc(texture, level, outSurfaceDesc);
-        }
-
-        unsigned int InvokeTextureGetLevelCount(void* const texture)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(texture);
-            auto* const getLevelCount = reinterpret_cast<texture_get_level_count_fn>(vtable[13]);
-            return getLevelCount(texture);
-        }
-
-        HRESULT InvokeSurfaceGetDesc(void* const surface, D3DSurfaceDescRuntime* const outSurfaceDesc)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(surface);
-            auto* const getDesc = reinterpret_cast<surface_get_desc_fn>(vtable[12]);
-            return getDesc(surface, outSurfaceDesc);
-        }
-
-        HRESULT InvokeSurfaceLockRect(
-            void* const surface,
-            D3DLockedRectRuntime* const outLockedRect,
-            const RECT* const rect,
-            const unsigned int flags
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(surface);
-            auto* const lockRect = reinterpret_cast<surface_lock_rect_fn>(vtable[13]);
-            return lockRect(surface, outLockedRect, rect, flags);
-        }
-
-        HRESULT InvokeSurfaceUnlockRect(void* const surface)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(surface);
-            auto* const unlockRect = reinterpret_cast<surface_unlock_rect_fn>(vtable[14]);
-            return unlockRect(surface);
-        }
-
-        HRESULT InvokeSurfaceGetDC(void* const surface, void** const outDeviceContext)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(surface);
-            auto* const getDC = reinterpret_cast<surface_get_dc_fn>(vtable[15]);
-            return getDC(surface, outDeviceContext);
-        }
-
-        unsigned int GetD3DXBufferSize(void* const d3dxBuffer)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(d3dxBuffer);
-            auto* const getBufferSize = reinterpret_cast<d3dx_buffer_get_size_fn>(vtable[4]);
-            return getBufferSize(d3dxBuffer);
-        }
-
-        void* GetD3DXBufferPointer(void* const d3dxBuffer)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(d3dxBuffer);
-            auto* const getBufferPointer = reinterpret_cast<d3dx_buffer_get_pointer_fn>(vtable[3]);
-            return getBufferPointer(d3dxBuffer);
         }
 
         HRESULT InvokeEffectCompilerCompileEffect(
@@ -1395,7 +325,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         HRESULT InvokeEffectGetTechniqueDesc(
             void* const effect,
             void* const techniqueHandle,
-            D3DXTechniqueDescRuntime* const outDesc
+            D3DXTECHNIQUE_DESC* const outDesc
         )
         {
             auto** const vtable = *reinterpret_cast<void***>(effect);
@@ -2287,13 +1217,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return &device->mDeviceContext;
         }
 
-        int InvokeNativeD3D9ShowCursor(void* const nativeDevice, const bool show)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const showCursor = reinterpret_cast<d3d9_device_show_cursor_fn>(vtable[12]);
-            return showCursor(nativeDevice, show ? 1 : 0);
-        }
-
         struct AdapterVectorCountRuntime final
         {
             void* allocatorProxy = nullptr;   // +0x00
@@ -2344,548 +1267,15 @@ namespace { // TEMPORARY PROBE (do not commit)
         std::uint32_t FormatToD3DFormat(std::uint32_t formatToken);
         std::uint32_t FormatGalToD3D(std::uint32_t mohoFormat);
 
-        HRESULT InvokeNativeCreateTexture(
-            DeviceD3D9* const device,
-            const unsigned int width,
-            const unsigned int height,
-            const unsigned int levels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            void** const outTexture
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createTexture = reinterpret_cast<d3d9_device_create_texture_fn>(vtable[23]);
-            return createTexture(nativeDevice, width, height, levels, usage, format, pool, outTexture, nullptr);
-        }
-
-        HRESULT InvokeNativeCreateCubeTexture(
-            DeviceD3D9* const device,
-            const unsigned int edgeLength,
-            const unsigned int levels,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            void** const outTexture
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createCubeTexture = reinterpret_cast<d3d9_device_create_cube_texture_fn>(vtable[25]);
-            return createCubeTexture(nativeDevice, edgeLength, levels, usage, format, pool, outTexture, nullptr);
-        }
-
-        HRESULT InvokeNativeCreateDepthStencilSurface(
-            DeviceD3D9* const device,
-            const unsigned int width,
-            const unsigned int height,
-            const std::uint32_t format,
-            const unsigned int multiSampleType,
-            const unsigned int multiSampleQuality,
-            void** const outSurface
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createDepthStencilSurface =
-                reinterpret_cast<d3d9_device_create_depth_stencil_surface_fn>(vtable[29]);
-            return createDepthStencilSurface(
-                nativeDevice,
-                width,
-                height,
-                format,
-                multiSampleType,
-                multiSampleQuality,
-                0,
-                outSurface,
-                nullptr
-            );
-        }
-
-        HRESULT InvokeNativeCreateVertexDeclaration(
-            DeviceD3D9* const device,
-            const void* const vertexElements,
-            void** const outDeclaration
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createVertexDeclaration =
-                reinterpret_cast<d3d9_device_create_vertex_declaration_fn>(vtable[86]);
-            return createVertexDeclaration(nativeDevice, vertexElements, outDeclaration);
-        }
-
-        HRESULT InvokeNativeCreateVertexBuffer(
-            DeviceD3D9* const device,
-            const unsigned int length,
-            const unsigned int usage,
-            const unsigned int fvf,
-            const D3DPOOL pool,
-            void** const outBuffer
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createVertexBuffer = reinterpret_cast<d3d9_device_create_vertex_buffer_fn>(vtable[26]);
-            return createVertexBuffer(nativeDevice, length, usage, fvf, pool, outBuffer, nullptr);
-        }
-
-        HRESULT InvokeNativeCreateIndexBuffer(
-            DeviceD3D9* const device,
-            const unsigned int length,
-            const unsigned int usage,
-            const std::uint32_t format,
-            const D3DPOOL pool,
-            void** const outBuffer
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createIndexBuffer = reinterpret_cast<d3d9_device_create_index_buffer_fn>(vtable[27]);
-            return createIndexBuffer(nativeDevice, length, usage, format, pool, outBuffer, nullptr);
-        }
-
-        HRESULT InvokeNativeGetBackBuffer(
-            DeviceD3D9* const device,
-            const unsigned int swapChainIndex,
-            const unsigned int backBufferIndex,
-            const unsigned int backBufferType,
-            void** const outBackBuffer
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getBackBuffer = reinterpret_cast<d3d9_device_get_back_buffer_fn>(vtable[18]);
-            return getBackBuffer(nativeDevice, swapChainIndex, backBufferIndex, backBufferType, outBackBuffer);
-        }
-
-        HRESULT InvokeNativeReset(DeviceD3D9* const device, void* const presentParameters)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const reset = reinterpret_cast<d3d9_device_reset_fn>(vtable[16]);
-            return reset(nativeDevice, presentParameters);
-        }
-
-        HRESULT InvokeNativeGetDeviceCaps(DeviceD3D9* const device, void* const outCaps)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getDeviceCaps = reinterpret_cast<d3d9_device_get_device_caps_fn>(vtable[7]);
-            return getDeviceCaps(nativeDevice, outCaps);
-        }
-
-        HRESULT InvokeNativeCreateQuery(DeviceD3D9* const device, const unsigned int queryType, void** const outQuery)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const createQuery = reinterpret_cast<d3d9_device_create_query_fn>(vtable[118]);
-            return createQuery(nativeDevice, queryType, outQuery);
-        }
-
-        HRESULT InvokeNativeSetRenderState(
-            DeviceD3D9* const device,
-            const unsigned int state,
-            const unsigned int value
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setRenderState = reinterpret_cast<d3d9_device_set_render_state_fn>(vtable[57]);
-            return setRenderState(nativeDevice, state, value);
-        }
-
-        HRESULT InvokeNativeCheckDeviceFormat(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const unsigned int deviceType,
-            const std::uint32_t adapterFormat,
-            const unsigned int usage,
-            const unsigned int resourceType,
-            const std::uint32_t checkFormat
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const checkDeviceFormat = reinterpret_cast<d3d9_check_device_format_fn>(vtable[10]);
-            return checkDeviceFormat(idirect, adapter, deviceType, adapterFormat, usage, resourceType, checkFormat);
-        }
-
-        HRESULT InvokeNativeCheckDeviceMultiSampleType(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const unsigned int deviceType,
-            const std::uint32_t surfaceFormat,
-            const bool windowed,
-            const unsigned int multiSampleType,
-            unsigned int* const outQualityLevels
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const checkMultiSample = reinterpret_cast<d3d9_check_device_multisample_type_fn>(vtable[11]);
-            return checkMultiSample(
-                idirect,
-                adapter,
-                deviceType,
-                surfaceFormat,
-                windowed ? 1 : 0,
-                multiSampleType,
-                outQualityLevels
-            );
-        }
-
-        unsigned int InvokeNativeGetAdapterCount(DeviceD3D9* const device)
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const getAdapterCount = reinterpret_cast<d3d9_get_adapter_count_fn>(vtable[4]);
-            return getAdapterCount(idirect);
-        }
-
-        unsigned int InvokeNativeGetAdapterModeCount(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const std::uint32_t format
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const getAdapterModeCount = reinterpret_cast<d3d9_get_adapter_mode_count_fn>(vtable[6]);
-            return getAdapterModeCount(idirect, adapter, format);
-        }
-
-        HRESULT InvokeNativeEnumAdapterModes(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const std::uint32_t format,
-            const unsigned int modeIndex,
-            void* const outMode
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const enumAdapterModes = reinterpret_cast<d3d9_enum_adapter_modes_fn>(vtable[7]);
-            return enumAdapterModes(idirect, adapter, format, modeIndex, outMode);
-        }
-
-        HRESULT InvokeNativeCreateDevice(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const unsigned int deviceType,
-            const HWND focusWindow,
-            const unsigned int behaviorFlags,
-            void* const presentParameters,
-            void** const outDevice
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const createDevice = reinterpret_cast<d3d9_create_device_fn>(vtable[16]);
-            return createDevice(idirect, adapter, deviceType, focusWindow, behaviorFlags, presentParameters, outDevice);
-        }
-
-        void* InvokeDirect3DCreate9Interface(const unsigned int sdkVersion)
-        {
-            HMODULE module = ::GetModuleHandleA("d3d9.dll");
-            if (module == nullptr)
-            {
-                module = ::LoadLibraryA("d3d9.dll");
-            }
-            if (module == nullptr)
-            {
-                return nullptr;
-            }
-
-            auto* const createDirect3D =
-                reinterpret_cast<direct3d_create9_fn>(::GetProcAddress(module, "Direct3DCreate9"));
-            if (createDirect3D == nullptr)
-            {
-                return nullptr;
-            }
-
-            return createDirect3D(sdkVersion);
-        }
-
-        HRESULT InvokeNativeGetAdapterIdentifier(
-            DeviceD3D9* const device,
-            const unsigned int adapter,
-            const unsigned int flags,
-            void* const outIdentifier
-        )
-        {
-            void* const idirect = device->mDirect3D;
-            auto** const vtable = *reinterpret_cast<void***>(idirect);
-            auto* const getAdapterIdentifier = reinterpret_cast<d3d9_get_adapter_identifier_fn>(vtable[5]);
-            return getAdapterIdentifier(idirect, adapter, flags, outIdentifier);
-        }
-
-        HRESULT InvokeNativeGetRenderTargetData(
-            DeviceD3D9* const device,
-            void* const sourceSurface,
-            void* const destinationSurface
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getRenderTargetData = reinterpret_cast<d3d9_device_get_render_target_data_fn>(vtable[32]);
-            return getRenderTargetData(nativeDevice, sourceSurface, destinationSurface);
-        }
-
-        HRESULT InvokeNativeStretchRect(
-            DeviceD3D9* const device,
-            void* const sourceSurface,
-            const RECT* const sourceRect,
-            void* const destinationSurface,
-            const RECT* const destinationRect,
-            const unsigned int filter
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const stretchRect = reinterpret_cast<d3d9_device_stretch_rect_fn>(vtable[34]);
-            return stretchRect(nativeDevice, sourceSurface, sourceRect, destinationSurface, destinationRect, filter);
-        }
-
-        HRESULT InvokeNativeTestCooperativeLevel(DeviceD3D9* const device)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const testCooperativeLevel = reinterpret_cast<d3d9_device_test_cooperative_level_fn>(vtable[3]);
-            return testCooperativeLevel(nativeDevice);
-        }
-
-        HRESULT InvokeNativeBeginScene(DeviceD3D9* const device)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const beginScene = reinterpret_cast<d3d9_device_begin_scene_fn>(vtable[41]);
-            return beginScene(nativeDevice);
-        }
-
-        HRESULT InvokeNativeEndScene(DeviceD3D9* const device)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const endScene = reinterpret_cast<d3d9_device_end_scene_fn>(vtable[42]);
-            return endScene(nativeDevice);
-        }
-
-        HRESULT InvokeNativePresent(DeviceD3D9* const device)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const present = reinterpret_cast<d3d9_device_present_fn>(vtable[17]);
-            return present(nativeDevice, nullptr, nullptr, nullptr, nullptr);
-        }
-
-        HRESULT InvokeNativeSetCursorProperties(
-            DeviceD3D9* const device,
-            const unsigned int hotspotX,
-            const unsigned int hotspotY,
-            void* const cursorSurface
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setCursorProperties = reinterpret_cast<d3d9_device_set_cursor_properties_fn>(vtable[10]);
-            return setCursorProperties(nativeDevice, hotspotX, hotspotY, cursorSurface);
-        }
-
-        HRESULT InvokeNativeSetViewport(DeviceD3D9* const device, const void* const viewport)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setViewport = reinterpret_cast<d3d9_device_set_viewport_fn>(vtable[47]);
-            return setViewport(nativeDevice, viewport);
-        }
-
-        HRESULT InvokeNativeGetViewport(DeviceD3D9* const device, void* const outViewport)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getViewport = reinterpret_cast<d3d9_device_get_viewport_fn>(vtable[48]);
-            return getViewport(nativeDevice, outViewport);
-        }
-
-        HRESULT InvokeNativeGetRenderTarget(DeviceD3D9* const device, const unsigned int index, void** const outRenderTarget)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const getRenderTarget = reinterpret_cast<d3d9_device_get_render_target_fn>(vtable[38]);
-            return getRenderTarget(nativeDevice, index, outRenderTarget);
-        }
-
-        HRESULT InvokeNativeSetRenderTarget(DeviceD3D9* const device, const unsigned int index, void* const renderTarget)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setRenderTarget = reinterpret_cast<d3d9_device_set_render_target_fn>(vtable[37]);
-            return setRenderTarget(nativeDevice, index, renderTarget);
-        }
-
-        HRESULT InvokeNativeGetDepthStencilSurface(DeviceD3D9* const device, void** const outDepthStencilSurface)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            // IDirect3DDevice9 declares SetDepthStencilSurface (39) *before*
-            // GetDepthStencilSurface (40), between GetRenderTarget (38) and
-            // BeginScene (41). These two were transposed, so every ClearTarget
-            // fed its output pointer to SetDepthStencilSurface as the new
-            // Z-stencil surface and faulted inside d3d9.dll.
-            auto* const getDepthStencilSurface = reinterpret_cast<d3d9_device_get_depth_stencil_surface_fn>(vtable[40]);
-            return getDepthStencilSurface(nativeDevice, outDepthStencilSurface);
-        }
-
-        HRESULT InvokeNativeSetDepthStencilSurface(DeviceD3D9* const device, void* const depthStencilSurface)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setDepthStencilSurface = reinterpret_cast<d3d9_device_set_depth_stencil_surface_fn>(vtable[39]);
-            return setDepthStencilSurface(nativeDevice, depthStencilSurface);
-        }
-
-        HRESULT InvokeNativeClear(
-            DeviceD3D9* const device,
-            const unsigned int count,
-            const void* const rects,
-            const unsigned int flags,
-            const std::uint32_t color,
-            const float depth,
-            const unsigned int stencil
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const clear = reinterpret_cast<d3d9_device_clear_fn>(vtable[43]);
-            return clear(nativeDevice, count, rects, flags, color, depth, stencil);
-        }
-
-        HRESULT InvokeNativeSetVertexDeclaration(DeviceD3D9* const device, void* const vertexDeclaration)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setVertexDeclaration = reinterpret_cast<d3d9_device_set_vertex_declaration_fn>(vtable[87]);
-            return setVertexDeclaration(nativeDevice, vertexDeclaration);
-        }
-
-        HRESULT InvokeNativeSetStreamSource(
-            DeviceD3D9* const device,
-            const unsigned int streamSlot,
-            void* const streamData,
-            const unsigned int offsetInBytes,
-            const unsigned int stride
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setStreamSource = reinterpret_cast<d3d9_device_set_stream_source_fn>(vtable[100]);
-            return setStreamSource(nativeDevice, streamSlot, streamData, offsetInBytes, stride);
-        }
-
-        HRESULT InvokeNativeSetStreamSourceFreq(
-            DeviceD3D9* const device,
-            const unsigned int streamSlot,
-            const unsigned int setting
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setStreamSourceFreq = reinterpret_cast<d3d9_device_set_stream_source_freq_fn>(vtable[102]);
-            return setStreamSourceFreq(nativeDevice, streamSlot, setting);
-        }
-
-        HRESULT InvokeNativeSetIndices(DeviceD3D9* const device, void* const indexBuffer)
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const setIndices = reinterpret_cast<d3d9_device_set_indices_fn>(vtable[104]);
-            return setIndices(nativeDevice, indexBuffer);
-        }
-
-        HRESULT InvokeNativeDrawPrimitive(
-            DeviceD3D9* const device,
-            const unsigned int primitiveType,
-            const unsigned int startVertex,
-            const unsigned int primitiveCount
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const drawPrimitive = reinterpret_cast<d3d9_device_draw_primitive_fn>(vtable[81]);
-            return drawPrimitive(nativeDevice, primitiveType, startVertex, primitiveCount);
-        }
-
-        HRESULT InvokeNativeDrawIndexedPrimitive(
-            DeviceD3D9* const device,
-            const unsigned int primitiveType,
-            const int baseVertexIndex,
-            const unsigned int minVertexIndex,
-            const unsigned int vertexCount,
-            const unsigned int startIndex,
-            const unsigned int primitiveCount
-        )
-        {
-            void* const nativeDevice = device->mDevice;
-            auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-            auto* const drawIndexedPrimitive = reinterpret_cast<d3d9_device_draw_indexed_primitive_fn>(vtable[82]);
-            return drawIndexedPrimitive(
-                nativeDevice,
-                primitiveType,
-                baseVertexIndex,
-                minVertexIndex,
-                vertexCount,
-                startIndex,
-                primitiveCount
-            );
-        }
-
-        HRESULT InvokeQueryIssue(void* const query, const unsigned int issueFlags)
-        {
-            auto** const vtable = *reinterpret_cast<void***>(query);
-            auto* const issue = reinterpret_cast<query_issue_fn>(vtable[6]);
-            return issue(query, issueFlags);
-        }
-
-        HRESULT InvokeQueryGetData(
-            void* const query,
-            void* const outData,
-            const unsigned int dataSize,
-            const unsigned int getDataFlags
-        )
-        {
-            auto** const vtable = *reinterpret_cast<void***>(query);
-            auto* const getData = reinterpret_cast<query_get_data_fn>(vtable[7]);
-            return getData(query, outData, dataSize, getDataFlags);
-        }
-
-        unsigned int MapImageFormatTokenToD3DX(const int token) noexcept
-        {
-            // DAT_00D421E4 image-format map lane (D3DXIMAGE_FILEFORMAT-compatible values).
-            static constexpr unsigned int kD3DXImageFormats[] = {
-                0U, // BMP
-                1U, // JPG
-                2U, // TGA
-                3U, // PNG
-                4U, // DDS
-                5U, // PPM
-                6U, // DIB
-                7U, // HDR
-                8U, // PFM
-            };
-
-            constexpr unsigned int kFormatCount =
-                static_cast<unsigned int>(sizeof(kD3DXImageFormats) / sizeof(kD3DXImageFormats[0]));
-
-            if ((token < 0) || (static_cast<unsigned int>(token) >= kFormatCount))
-            {
-                return kD3DXIFFDDS;
-            }
-
-            return kD3DXImageFormats[token];
-        }
+        // Address: 0x00D421E4 - the gal image file format, as the D3DX one. Both
+        // save paths index it directly (0x008EC78E, 0x008ECAAF).
+        constexpr D3DXIMAGE_FILEFORMAT kD3DXImageFileFormats[5] = {
+            D3DXIFF_BMP,
+            D3DXIFF_JPG,
+            D3DXIFF_TGA,
+            D3DXIFF_PNG,
+            D3DXIFF_DDS,
+        };
 
         unsigned int AlignToDword(const unsigned int value) noexcept
         {
@@ -2916,6 +1306,22 @@ namespace { // TEMPORARY PROBE (do not commit)
         [[noreturn]] void ThrowGalErrorFromHresult(const char* const file, const int line, const HRESULT code)
         {
             throw Error(MakeShortString(file), line, MakeShortString(::gpg::D3DErrorToString(static_cast<long>(code))));
+        }
+
+        /**
+         * Makes `call`; when it fails, makes it a second time and throws with
+         * the second result's text. Part of the backend checks its calls this
+         * way rather than keeping the first HRESULT - `GetTexture2D` repeats
+         * every failing call (0x008ECDB7, 0x008ECE6F, 0x008ECFDE, ...) -
+         * which the repeat preserves.
+         */
+        template <class Call>
+        void CheckD3DCall(const char* const file, const int line, Call&& call)
+        {
+            if (FAILED(call()))
+            {
+                ThrowGalErrorFromHresult(file, line, call());
+            }
         }
 
         int ResolveVertexShaderProfileToken(const char* const profileName) noexcept
@@ -3036,12 +1442,12 @@ namespace { // TEMPORARY PROBE (do not commit)
         {
             device.Func1();
 
-            const unsigned int adapterCount = InvokeNativeGetAdapterCount(&device);
+            const unsigned int adapterCount = device.mDirect3D->GetAdapterCount();
             for (unsigned int adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
             {
                 D3DADAPTER_IDENTIFIER9 adapterIdentifier{};
                 const HRESULT identifierResult =
-                    InvokeNativeGetAdapterIdentifier(&device, adapterIndex, 0U, &adapterIdentifier);
+                    device.mDirect3D->GetAdapterIdentifier(adapterIndex, 0U, &adapterIdentifier);
                 if (identifierResult < 0)
                 {
                     AppendD3D9SetupLogMessage("unable to enumerate adapters");
@@ -3064,17 +1470,11 @@ namespace { // TEMPORARY PROBE (do not commit)
                 );
 
                 const unsigned int modeCount =
-                    InvokeNativeGetAdapterModeCount(&device, adapterIndex, kD3DFormatX8R8G8B8);
+                    device.mDirect3D->GetAdapterModeCount(adapterIndex, D3DFMT_X8R8G8B8);
                 for (unsigned int modeIndex = 0; modeIndex < modeCount; ++modeIndex)
                 {
                     D3DDISPLAYMODE displayMode{};
-                    const HRESULT modeResult = InvokeNativeEnumAdapterModes(
-                        &device,
-                        adapterIndex,
-                        kD3DFormatX8R8G8B8,
-                        modeIndex,
-                        &displayMode
-                    );
+                    const HRESULT modeResult = device.mDirect3D->EnumAdapterModes(adapterIndex, D3DFMT_X8R8G8B8, modeIndex, &displayMode);
                     if (modeResult < 0)
                     {
                         AppendD3D9SetupLogMessage("unable to enumerate adapters");
@@ -3136,20 +1536,12 @@ namespace { // TEMPORARY PROBE (do not commit)
             context.mHWBasedInstancing = true;
             if (caps.VertexShaderVersion < kVertexShaderModel30)
             {
-                const HRESULT instancingFormatResult = InvokeNativeCheckDeviceFormat(
-                    &device,
-                    static_cast<unsigned int>(context.mAdapter),
-                    kD3DDevTypeHal,
-                    kD3DFormatX8R8G8B8,
-                    0U,
-                    kD3DRTypeSurface,
-                    kInstancingFourCC
-                );
+                const HRESULT instancingFormatResult = device.mDirect3D->CheckDeviceFormat(static_cast<unsigned int>(context.mAdapter), D3DDEVTYPE_HAL, D3DFMT_X8R8G8B8, 0U, D3DRTYPE_SURFACE, kInstancingFourCC);
 
                 if (instancingFormatResult >= 0)
                 {
                     const HRESULT pointSizeResult =
-                        InvokeNativeSetRenderState(&device, kD3DRenderStatePointSize, kInstancingFourCC);
+                        device.mDevice->SetRenderState(D3DRS_POINTSIZE, kInstancingFourCC);
                     if (pointSizeResult < 0)
                     {
                         context.mHWBasedInstancing = false;
@@ -3179,83 +1571,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             {
                 ThrowGalError("DeviceD3D9.cpp", 1434, "device does not support hardware based instancing");
             }
-        }
-
-        unsigned int ResolvePrimitiveType(const unsigned int topologyToken) noexcept
-        {
-            if (topologyToken < (sizeof(kPrimitiveTypeByToken) / sizeof(kPrimitiveTypeByToken[0])))
-            {
-                return kPrimitiveTypeByToken[topologyToken];
-            }
-
-            return 0U;
-        }
-
-        /**
-         * Address: 0x0093F180 (FUN_0093F180)
-         *
-         * What it does:
-         * Validates draw-count payload against primitive topology and converts
-         * vertex/input counts to native primitive counts.
-         */
-        unsigned int ComputePrimitiveCountForTopology(
-            const unsigned int primitiveType,
-            const unsigned int primitiveCountInput
-        )
-        {
-            switch (primitiveType)
-            {
-                case 1U:
-                    return primitiveCountInput;
-                case 2U:
-                    if ((primitiveCountInput & 1U) != 0U)
-                    {
-                        ThrowGalError("DrawContext.cpp", 35, "invalid number of vertices in line list");
-                    }
-                    return (primitiveCountInput >> 1U);
-                case 3U:
-                    if (primitiveCountInput <= 1U)
-                    {
-                        ThrowGalError("DrawContext.cpp", 39, "invalid number of vertices in line strip");
-                    }
-                    return (primitiveCountInput - 1U);
-                case 4U:
-                    if ((primitiveCountInput % 3U) != 0U)
-                    {
-                        ThrowGalError("DrawContext.cpp", 43, "invalid number of vertices in triangle list");
-                    }
-                    return (primitiveCountInput / 3U);
-                case 5U:
-                    if (primitiveCountInput <= 2U)
-                    {
-                        ThrowGalError("DrawContext.cpp", 47, "invalid number of vertices in triangle list");
-                    }
-                    return (primitiveCountInput - 2U);
-                default:
-                    ThrowGalError("DrawContext.cpp", 51, "unknown topology specified");
-            }
-        }
-
-        /**
-         * Address: 0x0093F470 (FUN_0093F470)
-         *
-         * What it does:
-         * Returns recovered primitive-count conversion for non-indexed draw payload.
-         */
-        unsigned int GetDrawPrimitiveCount(const DrawPrimitiveContextRuntime& context)
-        {
-            return ComputePrimitiveCountForTopology(context.topologyToken, context.primitiveCountInput);
-        }
-
-        /**
-         * Address: 0x0093F490 (FUN_0093F490)
-         *
-         * What it does:
-         * Returns recovered primitive-count conversion for indexed draw payload.
-         */
-        unsigned int GetDrawIndexedPrimitiveCount(const DrawIndexedPrimitiveContextRuntime& context)
-        {
-            return ComputePrimitiveCountForTopology(context.topologyToken, context.primitiveCountInput);
         }
 
         /**
@@ -3359,14 +1674,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             const auto raw = static_cast<unsigned int>(flags);
 
             unsigned int converted = 0U;
-            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::NoOverwrite)) != 0U)
+            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::ReadOnly)) != 0U)
             {
-                converted |= kD3DLockNoOverwrite;
+                converted |= D3DLOCK_READONLY;
             }
 
             if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::Discard)) != 0U)
             {
-                converted |= kD3DLockDiscard;
+                converted |= D3DLOCK_DISCARD;
             }
 
             return converted;
@@ -3377,19 +1692,19 @@ namespace { // TEMPORARY PROBE (do not commit)
             const auto raw = static_cast<unsigned int>(flags);
 
             unsigned int converted = 0U;
-            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::NoOverwrite)) != 0U)
+            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::ReadOnly)) != 0U)
             {
-                converted |= kD3DLockNoOverwrite;
+                converted |= D3DLOCK_READONLY;
             }
 
             if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::Discard)) != 0U)
             {
-                converted |= kD3DLockDiscard;
+                converted |= D3DLOCK_DISCARD;
             }
 
-            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::ReadOnly)) != 0U)
+            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::NoOverwrite)) != 0U)
             {
-                converted |= kD3DLockReadOnly;
+                converted |= D3DLOCK_NOOVERWRITE;
             }
 
             return converted;
@@ -3400,14 +1715,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             const auto raw = static_cast<unsigned int>(flags);
 
             unsigned int converted = 0U;
-            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::NoOverwrite)) != 0U)
+            if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::ReadOnly)) != 0U)
             {
-                converted |= kD3DLockNoOverwrite;
+                converted |= D3DLOCK_READONLY;
             }
 
             if ((raw & static_cast<unsigned int>(MohoD3DLockFlags::Discard)) != 0U)
             {
-                converted |= kD3DLockDiscard;
+                converted |= D3DLOCK_DISCARD;
             }
 
             return converted;
@@ -4317,7 +2632,7 @@ namespace { // TEMPORARY PROBE (do not commit)
          */
         void DestroyEffectD3D9State(EffectD3D9* const effect)
         {
-            ReleaseComLike(effect->dxEffect_);
+            SafeRelease(effect->dxEffect_);
 
             const EffectContextRuntime resetContext{};
             EffectContextRuntime* const runtime = AsEffectContextRuntime(effect);
@@ -4333,7 +2648,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         void InitializeEffectD3D9State(
             EffectD3D9* const effect,
             const EffectContext* const sourceContext,
-            void* const dxEffect
+            ID3DXEffect* const dxEffect
         )
         {
             DestroyEffectD3D9State(effect);
@@ -4361,17 +2676,10 @@ namespace { // TEMPORARY PROBE (do not commit)
             effect->selfWeak_.reset();
         }
 
-        [[nodiscard]] msvc8::string ReadD3DXErrorText(void* const d3dxErrorBuffer)
+        [[nodiscard]] msvc8::string ReadD3DXErrorText(ID3DXBuffer* const errors)
         {
-            const char* errorText = "unknown error";
-            if (d3dxErrorBuffer != nullptr)
-            {
-                const void* const textPtr = GetD3DXBufferPointer(d3dxErrorBuffer);
-                if (textPtr != nullptr)
-                {
-                    errorText = static_cast<const char*>(textPtr);
-                }
-            }
+            const char* const errorText =
+                (errors != nullptr) ? static_cast<const char*>(errors->GetBufferPointer()) : "unknown error";
 
             msvc8::string reason{};
             reason.assign_owned(errorText);
@@ -4392,30 +2700,31 @@ namespace { // TEMPORARY PROBE (do not commit)
             return message;
         }
 
-        void BuildD3DXMacroDefines(
-            std::vector<D3DXMacroRuntime>& outDefines,
-            const EffectContextLane54Runtime& macros
-        )
+        /**
+         * The context's macros as the NUL-terminated `D3DXMACRO` array D3DX
+         * takes, or null when there are none. `CreateEffectFromSourceBuffer`
+         * (0x008F0A81) allocates it with `new[]` and never frees it; the
+         * array points into the context's strings.
+         */
+        [[nodiscard]] D3DXMACRO* BuildD3DXMacroDefines(const EffectContextLane54Runtime& macros)
         {
-            outDefines.clear();
-
             const std::size_t macroCount = EffectMacroCount(macros);
             if (macroCount == 0U)
             {
-                return;
+                return nullptr;
             }
 
-            outDefines.resize(macroCount + 1U);
-
+            D3DXMACRO* const defines = new D3DXMACRO[macroCount + 1U];
             std::size_t index = 0U;
             for (EffectMacro* macro = macros.first; macro != macros.last; ++macro, ++index)
             {
-                outDefines[index].name = macro->keyText_.c_str();
-                outDefines[index].definition = macro->valueText_.c_str();
+                defines[index].Name = macro->keyText_.c_str();
+                defines[index].Definition = macro->valueText_.c_str();
             }
 
-            outDefines[index].name = nullptr;
-            outDefines[index].definition = nullptr;
+            defines[index].Name = nullptr;
+            defines[index].Definition = nullptr;
+            return defines;
         }
 
         /**
@@ -4475,103 +2784,80 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("DeviceD3D9.cpp", 1514, "");
             }
 
-            std::vector<D3DXMacroRuntime> macroDefines{};
-            BuildD3DXMacroDefines(macroDefines, contextRuntime->lane54);
-            const D3DXMacroRuntime* const defines = macroDefines.empty() ? nullptr : macroDefines.data();
+            const D3DXMACRO* const defines = BuildD3DXMacroDefines(contextRuntime->lane54);
 
-            ComObjectScope effectCompiler{};
-            ComObjectScope compilationErrors{};
-
-            const char* const sourceData =
-                reinterpret_cast<const char*>(static_cast<std::uintptr_t>(contextRuntime->field4C));
-            const unsigned int sourceBytes = (contextRuntime->field50 >= contextRuntime->field4C)
-                ? (contextRuntime->field50 - contextRuntime->field4C)
-                : 0U;
-
-            const HRESULT createCompilerResult = InvokeD3DXCreateEffectCompiler(
-                sourceData,
-                sourceBytes,
-                defines,
-                nullptr,
-                0x10001U,
-                effectCompiler.out(),
-                compilationErrors.out()
-            );
-            if (createCompilerResult < 0)
+            ID3DXEffectCompiler* effectCompiler = nullptr;
+            ID3DXBuffer* compiledEffect = nullptr;
+            ID3DXEffect* effect = nullptr;
+            ID3DXBuffer* errors = nullptr;
+            try
             {
-                const msvc8::string reason = ReadD3DXErrorText(compilationErrors.get());
-                const msvc8::string message =
-                    BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, reason);
-                ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
-            }
+                const char* const sourceData =
+                    reinterpret_cast<const char*>(static_cast<std::uintptr_t>(contextRuntime->field4C));
+                const unsigned int sourceBytes = contextRuntime->field50 - contextRuntime->field4C;
 
-            compilationErrors.reset();
-
-            ComObjectScope compiledEffectBuffer{};
-            const HRESULT compileEffectResult = InvokeEffectCompilerCompileEffect(
-                effectCompiler.get(),
-                1U,
-                compiledEffectBuffer.out(),
-                compilationErrors.out()
-            );
-            if (compileEffectResult < 0)
-            {
-                const msvc8::string reason = ReadD3DXErrorText(compilationErrors.get());
-                const msvc8::string message =
-                    BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, reason);
-                ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
-            }
-
-            compilationErrors.reset();
-
-            ComObjectScope nativeEffect{};
-            ComObjectScope createEffectErrors{};
-
-            const HRESULT createEffectResult = InvokeD3DXCreateEffect(
-                device->mDevice,
-                GetD3DXBufferPointer(compiledEffectBuffer.get()),
-                GetD3DXBufferSize(compiledEffectBuffer.get()),
-                defines,
-                nullptr,
-                1U,
-                nullptr,
-                nativeEffect.out(),
-                createEffectErrors.out()
-            );
-            if (createEffectResult < 0)
-            {
-                const msvc8::string reason = ReadD3DXErrorText(createEffectErrors.get());
-                const msvc8::string message =
-                    BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, reason);
-                ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
-            }
-
-            PipelineStateD3D9* const pipelineState = device->mPipelineState.get();
-            StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
-            const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
-            if (setStateManagerResult < 0)
-            {
-                ThrowGalError(
-                    "DeviceD3D9.cpp",
-                    1580,
-                    ::gpg::D3DErrorToString(static_cast<long>(setStateManagerResult))
+                HRESULT result = D3DXCreateEffectCompiler(
+                    sourceData, sourceBytes, defines, nullptr, D3DXSHADER_DEBUG | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,
+                    &effectCompiler, &errors
                 );
-            }
+                if (FAILED(result))
+                {
+                    const msvc8::string message =
+                        BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, ReadD3DXErrorText(errors));
+                    ThrowGalError("DeviceD3D9.cpp", 1549, message.c_str());
+                }
+                SafeRelease(errors);
 
-            const char* const cachePath = GetStringDataRaw(contextRuntime->field28);
-            std::ofstream compiledCache(
-                (cachePath != nullptr) ? cachePath : "",
-                std::ios::out | std::ios::binary
-            );
-            if (compiledCache.good())
+                result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG, &compiledEffect, &errors);
+                if (FAILED(result))
+                {
+                    const msvc8::string message =
+                        BuildEffectCreationMessage("unable to compile effect: ", *contextRuntime, ReadD3DXErrorText(errors));
+                    ThrowGalError("DeviceD3D9.cpp", 1557, message.c_str());
+                }
+                SafeRelease(errors);
+                SafeRelease(effectCompiler);
+
+                result = D3DXCreateEffect(
+                    device->mDevice, compiledEffect->GetBufferPointer(), compiledEffect->GetBufferSize(), defines,
+                    nullptr, D3DXSHADER_DEBUG, nullptr, &effect, &errors
+                );
+                if (FAILED(result))
+                {
+                    const msvc8::string message =
+                        BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, ReadD3DXErrorText(errors));
+                    ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
+                }
+                SafeRelease(errors);
+
+                result = effect->SetStateManager(device->mPipelineState->GetStateManager());
+                if (FAILED(result))
+                {
+                    ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1580, result);
+                }
+
+                std::ofstream compiledCache(contextRuntime->field28.c_str(), std::ios::binary);
+                if (compiledCache.is_open())
+                {
+                    WriteRawByteLaneToStream(
+                        compiledCache,
+                        compiledEffect->GetBufferPointer(),
+                        static_cast<std::size_t>(compiledEffect->GetBufferSize())
+                    );
+                    compiledCache.close();
+                }
+                SafeRelease(compiledEffect);
+            }
+            catch (...)
             {
-                const char* const compiledBytes = static_cast<const char*>(GetD3DXBufferPointer(compiledEffectBuffer.get()));
-                const unsigned int compiledBytesCount = GetD3DXBufferSize(compiledEffectBuffer.get());
-                WriteRawByteLaneToStream(compiledCache, compiledBytes, static_cast<std::size_t>(compiledBytesCount));
-                compiledCache.close();
+                SafeRelease(effectCompiler);
+                SafeRelease(compiledEffect);
+                SafeRelease(effect);
+                SafeRelease(errors);
+                throw;
             }
 
-            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, nativeEffect.release()));
+            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, effect));
             return outEffect;
         }
 
@@ -4618,74 +2904,61 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("DeviceD3D9.cpp", 1609, "");
             }
 
-            const char* const cachePath = GetStringDataRaw(contextRuntime->field28);
-            std::ifstream compiledCache(
-                (cachePath != nullptr) ? cachePath : "",
-                std::ios::in | std::ios::binary
-            );
-            if (!compiledCache.good())
+            std::ifstream compiledCache(contextRuntime->field28.c_str(), std::ios::binary);
+            if (!compiledCache.is_open())
             {
                 ThrowGalError("DeviceD3D9.cpp", 1612, "");
             }
 
-            compiledCache.seekg(0, std::ios::end);
-            const std::streampos compiledEndPosition = QueryCurrentInputPosition(compiledCache);
-            const std::streamoff compiledSizeStream =
-                (compiledEndPosition != std::streampos(-1))
-                ? static_cast<std::streamoff>(compiledEndPosition)
-                : static_cast<std::streamoff>(0);
-            compiledCache.seekg(0, std::ios::beg);
-
-            const std::size_t compiledSize = (compiledSizeStream > 0)
-                ? static_cast<std::size_t>(compiledSizeStream)
-                : 0U;
-            std::vector<char> compiledBytes(compiledSize);
-            if (compiledSize != 0U)
+            ID3DXBuffer* errors = nullptr;
+            ID3DXEffect* effect = nullptr;
+            char* compiledBytes = nullptr;
+            try
             {
+                compiledCache.seekg(0, std::ios::end);
+                const std::size_t compiledSize = static_cast<std::size_t>(QueryCurrentInputPosition(compiledCache));
+                compiledCache.seekg(0, std::ios::beg);
+
+                compiledBytes = new char[compiledSize];
                 // Address: 0x008F0230 (FUN_008F0230) -- std::basic_istream<char>::read(),
                 // a genuine CRT/STL <istream> body (sentry guard, virtual
                 // streambuf::_Sgetn_s dispatch, std::ios_base::clear on short read,
                 // std::_Mutex::_Unlock) with zero engine-specific behavior. Not a
                 // recovery target; this call is its real, already-wired invocation.
-                compiledCache.read(compiledBytes.data(), static_cast<std::streamsize>(compiledSize));
-            }
-            compiledCache.close();
+                compiledCache.read(compiledBytes, static_cast<std::streamsize>(compiledSize));
 
-            ComObjectScope nativeEffect{};
-            ComObjectScope createEffectErrors{};
-
-            const HRESULT createEffectResult = InvokeD3DXCreateEffect(
-                device->mDevice,
-                compiledBytes.empty() ? nullptr : static_cast<const void*>(compiledBytes.data()),
-                static_cast<unsigned int>(compiledBytes.size()),
-                nullptr,
-                nullptr,
-                0U,
-                nullptr,
-                nativeEffect.out(),
-                createEffectErrors.out()
-            );
-            if (createEffectResult < 0)
-            {
-                const msvc8::string reason = ReadD3DXErrorText(createEffectErrors.get());
-                const msvc8::string message =
-                    BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, reason);
-                ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
-            }
-
-            PipelineStateD3D9* const pipelineState = device->mPipelineState.get();
-            StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
-            const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
-            if (setStateManagerResult < 0)
-            {
-                ThrowGalError(
-                    "DeviceD3D9.cpp",
-                    1646,
-                    ::gpg::D3DErrorToString(static_cast<long>(setStateManagerResult))
+                HRESULT result = D3DXCreateEffect(
+                    device->mDevice, compiledBytes, static_cast<UINT>(compiledSize), nullptr, nullptr, 0U, nullptr,
+                    &effect, &errors
                 );
+                if (FAILED(result))
+                {
+                    const msvc8::string message =
+                        BuildEffectCreationMessage("unable to create effect: ", *contextRuntime, ReadD3DXErrorText(errors));
+                    ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
+                }
+                SafeRelease(errors);
+                // The binary leaves the pointer dangling here, so a failing
+                // SetStateManager below deletes the bytes a second time in the
+                // handler. Clearing it keeps that path defined.
+                delete[] compiledBytes;
+                compiledBytes = nullptr;
+
+                result = effect->SetStateManager(device->mPipelineState->GetStateManager());
+                if (FAILED(result))
+                {
+                    ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1646, result);
+                }
+            }
+            catch (...)
+            {
+                SafeRelease(errors);
+                SafeRelease(effect);
+                delete[] compiledBytes;
+                throw;
             }
 
-            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, nativeEffect.release()));
+            (void)ConstructSharedEffectD3D9FromRaw(outEffect, new EffectD3D9(context, effect));
             return outEffect;
         }
 
@@ -4710,144 +2983,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         void ApplyEffectVariableBaseVftableLane([[maybe_unused]] EffectVariableD3D9* const effectVariable) noexcept
         {
             // Modeled implicitly by normal C++ destruction; no explicit runtime write needed here.
-        }
-
-        /**
-         * Address: 0x008F5350 (FUN_008F5350)
-         * Mangled: ??_DRenderTargetD3D9@gal@gpg@@QAEXXZ
-         *
-         * What it does:
-         * Releases retained render-target resource handles and resets the local context lane.
-         */
-        void ResetRenderTargetD3D9State(RenderTargetD3D9* const renderTarget) noexcept
-        {
-            ReleaseComLike(renderTarget->surface_);
-            ReleaseComLike(renderTarget->texture_);
-
-            const RenderTargetContext resetContext{};
-            renderTarget->context_.width_ = resetContext.width_;
-            renderTarget->context_.height_ = resetContext.height_;
-            renderTarget->context_.format_ = resetContext.format_;
-        }
-
-        /**
-         * Address: 0x008F5410 (FUN_008F5410)
-         *
-         * What it does:
-         * Resets one render-target wrapper, stores one caller-provided
-         * `IDirect3DSurface9*` lane as the retained surface payload, snapshots
-         * one D3D9 surface descriptor, and copies descriptor width/height into
-         * the embedded render-target context lane.
-         */
-        int InitializeRenderTargetD3D9FromSurface(
-            RenderTargetD3D9* const renderTarget,
-            void* const surface
-        ) noexcept
-        {
-            ResetRenderTargetD3D9State(renderTarget);
-            renderTarget->surface_ = surface;
-
-            D3DSurfaceDescRuntime surfaceDesc{};
-            const int getDescResult = static_cast<int>(InvokeSurfaceGetDesc(surface, &surfaceDesc));
-            renderTarget->context_.width_ = surfaceDesc.width;
-            renderTarget->context_.height_ = surfaceDesc.height;
-            return getDescResult;
-        }
-
-        /**
-         * Address: 0x008F53B0 (FUN_008F53B0)
-         * Mangled: ??1RenderTargetD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Routes render-target destruction through the reset helper path.
-         */
-        void DestroyRenderTargetD3D9Body(RenderTargetD3D9* const renderTarget) noexcept
-        {
-            ResetRenderTargetD3D9State(renderTarget);
-        }
-
-        /**
-         * Address: 0x008E7FD0 (FUN_008E7FD0)
-         * Mangled: ??1DepthStencilTargetD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Releases retained depth-stencil surface state and restores context metadata.
-         */
-        void DestroyDepthStencilTargetD3D9Body(DepthStencilTargetD3D9* const depthStencilTarget) noexcept
-        {
-            ReleaseComLike(depthStencilTarget->depthStencilSurface_);
-
-            const DepthStencilTargetContext resetContext{};
-            depthStencilTarget->context_.width_ = resetContext.width_;
-            depthStencilTarget->context_.height_ = resetContext.height_;
-            depthStencilTarget->context_.format_ = resetContext.format_;
-            depthStencilTarget->context_.field0x10_ = resetContext.field0x10_;
-        }
-
-        /**
-         * Address: 0x009412B0 (FUN_009412B0)
-         * Mangled: ??_DCubeRenderTargetD3D9@gal@gpg@@QAEXXZ
-         *
-         * What it does:
-         * Releases cube render-target resource handles and restores context metadata.
-         */
-        void ResetCubeRenderTargetD3D9State(CubeRenderTargetD3D9* const cubeRenderTarget) noexcept
-        {
-            ReleaseComLike(cubeRenderTarget->cubeTexture_);
-
-            for (auto& faceSurface : cubeRenderTarget->faceSurfaces_)
-            {
-                ReleaseComLike(faceSurface);
-            }
-
-            const CubeRenderTargetContext resetContext{};
-            cubeRenderTarget->context_.dimension_ = resetContext.dimension_;
-            cubeRenderTarget->context_.format_ = resetContext.format_;
-        }
-
-        /**
-         * Address: 0x00941330 (FUN_00941330)
-         * Mangled: ??1CubeRenderTargetD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Routes cube render-target destruction through the reset helper path.
-         */
-        void DestroyCubeRenderTargetD3D9Body(CubeRenderTargetD3D9* const cubeRenderTarget) noexcept
-        {
-            ResetCubeRenderTargetD3D9State(cubeRenderTarget);
-        }
-
-        /**
-         * Address: 0x00941390 (FUN_00941390)
-         * Mangled: sub_941390
-         *
-         * What it does:
-         * Resets cube-target state, applies one context + cube-texture payload,
-         * and acquires one level-0 face surface for each cube face.
-         */
-        void AssignCubeRenderTargetD3D9State(
-            CubeRenderTargetD3D9* const cubeRenderTarget,
-            const CubeRenderTargetContext* const context,
-            void* const cubeTexture
-        ) noexcept
-        {
-            ResetCubeRenderTargetD3D9State(cubeRenderTarget);
-
-            cubeRenderTarget->context_.dimension_ = context->dimension_;
-            cubeRenderTarget->context_.format_ = context->format_;
-            cubeRenderTarget->cubeTexture_ = cubeTexture;
-
-            for (unsigned int faceIndex = 0; faceIndex < kCubeFaceCount; ++faceIndex)
-            {
-                void* faceSurface = nullptr;
-                static_cast<void>(InvokeGetCubeMapSurface(
-                    cubeRenderTarget->cubeTexture_,
-                    static_cast<unsigned int>(ResolveD3D9CubeFaceToken(static_cast<int>(faceIndex))),
-                    0U,
-                    &faceSurface
-                ));
-                cubeRenderTarget->faceSurfaces_[faceIndex] = faceSurface;
-            }
         }
 
         /**
@@ -5016,8 +3151,8 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     static void PackFloat2ToHalf2(std::uint16_t* const outHalf2, const float* const inFloat2)
     {
-        InvokeD3DXFloat32To16Array(&outHalf2[0], &inFloat2[0], 1U);
-        InvokeD3DXFloat32To16Array(&outHalf2[1], &inFloat2[1], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf2[0]), &inFloat2[0], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf2[1]), &inFloat2[1], 1U);
     }
 
     /**
@@ -5028,9 +3163,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     static void PackFloat3ToHalf3(std::uint16_t* const outHalf3, const float* const inFloat3)
     {
-        InvokeD3DXFloat32To16Array(&outHalf3[0], &inFloat3[0], 1U);
-        InvokeD3DXFloat32To16Array(&outHalf3[1], &inFloat3[1], 1U);
-        InvokeD3DXFloat32To16Array(&outHalf3[2], &inFloat3[2], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[0]), &inFloat3[0], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[1]), &inFloat3[1], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&outHalf3[2]), &inFloat3[2], 1U);
     }
 
     /**
@@ -5329,7 +3464,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             destination.instanceIndex = source.instanceIndex;
             destination.meshColor = source.meshColor;
             destination.color = source.color;
-            InvokeD3DXFloat32To16Array(&destination.shaderTime, &source.shaderTime, 1U);
+            D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.shaderTime), &source.shaderTime, 1U);
             CopyMatrix4x3Rows(
                 destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
                 source.transform
@@ -5338,7 +3473,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
             PackFloat2ToHalf2(destination.scroll, source.scroll);
             destination.dissolve = source.dissolve;
-            InvokeD3DXFloat32To16Array(&destination.parameter, &source.parameter, 1U);
+            D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.parameter), &source.parameter, 1U);
             return;
         }
 
@@ -5353,10 +3488,10 @@ namespace { // TEMPORARY PROBE (do not commit)
         PackFloat3ToHalf3(destination.binormal, source.binormal);
         PackFloat3ToHalf3(destination.tangent, source.tangent);
 
-        InvokeD3DXFloat32To16Array(&destination.texCoords[0], &source.texCoord0[0], 1U);
-        InvokeD3DXFloat32To16Array(&destination.texCoords[1], &source.texCoord0[1], 1U);
-        InvokeD3DXFloat32To16Array(&destination.texCoords[2], &source.texCoord1[0], 1U);
-        InvokeD3DXFloat32To16Array(&destination.texCoords[3], &source.texCoord1[1], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[0]), &source.texCoord0[0], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[1]), &source.texCoord0[1], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[2]), &source.texCoord1[0], 1U);
+        D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.texCoords[3]), &source.texCoord1[1], 1U);
     }
 
     /**
@@ -5644,9 +3779,9 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         mPipelineState.reset();
 
-        ReleaseComLike(mFrameEventQuery);
-        ReleaseComLike(mDevice);
-        ReleaseComLike(mDirect3D);
+        SafeRelease(mFrameEventQuery);
+        SafeRelease(mDevice);
+        SafeRelease(mDirect3D);
 
         mDeviceContext = DeviceContext(0);
     }
@@ -5661,99 +3796,94 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 122, "invalid device context specified");
         }
 
-        std::vector<D3DPRESENT_PARAMETERS> presentParameters(static_cast<std::size_t>(headCount));
-
-        mCurThreadId = static_cast<int>(::GetCurrentThreadId());
-        mDirect3D = InvokeDirect3DCreate9Interface(0x20U);
-        if (mDirect3D == nullptr)
+        // Freed on both ways out; a failure also takes down whatever was
+        // brought up (the catch at 0x008F37CC).
+        D3DPRESENT_PARAMETERS* const presentParameters = new D3DPRESENT_PARAMETERS[static_cast<std::size_t>(headCount)];
+        try
         {
-            AppendD3D9SetupLogMessage("unable to create Direct3D");
-            ThrowGalError("DeviceD3D9.cpp", 132, "unable to create Direct3D");
-        }
-
-        CollectAllAdaptersForSetup(*this);
-        CheckAdapterSelectionForSetup(*this, *context);
-
-        const HWND primaryWindow = reinterpret_cast<HWND>(context->GetHead(0U).mHandle);
-        const unsigned int behaviorFlags = ((headCount > 1) ? 0x200U : 0U) | 0x44U;
-        GetDeviceParameters(presentParameters.data(), context);
-
-        unsigned int selectedAdapter = static_cast<unsigned int>(context->mAdapter);
-        unsigned int deviceType = kD3DDevTypeHal;
-        const std::size_t adapterCount = mAdapters.size();
-        for (std::size_t adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
-        {
-            if (mAdapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
+            mCurThreadId = static_cast<int>(::GetCurrentThreadId());
+            mDirect3D = Direct3DCreate9(0x20U);
+            if (mDirect3D == nullptr)
             {
-                deviceType = 2U;
-                selectedAdapter = static_cast<unsigned int>(adapterIndex);
-                AppendD3D9SetupLogMessage("using NVPerfHUD adapter");
-                break;
+                AppendD3D9SetupLogMessage("unable to create Direct3D");
+                ThrowGalError("DeviceD3D9.cpp", 132, "unable to create Direct3D");
             }
-        }
 
-        HRESULT createResult = InvokeNativeCreateDevice(
-            this,
-            selectedAdapter,
-            deviceType,
-            primaryWindow,
-            behaviorFlags,
-            presentParameters.data(),
-            &mDevice
-        );
-        if (createResult < 0)
-        {
-            const std::size_t primaryAdapterIndex = static_cast<std::size_t>(context->mAdapter);
-            if (primaryAdapterIndex < mAdapters.size() &&
-                IsLegacyAtiCreateDeviceFallbackAdapter(mAdapters[primaryAdapterIndex]))
+            CollectAllAdaptersForSetup(*this);
+            CheckAdapterSelectionForSetup(*this, *context);
+
+            const HWND primaryWindow = reinterpret_cast<HWND>(context->GetHead(0U).mHandle);
+            const unsigned int behaviorFlags = ((headCount > 1) ? 0x200U : 0U) | 0x44U;
+            GetDeviceParameters(presentParameters, context);
+
+            unsigned int selectedAdapter = static_cast<unsigned int>(context->mAdapter);
+            D3DDEVTYPE deviceType = D3DDEVTYPE_HAL;
+            const std::size_t adapterCount = mAdapters.size();
+            for (std::size_t adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
             {
-                createResult = InvokeNativeCreateDevice(
-                    this,
-                    static_cast<unsigned int>(context->mAdapter),
-                    kD3DDevTypeHal,
-                    primaryWindow,
-                    36U,
-                    presentParameters.data(),
-                    &mDevice
-                );
-                if (createResult < 0)
+                if (mAdapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
                 {
-                    AppendD3D9SetupLogMessage("unable to create device");
-                    ThrowGalError("DeviceD3D9.cpp", 183, "unable to create device");
+                    deviceType = D3DDEVTYPE_REF;
+                    selectedAdapter = static_cast<unsigned int>(adapterIndex);
+                    AppendD3D9SetupLogMessage("using NVPerfHUD adapter");
+                    break;
                 }
             }
-            else
+
+            HRESULT createResult = mDirect3D->CreateDevice(selectedAdapter, deviceType, primaryWindow, behaviorFlags, presentParameters, &mDevice);
+            if (createResult < 0)
             {
-                AppendD3D9SetupLogMessage("unable to create device");
-                ThrowGalError("DeviceD3D9.cpp", 189, "unable to create device");
+                const std::size_t primaryAdapterIndex = static_cast<std::size_t>(context->mAdapter);
+                if (primaryAdapterIndex < mAdapters.size() &&
+                    IsLegacyAtiCreateDeviceFallbackAdapter(mAdapters[primaryAdapterIndex]))
+                {
+                    createResult = mDirect3D->CreateDevice(static_cast<unsigned int>(context->mAdapter), D3DDEVTYPE_HAL, primaryWindow, 36U, presentParameters, &mDevice);
+                    if (createResult < 0)
+                    {
+                        AppendD3D9SetupLogMessage("unable to create device");
+                        ThrowGalError("DeviceD3D9.cpp", 183, "unable to create device");
+                    }
+                }
+                else
+                {
+                    AppendD3D9SetupLogMessage("unable to create device");
+                    ThrowGalError("DeviceD3D9.cpp", 189, "unable to create device");
+                }
             }
-        }
 
-        mPipelineState.reset(new PipelineStateD3D9(mDevice));
-        if (mPipelineState.get() != nullptr)
+            mPipelineState.reset(new PipelineStateD3D9(mDevice));
+            if (mPipelineState.get() != nullptr)
+            {
+                mPipelineState->InitState();
+            }
+
+            static_cast<void>(BuildDeviceCapabilities(context));
+            mDeviceContext.mAdapter = static_cast<int>(selectedAdapter);
+            CreateHeads();
+
+            bool supportsDxt = true;
+            const int builtHeadCount = mDeviceContext.GetHeadCount();
+            for (int headIndex = 0; headIndex < builtHeadCount; ++headIndex)
+            {
+                supportsDxt = supportsDxt && HeadSupportsCapability2(mDeviceContext.GetHead(static_cast<unsigned int>(headIndex)), 12);
+            }
+
+            if (!supportsDxt)
+            {
+                AppendD3D9SetupLogMessage("Device does not support DXT texture formats");
+                ThrowGalError("DeviceD3D9.cpp", 209, "Device does not support DXT texture formats");
+            }
+
+            static_cast<void>(mDevice->CreateQuery(D3DQUERYTYPE_EVENT, &mFrameEventQuery));
+            AppendD3D9SetupLogMessage("device setup complete");
+        }
+        catch (...)
         {
-            mPipelineState->InitState();
+            delete[] presentParameters;
+            Shutdown();
+            throw;
         }
-
-        static_cast<void>(BuildDeviceCapabilities(context));
-        mDeviceContext.mAdapter = static_cast<int>(selectedAdapter);
-        CreateHeads();
-
-        bool supportsDxt = true;
-        const int builtHeadCount = mDeviceContext.GetHeadCount();
-        for (int headIndex = 0; headIndex < builtHeadCount; ++headIndex)
-        {
-            supportsDxt = supportsDxt && HeadSupportsCapability2(mDeviceContext.GetHead(static_cast<unsigned int>(headIndex)), 12);
-        }
-
-        if (!supportsDxt)
-        {
-            AppendD3D9SetupLogMessage("Device does not support DXT texture formats");
-            ThrowGalError("DeviceD3D9.cpp", 209, "Device does not support DXT texture formats");
-        }
-
-        static_cast<void>(InvokeNativeCreateQuery(this, kD3DQueryTypeEvent, &mFrameEventQuery));
-        AppendD3D9SetupLogMessage("device setup complete");
+        delete[] presentParameters;
     }
 
     /**
@@ -5806,7 +3936,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::ShowCursor(const bool show)
     {
         Func1();
-        return InvokeNativeD3D9ShowCursor(mDevice, show);
+        return mDevice->ShowCursor(show ? TRUE : FALSE);
     }
 
     /**
@@ -5829,20 +3959,20 @@ namespace { // TEMPORARY PROBE (do not commit)
         {
             outParameters->BackBufferWidth = head.mWidth;
             outParameters->BackBufferHeight = head.mHeight;
-            outParameters->BackBufferFormat = static_cast<D3DFORMAT>(kD3DFormatA8R8G8B8);
+            outParameters->BackBufferFormat = D3DFMT_A8R8G8B8;
             outParameters->BackBufferCount = 1U;
             outParameters->MultiSampleType = static_cast<D3DMULTISAMPLE_TYPE>(head.antialiasingHigh);
             outParameters->MultiSampleQuality = head.antialiasingLow;
-            outParameters->SwapEffect = static_cast<D3DSWAPEFFECT>(kD3DSwapEffectDiscard);
+            outParameters->SwapEffect = D3DSWAPEFFECT_DISCARD;
             outParameters->hDeviceWindow =
                 (headIndex == 0U && head.mWindowed) ? reinterpret_cast<HWND>(head.mHandle) : reinterpret_cast<HWND>(head.mWindow);
             outParameters->Windowed = head.mWindowed ? 0 : 1;
             outParameters->EnableAutoDepthStencil = 0;
-            outParameters->AutoDepthStencilFormat = static_cast<D3DFORMAT>(kD3DFormatUnknown);
+            outParameters->AutoDepthStencilFormat = D3DFMT_UNKNOWN;
             outParameters->Flags = 0U;
             outParameters->FullScreen_RefreshRateInHz = head.mWindowed ? head.framesPerSecond : 0U;
             outParameters->PresentationInterval =
-                ((headIndex == 0U) && context->mVSync) ? 1U : kPresentIntervalImmediate;
+                ((headIndex == 0U) && context->mVSync) ? 1U : D3DPRESENT_INTERVAL_IMMEDIATE;
         }
 
         return outParameters;
@@ -5881,49 +4011,41 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 1444, "internal D3D9 device initialization error");
         }
 
-        OutputContext* const heads = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
+        OutputContext* const heads = new OutputContext[headCount];
         mHeads = heads;
 
         for (unsigned int headIndex = 0; headIndex < headCount; ++headIndex)
         {
-            ComObjectScope backBuffer{};
-            const HRESULT getBackBufferResult =
-                InvokeNativeGetBackBuffer(this, headIndex, 0U, kD3DBackBufferTypeMono, backBuffer.out());
-            if (getBackBufferResult < 0)
+            IDirect3DSurface9* backBuffer = nullptr;
+            HRESULT result = mDevice->GetBackBuffer(headIndex, 0U, D3DBACKBUFFER_TYPE_MONO, &backBuffer);
+            if (FAILED(result))
             {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1451, getBackBufferResult);
+                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1451, result);
             }
 
             Clear(true, false, false, 0U, 0.0f, 0);
-            static_cast<void>(InvokeNativePresent(this));
+            mDevice->Present(nullptr, nullptr, nullptr, nullptr);
 
-            D3DSurfaceDescRuntime surfaceDesc{};
-            static_cast<void>(InvokeSurfaceGetDesc(backBuffer.get(), &surfaceDesc));
+            D3DSURFACE_DESC surfaceDesc;
+            backBuffer->GetDesc(&surfaceDesc);
 
-            ComObjectScope depthStencilSurface{};
-            const HRESULT createDepthResult = InvokeNativeCreateDepthStencilSurface(
-                this,
-                surfaceDesc.width,
-                surfaceDesc.height,
-                kD3DFormatD24S8,
-                surfaceDesc.multisampleType,
-                surfaceDesc.multisampleQuality,
-                depthStencilSurface.out()
+            IDirect3DSurface9* depthStencilSurface = nullptr;
+            result = mDevice->CreateDepthStencilSurface(
+                surfaceDesc.Width, surfaceDesc.Height, D3DFMT_D24S8, surfaceDesc.MultiSampleType,
+                surfaceDesc.MultiSampleQuality, FALSE, &depthStencilSurface, nullptr
             );
-            if (createDepthResult < 0)
+            if (FAILED(result))
             {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1462, createDepthResult);
+                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1462, result);
             }
 
-            // The head owns the back buffer directly: no render-target context
-            // is built here, and the surface-wrap ctor takes the dimensions
-            // back off the surface descriptor itself.
-            heads[headIndex].surface.reset(new RenderTargetD3D9(backBuffer.release()));
+            // Both surfaces pass straight into their wrappers, which own them
+            // from here; a throw above leaks what was already acquired, as the
+            // binary does (neither local is in its unwind map).
+            heads[headIndex].surface.reset(new RenderTargetD3D9(backBuffer));
 
-            const DepthStencilTargetContext depthStencilContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
-            heads[headIndex].depthStencil.reset(
-                new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface.release())
-            );
+            const DepthStencilTargetContext depthStencilContext(surfaceDesc.Width, surfaceDesc.Height, 3U, false);
+            heads[headIndex].depthStencil.reset(new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface));
         }
     }
 
@@ -5979,15 +4101,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             head.validFormats1.clear();
             for (int formatToken = 1; formatToken < 8; ++formatToken)
             {
-                const HRESULT result = InvokeNativeCheckDeviceFormat(
-                    this,
-                    adapterIndex,
-                    kD3DDevTypeHal,
-                    kD3DFormatX8R8G8B8,
-                    1U,
-                    kD3DRTypeTexture,
-                    GetD3DFormat(static_cast<std::uint32_t>(formatToken))
-                );
+                const HRESULT result = mDirect3D->CheckDeviceFormat(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_X8R8G8B8, 1U, D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(GetD3DFormat(static_cast<std::uint32_t>(formatToken))));
                 if (result >= 0)
                 {
                     // MSVC8 inlines the fast in-place append and, when the vector is
@@ -6010,15 +4124,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             head.validFormats2.clear();
             for (int formatToken = 1; formatToken < 20; ++formatToken)
             {
-                const HRESULT result = InvokeNativeCheckDeviceFormat(
-                    this,
-                    adapterIndex,
-                    kD3DDevTypeHal,
-                    kD3DFormatX8R8G8B8,
-                    0U,
-                    kD3DRTypeTexture,
-                    FormatGalToD3D(static_cast<std::uint32_t>(formatToken))
-                );
+                const HRESULT result = mDirect3D->CheckDeviceFormat(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_X8R8G8B8, 0U, D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(FormatGalToD3D(static_cast<std::uint32_t>(formatToken))));
                 if (result >= 0)
                 {
                     // MSVC8 inlines the fast in-place append and, when the vector is
@@ -6039,22 +4145,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
 
             D3DADAPTER_IDENTIFIER9 adapterIdentifier{};
-            static_cast<void>(InvokeNativeGetAdapterIdentifier(this, 0U, 0U, &adapterIdentifier));
+            static_cast<void>(mDirect3D->GetAdapterIdentifier(0U, 0U, &adapterIdentifier));
 
             head.mStrs.clear();
             if (adapterIdentifier.VendorId != kVendorIdNvidia)
             {
                 for (unsigned int sampleType = 2U; sampleType <= 16U; ++sampleType)
                 {
-                    const HRESULT result = InvokeNativeCheckDeviceMultiSampleType(
-                        this,
-                        adapterIndex,
-                        kD3DDevTypeHal,
-                        kD3DFormatA8R8G8B8,
-                        !head.mWindowed,
-                        sampleType,
-                        nullptr
-                    );
+                    const HRESULT result = mDirect3D->CheckDeviceMultiSampleType(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_A8R8G8B8, (!head.mWindowed) ? TRUE : FALSE, static_cast<D3DMULTISAMPLE_TYPE>(sampleType), nullptr);
                     if (result < 0)
                     {
                         continue;
@@ -6089,16 +4187,8 @@ namespace { // TEMPORARY PROBE (do not commit)
 
                 for (const SampleCandidate& candidate : kNvidiaSampleCandidates)
                 {
-                    unsigned int qualityLevels = 0U;
-                    const HRESULT checkResult = InvokeNativeCheckDeviceMultiSampleType(
-                        this,
-                        adapterIndex,
-                        kD3DDevTypeHal,
-                        kD3DFormatA8R8G8B8,
-                        !head.mWindowed,
-                        candidate.sampleType,
-                        &qualityLevels
-                    );
+                    DWORD qualityLevels = 0U;
+                    const HRESULT checkResult = mDirect3D->CheckDeviceMultiSampleType(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_A8R8G8B8, (!head.mWindowed) ? TRUE : FALSE, static_cast<D3DMULTISAMPLE_TYPE>(candidate.sampleType), &qualityLevels);
 
                     if ((checkResult < 0) || (qualityLevels <= candidate.sampleQuality))
                     {
@@ -6107,15 +4197,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
                     if (candidate.sampleType == 4U && candidate.sampleQuality == 4U)
                     {
-                        const HRESULT sixteenSampleResult = InvokeNativeCheckDeviceMultiSampleType(
-                            this,
-                            adapterIndex,
-                            kD3DDevTypeHal,
-                            kD3DFormatA8R8G8B8,
-                            !head.mWindowed,
-                            16U,
-                            nullptr
-                        );
+                        const HRESULT sixteenSampleResult = mDirect3D->CheckDeviceMultiSampleType(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_A8R8G8B8, (!head.mWindowed) ? TRUE : FALSE, static_cast<D3DMULTISAMPLE_TYPE>(16U), nullptr);
                         if (sixteenSampleResult >= 0)
                         {
                             HeadSampleOption option{};
@@ -6137,7 +4219,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         D3DCAPS9 caps{};
-        const HRESULT capsResult = InvokeNativeGetDeviceCaps(this, &caps);
+        const HRESULT capsResult = mDevice->GetDeviceCaps(&caps);
         if (capsResult < 0)
         {
             ThrowGalError("DeviceD3D9.cpp", 1343, "unable to retreive device caps");
@@ -6161,9 +4243,9 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         mDeviceContext.mVertexShaderProfile =
-            ResolveVertexShaderProfileToken(InvokeD3DXGetVertexShaderProfile(mDevice));
+            ResolveVertexShaderProfileToken(D3DXGetVertexShaderProfile(mDevice));
         mDeviceContext.mPixelShaderProfile =
-            ResolvePixelShaderProfileToken(InvokeD3DXGetPixelShaderProfile(mDevice));
+            ResolvePixelShaderProfileToken(D3DXGetPixelShaderProfile(mDevice));
         return mDeviceContext.mPixelShaderProfile;
     }
 
@@ -6176,7 +4258,6 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     int DeviceD3D9::Func9(DeviceContext* const context)
     {
-
         if (mPipelineState.get() != nullptr)
         {
             static_cast<void>(mPipelineState->ClearTextures());
@@ -6186,16 +4267,14 @@ namespace { // TEMPORARY PROBE (do not commit)
         delete[] mHeads;
         mHeads = nullptr;
 
-        ReleaseComLike(mFrameEventQuery);
+        SafeRelease(mFrameEventQuery);
 
-        const unsigned int headCount = static_cast<unsigned int>(context->GetHeadCount());
-        std::vector<D3DPRESENT_PARAMETERS> parameters(headCount);
-        if (headCount > 0U)
-        {
-            GetDeviceParameters(parameters.data(), context);
-        }
+        // Allocated with new[] (0x008F3130) and, unlike Setup's, never freed.
+        D3DPRESENT_PARAMETERS* const parameters =
+            new D3DPRESENT_PARAMETERS[static_cast<std::size_t>(context->GetHeadCount())];
+        GetDeviceParameters(parameters, context);
 
-        const HRESULT resetResult = InvokeNativeReset(this, parameters.empty() ? nullptr : parameters.data());
+        const HRESULT resetResult = mDevice->Reset(parameters);
         if (resetResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 866, resetResult);
@@ -6210,258 +4289,241 @@ namespace { // TEMPORARY PROBE (do not commit)
             static_cast<void>(mPipelineState->InitState());
         }
 
-        return InvokeNativeCreateQuery(this, kD3DQueryTypeEvent, &mFrameEventQuery);
+        return mDevice->CreateQuery(D3DQUERYTYPE_EVENT, &mFrameEventQuery);
     }
 
     namespace
     {
-        constexpr unsigned int kD3DResourceTypeTexture2D = 3U;
-        constexpr unsigned int kD3DResourceTypeVolumeTexture = 4U;
-        constexpr unsigned int kD3DResourceTypeCubeTexture = 5U;
-        constexpr std::uint32_t kD3DFormatIndex16 = 101U;
-        constexpr std::uint32_t kD3DFormatIndex32 = 102U;
-
-        struct D3DVertexElementRuntime final
-        {
-            std::uint16_t stream = 0U;
-            std::uint16_t offset = 0U;
-            std::uint8_t type = 0U;
-            std::uint8_t method = 0U;
-            std::uint8_t usage = 0U;
-            std::uint8_t usageIndex = 0U;
-        };
 
         static constexpr std::uint32_t kVertexFormatCount = 24U;
 
-        static constexpr D3DVertexElementRuntime kVertexElementEndSentinel = {
-            0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U
+        static constexpr D3DVERTEXELEMENT9 kVertexElementEndSentinel = D3DDECL_END();
+
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_0[2] = {
+            {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_0[2] = {
-            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_1[2] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_1[2] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_2[3] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_2[3] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_3[3] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_3[3] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_4[4] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 20, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_4[4] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x14U, 0x01U, 0x00U, 0x05U, 0x01U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_5[4] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            {0, 24, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_5[4] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
-            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_6[4] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+            {0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_6[4] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x04U, 0x00U, 0x0AU, 0x00U},
-            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_7[3] = {
+            {0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITIONT, 0},
+            {0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_7[3] = {
-            {0x00U, 0x00U, 0x03U, 0x00U, 0x09U, 0x00U},
-            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_8[4] = {
+            {0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITIONT, 0},
+            {0, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 24, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_8[4] = {
-            {0x00U, 0x00U, 0x03U, 0x00U, 0x09U, 0x00U},
-            {0x00U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x01U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_9[8] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            {0, 24, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {1, 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {1, 32, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {1, 48, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_9[8] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x02U, 0x00U, 0x03U, 0x00U},
-            {0x00U, 0x18U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x00U, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0x01U, 0x10U, 0x03U, 0x00U, 0x05U, 0x02U},
-            {0x01U, 0x20U, 0x03U, 0x00U, 0x05U, 0x03U},
-            {0x01U, 0x30U, 0x03U, 0x00U, 0x05U, 0x04U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_10[2] = {
+            {0, 0, D3DDECLTYPE_SHORT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_10[2] = {
-            {0x00U, 0x00U, 0x07U, 0x00U, 0x00U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_11[7] = {
+            {0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 16, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 32, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {0, 48, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {0, 60, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {0, 76, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_11[7] = {
-            {0x00U, 0x00U, 0x03U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x10U, 0x03U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x20U, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0x00U, 0x30U, 0x02U, 0x00U, 0x05U, 0x02U},
-            {0x00U, 0x3CU, 0x03U, 0x00U, 0x05U, 0x03U},
-            {0x00U, 0x4CU, 0x02U, 0x00U, 0x05U, 0x04U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_12[5] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {0, 36, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_12[5] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x18U, 0x02U, 0x00U, 0x05U, 0x01U},
-            {0x00U, 0x24U, 0x03U, 0x00U, 0x05U, 0x02U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_13[5] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 28, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {0, 44, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_13[5] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x03U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x1CU, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0x00U, 0x2CU, 0x03U, 0x00U, 0x05U, 0x02U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_14[15] = {
+            {0, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 16, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            {0, 28, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0},
+            {0, 40, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+            {0, 52, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 68, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
+            {1, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {1, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {1, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {1, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            {1, 48, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
+            {1, 52, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6},
+            {1, 68, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+            {1, 72, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_14[15] = {
-            {0x00U, 0x00U, 0x03U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x10U, 0x02U, 0x00U, 0x03U, 0x00U},
-            {0x00U, 0x1CU, 0x02U, 0x00U, 0x06U, 0x00U},
-            {0x00U, 0x28U, 0x02U, 0x00U, 0x07U, 0x00U},
-            {0x00U, 0x34U, 0x03U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x44U, 0x05U, 0x00U, 0x02U, 0x00U},
-            {0x01U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
-            {0x01U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
-            {0x01U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
-            {0x01U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
-            {0x01U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
-            {0x01U, 0x34U, 0x03U, 0x00U, 0x05U, 0x06U},
-            {0x01U, 0x44U, 0x04U, 0x00U, 0x0AU, 0x00U},
-            {0x01U, 0x48U, 0x00U, 0x00U, 0x05U, 0x07U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_15[15] = {
+            {0, 0, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 8, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            {0, 16, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0},
+            {0, 24, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+            {0, 32, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 40, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
+            {1, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {1, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {1, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {1, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            {1, 48, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
+            {1, 52, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6},
+            {1, 60, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+            {1, 64, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_15[15] = {
-            {0x00U, 0x00U, 0x10U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x08U, 0x10U, 0x00U, 0x03U, 0x00U},
-            {0x00U, 0x10U, 0x10U, 0x00U, 0x06U, 0x00U},
-            {0x00U, 0x18U, 0x10U, 0x00U, 0x07U, 0x00U},
-            {0x00U, 0x20U, 0x10U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x28U, 0x05U, 0x00U, 0x02U, 0x00U},
-            {0x01U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
-            {0x01U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
-            {0x01U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
-            {0x01U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
-            {0x01U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
-            {0x01U, 0x34U, 0x10U, 0x00U, 0x05U, 0x06U},
-            {0x01U, 0x3CU, 0x04U, 0x00U, 0x0AU, 0x00U},
-            {0x01U, 0x40U, 0x00U, 0x00U, 0x05U, 0x07U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_16[16] = {
+            {0, 0, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 8, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_NORMAL, 0},
+            {0, 16, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TANGENT, 0},
+            {0, 24, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BINORMAL, 0},
+            {0, 32, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {0, 40, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_BLENDINDICES, 0},
+            {1, 0, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {2, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {2, 12, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {2, 24, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {2, 36, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            {2, 48, D3DDECLTYPE_UBYTE4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
+            {2, 52, D3DDECLTYPE_FLOAT16_4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 6},
+            {2, 60, D3DDECLTYPE_D3DCOLOR, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_COLOR, 0},
+            {2, 64, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 7},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_16[16] = {
-            {0x00U, 0x00U, 0x10U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x08U, 0x10U, 0x00U, 0x03U, 0x00U},
-            {0x00U, 0x10U, 0x10U, 0x00U, 0x06U, 0x00U},
-            {0x00U, 0x18U, 0x10U, 0x00U, 0x07U, 0x00U},
-            {0x00U, 0x20U, 0x10U, 0x00U, 0x05U, 0x00U},
-            {0x00U, 0x28U, 0x05U, 0x00U, 0x02U, 0x00U},
-            {0x01U, 0x00U, 0x10U, 0x00U, 0x00U, 0x01U},
-            {0x02U, 0x00U, 0x02U, 0x00U, 0x05U, 0x01U},
-            {0x02U, 0x0CU, 0x02U, 0x00U, 0x05U, 0x02U},
-            {0x02U, 0x18U, 0x02U, 0x00U, 0x05U, 0x03U},
-            {0x02U, 0x24U, 0x02U, 0x00U, 0x05U, 0x04U},
-            {0x02U, 0x30U, 0x05U, 0x00U, 0x05U, 0x05U},
-            {0x02U, 0x34U, 0x10U, 0x00U, 0x05U, 0x06U},
-            {0x02U, 0x3CU, 0x04U, 0x00U, 0x0AU, 0x00U},
-            {0x02U, 0x40U, 0x00U, 0x00U, 0x05U, 0x07U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_17[5] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {0, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 8, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_17[5] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x00U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x00U, 0x01U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x08U, 0x01U, 0x00U, 0x05U, 0x01U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_18[4] = {
+            {0, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {1, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 8, D3DDECLTYPE_FLOAT1, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_18[4] = {
-            {0x00U, 0x00U, 0x02U, 0x00U, 0x00U, 0x00U},
-            {0x01U, 0x00U, 0x01U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x08U, 0x00U, 0x00U, 0x05U, 0x00U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_19[9] = {
+            {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 24, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {1, 40, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {1, 52, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            {1, 68, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 4},
+            {1, 80, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 5},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_19[9] = {
-            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
-            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x18U, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0x01U, 0x28U, 0x02U, 0x00U, 0x05U, 0x02U},
-            {0x01U, 0x34U, 0x03U, 0x00U, 0x05U, 0x03U},
-            {0x01U, 0x44U, 0x02U, 0x00U, 0x05U, 0x04U},
-            {0x01U, 0x50U, 0x02U, 0x00U, 0x05U, 0x05U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_20[5] = {
+            {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 16, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 24, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_20[5] = {
-            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
-            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x10U, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x18U, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_21[7] = {
+            {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {1, 0, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 16, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 28, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            {1, 36, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 2},
+            {1, 44, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 3},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_21[7] = {
-            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
-            {0x01U, 0x00U, 0x03U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x10U, 0x02U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x1CU, 0x01U, 0x00U, 0x05U, 0x01U},
-            {0x01U, 0x24U, 0x01U, 0x00U, 0x05U, 0x02U},
-            {0x01U, 0x2CU, 0x03U, 0x00U, 0x05U, 0x03U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_22[5] = {
+            {0, 0, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 0},
+            {1, 0, D3DDECLTYPE_FLOAT3, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_POSITION, 1},
+            {1, 12, D3DDECLTYPE_FLOAT2, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 0},
+            {1, 20, D3DDECLTYPE_FLOAT4, D3DDECLMETHOD_DEFAULT, D3DDECLUSAGE_TEXCOORD, 1},
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_22[5] = {
-            {0x00U, 0x00U, 0x01U, 0x00U, 0x00U, 0x00U},
-            {0x01U, 0x00U, 0x02U, 0x00U, 0x00U, 0x01U},
-            {0x01U, 0x0CU, 0x01U, 0x00U, 0x05U, 0x00U},
-            {0x01U, 0x14U, 0x03U, 0x00U, 0x05U, 0x01U},
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
+        static constexpr D3DVERTEXELEMENT9 kVertexFormat_23[1] = {
+            D3DDECL_END(),
         };
 
-        static constexpr D3DVertexElementRuntime kVertexFormat_23[1] = {
-            {0xFFU, 0x00U, 0x11U, 0x00U, 0x00U, 0x00U},
-        };
-
-        static constexpr const D3DVertexElementRuntime* kVertexFormatsByCode[kVertexFormatCount] = {
+        static constexpr const D3DVERTEXELEMENT9* kVertexFormatsByCode[kVertexFormatCount] = {
             kVertexFormat_0,  kVertexFormat_1,  kVertexFormat_2,  kVertexFormat_3,  kVertexFormat_4,  kVertexFormat_5,
             kVertexFormat_6,  kVertexFormat_7,  kVertexFormat_8,  kVertexFormat_9,  kVertexFormat_10, kVertexFormat_11,
             kVertexFormat_12, kVertexFormat_13, kVertexFormat_14, kVertexFormat_15, kVertexFormat_16, kVertexFormat_17,
             kVertexFormat_18, kVertexFormat_19, kVertexFormat_20, kVertexFormat_21, kVertexFormat_22, kVertexFormat_23,
         };
 
-        [[nodiscard]] bool IsVertexElementEndSentinel(const D3DVertexElementRuntime& element) noexcept
+        [[nodiscard]] bool IsVertexElementEndSentinel(const D3DVERTEXELEMENT9& element) noexcept
         {
-            return (element.stream == kVertexElementEndSentinel.stream) &&
-                   (element.offset == kVertexElementEndSentinel.offset) &&
-                   (element.type == kVertexElementEndSentinel.type) &&
-                   (element.method == kVertexElementEndSentinel.method) &&
-                   (element.usage == kVertexElementEndSentinel.usage) &&
-                   (element.usageIndex == kVertexElementEndSentinel.usageIndex);
+            return (element.Stream == kVertexElementEndSentinel.Stream) &&
+                   (element.Offset == kVertexElementEndSentinel.Offset) &&
+                   (element.Type == kVertexElementEndSentinel.Type) &&
+                   (element.Method == kVertexElementEndSentinel.Method) &&
+                   (element.Usage == kVertexElementEndSentinel.Usage) &&
+                   (element.UsageIndex == kVertexElementEndSentinel.UsageIndex);
         }
 
         /**
@@ -6471,7 +4533,7 @@ namespace { // TEMPORARY PROBE (do not commit)
          * Validates one vertex-format code and returns the recovered D3D vertex
          * element declaration table pointer for that format.
          */
-        const D3DVertexElementRuntime* GetVertexFormatElementsOrThrow(const std::uint32_t formatCode)
+        const D3DVERTEXELEMENT9* GetVertexFormatElementsOrThrow(const std::uint32_t formatCode)
         {
             if (formatCode >= kVertexFormatCount)
             {
@@ -6550,7 +4612,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         const auto* const sourceData = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(context->dataBegin_));
         const unsigned int sourceBytes = context->dataEnd_ - context->dataBegin_;
 
-        void* nativeTexture = nullptr;
+        IDirect3DBaseTexture9* nativeTexture = nullptr;
         if (context->source_ == 2U)
         {
             const unsigned int mappedFormat = FormatGalToD3D(context->format_);
@@ -6566,33 +4628,26 @@ namespace { // TEMPORARY PROBE (do not commit)
                 usageFlags |= 0x400U;
             }
 
-            const HRESULT createResult = InvokeD3DXCreateTexture(
-                mDevice,
-                context->width_,
-                context->height_,
-                context->mipmapLevels_,
-                usageFlags,
-                mappedFormat,
-                pool,
-                &nativeTexture
-            );
+            IDirect3DTexture9* texture;
+            const HRESULT createResult = D3DXCreateTexture(mDevice, context->width_, context->height_, context->mipmapLevels_, usageFlags, static_cast<D3DFORMAT>(mappedFormat), pool, &texture);
             if (createResult < 0)
             {
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 477, createResult);
             }
 
-            D3DSurfaceDescRuntime surfaceDesc{};
-            const HRESULT levelDescResult = InvokeTextureGetLevelDesc(nativeTexture, 0U, &surfaceDesc);
+            D3DSURFACE_DESC surfaceDesc;
+            const HRESULT levelDescResult = texture->GetLevelDesc(0U, &surfaceDesc);
             if (levelDescResult < 0)
             {
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 481, levelDescResult);
             }
 
             textureContext.type_ = 1U;
-            textureContext.mipmapLevels_ = InvokeTextureGetLevelCount(nativeTexture);
-            textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-            textureContext.width_ = surfaceDesc.width;
-            textureContext.height_ = surfaceDesc.height;
+            textureContext.mipmapLevels_ = texture->GetLevelCount();
+            textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.Format);
+            textureContext.width_ = surfaceDesc.Width;
+            textureContext.height_ = surfaceDesc.Height;
+            nativeTexture = texture;
         }
         else if (context->source_ == 1U)
         {
@@ -6601,92 +4656,64 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("DeviceD3D9.cpp", 350, "attempt to create texture from uninitialized memory");
             }
 
-            D3DXImageInfoRuntime imageInfo{};
-            const HRESULT imageInfoResult = InvokeD3DXGetImageInfoFromFileInMemory(sourceData, sourceBytes, &imageInfo);
+            D3DXIMAGE_INFO imageInfo{};
+            const HRESULT imageInfoResult = D3DXGetImageInfoFromFileInMemory(sourceData, sourceBytes, &imageInfo);
             if (imageInfoResult < 0)
             {
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 354, imageInfoResult);
             }
 
-            if (imageInfo.resourceType == kD3DResourceTypeCubeTexture)
+            if (imageInfo.ResourceType == D3DRTYPE_CUBETEXTURE)
             {
-                const unsigned int edgeLength = (context->width_ != 0U) ? context->width_ : kD3DXDefault;
-                const HRESULT createResult = InvokeD3DXCreateCubeTextureFromFileInMemoryEx(
-                    mDevice,
-                    sourceData,
-                    sourceBytes,
-                    edgeLength,
-                    kD3DXDefault,
-                    0U,
-                    FormatGalToD3D(context->format_),
-                    D3DPOOL_MANAGED,
-                    kD3DXDefault,
-                    kD3DXDefault,
-                    0U,
-                    nullptr,
-                    nullptr,
-                    &nativeTexture
-                );
+                const unsigned int edgeLength = (context->width_ != 0U) ? context->width_ : D3DX_DEFAULT;
+                IDirect3DCubeTexture9* cubeTexture;
+                const HRESULT createResult = D3DXCreateCubeTextureFromFileInMemoryEx(mDevice, sourceData, sourceBytes, edgeLength, D3DX_DEFAULT, 0U, static_cast<D3DFORMAT>(FormatGalToD3D(context->format_)), D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0U, nullptr, nullptr, &cubeTexture);
                 if (createResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 410, createResult);
                 }
 
-                D3DSurfaceDescRuntime surfaceDesc{};
-                const HRESULT levelDescResult = InvokeTextureGetLevelDesc(nativeTexture, 0U, &surfaceDesc);
+                D3DSURFACE_DESC surfaceDesc;
+                const HRESULT levelDescResult = cubeTexture->GetLevelDesc(0U, &surfaceDesc);
                 if (levelDescResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 414, levelDescResult);
                 }
 
                 textureContext.type_ = 2U;
-                textureContext.mipmapLevels_ = InvokeTextureGetLevelCount(nativeTexture);
-                textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-                textureContext.width_ = surfaceDesc.width;
-                textureContext.height_ = surfaceDesc.height;
+                textureContext.mipmapLevels_ = cubeTexture->GetLevelCount();
+                textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.Format);
+                textureContext.width_ = surfaceDesc.Width;
+                textureContext.height_ = surfaceDesc.Height;
+                nativeTexture = cubeTexture;
             }
-            else if (imageInfo.resourceType == kD3DResourceTypeVolumeTexture)
+            else if (imageInfo.ResourceType == D3DRTYPE_VOLUMETEXTURE)
             {
-                const HRESULT createResult = InvokeD3DXCreateVolumeTextureFromFileInMemoryEx(
-                    mDevice,
-                    sourceData,
-                    sourceBytes,
-                    kD3DXDefault,
-                    kD3DXDefault,
-                    kD3DXDefault,
-                    kD3DXDefault,
-                    0U,
-                    FormatGalToD3D(context->format_),
-                    D3DPOOL_MANAGED,
-                    kD3DXDefault,
-                    kD3DXDefault,
-                    0U,
-                    nullptr,
-                    nullptr,
-                    &nativeTexture
-                );
+                IDirect3DVolumeTexture9* volumeTexture;
+                const HRESULT createResult = D3DXCreateVolumeTextureFromFileInMemoryEx(mDevice, sourceData, sourceBytes, D3DX_DEFAULT, D3DX_DEFAULT, D3DX_DEFAULT, D3DX_DEFAULT, 0U, static_cast<D3DFORMAT>(FormatGalToD3D(context->format_)), D3DPOOL_MANAGED, D3DX_DEFAULT, D3DX_DEFAULT, 0U, nullptr, nullptr, &volumeTexture);
                 if (createResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 442, createResult);
                 }
 
-                D3DSurfaceDescRuntime surfaceDesc{};
-                const HRESULT levelDescResult = InvokeTextureGetLevelDesc(nativeTexture, 0U, &surfaceDesc);
+                D3DVOLUME_DESC volumeDesc;
+                const HRESULT levelDescResult = volumeTexture->GetLevelDesc(0U, &volumeDesc);
                 if (levelDescResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 446, levelDescResult);
                 }
 
                 textureContext.type_ = 3U;
-                textureContext.mipmapLevels_ = InvokeTextureGetLevelCount(nativeTexture);
-                textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-                textureContext.width_ = surfaceDesc.width;
-                textureContext.height_ = surfaceDesc.height;
+                textureContext.mipmapLevels_ = volumeTexture->GetLevelCount();
+                textureContext.format_ = FormatD3D9ToMoho(volumeDesc.Format);
+                textureContext.width_ = volumeDesc.Width;
+                textureContext.height_ = volumeDesc.Height;
+                nativeTexture = volumeTexture;
             }
-            else if (imageInfo.resourceType == kD3DResourceTypeTexture2D)
+            else if (imageInfo.ResourceType == D3DRTYPE_TEXTURE)
             {
-                const unsigned int width = (context->width_ != 0U) ? context->width_ : kD3DXDefault;
-                const unsigned int height = (context->height_ != 0U) ? context->height_ : kD3DXDefault;
+                const unsigned int width = (context->width_ != 0U) ? context->width_ : D3DX_DEFAULT;
+                const unsigned int height = (context->height_ != 0U) ? context->height_ : D3DX_DEFAULT;
                 // 0x008EB42A..0x008EB455, read off the pushes (IDA applies the sixteen-parameter
                 // volume prototype here too, shifting every label from `format` on by one slot):
                 // Filter = D3DX_DEFAULT, MipFilter = D3DX_SKIP_DDS_MIP_LEVELS(skip) | D3DX_FILTER_BOX.
@@ -6694,41 +4721,27 @@ namespace { // TEMPORARY PROBE (do not commit)
                 // level 0 unfilled, which renders as opaque black at any minification.
                 const unsigned int mipFilter = ((context->reserved0x44_ & 0x1FU) << 26U) | 5U;
 
-                const HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-                    mDevice,
-                    sourceData,
-                    sourceBytes,
-                    width,
-                    height,
-                    kD3DXDefault,
-                    0U,
-                    FormatGalToD3D(context->format_),
-                    D3DPOOL_MANAGED,
-                    kD3DXDefault,
-                    mipFilter,
-                    0U,
-                    nullptr,
-                    nullptr,
-                    &nativeTexture
-                );
+                IDirect3DTexture9* texture;
+                const HRESULT createResult = D3DXCreateTextureFromFileInMemoryEx(mDevice, sourceData, sourceBytes, width, height, D3DX_DEFAULT, 0U, static_cast<D3DFORMAT>(FormatGalToD3D(context->format_)), D3DPOOL_MANAGED, D3DX_DEFAULT, mipFilter, 0U, nullptr, nullptr, &texture);
                 { static int sDevBudget = 60; if (sDevBudget > 0) { --sDevBudget; ::gpg::Warnf("[TEXCREATE] tid=%lu device=%p bytes=%u skip=%u mipFilter=%08X w=%u h=%u loc=%s", ::GetCurrentThreadId(), mDevice, static_cast<unsigned>(sourceBytes), context->reserved0x44_, mipFilter, context->width_, context->height_, context->location_.c_str()); } } // TEMPORARY PROBE (do not commit)
                 if (createResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 377, createResult);
                 }
 
-                D3DSurfaceDescRuntime surfaceDesc{};
-                const HRESULT levelDescResult = InvokeTextureGetLevelDesc(nativeTexture, 0U, &surfaceDesc);
+                D3DSURFACE_DESC surfaceDesc;
+                const HRESULT levelDescResult = texture->GetLevelDesc(0U, &surfaceDesc);
                 if (levelDescResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 381, levelDescResult);
                 }
 
                 textureContext.type_ = 1U;
-                textureContext.mipmapLevels_ = InvokeTextureGetLevelCount(nativeTexture);
-                textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.format);
-                textureContext.width_ = surfaceDesc.width;
-                textureContext.height_ = surfaceDesc.height;
+                textureContext.mipmapLevels_ = texture->GetLevelCount();
+                textureContext.format_ = FormatD3D9ToMoho(surfaceDesc.Format);
+                textureContext.width_ = surfaceDesc.Width;
+                textureContext.height_ = surfaceDesc.Height;
+                nativeTexture = texture;
             }
             else
             {
@@ -6755,17 +4768,8 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        void* renderTexture = nullptr;
-        const HRESULT createResult = InvokeNativeCreateTexture(
-            this,
-            context->width_,
-            context->height_,
-            1U,
-            1U,
-            GetD3DFormat(context->format_),
-            D3DPOOL_DEFAULT,
-            &renderTexture
-        );
+        IDirect3DTexture9* renderTexture = nullptr;
+        const HRESULT createResult = mDevice->CreateTexture(context->width_, context->height_, 1U, 1U, static_cast<D3DFORMAT>(GetD3DFormat(context->format_)), D3DPOOL_DEFAULT, &renderTexture, nullptr);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 508, createResult);
@@ -6785,16 +4789,8 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        void* cubeTexture = nullptr;
-        const HRESULT createResult = InvokeNativeCreateCubeTexture(
-            this,
-            context->dimension_,
-            1U,
-            1U,
-            GetD3DFormat(context->format_),
-            D3DPOOL_DEFAULT,
-            &cubeTexture
-        );
+        IDirect3DCubeTexture9* cubeTexture = nullptr;
+        const HRESULT createResult = mDevice->CreateCubeTexture(context->dimension_, 1U, 1U, static_cast<D3DFORMAT>(GetD3DFormat(context->format_)), D3DPOOL_DEFAULT, &cubeTexture, nullptr);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 521, createResult);
@@ -6816,16 +4812,8 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        void* depthStencilSurface = nullptr;
-        const HRESULT createResult = InvokeNativeCreateDepthStencilSurface(
-            this,
-            context->width_,
-            context->height_,
-            FormatToD3DFormat(context->format_),
-            0U,
-            0U,
-            &depthStencilSurface
-        );
+        IDirect3DSurface9* depthStencilSurface = nullptr;
+        const HRESULT createResult = mDevice->CreateDepthStencilSurface(context->width_, context->height_, static_cast<D3DFORMAT>(FormatToD3DFormat(context->format_)), D3DMULTISAMPLE_NONE, 0U, FALSE, &depthStencilSurface, nullptr);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 534, createResult);
@@ -6846,12 +4834,8 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        void* vertexDeclaration = nullptr;
-        const HRESULT createResult = InvokeNativeCreateVertexDeclaration(
-            this,
-            GetVertexFormatElementsOrThrow(formatCode),
-            &vertexDeclaration
-        );
+        IDirect3DVertexDeclaration9* vertexDeclaration = nullptr;
+        const HRESULT createResult = mDevice->CreateVertexDeclaration(GetVertexFormatElementsOrThrow(formatCode), &vertexDeclaration);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 546, createResult);
@@ -6876,9 +4860,9 @@ namespace { // TEMPORARY PROBE (do not commit)
         const unsigned int usageFlags = ((context->usage_ == 2U) ? 0x200U : 0U) | 0x8U;
         const D3DPOOL pool = (context->usage_ == 2U) ? D3DPOOL_DEFAULT : D3DPOOL_MANAGED;
 
-        void* nativeVertexBuffer = nullptr;
+        IDirect3DVertexBuffer9* nativeVertexBuffer = nullptr;
         const HRESULT createResult =
-            InvokeNativeCreateVertexBuffer(this, byteWidth, usageFlags, 0U, pool, &nativeVertexBuffer);
+            mDevice->CreateVertexBuffer(byteWidth, usageFlags, 0U, pool, &nativeVertexBuffer, nullptr);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 560, createResult);
@@ -6906,12 +4890,12 @@ namespace { // TEMPORARY PROBE (do not commit)
         const unsigned int bytesPerIndex = (context->format_ == 1U) ? 2U : 4U;
         const unsigned int byteSize = context->size_ * bytesPerIndex;
         const unsigned int usageFlags = ((context->type_ == 2U) ? 0x200U : 0U) | 0x8U;
-        const std::uint32_t d3dFormat = (context->format_ == 1U) ? kD3DFormatIndex16 : kD3DFormatIndex32;
+        const D3DFORMAT d3dFormat = (context->format_ == 1U) ? D3DFMT_INDEX16 : D3DFMT_INDEX32;
         const D3DPOOL pool = (context->type_ == 2U) ? D3DPOOL_DEFAULT : D3DPOOL_MANAGED;
 
-        void* nativeIndexBuffer = nullptr;
+        IDirect3DIndexBuffer9* nativeIndexBuffer = nullptr;
         const HRESULT createResult =
-            InvokeNativeCreateIndexBuffer(this, byteSize, usageFlags, d3dFormat, pool, &nativeIndexBuffer);
+            mDevice->CreateIndexBuffer(byteSize, usageFlags, d3dFormat, pool, &nativeIndexBuffer, nullptr);
         if (createResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 581, createResult);
@@ -6945,20 +4929,20 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 646, "Missing dest   texture");
         }
 
-        void* const sourceSurface = static_cast<RenderTargetD3D9*>(source.get())->GetSurface();
+        IDirect3DSurface9* const sourceSurface = static_cast<RenderTargetD3D9*>(source.get())->GetSurface();
 
-        ComObjectScope destinationSurface{};
-        const HRESULT getSurfaceResult =
-            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(destination.get())->GetTexture1(), 0U, destinationSurface.out());
-        if (getSurfaceResult < 0)
+        IDirect3DSurface9* destinationSurface = nullptr;
+        HRESULT result = static_cast<TextureD3D9*>(destination.get())->GetTexture1()->GetSurfaceLevel(0U, &destinationSurface);
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 656, getSurfaceResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 656, result);
         }
 
-        const HRESULT copyResult = InvokeNativeGetRenderTargetData(this, sourceSurface, destinationSurface.get());
-        if (copyResult < 0)
+        result = mDevice->GetRenderTargetData(sourceSurface, destinationSurface);
+        destinationSurface->Release();
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 661, copyResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 661, result);
         }
     }
 
@@ -6988,14 +4972,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 625, "Missing dest   texture");
         }
 
-        const HRESULT stretchResult = InvokeNativeStretchRect(
-            this,
-            static_cast<RenderTargetD3D9*>(source.get())->GetSurface(),
-            sourceRect,
-            static_cast<RenderTargetD3D9*>(destination.get())->GetSurface(),
-            destinationRect,
-            kD3DTexFilterLinear
-        );
+        const HRESULT stretchResult = mDevice->StretchRect(static_cast<RenderTargetD3D9*>(source.get())->GetSurface(), sourceRect, static_cast<RenderTargetD3D9*>(destination.get())->GetSurface(), destinationRect, D3DTEXF_LINEAR);
         if (stretchResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 637, stretchResult);
@@ -7029,33 +5006,28 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 593, "Missing dest   texture");
         }
 
-        ComObjectScope sourceSurface{};
-        const HRESULT getSourceSurfaceResult =
-            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(source.get())->GetTexture1(), 0U, sourceSurface.out());
-        if (getSourceSurfaceResult < 0)
+        IDirect3DSurface9* sourceSurface = nullptr;
+        HRESULT result = static_cast<TextureD3D9*>(source.get())->GetTexture1()->GetSurfaceLevel(0U, &sourceSurface);
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 599, getSourceSurfaceResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 599, result);
         }
 
-        ComObjectScope destinationSurface{};
-        const HRESULT getDestinationSurfaceResult =
-            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(destination.get())->GetTexture1(), 0U, destinationSurface.out());
-        if (getDestinationSurfaceResult < 0)
+        IDirect3DSurface9* destinationSurface = nullptr;
+        result = static_cast<TextureD3D9*>(destination.get())->GetTexture1()->GetSurfaceLevel(0U, &destinationSurface);
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 605, getDestinationSurfaceResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 605, result);
         }
 
-        const HRESULT copyResult = InvokeD3DXLoadSurfaceFromSurface(
-            destinationSurface.get(),
-            destinationRect,
-            sourceSurface.get(),
-            sourceRect,
-            0xFFFFFFFFU,
-            0U
+        result = D3DXLoadSurfaceFromSurface(
+            destinationSurface, nullptr, destinationRect, sourceSurface, nullptr, sourceRect, D3DX_DEFAULT, 0U
         );
-        if (copyResult < 0)
+        sourceSurface->Release();
+        destinationSurface->Release();
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 610, copyResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 610, result);
         }
     }
 
@@ -7088,14 +5060,13 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 736, "Missing file");
         }
 
-        void* const nativeTexture = static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture();
+        IDirect3DCubeTexture9* const nativeTexture = static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture();
         if (nativeTexture == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 741, "unable to get concrete cube texture");
         }
 
-        const HRESULT saveResult =
-            InvokeD3DXSaveTextureToFileA(GetStringDataRaw(filePath), kD3DXIFFDDS, nativeTexture);
+        const HRESULT saveResult = D3DXSaveTextureToFileA(filePath.c_str(), D3DXIFF_DDS, nativeTexture, nullptr);
         if (saveResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 745, saveResult);
@@ -7126,14 +5097,14 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         // One `GetSurface` call (0x008ECA21); the result feeds the save.
-        void* const surface = static_cast<RenderTargetD3D9*>(renderTarget.get())->GetSurface();
+        IDirect3DSurface9* const surface = static_cast<RenderTargetD3D9*>(renderTarget.get())->GetSurface();
         if (surface == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 720, "Unable to get back buffer surface");
         }
 
         const HRESULT saveResult =
-            InvokeD3DXSaveSurfaceToFileA(GetStringDataRaw(filePath), MapImageFormatTokenToD3DX(fileFormat), surface);
+            D3DXSaveSurfaceToFileA(filePath.c_str(), kD3DXImageFileFormats[fileFormat], surface, nullptr, nullptr);
         if (saveResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 728, saveResult);
@@ -7157,47 +5128,44 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        ComObjectScope sourceSurface{};
+        IDirect3DSurface9* sourceSurface = nullptr;
         const HRESULT getSurfaceResult =
-            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(texture.get())->GetTexture1(), 0U, sourceSurface.out());
-        if (getSurfaceResult < 0)
+            static_cast<TextureD3D9*>(texture.get())->GetTexture1()->GetSurfaceLevel(0U, &sourceSurface);
+        if (FAILED(getSurfaceResult))
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 681, getSurfaceResult);
         }
 
-        const unsigned int d3dxFileFormat = MapImageFormatTokenToD3DX(fileFormat);
-        HRESULT saveResult = 0;
-
+        const D3DXIMAGE_FILEFORMAT format = kD3DXImageFileFormats[fileFormat];
+        HRESULT saveResult;
         if (outBuffer != nullptr)
         {
-            ComObjectScope fileBuffer{};
-            const HRESULT createBufferResult = InvokeD3DXCreateBuffer(0U, fileBuffer.out());
-            if (createBufferResult < 0)
+            ID3DXBuffer* fileBuffer;
+            if (FAILED(D3DXCreateBuffer(0U, &fileBuffer)))
             {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 690, createBufferResult);
+                // The binary's check macro evaluates its expression a second
+                // time to name the failure (0x008EC7B1).
+                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 690, D3DXCreateBuffer(0U, &fileBuffer));
             }
 
-            saveResult = InvokeD3DXSaveSurfaceToFileInMemoryEx(fileBuffer.out(), d3dxFileFormat, sourceSurface.get());
-            if (saveResult >= 0)
+            // Replaces the buffer made above without releasing it, and copies
+            // whatever the buffer holds even when the encode failed - both as
+            // the binary does.
+            saveResult = D3DXSaveSurfaceToFileInMemory(&fileBuffer, format, sourceSurface, nullptr, nullptr);
+            if (outBuffer->Size() != fileBuffer->GetBufferSize())
             {
-                const unsigned int serializedSize = GetD3DXBufferSize(fileBuffer.get());
-                if (outBuffer->Size() != serializedSize)
-                {
-                    gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(serializedSize);
-                    *outBuffer = resizedBuffer;
-                }
-
-                void* const sourceBytes = GetD3DXBufferPointer(fileBuffer.get());
-                char* const destinationBytes = outBuffer->GetPtr(0U, 0U);
-                std::memcpy(destinationBytes, sourceBytes, serializedSize);
+                *outBuffer = gpg::AllocMemBuffer(fileBuffer->GetBufferSize());
             }
+            std::memcpy(outBuffer->GetPtr(0U, 0U), fileBuffer->GetBufferPointer(), fileBuffer->GetBufferSize());
+            fileBuffer->Release();
         }
         else
         {
-            saveResult = InvokeD3DXSaveSurfaceToFileA(GetStringDataRaw(filePath), d3dxFileFormat, sourceSurface.get());
+            saveResult = D3DXSaveSurfaceToFileA(filePath.c_str(), format, sourceSurface, nullptr, nullptr);
         }
 
-        if (saveResult < 0)
+        sourceSurface->Release();
+        if (FAILED(saveResult))
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 707, saveResult);
         }
@@ -7227,134 +5195,63 @@ namespace { // TEMPORARY PROBE (do not commit)
             return;
         }
 
-        // The argument list below is read straight off the two call sites at
-        // 0x008ECD87 and 0x008ECDB7. Take the pushes, not the decompiler's
-        // labels: IDA resolves the callee to the 2D
-        // D3DXCreateTextureFromFileInMemoryEx (d3dx9_35.dll ordinal 0x62) but
-        // then applies the sixteen-parameter *volume* prototype to it, so it
-        // invents a `depth` argument and every label from `format` onwards is
-        // shifted one place left. The retry at 0x008ECDB7 settles it: it pushes
-        // exactly fifteen arguments.
+        // The argument list below is read straight off the call at 0x008ECD87.
+        // Take the pushes, not the decompiler's labels: IDA resolves the callee
+        // to the 2D D3DXCreateTextureFromFileInMemoryEx (d3dx9_35.dll ordinal
+        // 0x62) but then applies the sixteen-parameter *volume* prototype to
+        // it, so it invents a `depth` argument and every label from `format`
+        // onwards is shifted one place left. The repeat at 0x008ECDB7 settles
+        // it: it pushes exactly fifteen arguments.
         //
         // Getting the shift wrong is not a subtle fidelity issue - it hands
         // D3DX a Format of 2, which is not a D3DFORMAT at all, so the call
-        // fails, the identical retry fails with it, and no texture in the game
-        // ever loads. Every Bitmap control then reports 0x0, and since the whole
-        // MAUI layout is expressed relative to control sizes, each dialog
-        // collapses onto a single point.
-        D3DXImageInfoRuntime sourceImageInfo{};
-        void* sourceTexture = nullptr;
-        HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-            mDevice,
-            sourceData,
-            sourceBytes,
-            kD3DXDefaultNonPow2,
-            kD3DXDefaultNonPow2,
-            1U,
-            0U,
-            kD3DFormatUnknown,
-            D3DPOOL_SYSTEMMEM,
-            kD3DXFilterNone,
-            kD3DXFilterNone,
-            0U,
-            &sourceImageInfo,
-            nullptr,
-            &sourceTexture
-        );
-        if (createResult < 0)
-        {
-            createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-                mDevice,
-                sourceData,
-                sourceBytes,
-                kD3DXDefaultNonPow2,
-                kD3DXDefaultNonPow2,
-                1U,
-                0U,
-                kD3DFormatUnknown,
-                D3DPOOL_SYSTEMMEM,
-                kD3DXFilterNone,
-                kD3DXFilterNone,
-                0U,
-                &sourceImageInfo,
-                nullptr,
-                &sourceTexture
+        // fails and no texture in the game ever loads. Every Bitmap control
+        // then reports 0x0, and since the whole MAUI layout is expressed
+        // relative to control sizes, each dialog collapses onto a single point.
+        D3DXIMAGE_INFO sourceImageInfo;
+        IDirect3DTexture9* sourceTexture;
+        CheckD3DCall("DeviceD3D9.cpp", 779, [&] {
+            return D3DXCreateTextureFromFileInMemoryEx(
+                mDevice, sourceData, sourceBytes, D3DX_DEFAULT_NONPOW2, D3DX_DEFAULT_NONPOW2, 1U, 0U, D3DFMT_UNKNOWN,
+                D3DPOOL_SYSTEMMEM, D3DX_FILTER_NONE, D3DX_FILTER_NONE, 0U, &sourceImageInfo, nullptr, &sourceTexture
             );
-            if (createResult < 0)
-            {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 779, createResult);
-            }
-        }
+        });
 
-        ComObjectScope sourceTextureScope{};
-        *sourceTextureScope.out() = sourceTexture;
+        IDirect3DSurface9* surface;
+        CheckD3DCall("DeviceD3D9.cpp", 782, [&] { return sourceTexture->GetSurfaceLevel(0U, &surface); });
 
-        ComObjectScope sourceSurface{};
-        const HRESULT getSourceSurfaceResult = InvokeGetSurfaceLevel(sourceTextureScope.get(), 0U, sourceSurface.out());
-        if (getSourceSurfaceResult < 0)
+        D3DSURFACE_DESC sourceDesc;
+        CheckD3DCall("DeviceD3D9.cpp", 785, [&] { return surface->GetDesc(&sourceDesc); });
+
+        *outWidth = sourceDesc.Width;
+        *outHeight = static_cast<int>(sourceDesc.Height);
+
+        // Anything that is not already DXT5 is converted through a DXT5
+        // system-memory copy, which then stands in for the source surface.
+        IDirect3DTexture9* decodeTexture = nullptr;
+        if (sourceDesc.Format != D3DFMT_DXT5)
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 782, getSourceSurfaceResult);
+            CheckD3DCall("DeviceD3D9.cpp", 801, [&] {
+                return mDevice->CreateTexture(
+                    AlignToDword(sourceDesc.Width), AlignToDword(sourceDesc.Height), 1U, 0U, D3DFMT_DXT5,
+                    D3DPOOL_SYSTEMMEM, &decodeTexture, nullptr
+                );
+            });
+
+            IDirect3DSurface9* decodeSurface;
+            CheckD3DCall("DeviceD3D9.cpp", 804, [&] { return decodeTexture->GetSurfaceLevel(0U, &decodeSurface); });
+            CheckD3DCall("DeviceD3D9.cpp", 809, [&] {
+                return D3DXLoadSurfaceFromSurface(
+                    decodeSurface, nullptr, nullptr, surface, nullptr, nullptr, D3DX_FILTER_NONE, 0U
+                );
+            });
+
+            surface->Release();
+            surface = decodeSurface;
         }
 
-        D3DSurfaceDescRuntime sourceDesc{};
-        const HRESULT getDescResult = InvokeSurfaceGetDesc(sourceSurface.get(), &sourceDesc);
-        if (getDescResult < 0)
-        {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 785, getDescResult);
-        }
-
-        *outWidth = sourceDesc.width;
-        *outHeight = static_cast<int>(sourceDesc.height);
-
-        void* decodeSurface = sourceSurface.get();
-        ComObjectScope decodeTexture{};
-        ComObjectScope decodeSurfaceScope{};
-
-        if (sourceDesc.format != kD3DFormatDXT5)
-        {
-            const HRESULT createDecodeTextureResult = InvokeNativeCreateTexture(
-                this,
-                AlignToDword(sourceDesc.width),
-                AlignToDword(sourceDesc.height),
-                1U,
-                0U,
-                kD3DFormatDXT5,
-                D3DPOOL_MANAGED,
-                decodeTexture.out()
-            );
-            if (createDecodeTextureResult < 0)
-            {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 801, createDecodeTextureResult);
-            }
-
-            const HRESULT getDecodeSurfaceResult = InvokeGetSurfaceLevel(decodeTexture.get(), 0U, decodeSurfaceScope.out());
-            if (getDecodeSurfaceResult < 0)
-            {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 804, getDecodeSurfaceResult);
-            }
-
-            const HRESULT loadResult = InvokeD3DXLoadSurfaceFromSurface(
-                decodeSurfaceScope.get(),
-                nullptr,
-                sourceSurface.get(),
-                nullptr,
-                kD3DTexFilterPoint,
-                0U
-            );
-            if (loadResult < 0)
-            {
-                ThrowGalErrorFromHresult("DeviceD3D9.cpp", 809, loadResult);
-            }
-
-            decodeSurface = decodeSurfaceScope.get();
-        }
-
-        D3DLockedRectRuntime lockedRect{};
-        const HRESULT lockResult = InvokeSurfaceLockRect(decodeSurface, &lockedRect, nullptr, kD3DSurfaceLockReadOnly);
-        if (lockResult < 0)
-        {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 817, lockResult);
-        }
+        D3DLOCKED_RECT lockedRect;
+        CheckD3DCall("DeviceD3D9.cpp", 817, [&] { return surface->LockRect(&lockedRect, nullptr, D3DLOCK_READONLY); });
 
         const unsigned int alignedWidth = AlignToDword(*outWidth);
         const unsigned int alignedHeight = AlignToDword(static_cast<unsigned int>(*outHeight));
@@ -7364,13 +5261,12 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         if (outTextureData->Size() != totalBytes)
         {
-            gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(totalBytes);
-            *outTextureData = resizedBuffer;
+            *outTextureData = gpg::AllocMemBuffer(totalBytes);
         }
 
         char* const destinationBytes = outTextureData->GetPtr(0U, 0U);
-        const char* const sourceBytesPtr = static_cast<const char*>(lockedRect.bits);
-        if (static_cast<std::size_t>(lockedRect.pitch) == bytesPerRow)
+        const char* const sourceBytesPtr = static_cast<const char*>(lockedRect.pBits);
+        if (static_cast<std::size_t>(lockedRect.Pitch) == bytesPerRow)
         {
             std::memcpy(destinationBytes, sourceBytesPtr, totalBytes);
         }
@@ -7380,16 +5276,19 @@ namespace { // TEMPORARY PROBE (do not commit)
             {
                 std::memcpy(
                     destinationBytes + (rowIndex * bytesPerRow),
-                    sourceBytesPtr + (rowIndex * static_cast<std::size_t>(lockedRect.pitch)),
+                    sourceBytesPtr + (rowIndex * static_cast<std::size_t>(lockedRect.Pitch)),
                     bytesPerRow
                 );
             }
         }
 
-        const HRESULT unlockResult = InvokeSurfaceUnlockRect(decodeSurface);
-        if (unlockResult < 0)
+        CheckD3DCall("DeviceD3D9.cpp", 833, [&] { return surface->UnlockRect(); });
+
+        surface->Release();
+        sourceTexture->Release();
+        if (decodeTexture != nullptr)
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 833, unlockResult);
+            decodeTexture->Release();
         }
     }
 
@@ -7403,13 +5302,13 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::TestCooperativeLevel()
     {
         Func1();
-        const HRESULT result = InvokeNativeTestCooperativeLevel(this);
-        if (static_cast<std::uint32_t>(result) == kD3DDeviceLost)
+        const HRESULT result = mDevice->TestCooperativeLevel();
+        if (result == D3DERR_DEVICELOST)
         {
             return 2;
         }
 
-        if (static_cast<std::uint32_t>(result) == kD3DDeviceNotReset)
+        if (result == D3DERR_DEVICENOTRESET)
         {
             return 1;
         }
@@ -7436,19 +5335,19 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::BeginScene()
     {
         Func1();
-        const HRESULT result = InvokeNativeBeginScene(this);
+        const HRESULT result = mDevice->BeginScene();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 913, result);
         }
 
-        void* const frameEventQuery = mFrameEventQuery;
+        IDirect3DQuery9* const frameEventQuery = mFrameEventQuery;
         if (frameEventQuery == nullptr)
         {
             return 0;
         }
 
-        return InvokeQueryIssue(frameEventQuery, kD3DQueryIssueBegin);
+        return frameEventQuery->Issue(D3DISSUE_BEGIN);
     }
 
     /**
@@ -7460,7 +5359,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::EndScene()
     {
         Func1();
-        const HRESULT result = InvokeNativeEndScene(this);
+        const HRESULT result = mDevice->EndScene();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 926, result);
@@ -7476,8 +5375,8 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::Present()
     {
         Func1();
-        void* const frameEventQuery = mFrameEventQuery;
-        while (InvokeQueryGetData(frameEventQuery, nullptr, 0U, kD3DGetDataFlush) == 1)
+        IDirect3DQuery9* const frameEventQuery = mFrameEventQuery;
+        while (frameEventQuery->GetData(nullptr, 0U, D3DGETDATA_FLUSH) == 1)
         {
         }
 
@@ -7497,12 +5396,11 @@ namespace { // TEMPORARY PROBE (do not commit)
                 char tpath[600]; (void)std::snprintf(tpath, sizeof(tpath), "%s/dumpframe2.on", dir2);
                 const bool armed = ::GetFileAttributesA(tpath) != INVALID_FILE_ATTRIBUTES;
                 if (armed && sPairState < 2) {
-                    void* bb = nullptr;
-                    if (InvokeNativeGetBackBuffer(this, 0U, 0U, 0U, &bb) >= 0 && bb != nullptr) {
+                    IDirect3DSurface9* bb = nullptr;
+                    if (mDevice->GetBackBuffer(0U, 0U, D3DBACKBUFFER_TYPE_MONO, &bb) >= 0 && bb != nullptr) {
                         char out[600]; (void)std::snprintf(out, sizeof(out), "%s/frame_%c.bmp", dir2, sPairState == 0 ? 'A' : 'B');
-                        const HRESULT sh = InvokeD3DXSaveSurfaceToFileA(out, 0U, bb);
-                        using release_fn = unsigned long(STDMETHODCALLTYPE*)(void*);
-                        reinterpret_cast<release_fn>((*reinterpret_cast<void***>(bb))[2])(bb);
+                        const HRESULT sh = D3DXSaveSurfaceToFileA(out, D3DXIFF_BMP, bb, nullptr, nullptr);
+                        bb->Release();
                         ::gpg::Warnf("[FRAMEDUMP2] %d hr=%08lX %s", sPairState, static_cast<long>(sh), out);
                     }
                     ++sPairState;
@@ -7519,19 +5417,18 @@ namespace { // TEMPORARY PROBE (do not commit)
                 if (::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR") == 0 && length != 0u) {
                     char path[600]; (void)std::snprintf(path, sizeof(path), "%s/dumpframe.on", dir);
                     if (::GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
-                        void* bb = nullptr;
-                        if (InvokeNativeGetBackBuffer(this, 0U, 0U, 0U, &bb) >= 0 && bb != nullptr) {
+                        IDirect3DSurface9* bb = nullptr;
+                        if (mDevice->GetBackBuffer(0U, 0U, D3DBACKBUFFER_TYPE_MONO, &bb) >= 0 && bb != nullptr) {
                             char out[600]; (void)std::snprintf(out, sizeof(out), "%s/frame.bmp", dir);
-                            const HRESULT sh = InvokeD3DXSaveSurfaceToFileA(out, 0U, bb);
-                            using release_fn = unsigned long(STDMETHODCALLTYPE*)(void*);
-                            reinterpret_cast<release_fn>((*reinterpret_cast<void***>(bb))[2])(bb);
+                            const HRESULT sh = D3DXSaveSurfaceToFileA(out, D3DXIFF_BMP, bb, nullptr, nullptr);
+                            bb->Release();
                             ::gpg::Warnf("[FRAMEDUMP] hr=%08lX %s", static_cast<long>(sh), out);
                         }
                     }
                 }
             }
         }
-        const HRESULT result = InvokeNativePresent(this);
+        const HRESULT result = mDevice->Present(nullptr, nullptr, nullptr, nullptr);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 937, result);
@@ -7551,23 +5448,21 @@ namespace { // TEMPORARY PROBE (do not commit)
         Func1();
 
         auto* const cursorTexture = static_cast<TextureD3D9*>(context->texture_.get());
-        ComObjectScope cursorSurface{};
-        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(cursorTexture->GetTexture1(), 0U, cursorSurface.out());
-        if (getSurfaceResult < 0)
+        IDirect3DSurface9* cursorSurface = nullptr;
+        HRESULT result = cursorTexture->GetTexture1()->GetSurfaceLevel(0U, &cursorSurface);
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 949, getSurfaceResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 949, result);
         }
 
-        const HRESULT setCursorResult = InvokeNativeSetCursorProperties(
-            this,
-            static_cast<unsigned int>(context->hotspotX_),
-            static_cast<unsigned int>(context->hotspotY_),
-            cursorSurface.get()
+        result = mDevice->SetCursorProperties(
+            static_cast<UINT>(context->hotspotX_), static_cast<UINT>(context->hotspotY_), cursorSurface
         );
-        if (setCursorResult < 0)
+        if (FAILED(result))
         {
-            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 952, setCursorResult);
+            ThrowGalErrorFromHresult("DeviceD3D9.cpp", 952, result);
         }
+        SafeRelease(cursorSurface);
     }
 
     /**
@@ -7581,7 +5476,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::SetViewport(const void* const viewport)
     {
         Func1();
-        const HRESULT result = InvokeNativeSetViewport(this, viewport);
+        const HRESULT result = mDevice->SetViewport(static_cast<const D3DVIEWPORT9*>(viewport));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 973, result);
@@ -7599,7 +5494,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::GetViewport(void* const outViewport)
     {
         Func1();
-        const HRESULT result = InvokeNativeGetViewport(this, outViewport);
+        const HRESULT result = mDevice->GetViewport(static_cast<D3DVIEWPORT9*>(outViewport));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 981, result);
@@ -7618,15 +5513,21 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        ComObjectScope currentRenderTarget{};
-        InvokeNativeGetRenderTarget(this, 0U, currentRenderTarget.out());
+        // The current target is only compared against, so its reference is
+        // dropped at once (0x008EDB37) and the pointer kept as a value.
+        IDirect3DSurface9* currentRenderTarget = nullptr;
+        mDevice->GetRenderTarget(0U, &currentRenderTarget);
+        if (currentRenderTarget != nullptr)
+        {
+            currentRenderTarget->Release();
+        }
 
         if (context->surface.get() != nullptr)
         {
-            void* const targetSurface = static_cast<RenderTargetD3D9*>(context->surface.get())->GetSurface();
-            if (currentRenderTarget.get() != targetSurface)
+            IDirect3DSurface9* const targetSurface = static_cast<RenderTargetD3D9*>(context->surface.get())->GetSurface();
+            if (currentRenderTarget != targetSurface)
             {
-                const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, targetSurface);
+                const HRESULT setResult = mDevice->SetRenderTarget(0U, targetSurface);
                 if (setResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1004, setResult);
@@ -7635,45 +5536,49 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
         else if (context->cubeTarget.get() != nullptr)
         {
-            void* const targetSurface =
+            IDirect3DSurface9* const targetSurface =
                 static_cast<CubeRenderTargetD3D9*>(context->cubeTarget.get())->GetSurface(context->face);
-            if (currentRenderTarget.get() != targetSurface)
+            if (currentRenderTarget != targetSurface)
             {
-                const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, targetSurface);
+                const HRESULT setResult = mDevice->SetRenderTarget(0U, targetSurface);
                 if (setResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1017, setResult);
                 }
             }
         }
-        else if (currentRenderTarget.get() != nullptr)
+        else if (currentRenderTarget != nullptr)
         {
-            const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, nullptr);
+            const HRESULT setResult = mDevice->SetRenderTarget(0U, nullptr);
             if (setResult < 0)
             {
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1024, setResult);
             }
         }
 
-        ComObjectScope currentDepthStencilSurface{};
-        InvokeNativeGetDepthStencilSurface(this, currentDepthStencilSurface.out());
+        IDirect3DSurface9* currentDepthStencilSurface = nullptr;
+        mDevice->GetDepthStencilSurface(&currentDepthStencilSurface);
+        if (currentDepthStencilSurface != nullptr)
+        {
+            currentDepthStencilSurface->Release();
+        }
 
         if (context->depthStencil.get() != nullptr)
         {
-            void* const depthStencilSurface =
+            IDirect3DSurface9* const depthStencilSurface =
                 static_cast<DepthStencilTargetD3D9*>(context->depthStencil.get())->GetSurface();
-            if (currentDepthStencilSurface.get() != depthStencilSurface)
+            if (currentDepthStencilSurface != depthStencilSurface)
             {
-                const HRESULT setResult = InvokeNativeSetDepthStencilSurface(this, depthStencilSurface);
+                const HRESULT setResult = mDevice->SetDepthStencilSurface(depthStencilSurface);
                 if (setResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1043, setResult);
                 }
             }
         }
-        else if (currentDepthStencilSurface.get() != nullptr)
+        else if (currentDepthStencilSurface != nullptr)
         {
-            const HRESULT setResult = InvokeNativeSetDepthStencilSurface(this, nullptr);
+            const HRESULT setResult = mDevice->SetDepthStencilSurface(nullptr);
             if (setResult < 0)
             {
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1049, setResult);
@@ -7707,18 +5612,18 @@ namespace { // TEMPORARY PROBE (do not commit)
         unsigned int clearMask = 0U;
         if (clearTarget)
         {
-            clearMask |= kD3DClearTarget;
+            clearMask |= D3DCLEAR_TARGET;
         }
         if (clearZbuffer)
         {
-            clearMask |= kD3DClearZBuffer;
+            clearMask |= D3DCLEAR_ZBUFFER;
         }
         if (clearStencil)
         {
-            clearMask |= kD3DClearStencil;
+            clearMask |= D3DCLEAR_STENCIL;
         }
 
-        const HRESULT result = InvokeNativeClear(this, 0U, nullptr, clearMask, color, depth, static_cast<unsigned int>(stencil));
+        const HRESULT result = mDevice->Clear(0U, nullptr, clearMask, color, depth, static_cast<unsigned int>(stencil));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1066, result);
@@ -7736,9 +5641,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
     {
         Func1();
-        const HRESULT result = InvokeNativeSetVertexDeclaration(
-            this, static_cast<VertexFormatD3D9*>(vertexFormat.get())->GetDeclaration()
-        );
+        const HRESULT result = mDevice->SetVertexDeclaration(static_cast<VertexFormatD3D9*>(vertexFormat.get())->GetDeclaration());
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1082, result);
@@ -7769,9 +5672,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         VertexBufferContext* const vertexContext = vertexBuffer->GetContext();
         const unsigned int stride = vertexContext->stride_;
         const unsigned int offsetInBytes = static_cast<unsigned int>(startVertex) * stride;
-        const HRESULT setStreamResult = InvokeNativeSetStreamSource(
-            this, streamSlot, static_cast<VertexBufferD3D9*>(vertexBuffer.get())->GetD3D(), offsetInBytes, stride
-        );
+        const HRESULT setStreamResult = mDevice->SetStreamSource(streamSlot, static_cast<VertexBufferD3D9*>(vertexBuffer.get())->GetD3D(), offsetInBytes, stride);
         if (setStreamResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1093, setStreamResult);
@@ -7780,14 +5681,14 @@ namespace { // TEMPORARY PROBE (do not commit)
         unsigned int frequencySetting = 1U;
         if (vertexContext->type_ == 2U)
         {
-            frequencySetting = static_cast<unsigned int>(streamFrequencyToken) | kD3DStreamSourceIndexedData;
+            frequencySetting = static_cast<unsigned int>(streamFrequencyToken) | D3DSTREAMSOURCE_INDEXEDDATA;
         }
         else if (vertexContext->type_ == 3U)
         {
-            frequencySetting = kD3DStreamSourceInstancedData | 1U;
+            frequencySetting = D3DSTREAMSOURCE_INSTANCEDATA | 1U;
         }
 
-        const HRESULT setFrequencyResult = InvokeNativeSetStreamSourceFreq(this, streamSlot, frequencySetting);
+        const HRESULT setFrequencyResult = mDevice->SetStreamSourceFreq(streamSlot, frequencySetting);
         if (setFrequencyResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1102, setFrequencyResult);
@@ -7807,7 +5708,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         Func1();
 
         const HRESULT result =
-            InvokeNativeSetIndices(this, static_cast<IndexBufferD3D9*>(indexBuffer.get())->GetBuffer());
+            mDevice->SetIndices(static_cast<IndexBufferD3D9*>(indexBuffer.get())->GetBuffer());
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1112, result);
@@ -7886,30 +5787,21 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EE6B0 (FUN_008EE6B0)
      *
-     * void const *
-     *
      * What it does:
-     * Validates draw topology, binds recovered primitive type, and dispatches one
-     * native non-indexed draw.
+     * Validates the topology and issues one non-indexed draw, converting the
+     * context's vertex count into a primitive count.
      */
-    int DeviceD3D9::DrawPrimitive(const void* const context)
+    int DeviceD3D9::DrawPrimitive(const DrawContext* const context)
     {
         Func1();
 
-        const auto* const drawContext = reinterpret_cast<const DrawPrimitiveContextRuntime*>(context);
-        if (drawContext->topologyToken == 0U)
+        if (context->topology_ == 0)
         {
             ThrowGalError("DeviceD3D9.cpp", 1149, "invalid topology specified");
         }
 
-        const unsigned int primitiveType = ResolvePrimitiveType(drawContext->topologyToken);
-        const unsigned int primitiveCount = GetDrawPrimitiveCount(*drawContext);
-        const HRESULT result = InvokeNativeDrawPrimitive(
-            this,
-            primitiveType,
-            drawContext->startVertex,
-            primitiveCount
-        );
+        const D3DPRIMITIVETYPE primitiveType = kTopologyPrimitiveTypes[context->topology_];
+        const HRESULT result = mDevice->DrawPrimitive(primitiveType, context->startVertex_, context->GetPrimitiveCount());
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1152, result);
@@ -7921,32 +5813,27 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EE850 (FUN_008EE850)
      *
-     * void const *
-     *
      * What it does:
-     * Validates indexed draw topology, binds recovered primitive type, and
-     * dispatches one native indexed draw.
+     * Validates the topology and issues one indexed draw, converting the
+     * context's index count into a primitive count.
      */
-    int DeviceD3D9::DrawIndexedPrimitive(const void* const context)
+    int DeviceD3D9::DrawIndexedPrimitive(const DrawIndexedContext* const context)
     {
         Func1();
 
-        const auto* const drawContext = reinterpret_cast<const DrawIndexedPrimitiveContextRuntime*>(context);
-        if (drawContext->topologyToken == 0U)
+        if (context->topology_ == 0)
         {
             ThrowGalError("DeviceD3D9.cpp", 1159, "invalid topology specified");
         }
 
-        const unsigned int primitiveType = ResolvePrimitiveType(drawContext->topologyToken);
-        const unsigned int primitiveCount = GetDrawIndexedPrimitiveCount(*drawContext);
-        const HRESULT result = InvokeNativeDrawIndexedPrimitive(
-            this,
+        const D3DPRIMITIVETYPE primitiveType = kTopologyPrimitiveTypes[context->topology_];
+        const HRESULT result = mDevice->DrawIndexedPrimitive(
             primitiveType,
-            drawContext->baseVertexIndex,
-            drawContext->minVertexIndex,
-            drawContext->vertexCount,
-            drawContext->startIndex,
-            primitiveCount
+            context->baseVertexIndex_,
+            context->minVertexIndex_,
+            context->vertexCount_,
+            context->startIndex_,
+            context->GetPrimitiveCount()
         );
         if (result < 0)
         {
@@ -8027,45 +5914,46 @@ namespace { // TEMPORARY PROBE (do not commit)
         StateManagerD3D9* const stateManager = GetStateManager();
         if (enable)
         {
-            static_cast<void>(stateManager->SetTransform(kD3DTransformProjection, projection));
+            // Device slot 43 still passes the matrix untyped.
+            static_cast<void>(stateManager->SetTransform(D3DTS_PROJECTION, static_cast<const D3DMATRIX*>(projection)));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogEnable),
+                D3DRS_FOGENABLE,
                 1U
             ));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateRangeFogEnable),
+                D3DRS_RANGEFOGENABLE,
                 1U
             ));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogColor),
+                D3DRS_FOGCOLOR,
                 static_cast<unsigned int>(fogColor)
             ));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogTableMode),
-                kD3DFogModeLinear
+                D3DRS_FOGTABLEMODE,
+                D3DFOG_LINEAR
             ));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogStart),
+                D3DRS_FOGSTART,
                 std::bit_cast<unsigned int>(fogStart)
             ));
             static_cast<void>(stateManager->SetRenderState(
-                static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogEnd),
+                D3DRS_FOGEND,
                 std::bit_cast<unsigned int>(fogEnd)
             ));
             return;
         }
 
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateFogEnable),
+            D3DRS_FOGENABLE,
             0U
         ));
 
-        float projectionIdentity[4][4] = {};
-        projectionIdentity[0][0] = 1.0f;
-        projectionIdentity[1][1] = 1.0f;
-        projectionIdentity[2][2] = 1.0f;
-        projectionIdentity[3][3] = 1.0f;
-        static_cast<void>(stateManager->SetTransform(kD3DTransformProjection, projectionIdentity));
+        D3DMATRIX projectionIdentity = {};
+        projectionIdentity._11 = 1.0f;
+        projectionIdentity._22 = 1.0f;
+        projectionIdentity._33 = 1.0f;
+        projectionIdentity._44 = 1.0f;
+        static_cast<void>(stateManager->SetTransform(D3DTS_PROJECTION, &projectionIdentity));
     }
 
     /**
@@ -8076,9 +5964,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     int PipelineStateD3D9::SetWireframeState(const bool enabled)
     {
-        const unsigned int fillMode = enabled ? kD3DFillModeWireframe : kD3DFillModeSolid;
+        const unsigned int fillMode = enabled ? D3DFILL_WIREFRAME : D3DFILL_SOLID;
         return GetStateManager()->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DFillMode),
+            D3DRS_FILLMODE,
             fillMode
         );
     }
@@ -8102,7 +5990,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         return GetStateManager()->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateColorWriteEnable),
+            D3DRS_COLORWRITEENABLE,
             colorWriteEnable_
         );
     }
@@ -8117,40 +6005,40 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         StateManagerD3D9* const stateManager = GetStateManager();
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateColorWriteEnable),
+            D3DRS_COLORWRITEENABLE,
             colorWriteEnable_
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateAlphaBlendEnable),
+            D3DRS_ALPHABLENDENABLE,
             0U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateAlphaTestEnable),
+            D3DRS_ALPHATESTENABLE,
             0U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateStencilEnable),
+            D3DRS_STENCILENABLE,
             0U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateZEnable),
+            D3DRS_ZENABLE,
             1U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateZFunc),
-            kD3DCmpLessEqual
+            D3DRS_ZFUNC,
+            D3DCMP_LESSEQUAL
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateZWriteEnable),
+            D3DRS_ZWRITEENABLE,
             1U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateDepthBias),
+            D3DRS_DEPTHBIAS,
             0U
         ));
         static_cast<void>(stateManager->SetRenderState(
-            static_cast<StateManagerD3D9::render_state_type>(kD3DRenderStateCullMode),
-            kD3DCullCounterClockwise
+            D3DRS_CULLMODE,
+            D3DCULL_NONE
         ));
     }
 
@@ -8187,7 +6075,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     StateManagerD3D9* PipelineStateD3D9::GetStateManager()
     {
-        return reinterpret_cast<StateManagerD3D9*>(stateManager_);
+        return stateManager_;
     }
 
     /**
@@ -8300,7 +6188,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Initializes weak-self/context/effect lanes and binds caller-provided context/effect state.
      */
-    EffectD3D9::EffectD3D9(EffectContext* const context, void* const dxEffect)
+    EffectD3D9::EffectD3D9(EffectContext* const context, ID3DXEffect* const dxEffect)
         : selfWeak_(),
           effectContext_(),
           dxEffect_(nullptr)
@@ -8337,7 +6225,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Returns the retained D3DX effect interface and throws when missing.
      */
-    void* EffectD3D9::GetDxEffect()
+    ID3DXEffect* EffectD3D9::GetDxEffect()
     {
         if (dxEffect_ == nullptr)
         {
@@ -8369,7 +6257,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 break;
             }
 
-            D3DXTechniqueDescRuntime techniqueDesc{};
+            D3DXTECHNIQUE_DESC techniqueDesc{};
             result = InvokeEffectGetTechniqueDesc(dxEffect_, techniqueHandle, &techniqueDesc);
             if (result < 0)
             {
@@ -8382,7 +6270,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("EffectD3D9.cpp", 67, "invalid effect");
             }
             const EffectTechniqueSharedRef wrapper =
-                CreateEffectTechniqueWrapper(techniqueDesc.name, effect, techniqueHandle);
+                CreateEffectTechniqueWrapper(techniqueDesc.Name, effect, techniqueHandle);
             static_cast<void>(AppendEffectTechniqueSharedRef(outTechniques, wrapper));
             result = InvokeEffectFindNextValidTechnique(dxEffect_, techniqueHandle, &techniqueHandle);
         }
@@ -8910,8 +6798,8 @@ namespace { // TEMPORARY PROBE (do not commit)
                 PipelineStateD3D9* const ps = ActiveDeviceD3D9().mPipelineState.get();
                 if (ps != nullptr) {
                     for (unsigned s = 0; s < 8; ++s) {
-                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<StateManagerD3D9::sampler_state_type>(7U), 0U));
-                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<StateManagerD3D9::sampler_state_type>(9U), static_cast<unsigned>(sMipLevel)));
+                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<D3DSAMPLERSTATETYPE>(7U), 0U));
+                        static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<D3DSAMPLERSTATETYPE>(9U), static_cast<unsigned>(sMipLevel)));
                     }
                 }
             }
@@ -8947,7 +6835,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 if (pipelineState != nullptr)
                 {
                     static_cast<void>(pipelineState->GetStateManager()->SetRenderState(
-                        static_cast<StateManagerD3D9::render_state_type>(0x16U), static_cast<unsigned int>(sForcedCull)));
+                        static_cast<D3DRENDERSTATETYPE>(0x16U), static_cast<unsigned int>(sForcedCull)));
                 }
             }
             // Technique bisect: log each distinct technique once; "skip_<name>.on" turns
@@ -8997,7 +6885,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                         if (pipelineState != nullptr)
                         {
                             static_cast<void>(pipelineState->GetStateManager()->SetRenderState(
-                                static_cast<StateManagerD3D9::render_state_type>(0xA8U), 0U));
+                                static_cast<D3DRENDERSTATETYPE>(0xA8U), 0U));
                         }
                     }
                 }
@@ -9154,7 +7042,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     IndexBufferD3D9::IndexBufferD3D9(
         const IndexBufferContext* const context,
-        void* const d3dIndexBuffer
+        IDirect3DIndexBuffer9* const d3dIndexBuffer
     )
         : context_()
         , d3dIndexBuffer_(nullptr)
@@ -9174,7 +7062,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     std::uint32_t IndexBufferD3D9::SetBuffer(
         const IndexBufferContext* const context,
-        void* const d3dIndexBuffer
+        IDirect3DIndexBuffer9* const d3dIndexBuffer
     )
     {
         ResetBufferState();
@@ -9195,7 +7083,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void IndexBufferD3D9::ResetBufferState()
     {
-        ReleaseComLike(d3dIndexBuffer_);
+        SafeRelease(d3dIndexBuffer_);
 
         const IndexBufferContext resetContext{};
         context_.format_ = resetContext.format_;
@@ -9220,8 +7108,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F5260 (FUN_008F5260)
      *
      * What it does:
-     * Initializes one empty D3D9 render-target wrapper with default context
-     * and cleared retained texture/surface lanes.
+     * An empty render target.
      */
     RenderTargetD3D9::RenderTargetD3D9()
         : context_()
@@ -9230,100 +7117,114 @@ namespace { // TEMPORARY PROBE (do not commit)
     {}
 
     /**
-     * Address: 0x008F5620 (FUN_008F5620, gpg::gal::RenderTargetD3D9::RenderTargetD3D9)
+     * Address: 0x008F5620 (FUN_008F5620)
      *
      * What it does:
-     * Initializes one render-target wrapper and binds caller context plus one
-     * native texture payload.
+     * Wraps `renderTexture` as a render target of `context`.
      */
-    RenderTargetD3D9::RenderTargetD3D9(
-        const RenderTargetContext* const context,
-        void* const renderTexture
-    )
+    RenderTargetD3D9::RenderTargetD3D9(const RenderTargetContext* const context, IDirect3DTexture9* const renderTexture)
         : context_()
         , surface_(nullptr)
         , texture_(nullptr)
     {
-        static_cast<void>(SetRenderTexture(context, renderTexture));
+        SetRenderTexture(context, renderTexture);
     }
 
     /**
-     * Address: 0x008F5470 (FUN_008F5470, gpg::gal::RenderTargetD3D9::RenderTargetD3D9 `_0` overload)
-     * Mangled: ??0RenderTargetD3D9@gal@gpg@@QAE@@Z_0
+     * Address: 0x008F5470 (FUN_008F5470)
      *
      * What it does:
-     * Surface-wrap overload used by `DeviceD3D9::CreateHeads` to wrap a
-     * pre-existing `IDirect3DSurface9*` (typically a back-buffer) without an
-     * owning `RenderTargetContext`. Resets lane state, caches the back buffer
-     * in `surface_` (+0x14) and leaves `texture_` null, then queries surface
-     * width/height from the D3D9 descriptor and stores them in the embedded
-     * context lane.
+     * Wraps a surface that has no texture behind it - a head's back buffer
+     * (`DeviceD3D9::CreateHeads`).
      */
-    RenderTargetD3D9::RenderTargetD3D9(void* const backBufferSurface)
+    RenderTargetD3D9::RenderTargetD3D9(IDirect3DSurface9* const backBufferSurface)
         : context_()
         , surface_(nullptr)
         , texture_(nullptr)
     {
-        static_cast<void>(InitializeRenderTargetD3D9FromSurface(this, backBufferSurface));
+        SetSurface(backBufferSurface);
+    }
+
+    /**
+     * Address: 0x008F53B0 (FUN_008F53B0)
+     * Address: 0x008F5450 (FUN_008F5450, scalar deleting destructor)
+     *
+     * What it does:
+     * Releases the surface and the texture.
+     */
+    RenderTargetD3D9::~RenderTargetD3D9()
+    {
+        Reset();
+    }
+
+    /**
+     * Address: 0x008F5350 (FUN_008F5350)
+     *
+     * What it does:
+     * Releases the surface and the texture and empties the context.
+     */
+    void RenderTargetD3D9::Reset()
+    {
+        SafeRelease(surface_);
+        SafeRelease(texture_);
+        context_ = RenderTargetContext();
+    }
+
+    /**
+     * Address: 0x008F5410 (FUN_008F5410)
+     *
+     * What it does:
+     * Takes `surface` over and sizes the context from its description.
+     */
+    void RenderTargetD3D9::SetSurface(IDirect3DSurface9* const surface)
+    {
+        Reset();
+        surface_ = surface;
+
+        D3DSURFACE_DESC surfaceDesc;
+        surface_->GetDesc(&surfaceDesc);
+        context_.width_ = surfaceDesc.Width;
+        context_.height_ = surfaceDesc.Height;
     }
 
     /**
      * Address: 0x008F5500 (FUN_008F5500)
      *
      * What it does:
-     * Resets prior render-target state, stores the caller's texture in the
-     * `texture_` lane, then derives and caches its level-0 surface. The
-     * descriptor query runs on the derived surface and overwrites the context
-     * dimensions unconditionally - the binary ignores its `HRESULT`.
+     * Takes `renderTexture` over as the target of `context` and renders into
+     * its top level; the context is resized to that surface. Undoes itself
+     * when the surface cannot be had.
      */
-    void* RenderTargetD3D9::SetRenderTexture(
-        const RenderTargetContext* const context,
-        void* const renderTexture
-    )
+    void RenderTargetD3D9::SetRenderTexture(const RenderTargetContext* const context, IDirect3DTexture9* const renderTexture)
     {
-        ResetRenderTargetD3D9State(this);
-
-        context_.width_ = context->width_;
-        context_.height_ = context->height_;
-        context_.format_ = context->format_;
+        Reset();
+        context_ = *context;
         texture_ = renderTexture;
-
-        if (texture_ == nullptr)
+        try
         {
-            surface_ = nullptr;
-            return nullptr;
-        }
+            const HRESULT result = texture_->GetSurfaceLevel(0U, &surface_);
+            if (FAILED(result))
+            {
+                ThrowGalErrorFromHresult("RenderTargetD3D9.cpp", 89, result);
+            }
 
-        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(texture_, 0U, &surface_);
-        if (getSurfaceResult < 0)
+            D3DSURFACE_DESC surfaceDesc;
+            surface_->GetDesc(&surfaceDesc);
+            context_.width_ = surfaceDesc.Width;
+            context_.height_ = surfaceDesc.Height;
+        }
+        catch (...)
         {
-            ThrowGalErrorFromHresult("RenderTargetD3D9.cpp", 89, getSurfaceResult);
+            Reset();
+            throw;
         }
-
-        D3DSurfaceDescRuntime surfaceDesc{};
-        static_cast<void>(InvokeSurfaceGetDesc(surface_, &surfaceDesc));
-        context_.width_ = surfaceDesc.width;
-        context_.height_ = surfaceDesc.height;
-
-        return surface_;
-    }
-
-    /**
-     * Address: 0x008F5450 (FUN_008F5450)
-     *
-     * What it does:
-     * Owns the deleting-destructor path and delegates to render-target teardown helpers.
-     */
-    RenderTargetD3D9::~RenderTargetD3D9()
-    {
-        DestroyRenderTargetD3D9Body(this);
     }
 
     /**
      * Address: 0x008F52C0 (FUN_008F52C0)
      *
      * What it does:
-     * Returns the embedded render-target context lane at `this+0x04`.
+     * Returns the target's context.
      */
     RenderTargetContext* RenderTargetD3D9::GetContext()
     {
@@ -9335,9 +7236,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Mangled: ?GetSurface@D3DSurface@Moho@@QAEPAUIDirect3DSurface9@@XZ
      *
      * What it does:
-     * Returns the retained `IDirect3DSurface9*` lane at `this+0x14`.
+     * Returns the surface rendered into.
      */
-    void* RenderTargetD3D9::GetSurface()
+    IDirect3DSurface9* RenderTargetD3D9::GetSurface()
     {
         return surface_;
     }
@@ -9346,10 +7247,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F52E0 (FUN_008F52E0)
      *
      * What it does:
-     * Returns the retained `IDirect3DBaseTexture9*` lane at `this+0x18` for
+     * Returns the texture behind the surface, for
      * `EffectVariableD3D9::Func3` to bind through `ID3DXEffect::SetTexture`.
      */
-    void* RenderTargetD3D9::GetTexture()
+    IDirect3DTexture9* RenderTargetD3D9::GetTexture()
     {
         return texture_;
     }
@@ -9358,9 +7259,8 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F5300 (FUN_008F5300)
      *
      * What it does:
-     * Returns a GDI device context for the retained render surface via
-     * `IDirect3DSurface9::GetDC` (vtable slot 15), or null when the target has
-     * no surface (`cmp [ecx+0x14],0; je` at 0x008F5301).
+     * A GDI device context on the surface, or null when the target has no
+     * surface (`cmp [ecx+0x14],0; je` at 0x008F5301).
      */
     HDC RenderTargetD3D9::GetDC()
     {
@@ -9369,61 +7269,68 @@ namespace { // TEMPORARY PROBE (do not commit)
             return nullptr;
         }
 
-        void* deviceContext = nullptr;
-        static_cast<void>(InvokeSurfaceGetDC(surface_, &deviceContext));
-        return static_cast<HDC>(deviceContext);
+        HDC deviceContext = nullptr;
+        surface_->GetDC(&deviceContext);
+        return deviceContext;
     }
 
     /**
-     * Address: 0x008E7EB0 (FUN_008E7EB0, DepthStencilTargetD3D9 default-state init lane)
+     * Address: 0x008E7EB0 (FUN_008E7EB0)
      *
      * What it does:
-     * Initializes one D3D9 depth-stencil target object to default context
-     * values and a null retained surface lane.
+     * An empty depth-stencil target.
      */
-    [[nodiscard]] DepthStencilTargetD3D9* InitializeDepthStencilTargetD3D9DefaultState(
-        DepthStencilTargetD3D9* const target
-    )
-    {
-        target->context_ = DepthStencilTargetContext{};
-        target->depthStencilSurface_ = nullptr;
-        return target;
-    }
+    DepthStencilTargetD3D9::DepthStencilTargetD3D9()
+        : context_()
+        , depthStencilSurface_(nullptr)
+    {}
 
     /**
-     * Address: 0x008E8110 (FUN_008E8110, gpg::gal::DepthStencilTargetD3D9::DepthStencilTargetD3D9)
+     * Address: 0x008E8110 (FUN_008E8110)
      *
      * What it does:
-     * Initializes one depth-stencil target object, default-constructs the
-     * embedded context lane, and binds the provided context/surface payload.
+     * Wraps `depthStencilSurface` as a depth-stencil target of `context`.
      */
     DepthStencilTargetD3D9::DepthStencilTargetD3D9(
         const DepthStencilTargetContext* const context,
-        void* const depthStencilSurface
+        IDirect3DSurface9* const depthStencilSurface
     )
         : context_()
         , depthStencilSurface_(nullptr)
     {
-        (void)InitializeDepthStencilTargetD3D9DefaultState(this);
-        (void)SetSurface(context, depthStencilSurface);
+        SetSurface(context, depthStencilSurface);
     }
 
     /**
-     * Address: 0x008E80F0 (FUN_008E80F0)
+     * Address: 0x008E7FD0 (FUN_008E7FD0)
+     * Address: 0x008E80F0 (FUN_008E80F0, scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to depth-stencil teardown helpers.
+     * Releases the surface.
      */
     DepthStencilTargetD3D9::~DepthStencilTargetD3D9()
     {
-        DestroyDepthStencilTargetD3D9Body(this);
+        Reset();
+    }
+
+    /**
+     * Address: 0x008E7F80 (FUN_008E7F80)
+     *
+     * What it does:
+     * Releases the surface and empties the context. The destructor and
+     * `SetSurface` inline it.
+     */
+    void DepthStencilTargetD3D9::Reset()
+    {
+        SafeRelease(depthStencilSurface_);
+        context_ = DepthStencilTargetContext();
     }
 
     /**
      * Address: 0x008E7F00 (FUN_008E7F00)
      *
      * What it does:
-     * Returns the embedded depth-stencil context lane at `this+0x04`.
+     * Returns the target's context.
      */
     DepthStencilTargetContext* DepthStencilTargetD3D9::GetContext()
     {
@@ -9434,48 +7341,34 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008E7F40 (FUN_008E7F40)
      *
      * What it does:
-     * Returns the retained native depth-stencil surface lane at `this+0x18`.
+     * Returns the depth-stencil surface.
      */
-    void* DepthStencilTargetD3D9::GetSurface() const
+    IDirect3DSurface9* DepthStencilTargetD3D9::GetSurface() const
     {
         return depthStencilSurface_;
     }
 
     /**
-     * Address: 0x008E8070 (FUN_008E8070, gpg::gal::DepthStencilTargetD3D9::SetSurface)
+     * Address: 0x008E8070 (FUN_008E8070)
      *
      * What it does:
-     * Releases the previously retained depth-stencil surface (if any),
-     * resets context lanes to defaults, then installs the provided
-     * context/surface payload.
+     * Replaces the surface and the context.
      */
-    void* DepthStencilTargetD3D9::SetSurface(
+    void DepthStencilTargetD3D9::SetSurface(
         const DepthStencilTargetContext* const context,
-        void* const depthStencilSurface
+        IDirect3DSurface9* const depthStencilSurface
     )
     {
-        ReleaseComLike(depthStencilSurface_);
-
-        const DepthStencilTargetContext resetContext{};
-        context_.width_ = resetContext.width_;
-        context_.height_ = resetContext.height_;
-        context_.format_ = resetContext.format_;
-        context_.field0x10_ = resetContext.field0x10_;
-
-        context_.width_ = context->width_;
-        context_.height_ = context->height_;
-        context_.format_ = context->format_;
-        context_.field0x10_ = context->field0x10_;
+        Reset();
+        context_ = *context;
         depthStencilSurface_ = depthStencilSurface;
-        return depthStencilSurface_;
     }
 
     /**
      * Address: 0x009411E0 (FUN_009411E0)
      *
      * What it does:
-     * Initializes one empty D3D9 cube-render-target wrapper with default
-     * context and cleared texture/face-surface lanes.
+     * An empty cube render target.
      */
     CubeRenderTargetD3D9::CubeRenderTargetD3D9()
         : context_()
@@ -9484,39 +7377,87 @@ namespace { // TEMPORARY PROBE (do not commit)
     {}
 
     /**
-     * Address: 0x00941450 (FUN_00941450, gpg::gal::CubeRenderTargetD3D9::CubeRenderTargetD3D9)
+     * Address: 0x00941450 (FUN_00941450)
      *
      * What it does:
-     * Initializes cube-target state, applies one context/texture payload, and
-     * acquires one face-surface handle per cube face.
+     * Wraps `cubeTexture` as a cube render target of `context`.
      */
     CubeRenderTargetD3D9::CubeRenderTargetD3D9(
         const CubeRenderTargetContext* const context,
-        void* const cubeTexture
+        IDirect3DCubeTexture9* const cubeTexture
     )
         : context_()
         , cubeTexture_(nullptr)
         , faceSurfaces_{}
     {
-        AssignCubeRenderTargetD3D9State(this, context, cubeTexture);
+        SetTexture(context, cubeTexture);
     }
 
     /**
-     * Address: 0x00941430 (FUN_00941430)
+     * Address: 0x00941330 (FUN_00941330)
+     * Address: 0x00941430 (FUN_00941430, scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to cube-target teardown helpers.
+     * Releases the face surfaces and the texture.
      */
     CubeRenderTargetD3D9::~CubeRenderTargetD3D9()
     {
-        DestroyCubeRenderTargetD3D9Body(this);
+        Reset();
+    }
+
+    /**
+     * Address: 0x009412B0 (FUN_009412B0)
+     *
+     * What it does:
+     * Releases the six face surfaces, then the cube texture, and empties the
+     * context.
+     */
+    void CubeRenderTargetD3D9::Reset()
+    {
+        for (IDirect3DSurface9*& faceSurface : faceSurfaces_)
+        {
+            SafeRelease(faceSurface);
+        }
+        std::memset(faceSurfaces_, 0, sizeof(faceSurfaces_));
+
+        SafeRelease(cubeTexture_);
+        context_ = CubeRenderTargetContext();
+    }
+
+    /**
+     * Address: 0x00941390 (FUN_00941390)
+     *
+     * What it does:
+     * Takes `cubeTexture` over as the target of `context` and holds the top
+     * level of each face. Undoes itself if that throws.
+     */
+    void CubeRenderTargetD3D9::SetTexture(
+        const CubeRenderTargetContext* const context,
+        IDirect3DCubeTexture9* const cubeTexture
+    )
+    {
+        Reset();
+        context_ = *context;
+        cubeTexture_ = cubeTexture;
+        try
+        {
+            for (int face = 0; face < kCubeFaceCount; ++face)
+            {
+                cubeTexture_->GetCubeMapSurface(static_cast<D3DCUBEMAP_FACES>(face), 0U, &faceSurfaces_[face]);
+            }
+        }
+        catch (...)
+        {
+            Reset();
+            throw;
+        }
     }
 
     /**
      * Address: 0x00941240 (FUN_00941240)
      *
      * What it does:
-     * Returns the embedded cube render-target context lane at `this+0x04`.
+     * Returns the target's context.
      */
     CubeRenderTargetContext* CubeRenderTargetD3D9::GetContext()
     {
@@ -9526,14 +7467,13 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x009414D0 (FUN_009414D0)
      *
-     * int
-     *
      * What it does:
-     * Validates one cube face index and returns its retained native face surface lane.
+     * Returns the top-level surface of `face`. Only the upper bound is
+     * checked (`cmp eax,6; jl`).
      */
-    void* CubeRenderTargetD3D9::GetSurface(const int face) const
+    IDirect3DSurface9* CubeRenderTargetD3D9::GetSurface(const int face) const
     {
-        if ((face < 0) || (face >= kCubeFaceCount))
+        if (face >= kCubeFaceCount)
         {
             ThrowGalError("CubeRenderTargetD3D9.cpp", 104, "invalid cube face index specified");
         }
@@ -9545,10 +7485,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00941270 (FUN_00941270)
      *
      * What it does:
-     * Returns the retained cube texture at `this+0x10`
-     * (`mov eax,[ecx+0x10]; ret`).
+     * Returns the cube texture.
      */
-    void* CubeRenderTargetD3D9::GetTexture() const
+    IDirect3DCubeTexture9* CubeRenderTargetD3D9::GetTexture() const
     {
         return cubeTexture_;
     }
@@ -9586,13 +7525,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("IdxBufD3D9.cpp", 57, "lock mismatch");
         }
 
-        const HRESULT result = InvokeLock(
-            d3dIndexBuffer_,
-            offset,
-            size,
-            reinterpret_cast<void**>(&indexData_),
-            ToIndexBufferLockFlags(lockFlags)
-        );
+        const HRESULT result = d3dIndexBuffer_->Lock(offset, size, reinterpret_cast<void**>(&indexData_), ToIndexBufferLockFlags(lockFlags));
 
         if (result < 0)
         {
@@ -9621,7 +7554,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("IdxBufD3D9.cpp", 74, "lock mismatch");
         }
 
-        const HRESULT result = InvokeUnlock(d3dIndexBuffer_);
+        const HRESULT result = d3dIndexBuffer_->Unlock();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("IdxBufD3D9.cpp", 77, result);
@@ -9637,7 +7570,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Returns the retained D3D9 index-buffer handle and throws when unset.
      */
-    void* IndexBufferD3D9::GetBuffer()
+    IDirect3DIndexBuffer9* IndexBufferD3D9::GetBuffer()
     {
         if (d3dIndexBuffer_ == nullptr)
         {
@@ -9664,7 +7597,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     TextureD3D9::TextureD3D9(
         const TextureContext* const context,
-        void* const texture
+        IDirect3DBaseTexture9* const texture
     )
         : context_()
         , texture_(nullptr)
@@ -9701,13 +7634,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094A0A0 (FUN_0094A0A0)
      *
      * What it does:
-     * Returns the retained D3D texture pointer when the context type is 2D (`1`).
+     * Returns the texture as a 2D texture when the context type is 2D (`1`).
      */
-    void* TextureD3D9::GetTexture1() const
+    IDirect3DTexture9* TextureD3D9::GetTexture1() const
     {
         if (context_.type_ == 1U)
         {
-            return texture_;
+            return static_cast<IDirect3DTexture9*>(texture_);
         }
 
         return nullptr;
@@ -9717,13 +7650,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094A0B0 (FUN_0094A0B0)
      *
      * What it does:
-     * Returns the retained D3D texture pointer when the context type is volume (`2`).
+     * Returns the texture as a cube texture when the context type is cube (`2`).
      */
-    void* TextureD3D9::GetTexture2() const
+    IDirect3DCubeTexture9* TextureD3D9::GetTexture2() const
     {
         if (context_.type_ == 2U)
         {
-            return texture_;
+            return static_cast<IDirect3DCubeTexture9*>(texture_);
         }
 
         return nullptr;
@@ -9733,13 +7666,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094A0C0 (FUN_0094A0C0)
      *
      * What it does:
-     * Returns the retained D3D texture pointer when the context type is cube (`3`).
+     * Returns the texture as a volume texture when the context type is volume (`3`).
      */
-    void* TextureD3D9::GetTexture3() const
+    IDirect3DVolumeTexture9* TextureD3D9::GetTexture3() const
     {
         if (context_.type_ == 3U)
         {
-            return texture_;
+            return static_cast<IDirect3DVolumeTexture9*>(texture_);
         }
 
         return nullptr;
@@ -9754,7 +7687,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void TextureD3D9::SetTexture(
         const TextureContext* const context,
-        void* const texture
+        IDirect3DBaseTexture9* const texture
     )
     {
         Reset();
@@ -9793,21 +7726,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("TexD3D9.cpp", 65, "lock only 2D");
         }
 
-        struct LockedRectView
-        {
-            int pitch;
-            void* bits;
-        } lockedRect{};
+        D3DLOCKED_RECT lockedRect{};
 
         RECT copiedRect = rect;
         const RECT* const d3dRect = (copiedRect.left != copiedRect.right) ? &copiedRect : nullptr;
 
-        const HRESULT result = InvokeLockRect(
-            texture_,
-            level,
-            &lockedRect,
-            d3dRect,
-            ToTextureLockFlags(flags)
+        // A 2D texture (checked above), used as one directly.
+        const HRESULT result = static_cast<IDirect3DTexture9*>(texture_)->LockRect(
+            static_cast<UINT>(level), &lockedRect, d3dRect, ToTextureLockFlags(flags)
         );
         if (result < 0)
         {
@@ -9818,8 +7744,8 @@ namespace { // TEMPORARY PROBE (do not commit)
         TextureLockRect lock{};
         lock.flags = flags;
         lock.level = level;
-        lock.pitch = lockedRect.pitch;
-        lock.bits = lockedRect.bits;
+        lock.pitch = lockedRect.Pitch;
+        lock.bits = lockedRect.pBits;
         locking_ = true;
         return lock;
     }
@@ -9847,8 +7773,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("TexD3D9.cpp", 118, "tex lock mismatch");
         }
 
-        void* const unlockTexture = (context_.type_ == 1U) ? texture_ : nullptr;
-        const HRESULT result = InvokeUnlockRect(unlockTexture, level);
+        const HRESULT result = GetTexture1()->UnlockRect(static_cast<UINT>(level));
         if (result < 0)
         {
             ThrowGalErrorFromHresult("TexD3D9.cpp", 123, result);
@@ -9889,36 +7814,28 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("TexD3D9.cpp", 132, "currently allowed to only save 2D textures");
         }
 
-        ComObjectScope sourceSurface{};
-        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(texture_, 0U, sourceSurface.out());
-        if (getSurfaceResult < 0)
-        {
-            ThrowGalErrorFromHresult("TexD3D9.cpp", 136, getSurfaceResult);
-        }
+        // A 2D texture (checked above), used as one directly.
+        IDirect3DSurface9* surface;
+        CheckD3DCall("TexD3D9.cpp", 136, [&] {
+            return static_cast<IDirect3DTexture9*>(texture_)->GetSurfaceLevel(0U, &surface);
+        });
 
-        ComObjectScope fileBuffer{};
-        const HRESULT createBufferResult = InvokeD3DXCreateBuffer(0U, fileBuffer.out());
-        if (createBufferResult < 0)
-        {
-            ThrowGalErrorFromHresult("TexD3D9.cpp", 139, createBufferResult);
-        }
+        // The encode replaces the buffer made here without releasing it, as
+        // in DeviceD3D9::SaveTexture.
+        ID3DXBuffer* fileBuffer;
+        CheckD3DCall("TexD3D9.cpp", 139, [&] { return D3DXCreateBuffer(0U, &fileBuffer); });
+        CheckD3DCall("TexD3D9.cpp", 140, [&] {
+            return D3DXSaveSurfaceToFileInMemory(&fileBuffer, D3DXIFF_DDS, surface, nullptr, nullptr);
+        });
 
-        const HRESULT saveResult = InvokeD3DXSaveSurfaceToFileInMemory(fileBuffer.out(), sourceSurface.get());
-        if (saveResult < 0)
+        if (outBuffer->Size() != fileBuffer->GetBufferSize())
         {
-            ThrowGalErrorFromHresult("TexD3D9.cpp", 140, saveResult);
+            *outBuffer = gpg::AllocMemBuffer(fileBuffer->GetBufferSize());
         }
+        std::memcpy(outBuffer->GetPtr(0U, 0U), fileBuffer->GetBufferPointer(), fileBuffer->GetBufferSize());
 
-        const unsigned int serializedSize = GetD3DXBufferSize(fileBuffer.get());
-        if (outBuffer->Size() != serializedSize)
-        {
-            gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(serializedSize);
-            *outBuffer = resizedBuffer;
-        }
-
-        void* const sourceBytes = GetD3DXBufferPointer(fileBuffer.get());
-        char* const destinationBytes = outBuffer->GetPtr(0U, 0U);
-        std::memcpy(destinationBytes, sourceBytes, serializedSize);
+        surface->Release();
+        fileBuffer->Release();
     }
 
     /**
@@ -9941,7 +7858,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("TexD3D9.cpp", 198, "unknown tex type");
         }
 
-        ReleaseComLike(texture_);
+        SafeRelease(texture_);
 
         const TextureContext resetContext{};
         context_.AssignFrom(resetContext);
@@ -9955,16 +7872,15 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Initializes pipeline-state defaults and binds one state-manager instance
      * to the supplied native D3D9 device.
      */
-    PipelineStateD3D9::PipelineStateD3D9(void* const nativeDevice)
+    PipelineStateD3D9::PipelineStateD3D9(IDirect3DDevice9* const nativeDevice)
     {
         stateManager_ = nullptr;
         colorWriteEnable_ = 0x0FU;
 
-        StateManagerD3D9* const stateManager = new StateManagerD3D9(nativeDevice);
-        stateManager_ = stateManager;
-        if (stateManager != nullptr)
+        stateManager_ = new StateManagerD3D9(nativeDevice);
+        if (stateManager_ != nullptr)
         {
-            static_cast<void>(stateManager->AddRef());
+            stateManager_->AddRef();
         }
     }
 
@@ -9983,10 +7899,10 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         const auto setRenderState = [stateManager](const unsigned int state, const unsigned int value) {
-            static_cast<void>(stateManager->SetRenderState(static_cast<StateManagerD3D9::render_state_type>(state), value));
+            static_cast<void>(stateManager->SetRenderState(static_cast<D3DRENDERSTATETYPE>(state), value));
         };
         const auto setRenderStateFlt = [stateManager](const unsigned int state, const float value) {
-            static_cast<void>(stateManager->SetRenderStateFlt(static_cast<StateManagerD3D9::render_state_type>(state), value));
+            static_cast<void>(stateManager->SetRenderStateFlt(static_cast<D3DRENDERSTATETYPE>(state), value));
         };
         const auto setSamplerState = [stateManager](
                                          const unsigned int sampler,
@@ -9994,7 +7910,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                                          const unsigned int value
                                      ) {
             static_cast<void>(
-                stateManager->SetSamplerState(sampler, static_cast<StateManagerD3D9::sampler_state_type>(state), value)
+                stateManager->SetSamplerState(sampler, static_cast<D3DSAMPLERSTATETYPE>(state), value)
             );
         };
         const auto setTextureStageState = [stateManager](
@@ -10004,7 +7920,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                                            ) {
             return stateManager->SetTextureStageState(
                 stage,
-                static_cast<StateManagerD3D9::texture_stage_state_type>(state),
+                static_cast<D3DTEXTURESTAGESTATETYPE>(state),
                 value
             );
         };
@@ -10016,7 +7932,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             static_cast<void>(
                 stateManager->SetTextureStageStateFlt(
                     stage,
-                    static_cast<StateManagerD3D9::texture_stage_state_type>(state),
+                    static_cast<D3DTEXTURESTAGESTATETYPE>(state),
                     value
                 )
             );
@@ -10201,7 +8117,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     PipelineStateD3D9::~PipelineStateD3D9()
     {
-        ReleaseComLike(stateManager_);
+        SafeRelease(stateManager_);
     }
 
     /**
@@ -10229,7 +8145,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     VertexBufferD3D9::VertexBufferD3D9(
         const VertexBufferContext* const context,
-        void* const d3dVertexBuffer
+        IDirect3DVertexBuffer9* const d3dVertexBuffer
     )
         : VertexBufferD3D9()
     {
@@ -10245,7 +8161,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void VertexBufferD3D9::ResetBufferState()
     {
-        ReleaseComLike(d3dVertexBuffer_);
+        SafeRelease(d3dVertexBuffer_);
 
         const VertexBufferContext resetContext{};
         context_.AssignFrom(resetContext);
@@ -10260,7 +8176,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void VertexBufferD3D9::SetBuffer(
         const VertexBufferContext* const context,
-        void* const d3dVertexBuffer
+        IDirect3DVertexBuffer9* const d3dVertexBuffer
     )
     {
         ResetBufferState();
@@ -10310,13 +8226,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("VtxBufD3D9.cpp", 57, "lock mismatch");
         }
 
-        const HRESULT result = InvokeLock(
-            d3dVertexBuffer_,
-            offset,
-            size,
-            &mappedData_,
-            ToVertexBufferLockFlags(lockFlags)
-        );
+        const HRESULT result = d3dVertexBuffer_->Lock(offset, size, &mappedData_, ToVertexBufferLockFlags(lockFlags));
 
         if (result < 0)
         {
@@ -10345,7 +8255,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("VtxBufD3D9.cpp", 74, "lock mismatch");
         }
 
-        const HRESULT result = InvokeUnlock(d3dVertexBuffer_);
+        const HRESULT result = d3dVertexBuffer_->Unlock();
         if (result < 0)
         {
             ThrowGalErrorFromHresult("VtxBufD3D9.cpp", 77, result);
@@ -10361,7 +8271,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Returns the retained D3D9 vertex-buffer handle and throws when unset.
      */
-    void* VertexBufferD3D9::GetD3D()
+    IDirect3DVertexBuffer9* VertexBufferD3D9::GetD3D()
     {
         if (d3dVertexBuffer_ == nullptr)
         {
@@ -10391,7 +8301,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Adopts `vertexDeclaration` as the declaration for format `formatCode`
      * and computes the per-stream strides.
      */
-    VertexFormatD3D9::VertexFormatD3D9(const std::uint32_t formatCode, void* const vertexDeclaration)
+    VertexFormatD3D9::VertexFormatD3D9(const std::uint32_t formatCode, IDirect3DVertexDeclaration9* const vertexDeclaration)
         : vertexDeclaration_(nullptr)
     {
         SetFormatDeclaration(formatCode, vertexDeclaration);
@@ -10405,13 +8315,15 @@ namespace { // TEMPORARY PROBE (do not commit)
      * of every stream the format's element table reads (each stream's stride
      * is its furthest element end).
      */
-    void VertexFormatD3D9::SetFormatDeclaration(const std::uint32_t formatCode, void* const vertexDeclaration)
+    void VertexFormatD3D9::SetFormatDeclaration(
+        const std::uint32_t formatCode, IDirect3DVertexDeclaration9* const vertexDeclaration
+    )
     {
-        ReleaseComLike(vertexDeclaration_);
+        SafeRelease(vertexDeclaration_);
         vertexDeclaration_ = vertexDeclaration;
         formatCode_ = formatCode;
 
-        const D3DVertexElementRuntime* const elementTable = GetVertexFormatElementsOrThrow(formatCode);
+        const D3DVERTEXELEMENT9* const elementTable = GetVertexFormatElementsOrThrow(formatCode);
         std::size_t declarationElementCount = 0U;
         while (!IsVertexElementEndSentinel(elementTable[declarationElementCount]))
         {
@@ -10421,15 +8333,15 @@ namespace { // TEMPORARY PROBE (do not commit)
         streamStrides_.clear();
         for (std::size_t elementIndex = 0U; elementIndex < declarationElementCount; ++elementIndex)
         {
-            const D3DVertexElementRuntime& element = elementTable[elementIndex];
-            const std::size_t streamIndex = static_cast<std::size_t>(element.stream);
+            const D3DVERTEXELEMENT9& element = elementTable[elementIndex];
+            const std::size_t streamIndex = static_cast<std::size_t>(element.Stream);
             if (streamStrides_.size() <= streamIndex)
             {
                 streamStrides_.resize(streamIndex + 1U, 0U);
             }
 
             const std::uint32_t elementEndOffset =
-                static_cast<std::uint32_t>(element.offset) + GetVertexElementTypeSizeBytes(element.type);
+                static_cast<std::uint32_t>(element.Offset) + GetVertexElementTypeSizeBytes(element.Type);
             std::uint32_t& streamStride = streamStrides_[streamIndex];
             if (streamStride < elementEndOffset)
             {
@@ -10461,7 +8373,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void VertexFormatD3D9::ResetDeclarationState()
     {
-        ReleaseComLike(vertexDeclaration_);
+        SafeRelease(vertexDeclaration_);
         formatCode_ = 0x17U;
     }
 
@@ -10471,7 +8383,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Returns the retained D3D9 vertex-declaration handle and throws when unset.
      */
-    void* VertexFormatD3D9::GetDeclaration()
+    IDirect3DVertexDeclaration9* VertexFormatD3D9::GetDeclaration()
     {
         if (vertexDeclaration_ == nullptr)
         {
@@ -10493,7 +8405,9 @@ namespace gpg::gal
 
 long gpg::gal::DebugSaveSurfaceToFileA(const char* const filePath, const unsigned int fileFormat, void* const sourceSurface)
 {
-    return static_cast<long>(gpg::gal::InvokeD3DXSaveSurfaceToFileA(filePath, fileFormat, sourceSurface));
+    return static_cast<long>(::D3DXSaveSurfaceToFileA(
+        filePath, static_cast<D3DXIMAGE_FILEFORMAT>(fileFormat), static_cast<IDirect3DSurface9*>(sourceSurface), nullptr, nullptr
+    ));
 }
 
 // TEMPORARY PROBE (do not commit): texture twin of the surface dump hook.
@@ -10504,5 +8418,7 @@ namespace gpg::gal
 
 long gpg::gal::DebugSaveTextureToFileA(const char* const filePath, const unsigned int fileFormat, void* const sourceTexture)
 {
-    return static_cast<long>(gpg::gal::InvokeD3DXSaveTextureToFileA(filePath, fileFormat, sourceTexture));
+    return static_cast<long>(::D3DXSaveTextureToFileA(
+        filePath, static_cast<D3DXIMAGE_FILEFORMAT>(fileFormat), static_cast<IDirect3DBaseTexture9*>(sourceTexture), nullptr
+    ));
 }

@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
@@ -16,10 +18,6 @@
 
 namespace gpg {
 namespace gal {
-#if !defined(_D3D9TYPES_H_)
-    struct _D3DPRESENT_PARAMETERS_;
-#endif
-
     class Head;
     class DeviceContext;
     class Device;
@@ -546,25 +544,19 @@ namespace gal {
        * Slot: 46
        * Demangled: gpg::gal::DeviceD3D9::DrawIndexedPrimitive
        *
-       * void const *
-       *
        * What it does:
-       * Validates indexed draw topology, binds native primitive type, and
-       * dispatches one native indexed draw.
+       * Validates the topology and issues one indexed draw.
        */
-      virtual int DrawIndexedPrimitive(const void* context) override;
+      int DrawIndexedPrimitive(const DrawIndexedContext* context) override;
       /**
        * Address: 0x008EE6B0 (FUN_008EE6B0)
        * Slot: 47
        * Demangled: gpg::gal::DeviceD3D9::DrawPrimitive
        *
-       * void const *
-       *
        * What it does:
-       * Validates non-indexed draw topology, binds native primitive type, and
-       * dispatches one native draw.
+       * Validates the topology and issues one non-indexed draw.
        */
-      virtual int DrawPrimitive(const void* context) override;
+      int DrawPrimitive(const DrawContext* context) override;
       /**
        * Address: 0x008EEA00 (FUN_008EEA00)
        * Slot: 48
@@ -610,8 +602,8 @@ namespace gal {
        * What it does:
        * Builds one reset-parameter block for the requested head index.
        */
-      _D3DPRESENT_PARAMETERS_* GetHeadParameters(
-          _D3DPRESENT_PARAMETERS_* outParameters,
+      D3DPRESENT_PARAMETERS* GetHeadParameters(
+          D3DPRESENT_PARAMETERS* outParameters,
           const DeviceContext* context,
           unsigned int headIndex
       );
@@ -624,7 +616,7 @@ namespace gal {
        * What it does:
        * Writes reset-parameter blocks for all heads in the supplied context.
        */
-      void GetDeviceParameters(_D3DPRESENT_PARAMETERS_* outParameters, const DeviceContext* context);
+      void GetDeviceParameters(D3DPRESENT_PARAMETERS* outParameters, const DeviceContext* context);
 
       /**
        * Address: 0x008EEB80 (FUN_008EEB80)
@@ -650,10 +642,10 @@ namespace gal {
       msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
       DeviceContext mDeviceContext{0};                         // +0x38 the context actually in force
       boost::shared_ptr<PipelineStateD3D9> mPipelineState;     // +0x6C
-      void* mDirect3D = nullptr;                               // +0x74 IDirect3D9*
-      void* mDevice = nullptr;                                 // +0x78 IDirect3DDevice9*
+      IDirect3D9* mDirect3D = nullptr;                         // +0x74
+      IDirect3DDevice9* mDevice = nullptr;                     // +0x78
       OutputContext* mHeads = nullptr;                         // +0x7C one per head, new[]'d by CreateHeads
-      void* mFrameEventQuery = nullptr;                        // +0x80 IDirect3DQuery9*, D3DQUERYTYPE_EVENT
+      IDirect3DQuery9* mFrameEventQuery = nullptr;             // +0x80 D3DQUERYTYPE_EVENT
     };
 
     static_assert(offsetof(DeviceD3D9, mCurThreadId) == 0x24, "DeviceD3D9::mCurThreadId offset must be 0x24");

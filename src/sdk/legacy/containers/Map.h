@@ -351,6 +351,11 @@ namespace msvc8
 
         /**
          * Address: 0x007E2C60 (FUN_007E2C60, std::map<MeshBatchKey, vector<MeshInstance*>>::operator[])
+         * Address: 0x00949B30 (FUN_00949B30, msvc8::map<_D3DRENDERSTATETYPE, unsigned int>::operator[])
+         * Address: 0x00949BA0 (FUN_00949BA0, msvc8::map<_D3DSAMPLERSTATETYPE, unsigned int>::operator[])
+         * Address: 0x00949C10 (FUN_00949C10, msvc8::map<_D3DTEXTURESTAGESTATETYPE, unsigned int>::operator[]
+         * -- the three the `gpg::gal::StateCache::Update` miss path reaches,
+         * `tree_[state] = value` in gpg/gal/StateCache.h)
          * Address: 0x005A0040 (FUN_005A0040, std::map<uint, Moho::RUnitBlueprint*>::operator[])
          * Address: 0x00718360 (FUN_00718360, std::map<uint32, cellIndex>::operator[])
          * Address: 0x0083A9D0 (FUN_0083A9D0, msvc8::map<UiKeyMask,bool>::operator[] --

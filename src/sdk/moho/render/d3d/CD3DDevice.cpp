@@ -16,6 +16,7 @@
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/MeshFormatter.h"
@@ -213,35 +214,6 @@ namespace
     broadcaster->ListUnlink();
     return broadcaster;
   }
-
-  struct DrawPrimitiveContextRuntime
-  {
-    std::uint32_t pad00 = 0U;               // +0x00
-    std::uint32_t topologyToken = 0U;       // +0x04
-    std::uint32_t primitiveCountInput = 0U; // +0x08
-    std::uint32_t startVertex = 0U;         // +0x0C
-  };
-
-  static_assert(
-    sizeof(DrawPrimitiveContextRuntime) == 0x10,
-    "DrawPrimitiveContextRuntime size must be 0x10"
-  );
-
-  struct DrawIndexedPrimitiveContextRuntime
-  {
-    std::uint32_t pad00 = 0U;               // +0x00
-    std::uint32_t topologyToken = 0U;       // +0x04
-    std::uint32_t minVertexIndex = 0U;      // +0x08
-    std::uint32_t vertexCount = 0U;         // +0x0C
-    std::uint32_t primitiveCountInput = 0U; // +0x10
-    std::uint32_t startIndex = 0U;          // +0x14
-    std::int32_t baseVertexIndex = 0;       // +0x18
-  };
-
-  static_assert(
-    sizeof(DrawIndexedPrimitiveContextRuntime) == 0x1C,
-    "DrawIndexedPrimitiveContextRuntime size must be 0x1C"
-  );
 
   /**
    * Address: 0x004408F0 (FUN_004408F0, sub_4408F0)
@@ -1415,14 +1387,15 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
 
-      DrawIndexedPrimitiveContextRuntime drawContext{};
-      drawContext.topologyToken = static_cast<std::uint32_t>(*primitiveType);
-      drawContext.minVertexIndex = static_cast<std::uint32_t>(vertexSheet->Func5());
-      drawContext.vertexCount = indexSheet->GetSize();
-      drawContext.primitiveCountInput = 0U;
-      drawContext.startIndex = 0U;
-      drawContext.baseVertexIndex = 0;
-
+      // 0x0042FC32: the five-argument constructor, so the sheet's vertex count
+      // is the vertex count and the index sheet's size the index count.
+      gpg::gal::DrawIndexedContext drawContext(
+        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+        static_cast<std::uint32_t>(vertexSheet->Func5()),
+        indexSheet->GetSize(),
+        0U,
+        0U
+      );
       (void)device->DrawIndexedPrimitive(&drawContext);
       technique->EndPass();
     }
@@ -1451,13 +1424,12 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
 
-      DrawPrimitiveContextRuntime drawContext{};
-      drawContext.topologyToken = static_cast<std::uint32_t>(*primitiveType);
-      drawContext.primitiveCountInput =
-        static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->startVertex) + 1);
-      // Binary (0x0042F8D0): StartVertex comes from the view's +0x04 lane (baseVertex).
-      drawContext.startVertex = static_cast<std::uint32_t>(vertexSheetView->baseVertex);
-
+      // The first vertex is the view's base vertex (+0x04), not its start.
+      gpg::gal::DrawContext drawContext(
+        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+        static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->startVertex) + 1),
+        static_cast<std::uint32_t>(vertexSheetView->baseVertex)
+      );
       (void)device->DrawPrimitive(&drawContext);
       technique->EndPass();
     }
@@ -1494,14 +1466,14 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
 
-      DrawIndexedPrimitiveContextRuntime drawContext{};
-      drawContext.topologyToken = static_cast<std::uint32_t>(*primitiveType);
-      drawContext.minVertexIndex = static_cast<std::uint32_t>(vertexSheetView->startVertex);
-      drawContext.vertexCount = static_cast<std::uint32_t>(vertexCount);
-      drawContext.primitiveCountInput = static_cast<std::uint32_t>(indexSheetView->indexCount);
-      drawContext.startIndex = static_cast<std::uint32_t>(indexSheetView->startIndex);
-      drawContext.baseVertexIndex = vertexSheetView->baseVertex;
-
+      gpg::gal::DrawIndexedContext drawContext(
+        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+        static_cast<std::uint32_t>(vertexSheetView->startVertex),
+        static_cast<std::uint32_t>(vertexCount),
+        static_cast<std::uint32_t>(indexSheetView->indexCount),
+        static_cast<std::uint32_t>(indexSheetView->startIndex),
+        vertexSheetView->baseVertex
+      );
       (void)device->DrawIndexedPrimitive(&drawContext);
       technique->EndPass();
     }

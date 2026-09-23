@@ -1605,9 +1605,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\RenderTarget.hpp" />
     <ClInclude Include="gpg\gal\RenderTargetContext.hpp" />
     <ClInclude Include="gpg\gal\StateCache.h" />
-    <ClInclude Include="gpg\gal\StateCache_D3DRENDERSTATETYPE.hpp" />
-    <ClInclude Include="gpg\gal\StateCache_D3DSAMPLERSTATETYPE.hpp" />
-    <ClInclude Include="gpg\gal\StateCache_D3DTEXTURESTAGESTATETYPE.hpp" />
     <ClInclude Include="gpg\gal\Texture.hpp" />
     <ClInclude Include="gpg\gal\TextureContext.hpp" />
     <ClInclude Include="gpg\gal\VertexBuffer.hpp" />

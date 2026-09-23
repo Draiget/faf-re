@@ -4,6 +4,7 @@
 #include "Device.hpp"
 #include "DeviceContext.hpp"
 #include "DrawContext.hpp"
+#include "DrawIndexedContext.hpp"
 #include "EffectContext.hpp"
 #include "EffectMacro.hpp"
 #include "Error.hpp"
@@ -604,32 +605,160 @@ namespace gpg::gal
     DeviceContext::~DeviceContext() = default;
 
     /**
-     * Address: 0x0093F060 (FUN_0093F060, gpg::gal::DrawContext::DrawContext)
+     * Address: 0x0093F060 (FUN_0093F060)
      *
      * What it does:
-     * Initializes non-indexed draw payload lanes for topology token,
-     * primitive-count input, and start-vertex offset.
+     * Stores the topology, the vertex count and the first vertex.
      */
-    DrawContext::DrawContext(
-        const std::uint32_t topologyToken,
-        const std::uint32_t primitiveCountInput,
-        const std::uint32_t startVertex
-    )
-        : topologyToken_(topologyToken),
-          primitiveCountInput_(primitiveCountInput),
+    DrawContext::DrawContext(const TOPOLOGY topology, const std::uint32_t vertexCount, const std::uint32_t startVertex)
+        : topology_(topology),
+          vertexCount_(vertexCount),
           startVertex_(startVertex)
     {
     }
 
     /**
      * Address: 0x0093F080 (FUN_0093F080, gpg::gal::DrawContext::~DrawContext)
-     * Address: 0x0093F140 (FUN_0093F140)
+     * Address: 0x0093F140 (FUN_0093F140, scalar deleting destructor)
      *
      * What it does:
-     * Restores DrawContext vftable ownership and services deleting
-     * destructor thunk teardown.
+     * Restores the DrawContext vtable.
      */
     DrawContext::~DrawContext() = default;
+
+    /**
+     * Address: 0x0093F090 (FUN_0093F090)
+     *
+     * What it does:
+     * Zeroes every field.
+     */
+    DrawIndexedContext::DrawIndexedContext()
+        : topology_(static_cast<DrawContext::TOPOLOGY>(0)),
+          minVertexIndex_(0),
+          vertexCount_(0),
+          indexCount_(0),
+          startIndex_(0),
+          baseVertexIndex_(0)
+    {
+    }
+
+    /**
+     * Address: 0x0093F0B0 (FUN_0093F0B0)
+     *
+     * What it does:
+     * A draw whose minimum vertex index is zero.
+     */
+    DrawIndexedContext::DrawIndexedContext(
+        const DrawContext::TOPOLOGY topology,
+        const std::uint32_t vertexCount,
+        const std::uint32_t indexCount,
+        const std::uint32_t startIndex,
+        const std::uint32_t baseVertexIndex
+    )
+        : topology_(topology),
+          minVertexIndex_(0),
+          vertexCount_(vertexCount),
+          indexCount_(indexCount),
+          startIndex_(startIndex),
+          baseVertexIndex_(static_cast<std::int32_t>(baseVertexIndex))
+    {
+    }
+
+    /**
+     * Address: 0x0093F0F0 (FUN_0093F0F0)
+     *
+     * What it does:
+     * A draw with an explicit minimum vertex index.
+     */
+    DrawIndexedContext::DrawIndexedContext(
+        const DrawContext::TOPOLOGY topology,
+        const std::uint32_t minVertexIndex,
+        const std::uint32_t vertexCount,
+        const std::uint32_t indexCount,
+        const std::uint32_t startIndex,
+        const std::int32_t baseVertexIndex
+    )
+        : topology_(topology),
+          minVertexIndex_(minVertexIndex),
+          vertexCount_(vertexCount),
+          indexCount_(indexCount),
+          startIndex_(startIndex),
+          baseVertexIndex_(baseVertexIndex)
+    {
+    }
+
+    /**
+     * Address: 0x0093F130 (FUN_0093F130, gpg::gal::DrawIndexedContext::~DrawIndexedContext)
+     * Address: 0x0093F160 (FUN_0093F160, scalar deleting destructor)
+     *
+     * What it does:
+     * Restores the DrawIndexedContext vtable.
+     */
+    DrawIndexedContext::~DrawIndexedContext() = default;
+
+    /**
+     * Address: 0x0093F180 (FUN_0093F180)
+     *
+     * What it does:
+     * Converts `count` vertices (or indices) into a primitive count for
+     * `topology`, throwing when the count cannot form whole primitives.
+     */
+    std::uint32_t DrawContext::CountPrimitives(const TOPOLOGY topology, const std::uint32_t count)
+    {
+        switch (topology)
+        {
+        case TOPOLOGY_POINTLIST:
+            return count;
+        case TOPOLOGY_LINELIST:
+            if ((count & 1U) != 0U)
+            {
+                throw Error("DrawContext.cpp", 35, "invalid number of vertices in line list");
+            }
+            return count >> 1U;
+        case TOPOLOGY_LINESTRIP:
+            if (count <= 1U)
+            {
+                throw Error("DrawContext.cpp", 39, "invalid number of vertices in line strip");
+            }
+            return count - 1U;
+        case TOPOLOGY_TRIANGLELIST:
+            if ((count % 3U) != 0U)
+            {
+                throw Error("DrawContext.cpp", 43, "invalid number of vertices in triangle list");
+            }
+            return count / 3U;
+        case TOPOLOGY_TRIANGLESTRIP:
+            if (count <= 2U)
+            {
+                throw Error("DrawContext.cpp", 47, "invalid number of vertices in triangle list");
+            }
+            return count - 2U;
+        default:
+            throw Error("DrawContext.cpp", 51, "unknown topology specified");
+        }
+    }
+
+    /**
+     * Address: 0x0093F470 (FUN_0093F470)
+     *
+     * What it does:
+     * The number of primitives `vertexCount_` vertices make in this topology.
+     */
+    std::uint32_t DrawContext::GetPrimitiveCount() const
+    {
+        return CountPrimitives(topology_, vertexCount_);
+    }
+
+    /**
+     * Address: 0x0093F490 (FUN_0093F490)
+     *
+     * What it does:
+     * The number of primitives `indexCount_` indices make in this topology.
+     */
+    std::uint32_t DrawIndexedContext::GetPrimitiveCount() const
+    {
+        return DrawContext::CountPrimitives(topology_, indexCount_);
+    }
 
     /**
      * Address: 0x0093FBE0 (FUN_0093FBE0, gpg::gal::EffectContext::EffectContext)

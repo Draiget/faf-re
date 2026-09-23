@@ -3287,23 +3287,19 @@ namespace msvc8
              * member instead.)
              */
             /**
-             * Address: 0x00948DF0 (FUN_00948DF0, sub_948DF0)
-             * Address: 0x00948E60 (FUN_00948E60, sub_948E60)
+             * Address: 0x00948D80 (FUN_00948D80, render states)
+             * Address: 0x00948DF0 (FUN_00948DF0, sampler states)
+             * Address: 0x00948E60 (FUN_00948E60, texture-stage states)
              *
-             * `gpg::gal::backends::d3d9::StateManagerD3D9`'s sampler-state
-             * and texture-stage `CacheValue<>` instantiations respectively
-             * (`StateManagerD3D9.cpp`, isNil@+0x15, 8-byte value_type). Same
-             * inlined-lower-bound-then-verify shape as FUN_006E1940/
-             * FUN_008B6160 above, taking an output-parameter slot
-             * (`*outSlot = found`) rather than returning the node directly --
-             * the store-into-hidden-return-pointer convention already
-             * documented on `lower_bound_node`'s `FUN_006E1D30` adapter.
-             * Called at the very start of each instantiation (`this+0x14`
-             * into the function), matching `map.find(key)` being the first
-             * statement of `CacheValue<>`: FUN_00948DF0 from `FUN_00949CE0`
-             * (sampler-state), FUN_00948E60 from `FUN_00949D40`
-             * (texture-stage), both already recovered as this template's
-             * citation above.
+             * `find` for the three `gpg::gal::StateCache<K, unsigned int>`
+             * maps (`gpg/gal/StateCache.h`, isNil@+0x15, 8-byte value_type),
+             * the first statement of `StateCache::Update` (0x00949C80,
+             * 0x00949CE0, 0x00949D40). Same inlined-lower-bound-then-verify
+             * shape as FUN_006E1940/FUN_008B6160 above, taking an
+             * output-parameter slot (`*outSlot = found`) rather than
+             * returning the node directly -- the store-into-hidden-return-
+             * pointer convention already documented on `lower_bound_node`'s
+             * `FUN_006E1D30` adapter.
              */
             /**
              * Address: 0x0083AD60 (FUN_0083AD60, sub_83AD60) --
@@ -4382,6 +4378,9 @@ namespace msvc8
              * Address: 0x007F05A0 (FUN_007F05A0 -- `insert(hint, value)` -- the hint checks, then the descent for `msvc8::map<msvc8::string, moho::SRangeRenderProfile>` (`RangeRenderer::mRangeProfiles` at +0x04; pair 0xA8 -- the 0x1C key, a four-byte alignment hole, then the 8-aligned 0x88 profile -- node 0xC0, key at node+0x10, profile at node+0x30, colour/nil at +0xB8/+0xB9); callers 0x007EFD00; formerly `ResolveRangeProfileInsertSiteWithHint` in moho/render/RangeRenderer.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x005A08B0 (FUN_005A08B0 -- `insert_hint` -- the hint validation (increment it, re-compare) and the allocate-and-link that follows for `msvc8::map<std::uint32_t, const moho::RUnitBlueprint*>` (`CAiBuilderImpl::mRebuildStructures` at +0x18; pair 0x08, node 0x18, key at node+0x0C, blueprint at node+0x10, colour/nil at +0x14/+0x15); callers 0x005A0040; formerly `AddOrUpdateRebuildNode` in moho/ai/CAiBuilderImpl.cpp (RULE ONE), removed 2026-09-11.)
              * Address: 0x004E95A0 (FUN_004E95A0 -- `insert(hint, value)` -- `_Buynode` at the hinted edge, then link for `msvc8::map<const char*, TimeBarTrackLayout, CaseInsensitiveCStringLess>` (`TIME_RenderTimeBars`'s per-frame track table in moho/misc/TimeBar.cpp; pair 0x0C, node 0x18, colour/nil at +0x14/+0x15); callers 0x004E9100; formerly `BuynodeTimeBarTrackMap` in moho/misc/TimeBar.cpp (RULE ONE), removed 2026-09-11.)
+             * Address: 0x009496E0 (FUN_009496E0 -- the hinted insert under `operator[]` for `msvc8::map<_D3DRENDERSTATETYPE, unsigned int>` (`gpg::gal::StateCache`, gpg/gal/StateCache.h; pair 0x08, node 0x18, isNil@+0x15); callers 0x00949B30.)
+             * Address: 0x00949850 (FUN_00949850 -- the same for `msvc8::map<_D3DSAMPLERSTATETYPE, unsigned int>`; callers 0x00949BA0.)
+             * Address: 0x009499C0 (FUN_009499C0 -- the same for `msvc8::map<_D3DTEXTURESTAGESTATETYPE, unsigned int>`; callers 0x00949C10.)
              */
             node_type* insert_hint(const_iterator hint, const value_type& v)
             {

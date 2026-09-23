@@ -25,6 +25,8 @@ namespace gal {
     class OutputContext;
     class CursorContext;
     class DeviceContext;
+    class DrawContext;
+    class DrawIndexedContext;
     class CubeRenderTargetContext;
     class DepthStencilTargetContext;
     class EffectContext;
@@ -520,7 +522,7 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches indexed draw or indexed-instanced draw.
        */
-      virtual int DrawIndexedPrimitive(const void* context);
+      virtual int DrawIndexedPrimitive(const DrawIndexedContext* context);
       /**
        * Address: 0x008FCF90
        * Slot: 47
@@ -529,7 +531,7 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches draw or draw-instanced.
        */
-      virtual int DrawPrimitive(const void* context);
+      virtual int DrawPrimitive(const DrawContext* context);
       /**
        * Address: 0x008F9810
        * Slot: 48

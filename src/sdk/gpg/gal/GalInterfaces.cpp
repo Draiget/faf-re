@@ -1,7 +1,6 @@
 #include <algorithm>
 #include "Class.hpp"
 #include "CursorContext.hpp"
-#include "DrawIndexedContext.hpp"
 #include "EffectMacro.hpp"
 #include "Error.hpp"
 #include "Head.hpp"
@@ -5414,81 +5413,6 @@ namespace gpg::gal
       return lastAssigned;
     }
   } // namespace
-
-  /**
-   * Address: 0x0093F090 (FUN_0093F090, gpg::gal::DrawIndexedContext::DrawIndexedContext)
-   * Mangled: ??0DrawIndexedContext@gal@gpg@@QAE@XZ
-   *
-   * What it does:
-   * Initializes indexed-draw payload lanes to their zero/default values.
-   */
-  DrawIndexedContext::DrawIndexedContext()
-      : topologyToken_(0),
-        minVertexIndex_(0),
-        vertexCount_(0),
-        primitiveCountInput_(0),
-        startIndex_(0),
-        baseVertexIndex_(0)
-  {
-  }
-
-  /**
-   * Address: 0x0093F0B0 (FUN_0093F0B0, gpg::gal::DrawIndexedContext::DrawIndexedContext)
-   *
-   * What it does:
-   * Initializes indexed-draw payload lanes for topology, vertex count,
-   * primitive count, start index, and base vertex index.
-   */
-  DrawIndexedContext::DrawIndexedContext(
-    const int topology,
-    const int numVertices,
-    const int primCount,
-    const int startIndex,
-    const int baseVertIndex
-  )
-      : topologyToken_(static_cast<std::uint32_t>(topology)),
-        minVertexIndex_(0),
-        vertexCount_(static_cast<std::uint32_t>(numVertices)),
-        primitiveCountInput_(static_cast<std::uint32_t>(primCount)),
-        startIndex_(static_cast<std::uint32_t>(startIndex)),
-        baseVertexIndex_(baseVertIndex)
-  {
-  }
-
-  /**
-   * Address: 0x0093F0F0 (FUN_0093F0F0, gpg::gal::DrawIndexedContext::DrawIndexedContext)
-   * Mangled: ??0DrawIndexedContext@gal@gpg@@QAE@@Z
-   *
-   * What it does:
-   * Initializes indexed-draw payload lanes, including explicit minimum
-   * vertex index and base-vertex bias.
-   */
-  DrawIndexedContext::DrawIndexedContext(
-    const std::uint32_t topologyToken,
-    const std::uint32_t minVertexIndex,
-    const std::uint32_t vertexCount,
-    const std::uint32_t primitiveCountInput,
-    const std::uint32_t startIndex,
-    const std::int32_t baseVertexIndex
-  )
-      : topologyToken_(topologyToken),
-        minVertexIndex_(minVertexIndex),
-        vertexCount_(vertexCount),
-        primitiveCountInput_(primitiveCountInput),
-        startIndex_(startIndex),
-        baseVertexIndex_(baseVertexIndex)
-  {
-  }
-
-  /**
-   * Address: 0x0093F130 (FUN_0093F130, gpg::gal::DrawIndexedContext::~DrawIndexedContext)
-   * Address: 0x0093F160 (FUN_0093F160)
-   *
-   * What it does:
-   * Restores DrawIndexedContext vftable ownership and services deleting
-   * destructor thunk teardown.
-   */
-  DrawIndexedContext::~DrawIndexedContext() = default;
 
   /**
    * Address: 0x0093EEA0 (FUN_0093EEA0, __imp_??0CursorContext@gal@gpg@@QAE@XZ)

@@ -36,9 +36,6 @@ namespace
    */
   constexpr float kBoundaryEdgeMatchToleranceSq = 0.001f;
 
-  /** `D3DPT_TRIANGLELIST`, pushed as the topology token at 0x007D0BA4. */
-  constexpr int kTriangleListTopology = 4;
-
   /** Corner count and index count of the unit box the boundary shader casts. */
   constexpr int kBoundaryBoxVertexCount = 8;
   constexpr int kBoundaryBoxIndexCount = 36;
@@ -122,7 +119,7 @@ namespace
       technique->BeginPass(pass);
 
       const gpg::gal::DrawIndexedContext draw{
-        kTriangleListTopology, kBoundaryBoxVertexCount, kBoundaryBoxIndexCount, 0, 0
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, kBoundaryBoxVertexCount, kBoundaryBoxIndexCount, 0, 0
       };
       static_cast<void>(device->DrawIndexedPrimitive(&draw));
 

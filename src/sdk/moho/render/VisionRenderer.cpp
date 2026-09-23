@@ -49,9 +49,6 @@ namespace
    */
   constexpr std::uint32_t kVisionInstanceRingCapacity = 0x3000u;
 
-  /** `D3DPT_TRIANGLELIST`, pushed as the topology token at 0x0081CAB8. */
-  constexpr int kTriangleListTopology = 4;
-
   /**
    * Raw GAL lock-flag tokens the shipped ring allocator passes: 4 on the append
    * path (`push 4` at 0x0081CCCD) and 1 on the wrap path (`push 1` at
@@ -402,9 +399,9 @@ namespace moho
           technique->BeginPass(pass);
 
           const gpg::gal::DrawIndexedContext draw{
-            kTriangleListTopology,
-            static_cast<int>(renderer.mVertexCount),
-            static_cast<int>(renderer.mIndexCount),
+            gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+            static_cast<std::uint32_t>(renderer.mVertexCount),
+            static_cast<std::uint32_t>(renderer.mIndexCount),
             0,
             0
           };

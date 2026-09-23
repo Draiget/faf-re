@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
@@ -34,7 +36,7 @@ namespace gpg::gal
          * Initializes one D3D9 index-buffer wrapper and binds the provided
          * context/native buffer payload.
          */
-        IndexBufferD3D9(const IndexBufferContext* context, void* d3dIndexBuffer);
+        IndexBufferD3D9(const IndexBufferContext* context, IDirect3DIndexBuffer9* d3dIndexBuffer);
 
         /**
          * Address: 0x008F4C80 (FUN_008F4C80)
@@ -78,7 +80,7 @@ namespace gpg::gal
          * What it does:
          * Returns the retained D3D9 index-buffer handle and throws when unset.
          */
-        void* GetBuffer();
+        IDirect3DIndexBuffer9* GetBuffer();
 
         /**
          * Address: 0x008F4D10 (FUN_008F4D10, gpg::gal::IndexBufferD3D9::SetBuffer)
@@ -87,7 +89,7 @@ namespace gpg::gal
          * Releases any previous native index-buffer handle, resets context lanes,
          * then assigns one new context + native buffer payload.
          */
-        std::uint32_t SetBuffer(const IndexBufferContext* context, void* d3dIndexBuffer);
+        std::uint32_t SetBuffer(const IndexBufferContext* context, IDirect3DIndexBuffer9* d3dIndexBuffer);
 
         /**
          * Address: 0x008F4C30 (FUN_008F4C30)
@@ -99,7 +101,7 @@ namespace gpg::gal
 
     public:
         IndexBufferContext context_{};        // +0x04
-        void* d3dIndexBuffer_ = nullptr;      // +0x14
+        IDirect3DIndexBuffer9* d3dIndexBuffer_ = nullptr; // +0x14
         bool locked_ = false;                 // +0x18
         std::uint8_t lockPadding_[3]{};       // +0x19
         std::int16_t* indexData_ = nullptr;   // +0x1C

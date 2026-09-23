@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -34,7 +36,7 @@ namespace gpg::gal
          * Initializes one D3D9 vertex-buffer wrapper and binds the provided
          * context/native buffer payload.
          */
-        VertexBufferD3D9(const VertexBufferContext* context, void* d3dVertexBuffer);
+        VertexBufferD3D9(const VertexBufferContext* context, IDirect3DVertexBuffer9* d3dVertexBuffer);
 
         /**
          * Address: 0x008F57B0 (FUN_008F57B0)
@@ -78,7 +80,7 @@ namespace gpg::gal
          * What it does:
          * Returns the retained D3D9 vertex-buffer handle and throws when unset.
          */
-        void* GetD3D();
+        IDirect3DVertexBuffer9* GetD3D();
 
         /**
          * Address: 0x008F5850 (FUN_008F5850)
@@ -87,7 +89,7 @@ namespace gpg::gal
          * Releases any previous native vertex-buffer handle, resets context
          * lanes, then assigns one new context + native buffer payload.
          */
-        void SetBuffer(const VertexBufferContext* context, void* d3dVertexBuffer);
+        void SetBuffer(const VertexBufferContext* context, IDirect3DVertexBuffer9* d3dVertexBuffer);
 
         /**
          * Address: 0x008F5760 (FUN_008F5760)
@@ -100,7 +102,7 @@ namespace gpg::gal
 
     public:
         VertexBufferContext context_{}; // +0x04
-        void* d3dVertexBuffer_ = nullptr; // +0x18
+        IDirect3DVertexBuffer9* d3dVertexBuffer_ = nullptr; // +0x18
         bool locked_ = false; // +0x1C
         std::uint8_t lockPadding_[3]{}; // +0x1D
         void* mappedData_ = nullptr; // +0x20

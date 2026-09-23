@@ -492,7 +492,7 @@ namespace moho
           };
           const std::uint32_t stride = formatter->GetVertexStride(0, 0);
           const auto* const packed = static_cast<const std::uint8_t*>(
-            mStaticVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::ReadOnly));
+            mStaticVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::NoOverwrite));
           char rb[900];
           int w = std::snprintf(rb, sizeof(rb), "[VBREAD] batch=%p fmt=%u stride=%u decl=%p",
                                 static_cast<const void*>(this),
@@ -549,7 +549,7 @@ namespace moho
                                posMismatch, boneMismatch, sourceOutOfBounds, worstVertex, worstError);
             mStaticVertexBuffer->Unlock();
           }
-          const std::int16_t* const gpuIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::ReadOnly);
+          const std::int16_t* const gpuIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::NoOverwrite);
           if (gpuIndices != nullptr) {
             w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w), " | gpuIdx=%d,%d,%d,%d,%d,%d",
                                gpuIndices[0], gpuIndices[1], gpuIndices[2], gpuIndices[3], gpuIndices[4], gpuIndices[5]);
@@ -756,9 +756,9 @@ namespace moho
     device->SetVertexBuffer(1, mDynamicVertexBuffer, 1, 0);
 
     gpg::gal::DrawIndexedContext drawContext;
-    drawContext.topologyToken_ = 4;                 // triangle-list topology token
-    drawContext.vertexCount_ = mVertexCount;        // (.c mNumVertices)
-    drawContext.primitiveCountInput_ = mIndexCount; // (.c mPrimCount)
+    drawContext.topology_ = gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST;
+    drawContext.vertexCount_ = mVertexCount;
+    drawContext.indexCount_ = mIndexCount;
 
     gpg::gal::EffectTechniqueD3D9* const technique = effect->mCurrentTechnique.px;
 

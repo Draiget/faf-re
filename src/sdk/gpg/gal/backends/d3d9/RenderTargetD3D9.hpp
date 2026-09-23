@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <d3d9.h>
+
 #include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 
@@ -30,7 +32,7 @@ namespace gpg::gal
          * Initializes one render-target wrapper and binds caller context plus
          * one native texture payload.
          */
-        RenderTargetD3D9(const RenderTargetContext* context, void* renderTexture);
+        RenderTargetD3D9(const RenderTargetContext* context, IDirect3DTexture9* renderTexture);
 
         /**
          * Address: 0x008F5470 (FUN_008F5470, gpg::gal::RenderTargetD3D9::RenderTargetD3D9 `_0` overload)
@@ -44,15 +46,33 @@ namespace gpg::gal
          * D3D9 surface description and caches them into the embedded
          * `RenderTargetContext` dimension lane.
          */
-        explicit RenderTargetD3D9(void* backBufferSurface);
+        explicit RenderTargetD3D9(IDirect3DSurface9* backBufferSurface);
 
         /**
-         * Address: 0x008F5450 (FUN_008F5450)
+         * Address: 0x008F53B0 (FUN_008F53B0)
+         * Address: 0x008F5450 (FUN_008F5450, scalar deleting destructor)
          *
          * What it does:
-         * Owns the deleting-destructor path and delegates to render-target teardown helpers.
+         * Releases the surface and the texture.
          */
         ~RenderTargetD3D9() override;
+
+        /**
+         * Address: 0x008F5350 (FUN_008F5350)
+         *
+         * What it does:
+         * Releases the surface and the texture and empties the context.
+         */
+        void Reset();
+
+        /**
+         * Address: 0x008F5410 (FUN_008F5410)
+         *
+         * What it does:
+         * Takes `surface` over and sizes the context from its description.
+         * The surface constructor (0x008F5470) inlines it.
+         */
+        void SetSurface(IDirect3DSurface9* surface);
 
         /**
          * Address: 0x008F52C0 (FUN_008F52C0)
@@ -72,18 +92,18 @@ namespace gpg::gal
          * (both operands), `CreateRenderTarget`, `Func4`
          * (`D3DXSaveSurfaceToFile`), and `ClearTarget` (`SetRenderTarget`).
          */
-        void* GetSurface();
+        IDirect3DSurface9* GetSurface();
 
         /**
          * Address: 0x008F52E0 (FUN_008F52E0)
          *
          * What it does:
-         * Returns the retained `IDirect3DBaseTexture9*` lane at `this+0x18`.
-         * Its single caller is `EffectVariableD3D9::Func3`, which hands the
-         * result straight to `ID3DXEffect::SetTexture` - so this lane holds
-         * the texture, not the surface that was derived from it.
+         * Returns the texture at `this+0x18`. Its single caller is
+         * `EffectVariableD3D9::Func3`, which hands it straight to
+         * `ID3DXEffect::SetTexture` - the texture, not the surface derived
+         * from it.
          */
-        void* GetTexture();
+        IDirect3DTexture9* GetTexture();
 
         /**
          * Address: 0x008F5300 (FUN_008F5300)
@@ -105,7 +125,7 @@ namespace gpg::gal
          * Resets prior render-target state, stores one context + texture payload,
          * then acquires and caches level-0 render surface state.
          */
-        void* SetRenderTexture(const RenderTargetContext* context, void* renderTexture);
+        void SetRenderTexture(const RenderTargetContext* context, IDirect3DTexture9* renderTexture);
 
     public:
         RenderTargetContext context_{}; // +0x04
@@ -114,8 +134,8 @@ namespace gpg::gal
         // is then the object `GetDesc` (slot 12) and `GetDC` (slot 15) are
         // dispatched on. Keep the two apart - handing D3DX the surface where a
         // texture belongs faults inside the d3d9 draw, not at bind time.
-        void* surface_ = nullptr; // +0x14, IDirect3DSurface9*
-        void* texture_ = nullptr; // +0x18, IDirect3DBaseTexture9*
+        IDirect3DSurface9* surface_ = nullptr; // +0x14
+        IDirect3DTexture9* texture_ = nullptr; // +0x18
     };
 
     static_assert(offsetof(RenderTargetD3D9, context_) == 0x04, "RenderTargetD3D9::context_ offset must be 0x04");

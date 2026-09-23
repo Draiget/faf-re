@@ -15,6 +15,8 @@ namespace gpg::gal
   class CubeRenderTargetContext;
   class DepthStencilTargetContext;
   class DeviceContext;
+  class DrawContext;
+  class DrawIndexedContext;
   class RenderTargetContext;
   class TextureContext;
   class Effect;
@@ -601,7 +603,7 @@ namespace gpg::gal
      * What it does:
      * Issues one indexed draw.
      */
-    virtual int DrawIndexedPrimitive(const void* context) = 0;
+    virtual int DrawIndexedPrimitive(const DrawIndexedContext* context) = 0;
     /**
      * Slot: 47 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -609,7 +611,7 @@ namespace gpg::gal
      * What it does:
      * Issues one non-indexed draw.
      */
-    virtual int DrawPrimitive(const void* context) = 0;
+    virtual int DrawPrimitive(const DrawContext* context) = 0;
     /**
      * Slot: 48 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)

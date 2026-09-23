@@ -1,10 +1,6 @@
 #include "StateManagerD3D9.hpp"
 
 #include <bit>
-#include <mutex>
-#include <type_traits>
-#include <Unknwn.h>
-#include <unordered_map>
 // TEMPORARY PROBE (do not commit): log states pushed while TDecals is active (statediag.on).
 #include <cstdio>
 #include <cstring>
@@ -31,275 +27,25 @@ namespace gpg::gal
 {
   namespace
   {
-    constexpr GUID kStateManagerD3D9InterfaceId = {
+    // IID_ID3DXEffectStateManager, {79AAB587-6DBC-4FA7-82DE-37FA1781C5CE}
+    // (d3dx9effect.h). The binary compares against its own copy at 0x00D7EEBC.
+    constexpr GUID kIIDEffectStateManager = {
       0x79AAB587, 0x6DBC, 0x4FA7, {0x82, 0xDE, 0x37, 0xFA, 0x17, 0x81, 0xC5, 0xCE}
     };
-
-    struct EnumHash
-    {
-      template <typename EnumT>
-      std::size_t operator()(const EnumT value) const noexcept
-      {
-        using underlying_t = std::underlying_type_t<EnumT>;
-        return static_cast<std::size_t>(static_cast<underlying_t>(value));
-      }
-    };
-
-    struct StateManagerRuntimeCache
-    {
-      std::unordered_map<d3d9::RenderState, unsigned int, EnumHash> renderStateValues;
-      std::unordered_map<d3d9::SamplerState, unsigned int, EnumHash> samplerValues[16];
-      std::unordered_map<d3d9::TextureStageState, unsigned int, EnumHash> textureStageValues[8];
-    };
-
-    std::mutex gStateManagerCacheMutex;
-    std::unordered_map<const StateManagerD3D9*, StateManagerRuntimeCache> gStateManagerCaches;
-
-    /**
-     * Address: 0x00949C80 (FUN_00949C80) — render-state cache instantiation
-     * Address: 0x00949CE0 (FUN_00949CE0) — sampler-state cache instantiation
-     * Address: 0x00949D40 (FUN_00949D40) — texture-stage cache instantiation
-     *
-     * What it does:
-     * Find-or-insert helper that returns `false` only when the existing cache
-     * entry already maps `key` to `value`. The binary emits one specialization
-     * per state-table flavor; modern C++ template instantiation collapses them
-     * back into a single source helper.
-     *
-     * The 2007 binary backed this cache with `std::map<K,V>` (RB-tree), not a
-     * hash table - `map[key] = value` for the texture-stage specialization
-     * (0x00949D40) compiles down to `std::map<...>::operator[]`'s own
-     * find-or-default-insert machinery: `FUN_00949C10` (RB-tree descend;
-     * returns the existing slot on a hit, else calls the insert core) and
-     * `FUN_009499C0` (the insert-hint core; its own callees - `FUN_009492B0`,
-     * `FUN_00949620` external, `FUN_00948930`, and `FUN_009468D0` "redundant
-     * std::map<...>::_Tree internal emission" per its own skip note - are all
-     * already terminal). `std::unordered_map::operator[]` here is the same
-     * find-or-default-insert contract with a different underlying data
-     * structure; behavior is identical, so this modern rewrite already
-     * absorbs both binary helpers' role.
-     *
-     * The render-state and sampler-state specializations (0x00949C80/
-     * 0x00949CE0) emit the same `operator[]` shape as their own
-     * `std::map<...>::operator[]` pair: `FUN_00949B30`/`FUN_00949BA0` are
-     * their RB-tree-descend halves (isNil@+0x15, same shape as
-     * `FUN_00949C10` above -- lower_bound loop, hit returns the existing
-     * slot, miss falls through to an insert-hint core), absorbed into
-     * `std::unordered_map::operator[]` the same way. The two insert-hint
-     * cores are separate compiled bodies, one per specialization, despite
-     * the identical shape: `FUN_009496E0` (render-state, `sub_9496E0`,
-     * reached from `FUN_00949B30`) and `FUN_00949850` (sampler-state,
-     * `sub_949850`, reached from `FUN_00949BA0`).
-     */
-    template <typename MapT, typename KeyT, typename ValueT>
-    bool CacheValue(MapT& map, const KeyT key, const ValueT value)
-    {
-      const auto it = map.find(key);
-      if (it != map.end() && it->second == value) {
-        return false;
-      }
-
-      map[key] = value;
-      return true;
-    }
-
-    HRESULT InvokeSetRenderState(void* const device, const d3d9::RenderState state, const unsigned int value)
-    {
-      using set_render_state_fn = HRESULT(STDMETHODCALLTYPE*)(void*, d3d9::RenderState, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_render_state_fn>(vtable[0xE4 / sizeof(void*)]);
-      return fn(device, state, value);
-    }
-
-    HRESULT InvokeSetSamplerState(
-      void* const device, const unsigned int samplerIndex, const d3d9::SamplerState state, const unsigned int value
-    )
-    {
-      using set_sampler_state_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, d3d9::SamplerState, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_sampler_state_fn>(vtable[0x114 / sizeof(void*)]);
-      return fn(device, samplerIndex, state, value);
-    }
-
-    HRESULT InvokeSetTextureStageState(
-      void* const device, const unsigned int stageIndex, const d3d9::TextureStageState state, const unsigned int value
-    )
-    {
-      using set_texture_stage_state_fn =
-        HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, d3d9::TextureStageState, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_texture_stage_state_fn>(vtable[0x10C / sizeof(void*)]);
-      return fn(device, stageIndex, state, value);
-    }
-
-    HRESULT InvokeSetTexture(void* const device, const unsigned int stageIndex, void* const texture)
-    {
-      using set_texture_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_texture_fn>(vtable[0x104 / sizeof(void*)]);
-      return fn(device, stageIndex, texture);
-    }
-
-    HRESULT InvokeSetTransform(void* const device, const unsigned int transformState, const void* const matrix)
-    {
-      using set_transform_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_transform_fn>(vtable[0xB0 / sizeof(void*)]);
-      return fn(device, transformState, matrix);
-    }
-
-    HRESULT InvokeSetMaterial(void* const device, const void* const material)
-    {
-      using set_material_fn = HRESULT(STDMETHODCALLTYPE*)(void*, const void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_material_fn>(vtable[0xC4 / sizeof(void*)]);
-      return fn(device, material);
-    }
-
-    HRESULT InvokeSetLight(void* const device, const unsigned int lightIndex, const void* const light)
-    {
-      using set_light_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_light_fn>(vtable[0xCC / sizeof(void*)]);
-      return fn(device, lightIndex, light);
-    }
-
-    HRESULT InvokeLightEnable(void* const device, const unsigned int lightIndex, const int enabled)
-    {
-      using light_enable_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<light_enable_fn>(vtable[0xD4 / sizeof(void*)]);
-      return fn(device, lightIndex, enabled);
-    }
-
-    HRESULT InvokeSetNPatchMode(void* const device, const float nPatchSegments)
-    {
-      using set_npatch_mode_fn = HRESULT(STDMETHODCALLTYPE*)(void*, float);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_npatch_mode_fn>(vtable[0x13C / sizeof(void*)]);
-      return fn(device, nPatchSegments);
-    }
-
-    HRESULT InvokeSetFVF(void* const device, const unsigned int fvf)
-    {
-      using set_fvf_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_fvf_fn>(vtable[0x164 / sizeof(void*)]);
-      return fn(device, fvf);
-    }
-
-    HRESULT InvokeSetVertexShader(void* const device, void* const vertexShader)
-    {
-      using set_vertex_shader_fn = HRESULT(STDMETHODCALLTYPE*)(void*, void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_vertex_shader_fn>(vtable[0x170 / sizeof(void*)]);
-      return fn(device, vertexShader);
-    }
-
-    HRESULT InvokeSetVertexShaderConstantF(
-      void* const device,
-      const unsigned int startRegister,
-      const float* const constants,
-      const unsigned int vector4Count
-    )
-    {
-      using set_vertex_shader_constant_f_fn =
-        HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const float*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_vertex_shader_constant_f_fn>(vtable[0x178 / sizeof(void*)]);
-      return fn(device, startRegister, constants, vector4Count);
-    }
-
-    HRESULT InvokeSetVertexShaderConstantI(
-      void* const device, const unsigned int startRegister, const int* const constants, const unsigned int vector4Count
-    )
-    {
-      using set_vertex_shader_constant_i_fn =
-        HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const int*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_vertex_shader_constant_i_fn>(vtable[0x180 / sizeof(void*)]);
-      return fn(device, startRegister, constants, vector4Count);
-    }
-
-    HRESULT InvokeSetVertexShaderConstantB(
-      void* const device, const unsigned int startRegister, const int* const constants, const unsigned int boolCount
-    )
-    {
-      using set_vertex_shader_constant_b_fn =
-        HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const int*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_vertex_shader_constant_b_fn>(vtable[0x188 / sizeof(void*)]);
-      return fn(device, startRegister, constants, boolCount);
-    }
-
-    HRESULT InvokeSetPixelShader(void* const device, void* const pixelShader)
-    {
-      using set_pixel_shader_fn = HRESULT(STDMETHODCALLTYPE*)(void*, void*);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_pixel_shader_fn>(vtable[0x1AC / sizeof(void*)]);
-      return fn(device, pixelShader);
-    }
-
-    HRESULT InvokeSetPixelShaderConstantF(
-      void* const device,
-      const unsigned int startRegister,
-      const float* const constants,
-      const unsigned int vector4Count
-    )
-    {
-      using set_pixel_shader_constant_f_fn =
-        HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const float*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_pixel_shader_constant_f_fn>(vtable[0x1B4 / sizeof(void*)]);
-      return fn(device, startRegister, constants, vector4Count);
-    }
-
-    HRESULT InvokeSetPixelShaderConstantI(
-      void* const device, const unsigned int startRegister, const int* const constants, const unsigned int vector4Count
-    )
-    {
-      using set_pixel_shader_constant_i_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const int*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_pixel_shader_constant_i_fn>(vtable[0x1BC / sizeof(void*)]);
-      return fn(device, startRegister, constants, vector4Count);
-    }
-
-    HRESULT InvokeSetPixelShaderConstantB(
-      void* const device, const unsigned int startRegister, const int* const constants, const unsigned int boolCount
-    )
-    {
-      using set_pixel_shader_constant_b_fn = HRESULT(STDMETHODCALLTYPE*)(void*, unsigned int, const int*, unsigned int);
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const fn = reinterpret_cast<set_pixel_shader_constant_b_fn>(vtable[0x1C4 / sizeof(void*)]);
-      return fn(device, startRegister, constants, boolCount);
-    }
-
-    /**
-     * Address: 0x00949EB0 (FUN_00949EB0)
-     *
-     * What it does:
-     * Teardown helper used by the deleting-dtor path to clear sidecar runtime
-     * cache state owned by this lifted translation unit.
-     */
-    void DestroyStateManagerD3D9Body(StateManagerD3D9* const stateManager)
-    {
-      std::lock_guard<std::mutex> lock(gStateManagerCacheMutex);
-      gStateManagerCaches.erase(stateManager);
-    }
   } // namespace
 
   /**
    * Address: 0x00948280 (FUN_00948280)
    *
    * What it does:
-   * Initializes state-manager bookkeeping and binds the native D3D9 device lane.
+   * Binds the device with a zero reference count and empty caches.
    */
-  StateManagerD3D9::StateManagerD3D9(void* const device) :
-    uses_(0),
-    device_(device),
-    activeVertexShader_(nullptr),
-    activePixelShader_(nullptr),
-    activeFvf_(0)
+  StateManagerD3D9::StateManagerD3D9(IDirect3DDevice9* const device)
+    : uses_(0),
+      device_(device),
+      activeVertexShader_(nullptr),
+      activePixelShader_(nullptr),
+      activeFvf_(0)
   {
   }
 
@@ -308,11 +54,12 @@ namespace gpg::gal
    * Mangled: ?QueryInterface@StateManagerD3D9@gal@gpg@@UAGJABU_GUID@@PAPAX@Z
    *
    * What it does:
-   * Returns `this` for supported IIDs and increments refcount.
+   * Hands out `this`, add-ref'd, for IUnknown and ID3DXEffectStateManager.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::QueryInterface(REFIID riid, void** outObject)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::QueryInterface(REFIID riid, void** const outObject)
   {
-    if (InlineIsEqualGUID(riid, IID_IUnknown) || InlineIsEqualGUID(riid, kStateManagerD3D9InterfaceId)) {
+    if (riid == IID_IUnknown || riid == kIIDEffectStateManager)
+    {
       *outObject = this;
       AddRef();
       return S_OK;
@@ -344,7 +91,8 @@ namespace gpg::gal
   ULONG STDMETHODCALLTYPE StateManagerD3D9::Release()
   {
     const LONG remaining = InterlockedDecrement(&uses_);
-    if (remaining != 0) {
+    if (remaining != 0)
+    {
       return static_cast<ULONG>(remaining);
     }
 
@@ -357,22 +105,18 @@ namespace gpg::gal
    * Mangled: ?SetRenderState@StateManagerD3D9@gal@gpg@@UAGJW4_D3DRENDERSTATETYPE@@K@Z
    *
    * What it does:
-   * Emits a D3D render-state update only when cached value changes.
+   * Sets a render state unless the device already holds that value.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetRenderState(const render_state_type state, const unsigned int value)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetRenderState(const D3DRENDERSTATETYPE state, const DWORD value)
   {
-    bool changed = false;
+    const bool changed = renderStateCache_.Update(state, value);
+    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] RS state=%u value=%08X changed=%d", static_cast<unsigned>(state), static_cast<unsigned>(value), changed ? 1 : 0); } // TEMPORARY PROBE
+    if (!changed)
     {
-      std::lock_guard<std::mutex> lock(gStateManagerCacheMutex);
-      changed = CacheValue(gStateManagerCaches[this].renderStateValues, state, value);
-    }
-
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] RS state=%u value=%08X changed=%d", static_cast<unsigned>(state), value, changed ? 1 : 0); } // TEMPORARY PROBE
-    if (!changed) {
       return S_OK;
     }
 
-    return InvokeSetRenderState(device_, state, value);
+    return device_->SetRenderState(state, value);
   }
 
   /**
@@ -380,11 +124,11 @@ namespace gpg::gal
    * Mangled: ?SetRenderStateFlt@StateManagerD3D9@gal@gpg@@UAGJW4_D3DRENDERSTATETYPE@@M@Z
    *
    * What it does:
-   * Reuses SetRenderState with float payload bit-preserved as DWORD.
+   * `SetRenderState` with the float's bits as the value.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetRenderStateFlt(const render_state_type state, const float value)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetRenderStateFlt(const D3DRENDERSTATETYPE state, const float value)
   {
-    return SetRenderState(state, std::bit_cast<unsigned int>(value));
+    return SetRenderState(state, std::bit_cast<DWORD>(value));
   }
 
   /**
@@ -392,24 +136,21 @@ namespace gpg::gal
    * Mangled: ?SetSamplerState@StateManagerD3D9@gal@gpg@@UAGJKW4_D3DSAMPLERSTATETYPE@@K@Z
    *
    * What it does:
-   * Uses per-sampler cache for samplers [0,15] before forwarding to D3D9.
+   * Sets a sampler state unless the device already holds that value. Only
+   * samplers 0-15 are cached; the rest always reach the device.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetSamplerState(
-    const unsigned int samplerIndex, const sampler_state_type state, const unsigned int value
+    const DWORD sampler, const D3DSAMPLERSTATETYPE type, const DWORD value
   )
   {
-    bool changed = true;
-    if (samplerIndex < 16) {
-      std::lock_guard<std::mutex> lock(gStateManagerCacheMutex);
-      changed = CacheValue(gStateManagerCaches[this].samplerValues[samplerIndex], state, value);
-    }
-
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] SS sampler=%u state=%u value=%08X changed=%d", samplerIndex, static_cast<unsigned>(state), value, changed ? 1 : 0); } // TEMPORARY PROBE
-    if (!changed) {
+    const bool changed = sampler >= 16 || samplerStateCache_[sampler].Update(type, value);
+    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] SS sampler=%u state=%u value=%08X changed=%d", static_cast<unsigned>(sampler), static_cast<unsigned>(type), static_cast<unsigned>(value), changed ? 1 : 0); } // TEMPORARY PROBE
+    if (!changed)
+    {
       return S_OK;
     }
 
-    return InvokeSetSamplerState(device_, samplerIndex, state, value);
+    return device_->SetSamplerState(sampler, type, value);
   }
 
   /**
@@ -417,23 +158,19 @@ namespace gpg::gal
    * Mangled: ?SetTextureStageState@StateManagerD3D9@gal@gpg@@UAGJKW4_D3DTEXTURESTAGESTATETYPE@@K@Z
    *
    * What it does:
-   * Uses per-stage cache for stages [0,7] before forwarding to D3D9.
+   * Sets a texture-stage state unless the device already holds that value.
+   * Only stages 0-7 are cached; the rest always reach the device.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTextureStageState(
-    const unsigned int stageIndex, const texture_stage_state_type state, const unsigned int value
+    const DWORD stage, const D3DTEXTURESTAGESTATETYPE type, const DWORD value
   )
   {
-    bool changed = true;
-    if (stageIndex < 8) {
-      std::lock_guard<std::mutex> lock(gStateManagerCacheMutex);
-      changed = CacheValue(gStateManagerCaches[this].textureStageValues[stageIndex], state, value);
-    }
-
-    if (!changed) {
+    if (stage < 8 && !textureStageStateCache_[stage].Update(type, value))
+    {
       return S_OK;
     }
 
-    return InvokeSetTextureStageState(device_, stageIndex, state, value);
+    return device_->SetTextureStageState(stage, type, value);
   }
 
   /**
@@ -441,13 +178,13 @@ namespace gpg::gal
    * Mangled: ?SetTextureStageStateFlt@StateManagerD3D9@gal@gpg@@UAGJKW4_D3DTEXTURESTAGESTATETYPE@@M@Z
    *
    * What it does:
-   * Reuses SetTextureStageState with float payload bit-preserved as DWORD.
+   * `SetTextureStageState` with the float's bits as the value.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTextureStageStateFlt(
-    const unsigned int stageIndex, const texture_stage_state_type state, const float value
+    const DWORD stage, const D3DTEXTURESTAGESTATETYPE type, const float value
   )
   {
-    return SetTextureStageState(stageIndex, state, std::bit_cast<unsigned int>(value));
+    return SetTextureStageState(stage, type, std::bit_cast<DWORD>(value));
   }
 
   /**
@@ -455,15 +192,15 @@ namespace gpg::gal
    * Mangled: ?SetTexture@StateManagerD3D9@gal@gpg@@UAGJKPAVIDirect3DBaseTexture9@@@Z
    *
    * What it does:
-   * Forwards stage texture binding directly to the backend device.
+   * Binds a texture straight to the device; textures are not cached.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTexture(const unsigned int stageIndex, void* const texture)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTexture(const DWORD stage, IDirect3DBaseTexture9* const texture)
   {
-    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] TEX stage=%u texture=%p", stageIndex, texture); } // TEMPORARY PROBE
+    if (ProbeStateDiagArmed() && gProbeStateBudget > 0) { --gProbeStateBudget; gpg::Warnf("[STATEDIAG] TEX stage=%u texture=%p", static_cast<unsigned>(stage), static_cast<void*>(texture)); } // TEMPORARY PROBE
     { // TEMPORARY PROBE (do not commit): surface SetTexture failures (foreign-device textures etc.)
-      const HRESULT hrTex = InvokeSetTexture(device_, stageIndex, texture);
+      const HRESULT hrTex = device_->SetTexture(stage, texture);
       static int sFailBudget = 40;
-      if (hrTex != 0 && sFailBudget > 0) { --sFailBudget; gpg::Warnf("[SETTEXFAIL] stage=%u texture=%p hr=%08lX device=%p", stageIndex, texture, static_cast<long>(hrTex), device_); }
+      if (hrTex != 0 && sFailBudget > 0) { --sFailBudget; gpg::Warnf("[SETTEXFAIL] stage=%u texture=%p hr=%08lX device=%p", static_cast<unsigned>(stage), static_cast<void*>(texture), static_cast<long>(hrTex), static_cast<void*>(device_)); }
       return hrTex;
     }
   }
@@ -472,11 +209,11 @@ namespace gpg::gal
    * Address: 0x00948550 (FUN_00948550)
    *
    * What it does:
-   * Forwards N-patch tessellation mode directly to the backend device.
+   * Sets the N-patch segment count on the device.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetNPatchMode(const float nPatchSegments)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetNPatchMode(const FLOAT numSegments)
   {
-    return InvokeSetNPatchMode(device_, nPatchSegments);
+    return device_->SetNPatchMode(numSegments);
   }
 
   /**
@@ -484,55 +221,56 @@ namespace gpg::gal
    * Mangled: ?SetVertexShader@StateManagerD3D9@gal@gpg@@UAGJPAVIDirect3DVertexShader9@@@Z
    *
    * What it does:
-   * Avoids redundant backend calls when vertex shader pointer is unchanged.
+   * Binds a vertex shader unless it is already the active one.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetVertexShader(void* const vertexShader)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetVertexShader(IDirect3DVertexShader9* const shader)
   {
-    if (activeVertexShader_ == vertexShader) {
+    if (activeVertexShader_ == shader)
+    {
       return S_OK;
     }
 
-    activeVertexShader_ = vertexShader;
-    return InvokeSetVertexShader(device_, vertexShader);
+    activeVertexShader_ = shader;
+    return device_->SetVertexShader(shader);
   }
 
   /**
    * Address: 0x00948570 (FUN_00948570)
    *
    * What it does:
-   * Forwards float4 vertex-shader constant uploads directly to the backend device.
+   * Uploads float4 vertex-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetVertexShaderConstantF(
-    const unsigned int startRegister, const float* const constants, const unsigned int vector4Count
+    const UINT registerIndex, const FLOAT* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetVertexShaderConstantF(device_, startRegister, constants, vector4Count);
+    return device_->SetVertexShaderConstantF(registerIndex, constantData, registerCount);
   }
 
   /**
    * Address: 0x00948590 (FUN_00948590)
    *
    * What it does:
-   * Forwards int4 vertex-shader constant uploads directly to the backend device.
+   * Uploads int4 vertex-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetVertexShaderConstantI(
-    const unsigned int startRegister, const int* const constants, const unsigned int vector4Count
+    const UINT registerIndex, const INT* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetVertexShaderConstantI(device_, startRegister, constants, vector4Count);
+    return device_->SetVertexShaderConstantI(registerIndex, constantData, registerCount);
   }
 
   /**
    * Address: 0x009485B0 (FUN_009485B0)
    *
    * What it does:
-   * Forwards boolean vertex-shader constant uploads directly to the backend device.
+   * Uploads boolean vertex-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetVertexShaderConstantB(
-    const unsigned int startRegister, const int* const constants, const unsigned int boolCount
+    const UINT registerIndex, const BOOL* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetVertexShaderConstantB(device_, startRegister, constants, boolCount);
+    return device_->SetVertexShaderConstantB(registerIndex, constantData, registerCount);
   }
 
   /**
@@ -540,55 +278,56 @@ namespace gpg::gal
    * Mangled: ?SetPixelShader@StateManagerD3D9@gal@gpg@@UAGJPAVIDirect3DPixelShader9@@@Z
    *
    * What it does:
-   * Avoids redundant backend calls when pixel shader pointer is unchanged.
+   * Binds a pixel shader unless it is already the active one.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetPixelShader(void* const pixelShader)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetPixelShader(IDirect3DPixelShader9* const shader)
   {
-    if (activePixelShader_ == pixelShader) {
+    if (activePixelShader_ == shader)
+    {
       return S_OK;
     }
 
-    activePixelShader_ = pixelShader;
-    return InvokeSetPixelShader(device_, pixelShader);
+    activePixelShader_ = shader;
+    return device_->SetPixelShader(shader);
   }
 
   /**
    * Address: 0x009485D0 (FUN_009485D0)
    *
    * What it does:
-   * Forwards float4 pixel-shader constant uploads directly to the backend device.
+   * Uploads float4 pixel-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetPixelShaderConstantF(
-    const unsigned int startRegister, const float* const constants, const unsigned int vector4Count
+    const UINT registerIndex, const FLOAT* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetPixelShaderConstantF(device_, startRegister, constants, vector4Count);
+    return device_->SetPixelShaderConstantF(registerIndex, constantData, registerCount);
   }
 
   /**
    * Address: 0x009485F0 (FUN_009485F0)
    *
    * What it does:
-   * Forwards int4 pixel-shader constant uploads directly to the backend device.
+   * Uploads int4 pixel-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetPixelShaderConstantI(
-    const unsigned int startRegister, const int* const constants, const unsigned int vector4Count
+    const UINT registerIndex, const INT* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetPixelShaderConstantI(device_, startRegister, constants, vector4Count);
+    return device_->SetPixelShaderConstantI(registerIndex, constantData, registerCount);
   }
 
   /**
    * Address: 0x00948610 (FUN_00948610)
    *
    * What it does:
-   * Forwards boolean pixel-shader constant uploads directly to the backend device.
+   * Uploads boolean pixel-shader constants.
    */
   HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetPixelShaderConstantB(
-    const unsigned int startRegister, const int* const constants, const unsigned int boolCount
+    const UINT registerIndex, const BOOL* const constantData, const UINT registerCount
   )
   {
-    return InvokeSetPixelShaderConstantB(device_, startRegister, constants, boolCount);
+    return device_->SetPixelShaderConstantB(registerIndex, constantData, registerCount);
   }
 
   /**
@@ -596,16 +335,17 @@ namespace gpg::gal
    * Mangled: ?SetFVF@StateManagerD3D9@gal@gpg@@UAGJK@Z
    *
    * What it does:
-   * Avoids redundant backend calls when FVF is unchanged.
+   * Sets the FVF unless it is already the active one.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetFVF(const unsigned int fvf)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetFVF(const DWORD fvf)
   {
-    if (activeFvf_ == fvf) {
+    if (activeFvf_ == fvf)
+    {
       return S_OK;
     }
 
     activeFvf_ = fvf;
-    return InvokeSetFVF(device_, fvf);
+    return device_->SetFVF(fvf);
   }
 
   /**
@@ -613,11 +353,11 @@ namespace gpg::gal
    * Mangled: ?SetTransform@StateManagerD3D9@gal@gpg@@UAGJW4_D3DTRANSFORMSTATETYPE@@PBV_D3DMATRIX@@@Z
    *
    * What it does:
-   * Forwards transform state updates to the backend device.
+   * Sets a transform on the device.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTransform(const unsigned int transformState, const void* const matrix)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetTransform(const D3DTRANSFORMSTATETYPE state, const D3DMATRIX* const matrix)
   {
-    return InvokeSetTransform(device_, transformState, matrix);
+    return device_->SetTransform(state, matrix);
   }
 
   /**
@@ -625,11 +365,11 @@ namespace gpg::gal
    * Mangled: ?SetMaterial@StateManagerD3D9@gal@gpg@@UAGJPBV_D3DMATERIAL9@@@Z
    *
    * What it does:
-   * Forwards material updates to the backend device.
+   * Sets the material on the device.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetMaterial(const void* const material)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetMaterial(const D3DMATERIAL9* const material)
   {
-    return InvokeSetMaterial(device_, material);
+    return device_->SetMaterial(material);
   }
 
   /**
@@ -637,11 +377,11 @@ namespace gpg::gal
    * Mangled: ?SetLight@StateManagerD3D9@gal@gpg@@UAGJKPBV_D3DLIGHT9@@@Z
    *
    * What it does:
-   * Forwards indexed light updates to the backend device.
+   * Sets one light on the device.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetLight(const unsigned int lightIndex, const void* const light)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::SetLight(const DWORD index, const D3DLIGHT9* const light)
   {
-    return InvokeSetLight(device_, lightIndex, light);
+    return device_->SetLight(index, light);
   }
 
   /**
@@ -649,22 +389,21 @@ namespace gpg::gal
    * Mangled: ?LightEnable@StateManagerD3D9@gal@gpg@@UAGJKH@Z
    *
    * What it does:
-   * Forwards indexed light enable state to the backend device.
+   * Enables or disables one light on the device.
    */
-  HRESULT STDMETHODCALLTYPE StateManagerD3D9::LightEnable(const unsigned int lightIndex, const int enabled)
+  HRESULT STDMETHODCALLTYPE StateManagerD3D9::LightEnable(const DWORD index, const BOOL enable)
   {
-    return InvokeLightEnable(device_, lightIndex, enabled);
+    return device_->LightEnable(index, enable);
   }
 
   /**
-   * Address: 0x00949F60 (FUN_00949F60)
+   * Address: 0x00949EB0 (FUN_00949EB0)
+   * Address: 0x00949F60 (FUN_00949F60, scalar deleting destructor)
    * Mangled: ??_GStateManagerD3D9@gal@gpg@@UAEPAXI@Z
    *
    * What it does:
-   * Removes runtime cache sidecar state; member cache objects tear down via RAII.
+   * Destroys the caches: the texture-stage and sampler arrays through
+   * `eh vector destructor iterator`, then the render-state cache.
    */
-  StateManagerD3D9::~StateManagerD3D9()
-  {
-    DestroyStateManagerD3D9Body(this);
-  }
+  StateManagerD3D9::~StateManagerD3D9() = default;
 } // namespace gpg::gal

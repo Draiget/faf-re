@@ -167,7 +167,7 @@ namespace moho
 
     std::uint32_t lockFlags = 0;
     if (readOnly) {
-      lockFlags = static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::ReadOnly);
+      lockFlags = static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::NoOverwrite);
     }
     if (discard) {
       lockFlags |= static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::Discard);

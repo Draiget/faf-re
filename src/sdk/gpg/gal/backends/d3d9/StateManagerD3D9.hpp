@@ -1,9 +1,10 @@
 #pragma once
 
-#include "gpg/gal/D3D9Utils.h"
-#include "gpg/gal/StateCache_D3DRENDERSTATETYPE.hpp"
-#include "gpg/gal/StateCache_D3DSAMPLERSTATETYPE.hpp"
-#include "gpg/gal/StateCache_D3DTEXTURESTAGESTATETYPE.hpp"
+#include <cstddef>
+
+#include <d3dx9effect.h>
+
+#include "gpg/gal/StateCache.h"
 #include "platform/Platform.h"
 
 namespace gpg::gal
@@ -11,21 +12,21 @@ namespace gpg::gal
     /**
      * VFTABLE: 0x00D47F8C
      * COL:     0x00E53664
+     *
+     * The state manager every D3DX effect is given (`SetStateManager`, slot
+     * 71): D3DX routes each state an effect pass sets through it, and it drops
+     * the ones the device already holds.
      */
-    class StateManagerD3D9
+    class StateManagerD3D9 : public ID3DXEffectStateManager
     {
     public:
-        using render_state_type = d3d9::RenderState;
-        using sampler_state_type = d3d9::SamplerState;
-        using texture_stage_state_type = d3d9::TextureStageState;
-
         /**
          * Address: 0x00948280 (FUN_00948280)
          *
          * What it does:
          * Binds one native D3D9 device pointer and initializes state-cache lanes.
          */
-        explicit StateManagerD3D9(void* device);
+        explicit StateManagerD3D9(IDirect3DDevice9* device);
 
         /**
          * Address: 0x00948340 (FUN_00948340)
@@ -35,7 +36,7 @@ namespace gpg::gal
          * Supports COM-style interface negotiation for IUnknown and the
          * state-manager interface IID.
          */
-        virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** outObject);
+        HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** outObject) override;
 
         /**
          * Address: 0x009483A0 (FUN_009483A0)
@@ -44,7 +45,7 @@ namespace gpg::gal
          * What it does:
          * Increments and returns the intrusive COM-style reference count.
          */
-        virtual ULONG STDMETHODCALLTYPE AddRef();
+        ULONG STDMETHODCALLTYPE AddRef() override;
 
         /**
          * Address: 0x009483C0 (FUN_009483C0)
@@ -53,7 +54,7 @@ namespace gpg::gal
          * What it does:
          * Decrements reference count and destroys the object when it reaches 0.
          */
-        virtual ULONG STDMETHODCALLTYPE Release();
+        ULONG STDMETHODCALLTYPE Release() override;
 
         /**
          * Address: 0x009484D0 (FUN_009484D0)
@@ -62,7 +63,7 @@ namespace gpg::gal
          * What it does:
          * Forwards transform state updates directly to the D3D9 device.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetTransform(unsigned int transformState, const void* matrix);
+        HRESULT STDMETHODCALLTYPE SetTransform(D3DTRANSFORMSTATETYPE state, const D3DMATRIX* matrix) override;
 
         /**
          * Address: 0x009484F0 (FUN_009484F0)
@@ -71,7 +72,7 @@ namespace gpg::gal
          * What it does:
          * Forwards material updates directly to the D3D9 device.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetMaterial(const void* material);
+        HRESULT STDMETHODCALLTYPE SetMaterial(const D3DMATERIAL9* material) override;
 
         /**
          * Address: 0x00948510 (FUN_00948510)
@@ -80,7 +81,7 @@ namespace gpg::gal
          * What it does:
          * Forwards indexed light updates directly to the D3D9 device.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetLight(unsigned int lightIndex, const void* light);
+        HRESULT STDMETHODCALLTYPE SetLight(DWORD index, const D3DLIGHT9* light) override;
 
         /**
          * Address: 0x00948530 (FUN_00948530)
@@ -89,7 +90,7 @@ namespace gpg::gal
          * What it does:
          * Forwards indexed light enable/disable state to the D3D9 device.
          */
-        virtual HRESULT STDMETHODCALLTYPE LightEnable(unsigned int lightIndex, int enabled);
+        HRESULT STDMETHODCALLTYPE LightEnable(DWORD index, BOOL enable) override;
 
         /**
          * Address: 0x00949DA0 (FUN_00949DA0)
@@ -98,7 +99,7 @@ namespace gpg::gal
          * What it does:
          * Caches a render-state value and forwards to D3D9 only when changed.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetRenderState(render_state_type state, unsigned int value);
+        HRESULT STDMETHODCALLTYPE SetRenderState(D3DRENDERSTATETYPE state, DWORD value) override;
 
         /**
          * Address: 0x00948420 (FUN_00948420)
@@ -107,7 +108,7 @@ namespace gpg::gal
          * What it does:
          * Forwards stage-texture binding calls directly to the D3D9 device.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetTexture(unsigned int stageIndex, void* texture);
+        HRESULT STDMETHODCALLTYPE SetTexture(DWORD stage, IDirect3DBaseTexture9* texture) override;
 
         /**
          * Address: 0x00949E50 (FUN_00949E50)
@@ -116,11 +117,7 @@ namespace gpg::gal
          * What it does:
          * Caches per-stage texture-stage state values for stages [0,7].
          */
-        virtual HRESULT STDMETHODCALLTYPE SetTextureStageState(
-            unsigned int stageIndex,
-            texture_stage_state_type state,
-            unsigned int value
-        );
+        HRESULT STDMETHODCALLTYPE SetTextureStageState(DWORD stage, D3DTEXTURESTAGESTATETYPE type, DWORD value) override;
 
         /**
          * Address: 0x00949DF0 (FUN_00949DF0)
@@ -129,11 +126,7 @@ namespace gpg::gal
          * What it does:
          * Caches per-sampler state values for samplers [0,15].
          */
-        virtual HRESULT STDMETHODCALLTYPE SetSamplerState(
-            unsigned int samplerIndex,
-            sampler_state_type state,
-            unsigned int value
-        );
+        HRESULT STDMETHODCALLTYPE SetSamplerState(DWORD sampler, D3DSAMPLERSTATETYPE type, DWORD value) override;
 
         /**
          * Address: 0x00948550 (FUN_00948550)
@@ -141,7 +134,7 @@ namespace gpg::gal
          * What it does:
          * Forwards N-patch tessellation mode directly to the backend device.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetNPatchMode(float nPatchSegments);
+        HRESULT STDMETHODCALLTYPE SetNPatchMode(FLOAT numSegments) override;
 
         /**
          * Address: 0x009484A0 (FUN_009484A0)
@@ -150,7 +143,7 @@ namespace gpg::gal
          * What it does:
          * Caches active FVF value and forwards only on change.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetFVF(unsigned int fvf);
+        HRESULT STDMETHODCALLTYPE SetFVF(DWORD fvf) override;
 
         /**
          * Address: 0x00948440 (FUN_00948440)
@@ -159,7 +152,7 @@ namespace gpg::gal
          * What it does:
          * Caches active vertex-shader pointer and forwards only on change.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetVertexShader(void* vertexShader);
+        HRESULT STDMETHODCALLTYPE SetVertexShader(IDirect3DVertexShader9* shader) override;
 
         /**
          * Address: 0x00948570 (FUN_00948570)
@@ -167,11 +160,9 @@ namespace gpg::gal
          * What it does:
          * Forwards packed float4 constant uploads for the active vertex shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetVertexShaderConstantF(
-            unsigned int startRegister,
-            const float* constants,
-            unsigned int vector4Count
-        );
+        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantF(
+            UINT registerIndex, const FLOAT* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x00948590 (FUN_00948590)
@@ -179,11 +170,9 @@ namespace gpg::gal
          * What it does:
          * Forwards packed int4 constant uploads for the active vertex shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetVertexShaderConstantI(
-            unsigned int startRegister,
-            const int* constants,
-            unsigned int vector4Count
-        );
+        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantI(
+            UINT registerIndex, const INT* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x009485B0 (FUN_009485B0)
@@ -191,11 +180,9 @@ namespace gpg::gal
          * What it does:
          * Forwards boolean constant uploads for the active vertex shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetVertexShaderConstantB(
-            unsigned int startRegister,
-            const int* constants,
-            unsigned int boolCount
-        );
+        HRESULT STDMETHODCALLTYPE SetVertexShaderConstantB(
+            UINT registerIndex, const BOOL* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x00948470 (FUN_00948470)
@@ -204,7 +191,7 @@ namespace gpg::gal
          * What it does:
          * Caches active pixel-shader pointer and forwards only on change.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetPixelShader(void* pixelShader);
+        HRESULT STDMETHODCALLTYPE SetPixelShader(IDirect3DPixelShader9* shader) override;
 
         /**
          * Address: 0x009485D0 (FUN_009485D0)
@@ -212,11 +199,9 @@ namespace gpg::gal
          * What it does:
          * Forwards packed float4 constant uploads for the active pixel shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetPixelShaderConstantF(
-            unsigned int startRegister,
-            const float* constants,
-            unsigned int vector4Count
-        );
+        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantF(
+            UINT registerIndex, const FLOAT* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x009485F0 (FUN_009485F0)
@@ -224,11 +209,9 @@ namespace gpg::gal
          * What it does:
          * Forwards packed int4 constant uploads for the active pixel shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetPixelShaderConstantI(
-            unsigned int startRegister,
-            const int* constants,
-            unsigned int vector4Count
-        );
+        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantI(
+            UINT registerIndex, const INT* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x00948610 (FUN_00948610)
@@ -236,11 +219,9 @@ namespace gpg::gal
          * What it does:
          * Forwards boolean constant uploads for the active pixel shader.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetPixelShaderConstantB(
-            unsigned int startRegister,
-            const int* constants,
-            unsigned int boolCount
-        );
+        HRESULT STDMETHODCALLTYPE SetPixelShaderConstantB(
+            UINT registerIndex, const BOOL* constantData, UINT registerCount
+        ) override;
 
         /**
          * Address: 0x00949F60 (FUN_00949F60)
@@ -258,7 +239,7 @@ namespace gpg::gal
          * What it does:
          * Bit-casts float payload and dispatches through SetRenderState.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetRenderStateFlt(render_state_type state, float value);
+        virtual HRESULT STDMETHODCALLTYPE SetRenderStateFlt(D3DRENDERSTATETYPE state, float value);
 
         /**
          * Address: 0x00948410 (FUN_00948410)
@@ -267,20 +248,29 @@ namespace gpg::gal
          * What it does:
          * Bit-casts float payload and dispatches through SetTextureStageState.
          */
-        virtual HRESULT STDMETHODCALLTYPE SetTextureStageStateFlt(
-            unsigned int stageIndex,
-            texture_stage_state_type state,
-            float value
-        );
+        virtual HRESULT STDMETHODCALLTYPE SetTextureStageStateFlt(DWORD stage, D3DTEXTURESTAGESTATETYPE type, float value);
 
     protected:
-        volatile LONG uses_ = 0;                                              // +0x04
-        void* device_ = nullptr;                                              // +0x08
-        StateCache<d3d9::RenderState, unsigned int> renderStateCache_{};      // +0x0C
-        StateCache<_D3DSAMPLERSTATETYPE, unsigned int> samplerStateCache_[16];         // +0x1C
+        volatile LONG uses_ = 0;                                                    // +0x04
+        IDirect3DDevice9* device_ = nullptr;                                        // +0x08
+        StateCache<_D3DRENDERSTATETYPE, unsigned int> renderStateCache_;            // +0x0C
+        StateCache<_D3DSAMPLERSTATETYPE, unsigned int> samplerStateCache_[16];      // +0x1C
         StateCache<_D3DTEXTURESTAGESTATETYPE, unsigned int> textureStageStateCache_[8]; // +0x11C
-        void* activeVertexShader_ = nullptr;                                  // +0x19C
-        void* activePixelShader_ = nullptr;                                   // +0x1A0
-        unsigned int activeFvf_ = 0;                                          // +0x1A4
+        IDirect3DVertexShader9* activeVertexShader_ = nullptr;                      // +0x19C
+        IDirect3DPixelShader9* activePixelShader_ = nullptr;                        // +0x1A0
+        DWORD activeFvf_ = 0;                                                       // +0x1A4
+
+        friend struct StateManagerD3D9LayoutVerifier;
+    };
+
+    struct StateManagerD3D9LayoutVerifier
+    {
+        static_assert(offsetof(StateManagerD3D9, device_) == 0x08, "StateManagerD3D9::device_ offset must be 0x08");
+        static_assert(offsetof(StateManagerD3D9, renderStateCache_) == 0x0C, "StateManagerD3D9::renderStateCache_ offset must be 0x0C");
+        static_assert(offsetof(StateManagerD3D9, samplerStateCache_) == 0x1C, "StateManagerD3D9::samplerStateCache_ offset must be 0x1C");
+        static_assert(offsetof(StateManagerD3D9, textureStageStateCache_) == 0x11C, "StateManagerD3D9::textureStageStateCache_ offset must be 0x11C");
+        static_assert(offsetof(StateManagerD3D9, activeVertexShader_) == 0x19C, "StateManagerD3D9::activeVertexShader_ offset must be 0x19C");
+        static_assert(offsetof(StateManagerD3D9, activeFvf_) == 0x1A4, "StateManagerD3D9::activeFvf_ offset must be 0x1A4");
+        static_assert(sizeof(StateManagerD3D9) == 0x1A8, "StateManagerD3D9 size must be 0x1A8");
     };
 }

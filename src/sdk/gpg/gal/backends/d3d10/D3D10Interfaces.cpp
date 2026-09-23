@@ -5871,57 +5871,51 @@ namespace gpg::gal
   /**
    * Address: 0x008FCF90 (FUN_008FCF90)
    *
-   * void const *
-   *
    * What it does:
-   * Validates draw topology token, binds native primitive topology, then dispatches
-   * `Draw` vs `DrawInstanced` using the recovered instance-count lane at `this+0xD8`.
+   * Validates the topology, binds the native primitive topology, then dispatches
+   * `Draw` vs `DrawInstanced` using the instance count at `this+0xD8`.
    */
-  int DeviceD3D10::DrawPrimitive(const void* const context)
+  int DeviceD3D10::DrawPrimitive(const DrawContext* const context)
   {
-    const auto* const drawContext = static_cast<const DrawContext*>(context);
-    // D3D10's Draw takes a vertex count; the binary hands it this lane unconverted
-    // (`mov edx,[edi+8]` at 0x008FD05D), whatever the D3D9-facing name says.
-    if (drawContext->topologyToken_ == 0U) {
+    // D3D10's Draw takes the vertex count as is (`mov edx,[edi+8]` at
+    // 0x008FD05D); only the D3D9 backend converts it to primitives.
+    if (context->topology_ == 0) {
       ThrowInvalidTopologyError(1561);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken_));
+    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(context->topology_));
     const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
     if (instanceCount > 1U) {
-      return InvokeNativeDrawInstanced(this, drawContext->primitiveCountInput_, instanceCount, drawContext->startVertex_, 0U);
+      return InvokeNativeDrawInstanced(this, context->vertexCount_, instanceCount, context->startVertex_, 0U);
     }
 
-    return InvokeNativeDraw(this, drawContext->primitiveCountInput_, drawContext->startVertex_);
+    return InvokeNativeDraw(this, context->vertexCount_, context->startVertex_);
   }
 
   /**
    * Address: 0x008FD0A0 (FUN_008FD0A0)
    *
-   * void const *
-   *
    * What it does:
-   * Validates indexed draw topology token, binds native primitive topology, then
+   * Validates the topology, binds the native primitive topology, then
    * dispatches `DrawIndexed` vs `DrawIndexedInstanced`.
    */
-  int DeviceD3D10::DrawIndexedPrimitive(const void* const context)
+  int DeviceD3D10::DrawIndexedPrimitive(const DrawIndexedContext* const context)
   {
-    const auto* const drawContext = static_cast<const DrawIndexedContext*>(context);
-    // As above: DrawIndexed takes an index count, and the binary passes this lane
-    // through unconverted (`mov edx,[edi+0x10]` at 0x008FD16E).
-    if (drawContext->topologyToken_ == 0U) {
+    // As above: DrawIndexed takes the index count as is (`mov edx,[edi+0x10]`
+    // at 0x008FD16E).
+    if (context->topology_ == 0) {
       ThrowInvalidTopologyError(1580);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken_));
+    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(context->topology_));
     const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
     if (instanceCount > 1U) {
       return InvokeNativeDrawIndexedInstanced(
-        this, drawContext->primitiveCountInput_, instanceCount, drawContext->startIndex_, 0, 0U
+        this, context->indexCount_, instanceCount, context->startIndex_, 0, 0U
       );
     }
 
-    return InvokeNativeDrawIndexed(this, drawContext->primitiveCountInput_, drawContext->startIndex_, 0);
+    return InvokeNativeDrawIndexed(this, context->indexCount_, context->startIndex_, 0);
   }
 
   /**

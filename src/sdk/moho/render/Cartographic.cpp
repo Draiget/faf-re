@@ -152,9 +152,7 @@ namespace
   };
 
   constexpr std::uint32_t kCartographicVertexFormatToken = 22U;
-  constexpr std::uint32_t kCartographicTopologyTriangleList = 4U;
   constexpr std::uint32_t kCartographicQuadVertexCount = 4U;
-  constexpr std::uint32_t kCartographicQuadPrimitiveCountInput = 6U;
   constexpr std::uint32_t kCartographicMaxDecalInstances = 1024U;
   constexpr std::uint32_t kCartographicInstanceFloatCount = 9U;
 
@@ -1380,7 +1378,7 @@ namespace moho
     gpg::gal::IndexBufferContext indexContext{};
     indexContext.type_ = 1U;
     indexContext.format_ = 1U;
-    indexContext.size_ = kCartographicQuadPrimitiveCountInput;
+    indexContext.size_ = kCartographicQuadIndexCount;
 
     boost::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
     indexBuffer = device->CreateIndexBuffer(&indexContext);
@@ -1477,9 +1475,9 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
       gpg::gal::DrawIndexedContext drawContext(
-        static_cast<int>(kCartographicTopologyTriangleList),
-        static_cast<int>(kCartographicQuadVertexCount),
-        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+        kCartographicQuadVertexCount,
+        kCartographicQuadIndexCount,
         0,
         0
       );
@@ -2064,9 +2062,9 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
       gpg::gal::DrawIndexedContext drawContext(
-        static_cast<int>(kCartographicTopologyTriangleList),
-        static_cast<int>(kCartographicQuadVertexCount),
-        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+        kCartographicQuadVertexCount,
+        kCartographicQuadIndexCount,
         0,
         0
       );
@@ -2153,9 +2151,9 @@ namespace moho
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
       technique->BeginPass(static_cast<int>(passIndex));
       gpg::gal::DrawIndexedContext drawContext(
-        static_cast<int>(kCartographicTopologyTriangleList),
-        static_cast<int>(kCartographicQuadVertexCount),
-        static_cast<int>(kCartographicQuadPrimitiveCountInput),
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST,
+        kCartographicQuadVertexCount,
+        kCartographicQuadIndexCount,
         0,
         0
       );

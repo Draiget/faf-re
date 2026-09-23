@@ -3822,15 +3822,6 @@
     <ClInclude Include="gpg\gal\RenderTargetContext.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gpg\gal\StateCache_D3DRENDERSTATETYPE.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gpg\gal\StateCache_D3DSAMPLERSTATETYPE.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gpg\gal\StateCache_D3DTEXTURESTAGESTATETYPE.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="gpg\gal\Texture.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

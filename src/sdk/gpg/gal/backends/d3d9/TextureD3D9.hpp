@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Texture.hpp"
@@ -34,7 +36,7 @@ namespace gpg::gal
          * Initializes one texture wrapper and binds caller context plus
          * one native texture payload.
          */
-        TextureD3D9(const TextureContext* context, void* texture);
+        TextureD3D9(const TextureContext* context, IDirect3DBaseTexture9* texture);
 
         /**
          * Address: 0x0094AB60 (FUN_0094AB60)
@@ -89,25 +91,30 @@ namespace gpg::gal
          * Address: 0x0094A0A0 (FUN_0094A0A0)
          *
          * What it does:
-         * Returns the retained D3D texture pointer when the context type is 2D (`1`).
+         * Returns the texture as a 2D texture when the context type is 2D
+         * (`1`), else null.
          */
-        void* GetTexture1() const;
+        IDirect3DTexture9* GetTexture1() const;
 
         /**
          * Address: 0x0094A0B0 (FUN_0094A0B0)
          *
          * What it does:
-         * Returns the retained D3D texture pointer when the context type is volume (`2`).
+         * Returns the texture as a cube texture when the context type is cube
+         * (`2` - `DeviceD3D9::CreateTexture` sets it after
+         * D3DXCreateCubeTextureFromFileInMemoryEx, 0x008EB245), else null.
          */
-        void* GetTexture2() const;
+        IDirect3DCubeTexture9* GetTexture2() const;
 
         /**
          * Address: 0x0094A0C0 (FUN_0094A0C0)
          *
          * What it does:
-         * Returns the retained D3D texture pointer when the context type is cube (`3`).
+         * Returns the texture as a volume texture when the context type is
+         * volume (`3`, set after D3DXCreateVolumeTextureFromFileInMemoryEx,
+         * 0x008EB3AD), else null.
          */
-        void* GetTexture3() const;
+        IDirect3DVolumeTexture9* GetTexture3() const;
 
         /**
          * Address: 0x0094A980 (FUN_0094A980)
@@ -124,11 +131,11 @@ namespace gpg::gal
          * Resets prior texture state, copies caller context metadata, assigns a
          * new native texture handle, and clears copied source-data lanes.
          */
-        void SetTexture(const TextureContext* context, void* texture);
+        void SetTexture(const TextureContext* context, IDirect3DBaseTexture9* texture);
 
     public:
         TextureContext context_{}; // +0x04
-        void* texture_ = nullptr;  // +0x58
+        IDirect3DBaseTexture9* texture_ = nullptr; // +0x58 2D, volume or cube by `context_.type_`
         bool locking_ = false;     // +0x5C
         std::uint8_t lockPadding_[3]{}; // +0x5D
         int level_ = 0;            // +0x60

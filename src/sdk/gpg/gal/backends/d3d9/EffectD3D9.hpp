@@ -9,6 +9,8 @@
 #include "legacy/containers/Vector.h"
 #include "platform/Platform.h"
 
+struct ID3DXEffect;
+
 namespace gpg::gal
 {
     class EffectTechniqueD3D9;
@@ -29,7 +31,7 @@ namespace gpg::gal
          * What it does:
          * Initializes weak-self/context/effect lanes and binds caller-provided context/effect state.
          */
-        EffectD3D9(EffectContext* context, void* dxEffect);
+        EffectD3D9(EffectContext* context, ID3DXEffect* dxEffect);
 
         /**
          * Address: 0x00942EC0 (FUN_00942EC0)
@@ -93,12 +95,12 @@ namespace gpg::gal
          * What it does:
          * Returns the backing D3DX effect handle and throws when it is missing.
          */
-        void* GetDxEffect();
+        ID3DXEffect* GetDxEffect();
 
     public:
         boost::weak_ptr<EffectD3D9> selfWeak_{}; // +0x04 .. +0x0B
         EffectContext effectContext_{};          // +0x0C .. +0x6F
-        void* dxEffect_ = nullptr;               // +0x70
+        ID3DXEffect* dxEffect_ = nullptr;        // +0x70
     };
 
     static_assert(offsetof(EffectD3D9, selfWeak_) == 0x04, "EffectD3D9::selfWeak_ offset must be 0x04");

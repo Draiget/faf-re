@@ -808,8 +808,6 @@ void SkyDome::Destroy()
 
   namespace
   {
-    constexpr int kSkyTopologyTriangleList = 4; // gpg::gal::DrawContext::TOPOLOGY D3DPT_TRIANGLELIST
-
     /**
      * Resolves the concrete D3D9 "sky" effect the render passes drive.
      *
@@ -857,7 +855,7 @@ void SkyDome::Destroy()
     for (unsigned int pass = 0; pass < passCount; ++pass) {
       techniqueImpl->BeginPass(static_cast<int>(pass));
       gpg::gal::DrawIndexedContext drawContext(
-        kSkyTopologyTriangleList, mDomeVertexCount, mDomeIndexCount, 0, 0
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, mDomeVertexCount, mDomeIndexCount, 0, 0
       );
       device->DrawIndexedPrimitive(&drawContext);
       techniqueImpl->EndPass();
@@ -993,7 +991,7 @@ void SkyDome::Destroy()
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int pass = 0; pass < passCount; ++pass) {
       technique->BeginPass(static_cast<int>(pass));
-      gpg::gal::DrawIndexedContext drawContext(kSkyTopologyTriangleList, 4, 6, 0, 0);
+      gpg::gal::DrawIndexedContext drawContext(gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, 4, 6, 0, 0);
       device->DrawIndexedPrimitive(&drawContext);
       technique->EndPass();
     }
@@ -1046,7 +1044,7 @@ void SkyDome::Destroy()
     const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int pass = 0; pass < passCount; ++pass) {
       technique->BeginPass(static_cast<int>(pass));
-      gpg::gal::DrawIndexedContext drawContext(kSkyTopologyTriangleList, 4, 6, 0, 0);
+      gpg::gal::DrawIndexedContext drawContext(gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, 4, 6, 0, 0);
       device->DrawIndexedPrimitive(&drawContext);
       technique->EndPass();
     }

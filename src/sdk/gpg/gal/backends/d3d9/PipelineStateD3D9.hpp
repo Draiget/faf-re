@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "gpg/gal/PipelineState.hpp"
 
 namespace gpg::gal
@@ -23,7 +25,7 @@ namespace gpg::gal
          * Initializes pipeline-state defaults and constructs one retained D3D9
          * state-manager instance for the supplied native device.
          */
-        explicit PipelineStateD3D9(void* nativeDevice);
+        explicit PipelineStateD3D9(IDirect3DDevice9* nativeDevice);
 
         /**
          * Address: 0x00946BE0 (FUN_00946BE0)
@@ -109,7 +111,7 @@ namespace gpg::gal
         int InitState();
 
     public:
-        void* stateManager_ = nullptr;          // +0x04
+        StateManagerD3D9* stateManager_ = nullptr; // +0x04, an AddRef-counted ID3DXEffectStateManager
         std::uint32_t colorWriteEnable_ = 0x0F; // +0x08
     };
 

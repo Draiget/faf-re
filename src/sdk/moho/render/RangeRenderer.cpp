@@ -290,7 +290,6 @@ namespace
     return writeBase != 0;
   }
 
-  constexpr std::int32_t kTriangleListPrimitiveToken = 4; // D3DPT_TRIANGLELIST
   constexpr std::uint32_t kDynamicVertexBatchLimit = 1000u;
 
   /**
@@ -384,8 +383,8 @@ namespace
     for (int pass = 0; pass < passCount; ++pass) {
       castTechnique->BeginPass(pass);
       gpg::gal::DrawIndexedContext drawContext(
-        kTriangleListPrimitiveToken, static_cast<int>(rangeRenderer.mVertexCount),
-        static_cast<int>(rangeRenderer.mIndexCount), 0, 0
+        gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST, static_cast<std::uint32_t>(rangeRenderer.mVertexCount),
+        static_cast<std::uint32_t>(rangeRenderer.mIndexCount), 0, 0
       );
       device->DrawIndexedPrimitive(&drawContext);
       castTechnique->EndPass();

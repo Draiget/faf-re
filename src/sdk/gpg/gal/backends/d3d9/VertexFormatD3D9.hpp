@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d9.h>
+
 #include "gpg/gal/VertexFormat.hpp"
 
 namespace gpg::gal
@@ -33,7 +35,7 @@ namespace gpg::gal
          * Adopts `vertexDeclaration` as the declaration for format `formatCode`
          * and computes the per-stream strides.
          */
-        VertexFormatD3D9(std::uint32_t formatCode, void* vertexDeclaration);
+        VertexFormatD3D9(std::uint32_t formatCode, IDirect3DVertexDeclaration9* vertexDeclaration);
 
         /**
          * Address: 0x0094ACC0 (FUN_0094ACC0)
@@ -50,7 +52,7 @@ namespace gpg::gal
          * What it does:
          * Returns the declaration, throwing "invalid vertex format" when unset.
          */
-        void* GetDeclaration();
+        IDirect3DVertexDeclaration9* GetDeclaration();
 
         /**
          * Address: 0x0094AC90 (FUN_0094AC90)
@@ -67,10 +69,10 @@ namespace gpg::gal
          * Replaces the declaration and format code and rebuilds the stream
          * strides from the format's element table.
          */
-        void SetFormatDeclaration(std::uint32_t formatCode, void* vertexDeclaration);
+        void SetFormatDeclaration(std::uint32_t formatCode, IDirect3DVertexDeclaration9* vertexDeclaration);
 
     public:
-        void* vertexDeclaration_; // +0x18 IDirect3DVertexDeclaration9*
+        IDirect3DVertexDeclaration9* vertexDeclaration_; // +0x18
     };
 
     static_assert(offsetof(VertexFormatD3D9, vertexDeclaration_) == 0x18, "VertexFormatD3D9::vertexDeclaration_ offset must be 0x18");

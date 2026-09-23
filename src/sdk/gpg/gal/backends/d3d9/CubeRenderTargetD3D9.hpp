@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <d3d9.h>
+
 #include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 
@@ -30,15 +32,34 @@ namespace gpg::gal
          * Initializes cube-target state, applies one context/texture payload,
          * and acquires one face-surface handle per cube face.
          */
-        CubeRenderTargetD3D9(const CubeRenderTargetContext* context, void* cubeTexture);
+        CubeRenderTargetD3D9(const CubeRenderTargetContext* context, IDirect3DCubeTexture9* cubeTexture);
 
         /**
-         * Address: 0x00941430 (FUN_00941430)
+         * Address: 0x00941330 (FUN_00941330)
+         * Address: 0x00941430 (FUN_00941430, scalar deleting destructor)
          *
          * What it does:
-         * Owns the deleting-destructor path and delegates to cube-target teardown helpers.
+         * Releases the face surfaces and the texture.
          */
         ~CubeRenderTargetD3D9() override;
+
+        /**
+         * Address: 0x009412B0 (FUN_009412B0)
+         *
+         * What it does:
+         * Releases the six face surfaces, then the cube texture, and empties
+         * the context.
+         */
+        void Reset();
+
+        /**
+         * Address: 0x00941390 (FUN_00941390)
+         *
+         * What it does:
+         * Takes `cubeTexture` over as the target of `context` and holds the
+         * top level of each face; undoes itself if that throws.
+         */
+        void SetTexture(const CubeRenderTargetContext* context, IDirect3DCubeTexture9* cubeTexture);
 
         /**
          * Address: 0x00941240 (FUN_00941240)
@@ -56,7 +77,7 @@ namespace gpg::gal
          * What it does:
          * Validates one cube face index and returns its retained native face surface.
          */
-        void* GetSurface(int face) const;
+        IDirect3DSurface9* GetSurface(int face) const;
 
         /**
          * Address: 0x00941270 (FUN_00941270)
@@ -67,12 +88,12 @@ namespace gpg::gal
          * the effect variable's cube-target setter at 0x00944630, which hands
          * it to `ID3DXEffect::SetTexture`.
          */
-        void* GetTexture() const;
+        IDirect3DCubeTexture9* GetTexture() const;
 
     public:
         CubeRenderTargetContext context_{}; // +0x04
-        void* cubeTexture_ = nullptr;       // +0x10
-        void* faceSurfaces_[6]{};           // +0x14
+        IDirect3DCubeTexture9* cubeTexture_ = nullptr; // +0x10
+        IDirect3DSurface9* faceSurfaces_[6]{};         // +0x14, level 0 of each face
     };
 
     static_assert(offsetof(CubeRenderTargetD3D9, context_) == 0x04, "CubeRenderTargetD3D9::context_ offset must be 0x04");
