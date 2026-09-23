@@ -248,8 +248,8 @@ namespace moho
     gpg::gal::VertexBufferContext quadVertexContext{};
     quadVertexContext.type_ = 2U;
     quadVertexContext.usage_ = 1U;
-    quadVertexContext.width_ = 4U;
-    quadVertexContext.height_ = 8U;
+    quadVertexContext.vertexCount_ = 4U;
+    quadVertexContext.stride_ = 8U;
 
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> quadVertexBuffer;
     device->CreateVertexBuffer(&quadVertexBuffer, &quadVertexContext);
@@ -263,8 +263,8 @@ namespace moho
     gpg::gal::VertexBufferContext instanceVertexContext{};
     instanceVertexContext.type_ = 3U;
     instanceVertexContext.usage_ = 2U;
-    instanceVertexContext.width_ = static_cast<unsigned int>(mMaxParticles);
-    instanceVertexContext.height_ = sizeof(Instanced);
+    instanceVertexContext.vertexCount_ = static_cast<unsigned int>(mMaxParticles);
+    instanceVertexContext.stride_ = sizeof(Instanced);
 
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceVertexBuffer;
     device->CreateVertexBuffer(&instanceVertexBuffer, &instanceVertexContext);

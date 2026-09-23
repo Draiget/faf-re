@@ -441,8 +441,8 @@ namespace moho
     const std::uint32_t vertexStride = formatter->GetVertexStride(0, 0);
 
     gpg::gal::VertexBufferContext vertexContext;
-    vertexContext.width_ = static_cast<std::uint32_t>(mVertexCount);
-    vertexContext.height_ = vertexStride;
+    vertexContext.vertexCount_ = static_cast<std::uint32_t>(mVertexCount);
+    vertexContext.stride_ = vertexStride;
     vertexContext.type_ = 2U;
     vertexContext.usage_ = 1U;
 
@@ -691,11 +691,11 @@ namespace moho
     gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
 
     gpg::gal::VertexBufferContext vertexContext;
-    vertexContext.width_ = static_cast<std::uint32_t>(mActiveInstanceBudget);
+    vertexContext.vertexCount_ = static_cast<std::uint32_t>(mActiveInstanceBudget);
     vertexContext.type_ = 3U;
     vertexContext.usage_ = 2U;
     const std::uint32_t perInstanceStride = formatter->GetVertexStride(1, 0);
-    vertexContext.height_ = perInstanceStride;
+    vertexContext.stride_ = perInstanceStride;
 
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceBuffer;
     instanceBuffer = *device->CreateVertexBuffer(&instanceBuffer, &vertexContext);

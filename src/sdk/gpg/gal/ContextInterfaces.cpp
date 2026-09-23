@@ -212,8 +212,8 @@ namespace gpg::gal
     VertexBufferContext::VertexBufferContext()
         : type_(0),
           usage_(0),
-          width_(0),
-          height_(0)
+          vertexCount_(0),
+          stride_(0)
     {
     }
 
@@ -221,18 +221,18 @@ namespace gpg::gal
      * Address: 0x00940870 (FUN_00940870)
      *
      * What it does:
-     * Initializes vertex-buffer width/height/type/usage lanes from explicit payload values.
+     * Initializes vertex-buffer count/stride/type/usage lanes from explicit payload values.
      */
     VertexBufferContext::VertexBufferContext(
-        const std::uint32_t width,
-        const std::uint32_t height,
+        const std::uint32_t vertexCount,
+        const std::uint32_t stride,
         const std::uint32_t type,
         const std::uint32_t usage
     )
         : type_(type),
           usage_(usage),
-          width_(width),
-          height_(height)
+          vertexCount_(vertexCount),
+          stride_(stride)
     {
     }
 
@@ -246,8 +246,8 @@ namespace gpg::gal
     {
         type_ = other.type_;
         usage_ = other.usage_;
-        width_ = other.width_;
-        height_ = other.height_;
+        vertexCount_ = other.vertexCount_;
+        stride_ = other.stride_;
         return *this;
     }
 

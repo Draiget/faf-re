@@ -1433,15 +1433,15 @@ namespace moho
     mIndexCount = kRangeIndexCount;
 
     gpg::gal::VertexBufferContext primaryVertexBufferContext{};
-    primaryVertexBufferContext.width_ = mVertexCount;
-    primaryVertexBufferContext.height_ = kPrimaryVertexStrideBytes;
+    primaryVertexBufferContext.vertexCount_ = mVertexCount;
+    primaryVertexBufferContext.stride_ = kPrimaryVertexStrideBytes;
     primaryVertexBufferContext.type_ = 2u;
     primaryVertexBufferContext.usage_ = 1u;
     device->CreateVertexBuffer(&mGeometry.mVertexBuffer, &primaryVertexBufferContext);
 
     gpg::gal::VertexBufferContext dynamicVertexBufferContext{};
-    dynamicVertexBufferContext.width_ = kDynamicVertexCapacity;
-    dynamicVertexBufferContext.height_ = kDynamicVertexStrideBytes;
+    dynamicVertexBufferContext.vertexCount_ = kDynamicVertexCapacity;
+    dynamicVertexBufferContext.stride_ = kDynamicVertexStrideBytes;
     dynamicVertexBufferContext.type_ = 3u;
     dynamicVertexBufferContext.usage_ = 2u;
     device->CreateVertexBuffer(&mDynamicVertexBuffer, &dynamicVertexBufferContext);

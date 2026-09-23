@@ -624,8 +624,8 @@ void SkyDome::Destroy()
     mDomeVertexCount = (heightSegments * widthPlusOne) + 1;
 
     gpg::gal::VertexBufferContext context{};
-    context.width_ = static_cast<std::uint32_t>(mDomeVertexCount);
-    context.height_ = sizeof(SkyDomeVertex);
+    context.vertexCount_ = static_cast<std::uint32_t>(mDomeVertexCount);
+    context.stride_ = sizeof(SkyDomeVertex);
     context.type_ = 1u;
     context.usage_ = 1u;
     device->CreateVertexBuffer(&mDomeVertBuf, &context);
@@ -731,8 +731,8 @@ void SkyDome::Destroy()
     auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
 
     gpg::gal::VertexBufferContext quadContext{};
-    quadContext.width_ = 4u;
-    quadContext.height_ = 8u;
+    quadContext.vertexCount_ = 4u;
+    quadContext.stride_ = 8u;
     quadContext.type_ = 2u;
     quadContext.usage_ = 1u;
     device->CreateVertexBuffer(&mDecalVertBuf1, &quadContext);
@@ -742,15 +742,15 @@ void SkyDome::Destroy()
     mDecalVertBuf1->Unlock();
 
     gpg::gal::VertexBufferContext cumulusContext{};
-    cumulusContext.width_ = 1024u;
-    cumulusContext.height_ = 40u;
+    cumulusContext.vertexCount_ = 1024u;
+    cumulusContext.stride_ = 40u;
     cumulusContext.type_ = 3u;
     cumulusContext.usage_ = 2u;
     device->CreateVertexBuffer(&mDecalVertBuf2, &cumulusContext);
 
     gpg::gal::VertexBufferContext cirrusContext{};
-    cirrusContext.width_ = 10000u;
-    cirrusContext.height_ = 60u;
+    cirrusContext.vertexCount_ = 10000u;
+    cirrusContext.stride_ = 60u;
     cirrusContext.type_ = 3u;
     cirrusContext.usage_ = 2u;
     device->CreateVertexBuffer(&mDecalVertBuf3, &cirrusContext);

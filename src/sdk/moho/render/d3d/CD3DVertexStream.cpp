@@ -34,8 +34,8 @@ namespace moho
   {
     mContext.type_ = kVertexContextTypeDefault;
     mContext.usage_ = dynamicUsage ? kVertexContextUsageDynamic : kVertexContextUsageStatic;
-    mContext.width_ = width;
-    mContext.height_ = strideBytes;
+    mContext.vertexCount_ = width;
+    mContext.stride_ = strideBytes;
   }
 
   /**
@@ -79,7 +79,7 @@ namespace moho
     const bool discard
   )
   {
-    const std::uint32_t strideBytes = mBuffer.get()->GetContext()->height_;
+    const std::uint32_t strideBytes = mBuffer.get()->GetContext()->stride_;
 
     std::uint32_t lockFlags = 0;
     if (readOnly) {
@@ -161,7 +161,7 @@ namespace moho
   bool CD3DVertexStream::CreateBuffer()
   {
     if (mBuffer.get() == nullptr) {
-      if (mContext.width_ == 0) {
+      if (mContext.vertexCount_ == 0) {
         return false;
       }
 

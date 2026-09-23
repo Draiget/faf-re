@@ -25,9 +25,9 @@ namespace gpg::gal
          *
          * What it does:
          * Initializes vertex-buffer context lanes from explicit
-         * `width/height/type/usage` payload values.
+         * `vertexCount/stride/type/usage` payload values.
          */
-        VertexBufferContext(std::uint32_t width, std::uint32_t height, std::uint32_t type, std::uint32_t usage);
+        VertexBufferContext(std::uint32_t vertexCount, std::uint32_t stride, std::uint32_t type, std::uint32_t usage);
 
         /**
          * Address: 0x009408A0 (FUN_009408A0, gpg::gal::VertexBufferContext::~VertexBufferContext)
@@ -50,13 +50,16 @@ namespace gpg::gal
     public:
         std::uint32_t type_ = 0;   // +0x04
         std::uint32_t usage_ = 0;  // +0x08
-        std::uint32_t width_ = 0;  // +0x0C
-        std::uint32_t height_ = 0; // +0x10
+        // The buffer is `vertexCount_ * stride_` bytes (`CreateVertexBuffer`,
+        // 0x008FB8D0), and the stream setter binds `stride_` to
+        // `IASetVertexBuffers` and scales the start vertex by it (0x008F96CF).
+        std::uint32_t vertexCount_ = 0; // +0x0C
+        std::uint32_t stride_ = 0;      // +0x10
     };
 
     static_assert(offsetof(VertexBufferContext, type_) == 0x04, "VertexBufferContext::type_ offset must be 0x04");
     static_assert(offsetof(VertexBufferContext, usage_) == 0x08, "VertexBufferContext::usage_ offset must be 0x08");
-    static_assert(offsetof(VertexBufferContext, width_) == 0x0C, "VertexBufferContext::width_ offset must be 0x0C");
-    static_assert(offsetof(VertexBufferContext, height_) == 0x10, "VertexBufferContext::height_ offset must be 0x10");
+    static_assert(offsetof(VertexBufferContext, vertexCount_) == 0x0C, "VertexBufferContext::vertexCount_ offset must be 0x0C");
+    static_assert(offsetof(VertexBufferContext, stride_) == 0x10, "VertexBufferContext::stride_ offset must be 0x10");
     static_assert(sizeof(VertexBufferContext) == 0x14, "VertexBufferContext size must be 0x14");
 }

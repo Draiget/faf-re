@@ -1446,8 +1446,8 @@ namespace moho
     gpg::gal::VertexBufferContext quadVertexContext{};
     quadVertexContext.type_ = 2U;
     quadVertexContext.usage_ = 1U;
-    quadVertexContext.width_ = kCartographicQuadVertexCount;
-    quadVertexContext.height_ = static_cast<std::uint32_t>(sizeof(float) * 2U);
+    quadVertexContext.vertexCount_ = kCartographicQuadVertexCount;
+    quadVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * 2U);
 
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> quadVertexBuffer;
     device->CreateVertexBuffer(&quadVertexBuffer, &quadVertexContext);
@@ -1460,8 +1460,8 @@ namespace moho
     gpg::gal::VertexBufferContext instanceVertexContext{};
     instanceVertexContext.type_ = 3U;
     instanceVertexContext.usage_ = 2U;
-    instanceVertexContext.width_ = kCartographicMaxDecalInstances;
-    instanceVertexContext.height_ = static_cast<std::uint32_t>(sizeof(float) * kCartographicInstanceFloatCount);
+    instanceVertexContext.vertexCount_ = kCartographicMaxDecalInstances;
+    instanceVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * kCartographicInstanceFloatCount);
 
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceVertexBuffer;
     device->CreateVertexBuffer(&instanceVertexBuffer, &instanceVertexContext);

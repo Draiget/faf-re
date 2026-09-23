@@ -54,7 +54,6 @@ namespace gpg::gal
     using cursor_source_lock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, void*, int, std::uint32_t*, int);
     using cursor_source_unlock_fn =
       void(__thiscall*)(CursorPixelSourceRuntime*, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
-    using device_get_context_fn = void*(__thiscall*)(Device*);
     using device_create_vertex_format_fn = void(__thiscall*)(Device*, void*, int);
     using device_begin_technique_fn = void(__thiscall*)(Device*);
     using device_end_technique_fn = void(__thiscall*)(Device*);
@@ -122,8 +121,6 @@ namespace gpg::gal
     using device_native_draw_indexed_fn = int(__stdcall*)(void*, unsigned int, unsigned int, int);
     using device_native_draw_indexed_instanced_fn =
       int(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, int, unsigned int);
-    using index_buffer_get_context_fn = void*(__thiscall*)(IndexBufferD3D10*);
-    using vertex_buffer_get_context_fn = void*(__thiscall*)(VertexBufferD3D10*);
     using readback_get_size_fn = int(__stdcall*)(void*);
     using readback_get_data_fn = void*(__stdcall*)(void*);
     using device_native_copy_subresource_region_fn = int(__stdcall*)(
@@ -135,18 +132,6 @@ namespace gpg::gal
     {
       int dxgi = 0;
       int gal = 0;
-    };
-
-    struct IndexBufferContextRuntime final
-    {
-      std::uint32_t pad00 = 0U;  // +0x00
-      std::uint32_t format = 0U; // +0x04
-    };
-
-    struct VertexBufferContextRuntime final
-    {
-      std::uint8_t pad00_0F[0x10]{}; // +0x00 .. +0x0F
-      std::uint32_t stride = 0U;     // +0x10
     };
 
     /**
@@ -166,18 +151,6 @@ namespace gpg::gal
       std::int32_t face = 0;                                     // +0x0C
       boost::shared_ptr<RenderTargetD3D10> renderTarget;         // +0x10
       boost::shared_ptr<DepthStencilTargetD3D10> depthStencil;   // +0x18
-    };
-
-    struct HeadRuntime final
-    {
-      void* vtable = nullptr;             // +0x00
-      std::uint8_t pad04_07[0x04]{};      // +0x04 .. +0x07
-      HWND window = nullptr;              // +0x08
-      std::uint8_t windowed = 0U;         // +0x0C
-      std::uint8_t pad0D_0F[0x03]{};      // +0x0D .. +0x0F
-      std::uint32_t width = 0U;           // +0x10
-      std::uint32_t height = 0U;          // +0x14
-      std::uint32_t framesPerSecond = 0U; // +0x18
     };
 
     struct CursorPixelTransferTokenRuntime final
@@ -211,13 +184,6 @@ namespace gpg::gal
     constexpr std::uint32_t kHardwareVertexStrideBase = 0x48U;
     constexpr std::uint32_t kFloat16VertexStrideStream0 = 0x2CU;
     constexpr std::uint32_t kFloat16VertexStrideStream1 = 0x44U;
-
-    struct DeviceContextRuntimeFlags final
-    {
-      std::uint8_t pad00_10[0x11]{};
-      std::uint8_t hwBasedInstancing = 0; // +0x11
-      std::uint8_t meshFloat16 = 0;       // +0x12
-    };
 
     struct SourceMeshVertexRuntime final
     {
@@ -312,20 +278,6 @@ namespace gpg::gal
       float lane40 = 0.0f; // +0x40
     };
 
-    static_assert(
-      offsetof(IndexBufferContextRuntime, format) == 0x04, "IndexBufferContextRuntime::format offset must be 0x04"
-    );
-    static_assert(sizeof(IndexBufferContextRuntime) == 0x08, "IndexBufferContextRuntime size must be 0x08");
-    static_assert(
-      offsetof(VertexBufferContextRuntime, stride) == 0x10, "VertexBufferContextRuntime::stride offset must be 0x10"
-    );
-    static_assert(sizeof(VertexBufferContextRuntime) == 0x14, "VertexBufferContextRuntime size must be 0x14");
-    static_assert(offsetof(HeadRuntime, window) == 0x08, "HeadRuntime::window offset must be 0x08");
-    static_assert(offsetof(HeadRuntime, windowed) == 0x0C, "HeadRuntime::windowed offset must be 0x0C");
-    static_assert(offsetof(HeadRuntime, width) == 0x10, "HeadRuntime::width offset must be 0x10");
-    static_assert(offsetof(HeadRuntime, height) == 0x14, "HeadRuntime::height offset must be 0x14");
-    static_assert(offsetof(HeadRuntime, framesPerSecond) == 0x18, "HeadRuntime::framesPerSecond offset must be 0x18");
-    static_assert(sizeof(HeadRuntime) == 0x1C, "HeadRuntime size must be 0x1C");
     static_assert(sizeof(CursorPixelTransferTokenRuntime) == 0x10, "CursorPixelTransferTokenRuntime size must be 0x10");
     static_assert(
       offsetof(DrawPrimitiveContextRuntime, topologyToken) == 0x04,
@@ -350,13 +302,6 @@ namespace gpg::gal
     );
     static_assert(
       sizeof(DrawIndexedPrimitiveContextRuntime) == 0x18, "DrawIndexedPrimitiveContextRuntime size must be 0x18"
-    );
-    static_assert(
-      offsetof(DeviceContextRuntimeFlags, hwBasedInstancing) == 0x11,
-      "DeviceContextRuntimeFlags::hwBasedInstancing offset must be 0x11"
-    );
-    static_assert(
-      offsetof(DeviceContextRuntimeFlags, meshFloat16) == 0x12, "DeviceContextRuntimeFlags::meshFloat16 offset must be 0x12"
     );
     static_assert(
       offsetof(SourceMeshVertexRuntime, streamScalar04) == 0x04,
@@ -1137,20 +1082,6 @@ namespace gpg::gal
       return device->mOutputContext.texture.get();
     }
 
-    IndexBufferContextRuntime* InvokeIndexBufferGetContext(IndexBufferD3D10* const indexBuffer)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(indexBuffer);
-      auto* const getContext = reinterpret_cast<index_buffer_get_context_fn>(vtable[1]);
-      return reinterpret_cast<IndexBufferContextRuntime*>(getContext(indexBuffer));
-    }
-
-    VertexBufferContextRuntime* InvokeVertexBufferGetContext(VertexBufferD3D10* const vertexBuffer)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(vertexBuffer);
-      auto* const getContext = reinterpret_cast<vertex_buffer_get_context_fn>(vtable[1]);
-      return reinterpret_cast<VertexBufferContextRuntime*>(getContext(vertexBuffer));
-    }
-
     int InvokeNativeClearShaderResourceSlot(
       PipelineStateD3D10* const bindings, const unsigned int startSlot, void* const* const views
     )
@@ -1553,13 +1484,6 @@ namespace gpg::gal
       return kPrimitiveTopologyByToken[topologyToken];
     }
 
-    void* InvokeDeviceGetContext(Device* const device)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const getContext = reinterpret_cast<device_get_context_fn>(vtable[2]);
-      return getContext(device);
-    }
-
     void InvokeDeviceCreateVertexFormat(Device* const device, void* const streamToken, const int formatToken)
     {
       auto** const vtable = *reinterpret_cast<void***>(device);
@@ -1951,18 +1875,17 @@ namespace gpg::gal
      * one `Head` runtime view when a native window handle is present.
      */
     DXGI_SWAP_CHAIN_DESC*
-    BuildSwapChainDescFromHeadRuntime(DXGI_SWAP_CHAIN_DESC* const outDesc, const void* const headRaw)
+    BuildSwapChainDescFromHead(DXGI_SWAP_CHAIN_DESC* const outDesc, const Head* const head)
     {
       std::memset(outDesc, 0, sizeof(DXGI_SWAP_CHAIN_DESC));
-      const auto* const runtime = reinterpret_cast<const HeadRuntime*>(headRaw);
-      if (runtime->window == nullptr) {
+      if (head->mWindow == nullptr) {
         return outDesc;
       }
 
-      outDesc->BufferDesc.Width = runtime->width;
-      outDesc->BufferDesc.Height = runtime->height;
-      outDesc->BufferDesc.Format = static_cast<DXGI_FORMAT>(0x1C);
-      outDesc->BufferDesc.RefreshRate.Numerator = (runtime->windowed != 0U) ? runtime->framesPerSecond : 0U;
+      outDesc->BufferDesc.Width = head->mWidth;
+      outDesc->BufferDesc.Height = head->mHeight;
+      outDesc->BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+      outDesc->BufferDesc.RefreshRate.Numerator = head->mWindowed ? head->framesPerSecond : 0U;
       outDesc->BufferDesc.RefreshRate.Denominator = 1U;
       outDesc->BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
       outDesc->BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
@@ -1970,8 +1893,12 @@ namespace gpg::gal
       outDesc->SampleDesc.Quality = 0U;
       outDesc->BufferUsage = 48U;
       outDesc->BufferCount = 2U;
-      outDesc->OutputWindow = runtime->window;
-      outDesc->Windowed = (runtime->windowed == 0U);
+      outDesc->OutputWindow = static_cast<HWND>(head->mWindow);
+      // Inverted on purpose: the binary writes DXGI's `Windowed` as
+      // `mWindowed == 0`, and only takes the refresh rate above when
+      // `mWindowed` is set -- a rate that matters only full-screen. So this
+      // lane behaves as a full-screen flag whatever `Head` calls it.
+      outDesc->Windowed = head->mWindowed ? FALSE : TRUE;
       outDesc->SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
       outDesc->Flags = 0U;
       return outDesc;
@@ -4086,9 +4013,8 @@ namespace gpg::gal
    */
   bool HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    Device* const device = Device::GetInstance();
-    const auto* const context = reinterpret_cast<const DeviceContextRuntimeFlags*>(InvokeDeviceGetContext(device));
-    return context->hwBasedInstancing != 0U;
+    const DeviceContext* const context = reinterpret_cast<DeviceD3D10*>(Device::GetInstance())->GetDeviceContext();
+    return context->mHWBasedInstancing;
   }
 
   /**
@@ -4291,8 +4217,8 @@ namespace gpg::gal
   bool Float16HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
     Device* const device = Device::GetInstance();
-    const auto* const context = reinterpret_cast<const DeviceContextRuntimeFlags*>(InvokeDeviceGetContext(device));
-    return (context->hwBasedInstancing != 0U) && (context->meshFloat16 != 0U);
+    const DeviceContext* const context = reinterpret_cast<DeviceD3D10*>(device)->GetDeviceContext();
+    return context->mHWBasedInstancing && context->mSupportsFloat16;
   }
 
   /**
@@ -5263,8 +5189,8 @@ namespace gpg::gal
     DestroyState();
     context_.type_ = context->type_;
     context_.usage_ = context->usage_;
-    context_.width_ = context->width_;
-    context_.height_ = context->height_;
+    context_.vertexCount_ = context->vertexCount_;
+    context_.stride_ = context->stride_;
     nativeBuffer_ = nativeBuffer;
     stagingBuffer_ = stagingBuffer;
     nativeDevice_ = nativeDevice;
@@ -5382,8 +5308,8 @@ namespace gpg::gal
     const VertexBufferContext resetContext{};
     context_.type_ = resetContext.type_;
     context_.usage_ = resetContext.usage_;
-    context_.width_ = resetContext.width_;
-    context_.height_ = resetContext.height_;
+    context_.vertexCount_ = resetContext.vertexCount_;
+    context_.stride_ = resetContext.stride_;
   }
 
   /**
@@ -6056,7 +5982,7 @@ namespace gpg::gal
     for (unsigned int headIndex = 0U; headIndex < static_cast<unsigned int>(context->GetHeadCount()); ++headIndex) {
       const Head& head = context->GetHead(headIndex);
       DXGI_SWAP_CHAIN_DESC swapChainDesc{};
-      BuildSwapChainDescFromHeadRuntime(&swapChainDesc, &head);
+      BuildSwapChainDescFromHead(&swapChainDesc, &head);
 
       IDXGISwapChain* swapChain = nullptr;
       const HRESULT createSwapChainResult = dxgiFactory->CreateSwapChain(
@@ -6542,7 +6468,7 @@ namespace gpg::gal
     boost::shared_ptr<VertexBufferD3D10>* const outVertexBuffer, const VertexBufferContext* const context
   )
   {
-    const std::uint32_t byteWidth = context->width_ * context->height_;
+    const std::uint32_t byteWidth = context->vertexCount_ * context->stride_;
 
     D3D10_BUFFER_DESC gpuBufferDesc{};
     gpuBufferDesc.ByteWidth = byteWidth;
@@ -7421,9 +7347,9 @@ namespace gpg::gal
     const int startVertexMultiplier
   )
   {
-    VertexBufferContextRuntime* const context = InvokeVertexBufferGetContext(vertexBuffer);
+    const VertexBufferContext* const context = vertexBuffer->GetContext();
     void* const nativeVertexBuffer = vertexBuffer->GetNativeBufferOrThrow();
-    const unsigned int stride = context->stride;
+    const unsigned int stride = context->stride_;
     const unsigned int offset = static_cast<unsigned int>(startVertexMultiplier * static_cast<int>(stride));
 
     void* buffers[1] = {nativeVertexBuffer};
@@ -7446,8 +7372,8 @@ namespace gpg::gal
    */
   int DeviceD3D10::SetBufferIndices(IndexBufferD3D10* const indexBuffer, WeakRefCountedToken* const previousIndexRef)
   {
-    IndexBufferContextRuntime* const context = InvokeIndexBufferGetContext(indexBuffer);
-    const unsigned int indexFormatToken = (context->format == 2U) ? 0x2AU : 0x39U;
+    const IndexBufferContext* const context = indexBuffer->GetContextBuffer();
+    const unsigned int indexFormatToken = (context->format_ == 2U) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
     void* const nativeIndexBuffer = indexBuffer->GetNativeBufferOrThrow();
     const int result = InvokeNativeSetIndexBuffer(this, nativeIndexBuffer, indexFormatToken, 0U);
     ReleaseWeakRefToken(previousIndexRef);

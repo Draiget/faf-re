@@ -197,15 +197,15 @@ namespace moho
     mIndexCount = kVisionIndexCount;
 
     gpg::gal::VertexBufferContext vertexBuffer1Context{};
-    vertexBuffer1Context.width_ = mVertexCount;
-    vertexBuffer1Context.height_ = 12u;
+    vertexBuffer1Context.vertexCount_ = mVertexCount;
+    vertexBuffer1Context.stride_ = 12u;
     vertexBuffer1Context.type_ = 2u;
     vertexBuffer1Context.usage_ = 1u;
     device->CreateVertexBuffer(&mGeometry.mVertexBuffer, &vertexBuffer1Context);
 
     gpg::gal::VertexBufferContext vertexBuffer2Context{};
-    vertexBuffer2Context.width_ = kVisionInstanceRingCapacity;
-    vertexBuffer2Context.height_ = 12u;
+    vertexBuffer2Context.vertexCount_ = kVisionInstanceRingCapacity;
+    vertexBuffer2Context.stride_ = 12u;
     vertexBuffer2Context.type_ = 3u;
     vertexBuffer2Context.usage_ = 2u;
     device->CreateVertexBuffer(&mVertexBuffer2, &vertexBuffer2Context);

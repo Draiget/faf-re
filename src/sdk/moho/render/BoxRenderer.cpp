@@ -75,8 +75,8 @@ namespace moho
     device->CreateVertexFormat(&mGeometry.mVertexFormat, 1u);
 
     gpg::gal::VertexBufferContext vertexBufferContext{};
-    vertexBufferContext.width_ = static_cast<std::uint32_t>(kUnitBoxVertices.size());
-    vertexBufferContext.height_ = sizeof(BoxVertex);
+    vertexBufferContext.vertexCount_ = static_cast<std::uint32_t>(kUnitBoxVertices.size());
+    vertexBufferContext.stride_ = sizeof(BoxVertex);
     vertexBufferContext.type_ = 1u;
     vertexBufferContext.usage_ = 1u;
     device->CreateVertexBuffer(&mGeometry.mVertexBuffer, &vertexBufferContext);

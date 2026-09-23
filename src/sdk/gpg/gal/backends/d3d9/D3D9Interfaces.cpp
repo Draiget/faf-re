@@ -7592,7 +7592,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        const unsigned int byteWidth = context->width_ * context->height_;
+        const unsigned int byteWidth = context->vertexCount_ * context->stride_;
         const unsigned int usageFlags = ((context->usage_ == 2U) ? 0x200U : 0U) | 0x8U;
         const D3DPOOL pool = (context->usage_ == 2U) ? D3DPOOL_DEFAULT : D3DPOOL_MANAGED;
 
@@ -8486,7 +8486,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         Func1();
 
         VertexBufferContext* const vertexContext = vertexBuffer->GetContext();
-        const unsigned int stride = vertexContext->height_;
+        const unsigned int stride = vertexContext->stride_;
         const unsigned int offsetInBytes = static_cast<unsigned int>(streamOffsetMultiplier) * stride;
         const HRESULT setStreamResult =
             InvokeNativeSetStreamSource(this, streamSlot, vertexBuffer->d3dVertexBuffer_, offsetInBytes, stride);
