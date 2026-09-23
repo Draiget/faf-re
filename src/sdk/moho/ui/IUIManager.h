@@ -29,9 +29,11 @@ namespace moho
      * Address: 0x0084CB70 (FUN_0084CB70)
      *
      * What it does:
-     * Registers one input-window/host-window pair and installs key-handler state.
+     * Registers one input-window/host-window pair and pushes a CUIKeyHandler
+     * onto the input window. Returns the new head's index, or -1 without an
+     * input window.
      */
-    virtual int AddFrame(wxWindowBase* inputWindow, wxWindowBase* eventHostWindow) = 0;
+    virtual int AddFrame(wxWindow* inputWindow, wxWindow* eventHostWindow) = 0;
 
     /**
      * Address: 0x0084CC50 (FUN_0084CC50)

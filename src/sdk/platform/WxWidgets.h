@@ -48,3 +48,15 @@
 #ifdef __WXDEBUG__
   #error "a wx header was read in __WXDEBUG__ mode before platform/WxWidgets.h - include it first; wxmswu.lib is a FINAL build"
 #endif
+
+// <windows.h> defines CreateDialog, LoadMenu, GetCharWidth, FindWindow and a
+// dozen more as A/W macros, and wx declares members with those names. The
+// static build's public headers never read <windows.h> themselves (wx/app.h
+// does only under WXUSINGDLL), so an engine header that reads it between two
+// wx headers leaves the macros live for the next one: wx/msw/toplevel.h's
+// `CreateDialog` member stops compiling. Reading it here, then
+// wx/msw/winundef.h - which swaps each macro for an inline function - settles
+// the order for the whole TU, because <windows.h> is include-guarded and never
+// defines them again.
+#include <windows.h>
+#include <wx/msw/winundef.h>

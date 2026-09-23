@@ -196,7 +196,7 @@ bool moho::CUIManager::Init()
 /**
  * Address: 0x0084CB70 (FUN_0084CB70)
  */
-int moho::CUIManager::AddFrame(wxWindowBase* const inputWindow, wxWindowBase* const eventHostWindow)
+int moho::CUIManager::AddFrame(wxWindow* const inputWindow, wxWindow* const eventHostWindow)
 {
   if (inputWindow == nullptr) {
     return -1;
@@ -204,13 +204,10 @@ int moho::CUIManager::AddFrame(wxWindowBase* const inputWindow, wxWindowBase* co
 
   mInputWindows.PushBack(inputWindow);
   mHostWindows.PushBack(eventHostWindow);
+  const int head = static_cast<int>(mInputWindows.Size() - 1);
 
-  wxEvtHandlerRuntime* const keyHandler = UI_CreateKeyHandler();
-  if (keyHandler != nullptr) {
-    WX_PushEventHandler(inputWindow, keyHandler);
-  }
-
-  return static_cast<int>(mInputWindows.Size() - 1);
+  inputWindow->PushEventHandler(new CUIKeyHandler());
+  return head;
 }
 
 /**
@@ -225,7 +222,7 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
     const std::size_t sharedCount = std::min(mFrames.Size(), mInputWindows.Size());
     for (std::size_t index = 0; index < sharedCount; ++index) {
       if (mFrames[index] && mInputWindows[index] != nullptr) {
-        (void)WX_PopEventHandler(mInputWindows[index], false);
+        (void)mInputWindows[index]->PopEventHandler(false);
       }
     }
 
@@ -252,8 +249,7 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
   LuaPlus::LuaObject globals = mLuaState->GetGlobals();
   (void)globals.CreateTable("__EngineStats", 0, 0);
 
-  const std::size_t headCount = std::min(mInputWindows.Size(), mHostWindows.Size());
-  for (std::size_t head = 0; head < headCount; ++head) {
+  for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
     boost::shared_ptr<CMauiFrame> frame = CMauiFrame::Create(mLuaState);
     if (!frame) {
       gpg::Die("CUIManager::Init - unable to create root frame for head %d.", static_cast<int>(head));
@@ -264,23 +260,22 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
     CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame.get());
     frameView->mRenderPass = 8;
 
-    std::int32_t width = 0;
-    std::int32_t height = 0;
-    WX_GetClientSize(mHostWindows[head], width, height);
+    // Sized from the input window, not the host: both GetClientSize calls
+    // (0x0084CEAE / 0x0084CED7) go through `mInputWindows` (+0x38).
+    const int width = mInputWindows[head]->GetClientSize().x;
+    const int height = mInputWindows[head]->GetClientSize().y;
 
     CScriptLazyVar_float::SetValue(&frameView->mLeftLV, 0.0f);
     CScriptLazyVar_float::SetValue(&frameView->mTopLV, 0.0f);
     CScriptLazyVar_float::SetValue(&frameView->mWidthLV, static_cast<float>(width));
     CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
 
-    if (frameView->mEventHandler != nullptr && mInputWindows[head] != nullptr) {
-      // The mapper needs the window it is bound to before it starts receiving
-      // events: wheel events arrive in screen coordinates and are converted to
-      // client space through this lane. Everything else uses the event's own
-      // client coordinates, so a null here would silently misplace only the
-      // wheel.
-      SetMauiEventMapperWindow(frameView->mEventHandler, mInputWindows[head]);
-      WX_PushEventHandler(mInputWindows[head], frameView->mEventHandler);
+    if (frameView->mEventHandler != nullptr) {
+      // Pushed, then told which window it is on (0x0084CF66, 0x0084CF7C):
+      // wheel events arrive in screen coordinates and are converted to client
+      // space through that window.
+      mInputWindows[head]->PushEventHandler(frameView->mEventHandler);
+      frameView->mEventHandler->mWindow = mInputWindows[head];
     }
 
     frameView->mTargetHead = static_cast<std::int32_t>(head);
@@ -310,7 +305,7 @@ void moho::CUIManager::ClearFrames()
     const std::size_t sharedCount = std::min(mFrames.Size(), mInputWindows.Size());
     for (std::size_t index = 0; index < sharedCount; ++index) {
       if (mFrames[index] && mInputWindows[index] != nullptr) {
-        (void)WX_PopEventHandler(mInputWindows[index], false);
+        (void)mInputWindows[index]->PopEventHandler(false);
       }
     }
 
@@ -325,15 +320,12 @@ void moho::CUIManager::ClearFrames()
   }
 
   for (std::size_t index = 0; index < mInputWindows.Size(); ++index) {
-    wxWindowBase* const inputWindow = mInputWindows[index];
+    wxWindow* const inputWindow = mInputWindows[index];
     if (inputWindow == nullptr) {
       continue;
     }
 
-    wxEvtHandlerRuntime* const popped = WX_PopEventHandler(inputWindow, false);
-    if (popped != nullptr) {
-      delete popped;
-    }
+    delete inputWindow->PopEventHandler(false);
   }
 
   mInputWindows.ResetStorageToInline();
@@ -548,65 +540,26 @@ void moho::CUIManager::GetControlAtCursor(
   int* const outViewport, float* const outX, float* const outY, CMauiControl** const outControl
 )
 {
-  if (outViewport != nullptr) {
-    *outViewport = 0;
-  }
-  if (outX != nullptr) {
-    *outX = 0.0f;
-  }
-  if (outY != nullptr) {
-    *outY = 0.0f;
-  }
-  if (outControl != nullptr) {
-    *outControl = nullptr;
-  }
-
-  std::int32_t mouseX = 0;
-  std::int32_t mouseY = 0;
-  if (!WX_GetCursorPosition(mouseX, mouseY)) {
-    return;
-  }
-
+  // The out-parameters are written only on a hit; the callers initialise
+  // them (DebugMouseOverControl does).
+  const wxPoint mouse = wxGetMousePosition();
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
-    wxWindowBase* const inputWindow = mInputWindows[head];
-    if (inputWindow == nullptr) {
-      continue;
+    int x = mouse.x;
+    int y = mouse.y;
+    mInputWindows[head]->ScreenToClient(&x, &y);
+
+    int width = 0;
+    int height = 0;
+    mInputWindows[head]->GetClientSize(&width, &height);
+
+    if (wxRect(wxPoint(0, 0), wxSize(width, height)).Inside(x, y)) {
+      *outControl =
+        CMauiControl::GetTopmostControl(mFrames[head].get(), static_cast<float>(x), static_cast<float>(y));
+      *outX = static_cast<float>(x);
+      *outY = static_cast<float>(y);
+      *outViewport = static_cast<int>(head);
+      return;
     }
-
-    std::int32_t localX = mouseX;
-    std::int32_t localY = mouseY;
-    WX_ScreenToClient(inputWindow, localX, localY);
-
-    std::int32_t clientWidth = 0;
-    std::int32_t clientHeight = 0;
-    WX_GetClientSize(inputWindow, clientWidth, clientHeight);
-
-    if (localX < 0 || localY < 0 || localX >= clientWidth || localY >= clientHeight) {
-      continue;
-    }
-
-    if (head < mFrames.Size() && mFrames[head]) {
-      CMauiControl* const control = CMauiControl::GetTopmostControl(
-        mFrames[head].get(),
-        static_cast<float>(localX),
-        static_cast<float>(localY)
-      );
-
-      if (outControl != nullptr) {
-        *outControl = control;
-      }
-      if (outX != nullptr) {
-        *outX = static_cast<float>(localX);
-      }
-      if (outY != nullptr) {
-        *outY = static_cast<float>(localY);
-      }
-      if (outViewport != nullptr) {
-        *outViewport = static_cast<int>(head);
-      }
-    }
-
-    return;
   }
 }
 
@@ -615,19 +568,11 @@ void moho::CUIManager::GetControlAtCursor(
  */
 void moho::CUIManager::DumpControlsUnderMouse()
 {
-  std::int32_t mouseX = 0;
-  std::int32_t mouseY = 0;
-  (void)WX_GetCursorPosition(mouseX, mouseY);
-
+  const wxPoint mouse = wxGetMousePosition();
   for (std::size_t head = 0; head < mInputWindows.Size(); ++head) {
-    wxWindowBase* const inputWindow = mInputWindows[head];
-    if (inputWindow == nullptr) {
-      continue;
-    }
-
-    std::int32_t localX = mouseX;
-    std::int32_t localY = mouseY;
-    WX_ScreenToClient(inputWindow, localX, localY);
+    int localX = mouse.x;
+    int localY = mouse.y;
+    mInputWindows[head]->ScreenToClient(&localX, &localY);
 
     gpg::Logf(
       "\n\n--- Dumping controls for head #%d at cursor position %d, %d",

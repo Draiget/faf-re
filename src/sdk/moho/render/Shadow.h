@@ -28,8 +28,16 @@ namespace moho
    * light/camera setup (0x007FE940), the render pass (0x007FEEA0),
    * WRenViewport::RenderShadows (0x007F7D10) and MeshRenderer::ConfigureShader
    * (0x007E19D0).
+   *
+   * 8-byte aligned. The constructor puts the first field at +0x08 and never
+   * writes +0x04 - the hole MSVC leaves after the vfptr of an 8-aligned class -
+   * and WRenViewport, which embeds one at +0x4F0, is allocated with
+   * operator new(0x21A8) although its last field ends at +0x21A4. The
+   * alignment comes from mCamera: GeomCamera3's CGeomSolid3 planes are a
+   * fastvector_n, whose inline buffer is 8-aligned in the binary but not yet
+   * in gpg::core::FastVectorN. Until it is, the class carries it.
    */
-  class Shadow
+  class alignas(8) Shadow
   {
   public:
     /**
@@ -136,9 +144,10 @@ namespace moho
     ) const;
 
   public:
-    // Never written by the constructor and no reader was found in any of the
-    // functions listed above; kept as an explicit hole so the offsets below
-    // stay exact.
+    // Alignment padding after the vfptr (see the class comment): never written
+    // by the constructor, and nothing reads it. Explicit because the alignment
+    // is declared on the class rather than coming from mCamera, and a
+    // class-level alignas does not make MSVC pad the vfptr.
     std::uint32_t mUnusedHeaderWord;                      // +0x04
 
     std::int32_t mShadowFidelity;                         // +0x08

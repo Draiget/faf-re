@@ -78,6 +78,7 @@
 #include "moho/render/RCamManager.h"
 #include "moho/render/SelectionBracketRenderer.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/resource/blueprints/RMeshBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
@@ -156,24 +157,6 @@ namespace moho
  */
 moho::IWldUIProvider::IWldUIProvider() = default;
 
-/**
- * Address: 0x0096B5B0 (FUN_0096B5B0, func_GetCursorPos)
- *
- * What it does:
- * Captures one Win32 cursor position into a local lane, copies X/Y into the
- * caller-provided `POINT`, and returns that destination pointer.
- */
-POINT* WX_ReadCursorPositionPoint(
-  POINT* const outPosition
-)
-{
-  POINT cursorPosition{};
-  ::GetCursorPos(&cursorPosition);
-  outPosition->x = cursorPosition.x;
-  outPosition->y = cursorPosition.y;
-  return outPosition;
-}
-
 moho::CommandModeData* func_GetRightMouseButtonAction(
   moho::CommandModeData* commandData,
   moho::MouseInfo* mouseInfo,
@@ -186,391 +169,6 @@ namespace moho
   int cfunc_IN_ClearKeyMap(lua_State* luaContext);
   int func_FlushEvents(lua_State* luaContext);
 } // namespace moho
-
-/**
- * Address: 0x0096AFC0 (FUN_0096AFC0, wxCharCodeWXToMSW)
- *
- * What it does:
- * Translates one MAUI keycode into its Win32 virtual-key equivalent and
- * reports whether the key is handled as a special mapping lane.
- */
-int wxCharCodeWXToMSW(
-  int keyCode,
-  bool* const isSpecial
-)
-{
-  int mswKeyCode = keyCode;
-  *isSpecial = true;
-
-  if (keyCode > moho::MKEY_CANCEL) {
-    switch (static_cast<moho::EMauiKeyCode>(keyCode)) {
-    case moho::MKEY_CLEAR:
-      mswKeyCode = 12;
-      break;
-    case moho::MKEY_SHIFT:
-      mswKeyCode = 16;
-      break;
-    case moho::MKEY_CONTROL:
-      mswKeyCode = 17;
-      break;
-    case moho::MKEY_MENU:
-      mswKeyCode = 18;
-      break;
-    case moho::MKEY_PAUSE:
-      mswKeyCode = 19;
-      break;
-    case moho::MKEY_CAPITAL:
-      mswKeyCode = 20;
-      break;
-    case moho::MKEY_PRIOR:
-      mswKeyCode = 33;
-      break;
-    case moho::MKEY_NEXT:
-      mswKeyCode = 34;
-      break;
-    case moho::MKEY_END:
-      mswKeyCode = 35;
-      break;
-    case moho::MKEY_HOME:
-      mswKeyCode = 36;
-      break;
-    case moho::MKEY_LEFT:
-      mswKeyCode = 37;
-      break;
-    case moho::MKEY_UP:
-      mswKeyCode = 38;
-      break;
-    case moho::MKEY_RIGHT:
-      mswKeyCode = 39;
-      break;
-    case moho::MKEY_DOWN:
-      mswKeyCode = 40;
-      break;
-    case moho::MKEY_SELECT:
-      mswKeyCode = 41;
-      break;
-    case moho::MKEY_PRINT:
-      mswKeyCode = 42;
-      break;
-    case moho::MKEY_EXECUTE:
-      mswKeyCode = 43;
-      break;
-    case moho::MKEY_INSERT:
-      mswKeyCode = 45;
-      break;
-    case moho::MKEY_HELP:
-      mswKeyCode = 47;
-      break;
-    case moho::MKEY_NUMPAD0:
-      mswKeyCode = 96;
-      break;
-    case moho::MKEY_NUMPAD1:
-      mswKeyCode = 97;
-      break;
-    case moho::MKEY_NUMPAD2:
-      mswKeyCode = 98;
-      break;
-    case moho::MKEY_NUMPAD3:
-      mswKeyCode = 99;
-      break;
-    case moho::MKEY_NUMPAD4:
-      mswKeyCode = 100;
-      break;
-    case moho::MKEY_NUMPAD5:
-      mswKeyCode = 101;
-      break;
-    case moho::MKEY_NUMPAD6:
-      mswKeyCode = 102;
-      break;
-    case moho::MKEY_NUMPAD7:
-      mswKeyCode = 103;
-      break;
-    case moho::MKEY_NUMPAD8:
-      mswKeyCode = 104;
-      break;
-    case moho::MKEY_NUMPAD9:
-      mswKeyCode = 105;
-      break;
-    case moho::MKEY_F1:
-      mswKeyCode = 112;
-      break;
-    case moho::MKEY_F2:
-      mswKeyCode = 113;
-      break;
-    case moho::MKEY_F3:
-      mswKeyCode = 114;
-      break;
-    case moho::MKEY_F4:
-      mswKeyCode = 115;
-      break;
-    case moho::MKEY_F5:
-      mswKeyCode = 116;
-      break;
-    case moho::MKEY_F6:
-      mswKeyCode = 117;
-      break;
-    case moho::MKEY_F7:
-      mswKeyCode = 118;
-      break;
-    case moho::MKEY_F8:
-      mswKeyCode = 119;
-      break;
-    case moho::MKEY_F9:
-      mswKeyCode = 120;
-      break;
-    case moho::MKEY_F10:
-      mswKeyCode = 121;
-      break;
-    case moho::MKEY_F11:
-      mswKeyCode = 122;
-      break;
-    case moho::MKEY_F12:
-      mswKeyCode = 123;
-      break;
-    case moho::MKEY_F13:
-      mswKeyCode = 124;
-      break;
-    case moho::MKEY_F14:
-      mswKeyCode = 125;
-      break;
-    case moho::MKEY_F15:
-      mswKeyCode = 126;
-      break;
-    case moho::MKEY_F16:
-      mswKeyCode = 127;
-      break;
-    case moho::MKEY_F17:
-      mswKeyCode = 128;
-      break;
-    case moho::MKEY_F18:
-      mswKeyCode = 129;
-      break;
-    case moho::MKEY_F19:
-      mswKeyCode = 130;
-      break;
-    case moho::MKEY_F20:
-      mswKeyCode = 131;
-      break;
-    case moho::MKEY_F21:
-      mswKeyCode = 132;
-      break;
-    case moho::MKEY_F22:
-      mswKeyCode = 133;
-      break;
-    case moho::MKEY_F23:
-      mswKeyCode = 134;
-      break;
-    case moho::MKEY_F24:
-      mswKeyCode = 135;
-      break;
-    case moho::MKEY_NUMLOCK:
-      mswKeyCode = 144;
-      break;
-    case moho::MKEY_SCROLL:
-      mswKeyCode = 145;
-      break;
-    case moho::MKEY_NUMPAD_MULTIPLY:
-      mswKeyCode = 106;
-      break;
-    case moho::MKEY_NUMPAD_ADD:
-      mswKeyCode = 107;
-      break;
-    case moho::MKEY_NUMPAD_SUBTRACT:
-      mswKeyCode = 109;
-      break;
-    case moho::MKEY_NUMPAD_DECIMAL:
-      mswKeyCode = 110;
-      break;
-    case moho::MKEY_NUMPAD_DIVIDE:
-      mswKeyCode = 111;
-      break;
-    default:
-      *isSpecial = false;
-      break;
-    }
-  } else if (keyCode == moho::MKEY_CANCEL) {
-    return 3;
-  } else if (keyCode == moho::MKEY_DELETE) {
-    return 46;
-  } else {
-    *isSpecial = false;
-  }
-
-  return mswKeyCode;
-}
-
-/**
- * Address: 0x0096ABB0 (FUN_0096ABB0, wxCharCodeMSWToWX)
- *
- * What it does:
- * Maps one Win32 virtual-key lane into the MAUI keycode enum/value space used
- * by UI event dispatch.
- */
-int wxCharCodeMSWToWX(
-  const int keyCode
-)
-{
-  switch (keyCode) {
-  case 3:
-    return moho::MKEY_CANCEL;
-  case 8:
-    return moho::MKEY_BACK;
-  case 9:
-    return moho::MKEY_TAB;
-  case 12:
-    return moho::MKEY_CLEAR;
-  case 13:
-    return moho::MKEY_RETURN;
-  case 16:
-    return moho::MKEY_SHIFT;
-  case 17:
-    return moho::MKEY_CONTROL;
-  case 18:
-    return moho::MKEY_MENU;
-  case 19:
-    return moho::MKEY_PAUSE;
-  case 20:
-    return moho::MKEY_CAPITAL;
-  case 27:
-    return moho::MKEY_ESCAPE;
-  case 32:
-    return moho::MKEY_SPACE;
-  case 33:
-    return moho::MKEY_PRIOR;
-  case 34:
-    return moho::MKEY_NEXT;
-  case 35:
-    return moho::MKEY_END;
-  case 36:
-    return moho::MKEY_HOME;
-  case 37:
-    return moho::MKEY_LEFT;
-  case 38:
-    return moho::MKEY_UP;
-  case 39:
-    return moho::MKEY_RIGHT;
-  case 40:
-    return moho::MKEY_DOWN;
-  case 41:
-    return moho::MKEY_SELECT;
-  case 42:
-    return moho::MKEY_PRINT;
-  case 43:
-    return moho::MKEY_EXECUTE;
-  case 45:
-    return moho::MKEY_INSERT;
-  case 46:
-    return moho::MKEY_DELETE;
-  case 47:
-    return moho::MKEY_HELP;
-  case 96:
-    return moho::MKEY_NUMPAD0;
-  case 97:
-    return moho::MKEY_NUMPAD1;
-  case 98:
-    return moho::MKEY_NUMPAD2;
-  case 99:
-    return moho::MKEY_NUMPAD3;
-  case 100:
-    return moho::MKEY_NUMPAD4;
-  case 101:
-    return moho::MKEY_NUMPAD5;
-  case 102:
-    return moho::MKEY_NUMPAD6;
-  case 103:
-    return moho::MKEY_NUMPAD7;
-  case 104:
-    return moho::MKEY_NUMPAD8;
-  case 105:
-    return moho::MKEY_NUMPAD9;
-  case 106:
-    return moho::MKEY_NUMPAD_MULTIPLY;
-  case 107:
-    return moho::MKEY_NUMPAD_ADD;
-  case 109:
-    return moho::MKEY_NUMPAD_SUBTRACT;
-  case 110:
-    return moho::MKEY_NUMPAD_DECIMAL;
-  case 111:
-    return moho::MKEY_NUMPAD_DIVIDE;
-  case 112:
-    return moho::MKEY_F1;
-  case 113:
-    return moho::MKEY_F2;
-  case 114:
-    return moho::MKEY_F3;
-  case 115:
-    return moho::MKEY_F4;
-  case 116:
-    return moho::MKEY_F5;
-  case 117:
-    return moho::MKEY_F6;
-  case 118:
-    return moho::MKEY_F7;
-  case 119:
-    return moho::MKEY_F8;
-  case 120:
-    return moho::MKEY_F9;
-  case 121:
-    return moho::MKEY_F10;
-  case 122:
-    return moho::MKEY_F11;
-  case 123:
-    return moho::MKEY_F12;
-  case 124:
-    return moho::MKEY_F13;
-  case 125:
-    return moho::MKEY_F14;
-  case 126:
-    return moho::MKEY_F15;
-  case 127:
-    return moho::MKEY_F16;
-  case 128:
-    return moho::MKEY_F17;
-  case 129:
-    return moho::MKEY_F18;
-  case 130:
-    return moho::MKEY_F19;
-  case 131:
-    return moho::MKEY_F20;
-  case 132:
-    return moho::MKEY_F21;
-  case 133:
-    return moho::MKEY_F22;
-  case 134:
-    return moho::MKEY_F23;
-  case 135:
-    return moho::MKEY_F24;
-  case 144:
-    return moho::MKEY_NUMLOCK;
-  case 145:
-    return moho::MKEY_SCROLL;
-  case 186:
-    return ';';
-  case 187:
-    return '+';
-  case 188:
-    return ',';
-  case 189:
-    return '-';
-  case 190:
-    return '.';
-  case 191:
-    return '/';
-  case 192:
-    return '~';
-  case 219:
-    return '[';
-  case 220:
-    return '\\';
-  case 221:
-    return ']';
-  case 222:
-    return '\'';
-  default:
-    return 0;
-  }
-}
 
 namespace moho
 {
@@ -2980,108 +2578,6 @@ namespace
     sizeof(CurrentDraggerSentinel) == sizeof(DraggerLink),
     "CurrentDraggerSentinel must remain intrusive-link-compatible"
   );
-  struct WxWindowCaptureRuntimeView
-  {
-    std::uint8_t mUnknown00To107[0x108]{};
-    HWND mWindowHandle = nullptr; // +0x108
-  };
-
-  static_assert(
-    offsetof(WxWindowCaptureRuntimeView, mWindowHandle) == 0x108,
-    "WxWindowCaptureRuntimeView::mWindowHandle offset must be 0x108"
-  );
-
-  class CMauiWxEventMapper final : public moho::wxEvtHandlerRuntime
-  {
-  public:
-    std::uint8_t mUnknown04To27[0x24]{};
-    WxWindowCaptureRuntimeView* mWindowRuntime = nullptr; // +0x28
-    moho::CMauiFrame* mFrame = nullptr;                   // +0x2C
-
-    /**
-     * Address: 0x007A48D0 (FUN_007A48D0, ??1CMauiWxEventMapper@Moho@@QAE@@Z)
-     * Mangled: ??1CMauiWxEventMapper@Moho@@QAE@@Z
-     *
-     * What it does:
-     * Unlinks the global current-dragger sentinel from the dragger lane,
-     * clears mouse-capture state, and then runs the wxEvtHandler base
-     * destructor lane.
-     */
-    ~CMauiWxEventMapper() override;
-
-    /**
-     * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
-     *
-     * wxEvent-table sink installed at `0x00F5A488` for the
-     * `CMauiWxEventMapper` event table. Builds one typed `SMauiEventData`
-     * payload from the wxMouseEvent, hit-tests for the topmost control under
-     * the cursor, emits `MET_MouseEnter` / `MET_MouseExit` on hover changes,
-     * and routes the event to the topmost control via `PostEvent`. Press /
-     * double-click also runs the global `/lua/ui/uimain.lua:OnMouseButtonPress`
-     * Lua callback and notifies the previous keyboard-focus owner.
-     */
-    void OnMouseMove(wxEventRuntime& mouseEvent);
-
-    /**
-     * Address: 0x007A4FD0 (FUN_007A4FD0)
-     *
-     * wxEvent-table sink installed at `0x00F5A488` for the
-     * `CMauiWxEventMapper` event table. Routes one wx key-release event to the
-     * keyboard-focus control (or the top input-capture control) as a typed
-     * `MET_KeyUp` `SMauiEventData`.
-     */
-    void OnKeyUp(wxEventRuntime& keyEvent);
-
-    /**
-     * Address: 0x007A4EF0 (FUN_007A4EF0)
-     *
-     * wxEvent-table sink installed at `0x00F5A488` for the
-     * `CMauiWxEventMapper` event table. Routes one wx key-press event to the
-     * keyboard-focus control (or the top input-capture control) as a typed
-     * `MET_KeyDown` `SMauiEventData`.
-     */
-    void OnKeyDown(wxEventRuntime& keyEvent);
-
-    /**
-     * Address: 0x007A50B0 (FUN_007A50B0)
-     *
-     * wxEvent-table sink installed at `0x00F5A488` for the
-     * `CMauiWxEventMapper` event table. Routes one wx translated-character
-     * event to the keyboard-focus control (or the top input-capture control)
-     * as a typed `MET_Char` `SMauiEventData`.
-     */
-    void OnChar(wxEventRuntime& keyEvent);
-
-    /**
-     * Stands in for the compiler-emitted `CMauiWxEventMapper` event table at
-     * binary `0x00F5A488`, whose four rows bind the sinks above. Event types
-     * are runtime-assigned here, so the rows are matched by family rather than
-     * by a static `wxEVT_*` constant.
-     */
-    bool ProcessWxEvent(void* event) override;
-  };
-
-  static_assert(
-    offsetof(CMauiWxEventMapper, mWindowRuntime) == 0x28,
-    "CMauiWxEventMapper::mWindowRuntime offset must be 0x28"
-  );
-  static_assert(
-    offsetof(CMauiWxEventMapper, mFrame) == 0x2C,
-    "CMauiWxEventMapper::mFrame offset must be 0x2C"
-  );
-  static_assert(sizeof(CMauiWxEventMapper) == 0x30, "CMauiWxEventMapper size must be 0x30");
-
-  struct CMauiFrameDraggerRuntimeView
-  {
-    std::uint8_t mUnknown00To12B[0x12C]{};
-    moho::wxEvtHandlerRuntime* mEventMapper = nullptr; // +0x12C
-  };
-
-  static_assert(
-    offsetof(CMauiFrameDraggerRuntimeView, mEventMapper) == 0x12C,
-    "CMauiFrameDraggerRuntimeView::mEventMapper offset must be 0x12C"
-  );
-
   constexpr std::int32_t kMauiLButtonCode = 301;
   constexpr std::int32_t kMauiRButtonCode = 302;
   constexpr std::int32_t kMauiMButtonCode = 304;
@@ -3283,15 +2779,6 @@ namespace
   {
     return keyCode == kPostDraggerLeftButton || keyCode == kPostDraggerMiddleButton ||
       keyCode == kPostDraggerRightButton;
-  }
-
-  [[nodiscard]] HWND ResolveCaptureWindowHandle(
-    moho::wxEvtHandlerRuntime* const eventMapper
-  ) noexcept
-  {
-    auto* const mapperView = static_cast<CMauiWxEventMapper*>(eventMapper);
-    auto* const windowView = mapperView->mWindowRuntime;
-    return windowView->mWindowHandle;
   }
 
   msvc8::vector<moho::WeakPtr<moho::CMauiControl>> sInputCapture;
@@ -3869,28 +3356,6 @@ namespace
 
     static moho::CScrLuaInitFormSet sSet("User");
     return sSet;
-  }
-
-  struct WindowEventHandlerChain
-  {
-    wxWindowBase* window = nullptr;
-    std::vector<moho::wxEvtHandlerRuntime*> handlers{};
-  };
-
-  std::vector<WindowEventHandlerChain> gWindowEventHandlerChains;
-
-  [[nodiscard]]
-  std::vector<WindowEventHandlerChain>::iterator FindWindowEventHandlerChain(
-    const wxWindowBase* const window
-  )
-  {
-    return std::find_if(
-      gWindowEventHandlerChains.begin(),
-      gWindowEventHandlerChains.end(),
-      [window](const WindowEventHandlerChain& chain) {
-      return chain.window == window;
-    }
-    );
   }
 
   gpg::RType* CachedCScriptObjectPointerType()
@@ -11739,7 +11204,7 @@ static DraggerLink* func_UnlinkCurrentDraggerLink()
  * `gCurrentMouseOverControlLink`) and clears the global mouse-capture flag so
  * the next mapper instance starts with a clean tracking state.
  */
-CMauiWxEventMapper::~CMauiWxEventMapper()
+moho::CMauiWxEventMapper::~CMauiWxEventMapper()
 {
   // Unlink the mouse-over sentinel from whatever control it currently tracks.
   // When the link is in the "dead weak-owner" state (`mPrev == 4`), clear
@@ -11752,25 +11217,6 @@ CMauiWxEventMapper::~CMauiWxEventMapper()
     gCurrentMouseOverControlLink.mNextPrevNextField = 0u;
   }
   sMouseIsCaptured = 0;
-}
-
-/**
- * Address: 0x007A48B0 (FUN_007A48B0)
- *
- * What it does:
- * Scalar-deleting destructor wrapper for `CMauiWxEventMapper`.
- */
-[[maybe_unused]] static moho::wxEvtHandlerRuntime* func_DestroyMauiWxEventMapper(
-  moho::wxEvtHandlerRuntime* const eventMapper,
-  const char deleteFlags
-)
-{
-  auto* const typedMapper = static_cast<CMauiWxEventMapper*>(eventMapper);
-  typedMapper->~CMauiWxEventMapper();
-  if ((deleteFlags & 1) != 0) {
-    ::operator delete(typedMapper);
-  }
-  return eventMapper;
 }
 
 /**
@@ -11871,7 +11317,7 @@ void func_OnCommandDragEnd(
  */
 static std::uint8_t func_SetMouseCapture(
   const bool shouldCapture,
-  moho::wxEvtHandlerRuntime* const eventMapper
+  moho::CMauiWxEventMapper* const eventMapper
 )
 {
   std::uint8_t result = sMouseIsCaptured;
@@ -11881,8 +11327,7 @@ static std::uint8_t func_SetMouseCapture(
       sMouseIsCaptured = 0;
     }
     if (shouldCapture) {
-      const HWND windowHandle = ResolveCaptureWindowHandle(eventMapper);
-      const HWND capturedWindow = ::SetCapture(windowHandle);
+      const HWND capturedWindow = ::SetCapture(reinterpret_cast<HWND>(eventMapper->mWindow->GetHWND()));
       result = static_cast<std::uint8_t>(reinterpret_cast<std::uintptr_t>(capturedWindow));
       sMouseIsCaptured = 1;
     }
@@ -11915,8 +11360,7 @@ static void func_PostDragger(
   (void)func_SetCurDragger(dragger);
 
   if (originFrame != nullptr) {
-    auto* const frameView = reinterpret_cast<CMauiFrameDraggerRuntimeView*>(originFrame);
-    (void)func_SetMouseCapture(dragger != nullptr, frameView->mEventMapper);
+    (void)func_SetMouseCapture(dragger != nullptr, originFrame->mEventHandler);
   }
 
   if (func_GetCurrentDragger2() == nullptr) {
@@ -12060,63 +11504,46 @@ static moho::IMauiDragger* NewSelectionDragger(
   return dragger;
 }
 
-// Forward declarations for the wx mouse-event selector helpers defined at
-// global scope in `moho/app/WxRuntimeTypes.cpp`. They surface the same
-// runtime behavior as the binary FUN_00979280 / FUN_00979310 / FUN_009793A0 /
-// FUN_00979560 lanes used by `func_OnMouseMove`.
-bool wxMouseEventMatchesDoubleClickSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept;
-bool wxMouseEventMatchesPressSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept;
-bool wxMouseEventMatchesReleaseSelectorRuntime(const void* mouseEventRuntime, std::int32_t selector) noexcept;
-std::int32_t wxMouseEventResolveButtonSelectorRuntime(const void* mouseEventRuntime) noexcept;
-
 namespace
 {
   /**
-   * Layout view over `wxMouseEvent` fields beyond the `wxEvent` base. Field
-   * offsets are confirmed by FUN_007A4970 asm reads at `[esi+0x20..0x34]`.
+   * Depth of MAUI event dispatch currently on the stack. `PurgeDeleted` skips
+   * the delete while this is non-zero, so a control cannot be freed underneath
+   * an event walk that still holds a pointer to it. Single-threaded: every
+   * dispatch runs on the wx message loop.
    */
-  struct WxMouseEventDispatchRuntimeView
-  {
-    std::uint8_t mWxEventBase[0x20]{}; // +0x00 wxEventRuntime header
-    std::int32_t mMouseX = 0;          // +0x20
-    std::int32_t mMouseY = 0;          // +0x24
-    std::uint8_t mLeftDown = 0;        // +0x28
-    std::uint8_t mMiddleDown = 0;      // +0x29
-    std::uint8_t mRightDown = 0;       // +0x2A
-    std::uint8_t mControlDown = 0;     // +0x2B
-    std::uint8_t mShiftDown = 0;       // +0x2C
-    std::uint8_t mAltDown = 0;         // +0x2D
-    std::uint8_t mMetaDown = 0;        // +0x2E
-    std::uint8_t mReserved2F = 0;      // +0x2F
-    std::int32_t mWheelRotation = 0;   // +0x30
-    std::int32_t mWheelDelta = 0;      // +0x34
-  };
-  static_assert(
-    offsetof(WxMouseEventDispatchRuntimeView, mMouseX) == 0x20,
-    "WxMouseEventDispatchRuntimeView::mMouseX offset must be 0x20"
-  );
-  static_assert(
-    offsetof(WxMouseEventDispatchRuntimeView, mLeftDown) == 0x28,
-    "WxMouseEventDispatchRuntimeView::mLeftDown offset must be 0x28"
-  );
-  static_assert(
-    offsetof(WxMouseEventDispatchRuntimeView, mWheelRotation) == 0x30,
-    "WxMouseEventDispatchRuntimeView::mWheelRotation offset must be 0x30"
-  );
-  static_assert(
-    offsetof(WxMouseEventDispatchRuntimeView, mWheelDelta) == 0x34,
-    "WxMouseEventDispatchRuntimeView::mWheelDelta offset must be 0x34"
-  );
+  int gMauiEventDispatchDepth = 0;
 
+  struct MauiEventDispatchGuard
+  {
+    MauiEventDispatchGuard() noexcept
+    {
+      ++gMauiEventDispatchDepth;
+    }
+    ~MauiEventDispatchGuard()
+    {
+      --gMauiEventDispatchDepth;
+    }
+    MauiEventDispatchGuard(const MauiEventDispatchGuard&) = delete;
+    MauiEventDispatchGuard& operator=(const MauiEventDispatchGuard&) = delete;
+  };
+
+  [[nodiscard]] bool MauiEventDispatchInProgress() noexcept
+  {
+    return gMauiEventDispatchDepth > 0;
+  }
+} // namespace
+
+namespace
+{
   /**
    * Builds one `moho::SMauiEventData` payload from a wxMouseEvent, translating
    * wheel-event coordinates from screen-space to client-space through
    * `windowRuntime->ScreenToClient`.
    */
   [[nodiscard]] moho::SMauiEventData BuildMauiEventPayloadFromWxMouse(
-    const WxMouseEventDispatchRuntimeView* const mouseEvent,
-    const wxEventRuntime* const wxEvent,
-    WxWindowCaptureRuntimeView* const windowRuntime
+    const wxMouseEvent& mouseEvent,
+    wxWindow* const window
   )
   {
     moho::SMauiEventData payload{};
@@ -12124,38 +11551,37 @@ namespace
     payload.mMousePos.x = -1.0f;
     payload.mMousePos.y = -1.0f;
 
-    const std::int32_t mouseWheelEventType = moho::WX_GetWxEvtMouseWheelType();
-    if (windowRuntime != nullptr && wxEvent->mEventType == mouseWheelEventType) {
+    if (window != nullptr && mouseEvent.GetEventType() == wxEVT_MOUSEWHEEL) {
       // Wheel events report screen coordinates; convert to client space.
-      std::int32_t clientX = mouseEvent->mMouseX;
-      std::int32_t clientY = mouseEvent->mMouseY;
-      moho::WX_ScreenToClient(reinterpret_cast<wxWindowBase*>(windowRuntime), clientX, clientY);
+      int clientX = mouseEvent.m_x;
+      int clientY = mouseEvent.m_y;
+      window->ScreenToClient(&clientX, &clientY);
       payload.mMousePos.x = static_cast<float>(clientX);
       payload.mMousePos.y = static_cast<float>(clientY);
     } else {
-      payload.mMousePos.x = static_cast<float>(mouseEvent->mMouseX);
-      payload.mMousePos.y = static_cast<float>(mouseEvent->mMouseY);
+      payload.mMousePos.x = static_cast<float>(mouseEvent.m_x);
+      payload.mMousePos.y = static_cast<float>(mouseEvent.m_y);
     }
 
-    // Map the wxMouseEvent button/modifier flag bytes onto the typed Maui
+    // Map the wxMouseEvent button/modifier flags onto the typed Maui
     // modifier bitmask. Bit layout proven by FUN_007A4970 disassembly.
     std::uint32_t modifierBits = 0u;
-    if (mouseEvent->mLeftDown != 0) {
+    if (mouseEvent.m_leftDown) {
       modifierBits |= moho::MEM_Left;
     }
-    if (mouseEvent->mMiddleDown != 0) {
+    if (mouseEvent.m_middleDown) {
       modifierBits |= moho::MEM_Middle;
     }
-    if (mouseEvent->mRightDown != 0) {
+    if (mouseEvent.m_rightDown) {
       modifierBits |= moho::MEM_Right;
     }
-    if (mouseEvent->mControlDown != 0) {
+    if (mouseEvent.m_controlDown) {
       modifierBits |= moho::MEM_Ctrl;
     }
-    if (mouseEvent->mShiftDown != 0) {
+    if (mouseEvent.m_shiftDown) {
       modifierBits |= moho::MEM_Shift;
     }
-    if (mouseEvent->mAltDown != 0) {
+    if (mouseEvent.m_altDown) {
       modifierBits |= moho::MEM_Alt;
     }
     payload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
@@ -12242,15 +11668,16 @@ namespace
  *     and notifies the previous keyboard-focus owner via
  *     `LosingKeyboardFocus`).
  */
-void CMauiWxEventMapper::OnMouseMove(
-  wxEventRuntime& mouseEventRef
+void moho::CMauiWxEventMapper::OnMouseMove(
+  wxMouseEvent& mouseEvent
 )
 {
-  wxEventRuntime* const wxEventPtr = &mouseEventRef;
-  auto* const mouseEvent = reinterpret_cast<WxMouseEventDispatchRuntimeView*>(wxEventPtr);
+  // Script reached from this event may destroy controls it is still walking;
+  // see MauiEventDispatchGuard.
+  const MauiEventDispatchGuard dispatchGuard;
 
   // ---- Step 1: Build typed Maui event payload from wx mouse event ----
-  moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromWxMouse(mouseEvent, wxEventPtr, mWindowRuntime);
+  moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromWxMouse(mouseEvent, mWindow);
 
   // ---- Step 2: Resolve topmost-control under the cursor ----
   // The local tracking sentinel mirrors the binary's stack-local
@@ -12311,21 +11738,20 @@ void CMauiWxEventMapper::OnMouseMove(
   }
 
   // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
-  const void* const eventVoid = static_cast<const void*>(wxEventPtr);
-  const bool isPress = wxMouseEventMatchesPressSelectorRuntime(eventVoid, -1);
-  const bool isDoubleClick = wxMouseEventMatchesDoubleClickSelectorRuntime(eventVoid, -1);
+  const bool isPress = mouseEvent.ButtonDown();
+  const bool isDoubleClick = mouseEvent.ButtonDClick();
 
   // TEMPORARY PROBE -- inert move order triage, delete when resolved.
   {
-    const bool isRelease = wxMouseEventMatchesReleaseSelectorRuntime(eventVoid, -1);
+    const bool isRelease = mouseEvent.ButtonUp();
     if (isPress || isDoubleClick || isRelease) {
       gpg::Warnf(
         "[WXDIAG] evtType=%d press=%d dclick=%d release=%d selector=%d tracked=%p dragger=%p draggerKey=%d",
-        wxEventPtr->mEventType,
+        static_cast<int>(mouseEvent.GetEventType()),
         isPress ? 1 : 0,
         isDoubleClick ? 1 : 0,
         isRelease ? 1 : 0,
-        wxMouseEventResolveButtonSelectorRuntime(eventVoid),
+        mouseEvent.GetButton(),
         static_cast<void*>(trackedControl),
         static_cast<void*>(func_GetCurrentDraggerFromMouseMoveLane()),
         sCurrentDraggerKeycode
@@ -12335,9 +11761,9 @@ void CMauiWxEventMapper::OnMouseMove(
 
   if (!isPress && !isDoubleClick) {
     // ---- Non-press paths: release / motion / wheel / skip ----
-    if (wxMouseEventMatchesReleaseSelectorRuntime(eventVoid, -1)) {
+    if (mouseEvent.ButtonUp()) {
       eventPayload.mEventType = moho::MET_ButtonRelease;
-      const std::int32_t buttonSelector = wxMouseEventResolveButtonSelectorRuntime(eventVoid);
+      const std::int32_t buttonSelector = mouseEvent.GetButton();
       eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(buttonSelector);
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
 
@@ -12352,8 +11778,7 @@ void CMauiWxEventMapper::OnMouseMove(
       return;
     }
 
-    const std::int32_t motionEventType = moho::WX_GetWxEvtMotionType();
-    if (wxEventPtr->mEventType == motionEventType) {
+    if (mouseEvent.GetEventType() == wxEVT_MOTION) {
       eventPayload.mEventType = moho::MET_MouseMotion;
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
 
@@ -12374,14 +11799,14 @@ void CMauiWxEventMapper::OnMouseMove(
       return;
     }
 
-    if (mouseEvent->mWheelRotation != 0) {
+    if (mouseEvent.m_wheelRotation != 0) {
       if (trackedControl == nullptr) {
         UnlinkFocusControlSentinel(&trackingSentinel);
         return;
       }
       eventPayload.mEventType = moho::MET_WheelRotation;
-      eventPayload.mWheelRotation = mouseEvent->mWheelRotation;
-      eventPayload.mWheelData = mouseEvent->mWheelDelta;
+      eventPayload.mWheelRotation = mouseEvent.m_wheelRotation;
+      eventPayload.mWheelData = mouseEvent.m_wheelDelta;
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
       trackedControl->PostEvent(eventPayload);
       UnlinkFocusControlSentinel(&trackingSentinel);
@@ -12390,7 +11815,7 @@ void CMauiWxEventMapper::OnMouseMove(
 
     // No release / motion / wheel rotation: mark wx event as skipped so the
     // framework continues propagation up the wx event chain.
-    wxEventPtr->mSkipped = 1;
+    mouseEvent.Skip();
     UnlinkFocusControlSentinel(&trackingSentinel);
     return;
   }
@@ -12409,7 +11834,7 @@ void CMauiWxEventMapper::OnMouseMove(
   // Run the global `/lua/ui/uimain.lua:OnMouseButtonPress` callback so script
   // code observes the press before the typed event reaches the topmost control.
   LuaPlus::LuaState* const luaState = moho::g_UIManager != nullptr ? moho::g_UIManager->mLuaState : nullptr;
-  RunGlobalOnMouseButtonPressLuaCallback(luaState, isPress, mouseEvent->mMouseX, mouseEvent->mMouseY);
+  RunGlobalOnMouseButtonPressLuaCallback(luaState, isPress, mouseEvent.m_x, mouseEvent.m_y);
 
   // Both the focus notification above and the Lua callback just run can tear
   // down the control this press was aimed at, so ask the sentinel for it again
@@ -12419,7 +11844,7 @@ void CMauiWxEventMapper::OnMouseMove(
   // into a freed object.
   if (moho::CMauiControl* const pressTarget = trackingSentinel.ResolveFocusedControl(); pressTarget != nullptr) {
     eventPayload.mEventType = isPress ? moho::MET_ButtonPress : moho::MET_ButtonDClick;
-    eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(wxMouseEventResolveButtonSelectorRuntime(eventVoid));
+    eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(mouseEvent.GetButton());
     eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(pressTarget);
     pressTarget->PostEvent(eventPayload);
   }
@@ -12429,54 +11854,6 @@ void CMauiWxEventMapper::OnMouseMove(
 
 namespace
 {
-  /**
-   * Layout view over `wxKeyEvent` fields beyond the `wxEvent` base. Field
-   * offsets are confirmed by the FUN_007A4EF0 asm reads at `[esi+0x28]`
-   * (key code), `[esi+0x2C..0x2E]` (control/shift/alt flag bytes),
-   * `[esi+0x34]` (raw key code) and the `[esi+0x1C]` skip byte in the shared
-   * `wxEvent` header.
-   *
-   * `mRawFlags` (+0x38, matching real wx's `wxKeyEvent::m_rawFlags`) is
-   * confirmed by `Moho::CUIKeyHandler::OnKeyDown` (FUN_00838D10) at
-   * `[ebp+3Ah]`: a 16-bit read starting two bytes into this field, testing
-   * bit 0x4000 of the high half -- i.e. bit 30 of the full 32-bit value, the
-   * documented Win32 `WM_KEYDOWN` `lParam` "previously down" auto-repeat bit.
-   */
-  struct WxKeyEventDispatchRuntimeView
-  {
-    std::uint8_t mWxEventBase[0x1C]{}; // +0x00 wxEventRuntime header
-    std::uint8_t mSkipped = 0;         // +0x1C wxEvent::m_skipped
-    std::uint8_t mReserved1D[0x0B]{};  // +0x1D
-    std::int32_t mKeyCode = 0;         // +0x28
-    std::uint8_t mControlDown = 0;     // +0x2C
-    std::uint8_t mShiftDown = 0;       // +0x2D
-    std::uint8_t mAltDown = 0;         // +0x2E
-    std::uint8_t mMetaDown = 0;        // +0x2F
-    std::int32_t mScanCode = 0;        // +0x30
-    std::int32_t mRawKeyCode = 0;      // +0x34
-    std::uint32_t mRawFlags = 0;       // +0x38 wxKeyEvent::m_rawFlags
-  };
-  static_assert(
-    offsetof(WxKeyEventDispatchRuntimeView, mSkipped) == 0x1C,
-    "WxKeyEventDispatchRuntimeView::mSkipped offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(WxKeyEventDispatchRuntimeView, mKeyCode) == 0x28,
-    "WxKeyEventDispatchRuntimeView::mKeyCode offset must be 0x28"
-  );
-  static_assert(
-    offsetof(WxKeyEventDispatchRuntimeView, mControlDown) == 0x2C,
-    "WxKeyEventDispatchRuntimeView::mControlDown offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(WxKeyEventDispatchRuntimeView, mRawKeyCode) == 0x34,
-    "WxKeyEventDispatchRuntimeView::mRawKeyCode offset must be 0x34"
-  );
-  static_assert(
-    offsetof(WxKeyEventDispatchRuntimeView, mRawFlags) == 0x38,
-    "WxKeyEventDispatchRuntimeView::mRawFlags offset must be 0x38"
-  );
-
   /** Win32 `WM_KEYDOWN`/`WM_KEYUP` `lParam` bit 30: the key was already down. */
   constexpr std::uint32_t kWxKeyEventRawFlagPreviouslyDown = 0x40000000u;
 
@@ -12494,29 +11871,27 @@ namespace
    * wx continue its own propagation.
    */
   void DispatchMauiKeyEventToFocusOrCapture(
-    wxEventRuntime& keyEventRef,
+    wxKeyEvent& keyEvent,
     const moho::EMauiEventType eventType
   )
   {
-    auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
-
     moho::SMauiEventData eventPayload{};
     eventPayload.mEventType = eventType;
     eventPayload.mMousePos.x = -1.0f;
     eventPayload.mMousePos.y = -1.0f;
     eventPayload.mWheelRotation = 0;
     eventPayload.mWheelData = 0;
-    eventPayload.mKeyCode = keyEvent->mKeyCode;
-    eventPayload.mRawKeyCode = keyEvent->mRawKeyCode;
+    eventPayload.mKeyCode = keyEvent.m_keyCode;
+    eventPayload.mRawKeyCode = keyEvent.m_rawCode;
 
     std::uint32_t modifierBits = 0u;
-    if (keyEvent->mShiftDown != 0) {
+    if (keyEvent.m_shiftDown) {
       modifierBits |= moho::MEM_Shift;
     }
-    if (keyEvent->mControlDown != 0) {
+    if (keyEvent.m_controlDown) {
       modifierBits |= moho::MEM_Ctrl;
     }
-    if (keyEvent->mAltDown != 0) {
+    if (keyEvent.m_altDown) {
       modifierBits |= moho::MEM_Alt;
     }
     eventPayload.mModifiers = static_cast<moho::EMauiEventModifier>(modifierBits);
@@ -12530,13 +11905,13 @@ namespace
         return;
       }
 
-      keyEvent->mSkipped = 1;
+      keyEvent.Skip();
       return;
     }
 
     moho::CMauiControl* const captureControl = ResolveTopInputCaptureControl();
     if (captureControl == nullptr) {
-      keyEvent->mSkipped = 1;
+      keyEvent.Skip();
       return;
     }
 
@@ -12553,10 +11928,11 @@ namespace
  * `MET_KeyUp` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void CMauiWxEventMapper::OnKeyUp(
-  wxEventRuntime& keyEvent
+void moho::CMauiWxEventMapper::OnKeyUp(
+  wxKeyEvent& keyEvent
 )
 {
+  const MauiEventDispatchGuard dispatchGuard;
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyUp);
 }
 
@@ -12568,42 +11944,14 @@ void CMauiWxEventMapper::OnKeyUp(
  * `MET_KeyDown` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-void CMauiWxEventMapper::OnKeyDown(
-  wxEventRuntime& keyEvent
+void moho::CMauiWxEventMapper::OnKeyDown(
+  wxKeyEvent& keyEvent
 )
 {
+  const MauiEventDispatchGuard dispatchGuard;
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_KeyDown);
 }
 
-namespace
-{
-  /**
-   * Depth of MAUI event dispatch currently on the stack. `PurgeDeleted` skips
-   * the delete while this is non-zero, so a control cannot be freed underneath
-   * an event walk that still holds a pointer to it. Single-threaded: every
-   * dispatch runs on the wx message loop.
-   */
-  int gMauiEventDispatchDepth = 0;
-
-  struct MauiEventDispatchGuard
-  {
-    MauiEventDispatchGuard() noexcept
-    {
-      ++gMauiEventDispatchDepth;
-    }
-    ~MauiEventDispatchGuard()
-    {
-      --gMauiEventDispatchDepth;
-    }
-    MauiEventDispatchGuard(const MauiEventDispatchGuard&) = delete;
-    MauiEventDispatchGuard& operator=(const MauiEventDispatchGuard&) = delete;
-  };
-
-  [[nodiscard]] bool MauiEventDispatchInProgress() noexcept
-  {
-    return gMauiEventDispatchDepth > 0;
-  }
-} // namespace
 
 /**
  * Address: 0x007A50B0 (FUN_007A50B0)
@@ -12613,99 +11961,22 @@ namespace
  * `MET_Char` event to the keyboard-focus control, falling back to the top
  * input-capture control.
  */
-/**
- * The four rows of the `CMauiWxEventMapper` event table at binary
- * `0x00F5A488`, expressed as a match on the event family. wx assigns event
- * types at static-initialisation time in this build, so there is no constant
- * to put in a table row; `WX_ClassifyEventType` compares against the same
- * globals the window's own tables use.
- *
- * One row covers every mouse event: `OnMouseMove` is the single mouse sink for
- * the whole family and reads the specific type back out of the event itself.
- */
-bool CMauiWxEventMapper::ProcessWxEvent(
-  void* const event
+void moho::CMauiWxEventMapper::OnChar(
+  wxKeyEvent& keyEvent
 )
 {
-  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
-  if (wxEvent == nullptr) {
-    return false;
-  }
-
-  // Hold off control deletion for the length of this dispatch. Destroy() is
-  // already deferred - it only links the control into the root frame's deleted
-  // list - but PurgeDeleted, which does the actual delete, runs at the end of
-  // CMauiFrame::Frame, and script reached from an event can re-enter that tick.
-  // The splash screen does: a click runs LeaveSplashScreen, which destroys the
-  // screen group and then calls EngineStartFrontEndUI, and the frame update
-  // that follows frees the group while PostEvent is still walking up through
-  // it. The purge is skipped while this is held and happens on the next tick
-  // instead.
   const MauiEventDispatchGuard dispatchGuard;
-
-  switch (moho::WX_ClassifyEventType(wxEvent->mEventType)) {
-  case moho::WxEventFamily::Mouse:
-    OnMouseMove(*wxEvent);
-    return true;
-  case moho::WxEventFamily::KeyDown:
-    OnKeyDown(*wxEvent);
-    return wxEvent->mSkipped == 0;
-  case moho::WxEventFamily::KeyUp:
-    OnKeyUp(*wxEvent);
-    return wxEvent->mSkipped == 0;
-  case moho::WxEventFamily::Char:
-    OnChar(*wxEvent);
-    return wxEvent->mSkipped == 0;
-  case moho::WxEventFamily::Other:
-  default:
-    return false;
-  }
-}
-
-void CMauiWxEventMapper::OnChar(
-  wxEventRuntime& keyEvent
-)
-{
   DispatchMauiKeyEventToFocusOrCapture(keyEvent, moho::MET_Char);
 }
 
-// wxEventTableEntry sink for `Moho::CMauiWxEventMapper`.
-//
-// The binary places one `wxEventTable` array starting at `0x00F5A488` whose
-// four entries reference the static OnMouseMove handler at `0x007A4970`. In
-// the original 2007 source these are emitted by the wx framework's
-// `BEGIN_EVENT_TABLE` / `EVT_*` macros around the `CMauiWxEventMapper` class.
-//
-// Recovered source stores the member-fn pointer here so the linker keeps
-// `CMauiWxEventMapper::OnMouseMove` addressable from this TU, mirroring
-// the compiler-emitted event-table data block. The mapper publish helper
-// `PublishCMauiWxEventMapperEventTableBindings` returns the address of the
-// const bindings struct so a real call site (`CMauiFrame::CMauiFrame`) keeps
-// the table alive.
-namespace
-{
-  using CMauiWxEventMapperMouseEventFnPtr = void (CMauiWxEventMapper::*)(wxEventRuntime&);
-
-  struct CMauiWxEventMapperEventTableBindings
-  {
-    CMauiWxEventMapperMouseEventFnPtr onMouseMove;
-    CMauiWxEventMapperMouseEventFnPtr onKeyUp;
-    CMauiWxEventMapperMouseEventFnPtr onKeyDown;
-    CMauiWxEventMapperMouseEventFnPtr onChar;
-  };
-
-  const CMauiWxEventMapperEventTableBindings kCMauiWxEventMapperEventTableBindings = {
-    &CMauiWxEventMapper::OnMouseMove,
-    &CMauiWxEventMapper::OnKeyUp,
-    &CMauiWxEventMapper::OnKeyDown,
-    &CMauiWxEventMapper::OnChar,
-  };
-
-  [[nodiscard]] const void* PublishCMauiWxEventMapperEventTableBindings() noexcept
-  {
-    return static_cast<const void*>(&kCMauiWxEventMapperEventTableBindings);
-  }
-} // namespace
+// Rows 0x00F5A488: EVT_MOUSE_EVENTS is the thirteen mouse rows, all bound to
+// OnMouseMove (0x007A4970), in the order that macro lists them.
+BEGIN_EVENT_TABLE(moho::CMauiWxEventMapper, wxEvtHandler)
+  EVT_MOUSE_EVENTS(moho::CMauiWxEventMapper::OnMouseMove)
+  EVT_KEY_UP(moho::CMauiWxEventMapper::OnKeyUp)
+  EVT_KEY_DOWN(moho::CMauiWxEventMapper::OnKeyDown)
+  EVT_CHAR(moho::CMauiWxEventMapper::OnChar)
+END_EVENT_TABLE()
 
 /**
  * Address: 0x0078E210 (FUN_0078E210, cfunc_PostDragger)
@@ -20460,14 +19731,12 @@ namespace moho
    * mis-typed this field's pointee as `Moho::WRenViewport`; the raw
    * `sub ebp, [ebx+38h]` displacement off the `Moho::UI_Manager` global
    * lands exactly on `CUIManager::mInputWindows`, a
-   * `gpg::fastvector_n<wxWindowBase*, 2>`, per CUIManager.h), pops that
-   * window's two topmost pushed event handlers.
+   * `gpg::fastvector_n<wxWindow*, 2>`, per CUIManager.h), pops that
+   * window's two topmost pushed event handlers - the frame's
+   * CMauiWxEventMapper and the CUIKeyHandler behind it.
    *
    * The saved-handler storage is a real `msvc8::vector<msvc8::vector<
-   * wxWindowBase*>>` (one dynamically-grown inner vector per window, using
-   * this project's `wxWindowBase*`-typed `PopEventHandler`/
-   * `PushEventHandler` stand-in for the real `wxEvtHandler*` -- see
-   * `WxRuntimeTypes.h`'s `PopEventHandler`/`PushEventHandler` declarations),
+   * wxEvtHandler*>>` (one dynamically-grown inner vector per window),
    * not a fixed 2-slot pair -- the raw decompile shows a capacity-checked
    * append-or-grow sequence per `PopEventHandler()` result
    * (`if (size < capacity) *end++ = val; else <grow-call>;`), the exact
@@ -20475,7 +19744,7 @@ namespace moho
    * `resize()`-d to `mInputWindows.size()` up front (`FUN_0084E8A0`),
    * growing/shrinking through `FUN_0084EE20`/`FUN_0084EDB0`; the "move
    * existing 16-byte inner-vector elements into the new buffer" step
-   * (`FUN_0084F820`/`FUN_0084F8A0`) calls `msvc8::vector<wxWindowBase*>::
+   * (`FUN_0084F820`/`FUN_0084F8A0`) calls `msvc8::vector<wxEvtHandler*>::
    * operator=` per element, cited as `FUN_0084FF80` on that template
    * member in `Vector.h`. (`FUN_0084E8A0`/`FUN_0084EE20`/`FUN_0084EDB0`/
    * `FUN_0084F8A0` are not yet independently address-annotated -- their
@@ -20497,11 +19766,11 @@ namespace moho
    */
   void SuspendInputWindowEventHandlersAndFlushQueue()
   {
-    msvc8::vector<msvc8::vector<wxWindowBase*>> suspended;
+    msvc8::vector<msvc8::vector<wxEvtHandler*>> suspended;
     suspended.resize(g_UIManager->mInputWindows.size());
 
     std::size_t index = 0;
-    for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
+    for (wxWindow* const inputWindow : g_UIManager->mInputWindows) {
       suspended[index].push_back(inputWindow->PopEventHandler(false));
       suspended[index].push_back(inputWindow->PopEventHandler(false));
       ++index;
@@ -20512,7 +19781,7 @@ namespace moho
     }
 
     index = 0;
-    for (wxWindowBase* const inputWindow : g_UIManager->mInputWindows) {
+    for (wxWindow* const inputWindow : g_UIManager->mInputWindows) {
       inputWindow->PushEventHandler(suspended[index][1]);
       inputWindow->PushEventHandler(suspended[index][0]);
       ++index;
@@ -28168,20 +27437,8 @@ moho::CMauiFrame::CMauiFrame(
   frameView->mDeletedControlList.mNext = deletedListHead;
   frameView->mDeletedControlList.mPrev = deletedListHead;
 
-  frameView->mEventHandler = nullptr;
   frameView->mTargetHead = 0;
-
-  // Anchor the static wxEventTable bindings for `CMauiWxEventMapper` so the
-  // linker preserves `CMauiWxEventMapper::OnMouseMove`, mirroring the
-  // compiler-emitted event-table data block at binary `0x00F5A488`.
-  (void)PublishCMauiWxEventMapperEventTableBindings();
-
-  auto* const eventMapper = new (std::nothrow) CMauiWxEventMapper{};
-  if (eventMapper != nullptr) {
-    eventMapper->mWindowRuntime = nullptr;
-    eventMapper->mFrame = this;
-    frameView->mEventHandler = eventMapper;
-  }
+  frameView->mEventHandler = new CMauiWxEventMapper(this);
 
   CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
   CMauiControlExtendedRuntimeView::FromControl(this)->mRootFrame = this;
@@ -29485,8 +28742,18 @@ void moho::UI_NoteDisconnect(
  * Address: 0x0088F8E0 (FUN_0088F8E0) - the heap-clone branch FUN_0088F600
  *          calls when the bound string+MemBuffer node does not fit the
  *          function_buffer's SSO slot: copies the node via FUN_0088EE00
- *          (already recovered as `wxCopySharedRefStringAndMemBufferRuntime`
- *          in `WxRuntimeTypes.cpp`) and forwards to the node allocator below
+ *          and forwards to the node allocator below
+ * Address: 0x0088EE00 (FUN_0088EE00) - `list2<value<std::string>,
+ *          value<gpg::MemBuffer<char const>>>`'s implicit copy constructor:
+ *          `std::string::assign` (0x004056B0) for the string, then the
+ *          MemBuffer's four words with its shared count bumped
+ * Address: 0x0088BAB0 (FUN_0088BAB0) - that list's implicit destructor:
+ *          releases the MemBuffer's shared count (+0x20), then the string
+ * Address: 0x0088FFB0 (FUN_0088FFB0) - the heap node's destroy step:
+ *          `add eax, 4` past the manager tag, then FUN_0088BAB0
+ * Address: 0x008901D0 (FUN_008901D0) - a second emission of that step
+ * Address: 0x00890210 (FUN_00890210) - the same through `esi`, returning
+ *          the node
  * Address: 0x0088FAE0 (FUN_0088FAE0) - allocates the heap node (checked
  *          48-byte `operator new`, already recovered generically as
  *          `gpg::core::legacy::AllocateChecked48ByteLane` / FUN_00890080),
@@ -29496,8 +28763,7 @@ void moho::UI_NoteDisconnect(
  * Address: 0x008900D0 (FUN_008900D0) - `list2<value<std::string>,
  *          value<gpg::MemBuffer<char const>>>` node constructor for the
  *          heap-clone path: copies the manager/vtable-tag field, then
- *          copies the string+MemBuffer element via FUN_0088EE00
- *          (`wxCopySharedRefStringAndMemBufferRuntime`) -- the heap-clone
+ *          copies the string+MemBuffer element via FUN_0088EE00 -- the heap-clone
  *          counterpart to the already-cited construction-path node ctor
  *          FUN_0088F040 above
  * Address: 0x0088F860 (FUN_0088F860) - writes {manager=FUN_0088FC70,
@@ -31304,10 +30570,15 @@ void moho::UI_DumpCurrentInputCapture() {}
  * Address: 0x00838C60 (FUN_00838C60, sub_838C60)
  *
  * What it does:
- * Runs one key-handler teardown lane and then executes base
- * `wxEvtHandlerRuntime` destruction.
+ * Nothing of its own; `wxEvtHandler::~wxEvtHandler` follows.
  */
-moho::CUIKeyHandlerRuntime::~CUIKeyHandlerRuntime() = default;
+moho::CUIKeyHandler::~CUIKeyHandler() = default;
+
+// Rows 0x00F5B150.
+BEGIN_EVENT_TABLE(moho::CUIKeyHandler, wxEvtHandler)
+  EVT_KEY_UP(moho::CUIKeyHandler::OnKeyUp)
+  EVT_KEY_DOWN(moho::CUIKeyHandler::OnKeyDown)
+END_EVENT_TABLE()
 
 namespace moho
 {
@@ -31865,7 +31136,7 @@ int moho::IN_ParseKeyModifiers(
   //
   // (the flag-byte offsets are wxKeyEvent's own declaration order --
   // m_controlDown, m_shiftDown, m_altDown, m_metaDown -- and are asserted on
-  // `WxKeyEventDispatchRuntimeView`.)
+  // in wx/event.h.)
   //
   // So the first of the three reference strings must be SHIFT and the third
   // ALT. They had been modelled the other way round, which put every `Shift-`
@@ -31999,22 +31270,20 @@ void moho::IN_SetKeyName(
  *
  * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
  */
-void moho::CUIKeyHandlerRuntime::OnKeyDown(
-  wxEventRuntime& keyEventRef
+void moho::CUIKeyHandler::OnKeyDown(
+  wxKeyEvent& keyEvent
 )
 {
-  auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
-
   if (moho::Maui_CurrentFocusControl.ResolveFocusedControl() != nullptr) {
-    keyEvent->mSkipped = 1;
+    keyEvent.Skip();
     return;
   }
 
-  const bool shiftDown = keyEvent->mShiftDown != 0;
-  const bool ctrlDown = keyEvent->mControlDown != 0;
-  const bool altDown = keyEvent->mAltDown != 0;
+  const bool shiftDown = keyEvent.m_shiftDown;
+  const bool ctrlDown = keyEvent.m_controlDown;
+  const bool altDown = keyEvent.m_altDown;
 
-  UiKeyMask packedKeyMask = static_cast<UiKeyMask>(keyEvent->mRawKeyCode);
+  UiKeyMask packedKeyMask = static_cast<UiKeyMask>(keyEvent.m_rawCode);
   if (shiftDown) {
     packedKeyMask |= 0x80000000u;
   }
@@ -32026,17 +31295,17 @@ void moho::CUIKeyHandlerRuntime::OnKeyDown(
   }
 
   const bool keyIsTrackedForRepeat = gUiKeyRepeatMap.find(packedKeyMask) != gUiKeyRepeatMap.end();
-  if (!keyIsTrackedForRepeat && (keyEvent->mRawFlags & kWxKeyEventRawFlagPreviouslyDown) != 0) {
+  if (!keyIsTrackedForRepeat && (keyEvent.m_rawFlags & kWxKeyEventRawFlagPreviouslyDown) != 0) {
     // Stray Win32 auto-repeat for a key this handler never saw go down
     // (e.g. focus changed mid-press): drop it rather than firing a binding.
-    keyEvent->mSkipped = 1;
+    keyEvent.Skip();
     return;
   }
 
   const auto boundCommand = gUiKeyActionMap.find(packedKeyMask);
   if (boundCommand != gUiKeyActionMap.end()) {
     CON_Execute(boundCommand->second.c_str());
-    keyEvent->mSkipped = 1;
+    keyEvent.Skip();
     return;
   }
 
@@ -32045,7 +31314,7 @@ void moho::CUIKeyHandlerRuntime::OnKeyDown(
   // exactly, so wx keeps propagating the key afterward.
   constexpr std::int32_t kKeyCodeEnter = 13;
   constexpr std::int32_t kKeyCodeTilde = 0x7E; // '~'
-  switch (keyEvent->mKeyCode) {
+  switch (keyEvent.m_keyCode) {
   case kKeyCodeEnter:
     UI_ActivateChat(shiftDown, ctrlDown, altDown);
     return;
@@ -32053,7 +31322,7 @@ void moho::CUIKeyHandlerRuntime::OnKeyDown(
     MAUI_ToggleConsole();
     return;
   default:
-    keyEvent->mSkipped = 1;
+    keyEvent.Skip();
     return;
   }
 }
@@ -32063,207 +31332,11 @@ void moho::CUIKeyHandlerRuntime::OnKeyDown(
  *
  * See the class declaration in UiRuntimeTypes.h for the full evidence trail.
  */
-void moho::CUIKeyHandlerRuntime::OnKeyUp(
-  wxEventRuntime& keyEventRef
+void moho::CUIKeyHandler::OnKeyUp(
+  wxKeyEvent& keyEvent
 )
 {
-  auto* const keyEvent = reinterpret_cast<WxKeyEventDispatchRuntimeView*>(&keyEventRef);
-  keyEvent->mSkipped = 1;
-}
-
-/**
- * Models the compiled `CUIKeyHandler` event table's dispatch role directly
- * (binary table at `0x00F5B150`: row 1 `wxEVT_KEY_UP` -> `OnKeyUp`, row 2
- * `wxEVT_KEY_DOWN` -> `OnKeyDown`), the same approach
- * `CMauiWxEventMapper::ProcessWxEvent` uses for its own keyboard rows.
- */
-bool moho::CUIKeyHandlerRuntime::ProcessWxEvent(
-  void* const event
-)
-{
-  auto* const wxEvent = static_cast<wxEventRuntime*>(event);
-  if (wxEvent == nullptr) {
-    return false;
-  }
-
-  switch (moho::WX_ClassifyEventType(wxEvent->mEventType)) {
-  case moho::WxEventFamily::KeyDown:
-    OnKeyDown(*wxEvent);
-    return wxEvent->mSkipped == 0;
-  case moho::WxEventFamily::KeyUp:
-    OnKeyUp(*wxEvent);
-    return wxEvent->mSkipped == 0;
-  default:
-    return false;
-  }
-}
-
-moho::wxEvtHandlerRuntime* moho::UI_CreateKeyHandler()
-{
-  return new CUIKeyHandlerRuntime{};
-}
-
-namespace
-{
-  /**
-   * Offers one wx event to the handlers pushed in front of `window`, most
-   * recently pushed first - the order wx itself uses, since PushEventHandler
-   * puts the new handler at the head of the chain.
-   *
-   * Installed into the wx layer as `WX_SetPushedEventHandlerDispatch` so that
-   * `wxWindowBase::ProcessEvent` consults it before its own event tables. The
-   * wx layer cannot call this directly: it has no notion of a MAUI event
-   * mapper, and the chain lives here.
-   */
-  bool DispatchPushedEventHandlersForWindow(
-    wxWindowBase* const window,
-    void* const event
-  )
-  {
-    if (window == nullptr || event == nullptr) {
-      return false;
-    }
-
-    const auto chainIt = FindWindowEventHandlerChain(window);
-    if (chainIt == gWindowEventHandlerChains.end()) {
-      return false;
-    }
-
-    // Iterate a copy of the handler pointers: a sink can run Lua, and Lua can
-    // destroy the frame that owns the handler, which would rehash the chain
-    // vector under the loop.
-    const std::vector<moho::wxEvtHandlerRuntime*> handlers = chainIt->handlers;
-    for (auto it = handlers.rbegin(); it != handlers.rend(); ++it) {
-      if (*it != nullptr && (*it)->ProcessWxEvent(event)) {
-        return true;
-      }
-    }
-    return false;
-  }
-} // namespace
-
-void moho::SetMauiEventMapperWindow(
-  wxEvtHandlerRuntime* const handler,
-  wxWindowBase* const window
-)
-{
-  if (auto* const mapper = dynamic_cast<CMauiWxEventMapper*>(handler); mapper != nullptr) {
-    mapper->mWindowRuntime = reinterpret_cast<WxWindowCaptureRuntimeView*>(window);
-  }
-}
-
-bool moho::MAUI_EventDispatchInProgress() noexcept
-{
-  return MauiEventDispatchInProgress();
-}
-
-void moho::WX_PushEventHandler(
-  wxWindowBase* const window,
-  wxEvtHandlerRuntime* const handler
-)
-{
-  if (window == nullptr || handler == nullptr) {
-    return;
-  }
-
-  // Install the chain walk on first use. Until something is actually pushed
-  // there is nothing for wx to consult.
-  moho::WX_SetPushedEventHandlerDispatch(&DispatchPushedEventHandlersForWindow);
-
-  auto chainIt = FindWindowEventHandlerChain(window);
-  if (chainIt == gWindowEventHandlerChains.end()) {
-    gWindowEventHandlerChains.push_back(WindowEventHandlerChain{window, {}});
-    chainIt = gWindowEventHandlerChains.end() - 1;
-  }
-
-  chainIt->handlers.push_back(handler);
-}
-
-moho::wxEvtHandlerRuntime* moho::WX_PopEventHandler(
-  wxWindowBase* const window,
-  const bool deleteHandler
-)
-{
-  if (window == nullptr) {
-    return nullptr;
-  }
-
-  const auto chainIt = FindWindowEventHandlerChain(window);
-  if (chainIt == gWindowEventHandlerChains.end() || chainIt->handlers.empty()) {
-    return nullptr;
-  }
-
-  wxEvtHandlerRuntime* const popped = chainIt->handlers.back();
-  chainIt->handlers.pop_back();
-
-  if (chainIt->handlers.empty()) {
-    gWindowEventHandlerChains.erase(chainIt);
-  }
-
-  if (deleteHandler && popped != nullptr) {
-    delete popped;
-    return nullptr;
-  }
-
-  return popped;
-}
-
-void moho::WX_GetClientSize(
-  wxWindowBase* const window,
-  std::int32_t& outWidth,
-  std::int32_t& outHeight
-)
-{
-  if (window == nullptr) {
-    outWidth = 0;
-    outHeight = 0;
-    return;
-  }
-
-  window->DoGetClientSize(&outWidth, &outHeight);
-}
-
-void moho::WX_ScreenToClient(
-  wxWindowBase* const window,
-  std::int32_t& inOutX,
-  std::int32_t& inOutY
-)
-{
-  if (window == nullptr) {
-    return;
-  }
-
-  const HWND handle = reinterpret_cast<HWND>(static_cast<std::uintptr_t>(window->GetHandle()));
-  if (handle == nullptr) {
-    return;
-  }
-
-  POINT point{};
-  point.x = inOutX;
-  point.y = inOutY;
-  if (::ScreenToClient(handle, &point) == FALSE) {
-    return;
-  }
-
-  inOutX = point.x;
-  inOutY = point.y;
-}
-
-bool moho::WX_GetCursorPosition(
-  std::int32_t& outX,
-  std::int32_t& outY
-)
-{
-  POINT cursorPosition{};
-  if (::GetCursorPos(&cursorPosition) == FALSE) {
-    outX = 0;
-    outY = 0;
-    return false;
-  }
-
-  outX = cursorPosition.x;
-  outY = cursorPosition.y;
-  return true;
+  keyEvent.Skip();
 }
 
 const moho::VMatrix4& moho::UI_IdentityMatrix()

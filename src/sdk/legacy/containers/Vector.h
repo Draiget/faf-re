@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
+#include <concepts>
+#include <iterator>
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -6615,8 +6617,6 @@ namespace msvc8
          * Address: 0x0047DA70 (FUN_0047DA70 -- `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D780; formerly `InsertStampAt` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047D780 (FUN_0047D780 -- a register-shape entry into `_Insert_n` for the `moho::SSendStamp` send-stamp vector; callers 0x0047D500; formerly `InsertStampAtAlias` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0047DD80 (FUN_0047DD80 -- `_Insert_n` for the 8-byte `moho::SBandwidthUsageSample` series vector; callers 0x0047DA00; formerly `InsertBandwidthSampleCopies` in moho/net/Common.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004ADCE0 (FUN_004ADCE0 -- `_Insert_n`'s reallocating branch (buy, copy the prefix, splice the inserted run, copy the suffix, free the old block) for a 4-byte element; callers 0x004ACD80; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
-         * Address: 0x004ACD80 (FUN_004ACD80 -- `insert(pos, first, last)` for a 4-byte element; callers 0x004AA220, 0x004AB780, 0x004AC050; formerly `InsertDwordRangeIntoVectorRuntime` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004A30D0 (FUN_004A30D0 -- `insert(pos, count, value)` -- the 1.5x growth, the split copy around the gap and the fill for `msvc8::vector<std::uint8_t, false>` (the 0x0C `{first, last, end}` byte vector `PLAT_SetRegistryValue` / `PLAT_GetRegistryValue` build their mutable path copy in); callers 0x004A2FF0; formerly `InsertFillBytesIntoLegacyByteVectorStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x008E71D0 (FUN_008E71D0 -- `insert(pos, count, value)` -- the `_Insert_n` grow body: 1.5x growth floored to `size + count`, capped at 0x1FFFFFF for `msvc8::vector<gpg::gal::Head>` (`DeviceContext::mHeads`; the element is a non-trivial 0x80-byte `Head`, so every copy routes through its copy ctor at 0x004368B0); callers 0x008E748E, 0x008E7530; formerly `InsertNCopiesHeadVector` in gpg/gal/Device.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008E6F90 (FUN_008E6F90 -- that insert's spare-capacity fast path, the uninitialized fill it outlines for `msvc8::vector<gpg::gal::Head>` (`DeviceContext::mHeads`; the element is a non-trivial 0x80-byte `Head`, so every copy routes through its copy ctor at 0x004368B0); callers 0x008E7080, 0x008E7130, 0x008E7530; formerly `InsertNCopiesHeadVector` in gpg/gal/Device.cpp (RULE ONE), removed 2026-09-11.)
@@ -6717,6 +6717,88 @@ namespace msvc8
             first_ = newBuf;
             last_ = newBuf + cur + count;
             end_ = newBuf + newCap;
+            return first_ + offset;
+        }
+
+        /**
+         * Address: 0x004FA880 (FUN_004FA880 -- `insert(pos, first, last)` for the 0x28-byte `moho::CWinLogLine`: `CWinLogTarget::MergePendingLines` (0x004F6A50) appends the pending lines to the committed ones at `end()`. Its steps are `_Xlen` 0x004F8BB0, `_Allocate` 0x004FA650, `_Umove` 0x004FB680 / 0x004FA5E0, `_Ucopy` 0x004FB600 / 0x004FB150, `std::copy` 0x004FB190 and `_Destroy` 0x004FAC00. Formerly `AppendVectorWinLogLineRange` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), a `push_back` loop; removed 2026-09-24.)
+         * Address: 0x004ACD80 (FUN_004ACD80 -- `insert(pos, first, last)` for a 4-byte element; callers 0x004AA220, 0x004AB780, 0x004AC050; formerly `InsertDwordRangeIntoVectorRuntime` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004ADCE0 (FUN_004ADCE0 -- that insert's reallocating branch (buy, copy the prefix, splice the inserted run, copy the suffix, free the old block); callers 0x004ACD80; formerly `ReallocateAndSpliceDwordRange_004ADCE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         *
+         * What it does:
+         * VC8's forward-iterator `_Insert(where, first, last)`. Without room it
+         * grows the way `_Insert_n` does and builds prefix | range | suffix in
+         * the new block. With room and a range longer than the tail, it moves
+         * the tail up by `count`, copy-constructs the part of the range that
+         * lands past the old end, then assigns the rest over the tail's old
+         * slots. Otherwise it moves the last `count` elements into raw slots,
+         * shifts the rest of the tail up by assignment and assigns the range
+         * into the hole.
+         */
+        template <std::contiguous_iterator It>
+            requires std::same_as<std::iter_value_t<It>, T>
+        iterator insert(const_iterator pos, It first, It last) {
+            assert(pos >= first_ && pos <= last_);
+            const std::size_t offset = static_cast<std::size_t>(pos - first_);
+            const std::size_t count = static_cast<std::size_t>(last - first);
+            if (count == 0) {
+                return first_ + offset;
+            }
+
+            const std::size_t cur = size();
+            if (max_size() - cur < count) {
+                throw_too_long();
+            }
+
+            const T* const src = std::to_address(first);
+            if (capacity() < cur + count) {
+                const std::size_t newCap = recommended_capacity(cur + count);
+                T* const newBuf = allocate_slots_checked(newCap);
+                try {
+                    uninit_move_n(first_, offset, newBuf);
+                    try {
+                        uninit_copy_n(src, count, newBuf + offset);
+                        try {
+                            uninit_move_n(first_ + offset, cur - offset, newBuf + offset + count);
+                        } catch (...) {
+                            destroy_n(newBuf + offset, count);
+                            throw;
+                        }
+                    } catch (...) {
+                        destroy_n(newBuf, offset);
+                        throw;
+                    }
+                } catch (...) {
+                    ::operator delete(static_cast<void*>(newBuf));
+                    throw;
+                }
+                destroy_range(first_, last_);
+                deallocate_all();
+                first_ = newBuf;
+                last_ = newBuf + cur + count;
+                end_ = newBuf + newCap;
+                return first_ + offset;
+            }
+
+            T* const insertAt = first_ + offset;
+            T* const oldLast = last_;
+            const std::size_t tail = static_cast<std::size_t>(oldLast - insertAt);
+            if (tail < count) {
+                uninit_move_n(insertAt, tail, insertAt + count);
+                try {
+                    uninit_copy_n(src + tail, count - tail, oldLast);
+                } catch (...) {
+                    destroy_n(insertAt + count, tail);
+                    throw;
+                }
+                last_ = oldLast + count;
+                copy_or_move_assign(insertAt, src, tail);
+            } else {
+                uninit_move_n(oldLast - count, count, oldLast);
+                last_ = oldLast + count;
+                copy_backward_assign(insertAt, oldLast - count, oldLast);
+                copy_or_move_assign(insertAt, src, count);
+            }
             return first_ + offset;
         }
 

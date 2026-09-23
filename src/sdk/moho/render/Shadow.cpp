@@ -127,8 +127,7 @@ namespace moho
    * camera at `+0x18`, and null-clears every resource handle.
    */
   Shadow::Shadow()
-    : mUnusedHeaderWord(0)
-    , mShadowFidelity(0)
+    : mShadowFidelity(0)
     , mShadowBlurEnabled(false)
     , mPadding0D_0F{}
     , mShadowSize(0)

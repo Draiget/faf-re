@@ -13,8 +13,8 @@ namespace moho
   {
   public:
     using FrameVector = gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2>;
-    using InputWindowVector = gpg::fastvector_n<wxWindowBase*, 2>;
-    using HostWindowVector = gpg::fastvector_n<wxWindowBase*, 2>;
+    using InputWindowVector = gpg::fastvector_n<wxWindow*, 2>;
+    using HostWindowVector = gpg::fastvector_n<wxWindow*, 2>;
 
     /**
      * Address: 0x0084C9C0 (FUN_0084C9C0)
@@ -54,7 +54,7 @@ namespace moho
      * Registers one input window for wx event-handler routing plus one host
      * window used for client-size driven UI frame initialization.
      */
-    int AddFrame(wxWindowBase* inputWindow, wxWindowBase* eventHostWindow) override;
+    int AddFrame(wxWindow* inputWindow, wxWindow* eventHostWindow) override;
 
     /**
      * Address: 0x0084CC50 (FUN_0084CC50)

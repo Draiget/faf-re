@@ -12,7 +12,6 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/command/CmdDefs.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/misc/WeakPtr.h"
@@ -24,6 +23,10 @@
 #include "moho/resource/blueprints/RUnitBlueprintCapabilityEnums.h"
 #include "moho/script/CScriptObject.h"
 #include "Wm3Quaternion.h"
+
+#include "platform/WxWidgets.h"
+#include <wx/event.h>
+#include <wx/window.h>
 
 struct lua_State;
 
@@ -1246,86 +1249,136 @@ namespace moho
   );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UICommandDragger) == 0x1C, "moho::UICommandDragger size must be 0x1C");
 
-  struct wxEvtHandlerRuntime
-  {
-    virtual ~wxEvtHandlerRuntime() = default;
-
-    /**
-     * Offers one wx event to this handler. Returns true when it was consumed.
-     *
-     * In the binary these handlers are real `wxEvtHandler`s carrying a
-     * compiler-emitted event table, and wx walks it during `ProcessEvent`.
-     * This tree models the pushed-handler chain itself (see
-     * `WX_PushEventHandler`), so the table's job - match the event type, call
-     * the bound sink - is done by the override instead.
-     */
-    virtual bool ProcessWxEvent(void* /*event*/) { return false; }
-  };
+  class CMauiFrame;
 
   /**
-   * Address context: `FUN_0084CB70` (`CUIManager::AddFrame`) allocates one
-   * `CUIKeyHandler` object with `operator new(0x28)` and then pushes it onto
-   * the input-window event-handler chain.
+   * The keyboard-shortcut handler CUIManager::AddFrame pushes onto every input
+   * window: `inputWindow->PushEventHandler(new CUIKeyHandler)` (operator
+   * new(0x28) at 0x0084CBFA; the wxEvtHandler constructor 0x00979750 and the
+   * vftable 0x00E43ED0 store are inlined there). It adds no members.
+   *
+   * Its event table (rows 0x00F5B150) is EVT_KEY_UP(OnKeyUp),
+   * EVT_KEY_DOWN(OnKeyDown); GetEventTable is 0x00838B90 (slot 6) and the
+   * deleting destructor 0x00838C30 (slot 1), both the compiler's. The frame's
+   * CMauiWxEventMapper is pushed after it, so it only sees the keys the MAUI
+   * controls skipped.
    */
-  class CUIKeyHandlerRuntime final : public wxEvtHandlerRuntime
+  class CUIKeyHandler : public wxEvtHandler
   {
   public:
     /**
      * Address: 0x00838C60 (FUN_00838C60, sub_838C60)
      *
      * What it does:
-     * Runs the key-handler teardown lane and then falls through to the
-     * wx-event-handler base cleanup.
+     * Nothing of its own; `wxEvtHandler::~wxEvtHandler` (0x0097AAE0) follows.
      */
-    ~CUIKeyHandlerRuntime() override;
-
-    /**
-     * Models the compiled `CUIKeyHandler` event table's dispatch role
-     * directly (two rows: `wxEVT_KEY_UP` -> `OnKeyUp`, `wxEVT_KEY_DOWN` ->
-     * `OnKeyDown`, binary table at `0x00F5B150`), the same approach
-     * `CMauiWxEventMapper::ProcessWxEvent` uses for its own
-     * keyboard rows.
-     */
-    bool ProcessWxEvent(void* event) override;
+    ~CUIKeyHandler() override;
 
     /**
      * Address: 0x00838D10 (FUN_00838D10, Moho::CUIKeyHandler::OnKeyDown)
      *
-     * IDA signature:
-     * void __stdcall sub_838D10(int a1);
-     *
      * What it does:
-     * `wxEventTableEntry` key-press sink for the `CUIKeyHandler` event table
-     * (binary `0x00F5B150`, row 2 of 2 -- row 1 at `0x00F5B158` is
-     * `OnKeyUp`; both rows recovered by a raw dword byte-scan of the shipped
-     * `.exe`, since IDA's own xref pass missed this table entirely -
-     * `incoming_xrefs`/`callers` are empty for both sinks). Bails out when a
-     * `CMauiControl` currently owns keyboard focus. Otherwise packs the wx
-     * shift/ctrl/alt flags and raw key code into one `UiKeyMask` and looks it
-     * up in `gUiKeyActionMap`: a hit runs the bound command string through
-     * `Moho::CON_Execute`. A miss falls back to the two hardcoded shortcuts
-     * (Enter opens game chat, `~` toggles the console) via
-     * `Moho::UI_ActivateChat` / `Moho::MAUI_ToggleConsole`. Also consults
-     * `gUiKeyRepeatMap` to suppress processing when the Win32 "previously
-     * down" auto-repeat flag (`WM_KEYDOWN` lParam bit 30) is set for a key
-     * this handler is not currently tracking as held.
+     * Bails out, skipping the event, when a `CMauiControl` holds keyboard
+     * focus. Otherwise packs the shift/ctrl/alt flags and the raw key code
+     * into one `UiKeyMask` and looks it up in `gUiKeyActionMap`: a hit runs the
+     * bound command through `CON_Execute`. A miss falls back to the two
+     * hardcoded shortcuts (Enter opens game chat, `~` toggles the console).
+     * `gUiKeyRepeatMap` suppresses a Win32 auto-repeat (`m_rawFlags` bit 30)
+     * for a key this handler is not tracking as held.
      */
-    void OnKeyDown(wxEventRuntime& keyEvent);
+    void OnKeyDown(wxKeyEvent& event);
 
     /**
      * Address: 0x00838E30 (FUN_00838E30, sub_838E30)
      *
      * What it does:
-     * `wxEventTableEntry` key-release sink for the `CUIKeyHandler` event
-     * table (binary `0x00F5B150`, row 1 of 2). Unconditionally marks the wx
-     * event skipped; `CUIKeyHandler` takes no other action on key-up.
+     * Skips the event; the handler takes no action on key-up.
      */
-    void OnKeyUp(wxEventRuntime& keyEvent);
+    void OnKeyUp(wxKeyEvent& event);
 
-    std::uint8_t mUnknown04To27[0x24]{};
+    DECLARE_EVENT_TABLE()
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CUIKeyHandlerRuntime) == 0x28, "moho::CUIKeyHandlerRuntime size must be 0x28");
+  static_assert(sizeof(CUIKeyHandler) == 0x28, "moho::CUIKeyHandler size must be 0x28");
+
+  /**
+   * Turns the wx mouse and keyboard events of one input window into
+   * `SMauiEventData` for the MAUI controls of one root frame. `CMauiFrame`'s
+   * constructor creates it (operator new(0x30) at 0x007963DB, the wxEvtHandler
+   * constructor 0x00979750 and the vftable 0x00E3BA44 store inlined), and
+   * `CUIManager::SetNewLuaState` pushes it onto the frame's input window and
+   * then records that window in `mWindow`.
+   *
+   * Its event table (rows 0x00F5A488) is EVT_MOUSE_EVENTS(OnMouseMove) -
+   * all thirteen mouse types go to the one sink - then EVT_KEY_UP(OnKeyUp),
+   * EVT_KEY_DOWN(OnKeyDown) and EVT_CHAR(OnChar). GetEventTable is
+   * 0x007A4530 (slot 6) and the deleting destructor 0x007A48B0 (slot 1),
+   * both the compiler's.
+   */
+  class CMauiWxEventMapper : public wxEvtHandler
+  {
+  public:
+    explicit CMauiWxEventMapper(CMauiFrame* const frame)
+      : mWindow(nullptr)
+      , mFrame(frame)
+    {}
+
+    /**
+     * Address: 0x007A48D0 (FUN_007A48D0, ??1CMauiWxEventMapper@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Unlinks the global mouse-over control link and clears the mouse-capture
+     * flag; `wxEvtHandler::~wxEvtHandler` (0x0097AAE0) follows.
+     */
+    ~CMauiWxEventMapper() override;
+
+    /**
+     * Address: 0x007A4970 (FUN_007A4970, func_OnMouseMove)
+     *
+     * What it does:
+     * Builds one `SMauiEventData` from the mouse event, hit-tests for the
+     * topmost control under the cursor, emits `MET_MouseEnter` /
+     * `MET_MouseExit` on hover changes, and routes the event to that control
+     * (or the active dragger). A press or double-click also runs
+     * `/lua/ui/uimain.lua:OnMouseButtonPress` and tells the previous
+     * keyboard-focus owner it is losing focus.
+     */
+    void OnMouseMove(wxMouseEvent& event);
+
+    /**
+     * Address: 0x007A4FD0 (FUN_007A4FD0)
+     *
+     * What it does:
+     * Delivers `MET_KeyUp` to the keyboard-focus control, or the top
+     * input-capture control when nothing has focus.
+     */
+    void OnKeyUp(wxKeyEvent& event);
+
+    /**
+     * Address: 0x007A4EF0 (FUN_007A4EF0)
+     *
+     * What it does:
+     * Delivers `MET_KeyDown` the same way.
+     */
+    void OnKeyDown(wxKeyEvent& event);
+
+    /**
+     * Address: 0x007A50B0 (FUN_007A50B0)
+     *
+     * What it does:
+     * Delivers `MET_Char` the same way.
+     */
+    void OnChar(wxKeyEvent& event);
+
+    wxWindow* mWindow;   // +0x28: the input window this mapper was pushed onto
+    CMauiFrame* mFrame;  // +0x2C
+
+    DECLARE_EVENT_TABLE()
+  };
+
+  static_assert(offsetof(CMauiWxEventMapper, mWindow) == 0x28, "moho::CMauiWxEventMapper::mWindow offset must be 0x28");
+  static_assert(offsetof(CMauiWxEventMapper, mFrame) == 0x2C, "moho::CMauiWxEventMapper::mFrame offset must be 0x2C");
+  static_assert(sizeof(CMauiWxEventMapper) == 0x30, "moho::CMauiWxEventMapper size must be 0x30");
 
   /**
    * Address: 0x010C1B48 (data segment global, 256 * 28 bytes = 0x1C00)
@@ -2873,7 +2926,7 @@ namespace moho
     // ---------------------------------------------------------------------
     boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
     TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
-    wxEvtHandlerRuntime* mEventHandler = nullptr;       // +0x12C
+    CMauiWxEventMapper* mEventHandler = nullptr;        // +0x12C
     std::int32_t mTargetHead = -1;                      // +0x130
   };
 
@@ -4869,7 +4922,7 @@ namespace moho
   {
     boost::weak_ptr<CMauiFrame> mSelfWeak; // +0x11C
     TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
-    wxEvtHandlerRuntime* mEventHandler = nullptr;
+    CMauiWxEventMapper* mEventHandler = nullptr;
     std::int32_t mTargetHead = -1;
 
     [[nodiscard]] static CMauiFrameRuntimeView* FromFrame(CMauiFrame* frame) noexcept
@@ -10737,15 +10790,6 @@ namespace moho
     LuaPlus::LuaState* state
   );
 
-  [[nodiscard]] wxEvtHandlerRuntime* UI_CreateKeyHandler();
-  void WX_PushEventHandler(wxWindowBase* window, wxEvtHandlerRuntime* handler);
-
-  /**
-   * Binds a frame's MAUI event mapper to the input window it will receive
-   * events from. No-op for handlers that are not event mappers.
-   */
-  void SetMauiEventMapperWindow(wxEvtHandlerRuntime* handler, wxWindowBase* window);
-
   /**
    * True while a MAUI event is being dispatched on this thread.
    *
@@ -10756,10 +10800,6 @@ namespace moho
    * this; frame owners must defer theirs the same way.
    */
   [[nodiscard]] bool MAUI_EventDispatchInProgress() noexcept;
-  [[nodiscard]] wxEvtHandlerRuntime* WX_PopEventHandler(wxWindowBase* window, bool deleteHandler);
-  void WX_GetClientSize(wxWindowBase* window, std::int32_t& outWidth, std::int32_t& outHeight);
-  void WX_ScreenToClient(wxWindowBase* window, std::int32_t& inOutX, std::int32_t& inOutY);
-  [[nodiscard]] bool WX_GetCursorPosition(std::int32_t& outX, std::int32_t& outY);
 
   [[nodiscard]] const VMatrix4& UI_IdentityMatrix();
 
