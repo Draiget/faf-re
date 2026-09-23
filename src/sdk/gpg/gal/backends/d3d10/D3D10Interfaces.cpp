@@ -2427,28 +2427,6 @@ namespace gpg::gal
       return result;
     }
 
-    /**
-     * Address: 0x00900450 (FUN_00900450)
-     *
-     * What it does:
-     * Executes non-deleting destructor body lanes for `DeviceD3D10` by running
-     * runtime reset, then final member teardown/deallocation in binary order.
-     */
-    void DestroyDeviceD3D10Body(DeviceD3D10* const backend)
-    {
-      if (backend == nullptr) {
-        return;
-      }
-
-      static_cast<void>(ResetDeviceD3D10Runtime(backend));
-      backend->mCursor.~CursorD3D10();
-      backend->mPipelineState.reset();
-      backend->mSwapChains.tidy();
-      backend->mAdapters.tidy();
-      backend->mDeviceContext.~DeviceContext();
-      backend->mLog.tidy();
-      backend->mOutputContext.~OutputContext();
-    }
   } // namespace
 
   /**
@@ -4285,15 +4263,17 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x009005E0 (FUN_009005E0)
+   * Address: 0x00900450 (FUN_00900450)
+   * Address: 0x009005E0 (FUN_009005E0, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Owns the deleting-destructor thunk path for D3D10 backend instances.
+   * Releases the device objects and unloads the D3D10 modules; the member
+   * destructors then run in reverse declaration order (cursor, pipeline
+   * state, swap chains, adapters, device context, log, output context).
    */
-  void DeviceD3D10::DestroyBackendObject()
+  DeviceD3D10::~DeviceD3D10()
   {
-    DestroyDeviceD3D10Body(this);
-    ::operator delete(static_cast<void*>(this));
+    static_cast<void>(ResetDeviceD3D10Runtime(this));
   }
 
   /**

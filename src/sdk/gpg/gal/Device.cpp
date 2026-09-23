@@ -1,7 +1,9 @@
 #include "Device.hpp"
 #include "DeviceContext.hpp"
 #include "Error.hpp"
+#include "gpg/gal/backends/d3d10/DeviceD3D10.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "legacy/containers/AutoPtr.h"
 
 #include <Windows.h>
 #include <new>
@@ -10,7 +12,13 @@ namespace gpg::gal
 {
     namespace
     {
-        Device* sDeviceD3D = nullptr;
+        /**
+         * The active device (0x00F8E284). An `auto_ptr`: `Create` and
+         * `DestroyInstance` replace it with its delete-then-assign `reset`,
+         * and its exit-time destructor (0x00C095F0) deletes whatever device is
+         * still live.
+         */
+        msvc8::auto_ptr<Device> sDeviceD3D;
 
         [[noreturn]] void ThrowDeviceContextError(const int line, const char* const message)
         {
@@ -118,7 +126,7 @@ namespace gpg::gal
      */
     Device* Device::GetInstance()
     {
-        return sDeviceD3D;
+        return sDeviceD3D.get();
     }
 
     /**
@@ -129,39 +137,76 @@ namespace gpg::gal
      */
     bool Device::IsReady()
     {
-        return sDeviceD3D != nullptr;
-    }
-
-    /**
-     * What it does:
-     * Replaces the process-global backend device singleton pointer.
-     */
-    void Device::SetInstance(Device* const device)
-    {
-        sDeviceD3D = device;
+        return sDeviceD3D.get() != nullptr;
     }
 
     /**
      * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
      *
      * What it does:
-     * Runs slot-0 destroy behavior for the active backend device and clears
-     * the retained singleton pointer.
+     * Deletes the active device (through its virtual destructor, slot 0) and
+     * clears the singleton.
      */
     void Device::DestroyInstance()
     {
-        if (sDeviceD3D == nullptr)
+        sDeviceD3D.reset();
+    }
+
+    /**
+     * Address: 0x008E6B60 (FUN_008E6B60, func_CreateDeviceD3D)
+     *
+     * What it does:
+     * Deletes the active device, then builds the backend `context` asks for
+     * (`new DeviceD3D9`, 0x84 bytes, or `new DeviceD3D10`, 0x128), installs
+     * it as the active device before bringing it up, and returns it. Any other
+     * device type throws "unknown API requested" (Device.cpp line 135).
+     * `CScApp::CreateDevice` is the caller (0x008CFC09).
+     */
+    Device* Device::Create(DeviceContext* const context)
+    {
+        DestroyInstance();
+
+        switch (context->mDeviceType)
         {
-            return;
+        case 1:
+        {
+            DeviceD3D9* const device = new DeviceD3D9();
+            sDeviceD3D.reset(device);
+            device->Setup(context);
+            break;
+        }
+        case 2:
+        {
+            // DeviceD3D10 derives from Device in the binary; the recovered
+            // class does not yet, so it still comes through its bridge pair.
+            Device* const device = CreateDeviceD3D10Backend();
+            sDeviceD3D.reset(device);
+            InitializeDeviceD3D10Backend(device, context);
+            break;
+        }
+        default:
+            ThrowDeviceContextError(135, "unknown API requested");
         }
 
-        Device* const device = sDeviceD3D;
-        sDeviceD3D = nullptr;
-        // Slot 0. MSVC puts the scalar deleting destructor there, so this is
-        // what actually tears the backend down; it used to dispatch a
-        // do-nothing purecall stub, so the device was never destroyed.
-        device->DestroyBackendObject();
+        return sDeviceD3D.get();
     }
+
+    /**
+     * Address: 0x008E81B0 (FUN_008E81B0)
+     *
+     * What it does:
+     * Installs the base vtable and builds the empty output context.
+     */
+    Device::Device() = default;
+
+    /**
+     * Address: 0x008E81A0 (FUN_008E81A0)
+     *
+     * What it does:
+     * Reinstalls the base vtable and destroys the output context (a tail
+     * jump to `~OutputContext`, 0x008E76D0).
+     */
+    Device::~Device() = default;
 
     /**
      * Address: 0x0042EAE0 (FUN_0042EAE0)

@@ -57,11 +57,14 @@ namespace gal {
     class DeviceD3D10 {
     public:
       /**
-       * Address: 0x009005E0
-       * Slot: 0
-       * Demangled: DestroyBackendObject
+       * Address: 0x00900450 (FUN_00900450)
+       * Address: 0x009005E0 (FUN_009005E0, slot 0: the scalar deleting destructor)
+       *
+       * What it does:
+       * Releases the device objects and unloads the D3D10 modules, then
+       * destroys the members.
        */
-      virtual void DestroyBackendObject();
+      virtual ~DeviceD3D10();
       /**
        * Address: 0x008F86B0
        * Slot: 1

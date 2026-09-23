@@ -1438,7 +1438,7 @@ bool CScApp::CreateAppFrame(
     device->Clear2(true);
 
     context.mValidate = !moho::CFG_GetArgOption("/novalidate", 0, nullptr);
-    moho::CreateDeviceD3D(&context);
+    gpg::gal::Device::Create(&context);
 
     device->SetRenViewport(viewport);
     device->Clear2(false);

@@ -97,18 +97,22 @@ namespace gpg::gal
     static bool IsReady();
 
     /**
-     * What it does:
-     * Replaces the global active device singleton pointer.
-     */
-    static void SetInstance(Device* device);
-
-    /**
      * Address: 0x008E6700 (FUN_008E6700, func_DeivceD3DDtr)
      *
      * What it does:
      * Destroys and clears the global active device singleton when present.
      */
     static void DestroyInstance();
+
+    /**
+     * Address: 0x008E6B60 (FUN_008E6B60, func_CreateDeviceD3D)
+     *
+     * What it does:
+     * Replaces the active device with a new backend for
+     * `context->mDeviceType` (1 = D3D9, 2 = D3D10; anything else throws
+     * "unknown API requested"), brings it up for `context`, and returns it.
+     */
+    static Device* Create(DeviceContext* context);
 
     /**
      * Address: 0x0042EAE0 (FUN_0042EAE0)
@@ -119,14 +123,24 @@ namespace gpg::gal
     static void InitCursor();
 
     /**
-     * Slot: 0 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Address: 0x008E81B0 (FUN_008E81B0)
      *
      * What it does:
-     * Tears the backend device down. MSVC puts the scalar deleting destructor
-     * in slot 0, which is what `DestroyInstance` dispatches through.
+     * Installs the base vtable and builds the empty output context at +0x04.
+     * Both backend constructors inline it.
      */
-    virtual void DestroyBackendObject() = 0;
+    Device();
+
+    /**
+     * Address: 0x008E81A0 (FUN_008E81A0)
+     * Slot: 0 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Reinstalls the base vtable and destroys the output context. The slot
+     * holds the scalar deleting destructor, which is what `DestroyInstance`
+     * dispatches through.
+     */
+    virtual ~Device() = 0;
     /**
      * Slot: 1 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -614,8 +628,9 @@ namespace gpg::gal
     virtual void EndTechnique() = 0;
 
   protected:
-    std::uint32_t reserved0x04_ = 0; // +0x04
-    OutputContext outputContext_{};  // +0x08
+    OutputContext outputContext_{}; // +0x04 the bound targets (`ClearTarget` / `GetContext`)
   };
+
+  static_assert(sizeof(Device) == 0x24, "Device size must be 0x24");
 } // namespace gpg::gal
 

@@ -8,6 +8,8 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/backends/d3d9/AdapterD3D9.hpp"
 #include "gpg/gal/backends/d3d9/AdapterModeD3D9.hpp"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -49,11 +51,21 @@ namespace gal {
     class DeviceD3D9 : public Device {
     public:
       /**
-       * Address: 0x008F37F0
-       * Slot: 0
-       * Demangled: DestroyBackendObject
+       * Address: 0x008EFD50 (FUN_008EFD50)
+       *
+       * What it does:
+       * Builds an empty device; `Setup` brings it up.
        */
-      virtual void DestroyBackendObject() override;
+      DeviceD3D9();
+
+      /**
+       * Address: 0x008F3270 (FUN_008F3270)
+       * Address: 0x008F37F0 (FUN_008F37F0, slot 0: the scalar deleting destructor)
+       *
+       * What it does:
+       * Runs `Shutdown`, then destroys the members.
+       */
+      ~DeviceD3D9() override;
       /**
        * Address: 0x008E81D0 (FUN_008E81D0)
        * Slot: 1
@@ -574,6 +586,23 @@ namespace gal {
       virtual void EndTechnique() override;
 
       /**
+       * Address: 0x008F3320 (FUN_008F3320)
+       *
+       * What it does:
+       * Brings the device up for `context`: Direct3D, the device, adapters,
+       * capabilities, heads, pipeline state and the frame event query.
+       */
+      void Setup(const DeviceContext* context);
+
+      /**
+       * Address: 0x008F2F70 (FUN_008F2F70)
+       *
+       * What it does:
+       * Releases everything `Setup` built and empties the device context.
+       */
+      void Shutdown();
+
+      /**
        * Address: 0x008E82B0 (FUN_008E82B0)
        *
        * D3DPRESENT_PARAMETERS *,DeviceContext const *,unsigned int
@@ -615,25 +644,26 @@ namespace gal {
        * and updates shader/capability profile lanes.
        */
       int BuildDeviceCapabilities(const DeviceContext* context);
+
+    public:
+      int mCurThreadId = 0;                                    // +0x24 thread that ran Setup
+      msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
+      DeviceContext mDeviceContext{0};                         // +0x38 the context actually in force
+      boost::shared_ptr<PipelineStateD3D9> mPipelineState;     // +0x6C
+      void* mDirect3D = nullptr;                               // +0x74 IDirect3D9*
+      void* mDevice = nullptr;                                 // +0x78 IDirect3DDevice9*
+      OutputContext* mHeads = nullptr;                         // +0x7C one per head, new[]'d by CreateHeads
+      void* mFrameEventQuery = nullptr;                        // +0x80 IDirect3DQuery9*, D3DQUERYTYPE_EVENT
     };
 
-    /**
-     * Address: 0x008EFD50 (FUN_008EFD50)
-     *
-     * What it does:
-     * Allocates and initializes one D3D9 backend device object with recovered
-     * default runtime lanes.
-     */
-    Device* CreateDeviceD3D9Backend();
-
-    /**
-     * Address: 0x008F3320 (FUN_008F3320)
-     *
-     * What it does:
-     * Runs the full D3D9 startup setup chain from one caller device-context
-     * payload (interface/device creation, adapter scan, capabilities, heads,
-     * and pipeline/query initialization).
-     */
-    void InitializeDeviceD3D9Backend(Device* device, const DeviceContext* context);
+    static_assert(offsetof(DeviceD3D9, mCurThreadId) == 0x24, "DeviceD3D9::mCurThreadId offset must be 0x24");
+    static_assert(offsetof(DeviceD3D9, mAdapters) == 0x28, "DeviceD3D9::mAdapters offset must be 0x28");
+    static_assert(offsetof(DeviceD3D9, mDeviceContext) == 0x38, "DeviceD3D9::mDeviceContext offset must be 0x38");
+    static_assert(offsetof(DeviceD3D9, mPipelineState) == 0x6C, "DeviceD3D9::mPipelineState offset must be 0x6C");
+    static_assert(offsetof(DeviceD3D9, mDirect3D) == 0x74, "DeviceD3D9::mDirect3D offset must be 0x74");
+    static_assert(offsetof(DeviceD3D9, mDevice) == 0x78, "DeviceD3D9::mDevice offset must be 0x78");
+    static_assert(offsetof(DeviceD3D9, mHeads) == 0x7C, "DeviceD3D9::mHeads offset must be 0x7C");
+    static_assert(offsetof(DeviceD3D9, mFrameEventQuery) == 0x80, "DeviceD3D9::mFrameEventQuery offset must be 0x80");
+    static_assert(sizeof(DeviceD3D9) == 0x84, "DeviceD3D9 size must be 0x84");
 } // namespace gal
 } // namespace gpg

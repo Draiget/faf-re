@@ -440,52 +440,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return static_cast<int>(kCubeFaceByIndex[faceIndex]);
         }
 
-        struct DeviceD3D9RuntimeView final
-        {
-            std::uint8_t pad00_23[0x24]{};
-            int curThreadId = 0;                                  // +0x24
-            msvc8::vector<AdapterD3D9> adapters{};                // +0x28
-            DeviceContext deviceContext{};                         // +0x38
-            boost::shared_ptr<PipelineStateD3D9> pipelineState{}; // +0x6C
-            void* idirect = nullptr;                              // +0x74
-            void* nativeDevice = nullptr;                         // +0x78
-            void* headsBase = nullptr;                            // +0x7C
-            void* frameEventQuery = nullptr;                      // +0x80
-        };
-
-        static_assert(offsetof(DeviceD3D9RuntimeView, curThreadId) == 0x24, "DeviceD3D9RuntimeView::curThreadId offset must be 0x24");
-        static_assert(offsetof(DeviceD3D9RuntimeView, adapters) == 0x28, "DeviceD3D9RuntimeView::adapters offset must be 0x28");
-        static_assert(
-            offsetof(DeviceD3D9RuntimeView, deviceContext) == 0x38,
-            "DeviceD3D9RuntimeView::deviceContext offset must be 0x38"
-        );
-        static_assert(offsetof(DeviceD3D9RuntimeView, pipelineState) == 0x6C, "DeviceD3D9RuntimeView::pipelineState offset must be 0x6C");
-        static_assert(offsetof(DeviceD3D9RuntimeView, idirect) == 0x74, "DeviceD3D9RuntimeView::idirect offset must be 0x74");
-        static_assert(offsetof(DeviceD3D9RuntimeView, nativeDevice) == 0x78, "DeviceD3D9RuntimeView::nativeDevice offset must be 0x78");
-        static_assert(offsetof(DeviceD3D9RuntimeView, headsBase) == 0x7C, "DeviceD3D9RuntimeView::headsBase offset must be 0x7C");
-        static_assert(
-            offsetof(DeviceD3D9RuntimeView, frameEventQuery) == 0x80,
-            "DeviceD3D9RuntimeView::frameEventQuery offset must be 0x80"
-        );
-
-        class DeviceD3D9BackendObject final : public DeviceD3D9
-        {
-        public:
-            std::uint8_t pad04_23[0x20]{};
-            int curThreadId = 0;
-            msvc8::vector<AdapterD3D9> adapters{};
-            DeviceContext deviceContext{0};
-            boost::shared_ptr<PipelineStateD3D9> pipelineState{};
-            void* idirect = nullptr;
-            void* nativeDevice = nullptr;
-            void* headsBase = nullptr;
-            void* frameEventQuery = nullptr;
-        };
-
-#if defined(MOHO_ABI_MSVC8_COMPAT)
-        static_assert(sizeof(DeviceD3D9BackendObject) == 0x84, "DeviceD3D9BackendObject size must be 0x84");
-#endif
-
         struct DrawPrimitiveContextRuntime final
         {
             std::uint32_t pad00 = 0U;                // +0x00
@@ -1644,16 +1598,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return *static_cast<DeviceD3D9*>(Device::GetInstance());
         }
 
-        DeviceD3D9RuntimeView& AsDeviceD3D9Runtime(DeviceD3D9& device) noexcept
-        {
-            return *reinterpret_cast<DeviceD3D9RuntimeView*>(&device);
-        }
-
-        const DeviceD3D9RuntimeView& AsDeviceD3D9Runtime(const DeviceD3D9& device) noexcept
-        {
-            return *reinterpret_cast<const DeviceD3D9RuntimeView*>(&device);
-        }
-
         struct DwordPairRuntime final
         {
             std::uint32_t lane0 = 0U;
@@ -2340,7 +2284,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         DeviceContext* GetEmbeddedDeviceContext(DeviceD3D9* const device) noexcept
         {
-            return &AsDeviceD3D9Runtime(*device).deviceContext;
+            return &device->mDeviceContext;
         }
 
         int InvokeNativeD3D9ShowCursor(void* const nativeDevice, const bool show)
@@ -2388,12 +2332,12 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         std::uint32_t GetDeviceHeadCount(const DeviceD3D9* const device) noexcept
         {
-            return GetDeviceContextHeadCount(&AsDeviceD3D9Runtime(*device).deviceContext);
+            return GetDeviceContextHeadCount(&device->mDeviceContext);
         }
 
         OutputContext* GetDeviceHeadArrayBase(const DeviceD3D9* const device) noexcept
         {
-            return static_cast<OutputContext*>(AsDeviceD3D9Runtime(*device).headsBase);
+            return device->mHeads;
         }
 
         std::uint32_t GetD3DFormat(std::uint32_t formatToken);
@@ -2411,7 +2355,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outTexture
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createTexture = reinterpret_cast<d3d9_device_create_texture_fn>(vtable[23]);
             return createTexture(nativeDevice, width, height, levels, usage, format, pool, outTexture, nullptr);
@@ -2427,7 +2371,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outTexture
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createCubeTexture = reinterpret_cast<d3d9_device_create_cube_texture_fn>(vtable[25]);
             return createCubeTexture(nativeDevice, edgeLength, levels, usage, format, pool, outTexture, nullptr);
@@ -2443,7 +2387,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outSurface
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createDepthStencilSurface =
                 reinterpret_cast<d3d9_device_create_depth_stencil_surface_fn>(vtable[29]);
@@ -2466,7 +2410,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outDeclaration
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createVertexDeclaration =
                 reinterpret_cast<d3d9_device_create_vertex_declaration_fn>(vtable[86]);
@@ -2482,7 +2426,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outBuffer
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createVertexBuffer = reinterpret_cast<d3d9_device_create_vertex_buffer_fn>(vtable[26]);
             return createVertexBuffer(nativeDevice, length, usage, fvf, pool, outBuffer, nullptr);
@@ -2497,7 +2441,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outBuffer
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createIndexBuffer = reinterpret_cast<d3d9_device_create_index_buffer_fn>(vtable[27]);
             return createIndexBuffer(nativeDevice, length, usage, format, pool, outBuffer, nullptr);
@@ -2511,7 +2455,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outBackBuffer
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const getBackBuffer = reinterpret_cast<d3d9_device_get_back_buffer_fn>(vtable[18]);
             return getBackBuffer(nativeDevice, swapChainIndex, backBufferIndex, backBufferType, outBackBuffer);
@@ -2519,7 +2463,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeReset(DeviceD3D9* const device, void* const presentParameters)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const reset = reinterpret_cast<d3d9_device_reset_fn>(vtable[16]);
             return reset(nativeDevice, presentParameters);
@@ -2527,7 +2471,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeGetDeviceCaps(DeviceD3D9* const device, void* const outCaps)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const getDeviceCaps = reinterpret_cast<d3d9_device_get_device_caps_fn>(vtable[7]);
             return getDeviceCaps(nativeDevice, outCaps);
@@ -2535,7 +2479,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeCreateQuery(DeviceD3D9* const device, const unsigned int queryType, void** const outQuery)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const createQuery = reinterpret_cast<d3d9_device_create_query_fn>(vtable[118]);
             return createQuery(nativeDevice, queryType, outQuery);
@@ -2547,7 +2491,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int value
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setRenderState = reinterpret_cast<d3d9_device_set_render_state_fn>(vtable[57]);
             return setRenderState(nativeDevice, state, value);
@@ -2563,7 +2507,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const std::uint32_t checkFormat
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const checkDeviceFormat = reinterpret_cast<d3d9_check_device_format_fn>(vtable[10]);
             return checkDeviceFormat(idirect, adapter, deviceType, adapterFormat, usage, resourceType, checkFormat);
@@ -2579,7 +2523,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             unsigned int* const outQualityLevels
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const checkMultiSample = reinterpret_cast<d3d9_check_device_multisample_type_fn>(vtable[11]);
             return checkMultiSample(
@@ -2595,7 +2539,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         unsigned int InvokeNativeGetAdapterCount(DeviceD3D9* const device)
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const getAdapterCount = reinterpret_cast<d3d9_get_adapter_count_fn>(vtable[4]);
             return getAdapterCount(idirect);
@@ -2607,7 +2551,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const std::uint32_t format
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const getAdapterModeCount = reinterpret_cast<d3d9_get_adapter_mode_count_fn>(vtable[6]);
             return getAdapterModeCount(idirect, adapter, format);
@@ -2621,7 +2565,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void* const outMode
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const enumAdapterModes = reinterpret_cast<d3d9_enum_adapter_modes_fn>(vtable[7]);
             return enumAdapterModes(idirect, adapter, format, modeIndex, outMode);
@@ -2637,7 +2581,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void** const outDevice
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const createDevice = reinterpret_cast<d3d9_create_device_fn>(vtable[16]);
             return createDevice(idirect, adapter, deviceType, focusWindow, behaviorFlags, presentParameters, outDevice);
@@ -2672,7 +2616,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void* const outIdentifier
         )
         {
-            void* const idirect = AsDeviceD3D9Runtime(*device).idirect;
+            void* const idirect = device->mDirect3D;
             auto** const vtable = *reinterpret_cast<void***>(idirect);
             auto* const getAdapterIdentifier = reinterpret_cast<d3d9_get_adapter_identifier_fn>(vtable[5]);
             return getAdapterIdentifier(idirect, adapter, flags, outIdentifier);
@@ -2684,7 +2628,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void* const destinationSurface
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const getRenderTargetData = reinterpret_cast<d3d9_device_get_render_target_data_fn>(vtable[32]);
             return getRenderTargetData(nativeDevice, sourceSurface, destinationSurface);
@@ -2699,7 +2643,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int filter
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const stretchRect = reinterpret_cast<d3d9_device_stretch_rect_fn>(vtable[34]);
             return stretchRect(nativeDevice, sourceSurface, sourceRect, destinationSurface, destinationRect, filter);
@@ -2707,7 +2651,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeTestCooperativeLevel(DeviceD3D9* const device)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const testCooperativeLevel = reinterpret_cast<d3d9_device_test_cooperative_level_fn>(vtable[3]);
             return testCooperativeLevel(nativeDevice);
@@ -2715,7 +2659,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeBeginScene(DeviceD3D9* const device)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const beginScene = reinterpret_cast<d3d9_device_begin_scene_fn>(vtable[41]);
             return beginScene(nativeDevice);
@@ -2723,7 +2667,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeEndScene(DeviceD3D9* const device)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const endScene = reinterpret_cast<d3d9_device_end_scene_fn>(vtable[42]);
             return endScene(nativeDevice);
@@ -2731,7 +2675,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativePresent(DeviceD3D9* const device)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const present = reinterpret_cast<d3d9_device_present_fn>(vtable[17]);
             return present(nativeDevice, nullptr, nullptr, nullptr, nullptr);
@@ -2744,7 +2688,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             void* const cursorSurface
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setCursorProperties = reinterpret_cast<d3d9_device_set_cursor_properties_fn>(vtable[10]);
             return setCursorProperties(nativeDevice, hotspotX, hotspotY, cursorSurface);
@@ -2752,7 +2696,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeSetViewport(DeviceD3D9* const device, const void* const viewport)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setViewport = reinterpret_cast<d3d9_device_set_viewport_fn>(vtable[47]);
             return setViewport(nativeDevice, viewport);
@@ -2760,7 +2704,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeGetViewport(DeviceD3D9* const device, void* const outViewport)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const getViewport = reinterpret_cast<d3d9_device_get_viewport_fn>(vtable[48]);
             return getViewport(nativeDevice, outViewport);
@@ -2768,7 +2712,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeGetRenderTarget(DeviceD3D9* const device, const unsigned int index, void** const outRenderTarget)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const getRenderTarget = reinterpret_cast<d3d9_device_get_render_target_fn>(vtable[38]);
             return getRenderTarget(nativeDevice, index, outRenderTarget);
@@ -2776,7 +2720,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeSetRenderTarget(DeviceD3D9* const device, const unsigned int index, void* const renderTarget)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setRenderTarget = reinterpret_cast<d3d9_device_set_render_target_fn>(vtable[37]);
             return setRenderTarget(nativeDevice, index, renderTarget);
@@ -2784,7 +2728,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeGetDepthStencilSurface(DeviceD3D9* const device, void** const outDepthStencilSurface)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             // IDirect3DDevice9 declares SetDepthStencilSurface (39) *before*
             // GetDepthStencilSurface (40), between GetRenderTarget (38) and
@@ -2797,7 +2741,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeSetDepthStencilSurface(DeviceD3D9* const device, void* const depthStencilSurface)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setDepthStencilSurface = reinterpret_cast<d3d9_device_set_depth_stencil_surface_fn>(vtable[39]);
             return setDepthStencilSurface(nativeDevice, depthStencilSurface);
@@ -2813,7 +2757,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int stencil
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const clear = reinterpret_cast<d3d9_device_clear_fn>(vtable[43]);
             return clear(nativeDevice, count, rects, flags, color, depth, stencil);
@@ -2821,7 +2765,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeSetVertexDeclaration(DeviceD3D9* const device, void* const vertexDeclaration)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setVertexDeclaration = reinterpret_cast<d3d9_device_set_vertex_declaration_fn>(vtable[87]);
             return setVertexDeclaration(nativeDevice, vertexDeclaration);
@@ -2835,7 +2779,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int stride
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setStreamSource = reinterpret_cast<d3d9_device_set_stream_source_fn>(vtable[100]);
             return setStreamSource(nativeDevice, streamSlot, streamData, offsetInBytes, stride);
@@ -2847,7 +2791,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int setting
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setStreamSourceFreq = reinterpret_cast<d3d9_device_set_stream_source_freq_fn>(vtable[102]);
             return setStreamSourceFreq(nativeDevice, streamSlot, setting);
@@ -2855,7 +2799,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         HRESULT InvokeNativeSetIndices(DeviceD3D9* const device, void* const indexBuffer)
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const setIndices = reinterpret_cast<d3d9_device_set_indices_fn>(vtable[104]);
             return setIndices(nativeDevice, indexBuffer);
@@ -2868,7 +2812,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int primitiveCount
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const drawPrimitive = reinterpret_cast<d3d9_device_draw_primitive_fn>(vtable[81]);
             return drawPrimitive(nativeDevice, primitiveType, startVertex, primitiveCount);
@@ -2884,7 +2828,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             const unsigned int primitiveCount
         )
         {
-            void* const nativeDevice = AsDeviceD3D9Runtime(*device).nativeDevice;
+            void* const nativeDevice = device->mDevice;
             auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
             auto* const drawIndexedPrimitive = reinterpret_cast<d3d9_device_draw_indexed_primitive_fn>(vtable[82]);
             return drawIndexedPrimitive(
@@ -3041,9 +2985,8 @@ namespace { // TEMPORARY PROBE (do not commit)
         {
             device.Func1();
 
-            const DeviceD3D9RuntimeView& runtime = AsDeviceD3D9Runtime(device);
             const unsigned int headCount = static_cast<unsigned int>(context.GetHeadCount());
-            const unsigned int adapterCount = static_cast<unsigned int>(runtime.adapters.size());
+            const unsigned int adapterCount = static_cast<unsigned int>(device.mAdapters.size());
 
             if (headCount > adapterCount)
             {
@@ -3144,31 +3087,8 @@ namespace { // TEMPORARY PROBE (do not commit)
                     );
                 }
 
-                AsDeviceD3D9Runtime(device).adapters.push_back(adapter);
+                device.mAdapters.push_back(adapter);
             }
-        }
-
-        /**
-         * Address: 0x008F2F70 (FUN_008F2F70)
-         *
-         * What it does:
-         * Clears setup-owned runtime objects (heads, pipeline, query/device/
-         * interface pointers) and resets the embedded device-context lane.
-         */
-        void ResetDeviceRuntimeForSetup(DeviceD3D9& device)
-        {
-            auto& runtime = AsDeviceD3D9Runtime(device);
-
-            delete[] reinterpret_cast<OutputContext*>(runtime.headsBase);
-            runtime.headsBase = nullptr;
-
-            runtime.pipelineState.reset();
-
-            ReleaseComLike(runtime.frameEventQuery);
-            ReleaseComLike(runtime.nativeDevice);
-            ReleaseComLike(runtime.idirect);
-
-            runtime.deviceContext = DeviceContext(0);
         }
 
         [[nodiscard]] bool IsLegacyAtiCreateDeviceFallbackAdapter(const AdapterD3D9& adapter) noexcept
@@ -3210,8 +3130,7 @@ namespace { // TEMPORARY PROBE (do not commit)
          */
         void CheckHardwareInstancingSupport(DeviceD3D9& device, const D3DCAPS9& caps)
         {
-            auto& runtime = AsDeviceD3D9Runtime(device);
-            DeviceContext& context = runtime.deviceContext;
+            DeviceContext& context = device.mDeviceContext;
 
             device.Func1();
             context.mHWBasedInstancing = true;
@@ -3240,9 +3159,9 @@ namespace { // TEMPORARY PROBE (do not commit)
                 {
                     bool supportedAdapterFallback = false;
                     const auto adapterIndex = static_cast<std::size_t>(context.mAdapter);
-                    if (adapterIndex < runtime.adapters.size())
+                    if (adapterIndex < device.mAdapters.size())
                     {
-                        const AdapterD3D9& adapter = runtime.adapters[adapterIndex];
+                        const AdapterD3D9& adapter = device.mAdapters[adapterIndex];
                         supportedAdapterFallback =
                             (adapter.vendorId == kVendorIdAti) &&
                             ((adapter.deviceId == kAtiDeviceRadeonX800) || (adapter.deviceId == kAtiDeviceRadeonX850) ||
@@ -4608,9 +4527,8 @@ namespace { // TEMPORARY PROBE (do not commit)
             ComObjectScope nativeEffect{};
             ComObjectScope createEffectErrors{};
 
-            auto& deviceRuntime = AsDeviceD3D9Runtime(*device);
             const HRESULT createEffectResult = InvokeD3DXCreateEffect(
-                deviceRuntime.nativeDevice,
+                device->mDevice,
                 GetD3DXBufferPointer(compiledEffectBuffer.get()),
                 GetD3DXBufferSize(compiledEffectBuffer.get()),
                 defines,
@@ -4628,7 +4546,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("DeviceD3D9.cpp", 1575, message.c_str());
             }
 
-            PipelineStateD3D9* const pipelineState = deviceRuntime.pipelineState.get();
+            PipelineStateD3D9* const pipelineState = device->mPipelineState.get();
             StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
             const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
             if (setStateManagerResult < 0)
@@ -4736,9 +4654,8 @@ namespace { // TEMPORARY PROBE (do not commit)
             ComObjectScope nativeEffect{};
             ComObjectScope createEffectErrors{};
 
-            auto& deviceRuntime = AsDeviceD3D9Runtime(*device);
             const HRESULT createEffectResult = InvokeD3DXCreateEffect(
-                deviceRuntime.nativeDevice,
+                device->mDevice,
                 compiledBytes.empty() ? nullptr : static_cast<const void*>(compiledBytes.data()),
                 static_cast<unsigned int>(compiledBytes.size()),
                 nullptr,
@@ -4756,7 +4673,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalError("DeviceD3D9.cpp", 1640, message.c_str());
             }
 
-            PipelineStateD3D9* const pipelineState = deviceRuntime.pipelineState.get();
+            PipelineStateD3D9* const pipelineState = device->mPipelineState.get();
             StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
             const HRESULT setStateManagerResult = InvokeEffectSetStateManager(nativeEffect.get(), stateManager);
             if (setStateManagerResult < 0)
@@ -5561,30 +5478,27 @@ namespace { // TEMPORARY PROBE (do not commit)
     AdapterModeD3D9::~AdapterModeD3D9() = default;
 
     /**
-     * Address: 0x008F37F0 (FUN_008F37F0)
+     * Address: 0x008EFD50 (FUN_008EFD50)
      *
      * What it does:
-     * Applies D3D9 backend teardown lanes and deletes one startup-allocated
-     * backend object instance.
+     * Builds an empty device: every member has its initializer, so the body
+     * is empty (the stores at 0x008EFD84..0x008EFDB5 are those
+     * initializers, `DeviceContext(0)` included). `Device::Create` then
+     * runs `Setup`.
      */
-    void DeviceD3D9::DestroyBackendObject()
+    DeviceD3D9::DeviceD3D9() = default;
+
+    /**
+     * Address: 0x008F3270 (FUN_008F3270)
+     * Address: 0x008F37F0 (FUN_008F37F0, slot 0: the scalar deleting destructor)
+     *
+     * What it does:
+     * Runs `Shutdown`, then the member destructors (pipeline state, device
+     * context, adapter vector) and the `Device` base destructor.
+     */
+    DeviceD3D9::~DeviceD3D9()
     {
-        auto& runtime = AsDeviceD3D9Runtime(*this);
-
-        runtime.pipelineState.reset();
-
-        delete[] reinterpret_cast<OutputContext*>(runtime.headsBase);
-        runtime.headsBase = nullptr;
-
-        ReleaseComLike(runtime.frameEventQuery);
-        ReleaseComLike(runtime.nativeDevice);
-        ReleaseComLike(runtime.idirect);
-
-        runtime.adapters.clear();
-        runtime.deviceContext = DeviceContext(0);
-        runtime.curThreadId = 0;
-
-        delete static_cast<DeviceD3D9BackendObject*>(this);
+        Shutdown();
     }
 
     /**
@@ -5618,7 +5532,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     int DeviceD3D9::GetCurThreadId()
     {
-        return AsDeviceD3D9Runtime(*this).curThreadId;
+        return mCurThreadId;
     }
 
     /**
@@ -5643,14 +5557,13 @@ namespace { // TEMPORARY PROBE (do not commit)
       // keeps whatever capacity it already paid for across repeated queries.
       outModes.clear();
 
-      const DeviceD3D9RuntimeView& runtime = AsDeviceD3D9Runtime(*this);
-      if (adapterIndex >= static_cast<int>(runtime.adapters.size())) {
+      if (adapterIndex >= static_cast<int>(mAdapters.size())) {
         return;
       }
 
       // Copied field-by-field rather than element-wise: the source modes carry a
       // vptr this output does not reproduce, and only the three scalars matter.
-      for (const AdapterModeD3D9& mode : runtime.adapters[static_cast<std::size_t>(adapterIndex)].modes) {
+      for (const AdapterModeD3D9& mode : mAdapters[static_cast<std::size_t>(adapterIndex)].modes) {
         PushBackAdapterModeD3D9(outModes, AdapterModeD3D9(mode.width_, mode.height_, mode.refreshRate_));
       }
     }
@@ -5665,7 +5578,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     boost::shared_ptr<PipelineState> DeviceD3D9::GetPipelineState()
     {
         Func1();
-        return AsDeviceD3D9Runtime(*this).pipelineState;
+        return mPipelineState;
     }
 
     /**
@@ -5706,39 +5619,41 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008EFD50 (FUN_008EFD50)
-     *
-     * What it does:
-     * Allocates and initializes one D3D9 backend object with recovered default
-     * runtime lanes for startup dispatch.
-     */
-    Device* CreateDeviceD3D9Backend()
-    {
-        auto* const backend = new DeviceD3D9BackendObject();
-        auto& runtime = AsDeviceD3D9Runtime(*backend);
-        runtime.curThreadId = 0;
-        runtime.adapters.clear();
-        runtime.deviceContext = DeviceContext(0);
-        runtime.pipelineState.reset();
-        runtime.idirect = nullptr;
-        runtime.nativeDevice = nullptr;
-        runtime.headsBase = nullptr;
-        runtime.frameEventQuery = nullptr;
-        return reinterpret_cast<Device*>(backend);
-    }
-
-    /**
      * Address: 0x008F3320 (FUN_008F3320)
      *
      * What it does:
-     * Runs the full D3D9 startup setup chain: clears previous runtime state,
-     * creates Direct3D/device objects, rebuilds adapters/capabilities/heads,
-     * and initializes pipeline/query lanes.
+     * Brings the device up for `context`: shuts down whatever was there,
+     * creates Direct3D and the device (falling back for three old ATI parts),
+     * enumerates adapters, builds the capabilities, the heads, the pipeline
+     * state and the frame event query. `Device::Create` calls it right after
+     * constructing the device (0x008E6CD8).
      */
-    void InitializeDeviceD3D9Backend(Device* const device, const DeviceContext* const context)
+    /**
+     * Address: 0x008F2F70 (FUN_008F2F70)
+     *
+     * What it does:
+     * Releases everything `Setup` built: the head output contexts, the
+     * pipeline state, the frame query, the device and Direct3D, and puts the
+     * device context back to an empty one. The destructor and `Setup` both
+     * start with it.
+     */
+    void DeviceD3D9::Shutdown()
     {
-        auto* const backend = reinterpret_cast<DeviceD3D9*>(device);
-        ResetDeviceRuntimeForSetup(*backend);
+        delete[] mHeads;
+        mHeads = nullptr;
+
+        mPipelineState.reset();
+
+        ReleaseComLike(mFrameEventQuery);
+        ReleaseComLike(mDevice);
+        ReleaseComLike(mDirect3D);
+
+        mDeviceContext = DeviceContext(0);
+    }
+
+    void DeviceD3D9::Setup(const DeviceContext* const context)
+    {
+        Shutdown();
 
         const int headCount = context->GetHeadCount();
         if (headCount == 0)
@@ -5748,28 +5663,27 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         std::vector<D3DPRESENT_PARAMETERS> presentParameters(static_cast<std::size_t>(headCount));
 
-        auto& runtime = AsDeviceD3D9Runtime(*backend);
-        runtime.curThreadId = static_cast<int>(::GetCurrentThreadId());
-        runtime.idirect = InvokeDirect3DCreate9Interface(0x20U);
-        if (runtime.idirect == nullptr)
+        mCurThreadId = static_cast<int>(::GetCurrentThreadId());
+        mDirect3D = InvokeDirect3DCreate9Interface(0x20U);
+        if (mDirect3D == nullptr)
         {
             AppendD3D9SetupLogMessage("unable to create Direct3D");
             ThrowGalError("DeviceD3D9.cpp", 132, "unable to create Direct3D");
         }
 
-        CollectAllAdaptersForSetup(*backend);
-        CheckAdapterSelectionForSetup(*backend, *context);
+        CollectAllAdaptersForSetup(*this);
+        CheckAdapterSelectionForSetup(*this, *context);
 
         const HWND primaryWindow = reinterpret_cast<HWND>(context->GetHead(0U).mHandle);
         const unsigned int behaviorFlags = ((headCount > 1) ? 0x200U : 0U) | 0x44U;
-        backend->GetDeviceParameters(presentParameters.data(), context);
+        GetDeviceParameters(presentParameters.data(), context);
 
         unsigned int selectedAdapter = static_cast<unsigned int>(context->mAdapter);
         unsigned int deviceType = kD3DDevTypeHal;
-        const std::size_t adapterCount = runtime.adapters.size();
+        const std::size_t adapterCount = mAdapters.size();
         for (std::size_t adapterIndex = 0; adapterIndex < adapterCount; ++adapterIndex)
         {
-            if (runtime.adapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
+            if (mAdapters[adapterIndex].description.find("NVPerfHUD", 0U, 9U) != msvc8::string::npos)
             {
                 deviceType = 2U;
                 selectedAdapter = static_cast<unsigned int>(adapterIndex);
@@ -5779,28 +5693,28 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         HRESULT createResult = InvokeNativeCreateDevice(
-            backend,
+            this,
             selectedAdapter,
             deviceType,
             primaryWindow,
             behaviorFlags,
             presentParameters.data(),
-            &runtime.nativeDevice
+            &mDevice
         );
         if (createResult < 0)
         {
             const std::size_t primaryAdapterIndex = static_cast<std::size_t>(context->mAdapter);
-            if (primaryAdapterIndex < runtime.adapters.size() &&
-                IsLegacyAtiCreateDeviceFallbackAdapter(runtime.adapters[primaryAdapterIndex]))
+            if (primaryAdapterIndex < mAdapters.size() &&
+                IsLegacyAtiCreateDeviceFallbackAdapter(mAdapters[primaryAdapterIndex]))
             {
                 createResult = InvokeNativeCreateDevice(
-                    backend,
+                    this,
                     static_cast<unsigned int>(context->mAdapter),
                     kD3DDevTypeHal,
                     primaryWindow,
                     36U,
                     presentParameters.data(),
-                    &runtime.nativeDevice
+                    &mDevice
                 );
                 if (createResult < 0)
                 {
@@ -5815,21 +5729,21 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
         }
 
-        runtime.pipelineState.reset(new PipelineStateD3D9(runtime.nativeDevice));
-        if (runtime.pipelineState.get() != nullptr)
+        mPipelineState.reset(new PipelineStateD3D9(mDevice));
+        if (mPipelineState.get() != nullptr)
         {
-            runtime.pipelineState->InitState();
+            mPipelineState->InitState();
         }
 
-        static_cast<void>(backend->BuildDeviceCapabilities(context));
-        runtime.deviceContext.mAdapter = static_cast<int>(selectedAdapter);
-        backend->CreateHeads();
+        static_cast<void>(BuildDeviceCapabilities(context));
+        mDeviceContext.mAdapter = static_cast<int>(selectedAdapter);
+        CreateHeads();
 
         bool supportsDxt = true;
-        const int builtHeadCount = runtime.deviceContext.GetHeadCount();
+        const int builtHeadCount = mDeviceContext.GetHeadCount();
         for (int headIndex = 0; headIndex < builtHeadCount; ++headIndex)
         {
-            supportsDxt = supportsDxt && HeadSupportsCapability2(runtime.deviceContext.GetHead(static_cast<unsigned int>(headIndex)), 12);
+            supportsDxt = supportsDxt && HeadSupportsCapability2(mDeviceContext.GetHead(static_cast<unsigned int>(headIndex)), 12);
         }
 
         if (!supportsDxt)
@@ -5838,7 +5752,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 209, "Device does not support DXT texture formats");
         }
 
-        static_cast<void>(InvokeNativeCreateQuery(backend, kD3DQueryTypeEvent, &runtime.frameEventQuery));
+        static_cast<void>(InvokeNativeCreateQuery(this, kD3DQueryTypeEvent, &mFrameEventQuery));
         AppendD3D9SetupLogMessage("device setup complete");
     }
 
@@ -5892,7 +5806,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::ShowCursor(const bool show)
     {
         Func1();
-        return InvokeNativeD3D9ShowCursor(AsDeviceD3D9Runtime(*this).nativeDevice, show);
+        return InvokeNativeD3D9ShowCursor(mDevice, show);
     }
 
     /**
@@ -5960,16 +5874,15 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::CreateHeads()
     {
         Func1();
-        auto& runtime = AsDeviceD3D9Runtime(*this);
 
-        const unsigned int headCount = static_cast<unsigned int>(runtime.deviceContext.GetHeadCount());
-        if (runtime.headsBase != nullptr)
+        const unsigned int headCount = static_cast<unsigned int>(mDeviceContext.GetHeadCount());
+        if (mHeads != nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1444, "internal D3D9 device initialization error");
         }
 
         OutputContext* const heads = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
-        runtime.headsBase = heads;
+        mHeads = heads;
 
         for (unsigned int headIndex = 0; headIndex < headCount; ++headIndex)
         {
@@ -6040,19 +5953,18 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::BuildDeviceCapabilities(const DeviceContext* const context)
     {
         Func1();
-        auto& runtime = AsDeviceD3D9Runtime(*this);
-        runtime.deviceContext = *context;
+        mDeviceContext = *context;
 
         const unsigned int headCount = static_cast<unsigned int>(context->GetHeadCount());
-        if (headCount > runtime.adapters.size())
+        if (headCount > mAdapters.size())
         {
             ThrowGalError("DeviceD3D9.cpp", 1250, "invalid head count specified in device context");
         }
 
         for (unsigned int adapterIndex = 0; adapterIndex < headCount; ++adapterIndex)
         {
-            Head& head = runtime.deviceContext.mHeads[adapterIndex];
-            const AdapterD3D9& adapter = runtime.adapters[adapterIndex];
+            Head& head = mDeviceContext.mHeads[adapterIndex];
+            const AdapterD3D9& adapter = mAdapters[adapterIndex];
 
             head.adapterModes.clear();
             for (const AdapterModeD3D9& mode : adapter.modes)
@@ -6233,26 +6145,26 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         CheckHardwareInstancingSupport(*this, caps);
 
-        runtime.deviceContext.mSupportsFloat16 =
+        mDeviceContext.mSupportsFloat16 =
             ((caps.DeclTypes & kDeclTypeFloat16_2) != 0U) && ((caps.DeclTypes & kDeclTypeFloat16_4) != 0U);
-        runtime.deviceContext.mMaxPrimitiveCount = caps.MaxPrimitiveCount;
-        runtime.deviceContext.mMaxVertexCount = caps.MaxVertexIndex;
+        mDeviceContext.mMaxPrimitiveCount = caps.MaxPrimitiveCount;
+        mDeviceContext.mMaxVertexCount = caps.MaxVertexIndex;
 
-        if (runtime.deviceContext.mValidate && (caps.VertexShaderVersion < kVertexShaderModel20))
+        if (mDeviceContext.mValidate && (caps.VertexShaderVersion < kVertexShaderModel20))
         {
             ThrowGalError("DeviceD3D9.cpp", 1355, "Vertex shader 2.0 required");
         }
 
-        if (runtime.deviceContext.mValidate && (caps.PixelShaderVersion < kPixelShaderModel20))
+        if (mDeviceContext.mValidate && (caps.PixelShaderVersion < kPixelShaderModel20))
         {
             ThrowGalError("DeviceD3D9.cpp", 1361, "Pixel shader 2.0 required");
         }
 
-        runtime.deviceContext.mVertexShaderProfile =
-            ResolveVertexShaderProfileToken(InvokeD3DXGetVertexShaderProfile(runtime.nativeDevice));
-        runtime.deviceContext.mPixelShaderProfile =
-            ResolvePixelShaderProfileToken(InvokeD3DXGetPixelShaderProfile(runtime.nativeDevice));
-        return runtime.deviceContext.mPixelShaderProfile;
+        mDeviceContext.mVertexShaderProfile =
+            ResolveVertexShaderProfileToken(InvokeD3DXGetVertexShaderProfile(mDevice));
+        mDeviceContext.mPixelShaderProfile =
+            ResolvePixelShaderProfileToken(InvokeD3DXGetPixelShaderProfile(mDevice));
+        return mDeviceContext.mPixelShaderProfile;
     }
 
     /**
@@ -6264,18 +6176,17 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     int DeviceD3D9::Func9(DeviceContext* const context)
     {
-        auto& runtime = AsDeviceD3D9Runtime(*this);
 
-        if (runtime.pipelineState.get() != nullptr)
+        if (mPipelineState.get() != nullptr)
         {
-            static_cast<void>(runtime.pipelineState->ClearTextures());
+            static_cast<void>(mPipelineState->ClearTextures());
         }
-        runtime.pipelineState.reset();
+        mPipelineState.reset();
 
-        delete[] reinterpret_cast<OutputContext*>(runtime.headsBase);
-        runtime.headsBase = nullptr;
+        delete[] mHeads;
+        mHeads = nullptr;
 
-        ReleaseComLike(runtime.frameEventQuery);
+        ReleaseComLike(mFrameEventQuery);
 
         const unsigned int headCount = static_cast<unsigned int>(context->GetHeadCount());
         std::vector<D3DPRESENT_PARAMETERS> parameters(headCount);
@@ -6293,13 +6204,13 @@ namespace { // TEMPORARY PROBE (do not commit)
         static_cast<void>(BuildDeviceCapabilities(context));
         CreateHeads();
 
-        runtime.pipelineState.reset(new PipelineStateD3D9(runtime.nativeDevice));
-        if (runtime.pipelineState.get() != nullptr)
+        mPipelineState.reset(new PipelineStateD3D9(mDevice));
+        if (mPipelineState.get() != nullptr)
         {
-            static_cast<void>(runtime.pipelineState->InitState());
+            static_cast<void>(mPipelineState->InitState());
         }
 
-        return InvokeNativeCreateQuery(this, kD3DQueryTypeEvent, &runtime.frameEventQuery);
+        return InvokeNativeCreateQuery(this, kD3DQueryTypeEvent, &mFrameEventQuery);
     }
 
     namespace
@@ -6656,7 +6567,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
 
             const HRESULT createResult = InvokeD3DXCreateTexture(
-                AsDeviceD3D9Runtime(*this).nativeDevice,
+                mDevice,
                 context->width_,
                 context->height_,
                 context->mipmapLevels_,
@@ -6701,7 +6612,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             {
                 const unsigned int edgeLength = (context->width_ != 0U) ? context->width_ : kD3DXDefault;
                 const HRESULT createResult = InvokeD3DXCreateCubeTextureFromFileInMemoryEx(
-                    AsDeviceD3D9Runtime(*this).nativeDevice,
+                    mDevice,
                     sourceData,
                     sourceBytes,
                     edgeLength,
@@ -6737,7 +6648,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             else if (imageInfo.resourceType == kD3DResourceTypeVolumeTexture)
             {
                 const HRESULT createResult = InvokeD3DXCreateVolumeTextureFromFileInMemoryEx(
-                    AsDeviceD3D9Runtime(*this).nativeDevice,
+                    mDevice,
                     sourceData,
                     sourceBytes,
                     kD3DXDefault,
@@ -6784,7 +6695,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 const unsigned int mipFilter = ((context->reserved0x44_ & 0x1FU) << 26U) | 5U;
 
                 const HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-                    AsDeviceD3D9Runtime(*this).nativeDevice,
+                    mDevice,
                     sourceData,
                     sourceBytes,
                     width,
@@ -6800,7 +6711,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                     nullptr,
                     &nativeTexture
                 );
-                { static int sDevBudget = 60; if (sDevBudget > 0) { --sDevBudget; ::gpg::Warnf("[TEXCREATE] tid=%lu device=%p bytes=%u skip=%u mipFilter=%08X w=%u h=%u loc=%s", ::GetCurrentThreadId(), AsDeviceD3D9Runtime(*this).nativeDevice, static_cast<unsigned>(sourceBytes), context->reserved0x44_, mipFilter, context->width_, context->height_, context->location_.c_str()); } } // TEMPORARY PROBE (do not commit)
+                { static int sDevBudget = 60; if (sDevBudget > 0) { --sDevBudget; ::gpg::Warnf("[TEXCREATE] tid=%lu device=%p bytes=%u skip=%u mipFilter=%08X w=%u h=%u loc=%s", ::GetCurrentThreadId(), mDevice, static_cast<unsigned>(sourceBytes), context->reserved0x44_, mipFilter, context->width_, context->height_, context->location_.c_str()); } } // TEMPORARY PROBE (do not commit)
                 if (createResult < 0)
                 {
                     ThrowGalErrorFromHresult("DeviceD3D9.cpp", 377, createResult);
@@ -7334,7 +7245,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         D3DXImageInfoRuntime sourceImageInfo{};
         void* sourceTexture = nullptr;
         HRESULT createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-            AsDeviceD3D9Runtime(*this).nativeDevice,
+            mDevice,
             sourceData,
             sourceBytes,
             kD3DXDefaultNonPow2,
@@ -7353,7 +7264,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         if (createResult < 0)
         {
             createResult = InvokeD3DXCreateTextureFromFileInMemoryEx(
-                AsDeviceD3D9Runtime(*this).nativeDevice,
+                mDevice,
                 sourceData,
                 sourceBytes,
                 kD3DXDefaultNonPow2,
@@ -7531,7 +7442,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 913, result);
         }
 
-        void* const frameEventQuery = AsDeviceD3D9Runtime(*this).frameEventQuery;
+        void* const frameEventQuery = mFrameEventQuery;
         if (frameEventQuery == nullptr)
         {
             return 0;
@@ -7565,7 +7476,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     void DeviceD3D9::Present()
     {
         Func1();
-        void* const frameEventQuery = AsDeviceD3D9Runtime(*this).frameEventQuery;
+        void* const frameEventQuery = mFrameEventQuery;
         while (InvokeQueryGetData(frameEventQuery, nullptr, 0U, kD3DGetDataFlush) == 1)
         {
         }
@@ -7921,7 +7832,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         if (pipelineState == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1120, "unable to set distance fog state, invalid pipeline state");
@@ -7942,7 +7853,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         if (pipelineState == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1130, "unable to set wireframe state, invalid pipeline state");
@@ -7963,7 +7874,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         if (pipelineState == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1140, "unable to set color write state, invalid pipeline state");
@@ -8055,7 +7966,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         if (pipelineState == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1170, "unable to begin technique, invalid pipeline state");
@@ -8074,7 +7985,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         if (pipelineState == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 1180, "unable to end technique, invalid pipeline state");
@@ -8092,7 +8003,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     int DeviceD3D9::ClearTextures()
     {
         Func1();
-        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(*this).pipelineState.get();
+        PipelineStateD3D9* const pipelineState = mPipelineState.get();
         return pipelineState->ClearTextures();
     }
 
@@ -8989,14 +8900,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             { // TEMPORARY PROBE (do not commit): device cooperative level while decals draw
                 static unsigned sCoopCalls = 0;
                 if ((sCoopCalls++ % 128u) == 0u) {
-                    void* const nd = AsDeviceD3D9Runtime(ActiveDeviceD3D9()).nativeDevice;
+                    void* const nd = ActiveDeviceD3D9().mDevice;
                     using test_coop_fn = HRESULT(STDMETHODCALLTYPE*)(void*);
                     const HRESULT coop = reinterpret_cast<test_coop_fn>((*reinterpret_cast<void***>(nd))[3])(nd);
                     if (coop != 0 || sCoopCalls <= 128u) { ::gpg::Warnf("[COOP] TestCooperativeLevel=%08lX", static_cast<long>(coop)); }
                 }
             }
             if (sMipLevel >= 0) {
-                PipelineStateD3D9* const ps = AsDeviceD3D9Runtime(ActiveDeviceD3D9()).pipelineState.get();
+                PipelineStateD3D9* const ps = ActiveDeviceD3D9().mPipelineState.get();
                 if (ps != nullptr) {
                     for (unsigned s = 0; s < 8; ++s) {
                         static_cast<void>(ps->GetStateManager()->SetSamplerState(s, static_cast<StateManagerD3D9::sampler_state_type>(7U), 0U));
@@ -9032,7 +8943,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
             if (sForcedCull >= 0)
             {
-                PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(ActiveDeviceD3D9()).pipelineState.get();
+                PipelineStateD3D9* const pipelineState = ActiveDeviceD3D9().mPipelineState.get();
                 if (pipelineState != nullptr)
                 {
                     static_cast<void>(pipelineState->GetStateManager()->SetRenderState(
@@ -9082,7 +8993,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                     }
                     if (sSkipMask[slot] != 0)
                     {
-                        PipelineStateD3D9* const pipelineState = AsDeviceD3D9Runtime(ActiveDeviceD3D9()).pipelineState.get();
+                        PipelineStateD3D9* const pipelineState = ActiveDeviceD3D9().mPipelineState.get();
                         if (pipelineState != nullptr)
                         {
                             static_cast<void>(pipelineState->GetStateManager()->SetRenderState(

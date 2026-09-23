@@ -444,14 +444,6 @@ namespace moho
   [[nodiscard]] float MOV_GetDuration(gpg::StrArg sourcePath);
 
   /**
-   * Address: 0x008E6B60 (func_CreateDeviceD3D)
-   *
-   * What it does:
-   * Builds backend device singleton from the supplied gal context.
-   */
-  void CreateDeviceD3D(gpg::gal::DeviceContext* context);
-
-  /**
    * Address context:
    * - `FUN_00874C20` allocates this runtime owner with `operator new(0x0C)`.
    */
