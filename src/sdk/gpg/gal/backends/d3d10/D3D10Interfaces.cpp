@@ -93,8 +93,6 @@ namespace gpg::gal
     using texture_get_desc_fn = void(__stdcall*)(void*, void*);
     using texture_map_fn = HRESULT(__stdcall*)(void*, int, unsigned int, unsigned int, void*);
     using texture_unmap_fn = void(__stdcall*)(void*, int);
-    using device_helper34_fn = HRESULT(__thiscall*)(Device*, int, void**);
-    using device_helper44_fn = HRESULT(__thiscall*)(Device*, void*, int, void**);
     using device_native_create_buffer_fn = HRESULT(__stdcall*)(void*, const void*, const void*, void**);
     using device_native_create_texture2d_fn = HRESULT(__stdcall*)(void*, const void*, const void*, void**);
     using device_native_create_shader_resource_view_fn = HRESULT(__stdcall*)(void*, void*, const void*, void**);
@@ -128,81 +126,15 @@ namespace gpg::gal
     using vertex_buffer_get_context_fn = void*(__thiscall*)(VertexBufferD3D10*);
     using readback_get_size_fn = int(__stdcall*)(void*);
     using readback_get_data_fn = void*(__stdcall*)(void*);
-    using device_create_blob_api_fn = HRESULT(__stdcall*)(std::uint32_t, void**);
-    using device_create_effect_from_memory_api_fn = HRESULT(__stdcall*)(
-      const void*,
-      std::size_t,
-      const char*,
-      const D3D10_SHADER_MACRO*,
-      void*,
-      unsigned int,
-      unsigned int,
-      void*,
-      void*,
-      void*,
-      void**,
-      void**
-    );
-    using device_create_texture_from_memory_api_fn =
-      HRESULT(__stdcall*)(void*, const void*, std::uint32_t, const void*, void*, void**);
-    using device_save_texture_to_file_api_fn = HRESULT(__stdcall*)(void*, int, const char*);
-    using device_save_texture_to_memory_api_fn = HRESULT(__stdcall*)(void*, int, void**);
-    using create_dxgi_factory_api_fn = HRESULT(__stdcall*)(const IID&, void**);
-    using d3d10_create_device_api_fn =
-      HRESULT(__stdcall*)(IDXGIAdapter*, D3D10_DRIVER_TYPE, HMODULE, UINT, UINT, ID3D10Device**);
     using device_native_copy_subresource_region_fn = int(__stdcall*)(
       void*, void*, unsigned int, unsigned int, unsigned int, unsigned int, void*, unsigned int, const D3D10_BOX*
     );
     using device_native_copy_resource_result_fn = int(__stdcall*)(void*, void*, void*);
 
-    struct D3D10EffectDescRuntime final
-    {
-      std::uint8_t pad00_13[0x14]{};     // +0x00 .. +0x13
-      std::uint32_t techniqueCount = 0U; // +0x14
-    };
-
-    struct D3D10TechniqueDescRuntime final
-    {
-      const char* name = nullptr;   // +0x00
-      std::uint32_t passCount = 0U; // +0x04
-    };
-
-    struct TextureDescRuntime final
-    {
-      std::uint32_t width = 0U;          // +0x00
-      std::uint32_t height = 0U;         // +0x04
-      std::uint32_t mipLevels = 0U;      // +0x08
-      std::uint32_t arraySize = 0U;      // +0x0C
-      std::uint32_t format = 0U;         // +0x10
-      std::uint32_t sampleCount = 0U;    // +0x14
-      std::uint32_t sampleQuality = 0U;  // +0x18
-      std::uint32_t usage = 0U;          // +0x1C
-      std::uint32_t bindFlags = 0U;      // +0x20
-      std::uint32_t cpuAccessFlags = 0U; // +0x24
-      std::uint32_t miscFlags = 0U;      // +0x28
-    };
-
-    struct TextureMapResultRuntime final
-    {
-      void* bits = nullptr; // +0x00
-      int pitch = 0;        // +0x04
-    };
-
     struct DXGIFormatPair final
     {
       int dxgi = 0;
       int gal = 0;
-    };
-
-    struct VertexLayoutElementRuntime final
-    {
-      std::uint32_t semanticNameToken = 0U; // +0x00
-      std::uint32_t semanticIndex = 0U;     // +0x04
-      std::uint32_t format = 0U;            // +0x08
-      std::uint32_t inputSlot = 0U;         // +0x0C
-      std::uint32_t alignedByteOffset = 0U; // +0x10
-      std::uint32_t inputSlotClass = 0U;    // +0x14
-      std::uint32_t stepRate = 0U;          // +0x18
     };
 
     struct IndexBufferContextRuntime final
@@ -215,17 +147,6 @@ namespace gpg::gal
     {
       std::uint8_t pad00_0F[0x10]{}; // +0x00 .. +0x0F
       std::uint32_t stride = 0U;     // +0x10
-    };
-
-    struct D3D10PassDescRuntime final
-    {
-      const char* name = nullptr;           // +0x00
-      std::uint32_t annotationCount = 0U;   // +0x04
-      const void* inputSignature = nullptr; // +0x08
-      std::size_t inputSignatureSize = 0U;  // +0x0C
-      std::uint32_t stencilRef = 0U;        // +0x10
-      std::uint32_t sampleMask = 0U;        // +0x14
-      float blendFactor[4]{};               // +0x18
     };
 
     /**
@@ -267,16 +188,6 @@ namespace gpg::gal
       std::uint32_t dataPointer = 0U;   // +0x0C
     };
 
-    struct ViewportRuntime final
-    {
-      std::int32_t topLeftX = 0; // +0x00
-      std::int32_t topLeftY = 0; // +0x04
-      std::uint32_t width = 0U;  // +0x08
-      std::uint32_t height = 0U; // +0x0C
-      float minDepth = 0.0f;     // +0x10
-      float maxDepth = 0.0f;     // +0x14
-    };
-
     struct DrawPrimitiveContextRuntime final
     {
       std::uint32_t pad00 = 0U;         // +0x00
@@ -293,12 +204,6 @@ namespace gpg::gal
       std::uint32_t pad0C = 0U;         // +0x0C
       std::uint32_t indexCount = 0U;    // +0x10
       std::uint32_t startIndex = 0U;    // +0x14
-    };
-
-    struct TechniquePassCountRuntime final
-    {
-      std::uint32_t pad00 = 0U;     // +0x00
-      std::uint32_t passCount = 0U; // +0x04
     };
 
     constexpr std::uint32_t kHardwareVertexFormatToken = 14U;
@@ -408,36 +313,6 @@ namespace gpg::gal
     };
 
     static_assert(
-      offsetof(D3D10EffectDescRuntime, techniqueCount) == 0x14,
-      "D3D10EffectDescRuntime::techniqueCount offset must be 0x14"
-    );
-    static_assert(sizeof(D3D10EffectDescRuntime) == 0x18, "D3D10EffectDescRuntime size must be 0x18");
-    static_assert(
-      offsetof(D3D10TechniqueDescRuntime, passCount) == 0x04, "D3D10TechniqueDescRuntime::passCount offset must be 0x04"
-    );
-    static_assert(sizeof(D3D10TechniqueDescRuntime) == 0x08, "D3D10TechniqueDescRuntime size must be 0x08");
-    static_assert(offsetof(TextureDescRuntime, format) == 0x10, "TextureDescRuntime::format offset must be 0x10");
-    static_assert(offsetof(TextureDescRuntime, usage) == 0x1C, "TextureDescRuntime::usage offset must be 0x1C");
-    static_assert(offsetof(TextureDescRuntime, bindFlags) == 0x20, "TextureDescRuntime::bindFlags offset must be 0x20");
-    static_assert(
-      offsetof(TextureDescRuntime, cpuAccessFlags) == 0x24, "TextureDescRuntime::cpuAccessFlags offset must be 0x24"
-    );
-    static_assert(offsetof(TextureDescRuntime, miscFlags) == 0x28, "TextureDescRuntime::miscFlags offset must be 0x28");
-    static_assert(sizeof(TextureDescRuntime) == 0x2C, "TextureDescRuntime size must be 0x2C");
-    static_assert(sizeof(TextureMapResultRuntime) == 0x08, "TextureMapResultRuntime size must be 0x08");
-    static_assert(
-      offsetof(VertexLayoutElementRuntime, format) == 0x08, "VertexLayoutElementRuntime::format offset must be 0x08"
-    );
-    static_assert(
-      offsetof(VertexLayoutElementRuntime, inputSlot) == 0x0C,
-      "VertexLayoutElementRuntime::inputSlot offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(VertexLayoutElementRuntime, alignedByteOffset) == 0x10,
-      "VertexLayoutElementRuntime::alignedByteOffset offset must be 0x10"
-    );
-    static_assert(sizeof(VertexLayoutElementRuntime) == 0x1C, "VertexLayoutElementRuntime size must be 0x1C");
-    static_assert(
       offsetof(IndexBufferContextRuntime, format) == 0x04, "IndexBufferContextRuntime::format offset must be 0x04"
     );
     static_assert(sizeof(IndexBufferContextRuntime) == 0x08, "IndexBufferContextRuntime size must be 0x08");
@@ -445,14 +320,6 @@ namespace gpg::gal
       offsetof(VertexBufferContextRuntime, stride) == 0x10, "VertexBufferContextRuntime::stride offset must be 0x10"
     );
     static_assert(sizeof(VertexBufferContextRuntime) == 0x14, "VertexBufferContextRuntime size must be 0x14");
-    static_assert(
-      offsetof(D3D10PassDescRuntime, inputSignature) == 0x08, "D3D10PassDescRuntime::inputSignature offset must be 0x08"
-    );
-    static_assert(
-      offsetof(D3D10PassDescRuntime, inputSignatureSize) == 0x0C,
-      "D3D10PassDescRuntime::inputSignatureSize offset must be 0x0C"
-    );
-    static_assert(sizeof(D3D10PassDescRuntime) == 0x28, "D3D10PassDescRuntime size must be 0x28");
     static_assert(offsetof(HeadRuntime, window) == 0x08, "HeadRuntime::window offset must be 0x08");
     static_assert(offsetof(HeadRuntime, windowed) == 0x0C, "HeadRuntime::windowed offset must be 0x0C");
     static_assert(offsetof(HeadRuntime, width) == 0x10, "HeadRuntime::width offset must be 0x10");
@@ -460,9 +327,6 @@ namespace gpg::gal
     static_assert(offsetof(HeadRuntime, framesPerSecond) == 0x18, "HeadRuntime::framesPerSecond offset must be 0x18");
     static_assert(sizeof(HeadRuntime) == 0x1C, "HeadRuntime size must be 0x1C");
     static_assert(sizeof(CursorPixelTransferTokenRuntime) == 0x10, "CursorPixelTransferTokenRuntime size must be 0x10");
-    static_assert(offsetof(ViewportRuntime, width) == 0x08, "ViewportRuntime::width offset must be 0x08");
-    static_assert(offsetof(ViewportRuntime, minDepth) == 0x10, "ViewportRuntime::minDepth offset must be 0x10");
-    static_assert(sizeof(ViewportRuntime) == 0x18, "ViewportRuntime size must be 0x18");
     static_assert(
       offsetof(DrawPrimitiveContextRuntime, topologyToken) == 0x04,
       "DrawPrimitiveContextRuntime::topologyToken offset must be 0x04"
@@ -487,10 +351,6 @@ namespace gpg::gal
     static_assert(
       sizeof(DrawIndexedPrimitiveContextRuntime) == 0x18, "DrawIndexedPrimitiveContextRuntime size must be 0x18"
     );
-    static_assert(
-      offsetof(TechniquePassCountRuntime, passCount) == 0x04, "TechniquePassCountRuntime::passCount offset must be 0x04"
-    );
-    static_assert(sizeof(TechniquePassCountRuntime) == 0x08, "TechniquePassCountRuntime size must be 0x08");
     static_assert(
       offsetof(DeviceContextRuntimeFlags, hwBasedInstancing) == 0x11,
       "DeviceContextRuntimeFlags::hwBasedInstancing offset must be 0x11"
@@ -757,192 +617,199 @@ namespace gpg::gal
       1, 1, 2, 2, 3, 3, 3, 2, 3, 7, 1, 6, 3, 4, 17, 17, 18, 3, 8, 4, 6, 4, 0, 0,
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format0[1] = {
-      {0x00D433F8U, 0U, 16U, 0U, 0U, 0U, 0U},
+    // The per-format input layouts handed to `ID3D10Device::CreateInputLayout`.
+    // The shipped image stores each semantic as a pointer into its own .rdata;
+    // read back from ForgedAlliance.exe those are 0x00D433EC "TEXCOORD",
+    // 0x00D433F8 "POSITION", 0x00D43C1C "BLENDINDICES", 0x00D43C2C "BINORMAL",
+    // 0x00D43C38 "TANGENT", 0x00D43C40 "COLOR" and 0x00D43C48 "NORMAL". Format
+    // and classification are the SDK enumerators for the values the binary
+    // carries, so the tables compile to the same numbers.
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format0[1] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format1[1] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format1[1] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format2[2] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 6U, 0U, 12U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format2[2] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format3[2] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 12U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format3[2] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format4[3] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 1U, 16U, 0U, 20U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format4[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32_FLOAT, 0U, 20U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format5[3] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 6U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 24U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format5[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format6[3] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D43C40U, 0U, 28U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 16U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format6[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"COLOR", 0U, DXGI_FORMAT_R8G8B8A8_UNORM, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format7[2] = {
-      {0x00D433F8U, 0U, 2U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 16U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format7[2] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format8[3] = {
-      {0x00D433F8U, 0U, 2U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 16U, 0U, 0U},
-      {0x00D433ECU, 1U, 16U, 0U, 24U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format8[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format9[7] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 6U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 0U, 16U, 0U, 24U, 0U, 0U},
-      {0x00D433ECU, 1U, 2U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 2U, 2U, 1U, 16U, 1U, 1U},
-      {0x00D433ECU, 3U, 2U, 1U, 32U, 1U, 1U},
-      {0x00D433ECU, 4U, 2U, 1U, 48U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format9[7] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 16U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 32U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 48U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format10[1] = {
-      {0x00D433F8U, 0U, 12U, 0U, 0U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format10[1] = {
+      {"POSITION", 0U, DXGI_FORMAT_R16G16B16A16_UINT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format11[6] = {
-      {0x00D433F8U, 0U, 2U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 2U, 0U, 16U, 0U, 0U},
-      {0x00D433ECU, 1U, 2U, 0U, 32U, 0U, 0U},
-      {0x00D433ECU, 2U, 6U, 0U, 48U, 0U, 0U},
-      {0x00D433ECU, 3U, 2U, 0U, 60U, 0U, 0U},
-      {0x00D433ECU, 4U, 6U, 0U, 76U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format11[6] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 32U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 48U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 60U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 76U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format12[3] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 6U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 1U, 6U, 0U, 24U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format12[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format13[4] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D433ECU, 0U, 2U, 0U, 12U, 0U, 0U},
-      {0x00D433ECU, 1U, 2U, 0U, 28U, 0U, 0U},
-      {0x00D433ECU, 2U, 2U, 0U, 44U, 0U, 0U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format13[4] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 12U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 28U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 44U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format14[17] = {
-      {0x00D433F8U, 0U, 2U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 6U, 0U, 16U, 0U, 0U},
-      {0x00D43C38U, 0U, 6U, 0U, 28U, 0U, 0U},
-      {0x00D43C2CU, 0U, 6U, 0U, 40U, 0U, 0U},
-      {0x00D433ECU, 0U, 2U, 0U, 52U, 0U, 0U},
-      {0x00D43C1CU, 0U, 64U, 0U, 68U, 0U, 0U},
-      {0x00D43C1CU, 1U, 64U, 0U, 69U, 0U, 0U},
-      {0x00D43C1CU, 2U, 64U, 0U, 70U, 0U, 0U},
-      {0x00D43C1CU, 3U, 64U, 0U, 71U, 0U, 0U},
-      {0x00D433ECU, 1U, 6U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 2U, 6U, 1U, 12U, 1U, 1U},
-      {0x00D433ECU, 3U, 6U, 1U, 24U, 1U, 1U},
-      {0x00D433ECU, 4U, 6U, 1U, 36U, 1U, 1U},
-      {0x00D433ECU, 5U, 30U, 1U, 48U, 1U, 1U},
-      {0x00D433ECU, 6U, 2U, 1U, 52U, 1U, 1U},
-      {0x00D43C40U, 0U, 28U, 1U, 68U, 1U, 1U},
-      {0x00D433ECU, 7U, 41U, 1U, 72U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format14[17] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TANGENT", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 28U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BINORMAL", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 40U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32A32_FLOAT, 0U, 52U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 0U, DXGI_FORMAT_R8_SINT, 0U, 68U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 1U, DXGI_FORMAT_R8_SINT, 0U, 69U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 2U, DXGI_FORMAT_R8_SINT, 0U, 70U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 3U, DXGI_FORMAT_R8_SINT, 0U, 71U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 12U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 24U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 36U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 5U, DXGI_FORMAT_R8G8B8A8_UINT, 1U, 48U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 6U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 52U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"COLOR", 0U, DXGI_FORMAT_R8G8B8A8_UNORM, 1U, 68U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 7U, DXGI_FORMAT_R32_FLOAT, 1U, 72U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format15[17] = {
-      {0x00D433F8U, 0U, 10U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 10U, 0U, 8U, 0U, 0U},
-      {0x00D43C38U, 0U, 10U, 0U, 16U, 0U, 0U},
-      {0x00D43C2CU, 0U, 10U, 0U, 24U, 0U, 0U},
-      {0x00D433ECU, 0U, 10U, 0U, 32U, 0U, 0U},
-      {0x00D43C1CU, 0U, 64U, 0U, 40U, 0U, 0U},
-      {0x00D43C1CU, 1U, 64U, 0U, 41U, 0U, 0U},
-      {0x00D43C1CU, 2U, 64U, 0U, 42U, 0U, 0U},
-      {0x00D43C1CU, 3U, 64U, 0U, 43U, 0U, 0U},
-      {0x00D433ECU, 1U, 6U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 2U, 6U, 1U, 12U, 1U, 1U},
-      {0x00D433ECU, 3U, 6U, 1U, 24U, 1U, 1U},
-      {0x00D433ECU, 4U, 6U, 1U, 36U, 1U, 1U},
-      {0x00D433ECU, 5U, 28U, 1U, 48U, 1U, 1U},
-      {0x00D433ECU, 6U, 10U, 1U, 52U, 1U, 1U},
-      {0x00D43C40U, 0U, 28U, 1U, 60U, 1U, 1U},
-      {0x00D433ECU, 7U, 41U, 1U, 64U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format15[17] = {
+      {"POSITION", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 8U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TANGENT", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BINORMAL", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 32U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 0U, DXGI_FORMAT_R8_SINT, 0U, 40U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 1U, DXGI_FORMAT_R8_SINT, 0U, 41U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 2U, DXGI_FORMAT_R8_SINT, 0U, 42U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 3U, DXGI_FORMAT_R8_SINT, 0U, 43U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 12U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 24U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 36U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 5U, DXGI_FORMAT_R8G8B8A8_UNORM, 1U, 48U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 6U, DXGI_FORMAT_R16G16B16A16_FLOAT, 1U, 52U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"COLOR", 0U, DXGI_FORMAT_R8G8B8A8_UNORM, 1U, 60U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 7U, DXGI_FORMAT_R32_FLOAT, 1U, 64U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format16[18] = {
-      {0x00D433F8U, 0U, 10U, 0U, 0U, 0U, 0U},
-      {0x00D43C48U, 0U, 10U, 0U, 8U, 0U, 0U},
-      {0x00D43C38U, 0U, 10U, 0U, 16U, 0U, 0U},
-      {0x00D43C2CU, 0U, 10U, 0U, 24U, 0U, 0U},
-      {0x00D433ECU, 0U, 10U, 0U, 32U, 0U, 0U},
-      {0x00D43C1CU, 0U, 64U, 0U, 40U, 0U, 0U},
-      {0x00D43C1CU, 1U, 64U, 0U, 41U, 0U, 0U},
-      {0x00D43C1CU, 2U, 64U, 0U, 42U, 0U, 0U},
-      {0x00D43C1CU, 3U, 64U, 0U, 43U, 0U, 0U},
-      {0x00D433F8U, 1U, 10U, 1U, 0U, 0U, 0U},
-      {0x00D433ECU, 1U, 6U, 2U, 0U, 1U, 1U},
-      {0x00D433ECU, 2U, 6U, 2U, 12U, 1U, 1U},
-      {0x00D433ECU, 3U, 6U, 2U, 24U, 1U, 1U},
-      {0x00D433ECU, 4U, 6U, 2U, 36U, 1U, 1U},
-      {0x00D433ECU, 5U, 28U, 2U, 48U, 1U, 1U},
-      {0x00D433ECU, 6U, 10U, 2U, 52U, 1U, 1U},
-      {0x00D43C40U, 0U, 28U, 2U, 60U, 1U, 1U},
-      {0x00D433ECU, 7U, 41U, 2U, 64U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format16[18] = {
+      {"POSITION", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"NORMAL", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 8U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TANGENT", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 16U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BINORMAL", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 24U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R16G16B16A16_FLOAT, 0U, 32U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 0U, DXGI_FORMAT_R8_SINT, 0U, 40U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 1U, DXGI_FORMAT_R8_SINT, 0U, 41U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 2U, DXGI_FORMAT_R8_SINT, 0U, 42U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"BLENDINDICES", 3U, DXGI_FORMAT_R8_SINT, 0U, 43U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R16G16B16A16_FLOAT, 1U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 2U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32_FLOAT, 2U, 12U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32_FLOAT, 2U, 24U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 2U, 36U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 5U, DXGI_FORMAT_R8G8B8A8_UNORM, 2U, 48U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 6U, DXGI_FORMAT_R16G16B16A16_FLOAT, 2U, 52U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"COLOR", 0U, DXGI_FORMAT_R8G8B8A8_UNORM, 2U, 60U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 7U, DXGI_FORMAT_R32_FLOAT, 2U, 64U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format17[3] = {
-      {0x00D433F8U, 0U, 6U, 0U, 0U, 0U, 0U},
-      {0x00D433F8U, 1U, 16U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 1U, 16U, 1U, 8U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format17[3] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R32G32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32_FLOAT, 1U, 8U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format18[8] = {
-      {0x00D433F8U, 0U, 16U, 0U, 0U, 0U, 0U},
-      {0x00D433F8U, 1U, 2U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 0U, 16U, 1U, 16U, 1U, 1U},
-      {0x00D433ECU, 1U, 2U, 1U, 24U, 1U, 1U},
-      {0x00D433ECU, 2U, 6U, 1U, 40U, 1U, 1U},
-      {0x00D433ECU, 3U, 2U, 1U, 52U, 1U, 1U},
-      {0x00D433ECU, 4U, 6U, 1U, 68U, 1U, 1U},
-      {0x00D433ECU, 5U, 6U, 1U, 80U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format18[8] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 1U, 16U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 24U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 40U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 52U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 4U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 68U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 5U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 80U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format19[4] = {
-      {0x00D433F8U, 0U, 16U, 0U, 0U, 0U, 0U},
-      {0x00D433F8U, 1U, 2U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 0U, 16U, 1U, 16U, 1U, 1U},
-      {0x00D433ECU, 1U, 2U, 1U, 24U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format19[4] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 1U, 16U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 24U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format20[6] = {
-      {0x00D433F8U, 0U, 16U, 0U, 0U, 0U, 0U},
-      {0x00D433F8U, 1U, 2U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 0U, 6U, 1U, 16U, 1U, 1U},
-      {0x00D433ECU, 1U, 16U, 1U, 28U, 1U, 1U},
-      {0x00D433ECU, 2U, 16U, 1U, 36U, 1U, 1U},
-      {0x00D433ECU, 3U, 2U, 1U, 44U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format20[6] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 16U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32_FLOAT, 1U, 28U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 2U, DXGI_FORMAT_R32G32_FLOAT, 1U, 36U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 3U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 44U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
-    constexpr VertexLayoutElementRuntime kVertexLayoutElements_Format21[4] = {
-      {0x00D433F8U, 0U, 16U, 0U, 0U, 0U, 0U},
-      {0x00D433F8U, 1U, 6U, 1U, 0U, 1U, 1U},
-      {0x00D433ECU, 0U, 16U, 1U, 12U, 1U, 1U},
-      {0x00D433ECU, 1U, 2U, 1U, 20U, 1U, 1U},
+    constexpr D3D10_INPUT_ELEMENT_DESC kVertexLayoutElements_Format21[4] = {
+      {"POSITION", 0U, DXGI_FORMAT_R32G32_FLOAT, 0U, 0U, D3D10_INPUT_PER_VERTEX_DATA, 0U},
+      {"POSITION", 1U, DXGI_FORMAT_R32G32B32_FLOAT, 1U, 0U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 0U, DXGI_FORMAT_R32G32_FLOAT, 1U, 12U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
+      {"TEXCOORD", 1U, DXGI_FORMAT_R32G32B32A32_FLOAT, 1U, 20U, D3D10_INPUT_PER_INSTANCE_DATA, 1U},
     };
 
     // Address: 0x00F311F8 (off_F311F8)
-    constexpr const VertexLayoutElementRuntime* kVertexLayoutElementsByFormat[24] = {
+    constexpr const D3D10_INPUT_ELEMENT_DESC* kVertexLayoutElementsByFormat[24] = {
       kVertexLayoutElements_Format0,
       kVertexLayoutElements_Format1,
       kVertexLayoutElements_Format2,
@@ -1262,14 +1129,12 @@ namespace gpg::gal
 
     void* GetDeviceActiveRenderTargetContextRaw(DeviceD3D10* const device) noexcept
     {
-      auto* const runtimeBytes = reinterpret_cast<std::uint8_t*>(device);
-      return *reinterpret_cast<void**>(runtimeBytes + 0x14);
+      return device->mOutputContext.surface.get();
     }
 
     void* GetDeviceActiveDepthStencilContextRaw(DeviceD3D10* const device) noexcept
     {
-      auto* const runtimeBytes = reinterpret_cast<std::uint8_t*>(device);
-      return *reinterpret_cast<void**>(runtimeBytes + 0x1C);
+      return device->mOutputContext.texture.get();
     }
 
     IndexBufferContextRuntime* InvokeIndexBufferGetContext(IndexBufferD3D10* const indexBuffer)
@@ -1365,7 +1230,7 @@ namespace gpg::gal
 
     HRESULT InvokeNativeCreateInputLayout(
       DeviceD3D10* const device,
-      const VertexLayoutElementRuntime* const elements,
+      const D3D10_INPUT_ELEMENT_DESC* const elements,
       const std::uint32_t elementCount,
       const void* const inputSignature,
       const std::size_t inputSignatureSize,
@@ -1449,7 +1314,7 @@ namespace gpg::gal
       return clearDepthStencilView(nativeDevice, depthStencilView, clearMask, depth, stencil);
     }
 
-    int InvokeNativeSetViewport(DeviceD3D10* const device, const ViewportRuntime* const viewport)
+    int InvokeNativeSetViewport(DeviceD3D10* const device, const D3D10_VIEWPORT* const viewport)
     {
       void* const nativeDevice = GetDeviceNativeHandle(device);
       auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
@@ -1458,7 +1323,7 @@ namespace gpg::gal
     }
 
     void InvokeNativeGetViewport(
-      DeviceD3D10* const device, unsigned int* const viewportCount, ViewportRuntime* const outViewport
+      DeviceD3D10* const device, unsigned int* const viewportCount, D3D10_VIEWPORT* const outViewport
     )
     {
       void* const nativeDevice = GetDeviceNativeHandle(device);
@@ -1562,7 +1427,7 @@ namespace gpg::gal
       return drawIndexedInstanced(nativeDevice, indexCount, instanceCount, startIndex, baseVertex, startInstance);
     }
 
-    void InvokeTechniqueGetPassCount(void* const technique, TechniquePassCountRuntime* const outPassCount);
+    void InvokeTechniqueGetPassCount(void* const technique, D3D10_TECHNIQUE_DESC* const outPassCount);
     void* InvokeEffectGetVariableByName(void* const effect, const char* const name);
     void* InvokeVariableAsShaderResource(void* const variable);
     HRESULT InvokeShaderResourceSetResource(void* const shaderResourceValue, void* const resourceView);
@@ -1586,16 +1451,16 @@ namespace gpg::gal
       void* const sourceShaderResourceView
     )
     {
-      ViewportRuntime savedViewport{};
+      D3D10_VIEWPORT savedViewport{};
       unsigned int savedViewportCount = 1U;
       InvokeNativeGetViewport(device, &savedViewportCount, &savedViewport);
 
       if (destinationRenderTargetView != nullptr) {
-        ViewportRuntime fullscreenViewport{};
-        fullscreenViewport.width = destinationWidth;
-        fullscreenViewport.height = destinationHeight;
-        fullscreenViewport.minDepth = 0.0f;
-        fullscreenViewport.maxDepth = 1.0f;
+        D3D10_VIEWPORT fullscreenViewport{};
+        fullscreenViewport.Width = destinationWidth;
+        fullscreenViewport.Height = destinationHeight;
+        fullscreenViewport.MinDepth = 0.0f;
+        fullscreenViewport.MaxDepth = 1.0f;
         InvokeNativeSetViewport(device, &fullscreenViewport);
       }
 
@@ -1617,10 +1482,10 @@ namespace gpg::gal
         static_cast<void>(InvokeNativeClearTarget(device, 1U, renderTargets, nullptr));
       }
 
-      TechniquePassCountRuntime passCountRuntime{};
+      D3D10_TECHNIQUE_DESC passCountRuntime{};
       InvokeTechniqueGetPassCount(GetDeviceStretchRectTechnique(device), &passCountRuntime);
 
-      for (unsigned int passIndex = 0U; passIndex < passCountRuntime.passCount; ++passIndex) {
+      for (unsigned int passIndex = 0U; passIndex < passCountRuntime.Passes; ++passIndex) {
         void* const sourceVariable = InvokeEffectGetVariableByName(GetDeviceStretchRectEffect(device), "g_txSource");
         void* const sourceAsShaderResource = InvokeVariableAsShaderResource(sourceVariable);
         static_cast<void>(InvokeShaderResourceSetResource(sourceAsShaderResource, sourceShaderResourceView));
@@ -1716,7 +1581,7 @@ namespace gpg::gal
       endTechnique(device);
     }
 
-    HRESULT InvokeEffectGetDesc(void* const effect, D3D10EffectDescRuntime* const outDesc)
+    HRESULT InvokeEffectGetDesc(void* const effect, D3D10_EFFECT_DESC* const outDesc)
     {
       auto** const vtable = *reinterpret_cast<void***>(effect);
       auto* const getDesc = reinterpret_cast<effect_get_desc_fn>(vtable[6]);
@@ -1758,7 +1623,7 @@ namespace gpg::gal
       return isValid(technique);
     }
 
-    HRESULT InvokeTechniqueGetDesc(void* const technique, D3D10TechniqueDescRuntime* const outDesc)
+    HRESULT InvokeTechniqueGetDesc(void* const technique, D3D10_TECHNIQUE_DESC* const outDesc)
     {
       auto** const vtable = *reinterpret_cast<void***>(technique);
       auto* const getDesc = reinterpret_cast<technique_get_desc_fn>(vtable[1]);
@@ -1772,14 +1637,14 @@ namespace gpg::gal
       return getPassByIndex(technique, pass);
     }
 
-    void InvokeTechniqueGetPassCount(void* const technique, TechniquePassCountRuntime* const outPassCount)
+    void InvokeTechniqueGetPassCount(void* const technique, D3D10_TECHNIQUE_DESC* const outPassCount)
     {
       auto** const vtable = *reinterpret_cast<void***>(technique);
       auto* const getPassCount = reinterpret_cast<technique_get_pass_counter_fn>(vtable[1]);
       getPassCount(technique, outPassCount);
     }
 
-    HRESULT InvokePassGetDesc(void* const pass, D3D10PassDescRuntime* const outDesc)
+    HRESULT InvokePassGetDesc(void* const pass, D3D10_PASS_DESC* const outDesc)
     {
       auto** const vtable = *reinterpret_cast<void***>(pass);
       auto* const getDesc = reinterpret_cast<pass_get_desc_fn>(vtable[1]);
@@ -2013,7 +1878,7 @@ namespace gpg::gal
       return result;
     }
 
-    void InvokeTextureGetDesc(void* const texture, TextureDescRuntime* const outDesc)
+    void InvokeTextureGetDesc(void* const texture, D3D10_TEXTURE2D_DESC* const outDesc)
     {
       auto** const vtable = *reinterpret_cast<void***>(texture);
       auto* const getDesc = reinterpret_cast<texture_get_desc_fn>(vtable[12]);
@@ -2021,7 +1886,7 @@ namespace gpg::gal
     }
 
     HRESULT InvokeTextureMap(
-      void* const texture, const int level, const unsigned int mapMode, TextureMapResultRuntime* const outMapped
+      void* const texture, const int level, const unsigned int mapMode, D3D10_MAPPED_TEXTURE2D* const outMapped
     )
     {
       auto** const vtable = *reinterpret_cast<void***>(texture);
@@ -2047,8 +1912,9 @@ namespace gpg::gal
      */
     HRESULT InvokeDeviceHelper34(Device* const device, const int mode, void** const outValue)
     {
-      auto* const helper = *reinterpret_cast<device_helper34_fn*>(reinterpret_cast<std::uint8_t*>(device) + 0x34);
-      return helper(device, mode, outValue);
+      // The binary thunk is `mov eax,[ecx+0x34]; jmp eax`: `this` is not an
+      // argument, the export sees exactly the caller's two stack arguments.
+      return reinterpret_cast<DeviceD3D10*>(device)->mD3D10CreateBlob(static_cast<std::uint32_t>(mode), outValue);
     }
 
     /**
@@ -2062,8 +1928,8 @@ namespace gpg::gal
      */
     HRESULT InvokeDeviceHelper44(Device* const device, void* const texture, const int mode, void** const outValue)
     {
-      auto* const helper = *reinterpret_cast<device_helper44_fn*>(reinterpret_cast<std::uint8_t*>(device) + 0x44);
-      return helper(device, texture, mode, outValue);
+      // `mov ecx,[ecx+0x44]; jmp ecx`: as above, three stack arguments and no `this`.
+      return reinterpret_cast<DeviceD3D10*>(device)->mD3DX10SaveTextureToMemory(texture, mode, outValue);
     }
 
     int ResolveImageFileFormatToken(const int token) noexcept
@@ -2227,33 +2093,29 @@ namespace gpg::gal
       return AllocateArrayOrThrow(count, 0x04U);
     }
 
-    device_create_blob_api_fn GetDeviceCreateBlobApi(DeviceD3D10* const device) noexcept
+    DeviceD3D10::D3D10CreateBlobFn GetDeviceCreateBlobApi(DeviceD3D10* const device) noexcept
     {
-      return *reinterpret_cast<device_create_blob_api_fn*>(reinterpret_cast<std::uint8_t*>(device) + 0x34);
+      return device->mD3D10CreateBlob;
     }
 
-    device_create_effect_from_memory_api_fn GetDeviceCreateEffectFromMemoryApi(DeviceD3D10* const device) noexcept
+    DeviceD3D10::D3DX10CreateEffectFromMemoryFn GetDeviceCreateEffectFromMemoryApi(DeviceD3D10* const device) noexcept
     {
-      return *reinterpret_cast<device_create_effect_from_memory_api_fn*>(
-        reinterpret_cast<std::uint8_t*>(device) + 0x38
-      );
+      return device->mD3DX10CreateEffectFromMemory;
     }
 
-    device_create_texture_from_memory_api_fn GetDeviceCreateTextureFromMemoryApi(DeviceD3D10* const device) noexcept
+    DeviceD3D10::D3DX10CreateTextureFromMemoryFn GetDeviceCreateTextureFromMemoryApi(DeviceD3D10* const device) noexcept
     {
-      return *reinterpret_cast<device_create_texture_from_memory_api_fn*>(
-        reinterpret_cast<std::uint8_t*>(device) + 0x3C
-      );
+      return device->mD3DX10CreateTextureFromMemory;
     }
 
-    device_save_texture_to_file_api_fn GetDeviceSaveTextureToFileApi(DeviceD3D10* const device) noexcept
+    DeviceD3D10::D3DX10SaveTextureToFileFn GetDeviceSaveTextureToFileApi(DeviceD3D10* const device) noexcept
     {
-      return *reinterpret_cast<device_save_texture_to_file_api_fn*>(reinterpret_cast<std::uint8_t*>(device) + 0x40);
+      return device->mD3DX10SaveTextureToFileA;
     }
 
-    device_save_texture_to_memory_api_fn GetDeviceSaveTextureToMemoryApi(DeviceD3D10* const device) noexcept
+    DeviceD3D10::D3DX10SaveTextureToMemoryFn GetDeviceSaveTextureToMemoryApi(DeviceD3D10* const device) noexcept
     {
-      return *reinterpret_cast<device_save_texture_to_memory_api_fn*>(reinterpret_cast<std::uint8_t*>(device) + 0x44);
+      return device->mD3DX10SaveTextureToMemory;
     }
 
     HRESULT InvokeCreateBlobApi(DeviceD3D10* const device, void** const outBlob)
@@ -2266,7 +2128,7 @@ namespace gpg::gal
       const void* const sourceData,
       const std::uint32_t sourceBytes,
       const D3D10_SHADER_MACRO* const defines,
-      void** const outEffect,
+      ID3D10Effect** const outEffect,
       void** const outErrors
     )
     {
@@ -2278,7 +2140,7 @@ namespace gpg::gal
         nullptr,
         0x1000U,
         0U,
-        GetDeviceNativeHandle(device),
+        device->mDevice,
         nullptr,
         nullptr,
         outEffect,
@@ -2635,7 +2497,7 @@ namespace gpg::gal
      * writes pass-desc IA signature lanes for input-layout creation.
      */
     void GetVertexInputSignatureOrThrow(
-      DeviceD3D10* const device, const int formatToken, D3D10PassDescRuntime* const outPassDesc
+      DeviceD3D10* const device, const int formatToken, D3D10_PASS_DESC* const outPassDesc
     )
     {
       void* const signatureEffect = GetDeviceSignatureEffect(device);
@@ -2726,13 +2588,13 @@ namespace gpg::gal
      */
     void* CreateStagingTextureCopyOrThrow(Device* const device, void* const sourceTexture)
     {
-      TextureDescRuntime textureDesc{};
+      D3D10_TEXTURE2D_DESC textureDesc{};
       InvokeTextureGetDesc(sourceTexture, &textureDesc);
-      textureDesc.usage = 3U;
-      textureDesc.bindFlags = 0U;
-      textureDesc.cpuAccessFlags = 0x20000U;
+      textureDesc.Usage = D3D10_USAGE_STAGING;
+      textureDesc.BindFlags = 0U;
+      textureDesc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
 
-      void* const nativeDevice = *reinterpret_cast<void**>(reinterpret_cast<std::uint8_t*>(device) + 0xC0);
+      ID3D10Device* const nativeDevice = reinterpret_cast<DeviceD3D10*>(device)->mDevice;
       auto** const nativeVtable = *reinterpret_cast<void***>(nativeDevice);
 
       void* stagingTexture = nullptr;
@@ -2895,7 +2757,7 @@ namespace gpg::gal
      * Validates one vertex-format token and returns the matching static
      * element-layout table pointer.
      */
-    const VertexLayoutElementRuntime* GetVertexLayoutElementsOrThrow(const std::uint32_t format)
+    const D3D10_INPUT_ELEMENT_DESC* GetVertexLayoutElementsOrThrow(const std::uint32_t format)
     {
       if (format >= 24U) {
         ThrowGalError("VertexFormatD3D10.cpp", 426, "invalid vertex format specified");
@@ -4576,11 +4438,11 @@ namespace gpg::gal
   {
     DestroyState();
 
-    TextureDescRuntime textureDesc{};
+    D3D10_TEXTURE2D_DESC textureDesc{};
     InvokeTextureGetDesc(renderTexture, &textureDesc);
-    context_.format_ = static_cast<std::uint32_t>(MapDxgiToGalRenderTargetFormat(static_cast<int>(textureDesc.format)));
-    context_.width_ = textureDesc.width;
-    context_.height_ = textureDesc.height;
+    context_.format_ = static_cast<std::uint32_t>(MapDxgiToGalRenderTargetFormat(static_cast<int>(textureDesc.Format)));
+    context_.width_ = textureDesc.Width;
+    context_.height_ = textureDesc.Height;
 
     renderTexture_ = renderTexture;
     renderTargetView_ = renderTargetView;
@@ -4966,23 +4828,23 @@ namespace gpg::gal
     if (((flags & 1) == 0) && ((flags & 2) != 0)) {
       mapMode = 1U;
 
-      TextureDescRuntime textureDesc{};
+      D3D10_TEXTURE2D_DESC textureDesc{};
       InvokeTextureGetDesc(lockedTexture, &textureDesc);
-      if ((textureDesc.cpuAccessFlags & 0x20000U) == 0U) {
+      if ((textureDesc.CPUAccessFlags & 0x20000U) == 0U) {
         Device* const device = Device::GetInstance();
         stagingTexture_ = CreateStagingTextureCopyOrThrow(device, lockedTexture);
         mapTexture = stagingTexture_;
       }
     }
 
-    TextureMapResultRuntime mapped{};
+    D3D10_MAPPED_TEXTURE2D mapped{};
     const HRESULT mapResult = InvokeTextureMap(mapTexture, level, mapMode, &mapped);
     if (mapResult < 0) {
       ThrowGalErrorFromHresult("TextureD3D10.cpp", 96, mapResult);
     }
 
-    outRect->pitch = mapped.pitch;
-    outRect->bits = mapped.bits;
+    outRect->pitch = mapped.RowPitch;
+    outRect->bits = mapped.pData;
     lockHistory_[level] = *outRect;
     return outRect;
   }
@@ -5150,11 +5012,11 @@ namespace gpg::gal
     shaderResourceView_ = shaderResourceView;
     texture_ = texture;
 
-    TextureDescRuntime textureDesc{};
+    D3D10_TEXTURE2D_DESC textureDesc{};
     InvokeTextureGetDesc(texture_, &textureDesc);
-    context_.mipmapLevels_ = textureDesc.mipLevels;
-    context_.width_ = textureDesc.width;
-    context_.height_ = textureDesc.height;
+    context_.mipmapLevels_ = textureDesc.MipLevels;
+    context_.width_ = textureDesc.Width;
+    context_.height_ = textureDesc.Height;
 
     if (context_.mipmapLevels_ < 1U) {
       ThrowGalError("TextureD3D10.cpp", 205, "invalid texture");
@@ -5172,7 +5034,7 @@ namespace gpg::gal
     contextFormatBackup_ = static_cast<int>(context_.format_);
     const int contextFormatBackupDxgi = MapGalTextureFormatToDxgi(contextFormatBackup_);
     static_cast<void>(contextFormatBackupDxgi);
-    context_.format_ = static_cast<std::uint32_t>(MapDxgiToGalTextureFormat(static_cast<int>(textureDesc.format)));
+    context_.format_ = static_cast<std::uint32_t>(MapDxgiToGalTextureFormat(static_cast<int>(textureDesc.Format)));
     const unsigned int formatBlockBytes = GetTextureFormatBlockBytes(context_.format_);
     static_cast<void>(formatBlockBytes);
     if (context_.format_ == 20U) {
@@ -6376,7 +6238,7 @@ namespace gpg::gal
         ? (inboundRuntime->field50 - inboundRuntime->field4C)
         : 0U;
 
-    void* dxEffect = nullptr;
+    ID3D10Effect* dxEffect = nullptr;
     void* errorBlob = nullptr;
     const HRESULT result =
       InvokeCreateEffectFromMemoryApi(this, sourceData, sourceBytes, defines, &dxEffect, &errorBlob);
@@ -6474,15 +6336,15 @@ namespace gpg::gal
     }
 
     if (nativeTexture != nullptr) {
-      TextureDescRuntime textureDesc{};
+      D3D10_TEXTURE2D_DESC textureDesc{};
       InvokeTextureGetDesc(nativeTexture, &textureDesc);
 
       D3D10_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc{};
       shaderResourceViewDesc.Format = DXGI_FORMAT_UNKNOWN;
       shaderResourceViewDesc.ViewDimension =
-        (textureDesc.miscFlags != 4U) ? D3D10_SRV_DIMENSION_TEXTURE2D : D3D10_SRV_DIMENSION_TEXTURECUBE;
+        (textureDesc.MiscFlags != 4U) ? D3D10_SRV_DIMENSION_TEXTURE2D : D3D10_SRV_DIMENSION_TEXTURECUBE;
       shaderResourceViewDesc.Texture2D.MostDetailedMip = 0U;
-      shaderResourceViewDesc.Texture2D.MipLevels = textureDesc.mipLevels;
+      shaderResourceViewDesc.Texture2D.MipLevels = textureDesc.MipLevels;
 
       const HRESULT createSrvResult =
         InvokeNativeCreateShaderResourceView(this, nativeTexture, &shaderResourceViewDesc, &shaderResourceView);
@@ -6545,11 +6407,11 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 954, createSrvResult);
     }
 
-    ViewportRuntime viewport{};
-    viewport.width = context->width_;
-    viewport.height = context->height_;
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
+    D3D10_VIEWPORT viewport{};
+    viewport.Width = context->width_;
+    viewport.Height = context->height_;
+    viewport.MinDepth = 0.0f;
+    viewport.MaxDepth = 1.0f;
     SetViewport(&viewport);
 
     outRenderTarget->reset(new RenderTargetD3D10(context, nativeTexture, renderTargetView, shaderResourceView));
@@ -6651,15 +6513,15 @@ namespace gpg::gal
     boost::shared_ptr<VertexFormatD3D10>* const outVertexFormat, const std::uint32_t formatToken
   )
   {
-    const VertexLayoutElementRuntime* const elements = GetVertexLayoutElementsOrThrow(formatToken);
+    const D3D10_INPUT_ELEMENT_DESC* const elements = GetVertexLayoutElementsOrThrow(formatToken);
     const std::uint32_t elementCount = GetVertexLayoutElementCountOrThrow(formatToken);
 
-    D3D10PassDescRuntime passDesc{};
+    D3D10_PASS_DESC passDesc{};
     GetVertexInputSignatureOrThrow(this, static_cast<int>(formatToken), &passDesc);
 
     void* inputLayout = nullptr;
     const HRESULT createInputLayoutResult = InvokeNativeCreateInputLayout(
-      this, elements, elementCount, passDesc.inputSignature, passDesc.inputSignatureSize, &inputLayout
+      this, elements, elementCount, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &inputLayout
     );
     if (createInputLayoutResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1029, createInputLayoutResult);
@@ -7091,14 +6953,14 @@ namespace gpg::gal
       AddRefComLike(sourceTexture);
     }
 
-    TextureDescRuntime textureDesc{};
+    D3D10_TEXTURE2D_DESC textureDesc{};
     InvokeTextureGetDesc(sourceTexture, &textureDesc);
-    *outWidth = textureDesc.width;
-    *outHeight = static_cast<int>(textureDesc.height);
+    *outWidth = textureDesc.Width;
+    *outHeight = static_cast<int>(textureDesc.Height);
 
-    textureDesc.usage = 3U;
-    textureDesc.bindFlags = 0U;
-    textureDesc.cpuAccessFlags = 0x20000U;
+    textureDesc.Usage = D3D10_USAGE_STAGING;
+    textureDesc.BindFlags = 0U;
+    textureDesc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
 
     void* stagingTexture = nullptr;
     {
@@ -7116,7 +6978,7 @@ namespace gpg::gal
       copyResource(nativeDevice, stagingTexture, sourceTexture);
     }
 
-    TextureMapResultRuntime mappedTexture{};
+    D3D10_MAPPED_TEXTURE2D mappedTexture{};
     result = InvokeTextureMap(stagingTexture, 0, 1U, &mappedTexture);
     if (result < 0) {
       ReleaseComLike(stagingTexture);
@@ -7125,8 +6987,8 @@ namespace gpg::gal
       ThrowDeviceD3D10Hresult(1352, result);
     }
 
-    const std::uint32_t rowBytes = 16U * ((textureDesc.width + 3U) / 4U);
-    const std::uint32_t rowCount = (textureDesc.height + 3U) / 4U;
+    const std::uint32_t rowBytes = 16U * ((textureDesc.Width + 3U) / 4U);
+    const std::uint32_t rowCount = (textureDesc.Height + 3U) / 4U;
     const std::size_t requiredBytes = static_cast<std::size_t>(rowBytes) * static_cast<std::size_t>(rowCount);
     if (outTextureData->Size() != requiredBytes) {
       gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(requiredBytes);
@@ -7134,13 +6996,13 @@ namespace gpg::gal
     }
 
     char* const destinationBytes = outTextureData->GetPtr(0U, 0U);
-    const auto* const sourceBytesPtr = reinterpret_cast<const std::uint8_t*>(mappedTexture.bits);
-    if (static_cast<unsigned int>(mappedTexture.pitch) == rowBytes) {
+    const auto* const sourceBytesPtr = reinterpret_cast<const std::uint8_t*>(mappedTexture.pData);
+    if (static_cast<unsigned int>(mappedTexture.RowPitch) == rowBytes) {
       std::memcpy(destinationBytes, sourceBytesPtr, requiredBytes);
     } else {
       char* writeCursor = destinationBytes;
       for (std::uint32_t row = 0U; row < rowCount; ++row) {
-        std::memcpy(writeCursor, sourceBytesPtr + (static_cast<std::size_t>(mappedTexture.pitch) * row), rowBytes);
+        std::memcpy(writeCursor, sourceBytesPtr + (static_cast<std::size_t>(mappedTexture.RowPitch) * row), rowBytes);
         writeCursor += rowBytes;
       }
     }
@@ -7279,14 +7141,14 @@ namespace gpg::gal
    */
   int DeviceD3D10::SetViewport(const void* const viewport)
   {
-    const auto* const sourceViewport = reinterpret_cast<const ViewportRuntime*>(viewport);
-    ViewportRuntime viewportCopy{};
-    viewportCopy.topLeftX = sourceViewport->topLeftX;
-    viewportCopy.topLeftY = sourceViewport->topLeftY;
-    viewportCopy.width = sourceViewport->width;
-    viewportCopy.height = sourceViewport->height;
-    viewportCopy.minDepth = sourceViewport->minDepth;
-    viewportCopy.maxDepth = sourceViewport->maxDepth;
+    const auto* const sourceViewport = reinterpret_cast<const D3D10_VIEWPORT*>(viewport);
+    D3D10_VIEWPORT viewportCopy{};
+    viewportCopy.TopLeftX = sourceViewport->TopLeftX;
+    viewportCopy.TopLeftY = sourceViewport->TopLeftY;
+    viewportCopy.Width = sourceViewport->Width;
+    viewportCopy.Height = sourceViewport->Height;
+    viewportCopy.MinDepth = sourceViewport->MinDepth;
+    viewportCopy.MaxDepth = sourceViewport->MaxDepth;
     return InvokeNativeSetViewport(this, &viewportCopy);
   }
 
@@ -7301,16 +7163,16 @@ namespace gpg::gal
   void* DeviceD3D10::GetViewport(void* const outViewport)
   {
     unsigned int viewportCount = 1U;
-    ViewportRuntime viewport{};
+    D3D10_VIEWPORT viewport{};
     InvokeNativeGetViewport(this, &viewportCount, &viewport);
 
-    auto* const destinationViewport = reinterpret_cast<ViewportRuntime*>(outViewport);
-    destinationViewport->topLeftX = viewport.topLeftX;
-    destinationViewport->topLeftY = viewport.topLeftY;
-    destinationViewport->width = viewport.width;
-    destinationViewport->height = viewport.height;
-    destinationViewport->minDepth = viewport.minDepth;
-    destinationViewport->maxDepth = viewport.maxDepth;
+    auto* const destinationViewport = reinterpret_cast<D3D10_VIEWPORT*>(outViewport);
+    destinationViewport->TopLeftX = viewport.TopLeftX;
+    destinationViewport->TopLeftY = viewport.TopLeftY;
+    destinationViewport->Width = viewport.Width;
+    destinationViewport->Height = viewport.Height;
+    destinationViewport->MinDepth = viewport.MinDepth;
+    destinationViewport->MaxDepth = viewport.MaxDepth;
     return outViewport;
   }
 
@@ -7675,7 +7537,7 @@ namespace gpg::gal
     vertexDeclaration_ = vertexDeclaration;
     format_ = format;
 
-    const VertexLayoutElementRuntime* const layoutElements = GetVertexLayoutElementsOrThrow(format_);
+    const D3D10_INPUT_ELEMENT_DESC* const layoutElements = GetVertexLayoutElementsOrThrow(format_);
     const std::uint32_t layoutElementCount = GetVertexLayoutElementCountOrThrow(format_);
 
     if (streamStrides_.begin_ != streamStrides_.end_) {
@@ -7684,11 +7546,11 @@ namespace gpg::gal
 
     std::uint32_t result = layoutElementCount;
     for (std::uint32_t index = 0; index < layoutElementCount; ++index) {
-      const VertexLayoutElementRuntime& element = layoutElements[index];
-      EnsureVertexStreamStrideCount(&streamStrides_, element.inputSlot + 1U);
+      const D3D10_INPUT_ELEMENT_DESC& element = layoutElements[index];
+      EnsureVertexStreamStrideCount(&streamStrides_, element.InputSlot + 1U);
 
-      std::uint32_t* const streamStride = streamStrides_.begin_ + element.inputSlot;
-      const std::uint32_t candidate = element.alignedByteOffset + GetTextureFormatBlockBytes(element.format);
+      std::uint32_t* const streamStride = streamStrides_.begin_ + element.InputSlot;
+      const std::uint32_t candidate = element.AlignedByteOffset + GetTextureFormatBlockBytes(element.Format);
       result = (*streamStride > candidate) ? *streamStride : candidate;
       *streamStride = result;
     }
@@ -7749,19 +7611,19 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 52, "invalid effect");
     }
 
-    D3D10EffectDescRuntime effectDesc{};
+    D3D10_EFFECT_DESC effectDesc{};
     HRESULT result = InvokeEffectGetDesc(dxEffect_, &effectDesc);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectD3D10.cpp", 57, result);
     }
 
-    for (unsigned int index = 0; index < effectDesc.techniqueCount; ++index) {
+    for (unsigned int index = 0; index < effectDesc.Techniques; ++index) {
       void* const techniqueHandle = InvokeEffectGetTechniqueByIndex(dxEffect_, index);
       if ((techniqueHandle == nullptr) || (InvokeTechniqueIsValid(techniqueHandle) == FALSE)) {
         continue;
       }
 
-      D3D10TechniqueDescRuntime techniqueDesc{};
+      D3D10_TECHNIQUE_DESC techniqueDesc{};
       result = InvokeTechniqueGetDesc(techniqueHandle, &techniqueDesc);
       if (result < 0) {
         ThrowGalErrorFromHresult("EffectD3D10.cpp", 69, result);
@@ -7769,7 +7631,7 @@ namespace gpg::gal
 
       outTechniques.push_back(
         boost::shared_ptr<EffectTechniqueD3D10>(
-          new EffectTechniqueD3D10(techniqueDesc.name, dxEffect_, techniqueHandle)
+          new EffectTechniqueD3D10(techniqueDesc.Name, dxEffect_, techniqueHandle)
         )
       );
     }
@@ -7904,14 +7766,14 @@ namespace gpg::gal
     Device* const device = Device::GetInstance();
     InvokeDeviceBeginTechnique(device);
 
-    D3D10TechniqueDescRuntime techniqueDesc{};
+    D3D10_TECHNIQUE_DESC techniqueDesc{};
     const HRESULT result = InvokeTechniqueGetDesc(techniqueHandle_, &techniqueDesc);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 67, result);
     }
 
     beginEndActive_ = true;
-    return static_cast<int>(techniqueDesc.passCount);
+    return static_cast<int>(techniqueDesc.Passes);
   }
 
   /**
