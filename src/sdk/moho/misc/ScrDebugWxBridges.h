@@ -23,10 +23,12 @@ namespace moho::scrdebug
    *
    * The constructors allocate for themselves. The shipped binary split
    * allocation from construction and the call sites carried its byte counts
-   * (0x74 wxMenu, 0x160 wxMenuBar, 0x1A4 wxSplitterWindow, ...), but a
-   * static_assert showed sizeof(wxMenuItem) in this vendored wx build already
-   * exceeds the 0x74 it was given - those numbers describe the wx Gas Powered
-   * Games linked, not the one we link, and reusing them was a heap overflow.
+   * (0x74 wxMenu, 0x160 wxMenuBar, 0x1A4 wxSplitterWindow, ...). Those are
+   * exactly this vendored build's sizeof()s - measured against the headers
+   * wxmswu.lib was compiled from; see platform/WxWidgets.h. (An earlier note
+   * here compared wxMenuItem, which is 0x8C, against wxMenu's 0x74 and
+   * concluded the two wx builds differed; they do not.) `new T()` states the
+   * same allocation without repeating the number.
    *
    * Each entry cites the wx library body its call site dispatches to, read
    * from the disassembly of `ScrDebugWindow`'s constructor (`FUN_004BC110`).

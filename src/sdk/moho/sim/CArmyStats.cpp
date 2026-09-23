@@ -4,7 +4,7 @@
 // needs to own the `windows.h` inclusion so that `wx/msw/winundef.h` can drop
 // the `CreateDialog`/`GetClassInfo` macros before the wx class declarations are
 // parsed.
-#include <wx/defs.h>
+#include "platform/WxWidgets.h"
 #include <wx/dirdlg.h>
 
 #include "CArmyStats.h"

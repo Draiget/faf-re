@@ -2772,6 +2772,9 @@
     <ClInclude Include="platform\Platform.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="platform\WxWidgets.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\resource\CSimResources.h">
       <Filter>Header Files</Filter>
     </ClInclude>

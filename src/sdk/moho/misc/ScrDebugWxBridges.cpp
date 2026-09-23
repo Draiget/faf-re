@@ -6,6 +6,7 @@
 // definable at all - see ScrDebugWxBridges.h for why they had no definition
 // before.
 
+#include "platform/WxWidgets.h"
 #include <wx/wxprec.h>
 
 #ifndef WX_PRECOMP
@@ -20,15 +21,6 @@
 #include <wx/listctrl.h>
 #include <wx/dirctrl.h>
 #include <wx/bitmap.h>
-
-// wx/memory.h does `#define new WXDEBUG_NEW` whenever __WXDEBUG__ is on, which
-// _DEBUG turns on for us (wx/debug.h:26) even though the shipped game linked wx
-// with it off. That macro rewrites the placement-new below into a three-argument
-// call that has no overload, and rewrites plain `new` into wx's debug
-// allocator. Drop it; this file wants the real operator.
-#ifdef new
-#undef new
-#endif
 
 #include <new>
 

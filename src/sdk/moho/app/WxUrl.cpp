@@ -1,5 +1,7 @@
 #include "moho/app/WxUrl.h"
 
+#include "platform/WxWidgets.h"
+
 #include <cwchar>
 #include <vector>
 #include <windows.h>

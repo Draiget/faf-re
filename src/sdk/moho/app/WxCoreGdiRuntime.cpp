@@ -15,20 +15,6 @@ namespace
     "WxFontRefDataRuntimeView::nativeHandle offset must be 0x24"
   );
 
-  /**
-   * Address: 0x0096EA50 (FUN_0096EA50, GetHfontOf)
-   *
-   * What it does:
-   * Returns the native HFONT handle lane from wxFont ref-data storage, or zero
-   * when the font object has no shared ref-data.
-   */
-  [[maybe_unused]] std::uintptr_t GetHfontOf(
-    const void* const refData
-  )
-  {
-    const auto* const fontRefData = reinterpret_cast<const WxFontRefDataRuntimeView*>(refData);
-    return (fontRefData != nullptr) ? fontRefData->nativeHandle : 0u;
-  }
 } // namespace
 
 /**

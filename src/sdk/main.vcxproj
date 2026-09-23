@@ -2554,6 +2554,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\unit\EUnitCommandQueueStatusTypeInfo.h" />
     <ClInclude Include="moho\vision\VisionDB.h" />
     <ClInclude Include="platform\Platform.h" />
+    <ClInclude Include="platform\WxWidgets.h" />
     <ClInclude Include="util\Build.h" />
     <ClInclude Include="util\Debug.h" />
     <ClInclude Include="moho\misc\TypeInfo.h" />
