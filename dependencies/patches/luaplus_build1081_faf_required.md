@@ -63,8 +63,7 @@ Two defects, both fixed:
    recorded nowhere, since `dependencies/` is gitignored.
 
 Anyone setting up a fresh checkout would have got stock LuaPlus VM layouts with
-no error and no warning. See
-[`docker/DEPENDENCY-AUDIT.md`](../../docker/DEPENDENCY-AUDIT.md) findings 1 and 2.
+no error and no warning.
 
 The regenerated patch was verified by applying it to a fresh extraction of the
 archive and hashing the result: byte-identical to the working tree, zero
