@@ -78,4 +78,23 @@ namespace LuaPlus
 	// `luaU_undump` in LuaParser.cpp can invoke them by name.
 	void LuaLoadChunkHeader(LoadState* loadState);
 	Proto* LuaLoadProtoObject(LoadState* loadState, TString* fallbackSource);
+
+	/**
+	 * Native byte order, as the chunk header records it: 1 for little-endian,
+	 * 0 for big. Upstream writes a local `int x = 1` and reads its first byte;
+	 * this is a 32-bit x86 build, so the whole function folded to `mov eax, 1`.
+	 *
+	 * Recovered in LuaObject.cpp with the rest of the loader, immediately
+	 * before `LuaLoadChunkHeader` - which is where upstream's `lundump.c`
+	 * defines it, and where the binary puts it too.
+	 */
+	int luaU_endianness();
+
+	/**
+	 * Writes one compiled chunk to `writer` - the dump half of the format
+	 * `LuaLoadChunkHeader` / `LuaLoadProtoObject` read. Recovered in
+	 * LuaDump.cpp, which owns the file-private sub-dumpers it drives, and
+	 * declared here because `lua_dump` in LuaObject.cpp is its only caller.
+	 */
+	void luaU_dump(lua_State* state, const Proto* mainPrototype, lua_Chunkwriter writer, void* writerData);
 }

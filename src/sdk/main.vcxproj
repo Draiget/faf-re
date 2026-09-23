@@ -157,8 +157,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\LuaPlus_Build1081\Prebuilt\Lib\win32;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLibD_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <IgnoreSpecificDefaultLibraries>msvcrt.lib;%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ForceFileOutput>Enabled</ForceFileOutput>
@@ -204,8 +204,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\LuaPlus_Build1081\Prebuilt\Lib\win32;$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;LuaPlusLib_1081.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(DirectXLibX86);$(FafRepoRoot)dependencies\wxWindows-2.4.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ws2_32.lib;d3d9.lib;d3dx9.lib;d3d10.lib;dxgi.lib;dxguid.lib;dsound.lib;x3daudio.lib;legacy_stdio_definitions.lib;legacy_stdio_wide_specifiers.lib;dbghelp.lib;winmm.lib;version.lib;comctl32.lib;shlwapi.lib;faultrep.lib;zlib.lib;wxmswu.lib;regex.lib;png.lib;jpeg.lib;tiff.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalOptions>/IGNORE:4006 %(AdditionalOptions)</AdditionalOptions>
       <!-- Mirror of the Debug link, which excludes the release CRT so nothing
            can drag it in beside the debug one. This configuration uses the
@@ -331,6 +331,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="lua\LuaTypeInfoRegistration.cpp" />
     <ClCompile Include="lua\LuaTableIterator.cpp" />
     <ClCompile Include="lua\LuaStateConstruct.cpp" />
+    <ClCompile Include="lua\LuaDump.cpp" />
     <ClCompile Include="lua\LuaError.cpp" />
     <ClCompile Include="lua\LuaObject.cpp" />
     <ClCompile Include="lua\LuaParser.cpp" />

@@ -269,6 +269,33 @@ static_assert(offsetof(Proto, sizep) == 0x34, "Proto::sizep offset must be 0x34"
 static_assert(offsetof(Proto, sizelocvars) == 0x38, "Proto::sizelocvars offset must be 0x38");
 static_assert(sizeof(LocVar) == 0x0C, "LocVar size must be 0x0C");
 
+// The chunk writer pins the rest of the object, and it is the only place that
+// reads every remaining field in one pass. `DumpFunction` (0x00914BC0) walks
+// them in declaration order:
+//
+//     mov eax,[ebx+3Ch]                 lineDefined
+//     movzx edx,byte ptr [ebx+44h]      nups
+//     mov cl,byte ptr [ebx+45h]         numparams
+//     mov al,byte ptr [ebx+46h]         is_vararg
+//     movzx edx,byte ptr [ebx+47h]      maxstacksize
+//     mov ecx,[ebx+30h] / mov edx,[ebx+14h] / add ecx,ecx twice
+//                                       sizelineinfo / lineinfo, 4-byte stride
+//     mov edx,[ebx+2Ch] / mov eax,[ebx+0Ch] / add edx,edx twice
+//                                       sizecode / code, 4-byte Instruction
+//
+// The two vector lanes are what tell `DumpLines` and `DumpCode` apart, so the
+// +0x30/+0x14 and +0x2C/+0x0C pairs have to stay exactly as they are; the
+// out-of-line `DumpLines` at 0x009149F0 reads the same +0x30/+0x14 pair.
+static_assert(offsetof(Proto, code) == 0x0C, "Proto::code offset must be 0x0C");
+static_assert(offsetof(Proto, lineinfo) == 0x14, "Proto::lineinfo offset must be 0x14");
+static_assert(offsetof(Proto, sizecode) == 0x2C, "Proto::sizecode offset must be 0x2C");
+static_assert(offsetof(Proto, sizelineinfo) == 0x30, "Proto::sizelineinfo offset must be 0x30");
+static_assert(offsetof(Proto, lineDefined) == 0x3C, "Proto::lineDefined offset must be 0x3C");
+static_assert(offsetof(Proto, nups) == 0x44, "Proto::nups offset must be 0x44");
+static_assert(offsetof(Proto, numparams) == 0x45, "Proto::numparams offset must be 0x45");
+static_assert(offsetof(Proto, is_vararg) == 0x46, "Proto::is_vararg offset must be 0x46");
+static_assert(offsetof(Proto, maxstacksize) == 0x47, "Proto::maxstacksize offset must be 0x47");
+
 struct UpVal
 {
 	GCObject* next;

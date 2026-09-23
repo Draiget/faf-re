@@ -1746,6 +1746,9 @@
     <ClCompile Include="legacy\containers\Map.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="lua\LuaDump.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="lua\LuaObject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

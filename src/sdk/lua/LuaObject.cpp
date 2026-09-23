@@ -1906,6 +1906,69 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090D9A0 (FUN_0090D9A0, lua_getupvalue)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl lua_getupvalue(lua_State *L, int funcindex, int n);
+	 *
+	 * What it does:
+	 * Resolves upvalue `n` of the closure at `funcindex` through `aux_upvalue`
+	 * and, when it exists, pushes its value onto the stack and returns its name.
+	 *
+	 * The push is `api_incr_top` open-coded, and this fork's version carries a
+	 * stack check the stock one does not: at 0x0090D9D2 it compares the new top
+	 * against `L->ci->top` and, only when the top has reached or passed it, also
+	 * checks `L->stack_last - L->top` and grows by one slot when eight bytes or
+	 * fewer remain. One TObject is eight bytes here, so that is "no room for the
+	 * value we just wrote".
+	 */
+	extern "C" const char* lua_getupvalue(lua_State* const state, const int functionIndex, const int upvalueIndex)
+	{
+		TObject* valueSlot = nullptr;
+		const char* const upvalueName = aux_upvalue(state, functionIndex, &valueSlot, upvalueIndex);
+		if (upvalueName == nullptr) {
+			return nullptr;
+		}
+
+		*state->top = *valueSlot;
+
+		if (state->top >= state->ci->top && state->stack_last - state->top <= 1) {
+			luaD_growstack(state, 1);
+		}
+		++state->top;
+
+		return upvalueName;
+	}
+
+	/**
+	 * Address: 0x0090DA00 (FUN_0090DA00, lua_setupvalue)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl lua_setupvalue(lua_State *L, int funcindex, int n);
+	 *
+	 * What it does:
+	 * Resolves upvalue `n` of the closure at `funcindex` through `aux_upvalue`
+	 * and, when it exists, pops the stack top into it and returns its name.
+	 *
+	 * Note the asymmetry with `lua_getupvalue` above: the pop happens only on
+	 * the success path (0x0090DA1F sits after the `test eax, eax` at 0x0090DA1B),
+	 * so a failed lookup leaves the stack untouched.
+	 */
+	extern "C" const char* lua_setupvalue(lua_State* const state, const int functionIndex, const int upvalueIndex)
+	{
+		TObject* valueSlot = nullptr;
+		const char* const upvalueName = aux_upvalue(state, functionIndex, &valueSlot, upvalueIndex);
+		if (upvalueName == nullptr) {
+			return nullptr;
+		}
+
+		--state->top;
+		*valueSlot = *state->top;
+
+		return upvalueName;
+	}
+
+	/**
 	 * Address: 0x0090E330 (FUN_0090E330, luaL_pushresult)
 	 *
 	 * What it does:
@@ -4028,6 +4091,35 @@ extern "C"
 	}
 
 	/**
+	 * Address: 0x0090DBF0 (FUN_0090DBF0, luaL_error)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaL_error(lua_State *L, const char *fmt, ...);
+	 *
+	 * What it does:
+	 * Pushes the `source(line): ` prefix for the calling level, formats the
+	 * message after it, concatenates the two and raises the result as a Lua
+	 * error. Does not return.
+	 *
+	 * The `add esp, 0x20` at 0x0090DC1B unwinds four pushed arguments, not the
+	 * varargs: `fmt` is read once at 0x0090DBF1 and the va_list handed to
+	 * `lua_pushvfstring` is just `&fmt + 1` (`lea eax, [esp + 0x18]`), which is
+	 * what `va_start` compiles to for a cdecl callee.
+	 */
+	extern "C" int luaL_error(lua_State* const state, const char* const format, ...)
+	{
+		luaL_where(state, 1);
+
+		std::va_list arguments;
+		va_start(arguments, format);
+		lua_pushvfstring(state, format, arguments);
+		va_end(arguments);
+
+		lua_concat(state, 2);
+		return lua_error(state);
+	}
+
+	/**
 	 * Address: 0x0090DD40 (FUN_0090DD40, luaL_getmetafield)
 	 *
 	 * What it does:
@@ -5051,6 +5143,89 @@ namespace
 	};
 
 	/**
+	 * Address: 0x00912680 (FUN_00912680, lua_getlocal)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl lua_getlocal(lua_State *L, const lua_Debug *ar, int n);
+	 *
+	 * What it does:
+	 * Names local `n` of the frame `ar` refers to and, when it exists, pushes
+	 * its current value. Returns null for C frames and out-of-range indices.
+	 *
+	 * The frame is `L->base_ci[ar->i_ci]`; 0x0091268C computes the index as
+	 * `i_ci * 5` scaled by eight, which is the 0x28-byte CallInfo stride.
+	 * `ci->state >= 3` is the C-frame test (0x00912698) and returns null
+	 * immediately - a C frame has no Proto to name locals from. Otherwise the
+	 * closure comes from `ci->base[-1]`, read as `[base - 4]` because the value
+	 * word sits at +4 of an eight-byte TObject.
+	 */
+	extern "C" const char* lua_getlocal(lua_State* const state, const lua_Debug* const activationRecord, const int localIndex)
+	{
+		CallInfo* const frame = &state->base_ci[activationRecord->i_ci];
+		if (frame->state >= 3) {
+			return nullptr;
+		}
+
+		const auto* const closure = static_cast<const LClosure*>(frame->base[-1].value.p);
+		Proto* const prototype = closure->p;
+		if (prototype == nullptr) {
+			return nullptr;
+		}
+
+		const int currentPc = static_cast<int>(frame->savedpc - prototype->code);
+		const char* const localName = luaF_getlocalname(prototype, localIndex, currentPc);
+		if (localName == nullptr) {
+			return nullptr;
+		}
+
+		luaA_pushobject(state, &frame->base[localIndex - 1]);
+		return localName;
+	}
+
+	/**
+	 * Address: 0x009126F0 (FUN_009126F0, lua_setlocal)
+	 *
+	 * IDA signature:
+	 * const char *__cdecl lua_setlocal(lua_State *L, const lua_Debug *ar, int n);
+	 *
+	 * What it does:
+	 * Pops the stack top into local `n` of the frame `ar` refers to and returns
+	 * its name; returns null without storing when the local does not exist or is
+	 * compiler-internal.
+	 *
+	 * Two details this fork gets right that a naive port would not. The pop at
+	 * 0x0091271E happens **unconditionally**, before the name is even known, so
+	 * the value is consumed whether or not the store lands - unlike
+	 * `lua_setupvalue`, which pops only on success. And a name beginning with
+	 * '(' (0x28, tested at 0x00912755) marks a compiler-internal local, which is
+	 * reported as absent.
+	 */
+	extern "C" const char* lua_setlocal(lua_State* const state, const lua_Debug* const activationRecord, const int localIndex)
+	{
+		CallInfo* const frame = &state->base_ci[activationRecord->i_ci];
+
+		Proto* prototype = nullptr;
+		if (frame->state < 3) {
+			prototype = static_cast<const LClosure*>(frame->base[-1].value.p)->p;
+		}
+
+		--state->top;
+
+		if (prototype == nullptr) {
+			return nullptr;
+		}
+
+		const int currentPc = (frame->state >= 3) ? -1 : static_cast<int>(frame->savedpc - prototype->code);
+		const char* const localName = luaF_getlocalname(prototype, localIndex, currentPc);
+		if (localName == nullptr || localName[0] == '(') {
+			return nullptr;
+		}
+
+		frame->base[localIndex - 1] = *state->top;
+		return localName;
+	}
+
+	/**
 	 * Address: 0x00912940 (FUN_00912940, luaG_symbexec)
 	 *
 	 * IDA signature:
@@ -5255,6 +5430,26 @@ namespace
 				return code[last];
 			}
 		}
+	}
+
+	/**
+	 * Address: 0x00912D10 (FUN_00912D10, luaG_checkcode)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaG_checkcode(const Proto *pt);
+	 *
+	 * What it does:
+	 * Validates a prototype's whole bytecode by symbolically executing it to the
+	 * last instruction with no register of interest. Non-zero means the code
+	 * verified.
+	 *
+	 * `pt->sizecode` is read from +0x2C and `NO_REG` is the literal 0xFF pushed
+	 * at 0x00912D17 - the widest value a register operand can hold, so no real
+	 * register ever matches it.
+	 */
+	extern "C" int luaG_checkcode(const Proto* const prototype)
+	{
+		return static_cast<int>(luaG_symbexec(prototype, prototype->sizecode, 0xFF));
 	}
 
 	/**
@@ -9567,10 +9762,19 @@ namespace
 	/**
 	 * Address: 0x0090E8D0 (FUN_0090E8D0, lua_dostring)
 	 *
+	 * IDA signature:
+	 * int __cdecl lua_dostring(lua_State *L, const char *s);
+	 *
 	 * What it does:
 	 * Executes one null-terminated source string by forwarding to `lua_dobuffer`.
+	 *
+	 * `extern "C"` is load-bearing, not decoration. Without it this body carries
+	 * C++ linkage, the `_lua_dostring` every caller emits stays unresolved, and
+	 * the prebuilt LuaPlus library answers instead - with a `lua_State` laid out
+	 * differently from this tree's. The same trap is why `lua_version` below
+	 * carries it.
 	 */
-	int lua_dostring(lua_State* const state, const char* const source)
+	extern "C" int lua_dostring(lua_State* const state, const char* const source)
 	{
 		return lua_dobuffer(state, source, static_cast<int>(std::strlen(source)), source);
 	}
@@ -12976,6 +13180,34 @@ namespace LuaPlus
 	}
 
 	/**
+	 * Address: 0x00928EC0 (FUN_00928EC0, luaU_endianness)
+	 *
+	 * IDA signature:
+	 * int __cdecl luaU_endianness(void);
+	 *
+	 * What it does:
+	 * Reports the native byte order for the chunk header - 1 little-endian,
+	 * 0 big. Upstream writes `int x = 1; return *(char*)&x;`, which on this
+	 * 32-bit x86 target the compiler folds to the two instructions actually
+	 * present: `mov eax, 1` / `ret`.
+	 *
+	 * It sits at 0x00928EC0, directly between `LuaTestTypeSize` (0x00928E50)
+	 * and `LuaLoadChunkHeader` (0x00928ED0), which is exactly where
+	 * `lundump.c` defines it - and the reason it belongs here rather than in
+	 * the import-thunk file a PE-wide byte scan once put it in. Its only caller
+	 * is `LuaDumpChunkHeader` in LuaDump.cpp, which calls it at 0x00914D3B.
+	 *
+	 * Byte-identical bodies live at twelve other addresses in this image.
+	 * They are separate functions belonging to separate translation units, not
+	 * folded twins of this one; this address is the loader's.
+	 */
+	int luaU_endianness()
+	{
+		const int probe = 1;
+		return *reinterpret_cast<const char*>(&probe);
+	}
+
+	/**
 	 * Address: 0x00928ED0 (FUN_00928ED0, LoadChunk)
 	 * IDA signature:
 	 * void __usercall LoadChunk(LoadState *S@<eax>);
@@ -14427,6 +14659,48 @@ extern "C"
 		luaZ_init(&stream, reader, data, chunkname);
 		const int first = luaZ_lookahead(&stream);
 		return luaD_protectedparser(state, &stream, first == kLuaSignatureFirstByte);
+	}
+
+	/**
+	 * Address: 0x0090D610 (FUN_0090D610, lua_dump)
+	 *
+	 * IDA signature:
+	 * int __cdecl lua_dump(lua_State *L, lua_Chunkwriter writer, void *data);
+	 *
+	 * What it does:
+	 * The other direction from `lua_load`: takes the function on top of the
+	 * stack and writes its compiled form out through `writer`. Reports 1 when
+	 * it dumped something and 0 when the value on top was not a dumpable
+	 * function - it is a boolean, not a status code, so 0 is the failure.
+	 *
+	 * Two things disqualify a value, and the binary tests them in this order.
+	 * `cmp dword ptr [eax], 7` at 0x0090D61A wants a Lua closure: this fork
+	 * gives C functions their own tag (`LUA_CFUNCTION`, 6), so the tag check
+	 * alone is upstream's whole `isLfunction`, with no `isC` test needed after
+	 * it. `cmp byte ptr [eax+8], 0` at 0x0090D622 then wants
+	 * `nupvalues == 0`, because a closure that captured anything cannot be
+	 * reconstructed from bytecode alone.
+	 *
+	 * `extern "C"` comes from the enclosing block and is load-bearing, not
+	 * decoration: the vendored `lua.h` declares this inside `extern "C"`, so a
+	 * C++-mangled definition here would leave every caller's `_lua_dump`
+	 * unresolved and let the prebuilt LuaPlus library answer instead - with a
+	 * `lua_State` it lays out differently.
+	 */
+	int lua_dump(lua_State* const state, const lua_Chunkwriter writer, void* const data)
+	{
+		const TObject* const function = state->top - 1;
+		if (function->tt != LUA_TFUNCTION) {
+			return 0;
+		}
+
+		const Closure* const closure = static_cast<const Closure*>(function->value.p);
+		if (closure->l.nupvalues != 0) {
+			return 0;
+		}
+
+		LuaPlus::luaU_dump(state, closure->l.p, writer, data);
+		return 1;
 	}
 
 	// One block of a file being loaded. luaL_loadfile keeps this on its own
