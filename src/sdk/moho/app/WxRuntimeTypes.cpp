@@ -126,25 +126,6 @@ constexpr std::int32_t wxEVT_LEAVE_WINDOW = 1011;
 // nothing that is ever raised. Match against the gWxEvt*RuntimeType globals -
 // or WX_GetWxEvt*Type() from another translation unit - instead.
 constexpr std::int32_t wxEVT_COMMAND_MENU_SELECTED = 2000;
-const wxSize wxDefaultSize{-1, -1};
-
-/**
- * wx's default-position sentinel, the data global at 0x00F33E00: (-1, -1),
- * not the origin. `MSWGetCreateWindowCoords` keys off that -1 to pass
- * `CW_USEDEFAULT` to `CreateWindowEx`, so the distinction is not cosmetic.
- * Several call sites in this file previously kept their own local
- * `constexpr wxPoint{-1, -1}` mirror of this value because no real global
- * existed yet to reference (e.g. `WD3DViewport`'s constructor, which forwards
- * this sentinel to `wxWindow::wxWindow` regardless of any caller-side
- * position argument, per `FUN_00430980`/0x004309EB).
- *
- * `extern` is required, not stylistic: a `const` at namespace scope has
- * internal linkage by default in C++, so without it this global would never
- * become visible to WEmitterWx.cpp's `extern const wxPoint wxDefaultPosition;`
- * -- exactly the failure mode this fix hit before adding it (the symbol
- * compiled fine and simply never appeared in this TU's object file at all).
- */
-extern const wxPoint wxDefaultPosition{-1, -1};
 
 namespace
 {
@@ -23918,7 +23899,6 @@ moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
   // construction - the frame, its child window, client sizing, centring,
   // show and focus - runs exactly as evidenced.
   (void)splashPathText;
-  constexpr wxPoint kSplashDefaultPosition{-1, -1};
   const WxBitmapValueRuntimeView emptyBitmap{};
   wxSplashScreenRuntime* const splash = new (std::nothrow) wxSplashScreenRuntime(
     emptyBitmap,
@@ -23926,7 +23906,7 @@ moho::SplashScreenRuntime* moho::WX_CreateSplashScreen(
     0,
     nullptr,
     -1,
-    kSplashDefaultPosition,
+    wxDefaultPosition,
     size,
     kWxBorderSimple | kWxStayOnTop
   );
@@ -34577,14 +34557,10 @@ namespace
     // Placement-construct the most-derived (in the current source model)
     // WD3DViewport in place so the wx window hierarchy and D3D-device
     // reference lane are initialized exactly as the binary leaves them. The
-    // constexpr `wxDefaultPosition`-shaped local mirrors the binary's
-    // internal-default-position behavior (the WD3DViewport ctor forwards
-    // `wxDefaultPosition` to `wxWindow::wxWindow` regardless of any
-    // caller-side position argument; see FUN_00430980).
-    // wxDefaultPosition is (-1, -1) - the global at 0x00F33E00 - not the
-    // origin. MSWGetCreateWindowCoords keys off that -1 to pass CW_USEDEFAULT
-    // to CreateWindowEx, so the distinction is not cosmetic.
-    constexpr wxPoint defaultPosition{-1, -1};
+    // The WD3DViewport ctor forwards `wxDefaultPosition` (the wx global at
+    // 0x00F33E00, (-1, -1)) to `wxWindow::wxWindow` regardless of any
+    // caller-side position argument; see FUN_00430980.
+    const wxPoint& defaultPosition = wxDefaultPosition;
     std::construct_at(viewport, parentWindow, title, defaultPosition, viewportSize);
 
     // Binary: the WD3DViewport constructor runs
@@ -39682,36 +39658,6 @@ namespace
     "WxObjectDestroyFlagsRuntimeView::delayedDestroyFlag offset must be 0x60"
   );
 
-  wxListRuntime wxPendingDelete{};
-  wxListRuntime wxTimerRuntimeList{};
-  std::unordered_map<const wxListRuntime*, std::vector<void*>> gWxRuntimeListShadowEntries{};
-
-
-  [[nodiscard]] std::uint8_t WxRuntimeListDeleteObject(
-    wxListRuntime* const listOwner,
-    const void* const value
-  ) noexcept
-  {
-    if (listOwner == nullptr || value == nullptr) {
-      return 0u;
-    }
-
-    const auto found = gWxRuntimeListShadowEntries.find(listOwner);
-    if (found == gWxRuntimeListShadowEntries.end()) {
-      return 0u;
-    }
-
-    auto& entries = found->second;
-    const auto it = std::find(entries.begin(), entries.end(), value);
-    if (it == entries.end()) {
-      return 0u;
-    }
-
-    entries.erase(it);
-    return 1u;
-  }
-
-
 } // namespace
 
 /**
@@ -39729,7 +39675,9 @@ namespace
  *   wxList::DeleteObject(&wxPendingDelete, this);
  *   wxList::DeleteObject(&wxTopLevelWindows, this);
  *
- * Neither removal happened here. wxTopLevelWindows is appended to in
+ * Only the second is mirrored here. wxPendingDelete is the library's own list
+ * (wx/app.h); this tree kept a private stand-in that nothing ever appended to,
+ * so removing from it did nothing. wxTopLevelWindows is appended to in
  * wxWindow::Create and was never erased from, so once the frame went away the
  * list held a dangling pointer - and WxSendIdleEventsRuntime walks it on the
  * way out of WIN_AppExecute, calling GetEventHandler()->ProcessEvent through
@@ -39744,7 +39692,6 @@ namespace
  */
 wxWindowMswRuntime::~wxWindowMswRuntime()
 {
-  (void)WxRuntimeListDeleteObject(&wxPendingDelete, this);
   std::erase(gWxTopLevelWindows, static_cast<wxWindowBase*>(this));
 }
 

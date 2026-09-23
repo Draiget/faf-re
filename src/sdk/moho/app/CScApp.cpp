@@ -501,7 +501,6 @@ namespace
     (void)moho::UI_StartSplashScreens();
   }
 
-  constexpr wxPoint kWxDefaultPosition{-1, -1};
   constexpr std::int32_t kFullscreenFrameStyle = 0x200800;
   constexpr std::int32_t kWindowedFrameStyle = 0x20400E40;
 
@@ -1184,7 +1183,7 @@ bool CScApp::CreateDevice()
   primaryHead.mHeight = static_cast<std::uint32_t>(moho::wnd_DefaultCreateHeight);
   primaryHead.framesPerSecond = 60;
 
-  wxPoint position = kWxDefaultPosition;
+  wxPoint position = wxDefaultPosition;
   bool windowedByCommandLine = false;
   bool secondarySetupMode = false;
 

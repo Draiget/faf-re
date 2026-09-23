@@ -88,17 +88,6 @@ void* ConstructWxFileDialog(
   const void* const position
 );
 
-class wxPoint;
-
-/**
- * wx's default window position sentinel, passed to every dialog here.
- * Declared with the real wx type (`gdicmn.h`: `extern const wxPoint
- * wxDefaultPosition;`), a value not a pointer -- `wxPoint` only needs a
- * forward declaration since every use here takes this symbol's address
- * opaquely rather than accessing its members.
- */
-extern const wxPoint wxDefaultPosition;
-
 namespace
 {
   constexpr double kMinimumRepeatTime = 0.001;

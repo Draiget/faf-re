@@ -53,13 +53,10 @@ namespace
   constexpr std::int32_t kWxIdCancel = 5101;
   constexpr std::int32_t kNoStoredCoordinate = -1;
 
-  constexpr wxPoint kWxDefaultPosition{-1, -1};
-  constexpr wxSize kWxDefaultSize{-1, -1};
-
   // The two explicit control extents: 60h x -1 for the line entry
   // (0x004BBB58) and 30h x -1 for both push buttons (0x004BBC89, 0x004BBDC2).
-  constexpr wxSize kLineEntrySize{96, -1};
-  constexpr wxSize kDialogButtonSize{48, -1};
+  const wxSize kLineEntrySize(96, -1);
+  const wxSize kDialogButtonSize(48, -1);
 
   // `wx/defs.h` orientations and directions. The three layout flag words the
   // binary pushes are 50h, 70h and D0h.
@@ -342,7 +339,7 @@ moho::ScrGotoDialog::ScrGotoDialog()
       kWxIdAny,
       wxStringRuntime::Borrow(kGotoText),
       ReadPersistedDialogPosition(),
-      kWxDefaultSize,
+      wxDefaultSize,
       kGotoDialogStyle,
       wxStringRuntime::Borrow(kGotoDialogWindowName)
     )
@@ -360,8 +357,8 @@ moho::ScrGotoDialog::ScrGotoDialog()
     this,
     kWxIdAny,
     kGotoText,
-    kWxDefaultPosition,
-    kWxDefaultSize,
+    wxDefaultPosition,
+    wxDefaultSize,
     kNoWindowStyle,
     kWxStaticTextNameStr
   );
@@ -371,7 +368,7 @@ moho::ScrGotoDialog::ScrGotoDialog()
     this,
     kWxIdAny,
     kWxEmptyString,
-    kWxDefaultPosition,
+    wxDefaultPosition,
     kLineEntrySize,
     kNoWindowStyle,
     kWxDefaultValidator,
@@ -383,7 +380,7 @@ moho::ScrGotoDialog::ScrGotoDialog()
     this,
     kWxIdOk,
     kGotoText,
-    kWxDefaultPosition,
+    wxDefaultPosition,
     kDialogButtonSize,
     kNoWindowStyle,
     kWxDefaultValidator,
@@ -396,7 +393,7 @@ moho::ScrGotoDialog::ScrGotoDialog()
     this,
     kWxIdCancel,
     kCancelText,
-    kWxDefaultPosition,
+    wxDefaultPosition,
     kDialogButtonSize,
     kNoWindowStyle,
     kWxDefaultValidator,

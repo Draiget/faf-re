@@ -46,46 +46,19 @@
 #include <wx/wfstream.h>
 #include <wx/filename.h>
 #include <wx/string.h>
+#include <wx/gdicmn.h>
 
 struct _RTL_CRITICAL_SECTION;
 
-/**
- * Minimal recovered wx runtime types used by app/sim loop code.
- *
- * These declarations keep recovered dependencies centralized so loop/shutdown
- * code can use typed members instead of local ad-hoc overlay structs.
- */
-
-struct wxPoint
-{
-  std::int32_t x = 0;
-  std::int32_t y = 0;
-};
-
+// wx/gdicmn.h is where wxPoint, wxSize, wxRect, the stock GDI objects
+// (wxBLACK_BRUSH, wxNullBrush, ...), wxColourDatabase / wxTheColourDatabase and
+// wxInitializeStockObjects come from. The binary agrees with it: wxWindow::Refresh
+// (0x00968350) reads a wxRect as {x, y, width, height}, and wxApp::Initialize
+// (0x009927E0) allocates the colour database with operator new(0x1C).
 static_assert(sizeof(wxPoint) == 0x8, "wxPoint size must be 0x8");
-
-struct wxSize
-{
-  std::int32_t x = 0;
-  std::int32_t y = 0;
-};
-
 static_assert(sizeof(wxSize) == 0x8, "wxSize size must be 0x8");
-
-/**
- * Origin plus extent, in the order wxWindow::Refresh (0x00968350) reads them:
- * `x` at +0x00, `y` at +0x04, `width` at +0x08 and `height` at +0x0C, which it
- * turns into a Win32 RECT as {x, y, x + width, y + height}.
- */
-struct wxRect
-{
-  std::int32_t x = 0;
-  std::int32_t y = 0;
-  std::int32_t width = 0;
-  std::int32_t height = 0;
-};
-
 static_assert(sizeof(wxRect) == 0x10, "wxRect size must be 0x10");
+static_assert(sizeof(wxColourDatabase) == 0x1C, "wxColourDatabase size must be 0x1C");
 
 struct WxDisplaySizePairRuntime
 {
@@ -152,56 +125,6 @@ class wxCursor;
 class wxBitmap;
 class wxBrush;
 class wxCmdLineParser;
-
-/**
- * The two stock brushes `WD3DViewport::DrawBackgroundImage` (0x00430A60)
- * selects: `wxBLACK_BRUSH` (a `wxBrush*`) to fill with, and `&wxNullBrush` to
- * put back afterwards. Both live in `wxmsw.lib` as
- * `?wxBLACK_BRUSH@@3PAVwxBrush@@A` / `?wxNullBrush@@3VwxBrush@@A` and are
- * built by `wxInitializeStockObjects`, which `wxApp::Initialize` (0x009927E0)
- * runs.
- *
- * They have to be the real wx objects: `wxDC::SetBrush` takes a `wxBrush&`
- * and ref-counts it, so handing it a raw GDI `HBRUSH` from
- * `GetStockObject(BLACK_BRUSH)` - which is what stood here - made
- * `wxObject::Ref` write through a stock-object handle as if it were an
- * object pointer.
- */
-extern wxBrush* wxBLACK_BRUSH;
-extern wxBrush wxNullBrush;
-
-/**
- * The named-colour table the stock objects are built from.
- *
- * `wxApp::Initialize` (0x009927E0) does `operator new(0x1Cu)` followed by
- * `wxColourDatabase::wxColourDatabase(db, 2)` and publishes the result in
- * `wxTheColourDatabase`, immediately before calling
- * `wxInitializeStockObjects` - which goes straight to
- * `wxColour::InitFromName` and would read through a null table otherwise.
- *
- * Only the size and the constructor are modelled: 0x1C from that allocation,
- * and `??0wxColourDatabase@@QAE@H@Z` from `wxmsw.lib`, which is where the
- * body stays. Nothing here needs its fields.
- */
-class wxColourDatabase
-{
-public:
-  explicit wxColourDatabase(int type);
-
-private:
-  std::uint8_t mStorage[0x1C]{};
-};
-
-static_assert(sizeof(wxColourDatabase) == 0x1C, "wxColourDatabase size must be 0x1C");
-
-extern wxColourDatabase* wxTheColourDatabase;
-
-/**
- * Builds the wx stock pens, brushes, fonts and cursors.
- * `?wxInitializeStockObjects@@YAXXZ` in `wxmsw.lib`; `wxApp::Initialize`
- * (0x009927E0) is what calls it in the binary.
- */
-void wxInitializeStockObjects();
 struct wxMouseEventRuntime;
 class wxBitmapListRuntime;
 struct WxThreadSuspendControllerRuntime;
