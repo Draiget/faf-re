@@ -18,6 +18,8 @@
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/DrawContext.hpp"
+#include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
@@ -51,9 +53,9 @@ namespace gpg::gal
   {
     using release_fn = unsigned long(__stdcall*)(void*);
     using add_ref_fn = unsigned long(__stdcall*)(void*);
-    using cursor_source_lock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, void*, int, std::uint32_t*, int);
-    using cursor_source_unlock_fn =
-      void(__thiscall*)(CursorPixelSourceRuntime*, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
+    using cursor_source_lock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, TextureLockRectD3D10*, int, const RECT*, int);
+    // Slot 4 takes the lock rect by value: four dwords, in field order.
+    using cursor_source_unlock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, TextureLockRectD3D10);
     using device_create_vertex_format_fn = void(__thiscall*)(Device*, void*, int);
     using device_begin_technique_fn = void(__thiscall*)(Device*);
     using device_end_technique_fn = void(__thiscall*)(Device*);
@@ -151,32 +153,6 @@ namespace gpg::gal
       std::int32_t face = 0;                                     // +0x0C
       boost::shared_ptr<RenderTargetD3D10> renderTarget;         // +0x10
       boost::shared_ptr<DepthStencilTargetD3D10> depthStencil;   // +0x18
-    };
-
-    struct CursorPixelTransferTokenRuntime final
-    {
-      std::uint32_t token0 = 0U;        // +0x00
-      std::uint32_t token1 = 0U;        // +0x04
-      std::uint32_t rowPitchBytes = 0U; // +0x08
-      std::uint32_t dataPointer = 0U;   // +0x0C
-    };
-
-    struct DrawPrimitiveContextRuntime final
-    {
-      std::uint32_t pad00 = 0U;         // +0x00
-      std::uint32_t topologyToken = 0U; // +0x04
-      std::uint32_t vertexCount = 0U;   // +0x08
-      std::uint32_t startVertex = 0U;   // +0x0C
-    };
-
-    struct DrawIndexedPrimitiveContextRuntime final
-    {
-      std::uint32_t pad00 = 0U;         // +0x00
-      std::uint32_t topologyToken = 0U; // +0x04
-      std::uint32_t pad08 = 0U;         // +0x08
-      std::uint32_t pad0C = 0U;         // +0x0C
-      std::uint32_t indexCount = 0U;    // +0x10
-      std::uint32_t startIndex = 0U;    // +0x14
     };
 
     constexpr std::uint32_t kHardwareVertexFormatToken = 14U;
@@ -278,31 +254,6 @@ namespace gpg::gal
       float lane40 = 0.0f; // +0x40
     };
 
-    static_assert(sizeof(CursorPixelTransferTokenRuntime) == 0x10, "CursorPixelTransferTokenRuntime size must be 0x10");
-    static_assert(
-      offsetof(DrawPrimitiveContextRuntime, topologyToken) == 0x04,
-      "DrawPrimitiveContextRuntime::topologyToken offset must be 0x04"
-    );
-    static_assert(
-      offsetof(DrawPrimitiveContextRuntime, vertexCount) == 0x08,
-      "DrawPrimitiveContextRuntime::vertexCount offset must be 0x08"
-    );
-    static_assert(sizeof(DrawPrimitiveContextRuntime) == 0x10, "DrawPrimitiveContextRuntime size must be 0x10");
-    static_assert(
-      offsetof(DrawIndexedPrimitiveContextRuntime, topologyToken) == 0x04,
-      "DrawIndexedPrimitiveContextRuntime::topologyToken offset must be 0x04"
-    );
-    static_assert(
-      offsetof(DrawIndexedPrimitiveContextRuntime, indexCount) == 0x10,
-      "DrawIndexedPrimitiveContextRuntime::indexCount offset must be 0x10"
-    );
-    static_assert(
-      offsetof(DrawIndexedPrimitiveContextRuntime, startIndex) == 0x14,
-      "DrawIndexedPrimitiveContextRuntime::startIndex offset must be 0x14"
-    );
-    static_assert(
-      sizeof(DrawIndexedPrimitiveContextRuntime) == 0x18, "DrawIndexedPrimitiveContextRuntime size must be 0x18"
-    );
     static_assert(
       offsetof(SourceMeshVertexRuntime, streamScalar04) == 0x04,
       "SourceMeshVertexRuntime::streamScalar04 offset must be 0x04"
@@ -983,17 +934,17 @@ namespace gpg::gal
     }
 
     void BeginCursorPixelTransfer(
-      CursorPixelSourceRuntime* const source, CursorPixelTransferTokenRuntime& transfer, std::uint32_t (&metadata)[4]
+      CursorPixelSourceRuntime* const source, TextureLockRectD3D10& transfer, const RECT& rect
     )
     {
       auto* const beginTransfer = reinterpret_cast<cursor_source_lock_fn>(source->vtable[2]);
-      beginTransfer(source, &transfer, 0, metadata, 2);
+      beginTransfer(source, &transfer, 0, &rect, 2);
     }
 
-    void EndCursorPixelTransfer(CursorPixelSourceRuntime* const source, const CursorPixelTransferTokenRuntime& transfer)
+    void EndCursorPixelTransfer(CursorPixelSourceRuntime* const source, const TextureLockRectD3D10& transfer)
     {
       auto* const endTransfer = reinterpret_cast<cursor_source_unlock_fn>(source->vtable[4]);
-      endTransfer(source, transfer.token0, transfer.token1, transfer.rowPitchBytes, transfer.dataPointer);
+      endTransfer(source, transfer);
     }
 
     /**
@@ -1032,14 +983,13 @@ namespace gpg::gal
       );
       ::ReleaseDC(nullptr, dc);
 
-      CursorPixelTransferTokenRuntime transfer{};
-      std::uint32_t transferMetadata[4]{};
-      BeginCursorPixelTransfer(source, transfer, transferMetadata);
+      TextureLockRectD3D10 transfer{};
+      const RECT wholeSurface{};
+      BeginCursorPixelTransfer(source, transfer, wholeSurface);
 
       auto* const destinationPixels = reinterpret_cast<std::uint32_t*>(dibPixels);
-      const auto* const sourceBytes =
-        reinterpret_cast<const std::uint8_t*>(static_cast<std::uintptr_t>(transfer.dataPointer));
-      const std::uint32_t rowPitchBytes = transfer.rowPitchBytes;
+      const auto* const sourceBytes = static_cast<const std::uint8_t*>(transfer.bits);
+      const std::uint32_t rowPitchBytes = static_cast<std::uint32_t>(transfer.pitch);
       const auto* sourceRow = reinterpret_cast<const std::uint32_t*>(sourceBytes + (rowPitchBytes * 31U));
 
       for (std::uint32_t y = 0; y < 32U; ++y) {
@@ -6980,18 +6930,20 @@ namespace gpg::gal
    */
   int DeviceD3D10::DrawPrimitive(const void* const context)
   {
-    const auto* const drawContext = reinterpret_cast<const DrawPrimitiveContextRuntime*>(context);
-    if (drawContext->topologyToken == 0U) {
+    const auto* const drawContext = static_cast<const DrawContext*>(context);
+    // D3D10's Draw takes a vertex count; the binary hands it this lane unconverted
+    // (`mov edx,[edi+8]` at 0x008FD05D), whatever the D3D9-facing name says.
+    if (drawContext->topologyToken_ == 0U) {
       ThrowInvalidTopologyError(1561);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken));
+    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken_));
     const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
     if (instanceCount > 1U) {
-      return InvokeNativeDrawInstanced(this, drawContext->vertexCount, instanceCount, drawContext->startVertex, 0U);
+      return InvokeNativeDrawInstanced(this, drawContext->primitiveCountInput_, instanceCount, drawContext->startVertex_, 0U);
     }
 
-    return InvokeNativeDraw(this, drawContext->vertexCount, drawContext->startVertex);
+    return InvokeNativeDraw(this, drawContext->primitiveCountInput_, drawContext->startVertex_);
   }
 
   /**
@@ -7005,20 +6957,22 @@ namespace gpg::gal
    */
   int DeviceD3D10::DrawIndexedPrimitive(const void* const context)
   {
-    const auto* const drawContext = reinterpret_cast<const DrawIndexedPrimitiveContextRuntime*>(context);
-    if (drawContext->topologyToken == 0U) {
+    const auto* const drawContext = static_cast<const DrawIndexedContext*>(context);
+    // As above: DrawIndexed takes an index count, and the binary passes this lane
+    // through unconverted (`mov edx,[edi+0x10]` at 0x008FD16E).
+    if (drawContext->topologyToken_ == 0U) {
       ThrowInvalidTopologyError(1580);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken));
+    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(drawContext->topologyToken_));
     const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
     if (instanceCount > 1U) {
       return InvokeNativeDrawIndexedInstanced(
-        this, drawContext->indexCount, instanceCount, drawContext->startIndex, 0, 0U
+        this, drawContext->primitiveCountInput_, instanceCount, drawContext->startIndex_, 0, 0U
       );
     }
 
-    return InvokeNativeDrawIndexed(this, drawContext->indexCount, drawContext->startIndex, 0);
+    return InvokeNativeDrawIndexed(this, drawContext->primitiveCountInput_, drawContext->startIndex_, 0);
   }
 
   /**
