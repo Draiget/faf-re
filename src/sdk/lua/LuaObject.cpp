@@ -11158,8 +11158,11 @@ namespace
 	 * Opens the "table" library.
 	 *
 	 * Named apart from the binary's symbol for the same reason LuaOpenString is:
-	 * the prebuilt LuaPlus library exports its own luaopen_table, and that copy
-	 * was compiled against stock tag numbering.
+	 * `lualib.h` declares `luaopen_table` inside `extern "C"`, and the rename
+	 * keeps this body from having to answer to that C symbol. The vendored
+	 * library did export its own copy, compiled against stock tag numbering -
+	 * it is no longer linked as of 2026-09-23, but the rename stands on the
+	 * linkage argument alone.
 	 */
 	int LuaOpenTable(lua_State* const state)
 	{
@@ -11182,10 +11185,20 @@ namespace
 	 * fork's tag numbering.
 	 *
 	 * Named apart from the binary's symbol for the same reason `LuaOpenIo` is:
-	 * the prebuilt LuaPlus library exports its own `luaopen_string`, and while
-	 * that one is what currently answers, it walks a `lua_State` this tree
-	 * lays out differently and misreads its arguments - `string.gsub` in
-	 * particular rejects every replacement as neither string nor function.
+	 * the vendored `lualib.h` declares `luaopen_string` inside `extern "C"`, so
+	 * a definition under that name would have to be `extern "C"` too or leave
+	 * `_luaopen_string` for whatever else supplies it. The rename sidesteps the
+	 * question entirely, and the one caller (`LuaOpenString(state)`, below in
+	 * this file) names this body directly.
+	 *
+	 * An older version of this note said the prebuilt LuaPlus library's copy was
+	 * "what currently answers", and blamed `string.gsub` rejecting every
+	 * replacement on it. That was never true after the rename: a symbol scan of
+	 * all 1,037 objects found `_luaopen_string` neither defined nor referenced
+	 * anywhere in `src/sdk`, so the library's member was never pulled in to
+	 * begin with. Since 2026-09-23 the library is not linked at all. If the
+	 * `gsub` symptom is still reproducible, it has some other cause and the
+	 * search should start over.
 	 */
 	int LuaOpenString(lua_State* const state)
 	{
