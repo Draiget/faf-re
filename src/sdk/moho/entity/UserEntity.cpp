@@ -75,10 +75,10 @@ namespace
    * The five instructions at 0x0089E520 only shuffle the register-passed
    * `this`/storage pair onto the stack shape 0x00501A80 expects.
    */
-  [[maybe_unused]] moho::SpatialDB_MeshInstance* RegisterSpatialDbEntryAdapter(
-    moho::SpatialDB_MeshInstance* const destinationEntry,
-    void* const sessionSpatialDbStorage,
-    void* const owner,
+  [[maybe_unused]] moho::SpatialDBEntry<moho::UserEntity>* RegisterSpatialDbEntryAdapter(
+    moho::SpatialDBEntry<moho::UserEntity>* const destinationEntry,
+    moho::SpatialDB<moho::UserEntity>* const sessionSpatialDbStorage,
+    moho::UserEntity* const owner,
     const std::int32_t spatialDbMask
   )
   {

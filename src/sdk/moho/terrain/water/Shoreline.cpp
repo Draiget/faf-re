@@ -64,28 +64,6 @@ namespace
   moho::StatItem* sEngineStatShorelineVerticesFinal = nullptr;
   moho::StatItem* sEngineStatShorelineTrianglesFinal = nullptr;
 
-  struct ShorelineSpatialDbRuntimeView
-  {
-    void* mDebugProxy;             // +0x00
-    void** mShardsBegin;           // +0x04
-    void** mShardsEnd;             // +0x08
-    void** mShardsCapacity;        // +0x0C
-    std::uint8_t mShardData[0x60]; // +0x10
-    std::int32_t mWidth;           // +0x70
-    std::int32_t mHeight;          // +0x74
-    std::int32_t mWidthBy16;       // +0x78
-    std::int32_t mHeightBy16;      // +0x7C
-    std::int32_t mSizeClass;       // +0x80
-    std::uint8_t mPad84_87[0x04];  // +0x84
-    void* mMapHead;                // +0x88
-    std::int32_t mMapSize;         // +0x8C
-  };
-  static_assert(sizeof(ShorelineSpatialDbRuntimeView) == 0x90, "ShorelineSpatialDbRuntimeView size must be 0x90");
-
-  [[nodiscard]] ShorelineSpatialDbRuntimeView& GetShorelineSpatialDbRuntimeView(moho::Shoreline& shoreline) noexcept
-  {
-    return *reinterpret_cast<ShorelineSpatialDbRuntimeView*>(&shoreline.mSpatialDbEntry);
-  }
 
   void EnsureNamedStat(moho::StatItem*& slot, const char* const name)
   {
@@ -151,32 +129,32 @@ namespace
 
   void InitializeShorelineSpatialDbGrid(moho::Shoreline& shoreline, const std::int32_t width, const std::int32_t height)
   {
-    ShorelineSpatialDbRuntimeView& runtime = GetShorelineSpatialDbRuntimeView(shoreline);
-    if (runtime.mWidth == width && runtime.mHeight == height) {
+    moho::SpatialDB<moho::ShoreCell>& runtime = shoreline.mSpatialDb;
+    if (runtime.mMapWidth == width && runtime.mMapHeight == height) {
       return;
     }
 
-    runtime.mWidth = width;
-    runtime.mHeight = height;
-    runtime.mWidthBy16 = (width <= 0) ? 0 : ((width + 0x0F) >> 4);
-    runtime.mHeightBy16 = (height <= 0) ? 0 : ((height + 0x0F) >> 4);
+    runtime.mMapWidth = width;
+    runtime.mMapHeight = height;
+    runtime.mShardWidth = (width <= 0) ? 0 : ((width + 0x0F) >> 4);
+    runtime.mShardHeight = (height <= 0) ? 0 : ((height + 0x0F) >> 4);
 
     const std::int32_t maxExtent = std::max(width, height);
     if (maxExtent <= 0) {
-      runtime.mSizeClass = 0;
+      runtime.mShardLevel = 0;
     } else if (maxExtent <= 0x100) {
-      runtime.mSizeClass = 1;
+      runtime.mShardLevel = 1;
     } else if (maxExtent <= 0x400) {
-      runtime.mSizeClass = 2;
+      runtime.mShardLevel = 2;
     } else {
-      runtime.mSizeClass = 3;
+      runtime.mShardLevel = 3;
     }
 
-    if (runtime.mShardsBegin != nullptr) {
+    if (runtime.mShards.mBegin != nullptr) {
       for (std::int32_t index = 0; index < 16; ++index) {
-        runtime.mShardsBegin[index] = nullptr;
+        runtime.mShards.mBegin[index] = nullptr;
       }
-      runtime.mShardsEnd = runtime.mShardsBegin;
+      runtime.mShards.mEnd = runtime.mShards.mBegin;
     }
   }
 
@@ -235,8 +213,8 @@ namespace
       point.z = 0.0f;
     }
 
-    cell.mSpatialDbEntry.db = nullptr;
-    cell.mSpatialDbEntry.entry = 0;
+    cell.mSpatialDbEntry.mDb = nullptr;
+    cell.mSpatialDbEntry.mNode = nullptr;
     cell.mBounds.Min.x = 0.0f;
     cell.mBounds.Min.y = 0.0f;
     cell.mBounds.Min.z = 0.0f;
@@ -613,7 +591,7 @@ namespace
    */
   void InitializeShoreCellSpatialEntry(
     moho::ShoreCell& cell,
-    moho::SpatialDB_MeshInstance& shorelineSpatialDb,
+    moho::SpatialDB<moho::ShoreCell>& shorelineSpatialDb,
     moho::TerrainWaterResourceView* const terrainResource
   )
   {
@@ -686,7 +664,7 @@ namespace
       );
     }
 
-    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDbEntry, terrainResource);
+    InitializeShoreCellSpatialEntry(*cell, shoreline.mSpatialDb, terrainResource);
     AppendShoreCellRef(shoreline.mCells, cell);
   }
 
@@ -789,8 +767,8 @@ namespace moho
   {
     mType = 0;
 
-    mSpatialDbEntry.db = nullptr;
-    mSpatialDbEntry.entry = 0;
+    mSpatialDbEntry.mDb = nullptr;
+    mSpatialDbEntry.mNode = nullptr;
 
     for (ShoreCellPoint2& point : mPoints) {
       point.x = 0.0f;
@@ -805,12 +783,12 @@ namespace moho
    * Runs one null-guard adapter lane that only destroys one
    * `SpatialDB_MeshInstance` when its `db` lane is non-null.
    */
-  [[maybe_unused]] SpatialDB_MeshInstance* DestroySpatialDbMeshInstanceIfBoundAdapter(
-    SpatialDB_MeshInstance* const entry
+  [[maybe_unused]] SpatialDBEntry<ShoreCell>* DestroySpatialDbEntryIfBoundAdapter(
+    SpatialDBEntry<ShoreCell>* const entry
   )
   {
-    if (entry->db != nullptr) {
-      entry->~SpatialDB_MeshInstance();
+    if (entry->mDb != nullptr) {
+      entry->~SpatialDBEntry();
     }
 
     return entry;
@@ -837,8 +815,7 @@ namespace moho
    * shoreline-cell vector storage, vertex-sheet shared owner, and triangle count.
    */
   Shoreline::Shoreline()
-    : mSpatialDbEntry()
-    , mUnknown0C_93{}
+    : mSpatialDb()
     , mCells()
     , mVertexSheet()
     , mShorelineTris(0)
@@ -958,7 +935,7 @@ namespace moho
     }
 
     gpg::fastvector<UserEntity*> visibleCells;
-    (void)mSpatialDbEntry.CollectInView(
+    (void)mSpatialDb.CollectInView(
       const_cast<GeomCamera3*>(&camera), visibleCells, static_cast<EEntityType>(kSpatialRoutingMask)
     );
 

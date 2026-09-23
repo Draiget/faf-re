@@ -6342,7 +6342,7 @@ namespace moho
     // the Shift command graph rebuilt its nodes. The inline lane can come back
     // once the binary's per-vector-type collect template is restored.
     gpg::fastvector<UserEntity*> entities;
-    (void)reinterpret_cast<SpatialDB_MeshInstance*>(&mSession->mEntitySpatialDbStorage[0])
+    (void)mSession->GetEntitySpatialDbStorage()
       ->Collect(entities, ENTITYTYPE_Unit);
 
     for (UserEntity* const entity : entities) {
@@ -11352,7 +11352,7 @@ namespace moho
         // Cached-target reacquire: search nearby collected entities for the
         // closest live unit sharing the cached target's army.
         gpg::fastvector<UserEntity*> candidates{};
-        auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(graph.mSession->GetEntitySpatialDbStorage());
+        auto* const spatialDb = graph.mSession->GetEntitySpatialDbStorage();
         (void)spatialDb->Collect(candidates, ENTITYTYPE_Unit);
 
         UserEntity* closest = nullptr;
@@ -13921,7 +13921,9 @@ namespace moho
     // without it every `Register` from a UserEntity ctor finds a null tree
     // head and silently drops the entry, so unit picking, band-box
     // selection and every area query see an empty database.
-    static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->InitializeStorage();
+    // The storage lane is raw bytes, so the database is built into it in
+    // place: 0x00501D80 is SpatialDB<T>::SpatialDB, not a separate init step.
+    new (GetEntitySpatialDbStorage()) SpatialDB<UserEntity>();
     // 0x00893214-0x0089323D, immediately after that ctor: the extra-selection
     // weak set at +0xE0 gets its head sentinel built inline, exactly like every
     // other `WeakSet<UserEntity>` in this class --
@@ -14177,8 +14179,8 @@ namespace moho
     if (mWldMap != nullptr && mWldMap->mTerrainRes != nullptr) {
       if (const STIMap* const stiMap = GetSTIMap(); stiMap != nullptr) {
         if (const CHeightField* const heightField = stiMap->mHeightField.get(); heightField != nullptr) {
-          static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())
-            ->ResizeStorageForMap(heightField->Width() - 1, heightField->Height() - 1);
+          GetEntitySpatialDbStorage()
+            ->ResizeForMap(heightField->Width() - 1, heightField->Height() - 1);
         }
       }
     }
@@ -14265,7 +14267,8 @@ namespace moho
     // 0x00893A60 line 297: `~SpatialDB_MeshInstance(&mSpatialDB)` (0x00501E50)
     // runs after the extra-selection set is torn down and before the entity
     // map's storage is released.
-    static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage())->DestroyStorage();
+    // 0x00501E50 is SpatialDB<T>::~SpatialDB; the lane itself is not freed.
+    GetEntitySpatialDbStorage()->~SpatialDB();
     // The entity map's storage goes with the member (~map); 0x00893A60 frees it
     // here, after the spatial DB, because that is reverse declaration order.
 
@@ -14874,17 +14877,21 @@ namespace moho
   /**
     * Alias of FUN_008B85E0 (non-canonical helper lane).
    */
-  void* CWldSession::GetEntitySpatialDbStorage()
+  SpatialDB<UserEntity>* CWldSession::GetEntitySpatialDbStorage()
   {
-    return mEntitySpatialDbStorage;
+    // The storage is still a sized byte lane because CWldSession sequences its
+    // set-up explicitly; this accessor is the one place it becomes typed.
+    return reinterpret_cast<SpatialDB<UserEntity>*>(mEntitySpatialDbStorage);
   }
 
   /**
     * Alias of FUN_008B85E0 (non-canonical helper lane).
    */
-  const void* CWldSession::GetEntitySpatialDbStorage() const
+  const SpatialDB<UserEntity>* CWldSession::GetEntitySpatialDbStorage() const
   {
-    return mEntitySpatialDbStorage;
+    // The storage is still a sized byte lane because CWldSession sequences its
+    // set-up explicitly; this accessor is the one place it becomes typed.
+    return reinterpret_cast<const SpatialDB<UserEntity>*>(mEntitySpatialDbStorage);
   }
 
   /**
@@ -15764,7 +15771,7 @@ namespace moho
                    static_cast<const void*>(playableMap));
 
         gpg::fastvector<UserEntity*> allEntities{};
-        auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+        auto* const spatialDb = GetEntitySpatialDbStorage();
         (void)spatialDb->Collect(allEntities, ENTITYTYPE_Unit);
 
         UserUnit* ownUnit = nullptr;
@@ -15931,7 +15938,7 @@ namespace moho
       // Until that template is restored, the base-typed API must be handed a
       // vector that really does own its storage.
       gpg::fastvector<UserEntity*> tickers;
-      auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+      auto* const spatialDb = GetEntitySpatialDbStorage();
       (void)spatialDb->Collect(tickers, ENTITYTYPE_Unit);
 
       const auto tickerCount = static_cast<std::int32_t>(tickers.size());
@@ -20009,7 +20016,7 @@ namespace moho
     // The binary collects into a stack fastvector with a large inline buffer;
     // the heap-backed lane is behaviourally identical for a scratch list.
     gpg::fastvector<UserEntity*> visibleEntities{};
-    auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(GetEntitySpatialDbStorage());
+    auto* const spatialStorage = GetEntitySpatialDbStorage();
     (void)spatialStorage->CollectInView(const_cast<GeomCamera3*>(&view), visibleEntities, ENTITYTYPE_Entity);
 
     for (UserEntity* const entity : visibleEntities) {

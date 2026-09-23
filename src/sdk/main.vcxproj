@@ -1767,6 +1767,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\mesh\MeshThumbnailRenderer.h" />
     <ClInclude Include="moho\mesh\ShaderDictionary.h" />
     <ClInclude Include="moho\mesh\Mesh.h" />
+    <ClInclude Include="moho\mesh\SpatialDb.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImpl.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImplSerializer.h" />
     <ClInclude Include="moho\effects\rendering\CEffectImplTypeInfo.h" />

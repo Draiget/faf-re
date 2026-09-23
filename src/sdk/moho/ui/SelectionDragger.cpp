@@ -1115,7 +1115,7 @@ namespace moho
     // note in CWldSession::DoBeat.
     gpg::fastvector<UserEntity*> collectedEntities;
 
-    auto* const spatialDb = reinterpret_cast<SpatialDB_MeshInstance*>(dragger.mSess->GetEntitySpatialDbStorage());
+    auto* const spatialDb = dragger.mSess->GetEntitySpatialDbStorage();
     (void)spatialDb->CollectInVolume(collectedEntities, ENTITYTYPE_Unit, &selectionSolid);
 
     AddCollectedEntitiesToSelection(outSelection, collectedEntities);

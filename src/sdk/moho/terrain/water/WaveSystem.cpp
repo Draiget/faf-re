@@ -522,12 +522,12 @@ namespace moho
    * rebuilds texture/schedule/bounds runtime state.
    */
   WaveGenerator::WaveGenerator(
-    SpatialDB_MeshInstance* const spatialStorage,
+    SpatialDB<WaveGenerator>* const spatialStorage,
     const std::int32_t formatVersion,
     gpg::BinaryReader& reader
   )
     : mReserved04(0)
-    , mSpatialEntry{nullptr, 0}
+    , mSpatialEntry{}
     , mBounds{}
     , mBoundsCenter{0.0f, 0.0f, 0.0f}
     , mBoundsAxes()
@@ -567,7 +567,7 @@ namespace moho
    * then rebuilds texture handles, schedule timing, and spatial bounds.
    */
   WaveGenerator::WaveGenerator(
-    SpatialDB_MeshInstance* const spatialStorage,
+    SpatialDB<WaveGenerator>* const spatialStorage,
     const msvc8::string& primaryTexturePath,
     const msvc8::string& rampTexturePath,
     const Wm3::Vec3f& position,
@@ -581,7 +581,7 @@ namespace moho
     const float textureSelectionRange
   )
     : mReserved04(0)
-    , mSpatialEntry{nullptr, 0}
+    , mSpatialEntry{}
     , mBounds{}
     , mBoundsCenter{0.0f, 0.0f, 0.0f}
     , mBoundsAxes()
@@ -668,11 +668,10 @@ namespace moho
   WaveSystem::WaveSystem()
     : mReserved04(0)
     , mSpatialMeshInstance()
-    , mRuntimeBlock10{}
+    , mReserved98(0)
     , mWaveGenerators()
     , mGeneratorCache()
   {
-    mSpatialMeshInstance.InitializeStorage();
   }
 
   /**
@@ -689,7 +688,6 @@ namespace moho
   WaveSystem::~WaveSystem()
   {
     ClearWaveGeneratorState();
-    mSpatialMeshInstance.DestroyStorage();
   }
 
   /**
@@ -721,7 +719,7 @@ namespace moho
   )
   {
     ClearWaveGeneratorState();
-    mSpatialMeshInstance.ResizeStorageForMap(mapWidth, mapHeight);
+    mSpatialMeshInstance.ResizeForMap(mapWidth, mapHeight);
 
     std::int32_t generatorCount = 0;
     reader.ReadExact(generatorCount);

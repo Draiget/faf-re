@@ -551,7 +551,7 @@ namespace
         }
       }
     } else {
-      auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+      auto* const spatialDb = session->GetEntitySpatialDbStorage();
       (void)spatialDb->Collect(gathered, moho::ENTITYTYPE_Unit);
     }
 
@@ -714,7 +714,7 @@ namespace
     }
 
     gpg::fastvector<moho::UserEntity*> collected{};
-    auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+    auto* const spatialDb = session->GetEntitySpatialDbStorage();
     (void)spatialDb->Collect(collected, moho::ENTITYTYPE_Unit);
 
     moho::SSelectionSetUserEntity originalSelection(session->mSelection);

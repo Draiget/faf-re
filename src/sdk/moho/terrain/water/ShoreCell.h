@@ -44,7 +44,7 @@ namespace moho
     float mCenterX;                         // +0x08
     float mCenterZ;                         // +0x0C
     ShoreCellPoint2 mPoints[5];            // +0x10
-    SpatialDB_MeshInstance mSpatialDbEntry; // +0x38
+    SpatialDBEntry<ShoreCell> mSpatialDbEntry; // +0x38
     Wm3::AxisAlignedBox3f mBounds;         // +0x40
   };
 

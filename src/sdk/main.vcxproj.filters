@@ -5250,6 +5250,9 @@
     <ClInclude Include="moho\mesh\Mesh.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\mesh\SpatialDb.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\CSimConCommand.h">
       <Filter>Header Files</Filter>
     </ClInclude>

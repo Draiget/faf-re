@@ -82,7 +82,7 @@ namespace moho
     // unconditionally. See the matching note on the ENTITYTYPE_Unit collect in
     // CWldSession.cpp.
     gpg::fastvector<UserEntity*> projectiles;
-    auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+    auto* const spatialDb = session->GetEntitySpatialDbStorage();
     (void)spatialDb->Collect(projectiles, ENTITYTYPE_Projectile);
 
     for (UserEntity* const entity : projectiles) {

@@ -293,7 +293,7 @@ namespace moho
     /// (`SpatialDB_MeshInstance::Register`, 0x00501A80) with the category
     /// routing mask, and `~SpatialDB_MeshInstance` (0x00501BC0) unregisters it
     /// as an ordinary member destructor at 0x008B888D.
-    SpatialDB_MeshInstance mSpatialDbEntry;       // 0x10
+    SpatialDBEntry<UserEntity> mSpatialDbEntry;   // 0x10
     VisionDB::Handle* mVisionHandle;            // 0x18
     boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
     boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24

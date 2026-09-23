@@ -102,14 +102,16 @@ namespace moho
     void Update(const GeomCamera3& camera);
 
   public:
-    SpatialDB_MeshInstance mSpatialDbEntry;                      // +0x04
-    std::uint8_t mUnknown0C_93[0x88]{};                          // +0x0C..+0x93
+    // The shoreline owns the database its cells register into: 0x90 bytes at
+    // +0x04, which lands mCells exactly on +0x94. It used to be an 8-byte
+    // handle plus an opaque mUnknown0C_93[0x88] tail.
+    SpatialDB<ShoreCell> mSpatialDb;                             // +0x04
     msvc8::vector<boost::shared_ptr<ShoreCell>> mCells;          // +0x94
     boost::shared_ptr<ID3DVertexSheet> mVertexSheet;             // +0xA4
     std::int32_t mShorelineTris;                                 // +0xAC
   };
 
-  static_assert(offsetof(Shoreline, mSpatialDbEntry) == 0x04, "Shoreline::mSpatialDbEntry offset must be 0x04");
+  static_assert(offsetof(Shoreline, mSpatialDb) == 0x04, "Shoreline::mSpatialDb offset must be 0x04");
   static_assert(offsetof(Shoreline, mCells) == 0x94, "Shoreline::mCells offset must be 0x94");
   static_assert(offsetof(Shoreline, mVertexSheet) == 0xA4, "Shoreline::mVertexSheet offset must be 0xA4");
   static_assert(offsetof(Shoreline, mShorelineTris) == 0xAC, "Shoreline::mShorelineTris offset must be 0xAC");

@@ -80,10 +80,10 @@ namespace
     decal.mOrientation = record.mRot;
   }
 
-  [[nodiscard]] moho::SpatialDB_MeshInstance*
+  [[nodiscard]] moho::SpatialDB<moho::CWldTerrainDecal>*
   AsDecalManagerSpatialDbRuntime(moho::CDecalManager* const manager) noexcept
   {
-    return reinterpret_cast<moho::SpatialDB_MeshInstance*>(manager->mSpatialDbOwnerStorage);
+    return reinterpret_cast<moho::SpatialDB<moho::CWldTerrainDecal>*>(manager->mSpatialDbOwnerStorage);
   }
 
   /**
@@ -183,7 +183,7 @@ namespace
    * Sorts one collected `UserEntity*` range (entities or props gathered by
    * `EntitiesInView`/`PropsInView`) into decal-draw order. The binary orders
    * by each entity's spatial-db registration id
-   * (`UserEntity::mSpatialDbEntry.entry`, an unsigned compare at node
+   * (`UserEntity::mSpatialDbEntry.mNode`, an unsigned compare at node
    * offset `+0x14`) rather than by pointer identity, so this has to be
    * `msvc8::sort` with an explicit comparator, not a bare `std::sort` on the
    * pointers themselves.
@@ -195,8 +195,10 @@ namespace
         entities.begin(),
         entities.end(),
         [](const moho::UserEntity* const lhs, const moho::UserEntity* const rhs) noexcept {
-          return static_cast<std::uint32_t>(lhs->mSpatialDbEntry.entry)
-               < static_cast<std::uint32_t>(rhs->mSpatialDbEntry.entry);
+          // The binary compares the raw entry dword unsigned; that dword is the
+          // node pointer, so the ordering is by node address either way.
+          return reinterpret_cast<std::uintptr_t>(lhs->mSpatialDbEntry.mNode)
+               < reinterpret_cast<std::uintptr_t>(rhs->mSpatialDbEntry.mNode);
         }
       );
     }
@@ -248,8 +250,10 @@ namespace moho
     // separate call. A prior pass called this out explicitly as
     // `InitializeLookupTree(...)`; that helper duplicated
     // `msvc8::map<K,V>`'s own default constructor and is deleted.
-    SpatialDB_MeshInstance* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
-    spatialDb->InitializeStorage();
+    SpatialDB<CWldTerrainDecal>* const spatialDb = AsDecalManagerSpatialDbRuntime(this);
+    // 0x00501D80 is SpatialDB<T>::SpatialDB; the manager keeps the lane raw,
+    // so the database is built into it in place.
+    new (spatialDb) SpatialDB<CWldTerrainDecal>();
 
     if (mWldTerrain == nullptr) {
       return;
@@ -261,7 +265,7 @@ namespace moho
     }
 
     const CHeightField* const heightField = map->mHeightField.get();
-    spatialDb->ResizeStorageForMap(heightField->width - 1, heightField->height - 1);
+    spatialDb->ResizeForMap(heightField->width - 1, heightField->height - 1);
   }
 
   /**
@@ -330,7 +334,7 @@ namespace moho
       delete splat;
     }
 
-    AsDecalManagerSpatialDbRuntime(this)->DestroyStorage();
+    AsDecalManagerSpatialDbRuntime(this)->~SpatialDB();
   }
 
   /**
@@ -894,7 +898,7 @@ namespace moho
    * Seeds the splat's base decal state and leaves the batch-texture lane
    * empty until a name is assigned.
    */
-  CWldSplat::CWldSplat(SpatialDB_MeshInstance* const spatialDbOwner, IWldTerrainRes* const terrainRes)
+  CWldSplat::CWldSplat(SpatialDB<CWldTerrainDecal>* const spatialDbOwner, IWldTerrainRes* const terrainRes)
     : CWldTerrainDecal(spatialDbOwner, terrainRes)
     , mTex()
   {

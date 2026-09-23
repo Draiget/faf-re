@@ -4816,7 +4816,7 @@ bool moho::USERUNIT_CanBeBuiltAt(
   // whose grow path frees `start_` without an `originalVec_` test. See the
   // note in CWldSession::DoBeat.
   gpg::fastvector<UserEntity*> nearbyUnits{};
-  auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
+  auto* const spatialStorage = session.GetEntitySpatialDbStorage();
   spatialStorage->CollectInBox(nearbyUnits, overlapQuery);
 
   for (UserEntity* const nearbyEntity : nearbyUnits) {
@@ -4957,7 +4957,7 @@ bool moho::USERUNIT_CanOccupy(CWldSession& session, const SFootprint& footprint,
   // whose grow path frees `start_` without an `originalVec_` test. See the
   // note in CWldSession::DoBeat.
   gpg::fastvector<UserEntity*> nearbyUnits{};
-  auto* const spatialStorage = reinterpret_cast<SpatialDB_MeshInstance*>(session.GetEntitySpatialDbStorage());
+  auto* const spatialStorage = session.GetEntitySpatialDbStorage();
   spatialStorage->Collect(nearbyUnits, kSpatialTypeUnit);
 
   for (UserEntity* const nearbyEntity : nearbyUnits) {

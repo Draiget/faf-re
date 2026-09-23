@@ -228,7 +228,7 @@ namespace moho
      * Initializes one wave generator, loads serialized lanes from reader, and
      * rebuilds texture/schedule/bounds runtime state.
      */
-    WaveGenerator(SpatialDB_MeshInstance* spatialStorage, std::int32_t formatVersion, gpg::BinaryReader& reader);
+    WaveGenerator(SpatialDB<WaveGenerator>* spatialStorage, std::int32_t formatVersion, gpg::BinaryReader& reader);
 
     /**
      * Address: 0x00887D40 (FUN_00887D40, sub_887D40)
@@ -238,7 +238,7 @@ namespace moho
      * then rebuilds texture handles, schedule timing, and spatial bounds.
      */
     WaveGenerator(
-      SpatialDB_MeshInstance* spatialStorage,
+      SpatialDB<WaveGenerator>* spatialStorage,
       const msvc8::string& primaryTexturePath,
       const msvc8::string& rampTexturePath,
       const Wm3::Vec3f& position,
@@ -320,7 +320,7 @@ namespace moho
 
   private:
     std::uint32_t mReserved04;             // +0x04
-    SpatialDB_MeshInstance mSpatialEntry;  // +0x08
+    SpatialDBEntry<WaveGenerator> mSpatialEntry; // +0x08
     Wm3::AxisAlignedBox3f mBounds;         // +0x10
     Wm3::Vec3f mBoundsCenter;              // +0x28
     VAxes3 mBoundsAxes;                    // +0x34
@@ -439,8 +439,12 @@ namespace moho
 
   public:
     std::uint32_t mReserved04;                            // +0x04
-    SpatialDB_MeshInstance mSpatialMeshInstance;          // +0x08
-    std::uint8_t mRuntimeBlock10[0x8C];                   // +0x10
+    // The wave system's own spatial database, 0x90 bytes inline. It used to
+    // be an 8-byte handle plus an opaque mRuntimeBlock10[0x8C] tail -- the
+    // same split the mesh renderer carried, because one flat type had to
+    // serve as both the database and the per-object entry.
+    SpatialDB<WaveGenerator> mSpatialMeshInstance;        // +0x08
+    std::uint32_t mReserved98;                            // +0x98
     // 12-byte gpg-style vector (no proxy lane); matches the binary triplet
     // initialized in WaveSystem ctor at 0x00888CB0 (mVec._Myfirst/_Mylast/_Myend).
     gpg::core::FastVector<WaveGenerator*> mWaveGenerators; // +0x9C

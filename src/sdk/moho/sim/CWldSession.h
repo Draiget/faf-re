@@ -888,8 +888,8 @@ namespace moho
      * What it does:
      * Returns storage root used as SpatialDB_MeshInstance owner for user-entity DB entries.
      */
-    [[nodiscard]] void* GetEntitySpatialDbStorage();
-    [[nodiscard]] const void* GetEntitySpatialDbStorage() const;
+    [[nodiscard]] SpatialDB<UserEntity>* GetEntitySpatialDbStorage();
+    [[nodiscard]] const SpatialDB<UserEntity>* GetEntitySpatialDbStorage() const;
 
     /**
      * Address: 0x00894120 (FUN_00894120, ?GetTerrainRes@CWldSession@Moho@@QBEPAVIWldTerrainRes@2@XZ)

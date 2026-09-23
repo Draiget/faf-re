@@ -224,306 +224,9 @@ namespace moho
     return outBatchHandle;
   }
 
-  struct SpatialShardData;
-
-  template <class T>
-  struct SpatialShardArray
-  {
-    void* mDebugProxy; // +0x00
-    T** mBegin;        // +0x04
-    T** mEnd;          // +0x08
-    T** mCapacity;     // +0x0C
-  };
-
-  static_assert(sizeof(SpatialShardArray<void>) == 0x10, "SpatialShardArray size must be 0x10");
-
-  struct SpatialShard
-  {
-    SpatialShard* mParent;                     // +0x00
-    gpg::Rect2i mAreaRect;                     // +0x04
-    std::int32_t mLevel;                       // +0x14
-    std::int32_t mUnitCount;                   // +0x18
-    std::int32_t mProjectileCount;             // +0x1C
-    std::int32_t mPropCount;                   // +0x20
-    std::int32_t mEntityCount;                 // +0x24
-    Wm3::AxisAlignedBox3f mBounds;             // +0x28
-    SpatialShardArray<SpatialShard> mShards;   // +0x40
-    SpatialShardArray<SpatialShardData> mData; // +0x50
-
-    /**
-     * Address: 0x005011A0 (FUN_005011A0, Moho::SpatialShard::SpatialShard)
-     *
-     * What it does:
-     * Builds one shard node (or one leaf-data lane set) for the recursive 4x4
-     * spatial partition tree.
-     */
-    SpatialShard(std::int32_t level, SpatialShard* parent, const gpg::Rect2i& areaRect);
-
-    /**
-     * Address: 0x00501370 (FUN_00501370, Moho::SpatialShard::~SpatialShard)
-     *
-     * What it does:
-     * Releases recursively-owned child shards or leaf-data lanes and clears
-     * shard pointer arrays.
-     */
-    ~SpatialShard();
-
-    /**
-     * Address: 0x00501490 (FUN_00501490, Moho::SpatialShard::CountType)
-     *
-     * What it does:
-     * Returns true when this shard has no entities for the requested type mask.
-     */
-    [[nodiscard]] bool CountType(EEntityType type) const;
-
-    /**
-     * Address: 0x00501710 (FUN_00501710, Moho::SpatialShard::DecrementCount)
-     *
-     * What it does:
-     * Decrements one requested entity-lane counter on this shard and all
-     * ancestors.
-     */
-    static void DecrementCount(SpatialShard* shard, EEntityType type);
-
-    /**
-     * Address: 0x00501500 (FUN_00501500, Moho::SpatialShard::RecalculateBounds)
-     *
-     * What it does:
-     * Rebuilds this shard bounds from the 16 child lanes and propagates
-     * recalculation up the parent chain.
-     */
-    void RecalculateBounds();
-  };
-
-  static_assert(sizeof(SpatialShard) == 0x60, "SpatialShard size must be 0x60");
-  static_assert(offsetof(SpatialShard, mLevel) == 0x14, "SpatialShard::mLevel offset must be 0x14");
-  static_assert(offsetof(SpatialShard, mBounds) == 0x28, "SpatialShard::mBounds offset must be 0x28");
-  static_assert(offsetof(SpatialShard, mShards) == 0x40, "SpatialShard::mShards offset must be 0x40");
-  static_assert(offsetof(SpatialShard, mData) == 0x50, "SpatialShard::mData offset must be 0x50");
-
-  struct SpatialMapNode
-  {
-    SpatialMapNode* mLeft;      // +0x00
-    SpatialMapNode* mParent;    // +0x04
-    SpatialMapNode* mRight;     // +0x08
-    Wm3::AxisAlignedBox3f mBox; // +0x0C
-    std::uint32_t mEntityType;     // +0x24
-    SpatialShardData* mShardData;  // +0x28
-    float mFadeOut;                // +0x2C
-    void* mOwner;                  // +0x30
-    std::uint8_t mColor;           // +0x34
-    std::uint8_t mIsNil;           // +0x35
-    std::uint8_t mPad_36_37[0x02];
-  };
-
-  static_assert(sizeof(SpatialMapNode) == 0x38, "SpatialMapNode size must be 0x38");
-  static_assert(offsetof(SpatialMapNode, mBox) == 0x0C, "SpatialMapNode::mBox offset must be 0x0C");
-  static_assert(offsetof(SpatialMapNode, mEntityType) == 0x24, "SpatialMapNode::mEntityType offset must be 0x24");
-  static_assert(offsetof(SpatialMapNode, mShardData) == 0x28, "SpatialMapNode::mShardData offset must be 0x28");
-  static_assert(offsetof(SpatialMapNode, mFadeOut) == 0x2C, "SpatialMapNode::mFadeOut offset must be 0x2C");
-  static_assert(offsetof(SpatialMapNode, mOwner) == 0x30, "SpatialMapNode::mOwner offset must be 0x30");
-  static_assert(offsetof(SpatialMapNode, mIsNil) == 0x35, "SpatialMapNode::mIsNil offset must be 0x35");
-
-  struct SpatialMapTree
-  {
-    void* mAllocatorCookie; // +0x00
-    SpatialMapNode* mHead;  // +0x04
-    std::int32_t mSize;     // +0x08
-  };
-
-  static_assert(sizeof(SpatialMapTree) == 0x0C, "SpatialMapTree size must be 0x0C");
-
-  struct SpatialShardData
-  {
-    SpatialShard* mShard;       // +0x00
-    std::uint8_t mPad_04_13[0x10];
-    std::int32_t mTimeSinceRecalc; // +0x14
-    Wm3::AxisAlignedBox3f mBounds; // +0x18
-    SpatialMapTree mMapUnits;      // +0x30
-    SpatialMapTree mMapProjectiles; // +0x3C
-    SpatialMapTree mMapProps;      // +0x48
-    SpatialMapTree mMapEntities;   // +0x54
-
-    /**
-     * Address: 0x00500F60 (FUN_00500F60, Moho::SpatialShardData::SpatialShardData)
-     *
-     * What it does:
-     * Initializes one leaf-data lane container and allocates sentinel map
-     * heads for unit/projectile/prop/entity trees.
-     */
-    explicit SpatialShardData(SpatialShard* ownerShard);
-
-    /**
-     * Address: 0x005017E0 (FUN_005017E0, Moho::SpatialShardData::~SpatialShardData)
-     *
-     * What it does:
-     * Destroys all map nodes in unit/projectile/prop/entity trees and releases
-     * their sentinel heads.
-     */
-    ~SpatialShardData();
-
-    /**
-     * Address: 0x00502780 (FUN_00502780, Moho::SpatialShardData::CollectFromData)
-     *
-     * What it does:
-     * Appends all entity pointers from selected leaf maps to destination.
-     */
-    static void CollectFromData(EEntityType type, gpg::fastvector<UserEntity*>& destination, SpatialShardData* data);
-
-    /**
-     * Address: 0x00501070 (FUN_00501070, Moho::SpatialShardData::HasType)
-     *
-     * What it does:
-     * Returns true when this leaf-data lane has no entities for the requested
-     * type mask.
-     */
-    [[nodiscard]] static bool HasType(const SpatialShardData* data, EEntityType type);
-
-    /**
-     * Address: 0x005023B0 (FUN_005023B0, Moho::SpatialShardData::RecalculateBounds)
-     *
-     * What it does:
-     * Rebuilds leaf-map aggregate bounds and updates owner shard bounds.
-     */
-    void RecalculateBounds();
-
-    /**
-     * Address: 0x00503BB0 (FUN_00503BB0, Moho::SpatialShardData::Collect)
-     *
-     * What it does:
-     * Recursively collects selected entities from every shard/data lane.
-     */
-    static void Collect(SpatialShard* shard, EEntityType type, gpg::fastvector<UserEntity*>& destination);
-
-    /**
-     * Address: 0x00503C00 (FUN_00503C00, Moho::SpatialShardData::CollectInBox)
-     *
-     * What it does:
-     * Recursively collects selected entities that intersect one AABB query.
-     */
-    static void CollectInBox(
-      SpatialShard* shard,
-      EEntityType type,
-      const Wm3::AxisAlignedBox3f& bounds,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x00502950 (FUN_00502950, Moho::SpatialShardData::CollectInBoxFromData)
-     *
-     * What it does:
-     * Collects selected leaf-map entities intersecting one AABB query.
-     */
-    void CollectInBoxFromData(
-      const Wm3::AxisAlignedBox3f& bounds,
-      EEntityType type,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x00503DB0 (FUN_00503DB0, Moho::SpatialShardData::CollectInVolume)
-     *
-     * What it does:
-     * Recursively collects selected entities that intersect one convex volume.
-     */
-    static void CollectInVolume(
-      SpatialShard* shard,
-      EEntityType type,
-      CGeomSolid3* volume,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x00503490 (FUN_00503490, Moho::SpatialShardData::CollectInVolumeFromData)
-     *
-     * What it does:
-     * Collects selected leaf-map entities intersecting one convex volume.
-     */
-    void CollectInVolumeFromData(gpg::fastvector<UserEntity*>& destination, EEntityType type, CGeomSolid3* volume);
-
-    /**
-     * Address: 0x00503D40 (FUN_00503D40, Moho::SpatialShardData::CollectInSphere)
-     *
-     * What it does:
-     * Recursively collects selected entities that intersect one bounding
-     * sphere — walks the 4x4 child shard array, recursing into non-leaf
-     * children and dispatching to the per-leaf `CollectInSphereFromData`
-     * helper at the bottom level.
-     */
-    [[nodiscard]] static bool CollectInSphere(
-      SpatialShard* shard,
-      EEntityType type,
-      const SphereBoundsProbe& probe,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x005030C0 (FUN_005030C0, Moho::SpatialShardData::CollectInSphereFromData)
-     *
-     * What it does:
-     * Collects entities from this leaf shard-data lane that intersect one
-     * bounding sphere. Skips the lane when the shard reports no entities of
-     * the requested type or when the sphere does not touch the lane's AABB.
-     * Refreshes the cached bounds if their staleness counter is over the
-     * limit, then for each enabled entity-type bucket walks the associated
-     * tree appending owners whose node-box either intersects the sphere or
-     * is fully contained by it.
-     */
-    [[nodiscard]] bool CollectInSphereFromData(
-      EEntityType type,
-      const SphereBoundsProbe& probe,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x00502340 (FUN_00502340, Moho::SpatialShardData::RemoveNode)
-     *
-     * What it does:
-     * Removes one map node from the matching type lane and decrements shard
-     * counters up the parent chain.
-     */
-    void RemoveNode(SpatialMapNode* node);
-
-    /**
-     * Address: 0x00503730 (FUN_00503730, Moho::SpatialShardData::FindInVolumeFromData)
-     *
-     * What it does:
-     * Collects leaf-lane entities intersecting one volume with fade-threshold
-     * early-out driven by support selector and viewport plane lanes.
-     */
-    static void FindInVolumeFromData(
-      const Vector4f& fadePlane,
-      const Wm3::Vector3f& supportSelector,
-      SpatialShardData* data,
-      EEntityType type,
-      CGeomSolid3* volume,
-      gpg::fastvector<UserEntity*>& destination
-    );
-
-    /**
-     * Address: 0x00503E30 (FUN_00503E30, Moho::SpatialShardData::FindInVolume)
-     *
-     * What it does:
-     * Recursively collects entities intersecting one volume using view/fade
-     * cull inputs for leaf-lane filtering.
-     */
-    static void FindInVolume(
-      SpatialShard* shard,
-      EEntityType type,
-      CGeomSolid3* volume,
-      const Wm3::Vector3f& supportSelector,
-      const Vector4f& fadePlane,
-      gpg::fastvector<UserEntity*>& destination
-    );
-  };
-
-  static_assert(sizeof(SpatialShardData) == 0x60, "SpatialShardData size must be 0x60");
-  static_assert(offsetof(SpatialShardData, mTimeSinceRecalc) == 0x14, "SpatialShardData::mTimeSinceRecalc offset must be 0x14");
-  static_assert(offsetof(SpatialShardData, mBounds) == 0x18, "SpatialShardData::mBounds offset must be 0x18");
-  static_assert(offsetof(SpatialShardData, mMapUnits) == 0x30, "SpatialShardData::mMapUnits offset must be 0x30");
-  static_assert(offsetof(SpatialShardData, mMapProjectiles) == 0x3C, "SpatialShardData::mMapProjectiles offset must be 0x3C");
-  static_assert(offsetof(SpatialShardData, mMapProps) == 0x48, "SpatialShardData::mMapProps offset must be 0x48");
-  static_assert(offsetof(SpatialShardData, mMapEntities) == 0x54, "SpatialShardData::mMapEntities offset must be 0x54");
+  // The shard/map/database types that used to be defined here now live in
+  // moho/mesh/SpatialDb.h, so the owners that embed a SpatialDB<T> by value
+  // can see its layout. Their bodies stay in this file.
 } // namespace moho
 
 namespace
@@ -1946,10 +1649,10 @@ namespace
    * Address: 0x00505F20  `operator new(sizeof(SpatialMapNode))` lane
    * Address: 0x00504330  bridge into the hint-slot spatial insert
    * Address: 0x007E2AA0  placement-new bridge for SpatialDB_MeshInstance
-   * Address: 0x007E2AC0  bridge to SpatialDB_MeshInstance::CollectAllInVolume
+   * Address: 0x007E2AC0  bridge to SpatialDB<T>::CollectAllInVolume
    * Address: 0x007E2AD0  bridge into the mask-0x800 entry register
-   * Address: 0x008C5A90  bridge to SpatialDB_MeshInstance::CollectInBox
-   * Address: 0x007AE170  bridge to SpatialDB_MeshInstance::CollectInView
+   * Address: 0x008C5A90  bridge to SpatialDB<T>::CollectInBox
+   * Address: 0x007AE170  bridge to SpatialDB<T>::CollectInView
    */
   [[maybe_unused]] [[nodiscard]] std::uintptr_t* StorePointerSlot04LaneA(
     std::uintptr_t* const outLane,
@@ -2387,44 +2090,6 @@ namespace
 
   constexpr std::int32_t kMeshSpatialDbRoutingMask = 0x800;
 
-  struct SpatialDbMeshCollectView
-  {
-    void* shardProxy;                   // +0x00
-    moho::SpatialShard** shardBegin;    // +0x04
-    moho::SpatialShard** shardEnd;      // +0x08
-    moho::SpatialShard** shardCapacity; // +0x0C
-    moho::SpatialShardData shardData;   // +0x10
-    std::int32_t mapWidth;              // +0x70
-    std::int32_t mapHeight;             // +0x74
-    std::int32_t shardWidth;            // +0x78
-    std::int32_t shardHeight;           // +0x7C
-    std::int32_t shardLevel;            // +0x80
-    moho::SpatialMapTree mapTree;       // +0x84
-  };
-
-  static_assert(offsetof(SpatialDbMeshCollectView, shardProxy) == 0x00, "SpatialDbMeshCollectView::shardProxy offset must be 0x00");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardBegin) == 0x04, "SpatialDbMeshCollectView::shardBegin offset must be 0x04");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardEnd) == 0x08, "SpatialDbMeshCollectView::shardEnd offset must be 0x08");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardCapacity) == 0x0C, "SpatialDbMeshCollectView::shardCapacity offset must be 0x0C");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardData) == 0x10, "SpatialDbMeshCollectView::shardData offset must be 0x10");
-  static_assert(offsetof(SpatialDbMeshCollectView, mapWidth) == 0x70, "SpatialDbMeshCollectView::mapWidth offset must be 0x70");
-  static_assert(offsetof(SpatialDbMeshCollectView, mapHeight) == 0x74, "SpatialDbMeshCollectView::mapHeight offset must be 0x74");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardWidth) == 0x78, "SpatialDbMeshCollectView::shardWidth offset must be 0x78");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardHeight) == 0x7C, "SpatialDbMeshCollectView::shardHeight offset must be 0x7C");
-  static_assert(offsetof(SpatialDbMeshCollectView, shardLevel) == 0x80, "SpatialDbMeshCollectView::shardLevel offset must be 0x80");
-  static_assert(offsetof(SpatialDbMeshCollectView, mapTree) == 0x84, "SpatialDbMeshCollectView::mapTree offset must be 0x84");
-  static_assert(sizeof(SpatialDbMeshCollectView) == 0x90, "SpatialDbMeshCollectView size must be 0x90");
-
-  [[nodiscard]] SpatialDbMeshCollectView& AsSpatialDbMeshCollectView(moho::SpatialDB_MeshInstance& storage) noexcept
-  {
-    return *reinterpret_cast<SpatialDbMeshCollectView*>(&storage);
-  }
-
-  [[nodiscard]] moho::SpatialShardArray<moho::SpatialShard>&
-  AsSpatialDbShardArray(SpatialDbMeshCollectView& storage) noexcept
-  {
-    return *reinterpret_cast<moho::SpatialShardArray<moho::SpatialShard>*>(&storage.shardProxy);
-  }
 
   /**
     * Alias of FUN_00501D80 (non-canonical helper lane).
@@ -2433,23 +2098,24 @@ namespace
    * Initializes one spatial-db mesh storage view: resets shard vector lanes,
    * constructs inline shard-data state, and seeds an empty map sentinel tree.
    */
-  void InitializeSpatialDbMeshStorage(SpatialDbMeshCollectView& storage)
+  template <class T>
+  void InitializeSpatialDbMeshStorage(moho::SpatialDB<T>& storage)
   {
-    storage.shardProxy = nullptr;
-    storage.shardBegin = nullptr;
-    storage.shardEnd = nullptr;
-    storage.shardCapacity = nullptr;
-    new (&storage.shardData) moho::SpatialShardData(nullptr);
+    storage.mShards.mDebugProxy = nullptr;
+    storage.mShards.mBegin = nullptr;
+    storage.mShards.mEnd = nullptr;
+    storage.mShards.mCapacity = nullptr;
+    new (&storage.mShardData) moho::SpatialShardData(nullptr);
 
-    storage.mapWidth = 0;
-    storage.mapHeight = 0;
-    storage.shardWidth = 0;
-    storage.shardHeight = 0;
-    storage.shardLevel = 0;
-    InitializeSpatialMapTree(storage.mapTree);
+    storage.mMapWidth = 0;
+    storage.mMapHeight = 0;
+    storage.mShardWidth = 0;
+    storage.mShardHeight = 0;
+    storage.mShardLevel = 0;
+    InitializeSpatialMapTree(storage.mMapTree);
 
-    if (storage.shardBegin != storage.shardEnd) {
-      storage.shardEnd = storage.shardBegin;
+    if (storage.mShards.mBegin != storage.mShards.mEnd) {
+      storage.mShards.mEnd = storage.mShards.mBegin;
     }
   }
 
@@ -2460,25 +2126,26 @@ namespace
    * Releases shard allocations, destroys map/sentinel storage, tears down
    * inline shard-data state, and resets shard vector lanes.
    */
-  void DestroySpatialDbMeshStorage(SpatialDbMeshCollectView& storage)
+  template <class T>
+  void DestroySpatialDbMeshStorage(moho::SpatialDB<T>& storage)
   {
-    if (storage.shardBegin != nullptr && storage.shardEnd != nullptr && storage.shardEnd > storage.shardBegin) {
-      const std::ptrdiff_t shardCount = storage.shardEnd - storage.shardBegin;
+    if (storage.mShards.mBegin != nullptr && storage.mShards.mEnd != nullptr && storage.mShards.mEnd > storage.mShards.mBegin) {
+      const std::ptrdiff_t shardCount = storage.mShards.mEnd - storage.mShards.mBegin;
       for (std::ptrdiff_t index = 0; index < shardCount; ++index) {
-        delete storage.shardBegin[index];
-        storage.shardBegin[index] = nullptr;
+        delete storage.mShards.mBegin[index];
+        storage.mShards.mBegin[index] = nullptr;
       }
     }
-    storage.shardEnd = storage.shardBegin;
+    storage.mShards.mEnd = storage.mShards.mBegin;
 
-    DestroySpatialMapTree(storage.mapTree);
-    storage.shardData.~SpatialShardData();
+    DestroySpatialMapTree(storage.mMapTree);
+    storage.mShardData.~SpatialShardData();
 
-    delete[] storage.shardBegin;
-    storage.shardProxy = nullptr;
-    storage.shardBegin = nullptr;
-    storage.shardEnd = nullptr;
-    storage.shardCapacity = nullptr;
+    delete[] storage.mShards.mBegin;
+    storage.mShards.mDebugProxy = nullptr;
+    storage.mShards.mBegin = nullptr;
+    storage.mShards.mEnd = nullptr;
+    storage.mShards.mCapacity = nullptr;
   }
 
   /**
@@ -2487,18 +2154,19 @@ namespace
    * What it does:
    * Rebuilds top-level shard lanes for one map size update.
    */
-  void UpdateSpatialDbMeshStorageMapSize(SpatialDbMeshCollectView& storage, const std::int32_t width, const std::int32_t height)
+  template <class T>
+  void UpdateSpatialDbMeshStorageMapSize(moho::SpatialDB<T>& storage, const std::int32_t width, const std::int32_t height)
   {
-    if (width == storage.mapWidth && height == storage.mapHeight) {
+    if (width == storage.mMapWidth && height == storage.mMapHeight) {
       return;
     }
 
-    storage.mapWidth = width;
-    storage.shardWidth = width / kSpatialShardSlotCount;
-    storage.shardHeight = height / kSpatialShardSlotCount;
-    storage.mapHeight = height;
+    storage.mMapWidth = width;
+    storage.mShardWidth = width / kSpatialShardSlotCount;
+    storage.mShardHeight = height / kSpatialShardSlotCount;
+    storage.mMapHeight = height;
 
-    moho::SpatialShardArray<moho::SpatialShard>& shardArray = AsSpatialDbShardArray(storage);
+    moho::SpatialShardArray<moho::SpatialShard>& shardArray = storage.mShards;
     if (shardArray.mBegin != nullptr && shardArray.mEnd != nullptr && shardArray.mEnd > shardArray.mBegin) {
       const std::ptrdiff_t shardCount = shardArray.mEnd - shardArray.mBegin;
       for (std::ptrdiff_t index = 0; index < shardCount; ++index) {
@@ -2511,20 +2179,20 @@ namespace
       shardArray.mEnd = shardArray.mBegin;
     }
 
-    if (storage.mapWidth <= 0 || storage.mapHeight <= 0) {
+    if (storage.mMapWidth <= 0 || storage.mMapHeight <= 0) {
       return;
     }
 
-    const std::int32_t dominantExtent = std::max(storage.mapWidth, storage.mapHeight);
+    const std::int32_t dominantExtent = std::max(storage.mMapWidth, storage.mMapHeight);
     if (dominantExtent <= kSpatialShardLevelSmallThreshold) {
-      storage.shardLevel = kSpatialShardLevelSmall;
+      storage.mShardLevel = kSpatialShardLevelSmall;
     } else if (dominantExtent <= kSpatialShardLevelMediumThreshold) {
-      storage.shardLevel = kSpatialShardLevelMedium;
+      storage.mShardLevel = kSpatialShardLevelMedium;
     } else {
-      storage.shardLevel = kSpatialShardLevelLarge;
+      storage.mShardLevel = kSpatialShardLevelLarge;
     }
 
-    const std::int32_t shardSize = kSpatialShardCellSizeByLevel[storage.shardLevel];
+    const std::int32_t shardSize = kSpatialShardCellSizeByLevel[storage.mShardLevel];
     if (EnsureSpatialShardSlots16(shardArray) < static_cast<std::size_t>(kSpatialShardSlotCount)) {
       return;
     }
@@ -2539,8 +2207,8 @@ namespace
       cellRect.x1 = shardSize * (col + 1);
       cellRect.z1 = shardSize * (row + 1);
 
-      if (cellRect.x1 <= storage.mapWidth && cellRect.z1 <= storage.mapHeight) {
-        shardArray.mBegin[index] = new (std::nothrow) moho::SpatialShard(storage.shardLevel - 1, nullptr, cellRect);
+      if (cellRect.x1 <= storage.mMapWidth && cellRect.z1 <= storage.mMapHeight) {
+        shardArray.mBegin[index] = new (std::nothrow) moho::SpatialShard(storage.mShardLevel - 1, nullptr, cellRect);
       } else {
         shardArray.mBegin[index] = nullptr;
       }
@@ -2581,30 +2249,31 @@ namespace
    * Resolves one world position to leaf shard-data lane; falls back to inline
    * root shard-data lane when position is outside shard-grid coverage.
    */
+  template <class T>
   [[nodiscard]] moho::SpatialShardData*
-  ResolveSpatialLeafDataFromStoragePoint(const Wm3::Vec3f& point, SpatialDbMeshCollectView& storage)
+  ResolveSpatialLeafDataFromStoragePoint(const Wm3::Vec3f& point, moho::SpatialDB<T>& storage)
   {
     const std::int32_t coarseX = static_cast<std::int32_t>(std::floor(point.x * 0.0625f));
     const std::int32_t coarseZ = static_cast<std::int32_t>(std::floor(point.z * 0.0625f));
     if (
-      coarseX < 0 || coarseZ < 0 || coarseX >= storage.shardWidth || coarseZ >= storage.shardHeight ||
-      storage.shardBegin == nullptr
+      coarseX < 0 || coarseZ < 0 || coarseX >= storage.mShardWidth || coarseZ >= storage.mShardHeight ||
+      storage.mShards.mBegin == nullptr
     ) {
-      return &storage.shardData;
+      return &storage.mShardData;
     }
 
-    const float shardCellSize = static_cast<float>(kSpatialShardCellSizeByLevel[storage.shardLevel]);
+    const float shardCellSize = static_cast<float>(kSpatialShardCellSizeByLevel[storage.mShardLevel]);
     const std::int32_t shardX = static_cast<std::int32_t>(point.x / shardCellSize);
     const std::int32_t shardZ = static_cast<std::int32_t>(point.z / shardCellSize);
     const std::int32_t topIndex = shardX + kSpatialShardGridDimension * shardZ;
 
-    moho::SpatialShard* const rootShard = storage.shardBegin[topIndex];
+    moho::SpatialShard* const rootShard = storage.mShards.mBegin[topIndex];
     if (rootShard == nullptr) {
-      return &storage.shardData;
+      return &storage.mShardData;
     }
 
     moho::SpatialShardData* const leaf = ResolveSpatialLeafDataForPoint(rootShard, point.z, point.x);
-    return leaf != nullptr ? leaf : &storage.shardData;
+    return leaf != nullptr ? leaf : &storage.mShardData;
   }
 
   struct SpatialDbStorageRootView
@@ -3458,9 +3127,10 @@ namespace moho
    * What it does:
    * Initializes one embedded spatial-db mesh-storage view in-place.
    */
-  void SpatialDB_MeshInstance::InitializeStorage()
-  {
-    auto& storage = AsSpatialDbMeshCollectView(*this);
+  template <class T>
+  SpatialDB<T>::SpatialDB()
+{
+    auto& storage = *this;
     InitializeSpatialDbMeshStorage(storage);
   }
 
@@ -3473,21 +3143,24 @@ namespace moho
    * What it does:
    * Rebuilds embedded top-level shard lanes for one map-size update.
    */
-  void SpatialDB_MeshInstance::ResizeStorageForMap(const std::int32_t width, const std::int32_t height)
+  template <class T>
+  void SpatialDB<T>::ResizeForMap(const std::int32_t width, const std::int32_t height)
   {
-    auto& storage = AsSpatialDbMeshCollectView(*this);
+    auto& storage = *this;
     UpdateSpatialDbMeshStorageMapSize(storage, width, height);
   }
 
   /**
-   * Address: 0x00501E50 (FUN_00501E50, Moho::SpatialDB_MeshInstance::~SpatialDB_MeshInstance)
+   * Address: 0x00501E50 (FUN_00501E50, Moho::SpatialDB<T>::~SpatialDB)
    *
    * What it does:
-   * Tears down one embedded spatial-db mesh-storage view in-place.
+   * Releases every shard lane and map node this database owns. The owners
+   * that embed it by value run this as ordinary member destruction.
    */
-  void SpatialDB_MeshInstance::DestroyStorage()
+  template <class T>
+  SpatialDB<T>::~SpatialDB()
   {
-    auto& storage = AsSpatialDbMeshCollectView(*this);
+    auto& storage = *this;
     DestroySpatialDbMeshStorage(storage);
   }
 
@@ -3519,19 +3192,20 @@ namespace moho
    * What it does:
    * Registers one mesh-instance owner in the spatial-db storage and seeds entry state.
    */
-  void SpatialDB_MeshInstance::Register(void* const spatialDbStorage, void* const owner, const std::int32_t routingMask)
-  {
-    if (db) {
+  template <class T>
+  void SpatialDBEntry<T>::Register(SpatialDB<T>* const spatialDbStorage, T* const owner, const std::int32_t routingMask)
+{
+    if (mDb) {
       ClearRegistration();
     }
 
-    db = spatialDbStorage;
-    entry = 0;
-    if (!db) {
+    mDb = spatialDbStorage;
+    mNode = nullptr;
+    if (!mDb) {
       return;
     }
 
-    auto* const storage = reinterpret_cast<SpatialDbMeshCollectView*>(db);
+    auto* const storage = mDb;
     SpatialMapValuePayload payload{};
     payload.mBox = {};
     payload.mEntityType = static_cast<std::uint32_t>(routingMask);
@@ -3539,8 +3213,8 @@ namespace moho
     payload.mFadeOut = 0.0f;
     payload.mOwner = owner;
 
-    moho::SpatialMapNode* const inserted = InsertSpatialPayloadWithHint(storage->mapTree, payload, storage->mapTree.mHead);
-    entry = EntryHandleFromNode(inserted);
+    moho::SpatialMapNode* const inserted = InsertSpatialPayloadWithHint(storage->mMapTree, payload, storage->mMapTree.mHead);
+    mNode = inserted;
   }
 
   /**
@@ -3549,14 +3223,15 @@ namespace moho
    * What it does:
    * Updates dissolve-cutoff payload in the current spatial-db entry.
    */
-  void SpatialDB_MeshInstance::UpdateDissolveCutoff(const float cutoff)
+  template <class T>
+  void SpatialDBEntry<T>::UpdateDissolveCutoff(const float cutoff)
   {
-    if (!db || entry == 0) {
+    if (!mDb || mNode == nullptr) {
       return;
     }
 
-    auto* const storage = reinterpret_cast<SpatialDbMeshCollectView*>(db);
-    moho::SpatialMapNode* const currentNode = EntryNodeFromHandle(entry);
+    auto* const storage = mDb;
+    moho::SpatialMapNode* const currentNode = mNode;
     if (currentNode == nullptr || storage == nullptr) {
       return;
     }
@@ -3570,11 +3245,11 @@ namespace moho
       data->RemoveNode(currentNode);
       insertedNode = InsertSpatialPayloadIntoShardData(*data, payload);
     } else {
-      SpatialMapEraseNode(storage->mapTree, currentNode);
-      insertedNode = InsertSpatialPayloadWithHint(storage->mapTree, payload, storage->mapTree.mHead);
+      SpatialMapEraseNode(storage->mMapTree, currentNode);
+      insertedNode = InsertSpatialPayloadWithHint(storage->mMapTree, payload, storage->mMapTree.mHead);
     }
 
-    entry = EntryHandleFromNode(insertedNode);
+    mNode = insertedNode;
   }
 
   /**
@@ -3583,14 +3258,15 @@ namespace moho
    * What it does:
    * Copies one updated world AABB into this spatial-db entry payload lane.
    */
-  void SpatialDB_MeshInstance::UpdateBounds(const Wm3::AxisAlignedBox3f& bounds)
+  template <class T>
+  void SpatialDBEntry<T>::UpdateBounds(const Wm3::AxisAlignedBox3f& bounds)
   {
-    if (!db || entry == 0) {
+    if (!mDb || mNode == nullptr) {
       return;
     }
 
-    auto* const storage = reinterpret_cast<SpatialDbMeshCollectView*>(db);
-    moho::SpatialMapNode* const currentNode = EntryNodeFromHandle(entry);
+    auto* const storage = mDb;
+    moho::SpatialMapNode* const currentNode = mNode;
     if (currentNode == nullptr || storage == nullptr) {
       return;
     }
@@ -3600,7 +3276,7 @@ namespace moho
       : true;
     currentNode->mBox = bounds;
 
-    // TEMPORARY PROBE -- spatial-db triage, delete when resolved.
+    // TEMPORARY PROBE -- spatial-mDb triage, delete when resolved.
     if ((currentNode->mEntityType & kSpatialEntityTypeUnit) != 0u) {
       static unsigned sUpdateCalls = 0;
       if ((sUpdateCalls++ % 200u) == 0u) {
@@ -3616,13 +3292,13 @@ namespace moho
       if (currentNode->mShardData != nullptr) {
         currentNode->mShardData->RemoveNode(currentNode);
       } else {
-        SpatialMapEraseNode(storage->mapTree, currentNode);
+        SpatialMapEraseNode(storage->mMapTree, currentNode);
       }
 
       const Wm3::Vec3f queryPoint{bounds.Min.x, 0.0f, bounds.Min.z};
       moho::SpatialShardData* const targetData = ResolveSpatialLeafDataFromStoragePoint(queryPoint, *storage);
       moho::SpatialMapNode* const insertedNode = InsertSpatialPayloadIntoShardData(*targetData, payload);
-      entry = EntryHandleFromNode(insertedNode);
+      mNode = insertedNode;
       return;
     }
 
@@ -3644,25 +3320,26 @@ namespace moho
     ++data->mTimeSinceRecalc;
   }
 
-  void SpatialDB_MeshInstance::ClearRegistration() noexcept
+  template <class T>
+  void SpatialDBEntry<T>::ClearRegistration() noexcept
   {
-    if (!db) {
-      entry = 0;
+    if (!mDb) {
+      mNode = nullptr;
       return;
     }
 
-    auto* const storage = reinterpret_cast<SpatialDbMeshCollectView*>(db);
-    moho::SpatialMapNode* const currentNode = EntryNodeFromHandle(entry);
+    auto* const storage = mDb;
+    moho::SpatialMapNode* const currentNode = mNode;
     if (currentNode != nullptr) {
       if (currentNode->mShardData != nullptr) {
         currentNode->mShardData->RemoveNode(currentNode);
       } else if (storage != nullptr) {
-        SpatialMapEraseNode(storage->mapTree, currentNode);
+        SpatialMapEraseNode(storage->mMapTree, currentNode);
       }
     }
 
-    db = nullptr;
-    entry = 0;
+    mDb = nullptr;
+    mNode = nullptr;
   }
 
   /**
@@ -3671,8 +3348,9 @@ namespace moho
    * What it does:
    * Clears mesh-instance spatial-db registration state.
    */
-  SpatialDB_MeshInstance::~SpatialDB_MeshInstance()
-  {
+  template <class T>
+  SpatialDBEntry<T>::~SpatialDBEntry()
+{
     ClearRegistration();
   }
 
@@ -3683,26 +3361,27 @@ namespace moho
    * Walks all shard lanes in one mesh-instance view, collects node owners whose
    * AABBs intersect `bounds`, then appends matches from inline root shard data.
    */
+  template <class T>
   [[maybe_unused]] std::int32_t CollectShardsInBoxIntoDestination(
     const Wm3::AxisAlignedBox3f& bounds,
     gpg::fastvector<UserEntity*>& destination,
-    SpatialDbMeshCollectView& spatialView,
+    moho::SpatialDB<T>& spatialView,
     const EEntityType type
   )
   {
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         SpatialShardData::CollectInBox(*shard, type, bounds, destination);
       }
     }
 
-    spatialView.shardData.CollectInBoxFromData(bounds, type, destination);
+    spatialView.mShardData.CollectInBoxFromData(bounds, type, destination);
     return static_cast<std::int32_t>(destination.size());
   }
 
   /**
    * Helper lane (no canonical address — inlined into
-   * `SpatialDB_MeshInstance::CollectInVolume` at FUN_00504130 in the
+   * `SpatialDB<T>::CollectInVolume` at FUN_00504130 in the
    * binary). The previous recovery mis-attributed this helper to FUN_005040E0
    * which is in fact the bounding-sphere collect variant, recovered below.
    *
@@ -3710,20 +3389,21 @@ namespace moho
    * Walks all shard lanes in one mesh-instance view, collects node owners that
    * intersect `volume`, then appends matches from inline root shard data.
    */
+  template <class T>
   [[nodiscard]] std::int32_t CollectShardsInVolumeIntoDestination(
     CGeomSolid3* const volume,
     gpg::fastvector<UserEntity*>& destination,
-    SpatialDbMeshCollectView& spatialView,
+    moho::SpatialDB<T>& spatialView,
     const EEntityType type
   )
   {
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         SpatialShardData::CollectInVolume(*shard, type, volume, destination);
       }
     }
 
-    spatialView.shardData.CollectInVolumeFromData(destination, type, volume);
+    spatialView.mShardData.CollectInVolumeFromData(destination, type, volume);
 
     // TEMPORARY PROBE -- spatial-db triage, delete when resolved.
     if ((static_cast<std::uint32_t>(type) & kSpatialEntityTypeUnit) != 0u) {
@@ -3731,7 +3411,7 @@ namespace moho
       if ((sCollectCalls++ % 120u) == 0u) {
         int shardCount = 0;
         int shardsWithUnits = 0;
-        for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+        for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
           if (*shard != nullptr) {
             ++shardCount;
             if (!(*shard)->CountType(static_cast<EEntityType>(kSpatialEntityTypeUnit))) {
@@ -3739,65 +3419,67 @@ namespace moho
             }
           }
         }
-        const SpatialShardData& root = spatialView.shardData;
+        const SpatialShardData& root = spatialView.mShardData;
         gpg::Warnf("[SPDBDIAG] type=0x%X out=%u shards=%d shardsWithUnits=%d rootUnits=%d rootEntities=%d rootProps=%d rootBounds=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f) mapTreeSize=%d",
                    static_cast<unsigned>(type), static_cast<unsigned>(destination.size()), shardCount, shardsWithUnits,
                    root.mMapUnits.mSize, root.mMapEntities.mSize, root.mMapProps.mSize,
                    root.mBounds.Min.x, root.mBounds.Min.y, root.mBounds.Min.z, root.mBounds.Max.x, root.mBounds.Max.y, root.mBounds.Max.z,
-                   spatialView.mapTree.mSize);
+                   spatialView.mMapTree.mSize);
       }
     }
     return static_cast<std::int32_t>(destination.size());
   }
 
   /**
-   * Helper lane shared by `SpatialDB_MeshInstance::CollectInSphere` (the
+   * Helper lane shared by `SpatialDB<T>::CollectInSphere` (the
    * canonical FUN_005040E0 body). Walks all child shards in one
    * mesh-instance view, sphere-collecting node owners that touch the
    * bounding sphere into `destination`, then runs one sphere collect over
    * the inline root shard-data lane. Returns the count of destination
    * entries appended so far.
    */
+  template <class T>
   std::int32_t CollectShardsInSphereIntoDestination(
     const SphereBoundsProbe& probe,
     gpg::fastvector<UserEntity*>& destination,
-    SpatialDbMeshCollectView& spatialView,
+    moho::SpatialDB<T>& spatialView,
     const EEntityType type
   )
   {
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         SpatialShardData::CollectInSphere(*shard, type, probe, destination);
       }
     }
 
-    spatialView.shardData.CollectInSphereFromData(type, probe, destination);
+    spatialView.mShardData.CollectInSphereFromData(type, probe, destination);
     return static_cast<std::int32_t>(destination.size());
   }
 
   /**
-   * Address: 0x00503F80 (FUN_00503F80, Moho::SpatialDB_MeshInstance::Collect)
+   * Address: 0x00503F80 (FUN_00503F80, Moho::SpatialDB<T>::Collect)
    *
    * What it does:
    * Collects requested entity lanes from shard hierarchy, inline root
    * shard-data lane, and map-backed overflow lane.
    */
-  std::int32_t SpatialDB_MeshInstance::Collect(
+  template <class T>
+  std::int32_t SpatialDB<T>::Collect(
     gpg::fastvector<UserEntity*>& destination,
     const EEntityType type
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
 
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         SpatialShardData::Collect(*shard, type, destination);
       }
     }
 
-    SpatialShardData::CollectFromData(type, destination, &spatialView.shardData);
+    SpatialShardData::CollectFromData(type, destination, &spatialView.mShardData);
     const std::size_t beforeMapTree = destination.size();
-    CollectTreeNodes(spatialView.mapTree, destination, [](const Wm3::AxisAlignedBox3f&) { return true; });
+    CollectTreeNodes(spatialView.mMapTree, destination, [](const Wm3::AxisAlignedBox3f&) { return true; });
 
     // TEMPORARY PROBE -- spatial-db triage, delete when resolved. Validates
     // every collected owner: the object must have a readable vtable whose
@@ -3817,7 +3499,7 @@ namespace moho
             gpg::Warnf("[SPDBBAD] collect type=0x%X idx=%u/%u origin=%s owner=%p vtable=%p mapTreeSize=%d",
                        static_cast<unsigned>(type), static_cast<unsigned>(i), static_cast<unsigned>(destination.size()),
                        i >= beforeMapTree ? "mapTree" : "shard", owner, static_cast<const void*>(vtable),
-                       spatialView.mapTree.mSize);
+                       spatialView.mMapTree.mSize);
           }
           ++bad;
         }
@@ -3836,10 +3518,10 @@ namespace moho
    *
    * What it does:
    * Register-order bridge that forwards one mesh-instance spatial collect lane
-   * into `SpatialDB_MeshInstance::Collect`.
+   * into `SpatialDB<T>::Collect`.
    */
   [[maybe_unused]] std::int32_t CollectMeshInstanceRegisterAdapter(
-    SpatialDB_MeshInstance* const instance,
+    SpatialDB<MeshInstance>* const instance,
     const EEntityType type,
     gpg::fastvector<UserEntity*>& destination
   )
@@ -3849,77 +3531,81 @@ namespace moho
 
 
   /**
-   * Address: 0x00504040 (FUN_00504040, Moho::SpatialDB_MeshInstance::CollectInBox)
+   * Address: 0x00504040 (FUN_00504040, Moho::SpatialDB<T>::CollectInBox)
    *
    * What it does:
    * Walks all child shard pointers, collects unit entities intersecting
    * `bounds`, then collects from the inline root shard-data lane.
    */
-  std::int32_t SpatialDB_MeshInstance::CollectInBox(
+  template <class T>
+  std::int32_t SpatialDB<T>::CollectInBox(
     gpg::fastvector<UserEntity*>& destination,
     const Wm3::AxisAlignedBox3f& bounds
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
     constexpr EEntityType kUnitType = static_cast<EEntityType>(kSpatialEntityTypeUnit);
     return CollectShardsInBoxIntoDestination(bounds, destination, spatialView, kUnitType);
   }
 
   /**
-   * Address: 0x005040E0 (FUN_005040E0, Moho::SpatialDB_MeshInstance::CollectInSphere)
+   * Address: 0x005040E0 (FUN_005040E0, Moho::SpatialDB<T>::CollectInSphere)
    *
    * What it does:
    * Walks all child shard pointers, sphere-collecting matching entity owners
    * that touch the bounding sphere into `destination`, then collects from
    * the inline root shard-data lane.
    */
-  std::int32_t SpatialDB_MeshInstance::CollectInSphere(
+  template <class T>
+  std::int32_t SpatialDB<T>::CollectInSphere(
     gpg::fastvector<UserEntity*>& destination,
     const EEntityType type,
     const SphereBoundsProbe& probe
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
     return CollectShardsInSphereIntoDestination(probe, destination, spatialView, type);
   }
 
   /**
-   * Address: 0x00504130 (FUN_00504130, Moho::SpatialDB_MeshInstance::CollectInVolume)
+   * Address: 0x00504130 (FUN_00504130, Moho::SpatialDB<T>::CollectInVolume)
    *
    * What it does:
    * Walks all child shard pointers, collects matching entities intersecting
    * `volume`, then collects from the inline root shard-data lane.
    */
-  std::int32_t SpatialDB_MeshInstance::CollectInVolume(
+  template <class T>
+  std::int32_t SpatialDB<T>::CollectInVolume(
     gpg::fastvector<UserEntity*>& destination,
     const EEntityType type,
     CGeomSolid3* const volume
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
     return CollectShardsInVolumeIntoDestination(volume, destination, spatialView, type);
   }
 
   /**
-   * Address: 0x00504180 (FUN_00504180, Moho::SpatialDB_MeshInstance::CollectAllInVolume)
+   * Address: 0x00504180 (FUN_00504180, Moho::SpatialDB<T>::CollectAllInVolume)
    *
    * What it does:
    * Collects all render-relevant entity lanes (unit/prop/projectile/entity)
    * intersecting `volume` with fade-threshold cull inputs.
    */
-  std::int32_t SpatialDB_MeshInstance::CollectAllInVolume(
+  template <class T>
+  std::int32_t SpatialDB<T>::CollectAllInVolume(
     gpg::fastvector<UserEntity*>& destination,
     CGeomSolid3* const volume,
     const Wm3::Vector3f& supportSelector,
     const Vector4f& fadePlane
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
     constexpr EEntityType kAllRenderableTypes = static_cast<EEntityType>(
       kSpatialEntityTypeUnit | kSpatialEntityTypeProjectile | kSpatialEntityTypeProp | kSpatialEntityTypeEntity
     );
 
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         SpatialShardData::FindInVolume(*shard, kAllRenderableTypes, volume, supportSelector, fadePlane, destination);
       }
@@ -3928,7 +3614,7 @@ namespace moho
     SpatialShardData::FindInVolumeFromData(
       fadePlane,
       supportSelector,
-      &spatialView.shardData,
+      &spatialView.mShardData,
       kAllRenderableTypes,
       volume,
       destination
@@ -3937,27 +3623,28 @@ namespace moho
   }
 
   /**
-   * Address: 0x005041E0 (FUN_005041E0, Moho::SpatialDB_MeshInstance::CollectInView)
+   * Address: 0x005041E0 (FUN_005041E0, Moho::SpatialDB<T>::CollectInView)
    *
    * What it does:
    * Collects entities intersecting camera view/fade lanes from child shards
    * and inline root shard-data lane.
    */
-  std::int32_t SpatialDB_MeshInstance::CollectInView(
+  template <class T>
+  std::int32_t SpatialDB<T>::CollectInView(
     GeomCamera3* const camera,
     gpg::fastvector<UserEntity*>& destination,
     const EEntityType type
   )
   {
-    SpatialDbMeshCollectView& spatialView = AsSpatialDbMeshCollectView(*this);
+    SpatialDB<T>& spatialView = *this;
 
-    for (SpatialShard** shard = spatialView.shardBegin; shard != spatialView.shardEnd; ++shard) {
+    for (SpatialShard** shard = spatialView.mShards.mBegin; shard != spatialView.mShards.mEnd; ++shard) {
       if (*shard != nullptr) {
         CollectInViewFromShard(camera, destination, *shard, type);
       }
     }
 
-    CollectInViewFromLeafData(destination, &spatialView.shardData, camera, type);
+    CollectInViewFromLeafData(destination, &spatialView.mShardData, camera, type);
     return static_cast<std::int32_t>(destination.size());
   }
 
@@ -4701,7 +4388,7 @@ namespace moho
 
   MeshInstance::MeshInstance(
     const Wm3::Vec3f& scaleArg,
-    void* const spatialDbStorage,
+    SpatialDB<MeshInstance>* const spatialDbStorage,
     const std::int32_t gameTickArg,
     const std::int32_t colorArg,
     const bool isStaticPoseArg,
@@ -5339,7 +5026,6 @@ namespace moho
     // which is InitializeStorage (0x00501D80). Without it the shard vector is
     // never brought to a consistent empty state and the first CollectAllInVolume
     // of the first world-view frame walks from a null begin to a garbage end.
-    meshSpatialDb.InitializeStorage();
 
     gMeshRendererInstance = this;
   }
@@ -5350,7 +5036,8 @@ namespace moho
   MeshRenderer::~MeshRenderer()
   {
     Reset();
-    meshSpatialDb.ClearRegistration();
+    // meshSpatialDb tears itself down: 0x00501E50 is SpatialDB<T>::~SpatialDB,
+    // which runs as ordinary member destruction after this body.
     // `meshes` frees its nodes and header sentinel right here, inline
     // (0x007E2B20's tidy) - confirmed from FUN_007DF330.c: `sub_7E3E20` +
     // `operator delete(this->mMeshes._Myhead)` fire immediately after
@@ -5457,7 +5144,7 @@ namespace moho
    */
   void MeshRenderer::UpdateMapSize(const std::int32_t width, const std::int32_t height)
   {
-    meshSpatialDb.ResizeStorageForMap(width, height);
+    meshSpatialDb.ResizeForMap(width, height);
   }
 
   /**
@@ -7168,4 +6855,24 @@ namespace moho
   {
     out.reset(raw, MeshCacheEvictingDeleter{&tree, key});
   }
+
+  // MSVC emits one out-of-line body per (template, element type), and this
+  // binary carries exactly two of each: the renderer's SpatialDB<MeshInstance>
+  // and the world session's SpatialDB<UserEntity>. /OPT:ICF then folded the
+  // identical, pointer-only-differing pairs onto one address apiece, which is
+  // why the export names only one of them.
+  class WaveGenerator;
+  class ShoreCell;
+  class CWldTerrainDecal;
+
+  template struct SpatialDB<MeshInstance>;
+  template struct SpatialDB<UserEntity>;
+  template struct SpatialDB<WaveGenerator>;
+  template struct SpatialDB<ShoreCell>;
+  template struct SpatialDB<CWldTerrainDecal>;
+  template struct SpatialDBEntry<MeshInstance>;
+  template struct SpatialDBEntry<UserEntity>;
+  template struct SpatialDBEntry<WaveGenerator>;
+  template struct SpatialDBEntry<ShoreCell>;
+  template struct SpatialDBEntry<CWldTerrainDecal>;
 } // namespace moho

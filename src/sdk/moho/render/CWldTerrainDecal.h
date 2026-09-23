@@ -67,7 +67,7 @@ namespace moho
      * Seeds the terrain-decal defaults, registers the decal into the spatial
      * database, and initializes the default scale/position/orientation lanes.
      */
-    CWldTerrainDecal(SpatialDB_MeshInstance* spatialDbOwner, IWldTerrainRes* terrainRes);
+    CWldTerrainDecal(SpatialDB<CWldTerrainDecal>* spatialDbOwner, IWldTerrainRes* terrainRes);
 
     /**
      * Address: 0x0089CBB0 (FUN_0089CBB0, Moho::CWldTerrainDecal::dtr)
@@ -306,7 +306,7 @@ namespace moho
   public:
     // +0x04 is the `WeakObject` base's `weakLinkHead_`.
     IWldTerrainRes* mTerrainRes;               // +0x08
-    SpatialDB_MeshInstance mEntry;             // +0x0C
+    SpatialDBEntry<CWldTerrainDecal> mEntry;   // +0x0C
     std::uint32_t mVecIndex;                   // +0x14
     std::int32_t mIndex;                       // +0x18
     EWldTerrainDecalType mType;                // +0x1C

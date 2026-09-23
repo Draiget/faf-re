@@ -53,7 +53,7 @@ namespace moho
      * Seeds the splat's base decal state and leaves the batch-texture lane
      * empty until a name is assigned.
      */
-    CWldSplat(SpatialDB_MeshInstance* spatialDbOwner, IWldTerrainRes* terrainRes);
+    CWldSplat(SpatialDB<CWldTerrainDecal>* spatialDbOwner, IWldTerrainRes* terrainRes);
 
     /**
      * Address: 0x0089DFE0 (FUN_0089DFE0, Moho::CWldSplat::dtr)

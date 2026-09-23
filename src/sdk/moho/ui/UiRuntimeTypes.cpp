@@ -23933,7 +23933,7 @@ void moho::CUIWorldView::UpdateSelection(
     const float cameraZoom = mCamera->CameraGetTargetZoom();
 
     gpg::fastvector<UserEntity*> collected;
-    auto* const spatialDb = static_cast<SpatialDB_MeshInstance*>(mWldSession->GetEntitySpatialDbStorage());
+    auto* const spatialDb = mWldSession->GetEntitySpatialDbStorage();
     const EEntityType volumeEntityMask =
       (cameraZoom <= 150.0f) ? static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop) : ENTITYTYPE_Unit;
     (void)spatialDb->CollectInVolume(collected, volumeEntityMask, &selectionSolid);

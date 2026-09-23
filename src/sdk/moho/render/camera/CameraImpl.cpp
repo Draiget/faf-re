@@ -3121,7 +3121,7 @@ void moho::CameraImpl::CacheCameraFrustumUnits(const float deltaFrame)
 
   // Collect every unit/entity intersecting the current camera view.
   gpg::fastvector<UserEntity*> unitsInView;
-  auto* const spatialDb = static_cast<moho::SpatialDB_MeshInstance*>(session->GetEntitySpatialDbStorage());
+  auto* const spatialDb = session->GetEntitySpatialDbStorage();
   auto* const cameraView = const_cast<moho::GeomCamera3*>(&CameraGetView());
   spatialDb->CollectInView(
     cameraView, unitsInView, static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Entity)
