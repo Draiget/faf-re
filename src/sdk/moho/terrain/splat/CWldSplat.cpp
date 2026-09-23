@@ -188,17 +188,19 @@ namespace
    * `msvc8::sort` with an explicit comparator, not a bare `std::sort` on the
    * pointers themselves.
    */
-  [[nodiscard]] std::int32_t SortUserEntityPointerRange(gpg::fastvector<moho::UserEntity*>& entities)
+  [[nodiscard]] std::int32_t SortDecalDrawOrder(gpg::fastvector<moho::CWldTerrainDecal*>& entities)
   {
     if (entities.size() > 1u) {
       msvc8::sort(
         entities.begin(),
         entities.end(),
-        [](const moho::UserEntity* const lhs, const moho::UserEntity* const rhs) noexcept {
-          // The binary compares the raw entry dword unsigned; that dword is the
-          // node pointer, so the ordering is by node address either way.
-          return reinterpret_cast<std::uintptr_t>(lhs->mSpatialDbEntry.mNode)
-               < reinterpret_cast<std::uintptr_t>(rhs->mSpatialDbEntry.mNode);
+        [](const moho::CWldTerrainDecal* const lhs, const moho::CWldTerrainDecal* const rhs) noexcept {
+          // The binary compares one dword unsigned at +0x14. On these objects
+          // that is mVecIndex, the decal's slot in the manager's vector -- not
+          // a spatial-db node. Reading it through UserEntity* landed on the
+          // same offset by coincidence, since UserEntity::mSpatialDbEntry.mNode
+          // is also +0x14.
+          return lhs->mVecIndex < rhs->mVecIndex;
         }
       );
     }
@@ -824,7 +826,7 @@ namespace moho
    */
   std::int32_t CDecalManager::EntitiesInView(
     GeomCamera3* const camera,
-    gpg::fastvector<UserEntity*>& entities,
+    gpg::fastvector<CWldTerrainDecal*>& entities,
     const bool ignoreDecalLod
   )
   {
@@ -835,7 +837,7 @@ namespace moho
       spatialDb->CollectInView(camera, entities, static_cast<EEntityType>(0x0800u));
     }
 
-    return SortUserEntityPointerRange(entities);
+    return SortDecalDrawOrder(entities);
   }
 
   /**
@@ -847,7 +849,7 @@ namespace moho
    */
   std::int32_t CDecalManager::PropsInView(
     GeomCamera3* const camera,
-    gpg::fastvector<UserEntity*>& props,
+    gpg::fastvector<CWldTerrainDecal*>& props,
     const bool ignoreDecalLod
   )
   {
@@ -858,7 +860,7 @@ namespace moho
       spatialDb->CollectInView(camera, props, static_cast<EEntityType>(0x0200u));
     }
 
-    return SortUserEntityPointerRange(props);
+    return SortDecalDrawOrder(props);
   }
 
   /**

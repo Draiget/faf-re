@@ -237,10 +237,10 @@ namespace moho
     virtual void ProcessRemovals(std::int32_t tick) = 0;
 
     /// Slot 25.
-    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod) = 0;
+    virtual std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) = 0;
 
     /// Slot 26.
-    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod) = 0;
+    virtual std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) = 0;
 
     /// Slot 27.
     virtual void MarkPendingChanges() = 0;
@@ -542,7 +542,7 @@ namespace moho
      * Collects one camera-visible entity lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& entities, bool ignoreDecalLod) override;
+    std::int32_t EntitiesInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& entities, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878C40 (FUN_00878C40, Moho::CDecalManager::PropsInView)
@@ -551,7 +551,7 @@ namespace moho
      * Collects one camera-visible prop lane from the manager spatial-db
      * registration and sorts the collected pointer range.
      */
-    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<UserEntity*>& props, bool ignoreDecalLod) override;
+    std::int32_t PropsInView(GeomCamera3* camera, gpg::fastvector<CWldTerrainDecal*>& props, bool ignoreDecalLod) override;
 
     /**
      * Address: 0x00878CA0 (FUN_00878CA0, Moho::CDecalManager::Func25)

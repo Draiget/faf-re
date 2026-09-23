@@ -1036,15 +1036,14 @@ namespace moho
       if (!minimapPass && ren_Decals) {
         auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
 
-        gpg::fastvector<UserEntity*> visibleDecals;
+        gpg::fastvector<CWldTerrainDecal*> visibleDecals;
         (void)decalManager->EntitiesInView(mCamera, visibleDecals, ren_IgnoreDecalLOD);
         const float lodAreaThreshold = decalManager->GetLodThreshold(ren_DecalFidelity);
 
         static StatItem* sEngineStatRenderFlatDecals = nullptr;
         static StatItem* sEngineStatRenderDecals = nullptr;
 
-        for (UserEntity* const entity : visibleDecals) {
-          auto* const decal = reinterpret_cast<CWldTerrainDecal*>(entity);
+        for (CWldTerrainDecal* const decal : visibleDecals) {
 
           if (decal->mFidelity > 0) {
             continue;
@@ -1135,12 +1134,12 @@ namespace moho
     if (!minimapPass && ren_Splats) {
       auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
 
-      gpg::fastvector<UserEntity*> visibleSplats;
+      gpg::fastvector<CWldTerrainDecal*> visibleSplats;
       (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
       std::int32_t splatBudget = 0;
-      for (UserEntity* const entity : visibleSplats) {
-        auto* const splat = reinterpret_cast<CWldSplat*>(entity);
+      for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+        auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
         if (splat->mFidelity > 0) {
           continue;

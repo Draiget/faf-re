@@ -930,15 +930,15 @@ namespace moho
       // own field the same way CDecoder::DecodeCells corrupted a caller's
       // stack (00d79258). Collect into a genuinely heap-backed local
       // instead and copy the results in.
-      gpg::fastvector<UserEntity*> collectedInView{};
+      gpg::fastvector<WaveGenerator*> collectedInView{};
       mSpatialMeshInstance.CollectInView(
         const_cast<GeomCamera3*>(&camera),
         collectedInView,
         static_cast<EEntityType>(ENTITYTYPE_Entity));
 
       mGeneratorCache.clear();
-      for (UserEntity* const entity : collectedInView) {
-        mGeneratorCache.push_back(reinterpret_cast<WaveGenerator*>(entity));
+      for (WaveGenerator* const generator : collectedInView) {
+        mGeneratorCache.push_back(generator);
       }
     }
 

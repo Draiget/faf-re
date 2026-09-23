@@ -934,7 +934,7 @@ namespace moho
       return;
     }
 
-    gpg::fastvector<UserEntity*> visibleCells;
+    gpg::fastvector<ShoreCell*> visibleCells;
     (void)mSpatialDb.CollectInView(
       const_cast<GeomCamera3*>(&camera), visibleCells, static_cast<EEntityType>(kSpatialRoutingMask)
     );
@@ -948,12 +948,11 @@ namespace moho
       static_cast<ShorelineMeshRecord*>(vertexStream->Lock(0, kShorelineVertexSheetVertexCount, false, true));
 
     std::int32_t vertexCount = 0;
-    for (UserEntity* const entity : visibleCells) {
+    for (ShoreCell* const cell : visibleCells) {
       if (mShorelineTris >= kMaxShorelineTriangles) {
         break;
       }
 
-      auto* const cell = reinterpret_cast<ShoreCell*>(entity);
       const ShoreCellPoint2* const points = cell->mPoints;
 
       WriteShorelineMeshRecord(*writeCursor, points[0], points[1], points[2]);

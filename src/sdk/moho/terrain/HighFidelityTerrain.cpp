@@ -858,7 +858,7 @@ namespace moho
         if (!minimapPass && ren_Decals && !sNoDecalsToggle) {
           auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
 
-          gpg::fastvector<UserEntity*> visibleDecals;
+          gpg::fastvector<CWldTerrainDecal*> visibleDecals;
           (void)decalManager->EntitiesInView(mCamera, visibleDecals, ren_IgnoreDecalLOD);
           const float lodAreaThreshold = decalManager->GetLodThreshold(ren_DecalFidelity);
 
@@ -867,8 +867,7 @@ namespace moho
 
           auto& decalCommands = reinterpret_cast<HighFidelityDecalCommandLane&>(mPrimaryPatchData);
 
-          for (UserEntity* const entity : visibleDecals) {
-            auto* const decal = reinterpret_cast<CWldTerrainDecal*>(entity);
+          for (CWldTerrainDecal* const decal : visibleDecals) {
 
             if (!ren_NormalDecals
                 && (decal->mType == WldTerrainDecalType_NormalsAlpha || decal->mType == WldTerrainDecalType_Normals)) {
@@ -958,15 +957,15 @@ namespace moho
       if (!minimapPass && ren_Splats) {
         auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
 
-        gpg::fastvector<UserEntity*> visibleSplats;
+        gpg::fastvector<CWldTerrainDecal*> visibleSplats;
         (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
         auto& splatVertices = reinterpret_cast<HighFidelitySplatVertexLane&>(mSecondaryPatchData);
 
         std::int32_t splatBudget = 0;
         { static int sSp = 0; if ((sSp++ % 40) == 0) { gpg::Warnf("[SPLATDIAG] collected=%d", static_cast<int>(visibleSplats.end() - visibleSplats.begin())); } } // TEMPORARY PROBE (do not commit)
-        for (UserEntity* const entity : visibleSplats) {
-          auto* const splat = reinterpret_cast<CWldSplat*>(entity);
+        for (CWldTerrainDecal* const decalEntry : visibleSplats) {
+          auto* const splat = static_cast<CWldSplat*>(decalEntry);
 
           const CWldSplat::SplatVertex& firstVertex = splat->mSplatVertices[0];
           const Vector4f& row1 = mCamera->viewport.r[1];
