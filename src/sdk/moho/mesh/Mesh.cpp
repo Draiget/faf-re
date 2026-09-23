@@ -2737,7 +2737,7 @@ namespace moho
   template <class T>
   SpatialShardData<T>::SpatialShardData(SpatialShard<T>* const ownerShard)
     : mShard(ownerShard)
-    , mPad_04_13{}
+    , mUnknown_04_13{}
     , mTimeSinceRecalc(0)
     , mBounds{}
     , mMapUnits{}

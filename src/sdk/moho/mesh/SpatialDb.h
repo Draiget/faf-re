@@ -133,7 +133,23 @@ namespace moho
   struct SpatialShardData
   {
     SpatialShard<T>* mShard;       // +0x00
-    std::uint8_t mPad_04_13[0x10];
+
+    /**
+     * +0x04..+0x13. Four dwords the constructor at 0x00500F60 stores zero into
+     * individually, so a member was declared here -- this is not compiler
+     * padding. Nothing else in the subsystem touches it: not the destructor at
+     * 0x005017E0, not HasType (which answers per-type queries from the tree
+     * sizes at +0x38/+0x44/+0x50/+0x5C), not RecalculateBounds, and not any of
+     * the collect or find bodies. Both constructors that build one of these
+     * leave it at zero -- the database at 0x00501D80 for its inline lane, and
+     * the shard at 0x005011A0 for each of its 16 leaf lanes.
+     *
+     * The sibling SpatialShard carries a gpg::Rect2i at this exact offset and
+     * width, followed by a dword at +0x14, so an identical header is the
+     * natural reading. It stays unnamed because the shard *assigns* its rect
+     * while this zeroes, and no reader exists to settle the difference.
+     */
+    std::uint8_t mUnknown_04_13[0x10];
     std::int32_t mTimeSinceRecalc; // +0x14
     Wm3::AxisAlignedBox3f mBounds; // +0x18
     SpatialMapTree<T> mMapUnits;      // +0x30
