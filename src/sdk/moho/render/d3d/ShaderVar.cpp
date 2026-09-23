@@ -327,7 +327,7 @@ namespace moho
    * The binary reads only the handle's px word (0x00491299 `mov ecx, [eax]`),
    * calls vtable slot 2 of that object (0x004912AA `mov edx, [edx+8]`) - which
    * is ID3DRenderTarget::GetSurface, writing a
-   * boost::shared_ptr<gpg::gal::RenderTargetD3D9> into an 8-byte temporary -
+   * boost::shared_ptr<gpg::gal::RenderTarget> into an 8-byte temporary -
    * and hands that temporary to effect-variable vtable slot 3 (0x004912B5
    * `mov edx, [eax+0Ch]`), the render-target binder. The null branch at
    * 0x004912C6 zeroes the same temporary and calls the same slot, so both paths
@@ -340,7 +340,7 @@ namespace moho
       if (renderTarget != nullptr) {
         renderTarget->GetSurface(surfaceHandle);
       }
-      mEffectVariable->Func3(surfaceHandle);
+      mEffectVariable->SetRenderTarget(surfaceHandle);
     }
 
     return this;

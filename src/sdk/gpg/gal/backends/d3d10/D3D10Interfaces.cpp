@@ -136,25 +136,6 @@ namespace gpg::gal
       int gal = 0;
     };
 
-    /**
-     * Still an overlay, and knowingly so. It is `OutputContext` byte for byte,
-     * but `OutputContext` types its handles as `shared_ptr<RenderTargetContext>`
-     * and friends -- and `RenderTargetContext` is a creation descriptor, not a
-     * target -- while the D3D10 target classes declare no base at all. So there
-     * is no real type yet that holds a `RenderTargetD3D10` in the +0x10 slot or
-     * the depth-stencil target in +0x18. Removing this needs the gal
-     * render-target hierarchy recovered from RTTI first, and `OutputContext` is
-     * shared with the D3D9 backend.
-     */
-    struct OutputContextD3D10RuntimeView final
-    {
-      void* vtable = nullptr;                                    // +0x00
-      boost::shared_ptr<CubeRenderTargetD3D10> cubeTarget;       // +0x04
-      std::int32_t face = 0;                                     // +0x0C
-      boost::shared_ptr<RenderTargetD3D10> renderTarget;         // +0x10
-      boost::shared_ptr<DepthStencilTargetD3D10> depthStencil;   // +0x18
-    };
-
     constexpr std::uint32_t kHardwareVertexFormatToken = 14U;
     constexpr std::uint32_t kFloat16VertexFormatToken = 15U;
     constexpr std::uint32_t kHardwareVertexStrideBase = 0x48U;
@@ -338,23 +319,6 @@ namespace gpg::gal
       "Float16VertexPackedStream1Runtime::lane3C offset must be 0x3C"
     );
     static_assert(sizeof(Float16VertexPackedStream1Runtime) == 0x44, "Float16VertexPackedStream1Runtime size must be 0x44");
-    static_assert(
-      offsetof(OutputContextD3D10RuntimeView, cubeTarget) == 0x04,
-      "OutputContextD3D10RuntimeView::cubeTarget offset must be 0x04"
-    );
-    static_assert(
-      offsetof(OutputContextD3D10RuntimeView, face) == 0x0C,
-      "OutputContextD3D10RuntimeView::face offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(OutputContextD3D10RuntimeView, renderTarget) == 0x10,
-      "OutputContextD3D10RuntimeView::renderTarget offset must be 0x10"
-    );
-    static_assert(
-      offsetof(OutputContextD3D10RuntimeView, depthStencil) == 0x18,
-      "OutputContextD3D10RuntimeView::depthStencil offset must be 0x18"
-    );
-    static_assert(sizeof(OutputContextD3D10RuntimeView) == 0x20, "OutputContextD3D10RuntimeView size must be 0x20");
 
     constexpr DXGIFormatPair kTextureDxgiGalPairs[89] = {
       {0, 20},  {1, 20},  {2, 18},  {3, 20},  {4, 20},  {5, 20},  {6, 20},  {7, 20},  {8, 20},  {9, 20},
@@ -821,11 +785,6 @@ namespace gpg::gal
       }
     }
 
-    OutputContext* GetDeviceOutputContext(DeviceD3D10* const device) noexcept
-    {
-      return &device->mOutputContext;
-    }
-
     void* GetDeviceLogStorage(DeviceD3D10* const device) noexcept
     {
       return &device->mLog;
@@ -885,22 +844,6 @@ namespace gpg::gal
     void* GetDeviceStretchRectInputLayout(DeviceD3D10* const device) noexcept
     {
       return device->mRttInputLayout;
-    }
-
-    OutputContext* GetDeviceHeadArrayBase(DeviceD3D10* const device) noexcept
-    {
-      return device->mHeadOutputContexts;
-    }
-
-    /**
-     * Head count of the retained device context. This used to overlay a range
-     * view on what `GetDeviceContextLane` returned -- the context's vptr -- and
-     * so computed the count from two vtable entries. The `>> 7` it divided by is
-     * `sizeof(Head)` (0x80), which is what `size()` does.
-     */
-    std::uint32_t GetDeviceHeadCount(DeviceD3D10* const device) noexcept
-    {
-      return static_cast<std::uint32_t>(device->mDeviceContext.mHeads.size());
     }
 
     WeakRefCountedToken** GetDeviceVertexStreamRefArray(DeviceD3D10* const device) noexcept
@@ -1020,16 +963,6 @@ namespace gpg::gal
       }
 
       return iconHandle;
-    }
-
-    void* GetDeviceActiveRenderTargetContextRaw(DeviceD3D10* const device) noexcept
-    {
-      return device->mOutputContext.surface.get();
-    }
-
-    void* GetDeviceActiveDepthStencilContextRaw(DeviceD3D10* const device) noexcept
-    {
-      return device->mOutputContext.texture.get();
     }
 
     int InvokeNativeClearShaderResourceSlot(
@@ -2639,183 +2572,6 @@ namespace gpg::gal
       destination = source;
     }
 
-    template <class TPointee>
-    [[nodiscard]] int DeleteSharedCountCtorPointeeOnUnwind(TPointee* const pointer) noexcept
-    {
-      if (pointer != nullptr) {
-        delete pointer;
-      }
-      return 0;
-    }
-
-    /**
-     * Address: 0x008F9200 (FUN_008F9200)
-     *
-     * What it does:
-     * Deletes one `TextureD3D10` raw-pointer lane during
-     * `shared_count<TextureD3D10>` constructor unwind.
-     */
-    int DeleteTextureD3D10SharedCountCtorPointeeOnUnwind(
-      TextureD3D10* const texture
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(texture);
-    }
-
-    /**
-     * Address: 0x008F9220 (FUN_008F9220)
-     *
-     * What it does:
-     * Deletes one `RenderTargetD3D10` raw-pointer lane during
-     * `shared_count<RenderTargetD3D10>` constructor unwind.
-     */
-    int DeleteRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
-      RenderTargetD3D10* const renderTarget
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(renderTarget);
-    }
-
-    /**
-     * Address: 0x008F9240 (FUN_008F9240)
-     *
-     * What it does:
-     * Deletes one `CubeRenderTargetD3D10` raw-pointer lane during
-     * `shared_count<CubeRenderTargetD3D10>` constructor unwind.
-     */
-    int DeleteCubeRenderTargetD3D10SharedCountCtorPointeeOnUnwind(
-      CubeRenderTargetD3D10* const cubeRenderTarget
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(cubeRenderTarget);
-    }
-
-    /**
-     * Address: 0x008F9260 (FUN_008F9260)
-     *
-     * What it does:
-     * Deletes one `DepthStencilTargetD3D10` raw-pointer lane during
-     * `shared_count<DepthStencilTargetD3D10>` constructor unwind.
-     */
-    int DeleteDepthStencilTargetD3D10SharedCountCtorPointeeOnUnwind(
-      DepthStencilTargetD3D10* const depthStencilTarget
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(depthStencilTarget);
-    }
-
-    /**
-     * Address: 0x008F9280 (FUN_008F9280)
-     *
-     * What it does:
-     * Deletes one `VertexFormatD3D10` raw-pointer lane during
-     * `shared_count<VertexFormatD3D10>` constructor unwind.
-     */
-    int DeleteVertexFormatD3D10SharedCountCtorPointeeOnUnwind(
-      VertexFormatD3D10* const vertexFormat
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(vertexFormat);
-    }
-
-    /**
-     * Address: 0x008F92A0 (FUN_008F92A0)
-     *
-     * What it does:
-     * Deletes one `VertexBufferD3D10` raw-pointer lane during
-     * `shared_count<VertexBufferD3D10>` constructor unwind.
-     */
-    int DeleteVertexBufferD3D10SharedCountCtorPointeeOnUnwind(
-      VertexBufferD3D10* const vertexBuffer
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(vertexBuffer);
-    }
-
-    /**
-     * Address: 0x008F92C0 (FUN_008F92C0)
-     *
-     * What it does:
-     * Deletes one `IndexBufferD3D10` raw-pointer lane during
-     * `shared_count<IndexBufferD3D10>` constructor unwind.
-     */
-    int DeleteIndexBufferD3D10SharedCountCtorPointeeOnUnwind(
-      IndexBufferD3D10* const indexBuffer
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(indexBuffer);
-    }
-
-    /**
-     * Address: 0x008F93E0 (FUN_008F93E0)
-     *
-     * What it does:
-     * Deletes one `PipelineStateD3D10` raw-pointer lane during
-     * `shared_count<PipelineStateD3D10>` constructor unwind.
-     */
-    int DeletePipelineStateD3D10SharedCountCtorPointeeOnUnwind(
-      PipelineStateD3D10* const pipelineState
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(pipelineState);
-    }
-
-    /**
-     * Address: 0x0094B680 (FUN_0094B680)
-     *
-     * What it does:
-     * Deletes one `EffectTechniqueD3D10` raw-pointer lane during
-     * `shared_count<EffectTechniqueD3D10>` constructor unwind.
-     */
-    int DeleteEffectTechniqueD3D10SharedCountCtorPointeeOnUnwind(
-      EffectTechniqueD3D10* const effectTechnique
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(effectTechnique);
-    }
-
-    /**
-     * Address: 0x0094B6A0 (FUN_0094B6A0)
-     *
-     * What it does:
-     * Deletes one `EffectVariableD3D10` raw-pointer lane during
-     * `shared_count<EffectVariableD3D10>` constructor unwind.
-     */
-    int DeleteEffectVariableD3D10SharedCountCtorPointeeOnUnwind(
-      EffectVariableD3D10* const effectVariable
-    ) noexcept
-    {
-      return DeleteSharedCountCtorPointeeOnUnwind(effectVariable);
-    }
-
-    /**
-     * Address: 0x008F9C20 (FUN_008F9C20)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `CubeRenderTargetD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountCubeRenderTargetD3D10FromRaw(
-      boost::detail::shared_count* const outCount, CubeRenderTargetD3D10* const cubeRenderTarget
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, cubeRenderTarget);
-    }
-
-    /**
-     * Address: 0x008F9CB0 (FUN_008F9CB0)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `DepthStencilTargetD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountDepthStencilTargetD3D10FromRaw(
-      boost::detail::shared_count* const outCount, DepthStencilTargetD3D10* const depthStencilTarget
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, depthStencilTarget);
-    }
-
     /**
      * Address: 0x008F9D40 (FUN_008F9D40)
      *
@@ -2921,52 +2677,6 @@ namespace gpg::gal
     )
     {
       return boost::ConstructSharedFromRawViaCountCtor(outEffect, effect, ConstructSharedCountEffectD3D10FromRaw);
-    }
-
-    /**
-     * Address: 0x008FA460 (FUN_008FA460, boost::shared_ptr_CubeRenderTargetD3D10::shared_ptr_CubeRenderTargetD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<CubeRenderTargetD3D10>` from one raw
-     * pointer lane. FUN_008FA460's own disassembly publishes `px` first,
-     * then builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9C20 above, `ConstructSharedCountCubeRenderTargetD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`CubeRenderTargetD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<CubeRenderTargetD3D10>* ConstructSharedCubeRenderTargetD3D10FromRaw(
-      boost::shared_ptr<CubeRenderTargetD3D10>* const outCubeRenderTarget,
-      CubeRenderTargetD3D10* const cubeRenderTarget
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outCubeRenderTarget, cubeRenderTarget, ConstructSharedCountCubeRenderTargetD3D10FromRaw
-      );
-    }
-
-    /**
-     * Address: 0x008FA490 (FUN_008FA490, boost::shared_ptr_DepthStencilTargetD3D10::shared_ptr_DepthStencilTargetD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<DepthStencilTargetD3D10>` from one raw
-     * pointer lane. FUN_008FA490's own disassembly publishes `px` first,
-     * then builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9CB0 above, `ConstructSharedCountDepthStencilTargetD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`DepthStencilTargetD3D10` does not
-     * derive from `enable_shared_from_this`); reproduced explicitly here
-     * instead of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<DepthStencilTargetD3D10>* ConstructSharedDepthStencilTargetD3D10FromRaw(
-      boost::shared_ptr<DepthStencilTargetD3D10>* const outDepthStencilTarget,
-      DepthStencilTargetD3D10* const depthStencilTarget
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outDepthStencilTarget, depthStencilTarget, ConstructSharedCountDepthStencilTargetD3D10FromRaw
-      );
     }
 
     /**
@@ -3121,46 +2831,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008F9B90 (FUN_008F9B90, boost::detail::shared_count_RenderTargetD3D10::shared_count_RenderTargetD3D10)
-     *
-     * What it does:
-     * Allocates one 0x10-byte `sp_counted_impl_p<RenderTargetD3D10>`
-     * control block, publishes its vtable, sets use/weak count to one,
-     * and stores the owned raw pointer - the control-block half of
-     * constructing one `shared_ptr<RenderTargetD3D10>`.
-     */
-    boost::detail::shared_count* ConstructSharedCountRenderTargetD3D10FromRaw(
-      boost::detail::shared_count* const outCount, RenderTargetD3D10* const renderTarget
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, renderTarget);
-    }
-
-    /**
-     * Address: 0x008FA430 (FUN_008FA430, boost::shared_ptr_RenderTargetD3D10::shared_ptr_RenderTargetD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<RenderTargetD3D10>` from one raw pointer
-     * lane. FUN_008FA430's own disassembly publishes `px` ("targ") first,
-     * then builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9B90 above - a real, separately-emitted call, not
-     * inlined - also reached the same way from
-     * `AssignSharedRenderTargetD3D10FromRaw`'s `reset()` and from
-     * `DeviceD3D10::CreateVolumeTexture`) before a no-op
-     * `sp_enable_shared_from_this` (`RenderTargetD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<RenderTargetD3D10>* ConstructSharedRenderTargetD3D10FromRawCtor(
-      boost::shared_ptr<RenderTargetD3D10>* const outRenderTarget, RenderTargetD3D10* const renderTarget
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outRenderTarget, renderTarget, ConstructSharedCountRenderTargetD3D10FromRaw
-      );
-    }
-
-    /**
      * Address: 0x008FA0E0 (FUN_008FA0E0, boost::detail::shared_count_PipelineStateD3D10::shared_count_PipelineStateD3D10)
      *
      * What it does:
@@ -3197,21 +2867,6 @@ namespace gpg::gal
       return boost::ConstructSharedFromRawViaCountCtor(
         outPipelineState, pipelineState, ConstructSharedCountPipelineStateD3D10FromRaw
       );
-    }
-
-    /**
-     * Address: 0x008FA550 (FUN_008FA550, boost::shared_ptr_RenderTargetD3D10::operator=)
-     *
-     * What it does:
-     * Rebinds one `shared_ptr<RenderTargetD3D10>` from one raw render-target
-     * pointer and releases previous ownership.
-     */
-    boost::shared_ptr<RenderTargetD3D10>* AssignSharedRenderTargetD3D10FromRaw(
-      boost::shared_ptr<RenderTargetD3D10>* const outRenderTarget, RenderTargetD3D10* const renderTarget
-    )
-    {
-      outRenderTarget->reset(renderTarget);
-      return outRenderTarget;
     }
 
     /**
@@ -4220,9 +3875,9 @@ namespace gpg::gal
    * Address: 0x00902D70 (FUN_00902D70)
    *
    * What it does:
-   * D3D10 render-target slot returns null surface-level payload.
+   * D3D10 has no GDI-compatible surface to hand out (`xor eax,eax; ret`).
    */
-  void* RenderTargetD3D10::GetSurfaceLevel0()
+  HDC RenderTargetD3D10::GetDC()
   {
     return nullptr;
   }
@@ -5394,7 +5049,7 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op virtual slot.
    */
-  void DeviceD3D10::Func1() {}
+  void DeviceD3D10::Func1() const {}
 
   /**
    * Address: 0x008F86F0 (FUN_008F86F0)
@@ -5693,7 +5348,6 @@ namespace gpg::gal
     OutputContext* const outputContexts = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
     mHeadOutputContexts = outputContexts;
 
-    auto* const outputContextsRuntime = reinterpret_cast<OutputContextD3D10RuntimeView*>(outputContexts);
     auto* const device = mDevice;
     for (std::uint32_t headIndex = 0U; headIndex < headCount; ++headIndex) {
       auto* const swapChain = mSwapChains[headIndex];
@@ -5730,14 +5384,10 @@ namespace gpg::gal
         ThrowDeviceD3D10Hresult(1848, createSrvResult);
       }
 
-      outputContextsRuntime[headIndex].renderTarget.reset(
-        new RenderTargetD3D10(backBuffer, renderTargetView, shaderResourceView)
-      );
+      outputContexts[headIndex].surface.reset(new RenderTargetD3D10(backBuffer, renderTargetView, shaderResourceView));
 
-      DepthStencilTargetContext depthStencilContext(textureDesc.Width, textureDesc.Height, 3U, false);
-      boost::shared_ptr<DepthStencilTargetD3D10> depthStencilTarget;
-      CreateDepthStencilTarget(&depthStencilTarget, &depthStencilContext);
-      outputContextsRuntime[headIndex].depthStencil = depthStencilTarget;
+      const DepthStencilTargetContext depthStencilContext(textureDesc.Width, textureDesc.Height, 3U, false);
+      outputContexts[headIndex].depthStencil = CreateDepthStencilTarget(&depthStencilContext);
     }
 
     if (headCount > 0U) {
@@ -5832,41 +5482,33 @@ namespace gpg::gal
   /**
    * Address: 0x008FAB80 (FUN_008FAB80)
    *
-   * unsigned int
-   *
    * What it does:
-   * Validates one head index against the retained `DeviceContext` head count and
-   * returns the `this+0x118` head-array lane offset (`index * 0x20`).
+   * Validates one head index against the device context's head count
+   * (`sizeof(Head)` is 0x80, the `>> 7` of `size()`) and returns that head's
+   * output context from `mHeadOutputContexts`.
    */
-  void* DeviceD3D10::GetHead2(const unsigned int headIndex)
+  OutputContext* DeviceD3D10::GetHeadOutputContext(const unsigned int headIndex)
   {
-    const unsigned int headCount = GetDeviceHeadCount(this);
-    if (headIndex >= headCount) {
+    if (headIndex >= mDeviceContext.mHeads.size()) {
       ThrowGalError("DeviceD3D10.cpp", 727, "invalid head index specified");
     }
 
-    auto* const headArrayBase = reinterpret_cast<std::uint8_t*>(GetDeviceHeadArrayBase(this));
-    return headArrayBase + (headIndex * 0x20U);
+    return &mHeadOutputContexts[headIndex];
   }
 
   /**
    * Address: 0x008FAC50 (FUN_008FAC50)
    *
-   * unsigned int
-   *
    * What it does:
-   * Validates one head index against the retained `DeviceContext` head count and
-   * returns the `this+0x118` head-array lane offset (`index * 0x20`).
+   * The const overload of `GetHeadOutputContext`; same body.
    */
-  void* DeviceD3D10::GetHead1(const unsigned int headIndex)
+  const OutputContext* DeviceD3D10::GetHeadOutputContext(const unsigned int headIndex) const
   {
-    const unsigned int headCount = GetDeviceHeadCount(this);
-    if (headIndex >= headCount) {
+    if (headIndex >= mDeviceContext.mHeads.size()) {
       ThrowGalError("DeviceD3D10.cpp", 733, "invalid head index specified");
     }
 
-    auto* const headArrayBase = reinterpret_cast<std::uint8_t*>(GetDeviceHeadArrayBase(this));
-    return headArrayBase + (headIndex * 0x20U);
+    return &mHeadOutputContexts[headIndex];
   }
 
   /**
@@ -6086,14 +5728,12 @@ namespace gpg::gal
   /**
    * Address: 0x008FB1D0 (FUN_008FB1D0)
    *
-   * boost::shared_ptr<RenderTargetD3D10> *,RenderTargetContext const *
-   *
    * What it does:
-   * Creates one 2D render-target texture + RTV/SRV pair from caller context lanes.
+   * Creates one render-target/shader-resource 2D texture with its RTV and
+   * SRV, sets a viewport covering it, and wraps all three in a
+   * `RenderTargetD3D10`.
    */
-  boost::shared_ptr<RenderTargetD3D10>* DeviceD3D10::CreateVolumeTexture(
-    boost::shared_ptr<RenderTargetD3D10>* const outRenderTarget, const RenderTargetContext* const context
-  )
+  boost::shared_ptr<RenderTarget> DeviceD3D10::CreateRenderTarget(const RenderTargetContext* const context)
   {
     D3D10_TEXTURE2D_DESC textureDesc{};
     textureDesc.Width = context->width_;
@@ -6140,37 +5780,32 @@ namespace gpg::gal
     viewport.MaxDepth = 1.0f;
     SetViewport(&viewport);
 
-    outRenderTarget->reset(new RenderTargetD3D10(context, nativeTexture, renderTargetView, shaderResourceView));
-    return outRenderTarget;
+    return boost::shared_ptr<RenderTarget>(
+      new RenderTargetD3D10(context, nativeTexture, renderTargetView, shaderResourceView)
+    );
   }
 
   /**
    * Address: 0x008FA6B0 (FUN_008FA6B0)
    *
-   * boost::shared_ptr<CubeRenderTargetD3D10> *,CubeRenderTargetContext const *
-   *
    * What it does:
-   * Allocates one cube-render-target wrapper and returns it through caller shared output.
+   * Returns an empty `CubeRenderTargetD3D10`. Its constructor (0x008F7F80)
+   * takes the context but only default-constructs its own copy, and the
+   * D3D10 backend never creates a native cube texture.
    */
-  boost::shared_ptr<CubeRenderTargetD3D10>* DeviceD3D10::CreateCubeRenderTarget(
-    boost::shared_ptr<CubeRenderTargetD3D10>* const outCubeRenderTarget, const CubeRenderTargetContext* const context
-  )
+  boost::shared_ptr<CubeRenderTarget> DeviceD3D10::CreateCubeRenderTarget(const CubeRenderTargetContext* const context)
   {
-    return ConstructSharedCubeRenderTargetD3D10FromRaw(outCubeRenderTarget, new CubeRenderTargetD3D10(context));
+    return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D10(context));
   }
 
   /**
    * Address: 0x008FB570 (FUN_008FB570)
    *
-   * boost::shared_ptr<DepthStencilTargetD3D10> *,DepthStencilTargetContext const *
-   *
    * What it does:
-   * Creates one depth-stencil texture + DSV/SRV lane and returns wrapped ownership.
+   * Creates one depth texture with its DSV (plus an SRV when the context asks
+   * for a sampleable target) and wraps them in a `DepthStencilTargetD3D10`.
    */
-  boost::shared_ptr<DepthStencilTargetD3D10>* DeviceD3D10::CreateDepthStencilTarget(
-    boost::shared_ptr<DepthStencilTargetD3D10>* const outDepthStencilTarget,
-    const DepthStencilTargetContext* const context
-  )
+  boost::shared_ptr<DepthStencilTarget> DeviceD3D10::CreateDepthStencilTarget(const DepthStencilTargetContext* const context)
   {
     const DXGI_FORMAT depthFormat =
       static_cast<DXGI_FORMAT>(ResolveDepthStencilFormatToDxgi(static_cast<int>(context->format_)));
@@ -6221,8 +5856,7 @@ namespace gpg::gal
       }
     }
 
-    return ConstructSharedDepthStencilTargetD3D10FromRaw(
-      outDepthStencilTarget,
+    return boost::shared_ptr<DepthStencilTarget>(
       new DepthStencilTargetD3D10(context, depthTexture, depthStencilView, shaderResourceView)
     );
   }
@@ -6352,69 +5986,70 @@ namespace gpg::gal
   /**
    * Address: 0x008FC540 (FUN_008FC540)
    *
-   * gpg::gal::RenderTargetD3D10 **,gpg::gal::TextureD3D10 **
-   *
    * What it does:
-   * Validates source/destination texture wrappers and dispatches one native
-   * copy-resource lane on the retained D3D10 device.
+   * Reads one colour target back into a texture with one native
+   * `CopyResource` from the target's texture into the destination's.
    */
-  int DeviceD3D10::CreateRenderTarget(RenderTargetD3D10** const sourceTexture, TextureD3D10** const destinationTexture)
+  void DeviceD3D10::GetRenderTargetData(
+    const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<TextureD3D10>& destination
+  )
   {
-    if ((sourceTexture == nullptr) || (*sourceTexture == nullptr)) {
+    if (source.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1230, "Missing source texture");
     }
 
-    if ((destinationTexture == nullptr) || (*destinationTexture == nullptr)) {
+    if (destination.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1231, "Missing dest   texture");
     }
 
-    void* const sourceResource = (*sourceTexture)->GetRenderTextureOrThrow();
-    void* const destinationResource = (*destinationTexture)->GetTextureOrThrow();
-    return InvokeNativeCopyResourceResult(this, destinationResource, sourceResource);
+    void* const sourceResource = static_cast<RenderTargetD3D10*>(source.get())->GetRenderTextureOrThrow();
+    void* const destinationResource = destination->GetTextureOrThrow();
+    static_cast<void>(InvokeNativeCopyResourceResult(this, destinationResource, sourceResource));
   }
 
   /**
    * Address: 0x008FC290 (FUN_008FC290)
    *
-   * gpg::gal::RenderTargetD3D10 **,gpg::gal::RenderTargetD3D10 **,void const *,void const *
-   *
    * What it does:
-   * Copies from source to destination render target when contexts match; otherwise
-   * falls back to the shader-resource/render-target-view blit lane.
+   * Copies from source to destination target directly when their size and
+   * format match; otherwise draws the source's SRV into the destination's
+   * RTV through the RTT effect. On D3D10 only the destination rectangle's
+   * top-left corner is used.
    */
   void DeviceD3D10::StretchRect(
-    RenderTargetD3D10** const sourceTexture,
-    RenderTargetD3D10** const destinationTexture,
-    const void* const sourceRect,
-    const void* const destinationPoint
+    const boost::shared_ptr<RenderTarget>& source,
+    const boost::shared_ptr<RenderTarget>& destination,
+    const RECT* const sourceRect,
+    const RECT* const destinationRect
   )
   {
-    if ((sourceTexture == nullptr) || (*sourceTexture == nullptr)) {
+    if (source.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1174, "Missing source texture");
     }
 
-    if ((destinationTexture == nullptr) || (*destinationTexture == nullptr)) {
+    if (destination.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1175, "Missing dest   texture");
     }
 
-    const RenderTargetContext* const sourceContext = (*sourceTexture)->GetContext();
-    const RenderTargetContext* const destinationContext = (*destinationTexture)->GetContext();
+    auto* const sourceTarget = static_cast<RenderTargetD3D10*>(source.get());
+    auto* const destinationTarget = static_cast<RenderTargetD3D10*>(destination.get());
+    const RenderTargetContext* const sourceContext = sourceTarget->GetContext();
+    const RenderTargetContext* const destinationContext = destinationTarget->GetContext();
 
     if ((sourceContext->width_ == destinationContext->width_) &&
         (sourceContext->height_ == destinationContext->height_) &&
         (sourceContext->format_ == destinationContext->format_)) {
       unsigned int destinationX = 0U;
       unsigned int destinationY = 0U;
-      if (destinationPoint != nullptr) {
-        const auto* const point = reinterpret_cast<const POINT*>(destinationPoint);
-        destinationX = static_cast<unsigned int>(point->x);
-        destinationY = static_cast<unsigned int>(point->y);
+      if (destinationRect != nullptr) {
+        destinationX = static_cast<unsigned int>(destinationRect->left);
+        destinationY = static_cast<unsigned int>(destinationRect->top);
       }
 
       D3D10_BOX sourceBox{};
       const D3D10_BOX* sourceBoxPtr = nullptr;
       if (sourceRect != nullptr) {
-        const auto* const rect = reinterpret_cast<const RECT*>(sourceRect);
+        const RECT* const rect = sourceRect;
         sourceBox.left = static_cast<unsigned int>(rect->left);
         sourceBox.top = static_cast<unsigned int>(rect->top);
         sourceBox.front = 0U;
@@ -6424,16 +6059,16 @@ namespace gpg::gal
         sourceBoxPtr = &sourceBox;
       }
 
-      void* const sourceResource = (*sourceTexture)->GetRenderTextureOrThrow();
-      void* const destinationResource = (*destinationTexture)->GetRenderTextureOrThrow();
+      void* const sourceResource = sourceTarget->GetRenderTextureOrThrow();
+      void* const destinationResource = destinationTarget->GetRenderTextureOrThrow();
       InvokeNativeCopySubresourceRegion(
         this, destinationResource, destinationX, destinationY, sourceResource, sourceBoxPtr
       );
       return;
     }
 
-    void* const sourceShaderResourceView = (*sourceTexture)->GetShaderResourceViewOrThrow();
-    void* const destinationRenderTargetView = (*destinationTexture)->GetRenderTargetViewOrThrow();
+    void* const sourceShaderResourceView = sourceTarget->GetShaderResourceViewOrThrow();
+    void* const destinationRenderTargetView = destinationTarget->GetRenderTargetViewOrThrow();
     static_cast<void>(StretchRectFallbackBlit(
       this,
       destinationContext->width_,
@@ -6553,18 +6188,18 @@ namespace gpg::gal
   /**
    * Address: 0x008FC9B0 (FUN_008FC9B0)
    *
-   * gpg::gal::RenderTargetD3D10 **,msvc8::string const &,int
-   *
    * What it does:
-   * Saves one render-target texture lane to a file path using the recovered
-   * image-format token map from `DAT_00D430A0`.
+   * Writes one colour target's texture to `filePath`, mapping `fileFormat`
+   * through the image-format table at `DAT_00D430A0`.
    */
-  void
-  DeviceD3D10::Func4(RenderTargetD3D10** const renderTarget, const msvc8::string& filePath, const int fileFormatToken)
+  void DeviceD3D10::SaveRenderTarget(
+    const boost::shared_ptr<RenderTarget>& renderTarget, const msvc8::string& filePath, const int fileFormat
+  )
   {
-    const int imageFileFormat = ResolveImageFileFormatToken(fileFormatToken);
+    const int imageFileFormat = ResolveImageFileFormatToken(fileFormat);
+    auto* const target = static_cast<RenderTargetD3D10*>(renderTarget.get());
     const HRESULT result =
-      InvokeSaveTextureToFileApi(this, (*renderTarget)->GetRenderTextureOrThrow(), imageFileFormat, filePath.c_str());
+      InvokeSaveTextureToFileApi(this, target->GetRenderTextureOrThrow(), imageFileFormat, filePath.c_str());
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1286, result);
     }
@@ -6759,15 +6394,15 @@ namespace gpg::gal
   /**
    * Address: 0x008F8700 (FUN_008F8700)
    *
-   * int,int
-   *
    * What it does:
-   * Preserves the binary no-op virtual slot (`retn 8` shape).
+   * D3D10 cannot save a cube target: the body is a bare `ret 8`.
    */
-  void DeviceD3D10::Func3(const int arg1, const int arg2)
+  void DeviceD3D10::SaveCubeRenderTarget(
+    const boost::shared_ptr<CubeRenderTarget>& cubeTarget, const msvc8::string& filePath
+  )
   {
-    static_cast<void>(arg1);
-    static_cast<void>(arg2);
+    static_cast<void>(cubeTarget);
+    static_cast<void>(filePath);
   }
 
   /**
@@ -6986,19 +6621,19 @@ namespace gpg::gal
    */
   int DeviceD3D10::ClearTarget(const OutputContext* const context)
   {
-    *GetDeviceOutputContext(this) = *context;
+    mOutputContext = *context;
 
     void* renderTargetView = nullptr;
     void* depthStencilView = nullptr;
 
     if (context != nullptr) {
-      const auto& runtime = *reinterpret_cast<const OutputContextD3D10RuntimeView*>(context);
-      if (runtime.renderTarget.get() != nullptr) {
-        renderTargetView = runtime.renderTarget->GetRenderTargetViewOrThrow();
+      if (context->surface.get() != nullptr) {
+        renderTargetView = static_cast<RenderTargetD3D10*>(context->surface.get())->GetRenderTargetViewOrThrow();
       }
 
-      if (runtime.depthStencil.get() != nullptr) {
-        depthStencilView = runtime.depthStencil->GetDepthStencilViewOrThrow();
+      if (context->depthStencil.get() != nullptr) {
+        depthStencilView =
+          static_cast<DepthStencilTargetD3D10*>(context->depthStencil.get())->GetDepthStencilViewOrThrow();
       }
     }
 
@@ -7027,15 +6662,13 @@ namespace gpg::gal
     void* renderTargetView = nullptr;
     void* depthStencilView = nullptr;
 
-    void* const renderTargetContextRaw = GetDeviceActiveRenderTargetContextRaw(this);
-    if (renderTargetContextRaw != nullptr) {
-      renderTargetView = reinterpret_cast<RenderTargetD3D10*>(renderTargetContextRaw)->GetRenderTargetViewOrThrow();
+    if (mOutputContext.surface.get() != nullptr) {
+      renderTargetView = static_cast<RenderTargetD3D10*>(mOutputContext.surface.get())->GetRenderTargetViewOrThrow();
     }
 
-    void* const depthStencilContextRaw = GetDeviceActiveDepthStencilContextRaw(this);
-    if (depthStencilContextRaw != nullptr) {
+    if (mOutputContext.depthStencil.get() != nullptr) {
       depthStencilView =
-        reinterpret_cast<DepthStencilTargetD3D10*>(depthStencilContextRaw)->GetDepthStencilViewOrThrow();
+        static_cast<DepthStencilTargetD3D10*>(mOutputContext.depthStencil.get())->GetDepthStencilViewOrThrow();
     }
 
     if (clearColor && (renderTargetView != nullptr)) {

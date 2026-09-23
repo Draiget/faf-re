@@ -15,7 +15,6 @@ namespace boost::detail
 
 namespace gpg::gal
 {
-  class CubeRenderTargetD3D9;
   class DeviceD3D9;
   class DeviceContext;
   class TextureContext;
@@ -32,6 +31,7 @@ namespace Wm3
 namespace moho
 {
   class CD3DDepthStencil;
+  class CD3DRenderTarget;
   struct SD3DIndexRange;
   struct SD3DVertexRange;
   class CD3DDynamicTextureSheet;
@@ -432,13 +432,11 @@ namespace moho
      * Slot: 27
      * Demangled: Moho::CD3DDevice::GetRenderTarget
      *
-     * boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9> &
-     *
      * What it does:
-     * Copies the active cube render-target shared handle from device state.
+     * Copies the device's own render-target wrapper handle (+0x244), the
+     * `CD3DRenderTarget` that `SetRenViewport` allocates (0x0042DFC8).
      */
-    virtual boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9>&
-      GetRenderTarget(boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9>& outTarget);
+    virtual boost::shared_ptr<CD3DRenderTarget>& GetRenderTarget(boost::shared_ptr<CD3DRenderTarget>& outTarget);
 
     /**
      * Address: 0x0042EF70 (FUN_0042EF70)

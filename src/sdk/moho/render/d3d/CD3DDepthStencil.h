@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/gal/DepthStencilTargetContext.hpp"
-#include "gpg/gal/backends/d3d9/DepthStencilTargetD3D9.hpp"
+#include "gpg/gal/DepthStencilTarget.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/render/ID3DDepthStencil.h"
 
@@ -28,7 +28,7 @@ namespace moho
     /**
      * Address: 0x0043F0A0 (FUN_0043F0A0)
      *
-     * CD3DDevice *,boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9>
+     * CD3DDevice *,boost::shared_ptr<gpg::gal::DepthStencilTarget>
      *
      * What it does:
      * Initializes intrusive-list links, stores owner lane, and captures one
@@ -57,7 +57,7 @@ namespace moho
     /**
      * Address: 0x0043F3E0 (FUN_0043F3E0)
      *
-     * boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> &
+     * boost::shared_ptr<gpg::gal::DepthStencilTarget> &
      *
      * What it does:
      * Copies retained depth-stencil surface ownership into caller storage.

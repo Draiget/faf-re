@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/gal/DepthStencilTarget.hpp"
 #include "gpg/gal/DepthStencilTargetContext.hpp"
 
 namespace gpg::gal
@@ -10,7 +11,7 @@ namespace gpg::gal
      * VFTABLE: 0x00D421C4
      * COL:  0x00E504BC
      */
-    class DepthStencilTargetD3D9
+    class DepthStencilTargetD3D9 : public DepthStencilTarget
     {
     public:
         /**
@@ -28,7 +29,7 @@ namespace gpg::gal
          * What it does:
          * Owns the deleting-destructor path and delegates to depth-stencil teardown helpers.
          */
-        virtual ~DepthStencilTargetD3D9();
+        ~DepthStencilTargetD3D9() override;
 
         /**
          * Address: 0x008E7F00 (FUN_008E7F00)
@@ -36,7 +37,7 @@ namespace gpg::gal
          * What it does:
          * Returns the embedded depth-stencil context lane at `this+0x04`.
          */
-        virtual DepthStencilTargetContext* GetContext();
+        DepthStencilTargetContext* GetContext() override;
 
         /**
          * Address: 0x008E7F40 (FUN_008E7F40)

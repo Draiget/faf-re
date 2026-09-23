@@ -558,7 +558,9 @@ namespace moho
           return;
         }
         (void)std::snprintf(path, sizeof(path), "%s\\%s.bmp", dir, name);
-        const long hr = gpg::gal::DebugSaveSurfaceToFileA(path, 0U, surface->GetSurface());
+        const long hr = gpg::gal::DebugSaveSurfaceToFileA(
+          path, 0U, static_cast<gpg::gal::RenderTargetD3D9*>(surface.get())->GetSurface()
+        );
         gpg::Warnf("[SHADOWDUMP] %s -> %s hr=0x%08lX size=%d blur=%d valid=%d", name, path, hr, mShadowSize,
                    mShadowBlurEnabled ? 1 : 0, mShadowCameraValid ? 1 : 0);
       };

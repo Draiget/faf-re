@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 
 namespace gpg::gal
@@ -12,7 +13,7 @@ namespace gpg::gal
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\RenderTargetD3D10.cpp
      */
-    class RenderTargetD3D10
+    class RenderTargetD3D10 : public RenderTarget
     {
     public:
         /**
@@ -56,7 +57,7 @@ namespace gpg::gal
          * What it does:
          * Owns the deleting-destructor path and delegates body lanes to `FUN_00902EB0`.
          */
-        virtual ~RenderTargetD3D10();
+        ~RenderTargetD3D10() override;
 
         /**
          * Address: 0x00902D80 (FUN_00902D80)
@@ -64,15 +65,15 @@ namespace gpg::gal
          * What it does:
          * Returns the embedded render-target context lane at `this+0x04`.
          */
-        virtual RenderTargetContext* GetContext();
+        RenderTargetContext* GetContext() override;
 
         /**
          * Address: 0x00902D70 (FUN_00902D70)
          *
          * What it does:
-         * D3D10 render-target slot returns null surface-level payload.
+         * D3D10 has no GDI-compatible surface to hand out: always null.
          */
-        virtual void* GetSurfaceLevel0();
+        HDC GetDC() override;
 
         /**
          * Address: 0x00902E30 (FUN_00902E30)

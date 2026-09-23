@@ -9,9 +9,9 @@
 
 namespace gpg::gal
 {
-    class CubeRenderTargetD3D9;
+    class CubeRenderTarget;
     class EffectD3D9;
-    class RenderTargetD3D9;
+    class RenderTarget;
     class TextureD3D9;
 
     /**
@@ -52,22 +52,22 @@ namespace gpg::gal
         /**
          * Address: 0x00944630 (FUN_00944630)
          * Slot: 2
-         * Demangled: gpg::gal::EffectVariableD3D9::Func2
          *
          * What it does:
-         * Binds a cube-render-target texture lane to the backing D3DX effect parameter.
+         * Binds a cube render target's texture to this effect parameter
+         * (null target unbinds it).
          */
-        virtual void Func2(boost::shared_ptr<CubeRenderTargetD3D9> cubeRenderTarget);
+        virtual void SetCubeRenderTarget(boost::shared_ptr<CubeRenderTarget> cubeTarget);
 
         /**
          * Address: 0x00944420 (FUN_00944420)
          * Slot: 3
-         * Demangled: gpg::gal::EffectVariableD3D9::Func3
          *
          * What it does:
-         * Binds a render-target surface lane to the backing D3DX effect parameter.
+         * Binds a colour render target's texture to this effect parameter
+         * (null target unbinds it).
          */
-        virtual void Func3(boost::shared_ptr<RenderTargetD3D9> renderTarget);
+        virtual void SetRenderTarget(boost::shared_ptr<RenderTarget> renderTarget);
 
         /**
          * Address: 0x009441A0 (FUN_009441A0)

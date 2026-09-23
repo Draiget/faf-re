@@ -21,12 +21,9 @@
 #include "gpg/gal/MeshFormatter.h"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
-#include "gpg/gal/backends/d3d9/CubeRenderTargetD3D9.hpp"
-#include "gpg/gal/backends/d3d9/DepthStencilTargetD3D9.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
 #include "moho/app/WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -217,28 +214,6 @@ namespace
     return broadcaster;
   }
 
-  struct OutputContextD3D9RuntimeView
-  {
-    void* vtable = nullptr;                                        // +0x00
-    boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9> cubeTarget;  // +0x04
-    std::int32_t face = 0;                                         // +0x0C
-    boost::shared_ptr<gpg::gal::RenderTargetD3D9> renderTarget;    // +0x10
-    boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> depthStencil; // +0x18
-  };
-
-  static_assert(
-    sizeof(OutputContextD3D9RuntimeView) == sizeof(gpg::gal::OutputContext),
-    "OutputContextD3D9RuntimeView size must match gpg::gal::OutputContext"
-  );
-  static_assert(
-    offsetof(OutputContextD3D9RuntimeView, renderTarget) == 0x10,
-    "OutputContextD3D9RuntimeView::renderTarget offset must be 0x10"
-  );
-  static_assert(
-    offsetof(OutputContextD3D9RuntimeView, depthStencil) == 0x18,
-    "OutputContextD3D9RuntimeView::depthStencil offset must be 0x18"
-  );
-
   struct DrawPrimitiveContextRuntime
   {
     std::uint32_t pad00 = 0U;               // +0x00
@@ -267,18 +242,6 @@ namespace
     sizeof(DrawIndexedPrimitiveContextRuntime) == 0x1C,
     "DrawIndexedPrimitiveContextRuntime size must be 0x1C"
   );
-
-  [[nodiscard]] gpg::gal::OutputContext BuildOutputContext(
-    const moho::ID3DRenderTarget::SurfaceHandle& renderTarget,
-    const moho::ID3DDepthStencil::SurfaceHandle& depthStencil
-  )
-  {
-    gpg::gal::OutputContext context{};
-    auto& runtime = reinterpret_cast<OutputContextD3D9RuntimeView&>(context);
-    runtime.renderTarget = renderTarget;
-    runtime.depthStencil = depthStencil;
-    return context;
-  }
 
   /**
    * Address: 0x004408F0 (FUN_004408F0, sub_4408F0)
@@ -400,7 +363,7 @@ namespace
     boost::shared_ptr<moho::ID3DDepthStencil> mReaderWriterLocks2[2]; // +0x224
     boost::shared_ptr<void> mWriterLockContext1;                 // +0x234
     boost::shared_ptr<void> mWriterLockContext2;                 // +0x23C
-    boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9> mRenderTarget; // +0x244
+    boost::shared_ptr<moho::CD3DRenderTarget> mRenderTarget;     // +0x244
     boost::shared_ptr<moho::CD3DDepthStencil> mDepthStencil;     // +0x24C
     moho::CD3DEffect* mCurEffect = nullptr;                      // +0x254
     gpg::gal::CursorContext mCursorContext;                      // +0x258
@@ -641,18 +604,12 @@ namespace
           break;
         }
 
-        const auto* const outputContext =
-          reinterpret_cast<const OutputContextD3D9RuntimeView*>(device->GetHead2(static_cast<unsigned int>(headIndex)));
-        if (outputContext == nullptr) {
-          continue;
-        }
+        // 0x0042E3BE: slot 7, then a copy of the head's output context.
+        const gpg::gal::OutputContext outputContext =
+          *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex));
 
-        runtime->mReaderWriterLocks1[headIndex].reset(
-          new moho::CD3DRenderTarget(this, outputContext->renderTarget)
-        );
-        runtime->mReaderWriterLocks2[headIndex].reset(
-          new moho::CD3DDepthStencil(this, outputContext->depthStencil)
-        );
+        runtime->mReaderWriterLocks1[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
+        runtime->mReaderWriterLocks2[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
       }
 
       (void)mResources.InitResources(false);
@@ -809,21 +766,17 @@ namespace moho
     for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
       ReleaseHeadWriterLocks(*runtime, headIndex);
 
-      const auto* const outputContext =
-        reinterpret_cast<const OutputContextD3D9RuntimeView*>(device->GetHead2(static_cast<unsigned int>(headIndex)));
-      if (outputContext == nullptr) {
-        continue;
-      }
+      const gpg::gal::OutputContext outputContext =
+        *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex));
 
-      runtime->mReaderWriterLocks1[headIndex].reset(
-        new moho::CD3DRenderTarget(this, outputContext->renderTarget)
-      );
-      runtime->mReaderWriterLocks2[headIndex].reset(
-        new moho::CD3DDepthStencil(this, outputContext->depthStencil)
-      );
+      runtime->mReaderWriterLocks1[headIndex].reset(new moho::CD3DRenderTarget(this, outputContext.surface));
+      runtime->mReaderWriterLocks2[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
     }
 
-    runtime->mRenderTarget.reset();
+    // 0x0042DFC8: `push 0x28; call operator new; call 0x0043EBC0` - a fresh
+    // default `CD3DRenderTarget` (0x28 bytes), then the same for the depth
+    // stencil.
+    runtime->mRenderTarget.reset(new moho::CD3DRenderTarget());
     runtime->mDepthStencil.reset(new moho::CD3DDepthStencil());
 
     if (auto* const resources = static_cast<moho::CD3DDeviceResources*>(GetResources()); resources != nullptr) {
@@ -1196,13 +1149,10 @@ namespace moho
   /**
    * Address: 0x0042EF40 (FUN_0042EF40)
    *
-   * boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9> &
-   *
    * What it does:
-   * Copies one active cube render-target handle from runtime state.
+   * Copies the device's own render-target wrapper handle from runtime state.
    */
-  boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9>&
-  CD3DDevice::GetRenderTarget(boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9>& outTarget)
+  boost::shared_ptr<CD3DRenderTarget>& CD3DDevice::GetRenderTarget(boost::shared_ptr<CD3DRenderTarget>& outTarget)
   {
     return CopyRetainedHandle(CD3DDeviceRuntimeView::FromDevice(this)->mRenderTarget, outTarget);
   }
@@ -1270,7 +1220,7 @@ namespace moho
     ID3DDepthStencil::SurfaceHandle depthSurface{};
     depthStencil->GetSurface(depthSurface);
 
-    gpg::gal::OutputContext outputContext = BuildOutputContext(renderSurface, depthSurface);
+    const gpg::gal::OutputContext outputContext(renderSurface, depthSurface);
     device->ClearTarget(&outputContext);
     (void)device->BeginScene();
     device->Clear(clear, clear, clear, static_cast<std::uint32_t>(color), zValue, stencil);
@@ -1358,7 +1308,7 @@ namespace moho
     ID3DDepthStencil::SurfaceHandle depthSurface{};
     depthStencil->GetSurface(depthSurface);
 
-    gpg::gal::OutputContext outputContext = BuildOutputContext(renderSurface, depthSurface);
+    const gpg::gal::OutputContext outputContext(renderSurface, depthSurface);
     device->ClearTarget(&outputContext);
     device->Clear(clear, clear, clear, static_cast<std::uint32_t>(color), zValue, stencil);
   }
@@ -1740,16 +1690,16 @@ namespace moho
     const RECT* const destinationRect
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DRenderTarget::SurfaceHandle destinationSurface{};
     destinationRenderTarget->GetSurface(destinationSurface);
     ID3DRenderTarget::SurfaceHandle sourceSurface{};
     sourceRenderTarget->GetSurface(sourceSurface);
 
-    gpg::gal::RenderTargetD3D9* sourceRaw = sourceSurface.get();
-    gpg::gal::RenderTargetD3D9* destinationRaw = destinationSurface.get();
-    device->StretchRect(&sourceRaw, &destinationRaw, sourceRect, destinationRect);
+    // Slot 18 (`[vtbl+0x48]` at 0x0042FF13) on the base device, with the two
+    // surface handles passed by reference.
+    device->StretchRect(sourceSurface, destinationSurface, sourceRect, destinationRect);
   }
 
   /**
@@ -1787,8 +1737,7 @@ namespace moho
     ID3DRenderTarget::SurfaceHandle sourceSurface{};
     sourceRenderTarget->GetSurface(sourceSurface);
 
-    gpg::gal::RenderTargetD3D9* sourceRaw = sourceSurface.get();
-    device->CreateRenderTarget(&sourceRaw, &destinationTexture);
+    device->GetRenderTargetData(sourceSurface, destinationTexture);
   }
 
   /**

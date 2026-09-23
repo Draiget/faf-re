@@ -101,7 +101,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op slot body.
        */
-      virtual void Func1();
+      virtual void Func1() const;
       /**
        * Address: 0x008F86F0
        * Slot: 5
@@ -112,25 +112,21 @@ namespace gal {
        */
       virtual void GetModesForAdapter(int arg1, int arg2);
       /**
-       * Address: 0x008FAC50
-       * Slot: 6
-       * Demangled: gpg::gal::DeviceD3D10::GetHead1
-       *
-       * What it does:
-       * Validates one head index and returns the retained head lane pointer from
-       * the head-array base at `this+0x118`.
-       */
-      virtual void* GetHead1(unsigned int headIndex);
-      /**
        * Address: 0x008FAB80
        * Slot: 7
-       * Demangled: gpg::gal::DeviceD3D10::GetHead2
        *
        * What it does:
-       * Validates one head index and returns the retained head lane pointer from
-       * the head-array base at `this+0x118`.
+       * Returns head `headIndex`'s output context from `mHeadOutputContexts`.
        */
-      virtual void* GetHead2(unsigned int headIndex);
+      virtual OutputContext* GetHeadOutputContext(unsigned int headIndex);
+      /**
+       * Address: 0x008FAC50
+       * Slot: 6
+       *
+       * What it does:
+       * The const overload of slot 7.
+       */
+      virtual const OutputContext* GetHeadOutputContext(unsigned int headIndex) const;
       /**
        * Address: 0x008FA220
        * Slot: 8
@@ -172,39 +168,29 @@ namespace gal {
       /**
        * Address: 0x008FB1D0 (FUN_008FB1D0)
        * Slot: 11
-       * Demangled: gpg::gal::DeviceD3D10::CreateVolumeTexture
        *
        * What it does:
-       * Creates one 2D render-target texture + RTV/SRV pair from caller context lanes.
+       * Creates one render-target texture with its RTV/SRV pair and wraps them
+       * in a `RenderTargetD3D10`.
        */
-      virtual boost::shared_ptr<RenderTargetD3D10>* CreateVolumeTexture(
-          boost::shared_ptr<RenderTargetD3D10>* outRenderTarget,
-          const RenderTargetContext* context
-      );
+      virtual boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context);
       /**
        * Address: 0x008FA6B0 (FUN_008FA6B0)
        * Slot: 12
-       * Demangled: gpg::gal::DeviceD3D10::CreateCubeRenderTarget
        *
        * What it does:
-       * Allocates one cube-render-target wrapper and returns it through caller shared output.
+       * Returns an empty `CubeRenderTargetD3D10`; D3D10 has no cube targets.
        */
-      virtual boost::shared_ptr<CubeRenderTargetD3D10>* CreateCubeRenderTarget(
-          boost::shared_ptr<CubeRenderTargetD3D10>* outCubeRenderTarget,
-          const CubeRenderTargetContext* context
-      );
+      virtual boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context);
       /**
        * Address: 0x008FB570 (FUN_008FB570)
        * Slot: 13
-       * Demangled: gpg::gal::DeviceD3D10::CreateDepthStencilTarget
        *
        * What it does:
-       * Creates one depth-stencil texture + DSV/SRV lane and returns wrapped ownership.
+       * Creates one depth texture with its DSV (and SRV when sampleable) and
+       * wraps them in a `DepthStencilTargetD3D10`.
        */
-      virtual boost::shared_ptr<DepthStencilTargetD3D10>* CreateDepthStencilTarget(
-          boost::shared_ptr<DepthStencilTargetD3D10>* outDepthStencilTarget,
-          const DepthStencilTargetContext* context
-      );
+      virtual boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context);
       /**
        * Address: 0x008FE220 (FUN_008FE220)
        * Slot: 14
@@ -244,30 +230,28 @@ namespace gal {
       /**
        * Address: 0x008FC540
        * Slot: 17
-       * Demangled: gpg::gal::DeviceD3D10::CreateRenderTarget
        *
        * What it does:
-       * Validates source/destination texture handles and dispatches one native
-       * copy-resource lane on the retained D3D10 device.
+       * Copies one colour target's texture into `destination` with a native
+       * `CopyResource`.
        */
-      virtual int CreateRenderTarget(
-          RenderTargetD3D10** sourceTexture,
-          TextureD3D10** destinationTexture
+      virtual void GetRenderTargetData(
+          const boost::shared_ptr<RenderTarget>& source,
+          const boost::shared_ptr<TextureD3D10>& destination
       );
       /**
        * Address: 0x008FC290
        * Slot: 18
-       * Demangled: gpg::gal::DeviceD3D10::StretchRect
        *
        * What it does:
-       * If source/destination contexts match, dispatches native subresource copy;
-       * otherwise falls back to SRV->RTV blit helper path.
+       * Copies directly when source and destination match in size and format;
+       * otherwise draws the source into the destination through the RTT effect.
        */
       virtual void StretchRect(
-          RenderTargetD3D10** sourceTexture,
-          RenderTargetD3D10** destinationTexture,
-          const void* sourceRect,
-          const void* destinationPoint
+          const boost::shared_ptr<RenderTarget>& source,
+          const boost::shared_ptr<RenderTarget>& destination,
+          const RECT* sourceRect,
+          const RECT* destinationRect
       );
       /**
        * Address: 0x008FBDF0
@@ -287,24 +271,26 @@ namespace gal {
       /**
        * Address: 0x008F8700
        * Slot: 20
-       * Demangled: gpg::gal::DeviceD3D10::Func3
        *
        * What it does:
-       * Preserves the binary no-op slot with `retn 8` calling-shape.
+       * D3D10 cannot save a cube target (`ret 8`).
        */
-      virtual void Func3(int arg1, int arg2);
+      virtual void SaveCubeRenderTarget(
+          const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+          const msvc8::string& filePath
+      );
       /**
        * Address: 0x008FC9B0
        * Slot: 21
-       * Demangled: gpg::gal::DeviceD3D10::Func4
        *
        * What it does:
-       * Saves one texture to a file path using the recovered image-format token map.
+       * Writes one colour target's texture to `filePath` in image format
+       * `fileFormat`.
        */
-      virtual void Func4(
-          RenderTargetD3D10** renderTarget,
+      virtual void SaveRenderTarget(
+          const boost::shared_ptr<RenderTarget>& renderTarget,
           const msvc8::string& filePath,
-          int fileFormatToken
+          int fileFormat
       );
       /**
        * Address: 0x008FC6B0

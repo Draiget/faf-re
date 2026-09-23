@@ -4,7 +4,7 @@
 
 namespace gpg::gal
 {
-  class RenderTargetD3D9;
+  class RenderTarget;
 }
 
 namespace moho
@@ -12,7 +12,7 @@ namespace moho
   class ID3DRenderTarget
   {
   public:
-    using SurfaceHandle = boost::shared_ptr<gpg::gal::RenderTargetD3D9>;
+    using SurfaceHandle = boost::shared_ptr<gpg::gal::RenderTarget>;
 
     /**
      * Address: 0x0043EC50 (FUN_0043EC50, sub_43EC50)

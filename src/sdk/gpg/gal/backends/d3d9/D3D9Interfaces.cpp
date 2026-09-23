@@ -90,17 +90,31 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F5250 (FUN_008F5250)
      *
      * What it does:
-     * Initializes one abstract render-target base lane.
+     * Installs the abstract render-target vtable.
      */
     RenderTarget::RenderTarget() = default;
+
+    /**
+     * What it does:
+     * Reinstalls the abstract render-target vtable. Both derived destructors
+     * inline it (0x008F53F1, 0x00902EF1).
+     */
+    RenderTarget::~RenderTarget() = default;
 
     /**
      * Address: 0x008F7F20 (FUN_008F7F20)
      *
      * What it does:
-     * Initializes one abstract cube-render-target base lane.
+     * Installs the abstract cube-render-target vtable.
      */
     CubeRenderTarget::CubeRenderTarget() = default;
+
+    /**
+     * What it does:
+     * Reinstalls the abstract cube-render-target vtable. The derived
+     * destructors inline it (0x008F8068 in `CubeRenderTargetD3D10`).
+     */
+    CubeRenderTarget::~CubeRenderTarget() = default;
 
     /**
      * Address: 0x00902230 (FUN_00902230)
@@ -449,33 +463,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 #if defined(MOHO_ABI_MSVC8_COMPAT)
         static_assert(sizeof(DeviceD3D9BackendObject) == 0x84, "DeviceD3D9BackendObject size must be 0x84");
 #endif
-
-        struct OutputContextD3D9RuntimeView final
-        {
-            std::uint8_t pad00_03[0x04]{};
-            boost::shared_ptr<CubeRenderTargetD3D9> cubeTarget{};    // +0x04
-            std::int32_t face = 0;                                    // +0x0C
-            boost::shared_ptr<RenderTargetD3D9> renderTarget{};       // +0x10
-            boost::shared_ptr<DepthStencilTargetD3D9> depthStencil{}; // +0x18
-        };
-
-        static_assert(
-            offsetof(OutputContextD3D9RuntimeView, cubeTarget) == 0x04,
-            "OutputContextD3D9RuntimeView::cubeTarget offset must be 0x04"
-        );
-        static_assert(
-            offsetof(OutputContextD3D9RuntimeView, face) == 0x0C,
-            "OutputContextD3D9RuntimeView::face offset must be 0x0C"
-        );
-        static_assert(
-            offsetof(OutputContextD3D9RuntimeView, renderTarget) == 0x10,
-            "OutputContextD3D9RuntimeView::renderTarget offset must be 0x10"
-        );
-        static_assert(
-            offsetof(OutputContextD3D9RuntimeView, depthStencil) == 0x18,
-            "OutputContextD3D9RuntimeView::depthStencil offset must be 0x18"
-        );
-        static_assert(sizeof(OutputContextD3D9RuntimeView) == 0x20, "OutputContextD3D9RuntimeView size must be 0x20");
 
         struct DrawPrimitiveContextRuntime final
         {
@@ -1795,133 +1782,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x008E9330 (FUN_008E9330, boost::detail::shared_count_RenderTargetD3D9::shared_count_RenderTargetD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<RenderTargetD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<RenderTargetD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountRenderTargetD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            RenderTargetD3D9* const renderTarget
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, renderTarget);
-        }
-
-        /**
-         * Address: 0x008E9D20 (FUN_008E9D20, boost::shared_ptr_RenderTargetD3D9::shared_ptr_RenderTargetD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<RenderTargetD3D9>` from one raw pointer
-         * lane. FUN_008E9D20's own disassembly publishes `px` ("target")
-         * first, then builds the control block through one discrete
-         * `shared_count(T*)` call (FUN_008E9330 above - a real, separately-
-         * emitted call, not inlined - also reached the same way from
-         * `AssignSharedRenderTargetFromRaw`'s `reset()` and from
-         * `DeviceD3D9::CreateVolumeTexture`) before a no-op
-         * `sp_enable_shared_from_this` (`RenderTargetD3D9` does not derive
-         * from `enable_shared_from_this`); reproduced explicitly here
-         * instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<RenderTargetD3D9>* ConstructSharedRenderTargetD3D9FromRaw(
-            boost::shared_ptr<RenderTargetD3D9>* const outRenderTarget,
-            RenderTargetD3D9* const renderTarget
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outRenderTarget, renderTarget, ConstructSharedCountRenderTargetD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E93C0 (FUN_008E93C0)
-         *
-         * What it does:
-         * Placement-new constructs one `boost::detail::shared_count` lane
-         * over an uninitialized slot from one raw `CubeRenderTargetD3D9*`
-         * pointee (16-byte alloc + `sp_counted_impl_p<CubeRenderTargetD3D9>`
-         * vftable + refcount/weakcount=1 + raw ptr at +0xC). Engine-
-         * instantiated boost templated ctor emission, kept as a recoverable
-         * engine helper.
-         */
-        boost::detail::shared_count* ConstructSharedCountCubeRenderTargetD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            CubeRenderTargetD3D9* const cubeRenderTarget
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, cubeRenderTarget);
-        }
-
-        /**
-         * Address: 0x008E9D50 (FUN_008E9D50, boost::shared_ptr_CubeRenderTargetD3D9::shared_ptr_CubeRenderTargetD3D9)
-         *
-         * What it does:
-         * Placement-new constructs one `shared_ptr<CubeRenderTargetD3D9>`
-         * over an uninitialized output slot from one raw pointer.
-         * FUN_008E9D50's own disassembly publishes `px` first, then builds
-         * the control block through one discrete `shared_count(T*)` call
-         * (FUN_008E93C0 above, `ConstructSharedCountCubeRenderTargetD3D9FromRaw`
-         * - a real, separately-emitted call, not inlined) before a no-op
-         * `sp_enable_shared_from_this` (`CubeRenderTargetD3D9` does not
-         * derive from `enable_shared_from_this`); reproduced explicitly
-         * here instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<CubeRenderTargetD3D9>* ConstructSharedCubeRenderTargetD3D9FromRaw(
-            boost::shared_ptr<CubeRenderTargetD3D9>* const outCubeRenderTarget,
-            CubeRenderTargetD3D9* const cubeRenderTarget
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outCubeRenderTarget, cubeRenderTarget, ConstructSharedCountCubeRenderTargetD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E9450 (FUN_008E9450, boost::detail::shared_count_DepthStencilTargetD3D9::shared_count_DepthStencilTargetD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<DepthStencilTargetD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<DepthStencilTargetD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountDepthStencilTargetD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            DepthStencilTargetD3D9* const depthStencilTarget
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, depthStencilTarget);
-        }
-
-        /**
-         * Address: 0x008E9D80 (FUN_008E9D80, boost::shared_ptr_DepthStencilTargetD3D9::shared_ptr_DepthStencilTargetD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<DepthStencilTargetD3D9>` from one raw
-         * pointer lane. FUN_008E9D80's own disassembly publishes `px`
-         * ("targ") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_008E9450 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `AssignSharedDepthStencilTargetFromRaw`'s `reset()` and from
-         * `DeviceD3D9::CreateDepthStencilTarget`) before a no-op
-         * `sp_enable_shared_from_this` (`DepthStencilTargetD3D9` does not
-         * derive from `enable_shared_from_this`); reproduced explicitly
-         * here instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<DepthStencilTargetD3D9>* ConstructSharedDepthStencilTargetD3D9FromRaw(
-            boost::shared_ptr<DepthStencilTargetD3D9>* const outDepthStencilTarget,
-            DepthStencilTargetD3D9* const depthStencilTarget
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outDepthStencilTarget, depthStencilTarget, ConstructSharedCountDepthStencilTargetD3D9FromRaw
-            );
-        }
-
-        /**
          * Address: 0x008E94E0 (FUN_008E94E0, boost::detail::shared_count_VertexFormatD3D9::shared_count_VertexFormatD3D9)
          *
          * What it does:
@@ -2785,43 +2645,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
         }
 
-        /**
-         * Address: 0x008E9E40 (FUN_008E9E40, boost::shared_ptr_RenderTargetD3D9::operator=)
-         *
-         * What it does:
-         * Rebinds one `shared_ptr<RenderTargetD3D9>` from a raw pointer and
-         * releases prior ownership.
-         */
-        boost::shared_ptr<RenderTargetD3D9>* AssignSharedRenderTargetFromRaw(
-            boost::shared_ptr<RenderTargetD3D9>* const outRenderTarget,
-            RenderTargetD3D9* const renderTarget
-        )
-        {
-            outRenderTarget->reset(renderTarget);
-            return outRenderTarget;
-        }
-
-        /**
-         * Address: 0x008E9EB0 (FUN_008E9EB0, boost::shared_ptr_DepthStencilTargetD3D9::operator=)
-         *
-         * What it does:
-         * Rebinds one `shared_ptr<DepthStencilTargetD3D9>` from a raw pointer
-         * and releases prior ownership.
-         */
-        boost::shared_ptr<DepthStencilTargetD3D9>* AssignSharedDepthStencilTargetFromRaw(
-            boost::shared_ptr<DepthStencilTargetD3D9>* const outDepthStencilTarget,
-            DepthStencilTargetD3D9* const depthStencilTarget
-        )
-        {
-            outDepthStencilTarget->reset(depthStencilTarget);
-            return outDepthStencilTarget;
-        }
-
-        const OutputContextD3D9RuntimeView& AsOutputContextD3D9Runtime(const OutputContext& context) noexcept
-        {
-            return *reinterpret_cast<const OutputContextD3D9RuntimeView*>(&context);
-        }
-
         DeviceContext* GetEmbeddedDeviceContext(DeviceD3D9* const device) noexcept
         {
             return &AsDeviceD3D9Runtime(*device).deviceContext;
@@ -2870,14 +2693,14 @@ namespace { // TEMPORARY PROBE (do not commit)
             return static_cast<std::uint32_t>(context->GetHeadCount());
         }
 
-        std::uint32_t GetDeviceHeadCount(DeviceD3D9* const device) noexcept
+        std::uint32_t GetDeviceHeadCount(const DeviceD3D9* const device) noexcept
         {
-            return GetDeviceContextHeadCount(GetEmbeddedDeviceContext(device));
+            return GetDeviceContextHeadCount(&AsDeviceD3D9Runtime(*device).deviceContext);
         }
 
-        void* GetDeviceHeadArrayBase(DeviceD3D9* const device) noexcept
+        OutputContext* GetDeviceHeadArrayBase(const DeviceD3D9* const device) noexcept
         {
-            return AsDeviceD3D9Runtime(*device).headsBase;
+            return static_cast<OutputContext*>(AsDeviceD3D9Runtime(*device).headsBase);
         }
 
         std::uint32_t GetD3DFormat(std::uint32_t formatToken);
@@ -6179,7 +6002,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Preserves the binary no-op virtual pre-hook slot.
      */
-    void DeviceD3D9::Func1()
+    void DeviceD3D9::Func1() const
     {
     }
 
@@ -6526,7 +6349,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         OutputContext* const heads = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
         runtime.headsBase = heads;
-        auto* const outputHeads = reinterpret_cast<OutputContextD3D9RuntimeView*>(heads);
 
         for (unsigned int headIndex = 0; headIndex < headCount; ++headIndex)
         {
@@ -6562,13 +6384,12 @@ namespace { // TEMPORARY PROBE (do not commit)
             // The head owns the back buffer directly: no render-target context
             // is built here, and the surface-wrap ctor takes the dimensions
             // back off the surface descriptor itself.
-            RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(backBuffer.release());
-            (void)AssignSharedRenderTargetFromRaw(&outputHeads[headIndex].renderTarget, renderTarget);
+            heads[headIndex].surface.reset(new RenderTargetD3D9(backBuffer.release()));
 
             const DepthStencilTargetContext depthStencilContext(surfaceDesc.width, surfaceDesc.height, 3U, false);
-            DepthStencilTargetD3D9* const depthStencilTarget =
-                new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface.release());
-            (void)AssignSharedDepthStencilTargetFromRaw(&outputHeads[headIndex].depthStencil, depthStencilTarget);
+            heads[headIndex].depthStencil.reset(
+                new DepthStencilTargetD3D9(&depthStencilContext, depthStencilSurface.release())
+            );
         }
     }
 
@@ -7146,45 +6967,37 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EAB20 (FUN_008EAB20)
      *
-     * unsigned int
-     *
      * What it does:
-     * Validates one head index and returns the retained head lane pointer from
-     * the head-array base at `this+0x7C`.
+     * Validates one head index against the device context's head count and
+     * returns that head's output context from the array at `this+0x7C`
+     * (`shl eax,5` - `sizeof(OutputContext)` is 0x20).
      */
-    Head* DeviceD3D9::GetHead2(const unsigned int headIndex)
+    OutputContext* DeviceD3D9::GetHeadOutputContext(const unsigned int headIndex)
     {
         Func1();
-        const unsigned int headCount = GetDeviceHeadCount(this);
-        if (headIndex >= headCount)
+        if (headIndex >= GetDeviceHeadCount(this))
         {
             ThrowGalError("DeviceD3D9.cpp", 295, "invalid head index specified");
         }
 
-        auto* const headArrayBase = reinterpret_cast<std::uint8_t*>(GetDeviceHeadArrayBase(this));
-        return reinterpret_cast<Head*>(headArrayBase + (headIndex * 0x20U));
+        return &GetDeviceHeadArrayBase(this)[headIndex];
     }
 
     /**
      * Address: 0x008EABF0 (FUN_008EABF0)
      *
-     * unsigned int
-     *
      * What it does:
-     * Validates one head index and returns the retained head lane pointer from
-     * the head-array base at `this+0x7C`.
+     * The const overload of `GetHeadOutputContext`; same body.
      */
-    Head* DeviceD3D9::GetHead1(const unsigned int headIndex)
+    const OutputContext* DeviceD3D9::GetHeadOutputContext(const unsigned int headIndex) const
     {
         Func1();
-        const unsigned int headCount = GetDeviceHeadCount(this);
-        if (headIndex >= headCount)
+        if (headIndex >= GetDeviceHeadCount(this))
         {
             ThrowGalError("DeviceD3D9.cpp", 303, "invalid head index specified");
         }
 
-        auto* const headArrayBase = reinterpret_cast<std::uint8_t*>(GetDeviceHeadArrayBase(this));
-        return reinterpret_cast<Head*>(headArrayBase + (headIndex * 0x20U));
+        return &GetDeviceHeadArrayBase(this)[headIndex];
     }
 
     /**
@@ -7443,15 +7256,12 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EB610 (FUN_008EB610)
      *
-     * boost::shared_ptr<gpg::gal::RenderTargetD3D9> *,gpg::gal::RenderTargetContext const *
-     *
      * What it does:
-     * Creates one D3D9 render-target texture and returns wrapped ownership.
+     * Creates one single-level `D3DUSAGE_RENDERTARGET` texture of the
+     * context's size and format in the default pool and hands it to a new
+     * `RenderTargetD3D9`, which takes its level-0 surface.
      */
-    boost::shared_ptr<RenderTargetD3D9>* DeviceD3D9::CreateVolumeTexture(
-        boost::shared_ptr<RenderTargetD3D9>* const outRenderTarget,
-        const RenderTargetContext* const context
-    )
+    boost::shared_ptr<RenderTarget> DeviceD3D9::CreateRenderTarget(const RenderTargetContext* const context)
     {
         Func1();
 
@@ -7471,23 +7281,17 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 508, createResult);
         }
 
-        RenderTargetD3D9* const renderTarget = new RenderTargetD3D9(context, renderTexture);
-        (void)ConstructSharedRenderTargetD3D9FromRaw(outRenderTarget, renderTarget);
-        return outRenderTarget;
+        return boost::shared_ptr<RenderTarget>(new RenderTargetD3D9(context, renderTexture));
     }
 
     /**
      * Address: 0x008EB780 (FUN_008EB780)
      *
-     * boost::shared_ptr<gpg::gal::CubeRenderTargetD3D9> *,gpg::gal::CubeRenderTargetContext const *
-     *
      * What it does:
-     * Creates one D3D9 cube texture target and returns wrapped ownership.
+     * Creates one single-level render-target cube texture and hands it to a
+     * new `CubeRenderTargetD3D9`, which takes the six face surfaces.
      */
-    boost::shared_ptr<CubeRenderTargetD3D9>* DeviceD3D9::CreateCubeRenderTarget(
-        boost::shared_ptr<CubeRenderTargetD3D9>* const outCubeRenderTarget,
-        const CubeRenderTargetContext* const context
-    )
+    boost::shared_ptr<CubeRenderTarget> DeviceD3D9::CreateCubeRenderTarget(const CubeRenderTargetContext* const context)
     {
         Func1();
 
@@ -7506,22 +7310,17 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 521, createResult);
         }
 
-        CubeRenderTargetD3D9* const cubeRenderTarget = new CubeRenderTargetD3D9(context, cubeTexture);
-
-        (void)ConstructSharedCubeRenderTargetD3D9FromRaw(outCubeRenderTarget, cubeRenderTarget);
-        return outCubeRenderTarget;
+        return boost::shared_ptr<CubeRenderTarget>(new CubeRenderTargetD3D9(context, cubeTexture));
     }
 
     /**
      * Address: 0x008EB8E0 (FUN_008EB8E0)
      *
-     * boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> *,gpg::gal::DepthStencilTargetContext const *
-     *
      * What it does:
-     * Creates one D3D9 depth-stencil surface and returns wrapped ownership.
+     * Creates one non-multisampled depth/stencil surface of the context's size
+     * and format and wraps it in a `DepthStencilTargetD3D9`.
      */
-    boost::shared_ptr<DepthStencilTargetD3D9>* DeviceD3D9::CreateDepthStencilTarget(
-        boost::shared_ptr<DepthStencilTargetD3D9>* const outDepthStencilTarget,
+    boost::shared_ptr<DepthStencilTarget> DeviceD3D9::CreateDepthStencilTarget(
         const DepthStencilTargetContext* const context
     )
     {
@@ -7542,9 +7341,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 534, createResult);
         }
 
-        DepthStencilTargetD3D9* const depthStencilTarget = new DepthStencilTargetD3D9(context, depthStencilSurface);
-        (void)ConstructSharedDepthStencilTargetD3D9FromRaw(outDepthStencilTarget, depthStencilTarget);
-        return outDepthStencilTarget;
+        return boost::shared_ptr<DepthStencilTarget>(new DepthStencilTargetD3D9(context, depthStencilSurface));
     }
 
     /**
@@ -7654,34 +7451,33 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EC440 (FUN_008EC440)
      *
-     * gpg::gal::RenderTargetD3D9 **,boost::shared_ptr<gpg::gal::TextureD3D9> *
-     *
      * What it does:
-     * Validates source/destination texture handles, resolves destination level-0
-     * surface, and dispatches native `GetRenderTargetData`.
+     * Reads one colour target back into a system-memory texture: resolves the
+     * destination's level-0 surface and dispatches native
+     * `GetRenderTargetData` from the target's surface into it.
      */
-    void DeviceD3D9::CreateRenderTarget(
-        RenderTargetD3D9** const sourceTexture,
-        boost::shared_ptr<TextureD3D9>* const destinationTexture
+    void DeviceD3D9::GetRenderTargetData(
+        const boost::shared_ptr<RenderTarget>& source,
+        const boost::shared_ptr<TextureD3D9>& destination
     )
     {
         Func1();
 
-        if ((sourceTexture == nullptr) || (*sourceTexture == nullptr))
+        if (source.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 645, "Missing source texture");
         }
 
-        if ((destinationTexture == nullptr) || !destinationTexture->get())
+        if (destination.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 646, "Missing dest   texture");
         }
 
-        void* const sourceSurface = (*sourceTexture)->GetSurface();
+        void* const sourceSurface = static_cast<RenderTargetD3D9*>(source.get())->GetSurface();
 
         ComObjectScope destinationSurface{};
         const HRESULT getSurfaceResult =
-            InvokeGetSurfaceLevel(destinationTexture->get()->GetTexture1(), 0U, destinationSurface.out());
+            InvokeGetSurfaceLevel(destination->GetTexture1(), 0U, destinationSurface.out());
         if (getSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 656, getSurfaceResult);
@@ -7697,37 +7493,35 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EC250 (FUN_008EC250)
      *
-     * gpg::gal::RenderTargetD3D9 **,gpg::gal::RenderTargetD3D9 **,void const *,void const *
-     *
      * What it does:
-     * Validates source/destination render-surface handles and dispatches one native
-     * `IDirect3DDevice9::StretchRect` copy lane.
+     * Blits a rectangle of one colour target's surface into another through
+     * native `IDirect3DDevice9::StretchRect` with linear filtering.
      */
     void DeviceD3D9::StretchRect(
-        RenderTargetD3D9** const sourceTexture,
-        RenderTargetD3D9** const destinationTexture,
-        const void* const sourceRect,
-        const void* const destinationRect
+        const boost::shared_ptr<RenderTarget>& source,
+        const boost::shared_ptr<RenderTarget>& destination,
+        const RECT* const sourceRect,
+        const RECT* const destinationRect
     )
     {
         Func1();
 
-        if (*sourceTexture == nullptr)
+        if (source.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 624, "Missing source texture");
         }
 
-        if (*destinationTexture == nullptr)
+        if (destination.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 625, "Missing dest   texture");
         }
 
         const HRESULT stretchResult = InvokeNativeStretchRect(
             this,
-            (*sourceTexture)->GetSurface(),
-            reinterpret_cast<const RECT*>(sourceRect),
-            (*destinationTexture)->GetSurface(),
-            reinterpret_cast<const RECT*>(destinationRect),
+            static_cast<RenderTargetD3D9*>(source.get())->GetSurface(),
+            sourceRect,
+            static_cast<RenderTargetD3D9*>(destination.get())->GetSurface(),
+            destinationRect,
             kD3DTexFilterLinear
         );
         if (stretchResult < 0)
@@ -7796,12 +7590,21 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008ECB50 (FUN_008ECB50)
      *
-     * gpg::gal::TextureD3D9 **,msvc8::string const &
-     *
      * What it does:
-     * Saves one cube-texture lane to file as DDS.
+     * Writes one cube render target's texture to `filePath` as DDS.
+     *
+     * The target is a cube render target, not a texture: the texture comes
+     * from `CubeRenderTargetD3D9::GetTexture` (0x00941270,
+     * `mov eax,[ecx+0x10]`), and the failure text is "unable to get concrete
+     * cube texture". This body used to type the argument as a `TextureD3D9`
+     * and read that same +0x10 through a `GetLocation` accessor, which on a
+     * texture is the middle of the location string - so D3DX would have been
+     * handed string bytes as its texture.
      */
-    void DeviceD3D9::Func3(TextureD3D9** const texture, const msvc8::string& filePath)
+    void DeviceD3D9::SaveCubeRenderTarget(
+        const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+        const msvc8::string& filePath
+    )
     {
         Func1();
 
@@ -7813,7 +7616,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 736, "Missing file");
         }
 
-        void* const nativeTexture = const_cast<char*>((*texture)->GetLocation());
+        void* const nativeTexture = static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture();
         if (nativeTexture == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 741, "unable to get concrete cube texture");
@@ -7830,36 +7633,35 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EC970 (FUN_008EC970)
      *
-     * gpg::gal::RenderTargetD3D9 **,msvc8::string const &,int
-     *
      * What it does:
-     * Saves one render-target surface to file with the requested image-format token.
+     * Writes one colour target's surface to `filePath` in image format
+     * `fileFormat`.
      */
-    void DeviceD3D9::Func4(
-        RenderTargetD3D9** const renderTarget,
+    void DeviceD3D9::SaveRenderTarget(
+        const boost::shared_ptr<RenderTarget>& renderTarget,
         const msvc8::string& filePath,
-        const int fileFormatToken
+        const int fileFormat
     )
     {
         Func1();
 
-        // string+0x14 is mySize (see DeviceD3D9::Func3) - the guard rejects an
-        // empty path, and an SSO string's myRes is 15 even when empty.
+        // string+0x14 is mySize (see DeviceD3D9::SaveCubeRenderTarget) - the
+        // guard rejects an empty path, and an SSO string's myRes is 15 even
+        // when empty.
         if (filePath.mySize == 0U)
         {
             ThrowGalError("DeviceD3D9.cpp", 715, "Missing file");
         }
 
-        if (((*renderTarget)->GetSurface()) == nullptr)
+        // One `GetSurface` call (0x008ECA21); the result feeds the save.
+        void* const surface = static_cast<RenderTargetD3D9*>(renderTarget.get())->GetSurface();
+        if (surface == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 720, "Unable to get back buffer surface");
         }
 
-        const HRESULT saveResult = InvokeD3DXSaveSurfaceToFileA(
-            GetStringDataRaw(filePath),
-            MapImageFormatTokenToD3DX(fileFormatToken),
-            (*renderTarget)->GetSurface()
-        );
+        const HRESULT saveResult =
+            InvokeD3DXSaveSurfaceToFileA(GetStringDataRaw(filePath), MapImageFormatTokenToD3DX(fileFormat), surface);
         if (saveResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 728, saveResult);
@@ -8344,14 +8146,12 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        const auto& runtimeContext = AsOutputContextD3D9Runtime(*context);
-
         ComObjectScope currentRenderTarget{};
         InvokeNativeGetRenderTarget(this, 0U, currentRenderTarget.out());
 
-        if (runtimeContext.renderTarget.get() != nullptr)
+        if (context->surface.get() != nullptr)
         {
-            void* const targetSurface = runtimeContext.renderTarget->GetSurface();
+            void* const targetSurface = static_cast<RenderTargetD3D9*>(context->surface.get())->GetSurface();
             if (currentRenderTarget.get() != targetSurface)
             {
                 const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, targetSurface);
@@ -8361,9 +8161,10 @@ namespace { // TEMPORARY PROBE (do not commit)
                 }
             }
         }
-        else if (runtimeContext.cubeTarget.get() != nullptr)
+        else if (context->cubeTarget.get() != nullptr)
         {
-            void* const targetSurface = runtimeContext.cubeTarget->GetSurface(runtimeContext.face);
+            void* const targetSurface =
+                static_cast<CubeRenderTargetD3D9*>(context->cubeTarget.get())->GetSurface(context->face);
             if (currentRenderTarget.get() != targetSurface)
             {
                 const HRESULT setResult = InvokeNativeSetRenderTarget(this, 0U, targetSurface);
@@ -8385,9 +8186,10 @@ namespace { // TEMPORARY PROBE (do not commit)
         ComObjectScope currentDepthStencilSurface{};
         InvokeNativeGetDepthStencilSurface(this, currentDepthStencilSurface.out());
 
-        if (runtimeContext.depthStencil.get() != nullptr)
+        if (context->depthStencil.get() != nullptr)
         {
-            void* const depthStencilSurface = runtimeContext.depthStencil->GetSurface();
+            void* const depthStencilSurface =
+                static_cast<DepthStencilTargetD3D9*>(context->depthStencil.get())->GetSurface();
             if (currentDepthStencilSurface.get() != depthStencilSurface)
             {
                 const HRESULT setResult = InvokeNativeSetDepthStencilSurface(this, depthStencilSurface);
@@ -9449,12 +9251,14 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00944420 (FUN_00944420)
      *
      * What it does:
-     * Binds a render-target surface lane to the backing D3DX effect parameter.
+     * Binds a colour render target's texture (`RenderTargetD3D9::GetTexture`,
+     * not its surface) to this effect parameter; a null target unbinds it.
      */
-    void EffectVariableD3D9::Func3(boost::shared_ptr<RenderTargetD3D9> renderTarget)
+    void EffectVariableD3D9::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 189);
-        void* const textureHandle = (renderTarget.get() != nullptr) ? renderTarget->GetTexture() : nullptr;
+        void* const textureHandle =
+            (renderTarget.get() != nullptr) ? static_cast<RenderTargetD3D9*>(renderTarget.get())->GetTexture() : nullptr;
 
         const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
         if (result < 0)
@@ -9467,12 +9271,15 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00944630 (FUN_00944630)
      *
      * What it does:
-     * Binds a cube-render-target texture lane to the backing D3DX effect parameter.
+     * Binds a cube render target's texture (`CubeRenderTargetD3D9::GetTexture`,
+     * 0x00941270, called at 0x00944705) to this effect parameter; a null
+     * target unbinds it.
      */
-    void EffectVariableD3D9::Func2(boost::shared_ptr<CubeRenderTargetD3D9> cubeRenderTarget)
+    void EffectVariableD3D9::SetCubeRenderTarget(const boost::shared_ptr<CubeRenderTarget> cubeTarget)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 207);
-        void* const textureHandle = (cubeRenderTarget.get() != nullptr) ? cubeRenderTarget->cubeTexture_ : nullptr;
+        void* const textureHandle =
+            (cubeTarget.get() != nullptr) ? static_cast<CubeRenderTargetD3D9*>(cubeTarget.get())->GetTexture() : nullptr;
 
         const HRESULT result = InvokeEffectSetTexture(effect->GetDxEffect(), handle_, textureHandle);
         if (result < 0)
@@ -10060,13 +9867,19 @@ namespace { // TEMPORARY PROBE (do not commit)
      *
      * What it does:
      * Returns a GDI device context for the retained render surface via
-     * `IDirect3DSurface9::GetDC` (vtable slot 15).
+     * `IDirect3DSurface9::GetDC` (vtable slot 15), or null when the target has
+     * no surface (`cmp [ecx+0x14],0; je` at 0x008F5301).
      */
-    void* RenderTargetD3D9::GetSurfaceDC()
+    HDC RenderTargetD3D9::GetDC()
     {
+        if (surface_ == nullptr)
+        {
+            return nullptr;
+        }
+
         void* deviceContext = nullptr;
         static_cast<void>(InvokeSurfaceGetDC(surface_, &deviceContext));
-        return deviceContext;
+        return static_cast<HDC>(deviceContext);
     }
 
     /**
@@ -10237,6 +10050,18 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
+     * Address: 0x00941270 (FUN_00941270)
+     *
+     * What it does:
+     * Returns the retained cube texture at `this+0x10`
+     * (`mov eax,[ecx+0x10]; ret`).
+     */
+    void* CubeRenderTargetD3D9::GetTexture() const
+    {
+        return cubeTexture_;
+    }
+
+    /**
      * Address: 0x008F4BE0 (FUN_008F4BE0)
      *
      * What it does:
@@ -10379,17 +10204,6 @@ namespace { // TEMPORARY PROBE (do not commit)
     TextureContext* TextureD3D9::GetContext()
     {
         return &context_;
-    }
-
-    /**
-     * Address: 0x00941270 (FUN_00941270)
-     *
-     * What it does:
-     * Returns the raw location string pointer from the embedded texture context.
-     */
-    const char* TextureD3D9::GetLocation() const
-    {
-        return context_.location_.raw_data_unsafe();
     }
 
     /**

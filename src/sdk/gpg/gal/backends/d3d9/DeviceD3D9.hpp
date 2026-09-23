@@ -89,7 +89,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op virtual pre-hook slot.
        */
-      virtual void Func1() override;
+      void Func1() const override;
       /**
        * Address: 0x008F0170
        * Slot: 5
@@ -97,25 +97,21 @@ namespace gal {
        */
       virtual void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex);
       /**
-       * Address: 0x008EABF0 (FUN_008EABF0)
-       * Slot: 6
-       * Demangled: gpg::gal::DeviceD3D9::GetHead1
-       *
-       * What it does:
-       * Validates one head index and returns the retained head lane pointer from
-       * `this+0x7C` (`index * 0x20`).
-       */
-      virtual Head* GetHead1(unsigned int headIndex) override;
-      /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
-       * Demangled: gpg::gal::DeviceD3D9::GetHead2
        *
        * What it does:
-       * Validates one head index and returns the retained head lane pointer from
-       * `this+0x7C` (`index * 0x20`).
+       * Returns head `headIndex`'s output context from the array at `this+0x7C`.
        */
-      virtual Head* GetHead2(unsigned int headIndex) override;
+      OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
+      /**
+       * Address: 0x008EABF0 (FUN_008EABF0)
+       * Slot: 6
+       *
+       * What it does:
+       * The const overload of slot 7.
+       */
+      const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
       /**
        * Address: 0x008E9B00 (FUN_008E9B00)
        * Slot: 8
@@ -155,39 +151,32 @@ namespace gal {
       /**
        * Address: 0x008EB610 (FUN_008EB610)
        * Slot: 11
-       * Demangled: gpg::gal::DeviceD3D9::CreateVolumeTexture
        *
        * What it does:
-       * Creates one D3D9 render-target texture wrapper from caller context lanes.
+       * Creates one `D3DUSAGE_RENDERTARGET` texture of the context's size and
+       * format in the default pool and wraps it in a `RenderTargetD3D9`.
        */
-      virtual boost::shared_ptr<RenderTargetD3D9>* CreateVolumeTexture(
-          boost::shared_ptr<RenderTargetD3D9>* outRenderTarget,
-          const RenderTargetContext* context
-       );
+      boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
       /**
        * Address: 0x008EB780 (FUN_008EB780)
        * Slot: 12
-       * Demangled: gpg::gal::DeviceD3D9::CreateCubeRenderTarget
        *
        * What it does:
-       * Creates one D3D9 cube-render-target wrapper from caller context lanes.
+       * Creates one render-target cube texture and wraps it in a
+       * `CubeRenderTargetD3D9`.
        */
-      virtual boost::shared_ptr<CubeRenderTargetD3D9>* CreateCubeRenderTarget(
-          boost::shared_ptr<CubeRenderTargetD3D9>* outCubeRenderTarget,
-          const CubeRenderTargetContext* context
-       );
+      boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
       /**
        * Address: 0x008EB8E0 (FUN_008EB8E0)
        * Slot: 13
-       * Demangled: gpg::gal::DeviceD3D9::CreateDepthStencilTarget
        *
        * What it does:
-       * Creates one D3D9 depth-stencil surface wrapper from caller context lanes.
+       * Creates one depth/stencil surface and wraps it in a
+       * `DepthStencilTargetD3D9`.
        */
-      virtual boost::shared_ptr<DepthStencilTargetD3D9>* CreateDepthStencilTarget(
-          boost::shared_ptr<DepthStencilTargetD3D9>* outDepthStencilTarget,
+      boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(
           const DepthStencilTargetContext* context
-       );
+       ) override;
       /**
        * Address: 0x008EBA50 (FUN_008EBA50)
        * Slot: 14
@@ -227,30 +216,29 @@ namespace gal {
       /**
        * Address: 0x008EC440 (FUN_008EC440)
        * Slot: 17
-       * Demangled: gpg::gal::DeviceD3D9::CreateRenderTarget
        *
        * What it does:
-       * Validates source/destination handles and dispatches one native
-       * `GetRenderTargetData` copy lane.
+       * Reads a colour target back into a system-memory texture:
+       * `IDirect3DDevice9::GetRenderTargetData` from the target's surface
+       * into level 0 of `destination`.
        */
-      virtual void CreateRenderTarget(
-          RenderTargetD3D9** sourceTexture,
-          boost::shared_ptr<TextureD3D9>* destinationTexture
+      virtual void GetRenderTargetData(
+          const boost::shared_ptr<RenderTarget>& source,
+          const boost::shared_ptr<TextureD3D9>& destination
        );
       /**
        * Address: 0x008EC250 (FUN_008EC250)
        * Slot: 18
-       * Demangled: gpg::gal::DeviceD3D9::StretchRect
        *
        * What it does:
-       * Blits one source render surface into one destination render surface.
+       * Blits one colour target's surface into another with linear filtering.
        */
-      virtual void StretchRect(
-          RenderTargetD3D9** sourceTexture,
-          RenderTargetD3D9** destinationTexture,
-          const void* sourceRect,
-          const void* destinationRect
-       );
+      void StretchRect(
+          const boost::shared_ptr<RenderTarget>& source,
+          const boost::shared_ptr<RenderTarget>& destination,
+          const RECT* sourceRect,
+          const RECT* destinationRect
+       ) override;
       /**
        * Address: 0x008EBF70 (FUN_008EBF70)
        * Slot: 19
@@ -268,21 +256,27 @@ namespace gal {
       /**
        * Address: 0x008ECB50 (FUN_008ECB50)
        * Slot: 20
-       * Demangled: gpg::gal::DeviceD3D9::Func3
        *
        * What it does:
-       * Saves one cube texture lane to file as DDS.
+       * Writes one cube render target's texture to `filePath` as DDS.
        */
-      virtual void Func3(TextureD3D9** texture, const msvc8::string& filePath);
+      void SaveCubeRenderTarget(
+          const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+          const msvc8::string& filePath
+       ) override;
       /**
        * Address: 0x008EC970 (FUN_008EC970)
        * Slot: 21
-       * Demangled: gpg::gal::DeviceD3D9::Func4
        *
        * What it does:
-       * Saves one render surface lane to file using the requested image format token.
+       * Writes one colour target's surface to `filePath` in image format
+       * `fileFormat`.
        */
-      virtual void Func4(RenderTargetD3D9** renderTarget, const msvc8::string& filePath, int fileFormatToken);
+      void SaveRenderTarget(
+          const boost::shared_ptr<RenderTarget>& renderTarget,
+          const msvc8::string& filePath,
+          int fileFormat
+       ) override;
       /**
        * Address: 0x008EC6A0 (FUN_008EC6A0)
        * Slot: 22

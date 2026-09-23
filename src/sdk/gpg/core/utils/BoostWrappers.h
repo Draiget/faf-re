@@ -606,6 +606,19 @@ namespace boost
      * Address: 0x00445840 (FUN_00445840)
      * Address: 0x00446200 (FUN_00446200)
      *
+     * The gal target emissions of the same constructor - `shared_ptr<Base>(Y*)`
+     * for each backend target type Y: `px` published first, then one call to
+     * the `shared_count(Y*)` emission cited on `ConstructSharedCountFromRaw`.
+     * Each was a per-type `ConstructShared<Y>FromRaw` free function (RULE ONE),
+     * removed 2026-09-23; the backends now write
+     * `boost::shared_ptr<RenderTarget>(new RenderTargetD3D9(...))`.
+     * Address: 0x008E9D20 (FUN_008E9D20, shared_ptr<RenderTarget>(RenderTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9D50 (FUN_008E9D50, shared_ptr<CubeRenderTarget>(CubeRenderTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9D80 (FUN_008E9D80, shared_ptr<DepthStencilTarget>(DepthStencilTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008FA430 (FUN_008FA430, shared_ptr<RenderTarget>(RenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA460 (FUN_008FA460, shared_ptr<CubeRenderTarget>(CubeRenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA490 (FUN_008FA490, shared_ptr<DepthStencilTarget>(DepthStencilTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     *
      * What it does:
      * Constructs one `boost::shared_ptr<T>` from a raw pointee in caller-provided storage.
      */
@@ -620,6 +633,16 @@ namespace boost
 
     /**
      * Address: 0x00445880 (FUN_00445880)
+     *
+     * `shared_ptr<Base>::reset(Y*)` for the per-head back-buffer targets: a
+     * temporary `shared_ptr(p)` built through the `shared_count(Y*)` emission,
+     * swapped in, the old count released. `DeviceD3D9::CreateHeads` calls the
+     * first two (0x008EED88, 0x008EEDF6), `DeviceD3D10::CreateRenderTargets`
+     * the third (0x008FD781). Each was a per-type `AssignShared<Y>FromRaw`
+     * free function (RULE ONE), removed 2026-09-23.
+     * Address: 0x008E9E40 (FUN_008E9E40, shared_ptr<RenderTarget>::reset(RenderTargetD3D9*))
+     * Address: 0x008E9EB0 (FUN_008E9EB0, shared_ptr<DepthStencilTarget>::reset(DepthStencilTargetD3D9*))
+     * Address: 0x008FA550 (FUN_008FA550, shared_ptr<RenderTarget>::reset(RenderTargetD3D10*))
      *
      * What it does:
      * Rebinds one initialized `boost::shared_ptr<T>` to a raw pointee by
@@ -768,6 +791,35 @@ namespace boost
      * Address: 0x008F9130 (FUN_008F9130, sp_counted_impl_p<gpg::gal::IndexBufferD3D10>::get_deleter, vtable 0x00D43150 slot 3)
      * Address: 0x0094B620 (FUN_0094B620, sp_counted_impl_p<gpg::gal::EffectTechniqueD3D10>::get_deleter, vtable 0x00D4887C slot 3)
      * Address: 0x0094B650 (FUN_0094B650, sp_counted_impl_p<gpg::gal::EffectVariableD3D10>::get_deleter, vtable 0x00D48890 slot 3)
+     *
+     * `shared_count(Y*)` for the gal target types: `new sp_counted_impl_p<Y>(p)`
+     * inside a try whose catch deletes `p` and rethrows. The create slots call
+     * them directly with the outer `shared_ptr` constructor inlined (0x008EB74E,
+     * 0x008EB8B3, 0x008EBA15 on D3D9; 0x008FB53C, 0x008FA707, 0x008FB89B on
+     * D3D10). Each was a per-type `ConstructSharedCount<Y>FromRaw` free
+     * function (RULE ONE), removed 2026-09-23.
+     * Address: 0x008E9330 (FUN_008E9330, shared_count(RenderTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E93C0 (FUN_008E93C0, shared_count(CubeRenderTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9450 (FUN_008E9450, shared_count(DepthStencilTargetD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008F9B90 (FUN_008F9B90, shared_count(RenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008F9C20 (FUN_008F9C20, shared_count(CubeRenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008F9CB0 (FUN_008F9CB0, shared_count(DepthStencilTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     *
+     * `boost::checked_delete<Y>` as that catch path emits it for the D3D10
+     * backend types (`if (p) p->~Y()` through the deleting destructor,
+     * `push 1; call [vtbl]`). No source line names them; each was an uncalled
+     * `Delete<Y>SharedCountCtorPointeeOnUnwind` in D3D10Interfaces.cpp,
+     * removed 2026-09-23.
+     * Address: 0x008F9200 (FUN_008F9200, checked_delete<TextureD3D10>)
+     * Address: 0x008F9220 (FUN_008F9220, checked_delete<RenderTargetD3D10>, from 0x008F9B90)
+     * Address: 0x008F9240 (FUN_008F9240, checked_delete<CubeRenderTargetD3D10>)
+     * Address: 0x008F9260 (FUN_008F9260, checked_delete<DepthStencilTargetD3D10>)
+     * Address: 0x008F9280 (FUN_008F9280, checked_delete<VertexFormatD3D10>)
+     * Address: 0x008F92A0 (FUN_008F92A0, checked_delete<VertexBufferD3D10>)
+     * Address: 0x008F92C0 (FUN_008F92C0, checked_delete<IndexBufferD3D10>)
+     * Address: 0x008F93E0 (FUN_008F93E0, checked_delete<PipelineStateD3D10>)
+     * Address: 0x0094B680 (FUN_0094B680, checked_delete<EffectTechniqueD3D10>)
+     * Address: 0x0094B6A0 (FUN_0094B6A0, checked_delete<EffectVariableD3D10>)
      *
      * What it does:
      * Constructs one `boost::detail::shared_count` from a raw pointee in caller-provided storage.

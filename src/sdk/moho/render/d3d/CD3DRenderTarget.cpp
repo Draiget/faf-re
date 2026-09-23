@@ -1,7 +1,7 @@
 #include "CD3DRenderTarget.h"
 
-#include "gpg/gal/Device.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/core/utils/Global.h"
+#include "gpg/gal/Error.hpp"
 
 namespace moho
 {
@@ -22,7 +22,7 @@ namespace moho
   /**
    * Address: 0x0043EC60 (FUN_0043EC60)
    *
-   * CD3DDevice *,boost::shared_ptr<gpg::gal::RenderTargetD3D9>
+   * CD3DDevice *,boost::shared_ptr<gpg::gal::RenderTarget>
    *
    * What it does:
    * Initializes intrusive-list links, stores owner lane, and captures one
@@ -65,7 +65,7 @@ namespace moho
   /**
    * Address: 0x0043EFC0 (FUN_0043EFC0)
    *
-   * boost::shared_ptr<gpg::gal::RenderTargetD3D9> &
+   * boost::shared_ptr<gpg::gal::RenderTarget> &
    *
    * What it does:
    * Copies retained render-surface ownership into caller storage.
@@ -89,13 +89,20 @@ namespace moho
 
   /**
    * Address: 0x0043EDF0 (FUN_0043EDF0, sub_43EDF0)
+   *
+   * What it does:
+   * Recreates the surface from the retained context through
+   * `gpg::gal::RenderTarget::Create` (0x008E7A10). A device error is fatal:
+   * the handler at 0x0043EE9F hands the error's file, line and text to
+   * `gpg::Die`.
    */
   bool CD3DRenderTarget::RecreateFromContext()
   {
-    SurfaceHandle recreatedSurface{};
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    device->CreateVolumeTexture(&recreatedSurface, &mRenderTargetContext);
-    mSurface = recreatedSurface;
+    try {
+      mSurface = gpg::gal::RenderTarget::Create(mRenderTargetContext);
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
     return true;
   }
 

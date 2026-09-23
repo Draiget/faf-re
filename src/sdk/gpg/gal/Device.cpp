@@ -296,10 +296,7 @@ namespace gpg::gal
      */
     void Device::ClearTarget(const OutputContext* const context)
     {
-        outputContext_.cubeTarget = context->cubeTarget;
-        outputContext_.face = context->face;
-        outputContext_.surface = context->surface;
-        outputContext_.texture = context->texture;
+        outputContext_ = *context;
     }
 
     /**
@@ -312,10 +309,7 @@ namespace gpg::gal
      */
     void Device::GetContext(OutputContext* const outContext)
     {
-        outContext->cubeTarget = outputContext_.cubeTarget;
-        outContext->face = outputContext_.face;
-        outContext->surface = outputContext_.surface;
-        outContext->texture = outputContext_.texture;
+        *outContext = outputContext_;
     }
 
     /**

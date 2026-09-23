@@ -15,9 +15,9 @@ namespace gpg
 
 namespace gpg::gal
 {
-  class DepthStencilTargetD3D9;
+  class DepthStencilTarget;
   class IndexBufferD3D9;
-  class RenderTargetD3D9;
+  class RenderTarget;
   class TextureD3D9;
   class VertexBufferD3D9;
   class VertexFormatD3D9;
@@ -398,11 +398,8 @@ namespace moho
      * renderer lanes out of the caller and pushed the three by-value
      * `boost::shared_ptr` arguments to the tail. This declaration follows the
      * shipped layout because the shipped body reads lanes the mangled list does
-     * not contain. The two target handles are typed as the concrete D3D9
-     * implementations the runtime actually carries - `D3D9Interfaces.cpp` models
-     * the same two `OutputContext` lanes as `boost::shared_ptr<RenderTargetD3D9>`
-     * and `boost::shared_ptr<DepthStencilTargetD3D9>` - because the in-repo GAL
-     * headers do not declare `RenderTargetD3D9 : RenderTarget`.
+     * not contain; the two target handles are the gal base types the mangled
+     * name spells.
      */
     void Render(
       unsigned int headIndex,
@@ -412,8 +409,8 @@ namespace moho
       RangeRenderer* rangeRenderer,
       VisionRenderer* visionRenderer,
       BoundaryRenderer* boundaryRenderer,
-      boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget,
-      boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> depthStencilTarget,
+      boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+      boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
       boost::shared_ptr<CD3DPrimBatcher> primBatcher
     );
 
@@ -531,7 +528,7 @@ namespace moho
      * The shipped body is `retn 10h` (0x007D3AB7): link-time code generation
      * moved `this` onto the stack ahead of the two declared arguments.
      */
-    void RenderTerrainStage1(std::int32_t headIndex, boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget);
+    void RenderTerrainStage1(std::int32_t headIndex, boost::shared_ptr<gpg::gal::RenderTarget> colorTarget);
 
     /**
      * Address: 0x007D2CB0 (FUN_007D2CB0)

@@ -28,8 +28,6 @@
 #include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/DepthStencilTargetD3D9.hpp"
-#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
@@ -773,92 +771,6 @@ namespace
   ) noexcept
   {
     return *reinterpret_cast<gpg::gal::EffectD3D9*>(effect.get());
-  }
-
-  /**
-   * Keeps one concrete D3D9 target alive while a `gpg::gal::OutputContext`
-   * lane holds a pointer of the abstract context flavour its header declares.
-   *
-   * The shipped `OutputContext(SurfaceHandle, TextureHandle)` ctor
-   * (0x008E77D0) simply copies the two caller words and bumps the use count -
-   * the D3D9 backend parks a `RenderTargetD3D9` and a
-   * `DepthStencilTargetD3D9` in those two lanes, which is exactly how
-   * `D3D9Interfaces.cpp` models them in `OutputContextD3D9RuntimeView`.
-   * Boost 1.34.1 predates the aliasing `shared_ptr` constructor, so crossing
-   * the two handle flavours reuses the deleter-alias idiom this file already
-   * applies in `Cartographic::GetEffect`.
-   */
-  template <class Owner>
-  struct CartographicTargetAliasDeleter
-  {
-    explicit CartographicTargetAliasDeleter(boost::shared_ptr<Owner> ownerHandle)
-      : owner(ownerHandle)
-    {
-    }
-
-    template <class Aliased>
-    void operator()(Aliased*) const noexcept
-    {
-    }
-
-    boost::shared_ptr<Owner> owner;
-  };
-
-  [[nodiscard]] gpg::gal::OutputContext::SurfaceHandle AsOutputContextSurface(
-    const boost::shared_ptr<gpg::gal::RenderTargetD3D9>& colorTarget
-  )
-  {
-    return gpg::gal::OutputContext::SurfaceHandle(
-      reinterpret_cast<gpg::gal::RenderTargetContext*>(colorTarget.get()),
-      CartographicTargetAliasDeleter<gpg::gal::RenderTargetD3D9>(colorTarget)
-    );
-  }
-
-  [[nodiscard]] gpg::gal::OutputContext::TextureHandle AsOutputContextDepthStencil(
-    const boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9>& depthStencilTarget
-  )
-  {
-    return gpg::gal::OutputContext::TextureHandle(
-      reinterpret_cast<gpg::gal::TextureContext*>(depthStencilTarget.get()),
-      CartographicTargetAliasDeleter<gpg::gal::DepthStencilTargetD3D9>(depthStencilTarget)
-    );
-  }
-
-  /**
-   * Returns the output context one device head renders into.
-   *
-   * `gpg::gal::Device::GetHead2` is slot 7 (+0x1C) and really answers with the
-   * head's `gpg::gal::OutputContext`; the GAL base declaration still spells the
-   * return type `Head*` because that header pair was lifted before the
-   * output-context lane was identified. `moho/render/d3d/CD3DDevice.cpp`
-   * (0x00650, 0x00817) already reads the result the same way.
-   */
-  [[nodiscard]] gpg::gal::OutputContext& CartographicHeadOutputContext(
-    gpg::gal::DeviceD3D9& device,
-    const unsigned int headIndex
-  ) noexcept
-  {
-    return *reinterpret_cast<gpg::gal::OutputContext*>(device.GetHead2(headIndex));
-  }
-
-  /**
-   * Returns the render-target description of one device head.
-   *
-   * The shipped `RenderTerrainStage1` walks
-   * `GetHead2(headIndex)->surface->GetContext()` at 0x007D35C9..0x007D35D1 and
-   * reads `width_` (+0x04) and `height_` (+0x08) off the result. The surface
-   * lane holds the concrete `RenderTargetD3D9` whose slot-1 virtual
-   * `GetContext()` returns that description.
-   */
-  [[nodiscard]] const gpg::gal::RenderTargetContext& CartographicHeadRenderTargetContext(
-    gpg::gal::DeviceD3D9& device,
-    const unsigned int headIndex
-  ) noexcept
-  {
-    gpg::gal::OutputContext& outputContext = CartographicHeadOutputContext(device, headIndex);
-    auto* const renderTarget =
-      reinterpret_cast<gpg::gal::RenderTargetD3D9*>(outputContext.surface.get());
-    return *renderTarget->GetContext();
   }
 
   /**
@@ -2195,12 +2107,14 @@ namespace moho
    */
   void Cartographic::RenderTerrainStage1(
     const std::int32_t headIndex,
-    boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget
+    const boost::shared_ptr<gpg::gal::RenderTarget> colorTarget
   )
   {
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    // 0x007D35C9..0x007D35D1: the head's output context, its colour target, and
+    // that target's creation descriptor (`RenderTarget` slot 1).
     const gpg::gal::RenderTargetContext& headTarget =
-      CartographicHeadRenderTargetContext(*device, static_cast<unsigned int>(headIndex));
+      *device->GetHeadOutputContext(static_cast<unsigned int>(headIndex))->surface->GetContext();
 
     device->Clear(
       true,
@@ -2241,7 +2155,7 @@ namespace moho
 
     frameWidthVar->SetFloat(frameWidth);
     frameHeightVar->SetFloat(frameHeight);
-    frameTextureVar->Func3(colorTarget);
+    frameTextureVar->SetRenderTarget(colorTarget);
 
     const auto passCount = static_cast<unsigned int>(technique->BeginTechnique());
     for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
@@ -2305,9 +2219,9 @@ namespace moho
     RangeRenderer* const rangeRenderer,
     VisionRenderer* const visionRenderer,
     BoundaryRenderer* const boundaryRenderer,
-    boost::shared_ptr<gpg::gal::RenderTargetD3D9> colorTarget,
-    boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> depthStencilTarget,
-    boost::shared_ptr<CD3DPrimBatcher> primBatcher
+    const boost::shared_ptr<gpg::gal::RenderTarget> colorTarget,
+    const boost::shared_ptr<gpg::gal::DepthStencilTarget> depthStencilTarget,
+    const boost::shared_ptr<CD3DPrimBatcher> primBatcher
   )
   {
     const bool previousAlwaysRenderStrategicIcons = ui_AlwaysRenderStrategicIcons;
@@ -2315,7 +2229,7 @@ namespace moho
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
-    gpg::gal::OutputContext& headOutputContext = CartographicHeadOutputContext(*device, headIndex);
+    gpg::gal::OutputContext& headOutputContext = *device->GetHeadOutputContext(headIndex);
     (void)device->ClearTextures();
 
     CWldSession* const session = WLD_GetActiveSession();
@@ -2344,10 +2258,7 @@ namespace moho
     // returns (EH state 3 -> 2 at 0x007D19C8), so it is a full-expression
     // temporary rather than a function-scope local.
     {
-      const gpg::gal::OutputContext cartographicTarget(
-        AsOutputContextSurface(colorTarget),
-        AsOutputContextDepthStencil(depthStencilTarget)
-      );
+      const gpg::gal::OutputContext cartographicTarget(colorTarget, depthStencilTarget);
       device->ClearTarget(&cartographicTarget);
     }
 

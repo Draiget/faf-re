@@ -4,6 +4,7 @@
 
 #include <cstddef>
 
+#include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 
 namespace gpg {
@@ -12,7 +13,7 @@ namespace gal {
      * VFTABLE: 0x00D4300C
      * COL:  0x00E50BE8
      */
-    class CubeRenderTargetD3D10 {
+    class CubeRenderTargetD3D10 : public CubeRenderTarget {
     public:
       /**
        * Address: 0x008F7F30 (FUN_008F7F30)
@@ -40,7 +41,7 @@ namespace gal {
        * What it does:
        * Owns the deleting-destructor path for the wrapper and delegates body cleanup.
        */
-      virtual ~CubeRenderTargetD3D10();
+      ~CubeRenderTargetD3D10() override;
 
       /**
        * Address: 0x008F8020 (FUN_008F8020)
@@ -48,7 +49,7 @@ namespace gal {
        * What it does:
        * Returns the embedded cube-render-target context lane at `this+0x04`.
        */
-      virtual CubeRenderTargetContext* GetContext();
+      CubeRenderTargetContext* GetContext() override;
 
     public:
       CubeRenderTargetContext context_{}; // +0x04

@@ -15,7 +15,7 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
-#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
+#include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
 #include "moho/misc/FileWaitHandleSet.h"
@@ -694,8 +694,7 @@ namespace moho
         ID3DRenderTarget::SurfaceHandle sourceSurfaceForCopy{};
         sourceRenderTarget->GetSurface(sourceSurfaceForCopy);
 
-        gpg::gal::RenderTargetD3D9* sourceTexture = sourceSurfaceForCopy.get();
-        deviceD3D9->CreateRenderTarget(&sourceTexture, &destinationTexture);
+        deviceD3D9->GetRenderTargetData(sourceSurfaceForCopy, destinationTexture);
       }
     }
 

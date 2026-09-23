@@ -1,6 +1,7 @@
 #include "CubeRenderTargetContext.hpp"
 #include "DepthStencilTarget.hpp"
 #include "DepthStencilTargetContext.hpp"
+#include "Device.hpp"
 #include "DeviceContext.hpp"
 #include "DrawContext.hpp"
 #include "EffectContext.hpp"
@@ -8,6 +9,7 @@
 #include "Error.hpp"
 #include "IndexBufferContext.hpp"
 #include "OutputContext.hpp"
+#include "RenderTarget.hpp"
 #include "RenderTargetContext.hpp"
 #include "TextureContext.hpp"
 #include "VertexBuffer.hpp"
@@ -378,14 +380,21 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008E7E90 (FUN_008E7E90)
      * Address: 0x008E7EA0 (FUN_008E7EA0)
      *
      * What it does:
-     * Initializes one abstract depth-stencil target base lane and applies
-     * the base vftable ownership used by derived constructors.
+     * Installs the abstract depth-stencil-target vtable.
      */
     DepthStencilTarget::DepthStencilTarget() = default;
+
+    /**
+     * Address: 0x008E7E90 (FUN_008E7E90)
+     *
+     * What it does:
+     * Reinstalls the abstract depth-stencil-target vtable; the body the
+     * derived constructors' unwind funclets call.
+     */
+    DepthStencilTarget::~DepthStencilTarget() = default;
 
     /**
      * Address: 0x00903B60 (FUN_00903B60)
@@ -546,6 +555,18 @@ namespace gpg::gal
      * non-trivial member resources directly.
      */
     DepthStencilTargetContext::~DepthStencilTargetContext() = default;
+
+    /**
+     * Address: 0x0093F010 (FUN_0093F010)
+     *
+     * What it does:
+     * Creates one depth/stencil target on the active device through its
+     * slot 13 (`[vtbl+0x34]`).
+     */
+    boost::shared_ptr<DepthStencilTarget> DepthStencilTarget::Create(const DepthStencilTargetContext& context)
+    {
+        return Device::GetInstance()->CreateDepthStencilTarget(&context);
+    }
 
     /**
      * Address: 0x008E69B0 (FUN_008E69B0, gpg::gal::DeviceContext::~DeviceContext)
@@ -736,81 +757,65 @@ namespace gpg::gal
     /**
      * Address: 0x008E77B0 (FUN_008E77B0, gpg::gal::OutputContextInit)
      *
-     * IDA signature:
-     * gpg::gal::OutputContext *__thiscall gpg::gal::OutputContextInit(gpg::gal::OutputContext *this);
-     *
      * What it does:
-     * Initializes one output-context payload with null shared-handle lanes;
-     * the scalar `face` lane remains intentionally uninitialized.
+     * Initializes one output context with empty target handles; `face` is
+     * left uninitialized, as the binary leaves it.
      */
     OutputContext::OutputContext()
         : cubeTarget(),
           surface(),
-          texture()
+          depthStencil()
     {
     }
 
     /**
      * Address: 0x008E77D0 (FUN_008E77D0, gpg::gal::OutputContext::OutputContext)
      *
-     * SurfaceHandle,TextureHandle
-     *
-     * IDA signature:
-     * gpg::gal::OutputContext *__userpurge gpg::gal::OutputContext::OutputContext@<eax>(
-     *     gpg::gal::OutputContext *this@<ecx>,
-     *     boost::shared_ptr_D3DSurface a2,
-     *     boost::weak_ptr a3);
-     *
      * What it does:
-     * Initializes one output-context payload, clears cube-target handles, and
-     * copies caller-provided surface/texture handles with retained ownership.
+     * Binds a 2D colour target and its depth/stencil target: copies the two
+     * by-value handles into +0x10 and +0x18, retaining each, and leaves the
+     * cube handle at +0x04 empty.
      */
-    OutputContext::OutputContext(SurfaceHandle surfaceHandle, TextureHandle textureHandle)
+    OutputContext::OutputContext(
+        const boost::shared_ptr<RenderTarget> surface,
+        const boost::shared_ptr<DepthStencilTarget> depthStencil
+    )
         : cubeTarget(),
-          surface(surfaceHandle),
-          texture(textureHandle)
+          surface(surface),
+          depthStencil(depthStencil)
     {
     }
 
     /**
      * Address: 0x008E78C0 (FUN_008E78C0)
      *
-     * CubeTargetHandle,int face,TextureHandle
-     *
-     * IDA signature:
-     * gpg::gal::OutputContext *__userpurge OutputContext::OutputContext@<eax>(
-     *     gpg::gal::OutputContext *this@<ecx>,
-     *     boost::shared_ptr_CubeTarget cubeTarget,
-     *     int face,
-     *     boost::shared_ptr_Texture texture);
-     *
      * What it does:
-     * Initializes one output-context payload with caller-provided cube-target
-     * shared handle, face index selector, and texture shared handle. Retains
-     * ownership of both cube-target and texture counts while the 2D surface
-     * handle is left empty.
+     * Binds face `face` of a cube target plus its depth/stencil target,
+     * leaving the 2D surface handle empty.
      */
-    OutputContext::OutputContext(CubeTargetHandle cubeTargetHandle, std::int32_t face, TextureHandle textureHandle)
-        : cubeTarget(cubeTargetHandle),
+    OutputContext::OutputContext(
+        const boost::shared_ptr<CubeRenderTarget> cubeTarget,
+        const std::int32_t face,
+        const boost::shared_ptr<DepthStencilTarget> depthStencil
+    )
+        : cubeTarget(cubeTarget),
           face(face),
           surface(),
-          texture(textureHandle)
+          depthStencil(depthStencil)
     {
     }
 
     /**
      * Address: 0x00430160 (FUN_00430160)
      *
-     * OutputContext const &
-     *
      * What it does:
-     * Copies one output-context payload and retains shared-handle ownership.
+     * Copies one output context, retaining every target handle.
      */
     OutputContext::OutputContext(const OutputContext& other)
         : cubeTarget(other.cubeTarget),
           face(other.face),
           surface(other.surface),
-          texture(other.texture)
+          depthStencil(other.depthStencil)
     {
     }
 
@@ -819,8 +824,8 @@ namespace gpg::gal
      * Address: 0x008E8250 (FUN_008E8250, scalar/vector deleting-destructor thunk owner)
      *
      * What it does:
-     * Releases retained texture/surface/cube-target shared-handle lanes in
-     * reverse destruction order.
+     * Releases the depth/stencil, surface and cube-target handles in reverse
+     * declaration order.
      */
     OutputContext::~OutputContext() = default;
 
@@ -834,6 +839,18 @@ namespace gpg::gal
      * non-trivial member resources directly.
      */
     RenderTargetContext::~RenderTargetContext() = default;
+
+    /**
+     * Address: 0x008E7A10 (FUN_008E7A10)
+     *
+     * What it does:
+     * Creates one render target on the active device through its slot 11
+     * (`[vtbl+0x2C]`).
+     */
+    boost::shared_ptr<RenderTarget> RenderTarget::Create(const RenderTargetContext& context)
+    {
+        return Device::GetInstance()->CreateRenderTarget(&context);
+    }
 
     /**
      * Address: 0x008E7CC0 (FUN_008E7CC0, __imp_??1TextureContext@gal@gpg@@UAE@XZ)

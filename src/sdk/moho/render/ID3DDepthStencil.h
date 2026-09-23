@@ -4,7 +4,7 @@
 
 namespace gpg::gal
 {
-  class DepthStencilTargetD3D9;
+  class DepthStencilTarget;
 }
 
 namespace moho
@@ -12,7 +12,7 @@ namespace moho
   class ID3DDepthStencil
   {
   public:
-    using SurfaceHandle = boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9>;
+    using SurfaceHandle = boost::shared_ptr<gpg::gal::DepthStencilTarget>;
 
     /**
      * Address: 0x0043F090 (FUN_0043F090, sub_43F090)

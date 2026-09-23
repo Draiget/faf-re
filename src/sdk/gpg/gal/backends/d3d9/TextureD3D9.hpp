@@ -92,14 +92,6 @@ namespace gpg::gal
         virtual void SaveToBuffer(gpg::MemBuffer<char>* outBuffer);
 
         /**
-         * Address: 0x00941270 (FUN_00941270)
-         *
-         * What it does:
-         * Returns the raw location string pointer from the embedded texture context.
-         */
-        const char* GetLocation() const;
-
-        /**
          * Address: 0x0094A0A0 (FUN_0094A0A0)
          *
          * What it does:

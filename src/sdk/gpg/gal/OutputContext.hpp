@@ -1,65 +1,63 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
-#include "gpg/gal/CubeRenderTargetContext.hpp"
-#include "gpg/gal/RenderTargetContext.hpp"
-#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/CubeRenderTarget.hpp"
+#include "gpg/gal/DepthStencilTarget.hpp"
+#include "gpg/gal/RenderTarget.hpp"
 
 namespace gpg::gal
 {
     /**
      * VFTABLE: 0x00D42180
      * COL:     0x00E5EB7C
+     *
+     * Where the device draws: either a 2D colour target (`surface`) or one face
+     * of a cube target (`cubeTarget` + `face`), plus the depth/stencil target
+     * that goes with it. `Device::ClearTarget` binds one; each device head owns
+     * one built around its back buffer.
      */
     class OutputContext
     {
     public:
-        using CubeTargetHandle = boost::shared_ptr<CubeRenderTargetContext>;
-        using SurfaceHandle = boost::shared_ptr<RenderTargetContext>;
-        using TextureHandle = boost::shared_ptr<TextureContext>;
-
         /**
          * Address: 0x008E77B0 (FUN_008E77B0, gpg::gal::OutputContextInit)
          *
          * What it does:
-         * Initializes one output-context payload with null shared-handle lanes
-         * while leaving the scalar `face` lane uninitialized.
+         * Initializes one output context with empty target handles, leaving
+         * `face` uninitialized.
          */
         OutputContext();
 
         /**
          * Address: 0x008E77D0 (FUN_008E77D0)
          *
-         * SurfaceHandle,TextureHandle
-         *
          * What it does:
-         * Initializes one output-context payload, clears cube-target handles,
-         * and retains caller-provided surface/texture handle ownership.
+         * Binds a 2D colour target and its depth/stencil target; the cube
+         * handle stays empty. Both handles arrive by value (`ret 0x10`).
          */
-        OutputContext(SurfaceHandle surfaceHandle, TextureHandle textureHandle);
+        OutputContext(boost::shared_ptr<RenderTarget> surface, boost::shared_ptr<DepthStencilTarget> depthStencil);
 
         /**
          * Address: 0x008E78C0 (FUN_008E78C0)
          *
-         * CubeTargetHandle,int face,TextureHandle
-         *
          * What it does:
-         * Initializes one output-context payload with a caller-provided
-         * cube-render-target handle, face selector, and texture handle while
-         * leaving the 2D surface handle empty. Retains shared ownership for
-         * both cube-target and texture lanes.
+         * Binds one face of a cube target and its depth/stencil target; the 2D
+         * surface handle stays empty. `ret 0x14`: two handles and the face.
          */
-        OutputContext(CubeTargetHandle cubeTargetHandle, std::int32_t face, TextureHandle textureHandle);
+        OutputContext(
+            boost::shared_ptr<CubeRenderTarget> cubeTarget,
+            std::int32_t face,
+            boost::shared_ptr<DepthStencilTarget> depthStencil
+        );
 
         /**
          * Address: 0x00430160 (FUN_00430160)
          *
-         * OutputContext const &
-         *
          * What it does:
-         * Copies one output-context payload and retains shared-handle ownership.
+         * Copies one output context, retaining every target handle.
          */
         OutputContext(const OutputContext& other);
 
@@ -68,16 +66,22 @@ namespace gpg::gal
          * Address: 0x008E8250 (FUN_008E8250)
          *
          * What it does:
-         * Releases retained texture/surface/cube-target shared-handle lanes and
-         * owns the scalar/vector deleting-destructor thunk dispatch path.
+         * Releases the three target handles; 0x008E8250 is the scalar/vector
+         * deleting destructor.
          */
         virtual ~OutputContext();
 
-        CubeTargetHandle cubeTarget;  // +0x04
-        std::int32_t face;            // +0x0C
-        SurfaceHandle surface;        // +0x10
-        TextureHandle texture;        // +0x18
+        OutputContext& operator=(const OutputContext&) = default;
+
+        boost::shared_ptr<CubeRenderTarget> cubeTarget;     // +0x04
+        std::int32_t face;                                  // +0x0C
+        boost::shared_ptr<RenderTarget> surface;            // +0x10
+        boost::shared_ptr<DepthStencilTarget> depthStencil; // +0x18
     };
 
+    static_assert(offsetof(OutputContext, cubeTarget) == 0x04, "OutputContext::cubeTarget offset must be 0x04");
+    static_assert(offsetof(OutputContext, face) == 0x0C, "OutputContext::face offset must be 0x0C");
+    static_assert(offsetof(OutputContext, surface) == 0x10, "OutputContext::surface offset must be 0x10");
+    static_assert(offsetof(OutputContext, depthStencil) == 0x18, "OutputContext::depthStencil offset must be 0x18");
     static_assert(sizeof(OutputContext) == 0x20, "OutputContext size must be 0x20");
 }

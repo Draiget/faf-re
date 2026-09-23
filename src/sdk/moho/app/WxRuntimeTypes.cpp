@@ -73548,7 +73548,9 @@ void moho::WRenViewport::RenderCompositeTerrain(TerrainCommon* const terrain)
               continue;
             }
             (void)std::snprintf(path, sizeof(path), "%s\\composite_lock%d_head%d.bmp", dir, lock, runtime->mHead);
-            const long hr = gpg::gal::DebugSaveSurfaceToFileA(path, 0U, surface->GetSurface());
+            const long hr = gpg::gal::DebugSaveSurfaceToFileA(
+              path, 0U, static_cast<gpg::gal::RenderTargetD3D9*>(surface.get())->GetSurface()
+            );
             gpg::Warnf("[NORMALSDUMP] lock=%d head=%d -> %s hr=0x%08lX", lock, runtime->mHead, path, hr);
           }
         }

@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/gal/RenderTargetContext.hpp"
-#include "gpg/gal/backends/d3d9/RenderTargetD3D9.hpp"
+#include "gpg/gal/RenderTarget.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/render/ID3DRenderTarget.h"
 
@@ -28,7 +28,7 @@ namespace moho
     /**
      * Address: 0x0043EC60 (FUN_0043EC60)
      *
-     * CD3DDevice *,boost::shared_ptr<gpg::gal::RenderTargetD3D9>
+     * CD3DDevice *,boost::shared_ptr<gpg::gal::RenderTarget>
      *
      * What it does:
      * Initializes intrusive-list links, stores owner lane, and captures one
@@ -57,7 +57,7 @@ namespace moho
     /**
      * Address: 0x0043EFC0 (FUN_0043EFC0)
      *
-     * boost::shared_ptr<gpg::gal::RenderTargetD3D9> &
+     * boost::shared_ptr<gpg::gal::RenderTarget> &
      *
      * What it does:
      * Copies retained render-surface ownership into caller storage.

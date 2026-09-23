@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/gal/CubeRenderTarget.hpp"
 #include "gpg/gal/CubeRenderTargetContext.hpp"
 
 namespace gpg::gal
@@ -10,7 +11,7 @@ namespace gpg::gal
      * VFTABLE: 0x00D47CB4
      * COL:  0x00E531E8
      */
-    class CubeRenderTargetD3D9
+    class CubeRenderTargetD3D9 : public CubeRenderTarget
     {
     public:
         /**
@@ -37,7 +38,7 @@ namespace gpg::gal
          * What it does:
          * Owns the deleting-destructor path and delegates to cube-target teardown helpers.
          */
-        virtual ~CubeRenderTargetD3D9();
+        ~CubeRenderTargetD3D9() override;
 
         /**
          * Address: 0x00941240 (FUN_00941240)
@@ -45,7 +46,7 @@ namespace gpg::gal
          * What it does:
          * Returns the embedded cube render-target context lane at `this+0x04`.
          */
-        virtual CubeRenderTargetContext* GetContext();
+        CubeRenderTargetContext* GetContext() override;
 
         /**
          * Address: 0x009414D0 (FUN_009414D0)
@@ -56,6 +57,17 @@ namespace gpg::gal
          * Validates one cube face index and returns its retained native face surface.
          */
         void* GetSurface(int face) const;
+
+        /**
+         * Address: 0x00941270 (FUN_00941270)
+         *
+         * What it does:
+         * Returns the retained `IDirect3DCubeTexture9*` at `this+0x10`. Its
+         * callers are `DeviceD3D9::SaveCubeRenderTarget` (the DDS dump) and
+         * the effect variable's cube-target setter at 0x00944630, which hands
+         * it to `ID3DXEffect::SetTexture`.
+         */
+        void* GetTexture() const;
 
     public:
         CubeRenderTargetContext context_{}; // +0x04

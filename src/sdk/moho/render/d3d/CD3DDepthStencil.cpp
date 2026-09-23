@@ -1,8 +1,5 @@
 #include "CD3DDepthStencil.h"
 
-#include "gpg/gal/Device.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-
 namespace moho
 {
   /**
@@ -22,7 +19,7 @@ namespace moho
   /**
    * Address: 0x0043F0A0 (FUN_0043F0A0)
    *
-   * CD3DDevice *,boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9>
+   * CD3DDevice *,boost::shared_ptr<gpg::gal::DepthStencilTarget>
    *
    * What it does:
    * Initializes intrusive-list links, stores owner lane, and captures one
@@ -65,7 +62,7 @@ namespace moho
   /**
    * Address: 0x0043F3E0 (FUN_0043F3E0)
    *
-   * boost::shared_ptr<gpg::gal::DepthStencilTargetD3D9> &
+   * boost::shared_ptr<gpg::gal::DepthStencilTarget> &
    *
    * What it does:
    * Copies retained depth-stencil surface ownership into caller storage.
@@ -89,13 +86,14 @@ namespace moho
 
   /**
    * Address: 0x0043F230 (FUN_0043F230, sub_43F230)
+   *
+   * What it does:
+   * Recreates the surface from the retained context through
+   * `gpg::gal::DepthStencilTarget::Create` (0x0093F010).
    */
   bool CD3DDepthStencil::RecreateFromContext()
   {
-    SurfaceHandle recreatedSurface{};
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    device->CreateDepthStencilTarget(&recreatedSurface, &mDepthContext);
-    mSurface = recreatedSurface;
+    mSurface = gpg::gal::DepthStencilTarget::Create(mDepthContext);
     return true;
   }
 

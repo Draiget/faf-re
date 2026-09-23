@@ -6,11 +6,15 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/OutputContext.hpp"
+#include "legacy/containers/String.h"
 
 namespace gpg::gal
 {
   class Device;
+  class CubeRenderTargetContext;
+  class DepthStencilTargetContext;
   class DeviceContext;
+  class RenderTargetContext;
   class Effect;
   class CursorContext;
   class EffectContext;
@@ -36,9 +40,10 @@ namespace gpg::gal
    * `virtual void purecallN() {}` placeholder. `DeviceD3D9` declares the real
    * method at each of those positions, but a different name/signature does not
    * override - the compiler appends the backend method past this class's 50
-   * slots, and the placeholder stays at the indexed slot. `DeviceD3D9`'s vtable
-   * is therefore 71 entries where the binary has 50, and slots
-   * 5, 8, 10-24, 32, 40-42 hold these do-nothing stubs.
+   * slots, and the placeholder stays at the indexed slot. The slots still
+   * written that way are 5, 8, 10, 14-17, 19, 22, 32 and 40-42; slots 6-7,
+   * 11-13, 18, 20-21 and 23-24 carry their real signatures and `DeviceD3D9`
+   * overrides them.
    *
    * That is inert for a normal `deviceD3D9->Method()` call (it binds to the
    * appended slot and reaches the right body) but fatal two ways for anything
@@ -56,10 +61,11 @@ namespace gpg::gal
    * onto this class the way slot 9 (`CreateEffect`) already does.
    *
    * The full repair is to give every `purecallN` its real signature so the
-   * backend genuinely overrides and the vtable is 50 entries again. That needs
-   * the D3D9 wrapper types (`TextureD3D9`, `PipelineStateD3D9`, ...) to derive
-   * from their GAL base interfaces first, since the base cannot name backend
-   * types; none of them do today. Tracked as debt, not attempted here.
+   * backend genuinely overrides and the vtable is 50 entries again. Each slot
+   * needs its resource type's gal interface first, since the base cannot name
+   * backend types: the render targets have theirs (`RenderTarget`,
+   * `CubeRenderTarget`, `DepthStencilTarget`); `Texture`, the buffers, the
+   * vertex format and the pipeline state are still skeletons.
    *
    * `DeviceD3D10` does not derive from this class at all, so it is unaffected.
    */
@@ -146,9 +152,11 @@ namespace gpg::gal
      * DeviceD3D9 overrides it at the same index)
      *
      * What it does:
-     * Per-call pre-hook every backend entry point runs first.
+     * Per-call pre-hook every backend entry point runs first. It is `const`:
+     * the const `GetHeadOutputContext` overload (slot 6, 0x008EABF0) calls it
+     * too. Both shipped backends leave it empty.
      */
-    virtual void Func1() = 0;
+    virtual void Func1() const = 0;
     /**
      * Address: 0x00A82547
      * Slot: 5
@@ -156,21 +164,28 @@ namespace gpg::gal
      */
     virtual void purecall5() {}
     /**
-     * Slot: 6 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Returns one head descriptor by index.
+     * Returns the output context of head `headIndex` - its back-buffer colour
+     * target and depth/stencil target - or throws "invalid head index
+     * specified".
+     *
+     * Slots 6 and 7 are one overloaded name. MSVC lays overloaded virtuals out
+     * in reverse declaration order, so the non-const overload, declared first,
+     * lands in slot 7; `DeviceD3D9` defines it first too (its throw is
+     * `DeviceD3D9.cpp` line 295, the const one's line 303). Moho calls slot 7
+     * on a non-const `Device*` (0x0042E3BE in `CD3DDeviceSingleton::InitContext`,
+     * 0x0042DD28 in `CD3DDevice::SetRenViewport`).
      */
-    virtual Head* GetHead1(unsigned int headIndex) = 0;
+    virtual OutputContext* GetHeadOutputContext(unsigned int headIndex) = 0;
     /**
-     * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 6 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Returns one head output context by index.
+     * The const overload of slot 7; identical body.
      */
-    virtual Head* GetHead2(unsigned int headIndex) = 0;
+    virtual const OutputContext* GetHeadOutputContext(unsigned int headIndex) const = 0;
     /**
      * Address: 0x00A82547
      * Slot: 8
@@ -207,23 +222,28 @@ namespace gpg::gal
      */
     virtual void purecall10() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 11
-     * Demangled: _purecall
+     * Slot: 11 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one colour render target described by `context`.
      */
-    virtual void purecall11() {}
+    virtual boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 12
-     * Demangled: _purecall
+     * Slot: 12 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one six-face cube render target described by `context`.
      */
-    virtual void purecall12() {}
+    virtual boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 13
-     * Demangled: _purecall
+     * Slot: 13 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one depth/stencil target described by `context`.
      */
-    virtual void purecall13() {}
+    virtual boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(
+      const DepthStencilTargetContext* context
+    ) = 0;
     /**
      * Address: 0x00A82547
      * Slot: 14
@@ -249,11 +269,20 @@ namespace gpg::gal
      */
     virtual void purecall17() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 18
-     * Demangled: _purecall
+     * Slot: 18 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Copies (and scales) a rectangle of one colour target into another.
+     * `CD3DDevice::SetViewRect` (0x0042FEB0) dispatches it as `[vtbl+0x48]`,
+     * passing the addresses of the two `shared_ptr` temporaries its
+     * `GetSurface` calls returned.
      */
-    virtual void purecall18() {}
+    virtual void StretchRect(
+      const boost::shared_ptr<RenderTarget>& source,
+      const boost::shared_ptr<RenderTarget>& destination,
+      const RECT* sourceRect,
+      const RECT* destinationRect
+    ) = 0;
     /**
      * Address: 0x00A82547
      * Slot: 19
@@ -261,17 +290,27 @@ namespace gpg::gal
      */
     virtual void purecall19() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 20
-     * Demangled: _purecall
+     * Slot: 20 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Writes one cube render target to `filePath` as a DDS file.
      */
-    virtual void purecall20() {}
+    virtual void SaveCubeRenderTarget(
+      const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
+      const msvc8::string& filePath
+    ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 21
-     * Demangled: _purecall
+     * Slot: 21 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Writes one colour target's surface to `filePath` in image format
+     * `fileFormat`.
      */
-    virtual void purecall21() {}
+    virtual void SaveRenderTarget(
+      const boost::shared_ptr<RenderTarget>& renderTarget,
+      const msvc8::string& filePath,
+      int fileFormat
+    ) = 0;
     /**
      * Address: 0x00A82547
      * Slot: 22

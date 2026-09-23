@@ -2,6 +2,7 @@
 
 #include <cstddef>
 
+#include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 
 namespace gpg::gal
@@ -10,7 +11,7 @@ namespace gpg::gal
      * VFTABLE: 0x00D42EBC
      * COL:  0x00E50A68
      */
-    class RenderTargetD3D9
+    class RenderTargetD3D9 : public RenderTarget
     {
     public:
         /**
@@ -51,7 +52,7 @@ namespace gpg::gal
          * What it does:
          * Owns the deleting-destructor path and delegates to render-target teardown helpers.
          */
-        virtual ~RenderTargetD3D9();
+        ~RenderTargetD3D9() override;
 
         /**
          * Address: 0x008F52C0 (FUN_008F52C0)
@@ -59,7 +60,7 @@ namespace gpg::gal
          * What it does:
          * Returns the embedded render-target context lane at `this+0x04`.
          */
-        virtual RenderTargetContext* GetContext();
+        RenderTargetContext* GetContext() override;
 
         /**
          * Address: 0x008F52D0 (FUN_008F52D0, Moho::D3DSurface::GetSurface)
@@ -93,9 +94,9 @@ namespace gpg::gal
          * What it does:
          * Returns a GDI device context for the retained render surface -
          * `IDirect3DSurface9::GetDC` (vtable slot 15) on the `this+0x14`
-         * lane. Reached only through vtable slot 2 (`0x00D42EC4`).
+         * lane - or null when there is no surface.
          */
-        virtual void* GetSurfaceDC();
+        HDC GetDC() override;
 
         /**
          * Address: 0x008F5500 (FUN_008F5500)
