@@ -37,7 +37,7 @@ namespace
    * fill, then deserializes each tracked pointer lane through
    * `ReadArchive::ReadPointer_IFormationInstance`. The resize call
    * (`FUN_0059CE20`) is a separate compiler-emitted inline clone of
-   * `gpg::FastVectorRuntimeResizeFill` specialized for 4-byte pointer
+   * `gpg::core::FastVectorInline<T>::ResizeFill_` specialized for 4-byte pointer
    * elements -- see `FastVector.h`'s `Resize()` citation, which documents the
    * same address for this exact specialization.
    */

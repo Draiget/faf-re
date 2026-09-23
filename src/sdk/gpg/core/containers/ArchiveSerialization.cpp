@@ -980,7 +980,7 @@ namespace gpg
   // `SaveFastVectorCPathPoint` here, wrongly claiming Address: 0x005B4FF0.
   // The real 0x005B4FF0 body (confirmed against the .c/.asm: a direct
   // `(end-begin)/28` count with a plain per-element `WriteArchive::Write`
-  // loop, no `AsFastVectorRuntimeView`/`SaveContiguousArchiveVectorPayload`
+  // loop, no a runtime-view overlay / `SaveContiguousArchiveVectorPayload`
   // calls anywhere) is `moho`-anonymous-namespace `SaveFastVectorCPathPoint`
   // in CAiPathSpline.cpp, which is also the one actually wired into
   // `FastVectorCPathPointTypeInfo::Init()`'s `serSaveFunc_`. This orphan

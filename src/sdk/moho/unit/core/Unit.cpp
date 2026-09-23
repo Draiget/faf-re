@@ -11016,7 +11016,7 @@ namespace
   }
 
   /**
-   * Instantiates `gpg::FastVectorRuntimeCopyAssign<T>` per element type. For
+   * Instantiates `gpg::core::FastVectorInline<T>::AssignFrom` per element type. For
    * `SSTIUnitWeaponInfoSnapshot` (0x98 bytes) that emission is the copy-assign
    * body (FUN_00561D90), whose element-wise copy loop the binary emitted twice
    * as byte-identical ICF twins (FUN_0055E900) and (FUN_00562990), with the

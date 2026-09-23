@@ -248,8 +248,8 @@ namespace moho
      *
      * This is the array's own operation. It was previously performed from
      * outside by `ResizePoseBoneStorage`, which reinterpreted the four header
-     * pointers below as a `gpg::fastvector_runtime_view` and handed them to
-     * `FastVectorRuntimeResizeFill` -- the `AsFastVectorRuntimeView` reach-in
+     * pointers below as a runtime-view overlay and handed them to
+     * a free resize-fill helper -- the reach-in
      * that CLAUDE.md RULE ONE prohibits. The mechanics are unchanged; they just
      * live on the type that owns the pointers.
      *
@@ -260,7 +260,7 @@ namespace moho
      * outgoing capacity sentinel into that now-dead inline slot instead of
      * deleting anything (see `InlineCapacityFromHeader_` / `SaveInlineCapacity_`
      * on the `gpg` fastvectors, and the same branch in
-     * `FastVectorRuntimeReallocateInsert`).
+     * `gpg::core::FastVectorInline<T>::ReallocateInsert_`).
      */
     void resize(const std::size_t count, const CAniPoseBone& fillValue)
     {

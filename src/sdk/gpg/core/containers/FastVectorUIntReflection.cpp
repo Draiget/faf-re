@@ -473,9 +473,9 @@ namespace
     const unsigned int fill = 0;
     gpg::FastVectorUIntResize(&fill, count, storage);
 
-    auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadUInt(view.ElementAtUnchecked(i));
+      archive->ReadUInt(elements.Data() + (i));
     }
   }
 
@@ -494,11 +494,11 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->WriteUInt(*view.ElementAtUnchecked(i));
+      archive->WriteUInt(*elements.Data() + (i));
     }
   }
 
@@ -652,9 +652,9 @@ namespace
    */
   [[nodiscard]] unsigned int FastVectorFloatResize(const float* fillValue, const unsigned int newSize, void* objectStorage)
   {
-    auto& view = gpg::AsFastVectorRuntimeView<float>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
-    return static_cast<unsigned int>(view.begin ? (view.end - view.begin) : 0u);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<float>*>(objectStorage);
+    elements.resize(newSize, *fillValue);
+    return static_cast<unsigned int>(elements.Size());
   }
 
   /**
@@ -678,9 +678,9 @@ namespace
     const float fill = 0.0f;
     FastVectorFloatResize(&fill, count, storage);
 
-    auto& view = gpg::AsFastVectorRuntimeView<float>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<float>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadFloat(view.ElementAtUnchecked(i));
+      archive->ReadFloat(elements.Data() + (i));
     }
   }
 
@@ -699,11 +699,11 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<float>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<float>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->WriteFloat(*view.ElementAtUnchecked(i));
+      archive->WriteFloat(*elements.Data() + (i));
     }
   }
 
@@ -742,8 +742,8 @@ namespace
 
   void FastVectorStringResize(const msvc8::string* fillValue, const unsigned int newSize, void* objectStorage)
   {
-    auto& view = gpg::AsFastVectorRuntimeView<msvc8::string>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<msvc8::string>*>(objectStorage);
+    elements.resize(newSize, *fillValue);
   }
 
   /**
@@ -768,9 +768,9 @@ namespace
     const msvc8::string fill{};
     FastVectorStringResize(&fill, count, storage);
 
-    auto& view = gpg::AsFastVectorRuntimeView<msvc8::string>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<msvc8::string>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->ReadString(view.ElementAtUnchecked(i));
+      archive->ReadString(elements.Data() + (i));
     }
   }
 
@@ -790,11 +790,11 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<msvc8::string>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<msvc8::string>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->WriteString(const_cast<msvc8::string*>(view.ElementAtUnchecked(i)));
+      archive->WriteString(const_cast<msvc8::string*>(elements.Data() + (i)));
     }
   }
 
@@ -995,11 +995,7 @@ namespace
   void SetFastVectorUnitWeaponInfoCount(void* const vector, const int count)
   {
     moho::UnitWeaponInfo fill;
-    gpg::FastVectorRuntimeResizeFill<moho::UnitWeaponInfo>(
-      &fill,
-      static_cast<unsigned int>(count),
-      gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(vector)
-    );
+    static_cast<gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(vector)->resize(static_cast<unsigned int>(count), fill);
   }
 
   /**
@@ -1052,8 +1048,8 @@ namespace
 
   void FastVectorVector3fResize(const Wm3::Vector3f* fillValue, const unsigned int newSize, void* objectStorage)
   {
-    auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<Wm3::Vector3f>*>(objectStorage);
+    elements.resize(newSize, *fillValue);
   }
 
   /**
@@ -1069,8 +1065,8 @@ namespace
     void* objectStorage
   )
   {
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(objectStorage);
-    gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(objectStorage);
+    elements.resize(newSize, *fillValue);
   }
 
   /**
@@ -1096,11 +1092,11 @@ namespace
     const Wm3::Vector3f fill{};
     FastVectorVector3fResize(&fill, count, storage);
 
-    auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<Wm3::Vector3f>*>(storage);
     gpg::RType* const vector3Type = CachedVector3fType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(vector3Type, view.ElementAtUnchecked(i), owner);
+      archive->Read(vector3Type, elements.Data() + (i), owner);
     }
   }
 
@@ -1135,9 +1131,9 @@ namespace
 
     gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(attachInfoType, view.ElementAtUnchecked(i), owner);
+      archive->Read(attachInfoType, elements.Data() + (i), owner);
     }
   }
 
@@ -1157,14 +1153,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<Wm3::Vector3f>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
     gpg::RType* const vector3Type = CachedVector3fType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(vector3Type, view.ElementAtUnchecked(i), owner);
+      archive->Write(vector3Type, elements.Data() + (i), owner);
     }
   }
 
@@ -1189,14 +1185,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
     gpg::RType* const attachInfoType = CachedSSTIEntityAttachInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(attachInfoType, view.ElementAtUnchecked(i), owner);
+      archive->Write(attachInfoType, elements.Data() + (i), owner);
     }
   }
 
@@ -1233,18 +1229,14 @@ namespace
 
     {
       moho::UnitWeaponInfo fill;
-      gpg::FastVectorRuntimeResizeFill<moho::UnitWeaponInfo>(
-        &fill,
-        count,
-        gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(storage)
-      );
+      static_cast<gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(storage)->resize(count, fill);
     }
 
     gpg::RType* const weaponInfoType = CachedUnitWeaponInfoType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(weaponInfoType, view.ElementAtUnchecked(i), owner);
+      archive->Read(weaponInfoType, elements.Data() + (i), owner);
     }
   }
 } // namespace
@@ -1277,8 +1269,8 @@ void gpg::register_RFastVectorType_uint()
  */
 void gpg::FastVectorUIntResize(const unsigned int* fillValue, const unsigned int newSize, void* objectStorage)
 {
-  auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(objectStorage);
-  gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(objectStorage);
+  elements.resize(newSize, *fillValue);
 }
 
 /**
@@ -1290,8 +1282,8 @@ void gpg::FastVectorUIntResize(const unsigned int* fillValue, const unsigned int
  */
 void gpg::FastVectorSOCellPosResize(const moho::SOCellPos* fillValue, const unsigned int newSize, void* objectStorage)
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(objectStorage);
-  gpg::FastVectorRuntimeResizeFill(fillValue, newSize, view);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SOCellPos>*>(objectStorage);
+  elements.resize(newSize, *fillValue);
 }
 
 /**
@@ -1364,18 +1356,18 @@ gpg::RRef gpg::RFastVectorType<unsigned int>::SubscriptIndex(void* obj, const in
     return out;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(obj);
-  GPG_ASSERT(view.Data() != nullptr);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(obj);
+  GPG_ASSERT(elements.Data() != nullptr);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
   out.mType = CachedUIntType();
-  if (ind < 0 || !view.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
   }
 
-  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  out.mObj = elements.Data() + (static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -1388,11 +1380,11 @@ size_t gpg::RFastVectorType<unsigned int>::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(obj);
-  if (!view.Data()) {
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(obj);
+  if (!elements.Data()) {
     return 0u;
   }
-  return view.Size();
+  return elements.Size();
 }
 
 /**
@@ -1535,18 +1527,18 @@ gpg::RRef gpg::RFastVectorType<float>::SubscriptIndex(void* obj, const int ind) 
     return out;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<float>(obj);
-  GPG_ASSERT(view.Data() != nullptr);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<float>*>(obj);
+  GPG_ASSERT(elements.Data() != nullptr);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
   out.mType = CachedFloatType();
-  if (ind < 0 || !view.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
   }
 
-  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  out.mObj = elements.Data() + (static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -1562,11 +1554,11 @@ size_t gpg::RFastVectorType<float>::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<float>(obj);
-  if (!view.Data()) {
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<float>*>(obj);
+  if (!elements.Data()) {
     return 0u;
   }
-  return view.Size();
+  return elements.Size();
 }
 
 /**
@@ -1689,9 +1681,9 @@ void gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SSTIEntityAttachInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  gpg::RRef_SSTIEntityAttachInfo(&out, elements.Data() + (static_cast<std::size_t>(ind)));
   return out;
 }
 
@@ -1704,8 +1696,8 @@ gpg::RRef gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::SubscriptIndex(void*
  */
 size_t gpg::RFastVectorType<moho::SSTIEntityAttachInfo>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<moho::SSTIEntityAttachInfo>(obj);
-  return view.Size();
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::SSTIEntityAttachInfo>*>(obj);
+  return elements.Size();
 }
 
 /**
@@ -1825,9 +1817,9 @@ void gpg::RFastVectorType<moho::UnitWeaponInfo>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::UnitWeaponInfo>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_UnitWeaponInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  gpg::RRef_UnitWeaponInfo(&out, elements.Data() + (static_cast<std::size_t>(ind)));
   return out;
 }
 
@@ -1840,8 +1832,8 @@ gpg::RRef gpg::RFastVectorType<moho::UnitWeaponInfo>::SubscriptIndex(void* obj, 
  */
 size_t gpg::RFastVectorType<moho::UnitWeaponInfo>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<moho::UnitWeaponInfo>(obj);
-  return view.Size();
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::UnitWeaponInfo>*>(obj);
+  return elements.Size();
 }
 
 /**
@@ -1957,9 +1949,9 @@ void gpg::RFastVectorType<moho::SOffsetInfo>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::SOffsetInfo>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SOffsetInfo>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SOffsetInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  gpg::RRef_SOffsetInfo(&out, elements.Data() + (static_cast<std::size_t>(ind)));
   return out;
 }
 
@@ -1971,8 +1963,8 @@ gpg::RRef gpg::RFastVectorType<moho::SOffsetInfo>::SubscriptIndex(void* obj, con
  */
 size_t gpg::RFastVectorType<moho::SOffsetInfo>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<moho::SOffsetInfo>(obj);
-  return view.Size();
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::SOffsetInfo>*>(obj);
+  return elements.Size();
 }
 
 /**
@@ -2083,9 +2075,9 @@ void gpg::RFastVectorType<moho::SAssignedLocInfo>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::SAssignedLocInfo>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<moho::SAssignedLocInfo>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SAssignedLocInfo(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  gpg::RRef_SAssignedLocInfo(&out, elements.Data() + (static_cast<std::size_t>(ind)));
   return out;
 }
 
@@ -2098,8 +2090,8 @@ gpg::RRef gpg::RFastVectorType<moho::SAssignedLocInfo>::SubscriptIndex(void* obj
  */
 size_t gpg::RFastVectorType<moho::SAssignedLocInfo>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<moho::SAssignedLocInfo>(obj);
-  return view.Size();
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<moho::SAssignedLocInfo>*>(obj);
+  return elements.Size();
 }
 
 /**
@@ -2236,18 +2228,18 @@ gpg::RRef gpg::RFastVectorType<msvc8::string>::SubscriptIndex(void* obj, const i
     return out;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<msvc8::string>(obj);
-  GPG_ASSERT(view.Data() != nullptr);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<msvc8::string>*>(obj);
+  GPG_ASSERT(elements.Data() != nullptr);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
   out.mType = CachedStringType();
-  if (ind < 0 || !view.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
   }
 
-  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  out.mObj = elements.Data() + (static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -2264,11 +2256,11 @@ size_t gpg::RFastVectorType<msvc8::string>::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<msvc8::string>(obj);
-  if (!view.Data()) {
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<msvc8::string>*>(obj);
+  if (!elements.Data()) {
     return 0u;
   }
-  return view.Size();
+  return elements.Size();
 }
 
 /**
@@ -2409,18 +2401,18 @@ gpg::RRef gpg::RFastVectorType<Wm3::Vector3f>::SubscriptIndex(void* obj, const i
     return out;
   }
 
-  auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(obj);
-  GPG_ASSERT(view.Data() != nullptr);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<Wm3::Vector3f>*>(obj);
+  GPG_ASSERT(elements.Data() != nullptr);
   GPG_ASSERT(static_cast<std::size_t>(ind) < GetCount(obj));
 
   gpg::RRef out{};
   out.mType = CachedVector3fType();
-  if (ind < 0 || !view.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
+  if (ind < 0 || !elements.Data() || static_cast<std::size_t>(ind) >= GetCount(obj)) {
     out.mObj = nullptr;
     return out;
   }
 
-  out.mObj = view.ElementAtUnchecked(static_cast<std::size_t>(ind));
+  out.mObj = elements.Data() + (static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -2433,11 +2425,11 @@ size_t gpg::RFastVectorType<Wm3::Vector3f>::GetCount(void* obj) const
     return 0u;
   }
 
-  const auto& view = gpg::AsFastVectorRuntimeView<Wm3::Vector3f>(obj);
-  if (!view.Data()) {
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<Wm3::Vector3f>*>(obj);
+  if (!elements.Data()) {
     return 0u;
   }
-  return view.Size();
+  return elements.Size();
 }
 
 /**

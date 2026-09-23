@@ -58,9 +58,9 @@ namespace
 
     gpg::RType* const soCellPosType = CachedSOCellPosType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
+    auto& cells = *static_cast<gpg::core::FastVectorInline<moho::SOCellPos>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(soCellPosType, view.ElementAtUnchecked(i), owner);
+      archive->Read(soCellPosType, cells.Data() + i, owner);
     }
   }
 
@@ -80,14 +80,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& cells = *static_cast<const gpg::core::FastVectorInline<moho::SOCellPos>*>(storage);
+    const unsigned int count = cells.Data() ? static_cast<unsigned int>(cells.Size()) : 0u;
     archive->WriteUInt(count);
 
     gpg::RType* const soCellPosType = CachedSOCellPosType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(soCellPosType, view.ElementAtUnchecked(i), owner);
+      archive->Write(soCellPosType, cells.Data() + i, owner);
     }
   }
 
@@ -203,9 +203,9 @@ void gpg::RFastVectorType<moho::SOCellPos>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::SOCellPos>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(obj);
+  auto& cells = *static_cast<gpg::core::FastVectorInline<moho::SOCellPos>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_SOCellPos(&out, view.ElementAtUnchecked(static_cast<std::size_t>(ind)));
+  gpg::RRef_SOCellPos(&out, cells.Data() + static_cast<std::size_t>(ind));
   return out;
 }
 
@@ -214,8 +214,8 @@ gpg::RRef gpg::RFastVectorType<moho::SOCellPos>::SubscriptIndex(void* obj, const
  */
 size_t gpg::RFastVectorType<moho::SOCellPos>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<moho::SOCellPos>(obj);
-  return view.Size();
+  const auto& cells = *static_cast<const gpg::core::FastVectorInline<moho::SOCellPos>*>(obj);
+  return cells.Size();
 }
 
 /**

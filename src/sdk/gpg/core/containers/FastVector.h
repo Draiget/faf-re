@@ -9,34 +9,6 @@
 #include <new>
 #include <type_traits>
 
-namespace gpg
-{
-  // Forward declarations so gpg::core::FastVectorN's inline members can name the
-  // runtime-view resize helpers (defined later in this header, in namespace gpg).
-  template <class T>
-  struct fastvector_runtime_view;
-
-  template <class T>
-  fastvector_runtime_view<T>& AsFastVectorRuntimeView(void* object) noexcept;
-
-  template <class T>
-  void FastVectorRuntimeResizeFill(const T* fillValue, const unsigned int newSize, fastvector_runtime_view<T>& view);
-
-  template <class T>
-  [[nodiscard]] const fastvector_runtime_view<T>& AsFastVectorRuntimeView(const void* object) noexcept;
-
-  template <class T>
-  fastvector_runtime_view<T>*
-  FastVectorRuntimeCopyAssign(fastvector_runtime_view<T>& destination, const fastvector_runtime_view<T>& source);
-
-  template <class T>
-  [[nodiscard]] T*
-  FastVectorRuntimeInsertRange(fastvector_runtime_view<T>& view, T* insertPos, const T* sourceBegin, const T* sourceEnd);
-
-  template <class T>
-  std::size_t FastVectorRuntimeEnsureCapacity(std::size_t requiredCount, fastvector_runtime_view<T>& view);
-} // namespace gpg
-
 namespace gpg::core
 {
   namespace detail
@@ -343,9 +315,35 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x00402C20 (FUN_00402C20)
+     * Address: 0x00710F70 (FUN_00710F70, the `moho::SCondition` emission --
+     * emitted transitively via the insert lane from the CArmyStats
+     * trigger-condition append)
+     * Address: 0x0054D790 (FUN_0054D790, the `Moho::CAniPoseBone` emission --
+     * that element has a user-declared copy ctor, so the reallocate path
+     * copy-constructs rather than relocating bitwise)
+     * Address: 0x0054DF50 (FUN_0054DF50, the forward copy-assign range lane for
+     * the same element, used to rewind mLast after a shrink)
+     * Address: 0x005625D0 (FUN_005625D0, the generic 4-byte emission for
+     * `fastvector<WeakPtr<CUnitCommand>>`, reached from the reallocate-insert
+     * instantiation cited on `FastVectorInline<T>::ReallocateInsert_` at
+     * 0x00562350)
+     *
      * Copy-constructs `[first, last)` into the raw storage at `dest` and returns
      * the advanced cursor (`_Ucopy`). Advances without writing when `dest` is
      * null, matching the binary's null-guarded lanes.
+     *
+     * This is the *uninitialised*-copy lane: every call site writes past `end_`,
+     * or into storage `ReallocateInsert_` has just allocated. The destination
+     * has therefore never run a constructor, so the elements must be constructed
+     * here and never assigned. The `SCondition` emission (FUN_00710F70) shows
+     * this explicitly -- it self-links the destination's inline sentinel
+     * (`[dst+0x18..0x24] = dst+0x28`) before copying into it. Assigning instead
+     * would run `BVIntSet::operator=` over garbage and `delete[]` an
+     * uninitialised pointer.
+     *
+     * For trivially-copyable `T` this collapses to the same plain element store
+     * the generic 4-byte emission (FUN_00402C20) performs.
      */
     template <class T>
     inline T* ConstructRangeForward(T* dest, const T* first, const T* const last)
@@ -381,6 +379,28 @@ namespace gpg::core
     {
       auto b = reinterpret_cast<std::byte*>(base);
       return reinterpret_cast<T*>(b + idx * elem_);
+    }
+
+    /**
+     * Overwrite the first `count` already-live slots from `source`. VC8 emits a
+     * block move for a POD lane and an element-wise assignment loop for a value
+     * type that owns storage; both shapes appear in the copy-assign emissions
+     * (0x004028E0 for the 4-byte lane, 0x00553370 for 8-byte `Moho::SOCellPos`).
+     */
+    void AssignOverExistingPrefix_(const T* const source, const size_t count) noexcept(
+      std::is_trivially_copyable_v<T>
+    )
+    {
+      if (count == 0) {
+        return;
+      }
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(start_, source, count * elem_);
+      } else {
+        for (size_t i = 0; i < count; ++i) {
+          start_[i] = source[i];
+        }
+      }
     }
 
   public:
@@ -425,6 +445,7 @@ namespace gpg::core
      */
     [[nodiscard]]
     /**
+     * Address: 0x00402290 (FUN_00402290, the generic 4-byte emission)
      * Address: 0x006D1A00 (FUN_006D1A00 -- out-of-line `Size()` for an 8-byte element (`(end - begin) / 8`); zero callers, unreachable.)
      * Address: 0x006D1D00 (FUN_006D1D00 -- checked-iterator distance for an 8-byte element; zero callers, unreachable.)
      * Address: 0x006D1DF0 (FUN_006D1DF0 -- a second emission of the 8-byte checked-iterator distance; zero callers, unreachable.)
@@ -441,6 +462,7 @@ namespace gpg::core
      */
     [[nodiscard]]
     /**
+     * Address: 0x00402280 (FUN_00402280, the generic `Empty()` emission is the same shape)
      * Address: 0x006D19D0 (FUN_006D19D0 -- out-of-line `Capacity()` for an 8-byte element (`(capacity - begin) / 8`); zero callers, unreachable.)
      */
     size_t Capacity() const noexcept
@@ -460,6 +482,11 @@ namespace gpg::core
     }
 
     /**
+     * Address: 0x00402270 (FUN_00402270, the generic 4-byte emission)
+     * Address: 0x00402690 (FUN_00402690, the same body reached as the begin lane)
+     * Address: 0x00402350 (FUN_00402350, the unchecked element-at lane: `begin + index`)
+     * Address: 0x00402360 (FUN_00402360, its const emission)
+     *
      * Returns raw data pointer (maybe null if empty and unallocated).
      */
     [[nodiscard]]
@@ -831,17 +858,15 @@ namespace gpg::core
      * filling appended slots with `fill`.
      *
      * The emitted per-element-type bodies are cited on
-     * `gpg::FastVectorRuntimeResizeFill`, which is this method's
+     * `resize(n, value)`, which is this method's
      * implementation. Only `FastVectorN` had a `Resize` until 2026-08-21,
      * so every base-`FastVector` caller in the engine reached around the
-     * container through `AsFastVectorRuntimeView` -- see RULE ONE in
+     * container through a runtime-view overlay -- see RULE ONE in
      * CLAUDE.md.
      */
     void Resize(const size_t newSize, const T& fill = T{})
     {
-      gpg::FastVectorRuntimeResizeFill<T>(
-        &fill, static_cast<unsigned int>(newSize), gpg::AsFastVectorRuntimeView<T>(this)
-      );
+      resize(newSize, fill);
     }
 
     FastVector(const FastVector&) = delete;
@@ -850,7 +875,7 @@ namespace gpg::core
      * Copy assignment.
      *
      * MSVC emits one out-of-line body per element type; the recovered
-     * addresses live on `FastVectorRuntimeCopyAssign` below, which is this
+     * addresses live on `FastVectorInline<T>::AssignFrom`, whose shape this
      * operator's implementation. The shape is VC8's: when the destination is
      * already at least as long as the source, the elements are overwritten in
      * place and `mLast` is rebased; otherwise capacity is grown, the
@@ -858,15 +883,39 @@ namespace gpg::core
      *
      * This was `= delete` until 2026-08-21, which forced every caller in the
      * engine to reach around the container through
-     * `AsFastVectorRuntimeView` -- see RULE ONE in CLAUDE.md.
+     * a runtime-view overlay -- see RULE ONE in CLAUDE.md.
      */
     FastVector& operator=(const FastVector& other)
     {
-      if (this != &other) {
-        (void)gpg::FastVectorRuntimeCopyAssign<T>(
-          gpg::AsFastVectorRuntimeView<T>(this), gpg::AsFastVectorRuntimeView<T>(&other)
-        );
+      static_assert(
+        !IsIntrusiveWeakRefSlot<T>::value,
+        "FastVector<T>::operator= relocates elements without relinking their owner chains; an intrusive "
+        "weak-ref slot has to go through the relinking lane instead"
+      );
+      if (this == &other) {
+        return *this;
       }
+
+      const size_t destinationSize = Size();
+      const size_t sourceSize = other.Size();
+
+      // Fits in place: overwrite the live prefix and drop the surplus tail.
+      if (destinationSize >= sourceSize) {
+        AssignOverExistingPrefix_(other.start_, sourceSize);
+        T* const newEnd = ptr_at(start_, sourceSize);
+        detail::DestroyRange(newEnd, end_);
+        end_ = newEnd;
+        return *this;
+      }
+
+      // Grow first, then overwrite the overlapping prefix and copy-construct
+      // the remainder into the fresh slots.
+      Reserve(sourceSize);
+      AssignOverExistingPrefix_(other.start_, destinationSize);
+      for (size_t i = destinationSize; i < sourceSize; ++i) {
+        ::new (static_cast<void*>(start_ + i)) T(other.start_[i]);
+      }
+      end_ = ptr_at(start_, sourceSize);
       return *this;
     }
 
@@ -961,6 +1010,9 @@ namespace gpg::core
      * slot run an engine struct declares after this head), so binding is the
      * only thing this level can do about it.
      *
+     * Address: 0x004026F0 (FUN_004026F0, the generic emission: binds all four lanes to a
+     * caller-owned buffer)
+     * Address: 0x0047F500 (FUN_0047F500, the n64<char> fixed-span alias lane)
      * Address: 0x00553430 (FUN_00553430 -- `BindInlineStorage` for `unsigned int`: `lea edx,[ecx+edx*4]` -- base in ECX and the slot count in EDX, the by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneA` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x00553500 (FUN_00553500 -- `BindInlineStorage` for `unsigned int`: an ICF-identical second emission of that by-count form. Zero callers, unreachable; formerly `BindUIntRuntimeViewToExternalStorageLaneB` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0065A340 (FUN_0065A340 -- `BindInlineStorage` for `unsigned int`: the same body with the count folded to 26 (`lea edx,[ecx+0x68]`). Zero callers, unreachable; formerly `BindDwordVectorHeaderCapacity26` in gpg/core/containers/FastVectorUIntReflection.cpp (RULE ONE), removed 2026-09-18.)
@@ -997,6 +1049,8 @@ namespace gpg::core
      * What it does:
      * if heap-backed -> free heap and restore inline pointers from saved header;
      * otherwise only reset end to start.
+     * Address: 0x004021F0 (FUN_004021F0, the same body reached from the clear lane)
+     * Address: 0x004022A0 (FUN_004022A0, an alias emission of the same)
      * Address: 0x004E7280 (FUN_004E7280 -- reset to inline storage for a 24-byte element; Resets one 24-byte fastvector lane to its inline origin storage, releasing heap storage when the active lane is not already inline.)
      * Address: 0x0054CCF0 (FUN_0054CCF0 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and releases heap storage when the active lane is not already inline.)
      * Address: 0x0054D760 (FUN_0054D760 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
@@ -1005,7 +1059,7 @@ namespace gpg::core
      * Address: 0x0072A440 (FUN_0072A440 -- reset to inline storage for a ? element; Resets one inline-backed fastvector lane to inline storage and frees heap storage when the active lane is not already inline.)
      * Address: 0x0072A970 (FUN_0072A970 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
      * Address: 0x007AE790 (FUN_007AE790 -- reset to inline storage for a ? element; Alias reset lane for the same inline-backed fastvector storage contract.)
-     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` over a `fastvector_runtime_view` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x004C7C70 (FUN_004C7C70 -- `fastvector_n<LuaPlus::LuaObject, N>::clear`: destroy every live `LuaObject`, free the heap block when the active buffer is not the inline one, rebind to the inline buffer using the saved inline capacity. Formerly `ClearAndResetLuaObjectFastVector` in lua/LuaObject.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x0056B4B0 (FUN_0056B4B0 -- `FastVectorN<T, N>::ResetStorageToInline` for a 0x98-byte inline block; callers ; formerly `ResetInlineOffsetVectorStorageRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      * Address: 0x00954550 (FUN_00954550 -- `FastVectorInline<T>::ResetStorageToInline` for a 12-char inline-backed lane; zero callers, unreachable; formerly `FastVectorN12CharReleaseHeapStorage` in gpg/core/algorithms/Cluster.cpp (RULE ONE), removed 2026-09-10.)
      */
@@ -1018,7 +1072,7 @@ namespace gpg::core
      * Address: 0x0070FAD0 (FUN_0070FAD0, `gpg::fastvector_SCondition::
      * insert_range` -- the ordered insert `Unit::GuardedByList` and the
      * formation weak-ref sets perform; its reallocating branch is
-     * 0x00710E90, cited on `FastVectorRuntimeReallocateInsert`.)
+     * 0x00710E90, cited on `ReallocateInsert_`.)
      *
      * What it does:
      * Inserts `[first, last)` at `pos`, growing storage when the run no longer
@@ -1032,7 +1086,7 @@ namespace gpg::core
         "FastVectorInline<T>::InsertRange relocates elements without relinking their owner chains; an intrusive "
         "weak-ref slot has to go through the relinking lane instead"
       );
-      return gpg::FastVectorRuntimeInsertRange<T>(gpg::AsFastVectorRuntimeView<T>(this), pos, first, last);
+      return InsertRangeImpl_(pos, first, last);
     }
 
     void PushBack(const T& v)
@@ -1065,7 +1119,7 @@ namespace gpg::core
         "FastVectorInline<T>::Reserve relocates elements without relinking their owner chains; an intrusive "
         "weak-ref slot has to go through the relinking lane instead"
       );
-      (void)gpg::FastVectorRuntimeEnsureCapacity<T>(n, gpg::AsFastVectorRuntimeView<T>(this));
+      (void)EnsureCapacity_(n);
     }
 
     void reserve(const size_type n)
@@ -1081,9 +1135,7 @@ namespace gpg::core
         "weak-ref slot has to go through the relinking lane instead"
       );
       const T zeroFill{};
-      gpg::FastVectorRuntimeResizeFill<T>(
-        &zeroFill, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
-      );
+      ResizeFill_(zeroFill, n);
     }
 
     /**
@@ -1097,9 +1149,7 @@ namespace gpg::core
         "FastVectorInline<T>::resize(n, value) relocates elements without relinking their owner chains; an intrusive "
         "weak-ref slot has to go through the relinking lane instead"
       );
-      gpg::FastVectorRuntimeResizeFill<T>(
-        &value, static_cast<unsigned int>(n), gpg::AsFastVectorRuntimeView<T>(this)
-      );
+      ResizeFill_(value, n);
     }
 
   protected:
@@ -1138,6 +1188,248 @@ namespace gpg::core
         return nullptr;
       }
       return *reinterpret_cast<T* const*>(originalVec_);
+    }
+
+    /**
+     * Address: 0x004029B0 (FUN_004029B0, func_VecResize)
+     * Address: 0x00562350 (FUN_00562350, fastvector<WeakPtr<CUnitCommand>> instantiation)
+     * Address: 0x0056D2B0 (FUN_0056D2B0, fastvector<IUnitWeakPtr pair> instantiation)
+     * Address: 0x0067E190 (FUN_0067E190, fastvector<Wm3::Sphere3f> instantiation)
+     * Address: 0x0063C950 (FUN_0063C950 -- the reallocating insert (buy, copy prefix / inserted run / suffix, stamp the inline capacity sentinel or free the old block, rebase) for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C700, 0x0063C903; formerly `ReallocateWatchBoneStorageForInsert` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
+     * Address: 0x00710E90 (FUN_00710E90, the reallocating branch of the
+     * `moho::SCondition` instantiation -- sizes the new block with
+     * `count * 8 - count` doubled three times, which is `count * 56`, the
+     * SCondition stride; reached from `gpg::fastvector_SCondition::insert_range`
+     * 0x0070FAD0.)
+     * Address: 0x004026C0 (FUN_004026C0, the payload-relocation step -- moves the live
+     * range to the new block and rebases `end_`)
+     * Address: 0x00553A80 (FUN_00553A80, the `Moho::SOCellPos` instantiation
+     * reached from the reflected `SetCount`/`SerLoad` resize at 0x005532F0.)
+     *
+     * Buy a `newCapacity` block, uninitialized-copy the prefix, the inserted
+     * run and the suffix into it, then retire the old storage: when it was the
+     * inline window the capacity sentinel is restamped rather than freed
+     * (`mov eax,[esi+0xC]; cmp ecx,eax; je` at 0x00553AF8), otherwise the block
+     * is released. This is the one step that distinguishes an inline-backed
+     * vector from the plain heap-only `FastVector<T>`, which is why it lives
+     * here and not on the base.
+     */
+    std::size_t ReallocateInsert_(
+      T* const insertPos, const std::size_t newCapacity, const T* const sourceBegin, const T* const sourceEnd
+    )
+    {
+      static_assert(!std::is_void_v<T>, "ReallocateInsert_ requires a concrete element type");
+
+      T* const oldBegin = this->start_;
+      T* const oldEnd = this->end_;
+      T* const oldCapacityEnd = this->capacity_;
+
+      T* const newBegin = detail::AllocateElements<T>(newCapacity);
+      T* write = newBegin;
+
+      const bool insertInsideOld = oldBegin && insertPos && insertPos >= oldBegin && insertPos <= oldEnd;
+      try {
+        if (insertInsideOld) {
+          write = detail::ConstructRangeForward(write, oldBegin, insertPos);
+        }
+        write = detail::ConstructRangeForward(write, sourceBegin, sourceEnd);
+        if (insertInsideOld) {
+          write = detail::ConstructRangeForward(write, insertPos, oldEnd);
+        }
+      } catch (...) {
+        detail::DestroyRange(newBegin, write);
+        detail::FreeElements(newBegin);
+        throw;
+      }
+
+      detail::DestroyRange(oldBegin, oldEnd);
+      if (oldBegin == originalVec_) {
+        if (originalVec_) {
+          *reinterpret_cast<T**>(originalVec_) = oldCapacityEnd;
+        }
+      } else {
+        detail::FreeElements(oldBegin);
+      }
+
+      this->start_ = newBegin;
+      this->end_ = write;
+      this->capacity_ = newBegin + newCapacity;
+      return newCapacity;
+    }
+
+    /**
+     * Address: 0x004026A0 (FUN_004026A0)
+     *
+     * Grow so at least `requiredCount` values fit, preserving the live range.
+     */
+    std::size_t EnsureCapacity_(const std::size_t requiredCount)
+    {
+      if (requiredCount > this->Capacity()) {
+        (void)ReallocateInsert_(this->start_, requiredCount, this->start_, this->start_);
+      }
+      return requiredCount;
+    }
+
+    /**
+     * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize -- the generic 4-byte emission)
+     * Address: 0x0059CE20 (FUN_0059CE20, a separate compiler-emitted inline clone of the same
+     * template specialized for 4-byte pointer elements)
+     * Address: 0x005532F0 (FUN_005532F0, the `Moho::SOCellPos` emission the
+     * reflected `SetCount`, `SerLoad` and `Moho::CDecoder::DecodeCells` all
+     * dispatch through)
+     * Address: 0x0065ECE0 (FUN_0065ECE0, the 56-byte `moho::SEfxCurve` emission)
+     *
+     * Shrink by destroying the surplus tail, or grow by appending copies of
+     * `fill` one slot at a time, advancing `end_` as each is constructed.
+     */
+    void ResizeFill_(const T& fill, const std::size_t newSize)
+    {
+      const std::size_t currentSize = this->Size();
+      if (newSize <= currentSize) {
+        T* const newEnd = this->start_ + newSize;
+        detail::DestroyRange(newEnd, this->end_);
+        this->end_ = newEnd;
+        return;
+      }
+
+      (void)EnsureCapacity_(newSize);
+      while (this->end_ != this->start_ + newSize) {
+        ::new (static_cast<void*>(this->end_)) T(fill);
+        ++this->end_;
+      }
+    }
+
+    /**
+     * Address: 0x004028E0 (FUN_004028E0, the 4-byte lane emission)
+     * Address: 0x00561D90 (FUN_00561D90, the `gpg::fastvector_n<Moho::SSTIUnitWeaponInfoSnapshot, 1>`
+     * emission -- the 0x98-byte weapon-info snapshot, stride confirmed by the three `/152` size
+     * divides at 0x00561DA5/0x00561DB6/0x00561DC8 and the `152 * v3` prefix offset. Reached by
+     * name from `moho::CopyFastVectorN(mWeaponInfo, other.mWeaponInfo)` in
+     * `SSTIUnitVariableData::AssignFrom` (Unit.cpp).)
+     * Address: 0x00553370 (FUN_00553370, the 8-byte `Moho::SOCellPos` emission:
+     * element-wise assignment loops where the uint lane uses `memmove`, but the
+     * same three branches -- fits-in-place forward copy, reallocating grow, then
+     * copy-prefix plus tail insert. Instantiated for `SOCellPos` through
+     * `FastVectorN2RebindAndCopy` at the `CopySOCellPosFastVectorN2` call in
+     * `Moho::SSTICommandIssueData`'s copy constructor.)
+     *
+     * Copy `other`'s payload over this one. Public copy assignment stays deleted
+     * because an inline-backed vector must not be assigned through a base
+     * reference; the rebind helpers call this explicitly instead.
+     */
+  public:
+    void AssignFrom(const FastVectorInline& other)
+    {
+      if (this == &other) {
+        return;
+      }
+
+      const std::size_t destinationSize = this->Size();
+      const std::size_t sourceSize = other.Size();
+
+      if (destinationSize >= sourceSize) {
+        this->AssignOverExistingPrefix_(other.start_, sourceSize);
+        T* const newEnd = this->start_ + sourceSize;
+        detail::DestroyRange(newEnd, this->end_);
+        this->end_ = newEnd;
+        return;
+      }
+
+      if (sourceSize > this->Capacity()) {
+        (void)ReallocateInsert_(this->start_, sourceSize, this->start_, this->start_);
+      }
+      this->AssignOverExistingPrefix_(other.start_, destinationSize);
+      (void)InsertRangeImpl_(this->end_, other.start_ + destinationSize, other.end_);
+    }
+
+  protected:
+    /**
+     * Address: 0x00402B10 (FUN_00402B10)
+     * Address: 0x0092DAC5 (FUN_0092DAC5 -- the in-place arm for the byte lane)
+     *
+     * Insert `[sourceBegin, sourceEnd)` at `insertPos`. When the run no longer
+     * fits, growth goes through `ReallocateInsert_` so the inline window is
+     * never freed; otherwise the tail is opened in place. The two in-place arms
+     * differ by whether the insertion reaches past the old finish, and both
+     * write into already-live slots by assignment rather than a byte copy -- a
+     * raw move there would duplicate owning members and then double-free them.
+     */
+    T* InsertRangeImpl_(T* const insertPos, const T* const sourceBegin, const T* const sourceEnd)
+    {
+      static_assert(!std::is_void_v<T>, "InsertRangeImpl_ requires a concrete element type");
+
+      const std::ptrdiff_t insertCountSigned = sourceEnd - sourceBegin;
+      if (insertCountSigned <= 0) {
+        return this->end_;
+      }
+
+      const std::size_t insertCount = static_cast<std::size_t>(insertCountSigned);
+      const std::size_t currentSize = this->Size();
+      const std::size_t currentCapacity = this->Capacity();
+      const std::size_t required = currentSize + insertCount;
+
+      if (required > currentCapacity) {
+        std::size_t newCapacity = currentCapacity * 2u;
+        if (newCapacity < required) {
+          newCapacity = required;
+        }
+        (void)ReallocateInsert_(insertPos, newCapacity, sourceBegin, sourceEnd);
+        return this->end_;
+      }
+
+      T* const oldFinish = this->end_;
+      T* const insertEnd = insertPos + insertCount;
+
+      if (insertEnd > oldFinish) {
+        // The insertion stretches past the old finish: append the suffix of the
+        // inserted run, then the displaced old tail, then assign the remaining
+        // source prefix over the vacated live window.
+        const std::ptrdiff_t tailCount = oldFinish - insertPos;
+        const T* const sourceTailBegin = sourceBegin + tailCount;
+        this->end_ = detail::ConstructRangeForward(oldFinish, sourceTailBegin, sourceEnd);
+        this->end_ = detail::ConstructRangeForward(this->end_, insertPos, oldFinish);
+
+        const std::ptrdiff_t prefixCount = sourceTailBegin - sourceBegin;
+        if (prefixCount > 0) {
+          if constexpr (std::is_trivially_copyable_v<T>) {
+            std::memmove(oldFinish - prefixCount, sourceBegin, static_cast<std::size_t>(prefixCount) * sizeof(T));
+          } else {
+            T* write = oldFinish - prefixCount;
+            for (std::ptrdiff_t index = 0; index < prefixCount; ++index) {
+              write[index] = sourceBegin[index];
+            }
+          }
+        }
+        return this->end_;
+      }
+
+      // The insertion fits entirely before the old finish: relocate the trailing
+      // `insertCount` values into the appended window, shift the middle block
+      // right to open the gap, then assign the source into it.
+      T* const tailStart = oldFinish - static_cast<std::ptrdiff_t>(insertCount);
+      this->end_ = detail::ConstructRangeForward(oldFinish, tailStart, oldFinish);
+
+      const std::ptrdiff_t moveCount = tailStart - insertPos;
+      if (moveCount > 0) {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+          std::memmove(insertPos + insertCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T));
+        } else {
+          // The binary uses a backward element-assign loop here for non-trivial
+          // T (0x00562A80 for UnitWeaponInfo, calling its operator=).
+          (void)detail::CopyBackwardAssign<T>(
+            insertPos + moveCount, insertPos + insertCount + moveCount, insertPos
+          );
+        }
+      }
+
+      if constexpr (std::is_trivially_copyable_v<T>) {
+        std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
+      } else {
+        for (std::size_t index = 0; index < insertCount; ++index) {
+          insertPos[index] = sourceBegin[index];
+        }
+      }
+      return this->end_;
     }
   };
 
@@ -1275,16 +1567,14 @@ namespace gpg::core
      * the inline-capacity header (distinct from the default ctor), then resizes
      * the logical element count to `count`, zero-filling appended slots through
      * the shared fastvector_uint_resize helper (FUN_004022D0 =
-     * FastVectorRuntimeResizeFill). This is the emitted constructor the decoder
+     * ResizeFill_). This is the emitted constructor the decoder
      * uses to preallocate the raw entity-id scratch buffer.
      */
     explicit FastVectorN(std::size_t count)
     {
       RebindInlineNoFree();
       const T zeroFill{};
-      gpg::FastVectorRuntimeResizeFill<T>(
-        &zeroFill, static_cast<unsigned int>(count), gpg::AsFastVectorRuntimeView<T>(this)
-      );
+      this->ResizeFill_(zeroFill, count);
     }
 
     /**
@@ -3201,490 +3491,6 @@ namespace gpg
   using fastvector_n = core::FastVectorN<T, N>;
 
   /**
-   * Runtime view used by reflected fastvector lanes that keep one extra
-   * unresolved metadata word after the pointer triplet.
-   *
-   * Layout:
-   *   +0x00 begin
-   *   +0x04 end
-   *   +0x08 capacity end
-   *   +0x0C metadata/owner lane (unresolved)
-   */
-  template <class T>
-  struct fastvector_runtime_view
-  {
-    T* begin;
-    T* end;
-    T* capacityEnd;
-    void* metadata;
-
-    /**
-     * Address: 0x00402270 (FUN_00402270)
-     */
-    [[nodiscard]] T* Data() noexcept
-    {
-      return begin;
-    }
-
-    /**
-     * Address: 0x00402270 (FUN_00402270)
-     */
-    [[nodiscard]] const T* Data() const noexcept
-    {
-      return begin;
-    }
-
-    /**
-     * Address: 0x00402280 (FUN_00402280)
-     */
-    [[nodiscard]] bool Empty() const noexcept
-    {
-      return begin == end;
-    }
-
-    /**
-     * Address: 0x00402290 (FUN_00402290)
-     */
-    [[nodiscard]] std::size_t Size() const noexcept
-    {
-      return static_cast<std::size_t>(end - begin);
-    }
-
-    /**
-     * Address: 0x00402350 (FUN_00402350)
-     */
-    [[nodiscard]] T* ElementAtUnchecked(const std::size_t index) noexcept
-    {
-      return begin + index;
-    }
-
-    /**
-     * Address: 0x00402360 (FUN_00402360)
-     */
-    [[nodiscard]] const T* ElementAtUnchecked(const std::size_t index) const noexcept
-    {
-      return begin + index;
-    }
-  };
-  static_assert(sizeof(fastvector_runtime_view<void>) == 0x10, "fastvector_runtime_view<T> must be 0x10");
-  static_assert(
-    offsetof(fastvector_runtime_view<void>, begin) == 0x00, "fastvector_runtime_view<T>::begin offset must be 0x00"
-  );
-  static_assert(
-    offsetof(fastvector_runtime_view<void>, end) == 0x04, "fastvector_runtime_view<T>::end offset must be 0x04"
-  );
-  static_assert(
-    offsetof(fastvector_runtime_view<void>, capacityEnd) == 0x08,
-    "fastvector_runtime_view<T>::capacityEnd offset must be 0x08"
-  );
-  static_assert(
-    offsetof(fastvector_runtime_view<void>, metadata) == 0x0C,
-    "fastvector_runtime_view<T>::metadata offset must be 0x0C"
-  );
-
-  template <class T>
-  [[nodiscard]] inline fastvector_runtime_view<T>& AsFastVectorRuntimeView(void* object) noexcept
-  {
-    return *reinterpret_cast<fastvector_runtime_view<T>*>(object);
-  }
-
-  template <class T>
-  [[nodiscard]] inline const fastvector_runtime_view<T>& AsFastVectorRuntimeView(const void* object) noexcept
-  {
-    return *reinterpret_cast<const fastvector_runtime_view<T>*>(object);
-  }
-
-  /**
-   * Address: 0x00402C20 (FUN_00402C20)
-   * Address: 0x00710F70 (FUN_00710F70, gpg::FastVectorRuntimeCopyRange<moho::SCondition> —
-   * emitted transitively via InsertRange<SCondition> from CArmyStats trigger-condition append)
-   * Address: 0x0054D790 (FUN_0054D790, the `Moho::CAniPoseBone` emission —
-   * that element has a user-declared copy ctor, so the reallocate path
-   * copy-constructs rather than relocating bitwise)
-   * Address: 0x0054DF50 (FUN_0054DF50, the forward copy-assign range lane for
-   * the same element, used to rewind mLast after a shrink)
-   * Address: 0x005625D0 (FUN_005625D0, the generic 4-byte emission for
-   * `fastvector<WeakPtr<CUnitCommand>>`, reached from the reallocate-insert
-   * instantiation already cited on FastVectorRuntimeReallocateInsert below
-   * at 0x00562350)
-   *
-   * What it does:
-   * Copy-constructs [sourceBegin, sourceEnd) into `destination` and returns the
-   * first element after the copied range.
-   *
-   * This is the *uninitialised*-copy lane: every call site writes past the
-   * view's `end`, or into storage `FastVectorRuntimeReallocateInsert` has just
-   * allocated. The destination has therefore never run a constructor, so the
-   * elements must be constructed here and never assigned. The `SCondition`
-   * emission (FUN_00710F70) shows this explicitly - it self-links the
-   * destination's inline `FastVectorN` sentinel (`[dst+0x18..0x24] = dst+0x28`)
-   * before calling `fastvector_uint::cpy` into it. Assigning instead would run
-   * `BVIntSet::operator=` over garbage and `delete[]` an uninitialised pointer.
-   *
-   * For trivially-copyable `T` this collapses to the same plain element store
-   * the generic 4-byte emission (FUN_00402C20) performs.
-   */
-  template <class T>
-  [[nodiscard]] inline T* FastVectorRuntimeCopyRange(T* destination, const T* sourceBegin, const T* sourceEnd) noexcept
-  {
-    for (; sourceBegin != sourceEnd; ++destination) {
-      if (destination) {
-        if constexpr (std::is_copy_constructible_v<T>) {
-          ::new (static_cast<void*>(destination)) T(*sourceBegin);
-        } else {
-          ::new (static_cast<void*>(destination)) T();
-        }
-      }
-      ++sourceBegin;
-    }
-    return destination;
-  }
-
-  /**
-   * Address: 0x004029B0 (FUN_004029B0, func_VecResize)
-   * Address: 0x00562350 (FUN_00562350, fastvector<WeakPtr<CUnitCommand>> instantiation)
-   * Address: 0x0056D2B0 (FUN_0056D2B0, fastvector<IUnitWeakPtr pair> instantiation)
-   * Address: 0x0067E190 (FUN_0067E190, fastvector<Wm3::Sphere3f> instantiation)
-   *
-   * What it does:
-   * Reallocates runtime-view storage to `newCapacity` and inserts
-   * [sourceBegin, sourceEnd) at `insertPos`.
-   *
-   * The secondary addresses above are distinct MSVC8 template instantiations
-   * of this same helper for different element types (`WeakPtr<CUnitCommand>`
-   * @ size 4, IUnitWeakPtr intrusive-pair @ size 8, `Wm3::Sphere3f` @ size
-   * 16). The instantiated bodies are binary-equivalent to the template
-   * expansion below once the element-size constant folds into the pointer
-   * arithmetic; the address lines are kept here so the binary-to-source
-   * map stays one-to-one for each FUN_ token.
-   */
-  template <class T>
-  /**
-   * Address: 0x0063C950 (FUN_0063C950 -- the reallocating insert (buy, copy prefix / inserted run / suffix, stamp the inline capacity sentinel or free the old block, rebase) for `moho::SAniManipBinding` (`IAniManipulator::mWatchBones`, two bindings inline); callers 0x0063C5F0, 0x0063C700, 0x0063C903; formerly `ReallocateWatchBoneStorageForInsert` in moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-10.)
-   */
-  inline std::size_t FastVectorRuntimeReallocateInsert(
-    fastvector_runtime_view<T>& view,
-    T* insertPos,
-    const std::size_t newCapacity,
-    const T* sourceBegin,
-    const T* sourceEnd
-  )
-  {
-    static_assert(!std::is_void_v<T>, "FastVectorRuntimeReallocateInsert requires a concrete element type");
-
-    T* const oldBegin = view.begin;
-    T* const oldEnd = view.end;
-    T* const oldCapacityEnd = view.capacityEnd;
-
-    T* const newBegin = core::detail::AllocateElements<T>(newCapacity);
-    T* write = newBegin;
-
-    const bool insertInsideOld = oldBegin && insertPos && insertPos >= oldBegin && insertPos <= oldEnd;
-    try {
-      if (insertInsideOld) {
-        write = FastVectorRuntimeCopyRange(write, oldBegin, insertPos);
-      }
-      write = FastVectorRuntimeCopyRange(write, sourceBegin, sourceEnd);
-      if (insertInsideOld) {
-        write = FastVectorRuntimeCopyRange(write, insertPos, oldEnd);
-      }
-    } catch (...) {
-      core::detail::DestroyRange(newBegin, write);
-      core::detail::FreeElements(newBegin);
-      throw;
-    }
-
-    // The old range is dead once its values live in the new block (binary
-    // `_Destroy_range`), then the block is released or -- for the inline
-    // window -- its capacity sentinel is restamped before rebinding.
-    core::detail::DestroyRange(oldBegin, oldEnd);
-    T* const inlineBegin = reinterpret_cast<T*>(view.metadata);
-    if (oldBegin == inlineBegin) {
-      // Binary path stores prior inline-capacity sentinel before rebinding.
-      if (inlineBegin) {
-        *reinterpret_cast<T**>(inlineBegin) = oldCapacityEnd;
-      }
-    } else {
-      core::detail::FreeElements(oldBegin);
-    }
-
-    view.begin = newBegin;
-    view.end = write;
-    view.capacityEnd = newBegin + newCapacity;
-    return newCapacity;
-  }
-
-  /**
-   * Address: 0x00402B10 (FUN_00402B10)
-   * Address: 0x00710E90 (FUN_00710E90, the reallocating branch of the
-   * `moho::SCondition` instantiation -- sizes the new block with
-   * `count * 8 - count` doubled three times, which is `count * 56`, the
-   * SCondition stride; uninitialised-copies the three segments in order
-   * (prefix, inserted range, suffix), destroys the old range, frees the old
-   * block only when it is not the inline buffer, and rebases the lanes.
-   * Reached from `gpg::fastvector_SCondition::insert_range` (0x0070FAD0).)
-   *
-   * What it does:
-   * Inserts [sourceBegin, sourceEnd) at `insertPos`, growing runtime-view
-   * storage when needed.
-   */
-  template <class T>
-  [[nodiscard]] inline T*
-  FastVectorRuntimeInsertRange(fastvector_runtime_view<T>& view, T* insertPos, const T* sourceBegin, const T* sourceEnd)
-  {
-    static_assert(!std::is_void_v<T>, "FastVectorRuntimeInsertRange requires a concrete element type");
-
-    const std::ptrdiff_t insertCountSigned = sourceEnd - sourceBegin;
-    if (insertCountSigned <= 0) {
-      return view.end;
-    }
-
-    const std::size_t insertCount = static_cast<std::size_t>(insertCountSigned);
-    const std::size_t currentSize = (view.begin && view.end) ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-    const std::size_t currentCapacity =
-      (view.begin && view.capacityEnd) ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
-    const std::size_t required = currentSize + insertCount;
-
-    if (required > currentCapacity) {
-      std::size_t newCapacity = currentCapacity * 2u;
-      if (newCapacity < required) {
-        newCapacity = required;
-      }
-      FastVectorRuntimeReallocateInsert(view, insertPos, newCapacity, sourceBegin, sourceEnd);
-      return view.end;
-    }
-
-    T* const oldFinish = view.end;
-    T* const insertEnd = insertPos + insertCount;
-
-    if (insertEnd > oldFinish) {
-      // Insertion stretches beyond old finish: copy suffix of inserted range,
-      // then old tail, then source prefix into the vacated prefix window.
-      const std::ptrdiff_t tailCount = oldFinish - insertPos;
-      const T* const sourceTailBegin = sourceBegin + tailCount;
-      view.end = FastVectorRuntimeCopyRange(oldFinish, sourceTailBegin, sourceEnd);
-      view.end = FastVectorRuntimeCopyRange(view.end, insertPos, oldFinish);
-
-      const std::ptrdiff_t prefixCount = sourceTailBegin - sourceBegin;
-      if (prefixCount > 0) {
-        // This window is inside the *old* constructed range, so the elements
-        // there are live: assign over them rather than byte-copying, which
-        // would duplicate owning members (see the backward-shift note below).
-        if constexpr (std::is_trivially_copyable_v<T>) {
-          std::memmove(oldFinish - prefixCount, sourceBegin, static_cast<std::size_t>(prefixCount) * sizeof(T));
-        } else {
-          T* write = oldFinish - prefixCount;
-          for (std::ptrdiff_t index = 0; index < prefixCount; ++index) {
-            write[index] = sourceBegin[index];
-          }
-        }
-      }
-      return view.end;
-    }
-
-    // Insertion fits entirely before old finish: move trailing `insertCount`
-    // values to the appended tail window, shift middle block, then copy source.
-    T* const tailStart = oldFinish - static_cast<std::ptrdiff_t>(insertCount);
-    view.end = FastVectorRuntimeCopyRange(oldFinish, tailStart, oldFinish);
-
-    // Shift the middle block right by exactly `insertCount` to open the gap.
-    // `view.end` has already been advanced to `oldFinish + insertCount`, so
-    // `view.end - moveCount` lands at `insertPos + 2 * insertCount` and would
-    // overwrite the tail copied just above.
-    const std::ptrdiff_t moveCount = tailStart - insertPos;
-    if (moveCount > 0) {
-      if constexpr (std::is_trivially_copyable_v<T>) {
-        std::memmove(
-          insertPos + insertCount, insertPos, static_cast<std::size_t>(moveCount) * sizeof(T)
-        );
-      } else {
-        // The binary uses a backward element-assign loop here for non-trivial
-        // T (0x00562A80 for UnitWeaponInfo, calling its operator=). A byte-wise
-        // move would duplicate owning members - UnitWeaponInfo holds two
-        // msvc8::string lanes - and then double-free them.
-        (void)core::detail::CopyBackwardAssign<T>(
-          insertPos + moveCount, insertPos + insertCount + moveCount, insertPos
-        );
-      }
-    }
-
-    // The gap now holds live elements shifted out of the way, so the source
-    // goes in by assignment for the same reason as the backward shift above.
-    if constexpr (std::is_trivially_copyable_v<T>) {
-      std::memmove(insertPos, sourceBegin, insertCount * sizeof(T));
-    } else {
-      for (std::size_t index = 0; index < insertCount; ++index) {
-        insertPos[index] = sourceBegin[index];
-      }
-    }
-    return view.end;
-  }
-
-  /**
-   * Address: 0x004028E0 (FUN_004028E0, gpg::fastvector_uint::cpy)
-   * Address: 0x00553370 (FUN_00553370, gpg::fastvector<Moho::SOCellPos>::cpy)
-   * Address: 0x00561D90 (FUN_00561D90, gpg::fastvector_n<Moho::SSTIUnitWeaponInfoSnapshot, 1>::cpy
-   * — the 0x98-byte weapon-info snapshot emission, stride confirmed by the three
-   * `/152` size divides at 0x00561DA5/0x00561DB6/0x00561DC8 and the
-   * `152 * v3` prefix offset. Reached by name from
-   * `moho::CopyFastVectorN(mWeaponInfo, other.mWeaponInfo)` in
-   * `SSTIUnitVariableData::AssignFrom` (Unit.cpp), which forwards to this
-   * template through `AsFastVectorRuntimeView`.)
-   *
-   * What it does:
-   * Copies source contents into destination runtime view.
-   *
-   * The 0x00553370 entry is the same template body specialized for
-   * 8-byte `Moho::SOCellPos` elements: the compiler emits element-wise
-   * assignment loops instead of the 4-byte `memmove` seen in the uint
-   * (0x004028E0) emission, but the three branches are identical
-   * (fits-in-place forward copy; reallocate-insert via
-   * `FastVectorRuntimeReallocateInsert`; copy-prefix + tail
-   * `FastVectorRuntimeInsertRange`). Instantiated for `SOCellPos`
-   * through `FastVectorN2RebindAndCopy` at the `CopySOCellPosFastVectorN2`
-   * call in `Moho::SSTICommandIssueData`'s copy constructor.
-   */
-  template <class T>
-  [[nodiscard]] inline fastvector_runtime_view<T>*
-  FastVectorRuntimeCopyAssign(fastvector_runtime_view<T>& destination, const fastvector_runtime_view<T>& source)
-  {
-    static_assert(!std::is_void_v<T>, "FastVectorRuntimeCopyAssign requires a concrete element type");
-
-    if (&destination == &source) {
-      return &destination;
-    }
-
-    const std::size_t destinationSize =
-      (destination.begin && destination.end) ? static_cast<std::size_t>(destination.end - destination.begin) : 0u;
-    const std::size_t sourceSize =
-      (source.begin && source.end) ? static_cast<std::size_t>(source.end - source.begin) : 0u;
-
-    if (destinationSize >= sourceSize) {
-      // Overwrite the live prefix in place and drop the surplus tail: an
-      // element-wise assign for a value type that owns storage, a block move
-      // for a POD lane, then `_Destroy_range` over `[sourceSize, destinationSize)`.
-      if (sourceSize > 0) {
-        if constexpr (std::is_trivially_copyable_v<T>) {
-          std::memmove(destination.begin, source.begin, sourceSize * sizeof(T));
-        } else {
-          for (std::size_t index = 0; index < sourceSize; ++index) {
-            destination.begin[index] = source.begin[index];
-          }
-        }
-      }
-      T* const newEnd = destination.begin + sourceSize;
-      core::detail::DestroyRange(newEnd, destination.end);
-      destination.end = newEnd;
-      return &destination;
-    }
-
-    const std::size_t destinationCapacity = (destination.begin && destination.capacityEnd)
-      ? static_cast<std::size_t>(destination.capacityEnd - destination.begin)
-      : 0u;
-    if (sourceSize > destinationCapacity) {
-      FastVectorRuntimeReallocateInsert(
-        destination, destination.begin, sourceSize, destination.begin, destination.begin
-      );
-    }
-
-    if (destinationSize > 0) {
-      if constexpr (std::is_trivially_copyable_v<T>) {
-        std::memmove(destination.begin, source.begin, destinationSize * sizeof(T));
-      } else {
-        for (std::size_t index = 0; index < destinationSize; ++index) {
-          destination.begin[index] = source.begin[index];
-        }
-      }
-    }
-
-    FastVectorRuntimeInsertRange(
-      destination, destination.end, source.begin + static_cast<std::ptrdiff_t>(destinationSize), source.end
-    );
-    return &destination;
-  }
-
-  /**
-   * Address: 0x004026A0 (FUN_004026A0)
-   *
-   * What it does:
-   * Ensures runtime-view capacity can hold at least `requiredCount` values.
-   */
-  template <class T>
-  [[nodiscard]] inline std::size_t
-  FastVectorRuntimeEnsureCapacity(const std::size_t requiredCount, fastvector_runtime_view<T>& view)
-  {
-    const std::size_t currentCapacity =
-      (view.begin && view.capacityEnd) ? static_cast<std::size_t>(view.capacityEnd - view.begin) : 0u;
-    if (requiredCount > currentCapacity) {
-      FastVectorRuntimeReallocateInsert(view, view.begin, requiredCount, view.begin, view.begin);
-    }
-    return requiredCount;
-  }
-
-  /**
-   * Address: 0x004026C0 (FUN_004026C0)
-   *
-   * What it does:
-   * Moves current [oldBegin, end) payload to `newBegin` and updates end.
-   */
-  template <class T>
-  [[nodiscard]] inline T*
-  FastVectorRuntimeMoveRangeAndSetEnd(const T* oldBegin, fastvector_runtime_view<T>& view, T* newBegin)
-  {
-    if (newBegin != oldBegin) {
-      const std::ptrdiff_t count = view.end - oldBegin;
-      T* const newEnd = newBegin + count;
-      if (count > 0) {
-        std::memmove(newBegin, oldBegin, static_cast<std::size_t>(count) * sizeof(T));
-      }
-      view.end = newEnd;
-    }
-    return newBegin;
-  }
-
-  /**
-   * Address: 0x004026F0 (FUN_004026F0)
-   * Address: 0x0047F500 (FUN_0047F500, n64<char> fixed-span alias lane)
-   *
-   * What it does:
-   * Binds runtime-view pointers to a caller-owned buffer.
-   */
-  template <class T>
-  [[nodiscard]] inline fastvector_runtime_view<T>&
-  FastVectorRuntimeAdoptBuffer(fastvector_runtime_view<T>& view, const std::size_t count, T* begin) noexcept
-  {
-    view.begin = begin;
-    view.end = begin;
-    view.capacityEnd = begin + count;
-    view.metadata = begin;
-    return view;
-  }
-
-  /**
-   * Address: 0x004021F0 (FUN_004021F0)
-   * Address: 0x004022A0 (FUN_004022A0)
-   *
-   * What it does:
-   * Resets runtime-view storage back to metadata/inline storage.
-   */
-  template <class T>
-  inline void FastVectorRuntimeResetToInline(fastvector_runtime_view<T>& view)
-  {
-    T* const currentBegin = view.begin;
-    T* const inlineBegin = reinterpret_cast<T*>(view.metadata);
-    core::detail::DestroyRange(currentBegin, view.end);
-    if (currentBegin == inlineBegin) {
-      view.end = currentBegin;
-      return;
-    }
-
-    core::detail::FreeElements(currentBegin);
-    view.begin = inlineBegin;
-    view.capacityEnd = inlineBegin ? *reinterpret_cast<T* const*>(inlineBegin) : nullptr;
-    view.end = view.begin;
-  }
-
-  /**
    * Address: 0x004021D0 (FUN_004021D0)
    *
    * What it does:
@@ -3717,106 +3523,8 @@ namespace gpg
     }
 
     FastVectorN2InitInlineNoHeader(*destination);
-    auto& destinationView = AsFastVectorRuntimeView<T>(destination);
-    const auto& sourceView = AsFastVectorRuntimeView<T>(source);
-    FastVectorRuntimeCopyAssign(destinationView, sourceView);
+    destination->AssignFrom(*source);
     return destination;
   }
 
-  /**
-   * Address: 0x004022D0 (FUN_004022D0, gpg::fastvector_uint_resize)
-   * Address: 0x0059CE20 (FUN_0059CE20, pointer-element inline clone used by
-   * `RFastVectorType_IFormationInstance_P::SetCount` and its internal
-   * reflect/resize shim)
-   * Address: 0x0065ECE0 (FUN_0065ECE0, gpg::FastVectorRuntimeResizeFill<moho::SEfxCurve> — 56-byte element resize-fill)
-   *
-   * What it does:
-   * Resizes runtime-view storage and fills appended values with `*fillValue`.
-   * The 0x0059CE20 address is a separate compiler-emitted inline clone of
-   * this template specialized for 4-byte pointer elements; both entries
-   * share identical behavior (shrink-to-size, preserve-on-equal, ensure
-   * capacity and fill on grow). All pointer-fastvector resize callers route
-   * through this single template body.
-   */
-  template <class T>
-  inline void
-  FastVectorRuntimeResizeFill(const T* fillValue, const unsigned int newSize, fastvector_runtime_view<T>& view)
-  {
-    const T fill = fillValue ? *fillValue : T{};
-    const std::size_t currentSize = view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-
-    if (newSize < currentSize) {
-      T* const newEnd = view.begin + newSize;
-      core::detail::DestroyRange(newEnd, view.end);
-      view.end = newEnd;
-      return;
-    }
-
-    if (newSize == currentSize) {
-      return;
-    }
-
-    (void)FastVectorRuntimeEnsureCapacity(static_cast<std::size_t>(newSize), view);
-    while (view.end != view.begin + newSize) {
-      T* const slot = view.end;
-      view.end = slot + 1;
-      if (slot) {
-        if constexpr (std::is_copy_constructible_v<T>) {
-          ::new (static_cast<void*>(slot)) T(fill);
-        } else {
-          ::new (static_cast<void*>(slot)) T();
-        }
-      }
-    }
-  }
-
-  /**
-   * Address: 0x00402270 (FUN_00402270)
-   */
-  template <class T>
-  [[nodiscard]] inline T* FastVectorRuntimeBegin(const fastvector_runtime_view<T>& view) noexcept
-  {
-    return view.begin;
-  }
-
-  /**
-   * Address: 0x00402280 (FUN_00402280)
-   */
-  template <class T>
-  [[nodiscard]] inline bool FastVectorRuntimeEmpty(const fastvector_runtime_view<T>& view) noexcept
-  {
-    return view.begin == view.end;
-  }
-
-  /**
-   * Address: 0x00402290 (FUN_00402290)
-   */
-  template <class T>
-  [[nodiscard]] inline std::size_t FastVectorRuntimeCount(const fastvector_runtime_view<T>& view) noexcept
-  {
-    return view.begin ? static_cast<std::size_t>(view.end - view.begin) : 0u;
-  }
-
-  /**
-   * Address: 0x00402350 (FUN_00402350)
-   * Address: 0x00402360 (FUN_00402360)
-   */
-  template <class T>
-  [[nodiscard]] inline T* FastVectorRuntimeAt(const fastvector_runtime_view<T>& view, const std::size_t index) noexcept
-  {
-    return view.begin + index;
-  }
-
-  /**
-   * Address: 0x00402690 (FUN_00402690)
-   *
-   * What it does:
-   * Thin wrapper used by binary helpers to copy one runtime view into another.
-   */
-  template <class T>
-  [[nodiscard]] inline fastvector_runtime_view<T>*
-  FastVectorRuntimeCopyAssignAlias(fastvector_runtime_view<T>& destination, const fastvector_runtime_view<T>& source)
-  {
-    return FastVectorRuntimeCopyAssign(destination, source);
-  }
 } // namespace gpg

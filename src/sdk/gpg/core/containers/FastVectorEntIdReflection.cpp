@@ -80,9 +80,9 @@ namespace
 
     gpg::RType* const entIdType = CachedEntIdType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
-    auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
+    auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(storage);
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Read(entIdType, view.ElementAtUnchecked(i), owner);
+      archive->Read(entIdType, elements.Data() + (i), owner);
     }
   }
 
@@ -102,14 +102,14 @@ namespace
       return;
     }
 
-    const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(storage);
-    const unsigned int count = view.Data() ? static_cast<unsigned int>(view.Size()) : 0u;
+    const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(storage);
+    const unsigned int count = elements.Data() ? static_cast<unsigned int>(elements.Size()) : 0u;
     archive->WriteUInt(count);
 
     gpg::RType* const entIdType = CachedEntIdType();
     const gpg::RRef owner = ownerRef ? *ownerRef : gpg::RRef{};
     for (unsigned int i = 0; i < count; ++i) {
-      archive->Write(entIdType, view.ElementAtUnchecked(i), owner);
+      archive->Write(entIdType, elements.Data() + (i), owner);
     }
   }
 
@@ -223,9 +223,9 @@ void gpg::RFastVectorType<moho::EntId>::Init()
  */
 gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(void* obj, const int ind) const
 {
-  auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(obj);
+  auto& elements = *static_cast<gpg::core::FastVectorInline<unsigned int>*>(obj);
   gpg::RRef out{};
-  gpg::RRef_EntId(&out, reinterpret_cast<std::int32_t*>(view.ElementAtUnchecked(static_cast<std::size_t>(ind))));
+  gpg::RRef_EntId(&out, reinterpret_cast<std::int32_t*>(elements.Data() + (static_cast<std::size_t>(ind))));
   return out;
 }
 
@@ -234,8 +234,8 @@ gpg::RRef gpg::RFastVectorType<moho::EntId>::SubscriptIndex(void* obj, const int
  */
 size_t gpg::RFastVectorType<moho::EntId>::GetCount(void* obj) const
 {
-  const auto& view = gpg::AsFastVectorRuntimeView<unsigned int>(obj);
-  return view.Size();
+  const auto& elements = *static_cast<const gpg::core::FastVectorInline<unsigned int>*>(obj);
+  return elements.Size();
 }
 
 /**
