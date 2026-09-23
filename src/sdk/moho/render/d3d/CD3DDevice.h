@@ -624,6 +624,8 @@ namespace moho
      *
      * What it does:
      * Rebinds one GAL device-context payload and rebuilds head/render-target state.
+     * A `gal::Error` during the rebind (e.g. a failed device reset) is logged and
+     * reported as false.
      */
     virtual bool InitContext(gpg::gal::DeviceContext* context) = 0;
 
@@ -761,7 +763,9 @@ namespace moho
      *
      * What it does:
      * Presents one frame and dispatches clear/render callback lanes for the
-     * active viewport path.
+     * active viewport path. A `gal::Error` from the cooperative-level check,
+     * reset, present or render is logged and clears the scene-open flag
+     * instead of propagating.
      */
     void Paint();
 

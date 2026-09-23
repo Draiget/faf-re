@@ -67,6 +67,20 @@ namespace
   std::int32_t sCurGameTick = 0;
   gpg::gal::MeshFormatter* sCurHardwareVertexFormatter = nullptr;
 
+  // `gal::Device::TestCooperativeLevel` tokens (DeviceD3D9 override, 0x008ED360):
+  // D3D_OK -> 0, D3DERR_DEVICENOTRESET -> 1, D3DERR_DEVICELOST or any other
+  // success code -> 2. Failure HRESULTs throw instead.
+  constexpr int kCooperativeLevelNeedsReset = 1;
+  constexpr int kCooperativeLevelLost = 2;
+
+  // Body of the `catch (const gal::Error&)` handlers in the CD3DDevice family
+  // (InitContext 0x0042E6CB, Paint 0x00431097, ...): one warning with the throw
+  // site and message, format string "%s(%d) %s" at 0x00E0196C.
+  void WarnGalError(const gpg::gal::Error& error)
+  {
+    gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+  }
+
   [[nodiscard]] std::int32_t FloatToBits(const float value) noexcept
   {
     std::uint32_t bits = 0;
@@ -600,6 +614,12 @@ namespace
      * What it does:
      * Rebinds one GAL device-context payload, rebuilds per-head writer locks,
      * recreates tracked device resources, and re-emits init callbacks/events.
+     *
+     * The body from `mInitialized = 0` on runs under `catch (const gal::Error&)`
+     * (FuncInfo 0x00F24DEC, try states 0..5, adjectives 9 = const reference;
+     * handler 0x0042E6CB). A failed rebind - `Func9` throws when
+     * `IDirect3DDevice9::Reset` fails, e.g. on a device that was lost again -
+     * only warns: `mInitialized` stays 0 and the result is false.
      */
     bool InitContext(gpg::gal::DeviceContext* const context) override
     {
@@ -609,72 +629,76 @@ namespace
       }
 
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      runtime->mInitialized = 0;
+      try {
+        runtime->mInitialized = 0;
 
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-      const int headCount = context->GetHeadCount();
-      const std::size_t lockHeadCount =
-        std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
+        auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+        const int headCount = context->GetHeadCount();
+        const std::size_t lockHeadCount =
+          std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
 
-      // false = rebind, not shutdown: keep the batchers, only Reset the mesh
-      // renderer. Everything else the viewport holds is released either way,
-      // which is what lets `Func9`'s `IDirect3DDevice9::Reset` succeed.
-      if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(false);
-      }
-
-      const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
-      (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
-      ResetResourcesForContextTransition(mResources, false);
-      ResetWorldParticleBuffers();
-
-      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-        ReleaseHeadWriterLocks(*runtime, headIndex);
-      }
-
-      if (device != nullptr) {
-        (void)device->Func9(context);
-      }
-
-      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-        if (device == nullptr) {
-          break;
+        // false = rebind, not shutdown: keep the batchers, only Reset the mesh
+        // renderer. Everything else the viewport holds is released either way,
+        // which is what lets `Func9`'s `IDirect3DDevice9::Reset` succeed.
+        if (runtime->mViewport != nullptr) {
+          reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(false);
         }
 
-        const auto* const outputContext =
-          reinterpret_cast<const OutputContextD3D9RuntimeView*>(device->GetHead2(static_cast<unsigned int>(headIndex)));
-        if (outputContext == nullptr) {
-          continue;
+        const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
+        (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
+        ResetResourcesForContextTransition(mResources, false);
+        ResetWorldParticleBuffers();
+
+        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+          ReleaseHeadWriterLocks(*runtime, headIndex);
         }
 
-        runtime->mReaderWriterLocks1[headIndex].reset(
-          new moho::CD3DRenderTarget(this, outputContext->renderTarget)
-        );
-        runtime->mReaderWriterLocks2[headIndex].reset(
-          new moho::CD3DDepthStencil(this, outputContext->depthStencil)
-        );
+        if (device != nullptr) {
+          (void)device->Func9(context);
+        }
+
+        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+          if (device == nullptr) {
+            break;
+          }
+
+          const auto* const outputContext =
+            reinterpret_cast<const OutputContextD3D9RuntimeView*>(device->GetHead2(static_cast<unsigned int>(headIndex)));
+          if (outputContext == nullptr) {
+            continue;
+          }
+
+          runtime->mReaderWriterLocks1[headIndex].reset(
+            new moho::CD3DRenderTarget(this, outputContext->renderTarget)
+          );
+          runtime->mReaderWriterLocks2[headIndex].reset(
+            new moho::CD3DDepthStencil(this, outputContext->depthStencil)
+          );
+        }
+
+        (void)mResources.InitResources(false);
+
+        if (runtime->mViewport != nullptr) {
+          reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(false);
+        }
+
+        const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
+        (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
+
+        for (int headIndex = 1; headIndex < headCount; ++headIndex) {
+          const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
+          ::ShowWindow(static_cast<HWND>(head.mWindow), SW_SHOWNORMAL);
+        }
+
+        if (runtime->mCursorContext.pixelSource_ != nullptr && device != nullptr) {
+          device->SetCursor(&runtime->mCursorContext);
+        }
+
+        runtime->mInitialized = 1;
+        gpg::Warnf("[DEVRESET] CD3DDevice::InitContext done"); // TEMPORARY PROBE (do not commit)
+      } catch (const gpg::gal::Error& error) {
+        WarnGalError(error);
       }
-
-      (void)mResources.InitResources(false);
-
-      if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(false);
-      }
-
-      const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
-      (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
-
-      for (int headIndex = 1; headIndex < headCount; ++headIndex) {
-        const gpg::gal::Head& head = context->GetHead(static_cast<unsigned int>(headIndex));
-        ::ShowWindow(static_cast<HWND>(head.mWindow), SW_SHOWNORMAL);
-      }
-
-      if (runtime->mCursorContext.pixelSource_ != nullptr && device != nullptr) {
-        device->SetCursor(&runtime->mCursorContext);
-      }
-
-      runtime->mInitialized = 1;
-      gpg::Warnf("[DEVRESET] CD3DDevice::InitContext done"); // TEMPORARY PROBE (do not commit)
       return runtime->mInitialized != 0;
     }
 
@@ -1863,6 +1887,17 @@ namespace moho
    * What it does:
    * Presents one device frame when the device/runtime viewport is active, then
    * dispatches either clear or viewport render callback.
+   *
+   * Everything after the device lookup runs under `catch (const gal::Error&)`
+   * (FuncInfo 0x00F0EB3C, one try block, adjectives 9 = const reference; the
+   * handler at 0x00431097 is not in the Hex-Rays output). The handler warns and
+   * clears the scene-open byte at +0x18, so a scene the failed frame left open
+   * cannot make the next `BeginScene` skip, then leaves through the normal
+   * epilogue. This is how a device that is lost again between
+   * `TestCooperativeLevel` and `Present` is survived: after a restore from
+   * minimized, `TestCooperativeLevel` can still answer D3D_OK while `Present`
+   * already returns D3DERR_DEVICELOST; the next paint then sees
+   * D3DERR_DEVICENOTRESET and resets through `InitContext`.
    */
   void CD3DDevice::Paint()
   {
@@ -1872,22 +1907,27 @@ namespace moho
     }
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    const int coop = device->TestCooperativeLevel();
-    if (coop == 2) {
-      return;
-    }
-    if (coop == 1) {
-      gpg::gal::DeviceContext* const context = device->GetDeviceContext();
-      (void)InitContext(context);
-    }
+    try {
+      const int coop = device->TestCooperativeLevel();
+      if (coop == kCooperativeLevelLost) {
+        return;
+      }
+      if (coop == kCooperativeLevelNeedsReset) {
+        gpg::gal::DeviceContext* const context = device->GetDeviceContext();
+        (void)InitContext(context);
+      }
 
-    device->Present();
-    (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
+      device->Present();
+      (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderPresentCount, "Render_PresentCount"), 1);
 
-    if (runtime->mClearEnabled != 0) {
-      Clear();
-    } else {
-      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceRender();
+      if (runtime->mClearEnabled != 0) {
+        Clear();
+      } else {
+        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceRender();
+      }
+    } catch (const gpg::gal::Error& error) {
+      WarnGalError(error);
+      runtime->mSceneStarted = 0;
     }
   }
 
