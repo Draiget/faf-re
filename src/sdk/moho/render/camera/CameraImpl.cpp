@@ -523,7 +523,9 @@ namespace
       return;
     }
 
-    auto** const ownerLinkSlot = reinterpret_cast<moho::SSelectionWeakRefUserEntity**>(&entity->mIUnitChainHead);
+    // `mIUnitChainHead` is already the chain head of these nodes, so no cast:
+    // the slot the entity publishes is exactly a `SSelectionWeakRefUserEntity*`.
+    moho::SSelectionWeakRefUserEntity** const ownerLinkSlot = &entity->mIUnitChainHead;
     weakRef.mOwnerLinkSlot = ownerLinkSlot;
     weakRef.mNextOwner = *ownerLinkSlot;
     *ownerLinkSlot = &weakRef;

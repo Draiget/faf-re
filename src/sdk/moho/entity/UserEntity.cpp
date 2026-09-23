@@ -66,34 +66,23 @@ namespace
     return cached;
   }
 
-  void InitializeSpatialDbEntry(
-    moho::UserEntitySpatialDbEntry& entry,
-    void* const sessionSpatialDbStorage,
-    void* const owner,
-    const std::int32_t spatialDbMask
-  )
-  {
-    // Address: 0x00501A80 (FUN_00501A80, sub_501A80)
-    auto* const meshEntry = reinterpret_cast<moho::SpatialDB_MeshInstance*>(&entry);
-    meshEntry->Register(sessionSpatialDbStorage, owner, spatialDbMask);
-  }
-
   /**
    * Address: 0x0089E520 (FUN_0089E520)
    *
    * What it does:
-   * Register-shape adapter that forwards one spatial DB entry construction
-   * request into the canonical `InitializeSpatialDbEntry` helper and returns
-   * the destination entry pointer.
+   * Register-shape adapter that forwards one spatial-db registration into
+   * `SpatialDB_MeshInstance::Register` and returns the destination entry.
+   * The five instructions at 0x0089E520 only shuffle the register-passed
+   * `this`/storage pair onto the stack shape 0x00501A80 expects.
    */
-  [[maybe_unused]] moho::UserEntitySpatialDbEntry* InitializeSpatialDbEntryAdapterLane(
-    moho::UserEntitySpatialDbEntry* const destinationEntry,
+  [[maybe_unused]] moho::SpatialDB_MeshInstance* RegisterSpatialDbEntryAdapter(
+    moho::SpatialDB_MeshInstance* const destinationEntry,
     void* const sessionSpatialDbStorage,
     void* const owner,
     const std::int32_t spatialDbMask
   )
   {
-    InitializeSpatialDbEntry(*destinationEntry, sessionSpatialDbStorage, owner, spatialDbMask);
+    destinationEntry->Register(sessionSpatialDbStorage, owner, spatialDbMask);
     return destinationEntry;
   }
 
@@ -120,14 +109,19 @@ namespace
     out.reset(pose);
   }
 
-  // Same drain over the `void*` head lane an inline `HSndEntityLoop` keeps: the
-  // nodes are the sound manager's tracking records, which share the two-pointer
-  // shape (0x008B88A0's loop reads `[eax+4]` and clears both words).
+  // The same drain over the `void*` head lane an inline `HSndEntityLoop` keeps
+  // at +0x30. These nodes are the sound manager's tracking records, *not*
+  // selection weak-references: they only share the two-pointer shape
+  // (0x008B88A0's loop reads `[eax+4]` and clears both words). The record type
+  // has not been named yet, so the node stays the shape-only
+  // `TDatListItem<void, void>` the intrusive-link contract prescribes while an
+  // owner is still unidentified.
   void ResetLinkChain(void*& head) noexcept
   {
-    auto* node = static_cast<moho::UserEntityLinkNode*>(head);
+    using SoundTrackingNode = moho::TDatListItem<void, void>;
+    auto* node = static_cast<SoundTrackingNode*>(head);
     while (node) {
-      moho::UserEntityLinkNode* const next = node->mNext;
+      SoundTrackingNode* const next = node->mNext;
       node->mPrev = nullptr;
       node->mNext = nullptr;
       node = next;
@@ -135,26 +129,21 @@ namespace
     head = nullptr;
   }
 
-  void ResetLinkChain(moho::UserEntityLinkNode*& head) noexcept
+  /**
+   * Drains one intrusive chain of selection weak-references, nulling both
+   * words of every node. `~UserEntity` runs this over `mIUnitChainHead` at
+   * 0x008B8892: it re-reads the head each iteration (`mov eax, [esi+8]`),
+   * publishes `node->mNextOwner` into it (`mov [esi+8], ecx`), then clears
+   * `mOwnerLinkSlot` and `mNextOwner` (`mov [eax], ebx` / `mov [eax+4], ebx`).
+   */
+  void ResetLinkChain(moho::SSelectionWeakRefUserEntity*& head) noexcept
   {
-    // 0x004DFC50 / 0x00406560: unlink chain head by nulling each node's prev/next.
     while (head) {
-      moho::UserEntityLinkNode* const next = head->mNext;
-      head->mPrev = nullptr;
-      head->mNext = nullptr;
+      moho::SSelectionWeakRefUserEntity* const next = head->mNextOwner;
+      head->mOwnerLinkSlot = nullptr;
+      head->mNextOwner = nullptr;
       head = next;
     }
-  }
-
-  void DestroySpatialDbMeshInstanceStorage(moho::UserEntitySpatialDbEntry& storage)
-  {
-    // 0x008B8790: guard wrapper used by UserEntity dtor unwind path.
-    if (!storage.mSpatialDb) {
-      return;
-    }
-
-    auto* const meshInstance = reinterpret_cast<moho::SpatialDB_MeshInstance*>(&storage);
-    meshInstance->ClearRegistration();
   }
 
   void CopyPoseState(moho::CAniPose& dst, const moho::CAniPose& src)
@@ -315,7 +304,7 @@ namespace moho
     : WeakObject()
     , mIUnitChainHead(nullptr)
     , mSession(&session)
-    , mSpatialDbEntry{nullptr, 0}
+    , mSpatialDbEntry{}
     , mVisionHandle(nullptr)
     , mPosePrimary()
     , mPoseSecondary()
@@ -350,8 +339,10 @@ namespace moho
       }
     }
 
+    // 0x008B8721: `lea ebp, [edi+0x10]` addresses this member, `esi` carries
+    // `CWldSession + 0x50` as the storage root, and `eax` the routing mask.
     const std::int32_t spatialDbMask = BuildSpatialDbRoutingMaskFromEntityId(mParams.mEntityId, sourceIndex);
-    InitializeSpatialDbEntry(mSpatialDbEntry, mSession->GetEntitySpatialDbStorage(), this, spatialDbMask);
+    mSpatialDbEntry.Register(mSession->GetEntitySpatialDbStorage(), this, spatialDbMask);
 
     mRumbleLoopHandle = SND_GetSharedAmbientHandle(nullptr);
   }
@@ -380,7 +371,13 @@ namespace moho
       mVisionHandle = nullptr;
     }
 
-    DestroySpatialDbMeshInstanceStorage(mSpatialDbEntry);
+    // `mSpatialDbEntry` unregisters itself: 0x008B888D calls
+    // `~SpatialDB_MeshInstance` (0x00501BC0) on `this + 0x10` under the
+    // `db != nullptr` guard the compiler hoists to every call site. No source
+    // line writes that call -- it is ordinary member destruction -- so the
+    // former `DestroySpatialDbMeshInstanceStorage` wrapper is gone. It cited
+    // 0x008B8790, which is not a function at all (no progress-db entry, no
+    // callers, unreachable); that address is the constructor's unwind funclet.
     ResetLinkChain(mIUnitChainHead);
   }
 
@@ -567,7 +564,7 @@ namespace moho
         spatialBounds.Min = variableData.mCurTransform.pos_;
         spatialBounds.Max = variableData.mCurTransform.pos_;
       }
-      reinterpret_cast<SpatialDB_MeshInstance*>(&mSpatialDbEntry)->UpdateBounds(spatialBounds);
+      mSpatialDbEntry.UpdateBounds(spatialBounds);
       { static int sB = 0; if (sB < 14) { ++sB; gpg::Warnf("[BOUNDSDIAG] ent=%p mesh=%p box=(%.1f,%.1f,%.1f)-(%.1f,%.1f,%.1f)", static_cast<void*>(this), static_cast<void*>(mMeshInstance), spatialBounds.Min.x, spatialBounds.Min.y, spatialBounds.Min.z, spatialBounds.Max.x, spatialBounds.Max.y, spatialBounds.Max.z); } } // TEMPORARY PROBE (do not commit)
     }
 
@@ -810,7 +807,7 @@ namespace moho
     );
 
     const Wm3::AxisAlignedBox3f sweptBounds = mMeshInstance->GetSweptAlignedBox();
-    reinterpret_cast<SpatialDB_MeshInstance*>(&mSpatialDbEntry)->UpdateBounds(sweptBounds);
+    mSpatialDbEntry.UpdateBounds(sweptBounds);
   }
 
   /**

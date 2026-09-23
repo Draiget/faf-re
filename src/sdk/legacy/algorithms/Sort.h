@@ -382,7 +382,7 @@ namespace msvc8
          * settle-upward phase, matching this template's shape exactly rather
          * than the split `0x0089C170`/`0x0089C350` pair. Compares
          * `[node+0x14]` unsigned (`jnb`), i.e.
-         * `UserEntity::mSpatialDbEntry.mEntryId`. Called from `make_heap`
+         * `UserEntity::mSpatialDbEntry.entry`. Called from `make_heap`
          * (`0x0087E5B0`), `sort_heap` (`0x0087E5F0`), and three inlined
          * single-pop-step callers (`0x0087E8D0`, `0x0087EA70`, `0x0087EB30`).)
          * Address: 0x0087EA30 (FUN_0087EA30, VC8's standalone `_Push_heap` for

@@ -183,7 +183,7 @@ namespace
    * Sorts one collected `UserEntity*` range (entities or props gathered by
    * `EntitiesInView`/`PropsInView`) into decal-draw order. The binary orders
    * by each entity's spatial-db registration id
-   * (`UserEntity::mSpatialDbEntry.mEntryId`, an unsigned compare at node
+   * (`UserEntity::mSpatialDbEntry.entry`, an unsigned compare at node
    * offset `+0x14`) rather than by pointer identity, so this has to be
    * `msvc8::sort` with an explicit comparator, not a bare `std::sort` on the
    * pointers themselves.
@@ -195,8 +195,8 @@ namespace
         entities.begin(),
         entities.end(),
         [](const moho::UserEntity* const lhs, const moho::UserEntity* const rhs) noexcept {
-          return static_cast<std::uint32_t>(lhs->mSpatialDbEntry.mEntryId)
-               < static_cast<std::uint32_t>(rhs->mSpatialDbEntry.mEntryId);
+          return static_cast<std::uint32_t>(lhs->mSpatialDbEntry.entry)
+               < static_cast<std::uint32_t>(rhs->mSpatialDbEntry.entry);
         }
       );
     }

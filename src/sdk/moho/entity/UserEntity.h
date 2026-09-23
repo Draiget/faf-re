@@ -8,8 +8,10 @@
 #include "moho/audio/CSndParams.h"
 #include "moho/containers/TDatList.h"
 #include "moho/entity/SSTIEntityVariableData.h"
+#include "moho/mesh/Mesh.h"
 #include "moho/misc/WeakObject.h"
 #include "moho/render/camera/VTransform.h"
+#include "moho/sim/WeakEntitySet.h"
 #include "moho/vision/VisionDB.h"
 #include "Wm3Box3.h"
 
@@ -24,16 +26,6 @@ namespace moho
   class UserArmy;
   class CSndParams;
   struct REntityBlueprint;
-
-  using UserEntityLinkNode = TDatListItem<void, void>;
-  static_assert(sizeof(UserEntityLinkNode) == 0x08, "UserEntityLinkNode size must be 0x08");
-
-  struct UserEntitySpatialDbEntry
-  {
-    void* mSpatialDb;      // 0x00
-    std::int32_t mEntryId; // 0x04
-  };
-  static_assert(sizeof(UserEntitySpatialDbEntry) == 0x08, "UserEntitySpatialDbEntry size must be 0x08");
 
   class UserEntity : public WeakObject
   {
@@ -290,9 +282,18 @@ namespace moho
     // intrusive chain of `WeakPtr<UserEntity>` nodes that name this entity.
     // It used to be restated here as a second field, which pushed every
     // offset below it four bytes past the binary.
-    UserEntityLinkNode* mIUnitChainHead;        // 0x08
-    CWldSession* mSession;                      // 0x0C
-    UserEntitySpatialDbEntry mSpatialDbEntry;   // 0x10
+    /// Head of the intrusive chain of selection weak-references naming this
+    /// entity. `CameraImpl`'s `LinkSelectionWeakOwnerRef` pushes each
+    /// `SSelectionWeakRefUserEntity` onto this slot, and `~UserEntity` drains
+    /// it at 0x008B8892 by nulling both words of every node.
+    SSelectionWeakRefUserEntity* mIUnitChainHead; // 0x08
+    CWldSession* mSession;                        // 0x0C
+    /// The entity's registration in the session's mesh spatial database. The
+    /// constructor registers it at 0x008B8721 against `CWldSession + 0x50`
+    /// (`SpatialDB_MeshInstance::Register`, 0x00501A80) with the category
+    /// routing mask, and `~SpatialDB_MeshInstance` (0x00501BC0) unregisters it
+    /// as an ordinary member destructor at 0x008B888D.
+    SpatialDB_MeshInstance mSpatialDbEntry;       // 0x10
     VisionDB::Handle* mVisionHandle;            // 0x18
     boost::shared_ptr<CAniPose> mPosePrimary;   // 0x1C
     boost::shared_ptr<CAniPose> mPoseSecondary; // 0x24
