@@ -121,7 +121,7 @@ namespace moho
     // 0x007E6FB9..0x007E6FE3. The triangle count is the index count divided by
     // three (the binary's `imul 55555556h` signed magic divide), and the attach
     // count is the bone-table remainder past the skinned bones.
-    mVertexCount = static_cast<std::int32_t>(mesh.mBoneBoundsSampleCount);
+    mVertexCount = static_cast<std::int32_t>(mesh.mVertexCount);
     mIndexCount = static_cast<std::int32_t>(mesh.mIndexCount);
     mTriangleCount = mIndexCount / 3;
     mBoneCount = static_cast<std::int32_t>(mesh.mSkinBoneCount);

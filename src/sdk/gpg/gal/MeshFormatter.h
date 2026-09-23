@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "gpg/gal/MeshVertex.h"
+
 namespace gpg::gal
 {
 	/**
@@ -65,16 +67,16 @@ namespace gpg::gal
 		 * Address: 0x00A82547 (_purecall in MeshFormatter slot 4)
 		 * Slot: 4
 		 *
-		 * std::int32_t streamClass, void* destinationVertex,
-		 * const void* sourceVertex, std::int32_t writeVariant
-		 *
 		 * What it does:
-		 * Packs one source vertex payload into the backend-specific runtime layout.
+		 * Packs one half of `sourceVertex` into the vertex-buffer record at
+		 * `destinationVertex`: the geometry fields for stream class 0, the
+		 * instance fields otherwise. `writeVariant` selects format 16's extra
+		 * per-vertex position stream on the float16 D3D9 formatter.
 		 */
 		virtual void WriteFormattedVertex(
 			std::int32_t streamClass,
 			void* destinationVertex,
-			const void* sourceVertex,
+			const MeshVertex& sourceVertex,
 			std::int32_t writeVariant) = 0;
 
 	protected:

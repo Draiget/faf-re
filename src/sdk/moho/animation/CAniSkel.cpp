@@ -905,7 +905,8 @@ namespace moho
    * Mangled: ?UpdateBoneBounds@CAniSkel@Moho@@AAEXXZ
    *
    * What it does:
-   * Rebuilds per-bone min/max bounds from SCM sample mapping data.
+   * Rebuilds per-bone min/max bounds: every SCM vertex is rotated into its
+   * bone's frame and grows that bone's box.
    *
    * Ground truth (`FUN_0054A540.c`) rotates via
    * `Moho::MultQuadVec(&v31, v11, &v12->ori)`, not the generic
@@ -932,19 +933,19 @@ namespace moho
     }
 
     const std::uint32_t boneCount = static_cast<std::uint32_t>(mBones.size());
-    const std::uint32_t sampleCount = sourceFile->mBoneBoundsSampleCount;
-    if (sampleCount == 0u) {
+    const std::uint32_t vertexCount = sourceFile->mVertexCount;
+    if (vertexCount == 0u) {
       return;
     }
 
-    const SScmBoneBoundsSample* const samples = scm_file::GetBoneBoundsSamples(*sourceFile);
-    if (samples == nullptr) {
+    const SScmVertex* const vertices = scm_file::GetVertices(*sourceFile);
+    if (vertices == nullptr) {
       return;
     }
 
-    for (std::uint32_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const SScmBoneBoundsSample& sample = samples[sampleIndex];
-      const std::uint32_t boneIndex = sample.mBoneIndex;
+    for (std::uint32_t vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+      const SScmVertex& vertex = vertices[vertexIndex];
+      const std::uint32_t boneIndex = vertex.mBoneIndex;
       if (boneIndex >= boneCount) {
         gpg::Warnf("Encoutered bad SCM file. Dumping out data");
         for (std::uint32_t dumpIndex = 0; dumpIndex < boneCount; ++dumpIndex) {
@@ -952,12 +953,12 @@ namespace moho
           gpg::Warnf(" dumping bone %d name = %s", dumpIndex, boneName);
         }
 
-        GPG_ASSERT(!"Invalid bone index in SCM bounds sample");
+        GPG_ASSERT(!"Invalid bone index in SCM vertex");
         return;
       }
 
       SAniSkelBone& bone = boneStart[boneIndex];
-      const Wm3::Vec3f localPosition{sample.mLocalPositionX, sample.mLocalPositionY, sample.mLocalPositionZ};
+      const Wm3::Vec3f localPosition{vertex.mLocalPositionX, vertex.mLocalPositionY, vertex.mLocalPositionZ};
       Wm3::Vec3f rotatedPosition{};
       MultQuadVec(&rotatedPosition, &localPosition, &bone.mBoneTransform.orient_);
 

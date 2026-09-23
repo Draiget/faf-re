@@ -1596,6 +1596,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="gpg\gal\IndexBufferContext.hpp" />
     <ClInclude Include="gpg\gal\Matrix.h" />
     <ClInclude Include="gpg\gal\MeshFormatter.h" />
+    <ClInclude Include="gpg\gal\MeshVertex.h" />
     <ClInclude Include="gpg\gal\OutputContext.hpp" />
     <ClInclude Include="gpg\gal\PipelineState.hpp" />
     <ClInclude Include="gpg\gal\RenderTarget.hpp" />

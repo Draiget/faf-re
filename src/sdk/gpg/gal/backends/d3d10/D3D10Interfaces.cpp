@@ -133,183 +133,7 @@ namespace gpg::gal
     constexpr std::uint32_t kFloat16VertexStrideStream0 = 0x2CU;
     constexpr std::uint32_t kFloat16VertexStrideStream1 = 0x44U;
 
-    struct SourceMeshVertexRuntime final
-    {
-      std::uint8_t streamClassFlag = 0;  // +0x00
-      std::uint8_t pad01_03[3]{};
-      float streamScalar04 = 0.0f;       // +0x04
-      std::uint32_t streamPacked08 = 0U; // +0x08
-      float streamScalar0C = 0.0f;       // +0x0C
-      float transform4x4[16]{};          // +0x10 .. +0x4F
-      std::uint8_t streamFlag50 = 0;     // +0x50
-      std::uint8_t streamColor51 = 0;    // +0x51
-      std::uint8_t streamColor52 = 0;    // +0x52
-      std::uint8_t streamColor53 = 0;    // +0x53
-      std::uint8_t streamColor54 = 0;    // +0x54
-      std::uint8_t pad55_57[3]{};
-      float streamVec58[3]{};      // +0x58 .. +0x63
-      float streamVec64[3]{};      // +0x64 .. +0x6F
-      float streamVec70[3]{};      // +0x70 .. +0x7B
-      float streamVec7C[3]{};      // +0x7C .. +0x87
-      float streamVec88[3]{};      // +0x88 .. +0x93
-      float streamScalar94 = 0.0f; // +0x94
-      float streamScalar98 = 0.0f; // +0x98
-      float streamScalar9C = 0.0f; // +0x9C
-      float streamScalarA0 = 0.0f; // +0xA0
-      std::uint8_t streamBoolA4 = 0; // +0xA4
-      std::uint8_t padA5_A7[3]{};
-      float streamScalarA8 = 0.0f; // +0xA8
-      float streamScalarAC = 0.0f; // +0xAC
-      std::uint8_t streamFlagB0 = 0; // +0xB0
-      std::uint8_t padB1_B3[3]{};
-      float streamScalarB4 = 0.0f; // +0xB4
-    };
 
-    struct HardwareVertexPackedStream0Runtime final
-    {
-      float lane00 = 0.0f; // +0x00
-      float lane04 = 0.0f; // +0x04
-      float lane08 = 0.0f; // +0x08
-      float lane0C = 0.0f; // +0x0C
-      float lane10 = 0.0f; // +0x10
-      float lane14 = 0.0f; // +0x14
-      float lane18 = 0.0f; // +0x18
-      float lane1C = 0.0f; // +0x1C
-      float lane20 = 0.0f; // +0x20
-      float lane24 = 0.0f; // +0x24
-      float lane28 = 0.0f; // +0x28
-      float lane2C = 0.0f; // +0x2C
-      float lane30 = 0.0f; // +0x30
-      float lane34 = 0.0f; // +0x34
-      float lane38 = 0.0f; // +0x38
-      float lane3C = 0.0f; // +0x3C
-      float lane40 = 0.0f; // +0x40
-      std::uint8_t lane44 = 0; // +0x44
-      std::uint8_t lane45 = 0; // +0x45
-      std::uint8_t lane46 = 0; // +0x46
-      std::uint8_t lane47 = 0; // +0x47
-    };
-
-    struct HardwareVertexPackedStream1Runtime final
-    {
-      float row0[3]{}; // +0x00
-      float row1[3]{}; // +0x0C
-      float row2[3]{}; // +0x18
-      float row3[3]{}; // +0x24
-      std::uint8_t lane30 = 0; // +0x30
-      std::uint8_t lane31 = 0; // +0x31
-      std::uint8_t lane32 = 0; // +0x32
-      std::uint8_t lane33 = 0; // +0x33
-      float lane34 = 0.0f; // +0x34
-      float lane38 = 0.0f; // +0x38
-      float lane3C = 0.0f; // +0x3C
-      float lane40 = 0.0f; // +0x40
-      std::uint32_t lane44 = 0U; // +0x44
-      float lane48 = 0.0f; // +0x48
-    };
-
-    struct Float16VertexPackedStream1Runtime final
-    {
-      float row0[3]{}; // +0x00
-      float row1[3]{}; // +0x0C
-      float row2[3]{}; // +0x18
-      float row3[3]{}; // +0x24
-      std::uint8_t lane30 = 0; // +0x30
-      std::uint8_t lane31 = 0; // +0x31
-      std::uint8_t lane32 = 0; // +0x32
-      std::uint8_t lane33 = 0; // +0x33
-      std::uint16_t lane34 = 0; // +0x34
-      std::uint16_t lane36 = 0; // +0x36
-      std::uint16_t lane38 = 0; // +0x38
-      std::uint16_t lane3A = 0; // +0x3A
-      std::uint32_t lane3C = 0U; // +0x3C
-      float lane40 = 0.0f; // +0x40
-    };
-
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamScalar04) == 0x04,
-      "SourceMeshVertexRuntime::streamScalar04 offset must be 0x04"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, transform4x4) == 0x10,
-      "SourceMeshVertexRuntime::transform4x4 offset must be 0x10"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamColor51) == 0x51,
-      "SourceMeshVertexRuntime::streamColor51 offset must be 0x51"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamVec58) == 0x58, "SourceMeshVertexRuntime::streamVec58 offset must be 0x58"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamVec70) == 0x70, "SourceMeshVertexRuntime::streamVec70 offset must be 0x70"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamVec88) == 0x88, "SourceMeshVertexRuntime::streamVec88 offset must be 0x88"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamScalarA8) == 0xA8,
-      "SourceMeshVertexRuntime::streamScalarA8 offset must be 0xA8"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamFlagB0) == 0xB0, "SourceMeshVertexRuntime::streamFlagB0 offset must be 0xB0"
-    );
-    static_assert(
-      offsetof(SourceMeshVertexRuntime, streamScalarB4) == 0xB4,
-      "SourceMeshVertexRuntime::streamScalarB4 offset must be 0xB4"
-    );
-    static_assert(sizeof(SourceMeshVertexRuntime) == 0xB8, "SourceMeshVertexRuntime size must be 0xB8");
-    static_assert(
-      offsetof(HardwareVertexPackedStream0Runtime, lane0C) == 0x0C,
-      "HardwareVertexPackedStream0Runtime::lane0C offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream0Runtime, lane28) == 0x28,
-      "HardwareVertexPackedStream0Runtime::lane28 offset must be 0x28"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream0Runtime, lane44) == 0x44,
-      "HardwareVertexPackedStream0Runtime::lane44 offset must be 0x44"
-    );
-    static_assert(sizeof(HardwareVertexPackedStream0Runtime) == 0x48, "HardwareVertexPackedStream0Runtime size must be 0x48");
-    static_assert(
-      offsetof(HardwareVertexPackedStream1Runtime, row1) == 0x0C,
-      "HardwareVertexPackedStream1Runtime::row1 offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream1Runtime, row2) == 0x18,
-      "HardwareVertexPackedStream1Runtime::row2 offset must be 0x18"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream1Runtime, lane30) == 0x30,
-      "HardwareVertexPackedStream1Runtime::lane30 offset must be 0x30"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream1Runtime, lane44) == 0x44,
-      "HardwareVertexPackedStream1Runtime::lane44 offset must be 0x44"
-    );
-    static_assert(
-      offsetof(HardwareVertexPackedStream1Runtime, lane48) == 0x48,
-      "HardwareVertexPackedStream1Runtime::lane48 offset must be 0x48"
-    );
-    static_assert(sizeof(HardwareVertexPackedStream1Runtime) == 0x4C, "HardwareVertexPackedStream1Runtime size must be 0x4C");
-    static_assert(
-      offsetof(Float16VertexPackedStream1Runtime, row1) == 0x0C,
-      "Float16VertexPackedStream1Runtime::row1 offset must be 0x0C"
-    );
-    static_assert(
-      offsetof(Float16VertexPackedStream1Runtime, lane30) == 0x30,
-      "Float16VertexPackedStream1Runtime::lane30 offset must be 0x30"
-    );
-    static_assert(
-      offsetof(Float16VertexPackedStream1Runtime, lane34) == 0x34,
-      "Float16VertexPackedStream1Runtime::lane34 offset must be 0x34"
-    );
-    static_assert(
-      offsetof(Float16VertexPackedStream1Runtime, lane3C) == 0x3C,
-      "Float16VertexPackedStream1Runtime::lane3C offset must be 0x3C"
-    );
-    static_assert(sizeof(Float16VertexPackedStream1Runtime) == 0x44, "Float16VertexPackedStream1Runtime size must be 0x44");
 
     constexpr DXGIFormatPair kTextureDxgiGalPairs[89] = {
       {0, 20},  {1, 20},  {2, 18},  {3, 20},  {4, 20},  {5, 20},  {6, 20},  {7, 20},  {8, 20},  {9, 20},
@@ -1973,31 +1797,22 @@ namespace gpg::gal
      * Copies rows `(0,1,2)`, `(4,5,6)`, `(8,9,10)`, `(12,13,14)` from one
      * source 4x4 matrix into four contiguous 3-float destination rows.
      */
-    float* CopyMatrix4x3Rows(
+    const Matrix* CopyMatrix4x3Rows(
       float* const outRow0,
       float* const outRow1,
       float* const outRow2,
       float* const outRow3,
-      float* const sourceMatrix4x4
+      const Matrix& matrix
     )
     {
-      outRow0[0] = sourceMatrix4x4[0];
-      outRow0[1] = sourceMatrix4x4[1];
-      outRow0[2] = sourceMatrix4x4[2];
+      float* const outRows[4] = {outRow0, outRow1, outRow2, outRow3};
+      for (int row = 0; row < 4; ++row) {
+        outRows[row][0] = matrix.r[row].x;
+        outRows[row][1] = matrix.r[row].y;
+        outRows[row][2] = matrix.r[row].z;
+      }
 
-      outRow1[0] = sourceMatrix4x4[4];
-      outRow1[1] = sourceMatrix4x4[5];
-      outRow1[2] = sourceMatrix4x4[6];
-
-      outRow2[0] = sourceMatrix4x4[8];
-      outRow2[1] = sourceMatrix4x4[9];
-      outRow2[2] = sourceMatrix4x4[10];
-
-      outRow3[0] = sourceMatrix4x4[12];
-      outRow3[1] = sourceMatrix4x4[13];
-      outRow3[2] = sourceMatrix4x4[14];
-
-      return sourceMatrix4x4;
+      return &matrix;
     }
 
     /**
@@ -3429,58 +3244,59 @@ namespace gpg::gal
    * Address: 0x0094D550 (FUN_0094D550)
    *
    * What it does:
-   * Packs one source vertex into the runtime hardware-vertex stream layout.
+   * Packs one mesh vertex into vertex format 14: the geometry record for
+   * stream class 0 (position with w = 1), the instance record otherwise.
    */
   void HardwareVertexFormatterD3D10::WriteFormattedVertex(
     const std::int32_t streamClass,
     void* const destinationVertex,
-    const void* const sourceVertex,
+    const MeshVertex& source,
     const std::int32_t writeVariant
   )
   {
     static_cast<void>(writeVariant);
 
-    const auto& source = *reinterpret_cast<const SourceMeshVertexRuntime*>(sourceVertex);
     if (streamClass != 0) {
-      auto& destination = *reinterpret_cast<HardwareVertexPackedStream1Runtime*>(destinationVertex);
-      destination.lane30 = source.streamClassFlag;
-      destination.lane44 = source.streamPacked08;
-      destination.lane34 = source.streamScalar0C;
-      CopyMatrix4x3Rows(
-        destination.row0, destination.row1, destination.row2, destination.row3, const_cast<float*>(source.transform4x4)
-      );
-      destination.lane31 = source.streamFlag50;
-      destination.lane33 = (source.streamBoolA4 != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
-      destination.lane3C = source.streamScalarA8;
-      destination.lane40 = source.streamScalarAC;
-      destination.lane32 = source.streamFlagB0;
-      destination.lane38 = source.streamScalarB4;
-      destination.lane48 = source.streamScalar04;
+      auto& destination = *static_cast<HardwareVertexInstance*>(destinationVertex);
+      destination.instanceIndex = source.instanceIndex;
+      destination.color = source.color;
+      destination.shaderTime = source.shaderTime;
+      static_cast<void>(CopyMatrix4x3Rows(
+        destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
+        source.transform
+      ));
+      destination.bonePaletteBase = source.bonePaletteBase;
+      destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
+      destination.scroll[0] = source.scroll[0];
+      destination.scroll[1] = source.scroll[1];
+      destination.dissolve = source.dissolve;
+      destination.parameter = source.parameter;
+      destination.meshColor = source.meshColor;
       return;
     }
 
-    auto& destination = *reinterpret_cast<HardwareVertexPackedStream0Runtime*>(destinationVertex);
-    destination.lane44 = source.streamColor51;
-    destination.lane45 = source.streamColor52;
-    destination.lane46 = source.streamColor53;
-    destination.lane47 = source.streamColor54;
-    destination.lane00 = source.streamVec58[0];
-    destination.lane04 = source.streamVec58[1];
-    destination.lane08 = source.streamVec58[2];
-    destination.lane0C = 1.0f;
-    destination.lane10 = source.streamVec70[0];
-    destination.lane14 = source.streamVec70[1];
-    destination.lane18 = source.streamVec70[2];
-    destination.lane28 = source.streamVec7C[0];
-    destination.lane2C = source.streamVec7C[1];
-    destination.lane30 = source.streamVec7C[2];
-    destination.lane1C = source.streamVec88[0];
-    destination.lane20 = source.streamVec88[1];
-    destination.lane24 = source.streamVec88[2];
-    destination.lane34 = source.streamScalar94;
-    destination.lane38 = source.streamScalar98;
-    destination.lane3C = source.streamScalar9C;
-    destination.lane40 = source.streamScalarA0;
+    auto& destination = *static_cast<HardwareVertex*>(destinationVertex);
+    destination.boneIndices[0] = source.boneIndices[0];
+    destination.boneIndices[1] = source.boneIndices[1];
+    destination.boneIndices[2] = source.boneIndices[2];
+    destination.boneIndices[3] = source.boneIndices[3];
+    destination.position[0] = source.position[0];
+    destination.position[1] = source.position[1];
+    destination.position[2] = source.position[2];
+    destination.position[3] = 1.0f;
+    destination.normal[0] = source.normal[0];
+    destination.normal[1] = source.normal[1];
+    destination.normal[2] = source.normal[2];
+    destination.binormal[0] = source.binormal[0];
+    destination.binormal[1] = source.binormal[1];
+    destination.binormal[2] = source.binormal[2];
+    destination.tangent[0] = source.tangent[0];
+    destination.tangent[1] = source.tangent[1];
+    destination.tangent[2] = source.tangent[2];
+    destination.texCoords[0] = source.texCoord0[0];
+    destination.texCoords[1] = source.texCoord0[1];
+    destination.texCoords[2] = source.texCoord1[0];
+    destination.texCoords[3] = source.texCoord1[1];
   }
 
   /**
@@ -3633,33 +3449,36 @@ namespace gpg::gal
    * Address: 0x0094D7E0 (FUN_0094D7E0)
    *
    * What it does:
-   * Packs one source vertex into the runtime float16 stream-1 layout.
+   * Packs the instance half of one mesh vertex into the format 15 instance
+   * record (half-precision scalars). The body never looks at `streamClass`
+   * or `writeVariant` - the D3D10 float16 formatter only ever writes the
+   * instance stream.
    */
   void Float16HardwareVertexFormatterD3D10::WriteFormattedVertex(
     const std::int32_t streamClass,
     void* const destinationVertex,
-    const void* const sourceVertex,
+    const MeshVertex& source,
     const std::int32_t writeVariant
   )
   {
     static_cast<void>(streamClass);
     static_cast<void>(writeVariant);
 
-    const auto& source = *reinterpret_cast<const SourceMeshVertexRuntime*>(sourceVertex);
-    auto& destination = *reinterpret_cast<Float16VertexPackedStream1Runtime*>(destinationVertex);
-    destination.lane30 = source.streamClassFlag;
-    destination.lane3C = source.streamPacked08;
-    ConvertFloat32To16Array(&destination.lane34, &source.streamScalar0C, 1U);
-    CopyMatrix4x3Rows(
-      destination.row0, destination.row1, destination.row2, destination.row3, const_cast<float*>(source.transform4x4)
-    );
-    destination.lane31 = source.streamFlag50;
-    destination.lane33 = (source.streamBoolA4 != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
-    ConvertFloat32To16Array(&destination.lane3A, &source.streamScalarAC, 1U);
-    ConvertFloat32To16Array(&destination.lane38, &source.streamScalarA8, 1U);
-    destination.lane32 = source.streamFlagB0;
-    ConvertFloat32To16Array(&destination.lane36, &source.streamScalarB4, 1U);
-    destination.lane40 = source.streamScalar04;
+    auto& destination = *static_cast<Float16HardwareVertexInstance*>(destinationVertex);
+    destination.instanceIndex = source.instanceIndex;
+    destination.color = source.color;
+    ConvertFloat32To16Array(&destination.shaderTime, &source.shaderTime, 1U);
+    static_cast<void>(CopyMatrix4x3Rows(
+      destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
+      source.transform
+    ));
+    destination.bonePaletteBase = source.bonePaletteBase;
+    destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
+    ConvertFloat32To16Array(&destination.scroll[1], &source.scroll[1], 1U);
+    ConvertFloat32To16Array(&destination.scroll[0], &source.scroll[0], 1U);
+    destination.dissolve = source.dissolve;
+    ConvertFloat32To16Array(&destination.parameter, &source.parameter, 1U);
+    destination.meshColor = source.meshColor;
   }
 
   /**

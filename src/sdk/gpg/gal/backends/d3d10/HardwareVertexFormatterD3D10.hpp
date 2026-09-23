@@ -66,7 +66,7 @@ namespace gpg::gal
 		void WriteFormattedVertex(
 			std::int32_t streamClass,
 			void* destinationVertex,
-			const void* sourceVertex,
+			const MeshVertex& sourceVertex,
 			std::int32_t writeVariant) override;
 	};
 

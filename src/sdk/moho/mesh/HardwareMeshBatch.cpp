@@ -20,6 +20,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
+#include "gpg/gal/MeshVertex.h"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
@@ -68,67 +69,6 @@ namespace moho
 {
   namespace
   {
-    /**
-     * Staging layout the hardware vertex formatter reads as its source vertex
-     * (`WriteFormattedVertex`, stream class 0). This mirrors the backend's
-     * private `SourceMeshVertexRuntime` (0xB8 bytes); the batch-fill path only
-     * populates the fields the stream-0 packer consumes. Kept file-local as a
-     * transient staging record — it is not a binary-owned object.
-     *
-     * Field offsets byte-verified against the vertex-scatter loop in
-     * FUN_007E7540 (0x007E797D..0x007E7AD6) and the stream-0 reads in
-     * gpg::gal::Float16HardwareVertexFormatterD3D9::WriteFormattedVertex.
-     */
-    struct MeshBatchSourceVertex final
-    {
-      // --- Stream class 1 lanes (per-instance), written by FillBatch. --------
-      std::uint8_t instanceIndex = 0; // +0x00
-      std::uint8_t pad01_03[3]{};
-      float meshColor = 0.0f;         // +0x04
-      std::int32_t color = 0;         // +0x08
-      float shaderTime = 0.0f;        // +0x0C
-      VMatrix4 transform{};           // +0x10 (0x40 bytes)
-      std::uint8_t bonePaletteBase = 0; // +0x50
-      // --- Stream class 0 lanes (per-vertex), written by Initialize. --------
-      std::uint8_t boneIndex0 = 0; // +0x51
-      std::uint8_t boneIndex1 = 0; // +0x52
-      std::uint8_t boneIndex2 = 0; // +0x53
-      std::uint8_t boneIndex3 = 0; // +0x54
-      std::uint8_t pad55_57[3]{};
-      float position[3]{}; // +0x58
-      std::uint8_t pad64_6F[0x0C]{};
-      float vec70[3]{}; // +0x70
-      float vec7C[3]{}; // +0x7C
-      float vec88[3]{}; // +0x88
-      float texCoord0[2]{}; // +0x94 (streamScalar94/98)
-      float texCoord1[2]{}; // +0x9C (streamScalar9C/A0)
-      // --- Stream class 1 tail lanes (per-instance), written by FillBatch. ---
-      std::uint8_t useSecondaryData = 0; // +0xA4
-      std::uint8_t padA5_A7[3]{};
-      float scroll[2]{};                 // +0xA8, +0xAC
-      std::uint8_t dissolve = 0;         // +0xB0
-      std::uint8_t padB1_B3[3]{};
-      float parameter = 0.0f;            // +0xB4
-    };
-
-    static_assert(offsetof(MeshBatchSourceVertex, meshColor) == 0x04, "MeshBatchSourceVertex::meshColor offset must be 0x04");
-    static_assert(offsetof(MeshBatchSourceVertex, color) == 0x08, "MeshBatchSourceVertex::color offset must be 0x08");
-    static_assert(offsetof(MeshBatchSourceVertex, shaderTime) == 0x0C, "MeshBatchSourceVertex::shaderTime offset must be 0x0C");
-    static_assert(offsetof(MeshBatchSourceVertex, transform) == 0x10, "MeshBatchSourceVertex::transform offset must be 0x10");
-    static_assert(offsetof(MeshBatchSourceVertex, bonePaletteBase) == 0x50, "MeshBatchSourceVertex::bonePaletteBase offset must be 0x50");
-    static_assert(offsetof(MeshBatchSourceVertex, useSecondaryData) == 0xA4, "MeshBatchSourceVertex::useSecondaryData offset must be 0xA4");
-    static_assert(offsetof(MeshBatchSourceVertex, scroll) == 0xA8, "MeshBatchSourceVertex::scroll offset must be 0xA8");
-    static_assert(offsetof(MeshBatchSourceVertex, dissolve) == 0xB0, "MeshBatchSourceVertex::dissolve offset must be 0xB0");
-    static_assert(offsetof(MeshBatchSourceVertex, parameter) == 0xB4, "MeshBatchSourceVertex::parameter offset must be 0xB4");
-    static_assert(offsetof(MeshBatchSourceVertex, boneIndex0) == 0x51, "MeshBatchSourceVertex::boneIndex0 offset must be 0x51");
-    static_assert(offsetof(MeshBatchSourceVertex, position) == 0x58, "MeshBatchSourceVertex::position offset must be 0x58");
-    static_assert(offsetof(MeshBatchSourceVertex, vec70) == 0x70, "MeshBatchSourceVertex::vec70 offset must be 0x70");
-    static_assert(offsetof(MeshBatchSourceVertex, vec7C) == 0x7C, "MeshBatchSourceVertex::vec7C offset must be 0x7C");
-    static_assert(offsetof(MeshBatchSourceVertex, vec88) == 0x88, "MeshBatchSourceVertex::vec88 offset must be 0x88");
-    static_assert(offsetof(MeshBatchSourceVertex, texCoord0) == 0x94, "MeshBatchSourceVertex::texCoord0 offset must be 0x94");
-    static_assert(offsetof(MeshBatchSourceVertex, texCoord1) == 0x9C, "MeshBatchSourceVertex::texCoord1 offset must be 0x9C");
-    static_assert(sizeof(MeshBatchSourceVertex) == 0xB8, "MeshBatchSourceVertex size must be 0xB8");
-
     /// Wrap period the mesh shader's animated-time lane is reduced modulo
     /// (flt_F57F08); shared with the frame/effect shader-time lanes in Mesh.cpp.
     constexpr float kMeshShaderTimeWrapSeconds = 36000.0f;
@@ -457,31 +397,30 @@ namespace moho
     for (std::int32_t vertexIndex = 0; vertexIndex < mVertexCount; ++vertexIndex) {
       const SScmVertex& source = sourceVertices[vertexIndex];
 
-      MeshBatchSourceVertex staging{};
+      gpg::gal::MeshVertex staging{};
       staging.position[0] = source.mLocalPositionX;
       staging.position[1] = source.mLocalPositionY;
       staging.position[2] = source.mLocalPositionZ;
-      // 0x007E79B2..0x007E7A43 (staging record at [esp+0x4C]): SCM +0x0C ->
-      // staging +0x70, SCM +0x18 -> staging +0x88, SCM +0x24 -> staging +0x7C.
-      staging.vec70[0] = source.mVec0C[0];
-      staging.vec70[1] = source.mVec0C[1];
-      staging.vec70[2] = source.mVec0C[2];
-      staging.vec88[0] = source.mVec18[0];
-      staging.vec88[1] = source.mVec18[1];
-      staging.vec88[2] = source.mVec18[2];
-      staging.vec7C[0] = source.mVec24[0];
-      staging.vec7C[1] = source.mVec24[1];
-      staging.vec7C[2] = source.mVec24[2];
+      // 0x007E79B2..0x007E7A43, staging record at [esp+0x4C].
+      staging.normal[0] = source.mNormal[0];
+      staging.normal[1] = source.mNormal[1];
+      staging.normal[2] = source.mNormal[2];
+      staging.tangent[0] = source.mTangent[0];
+      staging.tangent[1] = source.mTangent[1];
+      staging.tangent[2] = source.mTangent[2];
+      staging.binormal[0] = source.mBinormal[0];
+      staging.binormal[1] = source.mBinormal[1];
+      staging.binormal[2] = source.mBinormal[2];
       staging.texCoord0[0] = source.mTexCoord0[0];
       staging.texCoord0[1] = source.mTexCoord0[1];
       staging.texCoord1[0] = source.mTexCoord1[0];
       staging.texCoord1[1] = source.mTexCoord1[1];
-      staging.boneIndex0 = source.mBoneIndex;
-      staging.boneIndex1 = source.mBoneIndex1;
-      staging.boneIndex2 = source.mBoneIndex2;
-      staging.boneIndex3 = source.mBoneIndex3;
+      staging.boneIndices[0] = source.mBoneIndex;
+      staging.boneIndices[1] = source.mBoneIndex1;
+      staging.boneIndices[2] = source.mBoneIndex2;
+      staging.boneIndices[3] = source.mBoneIndex3;
 
-      formatter->WriteFormattedVertex(0, mappedVertices, &staging, 0);
+      formatter->WriteFormattedVertex(0, mappedVertices, staging, 0);
       mappedVertices += vertexStride;
     }
 
@@ -538,7 +477,7 @@ namespace moho
                               "[MIXTRI] batch=%p unit=%s tris=%d mixed=%u badIndex=%u idx0..5=%u,%u,%u,%u,%u,%u hdr: vOff=%u vCnt=%u iOff=%u iCnt=%u skin=%u total=%u\n",
                               static_cast<const void*>(this), gateName, mTriangleCount, mixed, badIndex,
                               indices[0], indices[1], indices[2], indices[3], indices[4], indices[5],
-                              mesh->mBoneBoundsSampleOffset, mesh->mBoneBoundsSampleCount, mesh->mIndexDataOffset,
+                              mesh->mVertexOffset, mesh->mVertexCount, mesh->mIndexDataOffset,
                               mesh->mIndexCount, mesh->mSkinBoneCount, mesh->mBoneTotalCount);
           ::OutputDebugStringA(mixedLine);
         }
@@ -927,7 +866,7 @@ namespace moho
 
     // The binary zeroes the staging record once, ahead of the run, and only
     // rewrites the lanes that vary per instance.
-    MeshBatchSourceVertex staging{};
+    gpg::gal::MeshVertex staging{};
 
     const std::uint32_t instanceStride = formatter->GetVertexStride(1, 0);
 
@@ -1003,7 +942,7 @@ namespace moho
           formatter->WriteFormattedVertex(
             1,
             static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset,
-            &staging,
+            staging,
             0
           );
 

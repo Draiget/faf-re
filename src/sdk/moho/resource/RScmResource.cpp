@@ -290,8 +290,8 @@ namespace moho
    * ??0RScmResource@Moho@@QAE@VStrArg@gpg@@ABV?$shared_ptr@$$CBUSScmFile@Moho@@@boost@@@Z)
    *
    * What it does:
-   * Binds one SCM data-owner lane + resource path and computes cached
-   * bounds/size from embedded bone-bounds samples.
+   * Binds the SCM file and resource path, then caches the mesh's bounding
+   * box (over every vertex position) and its size.
    */
   RScmResource::RScmResource(const gpg::StrArg resourcePath, const boost::shared_ptr<const SScmFile>& scmFile) :
     mName(resourcePath),
@@ -300,30 +300,30 @@ namespace moho
     mBounds(Empty<Wm3::AxisAlignedBox3f>()),
     mSize(0.0f)
   {
-    const std::int32_t sampleCount = static_cast<std::int32_t>(mFile->mBoneBoundsSampleCount);
-    const SScmBoneBoundsSample* const samples = scm_file::GetBoneBoundsSamples(*mFile);
+    const std::int32_t vertexCount = static_cast<std::int32_t>(mFile->mVertexCount);
+    const SScmVertex* const vertices = scm_file::GetVertices(*mFile);
 
-    for (std::int32_t sampleIndex = 0; sampleIndex < sampleCount; ++sampleIndex) {
-      const SScmBoneBoundsSample& sample = samples[sampleIndex];
+    for (std::int32_t vertexIndex = 0; vertexIndex < vertexCount; ++vertexIndex) {
+      const SScmVertex& vertex = vertices[vertexIndex];
 
-      if (sample.mLocalPositionX < mBounds.Min.x) {
-        mBounds.Min.x = sample.mLocalPositionX;
+      if (vertex.mLocalPositionX < mBounds.Min.x) {
+        mBounds.Min.x = vertex.mLocalPositionX;
       }
-      if (sample.mLocalPositionY < mBounds.Min.y) {
-        mBounds.Min.y = sample.mLocalPositionY;
+      if (vertex.mLocalPositionY < mBounds.Min.y) {
+        mBounds.Min.y = vertex.mLocalPositionY;
       }
-      if (sample.mLocalPositionZ < mBounds.Min.z) {
-        mBounds.Min.z = sample.mLocalPositionZ;
+      if (vertex.mLocalPositionZ < mBounds.Min.z) {
+        mBounds.Min.z = vertex.mLocalPositionZ;
       }
 
-      if (sample.mLocalPositionX > mBounds.Max.x) {
-        mBounds.Max.x = sample.mLocalPositionX;
+      if (vertex.mLocalPositionX > mBounds.Max.x) {
+        mBounds.Max.x = vertex.mLocalPositionX;
       }
-      if (sample.mLocalPositionY > mBounds.Max.y) {
-        mBounds.Max.y = sample.mLocalPositionY;
+      if (vertex.mLocalPositionY > mBounds.Max.y) {
+        mBounds.Max.y = vertex.mLocalPositionY;
       }
-      if (sample.mLocalPositionZ > mBounds.Max.z) {
-        mBounds.Max.z = sample.mLocalPositionZ;
+      if (vertex.mLocalPositionZ > mBounds.Max.z) {
+        mBounds.Max.z = vertex.mLocalPositionZ;
       }
     }
 

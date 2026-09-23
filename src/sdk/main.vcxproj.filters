@@ -3999,6 +3999,9 @@
     <ClInclude Include="gpg\gal\MeshFormatter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="gpg\gal\MeshVertex.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\collision\CGeomSolid3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
