@@ -86,231 +86,16 @@ namespace gpg::gal
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/ui/IUIManager.h"
 
-// ---------------------------------------------------------------------------
-// The weak-slot registries `managedWindows` / `managedFrames`.
-//
-// Each managed dialog/frame owns the head of a chain of registry slots that
-// point back at it (the WeakObject pattern, spelled out by hand here), so that
-// WINX_Exit can find and destroy every one still open.
-// ---------------------------------------------------------------------------
-
-namespace
-{
-  constexpr std::uintptr_t kInlineHeadLinkSentinelMax = 0x10000u;
-
-  [[nodiscard]] bool IsInlineHeadLinkSentinel(
-    moho::ManagedWindowSlot** const ownerHeadLink
-  ) noexcept
-  {
-    return reinterpret_cast<std::uintptr_t>(ownerHeadLink) < kInlineHeadLinkSentinelMax;
-  }
-
-  [[nodiscard]] moho::ManagedWindowSlot* TranslateSlotPointerForReallocation(
-    moho::ManagedWindowSlot* const pointer,
-    const moho::ManagedWindowSlot* const oldStorage,
-    const std::size_t oldCount,
-    moho::ManagedWindowSlot* const newStorage
-  ) noexcept
-  {
-    if (pointer == nullptr || oldStorage == nullptr || oldCount == 0 || newStorage == nullptr) {
-      return pointer;
-    }
-
-    const std::uintptr_t oldBegin = reinterpret_cast<std::uintptr_t>(oldStorage);
-    const std::uintptr_t oldEnd = oldBegin + oldCount * sizeof(moho::ManagedWindowSlot);
-    const std::uintptr_t pointerValue = reinterpret_cast<std::uintptr_t>(pointer);
-    if (pointerValue < oldBegin || pointerValue >= oldEnd) {
-      return pointer;
-    }
-
-    const std::size_t index = (pointerValue - oldBegin) / sizeof(moho::ManagedWindowSlot);
-    return &newStorage[index];
-  }
-
-  void RebaseManagedSlotPointersAfterReallocation(
-    msvc8::vector<moho::ManagedWindowSlot>& slots,
-    const moho::ManagedWindowSlot* const oldStorage,
-    const std::size_t oldCount
-  ) noexcept
-  {
-    if (oldStorage == nullptr || oldCount == 0) {
-      return;
-    }
-
-    moho::ManagedWindowSlot* const newStorage = slots.data();
-    if (newStorage == nullptr || newStorage == oldStorage) {
-      return;
-    }
-
-    const std::size_t newCount = slots.size();
-    for (std::size_t index = 0; index < newCount; ++index) {
-      moho::ManagedWindowSlot& slot = newStorage[index];
-      slot.nextInOwnerChain =
-        TranslateSlotPointerForReallocation(slot.nextInOwnerChain, oldStorage, oldCount, newStorage);
-    }
-
-    for (std::size_t index = 0; index < newCount; ++index) {
-      moho::ManagedWindowSlot& slot = newStorage[index];
-      if (slot.ownerHeadLink == nullptr || IsInlineHeadLinkSentinel(slot.ownerHeadLink)) {
-        continue;
-      }
-
-      moho::ManagedWindowSlot* const translatedHead =
-        TranslateSlotPointerForReallocation(*slot.ownerHeadLink, oldStorage, oldCount, newStorage);
-      if (*slot.ownerHeadLink != translatedHead) {
-        *slot.ownerHeadLink = translatedHead;
-      }
-    }
-  }
-
-  void DetachSlotWithoutClearing(
-    moho::ManagedWindowSlot& slot
-  ) noexcept
-  {
-    if (slot.ownerHeadLink == nullptr || IsInlineHeadLinkSentinel(slot.ownerHeadLink)) {
-      return;
-    }
-
-    moho::ManagedWindowSlot** link = slot.ownerHeadLink;
-    while (*link != nullptr && *link != &slot) {
-      link = &(*link)->nextInOwnerChain;
-    }
-
-    if (*link == &slot) {
-      *link = slot.nextInOwnerChain;
-    }
-  }
-
-  void RelinkSlotToOwner(
-    moho::ManagedWindowSlot& slot,
-    moho::ManagedWindowSlot** const ownerHeadLink
-  ) noexcept
-  {
-    if (slot.ownerHeadLink == ownerHeadLink) {
-      return;
-    }
-
-    DetachSlotWithoutClearing(slot);
-    slot.ownerHeadLink = ownerHeadLink;
-    if (ownerHeadLink == nullptr) {
-      slot.nextInOwnerChain = nullptr;
-      return;
-    }
-
-    slot.nextInOwnerChain = *ownerHeadLink;
-    *ownerHeadLink = &slot;
-  }
-
-  template <typename TOwner>
-  [[nodiscard]] bool IsReusableManagedSlot(
-    const moho::ManagedWindowSlot& slot
-  )
-  {
-    return slot.ownerHeadLink == nullptr || slot.ownerHeadLink == TOwner::NullManagedSlotHeadLinkSentinel();
-  }
-
-  template <typename TOwner>
-  [[nodiscard]] bool TryReuseManagedSlot(
-    msvc8::vector<moho::ManagedWindowSlot>& slots,
-    moho::ManagedWindowSlot** const ownerHeadLink
-  )
-  {
-    for (moho::ManagedWindowSlot& slot : slots) {
-      if (!IsReusableManagedSlot<TOwner>(slot)) {
-        continue;
-      }
-
-      RelinkSlotToOwner(slot, ownerHeadLink);
-      return true;
-    }
-
-    return false;
-  }
-
-  template <typename TOwner>
-  void AppendManagedSlot(
-    msvc8::vector<moho::ManagedWindowSlot>& slots,
-    moho::ManagedWindowSlot** const ownerHeadLink
-  )
-  {
-    if (ownerHeadLink == nullptr) {
-      return;
-    }
-
-    moho::ManagedWindowSlot appendedSlot{};
-    appendedSlot.ownerHeadLink = ownerHeadLink;
-    appendedSlot.nextInOwnerChain = *ownerHeadLink;
-
-    // The slots link into each other, so growing the vector has to carry every
-    // link that pointed into the old storage across to the new one.
-    const moho::ManagedWindowSlot* const oldStorage = slots.data();
-    const std::size_t oldCount = slots.size();
-    slots.push_back(appendedSlot);
-    RebaseManagedSlotPointersAfterReallocation(slots, oldStorage, oldCount);
-
-    moho::ManagedWindowSlot& insertedSlot = slots.back();
-    insertedSlot.ownerHeadLink = ownerHeadLink;
-    *ownerHeadLink = &insertedSlot;
-  }
-
-  template <typename TOwner>
-  void RegisterManagedOwnerSlotImpl(
-    msvc8::vector<moho::ManagedWindowSlot>& slots,
-    moho::ManagedWindowSlot** const ownerHeadLink
-  )
-  {
-    if (ownerHeadLink == nullptr) {
-      return;
-    }
-
-    if (TryReuseManagedSlot<TOwner>(slots, ownerHeadLink)) {
-      return;
-    }
-
-    AppendManagedSlot<TOwner>(slots, ownerHeadLink);
-  }
-
-  void ReleaseManagedOwnerSlotChain(
-    moho::ManagedWindowSlot*& ownerHead
-  ) noexcept
-  {
-    while (ownerHead != nullptr) {
-      moho::ManagedWindowSlot* const slot = ownerHead;
-      ownerHead = slot->nextInOwnerChain;
-      slot->Clear();
-    }
-  }
-
-  template <typename TOwner>
-  void DestroyManagedRuntimeCollection(
-    msvc8::vector<moho::ManagedWindowSlot>& slots
-  )
-  {
-    for (std::size_t index = 0;; ++index) {
-      if (index >= slots.size()) {
-        break;
-      }
-
-      moho::ManagedWindowSlot& slot = slots[index];
-      if (slot.ownerHeadLink == nullptr || slot.ownerHeadLink == TOwner::NullManagedSlotHeadLinkSentinel()) {
-        continue;
-      }
-
-      TOwner* const owner = TOwner::FromManagedSlotHeadLink(slot.ownerHeadLink);
-      if (owner != nullptr) {
-        (void)owner->Destroy();
-      }
-
-      if (index >= slots.size()) {
-        continue;
-      }
-      slots[index].UnlinkFromOwner();
-    }
-  }
-} // namespace
-
-msvc8::vector<moho::ManagedWindowSlot> moho::managedWindows{};
-msvc8::vector<moho::ManagedWindowSlot> moho::managedFrames{};
+/**
+ * The managed-window registries (elements at 0x010A9B94 / 0x010A9BD8).
+ *
+ * Everything else about them is compiler-generated: the exit-time destructor
+ * registrations 0x00BC7320 / 0x00BC7330, their thunks 0x00BF18B0 /
+ * 0x00BF18C0, and the vector destructor bodies 0x004F8180 / 0x004F82D0,
+ * whose WeakPtr destructors unlink each slot from its window.
+ */
+msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>> moho::managedWindows;
+msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>> moho::managedFrames;
 wxWindow* moho::sMainWindow = nullptr;
 moho::WRenViewport* moho::ren_Viewport = nullptr;
 
@@ -892,8 +677,10 @@ void moho::CWinLogTarget::OnMessage(
   }
 }
 
+#define EVT_LOG_ADDITION_EVENT(fn)                                                                             DECLARE_EVENT_TABLE_ENTRY(                                                                                     moho::EVT_LOG_ADDITION, -1, -1,                                                                              (wxObjectEventFunction)(wxEventFunction)(moho::CLogAdditionEventFunction)&fn, (wxObject*)NULL              ),
+
 BEGIN_EVENT_TABLE(moho::WWinLogWindow, wxDialog)
-  EVT_CUSTOM(moho::EVT_LOG_ADDITION, -1, moho::WWinLogWindow::OnTargetPendingLinesChanged)
+  EVT_LOG_ADDITION_EVENT(moho::WWinLogWindow::OnTargetPendingLinesChanged)
   EVT_CHECKBOX(900, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
   EVT_CHECKBOX(901, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
   EVT_CHECKBOX(902, moho::WWinLogWindow::OnFilterOrCategoryControlsChanged)
@@ -1649,91 +1436,6 @@ long WSupComFrame::MSWWindowProc(
 }
 
 /**
- * Address family:
- * - 0x004F7210 (FUN_004F7210)
- * - 0x004F72D0 (FUN_004F72D0)
- *
- * What it does:
- * Unlinks one managed slot from its owner slot chain.
- */
-void moho::ManagedWindowSlot::UnlinkFromOwner() noexcept
-{
-  if (ownerHeadLink == nullptr || IsInlineHeadLinkSentinel(ownerHeadLink)) {
-    ownerHeadLink = nullptr;
-    nextInOwnerChain = nullptr;
-    return;
-  }
-
-  ManagedWindowSlot** link = ownerHeadLink;
-  while (*link != this) {
-    if (*link == nullptr) {
-      ownerHeadLink = nullptr;
-      nextInOwnerChain = nullptr;
-      return;
-    }
-    link = &(*link)->nextInOwnerChain;
-  }
-
-  *link = nextInOwnerChain;
-  ownerHeadLink = nullptr;
-  nextInOwnerChain = nullptr;
-}
-
-/**
- * Address context:
- * - destructor slot-clear writes in 0x004F40A0 / 0x004F4230
- *
- * What it does:
- * Clears both link lanes to the inert slot state.
- */
-void moho::ManagedWindowSlot::Clear() noexcept
-{
-  ownerHeadLink = nullptr;
-  nextInOwnerChain = nullptr;
-}
-
-moho::WWinManagedDialog* moho::WWinManagedDialog::FromManagedSlotHeadLink(
-  ManagedWindowSlot** const ownerHeadLink
-) noexcept
-{
-  if (ownerHeadLink == nullptr || ownerHeadLink == NullManagedSlotHeadLinkSentinel()) {
-    return nullptr;
-  }
-
-  const std::uintptr_t linkAddress = reinterpret_cast<std::uintptr_t>(ownerHeadLink);
-  return reinterpret_cast<WWinManagedDialog*>(linkAddress - offsetof(WWinManagedDialog, mManagedSlotsHead));
-}
-
-moho::ManagedWindowSlot** moho::WWinManagedDialog::NullManagedSlotHeadLinkSentinel() noexcept
-{
-  return reinterpret_cast<ManagedWindowSlot**>(offsetof(WWinManagedDialog, mManagedSlotsHead));
-}
-
-/**
- * Address: 0x004F7070 (FUN_004F7070)
- *
- * What it does:
- * Returns the current number of dialog-managed registry slots.
- */
-std::size_t moho::WWinManagedDialog::ManagedSlotCount()
-{
-  return managedWindows.size();
-}
-
-/**
- * Address: 0x004F70A0 (FUN_004F70A0)
- *
- * What it does:
- * Appends one dialog-managed registry slot and links it to `ownerHeadLink`.
- */
-void moho::WWinManagedDialog::AppendManagedSlotForOwner(
-  ManagedWindowSlot** const ownerHeadLink
-)
-{
-  AppendManagedSlot<WWinManagedDialog>(managedWindows, ownerHeadLink);
-}
-
-/**
  * Address: 0x004F3F50 (FUN_004F3F50)
  *
  * What it does:
@@ -1751,78 +1453,26 @@ moho::WWinManagedDialog::WWinManagedDialog(
   const wxString& name
 )
   : wxDialog(parent, id, title, position, size, style, name)
-  , mManagedSlotsHead(nullptr)
+  , WeakObject()
 {
-  RegisterManagedOwnerSlot();
+  for (std::size_t index = 0; index < managedWindows.size(); ++index) {
+    if (managedWindows[index].GetObjectPtr() == nullptr) {
+      managedWindows[index].Set(this);
+      return;
+    }
+  }
+  managedWindows.push_back(WeakPtr<WWinManagedDialog>(this));
 }
 
 /**
  * Address: 0x004F40A0 (FUN_004F40A0)
  *
  * What it does:
- * Unlinks every managed slot still pointing at this dialog; ~wxDialog follows.
+ * Detaches every weak reference still aimed at this dialog; ~wxDialog follows.
  */
 moho::WWinManagedDialog::~WWinManagedDialog()
 {
-  ReleaseManagedOwnerSlots();
-}
-
-void moho::WWinManagedDialog::RegisterManagedOwnerSlot()
-{
-  RegisterManagedOwnerSlotImpl<WWinManagedDialog>(managedWindows, &mManagedSlotsHead);
-}
-
-void moho::WWinManagedDialog::ReleaseManagedOwnerSlots()
-{
-  ReleaseManagedOwnerSlotChain(mManagedSlotsHead);
-}
-
-void moho::WWinManagedDialog::DestroyManagedOwners(
-  msvc8::vector<ManagedWindowSlot>& slots
-)
-{
-  DestroyManagedRuntimeCollection<WWinManagedDialog>(slots);
-}
-
-moho::WWinManagedFrame* moho::WWinManagedFrame::FromManagedSlotHeadLink(
-  ManagedWindowSlot** const ownerHeadLink
-) noexcept
-{
-  if (ownerHeadLink == nullptr || ownerHeadLink == NullManagedSlotHeadLinkSentinel()) {
-    return nullptr;
-  }
-
-  const std::uintptr_t linkAddress = reinterpret_cast<std::uintptr_t>(ownerHeadLink);
-  return reinterpret_cast<WWinManagedFrame*>(linkAddress - offsetof(WWinManagedFrame, mManagedSlotsHead));
-}
-
-moho::ManagedWindowSlot** moho::WWinManagedFrame::NullManagedSlotHeadLinkSentinel() noexcept
-{
-  return reinterpret_cast<ManagedWindowSlot**>(offsetof(WWinManagedFrame, mManagedSlotsHead));
-}
-
-/**
- * Address: 0x004F7140 (FUN_004F7140)
- *
- * What it does:
- * Returns the current number of frame-managed registry slots.
- */
-std::size_t moho::WWinManagedFrame::ManagedSlotCount()
-{
-  return managedFrames.size();
-}
-
-/**
- * Address: 0x004F7170 (FUN_004F7170)
- *
- * What it does:
- * Appends one frame-managed registry slot and links it to `ownerHeadLink`.
- */
-void moho::WWinManagedFrame::AppendManagedSlotForOwner(
-  ManagedWindowSlot** const ownerHeadLink
-)
-{
-  AppendManagedSlot<WWinManagedFrame>(managedFrames, ownerHeadLink);
+  DetachAllWeakReferences();
 }
 
 /**
@@ -1844,37 +1494,26 @@ moho::WWinManagedFrame::WWinManagedFrame(
   const wxString& name
 )
   : wxFrame(parent, id, title, position, size, style, name)
-  , mManagedSlotsHead(nullptr)
+  , WeakObject()
 {
-  RegisterManagedOwnerSlot();
+  for (std::size_t index = 0; index < managedFrames.size(); ++index) {
+    if (managedFrames[index].GetObjectPtr() == nullptr) {
+      managedFrames[index].Set(this);
+      return;
+    }
+  }
+  managedFrames.push_back(WeakPtr<WWinManagedFrame>(this));
 }
 
 /**
  * Address: 0x004F4230 (FUN_004F4230)
  *
  * What it does:
- * Unlinks every managed slot still pointing at this frame; ~wxFrame follows.
+ * Detaches every weak reference still aimed at this frame; ~wxFrame follows.
  */
 moho::WWinManagedFrame::~WWinManagedFrame()
 {
-  ReleaseManagedOwnerSlots();
-}
-
-void moho::WWinManagedFrame::RegisterManagedOwnerSlot()
-{
-  RegisterManagedOwnerSlotImpl<WWinManagedFrame>(managedFrames, &mManagedSlotsHead);
-}
-
-void moho::WWinManagedFrame::ReleaseManagedOwnerSlots()
-{
-  ReleaseManagedOwnerSlotChain(mManagedSlotsHead);
-}
-
-void moho::WWinManagedFrame::DestroyManagedOwners(
-  msvc8::vector<ManagedWindowSlot>& slots
-)
-{
-  DestroyManagedRuntimeCollection<WWinManagedFrame>(slots);
+  DetachAllWeakReferences();
 }
 
 namespace moho

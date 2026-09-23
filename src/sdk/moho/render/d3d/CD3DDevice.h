@@ -41,7 +41,7 @@ namespace moho
   class ID3DRenderTarget;
   class ID3DTextureSheet;
   class ID3DVertexSheet;
-  struct WRenViewport;
+  class WRenViewport;
 
   /**
    * What it does:

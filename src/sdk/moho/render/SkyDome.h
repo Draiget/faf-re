@@ -30,7 +30,7 @@ namespace moho
   class CD3DVertexFormat;
   class RD3DTextureResource;
   struct GeomCamera3;
-  struct WRenViewport;
+  class WRenViewport;
 
   /**
    * The packed vertex block one cumulus decal uploads: four vertices the

@@ -9,7 +9,7 @@
 
 namespace moho
 {
-  struct WRenViewport;
+  class WRenViewport;
   extern WRenViewport* ren_Viewport;
 }
 

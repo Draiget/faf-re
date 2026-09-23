@@ -34,7 +34,7 @@ namespace moho
   class CAiBrain;
   class IWldTerrainRes;
   struct UnitWeaponInfo;
-  struct WD3DViewport;
+  class WD3DViewport;
   class CDamage;
 }
 

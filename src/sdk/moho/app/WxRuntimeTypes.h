@@ -14,6 +14,8 @@
 #include "legacy/containers/Vector.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/math/Vector3f.h"
+#include "moho/misc/WeakObject.h"
+#include "moho/misc/WeakPtr.h"
 
 /**
  * wxWidgets 2.4.2 is linked, not recovered: `wxmswu.lib` is the library the
@@ -147,7 +149,6 @@ static_assert(sizeof(WSupComFrame) == 0x17C, "WSupComFrame size must be 0x17C");
 
 namespace moho
 {
-  struct ManagedWindowSlot;
   class WWinManagedDialog;
   class CWinLogTarget;
   class WWinLogWindow;
@@ -188,6 +189,12 @@ namespace moho
   };
 
   static_assert(sizeof(CLogAdditionEvent) == 0x20, "moho::CLogAdditionEvent size must be 0x20");
+
+  // The usual wx custom-event pair: a typed handler, and a table row that
+  // casts it in two steps (derived-to-base, then to the generic function).
+  // A single cast cannot, because WWinLogWindow's member pointers carry the
+  // multiple-inheritance representation (its WeakObject base).
+  using CLogAdditionEventFunction = void (wxEvtHandler::*)(CLogAdditionEvent&);
 
   /**
    * Wide text-builder helper used by `WWinLogWindow` replay/message formatting.
@@ -1119,62 +1126,15 @@ namespace moho
   void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
 
   /**
-   * Entry stored in the legacy `managedWindows` / `managedFrames` vectors.
+   * A dialog the engine keeps a weak reference to in `managedWindows`, so
+   * WINX_Exit can destroy whatever is still open.
    *
-   * The first field points to the owning window's head-link slot
-   * (`WWinManaged*::mManagedSlotsHead`), and the second field chains all
-   * slots associated with the owner.
+   * RTTI: WWinManagedDialog > wxDialog, WeakObject (at +0x170, mdisp 368);
+   * vftable 0x00E0C51C. Slot 0 is wxDialog's inline GetClassInfo and slot 6
+   * wxDialog::GetEventTable (0x0098B230): no class info or event table of its
+   * own.
    */
-  struct ManagedWindowSlot
-  {
-    ManagedWindowSlot** ownerHeadLink = nullptr;
-    ManagedWindowSlot* nextInOwnerChain = nullptr;
-
-    /**
-     * Address family:
-     * - 0x004F7210 (FUN_004F7210)
-     * - 0x004F72D0 (FUN_004F72D0)
-     *
-     * What it does:
-     * Detaches this slot from its owner-managed slot chain.
-     *
-     * Behavior is shared by constructor unwind + explicit owner-unlink paths.
-     */
-    void UnlinkFromOwner() noexcept;
-
-    /**
-     * Address context:
-     * - 0x004F40A0 (dialog dtor core)
-     * - 0x004F4230 (frame dtor core)
-     *
-     * What it does:
-     * Clears both slot links to the inert state.
-     */
-    void Clear() noexcept;
-  };
-
-  static_assert(sizeof(ManagedWindowSlot) == 0x8, "moho::ManagedWindowSlot size must be 0x8");
-  static_assert(
-    offsetof(ManagedWindowSlot, ownerHeadLink) == 0x0,
-    "moho::ManagedWindowSlot::ownerHeadLink offset must be 0x0"
-  );
-  static_assert(
-    offsetof(ManagedWindowSlot, nextInOwnerChain) == 0x4,
-    "moho::ManagedWindowSlot::nextInOwnerChain offset must be 0x4"
-  );
-
-  /**
-   * A dialog the engine keeps a weak slot for in `managedWindows`, so WINX_Exit
-   * can destroy whatever is still open.
-   *
-   * RTTI: WWinManagedDialog > wxDialog, vftable 0x00E0C51C. Slot 0 is
-   * wxDialog's inline GetClassInfo and slot 6 wxDialog::GetEventTable
-   * (0x0098B230): no class info or event table of its own. The one member
-   * sits right after the 0x170-byte wxDialog; it is the head of the weak-link
-   * chain the `managedWindows` slots hang off (a WeakObject, which the slot
-   * code below still spells out by hand).
-   */
-  class WWinManagedDialog : public wxDialog
+  class WWinManagedDialog : public wxDialog, public WeakObject
   {
   public:
     /**
@@ -1182,9 +1142,10 @@ namespace moho
      *
      * What it does:
      * `wxDialog(parent, id, title, position, size, style, name)`, then files
-     * this dialog in the first free `managedWindows` slot, or a new one. The
-     * one caller, WWinLogWindow, passes (null, -1, wxDefaultPosition,
-     * wxDefaultSize, wxCAPTION | wxSYSTEM_MENU | wxRESIZE_BORDER).
+     * this dialog in the first `managedWindows` slot whose window is gone, or
+     * a new one (`push_back`, 0x004F70A0). The one caller, WWinLogWindow,
+     * passes (null, -1, wxDefaultPosition, wxDefaultSize, wxCAPTION |
+     * wxSYSTEM_MENU | wxRESIZE_BORDER), which LTCG folded into the body.
      */
     WWinManagedDialog(
       wxWindow* parent,
@@ -1200,47 +1161,22 @@ namespace moho
      * Address: 0x004F40A0 (FUN_004F40A0)
      *
      * What it does:
-     * Unlinks every managed slot still pointing at this dialog, then
+     * Detaches every weak reference still aimed at this dialog, then
      * ~wxDialog. The deleting destructor (0x004F4080) is the compiler's.
      */
     ~WWinManagedDialog() override;
-
-    static WWinManagedDialog* FromManagedSlotHeadLink(ManagedWindowSlot** ownerHeadLink) noexcept;
-    static ManagedWindowSlot** NullManagedSlotHeadLinkSentinel() noexcept;
-
-    /**
-     * Address: 0x004F7070 (FUN_004F7070)
-     *
-     * What it does:
-     * Returns the current number of dialog-managed registry slots.
-     */
-    static std::size_t ManagedSlotCount();
-
-    /**
-     * Address: 0x004F70A0 (FUN_004F70A0)
-     *
-     * What it does:
-     * Appends one dialog-managed registry slot and links it to `ownerHeadLink`,
-     * preserving slot-chain ownership links across vector growth.
-     */
-    static void AppendManagedSlotForOwner(ManagedWindowSlot** ownerHeadLink);
-
-    static void DestroyManagedOwners(msvc8::vector<ManagedWindowSlot>& slots);
-
-  private:
-    void RegisterManagedOwnerSlot();
-    void ReleaseManagedOwnerSlots();
-
-  public:
-    ManagedWindowSlot* mManagedSlotsHead; // +0x170
   };
 
   static_assert(sizeof(wxDialog) == 0x170, "wxDialog size must be 0x170");
-  static_assert(
-    offsetof(WWinManagedDialog, mManagedSlotsHead) == 0x170,
-    "moho::WWinManagedDialog::mManagedSlotsHead offset must be 0x170"
-  );
   static_assert(sizeof(WWinManagedDialog) == 0x174, "moho::WWinManagedDialog size must be 0x174");
+
+  // The WeakObject base sits right after the 0x170-byte wxDialog; every
+  // `managedWindows` probe tests the slot against `null + 0x170`.
+  template <>
+  struct WeakPtrOwnerLinkOffset<WWinManagedDialog>
+  {
+    static constexpr std::uintptr_t value = 0x170;
+  };
 
   /**
    * The "Moho Log" dialog: the console log with its category and filter
@@ -1253,8 +1189,7 @@ namespace moho
    * the Clear button (906), size and move.
    *
    * The constructor (0x004F4270) also builds the dialog's sizers and
-   * controls and stores them in the pointers below; that part is not
-   * recovered, so the control pointers stay null and the handlers skip them.
+   * controls and stores them in the pointers below.
    */
   class WWinLogWindow : public WWinManagedDialog
   {
@@ -1412,14 +1347,14 @@ namespace moho
   static_assert(sizeof(WWinLogWindow) == 0x1CC, "moho::WWinLogWindow size must be 0x1CC");
 
   /**
-   * A frame the engine keeps a weak slot for in `managedFrames`, so WINX_Exit
-   * can destroy whatever is still open.
+   * A frame the engine keeps a weak reference to in `managedFrames`, so
+   * WINX_Exit can destroy whatever is still open.
    *
-   * RTTI: WWinManagedFrame > wxFrame, vftable 0x00E0C764. Slot 0 is
-   * wxFrame's inline GetClassInfo and slot 6 wxFrame::GetEventTable
-   * (0x0099E7A0). The one member sits right after the 0x178-byte wxFrame.
+   * RTTI: WWinManagedFrame > wxFrame, WeakObject (at +0x178, mdisp 376);
+   * vftable 0x00E0C764. Slot 0 is wxFrame's inline GetClassInfo and slot 6
+   * wxFrame::GetEventTable (0x0099E7A0).
    */
-  class WWinManagedFrame : public wxFrame
+  class WWinManagedFrame : public wxFrame, public WeakObject
   {
   public:
     /**
@@ -1428,9 +1363,10 @@ namespace moho
      *
      * What it does:
      * `wxFrame(parent, id, title, position, size, style, name)`, then files
-     * this frame in the first free `managedFrames` slot, or a new one. The
-     * binary's one caller passes (null, -1, wxDefaultPosition,
-     * wxDEFAULT_FRAME_STYLE), which LTCG folded into the body.
+     * this frame in the first `managedFrames` slot whose window is gone, or a
+     * new one (`push_back`, 0x004F7170). The binary's one caller passes
+     * (null, -1, wxDefaultPosition, wxDEFAULT_FRAME_STYLE), which LTCG folded
+     * into the body.
      */
     WWinManagedFrame(
       wxWindow* parent,
@@ -1446,51 +1382,24 @@ namespace moho
      * Address: 0x004F4230 (FUN_004F4230)
      *
      * What it does:
-     * Unlinks every managed slot still pointing at this frame, then ~wxFrame.
+     * Detaches every weak reference still aimed at this frame, then ~wxFrame.
      * The deleting destructor (0x004F4210) is the compiler's.
      */
     ~WWinManagedFrame() override;
-
-    static WWinManagedFrame* FromManagedSlotHeadLink(ManagedWindowSlot** ownerHeadLink) noexcept;
-    static ManagedWindowSlot** NullManagedSlotHeadLinkSentinel() noexcept;
-
-    /**
-     * Address: 0x004F7140 (FUN_004F7140)
-     *
-     * What it does:
-     * Returns the current number of frame-managed registry slots.
-     */
-    static std::size_t ManagedSlotCount();
-
-    /**
-     * Address: 0x004F7170 (FUN_004F7170)
-     *
-     * What it does:
-     * Appends one frame-managed registry slot and links it to `ownerHeadLink`,
-     * preserving slot-chain ownership links across vector growth.
-     */
-    static void AppendManagedSlotForOwner(ManagedWindowSlot** ownerHeadLink);
-
-    static void DestroyManagedOwners(msvc8::vector<ManagedWindowSlot>& slots);
-
-  private:
-    void RegisterManagedOwnerSlot();
-    void ReleaseManagedOwnerSlots();
-
-  public:
-    ManagedWindowSlot* mManagedSlotsHead; // +0x178
   };
 
-  static_assert(
-    offsetof(WWinManagedFrame, mManagedSlotsHead) == 0x178,
-    "moho::WWinManagedFrame::mManagedSlotsHead offset must be 0x178"
-  );
   static_assert(sizeof(WWinManagedFrame) == 0x17C, "moho::WWinManagedFrame size must be 0x17C");
 
-  // 0x010A9B94 family in FA.
-  extern msvc8::vector<ManagedWindowSlot> managedWindows;
-  // 0x010A9BD8 family in FA.
-  extern msvc8::vector<ManagedWindowSlot> managedFrames;
+  template <>
+  struct WeakPtrOwnerLinkOffset<WWinManagedFrame>
+  {
+    static constexpr std::uintptr_t value = 0x178;
+  };
+
+  // Every managed dialog / frame still open (elements at 0x010A9B94 /
+  // 0x010A9BD8): filled by the constructors, emptied by WINX_Exit.
+  extern msvc8::vector<WeakPtr<WWinManagedDialog>> managedWindows;
+  extern msvc8::vector<WeakPtr<WWinManagedFrame>> managedFrames;
 
   // The main frame (0x010A63B8): WIN_OkBox parents its message box on it,
   // and CScApp::CreateAppFrame sets it to the WSupComFrame.

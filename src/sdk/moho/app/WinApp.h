@@ -7,7 +7,7 @@
 #include "moho/task/CTaskThread.h"
 
 struct _EXCEPTION_POINTERS;
-class wxWindowBase;
+class wxWindow;
 class wxString;
 
 namespace moho
@@ -107,7 +107,7 @@ namespace moho
    * What it does:
    * Returns the process-global main-window owner pointer.
    */
-  wxWindowBase* WIN_GetMainWindow();
+  wxWindow* WIN_GetMainWindow();
 
   /**
    * Address: 0x004F25C0 (FUN_004F25C0, ?WIN_SetMainWindow@Moho@@YAXPAVwxWindow@@@Z)
@@ -115,7 +115,7 @@ namespace moho
    * What it does:
    * Updates the process-global main-window owner pointer.
    */
-  void WIN_SetMainWindow(wxWindowBase* mainWindow);
+  void WIN_SetMainWindow(wxWindow* mainWindow);
 
   /**
    * Address: 0x004A2150 (FUN_004A2150)
@@ -338,10 +338,9 @@ namespace moho
    * Address: 0x004F3B60 (FUN_004F3B60, ?WINX_Printf@Moho@@YA?AVwxString@@PBDZZ)
    *
    * What it does:
-   * Formats one UTF-8 vararg string, converts it to UTF-16, and writes the
-   * result into caller-provided `wxString` storage.
+   * Formats one UTF-8 vararg string and returns it as a (UTF-16) wxString.
    */
-  wxString* WINX_Printf(wxString* out, const char* format, ...);
+  wxString WINX_Printf(const char* format, ...);
 
   /**
    * Address: 0x004F3CE0 (FUN_004F3CE0)
@@ -371,15 +370,6 @@ namespace moho
   void WINX_ExitSplash();
 
   /**
-   * Address: 0x00BC7260 (FUN_00BC7260, register_wxAppFactory)
-   *
-   * What it does:
-   * Replays the bootstrap app-factory registration lane used by the process
-   * startup initializer.
-   */
-  void register_wxAppFactory();
-
-  /**
    * Address: 0x00BC7240 (FUN_00BC7240, register_wakeupTimer)
    *
    * What it does:
@@ -396,46 +386,5 @@ namespace moho
    */
   void register_startTime();
 
-  /**
-   * Address: 0x00BC7310 (FUN_00BC7310, wxNewEventType init)
-   *
-   * What it does:
-   * Allocates and stores the process-wide custom wx event type token used by
-   * this bootstrap lane.
-   */
-  int register_WinAppEventType();
-
-  /**
-   * Address: 0x00BC7320 (FUN_00BC7320, register_managedWindowsCleanup)
-   *
-   * What it does:
-   * Installs process-exit cleanup for the managed-dialog slot vector storage.
-   */
-  int register_managedWindowsCleanup();
-
-  /**
-   * Address: 0x00BC7330 (FUN_00BC7330, register_managedFramesCleanup)
-   *
-   * What it does:
-   * Installs process-exit cleanup for the managed-frame slot vector storage.
-   */
-  int register_managedFramesCleanup();
-
-  /**
-   * Address: 0x00BC7340 (FUN_00BC7340, register_winLogTarget)
-   *
-   * What it does:
-   * Touches the global log-target owner during startup so the source-side
-   * lifetime model stays aligned with the recovered binary lane.
-   */
-  void register_winLogTarget();
-
-  /**
-   * Address: 0x00BC73E0 (FUN_00BC73E0, register_splashScreen)
-   *
-   * What it does:
-   * Installs splash-screen process-exit cleanup for the startup lane.
-   */
-  void register_splashScreen();
 
 } // namespace moho

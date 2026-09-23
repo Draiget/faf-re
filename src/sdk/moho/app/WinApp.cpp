@@ -36,7 +36,6 @@
 #include "gpg/core/time/Timer.h"
 #include "IWinApp.h"
 #include "legacy/containers/Vector.h"
-#include "WxAppRuntime.h"
 #include "WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -49,15 +48,17 @@
 #pragma warning(push)
 #pragma warning(disable : 4996)
 
-int wxEntry(HINSTANCE hInstance, HINSTANCE hPrevInstance, char* pCmdLine, int nCmdShow, bool shouldInit);
-int wxNewEventType();
-
-// Stub body for the HINSTANCE-typed wxEntry overload. The prebuilt wxmsw.lib
-// exports `wxEntry(void*, void*, char*, int, bool)` (void* instead of
-// HINSTANCE__*), so the mangling differs and the linker can't find it. This
-// no-op keeps the link clean; the one callsite at line 2728 runs the native
-// Win32 message loop instead of wx's entrypoint at runtime.
-int wxEntry(HINSTANCE, HINSTANCE, char*, int, bool) { return 0; }
+/**
+ * wx builds the application object through this: wxCreateApp (0x004F1E90)
+ * checks the build options and news a MohoApp, the wxAppInitializer's static
+ * constructor (0x00BC7260) registers it, and wxGetApp (0x004F1FF0) is the
+ * accessor DECLARE_APP names in WxRuntimeTypes.h. wxEntry, called by
+ * WIN_AppExecute, runs it. MohoApp's constructor (0x004F1F10) and deleting
+ * destructor (0x004F1F60) are the compiler's, and 0x004F1B50 / 0x004F1B90
+ * are the wxAppInitializer constructor out of line (`wxApp::m_appInitFn =
+ * wxCreateApp`, the second returning the initializer).
+ */
+IMPLEMENT_APP_NO_MAIN(moho::MohoApp)
 
 namespace moho
 {
@@ -96,10 +97,18 @@ namespace
   );
 
   moho::CWinLogTarget& sLogWindowTarget = moho::sLogWindowTarget;
-  moho::SplashScreenRuntime* sSplashScreenPtr = nullptr;
-  int gRecoveredWinAppEventType = 0;
-  using WinAppFactoryFn = moho::IWinApp* (*)();
-  WinAppFactoryFn sWinAppFactory = nullptr;
+
+  /**
+   * The splash screen WINX_InitSplash shows (0x010A9BE4), a VC8
+   * `std::auto_ptr<wxSplashScreen>` in the binary: its static constructor
+   * (0x004F7360) nulls it, its exit-time destructor (0x004F7370, registered
+   * by 0x00BC73E0) deletes what is left, and 0x004F7390 is `reset` out of
+   * line.
+   */
+  std::unique_ptr<wxSplashScreen> sSplashScreen;
+
+  /** The PNG handler WINX_InitSplash installs on first use (0x010C6D48). */
+  wxPNGHandler* sSplashPngHandler = nullptr;
 
   using LegacyUnaryCdeclCallback = int(__cdecl*)(int value);
   using LegacyUnaryDispatchAdapter = int(__cdecl*)(LegacyUnaryCdeclCallback* callbackLane, int value);
@@ -109,7 +118,6 @@ namespace
     LegacyTypeInfoLane* destinationLane,
     LegacyTypeInfoLane* queryLane
   );
-  using WxAppInitAllocatorLane = void* (__cdecl*)();
   using LegacyCallbackLifecycleAdapter = int(__cdecl*)(void* sourceLane, void* destinationLane, int action);
 
   struct LegacyCallbackPayloadLane {
@@ -121,8 +129,6 @@ namespace
 
   LegacyUnaryDispatchAdapter gLegacyTimeBarUnaryDispatchAdapter = nullptr;
   LegacyTypeInfoDispatchAdapter gLegacyTimeBarTypeInfoDispatchAdapter = nullptr;
-  WxAppInitAllocatorLane gWxAppInitAllocatorLane = nullptr;
-  std::uint8_t gWxAppInitAnchorLane = 0u;
 
   /**
    * Address: 0x004E82D0 (FUN_004E82D0)
@@ -185,11 +191,6 @@ namespace
     result = (*destinationLane == callbackTypeInfo) ? sourceLane : nullptr;
     *destinationLane = (result != nullptr) ? *result : nullptr;
     return result;
-  }
-
-  void* __cdecl AllocateMohoAppStorageForWxBootstrap()
-  {
-    return ::operator new(sizeof(moho::MohoApp));
   }
 
   /**
@@ -968,217 +969,11 @@ namespace
   }
 
 
-  /**
-   * Address: 0x004F1B50 (FUN_004F1B50)
-   *
-   * What it does:
-   * Publishes the wx app-bootstrap allocation callback lane for `MohoApp`
-   * construction.
-   */
-  [[maybe_unused]] void InitializeMohoAppBootstrapAllocatorCallback()
-  {
-    gWxAppInitAllocatorLane = &AllocateMohoAppStorageForWxBootstrap;
-  }
-
-  /**
-   * Address: 0x004F1B90 (FUN_004F1B90)
-   *
-   * What it does:
-   * Publishes the wx app-bootstrap allocation callback lane for `MohoApp` and
-   * returns the static bootstrap anchor lane used by the registration path.
-   */
-  [[maybe_unused]] void* InitializeMohoAppBootstrapAllocatorLane()
-  {
-    gWxAppInitAllocatorLane = &AllocateMohoAppStorageForWxBootstrap;
-    return &gWxAppInitAnchorLane;
-  }
-
-  [[nodiscard]] moho::IWinApp* CreateRecoveredWinAppFactory()
-  {
-    return new CScApp();
-  }
-
-  void UnlinkManagedWindowSlotRangeCommon(
-    moho::ManagedWindowSlot* begin,
-    moho::ManagedWindowSlot* end
-  ) noexcept
-  {
-    while (begin != end) {
-      begin->UnlinkFromOwner();
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x004FADE0 (FUN_004FADE0)
-   *
-   * What it does:
-   * Unlinks one contiguous managed-dialog slot range from all owner chains.
-   */
-  moho::ManagedWindowSlot* UnlinkManagedDialogSlotRange(
-    moho::ManagedWindowSlot* const begin,
-    moho::ManagedWindowSlot* const end
-  ) noexcept
-  {
-    UnlinkManagedWindowSlotRangeCommon(begin, end);
-    return end;
-  }
-
-  /**
-   * Address: 0x004FAED0 (FUN_004FAED0)
-   *
-   * What it does:
-   * Unlinks one contiguous managed-frame slot range from all owner chains.
-   */
-  void UnlinkManagedFrameSlotRange(
-    moho::ManagedWindowSlot* const begin,
-    moho::ManagedWindowSlot* const end
-  ) noexcept
-  {
-    UnlinkManagedWindowSlotRangeCommon(begin, end);
-  }
-
-  /**
-   * Address: 0x004F8140 (FUN_004F8140)
-   *
-   * What it does:
-   * Allocates one managed-dialog slot-storage block for `managedWindows`,
-   * initializes `{begin,end}` to the allocation base, and sets capacity to
-   * `begin + slotCount`.
-   */
-  [[maybe_unused]] bool InitializeManagedWindowsStorage(const unsigned int slotCount)
-  {
-    constexpr unsigned int kMaxManagedWindowSlots = 0x1FFFFFFFu;
-    if (slotCount > kMaxManagedWindowSlots) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    // VC8 _Buy(n): drop to empty, then one exact-size allocation with
-    // mLast == mFirst -- reserve() on an empty vector is precisely that.
-    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
-    moho::managedWindows.reserve(slotCount);
-    return true;
-  }
-
-  /**
-   * Address: 0x004F8180 (FUN_004F8180)
-   *
-   * What it does:
-   * Unlinks every managed-dialog slot node, frees the backing slot-storage
-   * lane, and clears begin/end/capacity lanes on the global dialog slot
-   * vector.
-   */
-  void CleanupManagedWindowsAtExit()
-  {
-    // Slot nodes are unlinked explicitly -- the element destructor is trivial
-    // and will not detach them -- then VC8 _Tidy() frees and nulls the lanes.
-    if (!moho::managedWindows.empty()) {
-      (void)UnlinkManagedDialogSlotRange(moho::managedWindows.begin(), moho::managedWindows.end());
-    }
-    moho::managedWindows = msvc8::vector<moho::ManagedWindowSlot>{};
-  }
-
-  /**
-   * Address: 0x004F82D0 (FUN_004F82D0)
-   *
-   * What it does:
-   * Unlinks every managed-frame slot node, frees the backing slot-storage
-   * lane, and clears begin/end/capacity lanes on the global frame slot
-   * vector.
-   */
-  void CleanupManagedFramesAtExit()
-  {
-    if (!moho::managedFrames.empty()) {
-      UnlinkManagedFrameSlotRange(moho::managedFrames.begin(), moho::managedFrames.end());
-    }
-    moho::managedFrames = decltype(moho::managedFrames){};
-  }
-
-  /**
-   * Address: 0x00BF18B0 (FUN_00BF18B0)
-   *
-   * What it does:
-   * Preserves one startup-registered shutdown thunk lane by forwarding into
-   * `CleanupManagedWindowsAtExit` (`FUN_004F8180`).
-   */
-  [[maybe_unused]] void ShutdownManagedWindowsCleanupAdapter()
-  {
-    CleanupManagedWindowsAtExit();
-  }
-
-  /**
-   * Address: 0x00BF18C0 (FUN_00BF18C0)
-   *
-   * What it does:
-   * Preserves one startup-registered shutdown thunk lane by forwarding into
-   * `CleanupManagedFramesAtExit` (`FUN_004F82D0`).
-   */
-  [[maybe_unused]] void ShutdownManagedFramesCleanupAdapter(void* const runtimeOwner)
-  {
-    static_cast<void>(runtimeOwner);
-    CleanupManagedFramesAtExit();
-  }
-
-  /**
-   * Address: 0x004F7060 (FUN_004F7060)
-   *
-   * What it does:
-   * Forwards one managed-dialog cleanup thunk lane into
-   * `CleanupManagedWindowsAtExit`.
-   */
-  [[maybe_unused]] void CleanupManagedWindowsAtExitThunk(
-    void* const /*unused*/
-  ) noexcept
-  {
-    CleanupManagedWindowsAtExit();
-  }
-
-  /**
-   * Address: 0x004F7130 (FUN_004F7130)
-   *
-   * What it does:
-   * Forwards one managed-frame cleanup thunk lane into
-   * `CleanupManagedFramesAtExit`.
-   */
-  [[maybe_unused]] void CleanupManagedFramesAtExitThunk(
-    void* const /*unused*/
-  ) noexcept
-  {
-    CleanupManagedFramesAtExit();
-  }
-
-  /**
-   * Address: 0x004F7360 (FUN_004F7360)
-   *
-   * What it does:
-   * Clears the process-global splash-screen owner lane and returns the storage
-   * address used by startup registration code.
-   */
-  [[maybe_unused]] moho::SplashScreenRuntime** ResetSplashScreenPointerAndGetStorageLane() noexcept
-  {
-    sSplashScreenPtr = nullptr;
-    return &sSplashScreenPtr;
-  }
-
   [[maybe_unused]] const bool gWinAppBootstrap = []() {
     moho::register_startTime();
     moho::register_wakeupTimer();
-    moho::register_wxAppFactory();
-    (void)moho::register_WinAppEventType();
-    (void)moho::register_managedWindowsCleanup();
-    (void)moho::register_managedFramesCleanup();
-    moho::register_winLogTarget();
-    moho::register_splashScreen();
     return true;
   }();
-
-  void DestroyActiveSplashScreen() noexcept
-  {
-    if (sSplashScreenPtr != nullptr) {
-      sSplashScreenPtr->DeleteObject(1);
-      sSplashScreenPtr = nullptr;
-    }
-  }
 
   constexpr wchar_t kPathSeparator = L'\\';
   constexpr wchar_t kDxdiagOutputFileName[] = L"dxdiag.txt";
@@ -1747,15 +1542,6 @@ namespace
   using BugSplatAttachmentCallbackFn = bool(__cdecl*)(std::uint32_t, void*, void*);
   void DestroyBugSplatMiniDmpSenderAtExit();
 
-  [[nodiscard]]
-  moho::WWinLogWindow* CreateLogWindowRuntime()
-  {
-    moho::WWinLogWindow* const logWindow = new (std::nothrow) moho::WWinLogWindow();
-    if (logWindow != nullptr) {
-      logWindow->SetOwnerTarget(&sLogWindowTarget);
-    }
-    return logWindow;
-  }
 
   /**
    * Address: 0x010A87B8 (`bugsplat_miniDmpSender`)
@@ -2164,30 +1950,6 @@ namespace
     }
 
     return static_cast<DWORD>(FloorFrndintAdjustDown(remainingMs));
-  }
-
-  void WxPumpToIdleAndExit()
-  {
-    if (!moho::WxAppRuntime::IsAvailable()) {
-      return;
-    }
-
-    bool keepIdle = true;
-    for (;;) {
-      if (moho::WxAppRuntime::Pending()) {
-        moho::WxAppRuntime::Dispatch();
-        continue;
-      }
-
-      if (!keepIdle) {
-        break;
-      }
-
-      keepIdle = moho::WxAppRuntime::ProcessIdle();
-    }
-
-    moho::WxAppRuntime::OnExit();
-    wxApp::CleanUp();
   }
 
   /**
@@ -2835,76 +2597,6 @@ void moho::register_wakeupTimer()
   wakeupTimerDur = kInfiniteWakeupMs;
 }
 
-/**
- * Address: 0x00BC7260 (FUN_00BC7260, register_wxAppFactory)
- *
- * What it does:
- * Replays the bootstrap app-factory registration lane used by the process
- * startup initializer.
- */
-void moho::register_wxAppFactory()
-{
-  sWinAppFactory = &CreateRecoveredWinAppFactory;
-}
-
-/**
- * Address: 0x00BC7310 (FUN_00BC7310, wxNewEventType init)
- *
- * What it does:
- * Allocates and stores the process-wide custom wx event type token used by
- * this bootstrap lane.
- */
-int moho::register_WinAppEventType()
-{
-  gRecoveredWinAppEventType = wxNewEventType();
-  return gRecoveredWinAppEventType;
-}
-
-/**
- * Address: 0x00BC7320 (FUN_00BC7320, register_managedWindowsCleanup)
- *
- * What it does:
- * Installs process-exit cleanup for managed-dialog slot vector storage.
- */
-int moho::register_managedWindowsCleanup()
-{
-  return std::atexit(&CleanupManagedWindowsAtExit);
-}
-
-/**
- * Address: 0x00BC7330 (FUN_00BC7330, register_managedFramesCleanup)
- *
- * What it does:
- * Installs process-exit cleanup for managed-frame slot vector storage.
- */
-int moho::register_managedFramesCleanup()
-{
-  return std::atexit(&CleanupManagedFramesAtExit);
-}
-
-/**
- * Address: 0x00BC7340 (FUN_00BC7340, register_winLogTarget)
- *
- * What it does:
- * Touches the global log-target owner during startup so the source-side
- * lifetime model stays aligned with the recovered binary lane.
- */
-void moho::register_winLogTarget()
-{
-  sLogWindowTarget.dialog = nullptr;
-}
-
-/**
- * Address: 0x00BC73E0 (FUN_00BC73E0, register_splashScreen)
- *
- * What it does:
- * Installs splash-screen process-exit cleanup for the startup lane.
- */
-void moho::register_splashScreen()
-{
-  (void)std::atexit(&DestroyActiveSplashScreen);
-}
-
 moho::CTaskStage* moho::WIN_GetBeforeEventsStage()
 {
   // 0x011043CC
@@ -2995,7 +2687,7 @@ moho::IWinApp* moho::WIN_GetCurrentApp()
  * What it does:
  * Returns the process-global main-window owner pointer.
  */
-wxWindowBase* moho::WIN_GetMainWindow()
+wxWindow* moho::WIN_GetMainWindow()
 {
   return sMainWindow;
 }
@@ -3006,7 +2698,7 @@ wxWindowBase* moho::WIN_GetMainWindow()
  * What it does:
  * Updates the process-global main-window owner pointer.
  */
-void moho::WIN_SetMainWindow(wxWindowBase* const mainWindow)
+void moho::WIN_SetMainWindow(wxWindow* const mainWindow)
 {
   sMainWindow = mainWindow;
 }
@@ -3035,7 +2727,9 @@ void moho::WIN_AppExecute(IWinApp* const app)
     reinterpret_cast<LPCWSTR>(&WindowHook),
     &selfModule
   );
-  wxEntry(selfModule, nullptr, nullptr, 0, false);
+  // enterLoop = false: wx initialises and builds the MohoApp, and the loop
+  // below pumps it (0x004F2117, wxEntry 0x00992FF0).
+  wxEntry(reinterpret_cast<WXHINSTANCE>(selfModule), nullptr, nullptr, 0, false);
 
   if (!HasCorrectPlatform()) {
     WIN_OkBox(
@@ -3055,18 +2749,13 @@ void moho::WIN_AppExecute(IWinApp* const app)
   wakeupTimer.Reset();
   wakeupTimerDur = kInfiniteWakeupMs;
 
-  // Ahead of app->Init(), which is what creates the device and the frame:
-  // wxEntry brings wx up before any window exists, and the stock GDI objects
-  // this publishes are what the frame's first WM_ERASEBKGND selects. It also
-  // constructs the application object - nothing else does; see
-  // WX_EnsureApplicationObject. Without it EnableLoopFlags has nothing to set
-  // and KeepGoing answers false, so the loop below ended before it started.
-  moho::WX_EnsureApplicationObject();
-
   if (!app->Init()) {
     ::TerminateProcess(::GetCurrentProcess(), 1u);
   }
-  moho::WxAppRuntime::EnableLoopFlags();
+  // 0x004F2227..0x004F2233: wxApp::m_exitOnFrameDelete (+0x44) = Yes and
+  // m_keepGoing (+0x5C) = TRUE, the flag this loop runs on.
+  wxTheApp->SetExitOnFrameDelete(true);
+  wxGetApp().SetKeepGoing();
 
   _controlfp(0x20000, 0x30000);
 
@@ -3079,18 +2768,18 @@ void moho::WIN_AppExecute(IWinApp* const app)
       acceptNewEvent = false;
     }
 
-    if (moho::WxAppRuntime::Pending()) {
-      moho::WxAppRuntime::Dispatch();
+    if (wxTheApp->Pending()) {
+      wxTheApp->Dispatch();
       success = true;
       continue;
     }
 
-    if (moho::WxAppRuntime::IsAvailable() && success) {
-      success = moho::WxAppRuntime::ProcessIdle();
+    if (success) {
+      success = wxTheApp->ProcessIdle();
       continue;
     }
 
-    if (!moho::WxAppRuntime::KeepGoing()) {
+    if (!wxGetApp().KeepGoing()) {
       break;
     }
 
@@ -3108,7 +2797,24 @@ void moho::WIN_AppExecute(IWinApp* const app)
   app->Destroy();
   WINX_Exit();
   PLAT_Exit();
-  WxPumpToIdleAndExit();
+
+  // Drain what the teardown queued (0x004F2345..0x004F2382), then let wx go.
+  if (wxTheApp != nullptr) {
+    bool moreIdle = true;
+    for (;;) {
+      if (wxTheApp->Pending()) {
+        wxTheApp->Dispatch();
+        moreIdle = true;
+        continue;
+      }
+      if (!moreIdle) {
+        break;
+      }
+      moreIdle = wxTheApp->ProcessIdle();
+    }
+    wxTheApp->OnExit();
+    wxApp::CleanUp();
+  }
 
   if (sWindowHook != nullptr) {
     ::UnhookWindowsHookEx(sWindowHook);
@@ -3825,8 +3531,19 @@ bool moho::WIN_YesNoBox(const gpg::StrArg caption, const gpg::StrArg text)
  */
 void moho::WINX_Exit()
 {
-  WWinManagedDialog::DestroyManagedOwners(managedWindows);
-  WWinManagedFrame::DestroyManagedOwners(managedFrames);
+  for (std::size_t index = 0; index < managedWindows.size(); ++index) {
+    if (WWinManagedDialog* const dialog = managedWindows[index].GetObjectPtr(); dialog != nullptr) {
+      (void)dialog->Destroy();
+      managedWindows[index].UnlinkFromOwnerChain();
+    }
+  }
+
+  for (std::size_t index = 0; index < managedFrames.size(); ++index) {
+    if (WWinManagedFrame* const frame = managedFrames[index].GetObjectPtr(); frame != nullptr) {
+      (void)frame->Destroy();
+      managedFrames[index].UnlinkFromOwnerChain();
+    }
+  }
 }
 
 /**
@@ -3836,7 +3553,7 @@ void moho::WINX_Exit()
  * Formats one UTF-8 vararg string through `gpg::STR_Va`, converts it to wide
  * text, and stores the result in caller-provided `wxString`.
  */
-wxString* moho::WINX_Printf(wxString* const out, const char* const format, ...)
+wxString moho::WINX_Printf(const char* const format, ...)
 {
   va_list args;
   va_start(args, format);
@@ -3844,10 +3561,7 @@ wxString* moho::WINX_Printf(wxString* const out, const char* const format, ...)
   const msvc8::string formatted = gpg::STR_Va(formatCursor, args);
   va_end(args);
 
-  const std::wstring wideText = gpg::STR_Utf8ToWide(formatted.c_str());
-  auto* const outText = reinterpret_cast<wxStringRuntime*>(out);
-  *outText = wxStringRuntime::Borrow(wideText.c_str());
-  return out;
+  return wxString(gpg::STR_Utf8ToWide(formatted.c_str()).c_str());
 }
 
 /**
@@ -3862,30 +3576,42 @@ wxString* moho::WINX_Printf(wxString* const out, const char* const format, ...)
  */
 void moho::WINX_InitSplash(const gpg::StrArg filename)
 {
-  (void)WX_EnsureSplashPngHandler();
-  DestroyActiveSplashScreen();
+  if (sSplashPngHandler == nullptr) {
+    sSplashPngHandler = new wxPNGHandler();
+    wxImage::AddHandler(sSplashPngHandler);
+  }
+  sSplashScreen.reset();
 
-  if (filename == nullptr || filename[0] == '\0') {
+  wxBitmap bitmap;
+  if (!bitmap.LoadFile(wxString(filename, wxConvUTF8), wxBITMAP_TYPE_PNG)) {
     return;
   }
 
-  wxSize splashSize{1024, 768};
+  wxSize splashSize(1024, 768);
   RECT desktopRect{};
   if (::GetWindowRect(nullptr, &desktopRect) != 0) {
-    std::int32_t width = desktopRect.right - desktopRect.left;
-    if (width >= 1600) {
-      width = 1600;
+    splashSize.x = desktopRect.right - desktopRect.left;
+    if (splashSize.x >= 1600) {
+      splashSize.x = 1600;
     }
-    splashSize.x = width;
-
-    std::int32_t height = desktopRect.top - desktopRect.bottom;
-    if (height < 1200) {
-      height = 1200;
+    // top - bottom, as the binary computes it (0x004F3DFC): never above
+    // 1200 for a real rectangle, so the height comes out as 1200.
+    splashSize.y = desktopRect.top - desktopRect.bottom;
+    if (splashSize.y < 1200) {
+      splashSize.y = 1200;
     }
-    splashSize.y = height;
   }
 
-  sSplashScreenPtr = WX_CreateSplashScreen(filename, splashSize);
+  sSplashScreen.reset(new wxSplashScreen(
+    wxBitmap(bitmap.ConvertToImage().Rescale(splashSize.x, splashSize.y)),
+    wxSPLASH_CENTRE_ON_SCREEN,
+    0,
+    nullptr,
+    -1,
+    wxDefaultPosition,
+    splashSize,
+    wxSIMPLE_BORDER | wxSTAY_ON_TOP
+  ));
 }
 
 /**
@@ -3902,7 +3628,7 @@ void moho::WINX_PrecreateLogWindow()
     return;
   }
 
-  moho::WWinLogWindow* const createdLogWindow = CreateLogWindowRuntime();
+  WWinLogWindow* const createdLogWindow = new WWinLogWindow();
   boost::mutex::scoped_lock lock(sLogWindowTarget.lock);
   sLogWindowTarget.dialog = createdLogWindow;
 }
@@ -3916,11 +3642,9 @@ void moho::WINX_PrecreateLogWindow()
  */
 void moho::WINX_ExitSplash()
 {
-  DestroyActiveSplashScreen();
+  sSplashScreen.reset();
 }
 
 #pragma warning(pop)
 
-// Phase-1 pre-registration: run these descriptor registrations ahead of
-// every consumer that calls gpg::LookupRType. See StaticInitPhase.h.
-GPG_PREREGISTER_INIT(register_WinAppEventType_8090fb, moho::register_WinAppEventType)
+

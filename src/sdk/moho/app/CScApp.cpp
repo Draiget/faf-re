@@ -33,12 +33,12 @@
 #include "moho/misc/CDiskWatch.h"
 #include "moho/net/CGpgNetInterface.h"
 #include "moho/net/Common.h"
-#include "moho/app/WxAppRuntime.h"
 #include "moho/app/CWaitHandleSet.h"
 #include "moho/app/WinApp.h"
 #include "moho/math/MathReflection.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/sim/CWldSession.h"
 #include "moho/sim/SimDriver.h"
 #include "moho/task/CTaskThread.h"
@@ -672,23 +672,13 @@ namespace
     head.antialiasingLow = static_cast<std::uint32_t>(packedAntiAliasing & 0x1F);
   }
 
-  void DestroyFrameWindow(wxWindowBase*& frameWindow)
+  void DestroyFrameWindow(WSupComFrame*& frameWindow)
   {
     if (frameWindow == nullptr) {
       return;
     }
 
-    (void)moho::WxAppRuntime::DestroyWindow(frameWindow);
-    frameWindow = nullptr;
-  }
-
-  void DestroySupComFrameWindow(WSupComFrame*& frameWindow)
-  {
-    if (frameWindow == nullptr) {
-      return;
-    }
-
-    (void)moho::WxAppRuntime::DestroyWindow(frameWindow);
+    (void)frameWindow->Destroy();
     frameWindow = nullptr;
   }
 
@@ -1129,12 +1119,12 @@ void CScApp::Destroy()
   moho::UI_Exit();
 
   if (supcomFrame != nullptr) {
-    (void)moho::WxAppRuntime::DestroyWindow(supcomFrame);
+    (void)supcomFrame->Destroy();
     supcomFrame = nullptr;
   }
 
   if (frame != nullptr) {
-    (void)moho::WxAppRuntime::DestroyWindow(frame);
+    (void)frame->Destroy();
     frame = nullptr;
   }
 
@@ -1343,13 +1333,11 @@ bool CScApp::CreateAppFrame(
   auto handleFailure = [this](const char* const reason) -> bool {
     moho::WINX_ExitSplash();
     DestroyFrameWindow(frame);
-    DestroySupComFrameWindow(supcomFrame);
+    DestroyFrameWindow(supcomFrame);
     moho::WIN_SetMainWindow(nullptr);
 
-    if (wxTheApp != nullptr) {
-      while (wxTheApp->Pending()) {
-        wxTheApp->Dispatch();
-      }
+    // 0x008CFD00: idle until wx has nothing left to delete.
+    while (wxTheApp->ProcessIdle()) {
     }
 
     if (reason != nullptr && reason[0] != '\0') {
@@ -1368,7 +1356,7 @@ bool CScApp::CreateAppFrame(
     };
 
     frame = nullptr;
-    supcomFrame = WX_CreateSupComFrame(title.c_str(), position, primarySize, frameStyle);
+    supcomFrame = new WSupComFrame(title.c_str(), position, primarySize, frameStyle);
 
     if (primaryHead.mWindowed) {
       supcomFrame->Show(false);
@@ -1376,11 +1364,11 @@ bool CScApp::CreateAppFrame(
       if (maximized) {
         supcomFrame->Maximize(true);
       } else {
-        supcomFrame->DoSetClientSize(primarySize.x, primarySize.y);
+        supcomFrame->SetClientSize(primarySize.x, primarySize.y);
 
-        std::int32_t appliedWidth = 0;
-        std::int32_t appliedHeight = 0;
-        supcomFrame->DoGetClientSize(&appliedWidth, &appliedHeight);
+        int appliedWidth = 0;
+        int appliedHeight = 0;
+        supcomFrame->GetClientSize(&appliedWidth, &appliedHeight);
         if (appliedWidth != primarySize.x || appliedHeight != primarySize.y) {
           gpg::Warnf(
             "Unable to set requested size %i,%i. Results are undefined.", primarySize.x, primarySize.y
@@ -1395,27 +1383,27 @@ bool CScApp::CreateAppFrame(
     }
 
     if (!primaryHead.mWindowed && maximized) {
-      std::int32_t maximizedWidth = 0;
-      std::int32_t maximizedHeight = 0;
-      supcomFrame->DoGetClientSize(&maximizedWidth, &maximizedHeight);
+      int maximizedWidth = 0;
+      int maximizedHeight = 0;
+      supcomFrame->GetClientSize(&maximizedWidth, &maximizedHeight);
       primaryHead.mWidth = static_cast<std::uint32_t>(maximizedWidth);
       primaryHead.mHeight = static_cast<std::uint32_t>(maximizedHeight);
     }
 
     moho::WIN_SetMainWindow(supcomFrame);
 
-    std::int32_t clientWidth = 0;
-    std::int32_t clientHeight = 0;
-    moho::sMainWindow->DoGetClientSize(&clientWidth, &clientHeight);
+    int clientWidth = 0;
+    int clientHeight = 0;
+    moho::sMainWindow->GetClientSize(&clientWidth, &clientHeight);
 
-    const wxSize viewportSize{clientWidth, clientHeight};
+    const Wm3::Vector2i viewportSize{clientWidth, clientHeight};
     const bool hasSecondHead = context.GetHeadCount() > 1;
     moho::WD3DViewport* const viewport = moho::REN_CreateGameViewport(
       moho::sMainWindow, title.c_str(), viewportSize, hasSecondHead
     );
 
-    primaryHead.mHandle = reinterpret_cast<void*>(static_cast<std::uintptr_t>(viewport->m_parent->GetHandle()));
-    primaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(viewport->GetHandle()));
+    primaryHead.mHandle = reinterpret_cast<void*>(viewport->GetParent()->GetHandle());
+    primaryHead.mWindow = reinterpret_cast<void*>(viewport->GetHandle());
 
     if (hasSecondHead) {
       gpg::gal::Head& secondaryHead = context.GetHead(1);
@@ -1424,13 +1412,14 @@ bool CScApp::CreateAppFrame(
         static_cast<std::int32_t>(secondaryHead.mHeight),
       };
 
-      frame = WX_CreateSupComFrame(title.c_str(), position, secondarySize, frameStyle);
+      frame = new WSupComFrame(title.c_str(), position, secondarySize, frameStyle);
       frame->Show(!secondaryHead.mWindowed);
       secondaryHead.mHandle = primaryHead.mHandle;
-      secondaryHead.mWindow = reinterpret_cast<void*>(static_cast<std::uintptr_t>(frame->GetHandle()));
+      secondaryHead.mWindow = reinterpret_cast<void*>(frame->GetHandle());
     }
 
-    wxPaintEventRuntime paintEvent{};
+    // A stack wxPaintEvent handed straight to the handler (0x008CFB95).
+    wxPaintEvent paintEvent;
     viewport->OnPaint(paintEvent);
 
     moho::CD3DDevice* const device = moho::D3D_GetDevice();
@@ -1439,7 +1428,7 @@ bool CScApp::CreateAppFrame(
     context.mValidate = !moho::CFG_GetArgOption("/novalidate", 0, nullptr);
     gpg::gal::Device::Create(&context);
 
-    device->SetRenViewport(viewport);
+    device->SetRenViewport(static_cast<moho::WRenViewport*>(viewport));
     device->Clear2(false);
 
     moho::WINX_ExitSplash();
@@ -1448,7 +1437,7 @@ bool CScApp::CreateAppFrame(
       frame->Show(true);
     }
 
-    moho::ren_Viewport = viewport;
+    moho::ren_Viewport = static_cast<moho::WRenViewport*>(viewport);
     viewport->SetFocus();
     moho::WINX_PrecreateLogWindow();
 
@@ -1500,5 +1489,5 @@ bool CScApp::AppDoSuppressWindowsKeys() const
     return false;
   }
 
-  return moho::WxAppRuntime::IsSupComFrameWindowActive(supcomFrame);
+  return supcomFrame->IsApplicationActive();
 }

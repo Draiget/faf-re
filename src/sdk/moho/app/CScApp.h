@@ -146,8 +146,9 @@ public:
   std::uint8_t reserved4A[2];
   // +0x4C
   WSupComFrame* supcomFrame;
-  // +0x50
-  wxWindowBase* frame;
+  // +0x50: the second head's frame, a WSupComFrame like the first
+  // (CreateAppFrame builds it through the same constructor, 0x008CFB4C).
+  WSupComFrame* frame;
   // +0x54 (first-frame timing gate)
   std::uint8_t firstFramePending;
   // +0x55..+0x57
