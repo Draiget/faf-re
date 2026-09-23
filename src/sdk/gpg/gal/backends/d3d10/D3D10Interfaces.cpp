@@ -1734,45 +1734,6 @@ namespace gpg::gal
 
     static_assert(sizeof(EffectMacroVector) == 0x10, "EffectMacroVector size must be 0x10");
 
-    struct EffectContextRuntime final
-    {
-      void* vftable = nullptr;                                 // +0x00
-      std::uint32_t field04 = 0U;                              // +0x04
-      std::uint8_t field08 = 0U;                               // +0x08
-      std::uint8_t pad09_0B[3]{};                              // +0x09 .. +0x0B
-      msvc8::string field0C{};                                 // +0x0C
-      msvc8::string field28{};                                 // +0x28
-      std::uint32_t field44 = 0U;                              // +0x44
-      boost::detail::sp_counted_base* sharedCount48 = nullptr; // +0x48
-      std::uint32_t field4C = 0U;                              // +0x4C
-      std::uint32_t field50 = 0U;                              // +0x50
-      EffectMacroVector lane54{};                     // +0x54
-    };
-
-    static_assert(offsetof(EffectContextRuntime, field04) == 0x04, "EffectContextRuntime::field04 offset must be 0x04");
-    static_assert(offsetof(EffectContextRuntime, field08) == 0x08, "EffectContextRuntime::field08 offset must be 0x08");
-    static_assert(offsetof(EffectContextRuntime, field0C) == 0x0C, "EffectContextRuntime::field0C offset must be 0x0C");
-    static_assert(offsetof(EffectContextRuntime, field28) == 0x28, "EffectContextRuntime::field28 offset must be 0x28");
-    static_assert(offsetof(EffectContextRuntime, field44) == 0x44, "EffectContextRuntime::field44 offset must be 0x44");
-    static_assert(
-      offsetof(EffectContextRuntime, sharedCount48) == 0x48, "EffectContextRuntime::sharedCount48 offset must be 0x48"
-    );
-    static_assert(offsetof(EffectContextRuntime, field4C) == 0x4C, "EffectContextRuntime::field4C offset must be 0x4C");
-    static_assert(offsetof(EffectContextRuntime, field50) == 0x50, "EffectContextRuntime::field50 offset must be 0x50");
-    static_assert(offsetof(EffectContextRuntime, lane54) == 0x54, "EffectContextRuntime::lane54 offset must be 0x54");
-
-    static_assert(sizeof(EffectContextRuntime) == 0x64, "EffectContextRuntime size must be 0x64");
-
-    EffectContextRuntime* AsEffectContextRuntime(EffectD3D10* const effect) noexcept
-    {
-      return reinterpret_cast<EffectContextRuntime*>(&effect->context_);
-    }
-
-    const EffectContextRuntime* AsEffectContextRuntime(const EffectContext* const context) noexcept
-    {
-      return reinterpret_cast<const EffectContextRuntime*>(context);
-    }
-
     template <class T>
     void ReleaseComLike(T*& object) noexcept
     {
@@ -3443,113 +3404,6 @@ namespace gpg::gal
         ThrowVectorTooLongLengthErrorB,
         AllocateStride04Array
       );
-    }
-
-    EffectContextRuntime*
-    CopyEffectContextRuntime(EffectContextRuntime* const destination, const EffectContextRuntime* const source)
-    {
-      if (destination == source) {
-        return destination;
-      }
-
-      destination->field04 = source->field04;
-      destination->field08 = source->field08;
-      destination->field0C.assign(source->field0C, 0U, msvc8::string::npos);
-      destination->field28.assign(source->field28, 0U, msvc8::string::npos);
-      destination->field44 = source->field44;
-      AssignSharedCount(destination->sharedCount48, source->sharedCount48);
-      destination->field4C = source->field4C;
-      destination->field50 = source->field50;
-      destination->lane54 = source->lane54;
-      return destination;
-    }
-
-    void InitializeEffectContextRuntimeStorage(EffectContextRuntime& context)
-    {
-      context.field04 = 0U;
-      context.field08 = 0U;
-      context.pad09_0B[0] = 0U;
-      context.pad09_0B[1] = 0U;
-      context.pad09_0B[2] = 0U;
-      ::new (static_cast<void*>(&context.field0C)) msvc8::string();
-      ::new (static_cast<void*>(&context.field28)) msvc8::string();
-      context.field44 = 0U;
-      context.sharedCount48 = nullptr;
-      context.field4C = 0U;
-      context.field50 = 0U;
-      ::new (static_cast<void*>(&context.lane54)) EffectMacroVector();
-    }
-
-    void DestroyEffectContextRuntimeStorage(EffectContextRuntime& context) noexcept
-    {
-      ReleaseSharedCount(context.sharedCount48);
-      context.lane54.tidy();
-      context.field0C.tidy(true, 0U);
-      context.field28.tidy(true, 0U);
-      context.field44 = 0U;
-      context.field4C = 0U;
-      context.field50 = 0U;
-    }
-
-    /**
-     * Address: 0x0094B580 (FUN_0094B580)
-     *
-     * What it does:
-     * Initializes EffectD3D10 runtime storage lanes and clears retained effect handle.
-     */
-    void InitializeEffectD3D10Object(EffectD3D10* const effect)
-    {
-      InitializeEffectContextRuntimeStorage(*AsEffectContextRuntime(effect));
-      effect->dxEffect_ = nullptr;
-    }
-
-    /**
-     * Address: 0x0094BF10 (FUN_0094BF10)
-     *
-     * What it does:
-     * Releases retained effect object and resets embedded `EffectContext` state lanes.
-     */
-    void DestroyEffectD3D10State(EffectD3D10* const effect)
-    {
-      ReleaseComLike(effect->dxEffect_);
-
-      const EffectContextRuntime resetContext{};
-      CopyEffectContextRuntime(AsEffectContextRuntime(effect), &resetContext);
-    }
-
-    /**
-     * Address: 0x0094BF80 (FUN_0094BF80)
-     *
-     * What it does:
-     * Executes the recovered non-deleting destructor body lanes for `EffectD3D10`.
-     */
-    void DestroyEffectD3D10Body(EffectD3D10* const effect)
-    {
-      DestroyEffectD3D10State(effect);
-      DestroyEffectContextRuntimeStorage(*AsEffectContextRuntime(effect));
-    }
-
-    /**
-     * Address: 0x0094BFE0 (FUN_0094BFE0)
-     *
-     * What it does:
-     * Rebuilds effect state from caller-provided context/effect handles and clears
-     * context runtime shared-count lanes (`+0x48/+0x4C/+0x50`).
-     */
-    void InitializeEffectD3D10State(
-      EffectD3D10* const effect, const EffectContext* const sourceContext, void* const dxEffect
-    )
-    {
-      DestroyEffectD3D10State(effect);
-
-      EffectContextRuntime* const runtime = AsEffectContextRuntime(effect);
-      CopyEffectContextRuntime(runtime, AsEffectContextRuntime(sourceContext));
-      effect->dxEffect_ = dxEffect;
-
-      runtime->field44 = 0U;
-      ReleaseSharedCount(runtime->sharedCount48);
-      runtime->field4C = 0U;
-      runtime->field50 = 0U;
     }
 
     /**
@@ -6133,16 +5987,13 @@ namespace gpg::gal
     // but every other context lane (sourceType, sourcePath, source-byte
     // window) is read from the inbound caller-owned context — the local
     // copy is consumed for DefineMacro side effects only.
-    const EffectContextRuntime* const inboundRuntime = AsEffectContextRuntime(context);
-    const EffectContextRuntime* const localRuntime = AsEffectContextRuntime(localContext);
-
-    const std::size_t totalMacroCount = localRuntime->lane54.size();
+    const std::size_t totalMacroCount = localContext->mMacros.size();
     D3D10_SHADER_MACRO* defines = nullptr;
     if (totalMacroCount != 0U) {
       defines = new D3D10_SHADER_MACRO[totalMacroCount + 1U];
 
       std::size_t writeIndex = 0U;
-      for (const EffectMacro& macro : localRuntime->lane54) {
+      for (const EffectMacro& macro : localContext->mMacros) {
         defines[writeIndex].Name = macro.keyText_.c_str();
         defines[writeIndex].Definition = macro.valueText_.c_str();
         ++writeIndex;
@@ -6152,17 +6003,16 @@ namespace gpg::gal
       defines[writeIndex].Definition = nullptr;
     }
 
-    if (inboundRuntime->field04 != 2U) {
+    if (context->mSourceType != 2U) {
       delete[] defines;
       ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
     }
 
-    const auto* const sourceData =
-      reinterpret_cast<const void*>(static_cast<std::uintptr_t>(inboundRuntime->field4C));
+    const char* const sourceBegin = context->mSourceBuffer.mBegin;
+    const char* const sourceEnd = context->mSourceBuffer.mEnd;
+    const void* const sourceData = sourceBegin;
     const std::uint32_t sourceBytes =
-      (inboundRuntime->field50 >= inboundRuntime->field4C)
-        ? (inboundRuntime->field50 - inboundRuntime->field4C)
-        : 0U;
+      (sourceEnd >= sourceBegin) ? static_cast<std::uint32_t>(sourceEnd - sourceBegin) : 0U;
 
     ID3D10Effect* dxEffect = nullptr;
     void* errorBlob = nullptr;
@@ -6180,7 +6030,7 @@ namespace gpg::gal
 
     if (result < 0) {
       msvc8::string message("unable to create effect: ");
-      message = message + inboundRuntime->field0C;
+      message = message + context->mSourcePath;
       message = message + " reason: ";
       message = message + reason;
       ThrowGalError("DeviceD3D10.cpp", 828, message.c_str());
@@ -7496,19 +7346,49 @@ namespace gpg::gal
     : context_()
     , dxEffect_(nullptr)
   {
-    InitializeEffectD3D10Object(this);
-    InitializeEffectD3D10State(this, context, dxEffect);
+    AssignState(context, dxEffect);
   }
 
   /**
-   * Address: 0x0094C050 (FUN_0094C050)
+   * Address: 0x0094BF10 (FUN_0094BF10)
    *
    * What it does:
-   * Owns the deleting-destructor path and delegates teardown to `FUN_0094BF80`.
+   * Releases the native effect and assigns a fresh context over `context_`.
+   */
+  void EffectD3D10::ResetState()
+  {
+    ReleaseComLike(dxEffect_);
+    context_ = EffectContext();
+  }
+
+  /**
+   * Address: 0x0094BFE0 (FUN_0094BFE0)
+   *
+   * What it does:
+   * Resets, copies `source` into `context_`, adopts `dxEffect`, then empties the
+   * copied source buffer (the four words at this+0x48..+0x54, releasing the
+   * shared owner at +0x4C first).
+   */
+  void EffectD3D10::AssignState(const EffectContext* const source, void* const dxEffect)
+  {
+    ResetState();
+    context_ = *source;
+    dxEffect_ = dxEffect;
+    context_.mSourceBuffer.Reset();
+  }
+
+  /**
+   * Address: 0x0094BF80 (FUN_0094BF80)
+   * Address: 0x0094C050 (FUN_0094C050, the scalar deleting destructor)
+   *
+   * What it does:
+   * Resets the state; `context_` is then destroyed once, as a member
+   * (0x0093F950). This body used to tear `context_` down by hand as well, so
+   * the member destructor that followed ran over it a second time.
    */
   EffectD3D10::~EffectD3D10()
   {
-    DestroyEffectD3D10Body(this);
+    ResetState();
   }
 
   /**

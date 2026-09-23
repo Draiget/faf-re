@@ -36,6 +36,18 @@ namespace gpg::gal
         EffectContext(const EffectContext& other);
 
         /**
+         * Address: 0x00942CF0 (FUN_00942CF0, gpg::gal::EffectContext::operator=)
+         *
+         * What it does:
+         * Member-wise assignment behind a self-check: source type, cache flag,
+         * both paths, the shared source buffer and the macro list. One body,
+         * called by both backends -- the D3D9 effect paths (0x00942D60,
+         * 0x00942E50) and the D3D10 effect reset/assign (0x0094BF10,
+         * 0x0094BFE0).
+         */
+        EffectContext& operator=(const EffectContext& other);
+
+        /**
          * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
          *
          * bool,gpg::StrArg,gpg::StrArg,gpg::MemBuffer<char> const &,std::vector<gpg::gal::EffectMacro> const &

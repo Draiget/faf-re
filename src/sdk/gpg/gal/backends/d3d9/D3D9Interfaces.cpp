@@ -4802,10 +4802,12 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x00942CF0 (FUN_00942CF0)
-         *
-         * What it does:
-         * Copies the recoverable `EffectContext` lanes into destination context storage.
+         * A hand copy of `EffectContext::operator=` (0x00942CF0), which is where
+         * that address is recovered; the D3D10 backend already calls the operator.
+         * This one stays until the D3D9 side drops its `EffectContextRuntime`
+         * overlay, because its macro-vector copy goes through the local
+         * `AssignEffectContextLane54` rather than `msvc8::vector::operator=`, and
+         * the two have not been checked against each other.
          */
         EffectContextRuntime* CopyEffectContextRuntime(
             EffectContextRuntime* const destination,

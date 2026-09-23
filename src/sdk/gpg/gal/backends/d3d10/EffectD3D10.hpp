@@ -23,17 +23,25 @@ namespace gpg::gal
   public:
     /**
      * Address: 0x0094C070 (FUN_0094C070)
+     * Address: 0x0094B580 (FUN_0094B580 -- the default constructor: installs the
+     * `Effect` then `EffectD3D10` vtables and builds an empty context. Zero callers,
+     * unreachable; nothing in the binary constructs an `EffectD3D10` without a
+     * context. It was once called from the body of this constructor as if it were
+     * part of it, which constructed `context_` twice.)
      *
      * What it does:
-     * Initializes effect-context storage lanes, then binds caller context/effect handles.
+     * Builds an empty context and a null effect handle (`EffectContext()` at
+     * 0x0093FBE0, `mov [esi+0x68],0`), then binds the caller's through `AssignState`.
      */
     EffectD3D10(EffectContext* context, void* dxEffect);
 
     /**
-     * Address: 0x0094C050 (FUN_0094C050)
+     * Address: 0x0094BF80 (FUN_0094BF80)
+     * Address: 0x0094C050 (FUN_0094C050, the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_0094BF80` body lanes.
+     * Resets the state; `context_` is then destroyed as a member (0x0093F950),
+     * which is the second and last call the binary body makes.
      */
     virtual ~EffectD3D10();
 
@@ -84,6 +92,25 @@ namespace gpg::gal
      * No-op D3D10 effect lost-device slot.
      */
     virtual void OnLost();
+
+    /**
+     * Address: 0x0094BF10 (FUN_0094BF10)
+     *
+     * What it does:
+     * Releases the native effect and assigns a fresh context over `context_`:
+     * a temporary `EffectContext` (0x0093FBE0), `operator=` (0x00942CF0), and the
+     * temporary's destructor (0x0093F950).
+     */
+    void ResetState();
+
+    /**
+     * Address: 0x0094BFE0 (FUN_0094BFE0)
+     *
+     * What it does:
+     * Resets, copies `source` into `context_`, adopts `dxEffect`, and empties the
+     * copied source buffer -- the effect keeps the settings but not the bytes.
+     */
+    void AssignState(const EffectContext* source, void* dxEffect);
 
   public:
     EffectContext context_{};  // +0x04 .. +0x67

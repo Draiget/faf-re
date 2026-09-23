@@ -614,6 +614,29 @@ namespace gpg::gal
     {}
 
     /**
+     * Address: 0x00942CF0 (FUN_00942CF0, gpg::gal::EffectContext::operator=)
+     *
+     * What it does:
+     * Assigns every lane from `other` behind a self-check. The paths are
+     * whole-string assigns and the source buffer is a shared-owner copy, so the
+     * two contexts end up sharing one buffer.
+     */
+    EffectContext& EffectContext::operator=(const EffectContext& other)
+    {
+        if (this == &other) {
+            return *this;
+        }
+
+        mSourceType = other.mSourceType;
+        mUseCache = other.mUseCache;
+        mSourcePath.assign(other.mSourcePath, 0U, msvc8::string::npos);
+        mCachePath.assign(other.mCachePath, 0U, msvc8::string::npos);
+        mSourceBuffer = other.mSourceBuffer;
+        mMacros = other.mMacros;
+        return *this;
+    }
+
+    /**
      * Address: 0x0093FD90 (FUN_0093FD90, gpg::gal::EffectContext::EffectContext)
      *
      * What it does:
