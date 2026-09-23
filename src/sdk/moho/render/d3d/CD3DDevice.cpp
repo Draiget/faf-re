@@ -73,9 +73,10 @@ namespace
   constexpr int kCooperativeLevelNeedsReset = 1;
   constexpr int kCooperativeLevelLost = 2;
 
-  // Body of the `catch (const gal::Error&)` handlers in the CD3DDevice family
-  // (InitContext 0x0042E6CB, Paint 0x00431097, ...): one warning with the throw
-  // site and message, format string "%s(%d) %s" at 0x00E0196C.
+  // Body of the two non-fatal `catch (const gal::Error&)` handlers, InitContext
+  // (0x0042E6CB) and Paint (0x00431097): one warning with the throw site and
+  // message, format string "%s(%d) %s" at 0x00E0196C. The other handlers that
+  // format that string hand it to gpg::Die (0x00939000) instead.
   void WarnGalError(const gpg::gal::Error& error)
   {
     gpg::Warnf("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
