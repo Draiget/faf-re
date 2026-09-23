@@ -4,10 +4,13 @@
 #include <cstdint>
 #include <type_traits>
 
+#include "boost/shared_ptr.h"
 #include "gpg/gal/MeshVertex.h"
 
 namespace gpg::gal
 {
+	class VertexFormat;
+
 	/**
 	 * VFTABLE: 0x00D47F20
 	 * COL:     0x00E5345C
@@ -40,15 +43,12 @@ namespace gpg::gal
 		 * Address: 0x00A82547 (_purecall in MeshFormatter slot 2)
 		 * Slot: 2
 		 *
-		 * std::uintptr_t streamToken, std::int32_t layoutVariant
-		 *
 		 * What it does:
-		 * Selects/activates a backend vertex-format token and returns the input
-		 * token for chaining.
+		 * Creates, on the active device, the vertex format this formatter's
+		 * records are laid out in (Device slot 14). `layoutVariant` selects
+		 * format 16 over 15 on the D3D9 float16 formatter; the others ignore it.
 		 */
-		[[nodiscard]] virtual std::uintptr_t SelectVertexFormatToken(
-			std::uintptr_t streamToken,
-			std::int32_t layoutVariant) = 0;
+		[[nodiscard]] virtual boost::shared_ptr<VertexFormat> CreateVertexFormat(std::int32_t layoutVariant) = 0;
 
 		/**
 		 * Address: 0x00A82547 (_purecall in MeshFormatter slot 3)
@@ -86,4 +86,13 @@ namespace gpg::gal
 
 	static_assert(sizeof(MeshFormatter) == 0x4, "MeshFormatter size must be 0x4");
 	static_assert(std::is_polymorphic<MeshFormatter>::value, "MeshFormatter must remain polymorphic");
+
+	/**
+	 * Address: 0x008E7550 (FUN_008E7550, func_GetHardwareVertexFormatter)
+	 *
+	 * What it does:
+	 * Returns the process-wide hardware vertex formatter for the active
+	 * device, choosing it on first use (defined in the D3D9 backend TU).
+	 */
+	[[nodiscard]] MeshFormatter* GetHardwareVertexFormatter();
 }

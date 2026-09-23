@@ -164,7 +164,6 @@ namespace moho
      */
     void Func9() override;
 
-  private:
     /**
      * Address: 0x00440140 (FUN_00440140)
      *
@@ -172,9 +171,13 @@ namespace moho
      * char __usercall sub_440140@<al>(Moho::CD3DVertexSheet *a1@<edi>);
      *
      * What it does:
-     * Calls `CreateBuffer` for each owned stream and reports aggregate success.
+     * Calls `CreateBuffer` for each owned stream and reports aggregate
+     * success. `CD3DDeviceResources::InitResources` runs it for every sheet
+     * after a device reset (0x004407B0).
      */
     bool CreateOwnedStreamBuffers();
+
+  private:
 
     /**
      * Address: 0x004401C0 (FUN_004401C0)

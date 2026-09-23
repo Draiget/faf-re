@@ -7,9 +7,9 @@
 
 namespace gpg::gal
 {
-  class IndexBufferD3D9;
-  class VertexBufferD3D9;
-  class VertexFormatD3D9;
+  class IndexBuffer;
+  class VertexBuffer;
+  class VertexFormat;
 } // namespace gpg::gal
 
 namespace moho
@@ -91,7 +91,7 @@ namespace moho
      * What it does:
      * Ensures particle GPU resources exist, then unlocks instance data stream.
      */
-    int UnlockInstanceBuffer();
+    void UnlockInstanceBuffer();
 
     /**
      * Address: 0x0048E660 (FUN_0048E660)
@@ -106,10 +106,10 @@ namespace moho
     int mMaxParticles; // +0x04
     bool mInitialized; // +0x08
     std::uint8_t mPadding09[3]; // +0x09
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> mVertexFormat; // +0x0C
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mQuadVertexBuffer; // +0x14
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mInstanceVertexBuffer; // +0x1C
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mQuadIndexBuffer; // +0x24
+    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x0C
+    boost::shared_ptr<gpg::gal::VertexBuffer> mQuadVertexBuffer; // +0x14
+    boost::shared_ptr<gpg::gal::VertexBuffer> mInstanceVertexBuffer; // +0x1C
+    boost::shared_ptr<gpg::gal::IndexBuffer> mQuadIndexBuffer; // +0x24
 
   private:
     /**

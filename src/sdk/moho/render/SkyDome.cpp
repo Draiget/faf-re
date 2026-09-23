@@ -18,8 +18,8 @@
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/render/camera/GeomCamera3.h"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -628,7 +628,7 @@ void SkyDome::Destroy()
     context.stride_ = sizeof(SkyDomeVertex);
     context.type_ = 1u;
     context.usage_ = 1u;
-    device->CreateVertexBuffer(&mDomeVertBuf, &context);
+    mDomeVertBuf = device->CreateVertexBuffer(&context);
 
     auto* const vertices = static_cast<SkyDomeVertex*>(
       mDomeVertBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0))
@@ -680,7 +680,7 @@ void SkyDome::Destroy()
     context.size_ = static_cast<std::uint32_t>(mDomeIndexCount);
     context.format_ = 1u;
     context.type_ = 1u;
-    device->CreateIndexBuffer(&mDomeIndexBuf, &context);
+    mDomeIndexBuf = device->CreateIndexBuffer(&context);
 
     std::int16_t* const indices = mDomeIndexBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
     int writeIndex = 0;
@@ -735,7 +735,7 @@ void SkyDome::Destroy()
     quadContext.stride_ = 8u;
     quadContext.type_ = 2u;
     quadContext.usage_ = 1u;
-    device->CreateVertexBuffer(&mDecalVertBuf1, &quadContext);
+    mDecalVertBuf1 = device->CreateVertexBuffer(&quadContext);
 
     void* const quadVertices = mDecalVertBuf1->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
     std::memcpy(quadVertices, kDecalBillboardQuadVertices.data(), sizeof(kDecalBillboardQuadVertices));
@@ -746,14 +746,14 @@ void SkyDome::Destroy()
     cumulusContext.stride_ = 40u;
     cumulusContext.type_ = 3u;
     cumulusContext.usage_ = 2u;
-    device->CreateVertexBuffer(&mDecalVertBuf2, &cumulusContext);
+    mDecalVertBuf2 = device->CreateVertexBuffer(&cumulusContext);
 
     gpg::gal::VertexBufferContext cirrusContext{};
     cirrusContext.vertexCount_ = 10000u;
     cirrusContext.stride_ = 60u;
     cirrusContext.type_ = 3u;
     cirrusContext.usage_ = 2u;
-    device->CreateVertexBuffer(&mDecalVertBuf3, &cirrusContext);
+    mDecalVertBuf3 = device->CreateVertexBuffer(&cirrusContext);
   }
 
   /**
@@ -774,7 +774,7 @@ void SkyDome::Destroy()
     context.size_ = 6u;
     context.format_ = 1u;
     context.type_ = 1u;
-    device->CreateIndexBuffer(&mDecalIndexBuf, &context);
+    mDecalIndexBuf = device->CreateIndexBuffer(&context);
 
     std::int16_t* const indices = mDecalIndexBuf->Lock(0u, 0u, static_cast<gpg::gal::MohoD3DLockFlags>(0));
     std::memcpy(indices, kDecalQuadIndices.data(), sizeof(kDecalQuadIndices));

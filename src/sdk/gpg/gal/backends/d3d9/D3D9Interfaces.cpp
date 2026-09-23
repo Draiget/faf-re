@@ -82,9 +82,19 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F4B80 (FUN_008F4B80)
      *
      * What it does:
-     * Initializes one abstract index-buffer base lane.
+     * Installs the abstract index-buffer vtable.
      */
     IndexBuffer::IndexBuffer() = default;
+
+    /**
+     * Address: 0x008F4B70
+     *
+     * What it does:
+     * Reinstalls the abstract index-buffer vtable (`mov [ecx], 0x00D42D98;
+     * ret`). Both backend destructors inline it; this out-of-line copy is for
+     * their unwind paths, and IDA never boxed it as a function.
+     */
+    IndexBuffer::~IndexBuffer() = default;
 
     /**
      * Address: 0x008F5250 (FUN_008F5250)
@@ -117,12 +127,25 @@ namespace { // TEMPORARY PROBE (do not commit)
     CubeRenderTarget::~CubeRenderTarget() = default;
 
     /**
+     * Address: 0x00902240 (FUN_00902240)
+     *
+     * What it does:
+     * Installs the abstract pipeline-state vtable and returns `this`. Both
+     * backend constructors inline it.
+     */
+    PipelineState::PipelineState() = default;
+
+    /**
      * Address: 0x00902230 (FUN_00902230)
      *
      * What it does:
-     * Initializes one base `PipelineState` lane.
+     * Reinstalls the abstract pipeline-state vtable (`mov [ecx], 0x00D436F0;
+     * ret` - no `this` in eax, so this is the destructor, not the constructor
+     * it used to be annotated as). Called from both backends' pipeline-state
+     * constructor unwind paths and destructors (0x00949F80 and 0x00946BE0 on
+     * D3D9, 0x00902CA0 and 0x009023F0 on D3D10).
      */
-    PipelineState::PipelineState() = default;
+    PipelineState::~PipelineState() = default;
 
     // Mesh-batching hardware capability flags. Console-settable (see
     // `Moho::CON_mesh_Rebatch`, moho/console/CConCommand.cpp), which writes
@@ -1631,170 +1654,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return *reinterpret_cast<const DeviceD3D9RuntimeView*>(&device);
         }
 
-        /**
-         * Address: 0x008E94E0 (FUN_008E94E0, boost::detail::shared_count_VertexFormatD3D9::shared_count_VertexFormatD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<VertexFormatD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<VertexFormatD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountVertexFormatD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            VertexFormatD3D9* const vertexFormat
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, vertexFormat);
-        }
-
-        /**
-         * Address: 0x008E9DB0 (FUN_008E9DB0, boost::shared_ptr_VertexFormatD3D9::shared_ptr_VertexFormatD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<VertexFormatD3D9>` from one raw
-         * pointer lane. FUN_008E9DB0's own disassembly publishes `px`
-         * ("fmt") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_008E94E0 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `DeviceD3D9::CreateVertexFormat`) before a no-op
-         * `sp_enable_shared_from_this` (`VertexFormatD3D9` does not derive
-         * from `enable_shared_from_this`); reproduced explicitly here
-         * instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<VertexFormatD3D9>* ConstructSharedVertexFormatD3D9FromRaw(
-            boost::shared_ptr<VertexFormatD3D9>* const outVertexFormat,
-            VertexFormatD3D9* const vertexFormat
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outVertexFormat, vertexFormat, ConstructSharedCountVertexFormatD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E9570 (FUN_008E9570, boost::detail::shared_count_VertexBufferD3D9::shared_count_VertexBufferD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<VertexBufferD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<VertexBufferD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountVertexBufferD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            VertexBufferD3D9* const vertexBuffer
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, vertexBuffer);
-        }
-
-        /**
-         * Address: 0x008E9DE0 (FUN_008E9DE0, boost::shared_ptr_VertexBufferD3D9::shared_ptr_VertexBufferD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<VertexBufferD3D9>` from one raw
-         * pointer lane. FUN_008E9DE0's own disassembly publishes `px`
-         * ("buffer") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_008E9570 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `DeviceD3D9::CreateVertexBuffer`) before a no-op
-         * `sp_enable_shared_from_this` (`VertexBufferD3D9` does not derive
-         * from `enable_shared_from_this`); reproduced explicitly here
-         * instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<VertexBufferD3D9>* ConstructSharedVertexBufferD3D9FromRaw(
-            boost::shared_ptr<VertexBufferD3D9>* const outVertexBuffer,
-            VertexBufferD3D9* const vertexBuffer
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outVertexBuffer, vertexBuffer, ConstructSharedCountVertexBufferD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E9600 (FUN_008E9600, boost::detail::shared_count_IndexBufferD3D9::shared_count_IndexBufferD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<IndexBufferD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<IndexBufferD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountIndexBufferD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            IndexBufferD3D9* const indexBuffer
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, indexBuffer);
-        }
-
-        /**
-         * Address: 0x008E9E10 (FUN_008E9E10, boost::shared_ptr_IndexBufferD3D9::shared_ptr_IndexBufferD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<IndexBufferD3D9>` from one raw pointer
-         * lane. FUN_008E9E10's own disassembly publishes `px` ("buf")
-         * first, then builds the control block through one discrete
-         * `shared_count(T*)` call (FUN_008E9600 above - a real, separately-
-         * emitted call, not inlined - also reached the same way from
-         * `DeviceD3D9::CreateIndexBuffer`) before a no-op
-         * `sp_enable_shared_from_this` (`IndexBufferD3D9` does not derive
-         * from `enable_shared_from_this`); reproduced explicitly here
-         * instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<IndexBufferD3D9>* ConstructSharedIndexBufferD3D9FromRaw(
-            boost::shared_ptr<IndexBufferD3D9>* const outIndexBuffer,
-            IndexBufferD3D9* const indexBuffer
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outIndexBuffer, indexBuffer, ConstructSharedCountIndexBufferD3D9FromRaw
-            );
-        }
-
-        /**
-         * Address: 0x008E99E0 (FUN_008E99E0, boost::detail::shared_count_PipelineStateD3D9::shared_count_PipelineStateD3D9)
-         *
-         * What it does:
-         * Allocates one 0x10-byte `sp_counted_impl_p<PipelineStateD3D9>`
-         * control block, publishes its vtable, sets use/weak count to one,
-         * and stores the owned raw pointer - the control-block half of
-         * constructing one `shared_ptr<PipelineStateD3D9>`.
-         */
-        boost::detail::shared_count* ConstructSharedCountPipelineStateD3D9FromRaw(
-            boost::detail::shared_count* const outCount,
-            PipelineStateD3D9* const pipelineState
-        )
-        {
-            return boost::ConstructSharedCountFromRaw(outCount, pipelineState);
-        }
-
-        /**
-         * Address: 0x008EA060 (FUN_008EA060, boost::shared_ptr_PipelineStateD3D9::shared_ptr_PipelineStateD3D9)
-         *
-         * What it does:
-         * Constructs one `shared_ptr<PipelineStateD3D9>` from one raw
-         * pointer lane. FUN_008EA060's own disassembly publishes `px`
-         * ("state") first, then builds the control block through one
-         * discrete `shared_count(T*)` call (FUN_008E99E0 above - a real,
-         * separately-emitted call, not inlined - also reached the same way
-         * from `AssignSharedPipelineStateFromRaw`'s `reset()`) before a
-         * no-op `sp_enable_shared_from_this` (`PipelineStateD3D9` does not
-         * derive from `enable_shared_from_this`); reproduced explicitly
-         * here instead of relying on boost's own converting constructor.
-         */
-        boost::shared_ptr<PipelineStateD3D9>* ConstructSharedPipelineStateD3D9FromRaw(
-            boost::shared_ptr<PipelineStateD3D9>* const outPipelineState,
-            PipelineStateD3D9* const pipelineState
-        )
-        {
-            return boost::ConstructSharedFromRawViaCountCtor(
-                outPipelineState, pipelineState, ConstructSharedCountPipelineStateD3D9FromRaw
-            );
-        }
-
         struct DwordPairRuntime final
         {
             std::uint32_t lane0 = 0U;
@@ -2225,22 +2084,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
 
             return outEffect;
-        }
-
-        /**
-         * Address: 0x008EA250 (FUN_008EA250, boost::shared_ptr_PipelineStateD3D9::operator=)
-         *
-         * What it does:
-         * Rebinds one `shared_ptr<PipelineStateD3D9>` from a raw pointer,
-         * replacing and releasing any previous ownership lane.
-         */
-        boost::shared_ptr<PipelineStateD3D9>* AssignSharedPipelineStateFromRaw(
-            boost::shared_ptr<PipelineStateD3D9>* const outPipelineState,
-            PipelineStateD3D9* const pipelineState
-        )
-        {
-            outPipelineState->reset(pipelineState);
-            return outPipelineState;
         }
 
         /**
@@ -4953,61 +4796,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x00946BE0 (FUN_00946BE0)
-         * Mangled: ??_DPipelineStateD3D9@gal@gpg@@QAEXXZ
-         *
-         * What it does:
-         * Releases the backend pipeline-state handle retained at `+0x04`.
-         */
-        void DestroyPipelineStateD3D9Body(PipelineStateD3D9* const pipelineState) noexcept
-        {
-            ReleaseComLike(pipelineState->stateManager_);
-        }
-
-        /**
-         * Address: 0x0094ACC0 (FUN_0094ACC0)
-         * Mangled: ??_DVertexFormatD3D9@gal@gpg@@QAEXXZ
-         *
-         * What it does:
-         * Releases D3D9 declaration state, restores base format code, and tears down
-         * the heap lane that stores vertex element metadata.
-         */
-        void DestroyVertexFormatD3D9Body(VertexFormatD3D9* const vertexFormat) noexcept
-        {
-            vertexFormat->ResetDeclarationState();
-            vertexFormat->elementStrideByStream_ = msvc8::vector<std::uint32_t>{};
-        }
-
-        /**
-         * Address: 0x008F57B0 (FUN_008F57B0)
-         * Mangled: ??1VertexBufferD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Releases the backend vertex-buffer handle and restores embedded context metadata.
-         */
-        void DestroyVertexBufferD3D9Body(VertexBufferD3D9* const vertexBuffer) noexcept
-        {
-            vertexBuffer->ResetBufferState();
-        }
-
-        /**
-         * Address: 0x008F4C80 (FUN_008F4C80)
-         * Mangled: ??1IndexBufferD3D9@gal@gpg@@QAE@XZ
-         *
-         * What it does:
-         * Releases the retained index-buffer handle and restores embedded context metadata.
-         */
-        void DestroyIndexBufferD3D9Body(IndexBufferD3D9* const indexBuffer) noexcept
-        {
-            ReleaseComLike(indexBuffer->d3dIndexBuffer_);
-
-            const IndexBufferContext resetContext{};
-            indexBuffer->context_.format_ = resetContext.format_;
-            indexBuffer->context_.size_ = resetContext.size_;
-            indexBuffer->context_.type_ = resetContext.type_;
-        }
-
-        /**
          * Address: 0x008F5350 (FUN_008F5350)
          * Mangled: ??_DRenderTargetD3D9@gal@gpg@@QAEXXZ
          *
@@ -5245,13 +5033,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * return the cached formatter. The construction/fill/draw paths of
      * `HardwareMeshBatch` all resolve their formatter through this accessor.
      */
-    Float16HardwareVertexFormatterD3D9* GetHardwareVertexFormatter()
+    MeshFormatter* GetHardwareVertexFormatter()
     {
         const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
         const std::int32_t deviceTypeSelector = deviceContext->mDeviceType - 1;
 
         if (sCurrentHardwareVertexFormatter != nullptr) {
-            return static_cast<Float16HardwareVertexFormatterD3D9*>(sCurrentHardwareVertexFormatter);
+            return sCurrentHardwareVertexFormatter;
         }
 
         // Device type 1 (D3D9) uses the D3D9 formatter list; device type 2
@@ -5266,18 +5054,14 @@ namespace { // TEMPORARY PROBE (do not commit)
         };
 
         if (deviceTypeSelector == 0) {
-            return static_cast<Float16HardwareVertexFormatterD3D9*>(
-                SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9)
-            );
+            return SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9);
         }
 
         if (deviceTypeSelector == 1) {
             // The D3D10 device path selects from the D3D10 formatter table,
             // which is owned by the D3D10 backend; the D3D9 backend build does
             // not construct those singletons, so no candidate is available here.
-            return static_cast<Float16HardwareVertexFormatterD3D9*>(
-                SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9)
-            );
+            return SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9);
         }
 
         ThrowGalError("MeshVertex.cpp", 92, "unknown graphics API");
@@ -5425,20 +5209,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00945680 (FUN_00945680)
      *
      * What it does:
-     * Requests hardware vertex-format token `14` and returns the input stream token.
+     * Creates vertex format 14 on the active device (slot 14, `[vtbl+0x38]`).
      */
-    std::uintptr_t HardwareVertexFormatterD3D9::SelectVertexFormatToken(
-        const std::uintptr_t streamToken,
+    boost::shared_ptr<VertexFormat> HardwareVertexFormatterD3D9::CreateVertexFormat(
         const std::int32_t /*layoutVariant*/
     )
     {
-        // `streamToken` is the caller's `shared_ptr<VertexFormatD3D9>` output
-        // slot; `CreateVertexFormat` fills it and hands it back. The opaque
-        // `uintptr_t` spelling comes from the `MeshFormatter` virtual this
-        // overrides, which still carries the decompiler's typing.
-        auto* const outVertexFormat = reinterpret_cast<boost::shared_ptr<VertexFormatD3D9>*>(streamToken);
-        ActiveDeviceD3D9().CreateVertexFormat(outVertexFormat, 14U);
-        return streamToken;
+        return Device::GetInstance()->CreateVertexFormat(14U);
     }
 
     /**
@@ -5522,17 +5299,14 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x00945640 (FUN_00945640)
      *
      * What it does:
-     * Selects float16 vertex-format token (`15`/`16`) and returns the input stream token.
+     * Creates vertex format 15 on the active device, or 16 (the one with the
+     * second per-vertex position stream) when `layoutVariant` is set.
      */
-    std::uintptr_t Float16HardwareVertexFormatterD3D9::SelectVertexFormatToken(
-        const std::uintptr_t streamToken,
+    boost::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D9::CreateVertexFormat(
         const std::int32_t layoutVariant
     )
     {
-        const std::uint32_t formatCode = (layoutVariant != 0) ? 16U : 15U;
-        auto* const outVertexFormat = reinterpret_cast<boost::shared_ptr<VertexFormatD3D9>*>(streamToken);
-        ActiveDeviceD3D9().CreateVertexFormat(outVertexFormat, formatCode);
-        return streamToken;
+        return Device::GetInstance()->CreateVertexFormat((layoutVariant != 0) ? 16U : 15U);
     }
 
     /**
@@ -5884,17 +5658,14 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008E9B00 (FUN_008E9B00)
      *
-     * boost::shared_ptr<gpg::gal::PipelineStateD3D9> *
-     *
      * What it does:
-     * Dispatches `Func1` pre-hook and copies retained pipeline-state shared ownership.
+     * Runs the `Func1` pre-hook and returns a new reference to the device's
+     * pipeline state.
      */
-    boost::shared_ptr<PipelineStateD3D9>*
-    DeviceD3D9::GetPipelineState(boost::shared_ptr<PipelineStateD3D9>* const outPipelineState)
+    boost::shared_ptr<PipelineState> DeviceD3D9::GetPipelineState()
     {
         Func1();
-        *outPipelineState = AsDeviceD3D9Runtime(*this).pipelineState;
-        return outPipelineState;
+        return AsDeviceD3D9Runtime(*this).pipelineState;
     }
 
     /**
@@ -6044,8 +5815,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
         }
 
-        PipelineStateD3D9* const pipelineState = new PipelineStateD3D9(runtime.nativeDevice);
-        AssignSharedPipelineStateFromRaw(&runtime.pipelineState, pipelineState);
+        runtime.pipelineState.reset(new PipelineStateD3D9(runtime.nativeDevice));
         if (runtime.pipelineState.get() != nullptr)
         {
             runtime.pipelineState->InitState();
@@ -6523,8 +6293,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         static_cast<void>(BuildDeviceCapabilities(context));
         CreateHeads();
 
-        PipelineStateD3D9* const pipelineState = new PipelineStateD3D9(runtime.nativeDevice);
-        AssignSharedPipelineStateFromRaw(&runtime.pipelineState, pipelineState);
+        runtime.pipelineState.reset(new PipelineStateD3D9(runtime.nativeDevice));
         if (runtime.pipelineState.get() != nullptr)
         {
             static_cast<void>(runtime.pipelineState->InitState());
@@ -7157,16 +6926,12 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EBA50 (FUN_008EBA50)
      *
-     * boost::shared_ptr<gpg::gal::VertexFormatD3D9> *,std::uint32_t
-     *
      * What it does:
-     * Validates one format token, builds one vertex declaration lane, and returns
-     * wrapped format ownership.
+     * Creates the D3D9 vertex declaration for gal vertex format `formatCode`
+     * and wraps it in a `VertexFormatD3D9`. An unknown code throws from the
+     * element-table lookup.
      */
-    boost::shared_ptr<VertexFormatD3D9>* DeviceD3D9::CreateVertexFormat(
-        boost::shared_ptr<VertexFormatD3D9>* const outVertexFormat,
-        const std::uint32_t formatCode
-    )
+    boost::shared_ptr<VertexFormat> DeviceD3D9::CreateVertexFormat(const std::uint32_t formatCode)
     {
         Func1();
 
@@ -7181,23 +6946,18 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 546, createResult);
         }
 
-        VertexFormatD3D9* const vertexFormat = new VertexFormatD3D9(formatCode, vertexDeclaration);
-        (void)ConstructSharedVertexFormatD3D9FromRaw(outVertexFormat, vertexFormat);
-        return outVertexFormat;
+        return boost::shared_ptr<VertexFormat>(new VertexFormatD3D9(formatCode, vertexDeclaration));
     }
 
     /**
      * Address: 0x008EBBB0 (FUN_008EBBB0)
      *
-     * boost::shared_ptr<gpg::gal::VertexBufferD3D9> *,gpg::gal::VertexBufferContext const *
-     *
      * What it does:
-     * Creates one D3D9 vertex buffer from caller context lanes and returns wrapped ownership.
+     * Creates one D3D9 vertex buffer of `vertexCount * stride` bytes (dynamic
+     * buffers in the default pool, the rest managed) and wraps it in a
+     * `VertexBufferD3D9`.
      */
-    boost::shared_ptr<VertexBufferD3D9>* DeviceD3D9::CreateVertexBuffer(
-        boost::shared_ptr<VertexBufferD3D9>* const outVertexBuffer,
-        const VertexBufferContext* const context
-    )
+    boost::shared_ptr<VertexBuffer> DeviceD3D9::CreateVertexBuffer(const VertexBufferContext* const context)
     {
         Func1();
 
@@ -7213,24 +6973,17 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 560, createResult);
         }
 
-        VertexBufferD3D9* const vertexBuffer = new VertexBufferD3D9(context, nativeVertexBuffer);
-        (void)ConstructSharedVertexBufferD3D9FromRaw(outVertexBuffer, vertexBuffer);
-        return outVertexBuffer;
+        return boost::shared_ptr<VertexBuffer>(new VertexBufferD3D9(context, nativeVertexBuffer));
     }
 
     /**
      * Address: 0x008EBD30 (FUN_008EBD30)
      *
-     * boost::shared_ptr<gpg::gal::IndexBufferD3D9> *,gpg::gal::IndexBufferContext const *
-     *
      * What it does:
-     * Validates index-format context lanes, creates one D3D9 index buffer, and
-     * returns wrapped ownership.
+     * Creates one D3D9 index buffer of 16- or 32-bit indices (format 0 throws
+     * "undefined index buffer format") and wraps it in an `IndexBufferD3D9`.
      */
-    boost::shared_ptr<IndexBufferD3D9>* DeviceD3D9::CreateIndexBuffer(
-        boost::shared_ptr<IndexBufferD3D9>* const outIndexBuffer,
-        const IndexBufferContext* const context
-    )
+    boost::shared_ptr<IndexBuffer> DeviceD3D9::CreateIndexBuffer(const IndexBufferContext* const context)
     {
         Func1();
 
@@ -7253,9 +7006,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 581, createResult);
         }
 
-        IndexBufferD3D9* const indexBuffer = new IndexBufferD3D9(context, nativeIndexBuffer);
-        (void)ConstructSharedIndexBufferD3D9FromRaw(outIndexBuffer, indexBuffer);
-        return outIndexBuffer;
+        return boost::shared_ptr<IndexBuffer>(new IndexBufferD3D9(context, nativeIndexBuffer));
     }
 
     /**
@@ -8066,15 +7817,17 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EDF70 (FUN_008EDF70)
      *
-     * boost::shared_ptr<gpg::gal::VertexFormatD3D9>
-     *
      * What it does:
-     * Binds one caller-provided vertex declaration on the native D3D9 device lane.
+     * Binds `vertexFormat`'s declaration on the device. The declaration comes
+     * through `VertexFormatD3D9::GetDeclaration` (0x008EDFAC), which throws
+     * "invalid vertex format" when it is unset.
      */
-    void DeviceD3D9::SetVertexDeclaration(boost::shared_ptr<VertexFormatD3D9> vertexFormat)
+    void DeviceD3D9::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
     {
         Func1();
-        const HRESULT result = InvokeNativeSetVertexDeclaration(this, vertexFormat.get()->vertexDeclaration_);
+        const HRESULT result = InvokeNativeSetVertexDeclaration(
+            this, static_cast<VertexFormatD3D9*>(vertexFormat.get())->GetDeclaration()
+        );
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1082, result);
@@ -8084,26 +7837,30 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EE0B0 (FUN_008EE0B0)
      *
-     * std::uint32_t,boost::shared_ptr<gpg::gal::VertexBufferD3D9>,int,int
-     *
      * What it does:
-     * Binds one vertex stream source and applies stream-frequency mode bits from
-     * vertex-buffer context lanes.
+     * Binds `vertexBuffer` on stream `streamSlot`, starting `startVertex`
+     * vertices in, then sets the stream frequency from the buffer's type:
+     * type 2 (geometry) repeats every `streamFrequencyToken` instances,
+     * type 3 (per-instance) advances once per instance. The stride comes from
+     * the buffer's context (virtual `GetContext`, 0x008EE0EF) and the native
+     * buffer through `VertexBufferD3D9::GetD3D` (0x008EE10E), which throws
+     * when it is unset.
      */
     void DeviceD3D9::SetVertexBuffer(
         const std::uint32_t streamSlot,
-        boost::shared_ptr<VertexBufferD3D9> vertexBuffer,
+        const boost::shared_ptr<VertexBuffer> vertexBuffer,
         const int streamFrequencyToken,
-        const int streamOffsetMultiplier
+        const int startVertex
     )
     {
         Func1();
 
         VertexBufferContext* const vertexContext = vertexBuffer->GetContext();
         const unsigned int stride = vertexContext->stride_;
-        const unsigned int offsetInBytes = static_cast<unsigned int>(streamOffsetMultiplier) * stride;
-        const HRESULT setStreamResult =
-            InvokeNativeSetStreamSource(this, streamSlot, vertexBuffer->d3dVertexBuffer_, offsetInBytes, stride);
+        const unsigned int offsetInBytes = static_cast<unsigned int>(startVertex) * stride;
+        const HRESULT setStreamResult = InvokeNativeSetStreamSource(
+            this, streamSlot, static_cast<VertexBufferD3D9*>(vertexBuffer.get())->GetD3D(), offsetInBytes, stride
+        );
         if (setStreamResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1093, setStreamResult);
@@ -8129,17 +7886,17 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EE2E0 (FUN_008EE2E0)
      *
-     * boost::shared_ptr<gpg::gal::IndexBufferD3D9>
-     *
      * What it does:
-     * Dispatches pre-hook then binds one index-buffer handle on the native D3D9
-     * device lane.
+     * Binds `indexBuffer` as the device's index source. The native buffer
+     * comes through `IndexBufferD3D9::GetBuffer` (0x008EE31C), which throws
+     * "invalid index buffer" when it is unset.
      */
-    void DeviceD3D9::SetBufferIndices(boost::shared_ptr<IndexBufferD3D9> indexBuffer)
+    void DeviceD3D9::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
     {
         Func1();
 
-        const HRESULT result = InvokeNativeSetIndices(this, indexBuffer->d3dIndexBuffer_);
+        const HRESULT result =
+            InvokeNativeSetIndices(this, static_cast<IndexBufferD3D9*>(indexBuffer.get())->GetBuffer());
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1112, result);
@@ -8803,10 +8560,9 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("EffectD3D9.cpp", 96, "invalid effect");
         }
 
-        boost::shared_ptr<PipelineStateD3D9> pipelineState;
-        ActiveDeviceD3D9().GetPipelineState(&pipelineState);
+        const boost::shared_ptr<PipelineState> pipelineState = Device::GetInstance()->GetPipelineState();
 
-        StateManagerD3D9* const stateManager = pipelineState->GetStateManager();
+        StateManagerD3D9* const stateManager = static_cast<PipelineStateD3D9*>(pipelineState.get())->GetStateManager();
         static_cast<void>(InvokeEffectSetStateManager(dxEffect_, stateManager));
         static_cast<void>(InvokeEffectOnResetDevice(dxEffect_));
     }
@@ -9510,12 +9266,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         void* const d3dIndexBuffer
     )
     {
-        ReleaseComLike(d3dIndexBuffer_);
-
-        const IndexBufferContext resetContext{};
-        context_.format_ = resetContext.format_;
-        context_.size_ = resetContext.size_;
-        context_.type_ = resetContext.type_;
+        ResetBufferState();
 
         context_.format_ = context->format_;
         context_.size_ = context->size_;
@@ -9525,14 +9276,33 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008F4D80 (FUN_008F4D80)
+     * Address: 0x008F4C30 (FUN_008F4C30)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_008F4C80` body semantics.
+     * Releases the native index buffer and puts the context back to its
+     * defaults. The destructor and `SetBuffer` inline it.
+     */
+    void IndexBufferD3D9::ResetBufferState()
+    {
+        ReleaseComLike(d3dIndexBuffer_);
+
+        const IndexBufferContext resetContext{};
+        context_.format_ = resetContext.format_;
+        context_.size_ = resetContext.size_;
+        context_.type_ = resetContext.type_;
+    }
+
+    /**
+     * Address: 0x008F4C80 (FUN_008F4C80)
+     * Address: 0x008F4D80 (FUN_008F4D80, slot 0: the scalar deleting destructor)
+     *
+     * What it does:
+     * Releases the native index buffer and resets the context, then the
+     * `IndexBuffer` base destructor runs (inlined, 0x008F4CFD).
      */
     IndexBufferD3D9::~IndexBufferD3D9()
     {
-        DestroyIndexBufferD3D9Body(this);
+        ResetBufferState();
     }
 
     /**
@@ -9876,9 +9646,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F4BE0 (FUN_008F4BE0)
      *
      * What it does:
-     * Returns the embedded index-buffer context block at `this+0x04`.
+     * Returns the context the buffer was created from.
      */
-    IndexBufferContext* IndexBufferD3D9::GetContextBuffer()
+    IndexBufferContext* IndexBufferD3D9::GetContext()
     {
         return &context_;
     }
@@ -9928,7 +9698,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Unlocks the retained D3D9 index buffer and clears lock-tracking state.
      */
-    HRESULT IndexBufferD3D9::Unlock()
+    void IndexBufferD3D9::Unlock()
     {
         if (d3dIndexBuffer_ == nullptr)
         {
@@ -9948,7 +9718,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         locked_ = false;
         indexData_ = nullptr;
-        return result;
     }
 
     /**
@@ -10512,14 +10281,16 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x00946F10 (FUN_00946F10)
+     * Address: 0x00946BE0 (FUN_00946BE0)
+     * Address: 0x00946F10 (FUN_00946F10, slot 0: the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_00946BE0` body semantics.
+     * Releases the effect state manager, then the `PipelineState` base
+     * destructor runs (inlined, 0x00946C27).
      */
     PipelineStateD3D9::~PipelineStateD3D9()
     {
-        DestroyPipelineStateD3D9Body(this);
+        ReleaseComLike(stateManager_);
     }
 
     /**
@@ -10587,21 +10358,23 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008F58C0 (FUN_008F58C0)
+     * Address: 0x008F57B0 (FUN_008F57B0)
+     * Address: 0x008F58C0 (FUN_008F58C0, slot 0: the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_008F57B0` body semantics.
+     * Releases the native vertex buffer and resets the context, then the
+     * `VertexBuffer` base destructor runs (inlined, 0x008F5833).
      */
     VertexBufferD3D9::~VertexBufferD3D9()
     {
-        DestroyVertexBufferD3D9Body(this);
+        ResetBufferState();
     }
 
     /**
      * Address: 0x008F5700 (FUN_008F5700)
      *
      * What it does:
-     * Returns the embedded vertex-buffer context block at `this+0x04`.
+     * Returns the context the buffer was created from.
      */
     VertexBufferContext* VertexBufferD3D9::GetContext()
     {
@@ -10649,7 +10422,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Unlocks the retained D3D9 vertex buffer and clears lock-tracking state.
      */
-    HRESULT VertexBufferD3D9::Unlock()
+    void VertexBufferD3D9::Unlock()
     {
         if (d3dVertexBuffer_ == nullptr)
         {
@@ -10669,7 +10442,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         locked_ = false;
         mappedData_ = nullptr;
-        return result;
     }
 
     /**
@@ -10692,30 +10464,25 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094AED0 (FUN_0094AED0)
      *
      * What it does:
-     * Initializes one `VertexFormatD3D9` runtime lane with default format code
-     * (`0x17`), empty per-stream stride storage, and null declaration handle.
+     * Default-constructs an empty format: no declaration, format code `0x17`
+     * (the "no format" code the destructor also leaves behind).
      */
-    VertexFormatD3D9* InitializeVertexFormatD3D9DefaultState(VertexFormatD3D9* const vertexFormat) noexcept
+    VertexFormatD3D9::VertexFormatD3D9()
+        : vertexDeclaration_(nullptr)
     {
-        vertexFormat->formatCode_ = 0x17U;
-        vertexFormat->elementStrideByStream_ = msvc8::vector<std::uint32_t>{};
-        vertexFormat->vertexDeclaration_ = nullptr;
-        return vertexFormat;
+        formatCode_ = 0x17U;
     }
 
     /**
      * Address: 0x0094B0A0 (FUN_0094B0A0, gpg::gal::VertexFormatD3D9::VertexFormatD3D9)
      *
      * What it does:
-     * Initializes one D3D9 vertex-format wrapper and applies caller format
-     * code plus native declaration payload.
+     * Adopts `vertexDeclaration` as the declaration for format `formatCode`
+     * and computes the per-stream strides.
      */
     VertexFormatD3D9::VertexFormatD3D9(const std::uint32_t formatCode, void* const vertexDeclaration)
-        : formatCode_(0x17U)
-        , elementStrideByStream_()
-        , vertexDeclaration_(nullptr)
+        : vertexDeclaration_(nullptr)
     {
-        (void)InitializeVertexFormatD3D9DefaultState(this);
         SetFormatDeclaration(formatCode, vertexDeclaration);
     }
 
@@ -10723,8 +10490,9 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094AEF0 (FUN_0094AEF0)
      *
      * What it does:
-     * Applies one format/declaration payload and rebuilds per-stream stride
-     * lanes from the recovered D3D vertex-element table.
+     * Replaces the declaration and format code, then rebuilds the byte stride
+     * of every stream the format's element table reads (each stream's stride
+     * is its furthest element end).
      */
     void VertexFormatD3D9::SetFormatDeclaration(const std::uint32_t formatCode, void* const vertexDeclaration)
     {
@@ -10739,19 +10507,19 @@ namespace { // TEMPORARY PROBE (do not commit)
             ++declarationElementCount;
         }
 
-        elementStrideByStream_.clear();
+        streamStrides_.clear();
         for (std::size_t elementIndex = 0U; elementIndex < declarationElementCount; ++elementIndex)
         {
             const D3DVertexElementRuntime& element = elementTable[elementIndex];
             const std::size_t streamIndex = static_cast<std::size_t>(element.stream);
-            if (elementStrideByStream_.size() <= streamIndex)
+            if (streamStrides_.size() <= streamIndex)
             {
-                elementStrideByStream_.resize(streamIndex + 1U, 0U);
+                streamStrides_.resize(streamIndex + 1U, 0U);
             }
 
             const std::uint32_t elementEndOffset =
                 static_cast<std::uint32_t>(element.offset) + GetVertexElementTypeSizeBytes(element.type);
-            std::uint32_t& streamStride = elementStrideByStream_[streamIndex];
+            std::uint32_t& streamStride = streamStrides_[streamIndex];
             if (streamStride < elementEndOffset)
             {
                 streamStride = elementEndOffset;
@@ -10760,14 +10528,17 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x0094AD40 (FUN_0094AD40)
+     * Address: 0x0094ACC0 (FUN_0094ACC0)
+     * Address: 0x0094AD40 (FUN_0094AD40, slot 0: the scalar deleting destructor)
      *
      * What it does:
-     * Owns the deleting-destructor path and delegates to `FUN_0094ACC0` body semantics.
+     * Releases the declaration and leaves format code `0x17`, then the
+     * `VertexFormat` base destructor frees the stride vector (inlined,
+     * 0x0094AD03..0x0094AD23).
      */
     VertexFormatD3D9::~VertexFormatD3D9()
     {
-        DestroyVertexFormatD3D9Body(this);
+        ResetDeclarationState();
     }
 
     /**

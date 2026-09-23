@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 
 namespace gpg {
@@ -15,7 +17,7 @@ namespace gal {
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\VertexBufferD3D10.cpp
      */
-    class VertexBufferD3D10 {
+    class VertexBufferD3D10 : public VertexBuffer {
     public:
       /**
        * Address: 0x0094D990 (FUN_0094D990)
@@ -41,19 +43,21 @@ namespace gal {
           void* stagingBuffer
       );
       /**
-       * Address: 0x0094DB30 (FUN_0094DB30)
+       * Address: 0x0094DA80 (FUN_0094DA80)
+       * Address: 0x0094DB30 (FUN_0094DB30, slot 0: the scalar deleting destructor)
        *
        * What it does:
-       * Owns the deleting-destructor path and delegates body lanes to `FUN_0094DA80`.
+       * Releases the device buffers and resets the context.
        */
-      virtual ~VertexBufferD3D10();
+      ~VertexBufferD3D10() override;
       /**
        * Address: 0x0094D9F0 (FUN_0094D9F0)
+       * Slot: 1
        *
        * What it does:
-       * Returns the embedded vertex-buffer context lane at `this+0x04`.
+       * Returns the context the buffer was created from.
        */
-      virtual VertexBufferContext* GetContext();
+      VertexBufferContext* GetContext() override;
       /**
        * Address: 0x0094DC00 (FUN_0094DC00)
        *
@@ -63,7 +67,7 @@ namespace gal {
        * Maps the staging buffer with recovered map-flag conversion and returns
        * mapped pointer plus caller byte offset.
        */
-      virtual void* Lock(std::uint32_t offset, std::uint32_t size, unsigned int lockFlags);
+      void* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
 
       /**
        * Address: 0x0094DE30 (FUN_0094DE30)
@@ -71,7 +75,7 @@ namespace gal {
        * What it does:
        * Unmaps the staging lane and dispatches one native copy from staging to GPU buffer.
        */
-      virtual int Unlock();
+      void Unlock() override;
 
       /**
        * Address: 0x0094DA00 (FUN_0094DA00)

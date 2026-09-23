@@ -115,14 +115,11 @@ namespace gal {
       /**
        * Address: 0x008E9B00 (FUN_008E9B00)
        * Slot: 8
-       * Demangled: gpg::gal::DeviceD3D9::GetPipelineState
        *
        * What it does:
-       * Dispatches `Func1` pre-hook and copies retained pipeline-state shared ownership.
+       * Runs the `Func1` pre-hook and returns the device's pipeline state.
        */
-      virtual boost::shared_ptr<PipelineStateD3D9>* GetPipelineState(
-          boost::shared_ptr<PipelineStateD3D9>* outPipelineState
-       );
+      boost::shared_ptr<PipelineState> GetPipelineState() override;
       /**
        * Address: 0x008F13D0 (FUN_008F13D0)
        * Slot: 9
@@ -177,39 +174,28 @@ namespace gal {
       /**
        * Address: 0x008EBA50 (FUN_008EBA50)
        * Slot: 14
-       * Demangled: gpg::gal::DeviceD3D9::CreateVertexFormat
        *
        * What it does:
-       * Creates one D3D9 vertex declaration wrapper for the requested format token.
+       * Creates the D3D9 vertex declaration for gal vertex format
+       * `formatCode` and wraps it in a `VertexFormatD3D9`.
        */
-      virtual boost::shared_ptr<VertexFormatD3D9>* CreateVertexFormat(
-          boost::shared_ptr<VertexFormatD3D9>* outVertexFormat,
-          std::uint32_t formatCode
-       );
+      boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) override;
       /**
        * Address: 0x008EBBB0 (FUN_008EBBB0)
        * Slot: 15
-       * Demangled: gpg::gal::DeviceD3D9::CreateVertexBuffer
        *
        * What it does:
-       * Creates one D3D9 vertex buffer wrapper from caller context lanes.
+       * Creates one D3D9 vertex buffer described by `context`.
        */
-      virtual boost::shared_ptr<VertexBufferD3D9>* CreateVertexBuffer(
-          boost::shared_ptr<VertexBufferD3D9>* outVertexBuffer,
-          const VertexBufferContext* context
-       );
+      boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
       /**
        * Address: 0x008EBD30 (FUN_008EBD30)
        * Slot: 16
-       * Demangled: gpg::gal::DeviceD3D9::CreateIndexBuffer
        *
        * What it does:
-       * Creates one D3D9 index buffer wrapper from caller context lanes.
+       * Creates one D3D9 index buffer described by `context`.
        */
-      virtual boost::shared_ptr<IndexBufferD3D9>* CreateIndexBuffer(
-          boost::shared_ptr<IndexBufferD3D9>* outIndexBuffer,
-          const IndexBufferContext* context
-       );
+      boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
       /**
        * Address: 0x008EC440 (FUN_008EC440)
        * Slot: 17
@@ -476,42 +462,32 @@ namespace gal {
       /**
        * Address: 0x008EDF70 (FUN_008EDF70)
        * Slot: 40
-       * Demangled: gpg::gal::DeviceD3D9::SetVertexDeclaration
-       *
-       * boost::shared_ptr<gpg::gal::VertexFormatD3D9>
        *
        * What it does:
-       * Binds one vertex declaration from caller-provided vertex-format ownership.
+       * Binds `vertexFormat`'s D3D9 vertex declaration.
        */
-      virtual void SetVertexDeclaration(boost::shared_ptr<VertexFormatD3D9> vertexFormat);
+      void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
       /**
        * Address: 0x008EE0B0 (FUN_008EE0B0)
        * Slot: 41
-       * Demangled: gpg::gal::DeviceD3D9::SetVertexBuffer
-       *
-       * std::uint32_t,boost::shared_ptr<gpg::gal::VertexBufferD3D9>,int,int
        *
        * What it does:
-       * Binds one vertex-buffer stream and applies per-stream frequency token lanes.
+       * Binds one vertex stream and sets its instancing frequency.
        */
-      virtual void SetVertexBuffer(
+      void SetVertexBuffer(
           std::uint32_t streamSlot,
-          boost::shared_ptr<VertexBufferD3D9> vertexBuffer,
+          boost::shared_ptr<VertexBuffer> vertexBuffer,
           int streamFrequencyToken,
-          int streamOffsetMultiplier
-       );
+          int startVertex
+       ) override;
       /**
        * Address: 0x008EE2E0 (FUN_008EE2E0)
        * Slot: 42
-       * Demangled: gpg::gal::DeviceD3D9::SetBufferIndices
-       *
-       * boost::shared_ptr<gpg::gal::IndexBufferD3D9>
        *
        * What it does:
-       * Dispatches one native `SetIndices` bind from caller-owned index-buffer
-       * shared ownership.
+       * Binds `indexBuffer` as the device's index source.
        */
-      virtual void SetBufferIndices(boost::shared_ptr<IndexBufferD3D9> indexBuffer);
+      void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
       /**
        * Address: 0x008EE420 (FUN_008EE420)
        * Slot: 43

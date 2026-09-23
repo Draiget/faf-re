@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "boost/shared_ptr.h"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/RenderGeometryBuffers.h"
 
@@ -69,7 +69,7 @@ namespace moho
      * with `D3DLOCK_NOOVERWRITE`, wrapping back to 0 with `D3DLOCK_DISCARD`.
      */
     std::uint32_t mInstanceRingCursor = 0;                          // +0x24
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mVertexBuffer2;   // +0x28
+    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer2;   // +0x28
     CRenFrame mFrame;                                               // +0x30
   };
 

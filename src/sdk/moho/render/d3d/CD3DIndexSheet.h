@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "gpg/gal/IndexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
 #include "moho/containers/TDatList.h"
 #include "moho/render/ID3DIndexSheet.h"
 
@@ -65,7 +65,7 @@ namespace moho
     /**
      * Address: 0x0043F8B0 (FUN_0043F8B0)
      *
-     * boost::shared_ptr<gpg::gal::IndexBufferD3D9> &
+     * boost::shared_ptr<gpg::gal::IndexBuffer> &
      *
      * What it does:
      * Copies retained index-buffer ownership into caller storage.
@@ -125,23 +125,19 @@ namespace moho
      */
     [[nodiscard]] bool IsStaticBufferType() const;
 
-    /**
-     * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
-     *
-     * What it does:
-     * Forwards one index-buffer creation request through the active GAL device
-     * singleton and returns `outBuffer`.
-     */
-    static BufferHandle* CreateIndexBufferOnActiveDevice(BufferHandle* outBuffer, gpg::gal::IndexBufferContext* context);
-
+  public:
     /**
      * Address: 0x0043F700 (FUN_0043F700)
      *
      * What it does:
-     * Creates one gal index-buffer wrapper from retained context metadata.
+     * Creates the gal index buffer from the retained context when there is
+     * none (`IndexBuffer::Create`, 0x0043F737). `CD3DDeviceResources::
+     * InitResources` runs it for every sheet after a device reset
+     * (0x004407E4).
      */
     bool CreateBuffer();
 
+  private:
     /**
      * Address: 0x0043F810 (FUN_0043F810)
      *

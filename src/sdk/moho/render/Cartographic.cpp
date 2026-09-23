@@ -23,10 +23,10 @@
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
+#include "gpg/gal/VertexFormat.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Head.hpp"
@@ -1349,8 +1349,8 @@ namespace moho
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
 
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> vertexFormat;
-    device->CreateVertexFormat(&vertexFormat, kCartographicVertexFormatToken);
+    boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
+    vertexFormat = device->CreateVertexFormat(kCartographicVertexFormatToken);
     mVertexFormat = vertexFormat;
 
     gpg::gal::VertexBufferContext quadVertexContext{};
@@ -1359,8 +1359,8 @@ namespace moho
     quadVertexContext.vertexCount_ = kCartographicQuadVertexCount;
     quadVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * 2U);
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> quadVertexBuffer;
-    device->CreateVertexBuffer(&quadVertexBuffer, &quadVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
+    quadVertexBuffer = device->CreateVertexBuffer(&quadVertexContext);
     mQuadVertexBuffer = quadVertexBuffer;
 
     void* const quadVertexData = mQuadVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
@@ -1373,8 +1373,8 @@ namespace moho
     instanceVertexContext.vertexCount_ = kCartographicMaxDecalInstances;
     instanceVertexContext.stride_ = static_cast<std::uint32_t>(sizeof(float) * kCartographicInstanceFloatCount);
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceVertexBuffer;
-    device->CreateVertexBuffer(&instanceVertexBuffer, &instanceVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
+    instanceVertexBuffer = device->CreateVertexBuffer(&instanceVertexContext);
     mInstanceVertexBuffer = instanceVertexBuffer;
 
     gpg::gal::IndexBufferContext indexContext{};
@@ -1382,8 +1382,8 @@ namespace moho
     indexContext.format_ = 1U;
     indexContext.size_ = kCartographicQuadPrimitiveCountInput;
 
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> indexBuffer;
-    device->CreateIndexBuffer(&indexBuffer, &indexContext);
+    boost::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
+    indexBuffer = device->CreateIndexBuffer(&indexContext);
     mIndexBuffer = indexBuffer;
 
     auto* const indexWords = reinterpret_cast<std::uint32_t*>(
@@ -1534,8 +1534,8 @@ namespace moho
   {
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
 
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> frameVertexFormat;
-    device->CreateVertexFormat(&frameVertexFormat, kCartographicFrameVertexFormatToken);
+    boost::shared_ptr<gpg::gal::VertexFormat> frameVertexFormat;
+    frameVertexFormat = device->CreateVertexFormat(kCartographicFrameVertexFormatToken);
     mFrameVertexFormat = frameVertexFormat;
 
     gpg::gal::VertexBufferContext frameVertexContext(
@@ -1545,8 +1545,8 @@ namespace moho
       kCartographicBufferUsageDynamic
     );
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> frameVertexBuffer;
-    device->CreateVertexBuffer(&frameVertexBuffer, &frameVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> frameVertexBuffer;
+    frameVertexBuffer = device->CreateVertexBuffer(&frameVertexContext);
     mFrameVertexBuffer = frameVertexBuffer;
 
     gpg::gal::IndexBufferContext quadIndexContext(
@@ -1555,8 +1555,8 @@ namespace moho
       kCartographicBufferUsageStatic
     );
 
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> quadIndexBuffer;
-    device->CreateIndexBuffer(&quadIndexBuffer, &quadIndexContext);
+    boost::shared_ptr<gpg::gal::IndexBuffer> quadIndexBuffer;
+    quadIndexBuffer = device->CreateIndexBuffer(&quadIndexContext);
     mQuadIndexBuffer = quadIndexBuffer;
 
     auto* const indexWords = reinterpret_cast<std::uint32_t*>(
@@ -1846,8 +1846,8 @@ namespace moho
     }
     InitializeTerrainTextures(heightField, gridWidth, gridHeight, topographicSamples);
 
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> terrainVertexFormat;
-    device->CreateVertexFormat(&terrainVertexFormat, kCartographicTerrainVertexFormatToken);
+    boost::shared_ptr<gpg::gal::VertexFormat> terrainVertexFormat;
+    terrainVertexFormat = device->CreateVertexFormat(kCartographicTerrainVertexFormatToken);
     mTerrainVertexFormat = terrainVertexFormat;
 
     // The ground quad lives in heightfield sample space with the elevation
@@ -1872,8 +1872,8 @@ namespace moho
       kCartographicBufferUsageStatic
     );
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> terrainVertexBuffer;
-    device->CreateVertexBuffer(&terrainVertexBuffer, &terrainVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> terrainVertexBuffer;
+    terrainVertexBuffer = device->CreateVertexBuffer(&terrainVertexContext);
     mTerrainVertexBuffer = terrainVertexBuffer;
 
     void* const vertexData = mTerrainVertexBuffer->Lock(

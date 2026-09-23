@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 
 namespace gpg::gal
@@ -14,7 +15,7 @@ namespace gpg::gal
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\IndexBufferD3D9.cpp
      */
-    class IndexBufferD3D9
+    class IndexBufferD3D9 : public IndexBuffer
     {
     public:
         /**
@@ -36,36 +37,40 @@ namespace gpg::gal
         IndexBufferD3D9(const IndexBufferContext* context, void* d3dIndexBuffer);
 
         /**
-         * Address: 0x008F4D80 (FUN_008F4D80)
+         * Address: 0x008F4C80 (FUN_008F4C80)
+         * Address: 0x008F4D80 (FUN_008F4D80, slot 0: the scalar deleting destructor)
          *
          * What it does:
-         * Owns the deleting-destructor path and delegates to `FUN_008F4C80` body semantics.
+         * Releases the native index buffer and resets the context.
          */
-        virtual ~IndexBufferD3D9();
+        ~IndexBufferD3D9() override;
 
         /**
          * Address: 0x008F4BE0 (FUN_008F4BE0)
+         * Slot: 1
          *
          * What it does:
-         * Returns the embedded index-buffer context block at `this+0x04`.
+         * Returns the context the buffer was created from.
          */
-        virtual IndexBufferContext* GetContextBuffer();
+        IndexBufferContext* GetContext() override;
 
         /**
          * Address: 0x008F4E10 (FUN_008F4E10)
+         * Slot: 2
          *
          * What it does:
          * Locks the underlying D3D9 index buffer and returns mapped index data.
          */
-        virtual std::int16_t* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags);
+        std::int16_t* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
 
         /**
          * Address: 0x008F4FF0 (FUN_008F4FF0)
+         * Slot: 3
          *
          * What it does:
          * Unlocks the underlying D3D9 index buffer and clears lock-tracking state.
          */
-        virtual HRESULT Unlock();
+        void Unlock() override;
 
         /**
          * Address: 0x008F5190 (FUN_008F5190, gpg::gal::IndexBufferD3D9::GetBuffer)
@@ -81,17 +86,16 @@ namespace gpg::gal
          * What it does:
          * Releases any previous native index-buffer handle, resets context lanes,
          * then assigns one new context + native buffer payload.
-         *
-         * Address: 0x008F4C30 (FUN_008F4C30 -- the reset-only half of this: release
-         * the native buffer through its COM vtable, null +0x14, then copy a default
-         * IndexBufferContext over +0x04. Zero callers; formerly
-         * `ResetIndexBufferOwnerRuntime` over an IndexBufferOwnerRuntimeView in
-         * gpg/gal/ContextInterfaces.cpp, which described only this class's first
-         * 0x18 bytes and had the +0x14 lane typed `boost::detail::sp_counted_base*`
-         * with a `release()` call -- the binary does `call [[handle]+8]` with
-         * `handle` pushed, which is `IUnknown::Release`. Removed 2026-09-18.)
          */
         std::uint32_t SetBuffer(const IndexBufferContext* context, void* d3dIndexBuffer);
+
+        /**
+         * Address: 0x008F4C30 (FUN_008F4C30)
+         *
+         * What it does:
+         * Releases the native index buffer and restores the default context.
+         */
+        void ResetBufferState();
 
     public:
         IndexBufferContext context_{};        // +0x04

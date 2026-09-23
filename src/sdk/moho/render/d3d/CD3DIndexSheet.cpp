@@ -87,25 +87,7 @@ namespace moho
    */
   bool CD3DIndexSheet::IsStaticBufferType() const
   {
-    return mBuffer.get()->GetContextBuffer()->type_ == kIndexContextTypeStatic;
-  }
-
-  /**
-   * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
-   *
-   * What it does:
-   * Forwards one index-buffer creation request through the active GAL device
-   * singleton and returns `outBuffer`.
-   */
-  CD3DIndexSheet::BufferHandle* CD3DIndexSheet::CreateIndexBufferOnActiveDevice(
-    BufferHandle* const outBuffer,
-    gpg::gal::IndexBufferContext* const context
-  )
-  {
-    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-    deviceD3D9->CreateIndexBuffer(outBuffer, context);
-    return outBuffer;
+    return mBuffer.get()->GetContext()->type_ == kIndexContextTypeStatic;
   }
 
   /**
@@ -122,7 +104,7 @@ namespace moho
   /**
    * Address: 0x0043F8B0 (FUN_0043F8B0)
    *
-   * boost::shared_ptr<gpg::gal::IndexBufferD3D9> &
+   * boost::shared_ptr<gpg::gal::IndexBuffer> &
    *
    * What it does:
    * Copies retained index-buffer ownership into caller storage.
@@ -141,7 +123,7 @@ namespace moho
    */
   std::uint32_t CD3DIndexSheet::GetSize() const
   {
-    return mBuffer.get()->GetContextBuffer()->size_;
+    return mBuffer.get()->GetContext()->size_;
   }
 
   /**
@@ -154,7 +136,7 @@ namespace moho
    */
   bool CD3DIndexSheet::SetSize(const std::uint32_t size)
   {
-    if (size == mBuffer.get()->GetContextBuffer()->size_) {
+    if (size == mBuffer.get()->GetContext()->size_) {
       return true;
     }
 
@@ -178,7 +160,7 @@ namespace moho
     const bool discard
   )
   {
-    gpg::gal::IndexBufferD3D9* const indexBuffer = mBuffer.get();
+    gpg::gal::IndexBuffer* const indexBuffer = mBuffer.get();
     if (indexBuffer == nullptr) {
       return nullptr;
     }
@@ -206,7 +188,7 @@ namespace moho
    */
   void CD3DIndexSheet::Unlock()
   {
-    if (gpg::gal::IndexBufferD3D9* const indexBuffer = mBuffer.get(); indexBuffer != nullptr) {
+    if (gpg::gal::IndexBuffer* const indexBuffer = mBuffer.get(); indexBuffer != nullptr) {
       indexBuffer->Unlock();
     }
   }
@@ -234,7 +216,7 @@ namespace moho
   bool CD3DIndexSheet::CreateBuffer()
   {
     if (mBuffer.get() == nullptr) {
-      (void)CreateIndexBufferOnActiveDevice(&mBuffer, &mContext);
+      mBuffer = gpg::gal::IndexBuffer::Create(mContext);
     }
 
     return true;

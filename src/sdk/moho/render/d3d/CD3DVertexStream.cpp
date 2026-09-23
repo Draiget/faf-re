@@ -53,7 +53,7 @@ namespace moho
   /**
    * Address: 0x0043FD60 (FUN_0043FD60)
    *
-   * boost::shared_ptr<gpg::gal::VertexBufferD3D9> &
+   * boost::shared_ptr<gpg::gal::VertexBuffer> &
    *
    * What it does:
    * Copies retained vertex-buffer ownership into caller storage.
@@ -107,7 +107,7 @@ namespace moho
    */
   void CD3DVertexStream::Unlock()
   {
-    if (gpg::gal::VertexBufferD3D9* const vertexBuffer = mBuffer.get(); vertexBuffer != nullptr) {
+    if (gpg::gal::VertexBuffer* const vertexBuffer = mBuffer.get(); vertexBuffer != nullptr) {
       vertexBuffer->Unlock();
     }
   }
@@ -118,38 +118,20 @@ namespace moho
    *
    * What it does:
    * Releases retained vertex-buffer ownership and clears handle lanes.
-   * `BufferHandle` is `boost::shared_ptr<gpg::gal::VertexBufferD3D9>`
+   * `BufferHandle` is `boost::shared_ptr<gpg::gal::VertexBuffer>`
    * (`ID3DVertexStream::BufferHandle`); `mBuffer.reset()` compiles down to
    * this exact `sp_counted_impl_p` release body (decrement `use_count_`,
    * `dispose()` at zero, decrement `weak_count_`, `destroy()` at zero) -
-   * one binary address shared by every `boost::shared_ptr<VertexBufferD3D9>`
+   * one binary address shared by every `boost::shared_ptr<VertexBuffer>`
    * release/destroy site in this instantiation (SParticleBuffer, BoxRenderer,
    * BoundaryRenderer, Cartographic, RangeRenderer, SkyDome, VisionRenderer,
    * D3D9Interfaces, D3D10Interfaces - all already recovered, all reached via
-   * their own `.reset()`/destructor call on a `boost::shared_ptr<VertexBufferD3D9>`
+   * their own `.reset()`/destructor call on a `boost::shared_ptr<VertexBuffer>`
    * member, not a direct call to this address).
    */
   void CD3DVertexStream::ReleaseBufferHandle()
   {
     mBuffer.reset();
-  }
-
-  /**
-   * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
-   *
-   * What it does:
-   * Forwards one vertex-buffer creation request through the active GAL device
-   * singleton and returns `outBuffer`.
-   */
-  CD3DVertexStream::BufferHandle* CD3DVertexStream::CreateVertexBufferOnActiveDevice(
-    BufferHandle* const outBuffer,
-    gpg::gal::VertexBufferContext* const context
-  )
-  {
-    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    auto* const deviceD3D9 = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-    deviceD3D9->CreateVertexBuffer(outBuffer, context);
-    return outBuffer;
   }
 
   /**
@@ -165,7 +147,7 @@ namespace moho
         return false;
       }
 
-      (void)CreateVertexBufferOnActiveDevice(&mBuffer, &mContext);
+      mBuffer = gpg::gal::VertexBuffer::Create(mContext);
     }
 
     return true;

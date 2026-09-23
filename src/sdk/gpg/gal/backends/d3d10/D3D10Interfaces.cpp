@@ -48,9 +48,6 @@ namespace gpg::gal
   {
     using release_fn = unsigned long(__stdcall*)(void*);
     using add_ref_fn = unsigned long(__stdcall*)(void*);
-    using device_create_vertex_format_fn = void(__thiscall*)(Device*, void*, int);
-    using device_begin_technique_fn = void(__thiscall*)(Device*);
-    using device_end_technique_fn = void(__thiscall*)(Device*);
     using effect_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
     using effect_get_technique_by_index_fn = void*(__stdcall*)(void*, unsigned int);
     using effect_get_technique_by_name_fn = void*(__stdcall*)(void*, const char*);
@@ -575,31 +572,6 @@ namespace gpg::gal
       addRef(object);
     }
 
-    /**
-     * Address: 0x008F9470 (FUN_008F9470)
-     *
-     * What it does:
-     * Releases one intrusive weak-ref token lane by decrementing strong count,
-     * dispatching vtable release on transition to zero, then releasing weak count.
-     */
-    void ReleaseWeakRefToken(WeakRefCountedToken* const token) noexcept
-    {
-      if (token == nullptr) {
-        return;
-      }
-
-      if (_InterlockedExchangeAdd(&token->strongCount, -1) == 1) {
-        using weak_ref_vfunc = void(__thiscall*)(WeakRefCountedToken*);
-        auto* const releaseStrong = reinterpret_cast<weak_ref_vfunc>(token->vtable[1]);
-        releaseStrong(token);
-
-        if (_InterlockedExchangeAdd(&token->weakCount, -1) == 1) {
-          auto* const releaseWeak = reinterpret_cast<weak_ref_vfunc>(token->vtable[2]);
-          releaseWeak(token);
-        }
-      }
-    }
-
     void* GetDeviceLogStorage(DeviceD3D10* const device) noexcept
     {
       return &device->mLog;
@@ -661,23 +633,16 @@ namespace gpg::gal
       return device->mRttInputLayout;
     }
 
-    WeakRefCountedToken** GetDeviceVertexStreamRefArray(DeviceD3D10* const device) noexcept
-    {
-      return device->mVertexStreams;
-    }
-
     /**
      * `DrawPrimitive` (0x008FD049) and `DrawIndexedPrimitive` (0x008FD159) read
-     * this+0xD8 and draw instanced when it exceeds 1. Nothing else writes that
-     * dword: it is slot 0 of `mVertexStreams`, filled by the stream setter
-     * (`mov [esi+edi*4+0xD8], eax` at 0x008F970A) and cleared by `Setup`. So the
-     * shipped engine reads stream 0's reference as its instance count. That is
-     * kept exactly, because it is what the binary does; it is not a separate
-     * field and must not be given one.
+     * this+0xD8 and draw instanced when it exceeds 1: stream 0's frequency,
+     * which `SetVertexBuffer` stores (`mov [esi+edi*4+0xD8], eax` at
+     * 0x008F970A) and `Setup` clears. The geometry stream's frequency is the
+     * instance count every caller passes for it.
      */
     std::uint32_t GetDeviceInstanceCount(DeviceD3D10* const device) noexcept
     {
-      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(device->mVertexStreams[0]));
+      return static_cast<std::uint32_t>(device->mStreamFrequencies[0]);
     }
 
     msvc8::vector<IDXGISwapChain*>& GetDeviceSwapChains(DeviceD3D10* const device) noexcept
@@ -1155,27 +1120,6 @@ namespace gpg::gal
     std::uint32_t ResolvePrimitiveTopology(const std::uint32_t topologyToken) noexcept
     {
       return kPrimitiveTopologyByToken[topologyToken];
-    }
-
-    void InvokeDeviceCreateVertexFormat(Device* const device, void* const streamToken, const int formatToken)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const createVertexFormat = reinterpret_cast<device_create_vertex_format_fn>(vtable[14]);
-      createVertexFormat(device, streamToken, formatToken);
-    }
-
-    void InvokeDeviceBeginTechnique(Device* const device)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const beginTechnique = reinterpret_cast<device_begin_technique_fn>(vtable[48]);
-      beginTechnique(device);
-    }
-
-    void InvokeDeviceEndTechnique(Device* const device)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(device);
-      auto* const endTechnique = reinterpret_cast<device_end_technique_fn>(vtable[49]);
-      endTechnique(device);
     }
 
     HRESULT InvokeEffectGetDesc(void* const effect, D3D10_EFFECT_DESC* const outDesc)
@@ -1881,30 +1825,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x00901C90 (FUN_00901C90)
-     *
-     * What it does:
-     * Executes non-deleting destructor body lanes for `IndexBufferD3D10`.
-     */
-    void DestroyIndexBufferD3D10Body(IndexBufferD3D10* const indexBuffer)
-    {
-      indexBuffer->DestroyState();
-      indexBuffer->context_.~IndexBufferContext();
-    }
-
-    /**
-     * Address: 0x0094DA80 (FUN_0094DA80)
-     *
-     * What it does:
-     * Executes non-deleting destructor body lanes for `VertexBufferD3D10`.
-     */
-    void DestroyVertexBufferD3D10Body(VertexBufferD3D10* const vertexBuffer)
-    {
-      vertexBuffer->DestroyState();
-      vertexBuffer->context_.~VertexBufferContext();
-    }
-
-    /**
      * Address: 0x00900F50 (FUN_00900F50)
      *
      * What it does:
@@ -1916,52 +1836,6 @@ namespace gpg::gal
       technique->techniqueHandle_ = nullptr;
       technique->name_.tidy(true, 0U);
       technique->beginEndActive_ = false;
-    }
-
-    /**
-     * Address: 0x009023F0 (FUN_009023F0)
-     *
-     * What it does:
-     * Releases retained D3D10 pipeline-state COM handles and clears local
-     * state lanes.
-     */
-    void DestroyPipelineStateD3D10Body(PipelineStateD3D10* const pipelineState) noexcept
-    {
-      if (pipelineState == nullptr) {
-        return;
-      }
-
-      ReleaseComLike(pipelineState->device_);
-      pipelineState->device_ = nullptr;
-
-      ReleaseComLike(pipelineState->rasterizerState1_);
-      pipelineState->rasterizerState1_ = nullptr;
-      ReleaseComLike(pipelineState->depthStencilState1_);
-      pipelineState->depthStencilState1_ = nullptr;
-      ReleaseComLike(pipelineState->blendState1_);
-      pipelineState->blendState1_ = nullptr;
-      ReleaseComLike(pipelineState->samplerState1_);
-      pipelineState->samplerState1_ = nullptr;
-      ReleaseComLike(pipelineState->rasterizerState2_);
-      pipelineState->rasterizerState2_ = nullptr;
-      ReleaseComLike(pipelineState->depthStencilState2_);
-      pipelineState->depthStencilState2_ = nullptr;
-      ReleaseComLike(pipelineState->blendState2_);
-      pipelineState->blendState2_ = nullptr;
-    }
-
-    /**
-     * Address: 0x00902240 (FUN_00902240)
-     *
-     * PipelineState *
-     *
-     * What it does:
-     * ABI adapter lane for `PipelineState` constructor variants that return
-     * `this` after the canonical base-constructor side effects (`FUN_00902230`).
-     */
-    PipelineState* ReturnPipelineStateCtorSelfAdapter(PipelineState* const pipelineState) noexcept
-    {
-      return pipelineState;
     }
 
     int MapDxgiToGalRenderTargetFormat(const int dxgiFormat)
@@ -2194,101 +2068,6 @@ namespace gpg::gal
       depthStencilTarget->DestroyState();
     }
 
-    std::uint32_t VertexStreamStrideCount(const VertexStreamStrideStorage& storage) noexcept
-    {
-      if ((storage.begin_ == nullptr) || (storage.end_ == nullptr)) {
-        return 0U;
-      }
-
-      return static_cast<std::uint32_t>(storage.end_ - storage.begin_);
-    }
-
-    std::uint32_t VertexStreamStrideCapacity(const VertexStreamStrideStorage& storage) noexcept
-    {
-      if ((storage.begin_ == nullptr) || (storage.capacityEnd_ == nullptr)) {
-        return 0U;
-      }
-
-      return static_cast<std::uint32_t>(storage.capacityEnd_ - storage.begin_);
-    }
-
-    void EnsureVertexStreamStrideCount(VertexStreamStrideStorage* const storage, const std::uint32_t requiredCount)
-    {
-      const std::uint32_t currentCount = VertexStreamStrideCount(*storage);
-      if (requiredCount <= currentCount) {
-        return;
-      }
-
-      const std::uint32_t currentCapacity = VertexStreamStrideCapacity(*storage);
-      if (requiredCount > currentCapacity) {
-        auto* const newBegin =
-          static_cast<std::uint32_t*>(::operator new(static_cast<std::size_t>(requiredCount) * sizeof(std::uint32_t)));
-
-        if ((storage->begin_ != nullptr) && (currentCount != 0U)) {
-          std::memcpy(newBegin, storage->begin_, static_cast<std::size_t>(currentCount) * sizeof(std::uint32_t));
-        }
-
-        std::memset(
-          newBegin + currentCount, 0, static_cast<std::size_t>(requiredCount - currentCount) * sizeof(std::uint32_t)
-        );
-
-        if (storage->begin_ != nullptr) {
-          ::operator delete(storage->begin_);
-        }
-
-        storage->begin_ = newBegin;
-        storage->end_ = newBegin + requiredCount;
-        storage->capacityEnd_ = newBegin + requiredCount;
-        return;
-      }
-
-      std::memset(storage->end_, 0, static_cast<std::size_t>(requiredCount - currentCount) * sizeof(std::uint32_t));
-      storage->end_ = storage->begin_ + requiredCount;
-    }
-
-    /**
-     * Address: 0x00904180 (FUN_00904180)
-     *
-     * What it does:
-     * Releases the retained declaration handle lane and restores the format
-     * token to the invalid/default sentinel (`0x17`).
-     */
-    void ResetVertexFormatDeclaration(VertexFormatD3D10* const vertexFormat) noexcept
-    {
-      ReleaseComLike(vertexFormat->vertexDeclaration_);
-      vertexFormat->format_ = 0x17U;
-    }
-
-    /**
-     * Address: 0x009041B0 (FUN_009041B0)
-     *
-     * What it does:
-     * Releases heap storage for per-stream stride lanes and zeros begin/end/capacity.
-     */
-    void DestroyVertexFormatBaseBody(VertexFormatD3D10* const vertexFormat) noexcept
-    {
-      if (vertexFormat->streamStrides_.begin_ != nullptr) {
-        ::operator delete(vertexFormat->streamStrides_.begin_);
-      }
-
-      vertexFormat->streamStrides_.begin_ = nullptr;
-      vertexFormat->streamStrides_.end_ = nullptr;
-      vertexFormat->streamStrides_.capacityEnd_ = nullptr;
-    }
-
-    /**
-     * Address: 0x009041E0 (FUN_009041E0)
-     *
-     * What it does:
-     * Executes the recovered non-deleting destructor body lanes for
-     * `VertexFormatD3D10` and then its base-format storage lane.
-     */
-    void DestroyVertexFormatD3D10Body(VertexFormatD3D10* const vertexFormat) noexcept
-    {
-      ResetVertexFormatDeclaration(vertexFormat);
-      DestroyVertexFormatBaseBody(vertexFormat);
-    }
-
     /**
      * Address: 0x00904340 (FUN_00904340)
      *
@@ -2338,48 +2117,6 @@ namespace gpg::gal
 
       ReleaseSharedCount(destination);
       destination = source;
-    }
-
-    /**
-     * Address: 0x008F9D40 (FUN_008F9D40)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `VertexFormatD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountVertexFormatD3D10FromRaw(
-      boost::detail::shared_count* const outCount, VertexFormatD3D10* const vertexFormat
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, vertexFormat);
-    }
-
-    /**
-     * Address: 0x008F9DD0 (FUN_008F9DD0)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `VertexBufferD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountVertexBufferD3D10FromRaw(
-      boost::detail::shared_count* const outCount, VertexBufferD3D10* const vertexBuffer
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, vertexBuffer);
-    }
-
-    /**
-     * Address: 0x008F9E60 (FUN_008F9E60)
-     *
-     * What it does:
-     * Constructs one `boost::detail::shared_count` lane from one raw
-     * `IndexBufferD3D10*` pointee.
-     */
-    boost::detail::shared_count* ConstructSharedCountIndexBufferD3D10FromRaw(
-      boost::detail::shared_count* const outCount, IndexBufferD3D10* const indexBuffer
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, indexBuffer);
     }
 
     /**
@@ -2448,75 +2185,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x008FA4C0 (FUN_008FA4C0, boost::shared_ptr_VertexFormatD3D10::shared_ptr_VertexFormatD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<VertexFormatD3D10>` from one raw pointer
-     * lane. FUN_008FA4C0's own disassembly publishes `px` first, then
-     * builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9D40 above, `ConstructSharedCountVertexFormatD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`VertexFormatD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<VertexFormatD3D10>* ConstructSharedVertexFormatD3D10FromRaw(
-      boost::shared_ptr<VertexFormatD3D10>* const outVertexFormat,
-      VertexFormatD3D10* const vertexFormat
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outVertexFormat, vertexFormat, ConstructSharedCountVertexFormatD3D10FromRaw
-      );
-    }
-
-    /**
-     * Address: 0x008FA4F0 (FUN_008FA4F0, boost::shared_ptr_VertexBufferD3D10::shared_ptr_VertexBufferD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<VertexBufferD3D10>` from one raw pointer
-     * lane. FUN_008FA4F0's own disassembly publishes `px` first, then
-     * builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9DD0 above, `ConstructSharedCountVertexBufferD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`VertexBufferD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<VertexBufferD3D10>* ConstructSharedVertexBufferD3D10FromRaw(
-      boost::shared_ptr<VertexBufferD3D10>* const outVertexBuffer,
-      VertexBufferD3D10* const vertexBuffer
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outVertexBuffer, vertexBuffer, ConstructSharedCountVertexBufferD3D10FromRaw
-      );
-    }
-
-    /**
-     * Address: 0x008FA520 (FUN_008FA520, boost::shared_ptr_IndexBufferD3D10::shared_ptr_IndexBufferD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<IndexBufferD3D10>` from one raw pointer
-     * lane. FUN_008FA520's own disassembly publishes `px` first, then
-     * builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9E60 above, `ConstructSharedCountIndexBufferD3D10FromRaw`
-     * - a real, separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`IndexBufferD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<IndexBufferD3D10>* ConstructSharedIndexBufferD3D10FromRaw(
-      boost::shared_ptr<IndexBufferD3D10>* const outIndexBuffer,
-      IndexBufferD3D10* const indexBuffer
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outIndexBuffer, indexBuffer, ConstructSharedCountIndexBufferD3D10FromRaw
-      );
-    }
-
-    /**
      * Address: 0x0094B840 (FUN_0094B840, boost::shared_ptr_EffectTechniqueD3D10::shared_ptr_EffectTechniqueD3D10)
      *
      * What it does:
@@ -2560,60 +2228,6 @@ namespace gpg::gal
       return boost::ConstructSharedFromRawViaCountCtor(
         outEffectVariable, effectVariable, ConstructSharedCountEffectVariableD3D10FromRaw
       );
-    }
-
-    /**
-     * Address: 0x008FA0E0 (FUN_008FA0E0, boost::detail::shared_count_PipelineStateD3D10::shared_count_PipelineStateD3D10)
-     *
-     * What it does:
-     * Allocates one 0x10-byte `sp_counted_impl_p<PipelineStateD3D10>`
-     * control block, publishes its vtable, sets use/weak count to one,
-     * and stores the owned raw pointer - the control-block half of
-     * constructing one `shared_ptr<PipelineStateD3D10>`.
-     */
-    boost::detail::shared_count* ConstructSharedCountPipelineStateD3D10FromRaw(
-      boost::detail::shared_count* const outCount, PipelineStateD3D10* const pipelineState
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, pipelineState);
-    }
-
-    /**
-     * Address: 0x008FA5F0 (FUN_008FA5F0, boost::shared_ptr_PipelineStateD3D10::shared_ptr_PipelineStateD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<PipelineStateD3D10>` from one raw pointer
-     * lane. FUN_008FA5F0's own disassembly publishes `px` ("pipeline")
-     * first, then builds the control block through one discrete
-     * `shared_count(T*)` call (FUN_008FA0E0 above - a real, separately-
-     * emitted call, not inlined - also reached the same way from
-     * `AssignSharedPipelineStateD3D10FromRaw`'s `reset()`) before a no-op
-     * `sp_enable_shared_from_this` (`PipelineStateD3D10` does not derive
-     * from `enable_shared_from_this`); reproduced explicitly here instead
-     * of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<PipelineStateD3D10>* ConstructSharedPipelineStateD3D10FromRaw(
-      boost::shared_ptr<PipelineStateD3D10>* const outPipelineState, PipelineStateD3D10* const pipelineState
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(
-        outPipelineState, pipelineState, ConstructSharedCountPipelineStateD3D10FromRaw
-      );
-    }
-
-    /**
-     * Address: 0x008FA760 (FUN_008FA760, boost::shared_ptr_PipelineStateD3D10::operator=)
-     *
-     * What it does:
-     * Rebinds one `shared_ptr<PipelineStateD3D10>` from one raw pipeline-state
-     * pointer and releases previous ownership.
-     */
-    boost::shared_ptr<PipelineStateD3D10>* AssignSharedPipelineStateD3D10FromRaw(
-      boost::shared_ptr<PipelineStateD3D10>* const outPipelineState, PipelineStateD3D10* const pipelineState
-    )
-    {
-      outPipelineState->reset(pipelineState);
-      return outPipelineState;
     }
 
     /**
@@ -3134,15 +2748,32 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x009024D0 (FUN_009024D0)
+   * Address: 0x009023F0 (FUN_009023F0)
+   * Address: 0x009024D0 (FUN_009024D0, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Owns the scalar-deleting destructor path and releases retained D3D10
-   * pipeline-state COM handle lanes.
+   * Releases the device and both state packs, then the `PipelineState` base
+   * destructor runs (inlined, 0x009024B0).
    */
   PipelineStateD3D10::~PipelineStateD3D10()
   {
-    DestroyPipelineStateD3D10Body(this);
+    ReleaseComLike(device_);
+    device_ = nullptr;
+
+    ReleaseComLike(rasterizerState1_);
+    rasterizerState1_ = nullptr;
+    ReleaseComLike(depthStencilState1_);
+    depthStencilState1_ = nullptr;
+    ReleaseComLike(blendState1_);
+    blendState1_ = nullptr;
+    ReleaseComLike(samplerState1_);
+    samplerState1_ = nullptr;
+    ReleaseComLike(rasterizerState2_);
+    rasterizerState2_ = nullptr;
+    ReleaseComLike(depthStencilState2_);
+    depthStencilState2_ = nullptr;
+    ReleaseComLike(blendState2_);
+    blendState2_ = nullptr;
   }
 
   /**
@@ -3212,17 +2843,12 @@ namespace gpg::gal
    * Address: 0x0094D960 (FUN_0094D960)
    *
    * What it does:
-   * Selects hardware vertex-format token `14` and returns the input stream token.
+   * Creates vertex format 14 on the active device (slot 14, `[vtbl+0x38]`).
    */
-  std::uintptr_t HardwareVertexFormatterD3D10::SelectVertexFormatToken(
-    const std::uintptr_t streamToken,
-    const std::int32_t layoutVariant
-  )
+  boost::shared_ptr<VertexFormat> HardwareVertexFormatterD3D10::CreateVertexFormat(const std::int32_t layoutVariant)
   {
     static_cast<void>(layoutVariant);
-    Device* const device = Device::GetInstance();
-    InvokeDeviceCreateVertexFormat(device, reinterpret_cast<void*>(streamToken), static_cast<int>(kHardwareVertexFormatToken));
-    return streamToken;
+    return Device::GetInstance()->CreateVertexFormat(kHardwareVertexFormatToken);
   }
 
   /**
@@ -3417,17 +3043,15 @@ namespace gpg::gal
    * Address: 0x0094D930 (FUN_0094D930)
    *
    * What it does:
-   * Selects float16 vertex-format token `15` and returns the input stream token.
+   * Creates vertex format 15 on the active device. Unlike the D3D9 float16
+   * formatter it never picks 16: `layoutVariant` is ignored.
    */
-  std::uintptr_t Float16HardwareVertexFormatterD3D10::SelectVertexFormatToken(
-    const std::uintptr_t streamToken,
+  boost::shared_ptr<VertexFormat> Float16HardwareVertexFormatterD3D10::CreateVertexFormat(
     const std::int32_t layoutVariant
   )
   {
     static_cast<void>(layoutVariant);
-    Device* const device = Device::GetInstance();
-    InvokeDeviceCreateVertexFormat(device, reinterpret_cast<void*>(streamToken), static_cast<int>(kFloat16VertexFormatToken));
-    return streamToken;
+    return Device::GetInstance()->CreateVertexFormat(kFloat16VertexFormatToken);
   }
 
   /**
@@ -4209,23 +3833,25 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x00901D40 (FUN_00901D40)
+   * Address: 0x00901C90 (FUN_00901C90)
+   * Address: 0x00901D40 (FUN_00901D40, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Owns the deleting-destructor path and delegates body lanes to `FUN_00901C90`.
+   * Releases the device buffers and resets the context, then the
+   * `IndexBuffer` base destructor runs (inlined, 0x00901CD3).
    */
   IndexBufferD3D10::~IndexBufferD3D10()
   {
-    DestroyIndexBufferD3D10Body(this);
+    DestroyState();
   }
 
   /**
    * Address: 0x00901BE0 (FUN_00901BE0)
    *
    * What it does:
-   * Returns the embedded index-buffer context lane at `this+0x04`.
+   * Returns the context the buffer was created from.
    */
-  IndexBufferContext* IndexBufferD3D10::GetContextBuffer()
+  IndexBufferContext* IndexBufferD3D10::GetContext()
   {
     return &context_;
   }
@@ -4239,7 +3865,7 @@ namespace gpg::gal
    * Maps the staging buffer with recovered map-flag conversion and returns mapped data.
    */
   std::int16_t*
-  IndexBufferD3D10::Lock(const std::uint32_t offset, const std::uint32_t size, const unsigned int lockFlags)
+  IndexBufferD3D10::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
   {
     static_cast<void>(offset);
     static_cast<void>(size);
@@ -4256,7 +3882,8 @@ namespace gpg::gal
       ThrowGalError("IndexBufferD3D10.cpp", 59, "vertex buffer map/unmap mismatch");
     }
 
-    unsigned int mapMode = ((lockFlags * 2U) | (lockFlags >> 1U)) & 3U;
+    const auto flags = static_cast<unsigned int>(lockFlags);
+    unsigned int mapMode = ((flags * 2U) | (flags >> 1U)) & 3U;
     if (mapMode == 0U) {
       mapMode = 2U;
     }
@@ -4278,7 +3905,7 @@ namespace gpg::gal
    * What it does:
    * Unmaps the staging lane and dispatches one native copy from staging to GPU buffer.
    */
-  int IndexBufferD3D10::Unlock()
+  void IndexBufferD3D10::Unlock()
   {
     if (nativeBuffer_ == nullptr) {
       ThrowGalError("IndexBufferD3D10.cpp", 79, "attempt to unlock invalid vertex buffer");
@@ -4295,11 +3922,10 @@ namespace gpg::gal
     auto** const nativeDeviceVtable = *reinterpret_cast<void***>(nativeDevice_);
     auto* const copySubresourceRegion =
       reinterpret_cast<device_native_copy_subresource_region_fn>(nativeDeviceVtable[32]);
-    const int result = copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
+    copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
 
     locked_ = false;
     mappedData_ = nullptr;
-    return result;
   }
 
   /**
@@ -4388,21 +4014,23 @@ namespace gpg::gal
   }
 
   /**
-   * Address: 0x0094DB30 (FUN_0094DB30)
+   * Address: 0x0094DA80 (FUN_0094DA80)
+   * Address: 0x0094DB30 (FUN_0094DB30, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Owns the deleting-destructor path and delegates body lanes to `FUN_0094DA80`.
+   * Releases the device buffers and resets the context, then the
+   * `VertexBuffer` base destructor runs (inlined, 0x0094DAC3).
    */
   VertexBufferD3D10::~VertexBufferD3D10()
   {
-    DestroyVertexBufferD3D10Body(this);
+    DestroyState();
   }
 
   /**
    * Address: 0x0094D9F0 (FUN_0094D9F0)
    *
    * What it does:
-   * Returns the embedded vertex-buffer context lane at `this+0x04`.
+   * Returns the context the buffer was created from.
    */
   VertexBufferContext* VertexBufferD3D10::GetContext()
   {
@@ -4418,7 +4046,7 @@ namespace gpg::gal
    * Maps the staging buffer with recovered map-flag conversion and returns
    * mapped pointer plus caller byte offset.
    */
-  void* VertexBufferD3D10::Lock(const std::uint32_t offset, const std::uint32_t size, const unsigned int lockFlags)
+  void* VertexBufferD3D10::Lock(const unsigned int offset, const unsigned int size, const MohoD3DLockFlags lockFlags)
   {
     static_cast<void>(size);
 
@@ -4434,7 +4062,8 @@ namespace gpg::gal
       ThrowGalError("VertexBufferD3D10.cpp", 59, "vertex buffer map/unmap mismatch");
     }
 
-    unsigned int mapMode = ((lockFlags * 2U) | (lockFlags >> 1U)) & 3U;
+    const auto flags = static_cast<unsigned int>(lockFlags);
+    unsigned int mapMode = ((flags * 2U) | (flags >> 1U)) & 3U;
     if (mapMode == 0U) {
       mapMode = 2U;
     }
@@ -4457,7 +4086,7 @@ namespace gpg::gal
    * What it does:
    * Unmaps the staging lane and dispatches one native copy from staging to GPU buffer.
    */
-  int VertexBufferD3D10::Unlock()
+  void VertexBufferD3D10::Unlock()
   {
     if (nativeBuffer_ == nullptr) {
       ThrowGalError("VertexBufferD3D10.cpp", 79, "attempt to unlock invalid vertex buffer");
@@ -4474,11 +4103,10 @@ namespace gpg::gal
     auto** const nativeDeviceVtable = *reinterpret_cast<void***>(nativeDevice_);
     auto* const copySubresourceRegion =
       reinterpret_cast<device_native_copy_subresource_region_fn>(nativeDeviceVtable[32]);
-    const int result = copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
+    copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
 
     locked_ = false;
     mappedData_ = nullptr;
-    return result;
   }
 
   /**
@@ -5197,7 +4825,7 @@ namespace gpg::gal
 
     SetUpRTT();
 
-    std::memset(mVertexStreams, 0, sizeof(mVertexStreams));
+    std::memset(mStreamFrequencies, 0, sizeof(mStreamFrequencies));
     mPipelineState.reset(new PipelineStateD3D10(mDevice));
     mPipelineState->SetDeviceState();
 
@@ -5240,17 +4868,12 @@ namespace gpg::gal
   /**
    * Address: 0x008FA220 (FUN_008FA220)
    *
-   * boost::shared_ptr<gpg::gal::PipelineStateD3D10> *
-   *
    * What it does:
-   * Copies the retained pipeline-state shared-handle lane (`this+0xB4/+0xB8`)
-   * into caller output and increments the control-block use count when present.
+   * Returns a new reference to the device's pipeline state.
    */
-  boost::shared_ptr<PipelineStateD3D10>*
-  DeviceD3D10::GetPipelineState(boost::shared_ptr<PipelineStateD3D10>* const outPipelineState)
+  boost::shared_ptr<PipelineState> DeviceD3D10::GetPipelineState()
   {
-    *outPipelineState = mPipelineState;
-    return outPipelineState;
+    return mPipelineState;
   }
 
   /**
@@ -5587,14 +5210,12 @@ namespace gpg::gal
   /**
    * Address: 0x008FE220 (FUN_008FE220)
    *
-   * boost::shared_ptr<VertexFormatD3D10> *,std::uint32_t
-   *
    * What it does:
-   * Builds one input-layout declaration for the requested format token.
+   * Builds the input layout for gal vertex format `formatToken` against the
+   * signature effect's pass for that format and wraps it in a
+   * `VertexFormatD3D10`.
    */
-  boost::shared_ptr<VertexFormatD3D10>* DeviceD3D10::CreateVertexFormat(
-    boost::shared_ptr<VertexFormatD3D10>* const outVertexFormat, const std::uint32_t formatToken
-  )
+  boost::shared_ptr<VertexFormat> DeviceD3D10::CreateVertexFormat(const std::uint32_t formatToken)
   {
     const D3D10_INPUT_ELEMENT_DESC* const elements = GetVertexLayoutElementsOrThrow(formatToken);
     const std::uint32_t elementCount = GetVertexLayoutElementCountOrThrow(formatToken);
@@ -5610,20 +5231,17 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1029, createInputLayoutResult);
     }
 
-    return ConstructSharedVertexFormatD3D10FromRaw(outVertexFormat, new VertexFormatD3D10(formatToken, inputLayout));
+    return boost::shared_ptr<VertexFormat>(new VertexFormatD3D10(formatToken, inputLayout));
   }
 
   /**
    * Address: 0x008FB8D0 (FUN_008FB8D0)
    *
-   * boost::shared_ptr<VertexBufferD3D10> *,VertexBufferContext const *
-   *
    * What it does:
-   * Creates one GPU vertex buffer plus staging/upload lanes from caller context.
+   * Creates one GPU vertex buffer and the staging buffer `Lock` maps, and
+   * wraps both in a `VertexBufferD3D10`.
    */
-  boost::shared_ptr<VertexBufferD3D10>* DeviceD3D10::CreateVertexBuffer(
-    boost::shared_ptr<VertexBufferD3D10>* const outVertexBuffer, const VertexBufferContext* const context
-  )
+  boost::shared_ptr<VertexBuffer> DeviceD3D10::CreateVertexBuffer(const VertexBufferContext* const context)
   {
     const std::uint32_t byteWidth = context->vertexCount_ * context->stride_;
 
@@ -5653,8 +5271,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1056, createStagingBufferResult);
     }
 
-    return ConstructSharedVertexBufferD3D10FromRaw(
-      outVertexBuffer,
+    return boost::shared_ptr<VertexBuffer>(
       new VertexBufferD3D10(context, GetDeviceNativeHandle(this), gpuBuffer, stagingBuffer)
     );
   }
@@ -5662,14 +5279,11 @@ namespace gpg::gal
   /**
    * Address: 0x008FBB60 (FUN_008FBB60)
    *
-   * boost::shared_ptr<IndexBufferD3D10> *,IndexBufferContext const *
-   *
    * What it does:
-   * Creates one GPU index buffer plus staging/upload lanes from caller context.
+   * Creates one GPU index buffer and the staging buffer `Lock` maps, and
+   * wraps both in an `IndexBufferD3D10`.
    */
-  boost::shared_ptr<IndexBufferD3D10>* DeviceD3D10::CreateIndexBuffer(
-    boost::shared_ptr<IndexBufferD3D10>* const outIndexBuffer, const IndexBufferContext* const context
-  )
+  boost::shared_ptr<IndexBuffer> DeviceD3D10::CreateIndexBuffer(const IndexBufferContext* const context)
   {
     const std::uint32_t bytesPerIndex = (context->format_ == 1U) ? 2U : 4U;
     const std::uint32_t byteWidth = context->size_ * bytesPerIndex;
@@ -5700,8 +5314,7 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1083, createStagingBufferResult);
     }
 
-    return ConstructSharedIndexBufferD3D10FromRaw(
-      outIndexBuffer,
+    return boost::shared_ptr<IndexBuffer>(
       new IndexBufferD3D10(context, GetDeviceNativeHandle(this), gpuBuffer, stagingBuffer)
     );
   }
@@ -6472,70 +6085,55 @@ namespace gpg::gal
   /**
    * Address: 0x008F9600 (FUN_008F9600)
    *
-   * VertexFormatD3D10 *,WeakRefCountedToken *
-   *
    * What it does:
-   * Validates one vertex declaration, binds it on the native device input-layout
-   * slot, and releases the previous weak-ref token when supplied.
+   * Binds `vertexFormat`'s input layout (through
+   * `VertexFormatD3D10::ValidateLayoutOrThrow`, 0x008F962B).
    */
-  int DeviceD3D10::SetVertexDeclaration(
-    VertexFormatD3D10* const vertexFormat, WeakRefCountedToken* const previousFormatRef
-  )
+  void DeviceD3D10::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
   {
-    void* const declaration = vertexFormat->ValidateLayoutOrThrow();
-    const int result = InvokeNativeSetInputLayout(this, declaration);
-    ReleaseWeakRefToken(previousFormatRef);
-    return result;
+    InvokeNativeSetInputLayout(this, static_cast<VertexFormatD3D10*>(vertexFormat.get())->ValidateLayoutOrThrow());
   }
 
   /**
    * Address: 0x008F9690 (FUN_008F9690)
    *
-   * uint32_t,VertexBufferD3D10 *,WeakRefCountedToken *,WeakRefCountedToken *,int
-   *
    * What it does:
-   * Binds one vertex-buffer stream, updates the retained stream weak-ref slot,
-   * and releases the previous weak-ref token.
+   * Binds `vertexBuffer` on input slot `streamSlot`, starting `startVertex`
+   * vertices in, and records `streamFrequencyToken` for the slot. D3D10 has
+   * no stream frequency of its own: the draws read slot 0's value back as the
+   * instance count.
    */
-  WeakRefCountedToken* DeviceD3D10::Func15(
+  void DeviceD3D10::SetVertexBuffer(
     const std::uint32_t streamSlot,
-    VertexBufferD3D10* const vertexBuffer,
-    WeakRefCountedToken* const previousStreamRef,
-    WeakRefCountedToken* const currentStreamRef,
-    const int startVertexMultiplier
+    const boost::shared_ptr<VertexBuffer> vertexBuffer,
+    const int streamFrequencyToken,
+    const int startVertex
   )
   {
     const VertexBufferContext* const context = vertexBuffer->GetContext();
-    void* const nativeVertexBuffer = vertexBuffer->GetNativeBufferOrThrow();
+    void* const nativeVertexBuffer = static_cast<VertexBufferD3D10*>(vertexBuffer.get())->GetNativeBufferOrThrow();
     const unsigned int stride = context->stride_;
-    const unsigned int offset = static_cast<unsigned int>(startVertexMultiplier * static_cast<int>(stride));
+    const unsigned int offset = static_cast<unsigned int>(startVertex * static_cast<int>(stride));
 
     void* buffers[1] = {nativeVertexBuffer};
     InvokeNativeSetVertexBuffers(this, streamSlot, buffers, &stride, &offset);
 
-    GetDeviceVertexStreamRefArray(this)[streamSlot] = currentStreamRef;
-    ReleaseWeakRefToken(previousStreamRef);
-    return currentStreamRef;
+    mStreamFrequencies[streamSlot] = streamFrequencyToken;
   }
 
   /**
    * Address: 0x008F9760 (FUN_008F9760)
    *
-   * IndexBufferD3D10 *,WeakRefCountedToken *
-   *
    * What it does:
-   * Selects the recovered DXGI index format token from index-buffer context,
-   * binds the native index buffer with zero offset, then releases the prior
-   * weak-ref token.
+   * Binds `indexBuffer` as the index source at offset 0, 32-bit for index
+   * format 2 and 16-bit otherwise.
    */
-  int DeviceD3D10::SetBufferIndices(IndexBufferD3D10* const indexBuffer, WeakRefCountedToken* const previousIndexRef)
+  void DeviceD3D10::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
   {
-    const IndexBufferContext* const context = indexBuffer->GetContextBuffer();
+    const IndexBufferContext* const context = indexBuffer->GetContext();
     const unsigned int indexFormatToken = (context->format_ == 2U) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
-    void* const nativeIndexBuffer = indexBuffer->GetNativeBufferOrThrow();
-    const int result = InvokeNativeSetIndexBuffer(this, nativeIndexBuffer, indexFormatToken, 0U);
-    ReleaseWeakRefToken(previousIndexRef);
-    return result;
+    void* const nativeIndexBuffer = static_cast<IndexBufferD3D10*>(indexBuffer.get())->GetNativeBufferOrThrow();
+    InvokeNativeSetIndexBuffer(this, nativeIndexBuffer, indexFormatToken, 0U);
   }
 
   /**
@@ -6572,23 +6170,36 @@ namespace gpg::gal
    * inputs and rebuilds per-stream stride lanes.
    */
   VertexFormatD3D10::VertexFormatD3D10(const std::uint32_t format, void* const vertexDeclaration)
-    : format_(0x17U)
-    , streamStrides_()
-    , vertexDeclaration_(nullptr)
+    : vertexDeclaration_(nullptr)
   {
+    formatCode_ = 0x17U;
     Initialize(format, vertexDeclaration);
   }
 
   /**
-   * Address: 0x00904260 (FUN_00904260)
+   * Address: 0x009041E0 (FUN_009041E0)
+   * Address: 0x00904260 (FUN_00904260, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Owns the deleting-destructor path and delegates body lanes to
-   * `FUN_009041E0`.
+   * Releases the input layout and leaves format code `0x17`, then the
+   * `VertexFormat` base destructor frees the stride vector (inlined,
+   * 0x00904225).
    */
   VertexFormatD3D10::~VertexFormatD3D10()
   {
-    DestroyVertexFormatD3D10Body(this);
+    ResetDeclaration();
+  }
+
+  /**
+   * Address: 0x00904180 (FUN_00904180)
+   *
+   * What it does:
+   * Releases the input layout and restores format code `0x17`.
+   */
+  void VertexFormatD3D10::ResetDeclaration()
+  {
+    ReleaseComLike(vertexDeclaration_);
+    formatCode_ = 0x17U;
   }
 
   /**
@@ -6617,26 +6228,26 @@ namespace gpg::gal
    */
   std::uint32_t VertexFormatD3D10::Initialize(const std::uint32_t format, void* const vertexDeclaration)
   {
-    ResetVertexFormatDeclaration(this);
+    ResetDeclaration();
     vertexDeclaration_ = vertexDeclaration;
-    format_ = format;
+    formatCode_ = format;
 
-    const D3D10_INPUT_ELEMENT_DESC* const layoutElements = GetVertexLayoutElementsOrThrow(format_);
-    const std::uint32_t layoutElementCount = GetVertexLayoutElementCountOrThrow(format_);
+    const D3D10_INPUT_ELEMENT_DESC* const layoutElements = GetVertexLayoutElementsOrThrow(formatCode_);
+    const std::uint32_t layoutElementCount = GetVertexLayoutElementCountOrThrow(formatCode_);
 
-    if (streamStrides_.begin_ != streamStrides_.end_) {
-      streamStrides_.end_ = streamStrides_.begin_;
-    }
+    streamStrides_.clear();
 
     std::uint32_t result = layoutElementCount;
     for (std::uint32_t index = 0; index < layoutElementCount; ++index) {
       const D3D10_INPUT_ELEMENT_DESC& element = layoutElements[index];
-      EnsureVertexStreamStrideCount(&streamStrides_, element.InputSlot + 1U);
+      if (streamStrides_.size() <= element.InputSlot) {
+        streamStrides_.resize(element.InputSlot + 1U, 0U);
+      }
 
-      std::uint32_t* const streamStride = streamStrides_.begin_ + element.InputSlot;
+      std::uint32_t& streamStride = streamStrides_[element.InputSlot];
       const std::uint32_t candidate = element.AlignedByteOffset + GetTextureFormatBlockBytes(element.Format);
-      result = (*streamStride > candidate) ? *streamStride : candidate;
-      *streamStride = result;
+      result = (streamStride > candidate) ? streamStride : candidate;
+      streamStride = result;
     }
 
     return result;
@@ -6877,8 +6488,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 56, "invalid effect technique");
     }
 
-    Device* const device = Device::GetInstance();
-    InvokeDeviceBeginTechnique(device);
+    Device::GetInstance()->BeginTechnique();
 
     D3D10_TECHNIQUE_DESC techniqueDesc{};
     const HRESULT result = InvokeTechniqueGetDesc(techniqueHandle_, &techniqueDesc);
@@ -6902,8 +6512,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 77, "effect technique begin/end mismatch");
     }
 
-    Device* const device = Device::GetInstance();
-    InvokeDeviceEndTechnique(device);
+    Device::GetInstance()->EndTechnique();
     beginEndActive_ = false;
   }
 

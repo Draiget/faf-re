@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "gpg/gal/PipelineState.hpp"
+
 namespace gpg::gal
 {
     class StateManagerD3D9;
@@ -11,7 +13,7 @@ namespace gpg::gal
      * VFTABLE: 0x00D47F6C
      * COL:     0x00E5353C
      */
-    class PipelineStateD3D9
+    class PipelineStateD3D9 : public PipelineState
     {
     public:
         /**
@@ -24,12 +26,13 @@ namespace gpg::gal
         explicit PipelineStateD3D9(void* nativeDevice);
 
         /**
-         * Address: 0x00946F10 (FUN_00946F10)
+         * Address: 0x00946BE0 (FUN_00946BE0)
+         * Address: 0x00946F10 (FUN_00946F10, slot 0: the scalar deleting destructor)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk for D3D9 pipeline-state wrappers.
+         * Releases the effect state manager.
          */
-        virtual ~PipelineStateD3D9();
+        ~PipelineStateD3D9() override;
 
         /**
          * Address: 0x00946310 (FUN_00946310)

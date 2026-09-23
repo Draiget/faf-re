@@ -6,7 +6,7 @@
 
 namespace gpg::gal
 {
-  class IndexBufferD3D9;
+  class IndexBuffer;
 }
 
 namespace moho
@@ -16,7 +16,7 @@ namespace moho
   class ID3DIndexSheet
   {
   public:
-    using BufferHandle = boost::shared_ptr<gpg::gal::IndexBufferD3D9>;
+    using BufferHandle = boost::shared_ptr<gpg::gal::IndexBuffer>;
 
     /**
      * Address: 0x0043F5D0 (FUN_0043F5D0, sub_43F5D0)
@@ -61,7 +61,7 @@ namespace moho
     /**
      * Address: 0x00A82547 (_purecall slot)
      *
-     * boost::shared_ptr<gpg::gal::IndexBufferD3D9> &
+     * boost::shared_ptr<gpg::gal::IndexBuffer> &
      *
      * What it does:
      * Copies one index-buffer ownership lane into caller storage.

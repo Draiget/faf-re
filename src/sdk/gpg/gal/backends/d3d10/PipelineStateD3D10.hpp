@@ -5,13 +5,15 @@
 
 #include <d3d10.h>
 
+#include "gpg/gal/PipelineState.hpp"
+
 namespace gpg::gal
 {
     /**
      * VFTABLE: 0x00D436F8
      * COL:     0x00E510FC
      */
-    class PipelineStateD3D10
+    class PipelineStateD3D10 : public PipelineState
     {
     public:
         /**
@@ -51,13 +53,13 @@ namespace gpg::gal
         void SetDeviceState();
 
         /**
-         * Address: 0x009024D0 (FUN_009024D0)
+         * Address: 0x009023F0 (FUN_009023F0)
+         * Address: 0x009024D0 (FUN_009024D0, slot 0: the scalar deleting destructor)
          *
          * What it does:
-         * Owns the scalar-deleting destructor thunk and releases retained
-         * D3D10 pipeline-state COM handles.
+         * Releases the device and both state packs.
          */
-        virtual ~PipelineStateD3D10();
+        ~PipelineStateD3D10() override;
 
     public:
         ID3D10Device* device_ = nullptr;                         // +0x04

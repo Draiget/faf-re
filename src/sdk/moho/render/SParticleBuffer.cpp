@@ -9,9 +9,9 @@
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
+#include "gpg/gal/VertexFormat.hpp"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 
@@ -167,13 +167,11 @@ namespace moho
    * What it does:
    * Ensures particle GPU resources exist, then unlocks instance data stream.
    */
-  int ParticleBuffer::UnlockInstanceBuffer()
+  void ParticleBuffer::UnlockInstanceBuffer()
   {
-    if (!Initialize()) {
-      return 0;
+    if (Initialize()) {
+      mInstanceVertexBuffer->Unlock();
     }
-
-    return mInstanceVertexBuffer->Unlock();
   }
 
   /**
@@ -241,8 +239,8 @@ namespace moho
 
     auto* const device = static_cast<gpg::gal::DeviceD3D9*>(deviceBase);
 
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> vertexFormat;
-    device->CreateVertexFormat(&vertexFormat, 19U);
+    boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
+    vertexFormat = device->CreateVertexFormat(19U);
     mVertexFormat = vertexFormat;
 
     gpg::gal::VertexBufferContext quadVertexContext{};
@@ -251,8 +249,8 @@ namespace moho
     quadVertexContext.vertexCount_ = 4U;
     quadVertexContext.stride_ = 8U;
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> quadVertexBuffer;
-    device->CreateVertexBuffer(&quadVertexBuffer, &quadVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> quadVertexBuffer;
+    quadVertexBuffer = device->CreateVertexBuffer(&quadVertexContext);
     mQuadVertexBuffer = quadVertexBuffer;
 
     void* const quadVertexData =
@@ -266,8 +264,8 @@ namespace moho
     instanceVertexContext.vertexCount_ = static_cast<unsigned int>(mMaxParticles);
     instanceVertexContext.stride_ = sizeof(Instanced);
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceVertexBuffer;
-    device->CreateVertexBuffer(&instanceVertexBuffer, &instanceVertexContext);
+    boost::shared_ptr<gpg::gal::VertexBuffer> instanceVertexBuffer;
+    instanceVertexBuffer = device->CreateVertexBuffer(&instanceVertexContext);
     mInstanceVertexBuffer = instanceVertexBuffer;
 
     gpg::gal::IndexBufferContext indexContext{};
@@ -275,8 +273,8 @@ namespace moho
     indexContext.format_ = 1U;
     indexContext.size_ = 6U;
 
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> indexBuffer;
-    device->CreateIndexBuffer(&indexBuffer, &indexContext);
+    boost::shared_ptr<gpg::gal::IndexBuffer> indexBuffer;
+    indexBuffer = device->CreateIndexBuffer(&indexContext);
     mQuadIndexBuffer = indexBuffer;
 
     auto* const indexWords = reinterpret_cast<std::uint32_t*>(

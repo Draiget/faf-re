@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "moho/render/ID3DVertexStream.h"
 
 namespace moho
@@ -39,7 +39,7 @@ namespace moho
     /**
      * Address: 0x0043FD60 (FUN_0043FD60)
      *
-     * boost::shared_ptr<gpg::gal::VertexBufferD3D9> &
+     * boost::shared_ptr<gpg::gal::VertexBuffer> &
      *
      * What it does:
      * Copies retained vertex-buffer ownership into caller storage.
@@ -65,18 +65,6 @@ namespace moho
     void Unlock() override;
 
   private:
-    /**
-     * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
-     *
-     * What it does:
-     * Forwards one vertex-buffer creation request through the active GAL device
-     * singleton and returns `outBuffer`.
-     */
-    static BufferHandle* CreateVertexBufferOnActiveDevice(
-      BufferHandle* outBuffer,
-      gpg::gal::VertexBufferContext* context
-    );
-
     /**
      * Address: 0x0043FD20 (FUN_0043FD20, sub_43FD20)
      *

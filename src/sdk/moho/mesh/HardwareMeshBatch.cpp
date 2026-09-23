@@ -33,14 +33,6 @@
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
 
-namespace gpg::gal
-{
-  // Returns the process-wide hardware vertex formatter (float16 or plain,
-  // selected once by device type). Defined in the D3D9 backend TU near
-  // func_AllowMeshInstancing (0x008E7550, func_GetHardwareVertexFormatter).
-  Float16HardwareVertexFormatterD3D9* GetHardwareVertexFormatter();
-} // namespace gpg::gal
-
 namespace
 {
   // TEMPORARY -- runtime toggle files for the exploded-mesh triage. A toggle is
@@ -300,10 +292,10 @@ namespace moho
     mMaxInstancesPerDraw = 0;
     mActiveInstanceBudget = 0;
 
-    IndexBufferHandle().reset();
+    mIndexBuffer.reset();
     mStaticVertexBuffer.reset();
     mDynamicVertexBuffer.reset();
-    VertexFormatHandle().reset();
+    mVertexFormat.reset();
 
     if (mScratchVertexData != nullptr) {
       ::operator delete[](mScratchVertexData);
@@ -339,7 +331,7 @@ namespace moho
     // (vertex/index/triangle/bone counts) from the mesh resource.
     MeshBatch::Initialize(lod, remapToReferenceResource, referenceResource, currentResource);
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::DeviceContext* const deviceContext = device->GetDeviceContext();
 
     // Instanced (non-remap) batches split the device's primitive budget across
@@ -358,25 +350,17 @@ namespace moho
       indexContext.format_ = 1U;
       indexContext.type_ = 1U;
 
-      boost::shared_ptr<gpg::gal::IndexBufferD3D9> indexBuffer;
-      indexBuffer = *device->CreateIndexBuffer(&indexBuffer, &indexContext);
-      IndexBufferHandle() = indexBuffer;
+      mIndexBuffer = device->CreateIndexBuffer(&indexContext);
 
       const std::size_t indexBytes = static_cast<std::size_t>(mIndexCount) * sizeof(std::uint16_t);
-      std::int16_t* const mappedIndices =
-        IndexBufferHandle()->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
+      std::int16_t* const mappedIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None);
       std::memcpy(mappedIndices, scm_file::GetIndices(*mesh), indexBytes);
-      IndexBufferHandle()->Unlock();
+      mIndexBuffer->Unlock();
     }
 
     // --- Vertex declaration + static vertex buffer. ---
-    gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
-
-    // The formatter fills the passed shared_ptr slot with the GPU vertex
-    // declaration for stream class 0.
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> vertexFormat;
-    formatter->SelectVertexFormatToken(reinterpret_cast<std::uintptr_t>(&vertexFormat), 0);
-    VertexFormatHandle() = vertexFormat;
+    gpg::gal::MeshFormatter* const formatter = gpg::gal::GetHardwareVertexFormatter();
+    mVertexFormat = formatter->CreateVertexFormat(0);
 
     const std::uint32_t vertexStride = formatter->GetVertexStride(0, 0);
 
@@ -386,9 +370,7 @@ namespace moho
     vertexContext.type_ = 2U;
     vertexContext.usage_ = 1U;
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> vertexBuffer;
-    vertexBuffer = *device->CreateVertexBuffer(&vertexBuffer, &vertexContext);
-    mStaticVertexBuffer = vertexBuffer;
+    mStaticVertexBuffer = device->CreateVertexBuffer(&vertexContext);
 
     auto* mappedVertices =
       static_cast<std::uint8_t*>(mStaticVertexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::None));
@@ -514,8 +496,8 @@ namespace moho
           char rb[900];
           int w = std::snprintf(rb, sizeof(rb), "[VBREAD] batch=%p fmt=%u stride=%u decl=%p",
                                 static_cast<const void*>(this),
-                                VertexFormatHandle() ? VertexFormatHandle()->formatCode_ : 0u, stride,
-                                VertexFormatHandle() ? VertexFormatHandle()->vertexDeclaration_ : nullptr);
+                                mVertexFormat ? mVertexFormat->formatCode_ : 0u, stride,
+                                mVertexFormat ? static_cast<gpg::gal::VertexFormatD3D9*>(mVertexFormat.get())->vertexDeclaration_ : nullptr);
           for (int v = 0; v < 3 && packed != nullptr; ++v) {
             const std::uint8_t* const rec = packed + static_cast<std::size_t>(v) * stride;
             std::uint16_t h[4];
@@ -567,11 +549,11 @@ namespace moho
                                posMismatch, boneMismatch, sourceOutOfBounds, worstVertex, worstError);
             mStaticVertexBuffer->Unlock();
           }
-          const std::int16_t* const gpuIndices = IndexBufferHandle()->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::ReadOnly);
+          const std::int16_t* const gpuIndices = mIndexBuffer->Lock(0U, 0U, gpg::gal::MohoD3DLockFlags::ReadOnly);
           if (gpuIndices != nullptr) {
             w += std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w), " | gpuIdx=%d,%d,%d,%d,%d,%d",
                                gpuIndices[0], gpuIndices[1], gpuIndices[2], gpuIndices[3], gpuIndices[4], gpuIndices[5]);
-            IndexBufferHandle()->Unlock();
+            mIndexBuffer->Unlock();
           }
           (void)std::snprintf(rb + w, sizeof(rb) - static_cast<std::size_t>(w), "\n");
           ::OutputDebugStringA(rb);
@@ -622,12 +604,12 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     // New budget = min(requested, cap).
     mActiveInstanceBudget = (instanceCount < mMaxInstancesPerDraw) ? instanceCount : mMaxInstancesPerDraw;
 
-    gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
+    gpg::gal::MeshFormatter* const formatter = gpg::gal::GetHardwareVertexFormatter();
 
     gpg::gal::VertexBufferContext vertexContext;
     vertexContext.vertexCount_ = static_cast<std::uint32_t>(mActiveInstanceBudget);
@@ -636,9 +618,7 @@ namespace moho
     const std::uint32_t perInstanceStride = formatter->GetVertexStride(1, 0);
     vertexContext.stride_ = perInstanceStride;
 
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> instanceBuffer;
-    instanceBuffer = *device->CreateVertexBuffer(&instanceBuffer, &vertexContext);
-    mDynamicVertexBuffer = instanceBuffer;
+    mDynamicVertexBuffer = device->CreateVertexBuffer(&vertexContext);
 
     // Reallocate the CPU staging mirror to match the new instance budget.
     if (mScratchVertexData != nullptr) {
@@ -657,9 +637,9 @@ namespace moho
    */
   void HardwareMeshBatch::BindBuffers()
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    device->SetVertexDeclaration(VertexFormatHandle());
-    device->SetBufferIndices(IndexBufferHandle());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+    device->SetVertexDeclaration(mVertexFormat);
+    device->SetBufferIndices(mIndexBuffer);
   }
 
   /**
@@ -845,7 +825,7 @@ namespace moho
     SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.begin();
     SkinPaletteEntry* const rotPalette = rotPaletteVar.mPalette.begin();
 
-    gpg::gal::Float16HardwareVertexFormatterD3D9* const formatter = gpg::gal::GetHardwareVertexFormatter();
+    gpg::gal::MeshFormatter* const formatter = gpg::gal::GetHardwareVertexFormatter();
 
     // Seed every bone slot this batch owns with an identity transform, so a
     // batch that packs fewer instances than the palette holds leaves no stale

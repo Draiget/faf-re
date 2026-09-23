@@ -267,7 +267,7 @@ namespace moho
      * device reset and either recompiles effects (`devInit=true`) or forwards
      * reset notifications to loaded effects (`devInit=false`).
      */
-    bool InitResources(bool devInit);
+    void InitResources(bool devInit);
 
     /**
      * Address: 0x00440BC0 (FUN_00440BC0, helper lane)

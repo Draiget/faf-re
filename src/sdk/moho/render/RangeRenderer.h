@@ -5,7 +5,7 @@
 #include <string_view>
 
 #include "boost/shared_ptr.h"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "legacy/containers/Map.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -178,7 +178,7 @@ namespace moho
     std::uint32_t mVertexCount;                                       // +0x24
     RenderGeometryBuffers mGeometry;                                  // +0x28
     std::uint32_t mDynamicRingVertexCount;                            // +0x40
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDynamicVertexBuffer; // +0x44
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer; // +0x44
     CRenFrame mFrame;                                                 // +0x4C
   };
 

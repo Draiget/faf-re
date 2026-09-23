@@ -4,7 +4,7 @@
 
 namespace gpg::gal
 {
-  class VertexBufferD3D9;
+  class VertexBuffer;
 }
 
 namespace moho
@@ -12,7 +12,7 @@ namespace moho
   class ID3DVertexStream
   {
   public:
-    using BufferHandle = boost::shared_ptr<gpg::gal::VertexBufferD3D9>;
+    using BufferHandle = boost::shared_ptr<gpg::gal::VertexBuffer>;
 
     /**
      * Address: 0x0043FB00 (FUN_0043FB00, sub_43FB00)
@@ -33,7 +33,7 @@ namespace moho
     /**
      * Address: 0x00A82547 (_purecall slot)
      *
-     * boost::shared_ptr<gpg::gal::VertexBufferD3D9> &
+     * boost::shared_ptr<gpg::gal::VertexBuffer> &
      *
      * What it does:
      * Copies one vertex-buffer ownership lane into caller storage.

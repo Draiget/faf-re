@@ -275,7 +275,7 @@ namespace moho
    * Uploads a bounded batch of pending world particles into one particle
    * work-item instance stream for the current frame.
    */
-  bool UploadPendingParticlesIntoWorkItem(
+  void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     float frameDelta,
     msvc8::vector<SWorldParticle>& pendingParticles

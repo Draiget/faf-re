@@ -587,7 +587,7 @@ namespace
         runtime->mReaderWriterLocks2[headIndex].reset(new moho::CD3DDepthStencil(this, outputContext.depthStencil));
       }
 
-      (void)mResources.InitResources(false);
+      mResources.InitResources(false);
 
       if (runtime->mViewport != nullptr) {
         reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(false);
@@ -757,7 +757,7 @@ namespace moho
     runtime->mDepthStencil.reset(new moho::CD3DDepthStencil());
 
     if (auto* const resources = static_cast<moho::CD3DDeviceResources*>(GetResources()); resources != nullptr) {
-      (void)resources->InitResources(true);
+      resources->InitResources(true);
     }
 
     runtime->mDrawViewportBackground = 0u;

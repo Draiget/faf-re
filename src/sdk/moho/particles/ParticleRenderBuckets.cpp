@@ -369,7 +369,7 @@ namespace moho
    * Uploads a bounded batch of pending world particles into one particle
    * work-item instance stream for the current frame.
    */
-  bool UploadPendingParticlesIntoWorkItem(
+  void UploadPendingParticlesIntoWorkItem(
     SParticleRenderWorkItem& workItem,
     const float frameDelta,
     msvc8::vector<SWorldParticle>& pendingParticles
@@ -377,7 +377,7 @@ namespace moho
   {
     const std::size_t pendingCount = pendingParticles.size();
     if (pendingCount == 0U) {
-      return false;
+      return;
     }
 
     const std::size_t intervalCount =
@@ -391,7 +391,7 @@ namespace moho
     }
 
     if (maxUploadCount == 0U) {
-      return pendingCount != 0U;
+      return;
     }
 
     auto* const particleBuffer = static_cast<ParticleBuffer*>(workItem.mParticleBuffer);
@@ -400,7 +400,7 @@ namespace moho
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
       workItem.mIntervals.clear();
-      return false;
+      return;
     }
 
     ParticleBuffer::Instanced* lockedInstances = nullptr;
@@ -415,7 +415,7 @@ namespace moho
       workItem.mIntervalCursor = 0U;
       workItem.mRenderStartIndex = 0U;
       workItem.mIntervals.clear();
-      return false;
+      return;
     }
 
     for (std::size_t index = 0U; index < maxUploadCount; ++index) {
@@ -455,7 +455,7 @@ namespace moho
     workItem.mRenderStartIndex += static_cast<std::uint32_t>(maxUploadCount);
     // `erase(first, last)` (0x004956B0, cited on Vector.h): the uploaded prefix goes.
     (void)pendingParticles.erase(pendingParticles.begin(), pendingParticles.begin() + maxUploadCount);
-    return particleBuffer->UnlockInstanceBuffer() != 0;
+    particleBuffer->UnlockInstanceBuffer();
   }
 
   /**
@@ -586,7 +586,7 @@ namespace moho
     if (workItemCount != 0U) {
       SParticleRenderWorkItem* const tailWorkItem = bucket.activeWorkItems.back();
       if (tailWorkItem != nullptr) {
-        (void)UploadPendingParticlesIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingParticles);
+        UploadPendingParticlesIntoWorkItem(*tailWorkItem, frameDelta, bucket.pendingParticles);
       }
     }
 
@@ -607,7 +607,7 @@ namespace moho
 
       bucket.activeWorkItems.push_back(newWorkItem);
 
-      (void)UploadPendingParticlesIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingParticles);
+      UploadPendingParticlesIntoWorkItem(*newWorkItem, frameDelta, bucket.pendingParticles);
     }
 
     return true;

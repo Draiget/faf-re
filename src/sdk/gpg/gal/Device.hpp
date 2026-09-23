@@ -21,6 +21,12 @@ namespace gpg::gal
   class CursorContext;
   class EffectContext;
   class Head;
+  class IndexBuffer;
+  class IndexBufferContext;
+  class PipelineState;
+  class VertexBuffer;
+  class VertexBufferContext;
+  class VertexFormat;
 
   /**
    * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
@@ -43,8 +49,8 @@ namespace gpg::gal
    * method at each of those positions, but a different name/signature does not
    * override - the compiler appends the backend method past this class's 50
    * slots, and the placeholder stays at the indexed slot. The slots still
-   * written that way are 5, 8, 14-16, 32 and 40-42; slots 6-7, 10-13 and
-   * 17-24 carry their real signatures and `DeviceD3D9` overrides them.
+   * written that way are 5 and 32; slots 6-8, 10-24 and 40-42 carry their real
+   * signatures and `DeviceD3D9` overrides them.
    *
    * That is inert for a normal `deviceD3D9->Method()` call (it binds to the
    * appended slot and reaches the right body) but fatal two ways for anything
@@ -54,18 +60,17 @@ namespace gpg::gal
    *   - a `__thiscall` callee pops its own arguments, so a no-arg stub pops 0
    *     where the caller pushed N and `_RTC_CheckEsp` traps on return.
    *
-   * Do NOT reach these slots by hand-indexing the vtable - that is what caused
-   * the resize crash through `EffectD3D9::OnReset` (slot 8) and would have
-   * caused a second one through the hardware vertex formatter (slot 14). Use a
-   * typed `static_cast<DeviceD3D9*>` (see `Device::InitCursor` in Device.cpp
-   * and `ActiveDeviceD3D9` in D3D9Interfaces.cpp), or hoist the real signature
-   * onto this class the way slot 9 (`CreateEffect`) already does.
+   * Do NOT reach the remaining placeholders by hand-indexing the vtable - that
+   * is what caused the resize crash through `EffectD3D9::OnReset` while slot 8
+   * was still one. Use a typed `static_cast<DeviceD3D9*>` (see
+   * `Device::InitCursor` in Device.cpp), or give the slot its real signature
+   * here.
    *
    * The full repair is to give every `purecallN` its real signature so the
    * backend genuinely overrides and the vtable is 50 entries again. Each slot
    * needs its resource type's gal interface first, since the base cannot name
-   * backend types: the render targets and `Texture` have theirs; the
-   * buffers, the vertex format and the pipeline state are still skeletons.
+   * backend types; the render targets, `Texture`, the buffers, the vertex
+   * format and the pipeline state all have theirs now.
    *
    * `DeviceD3D10` does not derive from this class at all, so it is unaffected.
    */
@@ -187,11 +192,13 @@ namespace gpg::gal
      */
     virtual const OutputContext* GetHeadOutputContext(unsigned int headIndex) const = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 8
-     * Demangled: _purecall
+     * Slot: 8 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Returns the device's pipeline state (its fixed-function and default
+     * render state). `EffectD3D9::OnReset` reaches it through this slot.
      */
-    virtual void purecall8() {}
+    virtual boost::shared_ptr<PipelineState> GetPipelineState() = 0;
     /**
      * Address: 0x00A82547
      * Slot: 9
@@ -248,23 +255,28 @@ namespace gpg::gal
       const DepthStencilTargetContext* context
     ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 14
-     * Demangled: _purecall
+     * Slot: 14 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates the vertex format for gal vertex-format code `formatCode`. The
+     * hardware vertex formatters dispatch it as `[vtbl+0x38]` on the active
+     * device (0x0094565C).
      */
-    virtual void purecall14() {}
+    virtual boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatCode) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 15
-     * Demangled: _purecall
+     * Slot: 15 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one vertex buffer described by `context`.
      */
-    virtual void purecall15() {}
+    virtual boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 16
-     * Demangled: _purecall
+     * Slot: 16 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one index buffer described by `context`.
      */
-    virtual void purecall16() {}
+    virtual boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) = 0;
     /**
      * Slot: 17 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -510,23 +522,34 @@ namespace gpg::gal
      */
     virtual int ClearTextures() = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 40
-     * Demangled: _purecall
+     * Slot: 40 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Binds `vertexFormat` as the vertex declaration for the next draws.
      */
-    virtual void purecall40() {}
+    virtual void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 41
-     * Demangled: _purecall
+     * Slot: 41 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Binds `vertexBuffer` on vertex stream `streamSlot`, starting
+     * `startVertex` vertices in. `streamFrequencyToken` is the instance count
+     * a geometry stream repeats for; per-instance streams advance once per
+     * instance regardless.
      */
-    virtual void purecall41() {}
+    virtual void SetVertexBuffer(
+      std::uint32_t streamSlot,
+      boost::shared_ptr<VertexBuffer> vertexBuffer,
+      int streamFrequencyToken,
+      int startVertex
+    ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 42
-     * Demangled: _purecall
+     * Slot: 42 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Binds `indexBuffer` as the index source for the next indexed draws.
      */
-    virtual void purecall42() {}
+    virtual void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) = 0;
     /**
      * Slot: 43 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)

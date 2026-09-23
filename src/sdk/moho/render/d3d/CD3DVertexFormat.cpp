@@ -1,8 +1,9 @@
 #include "CD3DVertexFormat.h"
 
+#include "gpg/core/utils/Global.h"
 #include "gpg/gal/Device.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#include "gpg/gal/Error.hpp"
+#include "gpg/gal/VertexFormat.hpp"
 
 namespace moho
 {
@@ -19,22 +20,14 @@ namespace moho
   /**
    * Address: 0x0043CFC0 (FUN_0043CFC0)
    *
-   * std::uint32_t
-   *
    * What it does:
-   * Requests one gal vertex-format wrapper for the incoming format token and
-   * stores retained ownership.
+   * Creates gal vertex format `formatCode` on the active device (through
+   * `VertexFormat::Create`, 0x0043CFE6) and keeps it.
    */
   CD3DVertexFormat::CD3DVertexFormat(const std::uint32_t formatCode)
     : CD3DVertexFormat()
   {
-    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    if (device == nullptr) {
-      return;
-    }
-
-    auto* const d3dDevice = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-    d3dDevice->CreateVertexFormat(&mFormat, formatCode);
+    mFormat = gpg::gal::VertexFormat::Create(formatCode);
   }
 
   /**
@@ -59,7 +52,7 @@ namespace moho
       return 0;
     }
 
-    return static_cast<std::uint32_t>(vertexFormat->elementStrideByStream_.size());
+    return static_cast<std::uint32_t>(vertexFormat->streamStrides_.size());
   }
 
   /**
@@ -77,28 +70,29 @@ namespace moho
       return 0;
     }
 
-    if (elementIndex >= vertexFormat->elementStrideByStream_.size()) {
+    if (elementIndex >= vertexFormat->streamStrides_.size()) {
       return 0;
     }
 
-    return vertexFormat->elementStrideByStream_.data()[elementIndex];
+    return vertexFormat->streamStrides_.data()[elementIndex];
   }
 
   /**
    * Address: 0x0043F460 (FUN_0043F460)
    *
    * What it does:
-   * Binds the retained vertex declaration on the active gal device.
+   * Binds the retained vertex declaration on the active gal device (slot 40,
+   * `[vtbl+0xA0]`). A gal error is fatal: the handler at 0x0043F4D1 hands the
+   * error's file, line and text to `gpg::Die`.
    */
   bool CD3DVertexFormat::SetVertexDeclaration()
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    if (device == nullptr) {
-      return false;
+    try {
+      device->SetVertexDeclaration(mFormat);
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
     }
-
-    auto* const d3dDevice = reinterpret_cast<gpg::gal::DeviceD3D9*>(device);
-    d3dDevice->SetVertexDeclaration(mFormat);
     return true;
   }
 } // namespace moho

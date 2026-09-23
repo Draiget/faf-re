@@ -74,8 +74,8 @@ namespace moho
     , mUseSecondaryData(0)
     , pad_3D_3F{}
     , mParameterAnnotation(0)
-    , mVertexDeclarationHandle()
-    , mIndexBindingHandle()
+    , mVertexFormat()
+    , mIndexBuffer()
   {}
 
   /**

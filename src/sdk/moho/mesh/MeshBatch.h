@@ -8,16 +8,15 @@
 
 namespace gpg::gal
 {
-  class VertexBufferD3D9;
-  class VertexFormatD3D9;
-  class IndexBufferD3D9;
+  class IndexBuffer;
+  class VertexBuffer;
+  class VertexFormat;
 } // namespace gpg::gal
 
 namespace moho
 {
   class MeshInstance;
   class MeshLOD;
-  class MeshBatchRenderBinding;
   class RScmResource;
 
   /**
@@ -105,9 +104,9 @@ namespace moho
     msvc8::vector<std::int32_t> mBoneRemapIndices;    // +0x2C
     std::uint8_t mUseSecondaryData;                   // +0x3C
     std::uint8_t pad_3D_3F[0x03]{};
-    std::int32_t mParameterAnnotation;                                  // +0x40
-    boost::shared_ptr<MeshBatchRenderBinding> mVertexDeclarationHandle; // +0x44
-    boost::shared_ptr<MeshBatchRenderBinding> mIndexBindingHandle;      // +0x4C
+    std::int32_t mParameterAnnotation;                  // +0x40
+    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x44 the batch's vertex declaration
+    boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;   // +0x4C the batch's static index buffer
   };
 
   static_assert(offsetof(MeshBatch, mUseBoneRemap) == 0x04, "MeshBatch::mUseBoneRemap offset must be 0x04");
@@ -119,10 +118,8 @@ namespace moho
   static_assert(
     offsetof(MeshBatch, mParameterAnnotation) == 0x40, "MeshBatch::mParameterAnnotation offset must be 0x40"
   );
-  static_assert(
-    offsetof(MeshBatch, mVertexDeclarationHandle) == 0x44, "MeshBatch::mVertexDeclarationHandle offset must be 0x44"
-  );
-  static_assert(offsetof(MeshBatch, mIndexBindingHandle) == 0x4C, "MeshBatch::mIndexBindingHandle offset must be 0x4C");
+  static_assert(offsetof(MeshBatch, mVertexFormat) == 0x44, "MeshBatch::mVertexFormat offset must be 0x44");
+  static_assert(offsetof(MeshBatch, mIndexBuffer) == 0x4C, "MeshBatch::mIndexBuffer offset must be 0x4C");
   static_assert(sizeof(MeshBatch) == 0x54, "MeshBatch size must be 0x54");
 
   /**
@@ -137,12 +134,8 @@ namespace moho
    * `Render`) from `MeshBatch`.
    *
    * Layout (complete-object size 0x68 = base 0x54 + 0x14):
-   *   - `+0x44` (base `mVertexDeclarationHandle` slot, reused) holds the
-   *     `boost::shared_ptr<gpg::gal::VertexFormatD3D9>` for this batch's
-   *     GPU vertex declaration.
-   *   - `+0x4C` (base `mIndexBindingHandle` slot, reused) holds the
-   *     `boost::shared_ptr<gpg::gal::IndexBufferD3D9>` for the static index
-   *     buffer.
+   *   - `+0x44` / `+0x4C` are the base's vertex format and static index
+   *     buffer, which `Initialize` creates.
    *   - `+0x54` static (all-instances) vertex buffer.
    *   - `+0x5C` dynamic (per-instance) vertex buffer.
    *   - `+0x64` CPU scratch buffer for per-instance vertex staging.
@@ -210,28 +203,6 @@ namespace moho
      */
     std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool reflectedOnly) override;
 
-    /**
-     * Typed view of the base `mVertexDeclarationHandle` slot (+0x44).
-     *
-     * The binary reuses the base batch-render-binding handle slot to store this
-     * batch's `boost::shared_ptr<VertexFormatD3D9>`. `boost::shared_ptr<T>` has a
-     * T-independent layout, so this is a typed reinterpretation of the same
-     * slot, not raw offset arithmetic.
-     */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::VertexFormatD3D9>& VertexFormatHandle() noexcept
-    {
-      return reinterpret_cast<boost::shared_ptr<gpg::gal::VertexFormatD3D9>&>(mVertexDeclarationHandle);
-    }
-
-    /**
-     * Typed view of the base `mIndexBindingHandle` slot (+0x4C): the batch's
-     * `boost::shared_ptr<IndexBufferD3D9>` static index buffer.
-     */
-    [[nodiscard]] boost::shared_ptr<gpg::gal::IndexBufferD3D9>& IndexBufferHandle() noexcept
-    {
-      return reinterpret_cast<boost::shared_ptr<gpg::gal::IndexBufferD3D9>&>(mIndexBindingHandle);
-    }
-
   private:
     /**
      * Address: 0x007E7BE0 (FUN_007E7BE0)
@@ -254,9 +225,9 @@ namespace moho
 
   public:
     // +0x54 static (all-instances) GPU vertex buffer built in Initialize.
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mStaticVertexBuffer;
+    boost::shared_ptr<gpg::gal::VertexBuffer> mStaticVertexBuffer;
     // +0x5C dynamic (per-instance) GPU vertex buffer grown by PrepareBatch.
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDynamicVertexBuffer;
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer;
     // +0x64 CPU scratch buffer for per-instance vertex staging.
     void* mScratchVertexData = nullptr;
   };

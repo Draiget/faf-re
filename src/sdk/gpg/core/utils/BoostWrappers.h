@@ -338,6 +338,12 @@ namespace boost
          * Address: 0x0053A9A0 (FUN_0053A9A0, another ICF-shape twin,
          * branch-for-branch identical. Reached from 8 real call sites in
          * CAnimationManipulator.cpp's manipulator teardown paths.)
+         * Address: 0x008F9470 (FUN_008F9470, another copy of the same release
+         * in the D3D10 backend, no direct callers (its vertex-binding slots
+         * inline it for their by-value `shared_ptr` parameters); formerly
+         * `ReleaseWeakRefToken` over a `WeakRefCountedToken` stand-in for
+         * `sp_counted_base` in D3D10Interfaces.cpp (RULE ONE), removed
+         * 2026-09-23.)
          * Address: 0x007B8DE0 (FUN_007B8DE0, another ICF-shape twin,
          * branch-for-branch identical -- 31 total twins for this body,
          * canonical=FUN_004260B0. Reached from
@@ -621,6 +627,20 @@ namespace boost
      * Address: 0x008E9CF0 (FUN_008E9CF0, shared_ptr<Texture>(TextureD3D9*) - `DeviceD3D9::CreateTexture` calls it at 0x008EB5CB; formerly in D3D9Interfaces.cpp)
      * Address: 0x008FA400 (FUN_008FA400, shared_ptr<Texture>(TextureD3D10*), formerly in D3D10Interfaces.cpp)
      *
+     * The same constructor for the buffer, vertex-format and pipeline-state
+     * types (`boost::shared_ptr<VertexFormat>(new VertexFormatD3D9(...))` in
+     * the device create slots, `mPipelineState.reset(new PipelineStateD3D9(...))`
+     * through `reset`). Each was a per-type `ConstructShared<Y>FromRaw` free
+     * function (RULE ONE), removed 2026-09-23.
+     * Address: 0x008E9DB0 (FUN_008E9DB0, shared_ptr<VertexFormat>(VertexFormatD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9DE0 (FUN_008E9DE0, shared_ptr<VertexBuffer>(VertexBufferD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9E10 (FUN_008E9E10, shared_ptr<IndexBuffer>(IndexBufferD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008EA060 (FUN_008EA060, shared_ptr<PipelineStateD3D9>(PipelineStateD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008FA4C0 (FUN_008FA4C0, shared_ptr<VertexFormat>(VertexFormatD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA4F0 (FUN_008FA4F0, shared_ptr<VertexBuffer>(VertexBufferD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA520 (FUN_008FA520, shared_ptr<IndexBuffer>(IndexBufferD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA5F0 (FUN_008FA5F0, shared_ptr<PipelineStateD3D10>(PipelineStateD3D10*), formerly in D3D10Interfaces.cpp)
+     *
      * What it does:
      * Constructs one `boost::shared_ptr<T>` from a raw pointee in caller-provided storage.
      */
@@ -645,6 +665,8 @@ namespace boost
      * Address: 0x008E9E40 (FUN_008E9E40, shared_ptr<RenderTarget>::reset(RenderTargetD3D9*))
      * Address: 0x008E9EB0 (FUN_008E9EB0, shared_ptr<DepthStencilTarget>::reset(DepthStencilTargetD3D9*))
      * Address: 0x008FA550 (FUN_008FA550, shared_ptr<RenderTarget>::reset(RenderTargetD3D10*))
+     * Address: 0x008EA250 (FUN_008EA250, shared_ptr<PipelineStateD3D9>::reset(PipelineStateD3D9*) - device setup 0x008F3320 and `Func9` 0x008F3070; formerly `AssignSharedPipelineStateFromRaw` in D3D9Interfaces.cpp, removed 2026-09-23)
+     * Address: 0x008FA760 (FUN_008FA760, shared_ptr<PipelineStateD3D10>::reset(PipelineStateD3D10*) - `DeviceD3D10::Setup` 0x00900B30; formerly `AssignSharedPipelineStateD3D10FromRaw` in D3D10Interfaces.cpp, removed 2026-09-23)
      *
      * What it does:
      * Rebinds one initialized `boost::shared_ptr<T>` to a raw pointee by
@@ -808,6 +830,14 @@ namespace boost
      * Address: 0x008F9CB0 (FUN_008F9CB0, shared_count(DepthStencilTargetD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008E92A0 (FUN_008E92A0, shared_count(TextureD3D9*), formerly in D3D9Interfaces.cpp)
      * Address: 0x008F9B00 (FUN_008F9B00, shared_count(TextureD3D10*) - `DeviceD3D10::CreateTexture` calls it at 0x008FB082; formerly in D3D10Interfaces.cpp)
+     * Address: 0x008E94E0 (FUN_008E94E0, shared_count(VertexFormatD3D9*) - `DeviceD3D9::CreateVertexFormat` calls it at 0x008EBB7E; formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9570 (FUN_008E9570, shared_count(VertexBufferD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E9600 (FUN_008E9600, shared_count(IndexBufferD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008E99E0 (FUN_008E99E0, shared_count(PipelineStateD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008F9D40 (FUN_008F9D40, shared_count(VertexFormatD3D10*) - `DeviceD3D10::CreateVertexFormat` calls it; formerly in D3D10Interfaces.cpp)
+     * Address: 0x008F9DD0 (FUN_008F9DD0, shared_count(VertexBufferD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008F9E60 (FUN_008F9E60, shared_count(IndexBufferD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008FA0E0 (FUN_008FA0E0, shared_count(PipelineStateD3D10*), formerly in D3D10Interfaces.cpp)
      *
      * `boost::checked_delete<Y>` as that catch path emits it for the D3D10
      * backend types (`if (p) p->~Y()` through the deleting destructor,

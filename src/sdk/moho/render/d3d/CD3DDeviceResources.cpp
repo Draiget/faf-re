@@ -903,14 +903,14 @@ namespace moho
    * bool devInit
    *
    * What it does:
-   * Recreates runtime D3D buffers/surfaces for tracked resources after one
-   * device reset and either recompiles effects (`devInit=true`) or forwards
-   * reset notifications to loaded effects (`devInit=false`).
+   * Recreates the device objects of every tracked resource after a device
+   * reset - vertex-sheet streams, index sheets, render targets, depth/stencil
+   * surfaces, dynamic textures, in that order - then either recompiles the
+   * effects (`devInit`) or tells each loaded effect the device was reset.
+   * The binary ignores every create call's result.
    */
-  bool CD3DDeviceResources::InitResources(const bool devInit)
+  void CD3DDeviceResources::InitResources(const bool devInit)
   {
-    bool allCreated = true;
-
     using VertexSheetList = TDatList<CD3DVertexSheet, void>;
     using IndexSheetList = TDatList<CD3DIndexSheet, void>;
     using RenderTargetList = TDatList<CD3DRenderTarget, void>;
@@ -918,76 +918,38 @@ namespace moho
     using DynamicTextureSheetList = TDatList<CD3DDynamicTextureSheet, void>;
 
     for (auto* node = mVertexSheet2.mLink.mNext; node != &mVertexSheet2.mLink; node = node->mNext) {
-      auto* const vertexSheet =
-        VertexSheetList::template owner_from_member_node<CD3DVertexSheet, &CD3DVertexSheet::mLink>(node);
-      if (vertexSheet == nullptr) {
-        continue;
-      }
-
-      const std::uint32_t streamCount = static_cast<std::uint32_t>(vertexSheet->mStreams.size());
-      for (std::uint32_t streamIndex = 0U; streamIndex < streamCount; ++streamIndex) {
-        if (!vertexSheet->mOwnedStreamMask.TestBit(streamIndex)) {
-          continue;
-        }
-
-        CD3DVertexStream* const stream = vertexSheet->mStreams[streamIndex];
-        if (stream != nullptr && !stream->CreateBuffer()) {
-          allCreated = false;
-        }
-      }
+      VertexSheetList::template owner_from_member_node<CD3DVertexSheet, &CD3DVertexSheet::mLink>(node)
+        ->CreateOwnedStreamBuffers();
     }
 
     for (auto* node = mIndexSheet2.mLink.mNext; node != &mIndexSheet2.mLink; node = node->mNext) {
-      auto* const indexSheet =
-        IndexSheetList::template owner_from_member_node<CD3DIndexSheet, &CD3DIndexSheet::mLink>(node);
-      if (indexSheet == nullptr) {
-        continue;
-      }
-
-      if (indexSheet->mBuffer.get() == nullptr) {
-        auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-        if (device != nullptr) {
-          (void)device->CreateIndexBuffer(&indexSheet->mBuffer, &indexSheet->mContext);
-        }
-      }
+      IndexSheetList::template owner_from_member_node<CD3DIndexSheet, &CD3DIndexSheet::mLink>(node)->CreateBuffer();
     }
 
     for (auto* node = mRenderTarget.mLink.mNext; node != &mRenderTarget.mLink; node = node->mNext) {
-      auto* const renderTarget =
-        RenderTargetList::template owner_from_member_node<CD3DRenderTarget, &CD3DRenderTarget::mLink>(node);
-      if (renderTarget != nullptr && !renderTarget->RecreateFromContext()) {
-        allCreated = false;
-      }
+      RenderTargetList::template owner_from_member_node<CD3DRenderTarget, &CD3DRenderTarget::mLink>(node)
+        ->RecreateFromContext();
     }
 
     for (auto* node = mDepthStencil.mLink.mNext; node != &mDepthStencil.mLink; node = node->mNext) {
-      auto* const depthStencil =
-        DepthStencilList::template owner_from_member_node<CD3DDepthStencil, &CD3DDepthStencil::mLink>(node);
-      if (depthStencil != nullptr && !depthStencil->RecreateFromContext()) {
-        allCreated = false;
-      }
+      DepthStencilList::template owner_from_member_node<CD3DDepthStencil, &CD3DDepthStencil::mLink>(node)
+        ->RecreateFromContext();
     }
 
     for (auto* node = mTextureSheet.mLink.mNext; node != &mTextureSheet.mLink; node = node->mNext) {
-      auto* const dynamicSheet = DynamicTextureSheetList::template owner_from_member_node<
+      DynamicTextureSheetList::template owner_from_member_node<
         CD3DDynamicTextureSheet,
-        &CD3DDynamicTextureSheet::mLink>(node);
-      if (dynamicSheet != nullptr && !dynamicSheet->CreateTexture()) {
-        allCreated = false;
-      }
+        &CD3DDynamicTextureSheet::mLink>(node)
+        ->CreateTexture();
     }
 
     if (devInit) {
       DevResInitResources();
     } else {
       for (CD3DEffect* const effect : mEffects) {
-        if (effect != nullptr && effect->mEffect.px != nullptr) {
-          effect->mEffect.px->OnReset();
-        }
+        effect->mEffect.px->OnReset();
       }
     }
-
-    return allCreated;
   }
 
   /**

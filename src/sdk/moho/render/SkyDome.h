@@ -20,8 +20,8 @@ namespace gpg::gal
   class EffectTechnique;
   class EffectTechniqueD3D9;
   class Texture;
-  class IndexBufferD3D9;
-  class VertexBufferD3D9;
+  class IndexBuffer;
+  class VertexBuffer;
 }
 
 namespace moho
@@ -379,8 +379,8 @@ namespace moho
     std::int32_t mDomeVertexCount = 0;                             // +0x190
     std::int32_t mDomeIndexCount = 0;                              // +0x194
     boost::shared_ptr<CD3DVertexFormat> mDomeFormat;               // +0x198
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDomeVertBuf;    // +0x1A0
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDomeIndexBuf;    // +0x1A8
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDomeVertBuf;    // +0x1A0
+    boost::shared_ptr<gpg::gal::IndexBuffer> mDomeIndexBuf;    // +0x1A8
     // Texture lanes hold the GAL base texture extracted from each source
     // RD3DTextureResource (CreateTextures @0x00817850 stores
     // `resource->GetBaseTexture()` into these fields, and the render passes
@@ -388,19 +388,19 @@ namespace moho
     // shared_ptr<TextureD3D9>). They are GAL texture handles, not the owning
     // resource wrappers.
     boost::shared_ptr<gpg::gal::Texture> mHorizonLookupTex;    // +0x1B0
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf1;  // +0x1B8
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDecalIndexBuf;   // +0x1C0
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDecalVertBuf1;  // +0x1B8
+    boost::shared_ptr<gpg::gal::IndexBuffer> mDecalIndexBuf;   // +0x1C0
     bool mNeedsRebuild = true;                                     // +0x1C8
     std::uint8_t mPad1C9[0x03];                                    // +0x1C9
     boost::shared_ptr<gpg::gal::Texture> mAtmosphereTex;       // +0x1CC (decal albedo lane)
     boost::shared_ptr<gpg::gal::Texture> mAtmosphereTex2;      // +0x1D4 (decal glow lane)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat1;             // +0x1DC
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf2;  // +0x1E4
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDecalVertBuf2;  // +0x1E4
     boost::shared_ptr<gpg::gal::Texture> mDecalTex1;           // +0x1EC (cumulus light ramp)
     boost::shared_ptr<gpg::gal::Texture> mDecalTex2;           // +0x1F4 (cumulus dispersion ramp)
     boost::shared_ptr<gpg::gal::Texture> mDecalTex3;           // +0x1FC (cumulus texture)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat2;             // +0x204
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf3;  // +0x20C
+    boost::shared_ptr<gpg::gal::VertexBuffer> mDecalVertBuf3;  // +0x20C
     boost::shared_ptr<gpg::gal::Texture> mCirrusTex;           // +0x214
     boost::shared_ptr<gpg::gal::Texture> mCloudsTexture;       // +0x21C
   };

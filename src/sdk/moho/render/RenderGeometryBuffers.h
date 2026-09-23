@@ -3,9 +3,9 @@
 #include <cstddef>
 
 #include "boost/shared_ptr.h"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
+#include "gpg/gal/VertexFormat.hpp"
 
 namespace moho
 {
@@ -14,9 +14,9 @@ namespace moho
    */
   struct RenderGeometryBuffers
   {
-    boost::shared_ptr<gpg::gal::VertexFormatD3D9> mVertexFormat; // +0x00
-    boost::shared_ptr<gpg::gal::VertexBufferD3D9> mVertexBuffer; // +0x08
-    boost::shared_ptr<gpg::gal::IndexBufferD3D9> mIndexBuffer;    // +0x10
+    boost::shared_ptr<gpg::gal::VertexFormat> mVertexFormat; // +0x00
+    boost::shared_ptr<gpg::gal::VertexBuffer> mVertexBuffer; // +0x08
+    boost::shared_ptr<gpg::gal::IndexBuffer> mIndexBuffer;    // +0x10
 
     void Reset() noexcept;
   };

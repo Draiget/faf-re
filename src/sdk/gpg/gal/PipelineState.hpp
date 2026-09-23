@@ -1,30 +1,38 @@
-// Auto-generated from IDA VFTABLE/RTTI scan.
-// This header is a skeleton for reverse-engineering; adjust as needed.
 #pragma once
 
-namespace gpg {
-namespace gal {
+#include "boost/noncopyable.hpp"
+
+namespace gpg::gal
+{
     /**
      * VFTABLE: 0x00D436F0
      * COL:  0x00E510B0
+     *
+     * The backend's fixed-function and default render state. The interface
+     * is only its destructor; `Device::GetPipelineState` (slot 8) hands out
+     * the device's instance, and each backend keeps its own state objects
+     * behind it.
      */
-    class PipelineState {
+    class PipelineState : private boost::noncopyable
+    {
     public:
-      /**
-       * Address: 0x00902230 (FUN_00902230)
-       *
-       * What it does:
-       * Initializes one base `PipelineState` lane by installing the class
-       * vtable.
-       */
-      PipelineState();
+        /**
+         * Address: 0x00902240 (FUN_00902240)
+         *
+         * What it does:
+         * Installs the abstract pipeline-state vtable.
+         */
+        PipelineState();
 
-      /**
-       * Address: 0x00A82547
-       * Slot: 0
-       * Demangled: _purecall
-       */
-      virtual void purecall0() = 0;
+        /**
+         * Address: 0x00902230 (FUN_00902230)
+         * Slot: 0 (`_purecall` in the base's own table)
+         *
+         * What it does:
+         * Reinstalls the abstract pipeline-state vtable.
+         */
+        virtual ~PipelineState() = 0;
     };
-} // namespace gal
-} // namespace gpg
+
+    static_assert(sizeof(PipelineState) == 0x04, "PipelineState size must be 0x04");
+} // namespace gpg::gal

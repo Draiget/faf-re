@@ -6,7 +6,7 @@
 
 namespace gpg::gal
 {
-  class VertexFormatD3D9;
+  class VertexFormat;
 }
 
 namespace moho
@@ -14,7 +14,7 @@ namespace moho
   class ID3DVertexFormat
   {
   public:
-    using FormatHandle = boost::shared_ptr<gpg::gal::VertexFormatD3D9>;
+    using FormatHandle = boost::shared_ptr<gpg::gal::VertexFormat>;
 
     /**
      * Address: 0x0043F420 (FUN_0043F420, sub_43F420)

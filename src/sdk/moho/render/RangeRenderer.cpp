@@ -13,8 +13,8 @@
 #include "gpg/gal/backends/d3d9/EffectD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/backends/d3d9/EffectVariableD3D9.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
@@ -1427,7 +1427,7 @@ namespace moho
       return;
     }
 
-    device->CreateVertexFormat(&mGeometry.mVertexFormat, 17u);
+    mGeometry.mVertexFormat = device->CreateVertexFormat(17u);
 
     mVertexCount = kRangeVertexCount;
     mIndexCount = kRangeIndexCount;
@@ -1437,21 +1437,21 @@ namespace moho
     primaryVertexBufferContext.stride_ = kPrimaryVertexStrideBytes;
     primaryVertexBufferContext.type_ = 2u;
     primaryVertexBufferContext.usage_ = 1u;
-    device->CreateVertexBuffer(&mGeometry.mVertexBuffer, &primaryVertexBufferContext);
+    mGeometry.mVertexBuffer = device->CreateVertexBuffer(&primaryVertexBufferContext);
 
     gpg::gal::VertexBufferContext dynamicVertexBufferContext{};
     dynamicVertexBufferContext.vertexCount_ = kDynamicVertexCapacity;
     dynamicVertexBufferContext.stride_ = kDynamicVertexStrideBytes;
     dynamicVertexBufferContext.type_ = 3u;
     dynamicVertexBufferContext.usage_ = 2u;
-    device->CreateVertexBuffer(&mDynamicVertexBuffer, &dynamicVertexBufferContext);
+    mDynamicVertexBuffer = device->CreateVertexBuffer(&dynamicVertexBufferContext);
     mDynamicRingVertexCount = 0u;
 
     gpg::gal::IndexBufferContext indexBufferContext{};
     indexBufferContext.format_ = 1u;
     indexBufferContext.size_ = mIndexCount;
     indexBufferContext.type_ = 1u;
-    device->CreateIndexBuffer(&mGeometry.mIndexBuffer, &indexBufferContext);
+    mGeometry.mIndexBuffer = device->CreateIndexBuffer(&indexBufferContext);
 
     if (mGeometry.mVertexBuffer) {
       float* const vertexData =

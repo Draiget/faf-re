@@ -7,6 +7,7 @@
 #include "EffectContext.hpp"
 #include "EffectMacro.hpp"
 #include "Error.hpp"
+#include "IndexBuffer.hpp"
 #include "IndexBufferContext.hpp"
 #include "OutputContext.hpp"
 #include "RenderTarget.hpp"
@@ -15,6 +16,7 @@
 #include "TextureContext.hpp"
 #include "VertexBuffer.hpp"
 #include "VertexBufferContext.hpp"
+#include "VertexFormat.hpp"
 #include "StringUtils.h"
 
 #include "gpg/core/streams/MemBufferStream.h"
@@ -157,10 +159,19 @@ namespace gpg::gal
      * Address: 0x008F56A0 (FUN_008F56A0, gpg::gal::VertexBuffer::VertexBuffer)
      *
      * What it does:
-     * Initializes one abstract vertex-buffer base object and applies the
-     * base vftable lane used by derived constructors/unwind paths.
+     * Installs the abstract vertex-buffer vtable.
      */
     VertexBuffer::VertexBuffer() = default;
+
+    /**
+     * Address: 0x008F5690
+     *
+     * What it does:
+     * Reinstalls the abstract vertex-buffer vtable (`mov [ecx], 0x00D42F08;
+     * ret`). Both backend destructors inline it; this out-of-line copy is for
+     * their unwind paths, and IDA never boxed it as a function.
+     */
+    VertexBuffer::~VertexBuffer() = default;
 
     /**
      * Address: 0x009405F0 (FUN_009405F0)
@@ -769,6 +780,18 @@ namespace gpg::gal
     IndexBufferContext::~IndexBufferContext() = default;
 
     /**
+     * Address: 0x00940660 (FUN_00940660, func_DeviceCreateIndexBuffer)
+     *
+     * What it does:
+     * Creates one index buffer on the active device through its slot 16
+     * (`[vtbl+0x40]`). Caller: `CD3DIndexSheet::CreateBuffer` (0x0043F737).
+     */
+    boost::shared_ptr<IndexBuffer> IndexBuffer::Create(const IndexBufferContext& context)
+    {
+        return Device::GetInstance()->CreateIndexBuffer(&context);
+    }
+
+    /**
      * Address: 0x008E77B0 (FUN_008E77B0, gpg::gal::OutputContextInit)
      *
      * What it does:
@@ -891,4 +914,29 @@ namespace gpg::gal
      * Restores vertex-buffer context vftable ownership and services deleting-destructor teardown.
      */
     VertexBufferContext::~VertexBufferContext() = default;
+
+    /**
+     * Address: 0x009408D0 (FUN_009408D0, func_CreateVertexBuffer)
+     *
+     * What it does:
+     * Creates one vertex buffer on the active device through its slot 15
+     * (`[vtbl+0x3C]`). Caller: `CD3DVertexStream::CreateBuffer` (0x0043FC20).
+     */
+    boost::shared_ptr<VertexBuffer> VertexBuffer::Create(const VertexBufferContext& context)
+    {
+        return Device::GetInstance()->CreateVertexBuffer(&context);
+    }
+
+    /**
+     * Address: 0x00940900 (FUN_00940900)
+     *
+     * What it does:
+     * Creates gal vertex format `formatCode` on the active device through its
+     * slot 14 (`[vtbl+0x38]`). Caller: `CD3DVertexFormat`'s constructor
+     * (0x0043CFE6).
+     */
+    boost::shared_ptr<VertexFormat> VertexFormat::Create(const std::uint32_t formatCode)
+    {
+        return Device::GetInstance()->CreateVertexFormat(formatCode);
+    }
 }

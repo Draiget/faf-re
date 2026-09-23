@@ -41,15 +41,10 @@ namespace gal {
     class TextureD3D10;
     class VertexBufferD3D10;
     class VertexFormatD3D10;
-
-    struct WeakRefCountedToken
-    {
-        void** vtable = nullptr;          // +0x00
-        volatile long strongCount;    // +0x04
-        volatile long weakCount;      // +0x08
-    };
-
-    static_assert(sizeof(WeakRefCountedToken) == 0x0C, "WeakRefCountedToken size must be 0x0C");
+    class IndexBuffer;
+    class PipelineState;
+    class VertexBuffer;
+    class VertexFormat;
 
     /**
      * VFTABLE: 0x00D4340C
@@ -131,15 +126,11 @@ namespace gal {
       /**
        * Address: 0x008FA220
        * Slot: 8
-       * Demangled: gpg::gal::DeviceD3D10::GetPipelineState
        *
        * What it does:
-       * Copies the retained pipeline-state shared handle lane (`this+0xB4/+0xB8`)
-       * into caller output.
+       * Returns the device's pipeline state.
        */
-      virtual boost::shared_ptr<PipelineStateD3D10>* GetPipelineState(
-          boost::shared_ptr<PipelineStateD3D10>* outPipelineState
-      );
+      virtual boost::shared_ptr<PipelineState> GetPipelineState();
       /**
        * Address: 0x008FEA00 (FUN_008FEA00)
        * Slot: 9
@@ -191,39 +182,27 @@ namespace gal {
       /**
        * Address: 0x008FE220 (FUN_008FE220)
        * Slot: 14
-       * Demangled: gpg::gal::DeviceD3D10::CreateVertexFormat
        *
        * What it does:
-       * Builds one input-layout declaration for the requested format token.
+       * Builds the input layout for gal vertex format `formatToken`.
        */
-      virtual boost::shared_ptr<VertexFormatD3D10>* CreateVertexFormat(
-          boost::shared_ptr<VertexFormatD3D10>* outVertexFormat,
-          std::uint32_t formatToken
-      );
+      virtual boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatToken);
       /**
        * Address: 0x008FB8D0 (FUN_008FB8D0)
        * Slot: 15
-       * Demangled: gpg::gal::DeviceD3D10::CreateVertexBuffer
        *
        * What it does:
-       * Creates one GPU vertex buffer plus staging/upload lanes from caller context.
+       * Creates one GPU vertex buffer and its staging buffer.
        */
-      virtual boost::shared_ptr<VertexBufferD3D10>* CreateVertexBuffer(
-          boost::shared_ptr<VertexBufferD3D10>* outVertexBuffer,
-          const VertexBufferContext* context
-      );
+      virtual boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context);
       /**
        * Address: 0x008FBB60 (FUN_008FBB60)
        * Slot: 16
-       * Demangled: gpg::gal::DeviceD3D10::CreateIndexBuffer
        *
        * What it does:
-       * Creates one GPU index buffer plus staging/upload lanes from caller context.
+       * Creates one GPU index buffer and its staging buffer.
        */
-      virtual boost::shared_ptr<IndexBufferD3D10>* CreateIndexBuffer(
-          boost::shared_ptr<IndexBufferD3D10>* outIndexBuffer,
-          const IndexBufferContext* context
-      );
+      virtual boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context);
       /**
        * Address: 0x008FC540
        * Slot: 17
@@ -477,39 +456,32 @@ namespace gal {
       /**
        * Address: 0x008F9600
        * Slot: 40
-       * Demangled: gpg::gal::DeviceD3D10::SetVertexDeclaration
        *
        * What it does:
-       * Validates one vertex-format declaration handle, binds it on the native
-       * device, then releases the previous weak-ref token when provided.
+       * Binds `vertexFormat`'s input layout.
        */
-      virtual int SetVertexDeclaration(VertexFormatD3D10* vertexFormat, WeakRefCountedToken* previousFormatRef);
+      virtual void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat);
       /**
        * Address: 0x008F9690
        * Slot: 41
-       * Demangled: gpg::gal::DeviceD3D10::Func15
        *
        * What it does:
-       * Binds one vertex-buffer stream on the native device and updates the
-       * retained stream weak-ref lane.
+       * Binds one vertex stream and records its frequency.
        */
-      virtual WeakRefCountedToken* Func15(
+      virtual void SetVertexBuffer(
           std::uint32_t streamSlot,
-          VertexBufferD3D10* vertexBuffer,
-          WeakRefCountedToken* previousStreamRef,
-          WeakRefCountedToken* currentStreamRef,
-          int startVertexMultiplier
+          boost::shared_ptr<VertexBuffer> vertexBuffer,
+          int streamFrequencyToken,
+          int startVertex
       );
       /**
        * Address: 0x008F9760
        * Slot: 42
-       * Demangled: gpg::gal::DeviceD3D10::SetBufferIndices
        *
        * What it does:
-       * Binds one index buffer on the native device with recovered format token
-       * selection and releases the prior weak-ref token when provided.
+       * Binds `indexBuffer` as the index source.
        */
-      virtual int SetBufferIndices(IndexBufferD3D10* indexBuffer, WeakRefCountedToken* previousIndexRef);
+      virtual void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer);
       /**
        * Address: 0x008FE6D0
        * Slot: 43
@@ -696,9 +668,11 @@ namespace gal {
       ID3D10EffectTechnique* mRttTechnique = nullptr;                 // +0xCC  GetTechniqueByName("RTT")
       ID3D10Buffer* mRttQuadVertexBuffer = nullptr;                   // +0xD0
       ID3D10InputLayout* mRttInputLayout = nullptr;                   // +0xD4
-      // Not written by the constructor -- the stores skip +0xD8..+0x117 --
-      // and `Setup` clears all sixteen before anything reads them.
-      WeakRefCountedToken* mVertexStreams[16];                        // +0xD8  one binding per input slot
+      // The frequency `SetVertexBuffer` was last given for each input slot;
+      // the draws read slot 0's as the instance count. Not written by the
+      // constructor (its stores skip +0xD8..+0x117); `Setup` clears all
+      // sixteen before anything reads them.
+      std::int32_t mStreamFrequencies[16];                            // +0xD8
       OutputContext* mHeadOutputContexts = nullptr;                   // +0x118 new[]'d, one per head
       CursorD3D10 mCursor{};                                          // +0x11C
     };
@@ -716,7 +690,7 @@ namespace gal {
     static_assert(offsetof(DeviceD3D10, mDevice) == 0xC0, "DeviceD3D10::mDevice offset must be 0xC0");
     static_assert(offsetof(DeviceD3D10, mSignatureEffect) == 0xC4, "DeviceD3D10::mSignatureEffect offset must be 0xC4");
     static_assert(offsetof(DeviceD3D10, mRttInputLayout) == 0xD4, "DeviceD3D10::mRttInputLayout offset must be 0xD4");
-    static_assert(offsetof(DeviceD3D10, mVertexStreams) == 0xD8, "DeviceD3D10::mVertexStreams offset must be 0xD8");
+    static_assert(offsetof(DeviceD3D10, mStreamFrequencies) == 0xD8, "DeviceD3D10::mStreamFrequencies offset must be 0xD8");
     static_assert(offsetof(DeviceD3D10, mHeadOutputContexts) == 0x118, "DeviceD3D10::mHeadOutputContexts offset must be 0x118");
     static_assert(offsetof(DeviceD3D10, mCursor) == 0x11C, "DeviceD3D10::mCursor offset must be 0x11C");
     static_assert(sizeof(DeviceD3D10) == 0x128, "DeviceD3D10 size must be 0x128");

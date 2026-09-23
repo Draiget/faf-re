@@ -9,8 +9,8 @@
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
-#include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
-#include "gpg/gal/backends/d3d9/VertexBufferD3D9.hpp"
+#include "gpg/gal/IndexBuffer.hpp"
+#include "gpg/gal/VertexBuffer.hpp"
 
 namespace
 {
@@ -72,20 +72,20 @@ namespace moho
       return;
     }
 
-    device->CreateVertexFormat(&mGeometry.mVertexFormat, 1u);
+    mGeometry.mVertexFormat = device->CreateVertexFormat(1u);
 
     gpg::gal::VertexBufferContext vertexBufferContext{};
     vertexBufferContext.vertexCount_ = static_cast<std::uint32_t>(kUnitBoxVertices.size());
     vertexBufferContext.stride_ = sizeof(BoxVertex);
     vertexBufferContext.type_ = 1u;
     vertexBufferContext.usage_ = 1u;
-    device->CreateVertexBuffer(&mGeometry.mVertexBuffer, &vertexBufferContext);
+    mGeometry.mVertexBuffer = device->CreateVertexBuffer(&vertexBufferContext);
 
     gpg::gal::IndexBufferContext indexBufferContext{};
     indexBufferContext.size_ = static_cast<std::uint32_t>(kUnitBoxIndices.size());
     indexBufferContext.format_ = 1u;
     indexBufferContext.type_ = 1u;
-    device->CreateIndexBuffer(&mGeometry.mIndexBuffer, &indexBufferContext);
+    mGeometry.mIndexBuffer = device->CreateIndexBuffer(&indexBufferContext);
 
     if (mGeometry.mVertexBuffer) {
       void* const vertexStorage =

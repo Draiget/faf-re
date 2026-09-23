@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 
 namespace gpg::gal
@@ -14,7 +15,7 @@ namespace gpg::gal
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\VertexBufferD3D9.cpp
      */
-    class VertexBufferD3D9
+    class VertexBufferD3D9 : public VertexBuffer
     {
     public:
         /**
@@ -36,36 +37,40 @@ namespace gpg::gal
         VertexBufferD3D9(const VertexBufferContext* context, void* d3dVertexBuffer);
 
         /**
-         * Address: 0x008F58C0 (FUN_008F58C0)
+         * Address: 0x008F57B0 (FUN_008F57B0)
+         * Address: 0x008F58C0 (FUN_008F58C0, slot 0: the scalar deleting destructor)
          *
          * What it does:
-         * Owns the deleting-destructor thunk path for vertex-buffer wrappers.
+         * Releases the native vertex buffer and resets the context.
          */
-        virtual ~VertexBufferD3D9();
+        ~VertexBufferD3D9() override;
 
         /**
          * Address: 0x008F5700 (FUN_008F5700)
+         * Slot: 1
          *
          * What it does:
-         * Returns the embedded vertex-buffer context block at `this+0x04`.
+         * Returns the context the buffer was created from.
          */
-        virtual VertexBufferContext* GetContext();
+        VertexBufferContext* GetContext() override;
 
         /**
          * Address: 0x008F5950 (FUN_008F5950)
+         * Slot: 2
          *
          * What it does:
          * Locks the underlying D3D9 vertex buffer and returns mapped vertex data.
          */
-        virtual void* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags);
+        void* Lock(unsigned int offset, unsigned int size, MohoD3DLockFlags lockFlags) override;
 
         /**
          * Address: 0x008F5B40 (FUN_008F5B40)
+         * Slot: 3
          *
          * What it does:
          * Unlocks the underlying D3D9 vertex buffer and clears lock-tracking state.
          */
-        virtual HRESULT Unlock();
+        void Unlock() override;
 
         /**
          * Address: 0x008F5CE0 (FUN_008F5CE0, gpg::gal::VertexBufferD3D9::GetD3D)

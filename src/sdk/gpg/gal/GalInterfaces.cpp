@@ -17,15 +17,21 @@ namespace gpg::gal
    * Address: 0x009044C0 (FUN_009044C0, gpg::gal::VertexFormat::VertexFormat)
    *
    * What it does:
-   * Restores base vertex-format vtable ownership and clears three runtime
-   * state lanes used by derived backend wrappers.
+   * Installs the base vtable and empties the stride vector (its three
+   * pointers at +0x0C..+0x14). The format code is left for the backend.
    */
-  VertexFormat::VertexFormat()
-    : mReserved04{}
-    , mState0C(0)
-    , mState10(0)
-    , mState14(0)
-  {}
+  VertexFormat::VertexFormat() = default;
+
+  /**
+   * Address: 0x009041B0
+   *
+   * What it does:
+   * Reinstalls the base vtable and frees the stride vector. Both backend
+   * destructors inline it (0x0094AD03 on D3D9, 0x00904225 on D3D10); this
+   * out-of-line copy is for their unwind paths, and IDA never boxed it as a
+   * function.
+   */
+  VertexFormat::~VertexFormat() = default;
 
   /**
    * Address: 0x00903300 (FUN_00903300)
