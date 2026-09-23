@@ -69,14 +69,14 @@ SkyDome/WaterSurface, CMauiControl, CameraImpl and the virtual-destructor pass.
 ## What it found
 
 - `SkyDome`, `WaterSurface`, `HighFidelityWater`, `LowFidelityWater` — a missing
-  slot each (commit d2de354f).
+  slot each (commit 7f5846b1).
 - `CMauiControl` and its twelve subclasses — the whole 25-slot table permuted,
-  plus two members declared virtual that the engine does not (commit 4393556f).
+  plus two members declared virtual that the engine does not (commit 6bee07e7).
 - `CameraImpl` — all 44 slots permuted, a hand-written scalar-deleting
   destructor holding a slot of its own, and `CameraSetViewport` missing from the
-  table (commit f5c5a54a).
+  table (commit 09641e66).
 - Five base classes carrying a virtual destructor the engine has no slot for,
   displacing every method under it in them and in everything deriving from them
-  (commit b5fb4a97).
+  (commit 57dfcfe4).
 - `gpg::gal::DeviceD3D9` — 19 slots still not overridden; see
   `decomp/recovery/reports/by-source/src/sdk/gpg/gal/Device.reconstruction.md`.
