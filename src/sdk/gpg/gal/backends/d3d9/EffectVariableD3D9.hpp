@@ -12,7 +12,7 @@ namespace gpg::gal
     class CubeRenderTarget;
     class EffectD3D9;
     class RenderTarget;
-    class TextureD3D9;
+    class Texture;
 
     /**
      * VFTABLE: 0x00D47E94
@@ -77,7 +77,7 @@ namespace gpg::gal
          * What it does:
          * Binds a texture wrapper lane (2D/volume/cube) to the backing D3DX effect parameter.
          */
-        virtual void SetTexture(boost::shared_ptr<TextureD3D9> texture);
+        virtual void SetTexture(boost::shared_ptr<Texture> texture);
 
         /**
          * Address: 0x00943E10 (FUN_00943E10)

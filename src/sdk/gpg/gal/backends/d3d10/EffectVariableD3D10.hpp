@@ -10,7 +10,7 @@ namespace gpg::gal
 {
     class CubeRenderTargetD3D10;
     class RenderTargetD3D10;
-    class TextureD3D10;
+    class Texture;
 
     /**
      * VFTABLE: 0x00D488DC
@@ -71,7 +71,7 @@ namespace gpg::gal
          * What it does:
          * Binds a texture shader-resource view into this effect slot.
          */
-        virtual void SetTexture(boost::shared_ptr<TextureD3D10> texture);
+        virtual void SetTexture(boost::shared_ptr<Texture> texture);
 
         /**
          * Address: 0x0094C9B0 (FUN_0094C9B0)

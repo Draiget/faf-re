@@ -19,7 +19,7 @@ namespace gpg::gal
   class Effect;
   class EffectTechnique;
   class EffectTechniqueD3D9;
-  class TextureD3D9;
+  class Texture;
   class IndexBufferD3D9;
   class VertexBufferD3D9;
 }
@@ -387,22 +387,22 @@ namespace moho
     // bind them directly to EffectVariableD3D9::SetTexture, which takes a
     // shared_ptr<TextureD3D9>). They are GAL texture handles, not the owning
     // resource wrappers.
-    boost::shared_ptr<gpg::gal::TextureD3D9> mHorizonLookupTex;    // +0x1B0
+    boost::shared_ptr<gpg::gal::Texture> mHorizonLookupTex;    // +0x1B0
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf1;  // +0x1B8
     boost::shared_ptr<gpg::gal::IndexBufferD3D9> mDecalIndexBuf;   // +0x1C0
     bool mNeedsRebuild = true;                                     // +0x1C8
     std::uint8_t mPad1C9[0x03];                                    // +0x1C9
-    boost::shared_ptr<gpg::gal::TextureD3D9> mAtmosphereTex;       // +0x1CC (decal albedo lane)
-    boost::shared_ptr<gpg::gal::TextureD3D9> mAtmosphereTex2;      // +0x1D4 (decal glow lane)
+    boost::shared_ptr<gpg::gal::Texture> mAtmosphereTex;       // +0x1CC (decal albedo lane)
+    boost::shared_ptr<gpg::gal::Texture> mAtmosphereTex2;      // +0x1D4 (decal glow lane)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat1;             // +0x1DC
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf2;  // +0x1E4
-    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex1;           // +0x1EC (cumulus light ramp)
-    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex2;           // +0x1F4 (cumulus dispersion ramp)
-    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTex3;           // +0x1FC (cumulus texture)
+    boost::shared_ptr<gpg::gal::Texture> mDecalTex1;           // +0x1EC (cumulus light ramp)
+    boost::shared_ptr<gpg::gal::Texture> mDecalTex2;           // +0x1F4 (cumulus dispersion ramp)
+    boost::shared_ptr<gpg::gal::Texture> mDecalTex3;           // +0x1FC (cumulus texture)
     boost::shared_ptr<CD3DVertexFormat> mDecalFormat2;             // +0x204
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mDecalVertBuf3;  // +0x20C
-    boost::shared_ptr<gpg::gal::TextureD3D9> mCirrusTex;           // +0x214
-    boost::shared_ptr<gpg::gal::TextureD3D9> mCloudsTexture;       // +0x21C
+    boost::shared_ptr<gpg::gal::Texture> mCirrusTex;           // +0x214
+    boost::shared_ptr<gpg::gal::Texture> mCloudsTexture;       // +0x21C
   };
 
   static_assert(offsetof(SkyDome, mWatcherFlags) == 0x04, "SkyDome::mWatcherFlags offset must be 0x04");

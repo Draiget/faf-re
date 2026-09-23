@@ -298,7 +298,6 @@ namespace { // TEMPORARY PROBE (do not commit)
         using query_get_data_fn = HRESULT(__stdcall*)(void*, void*, unsigned int, unsigned int);
         using texture_get_level_desc_fn = HRESULT(__stdcall*)(void*, unsigned int, void*);
         using texture_get_level_count_fn = unsigned int(__stdcall*)(void*);
-        using texture_virtual_unlock_fn = HRESULT(__thiscall*)(TextureD3D9*, int);
         using d3d9_check_device_format_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, unsigned int, unsigned int, std::uint32_t);
         using d3d9_check_device_multisample_type_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, std::uint32_t, int, unsigned int, unsigned int*);
         using d3d9_get_adapter_identifier_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void*);
@@ -7001,54 +7000,14 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008E92A0 (FUN_008E92A0, boost::detail::shared_count_TextureD3D9::shared_count_TextureD3D9)
-     *
-     * What it does:
-     * Allocates one 0x10-byte `sp_counted_impl_p<TextureD3D9>` control
-     * block, publishes its vtable, sets use/weak count to one, and stores
-     * the owned raw pointer - the control-block half of constructing one
-     * `shared_ptr<TextureD3D9>`.
-     */
-    boost::detail::shared_count* ConstructSharedCountTextureD3D9FromRaw(
-        boost::detail::shared_count* const outCount,
-        TextureD3D9* const texture
-    )
-    {
-        return boost::ConstructSharedCountFromRaw(outCount, texture);
-    }
-
-    /**
-     * Address: 0x008E9CF0 (FUN_008E9CF0, boost::shared_ptr_TextureD3D9::shared_ptr_TextureD3D9)
-     *
-     * What it does:
-     * Constructs one `boost::shared_ptr<TextureD3D9>` in caller-provided storage
-     * from a raw texture pointer. FUN_008E9CF0's own disassembly publishes
-     * `px` ("tex") first, then builds the control block through one
-     * discrete `shared_count(T*)` call (FUN_008E92A0 above - a real,
-     * separately-emitted call, not inlined) before a no-op
-     * `sp_enable_shared_from_this` (`TextureD3D9` does not derive from
-     * `enable_shared_from_this`); reproduced explicitly here instead of
-     * relying on boost's own converting constructor.
-     */
-    [[nodiscard]] boost::shared_ptr<TextureD3D9>* ConstructTextureSharedFromRaw(
-        boost::shared_ptr<TextureD3D9>* const outTexture,
-        TextureD3D9* const texture
-    )
-    {
-        return boost::ConstructSharedFromRawViaCountCtor(outTexture, texture, ConstructSharedCountTextureD3D9FromRaw);
-    }
-
-    /**
      * Address: 0x008EACC0 (FUN_008EACC0)
      *
-     * boost::shared_ptr<gpg::gal::TextureD3D9> *,gpg::gal::TextureContext const *
-     *
      * What it does:
-     * Creates one D3D9 texture from memory/context source lanes, normalizes the
-     * resulting texture-context metadata, and returns wrapped shared ownership.
+     * Creates one D3D9 texture - empty at the context's size and format, or
+     * decoded from in-memory file data as a 2D, cube or volume texture - and
+     * wraps it in a `TextureD3D9` whose context records what was built.
      */
-    boost::shared_ptr<TextureD3D9>*
-    DeviceD3D9::CreateTexture(boost::shared_ptr<TextureD3D9>* const outTexture, const TextureContext* const context)
+    boost::shared_ptr<Texture> DeviceD3D9::CreateTexture(const TextureContext* const context)
     {
         Func1();
 
@@ -7249,8 +7208,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 493, "invalid source specified for texture data");
         }
 
-        TextureD3D9* const texture = new TextureD3D9(&textureContext, nativeTexture);
-        return ConstructTextureSharedFromRaw(outTexture, texture);
+        return boost::shared_ptr<Texture>(new TextureD3D9(&textureContext, nativeTexture));
     }
 
     /**
@@ -7458,7 +7416,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void DeviceD3D9::GetRenderTargetData(
         const boost::shared_ptr<RenderTarget>& source,
-        const boost::shared_ptr<TextureD3D9>& destination
+        const boost::shared_ptr<Texture>& destination
     )
     {
         Func1();
@@ -7477,7 +7435,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         ComObjectScope destinationSurface{};
         const HRESULT getSurfaceResult =
-            InvokeGetSurfaceLevel(destination->GetTexture1(), 0U, destinationSurface.out());
+            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(destination.get())->GetTexture1(), 0U, destinationSurface.out());
         if (getSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 656, getSurfaceResult);
@@ -7533,33 +7491,33 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EBF70 (FUN_008EBF70)
      *
-     * gpg::gal::TextureD3D9 **,gpg::gal::TextureD3D9 **,void const *,void const *
-     *
      * What it does:
-     * Resolves level-0 source/destination texture surfaces then copies source
-     * texels into destination via `D3DXLoadSurfaceFromSurface`.
+     * Resolves both textures' level-0 surfaces and copies the source region
+     * into the destination region with `D3DXLoadSurfaceFromSurface`; null
+     * rects mean the whole surface.
      */
     void DeviceD3D9::UpdateSurface(
-        TextureD3D9** const sourceTexture,
-        TextureD3D9** const destinationTexture,
-        const void* const sourceRect,
-        const void* const destinationRect
+        const boost::shared_ptr<Texture>& source,
+        const boost::shared_ptr<Texture>& destination,
+        const RECT* const sourceRect,
+        const RECT* const destinationRect
     )
     {
         Func1();
 
-        if (*sourceTexture == nullptr)
+        if (source.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 592, "Missing source texture");
         }
 
-        if (*destinationTexture == nullptr)
+        if (destination.get() == nullptr)
         {
             ThrowGalError("DeviceD3D9.cpp", 593, "Missing dest   texture");
         }
 
         ComObjectScope sourceSurface{};
-        const HRESULT getSourceSurfaceResult = InvokeGetSurfaceLevel((*sourceTexture)->GetTexture1(), 0U, sourceSurface.out());
+        const HRESULT getSourceSurfaceResult =
+            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(source.get())->GetTexture1(), 0U, sourceSurface.out());
         if (getSourceSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 599, getSourceSurfaceResult);
@@ -7567,7 +7525,7 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         ComObjectScope destinationSurface{};
         const HRESULT getDestinationSurfaceResult =
-            InvokeGetSurfaceLevel((*destinationTexture)->GetTexture1(), 0U, destinationSurface.out());
+            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(destination.get())->GetTexture1(), 0U, destinationSurface.out());
         if (getDestinationSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 605, getDestinationSurfaceResult);
@@ -7575,9 +7533,9 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         const HRESULT copyResult = InvokeD3DXLoadSurfaceFromSurface(
             destinationSurface.get(),
-            reinterpret_cast<const RECT*>(destinationRect),
+            destinationRect,
             sourceSurface.get(),
-            reinterpret_cast<const RECT*>(sourceRect),
+            sourceRect,
             0xFFFFFFFFU,
             0U
         );
@@ -7671,29 +7629,29 @@ namespace { // TEMPORARY PROBE (do not commit)
     /**
      * Address: 0x008EC6A0 (FUN_008EC6A0)
      *
-     * gpg::gal::TextureD3D9 **,msvc8::string const &,int,gpg::MemBuffer<char> *
-     *
      * What it does:
-     * Saves one texture surface either to file or caller memory buffer depending on
-     * whether `outBuffer` is non-null.
+     * Encodes one texture's level-0 surface in image format `fileFormat`:
+     * into `outBuffer` through a D3DX buffer when it is non-null, otherwise
+     * to `filePath`.
      */
-    void DeviceD3D9::Func5(
-        TextureD3D9** const texture,
+    void DeviceD3D9::SaveTexture(
+        const boost::shared_ptr<Texture>& texture,
         const msvc8::string& filePath,
-        const int fileFormatToken,
+        const int fileFormat,
         gpg::MemBuffer<char>* const outBuffer
     )
     {
         Func1();
 
         ComObjectScope sourceSurface{};
-        const HRESULT getSurfaceResult = InvokeGetSurfaceLevel((*texture)->GetTexture1(), 0U, sourceSurface.out());
+        const HRESULT getSurfaceResult =
+            InvokeGetSurfaceLevel(static_cast<TextureD3D9*>(texture.get())->GetTexture1(), 0U, sourceSurface.out());
         if (getSurfaceResult < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 681, getSurfaceResult);
         }
 
-        const unsigned int fileFormat = MapImageFormatTokenToD3DX(fileFormatToken);
+        const unsigned int d3dxFileFormat = MapImageFormatTokenToD3DX(fileFormat);
         HRESULT saveResult = 0;
 
         if (outBuffer != nullptr)
@@ -7705,7 +7663,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 ThrowGalErrorFromHresult("DeviceD3D9.cpp", 690, createBufferResult);
             }
 
-            saveResult = InvokeD3DXSaveSurfaceToFileInMemoryEx(fileBuffer.out(), fileFormat, sourceSurface.get());
+            saveResult = InvokeD3DXSaveSurfaceToFileInMemoryEx(fileBuffer.out(), d3dxFileFormat, sourceSurface.get());
             if (saveResult >= 0)
             {
                 const unsigned int serializedSize = GetD3DXBufferSize(fileBuffer.get());
@@ -7722,7 +7680,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
         else
         {
-            saveResult = InvokeD3DXSaveSurfaceToFileA(GetStringDataRaw(filePath), fileFormat, sourceSurface.get());
+            saveResult = InvokeD3DXSaveSurfaceToFileA(GetStringDataRaw(filePath), d3dxFileFormat, sourceSurface.get());
         }
 
         if (saveResult < 0)
@@ -8078,7 +8036,7 @@ namespace { // TEMPORARY PROBE (do not commit)
     {
         Func1();
 
-        auto* const cursorTexture = reinterpret_cast<TextureD3D9*>(context->pixelSource_);
+        auto* const cursorTexture = static_cast<TextureD3D9*>(context->texture_.get());
         ComObjectScope cursorSurface{};
         const HRESULT getSurfaceResult = InvokeGetSurfaceLevel(cursorTexture->GetTexture1(), 0U, cursorSurface.out());
         if (getSurfaceResult < 0)
@@ -9211,21 +9169,22 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Binds a texture wrapper lane (2D/volume/cube) to the backing D3DX effect parameter.
      */
-    void EffectVariableD3D9::SetTexture(boost::shared_ptr<TextureD3D9> texture)
+    void EffectVariableD3D9::SetTexture(const boost::shared_ptr<Texture> texture)
     {
         boost::shared_ptr<EffectD3D9> effect = LockEffectVariableOrThrow(effect_, 151);
         void* textureHandle = nullptr;
 
         if (texture)
         {
-            textureHandle = texture->GetTexture1();
+            auto* const textureD3D9 = static_cast<TextureD3D9*>(texture.get());
+            textureHandle = textureD3D9->GetTexture1();
             if (textureHandle == nullptr)
             {
-                textureHandle = texture->GetTexture2();
+                textureHandle = textureD3D9->GetTexture2();
             }
             if (textureHandle == nullptr)
             {
-                textureHandle = texture->GetTexture3();
+                textureHandle = textureD3D9->GetTexture3();
             }
         }
 
@@ -10276,9 +10235,11 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094A150 (FUN_0094A150)
      *
      * What it does:
-     * Locks texture level/rect range and returns mapped pitch/data in caller output.
+     * Locks one level of the 2D texture and returns the mapping. The caller's
+     * rect is always copied; an empty one (`left == right`, the
+     * `sub/neg/sbb/and` at 0x0094A341) locks the whole level.
      */
-    TextureLockRect* TextureD3D9::Lock(TextureLockRect* const outRect, const int level, const RECT* const rect, const int flags)
+    TextureLockRect TextureD3D9::Lock(const int level, const RECT& rect, const int flags)
     {
         if (texture_ == nullptr)
         {
@@ -10306,13 +10267,8 @@ namespace { // TEMPORARY PROBE (do not commit)
             void* bits;
         } lockedRect{};
 
-        RECT copiedRect{};
-        const RECT* d3dRect = nullptr;
-        if (rect != nullptr)
-        {
-            copiedRect = *rect;
-            d3dRect = (copiedRect.right != copiedRect.left) ? &copiedRect : nullptr;
-        }
+        RECT copiedRect = rect;
+        const RECT* const d3dRect = (copiedRect.left != copiedRect.right) ? &copiedRect : nullptr;
 
         const HRESULT result = InvokeLockRect(
             texture_,
@@ -10327,12 +10283,13 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         level_ = level;
-        outRect->level = level;
-        outRect->flags = flags;
-        outRect->bits = lockedRect.bits;
+        TextureLockRect lock{};
+        lock.flags = flags;
+        lock.level = level;
+        lock.pitch = lockedRect.pitch;
+        lock.bits = lockedRect.bits;
         locking_ = true;
-        outRect->pitch = lockedRect.pitch;
-        return outRect;
+        return lock;
     }
 
     /**
@@ -10341,7 +10298,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Unlocks the active texture level and clears lock-tracking state.
      */
-    HRESULT TextureD3D9::Unlock(const int level)
+    int TextureD3D9::Unlock(const int level)
     {
         if (texture_ == nullptr)
         {
@@ -10374,17 +10331,12 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x0094A090 (FUN_0094A090)
      *
      * What it does:
-     * Forwards to vtable-slot unlock path using the second stack argument.
+     * Releases one mapping by unlocking its level - a virtual call to slot 3
+     * (`mov eax,[ecx]; call [eax+0xC]`), `ret 0x10` for the by-value rect.
      */
-    int TextureD3D9::Func1(const int arg1, const int level, const int arg3, const int arg4)
+    int TextureD3D9::Unlock(const TextureLockRect lock)
     {
-        static_cast<void>(arg1);
-        static_cast<void>(arg3);
-        static_cast<void>(arg4);
-
-        auto** const vtable = *reinterpret_cast<void***>(this);
-        auto* const thunk = reinterpret_cast<texture_virtual_unlock_fn>(vtable[3]);
-        return thunk(this, level);
+        return Unlock(lock.level);
     }
 
     /**

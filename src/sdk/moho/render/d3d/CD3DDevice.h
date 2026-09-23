@@ -18,7 +18,6 @@ namespace gpg::gal
   class DeviceD3D9;
   class DeviceContext;
   class TextureContext;
-  class TextureD3D9;
 } // namespace gpg::gal
 
 namespace Wm3
@@ -793,18 +792,6 @@ namespace moho
    * Returns the global D3D device owner used by startup/render paths.
    */
   CD3DDevice* D3D_GetDevice();
-
-  /**
-   * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
-   *
-   * What it does:
-   * Pulls the active GAL device singleton and forwards one texture-create
-   * request into its virtual `CreateTexture` lane.
-   */
-  boost::shared_ptr<gpg::gal::TextureD3D9>& CreateTextureOnActiveDevice(
-    boost::shared_ptr<gpg::gal::TextureD3D9>& outTexture,
-    const gpg::gal::TextureContext& context
-  );
 
   /**
    * Address: 0x004305F0 (FUN_004305F0, ?REN_Init@Moho@@YAXXZ)

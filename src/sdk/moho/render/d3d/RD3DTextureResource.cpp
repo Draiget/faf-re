@@ -136,9 +136,7 @@ namespace moho
     }
 
     try {
-      TextureHandle createdTexture{};
-      (void)CreateTextureOnActiveDevice(createdTexture, mContext);
-      mBaseTex = createdTexture;
+      mBaseTex = gpg::gal::Texture::Create(mContext);
       mContext.ClearDataBuffer();
       return mBaseTex.get() != nullptr;
     } catch (...) {

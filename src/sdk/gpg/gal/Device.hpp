@@ -6,6 +6,7 @@
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/Texture.hpp"
 #include "legacy/containers/String.h"
 
 namespace gpg::gal
@@ -15,6 +16,7 @@ namespace gpg::gal
   class DepthStencilTargetContext;
   class DeviceContext;
   class RenderTargetContext;
+  class TextureContext;
   class Effect;
   class CursorContext;
   class EffectContext;
@@ -41,9 +43,8 @@ namespace gpg::gal
    * method at each of those positions, but a different name/signature does not
    * override - the compiler appends the backend method past this class's 50
    * slots, and the placeholder stays at the indexed slot. The slots still
-   * written that way are 5, 8, 10, 14-17, 19, 22, 32 and 40-42; slots 6-7,
-   * 11-13, 18, 20-21 and 23-24 carry their real signatures and `DeviceD3D9`
-   * overrides them.
+   * written that way are 5, 8, 14-16, 32 and 40-42; slots 6-7, 10-13 and
+   * 17-24 carry their real signatures and `DeviceD3D9` overrides them.
    *
    * That is inert for a normal `deviceD3D9->Method()` call (it binds to the
    * appended slot and reaches the right body) but fatal two ways for anything
@@ -63,9 +64,8 @@ namespace gpg::gal
    * The full repair is to give every `purecallN` its real signature so the
    * backend genuinely overrides and the vtable is 50 entries again. Each slot
    * needs its resource type's gal interface first, since the base cannot name
-   * backend types: the render targets have theirs (`RenderTarget`,
-   * `CubeRenderTarget`, `DepthStencilTarget`); `Texture`, the buffers, the
-   * vertex format and the pipeline state are still skeletons.
+   * backend types: the render targets and `Texture` have theirs; the
+   * buffers, the vertex format and the pipeline state are still skeletons.
    *
    * `DeviceD3D10` does not derive from this class at all, so it is unaffected.
    */
@@ -216,11 +216,14 @@ namespace gpg::gal
       EffectContext* context
     );
     /**
-     * Address: 0x00A82547
-     * Slot: 10
-     * Demangled: _purecall
+     * Slot: 10 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Creates one texture from `context` (in-memory file data, or an empty
+     * texture of a given size and format). `Texture::Create` (0x008E7C50)
+     * dispatches it.
      */
-    virtual void purecall10() {}
+    virtual boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) = 0;
     /**
      * Slot: 11 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -263,11 +266,15 @@ namespace gpg::gal
      */
     virtual void purecall16() {}
     /**
-     * Address: 0x00A82547
-     * Slot: 17
-     * Demangled: _purecall
+     * Slot: 17 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Reads one colour target back into a texture.
      */
-    virtual void purecall17() {}
+    virtual void GetRenderTargetData(
+      const boost::shared_ptr<RenderTarget>& source,
+      const boost::shared_ptr<Texture>& destination
+    ) = 0;
     /**
      * Slot: 18 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -284,11 +291,18 @@ namespace gpg::gal
       const RECT* destinationRect
     ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 19
-     * Demangled: _purecall
+     * Slot: 19 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Copies a rectangle of one texture's top level into another; null rects
+     * mean the whole surface.
      */
-    virtual void purecall19() {}
+    virtual void UpdateSurface(
+      const boost::shared_ptr<Texture>& source,
+      const boost::shared_ptr<Texture>& destination,
+      const RECT* sourceRect,
+      const RECT* destinationRect
+    ) = 0;
     /**
      * Slot: 20 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -312,11 +326,18 @@ namespace gpg::gal
       int fileFormat
     ) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 22
-     * Demangled: _purecall
+     * Slot: 22 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Encodes one texture in image format `fileFormat`, into `outBuffer`
+     * when it is non-null and to `filePath` otherwise.
      */
-    virtual void purecall22() {}
+    virtual void SaveTexture(
+      const boost::shared_ptr<Texture>& texture,
+      const msvc8::string& filePath,
+      int fileFormat,
+      gpg::MemBuffer<char>* outBuffer
+    ) = 0;
     /**
      * Address: 0x00A82547 (_purecall in the base's own table)
      * Slot: 23

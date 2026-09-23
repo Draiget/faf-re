@@ -71419,15 +71419,14 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
 
   // Save the accumulated sheet's texture to file. The binary reads the sheet's
   // retained texture handle (ID3DTextureSheet::GetTexture) and forwards it to
-  // the GAL backend's texture-save lane (DeviceD3D9::Func5) with the default
+  // the GAL backend's texture-save slot (Device::SaveTexture) with the default
   // image format and no in-memory output buffer. A GAL error is caught and
   // reported rather than propagated, matching the binary's inline EH funclet.
   if (device9 != nullptr) {
-    boost::shared_ptr<gpg::gal::TextureD3D9> texture{};
+    boost::shared_ptr<gpg::gal::Texture> texture{};
     dumpSheet->GetTexture(texture);
     try {
-      gpg::gal::TextureD3D9* rawTexture = texture.get();
-      device9->Func5(&rawTexture, dest, 0, nullptr);
+      device9->SaveTexture(texture, dest, 0, nullptr);
     } catch (const std::exception& error) {
       gpg::Warnf("Error saving file %s: %s", dest.c_str(), error.what());
     }
@@ -74121,14 +74120,13 @@ void moho::WRenViewport::TransformTerrainNormals()
       device->GetResources()->Func10(sheet, target, sheet);
       gpg::gal::DeviceD3D9* const dev9 = device->GetDeviceD3D9();
       if (dev9 != nullptr && sheet) {
-        boost::shared_ptr<gpg::gal::TextureD3D9> tex{};
+        boost::shared_ptr<gpg::gal::Texture> tex{};
         sheet->GetTexture(tex);
         const msvc8::string dest = gpg::STR_Printf(
           "C:\\ProgramData\\FAForever\\bin\\framedump\\BASIS_%s.bmp",
           (which == 0) ? "secondary_normals" : "primary_basis");
         try {
-          gpg::gal::TextureD3D9* raw = tex.get();
-          dev9->Func5(&raw, dest, 0, nullptr);
+          dev9->SaveTexture(tex, dest, 0, nullptr);
           gpg::Warnf("[BASISDIAG] dumped %s", dest.c_str());
         } catch (const std::exception& e) {
           gpg::Warnf("[BASISDIAG] dump failed: %s", e.what());

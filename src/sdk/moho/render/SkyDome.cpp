@@ -551,7 +551,7 @@ void SkyDome::Destroy()
     // its base GAL texture into the destination lane. Path -> lane mapping is
     // taken verbatim from the store offsets in FUN_00817850.
     const auto loadTexture =
-      [&](const msvc8::string& path, boost::shared_ptr<gpg::gal::TextureD3D9>& lane) {
+      [&](const msvc8::string& path, boost::shared_ptr<gpg::gal::Texture>& lane) {
         ID3DDeviceResources::TextureResourceHandle textureResource;
         resources->GetTexture(textureResource, path.c_str(), watcher, true);
         textureResource->GetTexture(lane);

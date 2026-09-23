@@ -139,15 +139,12 @@ namespace gal {
       /**
        * Address: 0x008EACC0 (FUN_008EACC0)
        * Slot: 10
-       * Demangled: gpg::gal::DeviceD3D9::CreateTexture
        *
        * What it does:
-       * Creates one D3D9 texture from context source lanes and returns wrapped ownership.
+       * Creates one D3D9 texture (empty, or decoded from in-memory file data)
+       * and wraps it in a `TextureD3D9`.
        */
-      virtual boost::shared_ptr<TextureD3D9>* CreateTexture(
-          boost::shared_ptr<TextureD3D9>* outTexture,
-          const TextureContext* context
-       );
+      boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
       /**
        * Address: 0x008EB610 (FUN_008EB610)
        * Slot: 11
@@ -222,10 +219,10 @@ namespace gal {
        * `IDirect3DDevice9::GetRenderTargetData` from the target's surface
        * into level 0 of `destination`.
        */
-      virtual void GetRenderTargetData(
+      void GetRenderTargetData(
           const boost::shared_ptr<RenderTarget>& source,
-          const boost::shared_ptr<TextureD3D9>& destination
-       );
+          const boost::shared_ptr<Texture>& destination
+       ) override;
       /**
        * Address: 0x008EC250 (FUN_008EC250)
        * Slot: 18
@@ -242,17 +239,17 @@ namespace gal {
       /**
        * Address: 0x008EBF70 (FUN_008EBF70)
        * Slot: 19
-       * Demangled: gpg::gal::DeviceD3D9::UpdateSurface
        *
        * What it does:
-       * Copies level-0 source texture surface data into the destination texture.
+       * Copies a region of one texture's level 0 into another through
+       * `D3DXLoadSurfaceFromSurface`.
        */
-      virtual void UpdateSurface(
-          TextureD3D9** sourceTexture,
-          TextureD3D9** destinationTexture,
-          const void* sourceRect,
-          const void* destinationRect
-       );
+      void UpdateSurface(
+          const boost::shared_ptr<Texture>& source,
+          const boost::shared_ptr<Texture>& destination,
+          const RECT* sourceRect,
+          const RECT* destinationRect
+       ) override;
       /**
        * Address: 0x008ECB50 (FUN_008ECB50)
        * Slot: 20
@@ -280,17 +277,17 @@ namespace gal {
       /**
        * Address: 0x008EC6A0 (FUN_008EC6A0)
        * Slot: 22
-       * Demangled: gpg::gal::DeviceD3D9::Func5
        *
        * What it does:
-       * Saves one texture surface either to file or to caller memory buffer.
+       * Encodes one texture's level 0 to `filePath`, or into `outBuffer` when
+       * it is non-null.
        */
-      virtual void Func5(
-          TextureD3D9** texture,
+      void SaveTexture(
+          const boost::shared_ptr<Texture>& texture,
           const msvc8::string& filePath,
-          int fileFormatToken,
+          int fileFormat,
           gpg::MemBuffer<char>* outBuffer
-       );
+       ) override;
       /**
        * Address: 0x008ECD20 (FUN_008ECD20)
        * Slot: 23

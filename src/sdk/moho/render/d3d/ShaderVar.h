@@ -11,7 +11,7 @@
 namespace gpg::gal
 {
   class EffectVariableD3D9;
-  class TextureD3D9;
+  class Texture;
 } // namespace gpg::gal
 
 namespace moho

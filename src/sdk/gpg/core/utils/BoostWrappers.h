@@ -618,6 +618,8 @@ namespace boost
      * Address: 0x008FA430 (FUN_008FA430, shared_ptr<RenderTarget>(RenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008FA460 (FUN_008FA460, shared_ptr<CubeRenderTarget>(CubeRenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008FA490 (FUN_008FA490, shared_ptr<DepthStencilTarget>(DepthStencilTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008E9CF0 (FUN_008E9CF0, shared_ptr<Texture>(TextureD3D9*) - `DeviceD3D9::CreateTexture` calls it at 0x008EB5CB; formerly in D3D9Interfaces.cpp)
+     * Address: 0x008FA400 (FUN_008FA400, shared_ptr<Texture>(TextureD3D10*), formerly in D3D10Interfaces.cpp)
      *
      * What it does:
      * Constructs one `boost::shared_ptr<T>` from a raw pointee in caller-provided storage.
@@ -804,6 +806,8 @@ namespace boost
      * Address: 0x008F9B90 (FUN_008F9B90, shared_count(RenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008F9C20 (FUN_008F9C20, shared_count(CubeRenderTargetD3D10*), formerly in D3D10Interfaces.cpp)
      * Address: 0x008F9CB0 (FUN_008F9CB0, shared_count(DepthStencilTargetD3D10*), formerly in D3D10Interfaces.cpp)
+     * Address: 0x008E92A0 (FUN_008E92A0, shared_count(TextureD3D9*), formerly in D3D9Interfaces.cpp)
+     * Address: 0x008F9B00 (FUN_008F9B00, shared_count(TextureD3D10*) - `DeviceD3D10::CreateTexture` calls it at 0x008FB082; formerly in D3D10Interfaces.cpp)
      *
      * `boost::checked_delete<Y>` as that catch path emits it for the D3D10
      * backend types (`if (p) p->~Y()` through the deleting destructor,

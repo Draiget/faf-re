@@ -5656,7 +5656,7 @@ namespace moho
     }
     if (!meshEnvironmentTex) {
       resources->GetTexture(meshEnvironmentTex, meshEnvironment.mCubeMapPath.c_str(), 0, true);
-      { ID3DTextureSheet::TextureHandle h{}; if (meshEnvironmentTex) { meshEnvironmentTex->GetTexture(h); } gpg::Warnf("[ENVDIAG] cube path='%s' res=%p tex=%p native1=%p native3=%p", meshEnvironment.mCubeMapPath.c_str(), static_cast<void*>(meshEnvironmentTex.get()), static_cast<void*>(h.get()), h ? h->GetTexture1() : nullptr, h ? h->GetTexture3() : nullptr); } // TEMPORARY PROBE (do not commit)
+      { ID3DTextureSheet::TextureHandle h{}; if (meshEnvironmentTex) { meshEnvironmentTex->GetTexture(h); } gpg::Warnf("[ENVDIAG] cube path='%s' res=%p tex=%p native1=%p native3=%p", meshEnvironment.mCubeMapPath.c_str(), static_cast<void*>(meshEnvironmentTex.get()), static_cast<void*>(h.get()), h ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() : nullptr, h ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture3() : nullptr); } // TEMPORARY PROBE (do not commit)
     }
     if (!anisotropiclookupTex) {
       resources->GetTexture(anisotropiclookupTex, "/textures/engine/anisotropiclookup.dds", 0, true);
@@ -6426,7 +6426,7 @@ namespace moho
               ++sDescBudget;
               ID3DTextureSheet::TextureHandle h{};
               material.mAlbedoSheet->GetTexture(h);
-              ProbeLogTextureDesc("unit-albedo", h ? h->GetTexture1() : nullptr);
+              ProbeLogTextureDesc("unit-albedo", h ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() : nullptr);
             }
           }
           gpg::Warnf("[TEXVARDIAG] exists env=%d albedo=%d spec=%d lookup=%d secondary=%d normals=%d | albedo=%p %dx%d spec=%p %dx%d normals=%p %dx%d tech=%s",

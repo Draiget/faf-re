@@ -15,6 +15,7 @@
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
+#include "gpg/gal/Texture.hpp"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 
@@ -155,16 +156,12 @@ namespace gal {
       /**
        * Address: 0x008FAD20 (FUN_008FAD20)
        * Slot: 10
-       * Demangled: gpg::gal::DeviceD3D10::CreateTexture
        *
        * What it does:
-       * Creates one texture resource from context source lanes and returns the wrapped
-       * texture + shader-resource-view payload.
+       * Creates one texture with its shader-resource view and wraps both in a
+       * `TextureD3D10`.
        */
-      virtual boost::shared_ptr<TextureD3D10>* CreateTexture(
-          boost::shared_ptr<TextureD3D10>* outTexture,
-          const TextureContext* context
-      );
+      virtual boost::shared_ptr<Texture> CreateTexture(const TextureContext* context);
       /**
        * Address: 0x008FB1D0 (FUN_008FB1D0)
        * Slot: 11
@@ -237,7 +234,7 @@ namespace gal {
        */
       virtual void GetRenderTargetData(
           const boost::shared_ptr<RenderTarget>& source,
-          const boost::shared_ptr<TextureD3D10>& destination
+          const boost::shared_ptr<Texture>& destination
       );
       /**
        * Address: 0x008FC290
@@ -256,17 +253,17 @@ namespace gal {
       /**
        * Address: 0x008FBDF0
        * Slot: 19
-       * Demangled: gpg::gal::DeviceD3D10::UpdateSurface
        *
        * What it does:
-       * If source/destination texture contexts match, dispatches native subresource
-       * copy; otherwise performs readback+rebuild fallback copy path.
+       * Copies directly when the two textures match in size and format;
+       * otherwise round-trips the source through an encoded blob. Only the
+       * destination rectangle's top-left corner is used.
        */
       virtual void UpdateSurface(
-          TextureD3D10** sourceTexture,
-          TextureD3D10** destinationTexture,
-          const void* sourceRect,
-          const void* destinationPoint
+          const boost::shared_ptr<Texture>& source,
+          const boost::shared_ptr<Texture>& destination,
+          const RECT* sourceRect,
+          const RECT* destinationRect
       );
       /**
        * Address: 0x008F8700
@@ -295,16 +292,15 @@ namespace gal {
       /**
        * Address: 0x008FC6B0
        * Slot: 22
-       * Demangled: gpg::gal::DeviceD3D10::Func5
        *
        * What it does:
-       * Saves one texture either to caller memory buffer or to file path depending
-       * on whether `outBuffer` is null.
+       * Encodes one texture to `filePath`, or into `outBuffer` when it is
+       * non-null.
        */
-      virtual void Func5(
-          TextureD3D10** texture,
+      virtual void SaveTexture(
+          const boost::shared_ptr<Texture>& texture,
           const msvc8::string& filePath,
-          int fileFormatToken,
+          int fileFormat,
           gpg::MemBuffer<char>* outBuffer
       );
       /**

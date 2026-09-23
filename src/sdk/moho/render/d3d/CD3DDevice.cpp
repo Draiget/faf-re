@@ -472,31 +472,6 @@ namespace
     runtime.mReaderWriterLocks2[headIndex].reset();
   }
 
-  /**
-   * Address: 0x0042E902 (FUN_0042E750 tail helper lane)
-   *
-   * What it does:
-   * Rebinds the device cursor context to one default-constructed state and
-   * releases the previous cursor-control shared lane.
-   */
-  void ResetCursorContextAfterDeviceDestroy(gpg::gal::CursorContext& cursorContext)
-  {
-    const gpg::gal::CursorContext resetContext{};
-    cursorContext.hotspotX_ = resetContext.hotspotX_;
-    cursorContext.hotspotY_ = resetContext.hotspotY_;
-    cursorContext.pixelSource_ = resetContext.pixelSource_;
-
-    if (resetContext.cursorControl_ != cursorContext.cursorControl_) {
-      if (resetContext.cursorControl_ != nullptr) {
-        resetContext.cursorControl_->add_ref_copy();
-      }
-      if (cursorContext.cursorControl_ != nullptr) {
-        cursorContext.cursorControl_->release();
-      }
-      cursorContext.cursorControl_ = resetContext.cursorControl_;
-    }
-  }
-
   class CD3DDeviceSingleton final : public moho::CD3DDevice
   {
   public:
@@ -626,7 +601,7 @@ namespace
         ::ShowWindow(static_cast<HWND>(head.mWindow), SW_SHOWNORMAL);
       }
 
-      if (runtime->mCursorContext.pixelSource_ != nullptr && device != nullptr) {
+      if (runtime->mCursorContext.texture_.get() != nullptr && device != nullptr) {
         device->SetCursor(&runtime->mCursorContext);
       }
 
@@ -673,7 +648,9 @@ namespace
         ReleaseHeadWriterLocks(*runtime, headIndex);
       }
 
-      ResetCursorContextAfterDeviceDestroy(runtime->mCursorContext);
+      // 0x0042E902: back to a default cursor - a temporary context,
+      // copy-assigned over the device's.
+      runtime->mCursorContext = gpg::gal::CursorContext();
 
       if (device != nullptr) {
         gpg::gal::Device::DestroyInstance();
@@ -996,10 +973,8 @@ namespace moho
         ID3DTextureSheet::TextureHandle sourceTexture{};
         sourceTextureSheet->GetTexture(sourceTexture);
 
-        gpg::gal::TextureD3D9* sourceRaw = sourceTexture.get();
-        gpg::gal::TextureD3D9* destinationRaw = destinationTexture.get();
-        if (sourceRaw != nullptr && destinationRaw != nullptr) {
-          device->UpdateSurface(&sourceRaw, &destinationRaw, nullptr, nullptr);
+        if (sourceTexture.get() != nullptr && destinationTexture.get() != nullptr) {
+          device->UpdateSurface(sourceTexture, destinationTexture, nullptr, nullptr);
         }
       }
     }
@@ -1014,46 +989,37 @@ namespace moho
   /**
    * Address: 0x0042EB40 (FUN_0042EB40)
    *
-   * int,int,boost::shared_ptr<moho::ID3DTextureSheet>
-   *
    * What it does:
-   * Resolves one cursor-pixel source payload, updates cursor context lanes, and
-   * forwards the resulting context to the active GAL device.
+   * Points the hardware cursor at the sheet's texture with the given hotspot
+   * and hands the context to the device (slot 31, `[vtbl+0x7C]` at
+   * 0x0042ECD5). The sheet's texture is fetched twice, once to test it and
+   * once to store it. A `gpg::gal::Error` - the only handler in the EH table
+   * (FuncInfo 0x00EDDF14) - is swallowed and reported as `false`.
    */
   bool CD3DDevice::SetCursor(
     const int hotspotX, const int hotspotY, const boost::shared_ptr<ID3DTextureSheet> cursorTexture
   )
   {
-    if (!gpg::gal::Device::IsReady() || cursorTexture.get() == nullptr) {
-      return false;
+    bool isSet = false;
+    try {
+      ID3DTextureSheet::TextureHandle probe{};
+      if (!gpg::gal::Device::IsReady() || cursorTexture.get() == nullptr ||
+          cursorTexture->GetTexture(probe).get() == nullptr) {
+        return false;
+      }
+
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+      auto* const view = CD3DDeviceRuntimeView::FromDevice(this);
+      view->mCursorContext.hotspotX_ = hotspotX;
+      view->mCursorContext.hotspotY_ = hotspotY;
+      ID3DTextureSheet::TextureHandle cursorPixels{};
+      view->mCursorContext.texture_ = cursorTexture->GetTexture(cursorPixels);
+      device->SetCursor(&view->mCursorContext);
+      isSet = true;
+    } catch (const gpg::gal::Error&) {
     }
 
-    ID3DTextureSheet::TextureHandle pixelSource{};
-    cursorTexture->GetTexture(pixelSource);
-    if (pixelSource.get() == nullptr) {
-      return false;
-    }
-
-    auto* const view = CD3DDeviceRuntimeView::FromDevice(this);
-    view->mCursorContext.hotspotX_ = hotspotX;
-    view->mCursorContext.hotspotY_ = hotspotY;
-
-    const auto rawPixelSource = boost::SharedPtrRawFromSharedBorrow(pixelSource);
-    boost::SharedCountPair currentCursorSource{
-      view->mCursorContext.pixelSource_,
-      view->mCursorContext.cursorControl_
-    };
-    const boost::SharedCountPair newCursorSource{
-      reinterpret_cast<void*>(rawPixelSource.px), rawPixelSource.pi
-    };
-    boost::AssignWeakPairFromShared(&currentCursorSource, &newCursorSource);
-    view->mCursorContext.pixelSource_ =
-      static_cast<gpg::gal::CursorPixelSourceRuntime*>(currentCursorSource.px);
-    view->mCursorContext.cursorControl_ = currentCursorSource.pi;
-
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-    device->SetCursor(&view->mCursorContext);
-    return true;
+    return isSet;
   }
 
   /**
@@ -1077,7 +1043,7 @@ namespace moho
 
   [[nodiscard]] bool CD3DDevice::IsCursorPixelSourceReady() const
   {
-    return CD3DDeviceRuntimeView::FromDevice(this)->mCursorContext.pixelSource_ != nullptr;
+    return CD3DDeviceRuntimeView::FromDevice(this)->mCursorContext.texture_.get() != nullptr;
   }
 
   [[nodiscard]] bool CD3DDevice::IsCursorShowing() const
@@ -1647,16 +1613,14 @@ namespace moho
     const RECT* const destinationRect
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DTextureSheet::TextureHandle destinationTexture{};
     destinationSheet->GetTexture(destinationTexture);
     ID3DTextureSheet::TextureHandle sourceTexture{};
     sourceSheet->GetTexture(sourceTexture);
 
-    gpg::gal::TextureD3D9* sourceRaw = sourceTexture.get();
-    gpg::gal::TextureD3D9* destinationRaw = destinationTexture.get();
-    device->UpdateSurface(&sourceRaw, &destinationRaw, sourceRect, destinationRect);
+    device->UpdateSurface(sourceTexture, destinationTexture, sourceRect, destinationRect);
   }
 
   /**
@@ -1850,27 +1814,6 @@ namespace moho
   {
     static CD3DDeviceSingleton sDevice{};
     return &sDevice;
-  }
-
-  /**
-   * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
-   *
-   * What it does:
-   * Pulls the active GAL device singleton and forwards one texture-create
-   * request into its virtual `CreateTexture` lane.
-   */
-  boost::shared_ptr<gpg::gal::TextureD3D9>& CreateTextureOnActiveDevice(
-    boost::shared_ptr<gpg::gal::TextureD3D9>& outTexture,
-    const gpg::gal::TextureContext& context
-  )
-  {
-    outTexture.reset();
-    if (gpg::gal::Device* const device = gpg::gal::Device::GetInstance(); device != nullptr) {
-      if (auto* const d3d9Device = dynamic_cast<gpg::gal::DeviceD3D9*>(device); d3d9Device != nullptr) {
-        (void)d3d9Device->CreateTexture(&outTexture, &context);
-      }
-    }
-    return outTexture;
   }
 
   /**

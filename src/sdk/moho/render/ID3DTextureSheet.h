@@ -34,7 +34,7 @@ namespace gpg
 
 namespace gpg::gal
 {
-  class TextureD3D9;
+  class Texture;
 }
 
 namespace moho
@@ -42,7 +42,7 @@ namespace moho
   class ID3DTextureSheet
   {
   public:
-    using TextureHandle = boost::shared_ptr<gpg::gal::TextureD3D9>;
+    using TextureHandle = boost::shared_ptr<gpg::gal::Texture>;
     static gpg::RType* sType;
 
     /**
@@ -84,7 +84,7 @@ namespace moho
     /**
      * Address: 0x00A82547 (_purecall slot)
      *
-     * boost::shared_ptr<gpg::gal::TextureD3D9> &
+     * boost::shared_ptr<gpg::gal::Texture> &
      *
      * What it does:
      * Copies retained texture ownership into caller storage.

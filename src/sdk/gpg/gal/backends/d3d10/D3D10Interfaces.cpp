@@ -44,18 +44,10 @@
 
 namespace gpg::gal
 {
-  struct CursorPixelSourceRuntime
-  {
-    void** vtable = nullptr; // +0x00
-  };
-
   namespace
   {
     using release_fn = unsigned long(__stdcall*)(void*);
     using add_ref_fn = unsigned long(__stdcall*)(void*);
-    using cursor_source_lock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, TextureLockRectD3D10*, int, const RECT*, int);
-    // Slot 4 takes the lock rect by value: four dwords, in field order.
-    using cursor_source_unlock_fn = void(__thiscall*)(CursorPixelSourceRuntime*, TextureLockRectD3D10);
     using device_create_vertex_format_fn = void(__thiscall*)(Device*, void*, int);
     using device_begin_technique_fn = void(__thiscall*)(Device*);
     using device_end_technique_fn = void(__thiscall*)(Device*);
@@ -90,7 +82,6 @@ namespace gpg::gal
     using vector_set_array_fn = HRESULT(__stdcall*)(void*, const void*, unsigned int, unsigned int);
     using shader_resource_set_resource_fn = HRESULT(__stdcall*)(void*, void*);
     using string_get_string_fn = HRESULT(__stdcall*)(void*, const char**);
-    using texture_virtual_unlock_fn = int(__thiscall*)(TextureD3D10*, int);
     using texture_get_desc_fn = void(__stdcall*)(void*, void*);
     using texture_map_fn = HRESULT(__stdcall*)(void*, int, unsigned int, unsigned int, void*);
     using texture_unmap_fn = void(__stdcall*)(void*, int);
@@ -876,36 +867,17 @@ namespace gpg::gal
         ((rgba & 0x00FF0000U) >> 16U);
     }
 
-    void BeginCursorPixelTransfer(
-      CursorPixelSourceRuntime* const source, TextureLockRectD3D10& transfer, const RECT& rect
-    )
-    {
-      auto* const beginTransfer = reinterpret_cast<cursor_source_lock_fn>(source->vtable[2]);
-      beginTransfer(source, &transfer, 0, &rect, 2);
-    }
-
-    void EndCursorPixelTransfer(CursorPixelSourceRuntime* const source, const TextureLockRectD3D10& transfer)
-    {
-      auto* const endTransfer = reinterpret_cast<cursor_source_unlock_fn>(source->vtable[4]);
-      endTransfer(source, transfer);
-    }
-
     /**
      * Address: 0x008F8130 (FUN_008F8130)
      *
-     * int,int,CursorPixelSourceRuntime *,boost::detail::sp_counted_base *
-     *
      * What it does:
-     * Builds a 32x32 ARGB cursor icon from one runtime pixel source, applying
-     * channel-swap and bottom-up row conversion, then releases one retained
-     * shared-count lane before returning the icon handle.
+     * Builds a 32x32 ARGB cursor icon from the cursor texture: locks level 0
+     * read-only (flags 2), copies the rows bottom-up with red and blue
+     * swapped, and unlocks through the by-value `Unlock` (slot 4). The texture
+     * handle arrives by value; its release on the way out is the parameter's
+     * destruction.
      */
-    void* BuildCursorIcon(
-      const int hotspotX,
-      const int hotspotY,
-      CursorPixelSourceRuntime* const source,
-      boost::detail::sp_counted_base* const sharedCount
-    )
+    HICON BuildCursorIcon(const int hotspotX, const int hotspotY, const boost::shared_ptr<Texture> texture)
     {
       BITMAPV5HEADER bitmapInfo{};
       bitmapInfo.bV5Size = sizeof(BITMAPV5HEADER);
@@ -926,9 +898,8 @@ namespace gpg::gal
       );
       ::ReleaseDC(nullptr, dc);
 
-      TextureLockRectD3D10 transfer{};
       const RECT wholeSurface{};
-      BeginCursorPixelTransfer(source, transfer, wholeSurface);
+      const TextureLockRect transfer = texture->Lock(0, wholeSurface, 2);
 
       auto* const destinationPixels = reinterpret_cast<std::uint32_t*>(dibPixels);
       const auto* const sourceBytes = static_cast<const std::uint8_t*>(transfer.bits);
@@ -944,7 +915,7 @@ namespace gpg::gal
           reinterpret_cast<const std::uint32_t*>(reinterpret_cast<const std::uint8_t*>(sourceRow) - rowPitchBytes);
       }
 
-      EndCursorPixelTransfer(source, transfer);
+      static_cast<void>(texture->Unlock(transfer));
 
       HBITMAP const maskBitmap = ::CreateBitmap(32, 32, 1U, 1U, nullptr);
       ICONINFO iconInfo{};
@@ -957,11 +928,6 @@ namespace gpg::gal
       HICON const iconHandle = ::CreateIconIndirect(&iconInfo);
       ::DeleteObject(colorBitmap);
       ::DeleteObject(maskBitmap);
-
-      if (sharedCount != nullptr) {
-        sharedCount->release();
-      }
-
       return iconHandle;
     }
 
@@ -2381,18 +2347,6 @@ namespace gpg::gal
     }
 
     /**
-     * Address: 0x009032F0 (FUN_009032F0)
-     *
-     * What it does:
-     * Represents the base-vftable unwind lane used by `TextureD3D10` destructor SEH
-     * tails in the binary.
-     */
-    void ApplyTextureBaseVftableLane(TextureD3D10* const texture)
-    {
-      static_cast<void>(texture);
-    }
-
-    /**
      * Address: 0x00903E10 (FUN_00903E10)
      *
      * What it does:
@@ -2401,7 +2355,6 @@ namespace gpg::gal
     void DestroyTextureD3D10Body(TextureD3D10* const texture)
     {
       texture->DestroyState();
-      ApplyTextureBaseVftableLane(texture);
     }
 
     /**
@@ -2792,42 +2745,6 @@ namespace gpg::gal
       return boost::ConstructSharedFromRawViaCountCtor(
         outEffectVariable, effectVariable, ConstructSharedCountEffectVariableD3D10FromRaw
       );
-    }
-
-    /**
-     * Address: 0x008F9B00 (FUN_008F9B00, boost::detail::shared_count_TextureD3D10::shared_count_TextureD3D10)
-     *
-     * What it does:
-     * Allocates one 0x10-byte `sp_counted_impl_p<TextureD3D10>` control
-     * block, publishes its vtable, sets use/weak count to one, and stores
-     * the owned raw pointer - the control-block half of constructing one
-     * `shared_ptr<TextureD3D10>`.
-     */
-    boost::detail::shared_count* ConstructSharedCountTextureD3D10FromRaw(
-      boost::detail::shared_count* const outCount, TextureD3D10* const texture
-    )
-    {
-      return boost::ConstructSharedCountFromRaw(outCount, texture);
-    }
-
-    /**
-     * Address: 0x008FA400 (FUN_008FA400, boost::shared_ptr_TextureD3D10::shared_ptr_TextureD3D10)
-     *
-     * What it does:
-     * Constructs one `shared_ptr<TextureD3D10>` from one raw pointer lane.
-     * FUN_008FA400's own disassembly publishes `px` ("tex") first, then
-     * builds the control block through one discrete `shared_count(T*)`
-     * call (FUN_008F9B00 above - a real, separately-emitted call, not
-     * inlined - also reached the same way from `DeviceD3D10::CreateTexture`)
-     * before a no-op `sp_enable_shared_from_this` (`TextureD3D10` does not
-     * derive from `enable_shared_from_this`); reproduced explicitly here
-     * instead of relying on boost's own converting constructor.
-     */
-    boost::shared_ptr<TextureD3D10>* ConstructSharedTextureD3D10FromRaw(
-      boost::shared_ptr<TextureD3D10>* const outTexture, TextureD3D10* const texture
-    )
-    {
-      return boost::ConstructSharedFromRawViaCountCtor(outTexture, texture, ConstructSharedCountTextureD3D10FromRaw);
     }
 
     /**
@@ -4179,11 +4096,12 @@ namespace gpg::gal
    * Address: 0x00903410 (FUN_00903410)
    *
    * What it does:
-   * Maps one texture level and writes map metadata (`flags/level/pitch/bits`)
-   * into caller output and cached per-level lock lanes.
+   * Maps one texture level and returns the mapping, also recorded in
+   * `lockHistory_[level]`. D3D10 maps whole levels, so the rect is unused; a
+   * read-only lock of a texture without CPU read access goes through a
+   * staging copy.
    */
-  TextureLockRectD3D10*
-  TextureD3D10::Lock(TextureLockRectD3D10* const outRect, const int level, const RECT* const rect, const int flags)
+  TextureLockRect TextureD3D10::Lock(const int level, const RECT& rect, const int flags)
   {
     static_cast<void>(rect);
 
@@ -4205,8 +4123,9 @@ namespace gpg::gal
       ThrowGalError("TextureD3D10.cpp", 62, "");
     }
 
-    outRect->flags = flags;
-    outRect->level = level;
+    TextureLockRect lock{};
+    lock.flags = flags;
+    lock.level = level;
 
     unsigned int mapMode = 4U;
     void* mapTexture = lockedTexture;
@@ -4228,10 +4147,10 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("TextureD3D10.cpp", 96, mapResult);
     }
 
-    outRect->pitch = mapped.RowPitch;
-    outRect->bits = mapped.pData;
-    lockHistory_[level] = *outRect;
-    return outRect;
+    lock.pitch = static_cast<int>(mapped.RowPitch);
+    lock.bits = mapped.pData;
+    lockHistory_[level] = lock;
+    return lock;
   }
 
   /**
@@ -4270,17 +4189,12 @@ namespace gpg::gal
    * Address: 0x00903390 (FUN_00903390)
    *
    * What it does:
-   * Forwards to vtable-slot unlock path using the second stack argument.
+   * Releases one mapping by unlocking its level - a virtual call to slot 3
+   * (`mov eax,[ecx]; call [eax+0xC]`), `ret 0x10` for the by-value rect.
    */
-  int TextureD3D10::Func1(const int arg1, const int level, const int arg3, const int arg4)
+  int TextureD3D10::Unlock(const TextureLockRect lock)
   {
-    static_cast<void>(arg1);
-    static_cast<void>(arg3);
-    static_cast<void>(arg4);
-
-    auto** const vtable = *reinterpret_cast<void***>(this);
-    auto* const thunk = reinterpret_cast<texture_virtual_unlock_fn>(vtable[3]);
-    return thunk(this, level);
+    return Unlock(lock.level);
   }
 
   /**
@@ -4363,9 +4277,7 @@ namespace gpg::gal
   void TextureD3D10::DestroyState()
   {
     if (lockActive_) {
-      auto** const vtable = *reinterpret_cast<void***>(this);
-      auto* const unlockThunk = reinterpret_cast<texture_virtual_unlock_fn>(vtable[3]);
-      unlockThunk(this, lockLevel_);
+      static_cast<void>(Unlock(lockLevel_));
     }
 
     if (lockHistory_ != nullptr) {
@@ -4415,7 +4327,7 @@ namespace gpg::gal
     context_.dataBegin_ = 0U;
     context_.dataEnd_ = 0U;
 
-    lockHistory_ = new TextureLockRectD3D10[context_.mipmapLevels_];
+    lockHistory_ = new TextureLockRect[context_.mipmapLevels_];
     contextFormatBackup_ = static_cast<int>(context_.format_);
     const int contextFormatBackupDxgi = MapGalTextureFormatToDxgi(contextFormatBackup_);
     static_cast<void>(contextFormatBackupDxgi);
@@ -4875,12 +4787,7 @@ namespace gpg::gal
   {
     Destroy();
 
-    boost::detail::sp_counted_base* const cursorControl = context->cursorControl_;
-    if (cursorControl != nullptr) {
-      cursorControl->add_ref_copy();
-    }
-
-    iconHandle_ = BuildCursorIcon(context->hotspotX_, context->hotspotY_, context->pixelSource_, cursorControl);
+    iconHandle_ = BuildCursorIcon(context->hotspotX_, context->hotspotY_, context->texture_);
     cursorHandle_ = ::SetCursor(reinterpret_cast<HCURSOR>(iconHandle_));
     return cursorHandle_;
   }
@@ -5635,14 +5542,12 @@ namespace gpg::gal
   /**
    * Address: 0x008FAD20 (FUN_008FAD20)
    *
-   * boost::shared_ptr<TextureD3D10> *,TextureContext const *
-   *
    * What it does:
-   * Creates one texture resource from context source lanes and returns the wrapped
-   * texture + shader-resource-view payload.
+   * Creates one texture (from in-memory file data, or empty at the context's
+   * size and format) with its shader-resource view and wraps both in a
+   * `TextureD3D10`.
    */
-  boost::shared_ptr<TextureD3D10>*
-  DeviceD3D10::CreateTexture(boost::shared_ptr<TextureD3D10>* const outTexture, const TextureContext* const context)
+  boost::shared_ptr<Texture> DeviceD3D10::CreateTexture(const TextureContext* const context)
   {
     void* nativeTexture = nullptr;
     void* shaderResourceView = nullptr;
@@ -5721,8 +5626,7 @@ namespace gpg::gal
       }
     }
 
-    outTexture->reset(new TextureD3D10(context, nativeTexture, shaderResourceView));
-    return outTexture;
+    return boost::shared_ptr<Texture>(new TextureD3D10(context, nativeTexture, shaderResourceView));
   }
 
   /**
@@ -5991,7 +5895,7 @@ namespace gpg::gal
    * `CopyResource` from the target's texture into the destination's.
    */
   void DeviceD3D10::GetRenderTargetData(
-    const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<TextureD3D10>& destination
+    const boost::shared_ptr<RenderTarget>& source, const boost::shared_ptr<Texture>& destination
   )
   {
     if (source.get() == nullptr) {
@@ -6003,7 +5907,7 @@ namespace gpg::gal
     }
 
     void* const sourceResource = static_cast<RenderTargetD3D10*>(source.get())->GetRenderTextureOrThrow();
-    void* const destinationResource = destination->GetTextureOrThrow();
+    void* const destinationResource = static_cast<TextureD3D10*>(destination.get())->GetTextureOrThrow();
     static_cast<void>(InvokeNativeCopyResourceResult(this, destinationResource, sourceResource));
   }
 
@@ -6081,44 +5985,43 @@ namespace gpg::gal
   /**
    * Address: 0x008FBDF0 (FUN_008FBDF0)
    *
-   * gpg::gal::TextureD3D10 **,gpg::gal::TextureD3D10 **,void const *,void const *
-   *
    * What it does:
    * Copies matching texture contexts directly; otherwise executes recovered
    * memory-encode/decode fallback before the final destination copy.
    */
   void DeviceD3D10::UpdateSurface(
-    TextureD3D10** const sourceTexture,
-    TextureD3D10** const destinationTexture,
-    const void* const sourceRect,
-    const void* const destinationPoint
+    const boost::shared_ptr<Texture>& source,
+    const boost::shared_ptr<Texture>& destination,
+    const RECT* const sourceRect,
+    const RECT* const destinationRect
   )
   {
-    if ((sourceTexture == nullptr) || (*sourceTexture == nullptr)) {
+    if (source.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1091, "Missing source texture");
     }
 
-    if ((destinationTexture == nullptr) || (*destinationTexture == nullptr)) {
+    if (destination.get() == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1092, "Missing dest   texture");
     }
 
-    const TextureContext* const sourceContext = (*sourceTexture)->GetContext();
-    const TextureContext* const destinationContext = (*destinationTexture)->GetContext();
+    auto* const sourceTexture = static_cast<TextureD3D10*>(source.get());
+    auto* const destinationTexture = static_cast<TextureD3D10*>(destination.get());
+    const TextureContext* const sourceContext = sourceTexture->GetContext();
+    const TextureContext* const destinationContext = destinationTexture->GetContext();
     if ((sourceContext->width_ == destinationContext->width_) &&
         (sourceContext->height_ == destinationContext->height_) &&
         (sourceContext->format_ == destinationContext->format_)) {
       unsigned int destinationX = 0U;
       unsigned int destinationY = 0U;
-      if (destinationPoint != nullptr) {
-        const auto* const point = reinterpret_cast<const POINT*>(destinationPoint);
-        destinationX = static_cast<unsigned int>(point->x);
-        destinationY = static_cast<unsigned int>(point->y);
+      if (destinationRect != nullptr) {
+        destinationX = static_cast<unsigned int>(destinationRect->left);
+        destinationY = static_cast<unsigned int>(destinationRect->top);
       }
 
       D3D10_BOX sourceBox{};
       const D3D10_BOX* sourceBoxPtr = nullptr;
       if (sourceRect != nullptr) {
-        const auto* const rect = reinterpret_cast<const RECT*>(sourceRect);
+        const RECT* const rect = sourceRect;
         sourceBox.left = static_cast<unsigned int>(rect->left);
         sourceBox.top = static_cast<unsigned int>(rect->top);
         sourceBox.front = 0U;
@@ -6128,8 +6031,8 @@ namespace gpg::gal
         sourceBoxPtr = &sourceBox;
       }
 
-      void* const sourceResource = (*sourceTexture)->GetTextureOrThrow();
-      void* const destinationResource = (*destinationTexture)->GetTextureOrThrow();
+      void* const sourceResource = sourceTexture->GetTextureOrThrow();
+      void* const destinationResource = destinationTexture->GetTextureOrThrow();
       InvokeNativeCopySubresourceRegion(
         this, destinationResource, destinationX, destinationY, sourceResource, sourceBoxPtr
       );
@@ -6143,7 +6046,7 @@ namespace gpg::gal
     }
 
     void* encodedTextureBlob = nullptr;
-    result = InvokeSaveTextureToMemoryApi(this, (*sourceTexture)->GetTextureOrThrow(), 4, &encodedTextureBlob);
+    result = InvokeSaveTextureToMemoryApi(this, sourceTexture->GetTextureOrThrow(), 4, &encodedTextureBlob);
     if (result < 0) {
       ReleaseComLike(createBlobScratch);
       ThrowDeviceD3D10Hresult(1112, result);
@@ -6173,7 +6076,7 @@ namespace gpg::gal
     }
 
     if (recreatedTexture != nullptr) {
-      InvokeNativeCopyResourceResult(this, (*destinationTexture)->GetTextureOrThrow(), recreatedTexture);
+      InvokeNativeCopyResourceResult(this, destinationTexture->GetTextureOrThrow(), recreatedTexture);
     }
 
     if (encodedTextureBlob == createBlobScratch) {
@@ -6208,21 +6111,20 @@ namespace gpg::gal
   /**
    * Address: 0x008FC6B0 (FUN_008FC6B0)
    *
-   * gpg::gal::TextureD3D10 **,msvc8::string const &,int,gpg::MemBuffer<char> *
-   *
    * What it does:
-   * Saves one texture to file when `outBuffer==nullptr`; otherwise serializes
-   * into caller memory buffer using the recovered blob helper lane.
+   * Encodes one texture in image format `fileFormat`: to `filePath` when
+   * `outBuffer` is null, otherwise into `outBuffer` through a D3DX memory
+   * blob.
    */
-  void DeviceD3D10::Func5(
-    TextureD3D10** const texture,
+  void DeviceD3D10::SaveTexture(
+    const boost::shared_ptr<Texture>& texture,
     const msvc8::string& filePath,
-    const int fileFormatToken,
+    const int fileFormat,
     gpg::MemBuffer<char>* const outBuffer
   )
   {
-    const int imageFileFormat = ResolveImageFileFormatToken(fileFormatToken);
-    TextureD3D10* const sourceTexture = *texture;
+    const int imageFileFormat = ResolveImageFileFormatToken(fileFormat);
+    auto* const sourceTexture = static_cast<TextureD3D10*>(texture.get());
 
     if (outBuffer == nullptr) {
       const HRESULT result =
@@ -7405,10 +7307,11 @@ namespace gpg::gal
    * What it does:
    * Binds a texture shader-resource view into this effect slot.
    */
-  void EffectVariableD3D10::SetTexture(boost::shared_ptr<TextureD3D10> texture)
+  void EffectVariableD3D10::SetTexture(const boost::shared_ptr<Texture> texture)
   {
     void* const shaderResourceVariable = InvokeVariableAsShaderResource(variableHandle_);
-    void* const shaderResourceView = (texture.get() != nullptr) ? texture->GetShaderResourceViewOrThrow() : nullptr;
+    void* const shaderResourceView =
+      (texture.get() != nullptr) ? static_cast<TextureD3D10*>(texture.get())->GetShaderResourceViewOrThrow() : nullptr;
     const HRESULT result = InvokeShaderResourceSetResource(shaderResourceVariable, shaderResourceView);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 132, result);

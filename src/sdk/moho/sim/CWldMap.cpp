@@ -1568,8 +1568,7 @@ namespace moho
     if (device != nullptr) {
       ID3DTextureSheet::TextureHandle texture{};
       mPreviewTexture->GetTexture(texture);
-      gpg::gal::TextureD3D9* rawTexture = texture.get();
-      device->Func5(&rawTexture, imageFormatName, kPreviewImageFormatToken, &encodedTexture);
+      device->SaveTexture(texture, imageFormatName, kPreviewImageFormatToken, &encodedTexture);
     }
 
     const std::uint32_t encodedByteCount = static_cast<std::uint32_t>(encodedTexture.Size());

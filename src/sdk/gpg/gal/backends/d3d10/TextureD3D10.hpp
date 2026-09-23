@@ -4,26 +4,19 @@
 #include <cstdint>
 
 #include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/gal/Texture.hpp"
 #include "gpg/gal/TextureContext.hpp"
 #include "platform/Platform.h"
 
 namespace gpg::gal
 {
-    struct TextureLockRectD3D10
-    {
-        int flags = 0;       // +0x00
-        int level = 0;       // +0x04
-        int pitch = 0;       // +0x08
-        void* bits = nullptr; // +0x0C
-    };
-
     /**
      * VFTABLE: 0x00D43B18
      * COL:  0x00E511E8
      * Source hints:
      *  - c:\work\rts\main\code\src\libs\gpggal\TextureD3D10.cpp
      */
-    class TextureD3D10
+    class TextureD3D10 : public Texture
     {
     public:
         /**
@@ -51,7 +44,7 @@ namespace gpg::gal
          * What it does:
          * Owns the deleting-destructor path and delegates body lanes to `FUN_00903E10`.
          */
-        virtual ~TextureD3D10();
+        ~TextureD3D10() override;
 
         /**
          * Address: 0x00903370 (FUN_00903370)
@@ -59,16 +52,24 @@ namespace gpg::gal
          * What it does:
          * Returns the embedded texture-context lane at `this+0x04`.
          */
-        virtual TextureContext* GetContext();
+        TextureContext* GetContext() override;
 
         /**
          * Address: 0x00903410 (FUN_00903410)
          *
          * What it does:
-         * Maps one texture level and writes map metadata (`flags/level/pitch/bits`)
-         * into caller output and cached per-level lock lanes.
+         * Maps one texture level (the rect is ignored - D3D10 maps whole
+         * levels), records the mapping in `lockHistory_[level]` and returns it.
          */
-        virtual TextureLockRectD3D10* Lock(TextureLockRectD3D10* outRect, int level, const RECT* rect, int flags);
+        TextureLockRect Lock(int level, const RECT& rect, int flags) override;
+
+        /**
+         * Address: 0x00903390 (FUN_00903390)
+         *
+         * What it does:
+         * Releases one mapping: `Unlock(lock.level)` through the vtable.
+         */
+        int Unlock(TextureLockRect lock) override;
 
         /**
          * Address: 0x00903700 (FUN_00903700)
@@ -76,15 +77,7 @@ namespace gpg::gal
          * What it does:
          * Unmaps one texture level and clears lock-tracking state lanes.
          */
-        virtual int Unlock(int level);
-
-        /**
-         * Address: 0x00903390 (FUN_00903390)
-         *
-         * What it does:
-         * Forwards to vtable-slot unlock path using the second stack argument.
-         */
-        virtual int Func1(int arg1, int level, int arg3, int arg4);
+        int Unlock(int level) override;
 
         /**
          * Address: 0x009038D0 (FUN_009038D0)
@@ -92,7 +85,7 @@ namespace gpg::gal
          * What it does:
          * Serializes texture bytes into the caller-provided memory buffer.
          */
-        virtual void SaveToBuffer(gpg::MemBuffer<char>* outBuffer);
+        void SaveToBuffer(gpg::MemBuffer<char>* outBuffer) override;
 
         /**
          * Address: 0x00903CA0 (FUN_00903CA0)
@@ -137,11 +130,10 @@ namespace gpg::gal
         bool lockActive_ = false;                 // +0x64
         std::uint8_t lockPadding_[3]{};           // +0x65
         int lockLevel_ = 0;                       // +0x68
-        TextureLockRectD3D10* lockHistory_ = nullptr; // +0x6C
+        TextureLockRect* lockHistory_ = nullptr;  // +0x6C
         int contextFormatBackup_ = 0;             // +0x70
     };
 
-    static_assert(sizeof(TextureLockRectD3D10) == 0x10, "TextureLockRectD3D10 size must be 0x10");
     static_assert(offsetof(TextureD3D10, context_) == 0x04, "TextureD3D10::context_ offset must be 0x04");
     static_assert(offsetof(TextureD3D10, texture_) == 0x58, "TextureD3D10::texture_ offset must be 0x58");
     static_assert(offsetof(TextureD3D10, stagingTexture_) == 0x5C, "TextureD3D10::stagingTexture_ offset must be 0x5C");

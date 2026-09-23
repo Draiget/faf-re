@@ -31,10 +31,19 @@ namespace gpg::gal
    * Address: 0x00903300 (FUN_00903300)
    *
    * What it does:
-   * Initializes one abstract texture base lane by installing the class
-   * vtable.
+   * Installs the abstract texture vtable.
    */
   Texture::Texture() = default;
+
+  /**
+   * Address: 0x009032F0 (FUN_009032F0)
+   *
+   * What it does:
+   * Reinstalls the abstract texture vtable (`mov [ecx],0x00D43AFC; ret`). The
+   * derived destructors inline it (0x00903E51, 0x0094AAD1); this out-of-line
+   * body is for their unwind paths.
+   */
+  Texture::~Texture() = default;
 } // namespace gpg::gal
 
 namespace gpg
@@ -5326,22 +5335,6 @@ namespace gpg::gal
 {
   namespace
   {
-    void ReleaseSharedCount(boost::detail::sp_counted_base*& control) noexcept
-    {
-      if (control != nullptr) {
-        control->release();
-        control = nullptr;
-      }
-    }
-
-    void PreserveCursorControlTransferSideEffects(boost::detail::sp_counted_base* const control) noexcept
-    {
-      if (control != nullptr) {
-        control->add_ref_copy();
-        control->release();
-      }
-    }
-
     /**
      * Address: 0x00940940 (FUN_00940940)
      *
@@ -5495,37 +5488,28 @@ namespace gpg::gal
    * Address: 0x0093EEA0 (FUN_0093EEA0, __imp_??0CursorContext@gal@gpg@@QAE@XZ)
    *
    * What it does:
-   * Initializes cursor hotspot/pixel-source/control lanes to zero/null.
+   * Initializes a zero hotspot and an empty texture handle.
    */
   CursorContext::CursorContext()
     : hotspotX_(0)
     , hotspotY_(0)
-    , pixelSource_(nullptr)
-    , cursorControl_(nullptr)
+    , texture_()
   {
   }
 
   /**
    * Address: 0x0093EF20 (FUN_0093EF20)
    *
-   * int,int,CursorPixelSourceRuntime *,boost::detail::sp_counted_base *
-   *
    * What it does:
-   * Initializes cursor hotspot/pixel-source/control lanes from caller payload
-   * and preserves legacy shared-count transfer side effects for cursor control.
+   * Copies the hotspot and retains the texture handle; the add-ref/release
+   * pair the body shows (0x0093EF55, 0x0093EF5C) is the by-value parameter
+   * being copied into the member and then destroyed.
    */
-  CursorContext::CursorContext(
-    const std::int32_t hotspotX,
-    const std::int32_t hotspotY,
-    CursorPixelSourceRuntime* const pixelSource,
-    boost::detail::sp_counted_base* const cursorControl
-  )
-    : hotspotX_(hotspotX)
-    , hotspotY_(hotspotY)
-    , pixelSource_(pixelSource)
-    , cursorControl_(cursorControl)
+  CursorContext::CursorContext(const POINT& hotspot, const boost::shared_ptr<Texture> texture)
+    : hotspotX_(hotspot.x)
+    , hotspotY_(hotspot.y)
+    , texture_(texture)
   {
-    PreserveCursorControlTransferSideEffects(cursorControl_);
   }
 
   /**
@@ -5533,12 +5517,9 @@ namespace gpg::gal
    * Scalar-deleting wrapper: 0x0093EEC0 (FUN_0093EEC0)
    *
    * What it does:
-   * Releases the retained cursor-control shared-count block before object teardown.
+   * Releases the texture handle.
    */
-  CursorContext::~CursorContext()
-  {
-    ReleaseSharedCount(cursorControl_);
-  }
+  CursorContext::~CursorContext() = default;
 
   /**
    * Address: 0x00940930 (FUN_00940930)

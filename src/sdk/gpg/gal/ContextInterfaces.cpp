@@ -11,6 +11,7 @@
 #include "OutputContext.hpp"
 #include "RenderTarget.hpp"
 #include "RenderTargetContext.hpp"
+#include "Texture.hpp"
 #include "TextureContext.hpp"
 #include "VertexBuffer.hpp"
 #include "VertexBufferContext.hpp"
@@ -251,6 +252,19 @@ namespace gpg::gal
         vertexCount_ = other.vertexCount_;
         stride_ = other.stride_;
         return *this;
+    }
+
+    /**
+     * Address: 0x008E7C50 (FUN_008E7C50, func_CreateTexture)
+     *
+     * What it does:
+     * Creates one texture on the active device through its slot 10
+     * (`[vtbl+0x28]`). Callers: `RD3DTextureResource` (0x0043DAA0) and
+     * `CD3DDynamicTextureSheet` (0x0043E8E0, 0x00442940).
+     */
+    boost::shared_ptr<Texture> Texture::Create(const TextureContext& context)
+    {
+        return Device::GetInstance()->CreateTexture(&context);
     }
 
     /**

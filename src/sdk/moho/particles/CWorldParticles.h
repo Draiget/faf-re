@@ -14,7 +14,7 @@
 
 namespace gpg::gal
 {
-  class TextureD3D9;
+  class Texture;
 }
 
 namespace moho

@@ -685,16 +685,14 @@ namespace
    * Locks the whole of texture level 0 and hands back the mapped bytes.
    *
    * The three cartographic lookup textures are each filled through the same
-   * `Lock(&lockRect, 0, &wholeSurface, 0)` / `Unlock(0)` pair the binary
-   * emits at 0x007D26C1, 0x007D28BE and 0x007D2B5A; lifting it keeps the
-   * zeroed whole-surface RECT out of the three fill loops.
+   * `Lock(0, wholeSurface, 0)` / `Unlock(0)` pair the binary emits at
+   * 0x007D26C1, 0x007D28BE and 0x007D2B5A; lifting it keeps the zeroed
+   * whole-surface RECT out of the three fill loops.
    */
-  [[nodiscard]] void* LockWholeCartographicTexture(gpg::gal::TextureD3D9& texture)
+  [[nodiscard]] void* LockWholeCartographicTexture(gpg::gal::Texture& texture)
   {
-    gpg::gal::TextureLockRect lockedRect{};
-    RECT wholeSurface{};
-    texture.Lock(&lockedRect, 0, &wholeSurface, 0);
-    return lockedRect.bits;
+    const RECT wholeSurface{};
+    return texture.Lock(0, wholeSurface, 0).bits;
   }
 
   void FillCartographicTextureContext(
@@ -1629,9 +1627,7 @@ namespace moho
         static_cast<std::uint32_t>(gridHeight)
       );
 
-      boost::shared_ptr<gpg::gal::TextureD3D9> elevationTexture;
-      device->CreateTexture(&elevationTexture, &elevationContext);
-      mElevTexture = elevationTexture;
+      mElevTexture = device->CreateTexture(&elevationContext);
 
       auto* rowCursor = static_cast<std::uint16_t*>(LockWholeCartographicTexture(*mElevTexture));
       for (std::int32_t z = 0; z < gridHeight; ++z) {
@@ -1660,9 +1656,7 @@ namespace moho
         1U
       );
 
-      boost::shared_ptr<gpg::gal::TextureD3D9> hypsometricTexture;
-      device->CreateTexture(&hypsometricTexture, &hypsometricContext);
-      mHypsometricTexture = hypsometricTexture;
+      mHypsometricTexture = device->CreateTexture(&hypsometricContext);
 
       auto* const rampTexels =
         static_cast<std::int32_t*>(LockWholeCartographicTexture(*mHypsometricTexture));
@@ -1714,9 +1708,7 @@ namespace moho
         1U
       );
 
-      boost::shared_ptr<gpg::gal::TextureD3D9> topographicTexture;
-      device->CreateTexture(&topographicTexture, &topographicContext);
-      mTopographicTexture = topographicTexture;
+      mTopographicTexture = device->CreateTexture(&topographicContext);
 
       auto* const rampTexels =
         static_cast<std::uint8_t*>(LockWholeCartographicTexture(*mTopographicTexture));

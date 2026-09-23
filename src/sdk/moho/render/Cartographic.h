@@ -18,7 +18,7 @@ namespace gpg::gal
   class DepthStencilTarget;
   class IndexBufferD3D9;
   class RenderTarget;
-  class TextureD3D9;
+  class Texture;
   class VertexBufferD3D9;
   class VertexFormatD3D9;
 }
@@ -212,7 +212,7 @@ namespace moho
   public:
     msvc8::string mTechniqueName;                                         // +0x04
     msvc8::string mTexturePath;                                           // +0x20
-    boost::shared_ptr<gpg::gal::TextureD3D9> mDecalTexture;               // +0x3C
+    boost::shared_ptr<gpg::gal::Texture> mDecalTexture;               // +0x3C
     boost::shared_ptr<gpg::gal::VertexFormatD3D9> mVertexFormat;          // +0x44
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mQuadVertexBuffer;      // +0x4C
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mInstanceVertexBuffer;  // +0x54
@@ -601,9 +601,9 @@ namespace moho
 
     // GPU resource handles, all lazily created by InitializeTerrain /
     // InitializeTerrainTextures and released by Shutdown / the dtor.
-    boost::shared_ptr<gpg::gal::TextureD3D9> mTopographicTexture;               // +0x64
-    boost::shared_ptr<gpg::gal::TextureD3D9> mHypsometricTexture;               // +0x6C
-    boost::shared_ptr<gpg::gal::TextureD3D9> mElevTexture;                      // +0x74
+    boost::shared_ptr<gpg::gal::Texture> mTopographicTexture;               // +0x64
+    boost::shared_ptr<gpg::gal::Texture> mHypsometricTexture;               // +0x6C
+    boost::shared_ptr<gpg::gal::Texture> mElevTexture;                      // +0x74
     boost::shared_ptr<gpg::gal::VertexFormatD3D9> mTerrainVertexFormat;         // +0x7C
     boost::shared_ptr<gpg::gal::VertexBufferD3D9> mTerrainVertexBuffer;         // +0x84
     boost::shared_ptr<gpg::gal::VertexFormatD3D9> mFrameVertexFormat;           // +0x8C

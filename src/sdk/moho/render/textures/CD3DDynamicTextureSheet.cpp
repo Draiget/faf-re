@@ -150,15 +150,14 @@ namespace moho
       return false;
     }
 
-    RECT fullRect{};
-    gpg::gal::TextureLockRect lockRect{};
+    const RECT fullRect{};
 
     auto* const context = mTexture->GetContext();
     const auto lockFlags = static_cast<int>(
       context->usage_ == kTextureUsageDynamic ? gpg::gal::MohoD3DLockFlags::Discard : gpg::gal::MohoD3DLockFlags::None
     );
 
-    mTexture->Lock(&lockRect, 0, &fullRect, lockFlags);
+    const gpg::gal::TextureLockRect lockRect = mTexture->Lock(0, fullRect, lockFlags);
     *outPitch = static_cast<std::uint32_t>(lockRect.pitch);
     *outBits = lockRect.bits;
 
@@ -183,9 +182,7 @@ namespace moho
       return false;
     }
 
-    RECT lockRectRegion = *rect;
-    gpg::gal::TextureLockRect lockRect{};
-    mTexture->Lock(&lockRect, 0, &lockRectRegion, 0);
+    const gpg::gal::TextureLockRect lockRect = mTexture->Lock(0, *rect, 0);
     *outPitch = static_cast<std::uint32_t>(lockRect.pitch);
     *outBits = lockRect.bits;
     return true;
@@ -280,7 +277,7 @@ namespace moho
       return false;
     }
 
-    (void)CreateTextureOnActiveDevice(mTexture, mContext);
+    mTexture = gpg::gal::Texture::Create(mContext);
     return mTexture.get() != nullptr;
   }
 } // namespace moho
