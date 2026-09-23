@@ -5,10 +5,18 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+#include <dxgi.h>
+
+#include "AdapterD3D10.hpp"
+#include "CursorD3D10.hpp"
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/OutputContext.hpp"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 
 namespace gpg {
 namespace gal {
@@ -640,7 +648,96 @@ namespace gal {
        * initialization).
        */
       void Setup(DeviceContext* context);
+
+      /**
+       * Address: 0x008FE5D0 (FUN_008FE5D0)
+       *
+       * What it does:
+       * Builds the output context, zeroes the module/export/COM lanes, builds
+       * the embedded device context with no heads and arms the cursor. The
+       * member initializers below are that body; `func_CreateDeviceD3D`
+       * (0x008E6B60) allocates 0x128 bytes and runs it.
+       */
+      DeviceD3D10();
+
+      // Export signatures resolved by `DynamicLink`. The effect loader is the
+      // early (Feb/Apr 2007) twelve-argument D3DX10 form: the call passes
+      // 0x800 in the slot that later SDKs gave to `pProfile`, which only fits
+      // `HLSLFlags` here.
+      using D3D10CreateDeviceFn =
+        HRESULT(__stdcall*)(IDXGIAdapter*, D3D10_DRIVER_TYPE, HMODULE, UINT, UINT, ID3D10Device**);
+      using D3D10CreateBlobFn = HRESULT(__stdcall*)(std::uint32_t, void**);
+      using D3DX10CreateEffectFromMemoryFn = HRESULT(__stdcall*)(
+        const void*,
+        std::size_t,
+        const char*,
+        const D3D10_SHADER_MACRO*,
+        void*,
+        unsigned int,
+        unsigned int,
+        ID3D10Device*,
+        void*,
+        void*,
+        ID3D10Effect**,
+        void**
+      );
+      using D3DX10CreateTextureFromMemoryFn =
+        HRESULT(__stdcall*)(void*, const void*, std::uint32_t, const void*, void*, void**);
+      using D3DX10SaveTextureToFileFn = HRESULT(__stdcall*)(void*, int, const char*);
+      using D3DX10SaveTextureToMemoryFn = HRESULT(__stdcall*)(void*, int, void**);
+      using CreateDXGIFactoryFn = HRESULT(__stdcall*)(const IID&, void**);
+
+      // Layout recovered from the constructor at 0x008FE5D0 and the 0x128-byte
+      // allocation in `func_CreateDeviceD3D`. Each lane is named for what the
+      // code that fills it stores there, not for what an overlay called it.
+      OutputContext mOutputContext{};                                 // +0x04
+      HMODULE mD3D10Module = nullptr;                                 // +0x24  LoadLibraryA("d3d10.dll")
+      HMODULE mD3DX10Module = nullptr;                                // +0x28  LoadLibraryA("d3dx10.dll")
+      HMODULE mDXGIModule = nullptr;                                  // +0x2C  LoadLibraryA("dxgi.dll")
+      D3D10CreateDeviceFn mD3D10CreateDevice = nullptr;               // +0x30
+      D3D10CreateBlobFn mD3D10CreateBlob = nullptr;                   // +0x34
+      D3DX10CreateEffectFromMemoryFn mD3DX10CreateEffectFromMemory = nullptr;   // +0x38
+      D3DX10CreateTextureFromMemoryFn mD3DX10CreateTextureFromMemory = nullptr; // +0x3C
+      D3DX10SaveTextureToFileFn mD3DX10SaveTextureToFileA = nullptr;  // +0x40
+      D3DX10SaveTextureToMemoryFn mD3DX10SaveTextureToMemory = nullptr; // +0x44
+      CreateDXGIFactoryFn mCreateDXGIFactory = nullptr;               // +0x48
+      int mCurThreadId = 0;                                           // +0x4C
+      msvc8::vector<msvc8::string> mLog{};                            // +0x50
+      DeviceContext mDeviceContext{0};                                // +0x60
+      msvc8::vector<AdapterD3D10> mAdapters{};                        // +0x94
+      msvc8::vector<IDXGISwapChain*> mSwapChains{};                   // +0xA4
+      boost::shared_ptr<PipelineStateD3D10> mPipelineState{};         // +0xB4
+      IDXGIFactory* mDXGIFactory = nullptr;                           // +0xBC
+      ID3D10Device* mDevice = nullptr;                                // +0xC0
+      ID3D10Effect* mSignatureEffect = nullptr;                       // +0xC4  from kSignaturePreambleEffectSource
+      ID3D10Effect* mRttEffect = nullptr;                             // +0xC8  from kRttEffectSource
+      ID3D10EffectTechnique* mRttTechnique = nullptr;                 // +0xCC  GetTechniqueByName("RTT")
+      ID3D10Buffer* mRttQuadVertexBuffer = nullptr;                   // +0xD0
+      ID3D10InputLayout* mRttInputLayout = nullptr;                   // +0xD4
+      // Not written by the constructor -- the stores skip +0xD8..+0x117 --
+      // and `Setup` clears all sixteen before anything reads them.
+      WeakRefCountedToken* mVertexStreams[16];                        // +0xD8  one binding per input slot
+      OutputContext* mHeadOutputContexts = nullptr;                   // +0x118 new[]'d, one per head
+      CursorD3D10 mCursor{};                                          // +0x11C
     };
+
+    static_assert(offsetof(DeviceD3D10, mOutputContext) == 0x04, "DeviceD3D10::mOutputContext offset must be 0x04");
+    static_assert(offsetof(DeviceD3D10, mD3D10Module) == 0x24, "DeviceD3D10::mD3D10Module offset must be 0x24");
+    static_assert(offsetof(DeviceD3D10, mCreateDXGIFactory) == 0x48, "DeviceD3D10::mCreateDXGIFactory offset must be 0x48");
+    static_assert(offsetof(DeviceD3D10, mCurThreadId) == 0x4C, "DeviceD3D10::mCurThreadId offset must be 0x4C");
+    static_assert(offsetof(DeviceD3D10, mLog) == 0x50, "DeviceD3D10::mLog offset must be 0x50");
+    static_assert(offsetof(DeviceD3D10, mDeviceContext) == 0x60, "DeviceD3D10::mDeviceContext offset must be 0x60");
+    static_assert(offsetof(DeviceD3D10, mAdapters) == 0x94, "DeviceD3D10::mAdapters offset must be 0x94");
+    static_assert(offsetof(DeviceD3D10, mSwapChains) == 0xA4, "DeviceD3D10::mSwapChains offset must be 0xA4");
+    static_assert(offsetof(DeviceD3D10, mPipelineState) == 0xB4, "DeviceD3D10::mPipelineState offset must be 0xB4");
+    static_assert(offsetof(DeviceD3D10, mDXGIFactory) == 0xBC, "DeviceD3D10::mDXGIFactory offset must be 0xBC");
+    static_assert(offsetof(DeviceD3D10, mDevice) == 0xC0, "DeviceD3D10::mDevice offset must be 0xC0");
+    static_assert(offsetof(DeviceD3D10, mSignatureEffect) == 0xC4, "DeviceD3D10::mSignatureEffect offset must be 0xC4");
+    static_assert(offsetof(DeviceD3D10, mRttInputLayout) == 0xD4, "DeviceD3D10::mRttInputLayout offset must be 0xD4");
+    static_assert(offsetof(DeviceD3D10, mVertexStreams) == 0xD8, "DeviceD3D10::mVertexStreams offset must be 0xD8");
+    static_assert(offsetof(DeviceD3D10, mHeadOutputContexts) == 0x118, "DeviceD3D10::mHeadOutputContexts offset must be 0x118");
+    static_assert(offsetof(DeviceD3D10, mCursor) == 0x11C, "DeviceD3D10::mCursor offset must be 0x11C");
+    static_assert(sizeof(DeviceD3D10) == 0x128, "DeviceD3D10 size must be 0x128");
 
     /**
      * Address: 0x008FE5D0 (FUN_008FE5D0)

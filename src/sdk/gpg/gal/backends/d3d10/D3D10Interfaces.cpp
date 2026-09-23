@@ -124,7 +124,6 @@ namespace gpg::gal
     using device_native_draw_indexed_fn = int(__stdcall*)(void*, unsigned int, unsigned int, int);
     using device_native_draw_indexed_instanced_fn =
       int(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, int, unsigned int);
-    using swap_chain_present_fn = HRESULT(__stdcall*)(void*, unsigned int, unsigned int);
     using index_buffer_get_context_fn = void*(__thiscall*)(IndexBufferD3D10*);
     using vertex_buffer_get_context_fn = void*(__thiscall*)(VertexBufferD3D10*);
     using readback_get_size_fn = int(__stdcall*)(void*);
@@ -229,37 +228,16 @@ namespace gpg::gal
       float blendFactor[4]{};               // +0x18
     };
 
-    struct DeviceTechniqueBindingsRuntime final
-    {
-      std::uint8_t pad00_03[0x04]{};     // +0x00 .. +0x03
-      void* nativeDevice = nullptr;      // +0x04
-      std::uint8_t pad08_1B[0x14]{};     // +0x08 .. +0x1B
-      void* rasterizerState = nullptr;   // +0x1C
-      void* depthStencilState = nullptr; // +0x20
-      void* blendState = nullptr;        // +0x24
-    };
-
-    struct DeviceD3D10RuntimeView final
-    {
-      std::uint8_t pad00_B3[0xB4]{};                                    // +0x00 .. +0xB3
-      DeviceTechniqueBindingsRuntime* techniqueBindings = nullptr;      // +0xB4 (pipeline-state px lane)
-      boost::detail::sp_counted_base* techniqueBindingsCount = nullptr; // +0xB8 (pipeline-state pi lane)
-      std::uint8_t padBC_BF[0x04]{};                                    // +0xBC .. +0xBF
-      void* nativeDevice = nullptr;                                     // +0xC0
-      void* signatureEffect = nullptr;                                  // +0xC4
-      void* stretchRectEffect = nullptr;                                // +0xC8
-      void* stretchRectTechnique = nullptr;                             // +0xCC
-      void* stretchRectVertexBuffer = nullptr;                          // +0xD0
-      void* stretchRectInputLayout = nullptr;                           // +0xD4
-      WeakRefCountedToken* vertexStreamRefs[1]{};                       // +0xD8 (start of stream-ref array)
-    };
-
-    struct DeviceOutputContextRuntime final
-    {
-      std::uint8_t pad00_03[0x04]{}; // +0x00 .. +0x03
-      OutputContext outputContext{}; // +0x04
-    };
-
+    /**
+     * Still an overlay, and knowingly so. It is `OutputContext` byte for byte,
+     * but `OutputContext` types its handles as `shared_ptr<RenderTargetContext>`
+     * and friends -- and `RenderTargetContext` is a creation descriptor, not a
+     * target -- while the D3D10 target classes declare no base at all. So there
+     * is no real type yet that holds a `RenderTargetD3D10` in the +0x10 slot or
+     * the depth-stencil target in +0x18. Removing this needs the gal
+     * render-target hierarchy recovered from RTTI first, and `OutputContext` is
+     * shared with the D3D9 backend.
+     */
     struct OutputContextD3D10RuntimeView final
     {
       void* vtable = nullptr;                                    // +0x00
@@ -267,33 +245,6 @@ namespace gpg::gal
       std::int32_t face = 0;                                     // +0x0C
       boost::shared_ptr<RenderTargetD3D10> renderTarget;         // +0x10
       boost::shared_ptr<DepthStencilTargetD3D10> depthStencil;   // +0x18
-    };
-
-    struct DeviceD3D10IntroRuntime final
-    {
-      std::uint8_t pad00_4B[0x4C]{};          // +0x00 .. +0x4B
-      int currentThreadId = 0;                // +0x4C
-      std::uint8_t logStorage[0x10]{};        // +0x50 .. +0x5F
-      DeviceContext* deviceContext = nullptr; // +0x60
-    };
-
-    struct DeviceCursorLaneRuntime final
-    {
-      std::uint8_t pad00_11B[0x11C]{}; // +0x00 .. +0x11B
-      CursorD3D10 cursor{};            // +0x11C
-    };
-
-    struct DeviceHeadArrayRuntime final
-    {
-      std::uint8_t pad00_117[0x118]{}; // +0x00 .. +0x117
-      void* headsBase = nullptr;       // +0x118
-    };
-
-    struct DeviceContextHeadRangeRuntime final
-    {
-      std::uint8_t pad00_27[0x28]{};            // +0x00 .. +0x27
-      const std::uint8_t* headsBegin = nullptr; // +0x28
-      const std::uint8_t* headsEnd = nullptr;   // +0x2C
     };
 
     struct HeadRuntime final
@@ -324,13 +275,6 @@ namespace gpg::gal
       std::uint32_t height = 0U; // +0x0C
       float minDepth = 0.0f;     // +0x10
       float maxDepth = 0.0f;     // +0x14
-    };
-
-    struct DeviceSwapChainRangeRuntime final
-    {
-      std::uint8_t pad00_A7[0xA8]{};    // +0x00 .. +0xA7
-      void** swapChainsBegin = nullptr; // +0xA8
-      void** swapChainsEnd = nullptr;   // +0xAC
     };
 
     struct DrawPrimitiveContextRuntime final
@@ -463,38 +407,6 @@ namespace gpg::gal
       float lane40 = 0.0f; // +0x40
     };
 
-    class DeviceD3D10BackendObject final : public DeviceD3D10
-    {
-    public:
-      OutputContext outputContext_{};                                     // +0x04
-      HMODULE d3dModulePrimary_ = nullptr;                                // +0x24
-      HMODULE d3dModuleSecondary_ = nullptr;                              // +0x28
-      HMODULE dxgiModule_ = nullptr;                                      // +0x2C
-      void* createDeviceApi_ = nullptr;                                   // +0x30
-      device_create_blob_api_fn createBlobApi_ = nullptr;                 // +0x34
-      device_create_effect_from_memory_api_fn createEffectFromMemoryApi_ = nullptr; // +0x38
-      device_create_texture_from_memory_api_fn createTextureFromMemoryApi_ = nullptr; // +0x3C
-      device_save_texture_to_file_api_fn saveTextureToFileApi_ = nullptr; // +0x40
-      device_save_texture_to_memory_api_fn saveTextureToMemoryApi_ = nullptr; // +0x44
-      void* createDxgiFactoryApi_ = nullptr;                              // +0x48
-      int currentThreadId_ = 0;                                           // +0x4C
-      msvc8::vector<msvc8::string> logStorage_{};                         // +0x50
-      DeviceContext deviceContext_{0};                                    // +0x60
-      msvc8::vector<AdapterD3D10> adapters_{};                            // +0x94
-      msvc8::vector<void*> swapChains_{};                                 // +0xA4
-      boost::shared_ptr<PipelineStateD3D10> pipelineState_{};             // +0xB4
-      void* dxgiFactory_ = nullptr;                                       // +0xBC
-      void* d3dDevice_ = nullptr;                                         // +0xC0
-      void* effectPreamble_ = nullptr;                                    // +0xC4
-      void* shaderPreamble_ = nullptr;                                    // +0xC8
-      void* rttTechnique_ = nullptr;                                      // +0xCC
-      void* stretchRectBuffer_ = nullptr;                                 // +0xD0
-      void* stretchRectInputLayout_ = nullptr;                            // +0xD4
-      std::uint32_t streamStateD8_[16]{};                                 // +0xD8 .. +0x117
-      void* outputContexts_ = nullptr;                                    // +0x118
-      CursorD3D10 cursor_{};                                              // +0x11C
-    };
-
     static_assert(
       offsetof(D3D10EffectDescRuntime, techniqueCount) == 0x14,
       "D3D10EffectDescRuntime::techniqueCount offset must be 0x14"
@@ -541,90 +453,6 @@ namespace gpg::gal
       "D3D10PassDescRuntime::inputSignatureSize offset must be 0x0C"
     );
     static_assert(sizeof(D3D10PassDescRuntime) == 0x28, "D3D10PassDescRuntime size must be 0x28");
-    static_assert(
-      offsetof(DeviceTechniqueBindingsRuntime, nativeDevice) == 0x04,
-      "DeviceTechniqueBindingsRuntime::nativeDevice offset must be 0x04"
-    );
-    static_assert(
-      offsetof(DeviceTechniqueBindingsRuntime, rasterizerState) == 0x1C,
-      "DeviceTechniqueBindingsRuntime::rasterizerState offset must be 0x1C"
-    );
-    static_assert(
-      offsetof(DeviceTechniqueBindingsRuntime, depthStencilState) == 0x20,
-      "DeviceTechniqueBindingsRuntime::depthStencilState offset must be 0x20"
-    );
-    static_assert(
-      offsetof(DeviceTechniqueBindingsRuntime, blendState) == 0x24,
-      "DeviceTechniqueBindingsRuntime::blendState offset must be 0x24"
-    );
-    static_assert(sizeof(DeviceTechniqueBindingsRuntime) == 0x28, "DeviceTechniqueBindingsRuntime size must be 0x28");
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, techniqueBindings) == 0xB4,
-      "DeviceD3D10RuntimeView::techniqueBindings offset must be 0xB4"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, techniqueBindingsCount) == 0xB8,
-      "DeviceD3D10RuntimeView::techniqueBindingsCount offset must be 0xB8"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, nativeDevice) == 0xC0, "DeviceD3D10RuntimeView::nativeDevice offset must be 0xC0"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, signatureEffect) == 0xC4,
-      "DeviceD3D10RuntimeView::signatureEffect offset must be 0xC4"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, stretchRectEffect) == 0xC8,
-      "DeviceD3D10RuntimeView::stretchRectEffect offset must be 0xC8"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, stretchRectTechnique) == 0xCC,
-      "DeviceD3D10RuntimeView::stretchRectTechnique offset must be 0xCC"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, stretchRectVertexBuffer) == 0xD0,
-      "DeviceD3D10RuntimeView::stretchRectVertexBuffer offset must be 0xD0"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, stretchRectInputLayout) == 0xD4,
-      "DeviceD3D10RuntimeView::stretchRectInputLayout offset must be 0xD4"
-    );
-    static_assert(
-      offsetof(DeviceD3D10RuntimeView, vertexStreamRefs) == 0xD8,
-      "DeviceD3D10RuntimeView::vertexStreamRefs offset must be 0xD8"
-    );
-    static_assert(
-      offsetof(DeviceOutputContextRuntime, outputContext) == 0x04,
-      "DeviceOutputContextRuntime::outputContext offset must be 0x04"
-    );
-    static_assert(sizeof(DeviceOutputContextRuntime) == 0x24, "DeviceOutputContextRuntime size must be 0x24");
-    static_assert(
-      offsetof(DeviceD3D10IntroRuntime, currentThreadId) == 0x4C,
-      "DeviceD3D10IntroRuntime::currentThreadId offset must be 0x4C"
-    );
-    static_assert(
-      offsetof(DeviceD3D10IntroRuntime, logStorage) == 0x50, "DeviceD3D10IntroRuntime::logStorage offset must be 0x50"
-    );
-    static_assert(
-      offsetof(DeviceD3D10IntroRuntime, deviceContext) == 0x60,
-      "DeviceD3D10IntroRuntime::deviceContext offset must be 0x60"
-    );
-    static_assert(
-      offsetof(DeviceCursorLaneRuntime, cursor) == 0x11C, "DeviceCursorLaneRuntime::cursor offset must be 0x11C"
-    );
-    static_assert(
-      offsetof(DeviceHeadArrayRuntime, headsBase) == 0x118, "DeviceHeadArrayRuntime::headsBase offset must be 0x118"
-    );
-    static_assert(sizeof(DeviceHeadArrayRuntime) == 0x11C, "DeviceHeadArrayRuntime size must be 0x11C");
-    static_assert(
-      offsetof(DeviceContextHeadRangeRuntime, headsBegin) == 0x28,
-      "DeviceContextHeadRangeRuntime::headsBegin offset must be 0x28"
-    );
-    static_assert(
-      offsetof(DeviceContextHeadRangeRuntime, headsEnd) == 0x2C,
-      "DeviceContextHeadRangeRuntime::headsEnd offset must be 0x2C"
-    );
-    static_assert(sizeof(DeviceContextHeadRangeRuntime) == 0x30, "DeviceContextHeadRangeRuntime size must be 0x30");
     static_assert(offsetof(HeadRuntime, window) == 0x08, "HeadRuntime::window offset must be 0x08");
     static_assert(offsetof(HeadRuntime, windowed) == 0x0C, "HeadRuntime::windowed offset must be 0x0C");
     static_assert(offsetof(HeadRuntime, width) == 0x10, "HeadRuntime::width offset must be 0x10");
@@ -635,14 +463,6 @@ namespace gpg::gal
     static_assert(offsetof(ViewportRuntime, width) == 0x08, "ViewportRuntime::width offset must be 0x08");
     static_assert(offsetof(ViewportRuntime, minDepth) == 0x10, "ViewportRuntime::minDepth offset must be 0x10");
     static_assert(sizeof(ViewportRuntime) == 0x18, "ViewportRuntime size must be 0x18");
-    static_assert(
-      offsetof(DeviceSwapChainRangeRuntime, swapChainsBegin) == 0xA8,
-      "DeviceSwapChainRangeRuntime::swapChainsBegin offset must be 0xA8"
-    );
-    static_assert(
-      offsetof(DeviceSwapChainRangeRuntime, swapChainsEnd) == 0xAC,
-      "DeviceSwapChainRangeRuntime::swapChainsEnd offset must be 0xAC"
-    );
     static_assert(
       offsetof(DrawPrimitiveContextRuntime, topologyToken) == 0x04,
       "DrawPrimitiveContextRuntime::topologyToken offset must be 0x04"
@@ -779,51 +599,6 @@ namespace gpg::gal
       "OutputContextD3D10RuntimeView::depthStencil offset must be 0x18"
     );
     static_assert(sizeof(OutputContextD3D10RuntimeView) == 0x20, "OutputContextD3D10RuntimeView size must be 0x20");
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, outputContext_) == 0x04,
-      "DeviceD3D10BackendObject::outputContext_ offset must be 0x04"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, d3dModulePrimary_) == 0x24,
-      "DeviceD3D10BackendObject::d3dModulePrimary_ offset must be 0x24"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, logStorage_) == 0x50,
-      "DeviceD3D10BackendObject::logStorage_ offset must be 0x50"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, deviceContext_) == 0x60,
-      "DeviceD3D10BackendObject::deviceContext_ offset must be 0x60"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, adapters_) == 0x94,
-      "DeviceD3D10BackendObject::adapters_ offset must be 0x94"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, swapChains_) == 0xA4,
-      "DeviceD3D10BackendObject::swapChains_ offset must be 0xA4"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, pipelineState_) == 0xB4,
-      "DeviceD3D10BackendObject::pipelineState_ offset must be 0xB4"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, d3dDevice_) == 0xC0,
-      "DeviceD3D10BackendObject::d3dDevice_ offset must be 0xC0"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, streamStateD8_) == 0xD8,
-      "DeviceD3D10BackendObject::streamStateD8_ offset must be 0xD8"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, outputContexts_) == 0x118,
-      "DeviceD3D10BackendObject::outputContexts_ offset must be 0x118"
-    );
-    static_assert(
-      offsetof(DeviceD3D10BackendObject, cursor_) == 0x11C,
-      "DeviceD3D10BackendObject::cursor_ offset must be 0x11C"
-    );
-    static_assert(sizeof(DeviceD3D10BackendObject) == 0x128, "DeviceD3D10BackendObject size must be 0x128");
 
     constexpr DXGIFormatPair kTextureDxgiGalPairs[89] = {
       {0, 20},  {1, 20},  {2, 18},  {3, 20},  {4, 20},  {5, 20},  {6, 20},  {7, 20},  {8, 20},  {9, 20},
@@ -1283,120 +1058,110 @@ namespace gpg::gal
       }
     }
 
-    DeviceD3D10RuntimeView* ViewDeviceRuntime(DeviceD3D10* const device) noexcept
-    {
-      return reinterpret_cast<DeviceD3D10RuntimeView*>(device);
-    }
-
-    DeviceD3D10BackendObject* AsDeviceD3D10BackendObject(DeviceD3D10* const device) noexcept
-    {
-      return static_cast<DeviceD3D10BackendObject*>(device);
-    }
-
     OutputContext* GetDeviceOutputContext(DeviceD3D10* const device) noexcept
     {
-      return &reinterpret_cast<DeviceOutputContextRuntime*>(device)->outputContext;
+      return &device->mOutputContext;
     }
 
     void* GetDeviceLogStorage(DeviceD3D10* const device) noexcept
     {
-      return reinterpret_cast<void*>(reinterpret_cast<DeviceD3D10IntroRuntime*>(device)->logStorage);
+      return &device->mLog;
     }
 
+    /**
+     * The binary's `GetDeviceContext` (0x008F86C0) is `lea eax,[ecx+0x60]` --
+     * the address of the embedded context. This used to read the dword stored
+     * at +0x60 instead, which is the context's vptr, so every caller got the
+     * vtable address back as a `DeviceContext*`.
+     */
     DeviceContext* GetDeviceContextLane(DeviceD3D10* const device) noexcept
     {
-      return reinterpret_cast<DeviceD3D10IntroRuntime*>(device)->deviceContext;
+      return &device->mDeviceContext;
     }
 
     int GetDeviceCurrentThreadId(DeviceD3D10* const device) noexcept
     {
-      return reinterpret_cast<DeviceD3D10IntroRuntime*>(device)->currentThreadId;
+      return device->mCurThreadId;
     }
 
     CursorD3D10* GetDeviceCursorLane(DeviceD3D10* const device) noexcept
     {
-      return &reinterpret_cast<DeviceCursorLaneRuntime*>(device)->cursor;
+      return &device->mCursor;
     }
 
-    DeviceTechniqueBindingsRuntime* GetDeviceTechniqueBindings(DeviceD3D10* const device) noexcept
+    PipelineStateD3D10* GetDeviceTechniqueBindings(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->techniqueBindings;
-    }
-
-    boost::detail::sp_counted_base* GetDeviceTechniqueBindingsCount(DeviceD3D10* const device) noexcept
-    {
-      return ViewDeviceRuntime(device)->techniqueBindingsCount;
+      return device->mPipelineState.get();
     }
 
     void* GetDeviceNativeHandle(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->nativeDevice;
+      return device->mDevice;
     }
 
     void* GetDeviceSignatureEffect(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->signatureEffect;
+      return device->mSignatureEffect;
     }
 
     void* GetDeviceStretchRectEffect(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->stretchRectEffect;
+      return device->mRttEffect;
     }
 
     void* GetDeviceStretchRectTechnique(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->stretchRectTechnique;
+      return device->mRttTechnique;
     }
 
     void* GetDeviceStretchRectVertexBuffer(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->stretchRectVertexBuffer;
+      return device->mRttQuadVertexBuffer;
     }
 
     void* GetDeviceStretchRectInputLayout(DeviceD3D10* const device) noexcept
     {
-      return ViewDeviceRuntime(device)->stretchRectInputLayout;
+      return device->mRttInputLayout;
     }
 
-    void* GetDeviceHeadArrayBase(DeviceD3D10* const device) noexcept
+    OutputContext* GetDeviceHeadArrayBase(DeviceD3D10* const device) noexcept
     {
-      return reinterpret_cast<DeviceHeadArrayRuntime*>(device)->headsBase;
+      return device->mHeadOutputContexts;
     }
 
+    /**
+     * Head count of the retained device context. This used to overlay a range
+     * view on what `GetDeviceContextLane` returned -- the context's vptr -- and
+     * so computed the count from two vtable entries. The `>> 7` it divided by is
+     * `sizeof(Head)` (0x80), which is what `size()` does.
+     */
     std::uint32_t GetDeviceHeadCount(DeviceD3D10* const device) noexcept
     {
-      const DeviceContext* const context = GetDeviceContextLane(device);
-      if (context == nullptr) {
-        return 0U;
-      }
-
-      const auto* const headRange = reinterpret_cast<const DeviceContextHeadRangeRuntime*>(context);
-      if ((headRange->headsBegin == nullptr) || (headRange->headsEnd == nullptr)) {
-        return 0U;
-      }
-
-      if (headRange->headsEnd < headRange->headsBegin) {
-        return 0U;
-      }
-
-      return static_cast<std::uint32_t>((headRange->headsEnd - headRange->headsBegin) >> 7U);
+      return static_cast<std::uint32_t>(device->mDeviceContext.mHeads.size());
     }
 
     WeakRefCountedToken** GetDeviceVertexStreamRefArray(DeviceD3D10* const device) noexcept
     {
-      auto* const runtimeBytes = reinterpret_cast<std::uint8_t*>(ViewDeviceRuntime(device));
-      return reinterpret_cast<WeakRefCountedToken**>(runtimeBytes + offsetof(DeviceD3D10RuntimeView, vertexStreamRefs));
+      return device->mVertexStreams;
     }
 
+    /**
+     * `DrawPrimitive` (0x008FD049) and `DrawIndexedPrimitive` (0x008FD159) read
+     * this+0xD8 and draw instanced when it exceeds 1. Nothing else writes that
+     * dword: it is slot 0 of `mVertexStreams`, filled by the stream setter
+     * (`mov [esi+edi*4+0xD8], eax` at 0x008F970A) and cleared by `Setup`. So the
+     * shipped engine reads stream 0's reference as its instance count. That is
+     * kept exactly, because it is what the binary does; it is not a separate
+     * field and must not be given one.
+     */
     std::uint32_t GetDeviceInstanceCount(DeviceD3D10* const device) noexcept
     {
-      auto* const runtimeBytes = reinterpret_cast<std::uint8_t*>(device);
-      return *reinterpret_cast<const std::uint32_t*>(runtimeBytes + 0xD8);
+      return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(device->mVertexStreams[0]));
     }
 
-    DeviceSwapChainRangeRuntime* GetDeviceSwapChainRange(DeviceD3D10* const device) noexcept
+    msvc8::vector<IDXGISwapChain*>& GetDeviceSwapChains(DeviceD3D10* const device) noexcept
     {
-      return reinterpret_cast<DeviceSwapChainRangeRuntime*>(device);
+      return device->mSwapChains;
     }
 
     std::uint32_t ConvertCursorPixelRgbaToBgra(const std::uint32_t rgba) noexcept
@@ -1522,33 +1287,33 @@ namespace gpg::gal
     }
 
     int InvokeNativeClearShaderResourceSlot(
-      DeviceTechniqueBindingsRuntime* const bindings, const unsigned int startSlot, void* const* const views
+      PipelineStateD3D10* const bindings, const unsigned int startSlot, void* const* const views
     )
     {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->nativeDevice);
+      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
       auto* const setShaderResources = reinterpret_cast<device_native_set_shader_resources_fn>(vtable[4]);
-      return setShaderResources(bindings->nativeDevice, startSlot, 1U, views);
+      return setShaderResources(bindings->device_, startSlot, 1U, views);
     }
 
-    void InvokeNativeSetRasterizerState(DeviceTechniqueBindingsRuntime* const bindings)
+    void InvokeNativeSetRasterizerState(PipelineStateD3D10* const bindings)
     {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->nativeDevice);
+      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
       auto* const setRasterizerState = reinterpret_cast<device_native_set_rasterizer_state_fn>(vtable[29]);
-      setRasterizerState(bindings->nativeDevice, bindings->rasterizerState);
+      setRasterizerState(bindings->device_, bindings->rasterizerState2_);
     }
 
-    void InvokeNativeSetDepthStencilState(DeviceTechniqueBindingsRuntime* const bindings)
+    void InvokeNativeSetDepthStencilState(PipelineStateD3D10* const bindings)
     {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->nativeDevice);
+      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
       auto* const setDepthStencilState = reinterpret_cast<device_native_set_depth_stencil_state_fn>(vtable[26]);
-      setDepthStencilState(bindings->nativeDevice, bindings->depthStencilState, 0U);
+      setDepthStencilState(bindings->device_, bindings->depthStencilState2_, 0U);
     }
 
-    int InvokeNativeSetBlendState(DeviceTechniqueBindingsRuntime* const bindings)
+    int InvokeNativeSetBlendState(PipelineStateD3D10* const bindings)
     {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->nativeDevice);
+      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
       auto* const setBlendState = reinterpret_cast<device_native_set_blend_state_fn>(vtable[25]);
-      return setBlendState(bindings->nativeDevice, bindings->blendState, nullptr, static_cast<unsigned int>(-1));
+      return setBlendState(bindings->device_, bindings->blendState2_, nullptr, static_cast<unsigned int>(-1));
     }
 
     HRESULT InvokeNativeCreateBuffer(DeviceD3D10* const device, const void* const description, void** const outBuffer)
@@ -1715,13 +1480,6 @@ namespace gpg::gal
       getRenderTargets(nativeDevice, renderTargetCount, outRenderTargetView, outDepthStencilView);
     }
 
-    HRESULT InvokeSwapChainPresent(void* const swapChain, const unsigned int syncInterval, const unsigned int flags)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(swapChain);
-      auto* const present = reinterpret_cast<swap_chain_present_fn>(vtable[8]);
-      return present(swapChain, syncInterval, flags);
-    }
-
     void InvokeNativeCopySubresourceRegion(
       DeviceD3D10* const device,
       void* const destinationResource,
@@ -1885,7 +1643,7 @@ namespace gpg::gal
      * Clears 128 texture shader-resource slots on the retained native D3D10
      * device lane and returns the final native-call result code.
      */
-    int ClearAllTextureShaderResourceSlots(DeviceTechniqueBindingsRuntime* const bindings)
+    int ClearAllTextureShaderResourceSlots(PipelineStateD3D10* const bindings)
     {
       unsigned int slot = 0U;
       void* nullResourceView = nullptr;
@@ -1905,7 +1663,7 @@ namespace gpg::gal
      * Applies retained rasterizer/depth-stencil/blend state lanes to the
      * native D3D10 device for begin-technique dispatch.
      */
-    int ApplyTechniqueStateBindings(DeviceTechniqueBindingsRuntime* const bindings)
+    int ApplyTechniqueStateBindings(PipelineStateD3D10* const bindings)
     {
       InvokeNativeSetRasterizerState(bindings);
       InvokeNativeSetDepthStencilState(bindings);
@@ -2455,8 +2213,6 @@ namespace gpg::gal
       return ::operator new(static_cast<std::size_t>(count) * static_cast<std::size_t>(elementSize));
     }
 
-
-
     /**
      * Address: 0x008F8ED0 (FUN_008F8ED0)
      *
@@ -2683,26 +2439,8 @@ namespace gpg::gal
       return ReleaseComLikeWithResult(adapter->dxgiAdapter_);
     }
 
-
-
     // Defined later in this TU; used by the vector<void*>::_Insert_n grow lane below.
     [[noreturn]] void ThrowVectorTooLongLengthErrorB();
-
-    /**
-     * Address: 0x008FE4B0 (FUN_008FE4B0)
-     *
-     * What it does:
-     * Appends one swap-chain handle into the retained backend swap-chain vector.
-     * Fast path stores into the free slot; when capacity is exhausted it
-     * falls into `msvc8::vector<void*>::_Insert_n` (FUN_008FE010), which is
-     * cited on that template member. Both arms together are push_back.
-     */
-    void* AppendBackendSwapChain(msvc8::vector<void*>& swapChains, IDXGISwapChain* const swapChain)
-    {
-      // Grow when full, otherwise write at mLast and bump it: push_back.
-      swapChains.push_back(swapChain);
-      return swapChain;
-    }
 
     /**
      * Address: 0x008F8670 (FUN_008F8670)
@@ -4045,59 +3783,53 @@ namespace gpg::gal
      * Releases startup/runtime-owned D3D10 device resources and resets recovered
      * context/module lanes.
      */
-    BOOL ResetDeviceD3D10Runtime(DeviceD3D10BackendObject* const backend)
+    BOOL ResetDeviceD3D10Runtime(DeviceD3D10* const backend)
     {
       if (backend == nullptr) {
         return FALSE;
       }
 
-      if (backend->outputContexts_ != nullptr) {
-        delete[] reinterpret_cast<OutputContext*>(backend->outputContexts_);
-        backend->outputContexts_ = nullptr;
+      if (backend->mHeadOutputContexts != nullptr) {
+        delete[] backend->mHeadOutputContexts;
+        backend->mHeadOutputContexts = nullptr;
       }
 
-      void** const swapChainsBegin = backend->swapChains_.begin();
-      void** const swapChainsEnd = backend->swapChains_.end();
-      if ((swapChainsBegin != nullptr) && (swapChainsEnd != nullptr)) {
-        for (void** it = swapChainsBegin; it != swapChainsEnd; ++it) {
-          void* swapChain = *it;
-          ReleaseComLike(swapChain);
-          *it = nullptr;
-        }
+      for (IDXGISwapChain*& swapChain : backend->mSwapChains) {
+        ReleaseComLike(swapChain);
       }
-      backend->swapChains_.clear();
+      backend->mSwapChains.clear();
 
-      backend->adapters_.clear();
-      backend->pipelineState_.reset();
+      backend->mAdapters.clear();
+      backend->mPipelineState.reset();
 
-      ReleaseComLike(backend->dxgiFactory_);
-      ReleaseComLike(backend->d3dDevice_);
-      ReleaseComLike(backend->effectPreamble_);
-      ReleaseComLike(backend->shaderPreamble_);
-      ReleaseComLike(backend->stretchRectBuffer_);
-      ReleaseComLike(backend->stretchRectInputLayout_);
+      ReleaseComLike(backend->mDXGIFactory);
+      ReleaseComLike(backend->mDevice);
+      ReleaseComLike(backend->mSignatureEffect);
+      ReleaseComLike(backend->mRttEffect);
+      ReleaseComLike(backend->mRttQuadVertexBuffer);
+      ReleaseComLike(backend->mRttInputLayout);
 
-      backend->cursor_.Destroy();
-      backend->deviceContext_ = DeviceContext(0);
-      backend->logStorage_.clear();
-      backend->currentThreadId_ = 0;
+      backend->mCursor.Destroy();
+      backend->mDeviceContext = DeviceContext(0);
+      backend->mLog.clear();
+      backend->mCurThreadId = 0;
 
-      ::FreeLibrary(backend->dxgiModule_);
-      backend->dxgiModule_ = nullptr;
+      ::FreeLibrary(backend->mDXGIModule);
+      backend->mDXGIModule = nullptr;
 
-      ::FreeLibrary(backend->d3dModuleSecondary_);
-      backend->d3dModuleSecondary_ = nullptr;
+      ::FreeLibrary(backend->mD3DX10Module);
+      backend->mD3DX10Module = nullptr;
 
-      const BOOL result = ::FreeLibrary(backend->d3dModulePrimary_);
-      backend->d3dModulePrimary_ = nullptr;
+      const BOOL result = ::FreeLibrary(backend->mD3D10Module);
+      backend->mD3D10Module = nullptr;
 
-      backend->createDeviceApi_ = nullptr;
-      backend->createBlobApi_ = nullptr;
-      backend->createEffectFromMemoryApi_ = nullptr;
-      backend->createTextureFromMemoryApi_ = nullptr;
-      backend->saveTextureToFileApi_ = nullptr;
-      backend->saveTextureToMemoryApi_ = nullptr;
-      backend->createDxgiFactoryApi_ = nullptr;
+      backend->mD3D10CreateDevice = nullptr;
+      backend->mD3D10CreateBlob = nullptr;
+      backend->mD3DX10CreateEffectFromMemory = nullptr;
+      backend->mD3DX10CreateTextureFromMemory = nullptr;
+      backend->mD3DX10SaveTextureToFileA = nullptr;
+      backend->mD3DX10SaveTextureToMemory = nullptr;
+      backend->mCreateDXGIFactory = nullptr;
       return result;
     }
 
@@ -4108,20 +3840,20 @@ namespace gpg::gal
      * Executes non-deleting destructor body lanes for `DeviceD3D10` by running
      * runtime reset, then final member teardown/deallocation in binary order.
      */
-    void DestroyDeviceD3D10Body(DeviceD3D10BackendObject* const backend)
+    void DestroyDeviceD3D10Body(DeviceD3D10* const backend)
     {
       if (backend == nullptr) {
         return;
       }
 
       static_cast<void>(ResetDeviceD3D10Runtime(backend));
-      backend->cursor_.~CursorD3D10();
-      backend->pipelineState_.reset();
-      backend->swapChains_.tidy();
-      backend->adapters_.tidy();
-      backend->deviceContext_.~DeviceContext();
-      backend->logStorage_.tidy();
-      backend->outputContext_.~OutputContext();
+      backend->mCursor.~CursorD3D10();
+      backend->mPipelineState.reset();
+      backend->mSwapChains.tidy();
+      backend->mAdapters.tidy();
+      backend->mDeviceContext.~DeviceContext();
+      backend->mLog.tidy();
+      backend->mOutputContext.~OutputContext();
     }
   } // namespace
 
@@ -5959,9 +5691,8 @@ namespace gpg::gal
    */
   void DeviceD3D10::DestroyBackendObject()
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    DestroyDeviceD3D10Body(backend);
-    ::operator delete(static_cast<void*>(backend));
+    DestroyDeviceD3D10Body(this);
+    ::operator delete(static_cast<void*>(this));
   }
 
   /**
@@ -5977,36 +5708,30 @@ namespace gpg::gal
    * Address: 0x008FE5D0 (FUN_008FE5D0)
    *
    * What it does:
-   * Allocates and initializes one D3D10 backend object with recovered
-   * constructor-default runtime lanes.
+   * Installs the vtable, builds the output context at +0x04, zeroes the
+   * module, export and COM lanes, builds the embedded `DeviceContext(0)` at
+   * +0x60 and the cursor at +0x11C. Every one of those is a member
+   * initializer on the class, so the body is empty: this used to be a free
+   * factory that `new`ed an overlay and then reset each member by hand.
+   */
+  DeviceD3D10::DeviceD3D10() = default;
+
+  /**
+   * Address context: 0x008E6B60 (func_CreateDeviceD3D)
+   *
+   * What it does:
+   * The D3D10 arm of the device factory: `push 0x128; call operator new`
+   * then the constructor above.
+   *
+   * The cast is the one piece of this left unrecovered. The binary's
+   * constructor installs `Device`'s vtable (0x00D42224) before its own, so
+   * `DeviceD3D10` derives from `gpg::gal::Device`; ours does not yet, because
+   * the two classes' virtual lists do not line up slot for slot and have to
+   * be reconciled against both vtables first.
    */
   Device* CreateDeviceD3D10Backend()
   {
-    auto* const backend = new DeviceD3D10BackendObject();
-
-    backend->outputContext_.cubeTarget.reset();
-    backend->outputContext_.face = 0;
-    backend->outputContext_.surface.reset();
-    backend->outputContext_.texture.reset();
-
-    backend->currentThreadId_ = 0;
-    backend->logStorage_.clear();
-    backend->deviceContext_ = DeviceContext(0);
-    backend->adapters_.clear();
-    backend->swapChains_.clear();
-    backend->pipelineState_.reset();
-
-    backend->dxgiFactory_ = nullptr;
-    backend->d3dDevice_ = nullptr;
-    backend->effectPreamble_ = nullptr;
-    backend->shaderPreamble_ = nullptr;
-    backend->rttTechnique_ = nullptr;
-    backend->stretchRectBuffer_ = nullptr;
-    backend->stretchRectInputLayout_ = nullptr;
-    backend->outputContexts_ = nullptr;
-    std::memset(backend->streamStateD8_, 0, sizeof(backend->streamStateD8_));
-
-    return reinterpret_cast<Device*>(backend);
+    return reinterpret_cast<Device*>(new DeviceD3D10());
   }
 
   /**
@@ -6032,9 +5757,8 @@ namespace gpg::gal
     }
 
     auto* const deviceD3D10 = reinterpret_cast<DeviceD3D10*>(device);
-    auto* const backend = AsDeviceD3D10BackendObject(deviceD3D10);
-    backend->currentThreadId_ = static_cast<int>(::GetCurrentThreadId());
-    backend->deviceContext_ = *context;
+    deviceD3D10->mCurThreadId = static_cast<int>(::GetCurrentThreadId());
+    deviceD3D10->mDeviceContext = *context;
 
     deviceD3D10->Setup(context);
   }
@@ -6103,42 +5827,41 @@ namespace gpg::gal
    */
   void DeviceD3D10::DynamicLink()
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
 
-    backend->d3dModulePrimary_ = ::LoadLibraryA("d3d10.dll");
-    if (backend->d3dModulePrimary_ == nullptr) {
+    mD3D10Module = ::LoadLibraryA("d3d10.dll");
+    if (mD3D10Module == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1645, "unable to explicitly link to d3d10.dll");
     }
 
-    backend->createDeviceApi_ = reinterpret_cast<void*>(::GetProcAddress(backend->d3dModulePrimary_, "D3D10CreateDevice"));
-    backend->createBlobApi_ = reinterpret_cast<device_create_blob_api_fn>(
-      ::GetProcAddress(backend->d3dModulePrimary_, "D3D10CreateBlob")
+    mD3D10CreateDevice = reinterpret_cast<D3D10CreateDeviceFn>(::GetProcAddress(mD3D10Module, "D3D10CreateDevice"));
+    mD3D10CreateBlob = reinterpret_cast<D3D10CreateBlobFn>(
+      ::GetProcAddress(mD3D10Module, "D3D10CreateBlob")
     );
 
-    backend->d3dModuleSecondary_ = ::LoadLibraryA("d3dx10.dll");
-    if (backend->d3dModuleSecondary_ == nullptr) {
+    mD3DX10Module = ::LoadLibraryA("d3dx10.dll");
+    if (mD3DX10Module == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1650, "unable to explicitly link to d3dx10.dll");
     }
 
-    backend->createEffectFromMemoryApi_ = reinterpret_cast<device_create_effect_from_memory_api_fn>(
-      ::GetProcAddress(backend->d3dModuleSecondary_, "D3DX10CreateEffectFromMemory")
+    mD3DX10CreateEffectFromMemory = reinterpret_cast<D3DX10CreateEffectFromMemoryFn>(
+      ::GetProcAddress(mD3DX10Module, "D3DX10CreateEffectFromMemory")
     );
-    backend->createTextureFromMemoryApi_ = reinterpret_cast<device_create_texture_from_memory_api_fn>(
-      ::GetProcAddress(backend->d3dModuleSecondary_, "D3DX10CreateTextureFromMemory")
+    mD3DX10CreateTextureFromMemory = reinterpret_cast<D3DX10CreateTextureFromMemoryFn>(
+      ::GetProcAddress(mD3DX10Module, "D3DX10CreateTextureFromMemory")
     );
-    backend->saveTextureToFileApi_ = reinterpret_cast<device_save_texture_to_file_api_fn>(
-      ::GetProcAddress(backend->d3dModuleSecondary_, "D3DX10SaveTextureToFileA")
+    mD3DX10SaveTextureToFileA = reinterpret_cast<D3DX10SaveTextureToFileFn>(
+      ::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToFileA")
     );
-    backend->saveTextureToMemoryApi_ = reinterpret_cast<device_save_texture_to_memory_api_fn>(
-      ::GetProcAddress(backend->d3dModuleSecondary_, "D3DX10SaveTextureToMemory")
+    mD3DX10SaveTextureToMemory = reinterpret_cast<D3DX10SaveTextureToMemoryFn>(
+      ::GetProcAddress(mD3DX10Module, "D3DX10SaveTextureToMemory")
     );
 
-    backend->dxgiModule_ = ::LoadLibraryA("dxgi.dll");
-    if (backend->dxgiModule_ == nullptr) {
+    mDXGIModule = ::LoadLibraryA("dxgi.dll");
+    if (mDXGIModule == nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1657, "unable to explicitly link to dxgi.dll");
     }
 
-    backend->createDxgiFactoryApi_ = reinterpret_cast<void*>(::GetProcAddress(backend->dxgiModule_, "CreateDXGIFactory"));
+    mCreateDXGIFactory = reinterpret_cast<CreateDXGIFactoryFn>(::GetProcAddress(mDXGIModule, "CreateDXGIFactory"));
   }
 
   /**
@@ -6150,10 +5873,9 @@ namespace gpg::gal
    */
   int DeviceD3D10::SetupDXGIDevice()
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    backend->adapters_.clear();
+    mAdapters.clear();
 
-    auto* const dxgiFactory = reinterpret_cast<IDXGIFactory*>(backend->dxgiFactory_);
+    auto* const dxgiFactory = mDXGIFactory;
     if (dxgiFactory == nullptr) {
       return E_POINTER;
     }
@@ -6163,7 +5885,7 @@ namespace gpg::gal
     for (unsigned int adapterIndex = 0U; result >= 0; ++adapterIndex) {
       AdapterD3D10 adapterEntry(adapter);
       if (adapterEntry.ProbeOutputsAndModes() >= 0) {
-        backend->adapters_.push_back(adapterEntry);
+        mAdapters.push_back(adapterEntry);
       }
 
       adapter = nullptr;
@@ -6182,10 +5904,9 @@ namespace gpg::gal
    */
   void DeviceD3D10::SetUpRTT()
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    auto* const device = reinterpret_cast<ID3D10Device*>(backend->d3dDevice_);
+    auto* const device = mDevice;
 
-    const HRESULT createEffectResult = backend->createEffectFromMemoryApi_(
+    const HRESULT createEffectResult = mD3DX10CreateEffectFromMemory(
       kRttEffectSource,
       sizeof(kRttEffectSource),
       nullptr,
@@ -6196,15 +5917,15 @@ namespace gpg::gal
       device,
       nullptr,
       nullptr,
-      &backend->shaderPreamble_,
+      &mRttEffect,
       nullptr
     );
     if (createEffectResult < 0) {
       ThrowDeviceD3D10Hresult(1925, createEffectResult);
     }
 
-    auto* const shaderEffect = reinterpret_cast<ID3D10Effect*>(backend->shaderPreamble_);
-    backend->rttTechnique_ = shaderEffect->GetTechniqueByName("RTT");
+    auto* const shaderEffect = mRttEffect;
+    mRttTechnique = shaderEffect->GetTechniqueByName("RTT");
 
     D3D10_BUFFER_DESC vertexBufferDesc{};
     vertexBufferDesc.ByteWidth = sizeof(kRttFullscreenVertices);
@@ -6220,8 +5941,8 @@ namespace gpg::gal
 
     ID3D10Buffer* quadVertexBuffer = nullptr;
     static_cast<void>(device->CreateBuffer(&vertexBufferDesc, &initialData, &quadVertexBuffer));
-    ReleaseComLike(backend->stretchRectBuffer_);
-    backend->stretchRectBuffer_ = quadVertexBuffer;
+    ReleaseComLike(mRttQuadVertexBuffer);
+    mRttQuadVertexBuffer = quadVertexBuffer;
 
     D3D10_INPUT_ELEMENT_DESC inputElements[2]{};
     inputElements[0].SemanticName = "POSITION";
@@ -6240,7 +5961,7 @@ namespace gpg::gal
     inputElements[1].InputSlotClass = D3D10_INPUT_PER_VERTEX_DATA;
     inputElements[1].InstanceDataStepRate = 0U;
 
-    auto* const technique = reinterpret_cast<ID3D10EffectTechnique*>(backend->rttTechnique_);
+    auto* const technique = mRttTechnique;
     auto* const pass = technique->GetPassByIndex(0U);
     D3D10_PASS_DESC passDesc{};
     static_cast<void>(pass->GetDesc(&passDesc));
@@ -6257,8 +5978,8 @@ namespace gpg::gal
       ThrowDeviceD3D10Hresult(1970, createInputLayoutResult);
     }
 
-    ReleaseComLike(backend->stretchRectInputLayout_);
-    backend->stretchRectInputLayout_ = inputLayout;
+    ReleaseComLike(mRttInputLayout);
+    mRttInputLayout = inputLayout;
   }
 
   /**
@@ -6270,24 +5991,23 @@ namespace gpg::gal
    */
   std::uint32_t DeviceD3D10::CheckAvailableFormats(DeviceContext* const context)
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    backend->deviceContext_ = *context;
+    mDeviceContext = *context;
 
     const std::uint32_t headCount = static_cast<std::uint32_t>(context->GetHeadCount());
-    if (headCount > static_cast<std::uint32_t>(backend->adapters_.size())) {
+    if (headCount > static_cast<std::uint32_t>(mAdapters.size())) {
       ThrowGalError("DeviceD3D10.cpp", 1695, "invalid head count specified in device context");
     }
 
-    backend->deviceContext_.mMaxPrimitiveCount = 0x10000U;
-    backend->deviceContext_.mMaxVertexCount = 0xFFFFU;
-    backend->deviceContext_.mHWBasedInstancing = true;
-    backend->deviceContext_.mVertexShaderProfile = 4;
-    backend->deviceContext_.mPixelShaderProfile = 8;
+    mDeviceContext.mMaxPrimitiveCount = 0x10000U;
+    mDeviceContext.mMaxVertexCount = 0xFFFFU;
+    mDeviceContext.mHWBasedInstancing = true;
+    mDeviceContext.mVertexShaderProfile = 4;
+    mDeviceContext.mPixelShaderProfile = 8;
 
-    auto* const device = reinterpret_cast<ID3D10Device*>(backend->d3dDevice_);
+    auto* const device = mDevice;
     for (std::uint32_t headIndex = 0U; headIndex < headCount; ++headIndex) {
-      Head& head = backend->deviceContext_.GetHead(headIndex);
-      const AdapterD3D10& adapter = backend->adapters_[headIndex];
+      Head& head = mDeviceContext.GetHead(headIndex);
+      const AdapterD3D10& adapter = mAdapters[headIndex];
 
       head.adapterModes.clear();
       for (const AdapterModeD3D10& adapterMode : adapter.modes_) {
@@ -6372,20 +6092,19 @@ namespace gpg::gal
    */
   void DeviceD3D10::CreateRenderTargets()
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    const std::uint32_t headCount = static_cast<std::uint32_t>(backend->deviceContext_.GetHeadCount());
+    const std::uint32_t headCount = static_cast<std::uint32_t>(mDeviceContext.GetHeadCount());
 
-    if (backend->outputContexts_ != nullptr) {
+    if (mHeadOutputContexts != nullptr) {
       ThrowGalError("DeviceD3D10.cpp", 1818, "internal D3D10 device initialization error");
     }
 
     OutputContext* const outputContexts = (headCount > 0U) ? new OutputContext[headCount] : nullptr;
-    backend->outputContexts_ = outputContexts;
+    mHeadOutputContexts = outputContexts;
 
     auto* const outputContextsRuntime = reinterpret_cast<OutputContextD3D10RuntimeView*>(outputContexts);
-    auto* const device = reinterpret_cast<ID3D10Device*>(backend->d3dDevice_);
+    auto* const device = mDevice;
     for (std::uint32_t headIndex = 0U; headIndex < headCount; ++headIndex) {
-      auto* const swapChain = reinterpret_cast<IDXGISwapChain*>(backend->swapChains_[headIndex]);
+      auto* const swapChain = mSwapChains[headIndex];
 
       ID3D10Texture2D* backBuffer = nullptr;
       const HRESULT getBufferResult = swapChain->GetBuffer(0U, IID_ID3D10Texture2D, reinterpret_cast<void**>(&backBuffer));
@@ -6444,36 +6163,34 @@ namespace gpg::gal
    */
   void DeviceD3D10::Setup(DeviceContext* const context)
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
 
     DynamicLink();
-    backend->logStorage_.clear();
+    mLog.clear();
 
-    const auto* const createDxgiFactory = reinterpret_cast<create_dxgi_factory_api_fn>(backend->createDxgiFactoryApi_);
-    const HRESULT createFactoryResult = createDxgiFactory(IID_IDXGIFactory, &backend->dxgiFactory_);
+    // `CreateDXGIFactory` returns through `void**` in the SDK itself.
+    const HRESULT createFactoryResult = mCreateDXGIFactory(IID_IDXGIFactory, reinterpret_cast<void**>(&mDXGIFactory));
     if (createFactoryResult < 0) {
       ThrowDeviceD3D10Hresult(610, createFactoryResult);
     }
 
     static_cast<void>(SetupDXGIDevice());
-    if (backend->adapters_.empty()) {
+    if (mAdapters.empty()) {
       ThrowGalError("DeviceD3D10.cpp", 620, "unable to enumerate adapters");
     }
 
-    const auto* const createDevice = reinterpret_cast<d3d10_create_device_api_fn>(backend->createDeviceApi_);
-    const HRESULT createDeviceResult = createDevice(
-      backend->adapters_.front().dxgiAdapter_,
+    const HRESULT createDeviceResult = mD3D10CreateDevice(
+      mAdapters.front().dxgiAdapter_,
       D3D10_DRIVER_TYPE_HARDWARE,
       nullptr,
       0U,
       29U,
-      reinterpret_cast<ID3D10Device**>(&backend->d3dDevice_)
+      &mDevice
     );
     if (createDeviceResult < 0) {
       ThrowDeviceD3D10Hresult(622, createDeviceResult);
     }
 
-    auto* const dxgiFactory = reinterpret_cast<IDXGIFactory*>(backend->dxgiFactory_);
+    auto* const dxgiFactory = mDXGIFactory;
     for (unsigned int headIndex = 0U; headIndex < static_cast<unsigned int>(context->GetHeadCount()); ++headIndex) {
       const Head& head = context->GetHead(headIndex);
       DXGI_SWAP_CHAIN_DESC swapChainDesc{};
@@ -6481,7 +6198,7 @@ namespace gpg::gal
 
       IDXGISwapChain* swapChain = nullptr;
       const HRESULT createSwapChainResult = dxgiFactory->CreateSwapChain(
-        reinterpret_cast<IUnknown*>(backend->d3dDevice_),
+        reinterpret_cast<IUnknown*>(mDevice),
         &swapChainDesc,
         &swapChain
       );
@@ -6489,10 +6206,10 @@ namespace gpg::gal
         ThrowDeviceD3D10Hresult(631, createSwapChainResult);
       }
 
-      static_cast<void>(AppendBackendSwapChain(backend->swapChains_, swapChain));
+      mSwapChains.push_back(swapChain);
     }
 
-    const HRESULT createSignatureResult = backend->createEffectFromMemoryApi_(
+    const HRESULT createSignatureResult = mD3DX10CreateEffectFromMemory(
       kSignaturePreambleEffectSource,
       sizeof(kSignaturePreambleEffectSource),
       nullptr,
@@ -6500,10 +6217,10 @@ namespace gpg::gal
       nullptr,
       0x800U,
       0U,
-      reinterpret_cast<ID3D10Device*>(backend->d3dDevice_),
+      mDevice,
       nullptr,
       nullptr,
-      &backend->effectPreamble_,
+      &mSignatureEffect,
       nullptr
     );
     if (createSignatureResult < 0) {
@@ -6512,9 +6229,9 @@ namespace gpg::gal
 
     SetUpRTT();
 
-    std::memset(backend->streamStateD8_, 0, sizeof(backend->streamStateD8_));
-    backend->pipelineState_.reset(new PipelineStateD3D10(reinterpret_cast<ID3D10Device*>(backend->d3dDevice_)));
-    backend->pipelineState_->SetDeviceState();
+    std::memset(mVertexStreams, 0, sizeof(mVertexStreams));
+    mPipelineState.reset(new PipelineStateD3D10(mDevice));
+    mPipelineState->SetDeviceState();
 
     static_cast<void>(CheckAvailableFormats(context));
     CreateRenderTargets();
@@ -6572,8 +6289,7 @@ namespace gpg::gal
   boost::shared_ptr<PipelineStateD3D10>*
   DeviceD3D10::GetPipelineState(boost::shared_ptr<PipelineStateD3D10>* const outPipelineState)
   {
-    auto* const backend = AsDeviceD3D10BackendObject(this);
-    *outPipelineState = backend->pipelineState_;
+    *outPipelineState = mPipelineState;
     return outPipelineState;
   }
 
@@ -7607,9 +7323,8 @@ namespace gpg::gal
    */
   void DeviceD3D10::Present()
   {
-    DeviceSwapChainRangeRuntime* const swapChainRange = GetDeviceSwapChainRange(this);
-    for (void** it = swapChainRange->swapChainsBegin; it != swapChainRange->swapChainsEnd; ++it) {
-      const HRESULT result = InvokeSwapChainPresent(*it, 0U, 0U);
+    for (IDXGISwapChain* const swapChain : mSwapChains) {
+      const HRESULT result = swapChain->Present(0U, 0U);
       if (result < 0) {
         throw Error(MakeShortString("DeviceD3D10.cpp"), 1415, MakeD3DErrorString(result));
       }
