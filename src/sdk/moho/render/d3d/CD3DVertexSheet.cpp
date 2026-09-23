@@ -209,7 +209,7 @@ namespace moho
         return false;
       }
 
-      mStreams[streamIndex]->mContext.width_ = static_cast<std::uint32_t>(streamFrequencyToken);
+      mStreams[streamIndex]->mContext.vertexCount_ = static_cast<std::uint32_t>(streamFrequencyToken);
     }
 
     return CreateOwnedStreamBuffers();
