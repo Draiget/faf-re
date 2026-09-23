@@ -45,3 +45,9 @@ gamedata/
 
 # Session memory is machine-local; never pushed.
 .memory/
+
+# Which OCI registry the build container pushes to and pulls from. Names
+# private infrastructure, so it is configured per-machine and stays out of
+# the repository - see docker/README.md. $env:FAF_DEPS_REGISTRY does the
+# same job without a file.
+docker/registry.local.json
