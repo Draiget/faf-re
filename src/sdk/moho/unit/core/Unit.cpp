@@ -16300,10 +16300,10 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
   );
   CollisionResult collisionResult{};
 
-  const int minX = RoundGridCoordDown(target->mCollisionBoundsMin.x) - static_cast<int>(moverFootprint.mSizeX);
-  const int maxX = RoundGridCoordUp(target->mCollisionBoundsMax.x) + 1;
-  const int minZ = RoundGridCoordDown(target->mCollisionBoundsMin.z) - static_cast<int>(moverFootprint.mSizeZ);
-  const int maxZ = RoundGridCoordUp(target->mCollisionBoundsMax.z) + 1;
+  const int minX = RoundGridCoordDown(target->mAABox.Min.x) - static_cast<int>(moverFootprint.mSizeX);
+  const int maxX = RoundGridCoordUp(target->mAABox.Max.x) + 1;
+  const int minZ = RoundGridCoordDown(target->mAABox.Min.z) - static_cast<int>(moverFootprint.mSizeZ);
+  const int maxZ = RoundGridCoordUp(target->mAABox.Max.z) + 1;
   if (minZ > maxZ) {
     return false;
   }

@@ -21,6 +21,7 @@
 #include "moho/math/Vector4f.h"
 #include "REntityBlueprint.h"
 #include "SEntAttachInfo.h"
+#include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box3.h"
 #include "Wm3Quaternion.h"
 #include "Wm3Sphere3.h"
@@ -1416,8 +1417,10 @@ namespace moho
     char pad_01F9_01FB[0x03];              // 0x01F9
     msvc8::string mUniqueName;             // 0x01FC (FUN_00689F20)
     EntitySetBase mShooters;               // 0x0218 (Entity:AddShooter/RemoveShooter ownership set)
-    Wm3::Vector3f mCollisionBoundsMin;     // 0x0240
-    Wm3::Vector3f mCollisionBoundsMax;     // 0x024C
+    // World-space bounds of `CollisionExtents`, refreshed by `UpdateAABox`
+    // (0x00679180, `?UpdateAABox@Entity@Moho@@QAEXXZ`); serialized through the
+    // `Wm3::AxisAlignedBox3<float>` RType.
+    Wm3::AxisAlignedBox3f mAABox;          // 0x0240
     LuaPlus::LuaObject mLuaPositionCache;  // 0x0258 (cached `Entity:GetPosition()` vector table)
     Motor* mMotor;                   // 0x026C
   };
@@ -2682,8 +2685,7 @@ namespace moho
   static_assert(offsetof(Entity, mPhysBody) == 0x1F4, "Entity::mPhysBody offset must be 0x1F4");
   static_assert(offsetof(Entity, mUniqueName) == 0x1FC, "Entity::mUniqueName offset must be 0x1FC");
   static_assert(offsetof(Entity, mShooters) == 0x218, "Entity::mShooters offset must be 0x218");
-  static_assert(offsetof(Entity, mCollisionBoundsMin) == 0x240, "Entity::mCollisionBoundsMin offset must be 0x240");
-  static_assert(offsetof(Entity, mCollisionBoundsMax) == 0x24C, "Entity::mCollisionBoundsMax offset must be 0x24C");
+  static_assert(offsetof(Entity, mAABox) == 0x240, "Entity::mAABox offset must be 0x240");
   static_assert(offsetof(Entity, mLuaPositionCache) == 0x258, "Entity::mLuaPositionCache offset must be 0x258");
   static_assert(offsetof(Entity, mMotor) == 0x26C, "Entity::mMotor offset must be 0x26C");
 

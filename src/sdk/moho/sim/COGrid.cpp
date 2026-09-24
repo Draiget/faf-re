@@ -870,8 +870,8 @@ namespace moho
     const Entity& entity
   ) noexcept
   {
-    const Wm3::Vec3f& entityMin = entity.mCollisionBoundsMin;
-    const Wm3::Vec3f& entityMax = entity.mCollisionBoundsMax;
+    const Wm3::Vec3f& entityMin = entity.mAABox.Min;
+    const Wm3::Vec3f& entityMax = entity.mAABox.Max;
     return bounds.Min.x <= entityMax.x && entityMin.x <= bounds.Max.x &&
       bounds.Min.y <= entityMax.y && entityMin.y <= bounds.Max.y &&
       bounds.Min.z <= entityMax.z && entityMin.z <= bounds.Max.z;
@@ -896,8 +896,8 @@ namespace moho
     const Entity& entity
   ) noexcept
   {
-    const Wm3::Vec3f& entityMin = entity.mCollisionBoundsMin;
-    const Wm3::Vec3f& entityMax = entity.mCollisionBoundsMax;
+    const Wm3::Vec3f& entityMin = entity.mAABox.Min;
+    const Wm3::Vec3f& entityMax = entity.mAABox.Max;
     return bounds.Min.x <= entityMin.x && entityMax.x <= bounds.Max.x &&
       bounds.Min.y <= entityMin.y && entityMax.y <= bounds.Max.y &&
       bounds.Min.z <= entityMin.z && entityMax.z <= bounds.Max.z;
@@ -926,9 +926,8 @@ namespace moho
     gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
   )
   {
-    const Wm3::AxisAlignedBox3f sourceBounds{source->mCollisionBoundsMin, source->mCollisionBoundsMax};
     CollisionDBRect queryRect{};
-    (void)func_AABoxToRect(&queryRect, sourceBounds);
+    (void)func_AABoxToRect(&queryRect, source->mAABox);
 
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount =
@@ -950,10 +949,10 @@ namespace moho
       // compares source.Min <= candidate.Max && candidate.Min <= source.Max
       // per axis using a sliding pointer pair — express it here by named
       // lane access.
-      const Wm3::Vec3f& sourceMin = source->mCollisionBoundsMin;
-      const Wm3::Vec3f& sourceMax = source->mCollisionBoundsMax;
-      const Wm3::Vec3f& candidateMin = candidate->mCollisionBoundsMin;
-      const Wm3::Vec3f& candidateMax = candidate->mCollisionBoundsMax;
+      const Wm3::Vec3f& sourceMin = source->mAABox.Min;
+      const Wm3::Vec3f& sourceMax = source->mAABox.Max;
+      const Wm3::Vec3f& candidateMin = candidate->mAABox.Min;
+      const Wm3::Vec3f& candidateMax = candidate->mAABox.Max;
       if (!(sourceMin.x <= candidateMax.x && candidateMin.x <= sourceMax.x &&
             sourceMin.y <= candidateMax.y && candidateMin.y <= sourceMax.y &&
             sourceMin.z <= candidateMax.z && candidateMin.z <= sourceMax.z)) {

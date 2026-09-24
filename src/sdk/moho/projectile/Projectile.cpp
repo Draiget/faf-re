@@ -579,8 +579,8 @@ namespace moho
       }
 
       // Lateral jitter driven by the entity's collision-bounds Z extent
-      // (Entity+0x248 == mCollisionBoundsMin.z): if positive, jitter X and Z.
-      const float jitter = mCollisionBoundsMin.z;
+      // (Entity+0x248 == mAABox.Min.z): if positive, jitter X and Z.
+      const float jitter = mAABox.Min.z;
       if (jitter > 0.0f) {
         mVelocity.x += rng->FRand(-jitter, jitter);
         mVelocity.z += rng->FRand(-jitter, jitter);

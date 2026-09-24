@@ -2093,7 +2093,7 @@ namespace moho
 
     (void)archive->ReadPointerOwned_Motor(&mMotor, &owner);
 
-    archive->Read(CachedCollisionBoxType(), &mCollisionBoundsMin, owner);
+    archive->Read(CachedCollisionBoxType(), &mAABox, owner);
   }
 
   /**
@@ -2202,7 +2202,7 @@ namespace moho
     gpg::WriteRawPointer(archive, motorRef, gpg::TrackedPointerState::Owned, owner);
 
     // Collision AABB (+0x240): min/max modeled split, first field is min.
-    archive->Write(CachedCollisionBoxType(), &mCollisionBoundsMin, owner);
+    archive->Write(CachedCollisionBoxType(), &mAABox, owner);
   }
 
   namespace
@@ -2497,8 +2497,8 @@ namespace moho
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
-    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
-    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mAABox.Min = {0.0f, 0.0f, 0.0f};
+    mAABox.Max = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
 
     if (sim != nullptr) {
@@ -2578,8 +2578,8 @@ namespace moho
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
-    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
-    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mAABox.Min = {0.0f, 0.0f, 0.0f};
+    mAABox.Max = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
 
     StandardInit(sim, entityId);
@@ -2649,8 +2649,8 @@ namespace moho
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
-    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
-    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mAABox.Min = {0.0f, 0.0f, 0.0f};
+    mAABox.Max = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
 
     BluePrint = blueprint;
@@ -2720,8 +2720,8 @@ namespace moho
     mInterfaceCreated = 0u;
     mScroller = nullptr;
     mPhysBody = nullptr;
-    mCollisionBoundsMin = {0.0f, 0.0f, 0.0f};
-    mCollisionBoundsMax = {0.0f, 0.0f, 0.0f};
+    mAABox.Min = {0.0f, 0.0f, 0.0f};
+    mAABox.Max = {0.0f, 0.0f, 0.0f};
     mMotor = nullptr;
 
     StandardInit(sim, entityId);
@@ -4040,8 +4040,8 @@ namespace moho
    * Address: 0x00679180 (FUN_00679180, ?UpdateAABox@Entity@Moho@@QAEXXZ)
    *
    * What it does:
-   * Reads one world-space AABB from the active collision primitive and updates
-   * the cached min/max bounds lanes at `+0x240/+0x24C`.
+   * Reads one world-space AABB from the active collision primitive into
+   * `mAABox` (+0x240).
    */
   void Entity::UpdateAABox()
   {
@@ -4049,9 +4049,7 @@ namespace moho
       return;
     }
 
-    const Wm3::AxisAlignedBox3f bounds = CollisionExtents->GetBoundingBox();
-    mCollisionBoundsMin = bounds.Min;
-    mCollisionBoundsMax = bounds.Max;
+    mAABox = CollisionExtents->GetBoundingBox();
   }
 
   /**
