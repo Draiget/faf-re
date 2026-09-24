@@ -2916,48 +2916,97 @@ namespace moho
 
   /**
    * Address: 0x00679CE0 (FUN_00679CE0)
+   * Mangled: ?GetBoneWorldTransform@Entity@Moho@@UBE?AVVTransform@2@H@Z
+   *
+   * VFTable SLOT: 18. Entity, Prop, Projectile, ReconBlip and Shield all keep
+   * this body; Unit (0x006AA5C0) and CollisionBeamEntity (0x006730B0)
+   * override it.
    *
    * What it does:
-   * Returns world transform for the requested bone (or entity/world-anchor fallback).
+   * Returns one bone's world transform:
+   *  - `boneIndex >= 0` (0x00679CEF..0x00679D16): the bone's entity-space
+   *    transform from the virtual `GetBoneLocalTransform` (vtable +0x4C,
+   *    slot 19), placed under the current transform by
+   *    `VTransform::Compose(local, mCurTransform)` (0x00549C20: `eax` = the
+   *    slot-19 result, stack = `&mVarDat.mCurTransform`).
+   *  - `boneIndex == -1` with a blueprint (0x00679D19..0x00679DC9): the
+   *    collision-centre anchor `(CollisionOffsetX, CollisionOffsetY +
+   *    SizeY * 0.5, CollisionOffsetZ)`, rotated by the current orientation
+   *    through `MultQuadVec` (0x00452D40) and added to the current position.
+   *    The orientation is the current one, unchanged.
+   *  - any other negative index (the `-2` weapon callers pass, or `-1`
+   *    without a blueprint) (0x00679DCC..0x00679E13): the current transform.
    */
   VTransform Entity::GetBoneWorldTransform(const int boneIndex) const
   {
-    VTransform result = mVarDat.mCurTransform;
-
-    if (boneIndex != -1 || !BluePrint) {
-      return result;
+    const VTransform& curTransform = mVarDat.mCurTransform;
+    if (boneIndex >= 0) {
+      return VTransform::Compose(GetBoneLocalTransform(boneIndex), curTransform);
     }
 
-    const Wm3::Vector3f localAnchor{
-      BluePrint->mCollisionOffsetX,
-      BluePrint->mCollisionOffsetY + BluePrint->mSizeY * 0.5f,
-      BluePrint->mCollisionOffsetZ,
-    };
-    const Wm3::Vector3f rotatedOffset = RotateVectorByQuaternion(mVarDat.mCurTransform.orient_, localAnchor);
-    result.pos_.x += rotatedOffset.x;
-    result.pos_.y += rotatedOffset.y;
-    result.pos_.z += rotatedOffset.z;
-    return result;
+    if (boneIndex == -1 && BluePrint != nullptr) {
+      const Wm3::Vector3f localAnchor{
+        BluePrint->mCollisionOffsetX,
+        BluePrint->mCollisionOffsetY + BluePrint->mSizeY * 0.5f,
+        BluePrint->mCollisionOffsetZ,
+      };
+      const Wm3::Vector3f rotatedAnchor = RotateVectorByQuaternion(curTransform.orient_, localAnchor);
+
+      VTransform anchorTransform = curTransform;
+      anchorTransform.pos_.x += rotatedAnchor.x;
+      anchorTransform.pos_.y += rotatedAnchor.y;
+      anchorTransform.pos_.z += rotatedAnchor.z;
+      return anchorTransform;
+    }
+
+    return curTransform;
   }
 
   /**
    * Address: 0x00679E20 (FUN_00679E20)
+   * Mangled: ?GetBoneLocalTransform@Entity@Moho@@UBE?AVVTransform@2@H@Z
+   *
+   * VFTable SLOT: 19. Kept by the same classes as slot 18, so it is what
+   * `GetBoneWorldTransform`'s `boneIndex >= 0` dispatch reaches for Entity,
+   * Prop, Projectile, ReconBlip and Shield. Unit (0x006AA440) and
+   * CollisionBeamEntity (0x006731A0) override it.
    *
    * What it does:
-   * Returns local-space transform for a bone index, with `-1` fallback to blueprint anchor.
+   * Returns one bone's transform in this entity's local space:
+   *  - `boneIndex >= 0` with a mesh (0x00679E2F..0x00679EC3): looks up the bone
+   *    in the mesh skeleton (`RScmResource::GetSkeleton` 0x00538DB0,
+   *    `CAniSkel::GetBone` 0x00549E20) and inverts its `mBoneTransform`
+   *    (`VTransform::Inverse` 0x0046FBF0). It multiplies the translation
+   *    lane by lane by `mVarDat.mScale` (0x00679E72..0x00679E99), then
+   *    copy-constructs the result (0x0046FC90). The skeleton handle is a
+   *    temporary that is released (0x00538320) before its pointer is
+   *    null-tested; the entity's mesh resource keeps the skeleton alive.
+   *  - `boneIndex == -1` with a blueprint (0x00679EC6..0x00679F30): identity
+   *    orientation at the collision-centre anchor `(CollisionOffsetX,
+   *    CollisionOffsetY + SizeY * 0.5, CollisionOffsetZ)`.
+   *  - otherwise, including a missing mesh, skeleton or bone
+   *    (0x00679F33..0x00679F69): the identity transform.
    */
   VTransform Entity::GetBoneLocalTransform(const int boneIndex) const
   {
-    VTransform result{};
-    result.orient_.w = 1.0f;
-    result.orient_.x = 0.0f;
-    result.orient_.y = 0.0f;
-    result.orient_.z = 0.0f;
-    result.pos_.x = 0.0f;
-    result.pos_.y = 0.0f;
-    result.pos_.z = 0.0f;
+    if (boneIndex >= 0) {
+      if (RScmResource* const scmResource = mVarDat.mScmResource.get(); scmResource != nullptr) {
+        const CAniSkel* const skeleton = scmResource->GetSkeleton().get();
+        if (skeleton != nullptr) {
+          const SAniSkelBone* const bone = skeleton->GetBone(static_cast<std::uint32_t>(boneIndex));
+          if (bone != nullptr) {
+            VTransform boneTransform = bone->mBoneTransform.Inverse();
+            boneTransform.pos_.x *= mVarDat.mScale.x;
+            boneTransform.pos_.y *= mVarDat.mScale.y;
+            boneTransform.pos_.z *= mVarDat.mScale.z;
+            return boneTransform;
+          }
+        }
+      }
+    }
 
-    if (boneIndex == -1 && BluePrint) {
+    VTransform result{};
+    if (boneIndex == -1 && BluePrint != nullptr) {
       result.pos_.x = BluePrint->mCollisionOffsetX;
       result.pos_.y = BluePrint->mCollisionOffsetY + BluePrint->mSizeY * 0.5f;
       result.pos_.z = BluePrint->mCollisionOffsetZ;
