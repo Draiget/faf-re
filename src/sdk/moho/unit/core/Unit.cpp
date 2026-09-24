@@ -146,7 +146,7 @@ namespace moho
     box.Min.z = static_cast<float>(pos->z);
     box.Max.z = static_cast<float>(pos->z + maxFootprintSide);
 
-    CollisionResultFastVectorN10 into{};
+    gpg::core::FastVectorN<CollisionResult, 10> into{};
     GatherUnmarkedUnitsInBox(*grid, box, into);
 
     for (const CollisionResult& hit : into) {
@@ -15400,7 +15400,7 @@ void Unit::UpdateBlipsInRange()
   const float noRushRadius = army->mVarDat.mNoRushRadius;
 
   // Gather every unit within the scan radius of this unit's position.
-  CollisionResultFastVectorN10 unitsInRange{};
+  gpg::core::FastVectorN<CollisionResult, 10> unitsInRange{};
   COGrid* const grid = SimulationRef->mOGrid;
   EntitiesAroundPoint(unitsInRange, scanRadius, *grid, ENTITYTYPE_Unit, GetPosition());
 

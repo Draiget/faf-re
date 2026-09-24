@@ -179,7 +179,7 @@ namespace
    * `COGrid::ForAllEntitiesIterator` call rather than an axis-aligned
    * approximation of it.
    */
-  void GatherNearbyAssistUnits(moho::Unit* const ownerUnit, moho::CollisionResultFastVectorN10& outHits)
+  void GatherNearbyAssistUnits(moho::Unit* const ownerUnit, gpg::core::FastVectorN<moho::CollisionResult, 10>& outHits)
   {
     if (ownerUnit == nullptr || ownerUnit->SimulationRef == nullptr || ownerUnit->SimulationRef->mOGrid == nullptr) {
       return;
@@ -492,7 +492,7 @@ namespace moho
       return false;
     }
 
-    CollisionResultFastVectorN10 nearbyHits{};
+    gpg::core::FastVectorN<CollisionResult, 10> nearbyHits{};
     GatherNearbyAssistUnits(mUnit, nearbyHits);
 
     Unit* bestTargetUnit = nullptr;

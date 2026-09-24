@@ -1752,7 +1752,7 @@ Entity* CAiAttackerImpl::TrackToTarget(UnitWeapon* const weapon)
   Entity* bestProjectile = nullptr;
   float bestDistanceSquared = std::numeric_limits<float>::infinity();
 
-  CollisionResultFastVectorN10 projectilesInRange{};
+  gpg::core::FastVectorN<CollisionResult, 10> projectilesInRange{};
   EntitiesAroundPoint(projectilesInRange, searchRadius, *sim->mOGrid, ENTITYTYPE_Projectile, unitPosition);
 
   for (const CollisionResult& hit : projectilesInRange) {

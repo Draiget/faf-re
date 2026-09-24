@@ -2473,7 +2473,7 @@ namespace moho
     // Gather colliders in the box: units always, and props too on the staggered
     // beat for larger units (asm 0x6B914C-0x6B920C).
     Sim* const sim = mUnit->SimulationRef;
-    CollisionResultFastVectorN10 hits{};
+    gpg::core::FastVectorN<CollisionResult, 10> hits{};
     const bool includeProps =
       (blueprint->mSizeX * blueprint->mSizeZ) > kPropScanFootprintThreshold &&
       (static_cast<std::uint32_t>(mUnit->GetEntityId()) % kPropScanTickPeriod) ==

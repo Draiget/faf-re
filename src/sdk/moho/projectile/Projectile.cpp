@@ -1583,7 +1583,7 @@ namespace moho
         querySphere.Center = Wm3::Vec3f(curPos.x, curPos.y, curPos.z);
         querySphere.Radius = 1.0f;
 
-        CollisionResultFastVectorN10 results{};
+        gpg::core::FastVectorN<CollisionResult, 10> results{};
         oGrid->ForAllEntitiesIterator(results, kProjectileCollisionMask, querySphere);
 
         for (const CollisionResult& result : results) {

@@ -976,6 +976,7 @@ namespace gpg::core
      * inline buffer is never freed) and nulls the lanes so the base destructor
      * has nothing left to do.
      * Address: 0x0056B4D0 (FUN_0056B4D0 -- the destructor of `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the element destructor the `eh vector destructor iterator` runs for `mOffsetInfo[2]` in `~CFormationInstance`.)
+     * Address: 0x0057E9D0 (FUN_0057E9D0 -- the destructor of `gpg::fastvector_n<Moho::CollisionResult, 10>`, the stack buffer every COGrid collision query fills; its 12 callers are the scope exits of those locals (`Sim::LocationIsFree`, `Projectile::CheckCollision`, `CUnitMotion::ProcessSurfaceCollisionFromLastMove`, ...). The FUN_00401DE0 body with `this` in ESI instead of ECX and the vector at +0x00; no element loop, `CollisionResult` being trivially destructible.)
      */
     ~FastVectorInline()
     {

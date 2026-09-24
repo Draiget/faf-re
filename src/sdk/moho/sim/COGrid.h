@@ -237,7 +237,7 @@ namespace moho
      * `outCollisions`.
      */
     void CollectEntitiesInBox(
-      CollisionResultFastVectorN10& outCollisions,
+      gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
       EEntityType flags,
       const Wm3::Box3f& box
     );
@@ -251,7 +251,7 @@ namespace moho
      * cheap containment pre-check against each entity cached collision bounds.
      */
     void ForAllEntitiesIterator(
-      CollisionResultFastVectorN10& outCollisions,
+      gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
       EEntityType flags,
       const Wm3::Sphere3f& sphere
     );
@@ -333,7 +333,7 @@ namespace moho
    * unit-search helpers.
    */
   void EntitiesAroundPoint(
-    CollisionResultFastVectorN10& outResults,
+    gpg::core::FastVectorN<CollisionResult, 10>& outResults,
     float radius,
     COGrid& grid,
     EEntityType type,
@@ -349,7 +349,9 @@ namespace moho
    * (sourceEntity = entity) per hit into `into`. Unlike COGrid::CollectEntitiesInBox
    * there is no precise CollideBox test — cached-bounds overlap is the only filter.
    */
-  void GatherUnmarkedUnitsInBox(COGrid& grid, const Wm3::AxisAlignedBox3f& box, CollisionResultFastVectorN10& into);
+  void GatherUnmarkedUnitsInBox(
+    COGrid& grid, const Wm3::AxisAlignedBox3f& box, gpg::core::FastVectorN<CollisionResult, 10>& into
+  );
 
   /**
    * Address: 0x007216D0 (FUN_007216D0, Moho::SweptPathBlockedByUnit)

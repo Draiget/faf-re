@@ -871,7 +871,7 @@ namespace moho
    * (radius mRadius) -- the ring band a ring-effect damage payload strikes.
    */
   void GatherEntitiesInDamageRing(
-    const CDamage& damage, COGrid* const oGrid, CollisionResultFastVectorN10& outResults)
+    const CDamage& damage, COGrid* const oGrid, gpg::core::FastVectorN<CollisionResult, 10>& outResults)
   {
     Wm3::Sphere3f innerSphere{};
     innerSphere.Center = damage.mOrigin;
@@ -938,7 +938,7 @@ namespace moho
     msvc8::list<SShieldDamageEntry> absorbingShields;
     SIM_DoDamage(sim, absorbingShields, damage);
 
-    CollisionResultFastVectorN10 ringResults{};
+    gpg::core::FastVectorN<CollisionResult, 10> ringResults{};
     GatherEntitiesInDamageRing(damage, sim->mOGrid, ringResults);
 
     Entity* const instigator = damage.mInstigator.GetObjectPtr();
@@ -1004,7 +1004,7 @@ namespace moho
     querySphere.Center = damage.mOrigin;
     querySphere.Radius = damage.mRadius;
 
-    CollisionResultFastVectorN10 areaResults{};
+    gpg::core::FastVectorN<CollisionResult, 10> areaResults{};
     sim->mOGrid->ForAllEntitiesIterator(
       areaResults,
       static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity),
@@ -1111,7 +1111,7 @@ namespace moho
     querySphere.Center = damage.mOrigin;
     querySphere.Radius = damage.mRadius;
 
-    CollisionResultFastVectorN10 impactResults{};
+    gpg::core::FastVectorN<CollisionResult, 10> impactResults{};
     sim->mOGrid->ForAllEntitiesIterator(impactResults, ENTITYTYPE_Unit, querySphere);
 
     Entity* const instigator = damage.mInstigator.GetObjectPtr();

@@ -940,7 +940,7 @@ namespace moho
     COGrid& grid,
     const EEntityType flags,
     Entity* const source,
-    CollisionResultFastVectorN10& outCollisions
+    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
   )
   {
     const EntityCollisionBoundsView sourceBoundsView{
@@ -1004,7 +1004,7 @@ namespace moho
    * primitive `CollideBox` hits to `outCollisions`.
    */
   void COGrid::CollectEntitiesInBox(
-    CollisionResultFastVectorN10& outCollisions,
+    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
     const EEntityType flags,
     const Wm3::Box3f& box
   )
@@ -1067,7 +1067,7 @@ namespace moho
   void GatherUnmarkedUnitsInBox(
     COGrid& grid,
     const Wm3::AxisAlignedBox3f& box,
-    CollisionResultFastVectorN10& into
+    gpg::core::FastVectorN<CollisionResult, 10>& into
   )
   {
     const EntityCollisionBoundsView boundsView{
@@ -1124,7 +1124,7 @@ namespace moho
     box.Min.z = static_cast<float>(cellPos.z);
     box.Max.z = static_cast<float>(cellPos.z + maxSpan);
 
-    CollisionResultFastVectorN10 nearbyUnits{};
+    gpg::core::FastVectorN<CollisionResult, 10> nearbyUnits{};
     GatherUnmarkedUnitsInBox(grid, box, nearbyUnits);
 
     for (const CollisionResult& hit : nearbyUnits) {
@@ -1248,7 +1248,7 @@ namespace moho
       1000.0f,
       halfLength);
 
-    CollisionResultFastVectorN10 hits{};
+    gpg::core::FastVectorN<CollisionResult, 10> hits{};
     grid.CollectEntitiesInBox(hits, ENTITYTYPE_Unit, sweptBox);
 
     for (const CollisionResult& hit : hits) {
@@ -1309,7 +1309,7 @@ namespace moho
    * accepts entities whose cached bounds lie fully inside a reduced inner box.
    */
   void COGrid::ForAllEntitiesIterator(
-    CollisionResultFastVectorN10& outCollisions,
+    gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
     const EEntityType flags,
     const Wm3::Sphere3f& sphere
   )
@@ -1611,7 +1611,7 @@ namespace moho
    * `InsertCollisionResultRange` (FUN_00723090) when full.
    */
   void EntitiesAroundPoint(
-    CollisionResultFastVectorN10& outResults,
+    gpg::core::FastVectorN<CollisionResult, 10>& outResults,
     const float radius,
     COGrid& grid,
     const EEntityType type,

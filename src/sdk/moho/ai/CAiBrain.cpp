@@ -1739,7 +1739,7 @@ namespace moho
 
     CAiReconDBImpl* const reconDb = brain->mArmy->GetReconDB();
 
-    CollisionResultFastVectorN10 gatheredEntities{};
+    gpg::core::FastVectorN<CollisionResult, 10> gatheredEntities{};
     EntitiesAroundPoint(gatheredEntities, dist, *brain->mSim->mOGrid, ENTITYTYPE_Unit, position);
 
     for (const CollisionResult& hit : gatheredEntities) {
@@ -6448,7 +6448,7 @@ bool moho::CAiBrain::CanBuildStructureAt(
     queryBox.Min.z = requestedSkirt.z0;
     queryBox.Max.z = requestedSkirt.z1;
 
-    CollisionResultFastVectorN10 nearbyUnits{};
+    gpg::core::FastVectorN<CollisionResult, 10> nearbyUnits{};
     GatherUnmarkedUnitsInBox(*mSim->mOGrid, queryBox, nearbyUnits);
 
     for (const CollisionResult& hit : nearbyUnits) {

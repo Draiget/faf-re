@@ -24026,7 +24026,7 @@ void Sim::FlattenMapRect(const gpg::Rect2i& rect, const float elevation)
   const VAxes3 boxAxes{Wm3::Quaternionf(0.0f, 0.0f, 0.0f, 0.0f)};
   const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
 
-  CollisionResultFastVectorN10 hits{};
+  gpg::core::FastVectorN<CollisionResult, 10> hits{};
   mOGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
 
   for (const CollisionResult& hit : hits) {
@@ -26743,7 +26743,9 @@ namespace
  * `collisions` box query. See header. The impulse math is a mass-weighted
  * separation along the XZ plane.
  */
-void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFastVectorN10* const collisions)
+void Sim::DoCollisionsFor(
+  Sim* const sim, Unit* const owner, gpg::core::FastVectorN<CollisionResult, 10>* const collisions
+)
 {
   constexpr float kMinPenetration = 0.001f;      // dword_DFF0AC
   constexpr float kMinSeparationSq = 0.000001f;  // flt_DFFBE8 (1e-6)
@@ -26936,7 +26938,7 @@ bool Sim::LocationIsFree(Sim* const sim, Unit* const ignore, gpg::Rect2i* const 
   const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
   const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
 
-  CollisionResultFastVectorN10 hits{};
+  gpg::core::FastVectorN<CollisionResult, 10> hits{};
   sim->mOGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
 
   for (const CollisionResult& hit : hits) {
@@ -27160,7 +27162,7 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
   const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
   const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
 
-  CollisionResultFastVectorN10 hits{};
+  gpg::core::FastVectorN<CollisionResult, 10> hits{};
   oGrid->CollectEntitiesInBox(hits, ENTITYTYPE_Unit, queryBox);
 
   // Collect our own mobile blockers that are air or currently at rest (moving

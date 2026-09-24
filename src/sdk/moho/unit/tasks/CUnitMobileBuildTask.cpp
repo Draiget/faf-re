@@ -326,7 +326,7 @@ namespace moho
     const float queryRadius = static_cast<float>(sizeX > sizeZ ? sizeX : sizeZ);
 
     const Wm3::Sphere3f querySphere{mBuildPosition, queryRadius};
-    CollisionResultFastVectorN10 collisions{};
+    gpg::core::FastVectorN<CollisionResult, 10> collisions{};
     mSim->mOGrid->ForAllEntitiesIterator(collisions, ENTITYTYPE_Unit, querySphere);
 
     for (const CollisionResult& hit : collisions) {
@@ -390,7 +390,7 @@ namespace moho
     const VAxes3 boxAxes{Wm3::Quaternionf(1.0f, 0.0f, 0.0f, 0.0f)};
     const Wm3::Box3f queryBox{boxCenter, &boxAxes.vX, &boxExtents.x};
 
-    CollisionResultFastVectorN10 collisions{};
+    gpg::core::FastVectorN<CollisionResult, 10> collisions{};
     mSim->mOGrid->CollectEntitiesInBox(collisions, ENTITYTYPE_Prop, queryBox);
 
     Entity* nearest = nullptr;

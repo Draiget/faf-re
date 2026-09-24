@@ -219,7 +219,7 @@ namespace moho
      * destroy-queued. The `collisions` vector is the box query the caller
      * (`CUnitMotion::ProcessSurfaceCollisionFromLastMove`) already filled.
      */
-    static void DoCollisionsFor(Sim* sim, Unit* unit, CollisionResultFastVectorN10* collisions);
+    static void DoCollisionsFor(Sim* sim, Unit* unit, gpg::core::FastVectorN<CollisionResult, 10>* collisions);
 
     /**
      * Address: 0x00748650 (FUN_00748650)
