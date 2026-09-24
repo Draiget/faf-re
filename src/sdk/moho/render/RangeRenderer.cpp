@@ -35,6 +35,7 @@
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/ShaderVar.h"
 #include "moho/render/RangeRendererStartupRegistrations.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CWldMap.h"
 #include "moho/sim/CWldSession.h"

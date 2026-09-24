@@ -1659,15 +1659,6 @@
     <ClCompile Include="moho\app\ResolutionCommands.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\app\WxAppRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\app\WxAppVectorHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\app\WxRuntimeClassInfoAccessors.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\app\WxRuntimeTypes.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1828,9 +1819,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\CrtRuntimeHelpers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="moho\misc\WxCrtBridge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\misc\StrSafeRuntime.cpp">
@@ -4686,12 +4674,6 @@
     <ClInclude Include="moho\app\ResolutionCommands.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\app\WxAppRuntime.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\app\WxAppVectorHelpers.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\app\WxRuntimeTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -6025,9 +6007,6 @@
     <ClCompile Include="moho\ai\CAiPathSpline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\app\WxCoreGdiRuntime.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\audio\CSimSoundManagerConstruct.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -6178,9 +6157,6 @@
     <ClInclude Include="moho\animation\IAniManipulatorTypeInfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\app\WxCoreGdiRuntime.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="moho\audio\CSimSoundManagerConstruct.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -6293,6 +6269,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\d3d\CD3DDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\d3d\WD3DViewport.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\render\WRenViewport.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\render\d3d\CD3DFontTypes.h">

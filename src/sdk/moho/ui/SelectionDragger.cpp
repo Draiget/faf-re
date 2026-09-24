@@ -5,6 +5,7 @@
 #include <limits>
 
 #include "gpg/core/containers/FastVector.h"
+#include "gpg/core/utils/Logging.h"
 #include "moho/collision/CGeomSolid3.h"
 #include "moho/entity/UserEntity.h"
 #include "moho/mesh/Mesh.h"

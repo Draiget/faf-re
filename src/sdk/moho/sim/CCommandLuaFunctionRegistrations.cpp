@@ -39,6 +39,7 @@
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/render/RCamManager.h"
 #include "moho/render/RangeRenderer.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/render/camera/CameraImpl.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
@@ -3967,7 +3968,7 @@ namespace moho
     moho::ApplyRangeProfileFilterToRenderer(
       highlightedColorPacked,
       categoryFilter,
-      moho::REN_GetViewportRangeRenderer(),
+      &moho::ren_Viewport->mRangeRenderer,
       profileName,
       buildColorPacked,
       selectedColorPacked,

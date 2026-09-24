@@ -1,5 +1,8 @@
 #include "CWldSession.h"
 
+#include "platform/WxWidgets.h"
+#include <wx/app.h>
+
 #include "legacy/algorithms/Sort.h"
 
 #include <algorithm>

@@ -2210,19 +2210,18 @@ namespace msvc8
          * Address: 0x008D4800 (FUN_008D4800, msvc8::vector<gpg::gal::Head>::operator=(const vector&))
          * Address: 0x008D73C0 (FUN_008D73C0, msvc8::vector<gpg::gal::HeadSampleOption>::operator=(const vector&))
          * Address: 0x005ED190 (FUN_005ED190, msvc8::vector<int>::operator=(const vector&))
-         * Address: 0x0084FF80 (FUN_0084FF80, msvc8::vector<wxWindowBase*>::
+         * Address: 0x0084FF80 (FUN_0084FF80, msvc8::vector<wxEvtHandler*>::
          * operator=(const vector&) -- the full VC8 assign shape (self-check,
          * empty-source clear, fits-in-capacity assign-over-then-append,
          * grows-beyond-capacity free-and-rebuy, shrinks-in-place memmove)
-         * for the 4-byte trivially-copyable pointer element (`wxWindowBase*`
-         * is this codebase's type-erased stand-in for the real wx
-         * `wxEvtHandler*` -- see `PopEventHandler`/`PushEventHandler` in
-         * WxRuntimeTypes.h). This is the per-window saved-handler inner
-         * vector `moho::SuspendInputWindowEventHandlersAndFlushQueue`
+         * for the 4-byte trivially-copyable pointer element, the handlers
+         * wxWindowBase::PopEventHandler hands back. This is the per-window
+         * saved-handler inner vector
+         * `moho::SuspendInputWindowEventHandlersAndFlushQueue`
          * (UiRuntimeTypes.cpp) builds as `msvc8::vector<msvc8::vector<
-         * wxWindowBase*>>`; reached through the outer vector's grow-relocate
+         * wxEvtHandler*>>`; reached through the outer vector's grow-relocate
          * step (`FUN_0084F820`, `copy_or_move_assign` for the 16-byte
-         * `vector<wxWindowBase*>` element, cited below on
+         * `vector<wxEvtHandler*>` element, cited below on
          * `copy_or_move_assign`), which the source
          * call `suspended.resize(g_UIManager->mInputWindows.size())`
          * instantiates regardless of how many old elements that particular
@@ -5147,7 +5146,7 @@ namespace msvc8
          * the `_Insert_n` grow core `FUN_004451A0` with `count = 1`. Reached
          * from this element's `push_back` (`FUN_00686E80`, cited above)
          * capacity-full path.)
-         * Address: 0x0084F200 (FUN_0084F200, `msvc8::vector<wxWindowBase*>::
+         * Address: 0x0084F200 (FUN_0084F200, `msvc8::vector<wxEvtHandler*>::
          * insert(iterator, const T&)` for
          * `SuspendInputWindowEventHandlersAndFlushQueue`'s per-window saved-
          * handler vector (`UiRuntimeTypes.cpp`) -- like `FUN_0082E950` above,
@@ -5511,6 +5510,9 @@ namespace msvc8
          * Address: 0x00692870 (FUN_00692870 -- `vector<T>::insert(pos, value)` for a 28-byte float[7] element (iterator returned through the hidden result slot); callers 0x00692700; formerly `InsertFloat7LaneAndRebaseCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00852350 (FUN_00852350 -- `vector<T>::insert(pos, value)` for a 12-byte element; callers 0x008522A0; formerly `InsertElement12LaneAndStoreRebasedCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004ADDE0 (FUN_004ADDE0 -- `insert(pos, value)` for a 4-byte element; callers 0x004AC330, 0x004AD027; formerly `InsertSingleDwordIntoLegacyVector_004ADDE0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x004F7F50 (FUN_004F7F50 -- single-value `insert(pos, value)` for the 0x28-byte `moho::CWinLogLine` (the log window's line lists), the capacity-full path of `push_back`: offset, `_Insert_n` 0x004F88B0, `begin() + offset`; caller 0x004F6FBE (0x004F6F40). Formerly `InsertVectorWinLogLineAtEnd` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x004F8CA0 (FUN_004F8CA0 -- single-value `insert(pos, value)` for the managed-dialog registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element); caller 0x004F811C (0x004F80F0). Formerly `InsertManagedWindowSlotIntoWindowsVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x004F9050 (FUN_004F9050 -- the same insert for the managed-frame registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`; caller 0x004F826C (0x004F8240). Formerly `InsertManagedWindowSlotIntoFramesVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6643,6 +6645,7 @@ namespace msvc8
          * Address: 0x00940AF0 (FUN_00940AF0 -- that insert's gap fill-assign sub-step (VC8's `std::fill`) for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940F56, 0x00940FC3 (`_Insert_n` 0x00940D40); formerly `CopyPackedAdapterModePayloadRangeRuntime` over a `PackedAdapterModeRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008E9280 (FUN_008E9280 -- that insert's gap fill-assign sub-step (VC8's `std::fill`, no null guard) for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF6D9, 0x008EF728 (`_Insert_n` 0x008EF500). It was cited on `uninit_fill_n`.)
          * Address: 0x008E9260 (FUN_008E9260 -- the same gap fill-assign for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF489, 0x008EF4D8 (`_Insert_n` 0x008EF2B0). It was cited on `uninit_fill_n`.)
+         * Address: 0x004F88B0 (FUN_004F88B0 -- `_Insert_n(pos, 1, value)` for the 0x28-byte `moho::CWinLogLine`, the grow-and-insert body under 0x004F7F50; caller 0x004F7F9B. Formerly `GrowAndInsertOneVectorWinLogLine` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -9105,7 +9108,7 @@ namespace msvc8
          * (CWldSession.cpp:14703) when the bucket's `mEdges` vector is at
          * capacity.)
          * Address: 0x0084EAD0 (FUN_0084EAD0, `msvc8::vector<
-         * wxWindowBase*>::uninit_fill_n` for the 4-byte pointer element --
+         * wxEvtHandler*>::uninit_fill_n` for the 4-byte pointer element --
          * the per-window saved pushed-event-handler inner vector built by
          * `moho::SuspendInputWindowEventHandlersAndFlushQueue`
          * (UiRuntimeTypes.cpp, `Address: 0x0084DA80`). Reached from this
@@ -9803,7 +9806,7 @@ namespace msvc8
          * constexpr` arm) -- one compiled `memmove_s` wrapper backs both
          * call shapes for this element. Reached from the `_Insert_n` grow
          * core `FUN_004451A0`, cited above on `insert`.)
-         * Address: 0x0084F940 (FUN_0084F940, `msvc8::vector<wxWindowBase*>::
+         * Address: 0x0084F940 (FUN_0084F940, `msvc8::vector<wxEvtHandler*>::
          * uninit_move_n` for `SuspendInputWindowEventHandlersAndFlushQueue`'s
          * per-window saved-handler vector (`UiRuntimeTypes.cpp`) -- same
          * trivial-scalar shape as `FUN_00445F20` immediately above: `count =
@@ -10107,16 +10110,15 @@ namespace msvc8
          * Reached from the `_Insert_n` grow body FUN_005C68E0, already
          * cited above.)
          * Address: 0x0084F820 (FUN_0084F820 — 16-byte `msvc8::vector<
-         * wxWindowBase*>` element (a nested vector, not a POD struct;
-         * `wxWindowBase*` is this codebase's stand-in for the real wx
-         * `wxEvtHandler*`, see the note on `operator=` above): pointer-walk
-         * loop form (`for (; src != srcEnd; dst += 16) dst[0..3] = *src++`,
+         * wxEvtHandler*>` element (a nested vector, not a POD struct):
+         * pointer-walk loop form
+         * (`for (; src != srcEnd; dst += 16) dst[0..3] = *src++`,
          * IDA shows the two cursors threaded through registers rather than
          * an index) calling this element type's own `operator=`
          * (`FUN_0084FF80`, cited above on `operator=`) per slot -- the
          * non-trivial branch here because a `vector<T>` element owns a heap
          * buffer and is not `is_trivially_copy_assignable_v`. Reached from
-         * the outer `msvc8::vector<msvc8::vector<wxWindowBase*>>`'s
+         * the outer `msvc8::vector<msvc8::vector<wxEvtHandler*>>`'s
          * grow-relocate path (`FUN_0084EE20`, not yet independently
          * address-annotated) when `moho::
          * SuspendInputWindowEventHandlersAndFlushQueue`'s
