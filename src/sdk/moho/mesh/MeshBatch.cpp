@@ -1,5 +1,6 @@
 #include "MeshBatch.h"
 
+#include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
@@ -132,7 +133,22 @@ namespace moho
     if (mUseBoneRemap != 0u) {
       // Remapped batches share one 80-slot skinning palette between instances,
       // so the budget is however many whole skeletons fit in it (0x007E6FFC).
-      mMaxInstancesPerDraw = 80 / mBoneCount;
+      //
+      // FAF divergence: the binary divides unguarded. A skinned mesh with no
+      // bones faults on the divide, and one with more bones than the palette
+      // holds gets a budget of zero - which `HardwareMeshBatch::FillBatch`
+      // cannot make progress on, so `MeshBatch::Render` spins forever, after
+      // FillBatch's identity seed has already written past the palette's
+      // storage. Shipped meshes top out at 58 bones; mod meshes need not. Such
+      // a batch keeps a zero budget and draws nothing (see FillBatch).
+      constexpr auto kPaletteSlots = static_cast<std::int32_t>(MeshShaderPaletteBuffer::kPaletteCapacity);
+      mMaxInstancesPerDraw = (mBoneCount > 0) ? kPaletteSlots / mBoneCount : 0;
+      if (mMaxInstancesPerDraw == 0) {
+        gpg::Warnf(
+          "Mesh \"%s\" has %d skinned bones but the GPU skinning palette holds %d; it will not be drawn.",
+          currentResource->mName.c_str(), mBoneCount, kPaletteSlots
+        );
+      }
 
       const RScmResource* const reference = referenceResource.get();
       if (reference == nullptr || reference == currentResource.get()) {
@@ -164,11 +180,18 @@ namespace moho
       // Non-remapped batches are hardware-instanced: the budget is whichever of
       // the 16-bit vertex-index ceiling and the device's primitive cap binds
       // first (0x007E72A3 onward).
-      std::int32_t budget = 0xFFFF / mVertexCount;
-      const auto primitiveBudget =
-        static_cast<std::int32_t>(deviceContext->mMaxPrimitiveCount / static_cast<std::uint32_t>(mTriangleCount));
-      if (budget >= primitiveBudget) {
-        budget = primitiveBudget;
+      //
+      // FAF divergence: both divides are guarded for the same reason as the
+      // skinned branch above - a mesh with no vertices or no whole triangle
+      // faulted here. It now gets a zero budget and draws nothing.
+      std::int32_t budget = 0;
+      if (mVertexCount > 0 && mTriangleCount > 0) {
+        budget = 0xFFFF / mVertexCount;
+        const auto primitiveBudget =
+          static_cast<std::int32_t>(deviceContext->mMaxPrimitiveCount / static_cast<std::uint32_t>(mTriangleCount));
+        if (budget >= primitiveBudget) {
+          budget = primitiveBudget;
+        }
       }
       mMaxInstancesPerDraw = budget;
     }

@@ -336,7 +336,11 @@ namespace moho
 
     // Instanced (non-remap) batches split the device's primitive budget across
     // as many instances as fit; remapped batches keep the base default.
-    if (mUseBoneRemap == 0) {
+    //
+    // FAF divergence: guarded like MeshBatch::Initialize's divides - a mesh with
+    // no whole triangle keeps the zero budget the base gave it, instead of
+    // faulting here.
+    if (mUseBoneRemap == 0 && mTriangleCount > 0) {
       mMaxInstancesPerDraw =
         static_cast<std::int32_t>(deviceContext->mMaxPrimitiveCount / static_cast<std::uint32_t>(mTriangleCount));
     }
@@ -820,6 +824,16 @@ namespace moho
     const bool reflectedOnly
   )
   {
+    // FAF divergence (see MeshBatch::Initialize): a batch with a zero instance
+    // budget cannot draw. Consume the whole run, so MeshBatch::Render's loop
+    // ends instead of re-entering here forever, and do it before the palette
+    // seed below, which indexes by bone and would write past the palette for a
+    // skeleton larger than it.
+    if (mMaxInstancesPerDraw <= 0) {
+      current = end;
+      return 0;
+    }
+
     MeshShaderPaletteVar& transPaletteVar = GetMeshShaderVarTransPalette();
     MeshShaderPaletteVar& rotPaletteVar = GetMeshShaderVarRotPalette();
     SkinPaletteEntry* const transPalette = transPaletteVar.mPalette.begin();
