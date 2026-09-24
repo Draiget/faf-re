@@ -145,25 +145,17 @@ namespace moho
       "Down",
       "Hover",
     };
-    // Turn-event names, the three-entry table at 0x00F58374. These used to be
-    // appended to the vert-event names above, but the binary keeps four
-    // separate tables back to back -- horz at 0x00F58350, vert at 0x00F58360,
-    // turn at 0x00F58374, motion state at 0x00F58380 -- and both
-    // SetMotionTurnEvent (0x006B8FB0) and CalcMoveAir's inlined reset index
-    // this one from its own base.
-    constexpr const char* kUnitMotionScriptTurnEventNames[] = {
-      "Straight",
-      "Turn",
-      "SharpTurn",
-    };
+    // The binary keeps four name tables back to back -- horz at 0x00F58350,
+    // vert at 0x00F58360, turn at 0x00F58374, motion state at 0x00F58380. The
+    // turn table's only readers are the callback paths FAF patched out of
+    // SetMotionTurnEvent (0x006B8FB0) and CalcMoveAir (0x006BFF2C), so it has
+    // no source counterpart.
     constexpr std::size_t kUnitMotionScriptStateNameCount =
       sizeof(kUnitMotionScriptStateNames) / sizeof(kUnitMotionScriptStateNames[0]);
     constexpr std::size_t kUnitMotionScriptHorzEventNameCount =
       sizeof(kUnitMotionScriptHorzEventNames) / sizeof(kUnitMotionScriptHorzEventNames[0]);
     constexpr std::size_t kUnitMotionScriptVertEventNameCount =
       sizeof(kUnitMotionScriptVertEventNames) / sizeof(kUnitMotionScriptVertEventNames[0]);
-    constexpr std::size_t kUnitMotionScriptTurnEventNameCount =
-      sizeof(kUnitMotionScriptTurnEventNames) / sizeof(kUnitMotionScriptTurnEventNames[0]);
     constexpr std::uint64_t kVerticalMotionStateMask =
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingDown)) |
       (1ull << static_cast<std::uint32_t>(UNITSTATE_MovingUp));
@@ -406,20 +398,6 @@ namespace moho
         return "";
       }
       return kUnitMotionScriptVertEventNames[eventOffset];
-    }
-
-    [[nodiscard]] const char* UnitMotionTurnEventToScriptString(const EUnitMotionTurnEvent event) noexcept
-    {
-      const auto eventIndex = static_cast<std::int32_t>(event);
-      if (eventIndex < 0) {
-        return "";
-      }
-
-      const auto eventOffset = static_cast<std::size_t>(eventIndex);
-      if (eventOffset >= kUnitMotionScriptTurnEventNameCount) {
-        return "";
-      }
-      return kUnitMotionScriptTurnEventNames[eventOffset];
     }
 
     [[nodiscard]] bool IsVector3fBinaryZero(const Wm3::Vector3f& value) noexcept
@@ -1670,22 +1648,23 @@ namespace moho
    * by three `90`s, which is a five-byte jump straight to the epilogue plus
    * padding, overwriting `74 25` (the "unchanged" early-out) AND the six-byte
    * store `89 81 84 00 00 00`. The `cmp` at 0x006B8FB7 still runs and its
-   * result is discarded. Everything after the patch survives intact and is
-   * recovered here; the unpatched sibling `SetMotionState` (0x006B8FF0) has
-   * the identical shape against field +0x78, which is what pins the store's
-   * position and width.
+   * result is discarded. The unpatched sibling `SetMotionState` (0x006B8FF0)
+   * has the identical shape against field +0x78, which is what pins the
+   * store's position and width.
+   *
+   * The code after the jump -- the `OnMotionTurnEventChange(new, old)` script
+   * callback -- is unreachable in every FAF build (2025.7.1, bin/external,
+   * the installed ForgedAlliance.exe and its Trim/Trim_original copies all
+   * carry the patch), and so is the inlined copy in CalcMoveAir (0x006BFF2C,
+   * `E9 24 00 00 00` over the `mov [ebp+84h], 0` store and the call). FAF's
+   * Unit.lua defines the handler as an empty function with the note "it was a
+   * cycle eater, so we killed it". The shipped engine therefore never stores
+   * a turn event and never calls the script, and this follows the shipped
+   * bytes: `mTurnEvent` keeps its constructed value (Straight).
    */
   void CUnitMotion::SetMotionTurnEvent(const EUnitMotionTurnEvent event)
   {
-    const EUnitMotionTurnEvent previousEvent = mTurnEvent;
-    if (previousEvent == event) {
-      return;
-    }
-
-    const char* oldEventName = UnitMotionTurnEventToScriptString(previousEvent);
-    const char* newEventName = UnitMotionTurnEventToScriptString(event);
-    mTurnEvent = event;
-    mUnit->CallbackStr("OnMotionTurnEventChange", &newEventName, &oldEventName);
+    (void)event;
   }
 
   /**
@@ -4228,9 +4207,8 @@ namespace moho
       } else {
         // 0x006BFE2F `jbe 0x6BFF24` -- inside StartTurnDistance the event is
         // reset to Straight. MSVC inlined this one call (0x006BFF24-0x006BFF50,
-        // itself hot-patched at 0x006BFF2C), folding `table[0]` into the
-        // literal `push 0xF58374`. Without it a flier keeps whichever turn
-        // event its last long leg left behind for the rest of its life.
+        // folding `table[0]` into the literal `push 0xF58374`); FAF's patch at
+        // 0x006BFF2C skips it just as it skips the out-of-line body.
         SetMotionTurnEvent(UMTE_Straight);
       }
 
