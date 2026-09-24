@@ -150,7 +150,7 @@ namespace moho
      * below. When mesh generation is enabled and something is dirty,
      * rebuilds tessellation, re-derives the four skirt-range fields plus
      * their min-scan base vertex, and (outside minimap passes, when
-     * `ren_Decals`) gathers on-screen decals into `mPrimaryPatchData` - the
+     * `ren_Decals`) gathers on-screen decals into `mDecalDrawCommands` - the
      * per-decal fidelity field only gates whether the LOD-area threshold
      * check applies (fidelity `0` always passes it), matching
      * `MediumFidelityTerrain`, not `LowFidelityTerrain`. Independently of
@@ -368,14 +368,14 @@ namespace moho
     std::int32_t mSkirtEndVertex = 0;                     // +0x38
     std::int32_t mSkirtBaseVertex = 0;                    // +0x3C
 
-    gpg::core::FastVectorN<std::uint32_t, 3000> mPrimaryPatchData; // +0x40
+    gpg::core::FastVectorN<TerrainDecalDrawCommand, 500> mDecalDrawCommands; // +0x40
     CTesselator* mTesselator = nullptr;                   // +0x2F30
     Shoreline mShoreline;                                 // +0x2F34
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;       // +0x2FE4
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;         // +0x2FE8
     std::uint32_t mPad2FEC = 0u;                          // +0x2FEC
 
-    gpg::core::FastVectorN<std::uint32_t, 70000> mSecondaryPatchData; // +0x2FF0
+    gpg::core::FastVectorN<TerrainSplatVertex, 10000> mSplatVertices; // +0x2FF0
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;       // +0x475C0
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;         // +0x475C4
     VTransform mTerrainTransform;                         // +0x475C8
@@ -411,8 +411,8 @@ namespace moho
     "HighFidelityTerrain::mViewportRenderHeight offset must be 0x24"
   );
   static_assert(
-    offsetof(HighFidelityTerrain, mPrimaryPatchData) == 0x40,
-    "HighFidelityTerrain::mPrimaryPatchData offset must be 0x40"
+    offsetof(HighFidelityTerrain, mDecalDrawCommands) == 0x40,
+    "HighFidelityTerrain::mDecalDrawCommands offset must be 0x40"
   );
   static_assert(
     offsetof(HighFidelityTerrain, mSkirtStartIndex) == 0x2C,
@@ -443,13 +443,13 @@ namespace moho
     "HighFidelityTerrain::mTerrainVertexSheet offset must be 0x2FE4"
   );
   static_assert(
-    offsetof(HighFidelityTerrain, mSecondaryPatchData) == 0x2FF0,
-    "HighFidelityTerrain::mSecondaryPatchData offset must be 0x2FF0"
+    offsetof(HighFidelityTerrain, mSplatVertices) == 0x2FF0,
+    "HighFidelityTerrain::mSplatVertices offset must be 0x2FF0"
   );
   static_assert(
-    (offsetof(HighFidelityTerrain, mSecondaryPatchData) +
-     offsetof(decltype(HighFidelityTerrain::mSecondaryPatchData), inlineVec_)) == 0x3000,
-    "HighFidelityTerrain::mSecondaryPatchData inline storage must start at 0x3000"
+    (offsetof(HighFidelityTerrain, mSplatVertices) +
+     offsetof(decltype(HighFidelityTerrain::mSplatVertices), inlineVec_)) == 0x3000,
+    "HighFidelityTerrain::mSplatVertices inline storage must start at 0x3000"
   );
   static_assert(
     offsetof(HighFidelityTerrain, mDynamicVertexSheet) == 0x475C0,

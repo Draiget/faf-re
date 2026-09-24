@@ -839,7 +839,7 @@ namespace moho
           mSkirtBaseVertex = std::min(mSkirtBaseVertex, static_cast<std::int32_t>(collisionIndexData[i]));
         }
 
-        mPrimaryPatchData.ResetStorageToInline();
+        mDecalDrawCommands.ResetStorageToInline();
 
         // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\nodecals.on" skips decals.
         static const bool sNoDecalsToggle = [] {
@@ -862,8 +862,7 @@ namespace moho
           static StatItem* sEngineStatRenderFlatDecals = nullptr;
           static StatItem* sEngineStatRenderDecals = nullptr;
 
-          auto& decalCommands =
-            reinterpret_cast<gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+          auto& decalCommands = mDecalDrawCommands;
 
           for (CWldTerrainDecal* const decal : visibleDecals) {
 
@@ -950,7 +949,7 @@ namespace moho
         }
       }
 
-      mSecondaryPatchData.ResetStorageToInline();
+      mSplatVertices.ResetStorageToInline();
 
       if (!minimapPass && ren_Splats) {
         auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -958,7 +957,7 @@ namespace moho
         gpg::fastvector<CWldTerrainDecal*> visibleSplats;
         (void)decalManager->PropsInView(mCamera, visibleSplats, ren_IgnoreDecalLOD);
 
-        auto& splatVertices = reinterpret_cast<gpg::core::FastVectorN<TerrainSplatVertex, 10000>&>(mSecondaryPatchData);
+        auto& splatVertices = mSplatVertices;
 
         std::int32_t splatBudget = 0;
         { static int sSp = 0; if ((sSp++ % 40) == 0) { gpg::Warnf("[SPLATDIAG] collected=%d", static_cast<int>(visibleSplats.end() - visibleSplats.begin())); } } // TEMPORARY PROBE (do not commit)
@@ -1165,8 +1164,7 @@ namespace moho
     };
 
     bool alphaTechniqueActive = false;
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
 
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       const EWldTerrainDecalType type = command.decal->mType;
@@ -1346,8 +1344,7 @@ namespace moho
 
     D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : techniqueName);
 
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
     if (FafProbeFrameDiag() > 0) { int nType = 0, nAll = 0; for (const TerrainDecalDrawCommand& c : decalCommands) { ++nAll; if (static_cast<std::int32_t>(c.decal->mType) == decalType) ++nType; } gpg::Warnf("[FD] f=%d DrawDecalPass type=%d tech=%s n=%d/%d camY=%.1f", FafProbeFrameSeq(), decalType, techniqueName, nType, nAll, mCamera ? mCamera->tranform.pos_.y : -1.0f); } // TEMPORARY PROBE (do not commit)
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
@@ -1537,8 +1534,7 @@ namespace moho
    */
   void HighFidelityTerrain::DrawSplatComposite()
   {
-    const auto& splatVertices =
-      reinterpret_cast<const gpg::core::FastVectorN<TerrainSplatVertex, 10000>&>(mSecondaryPatchData);
+    const auto& splatVertices = mSplatVertices;
     const std::size_t splatVertexCount = splatVertices.size();
     { static int sSd = 0; if ((sSd++ % 40) == 0) { gpg::Warnf("[SPLATDIAG] DrawSplatComposite verts=%d", static_cast<int>(splatVertexCount)); } } // TEMPORARY PROBE (do not commit)
     if (splatVertexCount == 0) {
@@ -1595,8 +1591,7 @@ namespace moho
 
     D3D_GetDevice()->SelectTechnique(ren_DecalOverDraw ? "TDecalOverDraw" : "TDecalsGlow");
 
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
       if (decal.mType != WldTerrainDecalType_Glow) {
@@ -1777,8 +1772,7 @@ namespace moho
 
     LoadShaderVars({});
 
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
       if (decal.mType != WldTerrainDecalType_WaterAlbedo) {
@@ -2252,13 +2246,13 @@ namespace moho
 
     DeleteOwned(mDynamicIndexSheet);
     DeleteOwned(mDynamicVertexSheet);
-    mSecondaryPatchData.ResetStorageToInline();
+    mSplatVertices.ResetStorageToInline();
 
     DeleteOwned(mTerrainIndexSheet);
     DeleteOwned(mTerrainVertexSheet);
 
     DeleteOwned(mTesselator);
-    mPrimaryPatchData.ResetStorageToInline();
+    mDecalDrawCommands.ResetStorageToInline();
   }
 
   /**

@@ -266,7 +266,7 @@ namespace moho
      * pending-changes flag. When mesh generation is enabled and something is
      * dirty, rebuilds tessellation, re-derives the four skirt-range fields
      * plus their min-scan base vertex, and (outside minimap passes, when
-     * `ren_Decals`) gathers on-screen decals into `mPrimaryPatchData`.
+     * `ren_Decals`) gathers on-screen decals into `mDecalDrawCommands`.
      * Independently of the dirty gate, resets and (outside minimap passes,
      * when `ren_Splats`) refills the splat-vertex lane, then unconditionally
      * re-uploads the tesselator's current rect-cache and collision-index
@@ -318,8 +318,8 @@ namespace moho
      * guess is now superseded by this confirmed single typed field.
      */
     VTransform mCachedCameraTransform;                              // +0x34
-    gpg::core::FastVectorN<std::uint32_t, 3000> mPrimaryPatchData; // +0x50
-    gpg::core::FastVectorN<std::uint32_t, 7000> mSecondaryPatchData; // +0x2F40
+    gpg::core::FastVectorN<TerrainDecalDrawCommand, 500> mDecalDrawCommands; // +0x50
+    gpg::core::FastVectorN<TerrainSplatVertex, 1000> mSplatVertices; // +0x2F40
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;                 // +0x9CB0
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;                   // +0x9CB4
 
@@ -382,12 +382,12 @@ namespace moho
     "LowFidelityTerrain::mSkirtBaseVertex offset must be 0x30"
   );
   static_assert(
-    offsetof(LowFidelityTerrain, mPrimaryPatchData) == 0x50,
-    "LowFidelityTerrain::mPrimaryPatchData offset must be 0x50"
+    offsetof(LowFidelityTerrain, mDecalDrawCommands) == 0x50,
+    "LowFidelityTerrain::mDecalDrawCommands offset must be 0x50"
   );
   static_assert(
-    offsetof(LowFidelityTerrain, mSecondaryPatchData) == 0x2F40,
-    "LowFidelityTerrain::mSecondaryPatchData offset must be 0x2F40"
+    offsetof(LowFidelityTerrain, mSplatVertices) == 0x2F40,
+    "LowFidelityTerrain::mSplatVertices offset must be 0x2F40"
   );
   static_assert(
     offsetof(LowFidelityTerrain, mDynamicVertexSheet) == 0x9CB0,

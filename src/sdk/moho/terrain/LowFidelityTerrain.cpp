@@ -126,17 +126,8 @@ namespace
   }
 
   // ----- Decal / splat draw helpers -----
-  // The low-fidelity decal-command lane is stored inline at mPrimaryPatchData
-  // (+0x50); each element is a moho::TerrainDecalDrawCommand (24 bytes,
-  // 3000 * uint32 == 500 * 24). The splat-vertex lane at mSecondaryPatchData
-  // (+0x2F40) holds 28-byte splat vertices (7000 * uint32 == 1000 * 28).
-
-  /// One composited splat vertex (28-byte element of the splat lane).
-  struct LowFidelitySplatVertex
-  {
-    std::uint8_t bytes[0x1C];
-  };
-  static_assert(sizeof(LowFidelitySplatVertex) == 0x1C, "LowFidelitySplatVertex size must be 0x1C");
+  // mDecalDrawCommands (+0x50) holds up to 500 TerrainDecalDrawCommand and
+  // mSplatVertices (+0x2F40) up to 1000 TerrainSplatVertex.
 
 
   /// Binds one command's index/vertex sub-range and submits one indexed
@@ -272,8 +263,8 @@ namespace moho
     Destroy();
     DeleteOwned(mDynamicIndexSheet);
     DeleteOwned(mDynamicVertexSheet);
-    mSecondaryPatchData.ResetStorageToInline();
-    mPrimaryPatchData.ResetStorageToInline();
+    mSplatVertices.ResetStorageToInline();
+    mDecalDrawCommands.ResetStorageToInline();
     DeleteOwned(mTerrainIndexSheet);
     DeleteOwned(mTerrainVertexSheet);
     DeleteOwned(mTesselator);
@@ -773,8 +764,7 @@ namespace moho
       D3D_GetDevice()->SelectTechnique(techniqueName);
     }
 
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<moho::TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
       if (static_cast<std::int32_t>(decal.mType) != decalType) {
@@ -817,8 +807,7 @@ namespace moho
       D3D_GetDevice()->SelectTechnique("TDecalsGlow");
     }
 
-    const auto& decalCommands =
-      reinterpret_cast<const gpg::core::FastVectorN<moho::TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData);
+    const auto& decalCommands = mDecalDrawCommands;
     for (const TerrainDecalDrawCommand& command : decalCommands) {
       CWldTerrainDecal& decal = *command.decal;
       if (decal.mType != WldTerrainDecalType_Glow) {
@@ -850,8 +839,7 @@ namespace moho
    */
   void LowFidelityTerrain::DrawSplatComposite()
   {
-    const auto& splatVertices =
-      reinterpret_cast<const gpg::core::FastVectorN<LowFidelitySplatVertex, 1000>&>(mSecondaryPatchData);
+    const auto& splatVertices = mSplatVertices;
     const std::size_t splatVertexCount = splatVertices.size();
     if (splatVertexCount == 0) {
       return;
@@ -859,7 +847,7 @@ namespace moho
 
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, splatVertices.data(), sizeof(LowFidelitySplatVertex) * splatVertexCount);
+    std::memcpy(lockedVertices, splatVertices.data(), sizeof(moho::TerrainSplatVertex) * splatVertexCount);
     mDynamicVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
@@ -1032,7 +1020,7 @@ namespace moho
         mSkirtBaseVertex = std::min(mSkirtBaseVertex, static_cast<std::int32_t>(collisionIndexData[i]));
       }
 
-      mPrimaryPatchData.ResetStorageToInline();
+      mDecalDrawCommands.ResetStorageToInline();
 
       if (!minimapPass && ren_Decals) {
         auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1091,7 +1079,7 @@ namespace moho
             command.indexCount = static_cast<std::int32_t>(addedIndexCount);
 
             if (command.indexCount > 0 && (command.startIndex + command.indexCount) < kSkirtMaxIndexCount) {
-              reinterpret_cast<gpg::core::FastVectorN<moho::TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData)
+              mDecalDrawCommands
                 .PushBack(command);
 
               if (sEngineStatRenderFlatDecals == nullptr) {
@@ -1117,7 +1105,7 @@ namespace moho
               command.indexCount = static_cast<std::int32_t>(addedIndexCount);
               command.startVertex = minRectIndex;
               command.endVertex = maxRectIndex;
-              reinterpret_cast<gpg::core::FastVectorN<moho::TerrainDecalDrawCommand, 500>&>(mPrimaryPatchData)
+              mDecalDrawCommands
                 .PushBack(command);
 
               if (sEngineStatRenderDecals == nullptr) {
@@ -1132,7 +1120,7 @@ namespace moho
       }
     }
 
-    mSecondaryPatchData.ResetStorageToInline();
+    mSplatVertices.ResetStorageToInline();
 
     if (!minimapPass && ren_Splats) {
       auto* const decalManager = static_cast<CDecalManager*>(terrainRes->GetDecalManager());
@@ -1176,11 +1164,10 @@ namespace moho
 
         splat->UpdateBatchTexture(texture_batcher);
 
-        auto& splatVertexLane =
-          reinterpret_cast<gpg::core::FastVectorN<LowFidelitySplatVertex, 1000>&>(mSecondaryPatchData);
+        auto& splatVertexLane = mSplatVertices;
         const std::size_t countBeforeAppend = splatVertexLane.Size();
         for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-          splatVertexLane.PushBack(reinterpret_cast<const LowFidelitySplatVertex&>(sourceVertex));
+          splatVertexLane.PushBack(reinterpret_cast<const moho::TerrainSplatVertex&>(sourceVertex));
         }
 
         for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {

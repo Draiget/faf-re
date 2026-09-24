@@ -23,40 +23,6 @@ namespace moho
   class CWldTerrainDecal;
   class MeshRenderer;
 
-  /**
-   * One queued terrain-decal draw command, recovered from the medium-fidelity
-   * decal draw helpers (0x008065E0 / 0x00806A50 / 0x00806C60). Each command
-   * carries the index/vertex-sheet sub-range for one decal quad plus the decal
-   * object that supplies its animated albedo/spec/normal textures. Element size
-   * is exactly 24 bytes; the command lane at `+0x40` holds up to 500 inline
-   * commands (`500 * 24 == 0x2EE0`, matching the inline byte window between
-   * `+0x50` and `mTesselator@+0x2F30`).
-   */
-  struct TerrainDecalDrawCommand
-  {
-    std::int32_t startIndex;   // +0x00 -> SD3DIndexRange::startIndex
-    std::int32_t indexCount;   // +0x04 -> SD3DIndexRange::indexCount
-    std::int32_t startVertex;  // +0x08 -> SD3DVertexRange::startVertex (min referenced vertex)
-    std::int32_t endVertex;    // +0x0C -> SD3DVertexRange::endVertex
-    float alpha;               // +0x10 -> DecalAlpha shader-var value
-    CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)
-  };
-  static_assert(sizeof(TerrainDecalDrawCommand) == 0x18, "TerrainDecalDrawCommand size must be 0x18");
-
-  /**
-   * One composited terrain splat vertex, recovered from the splat draw helper
-   * (0x00806860) which memcpys the whole splat lane into the overlay vertex
-   * sheet and draws it with the `TSplats` technique. Element size is exactly
-   * 28 bytes; the splat lane at `+0x2F40` holds up to 10000 inline vertices
-   * (`10000 * 28 == 0x445C0`, matching the inline byte window between `+0x2F50`
-   * and `mOverlayVertexSheet@+0x47510`). Only the raw byte payload is copied,
-   * so the individual channels are kept as an opaque 28-byte record.
-   */
-  struct TerrainSplatVertex
-  {
-    std::uint8_t bytes[0x1C]; // +0x00 opaque 28-byte vertex record
-  };
-  static_assert(sizeof(TerrainSplatVertex) == 0x1C, "TerrainSplatVertex size must be 0x1C");
 
 
   class CD3DDynamicTextureSheet;
