@@ -695,10 +695,9 @@ extern "C" void png_write_info_before_PLTE(png_structp png_ptr, png_infop info_p
  * before IDAT that are safe (or forced) to copy, writing each via
  * png_write_chunk.
  *
- * Callers: wxPNGHandler::SaveFile (0x00975370, still unrecovered -- see
- * decomp/recovery/reports/FUN_00975370.md for the wxImage/vtable evidence
- * and the ready-to-execute plan, blocked on a concurrently-locked file) and
- * png_write_png (0x009E8AB8, recovered below).
+ * Callers: wxPNGHandler::SaveFile (0x00975370, recovered as
+ * wxPngHandlerSaveFile in moho/app/WxRuntimeTypes.cpp) and png_write_png
+ * (0x009E8AB8, recovered below).
  */
 extern "C" void png_write_info(png_structp png_ptr, png_infop info_ptr);
 
@@ -793,7 +792,8 @@ extern "C" void png_write_find_filter(png_structp png_ptr, png_row_infop row_inf
  * data into row_buf, and dispatches to png_write_find_filter.
  *
  * Callers: png_write_rows (0x009E89A2, still unrecovered), png_write_image
- * (0x009E89C6, below), wxPNGHandler::SaveFile (0x00975370, still unrecovered).
+ * (0x009E89C6, below), wxPNGHandler::SaveFile (0x00975370, recovered as
+ * wxPngHandlerSaveFile in moho/app/WxRuntimeTypes.cpp; direct per-row calls).
  */
 extern "C" void png_write_row(png_structp png_ptr, std::uint8_t* row);
 
@@ -829,8 +829,9 @@ extern "C" void png_write_IEND(png_structp png_ptr);
  * (matching png_write_info's chunk-writing conventions), then PNG_AFTER_IDAT
  * + IEND.
  *
- * Callers: wxPNGHandler::SaveFile (0x00975370, still unrecovered),
- * png_write_png (0x009E8AB8, below).
+ * Callers: wxPNGHandler::SaveFile (0x00975370, recovered as
+ * wxPngHandlerSaveFile in moho/app/WxRuntimeTypes.cpp), png_write_png
+ * (0x009E8AB8, below).
  */
 extern "C" void png_write_end(png_structp png_ptr, png_infop info_ptr);
 

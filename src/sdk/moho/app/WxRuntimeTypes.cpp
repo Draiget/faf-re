@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <csetjmp>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -53,6 +54,7 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "libpng/PngReadRuntime.h"
+#include "libpng/PngSetRuntime.h"  // png_set_IHDR / png_set_sBIT / png_set_shift / png_set_packing
 #include "moho/console/CConCommand.h"
 #include "moho/effects/rendering/SEfxCurve.h"
 #include "moho/mesh/Mesh.h"
@@ -145,6 +147,27 @@ const wxSize wxDefaultSize{-1, -1};
  * compiled fine and simply never appeared in this TU's object file at all).
  */
 extern const wxPoint wxDefaultPosition{-1, -1};
+
+// libpng write-struct entry points and the wxPNGHandler error callbacks that
+// `wxPngHandlerSaveFile` reaches but that have no recovered body in this
+// project yet. They are declarations only: the vendored static libraries
+// provide them (wxmswu.lib defines `_wx_png_error`/`_wx_png_warning`; png.lib
+// defines the write-struct factory/destroyer and png_set_write_fn), exactly as
+// the shipped binary linked them.
+extern "C"
+{
+  png_structp png_create_write_struct(
+    const char* user_png_ver, void* error_ptr, png_error_ptr error_fn, png_error_ptr warn_fn);
+  void png_destroy_write_struct(png_structp* png_ptr_ptr, png_infop* info_ptr_ptr);
+  void png_set_error_fn(
+    png_structp png_ptr, void* error_ptr, png_error_ptr error_fn, png_error_ptr warning_fn);
+  void png_set_write_fn(
+    png_structp png_ptr, void* io_ptr,
+    void (*write_data_fn)(png_structp, png_bytep, png_size_t),
+    void (*output_flush_fn)(png_structp));
+  void wx_png_error(png_structp png_ptr, const char* message);
+  void wx_png_warning(png_structp png_ptr, const char* message);
+}
 
 namespace
 {
@@ -61352,6 +61375,154 @@ wxPngHandlerRuntime::~wxPngHandlerRuntime() = default;
   }
 
   return std::memcmp(signature, kPngSignaturePrefix, sizeof(signature)) == 0;
+}
+
+/**
+ * Address: 0x00975370 (FUN_00975370)
+ * Mangled: ?SaveFile@wxPNGHandler@@UAE_NPAVwxImage@@AAVwxOutputStream@@_N@Z
+ *
+ * IDA signature:
+ * bool __thiscall wxPNGHandler::SaveFile(wxImage *image, wxOutputStream& stream, bool verbose);
+ *
+ * What it does:
+ * `wxPNGHandler::SaveFile` - real vtable slot 5 of 14 on `wxPNGHandler`'s
+ * vtable (`??_7wxPNGHandler@@6B@` @ 0xD4E6A0); slots 4/5/6/7 are
+ * `wxImageHandler`'s LoadFile/SaveFile/GetImageCount/DoCanRead in
+ * dependencies/wxWindows-2.4.2/include/wx/image.h declaration order, the same
+ * mapping the adjacent recovered `wxPngHandlerDoCanRead` (slot 7) uses.
+ *
+ * Writes `image` out as one 8-bit RGB_ALPHA PNG stream. Source identity is the
+ * wx 2.4 branch `wxPNGHandler::SaveFile` at `src/common/imagpng.cpp`, RCS
+ * revision 1.27.2.3, dated 2003-02-25 - the same revision as the vendored
+ * `dependencies/wxWindows-2.4.2` tree. That source matches this recovery's
+ * fixed 8-bit RGB_ALPHA path, mask-colour transparency behaviour, libpng
+ * setup, setjmp/error handling, row allocation, png_write_info/png_write_end
+ * flow and teardown. The implementation installs a `wxPNGInfoStruct`-shaped
+ * callback context (`WxPngIoContextRuntime`: jmp_buf at +0x00, `verbose` at
+ * +0x40, the output stream at +0x44), creates the libpng write/info structs,
+ * registers `wx_png_error`/`wx_png_warning` plus the recovered
+ * `wxPngWriteToStreamCallback`, seeds an 8-bpp RGB_ALPHA, non-interlaced IHDR
+ * with an all-8 sBIT record, emits the header via `png_write_info`, applies the
+ * shift/packing transforms, expands each 24-bit source row into RGBA (alpha 0
+ * exactly where the pixel equals the image mask colour, otherwise 255), writes
+ * each row, then finishes via `png_write_end` and `png_destroy_write_struct`.
+ *
+ * Binary evidence: the recovered libpng write chain records this entry point
+ * as a caller of `png_write_info` (0x009E7A92), `png_write_row` (0x009E7EC5)
+ * and `png_write_end` (0x009E7D38); its only binary reference is the
+ * wxPNGHandler vtable slot above (single data xref, no code callers). That
+ * tracked callsite evidence differs from the 2003 wx source at exactly one
+ * point: the source calls `png_write_rows(png_ptr, &row_ptr, 1)`, whereas
+ * FAF-RE records 0x00975370 as directly calling `png_write_row`; the
+ * single-row wrapper is behaviourally identical, and this recovery
+ * deliberately follows the binary-derived callsite.
+ *
+ * Caveat: this recovery was recovered from the matching wx 2.4 branch
+ * implementation and cross-checked against the binary-derived callsite/vtable
+ * evidence already tracked in FAF-RE. The private disassembly/callgraph corpus
+ * and the retail binary were not available in this checkout, so FUN_00975370's
+ * body was not re-disassembled here.
+ */
+bool wxPngHandlerSaveFile(
+  wxImageRuntime* const image,
+  wxOutputStream& stream,
+  const bool verbose
+) noexcept
+{
+  // wxPNGInfoStruct: jmp_buf (0x40) + bool verbose (+0x40) + padding +
+  // wxOutputStream* (+0x44). The recovered runtime view names the leading
+  // bytes as one opaque lane; `verbose` and `stream` are written through it,
+  // matching the layout `wxPngWriteToStreamCallback` reads at +0x44.
+  WxPngIoContextRuntime wxinfo{};
+  wxinfo.setJmpAndStateLane[0x40] = verbose ? 1u : 0u;
+  wxinfo.stream = reinterpret_cast<WxPngIoStreamRuntime*>(&stream);
+
+  png_structp png_ptr = png_create_write_struct("1.2.5rc3", nullptr, nullptr, nullptr);
+  if (png_ptr == nullptr) {
+    if (verbose) {
+      wxLogError(L"Couldn't save PNG image.");
+    }
+    return false;
+  }
+
+  png_set_error_fn(png_ptr, nullptr, wx_png_error, wx_png_warning);
+
+  png_infop info_ptr = png_create_info_struct(png_ptr);
+  if (info_ptr == nullptr) {
+    png_destroy_write_struct(&png_ptr, nullptr);
+    if (verbose) {
+      wxLogError(L"Couldn't save PNG image.");
+    }
+    return false;
+  }
+
+  // Same raw-jmp_buf convention as png_create_read_struct_2 (PngReadRuntime.cpp).
+  if (setjmp(*reinterpret_cast<jmp_buf*>(wxinfo.setJmpAndStateLane)) != 0) {
+    png_destroy_write_struct(&png_ptr, nullptr);
+    if (verbose) {
+      wxLogError(L"Couldn't save PNG image.");
+    }
+    return false;
+  }
+
+  png_set_write_fn(png_ptr, &wxinfo, wxPngWriteToStreamCallback, nullptr);
+
+  // The wxImage surface SaveFile reads: ref-data geometry and pixel bytes via
+  // wxImage::GetWidth/GetHeight/GetData (which require Ok(): m_ok at +0x18
+  // plus non-zero width/height), and the mask colour at +0x14..+0x17
+  // (m_hasMask/m_maskRed/m_maskGreen/m_maskBlue in wxImageRefData's 2.4.2
+  // layout).
+  auto* const refData = static_cast<const WxImageRefDataRuntime*>(image->mRefData);
+  const bool imageOk =
+    refData != nullptr && refData->mMaskAndFlags[4] != 0 && refData->mWidth != 0 && refData->mHeight != 0;
+  const std::int32_t width = imageOk ? refData->mWidth : 0;
+  const std::int32_t height = imageOk ? refData->mHeight : 0;
+  const unsigned char* const pixels = imageOk ? refData->mPixelBytes : nullptr;
+  const bool hasMask = imageOk && refData->mMaskAndFlags[0] != 0;
+  const unsigned char maskRed = hasMask ? refData->mMaskAndFlags[1] : 0;
+  const unsigned char maskGreen = hasMask ? refData->mMaskAndFlags[2] : 0;
+  const unsigned char maskBlue = hasMask ? refData->mMaskAndFlags[3] : 0;
+
+  png_set_IHDR(
+    png_ptr, info_ptr, static_cast<std::uint32_t>(width), static_cast<std::uint32_t>(height),
+    8, 6 /* PNG_COLOR_TYPE_RGB_ALPHA */, 0 /* PNG_INTERLACE_NONE */,
+    0 /* PNG_COMPRESSION_TYPE_BASE */, 0 /* PNG_FILTER_TYPE_BASE */);
+
+  // png_color_8 is {red, green, blue, gray, alpha}. The wx source writes
+  // red/green/blue/alpha = 8 and leaves gray unset; gray is never read for an
+  // RGB_ALPHA image, so it is zeroed here for determinism.
+  std::uint8_t sigBit[5] = {8, 8, 8, 0, 8};
+  png_set_sBIT(png_ptr, info_ptr, sigBit);
+  png_write_info(png_ptr, info_ptr);
+  png_set_shift(png_ptr, sigBit);
+  png_set_packing(png_ptr);
+
+  unsigned char* const rowData =
+    static_cast<unsigned char*>(std::malloc(static_cast<std::size_t>(width) * 4u));
+  if (rowData == nullptr) {
+    png_destroy_write_struct(&png_ptr, nullptr);
+    return false;
+  }
+
+  for (std::int32_t y = 0; y < height; ++y) {
+    const unsigned char* src = pixels + (static_cast<std::ptrdiff_t>(y) * width * 3);
+    for (std::int32_t x = 0; x < width; ++x) {
+      const unsigned char red = *src++;
+      const unsigned char green = *src++;
+      const unsigned char blue = *src++;
+      rowData[(x << 2) + 0] = red;
+      rowData[(x << 2) + 1] = green;
+      rowData[(x << 2) + 2] = blue;
+      rowData[(x << 2) + 3] =
+        (!hasMask || red != maskRed || green != maskGreen || blue != maskBlue) ? 255u : 0u;
+    }
+    png_write_row(png_ptr, rowData);
+  }
+
+  std::free(rowData);
+  png_write_end(png_ptr, info_ptr);
+  png_destroy_write_struct(&png_ptr, &info_ptr);
+  return true;
 }
 
 /**
