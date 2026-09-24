@@ -5928,6 +5928,51 @@ namespace moho
     }
 
     /**
+     * FAF divergence from the shipped binary - not a recovered function.
+     *
+     * What it does:
+     * Empties every bucket's instance list for the next `MeshRenderer::Batch`
+     * while keeping the buckets themselves, and periodically drops the ones
+     * that went unused.
+     *
+     * The binary starts every Batch with `meshes.clear()`, and Batch runs two or
+     * three times a frame (main view, shadow camera, cartographic). That frees
+     * every map node and every instance vector, and the same buckets are then
+     * reallocated as they refill - thousands of allocations a frame in a busy
+     * scene. Clearing a vector keeps its capacity, so a bucket that is visible
+     * frame after frame stops allocating at all.
+     *
+     * Buckets left empty since the previous Batch are erased every
+     * `kPruneEveryNthBatch` calls, so the map follows the recently visible set
+     * instead of growing. Pruning only occasionally matters: main view and
+     * shadow camera alternate over the same map, so a bucket one of them sees
+     * is always momentarily empty from the other's point of view.
+     *
+     * An empty bucket's key may name a MeshLOD the mesh cache has since
+     * released. The key compare only reads that pointer's value, and every
+     * consumer of the map skips empty buckets before touching the LOD.
+     */
+    void RecycleBatchBuckets(MeshBatchBucketTree& buckets)
+    {
+      constexpr unsigned kPruneEveryNthBatch = 64u;
+      static unsigned sBatchesSincePrune = 0u;
+
+      const bool prune = (++sBatchesSincePrune >= kPruneEveryNthBatch);
+      if (prune) {
+        sBatchesSincePrune = 0u;
+      }
+
+      for (auto it = buckets.begin(); it != buckets.end();) {
+        if (prune && it->second.empty()) {
+          it = buckets.erase(it);
+          continue;
+        }
+        it->second.clear();
+        ++it;
+      }
+    }
+
+    /**
      * Resolves a material's cached render-stage index, resolving it from the
      * effect's `renderStage` integer annotation on first use and caching the
      * result back into `mShaderIndex` (binary: the `mMat.mVal < 0` block).
@@ -6043,6 +6088,11 @@ namespace moho
     // `head->left` and its `end()` is the header itself, stepped by `_Inc`
     // (0x007E42F0) - which is what `msvc8::map`'s iterator does.
     for (const MeshBatchBucket& bucket : meshMap) {
+      // A recycled bucket can sit empty over a released mesh; see
+      // RecycleBatchBuckets. Skip it before touching its LOD.
+      if (bucket.second.empty()) {
+        continue;
+      }
       MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
@@ -6134,6 +6184,10 @@ namespace moho
       [&](const char* const technique, std::uint8_t MeshLOD::* const gate) {
         device->SelectTechnique(technique);
         for (const MeshBatchBucket& bucket : meshes) {
+          // See RecycleBatchBuckets: an empty bucket's LOD may be released.
+          if (bucket.second.empty()) {
+            continue;
+          }
           MeshLOD* const lod = MeshBatchEntryLod(bucket);
           if (!(lod->*gate)) {
             continue;
@@ -6229,6 +6283,11 @@ namespace moho
     // Walk the batch-bucket map in key order (binary: begin = head->left,
     // end = header, stepped by `_Inc` at 0x007E42F0).
     for (const MeshBatchBucket& bucket : meshMap) {
+      // A recycled bucket can sit empty over a released mesh; see
+      // RecycleBatchBuckets. Skip it before touching its LOD.
+      if (bucket.second.empty()) {
+        continue;
+      }
       MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
@@ -6345,6 +6404,11 @@ namespace moho
     // Walk the batch-bucket map in key order (binary: begin = head->left,
     // end = header, stepped by `_Inc` at 0x007E42F0).
     for (const MeshBatchBucket& bucket : meshMap) {
+      // A recycled bucket can sit empty over a released mesh; see
+      // RecycleBatchBuckets. Skip it before touching its LOD.
+      if (bucket.second.empty()) {
+        continue;
+      }
       MeshLOD* const lod = MeshBatchEntryLod(bucket);
       MeshMaterial& material = lod->mat;
 
@@ -6677,7 +6741,7 @@ namespace moho
   {
     // Clear last frame's buckets and reset the renderer frame lanes.
     gPropSeen = 0; gPropLod = 0; gPropFrustum = 0; gPropPushed = 0; // TEMPORARY PROBE (do not commit)
-    meshes.clear();
+    RecycleBatchBuckets(meshes);
     // Binary stores `gameTick` (param0) into +0x94 and clears the batched-count
     // lane at +0x9C; both are reused by this pass as frame-scoped scratch.
     instanceListSize = gameTick;
