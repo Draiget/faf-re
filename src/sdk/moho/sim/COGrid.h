@@ -7,6 +7,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/collision/CColPrimitiveBase.h"
+#include "moho/sim/CollisionShape.h"
 #include "moho/sim/SFootprint.h"
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
@@ -17,7 +18,6 @@ namespace moho
   class Entity;
   class Unit;
   struct SOCellPos;
-  struct EntityCollisionCellSpan;
   class Sim;
 
   enum EEntityType : std::uint32_t
@@ -27,23 +27,6 @@ namespace moho
     ENTITYTYPE_Entity = 0x0400,
     ENTITYTYPE_Projectile = 0x0800,
   };
-
-  struct CollisionDBRect
-  {
-    std::uint16_t mStartX;
-    std::uint16_t mStartZ;
-    std::uint16_t mWidth;
-    std::uint16_t mHeight;
-
-    /**
-     * Address: 0x004FCA10 (FUN_004FCA10, Moho::CollisionDBRect::NotEqual)
-     *
-     * What it does:
-     * Returns `true` when any collision-rect lane differs from `other`.
-     */
-    [[nodiscard]] bool NotEqual(const CollisionDBRect& other) const noexcept;
-  };
-  static_assert(sizeof(CollisionDBRect) == 0x08, "CollisionDBRect size must be 0x08");
 
 
   struct EntityLineCollision
@@ -67,10 +50,8 @@ namespace moho
   );
 
 
-  struct EntityCollisionCellNode;
-
   /**
-   * The 4x4-cell collision bucket grid every entity's `EntityCollisionCellSpan`
+   * The 4x4-cell collision bucket grid every entity's `CollisionShape<Entity>`
    * links into. Field roles from the binary: `EnsureSize` (0x004FCE90) grows
    * `mFreeNodeCount` (+0x1C) by 0x2000 per 0x10000-byte chunk, threads the
    * chunk onto `mFreeNodeHead` (+0x20) and pushes it onto the `mAllBlocks`
@@ -80,8 +61,7 @@ namespace moho
    * pop/push the free list at +0x20 while adjusting the count at +0x1C;
    * `CollisionShapeBase::Add` (0x004FD420) walks rows with `mWidth` (+0x00)
    * as the stride, `mLastIndex` (+0x08) as the bucket mask and
-   * `mGridWidthShift` (+0x0C) as the row shift. This is the one owning layout;
-   * `EntityCollisionSpatialGrid` in Entity.h is an alias of it.
+   * `mGridWidthShift` (+0x0C) as the row shift.
    */
   struct EntityOccupationManager
   {
@@ -117,6 +97,34 @@ namespace moho
     ~EntityOccupationManager();
 
     /**
+     * Address: 0x004FCE90 (FUN_004FCE90)
+     *
+     * What it does:
+     * Adds 0x2000-node chunks (0x10000 bytes) to the free list until at least
+     * `requiredFreeNodes` are free, recording each chunk in the block vector.
+     */
+    void EnsureSize(int requiredFreeNodes);
+
+    /**
+     * Address: 0x004FCF20 (FUN_004FCF20)
+     *
+     * What it does:
+     * Pops a free node, owns it to `shape` and pushes it onto bucket
+     * `bucketIndex` of the shape's family; shapes with no family bits are
+     * skipped.
+     */
+    void AddColShapeAt(CollisionShapeBase* shape, int bucketIndex);
+
+    /**
+     * Address: 0x004FCF90 (FUN_004FCF90)
+     *
+     * What it does:
+     * Finds `shape`'s node in bucket `bucketIndex`, unlinks it and returns it
+     * to the free list.
+     */
+    void RemoveColShapeAt(int bucketIndex, CollisionShapeBase* shape);
+
+    /**
      * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
      *
      * What it does:
@@ -124,7 +132,7 @@ namespace moho
      * marks while collecting, then clears marks before returning.
      */
     int GatherUnmarkedUnitsInRect(
-      gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>& outSpans,
+      gpg::core::FastVectorN<CollisionShapeBase*, 20>& outSpans,
       const CollisionDBRect& rect,
       EEntityType flags
     );
@@ -133,8 +141,8 @@ namespace moho
      * Address: 0x00722DF0 (FUN_00722DF0, Moho::EntityOccupationManager::GatherUnmarkedEntities)
      *
      * What it does:
-     * Calls `GatherUnmarkedUnitsInRect`, then remaps span pointers to owning `Entity*`
-     * using the collision-span back-offset (`0x4C`).
+     * Calls `GatherUnmarkedUnitsInRect`, then maps each shape to its owning
+     * `Entity` (`CollisionShape<Entity>::OwnerOf`, the binary's `-0x4C`).
      */
     int GatherUnmarkedEntities(
       gpg::core::FastVectorN<Entity*, 20>& outEntities,
@@ -142,8 +150,6 @@ namespace moho
       EEntityType flags
     );
   };
-
-  using EntityOccupationGrid = EntityOccupationManager;
 
   static_assert(sizeof(EntityOccupationManager) == 0x34, "EntityOccupationManager size must be 0x34");
   static_assert(offsetof(EntityOccupationManager, mLastIndex) == 0x08, "EntityOccupationManager::mLastIndex offset must be 0x08");

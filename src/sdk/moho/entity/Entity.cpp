@@ -1106,7 +1106,7 @@ namespace
     return sim->mArmiesList[sourceIndex];
   }
 
-  [[nodiscard]] moho::EntityCollisionSpatialGrid* ResolveEntityCollisionGrid(moho::Sim* sim) noexcept
+  [[nodiscard]] moho::EntityOccupationManager* ResolveEntityCollisionGrid(moho::Sim* sim) noexcept
   {
     if (!sim || !sim->mOGrid) {
       return nullptr;
@@ -1206,252 +1206,6 @@ namespace
     return (static_cast<std::uint8_t>(caps) & bit) != 0u;
   }
 
-  /**
-   * Address: 0x004FD9B0 (FUN_004FD9B0, append-path subset)
-   *
-   * What it does:
-   * Pushes one chunk-base pointer into the grid chunk-pointer vector
-   * (layout at +0x28/+0x2C/+0x30).
-   *
-   * The `std::memmove(newBegin, begin, size * sizeof(*begin))` below is
-   * Address: 0x004FDE50 (FUN_004FDE50, `memmove_s`-based relocate of the
-   * live 4-byte-pointer range into the new buffer during growth)
-   */
-  void AppendCollisionChunkPointer(moho::EntityCollisionSpatialGrid& grid, moho::EntityCollisionCellNode* chunkBase)
-  {
-    auto** begin = grid.mAllBlocksBegin;
-    auto** end = grid.mAllBlocksEnd;
-    auto** capacityEnd = grid.mAllBlocksCapacityEnd;
-
-    if (begin && end < capacityEnd) {
-      *end = chunkBase;
-      grid.mAllBlocksEnd = end + 1;
-      return;
-    }
-
-    const std::size_t size = begin ? static_cast<std::size_t>(end - begin) : 0u;
-    const std::size_t capacity = begin ? static_cast<std::size_t>(capacityEnd - begin) : 0u;
-
-    if (capacity >= 0x3FFFFFFFu) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    std::size_t newCapacity = capacity + (capacity >> 1);
-    const std::size_t minCapacity = size + 1u;
-    if (newCapacity < minCapacity) {
-      newCapacity = minCapacity;
-    }
-    if (newCapacity > 0x3FFFFFFFu) {
-      newCapacity = minCapacity;
-    }
-
-    auto** newBegin = static_cast<moho::EntityCollisionCellNode**>(
-      ::operator new(newCapacity * sizeof(moho::EntityCollisionCellNode*))
-    );
-    if (size != 0u && begin) {
-      std::memmove(newBegin, begin, size * sizeof(*begin));
-    }
-    newBegin[size] = chunkBase;
-
-    if (begin) {
-      ::operator delete(begin);
-    }
-
-    grid.mAllBlocksBegin = newBegin;
-    grid.mAllBlocksEnd = newBegin + size + 1u;
-    grid.mAllBlocksCapacityEnd = newBegin + newCapacity;
-  }
-
-  /**
-   * Address: 0x004FCE90 (FUN_004FCE90)
-   *
-   * What it does:
-   * Ensures free-node list contains at least `requiredFreeNodes` entries by
-   * allocating 0x2000-node chunks (0x10000 bytes each) and linking them.
-   */
-  void EnsureCollisionFreeNodes(moho::EntityCollisionSpatialGrid& grid, const int requiredFreeNodes)
-  {
-    while (grid.mFreeNodeCount < requiredFreeNodes) {
-      auto* chunk = static_cast<moho::EntityCollisionCellNode*>(::operator new(0x10000u));
-      for (int i = 0; i < 0x1FFF; ++i) {
-        chunk[i].next = &chunk[i + 1];
-      }
-
-      chunk[0x1FFF].next = grid.mFreeNodeHead;
-      grid.mFreeNodeHead = chunk;
-
-      AppendCollisionChunkPointer(grid, chunk);
-      grid.mFreeNodeCount += 0x2000;
-    }
-  }
-
-  [[nodiscard]] moho::EntityCollisionCellNode**
-  SelectCollisionBucketHeadArray(moho::EntityCollisionSpatialGrid& grid, const std::uint32_t bucketFlags) noexcept
-  {
-    if ((bucketFlags & 0x100u) != 0u) {
-      return grid.mUnitBuckets;
-    }
-    if ((bucketFlags & 0x200u) != 0u) {
-      return grid.mPropBuckets;
-    }
-    if ((bucketFlags & 0x0C00u) != 0u) {
-      return grid.mEntityBuckets;
-    }
-    return nullptr;
-  }
-
-  /**
-   * Address: 0x004FCF20 (FUN_004FCF20)
-   *
-   * What it does:
-   * Pops one node from the grid free-list, tags ownership to `span`, then
-   * prepends it to the selected collision bucket chain.
-   */
-  void InsertSpanNodeIntoBucket(moho::EntityCollisionCellSpan& span, const int bucketIndex)
-  {
-    if ((span.mBucketFlags & 0x0F00u) == 0u) {
-      return;
-    }
-
-    moho::EntityCollisionSpatialGrid& grid = *span.mSpatialGrid;
-    moho::EntityCollisionCellNode* const node = grid.mFreeNodeHead;
-    grid.mFreeNodeHead = node->next;
-    node->owner = &span;
-
-    moho::EntityCollisionCellNode** const bucketHeads = SelectCollisionBucketHeadArray(grid, span.mBucketFlags);
-    node->next = bucketHeads[bucketIndex];
-    bucketHeads[bucketIndex] = node;
-
-    --grid.mFreeNodeCount;
-  }
-
-  /**
-   * Address: 0x004FCF90 (FUN_004FCF90)
-   *
-   * What it does:
-   * Removes `span` node from the selected bucket chain and returns the node
-   * to the grid free-list.
-   */
-  void RemoveSpanNodeFromBucket(
-    const int bucketIndex, moho::EntityCollisionSpatialGrid& grid, moho::EntityCollisionCellSpan& span
-  )
-  {
-    if ((span.mBucketFlags & 0x0F00u) == 0u) {
-      return;
-    }
-
-    moho::EntityCollisionCellNode** const bucketHeads = SelectCollisionBucketHeadArray(grid, span.mBucketFlags);
-    moho::EntityCollisionCellNode** link = &bucketHeads[bucketIndex];
-    moho::EntityCollisionCellNode* node = *link;
-    while (node->owner != &span) {
-      link = &node->next;
-      node = node->next;
-    }
-
-    *link = node->next;
-    node->owner = nullptr;
-    node->next = grid.mFreeNodeHead;
-    ++grid.mFreeNodeCount;
-    grid.mFreeNodeHead = node;
-  }
-
-  /**
-   * Address: 0x004FD420 (FUN_004FD420)
-   *
-   * What it does:
-   * Adds current span membership into collision buckets for all covered cells.
-   */
-  void AddSpanMembership(moho::EntityCollisionCellSpan& span)
-  {
-    moho::EntityCollisionSpatialGrid& grid = *span.mSpatialGrid;
-    const std::int32_t requiredNodes = static_cast<std::int32_t>(
-      static_cast<std::uint32_t>(span.mCellWidth) * static_cast<std::uint32_t>(span.mCellHeight)
-    );
-    EnsureCollisionFreeNodes(grid, requiredNodes);
-
-    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mGridWidthShift);
-    for (int row = 0; row < static_cast<int>(span.mCellHeight); ++row) {
-      for (int col = 0; col < static_cast<int>(span.mCellWidth); ++col) {
-        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mLastIndex);
-        InsertSpanNodeIntoBucket(span, bucketIndex);
-      }
-      rowBase += grid.mWidth;
-    }
-  }
-
-  /**
-   * Address: 0x004FD490 (FUN_004FD490)
-   *
-   * What it does:
-   * Removes current span membership from collision buckets for all covered cells.
-   */
-  void RemoveSpanMembership(moho::EntityCollisionCellSpan& span)
-  {
-    moho::EntityCollisionSpatialGrid& grid = *span.mSpatialGrid;
-    int rowBase = static_cast<int>(span.mCellStartX) + (static_cast<int>(span.mCellStartZ) << grid.mGridWidthShift);
-    for (int row = 0; row < static_cast<int>(span.mCellHeight); ++row) {
-      for (int col = 0; col < static_cast<int>(span.mCellWidth); ++col) {
-        const int bucketIndex = (rowBase + col) & static_cast<int>(grid.mLastIndex);
-        RemoveSpanNodeFromBucket(bucketIndex, grid, span);
-      }
-      rowBase += grid.mWidth;
-    }
-  }
-
-  [[nodiscard]] bool
-  CollisionDBRectEqualsSpan(const moho::CollisionDBRect& rect, const moho::EntityCollisionCellSpan& span) noexcept
-  {
-    return rect.mStartX == span.mCellStartX && rect.mStartZ == span.mCellStartZ && rect.mWidth == span.mCellWidth &&
-      rect.mHeight == span.mCellHeight;
-  }
-
-  void RelinkSpanToRectIfChanged(moho::EntityCollisionCellSpan& span, const moho::CollisionDBRect& nextRect)
-  {
-    if (CollisionDBRectEqualsSpan(nextRect, span)) {
-      return;
-    }
-
-    RemoveSpanMembership(span);
-    span.mCellStartX = nextRect.mStartX;
-    span.mCellStartZ = nextRect.mStartZ;
-    span.mCellWidth = nextRect.mWidth;
-    span.mCellHeight = nextRect.mHeight;
-    AddSpanMembership(span);
-  }
-
-  /**
-   * Address: 0x004FD590 (FUN_004FD590)
-   *
-   * What it does:
-   * Rebuilds quantized collision-cell rectangle directly from bounds and
-   * relinks bucket membership only when span changed.
-   */
-  void RelinkSpanFromBoundsIfChanged(moho::EntityCollisionCellSpan& span, const Wm3::AxisAlignedBox3f& bounds)
-  {
-    moho::CollisionDBRect nextRect{};
-    (void)moho::func_AABoxToRect(&nextRect, bounds);
-    RelinkSpanToRectIfChanged(span, nextRect);
-  }
-
-  /**
-   * Address: 0x004FD4F0 (FUN_004FD4F0)
-   *
-   * What it does:
-   * Reads primitive AABB, rebuilds quantized span rectangle, and if changed:
-   * removes old bucket membership, writes new rectangle, then re-adds membership.
-   */
-  void RelinkSpanFromCollisionPrimitive(
-    moho::EntityCollisionCellSpan& span, const moho::CColPrimitiveBase* collisionPrimitive
-  )
-  {
-    if (collisionPrimitive) {
-      RelinkSpanFromBoundsIfChanged(span, collisionPrimitive->GetBoundingBox());
-      return;
-    }
-
-    RelinkSpanToRectIfChanged(span, moho::CollisionDBRect{});
-  }
-
   void RefreshCollisionBoundsSnapshot(moho::Entity& entity)
   {
     entity.UpdateAABox();
@@ -1471,12 +1225,12 @@ namespace
     ::operator delete(old);
 
     if (!entity.CollisionExtents) {
-      RelinkSpanToRectIfChanged(entity.mCollisionCellSpan, moho::CollisionDBRect{});
+      entity.UpdateRect(static_cast<const moho::CColPrimitiveBase*>(nullptr));
       return;
     }
 
     entity.CollisionExtents->SetTransform(entity.mVarDat.mCurTransform);
-    RelinkSpanFromCollisionPrimitive(entity.mCollisionCellSpan, entity.CollisionExtents);
+    entity.UpdateRect(entity.CollisionExtents);
     RefreshCollisionBoundsSnapshot(entity);
   }
 
@@ -2425,17 +2179,9 @@ namespace moho
     // node is a safe no-op, matching the binary's unconditional unlink.
     mCoordNode.ListUnlink();
 
-    // Remove this entity's collision shape from the spatial grid (binary
-    // FUN_006785D0 line 79 -> CollisionShapeBase::Remove FUN_004FD490, whose body
-    // is the same grid-bucket removal loop as RemoveSpanMembership). The recovered
-    // destructor freed CollisionExtents but dropped the grid-membership removal,
-    // leaving stale span nodes threaded in the collision buckets that dangle once
-    // the entity is freed. If the entity had already left the grid,
-    // mCellWidth/mCellHeight are 0 so the loop is a no-op; the null guard is
-    // defensive (the binary assumes a live grid at teardown).
-    if (mCollisionCellSpan.mSpatialGrid != nullptr) {
-      RemoveSpanMembership(mCollisionCellSpan);
-    }
+    // The collision shape leaves the grid in ~CollisionShapeBase, which runs
+    // after this body and ~CTask -- binary FUN_006785D0 line 79 calls
+    // CollisionShapeBase::Remove (FUN_004FD490) at the same point.
   }
 
   /**
@@ -2446,7 +2192,8 @@ namespace moho
    * links the entity node into `Sim::mCoordEntities`.
    */
   Entity::Entity(Sim* sim, const std::uint32_t collisionBucketFlags)
-    : CTask(nullptr, false)
+    : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
+    , CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2454,13 +2201,6 @@ namespace moho
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
-    mCollisionCellSpan.mCellStartX = 0u;
-    mCollisionCellSpan.mCellStartZ = 0u;
-    mCollisionCellSpan.mCellWidth = 0u;
-    mCollisionCellSpan.mCellHeight = 0u;
-    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
-    mCollisionCellSpan.mReserved0C = 0u;
-    mCollisionCellSpan.mBucketFlags = collisionBucketFlags;
 
     mCoordNode.ListUnlink();
 
@@ -2528,7 +2268,8 @@ namespace moho
    * `CTaskThread` later, not this constructor.
    */
   Entity::Entity(Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
-    : CTask(nullptr, false)
+    : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
+    , CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2536,13 +2277,6 @@ namespace moho
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
-    mCollisionCellSpan.mCellStartX = 0u;
-    mCollisionCellSpan.mCellStartZ = 0u;
-    mCollisionCellSpan.mCellWidth = 0u;
-    mCollisionCellSpan.mCellHeight = 0u;
-    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
-    mCollisionCellSpan.mReserved0C = 0u;
-    mCollisionCellSpan.mBucketFlags = collisionBucketFlags;
 
     mCoordNode.ListUnlink();
 
@@ -2593,7 +2327,8 @@ namespace moho
    * seeds collision/grid metadata, and dispatches `StandardInit`.
    */
   Entity::Entity(REntityBlueprint* blueprint, Sim* sim, const EntId entityId, const std::uint32_t collisionBucketFlags)
-    : CTask(nullptr, false)
+    : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
+    , CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2607,13 +2342,6 @@ namespace moho
     LuaPlus::LuaObject scriptFactory = ResolveBlueprintScriptFactory(sim, blueprint);
     CreateLuaObject(scriptFactory, arg1, arg2, arg3);
 
-    mCollisionCellSpan.mCellStartX = 0u;
-    mCollisionCellSpan.mCellStartZ = 0u;
-    mCollisionCellSpan.mCellWidth = 0u;
-    mCollisionCellSpan.mCellHeight = 0u;
-    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
-    mCollisionCellSpan.mReserved0C = 0u;
-    mCollisionCellSpan.mBucketFlags = collisionBucketFlags;
 
     mCoordNode.ListUnlink();
 
@@ -2670,7 +2398,8 @@ namespace moho
    * default collision bucket mask `0x800`, then binds the provided Lua object.
    */
   Entity::Entity(const LuaPlus::LuaObject& luaObject, Sim* sim, const EntId entityId)
-    : CTask(nullptr, false)
+    : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), 0x800u)
+    , CTask(nullptr, false)
   {
     AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
@@ -2678,13 +2407,6 @@ namespace moho
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
 
-    mCollisionCellSpan.mCellStartX = 0u;
-    mCollisionCellSpan.mCellStartZ = 0u;
-    mCollisionCellSpan.mCellWidth = 0u;
-    mCollisionCellSpan.mCellHeight = 0u;
-    mCollisionCellSpan.mSpatialGrid = ResolveEntityCollisionGrid(sim);
-    mCollisionCellSpan.mReserved0C = 0u;
-    mCollisionCellSpan.mBucketFlags = 0x800u;
 
     mCoordNode.ListUnlink();
 
@@ -4067,7 +3789,7 @@ namespace moho
 
     auto* collision = CollisionExtents;
     collision->SetTransform(mVarDat.mCurTransform);
-    RelinkSpanFromCollisionPrimitive(mCollisionCellSpan, collision);
+    UpdateRect(collision);
     UpdateAABox();
   }
 

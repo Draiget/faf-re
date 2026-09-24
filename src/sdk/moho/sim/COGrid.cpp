@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
+#include <stdexcept>
 #include <typeinfo>
 
 #include "moho/containers/SCoordsVec2.h"
@@ -25,56 +26,6 @@
 
 namespace
 {
-  struct EntityOccupationBucketItem
-  {
-    EntityOccupationBucketItem* mNext;
-    moho::EntityCollisionCellSpan* mItem;
-  };
-
-  static_assert(sizeof(EntityOccupationBucketItem) == 0x08, "EntityOccupationBucketItem size must be 0x08");
-
-  struct EntityCollisionCellSpanRuntimeView
-  {
-    std::uint8_t mUnknown00[0x0C];
-    std::uint8_t mMarked;
-    std::uint8_t mUnknown0D[3];
-    std::uint32_t mTypeFlags;
-  };
-
-  static_assert(
-    offsetof(EntityCollisionCellSpanRuntimeView, mMarked) == 0x0C,
-    "EntityCollisionCellSpanRuntimeView::mMarked offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(EntityCollisionCellSpanRuntimeView, mTypeFlags) == 0x10,
-    "EntityCollisionCellSpanRuntimeView::mTypeFlags offset must be 0x10"
-  );
-
-  [[nodiscard]] EntityCollisionCellSpanRuntimeView&
-  AccessSpanRuntime(moho::EntityCollisionCellSpan* const span) noexcept
-  {
-    return *reinterpret_cast<EntityCollisionCellSpanRuntimeView*>(span);
-  }
-
-  [[nodiscard]] bool IsSpanMarked(moho::EntityCollisionCellSpan* const span) noexcept
-  {
-    return span && AccessSpanRuntime(span).mMarked != 0u;
-  }
-
-  void SetSpanMarked(moho::EntityCollisionCellSpan* const span, const bool marked) noexcept
-  {
-    if (!span) {
-      return;
-    }
-
-    AccessSpanRuntime(span).mMarked = marked ? 1u : 0u;
-  }
-
-  [[nodiscard]] std::uint32_t SpanTypeFlags(moho::EntityCollisionCellSpan* const span) noexcept
-  {
-    return span ? AccessSpanRuntime(span).mTypeFlags : 0u;
-  }
-
   using moho::AdvanceGridTraversalEdge;
   using moho::GetGridTraversalCell;
   using moho::GridTraversalLine;
@@ -206,17 +157,6 @@ bool moho::IsGridTraversalBeyondEnd(const GridTraversalLine& line) noexcept
 
 namespace
 {
-  [[nodiscard]] moho::Entity* EntityFromCollisionSpan(moho::EntityCollisionCellSpan* const span) noexcept
-  {
-    if (span == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::Entity*>(
-      reinterpret_cast<std::uint8_t*>(span) - offsetof(moho::Entity, mCollisionCellSpan)
-    );
-  }
-
   constexpr std::uint32_t kLineQueryEntitySpanTypeMask = 0x0D00u;
   constexpr float kWorldToOccupancyCellScale = 0.25f;
 
@@ -226,13 +166,12 @@ namespace
    * What it does:
    * Walks the occupancy grid along a 2-D line between (lineEnd.x, lineStart.z)
    * and (lineStart.x, lineEnd.z), gathering each unmarked
-   * `EntityCollisionCellSpan*` it visits into `outSpans`. The entity-bucket
+   * `CollisionShapeBase*` it visits into `outSpans`. The entity-bucket
    * sweep filters by `kLineQueryEntitySpanTypeMask`; the unit-bucket sweep
    * accepts everything not already marked. After the march, each freshly
-   * gathered span has its mark cleared. The output vector stores
-   * `EntityCollisionCellSpan*` reinterpreted as the bucket payload — callers
-   * may convert to `Entity*` via `EntityFromCollisionSpan` (see
-   * `GatherUnmarkedEntitiesInLine` at 0x00722E30).
+   * gathered shape has its mark cleared. The output holds the bucket payload,
+   * `CollisionShapeBase*`; `GatherUnmarkedEntitiesInLine` (0x00722E30) maps
+   * each to its owning `Entity`.
    *
    * IDA signature:
    *   sub_4FD200(Wm3::Vector3f *p2, Wm3::Vector3f *p1,
@@ -241,7 +180,7 @@ namespace
    */
   std::int32_t MarchLineAndGatherCollisionSpans(
     moho::EntityOccupationManager& manager,
-    gpg::core::FastVectorN<moho::EntityCollisionCellSpan*, 20>& outSpans,
+    gpg::core::FastVectorN<moho::CollisionShapeBase*, 20>& outSpans,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
@@ -258,8 +197,8 @@ namespace
       lineEnd.z * kWorldToOccupancyCellScale
     );
 
-    auto** const entityBuckets = reinterpret_cast<EntityOccupationBucketItem**>(manager.mEntityBuckets);
-    auto** const unitBuckets = reinterpret_cast<EntityOccupationBucketItem**>(manager.mUnitBuckets);
+    moho::EntityCollisionCellNode** const entityBuckets = manager.mEntityBuckets;
+    moho::EntityCollisionCellNode** const unitBuckets = manager.mUnitBuckets;
 
     while (!IsGridTraversalBeyondEnd(line)) {
       std::int32_t cellX = 0;
@@ -268,29 +207,26 @@ namespace
 
       const std::int32_t bucketIndex = manager.mLastIndex & (cellX + (cellZ << manager.mGridWidthShift));
       if (entityBuckets != nullptr) {
-        for (EntityOccupationBucketItem* item = entityBuckets[bucketIndex]; item != nullptr; item = item->mNext) {
-          moho::EntityCollisionCellSpan* const span = item->mItem;
-          if (span == nullptr) {
-            continue;
-          }
-          if ((SpanTypeFlags(span) & kLineQueryEntitySpanTypeMask) == 0u || IsSpanMarked(span)) {
+        for (moho::EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node != nullptr; node = node->next) {
+          moho::CollisionShapeBase* const shape = node->owner;
+          if ((shape->mBucketFlags & kLineQueryEntitySpanTypeMask) == 0u || shape->mMarked != 0u) {
             continue;
           }
 
-          SetSpanMarked(span, true);
-          outSpans.PushBack(span);
+          shape->mMarked = 1u;
+          outSpans.PushBack(shape);
         }
       }
 
       if (unitBuckets != nullptr) {
-        for (EntityOccupationBucketItem* item = unitBuckets[bucketIndex]; item != nullptr; item = item->mNext) {
-          moho::EntityCollisionCellSpan* const span = item->mItem;
-          if (span == nullptr || IsSpanMarked(span)) {
+        for (moho::EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node != nullptr; node = node->next) {
+          moho::CollisionShapeBase* const shape = node->owner;
+          if (shape->mMarked != 0u) {
             continue;
           }
 
-          SetSpanMarked(span, true);
-          outSpans.PushBack(span);
+          shape->mMarked = 1u;
+          outSpans.PushBack(shape);
         }
       }
 
@@ -299,10 +235,7 @@ namespace
 
     const std::int32_t count = static_cast<std::int32_t>(outSpans.end_ - outSpans.start_);
     for (std::int32_t index = 0; index < count; ++index) {
-      moho::EntityCollisionCellSpan* const span = outSpans.start_[index];
-      if (span != nullptr) {
-        SetSpanMarked(span, false);
-      }
+      outSpans.start_[index]->mMarked = 0u;
     }
     return count;
   }
@@ -311,12 +244,9 @@ namespace
    * Address: 0x00722E30 (FUN_00722E30)
    *
    * What it does:
-   * Thin typed wrapper around `MarchLineAndGatherCollisionSpans` (0x004FD200)
-   * that converts each gathered `EntityCollisionCellSpan*` to the enclosing
-   * `Entity*` via the `mCollisionCellSpan` subobject offset (0x4C). In the
-   * binary the inner function fills the vector with `CollisionShapeBase*`
-   * and this wrapper subtracts 76 bytes from each entry; the modern
-   * recovery expresses that as a typed `EntityFromCollisionSpan` rebase.
+   * Runs `MarchLineAndGatherCollisionSpans` (0x004FD200) on the caller's own
+   * vector, then rewrites each `CollisionShapeBase*` in place as its owning
+   * `Entity*` (`add reg, -4Ch`, the `CollisionShape<Entity>` base offset).
    */
   std::int32_t GatherUnmarkedEntitiesInLine(
     moho::EntityOccupationManager& manager,
@@ -325,16 +255,14 @@ namespace
     const Wm3::Vec3f& lineEnd
   )
   {
-    // The inner march stores `EntityCollisionCellSpan*` (the bucket payload)
-    // in its own typed vector; this layout is identical to
-    // `gpg::core::FastVectorN<Entity*, 20>` (both are `FastVectorN<pointer, 20>`).
-    auto& spanVec = reinterpret_cast<gpg::core::FastVectorN<moho::EntityCollisionCellSpan*, 20>&>(outEntities);
+    // The binary gathers into this same buffer: the shape pointers and the
+    // entity pointers share one `FastVectorN<pointer, 20>` object.
+    auto& shapes = reinterpret_cast<gpg::core::FastVectorN<moho::CollisionShapeBase*, 20>&>(outEntities);
 
-    const std::int32_t count = MarchLineAndGatherCollisionSpans(manager, spanVec, lineStart, lineEnd);
+    const std::int32_t count = MarchLineAndGatherCollisionSpans(manager, shapes, lineStart, lineEnd);
 
     for (std::int32_t index = 0; index < count; ++index) {
-      moho::EntityCollisionCellSpan* const span = spanVec.start_[index];
-      outEntities.start_[index] = EntityFromCollisionSpan(span);
+      outEntities.start_[index] = moho::CollisionShape<moho::Entity>::OwnerOf(shapes.start_[index]);
     }
     return count;
   }
@@ -588,10 +516,251 @@ namespace moho
   }
 
   /**
+   * Address: 0x004FD9B0 (FUN_004FD9B0, append-path subset)
+   *
+   * What it does:
+   * Pushes one chunk-base pointer into the grid chunk-pointer vector
+   * (layout at +0x28/+0x2C/+0x30).
+   *
+   * The `std::memmove(newBegin, begin, size * sizeof(*begin))` below is
+   * Address: 0x004FDE50 (FUN_004FDE50, `memmove_s`-based relocate of the
+   * live 4-byte-pointer range into the new buffer during growth)
+   */
+  static void AppendCollisionChunkPointer(EntityOccupationManager& grid, EntityCollisionCellNode* chunkBase)
+  {
+    auto** begin = grid.mAllBlocksBegin;
+    auto** end = grid.mAllBlocksEnd;
+    auto** capacityEnd = grid.mAllBlocksCapacityEnd;
+
+    if (begin && end < capacityEnd) {
+      *end = chunkBase;
+      grid.mAllBlocksEnd = end + 1;
+      return;
+    }
+
+    const std::size_t size = begin ? static_cast<std::size_t>(end - begin) : 0u;
+    const std::size_t capacity = begin ? static_cast<std::size_t>(capacityEnd - begin) : 0u;
+
+    if (capacity >= 0x3FFFFFFFu) {
+      throw std::length_error("vector<T> too long");
+    }
+
+    std::size_t newCapacity = capacity + (capacity >> 1);
+    const std::size_t minCapacity = size + 1u;
+    if (newCapacity < minCapacity) {
+      newCapacity = minCapacity;
+    }
+    if (newCapacity > 0x3FFFFFFFu) {
+      newCapacity = minCapacity;
+    }
+
+    auto** newBegin = static_cast<EntityCollisionCellNode**>(
+      ::operator new(newCapacity * sizeof(EntityCollisionCellNode*))
+    );
+    if (size != 0u && begin) {
+      std::memmove(newBegin, begin, size * sizeof(*begin));
+    }
+    newBegin[size] = chunkBase;
+
+    if (begin) {
+      ::operator delete(begin);
+    }
+
+    grid.mAllBlocksBegin = newBegin;
+    grid.mAllBlocksEnd = newBegin + size + 1u;
+    grid.mAllBlocksCapacityEnd = newBegin + newCapacity;
+  }
+
+  /**
+   * Address: 0x004FCE90 (FUN_004FCE90)
+   *
+   * What it does:
+   * Ensures free-node list contains at least `requiredFreeNodes` entries by
+   * allocating 0x2000-node chunks (0x10000 bytes each) and linking them.
+   */
+  void EntityOccupationManager::EnsureSize(const int requiredFreeNodes)
+  {
+    while (mFreeNodeCount < requiredFreeNodes) {
+      auto* chunk = static_cast<EntityCollisionCellNode*>(::operator new(0x10000u));
+      for (int i = 0; i < 0x1FFF; ++i) {
+        chunk[i].next = &chunk[i + 1];
+      }
+
+      chunk[0x1FFF].next = mFreeNodeHead;
+      mFreeNodeHead = chunk;
+
+      AppendCollisionChunkPointer(*this, chunk);
+      mFreeNodeCount += 0x2000;
+    }
+  }
+
+  /**
+   * Chooses the bucket array for a shape's family bits: units, props, then
+   * entities/projectiles; shared by `AddColShapeAt` and `RemoveColShapeAt`.
+   */
+  static EntityCollisionCellNode** SelectBucketArray(EntityOccupationManager& grid, const std::uint32_t bucketFlags) noexcept
+  {
+    if ((bucketFlags & 0x100u) != 0u) {
+      return grid.mUnitBuckets;
+    }
+    if ((bucketFlags & 0x200u) != 0u) {
+      return grid.mPropBuckets;
+    }
+    if ((bucketFlags & 0x0C00u) != 0u) {
+      return grid.mEntityBuckets;
+    }
+    return nullptr;
+  }
+
+  /**
+   * Address: 0x004FCF20 (FUN_004FCF20)
+   *
+   * What it does:
+   * Pops one node from the grid free-list, tags ownership to `shape`, then
+   * prepends it to the selected collision bucket chain.
+   */
+  void EntityOccupationManager::AddColShapeAt(CollisionShapeBase* const shape, const int bucketIndex)
+  {
+    if ((shape->mBucketFlags & 0x0F00u) == 0u) {
+      return;
+    }
+
+    EntityCollisionCellNode* const node = mFreeNodeHead;
+    mFreeNodeHead = node->next;
+    node->owner = shape;
+
+    EntityCollisionCellNode** const bucketHeads = SelectBucketArray(*this, shape->mBucketFlags);
+    node->next = bucketHeads[bucketIndex];
+    bucketHeads[bucketIndex] = node;
+
+    --mFreeNodeCount;
+  }
+
+  /**
+   * Address: 0x004FCF90 (FUN_004FCF90)
+   *
+   * What it does:
+   * Removes `shape`'s node from the selected bucket chain and returns the node
+   * to the grid free-list.
+   */
+  void EntityOccupationManager::RemoveColShapeAt(const int bucketIndex, CollisionShapeBase* const shape)
+  {
+    if ((shape->mBucketFlags & 0x0F00u) == 0u) {
+      return;
+    }
+
+    EntityCollisionCellNode** const bucketHeads = SelectBucketArray(*this, shape->mBucketFlags);
+    EntityCollisionCellNode** link = &bucketHeads[bucketIndex];
+    EntityCollisionCellNode* node = *link;
+    while (node->owner != shape) {
+      link = &node->next;
+      node = node->next;
+    }
+
+    *link = node->next;
+    node->owner = nullptr;
+    node->next = mFreeNodeHead;
+    ++mFreeNodeCount;
+    mFreeNodeHead = node;
+  }
+
+  /**
+   * The binary has no null test here; the guard predates this move and only
+   * matters for a shape whose grid was never set.
+   */
+  CollisionShapeBase::~CollisionShapeBase()
+  {
+    if (mSpatialGrid != nullptr) {
+      Remove();
+    }
+  }
+
+  /**
+   * Address: 0x004FD420 (FUN_004FD420)
+   *
+   * What it does:
+   * Adds current shape membership into collision buckets for all covered cells.
+   */
+  void CollisionShapeBase::Add()
+  {
+    EntityOccupationManager& grid = *mSpatialGrid;
+    const std::int32_t requiredNodes =
+      static_cast<std::int32_t>(static_cast<std::uint32_t>(mWidth) * static_cast<std::uint32_t>(mHeight));
+    grid.EnsureSize(requiredNodes);
+
+    int rowBase = static_cast<int>(mStartX) + (static_cast<int>(mStartZ) << grid.mGridWidthShift);
+    for (int row = 0; row < static_cast<int>(mHeight); ++row) {
+      for (int col = 0; col < static_cast<int>(mWidth); ++col) {
+        grid.AddColShapeAt(this, (rowBase + col) & static_cast<int>(grid.mLastIndex));
+      }
+      rowBase += grid.mWidth;
+    }
+  }
+
+  /**
+   * Address: 0x004FD490 (FUN_004FD490)
+   *
+   * What it does:
+   * Removes current shape membership from collision buckets for all covered cells.
+   */
+  void CollisionShapeBase::Remove()
+  {
+    EntityOccupationManager& grid = *mSpatialGrid;
+    int rowBase = static_cast<int>(mStartX) + (static_cast<int>(mStartZ) << grid.mGridWidthShift);
+    for (int row = 0; row < static_cast<int>(mHeight); ++row) {
+      for (int col = 0; col < static_cast<int>(mWidth); ++col) {
+        grid.RemoveColShapeAt((rowBase + col) & static_cast<int>(grid.mLastIndex), this);
+      }
+      rowBase += grid.mWidth;
+    }
+  }
+
+  void CollisionShapeBase::RelinkTo(const CollisionDBRect& rect)
+  {
+    if (!rect.NotEqual(*this)) {
+      return;
+    }
+
+    Remove();
+    static_cast<CollisionDBRect&>(*this) = rect;
+    Add();
+  }
+
+  /**
+   * Address: 0x004FD4F0 (FUN_004FD4F0)
+   *
+   * What it does:
+   * Reads primitive AABB, rebuilds quantized shape rectangle, and if changed:
+   * removes old bucket membership, writes new rectangle, then re-adds membership.
+   */
+  void CollisionShapeBase::UpdateRect(const CColPrimitiveBase* const primitive)
+  {
+    CollisionDBRect rect{};
+    if (primitive != nullptr) {
+      (void)func_AABoxToRect(&rect, primitive->GetBoundingBox());
+    }
+    RelinkTo(rect);
+  }
+
+  /**
+   * Address: 0x004FD590 (FUN_004FD590)
+   *
+   * What it does:
+   * Rebuilds quantized collision-cell rectangle directly from bounds and
+   * relinks bucket membership only when the rectangle changed.
+   */
+  void CollisionShapeBase::UpdateRect(const Wm3::AxisAlignedBox3f& bounds)
+  {
+    CollisionDBRect rect{};
+    (void)func_AABoxToRect(&rect, bounds);
+    RelinkTo(rect);
+  }
+
+  /**
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
   int EntityOccupationManager::GatherUnmarkedUnitsInRect(
-    gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>& outSpans, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorN<CollisionShapeBase*, 20>& outSpans, const CollisionDBRect& rect, const EEntityType flags
   )
   {
     outSpans.ResetStorageToInline();
@@ -612,9 +781,9 @@ namespace moho
       zCount = requestedZCount;
     }
 
-    auto** const unitBuckets = reinterpret_cast<EntityOccupationBucketItem**>(mUnitBuckets);
-    auto** const propBuckets = reinterpret_cast<EntityOccupationBucketItem**>(mPropBuckets);
-    auto** const entityBuckets = reinterpret_cast<EntityOccupationBucketItem**>(mEntityBuckets);
+    EntityCollisionCellNode** const unitBuckets = mUnitBuckets;
+    EntityCollisionCellNode** const propBuckets = mPropBuckets;
+    EntityCollisionCellNode** const entityBuckets = mEntityBuckets;
 
     if (zCount > 0) {
       do {
@@ -630,31 +799,31 @@ namespace moho
             const int bucketIndex = position & mLastIndex;
 
             if (includeUnits && unitBuckets) {
-              for (EntityOccupationBucketItem* item = unitBuckets[bucketIndex]; item; item = item->mNext) {
-                EntityCollisionCellSpan* const span = item->mItem;
-                if (!IsSpanMarked(span)) {
-                  SetSpanMarked(span, true);
-                  outSpans.PushBack(span);
+              for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
+                CollisionShapeBase* const shape = node->owner;
+                if (shape->mMarked == 0u) {
+                  shape->mMarked = 1u;
+                  outSpans.PushBack(shape);
                 }
               }
             }
 
             if (includeProps && propBuckets) {
-              for (EntityOccupationBucketItem* item = propBuckets[bucketIndex]; item; item = item->mNext) {
-                EntityCollisionCellSpan* const span = item->mItem;
-                if (!IsSpanMarked(span)) {
-                  SetSpanMarked(span, true);
-                  outSpans.PushBack(span);
+              for (EntityCollisionCellNode* node = propBuckets[bucketIndex]; node; node = node->next) {
+                CollisionShapeBase* const shape = node->owner;
+                if (shape->mMarked == 0u) {
+                  shape->mMarked = 1u;
+                  outSpans.PushBack(shape);
                 }
               }
             }
 
             if (includeDynamic && entityBuckets) {
-              for (EntityOccupationBucketItem* item = entityBuckets[bucketIndex]; item; item = item->mNext) {
-                EntityCollisionCellSpan* const span = item->mItem;
-                if (((flagBits & SpanTypeFlags(span)) != 0u) && !IsSpanMarked(span)) {
-                  SetSpanMarked(span, true);
-                  outSpans.PushBack(span);
+              for (EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node; node = node->next) {
+                CollisionShapeBase* const shape = node->owner;
+                if (((flagBits & shape->mBucketFlags) != 0u) && shape->mMarked == 0u) {
+                  shape->mMarked = 1u;
+                  outSpans.PushBack(shape);
                 }
               }
             }
@@ -671,7 +840,7 @@ namespace moho
 
     const int count = static_cast<int>(outSpans.end_ - outSpans.start_);
     for (int index = 0; index < count; ++index) {
-      SetSpanMarked(outSpans.start_[index], false);
+      outSpans.start_[index]->mMarked = 0u;
     }
 
     return count;
@@ -684,10 +853,12 @@ namespace moho
     gpg::core::FastVectorN<Entity*, 20>& outEntities, const CollisionDBRect& rect, const EEntityType flags
   )
   {
-    auto& spanVector = reinterpret_cast<gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>&>(outEntities);
-    const int count = GatherUnmarkedUnitsInRect(spanVector, rect, flags);
+    // Same buffer reuse as `GatherUnmarkedEntitiesInLine`: gather shapes into
+    // the caller's vector, then rewrite each as its owning entity.
+    auto& shapes = reinterpret_cast<gpg::core::FastVectorN<CollisionShapeBase*, 20>&>(outEntities);
+    const int count = GatherUnmarkedUnitsInRect(shapes, rect, flags);
     for (int index = 0; index < count; ++index) {
-      outEntities.start_[index] = Entity::FromCollisionCellSpan(spanVector.start_[index]);
+      outEntities.start_[index] = CollisionShape<Entity>::OwnerOf(shapes.start_[index]);
     }
     return count;
   }
@@ -1505,12 +1676,11 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans;
+    gpg::core::FastVectorN<CollisionShapeBase*, 20> gatheredSpans;
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
-    // The binary pre-converts each returned "span pointer" into its owning
-    // entity pointer by subtracting 0x4C (the `Entity::mCollisionCellSpan`
-    // subobject offset from the containing `Entity`). Mirror that here.
+    // Each gathered shape is the `CollisionShape<Entity>` base of its entity
+    // (the binary's `-0x4C`).
     const int gatheredCount = static_cast<int>(gatheredSpans.end_ - gatheredSpans.start_);
     for (int index = 0; index < gatheredCount; ++index) {
       auto* const spanPtr = gatheredSpans.start_[index];
@@ -1518,7 +1688,7 @@ namespace moho
         continue;
       }
 
-      Entity* const ownerEntity = Entity::FromCollisionCellSpan(spanPtr);
+      Entity* const ownerEntity = CollisionShape<Entity>::OwnerOf(spanPtr);
 
       Unit* const ownerUnit = ownerEntity->IsUnit();
       if (ownerUnit == nullptr) {

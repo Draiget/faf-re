@@ -4800,6 +4800,9 @@
     <ClInclude Include="moho\sim\COGrid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\sim\CollisionShape.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="moho\sim\COGridSerializer.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -16,6 +16,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
+#include "moho/sim/CollisionShape.h"
 #include "SSTIEntityVariableData.h"
 #include "moho/resource/RResId.h"
 #include "moho/math/Vector4f.h"
@@ -73,58 +74,7 @@ namespace moho
   struct SFootprint;
   struct SSyncData;
 
-  struct EntityCollisionCellSpan;
-
-  struct EntityCollisionCellNode
-  {
-    EntityCollisionCellNode* next;  // +0x00
-    EntityCollisionCellSpan* owner; // +0x04
-  };
-  static_assert(sizeof(EntityCollisionCellNode) == 0x08, "EntityCollisionCellNode size must be 0x08");
-  static_assert(offsetof(EntityCollisionCellNode, next) == 0x00, "EntityCollisionCellNode::next offset must be 0x00");
-  static_assert(offsetof(EntityCollisionCellNode, owner) == 0x04, "EntityCollisionCellNode::owner offset must be 0x04");
-
   struct EntityOccupationManager;
-
-  /**
-   * The collision bucket grid an entity span links into is the sim's
-   * `COGrid::mEntityOccupationManager` itself (`CollisionShapeBase::Add`,
-   * 0x004FD420, reads its width/mask/shift straight off that object). The
-   * owning layout lives in `moho/sim/COGrid.h`.
-   */
-  using EntityCollisionSpatialGrid = EntityOccupationManager;
-
-  /**
-   * Address owner: Entity + 0x4C
-   *
-   * What it does:
-   * Stores quantized collision-cell rectangle and grid-link metadata used by
-   * 0x004FD420 / 0x004FD490 relink paths.
-   */
-  struct EntityCollisionCellSpan
-  {
-    std::uint16_t mCellStartX;                // +0x00
-    std::uint16_t mCellStartZ;                // +0x02
-    std::uint16_t mCellWidth;                 // +0x04
-    std::uint16_t mCellHeight;                // +0x06
-    EntityCollisionSpatialGrid* mSpatialGrid; // +0x08
-    std::uint32_t mReserved0C;                // +0x0C
-    std::uint32_t mBucketFlags;               // +0x10
-  };
-
-  static_assert(sizeof(EntityCollisionCellSpan) == 0x14, "EntityCollisionCellSpan size must be 0x14");
-  static_assert(
-    offsetof(EntityCollisionCellSpan, mCellStartX) == 0x00, "EntityCollisionCellSpan::mCellStartX offset must be 0x00"
-  );
-  static_assert(
-    offsetof(EntityCollisionCellSpan, mCellWidth) == 0x04, "EntityCollisionCellSpan::mCellWidth offset must be 0x04"
-  );
-  static_assert(
-    offsetof(EntityCollisionCellSpan, mSpatialGrid) == 0x08, "EntityCollisionCellSpan::mSpatialGrid offset must be 0x08"
-  );
-  static_assert(
-    offsetof(EntityCollisionCellSpan, mBucketFlags) == 0x10, "EntityCollisionCellSpan::mBucketFlags offset must be 0x10"
-  );
 
   /**
    * Address: 0x0050B300 (FUN_0050B300, ?COORDS_Orient@Moho@@YA?AV?$Quaternion@M@Wm3@@MMM@Z)
@@ -507,7 +457,14 @@ namespace moho
   static_assert(sizeof(EntitySetBase) == 0x28, "EntitySetBase size must be 0x28");
   static_assert(sizeof(WeakEntitySetTemplate<Unit>) == 0x28, "WeakEntitySetTemplate<Unit> size must be 0x28");
 
-  class Entity : public CScriptObject, public CTask
+  /**
+   * Bases in declaration order: `CScriptObject`, `CollisionShape<Entity>`,
+   * `CTask`. MSVC lays out bases that carry a vfptr first, so `CTask` lands at
+   * +0x34 and the collision shape at +0x4C, as the RTTI records
+   * (`CollisionShape<Entity>` mdisp 76); destruction runs `~CTask` before the
+   * shape's `Remove`, the order `~Entity` (0x006785D0) shows.
+   */
+  class Entity : public CScriptObject, public CollisionShape<Entity>, public CTask
   {
     // Primary vftable (38 entries)
   public:
@@ -1338,16 +1295,8 @@ namespace moho
      */
     [[nodiscard]] static const char* LayerToString(const ELayer layer) noexcept;
 
-    /**
-     * The entity that owns `span` as its `mCollisionCellSpan` (+0x4C). The
-     * occupancy grid links and gathers these spans, and every consumer steps
-     * back to the entity with `add reg, -4Ch` (e.g. 0x0075B0E3 in
-     * `GetUnitsInRect`).
-     */
-    [[nodiscard]] static Entity* FromCollisionCellSpan(EntityCollisionCellSpan* span) noexcept;
-
-    // Entity data begins after CScriptObject(+0x34) and CTask(+0x18) subobjects.
-    EntityCollisionCellSpan mCollisionCellSpan; // 0x004C
+    // Entity data begins after the CScriptObject (+0x00, 0x34), CTask (+0x34,
+    // 0x18) and CollisionShape<Entity> (+0x4C, 0x14) subobjects.
 
     // 0x60: intrusive node used by Sim::mCoordEntities (+0xA5C in Sim).
     TDatListItem<Entity, void> mCoordNode;
@@ -2612,12 +2561,6 @@ namespace moho
   ENTSCR_GetBonePosition(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
-  static_assert(offsetof(Entity, mCollisionCellSpan) == 0x4C, "Entity::mCollisionCellSpan offset must be 0x4C");
-
-  inline Entity* Entity::FromCollisionCellSpan(EntityCollisionCellSpan* const span) noexcept
-  {
-    return reinterpret_cast<Entity*>(reinterpret_cast<std::uint8_t*>(span) - offsetof(Entity, mCollisionCellSpan));
-  }
   static_assert(offsetof(Entity, mCoordNode) == 0x60, "Entity::mCoordNode offset must be 0x60");
   static_assert(offsetof(Entity, id_) == 0x68, "Entity::id_ offset must be 0x68");
   static_assert(offsetof(Entity, BluePrint) == 0x6C, "Entity::BluePrint offset must be 0x6C");

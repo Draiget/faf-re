@@ -20840,7 +20840,7 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
+  gpg::core::FastVectorN<CollisionShapeBase*, 20> gatheredSpans{};
   constexpr EEntityType kEntityMask = static_cast<EEntityType>(
     ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity
   );
@@ -20859,7 +20859,7 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
+    Entity* const entity = CollisionShape<Entity>::OwnerOf(gatheredSpans[index]);
     const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
@@ -20966,7 +20966,7 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
+  gpg::core::FastVectorN<CollisionShapeBase*, 20> gatheredSpans{};
   const int gatheredCount =
     oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, collisionRect, ENTITYTYPE_Unit);
   if (gatheredCount <= 0) {
@@ -20979,7 +20979,7 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
+    Entity* const entity = CollisionShape<Entity>::OwnerOf(gatheredSpans[index]);
     Unit* const unit = entity != nullptr ? entity->IsUnit() : nullptr;
     if (unit == nullptr) {
       continue;
@@ -21098,7 +21098,7 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
+  gpg::core::FastVectorN<CollisionShapeBase*, 20> gatheredSpans{};
   constexpr EEntityType kReclaimableMask = static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop);
   const int gatheredCount = oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(
     gatheredSpans,
@@ -21115,7 +21115,7 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
   resultTable.AssignNewTable(state, gatheredCount, 0);
   int luaIndex = 1;
   for (int index = 0; index < gatheredCount; ++index) {
-    Entity* const entity = Entity::FromCollisionCellSpan(gatheredSpans[index]);
+    Entity* const entity = CollisionShape<Entity>::OwnerOf(gatheredSpans[index]);
     const auto entityObject = LuaPlus::LuaObject(entity->mLuaObj);
     resultTable.SetObject(luaIndex, entityObject);
     ++luaIndex;
