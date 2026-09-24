@@ -13,6 +13,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/algorithms/Sort.h"
 #include "legacy/containers/Set.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/ai/CAiAttackerImpl.h"
@@ -3116,14 +3117,13 @@ namespace moho
     }
 
     // --- Phase 3: distance-sort candidates and assign dock commands. ---
-    // Address: 0x0084A890 (FUN_0084A890) is this std::sort's own introsort
-    // partition/insertion-sort internals for the 12-byte DockCandidate
-    // element (confirmed: `(last-first)/12` element-count divisor, the
-    // <=32-element insertion-sort threshold, tail-calling the by-distSq
-    // comparator at 0x0084B3F0) -- MSVC8 STL-internal code the compiler
-    // emits for this call, not engine logic; the call below already
-    // reproduces it via the real, linked <algorithm> std::sort.
-    std::sort(candidates.begin(), candidates.end(), [](const DockCandidate& a, const DockCandidate& b) {
+    // The call inlines the `std::sort` entry and runs the MSVC8 introsort
+    // driver for the 12-byte DockCandidate directly, seeding the recursion
+    // budget with the element count, with the by-`distSq` predicate inlined
+    // into every body. The instantiation is catalogued on
+    // legacy/algorithms/Sort.h; platforms at equal distance only come out in
+    // the original's order through that algorithm, not the modern `std::sort`.
+    msvc8::sort(candidates.data(), candidates.data() + candidates.size(), [](const DockCandidate& a, const DockCandidate& b) {
       return a.distSq < b.distSq;
     });
 
@@ -3152,18 +3152,18 @@ namespace moho
           }
         }
 
-        // Order the chosen platforms by ascending free capacity, then distance.
-        // Address: 0x0084A9D0 (FUN_0084A9D0) is this std::sort's own
-        // introsort internals for the same 12-byte DockCandidate element,
-        // same shape as 0x0084A890 above but tail-calling the by-capacity-
-        // then-distance comparator at 0x0084B7E0 -- same MSVC8 STL-internal
-        // provenance, already reproduced by the real std::sort call below.
-        std::sort(
-          nearbyPlatforms.begin(),
-          nearbyPlatforms.end(),
+        // Order the chosen platforms by descending free capacity, so the
+        // roomiest platform is filled first, then by ascending distance. The
+        // predicate is inlined into the instantiation's `_Med3` and partition
+        // as a signed `setg` on `freeCapacity` with a `comiss` `distSq`
+        // tie-break; the instantiation is catalogued on
+        // legacy/algorithms/Sort.h.
+        msvc8::sort(
+          nearbyPlatforms.data(),
+          nearbyPlatforms.data() + nearbyPlatforms.size(),
           [](const DockCandidate& a, const DockCandidate& b) {
             if (a.freeCapacity != b.freeCapacity) {
-              return a.freeCapacity < b.freeCapacity;
+              return a.freeCapacity > b.freeCapacity;
             }
             return a.distSq < b.distSq;
           }

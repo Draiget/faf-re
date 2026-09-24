@@ -13,6 +13,7 @@
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/algorithms/Sort.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/ai/IAiTransport.h"
 #include "moho/command/CmdDefs.h"
@@ -106,16 +107,17 @@ namespace
    *                           _DWORD *rhsUnitSlot, int, float rhsDistSq);
    *
    * What it does:
-   * Strict-weak-ordering predicate for `std::sort(mPickupQueue.begin(),
-   * mPickupQueue.end(), ...)` in `CUnitLoadUnits::DoTask`. Orders pickup
-   * candidates by descending transport-load metric
-   * (`sizeX*sizeY*sizeZ*averageDensity`); when the two metrics compare equal,
-   * breaks the tie by ascending distance-squared (nearer unit first). This is
-   * the source-level comparator whose `std::sort<SPickUpInfo*>` instantiation
-   * emits the introsort/heap/partition/rotate/med3 COMDAT cluster
-   * (FUN_00628740 `_Sort`, FUN_006292F0 `_Unguarded_partition`,
-   * FUN_00629D80 `_Make_heap`, FUN_0062A000 `_Med3`, FUN_0062A610 `_Rotate`,
-   * and siblings).
+   * Strict-weak-ordering predicate for the pickup-queue `msvc8::sort` in
+   * `CUnitLoadUnits::DoTask`. Orders pickup candidates by descending
+   * transport-load metric (`sizeX*sizeY*sizeZ*averageDensity`); when the two
+   * metrics compare equal, breaks the tie by ascending distance-squared (nearer
+   * unit first). The `SPickUpInfo` instantiation of the MSVC8 introsort that
+   * calls it (driver, partition, `_Median`/`_Med3`, insertion sort, `_Rotate`,
+   * heap fallback) is catalogued on the members of legacy/algorithms/Sort.h.
+   *
+   * In the binary this is the `operator()` of an empty function object: DoTask
+   * hands the driver a zeroed one-byte predicate, and every sort body calls
+   * this address directly rather than through a pointer.
    *
    * The binary passes each `SPickUpInfo` operand by value, so its body also
    * relinks/unlinks each copy's weak-owner intrusive chain around the compare;
@@ -502,11 +504,13 @@ namespace moho
       mPickupQueue.push_back(SPickUpInfo(candidate, distanceSq));
     }
 
-    // std::sort<SPickUpInfo*> instantiation. Emits the MSVC8 introsort COMDAT
-    // cluster (FUN_00628740 _Sort, FUN_006292F0 _Unguarded_partition,
-    // FUN_00629D80 _Make_heap, FUN_0062A000 _Med3, FUN_0062A610 _Rotate, and
-    // siblings) with FUN_006248D0 as the comparator predicate.
-    std::sort(mPickupQueue.begin(), mPickupQueue.end(), ComparePickUpInfoLoadMetricThenDistance);
+    // One `sort` over the pickup queue. DoTask inlines the `std::sort` entry and
+    // calls the MSVC8 introsort driver directly, seeding the recursion budget
+    // with the element count -- `msvc8::sort`'s own
+    // `sort_impl(first, last, last - first, comp)`. That driver's insertion-sort
+    // cutoff, ninther pivot and heap fallback decide where candidates with equal
+    // keys land, so the modern `std::sort` would not reproduce the order.
+    msvc8::sort(mPickupQueue.begin(), mPickupQueue.end(), ComparePickUpInfoLoadMetricThenDistance);
 
     EntitySetTemplate<Unit> unitsToPickup{};
     bool rejectedByCapacity = false;

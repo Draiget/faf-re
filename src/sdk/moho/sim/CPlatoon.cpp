@@ -18,6 +18,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Logging.h"
+#include "legacy/algorithms/Sort.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaClassBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
@@ -397,83 +398,6 @@ namespace
       cursor = head->left;
     } while (cursor->isNil45 == 0u);
     return head;
-  }
-
-  /**
-   * Address: 0x00734460 (FUN_00734460)
-   *
-   * What it does:
-   * Inserts one `{payload, priority}` heap entry by promoting parents while
-   * preserving max-heap ordering within the bounded lane.
-   */
-  [[nodiscard]] std::int32_t InsertPlatoonPriorityEntryByPromotingParents(
-    PlatoonPriorityEntry* const heap,
-    int insertionIndex,
-    const int lowerBoundIndex,
-    const std::int32_t payload,
-    const float priority
-  ) noexcept
-  {
-    int parentIndex = (insertionIndex - 1) / 2;
-    while (lowerBoundIndex < insertionIndex) {
-      if (priority <= heap[parentIndex].priority) {
-        break;
-      }
-
-      heap[insertionIndex] = heap[parentIndex];
-      insertionIndex = parentIndex;
-      parentIndex = (parentIndex - 1) / 2;
-    }
-
-    heap[insertionIndex].payload = payload;
-    heap[insertionIndex].priority = priority;
-    return payload;
-  }
-
-  /**
-   * Address: 0x00734350 (FUN_00734350)
-   *
-   * What it does:
-   * Sifts one heap gap down through max-priority children, then reinserts the
-   * pending `{payload, priority}` pair via parent-promotion into the bounded
-   * lane used by platoon target-priority sorting.
-   */
-  [[maybe_unused]] [[nodiscard]] std::int32_t SiftDownPlatoonPriorityEntryAndReinsert(
-    int startIndex,
-    const int heapSize,
-    PlatoonPriorityEntry* const heap,
-    const std::int32_t payload,
-    const float priority
-  ) noexcept
-  {
-    const int originalIndex = startIndex;
-    int childIndex = (startIndex * 2) + 2;
-    bool childEqualsHeapBoundary = (childIndex == heapSize);
-
-    while (childIndex < heapSize) {
-      const int leftChildIndex = childIndex - 1;
-      if (heap[leftChildIndex].priority > heap[childIndex].priority) {
-        childIndex = leftChildIndex;
-      }
-
-      heap[startIndex] = heap[childIndex];
-      startIndex = childIndex;
-      childIndex = (childIndex * 2) + 2;
-      childEqualsHeapBoundary = (childIndex == heapSize);
-    }
-
-    if (childEqualsHeapBoundary) {
-      heap[startIndex] = heap[heapSize - 1];
-      startIndex = heapSize - 1;
-    }
-
-    return InsertPlatoonPriorityEntryByPromotingParents(
-      heap,
-      startIndex,
-      originalIndex,
-      payload,
-      priority
-    );
   }
 
   struct CSquadRuntimeView
@@ -3903,7 +3827,14 @@ namespace moho
           }
         }
 
-        std::sort(
+        // The call inlines the `std::sort` entry and runs the MSVC8 introsort
+        // driver for the 8-byte entry directly, seeding the recursion budget
+        // with the element count; the instantiation (driver, partition,
+        // ninther, insertion sort, heap fallback) is catalogued on
+        // legacy/algorithms/Sort.h. Units at equal distance are taken in the
+        // order that algorithm leaves them, which the modern `std::sort` does
+        // not reproduce.
+        msvc8::sort(
           nearbyUnits.begin(),
           nearbyUnits.end(),
           [](const PlatoonUnitSearchEntry& lhs, const PlatoonUnitSearchEntry& rhs) noexcept {
