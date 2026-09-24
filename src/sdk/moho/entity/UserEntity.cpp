@@ -16,6 +16,7 @@
 #include "moho/entity/REntityBlueprint.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/textures/CD3DBatchTexture.h"
 #include "moho/resource/RScmResource.h"
@@ -210,55 +211,6 @@ namespace
   [[nodiscard]] float ClampUnitInterval(const float value) noexcept
   {
     return std::clamp(value, 0.0f, 1.0f);
-  }
-
-  [[nodiscard]] bool NearlyEqual(const float lhs, const float rhs, const float epsilon = 1.0e-6f) noexcept
-  {
-    return std::fabs(lhs - rhs) <= epsilon;
-  }
-
-  [[nodiscard]] bool AreQuaternionsNearlyEqual(const Wm3::Quatf& lhs, const Wm3::Quatf& rhs) noexcept
-  {
-    return NearlyEqual(lhs.w, rhs.w) && NearlyEqual(lhs.x, rhs.x) && NearlyEqual(lhs.y, rhs.y) &&
-      NearlyEqual(lhs.z, rhs.z);
-  }
-
-  [[nodiscard]] Wm3::Quatf LerpQuaternionShortestPathNormalized(
-    const Wm3::Quatf& current, const Wm3::Quatf& previous, const float alpha
-  ) noexcept
-  {
-    if (AreQuaternionsNearlyEqual(current, previous)) {
-      return previous;
-    }
-
-    Wm3::Quatf adjustedCurrent = current;
-    if (Wm3::Quatf::Dot(previous, current) < 0.0f) {
-      adjustedCurrent.w = -adjustedCurrent.w;
-      adjustedCurrent.x = -adjustedCurrent.x;
-      adjustedCurrent.y = -adjustedCurrent.y;
-      adjustedCurrent.z = -adjustedCurrent.z;
-    }
-
-    const float keepWeight = 1.0f - alpha;
-    Wm3::Quatf blended{
-      previous.w * keepWeight + adjustedCurrent.w * alpha,
-      previous.x * keepWeight + adjustedCurrent.x * alpha,
-      previous.y * keepWeight + adjustedCurrent.y * alpha,
-      previous.z * keepWeight + adjustedCurrent.z * alpha,
-    };
-
-    const float lengthSq =
-      blended.w * blended.w + blended.x * blended.x + blended.y * blended.y + blended.z * blended.z;
-    if (lengthSq <= 1.0e-6f) {
-      return Wm3::Quatf{0.0f, 0.0f, 0.0f, 0.0f};
-    }
-
-    const float inverseLength = 1.0f / std::sqrt(lengthSq);
-    blended.w *= inverseLength;
-    blended.x *= inverseLength;
-    blended.y *= inverseLength;
-    blended.z *= inverseLength;
-    return blended;
   }
 
   [[nodiscard]] moho::EAlliance
@@ -457,13 +409,16 @@ namespace moho
       (variableData.mScmResource.get() != mVariableData.mScmResource.get());
 
     const bool scaleChanged = mMeshInstance != nullptr && mMeshInstance->isStaticPose == 0u &&
-      Wm3::Vector3f::Compare(&mMeshInstance->scale, &variableData.mScale);
+      mMeshInstance->scale != variableData.mScale;
 
-    const bool transformChanged = Wm3::Vector3f::Compare(&variableData.mCurTransform.pos_, &mVariableData.mCurTransform.pos_) ||
-      !AreQuaternionsNearlyEqual(mVariableData.mCurTransform.orient_, variableData.mCurTransform.orient_) ||
-      Wm3::Vector3f::Compare(&variableData.mLastTransform.pos_, &mVariableData.mLastTransform.pos_) ||
-      !AreQuaternionsNearlyEqual(mVariableData.mLastTransform.orient_, variableData.mLastTransform.orient_) ||
-      !NearlyEqual(variableData.mCurImpactValue, mVariableData.mCurImpactValue);
+    // 0x008B8F46..0x008B8F98: exact tests throughout -- `CompareArrays` on each
+    // position (0x004F0A50) and orientation (0x004F0B40), then `ucomiss` on the
+    // impact value, so a NaN or any bit change counts as changed.
+    const bool transformChanged = variableData.mCurTransform.pos_ != mVariableData.mCurTransform.pos_ ||
+      variableData.mCurTransform.orient_ != mVariableData.mCurTransform.orient_ ||
+      variableData.mLastTransform.pos_ != mVariableData.mLastTransform.pos_ ||
+      variableData.mLastTransform.orient_ != mVariableData.mLastTransform.orient_ ||
+      variableData.mCurImpactValue != mVariableData.mCurImpactValue;
 
     if (IsUserUnit() != nullptr && mVariableData.mHealth > variableData.mHealth) {
       if (mArmy != nullptr && mSession != nullptr && mArmy == mSession->GetFocusUserArmy()) {
@@ -616,8 +571,10 @@ namespace moho
       mutableThis->mTransform.pos_.x = previous.pos_.x + (current.pos_.x - previous.pos_.x) * clampedAlpha;
       mutableThis->mTransform.pos_.y = previous.pos_.y + (current.pos_.y - previous.pos_.y) * clampedAlpha;
       mutableThis->mTransform.pos_.z = previous.pos_.z + (current.pos_.z - previous.pos_.z) * clampedAlpha;
-      mutableThis->mTransform.orient_ =
-        LerpQuaternionShortestPathNormalized(current.orient_, previous.orient_, clampedAlpha);
+      // 0x008B8DBC: QuatLERP(current, previous, &blend, alpha) (0x004EBA80).
+      Wm3::Quatf blendedOrientation{};
+      (void)QuatLERP(&current.orient_, &previous.orient_, &blendedOrientation, clampedAlpha);
+      mutableThis->mTransform.orient_ = blendedOrientation;
       mutableThis->mLastInterpAmt = clampedAlpha;
     }
 

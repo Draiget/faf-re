@@ -327,7 +327,7 @@ int CUnitUpgradeTask::TaskTick()
 
     switch (mTaskState) {
       case TASKSTATE_Preparing:
-        if (mUnit != nullptr && mUnit->IsMobile() && Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
+        if (mUnit != nullptr && mUnit->IsMobile() && mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
           if (mUnit->AiNavigator != nullptr) {
             mUnit->AiNavigator->AbortMove();
             return 1;

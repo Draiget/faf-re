@@ -3575,7 +3575,7 @@ namespace moho
         // The original tests whether the blacklisted entity moved this tick by
         // comparing its current world position against its previous-tick world
         // position. `Wm3::Vector3f::Compare` returns true when the vectors DIFFER.
-        entityMoved = Wm3::Vector3f::Compare(&blacklistedEntity->mVarDat.mCurTransform.pos_, &blacklistedEntity->mVarDat.mLastTransform.pos_);
+        entityMoved = blacklistedEntity->mVarDat.mCurTransform.pos_ != blacklistedEntity->mVarDat.mLastTransform.pos_;
       }
 
       if (entityGone || entityMoved || row.mValue <= 0) {
@@ -3631,7 +3631,7 @@ namespace moho
       if (candidate.targetType == EAiTargetType::AITARGET_Ground) {
         // `Wm3::Vector3f::Compare` returns true when the vectors DIFFER, so the
         // targets are "same" only when the ground positions do NOT differ.
-        return !Wm3::Vector3f::Compare(&candidate.position, &current.position);
+        return candidate.position == current.position;
       }
       return true;
     }
@@ -4017,7 +4017,7 @@ namespace moho
       launchTransform.orient_ = COORDS_Orient(Wm3::Vector3f{0.0f, -1.0f, 0.0f});
     } else if (mWeaponBlueprint != nullptr && mWeaponBlueprint->UseFiringSolutionInsteadOfAimBone != 0u) {
       const Wm3::Vector3f& invalidAimingVector = GetRecoveredInvalidAimingVector();
-      if (Wm3::Vector3f::Compare(&mAimingAt, &invalidAimingVector)) {
+      if (mAimingAt != invalidAimingVector) {
         Wm3::Vector3f recoveredAimDirection = mAimingAt;
         if (Wm3::Vector3f::Normalize(&recoveredAimDirection) > 0.0f) {
           launchTransform.orient_ = COORDS_Orient(recoveredAimDirection);

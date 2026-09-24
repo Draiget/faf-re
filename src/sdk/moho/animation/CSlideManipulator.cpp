@@ -375,7 +375,7 @@ namespace
       manipulator->mGoal.z *= scale;
     }
 
-    const bool reachedGoal = !Wm3::Vector3f::Compare(&manipulator->mGoal, &manipulator->mCurrentPosition);
+    const bool reachedGoal = manipulator->mGoal == manipulator->mCurrentPosition;
     manipulator->EventSetSignaled(reachedGoal);
   }
 

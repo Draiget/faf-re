@@ -143,7 +143,7 @@ namespace
       return false;
     }
 
-    if (Wm3::Vector3f::Compare(&candidateUnit->mVarDat.mCurTransform.pos_, &candidateUnit->mVarDat.mLastTransform.pos_) != 0) {
+    if (candidateUnit->mVarDat.mCurTransform.pos_ != candidateUnit->mVarDat.mLastTransform.pos_) {
       return false;
     }
 

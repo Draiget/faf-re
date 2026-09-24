@@ -27126,7 +27126,7 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
       continue;
     }
     const bool airOrAtRest =
-      unit->mIsAir || (Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_) == 0);
+      unit->mIsAir || (unit->mVarDat.mCurTransform.pos_ == unit->mVarDat.mLastTransform.pos_);
     if (!airOrAtRest || unit->mVarDat.mLayerMask == LAYER_Air || unit->IsDead()) {
       continue;
     }
@@ -27152,7 +27152,7 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
     const Wm3::Vector3f zeroVec{0.0f, 0.0f, 0.0f};
     float unitDirX;
     float unitDirZ;
-    if (Wm3::Vector3f::Compare(&delta, &zeroVec) == 0) {
+    if (delta == zeroVec) {
       unitDirX = 0.0f;
       unitDirZ = 1.0f;
     } else {

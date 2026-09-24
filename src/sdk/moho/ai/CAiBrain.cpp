@@ -6694,7 +6694,7 @@ int moho::cfunc_CAiBrainPickBestAttackVectorL(LuaPlus::LuaState* const state)
   }
 
   const Wm3::Vector3f zeroVector = Wm3::Vector3f::Zero();
-  if (Wm3::Vector3f::Compare(&result.point, &zeroVector)) {
+  if (result.point != zeroVector) {
     LuaPlus::LuaObject resultObject = SCR_ToLua<SPointVector>(state, result);
     resultObject.PushStack(state);
   } else {

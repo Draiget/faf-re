@@ -1177,7 +1177,7 @@ namespace moho
   [[nodiscard]] bool SweptPathBlockedByUnit(
     COGrid& grid, Unit* const unit, const Wm3::Vector3f& fromCenter, const Wm3::Vector3f& toCenter, const int mode)
   {
-    if (!Wm3::Vector3f::Compare(&fromCenter, &toCenter)) {
+    if (fromCenter == toCenter) {
       // Endpoints coincide — nothing to sweep.
       return false;
     }

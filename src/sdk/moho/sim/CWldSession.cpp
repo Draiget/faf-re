@@ -8182,7 +8182,7 @@ namespace moho
         node = SSelectionSetUserEntity::find(&selection, node, &node);
       }
 
-      if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); Wm3::Vector3f::Compare(&anchorOverride, &zero)) {
+      if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); anchorOverride != zero) {
         outAnchor = anchorOverride;
         return false;
       }

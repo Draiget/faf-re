@@ -273,7 +273,7 @@ namespace
 
     // Wm3::Vector3f::Compare returns true when the vectors differ, so this is a
     // "guard position is set (non-zero)" test.
-    if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); Wm3::Vector3f::Compare(&guardPosition, &zero)) {
+    if (const Wm3::Vector3f zero = Wm3::Vector3f::Zero(); guardPosition != zero) {
       const RUnitBlueprintAI& ai = unit->GetBlueprint()->AI;
       const Wm3::Vec3f& unitPosition = unit->GetPosition();
       const float deltaX = unitPosition.x - guardPosition.x;
@@ -444,7 +444,7 @@ namespace moho
     }
 
     // Clear the target blacklist whenever the unit has moved this tick.
-    if (Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
+    if (mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
       WeaponResetBlacklist(*weapon);
     }
 

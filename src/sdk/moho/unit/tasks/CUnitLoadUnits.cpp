@@ -728,7 +728,7 @@ namespace moho
           // the unit is still travelling. A stationary transport advances
           // straight to the next state with its navigator untouched.
           IAiNavigator* const navigator = mUnit->AiNavigator;
-          if (navigator != nullptr && Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
+          if (navigator != nullptr && mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
             navigator->AbortMove();
           }
 

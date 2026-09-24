@@ -77,16 +77,14 @@ namespace
   }
 
   // 0x0076E4EA: `CIntel::Update` decides whether a handle has to be re-rastered
-  // with `Wm3::Vector3::Compare(newPos, &handle->mLastPos)`, which reports a
-  // *difference* and does so against WildMagic's 1e-5 epsilon
-  // (Wm3Vector3.h:245) -- not an exact float comparison. The exact form that
-  // stood here re-rastered on any bit-level jitter, tearing the circle out of
-  // the grid and queueing a delayed subtract every tick for a unit the engine
-  // considers stationary. `CIntelPosHandle::Update` reaches the same
-  // `Compare` through 0x0076D8D0, so this is the one spelling both lanes share.
+  // by calling `Vector3<float>::CompareArrays` (0x004F0A50) on the new and last
+  // positions: a 12-byte memcmp, i.e. WildMagic's own `operator!=`, so any bit
+  // difference re-rasters. `CIntelPosHandle::Update` makes the same call at
+  // 0x0076D8DC. (A 2026-09-14 change read that call as a 1e-5 epsilon compare;
+  // the epsilon only ever existed in a recovery-era patch to Wm3Vector3.h.)
   [[nodiscard]] bool PositionChanged(const moho::CIntelPosHandle& handle, const Wm3::Vec3f& position) noexcept
   {
-    return Wm3::Vec3f::Compare(&position, &handle.mLastPos) != 0;
+    return position != handle.mLastPos;
   }
 } // namespace
 

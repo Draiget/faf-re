@@ -683,7 +683,7 @@ namespace moho
     }
 
     case SCROLLTYPE_MotionDerived: {
-      if (!Wm3::Vector3f::Compare(&entityData.mCurTransform.pos_, &entityData.mLastTransform.pos_)) {
+      if (entityData.mCurTransform.pos_ == entityData.mLastTransform.pos_) {
         return;
       }
 

@@ -4953,7 +4953,7 @@ namespace moho
     Wm3::Vector3f launchDirection = BuildRandomProjectileDirection(random, *projectileBlueprint);
 
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    if (!Wm3::Vector3f::Compare(&launchDirection, &zero)) {
+    if (launchDirection == zero) {
       launchDirection = ResolveBoneForwardVector(launchTransform);
     }
 

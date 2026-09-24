@@ -53,8 +53,7 @@ namespace
     const std::uint32_t requestedRadius
   )
   {
-    const int compareResult = Wm3::Vec3f::Compare(&newPos, &entry->mLastPos);
-    if (compareResult != 0 || requestedRadius != entry->mRadius) {
+    if (newPos != entry->mLastPos || requestedRadius != entry->mRadius) {
       entry->SubViz();
       entry->mLastPos = newPos;
       entry->mRadius = requestedRadius;

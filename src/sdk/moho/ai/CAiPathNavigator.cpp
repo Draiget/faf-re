@@ -216,7 +216,7 @@ namespace
   [[nodiscard]] bool HasVectorValue(const Wm3::Vector3f& vec) noexcept
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    return Wm3::Vector3f::Compare(&vec, &zero);
+    return vec != zero;
   }
 
   [[nodiscard]] bool HasGoalArea(const SAiNavigatorGoal& goal) noexcept
@@ -1618,7 +1618,7 @@ void CAiPathNavigator::UpdateCurrentPosition(const Wm3::Vector3f& position)
   // 0x005AEB10 pushes 1 into `IsUnitState` (vtable +0x3C) and resets the
   // counter at 0x005AEB20 when it answers true, incrementing at 0x005AEB1A
   // otherwise; the position test ahead of it is
-  // `Vector3f::Compare(Position, PrevPosition)` at 0x005AEB02, whose non-zero
+  // `Vector3<float>::CompareArrays(Position, PrevPosition)` at 0x005AEB02, whose non-zero
   // "they differ" result also resets.
   //
   // Testing `UNITSTATE_Moving` inverted the meaning of the whole gate. A unit

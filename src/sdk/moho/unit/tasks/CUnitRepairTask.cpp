@@ -399,7 +399,7 @@ namespace moho
     // Grounded / being-built targets that have not moved this frame are idle;
     // an airborne flyer on the AIR layer cannot be repaired in place.
     if (!target->GetBlueprint()->Air.CanFly || target->IsBeingBuilt()) {
-      if (Wm3::Vector3f::Compare(&target->mVarDat.mCurTransform.pos_, &target->mVarDat.mLastTransform.pos_)) {
+      if (target->mVarDat.mCurTransform.pos_ != target->mVarDat.mLastTransform.pos_) {
         return -1;
       }
     } else if (target->mVarDat.mLayerMask == LAYER_Air) {

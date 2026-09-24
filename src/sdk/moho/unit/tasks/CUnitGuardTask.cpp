@@ -752,16 +752,16 @@ namespace moho
       }
 
       // Release the ogrid footprint reservation when a guard move-anchor was
-      // staked (non-zero indicates an active reservation). Compare uses the
-      // engine's 1e-5 epsilon, matching binary semantics.
+      // staked (non-zero indicates an active reservation). Both tests below are
+      // `Vector3<float>::CompareArrays` calls (0x00611934, 0x00611962): exact.
       const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-      if (Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero)) {
+      if (mGuardMoveAnchorPosition != zero) {
         unit->FreeOgridRect();
       }
 
       if (IAiNavigator* const navigator = unit->AiNavigator; navigator != nullptr) {
         // Issue one navigator-side abort iff the unit moved this tick.
-        if (Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_)) {
+        if (unit->mVarDat.mCurTransform.pos_ != unit->mVarDat.mLastTransform.pos_) {
           navigator->AbortMove();
         }
         unit->UpdateSpeedThroughStatus();
@@ -908,7 +908,7 @@ namespace moho
   Wm3::Vector3f CUnitGuardTask::EnsureReservedGuardMoveAnchorPosition()
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    if (!Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero)) {
+    if (mGuardMoveAnchorPosition == zero) {
       if (Unit* const guardedUnit = mSecondaryUnit.GetObjectPtr(); guardedUnit != nullptr) {
         mGuardMoveAnchorPosition = guardedUnit->GetPosition();
 
@@ -947,7 +947,7 @@ namespace moho
   Wm3::Vector3f CUnitGuardTask::ResolveRebuilderGuardQueueAnchorPosition()
   {
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    if (!Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero)) {
+    if (mGuardMoveAnchorPosition == zero) {
       if (mUnit == nullptr) {
         return mGuardMoveAnchorPosition;
       }
@@ -975,7 +975,7 @@ namespace moho
         }
       }
 
-      if (Wm3::Vector3f::Compare(&nearestGuardTarget, &zero)) {
+      if (nearestGuardTarget != zero) {
         mGuardMoveAnchorPosition = nearestGuardTarget;
 
         gpg::Rect2f guardSkirt{};
@@ -1137,8 +1137,8 @@ namespace moho
     const bool engineerWithGuardedUnit = mUnit->IsInCategory("ENGINEER") && guardedUnit != nullptr;
     if (engineerWithGuardedUnit) {
       const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-      const bool guardedUnitMoving = Wm3::Vector3f::Compare(&guardedUnit->mVarDat.mCurTransform.pos_, &guardedUnit->mVarDat.mLastTransform.pos_);
-      const bool hasReservedAnchor = Wm3::Vector3f::Compare(&mGuardMoveAnchorPosition, &zero);
+      const bool guardedUnitMoving = guardedUnit->mVarDat.mCurTransform.pos_ != guardedUnit->mVarDat.mLastTransform.pos_;
+      const bool hasReservedAnchor = mGuardMoveAnchorPosition != zero;
       const Wm3::Vector3f guardedPosition = guardedUnit->GetPosition();
 
       float deltaX = 0.0f;
@@ -1486,7 +1486,7 @@ namespace moho
         return nullptr;
       }
 
-      if (!Wm3::Vector3f::Compare(&guardedUnit->mVarDat.mCurTransform.pos_, &guardedUnit->mVarDat.mLastTransform.pos_)) {
+      if (guardedUnit->mVarDat.mCurTransform.pos_ == guardedUnit->mVarDat.mLastTransform.pos_) {
         if (guardedUnit->mVarDat.mHealth < guardedUnit->mVarDat.mMaxHealth) {
           return guardedUnit;
         }
@@ -1565,7 +1565,7 @@ namespace moho
         continue;
       }
 
-      if (Wm3::Vector3f::Compare(&candidate->mVarDat.mCurTransform.pos_, &candidate->mVarDat.mLastTransform.pos_)) {
+      if (candidate->mVarDat.mCurTransform.pos_ != candidate->mVarDat.mLastTransform.pos_) {
         continue;
       }
 
@@ -1741,7 +1741,7 @@ namespace moho
     }
 
     const Wm3::Vector3f zero = Wm3::Vector3f::Zero();
-    if (Wm3::Vector3f::Compare(&mGuardDirection, &zero)) {
+    if (mGuardDirection != zero) {
       mGuardDirection = zero;
       unit->FreeOgridRect();
     }

@@ -390,12 +390,12 @@ namespace moho
     Listener<ECommandEvent>::mListenerLink.ListUnlink();
 
     // (2) Navigator branch: stop honoring the formation, and abort the active
-    // move only when the unit's current and previous positions compare equal
-    // (0x0061B192..0x0061B1CF: `Wm3::Vector3::Compare` returns nonzero for an
-    // approximate match, and the binary branches to `AbortMove` on nonzero).
+    // move when the unit's current and previous positions differ
+    // (0x0061B1BD: `Vector3<float>::CompareArrays`, an exact memcmp; a non-zero
+    // result falls through to `AbortMove`, zero jumps past it at 0x0061B1C4).
     if (IAiNavigator* const navigator = mUnit->AiNavigator; navigator != nullptr) {
       navigator->IgnoreFormation(false);
-      if (Wm3::Vector3f::Compare(&mUnit->mVarDat.mCurTransform.pos_, &mUnit->mVarDat.mLastTransform.pos_)) {
+      if (mUnit->mVarDat.mCurTransform.pos_ != mUnit->mVarDat.mLastTransform.pos_) {
         navigator->AbortMove();
       }
     }
@@ -704,7 +704,7 @@ namespace moho
         if (candidateUnit == unit) {
           continue;
         }
-        if (Wm3::Vector3f::Compare(&candidate->mVarDat.mLastTransform.pos_, &candidate->mVarDat.mCurTransform.pos_)) {
+        if (candidate->mVarDat.mLastTransform.pos_ != candidate->mVarDat.mCurTransform.pos_) {
           continue; // stationary — already at rest, ignore
         }
         if (candidate->mVarDat.mLayerMask == LAYER_Air) {

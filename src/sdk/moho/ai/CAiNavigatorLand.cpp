@@ -542,7 +542,7 @@ int CAiNavigatorLand::Execute()
 
   if (mPathNavigator->mState != AIPATHNAVSTATE_Thinking) {
     const Wm3::Vector3f currentWaypoint = steering->GetWaypoint();
-    if (Wm3::Vector3f::Compare(&targetPos, &currentWaypoint)) {
+    if (targetPos != currentWaypoint) {
       const SOCellPos targetCell = TargetWorldToCell(targetPos, mUnit->GetFootprint());
       steering->UseTopSpeed(mPathNavigator->IsCellInGoal(targetCell));
 

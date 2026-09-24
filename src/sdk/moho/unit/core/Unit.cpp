@@ -4499,7 +4499,7 @@ int moho::cfunc_UnitHasValidTeleportDestL(LuaPlus::LuaState* const state)
     if (IAiTransport* const aiTransport = unit->AiTransport; aiTransport != nullptr) {
       const Wm3::Vec3f teleportDestination = aiTransport->TransportGetTeleportDest();
       const Wm3::Vec3f zero{};
-      hasValidTeleportDestination = Wm3::Vector3f::Compare(&teleportDestination, &zero) != 0;
+      hasValidTeleportDestination = teleportDestination != zero;
     }
   }
 
@@ -10665,7 +10665,7 @@ int moho::cfunc_UnitIsMovingL(LuaPlus::LuaState* const state)
   const LuaPlus::LuaObject unitObject(LuaPlus::LuaStackObject(state, 1));
   Unit* const unit = SCR_FromLua_Unit(unitObject);
 
-  const bool isMoving = Wm3::Vector3f::Compare(&unit->mVarDat.mCurTransform.pos_, &unit->mVarDat.mLastTransform.pos_) != 0;
+  const bool isMoving = unit->mVarDat.mCurTransform.pos_ != unit->mVarDat.mLastTransform.pos_;
   lua_pushboolean(rawState, isMoving ? 1 : 0);
   (void)lua_gettop(rawState);
   return 1;

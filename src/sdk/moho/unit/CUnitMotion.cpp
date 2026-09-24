@@ -2167,7 +2167,7 @@ namespace moho
     // Physics-body free-fall/spin step, gated on a stored angular impulse -
     // Wm3::Vector3f::Compare (FAF-mod) returns true when the operands
     // DIFFER, so this only runs when mTorque != 0.
-    if (Wm3::Vector3f::Compare(&mTorque, &Wm3::Vector3f::ZERO)) {
+    if (mTorque != Wm3::Vector3f::ZERO) {
       physBody->IntegrateFreefallStep(Wm3::Vector3f::ZERO, kSpinIntegrationDt, mTorque);
       transform.orient_ = physBody->mOrientation;
     }
@@ -3780,7 +3780,7 @@ namespace moho
           mCombatState = ACS_Combat;
           if (CAiTargetEntityIsAirLayer(target)) {
             Entity* const rawTargetEntity = target.targetEntity.GetObjectPtr();
-            if (Wm3::Vector3f::Compare(&rawTargetEntity->mVarDat.mCurTransform.pos_, &rawTargetEntity->mVarDat.mLastTransform.pos_)) {
+            if (rawTargetEntity->mVarDat.mCurTransform.pos_ != rawTargetEntity->mVarDat.mLastTransform.pos_) {
               // The entity's own orientation quaternion. This used to be
               // rebuilt lane by lane, because the lane was declared a plain
               // (x,y,z,w) `moho::Vector4f` over the w-first quaternion words it
@@ -3830,7 +3830,7 @@ namespace moho
         float speedLimit = maxAirSpeed;
         if (mCombatState == ACS_NormalTurn && CAiTargetEntityIsAirLayer(target)) {
           Entity* const rawEntity2 = target.targetEntity.GetObjectPtr();
-          if (!Wm3::Vector3f::Compare(&rawEntity2->mVarDat.mCurTransform.pos_, &rawEntity2->mVarDat.mLastTransform.pos_)) {
+          if (rawEntity2->mVarDat.mCurTransform.pos_ == rawEntity2->mVarDat.mLastTransform.pos_) {
             speedLimit = (air.MinAirspeed > targetDist) ? air.MinAirspeed : targetDist;
           }
         }
@@ -4009,9 +4009,9 @@ namespace moho
         // heading. `GetFormationVector` returns by value straight into the
         // local -- `lea ebx, [esp+a1.y]` at 0x006BF688 is its return slot.
         fallbackVector = unit->GetFormationVector();
-        if (Wm3::Vector3f::Compare(&fallbackVector, &Wm3::Vector3f::ZERO)) {
+        if (fallbackVector != Wm3::Vector3f::ZERO) {
           mFormationVec = fallbackVector;
-        } else if (Wm3::Vector3f::Compare(&mFormationVec, &Wm3::Vector3f::ZERO)) {
+        } else if (mFormationVec != Wm3::Vector3f::ZERO) {
           // 0x006BF6ED normalizes into a scratch (esi) from the member (edi);
           // `mFormationVec` itself is left alone.
           Wm3::Vector3f::NormalizeInto(mFormationVec, &fallbackVector);

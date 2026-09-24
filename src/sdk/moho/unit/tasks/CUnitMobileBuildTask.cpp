@@ -704,7 +704,7 @@ namespace moho
           (void)IssueCommandToSelectedUnits(mSim, dispatchSet, issueData, true);
         } else if (builtUnit != nullptr && builtUnit->AiBuilder != nullptr &&
                    builtUnit->AiBuilder->BuilderIsFactory() &&
-                   Wm3::Vector3f::Compare(&mBuildDirection, &zeroDir)) {
+                   mBuildDirection != zeroDir) {
           SEntitySetTemplateUnit dispatchSet{};
           (void)dispatchSet.AddUnit(builtUnit);
           const Wm3::Vec3f& unitPos = builtUnit->GetPosition();
