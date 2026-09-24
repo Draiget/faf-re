@@ -242,21 +242,6 @@ namespace
   constexpr const char* kTargetIdKey = "TargetId";
   constexpr const char* kBlueprintIdKey = "BlueprintId";
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RType* ResolveCachedType()
   {
@@ -1086,41 +1071,6 @@ namespace
 
 } // namespace
 
-/**
- * Address: 0x006EA340 (FUN_006EA340, Moho::InstanceCounter<Moho::CUnitCommand>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CUnitCommand
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CUnitCommand>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CUnitCommand).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
- * Address: 0x006E95B0 (FUN_006E95B0)
- *
- * What it does:
- * Increments the `CUnitCommand` instance-counter stat lane and returns the
- * pass-through value unchanged.
- */
-[[maybe_unused]] int IncrementCUnitCommandInstanceStatAndReturn(const int passthrough)
-{
-  moho::StatItem* const statItem = moho::InstanceCounter<moho::CUnitCommand>::GetStatItem();
-  (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
-  return passthrough;
-}
-
 CScriptObject* SCommandUnitSet::EntryFromUnit(Unit* const unit) noexcept
 {
   if (!unit) {
@@ -1264,11 +1214,6 @@ CUnitCommand::CUnitCommand()
   , mArgs()
   , mUnknownTailInt(0)
 {
-  // Increment the CUnitCommand instance-count stat (binary FUN_006E7FF0 via the
-  // IncrementCUnitCommandInstanceStatAndReturn helper FUN_006E95B0). The recovery
-  // had left the increment helper orphaned, dropping the ctor bump.
-  (void)IncrementCUnitCommandInstanceStatAndReturn(0);
-
   mPrev = this;
   mNext = this;
 
@@ -1341,12 +1286,6 @@ CUnitCommand::CUnitCommand(Sim* const sim, const SSTICommandIssueData& issueData
   , mArgs(issueData.mObject)
   , mUnknownTailInt(0)
 {
-  // Increment the CUnitCommand instance-count stat (via the
-  // IncrementCUnitCommandInstanceStatAndReturn helper FUN_006E95B0). This is the
-  // delegated-to root ctor; the (Sim*, issueData) ctor reaches it via delegation,
-  // so the bump lives here only (no double-count).
-  (void)IncrementCUnitCommandInstanceStatAndReturn(0);
-
   mPrev = this;
   mNext = this;
 
@@ -2103,11 +2042,6 @@ void CUnitCommand::DestroyInternal()
 
   // +0x0034 broadcaster/list base slice.
   runtime.broadcasterOwnerChainNode.UnlinkFromOwnerChain();
-
-  // Decrement the CUnitCommand instance-count stat (binary FUN_006E8500 line 97),
-  // balancing the +1 the constructors emit. The recovery had dropped it.
-  moho::StatItem* const statItem = moho::InstanceCounter<moho::CUnitCommand>::GetStatItem();
-  (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), -1L);
 }
 
 /**

@@ -10,6 +10,7 @@
 #include "legacy/containers/Vector.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/misc/CDiskWatch.h"
+#include "moho/misc/InstanceCounter.h"
 #include "moho/sim/SRuleFootprintsBlueprint.h"
 
 namespace LuaPlus
@@ -373,12 +374,22 @@ namespace moho
    * VFTABLE: 0x00E1610C
    * COL:  0x00E6A514
    */
-  class RRuleGameRules
+  class RRuleGameRules : public InstanceCounter<RRuleGameRules>
   {
   public:
     static gpg::RType* sType;
     static gpg::RType* sType2;
     [[nodiscard]] static gpg::RType* StaticGetClass();
+
+    /**
+     * Address: 0x00529530 (FUN_00529530)
+     *
+     * What it does:
+     * `InstanceCounter<RRuleGameRules>`'s +1 (an integer `lock xadd` into the
+     * stat, +0x24), then the vtable store. The out-of-line copy has no
+     * callers; `RRuleGameRulesImpl`'s constructor inlines it.
+     */
+    RRuleGameRules() = default;
 
     /**
      * Address: 0x00528080 (FUN_00528080)
@@ -575,7 +586,8 @@ namespace moho
      *
      * What it does:
      * Releases runtime blueprint/category/Lua storage owned by this concrete
-     * rule object and decrements the rule instance counter.
+     * rule object; the `RRuleGameRules` base's `InstanceCounter` then takes
+     * the instance count back.
      */
     ~RRuleGameRulesImpl() override;
 

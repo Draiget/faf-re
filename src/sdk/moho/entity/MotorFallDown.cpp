@@ -122,19 +122,6 @@ namespace
     return *static_cast<float*>(valueStorage);
   }
 
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   [[nodiscard]] float NormalizeAnglePositive(const float angleRadians) noexcept
   {
     float normalized = angleRadians;
@@ -397,7 +384,6 @@ namespace moho
     , mFallDepth(0.0f)
     , mBreakOnWhack(false)
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorFallDown>::GetStatItem(), 1);
   }
 
   /**
@@ -413,7 +399,6 @@ namespace moho
     , mFallDepth(0.0f)
     , mBreakOnWhack(false)
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorFallDown>::GetStatItem(), 1);
   }
 
   /**
@@ -422,7 +407,6 @@ namespace moho
    */
   MotorFallDown::~MotorFallDown()
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorFallDown>::GetStatItem(), -1);
   }
 
   /**
@@ -846,68 +830,6 @@ namespace moho
     return &binder;
   }
 } // namespace moho
-
-namespace
-{
-  /**
-   * Address: 0x006959B0 (FUN_006959B0)
-   *
-   * What it does:
-   * Increments the `MotorFallDown` instance-counter lane and returns the
-   * caller-provided passthrough value.
-   */
-  [[maybe_unused]] void* IncrementMotorFallDownInstanceCounterPassThrough(void* const value) noexcept
-  {
-    AddInstanceCounterDelta(moho::InstanceCounter<moho::MotorFallDown>::GetStatItem(), 1);
-    return value;
-  }
-
-  /**
-   * Address: 0x006959D0 (FUN_006959D0)
-   *
-   * What it does:
-   * Decrements the `MotorFallDown` instance-counter lane and returns the
-   * address of that counter slot.
-   */
-  [[maybe_unused]] volatile std::int32_t* DecrementMotorFallDownInstanceCounterAndReturnLane() noexcept
-  {
-    moho::StatItem* const statItem = moho::InstanceCounter<moho::MotorFallDown>::GetStatItem();
-    if (!statItem) {
-      return nullptr;
-    }
-
-    AddInstanceCounterDelta(statItem, -1);
-    return &statItem->mPrimaryValueBits;
-  }
-} // namespace
-
-/**
- * Address: 0x00695BC0 (FUN_00695BC0, Moho::InstanceCounter<Moho::MotorFallDown>::GetStatItem)
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::MotorFallDown>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  std::string statPath("Instance Counts_");
-  const char* const rawTypeName = typeid(moho::MotorFallDown).name();
-  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
-    if (*it != '_') {
-      statPath.push_back(*it);
-    }
-  }
-
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
 
 namespace
 {

@@ -28,7 +28,8 @@ namespace moho
    */
   class CAiNavigatorImpl : public IAiNavigator,
                            public CTask,
-                           public CScriptObject
+                           public CScriptObject,
+                           public InstanceCounter<CAiNavigatorImpl>
   {
   public:
     /**

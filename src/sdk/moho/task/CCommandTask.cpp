@@ -138,34 +138,6 @@ namespace
     return archive;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
-
   template <class TObject>
   gpg::RRef MakeDerivedRef(TObject* object, gpg::RType* const baseType)
   {
@@ -345,43 +317,16 @@ void WriteCCommandTaskArchiveAdapterVariantB(gpg::WriteArchive* const archive, c
 }
 
 /**
- * Address: 0x00599740 (FUN_00599740, Moho::InstanceCounter<Moho::CCommandTask>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for command-task
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CCommandTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CCommandTask).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x00608E90 (FUN_00608E90, non-deleting body)
  *
  * IDA signature:
  * volatile signed __int32 *__stdcall sub_608E90(Moho::CTask *a1);
  *
  * What it does:
- * Resets `CCommandTask` vtable, decrements command-task instance counter
- * bookkeeping, then runs `CTask` teardown.
+ * Base teardown only: `InstanceCounter<CCommandTask>`'s -1, then `CTask`.
  */
 CCommandTask::~CCommandTask()
 {
-  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), -1);
 }
 
 /**
@@ -433,7 +378,6 @@ CCommandTask::CCommandTask(Unit* const unit, Sim* const sim)
   , mDispatchResult(nullptr)
   , mLinkResult(static_cast<EAiResult>(0))
 {
-  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
 }
 
 /**
@@ -454,7 +398,6 @@ CCommandTask::CCommandTask()
   , mDispatchResult(nullptr)
   , mLinkResult(static_cast<EAiResult>(0))
 {
-  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
 }
 
 /**
@@ -475,7 +418,6 @@ CCommandTask::CCommandTask(CCommandTask* const parent)
   , mDispatchResult(parent ? &parent->mLinkResult : nullptr)
   , mLinkResult(static_cast<EAiResult>(0))
 {
-  AddStatCounter(InstanceCounter<CCommandTask>::GetStatItem(), 1);
 
   if (parent) {
     parent->mLinkResult = static_cast<EAiResult>(0);

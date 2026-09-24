@@ -1323,7 +1323,7 @@ namespace moho
      *
      * What it does:
      * Reads one unowned entity-pointer chain and relinks each entity's
-     * `mCoordNode` into `mCoordEntities` until a null sentinel is reached.
+     * dirty-list node into `mCoordEntities` until a null sentinel is reached.
      */
     void SerDirtyEnts(gpg::ReadArchive* archive);
 
@@ -1545,7 +1545,7 @@ namespace moho
     msvc8::list<Shield*> mShields;
     msvc8::deque<void*> mDeletionQueue;
     // 0x0A5C..0x0A63 intrusive list head (`mPrev` @ 0x0A5C, `mNext` @ 0x0A60).
-    TDatList<Entity, void> mCoordEntities;
+    TDatList<Entity, EntityDirtyList> mCoordEntities;
     bool mRequestXMLArmyStatsSubmit; // 0x0A64
     // 0x0A65..0x0A67: padding (int32 alignment)
     int32_t mSyncArmy; // 0x0A68

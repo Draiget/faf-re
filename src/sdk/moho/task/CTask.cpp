@@ -46,33 +46,6 @@ namespace
     return &CTaskTypeInfoSlot();
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   gpg::RType* CachedCTaskType()
   {
     if (!CTask::sType) {
@@ -303,31 +276,6 @@ void moho::WriteCTaskBase(gpg::WriteArchive* const archive, const void* const ob
 }
 
 /**
- * Address: 0x0040AB50 (FUN_0040AB50, Moho::InstanceCounter<Moho::CTask>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for task-instance
- * counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CTask).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x00408CB0 (FUN_00408CB0, ??1CTask@Moho@@UAE@XZ)
  *
  * What it does:
@@ -356,7 +304,6 @@ CTask::~CTask()
     *mDestroyFlag = true;
   }
 
-  AddStatCounter(InstanceCounter<CTask>::GetStatItem(), -1);
 }
 
 /**
@@ -368,7 +315,6 @@ CTask::~CTask()
  */
 CTask::CTask(CTaskThread* const thread, const bool owning)
 {
-  AddStatCounter(InstanceCounter<CTask>::GetStatItem(), 1);
 
   if (thread != nullptr) {
     mAutoDelete = owning;

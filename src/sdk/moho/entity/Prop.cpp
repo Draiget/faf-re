@@ -77,7 +77,7 @@ namespace
     prop.SimulationRef->mEntityDB->mEntList.push_back(&prop);
 
     if (prop.SimulationRef) {
-      prop.mCoordNode.ListLinkAfter(&prop.SimulationRef->mCoordEntities);
+      prop.ListLinkAfter(&prop.SimulationRef->mCoordEntities);
     }
   }
 
@@ -112,22 +112,6 @@ namespace
     grid->ExecuteOccupy(footprint.mOccupancyCaps, rect);
   }
 
-  /**
-   * Increments or decrements one StatItem's primary counter atomically.
-   *
-   * Binary lane: `Prop::Prop` and `Prop::~Prop` both emit
-   * `_InterlockedExchangeAdd(&statItem->mCounter, +/-1)` against the per-type
-   * instance-counter stat item.
-   */
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (statItem == nullptr) {
-      return;
-    }
-
-    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     // Every file that wants this set must resolve the one that already
@@ -158,27 +142,6 @@ namespace moho
   );
   int cfunc_CreatePropHPR(lua_State* luaContext);
   int cfunc_CreatePropHPRL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x006FAAD0 (FUN_006FAAD0, Moho::InstanceCounter<Moho::Prop>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for Prop instance
-   * counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::Prop>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::Prop).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
 
   CScrLuaMetatableFactory<Prop>& CScrLuaMetatableFactory<Prop>::Instance()
   {
@@ -490,12 +453,7 @@ namespace moho
     , pad_027A{0u, 0u}
     , mPriorityInfo{0, 0}
     , mHandleIndex(-1)
-  {
-    // Increment the Prop instance-count stat (binary FUN_006F9CD0). The recovery
-    // wired the matching -1 into ~Prop but dropped both ctors' +1, so the stat
-    // decremented without ever incrementing. Independent standalone ctor.
-    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), 1L);
-  }
+  {}
 
   /**
    * Address: 0x006F9D90 (FUN_006F9D90)
@@ -521,10 +479,6 @@ namespace moho
     , mPriorityInfo{0, 0}
     , mHandleIndex(-1)
   {
-    // Increment the Prop instance-count stat (binary FUN_006F9D90), before the
-    // early-out so every construction is counted. Independent standalone ctor.
-    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), 1L);
-
     if (!blueprint) {
       return;
     }
@@ -587,9 +541,8 @@ namespace moho
    * What it does:
    * Auto-unregisters this Prop from the EntityDB bounded-reclaim priority
    * queue when registered (`mHandleIndex != -1`), releases the reclaim-area
-   * occupancy footprint on the COGrid when `mTracksReclaimArea` is set,
-   * decrements the per-type instance counter, and falls through to
-   * `Entity::~Entity` for base teardown.
+   * occupancy footprint on the COGrid when `mTracksReclaimArea` is set; the
+   * `InstanceCounter<Prop>` and `Entity` bases' teardown follows.
    */
   Prop::~Prop()
   {
@@ -617,9 +570,7 @@ namespace moho
       SimulationRef->mOGrid->ReleaseOccupy(footprint.mOccupancyCaps, rect);
     }
 
-    AddInstanceCounterDelta(InstanceCounter<Prop>::GetStatItem(), -1L);
-
-    // Base `Entity::~Entity` runs implicitly as part of the C++ destructor chain.
+    // InstanceCounter<Prop>'s -1 and `Entity::~Entity` run implicitly as part of the C++ destructor chain.
   }
 
   /**
@@ -788,13 +739,7 @@ namespace moho
         child->mVarDat.mScale.x = childScale.x;
         child->mVarDat.mScale.y = childScale.y;
         child->mVarDat.mScale.z = childScale.z;
-        TDatListItem<Entity, void>* const node = &child->mCoordNode;
-        TDatListItem<Entity, void>* const head = &child->SimulationRef->mCoordEntities;
-        node->ListUnlink();
-        node->mPrev = head->mPrev;
-        node->mNext = head;
-        head->mPrev = node;
-        node->mPrev->mNext = node;
+        child->ListLinkBefore(&child->SimulationRef->mCoordEntities);
       }
       childMeshResource.release();
 
@@ -880,7 +825,7 @@ namespace moho
     const bool sameOrientation = mVarDat.mCurTransform.orient_.x == mVarDat.mLastTransform.orient_.x && mVarDat.mCurTransform.orient_.y == mVarDat.mLastTransform.orient_.y &&
       mVarDat.mCurTransform.orient_.z == mVarDat.mLastTransform.orient_.z && mVarDat.mCurTransform.orient_.w == mVarDat.mLastTransform.orient_.w;
     if (samePosition && sameOrientation) {
-      mCoordNode.ListUnlink();
+      ListUnlink();
     }
   }
 
@@ -914,8 +859,8 @@ namespace moho
       return 0.0f;
     }
 
-    if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
 
     const float previous = mVarDat.mFractionComplete;

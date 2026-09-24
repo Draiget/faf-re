@@ -1257,7 +1257,7 @@ namespace
 
   void RequeueEntityCoordUpdate(moho::Entity& entity) noexcept
   {
-    entity.mCoordNode.ListLinkAfter(&entity.SimulationRef->mCoordEntities);
+    entity.ListLinkAfter(&entity.SimulationRef->mCoordEntities);
   }
 
   [[nodiscard]] bool IsIntelEnabledForType(const moho::CIntel& intelManager, const moho::EIntel intelType) noexcept
@@ -5196,7 +5196,7 @@ void Sim::SerDirtyEnts(gpg::WriteArchive* const archive)
   }
 
   const gpg::RRef nullOwner{};
-  for (Entity* const entity : mCoordEntities.owners_member<Entity, &Entity::mCoordNode>()) {
+  for (Entity* const entity : mCoordEntities.owners()) {
     gpg::RRef entityRef{};
     gpg::RRef_Entity(&entityRef, entity);
     gpg::WriteRawPointer(archive, entityRef, gpg::TrackedPointerState::Unowned, nullOwner);
@@ -5224,7 +5224,7 @@ void Sim::SerDirtyEnts(gpg::ReadArchive* const archive)
   Entity* entity = nullptr;
   (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   while (entity != nullptr) {
-    entity->mCoordNode.ListLinkAfter(&mCoordEntities);
+    entity->ListLinkAfter(&mCoordEntities);
     ownerRef = gpg::RRef{};
     (void)archive->ReadPointer_Entity(&entity, &ownerRef);
   }
@@ -5818,7 +5818,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
   //   changed -> every unit in the DB is resynced, because visibility is
   //              computed against the focus army and all of it just became
   //              stale (0x007478C2 walks `mEntityDB->mAllUnits`);
-  //   otherwise -> only the dirty run threaded through `Entity::mCoordNode`
+  //   otherwise -> only the dirty run threaded through the entities' dirty-list node
   //              (0x0074791E walks `mCoordEntities`).
   //
   // Both dispatch the same virtual, vtable slot 12 (`mov eax, [edx+30h]`), and
@@ -5832,7 +5832,7 @@ void Sim::Sync(const SSyncFilter& filter, SSyncData*& outSyncData)
       ++syncedEntityCount;
     });
   } else {
-    auto dirtyEntities = mCoordEntities.owners_member<Entity, &Entity::mCoordNode>();
+    auto dirtyEntities = mCoordEntities.owners();
     for (auto it = dirtyEntities.begin(); it != dirtyEntities.end();) {
       Entity* const entity = *it;
       ++it;
@@ -6182,7 +6182,7 @@ void Sim::UpdateChecksum()
   }
 
   Logf("Dirty Entities\n");
-  for (Entity* entity : mCoordEntities.owners_member<Entity, &Entity::mCoordNode>()) {
+  for (Entity* entity : mCoordEntities.owners()) {
     const std::uint32_t entityId = static_cast<std::uint32_t>(entity->id_);
     mContext.Update(&entityId, sizeof(entityId));
     if (mLog) {
@@ -10911,7 +10911,7 @@ void Sim::AdvanceBeat(const int amt)
       }
     });
 
-    for (auto* entity : mCoordEntities.owners_member<Entity, &Entity::mCoordNode>()) {
+    for (auto* entity : mCoordEntities.owners()) {
       AdvanceCoords(entity);
     }
 

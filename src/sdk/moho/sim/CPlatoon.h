@@ -49,7 +49,7 @@ namespace moho
   /**
    * Recovered `CPlatoon` runtime object.
    */
-  class CPlatoon : public CScriptObject
+  class CPlatoon : public CScriptObject, public InstanceCounter<CPlatoon>
   {
   public:
     inline static gpg::RType* sType = nullptr;
@@ -94,8 +94,8 @@ namespace moho
      * Address: 0x00724EB0 (FUN_00724EB0, Moho::CPlatoon::~CPlatoon)
      *
      * What it does:
-     * Destroys owned squad objects, clears dynamic squad storage back to inline
-     * lanes, and decrements platoon instance counters.
+     * Destroys owned squad objects and clears dynamic squad storage back to
+     * inline lanes; the `InstanceCounter<CPlatoon>` base takes the count back.
      */
     ~CPlatoon() override;
 

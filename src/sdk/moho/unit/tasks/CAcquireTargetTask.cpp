@@ -41,21 +41,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   [[nodiscard]] gpg::RType* CachedCTaskType()
   {
     if (!CTask::sType) {
@@ -163,19 +148,6 @@ namespace
     field.v4 = 0;
     field.mDesc = nullptr;
     ownerType->AddBase(field);
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
   }
 
   constexpr std::int32_t kAcquireTargetRetargetCooldownTicks = 30;
@@ -334,27 +306,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x005DCC20 (FUN_005DCC20, Moho::InstanceCounter<Moho::CAcquireTargetTask>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for acquire-target
-   * task instance counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  StatItem* InstanceCounter<CAcquireTargetTask>::GetStatItem()
-  {
-    static StatItem* sEngineStat_InstanceCounts_CAcquireTargetTask = nullptr;
-    if (sEngineStat_InstanceCounts_CAcquireTargetTask) {
-      return sEngineStat_InstanceCounts_CAcquireTargetTask;
-    }
-
-    const std::string statName = BuildInstanceCounterStatPath(typeid(CAcquireTargetTask).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sEngineStat_InstanceCounts_CAcquireTargetTask = engineStats->GetItem(statName.c_str(), true);
-    return sEngineStat_InstanceCounts_CAcquireTargetTask;
-  }
-
-  /**
    * Address: 0x005D8A20 (FUN_005D8A20, ??0CAcquireTargetTask@Moho@@QAE@@Z)
    *
    * What it does:
@@ -369,7 +320,6 @@ namespace moho
     , mTargetCooldown(0)
     , mUpdateAttackerState(0u)
   {
-    AddStatCounter(InstanceCounter<CAcquireTargetTask>::GetStatItem(), 1);
     // Both listener bases arrive with an empty weak-link chain already:
     // `ManyToOneListener<TEvent>`'s constructor (0x005D88F0 / 0x005D8930) clears
     // `weakLinkHead_`, and MSVC emits those two base constructions ahead of this
@@ -388,7 +338,6 @@ namespace moho
    */
   CAcquireTargetTask::~CAcquireTargetTask()
   {
-    AddStatCounter(InstanceCounter<CAcquireTargetTask>::GetStatItem(), -1);
     static_cast<ManyToOneListener_ECollisionBeamEvent&>(*this).DetachAllWeakReferences();
     static_cast<ManyToOneListener_EProjectileImpactEvent&>(*this).DetachAllWeakReferences();
   }

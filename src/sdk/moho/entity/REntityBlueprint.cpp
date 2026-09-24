@@ -108,13 +108,10 @@ namespace moho
   {
     // 0x0051203A calls Moho::RBlueprint::~RBlueprint() -- the base-destructor
     // call the compiler emits because REntityBlueprint derives from
-    // RBlueprint in the binary. This class duplicates that header rather than
-    // inheriting it, so the base destructor never runs, and the one thing it
-    // does that the members do not do for themselves is release the shared
-    // instance count the constructor took through RBlueprint::InitIdentity.
-    // Without this the "Instance Counts_Moho::RBlueprint" stat only ever
-    // climbs -- once per unit, prop and projectile blueprint, every session.
-    BP_AddInstanceCountDelta(-1L);
+    // RBlueprint in the binary. This class repeats that header rather than
+    // inheriting it; the one thing that destructor does which the members do
+    // not do for themselves is give back the RBlueprint instance count, and
+    // the InstanceCounter<RBlueprint> base does that.
   }
 
   namespace

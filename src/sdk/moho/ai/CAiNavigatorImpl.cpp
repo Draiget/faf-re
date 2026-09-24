@@ -117,21 +117,6 @@ namespace
   template <>
   EngineStats* StartupEngineStatsSlot<0x10AEDB0u>::value = nullptr;
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   [[nodiscard]] gpg::RType* CachedIAiNavigatorType()
   {
     if (!IAiNavigator::sType) {
@@ -337,27 +322,6 @@ namespace
 
 gpg::RType* CAiNavigatorImpl::sType = nullptr;
 CScrLuaMetatableFactory<CAiNavigatorImpl> CScrLuaMetatableFactory<CAiNavigatorImpl>::sInstance{};
-
-/**
- * Address: 0x005A7870 (FUN_005A7870, Moho::InstanceCounter<Moho::CAiNavigatorImpl>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CAiNavigatorImpl
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CAiNavigatorImpl>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CAiNavigatorImpl).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
 
 /**
  * Address: 0x005A58E0 (FUN_005A58E0, cfunc_CAiNavigatorImplSetGoalL)
@@ -1344,17 +1308,6 @@ namespace
 
   [[maybe_unused]] CAiNavigatorImplStartupBootstrap gCAiNavigatorImplStartupBootstrap;
 
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
 } // namespace
 
 /**
@@ -1386,12 +1339,7 @@ CAiNavigatorImpl::CAiNavigatorImpl()
   , mIgnoreFormation(0)
   , mPad61{0, 0, 0}
   , mStatus(AINAVSTATUS_Idle)
-{
-  // Increment the CAiNavigatorImpl instance-count stat (binary FUN_005A3550).
-  // The (Unit*) ctor delegates here via `: CAiNavigatorImpl()`, so it inherits
-  // the +1 -- one increment per construction, matching the binary.
-  AddStatCounter(InstanceCounter<CAiNavigatorImpl>::GetStatItem(), 1L);
-}
+{}
 
 /**
  * Address: 0x005A33E0 (FUN_005A33E0, unit ctor)
@@ -1424,11 +1372,9 @@ CAiNavigatorImpl::CAiNavigatorImpl(Unit* const unit)
  */
 CAiNavigatorImpl::~CAiNavigatorImpl()
 {
-  // Decrement the CAiNavigatorImpl instance-count stat (binary FUN_005A37E0).
-  // The base ~IAiNavigator / ~CTask / ~CScriptObject subobject teardowns
-  // (including the Broadcaster<EAiNavigatorEvent> owner-chain unlink) still run
-  // automatically after this body, exactly as they did with `= default`.
-  AddStatCounter(InstanceCounter<CAiNavigatorImpl>::GetStatItem(), -1L);
+  // Everything here is base teardown: InstanceCounter<CAiNavigatorImpl>'s -1,
+  // then ~CScriptObject, ~CTask and ~IAiNavigator (with the
+  // Broadcaster<EAiNavigatorEvent> owner-chain unlink).
 }
 
 /**

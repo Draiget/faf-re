@@ -59,15 +59,6 @@ namespace
     return enabled ? kCollisionBeamDebugColorEnabled : kCollisionBeamDebugColorDisabled;
   }
 
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta)
-  {
-    if (!statItem) {
-      return;
-    }
-
-    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-  }
-
   // The entity's orientation is the quaternion this rotates by, used as it is
   // stored. It used to be spelled out as a four-argument `Quaternion` init,
   // because `Entity::Orientation` was a `moho::Vector4f` naming (x,y,z,w) over
@@ -146,35 +137,6 @@ namespace moho
   // different event type and was likewise a separate hand-written copy.
 
   /**
-   * Address: 0x00675070 (FUN_00675070, Moho::InstanceCounter<Moho::CollisionBeamEntity>::GetStatItem)
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::CollisionBeamEntity>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CollisionBeamEntity).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
-   * Address: 0x006746B0 (FUN_006746B0, constructor instance-counter helper)
-   *
-   * What it does:
-   * Increments `CollisionBeamEntity` instance-count stat and returns input.
-   */
-  void* IncrementCollisionBeamInstanceCounterAndReturn(void* const objectPtr)
-  {
-    AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), 1L);
-    return objectPtr;
-  }
-
-  /**
    * Address: 0x00672F80 (FUN_00672F80, Moho::CollisionBeamEntity::CollisionBeamEntity)
    */
   CollisionBeamEntity::CollisionBeamEntity(const LuaPlus::LuaObject& specObject, UnitWeapon* const launcherWeapon)
@@ -191,9 +153,7 @@ namespace moho
     , mCollisionCheckTickCounter(0)
     , mPad29C_29F{0u, 0u, 0u, 0u}
   {
-    (void)IncrementCollisionBeamInstanceCounterAndReturn(this);
-
-    mCoordNode.ListUnlink();
+    ListUnlink();
     StandardInit(launcherWeapon != nullptr ? launcherWeapon->mSim : nullptr, ReserveCollisionBeamEntityId(launcherWeapon));
 
     mLauncher.ResetFromObject(launcherWeapon);
@@ -219,7 +179,6 @@ namespace moho
     , mCollisionCheckTickCounter(0)
     , mPad29C_29F{0u, 0u, 0u, 0u}
   {
-    AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), 1L);
   }
 
   /**
@@ -229,7 +188,6 @@ namespace moho
   {
     mLauncher.UnlinkFromOwnerChain();
     mEffect.UnlinkFromOwnerChain();
-    AddInstanceCounterDelta(InstanceCounter<CollisionBeamEntity>::GetStatItem(), -1L);
     // `mListener` detaches itself: it is a `WeakPtr` node now, so MSVC emits
     // its unlink after this body, last in reverse declaration order - which is
     // where the binary puts it. The hand-written call that used to close this

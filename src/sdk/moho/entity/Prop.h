@@ -52,7 +52,7 @@ namespace moho
    * - Parent/attach ownership is inherited from `Entity::mAttachInfo`
    *   (`SEntAttachInfo` + `WeakPtr<Entity>` intrusive owner chain).
    */
-  class Prop : public Entity
+  class Prop : public Entity, public InstanceCounter<Prop>
   {
   public:
     static gpg::RType* sType;
@@ -84,8 +84,8 @@ namespace moho
      * What it does:
      * Auto-unregisters this Prop from the EntityDB bounded-reclaim priority
      * queue when registered, releases the reclaim-area occupancy footprint on
-     * the COGrid when tracked, decrements the per-type instance counter, and
-     * then chains to `Entity::~Entity` for base teardown.
+     * the COGrid when tracked; the `InstanceCounter<Prop>` and `Entity` bases'
+     * teardown follows.
      */
     ~Prop() override;
 

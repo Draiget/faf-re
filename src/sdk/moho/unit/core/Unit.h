@@ -744,7 +744,7 @@ namespace moho
    * VFTABLE: 0x00E2A574
    * COL:  0x00E83CA4
    */
-  class Unit : public IUnit, public Entity
+  class Unit : public IUnit, public Entity, public InstanceCounter<Unit>
   {
   public:
     /**

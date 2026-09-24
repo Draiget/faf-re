@@ -18,7 +18,7 @@ namespace moho
    * - Size: 0x20 bytes.
    * - `CAiAttackerImpl*` lane at +0x1C (serializer/runtime evidence).
    */
-  class LAiAttackerImpl : public CTask
+  class LAiAttackerImpl : public CTask, public InstanceCounter<LAiAttackerImpl>
   {
   public:
     /**
@@ -36,7 +36,7 @@ namespace moho
      * Slot: 0
      *
      * What it does:
-     * Decrements the LAiAttackerImpl instance-counter stat and tears down the
+     * Base teardown only: `InstanceCounter<LAiAttackerImpl>`'s -1, then the
      * base `CTask`.
      */
     ~LAiAttackerImpl() override;

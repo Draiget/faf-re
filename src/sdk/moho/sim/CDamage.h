@@ -21,7 +21,7 @@ namespace moho
     CDamage_RING_EFFECT = 2,
   };
 
-  class CDamage : public CScriptObject
+  class CDamage : public CScriptObject, public InstanceCounter<CDamage>
   {
   public:
     static gpg::RType* sType;
@@ -67,8 +67,8 @@ namespace moho
      * Slot: 2
      *
      * What it does:
-     * Unlinks weak links, releases string storage, decrements instance counter,
-     * then runs base `CScriptObject` teardown.
+     * Unlinks weak links and releases string storage, then runs base
+     * teardown (`InstanceCounter<CDamage>`, `CScriptObject`).
      */
     ~CDamage() override;
 

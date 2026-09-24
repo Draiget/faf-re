@@ -73,14 +73,6 @@ namespace
     return sEntityType;
   }
 
-  void AdjustShieldInstanceStat(const long delta)
-  {
-    moho::StatItem* const statItem = moho::InstanceCounter<moho::Shield>::GetStatItem();
-    if (statItem != nullptr) {
-      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-    }
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -170,27 +162,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00776E90 (FUN_00776E90, Moho::InstanceCounter<Moho::Shield>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for Shield instance
-   * counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::Shield>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::Shield).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
    * Address: 0x00776590 (FUN_00776590, ??0Shield@Moho@@QAE@@ZZ)
    *
    * What it does:
@@ -199,9 +170,7 @@ namespace moho
    */
   Shield::Shield(Sim* const sim)
     : Entity(sim, kShieldCollisionBucketFlags)
-  {
-    AdjustShieldInstanceStat(1L);
-  }
+  {}
 
   /**
    * Address: 0x00776490 (FUN_00776490, ??0Shield@Moho@@QAE@@Z)
@@ -220,8 +189,6 @@ namespace moho
                              : BuildShieldFamilySourceBits(kInvalidArmySourceIndex) | 1u)
       )
   {
-    AdjustShieldInstanceStat(1L);
-
     if (SimulationRef != nullptr) {
       SimulationRef->mShields.push_back(this);
     }
@@ -329,13 +296,12 @@ namespace moho
    * Address: 0x00776600 (FUN_00776600, non-deleting dtor core)
    *
    * What it does:
-   * Unlinks this shield from Sim shield-list and decrements the shield
-   * instance-stat lane before base entity teardown.
+   * Unlinks this shield from Sim shield-list; the `InstanceCounter<Shield>`
+   * and `Entity` bases' teardown follows.
    */
   Shield::~Shield()
   {
     UnlinkShieldFromSimList(this);
-    AdjustShieldInstanceStat(-1L);
   }
 
   /**

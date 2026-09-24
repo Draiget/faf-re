@@ -75,33 +75,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   /**
    * The reflected reference is assembled from the userdata HEADER, not read out
    * of its payload. This fork carries the `gpg::RType*` in `Udata::len`, and the
@@ -625,40 +598,15 @@ namespace
 } // namespace
 
 /**
- * Address: 0x004C7DC0 (FUN_004C7DC0, Moho::InstanceCounter<Moho::CScriptObject>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CScriptObject
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CScriptObject>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CScriptObject).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x004C6F70 (??0CScriptObject@Moho@@IAE@XZ)
  *
  * What it does:
- * Initializes weak-link storage and tracks CScriptObject instance count.
+ * Initializes weak-link storage; the `InstanceCounter<CScriptObject>` base
+ * counts the instance.
  */
 CScriptObject::CScriptObject()
 {
   weakLinkHead_ = 0u;
-  AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), 1);
 }
 
 /**
@@ -682,8 +630,9 @@ CScriptObject::CScriptObject(
  * Address: 0x004C7340 (FUN_004C7340, Moho::CScriptObject::~CScriptObject)
  *
  * What it does:
- * Clears Lua `_c_object` back-reference, decrements tracked instance count,
- * and unlinks all intrusive weak-reference nodes owned by this object.
+ * Clears Lua `_c_object` back-reference and unlinks all intrusive
+ * weak-reference nodes owned by this object; the `InstanceCounter` base then
+ * takes the instance count back.
  */
 CScriptObject::~CScriptObject()
 {
@@ -694,7 +643,6 @@ CScriptObject::~CScriptObject()
     }
   }
 
-  AddStatCounter(InstanceCounter<CScriptObject>::GetStatItem(), -1);
   DetachAllWeakReferences();
 }
 

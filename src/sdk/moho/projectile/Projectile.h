@@ -35,7 +35,7 @@ namespace moho
    * Primary projectile runtime entity. Current recovered layout keeps RTTI and
    * serializer-visible lanes while preserving full binary size.
    */
-  class Projectile : public Entity
+  class Projectile : public Entity, public InstanceCounter<Projectile>
   {
   private:
     /**
@@ -107,8 +107,8 @@ namespace moho
      * Address: 0x0069AED0 (FUN_0069AED0, Moho::Projectile::~Projectile)
      *
      * What it does:
-     * Unlinks intrusive weak/broadcaster lanes owned by this projectile and
-     * decrements the projectile instance-counter stat before base teardown.
+     * Unlinks intrusive weak/broadcaster lanes owned by this projectile before
+     * member and base teardown (`InstanceCounter<Projectile>`'s -1 among it).
      */
     ~Projectile() override;
 
@@ -200,9 +200,8 @@ namespace moho
     // mdisp=624 (dumps/rtti_dump_all.hpp:63981), with
     // `InstanceCounter<Projectile>` at mdisp=632 right after it. Modelling it as
     // the first member is layout-identical, because `sizeof(Entity)` is 0x270,
-    // so the base would land exactly here; the distinction is recorded rather
-    // than acted on because flipping it also moves `InstanceCounter<Projectile>`
-    // into the base list, and that one is empty-base-optimised.
+    // so the base would land exactly here. `InstanceCounter<Projectile>` is a
+    // base (declared after `Entity`); it is empty, so it takes no bytes.
     ManyToOneBroadcaster<EProjectileImpactEvent> mImpactEventBroadcaster; // +0x270
 
     /** The entity that fired this projectile, or the parent projectile's launcher for a child. */

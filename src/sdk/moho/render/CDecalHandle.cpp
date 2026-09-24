@@ -100,43 +100,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0077ADC0 (FUN_0077ADC0, Moho::InstanceCounter<Moho::CDecalHandle>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for CDecalHandle
-   * instance counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::CDecalHandle>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CDecalHandle).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
-   * Address: 0x0077A160 (FUN_0077A160)
-   *
-   * What it does:
-   * Atomically increments the CDecalHandle instance-counter stat value lane
-   * and returns one pass-through integer argument unchanged.
-   */
-  [[maybe_unused]] std::int32_t IncrementCDecalHandleStatCounterPassThrough(const std::int32_t passThrough) noexcept
-  {
-    ::InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&InstanceCounter<CDecalHandle>::GetStatItem()->mPrimaryValueBits),
-      1L
-    );
-    return passThrough;
-  }
-
-  /**
    * Address: 0x007788B0 (FUN_007788B0, Moho::CDecalHandle::GetClass)
    */
   gpg::RType* CDecalHandle::StaticGetClass()
@@ -182,13 +145,7 @@ namespace moho
     , mVisibleInFocus(0)
     , mPadD1{0, 0, 0}
     , mCreatedAtTick(0)
-  {
-    // Bump the CDecalHandle instance-count engine stat (binary FUN_007788F0) via
-    // the IncrementCDecalHandleStatCounterPassThrough helper. The recovery had
-    // incremented the write-only InstanceCounter::s_count member (nothing reads
-    // it) instead of the engine stat, leaving the stat at 0 and the helper orphaned.
-    (void)IncrementCDecalHandleStatCounterPassThrough(0);
-  }
+  {}
 
   /**
    * Address: 0x00778980 (FUN_00778980, Moho::CDecalHandle::CDecalHandle)
@@ -214,9 +171,6 @@ namespace moho
     (void)func_CreateCDecalHandleObject(&scriptFactory, state);
     CreateLuaObject(scriptFactory, arg1, arg2, arg3);
 
-    // Bump the CDecalHandle instance-count engine stat (binary FUN_00778980),
-    // as in the default ctor; independent ctor, so it increments too.
-    (void)IncrementCDecalHandleStatCounterPassThrough(0);
     mInfo.mObj = objectId;
   }
 
@@ -336,11 +290,6 @@ namespace moho
   CDecalHandle::~CDecalHandle()
   {
     mListNode.ListUnlink();
-    // Decrement the CDecalHandle instance-count engine stat (binary FUN_00778C10),
-    // matching the ctor increments; the recovery decremented the write-only
-    // s_count member instead of the engine stat.
-    ::InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&InstanceCounter<CDecalHandle>::GetStatItem()->mPrimaryValueBits), -1L);
   }
 
   CDecalHandle* CDecalHandle::FromListNode(CDecalHandleListNode* const node) noexcept

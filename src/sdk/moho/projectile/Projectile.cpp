@@ -139,19 +139,6 @@ namespace
     return out;
   }
 
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   // Pops (and, when not auto-owned, destroys) the top task off the entity's own
   // CTask-subobject owner thread. Mirrors the inline teardown the projectile ctor
   // performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C and
@@ -310,15 +297,11 @@ namespace moho
    *
    * What it does:
    * Constructs one archive-owned projectile shell from simulation owner
-   * context, initializes runtime lanes, and increments the projectile
-   * instance counter stat.
+   * context and initializes runtime lanes.
    */
   Projectile::Projectile(Sim* const sim)
     : Entity(sim, kProjectileCollisionBucketFlags)
   {
-
-    AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), 1L);
-
     mLauncherWeak.ClearLinkState();
     mVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
     mLocalAngularVelocity = Wm3::Vector3f{0.0f, 0.0f, 0.0f};
@@ -425,9 +408,6 @@ namespace moho
         kProjectileCollisionBucketFlags
       )
   {
-
-    AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), 1L);
-
     // Launcher weak link (+0x278): raw splice to the source entity's owner chain
     // head. The binary binds unlinked + head-inserts here (fresh storage, no
     // detach), then re-Sets to the resolved launcher further below.
@@ -632,7 +612,7 @@ namespace moho
     // Splice the coord node into Sim::mCoordEntities at the FRONT: the binary
     // self-inits the node to a singleton then inserts it immediately after the
     // list sentinel (ListLinkAfter unlinks-first, matching that exactly).
-    mCoordNode.ListLinkAfter(&sim->mCoordEntities);
+    ListLinkAfter(&sim->mCoordEntities);
 
     // Scale velocity = Display.MeshScaleVelocity + rand(±Display.MeshScaleVelocityRange).
     {
@@ -762,9 +742,9 @@ namespace moho
    * function here)
    *
    * What it does:
-   * Unlinks intrusive weak/broadcaster lanes owned by this projectile and
-   * decrements the projectile instance-counter stat before member/base
-   * destructors run.
+   * Unlinks intrusive weak/broadcaster lanes owned by this projectile before
+   * member and base destructors run (`InstanceCounter<Projectile>`'s -1 among
+   * them).
    */
   Projectile::~Projectile()
   {
@@ -777,7 +757,6 @@ namespace moho
     mTargetPosData.targetEntity.UnlinkFromOwnerChain();
     mLauncherWeak.UnlinkFromOwnerChain();
 
-    AddInstanceCounterDelta(InstanceCounter<Projectile>::GetStatItem(), -1L);
     // `mImpactEventBroadcaster` detaches itself: it is a `WeakPtr` node now, so
     // MSVC emits its unlink (asm 0x0069E144-0x0069E163) after this body, which
     // is where the binary runs it. The hand-written `UnlinkImpactBroadcaster`
@@ -883,7 +862,7 @@ namespace moho
     // Relink the coord node at the FRONT of the Sim coord list: the binary
     // unlinks then inserts immediately after the sentinel (node.prev=sentinel,
     // node.next=sentinel.next, sentinel.next=node), asm 0x0069BF3B-0069BF5D.
-    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkAfter(&SimulationRef->mCoordEntities);
 
     if (!mTrackTarget) {
       // --- Ballistic integration ---
@@ -1780,27 +1759,6 @@ namespace moho
 
     Projectile* const object = new (std::nothrow) Projectile(ownerSim);
     result->SetUnowned(MakeProjectileRef(object), 0u);
-  }
-
-  /**
-   * Address: 0x0069EDF0 (FUN_0069EDF0, Moho::InstanceCounter<Moho::Projectile>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for Projectile
-   * instance counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::Projectile>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::Projectile).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
   }
 
   /**

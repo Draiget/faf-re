@@ -25,7 +25,7 @@ namespace moho
    * VFTABLE: 0x00E3705C
    * COL: 0x00E90F9C
    */
-  class Shield : public Entity
+  class Shield : public Entity, public InstanceCounter<Shield>
   {
   public:
     static gpg::RType* sPointerType;

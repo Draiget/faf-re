@@ -24,33 +24,6 @@ moho::CTaskStage* moho::sUserStage = nullptr;
 
 namespace
 {
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   gpg::RType* CachedCTaskThreadType()
   {
     gpg::RType* cached = CTaskThread::sType;
@@ -554,31 +527,6 @@ namespace
 } // namespace
 
 /**
- * Address: 0x0040AC80 (FUN_0040AC80, Moho::InstanceCounter<Moho::CTaskThread>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for task-thread
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CTaskThread>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CTaskThread).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x0040CF90 (FUN_0040CF90, Moho::CTaskThread::MemberDeserialize)
  *
  * What it does:
@@ -654,9 +602,26 @@ CTaskThread::CTaskThread(CTaskStage* const stage)
   , mPendingFrames(0)
   , mStaged(false)
 {
-  AddStatCounter(InstanceCounter<CTaskThread>::GetStatItem(), 1);
   ListLinkBefore(&stage->mThreads);
 }
+
+/**
+ * Address: 0x00409580 (FUN_00409580)
+ *
+ * What it does:
+ * Builds a stage-less thread for the serializer's construct callback: the
+ * node links to itself, the `InstanceCounter<CTaskThread>` base counts it,
+ * and the load fills in the rest. Formerly `InitializeTaskThreadStorage`,
+ * which wrote the fields over raw storage and bumped the template's unused
+ * `s_count` instead of the stat.
+ */
+CTaskThread::CTaskThread()
+  : mEventLinkHead(nullptr)
+  , mStage(nullptr)
+  , mTaskTop(nullptr)
+  , mPendingFrames(0)
+  , mStaged(false)
+{}
 
 /**
  * Address: 0x004090E0 (FUN_004090E0, ??1CTaskThread@Moho@@QAE@@Z)
@@ -668,7 +633,6 @@ CTaskThread::CTaskThread(CTaskStage* const stage)
 CTaskThread::~CTaskThread()
 {
   PopTaskStack(this);
-  AddStatCounter(InstanceCounter<CTaskThread>::GetStatItem(), -1);
   ClearTaskEventLinks(this);
   ListUnlink();
 }

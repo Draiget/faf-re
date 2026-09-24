@@ -14,7 +14,7 @@ namespace moho
    * VFTABLE: 0x00E372F4
    * COL: 0x00E91714
    */
-  class CDecalHandle : public CScriptObject
+  class CDecalHandle : public CScriptObject, public InstanceCounter<CDecalHandle>
   {
   public:
     static gpg::RType* sType;

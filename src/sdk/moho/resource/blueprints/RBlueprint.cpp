@@ -84,32 +84,6 @@ namespace
     return &typeInfo->fields_.back();
   }
 
-  void AddRBlueprintInstanceCounterDelta(moho::StatItem* const statItem, const long delta)
-  {
-    if (!statItem) {
-      return;
-    }
-    (void)InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-  }
-
-  /**
-   * Address: 0x0050E060 (FUN_0050E060, Moho::InstanceCounter<Moho::RBlueprint>::InstanceCounter<Moho::RBlueprint>)
-   *
-   * What it does:
-   * Increments the reflected `InstanceCounter<RBlueprint>` stat lane and
-   * returns the incoming base-subobject pointer.
-   */
-  [[maybe_unused]]
-  moho::InstanceCounter<moho::RBlueprint>* ConstructRBlueprintInstanceCounterBaseFromThis(
-    moho::InstanceCounter<moho::RBlueprint>* const self
-  ) noexcept
-  {
-    AddRBlueprintInstanceCounterDelta(moho::InstanceCounter<moho::RBlueprint>::GetStatItem(), 1L);
-    return self;
-  }
-
-
-
   struct SerializerCallbackRuntimeView
   {
     void* vtableLane;            // +0x00
@@ -177,31 +151,6 @@ namespace moho
   gpg::RType* RBlueprint::sPointerType = nullptr;
 
   /**
-   * Address: 0x0050E0C0 (FUN_0050E0C0, Moho::InstanceCounter<Moho::RBlueprint>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for
-   * `RBlueprint` instance counting.
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::RBlueprint>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    if (!engineStats) {
-      return nullptr;
-    }
-
-    const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::RBlueprint).name());
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
    * Address: 0x0050DD60 (FUN_0050DD60)
    * Mangled: ??0RBlueprint@Moho@@QAE@PAVRRuleGameRules@1@ABVRResId@1@@Z
    *
@@ -212,18 +161,13 @@ namespace moho
    *         Moho::RResId const &resId);
    *
    * What it does:
-   * Initializes a base `RBlueprint` from `(rules, resId)`: bumps the
-   * shared `InstanceCounter<RBlueprint>` slot, captures the owning rules,
+   * Initializes a base `RBlueprint` from `(rules, resId)` (the
+   * `InstanceCounter<RBlueprint>` base counts it): captures the owning rules,
    * copies the resource id string into `mBlueprintId` (uses `strlen` of the
    * resource id buffer to honor the original byte-exact behavior),
    * default-initializes `mDescription` and `mSource`, and assigns the next
    * blueprint ordinal from the rules' virtual `AssignNextOrdinal` slot.
    */
-  void BP_AddInstanceCountDelta(const long delta)
-  {
-    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), delta);
-  }
-
   RBlueprint::RBlueprint(RRuleGameRules* const owner, const RResId& resId)
     : mOwner(owner)
     , mBlueprintId()
@@ -241,8 +185,6 @@ namespace moho
     std::int32_t& outOrdinal
   )
   {
-    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), 1L);
-
     // The original ctor reads the source-id buffer with `strlen`, so a string
     // containing embedded null bytes truncates exactly the same way.
     const char* const sourceData = resId.name.c_str();
@@ -257,17 +199,15 @@ namespace moho
    * Mangled: ??1RBlueprint@Moho@@QAE@@Z
    *
    * What it does:
-   * Releases base blueprint string lanes, decrements the shared
-   * `RBlueprint` instance counter slot, and restores the base
-   * `gpg::RObject` vtable lane.
+   * Releases base blueprint string lanes; the `InstanceCounter<RBlueprint>`
+   * base then takes the instance count back and `gpg::RObject` restores its
+   * vtable lane.
    */
   RBlueprint::~RBlueprint()
   {
     mSource.tidy(true, 0U);
     mDescription.tidy(true, 0U);
     mBlueprintId.tidy(true, 0U);
-
-    AddRBlueprintInstanceCounterDelta(InstanceCounter<RBlueprint>::GetStatItem(), -1L);
 
     // The binary ends here by storing the gpg::RObject vtable into the object's
     // first word. That is the inlined base destructor, and the compiler emits it

@@ -1905,7 +1905,7 @@ namespace moho
       if (unit == nullptr) {
         break;
       }
-      unit->mCoordNode.ListLinkAfter(&Simulation->mCoordEntities);
+      unit->ListLinkAfter(&Simulation->mCoordEntities);
       node = CEntityDb::NextAllUnitsNode(node);
     }
   }

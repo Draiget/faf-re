@@ -53,39 +53,6 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
-  std::uint32_t InitializeReservedAndTrackScrDiskWatcherTask() noexcept
-  {
-    AddInstanceCounterDelta(moho::InstanceCounter<moho::ScrDiskWatcherTask>::GetStatItem(), 1);
-    return 0;
-  }
-
   /**
    * Address: 0x004C1370 (FUN_004C1370, gpg::RRef_ScrDiskWatcherTask)
    *
@@ -220,32 +187,11 @@ void moho::register_ScrDiskWatcherTaskTypeInfo()
 gpg::RType* ScrDiskWatcherTask::sType = nullptr;
 
 /**
- * Address: 0x004C1060 (FUN_004C1060, Moho::InstanceCounter<Moho::ScrDiskWatcherTask>::GetStatItem)
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::ScrDiskWatcherTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem != nullptr) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (engineStats == nullptr) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::ScrDiskWatcherTask).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x004C0B60 (FUN_004C0B60, ??0ScrDiskWatcher@Moho@@QAE@@Z)
  */
 ScrDiskWatcherTask::ScrDiskWatcherTask(LuaPlus::LuaState* const luaState)
   : CTask(nullptr, false)
-  , mReserved18(InitializeReservedAndTrackScrDiskWatcherTask())
+  , mReserved18(0)
   , mLuaState(luaState)
   , mListener(nullptr)
 {
@@ -258,7 +204,6 @@ ScrDiskWatcherTask::ScrDiskWatcherTask(LuaPlus::LuaState* const luaState)
  */
 ScrDiskWatcherTask::~ScrDiskWatcherTask()
 {
-  AddInstanceCounterDelta(InstanceCounter<ScrDiskWatcherTask>::GetStatItem(), -1);
 }
 
 /**

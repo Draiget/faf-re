@@ -11,7 +11,7 @@ namespace moho
   class Unit;
   class UnitWeapon;
 
-  class CFireWeaponTask : public CTask
+  class CFireWeaponTask : public CTask, public InstanceCounter<CFireWeaponTask>
   {
   public:
     /**
@@ -35,7 +35,7 @@ namespace moho
      * Address: 0x006D3CF0 (FUN_006D3CF0, non-deleting body)
      *
      * What it does:
-     * Decrements the fire-task instance counter before base-task teardown.
+     * Base teardown only: `InstanceCounter<CFireWeaponTask>`'s -1, then `CTask`.
      */
     ~CFireWeaponTask() override;
 

@@ -25,7 +25,7 @@ namespace moho
    * What it does:
    * Concrete entity motor that keeps one sink-speed lane and exposes script-object behavior.
    */
-  class MotorSinkAway final : public Motor, public CScriptObject
+  class MotorSinkAway final : public Motor, public CScriptObject, public InstanceCounter<MotorSinkAway>
   {
   public:
     static gpg::RType* sType;

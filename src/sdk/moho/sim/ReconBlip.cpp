@@ -185,34 +185,6 @@ namespace
     return 1;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   struct ReflectedObjectDeleter
   {
     gpg::RType::delete_func_t deleteFunc = nullptr;
@@ -455,27 +427,6 @@ namespace
     sReconBlipPointerTypeStorage.~RPointerType<moho::ReconBlip>();
   }
 } // namespace
-
-/**
- * Address: 0x005C5390 (FUN_005C5390, Moho::InstanceCounter<Moho::ReconBlip>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for ReconBlip
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::ReconBlip>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::ReconBlip).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
 
 gpg::RType* ReconBlip::StaticGetClass()
 {
@@ -927,7 +878,6 @@ ReconBlip::ReconBlip(Sim* const sim) :
     mUnitVarDat{},
     mReconDat{}
 {
-  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), 1L);
 }
 
 /**
@@ -1075,7 +1025,6 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
     mUnitVarDat{},
     mReconDat{}
 {
-  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), 1L);
 
   mCreator.ResetFromObject(sourceUnit);
 
@@ -1135,8 +1084,8 @@ ReconBlip::ReconBlip(Unit* const sourceUnit, Sim* const sim, const bool fake) :
  *
  * What it does:
  * Destroys recon-blip-owned per-army state lanes, tears down unit variable/
- * constant payload ownership, unlinks creator weak-reference storage, and
- * decrements the recon-blip instance counter before base destruction.
+ * constant payload ownership and unlinks creator weak-reference storage
+ * before base destruction (`InstanceCounter<ReconBlip>`'s -1 among it).
  */
 ReconBlip::~ReconBlip()
 {
@@ -1152,7 +1101,6 @@ ReconBlip::~ReconBlip()
   mUnitConstDat.mStatsRoot.reset();
   mCreator.UnlinkFromOwnerChain();
 
-  AddInstanceCounterDelta(InstanceCounter<ReconBlip>::GetStatItem(), -1L);
 }
 
 /**
@@ -1291,8 +1239,8 @@ void ReconBlip::Refresh()
 
   // This block inlines Entity::SetPendingTransform's coord-list requeue, which
   // front-inserts (ListLinkAfter, after the sentinel) when the node is singleton.
-  if (SimulationRef && mCoordNode.ListIsSingleton()) {
-    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+  if (SimulationRef && ListIsSingleton()) {
+    ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   const VTransform& sourceTransform = sourceUnit->GetTransform();

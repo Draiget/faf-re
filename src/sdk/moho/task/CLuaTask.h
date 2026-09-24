@@ -29,7 +29,7 @@ namespace moho
   [[nodiscard]]
   msvc8::string SCR_Traceback(LuaPlus::LuaState* state, gpg::StrArg message);
 
-  class CLuaTask : public CTask
+  class CLuaTask : public CTask, public InstanceCounter<CLuaTask>
   {
   public:
     /**

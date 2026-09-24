@@ -73,7 +73,7 @@ namespace moho
 
   static_assert(sizeof(SCommandUnitSet) == 0x28, "moho::SCommandUnitSet size must be 0x28");
 
-  class CUnitCommand : public CScriptObject, public Broadcaster
+  class CUnitCommand : public CScriptObject, public Broadcaster, public InstanceCounter<CUnitCommand>
   {
   public:
     static gpg::RType* sType;

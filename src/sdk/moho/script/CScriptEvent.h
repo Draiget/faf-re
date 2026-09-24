@@ -62,7 +62,7 @@ namespace moho
   class UnitWeapon;
   class UserUnit;
 
-  class CScriptEvent : public CTaskEvent, public CScriptObject
+  class CScriptEvent : public CTaskEvent, public CScriptObject, public InstanceCounter<CScriptEvent>
   {
   public:
     /**

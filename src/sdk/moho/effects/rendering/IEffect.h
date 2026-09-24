@@ -17,7 +17,7 @@ namespace moho
   class Entity;
   struct SEfxCurve;
 
-  class IEffect : public CScriptObject
+  class IEffect : public CScriptObject, public InstanceCounter<IEffect>
   {
   public:
     static gpg::RType* sType;

@@ -115,22 +115,6 @@ namespace moho
 
     using BlueprintMapHeadAllocator = RRuleGameRulesBlueprintNode* (*)();
 
-    [[nodiscard]] std::string BuildInstanceCounterStatPathLocal(const char* const rawTypeName)
-    {
-      std::string path("Instance Counts_");
-      if (!rawTypeName) {
-        return path;
-      }
-
-      for (const char* it = rawTypeName; *it != '\0'; ++it) {
-        if (*it != '_') {
-          path.push_back(*it);
-        }
-      }
-
-      return path;
-    }
-
     [[nodiscard]] int CompareLex(const std::string_view lhs, const std::string_view rhs) noexcept
     {
       const std::size_t common = std::min(lhs.size(), rhs.size());
@@ -991,51 +975,6 @@ namespace moho
 
   } // namespace
 
-  /**
-   * Address: 0x0052CA60 (FUN_0052CA60, Moho::InstanceCounter<Moho::RRuleGameRules>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for
-   * `RRuleGameRules` instance counting.
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::RRuleGameRules>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    if (!engineStats) {
-      return nullptr;
-    }
-
-    const std::string statPath = BuildInstanceCounterStatPathLocal(typeid(moho::RRuleGameRules).name());
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
-   * Address: 0x00529530 (FUN_00529530)
-   *
-   * What it does:
-   * Executes the base-constructor instance-counter increment lane used by
-   * `RRuleGameRules` startup construction.
-   */
-  RRuleGameRules* initialize_RRuleGameRulesCtorCounterLane(RRuleGameRules* const object)
-  {
-    if (object == nullptr) {
-      return nullptr;
-    }
-
-    if (StatItem* const statItem = InstanceCounter<RRuleGameRules>::GetStatItem()) {
-      float one = 1.0f;
-      (void)statItem->AddFloat(&one);
-    }
-    return object;
-  }
-
   // The `owner` handle written below (mCategoryFallback's universe lane and
   // mWordUniverseHandle) is the table's only back-reference to the rules
   // that own it: `ParseEntityCategory` seeds every clause accumulator from
@@ -1147,8 +1086,6 @@ namespace moho
     , mPendingBlueprintReloadNext(nullptr)
     , mPendingBlueprintReloadPrev(nullptr)
   {
-    (void)initialize_RRuleGameRulesCtorCounterLane(this);
-
     // 0x00553... constructs the blueprint watcher in place; it has no default
     // state, which is why it is built here rather than in the member list.
     new (mDiskWatchListenerStorage) CDiskWatchListener("*.bp");
@@ -1297,7 +1234,8 @@ namespace moho
    *
    * What it does:
    * Releases runtime blueprint/category/Lua storage owned by this concrete
-   * rule object and decrements the rule instance counter.
+   * rule object; the `RRuleGameRules` base's `InstanceCounter` then takes
+   * the instance count back.
    */
   RRuleGameRulesImpl::~RRuleGameRulesImpl()
   {
@@ -1348,11 +1286,6 @@ namespace moho
 
     RuleMutexView(*this).~mutex();
     std::destroy_at(&DiskWatchListener());
-
-    if (StatItem* const statItem = InstanceCounter<RRuleGameRules>::GetStatItem()) {
-      float minusOne = -1.0f;
-      (void)statItem->AddFloat(&minusOne);
-    }
   }
 
   /**

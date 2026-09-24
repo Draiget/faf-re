@@ -7,6 +7,8 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/collision/ECollisionShape.h"
+#include "moho/misc/InstanceCounter.h"
+#include "moho/resource/blueprints/RBlueprint.h"
 #include "moho/sim/SFootprint.h"
 
 namespace gpg
@@ -43,7 +45,14 @@ namespace moho
    *   see the field's own doc comment for the full resolution of a
    *   previously-flagged (and now closed) +0x60-vs-+0x64 discrepancy.
    */
-  struct REntityBlueprint : public gpg::RObject
+  /**
+   * The binary derives this from `RBlueprint` (RTTI:
+   * `REntityBlueprint : RBlueprint, gpg::RObject, InstanceCounter<RBlueprint>`).
+   * This tree repeats `RBlueprint`'s fields inline instead, so it names the
+   * base's `InstanceCounter<RBlueprint>` itself: every unit, projectile and
+   * prop blueprint is one more live `RBlueprint`, as it is in the game.
+   */
+  struct REntityBlueprint : public gpg::RObject, public InstanceCounter<RBlueprint>
   {
     // +0x00 is the vtable word. It is a real vptr rather than an opaque pointer
     // field, because the type tests below are virtuals in the binary

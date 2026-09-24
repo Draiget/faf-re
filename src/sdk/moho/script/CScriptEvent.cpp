@@ -54,33 +54,6 @@ namespace
     return *reinterpret_cast<moho::CScriptEventTypeInfo*>(gCScriptEventTypeInfoStorage);
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   /**
    * Address: 0x004CA110 (FUN_004CA110, CScriptEvent startup type-info pre-registration)
    *
@@ -860,36 +833,10 @@ namespace moho
 }
 
 /**
- * Address: 0x004CB2A0 (FUN_004CB2A0, Moho::InstanceCounter<Moho::CScriptEvent>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CScriptEvent
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CScriptEvent>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CScriptEvent).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x004C9420 (FUN_004C9420, ??0CScriptEvent@Moho@@QAE@@Z)
  */
 CScriptEvent::CScriptEvent()
 {
-  AddStatCounter(InstanceCounter<CScriptEvent>::GetStatItem(), 1);
 }
 
 /**
@@ -899,7 +846,6 @@ CScriptEvent::CScriptEvent(const LuaPlus::LuaObject& scriptFactory)
   : CTaskEvent()
   , CScriptObject(scriptFactory, LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
 {
-  AddStatCounter(InstanceCounter<CScriptEvent>::GetStatItem(), 1);
 }
 
 /**
@@ -907,7 +853,6 @@ CScriptEvent::CScriptEvent(const LuaPlus::LuaObject& scriptFactory)
  */
 CScriptEvent::~CScriptEvent()
 {
-  AddStatCounter(InstanceCounter<CScriptEvent>::GetStatItem(), -1);
 }
 
 /**

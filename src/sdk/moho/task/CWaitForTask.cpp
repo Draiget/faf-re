@@ -144,39 +144,7 @@ namespace
     typeInfo->AddBase(baseField);
   }
 
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
 } // namespace
-
-/**
- * Address: 0x004CB460 (FUN_004CB460, Moho::InstanceCounter<Moho::CWaitForTask>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CWaitForTask
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CWaitForTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CWaitForTask).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
 
 /**
  * Address: 0x004CA470 (FUN_004CA470, sub_4CA470)
@@ -186,7 +154,6 @@ CWaitForTask::CWaitForTask()
   , mEventLinkRef{nullptr, nullptr}
   , mEventObject()
 {
-  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), 1L);
 }
 
 /**
@@ -197,7 +164,6 @@ CWaitForTask::CWaitForTask(const LuaPlus::LuaObject& payload)
   , mEventLinkRef{nullptr, nullptr}
   , mEventObject(payload)
 {
-  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), 1L);
 }
 
 /**
@@ -217,12 +183,6 @@ CWaitForTask::~CWaitForTask()
   }
 
   mEventLinkRef.ResetFromObject(nullptr);
-
-  // Decrement the CWaitForTask instance-count stat (binary FUN_004CA5B0). Both
-  // ctors (FUN_004CA470, FUN_004CA520) increment it by 1; the recovered code had
-  // dropped the whole InstanceCounter<CWaitForTask> tracking (GetStatItem defined
-  // but never called), so the stat was never maintained.
-  AddStatCounter(InstanceCounter<CWaitForTask>::GetStatItem(), -1L);
 }
 
 /**

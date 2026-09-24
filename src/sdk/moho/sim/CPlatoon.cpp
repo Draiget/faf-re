@@ -1153,46 +1153,6 @@ namespace moho
   int cfunc_CPlatoonPlatoonCategoryCountAroundPositionL(LuaPlus::LuaState* state);
   int cfunc_CPlatoonPlatoonCategoryCountL(LuaPlus::LuaState* state);
 
-  /**
-   * Address: 0x0072A780 (FUN_0072A780, Moho::InstanceCounter<Moho::CPlatoon>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for CPlatoon instance
-   * counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::CPlatoon>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CPlatoon).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
-   * Address: 0x0072A370 (FUN_0072A370)
-   *
-   * What it does:
-   * Increments the global `CPlatoon` instance-counter stat and returns the
-   * input platoon pointer unchanged.
-   */
-  [[maybe_unused]] CPlatoon* MarkCPlatoonInstanceConstructed(CPlatoon* const platoon)
-  {
-    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
-#else
-      statItem->mPrimaryValueBits += 1;
-#endif
-    }
-    return platoon;
-  }
-
   CScrLuaMetatableFactory<CPlatoon>& CScrLuaMetatableFactory<CPlatoon>::Instance()
   {
     return sInstance;
@@ -1333,15 +1293,7 @@ namespace moho
     , mLuaUnitList()
     , mHasLuaList(0u)
     , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
-  {
-    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
-#else
-      statItem->mPrimaryValueBits += 1;
-#endif
-    }
-  }
+  {}
 
   namespace
   {
@@ -1381,14 +1333,6 @@ namespace moho
     , mHasLuaList(0u)
     , mPad_0x109{0u, 0u, 0u, 0u, 0u, 0u, 0u}
   {
-    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1);
-#else
-      statItem->mPrimaryValueBits += 1;
-#endif
-    }
-
     if (platoonName != nullptr) {
       mName.assign(platoonName);
     }
@@ -1902,14 +1846,6 @@ namespace moho
       DestroyOwnedSquad(*squadIt);
     }
     mSquadList.ResetStorageToInline();
-
-    if (StatItem* const statItem = InstanceCounter<CPlatoon>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-      InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), -1);
-#else
-      statItem->mPrimaryValueBits -= 1;
-#endif
-    }
   }
 
   /**

@@ -24,27 +24,11 @@ namespace moho
 {
   class CFireWeaponTaskTypeInfo;
   void register_CFireWeaponTaskTypeInfo();
-
-  template <>
-  StatItem* InstanceCounter<CFireWeaponTask>::GetStatItem();
 } // namespace moho
 
 namespace
 {
   constexpr std::int32_t kHoldFireState = 1;
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
 
   template <class T>
   gpg::RType* CachedRType()
@@ -165,7 +149,6 @@ namespace moho
 CFireWeaponTask::CFireWeaponTask()
   : CTask(nullptr, false)
 {
-  AddStatCounter(InstanceCounter<CFireWeaponTask>::GetStatItem(), 1);
   mUnit = nullptr;
   mWeapon = nullptr;
   mFireClock = 0;
@@ -181,7 +164,6 @@ CFireWeaponTask::CFireWeaponTask()
 CFireWeaponTask::CFireWeaponTask(UnitWeapon* const weapon)
   : CTask(nullptr, false)
 {
-  AddStatCounter(InstanceCounter<CFireWeaponTask>::GetStatItem(), 1);
   mUnit = weapon ? weapon->mUnit : nullptr;
   mFireClock = 0;
   mWeapon = weapon;
@@ -195,11 +177,10 @@ CFireWeaponTask::CFireWeaponTask(UnitWeapon* const weapon)
  * function here)
  *
  * What it does:
- * Decrements the fire-task instance counter before base-task teardown.
+ * Base teardown only: `InstanceCounter<CFireWeaponTask>`'s -1, then `CTask`.
  */
 CFireWeaponTask::~CFireWeaponTask()
 {
-  AddStatCounter(InstanceCounter<CFireWeaponTask>::GetStatItem(), -1);
 }
 
 /**
@@ -316,38 +297,6 @@ void CFireWeaponTask::MemberSerialize(
   archive->WriteInt(task->mFireClock);
 }
 } // namespace moho
-
-/**
- * Address: 0x006DC240 (FUN_006DC240, Moho::InstanceCounter<Moho::CFireWeaponTask>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for fire-task instance
- * counting.
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CFireWeaponTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  std::string statPath("Instance Counts_");
-  const char* const rawTypeName = typeid(moho::CFireWeaponTask).name();
-  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
-    if (*it != '_') {
-      statPath.push_back(*it);
-    }
-  }
-
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
 
 namespace
 {

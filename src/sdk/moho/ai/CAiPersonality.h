@@ -29,7 +29,7 @@ namespace moho
    * VFTABLE: 0x00E1CA14
    * COL:  0x00E72C7C
    */
-  class CAiPersonality : public CScriptObject
+  class CAiPersonality : public CScriptObject, public InstanceCounter<CAiPersonality>
   {
   public:
     /**
@@ -37,8 +37,8 @@ namespace moho
      *
      * What it does:
      * Parameterless (no-Sim) constructor used by the reflection construct
-     * callback. Runs the default `CScriptObject()` base ctor, bumps the
-     * per-type instance counter, and empty/zero-inits every member (empty
+     * callback. Runs the default `CScriptObject()` and
+     * `InstanceCounter<CAiPersonality>` base ctors and empty/zero-inits every member (empty
      * name/chat strings, all profile ranges 0, empty favourite lists).
      */
     CAiPersonality();

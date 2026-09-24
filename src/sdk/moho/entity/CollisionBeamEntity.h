@@ -25,7 +25,7 @@ namespace moho
   class Sim;
   class UnitWeapon;
 
-  class CollisionBeamEntity : public Entity
+  class CollisionBeamEntity : public Entity, public InstanceCounter<CollisionBeamEntity>
   {
   public:
     static gpg::RType* sType;

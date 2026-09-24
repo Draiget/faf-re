@@ -58,6 +58,16 @@ namespace moho
     CTaskThread(CTaskStage* stage);
 
     /**
+     * Address: 0x00409580 (FUN_00409580)
+     *
+     * What it does:
+     * Stage-less thread for the serializer's construct callback (0x004094F0),
+     * which the load then fills in: self-linked node, no event links, the
+     * `InstanceCounter<CTaskThread>` +1, every other field zero.
+     */
+    CTaskThread();
+
+    /**
      * Address: 0x0040C5F0 (FUN_0040C5F0, Moho::CTaskThread::GetPointerType)
      *
      * What it does:

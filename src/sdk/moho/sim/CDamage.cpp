@@ -80,26 +80,6 @@ namespace
   }
 
   /**
-   * Address: 0x00739B00 (FUN_00739B00)
-   *
-   * What it does:
-   * Atomically increments the `CDamage` instance stat lane and returns the
-   * original caller payload pointer unchanged.
-   */
-  [[maybe_unused]] [[nodiscard]] void* IncrementCDamageInstanceCounterAndReturnPayload(void* const payload) noexcept
-  {
-#if defined(_WIN32)
-    (void)::InterlockedExchangeAdd(
-      reinterpret_cast<volatile long*>(&moho::InstanceCounter<moho::CDamage>::GetStatItem()->mPrimaryValueBits),
-      1L
-    );
-#else
-    ++moho::InstanceCounter<moho::CDamage>::GetStatItem()->mPrimaryValueBits;
-#endif
-    return payload;
-  }
-
-  /**
    * Address: 0x00739B30 (FUN_00739B30)
    *
    * What it does:
@@ -144,19 +124,6 @@ namespace
       cached = gpg::LookupRType(typeid(moho::SMinMax<float>));
     }
     return cached;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
   }
 
   [[nodiscard]] LuaPlus::LuaObject CreateDamageLuaFactoryObject(moho::Sim* const sim)
@@ -283,27 +250,6 @@ namespace moho
   gpg::RType* CDamage::sType = nullptr;
 
   /**
-   * Address: 0x0064C080 (FUN_0064C080, Moho::InstanceCounter<Moho::CDamage>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for CDamage instance
-   * counting (`Instance Counts_<type-name-without-underscores>`).
-   */
-  template <>
-  StatItem* InstanceCounter<CDamage>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::CDamage).name());
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
    * Address: 0x00736C40 (FUN_00736C40, ??0CDamage@Moho@@QAE@CDamage@Z)
    *
    * What it does:
@@ -313,8 +259,6 @@ namespace moho
   CDamage::CDamage(const CDamage& other)
     : CScriptObject()
   {
-    AddStatCounter(InstanceCounter<CDamage>::GetStatItem(), 1);
-
     mMethod = other.mMethod;
     mInstigator.ResetFromOwnerLinkSlot(other.mInstigator.ownerLinkSlot);
     mTarget.ResetFromOwnerLinkSlot(other.mTarget.ownerLinkSlot);
@@ -339,7 +283,6 @@ namespace moho
   CDamage::CDamage(Sim* const sim)
     : CScriptObject(CreateDamageLuaFactoryObject(sim), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
   {
-    AddStatCounter(InstanceCounter<CDamage>::GetStatItem(), 1);
 
     mRadius = 0.0f;
     mMaxRadius = 0.0f;
@@ -357,15 +300,14 @@ namespace moho
    * Deleting destructor thunk: 0x00736D50 (FUN_00736D50, Moho::CDamage::dtr)
    *
    * What it does:
-   * Releases string storage, unlinks weak lanes, and decrements CDamage
-   * instance stats before base teardown.
+   * Releases string storage and unlinks weak lanes before base teardown
+   * (`InstanceCounter<CDamage>`'s -1, then `CScriptObject`).
    */
   CDamage::~CDamage()
   {
     mType.tidy(true, 0u);
     mTarget.ResetFromObject(nullptr);
     mInstigator.ResetFromObject(nullptr);
-    AddStatCounter(InstanceCounter<CDamage>::GetStatItem(), -1);
   }
 
   /**

@@ -33,21 +33,6 @@ using namespace moho;
 namespace
 {
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   [[nodiscard]] gpg::RType* ResolveTaskType()
   {
     if (!CTask::sType) {
@@ -931,40 +916,8 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
 
 gpg::RType* CAiSteeringImpl::sType = nullptr;
 
-/**
- * Address: 0x005D3F20 (FUN_005D3F20, Moho::InstanceCounter<Moho::CAiSteeringImpl>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CAiSteeringImpl
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CAiSteeringImpl>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CAiSteeringImpl).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
 namespace
 {
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
 } // namespace
 
 /**
@@ -989,11 +942,6 @@ CAiSteeringImpl::CAiSteeringImpl()
   , mPausedForStateTransition(0)
   , mPadA1{0, 0, 0}
 {
-  // Increment the CAiSteeringImpl instance-count stat (binary FUN_005D2670).
-  // Placed on this root ctor only: the (Unit*,CUnitMotion*,ELayer) ctor delegates
-  // here via `: CAiSteeringImpl()`, so it inherits the +1 -- matching the binary's
-  // one increment per construction (FUN_005D2790 also increments exactly once).
-  AddStatCounter(InstanceCounter<CAiSteeringImpl>::GetStatItem(), 1L);
   ResetCollisionInfo(mCollisionInfo);
 }
 
@@ -1035,9 +983,6 @@ CAiSteeringImpl::~CAiSteeringImpl()
     mPath = nullptr;
   }
   ResetCollisionInfo(mCollisionInfo);
-
-  // Decrement the CAiSteeringImpl instance-count stat (binary FUN_005D2920).
-  AddStatCounter(InstanceCounter<CAiSteeringImpl>::GetStatItem(), -1L);
 }
 
 /**

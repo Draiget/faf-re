@@ -161,18 +161,6 @@ namespace
     return moho::CScrLuaMetatableFactory<moho::MotorSinkAway>::Instance().Get(state);
   }
 
-  void AddInstanceCounterDelta(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   template <class TObject>
   [[nodiscard]] gpg::RRef MakeDerivedRef(TObject* const object, gpg::RType* const baseType)
   {
@@ -299,7 +287,6 @@ namespace moho
     , CScriptObject()
     , mSinkDeltaY(0.0f)
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), 1);
   }
 
   /**
@@ -310,7 +297,6 @@ namespace moho
     , CScriptObject(GetMotorSinkAwayLuaFactoryObject(state), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
     , mSinkDeltaY(sinkDeltaY)
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), 1);
   }
 
   /**
@@ -319,7 +305,6 @@ namespace moho
    */
   MotorSinkAway::~MotorSinkAway()
   {
-    AddInstanceCounterDelta(InstanceCounter<MotorSinkAway>::GetStatItem(), -1);
   }
 
   /**
@@ -586,68 +571,6 @@ namespace gpg
     return out;
   }
 } // namespace gpg
-
-namespace
-{
-  /**
-   * Address: 0x00696BD0 (FUN_00696BD0)
-   *
-   * What it does:
-   * Increments the `MotorSinkAway` instance-counter lane and returns the
-   * caller-provided passthrough value.
-   */
-  [[maybe_unused]] void* IncrementMotorSinkAwayInstanceCounterPassThrough(void* const value) noexcept
-  {
-    AddInstanceCounterDelta(moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem(), 1);
-    return value;
-  }
-
-  /**
-   * Address: 0x00696BF0 (FUN_00696BF0)
-   *
-   * What it does:
-   * Decrements the `MotorSinkAway` instance-counter lane and returns the
-   * address of that counter slot.
-   */
-  [[maybe_unused]] volatile std::int32_t* DecrementMotorSinkAwayInstanceCounterAndReturnLane() noexcept
-  {
-    moho::StatItem* const statItem = moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem();
-    if (!statItem) {
-      return nullptr;
-    }
-
-    AddInstanceCounterDelta(statItem, -1);
-    return &statItem->mPrimaryValueBits;
-  }
-} // namespace
-
-/**
- * Address: 0x00696D90 (FUN_00696D90, Moho::InstanceCounter<Moho::MotorSinkAway>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for motor-sink-away
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::MotorSinkAway>::GetStatItem()
-{
-  static moho::StatItem* sEngineStat_InstanceCounts_MotorSinkAway = nullptr;
-  if (sEngineStat_InstanceCounts_MotorSinkAway) {
-    return sEngineStat_InstanceCounts_MotorSinkAway;
-  }
-
-  std::string statPath("Instance Counts_");
-  const char* const rawTypeName = typeid(moho::MotorSinkAway).name();
-  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
-    if (*it != '_') {
-      statPath.push_back(*it);
-    }
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sEngineStat_InstanceCounts_MotorSinkAway = engineStats->GetItem(statPath.c_str(), true);
-  return sEngineStat_InstanceCounts_MotorSinkAway;
-}
 
 namespace
 {

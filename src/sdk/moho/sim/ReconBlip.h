@@ -162,7 +162,7 @@ namespace moho
    * VFTABLE: 0x00E1D824
    * COL:  0x00E743E8
    */
-  class ReconBlip : public Entity
+  class ReconBlip : public Entity, public InstanceCounter<ReconBlip>
   {
   public:
     [[nodiscard]] static gpg::RType* StaticGetClass();
@@ -211,8 +211,8 @@ namespace moho
      *
      * What it does:
      * Destroys per-army recon lanes, releases unit-const/variable payload
-     * ownership, unlinks creator weak-link storage, and decrements the
-     * recon-blip instance counter before base teardown.
+     * ownership and unlinks creator weak-link storage before base teardown
+     * (`InstanceCounter<ReconBlip>`'s -1 among it).
      */
     ~ReconBlip() override;
 

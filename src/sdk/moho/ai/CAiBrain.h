@@ -11,6 +11,7 @@
 #include "moho/ai/SPointVector.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
 #include "moho/lua/CScrLuaBinderFwd.h"
+#include "moho/misc/InstanceCounter.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/serialization/SBuildReserveInfo.h"
 #include "moho/sim/ESquadClass.h"
@@ -79,7 +80,7 @@ namespace moho
    * VFTABLE: 0x00E19900
    * COL:  0x00E6EA10
    */
-  class CAiBrain : public CScriptObject
+  class CAiBrain : public CScriptObject, public InstanceCounter<CAiBrain>
   {
   public:
     /**

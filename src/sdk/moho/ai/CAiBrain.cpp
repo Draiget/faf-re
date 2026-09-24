@@ -422,21 +422,6 @@ namespace
   constexpr std::int32_t kBuildingStateTag = 5;
   std::int32_t gRecoveredCScrLuaMetatableFactoryCAiBrainIndex = 0;
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   struct SAttackVectorGridRow
   {
     std::int32_t mNextColumn = 0;         // +0x00 next cell to record
@@ -2142,27 +2127,6 @@ namespace moho
 gpg::RType* CAiBrain::sType = nullptr;
 
 /**
- * Address: 0x0057EC10 (FUN_0057EC10, Moho::InstanceCounter<Moho::CAiBrain>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CAiBrain instance
- * counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CAiBrain>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CAiBrain).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x00579E40 (FUN_00579E40, default ctor)
  */
 CAiBrain::CAiBrain()
@@ -2179,12 +2143,6 @@ CAiBrain::CAiBrain()
   , mReservedThreadStage(nullptr)
   , mTailWord(0)
 {
-  // Increment the CAiBrain instance-count stat (binary FUN_00579E40). The
-  // (CArmyImpl*) ctor delegates here via `: CAiBrain()`, so it inherits the +1 --
-  // one increment per construction, matching the binary.
-  ::InterlockedExchangeAdd(
-    reinterpret_cast<volatile long*>(&InstanceCounter<CAiBrain>::GetStatItem()->mPrimaryValueBits), 1L);
-
   mCurrentPlan.assign("", 0);
 }
 
@@ -2427,11 +2385,6 @@ CAiBrain::~CAiBrain()
 
   delete mPersonality;
   mPersonality = nullptr;
-
-  // Decrement the CAiBrain instance-count stat (binary FUN_0057A1E0), balancing
-  // the constructor's increment.
-  ::InterlockedExchangeAdd(
-    reinterpret_cast<volatile long*>(&InstanceCounter<CAiBrain>::GetStatItem()->mPrimaryValueBits), -1L);
 }
 
 /**

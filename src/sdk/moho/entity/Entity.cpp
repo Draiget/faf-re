@@ -379,22 +379,6 @@ namespace
     body.mWorldImpulse.z += (deltaX * impulse.y) - (deltaY * impulse.x);
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-
-    return path;
-  }
-
   void AddStatCounter(StatItem* const statItem, const long delta) noexcept
   {
     if (!statItem) {
@@ -1617,31 +1601,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x0067CBC0 (FUN_0067CBC0, Moho::InstanceCounter<Moho::Entity>::GetStatItem)
-   *
-   * What it does:
-   * Lazily resolves and caches the engine stat slot used for
-   * `Entity` instance counting.
-   */
-  template <>
-  moho::StatItem* moho::InstanceCounter<moho::Entity>::GetStatItem()
-  {
-    static moho::StatItem* sStatItem = nullptr;
-    if (sStatItem) {
-      return sStatItem;
-    }
-
-    moho::EngineStats* const engineStats = moho::GetEngineStats();
-    if (!engineStats) {
-      return nullptr;
-    }
-
-    const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::Entity).name());
-    sStatItem = engineStats->GetItem(statPath.c_str(), true);
-    return sStatItem;
-  }
-
-  /**
    * Address: 0x00676C40 (FUN_00676C40)
    *
    * What it does:
@@ -2162,22 +2121,13 @@ namespace moho
     // `Entity::SyncInterface` has grown it past the inline capacity.
     mVarDat.mAuxValueVector.ReleaseDynamicStorage();
 
-    // Decrement the Entity instance-count stat (binary FUN_006785D0 line 73:
-    // _InterlockedExchangeAdd(&InstanceCounter<Entity>::GetStatItem()->mCounter, -1)).
-    // Each Entity constructor increments it by 1; the recovered dtor had dropped
-    // the matching decrement, so the stat leaked upward on every entity teardown.
-    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), -1L);
-
-    // Unlink this entity's coordinate node from Sim::mCoordEntities (binary
-    // FUN_006785D0 lines 75-78, the intrusive splice + self-reset at offset
-    // 0x60/0x64 that follows CTask::~CTask and precedes CollisionShapeBase::Remove).
-    // The Entity constructor links mCoordNode into Sim::mCoordEntities, but
-    // TDatListItem has a trivial destructor (no auto-unlink), so the recovered
-    // dtor dropped the matching removal — leaving a dangling node threaded in the
-    // Sim coordinate-entity ring that corrupts the list the next time the Sim
-    // traverses it after this entity is freed. ListUnlink() on an already-singleton
-    // node is a safe no-op, matching the binary's unconditional unlink.
-    mCoordNode.ListUnlink();
+    // Leave Sim::mCoordEntities (binary FUN_006785D0 lines 75-78: the splice
+    // and self-reset at +0x60/+0x64). The binary runs it as the dirty-list
+    // base's teardown, after InstanceCounter<Entity>'s -1 and ~CTask; our
+    // TDatListItem has no destructor, so the unlink is written here, a little
+    // earlier than the binary does it. Nothing between the two points reads
+    // the list. Without it a freed entity stays threaded on the Sim's ring.
+    ListUnlink();
 
     // The collision shape leaves the grid in ~CollisionShapeBase, which runs
     // after this body and ~CTask -- binary FUN_006785D0 line 79 calls
@@ -2195,14 +2145,10 @@ namespace moho
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
-    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
-
-
-    mCoordNode.ListUnlink();
 
     id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
     BluePrint = nullptr;
@@ -2242,7 +2188,7 @@ namespace moho
     mMotor = nullptr;
 
     if (sim != nullptr) {
-      mCoordNode.ListLinkAfter(&sim->mCoordEntities);
+      ListLinkAfter(&sim->mCoordEntities);
     }
   }
 
@@ -2271,14 +2217,10 @@ namespace moho
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
-    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
-
-
-    mCoordNode.ListUnlink();
 
     id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
     BluePrint = nullptr;
@@ -2330,7 +2272,6 @@ namespace moho
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), collisionBucketFlags)
     , CTask(nullptr, false)
   {
-    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
@@ -2341,9 +2282,6 @@ namespace moho
     LuaPlus::LuaObject arg3{};
     LuaPlus::LuaObject scriptFactory = ResolveBlueprintScriptFactory(sim, blueprint);
     CreateLuaObject(scriptFactory, arg1, arg2, arg3);
-
-
-    mCoordNode.ListUnlink();
 
     id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
     BluePrint = nullptr;
@@ -2401,14 +2339,10 @@ namespace moho
     : CollisionShape<Entity>(ResolveEntityCollisionGrid(sim), 0x800u)
     , CTask(nullptr, false)
   {
-    AddStatCounter(InstanceCounter<Entity>::GetStatItem(), 1L);
     std::memset(pad_01BB, 0, sizeof(pad_01BB));
     std::memset(pad_01ED, 0, sizeof(pad_01ED));
     RealtimeStatsEnabled = 0u;
     std::memset(pad_01F9_01FB, 0, sizeof(pad_01F9_01FB));
-
-
-    mCoordNode.ListUnlink();
 
     id_ = static_cast<EntId>(moho::ToRaw(moho::EEntityIdSentinel::Invalid));
     BluePrint = nullptr;
@@ -2502,7 +2436,7 @@ namespace moho
     RevertCollisionShape();
 
     if (SimulationRef) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -2760,7 +2694,7 @@ namespace moho
     mVarDat.mRequestRefreshUI = 0u;
 
     if (mQueueRelinkBlocked == 0u) {
-      mCoordNode.ListUnlink();
+      ListUnlink();
     }
   }
 
@@ -3253,8 +3187,8 @@ namespace moho
     mPendingTransform = transform;
     mPendingVelocityScale = pendingVelocityScale;
 
-    if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -3616,7 +3550,7 @@ namespace moho
     // Unlink from the current list and re-insert immediately after the Sim
     // coord-dirty list sentinel (front). The binary does this unconditionally,
     // regardless of whether the node was already linked.
-    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -3755,7 +3689,7 @@ namespace moho
     SimulationRef->mDeletionQueue.push_back(this);
     SimulationRef->Logf("Entity 0x%08x queued for delete.\n", static_cast<unsigned int>(id_));
 
-    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -4011,7 +3945,7 @@ namespace moho
    * Stores one draw-scale triple and relinks this entity's coord node before
    * the simulation coord-entities head.
    */
-  TDatListItem<Entity, void>* SetEntityDrawScaleAndRelinkCoordNode(
+  TDatListItem<Entity, EntityDirtyList>* SetEntityDrawScaleAndRelinkCoordNode(
     Entity* const entity,
     const Wm3::Vector3f* const drawScale
   ) noexcept
@@ -4020,14 +3954,8 @@ namespace moho
     entity->mVarDat.mScale.y = drawScale->y;
     entity->mVarDat.mScale.z = drawScale->z;
 
-    TDatListItem<Entity, void>* const node = &entity->mCoordNode;
-    TDatListItem<Entity, void>* const head = &entity->SimulationRef->mCoordEntities;
-    node->ListUnlink();
-    node->mPrev = head->mPrev;
-    node->mNext = head;
-    head->mPrev = node;
-    node->mPrev->mNext = node;
-    return node;
+    entity->ListLinkBefore(&entity->SimulationRef->mCoordEntities);
+    return entity;
   }
 
   /**
@@ -4156,7 +4084,7 @@ namespace moho
 
     mVarDat.mUnderlayTexture = CD3DBatchTexture::FromFile(underlayPath.c_str(), 0u);
 
-    mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
   /**
@@ -4305,8 +4233,8 @@ namespace moho
       mIntelManager->ForceUpdate(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
     }
 
-    if (SimulationRef && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4394,8 +4322,8 @@ namespace moho
   {
     mVizToFocusPlayer = static_cast<std::int32_t>(mode);
     UpdateVisibility();
-    if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef != nullptr && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4410,8 +4338,8 @@ namespace moho
   {
     mVizToEnemies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
-    if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef != nullptr && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4426,8 +4354,8 @@ namespace moho
   {
     mVizToAllies = static_cast<std::int32_t>(mode);
     UpdateVisibility();
-    if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef != nullptr && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 
@@ -4442,8 +4370,8 @@ namespace moho
   {
     mVizToNeutrals = static_cast<std::int32_t>(mode);
     UpdateVisibility();
-    if (SimulationRef != nullptr && mCoordNode.ListIsSingleton()) {
-      mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
+    if (SimulationRef != nullptr && ListIsSingleton()) {
+      ListLinkAfter(&SimulationRef->mCoordEntities);
     }
   }
 

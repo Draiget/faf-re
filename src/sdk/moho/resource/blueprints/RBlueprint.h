@@ -5,6 +5,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
+#include "moho/misc/InstanceCounter.h"
 
 namespace gpg
 {
@@ -29,17 +30,7 @@ namespace moho
    * What it does:
    * Reflection type init for the common blueprint base (`sizeof = 0x60`).
    */
-  /**
-   * Applies one delta to the shared `InstanceCounter<RBlueprint>` stat lane.
-   *
-   * Exposed because `REntityBlueprint` duplicates this class's header
-   * instead of deriving from it, so the base constructor and destructor that
-   * would otherwise pair the count do not run on one. See the call in
-   * `~REntityBlueprint` for the evidence that the binary pairs them.
-   */
-  void BP_AddInstanceCountDelta(long delta);
-
-  struct RBlueprint : public gpg::RObject
+  struct RBlueprint : public gpg::RObject, public InstanceCounter<RBlueprint>
   {
     static gpg::RType* sPointerType;
 
@@ -61,8 +52,8 @@ namespace moho
      *         Moho::RResId const &resId);
      *
      * What it does:
-     * Initializes a base `RBlueprint` from a (rules, resource id) pair: bumps the
-     * shared instance counter, captures the owning `RRuleGameRules` pointer, copies
+     * Initializes a base `RBlueprint` from a (rules, resource id) pair (its
+     * `InstanceCounter` base counts it): captures the owning `RRuleGameRules` pointer, copies
      * the resource id string into `mBlueprintId`, default-initializes the description
      * and source strings, and assigns a unique blueprint ordinal from the rules.
      */
@@ -72,9 +63,11 @@ namespace moho
      * Address: 0x0050DD60 (FUN_0050DD60, the shared body of the base ctor)
      *
      * What it does:
-     * Performs the base-blueprint construction every blueprint receives: counts
-     * the instance, copies the resource id into the id string, and claims the
-     * next blueprint ordinal from the owning rules.
+     * Performs the base-blueprint construction every blueprint receives: copies
+     * the resource id into the id string and claims the next blueprint ordinal
+     * from the owning rules. The instance count is the `InstanceCounter<RBlueprint>`
+     * base's, which a derived blueprint that mirrors this layout inline must
+     * carry itself (`REntityBlueprint` does).
      *
      * Derived blueprints in this tree mirror the base layout inline instead of
      * inheriting it, so they call this on their own fields. That is what the
@@ -90,8 +83,8 @@ namespace moho
      * Mangled: ??1RBlueprint@Moho@@QAE@@Z
      *
      * What it does:
-     * Releases base blueprint string lanes and decrements the shared instance
-     * counter stat slot. The binary closes with a store of the `gpg::RObject`
+     * Releases base blueprint string lanes; the `InstanceCounter<RBlueprint>`
+     * base then takes the count back. The binary closes with a store of the `gpg::RObject`
      * vtable into the object's first word, which is the inlined gpg::RObject
      * base destructor the compiler now emits from the base declaration.
      */

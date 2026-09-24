@@ -12,7 +12,7 @@ namespace moho
   class Unit;
   class Sim;
 
-  class CCommandTask : public CTask
+  class CCommandTask : public CTask, public InstanceCounter<CCommandTask>
   {
   public:
     /**
@@ -23,8 +23,7 @@ namespace moho
      * volatile signed __int32 *__stdcall sub_608E90(Moho::CTask *a1);
      *
      * What it does:
-     * Resets `CCommandTask` vtable, decrements command-task instance counter
-     * bookkeeping, then runs `CTask` teardown.
+     * Base teardown only: `InstanceCounter<CCommandTask>`'s -1, then `CTask`.
      */
     ~CCommandTask() override;
 

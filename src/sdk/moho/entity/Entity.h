@@ -16,6 +16,7 @@
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
 #include "moho/containers/TDatList.h"
+#include "moho/misc/InstanceCounter.h"
 #include "moho/sim/CollisionShape.h"
 #include "SSTIEntityVariableData.h"
 #include "moho/resource/RResId.h"
@@ -458,13 +459,32 @@ namespace moho
   static_assert(sizeof(WeakEntitySetTemplate<Unit>) == 0x28, "WeakEntitySetTemplate<Unit> size must be 0x28");
 
   /**
-   * Bases in declaration order: `CScriptObject`, `CollisionShape<Entity>`,
-   * `CTask`. MSVC lays out bases that carry a vfptr first, so `CTask` lands at
-   * +0x34 and the collision shape at +0x4C, as the RTTI records
-   * (`CollisionShape<Entity>` mdisp 76); destruction runs `~CTask` before the
-   * shape's `Remove`, the order `~Entity` (0x006785D0) shows.
+   * Tag of the Sim's dirty-entity list, `Sim::mCoordEntities`: every entity
+   * whose coordinates changed this tick is threaded on it through its
+   * `TDatListItem<Entity, EntityDirtyList>` base (RTTI
+   * `.?AV?$TDatListItem@VEntity@Moho@@UEntityDirtyList@2@@Moho@@`).
    */
-  class Entity : public CScriptObject, public CollisionShape<Entity>, public CTask
+  struct EntityDirtyList
+  {};
+
+  /**
+   * Bases in declaration order: `CScriptObject`, `CollisionShape<Entity>`,
+   * `TDatListItem<Entity, EntityDirtyList>`, `CTask`, `InstanceCounter<Entity>`.
+   * MSVC lays out bases that carry a vfptr first, so `CTask` lands at +0x34,
+   * then the collision shape at +0x4C, the dirty-list node at +0x60 and the
+   * empty counter at +0x68, as the RTTI records (mdisp 76, 96 and 104).
+   *
+   * The constructors show the same order: 0x006779E0 builds the shape, links
+   * the node to itself, inlines `CTask`'s constructor with its own counter,
+   * then adds one to the Entity count. `~Entity` (0x006785D0) runs it
+   * backwards: the count, `~CTask`, the node's unlink, the shape's `Remove`.
+   * The node and the counter were members until 2026-09-24.
+   */
+  class Entity : public CScriptObject,
+                 public CollisionShape<Entity>,
+                 public TDatListItem<Entity, EntityDirtyList>,
+                 public CTask,
+                 public InstanceCounter<Entity>
   {
     // Primary vftable (38 entries)
   public:
@@ -1296,10 +1316,8 @@ namespace moho
     [[nodiscard]] static const char* LayerToString(const ELayer layer) noexcept;
 
     // Entity data begins after the CScriptObject (+0x00, 0x34), CTask (+0x34,
-    // 0x18) and CollisionShape<Entity> (+0x4C, 0x14) subobjects.
-
-    // 0x60: intrusive node used by Sim::mCoordEntities (+0xA5C in Sim).
-    TDatListItem<Entity, void> mCoordNode;
+    // 0x18), CollisionShape<Entity> (+0x4C, 0x14) and dirty-list node (+0x60,
+    // 0x08) subobjects.
     EntId id_;                     // 0x0068
     REntityBlueprint* BluePrint;   // 0x006C
     std::uint32_t mTickCreated;    // 0x0070
@@ -2561,7 +2579,8 @@ namespace moho
   ENTSCR_GetBonePosition(Entity* entity, LuaPlus::LuaStackObject& boneIdentifier, bool allowNilAndSpecialIndices);
 
   static_assert(sizeof(Entity) == 0x270, "Entity size must be 0x270");
-  static_assert(offsetof(Entity, mCoordNode) == 0x60, "Entity::mCoordNode offset must be 0x60");
+  // id_ sits right behind the 8-byte dirty-list node base, which therefore
+  // starts at 0x60.
   static_assert(offsetof(Entity, id_) == 0x68, "Entity::id_ offset must be 0x68");
   static_assert(offsetof(Entity, BluePrint) == 0x6C, "Entity::BluePrint offset must be 0x6C");
   static_assert(offsetof(Entity, mTickCreated) == 0x70, "Entity::mTickCreated offset must be 0x70");

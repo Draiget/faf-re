@@ -81,33 +81,6 @@ namespace
     return luaContext ? luaContext->stateUserData : nullptr;
   }
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
-
   /**
    * Address: 0x004C99D0 (FUN_004C99D0, CLuaTask startup type-info pre-registration)
    *
@@ -315,31 +288,6 @@ msvc8::string moho::SCR_Traceback(LuaPlus::LuaState* const state, const gpg::Str
 }
 
 /**
- * Address: 0x004CB370 (FUN_004CB370, Moho::InstanceCounter<Moho::CLuaTask>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the stat slot used for CLuaTask instance-count
- * tracking (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CLuaTask>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  if (!engineStats) {
-    return nullptr;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CLuaTask).name());
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x004C9570 (FUN_004C9570, ??0CLuaTask@Moho@@QAE@@Z)
  *
  * What it does:
@@ -353,7 +301,6 @@ CLuaTask::CLuaTask(CTaskThread* const thread, LuaPlus::LuaState** const newState
   , mResumeArgCount(0)
   , mExecuteDestroyedFlag(nullptr)
 {
-  AddStatCounter(InstanceCounter<CLuaTask>::GetStatItem(), 1);
 
   if (newState) {
     *newState = nullptr;
@@ -382,7 +329,6 @@ CLuaTask::~CLuaTask()
     delete mLuaState;
   }
 
-  AddStatCounter(InstanceCounter<CLuaTask>::GetStatItem(), -1);
 }
 
 /**

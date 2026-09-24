@@ -69,29 +69,6 @@ namespace
   }
 
   /**
-   * Address: 0x00409580 (FUN_00409580, sub_409580)
-   *
-   * What it does:
-   * Initializes raw `CTaskThread` storage for serializer-construct path
-   * without binding to a stage list.
-   */
-  [[nodiscard]] moho::CTaskThread* InitializeTaskThreadStorage(moho::CTaskThread* const thread)
-  {
-    thread->mPrev = thread;
-    thread->mNext = thread;
-    thread->mEventLinkHead = nullptr;
-    ++moho::InstanceCounter<moho::CTaskThread>::s_count;
-    thread->mStage = nullptr;
-    thread->mTaskTop = nullptr;
-    thread->mPendingFrames = 0;
-    thread->mStaged = false;
-    thread->mAlignmentPad19[0] = 0;
-    thread->mAlignmentPad19[1] = 0;
-    thread->mAlignmentPad19[2] = 0;
-    return thread;
-  }
-
-  /**
    * Address: 0x004094F0 (FUN_004094F0, sub_4094F0)
    *
    * What it does:
@@ -100,11 +77,7 @@ namespace
    */
   void ConstructTaskThreadForSerializer(gpg::SerConstructResult* const result)
   {
-    void* const storage = ::operator new(sizeof(moho::CTaskThread), std::nothrow);
-    moho::CTaskThread* thread = nullptr;
-    if (storage) {
-      thread = InitializeTaskThreadStorage(static_cast<moho::CTaskThread*>(storage));
-    }
+    moho::CTaskThread* const thread = new moho::CTaskThread();
 
     const gpg::RRef threadRef = MakeTaskThreadRef(thread);
     result->SetUnowned(threadRef, 0u);

@@ -30,7 +30,7 @@ namespace moho
    * Motor implementation that integrates tree sway/fall state and applies
    * a pending entity transform each update.
    */
-  class MotorFallDown final : public Motor, public CScriptObject
+  class MotorFallDown final : public Motor, public CScriptObject, public InstanceCounter<MotorFallDown>
   {
   public:
     static gpg::RType* sType;
@@ -103,12 +103,6 @@ namespace moho
     sizeof(CScrLuaMetatableFactory<MotorFallDown>) == 0x08,
     "CScrLuaMetatableFactory<MotorFallDown> size must be 0x08"
   );
-
-  /**
-   * Address: 0x00695BC0 (FUN_00695BC0, Moho::InstanceCounter<Moho::MotorFallDown>::GetStatItem)
-   */
-  template <>
-  StatItem* InstanceCounter<MotorFallDown>::GetStatItem();
 
   class MotorFallDownTypeInfo final : public gpg::RType
   {

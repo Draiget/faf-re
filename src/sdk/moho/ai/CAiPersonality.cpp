@@ -146,21 +146,6 @@ namespace
   gpg::RType* gStringVectorType = nullptr;
   EngineStats* gRecoveredAiPersonalityStartupStatsSlot = nullptr;
 
-  [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
-  {
-    std::string path("Instance Counts_");
-    if (!rawTypeName) {
-      return path;
-    }
-
-    for (const char* it = rawTypeName; *it != '\0'; ++it) {
-      if (*it != '_') {
-        path.push_back(*it);
-      }
-    }
-    return path;
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     if (moho::CScrLuaInitFormSet* const set = moho::SCR_FindLuaInitFormSet("Sim"); set != nullptr) {
@@ -1821,27 +1806,6 @@ CScrLuaInitForm* moho::func_CAiPersonalityGetChatFrequency_LuaFuncDef()
 }
 
 /**
- * Address: 0x005B93F0 (FUN_005B93F0, Moho::InstanceCounter<Moho::CAiPersonality>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for CAiPersonality
- * instance counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::CAiPersonality>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = BuildInstanceCounterStatPath(typeid(moho::CAiPersonality).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
-/**
  * Address: 0x00BCD6A0 (FUN_00BCD6A0)
  *
  * What it does:
@@ -1884,17 +1848,6 @@ namespace
 
   [[maybe_unused]] CAiPersonalityStartupBootstrap gCAiPersonalityStartupBootstrap;
 
-  void AddStatCounter(moho::StatItem* const statItem, const long delta) noexcept
-  {
-    if (!statItem) {
-      return;
-    }
-#if defined(_WIN32)
-    InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), delta);
-#else
-    statItem->mPrimaryValueBits += static_cast<std::int32_t>(delta);
-#endif
-  }
 } // namespace
 
 /**
@@ -1916,8 +1869,7 @@ LuaPlus::LuaObject CScrLuaMetatableFactory<CAiPersonality>::Create(LuaPlus::LuaS
  * callback. Chains the default `CScriptObject()` base ctor (no Lua metatable),
  * then empty/zero-initializes every member: both name strings default to empty
  * SSO, every `SAiPersonalityRange` is {0, 0}, and both favourite lists are
- * empty. The binary's explicit InstanceCounter bump is modeled the same way as
- * the sibling `CAiPersonality(Sim*)` ctor (elided from source).
+ * empty. The instance-count +1 is the `InstanceCounter<CAiPersonality>` base.
  */
 CAiPersonality::CAiPersonality()
   : mSim(nullptr)
@@ -1954,11 +1906,7 @@ CAiPersonality::CAiPersonality()
   , mTargetSpread{}
   , mQuittingTendency{}
   , mChatFrequency{}
-{
-  // Increment the CAiPersonality instance-count stat (binary FUN_005B6B40); the
-  // recovery had elided it. This ctor is independent of the (Sim*) ctor.
-  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), 1L);
-}
+{}
 
 /**
  * Address: 0x005B6DC0 (FUN_005B6DC0, ctor body)
@@ -2000,10 +1948,6 @@ CAiPersonality::CAiPersonality(Sim* const sim)
   , mChatFrequency{}
   , mDifficulty(kDefaultDifficulty)
 {
-  // Increment the CAiPersonality instance-count stat (binary FUN_005B6DC0);
-  // independent standalone ctor, so it bumps in addition to the default ctor.
-  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), 1L);
-
   if (mSim && mSim->mLuaState) {
     LuaPlus::LuaObject arg1;
     LuaPlus::LuaObject arg2;
@@ -2022,10 +1966,7 @@ CAiPersonality::CAiPersonality(Sim* const sim)
  */
 CAiPersonality::~CAiPersonality()
 {
-  // Decrement the CAiPersonality instance-count stat (binary FUN_005B7120). The
-  // member string/vector and base ~CScriptObject teardowns still run
-  // automatically after this body, exactly as they did with `= default`.
-  AddStatCounter(InstanceCounter<CAiPersonality>::GetStatItem(), -1L);
+  // Member and base teardown only, including InstanceCounter<CAiPersonality>'s -1.
 }
 
 /**

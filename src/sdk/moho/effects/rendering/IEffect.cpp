@@ -11,7 +11,7 @@
 #include "moho/effects/rendering/CEffectManagerImpl.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace moho
@@ -94,20 +94,6 @@ namespace moho
       (void)func_CreateLuaIEffect(&factory, luaState);
       return factory;
     }
-
-    void InitializeEffectManagerNodeAndStats(IEffect& effect)
-    {
-      effect.mManagerListNode.mNext = &effect.mManagerListNode;
-      effect.mManagerListNode.mPrev = &effect.mManagerListNode;
-
-      if (StatItem* const statItem = InstanceCounter<IEffect>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-        (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
-#else
-        statItem->mPrimaryValueBits += 1;
-#endif
-      }
-    }
   } // namespace
 
   /**
@@ -116,8 +102,6 @@ namespace moho
   IEffect::IEffect()
     : CScriptObject()
   {
-    InitializeEffectManagerNodeAndStats(*this);
-
     mManager = nullptr;
     mScriptObjectToken = -1;
   }
@@ -132,30 +116,8 @@ namespace moho
   IEffect::IEffect(CEffectManagerImpl* const manager, const int scriptObjectToken)
     : CScriptObject(BuildEffectLuaFactoryObject(manager), LuaPlus::LuaObject{}, LuaPlus::LuaObject{}, LuaPlus::LuaObject{})
   {
-    InitializeEffectManagerNodeAndStats(*this);
-
     mManager = manager;
     mScriptObjectToken = scriptObjectToken;
-  }
-
-  /**
-   * Address: 0x00659960 (FUN_00659960)
-   *
-   * What it does:
-   * Atomically increments the `IEffect` instance counter stat and returns one
-   * caller-passthrough value unchanged.
-   */
-  [[maybe_unused]] int IncrementIEffectInstanceCounterAndReturnPassthrough(const int passthrough)
-  {
-    if (StatItem* const statItem = InstanceCounter<IEffect>::GetStatItem(); statItem != nullptr) {
-#if defined(_WIN32)
-      (void)::InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&statItem->mPrimaryValueBits), 1L);
-#else
-      statItem->mPrimaryValueBits += 1;
-#endif
-    }
-
-    return passthrough;
   }
 
   /**
@@ -379,34 +341,6 @@ namespace moho
   void IEffect::OnTick()
   {}
 } // namespace moho
-
-/**
- * Address: 0x00657C40 (FUN_00657C40, Moho::InstanceCounter<Moho::IEffect>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for effect instance
- * counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::IEffect>::GetStatItem()
-{
-  static moho::StatItem* sEngineStat_InstanceCounts_IEffect = nullptr;
-  if (sEngineStat_InstanceCounts_IEffect) {
-    return sEngineStat_InstanceCounts_IEffect;
-  }
-
-  std::string statPath("Instance Counts_");
-  const char* const rawTypeName = typeid(moho::IEffect).name();
-  for (const char* it = rawTypeName; it && *it != '\0'; ++it) {
-    if (*it != '_') {
-      statPath.push_back(*it);
-    }
-  }
-
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sEngineStat_InstanceCounts_IEffect = engineStats->GetItem(statPath.c_str(), true);
-  return sEngineStat_InstanceCounts_IEffect;
-}
 
 // Phase-1 pre-registration: run these descriptor registrations ahead of
 // every consumer that calls gpg::LookupRType. See StaticInitPhase.h.

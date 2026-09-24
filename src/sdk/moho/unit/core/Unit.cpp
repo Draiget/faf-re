@@ -2449,27 +2449,6 @@ moho::Unit* moho::SCR_GetUnitOptional(const LuaPlus::LuaObject& unitObject)
   return static_cast<Unit*>(unitRef.mObj);
 }
 
-/**
- * Address: 0x006AEBF0 (FUN_006AEBF0, Moho::InstanceCounter<Moho::Unit>::GetStatItem)
- *
- * What it does:
- * Lazily resolves and caches the engine stat slot used for Unit instance
- * counting (`Instance Counts_<type-name-without-underscores>`).
- */
-template <>
-moho::StatItem* moho::InstanceCounter<moho::Unit>::GetStatItem()
-{
-  static moho::StatItem* sStatItem = nullptr;
-  if (sStatItem) {
-    return sStatItem;
-  }
-
-  const std::string statPath = moho::BuildInstanceCounterStatPath(typeid(moho::Unit).name());
-  moho::EngineStats* const engineStats = moho::GetEngineStats();
-  sStatItem = engineStats->GetItem(statPath.c_str(), true);
-  return sStatItem;
-}
-
 CScrLuaMetatableFactory<Unit> CScrLuaMetatableFactory<Unit>::sInstance{};
 
 CScrLuaMetatableFactory<Unit>::CScrLuaMetatableFactory()
@@ -13290,20 +13269,14 @@ int Unit::MotionTick()
  *
  * What it does:
  * Deserialization-construct constructor (private; invoked only by
- * Unit::MemberConstruct). Constructs the IUnit/Entity bases on `sim`, bumps the
- * live-Unit instance counter, default-constructs the const/variable stat-data
+ * Unit::MemberConstruct). Constructs the IUnit/Entity/InstanceCounter<Unit>
+ * bases on `sim`, default-constructs the const/variable stat-data
  * subobjects, and zero-initializes every runtime lane: AI sidecars, weak-ref
  * slots, the guarded-by list, the armor-multiplier map head, the economy-event
  * list, the info cache, the occupancy rect, and the recon/blip vectors.
  */
 Unit::Unit(Sim* sim) : IUnit(), Entity(sim, ENTITYTYPE_Unit)
 {
-  // The binary bumps the live-instance counter here (between the base ctors and
-  // the stat-data member ctors). Its ordering relative to the member ctors is
-  // unobservable because none of them read the counter.
-  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
-  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), 1L);
-
   // mConstDat is a real member and default-constructs automatically. The
   // variable stat-data subobject at +0x288 is flattened into Unit's field list
   // (see VarDat()), so construct it in place through the typed accessor.
@@ -13443,9 +13416,6 @@ Unit::Unit(const SUnitConstructionParams& params)
       ENTITYTYPE_Unit
     )
 {
-  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
-  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), 1L);
-
   new (&VarDat()) SSTIUnitVariableData();
 
   Sim* const sim = SimulationRef;
@@ -13820,12 +13790,6 @@ Unit::~Unit()
   DestroyUnitExtraStorage(mExtraStorage);
 
   static_cast<IUnit&>(*this).DetachAllWeakReferences();
-
-  // Decrement the Unit instance-count stat (binary FUN_006A6BF0 line ~467). The
-  // constructor bumps it +1; the recovered destructor had dropped the matching
-  // decrement, so the live-Unit stat only grew. Mirror the ctor's inline form.
-  StatItem* const instanceStat = InstanceCounter<Unit>::GetStatItem();
-  InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&instanceStat->mPrimaryValueBits), -1L);
 }
 
 /**
