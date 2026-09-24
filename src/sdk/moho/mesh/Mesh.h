@@ -1241,7 +1241,34 @@ namespace moho
       MeshBatchBucketTree& meshMap
     );
 
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * When the mesh effect reads its skinning palette from the bone palette
+     * texture, writes the bones of every posed instance of every skinned
+     * bucket in `meshes` into it and uploads it once, so every pass that
+     * draws this batch map finds its bones on the GPU already. Called at the
+     * end of `Batch`.
+     */
+    void PrepareBonePalettes();
+
   public:
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Hands the distance fog `WRenViewport::FogOn`/`FogOff` set on the device
+     * to the mesh effect too. A mesh effect compiled with FAF_BONE_TEXTURE
+     * runs shader model 3 pixel shaders, which Direct3D 9 does not fog, so
+     * they apply the same linear fog themselves from these values; any other
+     * mesh effect has no such parameters and this does nothing. `projection`
+     * is what the fog was set up with, null when it is off.
+     */
+    static void SetDistanceFog(
+      bool enabled, const gpg::gal::Matrix* projection, float fogStart, float fogEnd, std::uint32_t fogColor
+    );
+
     /**
      * Address: 0x007E5280 (FUN_007E5280,
      * ?FindOrCreateMesh@MeshRenderer@Moho@@QAE?AV?$shared_ptr@VMesh@Moho@@@boost@@PBVRMeshBlueprint@2@V?$shared_ptr@VMeshMaterial@Moho@@@3@@Z)

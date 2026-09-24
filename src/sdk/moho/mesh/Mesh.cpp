@@ -5177,6 +5177,10 @@ namespace moho
     insectlookupTex.reset();
     ResetLodBatchesForInstanceLinkList(instanceListHead);
     meshes.clear();
+
+    // FAF: the default-pool buffers the hardware batches share go too; a
+    // device reset needs every one of them released.
+    HardwareMeshBatch::ReleaseSharedBuffers();
   }
 
   /**
@@ -5194,6 +5198,9 @@ namespace moho
     ResetLodBatchesForInstanceLinkList(instanceListHead);
     RemoveLinkFromList(&instanceListHead);
     meshes.clear();
+
+    // FAF: see Reset.
+    HardwareMeshBatch::ReleaseSharedBuffers();
   }
 
   /**
@@ -6922,6 +6929,115 @@ namespace moho
       }
     }
     { static int sF = 0; if ((sF++ % 20) == 0) { gpg::Warnf("[PROPFUNNEL] seen=%d lod=%d frustum=%d cam=(%.1f,%.1f,%.1f)", gPropSeen, gPropLod, gPropFrustum, camera.tranform.pos_.x, camera.tranform.pos_.y, camera.tranform.pos_.z); } } // TEMPORARY PROBE (do not commit)
+
+    // FAF: the bones of this map's skinned instances, written once for every
+    // pass that is about to draw it.
+    PrepareBonePalettes();
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Writes the bones of every posed instance of every skinned bucket in
+   * `meshes` into the bone palette texture and uploads it, when the mesh
+   * effect reads its skinning palette from there. Each Batch call starts the
+   * texture over: the draws of the previous map have all been issued by then.
+   */
+  void MeshRenderer::PrepareBonePalettes()
+  {
+    if (!HardwareMeshBatch::UsesBoneTexture()) {
+      return;
+    }
+
+    HardwareMeshBatch::BeginBonePalettes();
+    for (const MeshBatchBucket& bucket : meshes) {
+      // See RecycleBatchBuckets: an empty bucket's LOD may be released.
+      if (bucket.second.empty() || !MeshBatchEntryIsSkinned(bucket)) {
+        continue;
+      }
+
+      // Every LOD batch is a HardwareMeshBatch (BuildHardwareMeshBatchForLod).
+      boost::shared_ptr<MeshBatch> batchHandle;
+      MeshBatchEntryLod(bucket)->GetSkinnedBatch(batchHandle);
+      if (batchHandle) {
+        static_cast<HardwareMeshBatch*>(batchHandle.get())->PrepareBonePalettes(bucket.second);
+      }
+    }
+    HardwareMeshBatch::UploadBonePalettes();
+  }
+
+  namespace
+  {
+    /**
+     * The distance fog parameters of a mesh effect compiled with
+     * FAF_BONE_TEXTURE (see MeshRenderer::SetDistanceFog).
+     */
+    struct DistanceFogShaderVars
+    {
+      ShaderVar params{};
+      ShaderVar color{};
+
+      DistanceFogShaderVars()
+      {
+        RegisterShaderVar("fogParams", &params, "mesh");
+        RegisterShaderVar("fogColor", &color, "mesh");
+      }
+    };
+
+    [[nodiscard]] DistanceFogShaderVars& GetDistanceFogShaderVars()
+    {
+      // Never destroyed: the effect unlinks its shader-vars when it goes,
+      // which may happen after static destruction would have run.
+      static DistanceFogShaderVars* const vars = new DistanceFogShaderVars();
+      return *vars;
+    }
+  } // namespace
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Sets the mesh effect's fog parameters to what the fixed-function linear
+   * table fog computes per pixel from the same values: the fraction of the
+   * pixel's own colour kept is saturate((end - d) / (end - start)), stored
+   * as `end / (end - start)` and `1 / (end - start)` so the shader does one
+   * multiply-add. d is the eye distance when the projection is w-based
+   * (Direct3D's "w-friendly" check, a non-zero _34) and the depth otherwise.
+   * With fog off the parameters keep every pixel's colour.
+   */
+  void MeshRenderer::SetDistanceFog(
+    const bool enabled,
+    const gpg::gal::Matrix* const projection,
+    const float fogStart,
+    const float fogEnd,
+    const std::uint32_t fogColor
+  )
+  {
+    DistanceFogShaderVars& vars = GetDistanceFogShaderVars();
+    if (!vars.params.Exists()) {
+      return;
+    }
+
+    float params[4] = {1.0f, 0.0f, 1.0f, 0.0f};
+    if (enabled) {
+      // A start at or past the end would divide by zero; this turns it into
+      // the step the fog would converge on.
+      constexpr float kMinimumFogRange = 1.0e-4f;
+      const float range = std::max(fogEnd - fogStart, kMinimumFogRange);
+      params[0] = fogEnd / range;
+      params[1] = 1.0f / range;
+      params[2] = (projection == nullptr || projection->r[2].w != 0.0f) ? 1.0f : 0.0f;
+    }
+    SetShaderVarMem(vars.params, 4u, params);
+
+    constexpr float kChannelScale = 1.0f / 255.0f;
+    const float color[3] = {
+      static_cast<float>((fogColor >> 16u) & 0xFFu) * kChannelScale,
+      static_cast<float>((fogColor >> 8u) & 0xFFu) * kChannelScale,
+      static_cast<float>(fogColor & 0xFFu) * kChannelScale,
+    };
+    SetShaderVarMem(vars.color, 3u, color);
   }
 
   /**

@@ -2,14 +2,17 @@
 #include <cstdlib>
 #include "MeshBatch.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <new>
+#include <unordered_map>
+#include <vector>
 
 #include "Mesh.h"
-#include "gpg/core/utils/Logging.h"   // TEMPORARY PROBE (do not commit)
+#include "gpg/core/utils/Logging.h"
 
 #include "moho/animation/CAniPose.h"
 #include "moho/animation/CAniSkel.h"
@@ -21,8 +24,11 @@
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/MeshVertex.h"
+#include "gpg/gal/Texture.hpp"
+#include "gpg/gal/TextureContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/backends/d3d9/EffectTechniqueD3D9.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/backends/d3d9/Float16HardwareVertexFormatterD3D9.hpp"
 #include "gpg/gal/backends/d3d9/IndexBufferD3D9.hpp"
@@ -30,6 +36,7 @@
 #include "gpg/gal/backends/d3d9/VertexFormatD3D9.hpp"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DEffectTechnique.h"
+#include "moho/render/d3d/ShaderVar.h"
 #include "moho/resource/RScmResource.h"
 #include "moho/resource/SScmFile.h"
 
@@ -90,7 +97,11 @@ namespace moho
     }
 
     /**
-     * Writes one instance's slice of the two global GPU skinning palettes.
+     * Writes one instance's bones into a skinning palette: bone `i`'s
+     * translation goes to `transPalette[i * stride]` and its rotation to
+     * `rotPalette[i * stride]`. The shader-constant palettes are two separate
+     * arrays (stride 1); the FAF bone palette texture interleaves the two
+     * (stride 2).
      *
      * Each bone's world placement is the pose's composite transform applied to
      * the skeleton's rest offset (scaled by the instance), and its rotation is
@@ -107,17 +118,16 @@ namespace moho
       const CAniSkel& skeleton,
       const msvc8::vector<std::int32_t>& boneRemapIndices,
       const std::int32_t boneCount,
-      const std::uint8_t paletteBase
+      SkinPaletteEntry* const transPalette,
+      SkinPaletteEntry* const rotPalette,
+      const std::size_t stride
     )
     {
-      SkinPaletteEntry* const transPalette = GetMeshShaderVarTransPalette().mPalette.begin();
-      SkinPaletteEntry* const rotPalette = GetMeshShaderVarRotPalette().mPalette.begin();
-
       const auto poseBoneCount = static_cast<std::uint32_t>(pose.mBones.end() - pose.mBones.begin());
       const float instanceScale = meshInstance.scale.x;
 
       for (std::int32_t boneIndex = 0; boneIndex < boneCount; ++boneIndex) {
-        const auto slot = static_cast<std::size_t>(paletteBase) + static_cast<std::size_t>(boneIndex);
+        const std::size_t slot = static_cast<std::size_t>(boneIndex) * stride;
         const auto remapIndex = static_cast<std::uint32_t>(boneRemapIndices[static_cast<std::size_t>(boneIndex)]);
 
         const CAniPoseBone* const poseBone =
@@ -239,6 +249,334 @@ namespace moho
         }
       }
     }
+
+    /**
+     * The mesh effect's two bone palette texture parameters, which it only
+     * declares when compiled with FAF_BONE_TEXTURE.
+     */
+    struct BoneTextureShaderVars
+    {
+      ShaderVar texture{};
+      ShaderVar size{};
+
+      BoneTextureShaderVars()
+      {
+        RegisterShaderVar("boneTexture", &texture, "mesh");
+        RegisterShaderVar("boneTextureSize", &size, "mesh");
+      }
+    };
+
+    [[nodiscard]] BoneTextureShaderVars& GetBoneTextureShaderVars()
+    {
+      // Never destroyed: the effect unlinks its shader-vars when it goes, and
+      // that may happen after static destruction would have run.
+      static BoneTextureShaderVars* const vars = new BoneTextureShaderVars();
+      return *vars;
+    }
+
+    /**
+     * FAF addition, not in the shipped binary: the skinning palette as a
+     * vertex texture.
+     *
+     * The shipped renderer uploads each draw's bones into the two 80-entry
+     * shader-constant palettes, so a skinned draw instances at most
+     * 80 / bones meshes - four ACUs. When the mesh effect is compiled with
+     * FAF_BONE_TEXTURE it reads the palette from this texture instead. Each
+     * bone is two float4 texels - translation with the instance scale in w,
+     * then the rotation quaternion - packed 512 bones to a 1024-texel row.
+     * Every instance's bones get a place of their own, and its vertex record
+     * carries the first one's index as two bytes (`anim.x` high, `anim.y`
+     * low), so one draw can carry as many instances as fit its vertex stream.
+     *
+     * `MeshRenderer::Batch` writes the bones of every posed instance of every
+     * skinned bucket it has just built and uploads the lot once; the passes
+     * that then draw those buckets (main view, reflection, silhouette, shadow
+     * depth) only look their instances up. An instance nobody prepared is
+     * written on the spot and the texture uploaded again before its draw.
+     * Every upload discards the texture's old contents and resends all of it,
+     * which draws already issued never see.
+     *
+     * Bones [0, 256) always hold the identity: unskinned batches carry their
+     * transform in the vertex record and index the palette with their own
+     * one-byte bone indices from base 0, as the constant path seeds it.
+     */
+    class BonePaletteTexture
+    {
+    public:
+      static constexpr std::uint32_t kWidth = 1024u;
+      static constexpr std::uint32_t kBonesPerRow = kWidth / 2u;
+      static constexpr std::uint32_t kIdentityBones = 256u;
+      /// A base travels as two bytes, so every bone index stays below this.
+      static constexpr std::uint32_t kMaxBones = 0x10000u;
+      static constexpr std::uint32_t kMinRows = 8u;
+      static constexpr std::uint32_t kNoBase = 0xFFFFFFFFu;
+
+      /// Where the instances of one prepared bucket went.
+      struct PreparedBucket
+      {
+        MeshInstance* const* begin;
+        std::size_t count;
+        std::size_t firstBase; // index of the bucket's first instance in mBases
+      };
+
+      BonePaletteTexture()
+      {
+        // An identity bone: no translation, unit scale, identity quaternion.
+        mTexels.assign(2u * kIdentityBones, SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f});
+      }
+
+      /// Keeps only the identity block, for a new set of buckets.
+      void Restart()
+      {
+        mTexels.resize(2u * kIdentityBones);
+        mBases.clear();
+        mPrepared.clear();
+        mDirty = true;
+      }
+
+      /// Reserves `boneCount` bones and returns the first; kNoBase when full.
+      [[nodiscard]] std::uint32_t Allocate(const std::uint32_t boneCount)
+      {
+        const auto base = static_cast<std::uint32_t>(mTexels.size() / 2u);
+        if (boneCount > kMaxBones - base) {
+          return kNoBase;
+        }
+        mTexels.resize(mTexels.size() + 2u * static_cast<std::size_t>(boneCount));
+        mDirty = true;
+        return base;
+      }
+
+      /**
+       * Writes one posed instance's bones, allocating their place; kNoBase
+       * when the texture is full.
+       */
+      [[nodiscard]] std::uint32_t WriteInstance(
+        const MeshInstance& meshInstance,
+        const CAniPose& pose,
+        const CAniSkel& skeleton,
+        const msvc8::vector<std::int32_t>& boneRemapIndices,
+        const std::int32_t boneCount
+      )
+      {
+        const std::uint32_t base = Allocate(static_cast<std::uint32_t>(boneCount));
+        if (base != kNoBase && boneCount > 0) {
+          SkinPaletteEntry* const bones = &mTexels[2u * static_cast<std::size_t>(base)];
+          FillInstanceBonePalettes(meshInstance, pose, skeleton, boneRemapIndices, boneCount, bones, bones + 1, 2u);
+        }
+        return base;
+      }
+
+      /// Records the bases just written for one bucket's instances, in order.
+      void RecordBucket(const msvc8::vector<MeshInstance*>& instances, const std::size_t firstBase)
+      {
+        mPrepared[instances.end()] = PreparedBucket{instances.begin(), instances.size(), firstBase};
+      }
+
+      /// The prepared bucket that ends at `end`, if `MeshRenderer::Batch` prepared it.
+      [[nodiscard]] const PreparedBucket* FindBucket(MeshInstance* const* const end) const
+      {
+        const auto it = mPrepared.find(end);
+        return it != mPrepared.end() ? &it->second : nullptr;
+      }
+
+      [[nodiscard]] std::uint32_t PreparedBase(const PreparedBucket& bucket, MeshInstance* const* const at) const
+      {
+        const auto index = static_cast<std::size_t>(at - bucket.begin);
+        return index < bucket.count ? mBases[bucket.firstBase + index] : kNoBase;
+      }
+
+      /**
+       * Sends the palette to the GPU when it changed since the last upload
+       * (or the texture does not exist yet), growing the texture as needed,
+       * and binds it to the mesh effect.
+       */
+      void Upload()
+      {
+        if (!mDirty && mTexture) {
+          return;
+        }
+
+        const auto bones = static_cast<std::uint32_t>(mTexels.size() / 2u);
+        const std::uint32_t rows = (bones + kBonesPerRow - 1u) / kBonesPerRow;
+        if (!mTexture || rows > mRows) {
+          std::uint32_t height = kMinRows;
+          while (height < rows) {
+            height *= 2u;
+          }
+          CreateTexture(height);
+        }
+
+        const RECT wholeLevel{};
+        const gpg::gal::TextureLockRect lock =
+          mTexture->Lock(0, wholeLevel, static_cast<int>(gpg::gal::MohoD3DLockFlags::Discard));
+        auto* const destination = static_cast<std::uint8_t*>(lock.bits);
+        for (std::uint32_t row = 0; row < rows; ++row) {
+          const std::size_t firstTexel = static_cast<std::size_t>(row) * kWidth;
+          const std::size_t texels = std::min<std::size_t>(kWidth, mTexels.size() - firstTexel);
+          std::memcpy(
+            destination + static_cast<std::size_t>(row) * static_cast<std::size_t>(lock.pitch),
+            &mTexels[firstTexel],
+            texels * sizeof(SkinPaletteEntry)
+          );
+        }
+        (void)mTexture->Unlock(lock);
+        mDirty = false;
+
+        Bind();
+      }
+
+      /**
+       * Drops the texture - a default-pool resource - ahead of a device reset
+       * or shutdown, unbinding it from the effect first: the effect holds a
+       * reference of its own. The next upload recreates it.
+       */
+      void Release()
+      {
+        if (mTexture) {
+          BoneTextureShaderVars& vars = GetBoneTextureShaderVars();
+          if (vars.texture.Exists()) {
+            vars.texture.mEffectVariable->SetTexture(boost::shared_ptr<gpg::gal::Texture>{});
+          }
+        }
+        mTexture.reset();
+        mRows = 0u;
+        Restart();
+      }
+
+      std::vector<std::uint32_t> mBases; // per prepared instance, kNoBase when it had no pose
+
+    private:
+      void CreateTexture(const std::uint32_t rows)
+      {
+        gpg::gal::TextureContext context{};
+        context.source_ = 2u;       // no file data: an empty texture
+        context.usage_ = 2u;        // dynamic, in the default pool
+        context.format_ = gpg::gal::kTextureFormatFloat4;
+        context.mipmapLevels_ = 1u;
+        context.width_ = kWidth;
+        context.height_ = rows;
+        mTexture = gpg::gal::Device::GetInstance()->CreateTexture(&context);
+        mRows = rows;
+        gpg::Logf("Mesh bone palette texture: %ux%u, room for %u bones", kWidth, rows, rows * kBonesPerRow);
+      }
+
+      void Bind()
+      {
+        BoneTextureShaderVars& vars = GetBoneTextureShaderVars();
+        if (vars.texture.Exists()) {
+          vars.texture.mEffectVariable->SetTexture(mTexture);
+        }
+        if (vars.size.Exists()) {
+          const float size[4] = {
+            1.0f / static_cast<float>(kWidth), 1.0f / static_cast<float>(mRows), static_cast<float>(kWidth), 0.0f
+          };
+          vars.size.mEffectVariable->SetVector(size);
+        }
+      }
+
+      std::vector<SkinPaletteEntry> mTexels;
+      std::unordered_map<MeshInstance* const*, PreparedBucket> mPrepared; // keyed by the bucket's end()
+      boost::shared_ptr<gpg::gal::Texture> mTexture;
+      std::uint32_t mRows = 0u;
+      bool mDirty = true;
+    };
+
+    [[nodiscard]] BonePaletteTexture& GetBonePaletteTexture()
+    {
+      // Never destroyed, for the reason GetBoneTextureShaderVars gives.
+      static BonePaletteTexture* const palette = new BonePaletteTexture();
+      return *palette;
+    }
+
+    /**
+     * FAF addition, not in the shipped binary: one dynamic vertex buffer that
+     * every hardware batch appends its per-instance records to.
+     *
+     * The shipped batches each own a dynamic buffer and lock it with DISCARD
+     * for every draw, so a frame renames hundreds of small buffers. Here each
+     * draw's records go in behind the previous draw's with NOOVERWRITE - the
+     * GPU may still be reading what came before, never the new part - and
+     * only a draw that no longer fits discards the buffer and starts again at
+     * its front.
+     */
+    class InstanceRingBuffer
+    {
+    public:
+      static constexpr std::uint32_t kDefaultRecords = 0x4000u;
+
+      /// Copies `count` records of `stride` bytes in and returns the first one's index.
+      [[nodiscard]] std::uint32_t Append(const void* const records, const std::uint32_t count, const std::uint32_t stride)
+      {
+        if (!mBuffer || stride != mStride || count > mCapacity) {
+          std::uint32_t capacity = kDefaultRecords;
+          while (capacity < count) {
+            capacity *= 2u;
+          }
+
+          gpg::gal::VertexBufferContext context;
+          context.vertexCount_ = capacity;
+          context.stride_ = stride;
+          context.type_ = 3U;  // a per-instance stream
+          context.usage_ = 2U; // dynamic
+          mBuffer = gpg::gal::Device::GetInstance()->CreateVertexBuffer(&context);
+          mCapacity = capacity;
+          mStride = stride;
+          mCursor = capacity; // so the first append discards
+        }
+
+        gpg::gal::MohoD3DLockFlags flags = gpg::gal::MohoD3DLockFlags::NoOverwrite;
+        if (count > mCapacity - mCursor) {
+          mCursor = 0u;
+          flags = gpg::gal::MohoD3DLockFlags::Discard;
+        }
+
+        void* const destination = mBuffer->Lock(mCursor * stride, count * stride, flags);
+        std::memcpy(destination, records, static_cast<std::size_t>(count) * stride);
+        mBuffer->Unlock();
+
+        const std::uint32_t first = mCursor;
+        mCursor += count;
+        return first;
+      }
+
+      [[nodiscard]] const boost::shared_ptr<gpg::gal::VertexBuffer>& Buffer() const noexcept
+      {
+        return mBuffer;
+      }
+
+      /// Drops the buffer, a default-pool resource, ahead of a device reset or shutdown.
+      void Release() noexcept
+      {
+        mBuffer.reset();
+        mCapacity = 0u;
+        mStride = 0u;
+        mCursor = 0u;
+      }
+
+    private:
+      boost::shared_ptr<gpg::gal::VertexBuffer> mBuffer;
+      std::uint32_t mCapacity = 0u;
+      std::uint32_t mStride = 0u;
+      std::uint32_t mCursor = 0u;
+    };
+
+    [[nodiscard]] InstanceRingBuffer& GetInstanceRingBuffer()
+    {
+      // Never destroyed, for the reason GetBoneTextureShaderVars gives.
+      static InstanceRingBuffer* const ring = new InstanceRingBuffer();
+      return *ring;
+    }
+
+    /// The ring buffer record FillBatch put the current draw's first instance at.
+    std::uint32_t sDrawFirstInstanceRecord = 0u;
+
+    /**
+     * FAF addition: the single-pass technique a batch's first draw began and
+     * left open, so the batch's further draws only commit their parameter
+     * changes instead of beginning the technique and its pass all over again.
+     * `HardwareMeshBatch::EndBatch` closes it. Batches draw one at a time.
+     */
+    gpg::gal::EffectTechnique* sOpenPassTechnique = nullptr;
   } // namespace
 
   /**
@@ -601,28 +939,24 @@ namespace moho
    * so it can hold `instanceCount` instances, clamped to the batch's
    * max-instances-per-draw budget. No-op when the current budget already covers
    * the request or is already at the cap.
+   *
+   * FAF divergence: the records go to the shared `InstanceRingBuffer`, so only
+   * the CPU scratch mirror grows here and `mDynamicVertexBuffer` stays empty;
+   * and the cap is `InstanceCap`, which lifts the palette's limit when the
+   * bones come from the bone palette texture.
    */
   void HardwareMeshBatch::PrepareBatch(const std::int32_t instanceCount)
   {
-    if (instanceCount <= mActiveInstanceBudget || mActiveInstanceBudget >= mMaxInstancesPerDraw) {
+    const std::int32_t instanceCap = InstanceCap(UsesBoneTexture());
+    if (instanceCount <= mActiveInstanceBudget || mActiveInstanceBudget >= instanceCap) {
       return;
     }
 
-    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-
     // New budget = min(requested, cap).
-    mActiveInstanceBudget = (instanceCount < mMaxInstancesPerDraw) ? instanceCount : mMaxInstancesPerDraw;
+    mActiveInstanceBudget = (instanceCount < instanceCap) ? instanceCount : instanceCap;
 
     gpg::gal::MeshFormatter* const formatter = gpg::gal::GetHardwareVertexFormatter();
-
-    gpg::gal::VertexBufferContext vertexContext;
-    vertexContext.vertexCount_ = static_cast<std::uint32_t>(mActiveInstanceBudget);
-    vertexContext.type_ = 3U;
-    vertexContext.usage_ = 2U;
     const std::uint32_t perInstanceStride = formatter->GetVertexStride(1, 0);
-    vertexContext.stride_ = perInstanceStride;
-
-    mDynamicVertexBuffer = device->CreateVertexBuffer(&vertexContext);
 
     // Reallocate the CPU staging mirror to match the new instance budget.
     if (mScratchVertexData != nullptr) {
@@ -660,6 +994,11 @@ namespace moho
    * the batch's vertex/index counts, then walks every pass of the current effect
    * technique, issuing one DrawIndexedPrimitive per pass between BeginPass/EndPass
    * and wrapped by BeginTechnique/EndTechnique.
+   *
+   * FAF divergence: the per-instance data comes from the shared instance ring
+   * buffer; a single-pass technique stays begun across all the batch's draws
+   * until EndBatch; and with the bone palette texture, bones written for this
+   * draw alone are uploaded before it.
    */
   void HardwareMeshBatch::DrawBatch(const std::int32_t packedCount)
   {
@@ -754,10 +1093,17 @@ namespace moho
       return;
     }
 
+    // FAF: bones FillBatch had to write for this draw alone reach the GPU
+    // first. When MeshRenderer::Batch prepared them all this does nothing.
+    if (UsesBoneTexture()) {
+      GetBonePaletteTexture().Upload();
+    }
+
     // Stream 0: static geometry, drawn once per `packedCount` instances.
     device->SetVertexBuffer(0, mStaticVertexBuffer, packedCount, 0);
-    // Stream 1: per-instance dynamic data, one advance per instance.
-    device->SetVertexBuffer(1, mDynamicVertexBuffer, 1, 0);
+    // Stream 1: per-instance dynamic data, one advance per instance. FAF: read
+    // from the shared ring buffer, where FillBatch appended this draw.
+    device->SetVertexBuffer(1, GetInstanceRingBuffer().Buffer(), 1, static_cast<int>(sDrawFirstInstanceRecord));
 
     gpg::gal::DrawIndexedContext drawContext;
     drawContext.topology_ = gpg::gal::DrawContext::TOPOLOGY_TRIANGLELIST;
@@ -766,7 +1112,26 @@ namespace moho
 
     gpg::gal::EffectTechnique* const technique = effect->mCurrentTechnique.get();
 
+    // FAF: a batch too big for one draw began the technique and its pass anew
+    // for every draw, re-applying every state of the pass each time. A
+    // single-pass technique now stays begun from the batch's first draw to
+    // EndBatch, and the later draws only commit the parameters that changed
+    // since (the skinning palettes). Multi-pass techniques keep the loop below.
+    if (sOpenPassTechnique != nullptr && technique == sOpenPassTechnique) {
+      static_cast<gpg::gal::EffectTechniqueD3D9*>(technique)->CommitChanges();
+      device->DrawIndexedPrimitive(&drawContext);
+      return;
+    }
+
+    constexpr std::int32_t kDeviceTypeD3D10 = 2;
     const int passCount = technique->BeginTechnique();
+    if (passCount == 1 && device->GetDeviceContext()->mDeviceType != kDeviceTypeD3D10) {
+      technique->BeginPass(0);
+      device->DrawIndexedPrimitive(&drawContext);
+      sOpenPassTechnique = technique;
+      return;
+    }
+
     for (int pass = 0; pass < passCount; ++pass) {
       technique->BeginPass(pass);
       device->DrawIndexedPrimitive(&drawContext);
@@ -783,9 +1148,18 @@ namespace moho
    * What it does:
    * End-of-batch hook. The hardware batch has no per-batch teardown work; the
    * binary body is empty.
+   *
+   * FAF divergence: ends the pass and technique DrawBatch left open for the
+   * batch's draws.
    */
   void HardwareMeshBatch::EndBatch()
   {
+    if (sOpenPassTechnique != nullptr) {
+      gpg::gal::EffectTechnique* const technique = sOpenPassTechnique;
+      sOpenPassTechnique = nullptr;
+      technique->EndPass();
+      technique->EndTechnique();
+    }
   }
 
   /**
@@ -824,12 +1198,17 @@ namespace moho
     const bool reflectedOnly
   )
   {
+    // FAF: whether the mesh effect reads the bones from the bone palette
+    // texture instead of the two shader-constant palettes.
+    const bool boneTexture = UsesBoneTexture();
+
     // FAF divergence (see MeshBatch::Initialize): a batch with a zero instance
     // budget cannot draw. Consume the whole run, so MeshBatch::Render's loop
     // ends instead of re-entering here forever, and do it before the palette
     // seed below, which indexes by bone and would write past the palette for a
     // skeleton larger than it.
-    if (mMaxInstancesPerDraw <= 0) {
+    const std::int32_t instanceCap = InstanceCap(boneTexture);
+    if (instanceCap <= 0) {
       current = end;
       return 0;
     }
@@ -843,20 +1222,29 @@ namespace moho
 
     // Seed every bone slot this batch owns with an identity transform, so a
     // batch that packs fewer instances than the palette holds leaves no stale
-    // bones behind.
-    { static int sSeed = 0; if (sSeed < 12) { ++sSeed; gpg::Warnf("[SEEDDIAG] batch=%p boneCount=%d remap=%d paletteSize=%u", static_cast<const void*>(this), mBoneCount, static_cast<int>(mUseBoneRemap), static_cast<unsigned>(transPaletteVar.mPalette.size())); } } // TEMPORARY PROBE (do not commit)
-    for (std::int32_t boneIndex = 0; boneIndex < mBoneCount; ++boneIndex) {
-      transPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
-      rotPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+    // bones behind. (The bone palette texture keeps its own identity block.)
+    if (!boneTexture) {
+      { static int sSeed = 0; if (sSeed < 12) { ++sSeed; gpg::Warnf("[SEEDDIAG] batch=%p boneCount=%d remap=%d paletteSize=%u", static_cast<const void*>(this), mBoneCount, static_cast<int>(mUseBoneRemap), static_cast<unsigned>(transPaletteVar.mPalette.size())); } } // TEMPORARY PROBE (do not commit)
+      for (std::int32_t boneIndex = 0; boneIndex < mBoneCount; ++boneIndex) {
+        transPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+        rotPalette[boneIndex] = SkinPaletteEntry{0.0f, 0.0f, 0.0f, 1.0f};
+      }
     }
 
     // One draw is capped by the dynamic buffer's instance budget; the caller
-    // re-enters for whatever is left over.
+    // re-enters for whatever is left over. FAF: and by the current cap, which
+    // may have shrunk since PrepareBatch sized the budget.
     const std::int32_t remaining = static_cast<std::int32_t>(end - current);
-    const std::int32_t instanceBudget = (remaining < mActiveInstanceBudget) ? remaining : mActiveInstanceBudget;
+    const std::int32_t instanceBudget = std::min({remaining, mActiveInstanceBudget, instanceCap});
     if (instanceBudget == 0) {
       return 0;
     }
+
+    // FAF: the bases MeshRenderer::Batch already wrote this bucket's bones
+    // at, when it did.
+    BonePaletteTexture& bonePalette = GetBonePaletteTexture();
+    const BonePaletteTexture::PreparedBucket* preparedBucket =
+      (boneTexture && mUseBoneRemap != 0) ? bonePalette.FindBucket(end) : nullptr;
 
     // The binary zeroes the staging record once, ahead of the run, and only
     // rewrites the lanes that vary per instance.
@@ -909,7 +1297,34 @@ namespace moho
             static_cast<std::int32_t>(meshInstance->dissolve * kDissolveToByteScale)
           );
 
-          if (mUseBoneRemap != 0) {
+          bool packInstance = true;
+          if (mUseBoneRemap != 0 && boneTexture) {
+            // FAF: skinned, with the bones in the bone palette texture. The
+            // record carries the first bone's index, high byte where the
+            // instance index went; MeshRenderer::Batch usually wrote the bones
+            // already.
+            CopyTransform4x4(&staging.transform, VMatrix4::sIdentity);
+
+            std::uint32_t base = (preparedBucket != nullptr)
+              ? bonePalette.PreparedBase(*preparedBucket, current)
+              : BonePaletteTexture::kNoBase;
+            if (base == BonePaletteTexture::kNoBase) {
+              base = bonePalette.WriteInstance(*meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount);
+            }
+            if (base == BonePaletteTexture::kNoBase) {
+              // The texture is full. Draw what is packed and start the texture
+              // over on the next call - or now, when nothing is packed yet.
+              if (packedCount > 0) {
+                break;
+              }
+              bonePalette.Restart();
+              preparedBucket = nullptr;
+              base = bonePalette.WriteInstance(*meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount);
+            }
+            packInstance = (base != BonePaletteTexture::kNoBase);
+            staging.instanceIndex = static_cast<std::uint8_t>(base >> 8u);
+            staging.bonePaletteBase = static_cast<std::uint8_t>(base & 0xFFu);
+          } else if (mUseBoneRemap != 0) {
             // Skinned: the vertex record carries no transform of its own - every
             // vertex is placed by the bone palette entries filled below.
             staging.bonePaletteBase =
@@ -917,11 +1332,16 @@ namespace moho
             CopyTransform4x4(&staging.transform, VMatrix4::sIdentity);
 
             FillInstanceBonePalettes(
-              *meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount, staging.bonePaletteBase
+              *meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount,
+              transPalette + staging.bonePaletteBase, rotPalette + staging.bonePaletteBase, 1u
             );
           } else {
             // Unskinned: one instance transform, scaled per axis, in the record.
             staging.bonePaletteBase = 0;
+            if (boneTexture) {
+              // FAF: base 0 of the bone palette texture, its identity block.
+              staging.instanceIndex = 0;
+            }
 
             meshInstance->UpdateInterpolatedFields();
 
@@ -933,15 +1353,17 @@ namespace moho
             { static int sI = 0; if (sI < 10) { ++sI; gpg::Warnf("[INSTDIAG] inst=%p pos=(%.2f,%.2f,%.2f) q=(%.3f,%.3f,%.3f,%.3f) scale=(%.3f,%.3f,%.3f) r0=(%.3f,%.3f,%.3f) r3=(%.2f,%.2f,%.2f)", static_cast<const void*>(meshInstance), meshInstance->interpolatedPosition.x, meshInstance->interpolatedPosition.y, meshInstance->interpolatedPosition.z, meshInstance->curOrientation.w, meshInstance->curOrientation.x, meshInstance->curOrientation.y, meshInstance->curOrientation.z, meshInstance->scale.x, meshInstance->scale.y, meshInstance->scale.z, instanceTransform.r[0].x, instanceTransform.r[0].y, instanceTransform.r[0].z, instanceTransform.r[3].x, instanceTransform.r[3].y, instanceTransform.r[3].z); } } // TEMPORARY PROBE (do not commit)
           }
 
-          formatter->WriteFormattedVertex(
-            1,
-            static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset,
-            staging,
-            0
-          );
+          if (packInstance) {
+            formatter->WriteFormattedVertex(
+              1,
+              static_cast<std::uint8_t*>(mScratchVertexData) + scratchOffset,
+              staging,
+              0
+            );
 
-          scratchOffset += instanceStride;
-          ++packedCount;
+            scratchOffset += instanceStride;
+            ++packedCount;
+          }
         }
       }
 
@@ -953,25 +1375,140 @@ namespace moho
 
     // Upload the packed run in one discard lock, then publish both palettes to
     // the mesh effect.
-    const std::uint32_t packedBytes = static_cast<std::uint32_t>(packedCount) * instanceStride;
-    void* const mapped = mDynamicVertexBuffer->Lock(0U, packedBytes, gpg::gal::MohoD3DLockFlags::Discard);
-    std::memcpy(mapped, mScratchVertexData, packedBytes);
-    mDynamicVertexBuffer->Unlock();
-
-    if (transPaletteVar.Exists()) {
-      transPaletteVar.mEffectVariable->SetValue(
-        transPaletteVar.mPalette.begin(),
-        static_cast<std::uint32_t>(transPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+    //
+    // FAF divergence: the run is appended to the shared instance ring buffer
+    // rather than discarding a buffer of this batch's own, and the constant
+    // palettes only go out when the shader reads them.
+    if (packedCount > 0) {
+      sDrawFirstInstanceRecord = GetInstanceRingBuffer().Append(
+        mScratchVertexData, static_cast<std::uint32_t>(packedCount), instanceStride
       );
     }
-    if (rotPaletteVar.Exists()) {
-      rotPaletteVar.mEffectVariable->SetValue(
-        rotPaletteVar.mPalette.begin(),
-        static_cast<std::uint32_t>(rotPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
-      );
+
+    if (!boneTexture) {
+      if (transPaletteVar.Exists()) {
+        transPaletteVar.mEffectVariable->SetValue(
+          transPaletteVar.mPalette.begin(),
+          static_cast<std::uint32_t>(transPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+        );
+      }
+      if (rotPaletteVar.Exists()) {
+        rotPaletteVar.mEffectVariable->SetValue(
+          rotPaletteVar.mPalette.begin(),
+          static_cast<std::uint32_t>(rotPaletteVar.mPalette.size()) * static_cast<std::uint32_t>(sizeof(SkinPaletteEntry))
+        );
+      }
     }
 
     return packedCount;
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * True when the loaded mesh effect declares `boneTexture`, i.e. it was
+   * compiled with FAF_BONE_TEXTURE (see `CD3DEffect::InitEffectFromFile`) and
+   * reads the skinning palette from the bone palette texture.
+   */
+  bool HardwareMeshBatch::UsesBoneTexture()
+  {
+    return GetBoneTextureShaderVars().texture.Exists();
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * How many instances one draw of this batch may carry. That is the budget
+   * `Initialize` derived, except for a skinned batch whose bones come from the
+   * bone palette texture: the 80-bone palette no longer limits it, only the
+   * device's primitive cap (the rule unskinned batches follow) and the ring
+   * buffer's default size.
+   */
+  std::int32_t HardwareMeshBatch::InstanceCap(const bool boneTexture) const
+  {
+    if (mUseBoneRemap == 0 || !boneTexture) {
+      return mMaxInstancesPerDraw;
+    }
+    if (mBoneCount <= 0 || mTriangleCount <= 0) {
+      return 0;
+    }
+
+    const gpg::gal::DeviceContext* const context = gpg::gal::Device::GetInstance()->GetDeviceContext();
+    const std::uint32_t primitiveCap = context->mMaxPrimitiveCount / static_cast<std::uint32_t>(mTriangleCount);
+    return static_cast<std::int32_t>(std::min(primitiveCap, InstanceRingBuffer::kDefaultRecords));
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Starts a new set of bones in the bone palette texture: everything but
+   * its identity block goes. `MeshRenderer::PrepareBonePalettes` calls it
+   * for each batch map it builds.
+   */
+  void HardwareMeshBatch::BeginBonePalettes()
+  {
+    GetBonePaletteTexture().Restart();
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Writes the bones of every posed instance of one skinned bucket into the
+   * bone palette texture and records where each went, in bucket order, so
+   * `FillBatch` finds them by the bucket's end and the instance's position.
+   * Instances without a pose (which `FillBatch` skips) record no base.
+   */
+  void HardwareMeshBatch::PrepareBonePalettes(const msvc8::vector<MeshInstance*>& instances)
+  {
+    if (mBoneCount <= 0 || instances.empty()) {
+      return;
+    }
+
+    BonePaletteTexture& palette = GetBonePaletteTexture();
+    const std::size_t firstBase = palette.mBases.size();
+    for (MeshInstance* const meshInstance : instances) {
+      boost::shared_ptr<CAniPose> pose;
+      CaptureMeshInstanceCurrentPose(&pose, meshInstance);
+      const boost::shared_ptr<const CAniSkel> skeleton =
+        pose.get() != nullptr ? pose->GetSkeleton() : boost::shared_ptr<const CAniSkel>{};
+
+      std::uint32_t base = BonePaletteTexture::kNoBase;
+      if (pose.get() != nullptr && skeleton.get() != nullptr) {
+        base = palette.WriteInstance(*meshInstance, *pose, *skeleton, mBoneRemapIndices, mBoneCount);
+      }
+      palette.mBases.push_back(base);
+    }
+    palette.RecordBucket(instances, firstBase);
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Sends the bones written since the last upload to the GPU.
+   */
+  void HardwareMeshBatch::UploadBonePalettes()
+  {
+    GetBonePaletteTexture().Upload();
+  }
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Releases the two default-pool resources every hardware batch shares -
+   * the bone palette texture and the instance ring buffer - which a device
+   * reset needs gone. Both come back on first use.
+   */
+  void HardwareMeshBatch::ReleaseSharedBuffers()
+  {
+    GetBonePaletteTexture().Release();
+    GetInstanceRingBuffer().Release();
+    sOpenPassTechnique = nullptr;
   }
 
   /**

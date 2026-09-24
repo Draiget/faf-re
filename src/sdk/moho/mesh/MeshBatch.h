@@ -203,7 +203,42 @@ namespace moho
      */
     std::int32_t FillBatch(MeshInstance**& current, MeshInstance** end, bool reflectedOnly) override;
 
+    // --- FAF additions, not in the shipped binary ---------------------------
+    //
+    // The bone palette texture: when the mesh effect is compiled with
+    // FAF_BONE_TEXTURE it reads the skinning palette from a vertex texture
+    // instead of the two 80-entry shader-constant arrays, which lifts the cap
+    // of 80 / bones instances per skinned draw. MeshRenderer::Batch writes
+    // every skinned instance's bones up front; see BonePaletteTexture in
+    // HardwareMeshBatch.cpp.
+
+    /** True when the loaded mesh effect reads its bones from the texture. */
+    [[nodiscard]] static bool UsesBoneTexture();
+
+    /** Empties the texture down to its identity block, for a new batch map. */
+    static void BeginBonePalettes();
+
+    /** Writes the bones of every posed instance of one skinned bucket. */
+    void PrepareBonePalettes(const msvc8::vector<MeshInstance*>& instances);
+
+    /** Sends the bones written since the last upload to the GPU. */
+    static void UploadBonePalettes();
+
+    /**
+     * Releases the default-pool resources all hardware batches share - the
+     * bone palette texture and the per-instance ring buffer - ahead of a
+     * device reset or shutdown. Both are rebuilt on first use.
+     */
+    static void ReleaseSharedBuffers();
+
   private:
+    /**
+     * FAF addition. How many instances one draw may carry: the budget
+     * `Initialize` derived, or, for a skinned batch reading the bone palette
+     * texture, the device's primitive cap.
+     */
+    [[nodiscard]] std::int32_t InstanceCap(bool boneTexture) const;
+
     /**
      * Address: 0x007E7BE0 (FUN_007E7BE0)
      *
@@ -227,6 +262,7 @@ namespace moho
     // +0x54 static (all-instances) GPU vertex buffer built in Initialize.
     boost::shared_ptr<gpg::gal::VertexBuffer> mStaticVertexBuffer;
     // +0x5C dynamic (per-instance) GPU vertex buffer grown by PrepareBatch.
+    // FAF: stays empty; the records go to the shared instance ring buffer.
     boost::shared_ptr<gpg::gal::VertexBuffer> mDynamicVertexBuffer;
     // +0x64 CPU scratch buffer for per-instance vertex staging.
     void* mScratchVertexData = nullptr;

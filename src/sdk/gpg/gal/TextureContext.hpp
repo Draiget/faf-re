@@ -10,6 +10,13 @@
 namespace gpg::gal
 {
   /**
+   * FAF addition: the gal texture format of four 32-bit floats per texel
+   * (`D3DFMT_A32B32G32R32F`, which the D3D9 backend's format table pairs with
+   * 18). The skinning palette texture uses it.
+   */
+  inline constexpr std::uint32_t kTextureFormatFloat4 = 18u;
+
+  /**
    * VFTABLE: 0x00D42190
    * COL:     0x00E50428
    */

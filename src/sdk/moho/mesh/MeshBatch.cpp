@@ -140,10 +140,12 @@ namespace moho
       // cannot make progress on, so `MeshBatch::Render` spins forever, after
       // FillBatch's identity seed has already written past the palette's
       // storage. Shipped meshes top out at 58 bones; mod meshes need not. Such
-      // a batch keeps a zero budget and draws nothing (see FillBatch).
+      // a batch keeps a zero budget and draws nothing (see FillBatch) - unless
+      // the mesh effect reads its bones from the bone palette texture, which
+      // has no such limit (HardwareMeshBatch::InstanceCap).
       constexpr auto kPaletteSlots = static_cast<std::int32_t>(MeshShaderPaletteBuffer::kPaletteCapacity);
       mMaxInstancesPerDraw = (mBoneCount > 0) ? kPaletteSlots / mBoneCount : 0;
-      if (mMaxInstancesPerDraw == 0) {
+      if (mMaxInstancesPerDraw == 0 && !HardwareMeshBatch::UsesBoneTexture()) {
         gpg::Warnf(
           "Mesh \"%s\" has %d skinned bones but the GPU skinning palette holds %d; it will not be drawn.",
           currentResource->mName.c_str(), mBoneCount, kPaletteSlots

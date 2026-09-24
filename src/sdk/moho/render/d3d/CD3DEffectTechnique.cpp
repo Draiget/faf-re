@@ -17,6 +17,8 @@
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
+#include "gpg/gal/TextureContext.hpp"
+#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -46,6 +48,41 @@ namespace moho
     [[nodiscard]] CD3DEffect::Technique& MutableTechnique(const TechniqueSet::iterator it) noexcept
     {
       return const_cast<CD3DEffect::Technique&>(*it);
+    }
+
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Decides whether an effect is compiled with FAF_BONE_TEXTURE, which makes
+     * FAF's mesh.fx read the skinning palette from a vertex texture (see
+     * `HardwareMeshBatch::UsesBoneTexture`). The source has to mention the
+     * macro - any other effect would only gain a second cache file - the
+     * device has to be Direct3D 9 and able to read a float4 texture in a
+     * vertex shader, and /nobonetexture on the command line turns it off.
+     */
+    [[nodiscard]] bool WantsBoneTextureVariant(
+      const gpg::gal::DeviceContext* const deviceContext, const gpg::MemBuffer<const char>& source
+    )
+    {
+      constexpr std::string_view kMacroName = "FAF_BONE_TEXTURE";
+      constexpr std::int32_t kDeviceTypeD3D10 = 2;
+
+      if (deviceContext == nullptr || deviceContext->mDeviceType == kDeviceTypeD3D10) {
+        return false;
+      }
+
+      const char* const text = source.GetPtr(0U, 0U);
+      if (text == nullptr || std::string_view(text, source.Size()).find(kMacroName) == std::string_view::npos) {
+        return false;
+      }
+
+      if (CFG_GetArgOption("/nobonetexture", 0U, nullptr)) {
+        return false;
+      }
+
+      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      return device != nullptr && device->SupportsVertexTextureFormat(gpg::gal::kTextureFormatFloat4);
     }
 
     /**
@@ -422,13 +459,6 @@ namespace moho
       SDiskFileInfo sourceInfo{};
       (void)waitHandleSet->GetFileInfo(mFile.c_str(), &sourceInfo, false);
 
-      const msvc8::string cachePath = cacheDirectory + "/" + mName + "." + engineVersion;
-      SDiskFileInfo cacheInfo{};
-      bool useCachePayload = false;
-      if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
-        useCachePayload = IsDiskFileInfoNotOlder(cacheInfo, sourceInfo);
-      }
-
       const gpg::MemBuffer<const char> effectSourceBuffer = DISK_MemoryMapFile(mFile.c_str());
       const std::size_t compatByteCount = compatStateBuffer.Size();
       const std::size_t effectByteCount = effectSourceBuffer.Size();
@@ -448,9 +478,42 @@ namespace moho
         );
       }
 
-      msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
-      const gpg::gal::EffectContext context(useCachePayload, mFile.c_str(), cachePath.c_str(), mergedBuffer, effectMacros);
-      mEffect = gpg::gal::Effect::Create(context);
+      // Builds the effect, from its compiled copy in the cache when that is at
+      // least as new as the source. FAF: `boneTexture` compiles the variant
+      // with FAF_BONE_TEXTURE defined (see WantsBoneTextureVariant); it turns
+      // into different shaders, so it is cached under a name of its own.
+      const auto createEffect = [&](const bool boneTexture) {
+        const msvc8::string cachePath =
+          cacheDirectory + "/" + mName + (boneTexture ? ".bonetex." : ".") + engineVersion;
+        SDiskFileInfo cacheInfo{};
+        bool useCachePayload = false;
+        if (waitHandleSet->GetFileInfo(cachePath.c_str(), &cacheInfo, false)) {
+          useCachePayload = IsDiskFileInfoNotOlder(cacheInfo, sourceInfo);
+        }
+
+        msvc8::vector<gpg::gal::EffectMacro> effectMacros{};
+        if (boneTexture) {
+          effectMacros.push_back(gpg::gal::EffectMacro("FAF_BONE_TEXTURE", "1"));
+        }
+        const gpg::gal::EffectContext context(
+          useCachePayload, mFile.c_str(), cachePath.c_str(), mergedBuffer, effectMacros
+        );
+        mEffect = gpg::gal::Effect::Create(context);
+      };
+
+      // A bone texture variant that fails to build falls back to the plain
+      // effect, which keeps the skinning palette in shader constants.
+      if (WantsBoneTextureVariant(deviceContext, effectSourceBuffer)) {
+        try {
+          createEffect(true);
+        } catch (const std::exception& exception) {
+          gpg::Warnf("%s: %s; building it without FAF_BONE_TEXTURE", effectFilePath, exception.what());
+          mEffect.reset();
+        }
+      }
+      if (!mEffect) {
+        createEffect(false);
+      }
 
       mTechniques.clear();
 

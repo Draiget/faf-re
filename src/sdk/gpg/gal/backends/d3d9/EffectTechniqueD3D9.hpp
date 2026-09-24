@@ -96,6 +96,16 @@ namespace gpg::gal
         void EndPass() override;
 
         /**
+         * FAF addition, not in the shipped binary.
+         *
+         * What it does:
+         * Sends effect parameters changed since `BeginPass` to the device
+         * (`ID3DXEffect::CommitChanges`), so one begun pass can issue several
+         * draws with different parameter values.
+         */
+        void CommitChanges();
+
+        /**
          * Address: 0x008F4430 (FUN_008F4430)
          * Slot: 6
          *

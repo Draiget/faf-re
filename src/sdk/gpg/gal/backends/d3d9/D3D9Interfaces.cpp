@@ -2320,6 +2320,46 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Asks the adapter whether a vertex shader can sample `textureFormat`. A
+     * vertex texture read needs a 3.0 vertex shader, which Direct3D 9 pairs
+     * only with a 3.0 pixel shader, so both versions are checked. Software
+     * vertex processing is refused outright rather than trusting the
+     * adapter's hardware answer for it.
+     */
+    bool DeviceD3D9::SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+    {
+        if (mDirect3D == nullptr || mDevice == nullptr)
+        {
+            return false;
+        }
+
+        D3DCAPS9 caps{};
+        if (FAILED(mDevice->GetDeviceCaps(&caps)) || caps.VertexShaderVersion < D3DVS_VERSION(3, 0) ||
+            caps.PixelShaderVersion < D3DPS_VERSION(3, 0))
+        {
+            return false;
+        }
+
+        D3DDEVICE_CREATION_PARAMETERS creation{};
+        D3DDISPLAYMODE displayMode{};
+        if (FAILED(mDevice->GetCreationParameters(&creation)) ||
+            (creation.BehaviorFlags & D3DCREATE_SOFTWARE_VERTEXPROCESSING) != 0U ||
+            FAILED(mDirect3D->GetAdapterDisplayMode(creation.AdapterOrdinal, &displayMode)))
+        {
+            return false;
+        }
+
+        const HRESULT result = mDirect3D->CheckDeviceFormat(
+            creation.AdapterOrdinal, creation.DeviceType, displayMode.Format, D3DUSAGE_QUERY_VERTEXTEXTURE,
+            D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(FormatGalToD3D(textureFormat))
+        );
+        return SUCCEEDED(result);
+    }
+
+    /**
      * Address: 0x008F3070 (FUN_008F3070)
      *
      * What it does:
@@ -5004,6 +5044,30 @@ namespace { // TEMPORARY PROBE (do not commit)
         if (result < 0)
         {
             ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 115, result);
+        }
+    }
+
+    /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Commits the effect parameters changed inside the active pass. D3DX only
+     * applies parameters at `BeginPass`, so a caller that sets new values
+     * between draws of one pass has to commit them before each draw. The line
+     * numbers are 0: there is no original source line to cite.
+     */
+    void EffectTechniqueD3D9::CommitChanges()
+    {
+        if (!beginEndActive_)
+        {
+            ThrowGalError("EffectTechniqueD3D9.cpp", 0, "effect technique begin/end mismatch");
+        }
+
+        boost::shared_ptr<EffectD3D9> effect = LockEffectOrThrow(effect_, 0);
+        const HRESULT result = effect->GetDxEffect()->CommitChanges();
+        if (result < 0)
+        {
+            ThrowGalErrorFromHresult("EffectTechniqueD3D9.cpp", 0, result);
         }
     }
 

@@ -4792,16 +4792,20 @@ void moho::WRenViewport::FogOn(const float offsetMultiplier)
   gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
   if (!moho::fog_DistanceFog) {
     device->SetFogState(false, nullptr, 0.0f, 1.0f, 0);
+    // FAF: see below.
+    moho::MeshRenderer::SetDistanceFog(false, nullptr, 0.0f, 1.0f, 0u);
     return;
   }
 
-  device->SetFogState(
-    true,
-    &mCam->projection,
-    fogInfo.mMaxClamp + fogOffset,
-    fogInfo.mCurveExponent + fogOffset,
-    static_cast<int>(PackFogColorArgb255(fogInfo))
-  );
+  const float fogStart = fogInfo.mMaxClamp + fogOffset;
+  const float fogEnd = fogInfo.mCurveExponent + fogOffset;
+  const std::uint32_t fogColor = PackFogColorArgb255(fogInfo);
+  device->SetFogState(true, &mCam->projection, fogStart, fogEnd, static_cast<int>(fogColor));
+
+  // FAF: a mesh effect compiled with FAF_BONE_TEXTURE runs shader model 3
+  // pixel shaders, which this fixed-function fog does not reach, so they fog
+  // themselves with the same values.
+  moho::MeshRenderer::SetDistanceFog(true, &mCam->projection, fogStart, fogEnd, fogColor);
 }
 
 /**
@@ -4816,6 +4820,9 @@ void moho::WRenViewport::FogOff()
 {
   gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
   device->SetFogState(false, nullptr, 0.0f, 1.0f, 0);
+
+  // FAF: the shader model 3 mesh pixel shaders stop fogging too (see FogOn).
+  moho::MeshRenderer::SetDistanceFog(false, nullptr, 0.0f, 1.0f, 0u);
 }
 
 /**

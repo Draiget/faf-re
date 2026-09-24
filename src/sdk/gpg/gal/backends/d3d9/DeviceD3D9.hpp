@@ -654,6 +654,17 @@ namespace gal {
        */
       boost::shared_ptr<Effect> CreateEffectFromCachedBinary(const EffectContext& context);
 
+      /**
+       * FAF addition, not in the shipped binary.
+       *
+       * What it does:
+       * Reports whether vertex shaders on this device can read a texture of gal
+       * format `textureFormat`: shader model 3 in both stages, hardware vertex
+       * processing, and the format passing `D3DUSAGE_QUERY_VERTEXTEXTURE` on
+       * the device's adapter.
+       */
+      [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
+
     public:
       int mCurThreadId = 0;                                    // +0x24 thread that ran Setup
       msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
