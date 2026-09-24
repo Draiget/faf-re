@@ -411,8 +411,8 @@ namespace moho
       currentTransform.orient_ = attachedEntity->mVarDat.mCurTransform.orient_;
       currentTransform.pos_ = attachedEntity->mVarDat.mCurTransform.pos_;
 
-      previousOrientation = attachedEntity->PendingOrientation;
-      previousPosition = attachedEntity->PendingPosition;
+      previousOrientation = attachedEntity->mPendingTransform.orient_;
+      previousPosition = attachedEntity->mPendingTransform.pos_;
     } else {
       const VTransform& previousHistory = attachedEntity->GetPositionHistory(tick - 1);
       previousOrientation = previousHistory.orient_;

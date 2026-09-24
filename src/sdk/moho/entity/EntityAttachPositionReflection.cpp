@@ -10,7 +10,7 @@
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/BadRefCast.h"
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/PositionHistory.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/task/CTask.h"
@@ -660,15 +660,12 @@ namespace
    * Address: 0x0067E020 (FUN_0067E020)
    *
    * What it does:
-   * Initializes one `PositionHistory` payload in caller-owned storage and
+   * Default-constructs one `PositionHistory` in caller-owned storage and
    * returns typed reflection reference lanes for that storage.
    */
   [[nodiscard]] gpg::RRef ConstructPositionHistoryRefInPlace(void* const objectStorage)
   {
-    auto* const history = static_cast<moho::PositionHistory*>(objectStorage);
-    if (history != nullptr) {
-      moho::InitializePositionHistory(*history);
-    }
+    auto* const history = new (objectStorage) moho::PositionHistory;
 
     gpg::RRef out{};
     (void)gpg::RRef_PositionHistory(&out, history);
@@ -688,16 +685,13 @@ namespace
    * Address: 0x0067DEE0 (FUN_0067DEE0)
    *
    * What it does:
-   * Heap-allocates one `PositionHistory`, runs `InitializePositionHistory` to
-   * default-construct each `VTransform` lane, and returns a typed `gpg::RRef`
-   * payload. Installed as `newRefFunc_` on `PositionHistoryTypeInfo`.
+   * Heap-allocates and default-constructs one `PositionHistory` (identity
+   * samples, cursor 0) and returns a typed `gpg::RRef` payload. Installed as
+   * `newRefFunc_` on `PositionHistoryTypeInfo`.
    */
   [[nodiscard]] gpg::RRef NewPositionHistoryRef()
   {
-    moho::PositionHistory* const history = new (std::nothrow) moho::PositionHistory();
-    if (history != nullptr) {
-      moho::InitializePositionHistory(*history);
-    }
+    moho::PositionHistory* const history = new (std::nothrow) moho::PositionHistory;
 
     gpg::RRef out{};
     (void)gpg::RRef_PositionHistory(&out, history);
@@ -737,24 +731,22 @@ namespace
    * Address: 0x0067E0B0 (FUN_0067E0B0)
    *
    * What it does:
-   * Constructs one `PositionHistory` over caller-provided storage. When
-   * `sourceRef` is supplied, copy-constructs from the upcast source payload;
-   * otherwise default-initializes. Returns a typed `gpg::RRef` to the storage.
+   * Copy-constructs one `PositionHistory` over caller-provided storage from
+   * the upcast source payload and returns a typed `gpg::RRef` to the storage.
    * Installed as `movRefFunc_` on `PositionHistoryTypeInfo`.
+   *
+   * The binary has no default-construct path here: with storage it upcasts
+   * `sourceRef` unconditionally (0x0067E0E2) and runs the implicit copy
+   * constructor (0x004FFE40 over `VTransform`'s 0x0046FC90, then `cursor`).
    */
   [[nodiscard]] gpg::RRef ConstructPositionHistoryRefFromSource(
     void* const objectStorage,
     gpg::RRef* const sourceRef
   )
   {
-    auto* history = static_cast<moho::PositionHistory*>(objectStorage);
-    if (history != nullptr) {
-      if (sourceRef == nullptr) {
-        moho::InitializePositionHistory(*history);
-      } else {
-        const moho::PositionHistory* const sourceHistory = UpcastPositionHistoryOrThrow(*sourceRef);
-        history = new (history) moho::PositionHistory(*sourceHistory);
-      }
+    moho::PositionHistory* history = nullptr;
+    if (objectStorage != nullptr) {
+      history = new (objectStorage) moho::PositionHistory(*UpcastPositionHistoryOrThrow(*sourceRef));
     }
 
     gpg::RRef out{};
@@ -874,11 +866,10 @@ namespace moho
       return;
     }
 
-    static_assert(sizeof(EntityTransformPayload) == sizeof(VTransform), "Position history sample must match VTransform layout");
     const gpg::RRef nullOwner{};
     gpg::RType* const transformType = ResolveVTransformType();
 
-    for (EntityTransformPayload& sample : samples) {
+    for (VTransform& sample : samples) {
       archive->Read(transformType, &sample, nullOwner);
     }
     archive->ReadInt(&cursor);
@@ -894,11 +885,10 @@ namespace moho
       return;
     }
 
-    static_assert(sizeof(EntityTransformPayload) == sizeof(VTransform), "Position history sample must match VTransform layout");
     const gpg::RRef nullOwner{};
     gpg::RType* const transformType = ResolveVTransformType();
 
-    for (const EntityTransformPayload& sample : samples) {
+    for (const VTransform& sample : samples) {
       archive->Write(transformType, &sample, nullOwner);
     }
     archive->WriteInt(cursor);

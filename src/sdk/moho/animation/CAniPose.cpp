@@ -11,7 +11,6 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/animation/CAniSkel.h"
-#include "moho/entity/EntityTransformPayload.h"
 #include "moho/math/QuaternionMath.h"
 
 namespace moho
@@ -362,10 +361,7 @@ namespace
 
   [[nodiscard]] bool PoseTransformDiffers(const moho::VTransform& lhs, const moho::VTransform& rhs) noexcept
   {
-    const moho::EntityTransformPayload lhsPayload = moho::ReadEntityTransformPayload(lhs);
-    const moho::EntityTransformPayload rhsPayload = moho::ReadEntityTransformPayload(rhs);
-    return moho::EntityTransformPositionDiffers(lhsPayload, rhsPayload)
-      || moho::EntityTransformOrientationDiffers(lhsPayload, rhsPayload);
+    return lhs.pos_ != rhs.pos_ || lhs.orient_ != rhs.orient_;
   }
 
 } // namespace

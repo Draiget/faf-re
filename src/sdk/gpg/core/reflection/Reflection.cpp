@@ -70,7 +70,7 @@
 #include "moho/debug/RDebugRadar.h"
 #include "moho/entity/EntityCollisionUpdater.h"
 #include "moho/entity/Motor.h"
-#include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/PositionHistory.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/CollisionBeamEntity.h"

@@ -6,7 +6,9 @@
 #include <limits>
 
 #include "gpg/core/utils/Global.h"
-#include "moho/entity/EntityTransformPayload.h"
+#include "moho/math/MathReflection.h"
+#include "moho/math/QuaternionMath.h"
+#include "moho/render/camera/VTransform.h"
 #include "moho/math/Wm3DistanceFafExtras.h"
 
 namespace
@@ -15,89 +17,6 @@ namespace
   constexpr float kSupportSelectionEpsilon = 1.0e-3f;
   constexpr float kSweepTMax = std::numeric_limits<float>::max();
   const Wm3::Vec3f kZeroVec3f{0.0f, 0.0f, 0.0f};
-
-  struct Basis3x3
-  {
-    float m00;
-    float m01;
-    float m02;
-    float m10;
-    float m11;
-    float m12;
-    float m20;
-    float m21;
-    float m22;
-  };
-
-  [[nodiscard]] Basis3x3 BuildBasisFromQuaternion(const moho::EntityTransformPayload& transform) noexcept
-  {
-    // Matches FUN_004EC590 (quaternion -> 3x3 basis used by primitive transform).
-    // Payload lanes are (w,x,y,z) in quatW/quatX/quatY/quatZ order.
-    const float qw = transform.quatW;
-    const float qx = transform.quatX;
-    const float qy = transform.quatY;
-    const float qz = transform.quatZ;
-
-    const float twoQx = qx + qx;
-    const float twoQy = qy + qy;
-    const float twoQz = qz + qz;
-
-    const float twoQxQx = twoQx * qx;
-    const float twoQyQy = twoQy * qy;
-    const float twoQzQz = twoQz * qz;
-    const float twoQxQy = twoQx * qy;
-    const float twoQxQz = twoQx * qz;
-    const float twoQyQz = twoQy * qz;
-    const float twoQwQx = twoQx * qw;
-    const float twoQwQy = twoQy * qw;
-    const float twoQwQz = twoQz * qw;
-
-    Basis3x3 basis{};
-    basis.m00 = 1.0f - (twoQyQy + twoQzQz);
-    basis.m01 = twoQxQy + twoQwQz;
-    basis.m02 = twoQxQz - twoQwQy;
-
-    basis.m10 = twoQxQy - twoQwQz;
-    basis.m11 = 1.0f - (twoQxQx + twoQzQz);
-    basis.m12 = twoQyQz + twoQwQx;
-
-    basis.m20 = twoQxQz + twoQwQy;
-    basis.m21 = twoQyQz - twoQwQx;
-    basis.m22 = 1.0f - (twoQxQx + twoQyQy);
-    return basis;
-  }
-
-  struct RotatedVec3
-  {
-    float x;
-    float y;
-    float z;
-  };
-
-  [[nodiscard]] RotatedVec3 RotateVectorByQuaternion(
-    const moho::EntityTransformPayload& transform, const float x, const float y, const float z
-  ) noexcept
-  {
-    // Payload quaternion lanes are packed as (w,x,y,z) in quatW/quatX/quatY/quatZ.
-    const float qw = transform.quatW;
-    const float qx = transform.quatX;
-    const float qy = transform.quatY;
-    const float qz = transform.quatZ;
-
-    const float uvx = qy * z - qz * y;
-    const float uvy = qz * x - qx * z;
-    const float uvz = qx * y - qy * x;
-
-    const float uuvx = qy * uvz - qz * uvy;
-    const float uuvy = qz * uvx - qx * uvz;
-    const float uuvz = qx * uvy - qy * uvx;
-
-    RotatedVec3 out{};
-    out.x = x + 2.0f * (qw * uvx + uuvx);
-    out.y = y + 2.0f * (qw * uvy + uuvy);
-    out.z = z + 2.0f * (qw * uvz + uuvz);
-    return out;
-  }
 
   [[nodiscard]] Wm3::Vec3f BuildBoxCenter(const Wm3::Box3f& box) noexcept
   {
@@ -382,30 +301,23 @@ namespace moho
    * int __thiscall sub_100FF470(int this, float* transformPayload);
    *
    * What it does:
-   * Rotates local-center offset by transform orientation, adds world position,
-   * and updates primitive basis rows.
+   * Rotates the local center by the orientation (`MultQuadVec`, 0x00452D40),
+   * adds the world position, and takes the box axes from
+   * `VAxes3::VAxes3(orient)` (0x004EC590), exactly the two calls the binary
+   * makes; they used to be open-coded here as a private basis build.
    */
-  void CColPrimitive<Wm3::Box3f>::SetTransform(const EntityTransformPayload& transform)
+  void CColPrimitive<Wm3::Box3f>::SetTransform(const VTransform& transform)
   {
-    const Basis3x3 basis = BuildBasisFromQuaternion(transform);
+    Wm3::Vec3f rotatedCenter{};
+    MultQuadVec(&rotatedCenter, &mLocalCenter, &transform.orient_);
+    mShape.Center.x = rotatedCenter.x + transform.pos_.x;
+    mShape.Center.y = transform.pos_.y + rotatedCenter.y;
+    mShape.Center.z = transform.pos_.z + rotatedCenter.z;
 
-    const float rotatedLocalX = mLocalCenter.x * basis.m00 + mLocalCenter.y * basis.m01 + mLocalCenter.z * basis.m02;
-    const float rotatedLocalY = mLocalCenter.x * basis.m10 + mLocalCenter.y * basis.m11 + mLocalCenter.z * basis.m12;
-    const float rotatedLocalZ = mLocalCenter.x * basis.m20 + mLocalCenter.y * basis.m21 + mLocalCenter.z * basis.m22;
-
-    mShape.Center[0] = transform.posX + rotatedLocalX;
-    mShape.Center[1] = transform.posY + rotatedLocalY;
-    mShape.Center[2] = transform.posZ + rotatedLocalZ;
-
-    mShape.Axis[0][0] = basis.m00;
-    mShape.Axis[0][1] = basis.m01;
-    mShape.Axis[0][2] = basis.m02;
-    mShape.Axis[1][0] = basis.m10;
-    mShape.Axis[1][1] = basis.m11;
-    mShape.Axis[1][2] = basis.m12;
-    mShape.Axis[2][0] = basis.m20;
-    mShape.Axis[2][1] = basis.m21;
-    mShape.Axis[2][2] = basis.m22;
+    const VAxes3 axes(transform.orient_);
+    mShape.Axis[0] = axes.vX;
+    mShape.Axis[1] = axes.vY;
+    mShape.Axis[2] = axes.vZ;
   }
 
   /**
@@ -595,14 +507,16 @@ namespace moho
    * int __thiscall sub_4FEBC0(float *this, float *transformPayload);
    *
    * What it does:
-   * Rotates local-center offset by transform orientation and adds world position.
+   * Rotates the local center by the orientation (`MultQuadVec`, 0x00452D40)
+   * and adds the world position.
    */
-  void CColPrimitive<Wm3::Sphere3f>::SetTransform(const EntityTransformPayload& transform)
+  void CColPrimitive<Wm3::Sphere3f>::SetTransform(const VTransform& transform)
   {
-    const RotatedVec3 rotated = RotateVectorByQuaternion(transform, mLocalCenter.x, mLocalCenter.y, mLocalCenter.z);
-    mShape.Center.x = transform.posX + rotated.x;
-    mShape.Center.y = transform.posY + rotated.y;
-    mShape.Center.z = transform.posZ + rotated.z;
+    Wm3::Vec3f rotatedCenter{};
+    MultQuadVec(&rotatedCenter, &mLocalCenter, &transform.orient_);
+    mShape.Center.x = transform.pos_.x + rotatedCenter.x;
+    mShape.Center.y = transform.pos_.y + rotatedCenter.y;
+    mShape.Center.z = transform.pos_.z + rotatedCenter.z;
   }
 
   /**

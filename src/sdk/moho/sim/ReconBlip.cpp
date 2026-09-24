@@ -17,7 +17,6 @@
 #include "moho/animation/CAniPose.h"
 #include "moho/ai/IAiReconDB.h"
 #include "moho/entity/EntityDb.h"
-#include "moho/entity/EntityTransformPayload.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/misc/Stats.h"
@@ -1283,11 +1282,11 @@ void ReconBlip::Refresh()
     return;
   }
 
-  EntityTransformPayload pending = ReadEntityTransformPayload(sourceUnit->PendingOrientation, sourceUnit->PendingPosition);
-  pending.posX += mJamOffset.x;
-  pending.posY += mJamOffset.y;
-  pending.posZ += mJamOffset.z;
-  WriteEntityTransformPayload(PendingOrientation, PendingPosition, pending);
+  VTransform pending = sourceUnit->mPendingTransform;
+  pending.pos_.x += mJamOffset.x;
+  pending.pos_.y += mJamOffset.y;
+  pending.pos_.z += mJamOffset.z;
+  mPendingTransform = pending;
   mPendingVelocityScale = sourceUnit->mPendingVelocityScale;
 
   // This block inlines Entity::SetPendingTransform's coord-list requeue, which
@@ -1296,9 +1295,11 @@ void ReconBlip::Refresh()
     mCoordNode.ListLinkAfter(&SimulationRef->mCoordEntities);
   }
 
-  const EntityTransformPayload sourceTransform = ReadEntityTransformPayload(sourceUnit->GetTransform());
-  mVarDat.mCurTransform.orient_ = {sourceTransform.quatW, sourceTransform.quatX, sourceTransform.quatY, sourceTransform.quatZ};
-  mVarDat.mCurTransform.pos_ = {sourceTransform.posX + mJamOffset.x, sourceTransform.posY + mJamOffset.y, sourceTransform.posZ + mJamOffset.z};
+  const VTransform& sourceTransform = sourceUnit->GetTransform();
+  mVarDat.mCurTransform.orient_ = sourceTransform.orient_;
+  mVarDat.mCurTransform.pos_ = {
+    sourceTransform.pos_.x + mJamOffset.x, sourceTransform.pos_.y + mJamOffset.y, sourceTransform.pos_.z + mJamOffset.z
+  };
   mVarDat.mCurImpactValue = sourceUnit->mVarDat.mCurImpactValue;
   SetCurrentLayer(sourceUnit->mVarDat.mLayerMask);
 

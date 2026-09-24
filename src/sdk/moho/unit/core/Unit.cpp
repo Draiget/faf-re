@@ -38,7 +38,6 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/EntityCollisionUpdater.h"
-#include "moho/entity/EntityTransformPayload.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"
@@ -210,12 +209,13 @@ namespace moho
         // else same formation layer -> does not block.
       } else {
         // Velocity path: velocity/compare evaluated before the layer test, as in
-        // the binary. The binary compares velocity to a static zero vector via a
-        // raw 12-byte memcmp (FUN_004F0A50, an ICF fold of Wm3::Vector3::Compare
-        // and EntityTransformPositionDiffers) — reproduce the exact byte compare.
+        // the binary. The binary compares velocity to a static zero vector with
+        // Wm3::Vector3<float>::CompareArrays (FUN_004F0A50, a 12-byte memcmp),
+        // i.e. WildMagic's own operator!= -- an exact bit compare, so -0.0f
+        // counts as moving.
         const Wm3::Vec3f curVel = curUnit->GetVelocity();
         const Wm3::Vec3f kZeroVelocity{0.0f, 0.0f, 0.0f};
-        const bool isMoving = std::memcmp(&curVel, &kZeroVelocity, sizeof(Wm3::Vec3f)) != 0;
+        const bool isMoving = curVel != kZeroVelocity;
 
         if (curUnit->mVarDat.mLayerMask == LAYER_Air) {
           continue;
@@ -13244,7 +13244,7 @@ int Unit::MotionTick()
     EconomyEventFromNode(node)->ProcessTick();
   }
 
-  AniActor->UpdateManipulators(reinterpret_cast<const VTransform&>(PendingOrientation));
+  AniActor->UpdateManipulators(mPendingTransform);
 
   mIsBusy = mAttachInfo.HasAttachTarget();
 
@@ -13607,15 +13607,12 @@ Unit::Unit(const SUnitConstructionParams& params)
       IUnit::CalcSpawnElevation(sim->mMapData, mVarDat.mLayerMask, spawnTransform, VarDat().mAttributes);
   }
 
-  // Lane-for-lane copy (0x006A5BF9..0x006A5C23 stores the transform's four
-  // orientation dwords straight into PendingOrientation). Getting this wrong by
-  // one lane rotates the whole quaternion and flips every spawned unit
-  // upside-down on the user side (its skinned mesh draws as an unlit black
-  // blob), which is what the spelling below did while `PendingOrientation` was
-  // a `moho::Vector4f` naming (x,y,z,w) over the quaternion's (w,x,y,z) words.
-  // It is a `Wm3::Quatf` now, same as `orient_`, so the copy is the assignment.
-  PendingOrientation = spawnTransform.orient_;
-  PendingPosition = spawnTransform.pos_;
+  // Word-for-word copy (0x006A5BF9..0x006A5C23 stores the transform straight
+  // into +0x150). Getting the quaternion one lane off rotates it and flips every
+  // spawned unit upside-down on the user side (its skinned mesh draws as an
+  // unlit black blob), which is what happened while +0x150 was spelled as a
+  // `moho::Vector4f` naming (x,y,z,w) over the quaternion's (w,x,y,z) words.
+  mPendingTransform = spawnTransform;
   // Twice, as the binary does: the first call publishes the spawn pose into the
   // current lane and the second copies it into the previous-frame lane, so the
   // unit does not interpolate in from wherever that lane happened to point.
@@ -14669,8 +14666,7 @@ void Unit::UpdateCollision()
     return;
   }
 
-  const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
-  CollisionExtents->SetTransform(current);
+  CollisionExtents->SetTransform(mVarDat.mCurTransform);
 
   if (const Wm3::Box3f* const existingBox = CollisionExtents->GetBox(); existingBox != nullptr) {
     const RUnitBlueprint* const blueprint = GetBlueprint();

@@ -34,7 +34,7 @@
 #include "moho/entity/UserEntity.h"
 #include "moho/entity/MotorFallDown.h"
 #include "moho/entity/MotorSinkAway.h"
-#include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/PositionHistory.h"
 #include "moho/entity/EVisibilityModeTypeInfo.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/projectile/Projectile.h"
@@ -1475,8 +1475,7 @@ namespace
       return;
     }
 
-    const moho::EntityTransformPayload current = moho::ReadEntityTransformPayload(entity.mVarDat.mCurTransform.orient_, entity.mVarDat.mCurTransform.pos_);
-    entity.CollisionExtents->SetTransform(current);
+    entity.CollisionExtents->SetTransform(entity.mVarDat.mCurTransform);
     RelinkSpanFromCollisionPrimitive(entity.mCollisionCellSpan, entity.CollisionExtents);
     RefreshCollisionBoundsSnapshot(entity);
   }
@@ -2094,7 +2093,7 @@ namespace moho
     (void)archive->ReadPointer_SimArmy(&army, &owner);
     ArmyRef = static_cast<CArmyImpl*>(army);
 
-    archive->Read(CachedVTransformType(), &PendingOrientation, owner);
+    archive->Read(CachedVTransformType(), &mPendingTransform, owner);
 
     (void)archive->ReadPointerOwned_PositionHistory(&mPositionHistory, &owner);
 
@@ -2189,7 +2188,7 @@ namespace moho
     gpg::WriteRawPointer(archive, armyRef, gpg::TrackedPointerState::Unowned, owner);
 
     // Pending world transform (+0x150), logically a VTransform payload.
-    archive->Write(CachedVTransformType(), &PendingOrientation, owner);
+    archive->Write(CachedVTransformType(), &mPendingTransform, owner);
 
     // Position-history pointer (OWNED).
     gpg::RRef positionHistoryRef{};
@@ -2528,8 +2527,6 @@ namespace moho
     SimulationRef = sim;
     ArmyRef = nullptr;
 
-    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 0.0f;
     mLastTickProcessed = 0u;
@@ -2613,8 +2610,6 @@ namespace moho
     SimulationRef = nullptr;
     ArmyRef = nullptr;
 
-    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 1.0f;
     mLastTickProcessed = 0u;
@@ -2687,8 +2682,6 @@ namespace moho
     SimulationRef = nullptr;
     ArmyRef = nullptr;
 
-    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 1.0f;
     mLastTickProcessed = 0u;
@@ -2761,8 +2754,6 @@ namespace moho
     SimulationRef = nullptr;
     ArmyRef = nullptr;
 
-    PendingOrientation = {1.0f, 0.0f, 0.0f, 0.0f};
-    PendingPosition = {0.0f, 0.0f, 0.0f};
     mPositionHistory = nullptr;
     mPendingVelocityScale = 1.0f;
     mLastTickProcessed = 0u;
@@ -3326,7 +3317,7 @@ namespace moho
    */
   VTransform Entity::GetBoneWorldTransform(const int boneIndex) const
   {
-    VTransform result = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_));
+    VTransform result = mVarDat.mCurTransform;
 
     if (boneIndex != -1 || !BluePrint) {
       return result;
@@ -3516,8 +3507,7 @@ namespace moho
     delete oldBody;
 
     if (cachedBody != nullptr) {
-      const VTransform transform = BuildVTransformFromEntityTransformPayload(ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_));
-      cachedBody->SetTransform(transform);
+      cachedBody->SetTransform(mVarDat.mCurTransform);
     }
 
     return cachedBody;
@@ -3572,11 +3562,11 @@ namespace moho
     AdvanceCoords();
 
     if (mIntelManager && SimulationRef) {
-      const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
+      const Wm3::Vec3f& position = mVarDat.mCurTransform.pos_;
       const Wm3::Vec3f probePosition{
-        current.posX,
-        current.posY + 1.0f,
-        current.posZ,
+        position.x,
+        position.y + 1.0f,
+        position.z,
       };
       mIntelManager->Update(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
     }
@@ -3591,8 +3581,7 @@ namespace moho
    */
   void Entity::SetPendingTransform(const VTransform& transform, const float pendingVelocityScale)
   {
-    const EntityTransformPayload pending = ReadEntityTransformPayload(transform);
-    WriteEntityTransformPayload(PendingOrientation, PendingPosition, pending);
+    mPendingTransform = transform;
     mPendingVelocityScale = pendingVelocityScale;
 
     if (SimulationRef && mCoordNode.ListIsSingleton()) {
@@ -4132,8 +4121,7 @@ namespace moho
     }
 
     auto* collision = CollisionExtents;
-    const EntityTransformPayload current = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
-    collision->SetTransform(current);
+    collision->SetTransform(mVarDat.mCurTransform);
     RelinkSpanFromCollisionPrimitive(mCollisionCellSpan, collision);
     UpdateAABox();
   }
@@ -4557,12 +4545,12 @@ namespace moho
 
   Wm3::Vec3f const& Entity::GetPositionWm3() const noexcept
   {
-    return *reinterpret_cast<Wm3::Vec3f const*>(&mVarDat.mCurTransform.pos_);
+    return mVarDat.mCurTransform.pos_;
   }
 
   VTransform const& Entity::GetTransformWm3() const noexcept
   {
-    return *reinterpret_cast<VTransform const*>(&mVarDat.mCurTransform.orient_);
+    return mVarDat.mCurTransform;
   }
 
   /**
@@ -4574,9 +4562,6 @@ namespace moho
   void Entity::InitPositionHistory()
   {
     PositionHistory* const rebuiltHistory = new (std::nothrow) PositionHistory;
-    if (rebuiltHistory) {
-      InitializePositionHistory(*rebuiltHistory);
-    }
 
     delete mPositionHistory;
     mPositionHistory = rebuiltHistory;
@@ -4591,14 +4576,12 @@ namespace moho
    */
   VTransform const& Entity::GetPositionHistory(const int tick) const
   {
-    static_assert(sizeof(VTransform) == sizeof(EntityTransformPayload), "VTransform payload size must match history sample");
-
     const PositionHistory* const positionHistory = mPositionHistory;
     const std::int32_t delta = positionHistory->cursor - tick;
     const std::int32_t historyIndex = (delta < 0)
-      ? (((delta + 1) % kEntityPositionHistorySampleCount) + (kEntityPositionHistorySampleCount - 1))
-      : (delta % kEntityPositionHistorySampleCount);
-    return *reinterpret_cast<const VTransform*>(&positionHistory->samples[static_cast<std::size_t>(historyIndex)]);
+      ? (((delta + 1) % PositionHistory::kSampleCount) + (PositionHistory::kSampleCount - 1))
+      : (delta % PositionHistory::kSampleCount);
+    return positionHistory->samples[static_cast<std::size_t>(historyIndex)];
   }
 
   /**
@@ -4611,9 +4594,6 @@ namespace moho
    */
   void Entity::AdvanceCoords()
   {
-    const EntityTransformPayload previous = ReadEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_);
-    const EntityTransformPayload current = ReadEntityTransformPayload(PendingOrientation, PendingPosition);
-
     // TEMPORARY PROBE (do not commit). A flying transport's Entity::Position
     // reads NaN -- its four engine emitters all report
     // `[EFXATTACH] nan-transform ent=... bone=28..31 dead=0`. This is the commit
@@ -4621,10 +4601,13 @@ namespace moho
     // pending transform arrives, and say whether the orientation went bad with
     // the position (orientation math) or the position alone (the integrator).
     {
-      const bool posBad = !(std::isfinite(current.posX) && std::isfinite(current.posY) && std::isfinite(current.posZ));
+      const VTransform& previous = mVarDat.mCurTransform;
+      const VTransform& current = mPendingTransform;
+      const bool posBad =
+        !(std::isfinite(current.pos_.x) && std::isfinite(current.pos_.y) && std::isfinite(current.pos_.z));
       const bool orientBad =
-        !(std::isfinite(current.quatW) && std::isfinite(current.quatX) &&
-          std::isfinite(current.quatY) && std::isfinite(current.quatZ));
+        !(std::isfinite(current.orient_.w) && std::isfinite(current.orient_.x) &&
+          std::isfinite(current.orient_.y) && std::isfinite(current.orient_.z));
       if (posBad || orientBad) {
         static int sAdvanceProbeBudget = 0;
         if (sAdvanceProbeBudget < 16) {
@@ -4642,33 +4625,37 @@ namespace moho
                     static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(this)),
                     className,
                     posBad ? 1 : 0, orientBad ? 1 : 0,
-                    previous.posX, previous.posY, previous.posZ,
-                    current.posX, current.posY, current.posZ,
-                    current.quatW, current.quatX, current.quatY, current.quatZ,
+                    previous.pos_.x, previous.pos_.y, previous.pos_.z,
+                    current.pos_.x, current.pos_.y, current.pos_.z,
+                    current.orient_.w, current.orient_.x, current.orient_.y, current.orient_.z,
                     mPendingVelocityScale);
           ::OutputDebugStringA(probe);
         }
       }
     }
 
-    WriteEntityTransformPayload(mVarDat.mLastTransform.orient_, mVarDat.mLastTransform.pos_, previous);
-    WriteEntityTransformPayload(mVarDat.mCurTransform.orient_, mVarDat.mCurTransform.pos_, current);
+    mVarDat.mLastTransform = mVarDat.mCurTransform;
+    mVarDat.mCurTransform = mPendingTransform;
     mVarDat.mCurImpactValue = mPendingVelocityScale;
 
     if (mPositionHistory) {
-      RecordEntityPositionHistory(*mPositionHistory, previous, current);
+      mPositionHistory->samples[mPositionHistory->cursor] = mVarDat.mLastTransform;
+      mPositionHistory->cursor = (mPositionHistory->cursor + 1) % PositionHistory::kSampleCount;
+      mPositionHistory->samples[mPositionHistory->cursor] = mVarDat.mCurTransform;
     }
 
     if (CollisionExtents &&
-        (EntityTransformPositionDiffers(current, previous) || EntityTransformOrientationDiffers(current, previous))) {
+        (mVarDat.mLastTransform.pos_ != mVarDat.mCurTransform.pos_ ||
+         mVarDat.mLastTransform.orient_ != mVarDat.mCurTransform.orient_)) {
       UpdateCollision();
     }
 
     if (mIntelManager && SimulationRef) {
+      const Wm3::Vec3f& position = mVarDat.mCurTransform.pos_;
       const Wm3::Vec3f probePosition{
-        current.posX,
-        current.posY + 1.0f,
-        current.posZ,
+        position.x,
+        position.y + 1.0f,
+        position.z,
       };
       mIntelManager->ForceUpdate(probePosition, static_cast<std::int32_t>(SimulationRef->mCurTick));
     }
@@ -7042,12 +7029,7 @@ namespace moho
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
-    const EntityTransformPayload current = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
-    Wm3::Quaternionf orientation{};
-    orientation.w = current.quatW;
-    orientation.x = current.quatX;
-    orientation.y = current.quatY;
-    orientation.z = current.quatZ;
+    const Wm3::Quaternionf orientation = entity->mVarDat.mCurTransform.orient_;
 
     LuaPlus::LuaObject luaOrientation = SCR_ToLua<Wm3::Quaternion<float>>(state, orientation);
     luaOrientation.PushStack(state);
@@ -7101,9 +7083,9 @@ namespace moho
     const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
     Entity* const entity = SCR_FromLua_Entity(entityObject, state);
 
-    const EntityTransformPayload current = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
-    const float numerator = 2.0f * ((current.quatW * current.quatY) + (current.quatX * current.quatZ));
-    const float denominator = 1.0f - (2.0f * ((current.quatZ * current.quatZ) + (current.quatY * current.quatY)));
+    const Wm3::Quatf& orientation = entity->mVarDat.mCurTransform.orient_;
+    const float numerator = 2.0f * ((orientation.w * orientation.y) + (orientation.x * orientation.z));
+    const float denominator = 1.0f - (2.0f * ((orientation.z * orientation.z) + (orientation.y * orientation.y)));
     const double heading = std::atan2(static_cast<double>(numerator), static_cast<double>(denominator));
     lua_pushnumber(rawState, heading);
     return 1;

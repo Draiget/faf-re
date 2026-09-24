@@ -47,7 +47,7 @@
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Shield.h"
 #include "moho/entity/REntityBlueprint.h"
-#include "moho/entity/EntityTransformPayload.h"
+#include "moho/entity/PositionHistory.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/entity/intel/CIntelPosHandle.h"
 #include "moho/entity/CTextureScroller.h"

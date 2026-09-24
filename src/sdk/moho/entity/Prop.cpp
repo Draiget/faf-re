@@ -534,12 +534,9 @@ namespace moho
     mVarDat.mScale.y = uniformScale;
     mVarDat.mScale.z = uniformScale;
 
-    // 0x006F9E5A..0x006F9E75: four `fld`/`fstp` pairs copy the caller's
-    // quaternion word for word into +0x150. Both sides are `Wm3::Quatf` now, so
-    // this is the assignment; it used to be written lane by lane against
-    // `moho::Vector4f`'s (x,y,z,w) names over the same (w,x,y,z) words.
-    PendingOrientation = transform.orient_;
-    PendingPosition = transform.pos_;
+    // 0x006F9E5A..0x006F9E75: `fld`/`fstp` pairs copy the caller's transform
+    // word for word into +0x150.
+    mPendingTransform = transform;
 
     const ELayer startingLayer = GetStartingLayer(transform.pos_, LAYER_Land);
     SetCurrentLayer(startingLayer);

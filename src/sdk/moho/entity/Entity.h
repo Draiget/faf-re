@@ -1386,12 +1386,12 @@ namespace moho
     // +0x014C is the owning army pointer in constructor/init and callsite evidence.
     // Attachment parent linkage is represented by mAttachInfo (+0x018C).
     CArmyImpl* ArmyRef;                           // 0x014C
-    // Pending transform payload (equivalent logical role to VTransform: orientation + position).
-    // A quaternion, like the two in `mVarDat`: `Wm3::Quatf` stores (w, x, y, z),
-    // and the identity this is seeded with is {1, 0, 0, 0}, the same four words
-    // the old `moho::Vector4f` spelling wrote.
-    Wm3::Quatf PendingOrientation;                 // 0x0150
-    Wm3::Vector3f PendingPosition;                 // 0x0160
+    // The transform `AdvanceCoords` (0x00678F10) commits into
+    // `mVarDat.mCurTransform` next tick. `SetPendingTransform` (0x00678E90,
+    // `?SetPendingTransform@Entity@Moho@@QAEXABVVTransform@2@M@Z`) stores a
+    // whole `VTransform` here, and the serializer moves it through `VTransform`'s
+    // RType. The constructors' identity stores are its default constructor.
+    VTransform mPendingTransform;                  // 0x0150
     PositionHistory* mPositionHistory;             // 0x016C
     float mPendingVelocityScale;                   // 0x0170
     std::uint32_t mLastTickProcessed;              // 0x0174
@@ -2667,8 +2667,7 @@ namespace moho
   };
   static_assert(offsetof(Entity, SimulationRef) == 0x148, "Entity::SimulationRef offset must be 0x148");
   static_assert(offsetof(Entity, ArmyRef) == 0x14C, "Entity::ArmyRef offset must be 0x14C");
-  static_assert(offsetof(Entity, PendingOrientation) == 0x150, "Entity::PendingOrientation offset must be 0x150");
-  static_assert(offsetof(Entity, PendingPosition) == 0x160, "Entity::PendingPosition offset must be 0x160");
+  static_assert(offsetof(Entity, mPendingTransform) == 0x150, "Entity::mPendingTransform offset must be 0x150");
   static_assert(offsetof(Entity, mPositionHistory) == 0x16C, "Entity::mPositionHistory offset must be 0x16C");
   static_assert(offsetof(Entity, mPendingVelocityScale) == 0x170, "Entity::mPendingVelocityScale offset must be 0x170");
   static_assert(offsetof(Entity, mLastTickProcessed) == 0x174, "Entity::mLastTickProcessed offset must be 0x174");

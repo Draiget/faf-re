@@ -1028,7 +1028,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\entity\EntityLuaFunctionThunks.cpp" />
     <ClCompile Include="moho\entity\REntityBlueprint.cpp" />
     <ClCompile Include="moho\entity\EntitySetReflection.cpp" />
-    <ClCompile Include="moho\entity\EntityTransformPayload.cpp" />
     <ClCompile Include="moho\entity\MotorReflection.cpp" />
     <ClCompile Include="moho\entity\MotorFallDown.cpp" />
     <ClCompile Include="moho\entity\MotorSinkAway.cpp" />
@@ -1716,7 +1715,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\EntityFastVectorReflection.h" />
     <ClInclude Include="moho\entity\EntitySetReflection.h" />
     <ClInclude Include="moho\entity\EntityPositionWatchEntry.h" />
-    <ClInclude Include="moho\entity\EntityTransformPayload.h" />
+    <ClInclude Include="moho\entity\PositionHistory.h" />
     <ClInclude Include="moho\entity\intel\CIntel.h" />
     <ClInclude Include="moho\entity\intel\CIntelSerializer.h" />
     <ClInclude Include="moho\entity\intel\CIntelTypeInfo.h" />

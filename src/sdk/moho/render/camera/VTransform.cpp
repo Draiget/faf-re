@@ -74,16 +74,6 @@ namespace
     type.fields_.push_back(field);
   }
 
-  [[nodiscard]] bool CompareQuaternionComponents(
-    const Wm3::Quatf& lhs,
-    const Wm3::Quatf& rhs,
-    const float epsilon = 1.0e-5f
-  ) noexcept
-  {
-    return std::fabs(lhs.w - rhs.w) > epsilon || std::fabs(lhs.x - rhs.x) > epsilon || std::fabs(lhs.y - rhs.y) > epsilon
-      || std::fabs(lhs.z - rhs.z) > epsilon;
-  }
-
   void CleanupVTransformTypeInfoAtExit()
   {
     if (!gVTransformTypeInfoConstructed) {
@@ -223,12 +213,15 @@ namespace moho
    * Address: 0x00549DC0 (FUN_00549DC0)
    *
    * What it does:
-   * Returns true when either translation or orientation lanes differ,
-   * matching the binary short-circuit comparison order.
+   * Returns true when the translation or the orientation differs bit for
+   * bit, translation first. The binary calls `Vector3<float>::CompareArrays`
+   * (0x004F0A50) then `Quaternion<float>::CompareArrays` (0x004F0B40), both
+   * plain `memcmp`s -- WildMagic's own `operator!=`. The earlier recovery
+   * compared with a 1e-5 tolerance, so sub-epsilon moves read as unchanged.
    */
   bool VTransform::Compare(const VTransform& rhs) const noexcept
   {
-    return Wm3::Vector3f::Compare(&pos_, &rhs.pos_) || CompareQuaternionComponents(rhs.orient_, orient_);
+    return pos_ != rhs.pos_ || orient_ != rhs.orient_;
   }
 
   /**

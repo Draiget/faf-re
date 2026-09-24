@@ -13,7 +13,6 @@
 #include "moho/effects/rendering/CEffectImpl.h"
 #include "moho/effects/rendering/IEffectManager.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityTransformPayload.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/render/EBeamParam.h"
@@ -127,20 +126,6 @@ namespace
   [[nodiscard]] bool IsAttachmentInvalid(const moho::Entity* const entity) noexcept
   {
     return entity == nullptr || entity->DestroyQueuedFlag != 0u;
-  }
-
-  [[nodiscard]] moho::VTransform ReadCurrentTransform(const moho::Entity& entity) noexcept
-  {
-    return moho::BuildVTransformFromEntityTransformPayload(
-      moho::ReadEntityTransformPayload(entity.mVarDat.mCurTransform.orient_, entity.mVarDat.mCurTransform.pos_)
-    );
-  }
-
-  [[nodiscard]] moho::VTransform ReadPreviousTransform(const moho::Entity& entity) noexcept
-  {
-    return moho::BuildVTransformFromEntityTransformPayload(
-      moho::ReadEntityTransformPayload(entity.mVarDat.mLastTransform.orient_, entity.mVarDat.mLastTransform.pos_)
-    );
   }
 
   [[nodiscard]] Wm3::Vec3f FetchVectorParam(moho::CEfxBeam& beam, const std::int32_t paramIndex)
@@ -589,9 +574,9 @@ namespace moho
         (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.x : 0.0f,
         (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.y : 0.0f,
         (probeSource != nullptr) ? probeSource->mVarDat.mCurTransform.pos_.z : 0.0f,
-        (probeSource != nullptr) ? probeSource->PendingPosition.x : 0.0f,
-        (probeSource != nullptr) ? probeSource->PendingPosition.y : 0.0f,
-        (probeSource != nullptr) ? probeSource->PendingPosition.z : 0.0f,
+        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.x : 0.0f,
+        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.y : 0.0f,
+        (probeSource != nullptr) ? probeSource->mPendingTransform.pos_.z : 0.0f,
         mBeam.mFromStart ? 1 : 0
       );
     }
@@ -652,8 +637,8 @@ namespace moho
       Entity* const endEntity = ResolveAttachEntity(mEnd);
       if (endEntity == nullptr) {
         mBeam.mFromStart = false;
-        mBeam.mCurStart = ReadCurrentTransform(*sourceEntity);
-        mBeam.mLastStart = ReadPreviousTransform(*sourceEntity);
+        mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
+        mBeam.mLastStart = sourceEntity->mVarDat.mLastTransform;
         mBeam.mStart = FetchVectorParam(*this, 0);
 
         const float beamLength = GetFloatParam(6);
@@ -679,10 +664,10 @@ namespace moho
         mBeam.mLastEnd.pos_ = ApplyPoint(mBeam.mLastStart, mBeam.mEnd);
       } else {
         mBeam.mFromStart = true;
-        mBeam.mCurStart = ReadCurrentTransform(*sourceEntity);
-        mBeam.mLastStart = ReadPreviousTransform(*sourceEntity);
-        mBeam.mCurEnd = ReadCurrentTransform(*endEntity);
-        mBeam.mLastEnd = ReadPreviousTransform(*endEntity);
+        mBeam.mCurStart = sourceEntity->mVarDat.mCurTransform;
+        mBeam.mLastStart = sourceEntity->mVarDat.mLastTransform;
+        mBeam.mCurEnd = endEntity->mVarDat.mCurTransform;
+        mBeam.mLastEnd = endEntity->mVarDat.mLastTransform;
 
         const VTransform sourceBoneTransform = sourceEntity->GetBoneLocalTransform(mEntityInfo.mParentBoneIndex);
         const Wm3::Vec3f localStart = FetchVectorParam(*this, 0);

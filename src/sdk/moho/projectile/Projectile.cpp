@@ -647,8 +647,8 @@ namespace moho
     // straight 4-float copy the binary does rather than a tuple-order rebuild
     // through a `moho::Vector4f`.
     const Wm3::Quatf& launchOrientation = launchTransform.orient_;
-    PendingOrientation = launchOrientation;
-    PendingPosition = launchTransform.pos_;
+    mPendingTransform.orient_ = launchOrientation;
+    mPendingTransform.pos_ = launchTransform.pos_;
     mVarDat.mCurTransform.orient_ = launchOrientation;
     mVarDat.mCurTransform.pos_ = launchTransform.pos_;
     mVarDat.mLastTransform.orient_ = launchOrientation;
@@ -1014,7 +1014,7 @@ namespace moho
     // Lifetime expiry: fuze in mid-air after the projectile outlives its timer.
     if (SimulationRef->mCurTick >= mLifetimeEnd && mImpactInterpolation < 0.0f) {
       mImpactInterpolation = 1.0f;
-      mImpactPosition = PendingPosition;
+      mImpactPosition = mPendingTransform.pos_;
       mImpactType = static_cast<EImpactType>((mBelowWater ? 1 : 0) + 3);
     }
 
@@ -1024,11 +1024,11 @@ namespace moho
       canvas->AddWireCoords(tran.pos_, drawOrient, 1.0f);
       if (mImpactInterpolation >= 0.0f) {
         canvas->AddLine(mImpactPosition, mVarDat.mCurTransform.pos_, 0xFF00FF00u);
-        canvas->AddLine(PendingPosition, mImpactPosition, 0xFFFF0000u);
+        canvas->AddLine(mPendingTransform.pos_, mImpactPosition, 0xFFFF0000u);
         const Wm3::Quaternionf kIdentity{1.0f, 0.0f, 0.0f, 0.0f};
         canvas->AddWireCoords(mImpactPosition, kIdentity, 1.0f);
       } else {
-        canvas->AddLine(PendingPosition, mVarDat.mCurTransform.pos_, 0xFF00FF00u);
+        canvas->AddLine(mPendingTransform.pos_, mVarDat.mCurTransform.pos_, 0xFF00FF00u);
       }
     }
 
@@ -1075,7 +1075,7 @@ namespace moho
       // Both lanes are `Wm3::Quatf`; these used to be rebuilt lane by lane
       // against the old `moho::Vector4f` spelling of the same words.
       const Wm3::Quaternionf& currentOrient = mVarDat.mCurTransform.orient_;
-      const Wm3::Quaternionf& pendingOrient = PendingOrientation;
+      const Wm3::Quaternionf& pendingOrient = mPendingTransform.orient_;
       moho::QuatLERP(&pendingOrient, &currentOrient, &lerped, mImpactInterpolation);
       // `QuatLERP` blends all four lanes symmetrically, so its result carries
       // the same convention as the two inputs and is stored as it is. Rebuilding
@@ -1418,7 +1418,7 @@ namespace moho
    *
    * What it does:
    * Per-tick collision pass over the segment swept from the current world position
-   * (Position) to the pending position (PendingPosition). Handles water-surface
+   * (Position) to the pending position (mPendingTransform.pos_). Handles water-surface
    * crossing / layer change, tests the water plane for surface-colliding ordnance,
    * samples the terrain surface, then (mDoCollision) the explicit homing target
    * and the entity sweep, and finally the terrain height field. The earliest hit
@@ -1430,7 +1430,7 @@ namespace moho
 
     // Swept segment this tick: current world position -> pending position.
     const Wm3::Vector3f& curPos = mVarDat.mCurTransform.pos_;
-    const Wm3::Vector3f& nextPos = PendingPosition;
+    const Wm3::Vector3f& nextPos = mPendingTransform.pos_;
 
     // Two-endpoint segment (Origin=midpoint, Direction=normalized, Extent=half
     // length) via the recovered FA ctor (FUN_004FE130). asm 0x0069D247.

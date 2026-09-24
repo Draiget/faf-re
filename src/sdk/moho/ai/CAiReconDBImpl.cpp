@@ -276,7 +276,7 @@ namespace
       return {};
     }
 
-    return reinterpret_cast<Entity*>(blip)->PendingPosition;
+    return reinterpret_cast<Entity*>(blip)->mPendingTransform.pos_;
   }
 
   /**

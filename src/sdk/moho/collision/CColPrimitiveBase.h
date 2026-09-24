@@ -12,7 +12,7 @@ namespace moho
 {
   class Entity;
 
-  struct EntityTransformPayload;
+  class VTransform;
 
   /**
    * Address: 0x004FE7A0 (FUN_004FE7A0) / 0x004FE860 / 0x004FF150 / 0x004FF260
@@ -133,7 +133,7 @@ namespace moho
     /**
      * Address: 0x004FF470 (FUN_004FF470) / 0x004FEBC0
      *
-     * EntityTransformPayload const&
+     * Moho::VTransform const&
      *
      * IDA signature:
      * int __thiscall sub_100FF470(int this, float* transformPayload);
@@ -141,7 +141,7 @@ namespace moho
      * What it does:
      * Applies world transform payload to local primitive state.
      */
-    virtual void SetTransform(const EntityTransformPayload& transform) = 0;
+    virtual void SetTransform(const VTransform& transform) = 0;
 
     /**
      * Address: 0x004FFBE0 (FUN_004FFBE0) / 0x004FF960
@@ -270,7 +270,7 @@ namespace moho
     /**
      * Address: 0x004FF470 (FUN_004FF470)
      */
-    void SetTransform(const EntityTransformPayload& transform) override;
+    void SetTransform(const VTransform& transform) override;
 
     /**
      * Address: 0x004FFBE0 (FUN_004FFBE0)
@@ -339,7 +339,7 @@ namespace moho
     /**
      * Address: 0x004FEBC0 (FUN_004FEBC0)
      */
-    void SetTransform(const EntityTransformPayload& transform) override;
+    void SetTransform(const VTransform& transform) override;
 
     /**
      * Address: 0x004FF960 (FUN_004FF960)

@@ -33,7 +33,20 @@ namespace moho
     Wm3::Quatf orient_; // 0x00 (w,x,y,z)
     Wm3::Vec3f pos_;    // 0x10
 
-    VTransform() noexcept = default;
+    /**
+     * Address: 0x006770F0 (FUN_006770F0)
+     *
+     * What it does:
+     * Identity orientation (w = 1) and zero translation. The out-of-line copy
+     * exists because `PositionHistory`'s default constructor hands its address
+     * to the `eh vector constructor iterator` (0x00403250) for 25 x 0x1C
+     * samples (0x00678800, 0x0067DEE0, 0x0067E020); everywhere else it is
+     * inlined as the `1.0f, 0, 0, 0, 0, 0, 0` stores (e.g. 0x00748C15).
+     */
+    VTransform() noexcept
+      : orient_(1.0f, 0.0f, 0.0f, 0.0f)
+      , pos_(0.0f, 0.0f, 0.0f)
+    {}
 
     /**
      * Address: 0x0046FB90 (FUN_0046FB90)
@@ -94,8 +107,9 @@ namespace moho
      * Address: 0x00549DC0 (FUN_00549DC0)
      *
      * What it does:
-     * Returns true when either translation or orientation lanes differ,
-     * matching the binary short-circuit comparison order.
+     * Returns true when the translation or the orientation differs bit for
+     * bit, translation first: `Vector3<float>::CompareArrays` (0x004F0A50) and
+     * `Quaternion<float>::CompareArrays` (0x004F0B40) are plain `memcmp`s.
      */
     [[nodiscard]] bool Compare(const VTransform& rhs) const noexcept;
 

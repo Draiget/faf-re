@@ -126,9 +126,6 @@
     <ClCompile Include="moho\entity\EntitySetReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\entity\EntityTransformPayload.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\entity\EntityAttachPositionReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3252,7 +3249,7 @@
     <ClInclude Include="moho\entity\EntityPositionWatchEntry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="moho\entity\EntityTransformPayload.h">
+    <ClInclude Include="moho\entity\PositionHistory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\intel\CIntel.h">

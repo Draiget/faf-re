@@ -9,7 +9,6 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityTransformPayload.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"
@@ -498,8 +497,7 @@ namespace moho
       std::cos(mFallDirectionRadians) * sinTilt,
     };
 
-    const EntityTransformPayload currentPayload = ReadEntityTransformPayload(entity->mVarDat.mCurTransform.orient_, entity->mVarDat.mCurTransform.pos_);
-    VTransform pendingTransform = BuildVTransformFromEntityTransformPayload(currentPayload);
+    VTransform pendingTransform = entity->mVarDat.mCurTransform;
 
     const Wm3::Vec3f currentAxis = BuildCurrentFallAxis(pendingTransform.orient_);
     Wm3::Quatf delta = BuildRotationDeltaFromAxes(targetAxis, currentAxis);

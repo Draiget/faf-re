@@ -1873,19 +1873,6 @@ namespace
     }
   }
 
-  struct PropCreateTransformWords
-  {
-    float orientX;
-    float orientY;
-    float orientZ;
-    float orientW;
-    float posX;
-    float posY;
-    float posZ;
-  };
-
-  static_assert(sizeof(PropCreateTransformWords) == 0x1C, "PropCreateTransformWords size must be 0x1C");
-
   bool ParseBoolLiteral(const char* text, bool& outValue)
   {
     if (gpg::STR_EqualsNoCase(text, "true")) {
@@ -3656,18 +3643,9 @@ namespace
       return;
     }
 
-    PropCreateTransformWords words{};
-    // VTransform quaternion lanes are stored as (w,x,y,z) in the first four floats.
-    words.orientX = 1.0f; // identity scalar lane
-    words.posX = worldPos.x;
-    words.posY = worldPos.y;
-    words.posZ = worldPos.z;
-
-    VTransform spawnXform{};
-    static_assert(
-      sizeof(VTransform) == sizeof(PropCreateTransformWords), "VTransform size must be 0x1C for prop spawn path"
-    );
-    std::memcpy(&spawnXform, &words, sizeof(spawnXform));
+    // 0x00748C15..0x00748C5D: identity orientation stores, then the position.
+    VTransform spawnXform;
+    spawnXform.pos_ = worldPos;
 
     (void)PROP_Create(sim, spawnXform, blueprintId);
   }
