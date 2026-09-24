@@ -289,7 +289,6 @@ namespace moho
     , mVisible(false)
     , mPad195{0}
     , mLastUpdate(0)
-    , mEnd(SEntAttachInfo::MakeDetached())
     , mBeam{}
     , mIsNew(true)
     , mPad295{0}
@@ -316,7 +315,6 @@ namespace moho
     , mVisible(false)
     , mPad195{0}
     , mLastUpdate(0)
-    , mEnd(SEntAttachInfo::MakeDetached())
     , mBeam{}
     , mIsNew(true)
     , mPad295{0}
@@ -360,8 +358,8 @@ namespace moho
    *
    * What it does:
    * Blueprint-driven beam ctor. Chains the manager-bound CEffectImpl base ctor,
-   * initializes the endpoint attach-info to the detached beam-end default
-   * (orientation x=1, others zero), sizes the effect param/texture/string lanes,
+   * default-constructs the endpoint attach-info (detached, identity relative
+   * transform), sizes the effect param/texture/string lanes,
    * then seeds every beam parameter (LOD cutoff, length, lifetime, UV scroll,
    * thickness, start/end colour, repeat rate) and both texture slots from the
    * blueprint before rebuilding beam render state via Reset().
@@ -380,20 +378,6 @@ namespace moho
     , mIsNew(true)
     , mPad295{0}
   {
-    // Endpoint attach-info: detached weak target, invalid parent/child bones,
-    // beam-end default orientation (x=1, y=z=w=0), zero relative position.
-    mEnd.mAttachTargetWeak.ownerLinkSlot = nullptr;
-    mEnd.mAttachTargetWeak.nextInOwner = nullptr;
-    mEnd.mParentBoneIndex = -1;
-    mEnd.mChildBoneIndex = -1;
-    mEnd.mRelativeOrientX = 1.0f;
-    mEnd.mRelativeOrientY = 0.0f;
-    mEnd.mRelativeOrientZ = 0.0f;
-    mEnd.mRelativeOrientW = 0.0f;
-    mEnd.mRelativePosX = 0.0f;
-    mEnd.mRelativePosY = 0.0f;
-    mEnd.mRelativePosZ = 0.0f;
-
     // Size the effect parameter lanes (fastvector_n resize emissions):
     // params -> 21 floats, textures -> 2 null slots, strings -> 2 empty.
     mParams.resize(BEAM_LASTPARAM, 0.0f);

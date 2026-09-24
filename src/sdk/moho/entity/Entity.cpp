@@ -1539,34 +1539,6 @@ namespace
   }
 
   /**
-   * Address: 0x005E3B50 (FUN_005E3B50)
-   *
-   * What it does:
-   * Builds one attach-info payload from parent handle, child/parent bone
-   * indices, and 7-float relative transform lanes.
-   */
-  [[nodiscard]] moho::SEntAttachInfo BuildAttachInfoFromBones(
-    moho::Entity* const parent,
-    const int childBoneIndex,
-    const int parentBoneIndex,
-    const float relativeTransform[7]
-  ) noexcept
-  {
-    moho::SEntAttachInfo attachInfo = moho::SEntAttachInfo::MakeDetached();
-    attachInfo.TargetWeakLink().ResetFromObject(parent);
-    attachInfo.mParentBoneIndex = parentBoneIndex;
-    attachInfo.mChildBoneIndex = childBoneIndex;
-    attachInfo.mRelativeOrientX = relativeTransform[0];
-    attachInfo.mRelativeOrientY = relativeTransform[1];
-    attachInfo.mRelativeOrientZ = relativeTransform[2];
-    attachInfo.mRelativeOrientW = relativeTransform[3];
-    attachInfo.mRelativePosX = relativeTransform[4];
-    attachInfo.mRelativePosY = relativeTransform[5];
-    attachInfo.mRelativePosZ = relativeTransform[6];
-    return attachInfo;
-  }
-
-  /**
    * Address: 0x00679680 (FUN_00679680)
    *
    * What it does:
@@ -1584,27 +1556,7 @@ namespace
 
     dst.mParentBoneIndex = src.mParentBoneIndex;
     dst.mChildBoneIndex = src.mChildBoneIndex;
-    dst.mRelativeOrientX = src.mRelativeOrientX;
-    dst.mRelativeOrientY = src.mRelativeOrientY;
-    dst.mRelativeOrientZ = src.mRelativeOrientZ;
-    dst.mRelativeOrientW = src.mRelativeOrientW;
-    dst.mRelativePosX = src.mRelativePosX;
-    dst.mRelativePosY = src.mRelativePosY;
-    dst.mRelativePosZ = src.mRelativePosZ;
-  }
-
-  [[nodiscard]] moho::VTransform ReadAttachRelativeTransform(const moho::SEntAttachInfo& attachInfo) noexcept
-  {
-    moho::VTransform relative{};
-    // Attach payload stores quaternion lanes as scalar-first packed float4.
-    relative.orient_.w = attachInfo.mRelativeOrientX;
-    relative.orient_.x = attachInfo.mRelativeOrientY;
-    relative.orient_.y = attachInfo.mRelativeOrientZ;
-    relative.orient_.z = attachInfo.mRelativeOrientW;
-    relative.pos_.x = attachInfo.mRelativePosX;
-    relative.pos_.y = attachInfo.mRelativePosY;
-    relative.pos_.z = attachInfo.mRelativePosZ;
-    return relative;
+    dst.mRelativeTransform = src.mRelativeTransform;
   }
 
   /**
@@ -2439,7 +2391,7 @@ namespace moho
     }
 
     mAttachInfo.TargetWeakLink().UnlinkFromOwnerChain();
-    mAttachInfo = SEntAttachInfo::MakeDetached();
+    mAttachInfo = SEntAttachInfo();
     mAttachedEntities.clear();
 
     ::operator delete(CollisionExtents);
@@ -2533,7 +2485,6 @@ namespace moho
     CollisionExtents = nullptr;
 
     mAttachedEntities.clear();
-    mAttachInfo = SEntAttachInfo::MakeDetached();
 
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
@@ -2615,7 +2566,6 @@ namespace moho
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
-    mAttachInfo = SEntAttachInfo::MakeDetached();
 
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
@@ -2687,7 +2637,6 @@ namespace moho
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
-    mAttachInfo = SEntAttachInfo::MakeDetached();
 
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
@@ -2759,7 +2708,6 @@ namespace moho
     mLastTickProcessed = 0u;
     CollisionExtents = nullptr;
 
-    mAttachInfo = SEntAttachInfo::MakeDetached();
 
     mQueueRelinkBlocked = 0u;
     DestroyQueuedFlag = 0u;
@@ -3377,8 +3325,7 @@ namespace moho
     }
 
     const VTransform parentBoneTransform = parentEntity->GetBoneWorldTransform(mAttachInfo.mParentBoneIndex);
-    const VTransform attachRelativeTransform = ReadAttachRelativeTransform(mAttachInfo);
-    const VTransform parentComposedTransform = VTransform::Compose(attachRelativeTransform, parentBoneTransform);
+    const VTransform parentComposedTransform = VTransform::Compose(mAttachInfo.mRelativeTransform, parentBoneTransform);
     VTransform attachedTransform = SolveAttachedWorldTransformFromChildLocal(childLocalTransform, parentComposedTransform);
     NormalizeQuatInPlace(&attachedTransform.orient_);
     return attachedTransform;
@@ -3814,7 +3761,7 @@ namespace moho
 
       parentChildren.erase(it);
 
-      SEntAttachInfo detached = SEntAttachInfo::MakeDetached();
+      SEntAttachInfo detached;
       ApplyAttachInfo(mAttachInfo, detached);
 
       return true;
@@ -4361,28 +4308,6 @@ namespace moho
     head->mPrev = node;
     node->mPrev->mNext = node;
     return node;
-  }
-
-  /**
-   * Address: 0x00689FE0 (FUN_00689FE0)
-   *
-   * What it does:
-   * Stores one 7-float attach-relative transform lane into `mAttachInfo`
-   * (`relative orientation` then `relative position`) and returns source.
-   */
-  [[maybe_unused]] const float* StoreEntityAttachRelativeTransformLanes(
-    const float* const transformLanes,
-    Entity* const entity
-  ) noexcept
-  {
-    entity->mAttachInfo.mRelativeOrientX = transformLanes[0];
-    entity->mAttachInfo.mRelativeOrientY = transformLanes[1];
-    entity->mAttachInfo.mRelativeOrientZ = transformLanes[2];
-    entity->mAttachInfo.mRelativeOrientW = transformLanes[3];
-    entity->mAttachInfo.mRelativePosX = transformLanes[4];
-    entity->mAttachInfo.mRelativePosY = transformLanes[5];
-    entity->mAttachInfo.mRelativePosZ = transformLanes[6];
-    return transformLanes;
   }
 
   /**
@@ -5880,13 +5805,9 @@ namespace moho
     const LuaPlus::LuaObject parentOffsetObject(LuaPlus::LuaStackObject(state, 2));
     const Wm3::Vector3f parentOffset = SCR_FromLuaCopy<Wm3::Vector3f>(parentOffsetObject);
 
-    entity->mAttachInfo.mRelativeOrientX = 1.0f;
-    entity->mAttachInfo.mRelativeOrientY = 0.0f;
-    entity->mAttachInfo.mRelativeOrientZ = 0.0f;
-    entity->mAttachInfo.mRelativeOrientW = 0.0f;
-    entity->mAttachInfo.mRelativePosX = parentOffset.x;
-    entity->mAttachInfo.mRelativePosY = parentOffset.y;
-    entity->mAttachInfo.mRelativePosZ = parentOffset.z;
+    VTransform offsetTransform;
+    offsetTransform.pos_ = parentOffset;
+    entity->mAttachInfo.mRelativeTransform = offsetTransform;
     return 0;
   }
 
@@ -6815,17 +6736,7 @@ namespace moho
     LuaPlus::LuaStackObject parentBoneArg(state, 4);
     const int parentBoneIndex = ENTSCR_ResolveBoneIndex(parentEntity, parentBoneArg, true);
 
-    const float relativeTransform[7] = {
-      1.0f, // orientation lane #0 (as copied by FUN_005E3B50)
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-      0.0f,
-    };
-
-    SEntAttachInfo attachInfo = BuildAttachInfoFromBones(parentEntity, childBoneIndex, parentBoneIndex, relativeTransform);
+    SEntAttachInfo attachInfo(parentEntity, childBoneIndex, parentBoneIndex, VTransform());
     const bool didAttach = childEntity->AttachTo(attachInfo);
     attachInfo.TargetWeakLink().UnlinkFromOwnerChain();
 

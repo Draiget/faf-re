@@ -8436,20 +8436,12 @@ Unit* Sim::TransferUnit(Unit* const unit, CArmyImpl* const newArmy)
       const int childBoneIndex = childChildBones[i];
 
       // Re-attach the transferred child to the replacement unit. The attach payload
-      // reuses the captured bone indices with an identity relative transform
-      // (scalar-first quaternion: w-lane = 1, all else 0).
-      SEntAttachInfo attachInfo{};
+      // reuses the captured bone indices with an identity relative transform.
+      SEntAttachInfo attachInfo;
       attachInfo.mAttachTargetWeak.BindObjectUnlinked(newUnit);
       (void)attachInfo.mAttachTargetWeak.LinkIntoOwnerChainHeadUnlinked();
       attachInfo.mParentBoneIndex = parentBoneIndex;
       attachInfo.mChildBoneIndex = childBoneIndex;
-      attachInfo.mRelativeOrientX = 1.0f;
-      attachInfo.mRelativeOrientY = 0.0f;
-      attachInfo.mRelativeOrientZ = 0.0f;
-      attachInfo.mRelativeOrientW = 0.0f;
-      attachInfo.mRelativePosX = 0.0f;
-      attachInfo.mRelativePosY = 0.0f;
-      attachInfo.mRelativePosZ = 0.0f;
 
       child->AttachTo(attachInfo);
       // Detach the temporary attach node from the replacement's weak chain; the
@@ -22290,17 +22282,7 @@ int moho::cfunc_EntityAttachToL(LuaPlus::LuaState* const state)
   LuaPlus::LuaStackObject parentBoneArg(state, 3);
   const int parentBoneIndex = ENTSCR_ResolveBoneIndex(parentEntity, parentBoneArg, true);
 
-  SEntAttachInfo attachInfo = SEntAttachInfo::MakeDetached();
-  attachInfo.TargetWeakLink().ResetFromObject(parentEntity);
-  attachInfo.mParentBoneIndex = parentBoneIndex;
-  attachInfo.mChildBoneIndex = 0;
-  attachInfo.mRelativeOrientX = 1.0f;
-  attachInfo.mRelativeOrientY = 0.0f;
-  attachInfo.mRelativeOrientZ = 0.0f;
-  attachInfo.mRelativeOrientW = 0.0f;
-  attachInfo.mRelativePosX = 0.0f;
-  attachInfo.mRelativePosY = 0.0f;
-  attachInfo.mRelativePosZ = 0.0f;
+  SEntAttachInfo attachInfo(parentEntity, 0, parentBoneIndex, VTransform());
 
   const bool didAttach = childEntity->AttachTo(attachInfo);
   attachInfo.TargetWeakLink().UnlinkFromOwnerChain();

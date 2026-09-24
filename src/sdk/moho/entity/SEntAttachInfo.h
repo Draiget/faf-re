@@ -4,6 +4,7 @@
 #include <cstdint>
 
 #include "moho/misc/WeakPtr.h"
+#include "moho/render/camera/VTransform.h"
 
 namespace gpg
 {
@@ -26,13 +27,9 @@ namespace moho
    * - first 8 bytes are `WeakPtr<Entity>` intrusive link state.
    * - owner slot stores encoded pointer to owner's weak-link head slot.
    * - second dword links this node into owner weak-chain.
-   * - Bone indices default to -1 when detached.
-   * - Orientation defaults to the identity quaternion, which this engine stores
-   *   scalar-first: the first orientation word (mRelativeOrientX) holds the
-   *   scalar and is 1.0, the remaining three are 0. Every binary attach-info
-   *   init writes orient.x = 1.0 (Entity ctors 0x006779E0/0x00678160,
-   *   CEffectImpl ctors 0x00659090/0x00659190, CEfxBeam ctor 0x006547C0); no
-   *   binary path writes orient.w = 1.0. Relative position defaults to zero.
+   *
+   * +0x10 is one `VTransform`: the serializer (0x0067ED40 / 0x0067EDD0) moves it
+   * through `VTransform`'s RType, and 0x005E3B50 copies it from a `VTransform`.
    */
   struct SEntAttachInfo
   {
@@ -40,15 +37,43 @@ namespace moho
 
     WeakPtr<Entity> mAttachTargetWeak; // +0x00
 
-    std::int32_t mParentBoneIndex; // +0x08
-    std::int32_t mChildBoneIndex;  // +0x0C
-    float mRelativeOrientX;        // +0x10
-    float mRelativeOrientY;        // +0x14
-    float mRelativeOrientZ;        // +0x18
-    float mRelativeOrientW;        // +0x1C
-    float mRelativePosX;           // +0x20
-    float mRelativePosY;           // +0x24
-    float mRelativePosZ;           // +0x28
+    std::int32_t mParentBoneIndex;  // +0x08
+    std::int32_t mChildBoneIndex;   // +0x0C
+    VTransform mRelativeTransform;  // +0x10
+
+    /**
+     * What it does:
+     * Detached: no target, both bones -1, identity relative transform. Inlined
+     * wherever an attach info is embedded (Entity ctors 0x006779E0/0x00678160,
+     * CEffectImpl ctors 0x00659090/0x00659190, CEfxBeam ctor 0x006547C0).
+     */
+    SEntAttachInfo() noexcept
+      : mParentBoneIndex(-1)
+      , mChildBoneIndex(-1)
+    {}
+
+    /**
+     * Address: 0x005E3B50 (FUN_005E3B50)
+     *
+     * What it does:
+     * Links to `parent`'s weak chain (`parent ? parent + 4 : 0`, push-front),
+     * stores both bone indices and copies `relativeTransform`. This in EAX,
+     * parent in EDX, transform in ECX, the two bones on the stack, `ret 8`.
+     * Callers: `CAiTransportImpl::TransportAddToStorage` (0x005E7C72),
+     * `cfunc_EntityAttachToL` (0x0068BF44), `cfunc_EntityAttachBoneToL`
+     * (0x0068C1E6), each with a default-constructed (identity) transform.
+     */
+    SEntAttachInfo(
+      Entity* const parent,
+      const std::int32_t childBoneIndex,
+      const std::int32_t parentBoneIndex,
+      const VTransform& relativeTransform
+    ) noexcept
+      : mAttachTargetWeak(parent)
+      , mParentBoneIndex(parentBoneIndex)
+      , mChildBoneIndex(childBoneIndex)
+      , mRelativeTransform(relativeTransform)
+    {}
 
     [[nodiscard]] WeakPtr<Entity>& TargetWeakLink() noexcept
     {
@@ -80,26 +105,6 @@ namespace moho
       return TargetWeakLink().GetObjectPtr();
     }
 
-    [[nodiscard]] static SEntAttachInfo MakeDetached() noexcept
-    {
-      SEntAttachInfo info{};
-      info.mAttachTargetWeak.ownerLinkSlot = nullptr;
-      info.mAttachTargetWeak.nextInOwner = nullptr;
-      info.mParentBoneIndex = -1;
-      info.mChildBoneIndex = -1;
-      // Identity quaternion, scalar-first: orient.x is the scalar (1.0). This
-      // matches every binary attach-info init; the previous (0,0,0,1) placed
-      // the scalar in the wrong word and produced a bogus 180 deg orientation.
-      info.mRelativeOrientX = 1.0f;
-      info.mRelativeOrientY = 0.0f;
-      info.mRelativeOrientZ = 0.0f;
-      info.mRelativeOrientW = 0.0f;
-      info.mRelativePosX = 0.0f;
-      info.mRelativePosY = 0.0f;
-      info.mRelativePosZ = 0.0f;
-      return info;
-    }
-
     /**
      * Address: 0x0067ED40 (FUN_0067ED40, Moho::SEntAttachInfo::MemberDeserialize)
      *
@@ -128,7 +133,6 @@ namespace moho
     offsetof(SEntAttachInfo, mChildBoneIndex) == 0x0C, "SEntAttachInfo::mChildBoneIndex offset must be 0x0C"
   );
   static_assert(
-    offsetof(SEntAttachInfo, mRelativeOrientW) == 0x1C, "SEntAttachInfo::mRelativeOrientW offset must be 0x1C"
+    offsetof(SEntAttachInfo, mRelativeTransform) == 0x10, "SEntAttachInfo::mRelativeTransform offset must be 0x10"
   );
-  static_assert(offsetof(SEntAttachInfo, mRelativePosX) == 0x20, "SEntAttachInfo::mRelativePosX offset must be 0x20");
 } // namespace moho

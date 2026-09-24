@@ -182,7 +182,7 @@ namespace moho
     LuaPlus::LuaStackObject otherBoneArg(state, lua_gettop(rawState));
     const int otherBoneIndex = ENTSCR_ResolveBoneIndex(launcherEntity, otherBoneArg, true);
 
-    SEntAttachInfo attachInfo = SEntAttachInfo::MakeDetached();
+    SEntAttachInfo attachInfo;
     attachInfo.TargetWeakLink().ResetFromObject(launcherEntity);
     attachInfo.mParentBoneIndex = otherBoneIndex;
     attachInfo.mChildBoneIndex = beamBoneIndex;

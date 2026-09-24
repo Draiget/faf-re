@@ -88,7 +88,6 @@ namespace moho
     , mParams()
     , mParticleTextures()
     , mStrings()
-    , mEntityInfo(SEntAttachInfo::MakeDetached())
     , mNewAttachment(0)
     , mPad14D{0, 0, 0}
     , mMatrix(VMatrix4::Identity())
@@ -107,7 +106,6 @@ namespace moho
     , mParams()
     , mParticleTextures()
     , mStrings()
-    , mEntityInfo(SEntAttachInfo::MakeDetached())
     , mNewAttachment(0)
     , mPad14D{0, 0, 0}
     , mMatrix(VMatrix4::Identity())

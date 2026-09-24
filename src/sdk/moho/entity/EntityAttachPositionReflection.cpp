@@ -833,7 +833,7 @@ namespace moho
     archive->ReadInt(&mChildBoneIndex);
 
     // Binary stores this 0x1C region through `VTransform` RTTI lanes.
-    archive->Read(ResolveVTransformType(), &mRelativeOrientX, nullOwner);
+    archive->Read(ResolveVTransformType(), &mRelativeTransform, nullOwner);
   }
 
   /**
@@ -853,7 +853,7 @@ namespace moho
     archive->WriteInt(mChildBoneIndex);
 
     // Binary stores this 0x1C region through `VTransform` RTTI lanes.
-    archive->Write(ResolveVTransformType(), &mRelativeOrientX, nullOwner);
+    archive->Write(ResolveVTransformType(), &mRelativeTransform, nullOwner);
   }
 
   /**

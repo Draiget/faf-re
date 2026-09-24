@@ -1545,7 +1545,7 @@ void CAiTransportImpl::AttachUnitToBone(
     return;
   }
 
-  SEntAttachInfo attachInfo = SEntAttachInfo::MakeDetached();
+  SEntAttachInfo attachInfo;
   attachInfo.mParentBoneIndex = static_cast<std::int32_t>(transportBoneIndex);
   attachInfo.mChildBoneIndex = static_cast<std::int32_t>(attachBoneIndex);
   attachInfo.TargetWeakLink().ResetFromObject(static_cast<Entity*>(mUnit));
@@ -1867,10 +1867,7 @@ void CAiTransportImpl::TransportAddToStorage(Unit* const unit)
   unit->RunScript("OnAddToStorage", mUnit);
   TransportClearReservation(unit);
 
-  SEntAttachInfo attachInfo = SEntAttachInfo::MakeDetached();
-  attachInfo.mParentBoneIndex = -1;
-  attachInfo.mChildBoneIndex = -1;
-  attachInfo.TargetWeakLink().ResetFromObject(static_cast<Entity*>(mUnit));
+  SEntAttachInfo attachInfo(static_cast<Entity*>(mUnit), -1, -1, VTransform());
   (void)unit->AttachTo(attachInfo);
   unit->TransportedByRef.ResetObjectPtr<Unit>(mUnit);
   (void)mStoredUnits.AddUnit(unit);
