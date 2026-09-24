@@ -2227,13 +2227,11 @@ namespace
     }
 
     const gpg::Rect2i ogridRect = GetReservedOgridRect(unit);
-    unit.SimulationRef->mOGrid->mOccupation.FillRect(
-      ogridRect.x0,
-      ogridRect.z0,
-      ogridRect.x1 - ogridRect.x0,
-      ogridRect.z1 - ogridRect.z0,
-      occupied
-    );
+    if (occupied) {
+      unit.SimulationRef->mOGrid->OccupyRect(ogridRect);
+    } else {
+      unit.SimulationRef->mOGrid->VacateRect(ogridRect);
+    }
   }
 
   /**
@@ -16362,19 +16360,11 @@ void Unit::ExecuteOccupyGround()
   const auto& occupyRects = blueprint->Physics.OccupyRects;
   if (occupyRects.empty()) {
     const Wm3::Vec3f& unitPos = GetPosition();
-    const auto x0 = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f))
-    );
-    const auto z0 = static_cast<std::int16_t>(
-      static_cast<std::int32_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
-    );
-
-    gpg::Rect2i rect{};
-    rect.x0 = static_cast<std::int32_t>(x0);
-    rect.z0 = static_cast<std::int32_t>(z0);
-    rect.x1 = rect.x0 + static_cast<std::int32_t>(footprint.mSizeX);
-    rect.z1 = rect.z0 + static_cast<std::int32_t>(footprint.mSizeZ);
-    ogrid->ExecuteOccupy(occupancyCaps, rect);
+    const SOCellPos origin{
+      static_cast<std::int16_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)),
+      static_cast<std::int16_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f)),
+    };
+    ogrid->ExecuteOccupy(origin, footprint);
     return;
   }
 
@@ -16404,18 +16394,13 @@ void Unit::ReleaseOccupyGround()
 
   const SFootprint& footprint = GetFootprint();
   const Wm3::Vec3f& unitPos = GetPosition();
-  gpg::Rect2i occupyRect{};
-  occupyRect.x0 = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f))
-  );
-  occupyRect.z0 = static_cast<std::int16_t>(
-    static_cast<std::int32_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f))
-  );
-  occupyRect.x1 = static_cast<std::int16_t>(occupyRect.x0 + static_cast<std::int32_t>(footprint.mSizeX));
-  occupyRect.z1 = static_cast<std::int16_t>(occupyRect.z0 + static_cast<std::int32_t>(footprint.mSizeZ));
+  const SOCellPos origin{
+    static_cast<std::int16_t>(std::lrintf(unitPos.x - static_cast<float>(footprint.mSizeX) * 0.5f)),
+    static_cast<std::int16_t>(std::lrintf(unitPos.z - static_cast<float>(footprint.mSizeZ) * 0.5f)),
+  };
 
   if (SimulationRef != nullptr && SimulationRef->mOGrid != nullptr) {
-    SimulationRef->mOGrid->ReleaseOccupy(footprint.mOccupancyCaps, occupyRect);
+    SimulationRef->mOGrid->ReleaseOccupy(origin, footprint);
   }
 
   FootprintDown = false;
@@ -16465,13 +16450,7 @@ bool Unit::CanReserveOgridRect(const gpg::Rect2i& ogridRect)
 
   bool canReserve = true;
   if (SimulationRef && SimulationRef->mOGrid) {
-    canReserve = !SimulationRef->mOGrid->mOccupation.GetRectOr(
-      ogridRect.x0,
-      ogridRect.z0,
-      ogridRect.x1 - ogridRect.x0,
-      ogridRect.z1 - ogridRect.z0,
-      true
-    );
+    canReserve = !SimulationRef->mOGrid->IsRectOccupied(ogridRect);
   }
 
   if (hadReservation) {

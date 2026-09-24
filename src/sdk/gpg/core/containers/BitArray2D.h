@@ -62,6 +62,16 @@ namespace gpg
 		void FillRect(int x0, int z0, int rectWidth, int rectHeight, bool fill);
 
 		/**
+		 * Address: 0x00720550 (FUN_00720550)
+		 *
+		 * What it does:
+		 * `FillRect` over a `Rect2i` (x0, z0, x1 - x0, z1 - z0). The out-of-line
+		 * copy has no callers; `COGrid::OccupyRect` and `COGrid::VacateRect`
+		 * inline it into direct calls of the five-argument form.
+		 */
+		void FillRect(const Rect2i& rect, bool fill);
+
+		/**
 		 * Address: 0x008D8270 (FUN_008D8270, ?AnyBitSet@BitArray2D@gpg@@QBE_NPAH0PAI@Z)
 		 *
 		 * What it does:

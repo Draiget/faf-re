@@ -19,6 +19,7 @@
 #include "moho/path/PathTables.h"
 #include "Wm3Box3.h"
 #include "moho/sim/Sim.h"
+#include "moho/sim/SOCellPos.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/GridTraversalLine.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
@@ -318,96 +319,6 @@ namespace
     return static_cast<std::uint16_t>(extent);
   }
 
-  struct CompactOccupancyRectExtentView
-  {
-    std::uint8_t width; // +0x00
-    std::uint8_t height; // +0x01
-    std::uint8_t caps; // +0x02
-  };
-  static_assert(
-    sizeof(CompactOccupancyRectExtentView) == 0x03,
-    "CompactOccupancyRectExtentView size must be 0x03"
-  );
-
-  struct CompactOccupancyRectOriginView
-  {
-    std::int16_t x; // +0x00
-    std::int16_t z; // +0x02
-  };
-  static_assert(
-    sizeof(CompactOccupancyRectOriginView) == 0x04,
-    "CompactOccupancyRectOriginView size must be 0x04"
-  );
-
-  /**
-   * Address: 0x00720550 (FUN_00720550)
-   *
-   * What it does:
-   * Fills one `BitArray2D` occupancy range defined by `rect` using `value`.
-   */
-  [[maybe_unused]] void FillBitArrayRectFromRect2i(
-    gpg::BitArray2D& occupancy,
-    const gpg::Rect2i& rect,
-    const bool value
-  )
-  {
-    occupancy.FillRect(
-      rect.x0,
-      rect.z0,
-      rect.x1 - rect.x0,
-      rect.z1 - rect.z0,
-      value
-    );
-  }
-
-  /**
-   * Address: 0x00720710 (FUN_00720710)
-   *
-   * What it does:
-   * Clears `COGrid::mOccupation` bits over `rect`.
-   */
-  [[maybe_unused]] void ClearCOGridOccupationRect(const gpg::Rect2i& rect, moho::COGrid& grid)
-  {
-    FillBitArrayRectFromRect2i(grid.mOccupation, rect, false);
-  }
-
-  /**
-   * Address: 0x00720740 (FUN_00720740)
-   *
-   * What it does:
-   * Returns whether any occupied bit is set in `grid.mOccupation` over `rect`.
-   */
-  [[maybe_unused]] bool IsCOGridOccupationRectBlocked(const gpg::Rect2i& rect, const moho::COGrid& grid)
-  {
-    return grid.mOccupation.GetRectOr(
-      rect.x0,
-      rect.z0,
-      rect.x1 - rect.x0,
-      rect.z1 - rect.z0,
-      true
-    );
-  }
-
-  /**
-   * Address: 0x00721B90 (FUN_00721B90)
-   *
-   * What it does:
-   * Expands one compact origin/extent occupancy payload into `Rect2i` and
-   * forwards the release to `COGrid::ReleaseOccupy`.
-   */
-  [[maybe_unused]] void ReleaseCompactOccupancyRect(
-    const CompactOccupancyRectExtentView& extent,
-    const CompactOccupancyRectOriginView& origin,
-    moho::COGrid& grid
-  )
-  {
-    gpg::Rect2i rect{};
-    rect.x0 = static_cast<int>(origin.x);
-    rect.z0 = static_cast<int>(origin.z);
-    rect.x1 = rect.x0 + static_cast<int>(extent.width);
-    rect.z1 = rect.z0 + static_cast<int>(extent.height);
-    grid.ReleaseOccupy(static_cast<moho::EOccupancyCaps>(extent.caps), rect);
-  }
 } // namespace
 
 namespace moho
@@ -453,23 +364,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00722DD0 (FUN_00722DD0)
-   *
-   * What it does:
-   * In-place construction adapter for `EntityOccupationManager` that preserves
-   * the binary register/return contract by returning destination storage.
-   */
-  [[maybe_unused]] EntityOccupationManager* ConstructEntityOccupationManagerInPlace(
-    const std::uint32_t width,
-    EntityOccupationManager& destination,
-    const std::uint32_t height
-  )
-  {
-    ::new (&destination) EntityOccupationManager(width, height);
-    return &destination;
-  }
-
-  /**
    * Address: 0x00720680 (FUN_00720680, Moho::COGrid::~COGrid)
    */
   COGrid::~COGrid() = default;
@@ -482,7 +376,29 @@ namespace moho
    */
   void COGrid::OccupyRect(const gpg::Rect2i& rect)
   {
-    mOccupation.FillRect(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
+    mOccupation.FillRect(rect, true);
+  }
+
+  /**
+   * Address: 0x00720710 (FUN_00720710)
+   *
+   * What it does:
+   * Clears `mOccupation` bits over `rect`.
+   */
+  void COGrid::VacateRect(const gpg::Rect2i& rect)
+  {
+    mOccupation.FillRect(rect, false);
+  }
+
+  /**
+   * Address: 0x00720740 (FUN_00720740)
+   *
+   * What it does:
+   * Returns whether any `mOccupation` bit over `rect` is set.
+   */
+  bool COGrid::IsRectOccupied(const gpg::Rect2i& rect) const
+  {
+    return mOccupation.GetRectOr(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, true);
   }
 
   /**
@@ -863,7 +779,7 @@ namespace moho
   } // namespace
 
   /**
-    * Alias of FUN_00721A90 (non-canonical helper lane).
+   * Address: 0x00721A90 (FUN_00721A90, Moho::COGrid::ExecuteOccupy)
    *
    * IDA signature:
    * void __usercall Moho::COGrid::ExecuteOccupy(
@@ -918,6 +834,42 @@ namespace moho
     sim->mPathTables->DirtyClusters(rect);
   }
 
+  namespace
+  {
+    /**
+     * The footprint's cells at `origin`: (x, z, x + mSizeX, z + mSizeZ), from
+     * the 16-bit origin words and the footprint's two size bytes.
+     */
+    [[nodiscard]] gpg::Rect2i FootprintRectAt(const SOCellPos& origin, const SFootprint& footprint) noexcept
+    {
+      const int x0 = origin.x;
+      const int z0 = origin.z;
+      return gpg::Rect2i{x0, z0, x0 + footprint.mSizeX, z0 + footprint.mSizeZ};
+    }
+  } // namespace
+
+  /**
+   * Address: 0x00721AF0 (FUN_00721AF0)
+   *
+   * What it does:
+   * Occupies the footprint's cells at `origin` with its own occupancy caps.
+   */
+  void COGrid::ExecuteOccupy(const SOCellPos& origin, const SFootprint& footprint)
+  {
+    ExecuteOccupy(footprint.mOccupancyCaps, FootprintRectAt(origin, footprint));
+  }
+
+  /**
+   * Address: 0x00721B90 (FUN_00721B90)
+   *
+   * What it does:
+   * Releases the footprint's cells at `origin`.
+   */
+  void COGrid::ReleaseOccupy(const SOCellPos& origin, const SFootprint& footprint)
+  {
+    ReleaseOccupy(footprint.mOccupancyCaps, FootprintRectAt(origin, footprint));
+  }
+
   /**
    * Address: 0x00721BD0 (FUN_00721BD0)
    *
@@ -926,16 +878,15 @@ namespace moho
    * collision-cell rectangle and gathers unmarked entity owners of `flags`
    * from this grid's occupation manager into `outEntities`.
    */
-  [[maybe_unused]] int GatherUnmarkedEntitiesInBounds(
+  int COGrid::GatherUnmarkedEntities(
     const Wm3::AxisAlignedBox3f& bounds,
-    COGrid& grid,
     const EEntityType flags,
     gpg::core::FastVectorN<Entity*, 20>& outEntities
   )
   {
     CollisionDBRect rect{};
     (void)func_AABoxToRect(&rect, bounds);
-    return grid.mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
+    return mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
   }
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromOrientedBox(const Wm3::Box3f& box) noexcept
@@ -1020,9 +971,13 @@ namespace moho
    * `source`'s collision shape. Hits are appended into `outCollisions` with
    * `sourceEntity` stamped to the owning candidate. The source entity itself is
    * always excluded from the gathered set.
+   *
+   * Nothing in the shipped binary calls it: no call instruction, xref, data
+   * reference or stored pointer targets 0x007227B0 (the ten call edges the
+   * callgraph index lists are spurious rows; none of those functions contain
+   * the call). It is kept as the COGrid member the engine defined.
    */
-  [[maybe_unused]] void CollectEntitiesCollidingWithEntity(
-    COGrid& grid,
+  void COGrid::CollectEntitiesCollidingWithEntity(
     const EEntityType flags,
     Entity* const source,
     gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
@@ -1033,7 +988,7 @@ namespace moho
 
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount =
-      grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
+      mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
 
     outCollisions.ResetStorageToInline();
 
@@ -1090,12 +1045,7 @@ namespace moho
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-    const int gatheredCount = GatherUnmarkedEntitiesInBounds(
-      queryBounds,
-      *this,
-      flags,
-      gatheredEntities
-    );
+    const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
 
@@ -1141,7 +1091,7 @@ namespace moho
   )
   {
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-    const int gatheredCount = GatherUnmarkedEntitiesInBounds(box, grid, ENTITYTYPE_Unit, gatheredEntities);
+    const int gatheredCount = grid.GatherUnmarkedEntities(box, ENTITYTYPE_Unit, gatheredEntities);
 
     into.ResetStorageToInline();
 
@@ -1378,12 +1328,7 @@ namespace moho
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-    const int gatheredCount = GatherUnmarkedEntitiesInBounds(
-      queryBounds,
-      *this,
-      flags,
-      gatheredEntities
-    );
+    const int gatheredCount = GatherUnmarkedEntities(queryBounds, flags, gatheredEntities);
 
     outCollisions.ResetStorageToInline();
 

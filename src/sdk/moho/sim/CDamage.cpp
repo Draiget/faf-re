@@ -819,10 +819,10 @@ namespace moho
     outerSphere.Center = damage.mOrigin;
     outerSphere.Radius = damage.mMaxRadius;
 
-    // Bounding cell rect covering the outer sphere. The binary builds the
-    // enclosing box around `mMaxRadius` on all three axes and hands it to
-    // `func_AABoxToRect` (0x004FCBE0, called here from 0x00722619), which
-    // quantizes the X/Z footprint into collision cells.
+    // Box around the outer sphere. The binary builds it around `mMaxRadius`
+    // on all three axes and inlines COGrid::GatherUnmarkedEntities over it:
+    // `func_AABoxToRect` (0x004FCBE0, called from 0x00722619) quantizes the
+    // X/Z footprint to collision cells, then the occupation manager gathers.
     const Wm3::AxisAlignedBox3f outerBounds{
       Wm3::Vector3f{
         damage.mOrigin.x - damage.mMaxRadius,
@@ -836,14 +836,11 @@ namespace moho
       },
     };
 
-    CollisionDBRect cellRect{};
-    (void)func_AABoxToRect(&cellRect, outerBounds);
-
     gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
-    (void)oGrid->mEntityOccupationManager.GatherUnmarkedEntities(
-      gatheredEntities,
-      cellRect,
-      static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity));
+    (void)oGrid->GatherUnmarkedEntities(
+      outerBounds,
+      static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity),
+      gatheredEntities);
 
     outResults.ResetStorageToInline();
 

@@ -79,6 +79,10 @@ namespace moho
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)
+     * Address: 0x00722DD0 (FUN_00722DD0, out-of-line construct-in-place of this
+     *   constructor: `this` in edx, call 0x004FCD20, return `this`; no callers.
+     *   COGrid's member list is the source that constructs one. Formerly
+     *   `ConstructEntityOccupationManagerInPlace`, removed 2026-09-24.)
      *
      * What it does:
      * Quantizes world dimensions to 4x4 collision buckets and allocates/zeros
@@ -203,7 +207,26 @@ namespace moho
     void OccupyRect(const gpg::Rect2i& rect);
 
     /**
-      * Alias of FUN_00721A90 (non-canonical helper lane).
+     * Address: 0x00720710 (FUN_00720710)
+     *
+     * What it does:
+     * Clears `mOccupation` bits over `rect`; `OccupyRect`'s counterpart. The
+     * out-of-line copy has no callers, `Unit::CanReserveOgridRect` inlines it.
+     */
+    void VacateRect(const gpg::Rect2i& rect);
+
+    /**
+     * Address: 0x00720740 (FUN_00720740)
+     *
+     * What it does:
+     * True when any `mOccupation` bit inside `rect` is set (`GetRectOr` with
+     * out-of-range cells counted as occupied). Inlined into
+     * `Unit::CanReserveOgridRect`; the out-of-line copy has no callers.
+     */
+    [[nodiscard]] bool IsRectOccupied(const gpg::Rect2i& rect) const;
+
+    /**
+     * Address: 0x00721A90 (FUN_00721A90, Moho::COGrid::ExecuteOccupy)
      *
      * What it does:
      * Marks the requested bits set in the terrain and/or water occupancy
@@ -225,6 +248,27 @@ namespace moho
     void ReleaseOccupy(EOccupancyCaps caps, const gpg::Rect2i& rect);
 
     /**
+     * Address: 0x00721AF0 (FUN_00721AF0)
+     *
+     * What it does:
+     * `ExecuteOccupy` over the footprint's cells at `origin`, with the
+     * footprint's own occupancy caps: rect (origin.x, origin.z,
+     * origin.x + mSizeX, origin.z + mSizeZ). Inlined into `Prop`'s blueprint
+     * constructor and `Unit::ExecuteOccupyGround`; no out-of-line callers.
+     */
+    void ExecuteOccupy(const SOCellPos& origin, const SFootprint& footprint);
+
+    /**
+     * Address: 0x00721B90 (FUN_00721B90)
+     *
+     * What it does:
+     * `ReleaseOccupy` over the same footprint rectangle. Inlined into
+     * `~Prop` (0x006FA0DC: the `movsx` of both 16-bit origin words) and
+     * `Unit::ReleaseOccupyGround`; no out-of-line callers.
+     */
+    void ReleaseOccupy(const SOCellPos& origin, const SFootprint& footprint);
+
+    /**
      * Address: 0x007229C0 (FUN_007229C0, Moho::COGrid::GetEntityCollisionsInLine)
      *
      * What it does:
@@ -236,6 +280,32 @@ namespace moho
       gpg::core::FastVectorN<EntityLineCollision, 10>& outCollisions,
       const Wm3::Vec3f& lineStart,
       const Wm3::Vec3f& lineEnd
+    );
+
+    /**
+     * Address: 0x007227B0 (FUN_007227B0, Moho::COGrid::CollectEntitiesCollidingWithEntity)
+     *
+     * What it does:
+     * Gathers the unmarked entities of `flags` in `source`'s AABB cells and
+     * appends each one whose shape collides `source`'s shape (source itself
+     * excluded). No caller anywhere in the shipped binary.
+     */
+    void CollectEntitiesCollidingWithEntity(
+      EEntityType flags, Entity* source, gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
+    );
+
+    /**
+     * Address: 0x00721BD0 (FUN_00721BD0)
+     *
+     * What it does:
+     * Quantizes `bounds` to collision cells (0x004FCBE0) and gathers the
+     * unmarked entities of `flags` in them. `CollectEntitiesInBox`,
+     * `GatherUnmarkedUnitsInBox` and `ForAllEntitiesIterator` use it; the binary
+     * inlines every use, including the damage-ring gather (0x00722560), so the
+     * out-of-line copy has no callers.
+     */
+    int GatherUnmarkedEntities(
+      const Wm3::AxisAlignedBox3f& bounds, EEntityType flags, gpg::core::FastVectorN<Entity*, 20>& outEntities
     );
 
     /**

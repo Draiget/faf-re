@@ -89,6 +89,17 @@ void BitArray2D::Reset(const unsigned int newWidth, const unsigned int newHeight
 }
 
 /**
+ * Address: 0x00720550 (FUN_00720550)
+ *
+ * What it does:
+ * Fills `rect` (x1/z1 exclusive) through the five-argument form.
+ */
+void BitArray2D::FillRect(const Rect2i& rect, const bool fill)
+{
+    FillRect(rect.x0, rect.z0, rect.x1 - rect.x0, rect.z1 - rect.z0, fill);
+}
+
+/**
  * Address: 0x008D8370 (FUN_008D8370, ?FillRect@BitArray2D@gpg@@QAEXHHHH_N@Z)
  */
 void BitArray2D::FillRect(int x0, int z0, const int rectWidth, const int rectHeight, const bool fill)

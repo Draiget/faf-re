@@ -81,37 +81,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00721AF0 (FUN_00721AF0)
-   *
-   * IDA signature:
-   * void __usercall sub_721AF0(const SFootprint *footprint@<eax>, const SOCellPos *origin@<edx>);
-   *
-   * What it does:
-   * Marks the footprint's cell rectangle at `origin` occupied with the
-   * footprint's own occupancy caps: `movzx [eax]` / `[eax+1]` are
-   * `mSizeX` / `mSizeZ`, `mov al, [eax+2]` is `mOccupancyCaps`, and the two
-   * `movsx word` loads off `edx` are the origin cell.
-   *
-   * This took an invented 3-byte `OccupancyFootprintRuntimeView` that the
-   * caller filled by copying those same three bytes out of
-   * `blueprint->mFootprint`, and two loose `int16_t` origin lanes. It takes the
-   * footprint and the `SOCellPos` it always read.
-   */
-  void OccupyFootprintAt(const moho::SFootprint& footprint, const moho::SOCellPos& origin, moho::COGrid* const grid)
-  {
-    if (grid == nullptr) {
-      return;
-    }
-
-    gpg::Rect2i rect{};
-    rect.x0 = static_cast<int>(origin.x);
-    rect.z0 = static_cast<int>(origin.z);
-    rect.x1 = rect.x0 + static_cast<int>(footprint.mSizeX);
-    rect.z1 = rect.z0 + static_cast<int>(footprint.mSizeZ);
-    grid->ExecuteOccupy(footprint.mOccupancyCaps, rect);
-  }
-
   [[nodiscard]] moho::CScrLuaInitFormSet& SimLuaInitSet()
   {
     // Every file that wants this set must resolve the one that already
@@ -526,7 +495,7 @@ namespace moho
         const int originZ = static_cast<int>(std::lrintf(transform.pos_.z - static_cast<float>(blueprint->mFootprint.mSizeZ) * 0.5f));
 
         const SOCellPos origin{static_cast<std::int16_t>(originX), static_cast<std::int16_t>(originZ)};
-        OccupyFootprintAt(blueprint->mFootprint, origin, sim->mOGrid);
+        sim->mOGrid->ExecuteOccupy(origin, blueprint->mFootprint);
       }
     }
   }
@@ -558,16 +527,11 @@ namespace moho
       const auto* const blueprint = static_cast<const RPropBlueprint*>(BluePrint);
       const SFootprint& footprint = blueprint->mFootprint;
 
-      const int originX = static_cast<int>(std::lrintf(mVarDat.mCurTransform.pos_.x - static_cast<float>(footprint.mSizeX) * 0.5f));
-      const int originZ = static_cast<int>(std::lrintf(mVarDat.mCurTransform.pos_.z - static_cast<float>(footprint.mSizeZ) * 0.5f));
-
-      gpg::Rect2i rect{};
-      rect.x0 = originX;
-      rect.z0 = originZ;
-      rect.x1 = originX + static_cast<int>(footprint.mSizeX);
-      rect.z1 = originZ + static_cast<int>(footprint.mSizeZ);
-
-      SimulationRef->mOGrid->ReleaseOccupy(footprint.mOccupancyCaps, rect);
+      const SOCellPos origin{
+        static_cast<std::int16_t>(std::lrintf(mVarDat.mCurTransform.pos_.x - static_cast<float>(footprint.mSizeX) * 0.5f)),
+        static_cast<std::int16_t>(std::lrintf(mVarDat.mCurTransform.pos_.z - static_cast<float>(footprint.mSizeZ) * 0.5f)),
+      };
+      SimulationRef->mOGrid->ReleaseOccupy(origin, footprint);
     }
 
     // InstanceCounter<Prop>'s -1 and `Entity::~Entity` run implicitly as part of the C++ destructor chain.

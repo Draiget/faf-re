@@ -27183,8 +27183,7 @@ void SIM_TryToBuild(Sim* const sim, CArmyImpl* const army, gpg::Rect2i* const re
     blocker->ReservedOgridRectMinZ = placedRect.z0;
     blocker->ReservedOgridRectMaxX = placedRect.x1;
     blocker->ReservedOgridRectMaxZ = placedRect.z1;
-    blocker->SimulationRef->mOGrid->mOccupation.FillRect(
-      placedRect.x0, placedRect.z0, placedRect.x1 - placedRect.x0, placedRect.z1 - placedRect.z0, true);
+    blocker->SimulationRef->mOGrid->OccupyRect(placedRect);
 
     if (IAiNavigator* const navigator = blocker->AiNavigator) {
       const SOCellPos goalCell{static_cast<std::int16_t>(placedRect.x0), static_cast<std::int16_t>(placedRect.z0)};
