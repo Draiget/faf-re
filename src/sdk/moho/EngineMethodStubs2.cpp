@@ -27,17 +27,17 @@
 namespace moho
 {
 
-// EntityCollisionUpdater (= Moho::CColPrimitiveBase) had all ten of its
-// virtuals stubbed here. They are pure in the binary: the class vftable at
-// 0x00E0D3F4 points every one of its 10 slots at _purecall (0x00A82547), so
-// the base contributes no bodies and these definitions were inventing
+// CColPrimitiveBase had all ten of its virtuals stubbed here. They are pure
+// in the binary: the class vftable at 0x00E0D3F4 points every one of its 10
+// slots at _purecall (0x00A82547), so the base contributes no bodies and these
+// definitions were inventing
 // behaviour -- GetBox in particular answered nullptr where a real box
 // primitive hands back its payload. The declarations are now `= 0`.
 //
 // The real bodies belong to Moho::CColPrimitive<T>, a template with two
 // instantiations (Box3f @0x00E0D50C, Sphere3f @0x00E0D480), which is what
-// the paired addresses in EntityCollisionUpdater.h have always been.
-// Recovering that template is the follow-up.
+// the paired addresses in EntityCollisionUpdater.h have always been. Both
+// are recovered there as explicit specializations.
 
 // IWldSessionLoader had all seven of its virtuals stubbed here. They are
 // pure in the binary: the interface vftable at 0x00E49FA4 points all 7 slots

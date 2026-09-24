@@ -455,7 +455,7 @@ namespace moho
    * What it does:
    * Initializes one collision-primitive base runtime lane.
    */
-  EntityCollisionUpdater::EntityCollisionUpdater() = default;
+  CColPrimitiveBase::CColPrimitiveBase() = default;
 
   /**
    * Address: 0x0067AC40 (FUN_0067AC40, inlined construction payload)
@@ -463,7 +463,7 @@ namespace moho
    * What it does:
    * Initializes box primitive state from local box and stores local-center copy.
    */
-  BoxCollisionPrimitive::BoxCollisionPrimitive(const Wm3::Box3f& localBox)
+  CColPrimitive<Wm3::Box3f>::CColPrimitive(const Wm3::Box3f& localBox)
     : mShape(localBox)
     , mLocalCenter(localBox.Center[0], localBox.Center[1], localBox.Center[2])
   {}
@@ -478,7 +478,7 @@ namespace moho
    * Computes world-space AABB from center/basis/extents and writes it to caller scratch buffer.
    */
   const EntityCollisionBoundsView*
-  BoxCollisionPrimitive::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
+  CColPrimitive<Wm3::Box3f>::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
   {
     auto* const bounds = &scratch0x1C->bounds;
     Wm3::Vec3f minimum{};
@@ -499,7 +499,7 @@ namespace moho
    * What it does:
    * Box primitive has no sphere view and returns null.
    */
-  const Wm3::Sphere3f* BoxCollisionPrimitive::GetSphere() const
+  const Wm3::Sphere3f* CColPrimitive<Wm3::Box3f>::GetSphere() const
   {
     return nullptr;
   }
@@ -510,7 +510,7 @@ namespace moho
    * What it does:
    * Returns pointer to box payload at +0x04.
    */
-  const Wm3::Box3f* BoxCollisionPrimitive::GetBox() const
+  const Wm3::Box3f* CColPrimitive<Wm3::Box3f>::GetBox() const
   {
     return &mShape;
   }
@@ -525,7 +525,7 @@ namespace moho
    * Rotates local-center offset by transform orientation, adds world position,
    * and updates primitive basis rows.
    */
-  void BoxCollisionPrimitive::SetTransform(const EntityTransformPayload& transform)
+  void CColPrimitive<Wm3::Box3f>::SetTransform(const EntityTransformPayload& transform)
   {
     const Basis3x3 basis = BuildBasisFromQuaternion(transform);
 
@@ -571,7 +571,7 @@ namespace moho
    * and the angular impulse it accumulated grew by four orders of magnitude in
    * a single contact instead of damping.
    */
-  Wm3::Vec3f* BoxCollisionPrimitive::GetCenter(Wm3::Vec3f* outCenter) const
+  Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::GetCenter(Wm3::Vec3f* outCenter) const
   {
     *outCenter = mLocalCenter;
     return outCenter;
@@ -587,7 +587,7 @@ namespace moho
    * `mLocalCenter`, the same lane `GetCenter` reads. The world-space
    * `mShape.Center` is derived from it by `SetTransform`, never written here.
    */
-  const Wm3::Vec3f* BoxCollisionPrimitive::SetCenter(const Wm3::Vec3f* center)
+  const Wm3::Vec3f* CColPrimitive<Wm3::Box3f>::SetCenter(const Wm3::Vec3f* center)
   {
     mLocalCenter = *center;
     return center;
@@ -599,7 +599,7 @@ namespace moho
    * What it does:
    * Tests segment-vs-box and fills first hit point, separation direction, and distance from line start.
    */
-  bool BoxCollisionPrimitive::CollideLine(
+  bool CColPrimitive<Wm3::Box3f>::CollideLine(
     const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
@@ -631,7 +631,7 @@ namespace moho
    * What it does:
    * Runs OBB-vs-OBB SAT and returns minimum penetration axis/depth.
    */
-  bool BoxCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Box3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {
     BoxBoxContactManifold manifold{};
     if (!ComputeBoxBoxContactManifold(mShape, *box, &manifold)) {
@@ -649,7 +649,7 @@ namespace moho
    * What it does:
    * Tests sphere-vs-box overlap and fills penetration direction/depth.
    */
-  bool BoxCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Box3f>::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
   {
     const float squaredDistance = Wm3::DistVector3Box3fGetSquared(sphere->Center, mShape);
     if (sphere->Radius * sphere->Radius <= squaredDistance) {
@@ -672,7 +672,7 @@ namespace moho
    * What it does:
    * Returns true when point lies inside oriented box extents.
    */
-  bool BoxCollisionPrimitive::PointInShape(const Wm3::Vec3f* point) const
+  bool CColPrimitive<Wm3::Box3f>::PointInShape(const Wm3::Vec3f* point) const
   {
     return mShape.ContainsPoint(*point);
   }
@@ -683,7 +683,7 @@ namespace moho
    * What it does:
    * Initializes sphere primitive state from local center/radius.
    */
-  SphereCollisionPrimitive::SphereCollisionPrimitive(const Wm3::Vec3f& localCenter, const float radius)
+  CColPrimitive<Wm3::Sphere3f>::CColPrimitive(const Wm3::Vec3f& localCenter, const float radius)
     : mShape(localCenter, radius)
     , mLocalCenter(localCenter)
   {}
@@ -698,7 +698,7 @@ namespace moho
    * Writes axis-aligned bounds from `{center,radius}` to caller scratch.
    */
   const EntityCollisionBoundsView*
-  SphereCollisionPrimitive::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
+  CColPrimitive<Wm3::Sphere3f>::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
   {
     auto* const bounds = &scratch0x1C->bounds;
     const float radius = mShape.Radius;
@@ -717,7 +717,7 @@ namespace moho
    * What it does:
    * Returns pointer to sphere payload at +0x04.
    */
-  const Wm3::Sphere3f* SphereCollisionPrimitive::GetSphere() const
+  const Wm3::Sphere3f* CColPrimitive<Wm3::Sphere3f>::GetSphere() const
   {
     return &mShape;
   }
@@ -728,7 +728,7 @@ namespace moho
    * What it does:
    * Sphere primitive has no box view and returns null.
    */
-  const Wm3::Box3f* SphereCollisionPrimitive::GetBox() const
+  const Wm3::Box3f* CColPrimitive<Wm3::Sphere3f>::GetBox() const
   {
     return nullptr;
   }
@@ -742,7 +742,7 @@ namespace moho
    * What it does:
    * Rotates local-center offset by transform orientation and adds world position.
    */
-  void SphereCollisionPrimitive::SetTransform(const EntityTransformPayload& transform)
+  void CColPrimitive<Wm3::Sphere3f>::SetTransform(const EntityTransformPayload& transform)
   {
     const RotatedVec3 rotated = RotateVectorByQuaternion(transform, mLocalCenter.x, mLocalCenter.y, mLocalCenter.z);
     mShape.Center.x = transform.posX + rotated.x;
@@ -761,7 +761,7 @@ namespace moho
    * written by `SetTransform`; see the box primitive's `GetCenter` for the
    * full evidence and for what reading the world lane here costs.
    */
-  Wm3::Vec3f* SphereCollisionPrimitive::GetCenter(Wm3::Vec3f* outCenter) const
+  Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::GetCenter(Wm3::Vec3f* outCenter) const
   {
     *outCenter = mLocalCenter;
     return outCenter;
@@ -776,7 +776,7 @@ namespace moho
    * 0x004FF986/8C/92 store to `[ecx+14h]`, `[ecx+18h]`, `[ecx+1Ch]` --
    * `mLocalCenter`, the same lane `GetCenter` reads.
    */
-  const Wm3::Vec3f* SphereCollisionPrimitive::SetCenter(const Wm3::Vec3f* center)
+  const Wm3::Vec3f* CColPrimitive<Wm3::Sphere3f>::SetCenter(const Wm3::Vec3f* center)
   {
     mLocalCenter = *center;
     return center;
@@ -788,7 +788,7 @@ namespace moho
    * What it does:
    * Tests segment-vs-sphere and fills first hit point, separation direction, and distance from line start.
    */
-  bool SphereCollisionPrimitive::CollideLine(
+  bool CColPrimitive<Wm3::Sphere3f>::CollideLine(
     const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
@@ -819,7 +819,7 @@ namespace moho
    * What it does:
    * Tests box-vs-sphere overlap and fills penetration direction/depth.
    */
-  bool SphereCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Sphere3f>::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {
     if (!Wm3::IntrBox3Sphere3fTest(*box, mShape)) {
       return false;
@@ -849,7 +849,7 @@ namespace moho
    * What it does:
    * Tests sphere-vs-sphere overlap and fills penetration direction/depth.
    */
-  bool SphereCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
+  bool CColPrimitive<Wm3::Sphere3f>::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
   {
     const Wm3::Vec3f delta = sphere->Center - mShape.Center;
     const float combinedRadius = sphere->Radius + mShape.Radius;
@@ -871,7 +871,7 @@ namespace moho
    * What it does:
    * Returns true when point lies strictly inside sphere.
    */
-  bool SphereCollisionPrimitive::PointInShape(const Wm3::Vec3f* point) const
+  bool CColPrimitive<Wm3::Sphere3f>::PointInShape(const Wm3::Vec3f* point) const
   {
     const Wm3::Vec3f delta = *point - mShape.Center;
     return mShape.Radius * mShape.Radius > Wm3::Vector3f::LengthSq(delta);
@@ -886,8 +886,8 @@ namespace moho
    * sphere), then calling the matching `CollideBox` or `CollideSphere` virtual
    * on `this`.  Asserts unreachable if `with` has neither shape.
    */
-  bool EntityCollisionUpdater::Collide(
-    const EntityCollisionUpdater* with,
+  bool CColPrimitiveBase::Collide(
+    const CColPrimitiveBase* with,
     CollisionResult* outResult
   ) const
   {

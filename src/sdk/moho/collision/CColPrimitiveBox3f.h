@@ -214,7 +214,7 @@ namespace moho
      * construct/delete callback fields. Confirmed from raw disassembly:
      * `mDeleteCallback` is the real global `operator delete(void*)`
      * directly (a `jmp ??3@YAXPAX@Z` thunk, not a per-type wrapper that
-     * runs `~BoxCollisionPrimitive()` first) -- the ctor's own atexit
+     * runs `~CColPrimitive<Wm3::Box3f>()` first) -- the ctor's own atexit
      * target is a plain unlink thunk, so it is modeled as the compiler's
      * implicit static-destructor registration rather than an explicit
      * call.

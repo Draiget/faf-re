@@ -58,7 +58,7 @@ namespace moho
   class VTransform;
   class CIntel;
   class Motor;
-  class EntityCollisionUpdater;
+  class CColPrimitiveBase;
   class CArmyImpl;
   class CSndParams;
   class STIMap;
@@ -1396,7 +1396,7 @@ namespace moho
     PositionHistory* mPositionHistory;             // 0x016C
     float mPendingVelocityScale;                   // 0x0170
     std::uint32_t mLastTickProcessed;              // 0x0174
-    EntityCollisionUpdater* CollisionExtents;      // 0x0178
+    CColPrimitiveBase* CollisionExtents;           // 0x0178
     msvc8::vector<Entity*> mAttachedEntities;      // 0x017C
     SEntAttachInfo mAttachInfo;                    // 0x018C
     std::uint8_t mQueueRelinkBlocked;              // 0x01B8

@@ -14681,7 +14681,7 @@ void Unit::UpdateCollision()
       expandedBox.Extent[0] = 0.5f * std::max(blueprint->mSizeX, skirtExtentX);
       expandedBox.Extent[2] = 0.5f * std::max(blueprint->mSizeZ, skirtExtentZ);
 
-      static_cast<BoxCollisionPrimitive*>(CollisionExtents)->mShape = expandedBox;
+      static_cast<CColPrimitive<Wm3::Box3f>*>(CollisionExtents)->mShape = expandedBox;
     }
   }
 
@@ -16273,7 +16273,7 @@ bool Unit::HasMeleeSpaceAroundLargeTarget(Unit* const target, SOCellPos* const i
     return false;
   }
 
-  EntityCollisionUpdater* const targetCollisionShape = target->CollisionExtents;
+  CColPrimitiveBase* const targetCollisionShape = target->CollisionExtents;
   if (targetCollisionShape == nullptr) {
     return false;
   }

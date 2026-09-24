@@ -30,6 +30,10 @@ namespace boost
 
 namespace Wm3
 {
+  template <class Real>
+  class Box3;
+  template <class Real>
+  class Sphere3;
   template <class T>
   class Vector3;
   using Vector3f = Vector3<float>;
@@ -185,7 +189,7 @@ namespace moho
   class RDebugNavWaypoints;
   class RDebugNavSteering;
   class RDebugWeapons;
-  class EntityCollisionUpdater;
+  class CColPrimitiveBase;
   class Motor;
   class Entity;
   class CollisionBeamEntity;
@@ -243,9 +247,8 @@ namespace moho
   struct CountedPtr;
   template <class T>
   struct WeakPtr;
-  using CColPrimitiveBase = EntityCollisionUpdater;
-  class SphereCollisionPrimitive;
-  class BoxCollisionPrimitive;
+  template <class TShape>
+  class CColPrimitive;
   class MotorSinkAway;
 } // namespace moho
 
@@ -2583,7 +2586,7 @@ namespace gpg
    * Builds a reflected reference for one sphere collision-primitive object
    * pointer with derived-type normalization.
    */
-  RRef* RRef_CColPrimitive_Sphere3f(RRef* out, moho::SphereCollisionPrimitive* value);
+  RRef* RRef_CColPrimitive_Sphere3f(RRef* out, moho::CColPrimitive<Wm3::Sphere3<float>>* value);
 
   /**
    * Address: 0x005008E0 (FUN_005008E0, gpg::RRef_CColPrimitive_Box3f)
@@ -2592,7 +2595,7 @@ namespace gpg
    * Builds a reflected reference for one box collision-primitive object
    * pointer with derived-type normalization.
    */
-  RRef* RRef_CColPrimitive_Box3f(RRef* out, moho::BoxCollisionPrimitive* value);
+  RRef* RRef_CColPrimitive_Box3f(RRef* out, moho::CColPrimitive<Wm3::Box3<float>>* value);
 
   /**
    * Address: 0x00537250 (FUN_00537250, gpg::RRef_EntityCategory)

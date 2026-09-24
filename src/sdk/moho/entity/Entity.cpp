@@ -1448,7 +1448,7 @@ namespace
    * removes old bucket membership, writes new rectangle, then re-adds membership.
    */
   void RelinkSpanFromCollisionPrimitive(
-    moho::EntityCollisionCellSpan& span, const moho::EntityCollisionUpdater* collisionPrimitive
+    moho::EntityCollisionCellSpan& span, const moho::CColPrimitiveBase* collisionPrimitive
   )
   {
     if (collisionPrimitive) {
@@ -1473,9 +1473,9 @@ namespace
    * Replaces collision primitive pointer, relinks span as needed, and keeps
    * cached collision bounds in sync.
    */
-  void InstallCollisionPrimitiveAndRefresh(moho::Entity& entity, moho::EntityCollisionUpdater* replacement)
+  void InstallCollisionPrimitiveAndRefresh(moho::Entity& entity, moho::CColPrimitiveBase* replacement)
   {
-    moho::EntityCollisionUpdater* const old = entity.CollisionExtents;
+    moho::CColPrimitiveBase* const old = entity.CollisionExtents;
     entity.CollisionExtents = replacement;
     ::operator delete(old);
 
@@ -2113,9 +2113,7 @@ namespace moho
     archive->ReadInt(&lastTickProcessed);
     mLastTickProcessed = static_cast<std::uint32_t>(lastTickProcessed);
 
-    auto* collisionExtents = static_cast<CColPrimitiveBase*>(CollisionExtents);
-    (void)archive->ReadPointerOwned_CColPrimitiveBase(&collisionExtents, &owner);
-    CollisionExtents = static_cast<EntityCollisionUpdater*>(collisionExtents);
+    (void)archive->ReadPointerOwned_CColPrimitiveBase(&CollisionExtents, &owner);
 
     archive->Read(CachedAttachedEntitiesType(), &mAttachedEntities, owner);
     archive->Read(CachedAttachInfoType(), &mAttachInfo, owner);
@@ -2210,7 +2208,7 @@ namespace moho
     archive->WriteFloat(mPendingVelocityScale);
     archive->WriteInt(static_cast<int>(mLastTickProcessed));
 
-    // Collision-primitive pointer (OWNED). CColPrimitiveBase == EntityCollisionUpdater.
+    // Collision-primitive pointer (OWNED).
     gpg::RRef collisionRef{};
     (void)gpg::RRef_CColPrimitiveBase(&collisionRef, CollisionExtents);
     gpg::WriteRawPointer(archive, collisionRef, gpg::TrackedPointerState::Owned, owner);
@@ -4163,7 +4161,7 @@ namespace moho
    */
   bool Entity::Intersects(const Wm3::Sphere3f& sphere, CollisionResult* const outResult)
   {
-    EntityCollisionUpdater* const collision = CollisionExtents;
+    CColPrimitiveBase* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideSphere(&sphere, outResult)) {
       return false;
     }
@@ -4181,7 +4179,7 @@ namespace moho
    */
   bool Entity::Intersects(const Wm3::Box3f& box, CollisionResult* const outResult)
   {
-    EntityCollisionUpdater* const collision = CollisionExtents;
+    CColPrimitiveBase* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideBox(&box, outResult)) {
       return false;
     }
@@ -4204,7 +4202,7 @@ namespace moho
     CollisionSegmentResult* const outResult
   )
   {
-    EntityCollisionUpdater* const collision = CollisionExtents;
+    CColPrimitiveBase* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideLine(&lineStart, &lineEnd, outResult)) {
       return false;
     }
@@ -4274,7 +4272,7 @@ namespace moho
    */
   void Entity::SetCollisionBoxShape(const Wm3::Box3f& localBox)
   {
-    InstallCollisionPrimitiveAndRefresh(*this, new BoxCollisionPrimitive(localBox));
+    InstallCollisionPrimitiveAndRefresh(*this, new CColPrimitive<Wm3::Box3f>(localBox));
   }
 
   /**
@@ -4285,7 +4283,7 @@ namespace moho
    */
   void Entity::SetCollisionSphereShape(const Wm3::Vec3f& localCenter, const float radius)
   {
-    InstallCollisionPrimitiveAndRefresh(*this, new SphereCollisionPrimitive(localCenter, radius));
+    InstallCollisionPrimitiveAndRefresh(*this, new CColPrimitive<Wm3::Sphere3f>(localCenter, radius));
   }
 
   /**

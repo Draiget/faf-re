@@ -201,7 +201,7 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeDColPrimSphereRef(moho::SphereCollisionPrimitive* object)
+  [[nodiscard]] gpg::RRef MakeDColPrimSphereRef(moho::CColPrimitive<Wm3::Sphere3f>* object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -237,7 +237,7 @@ namespace
     archive->Read(CachedDColPrimSphereShapeType(), &shape, ownerRef);
     archive->Read(CachedDColPrimSphereVector3fType(), &localCenter, ownerRef);
 
-    auto* object = new (std::nothrow) moho::SphereCollisionPrimitive(localCenter, shape.Radius);
+    auto* object = new (std::nothrow) moho::CColPrimitive<Wm3::Sphere3f>(localCenter, shape.Radius);
     if (object != nullptr) {
       object->mShape.Center = shape.Center;
       object->mShape.Radius = shape.Radius;
@@ -255,7 +255,7 @@ namespace
    * through the primitive virtual accessors used by save-construct lanes.
    */
   void SaveSpherePrimitiveConstructArgs(
-    moho::SphereCollisionPrimitive* const primitive,
+    moho::CColPrimitive<Wm3::Sphere3f>* const primitive,
     gpg::WriteArchive* const archive,
     gpg::SerSaveConstructArgsResult* const result
   )
@@ -280,7 +280,7 @@ namespace
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
-    auto* const primitive = reinterpret_cast<moho::SphereCollisionPrimitive*>(objectPtr);
+    auto* const primitive = reinterpret_cast<moho::CColPrimitive<Wm3::Sphere3f>*>(objectPtr);
     SaveSpherePrimitiveConstructArgs(primitive, archive, result);
   }
 
@@ -291,7 +291,7 @@ namespace
    * Frees one constructed sphere collision primitive's raw storage. Confirmed
    * from raw disassembly: the real delete-callback field is a direct jump
    * thunk to the global `operator delete(void*)`, NOT a per-type wrapper
-   * that runs `~SphereCollisionPrimitive()` first -- `SphereCollisionPrimitive`
+   * that runs `~CColPrimitive<Wm3::Sphere3f>()` first -- `CColPrimitive<Wm3::Sphere3f>`
    * is deleted through this path with no destructor call.
    */
   void DeleteDColPrimSphere(void* const objectPtr)

@@ -194,7 +194,7 @@ namespace moho
      * `mDeleteCallback` is the real global `operator delete(void*)`
      * directly (a `jmp ??3@YAXPAX@Z` thunk via `j_j_func_tent_Destroy_3`
      * at 0x00500430, not a per-type wrapper that runs
-     * `~SphereCollisionPrimitive()` first) -- the ctor's own atexit
+     * `~CColPrimitive<Wm3::Sphere3f>()` first) -- the ctor's own atexit
      * target is a plain unlink thunk, so it is modeled as the compiler's
      * implicit static-destructor registration rather than an explicit
      * call.

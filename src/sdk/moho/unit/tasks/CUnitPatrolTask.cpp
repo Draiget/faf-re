@@ -538,7 +538,7 @@ namespace moho
         continue;
       }
 
-      EntityCollisionUpdater* const collisionShape = blip->CollisionExtents;
+      CColPrimitiveBase* const collisionShape = blip->CollisionExtents;
       if (collisionShape == nullptr) {
         continue;
       }

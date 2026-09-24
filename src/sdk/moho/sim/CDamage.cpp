@@ -176,7 +176,7 @@ namespace
   [[maybe_unused]] bool ShieldContainsEntityPosition(moho::Shield* const shield, moho::Entity* const entity)
   {
     if (shield != nullptr) {
-      moho::EntityCollisionUpdater* const collisionShape = shield->CollisionExtents;
+      moho::CColPrimitiveBase* const collisionShape = shield->CollisionExtents;
       if (collisionShape != nullptr) {
         return collisionShape->PointInShape(&entity->mVarDat.mCurTransform.pos_);
       }
@@ -776,7 +776,7 @@ namespace moho
       if (shield == nullptr) {
         continue;
       }
-      EntityCollisionUpdater* const shieldShape = shield->CollisionExtents;
+      CColPrimitiveBase* const shieldShape = shield->CollisionExtents;
       if (shieldShape == nullptr) {
         continue;
       }
@@ -849,7 +849,7 @@ namespace moho
   {
     for (const SShieldDamageEntry& entry : absorbingShields) {
       Shield* const shield = entry.shield;
-      EntityCollisionUpdater* const shieldShape = shield != nullptr ? shield->CollisionExtents : nullptr;
+      CColPrimitiveBase* const shieldShape = shield != nullptr ? shield->CollisionExtents : nullptr;
       if (shield != nullptr && shieldShape != nullptr) {
         const Wm3::Vec3f& entityPosition = entity->GetPositionWm3();
         if (shieldShape->PointInShape(&entityPosition)) {
@@ -911,7 +911,7 @@ namespace moho
 
     CollisionResult collisionScratch{};
     for (Entity* const candidate : gatheredEntities) {
-      EntityCollisionUpdater* const shape = candidate->CollisionExtents;
+      CColPrimitiveBase* const shape = candidate->CollisionExtents;
       if (shape != nullptr && shape->CollideSphere(&innerSphere, &collisionScratch)) {
         // Inside the inner radius -- excluded from the ring band.
         continue;

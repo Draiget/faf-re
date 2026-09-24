@@ -7432,12 +7432,12 @@ gpg::RRef* RRef_RPropBlueprint(RRef* const out, moho::RPropBlueprint* const valu
  * Builds a reflection reference for one sphere collision primitive using
  * cached RTTI lookups and derived-type normalization.
  */
-gpg::RRef* RRef_CColPrimitive_Sphere3f(RRef* const out, moho::SphereCollisionPrimitive* const value)
+gpg::RRef* RRef_CColPrimitive_Sphere3f(RRef* const out, moho::CColPrimitive<Wm3::Sphere3f>* const value)
 {
-  return BuildTypedRefWithCache<moho::SphereCollisionPrimitive>(
+  return BuildTypedRefWithCache<moho::CColPrimitive<Wm3::Sphere3f>>(
     out,
     value,
-    typeid(moho::SphereCollisionPrimitive),
+    typeid(moho::CColPrimitive<Wm3::Sphere3f>),
     gCColPrimitiveSphere3fRRefType,
     gCColPrimitiveSphere3fRRefCache
   );
@@ -7450,12 +7450,12 @@ gpg::RRef* RRef_CColPrimitive_Sphere3f(RRef* const out, moho::SphereCollisionPri
  * Builds a reflection reference for one box collision primitive using cached
  * RTTI lookups and derived-type normalization.
  */
-gpg::RRef* RRef_CColPrimitive_Box3f(RRef* const out, moho::BoxCollisionPrimitive* const value)
+gpg::RRef* RRef_CColPrimitive_Box3f(RRef* const out, moho::CColPrimitive<Wm3::Box3f>* const value)
 {
-  return BuildTypedRefWithCache<moho::BoxCollisionPrimitive>(
+  return BuildTypedRefWithCache<moho::CColPrimitive<Wm3::Box3f>>(
     out,
     value,
-    typeid(moho::BoxCollisionPrimitive),
+    typeid(moho::CColPrimitive<Wm3::Box3f>),
     gCColPrimitiveBox3fRRefType,
     gCColPrimitiveBox3fRRefCache
   );
@@ -7465,12 +7465,12 @@ gpg::RRef* RRef_CColPrimitive_Box3f(RRef* const out, moho::BoxCollisionPrimitive
  * Address: 0x00500480 (FUN_00500480)
  *
  * What it does:
- * Materializes one reflected reference for `SphereCollisionPrimitive` and
+ * Materializes one reflected reference for `CColPrimitive<Wm3::Sphere3f>` and
  * copies the resulting lanes into `out`.
  */
-gpg::RRef* AssignSphereCollisionPrimitiveRef(
+gpg::RRef* AssignCColPrimitiveSphere3fRef(
   RRef* const out,
-  moho::SphereCollisionPrimitive* const value
+  moho::CColPrimitive<Wm3::Sphere3f>* const value
 )
 {
   RRef tmp{};
@@ -7484,12 +7484,12 @@ gpg::RRef* AssignSphereCollisionPrimitiveRef(
  * Address: 0x005005C0 (FUN_005005C0)
  *
  * What it does:
- * Materializes one reflected reference for `BoxCollisionPrimitive` and copies
+ * Materializes one reflected reference for `CColPrimitive<Wm3::Box3f>` and copies
  * the resulting lanes into `out`.
  */
-gpg::RRef* AssignBoxCollisionPrimitiveRef(
+gpg::RRef* AssignCColPrimitiveBox3fRef(
   RRef* const out,
-  moho::BoxCollisionPrimitive* const value
+  moho::CColPrimitive<Wm3::Box3f>* const value
 )
 {
   RRef tmp{};

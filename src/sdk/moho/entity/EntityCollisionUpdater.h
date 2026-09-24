@@ -242,10 +242,11 @@ namespace moho
    * and `Moho::CColPrimitive<Wm3::Sphere3f>` (vftable 0x00E0D480), both
    * deriving from this class with matching 10-slot tables. The first address
    * in each pair is the Box3f instantiation, the second the Sphere3f one.
-   * Neither instantiation is recovered yet; the payload each one returns
-   * lives at `+0x04` (see `GetSphere`/`GetBox`).
+   * Both are recovered below as explicit specializations; each keeps its
+   * world-space shape at `+0x04` (see `GetSphere`/`GetBox`) followed by its
+   * local center.
    */
-  class EntityCollisionUpdater
+  class CColPrimitiveBase
   {
   public:
     /**
@@ -254,7 +255,7 @@ namespace moho
      * What it does:
      * Initializes one collision-primitive base runtime lane.
      */
-    EntityCollisionUpdater();
+    CColPrimitiveBase();
 
     /**
      * Address: 0x004FFC20 (FUN_004FFC20) / 0x004FF9A0
@@ -381,22 +382,31 @@ namespace moho
      * `CollideBox`/`CollideSphere` virtual on `this` with the extracted shape
      * pointer.  Asserts if `with` has neither box nor sphere shape.
      */
-    bool Collide(const EntityCollisionUpdater* with, CollisionResult* outResult) const;
+    bool Collide(const CColPrimitiveBase* with, CollisionResult* outResult) const;
 
   protected:
-    ~EntityCollisionUpdater() = default;
+    ~CColPrimitiveBase() = default;
   };
 
   /**
-   * Concrete box primitive (`Moho::CColPrimitive<Wm3::Box3<float>>`).
+   * `Moho::CColPrimitive<T>`, the implementer of `CColPrimitiveBase`. The
+   * binary instantiates it for exactly two shapes, so only those two
+   * specializations exist; the primary template is never defined.
    */
-  class BoxCollisionPrimitive final : public EntityCollisionUpdater
+  template <class TShape>
+  class CColPrimitive;
+
+  /**
+   * Box primitive (`Moho::CColPrimitive<Wm3::Box3<float>>`, vftable 0x00E0D50C).
+   */
+  template <>
+  class CColPrimitive<Wm3::Box3f> final : public CColPrimitiveBase
   {
   public:
     /**
      * Address: 0x0067AC40 (FUN_0067AC40, inlined construction payload)
      */
-    explicit BoxCollisionPrimitive(const Wm3::Box3f& localBox);
+    explicit CColPrimitive(const Wm3::Box3f& localBox);
 
     /**
      * Address: 0x004FFC20 (FUN_004FFC20)
@@ -457,15 +467,16 @@ namespace moho
   };
 
   /**
-   * Concrete sphere primitive (`Moho::CColPrimitive<Wm3::Sphere3<float>>`).
+   * Sphere primitive (`Moho::CColPrimitive<Wm3::Sphere3<float>>`, vftable 0x00E0D480).
    */
-  class SphereCollisionPrimitive final : public EntityCollisionUpdater
+  template <>
+  class CColPrimitive<Wm3::Sphere3f> final : public CColPrimitiveBase
   {
   public:
     /**
      * Address: 0x0067AD30 (FUN_0067AD30, inlined construction payload)
      */
-    SphereCollisionPrimitive(const Wm3::Vec3f& localCenter, float radius);
+    CColPrimitive(const Wm3::Vec3f& localCenter, float radius);
 
     /**
      * Address: 0x004FF9A0 (FUN_004FF9A0)
@@ -526,21 +537,24 @@ namespace moho
   };
 
 #if defined(_M_IX86) || defined(__i386__)
-  static_assert(sizeof(EntityCollisionUpdater) == 0x04, "EntityCollisionUpdater size must be 0x04");
-
-  static_assert(offsetof(BoxCollisionPrimitive, mShape) == 0x04, "BoxCollisionPrimitive::mShape offset must be 0x04");
-  static_assert(
-    offsetof(BoxCollisionPrimitive, mLocalCenter) == 0x40, "BoxCollisionPrimitive::mLocalCenter offset must be 0x40"
-  );
-  static_assert(sizeof(BoxCollisionPrimitive) == 0x4C, "BoxCollisionPrimitive size must be 0x4C");
+  static_assert(sizeof(CColPrimitiveBase) == 0x04, "CColPrimitiveBase size must be 0x04");
 
   static_assert(
-    offsetof(SphereCollisionPrimitive, mShape) == 0x04, "SphereCollisionPrimitive::mShape offset must be 0x04"
+    offsetof(CColPrimitive<Wm3::Box3f>, mShape) == 0x04, "CColPrimitive<Wm3::Box3f>::mShape offset must be 0x04"
   );
   static_assert(
-    offsetof(SphereCollisionPrimitive, mLocalCenter) == 0x14,
-    "SphereCollisionPrimitive::mLocalCenter offset must be 0x14"
+    offsetof(CColPrimitive<Wm3::Box3f>, mLocalCenter) == 0x40,
+    "CColPrimitive<Wm3::Box3f>::mLocalCenter offset must be 0x40"
   );
-  static_assert(sizeof(SphereCollisionPrimitive) == 0x20, "SphereCollisionPrimitive size must be 0x20");
+  static_assert(sizeof(CColPrimitive<Wm3::Box3f>) == 0x4C, "CColPrimitive<Wm3::Box3f> size must be 0x4C");
+
+  static_assert(
+    offsetof(CColPrimitive<Wm3::Sphere3f>, mShape) == 0x04, "CColPrimitive<Wm3::Sphere3f>::mShape offset must be 0x04"
+  );
+  static_assert(
+    offsetof(CColPrimitive<Wm3::Sphere3f>, mLocalCenter) == 0x14,
+    "CColPrimitive<Wm3::Sphere3f>::mLocalCenter offset must be 0x14"
+  );
+  static_assert(sizeof(CColPrimitive<Wm3::Sphere3f>) == 0x20, "CColPrimitive<Wm3::Sphere3f> size must be 0x20");
 #endif
 } // namespace moho

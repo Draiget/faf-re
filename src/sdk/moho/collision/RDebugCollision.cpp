@@ -191,7 +191,7 @@ namespace moho
 
     CDebugCanvas* const canvas = sim->GetDebugCanvas();
     for (const auto& [entityId, entity] : sim->mEntityDB->mAllUnits) {
-      EntityCollisionUpdater* const extents = entity->CollisionExtents;
+      CColPrimitiveBase* const extents = entity->CollisionExtents;
       if (extents == nullptr) {
         continue;
       }

@@ -3451,7 +3451,7 @@ namespace moho
           Wm3::Vec3f{ownerHalfSizeX, kMeleeProbeHalfHeight, ownerHalfSizeZ}
         );
 
-        EntityCollisionUpdater* const targetCollisionShape = targetEntity->CollisionExtents;
+        CColPrimitiveBase* const targetCollisionShape = targetEntity->CollisionExtents;
         if (targetCollisionShape != nullptr && targetCollisionShape->CollideBox(&outerProbe, &collisionResult)) {
           collisionResult.sourceEntity = targetEntity;
           if (!targetCollisionShape->CollideBox(&innerProbe, &collisionResult)) {

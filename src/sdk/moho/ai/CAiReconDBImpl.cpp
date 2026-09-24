@@ -303,7 +303,7 @@ namespace
       return false;
     }
 
-    EntityCollisionUpdater* const collision = sourceUnit->CollisionExtents;
+    CColPrimitiveBase* const collision = sourceUnit->CollisionExtents;
     if (!collision) {
       return false;
     }

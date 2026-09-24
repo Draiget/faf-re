@@ -22687,7 +22687,7 @@ int moho::cfunc_EntityGetCollisionExtentsL(LuaPlus::LuaState* const state)
 
   const LuaPlus::LuaObject entityObject(LuaPlus::LuaStackObject(state, 1));
   Entity* const entity = SCR_FromLua_Entity(entityObject, state);
-  EntityCollisionUpdater* const collisionShape = entity->CollisionExtents;
+  CColPrimitiveBase* const collisionShape = entity->CollisionExtents;
 
   LuaPlus::LuaObject resultObject(state);
   if (collisionShape) {

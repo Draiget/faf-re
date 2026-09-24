@@ -983,8 +983,8 @@ namespace moho
         continue;
       }
 
-      EntityCollisionUpdater* const sourcePrimitive = source->CollisionExtents;
-      EntityCollisionUpdater* const candidatePrimitive = candidate->CollisionExtents;
+      CColPrimitiveBase* const sourcePrimitive = source->CollisionExtents;
+      CColPrimitiveBase* const candidatePrimitive = candidate->CollisionExtents;
       if (candidatePrimitive == nullptr ||
           !candidatePrimitive->Collide(sourcePrimitive, &collisionResult)) {
         continue;
@@ -1035,7 +1035,7 @@ namespace moho
         continue;
       }
 
-      EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+      CColPrimitiveBase* const collisionPrimitive = candidate->CollisionExtents;
       if (collisionPrimitive == nullptr) {
         continue;
       }
@@ -1342,7 +1342,7 @@ namespace moho
           continue;
         }
 
-        EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+        CColPrimitiveBase* const collisionPrimitive = candidate->CollisionExtents;
         if (collisionPrimitive == nullptr || !collisionPrimitive->CollideSphere(&sphere, &collisionResult)) {
           continue;
         }
@@ -1375,7 +1375,7 @@ namespace moho
         continue;
       }
 
-      EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+      CColPrimitiveBase* const collisionPrimitive = candidate->CollisionExtents;
       if (collisionPrimitive == nullptr || !collisionPrimitive->CollideSphere(&sphere, &collisionResult)) {
         continue;
       }
@@ -1406,7 +1406,7 @@ namespace moho
         continue;
       }
 
-      EntityCollisionUpdater* const collisionPrimitive = candidate->CollisionExtents;
+      CColPrimitiveBase* const collisionPrimitive = candidate->CollisionExtents;
       if (collisionPrimitive == nullptr) {
         continue;
       }

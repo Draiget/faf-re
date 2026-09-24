@@ -281,7 +281,7 @@ namespace
     return cached;
   }
 
-  [[nodiscard]] gpg::RRef MakeDColPrimBoxRef(moho::BoxCollisionPrimitive* object)
+  [[nodiscard]] gpg::RRef MakeDColPrimBoxRef(moho::CColPrimitive<Wm3::Box3f>* object)
   {
     gpg::RRef ref{};
     ref.mObj = object;
@@ -318,7 +318,7 @@ namespace
     archive->Read(CachedDColPrimBoxShapeType(), &shape, ownerRef);
     archive->Read(CachedDColPrimBoxVector3fType(), &localCenter, ownerRef);
 
-    auto* object = new (std::nothrow) moho::BoxCollisionPrimitive(shape);
+    auto* object = new (std::nothrow) moho::CColPrimitive<Wm3::Box3f>(shape);
     if (object != nullptr) {
       object->mLocalCenter = localCenter;
     }
@@ -334,7 +334,7 @@ namespace
    * through the primitive virtual accessors used by save-construct lanes.
    */
   void SaveBoxPrimitiveConstructArgs(
-    moho::BoxCollisionPrimitive* const primitive,
+    moho::CColPrimitive<Wm3::Box3f>* const primitive,
     gpg::WriteArchive* const archive,
     gpg::SerSaveConstructArgsResult* const result
   )
@@ -359,7 +359,7 @@ namespace
     gpg::WriteArchive* const archive, const int objectPtr, const int, gpg::RRef* const, gpg::SerSaveConstructArgsResult* const result
   )
   {
-    auto* const primitive = reinterpret_cast<moho::BoxCollisionPrimitive*>(objectPtr);
+    auto* const primitive = reinterpret_cast<moho::CColPrimitive<Wm3::Box3f>*>(objectPtr);
     SaveBoxPrimitiveConstructArgs(primitive, archive, result);
   }
 
@@ -370,7 +370,7 @@ namespace
    * Frees one constructed box collision primitive's raw storage. Confirmed
    * from raw disassembly: the real delete-callback field is a direct jump
    * thunk to the global `operator delete(void*)`, NOT a per-type wrapper
-   * that runs `~BoxCollisionPrimitive()` first -- `BoxCollisionPrimitive`
+   * that runs `~CColPrimitive<Wm3::Box3f>()` first -- `CColPrimitive<Wm3::Box3f>`
    * is deleted through this path with no destructor call.
    */
   void DeleteDColPrimBox(void* const objectPtr)

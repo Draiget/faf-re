@@ -108,9 +108,8 @@ namespace moho
   class IFormationInstance;
   class ISoundManager;
   class Motor;
-  class EntityCollisionUpdater;
+  class CColPrimitiveBase;
   class IAiSteering;
-  using CColPrimitiveBase = EntityCollisionUpdater;
   class CCommandTask;
   class CIntel;
   class CIntelPosHandle;
