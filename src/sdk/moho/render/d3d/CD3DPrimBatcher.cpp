@@ -1802,14 +1802,14 @@ namespace moho
       return;
     }
 
-    wxWindowBase* const inputWindow = manager.mInputWindows[headIndex];
+    wxWindow* const inputWindow = manager.mInputWindows[headIndex];
     if (inputWindow == nullptr) {
       return;
     }
 
-    std::int32_t width = 0;
-    std::int32_t height = 0;
-    WX_GetClientSize(inputWindow, width, height);
+    int width = 0;
+    int height = 0;
+    inputWindow->GetClientSize(&width, &height);
     if (width <= 0 || height <= 0) {
       return;
     }

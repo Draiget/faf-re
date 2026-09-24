@@ -555,6 +555,11 @@ namespace moho
      *   `nextInOwner = nullptr`. Zero callers, unreachable; formerly
      *   `AttachNodeToOwnerHead` over an `IntrusiveOwnerHeadRuntimeView` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
+     * Address: 0x0066A2A0 (FUN_0066A2A0 -- the `WeakPtr<WWinManagedFrame>` emission
+     *   (`lea edx, [ecx+178h]` is WeakPtrOwnerLinkOffset<WWinManagedFrame>);
+     *   caller EFX_CreateEmitterWindow 0x0066A007; formerly
+     *   `RebindManagedWindowSlotToFrame` in moho/console/CConCommand.cpp, removed
+     *   with the wx conversion.)
      */
     void ResetFromObject(T* object) noexcept
     {

@@ -9,9 +9,6 @@
 // stubbed here (they need type-correct implementations and member init).
 // Those remain as TODO recovery items; see decomp/recovery/disasm/.
 
-// Forward declarations for types referenced in stubbed signatures.
-class wxWindowBase;
-struct wxSize;
 namespace gpg
 {
   class RType;
@@ -116,10 +113,4 @@ namespace moho
 // src/sdk/moho/sim/CWldSession.cpp — the no-op stub that returned `out` unchanged
 // is gone.
 
-// ===== Free wxRuntime helper =====
-// wxDestroyListNoDeleteRuntime recovered in src/sdk/moho/app/WxRuntimeTypes.cpp
-// — the anonymous-namespace body (`wxDestroyListNoDeleteRuntimeImpl`) is now
-// wrapped by a file-scope trampoline so the global symbol resolves to the
-// real wxList vtable-rebind + base-teardown body instead of falling back to
-// a no-op (was leaking the embedded list at WxSocketBase+0x28).
 

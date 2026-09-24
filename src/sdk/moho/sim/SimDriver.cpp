@@ -13,7 +13,8 @@
 #include <boost/ptr_container/exception.hpp>
 #include "gpg/core/utils/BoostWrappers.h"
 #include "moho/render/camera/CameraImpl.h"
-#include "moho/app/WxAppRuntime.h"
+#include "platform/WxWidgets.h"
+#include <wx/app.h>
 #include "moho/net/CClientBase.h"
 #include "moho/net/IClient.h"
 #include "moho/render/d3d/CD3DFont.h"
@@ -2155,8 +2156,8 @@ DWORD CSimDriver::PerformNextEvent()
 
   bool keepIdle = true;
   for (;;) {
-    if (moho::WxAppRuntime::Pending()) {
-      moho::WxAppRuntime::Dispatch();
+    if (wxTheApp->Pending()) {
+      wxTheApp->Dispatch();
       keepIdle = true;
       continue;
     }
@@ -2165,7 +2166,7 @@ DWORD CSimDriver::PerformNextEvent()
       break;
     }
 
-    keepIdle = moho::WxAppRuntime::ProcessIdle();
+    keepIdle = wxTheApp->ProcessIdle();
   }
 
   return SleepEx(100, TRUE);
