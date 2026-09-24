@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <new>
 #include <windows.h>
 
 namespace
@@ -28,24 +29,71 @@ namespace
   constexpr char kHeapOutOfMemoryMessage[] = "Can not allocate memory area.";
   constexpr char kDebugNewline[] = "\n";
 
-  struct HeapManagerBlockRuntimeView;
+  /** Bytes the arena header and every block header reserve ahead of their data. */
+  constexpr std::uint32_t kHeapHeaderBytes = 0x20;
 
-  struct HeapManagerRuntimeView
+  /**
+   * One allocation in a `HeapManager` arena. The header lives at the start of
+   * the block's span; the caller's memory starts at the first aligned address
+   * past the header, and the span reserves room for that alignment slack.
+   */
+  struct HeapManagerBlock
   {
-    std::uint8_t* heapBase = nullptr; // +0x00
-    std::uint32_t heapByteCount = 0; // +0x04
-    std::uint32_t alignmentBytes = 0; // +0x08
-    HeapManagerBlockRuntimeView* head = nullptr; // +0x0C
+    std::uint32_t startOffset = 0;    // +0x00  from the arena base
+    std::uint32_t spanBytes = 0;      // +0x04  header + alignment slack + payload
+    HeapManagerBlock* prev = nullptr; // +0x08  lower-addressed neighbour
+    HeapManagerBlock* next = nullptr; // +0x0C  higher-addressed neighbour
+    std::uint32_t userAddress = 0;    // +0x10  address handed to the caller
   };
+  static_assert(offsetof(HeapManagerBlock, prev) == 0x08);
+  static_assert(offsetof(HeapManagerBlock, userAddress) == 0x10);
+  static_assert(sizeof(HeapManagerBlock) == 0x14);
 
-  struct HeapManagerBlockRuntimeView
+  /**
+   * CRI heap manager (`HEAPMNG`): an arena whose own header sits at the start
+   * of the buffer it manages. Blocks are carved from the arena past that
+   * header and kept in an address-ordered, null-terminated list.
+   */
+  struct HeapManager
   {
-    std::uint32_t startOffset = 0; // +0x00
-    std::uint32_t spanBytes = 0; // +0x04
-    HeapManagerBlockRuntimeView* prev = nullptr; // +0x08
-    HeapManagerBlockRuntimeView* next = nullptr; // +0x0C
-    std::uint32_t userPointer = 0; // +0x10
+    std::uint8_t* arenaBase = nullptr;  // +0x00  the arena, which begins with this header
+    std::uint32_t arenaBytes = 0;       // +0x04
+    std::uint32_t alignment = 0;        // +0x08  4 unless changed
+    HeapManagerBlock* head = nullptr;   // +0x0C  lowest-addressed block
+
+    /** First `alignment` boundary past the header of a block at `startOffset`. */
+    [[nodiscard]] std::uint32_t UserAddressAt(const std::uint32_t startOffset) const
+    {
+      const auto blockAddress = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(arenaBase)) + startOffset;
+      return (blockAddress + kHeapHeaderBytes + alignment - 1) / alignment * alignment;
+    }
+
+    /** Builds a block header at `startOffset` between `prev` and `next`. */
+    HeapManagerBlock* PlaceBlock(
+      const std::uint32_t startOffset,
+      const std::uint32_t spanBytes,
+      HeapManagerBlock* const prev,
+      HeapManagerBlock* const next
+    ) const
+    {
+      return ::new (arenaBase + startOffset) HeapManagerBlock{startOffset, spanBytes, prev, next, UserAddressAt(startOffset)};
+    }
+
+    /** Span a request of `byteCount` needs: header, alignment slack, payload. */
+    [[nodiscard]] std::uint32_t SpanFor(const std::uint32_t byteCount) const
+    {
+      return byteCount + alignment + kHeapHeaderBytes;
+    }
   };
+  static_assert(offsetof(HeapManager, alignment) == 0x08);
+  static_assert(offsetof(HeapManager, head) == 0x0C);
+  static_assert(sizeof(HeapManager) == 0x10);
+
+  /** Opaque `HEAPMNG` handle, as the M2A callers hold it, to the arena header. */
+  [[nodiscard]] HeapManager* HeapManagerFromHandle(const int handle)
+  {
+    return reinterpret_cast<HeapManager*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handle)));
+  }
 
   struct XefindFoundFileInfo
   {
@@ -75,34 +123,6 @@ namespace
     std::uint8_t mUnknown4A[0xE]{};
     std::int32_t hasMarkerPair = 0; // +0x58
   };
-
-  static_assert(offsetof(HeapManagerRuntimeView, heapBase) == 0x00, "HeapManagerRuntimeView::heapBase offset must be 0x00");
-  static_assert(
-    offsetof(HeapManagerRuntimeView, heapByteCount) == 0x04,
-    "HeapManagerRuntimeView::heapByteCount offset must be 0x04"
-  );
-  static_assert(
-    offsetof(HeapManagerRuntimeView, alignmentBytes) == 0x08,
-    "HeapManagerRuntimeView::alignmentBytes offset must be 0x08"
-  );
-  static_assert(offsetof(HeapManagerRuntimeView, head) == 0x0C, "HeapManagerRuntimeView::head offset must be 0x0C");
-  static_assert(sizeof(HeapManagerRuntimeView) == 0x10, "HeapManagerRuntimeView size must be 0x10");
-
-  static_assert(
-    offsetof(HeapManagerBlockRuntimeView, startOffset) == 0x00,
-    "HeapManagerBlockRuntimeView::startOffset offset must be 0x00"
-  );
-  static_assert(
-    offsetof(HeapManagerBlockRuntimeView, spanBytes) == 0x04,
-    "HeapManagerBlockRuntimeView::spanBytes offset must be 0x04"
-  );
-  static_assert(offsetof(HeapManagerBlockRuntimeView, prev) == 0x08, "HeapManagerBlockRuntimeView::prev offset must be 0x08");
-  static_assert(offsetof(HeapManagerBlockRuntimeView, next) == 0x0C, "HeapManagerBlockRuntimeView::next offset must be 0x0C");
-  static_assert(
-    offsetof(HeapManagerBlockRuntimeView, userPointer) == 0x10,
-    "HeapManagerBlockRuntimeView::userPointer offset must be 0x10"
-  );
-  static_assert(sizeof(HeapManagerBlockRuntimeView) == 0x14, "HeapManagerBlockRuntimeView size must be 0x14");
 
   static_assert(offsetof(M2aFrameScanRuntimeView, parserState) == 0x04, "M2aFrameScanRuntimeView::parserState offset must be 0x04");
   static_assert(
@@ -409,52 +429,6 @@ namespace
     return 1;
   }
 
-  [[nodiscard]] std::uint32_t AlignUpValue(std::uint32_t value, std::uint32_t alignment)
-  {
-    return alignment * ((value + alignment - 1u) / alignment);
-  }
-
-  [[nodiscard]] HeapManagerRuntimeView* AsHeapManager(void* heapManagerHandle)
-  {
-    return reinterpret_cast<HeapManagerRuntimeView*>(heapManagerHandle);
-  }
-
-  [[nodiscard]] HeapManagerBlockRuntimeView* BlockFromOffset(const HeapManagerRuntimeView* manager, std::uint32_t offset)
-  {
-    return reinterpret_cast<HeapManagerBlockRuntimeView*>(manager->heapBase + offset);
-  }
-
-  [[nodiscard]] std::uint32_t ComputeAlignedUserPointer(
-    const HeapManagerRuntimeView* manager,
-    const std::uint32_t startOffset
-  )
-  {
-    const auto baseAddress = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(manager->heapBase));
-    const auto laneAddress = baseAddress + startOffset + manager->alignmentBytes + 31u;
-    return AlignUpValue(laneAddress, manager->alignmentBytes);
-  }
-
-  void InitializeHeapBlock(
-    const HeapManagerRuntimeView* manager,
-    HeapManagerBlockRuntimeView* block,
-    const std::uint32_t startOffset,
-    const std::uint32_t spanBytes,
-    HeapManagerBlockRuntimeView* prev,
-    HeapManagerBlockRuntimeView* next
-  )
-  {
-    block->startOffset = startOffset;
-    block->spanBytes = spanBytes;
-    block->prev = prev;
-    block->next = next;
-    block->userPointer = ComputeAlignedUserPointer(manager, startOffset);
-  }
-
-  [[nodiscard]] HeapManagerBlockRuntimeView* NextHeapBlock(HeapManagerBlockRuntimeView* block)
-  {
-    return block->next;
-  }
-
   [[nodiscard]] std::int16_t ConvertFloatSampleToPcm16(float sample)
   {
     const double biased = (sample < 0.0f) ? (static_cast<double>(sample) - 0.5) : (static_cast<double>(sample) + 0.5);
@@ -709,7 +683,8 @@ extern "C"
    * Address: 0x00B275D0 (_HEAPMNG_Create)
    *
    * What it does:
-   * Initializes one in-place heap manager arena header.
+   * Turns a caller buffer of at least 1 KiB into an empty arena whose header
+   * occupies the buffer's start, with 4-byte alignment.
    */
   std::int32_t __cdecl HEAPMNG_Create(void* heapBuffer, const std::uint32_t heapByteCount, void** outHeapManager)
   {
@@ -723,12 +698,12 @@ extern "C"
     }
 
     heapmng_clear(heapBuffer, heapByteCount);
-    auto* const manager = AsHeapManager(heapBuffer);
-    manager->heapBase = static_cast<std::uint8_t*>(heapBuffer);
-    manager->heapByteCount = heapByteCount;
-    manager->alignmentBytes = 4;
+    auto* const manager = static_cast<HeapManager*>(heapBuffer);
+    manager->arenaBase = static_cast<std::uint8_t*>(heapBuffer);
+    manager->arenaBytes = heapByteCount;
+    manager->alignment = 4;
     manager->head = nullptr;
-    *outHeapManager = heapBuffer;
+    *outHeapManager = manager;
     return 0;
   }
 
@@ -736,7 +711,7 @@ extern "C"
    * Address: 0x00B27640 (_HEAPMNG_Destroy)
    *
    * What it does:
-   * Clears one heap manager arena memory range.
+   * Clears the whole arena, header included.
    */
   std::int32_t __cdecl HEAPMNG_Destroy(void* heapManagerHandle)
   {
@@ -745,8 +720,8 @@ extern "C"
       return -1;
     }
 
-    const auto* const manager = AsHeapManager(heapManagerHandle);
-    heapmng_clear(manager->heapBase, manager->heapByteCount);
+    const auto* const manager = static_cast<const HeapManager*>(heapManagerHandle);
+    heapmng_clear(manager->arenaBase, manager->arenaBytes);
     return 0;
   }
 
@@ -754,24 +729,19 @@ extern "C"
    * Address: 0x00B276F0 (_heapmng_first_alloc)
    *
    * What it does:
-   * Allocates first block in an empty heap manager arena.
+   * Places the first block of an empty arena right after the arena header.
    */
-  std::int32_t __cdecl heapmng_first_alloc(
-    HeapManagerRuntimeView* manager,
-    const std::uint32_t byteCount,
-    std::uint32_t* outPointer
-  )
+  std::int32_t __cdecl heapmng_first_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uint32_t* outAddress)
   {
-    const std::uint32_t requestedSpan = byteCount + manager->alignmentBytes + 32u;
-    if (requestedSpan > manager->heapByteCount - 32u) {
+    const std::uint32_t span = manager->SpanFor(byteCount);
+    if (span > manager->arenaBytes - kHeapHeaderBytes) {
       heapmng_debug_log(kHeapOutOfMemoryMessage);
       return -1;
     }
 
-    auto* const block = BlockFromOffset(manager, 32u);
-    InitializeHeapBlock(manager, block, 32u, requestedSpan, nullptr, nullptr);
+    HeapManagerBlock* const block = manager->PlaceBlock(kHeapHeaderBytes, span, nullptr, nullptr);
     manager->head = block;
-    *outPointer = block->userPointer;
+    *outAddress = block->userAddress;
     return 0;
   }
 
@@ -779,53 +749,44 @@ extern "C"
    * Address: 0x00B27760 (_heapmng_second_alloc)
    *
    * What it does:
-   * Allocates and links one additional block in a populated arena.
+   * First-fit placement in a populated arena: before the first block if the
+   * gap after the arena header fits, else in the first gap between blocks that
+   * fits, else appended after the last block.
    */
-  std::int32_t __cdecl heapmng_second_alloc(
-    HeapManagerRuntimeView* manager,
-    const std::uint32_t byteCount,
-    std::uint32_t* outPointer
-  )
+  std::int32_t __cdecl heapmng_second_alloc(HeapManager* manager, const std::uint32_t byteCount, std::uint32_t* outAddress)
   {
-    *outPointer = 0;
-    const std::uint32_t requestedSpan = byteCount + manager->alignmentBytes + 32u;
-    auto* cursor = manager->head;
+    *outAddress = 0;
+    const std::uint32_t span = manager->SpanFor(byteCount);
+    HeapManagerBlock* cursor = manager->head;
 
-    if (cursor->startOffset - 32u > requestedSpan) {
-      auto* const prefix = BlockFromOffset(manager, 32u);
-      InitializeHeapBlock(manager, prefix, 32u, requestedSpan, nullptr, cursor);
-      manager->head = prefix;
-      cursor->prev = prefix;
-      *outPointer = prefix->userPointer;
+    if (cursor->startOffset - kHeapHeaderBytes > span) {
+      HeapManagerBlock* const block = manager->PlaceBlock(kHeapHeaderBytes, span, nullptr, cursor);
+      manager->head = block;
+      cursor->prev = block;
+      *outAddress = block->userAddress;
       return 0;
     }
 
-    auto* next = NextHeapBlock(cursor);
-    while (next != nullptr) {
-      const std::uint32_t gap = next->startOffset - cursor->spanBytes - cursor->startOffset;
-      if (requestedSpan < gap) {
-        const std::uint32_t startOffset = cursor->startOffset + cursor->spanBytes;
-        auto* const block = BlockFromOffset(manager, startOffset);
-        InitializeHeapBlock(manager, block, startOffset, requestedSpan, cursor, next);
+    for (HeapManagerBlock* next = cursor->next; next != nullptr; cursor = next, next = cursor->next) {
+      const std::uint32_t gapEnd = cursor->startOffset + cursor->spanBytes;
+      if (span < next->startOffset - gapEnd) {
+        HeapManagerBlock* const block = manager->PlaceBlock(gapEnd, span, cursor, next);
         cursor->next = block;
         next->prev = block;
-        *outPointer = block->userPointer;
+        *outAddress = block->userAddress;
         return 0;
       }
-      cursor = next;
-      next = NextHeapBlock(cursor);
     }
 
-    const std::uint32_t appendOffset = cursor->startOffset + cursor->spanBytes;
-    if (appendOffset + requestedSpan >= manager->heapByteCount) {
+    const std::uint32_t tailOffset = cursor->startOffset + cursor->spanBytes;
+    if (tailOffset + span >= manager->arenaBytes) {
       heapmng_debug_log(kHeapOutOfMemoryMessage);
       return -1;
     }
 
-    auto* const appended = BlockFromOffset(manager, appendOffset);
-    InitializeHeapBlock(manager, appended, appendOffset, requestedSpan, cursor, nullptr);
-    cursor->next = appended;
-    *outPointer = appended->userPointer;
+    HeapManagerBlock* const block = manager->PlaceBlock(tailOffset, span, cursor, nullptr);
+    cursor->next = block;
+    *outAddress = block->userAddress;
     return 0;
   }
 
@@ -833,8 +794,8 @@ extern "C"
    * Address: 0x00B27670 (_HEAPMNG_Allocate)
    *
    * What it does:
-   * Allocates one block in heap manager arena, using first/second allocation
-   * lanes depending on list state.
+   * Allocates `byteCount` bytes from the arena. `*outPointer` is zeroed first,
+   * so it stays zero when the arena is full.
    */
   std::int32_t __cdecl HEAPMNG_Allocate(int heapManagerHandle, const SIZE_T byteCount, int* outPointer)
   {
@@ -847,44 +808,37 @@ extern "C"
       return -1;
     }
 
-    auto* const manager = AsHeapManager(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(heapManagerHandle)))
-    );
-
-    std::uint32_t rawPointer = 0;
-    std::int32_t result = 0;
-    if (manager->head == nullptr) {
-      result = heapmng_first_alloc(manager, static_cast<std::uint32_t>(byteCount), &rawPointer);
-    } else {
-      result = heapmng_second_alloc(manager, static_cast<std::uint32_t>(byteCount), &rawPointer);
+    *outPointer = 0;
+    HeapManager* const manager = HeapManagerFromHandle(heapManagerHandle);
+    std::uint32_t address = 0;
+    const std::int32_t result = (manager->head == nullptr)
+      ? heapmng_first_alloc(manager, static_cast<std::uint32_t>(byteCount), &address)
+      : heapmng_second_alloc(manager, static_cast<std::uint32_t>(byteCount), &address);
+    if (result < 0) {
+      return result;
     }
 
-    if (result >= 0) {
-      *outPointer = static_cast<int>(rawPointer);
-      return 0;
-    }
-    return result;
+    *outPointer = static_cast<int>(address);
+    return 0;
   }
 
   /**
    * Address: 0x00B279C0 (sub_B279C0)
    *
    * What it does:
-   * Resolves one heap block node by user pointer value.
+   * Finds the block that handed out `userAddress`.
    */
   std::int32_t __cdecl heapmng_find_block_by_user_pointer(
-    HeapManagerRuntimeView* manager,
-    const std::uint32_t userPointer,
-    HeapManagerBlockRuntimeView** outBlock
+    HeapManager* manager,
+    const std::uint32_t userAddress,
+    HeapManagerBlock** outBlock
   )
   {
-    auto* block = manager->head;
-    while (block != nullptr) {
-      if (block->userPointer == userPointer) {
+    for (HeapManagerBlock* block = manager->head; block != nullptr; block = block->next) {
+      if (block->userAddress == userAddress) {
         *outBlock = block;
         return 0;
       }
-      block = block->next;
     }
 
     heapmng_debug_log(kHeapIllegalAddressMessage);
@@ -895,7 +849,8 @@ extern "C"
    * Address: 0x00B27A00 (_HEAPMNG_Free)
    *
    * What it does:
-   * Unlinks one allocated block from heap manager arena list.
+   * Unlinks the block that handed out `pointerValue`; the arena bytes simply
+   * become a gap for later first-fit placement.
    */
   std::int32_t __cdecl HEAPMNG_Free(int heapManagerHandle, int pointerValue)
   {
@@ -904,11 +859,9 @@ extern "C"
       return -1;
     }
 
-    auto* const manager = AsHeapManager(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(heapManagerHandle)))
-    );
-    auto* block = manager->head;
-    while (block != nullptr && block->userPointer != static_cast<std::uint32_t>(pointerValue)) {
+    HeapManager* const manager = HeapManagerFromHandle(heapManagerHandle);
+    HeapManagerBlock* block = manager->head;
+    while (block != nullptr && block->userAddress != static_cast<std::uint32_t>(pointerValue)) {
       block = block->next;
     }
     if (block == nullptr) {
@@ -916,8 +869,8 @@ extern "C"
       return -1;
     }
 
-    auto* const prev = block->prev;
-    auto* const next = block->next;
+    HeapManagerBlock* const prev = block->prev;
+    HeapManagerBlock* const next = block->next;
     if (prev != nullptr) {
       prev->next = next;
     } else {
@@ -933,8 +886,9 @@ extern "C"
    * Address: 0x00B278B0 (_HEAPMNG_ReAllocate)
    *
    * What it does:
-   * Resizes one allocated heap block, attempting in-place growth before
-   * allocate-copy-free fallback.
+   * Resizes an allocation in place when its address is aligned and either its
+   * own span or the gap up to the next block fits; otherwise allocates, copies
+   * `byteCount` bytes and frees the old block.
    */
   std::int32_t __cdecl HEAPMNG_ReAllocate(
     void* heapManagerHandle,
@@ -952,54 +906,48 @@ extern "C"
       return -1;
     }
 
-    auto* const manager = AsHeapManager(heapManagerHandle);
-    const auto currentPointerValue = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(currentPointer));
+    auto* const manager = static_cast<HeapManager*>(heapManagerHandle);
+    const auto currentAddress = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(currentPointer));
     *outPointer = 0;
 
-    HeapManagerBlockRuntimeView* block = nullptr;
-    std::int32_t result = heapmng_find_block_by_user_pointer(manager, currentPointerValue, &block);
+    HeapManagerBlock* block = nullptr;
+    std::int32_t result = heapmng_find_block_by_user_pointer(manager, currentAddress, &block);
     if (result < 0) {
       return result;
     }
 
-    const std::uint32_t alignment = manager->alignmentBytes;
-    const std::uint32_t requiredSpan = alignment + byteCount + 32u;
-    if (currentPointerValue % alignment == 0u) {
-      if (requiredSpan <= block->spanBytes) {
-        block->spanBytes = requiredSpan;
-        *outPointer = currentPointerValue;
+    const std::uint32_t span = manager->SpanFor(byteCount);
+    if (currentAddress % manager->alignment == 0u) {
+      if (span <= block->spanBytes) {
+        block->spanBytes = span;
+        *outPointer = currentAddress;
         return 0;
       }
 
-      auto* const next = block->next;
-      if (next != nullptr && (next->startOffset - block->startOffset > requiredSpan)) {
-        block->spanBytes = requiredSpan;
-        *outPointer = currentPointerValue;
+      const HeapManagerBlock* const next = block->next;
+      if (next != nullptr && next->startOffset - block->startOffset > span) {
+        block->spanBytes = span;
+        *outPointer = currentAddress;
         return 0;
       }
     }
 
+    const auto handle = static_cast<int>(reinterpret_cast<std::uintptr_t>(heapManagerHandle));
     int newPointer = 0;
-    result = HEAPMNG_Allocate(
-      static_cast<int>(reinterpret_cast<std::uintptr_t>(heapManagerHandle)),
-      static_cast<SIZE_T>(byteCount),
-      &newPointer
-    );
-    if (result >= 0) {
-      heapmng_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(newPointer))), currentPointer, byteCount);
-      result = HEAPMNG_Free(
-        static_cast<int>(reinterpret_cast<std::uintptr_t>(heapManagerHandle)),
-        static_cast<int>(currentPointerValue)
-      );
-      if (result >= 0) {
-        *outPointer = static_cast<std::uint32_t>(newPointer);
-        return 0;
-      }
-    } else {
-      *outPointer = currentPointerValue;
+    result = HEAPMNG_Allocate(handle, static_cast<SIZE_T>(byteCount), &newPointer);
+    if (result < 0) {
+      *outPointer = currentAddress;
+      return result;
     }
 
-    return result;
+    heapmng_copy(reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(newPointer))), currentPointer, byteCount);
+    result = HEAPMNG_Free(handle, static_cast<int>(currentAddress));
+    if (result < 0) {
+      return result;
+    }
+
+    *outPointer = static_cast<std::uint32_t>(newPointer);
+    return 0;
   }
 
   /**
