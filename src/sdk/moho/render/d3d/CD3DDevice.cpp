@@ -17,6 +17,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/MeshFormatter.h"
@@ -1289,6 +1290,26 @@ namespace moho
     result = ResetStatCounter(EnsureEngineIntStat(sEngineStatRenderFlatDecals, "Render_FlatDecals"));
     result = ResetStatCounter(EnsureEngineIntStat(sEngineStatRenderDecals, "Render_Decals"));
     return result;
+  }
+
+  /**
+   * FAF instrumentation - not a recovered function.
+   *
+   * What it does:
+   * See the header. The shipped engine resets these three stats every frame
+   * and `ShowStats` displays them, but its release build never increments
+   * them: `AddPrimStats` / `AddVertexStats` survive only through the vtable
+   * (their StatItem slots, 0x010C6300..0x010C630C, are referenced by nothing
+   * else), and no code in the binary writes `Render_DrawPrimCalls` beyond
+   * `InitRenderEngineStats`' reset. The primitive and vertex figures go through
+   * those adders, so they land in the same named stats the engine resets.
+   */
+  void CD3DDevice::PublishDrawStatistics()
+  {
+    const gpg::gal::DrawStatistics submitted = gpg::gal::TakeDrawStatistics();
+    (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderDrawPrimCalls, "Render_DrawPrimCalls"), submitted.drawCalls);
+    (void)AddPrimStats(submitted.primitives, false);
+    (void)AddVertexStats(submitted.vertices, false);
   }
 
   /**

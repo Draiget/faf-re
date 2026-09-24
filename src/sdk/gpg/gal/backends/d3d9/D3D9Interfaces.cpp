@@ -18,6 +18,7 @@
 
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/core/utils/Logging.h" // TEMPORARY PROBE (do not commit)
 #include "gpg/gal/EffectMacro.hpp"
@@ -3868,12 +3869,15 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         const D3DPRIMITIVETYPE primitiveType = kTopologyPrimitiveTypes[context->topology_];
-        const HRESULT result = mDevice->DrawPrimitive(primitiveType, context->startVertex_, context->GetPrimitiveCount());
+        const std::uint32_t primitiveCount = context->GetPrimitiveCount();
+        const HRESULT result = mDevice->DrawPrimitive(primitiveType, context->startVertex_, primitiveCount);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1152, result);
         }
 
+        // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
+        RecordDraw(primitiveCount, context->vertexCount_);
         return result;
     }
 
@@ -3894,19 +3898,22 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         const D3DPRIMITIVETYPE primitiveType = kTopologyPrimitiveTypes[context->topology_];
+        const std::uint32_t primitiveCount = context->GetPrimitiveCount();
         const HRESULT result = mDevice->DrawIndexedPrimitive(
             primitiveType,
             context->baseVertexIndex_,
             context->minVertexIndex_,
             context->vertexCount_,
             context->startIndex_,
-            context->GetPrimitiveCount()
+            primitiveCount
         );
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 1162, result);
         }
 
+        // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
+        RecordDraw(primitiveCount, context->vertexCount_);
         return result;
     }
 

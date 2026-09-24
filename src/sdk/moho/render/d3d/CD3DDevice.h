@@ -768,6 +768,19 @@ namespace moho
     [[nodiscard]] bool IsCursorShowing() const;
     [[nodiscard]] bool ShouldDrawViewportBackground() const;
 
+    /**
+     * FAF instrumentation - not a recovered function; non-virtual, so the
+     * vtable and layout are unchanged.
+     *
+     * What it does:
+     * Adds what the GAL backend submitted since the previous call - draw
+     * calls, primitives, vertices (gpg/gal/DrawStatistics.h) - to this frame's
+     * `Render_DrawPrimCalls` / `Render_PrimitiveCount` / `Render_VertexCount`
+     * stats. Called right after `InitRenderEngineStats` zeroes them, so the
+     * stats show the last complete frame for the whole of the current one.
+     */
+    void PublishDrawStatistics();
+
   };
 
   /**

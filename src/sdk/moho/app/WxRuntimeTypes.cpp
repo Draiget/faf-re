@@ -3456,6 +3456,9 @@ void moho::WRenViewport::D3DWindowOnDeviceRender()
 
   ResetRenderUnitCountStat();
   (void)moho::D3D_GetDevice()->InitRenderEngineStats();
+  // FAF instrumentation, not in the binary: refill the draw stats just zeroed
+  // with the previous frame's submissions (CD3DDevice::PublishDrawStatistics).
+  moho::D3D_GetDevice()->PublishDrawStatistics();
 
   for (SWorldViewInfo& worldView : mWorldViews) {
     worldView.mView->Func1();
