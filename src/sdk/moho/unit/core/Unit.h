@@ -95,6 +95,73 @@ namespace moho
   [[nodiscard]] bool UnitIsBlockedAt(const Wm3::Vec3f& worldPosition, Unit* unit, int mode);
 
   /**
+   * Address: inlined at 0x00597D33-0x00597D6A and 0x00598031-0x0059807A
+   * (Moho::Sim::DoCollisionsFor, FUN_00597CD0)
+   *
+   * What it does:
+   * The engine's collision "mass" proxy for a unit: blueprint average density
+   * folded over the bounding-box volume. `Sim::DoCollisionsFor` evaluates this
+   * for both participants of a contact and splits the separation impulse
+   * between them in inverse proportion, which is why a heavier unit yields
+   * less and shoves harder.
+   */
+  [[nodiscard]] float BlueprintCollisionMass(const RUnitBlueprint& blueprint) noexcept;
+
+  /**
+   * Address: inlined at 0x00598086-0x005980B8 and 0x0059813E-0x0059816F
+   * (Moho::Sim::DoCollisionsFor, FUN_00597CD0)
+   *
+   * What it does:
+   * The footprint-flag gate the collision resolver applies before handing a
+   * separation impulse to `pushed`: the receiving unit either carries no
+   * footprint flags at all, or it and `against` both ignore structures. Both
+   * binary call sites pass the impulse *receiver* first, which is what the
+   * parameter names record.
+   */
+  [[nodiscard]] bool CollisionImpulseAllowed(const Unit& pushed, const Unit& against) noexcept;
+
+  /**
+   * FAF divergence from the shipped binary - not a recovered function.
+   *
+   * True when `mover` can shove `obstacle` out of its way instead of having to
+   * path around it: the obstacle is mobile, not pinned, eligible to receive a
+   * separation impulse, and light enough that `mover` keeps the dominant share
+   * of the momentum split `Sim::DoCollisionsFor` performs on contact.
+   *
+   * See `kBumpThroughMassRatio` for why this exists.
+   */
+  [[nodiscard]] bool UnitCanShoveAside(const Unit& mover, const Unit& obstacle) noexcept;
+
+  /**
+   * FAF divergence switch. `false` restores the shipped binary's pathing
+   * behaviour exactly - use it for fidelity runs.
+   *
+   * The shipped engine resolves unit-vs-unit contacts by mass
+   * (`BlueprintCollisionMass`) but decides what the *path planner* may walk
+   * through by footprint size, via `Unit::IsHigherPriorityThan`'s final
+   * tie-break. The two orderings disagree, and the disagreement is worst for
+   * exactly the unit the mass rule favours most: a commander treats its own T1
+   * screen as a wall and detours around it, while each T1 treats the commander
+   * as passable and walks into it.
+   */
+  inline constexpr bool kBumpThroughSpamEnabled = true;
+
+  /**
+   * How many times an obstacle's collision mass `mover` must exceed before the
+   * planner stops treating it as a wall.
+   *
+   * 1.0 would mean "any advantage at all counts", which would make near-peers
+   * flicker between avoiding and charging each other as blueprint masses drift.
+   * The margin keeps peers - two T2 tanks, two commanders - avoiding one
+   * another exactly as they do today, while a commander walks through T1/T2
+   * spam it can trivially displace.
+   *
+   * Compiled in rather than exposed as a con-var on purpose: the simulation is
+   * lockstep, so every client must evaluate this identically.
+   */
+  inline constexpr float kBumpThroughMassRatio = 2.0f;
+
+  /**
    * Address: 0x0067F080 (FUN_0067F080, func_GetUnitFactory)
    *
    * What it does:

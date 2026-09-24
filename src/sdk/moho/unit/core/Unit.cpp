@@ -273,6 +273,72 @@ namespace moho
   }
 
   /**
+   * Address: inlined at 0x00597D33-0x00597D6A and 0x00598031-0x0059807A
+   * (Moho::Sim::DoCollisionsFor, FUN_00597CD0)
+   *
+   * What it does:
+   * See the header declaration - density folded over the bounding-box volume.
+   */
+  float BlueprintCollisionMass(const RUnitBlueprint& blueprint) noexcept
+  {
+    return blueprint.mAverageDensity * blueprint.mSizeZ * blueprint.mSizeY * blueprint.mSizeX;
+  }
+
+  /**
+   * Address: inlined at 0x00598086-0x005980B8 and 0x0059813E-0x0059816F
+   * (Moho::Sim::DoCollisionsFor, FUN_00597CD0)
+   *
+   * What it does:
+   * See the header declaration - the footprint-flag gate on receiving an
+   * impulse.
+   */
+  bool CollisionImpulseAllowed(const Unit& pushed, const Unit& against) noexcept
+  {
+    const std::uint8_t pushedFlags = static_cast<std::uint8_t>(pushed.GetFootprint().mFlags);
+    const std::uint8_t againstFlags = static_cast<std::uint8_t>(against.GetFootprint().mFlags);
+    constexpr std::uint8_t kIgnoreStructures = static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures);
+    return pushedFlags == static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_None) ||
+      ((pushedFlags & kIgnoreStructures) != 0u && (againstFlags & kIgnoreStructures) != 0u);
+  }
+
+  /**
+   * FAF divergence from the shipped binary - not a recovered function.
+   *
+   * What it does:
+   * See the header declaration. Every gate below mirrors one the collision
+   * resolver applies before it will actually move `obstacle`, so the planner
+   * only walks through what the physics really does displace:
+   *   - `IsMobile` / `UNITSTATE_Immobile` mirror the two impulse branches'
+   *     own immobility tests (asm 0x005980C4, 0x00598177);
+   *   - `CollisionImpulseAllowed(obstacle, mover)` is the candidate-impulse
+   *     branch's footprint gate, receiver first (asm 0x0059813E);
+   *   - the mass comparison is the momentum split, strengthened from the
+   *     binary's `share > 0.1` acceptance to a clear-dominance margin.
+   */
+  bool UnitCanShoveAside(const Unit& mover, const Unit& obstacle) noexcept
+  {
+    if constexpr (!kBumpThroughSpamEnabled) {
+      return false;
+    } else {
+      if (!obstacle.IsMobile() || obstacle.IsUnitState(UNITSTATE_Immobile)) {
+        return false;
+      }
+      if (!CollisionImpulseAllowed(obstacle, mover)) {
+        return false;
+      }
+
+      const RUnitBlueprint* const moverBlueprint = mover.GetBlueprint();
+      const RUnitBlueprint* const obstacleBlueprint = obstacle.GetBlueprint();
+      if (moverBlueprint == nullptr || obstacleBlueprint == nullptr) {
+        return false;
+      }
+
+      return BlueprintCollisionMass(*moverBlueprint) >
+        BlueprintCollisionMass(*obstacleBlueprint) * kBumpThroughMassRatio;
+    }
+  }
+
+  /**
    * Address: 0x0062AA90 (FUN_0062AA90, func_UnitWontFitAt)
    *
    * What it does:

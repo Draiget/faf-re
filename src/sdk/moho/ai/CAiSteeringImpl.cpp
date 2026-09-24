@@ -903,6 +903,26 @@ bool moho::func_IsSourceUnit(const int mode, const Unit& owner, Unit* candidate)
     return false;
   }
 
+  // FAF divergence (see moho::kBumpThroughSpamEnabled): an obstacle the owner
+  // can simply shove aside is not something to plan around. Placed here, in the
+  // mode 1 tail, so it applies to the path planner and the navigator's own
+  // blocked tests but leaves mode 2 - steering avoidance, leader searches, and
+  // `Sim::DoCollisionsFor`'s own scan - untouched. Units therefore still slide
+  // around each other frame to frame, and the contact still resolves through
+  // the mass-weighted impulse split; only the decision to *route around* goes.
+  //
+  // Without this, `IsHigherPriorityThan` below decides the question on
+  // footprint size, and a commander loses that comparison to nothing while
+  // winning every contact it actually makes. The case it fails on is narrow and
+  // exactly the one that hurts: a unit holding UNITSTATE_Moving while
+  // physically stalled - a bunched, mutually-wedged spam blob - clears both the
+  // "moved this frame" skip at the top of this function and the
+  // stationary-yields-to-mover rule in `IsHigherPriorityThan`, then blocks
+  // outright. The denser the blob, the more of it is stalled on any given tick.
+  if (UnitCanShoveAside(owner, *candidate)) {
+    return true;
+  }
+
   return candidate->IsHigherPriorityThan(&owner);
 }
 

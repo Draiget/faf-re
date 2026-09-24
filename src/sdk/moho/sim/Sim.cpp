@@ -26720,27 +26720,15 @@ namespace
     return &AI_DebugCollisionConVar();
   }
 
-  // Owner "mass" proxy = blueprint average density folded over the unit's
-  // bounding-box volume (density * sizeX * sizeY * sizeZ). Used to weight the
-  // momentum split between two colliding units.
-  [[nodiscard]] float BlueprintMassProxy(const RUnitBlueprint& blueprint) noexcept
-  {
-    return blueprint.mAverageDensity * blueprint.mSizeZ * blueprint.mSizeY * blueprint.mSizeX;
-  }
-
-  // The collision-push footprint gate: `pusher` may transfer an impulse to
-  // `other` when the pusher ignores structures (FPFLAG_None), or both units are
-  // non-structural footprints (both carry FPFLAG_IgnoreStructures). Mirrors the
-  // two symmetric `Entity::GetFootprint().mFlags` tests in the binary
-  // (asm 0x598086-0x5980B8 and 0x59813E-0x59816F).
-  [[nodiscard]] bool CollisionPushAllowed(const Unit& pusher, const Unit& other) noexcept
-  {
-    const std::uint8_t pusherFlags = static_cast<std::uint8_t>(pusher.GetFootprint().mFlags);
-    const std::uint8_t otherFlags = static_cast<std::uint8_t>(other.GetFootprint().mFlags);
-    constexpr std::uint8_t kIgnoreStructures = static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_IgnoreStructures);
-    return pusherFlags == static_cast<std::uint8_t>(EFootprintFlags::FPFLAG_None) ||
-      ((pusherFlags & kIgnoreStructures) != 0u && (otherFlags & kIgnoreStructures) != 0u);
-  }
+  // The mass proxy and the impulse footprint-gate both used to live here as
+  // file-local copies. They are the same two expressions the pathing side now
+  // needs to answer "can this unit shove that one aside", so they moved to
+  // `moho::BlueprintCollisionMass` / `moho::CollisionImpulseAllowed`
+  // (moho/unit/core/Unit.h) and are shared rather than duplicated - a second
+  // copy of the momentum split is exactly how the two would silently drift.
+  //
+  // `CollisionImpulseAllowed` also renames the parameters to match what the two
+  // binary call sites below actually pass: the impulse *receiver* first.
 } // namespace
 
 /**
@@ -26773,7 +26761,7 @@ void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFast
   // (blueprint MaxSpeed * 0.1) and the current velocity magnitude
   // (asm 0x597D33-0x597DDA). MaxSpeed lives at blueprint Physics.MaxSpeed.
   const RUnitBlueprint* const ownerBlueprint = owner->GetBlueprint();
-  const float ownerMass = BlueprintMassProxy(*ownerBlueprint);
+  const float ownerMass = BlueprintCollisionMass(*ownerBlueprint);
 
   const Wm3::Vec3f ownerVelocity = owner->GetVelocity();
   const float ownerSpeed =
@@ -26890,13 +26878,13 @@ void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFast
     // A heavier owner claims a larger candidateShare, shoving the candidate
     // more while itself yielding less. The two AddImpulse branches below apply
     // these complementary shares.
-    const float candidateMass = BlueprintMassProxy(*candidate->GetBlueprint());
+    const float candidateMass = BlueprintCollisionMass(*candidate->GetBlueprint());
     const float candidateShare = ownerMass / (candidateMass + ownerMass);
     const float ownerShare = 1.0f - candidateShare;
 
     // Owner impulse (asm 0x598080-0x59811F): pushes the owner away from the
     // candidate, scaled by pushMagnitude and the owner's share.
-    if (ownerShare > kMinPushFactor && CollisionPushAllowed(*owner, *candidate) &&
+    if (ownerShare > kMinPushFactor && CollisionImpulseAllowed(*owner, *candidate) &&
         !owner->IsUnitState(UNITSTATE_Immobile)) {
       const Wm3::Vector3f ownerImpulse{
         (pushDir.x * pushMagnitude) * ownerShare,
@@ -26909,7 +26897,7 @@ void Sim::DoCollisionsFor(Sim* const sim, Unit* const owner, CollisionResultFast
     // Candidate impulse (asm 0x598131-0x5981E3): pushes the candidate the
     // opposite way (negated pushDir), scaled by pushMagnitude and the
     // candidate's share.
-    if (candidateShare > kMinPushFactor && CollisionPushAllowed(*candidate, *owner) &&
+    if (candidateShare > kMinPushFactor && CollisionImpulseAllowed(*candidate, *owner) &&
         !candidate->IsUnitState(UNITSTATE_Immobile)) {
       const Wm3::Vector3f candidateImpulse{
         (-pushDir.x * pushMagnitude) * candidateShare,
