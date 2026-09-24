@@ -4161,7 +4161,7 @@ namespace moho
    * Tests one world sphere against this entity's active collision primitive.
    * On hit, stamps this entity as the collision source lane in `outResult`.
    */
-  bool Entity::Intersects(const Wm3::Sphere3f& sphere, CollisionPairResult* const outResult)
+  bool Entity::Intersects(const Wm3::Sphere3f& sphere, CollisionResult* const outResult)
   {
     EntityCollisionUpdater* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideSphere(&sphere, outResult)) {
@@ -4179,7 +4179,7 @@ namespace moho
    * Tests one world-space box against this entity's active collision primitive.
    * On hit, stamps this entity as the collision source lane in `outResult`.
    */
-  bool Entity::Intersects(const Wm3::Box3f& box, CollisionPairResult* const outResult)
+  bool Entity::Intersects(const Wm3::Box3f& box, CollisionResult* const outResult)
   {
     EntityCollisionUpdater* const collision = CollisionExtents;
     if (collision == nullptr || !collision->CollideBox(&box, outResult)) {
@@ -4201,7 +4201,7 @@ namespace moho
   bool Entity::Intersects(
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd,
-    CollisionLineResult* const outResult
+    CollisionSegmentResult* const outResult
   )
   {
     EntityCollisionUpdater* const collision = CollisionExtents;

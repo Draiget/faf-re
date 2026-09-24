@@ -805,7 +805,7 @@ namespace moho
         }
       }
 
-      CollisionPairResult collisionScratch{};
+      CollisionResult collisionScratch{};
       Wm3::Sphere3f damageSphere{};
       damageSphere.Center = damage.mOrigin;
       damageSphere.Radius = damage.mRadius;
@@ -909,7 +909,7 @@ namespace moho
 
     outResults.ResetStorageToInline();
 
-    CollisionPairResult collisionScratch{};
+    CollisionResult collisionScratch{};
     for (Entity* const candidate : gatheredEntities) {
       EntityCollisionUpdater* const shape = candidate->CollisionExtents;
       if (shape != nullptr && shape->CollideSphere(&innerSphere, &collisionScratch)) {

@@ -62,8 +62,8 @@ namespace moho
   class CArmyImpl;
   class CSndParams;
   class STIMap;
-  struct CollisionPairResult;
-  struct CollisionLineResult;
+  struct CollisionResult;
+  struct CollisionSegmentResult;
   enum EVisibilityMode : std::int32_t;
   struct PositionHistory;
   struct SCoordsVec2;
@@ -1053,7 +1053,7 @@ namespace moho
      * Tests one world box against this entity's collision primitive and, on
      * hit, stamps this entity as the source lane in `outResult`.
      */
-    [[nodiscard]] bool Intersects(const Wm3::Box3f& box, CollisionPairResult* outResult);
+    [[nodiscard]] bool Intersects(const Wm3::Box3f& box, CollisionResult* outResult);
 
     /**
      * Address: 0x0067A9B0 (FUN_0067A9B0, ?Intersects@Entity@Moho@@QAE_NABV?$Sphere3@M@Wm3@@PAUCollisionResult@2@@Z)
@@ -1062,7 +1062,7 @@ namespace moho
      * Tests one world sphere against this entity's collision primitive and, on
      * hit, stamps this entity as the source lane in `outResult`.
      */
-    [[nodiscard]] bool Intersects(const Wm3::Sphere3f& sphere, CollisionPairResult* outResult);
+    [[nodiscard]] bool Intersects(const Wm3::Sphere3f& sphere, CollisionResult* outResult);
 
     /**
      * Address: 0x0067A9F0 (FUN_0067A9F0, ?Intersects@Entity@Moho@@QAE_NABV?$Vector3@M@Wm3@@0PAUCollisionSegmentResult@2@@Z)
@@ -1072,7 +1072,7 @@ namespace moho
      * and, on hit, stamps this entity as the source lane in `outResult`.
      */
     [[nodiscard]] bool
-    Intersects(const Wm3::Vec3f& lineStart, const Wm3::Vec3f& lineEnd, CollisionLineResult* outResult);
+    Intersects(const Wm3::Vec3f& lineStart, const Wm3::Vec3f& lineEnd, CollisionSegmentResult* outResult);
 
     /**
       * Alias of FUN_0067AC40 (non-canonical helper lane).

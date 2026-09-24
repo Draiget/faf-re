@@ -308,7 +308,7 @@ namespace
       return false;
     }
 
-    CollisionPairResult overlap{};
+    CollisionResult overlap{};
     return collision->CollideBox(&box, &overlap);
   }
 

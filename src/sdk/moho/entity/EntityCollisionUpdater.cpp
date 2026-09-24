@@ -600,7 +600,7 @@ namespace moho
    * Tests segment-vs-box and fills first hit point, separation direction, and distance from line start.
    */
   bool BoxCollisionPrimitive::CollideLine(
-    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult
+    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = BuildSegmentFromEndpoints(*lineStart, *lineEnd);
@@ -631,7 +631,7 @@ namespace moho
    * What it does:
    * Runs OBB-vs-OBB SAT and returns minimum penetration axis/depth.
    */
-  bool BoxCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const
+  bool BoxCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {
     BoxBoxContactManifold manifold{};
     if (!ComputeBoxBoxContactManifold(mShape, *box, &manifold)) {
@@ -649,7 +649,7 @@ namespace moho
    * What it does:
    * Tests sphere-vs-box overlap and fills penetration direction/depth.
    */
-  bool BoxCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const
+  bool BoxCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
   {
     const float squaredDistance = Wm3::DistVector3Box3fGetSquared(sphere->Center, mShape);
     if (sphere->Radius * sphere->Radius <= squaredDistance) {
@@ -789,7 +789,7 @@ namespace moho
    * Tests segment-vs-sphere and fills first hit point, separation direction, and distance from line start.
    */
   bool SphereCollisionPrimitive::CollideLine(
-    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult
+    const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
   ) const
   {
     const Wm3::Segment3f segment = BuildSegmentFromEndpoints(*lineStart, *lineEnd);
@@ -819,7 +819,7 @@ namespace moho
    * What it does:
    * Tests box-vs-sphere overlap and fills penetration direction/depth.
    */
-  bool SphereCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const
+  bool SphereCollisionPrimitive::CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const
   {
     if (!Wm3::IntrBox3Sphere3fTest(*box, mShape)) {
       return false;
@@ -849,7 +849,7 @@ namespace moho
    * What it does:
    * Tests sphere-vs-sphere overlap and fills penetration direction/depth.
    */
-  bool SphereCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const
+  bool SphereCollisionPrimitive::CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const
   {
     const Wm3::Vec3f delta = sphere->Center - mShape.Center;
     const float combinedRadius = sphere->Radius + mShape.Radius;
@@ -888,7 +888,7 @@ namespace moho
    */
   bool EntityCollisionUpdater::Collide(
     const EntityCollisionUpdater* with,
-    CollisionPairResult* outResult
+    CollisionResult* outResult
   ) const
   {
     if (const Wm3::Box3f* box = with->GetBox()) {

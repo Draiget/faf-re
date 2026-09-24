@@ -3883,7 +3883,7 @@ namespace moho
     // rather than reading through a hoisted pointer.
     //
     // That is not incidental. The body runs the `OnCollisionCheck` script, and
-    // this container is a `fastvector_n<CollisionEntry, 10>` - a script that
+    // this container is a `fastvector_n<WeaponCollisionEntry, 10>` - a script that
     // pushes an eleventh entry spills the run out of the inline window onto the
     // heap, and any pointer captured before that call is left aiming at storage
     // the container no longer uses. Caching begin/end/count across the call

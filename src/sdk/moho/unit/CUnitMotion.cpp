@@ -180,7 +180,7 @@ namespace moho
 
     // The candidate slots hold weak references to the *entities* the collision
     // grid returned, not to units: `ProcessSurfaceCollisionFromLastMove` builds
-    // each node straight from `CollisionPairResult::sourceEntity`
+    // each node straight from `CollisionResult::sourceEntity`
     // (0x006B9260 `mov ecx, [ebx+edi+4]` -> 0x006B9268 `call sub_5A6DB0`, whose
     // only adjustment is `add ecx, 4` -- Entity's `WeakObject` base, RTTI
     // mdisp=4). A candidate may therefore be a Prop as easily as a Unit, which

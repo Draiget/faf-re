@@ -959,7 +959,7 @@ namespace moho
 
     outCollisions.ResetStorageToInline();
 
-    CollisionPairResult collisionResult{};
+    CollisionResult collisionResult{};
     collisionResult.sourceEntity = source;
 
     for (int index = 0; index < gatheredCount; ++index) {
@@ -1040,7 +1040,7 @@ namespace moho
         continue;
       }
 
-      CollisionPairResult collisionResult{};
+      CollisionResult collisionResult{};
       if (!collisionPrimitive->CollideBox(&box, &collisionResult)) {
         continue;
       }
@@ -1182,7 +1182,7 @@ namespace moho
         static_cast<float>(queryFootprint.mSizeZ) * 0.5f
       );
 
-      CollisionPairResult pairResult{};
+      CollisionResult pairResult{};
       if (other->Intersects(queryBox, &pairResult)) {
         return true;
       }
@@ -1334,7 +1334,7 @@ namespace moho
 
     outCollisions.ResetStorageToInline();
 
-    CollisionPairResult collisionResult{};
+    CollisionResult collisionResult{};
     if (sphere.Radius <= 3.0f) {
       for (int index = 0; index < gatheredCount; ++index) {
         Entity* const candidate = gatheredEntities.start_[index];
@@ -1411,7 +1411,7 @@ namespace moho
         continue;
       }
 
-      CollisionLineResult collisionResult{};
+      CollisionSegmentResult collisionResult{};
       if (!collisionPrimitive->CollideLine(&lineStart, &lineEnd, &collisionResult)) {
         continue;
       }

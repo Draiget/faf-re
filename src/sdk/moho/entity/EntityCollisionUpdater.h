@@ -124,46 +124,50 @@ namespace moho
    * Address: 0x004FE7A0 (FUN_004FE7A0) / 0x004FE860 / 0x004FF150 / 0x004FF260
    *
    * What it does:
-   * Common pair-shape collision output.
+   * Common pair-shape collision output, `Moho::CollisionResult` in the
+   * `Entity::Intersects(Sphere3/Box3, ...)` and `CColPrimitiveBase::Collide`
+   * mangled names.
    * The first 0x08 bytes are not written by these methods in observed call paths.
    */
-  struct CollisionPairResult
+  struct CollisionResult
   {
     std::uint32_t reserved00; // +0x00
     Entity* sourceEntity;     // +0x04
     Wm3::Vec3f direction;     // +0x08
     float penetrationDepth;   // +0x14
   };
-  static_assert(sizeof(CollisionPairResult) == 0x18, "CollisionPairResult size must be 0x18");
-  static_assert(offsetof(CollisionPairResult, direction) == 0x08, "CollisionPairResult::direction offset must be 0x08");
+  static_assert(sizeof(CollisionResult) == 0x18, "CollisionResult size must be 0x18");
+  static_assert(offsetof(CollisionResult, direction) == 0x08, "CollisionResult::direction offset must be 0x08");
   static_assert(
-    offsetof(CollisionPairResult, penetrationDepth) == 0x14, "CollisionPairResult::penetrationDepth offset must be 0x14"
+    offsetof(CollisionResult, penetrationDepth) == 0x14, "CollisionResult::penetrationDepth offset must be 0x14"
   );
 
   /**
    * Address: 0x004FE9D0 (FUN_004FE9D0) / 0x004FF2D0
    *
    * What it does:
-   * Segment-shape collision output. `Entity::Intersects(lineStart, lineEnd, ...)`
-   * stamps the owning source entity into `sourceEntity` (+0x00) on hit.
+   * Segment-shape collision output, `Moho::CollisionSegmentResult` in the
+   * `Entity::Intersects(lineStart, lineEnd, ...)` mangling. That call stamps
+   * the owning source entity into `sourceEntity` (+0x00) on hit.
    */
-  struct CollisionLineResult
+  struct CollisionSegmentResult
   {
     Entity* sourceEntity;        // +0x00
     Wm3::Vec3f direction;        // +0x04
     Wm3::Vec3f position;         // +0x10
     float distanceFromLineStart; // +0x1C
   };
-  static_assert(sizeof(CollisionLineResult) == 0x20, "CollisionLineResult size must be 0x20");
-  static_assert(offsetof(CollisionLineResult, direction) == 0x04, "CollisionLineResult::direction offset must be 0x04");
-  static_assert(offsetof(CollisionLineResult, position) == 0x10, "CollisionLineResult::position offset must be 0x10");
+  static_assert(sizeof(CollisionSegmentResult) == 0x20, "CollisionSegmentResult size must be 0x20");
   static_assert(
-    offsetof(CollisionLineResult, distanceFromLineStart) == 0x1C,
-    "CollisionLineResult::distanceFromLineStart offset must be 0x1C"
+    offsetof(CollisionSegmentResult, direction) == 0x04, "CollisionSegmentResult::direction offset must be 0x04"
   );
-
-  using CollisionResult = CollisionPairResult;
-  using CollisionEntry = CollisionLineResult;
+  static_assert(
+    offsetof(CollisionSegmentResult, position) == 0x10, "CollisionSegmentResult::position offset must be 0x10"
+  );
+  static_assert(
+    offsetof(CollisionSegmentResult, distanceFromLineStart) == 0x1C,
+    "CollisionSegmentResult::distanceFromLineStart offset must be 0x1C"
+  );
 
   /**
    * Address: 0x007237E0 (FUN_007237E0, func_CopyCollisionResultArr2)
@@ -323,7 +327,7 @@ namespace moho
     /**
      * Address: 0x004FF2D0 (FUN_004FF2D0) / 0x004FE9D0
      *
-     * Wm3::Vector3<float> const*, Wm3::Vector3<float> const*, CollisionLineResult*
+     * Wm3::Vector3<float> const*, Wm3::Vector3<float> const*, CollisionSegmentResult*
      *
      * IDA signature:
      * char __thiscall Moho::CColPrimitive::Box::CollideLine(Moho::CColPrimitive_Box *this, Wm3::Vector3f *a2,
@@ -333,27 +337,27 @@ namespace moho
      * Tests segment-vs-shape and fills direction/contact position/travel distance.
      */
     virtual bool
-    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const = 0;
+    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult) const = 0;
 
     /**
      * Address: 0x004FF260 (FUN_004FF260) / 0x004FE860
      *
-     * Wm3::Box3<float> const*, CollisionPairResult*
+     * Wm3::Box3<float> const*, CollisionResult*
      *
      * What it does:
      * Tests box-vs-shape overlap and fills penetration direction/depth on hit.
      */
-    virtual bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const = 0;
+    virtual bool CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const = 0;
 
     /**
      * Address: 0x004FF150 (FUN_004FF150) / 0x004FE7A0
      *
-     * Wm3::Sphere3<float> const*, CollisionPairResult*
+     * Wm3::Sphere3<float> const*, CollisionResult*
      *
      * What it does:
      * Tests sphere-vs-shape overlap and fills penetration direction/depth on hit.
      */
-    virtual bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const = 0;
+    virtual bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const = 0;
 
     /**
      * Address: 0x004FF450 (FUN_004FF450) / 0x004FEB60
@@ -377,7 +381,7 @@ namespace moho
      * `CollideBox`/`CollideSphere` virtual on `this` with the extracted shape
      * pointer.  Asserts if `with` has neither box nor sphere shape.
      */
-    bool Collide(const EntityCollisionUpdater* with, CollisionPairResult* outResult) const;
+    bool Collide(const EntityCollisionUpdater* with, CollisionResult* outResult) const;
 
   protected:
     ~EntityCollisionUpdater() = default;
@@ -428,18 +432,19 @@ namespace moho
     /**
      * Address: 0x004FF2D0 (FUN_004FF2D0)
      */
-    [[nodiscard]] bool
-    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const override;
+    [[nodiscard]] bool CollideLine(
+      const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+    ) const override;
 
     /**
      * Address: 0x004FF260 (FUN_004FF260)
      */
-    [[nodiscard]] bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const override;
+    [[nodiscard]] bool CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const override;
 
     /**
      * Address: 0x004FF150 (FUN_004FF150)
      */
-    [[nodiscard]] bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const override;
+    [[nodiscard]] bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const override;
 
     /**
      * Address: 0x004FF450 (FUN_004FF450)
@@ -496,18 +501,19 @@ namespace moho
     /**
      * Address: 0x004FE9D0 (FUN_004FE9D0)
      */
-    [[nodiscard]] bool
-    CollideLine(const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionLineResult* outResult) const override;
+    [[nodiscard]] bool CollideLine(
+      const Wm3::Vec3f* lineStart, const Wm3::Vec3f* lineEnd, CollisionSegmentResult* outResult
+    ) const override;
 
     /**
      * Address: 0x004FE860 (FUN_004FE860)
      */
-    [[nodiscard]] bool CollideBox(const Wm3::Box3f* box, CollisionPairResult* outResult) const override;
+    [[nodiscard]] bool CollideBox(const Wm3::Box3f* box, CollisionResult* outResult) const override;
 
     /**
      * Address: 0x004FE7A0 (FUN_004FE7A0)
      */
-    [[nodiscard]] bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionPairResult* outResult) const override;
+    [[nodiscard]] bool CollideSphere(const Wm3::Sphere3f* sphere, CollisionResult* outResult) const override;
 
     /**
      * Address: 0x004FEB60 (FUN_004FEB60)

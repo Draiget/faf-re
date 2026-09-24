@@ -6,8 +6,6 @@ namespace moho
 {
   // Owning binary-facing layout is in moho/entity/EntityCollisionUpdater.h.
   using CColPrimitiveBase = EntityCollisionUpdater;
-  using CColPairResult = CollisionPairResult;
-  using CColLineResult = CollisionLineResult;
 
   template <class T>
   struct CColPrimitiveType;
