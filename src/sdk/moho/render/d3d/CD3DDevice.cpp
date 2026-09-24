@@ -25,7 +25,6 @@
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
-#include "moho/app/WxRuntimeTypes.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ID3DDeviceResources.h"
 #include "moho/misc/StartupHelpers.h"
@@ -36,6 +35,7 @@
 #include "moho/render/d3d/CD3DEffectTechnique.h"
 #include "moho/render/d3d/D3DSingletonCleanup.h"
 #include "moho/render/SParticleBuffer.h"
+#include "moho/render/WRenViewport.h"
 #include "moho/render/ID3DIndexSheet.h"
 #include "moho/render/ID3DDepthStencil.h"
 #include "moho/render/ID3DRenderTarget.h"
@@ -530,7 +530,7 @@ namespace
       // renderer. Everything else the viewport holds is released either way,
       // which is what lets `Reset`'s `IDirect3DDevice9::Reset` succeed.
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(false);
+        runtime->mViewport->D3DWindowOnDeviceExit(false);
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, false, {0u, 0u, 0u}};
@@ -562,7 +562,7 @@ namespace
       mResources.InitResources(false);
 
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(false);
+        runtime->mViewport->D3DWindowOnDeviceInit(false);
       }
 
       const moho::SD3DDeviceEvent deviceInitEvent{0u, false, {0u, 0u, 0u}};
@@ -598,7 +598,7 @@ namespace
       // and the map-imager border go too, and the mesh renderer is fully shut
       // down rather than reset.
       if (runtime->mViewport != nullptr) {
-        reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(true);
+        runtime->mViewport->D3DWindowOnDeviceExit(true);
       }
 
       const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
@@ -737,7 +737,7 @@ namespace moho
     (void)DispatchDeviceEventToListeners(deviceInitEvent, static_cast<moho::Broadcaster*>(this));
 
     if (runtime->mViewport != nullptr) {
-      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceInit(true);
+      runtime->mViewport->D3DWindowOnDeviceInit(true);
     }
     runtime->mInitialized = 1u;
   }
@@ -1790,7 +1790,7 @@ namespace moho
     if (runtime->mClearEnabled != 0) {
       Clear();
     } else {
-      reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceRender();
+      runtime->mViewport->D3DWindowOnDeviceRender();
     }
   }
 
