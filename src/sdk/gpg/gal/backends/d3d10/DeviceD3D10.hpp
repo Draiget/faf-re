@@ -13,6 +13,7 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/Texture.hpp"
@@ -57,7 +58,7 @@ namespace gal {
      * Log/code strings:
      *  - unknown error
      */
-    class DeviceD3D10 {
+    class DeviceD3D10 : public Device {
     public:
       /**
        * Address: 0x00900450 (FUN_00900450)
@@ -67,7 +68,7 @@ namespace gal {
        * Releases the device objects and unloads the D3D10 modules, then
        * destroys the members.
        */
-      virtual ~DeviceD3D10();
+      ~DeviceD3D10() override;
       /**
        * Address: 0x008F86B0
        * Slot: 1
@@ -76,7 +77,7 @@ namespace gal {
        * What it does:
        * Returns the retained device log-storage lane at `this+0x50`.
        */
-      virtual void* GetLog();
+      void* GetLog() override;
       /**
        * Address: 0x008F86C0
        * Slot: 2
@@ -85,7 +86,7 @@ namespace gal {
        * What it does:
        * Returns the retained device-context pointer lane at `this+0x60`.
        */
-      virtual DeviceContext* GetDeviceContext();
+      DeviceContext* GetDeviceContext() override;
       /**
        * Address: 0x008F86D0
        * Slot: 3
@@ -94,7 +95,7 @@ namespace gal {
        * What it does:
        * Returns the current thread-id lane stored at `this+0x4C`.
        */
-      virtual int GetCurThreadId();
+      int GetCurThreadId() override;
       /**
        * Address: 0x008F86E0
        * Slot: 4
@@ -103,7 +104,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op slot body.
        */
-      virtual void Func1() const;
+      void Func1() const override;
       /**
        * Address: 0x008F86F0
        * Slot: 5
@@ -112,7 +113,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op slot with `retn 8` calling-shape.
        */
-      virtual void GetModesForAdapter(int arg1, int arg2);
+      void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008FAB80
        * Slot: 7
@@ -120,7 +121,7 @@ namespace gal {
        * What it does:
        * Returns head `headIndex`'s output context from `mHeadOutputContexts`.
        */
-      virtual OutputContext* GetHeadOutputContext(unsigned int headIndex);
+      OutputContext* GetHeadOutputContext(unsigned int headIndex) override;
       /**
        * Address: 0x008FAC50
        * Slot: 6
@@ -128,7 +129,7 @@ namespace gal {
        * What it does:
        * The const overload of slot 7.
        */
-      virtual const OutputContext* GetHeadOutputContext(unsigned int headIndex) const;
+      const OutputContext* GetHeadOutputContext(unsigned int headIndex) const override;
       /**
        * Address: 0x008FA220
        * Slot: 8
@@ -136,7 +137,7 @@ namespace gal {
        * What it does:
        * Returns the device's pipeline state.
        */
-      virtual boost::shared_ptr<PipelineState> GetPipelineState();
+      boost::shared_ptr<PipelineState> GetPipelineState() override;
       /**
        * Address: 0x008FEA00 (FUN_008FEA00)
        * Slot: 9
@@ -147,7 +148,7 @@ namespace gal {
        * wraps the result in an `EffectD3D10`, constructed straight into the
        * caller's return slot.
        */
-      virtual boost::shared_ptr<Effect> CreateEffect(const EffectContext& context);
+      boost::shared_ptr<Effect> CreateEffect(const EffectContext& context) override;
       /**
        * Address: 0x008FAD20 (FUN_008FAD20)
        * Slot: 10
@@ -156,7 +157,7 @@ namespace gal {
        * Creates one texture with its shader-resource view and wraps both in a
        * `TextureD3D10`.
        */
-      virtual boost::shared_ptr<Texture> CreateTexture(const TextureContext* context);
+      boost::shared_ptr<Texture> CreateTexture(const TextureContext* context) override;
       /**
        * Address: 0x008FB1D0 (FUN_008FB1D0)
        * Slot: 11
@@ -165,7 +166,7 @@ namespace gal {
        * Creates one render-target texture with its RTV/SRV pair and wraps them
        * in a `RenderTargetD3D10`.
        */
-      virtual boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context);
+      boost::shared_ptr<RenderTarget> CreateRenderTarget(const RenderTargetContext* context) override;
       /**
        * Address: 0x008FA6B0 (FUN_008FA6B0)
        * Slot: 12
@@ -173,7 +174,7 @@ namespace gal {
        * What it does:
        * Returns an empty `CubeRenderTargetD3D10`; D3D10 has no cube targets.
        */
-      virtual boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context);
+      boost::shared_ptr<CubeRenderTarget> CreateCubeRenderTarget(const CubeRenderTargetContext* context) override;
       /**
        * Address: 0x008FB570 (FUN_008FB570)
        * Slot: 13
@@ -182,7 +183,7 @@ namespace gal {
        * Creates one depth texture with its DSV (and SRV when sampleable) and
        * wraps them in a `DepthStencilTargetD3D10`.
        */
-      virtual boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context);
+      boost::shared_ptr<DepthStencilTarget> CreateDepthStencilTarget(const DepthStencilTargetContext* context) override;
       /**
        * Address: 0x008FE220 (FUN_008FE220)
        * Slot: 14
@@ -190,7 +191,7 @@ namespace gal {
        * What it does:
        * Builds the input layout for gal vertex format `formatToken`.
        */
-      virtual boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatToken);
+      boost::shared_ptr<VertexFormat> CreateVertexFormat(std::uint32_t formatToken) override;
       /**
        * Address: 0x008FB8D0 (FUN_008FB8D0)
        * Slot: 15
@@ -198,7 +199,7 @@ namespace gal {
        * What it does:
        * Creates one GPU vertex buffer and its staging buffer.
        */
-      virtual boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context);
+      boost::shared_ptr<VertexBuffer> CreateVertexBuffer(const VertexBufferContext* context) override;
       /**
        * Address: 0x008FBB60 (FUN_008FBB60)
        * Slot: 16
@@ -206,7 +207,7 @@ namespace gal {
        * What it does:
        * Creates one GPU index buffer and its staging buffer.
        */
-      virtual boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context);
+      boost::shared_ptr<IndexBuffer> CreateIndexBuffer(const IndexBufferContext* context) override;
       /**
        * Address: 0x008FC540
        * Slot: 17
@@ -215,10 +216,10 @@ namespace gal {
        * Copies one colour target's texture into `destination` with a native
        * `CopyResource`.
        */
-      virtual void GetRenderTargetData(
+      void GetRenderTargetData(
           const boost::shared_ptr<RenderTarget>& source,
           const boost::shared_ptr<Texture>& destination
-      );
+      ) override;
       /**
        * Address: 0x008FC290
        * Slot: 18
@@ -227,12 +228,12 @@ namespace gal {
        * Copies directly when source and destination match in size and format;
        * otherwise draws the source into the destination through the RTT effect.
        */
-      virtual void StretchRect(
+      void StretchRect(
           const boost::shared_ptr<RenderTarget>& source,
           const boost::shared_ptr<RenderTarget>& destination,
           const RECT* sourceRect,
           const RECT* destinationRect
-      );
+      ) override;
       /**
        * Address: 0x008FBDF0
        * Slot: 19
@@ -242,12 +243,12 @@ namespace gal {
        * otherwise round-trips the source through an encoded blob. Only the
        * destination rectangle's top-left corner is used.
        */
-      virtual void UpdateSurface(
+      void UpdateSurface(
           const boost::shared_ptr<Texture>& source,
           const boost::shared_ptr<Texture>& destination,
           const RECT* sourceRect,
           const RECT* destinationRect
-      );
+      ) override;
       /**
        * Address: 0x008F8700
        * Slot: 20
@@ -255,10 +256,10 @@ namespace gal {
        * What it does:
        * D3D10 cannot save a cube target (`ret 8`).
        */
-      virtual void SaveCubeRenderTarget(
+      void SaveCubeRenderTarget(
           const boost::shared_ptr<CubeRenderTarget>& cubeTarget,
           const msvc8::string& filePath
-      );
+      ) override;
       /**
        * Address: 0x008FC9B0
        * Slot: 21
@@ -267,11 +268,11 @@ namespace gal {
        * Writes one colour target's texture to `filePath` in image format
        * `fileFormat`.
        */
-      virtual void SaveRenderTarget(
+      void SaveRenderTarget(
           const boost::shared_ptr<RenderTarget>& renderTarget,
           const msvc8::string& filePath,
           int fileFormat
-      );
+      ) override;
       /**
        * Address: 0x008FC6B0
        * Slot: 22
@@ -280,12 +281,12 @@ namespace gal {
        * Encodes one texture to `filePath`, or into `outBuffer` when it is
        * non-null.
        */
-      virtual void SaveTexture(
+      void SaveTexture(
           const boost::shared_ptr<Texture>& texture,
           const msvc8::string& filePath,
           int fileFormat,
           gpg::MemBuffer<char>* outBuffer
-      );
+      ) override;
       /**
        * Address: 0x008FCAC0
        * Slot: 23
@@ -295,13 +296,13 @@ namespace gal {
        * Decodes one texture resource from in-memory bytes and exports mapped blocks
        * into caller `MemBuffer`, writing decoded width/height lanes.
        */
-      virtual void GetTexture2D(
+      void GetTexture2D(
           const void* sourceData,
           std::uint32_t sourceBytes,
           gpg::MemBuffer<char>* outTextureData,
           std::uint32_t* outWidth,
           int* outHeight
-      );
+      ) override;
       /**
        * Address: 0x008FA260
        * Slot: 24
@@ -311,46 +312,44 @@ namespace gal {
        * Resets caller weak-handle output lane and consumes one temporary shared-handle
        * argument by value.
        */
-      virtual boost::weak_ptr<void>* Func7(
+      boost::weak_ptr<void>* Func7(
           boost::weak_ptr<void>* outWeakHandle,
           boost::shared_ptr<void> temporarySharedHandle
-      );
-      /**
-       * Address: 0x008F8720
-       * Slot: 25
-       * Demangled: gpg::gal::DeviceD3D10::Func8
-       *
-       * What it does:
-       * Preserves the binary no-op slot body.
-       */
-      virtual void Func8();
+      ) override;
       /**
        * Address: 0x008F8710
        * Slot: 26
-       * Demangled: gpg::gal::DeviceD3D10::Func9
        *
        * What it does:
-       * Preserves the binary no-op slot with `retn 4` calling-shape.
+       * Nothing: D3D10 has no device reset (`ret 4`).
        */
-      virtual void Func9(int arg1);
+      void Reset(DeviceContext* context) override;
+      /**
+       * Address: 0x008F8720
+       * Slot: 25
+       *
+       * What it does:
+       * Nothing, for the same reason.
+       */
+      void Reset() override;
       /**
        * Address: 0x008F8730
        * Slot: 27
        * Demangled: gpg::gal::DeviceD3D10::TestCooperativeLevel
        */
-      virtual int TestCooperativeLevel();
+      int TestCooperativeLevel() override;
       /**
        * Address: 0x008F8740
        * Slot: 28
        * Demangled: gpg::gal::DeviceD3D10::BeginScene
        */
-      virtual void BeginScene();
+      void BeginScene() override;
       /**
        * Address: 0x008F8750
        * Slot: 29
        * Demangled: gpg::gal::DeviceD3D10::EndScene
        */
-      virtual void EndScene();
+      void EndScene() override;
       /**
        * Address: 0x008FCEA0
        * Slot: 30
@@ -359,7 +358,7 @@ namespace gal {
        * What it does:
        * Presents each retained swapchain and throws on first failing HRESULT.
        */
-      virtual void Present();
+      void Present() override;
       /**
        * Address: 0x008F8760
        * Slot: 31
@@ -371,7 +370,7 @@ namespace gal {
        * Delegates cursor rebuild/apply state to the retained `CursorD3D10` lane
        * at `this+0x11C`.
        */
-      virtual void* SetCursor(const CursorContext* context);
+      void SetCursor(const CursorContext* context) override;
       /**
        * Address: 0x008F8770
        * Slot: 32
@@ -381,7 +380,7 @@ namespace gal {
        * Delegates cursor initialization validation to the retained
        * `CursorD3D10` lane at `this+0x11C`.
        */
-      virtual void* InitCursor();
+      void InitCursor() override;
       /**
        * Address: 0x008F8780
        * Slot: 33
@@ -393,7 +392,7 @@ namespace gal {
        * Delegates native cursor show/hide loop control to the retained
        * `CursorD3D10` lane at `this+0x11C`.
        */
-      virtual int ShowCursor(bool show);
+      int ShowCursor(bool show) override;
       /**
        * Address: 0x008F8790
        * Slot: 34
@@ -402,7 +401,7 @@ namespace gal {
        * What it does:
        * Binds one native viewport using caller-provided D3D10 viewport payload.
        */
-      virtual int SetViewport(const void* viewport);
+      void SetViewport(const D3DVIEWPORT9* viewport) override;
       /**
        * Address: 0x008F87F0
        * Slot: 35
@@ -411,23 +410,18 @@ namespace gal {
        * What it does:
        * Reads one native viewport and copies it into caller-provided payload.
        */
-      virtual void* GetViewport(void* outViewport);
+      void GetViewport(D3DVIEWPORT9* outViewport) override;
       /**
        * Address: 0x008F94B0
        * Slot: 36
        * Demangled: gpg::gal::DeviceD3D10::ClearTarget
        *
        * What it does:
-       * Copies the caller output-context into retained device state, resolves
-       * render/depth target views, and dispatches native clear-target binding.
+       * `Device::ClearTarget` (the base copy of the context), then binds its
+       * render-target and depth-stencil views. Slot 37 (`GetContext`) is the
+       * base's own body in this vtable too.
        */
-      virtual int ClearTarget(const OutputContext* context);
-      /**
-       * Address: 0x008E6810
-       * Slot: 37
-       * Demangled: gpg::gal::Device::GetContext
-       */
-      virtual void GetContext();
+      void ClearTarget(const OutputContext* context) override;
       /**
        * Address: 0x008F9510
        * Slot: 38
@@ -436,27 +430,25 @@ namespace gal {
        * bool,bool,bool,uint32_t,float,int
        *
        * What it does:
-       * Clears color and/or depth-stencil lanes on retained active targets,
-       * deriving clear-mask bits from depth/stencil booleans.
+       * Clears the bound colour and/or depth-stencil views.
        */
-      virtual int Clear(
+      void Clear(
           bool clearColor,
           bool clearDepth,
           bool clearStencil,
           std::uint32_t packedColor,
           float depth,
           int stencil
-      );
+      ) override;
       /**
        * Address: 0x008F95F0
        * Slot: 39
        * Demangled: gpg::gal::DeviceD3D10::ClearTextures
        *
        * What it does:
-       * Clears shader-resource bindings for 128 texture slots on the retained
-       * native D3D10 device lane.
+       * Tail-calls the pipeline state's `ClearTextures` (0x009022E0).
        */
-      virtual int ClearTextures();
+      void ClearTextures() override;
       /**
        * Address: 0x008F9600
        * Slot: 40
@@ -464,7 +456,7 @@ namespace gal {
        * What it does:
        * Binds `vertexFormat`'s input layout.
        */
-      virtual void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat);
+      void SetVertexDeclaration(boost::shared_ptr<VertexFormat> vertexFormat) override;
       /**
        * Address: 0x008F9690
        * Slot: 41
@@ -472,12 +464,12 @@ namespace gal {
        * What it does:
        * Binds one vertex stream and records its frequency.
        */
-      virtual void SetVertexBuffer(
+      void SetVertexBuffer(
           std::uint32_t streamSlot,
           boost::shared_ptr<VertexBuffer> vertexBuffer,
           int streamFrequencyToken,
           int startVertex
-      );
+      ) override;
       /**
        * Address: 0x008F9760
        * Slot: 42
@@ -485,7 +477,7 @@ namespace gal {
        * What it does:
        * Binds `indexBuffer` as the index source.
        */
-      virtual void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer);
+      void SetBufferIndices(boost::shared_ptr<IndexBuffer> indexBuffer) override;
       /**
        * Address: 0x008FE6D0
        * Slot: 43
@@ -494,7 +486,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op fog-state slot.
        */
-      virtual void SetFogState(int arg1, int arg2, int arg3, int arg4, int arg5);
+      void SetFogState(bool enable, const Matrix* projection, float fogStart, float fogEnd, int fogColor) override;
       /**
        * Address: 0x008FE6E0
        * Slot: 44
@@ -503,7 +495,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op wireframe-state slot.
        */
-      virtual void SetWireframeState(int arg1);
+      void SetWireframeState(bool enabled) override;
       /**
        * Address: 0x008FE6F0
        * Slot: 45
@@ -512,7 +504,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op color-write-state slot.
        */
-      virtual void SetColorWriteState(int arg1, int arg2);
+      void SetColorWriteState(bool writeColor, bool writeAlpha) override;
       /**
        * Address: 0x008FD0A0
        * Slot: 46
@@ -521,7 +513,7 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches indexed draw or indexed-instanced draw.
        */
-      virtual int DrawIndexedPrimitive(const DrawIndexedContext* context);
+      int DrawIndexedPrimitive(const DrawIndexedContext* context) override;
       /**
        * Address: 0x008FCF90
        * Slot: 47
@@ -530,27 +522,25 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches draw or draw-instanced.
        */
-      virtual int DrawPrimitive(const DrawContext* context);
+      int DrawPrimitive(const DrawContext* context) override;
       /**
        * Address: 0x008F9810
        * Slot: 48
        * Demangled: gpg::gal::DeviceD3D10::BeginTechnique
        *
        * What it does:
-       * Applies retained raster/depth/blend state lanes from the technique
-       * binding runtime onto the native D3D10 device.
+       * Tail-calls the pipeline state's `BeginTechnique` (0x00902320).
        */
-      virtual int BeginTechnique();
+      void BeginTechnique() override;
       /**
        * Address: 0x008F9820
        * Slot: 49
        * Demangled: gpg::gal::DeviceD3D10::EndTechnique
        *
        * What it does:
-       * For this binary lane, forwards to a no-op helper over the technique
-       * binding runtime.
+       * Tail-calls the pipeline state's (empty) `EndTechnique` (0x00902360).
        */
-      virtual int EndTechnique();
+      void EndTechnique() override;
 
       /**
        * Address: 0x008FD2E0 (FUN_008FD2E0)
@@ -648,7 +638,6 @@ namespace gal {
       // Layout recovered from the constructor at 0x008FE5D0 and the 0x128-byte
       // allocation in `func_CreateDeviceD3D`. Each lane is named for what the
       // code that fills it stores there, not for what an overlay called it.
-      OutputContext mOutputContext{};                                 // +0x04
       HMODULE mD3D10Module = nullptr;                                 // +0x24  LoadLibraryA("d3d10.dll")
       HMODULE mD3DX10Module = nullptr;                                // +0x28  LoadLibraryA("d3dx10.dll")
       HMODULE mDXGIModule = nullptr;                                  // +0x2C  LoadLibraryA("dxgi.dll")
@@ -681,7 +670,6 @@ namespace gal {
       CursorD3D10 mCursor{};                                          // +0x11C
     };
 
-    static_assert(offsetof(DeviceD3D10, mOutputContext) == 0x04, "DeviceD3D10::mOutputContext offset must be 0x04");
     static_assert(offsetof(DeviceD3D10, mD3D10Module) == 0x24, "DeviceD3D10::mD3D10Module offset must be 0x24");
     static_assert(offsetof(DeviceD3D10, mCreateDXGIFactory) == 0x48, "DeviceD3D10::mCreateDXGIFactory offset must be 0x48");
     static_assert(offsetof(DeviceD3D10, mCurThreadId) == 0x4C, "DeviceD3D10::mCurThreadId offset must be 0x4C");
@@ -698,23 +686,5 @@ namespace gal {
     static_assert(offsetof(DeviceD3D10, mHeadOutputContexts) == 0x118, "DeviceD3D10::mHeadOutputContexts offset must be 0x118");
     static_assert(offsetof(DeviceD3D10, mCursor) == 0x11C, "DeviceD3D10::mCursor offset must be 0x11C");
     static_assert(sizeof(DeviceD3D10) == 0x128, "DeviceD3D10 size must be 0x128");
-
-    /**
-     * Address: 0x008FE5D0 (FUN_008FE5D0)
-     *
-     * What it does:
-     * Allocates and initializes one D3D10 backend object with recovered
-     * constructor-default runtime lanes.
-     */
-    Device* CreateDeviceD3D10Backend();
-
-    /**
-     * Address context: 0x008E6B60 (func_CreateDeviceD3D)
-     *
-     * What it does:
-     * Copies startup device-context payload into recovered D3D10 backend
-     * context lanes and records the current thread id.
-     */
-    void InitializeDeviceD3D10Backend(Device* device, DeviceContext* context);
 } // namespace gal
 } // namespace gpg

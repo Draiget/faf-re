@@ -5,6 +5,7 @@
 
 #include <d3d9.h>
 
+#include "gpg/gal/Matrix.h"
 #include "gpg/gal/PipelineState.hpp"
 
 namespace gpg::gal
@@ -55,7 +56,7 @@ namespace gpg::gal
          */
         void SetFogState(
             bool enable,
-            const void* projection,
+            const Matrix* projection,
             float fogStart,
             float fogEnd,
             int fogColor

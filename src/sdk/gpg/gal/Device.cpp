@@ -177,11 +177,9 @@ namespace gpg::gal
         }
         case 2:
         {
-            // DeviceD3D10 derives from Device in the binary; the recovered
-            // class does not yet, so it still comes through its bridge pair.
-            Device* const device = CreateDeviceD3D10Backend();
+            DeviceD3D10* const device = new DeviceD3D10();
             sDeviceD3D.reset(device);
-            InitializeDeviceD3D10Backend(device, context);
+            device->Setup(context);
             break;
         }
         default:
@@ -207,23 +205,6 @@ namespace gpg::gal
      * jump to `~OutputContext`, 0x008E76D0).
      */
     Device::~Device() = default;
-
-    /**
-     * Address: 0x0042EAE0 (FUN_0042EAE0)
-     *
-     * What it does:
-     * Forwards one cursor initialization request to the active backend device.
-     */
-    void Device::InitCursor()
-    {
-        if (!IsReady())
-        {
-            return;
-        }
-
-        auto* const device = static_cast<DeviceD3D9*>(GetInstance());
-        device->InitCursor();
-    }
 
     /**
      * Address: 0x0079CB10 (FUN_0079CB10, gpg::gal::WindowIsForeground)
@@ -355,23 +336,5 @@ namespace gpg::gal
     void Device::GetContext(OutputContext* const outContext)
     {
         *outContext = outputContext_;
-    }
-
-    void Device::GetTexture2D(
-        const void* const /*sourceData*/,
-        const std::uint32_t /*sourceBytes*/,
-        gpg::MemBuffer<char>* const /*outTextureData*/,
-        std::uint32_t* const /*outWidth*/,
-        int* const /*outHeight*/
-    )
-    {
-    }
-
-    boost::weak_ptr<void>* Device::Func7(
-        boost::weak_ptr<void>* const outWeakHandle,
-        boost::shared_ptr<void> /*temporarySharedHandle*/
-    )
-    {
-        return outWeakHandle;
     }
 }

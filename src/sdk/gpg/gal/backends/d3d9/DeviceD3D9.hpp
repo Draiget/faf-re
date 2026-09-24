@@ -105,7 +105,7 @@ namespace gal {
        * Slot: 5
        * Demangled: gpg::gal::DeviceD3D9::GetModesForAdapter
        */
-      virtual void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex);
+      void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
@@ -311,26 +311,24 @@ namespace gal {
           boost::shared_ptr<void> temporarySharedHandle
        ) override;
       /**
-       * Address: 0x008E8210 (FUN_008E8210)
-       * Slot: 25
-       * Demangled: gpg::gal::DeviceD3D9::Func8
-       *
-       * What it does:
-       * Forwards the embedded device-context lane to slot-26 reset dispatch.
-       */
-      virtual int Func8() override;
-      /**
        * Address: 0x008F3070 (FUN_008F3070)
        * Slot: 26
-       * Demangled: gpg::gal::DeviceD3D9::Func9
        *
        * DeviceContext *
        *
        * What it does:
-       * Resets the native D3D9 device using one context payload, then rebuilds
-       * capabilities/head resources and recreates pipeline/query state.
+       * Resets the native D3D9 device for `context`, then rebuilds the
+       * capabilities, the heads, the pipeline state and the frame event query.
        */
-      virtual int Func9(DeviceContext* context) override;
+      void Reset(DeviceContext* context) override;
+      /**
+       * Address: 0x008E8210 (FUN_008E8210)
+       * Slot: 25
+       *
+       * What it does:
+       * `Reset(&mDeviceContext)`, through the slot.
+       */
+      void Reset() override;
       /**
        * Address: 0x008ED360 (FUN_008ED360)
        * Slot: 27
@@ -350,7 +348,7 @@ namespace gal {
        * Begins one native D3D9 scene and issues one begin marker on the retained frame
        * event query when available.
        */
-      virtual int BeginScene() override;
+      void BeginScene() override;
       /**
        * Address: 0x008ED550 (FUN_008ED550)
        * Slot: 29
@@ -389,7 +387,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op cursor-init slot body.
        */
-      virtual void InitCursor();
+      void InitCursor() override;
       /**
        * Address: 0x008E8230 (FUN_008E8230)
        * Slot: 33
@@ -411,7 +409,7 @@ namespace gal {
        * What it does:
        * Binds one viewport payload on the native D3D9 device lane.
        */
-      virtual void SetViewport(const void* viewport) override;
+      void SetViewport(const D3DVIEWPORT9* viewport) override;
       /**
        * Address: 0x008EDA00 (FUN_008EDA00)
        * Slot: 35
@@ -422,7 +420,7 @@ namespace gal {
        * What it does:
        * Reads one native D3D9 viewport into caller-provided payload storage.
        */
-      virtual void GetViewport(void* outViewport) override;
+      void GetViewport(D3DVIEWPORT9* outViewport) override;
       /**
        * Address: 0x008EDAF0 (FUN_008EDAF0)
        * Slot: 36
@@ -466,7 +464,7 @@ namespace gal {
        * What it does:
        * Dispatches `Func1` pre-hook then clears bound textures through pipeline-state helper.
        */
-      virtual int ClearTextures() override;
+      void ClearTextures() override;
       /**
        * Address: 0x008EDF70 (FUN_008EDF70)
        * Slot: 40
@@ -509,7 +507,7 @@ namespace gal {
        */
       virtual void SetFogState(
           bool enable,
-          const void* projection,
+          const Matrix* projection,
           float fogStart,
           float fogEnd,
           int fogColor
@@ -524,7 +522,7 @@ namespace gal {
        * What it does:
        * Validates retained pipeline state and forwards one wireframe-mode toggle.
        */
-      virtual int SetWireframeState(bool enabled) override;
+      void SetWireframeState(bool enabled) override;
       /**
        * Address: 0x008EE5E0 (FUN_008EE5E0)
        * Slot: 45
@@ -536,7 +534,7 @@ namespace gal {
        * Validates retained pipeline state and forwards recovered color-write mask
        * toggles.
        */
-      virtual int SetColorWriteState(bool arg1, bool arg2) override;
+      void SetColorWriteState(bool writeColor, bool writeAlpha) override;
       /**
        * Address: 0x008EE850 (FUN_008EE850)
        * Slot: 46

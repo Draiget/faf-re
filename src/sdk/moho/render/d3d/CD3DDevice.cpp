@@ -521,14 +521,14 @@ namespace
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
       runtime->mInitialized = 0;
 
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       const int headCount = context->GetHeadCount();
       const std::size_t lockHeadCount =
         std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
 
       // false = rebind, not shutdown: keep the batchers, only Reset the mesh
       // renderer. Everything else the viewport holds is released either way,
-      // which is what lets `Func9`'s `IDirect3DDevice9::Reset` succeed.
+      // which is what lets `Reset`'s `IDirect3DDevice9::Reset` succeed.
       if (runtime->mViewport != nullptr) {
         reinterpret_cast<moho::WD3DViewport*>(runtime->mViewport)->D3DWindowOnDeviceExit(false);
       }
@@ -543,7 +543,7 @@ namespace
       }
 
       if (device != nullptr) {
-        (void)device->Func9(context);
+        device->Reset(context);
       }
 
       for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
@@ -606,7 +606,7 @@ namespace
       ResetResourcesForContextTransition(mResources, true);
       mResources.ClearCachedVertexFormats();
 
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       int headCount = 0;
       if (device != nullptr) {
         if (gpg::gal::DeviceContext* const context = device->GetDeviceContext(); context != nullptr) {
@@ -648,14 +648,14 @@ namespace moho
    * Address: 0x0042DBF0 (FUN_0042DBF0)
    *
    * What it does:
-   * Returns the active GAL D3D9 backend pointer when the global device is ready.
+   * Returns the active gal device, or null before one exists.
    */
-  gpg::gal::DeviceD3D9* CD3DDevice::GetDeviceD3D9()
+  gpg::gal::Device* CD3DDevice::GetGalDevice()
   {
     if (!gpg::gal::Device::IsReady()) {
       return nullptr;
     }
-    return static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    return gpg::gal::Device::GetInstance();
   }
 
   /**
@@ -671,7 +671,7 @@ namespace moho
     CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
     runtime->mViewport = viewport;
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
       return;
     }
@@ -776,7 +776,7 @@ namespace moho
    */
   void CD3DDevice::Init()
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     gpg::gal::DeviceContext* const context = device->GetDeviceContext();
     (void)InitContext(context);
   }
@@ -795,7 +795,7 @@ namespace moho
       return 0;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     gpg::gal::DeviceContext* const context = device->GetDeviceContext();
     return static_cast<int>(context->GetHead(headIndex).mWidth);
   }
@@ -814,9 +814,27 @@ namespace moho
       return 0;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     gpg::gal::DeviceContext* const context = device->GetDeviceContext();
     return static_cast<int>(context->GetHead(headIndex).mHeight);
+  }
+
+  /**
+   * Address: 0x0042EAE0 (FUN_0042EAE0)
+   *
+   * What it does:
+   * Re-applies the hardware cursor through the active gal device's slot 32
+   * (`InitCursor`) when there is one. The viewport's window procedure calls it
+   * for WM_SETCURSOR over the client area (0x00430BC4). This used to be a
+   * static `gpg::gal::Device::InitCursor` that cast the device to the D3D9
+   * backend; a gal static cannot share the virtual's name, and the body lives
+   * with the render device here, not in the gal library.
+   */
+  void D3D_InitCursor()
+  {
+    if (gpg::gal::Device::IsReady()) {
+      gpg::gal::Device::GetInstance()->InitCursor();
+    }
   }
 
   /**
@@ -864,7 +882,7 @@ namespace moho
     float* const outMaxZ
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     D3DVIEWPORT9 viewport{};
     viewport.MaxZ = 1.0f;
@@ -890,7 +908,7 @@ namespace moho
     Wm3::Vector2i* const pos, Wm3::Vector2i* const size, const float minZ, const float maxZ
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     D3DVIEWPORT9 viewport{};
     viewport.X = static_cast<DWORD>(pos->x);
@@ -937,7 +955,7 @@ namespace moho
         }
       }
 
-      if (auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      if (gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
           device != nullptr && outSheet.get() != nullptr) {
         ID3DTextureSheet::TextureHandle destinationTexture{};
         outSheet->GetTexture(destinationTexture);
@@ -1006,7 +1024,7 @@ namespace moho
   {
     int result = gpg::gal::Device::IsReady() ? 1 : 0;
     if (result != 0) {
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       result = device->ShowCursor(show);
       CD3DDeviceRuntimeView::FromDevice(this)->mShowingCursor = show ? 1u : 0u;
     }
@@ -1151,7 +1169,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DRenderTarget::SurfaceHandle renderSurface{};
     renderTarget->GetSurface(renderSurface);
@@ -1178,7 +1196,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     (void)device->BeginScene();
     view->mSceneStarted = 1;
   }
@@ -1196,7 +1214,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     device->EndScene();
     view->mSceneStarted = 0;
   }
@@ -1239,7 +1257,7 @@ namespace moho
     const int stencil
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DRenderTarget::SurfaceHandle renderSurface{};
     renderTarget->GetSurface(renderSurface);
@@ -1344,7 +1362,7 @@ namespace moho
    */
   void CD3DDevice::SetAntiAliasingSamples(const int sampleCount)
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
       return;
     }
@@ -1378,7 +1396,7 @@ namespace moho
     ID3DVertexSheet* const vertexSheet, ID3DIndexSheet* const indexSheet, std::int32_t* const primitiveType
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     vertexSheet->Func9();
     indexSheet->SetBufferIndices();
 
@@ -1416,7 +1434,7 @@ namespace moho
     const SD3DVertexRange* const vertexSheetView, std::int32_t* const primitiveType
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     vertexSheetView->sheet->Func9();
 
     gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
@@ -1457,7 +1475,7 @@ namespace moho
       return true;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     vertexSheetView->sheet->Func9();
     indexSheetView->sheet->SetBufferIndices();
 
@@ -1495,7 +1513,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     (void)device->SetColorWriteState(colorWrite0, colorWrite1);
   }
 
@@ -1566,7 +1584,7 @@ namespace moho
    */
   int CD3DDevice::GetCurThreadId()
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     return device->GetCurThreadId();
   }
 
@@ -1666,7 +1684,7 @@ namespace moho
     ID3DRenderTarget* const sourceRenderTarget, ID3DTextureSheet* const destinationTextureSheet
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
 
     ID3DTextureSheet::TextureHandle destinationTexture{};
     destinationTextureSheet->GetTexture(destinationTexture);
@@ -1720,7 +1738,7 @@ namespace moho
     }
 
     try {
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
       (void)device->BeginScene();
       device->Clear(true, true, true, 0xFF000000u, 1.0f, 0);
       device->EndScene();
@@ -1756,7 +1774,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     const int coop = device->TestCooperativeLevel();
     if (coop == 2) {
       return;

@@ -24197,13 +24197,13 @@ long moho::WD3DViewport::MSWWindowProc(
 
     if (d3d_WindowsCursor) {
       if (setCursorMessage && clientHit && device->IsCursorPixelSourceReady()) {
-        gpg::gal::Device::InitCursor();
+        D3D_InitCursor();
         (void)device->ShowCursor(device->IsCursorShowing());
         return 1;
       }
     } else if (setCursorMessage && clientHit && (device->IsCursorPixelSourceReady() || !device->IsCursorShowing())) {
       ::SetCursor(nullptr);
-      gpg::gal::Device::InitCursor();
+      D3D_InitCursor();
       (void)device->ShowCursor(device->IsCursorShowing());
       return 1;
     }
@@ -34158,8 +34158,7 @@ namespace
       return;
     }
 
-    gpg::gal::Device* const instance = gpg::gal::Device::GetInstance();
-    auto* const deviceInstance = static_cast<gpg::gal::DeviceD3D9*>(instance);
+    gpg::gal::Device* const deviceInstance = gpg::gal::Device::GetInstance();
 
     // Resolve the active depth-stencil target once (raw pointer, up-cast to the
     // interface expected by SetRenderTarget1). The binary keeps only the .px of
@@ -34168,21 +34167,7 @@ namespace
     moho::ID3DDepthStencil* const depthStencil =
       moho::D3D_GetDevice()->GetDepthStencil(activeDepthStencil).get();
 
-    // Saved viewport blob (GetViewport / SetViewport take an opaque D3DVIEWPORT9
-    // pointer; modeled as a 7-DWORD struct so d3d9.h is not required here).
-    struct RenBloomViewport
-    {
-      std::uint32_t x;
-      std::uint32_t y;
-      std::uint32_t width;
-      std::uint32_t height;
-      float minZ;
-      float maxZ;
-      std::uint32_t pad;
-    };
-    static_assert(sizeof(RenBloomViewport) == 0x1C, "D3DVIEWPORT9 blob must be 0x1C");
-
-    RenBloomViewport savedViewport{};
+    D3DVIEWPORT9 savedViewport{};
 
     // Acquire this head's writer-lock render target, then StretchRect it into
     // the composite/blur target (SetViewRect: source=writerLock, dest=blur RT,
@@ -34200,13 +34185,13 @@ namespace
     // (0,0,width,height,0,1) for the post-process passes.
     deviceInstance->GetViewport(&savedViewport);
 
-    RenBloomViewport bloomViewport{};
-    bloomViewport.x = 0u;
-    bloomViewport.y = 0u;
-    bloomViewport.width = bloomRenderer->mHalfWidth;
-    bloomViewport.height = bloomRenderer->mHalfHeight;
-    bloomViewport.minZ = 0.0f;
-    bloomViewport.maxZ = 1.0f;
+    D3DVIEWPORT9 bloomViewport{};
+    bloomViewport.X = 0u;
+    bloomViewport.Y = 0u;
+    bloomViewport.Width = bloomRenderer->mHalfWidth;
+    bloomViewport.Height = bloomRenderer->mHalfHeight;
+    bloomViewport.MinZ = 0.0f;
+    bloomViewport.MaxZ = 1.0f;
     deviceInstance->SetViewport(&bloomViewport);
 
     // Glow-copy bias for the extract pass (see the note above): the map's
@@ -36552,7 +36537,7 @@ void moho::REN_MaybeDumpFrame(moho::ID3DRenderTarget* const renderTarget)
   }
 
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
-  gpg::gal::DeviceD3D9* const device9 = device->GetDeviceD3D9();
+  gpg::gal::Device* const device9 = device->GetGalDevice();
 
   // Copy the current head's screen writer-lock surface into the caller's
   // render target (whole-surface StretchRect: null source/dest rectangles).
@@ -37986,7 +37971,7 @@ void moho::WRenViewport::Render(const int head, void* const worldViewInfoVector)
     return;
   }
 
-  gpg::gal::DeviceD3D9* const galDevice = device->GetDeviceD3D9();
+  gpg::gal::Device* const galDevice = device->GetGalDevice();
 
   // Clamp the requested fidelity into the range this adapter actually supports.
   // The binary also latches and clears `ren_RegenShore` here; that flag is not
@@ -39157,7 +39142,7 @@ void moho::WRenViewport::RenderTerrainNormals(TerrainCommon* const terrain)
   WRenViewportRenderView* const runtime = AsRenderView(this);
   WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
-  gpg::gal::DeviceD3D9* const d3dDevice = device->GetDeviceD3D9();
+  gpg::gal::Device* const d3dDevice = device->GetGalDevice();
   if (d3dDevice != nullptr) {
     (void)d3dDevice->ClearTextures();
   }
@@ -39224,7 +39209,7 @@ void moho::WRenViewport::TransformTerrainNormals()
   WRenViewportRenderPassRuntime* const passView = AsRenderPassView(this);
   auto* const destroyView = reinterpret_cast<WRenViewportDestroyRuntimeView*>(this);
   moho::CD3DDevice* const device = moho::D3D_GetDevice();
-  if (gpg::gal::DeviceD3D9* const d3dDevice = device->GetDeviceD3D9(); d3dDevice != nullptr) {
+  if (gpg::gal::Device* const d3dDevice = device->GetGalDevice(); d3dDevice != nullptr) {
     (void)d3dDevice->ClearTextures();
   }
 
@@ -39277,7 +39262,7 @@ void moho::WRenViewport::TransformTerrainNormals()
         : passView->mPrimaryTargetLocks[head].get();
       boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet{};
       device->GetResources()->Func10(sheet, target, sheet);
-      gpg::gal::DeviceD3D9* const dev9 = device->GetDeviceD3D9();
+      gpg::gal::Device* const dev9 = device->GetGalDevice();
       if (dev9 != nullptr && sheet) {
         boost::shared_ptr<gpg::gal::Texture> tex{};
         sheet->GetTexture(tex);

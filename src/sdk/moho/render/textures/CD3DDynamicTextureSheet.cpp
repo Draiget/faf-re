@@ -272,7 +272,7 @@ namespace moho
       return false;
     }
 
-    if (mDevice->GetDeviceD3D9() == nullptr) {
+    if (mDevice->GetGalDevice() == nullptr) {
       mTexture.reset();
       return false;
     }

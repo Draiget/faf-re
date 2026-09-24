@@ -130,7 +130,7 @@ namespace moho
       mContext.reserved0x44_ = static_cast<std::uint32_t>(resources->GetSkipMipLevels());
     }
 
-    if (device->GetDeviceD3D9() == nullptr) {
+    if (device->GetGalDevice() == nullptr) {
       gpg::Warnf("Unable to load texture: %s", mContext.location_.c_str());
       return false;
     }

@@ -5,12 +5,16 @@
 #include "boost/shared_ptr.h"
 #include "boost/weak_ptr.h"
 #include "gpg/core/streams/MemBufferStream.h"
+#include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/Matrix.h"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/Texture.hpp"
 #include "legacy/containers/String.h"
+#include "legacy/containers/Vector.h"
 
 namespace gpg::gal
 {
+  class AdapterModeD3D9;
   class Device;
   class CubeRenderTargetContext;
   class DepthStencilTargetContext;
@@ -43,38 +47,11 @@ namespace gpg::gal
    * VFTABLE: 0x00D42224
    * COL:     0x00E5050C
    *
-   * KNOWN DEVIATION - the `purecallN()` slots below.
-   *
-   * In the binary these are pure virtuals carrying the backend's real
-   * signature; this reconstruction lost the signature and kept only a no-arg
-   * `virtual void purecallN() {}` placeholder. `DeviceD3D9` declares the real
-   * method at each of those positions, but a different name/signature does not
-   * override - the compiler appends the backend method past this class's 50
-   * slots, and the placeholder stays at the indexed slot. The slots still
-   * written that way are 5 and 32; slots 6-8, 10-24 and 40-42 carry their real
-   * signatures and `DeviceD3D9` overrides them.
-   *
-   * That is inert for a normal `deviceD3D9->Method()` call (it binds to the
-   * appended slot and reaches the right body) but fatal two ways for anything
-   * that reaches a backend method through a base `Device*`:
-   *   - the stub runs instead of the real body, leaving output parameters
-   *     untouched, and
-   *   - a `__thiscall` callee pops its own arguments, so a no-arg stub pops 0
-   *     where the caller pushed N and `_RTC_CheckEsp` traps on return.
-   *
-   * Do NOT reach the remaining placeholders by hand-indexing the vtable - that
-   * is what caused the resize crash through `EffectD3D9::OnReset` while slot 8
-   * was still one. Use a typed `static_cast<DeviceD3D9*>` (see
-   * `Device::InitCursor` in Device.cpp), or give the slot its real signature
-   * here.
-   *
-   * The full repair is to give every `purecallN` its real signature so the
-   * backend genuinely overrides and the vtable is 50 entries again. Each slot
-   * needs its resource type's gal interface first, since the base cannot name
-   * backend types; the render targets, `Texture`, the buffers, the vertex
-   * format and the pipeline state all have theirs now.
-   *
-   * `DeviceD3D10` does not derive from this class at all, so it is unaffected.
+   * Every slot is pure in the binary except 36 (`ClearTarget`) and 37
+   * (`GetContext`), and both backends override the other 48 at the same
+   * indices (vtables 0x00D4273C and 0x00D4340C). Two pairs are overloads, which
+   * MSVC lays out in reverse declaration order: `GetHeadOutputContext` (slots
+   * 6/7) and `Reset` (25/26).
    */
   class Device
   {
@@ -117,14 +94,6 @@ namespace gpg::gal
     static Device* Create(DeviceContext* context);
 
     /**
-     * Address: 0x0042EAE0 (FUN_0042EAE0)
-     *
-     * What it does:
-     * Forwards one cursor initialization request to the active backend device.
-     */
-    static void InitCursor();
-
-    /**
      * Address: 0x008E81B0 (FUN_008E81B0)
      *
      * What it does:
@@ -159,7 +128,7 @@ namespace gpg::gal
      * What it does:
      * Returns the active device-context object for the backend device.
      */
-    virtual DeviceContext* GetDeviceContext() { return nullptr; }
+    virtual DeviceContext* GetDeviceContext() = 0;
     /**
      * Slot: 3 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -179,11 +148,14 @@ namespace gpg::gal
      */
     virtual void Func1() const = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 5
-     * Demangled: _purecall
+     * Slot: 5 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
+     *
+     * What it does:
+     * Lists the display modes of adapter `adapterIndex`. The interface names the
+     * D3D9 mode type - `AdapterModeD3D9` has no base in the RTTI - and the D3D10
+     * backend leaves the slot empty (0x008F86F0, `ret 8`).
      */
-    virtual void purecall5() {}
+    virtual void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) = 0;
     /**
      * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -362,10 +334,6 @@ namespace gpg::gal
      * Decodes one texture payload from memory and exports the block-compressed
      * bytes plus its dimensions.
      *
-     * Declared here for the same reason CreateEffect is (slot 9 above): a slot
-     * the base leaves as an argument-less stub is not a slot a backend can
-     * override, so the backend's method gets appended past the base's table and
-     * the real slot keeps answering with the stub.
      */
     virtual void GetTexture2D(
       const void* sourceData,
@@ -373,35 +341,37 @@ namespace gpg::gal
       gpg::MemBuffer<char>* outTextureData,
       std::uint32_t* outWidth,
       int* outHeight
-    );
+    ) = 0;
     /**
      * Address: 0x00A82547 (_purecall in the base's own table)
      * Slot: 24
      *
      * What it does:
-     * Clears the caller's weak handle and consumes one temporary shared handle
-     * by value.
+     * Takes one handle by value and returns an empty one: both backends leave
+     * it unimplemented (0x008E9B40, 0x008FA260), and nothing in reach calls it,
+     * so the handle types are not known.
      */
     virtual boost::weak_ptr<void>* Func7(
       boost::weak_ptr<void>* outWeakHandle,
       boost::shared_ptr<void> temporarySharedHandle
-    );
+    ) = 0;
     /**
-     * Slot: 25 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 26 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Backend state query.
+     * Resets the native device for `context` and rebuilds everything that
+     * hangs off it (D3D9: 0x008F3070; D3D10 leaves it empty). Declared before
+     * its no-argument overload, which MSVC therefore puts at slot 25.
      */
-    virtual int Func8() = 0;
+    virtual void Reset(DeviceContext* context) = 0;
     /**
-     * Slot: 26 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 25 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Rebinds the device to one context.
+     * Resets the device for the context it already has (D3D9 0x008E8210 is
+     * `Reset(&mDeviceContext)`; D3D10 leaves it empty).
      */
-    virtual int Func9(DeviceContext* context) = 0;
+    virtual void Reset() = 0;
     /**
      * Slot: 27 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -417,7 +387,7 @@ namespace gpg::gal
      * What it does:
      * Opens a scene.
      */
-    virtual int BeginScene() = 0;
+    virtual void BeginScene() = 0;
     /**
      * Slot: 29 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -443,20 +413,14 @@ namespace gpg::gal
      */
     virtual void SetCursor(const CursorContext* context) = 0;
     /**
-     * Address: 0x00A82547
-     * Slot: 32
-     * Demangled: _purecall
+     * Slot: 32 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
-     * Still a stub, and still one of the slots DeviceD3D9 fails to override --
-     * but this one cannot simply be declared here, because `Device` already has
-     * a *static* InitCursor (0x0042EAE0) forwarding to the backend, and C++
-     * will not let a static and a virtual share a name and parameter list. One
-     * of the two names is wrong; both come from IDA heuristics rather than
-     * symbols (the D3D9 body at 0x008E8220 is a single `ret`, so it says
-     * nothing), and resolving it means renaming the static and its call sites
-     * in WxRuntimeTypes.cpp.
+     * What it does:
+     * Re-applies the hardware cursor. D3D9 leaves it empty (0x008E8220); D3D10
+     * forwards to its cursor (0x008F8770). `D3D_InitCursor` (0x0042EAE0) calls
+     * it for the viewport's WM_SETCURSOR.
      */
-    virtual void purecall32() {}
+    virtual void InitCursor() = 0;
     /**
      * Slot: 33 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -466,21 +430,21 @@ namespace gpg::gal
      */
     virtual int ShowCursor(bool show) = 0;
     /**
-     * Slot: 34 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 34 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Binds one viewport rectangle.
+     * Binds one viewport. The interface takes the D3D9 structure - the same way
+     * slot 18 takes Win32 `RECT`s - and the D3D10 backend copies its six fields
+     * into a `D3D10_VIEWPORT` (0x008F8790).
      */
-    virtual void SetViewport(const void* viewport) = 0;
+    virtual void SetViewport(const D3DVIEWPORT9* viewport) = 0;
     /**
-     * Slot: 35 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 35 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Reads the bound viewport rectangle.
+     * Reads the bound viewport back into `outViewport`.
      */
-    virtual void GetViewport(void* outViewport) = 0;
+    virtual void GetViewport(D3DVIEWPORT9* outViewport) = 0;
 
     /**
      * Address: 0x008E6940 (FUN_008E6940)
@@ -518,13 +482,14 @@ namespace gpg::gal
         int stencil
     ) = 0;
     /**
-     * Slot: 39 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
-     * DeviceD3D9 overrides it at the same index)
+     * Slot: 39 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Unbinds every texture stage.
+     * Unbinds every texture stage. Both backends tail-call their pipeline
+     * state's loop (0x008E8EEE, 0x008F95F6), and D3D10's ends in
+     * `PSSetShaderResources`, which returns nothing.
      */
-    virtual int ClearTextures() = 0;
+    virtual void ClearTextures() = 0;
     /**
      * Slot: 40 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
@@ -563,7 +528,7 @@ namespace gpg::gal
      */
     virtual void SetFogState(
         bool enable,
-        const void* projection,
+        const Matrix* projection,
         float fogStart,
         float fogEnd,
         int fogColor
@@ -575,7 +540,7 @@ namespace gpg::gal
      * What it does:
      * Switches between filled and wireframe fill mode.
      */
-    virtual int SetWireframeState(bool enabled) = 0;
+    virtual void SetWireframeState(bool enabled) = 0;
     /**
      * Slot: 45 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
@@ -583,7 +548,7 @@ namespace gpg::gal
      * What it does:
      * Sets the colour-write mask.
      */
-    virtual int SetColorWriteState(bool arg1, bool arg2) = 0;
+    virtual void SetColorWriteState(bool writeColor, bool writeAlpha) = 0;
     /**
      * Slot: 46 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)

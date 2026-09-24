@@ -53,6 +53,34 @@ namespace gpg::gal
         void SetDeviceState();
 
         /**
+         * Address: 0x009022E0 (FUN_009022E0)
+         *
+         * What it does:
+         * Unbinds all 128 pixel-shader resource slots, one
+         * `PSSetShaderResources` call per slot. `DeviceD3D10::ClearTextures`
+         * tail-calls it (0x008F95F6).
+         */
+        void ClearTextures();
+
+        /**
+         * Address: 0x00902320 (FUN_00902320)
+         *
+         * What it does:
+         * Binds the secondary state pack: rasterizer, depth-stencil (stencil
+         * ref 0) and blend (no blend factor, full sample mask).
+         * `DeviceD3D10::BeginTechnique` tail-calls it (0x008F9816).
+         */
+        void BeginTechnique();
+
+        /**
+         * Address: 0x00902360 (FUN_00902360)
+         *
+         * What it does:
+         * Nothing. `DeviceD3D10::EndTechnique` tail-calls it (0x008F9826).
+         */
+        void EndTechnique();
+
+        /**
          * Address: 0x009023F0 (FUN_009023F0)
          * Address: 0x009024D0 (FUN_009024D0, slot 0: the scalar deleting destructor)
          *

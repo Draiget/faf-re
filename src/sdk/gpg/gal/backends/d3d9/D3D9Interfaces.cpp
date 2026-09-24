@@ -823,11 +823,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
         }
 
-        DeviceContext* GetEmbeddedDeviceContext(DeviceD3D9* const device) noexcept
-        {
-            return &device->mDeviceContext;
-        }
-
         struct AdapterVectorCountRuntime final
         {
             void* allocatorProxy = nullptr;   // +0x00
@@ -2210,12 +2205,12 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008E81E0 (FUN_008E81E0)
      *
      * What it does:
-     * Dispatches `Func1` pre-hook and returns the embedded device-context lane.
+     * Runs the `Func1` pre-hook and returns the embedded device context.
      */
     DeviceContext* DeviceD3D9::GetDeviceContext()
     {
         Func1();
-        return GetEmbeddedDeviceContext(this);
+        return &mDeviceContext;
     }
 
     /**
@@ -2612,11 +2607,11 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008E8210 (FUN_008E8210)
      *
      * What it does:
-     * Forwards the embedded device-context lane to slot-26 virtual dispatch.
+     * Resets for the context the device already has, through slot 26.
      */
-    int DeviceD3D9::Func8()
+    void DeviceD3D9::Reset()
     {
-        return Func9(GetEmbeddedDeviceContext(this));
+        Reset(&mDeviceContext);
     }
 
     /**
@@ -2960,7 +2955,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Resets the native D3D9 device using caller context payload, then rebuilds
      * capabilities, head resources, pipeline state, and frame event-query state.
      */
-    int DeviceD3D9::Func9(DeviceContext* const context)
+    void DeviceD3D9::Reset(DeviceContext* const context)
     {
         if (mPipelineState.get() != nullptr)
         {
@@ -2993,7 +2988,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             static_cast<void>(mPipelineState->InitState());
         }
 
-        return mDevice->CreateQuery(D3DQUERYTYPE_EVENT, &mFrameEventQuery);
+        static_cast<void>(mDevice->CreateQuery(D3DQUERYTYPE_EVENT, &mFrameEventQuery));
     }
 
     namespace
@@ -4034,9 +4029,13 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008ED450 (FUN_008ED450)
      *
      * What it does:
-     * Begins one native scene and issues one begin-event query lane.
+     * Begins the native scene, then issues the frame event query
+     * (`D3DISSUE_END`, the only flag an event query takes: `push 1` at
+     * 0x008ED527). The recovered body issued `D3DISSUE_BEGIN`, which D3D9
+     * rejects for event queries, and skipped the call when the query was
+     * null; the binary does neither.
      */
-    int DeviceD3D9::BeginScene()
+    void DeviceD3D9::BeginScene()
     {
         Func1();
         const HRESULT result = mDevice->BeginScene();
@@ -4045,13 +4044,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 913, result);
         }
 
-        IDirect3DQuery9* const frameEventQuery = mFrameEventQuery;
-        if (frameEventQuery == nullptr)
-        {
-            return 0;
-        }
-
-        return frameEventQuery->Issue(D3DISSUE_BEGIN);
+        static_cast<void>(mFrameEventQuery->Issue(D3DISSUE_END));
     }
 
     /**
@@ -4177,10 +4170,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Binds one viewport payload on the native D3D9 device.
      */
-    void DeviceD3D9::SetViewport(const void* const viewport)
+    void DeviceD3D9::SetViewport(const D3DVIEWPORT9* const viewport)
     {
         Func1();
-        const HRESULT result = mDevice->SetViewport(static_cast<const D3DVIEWPORT9*>(viewport));
+        const HRESULT result = mDevice->SetViewport(viewport);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 973, result);
@@ -4195,10 +4188,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Reads one native viewport payload into caller-provided storage.
      */
-    void DeviceD3D9::GetViewport(void* const outViewport)
+    void DeviceD3D9::GetViewport(D3DVIEWPORT9* const outViewport)
     {
         Func1();
-        const HRESULT result = mDevice->GetViewport(static_cast<D3DVIEWPORT9*>(outViewport));
+        const HRESULT result = mDevice->GetViewport(outViewport);
         if (result < 0)
         {
             ThrowGalErrorFromHresult("DeviceD3D9.cpp", 981, result);
@@ -4429,7 +4422,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void DeviceD3D9::SetFogState(
         const bool enable,
-        const void* const projection,
+        const Matrix* const projection,
         const float fogStart,
         const float fogEnd,
         const int fogColor
@@ -4454,7 +4447,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Validates retained pipeline state and applies recovered wireframe fill mode.
      */
-    int DeviceD3D9::SetWireframeState(const bool enabled)
+    void DeviceD3D9::SetWireframeState(const bool enabled)
     {
         Func1();
 
@@ -4464,7 +4457,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 1130, "unable to set wireframe state, invalid pipeline state");
         }
 
-        return pipelineState->SetWireframeState(enabled);
+        static_cast<void>(pipelineState->SetWireframeState(enabled));
     }
 
     /**
@@ -4475,7 +4468,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Validates retained pipeline state and applies recovered color-write mask.
      */
-    int DeviceD3D9::SetColorWriteState(const bool arg1, const bool arg2)
+    void DeviceD3D9::SetColorWriteState(const bool writeColor, const bool writeAlpha)
     {
         Func1();
 
@@ -4485,7 +4478,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             ThrowGalError("DeviceD3D9.cpp", 1140, "unable to set color write state, invalid pipeline state");
         }
 
-        return pipelineState->SetColorWriteState(arg1, arg2);
+        static_cast<void>(pipelineState->SetColorWriteState(writeColor, writeAlpha));
     }
 
     /**
@@ -4591,11 +4584,10 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Dispatches `Func1` pre-hook then clears bound textures through pipeline-state helper.
      */
-    int DeviceD3D9::ClearTextures()
+    void DeviceD3D9::ClearTextures()
     {
         Func1();
-        PipelineStateD3D9* const pipelineState = mPipelineState.get();
-        return pipelineState->ClearTextures();
+        static_cast<void>(mPipelineState->ClearTextures());
     }
 
     /**
@@ -4609,7 +4601,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     void PipelineStateD3D9::SetFogState(
         const bool enable,
-        const void* const projection,
+        const Matrix* const projection,
         const float fogStart,
         const float fogEnd,
         const int fogColor
@@ -4618,8 +4610,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         StateManagerD3D9* const stateManager = GetStateManager();
         if (enable)
         {
-            // Device slot 43 still passes the matrix untyped.
-            static_cast<void>(stateManager->SetTransform(D3DTS_PROJECTION, static_cast<const D3DMATRIX*>(projection)));
+            static_cast<void>(stateManager->SetTransform(D3DTS_PROJECTION, reinterpret_cast<const D3DMATRIX*>(projection)));
             static_cast<void>(stateManager->SetRenderState(
                 D3DRS_FOGENABLE,
                 1U

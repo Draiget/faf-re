@@ -572,37 +572,6 @@ namespace gpg::gal
       addRef(object);
     }
 
-    void* GetDeviceLogStorage(DeviceD3D10* const device) noexcept
-    {
-      return &device->mLog;
-    }
-
-    /**
-     * The binary's `GetDeviceContext` (0x008F86C0) is `lea eax,[ecx+0x60]` --
-     * the address of the embedded context. This used to read the dword stored
-     * at +0x60 instead, which is the context's vptr, so every caller got the
-     * vtable address back as a `DeviceContext*`.
-     */
-    DeviceContext* GetDeviceContextLane(DeviceD3D10* const device) noexcept
-    {
-      return &device->mDeviceContext;
-    }
-
-    int GetDeviceCurrentThreadId(DeviceD3D10* const device) noexcept
-    {
-      return device->mCurThreadId;
-    }
-
-    CursorD3D10* GetDeviceCursorLane(DeviceD3D10* const device) noexcept
-    {
-      return &device->mCursor;
-    }
-
-    PipelineStateD3D10* GetDeviceTechniqueBindings(DeviceD3D10* const device) noexcept
-    {
-      return device->mPipelineState.get();
-    }
-
     void* GetDeviceNativeHandle(DeviceD3D10* const device) noexcept
     {
       return device->mDevice;
@@ -718,36 +687,6 @@ namespace gpg::gal
       ::DeleteObject(colorBitmap);
       ::DeleteObject(maskBitmap);
       return iconHandle;
-    }
-
-    int InvokeNativeClearShaderResourceSlot(
-      PipelineStateD3D10* const bindings, const unsigned int startSlot, void* const* const views
-    )
-    {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
-      auto* const setShaderResources = reinterpret_cast<device_native_set_shader_resources_fn>(vtable[4]);
-      return setShaderResources(bindings->device_, startSlot, 1U, views);
-    }
-
-    void InvokeNativeSetRasterizerState(PipelineStateD3D10* const bindings)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
-      auto* const setRasterizerState = reinterpret_cast<device_native_set_rasterizer_state_fn>(vtable[29]);
-      setRasterizerState(bindings->device_, bindings->rasterizerState2_);
-    }
-
-    void InvokeNativeSetDepthStencilState(PipelineStateD3D10* const bindings)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
-      auto* const setDepthStencilState = reinterpret_cast<device_native_set_depth_stencil_state_fn>(vtable[26]);
-      setDepthStencilState(bindings->device_, bindings->depthStencilState2_, 0U);
-    }
-
-    int InvokeNativeSetBlendState(PipelineStateD3D10* const bindings)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(bindings->device_);
-      auto* const setBlendState = reinterpret_cast<device_native_set_blend_state_fn>(vtable[25]);
-      return setBlendState(bindings->device_, bindings->blendState2_, nullptr, static_cast<unsigned int>(-1));
     }
 
     HRESULT InvokeNativeCreateBuffer(DeviceD3D10* const device, const void* const description, void** const outBuffer)
@@ -1070,48 +1009,6 @@ namespace gpg::gal
       return InvokeNativeClearTarget(device, 1U, restoreRenderTargets, previousDepthStencilView);
     }
 
-    /**
-     * Address: 0x009022E0 (FUN_009022E0)
-     *
-     * What it does:
-     * Clears 128 texture shader-resource slots on the retained native D3D10
-     * device lane and returns the final native-call result code.
-     */
-    int ClearAllTextureShaderResourceSlots(PipelineStateD3D10* const bindings)
-    {
-      unsigned int slot = 0U;
-      void* nullResourceView = nullptr;
-      int result = 0;
-      while (slot < 0x80U) {
-        result = InvokeNativeClearShaderResourceSlot(bindings, slot, &nullResourceView);
-        ++slot;
-      }
-
-      return result;
-    }
-
-    /**
-     * Address: 0x00902320 (FUN_00902320)
-     *
-     * What it does:
-     * Applies retained rasterizer/depth-stencil/blend state lanes to the
-     * native D3D10 device for begin-technique dispatch.
-     */
-    int ApplyTechniqueStateBindings(PipelineStateD3D10* const bindings)
-    {
-      InvokeNativeSetRasterizerState(bindings);
-      InvokeNativeSetDepthStencilState(bindings);
-      return InvokeNativeSetBlendState(bindings);
-    }
-
-    /**
-     * Address: 0x00902360 (FUN_00902360)
-     *
-     * What it does:
-     * Preserves the binary empty helper lane used by end-technique dispatch.
-     */
-    void nullsub_3640() {}
-
     [[noreturn]] void ThrowInvalidTopologyError(const int line)
     {
       ThrowGalError("DeviceD3D10.cpp", line, "invalid topology specified");
@@ -1416,7 +1313,7 @@ namespace gpg::gal
     {
       // The binary thunk is `mov eax,[ecx+0x34]; jmp eax`: `this` is not an
       // argument, the export sees exactly the caller's two stack arguments.
-      return reinterpret_cast<DeviceD3D10*>(device)->mD3D10CreateBlob(static_cast<std::uint32_t>(mode), outValue);
+      return static_cast<DeviceD3D10*>(device)->mD3D10CreateBlob(static_cast<std::uint32_t>(mode), outValue);
     }
 
     /**
@@ -1431,7 +1328,7 @@ namespace gpg::gal
     HRESULT InvokeDeviceHelper44(Device* const device, void* const texture, const int mode, void** const outValue)
     {
       // `mov ecx,[ecx+0x44]; jmp ecx`: as above, three stack arguments and no `this`.
-      return reinterpret_cast<DeviceD3D10*>(device)->mD3DX10SaveTextureToMemory(texture, mode, outValue);
+      return static_cast<DeviceD3D10*>(device)->mD3DX10SaveTextureToMemory(texture, mode, outValue);
     }
 
     int ResolveImageFileFormatToken(const int token) noexcept
@@ -2006,7 +1903,7 @@ namespace gpg::gal
       textureDesc.BindFlags = 0U;
       textureDesc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
 
-      ID3D10Device* const nativeDevice = reinterpret_cast<DeviceD3D10*>(device)->mDevice;
+      ID3D10Device* const nativeDevice = static_cast<DeviceD3D10*>(device)->mDevice;
       auto** const nativeVtable = *reinterpret_cast<void***>(nativeDevice);
 
       void* stagingTexture = nullptr;
@@ -2588,6 +2485,44 @@ namespace gpg::gal
   }
 
   /**
+   * Address: 0x009022E0 (FUN_009022E0)
+   *
+   * What it does:
+   * Unbinds all 128 pixel-shader resource slots, one call per slot. Formerly
+   * the free `ClearAllTextureShaderResourceSlots`, which returned the last
+   * call's value - `PSSetShaderResources` returns nothing.
+   */
+  void PipelineStateD3D10::ClearTextures()
+  {
+    ID3D10ShaderResourceView* const noView = nullptr;
+    for (UINT slot = 0U; slot < D3D10_COMMONSHADER_INPUT_RESOURCE_SLOT_COUNT; ++slot) {
+      device_->PSSetShaderResources(slot, 1U, &noView);
+    }
+  }
+
+  /**
+   * Address: 0x00902320 (FUN_00902320)
+   *
+   * What it does:
+   * Binds the secondary state pack. Formerly the free
+   * `ApplyTechniqueStateBindings` over three hand-indexed vtable calls.
+   */
+  void PipelineStateD3D10::BeginTechnique()
+  {
+    device_->RSSetState(rasterizerState2_);
+    device_->OMSetDepthStencilState(depthStencilState2_, 0U);
+    device_->OMSetBlendState(blendState2_, nullptr, 0xFFFFFFFFU);
+  }
+
+  /**
+   * Address: 0x00902360 (FUN_00902360)
+   *
+   * What it does:
+   * Nothing. Formerly `nullsub_3640`.
+   */
+  void PipelineStateD3D10::EndTechnique() {}
+
+  /**
    * Address: 0x009023F0 (FUN_009023F0)
    * Address: 0x009024D0 (FUN_009024D0, slot 0: the scalar deleting destructor)
    *
@@ -2675,7 +2610,7 @@ namespace gpg::gal
    */
   bool HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    const DeviceContext* const context = reinterpret_cast<DeviceD3D10*>(Device::GetInstance())->GetDeviceContext();
+    const DeviceContext* const context = static_cast<DeviceD3D10*>(Device::GetInstance())->GetDeviceContext();
     return context->mHWBasedInstancing;
   }
 
@@ -2875,7 +2810,7 @@ namespace gpg::gal
   bool Float16HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
     Device* const device = Device::GetInstance();
-    const DeviceContext* const context = reinterpret_cast<DeviceD3D10*>(device)->GetDeviceContext();
+    const DeviceContext* const context = static_cast<DeviceD3D10*>(device)->GetDeviceContext();
     return context->mHWBasedInstancing && context->mSupportsFloat16;
   }
 
@@ -4139,15 +4074,6 @@ namespace gpg::gal
   }
 
   /**
-   * Address family:
-   * - slot 37 runtime dispatch from `Device` surface
-   *
-   * What it does:
-   * Preserves the unresolved no-argument context-export slot.
-   */
-  void DeviceD3D10::GetContext() {}
-
-  /**
    * Address: 0x008FE5D0 (FUN_008FE5D0)
    *
    * What it does:
@@ -4160,53 +4086,6 @@ namespace gpg::gal
   DeviceD3D10::DeviceD3D10() = default;
 
   /**
-   * Address context: 0x008E6B60 (func_CreateDeviceD3D)
-   *
-   * What it does:
-   * The D3D10 arm of the device factory: `push 0x128; call operator new`
-   * then the constructor above.
-   *
-   * The cast is the one piece of this left unrecovered. The binary's
-   * constructor installs `Device`'s vtable (0x00D42224) before its own, so
-   * `DeviceD3D10` derives from `gpg::gal::Device`; ours does not yet, because
-   * the two classes' virtual lists do not line up slot for slot and have to
-   * be reconciled against both vtables first.
-   */
-  Device* CreateDeviceD3D10Backend()
-  {
-    return reinterpret_cast<Device*>(new DeviceD3D10());
-  }
-
-  /**
-   * Address context: 0x008E6B60 (func_CreateDeviceD3D)
-   *
-   * What it does:
-   * Copies startup device-context payload into recovered D3D10 backend context
-   * lanes, records current thread ownership, and runs the backend startup
-   * chain.
-   *
-   * The startup call is not optional decoration: `func_CreateDeviceD3D`
-   * publishes the new backend into the `sDeviceD3D` singleton
-   * (`mov sDeviceD3D, esi` at 0x008E6C78) and immediately calls
-   * `gpg::gal::DeviceD3D10::Setup(context)` at 0x008E6C7E with the requested
-   * `DeviceContext` in edi. Without it the whole D3D10 bring-up chain —
-   * `SetupDXGIDevice` -> `AdapterD3D10::ProbeOutputsAndModes` -> the adapter
-   * and display-mode append lanes — is never entered.
-   */
-  void InitializeDeviceD3D10Backend(Device* const device, DeviceContext* const context)
-  {
-    if ((device == nullptr) || (context == nullptr)) {
-      return;
-    }
-
-    auto* const deviceD3D10 = reinterpret_cast<DeviceD3D10*>(device);
-    deviceD3D10->mCurThreadId = static_cast<int>(::GetCurrentThreadId());
-    deviceD3D10->mDeviceContext = *context;
-
-    deviceD3D10->Setup(context);
-  }
-
-  /**
    * Address: 0x008F86B0 (FUN_008F86B0)
    *
    * What it does:
@@ -4214,18 +4093,19 @@ namespace gpg::gal
    */
   void* DeviceD3D10::GetLog()
   {
-    return GetDeviceLogStorage(this);
+    return &mLog;
   }
 
   /**
    * Address: 0x008F86C0 (FUN_008F86C0)
    *
    * What it does:
-   * Returns the retained device-context pointer lane at `this+0x60`.
+   * `lea eax, [ecx+0x60]`: the address of the embedded context. (An earlier
+   * recovery read the dword at +0x60 instead - the context's vptr.)
    */
   DeviceContext* DeviceD3D10::GetDeviceContext()
   {
-    return GetDeviceContextLane(this);
+    return &mDeviceContext;
   }
 
   /**
@@ -4236,7 +4116,7 @@ namespace gpg::gal
    */
   int DeviceD3D10::GetCurThreadId()
   {
-    return GetDeviceCurrentThreadId(this);
+    return mCurThreadId;
   }
 
   /**
@@ -4255,10 +4135,8 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op adapter-modes slot (`retn 8` shape).
    */
-  void DeviceD3D10::GetModesForAdapter(const int arg1, const int arg2)
+  void DeviceD3D10::GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& /*outModes*/, const int /*adapterIndex*/)
   {
-    static_cast<void>(arg1);
-    static_cast<void>(arg2);
   }
 
   /**
@@ -4926,11 +4804,11 @@ namespace gpg::gal
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 954, createSrvResult);
     }
 
-    D3D10_VIEWPORT viewport{};
+    D3DVIEWPORT9 viewport{};
     viewport.Width = context->width_;
     viewport.Height = context->height_;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
+    viewport.MinZ = 0.0f;
+    viewport.MaxZ = 1.0f;
     SetViewport(&viewport);
 
     return boost::shared_ptr<RenderTarget>(
@@ -5552,7 +5430,7 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op virtual slot.
    */
-  void DeviceD3D10::Func8() {}
+  void DeviceD3D10::Reset() {}
 
   /**
    * Address: 0x008F8710 (FUN_008F8710)
@@ -5562,9 +5440,8 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op virtual slot (`retn 4` shape).
    */
-  void DeviceD3D10::Func9(const int arg1)
+  void DeviceD3D10::Reset(DeviceContext* const /*context*/)
   {
-    static_cast<void>(arg1);
   }
 
   /**
@@ -5603,9 +5480,9 @@ namespace gpg::gal
    * Tail-delegates to the retained `CursorD3D10` lane at `this+0x11C` and
    * rebuilds/applies cursor icon state from caller context.
    */
-  void* DeviceD3D10::SetCursor(const CursorContext* const context)
+  void DeviceD3D10::SetCursor(const CursorContext* const context)
   {
-    return GetDeviceCursorLane(this)->SetCursor(context);
+    static_cast<void>(mCursor.SetCursor(context));
   }
 
   /**
@@ -5614,9 +5491,9 @@ namespace gpg::gal
    * What it does:
    * Tail-delegates to retained cursor lane initialization (`CursorD3D10::InitCursor`).
    */
-  void* DeviceD3D10::InitCursor()
+  void DeviceD3D10::InitCursor()
   {
-    return GetDeviceCursorLane(this)->InitCursor();
+    static_cast<void>(mCursor.InitCursor());
   }
 
   /**
@@ -5630,7 +5507,7 @@ namespace gpg::gal
    */
   int DeviceD3D10::ShowCursor(const bool show)
   {
-    return GetDeviceCursorLane(this)->ShowCursor(show);
+    return mCursor.ShowCursor(show);
   }
 
   /**
@@ -5641,17 +5518,16 @@ namespace gpg::gal
    * What it does:
    * Copies one caller viewport payload and binds it as the single native D3D10 viewport.
    */
-  int DeviceD3D10::SetViewport(const void* const viewport)
+  void DeviceD3D10::SetViewport(const D3DVIEWPORT9* const viewport)
   {
-    const auto* const sourceViewport = reinterpret_cast<const D3D10_VIEWPORT*>(viewport);
     D3D10_VIEWPORT viewportCopy{};
-    viewportCopy.TopLeftX = sourceViewport->TopLeftX;
-    viewportCopy.TopLeftY = sourceViewport->TopLeftY;
-    viewportCopy.Width = sourceViewport->Width;
-    viewportCopy.Height = sourceViewport->Height;
-    viewportCopy.MinDepth = sourceViewport->MinDepth;
-    viewportCopy.MaxDepth = sourceViewport->MaxDepth;
-    return InvokeNativeSetViewport(this, &viewportCopy);
+    viewportCopy.TopLeftX = static_cast<INT>(viewport->X);
+    viewportCopy.TopLeftY = static_cast<INT>(viewport->Y);
+    viewportCopy.Width = viewport->Width;
+    viewportCopy.Height = viewport->Height;
+    viewportCopy.MinDepth = viewport->MinZ;
+    viewportCopy.MaxDepth = viewport->MaxZ;
+    static_cast<void>(InvokeNativeSetViewport(this, &viewportCopy));
   }
 
   /**
@@ -5662,20 +5538,18 @@ namespace gpg::gal
    * What it does:
    * Fetches one native viewport payload and copies it back into caller memory.
    */
-  void* DeviceD3D10::GetViewport(void* const outViewport)
+  void DeviceD3D10::GetViewport(D3DVIEWPORT9* const outViewport)
   {
     unsigned int viewportCount = 1U;
     D3D10_VIEWPORT viewport{};
     InvokeNativeGetViewport(this, &viewportCount, &viewport);
 
-    auto* const destinationViewport = reinterpret_cast<D3D10_VIEWPORT*>(outViewport);
-    destinationViewport->TopLeftX = viewport.TopLeftX;
-    destinationViewport->TopLeftY = viewport.TopLeftY;
-    destinationViewport->Width = viewport.Width;
-    destinationViewport->Height = viewport.Height;
-    destinationViewport->MinDepth = viewport.MinDepth;
-    destinationViewport->MaxDepth = viewport.MaxDepth;
-    return outViewport;
+    outViewport->X = static_cast<DWORD>(viewport.TopLeftX);
+    outViewport->Y = static_cast<DWORD>(viewport.TopLeftY);
+    outViewport->Width = viewport.Width;
+    outViewport->Height = viewport.Height;
+    outViewport->MinZ = viewport.MinDepth;
+    outViewport->MaxZ = viewport.MaxDepth;
   }
 
   /**
@@ -5754,9 +5628,9 @@ namespace gpg::gal
    * Copies one output-context snapshot into retained device state, resolves
    * active render/depth view handles, and dispatches native target clear.
    */
-  int DeviceD3D10::ClearTarget(const OutputContext* const context)
+  void DeviceD3D10::ClearTarget(const OutputContext* const context)
   {
-    mOutputContext = *context;
+    Device::ClearTarget(context);
 
     void* renderTargetView = nullptr;
     void* depthStencilView = nullptr;
@@ -5773,7 +5647,7 @@ namespace gpg::gal
     }
 
     void* renderTargetViews[1] = {renderTargetView};
-    return InvokeNativeClearTarget(this, 1U, renderTargetViews, depthStencilView);
+    static_cast<void>(InvokeNativeClearTarget(this, 1U, renderTargetViews, depthStencilView));
   }
 
   /**
@@ -5782,10 +5656,10 @@ namespace gpg::gal
    * bool,bool,bool,uint32_t,float,int
    *
    * What it does:
-   * Clears active color and/or depth-stencil lanes based on caller boolean
-   * mask inputs and returns the native depth-clear result when dispatched.
+   * Clears the bound colour view with the unpacked ARGB colour, and the
+   * depth-stencil view with the depth/stencil flags that were asked for.
    */
-  int DeviceD3D10::Clear(
+  void DeviceD3D10::Clear(
     const bool clearColor,
     const bool clearDepth,
     const bool clearStencil,
@@ -5797,13 +5671,13 @@ namespace gpg::gal
     void* renderTargetView = nullptr;
     void* depthStencilView = nullptr;
 
-    if (mOutputContext.surface.get() != nullptr) {
-      renderTargetView = static_cast<RenderTargetD3D10*>(mOutputContext.surface.get())->GetRenderTargetViewOrThrow();
+    if (outputContext_.surface.get() != nullptr) {
+      renderTargetView = static_cast<RenderTargetD3D10*>(outputContext_.surface.get())->GetRenderTargetViewOrThrow();
     }
 
-    if (mOutputContext.depthStencil.get() != nullptr) {
+    if (outputContext_.depthStencil.get() != nullptr) {
       depthStencilView =
-        static_cast<DepthStencilTargetD3D10*>(mOutputContext.depthStencil.get())->GetDepthStencilViewOrThrow();
+        static_cast<DepthStencilTargetD3D10*>(outputContext_.depthStencil.get())->GetDepthStencilViewOrThrow();
     }
 
     if (clearColor && (renderTargetView != nullptr)) {
@@ -5825,12 +5699,10 @@ namespace gpg::gal
     }
 
     if ((clearMask != 0) && (depthStencilView != nullptr)) {
-      return InvokeNativeClearDepthStencilView(
+      static_cast<void>(InvokeNativeClearDepthStencilView(
         this, depthStencilView, static_cast<unsigned int>(clearMask), depth, static_cast<unsigned int>(stencil)
-      );
+      ));
     }
-
-    return clearMask;
   }
 
   /**
@@ -5839,13 +5711,14 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op fog-state lane.
    */
-  void DeviceD3D10::SetFogState(const int arg1, const int arg2, const int arg3, const int arg4, const int arg5)
+  void DeviceD3D10::SetFogState(
+    const bool /*enable*/,
+    const Matrix* const /*projection*/,
+    const float /*fogStart*/,
+    const float /*fogEnd*/,
+    const int /*fogColor*/
+  )
   {
-    static_cast<void>(arg1);
-    static_cast<void>(arg2);
-    static_cast<void>(arg3);
-    static_cast<void>(arg4);
-    static_cast<void>(arg5);
   }
 
   /**
@@ -5854,9 +5727,8 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op wireframe-state lane.
    */
-  void DeviceD3D10::SetWireframeState(const int arg1)
+  void DeviceD3D10::SetWireframeState(const bool /*enabled*/)
   {
-    static_cast<void>(arg1);
   }
 
   /**
@@ -5865,10 +5737,8 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op color-write-state lane.
    */
-  void DeviceD3D10::SetColorWriteState(const int arg1, const int arg2)
+  void DeviceD3D10::SetColorWriteState(const bool /*writeColor*/, const bool /*writeAlpha*/)
   {
-    static_cast<void>(arg1);
-    static_cast<void>(arg2);
   }
 
   /**
@@ -5878,9 +5748,9 @@ namespace gpg::gal
    * Clears shader-resource bindings for 128 texture slots on the retained
    * technique-state native device lane.
    */
-  int DeviceD3D10::ClearTextures()
+  void DeviceD3D10::ClearTextures()
   {
-    return ClearAllTextureShaderResourceSlots(GetDeviceTechniqueBindings(this));
+    mPipelineState->ClearTextures();
   }
 
   /**
@@ -5941,24 +5811,22 @@ namespace gpg::gal
    * Address: 0x008F9810 (FUN_008F9810)
    *
    * What it does:
-   * Applies recovered technique-state bindings onto the native D3D10 device.
+   * `mov ecx, [ecx+0xB4]; jmp`: the pipeline state's `BeginTechnique`.
    */
-  int DeviceD3D10::BeginTechnique()
+  void DeviceD3D10::BeginTechnique()
   {
-    return ApplyTechniqueStateBindings(GetDeviceTechniqueBindings(this));
+    mPipelineState->BeginTechnique();
   }
 
   /**
    * Address: 0x008F9820 (FUN_008F9820)
    *
    * What it does:
-   * Preserves the binary no-op end-technique lane (tail-jump to `nullsub_3640`).
+   * `mov ecx, [ecx+0xB4]; jmp`: the pipeline state's (empty) `EndTechnique`.
    */
-  int DeviceD3D10::EndTechnique()
+  void DeviceD3D10::EndTechnique()
   {
-    static_cast<void>(GetDeviceTechniqueBindings(this));
-    nullsub_3640();
-    return 0;
+    mPipelineState->EndTechnique();
   }
 
   /**

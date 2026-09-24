@@ -686,7 +686,7 @@ namespace moho
     }
 
     if (sheet != nullptr) {
-      gpg::gal::DeviceD3D9* const deviceD3D9 = mDevice->GetDeviceD3D9();
+      gpg::gal::Device* const deviceD3D9 = mDevice->GetGalDevice();
       if (deviceD3D9 != nullptr) {
         CD3DDynamicTextureSheet::TextureHandle destinationTexture{};
         sheet->GetTexture(destinationTexture);

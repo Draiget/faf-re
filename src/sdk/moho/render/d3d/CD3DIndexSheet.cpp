@@ -201,7 +201,7 @@ namespace moho
    */
   void CD3DIndexSheet::SetBufferIndices()
   {
-    gpg::gal::DeviceD3D9* const deviceD3D9 = mDevice->GetDeviceD3D9();
+    gpg::gal::Device* const deviceD3D9 = mDevice->GetGalDevice();
     if (deviceD3D9 != nullptr) {
       deviceD3D9->SetBufferIndices(mBuffer);
     }

@@ -15,7 +15,7 @@ namespace boost::detail
 
 namespace gpg::gal
 {
-  class DeviceD3D9;
+  class Device;
   class DeviceContext;
   class TextureContext;
 } // namespace gpg::gal
@@ -112,12 +112,14 @@ namespace moho
     /**
      * Address: 0x0042DBF0
      * Slot: 1
-     * Demangled: Moho::CD3DDevice::GetDeviceD3D9
      *
      * What it does:
-     * Returns the active GAL D3D9 backend pointer when the global device is ready.
+     * Returns the active gal device, or null before one exists. It returned
+     * the D3D9 backend type (IDA's label is `GetDeviceD3D9`), but the body is
+     * `Device::GetInstance()` whichever backend is active, and every caller
+     * uses only gal::Device slots.
      */
-    virtual gpg::gal::DeviceD3D9* GetDeviceD3D9();
+    virtual gpg::gal::Device* GetGalDevice();
 
     /**
      * Address: 0x0042DC10
@@ -784,6 +786,14 @@ namespace moho
    * device destroy on the global D3D device.
    */
   void D3D_Exit();
+
+  /**
+   * Address: 0x0042EAE0 (FUN_0042EAE0)
+   *
+   * What it does:
+   * Re-applies the hardware cursor on the active gal device, when there is one.
+   */
+  void D3D_InitCursor();
 
   /**
    * Address: 0x00430590 (D3D_GetDevice)
