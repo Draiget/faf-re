@@ -1,788 +1,411 @@
 #include "moho/misc/ScrFileCtrl.h"
 
-#include <cstdint>
 #include <fstream>
-#include <new>
-#include <string>
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <Windows.h>
-#include <CommCtrl.h>
+#include <wx/bitmap.h>
+#include <wx/colour.h>
+#include <wx/font.h>
+#include <wx/imaglist.h>
 
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/CVirtualFileSystem.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/ScrBreakpoint.h"
 #include "moho/misc/ScrDebugHooks.h"
 
 namespace
 {
-  constexpr std::uint32_t kSelectStateFlags = 6u;
-  constexpr std::uint32_t kSelectStateMask = 6u;
-  constexpr int kMarkerImageWidth = 24;
-  constexpr int kMarkerImageHeight = 12;
+  // ScrFileLine::mMarkerState is the row's image, in the order the
+  // constructor loads the bitmaps; -1 shows none.
+  constexpr int kNoMarker = -1;
+  constexpr int kCursorMarker = 0;
+  constexpr int kCursorOnBreakpointMarker = 1;
+  constexpr int kCursorOnDisabledBreakpointMarker = 2;
+  constexpr int kBreakpointMarker = 3;
+  constexpr int kDisabledBreakpointMarker = 4;
 
-  constexpr const char* kCursorMarkerImagePath = "/coderes/engine/dbg_cursor.bmp";
-  constexpr const char* kCursorEnabledMarkerImagePath = "/coderes/engine/dbg_cursor_enabled.bmp";
-  constexpr const char* kCursorDisabledMarkerImagePath = "/coderes/engine/dbg_cursor_disabled.bmp";
-  constexpr const char* kBreakpointEnabledMarkerImagePath = "/coderes/engine/dbg_break_enabled.bmp";
-  constexpr const char* kBreakpointDisabledMarkerImagePath = "/coderes/engine/dbg_break_disabled.bmp";
+  constexpr long kSourceColumn = 2;
+  constexpr long kFoundLineState = wxLIST_STATE_FOCUSED | wxLIST_STATE_SELECTED;
 
-  struct wxListActivationEventRuntimeView
+  /**
+   * A marker bitmap: the mounted path resolved through the VFS, loaded as a
+   * BMP. Inlined at each of the constructor's five images.
+   */
+  wxBitmap LoadMarkerBitmap(const char* const mountedPath)
   {
-    std::uint8_t mUnknown00To3F[0x40];
-    std::int32_t mItemIndex = -1;
-  };
-
-  static_assert(
-    offsetof(wxListActivationEventRuntimeView, mItemIndex) == 0x40,
-    "wxListActivationEventRuntimeView::mItemIndex offset must be 0x40"
-  );
-
-  struct wxSizeEventRuntimeView
-  {
-    std::uint8_t mUnknown00To1F[0x20];
-    std::int32_t mWidth = 0;
-    std::int32_t mHeight = 0;
-  };
-
-  static_assert(offsetof(wxSizeEventRuntimeView, mWidth) == 0x20, "wxSizeEventRuntimeView::mWidth offset must be 0x20");
-  static_assert(
-    offsetof(wxSizeEventRuntimeView, mHeight) == 0x24,
-    "wxSizeEventRuntimeView::mHeight offset must be 0x24"
-  );
-
-  [[nodiscard]] HWND AsListViewHandle(void* const runtimeHandle) noexcept
-  {
-    return reinterpret_cast<HWND>(runtimeHandle);
-  }
-
-  [[nodiscard]] wxStringRuntime BorrowUtf8AsWxString(const msvc8::string& text)
-  {
-    static thread_local std::wstring wideScratch{};
-    wideScratch = gpg::STR_Utf8ToWide(text.c_str());
-    return wxStringRuntime::Borrow(wideScratch.c_str());
-  }
-
-  [[nodiscard]] bool ResolveMountedPath(
-    const msvc8::string& mountedPath,
-    msvc8::string& outResolvedPath
-  )
-  {
-    outResolvedPath.assign(mountedPath, 0U, msvc8::string::npos);
-    if (outResolvedPath.empty()) {
-      return false;
-    }
-
-    moho::FILE_EnsureWaitHandleSet();
-    if (moho::CVirtualFileSystem* const vfs = moho::DISK_GetVFS(); vfs != nullptr) {
-      (void)vfs->FindFile(&outResolvedPath, outResolvedPath.c_str(), nullptr);
-    }
-
-    return !outResolvedPath.empty();
-  }
-
-  void InsertDefaultColumns(HWND const listView)
-  {
-    if (listView == nullptr) {
-      return;
-    }
-
-    LVCOLUMNW column{};
-    column.mask = LVCF_TEXT | LVCF_FMT | LVCF_WIDTH;
-    column.fmt = LVCFMT_LEFT;
-
-    column.pszText = const_cast<wchar_t*>(L"image");
-    column.cx = 32;
-    (void)::SendMessageW(listView, LVM_INSERTCOLUMNW, 0, reinterpret_cast<LPARAM>(&column));
-
-    column.pszText = const_cast<wchar_t*>(L"line");
-    column.cx = 64;
-    (void)::SendMessageW(listView, LVM_INSERTCOLUMNW, 1, reinterpret_cast<LPARAM>(&column));
-
-    column.pszText = const_cast<wchar_t*>(L"source");
-    column.cx = -1;
-    (void)::SendMessageW(listView, LVM_INSERTCOLUMNW, 2, reinterpret_cast<LPARAM>(&column));
-  }
-
-  void TryAddMarkerBitmap(const HIMAGELIST imageList, const msvc8::string& mountedPath)
-  {
-    if (imageList == nullptr || mountedPath.empty()) {
-      return;
-    }
-
-    msvc8::string resolvedPath{};
-    if (!ResolveMountedPath(mountedPath, resolvedPath)) {
-      return;
-    }
-
-    const std::wstring resolvedWidePath = gpg::STR_Utf8ToWide(resolvedPath.c_str());
-    const HBITMAP bitmap = reinterpret_cast<HBITMAP>(
-      ::LoadImageW(nullptr, resolvedWidePath.c_str(), IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE)
-    );
-    if (bitmap == nullptr) {
-      return;
-    }
-
-    (void)::ImageList_AddMasked(imageList, bitmap, RGB(255, 0, 255));
-    (void)::DeleteObject(bitmap);
+    msvc8::string diskPath;
+    (void)moho::DISK_GetVFS()->FindFile(&diskPath, mountedPath, nullptr);
+    return wxBitmap(gpg::STR_Utf8ToWide(diskPath.c_str()).c_str(), wxBITMAP_TYPE_BMP);
   }
 } // namespace
 
-wxEventTable moho::ScrFileCtrl::sm_eventTable = {nullptr, nullptr};
+// Table 0x00DFF644 = {&wxListCtrl::sm_eventTable (0x00D56818), rows 0x00F59654};
+// GetEventTable (0x004C1ED0) comes with it.
+BEGIN_EVENT_TABLE(moho::ScrFileCtrl, wxListCtrl)
+  EVT_SIZE(moho::ScrFileCtrl::OnSize)
+END_EVENT_TABLE()
 
 /**
  * Address: 0x004C1EE0 (FUN_004C1EE0)
- *
- * wxWindow *
- *
- * What it does:
- * Constructs one virtual source-file list control, binds marker imagery, and
- * initializes virtual columns used by script source rows.
  */
-moho::ScrFileCtrl::ScrFileCtrl(wxWindowBase* const parentWindow)
+moho::ScrFileCtrl::ScrFileCtrl(wxWindow* const parent)
+  : wxListCtrl(
+      parent, -1, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_VIRTUAL | wxLC_NO_HEADER | wxLC_SINGLE_SEL
+    )
+  , mCursorLine(0)
+  , mImageList(nullptr)
+  , mSourcePath()
+  , mLines()
 {
-  INITCOMMONCONTROLSEX commonControls{};
-  commonControls.dwSize = sizeof(commonControls);
-  commonControls.dwICC = ICC_LISTVIEW_CLASSES;
-  (void)::InitCommonControlsEx(&commonControls);
+  mImageList = new wxImageList(24, 12, true, 5);
+  mImageList->Add(LoadMarkerBitmap("/coderes/engine/dbg_cursor.bmp"));
+  mImageList->Add(LoadMarkerBitmap("/coderes/engine/dbg_cursor_enabled.bmp"));
+  mImageList->Add(LoadMarkerBitmap("/coderes/engine/dbg_cursor_disabled.bmp"));
+  mImageList->Add(LoadMarkerBitmap("/coderes/engine/dbg_break_enabled.bmp"));
+  mImageList->Add(LoadMarkerBitmap("/coderes/engine/dbg_break_disabled.bmp"));
+  SetImageList(mImageList, wxIMAGE_LIST_SMALL);
 
-  const HWND parentHandle = parentWindow != nullptr ? reinterpret_cast<HWND>(parentWindow->GetHandle()) : nullptr;
-  const DWORD style = WS_CHILD | WS_VISIBLE | LVS_REPORT | LVS_OWNERDATA;
-  const HWND listViewHandle = ::CreateWindowExW(
-    0,
-    WC_LISTVIEWW,
-    L"wxListCtrl",
-    style,
-    0,
-    0,
-    0,
-    0,
-    parentHandle,
-    reinterpret_cast<HMENU>(static_cast<std::intptr_t>(-1)),
-    nullptr,
-    nullptr
+  InsertColumn(0, wxT("image"), wxLIST_FORMAT_LEFT, 32);
+  InsertColumn(1, wxT("line"), wxLIST_FORMAT_LEFT, 64);
+  InsertColumn(kSourceColumn, wxT("source"), wxLIST_FORMAT_LEFT, -1);
+
+  Connect(
+    GetId(), -1, wxEVT_COMMAND_LIST_ITEM_ACTIVATED,
+    (wxObjectEventFunction)(wxEventFunction)(wxListEventFunction)&ScrFileCtrl::OnLineActivated
   );
-  mListViewHandle = listViewHandle;
-
-  const HIMAGELIST markerImages = ::ImageList_Create(kMarkerImageWidth, kMarkerImageHeight, ILC_COLOR32 | ILC_MASK, 5, 0);
-  mMarkerImageList = markerImages;
-  if (markerImages != nullptr) {
-    TryAddMarkerBitmap(markerImages, msvc8::string(kCursorMarkerImagePath));
-    TryAddMarkerBitmap(markerImages, msvc8::string(kCursorEnabledMarkerImagePath));
-    TryAddMarkerBitmap(markerImages, msvc8::string(kCursorDisabledMarkerImagePath));
-    TryAddMarkerBitmap(markerImages, msvc8::string(kBreakpointEnabledMarkerImagePath));
-    TryAddMarkerBitmap(markerImages, msvc8::string(kBreakpointDisabledMarkerImagePath));
-  }
-
-  if (listViewHandle != nullptr) {
-    if (markerImages != nullptr) {
-      (void)::SendMessageW(
-        listViewHandle,
-        LVM_SETIMAGELIST,
-        static_cast<WPARAM>(LVSIL_SMALL),
-        reinterpret_cast<LPARAM>(markerImages)
-      );
-    }
-    InsertDefaultColumns(listViewHandle);
-    SetVirtualLineCount(0);
-  }
-}
-
-/**
- * Address: 0x004C1ED0 (FUN_004C1ED0)
- *
- * What it does:
- * Returns this control's wx event-table lane.
- */
-const void* moho::ScrFileCtrl::GetEventTable() const
-{
-  return &sm_eventTable;
-}
-
-/**
- * Address: 0x004C2680 (FUN_004C2680)
- *
- * What it does:
- * Implements deleting-dtor thunk semantics for one script-file control.
- */
-moho::ScrFileCtrl* moho::ScrFileCtrl::DeleteWithFlag(
-  ScrFileCtrl* const object,
-  const std::uint8_t deleteFlags
-) noexcept
-{
-  if (object == nullptr) {
-    return nullptr;
-  }
-
-  object->~ScrFileCtrl();
-  if ((deleteFlags & 1u) != 0u) {
-    operator delete(object);
-  }
-  return object;
 }
 
 /**
  * Address: 0x004C26A0 (FUN_004C26A0)
- *
- * What it does:
- * Releases source-file state lanes and returns to base list-control state.
+ * Deleting: 0x004C2680 (FUN_004C2680)
  */
-moho::ScrFileCtrl::~ScrFileCtrl()
-{
-  if (mMarkerImageList != nullptr) {
-    (void)::ImageList_Destroy(reinterpret_cast<HIMAGELIST>(mMarkerImageList));
-    mMarkerImageList = nullptr;
-  }
-}
-
-int moho::ScrFileCtrl::GetLineCount() const noexcept
-{
-  return static_cast<int>(mLines.size());
-}
-
-int moho::ScrFileCtrl::GetSelectedRowIndex() const noexcept
-{
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr) {
-    return -1;
-  }
-
-  return static_cast<int>(
-    ::SendMessageW(
-      listView,
-      LVM_GETNEXTITEM,
-      static_cast<WPARAM>(-1),
-      static_cast<LPARAM>(LVNI_SELECTED)
-    )
-  );
-}
-
-void moho::ScrFileCtrl::SetRowState(
-  const int lineIndexZeroBased,
-  const std::uint32_t stateFlags,
-  const std::uint32_t stateMask
-) noexcept
-{
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr || lineIndexZeroBased < 0) {
-    return;
-  }
-
-  LVITEMW listItem{};
-  listItem.state = stateFlags;
-  listItem.stateMask = stateMask;
-  (void)::SendMessageW(
-    listView,
-    LVM_SETITEMSTATE,
-    static_cast<WPARAM>(lineIndexZeroBased),
-    reinterpret_cast<LPARAM>(&listItem)
-  );
-}
-
-void moho::ScrFileCtrl::EnsureRowVisible(const int lineIndexZeroBased) noexcept
-{
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr || lineIndexZeroBased < 0) {
-    return;
-  }
-
-  (void)::SendMessageW(
-    listView,
-    LVM_ENSUREVISIBLE,
-    static_cast<WPARAM>(lineIndexZeroBased),
-    static_cast<LPARAM>(0)
-  );
-}
-
-void moho::ScrFileCtrl::RedrawRow(const int lineIndexZeroBased) noexcept
-{
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr || lineIndexZeroBased < 0) {
-    return;
-  }
-
-  (void)::SendMessageW(
-    listView,
-    LVM_REDRAWITEMS,
-    static_cast<WPARAM>(lineIndexZeroBased),
-    static_cast<LPARAM>(lineIndexZeroBased)
-  );
-}
-
-void moho::ScrFileCtrl::SetVirtualLineCount(const int lineCount) noexcept
-{
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr) {
-    return;
-  }
-
-  (void)::SendMessageW(
-    listView,
-    LVM_SETITEMCOUNT,
-    static_cast<WPARAM>(lineCount >= 0 ? lineCount : 0),
-    static_cast<LPARAM>(0)
-  );
-}
-
-bool moho::ScrFileCtrl::ContainsSourceMatch(
-  const int lineIndexZeroBased,
-  const msvc8::string& needle
-) const
-{
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return false;
-  }
-
-  const ScrFileLine& sourceLine = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  return sourceLine.mSourceText.find(needle.c_str(), 0U, needle.size()) != msvc8::string::npos;
-}
-
-/**
- * Address: 0x004C2A40 (FUN_004C2A40)
- *
- * msvc8::string const &
- *
- * What it does:
- * Finds and selects the first source line containing one search token.
- */
-bool moho::ScrFileCtrl::FindAndSelectFirstSourceMatch(const msvc8::string& needle)
-{
-  const int lineCount = GetLineCount();
-  for (int lineIndex = 0; lineIndex < lineCount; ++lineIndex) {
-    if (!ContainsSourceMatch(lineIndex, needle)) {
-      continue;
-    }
-
-    SetRowState(lineIndex, kSelectStateFlags, kSelectStateMask);
-    EnsureRowVisible(lineIndex);
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Address: 0x004C2AE0 (FUN_004C2AE0)
- *
- * msvc8::string const &
- *
- * What it does:
- * Finds and selects the next source line containing one search token.
- */
-bool moho::ScrFileCtrl::FindAndSelectNextSourceMatch(const msvc8::string& needle)
-{
-  const int selectedLine = GetSelectedRowIndex();
-  if (selectedLine < 0) {
-    return false;
-  }
-
-  const int lineCount = GetLineCount();
-  for (int lineIndex = selectedLine + 1; lineIndex < lineCount; ++lineIndex) {
-    if (!ContainsSourceMatch(lineIndex, needle)) {
-      continue;
-    }
-
-    SetRowState(lineIndex, kSelectStateFlags, kSelectStateMask);
-    EnsureRowVisible(lineIndex);
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Address: 0x004C2B90 (FUN_004C2B90)
- *
- * msvc8::string const &
- *
- * What it does:
- * Finds and selects the previous source line containing one search token.
- */
-bool moho::ScrFileCtrl::FindAndSelectPreviousSourceMatch(const msvc8::string& needle)
-{
-  const int selectedLine = GetSelectedRowIndex();
-  if (selectedLine < 0) {
-    return false;
-  }
-
-  for (int lineIndex = selectedLine - 1; lineIndex >= 0; --lineIndex) {
-    if (!ContainsSourceMatch(lineIndex, needle)) {
-      continue;
-    }
-
-    SetRowState(lineIndex, kSelectStateFlags, kSelectStateMask);
-    EnsureRowVisible(lineIndex);
-    return true;
-  }
-
-  return false;
-}
-
-/**
- * Address: 0x004C2C20 (FUN_004C2C20)
- *
- * int
- *
- * What it does:
- * Selects and focuses the line immediately before the provided one-based
- * source line.
- */
-void moho::ScrFileCtrl::SelectPreviousSourceLine(const int lineOneBased)
-{
-  const int lineIndexZeroBased = lineOneBased - 1;
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return;
-  }
-
-  SetRowState(lineIndexZeroBased, kSelectStateFlags, kSelectStateMask);
-  EnsureRowVisible(lineIndexZeroBased);
-}
-
-/**
- * Address: 0x004C2C60 (FUN_004C2C60)
- *
- * bool
- *
- * What it does:
- * Enables or disables all breakpoint marker lanes already present in this
- * control.
- */
-void moho::ScrFileCtrl::SetBreakpointMarkersEnabled(const bool enabled)
-{
-  const int lineCount = GetLineCount();
-  for (int lineIndex = 0; lineIndex < lineCount; ++lineIndex) {
-    ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndex)];
-    switch (line.mMarkerState) {
-      case 1:
-      case 2:
-        line.mMarkerState = enabled ? 1 : 2;
-        break;
-      case 3:
-      case 4:
-        line.mMarkerState = enabled ? 3 : 4;
-        break;
-      default:
-        break;
-    }
-
-    RedrawRow(lineIndex);
-  }
-}
-
-/**
- * Address: 0x004C2CF0 (FUN_004C2CF0)
- *
- * int
- *
- * What it does:
- * Clears one breakpoint marker lane at the provided one-based source line.
- */
-void moho::ScrFileCtrl::ClearBreakpointMarkerAtLine(const int lineOneBased)
-{
-  const int lineIndexZeroBased = lineOneBased - 1;
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return;
-  }
-
-  ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  switch (line.mMarkerState) {
-    case 1:
-    case 2:
-      line.mMarkerState = 0;
-      break;
-    case 3:
-    case 4:
-      line.mMarkerState = -1;
-      break;
-    default:
-      break;
-  }
-
-  RedrawRow(lineIndexZeroBased);
-}
-
-/**
- * Address: 0x004C2DE0 (FUN_004C2DE0)
- *
- * int
- *
- * What it does:
- * Sets one active cursor location and updates marker state for that line.
- */
-bool moho::ScrFileCtrl::SetCursorLocation(const int lineOneBased)
-{
-  const int lineIndexZeroBased = lineOneBased - 1;
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    gpg::Warnf("invalid cursor location: %s(%i)", mSourcePath.c_str(), lineOneBased);
-    return false;
-  }
-
-  mActiveCursorLineOneBased = lineOneBased;
-  ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  switch (line.mMarkerState) {
-    case -1:
-      line.mMarkerState = 0;
-      break;
-    case 3:
-      line.mMarkerState = 1;
-      break;
-    case 4:
-      line.mMarkerState = 2;
-      break;
-    default:
-      break;
-  }
-
-  RedrawRow(lineIndexZeroBased);
-  EnsureRowVisible(lineIndexZeroBased);
-  return true;
-}
-
-/**
- * Address: 0x004C2EA0 (FUN_004C2EA0)
- *
- * What it does:
- * Clears the current active cursor location marker.
- */
-void moho::ScrFileCtrl::ClearCursorLocation()
-{
-  if (mActiveCursorLineOneBased < 1) {
-    return;
-  }
-
-  const int lineIndexZeroBased = mActiveCursorLineOneBased - 1;
-  mActiveCursorLineOneBased = 0;
-  if (lineIndexZeroBased < 0 || lineIndexZeroBased >= GetLineCount()) {
-    return;
-  }
-
-  ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  switch (line.mMarkerState) {
-    case 0:
-      line.mMarkerState = -1;
-      break;
-    case 1:
-      line.mMarkerState = 3;
-      break;
-    case 2:
-      line.mMarkerState = 4;
-      break;
-    default:
-      break;
-  }
-
-  RedrawRow(lineIndexZeroBased);
-}
-
-/**
- * Address: 0x004C2F10 (FUN_004C2F10)
- *
- * int
- *
- * What it does:
- * Returns one stored marker-state lane for the requested source row index.
- */
-int moho::ScrFileCtrl::GetLineMarkerState(const int lineIndexZeroBased) const
-{
-  return mLines[static_cast<std::size_t>(lineIndexZeroBased)].mMarkerState;
-}
-
-/**
- * Address: 0x004C2F30 (FUN_004C2F30)
- *
- * int,int
- *
- * What it does:
- * Returns one virtual-list text lane for source-line and column indices.
- */
-wxStringRuntime moho::ScrFileCtrl::GetVirtualItemText(
-  const int lineIndexZeroBased,
-  const int columnIndex
-) const
-{
-  const ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  if (columnIndex == 1) {
-    return BorrowUtf8AsWxString(line.mLineNumberText);
-  }
-  if (columnIndex == 2) {
-    return BorrowUtf8AsWxString(line.mSourceText);
-  }
-  return wxStringRuntime::Borrow(L"");
-}
-
-/**
- * Address: 0x004C3270 (FUN_004C3270)
- *
- * void *
- *
- * What it does:
- * Toggles one line breakpoint marker from an item-activation event.
- */
-void moho::ScrFileCtrl::OnLineActivated(const void* const listEvent)
-{
-  const auto* const eventView = reinterpret_cast<const wxListActivationEventRuntimeView*>(listEvent);
-  const int lineIndexZeroBased = eventView->mItemIndex;
-
-  ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-  const int lineOneBased = lineIndexZeroBased + 1;
-  const ScrBreakpoint breakpoint(mSourcePath, lineOneBased);
-
-  switch (line.mMarkerState) {
-    case -1:
-      line.mMarkerState = 3;
-      SCR_AddBreakpoint(breakpoint);
-      break;
-    case 0:
-      line.mMarkerState = 1;
-      SCR_AddBreakpoint(breakpoint);
-      break;
-    case 1:
-    case 2:
-      line.mMarkerState = 0;
-      SCR_RemoveBreakpoint(breakpoint);
-      break;
-    case 3:
-    case 4:
-      line.mMarkerState = -1;
-      SCR_RemoveBreakpoint(breakpoint);
-      break;
-    default:
-      break;
-  }
-
-  RedrawRow(lineIndexZeroBased);
-}
-
-/**
- * Address: 0x004C3400 (FUN_004C3400)
- *
- * What it does:
- * Reapplies persisted breakpoints for this source file into line markers.
- */
-void moho::ScrFileCtrl::RefreshBreakpointMarkers()
-{
-  msvc8::vector<ScrBreakpoint> breakpoints{};
-  SCR_EnumerateBreakpoints(mSourcePath, breakpoints);
-
-  const int lineCount = GetLineCount();
-  for (const ScrBreakpoint& breakpoint : breakpoints) {
-    const int lineIndexZeroBased = breakpoint.line - 1;
-    if (lineIndexZeroBased < 0 || lineIndexZeroBased >= lineCount) {
-      gpg::Warnf("Invalid breakpoint: %s(%d)", breakpoint.name.c_str(), breakpoint.line);
-      continue;
-    }
-
-    ScrFileLine& line = mLines[static_cast<std::size_t>(lineIndexZeroBased)];
-    line.mMarkerState = breakpoint.enabled ? 3 : 4;
-  }
-}
+moho::ScrFileCtrl::~ScrFileCtrl() = default;
 
 /**
  * Address: 0x004C2730 (FUN_004C2730)
  *
- * msvc8::string const &
- *
- * What it does:
- * Clears existing rows, loads one mounted source file line-by-line, reapplies
- * persisted breakpoint states, and refreshes virtual row count.
+ * The loop stops on badbit or eofbit only: a line that fills the buffer sets
+ * failbit alone, after which every getline fails without reaching either and
+ * the loop keeps appending empty lines. A last line with no newline is
+ * dropped. Both as shipped.
  */
-bool moho::ScrFileCtrl::LoadSourceFile(const msvc8::string& mountedSourcePath)
+bool moho::ScrFileCtrl::Load(const msvc8::string& fileName)
 {
-  ClearLoadedSource();
-  if (mountedSourcePath.empty()) {
+  Clear();
+  if (fileName.empty()) {
     return false;
   }
 
-  msvc8::string resolvedPath{};
-  if (!ResolveMountedPath(mountedSourcePath, resolvedPath)) {
+  msvc8::string diskPath;
+  (void)DISK_GetVFS()->FindFile(&diskPath, fileName.c_str(), nullptr);
+  if (diskPath.empty()) {
     return false;
   }
 
-  std::fstream sourceStream(resolvedPath.c_str(), std::ios::in);
-  if (!sourceStream.is_open()) {
+  std::fstream file(diskPath.c_str(), std::ios::in);
+  if (!file.is_open()) {
     return false;
   }
 
-  std::string sourceLineBuffer{};
-  int nextLineNumberOneBased = 1;
-  while (std::getline(sourceStream, sourceLineBuffer)) {
-    msvc8::string sourceLine{};
-    sourceLine.assign(sourceLineBuffer.c_str(), sourceLineBuffer.size());
-    mLines.push_back(ScrFileLine(nextLineNumberOneBased, sourceLine));
-    ++nextLineNumberOneBased;
+  char buffer[1024];
+  int lineNumber = 1;
+  file.getline(buffer, sizeof(buffer));
+  while (!file.bad() && !file.eof()) {
+    mLines.push_back(ScrFileLine(lineNumber++, buffer));
+    file.getline(buffer, sizeof(buffer));
   }
 
-  mSourcePath.assign(mountedSourcePath, 0U, msvc8::string::npos);
-  RefreshBreakpointMarkers();
-  SetVirtualLineCount(GetLineCount());
+  mSourcePath = fileName;
+  LoadBreakpoints();
+  SetItemCount(static_cast<long>(mLines.size()));
   return true;
 }
 
 /**
  * Address: 0x004C2DA0 (FUN_004C2DA0)
- *
- * What it does:
- * Clears all loaded line records, resets virtual item count, and clears active
- * cursor location.
  */
-void moho::ScrFileCtrl::ClearLoadedSource()
+void moho::ScrFileCtrl::Clear()
 {
   mLines.clear();
-  SetVirtualLineCount(0);
-  mActiveCursorLineOneBased = 0;
+  SetItemCount(0);
+  mCursorLine = 0;
+}
+
+/**
+ * Address: 0x004C2A40 (FUN_004C2A40)
+ */
+void moho::ScrFileCtrl::FindFirst(const msvc8::string& text)
+{
+  const int lineCount = static_cast<int>(mLines.size());
+  bool found = false;
+  for (int index = 0; !found && index < lineCount; ++index) {
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    if (found) {
+      SetItemState(index, kFoundLineState, kFoundLineState);
+      EnsureVisible(index);
+    }
+  }
+}
+
+/**
+ * Address: 0x004C2AE0 (FUN_004C2AE0)
+ */
+void moho::ScrFileCtrl::FindNext(const msvc8::string& text)
+{
+  const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (selected < 0) {
+    return;
+  }
+
+  const int lineCount = static_cast<int>(mLines.size());
+  bool found = false;
+  for (int index = selected + 1; !found && index < lineCount; ++index) {
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    if (found) {
+      SetItemState(index, kFoundLineState, kFoundLineState);
+      EnsureVisible(index);
+    }
+  }
+}
+
+/**
+ * Address: 0x004C2B90 (FUN_004C2B90)
+ */
+void moho::ScrFileCtrl::FindPrevious(const msvc8::string& text)
+{
+  const long selected = GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (selected < 0) {
+    return;
+  }
+
+  bool found = false;
+  for (int index = selected - 1; !found && index > -1; --index) {
+    found = mLines[index].mSourceText.find(text.c_str(), 0, text.size()) != msvc8::string::npos;
+    if (found) {
+      SetItemState(index, kFoundLineState, kFoundLineState);
+      EnsureVisible(index);
+    }
+  }
+}
+
+/**
+ * Address: 0x004C2C20 (FUN_004C2C20)
+ */
+void moho::ScrFileCtrl::GotoLine(const int line)
+{
+  const int index = line - 1;
+  if (index > -1 && index < static_cast<int>(mLines.size())) {
+    SetItemState(index, kFoundLineState, kFoundLineState);
+    EnsureVisible(index);
+  }
+}
+
+/**
+ * Address: 0x004C2C60 (FUN_004C2C60)
+ */
+void moho::ScrFileCtrl::EnableBreakpoints(const bool enable)
+{
+  const int lineCount = static_cast<int>(mLines.size());
+  for (int index = 0; index < lineCount; ++index) {
+    ScrFileLine& fileLine = mLines[index];
+    switch (fileLine.mMarkerState) {
+      case kCursorOnBreakpointMarker:
+      case kCursorOnDisabledBreakpointMarker:
+        fileLine.mMarkerState = enable ? kCursorOnBreakpointMarker : kCursorOnDisabledBreakpointMarker;
+        break;
+      case kBreakpointMarker:
+      case kDisabledBreakpointMarker:
+        fileLine.mMarkerState = enable ? kBreakpointMarker : kDisabledBreakpointMarker;
+        break;
+    }
+    RefreshItem(index);
+  }
+}
+
+/**
+ * Address: 0x004C2CF0 (FUN_004C2CF0)
+ */
+void moho::ScrFileCtrl::RemoveBreakpoint(const int line)
+{
+  const int index = line - 1;
+  if (index < 0 || index >= static_cast<int>(mLines.size())) {
+    return;
+  }
+
+  ScrFileLine& fileLine = mLines[index];
+  switch (fileLine.mMarkerState) {
+    case kCursorOnBreakpointMarker:
+    case kCursorOnDisabledBreakpointMarker:
+      fileLine.mMarkerState = kCursorMarker;
+      break;
+    case kBreakpointMarker:
+    case kDisabledBreakpointMarker:
+      fileLine.mMarkerState = kNoMarker;
+      break;
+  }
+  RefreshItem(index);
+}
+
+/**
+ * Address: 0x004C2D60 (FUN_004C2D60)
+ */
+void moho::ScrFileCtrl::RemoveAllBreakpoints()
+{
+  const int lineCount = static_cast<int>(mLines.size());
+  for (int index = 0; index < lineCount; ++index) {
+    RemoveBreakpoint(index + 1);
+  }
+}
+
+/**
+ * Address: 0x004C2DE0 (FUN_004C2DE0)
+ */
+bool moho::ScrFileCtrl::SetCursorLine(const int line)
+{
+  const int index = line - 1;
+  if (index > -1 && index < static_cast<int>(mLines.size())) {
+    ScrFileLine& fileLine = mLines[index];
+    mCursorLine = line;
+    switch (fileLine.mMarkerState) {
+      case kNoMarker:
+        fileLine.mMarkerState = kCursorMarker;
+        break;
+      case kBreakpointMarker:
+        fileLine.mMarkerState = kCursorOnBreakpointMarker;
+        break;
+      case kDisabledBreakpointMarker:
+        fileLine.mMarkerState = kCursorOnDisabledBreakpointMarker;
+        break;
+    }
+    RefreshItem(index);
+    EnsureVisible(index);
+    return true;
+  }
+
+  gpg::Warnf("invalid cursor location: %s(%i)", mSourcePath.c_str(), line);
+  return false;
+}
+
+/**
+ * Address: 0x004C2EA0 (FUN_004C2EA0)
+ */
+void moho::ScrFileCtrl::ClearCursor()
+{
+  if (mCursorLine < 1) {
+    return;
+  }
+
+  const int index = mCursorLine - 1;
+  ScrFileLine& fileLine = mLines[index];
+  mCursorLine = 0;
+  switch (fileLine.mMarkerState) {
+    case kCursorMarker:
+      fileLine.mMarkerState = kNoMarker;
+      break;
+    case kCursorOnBreakpointMarker:
+      fileLine.mMarkerState = kBreakpointMarker;
+      break;
+    case kCursorOnDisabledBreakpointMarker:
+      fileLine.mMarkerState = kDisabledBreakpointMarker;
+      break;
+  }
+  RefreshItem(index);
+}
+
+/**
+ * Address: 0x004C2F30 (FUN_004C2F30)
+ */
+wxString moho::ScrFileCtrl::OnGetItemText(const long item, const long column) const
+{
+  if (column == 1) {
+    return gpg::STR_Utf8ToWide(mLines[item].mLineNumberText.c_str()).c_str();
+  }
+  if (column == kSourceColumn) {
+    return gpg::STR_Utf8ToWide(mLines[item].mSourceText.c_str()).c_str();
+  }
+  return wxT("");
+}
+
+/**
+ * Address: 0x004C2F10 (FUN_004C2F10)
+ */
+int moho::ScrFileCtrl::OnGetItemImage(const long item) const
+{
+  return mLines[item].mMarkerState;
 }
 
 /**
  * Address: 0x004C30B0 (FUN_004C30B0)
  *
- * int
- *
- * What it does:
- * Returns one heap-allocated alternating-row text style object for virtual
- * source rows.
+ * The four statics are guarded by bits 1, 2, 4 and 8 of 0x011040BC, in this
+ * order: the font (0x01103EE0), black (0x01103EEC), the odd-line colour
+ * (0x011040AC) and the even-line colour (0x0110409C). The attribute's
+ * constructor (0x004C1A60) has the text colour and the font folded in.
  */
-void* moho::ScrFileCtrl::GetVirtualItemTextStyle(const int lineIndexZeroBased) const
+wxListItemAttr* moho::ScrFileCtrl::OnGetItemAttr(const long item) const
 {
-  static const wxColourRuntime kForeground = wxColourRuntime::FromRgb(0x00, 0x00, 0x00);
-  static const wxColourRuntime kOddBackground = wxColourRuntime::FromRgb(0xF7, 0xF7, 0xFF);
-  static const wxColourRuntime kEvenBackground = wxColourRuntime::FromRgb(0xFE, 0xFE, 0xFF);
+  static wxFont sourceFont(10, wxDEFAULT, wxNORMAL, wxNORMAL, false, wxT("Courier New"));
+  static wxColour textColour(0, 0, 0);
+  static wxColour oddLineColour(247, 247, 255);
+  static wxColour evenLineColour(254, 254, 255);
+  return new wxListItemAttr(textColour, (item % 2) != 0 ? oddLineColour : evenLineColour, sourceFont);
+}
 
-  const wxColourRuntime& background = ((lineIndexZeroBased & 1) == 0) ? kEvenBackground : kOddBackground;
-  return new (std::nothrow) wxTextAttrRuntime(kForeground, background, wxFontRuntime::Null());
+/**
+ * Address: 0x004C3270 (FUN_004C3270)
+ */
+void moho::ScrFileCtrl::OnLineActivated(wxListEvent& event)
+{
+  const long item = event.GetIndex();
+  ScrFileLine& fileLine = mLines[item];
+  switch (fileLine.mMarkerState) {
+    case kNoMarker:
+      fileLine.mMarkerState = kBreakpointMarker;
+      SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+      break;
+    case kCursorMarker:
+      fileLine.mMarkerState = kCursorOnBreakpointMarker;
+      SCR_AddBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+      break;
+    case kCursorOnBreakpointMarker:
+    case kCursorOnDisabledBreakpointMarker:
+      fileLine.mMarkerState = kCursorMarker;
+      SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+      break;
+    case kBreakpointMarker:
+    case kDisabledBreakpointMarker:
+      fileLine.mMarkerState = kNoMarker;
+      SCR_RemoveBreakpoint(ScrBreakpoint(mSourcePath, item + 1));
+      break;
+  }
+  RefreshItem(item);
 }
 
 /**
  * Address: 0x004C33D0 (FUN_004C33D0)
- *
- * void *
- *
- * What it does:
- * Resizes the source-text column to keep it width-coupled to the current
- * control client width.
  */
-void moho::ScrFileCtrl::OnResizeAdjustSourceColumn(const void* const sizeEvent)
+void moho::ScrFileCtrl::OnSize(wxSizeEvent& event)
 {
-  const auto* const eventView = reinterpret_cast<const wxSizeEventRuntimeView*>(sizeEvent);
-  if (eventView == nullptr) {
-    return;
-  }
+  SetColumnWidth(kSourceColumn, event.GetSize().x - 100);
+}
 
-  const int sourceColumnWidth = eventView->mWidth - 100;
-  const HWND listView = AsListViewHandle(mListViewHandle);
-  if (listView == nullptr) {
-    return;
+/**
+ * Address: 0x004C3400 (FUN_004C3400)
+ *
+ * A breakpoint on line 0 or below passes the check and writes in front of
+ * mLines, as shipped.
+ */
+void moho::ScrFileCtrl::LoadBreakpoints()
+{
+  msvc8::vector<ScrBreakpoint> breakpoints;
+  SCR_EnumerateBreakpoints(mSourcePath, breakpoints);
+  for (const ScrBreakpoint& breakpoint : breakpoints) {
+    const int index = breakpoint.line - 1;
+    if (index < static_cast<int>(mLines.size())) {
+      mLines[index].mMarkerState = breakpoint.enabled ? kBreakpointMarker : kDisabledBreakpointMarker;
+    } else {
+      gpg::Warnf("Invalid breakpoint: %s(%d)", breakpoint.name.c_str(), breakpoint.line);
+    }
   }
-
-  (void)::SendMessageW(
-    listView,
-    LVM_SETCOLUMNWIDTH,
-    static_cast<WPARAM>(2),
-    static_cast<LPARAM>(sourceColumnWidth)
-  );
 }

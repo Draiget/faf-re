@@ -1,226 +1,133 @@
 #include "moho/misc/ScrWatchCtrl.h"
 
-#include <cstdint>
-#include <cstring>
 #include <sstream>
-#include <string>
 
 #include "gpg/core/containers/String.h"
-#include "lua/LuaAssertion.h"
 #include "lua/LuaTableIterator.h"
 #include "moho/misc/TreeData.h"
 
 namespace
 {
-  [[nodiscard]] wxStringRuntime BorrowUtf8AsWxString(const char* const text)
-  {
-    static thread_local std::wstring wideScratch{};
-    wideScratch = gpg::STR_Utf8ToWide(text != nullptr ? text : "");
-    return wxStringRuntime::Borrow(wideScratch.c_str());
-  }
-
-  [[nodiscard]] wxStringRuntime BorrowUtf8AsWxString(const msvc8::string& text)
-  {
-    return BorrowUtf8AsWxString(text.c_str());
-  }
-
-  void SortWatchRootChildren(moho::ScrWatchCtrl& control, const wxTreeItemIdRuntime& rootItem) noexcept
-  {
-    if (!rootItem.IsValid()) {
-      return;
-    }
-
-    control.SortChildren(rootItem);
-  }
+  constexpr long kWatchTreeStyle = wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_HIDE_ROOT | wxTR_FULL_ROW_HIGHLIGHT;
 
   /**
-   * Address: 0x004D7280 (FUN_004D7280, FormatWatchKeyForTree)
+   * Address: 0x004D7280 (FUN_004D7280)
    *
    * What it does:
-   * Converts one Lua table-key object into display text for watch-tree rows,
-   * handling boolean/number/string lanes and using `<unknown>` fallback.
+   * A table key as a row name: booleans and numbers printed, strings as they
+   * are, anything else "<unknown>".
    */
-  [[nodiscard]] msvc8::string FormatWatchKeyForTree(const LuaPlus::LuaObject& keyObject)
+  msvc8::string FormatWatchKeyForTree(const LuaPlus::LuaObject& key)
   {
-    msvc8::string keyText{};
-
-    if (keyObject.IsBoolean()) {
-      keyText.assign_owned(keyObject.GetBoolean() ? "true" : "false");
-      return keyText;
+    switch (key.Type()) {
+      case LUA_TBOOLEAN:
+        return key.GetBoolean() ? "true" : "false";
+      case LUA_TNUMBER: {
+        std::ostringstream stream;
+        stream << static_cast<float>(key.GetNumber()); // FA's lua_Number is a float
+        return stream.str().c_str();
+      }
+      case LUA_TSTRING:
+        return key.GetString();
+      default:
+        return "<unknown>";
     }
-
-    if (keyObject.IsNumber()) {
-      std::ostringstream numberStream{};
-      numberStream << static_cast<float>(keyObject.GetNumber());
-      keyText.assign_owned(numberStream.str());
-      return keyText;
-    }
-
-    if (keyObject.IsString()) {
-      keyText.assign_owned(keyObject.GetString());
-      return keyText;
-    }
-
-    keyText.assign_owned("<unknown>");
-    return keyText;
   }
 } // namespace
 
-wxEventTable moho::ScrWatchCtrl::sm_eventTable = {nullptr, nullptr};
+// Table 0x00DFF60C = {&wxTreeListCtrl::sm_eventTable (0x00D52EFC), rows 0x00F596D4};
+// GetEventTable (0x004D6FE0) comes with it.
+BEGIN_EVENT_TABLE(moho::ScrWatchCtrl, wxTreeListCtrl)
+END_EVENT_TABLE()
 
 /**
  * Address: 0x004D6FF0 (FUN_004D6FF0, ??0ScrWatchCtrl@Moho@@QAE@PAVwxWindow@@ABHHHHABVwxPoint@@ABVwxSize@@@Z)
- *
- * What it does:
- * Builds the base tree-list control, appends Variable/Type/Value columns,
- * seeds the root item, and connects tree-item-activation dynamically (this
- * control's static event table is empty - the binary wires this handler
- * per-instance instead).
  */
 moho::ScrWatchCtrl::ScrWatchCtrl(
-  wxWindowBase* const parentWindow,
-  const std::int32_t windowId,
-  const std::uint32_t nameColumnWidth,
-  const std::uint32_t typeColumnWidth,
-  const std::uint32_t valueColumnWidth
+  wxWindow* const parent,
+  const int& id,
+  const int nameWidth,
+  const int typeWidth,
+  const int valueWidth,
+  const wxPoint& pos,
+  const wxSize& size
 )
-  : wxTreeListCtrlRuntime(
-      parentWindow,
-      windowId,
-      wxPoint{-1, -1},
-      wxSize{0, 0},
-      0x2809L, // wxTR_HAS_BUTTONS | wxTR_LINES_AT_ROOT | wxTR_HIDE_ROOT | wxSUNKEN_BORDER | wxCLIP_CHILDREN (binary style word)
-      wxStringRuntime::Borrow(L"wxTreeListCtrl")
-    )
+  : wxTreeListCtrl(parent, id, pos, size, kWatchTreeStyle)
+  , mRoot()
 {
-  AddColumn(wxStringRuntime::Borrow(L"Variable"), nameColumnWidth, true);
-  AddColumn(wxStringRuntime::Borrow(L"Type"), typeColumnWidth, true);
-  AddColumn(wxStringRuntime::Borrow(L"Value"), valueColumnWidth, true);
-  mRootItem = AddRoot(wxStringRuntime::Borrow(L"Variable"));
+  AddColumn(wxT("Variable"), nameWidth, false);
+  AddColumn(wxT("Type"), typeWidth, false);
+  AddColumn(wxT("Value"), valueWidth, false);
+  mRoot = AddRoot(wxT("VARIABLES"));
 
-  // 0x004D71AB-0x004D71C0: Connect(GetId(), -1, wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
-  // &ScrWatchCtrl::OnItemActivate, nullptr). This control's static event table
-  // is empty - the binary binds the handler per instance instead, because the
-  // id it matches on is the one the caller passed to this constructor.
-  using OnItemActivateThunk = void (ScrWatchCtrl::*)(wxTreeEventRuntime&);
-  constexpr OnItemActivateThunk kOnItemActivate = &ScrWatchCtrl::OnItemActivate;
-  void* rawHandlerAddress = nullptr;
-  static_assert(sizeof(kOnItemActivate) == sizeof(rawHandlerAddress),
-                "non-virtual single-inheritance member pointer must be a plain code address");
-  std::memcpy(&rawHandlerAddress, &kOnItemActivate, sizeof(rawHandlerAddress));
-
-  Connect(windowId, -1, WX_GetCommandTreeItemActivatedEventType(), rawHandlerAddress, nullptr);
+  Connect(
+    GetId(), -1, wxEVT_COMMAND_TREE_ITEM_ACTIVATED,
+    (wxObjectEventFunction)(wxEventFunction)(wxTreeEventFunction)&ScrWatchCtrl::OnItemActivate
+  );
 }
 
 /**
- * Address: 0x004D6FE0 (FUN_004D6FE0, Moho::ScrWatchCtrl::GetEventTable)
- *
- * What it does:
- * Returns this control's wx event-table lane.
- */
-const void* moho::ScrWatchCtrl::GetEventTable() const
-{
-  return &sm_eventTable;
-}
-
-/**
- * Address: 0x004D7270 (FUN_004D7270, Moho::ScrWatchCtrl::Clear)
- *
- * What it does:
- * Clears watch rows under the root tree item lane.
+ * Address: 0x004D7270 (FUN_004D7270, ?Clear@ScrWatchCtrl@Moho@@UAEXXZ)
  */
 void moho::ScrWatchCtrl::Clear()
 {
-  mRootItem.Reset();
+  DeleteChildren(mRoot);
 }
 
 /**
- * Address: 0x004D7220 (FUN_004D7220, Moho::ScrWatchCtrl::Update)
- *
- * What it does:
- * Rebuilds this watch tree from one watch-vector snapshot.
+ * Address: 0x004D7220 (FUN_004D7220, ?Update@ScrWatchCtrl@Moho@@QAEXABV?$vector@VScrWatch@Moho@@V?$allocator@VScrWatch@Moho@@@std@@@std@@@Z)
  */
 void moho::ScrWatchCtrl::Update(const msvc8::vector<ScrWatch>& watches)
 {
   Clear();
-  mRootItem = AddRoot(wxStringRuntime::Borrow(L""));
-
-  for (const ScrWatch& watch : watches) {
-    AddWatch(mRootItem, watch);
+  for (msvc8::vector<ScrWatch>::const_iterator watch = watches.begin(); watch != watches.end(); ++watch) {
+    AddWatch(mRoot, *watch);
   }
-
-  SortWatchRootChildren(*this, mRootItem);
+  SortChildren(mRoot);
 }
 
 /**
- * Address: 0x004D7380 (FUN_004D7380, Moho::ScrWatchCtrl::OnItemActivate)
- *
- * What it does:
- * Materializes child watch rows when an activated item contains a Lua table,
- * sorts those children, then toggles the expanded state.
+ * Address: 0x004D7380 (FUN_004D7380, ?OnItemActivate@ScrWatchCtrl@Moho@@QAEXAAVwxTreeEvent@@@Z)
  */
-void moho::ScrWatchCtrl::OnItemActivate(wxTreeEventRuntime& event)
+void moho::ScrWatchCtrl::OnItemActivate(wxTreeEvent& event)
 {
-  wxTreeItemIdRuntime activatedItem{};
-  event.GetItem(&activatedItem);
-  if (!activatedItem.IsValid()) {
+  const wxTreeItemId item = event.GetItem();
+  if (!item.IsOk()) {
     return;
   }
 
-  auto* const itemData = static_cast<TreeData*>(GetItemData(activatedItem));
-  if (itemData == nullptr) {
+  TreeData* const data = static_cast<TreeData*>(GetItemData(item));
+  if (data == nullptr) {
     return;
   }
 
-  LuaPlus::LuaObject& tableObject = itemData->mWatch.obj;
-  if (!tableObject.IsTable()) {
+  LuaPlus::LuaObject& table = data->mWatch.obj;
+  if (!table.IsTable()) {
     return;
   }
 
-  if (!HasChildren(activatedItem)) {
-    LuaPlus::LuaTableIterator iter(&tableObject, 1);
-    if (!iter.m_isDone) {
-      while (true) {
-        const msvc8::string keyText = FormatWatchKeyForTree(iter.m_keyObj);
-        if (!iter.IsValid()) {
-          throw LuaPlus::LuaAssertion("IsValid()");
-        }
-
-        const ScrWatch childWatch(keyText, iter.m_valueObj);
-        AddWatch(activatedItem, childWatch);
-
-        iter.Next();
-        if (iter.m_isDone) {
-          break;
-        }
-      }
+  if (!HasChildren(item)) {
+    for (LuaPlus::LuaTableIterator field(table, true); field; field.Next()) {
+      const msvc8::string name = FormatWatchKeyForTree(field.GetKey());
+      AddWatch(item, ScrWatch(name, field.GetValue()));
     }
-
-    SortChildren(activatedItem);
+    SortChildren(item);
   }
 
-  if (IsExpanded(activatedItem)) {
-    Collapse(activatedItem);
-    return;
+  if (IsExpanded(item)) {
+    Collapse(item);
+  } else {
+    Expand(item);
   }
-
-  Expand(activatedItem);
 }
 
 /**
- * Address: 0x004D7580 (FUN_004D7580, Moho::ScrWatchCtrl::AddWatch)
- *
- * What it does:
- * Appends one watch row and fills name/type/value columns plus payload.
+ * Address: 0x004D7580 (FUN_004D7580, ?AddWatch@ScrWatchCtrl@Moho@@AAEXABVwxTreeItemId@@ABVScrWatch@2@@Z)
  */
-void moho::ScrWatchCtrl::AddWatch(const wxTreeItemIdRuntime& parentItem, const ScrWatch& watch)
+void moho::ScrWatchCtrl::AddWatch(const wxTreeItemId& parent, const ScrWatch& watch)
 {
-  const wxTreeItemIdRuntime item = AppendItem(parentItem, BorrowUtf8AsWxString(watch.name));
+  const wxTreeItemId item = AppendItem(parent, gpg::STR_Utf8ToWide(watch.name.c_str()).c_str());
   SetItemData(item, new TreeData(watch));
-
-  const msvc8::string watchType = watch.GetType();
-  SetItemText(item, 1u, BorrowUtf8AsWxString(watchType));
-
-  const msvc8::string watchValue = watch.GetValue();
-  SetItemText(item, 2u, BorrowUtf8AsWxString(watchValue));
+  SetItemText(item, 1, gpg::STR_Utf8ToWide(watch.GetType().c_str()).c_str());
+  SetItemText(item, 2, gpg::STR_Utf8ToWide(watch.GetValue().c_str()).c_str());
 }

@@ -3,88 +3,52 @@
 #include <cstddef>
 
 #include "legacy/containers/String.h"
-#include "moho/app/WxRuntimeTypes.h"
+#include "platform/WxWidgets.h"
+#include <wx/event.h>
 
 namespace moho
 {
   /**
-   * Recovered script-pause wx event payload posted by debug hook paths.
+   * Address: 0x00BC5F40 (FUN_00BC5F40, dynamic initializer)
    *
-   * Layout evidence:
-   * - `FUN_004B4330` initializes wxEvent lanes and stores `(string,int)` at
-   *   `+0x20/+0x3C`.
-   * - `FUN_004B44A0` copy-clones wxEvent lanes plus payload.
+   * What it does:
+   * `wxNewEventType()` into 0x010A8A84, from DEFINE_EVENT_TYPE in
+   * ScrPauseEvent.cpp.
    */
-  class ScrPauseEvent final : public wxEventRuntime
+  extern const wxEventType EVT_SCR_PAUSE;
+
+  /**
+   * VFTABLE: 0x00E07E60 (??_7ScrPauseEvent@Moho@@6B@)
+   *
+   * Posted to the debugger window when a Lua thread stops at a breakpoint or a
+   * step: which source file and line it stopped on.
+   *
+   * No class info of its own - slot 0 is wxEvent::GetClassInfo, emitted here
+   * (0x004B4310). The copy constructor (0x004B44A0) and destructor (0x004B43B0,
+   * deleting 0x004B4450) are the compiler's.
+   */
+  class ScrPauseEvent : public wxEvent
   {
   public:
     /**
-     * Address: 0x004B4330 (FUN_004B4330, sub_4B4330)
-     *
-     * msvc8::string const &,int
+     * Address: 0x004B4330 (FUN_004B4330)
      *
      * What it does:
-     * Initializes one pause-event payload with source lane and source line.
+     * `wxEvent(0, EVT_SCR_PAUSE)` carrying the source and line.
      */
     ScrPauseEvent(const msvc8::string& sourceName, int sourceLine);
 
     /**
-     * Address: 0x004B44A0 (FUN_004B44A0, sub_4B44A0)
+     * Address: 0x004B43F0 (FUN_004B43F0)
      *
      * What it does:
-     * Copy-constructs one pause-event payload.
+     * `new ScrPauseEvent(*this)`, for AddPendingEvent's queued copy.
      */
-    ScrPauseEvent(const ScrPauseEvent& other);
+    wxEvent* Clone() const override;
 
-    /**
-       * Address: 0x004B4450 (FUN_004B4450)
-     *
-     * What it does:
-     * Releases payload string lanes and wxEvent ref-data state.
-     */
-    ~ScrPauseEvent();
-
-    /**
-     * Address: 0x004B4310 (FUN_004B4310, vftable lane)
-     *
-     * What it does:
-     * Returns class-info lane storage used by wx RTTI probes.
-     */
-    [[nodiscard]] void* GetClassInfo() const override;
-
-    /**
-      * Alias of FUN_004B4450 (non-canonical helper lane).
-     *
-     * What it does:
-     * Deletes this payload object.
-     */
-    void DeleteObject() override;
-
-    /**
-     * Address: 0x004B43F0 (FUN_004B43F0, sub_4B43F0)
-     *
-     * What it does:
-     * Allocates and copy-clones one pause-event payload.
-     */
-    [[nodiscard]] ScrPauseEvent* Clone() const override;
-
-    [[nodiscard]] const msvc8::string& GetSourceName() const noexcept;
-    [[nodiscard]] int GetSourceLine() const noexcept;
-
-  public:
     msvc8::string mSourceName; // +0x20
     int mSourceLine;           // +0x3C
   };
-
-  /**
-   * Address: 0x00BC5F40 (FUN_00BC5F40, sub_BC5F40)
-   *
-   * What it does:
-   * Allocates one wx event-type lane for `ScrPauseEvent`.
-   */
-  int register_ScrPauseEventType();
-
-  extern int gScrPauseEventType;
 
   static_assert(offsetof(ScrPauseEvent, mSourceName) == 0x20, "ScrPauseEvent::mSourceName offset must be 0x20");
   static_assert(offsetof(ScrPauseEvent, mSourceLine) == 0x3C, "ScrPauseEvent::mSourceLine offset must be 0x3C");

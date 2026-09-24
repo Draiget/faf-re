@@ -1,91 +1,70 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 
-#include "moho/app/WxRuntimeTypes.h"
+#include "platform/WxWidgets.h"
+#include <wx/dialog.h>
+
+class wxTextCtrl;
 
 namespace moho
 {
-  class ScrGotoDialog : public wxDialogRuntime
+  /**
+   * VFTABLE: 0x00E088CC (??_7ScrGotoDialog@Moho@@6B@)
+   *
+   * The debugger's "Goto" line prompt, shown modally from
+   * ScrDebugWindow::OnGotoLineCommand. It reopens where it was last moved to
+   * (Windows.Debug.Goto.x/y).
+   *
+   * Slot 0 is wxDialog::GetClassInfo (0x004A3970); 47, 139 and 140 are inline
+   * wx copies. The destructor (0x004BBEA0, deleting 0x004BC0C0) is the
+   * compiler's. The one stack instance (OnGotoLineCommand) has 0x17C bytes of
+   * frame before its EH record, which bounds the size.
+   */
+  class ScrGotoDialog : public wxDialog
   {
   public:
     /**
-     * Address: 0x004BB730 (FUN_004BB730)
-     * Mangled: ??0ScrGotoDialog@Moho@@QAE@@Z
-     *
-     * IDA signature:
-     * Moho::ScrGotoDialog *__thiscall Moho::ScrGotoDialog::ScrGotoDialog(Moho::ScrGotoDialog *this);
+     * Address: 0x004BB730 (FUN_004BB730, ??0ScrGotoDialog@Moho@@QAE@@Z)
      *
      * What it does:
-     * Builds the script-debugger "Goto line" dialog. Restores the last screen
-     * position from the `Windows.Debug.Goto.x` / `Windows.Debug.Goto.y` user
-     * preferences, runs the `wxDialog` base with title "Goto", window name
-     * "ScrGotoDialog" and style `wxCAPTION|wxSYSTEM_MENU`, then fills it with a
-     * vertical box sizer holding two horizontal rows: a "Goto" prompt label
-     * plus the line-number entry field, and the default "Goto" button plus
-     * "Cancel". `mIsInitializing` stays set for the whole build so the move
-     * handler does not write the transient placement back to preferences.
+     * A captioned dialog at the saved position: a "Goto" label beside a
+     * 96-pixel line field, over a default Goto (wxID_OK) and a Cancel button.
+     * mInitializing holds OnMove off until the layout is done.
      */
     ScrGotoDialog();
-
-    /**
-     * Address: 0x004BBEA0 (FUN_004BBEA0)
-     *
-     * What it does:
-     * Runs non-deleting teardown for one script goto dialog instance.
-     */
-    static ScrGotoDialog* DestroyWithoutDelete(ScrGotoDialog* object) noexcept;
-
-    /**
-     * Address: 0x004BC0C0 (FUN_004BC0C0)
-     *
-     * What it does:
-     * Implements deleting-dtor thunk semantics for one script goto dialog.
-     */
-    static ScrGotoDialog* DeleteWithFlag(ScrGotoDialog* object, std::uint8_t deleteFlags) noexcept;
-
-    /**
-     * Address: 0x004BC0F0 (FUN_004BC0F0)
-     *
-     * What it does:
-     * Returns this dialog runtime event-table lane.
-     */
-    [[nodiscard]] const void* GetEventTable() const override;
-
-    /**
-     * Address: 0x004BBEB0 (FUN_004BBEB0)
-     *
-     * What it does:
-     * Persists goto-dialog window position to user preferences after move
-     * handling when startup initialization has completed.
-     */
-    void PersistWindowPositionToPreferences();
 
     /**
      * Address: 0x004BBFF0 (FUN_004BBFF0)
      *
      * What it does:
-     * Reads goto-line text input and converts it to an integer line index.
+     * The typed line number, through atoi: 0 for anything that is not one.
      */
-    [[nodiscard]] int ParseRequestedLineNumber() const;
+    [[nodiscard]] int GetLine() const;
 
-    static wxEventTable sm_eventTable;
+    /**
+     * Address: 0x004BBFD0 (FUN_004BBFD0)
+     *
+     * What it does:
+     * Ends the dialog with wxID_OK, without wxDialog's validation.
+     */
+    void OnOK(wxCommandEvent& event);
 
-    std::uint8_t mIsInitializing = 0;
-    std::uint8_t mPadding171To173[0x3]{};
-    wxTextCtrlRuntime* mLineTextControl = nullptr;
-    std::uint8_t mUnknown178To183[0xC]{};
+    /**
+     * Address: 0x004BBEB0 (FUN_004BBEB0)
+     *
+     * What it does:
+     * Saves the position to Windows.Debug.Goto.x/y, once constructed.
+     */
+    void OnMove(wxMoveEvent& event);
+
+    bool mInitializing;      // +0x170
+    wxTextCtrl* mLineText;   // +0x174
+
+    DECLARE_EVENT_TABLE()
   };
 
-  static_assert(
-    offsetof(ScrGotoDialog, mIsInitializing) == 0x170,
-    "ScrGotoDialog::mIsInitializing offset must be 0x170"
-  );
-  static_assert(
-    offsetof(ScrGotoDialog, mLineTextControl) == 0x174,
-    "ScrGotoDialog::mLineTextControl offset must be 0x174"
-  );
-  static_assert(sizeof(ScrGotoDialog) == 0x184, "ScrGotoDialog size must be 0x184");
+  static_assert(offsetof(ScrGotoDialog, mInitializing) == 0x170, "ScrGotoDialog::mInitializing offset must be 0x170");
+  static_assert(offsetof(ScrGotoDialog, mLineText) == 0x174, "ScrGotoDialog::mLineText offset must be 0x174");
+  static_assert(sizeof(ScrGotoDialog) == 0x178, "ScrGotoDialog size must be 0x178");
 } // namespace moho
-

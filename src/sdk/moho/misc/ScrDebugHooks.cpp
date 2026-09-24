@@ -27,13 +27,6 @@
 #include "moho/misc/ScrWatch.h"
 #include "moho/misc/StartupHelpers.h"
 
-class wxEvent;
-class wxEvtHandler
-{
-public:
-  void AddPendingEvent(wxEvent& event);
-};
-
 namespace
 {
   struct LuaHookBinding
@@ -44,7 +37,7 @@ namespace
 
   struct ScrDebugRuntime
   {
-    void* debugWindow = nullptr;
+    moho::ScrDebugWindow* debugWindow = nullptr; // 0x010A63A4
     std::uint32_t debugWindowOwnerThreadId = 0;
 
     boost::mutex hookBindingMutex;
@@ -154,7 +147,7 @@ namespace
       return;
     }
 
-    msvc8::vector<msvc8::string> serializedBreakpoints;
+    msvc8::list<msvc8::string> serializedBreakpoints;
     for (const moho::ScrBreakpoint& breakpoint : runtime.breakpoints) {
       serializedBreakpoints.push_back(breakpoint.AsString());
     }
@@ -176,19 +169,6 @@ namespace
 
     mountedPath.assign(sourcePath, std::strlen(sourcePath));
     return mountedPath;
-  }
-
-  void PostPauseEventToDebugWindow(
-    void* const debugWindow,
-    moho::ScrPauseEvent& pauseEvent
-  )
-  {
-    if (debugWindow == nullptr) {
-      return;
-    }
-
-    auto* const eventHandler = reinterpret_cast<wxEvtHandler*>(debugWindow);
-    eventHandler->AddPendingEvent(reinterpret_cast<wxEvent&>(pauseEvent));
   }
 
   [[nodiscard]] moho::PausedThread* PopPausedThreadUnlocked(ScrDebugRuntime& runtime)
@@ -322,7 +302,7 @@ namespace
       boost::mutex::scoped_lock lock(runtime.pausedQueueMutex);
 
       moho::ScrPauseEvent pauseEvent(mountedSource, sourceLine);
-      PostPauseEventToDebugWindow(runtime.debugWindow, pauseEvent);
+      runtime.debugWindow->AddPendingEvent(pauseEvent);
 
       const std::uint32_t currentThreadId = ::GetCurrentThreadId();
       if (runtime.debugWindowOwnerThreadId == 0U) {
@@ -714,8 +694,8 @@ void moho::SCR_LoadBreakpoints()
     return;
   }
 
-  const msvc8::vector<msvc8::string> fallback;
-  const msvc8::vector<msvc8::string> serializedBreakpoints =
+  const msvc8::list<msvc8::string> fallback;
+  const msvc8::list<msvc8::string> serializedBreakpoints =
     preferences->GetStringArr(msvc8::string(kBreakpointPreferenceKey), fallback);
 
   const msvc8::string emptyName("");
@@ -859,8 +839,7 @@ void moho::SCR_DestroyDebugWindow()
     return;
   }
 
-  auto* const debugWindow = static_cast<moho::ScrDebugWindow*>(runtime.debugWindow);
-  (void)debugWindow->Destroy();
+  (void)runtime.debugWindow->Destroy();
   runtime.debugWindow = nullptr;
 
   {
@@ -880,11 +859,4 @@ void moho::SCR_DestroyDebugWindow()
 bool moho::SCR_IsDebugWindowActive()
 {
   return GetScrDebugRuntime().debugWindow != nullptr;
-}
-
-void moho::SCR_SetDebugWindowRuntime(void* const debugWindow, const std::uint32_t ownerThreadId)
-{
-  ScrDebugRuntime& runtime = GetScrDebugRuntime();
-  runtime.debugWindow = debugWindow;
-  runtime.debugWindowOwnerThreadId = ownerThreadId;
 }

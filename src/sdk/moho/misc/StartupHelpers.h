@@ -227,16 +227,16 @@ namespace moho
     virtual float GetNumber(const msvc8::string& key, float fallback) = 0;
     virtual std::uint32_t GetHex(const msvc8::string& key, std::uint32_t fallback) = 0;
     virtual msvc8::string GetString(const msvc8::string& key, const msvc8::string& fallback) = 0;
-    virtual msvc8::vector<msvc8::string> GetStringArr(
+    virtual msvc8::list<msvc8::string> GetStringArr(
       const msvc8::string& key,
-      const msvc8::vector<msvc8::string>& fallback
+      const msvc8::list<msvc8::string>& fallback
     ) = 0;
     virtual void SetBoolean(const msvc8::string& key, bool value) = 0;
     virtual void SetInteger(const msvc8::string& key, std::int32_t value) = 0;
     virtual void SetNumber(const msvc8::string& key, float value) = 0;
     virtual void SetHex(const msvc8::string& key, std::uint32_t value) = 0;
     virtual void SetString(const msvc8::string& key, const msvc8::string& value) = 0;
-    virtual void SetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& values) = 0;
+    virtual void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) = 0;
     /**
      * Address: 0x008C7EA0 (FUN_008C7EA0, Moho::CUserPrefs::LookupCurrentOption)
      *

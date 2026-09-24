@@ -210,9 +210,4 @@ namespace moho
    * Returns whether the script debug window runtime is currently active.
    */
   [[nodiscard]] bool SCR_IsDebugWindowActive();
-
-  /**
-   * Updates script debug window runtime ownership used by pause/resume flows.
-   */
-  void SCR_SetDebugWindowRuntime(void* debugWindow, std::uint32_t ownerThreadId);
 } // namespace moho

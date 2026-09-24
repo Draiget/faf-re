@@ -1042,7 +1042,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\math\Vector3f.cpp" />
     <ClCompile Include="moho\misc\CZipFile.cpp" />
     <ClCompile Include="moho\misc\ScrDebugWindow.cpp" />
-    <ClCompile Include="moho\misc\ScrDebugWxBridges.cpp" />
     <ClCompile Include="moho\misc\ScrGotoDialog.cpp" />
     <ClCompile Include="moho\render\Clutter.cpp" />
     <ClCompile Include="moho\render\ID3DDepthStencil.cpp" />
@@ -2645,7 +2644,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\misc\Listener.h" />
     <ClInclude Include="moho\misc\ManyToOneBroadcaster.h" />
     <ClInclude Include="moho\misc\ScrDebugWindow.h" />
-    <ClInclude Include="moho\misc\ScrDebugWxBridges.h" />
     <ClInclude Include="moho\misc\ScrGotoDialog.h" />
     <ClInclude Include="moho\misc\WeakPtr.h" />
     <ClInclude Include="libpng\PngWriteRuntime.h" />

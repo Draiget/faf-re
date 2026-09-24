@@ -1433,24 +1433,18 @@ namespace
    * Address: 0x008C7CB0 (FUN_008C7CB0, Moho::CUserPrefs::StringArrObject)
    *
    * What it does:
-   * Builds one Lua array object from a string vector, inserting one
+   * Builds one Lua array object from a string list, inserting one
    * `StringObject` element per index starting at 1.
    */
   [[nodiscard]] LuaPlus::LuaObject BuildPreferenceStringArrayObject(
-    LuaPlus::LuaState* const state, const msvc8::vector<msvc8::string>& values
+    LuaPlus::LuaState* const state, const msvc8::list<msvc8::string>& values
   )
   {
     LuaPlus::LuaObject out;
     out.AssignNewTable(state, 0, 0);
 
-    const msvc8::string* const begin = values.begin();
-    const msvc8::string* const end = values.end();
-    if (begin == nullptr || end == nullptr) {
-      return out;
-    }
-
     int luaIndex = 1;
-    for (const msvc8::string* it = begin; it != end; ++it, ++luaIndex) {
+    for (msvc8::list<msvc8::string>::const_iterator it = values.begin(); it != values.end(); ++it, ++luaIndex) {
       LuaPlus::LuaObject itemObject = BuildPreferenceStringObject(state, *it);
       out.Insert(luaIndex, itemObject);
     }
@@ -1727,7 +1721,7 @@ namespace
     LuaPlus::LuaState* const state,
     LuaPlus::LuaObject* const rootTable,
     const msvc8::string& dottedKey,
-    const msvc8::vector<msvc8::string>& values
+    const msvc8::list<msvc8::string>& values
   )
   {
     if (state == nullptr || rootTable == nullptr) {
@@ -1966,10 +1960,10 @@ namespace
      * Starts from one fallback string-array copy, then appends each string from
      * the local root table value when the resolved key is a Lua array-table.
      */
-    msvc8::vector<msvc8::string>
-    GetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& fallback) override
+    msvc8::list<msvc8::string>
+    GetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& fallback) override
     {
-      msvc8::vector<msvc8::string> outValues = fallback;
+      msvc8::list<msvc8::string> outValues = fallback;
 
       const LuaPlus::LuaObject value = LookupKey(key);
       if (value.IsNil() || !value.IsTable()) {
@@ -2019,7 +2013,7 @@ namespace
       SetPreferenceStringRecursive(&mState, &mRoot, key, value);
     }
 
-    void SetStringArr(const msvc8::string& key, const msvc8::vector<msvc8::string>& values) override
+    void SetStringArr(const msvc8::string& key, const msvc8::list<msvc8::string>& values) override
     {
       SetPreferenceStringArrayRecursive(&mState, &mRoot, key, values);
     }

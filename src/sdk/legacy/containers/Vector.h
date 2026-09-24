@@ -12212,6 +12212,24 @@ namespace msvc8
         }
 
         /**
+         * Address: 0x004C01A0 (FUN_004C01A0 -- `erase(first, last)` for `msvc8::list<msvc8::string>`: the whole list goes through clear(), a sub-range node by node, freeing each string; `ScrDebugWindow::mRecentFiles` at +0x1B4, the second half of the erase-remove in OnCloseFile / OnCloseAllFiles, callers 0x004BF188, 0x004BF317)
+         *
+         * The MSVC8 range erase.
+         */
+        iterator erase(const_iterator first, const_iterator last)
+        {
+            if (first == begin() && last == end()) {
+                clear();
+                return end();
+            }
+
+            while (first != last) {
+                first = erase(first);
+            }
+            return iterator(last._Ptr);
+        }
+
+        /**
          * Transfers the node range `[first, last)` out of `other` and relinks it
          * immediately before `where`, without allocating or destroying nodes.
          *

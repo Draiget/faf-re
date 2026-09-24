@@ -5,393 +5,272 @@
 
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
-#include "moho/app/WxRuntimeTypes.h"
-#include "moho/misc/ScrSourceCtrl.h"
+#include "platform/WxWidgets.h"
+#include <wx/frame.h>
+
+class wxGenericDirCtrl;
+class wxListCtrl;
+class wxListEvent;
+class wxSplitterEvent;
+class wxTextCtrl;
+class wxTreeEvent;
 
 namespace moho
 {
+  class ScrPauseEvent;
+  class ScrSourceCtrl;
   class ScrWatchCtrl;
 
-  struct wxAccelTableEntryRuntime
-  {
-    std::uint32_t flags = 0;
-    std::uint32_t keyCode = 0;
-    std::uint32_t commandId = 0;
-    void* commandTarget = nullptr;
-  };
-
-  static_assert(sizeof(wxAccelTableEntryRuntime) == 0x10, "wxAccelTableEntryRuntime size must be 0x10");
-
   /**
-   * `ScrDebugWindow` is a real `wxFrame` in this binary's RTTI
-   * (`class ScrDebugWindow : public wxFrame, public wxFrameBase, ...`,
-   * `dumps/rtti_dump_all.hpp`), and its vftable
-   * (`??_7ScrDebugWindow@Moho@@6B@`, VA 0x00E0863C) carries
-   * `wxFrame::ShowFullScreen` (FUN_0099EC80) at slot 138, same as
-   * `WSupComFrame`/`wxLogFrameRuntime` - see `wxFrameRuntime` in
-   * `WxRuntimeTypes.h` for the shared override.
+   * VFTABLE: 0x00E0863C (??_7ScrDebugWindow@Moho@@6B@)
+   *
+   * The Lua debugger. A source-file tree beside a notebook of open files
+   * (ScrSourceCtrl) above a notebook of the call stack and the local and
+   * global watches; File/View/Debug menus, a toolbar with a find field, and
+   * keys for the common commands. Position, size, sashes and column widths
+   * live in the Windows.Debug.* preferences, the open files in
+   * Options.Debug.Files. Created and destroyed by SCR_CreateDebugWindow /
+   * SCR_DestroyDebugWindow; a paused Lua thread posts it an EVT_SCR_PAUSE.
+   *
+   * Overrides nothing but the event table: slot 0 is wxFrame's GetClassInfo
+   * (0x004BABC0) and the rest are inline wx copies. The destructor
+   * (0x004BEB70, deleting 0x004BEB40) is the compiler's.
    */
-  class ScrDebugWindow : public wxFrameRuntime
+  class ScrDebugWindow : public wxFrame
   {
   public:
     /**
-     * Address: 0x004BEB70 (FUN_004BEB70)
+     * Address: 0x004BC110 (FUN_004BC110, Moho::ScrDebugWindow::ScrDebugWindow)
      *
      * What it does:
-     * Runs non-deleting teardown for one script-debug window instance,
-     * releasing recent-file list and selected-path storage before frame-base
-     * destruction.
+     * Builds the menus, the toolbar and the panes, restores the saved
+     * geometry, sashes and column widths, installs the accelerators, then
+     * reopens the saved files, dropping (and saving without) any that no
+     * longer open.
      */
-    static ScrDebugWindow* DestroyWithoutDelete(ScrDebugWindow* object) noexcept;
-
-    /**
-     * Address: 0x004BEB40 (FUN_004BEB40)
-     *
-     * What it does:
-     * Implements deleting-dtor thunk semantics for one script-debug window.
-     */
-    static ScrDebugWindow* DeleteWithFlag(ScrDebugWindow* object, std::uint8_t deleteFlags) noexcept;
+    ScrDebugWindow();
 
     /**
      * Address: 0x004BEBE0 (FUN_004BEBE0)
      *
-     * msvc8::string const &
-     *
      * What it does:
-     * Opens or selects one mounted source path in the source-page control and
-     * appends it to recent debug source files when not already listed.
+     * Opens `fileName` in the source notebook and, the first time, adds it
+     * to the saved file list.
      */
-    bool OpenMountedSourcePathAndTrackRecent(const msvc8::string& mountedSourcePath);
-
-    /**
-     * Address: 0x004BC100 (FUN_004BC100)
-     *
-     * What it does:
-     * Returns this debug-window event-table lane.
-     */
-    [[nodiscard]] const void* GetEventTable() const override;
+    bool OpenFile(const msvc8::string& fileName);
 
     /**
      * Address: 0x004BECF0 (FUN_004BECF0)
      *
-     * void *
-     *
      * What it does:
-     * Opens/focuses paused source location, rebuilds call-stack + watch lanes,
-     * and disables viewport render while script execution is paused.
+     * Shows where the thread stopped - or resumes it when the file or line
+     * will not show - fills the call stack and both watches, and takes input
+     * away from the game viewport.
      */
-    void OnScriptPauseEvent(void* pauseEvent);
-
-    /**
-     * Address: 0x004BF750 (FUN_004BF750)
-     *
-     * void *
-     *
-     * What it does:
-     * Focuses the call-stack-selected activation source location and rebuilds
-     * local watch lanes for that activation level.
-     */
-    void OnCallStackSelectionChanged(void* listEvent);
-
-    /**
-     * Address: 0x004BF630 (FUN_004BF630)
-     *
-     * void *
-     *
-     * IDA signature:
-     * Moho::WRenViewport *__thiscall sub_4BF630(int this, int a2)
-     *
-     * What it does:
-     * Clears active source-line execution markers across all open source pages,
-     * clears watch rows, then performs one script-debug step.
-     */
-    void OnStepCommand(void* commandEvent);
-
-    /**
-     * Address: 0x004BF690 (FUN_004BF690)
-     *
-     * void *
-     *
-     * IDA signature:
-     * Moho::WRenViewport *__thiscall sub_4BF690(int this, int a2)
-     *
-     * What it does:
-     * Clears active source-line execution markers across all open source pages,
-     * clears watch rows, then resumes script-debug execution.
-     */
-    void OnResumeCommand(void* commandEvent);
-
-    /**
-     * Address: 0x004BF6F0 (FUN_004BF6F0)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __stdcall sub_4BF6F0(int a1)
-     *
-     * What it does:
-     * Marks all source-line breakpoint indicators as enabled and enables all
-     * persisted global script breakpoints.
-     */
-    void OnEnableAllBreakpointsCommand(void* commandEvent);
-
-    /**
-     * Address: 0x004BF710 (FUN_004BF710)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __stdcall sub_4BF710(int a1)
-     *
-     * What it does:
-     * Marks all source-line breakpoint indicators as disabled and disables all
-     * persisted global script breakpoints.
-     */
-    void OnDisableAllBreakpointsCommand(void* commandEvent);
-
-    /**
-     * Address: 0x004BF960 (FUN_004BF960)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BF960(_BYTE *this, int a2)
-     *
-     * What it does:
-     * Persists the vertical splitter sash position while startup control wiring
-     * is complete.
-     */
-    void OnVerticalSashPositionChanged(void* splitterEvent);
-
-    /**
-     * Address: 0x004BFA00 (FUN_004BFA00)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BFA00(_BYTE *this, int a2)
-     *
-     * What it does:
-     * Persists the horizontal splitter sash position while startup control
-     * wiring is complete.
-     */
-    void OnHorizontalSashPositionChanged(void* splitterEvent);
-
-    /**
-     * Address: 0x004BFAA0 (FUN_004BFAA0)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __userpurge sub_4BFAA0(int a1@<ecx>, int a2@<ebp>, int a3@<esi>, int a4)
-     *
-     * What it does:
-     * Persists call-stack column widths (source/block/line) to user
-     * preferences while startup control wiring is complete.
-     */
-    void OnCallStackColumnsResized(void* commandEvent);
-
-    /**
-     * Address: 0x004BFC00 (FUN_004BFC00)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __userpurge sub_4BFC00(int a1@<ecx>, int a2@<ebp>, int a3@<esi>, int a4)
-     *
-     * What it does:
-     * Persists local-watch column widths (name/type/value) to user preferences
-     * while startup control wiring is complete.
-     */
-    void OnLocalWatchColumnsResized(void* commandEvent);
-
-    /**
-     * Address: 0x004BFD60 (FUN_004BFD60)
-     *
-     * void *
-     *
-     * IDA signature:
-     * void __userpurge sub_4BFD60(int a1@<ecx>, int a2@<ebp>, int a3@<esi>, int a4)
-     *
-     * What it does:
-     * Persists global-watch column widths (name/type/value) to user
-     * preferences while startup control wiring is complete.
-     */
-    void OnGlobalWatchColumnsResized(void* commandEvent);
+    void OnScriptPause(ScrPauseEvent& event);
 
     /**
      * Address: 0x004BF120 (FUN_004BF120)
      *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BF120(_DWORD *this, int a2)
-     *
      * What it does:
-     * Removes the currently selected source page, removes one matching recent
-     * source-file entry, and persists the updated recent-file list.
+     * Closes the selected file and drops it from the saved file list.
      */
-    void OnRemoveCurrentSourceCommand(void* commandEvent);
+    void OnCloseFile(wxCommandEvent& event);
 
     /**
      * Address: 0x004BF220 (FUN_004BF220)
      *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BF220(_DWORD *this, int a2)
+     * What it does:
+     * OnCloseFile until no file is left.
+     */
+    void OnCloseAllFiles(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF3F0 (FUN_004BF3F0)
      *
      * What it does:
-     * Repeatedly removes selected source pages until no source remains selected,
-     * erasing matching recent-file entries and persisting each update.
+     * Reloads every open file.
      */
-    void OnRemoveAllSourcePagesCommand(void* commandEvent);
+    void OnReloadAll(wxCommandEvent& event);
 
     /**
      * Address: 0x004BF400 (FUN_004BF400)
      *
-     * void *
-     *
-     * IDA signature:
-     * int __thiscall sub_4BF400(_DWORD *this, int a2)
-     *
      * What it does:
-     * Shows the goto-line dialog and focuses the requested source line on the
-     * currently selected source page.
+     * Asks for a line with ScrGotoDialog and selects it in the open file.
      */
-    void OnGotoLineCommand(void* commandEvent);
+    void OnGotoLine(wxCommandEvent& event);
 
     /**
      * Address: 0x004BF4C0 (FUN_004BF4C0)
      *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BF4C0(int this, int a2)
+     * What it does:
+     * Takes the find field's text and selects its first match.
+     */
+    void OnFind(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF5B0 (FUN_004BF5B0)
      *
      * What it does:
-     * Copies selected-source text into window state and focuses the first
-     * matching source line in the currently selected source page.
+     * Selects the next match of the last find.
      */
-    void OnSelectedSourcePathChanged(void* commandEvent);
+    void OnFindNext(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF5F0 (FUN_004BF5F0)
+     *
+     * What it does:
+     * Selects the previous match of the last find.
+     */
+    void OnFindPrevious(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF630 (FUN_004BF630)
+     *
+     * What it does:
+     * Clears the cursor and the locals, steps, and gives the game viewport
+     * its input back.
+     */
+    void OnStep(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF690 (FUN_004BF690)
+     *
+     * What it does:
+     * As OnStep, resuming instead.
+     */
+    void OnResume(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF6F0 (FUN_004BF6F0)
+     *
+     * What it does:
+     * Enables every breakpoint, markers and set.
+     */
+    void OnEnableBreakpoints(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF710 (FUN_004BF710)
+     *
+     * What it does:
+     * Disables every breakpoint, markers and set.
+     */
+    void OnDisableBreakpoints(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF730 (FUN_004BF730)
+     *
+     * What it does:
+     * Removes every breakpoint, markers and set.
+     */
+    void OnClearBreakpoints(wxCommandEvent& event);
+
+    /**
+     * Address: 0x004BF750 (FUN_004BF750)
+     *
+     * What it does:
+     * Shows the selected stack level's line and its locals.
+     */
+    void OnCallStackSelected(wxListEvent& event);
 
     /**
      * Address: 0x004BF840 (FUN_004BF840)
      *
-     * void *
-     *
-     * IDA signature:
-     * void __thiscall sub_4BF840(int this, int a2)
+     * What it does:
+     * Opens the file activated in the source tree, by its mounted path.
+     * Connected in the constructor, on the tree control's id.
+     */
+    void OnSourceFileActivated(wxTreeEvent& event);
+
+    /**
+     * Address: 0x004BF960 (FUN_004BF960)
      *
      * What it does:
-     * Reads the currently activated source path from the source-tree owner
-     * control, converts it to mounted-path form, and opens/tracks that source.
+     * Saves the tree/source sash as Windows.Debug.Sash.vertical.
      */
-    void OnSourceTreeItemActivated(void* commandEvent);
+    void OnVerticalSashChanged(wxSplitterEvent& event);
+
+    /**
+     * Address: 0x004BFA00 (FUN_004BFA00)
+     *
+     * What it does:
+     * Saves the source/stack sash as Windows.Debug.Sash.horizontal.
+     */
+    void OnHorizontalSashChanged(wxSplitterEvent& event);
+
+    /**
+     * Address: 0x004BFAA0 (FUN_004BFAA0)
+     *
+     * What it does:
+     * Saves the call stack's column widths.
+     */
+    void OnCallStackColumnResized(wxListEvent& event);
+
+    /**
+     * Address: 0x004BFC00 (FUN_004BFC00)
+     *
+     * What it does:
+     * Saves the locals' column widths.
+     */
+    void OnLocalsColumnResized(wxListEvent& event);
+
+    /**
+     * Address: 0x004BFD60 (FUN_004BFD60)
+     *
+     * What it does:
+     * Saves the globals' column widths.
+     */
+    void OnGlobalsColumnResized(wxListEvent& event);
 
     /**
      * Address: 0x004BFEC0 (FUN_004BFEC0)
      *
-     * void *
-     *
-     * IDA signature:
-     * void __userpurge sub_4BFEC0(_BYTE *a1@<ecx>, int a2@<esi>, int a3)
-     *
      * What it does:
-     * Persists debug-window X/Y position lanes while startup control wiring is
-     * complete.
+     * Saves the position as Windows.Debug.x/y.
      */
-    void OnWindowMoved(void* commandEvent);
+    void OnMove(wxMoveEvent& event);
 
     /**
-     * Address: 0x004BC110 (FUN_004BC110, ??0ScrDebugWindow@Moho@@...)
-     *
-     * IDA signature:
-     * Moho::ScrDebugWindow *__stdcall Moho::ScrDebugWindow::ScrDebugWindow(
-     *     Moho::ScrDebugWindow *this);
+     * Address: 0x004BFFE0 (FUN_004BFFE0)
      *
      * What it does:
-     * Builds the script-debugger frame: File/View/Debug menu bar, a toolbar
-     * with resume/step/breakpoint/find buttons, a nested nested-splitter
-     * layout (source-file tree | notebook of call-stack list + local/global
-     * watch trees), a keyboard accelerator table, and restores persisted
-     * window geometry/sash positions/column widths from user preferences.
-     * Also validates the persisted recent-files list against disk, dropping
-     * entries that no longer resolve through the VFS.
+     * Lays the frame out (wxTopLevelWindowBase::OnSize), then saves the size
+     * as Windows.Debug.width/height.
      */
-    ScrDebugWindow();
+    void OnSize(wxSizeEvent& event);
 
-    static wxEventTable sm_eventTable;
+    /**
+     * Address: 0x004C0100 (FUN_004C0100)
+     *
+     * What it does:
+     * SCR_DestroyDebugWindow.
+     */
+    void OnCloseWindow(wxCloseEvent& event);
 
-    std::uint8_t mUnknown004To177[0x174]{};
-    std::uint8_t mIsInitializingControls = 0; // +0x178
-    std::uint8_t mUnknown179To17B[0x3]{};
-    std::uint32_t mCreationThreadId = 0;      // +0x17C
-    void* mSourcePathOwnerControl = nullptr;  // +0x180
-    ScrSourceCtrl* mSourceControl = nullptr;  // +0x184
-    void* mCallStackControl = nullptr;        // +0x188
-    ScrWatchCtrl* mLocalWatchControl = nullptr;   // +0x18C
-    ScrWatchCtrl* mGlobalWatchControl = nullptr;  // +0x190
-    msvc8::string mSelectedSourcePath{};
-    void* mSelectedSourceControl = nullptr;   // +0x1B0
-    msvc8::list<msvc8::string> mRecentSourceFiles{};
+    bool mInitializing;                        // +0x178 holds the save handlers off while building
+    std::uint32_t mThreadId;                   // +0x17C the creating thread
+    wxGenericDirCtrl* mSourceTree;             // +0x180
+    ScrSourceCtrl* mSourceCtrl;                // +0x184
+    wxListCtrl* mCallStack;                    // +0x188
+    ScrWatchCtrl* mLocals;                     // +0x18C
+    ScrWatchCtrl* mGlobals;                    // +0x190
+    msvc8::string mFindString;                 // +0x194
+    wxTextCtrl* mFindText;                     // +0x1B0
+    msvc8::list<msvc8::string> mRecentFiles;   // +0x1B4 Options.Debug.Files
+
+    DECLARE_EVENT_TABLE()
   };
 
-  /**
-   * Address: 0x004BEB60 (FUN_004BEB60)
-   *
-   * What it does:
-   * Clears one accelerator-entry runtime lane before constructor wiring.
-   */
-  void ResetAccelTableEntry(wxAccelTableEntryRuntime& entry) noexcept;
+  static_assert(offsetof(ScrDebugWindow, mInitializing) == 0x178, "ScrDebugWindow::mInitializing offset must be 0x178");
+  static_assert(offsetof(ScrDebugWindow, mThreadId) == 0x17C, "ScrDebugWindow::mThreadId offset must be 0x17C");
+  static_assert(offsetof(ScrDebugWindow, mSourceTree) == 0x180, "ScrDebugWindow::mSourceTree offset must be 0x180");
+  static_assert(offsetof(ScrDebugWindow, mSourceCtrl) == 0x184, "ScrDebugWindow::mSourceCtrl offset must be 0x184");
+  static_assert(offsetof(ScrDebugWindow, mCallStack) == 0x188, "ScrDebugWindow::mCallStack offset must be 0x188");
+  static_assert(offsetof(ScrDebugWindow, mLocals) == 0x18C, "ScrDebugWindow::mLocals offset must be 0x18C");
+  static_assert(offsetof(ScrDebugWindow, mGlobals) == 0x190, "ScrDebugWindow::mGlobals offset must be 0x190");
+  static_assert(offsetof(ScrDebugWindow, mFindString) == 0x194, "ScrDebugWindow::mFindString offset must be 0x194");
+  static_assert(offsetof(ScrDebugWindow, mFindText) == 0x1B0, "ScrDebugWindow::mFindText offset must be 0x1B0");
+  static_assert(offsetof(ScrDebugWindow, mRecentFiles) == 0x1B4, "ScrDebugWindow::mRecentFiles offset must be 0x1B4");
+  static_assert(sizeof(ScrDebugWindow) == 0x1C0, "ScrDebugWindow size must be 0x1C0");
 } // namespace moho
-
-static_assert(sizeof(moho::ScrDebugWindow) == 0x1C0, "ScrDebugWindow size must be 0x1C0");
-static_assert(
-  offsetof(moho::ScrDebugWindow, mUnknown004To177) == 0x4,
-  "ScrDebugWindow::mUnknown004To177 offset must be 0x4"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mIsInitializingControls) == 0x178,
-  "ScrDebugWindow::mIsInitializingControls offset must be 0x178"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mUnknown179To17B) == 0x179,
-  "ScrDebugWindow::mUnknown179To17B offset must be 0x179"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mCreationThreadId) == 0x17C,
-  "ScrDebugWindow::mCreationThreadId offset must be 0x17C"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mSourcePathOwnerControl) == 0x180,
-  "ScrDebugWindow::mSourcePathOwnerControl offset must be 0x180"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mSourceControl) == 0x184,
-  "ScrDebugWindow::mSourceControl offset must be 0x184"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mCallStackControl) == 0x188,
-  "ScrDebugWindow::mCallStackControl offset must be 0x188"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mLocalWatchControl) == 0x18C,
-  "ScrDebugWindow::mLocalWatchControl offset must be 0x18C"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mGlobalWatchControl) == 0x190,
-  "ScrDebugWindow::mGlobalWatchControl offset must be 0x190"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mSelectedSourcePath) == 0x194,
-  "ScrDebugWindow::mSelectedSourcePath offset must be 0x194"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mSelectedSourceControl) == 0x1B0,
-  "ScrDebugWindow::mSelectedSourceControl offset must be 0x1B0"
-);
-static_assert(
-  offsetof(moho::ScrDebugWindow, mRecentSourceFiles) == 0x1B4,
-  "ScrDebugWindow::mRecentSourceFiles offset must be 0x1B4"
-);
