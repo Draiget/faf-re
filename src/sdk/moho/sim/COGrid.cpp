@@ -795,13 +795,6 @@ namespace moho
    */
   void COGrid::ExecuteOccupy(const EOccupancyCaps caps, const gpg::Rect2i& rect)
   {
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    {
-      static int sCount = 0;
-      if (sCount++ < 400) {
-        gpg::Warnf("[OCCDIAG] Occupy caps=0x%X rect=(%d,%d)-(%d,%d)", static_cast<unsigned>(caps), rect.x0, rect.z0, rect.x1, rect.z1);
-      }
-    }
     const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
     const int rectWidth = rect.x1 - rect.x0;
     const int rectHeight = rect.z1 - rect.z0;
@@ -828,13 +821,6 @@ namespace moho
    */
   void COGrid::ReleaseOccupy(const EOccupancyCaps caps, const gpg::Rect2i& rect)
   {
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    {
-      static int sCount = 0;
-      if (sCount++ < 400) {
-        gpg::Warnf("[OCCDIAG] Release caps=0x%X rect=(%d,%d)-(%d,%d)", static_cast<unsigned>(caps), rect.x0, rect.z0, rect.x1, rect.z1);
-      }
-    }
     const std::uint8_t capsBits = static_cast<std::uint8_t>(caps);
     const int rectWidth = rect.x1 - rect.x0;
     const int rectHeight = rect.z1 - rect.z0;

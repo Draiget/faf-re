@@ -400,19 +400,6 @@ namespace
    * `acceptedMask`, so a diagonal is offered only once both of its adjacent
    * cardinals have been accepted.
    */
-  // TEMPORARY PROBE -- navigation triage. Per-search tallies so one failing
-  // query can be read end to end instead of inferred from aggregates.
-  struct NavSearchStats
-  {
-    int level0Expansions;
-    int clusterExpansions;
-    int adjacentEmitted;
-    int clusterEdgesEmitted;
-    int clusterNodeHit;
-    int clusterNodeMiss;
-  };
-  NavSearchStats gNavSearch{};
-
   [[nodiscard]] bool EnumerateAdjacentCells(
     PathQueueImplBaseRuntime& implBase,
     const moho::SOCellPos& cell,
@@ -425,12 +412,8 @@ namespace
     }
 
     std::uint32_t acceptedMask = 0u;
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    static int sProbeCalls = 0;
-    int probeGated = 0, probeRect = 0, probeTraverse = 0, probeBounds = 0, probeAccepted = 0;
     for (std::size_t step = 0; step < 8; ++step) {
       if ((acceptedMask & kStepGate[step]) != kStepGate[step]) {
-        ++probeGated;
         continue;
       }
 
@@ -438,16 +421,6 @@ namespace
       const int candidateZ = static_cast<std::uint16_t>(cell.z) + kStepOffsetZ[step];
 
       if (!traveler->ShouldSearchRect(implBase.mClusterMap->ClusterRect(candidateX, candidateZ, 1u))) {
-        ++probeRect;
-        {
-          moho::SOCellPos gated{};
-          gated.x = static_cast<std::int16_t>(candidateX);
-          gated.z = static_cast<std::int16_t>(candidateZ);
-          if (traveler->IsGoalCandidateCell(gated)) {
-            gpg::Warnf("[NAVGOAL] goal cell (%d,%d) GATED OUT by ShouldSearchRect (from (%d,%d))", candidateX,
-                       candidateZ, static_cast<int>(cell.x), static_cast<int>(cell.z));
-          }
-        }
         continue;
       }
 
@@ -455,37 +428,14 @@ namespace
       candidate.x = static_cast<std::int16_t>(candidateX);
       candidate.z = static_cast<std::int16_t>(candidateZ);
 
-      const bool candidateIsGoal = traveler->IsGoalCandidateCell(candidate);
-
       if (!traveler->CanTraverseCell(candidate)) {
-        ++probeTraverse;
-        // TEMPORARY PROBE -- navigation triage. The search repeatedly stalls one
-        // cell short of its goal; this says whether the final step is refused by
-        // traversability rather than never being offered.
-        if (candidateIsGoal) {
-          gpg::Warnf("[NAVGOAL] goal cell (%d,%d) REFUSED by CanTraverseCell (from (%d,%d))",
-                     static_cast<int>(candidate.x), static_cast<int>(candidate.z), static_cast<int>(cell.x),
-                     static_cast<int>(cell.z));
-        }
         continue;
       }
 
       float cost = kStepCost[step];
       if (!traveler->IsInBounds(cell, candidate, &cost)) {
-        ++probeBounds;
-        if (candidateIsGoal) {
-          gpg::Warnf("[NAVGOAL] goal cell (%d,%d) REFUSED by IsInBounds (from (%d,%d))",
-                     static_cast<int>(candidate.x), static_cast<int>(candidate.z), static_cast<int>(cell.x),
-                     static_cast<int>(cell.z));
-        }
         continue;
       }
-      if (candidateIsGoal) {
-        gpg::Warnf("[NAVGOAL] goal cell (%d,%d) ACCEPTED as neighbour of (%d,%d)",
-                   static_cast<int>(candidate.x), static_cast<int>(candidate.z), static_cast<int>(cell.x),
-                   static_cast<int>(cell.z));
-      }
-      ++probeAccepted;
 
       PathQueueNeighbour neighbour{};
       neighbour.mCell = candidate;
@@ -493,14 +443,6 @@ namespace
       outNeighbours.push_back(neighbour);
 
       acceptedMask |= 1u << step;
-    }
-    ++gNavSearch.level0Expansions;
-    gNavSearch.adjacentEmitted += probeAccepted;
-    if (sProbeCalls++ < 40) {
-      const gpg::Rect2i r = implBase.mClusterMap->ClusterRect(static_cast<std::uint16_t>(cell.x), static_cast<std::uint16_t>(cell.z), 1u);
-      gpg::Warnf("[PATHDIAG] Adjacent cell=(%d,%d) gated=%d rect=%d traverse=%d bounds=%d accepted=%d rect1=(%d,%d)-(%d,%d)",
-                 static_cast<int>(cell.x), static_cast<int>(cell.z), probeGated, probeRect, probeTraverse, probeBounds,
-                 probeAccepted, r.x0, r.z0, r.x1, r.z1);
     }
     return true;
   }
@@ -572,22 +514,7 @@ namespace
             break;
           }
         }
-        // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-        {
-          static int sProbeCalls = 0;
-          if (sProbeCalls++ < 60) {
-            gpg::Warnf("[PATHDIAG] ClusterEdges cell=(%d,%d) level=%d cluster=(%d,%d) data=%p nodes=%u from=%u budget=%d",
-                       cellX, cellZ, level, clusterX, clusterZ, static_cast<const void*>(data), nodeCount, fromIndex,
-                       implBase.mBudget);
-          }
-        }
-
-        ++gNavSearch.clusterExpansions;
-        if (fromIndex >= nodeCount) {
-          ++gNavSearch.clusterNodeMiss;
-        }
         if (fromIndex < nodeCount) {
-          ++gNavSearch.clusterNodeHit;
           for (std::uint32_t toIndex = 0u; toIndex < nodeCount; ++toIndex) {
             if (toIndex == fromIndex) {
               continue;
@@ -624,7 +551,6 @@ namespace
               continue;
             }
 
-            ++gNavSearch.clusterEdgesEmitted;  // TEMPORARY PROBE
             PathQueueNeighbour neighbour{};
             neighbour.mCell = candidate;
             neighbour.mCost = cost;
@@ -2163,7 +2089,6 @@ namespace moho
     const SFootprint* const footprint = traveler.GetFootprint();
 
     implBase.mExpandCount = 0;
-    gNavSearch = NavSearchStats{};  // TEMPORARY PROBE
     implBase.mPathCap = traveler.GetPathcap();
 
     HPathCell anchorCell{};
@@ -2176,12 +2101,6 @@ namespace moho
     // is the base, so the concrete type has to be recovered here.
     const auto* const namedFootprint = static_cast<const SNamedFootprint*>(footprint);
     implBase.mClusterMap = owner.ClusterMapForFootprint(namedFootprint->mIndex);
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    gpg::Warnf("[PATHDIAG] Begin traveler=%p fpIndex=%d fp=%dx%d caps=0x%X cluster=%p cap=%d anchor=(%d,%d)",
-               static_cast<void*>(&traveler), namedFootprint->mIndex, static_cast<int>(namedFootprint->mSizeX),
-               static_cast<int>(namedFootprint->mSizeZ), static_cast<unsigned>(namedFootprint->mOccupancyCaps),
-               static_cast<void*>(implBase.mClusterMap), implBase.mPathCap, static_cast<int>(implBase.mClosestCell.x),
-               static_cast<int>(implBase.mClosestCell.z));
 
     implBase.ResetSearch();
     implBase.mResultCells.clear();
@@ -2216,16 +2135,6 @@ namespace moho
 
     implBase.mResultCells.clear();
     (void)implBase.BuildPath(implBase.mClosestCell, implBase.mResultCells);
-    // TEMPORARY PROBE -- inert move order triage, delete when resolved.
-    gpg::Warnf("[PATHDIAG] Finish traveler=%p reachedGoal=%d cells=%d expand=%d closest=(%d,%d) closestDist=%.1f",
-               static_cast<void*>(traveler), reachedGoal ? 1 : 0, static_cast<int>(implBase.mResultCells.size()),
-               implBase.mExpandCount, static_cast<int>(implBase.mClosestCell.x), static_cast<int>(implBase.mClosestCell.z),
-               implBase.mClosestDistance);
-    gpg::Warnf("[PATHDIAG] FinishStats traveler=%p lvl0=%d clusterCalls=%d adjEmit=%d clusterEdgeEmit=%d nodeHit=%d "
-               "nodeMiss=%d budgetLeft=%d cap=%d",
-               static_cast<void*>(traveler), gNavSearch.level0Expansions, gNavSearch.clusterExpansions,
-               gNavSearch.adjacentEmitted, gNavSearch.clusterEdgesEmitted, gNavSearch.clusterNodeHit,
-               gNavSearch.clusterNodeMiss, implBase.mBudget, implBase.mPathCap);
 
     UnlinkAndResetPathQueueNode(implBase.mTraveler);
 

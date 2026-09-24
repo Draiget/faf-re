@@ -969,26 +969,6 @@ void CAiPathFinder::QueueSearch()
     OCCUPY_FootprintFits(*mOGrid, anchorCell, footprint, EOccupancyCaps::OC_ANY);
   mHasOccupancyMask = (static_cast<std::uint8_t>(anchorFitCaps) != 0u) ? 1u : 0u;
 
-  // TEMPORARY PROBE -- navigation triage (units ignore buildings/props/slope).
-  // `mHasOccupancyMask` is the single gate that decides whether CanTraverseCell
-  // consults the occupancy grid and the slope test at all.
-  {
-    static int sCount = 0;
-    if (sCount++ < 250) {
-      const gpg::Rect2i probeOuter = GoalOuterRect(mGoal);
-      const gpg::Rect2i probeInner = GoalInnerRect(mGoal);
-      gpg::Warnf(
-        "[NAVGATE] QueueSearch finder=%p mask=%u anchorCaps=0x%X fp=%dx%d fpCaps=0x%X maxSlope=%.3f flags=0x%X "
-        "anchor=(%d,%d) search=%d outer=(%d,%d)-(%d,%d) inner=(%d,%d)-(%d,%d) layer=%d",
-        static_cast<const void*>(this), static_cast<unsigned>(mHasOccupancyMask), static_cast<unsigned>(anchorFitCaps),
-        static_cast<int>(footprint.mSizeX), static_cast<int>(footprint.mSizeZ),
-        static_cast<unsigned>(footprint.mOccupancyCaps), footprint.mMaxSlope,
-        static_cast<unsigned>(footprint.mFlags), static_cast<int>(anchorCell.x), static_cast<int>(anchorCell.z),
-        static_cast<int>(mSearchType), probeOuter.x0, probeOuter.z0, probeOuter.x1, probeOuter.z1, probeInner.x0,
-        probeInner.z0, probeInner.x1, probeInner.z1, static_cast<int>(mGoal.aux4));
-    }
-  }
-
   if (mSearchType == AIPATHSEARCH_None) {
     ClearRectHistory();
     return;
@@ -1039,25 +1019,6 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
 {
   const SOCellPos cell{cellPos.x, cellPos.z};
 
-  // TEMPORARY PROBE -- navigation triage. Counts how often the occupancy/slope
-  // gate is bypassed and how often it actually rejects a cell.
-  struct NavGateStats
-  {
-    long calls;
-    long maskOff;
-    long rejectFit;
-    long rejectBlocked;
-  };
-  static NavGateStats sStats{};
-  ++sStats.calls;
-  if (!mHasOccupancyMask) {
-    ++sStats.maskOff;
-  }
-  if ((sStats.calls % 4000) == 0) {
-    gpg::Warnf("[NAVGATE] CanTraverse calls=%ld maskOff=%ld rejFit=%ld rejBlocked=%ld", sStats.calls, sStats.maskOff,
-               sStats.rejectFit, sStats.rejectBlocked);
-  }
-
   if (!mUseGoalBoundaryProbe) {
     if (mHasOccupancyMask) {
       const SFootprint& footprint = mUnit->GetFootprint();
@@ -1067,7 +1028,6 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
           static_cast<std::uint8_t>(caps) & ~static_cast<std::uint8_t>(EOccupancyCaps::OC_SUB));
       }
       if (static_cast<std::uint8_t>(OCCUPY_FootprintFits(*mOGrid, cell, footprint, caps)) == 0u) {
-        ++sStats.rejectFit;
         return false;
       }
     }
@@ -1078,11 +1038,7 @@ bool CAiPathFinder::CanTraverseCell(const SOCellPos& cellPos) const
       return true;
     }
     const int mode = (mSearchType == AIPATHSEARCH_Leader) ? 2 : 1;
-    const bool blocked = COGrid::UnitIsBlocked(cell, *mOGrid, mUnit, mode);
-    if (blocked) {
-      ++sStats.rejectBlocked;
-    }
-    return !blocked;
+    return !COGrid::UnitIsBlocked(cell, *mOGrid, mUnit, mode);
   }
 
   // Goal-boundary-probe branch: evaluate a structure-ignoring copy of the
