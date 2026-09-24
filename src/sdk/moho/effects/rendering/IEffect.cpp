@@ -332,9 +332,9 @@ namespace moho
   /**
    * Address: 0x00654350 (FUN_00654350, Moho::IEffect::GetCurveParam)
    */
-  std::int32_t IEffect::GetCurveParam(const std::int32_t)
+  SEfxCurve* IEffect::GetCurveParam(const std::int32_t)
   {
-    return 0;
+    return nullptr;
   }
 
   /**
@@ -358,7 +358,7 @@ namespace moho
   /**
    * Address: 0x00654390 (FUN_00654390, Moho::IEffect::SetCurveParam)
    */
-  void IEffect::SetCurveParam(const std::int32_t, const void*)
+  void IEffect::SetCurveParam(const std::int32_t, const SEfxCurve*)
   {}
 
   /**

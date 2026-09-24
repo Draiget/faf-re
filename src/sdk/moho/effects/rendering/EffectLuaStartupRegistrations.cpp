@@ -316,11 +316,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::SEfxCurve* ResolveCurveStorage(const std::int32_t curveParamAddress) noexcept
-  {
-    return reinterpret_cast<moho::SEfxCurve*>(static_cast<std::uintptr_t>(curveParamAddress));
-  }
-
   /**
    * Address: 0x0066D6E0 (FUN_0066D6E0, shared IEffect named-float-param lane)
    *
@@ -2115,7 +2110,7 @@ namespace moho
     LuaPlus::LuaStackObject newCurveLengthArg(state, 3);
     const float newCurveLength = newCurveLengthArg.GetNumber();
 
-    SEfxCurve curve = *ResolveCurveStorage(effect->GetCurveParam(curveParamIndex));
+    SEfxCurve curve = *effect->GetCurveParam(curveParamIndex);
     const float oldCurveLength = curve.mBoundsMax.x - curve.mBoundsMin.x;
     const float xScale = (newCurveLength - 0.0f) / oldCurveLength;
     for (Wm3::Vector3f* key = curve.mKeys.begin(); key != curve.mKeys.end(); ++key) {

@@ -15,6 +15,7 @@ namespace moho
   class CEffectManagerImpl;
   class IEffectManager;
   class Entity;
+  struct SEfxCurve;
 
   class IEffect : public CScriptObject
   {
@@ -95,7 +96,7 @@ namespace moho
     /** Address: 0x006542E0 (FUN_006542E0, Moho::IEffect::GetQuatParam) */
     virtual Vector4f* GetQuatParam(Vector4f* outValue, std::int32_t paramIndex);
     /** Address: 0x00654350 (FUN_00654350, Moho::IEffect::GetCurveParam) */
-    virtual std::int32_t GetCurveParam(std::int32_t paramIndex);
+    virtual SEfxCurve* GetCurveParam(std::int32_t paramIndex);
     /** Address: 0x00654370 (FUN_00654370, Moho::IEffect::SetVectorParam) */
     virtual void SetVectorParam(std::int32_t paramIndex, const Wm3::Vector3f* value);
     /** Address: 0x00654360 (FUN_00654360, Moho::IEffect::SetFloatParam) */
@@ -103,7 +104,7 @@ namespace moho
     /** Address: 0x00654380 (FUN_00654380, Moho::IEffect::SetNParam) */
     virtual void SetNParam(std::int32_t paramIndex, const float* values, std::int32_t valueCount);
     /** Address: 0x00654390 (FUN_00654390, Moho::IEffect::SetCurveParam) */
-    virtual void SetCurveParam(std::int32_t paramIndex, const void* curveData);
+    virtual void SetCurveParam(std::int32_t paramIndex, const SEfxCurve* curve);
     /** Address: 0x006543A0 (FUN_006543A0, Moho::IEffect::SetEntity) */
     virtual void SetEntity(Entity* entity);
     /** Address: 0x006543B0 (FUN_006543B0, Moho::IEffect::SetBone) */

@@ -81,7 +81,7 @@ namespace moho
     /**
      * Address: 0x006546E0 (FUN_006546E0, Moho::CEffectImpl::GetCurveParam)
      */
-    std::int32_t GetCurveParam(std::int32_t paramIndex) override;
+    SEfxCurve* GetCurveParam(std::int32_t paramIndex) override;
 
     /**
      * Address: 0x00654610 (FUN_00654610, Moho::CEffectImpl::SetFloatParam)
@@ -101,7 +101,7 @@ namespace moho
     /**
      * Address: 0x006546D0 (FUN_006546D0, Moho::CEffectImpl::SetCurveParam)
      */
-    void SetCurveParam(std::int32_t paramIndex, const void* curveData) override;
+    void SetCurveParam(std::int32_t paramIndex, const SEfxCurve* curve) override;
 
     /**
      * Address: 0x006592D0 (FUN_006592D0, Moho::CEffectImpl::SetEntity)

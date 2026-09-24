@@ -71,14 +71,22 @@ namespace moho
     void UpdateCurveMask();
 
     /**
+     * Address: 0x0065C370 (FUN_0065C370)
+     * Slot: 10 (IEffect::GetCurveParam)
+     *
+     * What it does:
+     * The emitter's curve `paramIndex` (an EEmitterCurve), in place.
+     */
+    SEfxCurve* GetCurveParam(std::int32_t paramIndex) override;
+
+    /**
      * Address: 0x0065C320 (FUN_0065C320, Moho::CEfxEmitter::SetCurveParam)
      *
      * What it does:
-     * Copies one source curve bounds lane into the destination emitter slot,
-     * recomputes source-curve Y bounds from key payload, and invalidates one
-     * emitter parameter lane.
+     * Replaces curve `paramIndex` with a copy of `curve` - bounds and keys -
+     * and invalidates it.
      */
-    void SetCurveParam(std::int32_t paramIndex, const void* curveData) override;
+    void SetCurveParam(std::int32_t paramIndex, const SEfxCurve* curve) override;
 
     /**
      * Address: 0x0065C390 (FUN_0065C390, Moho::CEfxEmitter::Invalidate1)

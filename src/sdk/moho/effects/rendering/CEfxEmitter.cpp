@@ -79,21 +79,6 @@ namespace
   // `SEfxCurve` here, and the `[[maybe_unused]]` initializer written over it,
   // are gone.
 
-  void RecomputeCurveYBoundsFromKeys(moho::SEfxCurve* const curve) noexcept
-  {
-    curve->mBoundsMin.y = std::numeric_limits<float>::infinity();
-    curve->mBoundsMax.y = -std::numeric_limits<float>::infinity();
-
-    for (Wm3::Vector3f* key = curve->mKeys.begin(); key != curve->mKeys.end(); ++key) {
-      if (curve->mBoundsMin.y > key->y) {
-        curve->mBoundsMin.y = key->y;
-      }
-      if (key->y > curve->mBoundsMax.y) {
-        curve->mBoundsMax.y = key->y;
-      }
-    }
-  }
-
   [[nodiscard]] float ProjectViewportDepthRow1(const moho::VMatrix4& viewport, const Wm3::Vec3f& point) noexcept
   {
     return (point.x * viewport.r[1].x) + (point.y * viewport.r[1].y) + (point.z * viewport.r[1].z) + viewport.r[1].w;
@@ -530,24 +515,33 @@ namespace moho
    * Address: 0x0065C320 (FUN_0065C320, Moho::CEfxEmitter::SetCurveParam)
    *
    * What it does:
-   * Copies one source curve bounds lane into the destination emitter slot,
-   * recomputes source-curve Y bounds from key payload, and invalidates one
-   * emitter parameter lane.
+   * `mCurves[paramIndex] = *curve`, then Invalidate2 (slot +0x4C). The copy
+   * is SEfxCurve's own assignment: the four bound floats, then the key vector
+   * through fastvector assignment (0x0065F240). `paramIndex` steps whole
+   * 0x38-byte curves (0x0065C32E..0x0065C337, `index * 7 * 8`).
    *
-   * `paramIndex` indexes curves one-for-one: 0x0065C32E..0x0065C337 computes
-   * `curves + paramIndex * 0x38`, one whole `SEfxCurve` per step, the same
-   * stride `UpdateCurveMask` walks. IDA's half-size `SEfxCurve` is what makes
-   * its decompile look like every second slot.
+   * The earlier reading copied only the bounds and then recomputed the Y
+   * bounds of the *source* curve, taking the 0x0065F240 call for a bounds
+   * pass: the keys never reached the emitter, so Unit's three curve overrides,
+   * the Lua curve setters and the emitter editor all left its curves unchanged.
    */
-  void CEfxEmitter::SetCurveParam(const std::int32_t paramIndex, const void* const curveData)
+  void CEfxEmitter::SetCurveParam(const std::int32_t paramIndex, const SEfxCurve* const curve)
   {
-    const auto* const sourceCurve = static_cast<const SEfxCurve*>(curveData);
-    SEfxCurve& destinationCurve = mCurves[static_cast<std::size_t>(paramIndex)];
-    destinationCurve.mBoundsMin = sourceCurve->mBoundsMin;
-    destinationCurve.mBoundsMax = sourceCurve->mBoundsMax;
-
-    RecomputeCurveYBoundsFromKeys(const_cast<SEfxCurve*>(sourceCurve));
+    mCurves[static_cast<std::size_t>(paramIndex)] = *curve;
     Invalidate2(paramIndex);
+  }
+
+  /**
+   * Address: 0x0065C370 (FUN_0065C370)
+   *
+   * What it does:
+   * Returns curve `paramIndex` in place (`mCurves.start_ + paramIndex * 0x38`).
+   * Reached through IEffect slot 10 (+0x28) by the emitter editor's
+   * LoadFromEffect (0x006679EE) and cfunc_IEffectResizeEmitterCurveL (0x0066DC20).
+   */
+  SEfxCurve* CEfxEmitter::GetCurveParam(const std::int32_t paramIndex)
+  {
+    return &mCurves[static_cast<std::size_t>(paramIndex)];
   }
 
   /**
