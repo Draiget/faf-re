@@ -12,6 +12,8 @@
 #include "moho/console/CConFunc.h"
 #include "moho/misc/StartupHelpers.h"
 #include "moho/render/d3d/CD3DDevice.h"
+#include "moho/render/WRenViewport.h"
+#include <wx/toplevel.h>
 
 namespace
 {
@@ -84,7 +86,9 @@ namespace moho
     // explicit resolution override; this invocation is then a no-op beyond
     // the device-lock toggle.
     if (args.size() == 2u && valueToken != nullptr && valueToken->view() != "overridden") {
-      auto* const mainWindow = reinterpret_cast<WD3DViewport*>(sMainWindow);
+      // The main window is the SupCom frame: slot 131 below is
+      // wxTopLevelWindowMSW::Maximize, not a viewport hook.
+      wxTopLevelWindow* const mainWindow = static_cast<wxTopLevelWindow*>(sMainWindow);
 
       // 0x008D35AA-0x008D35B4: `head.mWindowed` is set from the *inverse* of
       // the "argument equals `windowed`" test, and it is reused with that
@@ -102,7 +106,7 @@ namespace moho
 
       if (head.mWindowed) {
         mainWindow->SetWindowStyleFlag(kBorderlessAdapterStyle);
-        mainWindow->D3DWindowOnDeviceInit(false);
+        mainWindow->Maximize(false);
 
         // 0x008D369D-0x008D36AA: parses `valueToken` as a `width,height,fps`
         // CSV triple (`Resolution::Resolution(const std::string&)` /
@@ -128,10 +132,10 @@ namespace moho
         ::SetWindowPos(windowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
       }
 
-      mainWindow->DoSetClientSize(static_cast<std::int32_t>(head.mWidth), static_cast<std::int32_t>(head.mHeight));
+      mainWindow->SetClientSize(static_cast<int>(head.mWidth), static_cast<int>(head.mHeight));
       mainWindow->Refresh(true, nullptr);
-      ren_Viewport->DoSetSize(
-        -1, -1, static_cast<std::int32_t>(head.mWidth), static_cast<std::int32_t>(head.mHeight), 0
+      ren_Viewport->SetSize(
+        -1, -1, static_cast<int>(head.mWidth), static_cast<int>(head.mHeight), wxSIZE_USE_EXISTING
       );
 
       device->Clear();
