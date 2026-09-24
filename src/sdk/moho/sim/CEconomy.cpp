@@ -1,16 +1,20 @@
 #include "CEconomy.h"
 
+#include <bit>
 #include <cstdint>
 #include <cstdlib>
 #include <typeinfo>
 #include <new>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
+#include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
+#include "legacy/containers/Vector.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/CArmyStats.h"
 #include "moho/sim/CEconStorage.h"
 #include "moho/sim/CSimArmyEconomyInfo.h"
 #include "moho/sim/Sim.h"
@@ -472,19 +476,16 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
-   *
-   * What it does:
-   * Unlinks the consumption-request sentinel node, releases extra-storage
-   * ownership (with max-storage rollback), then frees this economy object.
-   */
   namespace
   {
     /// The two resource lanes, in the order the binary indexes them.
     constexpr std::size_t kEnergyLane = 0u;
     constexpr std::size_t kMassLane = 1u;
     constexpr std::size_t kLaneCount = 2u;
+
+    /// The sim runs ten ticks a second; `Economy_Trend_*` turns the per-tick
+    /// figure into a per-second one with it (the float at 0x00DFF31C).
+    constexpr float kTicksPerSecond = 10.0f;
 
     /// `mRequested - mGranted`, clamped at zero per lane, as at 0x00771BC0.
     [[nodiscard]] SEconValue OutstandingRequest(const CEconRequest& request) noexcept
@@ -499,13 +500,84 @@ namespace moho
       return lane == kEnergyLane ? value.energy : value.mass;
     }
 
-    /// Bounds-checked army lookup, as the binary open-codes it at 0x00771C60.
-    [[nodiscard]] const CArmyImpl* ArmyAtEconomyIndex(const Sim& sim, const std::int32_t index) noexcept
+    [[nodiscard]] float& Lane(SEconValue& value, const std::size_t lane) noexcept
+    {
+      return lane == kEnergyLane ? value.energy : value.mass;
+    }
+
+    [[nodiscard]] float Lane(const SEconPair& value, const std::size_t lane) noexcept
+    {
+      return lane == kEnergyLane ? value.ENERGY : value.MASS;
+    }
+
+    [[nodiscard]] float& Lane(SEconPair& value, const std::size_t lane) noexcept
+    {
+      return lane == kEnergyLane ? value.ENERGY : value.MASS;
+    }
+
+    /**
+     * One lane of `mMaxStorage` as a float. The cap is an unsigned 64-bit pair,
+     * and the split `fild` pairs the binary emits at every read of it
+     * (0x007720C1, 0x00772150, 0x007723C1, 0x0077246B) are MSVC8's
+     * unsigned-64 conversion -- the same sequence `SEconTotals::MaxStorageOf`
+     * (0x00585920) compiles to -- not a sign-bit mask.
+     */
+    [[nodiscard]] float MaxStorage(const SEconTotals& totals, const std::size_t lane) noexcept
+    {
+      return static_cast<float>(lane == kEnergyLane ? totals.mMaxStorage.ENERGY : totals.mMaxStorage.MASS);
+    }
+
+    /// `sim.mArmiesList[index]`, or null when out of range. The binary
+    /// open-codes this check at each of its three army lookups (0x00771C58,
+    /// 0x00772012, 0x00772411) and dereferences the result unchecked.
+    [[nodiscard]] CArmyImpl* ArmyAtEconomyIndex(const Sim& sim, const std::int32_t index) noexcept
     {
       if (index < 0 || static_cast<std::size_t>(index) >= sim.mArmiesList.size()) {
         return nullptr;
       }
       return sim.mArmiesList[static_cast<std::size_t>(index)];
+    }
+
+    /// `SimArmy::GetEconomy()` (vtable slot 9, `call [eax+24h]` at 0x00772135
+    /// and 0x0077218F) hands the army's `CEconomy` out under the older
+    /// `CSimArmyEconomyInfo` description of the same 0x60-byte object, which
+    /// `CArmyImpl`'s constructor allocates as a `CEconomy`.
+    [[nodiscard]] CEconomy* EconomyOf(CArmyImpl& army)
+    {
+      return reinterpret_cast<CEconomy*>(army.GetEconomy());
+    }
+
+    /// True while either lane of `economy` stores less than its cap: the test
+    /// an ally has to pass to be offered overflow (0x0077213C).
+    [[nodiscard]] bool HasStorageRoom(const CEconomy& economy) noexcept
+    {
+      for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+        if (Lane(economy.mTotals.mStored, lane) < MaxStorage(economy.mTotals, lane)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    /// Stores `value` into one float army stat. Each "set" publish inlines this:
+    /// resolve the item through `func_GetArmyStat2`, mark it float, then swap
+    /// the new bits into the primary slot with a compare-exchange loop.
+    void SetFloatStat(CArmyStats& stats, const char* const statPath, const float value)
+    {
+      CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&stats, statPath);
+      item->SynchronizeAsFloat();
+      const std::int32_t bits = std::bit_cast<std::int32_t>(value);
+      (void)item->SetInt(&bits);
+    }
+
+    /// Adds `value` into one float army stat. The "accumulate" publishes inline
+    /// the same resolve and mark, then the compare-exchange add that
+    /// `StatItem::AddFloat` is.
+    void AddFloatStat(CArmyStats& stats, const char* const statPath, float value)
+    {
+      CArmyStatItem* const item = ResolveArmyStatItemCachedCreate(&stats, statPath);
+      item->SynchronizeAsFloat();
+      (void)item->AddFloat(&value);
     }
   } // namespace
 
@@ -529,15 +601,27 @@ namespace moho
    * then get their own ratio out of what is left in the *other* lane. Every
    * request is granted its outstanding share at whichever ratio applies, and
    * that grant is added to its `mGranted` so the next tick asks only for the
-   * remainder.
+   * remainder. The grants' sum is this tick's consumption.
    *
-   * @note Two tails of the binary body are not written yet, and both are
-   * additive rather than corrective: the `mResourceSharing` block from
-   * 0x00771EE0, which spreads storage overflow across allied economies that
-   * still have room, and the twenty-four `Economy_*` army-stat publishes from
-   * 0x00772050, which push these same numbers through `func_GetArmyStat2` with
-   * an interlocked accumulate for the stats overlay and AI queries. Neither
-   * feeds anything computed here.
+   * What the grants leave beyond max storage is overflow. When
+   * `mResourceSharing` is set (0x00772112), it is offered to the allies from
+   * `GetAlliedArmies`, in that order, that still have room in either lane:
+   * each gets an equal cut of whatever is still unplaced, capped by its own
+   * room, banked into its `mResources` and `mPendingResources` for its own tick
+   * to store. This economy then stores what it holds clamped to
+   * `[0, max storage]` whether or not anything was shared; overflow nobody
+   * took is only counted, as `Economy_AccumExcess_*`.
+   *
+   * Last come the twenty-four `Economy_*` army stats (0x0077249E-0x00772D1B):
+   * twenty-two resolved through `func_GetArmyStat2` and stored or accumulated
+   * with an inlined interlocked loop, and the two `Economy_PeakStorage_*`
+   * through `CArmyStats::SetUnitStatGreaterFloat`. Then both per-tick banks
+   * are emptied.
+   *
+   * The body runs 0x00771B50-0x00772D81 (`ret 4` at 0x00772D7F). The
+   * `fa_full_2026_03_26` capstone export stops at 0x007722C6, the nop pad
+   * after the jump at 0x007722C4, so everything from the ally share loop on
+   * has to be read from the PE.
    */
   void ProcessArmyEconomy(CEconomy& economy)
   {
@@ -558,10 +642,9 @@ namespace moho
 
     // Banked production, scaled by the army handicap when one is set. The gate
     // and the multiplier are read at [army+0x1DC] and [army+0x1E0] (0x00771C8D).
+    CArmyImpl* const army = ArmyAtEconomyIndex(*economy.mSim, economy.mIndex);
     SEconValue banked = economy.mResources;
-    if (const CArmyImpl* const army =
-          economy.mSim != nullptr ? ArmyAtEconomyIndex(*economy.mSim, economy.mIndex) : nullptr;
-        army != nullptr && army->mVarDat.mHandicapValue != 0.0f) {
+    if (army->mVarDat.mHandicapValue != 0.0f) {
       const float handicapExtra = army->mVarDat.mHandicapExtra;
       if (handicapExtra != 0.0f) {
         const float multiplier = handicapExtra + 1.0f;
@@ -609,15 +692,19 @@ namespace moho
     }
 
     // Pass two: grant each request its share and record it, so next tick asks
-    // only for the remainder.
+    // only for the remainder. The grants sum to this tick's consumption.
+    SEconValue consumed{0.0f, 0.0f};
     for (TDatListItem<void, void>* node = listHead->mNext; node != listHead; node = node->mNext) {
       CEconRequest* const request = RequestFromNode(node);
       const SEconValue outstanding = OutstandingRequest(*request);
 
       // A request that wants nothing from the limiting lane was pooled as a
-      // single-lane one, so it is served at the single-lane ratio (0x00771D9A).
+      // single-lane one, so it is served at the single-lane ratio (0x00771E68).
       const float ratio = Lane(outstanding, limitingLane) == 0.0f ? singleLaneRatio : dualLaneRatio;
       const SEconValue granted{outstanding.energy * ratio, outstanding.mass * ratio};
+
+      consumed.energy += granted.energy;
+      consumed.mass += granted.mass;
 
       available.energy = available.energy - granted.energy > 0.0f ? available.energy - granted.energy : 0.0f;
       available.mass = available.mass - granted.mass > 0.0f ? available.mass - granted.mass : 0.0f;
@@ -629,8 +716,9 @@ namespace moho
     economy.mTotals.mLastUseRequested.ENERGY = totalDemand.energy;
     economy.mTotals.mLastUseRequested.MASS = totalDemand.mass;
 
-    // Reported usage is the pooled demand at its ratio, not the running total
-    // accumulated above -- the binary recomputes it here (0x00771E2C).
+    // Reported usage is each pool at its own ratio, recomputed here
+    // (0x00771F78-0x0077201E) -- not `consumed`, which is per request and
+    // serves a single-lane request on the limiting lane at the pooled ratio.
     economy.mTotals.mLastUseActual.ENERGY =
       dualLaneDemand.energy * dualLaneRatio + singleLaneDemand.energy * singleLaneRatio;
     economy.mTotals.mLastUseActual.MASS =
@@ -639,30 +727,126 @@ namespace moho
     economy.mTotals.mIncome.ENERGY = economy.mResources.energy;
     economy.mTotals.mIncome.MASS = economy.mResources.mass;
 
-    // Whatever survived the grants is stored, capped by max storage. The cap is
-    // a double and the binary masks its sign bit before comparing (0x00771EA0).
+    // Both locals are built whether or not sharing is on, and live to the end
+    // of the function (0x00772058 fetches the allies, 0x0077205A-0x0077208A
+    // arms the two-slot inline buffer).
+    msvc8::vector<CArmyImpl*> allies;
+    army->GetAlliedArmies(&allies);
+    gpg::fastvector_n<CEconomy*, 2> recipients;
+
+    // Overflow: whatever the grants left above max storage (0x007720B0).
+    SEconValue shared{0.0f, 0.0f};
+    SEconValue excess{0.0f, 0.0f};
     for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
-      const double capacity =
-        lane == kEnergyLane ? economy.mTotals.mMaxStorage.ENERGY : economy.mTotals.mMaxStorage.MASS;
-      const auto cap = static_cast<float>(capacity < 0.0 ? -capacity : capacity);
-
-      float stored = Lane(available, lane);
-      if (cap <= stored) {
-        stored = cap;
-      }
-      if (stored < 0.0f) {
-        stored = 0.0f;
-      }
-
-      (lane == kEnergyLane ? economy.mTotals.mStored.ENERGY : economy.mTotals.mStored.MASS) = stored;
+      const float held = Lane(available, lane);
+      const float cap = MaxStorage(economy.mTotals, lane);
+      Lane(excess, lane) = held > cap ? held - cap : 0.0f;
     }
 
+    if (economy.mResourceSharing != 0u) {
+      // Allies still short of their cap in either lane, in army-list order.
+      for (CArmyImpl* const ally : allies) {
+        if (HasStorageRoom(*EconomyOf(*ally))) {
+          recipients.push_back(EconomyOf(*ally));
+        }
+      }
+
+      if (excess.energy != 0.0f || excess.mass != 0.0f) {
+        const int recipientCount = static_cast<int>(recipients.size());
+        for (int i = 0; i < recipientCount; ++i) {
+          // Each ally is offered an equal cut of what is still unplaced, so
+          // whatever one ally has no room for rolls on to the rest (0x00772228).
+          const float fraction = 1.0f / static_cast<float>(recipientCount - i);
+          SEconValue share{excess.energy * fraction, excess.mass * fraction};
+
+          CEconomy& recipient = *recipients[static_cast<std::size_t>(i)];
+          for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+            const float room = MaxStorage(recipient.mTotals, lane) - Lane(recipient.mTotals.mStored, lane);
+            float& cut = Lane(share, lane);
+            cut = room < 0.0f ? 0.0f : (cut < room ? cut : room);
+          }
+
+          // Banked like production, so the ally's own tick stores it.
+          recipient.mResources.energy += share.energy;
+          recipient.mResources.mass += share.mass;
+          recipient.mPendingResources.energy += share.energy;
+          recipient.mPendingResources.mass += share.mass;
+
+          for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+            const float left = Lane(excess, lane) - Lane(share, lane);
+            Lane(excess, lane) = left > 0.0f ? left : 0.0f;
+          }
+          shared.energy += share.energy;
+          shared.mass += share.mass;
+        }
+      }
+    }
+
+    // What this economy holds is stored, clamped to [0, max storage]
+    // (0x007723B0); the overflow was shared or is lost either way.
+    for (std::size_t lane = 0u; lane < kLaneCount; ++lane) {
+      const float cap = MaxStorage(economy.mTotals, lane);
+      const float held = Lane(available, lane);
+      const float capped = cap > held ? held : cap;
+      Lane(economy.mTotals.mStored, lane) = capped < 0.0f ? 0.0f : capped;
+    }
+
+    // The army stats, in the binary's order (0x0077249E-0x00772D1B).
+    CArmyStats& stats = *army->GetArmyStats();
+    const SEconValue maxStorage{MaxStorage(economy.mTotals, kEnergyLane), MaxStorage(economy.mTotals, kMassLane)};
+
+    AddFloatStat(stats, "Economy_TotalProduced_Mass", economy.mResources.mass);
+    AddFloatStat(stats, "Economy_TotalProduced_Energy", economy.mResources.energy);
+    AddFloatStat(stats, "Economy_TotalConsumed_Mass", consumed.mass);
+    AddFloatStat(stats, "Economy_TotalConsumed_Energy", consumed.energy);
+    SetFloatStat(stats, "Economy_Income_Mass", economy.mResources.mass);
+    SetFloatStat(stats, "Economy_Income_Energy", economy.mResources.energy);
+    SetFloatStat(stats, "Economy_Output_Mass", consumed.mass);
+    SetFloatStat(stats, "Economy_Output_Energy", consumed.energy);
+    SetFloatStat(stats, "Economy_Stored_Mass", economy.mTotals.mStored.MASS);
+    SetFloatStat(stats, "Economy_Stored_Energy", economy.mTotals.mStored.ENERGY);
+    SetFloatStat(stats, "Economy_MaxStorage_Mass", maxStorage.mass);
+    SetFloatStat(stats, "Economy_MaxStorage_Energy", maxStorage.energy);
+    SetFloatStat(stats, "Economy_Reclaimed_Mass", economy.mTotals.mReclaimed.MASS);
+    SetFloatStat(stats, "Economy_Reclaimed_Energy", economy.mTotals.mReclaimed.ENERGY);
+    AddFloatStat(stats, "Economy_Shared_Mass", shared.mass);
+    AddFloatStat(stats, "Economy_Shared_Energy", shared.energy);
+    SetFloatStat(
+      stats,
+      "Economy_Trend_Mass",
+      (economy.mPendingResources.mass - economy.mTotals.mLastUseRequested.MASS) * kTicksPerSecond
+    );
+    SetFloatStat(
+      stats,
+      "Economy_Trend_Energy",
+      (economy.mPendingResources.energy - economy.mTotals.mLastUseRequested.ENERGY) * kTicksPerSecond
+    );
+    SetFloatStat(
+      stats, "Economy_Ratio_Mass", maxStorage.mass > 0.0f ? economy.mTotals.mStored.MASS / maxStorage.mass : 0.0f
+    );
+    SetFloatStat(
+      stats,
+      "Economy_Ratio_Energy",
+      maxStorage.energy > 0.0f ? economy.mTotals.mStored.ENERGY / maxStorage.energy : 0.0f
+    );
+    stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Mass", &maxStorage.mass);
+    stats.SetUnitStatGreaterFloat("Economy_PeakStorage_Energy", &maxStorage.energy);
+    AddFloatStat(stats, "Economy_AccumExcess_Energy", excess.energy);
+    AddFloatStat(stats, "Economy_AccumExcess_Mass", excess.mass);
+
     // The per-tick banks are consumed, so they start the next tick empty
-    // (0x00772D5E); without this, income would accumulate without bound.
+    // (0x00772D1D); without this, income would accumulate without bound.
     economy.mResources = SEconValue{0.0f, 0.0f};
     economy.mPendingResources = SEconValue{0.0f, 0.0f};
   }
 
+  /**
+   * Address: 0x007048F0 (FUN_007048F0, Moho::CEconomy::Clear)
+   *
+   * What it does:
+   * Unlinks the consumption-request sentinel node, releases extra-storage
+   * ownership (with max-storage rollback), then frees this economy object.
+   */
   CEconomy* CEconomy::Clear()
   {
     mConsumptionData.mNext->mPrev = mConsumptionData.mPrev;

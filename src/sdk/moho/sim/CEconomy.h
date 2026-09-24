@@ -27,8 +27,11 @@ namespace moho
    * What it does:
    * Runs one army's per-tick economy: pools outstanding consumption demand,
    * serves it from stored plus banked production at a ratio bounded by the
-   * scarcer resource, publishes `mIncome`/`mLastUse*`/`mStored`, and empties
-   * the per-tick banks. Called by `CArmyImpl::OnTick` with `army->EconomyInfo`.
+   * scarcer resource, publishes `mIncome`/`mLastUse*`, offers overflow above
+   * max storage to allies with room when `mResourceSharing` is set, stores
+   * the rest clamped to max storage, publishes the twenty-four `Economy_*`
+   * army stats, and empties the per-tick banks. Called once per tick by
+   * `CArmyImpl::OnTick` with `army->EconomyInfo`.
    */
   void ProcessArmyEconomy(CEconomy& economy);
 

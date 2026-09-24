@@ -803,79 +803,6 @@ namespace
     statItem->mPrimaryValueBits = std::bit_cast<std::int32_t>(value);
   }
 
-  /**
-   * Refreshes army-visible economy cache lanes from the current per-army
-   * economy totals block.
-   *
-   * @warning This is NOT `func_ArmyProcessEconomy`. It used to claim address
-   * 0x00771B50, which is a **1418-instruction** function; this body is a
-   * twenty-line field copy, so the annotation asserted a recovery that does not
-   * exist and the progress DB still calls that address `recovered`. The copy
-   * itself duplicates what `CArmyImpl::CopyArmyVariableData` already does at
-   * sync time and is kept only because both tick paths call it.
-   *
-   * What 0x00771B50 actually is, and what is still missing -- established from
-   * its disassembly and decompilation so the recovery is mechanical:
-   *
-   * - Signature is `func_ArmyProcessEconomy(CEconomy*)`, not an army. Its sole
-   *   caller is `CArmyImpl::OnTick` at 0x006FFDC4, which pushes `[army+0x1F4]`
-   *   -- `EconomyInfo`. The call site below is therefore already correct.
-   * - It is the per-tick economy solver, and its absence is why the income
-   *   readout stays at +0 while the original binary shows +1 mass / +20 energy
-   *   on the same map. `Unit::HandleResourceManagement` banks production into
-   *   `mResources`/`mPendingResources` correctly; nothing then turns that into
-   *   `mTotals`, which is what `cfunc_GetEconomyTotalsL` reports to the UI.
-   * - Pass one walks the `mConsumptionData` list of `CEconRequest` nodes
-   *   (layout proven by the ctor at 0x00773630: `mNode` +0x00, `mRequested`
-   *   +0x08, `mGranted` +0x10, size 0x18) and sums each node's outstanding
-   *   `mRequested - mGranted`, clamped at zero, splitting requests that need
-   *   both resources from those needing one.
-   * - Available is `mTotals.mStored` plus banked production, the latter scaled
-   *   by `(mVarDat.mHandicapExtra + 1)` when `mVarDat.mHandicapValue` is
-   *   non-zero (read at `[army+0x1DC]` / `[army+0x1E0]` at 0x00771C8D).
-   * - A dual ratio is the smallest `available/demand` across both resources,
-   *   remembering which resource limited it; a single ratio is then taken from
-   *   what remains, over the other resource only. Pass two grants each node its
-   *   outstanding share at whichever ratio applies, accumulating the granted
-   *   total and adding it into that node's `mGranted`.
-   * - It then writes `mLastUseRequested`, `mLastUseActual` and `mIncome`
-   *   (`mIncome` is simply `mResources`), shares excess with allied economies
-   *   when `mResourceSharing` is set, clamps `mStored` into `[0, mMaxStorage]`,
-   *   and publishes twenty-four `Economy_*` army stats through
-   *   `func_GetArmyStat2` with interlocked accumulate.
-   *
-   * Note when writing the walk that `TDatListItem`'s `mPrev`/`mNext` names are
-   * the opposite of their slots (see the warning in `TDatList.h`); the binary
-   * starts from `[economy+0x5C]` and advances through the +0x04 slot.
-   */
-  void ProcessArmyEconomyTick(moho::CArmyImpl& army)
-  {
-    moho::CSimArmyEconomyInfo* const economyInfo = army.EconomyInfo;
-    if (economyInfo == nullptr) {
-      return;
-    }
-
-    const moho::SEconTotals& totals = economyInfo->economy;
-    army.mVarDat.mEconomyTotals.mStored.ENERGY = totals.mStored.ENERGY;
-    army.mVarDat.mEconomyTotals.mStored.MASS = totals.mStored.MASS;
-
-    army.mVarDat.mEconomyTotals.mIncome.ENERGY = totals.mIncome.ENERGY;
-    army.mVarDat.mEconomyTotals.mIncome.MASS = totals.mIncome.MASS;
-
-    army.mVarDat.mEconomyTotals.mReclaimed.ENERGY = totals.mReclaimed.ENERGY;
-    army.mVarDat.mEconomyTotals.mReclaimed.MASS = totals.mReclaimed.MASS;
-
-    army.mVarDat.mEconomyTotals.mLastUseRequested.ENERGY = totals.mLastUseRequested.ENERGY;
-    army.mVarDat.mEconomyTotals.mLastUseRequested.MASS = totals.mLastUseRequested.MASS;
-
-    army.mVarDat.mEconomyTotals.mLastUseActual.ENERGY = totals.mLastUseActual.ENERGY;
-    army.mVarDat.mEconomyTotals.mLastUseActual.MASS = totals.mLastUseActual.MASS;
-
-    army.mVarDat.mEconomyTotals.mMaxStorage.ENERGY = static_cast<std::uint32_t>(totals.mMaxStorage.ENERGY);
-    army.mVarDat.mEconomyTotals.mMaxStorage.MASS = static_cast<std::uint32_t>(totals.mMaxStorage.MASS);
-    army.mVarDat.mIsResourceSharingEnabled = economyInfo->isResourceSharingEnabled;
-  }
-
   [[nodiscard]] LuaPlus::LuaObject LuaField(const LuaPlus::LuaObject& table, const char* const key)
   {
     return table[key];
@@ -1439,7 +1366,12 @@ namespace moho
     }
 
     mVarDat.mFaction = GetLuaIntegerField(armySetup, "Faction") - 1;
-    ProcessArmyEconomyTick(*this);
+    // 0x006FEA9A-0x006FEAC1: the variable data starts as a copy of the new
+    // economy's totals (one 0x38-byte `rep movsd`, so the u64 max-storage pair
+    // is copied whole) and its sharing flag -- the same copy
+    // `CopyArmyVariableData` (0x00700243) takes at every sync.
+    mVarDat.mEconomyTotals = EconomyInfo->economy;
+    mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
 
     mVarDat.mIsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
     (void)mVarDat.mAllies.Add(static_cast<std::uint32_t>(armyIndex));
@@ -2035,15 +1967,14 @@ namespace moho
 
     CleanUpPlatoons();
 
-    // 0x006FFDC4: the binary pushes `[army+0x1F4]` -- EconomyInfo -- and calls
-    // func_ArmyProcessEconomy. CSimArmyEconomyInfo is the same object viewed
-    // through its economy-facing field names, exactly as CArmyImpl's own ctor
-    // and Unit::HandleResourceManagement already treat it.
-    if (EconomyInfo != nullptr) {
-      ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
-    }
-
-    ProcessArmyEconomyTick(*this);
+    // 0x006FFDBD-0x006FFDC4: the binary pushes `[army+0x1F4]` -- EconomyInfo --
+    // unchecked and calls func_ArmyProcessEconomy. That is the tick's only
+    // economy work: nothing between it and the `mCurTick > 10` test at
+    // 0x006FFDC9 refreshes `mVarDat`, whose economy copy is taken only by the
+    // constructor and by `CopyArmyVariableData` at sync time. CSimArmyEconomyInfo
+    // is the same object viewed through its economy-facing field names, exactly
+    // as CArmyImpl's own ctor and Unit::HandleResourceManagement already treat it.
+    ProcessArmyEconomy(*reinterpret_cast<CEconomy*>(EconomyInfo));
 
     if (Simulation != nullptr && Simulation->mCurTick > 10u && Stats != nullptr) {
       Stats->Update();
@@ -2290,26 +2221,13 @@ namespace moho
    */
   SSTIArmyVariableData* CArmyImpl::CopyArmyVariableData(SSTIArmyVariableData* outBuffer)
   {
-    if (EconomyInfo != nullptr) {
-      const SEconTotals& econ = EconomyInfo->economy;
-      mVarDat.mEconomyTotals.mStored.ENERGY = econ.mStored.ENERGY;
-      mVarDat.mEconomyTotals.mStored.MASS = econ.mStored.MASS;
-      mVarDat.mEconomyTotals.mIncome.ENERGY = econ.mIncome.ENERGY;
-      mVarDat.mEconomyTotals.mIncome.MASS = econ.mIncome.MASS;
-      mVarDat.mEconomyTotals.mReclaimed.ENERGY = econ.mReclaimed.ENERGY;
-      mVarDat.mEconomyTotals.mReclaimed.MASS = econ.mReclaimed.MASS;
-      mVarDat.mEconomyTotals.mLastUseRequested.ENERGY = econ.mLastUseRequested.ENERGY;
-      mVarDat.mEconomyTotals.mLastUseRequested.MASS = econ.mLastUseRequested.MASS;
-      mVarDat.mEconomyTotals.mLastUseActual.ENERGY = econ.mLastUseActual.ENERGY;
-      mVarDat.mEconomyTotals.mLastUseActual.MASS = econ.mLastUseActual.MASS;
-      mVarDat.mEconomyTotals.mMaxStorage.ENERGY = static_cast<std::uint32_t>(econ.mMaxStorage.ENERGY);
-      mVarDat.mEconomyTotals.mMaxStorage.MASS = static_cast<std::uint32_t>(econ.mMaxStorage.MASS);
-      mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
-    }
-
-    if (outBuffer == nullptr) {
-      return nullptr;
-    }
+    // 0x00700243..0x0070025B: the economy's totals block goes into `mVarDat` whole: a 14-dword
+    // `rep movsd` from `EconomyInfo + 0x18` to `this + 0x88`, so the 64-bit max-storage lanes keep
+    // their high halves. Then 0x0070025D..0x00700265 copies the sharing flag. There is no null test
+    // on `EconomyInfo` or `outBuffer`; the army always owns an economy. (This used to copy field by
+    // field and truncate max storage to 32 bits, as the constructor's copy also did.)
+    mVarDat.mEconomyTotals = EconomyInfo->economy;
+    mVarDat.mIsResourceSharingEnabled = EconomyInfo->isResourceSharingEnabled;
 
     // The binary tail-calls the shared variable-data assignment
     // (FUN_00700280) with the army's own payload.
