@@ -4905,54 +4905,5 @@ void moho::WRenViewport::TransformTerrainNormals()
   mFrame.InitTransformedVerts(static_cast<float>(headWidth), static_cast<float>(headHeight));
   mFrame.SetTexture(0u, mSecondaryTargetLocks[head]);
   mFrame.Render(headWidth, headHeight);
-
-  // TEMPORARY PROBE (do not commit). SCMP_009's ambient is genuinely (0,0,0)
-  // (verified byte-for-byte against the .scmap lighting block at 0x2411CC), so
-  // terrain is lit ENTIRELY by the diffuse N.L term. Forcing ambient to 0.5
-  // makes fully-textured terrain appear, which proves geometry/albedo are fine
-  // and the normal basis is dead. This is the pass that builds it: normals ->
-  // mSecondaryTargetLocks[head], TCreateBasis -> mPrimaryTargetLocks[head].
-  {
-    static int sBasisBudget = 0;
-    if (sBasisBudget < 4) {
-      ++sBasisBudget;
-      gpg::Warnf("[BASISDIAG] head=%d src(secondary)=%08X dst(primary)=%08X size=%dx%d",
-                 head,
-                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(mSecondaryTargetLocks[head].get())),
-                 static_cast<unsigned>(reinterpret_cast<std::uintptr_t>(mPrimaryTargetLocks[head].get())),
-                 headWidth, headHeight);
-    }
-
-    // Dump the two normal-basis targets AS-IS (no screen copy, unlike
-    // REN_MaybeDumpFrame) so we can see whether DrawTerrainNormal actually
-    // wrote normals and whether TCreateBasis produced a usable basis.
-    static int sBasisDumps = 0;
-    static int sBasisCloseDumps = 0;
-    const bool closeCamera = mCam != nullptr && mCam->tranform.pos_.y < 300.0f;
-    const bool wantDump = getenv("FAF_DUMP_BASIS") != nullptr
-      && ((sBasisDumps < 2) || (closeCamera && sBasisCloseDumps < 2));
-    if (wantDump) {
-      const int which = (sBasisDumps < 2) ? sBasisDumps++ : sBasisCloseDumps++;
-      moho::ID3DRenderTarget* const target = (which == 0)
-        ? mSecondaryTargetLocks[head].get()
-        : mPrimaryTargetLocks[head].get();
-      boost::shared_ptr<moho::CD3DDynamicTextureSheet> sheet{};
-      device->GetResources()->Func10(sheet, target, sheet);
-      gpg::gal::Device* const dev9 = device->GetGalDevice();
-      if (dev9 != nullptr && sheet) {
-        boost::shared_ptr<gpg::gal::Texture> tex{};
-        sheet->GetTexture(tex);
-        const msvc8::string dest = gpg::STR_Printf(
-          "C:\\ProgramData\\FAForever\\bin\\framedump\\BASIS_%s.bmp",
-          (which == 0) ? "secondary_normals" : "primary_basis");
-        try {
-          dev9->SaveTexture(tex, dest, 0, nullptr);
-          gpg::Warnf("[BASISDIAG] dumped %s", dest.c_str());
-        } catch (const std::exception& e) {
-          gpg::Warnf("[BASISDIAG] dump failed: %s", e.what());
-        }
-      }
-    }
-  }
 }
 
