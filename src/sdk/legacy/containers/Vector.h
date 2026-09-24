@@ -6650,6 +6650,8 @@ namespace msvc8
          * Address: 0x008E9280 (FUN_008E9280 -- that insert's gap fill-assign sub-step (VC8's `std::fill`, no null guard) for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF6D9, 0x008EF728 (`_Insert_n` 0x008EF500). It was cited on `uninit_fill_n`.)
          * Address: 0x008E9260 (FUN_008E9260 -- the same gap fill-assign for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF489, 0x008EF4D8 (`_Insert_n` 0x008EF2B0). It was cited on `uninit_fill_n`.)
          * Address: 0x004F88B0 (FUN_004F88B0 -- `_Insert_n(pos, 1, value)` for the 0x28-byte `moho::CWinLogLine`, the grow-and-insert body under 0x004F7F50; caller 0x004F7F9B. Formerly `GrowAndInsertOneVectorWinLogLine` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x004FD9B0 (FUN_004FD9B0 -- `_Insert_n` for the 4-byte `EntityCollisionCellNode*` element of `EntityOccupationManager::mAllBlocks` (+0x24), the full arm of `EnsureSize`'s inlined `push_back` (0x004FCF08). Formerly `AppendCollisionChunkPointer` in Entity.cpp, then COGrid.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x004FDE50 (FUN_004FDE50 -- that insert's `memmove_s` relocate of the live pointer range into the new block, for the same vector.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);

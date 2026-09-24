@@ -6,6 +6,7 @@
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
+#include "legacy/containers/Vector.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/sim/CollisionShape.h"
 #include "moho/sim/SFootprint.h"
@@ -53,12 +54,12 @@ namespace moho
   /**
    * The 4x4-cell collision bucket grid every entity's `CollisionShape<Entity>`
    * links into. Field roles from the binary: `EnsureSize` (0x004FCE90) grows
-   * `mFreeNodeCount` (+0x1C) by 0x2000 per 0x10000-byte chunk, threads the
-   * chunk onto `mFreeNodeHead` (+0x20) and pushes it onto the `mAllBlocks`
+   * `mFreeNodeCount` (+0x20) by 0x2000 per 0x10000-byte chunk, threads the
+   * chunk onto `mFreeNodeHead` (+0x1C) and pushes it onto `mAllBlocks`, an
    * MSVC8 vector at +0x24 (proxy, first, last, end); `AddColShapeAt`
    * (0x004FCF20) / `RemoveColShapeAt` (0x004FCF90) pick the bucket array by
    * entity family (+0x10 units, +0x14 props, +0x18 projectiles/entities) and
-   * pop/push the free list at +0x20 while adjusting the count at +0x1C;
+   * pop/push the free list at +0x1C while adjusting the count at +0x20;
    * `CollisionShapeBase::Add` (0x004FD420) walks rows with `mWidth` (+0x00)
    * as the stride, `mLastIndex` (+0x08) as the bucket mask and
    * `mGridWidthShift` (+0x0C) as the row shift.
@@ -72,12 +73,9 @@ namespace moho
     EntityCollisionCellNode** mUnitBuckets;              // +0x10
     EntityCollisionCellNode** mPropBuckets;              // +0x14
     EntityCollisionCellNode** mEntityBuckets;            // +0x18
-    std::int32_t mFreeNodeCount;                         // +0x1C
-    EntityCollisionCellNode* mFreeNodeHead;              // +0x20
-    void* mAllBlocksProxy;                               // +0x24
-    EntityCollisionCellNode** mAllBlocksBegin;           // +0x28
-    EntityCollisionCellNode** mAllBlocksEnd;             // +0x2C
-    EntityCollisionCellNode** mAllBlocksCapacityEnd;     // +0x30
+    EntityCollisionCellNode* mFreeNodeHead;              // +0x1C
+    std::int32_t mFreeNodeCount;                         // +0x20
+    msvc8::vector<EntityCollisionCellNode*> mAllBlocks;  // +0x24
 
     /**
      * Address: 0x004FCD20 (FUN_004FCD20, Moho::EntityOccupationManager::EntityOccupationManager)
@@ -158,12 +156,13 @@ namespace moho
     "EntityOccupationManager::mGridWidthShift offset must be 0x0C"
   );
   static_assert(
-    offsetof(EntityOccupationManager, mAllBlocksBegin) == 0x28,
-    "EntityOccupationManager::mAllBlocksBegin offset must be 0x28"
+    offsetof(EntityOccupationManager, mFreeNodeHead) == 0x1C, "EntityOccupationManager::mFreeNodeHead offset must be 0x1C"
   );
   static_assert(
-    offsetof(EntityOccupationManager, mAllBlocksCapacityEnd) == 0x30,
-    "EntityOccupationManager::mAllBlocksCapacityEnd offset must be 0x30"
+    offsetof(EntityOccupationManager, mFreeNodeCount) == 0x20, "EntityOccupationManager::mFreeNodeCount offset must be 0x20"
+  );
+  static_assert(
+    offsetof(EntityOccupationManager, mAllBlocks) == 0x24, "EntityOccupationManager::mAllBlocks offset must be 0x24"
   );
 
   class COGrid

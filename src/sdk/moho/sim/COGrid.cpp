@@ -9,7 +9,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <new>
-#include <stdexcept>
 #include <typeinfo>
 
 #include "moho/containers/SCoordsVec2.h"
@@ -435,12 +434,8 @@ namespace moho
     , mUnitBuckets(nullptr)
     , mPropBuckets(nullptr)
     , mEntityBuckets(nullptr)
-    , mFreeNodeCount(0)
     , mFreeNodeHead(nullptr)
-    , mAllBlocksProxy(nullptr)
-    , mAllBlocksBegin(nullptr)
-    , mAllBlocksEnd(nullptr)
-    , mAllBlocksCapacityEnd(nullptr)
+    , mFreeNodeCount(0)
   {
     mLastIndex =
       static_cast<std::int32_t>((static_cast<std::uint32_t>(mWidth) * static_cast<std::uint32_t>(mHeight)) - 1u);
@@ -499,76 +494,12 @@ namespace moho
     operator delete[](mPropBuckets);
     operator delete[](mEntityBuckets);
 
-    if (mAllBlocksBegin) {
-      const std::ptrdiff_t count = mAllBlocksEnd - mAllBlocksBegin;
-      for (std::ptrdiff_t index = 0; index < count; ++index) {
-        operator delete[](mAllBlocksBegin[index]);
-      }
+    // 0x004FCE2C..0x004FCE59; the vector's own storage is released by
+    // ~vector (the `_Tidy` at 0x004FCE5C).
+    const int blockCount = static_cast<int>(mAllBlocks.size());
+    for (int index = 0; index < blockCount; ++index) {
+      operator delete[](mAllBlocks[index]);
     }
-
-    if (mAllBlocksBegin) {
-      operator delete(mAllBlocksBegin);
-    }
-
-    mAllBlocksBegin = nullptr;
-    mAllBlocksEnd = nullptr;
-    mAllBlocksCapacityEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x004FD9B0 (FUN_004FD9B0, append-path subset)
-   *
-   * What it does:
-   * Pushes one chunk-base pointer into the grid chunk-pointer vector
-   * (layout at +0x28/+0x2C/+0x30).
-   *
-   * The `std::memmove(newBegin, begin, size * sizeof(*begin))` below is
-   * Address: 0x004FDE50 (FUN_004FDE50, `memmove_s`-based relocate of the
-   * live 4-byte-pointer range into the new buffer during growth)
-   */
-  static void AppendCollisionChunkPointer(EntityOccupationManager& grid, EntityCollisionCellNode* chunkBase)
-  {
-    auto** begin = grid.mAllBlocksBegin;
-    auto** end = grid.mAllBlocksEnd;
-    auto** capacityEnd = grid.mAllBlocksCapacityEnd;
-
-    if (begin && end < capacityEnd) {
-      *end = chunkBase;
-      grid.mAllBlocksEnd = end + 1;
-      return;
-    }
-
-    const std::size_t size = begin ? static_cast<std::size_t>(end - begin) : 0u;
-    const std::size_t capacity = begin ? static_cast<std::size_t>(capacityEnd - begin) : 0u;
-
-    if (capacity >= 0x3FFFFFFFu) {
-      throw std::length_error("vector<T> too long");
-    }
-
-    std::size_t newCapacity = capacity + (capacity >> 1);
-    const std::size_t minCapacity = size + 1u;
-    if (newCapacity < minCapacity) {
-      newCapacity = minCapacity;
-    }
-    if (newCapacity > 0x3FFFFFFFu) {
-      newCapacity = minCapacity;
-    }
-
-    auto** newBegin = static_cast<EntityCollisionCellNode**>(
-      ::operator new(newCapacity * sizeof(EntityCollisionCellNode*))
-    );
-    if (size != 0u && begin) {
-      std::memmove(newBegin, begin, size * sizeof(*begin));
-    }
-    newBegin[size] = chunkBase;
-
-    if (begin) {
-      ::operator delete(begin);
-    }
-
-    grid.mAllBlocksBegin = newBegin;
-    grid.mAllBlocksEnd = newBegin + size + 1u;
-    grid.mAllBlocksCapacityEnd = newBegin + newCapacity;
   }
 
   /**
@@ -589,7 +520,7 @@ namespace moho
       chunk[0x1FFF].next = mFreeNodeHead;
       mFreeNodeHead = chunk;
 
-      AppendCollisionChunkPointer(*this, chunk);
+      mAllBlocks.push_back(chunk);
       mFreeNodeCount += 0x2000;
     }
   }
