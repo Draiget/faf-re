@@ -1027,6 +1027,12 @@ namespace moho
     return out;
   }
 
+  /**
+   * AABB overlap as CollectEntitiesInBox (0x00721EC0), func_GatherUnmarkedUnitsInBox (0x00721D00)
+   * and ForAllEntitiesIterator (0x00722171) test it: per axis `comiss boundsMin, entity.Max; ja`
+   * and `comiss entity.Min, boundsMax; ja` reject. Written as `!(a > b)`, not `a <= b`, so that a
+   * NaN bound compares unordered and passes, as the `ja` lets it.
+   */
   [[nodiscard]] static bool AxisAlignedBoundsOverlapEntityBounds(
     const Wm3::AxisAlignedBox3f& bounds,
     const Entity& entity
@@ -1034,9 +1040,9 @@ namespace moho
   {
     const Wm3::Vec3f& entityMin = entity.mAABox.Min;
     const Wm3::Vec3f& entityMax = entity.mAABox.Max;
-    return bounds.Min.x <= entityMax.x && entityMin.x <= bounds.Max.x &&
-      bounds.Min.y <= entityMax.y && entityMin.y <= bounds.Max.y &&
-      bounds.Min.z <= entityMax.z && entityMin.z <= bounds.Max.z;
+    return !(bounds.Min.x > entityMax.x) && !(entityMin.x > bounds.Max.x) &&
+      !(bounds.Min.y > entityMax.y) && !(entityMin.y > bounds.Max.y) &&
+      !(bounds.Min.z > entityMax.z) && !(entityMin.z > bounds.Max.z);
   }
 
   [[nodiscard]] static Wm3::AxisAlignedBox3f BuildAxisAlignedBoundsFromSphere(
@@ -1051,18 +1057,6 @@ namespace moho
     bounds.Max.y = sphere.Center.y + sphere.Radius;
     bounds.Max.z = sphere.Center.z + sphere.Radius;
     return bounds;
-  }
-
-  [[nodiscard]] static bool AxisAlignedBoundsContainEntityBounds(
-    const Wm3::AxisAlignedBox3f& bounds,
-    const Entity& entity
-  ) noexcept
-  {
-    const Wm3::Vec3f& entityMin = entity.mAABox.Min;
-    const Wm3::Vec3f& entityMax = entity.mAABox.Max;
-    return bounds.Min.x <= entityMin.x && entityMax.x <= bounds.Max.x &&
-      bounds.Min.y <= entityMin.y && entityMax.y <= bounds.Max.y &&
-      bounds.Min.z <= entityMin.z && entityMax.z <= bounds.Max.z;
   }
 
   /**
@@ -1426,7 +1420,7 @@ namespace moho
    * What it does:
    * Gathers unmarked candidate entities in one sphere bounds lane, then
    * appends per-entity sphere collision results. For larger radii, first
-   * accepts entities whose cached bounds lie fully inside a reduced inner box.
+   * accepts entities whose cached bounds overlap a reduced inner box (0.707r).
    */
   void COGrid::ForAllEntitiesIterator(
     gpg::core::FastVectorN<CollisionResult, 10>& outCollisions,
@@ -1476,7 +1470,11 @@ namespace moho
         continue;
       }
 
-      if (AxisAlignedBoundsContainEntityBounds(innerBounds, *candidate)) {
+      // 0x00722171..0x0072218F: per axis `comiss innerMin, entity.Max; ja reject` and
+      // `comiss entity.Min, innerMax; ja reject` -- an AABB *overlap* test, so any entity touching
+      // the inner box is accepted without the sphere test. (This site used to test containment,
+      // which sent such entities on to `CollideSphere` and could drop hits the binary keeps.)
+      if (AxisAlignedBoundsOverlapEntityBounds(innerBounds, *candidate)) {
         collisionResult.sourceEntity = candidate;
         outCollisions.PushBack(collisionResult);
         continue;

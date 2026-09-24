@@ -14,13 +14,14 @@
 #include "moho/ai/CAiBrain.h"
 #include "moho/ai/IAiNavigator.h"
 #include "moho/console/CVarAccess.h"
-#include "moho/entity/EntityDb.h"
 #include "moho/math/QuaternionMath.h"
 #include "moho/math/Vector2f.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/misc/StatItem.h"
 #include "moho/misc/Stats.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/sim/CArmyImpl.h"
+#include "moho/sim/COGrid.h"
 #include "moho/sim/CSimConVarBase.h"
 #include "moho/sim/SFootprint.h"
 #include "moho/sim/Sim.h"
@@ -329,7 +330,9 @@ namespace
     const float brakingDistance = (blueprint->Physics.MaxAcceleration > 0.0f)
       ? (blueprint->Physics.MaxSpeed * blueprint->Physics.MaxSpeed) / (blueprint->Physics.MaxAcceleration * 2.0f)
       : 0.0f;
-    return unitRadius + pathTravelDistance + brakingDistance;
+    // 0x005D38A4..0x005D38B8 adds travel + braking first and the extent last;
+    // keep that float summation order.
+    return pathTravelDistance + brakingDistance + unitRadius;
   }
 
   [[nodiscard]] bool ShouldIgnoreBrakingForCollisionPair(const Unit& first, const Unit& second) noexcept
@@ -574,6 +577,18 @@ namespace
     }
   }
 
+  /**
+   * Candidate gather of `CAiSteeringImpl::CheckCollisions` (FUN_005D3740,
+   * 0x005D3827..0x005D3A29; the ResetCollisionInfo call at 0x005D38C5 stays in
+   * CheckCollisions, ahead of this).
+   *
+   * What it does:
+   * Sphere-queries the occupation grid around the owner and sorts the unit
+   * hits, in grid order, into the two lists `CheckCollisions` predicts
+   * against: `preferred` holds units the owner steers around, `deferred`
+   * holds same-army units that do not outrank the owner and are made to steer
+   * around it instead.
+   */
   void CollectCollisionCandidates(
     CAiSteeringImpl& steering,
     gpg::core::FastVectorN<Unit*, 10>& preferred,
@@ -581,24 +596,27 @@ namespace
   )
   {
     Unit* const owner = steering.mOwnerUnit;
-    if (!owner || !owner->SimulationRef || !owner->SimulationRef->mEntityDB) {
+    if (!owner || !owner->SimulationRef || !owner->SimulationRef->mOGrid) {
       return;
     }
 
-    const float radius = ComputeCollisionQueryRadius(*owner, steering.mPath);
-    const float radiusSq = radius * radius;
-    const Wm3::Vector3f& ownerPosition = owner->GetPosition();
+    // 0x005D38CA..0x005D3921: sphere {owner position, query radius}, unit mask
+    // 0x100, through COGrid::ForAllEntitiesIterator (0x00721FB0). The binary's
+    // hit buffer is a fastvector_n of 20; the recovered signature takes 10.
+    const float queryRadius = ComputeCollisionQueryRadius(*owner, steering.mPath);
+    const Wm3::Sphere3f querySphere{owner->GetPosition(), queryRadius};
+    gpg::core::FastVectorN<CollisionResult, 10> collisions{};
+    owner->SimulationRef->mOGrid->ForAllEntitiesIterator(collisions, ENTITYTYPE_Unit, querySphere);
 
-    for (const auto& [entityId, entity] : owner->SimulationRef->mEntityDB->mAllUnits) {
+    // 0x005D395D..0x005D3A29: every hit, in grid order, through the binary's filters.
+    for (const CollisionResult& hit : collisions) {
+      Entity* const entity = hit.sourceEntity;
       Unit* const candidate = entity ? entity->IsUnit() : nullptr;
       if (!candidate) {
         continue;
       }
 
-      if (Wm3::Vector3f::DistanceSq3D(ownerPosition, candidate->GetPosition()) > radiusSq) {
-        continue;
-      }
-
+      // 0x005D397F: mode 2 (ebx), owner in edi, candidate in esi.
       if (func_IsSourceUnit(2, *owner, candidate)) {
         continue;
       }
@@ -613,14 +631,21 @@ namespace
         continue;
       }
 
-      if (candidate->mVarDat.mLayerMask == owner->mVarDat.mLayerMask && !owner->IsHigherPriorityThan(candidate)) {
+      // 0x005D39AB..0x005D39D0: same army (Unit+0x154, Entity::ArmyRef) and the
+      // candidate does not outrank the owner, so the candidate yields. The call
+      // at 0x005D39C3 is candidate->IsHigherPriorityThan(owner): this in ecx,
+      // other in eax.
+      if (candidate->ArmyRef == owner->ArmyRef && !candidate->IsHigherPriorityThan(owner)) {
         deferred.PushBack(candidate);
         continue;
       }
 
-      const RUnitBlueprint* const candidateBlueprint = candidate->GetBlueprint();
-      if (!candidatePath && (!candidateBlueprint || !candidateBlueprint->Air.CanFly)) {
-        continue;
+      // 0x005D39D6..0x005D39E8: the owner only yields to a unit on a path or one that can fly.
+      if (!candidatePath) {
+        const RUnitBlueprint* const candidateBlueprint = candidate->GetBlueprint();
+        if (!candidateBlueprint || !candidateBlueprint->Air.CanFly) {
+          continue;
+        }
       }
 
       preferred.PushBack(candidate);
@@ -1342,10 +1367,10 @@ void CAiSteeringImpl::UpdatePath(const int pathMode, const Wm3::Vector3f& destin
 {
   // TEMPORARY PROBE -- inert move order triage, delete when resolved.
   {
-    static int sCount = 0;
-    if (sCount++ < 200) {
+    static DiagnosticBudget sCount;
+    if (const int seen = sCount.Next(); seen < 200) {
       gpg::Warnf("[STEERDIAG] UpdatePath mode=%d dest=(%.1f,%.1f) cont=%d n=%d", pathMode, destination.x, destination.z,
-                 allowContinuation ? 1 : 0, sCount);
+                 allowContinuation ? 1 : 0, seen + 1);
     }
   }
   ResetCollisionInfo(mCollisionInfo);
@@ -1370,6 +1395,13 @@ void CAiSteeringImpl::UpdatePath(const int pathMode, const Wm3::Vector3f& destin
 
 /**
  * Address: 0x005D3740 (FUN_005D3740, Moho::CAiSteeringImpl::CheckCollisions)
+ *
+ * What it does:
+ * Skips dead, being-built, destroy-queued and submerged owners, clears the
+ * collision state, then gathers nearby units with one occupation-grid sphere
+ * query (`COGrid::ForAllEntitiesIterator`, called at 0x005D3921 with mask
+ * 0x100) and predicts collisions against them in grid order: first the units
+ * the owner yields to, then the same-army units that yield to the owner.
  */
 void CAiSteeringImpl::CheckCollisions()
 {
@@ -1377,7 +1409,8 @@ void CAiSteeringImpl::CheckCollisions()
     return;
   }
 
-  if (mOwnerUnit->IsDead() || mOwnerUnit->DestroyQueued() || mOwnerUnit->IsBeingBuilt() ||
+  // 0x005D3767..0x005D37A7: IUnit slots +0x28, +0x34, +0x2C, then the layer.
+  if (mOwnerUnit->IsDead() || mOwnerUnit->IsBeingBuilt() || mOwnerUnit->DestroyQueued() ||
       mOwnerUnit->mVarDat.mLayerMask == LAYER_Sub) {
     return;
   }
@@ -1513,14 +1546,14 @@ bool CAiSteeringImpl::ProcessSplineMovement()
 
     // TEMPORARY PROBE -- inert move order triage, delete when resolved.
     {
-      static int sCount = 0;
-      if ((sCount++ % 10) == 0) {
+      static DiagnosticBudget sCount;
+      if (const int seen = sCount.Next(); (seen % 10) == 0) {
         gpg::Warnf("[STEERDIAG] Spline tick col=%d gate=%d tick=%d paused=%d refresh=%d nodes=%d/%d pushed=%d immobile=%d stun=%d n=%d",
                    static_cast<int>(mCollisionInfo.mCollisionType), mCollisionInfo.mTickGate,
                    sim ? static_cast<int>(sim->mCurTick) : -1, static_cast<int>(mPausedForStateTransition), doPathRefresh ? 1 : 0,
                    mPath ? static_cast<int>(mPath->mCurrentNodeIndex) : -1, mPath ? static_cast<int>(mPath->mNodeCount) : -1,
                    motion ? static_cast<int>(motion->mIsBeingPushed) : -1,
-                   IsUnitState(mOwnerUnit, UNITSTATE_Immobile) ? 1 : 0, static_cast<int>(mOwnerUnit->StunnedState), sCount);
+                   IsUnitState(mOwnerUnit, UNITSTATE_Immobile) ? 1 : 0, static_cast<int>(mOwnerUnit->StunnedState), seen + 1);
       }
     }
     UpdateMotionPathPointers(*this);
@@ -1538,13 +1571,16 @@ bool CAiSteeringImpl::DriveToNextWaypoint()
   const bool refreshPending = mNeedsWaypointRefresh != 0;
   // TEMPORARY PROBE -- inert move order triage, delete when resolved.
   {
-    static int sCount = 0;
-    if (refreshPending || (sCount++ % 25) == 0) {
+    static DiagnosticBudget sCount;
+    // A refresh beat logs without counting, as the `||` short-circuit had it;
+    // `n` is the count after this beat.
+    const int n = refreshPending ? sCount.Count() : sCount.Next() + 1;
+    if (refreshPending || ((n - 1) % 25) == 0) {
       const Wm3::Vector3f p = mOwnerUnit ? mOwnerUnit->GetPosition() : Wm3::Vector3f::Zero();
       gpg::Warnf("[STEERDIAG] Drive idx=%d count=%d spline=%d refresh=%d pathNodes=%d/%d dest=(%.1f,%.1f) pos=(%.1f,%.1f) n=%d",
                  mCurrentWaypointIndex, mWaypointCount, processResult ? 1 : 0, refreshPending ? 1 : 0,
                  mPath ? static_cast<int>(mPath->mCurrentNodeIndex) : -1, mPath ? static_cast<int>(mPath->mNodeCount) : -1,
-                 mDestination.x, mDestination.z, p.x, p.z, sCount);
+                 mDestination.x, mDestination.z, p.x, p.z, n);
     }
   }
 
