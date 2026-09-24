@@ -14,7 +14,6 @@
 
 namespace gpg::gal
 {
-  class AdapterModeD3D9;
   class Device;
   class CubeRenderTargetContext;
   class DepthStencilTargetContext;
@@ -27,6 +26,7 @@ namespace gpg::gal
   class CursorContext;
   class EffectContext;
   class Head;
+  struct HeadAdapterMode;
   class IndexBuffer;
   class IndexBufferContext;
   class PipelineState;
@@ -151,11 +151,13 @@ namespace gpg::gal
      * Slot: 5 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *
      * What it does:
-     * Lists the display modes of adapter `adapterIndex`. The interface names the
-     * D3D9 mode type - `AdapterModeD3D9` has no base in the RTTI - and the D3D10
-     * backend leaves the slot empty (0x008F86F0, `ret 8`).
+     * Replaces `outModes` with the display modes of adapter `adapterIndex` as
+     * `{width, height, refresh}` triples, the element `Head::adapterModes`
+     * holds: the D3D9 body pushes 12-byte elements (0x008F0170) and the options
+     * code that calls it walks the result at a 12-byte stride (0x008D2305). The
+     * D3D10 backend leaves the slot empty (0x008F86F0, `ret 8`).
      */
-    virtual void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) = 0;
+    virtual void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) = 0;
     /**
      * Slot: 7 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224)
      *

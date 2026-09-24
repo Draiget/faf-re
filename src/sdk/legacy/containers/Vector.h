@@ -2058,6 +2058,7 @@ namespace msvc8
          * Address: 0x007AE840 (FUN_007AE840 -- `vector<T>::vector(const vector&)` for the 4-byte `moho::CameraImpl*` element (`_Xlen` 0x007AFF20, buy 0x007B1240, `_Ucopy` 0x007B1B70, `_Tidy` 0x007AF380 on the throw path): reached from `RCamManager::GetAllCameras` 0x007AAB60's `return mCams;`; callers 0x007AAB60; formerly `CopyConstructVectorOfCameraImplPtr` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x007BAFE0 (FUN_007BAFE0 -- `vector<T>::vector(const vector&)` for the 0x24-byte `moho::SNetCommandArg` element: reached from both `SNetCommand` constructors (0x007B6720, 0x007BCE70), which copy `mArgs` in the member-init list; callers 0x007B6720, 0x007BCE70; formerly `CopyConstructVectorOfSNetCommandArg` in moho/misc/EngineVectorHelpers.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008FE700 (FUN_008FE700 -- `vector<T>::vector(const vector&)` -- reached from both `EffectContext` copy sites, which placement-copy-construct the macro table into freshly allocated runtime storage for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext`'s macro table; the 0x3C element is two `msvc8::string`s, so every element step routes through `msvc8::string::assign`); callers 0x008FE7E0, 0x0093FCC0, 0x0093FD90; formerly `CopyConstructEffectMacroVector` in gpg/gal/ContextInterfaces.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x008EFB60 (FUN_008EFB60 -- `vector(const vector&)`: `_Buy` inlined (`_Xlen` 0x008EAA50 past 0x0FFFFFFF, allocate 0x008E87F0), `_Ucopy` through the const-source `_Uninit_copy` 0x008EA490, `_Tidy` 0x008EA7D0 and rethrow on a throw, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008F0020, the `modes` member copy in `AdapterD3D9`'s copy constructor 0x008EFF80, whose recovered body default-constructed `modes` and assigned it instead. Was DB `external_dependency`; it is engine code.)
          */
         vector(const vector& other) : vector() {
             // VC8: `if (_Buy(other.size())) { try { _Mylast = _Ucopy(...); }
@@ -2190,6 +2191,7 @@ namespace msvc8
          * `DestroyLegacySyncEntityVariableVectorSlot` free function in
          * `moho/sim/SimDriver.cpp` -- collapsed into this template
          * instantiation, RULE ONE.
+         * Address: 0x008EAA40 (FUN_008EAA40 -- `~vector`, one `jmp` into `_Tidy` 0x008EA7D0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable -- `~AdapterD3D9` calls `_Tidy` directly (0x00940CBF). Was DB `skip`.)
          *
          * Destructor: destroy elements and free storage if allowed
          */
@@ -2649,6 +2651,7 @@ namespace msvc8
          * Address: 0x004A32E0 (FUN_004A32E0 -- a second emission of that slot assignment for `msvc8::vector<std::uint8_t, false>` (the registry-path byte vector; these are the iterator and range steps its insert and resize compile to); zero callers, unreachable; formerly `AssignUint32SlotDuplicate` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00889FE0 (FUN_00889FE0 -- `size()` for a 0x4C-byte element: `(last_ - first_) / 76` with a null-`first_` guard returning 0; one caller, 0x008895A0; formerly `CountStride76RecordsRuntime` in moho/sim/CWldMap.cpp over a `Stride76RangeRuntimeView` stand-in (RULE ONE), removed 2026-09-18.)
          * Address: 0x008E8400 (FUN_008E8400 -- `size()`, `(last - first) / 60` through `0x88888889 >> 5`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x0093FFA5, 0x00942C64, 0x00942CBB; formerly `EffectMacroCount` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008E83A0 (FUN_008E83A0 -- `size()`, `(last - first) / 112` (`0x92492493`, `add`, `sar 6`) with the null-`first` guard, for `msvc8::vector<gpg::gal::AdapterD3D9>` (`DeviceD3D9::mAdapters` at +0x28, the 0x70 element); callers 0x008F1992 (`_Insert_n` 0x008F1890); formerly `CountAdapterVectorElements` over an `AdapterVectorCountRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -3438,6 +3441,7 @@ namespace msvc8
          * Address: 0x00891560 (FUN_00891560 -- a third emission of that `_Tidy` for `msvc8::vector<moho::CWldPropEntry>` (`CWldProps` is that head and nothing else; the 0x38 element leads with an 0x1C blueprint-path string, so `max_size()` is 0x04924924); zero callers, unreachable; formerly `ClearOwnedWldPropsEntriesStorageLaneC` in moho/sim/CWldMap.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x005EA550 (FUN_005EA550 -- `_Tidy` -- destroy the live range, free the block, null the three lanes for `msvc8::vector<moho::SAiReservedTransportBone>` (the 0x1C element owns an inner `msvc8::vector<int>` and a `WeakPtr<Unit>` that unlinks itself); callers 0x005ED2D0 (unreached); formerly `ResetReservedTransportBoneVectorStorage` in moho/ai/SAiReservedTransportBoneSerializer.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00432290 (FUN_00432290 -- `_Tidy`: destroy the live range (0x004331C0), free the block, null the three pointers, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x008FE797, 0x0093F980 (`~EffectContext`'s member destructor); formerly `DestroyEffectMacroStorage` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp, whose 'also emitted at 0x00942380' was a point inside `EffectD3D9::GetDxEffect`, (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA7D0 (FUN_008EA7D0 -- `_Tidy`: each element through its virtual destructor (flag 0), free the block, null the three pointers, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940CBF (`~AdapterD3D9`'s member teardown), 0x008EFC0D (the copy constructor's throw path), 0x008EAA40 (`~vector`). Was DB `external_dependency`; it is engine code.)
          */
         void tidy() noexcept {
             destroy_all();
@@ -4013,6 +4017,7 @@ namespace msvc8
          * Address: 0x005EAFF0 (FUN_005EAFF0 -- `push_back` -- reached from that same SerLoad's `loaded.push_back(entry)` for `msvc8::vector<moho::SAiReservedTransportBone>` (the reflected reserved-bone vector; the 0x1C element owns an inner `msvc8::vector<int>` and a self-unlinking `WeakPtr<Unit>`); callers 0x005EA070; formerly `PushBackReservedTransportBoneVector` in moho/ai/IAiTransport.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x008FE4B0 (FUN_008FE4B0 -- `push_back` -- reached from `DeviceD3D10::Setup`'s `mSwapChains.push_back(swapChain)`, one per head; the capacity-full path is `_Insert_n` 0x008FE010 for `msvc8::vector<IDXGISwapChain*>` (`DeviceD3D10::mSwapChains` at +0xA4); callers 0x00900B30; formerly `AppendBackendSwapChain` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-23.)
          * Address: 0x00942860 (FUN_00942860 -- `push_back`: `_Ufill(last, 1, v)` inlined when there is room, else `_Insert_n(end, 1, v)` 0x00942490, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x00942A90 (`EffectD3D9::GetTechniques`), 0x0094BE69 (`EffectD3D10::GetTechniques`); formerly `AppendEffectTechniqueSharedRef` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EFDD0 (FUN_008EFDD0 -- `push_back`: `_Ufill(last, 1, v)` over 0x008EA090 when there is room, else `insert(end, v)` 0x008EFA50, for `msvc8::vector<gpg::gal::HeadAdapterMode>` (`Head::adapterModes` at +0x50 and gal::Device slot 5's out-vector; the 0x0C `{width, height, refresh}` element); callers 0x008F020C (`DeviceD3D9::GetModesForAdapter`), 0x008F2218 (`DeviceD3D9::BuildDeviceCapabilities`), 0x008FF752 (`DeviceD3D10::CheckAvailableFormats`); formerly `AppendHeadAdapterMode` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4420,6 +4425,7 @@ namespace msvc8
          * Address: 0x00519D40 (FUN_00519D40 -- `erase(first, last)` -- destroy `[first, last)` in place at a 0xCC stride, rewind `_Mylast` to `first`, hand `first` back through the caller's slot. This is the shrink half of `resize` for `msvc8::vector<moho::RMeshBlueprintLOD>` (`RMeshBlueprint::mLods`; the element is 0xCC and owns seven legacy strings, so every element step routes through its constructor 0x005183D0 or its destructor 0x00519800); callers 0x00519A10, 0x0051A900, 0x0051AACF; formerly `EraseTrailingLodRange` in moho/resource/blueprints/RMeshBlueprintLODTypeInfo.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00951E40 (FUN_00951E40 -- `erase(first, last)` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14): move the survivors down through the element's copy-assign 0x009506F0, release the vacated tail's control blocks, rebase `_Mylast`, hand `first` back through the caller's slot; zero callers, unreachable; formerly `EraseTrackedPointerRangeAndStoreCursorRuntime` in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-18.)
          * Address: 0x009427F0 (FUN_009427F0 -- `erase(first, last)`: `_Copy_opt` the tail down, destroy the rest through the virtual destructor, return `first`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x009428DE (`clear()`), 0x00942BA0 (the empty-source path of `operator=`); formerly `EraseEffectMacroTailRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA6F0 (FUN_008EA6F0 -- `erase(first, last)`: `std::copy` the tail down (0x008EA190), destroy the vacated tail through the virtual destructor, rebase `_Mylast`, hand `first` back through the hidden slot, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8A4 (the empty-source path of `operator=` 0x008EF870) and 0x008EA8EE, an IDA-unboxed `clear()` at 0x008EA8E0 with no references. Was DB `external_dependency`; it is engine code.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -4474,8 +4480,12 @@ namespace msvc8
          * per-element field-copy loop FUN_00693200, i.e. the tail-shift/copy
          * sub-step this grow body calls into).
          * Address: 0x00940D40 (FUN_00940D40, msvc8::vector<gpg::gal::AdapterModeD3D9>::_Insert_n
-         * 16-byte-element grow body; emitted via PushBackAdapterModeD3D9 modes.push_back
-         * (D3D9Interfaces.cpp:3258)).
+         * 16-byte-element grow body; reached from `push_back`'s capacity-full path
+         * (0x009411C4) -- the `push_back` at 0x00941160, which IDA never boxed and
+         * whose one entry is `AdapterD3D9::AddMode` (0x009411D0, `add ecx, 60h` and a
+         * jump), called by `CollectAllAdapters` per display mode. Its single-element
+         * `insert(pos, v)` (0x00940FF0, the other call at 0x0094101E) is unboxed too
+         * and unreferenced.)
          * Address: 0x00882BA0 (FUN_00882BA0, msvc8::vector<msvc8::string>::_Insert_n
          * grow-and-fill body; emitted via ResizeLegacyStringVectorExact
          * outStrings.resize(n, fillValue) (CSaveGameRequestImpl.cpp:125)).
@@ -4543,17 +4553,22 @@ namespace msvc8
          * AppendShoreCellRef (Shoreline.cpp) invokes shorelineCells.push_back(cell)
          * by name — MSVC8's push_back (FUN_008135A0) is insert(end(),1,value) when
          * full — so this per-T 8-byte shared_ptr symbol is emitted).
-         * Address: 0x008EF500 (FUN_008EF500, msvc8::vector<std::int32_t>::_Insert_n
-         * grow body for gpg::gal::Head::validFormats1 @+0x70; the recovered caller
-         * gpg::gal::DeviceD3D9::BuildDeviceCapabilities appends valid texture formats
-         * and, on the capacity-full path, invokes validFormats1.insert(end(),1,token)
-         * by name (MSVC8's push_back is insert(end(),1,value) when full), so this
-         * per-T scalar-int32 symbol is emitted).
-         * Address: 0x008EF2B0 (FUN_008EF2B0, msvc8::vector<std::int32_t>::_Insert_n
-         * grow body for gpg::gal::Head::validFormats2 @+0x60; the same recovered
-         * caller appends valid GAL-format tokens and invokes
-         * validFormats2.insert(end(),1,token) by name, so this per-T scalar-int32
-         * symbol is emitted).
+         * Address: 0x008EF500 (FUN_008EF500, `_Insert_n` for gpg::gal::Head::validFormats1
+         * @+0x70, reached from `validFormats1.push_back(token)` with push_back
+         * inlined: the capacity-full path calls it at 0x008F22E4 in
+         * `DeviceD3D9::BuildDeviceCapabilities` and at 0x008FF833 in
+         * `DeviceD3D10::CheckAvailableFormats`. The element is a 4-byte non-builtin
+         * type, not the `std::int32_t` Head.hpp declares: its `_Uninit_fill_n`
+         * (0x008EA100) is VC8's non-scalar form, a placement copy guarded against a
+         * null slot, where a built-in integer takes the scalar `_Fill_n` with no
+         * guard (compare `vector<std::uint32_t>`'s `_Ufill` 0x00498B80).
+         * `validFormats2` is a second such type -- each emission below exists twice,
+         * byte-identical. This instantiation's out-of-line `push_back` (0x008EFED0)
+         * and `insert(pos, v)` (0x008EFB10) are IDA-unboxed and unreferenced.)
+         * Address: 0x008EF2B0 (FUN_008EF2B0, the same `_Insert_n` for
+         * gpg::gal::Head::validFormats2 @+0x60; callers 0x008F23B3 and 0x008FF916 in
+         * the same two functions. Its unboxed `push_back` and `insert(pos, v)` are
+         * 0x008EFE60 and 0x008EFAC0.)
          * Address: 0x008DCB70 (FUN_008DCB70, msvc8::vector<gpg::REnumType::ROptionValue>::_Insert_n
          * grow/insert body for the 8-byte enum-option element {int mValue; const char* mName;};
          * the recovered caller gpg::AppendEnumOptionValue (Reflection.cpp) invokes
@@ -5093,9 +5108,8 @@ namespace msvc8
          * tail-call/iterator-rebuild shape as the two entries directly
          * above, offset computed as `(pos - first_) / 12`, tail-calls the
          * `_Insert_n` grow core `FUN_008EF010` with `count = 1`. Reached
-         * from `push_back`'s capacity-full path via `AppendHeadAdapterMode`
-         * (D3D9Interfaces.cpp, `adapterModes.push_back(mode); return
-         * &adapterModes.back();`).)
+         * from `push_back`'s capacity-full path (0x008EFE51, `push_back`
+         * 0x008EFDD0).)
          *
          * Address: 0x0082E950 (FUN_0082E950, msvc8::vector<UICommandGraph::
          * CommandGraphEdge*>::insert for the 4-byte pointer element -- the
@@ -6625,6 +6639,10 @@ namespace msvc8
          * Address: 0x00942490 (FUN_00942490 -- `_Insert_n`: shift the tail (`_Ucopy` 0x00942410, `copy_backward` 0x00941BD0) and fill the gap (0x00941AC0) in place, or grow 1.5x and rebuild head | `_Ufill` 0x00941D00 | tail, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x009427CE, 0x009428C4; formerly `InsertEffectTechniqueCopies` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941AC0 (FUN_00941AC0 -- that insert's gap fill-assign sub-step (VC8's `std::fill`), retain-then-release per slot from one source value, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x009426B4, 0x00942718; formerly `CopyAssignEffectTechniqueSharedRefRawRangeRetain` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp, which advanced the source pointer per slot where the binary reads one value, (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941BC0 (FUN_00941BC0 -- a `jmp` alias into that fill for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); zero callers, unreachable; formerly `CopyAssignEffectTechniqueSharedRefRawRangeRetainDispatchLaneA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EF010 (FUN_008EF010 -- `_Insert_n` for `msvc8::vector<gpg::gal::HeadAdapterMode>` (`Head::adapterModes` at +0x50 and gal::Device slot 5's out-vector; the 0x0C `{width, height, refresh}` element): the value copied into a local first, then grow 1.5x and rebuild head | `_Ufill` 0x008EA500 | tail, or shift in place (`copy_backward` 0x008E9FD0) and fill (0x008E9230); callers 0x008EFA99 (`insert(pos, v)` 0x008EFA50, `push_back`'s capacity-full path). It had no anchor.)
+         * Address: 0x00940AF0 (FUN_00940AF0 -- that insert's gap fill-assign sub-step (VC8's `std::fill`) for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940F56, 0x00940FC3 (`_Insert_n` 0x00940D40); formerly `CopyPackedAdapterModePayloadRangeRuntime` over a `PackedAdapterModeRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008E9280 (FUN_008E9280 -- that insert's gap fill-assign sub-step (VC8's `std::fill`, no null guard) for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF6D9, 0x008EF728 (`_Insert_n` 0x008EF500). It was cited on `uninit_fill_n`.)
+         * Address: 0x008E9260 (FUN_008E9260 -- the same gap fill-assign for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF489, 0x008EF4D8 (`_Insert_n` 0x008EF2B0). It was cited on `uninit_fill_n`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -6789,9 +6807,9 @@ namespace msvc8
          * vtable symbol referenced in the caller) -- the same vtbl-slot-0
          * virtual dtor loop shape as the `AdapterD3D10` entry above,
          * `flag=0`. Reached from the `_Insert_n` grow body FUN_00940D40
-         * (cited above on `insert`, `PushBackAdapterModeD3D9`
-         * modes.push_back, D3D9Interfaces.cpp:3258), which destroys the old
-         * range after relocating into the reallocated buffer.)
+         * (cited above on `insert`, under `AdapterD3D9::AddMode`'s
+         * `modes.push_back`), which destroys the old range after relocating
+         * into the reallocated buffer.)
          * Address: 0x00857630 (FUN_00857630, `msvc8::vector<boost::
          * shared_ptr<moho::MeshInstance>>::destroy_range` for the 8-byte
          * shared_ptr `(px, pn)` pair element -- forward `[first,last)` walk
@@ -8215,6 +8233,13 @@ namespace msvc8
          * Address: 0x00941CE0 (FUN_00941CE0 -- a tail-jump bridge into it for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); zero callers, unreachable; formerly `CopyAssignEffectTechniqueSharedRefRangeDispatchLaneB` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941D40 (FUN_00941D40 -- a third bridge into it for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); zero callers, unreachable; formerly `CopyAssignEffectTechniqueSharedRefRangeDispatchLaneC` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00942410 (FUN_00942410 -- `_Ucopy`, the member bridge into it, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x00942677, 0x009426FA; formerly `CopyAssignEffectTechniqueRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA210 (FUN_008EA210 -- `_Uninit_copy` from a non-const source: per slot, when the slot is not null, the element's copy constructor, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940E40, 0x00940E71 (`_Insert_n` 0x00940D40), the member adapters 0x00940C60 (`_Umove`) and 0x008EA750 (`_Ucopy`) and the bridges below; formerly `CopyAdapterModeRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA750 (FUN_008EA750 -- `_Ucopy`, the member bridge (allocator from `this`, tags pushed) into it, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF956, 0x008EF9B0 (`operator=` 0x008EF870); formerly `CopyAdapterModeRangeDispatch` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA4D0 (FUN_008EA4D0 -- a cdecl bridge (`unchecked_uninitialized_copy`) into 0x008EA210 for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyAdapterModeRangeAdapter` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x00940C30 (FUN_00940C30 -- a second cdecl bridge into 0x008EA210 for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyAdapterModeRangeDispatchLegacyLaneA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA490 (FUN_008EA490 -- the same `_Uninit_copy` instantiated for a const source (the copy constructor's `_Ucopy` over `const_iterator`), byte-identical to 0x008EA210, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EFBEA (`vector(const vector&)` 0x008EFB60), 0x008EA6C0, 0x008EA8B0; formerly `CopyPackedAdapterModeRangeRuntime` over raw dwords in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA6C0 (FUN_008EA6C0 -- a cdecl bridge into the const-source 0x008EA490 for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyPackedAdapterModeRangeRuntimeAdapterA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA8B0 (FUN_008EA8B0 -- a member (`_Ucopy`) bridge into the const-source 0x008EA490 for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyPackedAdapterModeRangeRuntimeAdapterB` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
     public:
         static void uninit_copy_n(const T* src, const std::size_t n, T* dst) {
@@ -8301,8 +8326,7 @@ namespace msvc8
          * uninit_fill_n for the 12-byte trivially-copyable element (width/height/
          * refreshRate dwords) -- the same count-driven dword-triple fill loop,
          * called with n=1 from push_back's in-place fast path FUN_008EFDD0 (cited
-         * on `AppendHeadAdapterMode`, D3D9Interfaces.cpp) when the vector still has
-         * spare capacity)
+         * on `push_back`) when the vector still has spare capacity)
          * Address: 0x0076AAB0 (FUN_0076AAB0, msvc8::vector<gpg::AStarOpenHeap<TCell>::
          * Entry>::uninit_fill_n for the 12-byte `{float mPriority; AStarNode<TCell>*
          * mNode; std::int32_t mHandle}` element -- a dst/dstEnd-bounded dword-triple
@@ -9068,18 +9092,6 @@ namespace msvc8
          * site. Reached from this instantiation's `_Insert_n` grow body
          * `FUN_008DD050` (cited above, the global reflection `TypeVec`);
          * emitted via `gpg::RType::RegisterType`'s `insert(end(), 1, this)`.)
-         * Address: 0x008E9260 (FUN_008E9260, `msvc8::vector<
-         * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats2`
-         * @+0x60, expressed over a `[begin,end)` pointer pair. Reached from
-         * this instantiation's `_Insert_n` grow body `FUN_008EF2B0` (cited
-         * above); emitted via `gpg::gal::DeviceD3D9::BuildDeviceCapabilities`'s
-         * `validFormats2.insert(end(),1,token)`, D3D9Interfaces.cpp.)
-         * Address: 0x008E9280 (FUN_008E9280, `msvc8::vector<
-         * std::int32_t>::uninit_fill_n` for `gpg::gal::Head::validFormats1`
-         * @+0x70, the sibling of the entry immediately above. Reached from
-         * this instantiation's `_Insert_n` grow body `FUN_008EF500` (cited
-         * above); emitted via the same `BuildDeviceCapabilities`'s
-         * `validFormats1.insert(end(),1,token)`.)
          *
          * Address: 0x008E9230 (FUN_008E9230, `msvc8::vector<gpg::gal::
          * HeadAdapterMode>::uninit_fill_n` for the 12-byte `{width; height;
@@ -9089,7 +9101,7 @@ namespace msvc8
          * `FUN_008EF010` (named within `FUN_008EFA50`'s citation above as
          * the tail-called, count=1 reallocation half of `insert(iterator,
          * const T&)`), itself reached from `push_back`'s capacity-full path
-         * via `AppendHeadAdapterMode` (D3D9Interfaces.cpp). DB-integrity fix:
+         * (`push_back` 0x008EFDD0). DB-integrity fix:
          * was duplicated as a standalone 12-byte fill free
          * function in `moho/containers/LegacyContainerFillLanesB.cpp`
          * (orphan -- anonymous-namespace, no source-level caller); removed
@@ -9345,6 +9357,15 @@ namespace msvc8
          * Address: 0x00941C40 (FUN_00941C40 -- `_Uninit_fill_n`: `n` placement copies of one `shared_ptr` (retain each), for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x00941CD1, 0x00941D22, 0x009428A3 (`push_back`'s spare-capacity path); formerly `CopyConstructEffectTechniqueSharedRefCount` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941CB0 (FUN_00941CB0 -- a tag-pushing bridge into it for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); zero callers, unreachable; formerly `CopyConstructEffectTechniqueSharedRefCountDispatchLaneA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00941D00 (FUN_00941D00 -- `_Ufill`, the advance-returning member adapter (`fill; return p + n`) for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x009425BB, 0x00942697 (`_Insert_n`). It was parked as `skip` after a citation that named no body; this is it.)
+         * Address: 0x00940B60 (FUN_00940B60 -- `_Uninit_fill_n`: per slot, when the slot is not null, the element's copy constructor from the one value, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x009411A3 (`push_back` 0x00941160's spare-capacity path), 0x00940BF0, 0x00940BA0; formerly `FillPackedAdapterModeRangeRuntime` over raw dwords in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x00940BF0 (FUN_00940BF0 -- `_Ufill`, the advance-returning member adapter over it, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940E53, 0x00940F40 (`_Insert_n` 0x00940D40); formerly `FillPackedAdapterModeRangeAndReturnEnd` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x00940BA0 (FUN_00940BA0 -- a tag-pushing bridge into 0x00940B60 for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `FillPackedAdapterModeRangeRuntimeDispatchA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA100 (FUN_008EA100 -- `_Uninit_fill_n` for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500): a placement copy guarded against a null slot; callers 0x008F22C7 (`DeviceD3D9::BuildDeviceCapabilities`'s inlined `push_back`), 0x008FF816 (`DeviceD3D10::CheckAvailableFormats`'s), 0x008EA580, 0x008EA320, and 0x008EFF13 in the unboxed out-of-line `push_back` 0x008EFED0; formerly `FillDwordRangeWithSourceLaneDispatchB` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA580 (FUN_008EA580 -- `_Ufill` over it for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF5FE, 0x008EF6C3 (`_Insert_n` 0x008EF500); formerly `FillDwordRangeWithSourceLaneDispatchBAndReturnEnd` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA320 (FUN_008EA320 -- a tag-pushing bridge into 0x008EA100 for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); zero callers, unreachable; formerly `FillDwordRangeWithSourceLaneDispatchBAdapter` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA0D0 (FUN_008EA0D0 -- the same `_Uninit_fill_n` for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008F2396, 0x008FF8F9 (the same two inlined `push_back`s), 0x008EA540, 0x008EA2F0, and 0x008EFEA3 in the unboxed `push_back` 0x008EFE60; formerly `FillDwordRangeWithSourceLaneDispatchA` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA540 (FUN_008EA540 -- `_Ufill` over it for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF3AE, 0x008EF473 (`_Insert_n` 0x008EF2B0); formerly `FillDwordRangeWithSourceLaneDispatchAAndReturnEnd` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA2F0 (FUN_008EA2F0 -- a tag-pushing bridge into 0x008EA0D0 for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); zero callers, unreachable; formerly `FillDwordRangeWithSourceLaneDispatchAAdapter` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
         static void uninit_fill_n(T* dst, const std::size_t n, const T& value) {
             std::size_t i = 0;
@@ -9893,6 +9914,8 @@ namespace msvc8
          * started from; the graph showed zero open callees and a
          * recovered caller, and the note predated `sub_7E9280`'s own
          * recovery.
+         * Address: 0x00940C60 (FUN_00940C60 -- `_Umove`, the member bridge into the copy 0x008EA210 (VC8 moves an element with no move semantics by copying it), for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940F23, 0x00940FA5 (`_Insert_n` 0x00940D40); formerly a second address on `CopyAdapterModeRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x00940BD0 (FUN_00940BD0 -- `_Uninit_move`'s fallback to the copy, a tag-rewriting `jmp` into 0x008EA210, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable; formerly `CopyAdapterModeRangeDispatchB` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
         static void uninit_move_n(T* src, const std::size_t n, T* dst) {
             if constexpr (std::is_trivially_copyable_v<T>) {
@@ -10198,6 +10221,7 @@ namespace msvc8
          * Address: 0x006B13D0 (FUN_006B13D0 -- a register-shape bridge into it for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each assignment is `WeakPtr::operator=`, which unlinks the destination from its old owner chain and splices it onto the source's). The body is ICF-folded across every `T`; zero callers, unreachable; formerly `AssignWeakPtrRangeForwardAdapterB` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x00942440 (FUN_00942440 -- `_Copy_opt`, both strings assigned per 0x3C slot -- the D3D9 translation unit's copy of 0x0093FAB0 -- for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00942790, 0x0094281C, 0x00942BF2; formerly `CopyAssignEffectMacroRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x00942770 (FUN_00942770 -- the `std::copy` bridge into it (three zero tag bytes pushed) for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00942C79; formerly `CopyAssignEffectMacroRangeBridge` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA190 (FUN_008EA190 -- `std::copy` (`_Copy_opt`) for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8CC, 0x008EF943 (`operator=` 0x008EF870), 0x008EA708 (`erase` 0x008EA6F0); formerly `CopyPackedAdapterModeTailRange` over a `PackedAdapterModeRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
     public:
         static void copy_or_move_assign(T* dst, const T* src, const std::size_t n) {
@@ -10381,6 +10405,12 @@ namespace msvc8
          * Address: 0x007B17B0 (FUN_007B17B0 -- a seventeenth address on that backward assign for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each assignment is `WeakPtr::operator=`, which unlinks the destination from its old owner chain and splices it onto the source's). The body is ICF-folded across every `T`; callers 0x007AF0B0, 0x007B10A0; formerly `AssignWeakPtrRangeBackward` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x0061CC40 (FUN_0061CC40 -- a bridge into that backward assign for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each assignment is `WeakPtr::operator=`, which unlinks the destination from its old owner chain and splices it onto the source's). The body is ICF-folded across every `T`; zero callers, unreachable; formerly `AssignWeakPtrRangeBackwardAdapterA` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
          * Address: 0x0061CC70 (FUN_0061CC70 -- a second bridge into it for `msvc8::vector<moho::WeakPtr<T>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element; each assignment is `WeakPtr::operator=`, which unlinks the destination from its old owner chain and splices it onto the source's). The body is ICF-folded across every `T`; zero callers, unreachable; formerly `AssignWeakPtrRangeBackwardAdapterB` in moho/misc/WeakPtr.h (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00940A80 (FUN_00940A80 -- `copy_backward` (`_Copy_backward_opt`) for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940B50; formerly `CopyPackedAdapterModeTailRangeBackward` over a `PackedAdapterModeRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x00940B30 (FUN_00940B30 -- `_Unchecked_move_backward`, the tag-pushing bridge into it, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x00940FB3 (`_Insert_n` 0x00940D40's in-place shift). Was DB `skip` as a tail-call thunk; `_Insert_n` runs it.)
+         * Address: 0x008E9FD0 (FUN_008E9FD0 -- `copy_backward` for `msvc8::vector<gpg::gal::HeadAdapterMode>` (`Head::adapterModes` at +0x50 and gal::Device slot 5's out-vector; the 0x0C `{width, height, refresh}` element); callers 0x008EF287 (`_Insert_n` 0x008EF010); formerly `CopyDwordTripleRangeBackwardD3D9` over a `DwordTripleRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA030 (FUN_008EA030 -- `copy_backward` for `Head::validFormats1` (+0x70; the 4-byte non-builtin element described on `insert` at 0x008EF500); callers 0x008EF718 (`_Insert_n` 0x008EF500); formerly `CopyDwordRangeBackwardD3D9B` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008EA000 (FUN_008EA000 -- `copy_backward` for `Head::validFormats2` (+0x60; the same kind of element, a separate instantiation); callers 0x008EF4C8 (`_Insert_n` 0x008EF2B0); formerly `CopyDwordRangeBackwardD3D9A` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x008F6580 (FUN_008F6580 -- `copy_backward` for `msvc8::vector<DXGI_MODE_DESC>` (the D3D10 adapter-mode list, the 0x1C POD element, one `rep movsd` per slot); callers 0x008F6CEE (`_Insert_n` 0x008F6A50); formerly `CopyDwordHeptRangeBackwardD3D9` over a `DwordHeptRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          */
     public:
         static void copy_backward_assign(const T* first, const T* last, T* destLast) {
@@ -11182,6 +11212,7 @@ namespace msvc8
          * Address: 0x004ADFF0 (FUN_004ADFF0 -- `_Xlen` for a 4-byte element; callers 0x004AD098, 0x004ADDE0; formerly `ThrowVectorTooLong_004ADFF0` in moho/resource/ResourceManager.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x004241C0 (FUN_004241C0 -- `throw_too_long` -- the length_error the growth cap raises for `msvc8::vector<boost::SharedPtrRaw<moho::ID3DTextureSheet>>` (`CAnimTexture::mFrames` at +0x08; the 8-byte `{px, pi}` element retains and releases its control block on every copy); callers 0x00423948, 0x00423EB0; formerly `ThrowAnimTextureFrameVectorTooLong` in moho/animation/CAnimTexture.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x004331F0 (FUN_004331F0 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x00432266, 0x0093FF3B. It was marked `skip` as a non-engine runtime helper; it is this engine instantiation.)
+         * Address: 0x008EAA50 (FUN_008EAA50 -- `_Xlen`, `length_error("vector<T> too long")`, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF776 (`_Buy` 0x008EF750), 0x008EFBB3 (the copy constructor), 0x00940DBC (`_Insert_n` 0x00940D40). It had no anchor.)
          */
         [[noreturn]] static void throw_too_long()
         {
@@ -11311,6 +11342,7 @@ namespace msvc8
          * Address: 0x00783190 (FUN_00783190 -- `_Buy` for a 8-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007983B0 (FUN_007983B0 -- `_Buy` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007C92B0 (FUN_007C92B0 -- `_Buy` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
+         * Address: 0x008EF750 (FUN_008EF750 -- `_Buy`: null the three pointers, then for a non-zero count `_Xlen` past 0x0FFFFFFF and allocate through 0x008E87F0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF999 (`operator=` 0x008EF870's reallocating path). Was DB `external_dependency`; it is engine code.)
          */
         bool buy(const std::size_t count) {
             first_ = nullptr;

@@ -282,573 +282,6 @@ namespace { // TEMPORARY PROBE (do not commit)
             return *static_cast<DeviceD3D9*>(Device::GetInstance());
         }
 
-        struct DwordPairRuntime final
-        {
-            std::uint32_t lane0 = 0U;
-            std::uint32_t lane1 = 0U;
-        };
-        static_assert(sizeof(DwordPairRuntime) == 0x08, "DwordPairRuntime size must be 0x08");
-
-        struct DwordTripleRuntime final
-        {
-            std::uint32_t lane0 = 0U;
-            std::uint32_t lane1 = 0U;
-            std::uint32_t lane2 = 0U;
-        };
-        static_assert(sizeof(DwordTripleRuntime) == 0x0C, "DwordTripleRuntime size must be 0x0C");
-
-        struct DwordHeptRuntime final
-        {
-            std::uint32_t lanes[7]{};
-        };
-        static_assert(sizeof(DwordHeptRuntime) == 0x1C, "DwordHeptRuntime size must be 0x1C");
-
-        /**
-         * Address: 0x008E9FD0 (FUN_008E9FD0)
-         *
-         * What it does:
-         * Copies one half-open 12-byte lane range backward from
-         * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
-         */
-        [[nodiscard]] DwordTripleRuntime* CopyDwordTripleRangeBackwardD3D9(
-            const DwordTripleRuntime* const sourceBegin,
-            const DwordTripleRuntime* sourceEnd,
-            DwordTripleRuntime* destinationEnd
-        ) noexcept
-        {
-            while (sourceEnd != sourceBegin)
-            {
-                --sourceEnd;
-                --destinationEnd;
-                *destinationEnd = *sourceEnd;
-            }
-
-            return destinationEnd;
-        }
-
-        /**
-         * Address: 0x008EA000 (FUN_008EA000)
-         *
-         * What it does:
-         * Copies one half-open dword range backward from `[sourceBegin,
-         * sourceEnd)` into storage ending at `destinationEnd`.
-         */
-        [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9A(
-            const std::uint32_t* const sourceBegin,
-            const std::uint32_t* sourceEnd,
-            std::uint32_t* destinationEnd
-        ) noexcept
-        {
-            while (sourceEnd != sourceBegin)
-            {
-                --sourceEnd;
-                --destinationEnd;
-                *destinationEnd = *sourceEnd;
-            }
-
-            return destinationEnd;
-        }
-
-        /**
-         * Address: 0x008EA030 (FUN_008EA030)
-         *
-         * What it does:
-         * Alias lane of `CopyDwordRangeBackwardD3D9A`.
-         */
-        [[nodiscard]] std::uint32_t* CopyDwordRangeBackwardD3D9B(
-            const std::uint32_t* const sourceBegin,
-            const std::uint32_t* const sourceEnd,
-            std::uint32_t* const destinationEnd
-        ) noexcept
-        {
-            return CopyDwordRangeBackwardD3D9A(sourceBegin, sourceEnd, destinationEnd);
-        }
-
-        /**
-         * Address: 0x008F6580 (FUN_008F6580)
-         *
-         * What it does:
-         * Copies one half-open 28-byte lane range backward from
-         * `[sourceBegin, sourceEnd)` into storage ending at `destinationEnd`.
-         */
-        [[nodiscard]] DwordHeptRuntime* CopyDwordHeptRangeBackwardD3D9(
-            const DwordHeptRuntime* const sourceBegin,
-            const DwordHeptRuntime* sourceEnd,
-            DwordHeptRuntime* destinationEnd
-        ) noexcept
-        {
-            while (sourceEnd != sourceBegin)
-            {
-                --sourceEnd;
-                --destinationEnd;
-                *destinationEnd = *sourceEnd;
-            }
-
-            return destinationEnd;
-        }
-
-        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneCore(
-            std::uint32_t* destination,
-            int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            for (int remaining = count; remaining != 0; --remaining, ++destination)
-            {
-                if (destination != nullptr)
-                {
-                    *destination = *sourceLane;
-                }
-            }
-            return destination;
-        }
-
-        /**
-         * Address: 0x008EA0D0 (FUN_008EA0D0)
-         *
-         * What it does:
-         * Writes one repeated dword source lane into `count` consecutive dword
-         * destination slots.
-         */
-        void FillDwordRangeWithSourceLaneDispatchA(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            (void)FillDwordRangeWithSourceLaneCore(destination, count, sourceLane);
-        }
-
-        /**
-         * Address: 0x008EA2F0 (FUN_008EA2F0)
-         *
-         * What it does:
-         * Adapter lane forwarding one repeated dword fill request to
-         * `FillDwordRangeWithSourceLaneDispatchA`.
-         */
-        void FillDwordRangeWithSourceLaneDispatchAAdapter(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            FillDwordRangeWithSourceLaneDispatchA(destination, count, sourceLane);
-        }
-
-        /**
-         * Address: 0x008EA540 (FUN_008EA540)
-         *
-         * What it does:
-         * Dispatches one repeated dword fill lane through
-         * `FillDwordRangeWithSourceLaneDispatchA` and returns one-past-end
-         * destination cursor.
-         */
-        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchAAndReturnEnd(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            FillDwordRangeWithSourceLaneDispatchA(destination, count, sourceLane);
-            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(std::uint32_t);
-            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
-        }
-
-        /**
-         * Address: 0x008EA100 (FUN_008EA100)
-         *
-         * What it does:
-         * Dispatch alias for the repeated dword fill lane used by adjacent D3D9
-         * capability/setup helper chains.
-         */
-        void FillDwordRangeWithSourceLaneDispatchB(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            (void)FillDwordRangeWithSourceLaneCore(destination, count, sourceLane);
-        }
-
-        /**
-         * Address: 0x008EA320 (FUN_008EA320)
-         *
-         * What it does:
-         * Adapter lane forwarding one repeated dword fill request to
-         * `FillDwordRangeWithSourceLaneDispatchB`.
-         */
-        void FillDwordRangeWithSourceLaneDispatchBAdapter(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            FillDwordRangeWithSourceLaneDispatchB(destination, count, sourceLane);
-        }
-
-        /**
-         * Address: 0x008EA580 (FUN_008EA580)
-         *
-         * What it does:
-         * Dispatches one repeated dword fill lane through
-         * `FillDwordRangeWithSourceLaneDispatchB` and returns one-past-end
-         * destination cursor.
-         */
-        [[nodiscard]] std::uint32_t* FillDwordRangeWithSourceLaneDispatchBAndReturnEnd(
-            std::uint32_t* const destination,
-            const int count,
-            const std::uint32_t* const sourceLane
-        ) noexcept
-        {
-            FillDwordRangeWithSourceLaneDispatchB(destination, count, sourceLane);
-            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destination);
-            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(std::uint32_t);
-            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
-        }
-
-        struct PackedAdapterModeRuntime final
-        {
-            std::uint32_t vftable = 0U; // +0x00
-            std::uint32_t width = 0U;   // +0x04
-            std::uint32_t height = 0U;  // +0x08
-            std::uint32_t refresh = 0U; // +0x0C
-        };
-
-        static_assert(sizeof(PackedAdapterModeRuntime) == 0x10, "PackedAdapterModeRuntime size must be 0x10");
-
-        /**
-         * Address: 0x008EA190 (FUN_008EA190)
-         *
-         * What it does:
-         * Copies one packed adapter-mode tail range (`width/height/refresh`)
-         * over `[sourceFirst, sourceLast)` into destination slots and returns
-         * one-past the final destination element.
-         */
-        PackedAdapterModeRuntime* CopyPackedAdapterModeTailRange(
-            const PackedAdapterModeRuntime* sourceFirst,
-            const PackedAdapterModeRuntime* sourceLast,
-            PackedAdapterModeRuntime* destinationFirst
-        ) noexcept
-        {
-            const PackedAdapterModeRuntime* read = sourceFirst;
-            PackedAdapterModeRuntime* write = destinationFirst;
-            while (read != sourceLast)
-            {
-                write->width = read->width;
-                write->height = read->height;
-                write->refresh = read->refresh;
-                ++read;
-                ++write;
-            }
-
-            return write;
-        }
-
-        /**
-         * Address: 0x00940A80 (FUN_00940A80)
-         *
-         * What it does:
-         * Copies one packed adapter-mode tail range (`width/height/refresh`)
-         * backward from `[sourceBegin, sourceEnd)` into storage ending at
-         * `destinationEnd`, then returns the updated destination begin lane.
-         */
-        [[nodiscard]] PackedAdapterModeRuntime* CopyPackedAdapterModeTailRangeBackward(
-            const PackedAdapterModeRuntime* const sourceBegin,
-            const PackedAdapterModeRuntime* sourceEnd,
-            PackedAdapterModeRuntime* destinationEnd
-        ) noexcept
-        {
-            while (sourceEnd != sourceBegin)
-            {
-                --destinationEnd;
-                --sourceEnd;
-                destinationEnd->width = sourceEnd->width;
-                destinationEnd->height = sourceEnd->height;
-                destinationEnd->refresh = sourceEnd->refresh;
-            }
-
-            return destinationEnd;
-        }
-
-        /**
-         * Address: 0x008EA210 (FUN_008EA210)
-         * Address: 0x00940C60 (FUN_00940C60)
-         *
-         * What it does:
-         * Copy-constructs one half-open `AdapterModeD3D9` range into caller
-         * storage and returns one-past-last destination slot.
-         */
-        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRange(
-            AdapterModeD3D9* const destinationBegin,
-            const AdapterModeD3D9* sourceBegin,
-            const AdapterModeD3D9* sourceEnd
-        )
-        {
-            std::uintptr_t destinationCursor = reinterpret_cast<std::uintptr_t>(destinationBegin);
-            for (const AdapterModeD3D9* sourceCursor = sourceBegin;
-                 sourceCursor != sourceEnd;
-                 ++sourceCursor, destinationCursor += sizeof(AdapterModeD3D9))
-            {
-                if (destinationCursor == 0U)
-                {
-                    continue;
-                }
-
-                auto* const destination = reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
-                ::new (static_cast<void*>(destination)) AdapterModeD3D9(
-                    sourceCursor->width_,
-                    sourceCursor->height_,
-                    sourceCursor->refreshRate_
-                );
-            }
-
-            return reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
-        }
-
-        /**
-         * Address: 0x008EA4D0 (FUN_008EA4D0)
-         *
-         * What it does:
-         * Adapter lane forwarding one `AdapterModeD3D9` copy-range request to
-         * `CopyAdapterModeRange`.
-         */
-        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeAdapter(
-            AdapterModeD3D9* const destinationBegin,
-            const AdapterModeD3D9* sourceBegin,
-            const AdapterModeD3D9* sourceEnd
-        )
-        {
-            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
-        }
-
-        /**
-         * Address: 0x008EA750 (FUN_008EA750)
-         *
-         * What it does:
-         * Dispatch alias lane for `CopyAdapterModeRange`.
-         */
-        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatch(
-            AdapterModeD3D9* const destinationBegin,
-            const AdapterModeD3D9* sourceBegin,
-            const AdapterModeD3D9* sourceEnd
-        )
-        {
-            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
-        }
-
-        /**
-         * Address: 0x00940BD0 (FUN_00940BD0)
-         *
-         * What it does:
-         * Dispatch alias lane for `CopyAdapterModeRange`.
-         */
-        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchB(
-            AdapterModeD3D9* const destinationBegin,
-            const AdapterModeD3D9* sourceBegin,
-            const AdapterModeD3D9* sourceEnd
-        )
-        {
-            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
-        }
-
-        /**
-         * Address: 0x00940C30 (FUN_00940C30)
-         *
-         * What it does:
-         * Legacy cdecl adapter lane that forwards one adapter-mode range copy
-         * request to `CopyAdapterModeRange`.
-         */
-        [[nodiscard]] AdapterModeD3D9* CopyAdapterModeRangeDispatchLegacyLaneA(
-            AdapterModeD3D9* const destinationBegin,
-            const AdapterModeD3D9* sourceBegin,
-            const AdapterModeD3D9* sourceEnd
-        )
-        {
-            return CopyAdapterModeRange(destinationBegin, sourceBegin, sourceEnd);
-        }
-
-        /**
-         * Address: 0x008EA490 (FUN_008EA490)
-         *
-         * What it does:
-         * Copies one packed adapter-mode range (`4 dwords` stride) into
-         * destination storage and rebinds `AdapterModeD3D9` vtable ownership.
-         */
-        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntime(
-            const std::uint32_t* sourceBegin,
-            const std::uint32_t* sourceEnd,
-            std::uint32_t* destinationBegin
-        )
-        {
-            const std::uint32_t* sourceCursor = sourceBegin;
-            std::uint32_t* destinationCursor = destinationBegin;
-
-            while (sourceCursor != sourceEnd)
-            {
-                if (destinationCursor != nullptr)
-                {
-                    auto* const destinationMode = reinterpret_cast<AdapterModeD3D9*>(destinationCursor);
-                    ::new (static_cast<void*>(destinationMode))
-                        AdapterModeD3D9(sourceCursor[1], sourceCursor[2], sourceCursor[3]);
-                }
-
-                sourceCursor += 4;
-                if (destinationCursor != nullptr)
-                {
-                    destinationCursor += 4;
-                }
-            }
-
-            return destinationCursor;
-        }
-
-        /**
-         * Address: 0x008EA6C0 (FUN_008EA6C0)
-         *
-         * What it does:
-         * Cdecl adapter lane forwarding one packed adapter-mode copy-range
-         * request to `CopyPackedAdapterModeRangeRuntime`.
-         */
-        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterA(
-            const std::uint32_t* sourceBegin,
-            const std::uint32_t* sourceEnd,
-            std::uint32_t* destinationBegin
-        )
-        {
-            return CopyPackedAdapterModeRangeRuntime(sourceBegin, sourceEnd, destinationBegin);
-        }
-
-        /**
-         * Address: 0x008EA8B0 (FUN_008EA8B0)
-         *
-         * What it does:
-         * Stdcall adapter lane forwarding one packed adapter-mode copy-range
-         * request to `CopyPackedAdapterModeRangeRuntime`.
-         */
-        [[nodiscard]] std::uint32_t* CopyPackedAdapterModeRangeRuntimeAdapterB(
-            const std::uint32_t* sourceBegin,
-            const std::uint32_t* sourceEnd,
-            std::uint32_t* destinationBegin
-        )
-        {
-            return CopyPackedAdapterModeRangeRuntime(sourceBegin, sourceEnd, destinationBegin);
-        }
-
-        /**
-         * Address: 0x00940AF0 (FUN_00940AF0)
-         *
-         * What it does:
-         * Writes one packed adapter-mode payload range (`+0x04/+0x08/+0x0C`
-         * dwords per 16-byte lane) from one fixed source mode.
-         */
-        [[nodiscard]] std::uint32_t* CopyPackedAdapterModePayloadRangeRuntime(
-            std::uint32_t* destinationBegin,
-            std::uint32_t* const destinationEnd,
-            const std::uint32_t* const sourceMode
-        )
-        {
-            std::uint32_t* result = destinationBegin;
-            if (destinationBegin != destinationEnd)
-            {
-                result = destinationBegin + 2;
-                do
-                {
-                    result[-1] = sourceMode[1];
-                    result[0] = sourceMode[2];
-                    result[1] = sourceMode[3];
-                    result += 4;
-                } while (result - 2 != destinationEnd);
-            }
-            return result;
-        }
-
-        /**
-         * Address: 0x00940B60 (FUN_00940B60)
-         *
-         * What it does:
-         * Fills `count` packed adapter-mode slots (`4 dwords` stride) from one
-         * source mode payload and rebinds `AdapterModeD3D9` vtable ownership.
-         */
-        void FillPackedAdapterModeRangeRuntime(
-            std::uint32_t* destinationBegin,
-            std::uint32_t count,
-            const std::uint32_t* const sourceMode
-        )
-        {
-            while (count != 0U)
-            {
-                if (destinationBegin != nullptr && sourceMode != nullptr)
-                {
-                    auto* const destinationMode = reinterpret_cast<AdapterModeD3D9*>(destinationBegin);
-                    ::new (static_cast<void*>(destinationMode))
-                        AdapterModeD3D9(sourceMode[1], sourceMode[2], sourceMode[3]);
-                    destinationBegin += 4;
-                }
-                --count;
-            }
-        }
-
-        /**
-         * Address: 0x00940BA0 (FUN_00940BA0)
-         *
-         * What it does:
-         * Dispatch alias lane for packed adapter-mode fill behavior.
-         */
-        void FillPackedAdapterModeRangeRuntimeDispatchA(
-            std::uint32_t* const destinationBegin,
-            const std::uint32_t count,
-            const std::uint32_t* const sourceMode
-        )
-        {
-            FillPackedAdapterModeRangeRuntime(destinationBegin, count, sourceMode);
-        }
-
-        /**
-         * Address: 0x00940BF0 (FUN_00940BF0)
-         *
-         * What it does:
-         * Fills `count` packed adapter-mode slots from one source payload and
-         * returns the one-past-end destination cursor lane.
-         */
-        [[nodiscard]] std::uint32_t* FillPackedAdapterModeRangeAndReturnEnd(
-            std::uint32_t* const destinationBegin,
-            const std::uint32_t count,
-            const std::uint32_t* const sourceMode
-        )
-        {
-            FillPackedAdapterModeRangeRuntime(destinationBegin, count, sourceMode);
-            const auto destinationAddress = reinterpret_cast<std::uintptr_t>(destinationBegin);
-            const auto byteAdvance = static_cast<std::uintptr_t>(count) * sizeof(AdapterModeD3D9);
-            return reinterpret_cast<std::uint32_t*>(destinationAddress + byteAdvance);
-        }
-
-        struct AdapterVectorCountRuntime final
-        {
-            void* allocatorProxy = nullptr;   // +0x00
-            AdapterD3D9* first = nullptr;     // +0x04
-            AdapterD3D9* last = nullptr;      // +0x08
-        };
-        static_assert(sizeof(AdapterVectorCountRuntime) == 0x0C, "AdapterVectorCountRuntime size must be 0x0C");
-
-        /**
-         * Address: 0x008E83A0 (FUN_008E83A0)
-         *
-         * What it does:
-         * Returns element count from one adapter-vector lane (`_Mylast -
-         * _Myfirst`) with 0x70-byte element stride, or zero when uninitialized.
-         */
-        [[nodiscard]] int CountAdapterVectorElements(const AdapterVectorCountRuntime* const vectorLane) noexcept
-        {
-            const AdapterD3D9* const first = vectorLane->first;
-            if (first == nullptr)
-            {
-                return 0;
-            }
-
-            return static_cast<int>(vectorLane->last - first);
-        }
-
         std::uint32_t GetDeviceContextHeadCount(const DeviceContext* const context) noexcept
         {
             if (context == nullptr)
@@ -1017,32 +450,11 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
-         * Address: 0x009411D0 (FUN_009411D0, msvc8::vector<AdapterModeD3D9>::push_back)
-         *
-         * What it does:
-         * Per-T named helper binding the engine-instantiated
-         * `msvc8::vector<gpg::gal::AdapterModeD3D9>::push_back` slow-path body.
-         * Rewriting the inline `modes.push_back(...)` call site in
-         * `CollectAllAdaptersForSetup` through this helper preserves the
-         * MSVC8 1:1 symbol shape for the per-T template emission even when
-         * the modern compiler would otherwise inline the natural form.
-         */
-        void PushBackAdapterModeD3D9(
-            msvc8::vector<AdapterModeD3D9>& modes,
-            const AdapterModeD3D9& mode)
-        {
-            modes.push_back(mode);
-        }
-
-        /**
          * Address: 0x008F1CB0 (FUN_008F1CB0, func_CollectAllAdapters)
          *
          * What it does:
          * Enumerates all Direct3D adapters, captures identity/mode lists, and
-         * appends them to the backend adapter storage. Routes each
-         * `adapter.modes.push_back(...)` through the per-T named helper
-         * `PushBackAdapterModeD3D9` (FUN_009411D0) to preserve the MSVC8
-         * `vector<AdapterModeD3D9>::push_back` symbol shape.
+         * appends them to the backend adapter storage.
          */
         void CollectAllAdaptersForSetup(DeviceD3D9& device)
         {
@@ -1087,10 +499,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                         ThrowGalError("DeviceD3D9.cpp", 1212, "unable to enumerate adapters");
                     }
 
-                    PushBackAdapterModeD3D9(
-                        adapter.modes,
-                        AdapterModeD3D9(displayMode.Width, displayMode.Height, displayMode.RefreshRate)
-                    );
+                    adapter.AddMode(AdapterModeD3D9(displayMode.Width, displayMode.Height, displayMode.RefreshRate));
                 }
 
                 device.mAdapters.push_back(adapter);
@@ -2097,22 +1506,12 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008EFF80 (FUN_008EFF80, gpg::gal::AdapterD3D9::AdapterD3D9 copy)
      *
      * What it does:
-     * Copy-constructs one adapter descriptor by cloning identifier lanes,
-     * descriptive strings, and the adapter mode vector.
+     * Memberwise copy: the two ids, the three strings, then `modes` through the
+     * vector's copy constructor (0x008EFB60, called at 0x008F0020). The
+     * recovered body default-constructed `modes` and assigned it afterwards,
+     * which runs `operator=` (0x008EF870) instead.
      */
-    AdapterD3D9::AdapterD3D9(const AdapterD3D9& other)
-        : vendorId(other.vendorId)
-        , deviceId(other.deviceId)
-        , driver()
-        , deviceName()
-        , description()
-        , modes()
-    {
-        driver.assign(other.driver, 0U, msvc8::string::npos);
-        deviceName.assign(other.deviceName, 0U, msvc8::string::npos);
-        description.assign(other.description, 0U, msvc8::string::npos);
-        modes = other.modes;
-    }
+    AdapterD3D9::AdapterD3D9(const AdapterD3D9&) = default;
 
     /**
      * Address: 0x00940C90 (FUN_00940C90)
@@ -2123,6 +1522,19 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Destroys adapter mode list and all descriptive string lanes.
      */
     AdapterD3D9::~AdapterD3D9() = default;
+
+    /**
+     * Address: 0x009411D0 (FUN_009411D0)
+     *
+     * What it does:
+     * `modes.push_back(mode)`. The body is `add ecx, 60h` and a jump into the
+     * vector's `push_back` (0x00941160); `CollectAllAdapters` calls it once per
+     * enumerated display mode (0x008F1EDF).
+     */
+    void AdapterD3D9::AddMode(const AdapterModeD3D9& mode)
+    {
+        modes.push_back(mode);
+    }
 
     /**
      * Address: 0x00940990 (FUN_00940990, ??0AdapterModeD3D9@gal@gpg@@QAE@@Z)
@@ -2238,23 +1650,26 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Address: 0x008F0170 (FUN_008F0170)
      *
      * What it does:
-     * Preserves the currently unresolved adapter-mode projection slot.
+     * Replaces `outModes` with the display modes of adapter `adapterIndex` as
+     * `{width, height, refresh}` triples - the options screen's resolution list
+     * (`SetupPrimaryAdapterSettings` asks for adapter 0 at 0x008D22F7, the
+     * secondary for adapter 1 at 0x008D2807). An index past the adapter list
+     * leaves it empty. The recovered body pushed 16-byte `AdapterModeD3D9`s into
+     * a vector the caller walks at a 12-byte stride.
      */
-    void DeviceD3D9::GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, const int adapterIndex)
+    void DeviceD3D9::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
     {
-      // The binary rewinds the output rather than releasing it, so the caller
-      // keeps whatever capacity it already paid for across repeated queries.
-      outModes.clear();
+        outModes.clear();
+        if (adapterIndex >= static_cast<int>(mAdapters.size()))
+        {
+            return;
+        }
 
-      if (adapterIndex >= static_cast<int>(mAdapters.size())) {
-        return;
-      }
-
-      // Copied field-by-field rather than element-wise: the source modes carry a
-      // vptr this output does not reproduce, and only the three scalars matter.
-      for (const AdapterModeD3D9& mode : mAdapters[static_cast<std::size_t>(adapterIndex)].modes) {
-        PushBackAdapterModeD3D9(outModes, AdapterModeD3D9(mode.width_, mode.height_, mode.refreshRate_));
-      }
+        for (const AdapterModeD3D9& mode : mAdapters[static_cast<std::size_t>(adapterIndex)].modes)
+        {
+            const HeadAdapterMode headMode{mode.width_, mode.height_, mode.refreshRate_};
+            outModes.push_back(headMode);
+        }
     }
 
     /**
@@ -2749,22 +2164,6 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x008EFDD0 (FUN_008EFDD0)
-     *
-     * What it does:
-     * Appends one adapter-mode projection entry (`width/height/refresh`) to the
-     * destination head-mode vector and returns the inserted slot.
-     */
-    HeadAdapterMode* AppendHeadAdapterMode(
-        msvc8::vector<HeadAdapterMode>& adapterModes,
-        const HeadAdapterMode& mode
-    )
-    {
-        adapterModes.push_back(mode);
-        return &adapterModes.back();
-    }
-
-    /**
      * Address: 0x008F2080 (FUN_008F2080)
      *
      * What it does:
@@ -2790,11 +2189,8 @@ namespace { // TEMPORARY PROBE (do not commit)
             head.adapterModes.clear();
             for (const AdapterModeD3D9& mode : adapter.modes)
             {
-                HeadAdapterMode mappedMode{};
-                mappedMode.width = mode.width_;
-                mappedMode.height = mode.height_;
-                mappedMode.refreshRate = mode.refreshRate_;
-                static_cast<void>(AppendHeadAdapterMode(head.adapterModes, mappedMode));
+                const HeadAdapterMode headMode{mode.width_, mode.height_, mode.refreshRate_};
+                head.adapterModes.push_back(headMode);
             }
 
             head.validFormats1.clear();
@@ -2803,20 +2199,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 const HRESULT result = mDirect3D->CheckDeviceFormat(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_X8R8G8B8, 1U, D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(GetD3DFormat(static_cast<std::uint32_t>(formatToken))));
                 if (result >= 0)
                 {
-                    // MSVC8 inlines the fast in-place append and, when the vector is
-                    // at capacity, calls the out-of-line grow lane
-                    // msvc8::vector<std::int32_t>::_Insert_n (FUN_008EF500) as
-                    // _Insert_n(_Mylast, 1, &formatToken). Mirror that shape so the
-                    // front-end emits that per-T insert symbol.
-                    if (head.validFormats1.size() < head.validFormats1.capacity())
-                    {
-                        head.validFormats1.push_back(formatToken);
-                    }
-                    else
-                    {
-                        static_cast<void>(head.validFormats1.insert(
-                            head.validFormats1.end(), static_cast<std::size_t>(1), formatToken));
-                    }
+                    head.validFormats1.push_back(formatToken);
                 }
             }
 
@@ -2826,20 +2209,7 @@ namespace { // TEMPORARY PROBE (do not commit)
                 const HRESULT result = mDirect3D->CheckDeviceFormat(adapterIndex, D3DDEVTYPE_HAL, D3DFMT_X8R8G8B8, 0U, D3DRTYPE_TEXTURE, static_cast<D3DFORMAT>(FormatGalToD3D(static_cast<std::uint32_t>(formatToken))));
                 if (result >= 0)
                 {
-                    // MSVC8 inlines the fast in-place append and, when the vector is
-                    // at capacity, calls the out-of-line grow lane
-                    // msvc8::vector<std::int32_t>::_Insert_n (FUN_008EF2B0) as
-                    // _Insert_n(_Mylast, 1, &formatToken). Mirror that shape so the
-                    // front-end emits that per-T insert symbol.
-                    if (head.validFormats2.size() < head.validFormats2.capacity())
-                    {
-                        head.validFormats2.push_back(formatToken);
-                    }
-                    else
-                    {
-                        static_cast<void>(head.validFormats2.insert(
-                            head.validFormats2.end(), static_cast<std::size_t>(1), formatToken));
-                    }
+                    head.validFormats2.push_back(formatToken);
                 }
             }
 

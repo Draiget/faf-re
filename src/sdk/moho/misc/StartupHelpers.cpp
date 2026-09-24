@@ -1222,42 +1222,35 @@ namespace
   // states are published in the adapter's own order as the scan walks it.
   using AdapterModeDedup = msvc8::set<moho::Resolution, ResolutionLess>;
 
-  [[nodiscard]] msvc8::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(const std::uint32_t headIndex)
+  /**
+   * The list both adapter option builders publish: the device's display modes
+   * for `adapterIndex` (gal::Device slot 5 - adapter 0 at 0x008D22F7, adapter 1
+   * at 0x008D2807), less the modes under the minimum window size and repeats.
+   * The recovered version read the head's own `adapterModes` copy instead and
+   * gave up when the context had no head at that index; the binary asks the
+   * device and has neither the head lookup nor the guards.
+   */
+  [[nodiscard]] msvc8::vector<gpg::gal::HeadAdapterMode> CollectAdapterModes(const int adapterIndex)
   {
+    msvc8::vector<gpg::gal::HeadAdapterMode> adapterModes;
+    gpg::gal::Device::GetInstance()->GetModesForAdapter(adapterModes, adapterIndex);
+
     msvc8::vector<gpg::gal::HeadAdapterMode> modes;
     AdapterModeDedup published;
-
-    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    if (device == nullptr) {
-      return modes;
-    }
-
-    gpg::gal::DeviceContext* const context = device->GetDeviceContext();
-    if (context == nullptr || headIndex >= static_cast<std::uint32_t>(context->GetHeadCount())) {
-      return modes;
-    }
-
-    const gpg::gal::Head& head = context->GetHead(headIndex);
-    const gpg::gal::HeadAdapterMode* const sourceBegin = head.adapterModes.begin();
-    const gpg::gal::HeadAdapterMode* const sourceEnd = head.adapterModes.end();
-    if (sourceBegin == nullptr || sourceEnd == nullptr) {
-      return modes;
-    }
-
-    for (const gpg::gal::HeadAdapterMode* it = sourceBegin; it != sourceEnd; ++it) {
-      if (!IsModeAboveWindowMinimum(*it)) {
+    for (const gpg::gal::HeadAdapterMode& adapterMode : adapterModes) {
+      if (!IsModeAboveWindowMinimum(adapterMode)) {
         continue;
       }
       const moho::Resolution mode(
-        static_cast<std::int32_t>(it->width),
-        static_cast<std::int32_t>(it->height),
-        static_cast<std::int32_t>(it->refreshRate)
+        static_cast<std::int32_t>(adapterMode.width),
+        static_cast<std::int32_t>(adapterMode.height),
+        static_cast<std::int32_t>(adapterMode.refreshRate)
       );
       if (published.find(mode) != published.end()) {
         continue;
       }
       (void)published.insert(mode);
-      modes.push_back(*it);
+      modes.push_back(adapterMode);
     }
 
     return modes;

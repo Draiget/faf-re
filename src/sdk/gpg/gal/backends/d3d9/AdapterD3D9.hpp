@@ -46,8 +46,7 @@ namespace gpg::gal
      * Address: 0x008EFF80 (FUN_008EFF80, gpg::gal::AdapterD3D9::AdapterD3D9 copy)
      *
      * What it does:
-     * Copy-constructs one adapter descriptor by cloning identifier lanes,
-     * string lanes, and the adapter-mode vector payload.
+     * Memberwise copy; `modes` goes through the vector's copy constructor.
      */
     AdapterD3D9(const AdapterD3D9& other);
 
@@ -59,6 +58,14 @@ namespace gpg::gal
      * Destroys adapter mode list and all descriptive string lanes.
      */
     virtual ~AdapterD3D9();
+
+    /**
+     * Address: 0x009411D0 (FUN_009411D0)
+     *
+     * What it does:
+     * Appends one display mode to `modes`.
+     */
+    void AddMode(const AdapterModeD3D9& mode);
 
   public:
     std::uint32_t vendorId = 0;             // +0x04

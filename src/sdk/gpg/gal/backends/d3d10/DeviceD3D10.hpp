@@ -113,7 +113,7 @@ namespace gal {
        * What it does:
        * Preserves the binary no-op slot with `retn 8` calling-shape.
        */
-      void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) override;
+      void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008FAB80
        * Slot: 7

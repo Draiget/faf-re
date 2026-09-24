@@ -4135,7 +4135,7 @@ namespace gpg::gal
    * What it does:
    * Preserves the binary no-op adapter-modes slot (`retn 8` shape).
    */
-  void DeviceD3D10::GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& /*outModes*/, const int /*adapterIndex*/)
+  void DeviceD3D10::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& /*outModes*/, const int /*adapterIndex*/)
   {
   }
 

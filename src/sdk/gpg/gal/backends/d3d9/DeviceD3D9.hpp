@@ -105,7 +105,7 @@ namespace gal {
        * Slot: 5
        * Demangled: gpg::gal::DeviceD3D9::GetModesForAdapter
        */
-      void GetModesForAdapter(msvc8::vector<AdapterModeD3D9>& outModes, int adapterIndex) override;
+      void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
        * Address: 0x008EAB20 (FUN_008EAB20)
        * Slot: 7
