@@ -701,19 +701,20 @@ namespace moho
   /**
    * Address: 0x00470C90 (FUN_00470C90, Moho::GeomCamera3::Unproject)
    *
-   * Wm3::Vector2<float> const&
+   * Wm3::Vector2<float> const&, float, float, float, float
    *
    * What it does:
-   * Converts one screen-space point into a world-space ray using the inverse
-   * view-projection matrix and current viewport bounds.
+   * See the declaration - unprojects one point of the caller-supplied screen
+   * rectangle into a world-space ray.
    */
-  GeomLine3 GeomCamera3::Unproject(const Wm3::Vector2f& screenPoint) const
+  GeomLine3 GeomCamera3::Unproject(
+    const Wm3::Vector2f& screenPoint,
+    const float viewportX0,
+    const float viewportX1,
+    const float viewportY0,
+    const float viewportY1
+  ) const
   {
-    const float viewportX0 = viewport.r[3].x;
-    const float viewportX1 = viewport.r[3].x + viewport.r[3].z;
-    const float viewportY0 = viewport.r[3].y + viewport.r[3].w;
-    const float viewportY1 = viewport.r[3].y;
-
     const float ndcX = (((screenPoint.x - viewportX0) / (viewportX1 - viewportX0)) * 2.0f) - 1.0f;
     const float ndcY = (((screenPoint.y - viewportY0) / (viewportY1 - viewportY0)) * 2.0f) - 1.0f;
 
@@ -730,6 +731,25 @@ namespace moho
     line.farthest = Wm3::Vector3f::Normalize(&line.dir);
     line.closest = 0.0f;
     return line;
+  }
+
+  /**
+   * Address: 0x00470F20 (unboxed 64-byte wrapper; see the declaration)
+   *
+   * Wm3::Vector2<float> const&
+   *
+   * What it does:
+   * Unprojects one point expressed in this camera's own viewport pixels.
+   */
+  GeomLine3 GeomCamera3::Unproject(const Wm3::Vector2f& screenPoint) const
+  {
+    return Unproject(
+      screenPoint,
+      viewport.r[3].x,
+      viewport.r[3].x + viewport.r[3].z,
+      viewport.r[3].y + viewport.r[3].w,
+      viewport.r[3].y
+    );
   }
 
   /**

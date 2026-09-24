@@ -173,8 +173,35 @@ namespace moho
    * Address: 0x00546650 (FUN_00546650, Moho::CSimResources::DepositIsInArea)
    *
    * What it does:
-   * Tests containment relation used by original placement logic for typed
-   * deposits.
+   * Returns true when the query area and one deposit of the requested type
+   * are in a containment relation - either the area encloses the deposit or
+   * the deposit encloses the area. This is the gate `OCCUPY_Check` runs for
+   * `RULEUBR_OnMassDeposit` / `RULEUBR_OnHydrocarbonDeposit`, i.e. the only
+   * thing that keeps a mass extractor on its mass point.
+   *
+   * The shipped body picks which way round to test from the two `x0`s
+   * (0x005466BC `cmp esi, edx` / `jg`), and the two arms are exact mirrors of
+   * each other:
+   *
+   *   area.x0 <= deposit.x0  ->  area encloses deposit
+   *       0x005466C0  area.x1 >= deposit.x1
+   *       0x005466C8  deposit.z0 >= area.z0
+   *       0x005466D0  area.z1 >= deposit.z1
+   *   area.x0 >= deposit.x0  ->  deposit encloses area
+   *       0x005466DC  deposit.x1 >= area.x1
+   *       0x005466E4  area.z0 >= deposit.z0
+   *       0x005466EC  deposit.z1 >= area.z1
+   *
+   * When the first arm fails, 0x005466D8 re-tests `area.x0 < deposit.x0` and
+   * only advances to the next deposit on a *strict* less-than; equal `x0`s
+   * fall through into the second arm, so a deposit is given both tests.
+   *
+   * Both arms had previously been recovered with the *same* comparison - the
+   * enclosing arm carried the enclosed arm's three tests. For the 1x1 rects
+   * this function is actually called with (a mass point and a mass
+   * extractor's footprint), that degenerates to "area.x0 <= deposit.x0 &&
+   * area.z0 == deposit.z0", i.e. a mass extractor could be placed on any cell
+   * in the same Z row at or west of any mass point on the map.
    */
   bool CSimResources::DepositIsInArea(EDepositType type, gpg::Rect2i* area)
   {
@@ -186,13 +213,9 @@ namespace moho
 
       const gpg::Rect2i& rect = deposit.footprintRect;
       if (area->x0 <= rect.x0) {
-        if (rect.x1 >= area->x1 && area->z0 >= rect.z0 && rect.z1 >= area->z1) {
+        if (area->x1 >= rect.x1 && rect.z0 >= area->z0 && area->z1 >= rect.z1) {
           return true;
         }
-        continue;
-      }
-
-      if (area->x1 < rect.x1 || rect.z0 < area->z0 || area->z1 < rect.z1) {
         if (area->x0 < rect.x0) {
           continue;
         }

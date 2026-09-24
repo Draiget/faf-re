@@ -37228,7 +37228,13 @@ void moho::REN_RenderCameraOutline(
 
   CD3DPrimBatcher::Vertex corners[4];
   for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
-    const GeomLine3 ray = camera->Unproject(kNdcCorners[cornerIndex]);
+    // The unit rectangle, not the camera's own viewport: 0x007F99A5 zeroes
+    // xmm1 (x0) and xmm4 (y0) and loads 1.0f into xmm2 (x1) and xmm5 (y1), so
+    // the four corner literals above ARE normalised device coordinates. Going
+    // through the camera-viewport wrapper instead mapped all four of them to
+    // within one pixel of the view's top-left corner, collapsing the outline
+    // to a point and leaving the minimap with no camera-frustum indicator.
+    const GeomLine3 ray = camera->Unproject(kNdcCorners[cornerIndex], 0.0f, 1.0f, 0.0f, 1.0f);
     const Wm3::Vec3f hit = IntersectCameraRayWithGroundPlane(ray, groundY);
     corners[cornerIndex] = CD3DPrimBatcher::Vertex{hit.x, hit.y, hit.z, 0xFFFFFFFFu, 0.0f, 0.0f};
   }

@@ -114,11 +114,46 @@ namespace moho
     /**
      * Address: 0x00470C90 (FUN_00470C90, Moho::GeomCamera3::Unproject)
      *
+     * Wm3::Vector2<float> const&, float, float, float, float
+     *
+     * What it does:
+     * Converts one point in the caller-supplied screen rectangle into a
+     * world-space ray through the inverse view-projection matrix. The four
+     * bounds are the same lanes `Project`'s bounds overload takes, and the
+     * shipped body receives them in xmm1/xmm2/xmm4/xmm5 (0x00470CB0..
+     * 0x00470CD5: `x - x0`, `x1 - x0`, `y - y0`, `y1 - y0`, each scaled by 2
+     * and biased by -1).
+     *
+     * Most call sites hand over the camera's own viewport and so read as the
+     * one-argument form below, but `REN_RenderCameraOutline` deliberately
+     * passes the unit rectangle {0,1,0,1} so it can unproject the frustum's
+     * four NDC corners (0x007F99A5 `xorps xmm1,xmm1` / 0x007F99AF `movss
+     * xmm2, 1.0f` / 0x007F99D0..0x007F99D3 `movaps xmm5,xmm2` + `movaps
+     * xmm4,xmm1`). Folding the two overloads into one that always used the
+     * camera viewport collapsed all four of those corners onto a single
+     * pixel, which is why the minimap drew no camera outline at all.
+     */
+    [[nodiscard]] GeomLine3 Unproject(
+      const Wm3::Vector2f& screenPoint,
+      float viewportX0,
+      float viewportX1,
+      float viewportY0,
+      float viewportY1
+    ) const;
+
+    /**
+     * Address: 0x00470F20 (the 64-byte body between `Unproject` and `Project`;
+     * IDA left it unboxed, so it carries no `FUN_` token - decoded from the
+     * shipped bytes: four `movss` off `viewport.r[3]` at +0x2B4/+0x2B8/+0x2BC/
+     * +0x2C0, `xmm4 += xmm5`, `xmm2 += xmm1`, then `call 0x00470C90`.)
+     *
      * Wm3::Vector2<float> const&
      *
      * What it does:
-     * Converts one screen-space point into a world-space ray using the
-     * inverse view-projection matrix and current viewport bounds.
+     * Unprojects one point given in this camera's own viewport pixels, by
+     * forwarding {x, x + width, y + height, y} to the bounds overload. The
+     * vertical pair is deliberately inverted, exactly as `Project`'s own
+     * one-argument wrapper at 0x00471080 inverts it.
      */
     [[nodiscard]] GeomLine3 Unproject(const Wm3::Vector2f& screenPoint) const;
 
