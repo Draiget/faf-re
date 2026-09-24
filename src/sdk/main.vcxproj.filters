@@ -336,6 +336,9 @@
     <ClCompile Include="moho\sim\SimDriver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="moho\sim\SimWorkerPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="moho\sim\SSyncFilter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2725,6 +2728,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\SimDriver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimThreadRole.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="moho\sim\SimWorkerPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\sim\ISTIDriver.h">

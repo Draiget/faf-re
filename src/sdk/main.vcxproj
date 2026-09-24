@@ -685,6 +685,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\sim\SSTICommandSource.cpp" />
     <ClCompile Include="moho\sim\IArmyTypeInfo.cpp" />
     <ClCompile Include="moho\sim\SimDriver.cpp" />
+    <ClCompile Include="moho\sim\SimWorkerPool.cpp" />
     <ClCompile Include="moho\sim\SSyncFilter.cpp" />
     <ClCompile Include="moho\sim\SSTIArmyConstantData.cpp" />
     <ClCompile Include="moho\command\EUnitCommandTypeTypeInfo.cpp" />
@@ -2371,6 +2372,8 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\sim\SimArmySerializer.h" />
     <ClInclude Include="moho\sim\SimArmyTypeInfo.h" />
     <ClInclude Include="moho\sim\SimDriver.h" />
+    <ClInclude Include="moho\sim\SimThreadRole.h" />
+    <ClInclude Include="moho\sim\SimWorkerPool.h" />
     <ClInclude Include="moho\sim\SSyncFilter.h" />
     <ClInclude Include="moho\sim\STIMap.h" />
     <ClInclude Include="moho\sim\STIMapReflection.h" />
