@@ -20,29 +20,6 @@ namespace moho
   inline constexpr std::size_t kEmitterCurveCount = 21u;
 
   /**
-   * `CEfxEmitter::mCurves`: a `0x10` `{start_, end_, capacity_, originalVec_}`
-   * head at `+0x198` followed immediately by its own `21 * 0x38` inline window
-   * at `+0x1A8`, which ends exactly where `mBlueprint` begins (`+0x640`).
-   *
-   * Both constructors arm it with the four stores at 0x0065B9F0 / 0x0065BAC7
-   * (`start_ = end_ = originalVec_ = this + 0x1A8`, `capacity_ = that + 0x498`),
-   * `~CEfxEmitter` releases it at 0x0065DE3F through the `ResetInline_` shape,
-   * and a blueprint emitter fills it with `resize(21, SEfxCurve{})` at
-   * 0x0065BB41. Capacity is exactly the fill count, so a well-formed emitter
-   * never leaves the inline window -- the destructor's heap arm is dead in
-   * practice and stays only because the container cannot know that.
-   *
-   * Formerly modelled as a hand-written `CEfxCurveVectorRuntime` four-pointer
-   * head plus a separate `std::uint8_t mInlineCurveStorage[21 * 0x38]` byte
-   * lane, with both constructors writing the four pointers by hand and
-   * `mEnd` spelled `reinterpret_cast<SEfxCurve*>(&mBlueprint)` -- the
-   * capacity-end of the window happens to be the address of the next member.
-   */
-  using CEfxEmitterCurveArray = gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>;
-
-  static_assert(sizeof(CEfxEmitterCurveArray) == 0x4A8, "CEfxEmitterCurveArray size must be 0x4A8");
-
-  /**
    * VFTABLE: 0x00E240B4
    * COL: 0x00E7E5E4
    *
@@ -238,7 +215,26 @@ namespace moho
 
     EmitterType mEmitterType;               // +0x190
     std::uint8_t mPad194[0x04];             // +0x194
-    CEfxEmitterCurveArray mCurves;          // +0x198 (0x10 head + 21 * 0x38 window)
+    /**
+     * A `0x10` `{start_, end_, capacity_, originalVec_}`
+     * head at `+0x198` followed immediately by its own `21 * 0x38` inline window
+     * at `+0x1A8`, which ends exactly where `mBlueprint` begins (`+0x640`).
+     *
+     * Both constructors arm it with the four stores at 0x0065B9F0 / 0x0065BAC7
+     * (`start_ = end_ = originalVec_ = this + 0x1A8`, `capacity_ = that + 0x498`),
+     * `~CEfxEmitter` releases it at 0x0065DE3F through the `ResetInline_` shape,
+     * and a blueprint emitter fills it with `resize(21, SEfxCurve{})` at
+     * 0x0065BB41. Capacity is exactly the fill count, so a well-formed emitter
+     * never leaves the inline window -- the destructor's heap arm is dead in
+     * practice and stays only because the container cannot know that.
+     *
+     * Formerly modelled as a hand-written `CEfxCurveVectorRuntime` four-pointer
+     * head plus a separate `std::uint8_t mInlineCurveStorage[21 * 0x38]` byte
+     * lane, with both constructors writing the four pointers by hand and
+     * `mEnd` spelled `reinterpret_cast<SEfxCurve*>(&mBlueprint)` -- the
+     * capacity-end of the window happens to be the address of the next member.
+     */
+    gpg::fastvector_n<SEfxCurve, kEmitterCurveCount> mCurves; // +0x198
     REmitterBlueprint* mBlueprint;          // +0x640
     float mTotalEmissions;                  // +0x644
     std::uint32_t mLife;                    // +0x648
@@ -257,6 +253,7 @@ namespace moho
   {
     static_assert(offsetof(CEfxEmitter, mEmitterType) == 0x190, "CEfxEmitter::mEmitterType offset must be 0x190");
     static_assert(offsetof(CEfxEmitter, mCurves) == 0x198, "CEfxEmitter::mCurves offset must be 0x198");
+    static_assert(sizeof(CEfxEmitter::mCurves) == 0x4A8, "CEfxEmitter::mCurves size must be 0x4A8");
     static_assert(
       offsetof(CEfxEmitter, mCurves.inlineVec_) == 0x1A8, "CEfxEmitter::mCurves inline window offset must be 0x1A8"
     );

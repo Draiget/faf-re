@@ -97,17 +97,13 @@ namespace
         return source;
     }
 
-    // The cluster node scratch of `ClusterBuild`: `gpg::fastvector_n<Node, 16>`,
-    // one packed `x | (z << 8)` word per boundary node.
-    using ClusterNodeScratch = gpg::fastvector_n<std::int16_t, 16>;
-
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartBit = { 0u, 0u, 0u, 8u };
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeStartLayer = { 0u, 8u, 0u, 0u };
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeBitStep = { 1u, 1u, 0u, 0u };
     constexpr std::array<std::uint8_t, 4> kOccupationEdgeLayerStep = { 0u, 0u, 1u, 1u };
 
     void AppendPackedEdgeWord(
-      ClusterNodeScratch& outEdges,
+      gpg::fastvector_n<std::int16_t, 16>& outEdges,
       const std::uint8_t lowByte,
       const std::uint8_t highByte
     )
@@ -131,7 +127,7 @@ namespace
      */
     std::int16_t* BuildOccupationEdgeContacts(
       const gpg::HaStar::OccupationData& occupationData,
-      ClusterNodeScratch& outEdges
+      gpg::fastvector_n<std::int16_t, 16>& outEdges
     )
     {
       for (std::uint32_t edgeIndex = 0; edgeIndex < 4u; ++edgeIndex) {
@@ -2752,7 +2748,7 @@ namespace
      */
     void BuildClusterEdgeCosts(
       const gpg::HaStar::OccupationData& occupation,
-      const ClusterNodeScratch& nodes,
+      const gpg::fastvector_n<std::int16_t, 16>& nodes,
       gpg::core::FastVectorInline<std::uint8_t>& outEdges
     )
     {
@@ -2897,7 +2893,7 @@ namespace
      * `ioEdges.size() == TriangularSize(nnodes_used)`.
      */
     void DropUnreachedClusterNodes(
-      ClusterNodeScratch& ioNodes,
+      gpg::fastvector_n<std::int16_t, 16>& ioNodes,
       gpg::core::FastVectorInline<std::uint8_t>& ioEdges
     )
     {
@@ -3230,8 +3226,9 @@ unsigned int hash_value(const Cluster& cluster)
  */
 Cluster ClusterBuild(const OccupationData& occupationData)
 {
-    // Node scratch: fastvector<Node> with a 32-byte (16-node) inline buffer.
-    ClusterNodeScratch nodeView;
+    // Node scratch: fastvector<Node> with a 32-byte (16-node) inline buffer,
+    // one packed `x | (z << 8)` word per boundary node.
+    gpg::fastvector_n<std::int16_t, 16> nodeView;
 
     // Edge scratch: fastvector<Edge> with a 120-byte inline buffer.
     gpg::fastvector_n<std::uint8_t, 120> edgeView;

@@ -303,76 +303,12 @@ namespace
   };
   static_assert(sizeof(PathQueueNeighbour) == 0x08, "PathQueueNeighbour size must be 0x08");
 
-  /**
-   * `WorkOnce` holds candidates in a stack buffer spanning `[esp+660h]` to
-   * `[esp+CA0h]` (0x640 bytes) with a 0x10-byte header at `[esp+650h]`, i.e.
-   * 200 inline entries before the vector spills to the heap.
-   *
-   * The 0x10-byte header is the four `FastVectorN` pointer lanes, and the
-   * grow/insert lanes below read them at exactly those displacements:
-   * `+0x00 start_`, `+0x04 end_`, `+0x08 capacity_`, `+0x0C originalVec_`
-   * (`mov esi,[edi+4]` / `cmp edx,[edi+8]` at 0x00767378-0x00767384, and
-   * `mov eax,[esi+0Ch]` at 0x00767848 for the inline-origin check).
-   *
-   * Address: 0x00767370 (FUN_00767370)
-   *
-   * IDA signature:
-   * int __userpurge sub_767370@<eax>(_DWORD *a1@<edi>, int a2, int a3, int a4);
-   *
-   * What it does:
-   * The out-of-line MSVC8 emission of
-   * `gpg::core::FastVectorN<PathQueueNeighbour, 200>::InsertAt` - the
-   * trivially-copyable element lane. It splices `[a3, a4)` in before `a2`:
-   * when `size + count` still fits the capacity lane it copy-constructs the
-   * displaced tail past `end_`, memmoves the middle block up by `count`, then
-   * memmoves the source over the vacated window; when the range spills past
-   * `end_` it copy-constructs the overflow suffix and the displaced tail
-   * instead. When capacity is short it doubles it (`requiredSize < 2*capacity
-   * ? 2*capacity : requiredSize`) and tail-calls the grow lane.
-   *
-   * This body is not written out again here: it is the template in
-   * `gpg/core/containers/FastVector.h` (`FastVectorN::InsertAt`, the
-   * `is_trivially_copyable_v<T>` lane at the tail of the function), and the
-   * compiler emits it for this instantiation because
-   * `EnumerateAdjacentCells` / `EnumerateClusterEdges` below odr-use
-   * `PathQueueNeighbourBuffer::push_back`. Writing a second per-element-size
-   * copy of it would duplicate a container operation the SDK already models.
-   * Its sibling emissions of the same template body are already recovered as
-   * `gpg::core::legacy::AppendRange8ByteLane` (0x0080EF20 / 0x007A24B0);
-   * FUN_0080EF20 decompiles line-for-line identically to FUN_00767370,
-   * differing only in the two callee addresses.
-   *
-   * Reached from the two `push_back` full-storage arms in this file:
-   *   - 0x00766490, the `outNeighbours.push_back(neighbour)` in
-   *     `EnumerateAdjacentCells` (FUN_00766350, level-0 arm),
-   *   - 0x0076674D, the `outNeighbours.push_back(neighbour)` in
-   *     `EnumerateClusterEdges` (FUN_00766350, level>0 arm).
-   * Both sites match the template's `if (end_ == capacity_) InsertAt(end_,
-   * &value, &value + 1);` guard exactly (`mov eax,[edi+4]; cmp eax,[edi+8];
-   * jnz <in-place store>` at 0x0076646A / 0x0076671A).
-   *
-   * Address: 0x007677D0 (FUN_007677D0)
-   *
-   * IDA signature:
-   * int __fastcall sub_7677D0(int splitPos@<ecx>, char **vec@<edx>, int capacity, int first, int last);
-   *
-   * What it does:
-   * The matching `FastVectorN::GrowInsert` emission this instantiation
-   * tail-calls at 0x007673B4. Allocates `operator new[](8 * capacity)`,
-   * materializes prefix / inserted range / suffix into it through the copy
-   * lane, then either hands the inline window back
-   * (`*originalVec_ = capacity_` when `start_ == originalVec_`) or
-   * `operator delete[]`s the old heap block, and rebinds the three lanes.
-   * On a throwing copy the funclet at 0x00767882 frees the new block before
-   * rethrowing, which is what `new T[]` + the template's scope give here.
-   *
-   * Address: 0x007678A0 (FUN_007678A0)
-   *
-   * What it does:
-   * The element copy lane both of the above call; already recovered as
-   * `gpg::core::legacy::CopyForward8ByteLane`.
-   */
-  using PathQueueNeighbourBuffer = gpg::core::FastVectorN<PathQueueNeighbour, 200>;
+  // `WorkOnce` holds its candidates in a `gpg::core::FastVectorN<PathQueueNeighbour, 200>`
+  // on the stack: the 0x10 head at [esp+650h], then 200 inline entries at
+  // [esp+660h]..[esp+CA0h] before it spills to the heap. The out-of-line
+  // InsertAt / GrowInsert / copy emissions for it (0x00767370 / 0x007677D0 /
+  // 0x007678A0), and the `push_back` sites that reach them, are cited on the
+  // FastVectorN members in gpg/core/containers/FastVector.h.
 
   /**
    * Address: 0x00E35E84 / 0x00E35E8C / 0x00E35E94 / 0x00E35E9C
@@ -403,7 +339,7 @@ namespace
   [[nodiscard]] bool EnumerateAdjacentCells(
     PathQueueImplBaseRuntime& implBase,
     const moho::SOCellPos& cell,
-    PathQueueNeighbourBuffer& outNeighbours
+    gpg::core::FastVectorN<PathQueueNeighbour, 200>& outNeighbours
   )
   {
     moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
@@ -466,7 +402,7 @@ namespace
     PathQueueImplBaseRuntime& implBase,
     const moho::SOCellPos& cell,
     const int level,
-    PathQueueNeighbourBuffer& outNeighbours
+    gpg::core::FastVectorN<PathQueueNeighbour, 200>& outNeighbours
   )
   {
     moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
@@ -582,7 +518,7 @@ namespace
   [[nodiscard]] bool ExpandCellNeighbours(
     PathQueueImplBaseRuntime& implBase,
     const moho::SOCellPos& cell,
-    PathQueueNeighbourBuffer& outNeighbours
+    gpg::core::FastVectorN<PathQueueNeighbour, 200>& outNeighbours
   )
   {
     moho::IPathTraveler* const traveler = implBase.CurrentTraveler();
@@ -645,7 +581,7 @@ namespace
   [[nodiscard]] PathQueueStep StepExpansion(
     PathQueueImplBaseRuntime& implBase,
     const moho::SOCellPos& cell,
-    PathQueueNeighbourBuffer& outNeighbours
+    gpg::core::FastVectorN<PathQueueNeighbour, 200>& outNeighbours
   )
   {
     --implBase.mBudget;
@@ -2005,7 +1941,7 @@ namespace moho
    */
   [[nodiscard]] PathQueueStep PathQueueWorkOnce(PathQueueImplBaseRuntime& implBase)
   {
-    PathQueueNeighbourBuffer neighbours;
+    gpg::core::FastVectorN<PathQueueNeighbour, 200> neighbours;
 
     while (!implBase.OpenSet().empty()) {
       gpg::AStarNode<SOCellPos>* const current = implBase.OpenSet().top();

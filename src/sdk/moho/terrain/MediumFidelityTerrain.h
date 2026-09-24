@@ -58,8 +58,6 @@ namespace moho
   };
   static_assert(sizeof(TerrainSplatVertex) == 0x1C, "TerrainSplatVertex size must be 0x1C");
 
-  using MediumDecalCommandLane = gpg::core::FastVectorN<TerrainDecalDrawCommand, 500>;
-  using MediumSplatVertexLane = gpg::core::FastVectorN<TerrainSplatVertex, 10000>;
 
   class CD3DDynamicTextureSheet;
   class CD3DIndexSheet;
@@ -553,12 +551,12 @@ namespace moho
     std::uint32_t mSkirtEndIndex = 0u;                                // +0x34
     std::int32_t mSkirtEndVertex = 0;                                 // +0x38
     std::int32_t mSkirtBaseVertex = 0;                                // +0x3C
-    MediumDecalCommandLane mDecalDrawCommands;                         // +0x40
+    gpg::core::FastVectorN<TerrainDecalDrawCommand, 500> mDecalDrawCommands; // +0x40
     CTesselator* mTesselator;                                          // +0x2F30
     CD3DVertexSheet* mTerrainVertexSheet;                              // +0x2F34
     CD3DIndexSheet* mTerrainIndexSheet;                                // +0x2F38
     std::uint32_t mPad2F3C = 0u;                                       // +0x2F3C
-    MediumSplatVertexLane mSplatVertices;                              // +0x2F40
+    gpg::core::FastVectorN<TerrainSplatVertex, 10000> mSplatVertices;  // +0x2F40
     CD3DVertexSheet* mOverlayVertexSheet;                              // +0x47510
     CD3DIndexSheet* mOverlayIndexSheet;                                // +0x47514
     VTransform mOverlayTransform;                                      // +0x47518
@@ -566,8 +564,8 @@ namespace moho
   };
 
   static_assert(
-    offsetof(MediumDecalCommandLane, inlineVec_) == 0x10,
-    "FastVectorN<TerrainDecalDrawCommand,500>::inlineVec_ offset must be 0x10"
+    offsetof(decltype(MediumFidelityTerrain::mDecalDrawCommands), inlineVec_) == 0x10,
+    "MediumFidelityTerrain::mDecalDrawCommands inline window must start at +0x10"
   );
 
   static_assert(
@@ -620,7 +618,7 @@ namespace moho
   );
   static_assert(
     offsetof(MediumFidelityTerrain, mDecalDrawCommands) +
-        offsetof(MediumDecalCommandLane, inlineVec_) ==
+        offsetof(decltype(MediumFidelityTerrain::mDecalDrawCommands), inlineVec_) ==
       0x50,
     "MediumFidelityTerrain decal-command inline storage must start at 0x50"
   );

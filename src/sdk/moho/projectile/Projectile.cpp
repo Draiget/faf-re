@@ -1632,7 +1632,7 @@ namespace moho
         Entity* const collidedEntity = mCollidedEntityWeak.GetObjectPtr();
         CArmyImpl* const projectileArmy = ArmyRef;
 
-        EntityLineCollisionVector results{};
+        gpg::core::FastVectorN<EntityLineCollision, 10> results{};
         oGrid->GetEntityCollisionsInLine(results, lineStart, lineEnd);
 
         for (const EntityLineCollision& result : results) {

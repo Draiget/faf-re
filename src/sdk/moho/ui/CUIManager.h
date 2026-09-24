@@ -12,9 +12,6 @@ namespace moho
   class CUIManager final : public IUIManager
   {
   public:
-    using FrameVector = gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2>;
-    using InputWindowVector = gpg::fastvector_n<wxWindow*, 2>;
-    using HostWindowVector = gpg::fastvector_n<wxWindow*, 2>;
 
     /**
      * Address: 0x0084C9C0 (FUN_0084C9C0)
@@ -153,21 +150,21 @@ namespace moho
 
   public:
     std::uint32_t mUnknown04 = 0;           // +0x04
-    FrameVector mFrames;                    // +0x08
+    gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2> mFrames; // +0x08
     CMauiCursorLink mCursorLink;            // +0x28
     LuaPlus::LuaState* mLuaState = nullptr; // +0x30
     std::uint32_t mUnknown34 = 0;           // +0x34
-    InputWindowVector mInputWindows;        // +0x38
-    HostWindowVector mHostWindows;          // +0x50
+    gpg::fastvector_n<wxWindow*, 2> mInputWindows; // +0x38
+    gpg::fastvector_n<wxWindow*, 2> mHostWindows; // +0x50
     float mUIControlsAlpha = 1.0f;          // +0x68
     float mUnknown6C = 0.0f;                // +0x6C
     float mGCTime = 0.0f;                   // +0x70
     std::uint32_t mUnknown74 = 0;           // +0x74
   };
 
-  static_assert(sizeof(CUIManager::FrameVector) == 0x20, "moho::CUIManager::FrameVector size must be 0x20");
-  static_assert(sizeof(CUIManager::InputWindowVector) == 0x18, "moho::CUIManager::InputWindowVector size must be 0x18");
-  static_assert(sizeof(CUIManager::HostWindowVector) == 0x18, "moho::CUIManager::HostWindowVector size must be 0x18");
+  static_assert(sizeof(CUIManager::mFrames) == 0x20, "moho::CUIManager::mFrames size must be 0x20");
+  static_assert(sizeof(CUIManager::mInputWindows) == 0x18, "moho::CUIManager::mInputWindows size must be 0x18");
+  static_assert(sizeof(CUIManager::mHostWindows) == 0x18, "moho::CUIManager::mHostWindows size must be 0x18");
 
   static_assert(sizeof(CUIManager) == 0x78, "moho::CUIManager size must be 0x78");
 } // namespace moho

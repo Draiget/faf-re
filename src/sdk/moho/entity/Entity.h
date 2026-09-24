@@ -275,7 +275,6 @@ namespace moho
   public:
     inline static gpg::RType* sType = nullptr;
 
-    using storage_type = gpg::fastvector_n<T*, 4>;
     using iterator = T**;
     using const_iterator = T* const*;
 
@@ -405,7 +404,7 @@ namespace moho
     }
 
   public:
-    storage_type mVec;
+    gpg::fastvector_n<T*, 4> mVec;
 
   private:
     template <typename Iter>
@@ -460,7 +459,7 @@ namespace moho
      * Inserts one entity pointer into sorted storage when missing and returns
      * `{position, inserted}` semantics.
      */
-    [[nodiscard]] static InsertResult InsertUniqueByEntityId(storage_type& vec, T* const entity) noexcept
+    [[nodiscard]] static InsertResult InsertUniqueByEntityId(gpg::fastvector_n<T*, 4>& vec, T* const entity) noexcept
     {
       iterator first = vec.begin();
       iterator last = vec.end();

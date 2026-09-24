@@ -45,8 +45,6 @@ namespace moho
   };
   static_assert(sizeof(CollisionDBRect) == 0x08, "CollisionDBRect size must be 0x08");
 
-  using CollisionSpanVector = gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>;
-  using EntityGatherVector = gpg::core::FastVectorN<Entity*, 20>;
 
   struct EntityLineCollision
   {
@@ -68,7 +66,6 @@ namespace moho
     "EntityLineCollision::distanceFromLineStart offset must be 0x1C"
   );
 
-  using EntityLineCollisionVector = gpg::core::FastVectorN<EntityLineCollision, 10>;
 
   struct EntityCollisionCellNode;
 
@@ -126,7 +123,11 @@ namespace moho
      * Gathers unmarked collision-span owners from selected bucket classes in `rect`,
      * marks while collecting, then clears marks before returning.
      */
-    int GatherUnmarkedUnitsInRect(CollisionSpanVector& outSpans, const CollisionDBRect& rect, EEntityType flags);
+    int GatherUnmarkedUnitsInRect(
+      gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>& outSpans,
+      const CollisionDBRect& rect,
+      EEntityType flags
+    );
 
     /**
      * Address: 0x00722DF0 (FUN_00722DF0, Moho::EntityOccupationManager::GatherUnmarkedEntities)
@@ -135,7 +136,11 @@ namespace moho
      * Calls `GatherUnmarkedUnitsInRect`, then remaps span pointers to owning `Entity*`
      * using the collision-span back-offset (`0x4C`).
      */
-    int GatherUnmarkedEntities(EntityGatherVector& outEntities, const CollisionDBRect& rect, EEntityType flags);
+    int GatherUnmarkedEntities(
+      gpg::core::FastVectorN<Entity*, 20>& outEntities,
+      const CollisionDBRect& rect,
+      EEntityType flags
+    );
   };
 
   using EntityOccupationGrid = EntityOccupationManager;
@@ -223,7 +228,7 @@ namespace moho
      * line-hit payloads for primitives whose `CollideLine` test succeeds.
      */
     void GetEntityCollisionsInLine(
-      EntityLineCollisionVector& outCollisions,
+      gpg::core::FastVectorN<EntityLineCollision, 10>& outCollisions,
       const Wm3::Vec3f& lineStart,
       const Wm3::Vec3f& lineEnd
     );

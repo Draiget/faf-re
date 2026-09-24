@@ -4009,7 +4009,7 @@ namespace moho
 
     float templateSpanZ = 0.0f;
     float templateSpanX = 0.0f;
-    SBuildTemplateBuffer activeTemplate{};
+    gpg::fastvector_n<SBuildTemplateInfo, 16> activeTemplate{};
     session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
     if (!activeTemplate.Empty()) {
@@ -4078,7 +4078,7 @@ namespace moho
       return 0;
     }
 
-    SBuildTemplateBuffer templates;
+    gpg::fastvector_n<SBuildTemplateInfo, 16> templates;
 
     const float templateSpanX = static_cast<float>(buildTemplate[1].GetNumber());
     const float templateSpanZ = static_cast<float>(buildTemplate[2].GetNumber());

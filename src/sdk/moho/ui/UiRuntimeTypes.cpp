@@ -10326,7 +10326,7 @@ static void IssueBuildDragOrders(
   // locals from being read uninitialised in the (impossible) failure path.
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
-  moho::SBuildTemplateBuffer templates;
+  gpg::fastvector_n<moho::SBuildTemplateInfo, 16> templates;
   (void)session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &templates);
 
   BuildDragStepStateRuntimeView dragStep{};
@@ -10575,7 +10575,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
 
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
-  moho::SBuildTemplateBuffer buildTemplate{};
+  gpg::fastvector_n<moho::SBuildTemplateInfo, 16> buildTemplate{};
   (void)mSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &buildTemplate);
 
   // Whichever axis the drag runs along picks the stamp pitch.
@@ -23514,7 +23514,7 @@ void moho::CUIWorldView::UpdateSelection(
 
   float templateSpanZ = 0.0f;
   float templateSpanX = 0.0f;
-  SBuildTemplateBuffer activeTemplate{};
+  gpg::fastvector_n<SBuildTemplateInfo, 16> activeTemplate{};
   (void)mWldSession->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &activeTemplate);
 
   if (activeTemplate.Empty()) {

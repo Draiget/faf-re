@@ -901,7 +901,7 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_AABoxToRect(&cellRect, outerBounds);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     (void)oGrid->mEntityOccupationManager.GatherUnmarkedEntities(
       gatheredEntities,
       cellRect,

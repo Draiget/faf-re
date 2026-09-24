@@ -1678,7 +1678,7 @@ namespace moho
     CollisionDBRect collisionRect{};
     (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     (void)brain->mSim->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
       gatheredEntities,
       collisionRect,

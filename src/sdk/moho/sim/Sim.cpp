@@ -20870,7 +20870,7 @@ int moho::cfunc_GetEntitiesInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  CollisionSpanVector gatheredSpans{};
+  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
   constexpr EEntityType kEntityMask = static_cast<EEntityType>(
     ENTITYTYPE_Unit | ENTITYTYPE_Prop | ENTITYTYPE_Projectile | ENTITYTYPE_Entity
   );
@@ -20996,7 +20996,7 @@ int moho::cfunc_GetUnitsInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  CollisionSpanVector gatheredSpans{};
+  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
   const int gatheredCount =
     oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, collisionRect, ENTITYTYPE_Unit);
   if (gatheredCount <= 0) {
@@ -21128,7 +21128,7 @@ int moho::cfunc_GetReclaimablesInRectL(LuaPlus::LuaState* const state)
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  CollisionSpanVector gatheredSpans{};
+  gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans{};
   constexpr EEntityType kReclaimableMask = static_cast<EEntityType>(ENTITYTYPE_Unit | ENTITYTYPE_Prop);
   const int gatheredCount = oGrid->mEntityOccupationManager.GatherUnmarkedUnitsInRect(
     gatheredSpans,

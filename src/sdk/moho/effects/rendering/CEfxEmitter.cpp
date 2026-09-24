@@ -263,7 +263,7 @@ namespace moho
 
     mBlueprint = const_cast<REmitterBlueprint*>(blueprint);
     if (blueprint != nullptr) {
-      CEfxEmitterCurveArray& curves = mCurves;
+      gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>& curves = mCurves;
       BuildEmitterCurveFromBlueprint(curves[EMITTER_XDIR_CURVE], blueprint->XDirectionCurve);
       BuildEmitterCurveFromBlueprint(curves[EMITTER_YDIR_CURVE], blueprint->YDirectionCurve);
       BuildEmitterCurveFromBlueprint(curves[EMITTER_ZDIR_CURVE], blueprint->ZDirectionCurve);
@@ -795,7 +795,7 @@ namespace moho
   {
     UpdateCurveMask();
 
-    CEfxEmitterCurveArray& curves = mCurves;
+    gpg::fastvector_n<SEfxCurve, kEmitterCurveCount>& curves = mCurves;
     const float* const params = mParams.start_;
     const float scale = params[EFFECT_SCALE];
 

@@ -57,7 +57,6 @@ namespace moho
   static_assert(offsetof(WeaponCollisionEntry, entity) == 0x00, "WeaponCollisionEntry::entity offset must be 0x00");
   static_assert(offsetof(WeaponCollisionEntry, dist) == 0x1C, "WeaponCollisionEntry::dist offset must be 0x1C");
 
-  using WeaponCollisionEntryVec = gpg::fastvector_n<WeaponCollisionEntry, 10>;
 
   enum class ESolutionStatus : std::int32_t
   {
@@ -474,8 +473,12 @@ namespace moho
      * Scans collision candidates, applies script and ally filters, and returns
      * the nearest surviving collision lane.
      */
-    [[nodiscard]] static WeaponCollisionEntry*
-    GetClosestCollision(WeaponCollisionEntryVec* collisions, UnitWeapon* weapon, Unit* ownerUnit, bool ignoreAlly);
+    [[nodiscard]] static WeaponCollisionEntry* GetClosestCollision(
+      gpg::fastvector_n<WeaponCollisionEntry, 10>* collisions,
+      UnitWeapon* weapon,
+      Unit* ownerUnit,
+      bool ignoreAlly
+    );
 
     /**
      * Address: 0x006D5200 (FUN_006D5200, sub_6D5200)

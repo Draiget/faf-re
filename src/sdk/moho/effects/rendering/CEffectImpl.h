@@ -10,13 +10,6 @@
 
 namespace moho
 {
-  using CEffectParamArray = gpg::fastvector_n<float, 26>;
-  using CEffectTextureArray = gpg::fastvector_n<CParticleTexture*, 2>;
-  using CEffectStringArray = gpg::fastvector_n<msvc8::string, 2>;
-
-  static_assert(sizeof(CEffectParamArray) == 0x78, "CEffectParamArray size must be 0x78");
-  static_assert(sizeof(CEffectTextureArray) == 0x18, "CEffectTextureArray size must be 0x18");
-  static_assert(sizeof(CEffectStringArray) == 0x48, "CEffectStringArray size must be 0x48");
 
   class CEffectImpl : public IEffect
   {
@@ -142,9 +135,9 @@ namespace moho
 
   public:
     std::uint32_t mUnknown44;         // +0x44
-    CEffectParamArray mParams;        // +0x48
-    CEffectTextureArray mParticleTextures; // +0xC0
-    CEffectStringArray mStrings;      // +0xD8
+    gpg::fastvector_n<float, 26> mParams; // +0x48
+    gpg::fastvector_n<CParticleTexture*, 2> mParticleTextures; // +0xC0
+    gpg::fastvector_n<msvc8::string, 2> mStrings; // +0xD8
     SEntAttachInfo mEntityInfo;       // +0x120
     std::uint8_t mNewAttachment;      // +0x14C
     std::uint8_t mPad14D[0x03];       // +0x14D
@@ -153,6 +146,9 @@ namespace moho
 
   static_assert(offsetof(CEffectImpl, mUnknown44) == 0x44, "CEffectImpl::mUnknown44 offset must be 0x44");
   static_assert(offsetof(CEffectImpl, mParams) == 0x48, "CEffectImpl::mParams offset must be 0x48");
+  static_assert(sizeof(CEffectImpl::mParams) == 0x78, "CEffectImpl::mParams size must be 0x78");
+  static_assert(sizeof(CEffectImpl::mParticleTextures) == 0x18, "CEffectImpl::mParticleTextures size must be 0x18");
+  static_assert(sizeof(CEffectImpl::mStrings) == 0x48, "CEffectImpl::mStrings size must be 0x48");
   static_assert(offsetof(CEffectImpl, mParams.start_) == 0x48, "CEffectImpl::mParams.start_ offset must be 0x48");
   static_assert(offsetof(CEffectImpl, mParams.end_) == 0x4C, "CEffectImpl::mParams.end_ offset must be 0x4C");
   static_assert(offsetof(CEffectImpl, mParams.capacity_) == 0x50, "CEffectImpl::mParams.capacity_ offset must be 0x50");

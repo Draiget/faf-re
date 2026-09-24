@@ -1517,15 +1517,6 @@ namespace moho
     struct CommandGraphEdge;
 
     /**
-     * The two per-node edge lists (`mLaneA`: edges arriving here, `mLaneB`:
-     * edges leaving here) are `gpg::fastvector_n<CommandGraphEdge*, 2>`: the
-     * 0x10 header plus two inline slots the binary's node layout carries at
-     * +0x48 and +0x60. Growth, copy and release go through the template
-     * (`push_back`, the copy constructor, `ResetStorageToInline`).
-     */
-    using CommandGraphDwordLane = gpg::fastvector_n<CommandGraphEdge*, 2>;
-
-    /**
      * Payload of one command-graph hash node — the drawable record for a single
      * command. `mMapAB0` keys these by the issuing command, `mMapAB1` by the
      * head command of a queue, in which case `mPositionSum`/`mWeight` accumulate
@@ -1578,8 +1569,14 @@ namespace moho
        * `field_0x44` until 0x008272A0's write at 0x008272E0 pinned the meaning.
        */
       std::uint32_t mCompletionTick;       // +0x44
-      CommandGraphDwordLane mLaneA;        // +0x48
-      CommandGraphDwordLane mLaneB;        // +0x60
+      /**
+       * The two edge lists: `mLaneA` holds the edges arriving here, `mLaneB`
+       * the edges leaving. Each is the 0x10 header plus two inline slots;
+       * growth, copy and release go through the template (`push_back`, the
+       * copy constructor, `ResetStorageToInline`).
+       */
+      gpg::fastvector_n<CommandGraphEdge*, 2> mLaneA; // +0x48
+      gpg::fastvector_n<CommandGraphEdge*, 2> mLaneB; // +0x60
 
       /**
        * Address: 0x00826550 (FUN_00826550, sub_826550)
@@ -2657,8 +2654,8 @@ namespace moho
   static_assert(sizeof(UICommandGraph::CommandGraphNode) == 0x54, "UICommandGraph::CommandGraphNode size must be 0x54");
   static_assert(sizeof(UICommandGraph::HashListNode88) == 0x88, "UICommandGraph::HashListNode88 size must be 0x88");
   static_assert(
-    sizeof(UICommandGraph::CommandGraphDwordLane) == 0x18,
-    "UICommandGraph::CommandGraphDwordLane size must be 0x18"
+    sizeof(UICommandGraph::UICommandGraphDrawNode::mLaneA) == 0x18,
+    "UICommandGraph::UICommandGraphDrawNode::mLaneA size must be 0x18"
   );
   static_assert(
     sizeof(UICommandGraph::UICommandGraphDrawNode) == 0x78,
@@ -3713,7 +3710,7 @@ namespace moho
     // are the compiler's per-element/range release for `SBuildTemplateInfo`'s
     // `msvc8::string mBlueprintId` member -- the same release
     // `SBuildTemplateInfo`'s implicit destructor already performs. Now that
-    // `SBuildTemplateBuffer` is `gpg::fastvector_n<SBuildTemplateInfo, 16>`
+    // `gpg::fastvector_n<SBuildTemplateInfo, 16>` is `gpg::fastvector_n<SBuildTemplateInfo, 16>`
     // (CWldSession.h), that release happens through the container's own
     // element lifetime (array-new/delete[] on the heap arm, implicit dtor on
     // scope exit / overwrite-by-assignment on the inline arm -- see
@@ -3745,7 +3742,7 @@ namespace moho
     // rebind-to-inline + copy-construct pass that duplicated
     // `gpg::core::FastVectorN<SBuildTemplateInfo, 16>`'s own copy constructor
     // (`FastVectorN(const FastVectorN&) : FastVectorN() { ResetFrom(other); }`,
-    // FastVector.h). `SBuildTemplateBuffer` now being that template directly
+    // FastVector.h). `gpg::fastvector_n<SBuildTemplateInfo, 16>` now being that template directly
     // (CWldSession.h), the address is cited on that constructor instead; call
     // sites use placement-new (`GetActiveBuildTemplate` below) or plain
     // copy-construction, matching the binary's hidden-return-slot ABI for
@@ -4759,8 +4756,8 @@ namespace moho
 
     // The two lane copies: `fastvector_n<CommandGraphEdge*, 2>`'s copy constructor
     // (0x0082E5E0, cited on FastVector.h) into the raw destination slots.
-    ::new (static_cast<void*>(&destination->mLaneA)) CommandGraphDwordLane(source.mLaneA);
-    ::new (static_cast<void*>(&destination->mLaneB)) CommandGraphDwordLane(source.mLaneB);
+    ::new (static_cast<void*>(&destination->mLaneA)) gpg::fastvector_n<CommandGraphEdge*, 2>(source.mLaneA);
+    ::new (static_cast<void*>(&destination->mLaneB)) gpg::fastvector_n<CommandGraphEdge*, 2>(source.mLaneB);
 
     return destination;
   }
@@ -15287,15 +15284,15 @@ namespace moho
    * ctor in FastVector.h at 0x00898E50) because at the true ABI level `a4` is
    * raw, not-yet-constructed return-slot storage. Every recovered caller in
    * this tree instead declares `result` as an ordinary local first (so it is
-   * already a live, default-constructed `SBuildTemplateBuffer` by the time
+   * already a live, default-constructed `gpg::fastvector_n<SBuildTemplateInfo, 16>` by the time
    * this runs) -- placement-constructing over that would skip its destructor.
    * Assignment (`ResetFrom`, the same machinery the copy ctor delegates to)
    * gives the identical end state without that hazard.
    */
-  SBuildTemplateBuffer* CWldSession::GetActiveBuildTemplate(
+  gpg::fastvector_n<SBuildTemplateInfo, 16>* CWldSession::GetActiveBuildTemplate(
     float* const outTemplateSpanZ,
     float* const outTemplateSpanX,
-    SBuildTemplateBuffer* const result
+    gpg::fastvector_n<SBuildTemplateInfo, 16>* const result
   ) const
   {
     *outTemplateSpanX = mBuildTemplateArg1;
@@ -15410,7 +15407,7 @@ namespace moho
    * 0x00899790 on `FastVectorN::operator=` in FastVector.h.
    */
   void CWldSession::SetActiveBuildTemplate(
-    const SBuildTemplateBuffer& templates,
+    const gpg::fastvector_n<SBuildTemplateInfo, 16>& templates,
     const float templateSpanX,
     const float templateSpanZ
   )

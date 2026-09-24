@@ -547,11 +547,10 @@ namespace moho
    */
   [[nodiscard]] gpg::RType* preregister_UnitWeaponInfoTypeInfo();
 
-  using SSTIUnitWeaponInfoSnapshot = UnitWeaponInfo;
-  static_assert(sizeof(SSTIUnitWeaponInfoSnapshot) == 0x98, "SSTIUnitWeaponInfoSnapshot size must be 0x98");
-
-  using SSTIUnitWeaponInfoVector = gpg::fastvector_n<SSTIUnitWeaponInfoSnapshot, 1>;
-  static_assert(sizeof(SSTIUnitWeaponInfoVector) == 0xA8, "SSTIUnitWeaponInfoVector size must be 0xA8");
+  static_assert(
+    sizeof(gpg::fastvector_n<UnitWeaponInfo, 1>) == 0xA8,
+    "weapon-info vector (1 inline) size must be 0xA8"
+  );
 
   /**
    * Address: 0x005C3850 (FUN_005C3850, init_SSTIUnitWeaponInfoVector_inline)
@@ -560,7 +559,8 @@ namespace moho
    * Rebinds one weapon-info fastvector to inline storage and applies the
    * zero-count resize lane used by `SSTIUnitVariableData` construction.
    */
-  SSTIUnitWeaponInfoVector* InitializeSSTIUnitWeaponInfoVector(SSTIUnitWeaponInfoVector* weaponInfo);
+  gpg::fastvector_n<UnitWeaponInfo, 1>*
+  InitializeSSTIUnitWeaponInfoVector(gpg::fastvector_n<UnitWeaponInfo, 1>* weaponInfo);
 
   /**
    * Reflection type in RTTI: Moho::SSTIUnitVariableData
@@ -674,7 +674,7 @@ namespace moho
     // (0x10 header + 8 * 4).
     gpg::fastvector_n<CmdId, 8> mCommands;   // +0x098
     gpg::fastvector_n<CmdId, 8> mBuildQueue; // +0x0C8
-    SSTIUnitWeaponInfoVector mWeaponInfo; // +0x0F8
+    gpg::fastvector_n<UnitWeaponInfo, 1> mWeaponInfo; // +0x0F8
     UnitAttributes mAttributes;           // +0x1A0
     std::uint32_t mScriptbits;            // +0x210
     std::uint64_t mUnitStates;            // +0x218

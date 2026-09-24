@@ -91,22 +91,6 @@ namespace moho
   );
   struct GeomCamera3;
 
-  /**
-   * `gpg::fastvector_n<SBuildTemplateInfo, 16>` — confirmed by the RTTI/export
-   * mangled name on `GetActiveBuildTemplate`/`SetActiveBuildTemplate` below
-   * (`?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@`) and by exact
-   * layout match against `gpg::core::FastVectorN<T,16>` (FastVector.h):
-   * `{start_,end_,capacity_}` inherited @0x00/0x04/0x08, `originalVec_` @0x0C,
-   * `inlineVec_[16]` @0x10 — byte-identical to the binary's
-   * `mStart/mFinish/mCapacity/mOriginalStart/mInlineStorage` fields this type
-   * used to declare by hand. The per-T emissions for this element
-   * (`operator=` @0x00899790, copy-ctor @0x00898E50, `InsertAt`'s deep-copy
-   * lane @0x008489D0/0x00848F50/0x00849030) are cited on the matching
-   * `FastVectorN` members in FastVector.h.
-   */
-  using SBuildTemplateBuffer = gpg::fastvector_n<SBuildTemplateInfo, 16>;
-  static_assert(sizeof(SBuildTemplateBuffer) == 0x2D0, "SBuildTemplateBuffer size must be 0x2D0");
-
   struct MouseInfo
   {
     MouseInfo();
@@ -1342,8 +1326,11 @@ namespace moho
      * Copies the active build-template buffer into one caller-owned inline
      * fastvector lane and returns the current template X/Z extents.
      */
-    SBuildTemplateBuffer*
-    GetActiveBuildTemplate(float* outTemplateSpanZ, float* outTemplateSpanX, SBuildTemplateBuffer* result) const;
+    gpg::fastvector_n<SBuildTemplateInfo, 16>* GetActiveBuildTemplate(
+      float* outTemplateSpanZ,
+      float* outTemplateSpanX,
+      gpg::fastvector_n<SBuildTemplateInfo, 16>* result
+    ) const;
 
     /**
      * Address: 0x00896AA0 (FUN_00896AA0, ?GenerateBuildTemplates@CWldSession@Moho@@QAEXXZ)
@@ -1378,7 +1365,7 @@ namespace moho
      * the engine-emitted assignment symbol bound.
      */
     void SetActiveBuildTemplate(
-      const SBuildTemplateBuffer& templates,
+      const gpg::fastvector_n<SBuildTemplateInfo, 16>& templates,
       float templateSpanX,
       float templateSpanZ
     );
@@ -1473,7 +1460,21 @@ namespace moho
      */
     msvc8::map<std::uint32_t, UserEntity*> mEntities;       // 0x0044
     std::uint8_t mEntitySpatialDbStorage[0xA0];             // 0x0050
-    SBuildTemplateBuffer mBuildTemplates;                   // 0x00F0 (inline-buffer vector-style storage)
+    /**
+     * The active build templates, a `gpg::fastvector_n<SBuildTemplateInfo, 16>`
+     * -- confirmed by the mangled names of `GetActiveBuildTemplate` and
+     * `SetActiveBuildTemplate`
+     * (`?$fastvector_n@USBuildTemplateInfo@Moho@@$0BA@@gpg@@`) and by exact
+     * layout match against `gpg::core::FastVectorN<T,16>` (FastVector.h):
+     * `{start_,end_,capacity_}` inherited @0x00/0x04/0x08, `originalVec_` @0x0C,
+     * `inlineVec_[16]` @0x10 — byte-identical to the binary's
+     * `mStart/mFinish/mCapacity/mOriginalStart/mInlineStorage` fields this type
+     * used to declare by hand. The per-T emissions for this element
+     * (`operator=` @0x00899790, copy-ctor @0x00898E50, `InsertAt`'s deep-copy
+     * lane @0x008489D0/0x00848F50/0x00849030) are cited on the matching
+     * `FastVectorN` members in FastVector.h.
+     */
+    gpg::fastvector_n<SBuildTemplateInfo, 16> mBuildTemplates; // 0x00F0
     float mBuildTemplateArg1;                               // 0x03C0
     float mBuildTemplateArg2;                               // 0x03C4
     /// The real recovered type, not the generated skeleton. Declaring the
@@ -1594,6 +1595,7 @@ namespace moho
     "CWldSession extra-selection view base must remain at 0xE0"
   );
   static_assert(offsetof(CWldSession, mBuildTemplates) == 0xF0, "CWldSession::mBuildTemplates offset must be 0xF0");
+  static_assert(sizeof(CWldSession::mBuildTemplates) == 0x2D0, "CWldSession::mBuildTemplates size must be 0x2D0");
   static_assert(
     offsetof(CWldSession, mBuildTemplateArg1) == 0x3C0, "CWldSession::mBuildTemplateArg1 offset must be 0x3C0"
   );

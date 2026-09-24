@@ -549,7 +549,6 @@ namespace
 
   [[nodiscard]] moho::BVIntSet& AsBVIntSet(moho::Set& set) noexcept
   {
-    using WordVectorStorage = gpg::core::FastVectorN<std::uint32_t, 2>;
     static_assert(sizeof(moho::Set) == sizeof(moho::BVIntSet), "Set/BVIntSet size mismatch");
     static_assert(
       offsetof(moho::Set, baseWordIndex) == offsetof(moho::BVIntSet, mFirstWordIndex),
@@ -559,16 +558,18 @@ namespace
       offsetof(moho::Set, meta) == offsetof(moho::BVIntSet, mReservedMetaWord), "Set::meta offset mismatch"
     );
     static_assert(
-      offsetof(moho::Set, items_begin) == offsetof(moho::BVIntSet, mWords) + offsetof(WordVectorStorage, start_),
+      offsetof(moho::Set, items_begin) ==
+        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), start_),
       "Set::items_begin offset mismatch"
     );
     static_assert(
-      offsetof(moho::Set, items_end) == offsetof(moho::BVIntSet, mWords) + offsetof(WordVectorStorage, end_),
+      offsetof(moho::Set, items_end) ==
+        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), end_),
       "Set::items_end offset mismatch"
     );
     static_assert(
       offsetof(moho::Set, items_capacity_end) ==
-        offsetof(moho::BVIntSet, mWords) + offsetof(WordVectorStorage, capacity_),
+        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), capacity_),
       "Set::items_capacity_end offset mismatch"
     );
     return reinterpret_cast<moho::BVIntSet&>(set);

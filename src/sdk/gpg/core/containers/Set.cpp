@@ -7,10 +7,12 @@
 
 namespace
 {
-  using SetWordStorage = gpg::core::FastVectorN<std::uint32_t, 2>;
   using SetWordVector = gpg::core::FastVector<std::uint32_t>;
 
-  static_assert(sizeof(SetWordStorage) == 0x18, "Set word-storage lane must match fastvector_n<uint32_t,2> ABI");
+  static_assert(
+    sizeof(gpg::core::FastVectorN<std::uint32_t, 2>) == 0x18,
+    "Set word-storage lane must match fastvector_n<uint32_t,2> ABI"
+  );
   static_assert(offsetof(moho::Set, items_begin) == 0x08, "Set::items_begin offset must be 0x08");
   static_assert(offsetof(moho::Set, owner_or_pad) == 0x1C, "Set::owner_or_pad offset must be 0x1C");
 }
@@ -48,8 +50,8 @@ namespace moho
     // Binary lane does not write +0x04 for this copy-ctor path.
     // Keep meta untouched to preserve the original initialization behavior.
 
-    auto& dstWords = *reinterpret_cast<SetWordStorage*>(&items_begin);
-    const auto& srcWords = *reinterpret_cast<const SetWordStorage*>(&other.items_begin);
+    auto& dstWords = *reinterpret_cast<gpg::core::FastVectorN<std::uint32_t, 2>*>(&items_begin);
+    const auto& srcWords = *reinterpret_cast<const gpg::core::FastVectorN<std::uint32_t, 2>*>(&other.items_begin);
     gpg::core::legacy::RebindInlineAndCopy(
       dstWords,
       static_cast<const SetWordVector&>(srcWords)

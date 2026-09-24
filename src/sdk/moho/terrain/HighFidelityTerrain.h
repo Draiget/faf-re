@@ -34,8 +34,6 @@ namespace moho
   class HighFidelityTerrain : public TerrainCommon
   {
   public:
-    using PrimaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 3000>;
-    using SecondaryPatchIndexLane = gpg::core::FastVectorN<std::uint32_t, 70000>;
 
     /**
      * Address: 0x007FF940 (??0HighFidelityTerrain@Moho@@QAE@@Z)
@@ -370,14 +368,14 @@ namespace moho
     std::int32_t mSkirtEndVertex = 0;                     // +0x38
     std::int32_t mSkirtBaseVertex = 0;                    // +0x3C
 
-    PrimaryPatchIndexLane mPrimaryPatchData;              // +0x40
+    gpg::core::FastVectorN<std::uint32_t, 3000> mPrimaryPatchData; // +0x40
     CTesselator* mTesselator = nullptr;                   // +0x2F30
     Shoreline mShoreline;                                 // +0x2F34
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;       // +0x2FE4
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;         // +0x2FE8
     std::uint32_t mPad2FEC = 0u;                          // +0x2FEC
 
-    SecondaryPatchIndexLane mSecondaryPatchData;          // +0x2FF0
+    gpg::core::FastVectorN<std::uint32_t, 70000> mSecondaryPatchData; // +0x2FF0
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;       // +0x475C0
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;         // +0x475C4
     VTransform mTerrainTransform;                         // +0x475C8
@@ -449,8 +447,8 @@ namespace moho
     "HighFidelityTerrain::mSecondaryPatchData offset must be 0x2FF0"
   );
   static_assert(
-    (offsetof(HighFidelityTerrain, mSecondaryPatchData) + offsetof(HighFidelityTerrain::SecondaryPatchIndexLane, inlineVec_))
-      == 0x3000,
+    (offsetof(HighFidelityTerrain, mSecondaryPatchData) +
+     offsetof(decltype(HighFidelityTerrain::mSecondaryPatchData), inlineVec_)) == 0x3000,
     "HighFidelityTerrain::mSecondaryPatchData inline storage must start at 0x3000"
   );
   static_assert(

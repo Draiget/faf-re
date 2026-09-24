@@ -1303,7 +1303,7 @@ namespace gpg::core
 
     /**
      * Address: 0x004028E0 (FUN_004028E0, the 4-byte lane emission)
-     * Address: 0x00561D90 (FUN_00561D90, the `gpg::fastvector_n<Moho::SSTIUnitWeaponInfoSnapshot, 1>`
+     * Address: 0x00561D90 (FUN_00561D90, the `gpg::fastvector_n<Moho::UnitWeaponInfo, 1>`
      * emission -- the 0x98-byte weapon-info snapshot, stride confirmed by the three `/152` size
      * divides at 0x00561DA5/0x00561DB6/0x00561DC8 and the `152 * v3` prefix offset. Reached by
      * name from `moho::CopyFastVectorN(mWeaponInfo, other.mWeaponInfo)` in
@@ -1981,7 +1981,7 @@ namespace gpg::core
      * constructor, so it takes the deep-copy path below)
      * Address: 0x0084E570 (FUN_0084E570, gpg::fastvector_n<boost::shared_ptr<Moho::CMauiFrame>, 2>::InsertAt)
      * Address: 0x0083B6F0 (FUN_0083B6F0, gpg::fastvector_n<msvc8::string, 4>::InsertAt)
-     * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::InsertAt)
+     * Address: 0x00767370 (FUN_00767370, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::InsertAt -- `WorkOnce`'s candidate buffer in moho/path/PathTables.cpp, a 0x10 head at [esp+650h] and 200 8-byte entries at [esp+660h]..[esp+CA0h]; reached from the two `push_back` full-storage arms at 0x00766490 (EnumerateAdjacentCells) and 0x0076674D (EnumerateClusterEdges), whose `mov eax,[edi+4]; cmp eax,[edi+8]` guards at 0x0076646A / 0x0076671A are the template's `end_ == capacity_` test. Doubles the capacity when short and tail-calls GrowInsert at 0x007673B4.)
      * Address: 0x008489D0 (FUN_008489D0,
      * gpg::fastvector_n<Moho::SBuildTemplateInfo, 16>::InsertAt -- the
      * deep-copy lane (44-byte element owning an `msvc8::string`). Confirmed
@@ -2841,7 +2841,7 @@ namespace gpg::core
      * Address: 0x005811A0 (FUN_005811A0, gpg::fastvector_Entity::GrowInsert)
      * Address: 0x00505BA0 (FUN_00505BA0, gpg::fastvector_UserEntity::GrowInsert)
      * Address: 0x00723340 (FUN_00723340, gpg::fastvector_n<moho::CollisionResult, 10>::GrowInsert lane)
-     * Address: 0x007677D0 (FUN_007677D0, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::GrowInsert lane)
+     * Address: 0x007677D0 (FUN_007677D0, gpg::fastvector_n<Moho::PathQueueNeighbour, 200>::GrowInsert lane -- `operator new[](8 * capacity)`, prefix / inserted range / suffix through the copy lane 0x007678A0, then hands the inline window back or frees the old block; the funclet at 0x00767882 frees the new block on a throwing copy.)
      * Address: 0x004FDC60 (FUN_004FDC60, gpg::fastvector_EntityOccupation::insert_new_range
      * -- the real binary's per-type "allocate new buffer, copy prefix +
      * inserted range + suffix" growth helper for the trivially-copyable

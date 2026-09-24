@@ -32,7 +32,6 @@ using namespace moho;
 
 namespace
 {
-  using UnitVector = gpg::core::FastVectorN<Unit*, 10>;
 
   [[nodiscard]] std::string BuildInstanceCounterStatPath(const char* const rawTypeName)
   {
@@ -590,7 +589,11 @@ namespace
     }
   }
 
-  void CollectCollisionCandidates(CAiSteeringImpl& steering, UnitVector& preferred, UnitVector& deferred)
+  void CollectCollisionCandidates(
+    CAiSteeringImpl& steering,
+    gpg::core::FastVectorN<Unit*, 10>& preferred,
+    gpg::core::FastVectorN<Unit*, 10>& deferred
+  )
   {
     Unit* const owner = steering.mOwnerUnit;
     if (!owner || !owner->SimulationRef || !owner->SimulationRef->mEntityDB) {
@@ -1436,8 +1439,8 @@ void CAiSteeringImpl::CheckCollisions()
 
   // FUN_005D3740 always clears collision state before candidate scan.
   ResetCollisionInfo(mCollisionInfo);
-  UnitVector preferred;
-  UnitVector deferred;
+  gpg::core::FastVectorN<Unit*, 10> preferred;
+  gpg::core::FastVectorN<Unit*, 10> deferred;
   CollectCollisionCandidates(*this, preferred, deferred);
 
   for (Unit* candidate : preferred) {

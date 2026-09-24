@@ -3859,7 +3859,7 @@ namespace moho
    * the nearest surviving collision lane.
    */
   WeaponCollisionEntry* UnitWeapon::GetClosestCollision(
-    WeaponCollisionEntryVec* const collisions,
+    gpg::fastvector_n<WeaponCollisionEntry, 10>* const collisions,
     UnitWeapon* const weapon,
     Unit* const ownerUnit,
     const bool ignoreAlly
@@ -4182,9 +4182,9 @@ namespace moho
     outHelper->mLineScale = sweepLength * 0.5f;
 
     // Gather entity collisions along the segment and pick the nearest valid hit.
-    WeaponCollisionEntryVec collisions;
+    gpg::fastvector_n<WeaponCollisionEntry, 10> collisions;
     mSim->mOGrid->GetEntityCollisionsInLine(
-      reinterpret_cast<EntityLineCollisionVector&>(collisions),
+      reinterpret_cast<gpg::core::FastVectorN<EntityLineCollision, 10>&>(collisions),
       beamStart,
       sweepEnd
     );

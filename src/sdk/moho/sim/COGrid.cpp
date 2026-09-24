@@ -241,7 +241,7 @@ namespace
    */
   std::int32_t MarchLineAndGatherCollisionSpans(
     moho::EntityOccupationManager& manager,
-    moho::CollisionSpanVector& outSpans,
+    gpg::core::FastVectorN<moho::EntityCollisionCellSpan*, 20>& outSpans,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
@@ -320,15 +320,15 @@ namespace
    */
   std::int32_t GatherUnmarkedEntitiesInLine(
     moho::EntityOccupationManager& manager,
-    moho::EntityGatherVector& outEntities,
+    gpg::core::FastVectorN<moho::Entity*, 20>& outEntities,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
   {
     // The inner march stores `EntityCollisionCellSpan*` (the bucket payload)
     // in its own typed vector; this layout is identical to
-    // `EntityGatherVector` (both are `FastVectorN<pointer, 20>`).
-    auto& spanVec = reinterpret_cast<moho::CollisionSpanVector&>(outEntities);
+    // `gpg::core::FastVectorN<Entity*, 20>` (both are `FastVectorN<pointer, 20>`).
+    auto& spanVec = reinterpret_cast<gpg::core::FastVectorN<moho::EntityCollisionCellSpan*, 20>&>(outEntities);
 
     const std::int32_t count = MarchLineAndGatherCollisionSpans(manager, spanVec, lineStart, lineEnd);
 
@@ -591,7 +591,7 @@ namespace moho
    * Address: 0x004FD000 (FUN_004FD000, Moho::EntityOccupationManager::GatherUnmarkedUnitsInRect)
    */
   int EntityOccupationManager::GatherUnmarkedUnitsInRect(
-    CollisionSpanVector& outSpans, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>& outSpans, const CollisionDBRect& rect, const EEntityType flags
   )
   {
     outSpans.ResetStorageToInline();
@@ -681,10 +681,10 @@ namespace moho
    * Address: 0x00722DF0 (FUN_00722DF0, Moho::EntityOccupationManager::GatherUnmarkedEntities)
    */
   int EntityOccupationManager::GatherUnmarkedEntities(
-    EntityGatherVector& outEntities, const CollisionDBRect& rect, const EEntityType flags
+    gpg::core::FastVectorN<Entity*, 20>& outEntities, const CollisionDBRect& rect, const EEntityType flags
   )
   {
-    auto& spanVector = reinterpret_cast<CollisionSpanVector&>(outEntities);
+    auto& spanVector = reinterpret_cast<gpg::core::FastVectorN<EntityCollisionCellSpan*, 20>&>(outEntities);
     const int count = GatherUnmarkedUnitsInRect(spanVector, rect, flags);
     for (int index = 0; index < count; ++index) {
       outEntities.start_[index] = Entity::FromCollisionCellSpan(spanVector.start_[index]);
@@ -828,7 +828,7 @@ namespace moho
     const Wm3::AxisAlignedBox3f& bounds,
     COGrid& grid,
     const EEntityType flags,
-    EntityGatherVector& outEntities
+    gpg::core::FastVectorN<Entity*, 20>& outEntities
   )
   {
     CollisionDBRect rect{};
@@ -930,7 +930,7 @@ namespace moho
     CollisionDBRect queryRect{};
     (void)func_AABoxToRect(&queryRect, sourceBounds);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount =
       grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, queryRect, flags);
 
@@ -988,7 +988,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntitiesInBounds(
       queryBounds,
       *this,
@@ -1039,7 +1039,7 @@ namespace moho
     gpg::core::FastVectorN<CollisionResult, 10>& into
   )
   {
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntitiesInBounds(box, grid, ENTITYTYPE_Unit, gatheredEntities);
 
     into.ResetStorageToInline();
@@ -1276,7 +1276,7 @@ namespace moho
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntitiesInBounds(
       queryBounds,
       *this,
@@ -1341,12 +1341,12 @@ namespace moho
    * Address: 0x007229C0 (FUN_007229C0, Moho::COGrid::GetEntityCollisionsInLine)
    */
   void COGrid::GetEntityCollisionsInLine(
-    EntityLineCollisionVector& outCollisions,
+    gpg::core::FastVectorN<EntityLineCollision, 10>& outCollisions,
     const Wm3::Vec3f& lineStart,
     const Wm3::Vec3f& lineEnd
   )
   {
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     const std::int32_t gatheredCount =
       GatherUnmarkedEntitiesInLine(mEntityOccupationManager, gatheredEntities, lineStart, lineEnd);
 
@@ -1506,7 +1506,7 @@ namespace moho
     CollisionDBRect cellRect{};
     (void)func_Rect2fToInt16(&cellRect, rect);
 
-    CollisionSpanVector gatheredSpans;
+    gpg::core::FastVectorN<EntityCollisionCellSpan*, 20> gatheredSpans;
     (void)grid.mEntityOccupationManager.GatherUnmarkedUnitsInRect(gatheredSpans, cellRect, ENTITYTYPE_Unit);
 
     // The binary pre-converts each returned "span pointer" into its owning
@@ -1582,7 +1582,7 @@ namespace moho
     CollisionDBRect gatherRect{};
     (void)func_AABoxToRect(&gatherRect, queryBounds);
 
-    EntityGatherVector gatheredEntities{};
+    gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
 
     // Release any escaped heap storage and rebind to the inline window before

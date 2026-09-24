@@ -11083,7 +11083,7 @@ namespace
 
   /**
    * Instantiates `gpg::core::FastVectorInline<T>::AssignFrom` per element type. For
-   * `SSTIUnitWeaponInfoSnapshot` (0x98 bytes) that emission is the copy-assign
+   * `UnitWeaponInfo` (0x98 bytes) that emission is the copy-assign
    * body (FUN_00561D90), whose element-wise copy loop the binary emitted twice
    * as byte-identical ICF twins (FUN_0055E900) and (FUN_00562990), with the
    * uninitialised-copy lane at (FUN_00562470).
@@ -11202,7 +11202,7 @@ namespace
   {
     static gpg::RType* cached = nullptr;
     if (!cached) {
-      cached = gpg::LookupRType(typeid(SSTIUnitWeaponInfoVector));
+      cached = gpg::LookupRType(typeid(gpg::fastvector_n<UnitWeaponInfo, 1>));
     }
     return cached;
   }
@@ -12638,7 +12638,9 @@ namespace moho
  * Caller at Unit.cpp:11869 still resolves correctly via `using
  * namespace moho;` at Unit.cpp:128 + ADL on the parameter type.
  */
-SSTIUnitWeaponInfoVector* InitializeSSTIUnitWeaponInfoVector(SSTIUnitWeaponInfoVector* const weaponInfo)
+gpg::fastvector_n<UnitWeaponInfo, 1>* InitializeSSTIUnitWeaponInfoVector(
+  gpg::fastvector_n<UnitWeaponInfo, 1>* const weaponInfo
+)
 {
   // Binary writes the four FastVectorN<UnitWeaponInfo,1> lane pointers
   // unconditionally — no null check at FUN_005C3850 entry. Matches the
@@ -16652,7 +16654,7 @@ SEntitySetTemplateUnit* Unit::CollectAllOverlapping(SEntitySetTemplateUnit* cons
   CollisionDBRect collisionRect{};
   (void)func_Rect2fToInt16(&collisionRect, queryRect);
 
-  EntityGatherVector gatheredEntities{};
+  gpg::core::FastVectorN<Entity*, 20> gatheredEntities{};
   (void)unit->SimulationRef->mOGrid->mEntityOccupationManager.GatherUnmarkedEntities(
     gatheredEntities,
     collisionRect,
@@ -17348,7 +17350,7 @@ void Unit::Sync(SSyncData* const syncData)
     if (!IsDead() && !DestroyQueued()) {
       const std::int32_t weaponCount = AiAttacker != nullptr ? AiAttacker->GetWeaponCount() : 0;
 
-      SSTIUnitWeaponInfoVector& weaponInfo = varDat.mWeaponInfo;
+      gpg::fastvector_n<UnitWeaponInfo, 1>& weaponInfo = varDat.mWeaponInfo;
       if (static_cast<std::size_t>(weaponCount) > weaponInfo.size()) {
         weaponInfo.resize(static_cast<std::size_t>(weaponCount), UnitWeaponInfo{});
       }

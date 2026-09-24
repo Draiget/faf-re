@@ -48,7 +48,6 @@ namespace
 {
   using UnitOffsetMap = msvc8::map<moho::EntId, moho::SUnitOffsetInfo>;
   using CoordMap = msvc8::map<moho::EntId, moho::SCoordsVec2>;
-  using UnitWeakSet = gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>;
 
   [[nodiscard]] gpg::RType* CachedEntIdType();
   [[nodiscard]] gpg::RType* CachedSUnitOffsetInfoType();

@@ -544,23 +544,14 @@ namespace moho
   [[nodiscard]] float GetHeightFieldElevation(const boost::shared_ptr<CHeightField>& heightField, float x, float z);
 
   /**
-   * Address context:
-   * - 0x005783E0 (FUN_005783E0)
-   * - 0x00578460 (FUN_00578460, func_ConstructTerrainTypes)
-   * - 0x00577AD0 (FUN_00577AD0)
-   *
-   * What it does:
-   * `fastvector_n`-style header for terrain Lua objects with 0x100 inline slots.
-   * Inline storage is raw bytes so element lifetime is managed explicitly by
-   * helper routines (construct/destroy loops), matching binary behavior.
+   * The 256 terrain-type Lua objects, held inline behind the usual
+   * `{start, end, capacity, originalVec}` head. Built by
+   * `ConstructTerrainTypes` (0x00578460) and `InitTerrainTypes` (0x005783E0),
+   * torn down by `~STIMap` (0x00577AD0).
    */
-  // `{start, end, capacity, inline}` at 0x10 followed by 256 inline elements
-  // is `gpg::core::FastVectorN<LuaPlus::LuaObject, 0x100>` itself.
-  using TerrainTypesVectorN = gpg::fastvector_n<LuaPlus::LuaObject, 0x100>;
-
   struct TerrainTypes
   {
-    TerrainTypesVectorN ttvec; // +0x0000
+    gpg::fastvector_n<LuaPlus::LuaObject, 0x100> ttvec; // +0x0000
   };
 
   struct TerrainTypeGrid
@@ -570,7 +561,6 @@ namespace moho
     std::int32_t height; // +0x08
   };
 
-  static_assert(sizeof(TerrainTypesVectorN) == 0x1410, "TerrainTypesVectorN size must be 0x1410");
   static_assert(sizeof(TerrainTypes) == 0x1410, "TerrainTypes size must be 0x1410");
   static_assert(sizeof(TerrainTypeGrid) == 0x0C, "TerrainTypeGrid size must be 0x0C");
 

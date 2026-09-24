@@ -267,7 +267,7 @@ namespace
   }
 
   void GatherUnitEntitiesAroundPoint(
-    moho::EntityGatherVector& outEntities,
+    gpg::core::FastVectorN<moho::Entity*, 20>& outEntities,
     moho::COGrid& ogrid,
     const Wm3::Vector3f& center,
     const float radius
@@ -1143,7 +1143,7 @@ namespace moho
     const float guardScanRadius = ownerUnit->GetBlueprint()->AI.GuardScanRadius;
     const float guardScanRadiusSq = guardScanRadius * guardScanRadius;
 
-    EntityGatherVector nearbyEntities{};
+    gpg::core::FastVectorN<Entity*, 20> nearbyEntities{};
     GatherUnitEntitiesAroundPoint(nearbyEntities, *ownerUnit->SimulationRef->mOGrid, ownerPosition, guardScanRadius);
 
     EntitySetTemplate<Entity> candidateSet{};

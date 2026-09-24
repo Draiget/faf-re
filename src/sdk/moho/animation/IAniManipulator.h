@@ -32,17 +32,13 @@ namespace moho
   static_assert(offsetof(SAniManipBinding, mFlags) == 0x04, "SAniManipBinding::mFlags offset must be 0x04");
   static_assert(sizeof(SAniManipBinding) == 0x08, "SAniManipBinding size must be 0x08");
 
-  /**
-   * Two bindings live inline before the lane spills to the heap: the
-   * `{begin, end, capacityEnd, originalVec}` head at +0x00 followed by the
-   * inline run at +0x10 is `gpg::fastvector_n<SAniManipBinding, 2>`.
-   */
-  using SAniManipBindingStorage = gpg::fastvector_n<SAniManipBinding, 2>;
-
-  // {begin, end, capacityEnd, originalVec} at +0x00..+0x0F, the two inline
-  // bindings at +0x10; `offsetof` cannot name the container's members, so the
-  // size assert carries the layout.
-  static_assert(sizeof(SAniManipBindingStorage) == 0x20, "SAniManipBindingStorage size must be 0x20");
+  // `IAniManipulator::mWatchBones` keeps two bindings inline before spilling to
+  // the heap: {begin, end, capacityEnd, originalVec} at +0x00..+0x0F, the two
+  // inline bindings at +0x10. `offsetof` cannot name the container's members,
+  // so the size assert carries the layout.
+  static_assert(
+    sizeof(gpg::fastvector_n<SAniManipBinding, 2>) == 0x20, "watch-bone vector (2 inline bindings) size must be 0x20"
+  );
 
   class IAniManipulator : public CScriptEvent
   {
@@ -196,7 +192,7 @@ namespace moho
      *   binding whose `mBoneIndex` matches, returning bool; formerly
      *   `HasWatchedBoneIndex` over an `IAniManipulatorWatchBoneRuntimeView`.)
      */
-    SAniManipBindingStorage mWatchBones;                 // +0x60
+    gpg::fastvector_n<SAniManipBinding, 2> mWatchBones; // +0x60
   };
 
   class CFootPlantManipulator : public IAniManipulator

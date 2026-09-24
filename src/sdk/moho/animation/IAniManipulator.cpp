@@ -758,7 +758,7 @@ namespace
     archive->WriteInt(object->mPrecedence);
     archive->Write(
       CachedFastVectorSAniManipBindingType(),
-      const_cast<moho::SAniManipBindingStorage*>(&object->mWatchBones),
+      const_cast<gpg::fastvector_n<moho::SAniManipBinding, 2>*>(&object->mWatchBones),
       nullOwner
     );
   }
