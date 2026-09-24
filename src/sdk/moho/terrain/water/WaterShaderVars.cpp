@@ -30,20 +30,29 @@ namespace moho
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2ReflectionMapShaderVar, "ReflectionMap")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2TimeShaderVar, "Time")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2FresnelLookupShaderVar, "FresnelLookup")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterColorShaderVar, "WaterColor")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterLerpShaderVar, "WaterLerp")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2RefractionScaleShaderVar, "RefractionScale")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2FresnelBiasShaderVar, "FresnelBias")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2FresnelPowerShaderVar, "FresnelPower")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2UnitReflectionAmountShaderVar, "UnitReflectionAmount")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SkyReflectionAmountShaderVar, "SkyReflectionAmount")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2NormalRepeatRateShaderVar, "NormalRepeatRate")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal1MovementShaderVar, "Normal1Movement")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal2MovementShaderVar, "Normal2Movement")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal3MovementShaderVar, "Normal3Movement")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal4MovementShaderVar, "Normal4Movement")
+  /*
+   * The spellings below are the binary's, byte for byte: the CRT-init thunks
+   * 0x00BE3520..0x00BE36C0 pass "waterColor" (0x00E41CB8) through
+   * "sunReflectionAmount" (0x00E41D8C) to RegisterShaderVar (0x00438000), and
+   * effects/water2.fx declares them the same way. Effect parameter lookup is
+   * case-sensitive, so the capitalised forms a previous pass guessed never
+   * bound and every one of these read the shader's compiled-in default.
+   * SunShininess and SunGlow really are capitalised (0x00BE36A0, 0x00BE36E0).
+   */
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterColorShaderVar, "waterColor")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2WaterLerpShaderVar, "waterLerp")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2RefractionScaleShaderVar, "refractionScale")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2FresnelBiasShaderVar, "fresnelBias")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2FresnelPowerShaderVar, "fresnelPower")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2UnitReflectionAmountShaderVar, "unitreflectionAmount")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SkyReflectionAmountShaderVar, "skyreflectionAmount")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2NormalRepeatRateShaderVar, "normalRepeatRate")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal1MovementShaderVar, "normal1Movement")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal2MovementShaderVar, "normal2Movement")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal3MovementShaderVar, "normal3Movement")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2Normal4MovementShaderVar, "normal4Movement")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunShininessShaderVar, "SunShininess")
-  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunReflectionAmountShaderVar, "SunReflectionAmount")
+  DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunReflectionAmountShaderVar, "sunReflectionAmount")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunDirectionShaderVar, "SunDirection")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunColorShaderVar, "SunColor")
   DEFINE_WATER2_SHADER_VAR_GETTER(GetWater2SunGlowShaderVar, "SunGlow")

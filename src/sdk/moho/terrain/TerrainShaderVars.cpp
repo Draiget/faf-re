@@ -85,9 +85,9 @@ namespace moho
     RegisterShaderVar("HeightScale", &heightScale, "terrain");
     RegisterShaderVar("NormalMapScale", &normalMapScale, "terrain");
     RegisterShaderVar("NormalMapOffset", &normalMapOffset, "terrain");
-    RegisterShaderVar("E_X", &normalBasisEX, "terrain");
-    RegisterShaderVar("E_Y", &normalBasisEY, "terrain");
-    RegisterShaderVar("Size_Source", &normalBasisSizeSource, "terrain");
+    RegisterShaderVar("e_x", &normalBasisEX, "terrain");
+    RegisterShaderVar("e_y", &normalBasisEY, "terrain");
+    RegisterShaderVar("size_source", &normalBasisSizeSource, "terrain");
 
     RegisterShaderVar("WaterRamp", &waterRamp, "terrain");
     RegisterShaderVar("WaterElevation", &waterElevation, "terrain");

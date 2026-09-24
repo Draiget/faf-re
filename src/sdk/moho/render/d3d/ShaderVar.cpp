@@ -231,25 +231,20 @@ namespace moho
    * returned handle, no null-tolerant path). `ShaderVar::Exists()` itself
    * sets up no catch of its own -- its SEH frame (`SEH_437ED0`) only unwinds
    * the two local `boost::shared_ptr`s, matching the plain non-exceptional
-   * return paths already in this function's decompile. Live testing against
-   * the currently-installed FAForever asset set (effects.nx2) shows real
-   * effect files that genuinely lack parameters this engine code expects
-   * -- e.g. `water2.fx` here has none of WaterColor/WaterLerp/FresnelBias/
-   * FresnelPower/UnitReflectionAmount/SkyReflectionAmount/NormalRepeatRate/
-   * Normal1-4Movement/SunShininess/SunReflectionAmount/SunDirection, byte-
-   * verified absent from its source text (not merely dead-stripped by the
-   * effect compiler) -- so the literal 2007 throw-on-miss behavior crashes
-   * the whole process on the very first water-rendering frame
-   * (HighFidelityWater::RenderWaterSurface -> SetShaderVarMem -> here), and
-   * the same defect already crashed terrain rendering once (fixed in
-   * 6823547b / b65f910b) before this water instance surfaced. `Exists()`'s
-   * own name and every calling convention across this codebase (terrain,
-   * water, and the GetTexture() below) already assume a safe, non-throwing
-   * bool check -- that split-brain (safe contract wrapping an unsafe
-   * primitive) is the actual bug. Catching here, at the one choke point
-   * every caller already funnels through, keeps every other call site
-   * exactly as recovered and matches the documented design intent instead
-   * of the letter of one binary snapshot tested against different content.
+   * return paths already in this function's decompile.
+   *
+   * The catch below is NOT in the binary. It went in when the first
+   * water-rendering frame threw here, on the theory that FAF's `water2.fx`
+   * lacks WaterColor/WaterLerp/FresnelBias/... . That theory was wrong: the
+   * shader declares `waterColor`, `waterLerp`, `fresnelBias`, ... exactly as
+   * the binary's registration thunks spell them (0x00BE3520..0x00BE36C0), and
+   * the throws came from our own mis-cased names, since corrected along with
+   * terrain's `e_x`/`e_y`/`size_source`. Every one of the binary's 195
+   * RegisterShaderVar (0x00438000) name/effect pairs now matches the source
+   * byte for byte, and retail runs these assets without throwing, so the
+   * catch has no known trigger left. What it does do is turn any future
+   * misspelling into a silently unbound parameter instead of a GAL error;
+   * that is how the water2 names went unnoticed.
    *
    * Second-order fallout from that same catch, found live via
    * HighFidelityWater::RenderWaterSurface -> SetShaderVarMem crashing on

@@ -118,9 +118,9 @@ namespace moho
     ShaderVar heightScale;           // "HeightScale"
     ShaderVar normalMapScale;        // "NormalMapScale"
     ShaderVar normalMapOffset;       // "NormalMapOffset"
-    ShaderVar normalBasisEX;         // decompiler label "E_X"
-    ShaderVar normalBasisEY;         // decompiler label "E_Y"
-    ShaderVar normalBasisSizeSource; // decompiler label "Size_Source"
+    ShaderVar normalBasisEX;         // "e_x"         (0x00BE27D0, string 0x00E411D0)
+    ShaderVar normalBasisEY;         // "e_y"         (0x00BE27F0, string 0x00E411D4)
+    ShaderVar normalBasisSizeSource; // "size_source" (0x00BE2810, string 0x00E411D8)
 
     // Terrain normal/decal draw lane (bound by MediumFidelityTerrain::DrawNormals
     // and its decal/splat draw helpers at 0x008065E0 / 0x00806860 / 0x00806A50 /

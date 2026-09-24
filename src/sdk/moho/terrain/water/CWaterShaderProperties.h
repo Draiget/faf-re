@@ -24,7 +24,7 @@ namespace moho
    * Every name here is pinned by three independent sources that agree:
    *
    * - the effect-variable strings the renderers look each lane up by
-   *   (`"WaterColor"`, `"NormalRepeatRate"`, `"SunDirection"`, ... -- see
+   *   (`"waterColor"`, `"normalRepeatRate"`, `"SunDirection"`, ... -- see
    *   `WaterShaderVars.cpp`), and the float count each `SetShaderVarMem` call
    *   passes, which is what makes the array members arrays;
    * - the defaults the constructor at 0x0089F600 seeds, which are the stock
@@ -39,23 +39,23 @@ namespace moho
    */
   struct WaterShaderNumericState
   {
-    float mWaterColor[3]{};        // +0x00  "WaterColor",           3 floats
-    float mWaterLerp[2]{};         // +0x0C  "WaterLerp",            2 floats
-    float mRefractionScale{};      // +0x14  "RefractionScale"
-    float mFresnelBias{};          // +0x18  "FresnelBias"
-    float mFresnelPower{};         // +0x1C  "FresnelPower"
-    float mUnitReflectionAmount{}; // +0x20  "UnitReflectionAmount"
-    float mSkyReflectionAmount{};  // +0x24  "SkyReflectionAmount"
-    float mNormalRepeatRate[4]{};  // +0x28  "NormalRepeatRate",     4 floats
-    float mNormal1Movement[2]{};   // +0x38  "Normal1Movement",      2 floats
-    float mNormal2Movement[2]{};   // +0x40  "Normal2Movement",      2 floats
-    float mNormal3Movement[2]{};   // +0x48  "Normal3Movement",      2 floats
-    float mNormal4Movement[2]{};   // +0x50  "Normal4Movement",      2 floats
+    float mWaterColor[3]{};        // +0x00  "waterColor",           3 floats
+    float mWaterLerp[2]{};         // +0x0C  "waterLerp",            2 floats
+    float mRefractionScale{};      // +0x14  "refractionScale"
+    float mFresnelBias{};          // +0x18  "fresnelBias"
+    float mFresnelPower{};         // +0x1C  "fresnelPower"
+    float mUnitReflectionAmount{}; // +0x20  "unitreflectionAmount"
+    float mSkyReflectionAmount{};  // +0x24  "skyreflectionAmount"
+    float mNormalRepeatRate[4]{};  // +0x28  "normalRepeatRate",     4 floats
+    float mNormal1Movement[2]{};   // +0x38  "normal1Movement",      2 floats
+    float mNormal2Movement[2]{};   // +0x40  "normal2Movement",      2 floats
+    float mNormal3Movement[2]{};   // +0x48  "normal3Movement",      2 floats
+    float mNormal4Movement[2]{};   // +0x50  "normal4Movement",      2 floats
     float mSunShininess{};         // +0x58  "SunShininess"
     float mSunStrength{};          // +0x5C  archive-only, bound by nothing
     float mSunDirection[3]{};      // +0x60  "SunDirection",         3 floats
     float mSunColor[3]{};          // +0x6C  "SunColor",             3 floats
-    float mSunReflectionAmount{};  // +0x78  "SunReflectionAmount"
+    float mSunReflectionAmount{};  // +0x78  "sunReflectionAmount"
     float mSunGlow{};              // +0x7C  "SunGlow"
   };
   static_assert(offsetof(WaterShaderNumericState, mWaterLerp) == 0x0C,
