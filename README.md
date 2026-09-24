@@ -1,6 +1,6 @@
 # faf-re
 
-The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as modern, readable, buildable C++20 — so it can be maintained, ported and extended instead of staying frozen in a binary nobody can change. Inspired by, and indebted to, the [Forged Alliance Forever](https://faforever.com) community.
+The Moho engine behind *Supreme Commander: Forged Alliance* (2007), rebuilt as modern, readable, buildable C++20 — so it can be maintained instead of staying frozen in a binary nobody can change. Inspired by, and indebted to, the [Forged Alliance Forever](https://faforever.com) community.
 
 > An independent preservation and interoperability effort. Not affiliated with, endorsed by, or supported by the original publisher or developer.
 
@@ -29,7 +29,14 @@ Most symbols in the retail engine were never hand-written code — they are temp
 
 ## Libraries the engine uses
 
-Boost `1.34.1` · LuaPlus `5.0` build `1081` · wxWidgets `2.4.2` (MSW) · Wild Magic `3.8` · [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64) · BugSplat · CRI Middleware (Sofdec + ADX) · DirectX 9/10 with XACT audio, where the DX10 path was already partial in the original.
+- Boost `1.34.1`
+- LuaPlus `5.0` build `1081`
+- wxWidgets `2.4.2` (MSW)
+- Wild Magic `3.8`
+- [zlib `1.2.3`](https://github.com/OSDVF/zlib-win-x64)
+- BugSplat
+- CRI Middleware (Sofdec + ADX)
+- DirectX 9/10 with XACT audio, where the DX10 path was already partial in the original.
 
 ## Credits
 
