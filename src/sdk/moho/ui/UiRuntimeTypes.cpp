@@ -11534,6 +11534,11 @@ namespace
   }
 } // namespace
 
+bool moho::MAUI_EventDispatchInProgress() noexcept
+{
+  return MauiEventDispatchInProgress();
+}
+
 namespace
 {
   /**
