@@ -1819,48 +1819,6 @@ extern "C"
   );
   int ADX_DecodeFooter(const std::uint8_t* sourceBytes, std::int32_t sourceLength, std::int16_t* outFooterBytes);
 
-  void ADXPD_Init();
-  void ADXPD_Finish();
-  void* ADXPD_Create();
-  void ADXPD_Destroy(void* adxPacketDecoder);
-  void ADXPD_GetDly(void* adxPacketDecoder, std::int16_t* outDelay0, std::int16_t* outDelay1);
-  std::int16_t ADXPD_GetExtPrm(
-    void* adxPacketDecoder,
-    std::int16_t* outKey0,
-    std::int16_t* outKeyMultiplier,
-    std::int16_t* outKeyAdder
-  );
-  void* ADXPD_SetDly(void* adxPacketDecoder, const std::int16_t* delay0, const std::int16_t* delay1);
-  void* ADXPD_SetExtPrm(void* adxPacketDecoder, std::int16_t key0, std::int16_t keyMultiplier, std::int16_t keyAdder);
-  std::int32_t ADXPD_SetCoef(void* adxPacketDecoder, std::int32_t sampleRate, std::int16_t coefficientIndex);
-  std::int32_t __cdecl ADXPD_EntryMono(
-    void* adxPacketDecoder,
-    char* sourceBytes,
-    std::int32_t sourceBlockCount,
-    std::uint16_t* outputLeft,
-    std::uint16_t* outputRight
-  );
-  std::int32_t __cdecl ADXPD_EntryPl2(
-    void* adxPacketDecoder,
-    char* sourceBytes,
-    std::int32_t sourceBlockCount,
-    std::uint16_t* outputLeft,
-    std::uint16_t* outputRight
-  );
-  std::int32_t __cdecl ADXPD_EntrySte(
-    void* adxPacketDecoder,
-    char* sourceBytes,
-    std::int32_t sourceBlockCount,
-    std::uint16_t* outputLeft,
-    std::uint16_t* outputRight
-  );
-  void* ADXPD_Start(void* adxPacketDecoder);
-  void* ADXPD_Stop(void* adxPacketDecoder);
-  void* ADXPD_Reset(void* adxPacketDecoder);
-  std::int32_t ADXPD_GetNumBlk(void* adxPacketDecoder);
-  std::int32_t ADXPD_GetStat(void* adxPacketDecoder);
-  void __cdecl ADXPD_ExecHndl(std::int32_t handleAddress);
-
   int ADXERR_CallErrFunc1_(const char* message);
   int ADXERR_CallErrFunc2_(const char* prefix, const char* message);
   void ADXERR_ItoA2(std::int32_t highWord, std::int32_t lowWord, char* outText, std::int32_t outBytes);

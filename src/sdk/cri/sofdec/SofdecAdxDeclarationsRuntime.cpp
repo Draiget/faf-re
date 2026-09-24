@@ -4562,28 +4562,6 @@ namespace
   constexpr std::uint32_t kM2aDownmixBufferBytes =
     static_cast<std::uint32_t>(kM2aPcmWindowSampleCount * sizeof(float));
 
-  struct AdxPacketDecodeSampleView
-  {
-    std::uint8_t mUnknown00[0x10]{}; // +0x00
-    std::int32_t sourceChannels = 0; // +0x10
-    std::uint8_t mUnknown14[0x0C]{}; // +0x14
-    std::uint8_t* primaryOutputBytes = nullptr; // +0x20
-    std::uint8_t* secondaryOutputBytes = nullptr; // +0x24
-  };
-
-  static_assert(
-    offsetof(AdxPacketDecodeSampleView, sourceChannels) == 0x10,
-    "AdxPacketDecodeSampleView::sourceChannels offset must be 0x10"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeSampleView, primaryOutputBytes) == 0x20,
-    "AdxPacketDecodeSampleView::primaryOutputBytes offset must be 0x20"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeSampleView, secondaryOutputBytes) == 0x24,
-    "AdxPacketDecodeSampleView::secondaryOutputBytes offset must be 0x24"
-  );
-
   struct AdxtDolbyRuntimeState
   {
     void* workBufferBase = nullptr; // +0x00

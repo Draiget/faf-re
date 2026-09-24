@@ -1373,6 +1373,48 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSoundPort) == 0x6C, "SofdecSoundPort size must be 0x6C");
 
   /**
+   * CRI ADX packet decoder (`ADXPD`), one slot of the fixed 32-entry
+   * `adxpd_obj` pool owned by an ADXB decoder.
+   *
+   * ADXB queues one run of ADX blocks with `ADXPD_EntryMono/Pl2/Ste`, starts it,
+   * and `ADXPD_ExecHndl` decodes it through `ADX_DecodeMono4`/`ADX_DecodeSte4`
+   * into the output planes, advancing the two-tap predictor history and the
+   * key stream as it goes.
+   */
+  struct AdxPacketDecoder
+  {
+    std::int32_t used = 0;                // +0x00  pool slot in use
+    std::int32_t slotIndex = 0;           // +0x04
+    std::int32_t mode = 0;                // +0x08  ADXPD_SetMode
+    std::int32_t status = 0;              // +0x0C  0 idle, 1 queued, 2 decoding, 3 done
+    std::int32_t decodedBlockCount = 0;   // +0x10
+    std::int32_t channelCount = 0;        // +0x14  1 mono/Ste, 2 PL2 interleave
+    char* sourceData = nullptr;           // +0x18
+    std::int32_t sourceBlockCount = 0;    // +0x1C
+    std::uint16_t* outputLeft = nullptr;  // +0x20
+    std::uint16_t* outputRight = nullptr; // +0x24
+    std::int16_t delay[2][2]{};           // +0x28  per channel: {previous sample, the one before}
+    std::int16_t coefficient0 = 0;        // +0x30  ADX_GetCoefficient
+    std::int16_t coefficient1 = 0;        // +0x32
+    std::uint16_t key = 0;                // +0x34  ADXPD_SetExtPrm k0, advanced per block
+    std::int16_t keyMultiplier = 0;       // +0x36
+    std::int16_t keyAdder = 0;            // +0x38
+  };
+
+  static_assert(offsetof(AdxPacketDecoder, status) == 0x0C);
+  static_assert(offsetof(AdxPacketDecoder, decodedBlockCount) == 0x10);
+  static_assert(offsetof(AdxPacketDecoder, channelCount) == 0x14);
+  static_assert(offsetof(AdxPacketDecoder, sourceData) == 0x18);
+  static_assert(offsetof(AdxPacketDecoder, sourceBlockCount) == 0x1C);
+  static_assert(offsetof(AdxPacketDecoder, outputLeft) == 0x20);
+  static_assert(offsetof(AdxPacketDecoder, outputRight) == 0x24);
+  static_assert(offsetof(AdxPacketDecoder, delay) == 0x28);
+  static_assert(offsetof(AdxPacketDecoder, coefficient0) == 0x30);
+  static_assert(offsetof(AdxPacketDecoder, key) == 0x34);
+  static_assert(offsetof(AdxPacketDecoder, keyAdder) == 0x38);
+  static_assert(sizeof(AdxPacketDecoder) == 0x3C);
+
+  /**
    * ADXB get-write callback (`getwr`): reports where the next decoded span goes
    * in the PCM ring, how many samples fit there, and how many samples remain
    * before the stream's trap point. Returns the PCM ring base.
@@ -1412,7 +1454,7 @@ namespace moho
     std::int16_t slotState = 0;             // +0x00  pool slot in use
     std::int16_t initState = 0;             // +0x02  1 once a header has been decoded
     std::int32_t status = 0;                // +0x04  0 idle, 1 running, 2 span decoded, 3 span committed
-    void* adxPacketDecoder = nullptr;       // +0x08
+    AdxPacketDecoder* adxPacketDecoder = nullptr; // +0x08
     std::int8_t headerType = 0;             // +0x0C
     std::int8_t sourceSampleBits = 0;       // +0x0D
     std::int8_t sourceChannels = 0;         // +0x0E
@@ -5849,6 +5891,184 @@ std::int32_t ADXB_SetDecErrMode(std::int32_t decodeErrorMode);
  * Returns process-global ADXB decode-error mode lane.
  */
 std::int32_t ADXB_GetDecErrMode();
+
+/**
+ * Address: 0x00B27D40 (_ADXPD_Init)
+ *
+ * What it does:
+ * Clears the ADX packet-decoder pool.
+ */
+void ADXPD_Init();
+
+/**
+ * Address: 0x00B27D60 (_ADXPD_Finish)
+ *
+ * What it does:
+ * Clears the ADX packet-decoder pool.
+ */
+void ADXPD_Finish();
+
+/**
+ * Address: 0x00B27D80 (_ADXPD_Create)
+ *
+ * What it does:
+ * Claims a free pool slot, resets it, and selects the 500 Hz / 44.1 kHz
+ * predictor coefficients.
+ */
+moho::AdxPacketDecoder* ADXPD_Create();
+
+/**
+ * Address: 0x00B27ED0 (_ADXPD_Destroy)
+ *
+ * What it does:
+ * Releases one packet decoder's pool slot.
+ */
+void ADXPD_Destroy(moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B27E00 (_ADXPD_SetCoef)
+ *
+ * What it does:
+ * Selects the predictor coefficients for a cutoff index and sample rate.
+ */
+std::int32_t ADXPD_SetCoef(moho::AdxPacketDecoder* decoder, std::int32_t sampleRate, std::int16_t coefficientIndex);
+
+/**
+ * Address: 0x00B27E20 (_ADXPD_SetDly)
+ *
+ * What it does:
+ * Loads the predictor history: `delay0[ch]` is each channel's previous sample,
+ * `delay1[ch]` the one before.
+ */
+moho::AdxPacketDecoder* ADXPD_SetDly(moho::AdxPacketDecoder* decoder, const std::int16_t* delay0, const std::int16_t* delay1);
+
+/**
+ * Address: 0x00B27E50 (_ADXPD_GetDly)
+ *
+ * What it does:
+ * Reads the predictor history back in `ADXPD_SetDly` form.
+ */
+void ADXPD_GetDly(const moho::AdxPacketDecoder* decoder, std::int16_t* outDelay0, std::int16_t* outDelay1);
+
+/**
+ * Address: 0x00B27E80 (_ADXPD_SetExtPrm)
+ *
+ * What it does:
+ * Loads the key stream: start value, multiplier, adder.
+ */
+moho::AdxPacketDecoder*
+ADXPD_SetExtPrm(moho::AdxPacketDecoder* decoder, std::int16_t key0, std::int16_t keyMultiplier, std::int16_t keyAdder);
+
+/**
+ * Address: 0x00B27EA0 (_ADXPD_GetExtPrm)
+ *
+ * What it does:
+ * Reads the key stream back.
+ */
+std::int16_t ADXPD_GetExtPrm(
+  const moho::AdxPacketDecoder* decoder,
+  std::int16_t* outKey0,
+  std::int16_t* outKeyMultiplier,
+  std::int16_t* outKeyAdder
+);
+
+/**
+ * Address: 0x00B27EF0 (_ADXPD_SetMode)
+ *
+ * What it does:
+ * Stores the decode mode.
+ */
+std::int32_t ADXPD_SetMode(moho::AdxPacketDecoder* decoder, std::int32_t mode);
+
+/**
+ * Address: 0x00B27F00 (_ADXPD_GetStat)
+ *
+ * What it does:
+ * Returns the packet decoder's status.
+ */
+std::int32_t ADXPD_GetStat(const moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B27F10 (_ADXPD_EntryMono)
+ *
+ * What it does:
+ * Queues a mono block run while idle.
+ */
+std::int32_t __cdecl ADXPD_EntryMono(
+  moho::AdxPacketDecoder* decoder,
+  char* sourceData,
+  std::int32_t sourceBlockCount,
+  std::uint16_t* outputLeft,
+  std::uint16_t* outputRight
+);
+
+/**
+ * Address: 0x00B27F50 (_ADXPD_EntryPl2)
+ *
+ * What it does:
+ * Queues a stereo-interleaved (Pro Logic II) block run while idle.
+ */
+std::int32_t __cdecl ADXPD_EntryPl2(
+  moho::AdxPacketDecoder* decoder,
+  char* sourceData,
+  std::int32_t sourceBlockCount,
+  std::uint16_t* outputLeft,
+  std::uint16_t* outputRight
+);
+
+/**
+ * Address: 0x00B27F90 (_ADXPD_EntrySte)
+ *
+ * What it does:
+ * Queues a single-channel block run decoded into both planes while idle.
+ */
+std::int32_t __cdecl ADXPD_EntrySte(
+  moho::AdxPacketDecoder* decoder,
+  char* sourceData,
+  std::int32_t sourceBlockCount,
+  std::uint16_t* outputLeft,
+  std::uint16_t* outputRight
+);
+
+/**
+ * Address: 0x00B27FD0 (_ADXPD_Start)
+ *
+ * What it does:
+ * Moves an idle decoder with a queued run to "queued".
+ */
+moho::AdxPacketDecoder* ADXPD_Start(moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B27FF0 (_ADXPD_Stop)
+ *
+ * What it does:
+ * Stops the decoder and clears the predictor history.
+ */
+std::int16_t* ADXPD_Stop(moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B28010 (_ADXPD_Reset)
+ *
+ * What it does:
+ * Returns a finished decoder to idle.
+ */
+moho::AdxPacketDecoder* ADXPD_Reset(moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B28030 (_ADXPD_GetNumBlk)
+ *
+ * What it does:
+ * Returns the blocks the last run decoded.
+ */
+std::int32_t ADXPD_GetNumBlk(const moho::AdxPacketDecoder* decoder);
+
+/**
+ * Address: 0x00B28050 (_ADXPD_ExecHndl)
+ *
+ * What it does:
+ * Decodes the queued run on the mono or stereo path.
+ */
+void __cdecl ADXPD_ExecHndl(moho::AdxPacketDecoder* decoder);
 
 /**
  * Address: 0x00B20B50 (ADXB_Init)

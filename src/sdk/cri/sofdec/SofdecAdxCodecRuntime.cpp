@@ -3639,7 +3639,7 @@
    * What it does:
    * Returns the decoder's ADX packet decoder.
    */
-  void* ADXB_GetAdxpd(const moho::AdxBitstreamDecoderState* decoder)
+  moho::AdxPacketDecoder* ADXB_GetAdxpd(const moho::AdxBitstreamDecoderState* decoder)
   {
     return decoder->adxPacketDecoder;
   }
@@ -3877,22 +3877,21 @@
       return;
     }
 
-    ADXPD_ExecHndl(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder->adxPacketDecoder)));
-    if (ADXPD_GetStat(decoder->adxPacketDecoder) != 3) {
+    moho::AdxPacketDecoder* const packetDecoder = decoder->adxPacketDecoder;
+    ADXPD_ExecHndl(packetDecoder);
+    if (ADXPD_GetStat(packetDecoder) != 3) {
       return;
     }
 
     if (decoder->channelExpandHandle != 0) {
-      auto* const packetState = reinterpret_cast<AdxPacketDecodeSampleView*>(decoder->adxPacketDecoder);
+      // Every ADX block is 32 samples; hand each decoded left/right pair to
+      // the channel expander. The block count is re-read per sample, as the
+      // binary does.
       ADXCRS_Lock();
-      for (std::int32_t sampleIndex = 0; sampleIndex < 32 * packetState->sourceChannels; ++sampleIndex) {
-        const auto sampleOffsetBytes = static_cast<std::size_t>(2 * sampleIndex);
-        const auto* const leftSample =
-          reinterpret_cast<const std::int16_t*>(packetState->primaryOutputBytes + sampleOffsetBytes);
-        const auto* const rightSample =
-          reinterpret_cast<const std::int16_t*>(packetState->secondaryOutputBytes + sampleOffsetBytes);
-        const auto sampleValue = static_cast<std::int32_t>(*leftSample);
-        ADXB_OnExpandSamplePair(decoder, sampleValue, leftSample, rightSample);
+      for (std::int32_t sampleIndex = 0; sampleIndex < 32 * packetDecoder->decodedBlockCount; ++sampleIndex) {
+        const auto* const leftSample = reinterpret_cast<const std::int16_t*>(packetDecoder->outputLeft + sampleIndex);
+        const auto* const rightSample = reinterpret_cast<const std::int16_t*>(packetDecoder->outputRight + sampleIndex);
+        ADXB_OnExpandSamplePair(decoder, *leftSample, leftSample, rightSample);
       }
       ADXCRS_Unlock();
     }

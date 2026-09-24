@@ -8,89 +8,8 @@
 #include <cstring>
 #include <windows.h>
 
-extern "C" std::int32_t ADXPD_GetStat(void* adxPacketDecoder);
-
 namespace
 {
-  struct AdxPacketDecodeHandleRuntimeView
-  {
-    std::int32_t objectState = 0; // +0x00
-    std::int32_t slotIndex = 0; // +0x04
-    std::int32_t decodeMode = 0; // +0x08
-    std::int32_t runState = 0; // +0x0C
-    std::int32_t decodedBlockCount = 0; // +0x10
-    std::int32_t sourceChannels = 0; // +0x14
-    char* sourceBytes = nullptr; // +0x18
-    std::int32_t sourceBlockCount = 0; // +0x1C
-    std::uint16_t* outputLeft = nullptr; // +0x20
-    std::uint16_t* outputRight = nullptr; // +0x24
-    std::int16_t leftHistory[2]{}; // +0x28
-    std::int16_t rightHistory[2]{}; // +0x2C
-    std::int16_t coefficient0 = 0; // +0x30
-    std::int16_t coefficient1 = 0; // +0x32
-    std::uint16_t keyState = 0; // +0x34
-    std::int16_t keyMultiplier = 0; // +0x36
-    std::int16_t keyAdder = 0; // +0x38
-  };
-
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, runState) == 0x0C,
-    "AdxPacketDecodeHandleRuntimeView::runState offset must be 0x0C"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, decodedBlockCount) == 0x10,
-    "AdxPacketDecodeHandleRuntimeView::decodedBlockCount offset must be 0x10"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, sourceChannels) == 0x14,
-    "AdxPacketDecodeHandleRuntimeView::sourceChannels offset must be 0x14"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, sourceBytes) == 0x18,
-    "AdxPacketDecodeHandleRuntimeView::sourceBytes offset must be 0x18"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, sourceBlockCount) == 0x1C,
-    "AdxPacketDecodeHandleRuntimeView::sourceBlockCount offset must be 0x1C"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, outputLeft) == 0x20,
-    "AdxPacketDecodeHandleRuntimeView::outputLeft offset must be 0x20"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, outputRight) == 0x24,
-    "AdxPacketDecodeHandleRuntimeView::outputRight offset must be 0x24"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, leftHistory) == 0x28,
-    "AdxPacketDecodeHandleRuntimeView::leftHistory offset must be 0x28"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, rightHistory) == 0x2C,
-    "AdxPacketDecodeHandleRuntimeView::rightHistory offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, coefficient0) == 0x30,
-    "AdxPacketDecodeHandleRuntimeView::coefficient0 offset must be 0x30"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, coefficient1) == 0x32,
-    "AdxPacketDecodeHandleRuntimeView::coefficient1 offset must be 0x32"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, keyState) == 0x34,
-    "AdxPacketDecodeHandleRuntimeView::keyState offset must be 0x34"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, keyMultiplier) == 0x36,
-    "AdxPacketDecodeHandleRuntimeView::keyMultiplier offset must be 0x36"
-  );
-  static_assert(
-    offsetof(AdxPacketDecodeHandleRuntimeView, keyAdder) == 0x38,
-    "AdxPacketDecodeHandleRuntimeView::keyAdder offset must be 0x38"
-  );
-  static_assert(sizeof(AdxPacketDecodeHandleRuntimeView) == 0x3C, "AdxPacketDecodeHandleRuntimeView size must be 0x3C");
-
   constexpr char kRiffTag[4] = {'R', 'I', 'F', 'F'};
   constexpr char kWaveTag[4] = {'W', 'A', 'V', 'E'};
   constexpr char kSpsdTag[4] = {'S', 'P', 'S', 'D'};
@@ -465,29 +384,28 @@ namespace
     return (channels * bitsPerSample) / 8;
   }
 
-  [[nodiscard]] AdxPacketDecodeHandleRuntimeView* AsPacketDecodeHandle(void* adxPacketDecoder)
-  {
-    return reinterpret_cast<AdxPacketDecodeHandleRuntimeView*>(adxPacketDecoder);
-  }
-
-  [[nodiscard]] std::int32_t ADXPD_EntryCommon(
-    AdxPacketDecodeHandleRuntimeView* handle,
-    char* sourceBytes,
-    std::int32_t sourceBlockCount,
-    std::uint16_t* outputLeft,
-    std::uint16_t* outputRight,
-    std::int32_t sourceChannels
+  /**
+   * The body the three `ADXPD_Entry*` share: while the decoder is idle, queue
+   * a block run and its output planes. Only the channel count differs.
+   */
+  [[nodiscard]] std::int32_t QueueBlockRun(
+    moho::AdxPacketDecoder& decoder,
+    char* const sourceData,
+    const std::int32_t sourceBlockCount,
+    std::uint16_t* const outputLeft,
+    std::uint16_t* const outputRight,
+    const std::int32_t channelCount
   )
   {
-    if (handle->runState != 0) {
+    if (decoder.status != 0) {
       return 0;
     }
 
-    handle->sourceBytes = sourceBytes;
-    handle->sourceBlockCount = sourceBlockCount;
-    handle->sourceChannels = sourceChannels;
-    handle->outputLeft = outputLeft;
-    handle->outputRight = outputRight;
+    decoder.sourceData = sourceData;
+    decoder.sourceBlockCount = sourceBlockCount;
+    decoder.channelCount = channelCount;
+    decoder.outputLeft = outputLeft;
+    decoder.outputRight = outputRight;
     return 1;
   }
 
@@ -582,7 +500,6 @@ extern "C"
     std::int16_t* outCoefficient0,
     std::int16_t* outCoefficient1
   );
-  std::int32_t ADXPD_GetStat(void* adxPacketDecoder);
   std::uint8_t* AU_GetInfo(
     std::uint8_t* sourceBytes,
     std::int32_t sourceLength,
@@ -600,7 +517,7 @@ extern "C"
     std::int32_t* outTotalSampleCount
   );
   std::int32_t adxpd_internal_error = 0;
-  AdxPacketDecodeHandleRuntimeView adxpd_obj[32]{};
+  moho::AdxPacketDecoder adxpd_obj[32]{};
   std::int32_t xeci_thread_prio_2 = 0;
   XefindVisitCallback xeci_unk1_func = nullptr;
   void* xeci_unk1_func_obj = nullptr;
@@ -1224,7 +1141,7 @@ extern "C"
    * Address: 0x00B27D40 (_ADXPD_Init)
    *
    * What it does:
-   * Clears the global ADX packet-decoder handle pool.
+   * Clears the ADX packet-decoder pool.
    */
   void ADXPD_Init()
   {
@@ -1235,7 +1152,7 @@ extern "C"
    * Address: 0x00B27D60 (_ADXPD_Finish)
    *
    * What it does:
-   * Clears the global ADX packet-decoder handle pool.
+   * Clears the ADX packet-decoder pool.
    */
   void ADXPD_Finish()
   {
@@ -1246,25 +1163,22 @@ extern "C"
    * Address: 0x00B27D80 (_ADXPD_Create)
    *
    * What it does:
-   * Allocates and initializes one handle from the fixed ADX packet-decoder
-   * pool.
+   * Claims the first free pool slot, resets it, and selects the 500 Hz /
+   * 44.1 kHz predictor coefficients; null when the pool is full.
    */
-  void* ADXPD_Create()
+  moho::AdxPacketDecoder* ADXPD_Create()
   {
     for (std::int32_t slotIndex = 0; slotIndex < 32; ++slotIndex) {
-      auto* const handle = &adxpd_obj[slotIndex];
-      if (handle->objectState == 0) {
-        std::memset(handle, 0, sizeof(AdxPacketDecodeHandleRuntimeView));
-        handle->slotIndex = slotIndex;
-        handle->objectState = 1;
-        handle->decodeMode = 0;
-        handle->runState = 0;
-        ADX_GetCoefficient(500, 44100, &handle->coefficient0, &handle->coefficient1);
-        handle->leftHistory[0] = 0;
-        handle->leftHistory[1] = 0;
-        handle->rightHistory[0] = 0;
-        handle->rightHistory[1] = 0;
-        return handle;
+      moho::AdxPacketDecoder& decoder = adxpd_obj[slotIndex];
+      if (decoder.used == 0) {
+        std::memset(&decoder, 0, sizeof(decoder));
+        decoder.slotIndex = slotIndex;
+        decoder.used = 1;
+        decoder.mode = 0;
+        decoder.status = 0;
+        ADX_GetCoefficient(500, 44100, &decoder.coefficient0, &decoder.coefficient1);
+        std::memset(decoder.delay, 0, sizeof(decoder.delay));
+        return &decoder;
       }
     }
     return nullptr;
@@ -1274,239 +1188,218 @@ extern "C"
    * Address: 0x00B27E00 (_ADXPD_SetCoef)
    *
    * What it does:
-   * Selects coefficient pair for one ADX packet-decoder handle.
+   * Selects the predictor coefficients for a cutoff index and sample rate.
    */
-  std::int32_t ADXPD_SetCoef(void* adxPacketDecoder, std::int32_t sampleRate, std::int16_t coefficientIndex)
+  std::int32_t ADXPD_SetCoef(moho::AdxPacketDecoder* decoder, std::int32_t sampleRate, std::int16_t coefficientIndex)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return ADX_GetCoefficient(coefficientIndex, sampleRate, &handle->coefficient0, &handle->coefficient1);
+    return ADX_GetCoefficient(coefficientIndex, sampleRate, &decoder->coefficient0, &decoder->coefficient1);
   }
 
   /**
    * Address: 0x00B27E20 (_ADXPD_SetDly)
    *
    * What it does:
-   * Writes delay/history lanes for one ADX packet-decoder handle.
+   * Loads the predictor history: `delay0[ch]` is each channel's previous
+   * sample, `delay1[ch]` the one before.
    */
-  void* ADXPD_SetDly(void* adxPacketDecoder, const std::int16_t* delay0, const std::int16_t* delay1)
+  moho::AdxPacketDecoder* ADXPD_SetDly(moho::AdxPacketDecoder* decoder, const std::int16_t* delay0, const std::int16_t* delay1)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    handle->leftHistory[0] = delay0[0];
-    handle->rightHistory[0] = delay1[0];
-    handle->leftHistory[1] = delay0[1];
-    handle->rightHistory[1] = delay1[1];
-    return adxPacketDecoder;
+    for (std::size_t channel = 0; channel < 2; ++channel) {
+      decoder->delay[channel][0] = delay0[channel];
+      decoder->delay[channel][1] = delay1[channel];
+    }
+    return decoder;
   }
 
   /**
    * Address: 0x00B27E50 (_ADXPD_GetDly)
    *
    * What it does:
-   * Reads delay/history lanes from one ADX packet-decoder handle.
+   * Reads the predictor history back in `ADXPD_SetDly` form.
    */
-  void ADXPD_GetDly(void* adxPacketDecoder, std::int16_t* outDelay0, std::int16_t* outDelay1)
+  void ADXPD_GetDly(const moho::AdxPacketDecoder* decoder, std::int16_t* outDelay0, std::int16_t* outDelay1)
   {
-    const auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    outDelay0[0] = handle->leftHistory[0];
-    outDelay1[0] = handle->rightHistory[0];
-    outDelay0[1] = handle->leftHistory[1];
-    outDelay1[1] = handle->rightHistory[1];
+    for (std::size_t channel = 0; channel < 2; ++channel) {
+      outDelay0[channel] = decoder->delay[channel][0];
+      outDelay1[channel] = decoder->delay[channel][1];
+    }
   }
 
   /**
    * Address: 0x00B27E80 (_ADXPD_SetExtPrm)
    *
    * What it does:
-   * Writes ADX key-extension parameters for one packet-decoder handle.
+   * Loads the key stream: start value, multiplier, adder.
    */
-  void* ADXPD_SetExtPrm(
-    void* adxPacketDecoder,
-    std::int16_t key0,
-    std::int16_t keyMultiplier,
-    std::int16_t keyAdder
-  )
+  moho::AdxPacketDecoder*
+  ADXPD_SetExtPrm(moho::AdxPacketDecoder* decoder, std::int16_t key0, std::int16_t keyMultiplier, std::int16_t keyAdder)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    handle->keyState = static_cast<std::uint16_t>(key0);
-    handle->keyMultiplier = keyMultiplier;
-    handle->keyAdder = keyAdder;
-    return adxPacketDecoder;
+    decoder->key = static_cast<std::uint16_t>(key0);
+    decoder->keyMultiplier = keyMultiplier;
+    decoder->keyAdder = keyAdder;
+    return decoder;
   }
 
   /**
    * Address: 0x00B27EA0 (_ADXPD_GetExtPrm)
    *
    * What it does:
-   * Reads ADX key-extension parameters from one packet-decoder handle.
+   * Reads the key stream back.
    */
   std::int16_t ADXPD_GetExtPrm(
-    void* adxPacketDecoder,
+    const moho::AdxPacketDecoder* decoder,
     std::int16_t* outKey0,
     std::int16_t* outKeyMultiplier,
     std::int16_t* outKeyAdder
   )
   {
-    const auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    *outKey0 = static_cast<std::int16_t>(handle->keyState);
-    *outKeyMultiplier = handle->keyMultiplier;
-    *outKeyAdder = handle->keyAdder;
-    return handle->keyAdder;
+    *outKey0 = static_cast<std::int16_t>(decoder->key);
+    *outKeyMultiplier = decoder->keyMultiplier;
+    *outKeyAdder = decoder->keyAdder;
+    return decoder->keyAdder;
   }
 
   /**
    * Address: 0x00B27ED0 (_ADXPD_Destroy)
    *
    * What it does:
-   * Releases one ADX packet-decoder handle slot in the global pool.
+   * Releases one packet decoder's pool slot.
    */
-  void ADXPD_Destroy(void* adxPacketDecoder)
+  void ADXPD_Destroy(moho::AdxPacketDecoder* decoder)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    if (handle == nullptr) {
+    if (decoder == nullptr) {
       return;
     }
 
-    handle->objectState = 0;
-    std::memset(handle, 0, sizeof(AdxPacketDecodeHandleRuntimeView));
+    decoder->used = 0;
+    std::memset(decoder, 0, sizeof(*decoder));
   }
 
   /**
    * Address: 0x00B27EF0 (_ADXPD_SetMode)
    *
    * What it does:
-   * Sets one packet-decoder mode lane.
+   * Stores the decode mode.
    */
-  std::int32_t ADXPD_SetMode(void* adxPacketDecoder, std::int32_t decodeMode)
+  std::int32_t ADXPD_SetMode(moho::AdxPacketDecoder* decoder, std::int32_t mode)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    handle->decodeMode = decodeMode;
-    return decodeMode;
+    decoder->mode = mode;
+    return mode;
   }
 
   /**
    * Address: 0x00B27F00 (_ADXPD_GetStat)
    *
    * What it does:
-   * Returns one packet-decoder run-state lane.
+   * Returns the packet decoder's status.
    */
-  std::int32_t ADXPD_GetStat(void* adxPacketDecoder)
+  std::int32_t ADXPD_GetStat(const moho::AdxPacketDecoder* decoder)
   {
-    const auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return handle->runState;
+    return decoder->status;
   }
 
   /**
    * Address: 0x00B27F10 (_ADXPD_EntryMono)
    *
    * What it does:
-   * Enqueues one mono ADX packet-decode job into the handle.
+   * Queues a mono block run while idle.
    */
   std::int32_t __cdecl ADXPD_EntryMono(
-    void* adxPacketDecoder,
-    char* sourceBytes,
+    moho::AdxPacketDecoder* decoder,
+    char* sourceData,
     std::int32_t sourceBlockCount,
     std::uint16_t* outputLeft,
     std::uint16_t* outputRight
   )
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return ADXPD_EntryCommon(handle, sourceBytes, sourceBlockCount, outputLeft, outputRight, 1);
+    return QueueBlockRun(*decoder, sourceData, sourceBlockCount, outputLeft, outputRight, 1);
   }
 
   /**
    * Address: 0x00B27F50 (_ADXPD_EntryPl2)
    *
    * What it does:
-   * Enqueues one PL2/stereo ADX packet-decode job into the handle.
+   * Queues a stereo-interleaved (Pro Logic II) block run while idle.
    */
   std::int32_t __cdecl ADXPD_EntryPl2(
-    void* adxPacketDecoder,
-    char* sourceBytes,
+    moho::AdxPacketDecoder* decoder,
+    char* sourceData,
     std::int32_t sourceBlockCount,
     std::uint16_t* outputLeft,
     std::uint16_t* outputRight
   )
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return ADXPD_EntryCommon(handle, sourceBytes, sourceBlockCount, outputLeft, outputRight, 2);
+    return QueueBlockRun(*decoder, sourceData, sourceBlockCount, outputLeft, outputRight, 2);
   }
 
   /**
    * Address: 0x00B27F90 (_ADXPD_EntrySte)
    *
    * What it does:
-   * Enqueues one standard stereo ADX packet-decode job into the handle.
+   * Queues a single-channel block run decoded into both planes while idle.
    */
   std::int32_t __cdecl ADXPD_EntrySte(
-    void* adxPacketDecoder,
-    char* sourceBytes,
+    moho::AdxPacketDecoder* decoder,
+    char* sourceData,
     std::int32_t sourceBlockCount,
     std::uint16_t* outputLeft,
     std::uint16_t* outputRight
   )
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return ADXPD_EntryCommon(handle, sourceBytes, sourceBlockCount, outputLeft, outputRight, 1);
+    return QueueBlockRun(*decoder, sourceData, sourceBlockCount, outputLeft, outputRight, 1);
   }
 
   /**
    * Address: 0x00B27FD0 (_ADXPD_Start)
    *
    * What it does:
-   * Transitions one packet-decoder handle from idle to queued state.
+   * Moves an idle decoder to "queued" and clears its block count.
    */
-  void* ADXPD_Start(void* adxPacketDecoder)
+  moho::AdxPacketDecoder* ADXPD_Start(moho::AdxPacketDecoder* decoder)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    if (handle->runState == 0) {
-      handle->decodedBlockCount = 0;
-      handle->runState = 1;
+    if (decoder->status == 0) {
+      decoder->decodedBlockCount = 0;
+      decoder->status = 1;
     }
-    return adxPacketDecoder;
+    return decoder;
   }
 
   /**
    * Address: 0x00B27FF0 (_ADXPD_Stop)
    *
    * What it does:
-   * Stops one packet-decoder handle and clears delay/history lanes.
+   * Stops the decoder and clears the predictor history.
    */
-  void* ADXPD_Stop(void* adxPacketDecoder)
+  std::int16_t* ADXPD_Stop(moho::AdxPacketDecoder* decoder)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    handle->runState = 0;
-    handle->leftHistory[0] = 0;
-    handle->leftHistory[1] = 0;
-    handle->rightHistory[0] = 0;
-    handle->rightHistory[1] = 0;
-    return handle->leftHistory;
+    decoder->status = 0;
+    std::memset(decoder->delay, 0, sizeof(decoder->delay));
+    return decoder->delay[0];
   }
 
   /**
    * Address: 0x00B28010 (_ADXPD_Reset)
    *
    * What it does:
-   * Clears completed state on one packet-decoder handle.
+   * Returns a finished decoder to idle.
    */
-  void* ADXPD_Reset(void* adxPacketDecoder)
+  moho::AdxPacketDecoder* ADXPD_Reset(moho::AdxPacketDecoder* decoder)
   {
-    auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    if (handle->runState == 3) {
-      handle->runState = 0;
+    if (decoder->status == 3) {
+      decoder->status = 0;
     }
-    return adxPacketDecoder;
+    return decoder;
   }
 
   /**
    * Address: 0x00B28030 (_ADXPD_GetNumBlk)
    *
    * What it does:
-   * Returns decoded-block count/status lane for one packet-decoder handle.
+   * Returns the blocks the last run decoded.
    */
-  std::int32_t ADXPD_GetNumBlk(void* adxPacketDecoder)
+  std::int32_t ADXPD_GetNumBlk(const moho::AdxPacketDecoder* decoder)
   {
-    const auto* const handle = AsPacketDecodeHandle(adxPacketDecoder);
-    return handle->decodedBlockCount;
+    return decoder->decodedBlockCount;
   }
 
   /**
@@ -1524,58 +1417,52 @@ extern "C"
    * Address: 0x00B28050 (_ADXPD_ExecHndl)
    *
    * What it does:
-   * Runs one ADX packet-decoder handle execution step and dispatches mono or
-   * stereo decode path based on channel count.
+   * Decodes the queued run: mono runs through `ADX_DecodeMono4`, everything
+   * else through `ADX_DecodeSte4`, which must consume blocks in pairs; an odd
+   * count latches the internal-error flag.
    */
-  void __cdecl ADXPD_ExecHndl(std::int32_t handleAddress)
+  void __cdecl ADXPD_ExecHndl(moho::AdxPacketDecoder* decoder)
   {
-    auto* const handle = reinterpret_cast<AdxPacketDecodeHandleRuntimeView*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(handleAddress))
-    );
-
-    if (handle->runState == 1) {
-      handle->runState = 2;
+    if (decoder->status == 1) {
+      decoder->status = 2;
     }
-
-    if (handle->runState != 2) {
+    if (decoder->status != 2) {
       return;
     }
 
-    if (handle->sourceChannels == 1) {
-      handle->decodedBlockCount = ADX_DecodeMono4(
-        handle->sourceBytes,
-        handle->sourceBlockCount,
-        handle->outputLeft,
-        handle->leftHistory,
-        handle->coefficient0,
-        handle->coefficient1,
-        &handle->keyState,
-        handle->keyMultiplier,
-        handle->keyAdder
+    if (decoder->channelCount == 1) {
+      decoder->decodedBlockCount = ADX_DecodeMono4(
+        decoder->sourceData,
+        decoder->sourceBlockCount,
+        decoder->outputLeft,
+        decoder->delay[0],
+        decoder->coefficient0,
+        decoder->coefficient1,
+        &decoder->key,
+        decoder->keyMultiplier,
+        decoder->keyAdder
       );
-      handle->runState = 3;
+      decoder->status = 3;
       return;
     }
 
-    handle->decodedBlockCount = ADX_DecodeSte4(
-      handle->sourceBytes,
-      handle->sourceBlockCount,
-      handle->outputLeft,
-      handle->leftHistory,
-      handle->outputRight,
-      handle->rightHistory,
-      handle->coefficient0,
-      handle->coefficient1,
-      &handle->keyState,
-      handle->keyMultiplier,
-      handle->keyAdder
+    decoder->decodedBlockCount = ADX_DecodeSte4(
+      decoder->sourceData,
+      decoder->sourceBlockCount,
+      decoder->outputLeft,
+      decoder->delay[0],
+      decoder->outputRight,
+      decoder->delay[1],
+      decoder->coefficient0,
+      decoder->coefficient1,
+      &decoder->key,
+      decoder->keyMultiplier,
+      decoder->keyAdder
     );
-
-    if ((handle->decodedBlockCount & 1) != 0) {
+    if (decoder->decodedBlockCount % 2 == 1) {
       adxpd_error();
     }
-
-    handle->runState = 3;
+    decoder->status = 3;
   }
 
   /**

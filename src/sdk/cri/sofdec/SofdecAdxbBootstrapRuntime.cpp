@@ -179,7 +179,7 @@
       return 0;
     }
 
-    void* const adxPacketDecoder = decoder->adxPacketDecoder;
+    moho::AdxPacketDecoder* const adxPacketDecoder = decoder->adxPacketDecoder;
     decoder->adxPacketDecoder = nullptr;
     ADXPD_Destroy(adxPacketDecoder);
     std::memset(decoder, 0, sizeof(*decoder));
