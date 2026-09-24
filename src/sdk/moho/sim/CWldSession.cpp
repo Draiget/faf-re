@@ -4139,6 +4139,8 @@ namespace moho
       mSelectedIcons.reserve(0x80);
       mLifebarIcons.reserve(0x80);
 
+      // Held until the LuaObjects below are gone: they live in the shared colour LuaState.
+      const auto colorLock = moho::LockColorLuaState();
       LuaPlus::LuaObject* const colors = moho::GetColors();
       const LuaPlus::LuaObject gameColors = (*colors)["GameColors"];
       const LuaPlus::LuaObject teamColorMode = gameColors["TeamColorMode"];

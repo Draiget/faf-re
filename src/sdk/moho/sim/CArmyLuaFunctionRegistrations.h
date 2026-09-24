@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <mutex>
 
 #include "legacy/containers/String.h"
 
@@ -26,6 +27,19 @@ namespace moho
    * same cached table instead of loading `gameColors.lua` a second time.
    */
   [[nodiscard]] LuaPlus::LuaObject* GetColors();
+
+  /**
+   * Engine addition, not recovered from the binary: guards the process-static colour `LuaState` and
+   * the `GetColors()` table.
+   *
+   * Both the Sim thread (army setup) and the main thread (strategic icons, unit colour lookups) use
+   * them, and every table read creates `LuaObject`s in that state's used-object list. The original
+   * took no lock, which was a latent race.
+   *
+   * Every colour accessor in this file holds the lock. A caller that reads the `GetColors()` table
+   * directly must hold it for as long as its own `LuaObject`s are alive.
+   */
+  [[nodiscard]] std::unique_lock<std::recursive_mutex> LockColorLuaState();
 
   /**
    * Address: 0x005068B0 (FUN_005068B0, ?GetPlayerColor@Moho@@YAIH@Z)

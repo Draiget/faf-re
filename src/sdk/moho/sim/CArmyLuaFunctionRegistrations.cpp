@@ -142,6 +142,12 @@ namespace moho
   int cfunc_AddBuildRestrictionL(LuaPlus::LuaState* state);
   int cfunc_RemoveBuildRestrictionL(LuaPlus::LuaState* state);
 
+  std::unique_lock<std::recursive_mutex> LockColorLuaState()
+  {
+    static std::recursive_mutex sColorLuaStateMutex;
+    return std::unique_lock<std::recursive_mutex>(sColorLuaStateMutex);
+  }
+
   /**
    * Address: 0x00506760 (FUN_00506760, ?GetColors@Moho@@YA?AVLuaObject@LuaPlus@@AAVLuaState@3@@Z)
    *
@@ -157,6 +163,7 @@ namespace moho
    */
   [[nodiscard]] LuaPlus::LuaObject* GetColors()
   {
+    const auto colorLock = LockColorLuaState();
     static LuaPlus::LuaObject sGameColorsObject;
     static bool sLoadOnce = true;
 
@@ -183,6 +190,7 @@ namespace moho
    */
   std::uint32_t GetPlayerColor(const int idx)
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolvePlayerColorByIndex(colorState, idx);
   }
@@ -198,6 +206,7 @@ namespace moho
    */
   std::uint32_t GetArmyColor(const int idx)
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolveArmyColorByIndex(colorState, idx);
   }
@@ -212,6 +221,7 @@ namespace moho
    */
   msvc8::string GetPlayerColorName(const int idx)
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolvePlayerColorNameByIndex(colorState, idx);
   }
@@ -224,6 +234,7 @@ namespace moho
    */
   std::uint32_t GetPlayerColorCount()
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolvePlayerColorCount(colorState);
   }
@@ -236,6 +247,7 @@ namespace moho
    */
   std::uint32_t GetCivilianArmyColor()
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolveGameColorField(colorState, kCivilianArmyColorFieldName);
   }
@@ -248,6 +260,7 @@ namespace moho
    */
   std::uint32_t GetUnidentifiedColor()
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
     return ResolveGameColorField(colorState, kUnidentifiedColorFieldName);
   }
@@ -263,6 +276,7 @@ namespace moho
    */
   int func_GetColorIndex(const int packedColor)
   {
+    const auto colorLock = LockColorLuaState();
     LuaPlus::LuaState* const colorState = GetColorLuaState();
 
     LuaPlus::LuaObject* const gameColorsRoot = GetColors();
