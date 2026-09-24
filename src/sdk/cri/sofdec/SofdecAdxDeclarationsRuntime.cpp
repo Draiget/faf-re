@@ -2473,7 +2473,7 @@
   std::int32_t __cdecl m2adec_decode_fil(M2aDecoderContext* context);
   std::int32_t __cdecl m2adec_decode_pce(M2aDecoderContext* context);
   std::int32_t __cdecl m2adec_specify_location(M2aDecoderContext* context);
-  std::int32_t __cdecl m2adec_find_sync_offset(void* state, std::int32_t* outOffset);
+  std::int32_t __cdecl m2adec_find_sync_offset(M2aDecoderContext* context, std::int32_t* outOffset);
   std::int32_t __cdecl m2adec_convert_to_pcm16(float* sourceSamples, std::int32_t destinationAddress);
 
   int __cdecl mpabdr_Init();

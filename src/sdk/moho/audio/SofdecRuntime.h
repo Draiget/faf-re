@@ -1841,6 +1841,85 @@ namespace moho::cri::mpa
   // Runtime/state type aliases will be added here as public MPA types are lifted into the header.
 }
 
+/** One channel-pair location entry of the CRI MPEG-2 AAC decoder. */
+struct M2aChannelPairLocation
+{
+  std::int32_t channelPairType = 0; // +0x00
+  std::int32_t channelClass = 0;    // +0x04
+  std::int32_t locationClass = 0;   // +0x08
+};
+static_assert(sizeof(M2aChannelPairLocation) == 0x0C);
+
+/**
+ * CRI MPEG-2 AAC decoder context (`M2ADEC`).
+ *
+ * Partially named. Most of the M2A decoder still reaches these words through
+ * the context-word indexes in SofdecAdxDeclarationsRuntime.cpp
+ * (`kM2aContext*Index`); the named fields agree with those indexes.
+ */
+struct M2aDecoderContext
+{
+  std::uint8_t mUnknown00[0x04]{};
+  std::int32_t status = 0;                   // +0x04  0 stopped, 1 decoding, 2 stream ended, 3 error
+  std::int32_t errorCode = 0;                // +0x08  M2ADEC_GetErrorCode
+  std::uint8_t mUnknown0C[0x0C]{};
+  const std::uint8_t* inputBuffer = nullptr; // +0x18  M2ADEC_Process source span
+  std::int32_t inputByteCount = 0;           // +0x1C
+  std::uint8_t mUnknown20[0x04]{};
+  std::int32_t bitstreamHandle = 0;          // +0x24
+  std::int32_t activeElementIndex = 0;       // +0x28
+  std::int32_t activeWindowGroupIndex = 0;   // +0x2C
+  std::uint8_t mUnknown30[0x04]{};
+  std::int32_t mUnknown34 = 0;               // +0x34  cleared before every resync scan
+  std::int32_t frameCount = 0;               // +0x38
+  std::uint8_t mUnknown3C[0x04]{};
+  std::int32_t supplyTerminated = 0;         // +0x40  set by the term-supply entry
+  std::int32_t headerType = 0;               // +0x44  1 ADIF, 2 ADTS
+  std::uint8_t adifSyncBytes[2]{};           // +0x48  bytes an ADIF resync looks for
+  std::uint8_t mUnknown4A[0x0E]{};
+  std::int32_t adifSyncBytesValid = 0;       // +0x58
+  std::uint8_t mUnknown5C[0x0C]{};
+  std::int32_t locationCountClass0 = 0;      // +0x68
+  std::int32_t locationCountClass1 = 0;      // +0x6C
+  std::int32_t locationCountClass3 = 0;      // +0x70
+  std::int32_t locationCountClass4 = 0;      // +0x74
+  std::int32_t locationCountClass5 = 0;      // +0x78
+  std::int32_t locationCountClass6 = 0;      // +0x7C
+  std::int32_t locationCountClass7 = 0;      // +0x80
+  std::uint8_t mUnknown84[0x08]{};
+  const std::int32_t* scalefactorBandWidthsLong = nullptr;  // +0x8C
+  const std::int32_t* scalefactorBandWidthsShort = nullptr; // +0x90
+  std::uint8_t mUnknown94[0x04]{};
+  void* pceMap = nullptr;                                   // +0x98
+  M2aChannelPairLocation* channelPairLocationEntries[128]{}; // +0x9C
+  void* m2aIcsInfoTable[16]{};                              // +0x29C
+  std::uint8_t mUnknown2DC[0x3C0]{};
+  void* m2aPrimaryStateTable[16]{};                         // +0x69C
+  void* m2aSecondaryStateTable[16]{};                       // +0x6DC
+};
+
+static_assert(offsetof(M2aDecoderContext, status) == 0x04);
+static_assert(offsetof(M2aDecoderContext, errorCode) == 0x08);
+static_assert(offsetof(M2aDecoderContext, inputBuffer) == 0x18);
+static_assert(offsetof(M2aDecoderContext, inputByteCount) == 0x1C);
+static_assert(offsetof(M2aDecoderContext, bitstreamHandle) == 0x24);
+static_assert(offsetof(M2aDecoderContext, activeElementIndex) == 0x28);
+static_assert(offsetof(M2aDecoderContext, activeWindowGroupIndex) == 0x2C);
+static_assert(offsetof(M2aDecoderContext, mUnknown34) == 0x34);
+static_assert(offsetof(M2aDecoderContext, frameCount) == 0x38);
+static_assert(offsetof(M2aDecoderContext, supplyTerminated) == 0x40);
+static_assert(offsetof(M2aDecoderContext, headerType) == 0x44);
+static_assert(offsetof(M2aDecoderContext, adifSyncBytes) == 0x48);
+static_assert(offsetof(M2aDecoderContext, adifSyncBytesValid) == 0x58);
+static_assert(offsetof(M2aDecoderContext, locationCountClass0) == 0x68);
+static_assert(offsetof(M2aDecoderContext, scalefactorBandWidthsLong) == 0x8C);
+static_assert(offsetof(M2aDecoderContext, scalefactorBandWidthsShort) == 0x90);
+static_assert(offsetof(M2aDecoderContext, pceMap) == 0x98);
+static_assert(offsetof(M2aDecoderContext, channelPairLocationEntries) == 0x9C);
+static_assert(offsetof(M2aDecoderContext, m2aIcsInfoTable) == 0x29C);
+static_assert(offsetof(M2aDecoderContext, m2aPrimaryStateTable) == 0x69C);
+static_assert(offsetof(M2aDecoderContext, m2aSecondaryStateTable) == 0x6DC);
+
 extern "C" {
 /**
  * Address: 0x00B07C40 (ADXPC_SetupSoundDirectSound8)

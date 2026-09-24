@@ -104,67 +104,6 @@ namespace
 
   using XefindVisitCallback = std::int32_t(__cdecl*)(const XefindFoundFileInfo* foundFile, void* callbackContext);
 
-  struct M2aFrameScanRuntimeView
-  {
-    std::uint8_t mUnknown00[0x4]{};
-    std::int32_t parserState = 0; // +0x04
-    std::int32_t parserErrorCode = 0; // +0x08
-    std::uint8_t mUnknown0C[0x18]{};
-    std::uint8_t* inputBytes = nullptr; // +0x24
-    std::int32_t inputByteCount = 0; // +0x28
-    std::uint8_t mUnknown2C[0x8]{};
-    std::int32_t scanCursor = 0; // +0x34
-    std::int32_t hasSyncLane = 0; // +0x38
-    std::uint8_t mUnknown3C[0x4]{};
-    std::int32_t enforceFrameEdge = 0; // +0x40
-    std::int32_t markerScanMode = 0; // +0x44
-    std::uint8_t markerByte0 = 0; // +0x48
-    std::uint8_t markerByte1 = 0; // +0x49
-    std::uint8_t mUnknown4A[0xE]{};
-    std::int32_t hasMarkerPair = 0; // +0x58
-  };
-
-  static_assert(offsetof(M2aFrameScanRuntimeView, parserState) == 0x04, "M2aFrameScanRuntimeView::parserState offset must be 0x04");
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, parserErrorCode) == 0x08,
-    "M2aFrameScanRuntimeView::parserErrorCode offset must be 0x08"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, inputBytes) == 0x24,
-    "M2aFrameScanRuntimeView::inputBytes offset must be 0x24"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, inputByteCount) == 0x28,
-    "M2aFrameScanRuntimeView::inputByteCount offset must be 0x28"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, scanCursor) == 0x34,
-    "M2aFrameScanRuntimeView::scanCursor offset must be 0x34"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, hasSyncLane) == 0x38,
-    "M2aFrameScanRuntimeView::hasSyncLane offset must be 0x38"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, enforceFrameEdge) == 0x40,
-    "M2aFrameScanRuntimeView::enforceFrameEdge offset must be 0x40"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, markerScanMode) == 0x44,
-    "M2aFrameScanRuntimeView::markerScanMode offset must be 0x44"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, markerByte0) == 0x48,
-    "M2aFrameScanRuntimeView::markerByte0 offset must be 0x48"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, markerByte1) == 0x49,
-    "M2aFrameScanRuntimeView::markerByte1 offset must be 0x49"
-  );
-  static_assert(
-    offsetof(M2aFrameScanRuntimeView, hasMarkerPair) == 0x58,
-    "M2aFrameScanRuntimeView::hasMarkerPair offset must be 0x58"
-  );
   static_assert(sizeof(XefindFoundFileInfo) == 0x0C, "XefindFoundFileInfo size must be 0x0C");
 
   [[nodiscard]] std::uint32_t ReadBe32(const std::uint8_t* bytes)
@@ -543,77 +482,90 @@ extern "C"
   }
 
   /**
-   * Address: 0x00B274D0 (sub_B274D0)
+   * Address: 0x00B274F0
    *
    * What it does:
-   * Scans one MPEG audio payload lane and reports next frame-sync offset.
+   * ADIF resync: once a frame has been decoded and the two sync bytes are
+   * known, returns the offset of the first input byte after the first that
+   * matches either. Without them an ADIF stream cannot resync, so the decoder
+   * enters the error state.
    */
-  std::int32_t __cdecl m2adec_scan_frame_sync(M2aFrameScanRuntimeView* state, std::int32_t* outOffset)
+  std::int32_t __cdecl m2adec_scan_adif_sync(M2aDecoderContext* context, std::int32_t* outOffset)
   {
-    if (state->markerScanMode == 1) {
-      if (state->hasSyncLane != 0 && state->hasMarkerPair != 0) {
-        const std::int32_t inputByteCount = state->inputByteCount;
-        std::int32_t scanIndex = 1;
-        for (; scanIndex < inputByteCount; ++scanIndex) {
-          const std::uint8_t byteValue = state->inputBytes[scanIndex];
-          if (byteValue == state->markerByte0 || byteValue == state->markerByte1) {
-            break;
-          }
-        }
-        *outOffset = scanIndex;
-        return 0;
-      }
-
-      state->parserState = 3;
-      state->parserErrorCode = 2;
+    if (context->frameCount == 0 || context->adifSyncBytesValid == 0) {
+      context->status = 3;
+      context->errorCode = 2;
       return -1;
     }
 
-    std::int32_t scanIndex = 1;
-    const std::int32_t scanLimit = state->inputByteCount - 1;
-    if (scanLimit > 1) {
-      const std::uint8_t* cursor = state->inputBytes + 2;
-      do {
-        if (cursor[-1] == 0xFFu && (*cursor == 0xF8u || *cursor == 0xF9u)) {
-          break;
-        }
-        ++scanIndex;
-        ++cursor;
-      } while (scanIndex < scanLimit);
+    const std::uint8_t* const input = context->inputBuffer;
+    std::int32_t offset = 1;
+    while (offset < context->inputByteCount && input[offset] != context->adifSyncBytes[0]
+           && input[offset] != context->adifSyncBytes[1]) {
+      ++offset;
     }
-
-    if (state->inputBytes[scanIndex] == 0xFFu) {
-      *outOffset = scanIndex;
-      return 0;
-    }
-
-    *outOffset = scanIndex + 1;
+    *outOffset = offset;
     return 0;
+  }
+
+  /**
+   * Address: 0x00B27550
+   *
+   * What it does:
+   * ADTS resync: returns the offset of the next `FF F8`/`FF F9` sync word
+   * after the first byte; when none is found, the last byte examined counts
+   * as consumed unless it is itself an `FF`.
+   */
+  std::int32_t __cdecl m2adec_scan_adts_sync(M2aDecoderContext* context, std::int32_t* outOffset)
+  {
+    const std::uint8_t* const input = context->inputBuffer;
+    std::int32_t offset = 1;
+    while (offset < context->inputByteCount - 1
+           && !(input[offset] == 0xFF && (input[offset + 1] == 0xF8 || input[offset + 1] == 0xF9))) {
+      ++offset;
+    }
+    *outOffset = (input[offset] == 0xFF) ? offset : offset + 1;
+    return 0;
+  }
+
+  /**
+   * Address: 0x00B274D0 (sub_B274D0)
+   *
+   * What it does:
+   * Picks the resync scan for the stream's header type: ADIF (1) or ADTS.
+   */
+  std::int32_t __cdecl m2adec_scan_frame_sync(M2aDecoderContext* context, std::int32_t* outOffset)
+  {
+    if (context->headerType == 1) {
+      return m2adec_scan_adif_sync(context, outOffset);
+    }
+    return m2adec_scan_adts_sync(context, outOffset);
   }
 
   /**
    * Address: 0x00B27470 (sub_B27470)
    *
    * What it does:
-   * Resets scan cursor and applies frame-end state transitions after sync scan.
+   * Resynchronises after a decode error: finds the next frame start in the
+   * input and, once the input has been terminated, ends the stream when the
+   * search runs out (ADIF always consumes everything).
    */
-  std::int32_t __cdecl m2adec_find_sync_offset(M2aFrameScanRuntimeView* state, std::int32_t* outOffset)
+  std::int32_t __cdecl m2adec_find_sync_offset(M2aDecoderContext* context, std::int32_t* outOffset)
   {
-    state->scanCursor = 0;
-    const std::int32_t result = m2adec_scan_frame_sync(state, outOffset);
+    context->mUnknown34 = 0;
+    const std::int32_t result = m2adec_scan_frame_sync(context, outOffset);
     if (result < 0) {
       return result;
     }
 
-    if (state->enforceFrameEdge == 1) {
-      const std::int32_t inputByteCount = state->inputByteCount;
-      if (state->markerScanMode == 1) {
-        *outOffset = inputByteCount;
-        state->parserState = 2;
+    if (context->supplyTerminated == 1) {
+      if (context->headerType == 1) {
+        *outOffset = context->inputByteCount;
+        context->status = 2;
         return 0;
       }
-      if (*outOffset >= inputByteCount) {
-        state->parserState = 2;
+      if (*outOffset >= context->inputByteCount) {
+        context->status = 2;
       }
     }
 
