@@ -1,69 +1,1613 @@
-diff --git a/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c b/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
---- a/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
-+++ b/dependencies/LuaPlus_Build1081/Src/LuaPlus/LuaPlusAddons.c
-@@ -20,7 +20,7 @@
- #ifndef lua_number2wstr
- #include <stdio.h>
--#define lua_number2wstr(s,n)    swprintf((s), LUA_NUMBER_WFMT, (n))
-+#define lua_number2wstr(s,n)    _snwprintf((wchar_t*)(s), 32, LUA_NUMBER_WFMT, (n))
+diff -ruN a/LuaPlusLib_1081.vcxproj b/LuaPlusLib_1081.vcxproj
+--- a/LuaPlusLib_1081.vcxproj
++++ b/LuaPlusLib_1081.vcxproj
+@@ -1,235 +1,235 @@
+-﻿<?xml version="1.0" encoding="utf-8"?>
+-<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+-  <ItemGroup Label="ProjectConfigurations">
+-    <ProjectConfiguration Include="Debug|Win32">
+-      <Configuration>Debug</Configuration>
+-      <Platform>Win32</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Release|Win32">
+-      <Configuration>Release</Configuration>
+-      <Platform>Win32</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Debug|x64">
+-      <Configuration>Debug</Configuration>
+-      <Platform>x64</Platform>
+-    </ProjectConfiguration>
+-    <ProjectConfiguration Include="Release|x64">
+-      <Configuration>Release</Configuration>
+-      <Platform>x64</Platform>
+-    </ProjectConfiguration>
+-  </ItemGroup>
+-
+-  <PropertyGroup Label="Globals">
+-    <VCProjectVersion>17.0</VCProjectVersion>
+-    <Keyword>Win32Proj</Keyword>
+-    <ProjectGuid>{5A3A2C6E-5FC6-4F96-8E2E-D1F2C577C45A}</ProjectGuid>
+-    <RootNamespace>LuaPlusLib1081</RootNamespace>
+-    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+-    <ProjectName>LuaPlusLib_1081</ProjectName>
+-  </PropertyGroup>
+-
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+-
+-  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <ConfigurationType>StaticLibrary</ConfigurationType>
+-    <UseDebugLibraries>true</UseDebugLibraries>
+-    <PlatformToolset>v143</PlatformToolset>
+-    <CharacterSet>MultiByte</CharacterSet>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <ConfigurationType>StaticLibrary</ConfigurationType>
+-    <UseDebugLibraries>false</UseDebugLibraries>
+-    <PlatformToolset>v143</PlatformToolset>
+-    <WholeProgramOptimization>true</WholeProgramOptimization>
+-    <CharacterSet>MultiByte</CharacterSet>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <ConfigurationType>StaticLibrary</ConfigurationType>
+-    <UseDebugLibraries>true</UseDebugLibraries>
+-    <PlatformToolset>v143</PlatformToolset>
+-    <CharacterSet>MultiByte</CharacterSet>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <ConfigurationType>StaticLibrary</ConfigurationType>
+-    <UseDebugLibraries>false</UseDebugLibraries>
+-    <PlatformToolset>v143</PlatformToolset>
+-    <WholeProgramOptimization>true</WholeProgramOptimization>
+-    <CharacterSet>MultiByte</CharacterSet>
+-  </PropertyGroup>
+-
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+-
+-  <ImportGroup Label="ExtensionSettings" />
+-  <ImportGroup Label="Shared" />
+-
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+-  </ImportGroup>
+-
+-  <PropertyGroup Label="UserMacros" />
+-
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
+-    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
+-    <TargetName>LuaPlusLibD_1081</TargetName>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
+-    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
+-    <TargetName>LuaPlusLib_1081</TargetName>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
+-    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
+-    <TargetName>LuaPlusLibD_1081</TargetName>
+-  </PropertyGroup>
+-
+-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
+-    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
+-    <TargetName>LuaPlusLib_1081</TargetName>
+-  </PropertyGroup>
+-
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <SDLCheck>true</SDLCheck>
+-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+-      <ConformanceMode>false</ConformanceMode>
+-      <PreprocessorDefinitions>LUA_OPNAMES;WIN32;_DEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-    </ClCompile>
+-  </ItemDefinitionGroup>
+-
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <SDLCheck>true</SDLCheck>
+-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+-      <FunctionLevelLinking>true</FunctionLevelLinking>
+-      <IntrinsicFunctions>true</IntrinsicFunctions>
+-      <ConformanceMode>false</ConformanceMode>
+-      <PreprocessorDefinitions>LUA_OPNAMES;WIN32;NDEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-    </ClCompile>
+-  </ItemDefinitionGroup>
+-
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <SDLCheck>true</SDLCheck>
+-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+-      <ConformanceMode>false</ConformanceMode>
+-      <PreprocessorDefinitions>LUA_OPNAMES;_DEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-    </ClCompile>
+-  </ItemDefinitionGroup>
+-
+-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+-    <ClCompile>
+-      <WarningLevel>Level4</WarningLevel>
+-      <SDLCheck>true</SDLCheck>
+-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+-      <FunctionLevelLinking>true</FunctionLevelLinking>
+-      <IntrinsicFunctions>true</IntrinsicFunctions>
+-      <ConformanceMode>false</ConformanceMode>
+-      <PreprocessorDefinitions>LUA_OPNAMES;NDEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+-      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
+-      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+-    </ClCompile>
+-  </ItemDefinitionGroup>
+-
+-  <ItemGroup>
+-    <ClCompile Include=".\Src\LuaPlus\LuaObject.cpp" />
+-    <ClCompile Include=".\Src\LuaPlus\LuaPlus.cpp" />
+-    <ClCompile Include=".\Src\LuaPlus\LuaPlusAddons.c" />
+-    <ClCompile Include=".\Src\LuaPlus\LuaPlusFunctions.cpp" />
+-    <ClCompile Include=".\Src\LuaPlus\LuaStackObject.cpp" />
+-    <ClCompile Include=".\Src\LuaPlus\LuaState.cpp" />
+-    <ClCompile Include=".\Src\LuaPlus\lwstrlib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lapi.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\lauxlib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\lbaselib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lcode.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\ldblib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\ldebug.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\ldo.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\ldump.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lfunc.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lgc.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\liolib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\llex.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\lmathlib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lmem.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\loadlib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lobject.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lopcodes.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lparser.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lstate.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lstring.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\lstrlib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\ltable.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lib\ltablib.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\ltm.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lundump.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lvm.c" />
+-    <ClCompile Include=".\Src\LuaPlus\src\lzio.c" />
+-  </ItemGroup>
+-
+-  <ItemGroup>
+-    <ClInclude Include=".\Src\LuaPlus\LuaLink.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaObject.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaObject.inl" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaPlus.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaPlusAddons.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaPlusFunctions.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaPlusLoader.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaStackObject.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaStackObject.inl" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaState.h" />
+-    <ClInclude Include=".\Src\LuaPlus\LuaState.inl" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lapi.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lcode.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\ldebug.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\ldo.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lfunc.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lgc.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\llex.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\llimits.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lmem.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lobject.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lopcodes.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lparser.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lstate.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lstring.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\ltable.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\ltm.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lundump.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lvm.h" />
+-    <ClInclude Include=".\Src\LuaPlus\src\lzio.h" />
+-    <ClInclude Include=".\Src\LuaPlus\include\lauxlib.h" />
+-    <ClInclude Include=".\Src\LuaPlus\include\lua.h" />
+-    <ClInclude Include=".\Src\LuaPlus\include\lualib.h" />
+-  </ItemGroup>
+-
+-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+-  <ImportGroup Label="ExtensionTargets" />
+-</Project>
++<?xml version="1.0" encoding="utf-8"?>
++<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
++  <ItemGroup Label="ProjectConfigurations">
++    <ProjectConfiguration Include="Debug|Win32">
++      <Configuration>Debug</Configuration>
++      <Platform>Win32</Platform>
++    </ProjectConfiguration>
++    <ProjectConfiguration Include="Release|Win32">
++      <Configuration>Release</Configuration>
++      <Platform>Win32</Platform>
++    </ProjectConfiguration>
++    <ProjectConfiguration Include="Debug|x64">
++      <Configuration>Debug</Configuration>
++      <Platform>x64</Platform>
++    </ProjectConfiguration>
++    <ProjectConfiguration Include="Release|x64">
++      <Configuration>Release</Configuration>
++      <Platform>x64</Platform>
++    </ProjectConfiguration>
++  </ItemGroup>
++
++  <PropertyGroup Label="Globals">
++    <VCProjectVersion>17.0</VCProjectVersion>
++    <Keyword>Win32Proj</Keyword>
++    <ProjectGuid>{5A3A2C6E-5FC6-4F96-8E2E-D1F2C577C45A}</ProjectGuid>
++    <RootNamespace>LuaPlusLib1081</RootNamespace>
++    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
++    <ProjectName>LuaPlusLib_1081</ProjectName>
++  </PropertyGroup>
++
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
++
++  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
++    <ConfigurationType>StaticLibrary</ConfigurationType>
++    <UseDebugLibraries>true</UseDebugLibraries>
++    <PlatformToolset>v143</PlatformToolset>
++    <CharacterSet>MultiByte</CharacterSet>
++  </PropertyGroup>
++
++  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
++    <ConfigurationType>StaticLibrary</ConfigurationType>
++    <UseDebugLibraries>false</UseDebugLibraries>
++    <PlatformToolset>v143</PlatformToolset>
++    <WholeProgramOptimization>true</WholeProgramOptimization>
++    <CharacterSet>MultiByte</CharacterSet>
++  </PropertyGroup>
++
++  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <ConfigurationType>StaticLibrary</ConfigurationType>
++    <UseDebugLibraries>true</UseDebugLibraries>
++    <PlatformToolset>v143</PlatformToolset>
++    <CharacterSet>MultiByte</CharacterSet>
++  </PropertyGroup>
++
++  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <ConfigurationType>StaticLibrary</ConfigurationType>
++    <UseDebugLibraries>false</UseDebugLibraries>
++    <PlatformToolset>v143</PlatformToolset>
++    <WholeProgramOptimization>true</WholeProgramOptimization>
++    <CharacterSet>MultiByte</CharacterSet>
++  </PropertyGroup>
++
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
++
++  <ImportGroup Label="ExtensionSettings" />
++  <ImportGroup Label="Shared" />
++
++  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
++    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
++  </ImportGroup>
++  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
++    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
++  </ImportGroup>
++  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
++  </ImportGroup>
++  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
++  </ImportGroup>
++
++  <PropertyGroup Label="UserMacros" />
++
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
++    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
++    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
++    <TargetName>LuaPlusLibD_1081</TargetName>
++  </PropertyGroup>
++
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
++    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
++    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
++    <TargetName>LuaPlusLib_1081</TargetName>
++  </PropertyGroup>
++
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
++    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
++    <TargetName>LuaPlusLibD_1081</TargetName>
++  </PropertyGroup>
++
++  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <OutDir>$(MSBuildThisFileDirectory)..\..\output\LuaPlus_Build1081\$(Platform)\$(Configuration)\</OutDir>
++    <IntDir>$(MSBuildThisFileDirectory)..\..\buildstage\LuaPlus_Build1081\$(Platform)\$(Configuration)\</IntDir>
++    <TargetName>LuaPlusLib_1081</TargetName>
++  </PropertyGroup>
++
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
++    <ClCompile>
++      <WarningLevel>Level4</WarningLevel>
++      <SDLCheck>true</SDLCheck>
++      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
++      <ConformanceMode>false</ConformanceMode>
++      <PreprocessorDefinitions>LUA_NUMBER=float;LUA_OPNAMES;WIN32;_DEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
++      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
++    </ClCompile>
++  </ItemDefinitionGroup>
++
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
++    <ClCompile>
++      <WarningLevel>Level4</WarningLevel>
++      <SDLCheck>true</SDLCheck>
++      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
++      <FunctionLevelLinking>true</FunctionLevelLinking>
++      <IntrinsicFunctions>true</IntrinsicFunctions>
++      <ConformanceMode>false</ConformanceMode>
++      <PreprocessorDefinitions>LUA_NUMBER=float;LUA_OPNAMES;WIN32;NDEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
++      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
++    </ClCompile>
++  </ItemDefinitionGroup>
++
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
++    <ClCompile>
++      <WarningLevel>Level4</WarningLevel>
++      <SDLCheck>true</SDLCheck>
++      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
++      <ConformanceMode>false</ConformanceMode>
++      <PreprocessorDefinitions>LUA_OPNAMES;_DEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
++      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
++    </ClCompile>
++  </ItemDefinitionGroup>
++
++  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
++    <ClCompile>
++      <WarningLevel>Level4</WarningLevel>
++      <SDLCheck>true</SDLCheck>
++      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
++      <FunctionLevelLinking>true</FunctionLevelLinking>
++      <IntrinsicFunctions>true</IntrinsicFunctions>
++      <ConformanceMode>false</ConformanceMode>
++      <PreprocessorDefinitions>LUA_OPNAMES;NDEBUG;_LIB;LUAPLUS_LIB;LUAPLUS_HAS_WCHAR_T;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
++      <UndefinePreprocessorDefinitions>UNICODE;_UNICODE;%(UndefinePreprocessorDefinitions)</UndefinePreprocessorDefinitions>
++      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)Src\LuaPlus\include;$(MSBuildThisFileDirectory)Src\LuaPlus\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
++    </ClCompile>
++  </ItemDefinitionGroup>
++
++  <ItemGroup>
++    <ClCompile Include=".\Src\LuaPlus\LuaObject.cpp" />
++    <ClCompile Include=".\Src\LuaPlus\LuaPlus.cpp" />
++    <ClCompile Include=".\Src\LuaPlus\LuaPlusAddons.c" />
++    <ClCompile Include=".\Src\LuaPlus\LuaPlusFunctions.cpp" />
++    <ClCompile Include=".\Src\LuaPlus\LuaStackObject.cpp" />
++    <ClCompile Include=".\Src\LuaPlus\LuaState.cpp" />
++    <ClCompile Include=".\Src\LuaPlus\lwstrlib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lapi.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\lauxlib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\lbaselib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lcode.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\ldblib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\ldebug.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\ldo.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\ldump.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lfunc.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lgc.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\liolib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\llex.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\lmathlib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lmem.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\loadlib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lobject.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lopcodes.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lparser.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lstate.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lstring.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\lstrlib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\ltable.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lib\ltablib.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\ltm.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lundump.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lvm.c" />
++    <ClCompile Include=".\Src\LuaPlus\src\lzio.c" />
++  </ItemGroup>
++
++  <ItemGroup>
++    <ClInclude Include=".\Src\LuaPlus\LuaLink.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaObject.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaObject.inl" />
++    <ClInclude Include=".\Src\LuaPlus\LuaPlus.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaPlusAddons.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaPlusFunctions.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaPlusLoader.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaStackObject.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaStackObject.inl" />
++    <ClInclude Include=".\Src\LuaPlus\LuaState.h" />
++    <ClInclude Include=".\Src\LuaPlus\LuaState.inl" />
++    <ClInclude Include=".\Src\LuaPlus\src\lapi.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lcode.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\ldebug.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\ldo.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lfunc.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lgc.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\llex.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\llimits.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lmem.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lobject.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lopcodes.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lparser.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lstate.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lstring.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\ltable.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\ltm.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lundump.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lvm.h" />
++    <ClInclude Include=".\Src\LuaPlus\src\lzio.h" />
++    <ClInclude Include=".\Src\LuaPlus\include\lauxlib.h" />
++    <ClInclude Include=".\Src\LuaPlus\include\lua.h" />
++    <ClInclude Include=".\Src\LuaPlus\include\lualib.h" />
++  </ItemGroup>
++
++  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
++  <ImportGroup Label="ExtensionTargets" />
++</Project>
+ 
+diff -ruN a/Src/LuaPlus/LuaObject.cpp b/Src/LuaPlus/LuaObject.cpp
+--- a/Src/LuaPlus/LuaObject.cpp
++++ b/Src/LuaPlus/LuaObject.cpp
+@@ -68,10 +68,10 @@
+ 	m_next(NULL),
+ 	m_prev(NULL)
+ {
+-	// If this compile time assertion fires, change the line:
+-	//    	unsigned char m_object[12];
++	// If this compile time assertion fires, change TOBJECT_SIZE
+ 	// in LuaObject.h to match the size of lua_TObject.
+-	STATIC_CHECK(sizeof(lua_TObject) == TOBJECT_SIZE, lua_TObject_must_be_12_bytes);
++	// GAME FORK: lua_TObject is 8 bytes here, not the stock 12.
++	STATIC_CHECK(sizeof(lua_TObject) == TOBJECT_SIZE, lua_TObject_must_match_TOBJECT_SIZE);
+ 
+ 	setnilvalue2n(&m_object);
+ }
+@@ -79,10 +79,10 @@
+ 
+ LuaObject::LuaObject(LuaState* state) throw()
+ {
+-	// If this compile time assertion fires, change the line:
+-	//    	unsigned char m_object[12];
++	// If this compile time assertion fires, change TOBJECT_SIZE
+ 	// in LuaObject.h to match the size of lua_TObject.
+-	STATIC_CHECK(sizeof(lua_TObject) == TOBJECT_SIZE, lua_TObject_must_be_12_bytes);
++	// GAME FORK: lua_TObject is 8 bytes here, not the stock 12.
++	STATIC_CHECK(sizeof(lua_TObject) == TOBJECT_SIZE, lua_TObject_must_match_TOBJECT_SIZE);
+ 
+ 	AddToUsedList(state);
+ 	setnilvalue2n(&m_object);
+diff -ruN a/Src/LuaPlus/LuaObject.h b/Src/LuaPlus/LuaObject.h
+--- a/Src/LuaPlus/LuaObject.h
++++ b/Src/LuaPlus/LuaObject.h
+@@ -240,7 +240,10 @@
+ 	LuaObject* m_next;		   // only valid when in free list
+ 	LuaObject* m_prev;		   // only valid when in used list
+ 	LuaState* m_state;
+-	enum { TOBJECT_SIZE = 12 };
++	// GAME FORK: lua_TObject is 8 bytes (float lua_Number + pack(4)), not 12,
++	// which makes sizeof(LuaObject) 0x14 -- matching the static_assert in
++	// src/sdk/lua/LuaObject.h.
++	enum { TOBJECT_SIZE = 8 };
+ #ifdef BUILDING_LUAPLUS
+ 	lua_TObject m_object;
+ #else BUILDING_LUAPLUS
+diff -ruN a/Src/LuaPlus/LuaPlusAddons.h b/Src/LuaPlus/LuaPlusAddons.h
+--- a/Src/LuaPlus/LuaPlusAddons.h
++++ b/Src/LuaPlus/LuaPlusAddons.h
+@@ -57,8 +57,11 @@
+ LUA_API int lua_getn (lua_State *L, int index);
+ 
+ /* formats for Lua numbers */
++/* GAME FORK: lua_Number is float, so the wide scan format must be L"%f" --
++** L"%lf" makes fwscanf write 8 bytes through a 4-byte lua_Number*
++** (liolib.c `read_number'). */
+ #ifndef LUA_NUMBER_WSCAN
+-#define LUA_NUMBER_WSCAN	L"%lf"
++#define LUA_NUMBER_WSCAN	L"%f"
  #endif
  
- int luaV_towstring (lua_State *L, TObject *obj) {
-diff --git a/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c b/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
---- a/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
-+++ b/dependencies/LuaPlus_Build1081/Src/LuaPlus/lwstrlib.c
-@@ -714,7 +714,7 @@ static void luaI_addquoted (lua_State *L, luaL_Buffer *b, int arg) {
- 		  else
- 		  {
- 			  lua_WChar buf[5];
--			  swprintf(buf, L"\\%03d", *s);
-+			  _snwprintf((wchar_t*)buf, 5, L"\\%03d", *s);
- 			  luaL_addlwstring(b, buf, 4);
- 		  }
+ #ifndef LUA_NUMBER_WFMT
+diff -ruN a/Src/LuaPlus/include/lua.h b/Src/LuaPlus/include/lua.h
+--- a/Src/LuaPlus/include/lua.h
++++ b/Src/LuaPlus/include/lua.h
+@@ -95,6 +95,11 @@
+ 
+ 
+ /* type of numbers in Lua */
++/* GAME FORK: the shipped engine builds this Lua with a 4-byte lua_Number
++** (`union Value { void* p; float n; int b; }' in src/sdk/lua/LuaPrimitives.h),
++** which is what makes sizeof(TObject) 8 instead of 12. The project files
++** define LUA_NUMBER=float; the fallback below keeps stock behaviour for any
++** other consumer of this header. */
+ #ifndef LUA_NUMBER
+ typedef double lua_Number;
+ #else
+@@ -303,8 +308,13 @@
+ */
+ 
+ /* formats for Lua numbers */
++/* GAME FORK: lua_Number is float (see the LUA_NUMBER typedef above), so the
++** scan format must be "%f" -- "%lf" makes scanf write 8 bytes through a
++** 4-byte lua_Number* (liolib.c `read_number'). LUA_NUMBER_FMT stays "%.14g":
++** luaV_tostring (FUN_009291A0) loads the value with `fld dword ptr' and hands
++** it to sprintf("%.14g") after the usual float->double varargs promotion. */
+ #ifndef LUA_NUMBER_SCAN
+-#define LUA_NUMBER_SCAN		"%lf"
++#define LUA_NUMBER_SCAN		"%f"
+ #endif
+ 
+ #ifndef LUA_NUMBER_FMT
+diff -ruN a/Src/LuaPlus/src/ldebug.c b/Src/LuaPlus/src/ldebug.c
+--- a/Src/LuaPlus/src/ldebug.c
++++ b/Src/LuaPlus/src/ldebug.c
+@@ -36,9 +36,9 @@
+ static int currentpc (CallInfo *ci) {
+   if (!isLua(ci)) return -1;  /* function is not a Lua function? */
+   if (ci->state & CI_HASFRAME)  /* function has a frame? */
+-    ci->u.l.savedpc = *ci->u.l.pc;  /* use `pc' from there */
++    ci->savedpc = *ci->pc;  /* use `pc' from there */
+   /* function's pc is saved */
+-  return pcRel(ci->u.l.savedpc, ci_func(ci)->l.p);
++  return pcRel(ci->savedpc, ci_func(ci)->l.p);
+ }
+ 
+ 
+@@ -55,7 +55,10 @@
+   CallInfo *ci;
+   for (ci = L->ci; ci != L->base_ci; ci--)  /* update all `savedpc's */
+     currentpc(ci);
+-  L->hookinit = 1;
++  /* GAME FORK: `hookinit' has no dedicated engine field; it is parked in the
++  ** spare byte at global_State+0x153 (never written by the engine's
++  ** f_luaopen, which only touches +0x150..+0x152). */
++  G(L)->hookinit = 1;
+ }
+ 
+ 
+@@ -67,27 +70,29 @@
+     mask = 0;
+     func = NULL;
+   }
+-  L->hook = func;
+-  L->basehookcount = count;
++  /* GAME FORK: hook state lives in global_State -- see lua_sethook
++  ** (FUN_00912560), which writes l_G+0x15C/+0x154/+0x158/+0x151. */
++  G(L)->hook = func;
++  G(L)->basehookcount = count;
+   resethookcount(L);
+-  L->hookmask = cast(lu_byte, mask);
+-  L->hookinit = 0;
++  G(L)->hookmask = cast(lu_byte, mask);
++  G(L)->hookinit = 0;
+   return 1;
+ }
+ 
+ 
+ LUA_API lua_Hook lua_gethook (lua_State *L) {
+-  return L->hook;
++  return G(L)->hook;
+ }
+ 
+ 
+ LUA_API int lua_gethookmask (lua_State *L) {
+-  return L->hookmask;
++  return G(L)->hookmask;
+ }
+ 
+ 
+ LUA_API int lua_gethookcount (lua_State *L) {
+-  return L->basehookcount;
++  return G(L)->basehookcount;
+ }
+ 
+ 
+@@ -98,7 +103,7 @@
+   for (ci = L->ci; level > 0 && ci > L->base_ci; ci--) {
+     level--;
+     if (!(ci->state & CI_C))  /* Lua function? */
+-      level -= ci->u.l.tailcalls;  /* skip lost tail calls */
++      level -= ci->tailcalls;  /* skip lost tail calls */
+   }
+   if (level > 0 || ci == L->base_ci) status = 0;  /* there is no such level */
+   else if (level < 0) {  /* level is of a lost tail call */
+@@ -492,7 +497,7 @@
+ 
+ static const char *getfuncname (CallInfo *ci, const char **name) {
+   Instruction i;
+-  if ((isLua(ci) && ci->u.l.tailcalls > 0) || !isLua(ci - 1))
++  if ((isLua(ci) && ci->tailcalls > 0) || !isLua(ci - 1))
+     return NULL;  /* calling function is not Lua (or is unknown) */
+   ci--;  /* calling function */
+   i = ci_func(ci)->l.p->code[currentpc(ci)];
+diff -ruN a/Src/LuaPlus/src/ldebug.h b/Src/LuaPlus/src/ldebug.h
+--- a/Src/LuaPlus/src/ldebug.h
++++ b/Src/LuaPlus/src/ldebug.h
+@@ -15,7 +15,8 @@
+ 
+ #define getline(f,pc)	(((f)->lineinfo) ? (f)->lineinfo[pc] : 0)
+ 
+-#define resethookcount(L)	(L->hookcount = L->basehookcount)
++/* GAME FORK: hook bookkeeping is per-VM (global_State), not per-thread. */
++#define resethookcount(L)	(G(L)->hookcount = G(L)->basehookcount)
+ 
+ 
+ void luaG_inithooks (lua_State *L);
+diff -ruN a/Src/LuaPlus/src/ldo.c b/Src/LuaPlus/src/ldo.c
+--- a/Src/LuaPlus/src/ldo.c
++++ b/Src/LuaPlus/src/ldo.c
+@@ -162,8 +162,9 @@
+ 
+ 
+ void luaD_callhook (lua_State *L, int event, int line) {
+-  lua_Hook hook = L->hook;
+-  if (hook && L->allowhook) {
++  /* GAME FORK: hook state is per-VM (global_State), not per-thread. */
++  lua_Hook hook = G(L)->hook;
++  if (hook && G(L)->allowhook) {
+     ptrdiff_t top = savestack(L, L->top);
+     ptrdiff_t ci_top = savestack(L, L->ci->top);
+     lua_Debug ar;
+@@ -175,12 +176,12 @@
+       ar.i_ci = L->ci - L->base_ci;
+     luaD_checkstack(L, LUA_MINSTACK);  /* ensure minimum stack size */
+     L->ci->top = L->top + LUA_MINSTACK;
+-    L->allowhook = 0;  /* cannot call hooks inside a hook */
++    G(L)->allowhook = 0;  /* cannot call hooks inside a hook */
+     lua_unlock(L);
+     (*hook)(L, &ar);
+     lua_lock(L);
+-    lua_assert(!L->allowhook);
+-    L->allowhook = 1;
++    lua_assert(!G(L)->allowhook);
++    G(L)->allowhook = 1;
+     L->ci->top = restorestack(L, ci_top);
+     L->top = restorestack(L, top);
+   }
+@@ -245,8 +246,8 @@
+     ci = ++L->ci;  /* now `enter' new function */
+     L->base = L->ci->base = restorestack(L, funcr) + 1;
+     ci->top = L->base + p->maxstacksize;
+-    ci->u.l.savedpc = p->code;  /* starting point */
+-    ci->u.l.tailcalls = 0;
++    ci->savedpc = p->code;  /* starting point */
++    ci->tailcalls = 0;
+     ci->state = CI_SAVEDPC;
+     //jj ?? <=
+     while (L->top < ci->top)
+@@ -262,7 +263,7 @@
+     L->base = L->ci->base = restorestack(L, funcr) + 1;
+     ci->top = L->top + LUA_MINSTACK;
+     ci->state = CI_C;  /* a C function */
+-    if (L->hookmask & LUA_MASKCALL)
++    if (G(L)->hookmask & LUA_MASKCALL)
+       luaD_callhook(L, LUA_HOOKCALL, -1);
+     lua_unlock(L);
+ #ifdef LUA_COMPATUPVALUES
+@@ -279,7 +280,7 @@
+   ptrdiff_t fr = savestack(L, firstResult);  /* next call may change stack */
+   luaD_callhook(L, LUA_HOOKRET, -1);
+   if (!(L->ci->state & CI_C)) {  /* Lua function? */
+-    while (L->ci->u.l.tailcalls--)  /* call hook for eventual tail calls */
++    while (L->ci->tailcalls--)  /* call hook for eventual tail calls */
+       luaD_callhook(L, LUA_HOOKTAILRET, -1);
+   }
+   return restorestack(L, fr);
+@@ -288,7 +289,7 @@
+ 
+ void luaD_poscall (lua_State *L, int wanted, StkId firstResult) { 
+   StkId res;
+-  if (L->hookmask & LUA_MASKRET)
++  if (G(L)->hookmask & LUA_MASKRET)
+     firstResult = callrethooks(L, firstResult);
+   res = L->base - 1;  /* res == final position of 1st result */
+   L->ci--;
+@@ -348,9 +349,9 @@
+       /* finish interrupted execution of `OP_CALL' */
+       int nresults;
+       lua_assert((ci-1)->state & CI_SAVEDPC);
+-      lua_assert(GET_OPCODE(*((ci-1)->u.l.savedpc - 1)) == OP_CALL ||
+-                 GET_OPCODE(*((ci-1)->u.l.savedpc - 1)) == OP_TAILCALL);
+-      nresults = GETARG_C(*((ci-1)->u.l.savedpc - 1)) - 1;
++      lua_assert(GET_OPCODE(*((ci-1)->savedpc - 1)) == OP_CALL ||
++                 GET_OPCODE(*((ci-1)->savedpc - 1)) == OP_TAILCALL);
++      nresults = GETARG_C(*((ci-1)->savedpc - 1)) - 1;
+       luaD_poscall(L, nresults, L->top - nargs);  /* complete it */
+       if (nresults >= 0) L->top = L->ci->top;
      }
-@@ -752,7 +752,7 @@ static void luaI_addquotedbinary (lua_State *L, luaL_Buffer *b, int arg) {
- 				else
- 				{
- 					lua_WChar str[10];
--					swprintf(str, L"\\x%04x", (unsigned long)*s);
-+					_snwprintf((wchar_t*)str, 10, L"\\x%04x", (unsigned long)*s);
- 					luaL_addwstring(b, str);
- 				}
- 		}
-@@ -785,7 +785,7 @@ static void luaI_addquotedbinary (lua_State *L, luaL_Buffer *b, int arg) {
- 				else
- 				{
- 					lua_WChar str[10];
--					swprintf(str, L"\\x%02x", (unsigned long)(unsigned char)*s);
-+					_snwprintf((wchar_t*)str, 10, L"\\x%02x", (unsigned long)(unsigned char)*s);
- 					luaL_addwstring(b, str);
- 				}
- 		}
-@@ -908,15 +908,15 @@ int wstr_format_helper (luaL_Buffer* b, lua_State *L, int arg) {
- 		  break;
- 		}
-         case 'c':  case 'd':  case 'i':
--          swprintf(buff, form, luaL_checkint(L, arg));
-+          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, luaL_checkint(L, arg));
-           break;
-         case 'o':  case 'u':  case 'x':  case 'X':
-           //?? How should this be for integers?
--          swprintf(buff, form, (unsigned int)(luaL_checknumber(L, arg)));
-+          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, (unsigned int)(luaL_checknumber(L, arg)));
-           break;
-         case 'e':  case 'E': case 'f':
-         case 'g': case 'G':
--          swprintf(buff, form, luaL_checknumber(L, arg));
-+          _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, luaL_checknumber(L, arg));
-           break;
-         case 'q':
-           luaI_addquoted(L, b, arg);
-@@ -935,7 +935,7 @@ int wstr_format_helper (luaL_Buffer* b, lua_State *L, int arg) {
-             continue;  /* skip the `addsize' at the end */
+@@ -383,7 +384,7 @@
+   }
+   else if (!(L->ci->state & CI_YIELD))  /* not inside a yield? */
+     return resume_error(L, "cannot resume non-suspended coroutine");
+-  old_allowhooks = L->allowhook;
++  old_allowhooks = G(L)->allowhook;
+   lua_assert(L->errfunc == 0 && L->nCcalls == 0);
+   status = luaD_rawrunprotected(L, resume, &nargs);
+   if (status != 0) {  /* error? */
+@@ -392,7 +393,7 @@
+     L->nCcalls = 0;
+     luaF_close(L, L->base);  /* close eventual pending closures */
+     seterrorobj(L, status, L->base);
+-    L->allowhook = old_allowhooks;
++    G(L)->allowhook = old_allowhooks;
+     restore_stack_limit(L);
+   }
+   lua_unlock(L);
+@@ -427,7 +428,7 @@
+   int status;
+   unsigned short oldnCcalls = L->nCcalls;
+   ptrdiff_t old_ci = saveci(L, L->ci);
+-  lu_byte old_allowhooks = L->allowhook;
++  lu_byte old_allowhooks = G(L)->allowhook;
+   ptrdiff_t old_errfunc = L->errfunc;
+   L->errfunc = ef;
+   status = luaD_rawrunprotected(L, func, u);
+@@ -445,7 +446,7 @@
+     L->nCcalls = oldnCcalls;
+     L->ci = restoreci(L, old_ci);
+     L->base = L->ci->base;
+-    L->allowhook = old_allowhooks;
++    G(L)->allowhook = old_allowhooks;
+     restore_stack_limit(L);
+   }
+   L->errfunc = old_errfunc;
+diff -ruN a/Src/LuaPlus/src/lgc.c b/Src/LuaPlus/src/lgc.c
+--- a/Src/LuaPlus/src/lgc.c
++++ b/Src/LuaPlus/src/lgc.c
+@@ -498,8 +498,9 @@
+ 
+ 
+ void luaC_callGCTM (lua_State *L) {
+-  lu_byte oldah = L->allowhook;
+-  L->allowhook = 0;  /* stop debug hooks during GC tag methods */
++  /* GAME FORK: hook state is per-VM (global_State), not per-thread. */
++  lu_byte oldah = G(L)->allowhook;
++  G(L)->allowhook = 0;  /* stop debug hooks during GC tag methods */
+   L->top++;  /* reserve space to keep udata while runs its gc method */
+ #if LUA_REFCOUNT
+   while (G(L)->tmudata_head.next != (GCObject*)&G(L)->tmudata_tail) {
+@@ -525,7 +526,7 @@
+     do1gcTM(L, udata);
+   }
+   L->top--;
+-  L->allowhook = oldah;  /* restore hooks */
++  G(L)->allowhook = oldah;  /* restore hooks */
+ }
+ 
+ 
+diff -ruN a/Src/LuaPlus/src/llex.c b/Src/LuaPlus/src/llex.c
+--- a/Src/LuaPlus/src/llex.c
++++ b/Src/LuaPlus/src/llex.c
+@@ -35,12 +35,9 @@
+ #define lex_isalnum(c) isalnum(c)
+ #endif _WIN32_WCE
+ 
+-#ifdef _DEBUG
++/* GAME FORK: allocName is unconditional -- see lmem.h. */
+ #define luaM_setname(L, name) \
+ 	L->allocName = name
+-#else !_DEBUG
+-#define luaM_setname(L, name)
+-#endif _DEBUG
+ 
+ #define next(LS) (LS->current = zgetc(LS->z))
+ 
+diff -ruN a/Src/LuaPlus/src/lmem.c b/Src/LuaPlus/src/lmem.c
+--- a/Src/LuaPlus/src/lmem.c
++++ b/Src/LuaPlus/src/lmem.c
+@@ -76,11 +76,9 @@
+   else if (size >= MAX_SIZET)
+     luaG_runerror(L, "memory allocation error: block too big");
+   else {
+-#ifdef _DEBUG
++    /* GAME FORK: allocName is always present, so both configurations pass
++    ** the same arguments to the allocator hook. */
+     block = (*G(L)->reallocFunc)(block, oldsize, size, G(L)->memData, L->allocName, L->allocFlags);
+-#else !_DEBUG
+-    block = (*G(L)->reallocFunc)(block, oldsize, size, G(L)->memData, NULL, L->allocFlags);
+-#endif _DEBUG
+     luaM_setname(L, NULL);
+     if (block == NULL) {
+       if (L)
+diff -ruN a/Src/LuaPlus/src/lmem.h b/Src/LuaPlus/src/lmem.h
+--- a/Src/LuaPlus/src/lmem.h
++++ b/Src/LuaPlus/src/lmem.h
+@@ -39,15 +39,13 @@
+    ((v)=cast(t *, luaM_realloc(L, v,cast(lu_mem, oldn)*cast(lu_mem, sizeof(t)), \
+                                     cast(lu_mem, n)*cast(lu_mem, sizeof(t)))))
+ 
+-#ifdef _DEBUG
++/* GAME FORK: lua_State::allocName exists in every configuration now (stock
++** guarded it with _DEBUG, which silently gave Release a different lua_State
++** layout), so the allocation-name bookkeeping is unconditional too. */
+ #define luaM_setname(L, name) \
+ 	L->allocName = name
+ #define luaM_setnameif(L, name) \
+ 	if (!L->allocName) L->allocName = name
+-#else !_DEBUG
+-#define luaM_setname(L, name)
+-#define luaM_setnameif(L, name)
+-#endif _DEBUG
+ 
+ #endif
+ 
+diff -ruN a/Src/LuaPlus/src/lobject.h b/Src/LuaPlus/src/lobject.h
+--- a/Src/LuaPlus/src/lobject.h
++++ b/Src/LuaPlus/src/lobject.h
+@@ -97,10 +97,13 @@
+ /*
+ ** Lua values (or `tagged objects')
+ */
++/* GAME FORK: the shipped engine declares TObject under `#pragma pack(push,4)`
++** (see src/sdk/lua/LuaPrimitives.h), not pack(1). Combined with the float
++** lua_Number this gives sizeof(TObject) == 8, align 4. */
+ #if defined(_MSC_VER)
+-#include <pshpack1.h>
++#include <pshpack4.h>
+ #elif defined(__GNU_C__)
+-__attribute__((aligned(1)))
++__attribute__((aligned(4)))
+ #endif _MSC_VER
+ typedef struct lua_TObject {
+   int tt;
+@@ -272,30 +275,39 @@
+ /*
+ ** String headers for string table
+ */
++/* GAME FORK: the engine's TString drops the L_Umaxalign arm (align 4, not 8),
++** widens `reserved' to a dword at +0x08 and carries the character payload as
++** an explicit `str' member at +0x14 -- NOT at sizeof(TString) (== 0x18).
++** See src/sdk/lua/LuaRuntimeTypes.h and newlstr (FUN_00924860), which
++** allocates offsetof(TString,str) + len + 1 and writes chars from +0x14. */
+ typedef union TString {
+-  L_Umaxalign dummy;  /* ensures maximum alignment for strings */
+   struct {
+-    CommonHeader;
+-    lu_byte reserved;
+-    lu_hash hash;
+-    size_t len;
++    CommonHeader;       /* next +0x00, tt +0x04, marked +0x05 */
++    int reserved;       /* +0x08 */
++    lu_hash hash;       /* +0x0C */
++    size_t len;         /* +0x10 */
++    char str[1];        /* +0x14 -- char / lua_WChar payload */
+   } tsv;
+ } TString;
+ 
+ 
+-#define getstr(ts)	cast(const char *, (ts) + 1)
++/* offset of the character payload; deliberately not sizeof(TString) */
++#define sizeofTStringHeader	(cast(lu_mem, offsetof(TString, tsv.str)))
++
++#define getstr(ts)	cast(const char *, (ts)->tsv.str)
++#define getstrmutable(ts)	cast(char *, (ts)->tsv.str)
+ #define svalue(o)       getstr(tsvalue(o))
+-#define getwstr(ts)	cast(const lua_WChar *, (ts) + 1)
++#define getwstr(ts)	cast(const lua_WChar *, cast(const void *, (ts)->tsv.str))
+ #define wsvalue(o)       getwstr(tsvalue(o))
+ 
+ 
+ 
++/* GAME FORK: no L_Umaxalign arm (the engine's Udata is align 4, size 0x10). */
+ typedef union Udata {
+-  L_Umaxalign dummy;  /* ensures maximum alignment for `local' udata */
+   struct {
+-    CommonHeader;
+-    struct Table *metatable;
+-    size_t len;
++    CommonHeader;              /* next +0x00, tt +0x04, marked +0x05 */
++    struct Table *metatable;   /* +0x08 */
++    size_t len;                /* +0x0C */
+   } uv;
+ } Udata;
+ 
+@@ -326,6 +338,18 @@
+   lu_byte numparams;
+   lu_byte is_vararg;
+   lu_byte maxstacksize;
++  /* GAME FORK: the engine's Proto carries 0x28 more bytes past maxstacksize
++  ** (sizeof == 0x70, natural align 8). Fields +0x00..+0x47 are unchanged.
++  ** See src/sdk/lua/LuaRuntimeTypes.h. */
++  int reserved48;
++  int reserved4C;
++  int reserved50;
++  int reserved54;
++  int reserved58;
++  int reserved5C;
++  int reserved60;
++  int reserved64;
++  __int64 reserved68;
+ } Proto;
+ 
+ 
+@@ -352,21 +376,30 @@
+ ** Closures
+ */
+ 
++/* GAME FORK: the engine's closure header puts `nupvalues' at +0x08 and `isC'
++** at +0x09 (stock had isC +0x06 / nupvalues +0x07), pushing gclist to +0x0C.
++** Proven by luaF_newCclosure (FUN_00914E90), luaF_newLclosure (FUN_00914EF0),
++** traversecclosure (FUN_00915540) and traverselclosure (FUN_00915580). */
+ #define ClosureHeader \
+-	CommonHeader; lu_byte isC; lu_byte nupvalues; GCObject *gclist
++	CommonHeader; lu_byte reservedHeader[2]; lu_byte nupvalues; lu_byte isC; \
++	GCObject *gclist
+ 
+ typedef struct CClosure {
+-  ClosureHeader;
+-  lua_CFunction f;
+-  TObject upvalue[1];
++  ClosureHeader;              /* gclist +0x0C */
++  lua_CFunction f;            /* +0x10 */
++  /* GAME FORK: 44 unused bytes before the upvalue array; the engine's first
++  ** upvalue lives at +0x40 (traversecclosure walks from [cl+0x40], and
++  ** luaF_newCclosure allocates 0x40 + n*sizeof(TObject)). */
++  lu_byte reservedTail[44];   /* +0x14 */
++  TObject upvalue[1];         /* +0x40 */
+ } CClosure;
+ 
+ 
+ typedef struct LClosure {
+-  ClosureHeader;
+-  struct Proto *p;
+-  TObject g;  /* global table for this closure */
+-  UpVal *upvals[1];
++  ClosureHeader;              /* gclist +0x0C */
++  TObject g;                  /* +0x10 -- global table for this closure */
++  struct Proto *p;            /* +0x18 (game fork swaps g and p vs stock) */
++  UpVal *upvals[1];           /* +0x1C */
+ } LClosure;
+ 
+ 
+@@ -391,16 +424,20 @@
+ } Node;
+ 
+ 
++/* GAME FORK: the engine's Table has a spare dword right after the common
++** header, so flags/lsizenode sit at +0x0C/+0x0D and everything below shifts
++** by 8 (sizeof == 0x28). See src/sdk/lua/LuaRuntimeTypes.h. */
+ typedef struct Table {
+-  CommonHeader;
+-  lu_byte flags;  /* 1<<p means tagmethod(p) is not present */ 
+-  lu_byte lsizenode;  /* log2 of size of `node' array */
+-  struct Table *metatable;
+-  TObject *array;  /* array part */
+-  Node *node;
+-  Node *firstfree;  /* this position is free; all positions after it are full */
+-  GCObject *gclist;
+-  int sizearray;  /* size of `array' array */
++  CommonHeader;         /* next +0x00, tt +0x04, marked +0x05 */
++  int reservedAfterHeader;  /* +0x08 */
++  lu_byte flags;  /* +0x0C -- 1<<p means tagmethod(p) is not present */
++  lu_byte lsizenode;  /* +0x0D -- log2 of size of `node' array */
++  struct Table *metatable;  /* +0x10 */
++  TObject *array;  /* +0x14 -- array part */
++  Node *node;  /* +0x18 */
++  Node *firstfree;  /* +0x1C -- this position is free; all after it are full */
++  GCObject *gclist;  /* +0x20 */
++  int sizearray;  /* +0x24 -- size of `array' array */
+ } Table;
+ 
+ 
+diff -ruN a/Src/LuaPlus/src/lstate.c b/Src/LuaPlus/src/lstate.c
+--- a/Src/LuaPlus/src/lstate.c
++++ b/Src/LuaPlus/src/lstate.c
+@@ -6,6 +6,7 @@
+ 
+ 
+ #include <stdlib.h>
++#include <string.h>
+ 
+ #define lstate_c
+ 
+@@ -197,6 +198,15 @@
+   L1->base_ci = luaM_newvector(L, BASIC_CI_SIZE, CallInfo);
+   L1->ci = L1->base_ci;
+   L1->ci->state = CI_C;  /*  not a Lua function */
++  /* GAME FORK: the engine's stack_init zeroes the grown CallInfo tail
++  ** (savedpc/pc/+0x14/+0x18/+0x1C/tailcalls) -- mirror that here. */
++  L1->ci->savedpc = NULL;
++  L1->ci->pc = NULL;
++  L1->ci->reserved14 = 0;
++  L1->ci->reserved18 = 0;
++  L1->ci->reserved1C = 0;
++  L1->ci->tailcalls = 0;
++  L1->ci->reserved24 = 0;
+   setnilvalue2n(L1->top++);  /* `function' entry for this `ci' */
+   L1->base = L1->ci->base = L1->top;
+   L1->ci->top = L1->top + LUA_MINSTACK;
+@@ -219,9 +229,10 @@
+   global_State globalState;
+   lua_State luaState;
+   global_State *g;
+-#ifdef _DEBUG
++  /* GAME FORK: allocName is not _DEBUG-only any more (the field exists in
++  ** every configuration, so Release and Debug share one lua_State layout). */
+   luaState.allocName = "Lua_global_State";
+-#endif _DEBUG
++  luaState.allocFlags = 0;
+   luaState.l_G = &globalState;
+   globalState.reallocFunc = luaHelper_Realloc;
+   globalState.freeFunc = luaHelper_Free;
+@@ -243,6 +254,7 @@
+   g->panic = default_panic;
+ #if !LUA_REFCOUNT
+   g->rootgc = NULL;
++  g->rootgc1 = NULL;  /* GAME FORK: fourth GC root list at +0x10 */
+   g->rootudata = NULL;
+   g->tmudata = NULL;
+ #else LUA_REFCOUNT
+@@ -288,13 +300,31 @@
+   g->freeFunc = luaHelper_Free;
+   g->memData = luaHelper_memData;
+   g->fatalErrorFunc = defaultFatalErrorFunc;
+-#ifdef LUA_MTSUPPORT
++  /* GAME FORK: these slots exist regardless of LUA_MTSUPPORT. */
+   g->lockData = NULL;
+   g->lockFunc = NULL;
+   g->unlockFunc = NULL;
+-#endif LUA_MTSUPPORT
+   g->userGCFunction = NULL;
+   g->globalUserData = NULL;
++  /* GAME FORK: engine-only slots the recovered core reads. `lstate' is the
++  ** currently-active thread (l_G+0x40) and must never be NULL. */
++  g->lstate = L;
++  g->gcTraversalLockDepth = 0;
++  g->allocTrackingEnabled = 0;
++  g->userdataMetatable = NULL;
++  g->reservedF8 = g->reservedFC = g->reserved100 = g->reserved104 = 0;
++  g->reserved10C = g->reserved110 = g->reserved114 = 0;
++  g->reserved120 = g->reserved124 = g->reserved128 = g->reserved12C = 0;
++  g->reserved144 = 0;
++  memset(g->reserved160, 0, sizeof(g->reserved160));
++  /* GAME FORK: hook state moved here from lua_State. preinit_state cannot
++  ** touch it -- it runs before L->l_G is assigned. */
++  g->hook = NULL;
++  g->hookmask = 0;
++  g->hookinit = 0;
++  g->basehookcount = 0;
++  g->hookcount = 0;
++  g->allowhook = 1;
+ 
+   stack_init(L, L);  /* init stack */
+ 
+@@ -318,6 +348,9 @@
+     sethvalue2n(defaultmetatypes(L, i), luaH_new(L, 0, 0));
+     hvalue(defaultmetatypes(L, i))->metatable = hvalue(defaultmeta(L));
+   }
++  /* GAME FORK: the engine caches the userdata default metatable at
++  ** global_State+0x118 (luaS_newudata, FUN_00924A10, reads it from there). */
++  g->userdataMetatable = hvalue(defaultmetatypes(L, LUA_TUSERDATA));
+ 
+   luaM_setname(L, "Lua_Globals");
+   sethvalue(gt(L), luaH_new(L, 0, 4));  /* table of globals */
+@@ -340,17 +373,21 @@
+   L->stack = NULL;
+   L->stacksize = 0;
+   L->errorJmp = NULL;
+-  L->hook = NULL;
+-  L->hookmask = L->hookinit = 0;
+-  L->basehookcount = 0;
+-  L->allowhook = 1;
+-  resethookcount(L);
++  /* GAME FORK: hook state lives in global_State now, and l_G is not assigned
++  ** yet at this point (lua_open sets it after this call), so the hook fields
++  ** are initialised in f_luaopen instead. Threads deliberately do not
++  ** re-initialise them -- hooks are per-VM, not per-thread. */
+   L->openupval = NULL;
+   L->size_ci = 0;
+   L->nCcalls = 0;
+   L->base_ci = L->ci = NULL;
+   L->errfunc = 0;
++  L->allocFlags = 0;
++  L->allocName = NULL;
+   L->stateUserData = NULL;	
++  L->reserved48 = L->reserved4C = 0;
++  L->reserved54 = L->reserved5C = 0;
++  L->reserved64 = L->reserved68 = 0;
+   setnilvalue2n(gt(L));
+ }
+ 
+@@ -361,6 +398,8 @@
+ 
+   luaF_close(L, L->stack);  /* close all upvalues for this thread */
+ 
++  luaState.allocName = "Lua_close_state";
++  luaState.allocFlags = 0;
+   luaState.l_G = &globalState;
+   globalState.reallocFunc = G(L)->reallocFunc;
+   globalState.freeFunc = G(L)->freeFunc;
+@@ -422,9 +461,9 @@
+   lua_State *L;
+   global_State globalState;
+   lua_State luaState;
+-#ifdef _DEBUG
++  /* GAME FORK: allocName exists in every configuration (see lstate.h). */
+   luaState.allocName = "Lua_lua_State";
+-#endif _DEBUG
++  luaState.allocFlags = 0;
+   luaState.l_G = &globalState;
+   globalState.reallocFunc = luaHelper_Realloc;
+   globalState.freeFunc = luaHelper_Free;
+diff -ruN a/Src/LuaPlus/src/lstate.h b/Src/LuaPlus/src/lstate.h
+--- a/Src/LuaPlus/src/lstate.h
++++ b/Src/LuaPlus/src/lstate.h
+@@ -74,20 +74,23 @@
+ /*
+ ** informations about a call
+ */
++/* GAME FORK: the engine un-unionises CallInfo and grows it to 0x28 bytes.
++** savedpc/pc keep their stock offsets but are plain members, `tailcalls'
++** moves from +0x14 to +0x20 and three spare dwords sit in between.
++** Proven by luaD_reallocCI (FUN_00913920), which strides by n*5*8 == n*0x28,
++** and lua_stack_init (FUN_009240C0), which allocates 8*0x28 for base_ci and
++** zeroes +0x0C..+0x20. Mirrored by src/sdk/lua/LuaRuntimeTypes.h. */
+ typedef struct CallInfo {
+-  StkId base;  /* base for called function */
+-  StkId	top;  /* top for this function */
+-  int state;  /* bit fields; see below */
+-  union {
+-    struct {  /* for Lua functions */
+-      const Instruction *savedpc;
+-      const Instruction **pc;  /* points to `pc' variable in `luaV_execute' */
+-      int tailcalls;  /* number of tail calls lost under this entry */
+-    } l;
+-    struct {  /* for C functions */
+-      int dummy;  /* just to avoid an empty struct */
+-    } c;
+-  } u;
++  StkId base;  /* +0x00 base for called function */
++  StkId	top;  /* +0x04 top for this function */
++  int state;  /* +0x08 bit fields; see below */
++  const Instruction *savedpc;  /* +0x0C */
++  const Instruction **pc;  /* +0x10 points to `pc' in `luaV_execute' */
++  int reserved14;  /* +0x14 (zeroed by stack_init in the engine) */
++  int reserved18;  /* +0x18 */
++  int reserved1C;  /* +0x1C */
++  int tailcalls;  /* +0x20 number of tail calls lost under this entry */
++  int reserved24;  /* +0x24 */
+ } CallInfo;
+ 
+ 
+@@ -110,12 +113,28 @@
+ /*
+ ** `global state', shared by all threads of this state
+ */
++/*
++** GAME FORK layout (mirrors src/sdk/lua/LuaRuntimeTypes.h; sizeof == 0x1B8).
++** Differences vs stock LuaPlus 1081:
++**   - a fourth GC root list (`rootgc1') at +0x10, pushing rootudata to +0x14;
++**   - `nblocks' leaves +0x24 and lives in the reserved block at +0x108;
++**   - `panic' moves to +0x24 and a GC-traversal lock counter appears at +0x28;
++**   - a `lstate' (currently-active thread) slot at +0x40;
++**   - the MT-support slots exist unconditionally at +0xEC..+0xF4;
++**   - a reserved block +0xF8..+0x12F holding nblocks (+0x108) and the
++**     userdata default-metatable pointer (+0x118);
++**   - a spare dword at +0x144 before globalUserData;
++**   - the debug-hook state relocated out of lua_State to +0x150..+0x15F;
++**   - an 88-byte reserved tail at +0x160.
++** `tmudata' has no proven engine slot, so it is parked in the reserved block
++** at +0x11C rather than left aliasing rootudata.
++*/
+ typedef struct global_State {
+-  stringtable strt;  /* hash table for strings */
++  stringtable strt;  /* +0x00 hash table for strings */
+ #if !LUA_REFCOUNT
+-  GCObject *rootgc;  /* list of (almost) all collectable objects */
+-  GCObject *rootudata;   /* (separated) list of all userdata */
+-  GCObject *tmudata;  /* list of userdata to be GC */
++  GCObject *rootgc;  /* +0x0C list of (almost) all collectable objects */
++  GCObject *rootgc1;  /* +0x10 secondary GC root list (engine debug traversal) */
++  GCObject *rootudata;   /* +0x14 (separated) list of all userdata */
+ #else LUA_REFCOUNT
+   GCheader rootgc_head;
+   GCheader rootgc_tail;
+@@ -124,69 +143,99 @@
+   GCheader tmudata_head;
+   GCheader tmudata_tail;
+ #endif LUA_REFCOUNT
+-  Mbuffer buff;  /* temporary buffer for string concatentation */
+-  lu_mem GCthreshold;
+-  lu_mem nblocks;  /* number of `bytes' currently allocated */
+-  lua_CFunction panic;  /* to be called in unprotected errors */
+-  TObject _registry;
+-  TObject _defaultmeta;
+-  struct lua_State *mainthread;
+-  Node dummynode[1];  /* common node array for all empty tables */
+-  TString *tmname[TM_N];  /* array with tag-method names */
++  Mbuffer buff;  /* +0x18 temporary buffer for string concatentation */
++  lu_mem GCthreshold;  /* +0x20 */
++  lua_CFunction panic;  /* +0x24 to be called in unprotected errors */
++  int gcTraversalLockDepth;  /* +0x28 engine-only recursion guard */
++  TObject _registry;  /* +0x2C */
++  TObject _defaultmeta;  /* +0x34 */
++  struct lua_State *mainthread;  /* +0x3C */
++  struct lua_State *lstate;  /* +0x40 currently-active thread */
++  Node dummynode[1];  /* +0x44 common node array for all empty tables */
++  TString *tmname[TM_N];  /* +0x58 array with tag-method names */
+   // Custom data starts here.
+-  TObject _defaultmetatypes[LUA_NTYPES];
+-  void (*fatalErrorFunc)(void);
+-#ifdef LUA_MTSUPPORT
+-  void* lockData;
+-  void (*lockFunc)(void*);
+-  void (*unlockFunc)(void*);
+-#endif LUA_MTSUPPORT
+-  void* memData;
+-  lua_ReallocFunction reallocFunc;
+-  lua_FreeFunction freeFunc;
+-  int minimumstrings;
+-  void* globalUserData;
+-  void (*userGCFunction)(void*);
++  TObject _defaultmetatypes[LUA_NTYPES];  /* +0x94 */
++  /* GAME FORK: present whether or not LUA_MTSUPPORT is defined. */
++  void* lockData;  /* +0xEC */
++  void (*lockFunc)(void*);  /* +0xF0 */
++  void (*unlockFunc)(void*);  /* +0xF4 */
++  int reservedF8;  /* +0xF8 */
++  int reservedFC;  /* +0xFC */
++  int reserved100;  /* +0x100 */
++  int reserved104;  /* +0x104 */
++  lu_mem nblocks;  /* +0x108 number of `bytes' currently allocated */
++  int reserved10C;  /* +0x10C */
++  int reserved110;  /* +0x110 */
++  int reserved114;  /* +0x114 */
++  struct Table *userdataMetatable;  /* +0x118 default metatable for new udata */
++  GCObject *tmudata;  /* +0x11C list of userdata to be GC (parked slot) */
++  int reserved120;  /* +0x120 */
++  int reserved124;  /* +0x124 */
++  int reserved128;  /* +0x128 */
++  int reserved12C;  /* +0x12C */
++  void (*fatalErrorFunc)(void);  /* +0x130 */
++  void* memData;  /* +0x134 */
++  lua_ReallocFunction reallocFunc;  /* +0x138 */
++  lua_FreeFunction freeFunc;  /* +0x13C */
++  int minimumstrings;  /* +0x140 */
++  int reserved144;  /* +0x144 */
++  void* globalUserData;  /* +0x148 */
++  void (*userGCFunction)(void*);  /* +0x14C */
++  lu_byte allocTrackingEnabled;  /* +0x150 engine allocation-tracking gate */
++  /* GAME FORK: debug-hook state is per-VM here, not per-thread. */
++  lu_byte hookmask;  /* +0x151 */
++  lu_byte allowhook;  /* +0x152 */
++  lu_byte hookinit;  /* +0x153 -- spare engine byte reused for `hookinit' */
++  int basehookcount;  /* +0x154 */
++  int hookcount;  /* +0x158 */
++  lua_Hook hook;  /* +0x15C */
++  lu_byte reserved160[88];  /* +0x160 -- pads sizeof(global_State) to 0x1B8 */
+ } global_State;
+ 
+ 
+ /*
+ ** `per thread' state
++**
++** GAME FORK layout (mirrors src/sdk/lua/LuaRuntimeTypes.h; sizeof == 0x70,
++** align 8). The debug-hook block that stock keeps between nCcalls and _gt is
++** gone (it now lives in global_State), which pulls _gt down to +0x30, and
++** allocFlags/stateUserData are hoisted to +0x40/+0x44 ahead of the error
++** bookkeeping.
+ */
+-struct lua_State {
+-  CommonHeader;
+-  StkId top;  /* first free slot in the stack */
+-  StkId base;  /* base of current function */
+-  global_State *l_G;
+-  CallInfo *ci;  /* call info for current function */
+-  StkId stack_last;  /* last free slot in the stack */
+-  StkId stack;  /* stack base */
+-  int stacksize;
+-  CallInfo *end_ci;  /* points after end of ci array*/
+-  CallInfo *base_ci;  /* array of CallInfo's */
+-  unsigned short size_ci;  /* size of array `base_ci' */
+-  unsigned short nCcalls;  /* number of nested C calls */
+-  lu_byte hookmask;
+-  lu_byte allowhook;
+-  lu_byte hookinit;
+-  int basehookcount;
+-  int hookcount;
+-  lua_Hook hook;
+-  TObject _gt;  /* table of globals */
+-  GCObject *openupval;  /* list of open upvalues in this stack */
++struct __declspec(align(8)) lua_State {
++  CommonHeader;  /* next +0x00, tt +0x04, marked +0x05 */
++  StkId top;  /* +0x08 first free slot in the stack */
++  StkId base;  /* +0x0C base of current function */
++  global_State *l_G;  /* +0x10 */
++  CallInfo *ci;  /* +0x14 call info for current function */
++  StkId stack_last;  /* +0x18 last free slot in the stack */
++  StkId stack;  /* +0x1C stack base */
++  int stacksize;  /* +0x20 */
++  CallInfo *end_ci;  /* +0x24 points after end of ci array*/
++  CallInfo *base_ci;  /* +0x28 array of CallInfo's */
++  unsigned short size_ci;  /* +0x2C size of array `base_ci' */
++  unsigned short nCcalls;  /* +0x2E number of nested C calls */
++  TObject _gt;  /* +0x30 table of globals */
++  GCObject *openupval;  /* +0x38 list of open upvalues in this stack */
+ #if !LUA_REFCOUNT
+-  GCObject *gclist;
++  GCObject *gclist;  /* +0x3C */
+ #else LUA_REFCOUNT
+   GCheader gclist_head;
+   GCheader gclist_tail;
+ #endif LUA_REFCOUNT
+-  struct lua_longjmp *errorJmp;  /* current error recover point */
+-  ptrdiff_t errfunc;  /* current error handling function (stack index) */
+-#ifdef _DEBUG
+-  const char* allocName;
+-#endif _DEBUG
+-  unsigned int allocFlags;
+-  void* stateUserData;
++  unsigned int allocFlags;  /* +0x40 */
++  void* stateUserData;  /* +0x44 */
++  int reserved48;  /* +0x48 */
++  int reserved4C;  /* +0x4C */
++  struct lua_longjmp *errorJmp;  /* +0x50 current error recover point */
++  int reserved54;  /* +0x54 */
++  ptrdiff_t errfunc;  /* +0x58 error handling function (stack index) */
++  int reserved5C;  /* +0x5C high half of the engine's 8-byte errfunc slot */
++  /* GAME FORK: unconditional -- stock guards this with _DEBUG, which makes
++  ** Release|Win32 build a differently sized lua_State than Debug|Win32. */
++  const char* allocName;  /* +0x60 */
++  int reserved64;  /* +0x64 */
++  int reserved68;  /* +0x68 */
+ };
+ 
+ 
+@@ -224,6 +273,55 @@
+ #define valtogco(v)	(cast(GCObject *, (v)))
+ 
+ 
++/*
++** GAME FORK layout guards. These reproduce the static_asserts in
++** src/sdk/lua/LuaRuntimeTypes.h: if any of them trips, this library and the
++** recovered engine core no longer agree on the shape of the VM and must not
++** be linked together.
++*/
++#define LUA_ABI_CHECK(name, cond) \
++  struct luaAbiCheck_##name { int abiCheck : ((cond) ? 1 : -1); }
++
++LUA_ABI_CHECK(TObject_size,      sizeof(TObject) == 0x08);
++LUA_ABI_CHECK(Node_size,         sizeof(Node) == 0x14);
++LUA_ABI_CHECK(TString_size,      sizeof(TString) == 0x18);
++LUA_ABI_CHECK(TString_str,       offsetof(TString, tsv.str) == 0x14);
++LUA_ABI_CHECK(Udata_size,        sizeof(Udata) == 0x10);
++LUA_ABI_CHECK(UpVal_size,        sizeof(UpVal) == 0x14);
++LUA_ABI_CHECK(Table_size,        sizeof(Table) == 0x28);
++LUA_ABI_CHECK(Table_metatable,   offsetof(Table, metatable) == 0x10);
++LUA_ABI_CHECK(Proto_size,        sizeof(Proto) == 0x70);
++LUA_ABI_CHECK(CClosure_nupvals,  offsetof(CClosure, nupvalues) == 0x08);
++LUA_ABI_CHECK(CClosure_f,        offsetof(CClosure, f) == 0x10);
++LUA_ABI_CHECK(CClosure_upvalue,  offsetof(CClosure, upvalue) == 0x40);
++LUA_ABI_CHECK(CClosure_size,     sizeof(CClosure) == 0x48);
++LUA_ABI_CHECK(LClosure_g,        offsetof(LClosure, g) == 0x10);
++LUA_ABI_CHECK(LClosure_p,        offsetof(LClosure, p) == 0x18);
++LUA_ABI_CHECK(LClosure_upvals,   offsetof(LClosure, upvals) == 0x1C);
++LUA_ABI_CHECK(CallInfo_savedpc,  offsetof(CallInfo, savedpc) == 0x0C);
++LUA_ABI_CHECK(CallInfo_tailcall, offsetof(CallInfo, tailcalls) == 0x20);
++LUA_ABI_CHECK(CallInfo_size,     sizeof(CallInfo) == 0x28);
++LUA_ABI_CHECK(State_gt,          offsetof(struct lua_State, _gt) == 0x30);
++LUA_ABI_CHECK(State_allocFlags,  offsetof(struct lua_State, allocFlags) == 0x40);
++LUA_ABI_CHECK(State_userData,    offsetof(struct lua_State, stateUserData) == 0x44);
++LUA_ABI_CHECK(State_size,        sizeof(struct lua_State) == 0x70);
++LUA_ABI_CHECK(Global_rootudata,  offsetof(global_State, rootudata) == 0x14);
++LUA_ABI_CHECK(Global_threshold,  offsetof(global_State, GCthreshold) == 0x20);
++LUA_ABI_CHECK(Global_registry,   offsetof(global_State, _registry) == 0x2C);
++LUA_ABI_CHECK(Global_lstate,     offsetof(global_State, lstate) == 0x40);
++LUA_ABI_CHECK(Global_metatypes,  offsetof(global_State, _defaultmetatypes) == 0x94);
++LUA_ABI_CHECK(Global_lockData,   offsetof(global_State, lockData) == 0xEC);
++LUA_ABI_CHECK(Global_nblocks,    offsetof(global_State, nblocks) == 0x108);
++LUA_ABI_CHECK(Global_udataMeta,  offsetof(global_State, userdataMetatable) == 0x118);
++LUA_ABI_CHECK(Global_fatalError, offsetof(global_State, fatalErrorFunc) == 0x130);
++LUA_ABI_CHECK(Global_userGC,     offsetof(global_State, userGCFunction) == 0x14C);
++LUA_ABI_CHECK(Global_hookmask,   offsetof(global_State, hookmask) == 0x151);
++LUA_ABI_CHECK(Global_basehook,   offsetof(global_State, basehookcount) == 0x154);
++LUA_ABI_CHECK(Global_hookcount,  offsetof(global_State, hookcount) == 0x158);
++LUA_ABI_CHECK(Global_hook,       offsetof(global_State, hook) == 0x15C);
++LUA_ABI_CHECK(Global_size,       sizeof(global_State) == 0x1B8);
++
++
+ lua_State *luaE_newthread (lua_State *L);
+ void luaE_freethread (lua_State *L, lua_State *L1);
+ 
+diff -ruN a/Src/LuaPlus/src/lstring.c b/Src/LuaPlus/src/lstring.c
+--- a/Src/LuaPlus/src/lstring.c
++++ b/Src/LuaPlus/src/lstring.c
+@@ -62,8 +62,10 @@
+   ts->tsv.marked = 0;
+   ts->tsv.tt = LUA_TSTRING;
+   ts->tsv.reserved = 0;
+-  memcpy(ts+1, str, l*sizeof(char));
+-  ((char *)(ts+1))[l] = '\0';  /* ending 0 */
++  /* GAME FORK: the payload lives at offsetof(TString,str) (+0x14), which is
++  ** not (ts+1) any more -- sizeof(TString) is 0x18. */
++  memcpy(getstrmutable(ts), str, l*sizeof(char));
++  getstrmutable(ts)[l] = '\0';  /* ending 0 */
+   tb = &G(L)->strt;
+   h = lmod(h, tb->size);
+   ts->tsv.next = tb->hash[h];  /* chain new entry */
+@@ -90,9 +92,10 @@
+   ts->tsv.marked = 0;
+   ts->tsv.tt = LUA_TWSTRING;
+   ts->tsv.reserved = 0;
+-  memcpy(ts+1, str, l*sizeof(lua_WChar));
+-  ((char *)(ts+1))[l * 2] = '\0';  /* ending 0 */
+-  ((char *)(ts+1))[l * 2 + 1] = '\0';  /* ending 0 */
++  /* GAME FORK: the payload lives at offsetof(TString,str) (+0x14). */
++  memcpy(getstrmutable(ts), str, l*sizeof(lua_WChar));
++  getstrmutable(ts)[l * 2] = '\0';  /* ending 0 */
++  getstrmutable(ts)[l * 2 + 1] = '\0';  /* ending 0 */
+   tb = &G(L)->strt;
+   h = lmod(h, tb->size);
+   ts->tsv.next = tb->hash[h];  /* chain new entry */
+diff -ruN a/Src/LuaPlus/src/lstring.h b/Src/LuaPlus/src/lstring.h
+--- a/Src/LuaPlus/src/lstring.h
++++ b/Src/LuaPlus/src/lstring.h
+@@ -13,9 +13,13 @@
+ 
+ 
+ 
+-#define sizestring(l)	(cast(lu_mem, sizeof(union TString))+ \
++/* GAME FORK: the payload starts at offsetof(TString,str) == 0x14, which is
++** 4 bytes below sizeof(TString) == 0x18. newlstr (FUN_00924860) allocates
++** exactly offsetof(TString,str) + len + 1, so the lib must match or every
++** string body is offset by 4 bytes against the recovered core. */
++#define sizestring(l)	(sizeofTStringHeader + \
+                          (cast(lu_mem, l)+1)*sizeof(char))
+-#define sizewstring(l)	(cast(lu_mem, sizeof(union TString))+ \
++#define sizewstring(l)	(sizeofTStringHeader + \
+                          (cast(lu_mem, l)+1)*sizeof(lua_WChar))
+ 
+ #define sizeudata(l)	(cast(lu_mem, sizeof(union Udata))+(l))
+diff -ruN a/Src/LuaPlus/src/lvm.c b/Src/LuaPlus/src/lvm.c
+--- a/Src/LuaPlus/src/lvm.c
++++ b/Src/LuaPlus/src/lvm.c
+@@ -70,9 +70,10 @@
+ 
+ 
+ static void traceexec (lua_State *L) {
+-  lu_byte mask = L->hookmask;
++  /* GAME FORK: hook state is per-VM (global_State), not per-thread. */
++  lu_byte mask = G(L)->hookmask;
+   if (mask & LUA_MASKCOUNT) {  /* instruction-hook set? */
+-    if (L->hookcount == 0) {
++    if (G(L)->hookcount == 0) {
+       resethookcount(L);
+       luaD_callhook(L, LUA_HOOKCOUNT, -1);
+       return;
+@@ -81,21 +82,21 @@
+   if (mask & LUA_MASKLINE) {
+     CallInfo *ci = L->ci;
+     Proto *p = ci_func(ci)->l.p;
+-    int newline = getline(p, pcRel(*ci->u.l.pc, p));
+-    if (!L->hookinit) {
++    int newline = getline(p, pcRel(*ci->pc, p));
++    if (!G(L)->hookinit) {
+       luaG_inithooks(L);
+       return;
+     }
+     lua_assert(ci->state & CI_HASFRAME);
+-    if (pcRel(*ci->u.l.pc, p) == 0)  /* tracing may be starting now? */
+-      ci->u.l.savedpc = *ci->u.l.pc;  /* initialize `savedpc' */
++    if (pcRel(*ci->pc, p) == 0)  /* tracing may be starting now? */
++      ci->savedpc = *ci->pc;  /* initialize `savedpc' */
+     /* calls linehook when enters a new line or jumps back (loop) */
+-    if (*ci->u.l.pc <= ci->u.l.savedpc ||
+-        newline != getline(p, pcRel(ci->u.l.savedpc, p))) {
++    if (*ci->pc <= ci->savedpc ||
++        newline != getline(p, pcRel(ci->savedpc, p))) {
+       luaD_callhook(L, LUA_HOOKLINE, newline);
+       ci = L->ci;  /* previous call may reallocate `ci' */
+     }
+-    ci->u.l.savedpc = *ci->u.l.pc;
++    ci->savedpc = *ci->pc;
+   }
+ }
+ 
+@@ -472,25 +473,25 @@
+   TObject *k;
+   const Instruction *pc;
+  callentry:  /* entry point when calling new functions */
+-  if (L->hookmask & LUA_MASKCALL)
++  if (G(L)->hookmask & LUA_MASKCALL)
+     luaD_callhook(L, LUA_HOOKCALL, -1);
+  retentry:  /* entry point when returning to old functions */
+-  L->ci->u.l.pc = &pc;
++  L->ci->pc = &pc;
+   lua_assert(L->ci->state == CI_SAVEDPC ||
+              L->ci->state == (CI_SAVEDPC | CI_CALLING));
+   L->ci->state = CI_HASFRAME;  /* activate frame */
+-  pc = L->ci->u.l.savedpc;
++  pc = L->ci->savedpc;
+   cl = &clvalue(L->base - 1)->l;
+   k = cl->p->k;
+   /* main loop of interpreter */
+   for (;;) {
+     const Instruction i = *pc++;
+     StkId base, ra;
+-    if ((L->hookmask & (LUA_MASKLINE | LUA_MASKCOUNT)) &&
+-        (--L->hookcount == 0 || L->hookmask & LUA_MASKLINE)) {
++    if ((G(L)->hookmask & (LUA_MASKLINE | LUA_MASKCOUNT)) &&
++        (--G(L)->hookcount == 0 || G(L)->hookmask & LUA_MASKLINE)) {
+       traceexec(L);
+       if (L->ci->state & CI_YIELD) {  /* did hook yield? */
+-        L->ci->u.l.savedpc = pc - 1;
++        L->ci->savedpc = pc - 1;
+         L->ci->state = CI_YIELD | CI_SAVEDPC;
+         return NULL;
+       }
+@@ -751,7 +752,7 @@
+         if (firstResult) {
+           if (firstResult > L->top) {  /* yield? */
+             lua_assert(L->ci->state == (CI_C | CI_YIELD));
+-            (L->ci - 1)->u.l.savedpc = pc;
++            (L->ci - 1)->savedpc = pc;
+             (L->ci - 1)->state = CI_SAVEDPC;
+             return NULL;
            }
-           else {
--            swprintf(buff, form, s);
-+            _snwprintf((wchar_t*)buff, MAX_ITEM, (const wchar_t*)form, (const wchar_t*)s);
-             break;
-           }
+@@ -761,7 +762,7 @@
          }
+         else {  /* it is a Lua function */
+           if (GET_OPCODE(i) == OP_CALL) {  /* regular call? */
+-            (L->ci-1)->u.l.savedpc = pc;  /* save `pc' to return later */
++            (L->ci-1)->savedpc = pc;  /* save `pc' to return later */
+             (L->ci-1)->state = (CI_SAVEDPC | CI_CALLING);
+           }
+           else {  /* tail call: put new frame in place of previous one */
+@@ -773,8 +774,8 @@
+               setobjs2s(base+aux-1, ra+aux);
+             (L->ci - 1)->top = L->top = base+aux;  /* correct top */
+             lua_assert(L->ci->state & CI_SAVEDPC);
+-            (L->ci - 1)->u.l.savedpc = L->ci->u.l.savedpc;
+-            (L->ci - 1)->u.l.tailcalls++;  /* one more call lost */
++            (L->ci - 1)->savedpc = L->ci->savedpc;
++            (L->ci - 1)->tailcalls++;  /* one more call lost */
+             (L->ci - 1)->state = CI_SAVEDPC;
+             L->ci--;  /* remove new frame */
+             L->base = L->ci->base;
+@@ -790,17 +791,17 @@
+         lua_assert(L->ci->state & CI_HASFRAME);
+         if (L->openupval) luaF_close(L, base);
+         L->ci->state = CI_SAVEDPC;  /* deactivate current function */
+-        L->ci->u.l.savedpc = pc;
++        L->ci->savedpc = pc;
+         /* previous function was running `here'? */
+         if (!(ci->state & CI_CALLING)) {
+-          lua_assert((ci->state & CI_C) || ci->u.l.pc != &pc);
++          lua_assert((ci->state & CI_C) || ci->pc != &pc);
+           return ra;  /* no: return */
+         }
+         else {  /* yes: continue its execution */
+           int nresults;
+           lua_assert(ttisfunction(ci->base - 1) && (ci->state & CI_SAVEDPC));
+-          lua_assert(GET_OPCODE(*(ci->u.l.savedpc - 1)) == OP_CALL);
+-          nresults = GETARG_C(*(ci->u.l.savedpc - 1)) - 1;
++          lua_assert(GET_OPCODE(*(ci->savedpc - 1)) == OP_CALL);
++          nresults = GETARG_C(*(ci->savedpc - 1)) - 1;
+           luaD_poscall(L, nresults, ra);
+           if (nresults >= 0) L->top = L->ci->top;
+           goto retentry;

@@ -1,0 +1,218 @@
+diff -ruN a/README b/README
+--- a/README
++++ b/README
+@@ -1,3 +1,5 @@
++OSDVF Note: Skompilováno Intel Compilerem na Windows x64. Rules.
++
+ ZLIB DATA COMPRESSION LIBRARY
+ 
+ zlib 1.2.3 is a general purpose data compression library.  All the code is
+diff -ruN a/crc32.c b/crc32.c
+--- a/crc32.c
++++ b/crc32.c
+@@ -201,6 +201,14 @@
+ 
+ /* =========================================================================
+  * This function can be used by asm versions of crc32()
++ *
++ * Address: 0x0095D6D0 (FUN_0095D6D0) in ForgedAlliance.exe 2025.7.1. Just
++ * `mov eax, offset crc_table (0xD4A698) / ret` (6 bytes, 2 instructions) --
++ * confirms DYNAMIC_CRC_TABLE is NOT defined in this build (no crc_table_empty
++ * check emitted), i.e. the static crc32.h table path was compiled. Recovered
++ * as RuntimeGetZlibCrcTable in src/sdk/gpg/core/streams/ZLibDeflateRuntime.cpp.
++ * No caller found in this binary (real zlib API, exists for external asm
++ * callers this build doesn't have).
+  */
+ const unsigned long FAR * ZEXPORT get_crc_table()
+ {
+@@ -215,7 +223,35 @@
+ #define DO1 crc = crc_table[0][((int)crc ^ (*buf++)) & 0xff] ^ (crc >> 8)
+ #define DO8 DO1; DO1; DO1; DO1; DO1; DO1; DO1; DO1
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: 0x0095DE30 (FUN_0095DE30, IDA-named "crc32") in
++ * ForgedAlliance.exe 2025.7.1, 24-byte main chunk. Confirmed byte-for-byte:
++ * `if (buf == Z_NULL) return 0UL;` is the `test ecx,ecx / jnz / xor eax,eax /
++ * retn` at the top (no DYNAMIC_CRC_TABLE check, matching get_crc_table's
++ * finding above). The `#ifdef BYFOUR` endian-select block did NOT survive to
++ * an if/else in this build: since sizeof(void*)==sizeof(ptrdiff_t) is always
++ * true on this 32-bit target, the compiler proved the `if
++ * (*((unsigned char*)&endian))` branch is unconditionally taken and replaced
++ * `return crc32_little(crc, buf, len);` with a plain sibling-call
++ * (`jmp loc_95D6E0`, at 0x0095DE43) -- there is no runtime branch and no call
++ * to crc32_big anywhere in this function. IDA's own function-chunk analysis
++ * recognises the jmp target (crc32_little's body, see below) as a *tail
++ * chunk of this same function* -- the exported FUN_0095DE30.asm already spans
++ * both the dispatcher (0x0095DE30-0x0095DE48) and the tail-jumped body
++ * (0x0095D6E0-0x0095D970) as one 681-byte unit, which is why the address gap
++ * between get_crc_table (ends 0x0095D6D6) and this tail chunk's start
++ * (0x0095D6E0) is only 10 bytes of int3 padding, not a genuinely untokenized
++ * function.
++ *
++ * Recovered as crc32() in src/sdk/zlib/ZLibCrcRuntime.cpp (pre-existing,
++ * independently re-verified here) -- the recovered body directly implements
++ * the slice-by-4 little-endian algorithm below (SliceStep), which is the
++ * correct behavioural recovery of this function as it is actually compiled
++ * in this binary (dispatcher + unconditional little-endian body, no separate
++ * crc32_little call boundary to preserve). Real, extensively-called: 26
++ * code xrefs from inflate (11 sites), deflate (9 sites), fill_window,
++ * deflateReset, and libpng's png_reset_crc/png_calculate_crc.
++ */
+ unsigned long ZEXPORT crc32(crc, buf, len)
+     unsigned long crc;
+     const unsigned char FAR *buf;
+@@ -258,7 +294,21 @@
+             crc_table[1][(c >> 16) & 0xff] ^ crc_table[0][c >> 24]
+ #define DOLIT32 DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4; DOLIT4
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: tail chunk of 0x0095DE30 ("crc32"), body at 0x0095D6E0-0x0095D970
++ * in ForgedAlliance.exe 2025.7.1 (656 bytes), reached only by the
++ * unconditional `jmp` at 0x0095DE43 -- see crc32() above. Confirmed
++ * byte-for-byte: register calling convention is EAX=crc, ECX=buf, EDX=len
++ * (`push esi / mov esi,edx / test esi,esi / not eax`  =  `c=(u4)crc; c=~c;`
++ * with len moved to esi as the loop counter); the byte-alignment loop, the
++ * 32-byte DOLIT32 unrolled loop, the 4-byte DOLIT4 loop, and the trailing
++ * byte loop all match exactly, including the table order in DOLIT4
++ * (crc_table[3,2,1,0] = 0xD4B298/AE98/AA98/A698, confirmed via data_refs in
++ * FUN_0095DE30.meta.json). Recovered together with crc32() above (see that
++ * citation) -- this binary has no separate call boundary for crc32_little,
++ * so there is no separate recovered C++ symbol for it either; SliceStep in
++ * src/sdk/zlib/ZLibCrcRuntime.cpp is its behavioural equivalent.
++ */
+ local unsigned long crc32_little(crc, buf, len)
+     unsigned long crc;
+     const unsigned char FAR *buf;
+@@ -298,7 +348,29 @@
+             crc_table[6][(c >> 16) & 0xff] ^ crc_table[7][c >> 24]
+ #define DOBIG32 DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4; DOBIG4
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: 0x0095D980 (FUN_0095D980) in ForgedAlliance.exe 2025.7.1, 740
++ * bytes. Confirmed byte-for-byte: prologue computes `REV((u4)crc)` (the
++ * and/shl/add sequence building each of the four REV() terms) then `~c`,
++ * matching this body exactly (as opposed to crc32_little's plain `c=~c` with
++ * no REV); DOBIG4's table order (crc_table[4,5,6,7] =
++ * 0xD4B698/BA98/BE98/C298) is confirmed via data_refs in
++ * FUN_0095D980.meta.json. Register convention differs from crc32_little's
++ * (EAX=len, ECX=buf, crc reloaded from the stack) -- consistent with each
++ * `local` (internal-linkage) function being optimized independently.
++ *
++ * PROVABLY UNREACHABLE in this binary: crc32() (0x0095DE30, see above) does
++ * not contain an endian branch at all -- it unconditionally `jmp`s to
++ * crc32_little and never calls this function. An exhaustive whole-image scan
++ * (relative CALL/JMP/Jcc targets and raw address occurrences in every PE
++ * section) independently confirms zero references of any kind to 0x0095D980
++ * anywhere in bin/2025.7.1/ForgedAlliance.exe or bin/external. This
++ * corroborates and strengthens the existing `skip` classification in
++ * recovered_progress.json (FUN_0095D980, "IDA found dead/unstripped code, no
++ * source maps to it" -- TUs compiled without /Gy, /OPT:REF could not strip
++ * it): not only is there no reference to it, the one function that could
++ * plausibly have called it provably does not.
++ */
+ local unsigned long crc32_big(crc, buf, len)
+     unsigned long crc;
+     const unsigned char FAR *buf;
+diff -ruN a/deflate.c b/deflate.c
+--- a/deflate.c
++++ b/deflate.c
+@@ -389,7 +389,18 @@
+     return Z_OK;
+ }
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: 0x0095AB90 (FUN_0095AB90) in ForgedAlliance.exe 2025.7.1.
++ * Confirmed byte-for-byte against this real body via direct pefile+Capstone
++ * read (no IDA .i64 touched): null/state checks compile to the same two
++ * `test/je` pairs, `strm->state->wrap != 2` reads offset +0x18 of
++ * deflate_state (cmp dword ptr [eax+0x18], 2 / jne), and the gzhead store
++ * writes offset +0x1C (mov [eax+0x1C], ecx) -- both offsets match this
++ * project's zlib::DeflateState (src/sdk/zlib/ZLibDeflate.h). Recovered as
++ * deflateSetHeader in src/sdk/zlib/ZLibDeflateRuntime.cpp. No call site or
++ * data reference to 0x0095AB90 was found anywhere in the binary (exhaustive
++ * whole-image scan); real but unexercised by this build of the engine.
++ */
+ int ZEXPORT deflateSetHeader (strm, head)
+     z_streamp strm;
+     gz_headerp head;
+@@ -400,7 +411,16 @@
+     return Z_OK;
+ }
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: 0x0095ABC0 (FUN_0095ABC0) in ForgedAlliance.exe 2025.7.1.
++ * Confirmed byte-for-byte: `bi_valid = bits` writes offset +0x16BC and
++ * `bi_buf = (ush)(value & ((1<<bits)-1))` writes offset +0x16B8 of
++ * deflate_state -- both already-asserted offsets in zlib::DeflateState
++ * (src/sdk/zlib/ZLibDeflate.h). Recovered as deflatePrime in
++ * src/sdk/zlib/ZLibDeflateRuntime.cpp. No call site or data reference to
++ * 0x0095ABC0 was found anywhere in the binary (exhaustive whole-image scan);
++ * real but unexercised by this build of the engine.
++ */
+ int ZEXPORT deflatePrime (strm, bits, value)
+     z_streamp strm;
+     int bits;
+@@ -450,7 +470,16 @@
+     return err;
+ }
+ 
+-/* ========================================================================= */
++/* =========================================================================
++ * Address: 0x0095AC00 (FUN_0095AC00) in ForgedAlliance.exe 2025.7.1.
++ * Confirmed byte-for-byte: the four stack args are stored in exactly this
++ * source order into deflate_state good_match(+0x8C), max_lazy_match(+0x80),
++ * nice_match(+0x90), max_chain_length(+0x7C) -- all four already-asserted
++ * offsets in zlib::DeflateState (src/sdk/zlib/ZLibDeflate.h). Recovered as
++ * deflateTune in src/sdk/zlib/ZLibDeflateRuntime.cpp. No call site or data
++ * reference to 0x0095AC00 was found anywhere in the binary (exhaustive
++ * whole-image scan); real but unexercised by this build of the engine.
++ */
+ int ZEXPORT deflateTune(strm, good_length, max_lazy, nice_length, max_chain)
+     z_streamp strm;
+     int good_length;
+@@ -485,6 +514,21 @@
+  * for every combination of windowBits and memLevel, as well as wrap.
+  * But even the conservative upper bound of about 14% expansion does not
+  * seem onerous for output buffer allocation.
++ *
++ * Address: 0x0095AC40 (FUN_0095AC40) in ForgedAlliance.exe 2025.7.1.
++ * Confirmed byte-for-byte: the conservative-bound arithmetic
++ * (sourceLen + ((sourceLen+7)>>3) + ((sourceLen+63)>>6) + 11) matches the
++ * asm's lea/shr/lea sequence exactly; the two guard checks read deflate_state
++ * w_bits(+0x30) and hash_bits(+0x50) against 0xF (15) -- NOT `wrap` as an
++ * earlier same-session hypothesis guessed (wrap is a different field, +0x18,
++ * used by deflateSetHeader above) -- and the tight-bound path is a real
++ * `call` to compressBound at 0x0095DF20 (recovered as compressBoundRuntime in
++ * src/sdk/gpg/core/streams/ZLibDeflateRuntime.cpp). Recovered as
++ * deflateBound in src/sdk/zlib/ZLibDeflateRuntime.cpp, which now gives
++ * compressBoundRuntime a real, named, source-level caller. No call site or
++ * data reference to 0x0095AC40 itself was found anywhere in the binary
++ * (exhaustive whole-image scan); real but unexercised by this build of the
++ * engine.
+  */
+ uLong ZEXPORT deflateBound(strm, sourceLen)
+     z_streamp strm;
+diff -ruN a/include/zconf.h b/include/zconf.h
+--- a/include/zconf.h
++++ b/include/zconf.h
+@@ -284,9 +284,13 @@
+    typedef Byte       *voidp;
+ #endif
+ 
+-#if 0           /* HAVE_UNISTD_H -- this line is updated by ./configure */
++#if 1           /* HAVE_UNISTD_H -- this line is updated by ./configure */
+ #  include <sys/types.h> /* for off_t */
+-#  include <unistd.h>    /* for SEEK_* and off_t */
++#if defined(_WIN32)
++#include <io.h>
++#else
++#include <unistd.h>         /* for SEEK_*, off_t, and _LFS64_LARGEFILE */
++#endif
+ #  ifdef VMS
+ #    include <unixio.h>   /* for off_t */
+ #  endif

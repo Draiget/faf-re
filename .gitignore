@@ -57,3 +57,6 @@ docker/
 # skills/fa-recovery-iteration/scripts/update_readme_progress.py; machine-local
 # working notes, not a published artifact.
 RECOVERY_STATUS.md
+
+# Resolve-Deps.ps1 download cache for the upstream dependency archives.
+.depcache/

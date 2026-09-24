@@ -1,327 +1,301 @@
+diff -ruN a/boost/config/compiler/visualc.hpp b/boost/config/compiler/visualc.hpp
+--- a/boost/config/compiler/visualc.hpp
++++ b/boost/config/compiler/visualc.hpp
+@@ -168,8 +168,9 @@
+ #error "Compiler not supported or configured - please reconfigure"
+ #endif
+ //
+-// last known and checked version is 1400 (VC8):
+-#if (_MSC_VER > 1400)
++// last known and checked version is 1400 (VC8).
++// Extended to 1950 for modern MSVC builds (VS 2022+).
++#if (_MSC_VER > 1950)
+ #  if defined(BOOST_ASSERT_CONFIG)
+ #     error "Unknown compiler version - please run the configure tests and report the results"
+ #  else
+diff -ruN a/boost/function/function_base.hpp b/boost/function/function_base.hpp
 --- a/boost/function/function_base.hpp
 +++ b/boost/function/function_base.hpp
-@@ -301,13 +301,13 @@
-         manager(const function_buffer& in_buffer, function_buffer& out_buffer, 
+@@ -302,9 +302,9 @@
                  functor_manager_operation_type op, mpl::false_)
          {
--#ifndef BOOST_NO_STD_ALLOCATOR
+ #ifndef BOOST_NO_STD_ALLOCATOR
 -          typedef typename Allocator::template rebind<functor_type>::other
 -            allocator_type;
 -          typedef typename allocator_type::pointer pointer_type;
--#else
--          typedef functor_type* pointer_type;
--#endif // BOOST_NO_STD_ALLOCATOR
-+#ifndef BOOST_NO_STD_ALLOCATOR
 +          typedef std::allocator<functor_type> allocator_type;
 +          typedef std::allocator_traits<allocator_type> allocator_traits;
 +          typedef functor_type* pointer_type;
-+#else
-+          typedef functor_type* pointer_type;
-+#endif // BOOST_NO_STD_ALLOCATOR
- 
- #  ifndef BOOST_NO_STD_ALLOCATOR
-           allocator_type allocator;
-@@ -320,9 +320,9 @@
-               (const functor_type*)(in_buffer.obj_ptr);
+ #else
+           typedef functor_type* pointer_type;
+ #endif // BOOST_NO_STD_ALLOCATOR
+@@ -321,8 +321,8 @@
  
              // Clone the functor
--#  ifndef BOOST_NO_STD_ALLOCATOR
+ #  ifndef BOOST_NO_STD_ALLOCATOR
 -            pointer_type copy = allocator.allocate(1);
 -            allocator.construct(copy, *f);
-+#  ifndef BOOST_NO_STD_ALLOCATOR
 +            pointer_type copy = allocator_traits::allocate(allocator, 1);
 +            allocator_traits::construct(allocator, copy, *f);
  
              // Get back to the original pointer type
              functor_type* new_f = static_cast<functor_type*>(copy);
-@@ -335,15 +335,15 @@
-             functor_type* f =
-               static_cast<functor_type*>(out_buffer.obj_ptr);
+@@ -341,8 +341,8 @@
+             pointer_type victim = static_cast<pointer_type>(f);
  
--#  ifndef BOOST_NO_STD_ALLOCATOR
--            /* Cast from the functor pointer type to the allocator's pointer
--               type */
--            pointer_type victim = static_cast<pointer_type>(f);
--
--            // Destroy and deallocate the functor
+             // Destroy and deallocate the functor
 -            allocator.destroy(victim);
 -            allocator.deallocate(victim, 1);
--#  else
-+#  ifndef BOOST_NO_STD_ALLOCATOR
-+            /* Cast from the functor pointer type to the allocator's pointer
-+               type */
-+            pointer_type victim = static_cast<pointer_type>(f);
-+
-+            // Destroy and deallocate the functor
 +            allocator_traits::destroy(allocator, victim);
 +            allocator_traits::deallocate(allocator, victim, 1);
-+#  else
+ #  else
              delete f;
  #  endif // BOOST_NO_STD_ALLOCATOR
-             out_buffer.obj_ptr = 0;
-
+diff -ruN a/boost/function/function_template.hpp b/boost/function/function_template.hpp
 --- a/boost/function/function_template.hpp
 +++ b/boost/function/function_template.hpp
-@@ -9,7 +9,8 @@
- 
+@@ -10,6 +10,7 @@
  // Note: this header is a header template and must NOT have multiple-inclusion
  // protection.
--#include <boost/function/detail/prologue.hpp>
-+#include <boost/function/detail/prologue.hpp>
+ #include <boost/function/detail/prologue.hpp>
 +#include <memory>
  
  #define BOOST_FUNCTION_TEMPLATE_PARMS BOOST_PP_ENUM_PARAMS(BOOST_FUNCTION_NUM_ARGS, typename T)
  
-@@ -382,20 +383,18 @@
-         void 
+@@ -383,16 +384,14 @@
          assign_functor(FunctionObj f, function_buffer& functor, mpl::false_)
          {
--#ifndef BOOST_NO_STD_ALLOCATOR
+ #ifndef BOOST_NO_STD_ALLOCATOR
 -          typedef typename Allocator::template rebind<FunctionObj>::other
 -            allocator_type;
 -          typedef typename allocator_type::pointer pointer_type;
--
--          allocator_type allocator;
++          typedef std::allocator<FunctionObj> allocator_type;
+ 
+           allocator_type allocator;
 -          pointer_type copy = allocator.allocate(1);
 -          allocator.construct(copy, f);
--
--          // Get back to the original pointer type
--          functor.obj_ptr = static_cast<FunctionObj*>(copy);
--#  else
--          functor.obj_ptr = new FunctionObj(f);
--#  endif // BOOST_NO_STD_ALLOCATOR
-+#ifndef BOOST_NO_STD_ALLOCATOR
-+          typedef std::allocator<FunctionObj> allocator_type;
-+
-+          allocator_type allocator;
 +          FunctionObj* copy = std::allocator_traits<allocator_type>::allocate(allocator, 1);
 +          std::allocator_traits<allocator_type>::construct(allocator, copy, f);
-+
-+          // Get back to the original pointer type
-+          functor.obj_ptr = copy;
-+#  else
-+          functor.obj_ptr = new FunctionObj(f);
-+#  endif // BOOST_NO_STD_ALLOCATOR
-         }
  
-         template<typename FunctionObj>
-
+           // Get back to the original pointer type
+-          functor.obj_ptr = static_cast<FunctionObj*>(copy);
++          functor.obj_ptr = copy;
+ #  else
+           functor.obj_ptr = new FunctionObj(f);
+ #  endif // BOOST_NO_STD_ALLOCATOR
+diff -ruN a/boost/get_pointer.hpp b/boost/get_pointer.hpp
 --- a/boost/get_pointer.hpp
 +++ b/boost/get_pointer.hpp
 @@ -18,10 +18,12 @@
  
  // get_pointer(shared_ptr<T> const & p) has been moved to shared_ptr.hpp
  
--template<class T> T * get_pointer(std::auto_ptr<T> const& p)
--{
--    return p.get();
--}
 +#if !defined(BOOST_NO_AUTO_PTR)
-+template<class T> T * get_pointer(std::auto_ptr<T> const& p)
-+{
-+    return p.get();
-+}
+ template<class T> T * get_pointer(std::auto_ptr<T> const& p)
+ {
+     return p.get();
+ }
 +#endif
  
  
  } // namespace boost
-
+diff -ruN a/boost/thread/mutex.hpp b/boost/thread/mutex.hpp
 --- a/boost/thread/mutex.hpp
 +++ b/boost/thread/mutex.hpp
-@@ -33,13 +33,16 @@
- class BOOST_THREAD_DECL mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<mutex>;
--
--    typedef detail::thread::scoped_lock<mutex> scoped_lock;
--
--    mutex();
--    ~mutex();
-+public:
-+    friend class detail::thread::lock_ops<mutex>;
-+
-+    typedef detail::thread::scoped_lock<mutex> scoped_lock;
-+
-+    mutex();
-+    ~mutex();
-+
+@@ -41,6 +41,9 @@
+     mutex();
+     ~mutex();
+ 
 +    void lock() { do_lock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if defined(BOOST_HAS_WINTHREADS)
-@@ -73,14 +76,18 @@
- class BOOST_THREAD_DECL try_mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<try_mutex>;
-+public:
-+    friend class detail::thread::lock_ops<try_mutex>;
+     typedef void* cv_state;
+@@ -82,6 +85,10 @@
+     try_mutex();
+     ~try_mutex();
  
-     typedef detail::thread::scoped_lock<try_mutex> scoped_lock;
-     typedef detail::thread::scoped_try_lock<try_mutex> scoped_try_lock;
- 
--    try_mutex();
--    ~try_mutex();
-+    try_mutex();
-+    ~try_mutex();
-+
 +    void lock() { do_lock(); }
 +    bool try_lock() { return do_trylock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if defined(BOOST_HAS_WINTHREADS)
-@@ -115,15 +122,19 @@
- class BOOST_THREAD_DECL timed_mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<timed_mutex>;
-+public:
-+    friend class detail::thread::lock_ops<timed_mutex>;
+     typedef void* cv_state;
+@@ -125,6 +132,10 @@
+     timed_mutex();
+     ~timed_mutex();
  
-     typedef detail::thread::scoped_lock<timed_mutex> scoped_lock;
-     typedef detail::thread::scoped_try_lock<timed_mutex> scoped_try_lock;
-     typedef detail::thread::scoped_timed_lock<timed_mutex> scoped_timed_lock;
- 
--    timed_mutex();
--    ~timed_mutex();
-+    timed_mutex();
-+    ~timed_mutex();
-+
 +    void lock() { do_lock(); }
 +    bool try_lock() { return do_trylock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if defined(BOOST_HAS_WINTHREADS)
-
+     typedef void* cv_state;
+diff -ruN a/boost/thread/recursive_mutex.hpp b/boost/thread/recursive_mutex.hpp
 --- a/boost/thread/recursive_mutex.hpp
 +++ b/boost/thread/recursive_mutex.hpp
-@@ -32,13 +32,16 @@
- class BOOST_THREAD_DECL recursive_mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<recursive_mutex>;
-+public:
-+    friend class detail::thread::lock_ops<recursive_mutex>;
+@@ -40,6 +40,9 @@
+     recursive_mutex();
+     ~recursive_mutex();
  
-     typedef detail::thread::scoped_lock<recursive_mutex> scoped_lock;
- 
--    recursive_mutex();
--    ~recursive_mutex();
-+    recursive_mutex();
-+    ~recursive_mutex();
-+
 +    void lock() { do_lock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
-@@ -77,15 +80,19 @@
- class BOOST_THREAD_DECL recursive_try_mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<recursive_try_mutex>;
-+public:
-+    friend class detail::thread::lock_ops<recursive_try_mutex>;
+     typedef std::size_t cv_state;
+@@ -87,6 +90,10 @@
+     recursive_try_mutex();
+     ~recursive_try_mutex();
  
-     typedef detail::thread::scoped_lock<recursive_try_mutex> scoped_lock;
-     typedef detail::thread::scoped_try_lock<
-         recursive_try_mutex> scoped_try_lock;
- 
--    recursive_try_mutex();
--    ~recursive_try_mutex();
-+    recursive_try_mutex();
-+    ~recursive_try_mutex();
-+
 +    void lock() { do_lock(); }
 +    bool try_lock() { return do_trylock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
-@@ -125,8 +132,8 @@
- class BOOST_THREAD_DECL recursive_timed_mutex
-     : private noncopyable
- {
--public:
--    friend class detail::thread::lock_ops<recursive_timed_mutex>;
-+public:
-+    friend class detail::thread::lock_ops<recursive_timed_mutex>;
+     typedef std::size_t cv_state;
+@@ -137,6 +144,10 @@
+     recursive_timed_mutex();
+     ~recursive_timed_mutex();
  
-     typedef detail::thread::scoped_lock<recursive_timed_mutex> scoped_lock;
-     typedef detail::thread::scoped_try_lock<
-@@ -134,8 +141,12 @@
-     typedef detail::thread::scoped_timed_lock<
-         recursive_timed_mutex> scoped_timed_lock;
- 
--    recursive_timed_mutex();
--    ~recursive_timed_mutex();
-+    recursive_timed_mutex();
-+    ~recursive_timed_mutex();
-+
 +    void lock() { do_lock(); }
 +    bool try_lock() { return do_trylock(); }
 +    void unlock() { do_unlock(); }
- 
++
  private:
  #if (defined(BOOST_HAS_WINTHREADS) || defined(BOOST_HAS_MPTASKS))
-
+     typedef std::size_t cv_state;
+diff -ruN a/boost/thread/xtime.hpp b/boost/thread/xtime.hpp
 --- a/boost/thread/xtime.hpp
 +++ b/boost/thread/xtime.hpp
-@@ -11,11 +11,17 @@
+@@ -13,6 +13,12 @@
  
- #include <boost/cstdint.hpp>
+ namespace boost {
  
--namespace boost {
--
--enum xtime_clock_types
--{
--    TIME_UTC=1
-+namespace boost {
-+
 +#if defined(TIME_UTC) && defined(_MSC_VER)
 +# pragma push_macro("TIME_UTC")
 +# undef TIME_UTC
 +# define BOOST_THREAD_RESTORE_TIME_UTC
 +#endif
 +
-+enum xtime_clock_types
-+{
-+    TIME_UTC=1
- //    TIME_TAI,
- //    TIME_MONOTONIC,
- //    TIME_PROCESS,
-@@ -41,14 +47,19 @@
- 
- int BOOST_THREAD_DECL xtime_get(struct xtime* xtp, int clock_type);
- 
--inline int xtime_cmp(const xtime& xt1, const xtime& xt2)
--{
-+inline int xtime_cmp(const xtime& xt1, const xtime& xt2)
-+{
-     if (xt1.sec == xt2.sec)
-         return (int)(xt1.nsec - xt2.nsec);
-     else 
+ enum xtime_clock_types
+ {
+     TIME_UTC=1
+@@ -49,6 +55,11 @@
          return (xt1.sec > xt2.sec) ? 1 : -1;
--}
--
--} // namespace boost
-+}
-+
+ }
+ 
 +#if defined(BOOST_THREAD_RESTORE_TIME_UTC) && defined(_MSC_VER)
 +# pragma pop_macro("TIME_UTC")
 +# undef BOOST_THREAD_RESTORE_TIME_UTC
 +#endif
 +
-+} // namespace boost
+ } // namespace boost
  
  #endif //BOOST_XTIME_WEK070601_HPP
-
+diff -ruN a/libs/thread/src/condition.cpp b/libs/thread/src/condition.cpp
+--- a/libs/thread/src/condition.cpp
++++ b/libs/thread/src/condition.cpp
+@@ -38,6 +38,16 @@
+ namespace detail {
+ 
+ #if defined(BOOST_HAS_WINTHREADS)
++// Address: 0x00AC2190 (FUN_00AC2190, boost::detail::condition_impl::condition_impl)
++// This TU's main.vcxproj ClCompile entry undefines UNICODE/_UNICODE so the
++// CreateSemaphore/CreateMutex macros below resolve to CreateSemaphoreA/
++// CreateMutexA -- confirmed against the real binary's disassembly at this
++// address, which calls __imp_CreateSemaphoreA/__imp_CreateMutexA explicitly.
++// Without that override this project's project-wide Unicode charset would
++// silently flip these to the W-suffixed entry points, diverging from the
++// shipped binary. See also src/sdk/gpg/core/utils/BoostWrappers.cpp, which
++// no longer hand-defines this constructor (removed 2026-08-26 as an ODR
++// duplicate of this same symbol, masked only by /FORCE).
+ condition_impl::condition_impl()
+     : m_gone(0), m_blocked(0), m_waiting(0)
+ {
+diff -ruN a/libs/thread/src/once.cpp b/libs/thread/src/once.cpp
+--- a/libs/thread/src/once.cpp
++++ b/libs/thread/src/once.cpp
+@@ -113,14 +113,7 @@
+ // according to the above function type wrappers.
+ inline LONG compare_exchange(volatile LPLONG dest, LONG exch, LONG cmp)
+ {
+-#ifdef _WIN64
+-    // Original patch from Anthony Williams.
+-    // I (Roland Schwarz) am trying this for RC_1_34_0, since x64 regressions are
+-    // currently not run on x64 platforms for HEAD
+-    return InterlockedCompareExchange(dest, exch,cmp);
+-#else    
+-    return ice_wrapper(&InterlockedCompareExchange, dest, exch, cmp);
+-#endif
++    return ::InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(dest), exch, cmp);
+ }
+ }
+ #endif
+diff -ruN a/libs/thread/src/thread.cpp b/libs/thread/src/thread.cpp
+--- a/libs/thread/src/thread.cpp
++++ b/libs/thread/src/thread.cpp
+@@ -93,6 +93,14 @@
+ 
+ extern "C" {
+ #if defined(BOOST_HAS_WINTHREADS)
++    /*
++     * FAF binary mapping:
++     * Address: 0x00AC32C0 (FUN_00AC32C0, thread_proxy)
++     *
++     * What it does:
++     * Clones one thread functor payload, signals startup synchronization,
++     * invokes the user callable, then runs thread-exit cleanup.
++     */
+     unsigned __stdcall thread_proxy(void* param)
+ #elif defined(BOOST_HAS_PTHREADS)
+         static void* thread_proxy(void* param)
+@@ -179,6 +187,12 @@
+     param.wait();
+ }
+ 
++// Address: 0x00AC2760 (FUN_00AC2760, boost::thread::~thread)
++// CloseHandle has no A/W variant, so this WINTHREADS branch is UNICODE-
++// build-agnostic and byte-behavior-identical to the real binary as-is.
++// src/sdk/gpg/core/utils/BoostWrappers.cpp no longer hand-defines this
++// destructor (removed 2026-08-26 as an ODR duplicate of this same symbol,
++// masked only by /FORCE).
+ thread::~thread()
+ {
+     if (m_joinable)
+diff -ruN a/libs/thread/src/timeconv.inl b/libs/thread/src/timeconv.inl
+--- a/libs/thread/src/timeconv.inl
++++ b/libs/thread/src/timeconv.inl
+@@ -6,6 +6,10 @@
+ 
+ // boostinspect:nounnamed
+ 
++#if defined(TIME_UTC)
++#  undef TIME_UTC
++#endif
++
+ namespace {
+ const int MILLISECONDS_PER_SECOND = 1000;
+ const int NANOSECONDS_PER_SECOND = 1000000000;
+diff -ruN a/libs/thread/src/xtime.cpp b/libs/thread/src/xtime.cpp
+--- a/libs/thread/src/xtime.cpp
++++ b/libs/thread/src/xtime.cpp
+@@ -75,6 +75,14 @@
+ #endif
+ 
+ 
++/*
++ * FAF binary mapping:
++ * Address: 0x00AC5650 (FUN_00AC5650, xtime_get)
++ *
++ * What it does:
++ * Reads one UTC system-time snapshot, converts FILETIME ticks to seconds and
++ * nanoseconds, and stores the result in `xtime`.
++ */
+ int xtime_get(struct xtime* xtp, int clock_type)
+ {
+     if (clock_type == TIME_UTC)

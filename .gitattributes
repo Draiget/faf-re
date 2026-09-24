@@ -1,0 +1,4 @@
+# Dependency patches are byte-exact. Their body lines carry the CR that CRLF
+# target files have, while headers and LF targets do not. core.autocrlf would
+# normalise that away and the patches would only apply inside this work tree.
+dependencies/patches/*.patch -text

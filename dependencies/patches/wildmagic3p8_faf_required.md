@@ -1,5 +1,21 @@
 # FAF WildMagic 3.8 Patch
 
+> **Baseline note (2026-09-23).** The container build takes Wild Magic from the
+> vendored archive `WildMagic3p8.7z` (SHA256 `94567f10…`), which is a
+> *post-patch* snapshot — every change below is already present in it, so
+> nothing is applied at build time. `docker/scripts/Apply-Patches.ps1` verifies
+> it by content instead (358 added lines, all confirmed present).
+>
+> The archive also carries two things this patch does **not** cover, and which
+> would be lost if the tree were rebuilt from a vendor release:
+>   * the `.vcxproj` files (`Foundation`, `Dx9Renderer`, `Dx9Application`),
+>     which `main.vcxproj` consumes as `ProjectReference`s;
+>   * `_ITERATOR_DEBUG_LEVEL=0` on `Foundation.vcxproj`'s Debug|Win32
+>     configuration, which must match `main.vcxproj`. A mismatch is not silent —
+>     the linker rejects it with LNK2038, naming `Wm3System.obj`, `Wm3Math.obj`
+>     and `Wm3Vector3.obj`.
+
+
 This repo uses an external `WildMagic3p8` tree (Geometric Tools' Wild Magic 3.8,
 circa 2006). FAF reuses Wild Magic's `Foundation` math library and `Dx9Renderer`
 helpers, but the SDK consumer code (`src/sdk/**`) was originally hand-recovered
