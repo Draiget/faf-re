@@ -43,10 +43,8 @@ namespace moho
   // shadowing the real recovered RTTI registration in moho/unit/core/Unit.cpp.
   // The real definitions there were at file scope (not inside namespace moho)
   // so the linker couldn't reach them; that has been fixed by wrapping them
-  // in `namespace moho { ... }`. Same fix applied to
-  // InitializeSSTIUnitWeaponInfoVector (FUN_005C3850) — the real body in
-  // moho/unit/core/Unit.cpp is now wrapped in `namespace moho { ... }`
-  // matching the Unit.h:485 declaration, so the no-op stub here is gone.
+  // in `namespace moho { ... }`. FUN_005C3850, once a stub here too, is
+  // `fastvector_n<UnitWeaponInfo, 1>(0)` on the FastVectorN template.
   // WLD_CreateTerrainRes recovered in src/sdk/moho/sim/CWldMap.cpp
   // (FUN_008A7B90): real `operator new(0xC38)` + IWldTerrainRes base ctor +
   // CWldTerrainRes field construction. Replaces the no-op null-returning stub.

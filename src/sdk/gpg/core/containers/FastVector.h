@@ -1573,6 +1573,14 @@ namespace gpg::core
      * the shared fastvector_uint_resize helper (FUN_004022D0 =
      * ResizeFill_). This is the emitted constructor the decoder
      * uses to preallocate the raw entity-id scratch buffer.
+     *
+     * Address: 0x005C3850 (FUN_005C3850 -- the `fastvector_n<moho::UnitWeaponInfo, 1>`
+     *   emission, `this` on the stack: arm the 0x98-byte inline window, build
+     *   the fill with UnitWeaponInfo() (0x0055B6E0), resize through 0x0055D260
+     *   and destroy the fill (0x0055D170). Called for `mWeaponInfo(0)` in
+     *   `SSTIUnitVariableData`'s member list (0x005BD89A). Formerly
+     *   `InitializeSSTIUnitWeaponInfoVector` in moho/unit/core/Unit.cpp,
+     *   removed 2026-09-24.)
      */
     explicit FastVectorN(std::size_t count)
     {

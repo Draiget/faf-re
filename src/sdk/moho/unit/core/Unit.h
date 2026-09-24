@@ -553,16 +553,6 @@ namespace moho
   );
 
   /**
-   * Address: 0x005C3850 (FUN_005C3850, init_SSTIUnitWeaponInfoVector_inline)
-   *
-   * What it does:
-   * Rebinds one weapon-info fastvector to inline storage and applies the
-   * zero-count resize lane used by `SSTIUnitVariableData` construction.
-   */
-  gpg::fastvector_n<UnitWeaponInfo, 1>*
-  InitializeSSTIUnitWeaponInfoVector(gpg::fastvector_n<UnitWeaponInfo, 1>* weaponInfo);
-
-  /**
    * Reflection type in RTTI: Moho::SSTIUnitVariableData
    * Size evidence:
    * - SSTIUnitVariableDataTypeInfo::Init (0x0055C680) sets sizeof(type)=552 (0x228).
