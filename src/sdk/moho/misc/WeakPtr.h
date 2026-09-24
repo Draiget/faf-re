@@ -5,6 +5,7 @@
 #include <new>
 
 #include "legacy/containers/Vector.h"
+#include "moho/sim/SimThreadRole.h"
 
 // Windows GDI headers define `GetObject` as an ANSI/Unicode macro alias.
 // Undefine it so intrusive weak-pointer accessors keep their intended name.
@@ -123,6 +124,7 @@ namespace moho
         if (ownerLinkSlot == nullptr) {
           destination->nextInOwner = nullptr;
         } else {
+          MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
           auto** const ownerHead = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
           destination->nextInOwner = *ownerHead;
           *ownerHead = destination;
@@ -264,6 +266,7 @@ namespace moho
       , nextInOwner(nullptr)
     {
       if (ownerLinkSlot != nullptr && !IsSentinel()) {
+        MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
         auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
         nextInOwner = *head;
         *head = this;
@@ -425,6 +428,7 @@ namespace moho
         return false;
       }
 
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
       auto** slot = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
       while (*slot && *slot != this) {
         slot = &(*slot)->nextInOwner;
@@ -489,6 +493,7 @@ namespace moho
         return false;
       }
 
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
       auto** const head = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
       nextInOwner = *head;
       *head = this;
@@ -520,6 +525,8 @@ namespace moho
       if (newOwnerLinkSlot == ownerLinkSlot) {
         return;
       }
+
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
 
       // Detach from current owner chain.
       if (ownerLinkSlot && !IsSentinel()) {
@@ -850,6 +857,7 @@ namespace moho
         continue;
       }
 
+      MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
       auto** cursor = reinterpret_cast<WeakPtr<void>**>(begin->ownerLinkSlot);
       while (*cursor != begin) {
         cursor = &(*cursor)->nextInOwner;
@@ -915,6 +923,7 @@ namespace moho
       return;
     }
 
+    MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
     auto** cursor = reinterpret_cast<WeakPtr<T>**>(ownerLinkSlot);
     while (*cursor != nullptr && *cursor != this) {
       cursor = &(*cursor)->nextInOwner;
@@ -939,6 +948,7 @@ namespace moho
       return;
     }
 
+    MOHO_ASSERT_NOT_SIM_WORKER("WeakPtr owner-chain link");
     if (ownerLinkSlot != nullptr) {
       auto** existing = reinterpret_cast<WeakPtr<Unit>**>(ownerLinkSlot);
       while (*existing != this) {

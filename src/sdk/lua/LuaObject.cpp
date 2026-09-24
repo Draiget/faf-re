@@ -37,6 +37,7 @@
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/sim/SimThreadRole.h"
 
 using namespace LuaPlus;
 
@@ -18306,6 +18307,7 @@ LuaObject& LuaObject::operator=(const LuaObject& other)
 	}
 
 	if (m_state) {
+		MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 		*m_prev = m_next;
 		m_next->m_prev = m_prev;
 		m_object.tt = LUA_TNIL;
@@ -18333,6 +18335,7 @@ LuaObject& LuaObject::operator=(const LuaObject& other)
 LuaObject& LuaObject::operator=(const LuaStackObject& stackObject)
 {
 	if (m_state) {
+		MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 		*m_prev = m_next;
 		m_next->m_prev = m_prev;
 		m_object.tt = LUA_TNIL;
@@ -18358,6 +18361,7 @@ LuaObject& LuaObject::operator=(const LuaStackObject& stackObject)
 LuaObject::~LuaObject()
 {
 	if (m_state) {
+		MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 		*m_prev = m_next;
 		m_next->m_prev = m_prev;
 		m_object.tt = LUA_TNIL;
@@ -19985,6 +19989,7 @@ void LuaObject::MemberDeserialize(
  */
 void LuaObject::AddToUsedObjectList(LuaState* state, TObject* object)
 {
+	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 	Ensure(state != nullptr, "state");
 	Ensure(state->m_rootState != nullptr, "state->m_rootState");
 	Ensure(object != nullptr, "obj");
@@ -20031,6 +20036,7 @@ void LuaObject::AssignTObject(LuaState* state, TObject* object)
  */
 void LuaObject::AddToUsedList(LuaState* state)
 {
+	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 	Ensure(state != nullptr, "state");
 	Ensure(state->m_rootState != nullptr, "state->m_rootState");
 
@@ -20082,6 +20088,7 @@ void LuaObject::Reset()
 		return;
 	}
 
+	MOHO_ASSERT_NOT_SIM_WORKER("LuaObject used-object list");
 	if (m_prev && m_next) {
 		*m_prev = m_next;
 		m_next->m_prev = m_prev;

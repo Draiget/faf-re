@@ -10,6 +10,7 @@
 #include <cstring>
 #include <new>
 #include <typeinfo>
+#include <vector>
 
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
@@ -22,6 +23,7 @@
 #include "moho/sim/SOCellPos.h"
 #include "moho/sim/STIMap.h"
 #include "moho/sim/GridTraversalLine.h"
+#include "moho/sim/SimThreadRole.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -161,6 +163,102 @@ namespace
   constexpr float kWorldToOccupancyCellScale = 0.25f;
 
   /**
+   * Engine addition, not recovered from the binary: per-thread dedup for occupancy gathers run on
+   * CSimWorkerPool workers.
+   *
+   * The binary dedups a gather through the shapes themselves. It sets `CollisionShapeBase::mMarked`
+   * on each shape it collects and clears the marks after the walk (0x004FD200, 0x004FD000). Every
+   * query is therefore a write to shared shapes, and two gathers running at once would corrupt each
+   * other's marks.
+   *
+   * On a worker, the same walk dedups through this thread-private set instead: same shapes, same
+   * order, no shared writes. The Sim thread keeps the binary's mark path. A generation stamp makes
+   * `Begin` O(1), so the table is never cleared between queries.
+   */
+  class GatherVisitSet
+  {
+  public:
+    void Begin() noexcept
+    {
+      if (++mStamp == 0u) {
+        std::fill(mSlots.begin(), mSlots.end(), Slot{});
+        mStamp = 1u;
+      }
+      mSize = 0u;
+    }
+
+    /// True the first time `shape` is seen since `Begin`.
+    [[nodiscard]] bool Insert(const moho::CollisionShapeBase* const shape)
+    {
+      if ((mSize + 1u) * 2u > mSlots.size()) {
+        Grow();
+      }
+      return Place(shape);
+    }
+
+  private:
+    struct Slot
+    {
+      const moho::CollisionShapeBase* shape = nullptr;
+      std::uint32_t stamp = 0u;
+    };
+
+    [[nodiscard]] bool Place(const moho::CollisionShapeBase* const shape) noexcept
+    {
+      const std::size_t mask = mSlots.size() - 1u;
+      // Fibonacci hashing of the pointer; shapes are at least 4-byte aligned.
+      std::size_t index = static_cast<std::size_t>((reinterpret_cast<std::uintptr_t>(shape) >> 2) * 2654435761u) & mask;
+      for (;;) {
+        Slot& slot = mSlots[index];
+        if (slot.stamp != mStamp) {
+          slot.shape = shape;
+          slot.stamp = mStamp;
+          ++mSize;
+          return true;
+        }
+        if (slot.shape == shape) {
+          return false;
+        }
+        index = (index + 1u) & mask;
+      }
+    }
+
+    void Grow()
+    {
+      std::vector<Slot> previous = std::move(mSlots);
+      mSlots.assign(previous.empty() ? 256u : previous.size() * 2u, Slot{});
+      mSize = 0u;
+      for (const Slot& slot : previous) {
+        if (slot.stamp == mStamp) {
+          (void)Place(slot.shape);
+        }
+      }
+    }
+
+    std::vector<Slot> mSlots;
+    std::uint32_t mStamp = 0u;
+    std::size_t mSize = 0u;
+  };
+
+  thread_local GatherVisitSet tGatherVisits;
+
+  /**
+   * Claims `shape` for the current gather. On the owning thread this is the binary's
+   * `if (!mMarked) { mMarked = 1; ... }`; on a pool worker it is a thread-private set test.
+   */
+  [[nodiscard]] bool ClaimGatherShape(moho::CollisionShapeBase* const shape, const bool useSharedMarks)
+  {
+    if (useSharedMarks) {
+      if (shape->mMarked != 0u) {
+        return false;
+      }
+      shape->mMarked = 1u;
+      return true;
+    }
+    return tGatherVisits.Insert(shape);
+  }
+
+  /**
    * Address: 0x004FD200 (FUN_004FD200)
    *
    * What it does:
@@ -200,6 +298,12 @@ namespace
     moho::EntityCollisionCellNode** const entityBuckets = manager.mEntityBuckets;
     moho::EntityCollisionCellNode** const unitBuckets = manager.mUnitBuckets;
 
+    // Pool workers must not write `mMarked` on shared shapes; see `GatherVisitSet`.
+    const bool useSharedMarks = !moho::IsSimWorkerThread();
+    if (!useSharedMarks) {
+      tGatherVisits.Begin();
+    }
+
     while (!IsGridTraversalBeyondEnd(line)) {
       std::int32_t cellX = 0;
       std::int32_t cellZ = 0;
@@ -209,11 +313,10 @@ namespace
       if (entityBuckets != nullptr) {
         for (moho::EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node != nullptr; node = node->next) {
           moho::CollisionShapeBase* const shape = node->owner;
-          if ((shape->mBucketFlags & kLineQueryEntitySpanTypeMask) == 0u || shape->mMarked != 0u) {
+          if ((shape->mBucketFlags & kLineQueryEntitySpanTypeMask) == 0u || !ClaimGatherShape(shape, useSharedMarks)) {
             continue;
           }
 
-          shape->mMarked = 1u;
           outSpans.PushBack(shape);
         }
       }
@@ -221,11 +324,10 @@ namespace
       if (unitBuckets != nullptr) {
         for (moho::EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node != nullptr; node = node->next) {
           moho::CollisionShapeBase* const shape = node->owner;
-          if (shape->mMarked != 0u) {
+          if (!ClaimGatherShape(shape, useSharedMarks)) {
             continue;
           }
 
-          shape->mMarked = 1u;
           outSpans.PushBack(shape);
         }
       }
@@ -234,8 +336,10 @@ namespace
     }
 
     const std::int32_t count = static_cast<std::int32_t>(outSpans.end_ - outSpans.start_);
-    for (std::int32_t index = 0; index < count; ++index) {
-      outSpans.start_[index]->mMarked = 0u;
+    if (useSharedMarks) {
+      for (std::int32_t index = 0; index < count; ++index) {
+        outSpans.start_[index]->mMarked = 0u;
+      }
     }
     return count;
   }
@@ -632,6 +736,12 @@ namespace moho
     EntityCollisionCellNode** const propBuckets = mPropBuckets;
     EntityCollisionCellNode** const entityBuckets = mEntityBuckets;
 
+    // Pool workers must not write `mMarked` on shared shapes; see `GatherVisitSet`.
+    const bool useSharedMarks = !IsSimWorkerThread();
+    if (!useSharedMarks) {
+      tGatherVisits.Begin();
+    }
+
     if (zCount > 0) {
       do {
         if (xCount > 0) {
@@ -648,8 +758,7 @@ namespace moho
             if (includeUnits && unitBuckets) {
               for (EntityCollisionCellNode* node = unitBuckets[bucketIndex]; node; node = node->next) {
                 CollisionShapeBase* const shape = node->owner;
-                if (shape->mMarked == 0u) {
-                  shape->mMarked = 1u;
+                if (ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
                 }
               }
@@ -658,8 +767,7 @@ namespace moho
             if (includeProps && propBuckets) {
               for (EntityCollisionCellNode* node = propBuckets[bucketIndex]; node; node = node->next) {
                 CollisionShapeBase* const shape = node->owner;
-                if (shape->mMarked == 0u) {
-                  shape->mMarked = 1u;
+                if (ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
                 }
               }
@@ -668,8 +776,7 @@ namespace moho
             if (includeDynamic && entityBuckets) {
               for (EntityCollisionCellNode* node = entityBuckets[bucketIndex]; node; node = node->next) {
                 CollisionShapeBase* const shape = node->owner;
-                if (((flagBits & shape->mBucketFlags) != 0u) && shape->mMarked == 0u) {
-                  shape->mMarked = 1u;
+                if (((flagBits & shape->mBucketFlags) != 0u) && ClaimGatherShape(shape, useSharedMarks)) {
                   outSpans.PushBack(shape);
                 }
               }
@@ -686,8 +793,10 @@ namespace moho
     }
 
     const int count = static_cast<int>(outSpans.end_ - outSpans.start_);
-    for (int index = 0; index < count; ++index) {
-      outSpans.start_[index]->mMarked = 0u;
+    if (useSharedMarks) {
+      for (int index = 0; index < count; ++index) {
+        outSpans.start_[index]->mMarked = 0u;
+      }
     }
 
     return count;

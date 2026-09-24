@@ -1,10 +1,13 @@
 #include "CAniPose.h"
 
+#include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <limits>
 #include <new>
 #include <typeinfo>
+
+#include <intrin.h>
 
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/FastVector.h"
@@ -364,6 +367,22 @@ namespace
     return lhs.pos_ != rhs.pos_ || lhs.orient_ != rhs.orient_;
   }
 
+  // `CAniPoseBone::mCompositeDirty` states. The binary stores only 0 (valid) and 1 (dirty); the
+  // transient busy state is an engine addition that lives only while one thread recomputes the
+  // composite in `GetCompositeTransform`.
+  constexpr std::uint8_t kCompositeValid = 0u;
+  constexpr std::uint8_t kCompositeDirty = 1u;
+  constexpr std::uint8_t kCompositeBusy = 2u;
+
+  /// Reads a source bone's flag for copying. A bone that another thread is recomputing right now is
+  /// copied as dirty, so the copy never waits on a recompute nobody will publish to it.
+  [[nodiscard]] std::uint8_t LoadCopyableCompositeState(const moho::CAniPoseBone& source) noexcept
+  {
+    const std::uint8_t state =
+      std::atomic_ref<std::uint8_t>(const_cast<std::uint8_t&>(source.mCompositeDirty)).load(std::memory_order_acquire);
+    return state == kCompositeBusy ? kCompositeDirty : state;
+  }
+
 } // namespace
 
 namespace moho
@@ -400,8 +419,7 @@ namespace moho
    * link, parent link, and visibility flags.
    */
   CAniPoseBone::CAniPoseBone(const CAniPoseBone& copy)
-    : mCompositeTransform(copy.mCompositeTransform)
-    , mCompositeDirty(copy.mCompositeDirty)
+    : mCompositeDirty(LoadCopyableCompositeState(copy))
     , mCompositeIsLocal(copy.mCompositeIsLocal)
     , mLocalTransform(copy.mLocalTransform)
     , mIdx(copy.mIdx)
@@ -410,6 +428,8 @@ namespace moho
     , mVisible(copy.mVisible)
     , mSkipNextInterp(copy.mSkipNextInterp)
   {
+    // The flag is loaded first (above) so a composite published by another thread is copied whole.
+    mCompositeTransform = copy.mCompositeTransform;
     pad_1E_1F[0] = copy.pad_1E_1F[0];
     pad_1E_1F[1] = copy.pad_1E_1F[1];
     pad_4A_4B[0] = copy.pad_4A_4B[0];
@@ -427,8 +447,9 @@ namespace moho
    */
   CAniPoseBone& CAniPoseBone::operator=(const CAniPoseBone& copy) noexcept
   {
+    // Flag before transform, as in the copy constructor.
+    mCompositeDirty = LoadCopyableCompositeState(copy);
     mCompositeTransform = copy.mCompositeTransform;
-    mCompositeDirty = copy.mCompositeDirty;
     mCompositeIsLocal = copy.mCompositeIsLocal;
     pad_1E_1F[0] = copy.pad_1E_1F[0];
     pad_1E_1F[1] = copy.pad_1E_1F[1];
@@ -496,8 +517,25 @@ namespace moho
   const VTransform& CAniPoseBone::GetCompositeTransform() const
   {
     auto* const self = const_cast<CAniPoseBone*>(this);
-    if (self->mCompositeDirty == 0u) {
-      return self->mCompositeTransform;
+
+    // Engine addition: the binary tests and clears `mCompositeDirty` with plain byte moves, so two
+    // threads reading the same dirty bone would both write the cache. That happens when sim jobs aim
+    // at another unit's bone, or when the render thread reads a pose the sim still reads. The byte
+    // now doubles as a publication flag. Exactly one reader claims the recompute (dirty -> busy);
+    // the others wait for the published value. Single-threaded, this is the binary's behaviour.
+    std::atomic_ref<std::uint8_t> state(self->mCompositeDirty);
+    for (;;) {
+      std::uint8_t observed = state.load(std::memory_order_acquire);
+      if (observed == kCompositeValid) {
+        return self->mCompositeTransform;
+      }
+      if (observed == kCompositeBusy) {
+        _mm_pause();
+        continue;
+      }
+      if (state.compare_exchange_weak(observed, kCompositeBusy, std::memory_order_acquire, std::memory_order_relaxed)) {
+        break;
+      }
     }
 
     // Branch polarity is the binary's, at 0x0054BED1..0x0054BF0C: a NON-ZERO
@@ -523,7 +561,7 @@ namespace moho
       self->mCompositeTransform = self->mLocalTransform;
     }
 
-    self->mCompositeDirty = 0u;
+    state.store(kCompositeValid, std::memory_order_release);
     return self->mCompositeTransform;
   }
 
