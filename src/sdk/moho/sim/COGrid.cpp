@@ -13,7 +13,7 @@
 
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/path/PathTables.h"
@@ -1558,8 +1558,8 @@ namespace moho
    * `func_AABoxToRect` (FUN_004FCBE0), gathers unmarked entities
    * in that cell rect from the grid occupation manager
    * (`GatherUnmarkedEntities` = FUN_00722DF0), clears `outResults`, then appends
-   * each entity that passes the squared-XZ range test — growing through
-   * `InsertCollisionResultRange` (FUN_00723090) when full.
+   * each entity that passes the squared-XZ range test with `push_back`, whose
+   * full arm is the `CollisionResult` `InsertAt` (FUN_00723090).
    */
   void EntitiesAroundPoint(
     gpg::core::FastVectorN<CollisionResult, 10>& outResults,
@@ -1598,14 +1598,7 @@ namespace moho
       }
 
       hit.sourceEntity = entity;
-      if (outResults.end_ == outResults.capacity_) {
-        InsertCollisionResultRange(outResults, outResults.end_, &hit, &hit + 1);
-      } else {
-        if (outResults.end_ != nullptr) {
-          *outResults.end_ = hit;
-        }
-        ++outResults.end_;
-      }
+      outResults.push_back(hit);
     }
   }
 } // namespace moho

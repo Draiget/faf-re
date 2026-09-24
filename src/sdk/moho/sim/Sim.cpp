@@ -73,7 +73,7 @@
 #include "moho/console/CVarAccess.h"
 #include "moho/debug/RDebugOverlayClass.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/EntityCategoryReflection.h"
 #include "moho/entity/CollisionBeamEntity.h"

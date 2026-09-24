@@ -23,7 +23,7 @@
 #include "moho/ai/IFormationInstance.h"
 #include "moho/ai/IFormationInstanceCountedPtrReflection.h"
 #include "moho/ai/IAiNavigator.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Prop.h"
 #include "moho/math/QuaternionMath.h"

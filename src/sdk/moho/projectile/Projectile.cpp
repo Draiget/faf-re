@@ -27,7 +27,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/resource/blueprints/RProjectileBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/sim/CArmyImpl.h"
 #include "moho/sim/CArmyStats.h"
 #include "moho/sim/COGrid.h"

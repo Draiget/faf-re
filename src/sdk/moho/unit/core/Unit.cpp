@@ -37,7 +37,7 @@
 #include "moho/animation/CAniSkel.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategoryReflection.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/effects/rendering/SEfxCurve.h"

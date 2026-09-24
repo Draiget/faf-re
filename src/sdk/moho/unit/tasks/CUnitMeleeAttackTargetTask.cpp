@@ -19,7 +19,7 @@
 #include "moho/ai/IAiNavigator.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/math/Vector3f.h"
 #include "moho/path/SNavGoal.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"

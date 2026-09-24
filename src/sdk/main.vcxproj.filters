@@ -57,9 +57,6 @@
     <ClCompile Include="moho\entity\EntityCategoryReflection.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\entity\EntityCollisionUpdater.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="moho\entity\CTextureScroller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -3229,9 +3226,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\EntityCategoryReflection.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="moho\entity\EntityCollisionUpdater.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\entity\Motor.h">

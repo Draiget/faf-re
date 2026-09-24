@@ -23,7 +23,7 @@
 #include "moho/sim/Sim.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/STIMap.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/task/CTaskThread.h"
 #include "moho/task/CTask.h"
 #include "moho/task/CTaskThreadWeakPtrReflection.h"

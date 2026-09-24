@@ -13,7 +13,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/Shield.h"
 #include "moho/sim/COGrid.h"
 #include "moho/sim/RRuleGameRules.h"

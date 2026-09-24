@@ -14,7 +14,7 @@
 #include "moho/ai/CAiBrain.h"
 #include "moho/animation/CAniActor.h"
 #include "moho/entity/EntityDb.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/intel/CIntel.h"
 #include "moho/particles/SWorldBeam.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"

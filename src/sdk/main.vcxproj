@@ -695,7 +695,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\command\SSTICommandConstantData.cpp" />
     <ClCompile Include="moho\command\SSTICommandVariableData.cpp" />
     <ClCompile Include="moho\entity\EntityCategoryTypeInfo.cpp" />
-    <ClCompile Include="moho\entity\EntityCollisionUpdater.cpp" />
     <ClCompile Include="moho\entity\CTextureScroller.cpp" />
     <ClCompile Include="moho\entity\Entity.cpp" />
     <ClCompile Include="moho\entity\EntitySerializer.cpp" />
@@ -1709,7 +1708,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\entity\ECollisionBeamEvent.h" />
     <ClInclude Include="moho\entity\EntityCategoryLookupResolver.h" />
     <ClInclude Include="moho\entity\EntityCategoryReflection.h" />
-    <ClInclude Include="moho\entity\EntityCollisionUpdater.h" />
     <ClInclude Include="moho\entity\Motor.h" />
     <ClInclude Include="moho\entity\MotorReflection.h" />
     <ClInclude Include="moho\entity\EntityFastVectorReflection.h" />

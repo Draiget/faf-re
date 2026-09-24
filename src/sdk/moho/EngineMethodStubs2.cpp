@@ -9,7 +9,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "moho/ai/CAiAttackerImpl.h"
 #include "moho/command/ICommandSink.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/CollisionBeamEntity.h"
 #include "moho/render/CRenFrame.h"
 #include "moho/render/MapImager.h"

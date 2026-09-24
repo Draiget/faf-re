@@ -26,7 +26,7 @@
 #include "moho/ai/CAiTarget.h"
 #include "moho/entity/CTextureScroller.h"
 #include "moho/entity/EntityCategoryLookupResolver.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/entity/Motor.h"
 #include "moho/entity/SSTIEntityConstantData.h"

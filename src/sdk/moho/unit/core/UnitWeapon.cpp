@@ -22,7 +22,7 @@
 #include "moho/ai/IAiAttacker.h"
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/EntityCategorySetVectorReflection.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/lua/CScrLuaBinder.h"
 #include "moho/lua/CScrLuaInitForm.h"
 #include "moho/lua/CScrLuaObjectFactory.h"

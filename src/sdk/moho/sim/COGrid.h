@@ -6,7 +6,7 @@
 #include "gpg/core/containers/BitArray2D.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/sim/SFootprint.h"
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"

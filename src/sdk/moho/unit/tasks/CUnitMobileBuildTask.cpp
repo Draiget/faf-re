@@ -24,7 +24,7 @@
 #include "moho/containers/SCoordsVec2.h"
 #include "moho/entity/Entity.h"
 #include "moho/entity/EntityCategoryReflection.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/math/MathReflection.h"
 #include "moho/misc/WeakPtr.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"

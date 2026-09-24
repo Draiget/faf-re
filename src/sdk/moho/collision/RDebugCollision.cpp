@@ -7,7 +7,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "moho/entity/Entity.h"
-#include "moho/entity/EntityCollisionUpdater.h"
+#include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
 #include "moho/sim/Sim.h"
 #include "gpg/core/reflection/StaticInitPhase.h"

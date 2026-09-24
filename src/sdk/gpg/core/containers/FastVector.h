@@ -2061,6 +2061,7 @@ namespace gpg::core
      * Address: 0x0072A850 (FUN_0072A850 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
      * Address: 0x00774000 (FUN_00774000 -- `insert_range`/`InsertAt` for a 4-byte element; Inserts one 4-byte range before `insertPosition`, growing storage when capacity is insufficient.)
      * Address: 0x006AEAD0 (FUN_006AEAD0 -- `insert_range`/`InsertAt` for a 8-byte element; Inserts one 8-byte source range before `insertPosition`, growing storage when required and preserving overlap-safe lane movement semantics.)
+     * Address: 0x00723090 (FUN_00723090 -- `InsertAt` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the full arm of the inlined `push_back` in the COGrid gathers 0x00721C00/0x00721DC0/0x00721FB0/0x00722350/0x007227B0 and CDamage's 0x00722560; its tail shifts are the `_Copy_backward` pair 0x007237E0/0x00723770 and its `_Ucopy` is 0x00723410. Formerly `InsertCollisionResultRange` in moho/entity/EntityCollisionUpdater.cpp (RULE ONE), file removed 2026-09-24.)
      */
     void InsertAt(T* pos, const T* insStart, const T* insEnd)
     {
@@ -2583,6 +2584,7 @@ namespace gpg::core
      * writing when `dest == nullptr`, matching the binary's null-guarded lane.
      * Address: 0x0056F1F0 (FUN_0056F1F0 -- `_Ucopy` for `gpg::fastvector_n<moho::SOffsetInfo, 2>` (`CFormationInstance::mOffsetInfo`, element 0x4C), the copy-construct step of its `GrowInsertDeepCopy`/`InsertAt`.)
      * Address: 0x0056D390 (FUN_0056D390 -- `_Ucopy` for `gpg::fastvector_n<moho::WeakPtr<moho::IUnit>, 4>` (`CFormationInstance::mUnits` and the formation scratch sets, element 0x08), the relinking copy-construct step of its `InsertAt` (0x0056B2F0).)
+     * Address: 0x00723410 (FUN_00723410 -- `_Ucopy` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), null-guarded; called from `InsertAt` 0x00723090 and the grow lane 0x00723340. Formerly `CopyCollisionResultsForward`, RULE ONE.)
      */
     static T* UninitializedCopyForward(T* dest, const T* copyBegin, const T* copyEnd)
     {
@@ -2631,6 +2633,10 @@ namespace gpg::core
      * Address: 0x00713950 (FUN_00713950 -- a second emission of the same `SCondition` `_Copy_backward`.)
      * Address: 0x00712840 (FUN_00712840 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
      * Address: 0x00712870 (FUN_00712870 -- jump thunk into the `SCondition` `_Copy_backward`; zero callers.)
+     * Address: 0x007237E0 (FUN_007237E0 -- `_Copy_backward` for `gpg::fastvector_n<moho::CollisionResult, 10>` (element 0x18), the in-place tail shift of `InsertAt` 0x00723090. Formerly `CopyCollisionResultsBackward`, RULE ONE.)
+     * Address: 0x00723770 (FUN_00723770 -- a second, byte-identical emission of the same `CollisionResult` `_Copy_backward`, also called from 0x00723090.)
+     * Address: 0x00723610 (FUN_00723610 -- calling-convention bridge into the `CollisionResult` `_Copy_backward` 0x00723770 (source-first argument order); zero callers.)
+     * Address: 0x00723640 (FUN_00723640 -- calling-convention bridge into the `CollisionResult` `_Copy_backward` 0x007237E0; zero callers.)
      * Address: 0x00762590 (FUN_00762590 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
      * Address: 0x007625C0 (FUN_007625C0 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
      * Address: 0x0080B670 (FUN_0080B670 -- `_Copy_backward` for a 28-byte element; Copies 28-byte elements backward from `[sourceBegin, sourceEnd)` into the destination tail lane.)
