@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "gpg/core/containers/Set.h"
+#include "moho/containers/BVIntSet.h"
 #include "gpg/core/reflection/Reflection.h"
 #include "legacy/containers/String.h"
 #include "legacy/containers/Vector.h"
@@ -80,12 +80,12 @@ namespace moho
     SEconTotals mEconomyTotals;             // 0x000
     std::uint8_t mIsResourceSharingEnabled; // 0x038
     std::uint8_t mPad_0039_0040[0x07]{};
-    Set mNeutrals;        // 0x040
-    Set mAllies;          // 0x060
-    Set mEnemies;         // 0x080
+    BVIntSet mNeutrals;   // 0x040
+    BVIntSet mAllies;     // 0x060
+    BVIntSet mEnemies;    // 0x080
     std::uint8_t mIsAlly; // 0x0A0
     std::uint8_t mPad_00A1_00A8[0x07]{};
-    Set mValidCommandSources;       // 0x0A8
+    BVIntSet mValidCommandSources;  // 0x0A8
     std::uint32_t mPlayerColorBgra; // 0x0C8
     std::uint32_t mArmyColorBgra;   // 0x0CC
     msvc8::string mArmyType;        // 0x0D0

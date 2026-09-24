@@ -547,34 +547,6 @@ namespace
     }
   }
 
-  [[nodiscard]] moho::BVIntSet& AsBVIntSet(moho::Set& set) noexcept
-  {
-    static_assert(sizeof(moho::Set) == sizeof(moho::BVIntSet), "Set/BVIntSet size mismatch");
-    static_assert(
-      offsetof(moho::Set, baseWordIndex) == offsetof(moho::BVIntSet, mFirstWordIndex),
-      "Set::baseWordIndex offset mismatch"
-    );
-    static_assert(
-      offsetof(moho::Set, meta) == offsetof(moho::BVIntSet, mReservedMetaWord), "Set::meta offset mismatch"
-    );
-    static_assert(
-      offsetof(moho::Set, items_begin) ==
-        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), start_),
-      "Set::items_begin offset mismatch"
-    );
-    static_assert(
-      offsetof(moho::Set, items_end) ==
-        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), end_),
-      "Set::items_end offset mismatch"
-    );
-    static_assert(
-      offsetof(moho::Set, items_capacity_end) ==
-        offsetof(moho::BVIntSet, mWords) + offsetof(decltype(moho::BVIntSet::mWords), capacity_),
-      "Set::items_capacity_end offset mismatch"
-    );
-    return reinterpret_cast<moho::BVIntSet&>(set);
-  }
-
   void ResetArmyPoolPlatoons(moho::ArmyPool& pool)
   {
     // Address: 0x00701B70 (FUN_00701B70), initialization prefix.
@@ -1470,8 +1442,8 @@ namespace moho
     ProcessArmyEconomyTick(*this);
 
     mVarDat.mIsAlly = static_cast<std::uint8_t>(isFocusArmy ? 1u : 0u);
-    (void)AsBVIntSet(mVarDat.mAllies).Add(static_cast<std::uint32_t>(armyIndex));
-    AsBVIntSet(mVarDat.mValidCommandSources) = launchInfo.mUnitSources;
+    (void)mVarDat.mAllies.Add(static_cast<std::uint32_t>(armyIndex));
+    mVarDat.mValidCommandSources = launchInfo.mUnitSources;
     AssignAllUnitsCategoryFilter(*this);
 
     const int mapMaxExtent = ResolveMapMaxExtent(sim);
@@ -1906,16 +1878,16 @@ namespace moho
    */
   void CArmyImpl::SetAlliance(const std::uint32_t armyId, const int relationIndex)
   {
-    Set* relationSets[3] = {&mVarDat.mNeutrals, &mVarDat.mAllies, &mVarDat.mEnemies};
+    BVIntSet* relationSets[3] = {&mVarDat.mNeutrals, &mVarDat.mAllies, &mVarDat.mEnemies};
 
     for (int i = 0; i < 3; ++i) {
-      Set& relation = *relationSets[i];
+      BVIntSet& relation = *relationSets[i];
       if (i == relationIndex) {
         // Binary path uses FUN_00401980 (EnsureBounds) before setting the bit.
-        AsBVIntSet(relation).Add(armyId);
+        (void)relation.Add(armyId);
       } else {
         // Binary path uses FUN_004018A0 (Finalize) after in-range clear.
-        AsBVIntSet(relation).Remove(armyId);
+        (void)relation.Remove(armyId);
       }
     }
 
@@ -1951,7 +1923,7 @@ namespace moho
       return;
     }
 
-    mVarDat.mIsAlly = AsBVIntSet(mVarDat.mAllies).Contains(static_cast<std::uint32_t>(focusArmyIndex)) ? 1u : 0u;
+    mVarDat.mIsAlly = mVarDat.mAllies.Contains(static_cast<std::uint32_t>(focusArmyIndex)) ? 1u : 0u;
   }
 
   /**
@@ -2291,7 +2263,7 @@ namespace moho
   void CArmyImpl::OnCommandSourceTerminated(const std::uint32_t sourceId)
   {
     mVarDat.mValidCommandSources.Remove(sourceId);
-    if (mVarDat.mValidCommandSources.items_begin == mVarDat.mValidCommandSources.items_end && AiBrain != nullptr) {
+    if (mVarDat.mValidCommandSources.WordCount() == 0u && AiBrain != nullptr) {
       reinterpret_cast<CScriptObject*>(AiBrain)->CallbackStr("AbandonedByPlayer");
     }
   }
@@ -2667,19 +2639,19 @@ namespace moho
     // block, which is a no-op on the empty input this is always given.
     *outArmyList = msvc8::vector<CArmyImpl*>{};
 
-    if (mVarDat.mAllies.items_begin == nullptr || mVarDat.mAllies.items_end == nullptr) {
+    if (mVarDat.mAllies.mWords.start_ == nullptr || mVarDat.mAllies.mWords.end_ == nullptr) {
       return outArmyList;
     }
 
-    const std::uint32_t wordCount = static_cast<std::uint32_t>(mVarDat.mAllies.items_end - mVarDat.mAllies.items_begin);
+    const std::uint32_t wordCount = static_cast<std::uint32_t>(mVarDat.mAllies.mWords.end_ - mVarDat.mAllies.mWords.start_);
     for (std::uint32_t wordOffset = 0; wordOffset < wordCount; ++wordOffset) {
-      // moho::Set is a packed bitset of army IDs in 32-bit words.
-      const std::int32_t absoluteWord = mVarDat.mAllies.baseWordIndex + static_cast<std::int32_t>(wordOffset);
+      // A BVIntSet word holds 32 army IDs, starting at mFirstWordIndex.
+      const std::int32_t absoluteWord = static_cast<std::int32_t>(mVarDat.mAllies.mFirstWordIndex) + static_cast<std::int32_t>(wordOffset);
       if (absoluteWord < 0) {
         continue;
       }
 
-      std::uint32_t bits = mVarDat.mAllies.items_begin[wordOffset];
+      std::uint32_t bits = mVarDat.mAllies.mWords.start_[wordOffset];
       for (std::uint32_t bit = 0; bit < 32; ++bit) {
         const std::uint32_t mask = (1u << bit);
         if ((bits & mask) == 0u) {

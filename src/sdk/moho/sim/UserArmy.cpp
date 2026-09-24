@@ -164,12 +164,7 @@ namespace moho
       return false;
     }
 
-    const Set& allies = mVarDat.mAllies;
-    if (!allies.items_begin || !allies.items_end) {
-      return false;
-    }
-
-    return allies.Contains(armyIndex);
+    return mVarDat.mAllies.Contains(armyIndex);
   }
 
   /**
@@ -185,12 +180,7 @@ namespace moho
       return false;
     }
 
-    const Set& enemies = mVarDat.mEnemies;
-    if (!enemies.items_begin || !enemies.items_end) {
-      return false;
-    }
-
-    return enemies.Contains(armyIndex);
+    return mVarDat.mEnemies.Contains(armyIndex);
   }
 
   /**

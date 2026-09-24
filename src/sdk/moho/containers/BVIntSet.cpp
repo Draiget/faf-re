@@ -130,10 +130,16 @@ bool moho::BVIntSetIndexValueNotEqual(const BVIntSetIndex& lhs, const BVIntSetIn
   return lhs.mValue != rhs.mValue;
 }
 
+/**
+ * Address: 0x00401E10 (FUN_00401E10)
+ *
+ * What it does:
+ * Copies the first-word index and the word storage; the binary never writes
+ * +0x04 here (0x00401E17..0x00401E22), so it keeps its default.
+ */
 BVIntSet::BVIntSet(const BVIntSet& set)
 {
   mFirstWordIndex = set.mFirstWordIndex;
-  mReservedMetaWord = set.mReservedMetaWord;
   mWords.ResetFrom(set.mWords);
 }
 

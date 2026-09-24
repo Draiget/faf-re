@@ -117,10 +117,22 @@ namespace moho
     // Packed presence bits in contiguous 32-value words.
     gpg::core::FastVectorN<unsigned int, 2> mWords{};
 
+    /**
+     * Address: 0x00401080 (FUN_00401080)
+     *
+     * What it does:
+     * Empty set: first word 0, word storage bound to its two-word inline
+     * window. Formerly `moho::Set::Set` in gpg/core/containers/Set.h, a second
+     * layout of this type, removed 2026-09-24.
+     */
     BVIntSet() = default;
 
     /**
-     * Copy-constructs the set storage from another BVIntSet.
+     * Address: 0x00401E10 (FUN_00401E10)
+     *
+     * What it does:
+     * Copies the first-word index (+0x00) and the word storage (0x00402220);
+     * +0x04 is not copied. Formerly `moho::Set::Set(const Set&)`.
      */
     BVIntSet(const BVIntSet& set);
     BVIntSet& operator=(const BVIntSet& set);

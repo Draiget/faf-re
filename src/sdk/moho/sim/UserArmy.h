@@ -203,16 +203,16 @@ namespace moho
     "UserArmy::mVarDat.mAllies offset must be 0xE0"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, meta) == 0xE4,
-    "UserArmy::mVarDat.mAllies.meta offset must be 0xE4"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mReservedMetaWord) == 0xE4,
+    "UserArmy::mVarDat.mAllies.mReservedMetaWord offset must be 0xE4"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, items_begin) == 0xE8,
-    "UserArmy::mVarDat.mAllies.items_begin offset must be 0xE8"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) + offsetof(decltype(BVIntSet::mWords), start_) == 0xE8,
+    "UserArmy::mVarDat.mAllies word start offset must be 0xE8"
   );
   static_assert(
-    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(Set, items_end) == 0xEC,
-    "UserArmy::mVarDat.mAllies.items_end offset must be 0xEC"
+    offsetof(UserArmy, mVarDat) + offsetof(SSTIArmyVariableData, mAllies) + offsetof(BVIntSet, mWords) + offsetof(decltype(BVIntSet::mWords), end_) == 0xEC,
+    "UserArmy::mVarDat.mAllies word end offset must be 0xEC"
   );
   static_assert(offsetof(UserArmy, mWeakRefs) == 0x1E0, "UserArmy::mWeakRefs offset must be 0x1E0");
   static_assert(offsetof(UserArmy, mSession) == 0x1E4, "UserArmy::mSession offset must be 0x1E4");

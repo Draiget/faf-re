@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gpg/core/containers/Set.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "IClient.h"

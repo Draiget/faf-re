@@ -1863,13 +1863,13 @@ namespace
     // command arriving from that source is then dropped before it reaches a
     // unit. `Set::Add`/`Set::Remove` also keep the used-word window and the
     // empty-set case right, which the copy did not.
-    Set& validSources = army.mVarDat.mValidCommandSources;
+    BVIntSet& validSources = army.mVarDat.mValidCommandSources;
 
     const std::uint32_t source = static_cast<std::uint32_t>(sourceIndex);
     if (enabled) {
-      validSources.Add(source);
+      (void)validSources.Add(source);
     } else {
-      validSources.Remove(source);
+      (void)validSources.Remove(source);
     }
   }
 
@@ -14802,7 +14802,7 @@ namespace
    * Returns whether `targetArmyIndex` is in one neutral-relation bitset lane.
    * Legacy behavior treats `0xFFFFFFFF` as neutral by default.
    */
-  [[nodiscard]] bool IsArmyMarkedNeutral(const std::uint32_t targetArmyIndex, const moho::Set& neutralSet) noexcept
+  [[nodiscard]] bool IsArmyMarkedNeutral(const std::uint32_t targetArmyIndex, const moho::BVIntSet& neutralSet) noexcept
   {
     if (targetArmyIndex == std::numeric_limits<std::uint32_t>::max()) {
       return true;
@@ -18921,11 +18921,11 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
 
     LuaPlus::LuaObject authorizedCommandSources(state);
     authorizedCommandSources.AssignNewTable(state, 0, 0u);
-    const Set& validSources = army->mVarDat.mValidCommandSources;
+    const BVIntSet& validSources = army->mVarDat.mValidCommandSources;
     int luaSourceIndex = 1;
-    const std::size_t usedWords = static_cast<std::size_t>(validSources.items_end - validSources.items_begin);
+    const std::size_t usedWords = static_cast<std::size_t>(validSources.mWords.end_ - validSources.mWords.start_);
     for (std::size_t wordIndex = 0; wordIndex < usedWords; ++wordIndex) {
-      const std::uint32_t wordBits = validSources.items_begin[wordIndex];
+      const std::uint32_t wordBits = validSources.mWords.start_[wordIndex];
       if (wordBits == 0u) {
         continue;
       }
@@ -18935,7 +18935,7 @@ int moho::cfunc_GetArmiesTableL(LuaPlus::LuaState* const state)
           continue;
         }
         const std::uint32_t sourceId =
-          static_cast<std::uint32_t>((validSources.baseWordIndex + static_cast<std::int32_t>(wordIndex)) * 32u + bit);
+          static_cast<std::uint32_t>((static_cast<std::int32_t>(validSources.mFirstWordIndex) + static_cast<std::int32_t>(wordIndex)) * 32u + bit);
         authorizedCommandSources.SetInteger(luaSourceIndex++, static_cast<std::int32_t>(sourceId + 1u));
       }
     }
@@ -23903,7 +23903,7 @@ int moho::cfunc_SetCommandSourceSim(lua_State* const luaContext)
   }
 
   CArmyImpl* const army = sim->mArmiesList[static_cast<std::size_t>(armyIndex)];
-  if (!army || !army->mVarDat.mValidCommandSources.items_begin) {
+  if (!army || !army->mVarDat.mValidCommandSources.mWords.start_) {
     return 0;
   }
 

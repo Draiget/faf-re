@@ -570,9 +570,6 @@
     <ClCompile Include="gpg\core\containers\WriteArchive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gpg\core\containers\Set.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="gpg\gal\ContextInterfaces.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -2989,9 +2986,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="legacy\containers\String.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gpg\core\containers\Set.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="moho\math\Vector2f.h">

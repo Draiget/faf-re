@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "../../gpg/core/containers/FastVector.h"
-#include "../../gpg/core/containers/Set.h"
+#include "../containers/BVIntSet.h"
 #include "../../legacy/containers/String.h"
 #include "../../legacy/containers/Vector.h"
 #include "../entity/EntityCategoryReflection.h"

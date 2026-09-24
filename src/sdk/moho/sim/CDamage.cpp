@@ -733,11 +733,7 @@ namespace moho
     if (army == nullptr || armyIndex == 0xFFFFFFFFu) {
       return false;
     }
-    const Set& allies = army->mVarDat.mAllies;
-    if (allies.items_begin == nullptr || allies.items_end == nullptr) {
-      return false;
-    }
-    return allies.Contains(armyIndex);
+    return army->mVarDat.mAllies.Contains(armyIndex);
   }
 
   [[nodiscard]] bool PointInsideSphere(const Wm3::Vec3f& point, const Wm3::Sphere3f& sphere) noexcept
