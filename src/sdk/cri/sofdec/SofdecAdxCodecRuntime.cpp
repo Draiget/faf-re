@@ -907,7 +907,7 @@
       decoder->loopStartOffset = 0;
       decoder->loopEndSample = 0;
       decoder->loopEndOffset = 0;
-      decoder->entrySubmittedBytes = 0;
+      decoder->decodedSampleTotal = 0;
 
       std::int32_t encryptionMode = 0;
       std::int32_t headerVersion = 0;
@@ -937,10 +937,10 @@
     decoder->outputChannels = static_cast<std::int32_t>(static_cast<std::int8_t>(decoder->sourceChannels));
     decoder->outputBlockBytes = static_cast<std::int32_t>(static_cast<std::int8_t>(decoder->sourceBlockBytes));
     decoder->outputBlockSamples = decoder->sourceBlockSamples;
-    decoder->entryCommittedBytes = 0;
-    decoder->outputPcmBuffer0 = decoder->pcmBuffer0;
-    decoder->outputPcmBuffer1 = decoder->pcmBuffer1;
-    decoder->outputPcmBuffer2 = decoder->pcmBuffer2;
+    decoder->bufferedSampleCount = 0;
+    decoder->outputBuffer = decoder->pcmBuffer;
+    decoder->outputBufferSamples = decoder->pcmBufferSamples;
+    decoder->outputChannelStride = decoder->pcmChannelStride;
 
     return static_cast<std::int16_t>(headerIdentity);
   }
@@ -989,9 +989,9 @@
     decoder->outputBlockSamples = 1152;
     decoder->sampleRate = kMpegAudioSampleRateByHeaderIndex[sampleRateIndex];
     decoder->outputChannels = static_cast<std::int32_t>(channelCount);
-    decoder->outputPcmBuffer0 = decoder->pcmBuffer0;
-    decoder->outputPcmBuffer1 = decoder->pcmBuffer1;
-    decoder->outputPcmBuffer2 = decoder->pcmBuffer2;
+    decoder->outputBuffer = decoder->pcmBuffer;
+    decoder->outputBufferSamples = decoder->pcmBufferSamples;
+    decoder->outputChannelStride = decoder->pcmChannelStride;
 
     decoder->initState = 1;
     decoder->sourceSampleBits = 16;
@@ -999,7 +999,7 @@
     decoder->sourceBlockBytes = 127;
     decoder->format = 11;
     decoder->outputBlockBytes = 127;
-    decoder->entryCommittedBytes = 0;
+    decoder->bufferedSampleCount = 0;
     decoder->adpcmCoefficientIndex = 0;
     decoder->loopCount = 0;
     decoder->loopType = 0;
@@ -1008,7 +1008,7 @@
     decoder->loopStartOffset = 0;
     decoder->loopEndSample = 0;
     decoder->loopEndOffset = 0;
-    decoder->entrySubmittedBytes = 0;
+    decoder->decodedSampleTotal = 0;
     return 1;
   }
 
@@ -1080,16 +1080,16 @@
     decoder->sourceBlockSamples = 1024;
     decoder->outputBlockSamples = 1024;
     decoder->sourceChannels = 2;
-    decoder->outputPcmBuffer0 = decoder->pcmBuffer0;
-    decoder->outputPcmBuffer1 = decoder->pcmBuffer1;
+    decoder->outputBuffer = decoder->pcmBuffer;
+    decoder->outputBufferSamples = decoder->pcmBufferSamples;
     decoder->sourceSampleBits = 16;
     decoder->totalSampleCount = 0x7FFFFFFF;
     decoder->sourceBlockBytes = 127;
     decoder->format = 12;
     decoder->outputChannels = 2;
     decoder->outputBlockBytes = 127;
-    decoder->outputPcmBuffer2 = decoder->pcmBuffer2;
-    decoder->entryCommittedBytes = 0;
+    decoder->outputChannelStride = decoder->pcmChannelStride;
+    decoder->bufferedSampleCount = 0;
     decoder->adpcmCoefficientIndex = 0;
     decoder->loopCount = 0;
     decoder->loopType = 0;
@@ -1098,7 +1098,7 @@
     decoder->loopStartOffset = 0;
     decoder->loopEndSample = 0;
     decoder->loopEndOffset = 0;
-    decoder->entrySubmittedBytes = 0;
+    decoder->decodedSampleTotal = 0;
     return 1;
   }
 
@@ -1144,10 +1144,10 @@
   {
     decoder->sourceBlockSamples = 1024;
     decoder->outputBlockSamples = 1024;
-    decoder->outputPcmBuffer0 = decoder->pcmBuffer0;
+    decoder->outputBuffer = decoder->pcmBuffer;
     decoder->sourceBlockBytes = 127;
     decoder->outputBlockBytes = 127;
-    decoder->outputPcmBuffer2 = decoder->pcmBuffer2;
+    decoder->outputChannelStride = decoder->pcmChannelStride;
     decoder->format = decoder->preferredFormat;
     decoder->initState = 1;
     decoder->sampleRate = 48000;
@@ -1155,8 +1155,8 @@
     decoder->sourceSampleBits = 16;
     decoder->totalSampleCount = 0x7FFFFFFF;
     decoder->outputChannels = 2;
-    decoder->outputPcmBuffer1 = decoder->pcmBuffer1;
-    decoder->entryCommittedBytes = 0;
+    decoder->outputBufferSamples = decoder->pcmBufferSamples;
+    decoder->bufferedSampleCount = 0;
     decoder->adpcmCoefficientIndex = 0;
     decoder->loopCount = 0;
     decoder->loopType = 0;
@@ -1165,7 +1165,7 @@
     decoder->loopStartOffset = 0;
     decoder->loopEndSample = 0;
     decoder->loopEndOffset = 0;
-    decoder->entrySubmittedBytes = 0;
+    decoder->decodedSampleTotal = 0;
     return decoder;
   }
 
@@ -1216,16 +1216,17 @@
    * Address: 0x00B211E0 (ADXB_EntryGetWrFunc)
    *
    * What it does:
-   * Registers entry-get write callback lane and context.
+   * Replaces the get-write callback and its context (the default writes into
+   * the decoder's own PCM ring).
    */
   moho::AdxBitstreamDecoderState* ADXB_EntryGetWrFunc(
     moho::AdxBitstreamDecoderState* decoder,
-    void* entryGetWriteFunc,
-    const std::int32_t entryGetWriteContext
+    const moho::AdxbGetWriteFunc getWriteFunc,
+    void* const getWriteContext
   )
   {
-    decoder->entryGetWriteFunc = entryGetWriteFunc;
-    decoder->entryGetWriteContext = entryGetWriteContext;
+    decoder->getWriteFunc = getWriteFunc;
+    decoder->getWriteContext = getWriteContext;
     return decoder;
   }
 
@@ -1233,16 +1234,16 @@
    * Address: 0x00B21200 (ADXB_EntryAddWrFunc)
    *
    * What it does:
-   * Registers entry-add write callback lane and context.
+   * Replaces the add-write callback and its context.
    */
   moho::AdxBitstreamDecoderState* ADXB_EntryAddWrFunc(
     moho::AdxBitstreamDecoderState* decoder,
-    void* entryAddWriteFunc,
-    const std::int32_t entryAddWriteContext
+    const moho::AdxbAddWriteFunc addWriteFunc,
+    void* const addWriteContext
   )
   {
-    decoder->entryAddWriteFunc = entryAddWriteFunc;
-    decoder->entryAddWriteContext = entryAddWriteContext;
+    decoder->addWriteFunc = addWriteFunc;
+    decoder->addWriteContext = addWriteContext;
     return decoder;
   }
 
@@ -1250,11 +1251,11 @@
    * Address: 0x00B21220 (ADXB_GetPcmBuf)
    *
    * What it does:
-   * Returns primary PCM buffer lane.
+   * Returns the PCM ring bound by `ADXB_Create`.
    */
-  void* ADXB_GetPcmBuf(const moho::AdxBitstreamDecoderState* decoder)
+  std::int16_t* ADXB_GetPcmBuf(const moho::AdxBitstreamDecoderState* decoder)
   {
-    return decoder->pcmBuffer0;
+    return decoder->pcmBuffer;
   }
 
   /**
@@ -1499,7 +1500,7 @@
    */
   std::int32_t ADXB_TakeSnapshot(moho::AdxBitstreamDecoderState* decoder)
   {
-    ADXPD_GetDly(decoder->adxPacketDecoder, &decoder->snapshotDelay0, &decoder->snapshotDelay1);
+    ADXPD_GetDly(decoder->adxPacketDecoder, decoder->snapshotDelay0, decoder->snapshotDelay1);
     return ADXPD_GetExtPrm(
       decoder->adxPacketDecoder,
       &decoder->snapshotExtKey0,
@@ -1516,7 +1517,7 @@
    */
   std::int32_t ADXB_RestoreSnapshot(moho::AdxBitstreamDecoderState* decoder)
   {
-    ADXPD_SetDly(decoder->adxPacketDecoder, &decoder->snapshotDelay0, &decoder->snapshotDelay1);
+    ADXPD_SetDly(decoder->adxPacketDecoder, decoder->snapshotDelay0, decoder->snapshotDelay1);
     const void* const result = ADXPD_SetExtPrm(
       decoder->adxPacketDecoder,
       decoder->snapshotExtKey0,
@@ -3524,33 +3525,24 @@
    * Address: 0x00B21780 (ADXB_EntryData)
    *
    * What it does:
-   * Seeds one decode-entry run and returns number of decode blocks.
+   * Hands the decoder one input span and returns how many whole blocks (ADX)
+   * or frames (PCM) it holds.
    */
-  std::int32_t ADXB_EntryData(
-    moho::AdxBitstreamDecoderState* decoder,
-    const std::int32_t streamDataOffset,
-    const std::int32_t inputBytes
-  )
+  std::int32_t ADXB_EntryData(moho::AdxBitstreamDecoderState* decoder, char* const inputData, const std::int32_t inputBytes)
   {
     decoder->decodeCursor = 0;
+    decoder->inputData = inputData;
 
-    std::int32_t unitBytes = 0;
-    decoder->streamDataOffset = streamDataOffset;
+    const std::int32_t unitBytes = (decoder->format == 0)
+      ? decoder->sourceBlockBytes
+      : decoder->sourceChannels * (decoder->sourceSampleBits / 8);
 
-    if (decoder->format == 0) {
-      unitBytes = static_cast<std::int32_t>(static_cast<std::int8_t>(decoder->sourceBlockBytes));
-    } else {
-      const auto sampleBits = static_cast<std::int32_t>(static_cast<std::int8_t>(decoder->sourceSampleBits));
-      const auto roundedBytes = (sampleBits + ((sampleBits >> 31) & 7)) >> 3;
-      unitBytes = static_cast<std::int32_t>(static_cast<std::int8_t>(decoder->sourceChannels)) * roundedBytes;
-    }
-
-    decoder->decodeProgress0 = 0;
-    decoder->decodeProgress1 = 0;
-    decoder->pendingConsumeBytes = 0;
-    decoder->pendingSubmitBytes = 0;
-    decoder->streamBlockCount = inputBytes / unitBytes;
-    return decoder->streamBlockCount;
+    decoder->lastDecodedSamples = 0;
+    decoder->lastDecodedBytes = 0;
+    decoder->mUnknown104 = 0;
+    decoder->decodeCallbackReportedBytes = 0;
+    decoder->inputBlockCount = inputBytes / unitBytes;
+    return decoder->inputBlockCount;
   }
 
   /**
@@ -3588,15 +3580,15 @@
    * Address: 0x00B21840 (ADXB_Reset)
    *
    * What it does:
-   * Resets ADX packet-decode state when one decode pass reached done state.
+   * Once a committed span has been consumed, rearms the packet decoder and
+   * rewinds the default write position.
    */
   std::int32_t ADXB_Reset(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    if (runtime->runState == 3) {
-      ADXPD_Reset(runtime->adxPacketDecoder);
-      runtime->entryCommittedBytes = 0;
-      runtime->runState = 0;
+    if (decoder->status == 3) {
+      ADXPD_Reset(decoder->adxPacketDecoder);
+      decoder->bufferedSampleCount = 0;
+      decoder->status = 0;
     }
 
     return 0;
@@ -3606,22 +3598,22 @@
    * Address: 0x00B21870 (ADXB_GetDecDtLen)
    *
    * What it does:
-   * Returns decoded output-byte count from one ADXB runtime object.
+   * Returns the input bytes the last span consumed.
    */
   std::int32_t ADXB_GetDecDtLen(const moho::AdxBitstreamDecoderState* decoder)
   {
-    return AsAdxbRuntimeView(decoder)->producedByteCount;
+    return decoder->lastDecodedBytes;
   }
 
   /**
    * Address: 0x00B21880 (ADXB_GetDecNumSmpl)
    *
    * What it does:
-   * Returns decoded output-sample count from one ADXB runtime object.
+   * Returns the samples the last span produced.
    */
   std::int32_t ADXB_GetDecNumSmpl(const moho::AdxBitstreamDecoderState* decoder)
   {
-    return AsAdxbRuntimeView(decoder)->producedSampleCount;
+    return decoder->lastDecodedSamples;
   }
 
   /**
@@ -3632,13 +3624,12 @@
    */
   moho::AdxBitstreamDecoderState* ADXB_SetCbDec(
     moho::AdxBitstreamDecoderState* decoder,
-    std::int32_t(__cdecl* callback)(std::int32_t, std::int32_t, std::int32_t),
+    const moho::AdxbDecodeCallback callback,
     const std::int32_t callbackContext
   )
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    runtime->decodeCallback = callback;
-    runtime->decodeCallbackContext = callbackContext;
+    decoder->decodeCallback = callback;
+    decoder->decodeCallbackContext = callbackContext;
     return decoder;
   }
 
@@ -3646,33 +3637,33 @@
    * Address: 0x00B218B0 (ADXB_GetAdxpd)
    *
    * What it does:
-   * Returns attached ADX packet-decoder handle from one ADXB runtime object.
+   * Returns the decoder's ADX packet decoder.
    */
   void* ADXB_GetAdxpd(const moho::AdxBitstreamDecoderState* decoder)
   {
-    return AsAdxbRuntimeView(decoder)->adxPacketDecoder;
+    return decoder->adxPacketDecoder;
   }
 
   /**
    * Address: 0x00B218C0 (ADXB_EvokeExpandMono)
    *
    * What it does:
-   * Queues one mono expansion decode job into ADXPD and starts execution.
+   * Queues `blockCount` mono ADX blocks from the input span into the write
+   * window and starts the packet decoder.
    */
   std::int32_t ADXB_EvokeExpandMono(moho::AdxBitstreamDecoderState* decoder, const std::int32_t blockCount)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    auto* const outputLeft = runtime->outputWordStream0 + runtime->entryWriteStartWordIndex;
+    std::int16_t* const left = decoder->outputBuffer + decoder->writeSampleIndex;
 
     ADXPD_EntryMono(
-      runtime->adxPacketDecoder,
-      runtime->sourceWordStream,
+      decoder->adxPacketDecoder,
+      decoder->inputData,
       blockCount,
-      reinterpret_cast<std::uint16_t*>(outputLeft),
+      reinterpret_cast<std::uint16_t*>(left),
       nullptr
     );
 
-    const auto result = ADXPD_Start(runtime->adxPacketDecoder);
+    const auto result = ADXPD_Start(decoder->adxPacketDecoder);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(result));
   }
 
@@ -3680,23 +3671,23 @@
    * Address: 0x00B218F0 (ADXB_EvokeExpandPl2)
    *
    * What it does:
-   * Queues one PL2 expansion decode job into ADXPD and starts execution.
+   * Queues `blockCount` stereo ADX block pairs (Pro Logic II interleave) into
+   * both channel planes of the write window and starts the packet decoder.
    */
   std::int32_t ADXB_EvokeExpandPl2(moho::AdxBitstreamDecoderState* decoder, const std::int32_t blockCount)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    auto* const outputLeft = runtime->outputWordStream0 + runtime->entryWriteStartWordIndex;
-    auto* const outputRight = outputLeft + runtime->outputSecondChannelOffset;
+    std::int16_t* const left = decoder->outputBuffer + decoder->writeSampleIndex;
+    std::int16_t* const right = left + decoder->outputChannelStride;
 
     ADXPD_EntryPl2(
-      runtime->adxPacketDecoder,
-      runtime->sourceWordStream,
+      decoder->adxPacketDecoder,
+      decoder->inputData,
       blockCount * 2,
-      reinterpret_cast<std::uint16_t*>(outputLeft),
-      reinterpret_cast<std::uint16_t*>(outputRight)
+      reinterpret_cast<std::uint16_t*>(left),
+      reinterpret_cast<std::uint16_t*>(right)
     );
 
-    const auto result = ADXPD_Start(runtime->adxPacketDecoder);
+    const auto result = ADXPD_Start(decoder->adxPacketDecoder);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(result));
   }
 
@@ -3704,23 +3695,23 @@
    * Address: 0x00B21930 (ADXB_EvokeExpandSte)
    *
    * What it does:
-   * Queues one stereo expansion decode job into ADXPD and starts execution.
+   * Queues `blockCount` ADX blocks decoded into both channel planes (the
+   * channel-expand path) and starts the packet decoder.
    */
   std::int32_t ADXB_EvokeExpandSte(moho::AdxBitstreamDecoderState* decoder, const std::int32_t blockCount)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    auto* const outputLeft = runtime->outputWordStream0 + runtime->entryWriteStartWordIndex;
-    auto* const outputRight = outputLeft + runtime->outputSecondChannelOffset;
+    std::int16_t* const left = decoder->outputBuffer + decoder->writeSampleIndex;
+    std::int16_t* const right = left + decoder->outputChannelStride;
 
     ADXPD_EntrySte(
-      runtime->adxPacketDecoder,
-      runtime->sourceWordStream,
+      decoder->adxPacketDecoder,
+      decoder->inputData,
       blockCount,
-      reinterpret_cast<std::uint16_t*>(outputLeft),
-      reinterpret_cast<std::uint16_t*>(outputRight)
+      reinterpret_cast<std::uint16_t*>(left),
+      reinterpret_cast<std::uint16_t*>(right)
     );
 
-    const auto result = ADXPD_Start(runtime->adxPacketDecoder);
+    const auto result = ADXPD_Start(decoder->adxPacketDecoder);
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(result));
   }
 
@@ -3728,57 +3719,44 @@
    * Address: 0x00B21970 (ADXB_EvokeDecode)
    *
    * What it does:
-   * Computes bounded decode-block count for current write window and dispatches
-   * mono/stereo/PL2 expansion lane.
+   * Sizes the next ADX run in whole blocks: bounded by the input span, by the
+   * samples until the trap, by the owner's window (plus the tail slack a
+   * partial block needs when the trap cuts it), and by the room left in the
+   * PCM ring; then queues it on the mono, stereo or PL2 path.
    */
   std::int32_t ADXB_EvokeDecode(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    const auto decodeUnitWords = runtime->entrySubmittedBytes;
-    const auto outputChannelCount = runtime->outputChannels;
+    const std::int32_t blockSamples = decoder->outputBlockSamples;
+    const std::int32_t channels = decoder->outputChannels;
 
-    const auto blockLimitByInput = runtime->sourceWordLimit / outputChannelCount;
-    auto blockLimitByWindowCapacity = (runtime->entryWriteCapacityWords + decodeUnitWords - 1) / decodeUnitWords;
+    const std::int32_t blocksInInput = decoder->inputBlockCount / channels;
+    const std::int32_t blocksUntilTrap = (decoder->samplesUntilTrap + blockSamples - 1) / blockSamples;
+    const std::int32_t tailSlack =
+      blockSamples - (decoder->samplesUntilTrap + blockSamples - 1) % blockSamples - 1;
 
-    const auto tailRemainder = (runtime->entryWriteCapacityWords + decodeUnitWords - 1) % decodeUnitWords;
-    const auto tailSlackWords = decodeUnitWords - tailRemainder - 1;
-
-    auto blockLimitByOutputWindow =
-      (runtime->outputWordLimit - runtime->entryWriteStartWordIndex + decodeUnitWords - 1) / decodeUnitWords;
-
-    if (
-      ((runtime->entryWriteCapacityWords + decodeUnitWords - 1) / decodeUnitWords) < blockLimitByOutputWindow
-      && runtime->entryWriteStartWordIndex + decodeUnitWords * blockLimitByOutputWindow - tailSlackWords < runtime->outputWordLimit
-    ) {
-      ++blockLimitByOutputWindow;
+    std::int32_t blocksInRing =
+      (decoder->outputBufferSamples - decoder->writeSampleIndex + blockSamples - 1) / blockSamples;
+    if (blocksUntilTrap < blocksInRing
+        && decoder->writeSampleIndex + blockSamples * blocksInRing - tailSlack < decoder->outputBufferSamples) {
+      ++blocksInRing;
     }
 
-    auto pendingWriteWords = runtime->entryWriteUsedWordCount;
-    if (runtime->entryWriteCapacityWords < pendingWriteWords) {
-      pendingWriteWords += tailSlackWords;
+    std::int32_t windowSamples = decoder->writableSamples;
+    if (decoder->samplesUntilTrap < windowSamples) {
+      windowSamples += tailSlack;
     }
 
-    auto decodeBlockCount = pendingWriteWords / decodeUnitWords;
-    if (decodeBlockCount > blockLimitByInput) {
-      decodeBlockCount = blockLimitByInput;
-    }
-    if (decodeBlockCount > ((runtime->entryWriteCapacityWords + decodeUnitWords - 1) / decodeUnitWords)) {
-      decodeBlockCount = (runtime->entryWriteCapacityWords + decodeUnitWords - 1) / decodeUnitWords;
-    }
-    if (decodeBlockCount > blockLimitByWindowCapacity) {
-      decodeBlockCount = blockLimitByWindowCapacity;
-    }
-    if (decodeBlockCount > blockLimitByOutputWindow) {
-      decodeBlockCount = blockLimitByOutputWindow;
-    }
+    std::int32_t blockCount = std::min(blocksInInput, windowSamples / blockSamples);
+    blockCount = std::min(blockCount, blocksUntilTrap);
+    blockCount = std::min(blockCount, blocksInRing);
 
-    if (outputChannelCount == 2) {
-      return ADXB_EvokeExpandPl2(decoder, decodeBlockCount);
+    if (channels == 2) {
+      return ADXB_EvokeExpandPl2(decoder, blockCount);
     }
-    if (runtime->channelExpandHandle != 0) {
-      return ADXB_EvokeExpandSte(decoder, decodeBlockCount);
+    if (decoder->channelExpandHandle != 0) {
+      return ADXB_EvokeExpandSte(decoder, blockCount);
     }
-    return ADXB_EvokeExpandMono(decoder, decodeBlockCount);
+    return ADXB_EvokeExpandMono(decoder, blockCount);
   }
 
   /**
@@ -3841,85 +3819,71 @@
    * Address: 0x00B21AE0 (ADXB_EndDecode)
    *
    * What it does:
-   * Finalizes one ADXPD decode step, computes produced counts, and applies
-   * wrap-buffer copy lanes when window overflows.
+   * Turns the finished packet-decoder run into the span's sample and byte
+   * counts (a trap cuts the last block short), then copies whatever ran past
+   * the end of the PCM ring into its wrap area.
    */
   std::int16_t* ADXB_EndDecode(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    auto* const outputWords = runtime->outputWordStream0;
-    const auto decodedBlockCount = ADXPD_GetNumBlk(runtime->adxPacketDecoder);
+    std::int16_t* const outputBuffer = decoder->outputBuffer;
+    const std::int32_t blockSamples = decoder->outputBlockSamples;
+    const std::int32_t decodedBlocks = ADXPD_GetNumBlk(decoder->adxPacketDecoder);
 
-    std::int32_t producedSamples = runtime->outputBlockSamples * decodedBlockCount / runtime->outputChannels;
-    if (
-      ((runtime->entryWriteCapacityWords + runtime->outputBlockSamples - 1) / runtime->outputBlockSamples) * runtime->outputChannels
-      <= decodedBlockCount
-    ) {
-      producedSamples +=
-        ((runtime->entryWriteCapacityWords + runtime->outputBlockSamples - 1) % runtime->outputBlockSamples)
-        - runtime->outputBlockSamples + 1;
+    std::int32_t decodedSamples = blockSamples * decodedBlocks / decoder->outputChannels;
+    const std::int32_t trapSpan = decoder->samplesUntilTrap + blockSamples - 1;
+    if ((trapSpan / blockSamples) * decoder->outputChannels <= decodedBlocks) {
+      decodedSamples += trapSpan % blockSamples - blockSamples + 1;
     }
 
-    runtime->producedSampleCount = producedSamples;
-    runtime->producedByteCount = runtime->outputBlockBytes * decodedBlockCount;
+    decoder->lastDecodedSamples = decodedSamples;
+    decoder->lastDecodedBytes = decoder->outputBlockBytes * decodedBlocks;
 
-    const auto windowTailWord = runtime->entryWriteStartWordIndex + producedSamples;
-    if (windowTailWord >= runtime->pcmBufferSampleLimit) {
-      const auto tailWordCount = windowTailWord - runtime->pcmBufferSampleLimit;
-      if (runtime->outputChannels == 2 || runtime->channelExpandHandle != 0) {
-        ADXB_CopyExtraBufSte(
-          outputWords,
-          runtime->pcmBufferSampleLimit,
-          runtime->outputSecondChannelOffset,
-          tailWordCount
-        );
+    const std::int32_t writeEnd = decoder->writeSampleIndex + decodedSamples;
+    if (writeEnd >= decoder->pcmBufferSamples) {
+      const std::int32_t overrun = writeEnd - decoder->pcmBufferSamples;
+      if (decoder->outputChannels == 2 || decoder->channelExpandHandle != 0) {
+        ADXB_CopyExtraBufSte(outputBuffer, decoder->pcmBufferSamples, decoder->pcmChannelStride, overrun);
       } else {
-        ADXB_CopyExtraBufMono(
-          outputWords,
-          runtime->pcmBufferSampleLimit,
-          runtime->outputSecondChannelOffset,
-          tailWordCount
-        );
+        ADXB_CopyExtraBufMono(outputBuffer, decoder->pcmBufferSamples, decoder->pcmChannelStride, overrun);
       }
     }
 
-    return outputWords;
+    return outputBuffer;
   }
 
   /**
    * Address: 0x00B21BC0 (ADXB_ExecOneAdx)
    *
    * What it does:
-   * Executes one ADX decode step: acquires write window, runs ADXPD, handles
-   * optional channel-expand callbacks, and commits produced output.
+   * Executes one ADX decode step: takes a write window, runs the packet
+   * decoder, feeds every decoded sample pair to the channel expander when one
+   * is attached, and commits the span.
    */
   void ADXB_ExecOneAdx(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-
-    if (runtime->runState == 1 && ADXPD_GetStat(runtime->adxPacketDecoder) == 0) {
-      runtime->entryGetWriteFunc(
-        runtime->entryGetWriteContext,
-        &runtime->entryWriteStartWordIndex,
-        &runtime->entryWriteUsedWordCount,
-        &runtime->entryWriteCapacityWords
+    if (decoder->status == 1 && ADXPD_GetStat(decoder->adxPacketDecoder) == 0) {
+      decoder->getWriteFunc(
+        decoder->getWriteContext,
+        &decoder->writeSampleIndex,
+        &decoder->writableSamples,
+        &decoder->samplesUntilTrap
       );
 
       ADXB_EvokeDecode(decoder);
-      runtime->runState = 2;
+      decoder->status = 2;
     }
 
-    if (runtime->runState != 2) {
+    if (decoder->status != 2) {
       return;
     }
 
-    ADXPD_ExecHndl(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(runtime->adxPacketDecoder)));
-    if (ADXPD_GetStat(runtime->adxPacketDecoder) != 3) {
+    ADXPD_ExecHndl(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder->adxPacketDecoder)));
+    if (ADXPD_GetStat(decoder->adxPacketDecoder) != 3) {
       return;
     }
 
-    if (runtime->channelExpandHandle != 0) {
-      auto* const packetState = reinterpret_cast<AdxPacketDecodeSampleView*>(runtime->adxPacketDecoder);
+    if (decoder->channelExpandHandle != 0) {
+      auto* const packetState = reinterpret_cast<AdxPacketDecodeSampleView*>(decoder->adxPacketDecoder);
       ADXCRS_Lock();
       for (std::int32_t sampleIndex = 0; sampleIndex < 32 * packetState->sourceChannels; ++sampleIndex) {
         const auto sampleOffsetBytes = static_cast<std::size_t>(2 * sampleIndex);
@@ -3934,15 +3898,10 @@
     }
 
     ADXB_EndDecode(decoder);
-    ADXPD_Reset(runtime->adxPacketDecoder);
+    ADXPD_Reset(decoder->adxPacketDecoder);
 
-    runtime->entryAddWriteFunc(
-      runtime->entryAddWriteContext,
-      runtime->producedByteCount,
-      runtime->producedSampleCount
-    );
-
-    runtime->runState = 3;
+    decoder->addWriteFunc(decoder->addWriteContext, decoder->lastDecodedBytes, decoder->lastDecodedSamples);
+    decoder->status = 3;
   }
 
   std::int32_t adxb_dec_cb_proc(moho::AdxBitstreamDecoderState* decoder);
@@ -3951,43 +3910,41 @@
    * Address: 0x00B21CB0 (ADXB_ExecHndl)
    *
    * What it does:
-   * Dispatches one ADXB execution lane by decoded format and runs optional
-   * decode-progress callback hook.
+   * Dispatches one decode step to the executor of the decoded format, then
+   * reports progress to the decode callback when one is registered.
    */
   std::int32_t ADXB_ExecHndl(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-
-    switch (runtime->format) {
+    switch (decoder->format) {
       case 0:
         ADXB_ExecOneAdx(decoder);
         break;
       case 10:
-        ADXB_ExecOneAhx(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneAhx(decoder);
         break;
       case 2:
-        ADXB_ExecOneSpsd(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneSpsd(decoder);
         break;
       case 3:
-        ADXB_ExecOneAiff(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneAiff(decoder);
         break;
       case 4:
-        ADXB_ExecOneAu(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneAu(decoder);
         break;
       case 1:
-        ADXB_ExecOneWav(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneWav(decoder);
         break;
       case 11:
-        ADXB_ExecOneMpa(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneMpa(decoder);
         break;
       case 12:
-        ADXB_ExecOneM2a(static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(decoder)));
+        ADXB_ExecOneM2a(decoder);
         break;
       default:
         break;
     }
 
-    if (runtime->decodeCallback != nullptr) {
+    if (decoder->decodeCallback != nullptr) {
       return adxb_dec_cb_proc(decoder);
     }
     return 0;
@@ -3997,22 +3954,19 @@
    * Address: 0x00B21D50 (adxb_dec_cb_proc)
    *
    * What it does:
-   * Computes decode delta accounting and invokes ADXB decode callback.
+   * Reports the input bytes decoded since the previous report (wrapping at
+   * 0x7FFFFFFF) and the PCM bytes of the last span to the decode callback.
    */
   std::int32_t adxb_dec_cb_proc(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-
-    auto producedDelta = runtime->producedByteCount - runtime->decodeCallbackConsumedBytes;
-    if (producedDelta < 0) {
-      producedDelta += 0x7FFFFFFF;
+    std::int32_t decodedBytesDelta = decoder->lastDecodedBytes - decoder->decodeCallbackReportedBytes;
+    if (decodedBytesDelta < 0) {
+      decodedBytesDelta += 0x7FFFFFFF;
     }
 
-    const auto producedBytes =
-      2 * runtime->producedSampleCount * static_cast<std::int32_t>(runtime->sourceChannels);
-
-    const auto result = runtime->decodeCallback(runtime->decodeCallbackContext, producedDelta, producedBytes);
-    runtime->decodeCallbackConsumedBytes = runtime->producedByteCount;
+    const std::int32_t decodedPcmBytes = 2 * decoder->lastDecodedSamples * decoder->sourceChannels;
+    const auto result = decoder->decodeCallback(decoder->decodeCallbackContext, decodedBytesDelta, decodedPcmBytes);
+    decoder->decodeCallbackReportedBytes = decoder->lastDecodedBytes;
     return result;
   }
 
@@ -4041,9 +3995,8 @@
    */
   std::int32_t ADXB_SetAhxInSj(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    if (runtime->ahxDecoderHandle != nullptr && ahxsetsjifunc != nullptr) {
-      return ahxsetsjifunc(runtime->ahxDecoderHandle);
+    if (decoder->ahxDecoderHandle != nullptr && ahxsetsjifunc != nullptr) {
+      return ahxsetsjifunc(decoder->ahxDecoderHandle);
     }
     return 0;
   }
@@ -4052,16 +4005,15 @@
    * Address: 0x00B21DF0 (ADXB_SetAhxDecSmpl)
    *
    * What it does:
-   * Stores AHX max decode samples and derived 96-sample block count lane.
+   * Stores the AHX decode sample limit and its 96-sample block count.
    */
   std::uint32_t ADXB_SetAhxDecSmpl(moho::AdxBitstreamDecoderState* decoder, const std::int32_t maxDecodeSamples)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    if (runtime->ahxDecoderHandle != nullptr && ahxsetdecsmplfunc != nullptr) {
-      ahxsetdecsmplfunc(runtime->ahxDecoderHandle, maxDecodeSamples);
+    if (decoder->ahxDecoderHandle != nullptr && ahxsetdecsmplfunc != nullptr) {
+      ahxsetdecsmplfunc(decoder->ahxDecoderHandle, maxDecodeSamples);
     }
 
-    runtime->ahxMaxDecodeSamples = maxDecodeSamples;
+    decoder->ahxDecodeSampleLimit = maxDecodeSamples;
 
     const auto highProductWord = static_cast<std::int32_t>(
       (0x2AAAAAABLL * static_cast<long long>(maxDecodeSamples)) >> 32
@@ -4069,7 +4021,7 @@
     auto divideBy96 = highProductWord >> 4;
     const auto signAdjust = static_cast<std::uint32_t>(divideBy96) >> 31;
     divideBy96 += static_cast<std::int32_t>(signAdjust);
-    runtime->ahxMaxDecodeBlocks = divideBy96;
+    decoder->ahxDecodeBlockLimit = divideBy96;
     return signAdjust;
   }
 
@@ -4093,11 +4045,10 @@
    * Address: 0x00B1B000 (FUN_00B1B000, _ADXB_SetMpaDecSmpl)
    *
    * What it does:
-   * Stores MPEG audio decode sample limit and derived 1152-sample block count.
+   * Stores the MPEG audio decode sample limit and its 1152-sample frame count.
    */
   std::uint32_t ADXB_SetMpaDecSmpl(moho::AdxBitstreamDecoderState* const decoder, const std::int32_t maxDecodeSamples)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
     const auto highProductWord = static_cast<std::int32_t>(
       (0x38E38E39LL * static_cast<long long>(maxDecodeSamples)) >> 32
     );
@@ -4105,8 +4056,8 @@
     const auto signAdjust = static_cast<std::uint32_t>(divideBy1152) >> 31;
     divideBy1152 += static_cast<std::int32_t>(signAdjust);
 
-    runtime->mpaDecodeSampleLimit = maxDecodeSamples;
-    runtime->mpaDecodeBlockLimit = divideBy1152;
+    decoder->mpaDecodeSampleLimit = maxDecodeSamples;
+    decoder->mpaDecodeBlockLimit = divideBy1152;
     return signAdjust;
   }
 
@@ -4142,17 +4093,15 @@
    * Address: 0x00B1B050 (_ADXB_ExecOneMpa)
    *
    * What it does:
-   * Executes one MPEG audio decode step through registered runtime callback.
+   * Runs one MPEG audio decode step through the registered MPA exec hook,
+   * which receives the decoder, when an MPA decoder is attached.
    */
-  std::int32_t __cdecl ADXB_ExecOneMpa(const std::int32_t decoderAddress)
+  std::int32_t __cdecl ADXB_ExecOneMpa(moho::AdxBitstreamDecoderState* const decoder)
   {
-    auto* const decoder = reinterpret_cast<moho::AdxBitstreamDecoderState*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderAddress))
-    );
     if (decoder->mpegAudioDecoder != nullptr) {
-      return mpaexecfunc();
+      return mpaexecfunc(decoder);
     }
-    return decoderAddress;
+    return 0;
   }
 
   /**
@@ -4174,17 +4123,15 @@
    * Address: 0x00B1BEB0 (_ADXB_ExecOneM2a)
    *
    * What it does:
-   * Executes one MPEG-2 AAC decode step through registered runtime callback.
+   * Runs one MPEG-2 AAC decode step through the registered M2A exec hook,
+   * which receives the decoder, when an M2A decoder is attached.
    */
-  std::int32_t __cdecl ADXB_ExecOneM2a(const std::int32_t decoderAddress)
+  std::int32_t __cdecl ADXB_ExecOneM2a(moho::AdxBitstreamDecoderState* const decoder)
   {
-    auto* const decoder = reinterpret_cast<moho::AdxBitstreamDecoderState*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderAddress))
-    );
     if (decoder->mpeg2AacDecoder != nullptr) {
-      return m2aexecfunc();
+      return m2aexecfunc(decoder);
     }
-    return decoderAddress;
+    return 0;
   }
 
   /**
@@ -4193,7 +4140,7 @@
    * What it does:
    * Executes AHX decode lane through registered runtime callback.
    */
-  std::int32_t __cdecl ADXB_ExecOneAhx(const std::int32_t /*decoderAddress*/)
+  std::int32_t __cdecl ADXB_ExecOneAhx(moho::AdxBitstreamDecoderState* const /*decoder*/)
   {
     if (ahxexecfunc != nullptr) {
       return ahxexecfunc();
@@ -4209,9 +4156,8 @@
    */
   std::int32_t ADXB_AhxTermSupply(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const runtime = AsAdxbRuntimeView(decoder);
-    if (runtime->ahxDecoderHandle != nullptr && ahxtermsupplyfunc != nullptr) {
-      return ahxtermsupplyfunc(runtime->ahxDecoderHandle);
+    if (decoder->ahxDecoderHandle != nullptr && ahxtermsupplyfunc != nullptr) {
+      return ahxtermsupplyfunc(decoder->ahxDecoderHandle);
     }
     return 0;
   }
@@ -5091,9 +5037,8 @@
 
   [[nodiscard]] static AdxtDolbyRuntimeState* ADXB_GetDolbyState(moho::AdxBitstreamDecoderState* const decoder)
   {
-    const auto* const decoderView = AsAdxbRuntimeView(decoder);
     return reinterpret_cast<AdxtDolbyRuntimeState*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoderView->channelExpandHandle))
+      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(decoder->channelExpandHandle))
     );
   }
 
@@ -5117,12 +5062,11 @@
 
     auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
     auto* const decoder = AsAdxsjdRuntimeView(runtime->sjdHandle)->Decoder();
-    auto* const decoderView = AsAdxbRuntimeView(decoder);
     auto* const dolbyState = ADXB_GetDolbyState(decoder);
     if (runtime->maxChannelCount >= 2 && dolbyState != nullptr) {
       ADXT_SetMixTableIndicesLocked(dolbyState, matrixParamA, matrixParamB);
-      decoderView->expandMatrixParamA = matrixParamA;
-      decoderView->expandMatrixParamB = matrixParamB;
+      decoder->expandMatrixParamA = matrixParamA;
+      decoder->expandMatrixParamB = matrixParamB;
       return;
     }
 
@@ -5140,7 +5084,6 @@
   {
     auto* const runtime = static_cast<AdxtRuntimeState*>(adxtRuntime);
     auto* const decoder = AsAdxsjdRuntimeView(runtime->sjdHandle)->Decoder();
-    auto* const decoderView = AsAdxbRuntimeView(decoder);
     auto* const dolbyState = ADXB_GetDolbyState(decoder);
     if (dolbyState == nullptr) {
       return;
@@ -5149,7 +5092,7 @@
     ADXT_Stop(adxtRuntime);
     sofdec_EnterLock_7();
     ADXT_ClearControlStateLocked(dolbyState);
-    decoderView->channelExpandHandle = 0;
+    decoder->channelExpandHandle = 0;
     ADXT_DecrementAttachRefLocked(0);
     sofdec_LeaveLock_7();
   }

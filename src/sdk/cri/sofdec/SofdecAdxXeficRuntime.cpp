@@ -2477,14 +2477,14 @@
     std::int32_t mpaState = 0;
     MPASJD_GetStat(mpaDecoder, &mpaState);
     if (mpaState == 0) {
-      decoder->decodeProgress0 = 0;
-      decoder->entrySubmittedBytes = 0;
+      decoder->lastDecodedSamples = 0;
+      decoder->decodedSampleTotal = 0;
       MPASJD_Stop(mpaDecoder);
     }
 
     std::int32_t result = decoder->status;
     if (result == kMpasjdStatePrimed) {
-      decoder->entrySubmittedBytes = 0;
+      decoder->decodedSampleTotal = 0;
       result = MPASJD_Start(mpaDecoder);
       decoder->status = kMpasjdStateRunning;
       return result;
@@ -2505,12 +2505,12 @@
     MPASJD_GetNumSmplsDcd(mpaDecoder, &decodedSamples);
     MPASJD_GetNumBytesDcd(mpaDecoder, &decodedBytes);
 
-    const std::int32_t previousSubmittedBytes = decoder->entrySubmittedBytes;
+    const std::int32_t previousDecodedSamples = decoder->decodedSampleTotal;
     decoder->sourceChannels = static_cast<std::int8_t>(channelCount);
     decoder->sampleRate = frequency;
-    decoder->decodeProgress0 = decodedSamples - previousSubmittedBytes;
-    decoder->entrySubmittedBytes = previousSubmittedBytes + decoder->decodeProgress0;
-    decoder->decodeProgress1 = decodedBytes;
+    decoder->lastDecodedSamples = decodedSamples - previousDecodedSamples;
+    decoder->decodedSampleTotal = previousDecodedSamples + decoder->lastDecodedSamples;
+    decoder->lastDecodedBytes = decodedBytes;
 
     MPASJD_GetStat(mpaDecoder, &mpaState);
     result = mpaState;
@@ -3979,14 +3979,14 @@
     std::int32_t m2aState = 0;
     M2ASJD_GetStat(m2aDecoder, &m2aState);
     if (m2aState == 0) {
-      decoder->decodeProgress0 = 0;
-      decoder->entrySubmittedBytes = 0;
+      decoder->lastDecodedSamples = 0;
+      decoder->decodedSampleTotal = 0;
       M2ASJD_Stop(m2aDecoder);
     }
 
     std::int32_t result = decoder->status;
     if (result == kM2asjdStatePrimed) {
-      decoder->entrySubmittedBytes = 0;
+      decoder->decodedSampleTotal = 0;
       result = M2ASJD_Start(m2aDecoder);
       decoder->status = kM2asjdStateRunning;
       return result;
@@ -4007,12 +4007,12 @@
     M2ASJD_GetNumSmplsDcd(m2aDecoder, &decodedSamples);
     M2ASJD_GetNumBytesDcd(m2aDecoder, &decodedBytes);
 
-    const std::int32_t previousSubmittedBytes = decoder->entrySubmittedBytes;
+    const std::int32_t previousDecodedSamples = decoder->decodedSampleTotal;
     decoder->sourceChannels = static_cast<std::int8_t>(channelCount);
     decoder->sampleRate = frequency;
-    decoder->decodeProgress0 = decodedSamples - previousSubmittedBytes;
-    decoder->entrySubmittedBytes = previousSubmittedBytes + decoder->decodeProgress0;
-    decoder->decodeProgress1 = decodedBytes;
+    decoder->lastDecodedSamples = decodedSamples - previousDecodedSamples;
+    decoder->decodedSampleTotal = previousDecodedSamples + decoder->lastDecodedSamples;
+    decoder->lastDecodedBytes = decodedBytes;
 
     M2ASJD_GetStat(m2aDecoder, &m2aState);
     result = m2aState;

@@ -74,36 +74,36 @@
    * Address: 0x00B20BA0 (adxb_DefGetWr)
    *
    * What it does:
-   * Default ADXB write-lane getter callback for one decoder instance.
+   * Default get-write callback: decoding appends to the decoder's own PCM
+   * ring, so the window starts at the buffered sample count, is bounded by the
+   * room left in the ring, and the trap is the end of the stream.
    */
-  std::int32_t adxb_DefGetWr(
-    moho::AdxBitstreamDecoderState* decoder,
-    std::int32_t* outCommittedBytes,
-    std::int32_t* outRemainingBufferBytes,
-    std::int32_t* outRemainingSamples
+  std::int16_t* adxb_DefGetWr(
+    void* const context,
+    std::int32_t* const outWriteSampleIndex,
+    std::int32_t* const outWritableSamples,
+    std::int32_t* const outSamplesUntilTrap
   )
   {
-    *outCommittedBytes = decoder->entryCommittedBytes;
-    *outRemainingBufferBytes =
-      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder->pcmBuffer1)) - decoder->entryCommittedBytes;
-    *outRemainingSamples = decoder->totalSampleCount - decoder->entrySubmittedBytes;
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder->pcmBuffer0));
+    const auto* const decoder = static_cast<const moho::AdxBitstreamDecoderState*>(context);
+    *outWriteSampleIndex = decoder->bufferedSampleCount;
+    *outWritableSamples = decoder->pcmBufferSamples - decoder->bufferedSampleCount;
+    *outSamplesUntilTrap = decoder->totalSampleCount - decoder->decodedSampleTotal;
+    return decoder->pcmBuffer;
   }
 
   /**
    * Address: 0x00B20BE0 (adxb_DefAddWr)
    *
    * What it does:
-   * Default ADXB write-lane advance callback for one decoder instance.
+   * Default add-write callback: advances the buffered and decoded sample
+   * counts by the samples of the committed span.
    */
-  std::int32_t adxb_DefAddWr(
-    moho::AdxBitstreamDecoderState* decoder,
-    std::int32_t /*unused*/,
-    const std::int32_t writtenBytes
-  )
+  std::int32_t adxb_DefAddWr(void* const context, std::int32_t /*decodedBytes*/, const std::int32_t decodedSamples)
   {
-    decoder->entryCommittedBytes += writtenBytes;
-    decoder->entrySubmittedBytes += writtenBytes;
+    auto* const decoder = static_cast<moho::AdxBitstreamDecoderState*>(context);
+    decoder->bufferedSampleCount += decodedSamples;
+    decoder->decodedSampleTotal += decodedSamples;
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder));
   }
 
@@ -129,7 +129,12 @@
    * What it does:
    * Allocates one ADXB decoder object from fixed runtime pool and initializes core lanes.
    */
-  moho::AdxBitstreamDecoderState* ADXB_Create(void* pcmBufferTag, void* pcmBuffer0, void* pcmBuffer1, void* pcmBuffer2)
+  moho::AdxBitstreamDecoderState* ADXB_Create(
+    const std::int32_t maxChannels,
+    std::int16_t* const pcmBuffer,
+    const std::int32_t pcmBufferSamples,
+    const std::int32_t pcmChannelStride
+  )
   {
     std::int32_t slotIndex = 0;
     while (slotIndex < 32 && adxb_obj[slotIndex].slotState != 0) {
@@ -150,14 +155,14 @@
       return nullptr;
     }
 
-    decoder->pcmBufferTag = pcmBufferTag;
-    decoder->pcmBuffer0 = pcmBuffer0;
-    decoder->pcmBuffer1 = pcmBuffer1;
-    decoder->pcmBuffer2 = pcmBuffer2;
-    decoder->entryGetWriteFunc = reinterpret_cast<void*>(adxb_DefGetWr);
-    decoder->entryGetWriteContext = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder));
-    decoder->entryAddWriteFunc = reinterpret_cast<void*>(adxb_DefAddWr);
-    decoder->entryAddWriteContext = static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(decoder));
+    decoder->maxChannels = maxChannels;
+    decoder->pcmBuffer = pcmBuffer;
+    decoder->pcmBufferSamples = pcmBufferSamples;
+    decoder->pcmChannelStride = pcmChannelStride;
+    decoder->getWriteFunc = adxb_DefGetWr;
+    decoder->getWriteContext = decoder;
+    decoder->addWriteFunc = adxb_DefAddWr;
+    decoder->addWriteContext = decoder;
     adxb_ResetAinf(decoder);
     return decoder;
   }

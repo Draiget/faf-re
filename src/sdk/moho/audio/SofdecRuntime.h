@@ -1373,14 +1373,45 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(SofdecSoundPort) == 0x6C, "SofdecSoundPort size must be 0x6C");
 
   /**
-   * Partial runtime view for ADX bitstream decoder state lanes used by
-   * ADXB accessors and snapshot/start-stop helpers.
+   * ADXB get-write callback (`getwr`): reports where the next decoded span goes
+   * in the PCM ring, how many samples fit there, and how many samples remain
+   * before the stream's trap point. Returns the PCM ring base.
+   */
+  using AdxbGetWriteFunc = std::int16_t*(__cdecl*)(
+    void* context,
+    std::int32_t* outWriteSampleIndex,
+    std::int32_t* outWritableSamples,
+    std::int32_t* outSamplesUntilTrap
+  );
+
+  /**
+   * ADXB add-write callback (`addwr`): commits one decoded span as
+   * (input bytes consumed, output samples produced).
+   */
+  using AdxbAddWriteFunc = std::int32_t(__cdecl*)(void* context, std::int32_t decodedBytes, std::int32_t decodedSamples);
+
+  /**
+   * ADXB decode-progress callback (`ADXB_SetCbDec`): receives the input bytes
+   * decoded since the previous report and the PCM bytes of the last span.
+   */
+  using AdxbDecodeCallback =
+    std::int32_t(__cdecl*)(std::int32_t context, std::int32_t decodedBytesDelta, std::int32_t decodedPcmBytes);
+
+  /**
+   * CRI ADX basic decoder (`ADXB`), one slot of the fixed 32-entry `adxb_obj`
+   * pool.
+   *
+   * `ADXB_Create(maxChannels, pcmBuffer, pcmBufferSamples, pcmChannelStride)`
+   * binds the PCM ring; a header decoder (`ADXB_DecodeHeader*`) fills the stream
+   * description and latches the ring into the `output*` lanes; `ADXB_EntryData`
+   * hands it one input span; every `ADXB_ExecOne*` asks `getWriteFunc` for a
+   * write window, decodes into it, and reports the span through `addWriteFunc`.
    */
   struct AdxBitstreamDecoderState
   {
-    std::int16_t slotState = 0;             // +0x00
-    std::int16_t initState = 0;             // +0x02
-    std::int32_t status = 0;                // +0x04
+    std::int16_t slotState = 0;             // +0x00  pool slot in use
+    std::int16_t initState = 0;             // +0x02  1 once a header has been decoded
+    std::int32_t status = 0;                // +0x04  0 idle, 1 running, 2 span decoded, 3 span committed
     void* adxPacketDecoder = nullptr;       // +0x08
     std::int8_t headerType = 0;             // +0x0C
     std::int8_t sourceSampleBits = 0;       // +0x0D
@@ -1398,31 +1429,33 @@ namespace moho
     std::int32_t loopStartOffset = 0;     // +0x2C
     std::int32_t loopEndSample = 0;       // +0x30
     std::int32_t loopEndOffset = 0;       // +0x34
-    void* pcmBufferTag = nullptr;         // +0x38
-    void* pcmBuffer0 = nullptr;           // +0x3C
-    void* pcmBuffer1 = nullptr;           // +0x40
-    void* pcmBuffer2 = nullptr;           // +0x44
-    std::int32_t streamDataOffset = 0;    // +0x48
-    std::int32_t streamBlockCount = 0;    // +0x4C
+    std::int32_t maxChannels = 0;         // +0x38  ADXB_Create arg 1
+    std::int16_t* pcmBuffer = nullptr;    // +0x3C  PCM ring, channel 0
+    std::int32_t pcmBufferSamples = 0;    // +0x40  ring length per channel
+    std::int32_t pcmChannelStride = 0;    // +0x44  samples from channel 0 to channel 1 (ring + wrap extra)
+    char* inputData = nullptr;            // +0x48  ADXB_EntryData span
+    std::int32_t inputBlockCount = 0;     // +0x4C  whole blocks (PCM: frames) in that span
     std::int32_t outputChannels = 0;      // +0x50
     std::int32_t outputBlockBytes = 0;    // +0x54
     std::int32_t outputBlockSamples = 0;  // +0x58
-    void* outputPcmBuffer0 = nullptr;     // +0x5C
-    void* outputPcmBuffer1 = nullptr;     // +0x60
-    void* outputPcmBuffer2 = nullptr;     // +0x64
-    std::uint8_t mUnknown68[0xC]{};
-    std::int32_t decodeCursor = 0;         // +0x74
-    void* entryGetWriteFunc = nullptr;     // +0x78
-    std::int32_t entryGetWriteContext = 0; // +0x7C
-    void* entryAddWriteFunc = nullptr;     // +0x80
-    std::int32_t entryAddWriteContext = 0; // +0x84
-    std::int32_t entrySubmittedBytes = 0;  // +0x88
-    std::int32_t entryCommittedBytes = 0;  // +0x8C
-    std::int32_t decodeProgress0 = 0;      // +0x90
-    std::int32_t decodeProgress1 = 0;      // +0x94
-    std::int16_t format = 0;               // +0x98
-    std::int16_t preferredFormat = 0;      // +0x9A
-    std::int16_t outputSamplePacking = 0;  // +0x9C
+    std::int16_t* outputBuffer = nullptr; // +0x5C  pcmBuffer, latched by the header decoder
+    std::int32_t outputBufferSamples = 0; // +0x60  pcmBufferSamples, latched
+    std::int32_t outputChannelStride = 0; // +0x64  pcmChannelStride, latched
+    std::int32_t writeSampleIndex = 0;    // +0x68  getWriteFunc outputs for the current span
+    std::int32_t writableSamples = 0;     // +0x6C
+    std::int32_t samplesUntilTrap = 0;    // +0x70
+    std::int32_t decodeCursor = 0;        // +0x74
+    AdxbGetWriteFunc getWriteFunc = nullptr; // +0x78
+    void* getWriteContext = nullptr;         // +0x7C
+    AdxbAddWriteFunc addWriteFunc = nullptr; // +0x80
+    void* addWriteContext = nullptr;         // +0x84
+    std::int32_t decodedSampleTotal = 0;     // +0x88  default callbacks: samples decoded from the stream
+    std::int32_t bufferedSampleCount = 0;    // +0x8C  default callbacks: write position in pcmBuffer
+    std::int32_t lastDecodedSamples = 0;     // +0x90  ADXB_GetDecNumSmpl
+    std::int32_t lastDecodedBytes = 0;       // +0x94  ADXB_GetDecDtLen (input bytes)
+    std::int16_t format = 0;                 // +0x98
+    std::int16_t preferredFormat = 0;        // +0x9A
+    std::int16_t outputSamplePacking = 0;    // +0x9C
     std::uint8_t mUnknown9E[0x2]{};
     std::int16_t extKey0 = 0;                  // +0xA0
     std::int16_t extKeyMultiplier = 0;         // +0xA2
@@ -1430,281 +1463,105 @@ namespace moho
     std::int16_t snapshotExtKey0 = 0;          // +0xA6
     std::int16_t snapshotExtKeyMultiplier = 0; // +0xA8
     std::int16_t snapshotExtKeyAdder = 0;      // +0xAA
-    std::int16_t snapshotDelay0 = 0;           // +0xAC
-    std::uint8_t mUnknownAE[0x2]{};
-    std::int16_t snapshotDelay1 = 0; // +0xB0
-    std::uint8_t mUnknownB2[0x2]{};
-    void* ahxDecoderHandle = nullptr; // +0xB4
-    std::uint8_t mUnknownB8[0x8]{};
-    void* mpegAudioDecoder = nullptr; // +0xC0
-    std::uint8_t mUnknownC4[0x8]{};
-    void* mpeg2AacDecoder = nullptr;       // +0xCC
-    std::int32_t m2aDecodeSampleLimit = 0; // +0xD0
-    std::int32_t m2aDecodeBlockLimit = 0;  // +0xD4
-    std::int32_t ainfLength = 0;           // +0xD8
-    std::uint8_t dataIdBytes[0x10]{};      // +0xDC
-    std::int16_t defaultOutputVolume = 0;  // +0xEC
-    std::int16_t defaultPanByChannel[3]{}; // +0xEE
-    std::int32_t channelExpandHandle = 0;  // +0xF4
-    std::uint8_t mUnknownF8[0x8]{};
-    std::int32_t pendingSubmitBytes = 0;  // +0x100
-    std::int32_t pendingConsumeBytes = 0; // +0x104
-    std::uint8_t mUnknown108[0x8]{};
+    std::int16_t snapshotDelay0[2]{};          // +0xAC  ADXPD_GetDly: previous sample, per channel
+    std::int16_t snapshotDelay1[2]{};          // +0xB0  ADXPD_GetDly: sample before that, per channel
+    void* ahxDecoderHandle = nullptr;          // +0xB4
+    std::int32_t ahxDecodeSampleLimit = 0;     // +0xB8
+    std::int32_t ahxDecodeBlockLimit = 0;      // +0xBC  96-sample blocks
+    void* mpegAudioDecoder = nullptr;          // +0xC0
+    std::int32_t mpaDecodeSampleLimit = 0;     // +0xC4
+    std::int32_t mpaDecodeBlockLimit = 0;      // +0xC8  1152-sample frames
+    void* mpeg2AacDecoder = nullptr;           // +0xCC
+    std::int32_t m2aDecodeSampleLimit = 0;     // +0xD0
+    std::int32_t m2aDecodeBlockLimit = 0;      // +0xD4  1024-sample frames
+    std::int32_t ainfLength = 0;               // +0xD8
+    std::uint8_t dataIdBytes[0x10]{};          // +0xDC
+    std::int16_t defaultOutputVolume = 0;      // +0xEC
+    std::int16_t defaultPanByChannel[3]{};     // +0xEE
+    std::int32_t channelExpandHandle = 0;      // +0xF4
+    std::int32_t expandMatrixParamA = 0;       // +0xF8
+    std::int32_t expandMatrixParamB = 0;       // +0xFC
+    std::int32_t decodeCallbackReportedBytes = 0; // +0x100  lastDecodedBytes at the previous report
+    std::int32_t mUnknown104 = 0;                 // +0x104  cleared by ADXB_EntryData, no reader recovered
+    AdxbDecodeCallback decodeCallback = nullptr;  // +0x108
+    std::int32_t decodeCallbackContext = 0;       // +0x10C
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, slotState) == 0x00,
-    "AdxBitstreamDecoderState::slotState offset must be 0x00"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, initState) == 0x02,
-    "AdxBitstreamDecoderState::initState offset must be 0x02"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, status) == 0x04,
-    "AdxBitstreamDecoderState::status offset must be 0x04"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, adxPacketDecoder) == 0x08,
-    "AdxBitstreamDecoderState::adxPacketDecoder offset must be 0x08"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, headerType) == 0x0C,
-    "AdxBitstreamDecoderState::headerType offset must be 0x0C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, sourceSampleBits) == 0x0D,
-    "AdxBitstreamDecoderState::sourceSampleBits offset must be 0x0D"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, sourceChannels) == 0x0E,
-    "AdxBitstreamDecoderState::sourceChannels offset must be 0x0E"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, sourceBlockBytes) == 0x0F,
-    "AdxBitstreamDecoderState::sourceBlockBytes offset must be 0x0F"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, sourceBlockSamples) == 0x10,
-    "AdxBitstreamDecoderState::sourceBlockSamples offset must be 0x10"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, sampleRate) == 0x14,
-    "AdxBitstreamDecoderState::sampleRate offset must be 0x14"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, totalSampleCount) == 0x18,
-    "AdxBitstreamDecoderState::totalSampleCount offset must be 0x18"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, adpcmCoefficientIndex) == 0x1C,
-    "AdxBitstreamDecoderState::adpcmCoefficientIndex offset must be 0x1C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopInsertedSamples) == 0x20,
-    "AdxBitstreamDecoderState::loopInsertedSamples offset must be 0x20"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopCount) == 0x24,
-    "AdxBitstreamDecoderState::loopCount offset must be 0x24"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopType) == 0x26,
-    "AdxBitstreamDecoderState::loopType offset must be 0x26"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pcmBuffer0) == 0x3C,
-    "AdxBitstreamDecoderState::pcmBuffer0 offset must be 0x3C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pcmBuffer1) == 0x40,
-    "AdxBitstreamDecoderState::pcmBuffer1 offset must be 0x40"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pcmBuffer2) == 0x44,
-    "AdxBitstreamDecoderState::pcmBuffer2 offset must be 0x44"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputChannels) == 0x50,
-    "AdxBitstreamDecoderState::outputChannels offset must be 0x50"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputBlockBytes) == 0x54,
-    "AdxBitstreamDecoderState::outputBlockBytes offset must be 0x54"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputBlockSamples) == 0x58,
-    "AdxBitstreamDecoderState::outputBlockSamples offset must be 0x58"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputPcmBuffer0) == 0x5C,
-    "AdxBitstreamDecoderState::outputPcmBuffer0 offset must be 0x5C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputPcmBuffer1) == 0x60,
-    "AdxBitstreamDecoderState::outputPcmBuffer1 offset must be 0x60"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputPcmBuffer2) == 0x64,
-    "AdxBitstreamDecoderState::outputPcmBuffer2 offset must be 0x64"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopStartSample) == 0x28,
-    "AdxBitstreamDecoderState::loopStartSample offset must be 0x28"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopStartOffset) == 0x2C,
-    "AdxBitstreamDecoderState::loopStartOffset offset must be 0x2C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopEndSample) == 0x30,
-    "AdxBitstreamDecoderState::loopEndSample offset must be 0x30"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, loopEndOffset) == 0x34,
-    "AdxBitstreamDecoderState::loopEndOffset offset must be 0x34"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pcmBufferTag) == 0x38,
-    "AdxBitstreamDecoderState::pcmBufferTag offset must be 0x38"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, streamDataOffset) == 0x48,
-    "AdxBitstreamDecoderState::streamDataOffset offset must be 0x48"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, streamBlockCount) == 0x4C,
-    "AdxBitstreamDecoderState::streamBlockCount offset must be 0x4C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, decodeCursor) == 0x74,
-    "AdxBitstreamDecoderState::decodeCursor offset must be 0x74"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entryGetWriteFunc) == 0x78,
-    "AdxBitstreamDecoderState::entryGetWriteFunc offset must be 0x78"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entryGetWriteContext) == 0x7C,
-    "AdxBitstreamDecoderState::entryGetWriteContext offset must be 0x7C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entryAddWriteFunc) == 0x80,
-    "AdxBitstreamDecoderState::entryAddWriteFunc offset must be 0x80"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entryAddWriteContext) == 0x84,
-    "AdxBitstreamDecoderState::entryAddWriteContext offset must be 0x84"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entrySubmittedBytes) == 0x88,
-    "AdxBitstreamDecoderState::entrySubmittedBytes offset must be 0x88"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, entryCommittedBytes) == 0x8C,
-    "AdxBitstreamDecoderState::entryCommittedBytes offset must be 0x8C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, decodeProgress0) == 0x90,
-    "AdxBitstreamDecoderState::decodeProgress0 offset must be 0x90"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, decodeProgress1) == 0x94,
-    "AdxBitstreamDecoderState::decodeProgress1 offset must be 0x94"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, format) == 0x98,
-    "AdxBitstreamDecoderState::format offset must be 0x98"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, preferredFormat) == 0x9A,
-    "AdxBitstreamDecoderState::preferredFormat offset must be 0x9A"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, outputSamplePacking) == 0x9C,
-    "AdxBitstreamDecoderState::outputSamplePacking offset must be 0x9C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, extKey0) == 0xA0,
-    "AdxBitstreamDecoderState::extKey0 offset must be 0xA0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, extKeyMultiplier) == 0xA2,
-    "AdxBitstreamDecoderState::extKeyMultiplier offset must be 0xA2"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, extKeyAdder) == 0xA4,
-    "AdxBitstreamDecoderState::extKeyAdder offset must be 0xA4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, snapshotExtKey0) == 0xA6,
-    "AdxBitstreamDecoderState::snapshotExtKey0 offset must be 0xA6"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, snapshotExtKeyMultiplier) == 0xA8,
-    "AdxBitstreamDecoderState::snapshotExtKeyMultiplier offset must be 0xA8"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, snapshotExtKeyAdder) == 0xAA,
-    "AdxBitstreamDecoderState::snapshotExtKeyAdder offset must be 0xAA"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, snapshotDelay0) == 0xAC,
-    "AdxBitstreamDecoderState::snapshotDelay0 offset must be 0xAC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, snapshotDelay1) == 0xB0,
-    "AdxBitstreamDecoderState::snapshotDelay1 offset must be 0xB0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, ahxDecoderHandle) == 0xB4,
-    "AdxBitstreamDecoderState::ahxDecoderHandle offset must be 0xB4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, mpegAudioDecoder) == 0xC0,
-    "AdxBitstreamDecoderState::mpegAudioDecoder offset must be 0xC0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, mpeg2AacDecoder) == 0xCC,
-    "AdxBitstreamDecoderState::mpeg2AacDecoder offset must be 0xCC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, m2aDecodeSampleLimit) == 0xD0,
-    "AdxBitstreamDecoderState::m2aDecodeSampleLimit offset must be 0xD0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, m2aDecodeBlockLimit) == 0xD4,
-    "AdxBitstreamDecoderState::m2aDecodeBlockLimit offset must be 0xD4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, ainfLength) == 0xD8,
-    "AdxBitstreamDecoderState::ainfLength offset must be 0xD8"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, dataIdBytes) == 0xDC,
-    "AdxBitstreamDecoderState::dataIdBytes offset must be 0xDC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, defaultOutputVolume) == 0xEC,
-    "AdxBitstreamDecoderState::defaultOutputVolume offset must be 0xEC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, defaultPanByChannel) == 0xEE,
-    "AdxBitstreamDecoderState::defaultPanByChannel offset must be 0xEE"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, channelExpandHandle) == 0xF4,
-    "AdxBitstreamDecoderState::channelExpandHandle offset must be 0xF4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pendingSubmitBytes) == 0x100,
-    "AdxBitstreamDecoderState::pendingSubmitBytes offset must be 0x100"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(AdxBitstreamDecoderState, pendingConsumeBytes) == 0x104,
-    "AdxBitstreamDecoderState::pendingConsumeBytes offset must be 0x104"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(AdxBitstreamDecoderState) == 0x110, "AdxBitstreamDecoderState size must be 0x110");
+  static_assert(offsetof(AdxBitstreamDecoderState, slotState) == 0x00);
+  static_assert(offsetof(AdxBitstreamDecoderState, initState) == 0x02);
+  static_assert(offsetof(AdxBitstreamDecoderState, status) == 0x04);
+  static_assert(offsetof(AdxBitstreamDecoderState, adxPacketDecoder) == 0x08);
+  static_assert(offsetof(AdxBitstreamDecoderState, headerType) == 0x0C);
+  static_assert(offsetof(AdxBitstreamDecoderState, sourceSampleBits) == 0x0D);
+  static_assert(offsetof(AdxBitstreamDecoderState, sourceChannels) == 0x0E);
+  static_assert(offsetof(AdxBitstreamDecoderState, sourceBlockBytes) == 0x0F);
+  static_assert(offsetof(AdxBitstreamDecoderState, sourceBlockSamples) == 0x10);
+  static_assert(offsetof(AdxBitstreamDecoderState, sampleRate) == 0x14);
+  static_assert(offsetof(AdxBitstreamDecoderState, totalSampleCount) == 0x18);
+  static_assert(offsetof(AdxBitstreamDecoderState, adpcmCoefficientIndex) == 0x1C);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopInsertedSamples) == 0x20);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopCount) == 0x24);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopType) == 0x26);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopStartSample) == 0x28);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopStartOffset) == 0x2C);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopEndSample) == 0x30);
+  static_assert(offsetof(AdxBitstreamDecoderState, loopEndOffset) == 0x34);
+  static_assert(offsetof(AdxBitstreamDecoderState, maxChannels) == 0x38);
+  static_assert(offsetof(AdxBitstreamDecoderState, pcmBuffer) == 0x3C);
+  static_assert(offsetof(AdxBitstreamDecoderState, pcmBufferSamples) == 0x40);
+  static_assert(offsetof(AdxBitstreamDecoderState, pcmChannelStride) == 0x44);
+  static_assert(offsetof(AdxBitstreamDecoderState, inputData) == 0x48);
+  static_assert(offsetof(AdxBitstreamDecoderState, inputBlockCount) == 0x4C);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputChannels) == 0x50);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputBlockBytes) == 0x54);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputBlockSamples) == 0x58);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputBuffer) == 0x5C);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputBufferSamples) == 0x60);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputChannelStride) == 0x64);
+  static_assert(offsetof(AdxBitstreamDecoderState, writeSampleIndex) == 0x68);
+  static_assert(offsetof(AdxBitstreamDecoderState, writableSamples) == 0x6C);
+  static_assert(offsetof(AdxBitstreamDecoderState, samplesUntilTrap) == 0x70);
+  static_assert(offsetof(AdxBitstreamDecoderState, decodeCursor) == 0x74);
+  static_assert(offsetof(AdxBitstreamDecoderState, getWriteFunc) == 0x78);
+  static_assert(offsetof(AdxBitstreamDecoderState, getWriteContext) == 0x7C);
+  static_assert(offsetof(AdxBitstreamDecoderState, addWriteFunc) == 0x80);
+  static_assert(offsetof(AdxBitstreamDecoderState, addWriteContext) == 0x84);
+  static_assert(offsetof(AdxBitstreamDecoderState, decodedSampleTotal) == 0x88);
+  static_assert(offsetof(AdxBitstreamDecoderState, bufferedSampleCount) == 0x8C);
+  static_assert(offsetof(AdxBitstreamDecoderState, lastDecodedSamples) == 0x90);
+  static_assert(offsetof(AdxBitstreamDecoderState, lastDecodedBytes) == 0x94);
+  static_assert(offsetof(AdxBitstreamDecoderState, format) == 0x98);
+  static_assert(offsetof(AdxBitstreamDecoderState, preferredFormat) == 0x9A);
+  static_assert(offsetof(AdxBitstreamDecoderState, outputSamplePacking) == 0x9C);
+  static_assert(offsetof(AdxBitstreamDecoderState, extKey0) == 0xA0);
+  static_assert(offsetof(AdxBitstreamDecoderState, extKeyMultiplier) == 0xA2);
+  static_assert(offsetof(AdxBitstreamDecoderState, extKeyAdder) == 0xA4);
+  static_assert(offsetof(AdxBitstreamDecoderState, snapshotExtKey0) == 0xA6);
+  static_assert(offsetof(AdxBitstreamDecoderState, snapshotExtKeyMultiplier) == 0xA8);
+  static_assert(offsetof(AdxBitstreamDecoderState, snapshotExtKeyAdder) == 0xAA);
+  static_assert(offsetof(AdxBitstreamDecoderState, snapshotDelay0) == 0xAC);
+  static_assert(offsetof(AdxBitstreamDecoderState, snapshotDelay1) == 0xB0);
+  static_assert(offsetof(AdxBitstreamDecoderState, ahxDecoderHandle) == 0xB4);
+  static_assert(offsetof(AdxBitstreamDecoderState, ahxDecodeSampleLimit) == 0xB8);
+  static_assert(offsetof(AdxBitstreamDecoderState, ahxDecodeBlockLimit) == 0xBC);
+  static_assert(offsetof(AdxBitstreamDecoderState, mpegAudioDecoder) == 0xC0);
+  static_assert(offsetof(AdxBitstreamDecoderState, mpaDecodeSampleLimit) == 0xC4);
+  static_assert(offsetof(AdxBitstreamDecoderState, mpaDecodeBlockLimit) == 0xC8);
+  static_assert(offsetof(AdxBitstreamDecoderState, mpeg2AacDecoder) == 0xCC);
+  static_assert(offsetof(AdxBitstreamDecoderState, m2aDecodeSampleLimit) == 0xD0);
+  static_assert(offsetof(AdxBitstreamDecoderState, m2aDecodeBlockLimit) == 0xD4);
+  static_assert(offsetof(AdxBitstreamDecoderState, ainfLength) == 0xD8);
+  static_assert(offsetof(AdxBitstreamDecoderState, dataIdBytes) == 0xDC);
+  static_assert(offsetof(AdxBitstreamDecoderState, defaultOutputVolume) == 0xEC);
+  static_assert(offsetof(AdxBitstreamDecoderState, defaultPanByChannel) == 0xEE);
+  static_assert(offsetof(AdxBitstreamDecoderState, channelExpandHandle) == 0xF4);
+  static_assert(offsetof(AdxBitstreamDecoderState, expandMatrixParamA) == 0xF8);
+  static_assert(offsetof(AdxBitstreamDecoderState, expandMatrixParamB) == 0xFC);
+  static_assert(offsetof(AdxBitstreamDecoderState, decodeCallbackReportedBytes) == 0x100);
+  static_assert(offsetof(AdxBitstreamDecoderState, mUnknown104) == 0x104);
+  static_assert(offsetof(AdxBitstreamDecoderState, decodeCallback) == 0x108);
+  static_assert(offsetof(AdxBitstreamDecoderState, decodeCallbackContext) == 0x10C);
+  static_assert(sizeof(AdxBitstreamDecoderState) == 0x110);
 
   using SofdecErrorHandler = void(__cdecl*)(std::int32_t callbackObject, std::int32_t errorCode);
 
@@ -6015,7 +5872,12 @@ std::int32_t ADXB_Finish();
  * What it does:
  * Allocates and initializes one ADXB decoder object from fixed runtime pool.
  */
-moho::AdxBitstreamDecoderState* ADXB_Create(void* pcmBufferTag, void* pcmBuffer0, void* pcmBuffer1, void* pcmBuffer2);
+moho::AdxBitstreamDecoderState* ADXB_Create(
+  std::int32_t maxChannels,
+  std::int16_t* pcmBuffer,
+  std::int32_t pcmBufferSamples,
+  std::int32_t pcmChannelStride
+);
 
 /**
  * Address: 0x00B20CF0 (ADXB_Destroy)
@@ -6091,8 +5953,8 @@ ADXB_DecodeHeader(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* h
  */
 moho::AdxBitstreamDecoderState* ADXB_EntryGetWrFunc(
   moho::AdxBitstreamDecoderState* decoder,
-  void* entryGetWriteFunc,
-  std::int32_t entryGetWriteContext
+  moho::AdxbGetWriteFunc getWriteFunc,
+  void* getWriteContext
 );
 
 /**
@@ -6103,17 +5965,17 @@ moho::AdxBitstreamDecoderState* ADXB_EntryGetWrFunc(
  */
 moho::AdxBitstreamDecoderState* ADXB_EntryAddWrFunc(
   moho::AdxBitstreamDecoderState* decoder,
-  void* entryAddWriteFunc,
-  std::int32_t entryAddWriteContext
+  moho::AdxbAddWriteFunc addWriteFunc,
+  void* addWriteContext
 );
 
 /**
  * Address: 0x00B21220 (ADXB_GetPcmBuf)
  *
  * What it does:
- * Returns primary PCM output buffer pointer.
+ * Returns the PCM ring bound by `ADXB_Create`.
  */
-void* ADXB_GetPcmBuf(const moho::AdxBitstreamDecoderState* decoder);
+std::int16_t* ADXB_GetPcmBuf(const moho::AdxBitstreamDecoderState* decoder);
 
 /**
  * Address: 0x00B21230 (ADXB_GetFormat)
@@ -6369,8 +6231,7 @@ std::int32_t ADXB_GetStat(const moho::AdxBitstreamDecoderState* decoder);
  * What it does:
  * Seeds one decode-entry run and returns number of decode blocks.
  */
-std::int32_t
-ADXB_EntryData(moho::AdxBitstreamDecoderState* decoder, std::int32_t streamDataOffset, std::int32_t inputBytes);
+std::int32_t ADXB_EntryData(moho::AdxBitstreamDecoderState* decoder, char* inputData, std::int32_t inputBytes);
 
 /**
  * Address: 0x00B217F0 (ADXB_Start)

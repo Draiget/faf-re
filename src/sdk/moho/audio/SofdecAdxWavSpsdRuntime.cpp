@@ -1,65 +1,17 @@
 #include "moho/audio/SofdecRuntime.h"
 
+#include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <windows.h>
 
+extern "C" std::int32_t ADXPD_GetStat(void* adxPacketDecoder);
+
 namespace
 {
-  struct AdxbExecRuntimeView
-  {
-    std::int16_t slotState = 0; // +0x00
-    std::int16_t initState = 0; // +0x02
-    std::int32_t runState = 0; // +0x04
-    void* adxPacketDecoder = nullptr; // +0x08
-    std::int8_t headerType = 0; // +0x0C
-    std::int8_t sourceSampleBits = 0; // +0x0D
-    std::int8_t sourceChannels = 0; // +0x0E
-    std::int8_t sourceBlockBytes = 0; // +0x0F
-    std::int32_t sourceBlockSamples = 0; // +0x10
-    std::int32_t sampleRate = 0; // +0x14
-    std::int32_t totalSampleCount = 0; // +0x18
-    std::int16_t adpcmCoefficientIndex = 0; // +0x1C
-    std::uint8_t mUnknown1E[0x2]{}; // +0x1E
-    std::int32_t loopInsertedSamples = 0; // +0x20
-    std::int16_t loopCount = 0; // +0x24
-    std::uint16_t loopType = 0; // +0x26
-    std::int32_t loopStartSample = 0; // +0x28
-    std::int32_t loopStartOffset = 0; // +0x2C
-    std::int32_t loopEndSample = 0; // +0x30
-    std::int32_t loopEndOffset = 0; // +0x34
-    void* pcmBufferTag = nullptr; // +0x38
-    std::int16_t* pcmBuffer0 = nullptr; // +0x3C
-    std::int32_t pcmBufferSampleLimit = 0; // +0x40
-    std::int32_t pcmBufferSecondChannelOffset = 0; // +0x44
-    std::int16_t* sourceWordStream = nullptr; // +0x48
-    std::int32_t sourceWordLimit = 0; // +0x4C
-    std::int32_t outputChannels = 0; // +0x50
-    std::int32_t outputBlockBytes = 0; // +0x54
-    std::int32_t outputBlockSamples = 0; // +0x58
-    std::int16_t* outputWordStream0 = nullptr; // +0x5C
-    std::int32_t outputWordLimit = 0; // +0x60
-    std::int32_t outputSecondChannelOffset = 0; // +0x64
-    std::int32_t callbackLane0 = 0; // +0x68
-    std::int32_t callbackLane1 = 0; // +0x6C
-    std::int32_t callbackLane2 = 0; // +0x70
-    std::int32_t callbackLane3 = 0; // +0x74
-    void(__cdecl* entryGetWriteFunc)(std::int32_t, std::int32_t*, std::int32_t*, std::int32_t*) = nullptr; // +0x78
-    std::int32_t entryGetWriteContext = 0; // +0x7C
-    std::int32_t(__cdecl* entryAddWriteFunc)(std::int32_t, std::int32_t, std::int32_t) = nullptr; // +0x80
-    std::int32_t entryAddWriteContext = 0; // +0x84
-    std::int32_t entrySubmittedBytes = 0; // +0x88
-    std::int32_t entryCommittedBytes = 0; // +0x8C
-    std::int32_t producedSampleCount = 0; // +0x90
-    std::int32_t producedByteCount = 0; // +0x94
-    std::int16_t format = 0; // +0x98
-    std::int16_t preferredFormat = 0; // +0x9A
-    std::int16_t outputSamplePacking = 0; // +0x9C
-    std::uint8_t mUnknown9E[0x2]{}; // +0x9E
-  };
-
   struct AdxPacketDecodeHandleRuntimeView
   {
     std::int32_t objectState = 0; // +0x00
@@ -80,45 +32,6 @@ namespace
     std::int16_t keyMultiplier = 0; // +0x36
     std::int16_t keyAdder = 0; // +0x38
   };
-
-  static_assert(
-    offsetof(AdxbExecRuntimeView, runState) == 0x04, "AdxbExecRuntimeView::runState offset must be 0x04"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, adxPacketDecoder) == 0x08,
-    "AdxbExecRuntimeView::adxPacketDecoder offset must be 0x08"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, sourceChannels) == 0x0E,
-    "AdxbExecRuntimeView::sourceChannels offset must be 0x0E"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, sourceWordStream) == 0x48,
-    "AdxbExecRuntimeView::sourceWordStream offset must be 0x48"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, entryGetWriteFunc) == 0x78,
-    "AdxbExecRuntimeView::entryGetWriteFunc offset must be 0x78"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, entryAddWriteFunc) == 0x80,
-    "AdxbExecRuntimeView::entryAddWriteFunc offset must be 0x80"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, producedSampleCount) == 0x90,
-    "AdxbExecRuntimeView::producedSampleCount offset must be 0x90"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, producedByteCount) == 0x94,
-    "AdxbExecRuntimeView::producedByteCount offset must be 0x94"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, format) == 0x98, "AdxbExecRuntimeView::format offset must be 0x98"
-  );
-  static_assert(
-    offsetof(AdxbExecRuntimeView, outputSamplePacking) == 0x9C,
-    "AdxbExecRuntimeView::outputSamplePacking offset must be 0x9C"
-  );
 
   static_assert(
     offsetof(AdxPacketDecodeHandleRuntimeView, runState) == 0x0C,
@@ -330,80 +243,221 @@ namespace
     );
   }
 
-  [[nodiscard]] std::int16_t DecodeBigEndianS16(const std::uint8_t* bytes)
+  /** RIFF chunk header: four-character id and little-endian body size. */
+  struct RiffChunkHeader
   {
-    return static_cast<std::int16_t>(ReadBe16(bytes));
-  }
+    char id[4];         // +0x00
+    std::uint32_t size; // +0x04
+  };
+  static_assert(sizeof(RiffChunkHeader) == 0x08);
 
-  [[nodiscard]] std::int16_t SignExtend8ToS16(std::uint8_t sample)
+  /**
+   * WAVE `fmt ` chunk body (PCMWAVEFORMAT). `formatTag` is signed because the
+   * WAV parser rejects tags above 1 with a signed compare, which lets
+   * WAVE_FORMAT_EXTENSIBLE (0xFFFE) through as -2.
+   */
+  struct WaveFormatChunk
   {
-    return static_cast<std::int16_t>(static_cast<std::int16_t>(static_cast<std::int8_t>(sample)) << 8u);
-  }
+    std::int16_t formatTag;       // +0x00
+    std::uint16_t channels;       // +0x02
+    std::uint32_t samplesPerSec;  // +0x04
+    std::uint32_t avgBytesPerSec; // +0x08
+    std::uint16_t blockAlign;     // +0x0C
+    std::uint16_t bitsPerSample;  // +0x0E
+  };
+  static_assert(sizeof(WaveFormatChunk) == 0x10);
 
-  [[nodiscard]] std::int16_t DecodeWaveUnsigned8ToS16(std::uint8_t sample)
+  /** The SPSD header fields `ADX_DecodeInfoSpsd` reads. */
+  struct SpsdHeader
   {
-    return static_cast<std::int16_t>((static_cast<std::int32_t>(sample) - 128) << 8u);
-  }
+    char magic[4];                     // +0x00  "SPSD"
+    std::uint8_t mUnknown04[3];        // +0x04
+    std::uint8_t headerParagraphs;     // +0x07  header length in 16-byte units
+    std::uint8_t encoding;             // +0x08  0 PCM16, 1 PCM8, 2/3 4-bit
+    std::uint8_t channelMode;          // +0x09  low two bits: channels - 1
+    std::uint8_t mUnknown0A[2];        // +0x0A
+    std::int32_t dataBytes;            // +0x0C
+    std::uint8_t mUnknown10[0x1A];     // +0x10
+    std::uint16_t sampleRate;          // +0x2A
+  };
+  static_assert(offsetof(SpsdHeader, headerParagraphs) == 0x07);
+  static_assert(offsetof(SpsdHeader, dataBytes) == 0x0C);
+  static_assert(offsetof(SpsdHeader, sampleRate) == 0x2A);
 
-  [[nodiscard]] std::int16_t DecodeMuLawToS16(std::uint8_t sample)
+  [[nodiscard]] constexpr std::int16_t MuLawToPcm16(const std::uint8_t sample)
   {
-    const std::uint8_t normalized = static_cast<std::uint8_t>(~sample);
-    const std::int32_t sign = normalized & 0x80;
+    const auto normalized = static_cast<std::uint8_t>(~sample);
     const std::int32_t exponent = (normalized >> 4) & 0x07;
     const std::int32_t mantissa = normalized & 0x0F;
-    std::int32_t decoded = ((mantissa << 3) + 0x84) << exponent;
-    decoded -= 0x84;
-    if (sign != 0) {
-      decoded = -decoded;
-    }
-    return static_cast<std::int16_t>(decoded);
+    const std::int32_t magnitude = (((mantissa << 3) + 0x84) << exponent) - 0x84;
+    return static_cast<std::int16_t>((normalized & 0x80) != 0 ? -magnitude : magnitude);
   }
 
-  [[nodiscard]] int ComputeWritableSampleCount(AdxbExecRuntimeView* state, int* outWriteStartSample)
+  [[nodiscard]] constexpr std::array<std::int16_t, 256> BuildMuLawTable()
   {
-    state->entryGetWriteFunc(
-      state->entryGetWriteContext,
-      &state->callbackLane0,
-      &state->callbackLane1,
-      &state->callbackLane2
+    std::array<std::int16_t, 256> table{};
+    for (std::size_t sample = 0; sample < table.size(); ++sample) {
+      table[sample] = MuLawToPcm16(static_cast<std::uint8_t>(sample));
+    }
+    return table;
+  }
+
+  /**
+   * u-law expansion table the AU executor indexes (0x00F484A8 in the shipped
+   * binary). Built from the G.711 expansion rule; all 256 entries were
+   * compared against the binary's table and match.
+   */
+  constexpr std::array<std::int16_t, 256> kMuLawToPcm16 = BuildMuLawTable();
+
+  /** Sample conversions the PCM executors instantiate `ExecutePcmSpan` with. */
+  struct PcmFromLittleEndian16
+  {
+    [[nodiscard]] std::int16_t operator()(const std::int16_t sample) const { return sample; }
+  };
+
+  struct PcmFromBigEndian16
+  {
+    [[nodiscard]] std::int16_t operator()(const std::uint16_t sample) const
+    {
+      return static_cast<std::int16_t>(static_cast<std::uint16_t>((sample << 8) | (sample >> 8)));
+    }
+  };
+
+  struct PcmFromSigned8
+  {
+    [[nodiscard]] std::int16_t operator()(const std::uint8_t sample) const
+    {
+      return static_cast<std::int16_t>(sample << 8);
+    }
+  };
+
+  struct PcmFromUnsigned8
+  {
+    [[nodiscard]] std::int16_t operator()(const std::uint8_t sample) const
+    {
+      return static_cast<std::int16_t>((static_cast<std::int32_t>(sample) - 128) << 8);
+    }
+  };
+
+  struct PcmFromMuLaw
+  {
+    [[nodiscard]] std::int16_t operator()(const std::uint8_t sample) const { return kMuLawToPcm16[sample]; }
+  };
+
+  /**
+   * Asks the decoder's owner where the next span goes and returns how many
+   * sample frames fit: bounded by the room left in the PCM ring, by the owner's
+   * window, and by the frames left in the input span.
+   */
+  [[nodiscard]] std::int32_t AcquireWriteWindow(moho::AdxBitstreamDecoderState& decoder)
+  {
+    decoder.getWriteFunc(
+      decoder.getWriteContext,
+      &decoder.writeSampleIndex,
+      &decoder.writableSamples,
+      &decoder.samplesUntilTrap
     );
-
-    int producedSamples = state->outputWordLimit - state->callbackLane0;
-    if (producedSamples > state->callbackLane1) {
-      producedSamples = state->callbackLane1;
-    }
-    if (producedSamples > state->sourceWordLimit) {
-      producedSamples = state->sourceWordLimit;
-    }
-
-    *outWriteStartSample = state->callbackLane0;
-    return producedSamples;
+    return std::min(
+      std::min(decoder.outputBufferSamples - decoder.writeSampleIndex, decoder.writableSamples),
+      decoder.inputBlockCount
+    );
   }
 
-  void CommitProducedSpan(AdxbExecRuntimeView* state, int producedSamples, int producedBytes)
+  /** Records one decoded span and moves the decoder to "span decoded". */
+  void MarkSpanDecoded(moho::AdxBitstreamDecoderState& decoder, const std::int32_t samples, const std::int32_t bytes)
   {
-    state->producedSampleCount = producedSamples;
-    state->producedByteCount = producedBytes;
-    state->runState = 2;
+    decoder.lastDecodedSamples = samples;
+    decoder.lastDecodedBytes = bytes;
+    decoder.status = 2;
   }
 
-  [[nodiscard]] int FinishProducedSpan(AdxbExecRuntimeView* state)
+  /** Hands a decoded span to the owner's add-write callback, once. */
+  std::int32_t CommitDecodedSpan(moho::AdxBitstreamDecoderState& decoder)
   {
-    int result = 0;
-    if (state->runState == 2) {
-      result = state->entryAddWriteFunc(
-        state->entryAddWriteContext,
-        state->producedByteCount,
-        state->producedSampleCount
-      );
-      state->runState = 3;
+    std::int32_t result = 0;
+    if (decoder.status == 2) {
+      result = decoder.addWriteFunc(decoder.addWriteContext, decoder.lastDecodedBytes, decoder.lastDecodedSamples);
+      decoder.status = 3;
     }
     return result;
+  }
+
+  /**
+   * One PCM decode step. CRI repeats this body in every PCM executor (WAV,
+   * AU, AIFF, SPSD) with only the source sample type and its conversion
+   * differing, so each executor is one instantiation: take a write window,
+   * de-interleave the input frames into the channel planes of the PCM ring,
+   * and commit the span.
+   */
+  template <typename SourceSample, typename ToPcm16>
+  std::int32_t ExecutePcmSpan(moho::AdxBitstreamDecoderState& decoder, const ToPcm16 toPcm16)
+  {
+    if (decoder.status == 1 && ADXPD_GetStat(decoder.adxPacketDecoder) == 0) {
+      const std::int32_t frames = AcquireWriteWindow(decoder);
+      const auto* const source = reinterpret_cast<const SourceSample*>(decoder.inputData);
+      std::int16_t* const left = decoder.outputBuffer + decoder.writeSampleIndex;
+
+      if (decoder.sourceChannels == 2) {
+        std::int16_t* const right = left + decoder.outputChannelStride;
+        for (std::int32_t frame = 0; frame < frames; ++frame) {
+          left[frame] = toPcm16(source[2 * frame]);
+          right[frame] = toPcm16(source[2 * frame + 1]);
+        }
+      } else {
+        for (std::int32_t frame = 0; frame < frames; ++frame) {
+          left[frame] = toPcm16(source[frame]);
+        }
+      }
+
+      const auto sourceBytes = static_cast<std::int32_t>(sizeof(SourceSample)) * frames * decoder.sourceChannels;
+      MarkSpanDecoded(decoder, frames, sourceBytes);
+    }
+    return CommitDecodedSpan(decoder);
+  }
+
+  /**
+   * The output lanes every PCM header decoder latches once its info parser
+   * accepted the header: the source shape becomes the output shape, the PCM
+   * ring from `ADXB_Create` becomes the active output, loop state and the
+   * default callbacks' counters restart.
+   */
+  void LatchPcmOutput(moho::AdxBitstreamDecoderState& decoder)
+  {
+    decoder.outputChannels = decoder.sourceChannels;
+    decoder.outputBlockBytes = decoder.sourceBlockBytes;
+    decoder.outputBlockSamples = decoder.sourceBlockSamples;
+    decoder.outputBuffer = decoder.pcmBuffer;
+    decoder.outputBufferSamples = decoder.pcmBufferSamples;
+    decoder.outputChannelStride = decoder.pcmChannelStride;
+    decoder.adpcmCoefficientIndex = 0;
+    decoder.loopType = 0;
+    decoder.loopCount = 0;
+    decoder.loopEndOffset = 0;
+    decoder.loopEndSample = 0;
+    decoder.loopStartOffset = 0;
+    decoder.loopStartSample = 0;
+    decoder.loopInsertedSamples = 0;
+    decoder.bufferedSampleCount = 0;
+    decoder.decodedSampleTotal = 0;
   }
 
   [[nodiscard]] bool FourCcEquals(const std::uint8_t* bytes, const char tag[4])
   {
     return std::memcmp(bytes, tag, 4u) == 0;
+  }
+
+  /**
+   * First byte offset below `headerSize` holding `tag`, or `headerSize` when
+   * there is none. Like the binary it compares a whole dword at every offset,
+   * the last three included.
+   */
+  [[nodiscard]] std::int32_t FindWaveTag(const std::uint8_t* headerBytes, const std::int32_t headerSize, const char tag[4])
+  {
+    std::int32_t offset = 0;
+    while (offset < headerSize && !FourCcEquals(headerBytes + offset, tag)) {
+      ++offset;
+    }
+    return offset;
   }
 
   [[nodiscard]] int ComputeBlockBytes(std::int32_t channels, std::int32_t bitsPerSample)
@@ -540,10 +594,10 @@ extern "C"
   );
   std::uint8_t* AIFF_GetInfo(
     std::uint8_t* sourceBytes,
-    std::uint32_t* outSampleRate,
-    std::uint32_t* outChannels,
-    std::uint32_t* outTotalSampleCount,
-    std::int32_t* outSampleBits
+    std::int32_t* outSampleRate,
+    std::int32_t* outChannels,
+    std::int32_t* outSampleBits,
+    std::int32_t* outTotalSampleCount
   );
   std::int32_t adxpd_internal_error = 0;
   AdxPacketDecodeHandleRuntimeView adxpd_obj[32]{};
@@ -551,8 +605,6 @@ extern "C"
   XefindVisitCallback xeci_unk1_func = nullptr;
   void* xeci_unk1_func_obj = nullptr;
   LARGE_INTEGER xefind_last_scan_counter{};
-  std::int32_t ADXB_ExecOneWav8(std::int32_t decoderAddress);
-  std::int32_t ADXB_ExecOneWav16(std::int32_t decoderAddress);
 
   /**
    * Address: 0x00B29470 (_ADXB_CheckWav)
@@ -1547,58 +1599,45 @@ extern "C"
   int __cdecl ADX_DecodeInfoAu(
     std::uint8_t* headerBytes,
     std::int32_t headerSize,
-    std::int16_t* outHeaderIdentity,
+    std::int16_t* outHeaderBytes,
     std::int8_t* outHeaderType,
-    std::int8_t* outSourceSampleBits,
-    std::int8_t* outSourceChannels,
-    std::int8_t* outSourceBlockBytes,
+    std::int8_t* outSampleBits,
+    std::int8_t* outBlockBytes,
+    std::int8_t* outChannels,
     std::int32_t* outSampleRate,
     std::int32_t* outTotalSampleCount,
-    std::int32_t* outCodecClass,
+    std::int32_t* outBlockSamples,
     std::int32_t* outPackingMode
   )
   {
     if (headerSize < 8) {
-      *outHeaderIdentity = 0;
+      *outHeaderBytes = 0;
       return -1;
     }
 
-    const auto* const base = headerBytes;
-    std::int32_t parsedSampleRate = headerSize;
-    std::int32_t parsedChannels = 0;
-    std::int32_t parsedSampleBits = 0;
-    std::int32_t parsedTotalSampleCount = 0;
-    std::int32_t parsedPackingMode = *outPackingMode;
-
-    auto* streamData = AU_GetInfo(
-      headerBytes,
-      headerSize,
-      &parsedSampleRate,
-      &parsedChannels,
-      &parsedSampleBits,
-      &parsedTotalSampleCount,
-      &parsedPackingMode
+    std::int32_t sampleRate = 0;
+    std::int32_t channels = 0;
+    std::int32_t sampleBits = 0;
+    std::int32_t totalSampleCount = 0;
+    const std::uint8_t* const streamData = AU_GetInfo(
+      headerBytes, headerSize, &sampleRate, &channels, &sampleBits, &totalSampleCount, outPackingMode
     );
     if (streamData == nullptr) {
       return -1;
     }
 
-    const auto headerIdentity =
-      static_cast<std::int16_t>(static_cast<std::uintptr_t>(streamData - base));
-    *outHeaderIdentity = headerIdentity;
-    if (headerIdentity <= 0) {
+    *outHeaderBytes = static_cast<std::int16_t>(streamData - headerBytes);
+    if (*outHeaderBytes <= 0) {
       return -1;
     }
 
-    *outSampleRate = parsedSampleRate;
-    *outSourceChannels = static_cast<std::int8_t>(parsedChannels);
-    *outSourceSampleBits = static_cast<std::int8_t>(parsedSampleBits);
-    *outTotalSampleCount = parsedTotalSampleCount;
+    *outSampleRate = sampleRate;
+    *outChannels = static_cast<std::int8_t>(channels);
+    *outSampleBits = static_cast<std::int8_t>(sampleBits);
+    *outTotalSampleCount = totalSampleCount;
     *outHeaderType = -1;
-    *outSourceBlockBytes =
-      static_cast<std::int8_t>(ComputeBlockBytes(parsedChannels, parsedSampleBits));
-    *outCodecClass = 1;
-    *outPackingMode = parsedPackingMode;
+    *outBlockBytes = static_cast<std::int8_t>(ComputeBlockBytes(*outChannels, *outSampleBits));
+    *outBlockSamples = 1;
     return 0;
   }
 
@@ -1671,190 +1710,80 @@ extern "C"
    */
   int ADXB_DecodeHeaderAu(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* headerBytes, std::int32_t headerSize)
   {
-    auto* const state = reinterpret_cast<AdxbExecRuntimeView*>(decoder);
-    std::int16_t headerIdentity = 0;
+    std::int16_t headerBytesConsumed = 0;
     std::int32_t packingMode = 0;
 
-    state->initState = 1;
+    decoder->initState = 1;
     if (ADX_DecodeInfoAu(
           const_cast<std::uint8_t*>(headerBytes),
           headerSize,
-          &headerIdentity,
-          &state->headerType,
-          &state->sourceSampleBits,
-          &state->sourceChannels,
-          &state->sourceBlockBytes,
-          &state->sampleRate,
-          &state->totalSampleCount,
-          &state->sourceBlockSamples,
+          &headerBytesConsumed,
+          &decoder->headerType,
+          &decoder->sourceSampleBits,
+          &decoder->sourceBlockBytes,
+          &decoder->sourceChannels,
+          &decoder->sampleRate,
+          &decoder->totalSampleCount,
+          &decoder->sourceBlockSamples,
           &packingMode
         ) < 0) {
       return 0;
     }
 
-    state->outputChannels = state->sourceChannels;
-    state->outputBlockBytes = state->sourceBlockBytes;
-    state->outputBlockSamples = state->sourceBlockSamples;
-    state->outputWordStream0 = state->pcmBuffer0;
-    state->outputWordLimit = state->pcmBufferSampleLimit;
-    state->adpcmCoefficientIndex = 0;
-    state->loopCount = 0;
-    state->loopType = 0;
-    state->loopEndOffset = 0;
-    state->loopEndSample = 0;
-    state->loopStartOffset = 0;
-    state->loopStartSample = 0;
-    state->loopInsertedSamples = 0;
-    state->outputSecondChannelOffset = state->pcmBufferSecondChannelOffset;
-    state->producedSampleCount = 0;
-    state->producedByteCount = 0;
-    state->format = 4;
-    state->outputSamplePacking = static_cast<std::int16_t>(packingMode);
-    return headerIdentity;
+    LatchPcmOutput(*decoder);
+    decoder->format = 4;
+    decoder->outputSamplePacking = static_cast<std::int16_t>(packingMode);
+    return headerBytesConsumed;
   }
 
   /**
    * Address: 0x00B28540 (_ADXB_ExecOneAu16)
    *
    * What it does:
-   * Executes one AU 16-bit decode/write lane with big-endian sample swap.
+   * Decodes one span of big-endian 16-bit AU samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneAu16(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAu16(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        int writeStartSample = 0;
-        int producedSamples = ComputeWritableSampleCount(state, &writeStartSample);
-
-        auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(state->sourceWordStream);
-        auto* const outputPrimary = state->outputWordStream0 + writeStartSample;
-        if (state->sourceChannels == 2) {
-          auto* const outputSecondary =
-            state->outputWordStream0 + writeStartSample + state->outputSecondChannelOffset;
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeBigEndianS16(sourceBytes + (4 * sampleIndex));
-            outputSecondary[sampleIndex] = DecodeBigEndianS16(sourceBytes + (4 * sampleIndex) + 2);
-          }
-        } else {
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeBigEndianS16(sourceBytes + (2 * sampleIndex));
-          }
-        }
-
-        const int packedSamples = producedSamples * state->sourceChannels;
-        CommitProducedSpan(state, producedSamples, 2 * packedSamples);
-      }
-    }
-
-    result = FinishProducedSpan(state);
-    return result;
+    return ExecutePcmSpan<std::uint16_t>(*decoder, PcmFromBigEndian16{});
   }
 
   /**
    * Address: 0x00B28660 (_ADXB_ExecOneAu8)
    *
    * What it does:
-   * Executes one AU signed-8 decode/write lane into signed-16 output.
+   * Decodes one span of signed 8-bit AU samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneAu8(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAu8(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        int writeStartSample = 0;
-        int producedSamples = ComputeWritableSampleCount(state, &writeStartSample);
-
-        const auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(state->sourceWordStream);
-        auto* const outputPrimary = state->outputWordStream0 + writeStartSample;
-        if (state->sourceChannels == 2) {
-          auto* const outputSecondary =
-            state->outputWordStream0 + writeStartSample + state->outputSecondChannelOffset;
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = SignExtend8ToS16(sourceBytes[2 * sampleIndex]);
-            outputSecondary[sampleIndex] = SignExtend8ToS16(sourceBytes[(2 * sampleIndex) + 1]);
-          }
-        } else {
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = SignExtend8ToS16(sourceBytes[sampleIndex]);
-          }
-        }
-
-        CommitProducedSpan(state, producedSamples, producedSamples * state->sourceChannels);
-      }
-    }
-
-    result = FinishProducedSpan(state);
-    return result;
+    return ExecutePcmSpan<std::uint8_t>(*decoder, PcmFromSigned8{});
   }
 
   /**
    * Address: 0x00B28760 (_ADXB_ExecOneAuUlaw)
    *
    * What it does:
-   * Executes one AU u-law decode/write lane into signed-16 output.
+   * Decodes one span of u-law AU samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneAuUlaw(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAuUlaw(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        int writeStartSample = 0;
-        int producedSamples = ComputeWritableSampleCount(state, &writeStartSample);
-
-        const auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(state->sourceWordStream);
-        auto* const outputPrimary = state->outputWordStream0 + writeStartSample;
-        if (state->sourceChannels == 2) {
-          auto* const outputSecondary =
-            state->outputWordStream0 + writeStartSample + state->outputSecondChannelOffset;
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeMuLawToS16(sourceBytes[2 * sampleIndex]);
-            outputSecondary[sampleIndex] = DecodeMuLawToS16(sourceBytes[(2 * sampleIndex) + 1]);
-          }
-        } else {
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeMuLawToS16(sourceBytes[sampleIndex]);
-          }
-        }
-
-        CommitProducedSpan(state, producedSamples, producedSamples * state->sourceChannels);
-      }
-    }
-
-    result = FinishProducedSpan(state);
-    return result;
+    return ExecutePcmSpan<std::uint8_t>(*decoder, PcmFromMuLaw{});
   }
 
   /**
    * Address: 0x00B28870 (_ADXB_ExecOneAu)
    *
    * What it does:
-   * Dispatches AU decode lane by packed sample format.
+   * Dispatches the AU executor by sample packing.
    */
-  int __cdecl ADXB_ExecOneAu(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAu(moho::AdxBitstreamDecoderState* decoder)
   {
-    const auto* const state =
-      reinterpret_cast<const AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-
-    if (state->outputSamplePacking == 2) {
-      return ADXB_ExecOneAuUlaw(decoderAddress);
+    if (decoder->outputSamplePacking == 2) {
+      return ADXB_ExecOneAuUlaw(decoder);
     }
-    if (state->outputSamplePacking == 1) {
-      return ADXB_ExecOneAu8(decoderAddress);
+    if (decoder->outputSamplePacking == 1) {
+      return ADXB_ExecOneAu8(decoder);
     }
-    return ADXB_ExecOneAu16(decoderAddress);
+    return ADXB_ExecOneAu16(decoder);
   }
 
   /**
@@ -1878,47 +1807,43 @@ extern "C"
   int __cdecl ADX_DecodeInfoAiff(
     std::uint8_t* headerBytes,
     std::int32_t headerSize,
-    std::int16_t* outHeaderIdentity,
+    std::int16_t* outHeaderBytes,
     std::int8_t* outHeaderType,
-    std::int8_t* outSourceSampleBits,
-    std::int8_t* outSourceChannels,
-    std::int8_t* outSourceBlockBytes,
+    std::int8_t* outSampleBits,
+    std::int8_t* outBlockBytes,
+    std::int8_t* outChannels,
     std::int32_t* outSampleRate,
-    std::uint32_t* outTotalSampleCount,
-    std::uint32_t* outCodecClass
+    std::int32_t* outTotalSampleCount,
+    std::int32_t* outBlockSamples
   )
   {
-    if (headerSize < 4096) {
-      *outHeaderIdentity = 0;
+    if (headerSize < 0x1000) {
+      *outHeaderBytes = 0;
       return -1;
     }
 
-    auto* const base = headerBytes;
-    std::uint32_t parsedSampleRate = static_cast<std::uint32_t>(headerSize);
-    std::uint32_t parsedChannels = 0;
-    std::uint32_t parsedTotalSampleCount = 0;
-    std::int32_t parsedSampleBits = 0;
-    auto* streamData =
-      AIFF_GetInfo(headerBytes, &parsedSampleRate, &parsedChannels, &parsedTotalSampleCount, &parsedSampleBits);
+    std::int32_t sampleRate = 0;
+    std::int32_t channels = 0;
+    std::int32_t sampleBits = 0;
+    std::int32_t totalSampleCount = 0;
+    const std::uint8_t* const streamData =
+      AIFF_GetInfo(headerBytes, &sampleRate, &channels, &sampleBits, &totalSampleCount);
     if (streamData == nullptr) {
       return -1;
     }
 
-    const auto headerIdentity =
-      static_cast<std::int16_t>(static_cast<std::uintptr_t>(streamData - base));
-    *outHeaderIdentity = headerIdentity;
-    if (headerIdentity <= 0) {
+    *outHeaderBytes = static_cast<std::int16_t>(streamData - headerBytes);
+    if (*outHeaderBytes <= 0) {
       return -1;
     }
 
-    *outSampleRate = static_cast<std::int32_t>(parsedSampleRate);
-    *outSourceChannels = static_cast<std::int8_t>(parsedChannels);
-    *outSourceSampleBits = static_cast<std::int8_t>(parsedSampleBits);
-    *outTotalSampleCount = parsedTotalSampleCount;
+    *outSampleRate = sampleRate;
+    *outChannels = static_cast<std::int8_t>(channels);
+    *outSampleBits = static_cast<std::int8_t>(sampleBits);
+    *outTotalSampleCount = totalSampleCount;
     *outHeaderType = -1;
-    *outSourceBlockBytes =
-      static_cast<std::int8_t>(ComputeBlockBytes(static_cast<std::int32_t>(parsedChannels), parsedSampleBits));
-    *outCodecClass = 1;
+    *outBlockBytes = static_cast<std::int8_t>(ComputeBlockBytes(*outChannels, *outSampleBits));
+    *outBlockSamples = 1;
     return 0;
   }
 
@@ -1926,67 +1851,59 @@ extern "C"
    * Address: 0x00B28990 (_AIFF_GetInfo)
    *
    * What it does:
-   * Walks AIFF chunks (`COMM` and `SSND`) and returns stream-data pointer plus
-   * decoded channels/sample-rate/sample-size/sample-count lanes.
+   * Walks the AIFF `FORM` chunk list for `COMM` (channels, frame count,
+   * sample size, rate) and `SSND` (sample data), returning the sample data
+   * once both were seen, or whatever was found when the form ends.
    */
   std::uint8_t* AIFF_GetInfo(
     std::uint8_t* sourceBytes,
-    std::uint32_t* outSampleRate,
-    std::uint32_t* outChannels,
-    std::uint32_t* outTotalSampleCount,
-    std::int32_t* outSampleBits
+    std::int32_t* outSampleRate,
+    std::int32_t* outChannels,
+    std::int32_t* outSampleBits,
+    std::int32_t* outTotalSampleCount
   )
   {
     if (!ADXB_CheckAiff(sourceBytes)) {
       return nullptr;
     }
 
-    const std::uint32_t formSize = ReadBe32(sourceBytes + 4);
-    auto* const formBody = sourceBytes + 12;
-    auto* const formEnd = formBody + static_cast<std::ptrdiff_t>(formSize - 4);
+    std::uint8_t* cursor = sourceBytes + 12;
+    const std::uint8_t* const formEnd = cursor + ReadBe32(sourceBytes + 4) - 4;
+    const std::uint32_t ssndId = ReadBe32(reinterpret_cast<const std::uint8_t*>(kAiffChunkSsnd));
+    const std::uint32_t commId = ReadBe32(reinterpret_cast<const std::uint8_t*>(kAiffChunkComm));
 
     std::uint8_t* streamData = nullptr;
     bool foundSsnd = false;
     bool foundComm = false;
-    auto* cursor = formBody;
-
     while (cursor < formEnd) {
-      if ((formEnd - cursor) < 8) {
-        break;
-      }
-
       const std::uint32_t chunkId = ReadBe32(cursor);
-      const std::uint32_t chunkSize = ReadBe32(cursor + 4);
+      const auto chunkSize = static_cast<std::int32_t>(ReadBe32(cursor + 4));
       cursor += 8;
 
-      if (chunkId == ReadBe32(reinterpret_cast<const std::uint8_t*>(kAiffChunkSsnd))) {
+      if (chunkId == ssndId) {
         if (!foundSsnd) {
-          foundSsnd = true;
-          if ((formEnd - cursor) < 4) {
-            return nullptr;
-          }
-
           const std::uint32_t dataOffset = ReadBe32(cursor);
           cursor += 4;
-          streamData = cursor + static_cast<std::ptrdiff_t>(dataOffset);
+          foundSsnd = true;
+          streamData = cursor + dataOffset;
           if (foundComm) {
             return streamData;
           }
         }
-      } else if (chunkId == ReadBe32(reinterpret_cast<const std::uint8_t*>(kAiffChunkComm))) {
+      } else if (chunkId == commId) {
         if (!foundComm) {
-          if (chunkSize < 18u) {
+          if (chunkSize < 18) {
             return nullptr;
           }
 
           *outChannels = ReadBe16(cursor);
-          *outTotalSampleCount = ReadBe32(cursor + 2);
-          *outSampleBits = static_cast<std::int32_t>(ReadBe16(cursor + 6));
+          *outTotalSampleCount = static_cast<std::int32_t>(ReadBe32(cursor + 2));
+          *outSampleBits = ReadBe16(cursor + 6);
 
-          const std::uint8_t exponent = cursor[9];
-          const std::uint16_t mantissaHigh = ReadBe16(cursor + 10);
-          const auto shiftCount = static_cast<unsigned int>(static_cast<std::uint8_t>(14u - exponent)) & 0x1Fu;
-          *outSampleRate = static_cast<std::uint32_t>(mantissaHigh >> shiftCount);
+          // The 80-bit extended sample rate, reduced to its top mantissa word
+          // shifted by the low exponent byte (x86 masks the count to 5 bits).
+          const auto shift = static_cast<std::uint8_t>(14u - cursor[9]) & 0x1Fu;
+          *outSampleRate = static_cast<std::int32_t>(ReadBe16(cursor + 10) >> shift);
 
           cursor += 18;
           foundComm = true;
@@ -1995,7 +1912,7 @@ extern "C"
           }
         }
       } else {
-        cursor += static_cast<std::ptrdiff_t>((chunkSize + 1u) & ~1u);
+        cursor += (chunkSize + 1) & ~1;
       }
     }
 
@@ -2006,7 +1923,8 @@ extern "C"
    * Address: 0x00B28C30 (_ADXB_DecodeHeaderAiff)
    *
    * What it does:
-   * Decodes AIFF header fields into ADXB runtime state lanes.
+   * Decodes an AIFF header into the decoder and latches the PCM output; 8-bit
+   * sources use signed-byte packing, everything else big-endian 16-bit.
    */
   int ADXB_DecodeHeaderAiff(
     moho::AdxBitstreamDecoderState* decoder,
@@ -2014,170 +1932,138 @@ extern "C"
     std::int32_t headerSize
   )
   {
-    auto* const state = reinterpret_cast<AdxbExecRuntimeView*>(decoder);
-    std::int16_t headerIdentity = 0;
-    std::uint32_t codecClass = 0;
+    std::int16_t headerBytesConsumed = 0;
 
-    state->initState = 1;
+    decoder->initState = 1;
     if (ADX_DecodeInfoAiff(
           const_cast<std::uint8_t*>(headerBytes),
           headerSize,
-          &headerIdentity,
-          &state->headerType,
-          &state->sourceSampleBits,
-          &state->sourceChannels,
-          &state->sourceBlockBytes,
-          &state->sampleRate,
-          reinterpret_cast<std::uint32_t*>(&state->totalSampleCount),
-          &codecClass
+          &headerBytesConsumed,
+          &decoder->headerType,
+          &decoder->sourceSampleBits,
+          &decoder->sourceBlockBytes,
+          &decoder->sourceChannels,
+          &decoder->sampleRate,
+          &decoder->totalSampleCount,
+          &decoder->sourceBlockSamples
         ) < 0) {
       return 0;
     }
 
-    state->outputChannels = state->sourceChannels;
-    state->outputBlockBytes = state->sourceBlockBytes;
-    state->outputBlockSamples = state->sourceBlockSamples;
-    state->outputWordStream0 = state->pcmBuffer0;
-    state->outputWordLimit = state->pcmBufferSampleLimit;
-    state->adpcmCoefficientIndex = 0;
-    state->loopCount = 0;
-    state->loopType = 0;
-    state->loopEndOffset = 0;
-    state->loopEndSample = 0;
-    state->loopStartOffset = 0;
-    state->loopStartSample = 0;
-    state->loopInsertedSamples = 0;
-    state->outputSecondChannelOffset = state->pcmBufferSecondChannelOffset;
-    state->producedSampleCount = 0;
-    state->producedByteCount = 0;
-    state->format = 3;
-    state->outputSamplePacking = (state->sourceSampleBits == 8) ? 1 : 0;
-    return headerIdentity;
+    LatchPcmOutput(*decoder);
+    decoder->format = 3;
+    decoder->outputSamplePacking = (decoder->sourceSampleBits == 8) ? 1 : 0;
+    return headerBytesConsumed;
   }
 
   /**
    * Address: 0x00B28D00 (_ADXB_ExecOneAiff16)
    *
    * What it does:
-   * Executes one AIFF 16-bit decode/write lane with big-endian sample swap.
+   * Decodes one span of big-endian 16-bit AIFF samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneAiff16(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAiff16(moho::AdxBitstreamDecoderState* decoder)
   {
-    return ADXB_ExecOneAu16(decoderAddress);
+    return ExecutePcmSpan<std::uint16_t>(*decoder, PcmFromBigEndian16{});
   }
 
   /**
    * Address: 0x00B28E20 (_ADXB_ExecOneAiff8)
    *
    * What it does:
-   * Executes one AIFF signed-8 decode/write lane into signed-16 output.
+   * Decodes one span of signed 8-bit AIFF samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneAiff8(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAiff8(moho::AdxBitstreamDecoderState* decoder)
   {
-    return ADXB_ExecOneAu8(decoderAddress);
+    return ExecutePcmSpan<std::uint8_t>(*decoder, PcmFromSigned8{});
   }
 
   /**
    * Address: 0x00B28F20 (_ADXB_ExecOneAiff)
    *
    * What it does:
-   * Dispatches AIFF decode lane by packed sample format.
+   * Dispatches the AIFF executor by sample packing.
    */
-  int __cdecl ADXB_ExecOneAiff(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneAiff(moho::AdxBitstreamDecoderState* decoder)
   {
-    const auto* const state =
-      reinterpret_cast<const AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    if (state->outputSamplePacking == 1) {
-      return ADXB_ExecOneAiff8(decoderAddress);
+    if (decoder->outputSamplePacking == 1) {
+      return ADXB_ExecOneAiff8(decoder);
     }
-    return ADXB_ExecOneAiff16(decoderAddress);
+    return ADXB_ExecOneAiff16(decoder);
   }
 
   /**
    * Address: 0x00B28F40 (_ADX_DecodeInfoWav)
    *
    * What it does:
-   * Decodes WAV format/data chunk metadata and output packing class.
+   * Finds the `fmt ` and `data` chunks of a RIFF/WAVE header and derives the
+   * decoder's stream shape from them. 4-bit sources are consumed as 16-bit
+   * frames of four samples.
    */
   int __cdecl ADX_DecodeInfoWav(
     const std::uint8_t* headerBytes,
     std::int32_t headerSize,
-    std::int16_t* outHeaderIdentity,
+    std::int16_t* outHeaderBytes,
     std::int8_t* outHeaderType,
-    std::int8_t* outSourceSampleBits,
-    std::int8_t* outSourceChannels,
-    std::int8_t* outSourceBlockBytes,
-    std::uint32_t* outSampleRate,
+    std::int8_t* outSampleBits,
+    std::int8_t* outBlockBytes,
+    std::int8_t* outChannels,
+    std::int32_t* outSampleRate,
     std::int32_t* outTotalSampleCount,
-    std::uint32_t* outCodecClass,
+    std::int32_t* outBlockSamples,
     std::int16_t* outPackingMode
   )
   {
-    int fmtOffset = -1;
-    for (int offset = 0; offset < headerSize; ++offset) {
-      if ((offset + 4) <= headerSize && FourCcEquals(headerBytes + offset, kFormatTag)) {
-        fmtOffset = offset;
-        break;
-      }
-    }
-    if (fmtOffset < 0 || (fmtOffset % 4) != 0) {
+    const std::int32_t formatOffset = FindWaveTag(headerBytes, headerSize, kFormatTag);
+    if (formatOffset == headerSize || formatOffset % 4 != 0) {
       return -1;
     }
 
-    const auto* const formatChunk = headerBytes + fmtOffset + 8;
-    if (*reinterpret_cast<const std::uint16_t*>(formatChunk) > 1u) {
+    const auto& format =
+      *reinterpret_cast<const WaveFormatChunk*>(headerBytes + formatOffset + sizeof(RiffChunkHeader));
+    if (format.formatTag > 1) {
       return -1;
     }
 
-    int dataOffset = -1;
-    for (int offset = 0; offset < headerSize; ++offset) {
-      if ((offset + 4) <= headerSize && FourCcEquals(headerBytes + offset, kDataTag)) {
-        dataOffset = offset;
-        break;
-      }
-    }
-    if (dataOffset < 0) {
+    const std::int32_t dataOffset = FindWaveTag(headerBytes, headerSize, kDataTag);
+    if (dataOffset == headerSize) {
       return -1;
     }
 
-    const auto dataBytes = *reinterpret_cast<const std::uint32_t*>(headerBytes + dataOffset + 4);
-    *outHeaderIdentity = static_cast<std::int16_t>(dataOffset + 8);
+    const auto dataBytes =
+      static_cast<std::int32_t>(reinterpret_cast<const RiffChunkHeader*>(headerBytes + dataOffset)->size);
+    *outHeaderBytes = static_cast<std::int16_t>(dataOffset + sizeof(RiffChunkHeader));
     *outHeaderType = -1;
-    *outSampleRate = *reinterpret_cast<const std::uint32_t*>(formatChunk + 4);
-    *outSourceChannels = static_cast<std::int8_t>(formatChunk[2]);
-    *outSourceSampleBits = static_cast<std::int8_t>(formatChunk[14]);
-    *outSourceBlockBytes = static_cast<std::int8_t>(formatChunk[12]);
-    *outTotalSampleCount = static_cast<std::int32_t>(dataBytes / static_cast<std::uint8_t>(*outSourceBlockBytes));
-    *outCodecClass = 1;
+    *outSampleRate = static_cast<std::int32_t>(format.samplesPerSec);
+    *outChannels = static_cast<std::int8_t>(format.channels);
+    *outSampleBits = static_cast<std::int8_t>(format.bitsPerSample);
+    *outBlockBytes = static_cast<std::int8_t>(format.blockAlign);
+    *outTotalSampleCount = dataBytes / *outBlockBytes;
+    *outBlockSamples = 1;
 
-    if (*outSourceSampleBits == 16) {
+    if (*outSampleBits == 16) {
       *outPackingMode = 0;
-    } else if (*outSourceSampleBits == 8) {
+    } else if (*outSampleBits == 8) {
       *outPackingMode = 1;
-    } else if (*outSourceSampleBits == 4) {
-      *outSourceBlockBytes = static_cast<std::int8_t>(2 * *outSourceChannels);
-      *outCodecClass = 4;
-      *outTotalSampleCount =
-        static_cast<std::int32_t>(dataBytes / 2 / static_cast<std::uint8_t>(*outSourceChannels));
-      *outSourceSampleBits = 16;
+    } else if (*outSampleBits == 4) {
+      *outBlockBytes = static_cast<std::int8_t>(2 * *outChannels);
+      *outBlockSamples = 4;
+      *outTotalSampleCount = dataBytes / 2 / *outChannels;
+      *outSampleBits = 16;
       *outPackingMode = 2;
     }
 
-    if (*outSourceSampleBits == 0 ||
-        *outSourceBlockBytes == 0 ||
-        *outSourceChannels <= 0 ||
-        *outSourceChannels > 2) {
+    if (*outSampleBits == 0 || *outBlockBytes == 0 || *outChannels <= 0 || *outChannels > 2) {
       return -1;
     }
-
-    return (*outSampleRate != 0u) ? 0 : -1;
+    return (*outSampleRate != 0) ? 0 : -1;
   }
 
   /**
    * Address: 0x00B29090 (_ADXB_DecodeHeaderWav)
    *
    * What it does:
-   * Decodes WAV header fields into ADXB runtime state lanes.
+   * Decodes a WAV header into the decoder and latches the PCM output.
    */
   int ADXB_DecodeHeaderWav(
     moho::AdxBitstreamDecoderState* decoder,
@@ -2185,208 +2071,110 @@ extern "C"
     std::int32_t headerSize
   )
   {
-    auto* const state = reinterpret_cast<AdxbExecRuntimeView*>(decoder);
-    std::int16_t headerIdentity = 0;
-    std::uint32_t codecClass = 0;
+    std::int16_t headerBytesConsumed = 0;
 
-    state->initState = 1;
+    decoder->initState = 1;
     if (ADX_DecodeInfoWav(
           headerBytes,
           headerSize,
-          &headerIdentity,
-          &state->headerType,
-          &state->sourceSampleBits,
-          &state->sourceChannels,
-          &state->sourceBlockBytes,
-          reinterpret_cast<std::uint32_t*>(&state->sampleRate),
-          &state->totalSampleCount,
-          &codecClass,
-          &state->outputSamplePacking
+          &headerBytesConsumed,
+          &decoder->headerType,
+          &decoder->sourceSampleBits,
+          &decoder->sourceBlockBytes,
+          &decoder->sourceChannels,
+          &decoder->sampleRate,
+          &decoder->totalSampleCount,
+          &decoder->sourceBlockSamples,
+          &decoder->outputSamplePacking
         ) < 0) {
       return 0;
     }
 
-    state->outputChannels = state->sourceChannels;
-    state->outputBlockBytes = state->sourceBlockBytes;
-    state->outputBlockSamples = state->sourceBlockSamples;
-    state->outputWordStream0 = state->pcmBuffer0;
-    state->outputWordLimit = state->pcmBufferSampleLimit;
-    state->adpcmCoefficientIndex = 0;
-    state->loopCount = 0;
-    state->loopType = 0;
-    state->loopEndOffset = 0;
-    state->loopEndSample = 0;
-    state->loopStartOffset = 0;
-    state->loopStartSample = 0;
-    state->loopInsertedSamples = 0;
-    state->outputSecondChannelOffset = state->pcmBufferSecondChannelOffset;
-    state->producedSampleCount = 0;
-    state->producedByteCount = 0;
-    state->format = 1;
-    return headerIdentity;
+    LatchPcmOutput(*decoder);
+    decoder->format = 1;
+    return headerBytesConsumed;
   }
 
   /**
    * Address: 0x00B29150 (_ADXB_ExecOneWav16)
    *
    * What it does:
-   * Executes one WAV 16-bit decode/write lane.
+   * Decodes one span of little-endian 16-bit WAV samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneWav16(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneWav16(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        int writeStartSample = 0;
-        const int producedSamples = ComputeWritableSampleCount(state, &writeStartSample);
-
-        const auto* const sourceWords = reinterpret_cast<const std::int16_t*>(state->sourceWordStream);
-        auto* const outputPrimary = state->outputWordStream0 + writeStartSample;
-        if (state->sourceChannels == 2) {
-          auto* const outputSecondary =
-            state->outputWordStream0 + writeStartSample + state->outputSecondChannelOffset;
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = sourceWords[2 * sampleIndex];
-            outputSecondary[sampleIndex] = sourceWords[(2 * sampleIndex) + 1];
-          }
-        } else {
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = sourceWords[sampleIndex];
-          }
-        }
-
-        const int packedSamples = producedSamples * state->sourceChannels;
-        CommitProducedSpan(state, producedSamples, 2 * packedSamples);
-      }
-    }
-
-    result = FinishProducedSpan(state);
-    return result;
+    return ExecutePcmSpan<std::int16_t>(*decoder, PcmFromLittleEndian16{});
   }
 
   /**
    * Address: 0x00B29250 (_ADXB_ExecOneWav8)
    *
    * What it does:
-   * Executes one WAV unsigned-8 decode/write lane into signed-16 output.
+   * Decodes one span of unsigned 8-bit WAV samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneWav8(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneWav8(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        int writeStartSample = 0;
-        const int producedSamples = ComputeWritableSampleCount(state, &writeStartSample);
-
-        const auto* const sourceBytes = reinterpret_cast<const std::uint8_t*>(state->sourceWordStream);
-        auto* const outputPrimary = state->outputWordStream0 + writeStartSample;
-        if (state->sourceChannels == 2) {
-          auto* const outputSecondary =
-            state->outputWordStream0 + writeStartSample + state->outputSecondChannelOffset;
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeWaveUnsigned8ToS16(sourceBytes[2 * sampleIndex]);
-            outputSecondary[sampleIndex] = DecodeWaveUnsigned8ToS16(sourceBytes[(2 * sampleIndex) + 1]);
-          }
-        } else {
-          for (int sampleIndex = 0; sampleIndex < producedSamples; ++sampleIndex) {
-            outputPrimary[sampleIndex] = DecodeWaveUnsigned8ToS16(sourceBytes[sampleIndex]);
-          }
-        }
-
-        CommitProducedSpan(state, producedSamples, producedSamples * state->sourceChannels);
-      }
-    }
-
-    result = FinishProducedSpan(state);
-    return result;
+    return ExecutePcmSpan<std::uint8_t>(*decoder, PcmFromUnsigned8{});
   }
 
   /**
    * Address: 0x00B294E0 (_ADX_DecodeInfoSpsd)
    *
    * What it does:
-   * Decodes SPSD header metadata lanes into ADXB runtime outputs.
+   * Derives the stream shape from an SPSD header. Whatever encoding the header
+   * names, the decoder consumes the payload as 16-bit frames.
    */
   int __cdecl ADX_DecodeInfoSpsd(
     const std::uint8_t* headerBytes,
     std::int32_t headerSize,
-    std::int16_t* outHeaderIdentity,
+    std::int16_t* outHeaderBytes,
     std::int8_t* outHeaderType,
-    std::int8_t* outSourceSampleBits,
-    std::int8_t* outSourceChannels,
-    std::int8_t* outSourceBlockBytes,
-    std::int32_t* outSourceBlockSamples,
+    std::int8_t* outSampleBits,
+    std::int8_t* outBlockBytes,
+    std::int8_t* outChannels,
     std::int32_t* outSampleRate,
     std::int32_t* outTotalSampleCount,
-    std::int16_t* outFormat
+    std::int32_t* outBlockSamples,
+    std::int16_t* outPackingMode
   )
   {
     (void)headerSize;
-    *outHeaderIdentity = static_cast<std::int16_t>(16 * headerBytes[7]);
-    *outSourceChannels = static_cast<std::int8_t>((headerBytes[9] & 3) + 1);
-    *outSampleRate = static_cast<std::int32_t>(
-      static_cast<std::uint16_t>(headerBytes[42] | (headerBytes[43] << 8))
-    );
+    const auto& header = *reinterpret_cast<const SpsdHeader*>(headerBytes);
+    *outHeaderBytes = static_cast<std::int16_t>(16 * header.headerParagraphs);
+    *outChannels = static_cast<std::int8_t>((header.channelMode & 3) + 1);
+    *outSampleRate = header.sampleRate;
 
-    switch (headerBytes[8]) {
+    switch (header.encoding) {
       case 0:
-        *outSourceSampleBits = 16;
-        *outSourceBlockBytes = static_cast<std::int8_t>(2 * (*outSourceChannels));
-        *outSourceBlockSamples = 1;
-        *outTotalSampleCount = static_cast<std::int32_t>(
-          (static_cast<std::int32_t>(
-             headerBytes[12] | (headerBytes[13] << 8) | (headerBytes[14] << 16) | (headerBytes[15] << 24)
-           )) /
-          2
-        );
-        *outFormat = 0;
+        *outSampleBits = 16;
+        *outBlockBytes = static_cast<std::int8_t>(2 * *outChannels);
+        *outBlockSamples = 1;
+        *outTotalSampleCount = header.dataBytes / 2;
+        *outPackingMode = 0;
         break;
-
       case 1:
-        *outSourceSampleBits = 8;
-        *outSourceBlockBytes = *outSourceChannels;
-        *outSourceBlockSamples = 1;
-        *outTotalSampleCount = static_cast<std::int32_t>(
-          headerBytes[12] | (headerBytes[13] << 8) | (headerBytes[14] << 16) | (headerBytes[15] << 24)
-        );
-        *outFormat = 1;
+        *outSampleBits = 8;
+        *outBlockBytes = *outChannels;
+        *outBlockSamples = 1;
+        *outTotalSampleCount = header.dataBytes;
+        *outPackingMode = 1;
         break;
-
       case 2:
       case 3:
-        *outSourceSampleBits = 4;
-        *outSourceBlockBytes = *outSourceChannels;
-        *outSourceBlockSamples = 2;
-        *outTotalSampleCount =
-          2 *
-          static_cast<std::int32_t>(
-            headerBytes[12] | (headerBytes[13] << 8) | (headerBytes[14] << 16) | (headerBytes[15] << 24)
-          );
-        *outFormat = 2;
+        *outSampleBits = 4;
+        *outBlockBytes = *outChannels;
+        *outBlockSamples = 2;
+        *outTotalSampleCount = 2 * header.dataBytes;
+        *outPackingMode = 2;
         break;
-
       default:
         break;
     }
 
-    // Runtime always normalizes SPSD decode lane to 16-bit mono-step output.
-    *outSourceBlockBytes = 2;
-    *outSourceBlockSamples = 1;
-    *outTotalSampleCount = static_cast<std::int32_t>(
-      (static_cast<std::int32_t>(
-         headerBytes[12] | (headerBytes[13] << 8) | (headerBytes[14] << 16) | (headerBytes[15] << 24)
-       )) /
-      2
-    );
-    *outSourceSampleBits = 16;
+    *outBlockBytes = 2;
+    *outBlockSamples = 1;
+    *outTotalSampleCount = header.dataBytes / 2;
+    *outSampleBits = 16;
     *outHeaderType = -1;
     return 0;
   }
@@ -2395,157 +2183,86 @@ extern "C"
    * Address: 0x00B295D0 (_ADXB_DecodeHeaderSpsd)
    *
    * What it does:
-   * Decodes SPSD header into ADXB runtime fields and resets decode-state lanes.
+   * Decodes an SPSD header into the decoder and latches the PCM output.
    */
   int ADXB_DecodeHeaderSpsd(moho::AdxBitstreamDecoderState* decoder, const std::uint8_t* headerBytes, std::int32_t headerSize)
   {
-    auto* const state = reinterpret_cast<AdxbExecRuntimeView*>(decoder);
-    std::int16_t headerIdentity = 0;
+    std::int16_t headerBytesConsumed = 0;
 
-    state->initState = 1;
+    decoder->initState = 1;
     if (ADX_DecodeInfoSpsd(
           headerBytes,
           headerSize,
-          &headerIdentity,
-          &state->headerType,
-          &state->sourceSampleBits,
-          &state->sourceChannels,
-          &state->sourceBlockBytes,
-          &state->sourceBlockSamples,
-          &state->sampleRate,
-          &state->totalSampleCount,
-          &state->outputSamplePacking
+          &headerBytesConsumed,
+          &decoder->headerType,
+          &decoder->sourceSampleBits,
+          &decoder->sourceBlockBytes,
+          &decoder->sourceChannels,
+          &decoder->sampleRate,
+          &decoder->totalSampleCount,
+          &decoder->sourceBlockSamples,
+          &decoder->outputSamplePacking
         ) < 0) {
       return 0;
     }
 
-    state->outputChannels = state->sourceChannels;
-    state->outputBlockBytes = state->sourceBlockBytes;
-    state->outputBlockSamples = state->sourceBlockSamples;
-    state->outputWordStream0 = state->pcmBuffer0;
-    state->outputWordLimit = state->pcmBufferSampleLimit;
-    state->adpcmCoefficientIndex = 0;
-    state->loopCount = 0;
-    state->loopType = 0;
-    state->loopEndOffset = 0;
-    state->loopEndSample = 0;
-    state->loopStartOffset = 0;
-    state->loopStartSample = 0;
-    state->loopInsertedSamples = 0;
-    state->outputSecondChannelOffset = state->pcmBufferSecondChannelOffset;
-    state->entryCommittedBytes = 0;
-    state->entrySubmittedBytes = 0;
-    state->format = 2;
-    return headerIdentity;
+    LatchPcmOutput(*decoder);
+    decoder->format = 2;
+    return headerBytesConsumed;
   }
 
   /**
    * Address: 0x00B29360 (_ADXB_ExecOneWav4)
    *
    * What it does:
-   * Executes one ADXB WAV-4 decode/write lane and commits produced bytes.
+   * Decodes one span of the 4-bit WAV packing, which reaches the decoder as
+   * 16-bit frames: mono frames are little-endian words, stereo frames
+   * interleave the two channels byte by byte (L lo, R lo, L hi, R hi).
    */
-  int __cdecl ADXB_ExecOneWav4(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneWav4(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    auto* sourceWords = state->sourceWordStream;
-    int result = state->runState;
+    if (decoder->status == 1 && ADXPD_GetStat(decoder->adxPacketDecoder) == 0) {
+      const std::int32_t frames = AcquireWriteWindow(*decoder);
+      const auto* const source = reinterpret_cast<const std::uint8_t*>(decoder->inputData);
+      std::int16_t* const left = decoder->outputBuffer + decoder->writeSampleIndex;
 
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        state->entryGetWriteFunc(
-          state->entryGetWriteContext,
-          &state->callbackLane0,
-          &state->callbackLane1,
-          &state->callbackLane2
-        );
-
-        int startSample = state->callbackLane0;
-        int producedSamples = state->outputWordLimit - startSample;
-        if (producedSamples > state->callbackLane1) {
-          producedSamples = state->callbackLane1;
+      if (decoder->sourceChannels == 2) {
+        std::int16_t* const right = left + decoder->outputChannelStride;
+        for (std::int32_t frame = 0; frame < frames; ++frame) {
+          const std::uint8_t* const bytes = source + 4 * frame;
+          left[frame] = static_cast<std::int16_t>(bytes[0] | (bytes[2] << 8));
+          right[frame] = static_cast<std::int16_t>(bytes[1] | (bytes[3] << 8));
         }
-        if (producedSamples > state->sourceWordLimit) {
-          producedSamples = state->sourceWordLimit;
+      } else {
+        for (std::int32_t frame = 0; frame < frames; ++frame) {
+          const std::uint8_t* const bytes = source + 2 * frame;
+          left[frame] = static_cast<std::int16_t>(bytes[0] | (bytes[1] << 8));
         }
-
-        auto* outputBase = state->outputWordStream0 + startSample;
-        if (state->sourceChannels == 2) {
-          auto* outputSecond =
-            state->outputWordStream0 + startSample + state->outputSecondChannelOffset;
-          if (producedSamples > 0) {
-            const std::uint8_t* sourceBytes =
-              reinterpret_cast<const std::uint8_t*>(sourceWords) + 3;
-            int remaining = producedSamples;
-            do {
-              const std::int16_t leftSample = static_cast<std::int16_t>(
-                (static_cast<std::uint16_t>(sourceBytes[-1]) << 8) |
-                static_cast<std::uint16_t>(sourceBytes[-3])
-              );
-              sourceBytes += 4;
-
-              const std::int16_t rightSample = static_cast<std::int16_t>(
-                (static_cast<std::uint16_t>(sourceBytes[-4]) << 8) |
-                static_cast<std::uint16_t>(sourceBytes[-6])
-              );
-
-              *outputBase = leftSample;
-              *outputSecond = rightSample;
-              ++outputBase;
-              ++outputSecond;
-              --remaining;
-            } while (remaining != 0);
-          }
-        } else if (producedSamples > 0) {
-          auto* src = sourceWords;
-          auto* dst = outputBase;
-          int remaining = producedSamples;
-          do {
-            *dst++ = *src++;
-            --remaining;
-          } while (remaining != 0);
-        }
-
-        state->producedSampleCount = producedSamples;
-        state->producedByteCount = 2 * producedSamples * state->sourceChannels;
-        state->runState = 2;
       }
-    }
 
-    if (state->runState == 2) {
-      result = state->entryAddWriteFunc(
-        state->entryAddWriteContext,
-        state->producedByteCount,
-        state->producedSampleCount
-      );
-      state->runState = 3;
+      MarkSpanDecoded(*decoder, frames, 2 * frames * decoder->sourceChannels);
     }
-
-    return result;
+    return CommitDecodedSpan(*decoder);
   }
 
   /**
    * Address: 0x00B294A0 (_ADXB_ExecOneWav)
    *
    * What it does:
-   * Dispatches WAV decode lane by format class.
+   * Dispatches the WAV executor by sample packing; an unknown packing does
+   * nothing and hands the packing value back.
    */
-  int __cdecl ADXB_ExecOneWav(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneWav(moho::AdxBitstreamDecoderState* decoder)
   {
-    const auto* const state =
-      reinterpret_cast<const AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-
-    switch (state->outputSamplePacking) {
+    switch (decoder->outputSamplePacking) {
       case 2:
-        return ADXB_ExecOneWav4(decoderAddress);
+        return ADXB_ExecOneWav4(decoder);
       case 1:
-        return ADXB_ExecOneWav8(decoderAddress);
+        return ADXB_ExecOneWav8(decoder);
       case 0:
-        return ADXB_ExecOneWav16(decoderAddress);
+        return ADXB_ExecOneWav16(decoder);
       default:
-        return state->outputSamplePacking;
+        return decoder->outputSamplePacking;
     }
   }
 
@@ -2553,73 +2270,10 @@ extern "C"
    * Address: 0x00B29690 (_ADXB_ExecOneSpsd)
    *
    * What it does:
-   * Executes one ADXB SPSD decode/write lane and commits produced bytes.
+   * Decodes one span of little-endian 16-bit SPSD samples into the PCM ring.
    */
-  int __cdecl ADXB_ExecOneSpsd(std::int32_t decoderAddress)
+  int __cdecl ADXB_ExecOneSpsd(moho::AdxBitstreamDecoderState* decoder)
   {
-    auto* const state =
-      reinterpret_cast<AdxbExecRuntimeView*>(static_cast<std::uintptr_t>(decoderAddress));
-    auto* sourceWords = state->sourceWordStream;
-    int result = state->runState;
-
-    if (result == 1) {
-      result = ADXPD_GetStat(state->adxPacketDecoder);
-      if (result == 0) {
-        state->entryGetWriteFunc(
-          state->entryGetWriteContext,
-          &state->callbackLane0,
-          &state->callbackLane1,
-          &state->callbackLane2
-        );
-
-        int startSample = state->callbackLane0;
-        result = state->outputWordLimit - startSample;
-        if (result > state->callbackLane1) {
-          result = state->callbackLane1;
-        }
-        if (result > state->sourceWordLimit) {
-          result = state->sourceWordLimit;
-        }
-
-        auto* outputBase = state->outputWordStream0 + startSample;
-        if (state->sourceChannels == 2) {
-          auto* outputSecond =
-            state->outputWordStream0 + startSample + state->outputSecondChannelOffset;
-          int sampleIndex = 0;
-          if (result > 0) {
-            do {
-              const std::int16_t leftSample = sourceWords[2 * sampleIndex];
-              const std::int16_t rightSample = sourceWords[(2 * sampleIndex) + 1];
-              *outputBase++ = leftSample;
-              *outputSecond++ = rightSample;
-              ++sampleIndex;
-            } while (sampleIndex < result);
-          }
-        } else if (result > 0) {
-          auto* dst = outputBase;
-          const auto* src = sourceWords;
-          int remaining = result;
-          do {
-            *dst++ = *src++;
-            --remaining;
-          } while (remaining != 0);
-        }
-
-        state->producedSampleCount = result;
-        state->producedByteCount = 2 * result * state->sourceChannels;
-        state->runState = 2;
-      }
-    }
-
-    if (state->runState == 2) {
-      result = state->entryAddWriteFunc(
-        state->entryAddWriteContext,
-        state->producedByteCount,
-        state->producedSampleCount
-      );
-      state->runState = 3;
-    }
-
-    return result;
+    return ExecutePcmSpan<std::int16_t>(*decoder, PcmFromLittleEndian16{});
   }
 }

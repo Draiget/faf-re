@@ -1617,8 +1617,8 @@
     std::int32_t outputHandleCount,
     std::int32_t* outputHandleAddresses
   );
-  std::int32_t adxsjd_get_wr(
-    std::int32_t callbackContext,
+  std::int16_t* adxsjd_get_wr(
+    void* callbackContext,
     std::int32_t* outWriteOffsetSamples,
     std::int32_t* outWritableSamples,
     std::int32_t* outUntilTrapSamples
@@ -3078,13 +3078,13 @@
   std::int32_t ADXB_SetM2aDecSmpl(moho::AdxBitstreamDecoderState* decoder, std::int32_t maxDecodeSamples);
   std::int32_t ADXB_MpaTermSupply(moho::AdxBitstreamDecoderState* decoder);
   std::int32_t ADXB_M2aTermSupply(moho::AdxBitstreamDecoderState* decoder);
-  std::int32_t __cdecl ADXB_ExecOneWav(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneSpsd(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneAiff(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneAu(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneAhx(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneMpa(std::int32_t decoderAddress);
-  std::int32_t __cdecl ADXB_ExecOneM2a(std::int32_t decoderAddress);
+  std::int32_t __cdecl ADXB_ExecOneWav(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneSpsd(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneAiff(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneAu(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneAhx(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneMpa(moho::AdxBitstreamDecoderState* decoder);
+  std::int32_t __cdecl ADXB_ExecOneM2a(moho::AdxBitstreamDecoderState* decoder);
   struct SflibErrorInfo;
   struct SflibLibWorkRuntime;
   using SflibErrorCallback = std::int32_t(__cdecl*)(std::int32_t callbackObject, std::int32_t errorCode);
@@ -3328,10 +3328,10 @@
   extern void(__cdecl* ahxsetdecsmplfunc)(void* ahxDecoderHandle, std::int32_t maxDecodeSamples);
   extern std::int32_t(__cdecl* ahxexecfunc)();
   extern std::int32_t(__cdecl* ahxtermsupplyfunc)(void* ahxDecoderHandle);
-  extern std::int32_t(__cdecl* mpaexecfunc)();
+  extern std::int32_t(__cdecl* mpaexecfunc)(moho::AdxBitstreamDecoderState* decoder);
   extern std::int32_t(__cdecl* mpatermsupplyfunc)(void* mpaDecoderHandle);
   extern std::int32_t(__cdecl* mpasetsjifunc)(void* mpaDecoderHandle);
-  extern std::int32_t(__cdecl* m2aexecfunc)();
+  extern std::int32_t(__cdecl* m2aexecfunc)(moho::AdxBitstreamDecoderState* decoder);
   extern std::int32_t(__cdecl* m2asetsjifunc)(void* m2aDecoderHandle);
   extern std::int32_t(__cdecl* m2atermsupplyfunc)(void* m2aDecoderHandle);
   extern std::int32_t adxt_q12_mix_table[];
@@ -3432,10 +3432,10 @@
   AdxtCodecStopCallback m2astopfunc = nullptr;
   AdxtEndDecodeInfoCallback adxt_enddecinfo_cbfn = nullptr;
   std::int32_t adxt_dbg_rna_ndata = 0;
-  std::int32_t(__cdecl* mpaexecfunc)() = nullptr;
+  std::int32_t(__cdecl* mpaexecfunc)(moho::AdxBitstreamDecoderState* decoder) = nullptr;
   std::int32_t(__cdecl* mpatermsupplyfunc)(void* mpaDecoderHandle) = nullptr;
   std::int32_t(__cdecl* mpasetsjifunc)(void* mpaDecoderHandle) = nullptr;
-  std::int32_t(__cdecl* m2aexecfunc)() = nullptr;
+  std::int32_t(__cdecl* m2aexecfunc)(moho::AdxBitstreamDecoderState* decoder) = nullptr;
   std::int32_t(__cdecl* m2asetsjifunc)(void* m2aDecoderHandle) = nullptr;
   std::int32_t(__cdecl* m2atermsupplyfunc)(void* m2aDecoderHandle) = nullptr;
   extern std::int16_t skg_prim_tbl[1024];
@@ -4561,136 +4561,6 @@ namespace
   constexpr float kM2aMonoDownmixScale = 0.5f;
   constexpr std::uint32_t kM2aDownmixBufferBytes =
     static_cast<std::uint32_t>(kM2aPcmWindowSampleCount * sizeof(float));
-
-  struct AdxbRuntimeView
-  {
-    std::int16_t slotState = 0; // +0x00
-    std::int16_t initState = 0; // +0x02
-    std::int32_t runState = 0; // +0x04
-    void* adxPacketDecoder = nullptr; // +0x08
-    std::int8_t headerType = 0; // +0x0C
-    std::int8_t sourceSampleBits = 0; // +0x0D
-    std::int8_t sourceChannels = 0; // +0x0E
-    std::int8_t sourceBlockBytes = 0; // +0x0F
-    std::int32_t sourceBlockSamples = 0; // +0x10
-    std::int32_t sampleRate = 0; // +0x14
-    std::int32_t totalSampleCount = 0; // +0x18
-    std::int16_t adpcmCoefficientIndex = 0; // +0x1C
-    std::uint8_t mUnknown1E[0x2]{}; // +0x1E
-    std::int32_t loopInsertedSamples = 0; // +0x20
-    std::int16_t loopCount = 0; // +0x24
-    std::uint16_t loopType = 0; // +0x26
-    std::int32_t loopStartSample = 0; // +0x28
-    std::int32_t loopStartOffset = 0; // +0x2C
-    std::int32_t loopEndSample = 0; // +0x30
-    std::int32_t loopEndOffset = 0; // +0x34
-    void* pcmBufferTag = nullptr; // +0x38
-    std::int16_t* pcmBuffer0 = nullptr; // +0x3C
-    std::int32_t pcmBufferSampleLimit = 0; // +0x40
-    std::int32_t pcmBufferSecondChannelOffset = 0; // +0x44
-    char* sourceWordStream = nullptr; // +0x48
-    std::int32_t sourceWordLimit = 0; // +0x4C
-    std::int32_t outputChannels = 0; // +0x50
-    std::int32_t outputBlockBytes = 0; // +0x54
-    std::int32_t outputBlockSamples = 0; // +0x58
-    std::int16_t* outputWordStream0 = nullptr; // +0x5C
-    std::int32_t outputWordLimit = 0; // +0x60
-    std::int32_t outputSecondChannelOffset = 0; // +0x64
-    std::int32_t entryWriteStartWordIndex = 0; // +0x68
-    std::int32_t entryWriteUsedWordCount = 0; // +0x6C
-    std::int32_t entryWriteCapacityWords = 0; // +0x70
-    std::int32_t callbackLane3 = 0; // +0x74
-    void(__cdecl* entryGetWriteFunc)(std::int32_t, std::int32_t*, std::int32_t*, std::int32_t*) = nullptr; // +0x78
-    std::int32_t entryGetWriteContext = 0; // +0x7C
-    std::int32_t(__cdecl* entryAddWriteFunc)(std::int32_t, std::int32_t, std::int32_t) = nullptr; // +0x80
-    std::int32_t entryAddWriteContext = 0; // +0x84
-    std::int32_t entrySubmittedBytes = 0; // +0x88
-    std::int32_t entryCommittedBytes = 0; // +0x8C
-    std::int32_t producedSampleCount = 0; // +0x90
-    std::int32_t producedByteCount = 0; // +0x94
-    std::int16_t format = 0; // +0x98
-    std::int16_t preferredFormat = 0; // +0x9A
-    std::int16_t outputSamplePacking = 0; // +0x9C
-    std::uint8_t mUnknown9E[0x2]{}; // +0x9E
-    std::uint8_t mUnknownA0[0x14]{}; // +0xA0
-    void* ahxDecoderHandle = nullptr; // +0xB4
-    std::int32_t ahxMaxDecodeSamples = 0; // +0xB8
-    std::int32_t ahxMaxDecodeBlocks = 0; // +0xBC
-    std::uint8_t mUnknownC0[0x4]{}; // +0xC0
-    std::int32_t mpaDecodeSampleLimit = 0; // +0xC4
-    std::int32_t mpaDecodeBlockLimit = 0; // +0xC8
-    std::uint8_t mUnknownCC[0x28]{}; // +0xCC
-    std::int32_t channelExpandHandle = 0; // +0xF4
-    std::int32_t expandMatrixParamA = 0; // +0xF8
-    std::int32_t expandMatrixParamB = 0; // +0xFC
-    std::int32_t decodeCallbackConsumedBytes = 0; // +0x100
-    std::uint8_t mUnknown104[0x4]{}; // +0x104
-    std::int32_t(__cdecl* decodeCallback)(std::int32_t callbackContext, std::int32_t producedDelta, std::int32_t producedBytes) = nullptr; // +0x108
-    std::int32_t decodeCallbackContext = 0; // +0x10C
-  };
-
-  static_assert(offsetof(AdxbRuntimeView, runState) == 0x04, "AdxbRuntimeView::runState offset must be 0x04");
-  static_assert(offsetof(AdxbRuntimeView, adxPacketDecoder) == 0x08, "AdxbRuntimeView::adxPacketDecoder offset must be 0x08");
-  static_assert(offsetof(AdxbRuntimeView, sourceChannels) == 0x0E, "AdxbRuntimeView::sourceChannels offset must be 0x0E");
-  static_assert(offsetof(AdxbRuntimeView, sourceWordStream) == 0x48, "AdxbRuntimeView::sourceWordStream offset must be 0x48");
-  static_assert(offsetof(AdxbRuntimeView, outputChannels) == 0x50, "AdxbRuntimeView::outputChannels offset must be 0x50");
-  static_assert(offsetof(AdxbRuntimeView, outputWordStream0) == 0x5C, "AdxbRuntimeView::outputWordStream0 offset must be 0x5C");
-  static_assert(
-    offsetof(AdxbRuntimeView, entryGetWriteFunc) == 0x78, "AdxbRuntimeView::entryGetWriteFunc offset must be 0x78"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, entryAddWriteFunc) == 0x80, "AdxbRuntimeView::entryAddWriteFunc offset must be 0x80"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, producedSampleCount) == 0x90, "AdxbRuntimeView::producedSampleCount offset must be 0x90"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, producedByteCount) == 0x94, "AdxbRuntimeView::producedByteCount offset must be 0x94"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, channelExpandHandle) == 0xF4,
-    "AdxbRuntimeView::channelExpandHandle offset must be 0xF4"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, expandMatrixParamA) == 0xF8,
-    "AdxbRuntimeView::expandMatrixParamA offset must be 0xF8"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, expandMatrixParamB) == 0xFC,
-    "AdxbRuntimeView::expandMatrixParamB offset must be 0xFC"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, ahxDecoderHandle) == 0xB4,
-    "AdxbRuntimeView::ahxDecoderHandle offset must be 0xB4"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, ahxMaxDecodeSamples) == 0xB8,
-    "AdxbRuntimeView::ahxMaxDecodeSamples offset must be 0xB8"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, ahxMaxDecodeBlocks) == 0xBC,
-    "AdxbRuntimeView::ahxMaxDecodeBlocks offset must be 0xBC"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, mpaDecodeSampleLimit) == 0xC4,
-    "AdxbRuntimeView::mpaDecodeSampleLimit offset must be 0xC4"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, mpaDecodeBlockLimit) == 0xC8,
-    "AdxbRuntimeView::mpaDecodeBlockLimit offset must be 0xC8"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, decodeCallbackConsumedBytes) == 0x100,
-    "AdxbRuntimeView::decodeCallbackConsumedBytes offset must be 0x100"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, decodeCallback) == 0x108, "AdxbRuntimeView::decodeCallback offset must be 0x108"
-  );
-  static_assert(
-    offsetof(AdxbRuntimeView, decodeCallbackContext) == 0x10C,
-    "AdxbRuntimeView::decodeCallbackContext offset must be 0x10C"
-  );
-  static_assert(sizeof(AdxbRuntimeView) == 0x110, "AdxbRuntimeView size must be 0x110");
 
   struct AdxPacketDecodeSampleView
   {
@@ -6029,16 +5899,6 @@ namespace
       return pointer;
     }
     return pointer + (4u - misalignment);
-  }
-
-  [[nodiscard]] AdxbRuntimeView* AsAdxbRuntimeView(moho::AdxBitstreamDecoderState* const decoder)
-  {
-    return reinterpret_cast<AdxbRuntimeView*>(decoder);
-  }
-
-  [[nodiscard]] const AdxbRuntimeView* AsAdxbRuntimeView(const moho::AdxBitstreamDecoderState* const decoder)
-  {
-    return reinterpret_cast<const AdxbRuntimeView*>(decoder);
   }
 
   [[nodiscard]] AdxsjdRuntimeView* AsAdxsjdRuntimeView(const std::int32_t sjdHandle)

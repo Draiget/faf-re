@@ -10800,24 +10800,20 @@
     const std::int32_t sourceHalfBufferBytes = SJRBF_GetBufSize(sourceHandle) / 2;
     const std::int32_t sourceHalfExtraBytes = SJRBF_GetXtrSize(sourceHandle) / 2;
 
+    // The first output SJ's ring is the PCM ring: its byte sizes halve into
+    // 16-bit sample counts, and channel 1 starts past the ring's extra area.
     runtime->adxbHandle = ADXB_Create(
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(outputHandleCount))),
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceBufferAddress))),
-      reinterpret_cast<void*>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceHalfBufferBytes))),
-      reinterpret_cast<void*>(
-        static_cast<std::uintptr_t>(static_cast<std::uint32_t>(sourceHalfBufferBytes + sourceHalfExtraBytes))
-      )
+      outputHandleCount,
+      reinterpret_cast<std::int16_t*>(SjAddressToPointer(sourceBufferAddress)),
+      sourceHalfBufferBytes,
+      sourceHalfBufferBytes + sourceHalfExtraBytes
     );
 
     if (runtime->adxbHandle == nullptr) {
       return 0;
     }
 
-    ADXB_EntryGetWrFunc(
-      runtime->adxbHandle,
-      reinterpret_cast<void*>(adxsjd_get_wr),
-      static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(runtime))
-    );
+    ADXB_EntryGetWrFunc(runtime->adxbHandle, adxsjd_get_wr, runtime);
 
     runtime->inputSourceHandle = reinterpret_cast<void*>(
       static_cast<std::uintptr_t>(static_cast<std::uint32_t>(inputSourceHandleAddress))
@@ -10969,16 +10965,14 @@
    * Fetches writable output chunks from ADXSJD output lanes and reports decode
    * write window/capacity/trap-distance lanes to ADXB.
    */
-  std::int32_t adxsjd_get_wr(
-    const std::int32_t callbackContext,
+  std::int16_t* adxsjd_get_wr(
+    void* const callbackContext,
     std::int32_t* const outWriteOffsetSamples,
     std::int32_t* const outWritableSamples,
     std::int32_t* const outUntilTrapSamples
   )
   {
-    auto* const runtime = reinterpret_cast<AdxsjdRuntimeView*>(
-      static_cast<std::uintptr_t>(static_cast<std::uint32_t>(callbackContext))
-    );
+    auto* const runtime = static_cast<AdxsjdRuntimeView*>(callbackContext);
 
     const std::int32_t channelCount = ADXB_GetNumChan(runtime->Decoder());
     for (std::int32_t lane = 0; lane < channelCount; ++lane) {
@@ -11000,7 +10994,7 @@
       *outUntilTrapSamples = runtime->trapSampleCount - runtime->trapCount;
     }
 
-    return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(ADXB_GetPcmBuf(runtime->Decoder())));
+    return ADXB_GetPcmBuf(runtime->Decoder());
   }
 
   [[nodiscard]] static moho::SofdecSjSupplyHandle* AsSofdecSjSupplyHandle(void* const handle)
@@ -11102,8 +11096,7 @@
 
     if (sourceBytesAvailable >= 16 && headerConsumedBytes != 0 && headerConsumedBytes <= sourceBytesAvailable) {
       if (headerConsumedBytes < 0) {
-        const auto* const decoderView = AsAdxbRuntimeView(decoder);
-        if (decoderView->preferredFormat == 0) {
+        if (decoder->preferredFormat == 0) {
           ADXSJD_PutSupplyChunk(sourceHandle, 1, &runtime->outputWriteChunks[0]);
           if (ADXB_GetDecErrMode() == 0) {
             ADXERR_CallErrFunc2_(kAdxsjdDecodePrepHeaderErrorPrefix, kAdxsjdDecodePrepHeaderErrorMessage);
@@ -11144,8 +11137,8 @@
         ADXSJD_PutSupplyChunk(sourceHandle, 1, &trailingChunk);
       }
 
-      if (AsAdxbRuntimeView(decoder)->channelExpandHandle != 0 && ADXB_OnUpdateSampleRate != nullptr) {
-        ADXB_OnUpdateSampleRate(decoder, AsAdxbRuntimeView(decoder)->sampleRate);
+      if (decoder->channelExpandHandle != 0 && ADXB_OnUpdateSampleRate != nullptr) {
+        ADXB_OnUpdateSampleRate(decoder, decoder->sampleRate);
       }
 
       runtime->streamFormatClass = 2;
@@ -11264,7 +11257,11 @@
       ADXSJD_PutSupplyChunk(sourceHandle, 1, &runtime->outputWriteChunks[0]);
     }
 
-    ADXB_EntryData(decoder, runtime->outputWriteChunks[0].bufferAddress, runtime->outputWriteChunks[0].byteCount);
+    ADXB_EntryData(
+      decoder,
+      reinterpret_cast<char*>(SjAddressToPointer(runtime->outputWriteChunks[0].bufferAddress)),
+      runtime->outputWriteChunks[0].byteCount
+    );
     return static_cast<std::int32_t>(reinterpret_cast<std::intptr_t>(ADXB_Start(decoder)));
   }
 
