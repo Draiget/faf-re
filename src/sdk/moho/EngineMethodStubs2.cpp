@@ -36,8 +36,8 @@ namespace moho
 //
 // The real bodies belong to Moho::CColPrimitive<T>, a template with two
 // instantiations (Box3f @0x00E0D50C, Sphere3f @0x00E0D480), which is what
-// the paired addresses in EntityCollisionUpdater.h have always been. Both
-// are recovered there as explicit specializations.
+// the paired addresses on CColPrimitiveBase have always been. Both are
+// recovered in moho/collision/CColPrimitiveBase.h as explicit specializations.
 
 // IWldSessionLoader had all seven of its virtuals stubbed here. They are
 // pure in the binary: the interface vftable at 0x00E49FA4 points all 7 slots

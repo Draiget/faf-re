@@ -6344,7 +6344,7 @@ namespace Wm3
    * referenced addresses) found zero references to either address.
    * `grep -rn IntrSegment3Box3 src/sdk/` finds only the *float* free-
    * function API (`IntrSegment3Box3fFind`, called from
-   * `EntityCollisionUpdater.cpp:597`, which writes into a caller-owned
+   * `CColPrimitive<Wm3::Box3f>::CollideLine`, which writes into a caller-owned
    * output array and never touches `Real=double` or `.GetPoint()`); no
    * engine code anywhere constructs the double intersector or reaches its
    * `Find()`/`GetPoint()`. This confirms a real template match but not a
@@ -6418,7 +6418,7 @@ namespace Wm3
    * comments) found zero references to `0x00A46990`. `grep -rn
    * IntrSegment3Sphere3 src/sdk/` finds only the *float* free-function API
    * (`IntrSegment3Sphere3fFind`, called from
-   * `EntityCollisionUpdater.cpp:778`, which writes into a caller-owned
+   * `CColPrimitive<Wm3::Sphere3f>::CollideLine`, which writes into a caller-owned
    * output array); no engine code constructs the double intersector or
    * reaches its `Find()`/`GetPoint()`. Real match, no real caller -- does
    * not clear the `Eigen<Real>::operator()` relocation bar (commit
