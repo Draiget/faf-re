@@ -26,6 +26,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace moho
 {
@@ -663,8 +664,8 @@ namespace moho
               // CUnitCallTransport's own TASKSTATE_Preparing refuses to advance
               // while the transport is in a holding pattern, so a head-command
               // mismatch deadlocks both halves with the order still queued.
-              static int sHeadMismatchProbe = 0;
-              if ((sHeadMismatchProbe++ % 60) == 0) {
+              static moho::DiagnosticBudget sHeadMismatchProbe;
+              if ((sHeadMismatchProbe.Next() % 60) == 0) {
                 DiagLine(
                   "[XPORTDIAG] LoadUnits head mismatch: transport=%p ownerHead=%p candidate=%p candHead=%p",
                   static_cast<void*>(mUnit), static_cast<void*>(ownerHeadCommand),

@@ -118,6 +118,7 @@
 #include "moho/resource/blueprints/RTrailBlueprint.h"
 #include "moho/resource/blueprints/RUnitBlueprint.h"
 #include "moho/projectile/Projectile.h"
+#include "moho/misc/DiagnosticBudget.h"
 #include "moho/script/CScriptEvent.h"
 #include "moho/script/CScriptObject.h"
 #include "moho/misc/LaunchInfoBase.h"
@@ -10792,8 +10793,8 @@ void Sim::AdvanceBeat(const int amt)
   // below (which contains the recon drive) is entered at all, so a "recon never
   // ticks" reading can be told apart from "the sim is simply paused".
   {
-    static int sProbe = 0;
-    if (sProbe++ < 6) {
+    static DiagnosticBudget sProbe;
+    if (sProbe.Take(6)) {
       gpg::Warnf(
         "[SIMGATE] tick=%u gameOver=%d pausedBy=%d singleStep=%d armies=%u",
         mCurTick,
@@ -10862,8 +10863,8 @@ void Sim::AdvanceBeat(const int amt)
     // enemy-click symptoms. This reports which of the two guards below is
     // dropping out -- an empty army list, or a null recon DB per army.
     {
-      static int sProbe = 0;
-      if (sProbe++ < 4) {
+      static DiagnosticBudget sProbe;
+      if (sProbe.Take(4)) {
         std::size_t nullDb = 0;
         for (std::size_t i = 0; i < mArmiesList.size(); ++i) {
           CArmyImpl* const a = mArmiesList[i];
@@ -22812,12 +22813,12 @@ int moho::cfunc_EntityEnableIntelL(LuaPlus::LuaState* const state)
     // "the handle was never allocated by InitIntel" (only 2 of 9 slots are
     // non-null) from "it was already enabled".
     {
-      static unsigned sCalls = 0;
+      static DiagnosticBudget sCalls;
       CIntelPosHandle* const probeHandle = ResolveIntelPosHandleForType(*intelManager, intelType);
-      if (sCalls++ < 40) {
+      if (const unsigned call = static_cast<unsigned>(sCalls.Next()) + 1u; call <= 40u) {
         gpg::Warnf(
           "[ENABLEINTEL] call=%u type=%d handle=%p enabled=%u radius=%u grid=%p",
-          sCalls, static_cast<int>(intelType), static_cast<void*>(probeHandle),
+          call, static_cast<int>(intelType), static_cast<void*>(probeHandle),
           probeHandle ? static_cast<unsigned>(probeHandle->mEnabled) : 9u,
           probeHandle ? static_cast<unsigned>(probeHandle->mRadius) : 0u,
           probeHandle ? static_cast<void*>(probeHandle->mGrid.px) : nullptr

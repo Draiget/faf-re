@@ -3132,6 +3132,9 @@
     <ClInclude Include="moho\misc\TimeBar.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="moho\misc\DiagnosticBudget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="gpg\core\containers\IntrusiveRbTree.h">
       <Filter>Header Files</Filter>
     </ClInclude>

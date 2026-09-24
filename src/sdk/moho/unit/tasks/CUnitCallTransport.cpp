@@ -19,6 +19,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CUnitMoveTask.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace
 {
@@ -248,8 +249,8 @@ namespace moho
         // CUnitLoadUnits' TASKSTATE_Preparing leaves set whenever it bails on a
         // head-command mismatch. These four flags say exactly which half of the
         // handshake is refusing to advance.
-        static int sCallTransportWaitProbe = 0;
-        if ((sCallTransportWaitProbe++ % 60) == 0) {
+        static DiagnosticBudget sCallTransportWaitProbe;
+        if ((sCallTransportWaitProbe.Next() % 60) == 0) {
           gpg::Warnf(
             "[XPORTDIAG] CallTransport wait: unit=%p xport=%p loading=%d holding=%d headsMatch=%d assist=%d",
             static_cast<void*>(mUnit), static_cast<void*>(transportUnit),

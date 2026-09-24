@@ -37,6 +37,7 @@
 #include "moho/unit/core/UnitWeapon.h"
 #include "moho/math/Wm3DistanceFafExtras.h"
 #include "Wm3Box3.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace gpg
 {
@@ -1258,8 +1259,8 @@ namespace moho
     // retarget), and ungated it buries every other probe in the .sclog and
     // slows the beat enough to change the timing being measured.
     {
-      static int sMotDiag = 0;
-      if (sMotDiag++ < 200) {
+      static DiagnosticBudget sMotDiag;
+      if (sMotDiag.Take(200)) {
         gpg::Warnf(
           "[MOTDIAG] SetTarget unit=%p target=(%.1f,%.1f) layer=%d state=%d",
           static_cast<void*>(mUnit), target.x, target.z,
@@ -1403,10 +1404,10 @@ namespace moho
     entity.SetPendingTransform(transform, pendingVelocityScale);
     // TEMPORARY PROBE -- inert move order triage, delete when resolved.
     {
-      static int sCount = 0;
-      if ((sCount++ % 20) == 0) {
+      static DiagnosticBudget sCount;
+      if (const int moveCount = sCount.Next() + 1; (moveCount - 1) % 20 == 0) {
         gpg::Warnf("[MOTDIAG] MoveTo unit=%p to=(%.2f,%.2f,%.2f) step=%.3f n=%d", static_cast<void*>(mUnit),
-                   transform.pos_.x, transform.pos_.y, transform.pos_.z, timeStep, sCount);
+                   transform.pos_.x, transform.pos_.y, transform.pos_.z, timeStep, moveCount);
       }
     }
     mUnit->SimulationRef->Logf(
@@ -2543,8 +2544,8 @@ namespace moho
     // TEMPORARY PROBE -- lever-arm triage for the ground-collision angular
     // runaway. Delete when resolved.
     if (anyGroundHit) {
-      static int sLeverCount = 0;
-      if (sLeverCount++ < 12) {
+      static DiagnosticBudget sLeverCount;
+      if (sLeverCount.Take(12)) {
         const Wm3::Sphere3f& s0 = *collisionSpheres.begin();
         const GroundPenetrationSample& h0 = *hitRecords.begin();
         gpg::Warnf(
@@ -3605,8 +3606,8 @@ namespace moho
     {
       const float accelMag = std::sqrt((accelX * accelX) + (accelY * accelY) + (accelZ * accelZ));
       if (!std::isfinite(accelMag) || accelMag > 2000.0f) {
-        static int sAirBlowCount = 0;
-        if (sAirBlowCount++ < 24) {
+        static DiagnosticBudget sAirBlowCount;
+        if (sAirBlowCount.Take(24)) {
           gpg::Warnf(
             "[AIRBLOW] unit=%p load=%.5f gains(turn=%.4f roll=%.4f lift=%.4f) dampMv=%.4f "
             "KMove=%.4f KLiftDamp=%.4f KTurnDamp=%.4f steer=(%.2f,%.2f,%.2f) vel=(%.2f,%.2f,%.2f) "
@@ -4303,8 +4304,8 @@ namespace moho
       const float pre = Wm3::Vector3f::Length(wImpBeforeIntegrate);
       const float post = Wm3::Vector3f::Length(physBody->mWorldImpulse);
       if (!std::isfinite(post) || post > 1000.0f || (pre > 1.0f && post > (pre * 1.3f))) {
-        static int sSpinCount = 0;
-        if (sSpinCount++ < 40) {
+        static DiagnosticBudget sSpinCount;
+        if (sSpinCount.Take(40)) {
           gpg::Warnf(
             "[AIRSPIN] unit=%p |wImp| pre=%.3f afterIntegrate=%.3f (integrateGain=%.3f) "
             "torque=(%.1f,%.1f,%.1f) invI=(%.6f,%.6f,%.6f) mass=%.2f curElev=%.2f speed=%.2f",
@@ -4325,8 +4326,8 @@ namespace moho
       const float postSpeed = Wm3::Vector3f::Length(physBody->mVelocity);
       const float preSpeed = Wm3::Vector3f::Length(mPreviousVelocity);
       if (!std::isfinite(postSpeed) || postSpeed > 250.0f) {
-        static int sFleeCount = 0;
-        if (sFleeCount++ < 24) {
+        static DiagnosticBudget sFleeCount;
+        if (sFleeCount.Take(24)) {
           gpg::Warnf(
             "[AIRFLEE] unit=%p preSpeed=%.2f postSpeed=%.2f pre=(%.2f,%.2f,%.2f) "
             "post=(%.2f,%.2f,%.2f) force=(%.1f,%.1f,%.1f) torque=(%.1f,%.1f,%.1f) "
@@ -4399,11 +4400,11 @@ namespace moho
   {
     // TEMPORARY PROBE -- inert move order triage, delete when resolved.
     {
-      static int sCount = 0;
-      if ((sCount++ % 100) == 0) {
+      static DiagnosticBudget sCount;
+      if (const int tickCount = sCount.Next() + 1; (tickCount - 1) % 100 == 0) {
         gpg::Warnf("[MOTDIAG] CUnitMotion::MotionTick unit=%p state=%d target=(%.1f,%.1f,%.1f) n=%d",
                    static_cast<void*>(mUnit), static_cast<int>(mMotionState), mTargetPosition.x, mTargetPosition.y,
-                   mTargetPosition.z, sCount);
+                   mTargetPosition.z, tickCount);
       }
     }
     if (mUnit->IsBeingBuilt()) {

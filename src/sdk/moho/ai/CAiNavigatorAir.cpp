@@ -14,6 +14,7 @@
 #include "moho/unit/CUnitMotion.h"
 #include "moho/unit/core/IUnit.h"
 #include "moho/unit/core/Unit.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 using namespace moho;
 
@@ -444,8 +445,8 @@ int CAiNavigatorAir::Execute()
   // line with atTarget=1 and a large dist is the bug reproducing: arrival
   // declared while still far away, because vert=Hover skipped the distance test.
   {
-    static int sProbe = 0;
-    if (sProbe++ < 60) {
+    static DiagnosticBudget sProbe;
+    if (sProbe.Take(60)) {
       const CUnitMotion* const motion = mUnit->UnitMotion;
       const float dx = mGoalPos.x - mUnit->GetPosition().x;
       const float dz = mGoalPos.z - mUnit->GetPosition().z;

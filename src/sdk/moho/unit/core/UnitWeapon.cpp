@@ -55,6 +55,7 @@
 #include "moho/unit/core/Unit.h"
 #include "moho/unit/tasks/CFireWeaponTask.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace
 {
@@ -376,8 +377,8 @@ namespace
   // that is always opened. Bounded, because CanFire runs per weapon per tick.
   void BombDiagLine(const char* const fmt, ...)
   {
-    static int sCount = 0;
-    if (sCount++ >= 400) {
+    static moho::DiagnosticBudget sCount;
+    if (!sCount.Take(400)) {
       return;
     }
 

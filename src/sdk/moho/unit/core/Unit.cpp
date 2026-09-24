@@ -97,6 +97,7 @@
 #include "moho/unit/core/UserUnit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace gpg
 {
@@ -13147,12 +13148,12 @@ int Unit::MotionTick()
   SimulationRef->Logf("0x%08x's motion tick.\n", id_);
   // TEMPORARY PROBE -- inert move order triage, delete when resolved.
   {
-    static int sMotionTickCount = 0;
-    if ((sMotionTickCount++ % 100) == 0) {
+    static DiagnosticBudget sMotionTickCount;
+    if (const int motionTick = sMotionTickCount.Next() + 1; (motionTick - 1) % 100 == 0) {
       const Wm3::Vec3f& p = GetPosition();
       gpg::Warnf("[MOTDIAG] Unit::MotionTick id=0x%08X pos=(%.1f,%.1f,%.1f) motion=%p nav=%p queue=%d n=%d",
                  static_cast<unsigned>(id_), p.x, p.y, p.z, static_cast<void*>(UnitMotion), static_cast<void*>(AiNavigator),
-                 CommandQueue != nullptr ? static_cast<int>(CommandQueue->mCommandVec.size()) : -1, sMotionTickCount);
+                 CommandQueue != nullptr ? static_cast<int>(CommandQueue->mCommandVec.size()) : -1, motionTick);
     }
   }
 
@@ -15390,8 +15391,8 @@ void Unit::UpdateBlipsInRange()
   {
     // Periodic and only when something is actually in range -- an early
     // "enemy=0" just means the armies have not met yet.
-    static int sProbe = 0;
-    if ((unitsInRange.end() - unitsInRange.begin()) > 1 && (sProbe++ % 40) == 0) {
+    static DiagnosticBudget sProbe;
+    if ((unitsInRange.end() - unitsInRange.begin()) > 1 && (sProbe.Next() % 40) == 0) {
       std::size_t candidates = 0;
       std::size_t enemies = 0;
       std::size_t withBlip = 0;
@@ -16302,8 +16303,8 @@ void Unit::ExecuteOccupyGround()
   // TEMPORARY PROBE -- navigation triage. Separate tag from [OCCDIAG] because
   // the map's props exhaust that probe's budget before any structure lands.
   {
-    static int sCount = 0;
-    if (sCount++ < 60) {
+    static DiagnosticBudget sCount;
+    if (sCount.Take(60)) {
       gpg::Warnf("[NAVGATE] UnitOccupy caps=0x%X fp=%dx%d rects=%d motion=%d bp=%s",
                  static_cast<unsigned>(occupancyCaps), static_cast<int>(footprint.mSizeX),
                  static_cast<int>(footprint.mSizeZ), static_cast<int>(blueprint->Physics.OccupyRects.size()),
@@ -17301,8 +17302,8 @@ void Unit::Sync(SSyncData* const syncData)
   VarDat().mPriorSharedPose = AniActor->GetPriorPoseShared();
   // TEMPORARY PROBE -- invisible-commander triage, delete when resolved.
   if (GetBlueprint() != nullptr && std::strstr(GetBlueprint()->mBlueprintId.c_str(), "uel0001") != nullptr) {
-    static int sSyncCount = 0;
-    if ((sSyncCount++ % 20) == 0) {
+    static DiagnosticBudget sSyncCount;
+    if (const int syncCount = sSyncCount.Next() + 1; (syncCount - 1) % 20 == 0) {
       auto countVisible = [](const CAniPose* pose) {
         int n = 0;
         if (pose != nullptr) {
@@ -17325,7 +17326,7 @@ void Unit::Sync(SSyncData* const syncData)
       }
       gpg::Warnf("[POSEDIAG] Sync unit=%p cur=%p visible=%d prior=%p visible=%d bones=%s n=%d", static_cast<void*>(this),
                  static_cast<const void*>(cur), countVisible(cur), static_cast<const void*>(prior), countVisible(prior), rootFlags,
-                 sSyncCount);
+                 syncCount);
     }
   }
 

@@ -2179,6 +2179,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClInclude Include="moho\misc\XDataError.h" />
     <ClInclude Include="moho\misc\XFileError.h" />
     <ClInclude Include="moho\misc\TimeBar.h" />
+    <ClInclude Include="moho\misc\DiagnosticBudget.h" />
     <ClInclude Include="moho\containers\TDatList.h" />
     <ClInclude Include="moho\containers\TDatTreeItem.h" />
     <ClInclude Include="moho\misc\VisionDb.h" />

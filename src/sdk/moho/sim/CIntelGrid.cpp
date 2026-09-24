@@ -14,6 +14,7 @@
 #include "moho/sim/STIMap.h"
 #include "moho/sim/STIMapReflection.h"
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace gpg
 {
@@ -418,16 +419,16 @@ namespace moho
     // a world radius smaller than the cell size truncates to 0 and writes
     // nothing.
     {
-      static unsigned sCalls = 0;
-      static unsigned sZeroCell = 0;
-      ++sCalls;
+      static DiagnosticBudget sCalls;
+      static DiagnosticBudget sZeroCell;
+      const unsigned calls = static_cast<unsigned>(sCalls.Next()) + 1u;
       if ((radius / mGridSize) == 0u) {
-        ++sZeroCell;
+        (void)sZeroCell.Next();
       }
-      if ((sCalls % 100u) == 0u) {
+      if ((calls % 100u) == 0u) {
         gpg::Warnf(
           "[INTELSTAMP] calls=%u zeroCellRadius=%u radius=%u gridSize=%u cells=%u pos=(%.1f,%.1f)",
-          sCalls, sZeroCell, radius, mGridSize, radius / mGridSize, position.x, position.z
+          calls, static_cast<unsigned>(sZeroCell.Count()), radius, mGridSize, radius / mGridSize, position.x, position.z
         );
       }
     }

@@ -41,6 +41,7 @@
 #include "moho/task/CTaskThread.h"
 #include "moho/unit/core/Unit.h"
 #include "Wm3Segment3.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace moho
 {
@@ -1133,8 +1134,8 @@ namespace moho
     }
 
     {
-      static int sImpactProbe = 0;
-      if (sImpactProbe++ < 20) {
+      static DiagnosticBudget sImpactProbe;
+      if (sImpactProbe.Take(20)) {
         gpg::Warnf("[IMPACTDIAG] Projectile::Impact this=%p type='%s' collided=%p",
                    static_cast<void*>(this), impactTypeString != nullptr ? impactTypeString : "<null>",
                    static_cast<void*>(collidedEntity));

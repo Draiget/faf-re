@@ -76,6 +76,7 @@
 #include "moho/unit/core/Unit.h"
 
 #include "gpg/core/reflection/StaticInitPhase.h"
+#include "moho/misc/DiagnosticBudget.h"
 
 namespace gpg
 {
@@ -3593,8 +3594,8 @@ namespace moho
       next = 0.0f;
     }
     {
-      static int sAdjProbe = 0;
-      if (delta < 0.0f && sAdjProbe++ < 40) {
+      static DiagnosticBudget sAdjProbe;
+      if (delta < 0.0f && sAdjProbe.Take(40)) {
         gpg::Warnf("[DMGDIAG] AdjustHealth this=%p isUnit=%d health=%.2f maxHealth=%.2f delta=%.2f next=%.2f willSet=%d",
                    static_cast<void*>(this), (IsUnit() != nullptr) ? 1 : 0,
                    mVarDat.mHealth, mVarDat.mMaxHealth, delta, next, (next != mVarDat.mHealth) ? 1 : 0);
@@ -4182,9 +4183,8 @@ namespace moho
         !(std::isfinite(current.orient_.w) && std::isfinite(current.orient_.x) &&
           std::isfinite(current.orient_.y) && std::isfinite(current.orient_.z));
       if (posBad || orientBad) {
-        static int sAdvanceProbeBudget = 0;
-        if (sAdvanceProbeBudget < 16) {
-          ++sAdvanceProbeBudget;
+        static DiagnosticBudget sAdvanceProbeBudget;
+        if (sAdvanceProbeBudget.Take(16)) {
           char probe[352];
           const char* className = "?";
           try {
@@ -5847,8 +5847,8 @@ namespace moho
     const float delta = static_cast<float>(lua_tonumber(rawState, 3));
 
     {
-      static int sBindProbe = 0;
-      if (delta < 0.0f && sBindProbe++ < 30) {
+      static DiagnosticBudget sBindProbe;
+      if (delta < 0.0f && sBindProbe.Take(30)) {
         gpg::Warnf("[DMGDIAG] Lua AdjustHealth binding entity=%p isUnit=%d delta=%.1f",
                    static_cast<void*>(entity), (entity->IsUnit() != nullptr) ? 1 : 0, delta);
       }
