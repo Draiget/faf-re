@@ -65,18 +65,15 @@ public:
 
     /**
      * Address: 0x008E4960 (FUN_008E4960, HistoryLogTarget::~HistoryLogTarget)
-     * Address: 0x008E45E0 (FUN_008E45E0, the binary's std::list<Entry> node
-     *   teardown walk this destructor ran over its original list-backed
-     *   retention lane -- confirmed callsite at 0x008E498B inside this
-     *   destructor's own body; absorbed here by mEntries' (msvc8::vector<Entry>)
-     *   implicit destructor immediately below, same per-entry teardown)
-     * Address: 0x008E42C0 (FUN_008E42C0, the same original std::list<Entry>'s
-     *   node buy/allocate half: operator new(0x30) -- 8-byte prev/next plus
+     * Address: 0x008E45E0 (FUN_008E45E0, `msvc8::list<Entry>`'s node teardown
+     *   walk -- confirmed callsite at 0x008E498B inside this destructor's own
+     *   body; emitted by `mEntries`' implicit destructor)
+     * Address: 0x008E42C0 (FUN_008E42C0, `msvc8::list<Entry>`'s node
+     *   buy/allocate half: operator new(0x30) -- 8-byte next/prev plus
      *   Entry's 40-byte payload (kind+severity+msvc8::string+contextDepth) --
      *   then self-links the fresh node as an empty sentinel. Reached from
-     *   this constructor's own original list-init sequence and from
-     *   HistoryLogTarget::Log's original per-message list insert, both
-     *   superseded by mEntries' (msvc8::vector<Entry>) push_back below.)
+     *   this constructor's list init and from every per-message
+     *   `mEntries.push_back` in OnMessage.)
      * Also emitted at: 0x008E4B10 (FUN_008E4B10, HistoryLogTarget::dtr) --
      *   the scalar deleting destructor MSVC generates for any polymorphic
      *   class with a virtual destructor override, matching this override
@@ -158,7 +155,7 @@ public:
      */
     void ReplayTo(gpg::LogTarget& target)
     {
-        msvc8::vector<Entry> snapshot{};
+        msvc8::list<Entry> snapshot{};
         {
             boost::recursive_mutex::scoped_lock lock(mLock);
             if (mEntries.empty()) {
@@ -210,15 +207,17 @@ public:
 private:
     /**
      * Address: 0x008E4770 (FUN_008E4770, HistoryLogTarget::TrimLocked)
-     * Address: 0x008E4660 (FUN_008E4660, the binary's std::list<Entry>::erase
-     *   node-unlink this trim loop called on its original list-backed
-     *   retention lane -- confirmed callsite at 0x008E4833 inside this
-     *   function's own body; absorbed here by the mEntries.erase(...) call
-     *   below, same per-entry drop)
+     * Address: 0x008E4660 (FUN_008E4660, `msvc8::list<Entry>::erase`'s node
+     *   unlink -- confirmed callsite at 0x008E4833 inside this function's own
+     *   body; emitted by the `mEntries.erase(...)` calls below)
      *
      * What it does:
      * Removes oldest retained message entries (and stale context lanes) until
      * retained message count is within the configured cap.
+     *
+     * The walk re-examines the same entry after dropping the context entry
+     * before it (`previous`), which is why that erase does not advance `it`:
+     * a list erase leaves every other iterator valid.
      */
     void TrimLocked()
     {
@@ -234,18 +233,19 @@ private:
             bool removedMessage = false;
             int currentDepth = 0;
 
-            for (std::size_t index = 0; index < mEntries.size();) {
-                const int entryDepth = mEntries[index].contextDepth;
+            for (auto it = mEntries.begin(); it != mEntries.end();) {
+                const int entryDepth = it->contextDepth;
                 if (entryDepth < 0) {
-                    mEntries.erase(mEntries.begin() + index);
+                    it = mEntries.erase(it);
                     continue;
                 }
                 if (entryDepth < currentDepth) {
-                    if (index == 0) {
+                    if (it == mEntries.begin()) {
                         currentDepth = entryDepth;
                     } else {
-                        --index;
-                        mEntries.erase(mEntries.begin() + index);
+                        auto previous = it;
+                        --previous;
+                        mEntries.erase(previous);
                         --currentDepth;
                     }
                     continue;
@@ -253,13 +253,13 @@ private:
 
                 currentDepth = entryDepth;
 
-                if (mEntries[index].kind == EntryKind::Context) {
+                if (it->kind == EntryKind::Context) {
                     ++currentDepth;
-                    ++index;
+                    ++it;
                     continue;
                 }
 
-                mEntries.erase(mEntries.begin() + index);
+                mEntries.erase(it);
                 --mMessageCount;
                 removedMessage = true;
                 break;
@@ -272,7 +272,11 @@ private:
     }
 
     boost::recursive_mutex mLock{};
-    msvc8::vector<Entry> mEntries{};
+    // A list, as in the binary (node alloc 0x008E42C0, unlink 0x008E4660):
+    // once the cap is reached every new message evicts the oldest one, which is
+    // an O(1) unlink here. As a vector, each eviction shifted every retained
+    // entry - on every log line, since `EnableLogHistory(100)` runs at startup.
+    msvc8::list<Entry> mEntries{};
     std::int32_t mMaxMessages = 0;
     std::int32_t mMessageCount = 0;
     std::int32_t mReplayDepth = 0;
