@@ -2194,6 +2194,8 @@ namespace msvc8
          * `moho/sim/SimDriver.cpp` -- collapsed into this template
          * instantiation, RULE ONE.
          * Address: 0x008EAA40 (FUN_008EAA40 -- `~vector`, one `jmp` into `_Tidy` 0x008EA7D0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); zero callers, unreachable -- `~AdapterD3D9` calls `_Tidy` directly (0x00940CBF). Was DB `skip`.)
+         * Address: 0x004F7060 (FUN_004F7060 -- `~vector`, one `jmp` into the destructor body 0x004F8180, for `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`); zero callers: the exit-time destructor runs through 0x00BF18B0. Formerly anchored in moho/app/WinApp.cpp.)
+         * Address: 0x004F7130 (FUN_004F7130 -- the same `jmp` into 0x004F82D0 for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`); zero callers, exit-time destructor 0x00BF18C0. Formerly anchored in moho/app/WinApp.cpp.)
          *
          * Destructor: destroy elements and free storage if allowed
          */
@@ -2653,6 +2655,8 @@ namespace msvc8
          * Address: 0x00889FE0 (FUN_00889FE0 -- `size()` for a 0x4C-byte element: `(last_ - first_) / 76` with a null-`first_` guard returning 0; one caller, 0x008895A0; formerly `CountStride76RecordsRuntime` in moho/sim/CWldMap.cpp over a `Stride76RangeRuntimeView` stand-in (RULE ONE), removed 2026-09-18.)
          * Address: 0x008E8400 (FUN_008E8400 -- `size()`, `(last - first) / 60` through `0x88888889 >> 5`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x0093FFA5, 0x00942C64, 0x00942CBB; formerly `EffectMacroCount` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008E83A0 (FUN_008E83A0 -- `size()`, `(last - first) / 112` (`0x92492493`, `add`, `sar 6`) with the null-`first` guard, for `msvc8::vector<gpg::gal::AdapterD3D9>` (`DeviceD3D9::mAdapters` at +0x28, the 0x70 element); callers 0x008F1992 (`_Insert_n` 0x008F1890); formerly `CountAdapterVectorElements` over an `AdapterVectorCountRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x004F7070 (FUN_004F7070 -- `size()` specialised to `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): the global's `first_`/`last_` (0x010A9B94/0x010A9B98) read directly, `(last_ - first_) >> 3` behind the null-`first_` guard; caller 0x004F8D63 (the registry's `insert`, 0x004F8CA0). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
+         * Address: 0x004F7140 (FUN_004F7140 -- the same `size()` for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`) (0x010A9BD8); caller 0x004F9113 (`insert`, 0x004F9050). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -7254,6 +7258,8 @@ namespace msvc8
          * deleting destructor through vtable +0x08 with flag 0); first in ESI, last in EDI; callers
          * 0x00516310 (`reserve`), 0x00516970 (`insert`); formerly `LegacyInvokeVirtualSlot8AcrossStride16RangeRuntimeLaneAlpha` in moho/misc/WinApiImportThunks.cpp (RULE ONE), removed 2026-09-22.)
          * Address: 0x004331C0 (FUN_004331C0 -- `_Destroy` through the element's virtual destructor (`push 0; call [vtbl]`) at stride 0x3C, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x004314F1, 0x004322A1, 0x00940045, 0x00940086, 0x00940150, 0x00942C01, 0x00942CA8. It was marked `skip` as a non-engine STL helper; it is this engine instantiation.)
+         * Address: 0x004FADE0 (FUN_004FADE0 -- `destroy_range` for `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): each slot's `~WeakPtr` unlinks it from its dialog's owner chain; `first` in ECX, `last` in EDX; callers 0x004F8195 (the destructor body 0x004F8180), 0x004F8E1C, 0x004F8E5B and 0x004F8EDC (`insert`, 0x004F8CA0), 0x004F8C95, 0x004FA6B5. Formerly anchored in moho/app/WinApp.cpp.)
+         * Address: 0x004FAED0 (FUN_004FAED0 -- the same for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`); callers 0x004F82E5 (0x004F82D0), 0x004F91CC, 0x004F920B and 0x004F928C (`insert`, 0x004F9050), 0x004F9045, 0x004FA775. Formerly anchored in moho/app/WinApp.cpp.)
          */
         static void destroy_range(T* first, T* last) noexcept {
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -11427,6 +11433,7 @@ namespace msvc8
          * Address: 0x007983B0 (FUN_007983B0 -- `_Buy` for a 20-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x007C92B0 (FUN_007C92B0 -- `_Buy` for a 16-byte element; zero callers, no xrefs, unreachable from every seeded root: a linker-retained copy nothing runs.)
          * Address: 0x008EF750 (FUN_008EF750 -- `_Buy`: null the three pointers, then for a non-zero count `_Xlen` past 0x0FFFFFFF and allocate through 0x008E87F0, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF999 (`operator=` 0x008EF870's reallocating path). Was DB `external_dependency`; it is engine code.)
+         * Address: 0x004F8140 (FUN_004F8140 -- `_Buy` specialised to `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`) (0x010A9B94), the 8-byte element: `_Xlen` past 0x1FFFFFFF, the allocation (0x004FA720, or `operator new(0)` for a zero count, which this copy does not return early on), then `last_ = first_`, `end_ = first_ + count`; zero callers, a linker-retained copy nothing runs. Formerly `InitializeManagedWindowsStorage` in moho/app/WinApp.cpp (RULE ONE), removed 2026-09-24.)
          */
         bool buy(const std::size_t count) {
             first_ = nullptr;

@@ -560,6 +560,12 @@ namespace moho
      *   caller EFX_CreateEmitterWindow 0x0066A007; formerly
      *   `RebindManagedWindowSlotToFrame` in moho/console/CConCommand.cpp, removed
      *   with the wx conversion.)
+     * Address: 0x004F7230 (FUN_004F7230 -- the `WeakPtr<WWinManagedDialog>`
+     *   emission (`lea edx, [ecx+170h]`), the slot in EAX and the dialog in
+     *   ECX; zero callers, a linker-retained copy.)
+     * Address: 0x004F72F0 (FUN_004F72F0 -- a second
+     *   `WeakPtr<WWinManagedFrame>` emission (`lea edx, [ecx+178h]`) in the
+     *   managed-window TU; zero callers.)
      */
     void ResetFromObject(T* object) noexcept
     {
@@ -859,6 +865,11 @@ namespace moho
    * member destructor of the two weak lanes)
    * Address: 0x0056AA50 (FUN_0056AA50, Moho::WeakPtr_IUnit::~WeakPtr_IUnit --
    * the `WeakPtr<IUnit>` emission of this same body)
+   * Address: 0x004F7210 (FUN_004F7210 -- the `WeakPtr<WWinManagedDialog>`
+   * emission; zero callers, the registry's destroy range 0x004FADE0 inlines
+   * it. Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
+   * Address: 0x004F72D0 (FUN_004F72D0 -- the `WeakPtr<WWinManagedFrame>`
+   * emission; zero callers, 0x004FAED0 inlines it.)
    *
    * IDA signature:
    * void __fastcall sub_5A6DE0(WeakPtr<T> *this@<ecx>);

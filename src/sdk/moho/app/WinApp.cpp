@@ -64,10 +64,16 @@ namespace moho
 {
   struct STimeBarThreadInfo;
 
-  // managedWindows / managedFrames are defined by WxRuntimeTypes.cpp, which owns
-  // WxRuntimeTypes.h's declarations of them, the slot type, and the vector
-  // insert emissions that resize them. This file only registers, drains and
-  // destroys their contents, so it takes them through the header's externs.
+  // managedWindows / managedFrames are defined in WxRuntimeTypes.cpp; this file
+  // registers, drains and destroys their contents through the header's
+  // externs.
+
+  /**
+   * The log window's target (0x010A9BA0). Its static initialiser 0x00BC7340,
+   * listed in the CRT's initialiser table at 0x00C0FA60, runs the
+   * constructor (0x004F38F0) and registers the exit-time destructor thunk
+   * 0x00BF18D0, which calls ~CWinLogTarget (0x004F39B0).
+   */
   CWinLogTarget sLogWindowTarget{};
 }
 
