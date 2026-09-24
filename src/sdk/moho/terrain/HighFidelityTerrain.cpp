@@ -68,17 +68,16 @@ namespace
 
   // TEMPORARY PROBE (do not commit): "<FAF_TOGGLE_DIR>\<name>" exists => true.
   // TEMPORARY PROBE (do not commit): describe a native IDirect3DTexture9 (level 0).
-  void ProbeLogTextureDesc(const char* const tag, void* const nativeTexture)
+  void ProbeLogTextureDesc(const char* const tag, IDirect3DTexture9* const nativeTexture)
   {
     if (nativeTexture == nullptr) { gpg::Warnf("[TEXDESC] %s native=null", tag); return; }
-    struct SurfDesc { unsigned format, type, usage, pool, msType, msQuality, width, height; } desc{};
-    auto** const vt = *reinterpret_cast<void***>(nativeTexture);
-    using get_level_desc_fn = long(__stdcall*)(void*, unsigned, SurfDesc*);
-    using get_level_count_fn = unsigned long(__stdcall*)(void*);
-    const long hr = reinterpret_cast<get_level_desc_fn>(vt[17])(nativeTexture, 0U, &desc);
-    const unsigned long levels = reinterpret_cast<get_level_count_fn>(vt[13])(nativeTexture);
-    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08X pool=%u %ux%u levels=%lu",
-               tag, nativeTexture, hr, desc.format, desc.type, desc.usage, desc.pool, desc.width, desc.height, levels);
+    D3DSURFACE_DESC desc{};
+    const HRESULT hr = nativeTexture->GetLevelDesc(0U, &desc);
+    const DWORD levels = nativeTexture->GetLevelCount();
+    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08lX pool=%u %ux%u levels=%lu",
+               tag, static_cast<void*>(nativeTexture), static_cast<unsigned long>(hr), static_cast<unsigned>(desc.Format),
+               static_cast<unsigned>(desc.Type), static_cast<unsigned long>(desc.Usage), static_cast<unsigned>(desc.Pool),
+               desc.Width, desc.Height, static_cast<unsigned long>(levels));
   }
   bool HighFidelityProbeToggle(const char* const name)
   {
@@ -242,11 +241,10 @@ namespace moho
    */
   extern bool ren_ShowDirtyTerrain;
 
-  // The decal passes reinterpret the primary patch lane as
-  // `FastVectorN<TerrainDecalDrawCommand, 500>` (0x10 + 500 * 0x18 == 0x2EF0,
-  // the span of `FastVectorN<uint32_t, 3000>`), and the splat pass the
-  // secondary one as `FastVectorN<TerrainSplatVertex, 10000>` (0x10 +
-  // 10000 * 0x1C, the span of `FastVectorN<uint32_t, 70000>`), exactly as low
+  // The decal passes queue into `mDecalDrawCommands`
+  // (`FastVectorN<TerrainDecalDrawCommand, 500>`, 0x10 + 500 * 0x18 == 0x2EF0)
+  // and the splat pass copies each `CWldSplat`'s four vertices into
+  // `mSplatVertices` (`FastVectorN<CWldSplat::SplatVertex, 10000>`), as low
   // fidelity does.
   extern bool ren_Decals;
   extern bool ren_DecalOverDraw;
@@ -320,7 +318,7 @@ namespace moho
    * Binds the terrain resource, resets shared high-fidelity helper ownership
    * lanes, then dispatches initialization.
    */
-  bool HighFidelityTerrain::Create(TerrainWaterResourceView* const terrainResource)
+  bool HighFidelityTerrain::Create(IWldTerrainRes* const terrainResource)
   {
     mTerrainResource = terrainResource;
 
@@ -363,7 +361,7 @@ namespace moho
       return false;
     }
 
-    CHeightField* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+    CHeightField* const heightField = mTerrainResource->mMap->mHeightField.get();
     ReplaceOwned(mTesselator, new CTesselator(heightField));
 
     mShoreline.Generate(mTerrainResource);
@@ -383,7 +381,7 @@ namespace moho
       ReplaceOwned(sHighFidelityWaterSurface, CreateWaterFidelity(mTerrainResource));
     }
 
-    const TerrainHeightFieldRuntimeView* const heightFieldRuntime = mTerrainResource->mMap->mHeightFieldObject;
+    const CHeightField* const heightFieldRuntime = mTerrainResource->mMap->mHeightField.get();
     const int widthMinusOne = heightFieldRuntime->width - 1;
     const int heightMinusOne = heightFieldRuntime->height - 1;
     const int quarterWidth = (widthMinusOne / 2) / 2;
@@ -432,7 +430,7 @@ namespace moho
   {
     auto& shaderVars = GetTerrainShaderVars();
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(terrainRes);
 
@@ -524,8 +522,7 @@ namespace moho
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
     const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
-    const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);
-    const TerrainHeightFieldRuntimeView* const heightField = activeTerrainView->mMap->mHeightFieldObject;
+    const CHeightField* const heightField = activeMap->mTerrainRes->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
@@ -596,7 +593,7 @@ namespace moho
       shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
     }
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     const float lightingMultiplier = terrainRes->GetLightingMultiplier();
     if (shaderVars.lightingMultiplier.Exists()) {
@@ -783,7 +780,7 @@ namespace moho
     mViewportRenderWidth = viewportBlock[4];
     mViewportRenderHeight = viewportBlock[5];
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     bool dirty = terrainRes->IsInEditMode();
     if (!dirty) {
@@ -879,7 +876,7 @@ namespace moho
             const float midX = (decal->mBoundsMaxX + decal->mBoundsMinX) * 0.5f;
             const float midZ = (decal->mBoundsMaxZ + decal->mBoundsMinZ) * 0.5f;
 
-            auto* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+            auto* const heightField = mTerrainResource->mMap->mHeightField.get();
             const float elevation = heightField->GetElevation(midX, midZ);
 
             const Vector4f& row1 = mCamera->viewport.r[1];
@@ -996,11 +993,11 @@ namespace moho
 
           const std::size_t countBeforeAppend = splatVertices.Size();
           for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-            splatVertices.PushBack(reinterpret_cast<const TerrainSplatVertex&>(sourceVertex));
+            splatVertices.PushBack(sourceVertex);
           }
 
           for (std::size_t v = countBeforeAppend; v < splatVertices.Size(); ++v) {
-            *reinterpret_cast<float*>(splatVertices[v].bytes + 0x14) = bakedAlpha;
+            splatVertices[v].mAlpha = bakedAlpha;
           }
         }
       }
@@ -1220,7 +1217,7 @@ namespace moho
     }
 
     auto& shaderVars = GetTerrainShaderVars();
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectFxFile("terrain");
@@ -1546,7 +1543,7 @@ namespace moho
 
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, splatVertices.data(), sizeof(TerrainSplatVertex) * splatVertexCount);
+    std::memcpy(lockedVertices, splatVertices.data(), sizeof(CWldSplat::SplatVertex) * splatVertexCount);
     mDynamicVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("TSplats");
@@ -1667,7 +1664,7 @@ namespace moho
     }
 
     auto& shaderVars = GetTerrainShaderVars();
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     // Water ramp texture from the terrain's water shader properties.
     CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
@@ -1704,7 +1701,7 @@ namespace moho
     // Absent water puts every elevation below the terrain so the shader's
     // depth tests never trigger.
     constexpr float kNoWaterElevation = -10000.0F;
-    const TerrainMapRuntimeView& map = *mTerrainResource->mMap;
+    const STIMap& map = *mTerrainResource->mMap;
 
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(
@@ -1843,7 +1840,7 @@ namespace moho
     };
     SetShaderVarMem(GetWater2ViewportScaleOffsetShaderVar(), 4U, viewportScaleOffset);
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
     (void)sHighFidelityWaterSurface->RenderWaterSurface(
       tick,
       tickLerp,
@@ -2143,9 +2140,7 @@ namespace moho
       heightFieldSource = activeSession->mWldMap->mTerrainRes;
     }
 
-    const auto* const heightFieldView = reinterpret_cast<const TerrainWaterResourceView*>(heightFieldSource);
-    const auto* const heightField =
-      reinterpret_cast<const CHeightField*>(heightFieldView->mMap->mHeightFieldObject);
+    const CHeightField* const heightField = heightFieldSource->mMap->mHeightField.get();
 
     // Terrain footprint of the camera frustum, truncated to grid indices. The
     // binary keeps only the X/Z lanes of the box (0x00801F88-0x00801FA3
@@ -2217,8 +2212,7 @@ namespace moho
     GetWater2WorldToViewShorelineShaderVar().SetMatrix4x4(&camera->view);
     GetWater2ProjectionShorelineShaderVar().SetMatrix4x4(&camera->projection);
 
-    const auto* const terrainView = reinterpret_cast<const TerrainWaterResourceView*>(terrainRes);
-    const TerrainMapRuntimeView* const map = terrainView->mMap;
+    const STIMap* const map = terrainRes->mMap;
     const float waterElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : kDisabledWaterElevation;
     GetWater2WaterElevationTShorelineShaderVar().SetFloat(waterElevation);
 

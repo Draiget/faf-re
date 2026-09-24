@@ -9,6 +9,7 @@
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/MediumFidelityTerrain.h"
 #include "moho/terrain/TerrainCommon.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/Shoreline.h"
 
 namespace gpg::gal
@@ -25,7 +26,7 @@ namespace moho
   class CD3DVertexSheet;
   class CTesselator;
   struct GeomCamera3;
-  struct TerrainWaterResourceView;
+  class IWldTerrainRes;
   struct TerrainShadowContext;
 
   /**
@@ -80,7 +81,7 @@ namespace moho
      * Binds the terrain resource, clears shared high-fidelity water/texture
      * helper lanes, then dispatches initialization.
      */
-    bool Create(TerrainWaterResourceView* terrainResource) override;
+    bool Create(IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x008002E0 (FUN_008002E0, Moho::HighFidelityTerrain::Destroy)
@@ -354,7 +355,7 @@ namespace moho
      */
     static void DrawShoreline(const Shoreline* shoreline, const GeomCamera3* camera);
 
-    TerrainWaterResourceView* mTerrainResource = nullptr; // +0x0C
+    IWldTerrainRes* mTerrainResource = nullptr; // +0x0C
     std::int32_t mViewportOriginX = 0;                    // +0x10
     std::int32_t mViewportOriginY = 0;                    // +0x14
     std::int32_t mViewportWidth = 0;                      // +0x18
@@ -375,7 +376,7 @@ namespace moho
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;         // +0x2FE8
     std::uint32_t mPad2FEC = 0u;                          // +0x2FEC
 
-    gpg::core::FastVectorN<TerrainSplatVertex, 10000> mSplatVertices; // +0x2FF0
+    gpg::core::FastVectorN<CWldSplat::SplatVertex, 10000> mSplatVertices; // +0x2FF0
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;       // +0x475C0
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;         // +0x475C4
     VTransform mTerrainTransform;                         // +0x475C8

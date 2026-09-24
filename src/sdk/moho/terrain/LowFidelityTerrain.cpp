@@ -127,7 +127,7 @@ namespace
 
   // ----- Decal / splat draw helpers -----
   // mDecalDrawCommands (+0x50) holds up to 500 TerrainDecalDrawCommand and
-  // mSplatVertices (+0x2F40) up to 1000 TerrainSplatVertex.
+  // mSplatVertices (+0x2F40) up to 1000 CWldSplat::SplatVertex.
 
 
   /// Binds one command's index/vertex sub-range and submits one indexed
@@ -312,7 +312,7 @@ namespace moho
    * Binds the terrain resource, clears shared global terrain-water assets,
    * then dispatches initialization.
    */
-  bool LowFidelityTerrain::Create(TerrainWaterResourceView* const terrainResource)
+  bool LowFidelityTerrain::Create(IWldTerrainRes* const terrainResource)
   {
     mTerrainResource = terrainResource;
 
@@ -332,8 +332,8 @@ namespace moho
    */
   bool LowFidelityTerrain::Init()
   {
-    TerrainMapRuntimeView* const terrainMap = mTerrainResource->mMap;
-    CHeightField* const heightField = reinterpret_cast<CHeightField*>(terrainMap->mHeightFieldObject);
+    STIMap* const terrainMap = mTerrainResource->mMap;
+    CHeightField* const heightField = terrainMap->mHeightField.get();
 
     CTesselator* const nextTesselator = new CTesselator(heightField);
     if (nextTesselator != mTesselator) {
@@ -532,7 +532,7 @@ namespace moho
     const boost::shared_ptr<ID3DRenderTarget> refractionTexture,
     const boost::shared_ptr<ID3DRenderTarget> reflectionTexture)
   {
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     (void)sTerrainWaterSurface->RenderWaterSurface(
       tick,
@@ -649,9 +649,9 @@ namespace moho
       shaderVars.heightScale.SetFloat(mTesselator->GetHeightScale());
     }
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
-    const TerrainHeightFieldRuntimeView* const heightField = mTerrainResource->mMap->mHeightFieldObject;
+    const CHeightField* const heightField = mTerrainResource->mMap->mHeightField.get();
     const float terrainScale[4] = {
       1.0F / static_cast<float>(heightField->width - 1),
       1.0F / static_cast<float>(heightField->height - 1),
@@ -707,7 +707,7 @@ namespace moho
 
     D3D_GetDevice()->SelectTechnique("LowFidelityLighting");
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     if (shaderVars.lightingMultiplier.Exists()) {
       shaderVars.lightingMultiplier.SetFloat(terrainRes->GetLightingMultiplier());
@@ -847,7 +847,7 @@ namespace moho
 
     void* const lockedVertices =
       mDynamicVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, splatVertices.data(), sizeof(moho::TerrainSplatVertex) * splatVertexCount);
+    std::memcpy(lockedVertices, splatVertices.data(), sizeof(moho::CWldSplat::SplatVertex) * splatVertexCount);
     mDynamicVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("LowFidelitySplat");
@@ -895,7 +895,7 @@ namespace moho
     DrawLowFidelityTerrainBatch(reinterpret_cast<const LowFidelityTriangleBatchRuntime&>(*this));
     LoadTerrainLighting(shadowContext);
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     const std::int32_t normalMapCount = terrainRes->GetNormalMapCount();
     for (std::int32_t tile = 0; tile < normalMapCount; ++tile) {
@@ -977,7 +977,7 @@ namespace moho
   {
     mCamera = camera;
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     bool dirty = terrainRes->IsInEditMode();
     if (!dirty) {
@@ -1048,7 +1048,7 @@ namespace moho
           const float midX = (decal->mBoundsMaxX + decal->mBoundsMinX) * 0.5f;
           const float midZ = (decal->mBoundsMaxZ + decal->mBoundsMinZ) * 0.5f;
 
-          auto* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+          auto* const heightField = mTerrainResource->mMap->mHeightField.get();
           const float elevation = heightField->GetElevation(midX, midZ);
 
           const Vector4f& row1 = mCamera->viewport.r[1];
@@ -1167,11 +1167,11 @@ namespace moho
         auto& splatVertexLane = mSplatVertices;
         const std::size_t countBeforeAppend = splatVertexLane.Size();
         for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-          splatVertexLane.PushBack(reinterpret_cast<const moho::TerrainSplatVertex&>(sourceVertex));
+          splatVertexLane.PushBack(sourceVertex);
         }
 
         for (std::size_t v = countBeforeAppend; v < splatVertexLane.Size(); ++v) {
-          *reinterpret_cast<float*>(splatVertexLane[v].bytes + 0x14) = bakedAlpha;
+          splatVertexLane[v].mAlpha = bakedAlpha;
         }
       }
     }

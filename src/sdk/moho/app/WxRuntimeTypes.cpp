@@ -2265,7 +2265,7 @@ void moho::WRenViewport::AddWorldView(
   entry.mDepth = depth;
   (void)AssignSharedTerrainFromRaw(&entry.mTerrain, IRenTerrain::Create());
   if (entry.mTerrain) {
-    (void)entry.mTerrain->Create(reinterpret_cast<TerrainWaterResourceView*>(REN_GetTerrainRes()));
+    (void)entry.mTerrain->Create(REN_GetTerrainRes());
   }
 
   worldViews.insert(insertPos, entry);
@@ -3598,7 +3598,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
   worldViewEntry.mView = &previewView;
   (void)AssignSharedTerrainFromRaw(&worldViewEntry.mTerrain, moho::IRenTerrain::Create());
   if (worldViewEntry.mTerrain) {
-    (void)worldViewEntry.mTerrain->Create(reinterpret_cast<moho::TerrainWaterResourceView*>(terrainRes));
+    (void)worldViewEntry.mTerrain->Create(terrainRes);
   }
 
   msvc8::vector<SWorldViewInfo> previewWorldViews{};

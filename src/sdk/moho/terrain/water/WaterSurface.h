@@ -15,55 +15,7 @@ namespace moho
   class ID3DRenderTarget;
   class CWaterShaderProperties;
   struct GeomCamera3;
-
-  struct TerrainHeightFieldRuntimeView
-  {
-    std::uint16_t* data; // +0x00
-    std::int32_t width;  // +0x04
-    std::int32_t height; // +0x08
-  };
-  static_assert(sizeof(TerrainHeightFieldRuntimeView) == 0x0C, "TerrainHeightFieldRuntimeView size must be 0x0C");
-
-  struct TerrainMapRuntimeView
-  {
-    TerrainHeightFieldRuntimeView* mHeightFieldObject; // +0x0000
-    void* mHeightFieldRef;                             // +0x0004
-    std::uint8_t pad_0008_1534[0x152C];               // +0x0008
-    std::uint8_t mWaterEnabled;                       // +0x1534
-    std::uint8_t pad_1535_1537[3];                    // +0x1535
-    float mWaterElevation;                            // +0x1538
-    float mWaterElevationDeep;                        // +0x153C
-    float mWaterElevationAbyss;                       // +0x1540
-  };
-  static_assert(offsetof(TerrainMapRuntimeView, mWaterEnabled) == 0x1534, "TerrainMapRuntimeView::mWaterEnabled offset must be 0x1534");
-  static_assert(
-    offsetof(TerrainMapRuntimeView, mWaterElevation) == 0x1538,
-    "TerrainMapRuntimeView::mWaterElevation offset must be 0x1538"
-  );
-  static_assert(
-    offsetof(TerrainMapRuntimeView, mWaterElevationDeep) == 0x153C,
-    "TerrainMapRuntimeView::mWaterElevationDeep offset must be 0x153C"
-  );
-  static_assert(
-    offsetof(TerrainMapRuntimeView, mWaterElevationAbyss) == 0x1540,
-    "TerrainMapRuntimeView::mWaterElevationAbyss offset must be 0x1540"
-  );
-
-  /**
-   * Recovered leading layout for world-terrain water resources consumed by
-   * low/high water initialization lanes.
-   */
-  struct TerrainWaterResourceView
-  {
-    void* mVtable;                // +0x00
-    TerrainMapRuntimeView* mMap;  // +0x04
-  };
-
-  static_assert(
-    offsetof(TerrainWaterResourceView, mMap) == 0x04,
-    "TerrainWaterResourceView::mMap offset must be 0x04"
-  );
-  static_assert(sizeof(TerrainWaterResourceView) == 0x08, "TerrainWaterResourceView size must be 0x08");
+  class IWldTerrainRes;
 
   /**
    * Common water-render interface used by terrain fidelity factory lanes.
@@ -89,7 +41,7 @@ namespace moho
     /**
      * Rebuilds render sheets from the current terrain map dimensions.
      */
-    virtual bool InitVerts(TerrainWaterResourceView* terrainResource) = 0;
+    virtual bool InitVerts(IWldTerrainRes* terrainResource) = 0;
 
     /**
      * Address family:

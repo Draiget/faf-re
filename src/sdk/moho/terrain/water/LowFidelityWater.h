@@ -27,7 +27,7 @@ namespace moho
     /**
      * Address: 0x0080FA10 (FUN_0080FA10)
      *
-     * TerrainWaterResourceView *
+     * IWldTerrainRes *
      *
      * IDA signature:
      * char __thiscall Moho::LowFidelityWater::InitVerts(float *this, int terrainRes);
@@ -36,7 +36,7 @@ namespace moho
      * Rebuilds one low-fidelity water quad vertex/index-sheet pair from the
      * current terrain map dimensions and water elevation.
      */
-    bool InitVerts(TerrainWaterResourceView* terrainResource) override;
+    bool InitVerts(IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x0080FC40 (FUN_0080FC40)
@@ -71,7 +71,7 @@ namespace moho
       const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
-    TerrainWaterResourceView* mTerrainRes = nullptr; // +0x04
+    IWldTerrainRes* mTerrainRes = nullptr; // +0x04
     float mWaterElevation = 0.0F;                    // +0x08
     CD3DVertexSheet* mVertexSheet = nullptr;         // +0x0C
     CD3DIndexSheet* mIndexSheet = nullptr;           // +0x10

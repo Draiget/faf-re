@@ -63,9 +63,9 @@ namespace moho
       float z;
     };
 
-    [[nodiscard]] WaterExtents2D GetWaterMapExtents(const TerrainWaterResourceView& terrainResource)
+    [[nodiscard]] WaterExtents2D GetWaterMapExtents(const IWldTerrainRes& terrainResource)
     {
-      const TerrainHeightFieldRuntimeView* const field = terrainResource.mMap->mHeightFieldObject;
+      const CHeightField* const field = terrainResource.mMap->mHeightField.get();
       const float halfWidth = static_cast<float>((field->width - 1) >> 1);
       const float halfHeight = static_cast<float>((field->height - 1) >> 1);
       return {halfWidth * 2.0f, halfHeight * 2.0f};
@@ -175,10 +175,10 @@ namespace moho
    * Builds one high-fidelity water quad vertex/index-sheet pair from the
    * current terrain map extents and water elevation.
    */
-  bool HighFidelityWater::InitVerts(TerrainWaterResourceView* const terrainResource)
+  bool HighFidelityWater::InitVerts(IWldTerrainRes* const terrainResource)
   {
     mTerrainRes = terrainResource;
-    TerrainMapRuntimeView* const terrainMap = terrainResource->mMap;
+    STIMap* const terrainMap = terrainResource->mMap;
     mWaterElevation = terrainMap->mWaterEnabled != 0 ? terrainMap->mWaterElevation : kDisabledWaterElevation;
 
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
@@ -264,7 +264,7 @@ namespace moho
     device->SelectFxFile("water2");
     device->SelectTechnique("TWaterLayAlphaMask");
 
-    IWldTerrainRes* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainRes);
+    IWldTerrainRes* const terrainRes = mTerrainRes;
     boost::shared_ptr<CD3DDynamicTextureSheet> utilityTexture =
       boost::static_pointer_cast<CD3DDynamicTextureSheet>(terrainRes->GetWaterMap());
     GetWater2UtilityTextureCShaderVar().GetTexture(utilityTexture);
@@ -366,8 +366,7 @@ namespace moho
 
     CWldSession* const activeSession = WLD_GetActiveSession();
     IWldTerrainRes* const terrainRes = activeSession->mWldMap->mTerrainRes;
-    const auto* const terrainView = reinterpret_cast<const TerrainWaterResourceView*>(terrainRes);
-    const TerrainHeightFieldRuntimeView* const heightField = terrainView->mMap->mHeightFieldObject;
+    const CHeightField* const heightField = terrainRes->mMap->mHeightField.get();
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
       -1.0f / static_cast<float>(heightField->height - 1),

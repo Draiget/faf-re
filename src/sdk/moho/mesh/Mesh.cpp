@@ -60,17 +60,16 @@ namespace gpg::gal
 
 namespace { // TEMPORARY PROBE (do not commit)
   // TEMPORARY PROBE (do not commit): describe a native IDirect3DTexture9 (level 0).
-  void ProbeLogTextureDesc(const char* const tag, void* const nativeTexture)
+  void ProbeLogTextureDesc(const char* const tag, IDirect3DTexture9* const nativeTexture)
   {
     if (nativeTexture == nullptr) { gpg::Warnf("[TEXDESC] %s native=null", tag); return; }
-    struct SurfDesc { unsigned format, type, usage, pool, msType, msQuality, width, height; } desc{};
-    auto** const vt = *reinterpret_cast<void***>(nativeTexture);
-    using get_level_desc_fn = long(__stdcall*)(void*, unsigned, SurfDesc*);
-    using get_level_count_fn = unsigned long(__stdcall*)(void*);
-    const long hr = reinterpret_cast<get_level_desc_fn>(vt[17])(nativeTexture, 0U, &desc);
-    const unsigned long levels = reinterpret_cast<get_level_count_fn>(vt[13])(nativeTexture);
-    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08X pool=%u %ux%u levels=%lu",
-               tag, nativeTexture, hr, desc.format, desc.type, desc.usage, desc.pool, desc.width, desc.height, levels);
+    D3DSURFACE_DESC desc{};
+    const HRESULT hr = nativeTexture->GetLevelDesc(0U, &desc);
+    const DWORD levels = nativeTexture->GetLevelCount();
+    gpg::Warnf("[TEXDESC] %s native=%p hr=%08lX fmt=%u type=%u usage=%08lX pool=%u %ux%u levels=%lu",
+               tag, static_cast<void*>(nativeTexture), static_cast<unsigned long>(hr), static_cast<unsigned>(desc.Format),
+               static_cast<unsigned>(desc.Type), static_cast<unsigned long>(desc.Usage), static_cast<unsigned>(desc.Pool),
+               desc.Width, desc.Height, static_cast<unsigned long>(levels));
   }
 }
 namespace moho
@@ -5694,14 +5693,12 @@ namespace moho
     // `REN_GetTerrainRes` folds in both the map and terrain null checks and
     // returns `sWldMap->mTerrainRes` (mirrors 0x007E1A0B..0x007E1A25).
     IWldTerrainRes* const terrainRes = REN_GetTerrainRes();
-    const auto* const terrainView =
-      reinterpret_cast<const TerrainWaterResourceView*>(terrainRes);
 
     // Surface (water) elevation lane: current water elevation when water is
     // enabled on the active map, else -10000; -1000 when there is no terrain.
     float surfaceElevation;
-    if (terrainView != nullptr) {
-      const TerrainMapRuntimeView* const map = terrainView->mMap;
+    if (terrainRes != nullptr) {
+      const STIMap* const map = terrainRes->mMap;
       surfaceElevation = (map->mWaterEnabled != 0) ? map->mWaterElevation : -10000.0f;
     } else {
       surfaceElevation = -1000.0f;
@@ -5762,8 +5759,8 @@ namespace moho
     BindTextureShaderVar(sv.dissolveTexture, boost::static_pointer_cast<ID3DTextureSheet>(dissolveTex));
 
     if (terrainRes != nullptr) {
-      const TerrainMapRuntimeView* const map = terrainView->mMap;
-      const TerrainHeightFieldRuntimeView* const heightField = map->mHeightFieldObject;
+      const STIMap* const map = terrainRes->mMap;
+      const CHeightField* const heightField = map->mHeightField.get();
 
       // Terrain scale = {1/(width-1), 0, 1/(height-1), 1}.
       const float terrainScaleValues[4] = {

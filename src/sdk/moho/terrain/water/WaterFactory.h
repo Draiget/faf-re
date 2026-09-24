@@ -11,5 +11,5 @@ namespace moho
    * Allocates one low/high-fidelity water surface by `graphics_Fidelity`,
    * logs the selected path, and initializes water render sheets.
    */
-  [[nodiscard]] WaterSurface* CreateWaterFidelity(TerrainWaterResourceView* terrainResource);
+  [[nodiscard]] WaterSurface* CreateWaterFidelity(IWldTerrainRes* terrainResource);
 } // namespace moho

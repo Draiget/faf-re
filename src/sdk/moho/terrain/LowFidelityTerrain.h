@@ -7,6 +7,7 @@
 #include "gpg/core/containers/FastVector.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
+#include "moho/terrain/splat/CWldSplat.h"
 #include "moho/terrain/water/WaterSurface.h"
 
 namespace boost::detail
@@ -86,7 +87,7 @@ namespace moho
      * Binds the terrain resource, clears shared global terrain-water assets,
      * then dispatches initialization.
      */
-    bool Create(TerrainWaterResourceView* terrainResource) override;
+    bool Create(IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x00808240 (FUN_00808240, Moho::LowFidelityTerrain::Init)
@@ -284,7 +285,7 @@ namespace moho
       std::int32_t forceRegenerate
     ) override;
 
-    TerrainWaterResourceView* mTerrainResource = nullptr;           // +0x0C
+    IWldTerrainRes* mTerrainResource = nullptr;           // +0x0C
     CTesselator* mTesselator = nullptr;                             // +0x10
     CD3DVertexSheet* mTerrainVertexSheet = nullptr;                 // +0x14
     CD3DIndexSheet* mTerrainIndexSheet = nullptr;                   // +0x18
@@ -319,7 +320,7 @@ namespace moho
      */
     VTransform mCachedCameraTransform;                              // +0x34
     gpg::core::FastVectorN<TerrainDecalDrawCommand, 500> mDecalDrawCommands; // +0x50
-    gpg::core::FastVectorN<TerrainSplatVertex, 1000> mSplatVertices; // +0x2F40
+    gpg::core::FastVectorN<CWldSplat::SplatVertex, 1000> mSplatVertices; // +0x2F40
     CD3DVertexSheet* mDynamicVertexSheet = nullptr;                 // +0x9CB0
     CD3DIndexSheet* mDynamicIndexSheet = nullptr;                   // +0x9CB4
 

@@ -46,7 +46,7 @@ namespace moho
      * Builds one high-fidelity water quad vertex/index-sheet pair from the
      * current terrain map extents and water elevation.
      */
-    bool InitVerts(TerrainWaterResourceView* terrainResource) override;
+    bool InitVerts(IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x00810540 (FUN_00810540, Moho::HighFidelityWater::Func1)
@@ -84,7 +84,7 @@ namespace moho
       const boost::shared_ptr<ID3DRenderTarget>& reflectionTexture
     ) override;
 
-    TerrainWaterResourceView* mTerrainRes = nullptr;              // +0x04
+    IWldTerrainRes* mTerrainRes = nullptr;              // +0x04
     float mWaterElevation = 0.0F;                                 // +0x08
     float mCachedFresnelBias = 0.0F;                              // +0x0C
     float mCachedFresnelPower = 0.0F;                             // +0x10

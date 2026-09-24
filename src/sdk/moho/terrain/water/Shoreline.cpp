@@ -12,6 +12,8 @@
 #include "moho/render/ID3DVertexStream.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/render/d3d/CD3DVertexSheet.h"
+#include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 #include "moho/terrain/water/ShoreCell.h"
 #include "moho/terrain/water/WaterSurface.h"
 #include "platform/Platform.h"
@@ -159,7 +161,7 @@ namespace
   }
 
   [[nodiscard]] float ReadHeightSampleMeters(
-    const moho::TerrainHeightFieldRuntimeView* const heightField,
+    const moho::CHeightField* const heightField,
     const std::int32_t sampleX,
     const std::int32_t sampleZ
   )
@@ -592,13 +594,13 @@ namespace
   void InitializeShoreCellSpatialEntry(
     moho::ShoreCell& cell,
     moho::SpatialDB<moho::ShoreCell>& shorelineSpatialDb,
-    moho::TerrainWaterResourceView* const terrainResource
+    moho::IWldTerrainRes* const terrainResource
   )
   {
     cell.mSpatialDbEntry.Register(&shorelineSpatialDb, &cell, kSpatialRoutingMask);
     cell.mSpatialDbEntry.UpdateDissolveCutoff(moho::ren_ShorelineCutoff);
 
-    const moho::TerrainMapRuntimeView* const map = terrainResource != nullptr ? terrainResource->mMap : nullptr;
+    const moho::STIMap* const map = terrainResource != nullptr ? terrainResource->mMap : nullptr;
     const float waterElevation = (map != nullptr && map->mWaterEnabled != 0u) ? map->mWaterElevation : kNoWaterElevation;
 
     cell.mBounds.Min.x = cell.mCenterX - kSpatialPadding;
@@ -631,7 +633,7 @@ namespace
    */
   void CreateShoreCellFromMask(
     moho::Shoreline& shoreline,
-    moho::TerrainWaterResourceView* const terrainResource,
+    moho::IWldTerrainRes* const terrainResource,
     const std::int32_t maskType,
     const float baseX,
     const float baseZ,
@@ -844,14 +846,14 @@ namespace moho
    * Rebuilds shoreline cells from terrain-water heightfield masks, recreates
    * shoreline vertex-sheet ownership, and updates shoreline-cell stats.
    */
-  void Shoreline::Generate(TerrainWaterResourceView* const terrainResource)
+  void Shoreline::Generate(IWldTerrainRes* const terrainResource)
   {
     Destroy();
 
     EnsureNamedStat(sEngineStatShorelineTotalCellsStage1, "Shoreline_TotalCells");
     StoreStatCounter(sEngineStatShorelineTotalCellsStage1, 0);
 
-    TerrainMapRuntimeView* const map = (terrainResource != nullptr) ? terrainResource->mMap : nullptr;
+    STIMap* const map = (terrainResource != nullptr) ? terrainResource->mMap : nullptr;
     if (map == nullptr || map->mWaterEnabled == 0u) {
       return;
     }
@@ -863,7 +865,7 @@ namespace moho
     mVertexSheet = boost::shared_ptr<ID3DVertexSheet>(static_cast<ID3DVertexSheet*>(vertexSheet));
 
     const float waterElevation = (map->mWaterEnabled != 0u) ? map->mWaterElevation : kNoWaterElevation;
-    TerrainHeightFieldRuntimeView* const heightField = map->mHeightFieldObject;
+    CHeightField* const heightField = map->mHeightField.get();
     if (heightField != nullptr) {
       const std::int32_t width = heightField->width - 1;
       const std::int32_t height = heightField->height - 1;

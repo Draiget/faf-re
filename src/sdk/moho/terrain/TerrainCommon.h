@@ -9,7 +9,7 @@
 namespace moho
 {
   class RD3DTextureResource;
-  struct TerrainWaterResourceView;
+  class IWldTerrainRes;
   struct GeomCamera3;
   class ID3DRenderTarget;
   struct TerrainShadowContext;
@@ -40,20 +40,6 @@ namespace moho
     CWldTerrainDecal* decal;   // +0x14 -> owning decal (textures + matrices)
   };
   static_assert(sizeof(TerrainDecalDrawCommand) == 0x18, "TerrainDecalDrawCommand size must be 0x18");
-
-  /**
-   * One composited terrain splat vertex, recovered from the splat draw helper
-   * (0x00806860) which memcpys the whole splat lane into the overlay vertex
-   * sheet and draws it with the `TSplats` technique. Element size is exactly
-   * 28 bytes; `mSplatVertices` holds 10000 inline in the medium and high
-   * fidelities and 1000 in the low one. Only the raw byte payload is copied,
-   * so the individual channels are kept as an opaque 28-byte record.
-   */
-  struct TerrainSplatVertex
-  {
-    std::uint8_t bytes[0x1C]; // +0x00 opaque 28-byte vertex record
-  };
-  static_assert(sizeof(TerrainSplatVertex) == 0x1C, "TerrainSplatVertex size must be 0x1C");
 
   /**
    * VFTABLE: 0x00E419D4
@@ -156,7 +142,7 @@ namespace moho
      * Binds one terrain-resource owner lane and initializes fidelity-specific
      * terrain runtime state.
      */
-    [[nodiscard]] virtual bool Create(TerrainWaterResourceView* terrainResource) = 0;
+    [[nodiscard]] virtual bool Create(IWldTerrainRes* terrainResource) = 0;
 
     /**
      * Primary vtable slot 3. Bodies: 0x00808240 (Low), 0x00803CE0 (Medium),

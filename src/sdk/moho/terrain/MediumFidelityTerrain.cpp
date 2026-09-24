@@ -311,7 +311,7 @@ namespace moho
    * Binds the terrain resource, resets shared medium-fidelity helper
    * ownership lanes, then dispatches initialization.
    */
-  bool MediumFidelityTerrain::Create(TerrainWaterResourceView* const terrainResource)
+  bool MediumFidelityTerrain::Create(IWldTerrainRes* const terrainResource)
   {
     mTerrainResource = terrainResource;
 
@@ -353,7 +353,7 @@ namespace moho
       return false;
     }
 
-    CHeightField* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+    CHeightField* const heightField = mTerrainResource->mMap->mHeightField.get();
     ReplaceOwned(mTesselator, new CTesselator(heightField));
 
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
@@ -371,7 +371,7 @@ namespace moho
       ReplaceOwned(sMediumFidelityWaterSurface, CreateWaterFidelity(mTerrainResource));
     }
 
-    const TerrainHeightFieldRuntimeView* const heightFieldRuntime = mTerrainResource->mMap->mHeightFieldObject;
+    const CHeightField* const heightFieldRuntime = mTerrainResource->mMap->mHeightField.get();
     const int widthMinusOne = heightFieldRuntime->width - 1;
     const int heightMinusOne = heightFieldRuntime->height - 1;
     const int quarterWidth = (widthMinusOne / 2) / 2;
@@ -420,7 +420,7 @@ namespace moho
   {
     auto& shaderVars = GetTerrainShaderVars();
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
     StratumMaterial& strata = terrainRes->GetStratumMaterial();
     strata.SetSizeTo(terrainRes);
 
@@ -474,8 +474,7 @@ namespace moho
     shaderVars.normalTexture.SetRenderTargetTexture(terrainNormalTexture);
 
     const auto* const activeMap = WLD_GetActiveSession()->mWldMap;
-    const auto* const activeTerrainView = reinterpret_cast<const TerrainWaterResourceView*>(activeMap->mTerrainRes);
-    const TerrainHeightFieldRuntimeView* const heightField = activeTerrainView->mMap->mHeightFieldObject;
+    const CHeightField* const heightField = activeMap->mTerrainRes->mMap->mHeightField.get();
 
     const float terrainScale[4] = {
       1.0f / static_cast<float>(heightField->width - 1),
@@ -542,7 +541,7 @@ namespace moho
       shaderVars.projMatrix.SetMatrix4x4(&camera.projection);
     }
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     const float lightingMultiplier = terrainRes->GetLightingMultiplier();
     if (shaderVars.lightingMultiplier.Exists()) {
@@ -1041,7 +1040,7 @@ namespace moho
     // Copy the whole splat lane into the overlay vertex sheet's stream buffer.
     void* const lockedVertices =
       mOverlayVertexSheet->GetVertStream(0U)->Lock(0, static_cast<std::int32_t>(splatVertexCount), false, true);
-    std::memcpy(lockedVertices, mSplatVertices.data(), sizeof(TerrainSplatVertex) * splatVertexCount);
+    std::memcpy(lockedVertices, mSplatVertices.data(), sizeof(CWldSplat::SplatVertex) * splatVertexCount);
     mOverlayVertexSheet->GetVertStream(0U)->Unlock();
 
     D3D_GetDevice()->SelectTechnique("TSplats");
@@ -1229,7 +1228,7 @@ namespace moho
     }
 
     auto& shaderVars = GetTerrainShaderVars();
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     CD3DDevice* const device = D3D_GetDevice();
     device->SelectFxFile("terrain");
@@ -1394,7 +1393,7 @@ namespace moho
     };
     SetShaderVarMem(GetWater2ViewportScaleOffsetShaderVar(), 4U, viewportScaleOffset);
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
     (void)sMediumFidelityWaterSurface->RenderWaterSurface(
       tick,
       tickLerp,
@@ -1446,7 +1445,7 @@ namespace moho
       return true;
     }
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     // Water ramp texture from the terrain's water shader properties.
     CWaterShaderProperties* const waterProperties = terrainRes->GetWaterShaderProperties();
@@ -1461,7 +1460,7 @@ namespace moho
     // Water elevation constants (defaulting to the -10000.0 sentinel when the map
     // has no water enabled). The runtime map object at mTerrainResource->mMap is
     // the same object read by the binary at [terrainRes + 4].
-    const TerrainMapRuntimeView& map = *mTerrainResource->mMap;
+    const STIMap& map = *mTerrainResource->mMap;
     const float waterElevation = map.mWaterEnabled ? map.mWaterElevation : kWaterElevationSentinel;
     if (shaderVars.waterElevation.Exists()) {
       shaderVars.waterElevation.SetFloat(waterElevation);
@@ -1526,7 +1525,7 @@ namespace moho
     mViewportRenderWidth = viewportBlock[4];
     mViewportRenderHeight = viewportBlock[5];
 
-    auto* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainResource);
+    auto* const terrainRes = mTerrainResource;
 
     bool dirty = terrainRes->IsInEditMode();
     if (!dirty) {
@@ -1597,7 +1596,7 @@ namespace moho
             const float midX = (decal->mBoundsMaxX + decal->mBoundsMinX) * 0.5f;
             const float midZ = (decal->mBoundsMaxZ + decal->mBoundsMinZ) * 0.5f;
 
-            auto* const heightField = reinterpret_cast<CHeightField*>(mTerrainResource->mMap->mHeightFieldObject);
+            auto* const heightField = mTerrainResource->mMap->mHeightField.get();
             const float elevation = heightField->GetElevation(midX, midZ);
 
             const Vector4f& row1 = mCamera->viewport.r[1];
@@ -1709,11 +1708,11 @@ namespace moho
 
           const std::size_t countBeforeAppend = mSplatVertices.Size();
           for (const CWldSplat::SplatVertex& sourceVertex : splat->mSplatVertices) {
-            mSplatVertices.PushBack(reinterpret_cast<const TerrainSplatVertex&>(sourceVertex));
+            mSplatVertices.PushBack(sourceVertex);
           }
 
           for (std::size_t v = countBeforeAppend; v < mSplatVertices.Size(); ++v) {
-            *reinterpret_cast<float*>(mSplatVertices[v].bytes + 0x14) = bakedAlpha;
+            mSplatVertices[v].mAlpha = bakedAlpha;
           }
         }
       }

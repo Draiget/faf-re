@@ -12,7 +12,7 @@ namespace moho
   class ID3DVertexSheet;
   class ShoreCell;
   struct GeomCamera3;
-  struct TerrainWaterResourceView;
+  class IWldTerrainRes;
 
   /**
    * Address: 0x010A6442 (?ren_Shoreline@Moho@@3_NA)
@@ -79,7 +79,7 @@ namespace moho
      * Rebuilds shoreline cells from terrain-water heightfield masks, recreates
      * shoreline vertex-sheet ownership, and updates shoreline-cell stats.
      */
-    void Generate(TerrainWaterResourceView* terrainResource);
+    void Generate(IWldTerrainRes* terrainResource);
 
     /**
      * Address: 0x00812E80 (FUN_00812E80, Moho::Shoreline::Update)

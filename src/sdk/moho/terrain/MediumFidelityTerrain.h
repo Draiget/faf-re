@@ -10,6 +10,7 @@
 #include "legacy/containers/String.h"
 #include "moho/render/camera/VTransform.h"
 #include "moho/terrain/TerrainCommon.h"
+#include "moho/terrain/splat/CWldSplat.h"
 
 namespace gpg::gal
 {
@@ -31,7 +32,7 @@ namespace moho
   class CD3DVertexSheet;
   class CTesselator;
   struct GeomCamera3;
-  struct TerrainWaterResourceView;
+  class IWldTerrainRes;
 
   /**
    * Draw parameters for one terrain technique pass - the argument block of
@@ -197,7 +198,7 @@ namespace moho
      * Binds the terrain resource, clears shared medium-fidelity water/texture
      * helper lanes, then dispatches initialization.
      */
-    bool Create(TerrainWaterResourceView* terrainResource) override;
+    bool Create(IWldTerrainRes* terrainResource) override;
 
     /**
      * Address: 0x00804350 (FUN_00804350)
@@ -504,7 +505,7 @@ namespace moho
     void DrawNormalMappedDecals(std::int32_t gameTick, float lod);
 
   public:
-    TerrainWaterResourceView* mTerrainResource;                        // +0x0C
+    IWldTerrainRes* mTerrainResource;                        // +0x0C
     std::int32_t mViewportOriginX;                                     // +0x10
     std::int32_t mViewportOriginY;                                     // +0x14
     std::int32_t mViewportWidth;                                       // +0x18
@@ -522,7 +523,7 @@ namespace moho
     CD3DVertexSheet* mTerrainVertexSheet;                              // +0x2F34
     CD3DIndexSheet* mTerrainIndexSheet;                                // +0x2F38
     std::uint32_t mPad2F3C = 0u;                                       // +0x2F3C
-    gpg::core::FastVectorN<TerrainSplatVertex, 10000> mSplatVertices;  // +0x2F40
+    gpg::core::FastVectorN<CWldSplat::SplatVertex, 10000> mSplatVertices;  // +0x2F40
     CD3DVertexSheet* mOverlayVertexSheet;                              // +0x47510
     CD3DIndexSheet* mOverlayIndexSheet;                                // +0x47514
     VTransform mOverlayTransform;                                      // +0x47518

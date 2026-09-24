@@ -12,6 +12,7 @@
 #include "moho/render/d3d/CD3DVertexSheet.h"
 #include "moho/render/textures/CD3DDynamicTextureSheet.h"
 #include "moho/sim/CWldMap.h"
+#include "moho/sim/STIMap.h"
 #include "moho/terrain/water/CWaterShaderProperties.h"
 #include "moho/terrain/water/WaterShaderVars.h"
 
@@ -41,9 +42,9 @@ namespace moho
       float z;
     };
 
-    [[nodiscard]] WaterExtents2D GetWaterMapExtents(const TerrainWaterResourceView& terrainResource)
+    [[nodiscard]] WaterExtents2D GetWaterMapExtents(const IWldTerrainRes& terrainResource)
     {
-      const TerrainHeightFieldRuntimeView* const field = terrainResource.mMap->mHeightFieldObject;
+      const CHeightField* const field = terrainResource.mMap->mHeightField.get();
       const float halfWidth = static_cast<float>((field->width - 1) >> 1);
       const float halfHeight = static_cast<float>((field->height - 1) >> 1);
       return {halfWidth * 2.0f, halfHeight * 2.0f};
@@ -82,7 +83,7 @@ namespace moho
   /**
    * Address: 0x0080FA10 (FUN_0080FA10)
    *
-   * TerrainWaterResourceView *
+   * IWldTerrainRes *
    *
    * IDA signature:
    * char __thiscall Moho::LowFidelityWater::InitVerts(float *this, int terrainRes);
@@ -91,13 +92,13 @@ namespace moho
    * Rebuilds one low-fidelity water quad vertex/index-sheet pair from the
    * current terrain map dimensions and water elevation.
    */
-  bool LowFidelityWater::InitVerts(TerrainWaterResourceView* const terrainRes)
+  bool LowFidelityWater::InitVerts(IWldTerrainRes* const terrainRes)
   {
     CD3DDevice* const device = D3D_GetDevice();
     ID3DDeviceResources* const resources = device->GetResources();
 
     mTerrainRes = terrainRes;
-    TerrainMapRuntimeView* const terrainMap = terrainRes->mMap;
+    STIMap* const terrainMap = terrainRes->mMap;
     mWaterElevation = terrainMap->mWaterEnabled != 0 ? terrainMap->mWaterElevation : kDisabledWaterElevation;
 
     CD3DVertexFormat* const vertexFormat = resources->GetVertexFormat(kLowFidelityWaterVertexFormatToken);
@@ -239,7 +240,7 @@ namespace moho
     BindTextureShaderVar(GetWater2NormalMap2ShaderVar(), shaderProperties->GetNormalMap(2));
     BindTextureShaderVar(GetWater2NormalMap3ShaderVar(), shaderProperties->GetNormalMap(3));
 
-    IWldTerrainRes* const terrainRes = reinterpret_cast<IWldTerrainRes*>(mTerrainRes);
+    IWldTerrainRes* const terrainRes = mTerrainRes;
     BindTextureShaderVar(GetWater2FresnelLookupShaderVar(), terrainRes->GetWaterMap());
 
     std::int32_t primitiveType = 4;

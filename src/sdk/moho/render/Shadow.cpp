@@ -323,9 +323,7 @@ namespace moho
     }
     // Same route the terrain passes use: the resource view carries the map,
     // and the map's height-field lane is the collision surface.
-    auto* const terrainView = reinterpret_cast<TerrainWaterResourceView*>(terrainRes);
-    auto* const heightField =
-      reinterpret_cast<CHeightField*>(terrainView->mMap->mHeightFieldObject);
+    CHeightField* const heightField = terrainRes->mMap->mHeightField.get();
     if (heightField == nullptr) {
       return false;
     }
