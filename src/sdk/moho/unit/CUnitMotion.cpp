@@ -2507,6 +2507,10 @@ namespace moho
    * Mangled: ?HandleGroundCollision@CUnitMotion@Moho@@AAE_NXZ
    *
    * What it does: see header.
+   *
+   * Nothing calls this in the shipped engine; FAF patched its one call site
+   * out of `CalcMoveAir` (0x006C018B). See the note at the end of that
+   * function before wiring it back in.
    */
   bool CUnitMotion::HandleGroundCollision()
   {
@@ -4301,7 +4305,7 @@ namespace moho
       MultQuadVec(&mTorque, &randomAngularAccel, &physBody->mOrientation);
     }
 
-    // ---- Shared tail: physics integration + layer/collision + writeback ----
+    // ---- Shared tail: physics integration + layer + writeback ----
     // 0x006C0073-0x006C0186: both branches land here, and the dead/ballistic
     // one arrives with `control` still zeroed - it contributes no force and no
     // torque this beat, having handed its tumble to `mTorque` for
@@ -4312,31 +4316,21 @@ namespace moho
     mPreviousVelocity = physBody->mVelocity;
 
     // TEMPORARY PROBE -- angular runaway triage. Snapshots mWorldImpulse around
-    // each of its two writers so the growth can be attributed. Delete when
-    // resolved.
+    // its writer so the growth can be attributed. Delete when resolved.
     const Wm3::Vector3f wImpBeforeIntegrate = physBody->mWorldImpulse;
 
     physBody->IntegrateFreefallStep(control.force, kFixedIntegrationDt, control.torque);
 
-    const Wm3::Vector3f wImpAfterIntegrate = physBody->mWorldImpulse;
-
-    const bool groundHit = HandleGroundCollision();
-
     {
-      const Wm3::Vector3f wImpAfterGround = physBody->mWorldImpulse;
       const float pre = Wm3::Vector3f::Length(wImpBeforeIntegrate);
-      const float mid = Wm3::Vector3f::Length(wImpAfterIntegrate);
-      const float post = Wm3::Vector3f::Length(wImpAfterGround);
-      const float worst = (post > mid) ? post : mid;
-      if (!std::isfinite(worst) || worst > 1000.0f || (pre > 1.0f && worst > (pre * 1.3f))) {
+      const float post = Wm3::Vector3f::Length(physBody->mWorldImpulse);
+      if (!std::isfinite(post) || post > 1000.0f || (pre > 1.0f && post > (pre * 1.3f))) {
         static int sSpinCount = 0;
         if (sSpinCount++ < 40) {
           gpg::Warnf(
-            "[AIRSPIN] unit=%p ground=%d |wImp| pre=%.3f afterIntegrate=%.3f afterGround=%.3f "
-            "(integrateGain=%.3f groundGain=%.3f) torque=(%.1f,%.1f,%.1f) "
-            "invI=(%.6f,%.6f,%.6f) mass=%.2f curElev=%.2f speed=%.2f",
-            static_cast<void*>(unit), groundHit ? 1 : 0, pre, mid, post,
-            (pre > 0.0f) ? (mid / pre) : 0.0f, (mid > 0.0f) ? (post / mid) : 0.0f,
+            "[AIRSPIN] unit=%p |wImp| pre=%.3f afterIntegrate=%.3f (integrateGain=%.3f) "
+            "torque=(%.1f,%.1f,%.1f) invI=(%.6f,%.6f,%.6f) mass=%.2f curElev=%.2f speed=%.2f",
+            static_cast<void*>(unit), pre, post, (pre > 0.0f) ? (post / pre) : 0.0f,
             control.torque.x, control.torque.y, control.torque.z,
             physBody->mInvInertiaTensor.x, physBody->mInvInertiaTensor.y, physBody->mInvInertiaTensor.z,
             physBody->mMass, mCurElevation, Wm3::Vector3f::Length(physBody->mVelocity)
@@ -4347,8 +4341,8 @@ namespace moho
 
     // TEMPORARY PROBE -- "collides with ground then flees at insane speed"
     // triage. Reports the tick's whole velocity history so the runaway can be
-    // attributed to the control force, the freefall step, or the ground
-    // collision response. Delete when resolved.
+    // attributed to the control force or the freefall step. Delete when
+    // resolved.
     {
       const float postSpeed = Wm3::Vector3f::Length(physBody->mVelocity);
       const float preSpeed = Wm3::Vector3f::Length(mPreviousVelocity);
@@ -4356,10 +4350,10 @@ namespace moho
         static int sFleeCount = 0;
         if (sFleeCount++ < 24) {
           gpg::Warnf(
-            "[AIRFLEE] unit=%p ground=%d preSpeed=%.2f postSpeed=%.2f pre=(%.2f,%.2f,%.2f) "
+            "[AIRFLEE] unit=%p preSpeed=%.2f postSpeed=%.2f pre=(%.2f,%.2f,%.2f) "
             "post=(%.2f,%.2f,%.2f) force=(%.1f,%.1f,%.1f) torque=(%.1f,%.1f,%.1f) "
             "pos=(%.1f,%.1f,%.1f) curElev=%.2f tgtElev=%.2f newElev=%.2f layer=%d vert=%d",
-            static_cast<void*>(unit), groundHit ? 1 : 0, preSpeed, postSpeed,
+            static_cast<void*>(unit), preSpeed, postSpeed,
             mPreviousVelocity.x, mPreviousVelocity.y, mPreviousVelocity.z,
             physBody->mVelocity.x, physBody->mVelocity.y, physBody->mVelocity.z,
             control.force.x, control.force.y, control.force.z,
@@ -4372,31 +4366,35 @@ namespace moho
       }
     }
 
-    // The engine's predicate is `groundHit && enteredLandingPhase &&
-    // horizontalDistance < 0.5f` (0x006C0191 `test al,al`, 0x006C0195 `cmp
-    // byte [esp+17h],0`, 0x006C019C-0x006C01A9 `movss xmm0,[0x00E4F724=0.5] /
-    // comiss xmm0,[esp+44h] / jbe`). What stood here had neither a
-    // landing-phase term nor a distance term: `mLayer` and `mReservation`
-    // both persist across ticks from an earlier landing attempt, so a ground
-    // touch at ANY horizontal distance latched `unit->mVarDat.mLayerMask = mLayer`.
-    // That is the second disjunct of the arrival test above, so latching it
-    // early lets a flier declare arrival without the elevation-convergence
-    // check and settle into UMVE_Bottom/UMVE_Hover -- and `AtTarget()` reports
-    // true unconditionally while hovering, which makes every later navigator
-    // goal arrive instantly.
+    // No terrain collision for a flier: every FAF build, 2025.7.1 included,
+    // hot-patches it out of this tail, and FAF's scripts depend on that.
     //
-    // Note for anyone byte-checking this against bin/2025.7.1: that build does
-    // not run this block at all. 0x006C018B holds `EB 2E` -- an unconditional
-    // jump over it -- followed by `90 90 90 90`, the hot-patch signature, and
-    // a scan finds no call to HandleGroundCollision (FUN_006BC460) anywhere in
-    // that image. The call at 0x006C0186 still runs; only its result is
-    // discarded. Recovered here as the engine's own source rather than as the
-    // post-link patch, since a patch is not something source compiles to; the
-    // corrected predicate is in any case strictly narrower than what it
-    // replaces.
-    if (groundHit && enteredLandingPhase && horizontalDistance < 0.5f) {
-      unit->SetCurrentLayer(mLayer);
-    } else if (mVertEvent != UMVE_Hover) {
+    // The GPG build called HandleGroundCollision (0x006BC460) here, and
+    // latched the landing layer when it reported contact inside 0.5 of the
+    // goal during the landing phase. The six patched bytes were
+    // `push ebp / call 0x006BC460` (the callee ends `ret 4`); what they fed
+    // survives, unreachable, right behind the patch:
+    //
+    //   0x006C018B  EB 2E 90 90 90 90        jmp 0x006C01BB   ; FAF
+    //   0x006C0191  84 C0                    test  al, al      ; ground hit
+    //   0x006C0195  80 7C 24 17 00           cmp   byte [esp+17h], 0  ; landing phase
+    //   0x006C019C  F3 0F 10 05 24 F7 E4 00  movss xmm0, [0x00E4F724]  ; 0.5
+    //   0x006C01A4  0F 2F 44 24 44           comiss xmm0, [esp+44h]    ; distance
+    //   0x006C01B4  E8 37 AE FB FF           call  Entity::SetCurrentLayer(mLayer)
+    //
+    // Nothing else in the image references 0x006BC460 -- no rel32 call or jump
+    // and no pointer in any section, FAF's `.exxt` included -- so the shipped
+    // engine never runs it. (The call at 0x006C0186 is the tail of the freefall
+    // step above, `SPhysBody::IntegrateAngularImpulse`, not this one.)
+    //
+    // Restoring the GPG call is not neutral. FAF's Cybran build drones
+    // (URA0001O/URA0002O/URA0003O, `Air.CanFly = true`) call
+    // `SetCollisionShape('None')` in OnCreate, and HandleGroundCollision reads
+    // `CollisionExtents` unguarded through Entity::GetTerrainCollisionGeom
+    // (0x0067AA57). URA0001O cruises at Elevation 2 on a 1x1 footprint, right
+    // on HandleGroundCollision's `2 * max(SizeX, SizeZ)` early-out, so the sim
+    // thread crashed on the first tick it sat at or below 2.0.
+    if (mVertEvent != UMVE_Hover) {
       const ELayer previousLayer2 = unit->mVarDat.mLayerMask;
       unit->mVarDat.mLayerMask = LAYER_Air;
       if (previousLayer2 != LAYER_Air) {

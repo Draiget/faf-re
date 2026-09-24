@@ -4220,6 +4220,11 @@ namespace moho
    * Emits one terrain-collision proxy sphere list from the active collision
    * primitive: eight corner points for box primitives, or one center/radius
    * sphere for sphere primitives.
+   *
+   * 0x0067AA57 loads `CollisionExtents` and calls through its vtable with no
+   * null test, so an entity whose script ran `SetCollisionShape('None')` must
+   * never get here. Its only caller, `CUnitMotion::HandleGroundCollision`, is
+   * unreachable in FAF's build (patched out of `CalcMoveAir` at 0x006C018B).
    */
   void Entity::GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const
   {

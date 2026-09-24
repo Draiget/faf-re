@@ -573,6 +573,12 @@ namespace moho
      * were found, fed to `SPhysBody::ApplyGroundCollisionResponse`. Returns
      * true if the unit is touching ground, or (for units that can't fly in
      * water) at/below water.
+     *
+     * Unreachable in every FAF build: its only call, in `CalcMoveAir`'s tail,
+     * was hot-patched to a jump at 0x006C018B and no other reference to
+     * 0x006BC460 exists in the image. Kept as the recovered GPG body, and
+     * deliberately not called -- it dereferences `CollisionExtents`
+     * unguarded, which FAF's scripts clear on flying drones.
      */
     [[nodiscard]] bool HandleGroundCollision();
 
@@ -686,8 +692,10 @@ namespace moho
      * water look-ahead and combat state, steers via `ComputeAirControl`/
      * `ComputeAirCombatTactics`, fires vertical/horizontal/turn motion-event
      * script callbacks, integrates the linked `SPhysBody` (linear+angular),
-     * resolves ground collision/layer transition, and writes the resulting
-     * world transform back through `outTransform`. If the unit is dead and
+     * returns the unit to `LAYER_Air` unless it is hovering, and writes the
+     * resulting world transform back through `outTransform`. It runs no
+     * terrain collision: FAF hot-patched the `HandleGroundCollision` call out
+     * of the tail at 0x006C018B (see the definition). If the unit is dead and
      * not already flying (or shouldn't hover), instead forces `LAYER_Air`/
      * `UMS_Ballistic` and seeds a random tumble torque before falling into
      * the same physics-integration tail.

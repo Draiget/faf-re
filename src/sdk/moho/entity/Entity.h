@@ -1099,6 +1099,10 @@ namespace moho
      * Emits terrain-collision proxy spheres from current collision primitive:
      * eight corner points for box shapes, or one center/radius sphere for
      * sphere shapes.
+     *
+     * Requires a collision primitive; the binary does not check for one. Its
+     * only caller is `CUnitMotion::HandleGroundCollision`, which FAF's build
+     * never reaches.
      */
     void GetTerrainCollisionGeom(gpg::fastvector<Wm3::Sphere3f>& outSpheres) const;
 
