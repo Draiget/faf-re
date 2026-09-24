@@ -40,6 +40,34 @@
 
 namespace
 {
+  /**
+   * The shipped exe's CRT (VS2005 msvcr80, `__tmainCRTStartup`) calls
+   * GetStartupInfo before it runs any initializer; today's CRT asks only in
+   * `invoke_main`, after them. The order matters under FAF's install: its ASI
+   * loader (bin\dsound.dll) loads `scripts\UptimeFaker32.asi` on the first call
+   * the exe makes to one of the kernel32 functions it hooks, and UptimeFaker
+   * rebases QueryPerformanceCounter and GetTickCount to a one-day uptime. The
+   * static `gpg::time::Timer`s (wakeupTimer, startTime, ...) must sample the
+   * rebased counter too: one real sample stored first leaves
+   * `gpg::time::GetCycle`'s never-backwards clamp ahead of every later reading,
+   * so the frame clock stops and the intro movie never starts. Asking first, as
+   * the old CRT did, keeps every sample on one timeline.
+   */
+  int __cdecl QueryStartupInfoBeforeInitializers()
+  {
+    STARTUPINFOW startupInfo{};
+    ::GetStartupInfoW(&startupInfo);
+    return 0;
+  }
+} // namespace
+
+// `.CRT$XI*` entries run from `_initterm_e`, ahead of every C++ initializer.
+#pragma section(".CRT$XIB", read)
+extern "C" __declspec(allocate(".CRT$XIB")) int(__cdecl* const gQueryStartupInfoBeforeInitializers)() =
+  &QueryStartupInfoBeforeInitializers;
+
+namespace
+{
   class AllocationLogSymbolAddressCache
   {
   private:
