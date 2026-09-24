@@ -343,22 +343,14 @@ namespace moho
    * int __thiscall sub_4FFC20(char* this, int scratchOut);
    *
    * What it does:
-   * Computes world-space AABB from center/basis/extents and writes it to caller scratch buffer.
+   * Computes the world-space AABB from center/basis/extents.
    */
-  const EntityCollisionBoundsView*
-  CColPrimitive<Wm3::Box3f>::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
+  Wm3::AxisAlignedBox3f CColPrimitive<Wm3::Box3f>::GetBoundingBox() const
   {
-    auto* const bounds = &scratch0x1C->bounds;
     Wm3::Vec3f minimum{};
     Wm3::Vec3f maximum{};
     mShape.ComputeAABB(minimum, maximum);
-    bounds->minX = minimum.x;
-    bounds->minY = minimum.y;
-    bounds->minZ = minimum.z;
-    bounds->maxX = maximum.x;
-    bounds->maxY = maximum.y;
-    bounds->maxZ = maximum.z;
-    return bounds;
+    return {minimum, maximum};
   }
 
   /**
@@ -563,20 +555,15 @@ namespace moho
    * float *__thiscall sub_4FF9A0(float *this, float *a2);
    *
    * What it does:
-   * Writes axis-aligned bounds from `{center,radius}` to caller scratch.
+   * Returns the axis-aligned bounds of `{center, radius}`.
    */
-  const EntityCollisionBoundsView*
-  CColPrimitive<Wm3::Sphere3f>::GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const
+  Wm3::AxisAlignedBox3f CColPrimitive<Wm3::Sphere3f>::GetBoundingBox() const
   {
-    auto* const bounds = &scratch0x1C->bounds;
     const float radius = mShape.Radius;
-    bounds->minX = mShape.Center.x - radius;
-    bounds->minY = mShape.Center.y - radius;
-    bounds->minZ = mShape.Center.z - radius;
-    bounds->maxX = mShape.Center.x + radius;
-    bounds->maxY = mShape.Center.y + radius;
-    bounds->maxZ = mShape.Center.z + radius;
-    return bounds;
+    return {
+      Wm3::Vec3f{mShape.Center.x - radius, mShape.Center.y - radius, mShape.Center.z - radius},
+      Wm3::Vec3f{mShape.Center.x + radius, mShape.Center.y + radius, mShape.Center.z + radius},
+    };
   }
 
   /**

@@ -22691,23 +22691,14 @@ int moho::cfunc_EntityGetCollisionExtentsL(LuaPlus::LuaState* const state)
 
   LuaPlus::LuaObject resultObject(state);
   if (collisionShape) {
-    EntityCollisionBoundsScratch scratchBounds{};
-    const EntityCollisionBoundsView* const bounds = collisionShape->GetBoundingBox(&scratchBounds);
+    const Wm3::AxisAlignedBox3f bounds = collisionShape->GetBoundingBox();
 
     resultObject.AssignNewTable(state, 0, 0u);
 
-    Wm3::Vector3f minBounds{};
-    minBounds.x = bounds->minX;
-    minBounds.y = bounds->minY;
-    minBounds.z = bounds->minZ;
-    const LuaPlus::LuaObject minObject = SCR_ToLua<Wm3::Vector3<float>>(state, minBounds);
+    const LuaPlus::LuaObject minObject = SCR_ToLua<Wm3::Vector3<float>>(state, bounds.Min);
     resultObject.SetObject("Min", minObject);
 
-    Wm3::Vector3f maxBounds{};
-    maxBounds.x = bounds->maxX;
-    maxBounds.y = bounds->maxY;
-    maxBounds.z = bounds->maxZ;
-    const LuaPlus::LuaObject maxObject = SCR_ToLua<Wm3::Vector3<float>>(state, maxBounds);
+    const LuaPlus::LuaObject maxObject = SCR_ToLua<Wm3::Vector3<float>>(state, bounds.Max);
     resultObject.SetObject("Max", maxObject);
   }
 

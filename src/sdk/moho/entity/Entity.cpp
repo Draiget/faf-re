@@ -1206,14 +1206,6 @@ namespace
     return (static_cast<std::uint8_t>(caps) & bit) != 0u;
   }
 
-  // `CollisionCellRect` + `BuildCollisionCellRectFromBounds` (FUN_004FCBE0) and
-  // their floor/ceil/clamp helpers were promoted to public
-  // `moho::` scope in `EntityCollisionUpdater.h` so the shared leaf can be
-  // invoked by name from `func_EntitiesAroundPoint` (COGrid.cpp) as the binary
-  // does. The call sites below still name them unqualified via this alias.
-  using moho::BuildCollisionCellRectFromBounds;
-  using moho::CollisionCellRect;
-
   /**
    * Address: 0x004FD9B0 (FUN_004FD9B0, append-path subset)
    *
@@ -1407,23 +1399,23 @@ namespace
   }
 
   [[nodiscard]] bool
-  CollisionCellRectEqualsSpan(const CollisionCellRect& rect, const moho::EntityCollisionCellSpan& span) noexcept
+  CollisionDBRectEqualsSpan(const moho::CollisionDBRect& rect, const moho::EntityCollisionCellSpan& span) noexcept
   {
-    return rect.startX == span.mCellStartX && rect.startZ == span.mCellStartZ && rect.width == span.mCellWidth &&
-      rect.height == span.mCellHeight;
+    return rect.mStartX == span.mCellStartX && rect.mStartZ == span.mCellStartZ && rect.mWidth == span.mCellWidth &&
+      rect.mHeight == span.mCellHeight;
   }
 
-  void RelinkSpanToRectIfChanged(moho::EntityCollisionCellSpan& span, const CollisionCellRect& nextRect)
+  void RelinkSpanToRectIfChanged(moho::EntityCollisionCellSpan& span, const moho::CollisionDBRect& nextRect)
   {
-    if (CollisionCellRectEqualsSpan(nextRect, span)) {
+    if (CollisionDBRectEqualsSpan(nextRect, span)) {
       return;
     }
 
     RemoveSpanMembership(span);
-    span.mCellStartX = nextRect.startX;
-    span.mCellStartZ = nextRect.startZ;
-    span.mCellWidth = nextRect.width;
-    span.mCellHeight = nextRect.height;
+    span.mCellStartX = nextRect.mStartX;
+    span.mCellStartZ = nextRect.mStartZ;
+    span.mCellWidth = nextRect.mWidth;
+    span.mCellHeight = nextRect.mHeight;
     AddSpanMembership(span);
   }
 
@@ -1434,9 +1426,10 @@ namespace
    * Rebuilds quantized collision-cell rectangle directly from bounds and
    * relinks bucket membership only when span changed.
    */
-  void RelinkSpanFromBoundsIfChanged(moho::EntityCollisionCellSpan& span, const moho::EntityCollisionBoundsView& bounds)
+  void RelinkSpanFromBoundsIfChanged(moho::EntityCollisionCellSpan& span, const Wm3::AxisAlignedBox3f& bounds)
   {
-    const CollisionCellRect nextRect = BuildCollisionCellRectFromBounds(bounds);
+    moho::CollisionDBRect nextRect{};
+    (void)moho::func_AABoxToRect(&nextRect, bounds);
     RelinkSpanToRectIfChanged(span, nextRect);
   }
 
@@ -1452,13 +1445,11 @@ namespace
   )
   {
     if (collisionPrimitive) {
-      moho::EntityCollisionBoundsScratch scratchBounds{};
-      const moho::EntityCollisionBoundsView* const bounds = collisionPrimitive->GetBoundingBox(&scratchBounds);
-      RelinkSpanFromBoundsIfChanged(span, *bounds);
+      RelinkSpanFromBoundsIfChanged(span, collisionPrimitive->GetBoundingBox());
       return;
     }
 
-    RelinkSpanToRectIfChanged(span, CollisionCellRect{});
+    RelinkSpanToRectIfChanged(span, moho::CollisionDBRect{});
   }
 
   void RefreshCollisionBoundsSnapshot(moho::Entity& entity)
@@ -1480,7 +1471,7 @@ namespace
     ::operator delete(old);
 
     if (!entity.CollisionExtents) {
-      RelinkSpanToRectIfChanged(entity.mCollisionCellSpan, CollisionCellRect{});
+      RelinkSpanToRectIfChanged(entity.mCollisionCellSpan, moho::CollisionDBRect{});
       return;
     }
 
@@ -4122,14 +4113,9 @@ namespace moho
       return;
     }
 
-    EntityCollisionBoundsScratch scratchBounds{};
-    const EntityCollisionBoundsView* const bounds = CollisionExtents->GetBoundingBox(&scratchBounds);
-    mCollisionBoundsMin.x = bounds->minX;
-    mCollisionBoundsMin.y = bounds->minY;
-    mCollisionBoundsMin.z = bounds->minZ;
-    mCollisionBoundsMax.x = bounds->maxX;
-    mCollisionBoundsMax.y = bounds->maxY;
-    mCollisionBoundsMax.z = bounds->maxZ;
+    const Wm3::AxisAlignedBox3f bounds = CollisionExtents->GetBoundingBox();
+    mCollisionBoundsMin = bounds.Min;
+    mCollisionBoundsMax = bounds.Max;
   }
 
   /**

@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "Wm3AxisAlignedBox3.h"
 #include "Wm3Box3.h"
 #include "Wm3Sphere3.h"
 #include "Wm3Vector3.h"
@@ -12,32 +13,6 @@ namespace moho
   class Entity;
 
   struct EntityTransformPayload;
-
-  struct EntityCollisionBoundsView
-  {
-    float minX;
-    float minY;
-    float minZ;
-    float maxX;
-    float maxY;
-    float maxZ;
-  };
-  static_assert(sizeof(EntityCollisionBoundsView) == 0x18, "EntityCollisionBoundsView size must be 0x18");
-
-  /**
-   * Scratch payload passed to primitive `GetBoundingBox` slot.
-   *
-   * Binary evidence:
-   * - Callers allocate 0x1C bytes on stack (`_BYTE[28]`) and pass to vtable slot 0.
-   * - Primitive writes the first 0x18 bytes as `{min,max}` floats.
-   * - Last 0x04 bytes are currently not consumed by known callers.
-   */
-  struct EntityCollisionBoundsScratch
-  {
-    EntityCollisionBoundsView bounds; // +0x00 .. +0x17
-    std::uint32_t reserved18;         // +0x18
-  };
-  static_assert(sizeof(EntityCollisionBoundsScratch) == 0x1C, "EntityCollisionBoundsScratch size must be 0x1C");
 
   /**
    * Address: 0x004FE7A0 (FUN_004FE7A0) / 0x004FE860 / 0x004FF150 / 0x004FF260
@@ -125,15 +100,19 @@ namespace moho
     /**
      * Address: 0x004FFC20 (FUN_004FFC20) / 0x004FF9A0
      *
-     * EntityCollisionBoundsScratch*
-     *
      * IDA signature:
      * int __thiscall sub_4FFC20(char* this, int scratchOut);
      *
      * What it does:
-     * Writes world-space AABB to caller scratch and returns `&scratch->bounds`.
+     * Returns the primitive's world-space axis-aligned bounds by value.
+     *
+     * IDA's `scratchOut` is MSVC's hidden return slot: both overrides write
+     * six floats, `{Min, Max}`, to `[eax+0x00..0x14]`, hand the same pointer
+     * back in EAX and end `ret 4`, and the caller at 0x004FD516 passes the
+     * result straight to `func_AABoxToRect`, which takes a
+     * `Wm3::AxisAlignedBox3f`.
      */
-    virtual const EntityCollisionBoundsView* GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const = 0;
+    virtual Wm3::AxisAlignedBox3f GetBoundingBox() const = 0;
 
     /**
      * Address: 0x004FF130 (FUN_004FF130) / 0x004FE780
@@ -276,8 +255,7 @@ namespace moho
     /**
      * Address: 0x004FFC20 (FUN_004FFC20)
      */
-    [[nodiscard]] const EntityCollisionBoundsView*
-    GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const override;
+    [[nodiscard]] Wm3::AxisAlignedBox3f GetBoundingBox() const override;
 
     /**
      * Address: 0x004FF130 (FUN_004FF130)
@@ -346,8 +324,7 @@ namespace moho
     /**
      * Address: 0x004FF9A0 (FUN_004FF9A0)
      */
-    [[nodiscard]] const EntityCollisionBoundsView*
-    GetBoundingBox(EntityCollisionBoundsScratch* scratch0x1C) const override;
+    [[nodiscard]] Wm3::AxisAlignedBox3f GetBoundingBox() const override;
 
     /**
      * Address: 0x004FE780 (FUN_004FE780)

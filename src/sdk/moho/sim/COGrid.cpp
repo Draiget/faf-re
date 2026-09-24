@@ -391,24 +391,6 @@ namespace
     return static_cast<std::uint16_t>(extent);
   }
 
-  // `EntityCollisionBoundsView` is the same six-float min/max footprint the
-  // collision primitives hand back from their `GetBoundingBox` slot, so the
-  // quantization is `func_AABoxToRect` (0x004FCBE0) verbatim -- the binary
-  // reaches it from the same eight collision-query sites this file recovers.
-  [[nodiscard]] moho::CollisionDBRect BuildCollisionRectFromBounds(
-    const moho::EntityCollisionBoundsView& bounds
-  ) noexcept
-  {
-    const Wm3::AxisAlignedBox3f box{
-      Wm3::Vector3f{bounds.minX, bounds.minY, bounds.minZ},
-      Wm3::Vector3f{bounds.maxX, bounds.maxY, bounds.maxZ},
-    };
-
-    moho::CollisionDBRect rect{};
-    (void)moho::func_AABoxToRect(&rect, box);
-    return rect;
-  }
-
   struct CompactOccupancyRectExtentView
   {
     std::uint8_t width; // +0x00
@@ -843,13 +825,14 @@ namespace moho
    * from this grid's occupation manager into `outEntities`.
    */
   [[maybe_unused]] int GatherUnmarkedEntitiesInBounds(
-    const EntityCollisionBoundsView& bounds,
+    const Wm3::AxisAlignedBox3f& bounds,
     COGrid& grid,
     const EEntityType flags,
     EntityGatherVector& outEntities
   )
   {
-    const CollisionDBRect rect = BuildCollisionRectFromBounds(bounds);
+    CollisionDBRect rect{};
+    (void)func_AABoxToRect(&rect, bounds);
     return grid.mEntityOccupationManager.GatherUnmarkedEntities(outEntities, rect, flags);
   }
 
@@ -943,15 +926,9 @@ namespace moho
     gpg::core::FastVectorN<CollisionResult, 10>& outCollisions
   )
   {
-    const EntityCollisionBoundsView sourceBoundsView{
-      source->mCollisionBoundsMin.x,
-      source->mCollisionBoundsMin.y,
-      source->mCollisionBoundsMin.z,
-      source->mCollisionBoundsMax.x,
-      source->mCollisionBoundsMax.y,
-      source->mCollisionBoundsMax.z
-    };
-    const CollisionDBRect queryRect = BuildCollisionRectFromBounds(sourceBoundsView);
+    const Wm3::AxisAlignedBox3f sourceBounds{source->mCollisionBoundsMin, source->mCollisionBoundsMax};
+    CollisionDBRect queryRect{};
+    (void)func_AABoxToRect(&queryRect, sourceBounds);
 
     EntityGatherVector gatheredEntities{};
     const int gatheredCount =
@@ -1010,18 +987,10 @@ namespace moho
   )
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromOrientedBox(box);
-    const EntityCollisionBoundsView queryBoundsView{
-      queryBounds.Min.x,
-      queryBounds.Min.y,
-      queryBounds.Min.z,
-      queryBounds.Max.x,
-      queryBounds.Max.y,
-      queryBounds.Max.z
-    };
 
     EntityGatherVector gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntitiesInBounds(
-      queryBoundsView,
+      queryBounds,
       *this,
       flags,
       gatheredEntities
@@ -1070,17 +1039,8 @@ namespace moho
     gpg::core::FastVectorN<CollisionResult, 10>& into
   )
   {
-    const EntityCollisionBoundsView boundsView{
-      box.Min.x,
-      box.Min.y,
-      box.Min.z,
-      box.Max.x,
-      box.Max.y,
-      box.Max.z
-    };
-
     EntityGatherVector gatheredEntities{};
-    const int gatheredCount = GatherUnmarkedEntitiesInBounds(boundsView, grid, ENTITYTYPE_Unit, gatheredEntities);
+    const int gatheredCount = GatherUnmarkedEntitiesInBounds(box, grid, ENTITYTYPE_Unit, gatheredEntities);
 
     into.ResetStorageToInline();
 
@@ -1315,18 +1275,10 @@ namespace moho
   )
   {
     const Wm3::AxisAlignedBox3f queryBounds = BuildAxisAlignedBoundsFromSphere(sphere);
-    const EntityCollisionBoundsView queryBoundsView{
-      queryBounds.Min.x,
-      queryBounds.Min.y,
-      queryBounds.Min.z,
-      queryBounds.Max.x,
-      queryBounds.Max.y,
-      queryBounds.Max.z
-    };
 
     EntityGatherVector gatheredEntities{};
     const int gatheredCount = GatherUnmarkedEntitiesInBounds(
-      queryBoundsView,
+      queryBounds,
       *this,
       flags,
       gatheredEntities
@@ -1604,7 +1556,7 @@ namespace moho
    * Collects entities of `type` whose XZ distance to `center` is within `radius`
    * into `outResults` (one `CollisionResult` per hit, `sourceEntity` set). Builds
    * a radius-sized AABB (Y spanning [-10000, 10000]), quantizes it via
-   * `BuildCollisionCellRectFromBounds` (FUN_004FCBE0), gathers unmarked entities
+   * `func_AABoxToRect` (FUN_004FCBE0), gathers unmarked entities
    * in that cell rect from the grid occupation manager
    * (`GatherUnmarkedEntities` = FUN_00722DF0), clears `outResults`, then appends
    * each entity that passes the squared-XZ range test — growing through
@@ -1621,22 +1573,14 @@ namespace moho
     const float radiusSquared = radius * radius;
 
     // AABB around the query centre with an effectively unbounded vertical extent
-    // (matches the binary's -10000 / +10000 Y lanes). Layout is
-    // {minX, minY, minZ, maxX, maxY, maxZ} = Wm3::AxisAlignedBox3f.
-    EntityCollisionBoundsView queryBounds{};
-    queryBounds.minX = center.x - radius;
-    queryBounds.minY = -10000.0f;
-    queryBounds.minZ = center.z - radius;
-    queryBounds.maxX = center.x + radius;
-    queryBounds.maxY = 10000.0f;
-    queryBounds.maxZ = center.z + radius;
+    // (matches the binary's -10000 / +10000 Y lanes).
+    const Wm3::AxisAlignedBox3f queryBounds{
+      Wm3::Vector3f{center.x - radius, -10000.0f, center.z - radius},
+      Wm3::Vector3f{center.x + radius, 10000.0f, center.z + radius},
+    };
 
-    const CollisionCellRect cellRect = BuildCollisionCellRectFromBounds(queryBounds);
-    static_assert(
-      sizeof(CollisionCellRect) == sizeof(CollisionDBRect),
-      "CollisionCellRect must alias CollisionDBRect for the grid gather call"
-    );
-    const CollisionDBRect gatherRect = reinterpret_cast<const CollisionDBRect&>(cellRect);
+    CollisionDBRect gatherRect{};
+    (void)func_AABoxToRect(&gatherRect, queryBounds);
 
     EntityGatherVector gatheredEntities{};
     grid.mEntityOccupationManager.GatherUnmarkedEntities(gatheredEntities, gatherRect, type);
