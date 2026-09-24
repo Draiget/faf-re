@@ -1,7 +1,6 @@
 #pragma once
 
 #include "gpg/core/containers/FastVector.h"
-#include "gpg/core/containers/FastVector.h"
 #include <cstddef>
 #include <cstdint>
 
