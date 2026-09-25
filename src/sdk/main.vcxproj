@@ -344,8 +344,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
     <ClCompile Include="lua\LuaStateTypeInfo.cpp" />
     <ClCompile Include="moho\lua\UnrecoveredLuaCallbackStubs.cpp" />
-    <ClCompile Include="moho\EngineUnrecoveredStubs.cpp" />
-    <ClCompile Include="moho\EngineMethodStubs.cpp" />
     <ClCompile Include="moho\EngineMethodStubs2.cpp" />
     <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
     <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
