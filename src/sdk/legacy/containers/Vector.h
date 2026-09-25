@@ -2198,6 +2198,10 @@ namespace msvc8
          * Address: 0x004F7130 (FUN_004F7130 -- the same `jmp` into 0x004F82D0 for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`); zero callers, exit-time destructor 0x00BF18C0. Formerly anchored in moho/app/WinApp.cpp.)
          *
          * Destructor: destroy elements and free storage if allowed
+         * Address: 0x007A5970 (FUN_007A5970 -- `~vector` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp), run at exit
+         *   through the atexit thunk 0x00C032E0: unlink every element, free, null the triple.
+         *   Formerly `CleanupInputCaptureAtExit`.)
+         * Address: 0x00C032E0 (FUN_00C032E0 -- that atexit thunk.)
          */
         ~vector() {
             destroy_all();
@@ -2657,6 +2661,8 @@ namespace msvc8
          * Address: 0x008E83A0 (FUN_008E83A0 -- `size()`, `(last - first) / 112` (`0x92492493`, `add`, `sar 6`) with the null-`first` guard, for `msvc8::vector<gpg::gal::AdapterD3D9>` (`DeviceD3D9::mAdapters` at +0x28, the 0x70 element); callers 0x008F1992 (`_Insert_n` 0x008F1890); formerly `CountAdapterVectorElements` over an `AdapterVectorCountRuntime` overlay in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F7070 (FUN_004F7070 -- `size()` specialised to `moho::managedWindows` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>`): the global's `first_`/`last_` (0x010A9B94/0x010A9B98) read directly, `(last_ - first_) >> 3` behind the null-`first_` guard; caller 0x004F8D63 (the registry's `insert`, 0x004F8CA0). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
          * Address: 0x004F7140 (FUN_004F7140 -- the same `size()` for `moho::managedFrames` (`msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`) (0x010A9BD8); caller 0x004F9113 (`insert`, 0x004F9050). Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
+         * Address: 0x007A56A0 (FUN_007A56A0 -- `size()` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp) (`sar 3`).
+         *   Formerly `InputCaptureCount`.)
          */
         [[nodiscard]] std::size_t size() const noexcept {
 	        return static_cast<std::size_t>(last_ - first_);
@@ -4023,6 +4029,8 @@ namespace msvc8
          * Address: 0x008FE4B0 (FUN_008FE4B0 -- `push_back` -- reached from `DeviceD3D10::Setup`'s `mSwapChains.push_back(swapChain)`, one per head; the capacity-full path is `_Insert_n` 0x008FE010 for `msvc8::vector<IDXGISwapChain*>` (`DeviceD3D10::mSwapChains` at +0xA4); callers 0x00900B30; formerly `AppendBackendSwapChain` in gpg/gal/backends/d3d10/D3D10Interfaces.cpp (RULE ONE), removed 2026-09-23.)
          * Address: 0x00942860 (FUN_00942860 -- `push_back`: `_Ufill(last, 1, v)` inlined when there is room, else `_Insert_n(end, 1, v)` 0x00942490, for `msvc8::vector<boost::shared_ptr<gpg::gal::EffectTechnique>>` (the out-vector of `Effect::GetTechniques`, which both backends fill through the same emissions); callers 0x00942A90 (`EffectD3D9::GetTechniques`), 0x0094BE69 (`EffectD3D10::GetTechniques`); formerly `AppendEffectTechniqueSharedRef` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EFDD0 (FUN_008EFDD0 -- `push_back`: `_Ufill(last, 1, v)` over 0x008EA090 when there is room, else `insert(end, v)` 0x008EFA50, for `msvc8::vector<gpg::gal::HeadAdapterMode>` (`Head::adapterModes` at +0x50 and gal::Device slot 5's out-vector; the 0x0C `{width, height, refresh}` element); callers 0x008F020C (`DeviceD3D9::GetModesForAdapter`), 0x008F2218 (`DeviceD3D9::BuildDeviceCapabilities`), 0x008FF752 (`DeviceD3D10::CheckAvailableFormats`); formerly `AppendHeadAdapterMode` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x007A5710 (FUN_007A5710 -- `push_back` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp); caller
+         *   `AddInputCaptureControl` 0x007A4540. Formerly `AppendInputCaptureWeakReference`.)
          */
         void push_back(const T& value) {
             // VC8 splits this in two and the binary keeps both halves out of
@@ -4431,6 +4439,12 @@ namespace msvc8
          * Address: 0x00951E40 (FUN_00951E40 -- `erase(first, last)` for `msvc8::vector<gpg::TrackedPointerInfo>` (`gpg::ReadArchive::mTrackedPtrs` at +0x14): move the survivors down through the element's copy-assign 0x009506F0, release the vacated tail's control blocks, rebase `_Mylast`, hand `first` back through the caller's slot; zero callers, unreachable; formerly `EraseTrackedPointerRangeAndStoreCursorRuntime` in gpg/core/containers/ReadArchive.cpp (RULE ONE), removed 2026-09-18.)
          * Address: 0x009427F0 (FUN_009427F0 -- `erase(first, last)`: `_Copy_opt` the tail down, destroy the rest through the virtual destructor, return `first`, for `msvc8::vector<gpg::gal::EffectMacro>` (`EffectContext::mMacros` at +0x54, the 0x3C two-string element); callers 0x009428DE (`clear()`), 0x00942BA0 (the empty-source path of `operator=`); formerly `EraseEffectMacroTailRange` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x008EA6F0 (FUN_008EA6F0 -- `erase(first, last)`: `std::copy` the tail down (0x008EA190), destroy the vacated tail through the virtual destructor, rebase `_Mylast`, hand `first` back through the hidden slot, for `msvc8::vector<gpg::gal::AdapterModeD3D9>` (`AdapterD3D9::modes` at +0x60; the 0x10 element is polymorphic, so a copy-construct stores its vtable 0x00D423A4 and an assignment copies only width/height/refresh); callers 0x008EF8A4 (the empty-source path of `operator=` 0x008EF870) and 0x008EA8EE, an IDA-unboxed `clear()` at 0x008EA8E0 with no references. Was DB `external_dependency`; it is engine code.)
+         * Address: 0x007A58C0 (FUN_007A58C0 -- `erase(first, last)` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp),
+         *   iterator through the result slot. Formerly `EraseInputCaptureRangeCompacting`.)
+         * Address: 0x007A5F60 (FUN_007A5F60 -- the `std::copy` of the tail it makes for the
+         *   same vector, through `WeakPtr`'s relinking assignment; 0x007A5E30 is its
+         *   register-order adapter. Formerly `CopyInputCaptureWeakRangeAssign`.)
+         * Address: 0x007A5E30 (FUN_007A5E30 -- see 0x007A5F60 above.)
          */
         iterator erase(iterator first, iterator last) {
             assert(first_ <= first && first <= last && last <= last_);
@@ -5517,6 +5531,9 @@ namespace msvc8
          * Address: 0x004F7F50 (FUN_004F7F50 -- single-value `insert(pos, value)` for the 0x28-byte `moho::CWinLogLine` (the log window's line lists), the capacity-full path of `push_back`: offset, `_Insert_n` 0x004F88B0, `begin() + offset`; caller 0x004F6FBE (0x004F6F40). Formerly `InsertVectorWinLogLineAtEnd` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F8CA0 (FUN_004F8CA0 -- single-value `insert(pos, value)` for the managed-dialog registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedDialog>>` (the 0x08 `{ownerLinkSlot, nextInOwner}` element); caller 0x004F811C (0x004F80F0). Formerly `InsertManagedWindowSlotIntoWindowsVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004F9050 (FUN_004F9050 -- the same insert for the managed-frame registry `msvc8::vector<moho::WeakPtr<moho::WWinManagedFrame>>`; caller 0x004F826C (0x004F8240). Formerly `InsertManagedWindowSlotIntoFramesVector` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
+         * Address: 0x007A5870 (FUN_007A5870 -- `insert(pos, value)` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp):
+         *   the offset, the `_Insert_n` below, the rebased iterator. Formerly
+         *   `InsertInputCaptureWithGrowth`.)
          */
         iterator insert(const_iterator pos, const T& value) {
             const std::size_t offset =
@@ -6652,6 +6669,9 @@ namespace msvc8
          * Address: 0x004F88B0 (FUN_004F88B0 -- `_Insert_n(pos, 1, value)` for the 0x28-byte `moho::CWinLogLine`, the grow-and-insert body under 0x004F7F50; caller 0x004F7F9B. Formerly `GrowAndInsertOneVectorWinLogLine` in moho/app/WxAppVectorHelpers.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004FD9B0 (FUN_004FD9B0 -- `_Insert_n` for the 4-byte `EntityCollisionCellNode*` element of `EntityOccupationManager::mAllBlocks` (+0x24), the full arm of `EnsureSize`'s inlined `push_back` (0x004FCF08). Formerly `AppendCollisionChunkPointer` in Entity.cpp, then COGrid.cpp (RULE ONE), removed 2026-09-24.)
          * Address: 0x004FDE50 (FUN_004FDE50 -- that insert's `memmove_s` relocate of the live pointer range into the new block, for the same vector.)
+         * Address: 0x007A5A70 (FUN_007A5A70 -- `_Insert_n` for `msvc8::vector<WeakPtr<CMauiControl>>` (`sInputCapture`, the MAUI input-capture stack in moho/ui/UiRuntimeTypes.cpp): the local
+         *   value copy, the in-place tail shift, and the 1.5x relocation. Formerly
+         *   `GrowAndInsertInputCaptureWeakRef`.)
          */
         iterator insert(const_iterator pos, std::size_t count, const T& value) {
             assert(pos >= first_ && pos <= last_);
@@ -11857,6 +11877,8 @@ namespace msvc8
          * Address: 0x00495EA0 (FUN_00495EA0 -- `list<ParticleBuffer*>::begin()`; zero callers, unreachable; formerly `GetLegacyPoolListBeginNode` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Writes the begin-node (`head->next`) from one legacy list header into caller storage.)
          * Address: 0x00495FD0 (FUN_00495FD0 -- `list<ParticleBuffer*>::begin()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListBeginNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate begin-node accessor thunk for the same legacy list layout used by sibling pool lanes.)
          * Address: 0x005142F0 (FUN_005142F0 -- `begin()` written through a caller slot for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListBeginCursor` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00858340 (FUN_00858340 -- `begin()` written through the result slot for
+         *   `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14); formerly `StoreCommandFeedbackFirstNodeLane`.)
          */
         iterator begin()
         {
@@ -11873,6 +11895,8 @@ namespace msvc8
          * Address: 0x00495FE0 (FUN_00495FE0 -- `list<ParticleBuffer*>::end()` (the second pool's copy); zero callers, unreachable; formerly `GetLegacyPoolListHeadNodeDuplicate` in moho/particles/ParticleRenderBuckets.cpp, removed 2026-09-10; Duplicate head-sentinel accessor thunk for the same legacy list layout used by sibling pool lanes.)
          * Address: 0x00514300 (FUN_00514300 -- `end()` written through a caller slot for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListSentinelCursorA` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00514400 (FUN_00514400 -- a second emission of that `end()` export for `msvc8::list<moho::SNamedFootprint>` (`SRuleFootprintsBlueprint`; the 0x0C `{proxy, head, size}` head over a `{next, prev, value}` node); zero callers, unreachable; formerly `StoreSNamedFootprintListSentinelCursorB` in moho/path/SNamedFootprintTypeInfo.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x00858350 (FUN_00858350 -- `end()` written through the result slot for
+         *   `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14); formerly `StoreCommandFeedbackSentinelNodeLane`.)
          */
         iterator end()
         {
@@ -12071,6 +12095,9 @@ namespace msvc8
          * Address: 0x00930220 (FUN_00930220 -- `list<T>::insert(pos, value)` for a 32-byte value, iterator through the hidden slot; zero callers, unreachable; formerly `InsertNode32BeforeAndGrowListStoreCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00933600 (FUN_00933600 -- `list<T>::insert(pos, value)` for a 24-byte value (32-byte node); zero callers, unreachable; formerly `InsertNode24BeforeAndGrowListRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x00934040 (FUN_00934040 -- `list<T>::insert(pos, value)` for a 24-byte value, iterator through the hidden slot; zero callers, unreachable; formerly `InsertNode24BeforeAndGrowListStoreCursorRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
+         * Address: 0x008583D0 (FUN_008583D0 -- `insert(pos, v)` for `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14),
+         *   reached from `sCommandFeedbackBlips.push_back(blip)` in `cfunc_AddCommandFeedbackBlipL`
+         *   0x00857BE0; formerly `InsertCommandFeedbackBlipBeforeNode`.)
          */
         iterator insert(const_iterator pos, const value_type& v)
         {
@@ -12307,6 +12334,11 @@ namespace msvc8
          * Address: 0x0081BA00 (FUN_0081BA00 -- `_Buynode` -- one 0x0C node, links written, value stored for `msvc8::list<moho::VisionDB::Entry*>` (`VisionDB::Pool::mEntryBlocks` at +0x04 and `mFreeEntries` at +0x10; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x0081AA00, 0x0081ABF0, 0x0081B68C; formerly `the free-list append in NewEntry` in moho/vision/VisionDB.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x00739F90 (FUN_00739F90 -- `_Buynode(next, prev, value)` -- the node `push_back` splices at the tail for `msvc8::list<moho::Shield*>` (`Sim::mShields`; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x00739D50, 0x0073ADB0, 0x0074C29C; formerly `AllocateShieldListNode` in moho/entity/Shield.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0081A590 (FUN_0081A590 -- `_Buynode` -- allocate the 0x30 node, seat its links and copy the 0x28 vertex block in for `msvc8::list<moho::SkyDomeDecalVertices>` (`SkyDome::mDecalUploads` at +0xB4; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x28 vertex block}` 0x30); callers 0x00815660, 0x00815FA0, 0x008168F0; formerly `AllocateSkyDomeDecalUploadNode` in moho/render/SkyDome.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x008584F0 (FUN_008584F0 -- `_Buynode(next, prev, value)` for
+         *   `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14); caller the `insert` at 0x008583D0; formerly
+         *   `AllocateCommandFeedbackBlipNodeLane`.)
+         * Address: 0x00858730 (FUN_00858730 -- the checked one-node `operator new` this
+         *   `_Buynode` inlines for the same list (`0xFFFFFFFF / 0x14` guard, dead at one node).)
          */
         _Nodeptr _Buynode(_Nodeptr next, _Nodeptr prev, const value_type& v)
         {
@@ -12349,6 +12381,9 @@ namespace msvc8
          * Address: 0x007D8510 (FUN_007D8510 -- `_Incsize` with the 0x3FFFFFFF guard for `msvc8::list<moho::ClutterRegion*>` / `msvc8::list<void*>` (`Clutter::mList1` at +0x04, `mList2` at +0x10 and `ClutterRegion::mMap` at +0x2C; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x007D7430, 0x007D7805, 0x007D7CD0; formerly `IncrementPointerListSizeChecked` in moho/render/Clutter.cpp (RULE ONE), removed 2026-09-10.)
          * Address: 0x0081BA40 (FUN_0081BA40 -- `_Incsize` -- the 0x3FFFFFFF Dinkumware cap, throwing `list<T> too long` past it for `msvc8::list<moho::VisionDB::Entry*>` (`VisionDB::Pool::mEntryBlocks` at +0x04 and `mFreeEntries` at +0x10; head `{proxy, head, size}` 0x0C, node `{next, prev, value}` 0x0C); callers 0x0081AA00, 0x0081ABF0, 0x0081B695; formerly `the open-coded size guard in NewEntry` in moho/vision/VisionDB.cpp (RULE ONE), removed 2026-09-11.)
          * Address: 0x0081A5D0 (FUN_0081A5D0 -- `_Incsize` -- bump the size, throwing `list<T> too long` at 107374182 (`0xFFFFFFFF / 0x28`) for `msvc8::list<moho::SkyDomeDecalVertices>` (`SkyDome::mDecalUploads` at +0xB4; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x28 vertex block}` 0x30); callers 0x00815660, 0x00815FA0, 0x008168F0; formerly `BumpSkyDomeDecalUploadCount` in moho/render/SkyDome.cpp (RULE ONE), removed 2026-09-11.)
+         * Address: 0x00858530 (FUN_00858530 -- `_Incsize(1)` for `msvc8::list<SCommandFeedbackBlip>` (`sCommandFeedbackBlips` in moho/ui/UiRuntimeTypes.cpp; head `{proxy, head, size}` 0x0C, node `{next, prev, 0x0C blip}` 0x14):
+         *   `list<T> too long` at 0x15555555 == `0xFFFFFFFF / 0x0C`; formerly
+         *   `IncrementCommandFeedbackListSizeChecked`.)
          */
         void _Incsize(size_type count)
         {

@@ -454,7 +454,7 @@ void CClientBase::ApplyIncomingGameSpeedRequest(const int32_t speedClock, const 
     mManager->mGameSpeedClock = speedClock;
     mManager->mGameSpeedRequester = mIndex;
     mManager->mGameSpeed = requestedSimRate;
-    mManager->mInterface->NoteGameSpeedChanged();
+    mManager->mInterface->NoteGameSpeedChanged(this, requestedSimRate);
   }
 }
 

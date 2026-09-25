@@ -4802,51 +4802,6 @@ namespace moho
   void UI_DriverNoteGameSpeedChanged(std::int32_t slotZeroBased, std::int32_t gameSpeed);
 
   /**
-   * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
-   *
-   * What it does:
-   * Forwards one assembled bottleneck snapshot into the GPGNet reporting lane.
-   */
-  /**
-   * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
-   *
-   * What it does:
-   * Posts the localized "%s disconnected." console notice for the given client
-   * onto the main thread (CWldUiInterface's NoteDisconnect override).
-   */
-  void UI_NoteDisconnect(const IClient* client);
-
-  /**
-   * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
-   *
-   * What it does:
-   * Posts the received chat payload (decoded via func_ReceiveChat into the UI
-   * Lua ReceiveChat callback) onto the main thread, tagged with the sender's
-   * nickname. CWldUiInterface's ReceiveChat override.
-   */
-  void UI_ReceiveChat(const IClient* sender, gpg::MemBuffer<const char> data);
-
-  /**
-   * Address: 0x0088B960 (FUN_0088B960, Moho::CWldUiInterface::NoteGameSpeedChanged)
-   *
-   * What it does:
-   * Posts the driver-gated game-speed-changed notice for this interface's local
-   * player slot onto the main thread. CWldUiInterface's NoteGameSpeedChanged
-   * override.
-   */
-  void UI_InterfaceNoteGameSpeedChanged(const IClientMgrUIInterface* self, std::int32_t gameSpeed);
-
-  void UI_ReportBottleneck(const SClientBottleneckInfo& info);
-
-  /**
-   * Address: 0x0088B9C0 (FUN_0088B9C0, Moho::CWldUiInterface::ReportBottleneckCleared)
-   *
-   * What it does:
-   * Reports that the current client bottleneck condition has been cleared.
-   */
-  void UI_ReportBottleneckCleared();
-
-  /**
    * Address: 0x0083D740 (FUN_0083D740, ?UI_NoteGameOver@Moho@@YAXXZ)
    *
    * What it does:

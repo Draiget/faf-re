@@ -20772,7 +20772,7 @@ namespace moho
       }
 
       if (pendingSession != nullptr && pendingSession->mClientManager != nullptr) {
-        pendingSession->mClientManager->SetUIInterface(GetClientMgrUiInterfaceBootstrap());
+        pendingSession->mClientManager->SetUIInterface(&sCWldUiInterface);
       }
 
       gWldFrameAction = EWldFrameAction::Loading;

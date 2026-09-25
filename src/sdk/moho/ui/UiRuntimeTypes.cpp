@@ -2068,7 +2068,7 @@ namespace
    * What it does:
    * Returns the process-global input-capture vector storage.
    */
-  [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
+  [[maybe_unused]] [[nodiscard]] msvc8::vector<moho::WeakPtr<moho::CMauiControl>>* ResolveInputCaptureStorage() noexcept
   {
     return ResolveInputCaptureStorageWithArg(0);
   }
@@ -2115,130 +2115,6 @@ namespace
     return sInputCapture.begin() + static_cast<std::ptrdiff_t>(index);
   }
 
-  void UnlinkInputCaptureWeakPtrRange(
-    moho::WeakPtr<moho::CMauiControl>* begin,
-    moho::WeakPtr<moho::CMauiControl>* end
-  ) noexcept
-  {
-    while (begin != end) {
-      begin->UnlinkFromOwnerChain();
-      ++begin;
-    }
-  }
-
-  /**
-   * Address: 0x007A5970 (FUN_007A5970)
-   *
-   * What it does:
-   * Unlinks every weak-capture node from owner chains, frees the global
-   * input-capture backing storage lane, and clears begin/end/capacity lanes.
-   */
-  [[maybe_unused]] void CleanupInputCaptureAtExit() noexcept
-  {
-    if (sInputCapture.begin() != nullptr) {
-      UnlinkInputCaptureWeakPtrRange(sInputCapture.begin(), sInputCapture.end());
-      ::operator delete(static_cast<void*>(sInputCapture.begin()));
-    }
-
-    // No public msvc8::vector<T> API releases an externally-freed buffer
-    // without also re-invoking element destructors on it -- the
-    // WeakPtr<CMauiControl> lanes above are already unlinked and their
-    // storage already freed by hand, so this only needs to zero the
-    // triplet. Matches the established WeakPtr.h precedent
-    // (EnsureWeakPtrVectorCapacity) for this same narrow "commit cleared
-    // internal state" step; no reads happen through this view.
-    auto& captureView = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-    captureView.begin = nullptr;
-    captureView.end = nullptr;
-    captureView.capacityEnd = nullptr;
-  }
-
-  /**
-   * Address: 0x00C032E0 (FUN_00C032E0)
-   *
-   * What it does:
-   * Thunk lane that forwards global input-capture cleanup-at-exit teardown
-   * into `FUN_007A5970`.
-   */
-  [[maybe_unused]] void CleanupInputCaptureAtExitAdapter() noexcept
-  {
-    CleanupInputCaptureAtExit();
-  }
-  /**
-   * Address: 0x007A56A0 (FUN_007A56A0)
-   *
-   * What it does:
-   * Returns the current number of weak-control entries in the global input
-   * capture stack.
-   */
-  [[nodiscard]] std::size_t InputCaptureCount() noexcept
-  {
-    return ResolveInputCaptureStorage()->size();
-  }
-
-  /**
-   * Address: 0x007A5F60 (FUN_007A5F60)
-   *
-   * What it does:
-   * Copy-assigns one contiguous weak-control range while preserving intrusive
-   * weak-owner chain semantics for each destination lane.
-   */
-  [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* CopyInputCaptureWeakRangeAssign(
-    moho::WeakPtr<moho::CMauiControl>* destination,
-    const moho::WeakPtr<moho::CMauiControl>* sourceBegin,
-    const moho::WeakPtr<moho::CMauiControl>* sourceEnd
-  ) noexcept
-  {
-    const moho::WeakPtr<moho::CMauiControl>* source = sourceBegin;
-    while (source != sourceEnd) {
-      if (source->ownerLinkSlot != destination->ownerLinkSlot) {
-        if (destination->ownerLinkSlot != nullptr) {
-          auto** ownerCursor = reinterpret_cast<moho::WeakPtr<moho::CMauiControl>**>(destination->ownerLinkSlot);
-          while (*ownerCursor != destination) {
-            ownerCursor = &(*ownerCursor)->nextInOwner;
-          }
-          *ownerCursor = destination->nextInOwner;
-        }
-
-        destination->ownerLinkSlot = source->ownerLinkSlot;
-        if (source->ownerLinkSlot == nullptr) {
-          destination->nextInOwner = nullptr;
-        } else {
-          auto** const sourceHead = reinterpret_cast<moho::WeakPtr<moho::CMauiControl>**>(source->ownerLinkSlot);
-          destination->nextInOwner = *sourceHead;
-          *sourceHead = destination;
-        }
-      }
-
-      ++source;
-      ++destination;
-    }
-
-    return destination;
-  }
-
-  /**
-   * Address: 0x007A5E30 (FUN_007A5E30)
-   *
-   * What it does:
-   * Register-order adapter that forwards one input-capture weak-range
-   * copy-assign lane through CopyInputCaptureWeakRangeAssign.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::WeakPtr<moho::CMauiControl>* CopyInputCaptureWeakRangeAssignRegisterAdapter(
-    moho::WeakPtr<moho::CMauiControl>* const destination,
-    const moho::WeakPtr<moho::CMauiControl>* const sourceBegin,
-    const moho::WeakPtr<moho::CMauiControl>* const sourceEnd
-  ) noexcept
-  {
-    return CopyInputCaptureWeakRangeAssign(destination, sourceBegin, sourceEnd);
-  }
-  // Forward declaration for FUN_007A58C0 (defined below).
-  moho::WeakPtr<moho::CMauiControl>** EraseInputCaptureRangeCompacting(
-    moho::WeakPtr<moho::CMauiControl>** outIterator,
-    moho::WeakPtr<moho::CMauiControl>* eraseBegin,
-    moho::WeakPtr<moho::CMauiControl>* eraseEnd
-  ) noexcept;
-
   /**
    * Address: inlined at 0x007A4713 (inside CompactInputCaptureStack,
    * FUN_007A4720) and 0x007A57F3 (inside func_RemoveInputCapture's chain,
@@ -2258,253 +2134,14 @@ namespace
     const std::size_t index
   ) noexcept
   {
-    const std::size_t count = sInputCapture.size();
-    if (sInputCapture.begin() == nullptr || index >= count) {
+    if (index >= sInputCapture.size()) {
       return;
     }
-
-    sInputCapture.begin()[index].ResetFromObject(nullptr);
-
-    // Erase one weak-capture slot by delegating to the general range-erase
-    // helper (FUN_007A58C0). It shifts `[index+1, end)` down onto `[index,
-    // end-1)` with intrusive-chain relinking, unlinks the vacated tail, and
-    // updates `_Mylast`.
-    (void)EraseInputCaptureRangeCompacting(nullptr, sInputCapture.begin() + index, sInputCapture.begin() + index + 1u);
+    // The tail shifts down through WeakPtr's relinking assignment and the
+    // vacated last slot is unlinked by its destructor.
+    (void)sInputCapture.erase(sInputCapture.begin() + static_cast<std::ptrdiff_t>(index));
   }
 
-  /**
-   * Address: 0x007A58C0 (FUN_007A58C0)
-   *
-   * IDA signature:
-   * int *__userpurge sub_7A58C0@<eax>(int *outIterator@<ebx>,
-   *                                    WeakPtr<CMauiControl> *eraseBegin,
-   *                                    WeakPtr<CMauiControl> *eraseEnd);
-   *
-   * What it does:
-   * Erases the contiguous range `[eraseBegin, eraseEnd)` inside the global
-   * `sInputCapture` weak-capture vector by shifting the live tail
-   * `[eraseEnd, _Mylast)` down onto `eraseBegin` using intrusive weak-owner
-   * chain relinking (via `CopyInputCaptureWeakRangeAssign`), then unlinks the
-   * now-vacant slots, and updates `_Mylast` to the compacted end. Finally
-   * stores `eraseBegin` (the returned iterator-after-erase) into
-   * `*outIterator`. This is the pattern MSVC emits for
-   * `std::vector::erase(first, last)` on the capture stack.
-   *
-   * Binary-fidelity note: when `eraseBegin == eraseEnd` the shift is a no-op
-   * but `*outIterator = eraseBegin` is still performed unconditionally.
-   */
-  moho::WeakPtr<moho::CMauiControl>** EraseInputCaptureRangeCompacting(
-    moho::WeakPtr<moho::CMauiControl>** const outIterator,
-    moho::WeakPtr<moho::CMauiControl>* const eraseBegin,
-    moho::WeakPtr<moho::CMauiControl>* const eraseEnd
-  ) noexcept
-  {
-    if (eraseBegin != eraseEnd) {
-      moho::WeakPtr<moho::CMauiControl>* const oldEnd = sInputCapture.end();
-
-      // Shift the live tail [eraseEnd, oldEnd) down onto eraseBegin while
-      // preserving intrusive weak-owner chain slots for every moved entry.
-      moho::WeakPtr<moho::CMauiControl>* const compactedEnd =
-        CopyInputCaptureWeakRangeAssign(eraseBegin, eraseEnd, oldEnd);
-
-      // Unlink the now-vacant trailing slots from their weak owner chains.
-      UnlinkInputCaptureWeakPtrRange(compactedEnd, oldEnd);
-
-      // No public msvc8::vector<T> API shrinks `_Mylast` in place without
-      // re-destroying the (already-unlinked) trailing slots -- same narrow
-      // "commit updated internal state" reach-in as
-      // CleanupInputCaptureAtExit above; nothing here is read through the
-      // view, only written.
-      moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = compactedEnd;
-    }
-
-    if (outIterator != nullptr) {
-      *outIterator = eraseBegin;
-    }
-    return outIterator;
-  }
-
-  /**
-   * Address: 0x007A5A70 (FUN_007A5A70)
-   *
-   * IDA signature:
-   * void __stdcall sub_7A5A70(int insertAt, WeakPtr<CMauiControl> *value);
-   * (IDA flags this export's `.c` pseudocode "bad sp value at call has been
-   * detected" / "positive sp value has been detected" -- recovered here
-   * from the raw `.asm` instead, cross-checked instruction-by-instruction
-   * against the real bodies of every callee below, since call-argument
-   * groupings are exactly what that decompiler warning calls into
-   * question.)
-   *
-   * What it does:
-   * The real out-of-line `insert(pos, value)`-with-growth core for
-   * `sInputCapture`'s `msvc8::vector<WeakPtr<CMauiControl>>` storage --
-   * `InsertInputCaptureWithGrowth` (FUN_007A5870) is a thin wrapper that
-   * only computes the pre-call index and rebases the returned iterator;
-   * this function does the actual capacity check, growth/relocation, and
-   * intrusive-chain-safe element placement.
-   *
-   * First stages a by-value copy of `value` into a stack-local temporary,
-   * splicing it in at the head of `value`'s owner chain in place of
-   * `value` itself (mirrors `ResetFromOwnerLinkSlot`'s own unlink-and-relink
-   * dance exactly) so the rest of the function can safely read the staged
-   * value even if `value` itself aliases into `sInputCapture`'s own storage
-   * across the shift/reallocation below; the temporary is unlinked again
-   * before returning, on every exit path including exceptional ones (the
-   * real binary does this via SEH state tracking plus an EH funclet at
-   * 0x00B953B0 that tail-calls FUN_0079DB60 -- compiler-emitted unwind
-   * glue, not distinct source; expressed here as a scope guard instead).
-   *
-   * Then, guarding `size() == max_size()` (throws via `throw_too_long()`,
-   * FUN_007A5D20, cited on `msvc8::vector<T>::throw_too_long` in Vector.h):
-   *   - Capacity available (`capacity() >= size()+1`): if inserting before
-   *     the end, extends the live range by duplicating the current last
-   *     element into the new slot (`uninit_copy_n`), shifts the
-   *     middle range `[insertAt, oldLast)` backward by one
-   *     (`copy_backward_assign`), then assigns the staged value into
-   *     the vacated gap (`WeakPtr<T>::AssignFillRange`); if inserting at
-   *     the end, constructs the staged value directly at `_Mylast`
-   *     (`WeakPtr<T>::FillConstructRange`) and bumps it by one element.
-   *   - Capacity exhausted: computes 1.5x growth via `recommended_capacity`
-   *     (its own internal fallback to `need` matches the binary's
-   *     redundant re-derivation of `size()+1` for the "1.5x wasn't enough"
-   *     case), allocates the new buffer (`allocate_slots_checked`,
-   *     FUN_007A5EF0), copies the prefix `[begin,insertAt)` into it
-   *     (`uninit_copy_n`), fill-constructs the staged value into
-   *     the gap (`WeakPtr<T>::FillConstructRange`), copies the suffix
-   *     `[insertAt,end)` after it (`uninit_copy_n`), then (if
-   *     there was an old buffer) unlinks its live range
-   *     (`UnlinkWeakPtrRangeWithoutClearing`) and frees it, and commits the
-   *     new `{begin,end,capacityEnd}` triplet.
-   */
-  void GrowAndInsertInputCaptureWeakRef(
-    moho::WeakPtr<moho::CMauiControl>* const insertAt,
-    const moho::WeakPtr<moho::CMauiControl>& value
-  )
-  {
-    using CaptureWeakPtr = moho::WeakPtr<moho::CMauiControl>;
-    using VoidWeakPtr = moho::WeakPtr<void>;
-
-    // Stage a relink-safe local copy of `value` (see doc comment above) and
-    // guarantee its owner chain is restored on every exit path, including
-    // exceptional ones raised by throw_too_long()/allocate_slots_checked()
-    // below.
-    CaptureWeakPtr stagedValue{};
-    stagedValue.ResetFromOwnerLinkSlot(value.ownerLinkSlot);
-    struct StagedValueUnlinkGuard
-    {
-      CaptureWeakPtr* target;
-      ~StagedValueUnlinkGuard()
-      {
-        target->UnlinkFromOwnerChain();
-      }
-    } stagedValueUnlinkGuard{&stagedValue};
-
-    if (InputCaptureCount() == sInputCapture.max_size()) {
-      sInputCapture.throw_too_long();
-    }
-
-    const std::size_t oldSize = sInputCapture.size();
-    if (sInputCapture.capacity() >= oldSize + 1u) {
-      // In-place branch: capacity already covers the new element.
-      CaptureWeakPtr* const oldLast = sInputCapture.end();
-      if (insertAt != oldLast) {
-        // Real shift: duplicate the last live element into the new
-        // (currently uninitialized) one-past-end slot, extending the live
-        // range by one -- this is a *construct*, matching
-        // uninit_copy_n's shape, not an assign.
-        msvc8::vector<VoidWeakPtr>::uninit_copy_n(
-          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1), 1u, reinterpret_cast<VoidWeakPtr*>(oldLast)
-        );
-        VoidWeakPtr* const newEnd = reinterpret_cast<VoidWeakPtr*>(oldLast) + 1;
-        moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = reinterpret_cast<CaptureWeakPtr*>(newEnd);
-
-        // Shift [insertAt, oldLast-1) backward by one to open the gap.
-        msvc8::vector<VoidWeakPtr>::copy_backward_assign(
-          reinterpret_cast<const VoidWeakPtr*>(insertAt),
-          reinterpret_cast<const VoidWeakPtr*>(oldLast - 1),
-          reinterpret_cast<VoidWeakPtr*>(oldLast)
-        );
-
-        // Assign the staged value into the now-vacated gap.
-        (void)CaptureWeakPtr::AssignFillRange(insertAt, insertAt + 1, stagedValue);
-      } else {
-        // Append: construct the staged value directly at the old end.
-        (void)CaptureWeakPtr::FillConstructRange(oldLast, 1, stagedValue);
-        moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = oldLast + 1;
-      }
-    } else {
-      // Reallocation branch: geometric growth, single-pass gap-aware copy.
-      const std::size_t newCapacity = sInputCapture.recommended_capacity(InputCaptureCount() + 1u);
-      CaptureWeakPtr* const newBuffer = newCapacity != 0u ? sInputCapture.allocate_slots_checked(newCapacity)
-                                                          : static_cast<CaptureWeakPtr*>(::operator new(0u));
-
-      const std::size_t prefixCount = static_cast<std::size_t>(insertAt - sInputCapture.begin());
-      msvc8::vector<VoidWeakPtr>::uninit_copy_n(
-        reinterpret_cast<const VoidWeakPtr*>(sInputCapture.begin()),
-        prefixCount,
-        reinterpret_cast<VoidWeakPtr*>(newBuffer)
-      );
-      VoidWeakPtr* const afterPrefixVoid = reinterpret_cast<VoidWeakPtr*>(newBuffer) + prefixCount;
-      CaptureWeakPtr* const afterPrefix = reinterpret_cast<CaptureWeakPtr*>(afterPrefixVoid);
-
-      (void)CaptureWeakPtr::FillConstructRange(afterPrefix, 1, stagedValue);
-
-      msvc8::vector<VoidWeakPtr>::uninit_copy_n(
-        reinterpret_cast<const VoidWeakPtr*>(insertAt),
-        static_cast<std::size_t>(sInputCapture.end() - insertAt),
-        reinterpret_cast<VoidWeakPtr*>(afterPrefix + 1)
-      );
-
-      if (sInputCapture.begin() != nullptr) {
-        moho::UnlinkWeakPtrRangeWithoutClearing(
-          reinterpret_cast<VoidWeakPtr*>(sInputCapture.begin()), reinterpret_cast<VoidWeakPtr*>(sInputCapture.end())
-        );
-        ::operator delete(static_cast<void*>(sInputCapture.begin()));
-      }
-
-      // No public msvc8::vector<T> API adopts an externally-built,
-      // already-relocated buffer -- same narrow "commit new internal
-      // state" reach-in as CleanupInputCaptureAtExit/
-      // EraseInputCaptureRangeCompacting above.
-      auto& view = moho::AsWeakPtrVectorRuntimeView(sInputCapture);
-      view.begin = newBuffer;
-      view.end = newBuffer + oldSize + 1u;
-      view.capacityEnd = newBuffer + newCapacity;
-    }
-  }
-
-  /**
-   * Address: 0x007A5870 (FUN_007A5870)
-   *
-   * What it does:
-   * Computes the pre-growth index of `insertAt` within `sInputCapture`,
-   * delegates the actual insert-with-growth work to
-   * `GrowAndInsertInputCaptureWeakRef` (FUN_007A5A70), then rebases the
-   * (possibly-reallocated) inserted position using that pre-growth index
-   * and stores it into `*outIterator`.
-   */
-  [[nodiscard]] moho::WeakPtr<moho::CMauiControl>** InsertInputCaptureWithGrowth(
-    moho::WeakPtr<moho::CMauiControl>** const outIterator,
-    moho::WeakPtr<moho::CMauiControl>* const insertAt,
-    const moho::WeakPtr<moho::CMauiControl>* const value
-  )
-  {
-    using CaptureWeakPtr = moho::WeakPtr<moho::CMauiControl>;
-
-    std::size_t insertIndex = 0u;
-    if (sInputCapture.begin() != nullptr && sInputCapture.size() != 0u && insertAt != nullptr) {
-      insertIndex = static_cast<std::size_t>(insertAt - sInputCapture.begin());
-    }
-
-    GrowAndInsertInputCaptureWeakRef(insertAt, *value);
-
-    if (outIterator != nullptr) {
-      CaptureWeakPtr* const rebasedBegin = sInputCapture.begin();
-      *outIterator = rebasedBegin != nullptr ? rebasedBegin + insertIndex : nullptr;
-    }
-    return outIterator;
-  }
 
   /**
    * Address: 0x007A4720 (FUN_007A4720, sub_7A4720)
@@ -2515,19 +2152,22 @@ namespace
    */
   void CompactInputCaptureStack() noexcept
   {
-    std::vector<std::size_t> staleIndices{};
-
-    const std::size_t count = sInputCapture.size();
-    if (sInputCapture.begin() != nullptr && count > 0u) {
-      for (std::size_t index = 0; index < count; ++index) {
-        if (sInputCapture.begin()[index].GetObjectPtr() == nullptr) {
-          staleIndices.push_back(index);
-        }
+    // The binary collects the stale indices first and then erases them in
+    // ascending order, without re-basing the later ones after an erase shifts
+    // the tail down - so with two stale entries the second erase lands one
+    // slot high. That order is kept. Where the binary would then erase one
+    // past the end (two stale entries at the very top) and walk its copy loop
+    // off the buffer, RemoveInputCaptureAt's bounds check stops it instead.
+    msvc8::vector<std::int32_t> staleIndices;
+    const std::int32_t count = static_cast<std::int32_t>(sInputCapture.size());
+    for (std::int32_t index = 0; index < count; ++index) {
+      if (sInputCapture[static_cast<std::size_t>(index)].GetObjectPtr() == nullptr) {
+        staleIndices.push_back(index);
       }
     }
 
-    for (std::size_t i = 0; i < staleIndices.size(); ++i) {
-      RemoveInputCaptureAt(staleIndices[i]);
+    for (const std::int32_t index : staleIndices) {
+      RemoveInputCaptureAt(static_cast<std::size_t>(index));
     }
   }
 
@@ -2540,53 +2180,13 @@ namespace
    */
   [[nodiscard]] moho::CMauiControl* ResolveTopInputCaptureControl() noexcept
   {
+    if (sInputCapture.empty()) {
+      return nullptr;
+    }
     CompactInputCaptureStack();
-
-    const std::size_t count = sInputCapture.size();
-    if (sInputCapture.begin() == nullptr || count == 0u) {
-      return nullptr;
-    }
-
-    return sInputCapture.begin()[count - 1u].GetObjectPtr();
+    return sInputCapture.empty() ? nullptr : sInputCapture.back().GetObjectPtr();
   }
 
-  /**
-   * Address: 0x007A5710 (FUN_007A5710, sub_7A5710)
-   *
-   * What it does:
-   * `push_back`-shaped append: if capacity is exhausted, delegates to the
-   * growth-aware insert-at-end core (`InsertInputCaptureWithGrowth`,
-   * FUN_007A5870); otherwise constructs the new lane directly at the
-   * current `_Mylast` (`WeakPtr<T>::FillConstructRange`) and bumps it by
-   * one element. The binary's own return value (`result`, echoed straight
-   * through from whichever path ran) is never read by either of this
-   * function's two real callers (`AddInputCaptureControl` discards it
-   * explicitly), so the exact returned pointer is not independently
-   * observable; this returns a pointer to the newly appended lane on both
-   * paths.
-   */
-  [[nodiscard]] static moho::WeakPtr<moho::CMauiControl>* AppendInputCaptureWeakReference(
-    const moho::WeakPtr<moho::CMauiControl>* const captureRef
-  )
-  {
-    if (captureRef == nullptr) {
-      return nullptr;
-    }
-
-    if (sInputCapture.begin() == nullptr || sInputCapture.size() >= sInputCapture.capacity()) {
-      // Slow path: delegate to the growth-aware insert-at-end core.
-      moho::WeakPtr<moho::CMauiControl>* rebasedPosition = nullptr;
-      (void)InsertInputCaptureWithGrowth(&rebasedPosition, sInputCapture.end(), captureRef);
-      return rebasedPosition;
-    }
-
-    // Fast path: capacity already covers one more element -- construct
-    // directly at the current end and bump it.
-    moho::WeakPtr<moho::CMauiControl>* const oldEnd = sInputCapture.end();
-    (void)moho::WeakPtr<moho::CMauiControl>::FillConstructRange(oldEnd, 1, *captureRef);
-    moho::AsWeakPtrVectorRuntimeView(sInputCapture).end = oldEnd + 1;
-    return oldEnd;
-  }
 
   /**
    * Address: 0x007A4540 (FUN_007A4540, sub_7A4540)
@@ -2599,14 +2199,9 @@ namespace
     moho::CMauiControl* const control
   )
   {
-    if (control == nullptr) {
-      return;
-    }
-
-    moho::WeakPtr<moho::CMauiControl> captureRef{};
-    captureRef.ResetFromObject(control);
-    (void)AppendInputCaptureWeakReference(&captureRef);
-    captureRef.ResetFromObject(nullptr);
+    // A null control is pushed too; nothing in the binary filters it here.
+    const moho::WeakPtr<moho::CMauiControl> capture(control);
+    sInputCapture.push_back(capture);
   }
 
   [[nodiscard]] moho::CScrLuaInitFormSet& UserLuaInitSet()
@@ -26986,339 +26581,6 @@ void moho::UI_NoteGameSpeedChanged(
 }
 
 /**
- * Address: 0x0088BA50 (FUN_0088BA50, func_DriverNoteGameSpeedChanged)
- *
- * What it does:
- * Forwards game-speed UI callback only while one active simulation driver
- * instance exists.
- */
-void moho::UI_DriverNoteGameSpeedChanged(
-  const std::int32_t slotZeroBased,
-  const std::int32_t gameSpeed
-)
-{
-  if (SIM_GetActiveDriver() != nullptr) {
-    UI_NoteGameSpeedChanged(slotZeroBased, gameSpeed);
-  }
-}
-
-namespace
-{
-  /**
-   * Address: 0x0088B9D0 (FUN_0088B9D0, Moho::func_ConPrintDisconnect)
-   *
-   * What it does:
-   * Async worker for the disconnect notice: localizes the
-   * "<LOC Engine0002>%s disconnected." message and console-prints it with the
-   * disconnected client's nickname. Posted onto the main thread by
-   * CWldUiInterface::NoteDisconnect.
-   *
-   * Signature note: the manager RTTI installed by the NoteDisconnect
-   * `boost::bind` chain (0x0088FBD0, `get_functor_type_tag`) publishes this
-   * function's pointer type as `void (__cdecl *)(gpg::StrArg)`. As with
-   * `func_ReceiveChat` (see `UiRuntimeTypes.h`), this SDK's `gpg::StrArg` is
-   * currently the simplified `= const char*` alias with no implicit
-   * conversion from `msvc8::string`, so the parameter is kept as
-   * `const msvc8::string&` -- a known, evidenced gap, not a guess (see
-   * `gpg/core/utils/Logging.h`'s `LogScopeEntry` note and
-   * `CGpgNetInterface.cpp`'s `MakeConnectThreadLaunchCallback`).
-   */
-  void ConPrintClientDisconnected(
-    const msvc8::string& nickname
-  )
-  {
-    const msvc8::string message = moho::Loc(moho::USER_GetLuaState(), "<LOC Engine0002>%s disconnected.");
-    moho::CON_Printf(message.c_str(), nickname.c_str());
-  }
-} // namespace
-
-/**
- * Address: 0x0088B810 (FUN_0088B810, Moho::CWldUiInterface::NoteDisconnect)
- * Address: 0x0088EA50 (FUN_0088EA50, boost::bind_ConPrintDisconnect) - builds
- *          the `bind_t<void, void(__cdecl*)(gpg::StrArg),
- *          list1<value<std::string>>>` from the captured nickname
- * Address: 0x0088EB10 (FUN_0088EB10) - boost::function0<void>::function<F>
- *          converting constructor (installs the bind_t into the
- *          function_buffer)
- * Address: 0x0088F150 (FUN_0088F150) - assign_to<F> relay
- * Address: 0x0088F270 (FUN_0088F270) - magic-statics guard (dword_110413C)
- *          around the one-time manager/invoker install for this bind_t<>
- * Address: 0x0088F470 (FUN_0088F470) - basic_vtable<F>::init relay
- * Address: 0x0088F500 (FUN_0088F500) - functor-non-empty relay, checked
- *          unconditionally on every assign (not just the guarded first-init
- *          path) to decide whether `*arg0` gets the vtable pointer or null
- * Address: 0x0088F7A0 (FUN_0088F7A0) - the heap-clone branch FUN_0088F500
- *          calls when the bound string does not fit the function_buffer's
- *          SSO slot: copies the string into a local buffer and forwards to
- *          the node allocator below
- * Address: 0x0088FA30 (FUN_0088FA30) - allocates the heap node (checked
- *          32-byte `operator new`, `AllocateChecked32ByteLane` /
- *          FUN_0088FFC0), constructs it (FUN_00890010), and frees the
- *          function_buffer's previous heap block if it held one
- * Address: 0x0088FFC0 (FUN_0088FFC0) - checked 32-byte array-allocation
- *          helper, already recovered generically as
- *          `gpg::core::legacy::AllocateChecked32ByteLane` in
- *          `CheckedArrayAllocationLanes.cpp`; shared by FUN_0088FA30's and
- *          FUN_0088FE40's clone paths
- * Address: 0x00890010 (FUN_00890010) - `list1<value<std::string>>` node
- *          constructor: copy-constructs the bound string into the new heap
- *          node, shared by FUN_0088FA30's and FUN_0088FE40's clone paths
- *          (same "real vendored boost header emits it" shape as the
- *          already-cited `list2<>` node ctor FUN_0088F040 below)
- * Address: 0x0088F700 (FUN_0088F700) - writes {manager=FUN_0088FBD0,
- *          invoker=FUN_0088FBA0} into the static vtable pair
- *          (dword_1104130 / dword_1104134)
- * Address: 0x0088FBD0 (FUN_0088FBD0) - basic_vtable<F>::manager (RTTI-
- *          confirmed via the embedded `bind_t<void,void(__cdecl*)(gpg::StrArg),
- *          list1<value<std::string>>>` type descriptor returned for
- *          `get_functor_type_tag`)
- * Address: 0x0088FE40 (FUN_0088FE40) - functor_manager<F,A>::manager's
- *          heap-allocated-functor overload (mpl::false_), tail-called by
- *          FUN_0088FBD0 for clone/destroy/check_functor_type_tag -- the
- *          NoteDisconnect-side sibling of ReceiveChat's FUN_0088FEC0 below.
- *          `clone_functor_tag` allocates+constructs via FUN_0088FFC0 /
- *          FUN_00890010, `destroy_functor_tag` frees the bound string and
- *          the node, `check_functor_type_tag` compares against the same
- *          `bind_t<>` RTTI descriptor FUN_0088FBD0 returns
- * Address: 0x0088FBA0 (FUN_0088FBA0) - basic_vtable<F>::invoker: SSO-aware
- *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr)` against the
- *          bound string
- *
- * What it does:
- * IClientMgrUIInterface::NoteDisconnect override: captures the disconnected
- * client's nickname and posts the localized console disconnect notice onto the
- * main thread (so console output happens on the UI thread). The binary builds
- * this callback via `boost::bind(&ConPrintClientDisconnected, nickname)` (a
- * free-function bind storing a real `std::string` copy, per the manager RTTI)
- * rather than a closure object -- expressed here the same way so this call
- * site is the one that actually instantiates the cited manager/invoker pair.
- *
- * FUN_0088F9F0 sits a few bytes below this chain and stamps the identical
- * {manager=FUN_0088FBD0, invoker=FUN_0088FBA0} pair FUN_0088F700 installs,
- * but it is not cited here: it has zero incoming references anywhere --
- * empty in the IDA-exported xrefs for both analyzed databases, empty in the
- * enriched callgraph index's call_edges/incoming_xrefs tables, and a raw
- * CALL/JMP-rel32 plus absolute-address byte scan of both
- * `bin/2025.7.1/ForgedAlliance.exe` and `bin/external/ForgedAlliance.exe`
- * finds no reference of any kind to 0x0088F9F0. Left `skip`, matching the
- * `FUN_0088FDC0` precedent a few bytes further down (already byte-verified
- * unreferenced the same way) rather than folded into this call site without
- * evidence.
- */
-void moho::UI_NoteDisconnect(
-  const IClient* const client
-)
-{
-  const msvc8::string nickname = client->GetNickname();
-  boost::function<void(), std::allocator<void>> callback = boost::bind(&ConPrintClientDisconnected, nickname);
-  THREAD_InvokeAsync(callback, 0u);
-}
-
-/**
- * Address: 0x0088B880 (FUN_0088B880, Moho::CWldUiInterface::ReceiveChat)
- * Address: 0x0088EB90 (FUN_0088EB90, boost::bind_ReceiveChat) - builds the
- *          `bind_t<void, void(__cdecl*)(gpg::StrArg,gpg::MemBuffer<char
- *          const> const&), list2<value<std::string>,
- *          value<gpg::MemBuffer<char const>>>>` from the captured nickname
- *          and payload (the MemBuffer copy bumps its shared refcount via
- *          `_InterlockedExchangeAdd`, matching `gpg::MemBuffer`'s own copy
- *          semantics)
- * Address: 0x0088EED0 (FUN_0088EED0) - `list2<value<std::string>,
- *          value<gpg::MemBuffer<char const>>>`'s element-copy relay: copies
- *          the bound `std::string` by value (`std::string::assign`), bumps
- *          the `gpg::MemBuffer`'s shared refcount (`_InterlockedExchangeAdd`
- *          on the iterator-base count), then forwards into the node
- *          constructor below; on the way out, releases the caller's
- *          temporary refcount via the same two-phase
- *          `dispose`/`destroy` vtable-slot release this project has
- *          already identified elsewhere as `sp_counted_base::release()`
- *          (RbTree.h's `erase_node` citations document the same shape).
- * Address: 0x0088F040 (FUN_0088F040) - the `list2<...>` node constructor
- *          itself: copy-constructs the `std::string` element in place
- *          (`sub_420DD0`, already `skip` - CRT `std::string` copy-ctor
- *          internals) and stores the `gpg::MemBuffer`'s
- *          {iteratorBase, refcountPtr, begin, end} fields verbatim into the
- *          node's trailing slots.
- * Address: 0x0088ECE0 (FUN_0088ECE0) - boost::function0<void>::function<F>
- *          converting constructor (installs the bind_t into the
- *          function_buffer)
- * Address: 0x0088F1D0 (FUN_0088F1D0) - assign_to<F> relay
- * Address: 0x0088F350 (FUN_0088F350) - magic-statics guard (dword_1104138)
- *          around the one-time manager/invoker install for this bind_t<>
- * Address: 0x0088F590 (FUN_0088F590) - basic_vtable<F>::init relay
- * Address: 0x0088F600 (FUN_0088F600) - functor-non-empty relay, checked
- *          unconditionally on every assign (not just the guarded first-init
- *          path) to decide whether `*arg0` gets the vtable pointer or null
- * Address: 0x0088F8E0 (FUN_0088F8E0) - the heap-clone branch FUN_0088F600
- *          calls when the bound string+MemBuffer node does not fit the
- *          function_buffer's SSO slot: copies the node via FUN_0088EE00
- *          and forwards to the node allocator below
- * Address: 0x0088EE00 (FUN_0088EE00) - `list2<value<std::string>,
- *          value<gpg::MemBuffer<char const>>>`'s implicit copy constructor:
- *          `std::string::assign` (0x004056B0) for the string, then the
- *          MemBuffer's four words with its shared count bumped
- * Address: 0x0088BAB0 (FUN_0088BAB0) - that list's implicit destructor:
- *          releases the MemBuffer's shared count (+0x20), then the string
- * Address: 0x0088FFB0 (FUN_0088FFB0) - the heap node's destroy step:
- *          `add eax, 4` past the manager tag, then FUN_0088BAB0
- * Address: 0x008901D0 (FUN_008901D0) - a second emission of that step
- * Address: 0x00890210 (FUN_00890210) - the same through `esi`, returning
- *          the node
- * Address: 0x0088FAE0 (FUN_0088FAE0) - allocates the heap node (checked
- *          48-byte `operator new`, already recovered generically as
- *          `gpg::core::legacy::AllocateChecked48ByteLane` / FUN_00890080),
- *          constructs it (FUN_008900D0), and releases the caller's
- *          temporary via the same two-phase `FUN_0088BAB0` release used
- *          elsewhere in this chain
- * Address: 0x008900D0 (FUN_008900D0) - `list2<value<std::string>,
- *          value<gpg::MemBuffer<char const>>>` node constructor for the
- *          heap-clone path: copies the manager/vtable-tag field, then
- *          copies the string+MemBuffer element via FUN_0088EE00 -- the heap-clone
- *          counterpart to the already-cited construction-path node ctor
- *          FUN_0088F040 above
- * Address: 0x0088F860 (FUN_0088F860) - writes {manager=FUN_0088FC70,
- *          invoker=FUN_0088FC40} into the static vtable pair (stru_1104128)
- * Address: 0x0088FC70 (FUN_0088FC70) - basic_vtable<F>::manager (RTTI-
- *          confirmed via the embedded `bind_t<void,void(__cdecl*)(gpg::StrArg,
- *          gpg::MemBuffer<char const> const&),list2<value<std::string>,
- *          value<gpg::MemBuffer<char const>>>>` type descriptor returned for
- *          `get_functor_type_tag`)
- * Address: 0x0088FC40 (FUN_0088FC40) - basic_vtable<F>::invoker: SSO-aware
- *          call `(*f_)(_Myres < 0x10 ? &_Bx._Buf[0] : _Bx._Ptr, memBuffer)`
- *          against the bound string and MemBuffer (cdecl, 2 args, `add
- *          esp,8` confirms the arity)
- * Address: 0x0088FEC0 (FUN_0088FEC0) - the heap-allocated-functor overload
- *          `boost::detail::function::functor_manager<Functor,
- *          Allocator>::manager(in_buffer, out_buffer, op, mpl::false_)`
- *          this bind_t<>'s size rules out the small-object buffer for
- *          (`dependencies/boost_1_34_1/boost/function/function_base.hpp`,
- *          the `mpl::false_` overload at ~line 300): `manage` (FUN_0088FC70,
- *          cited above) tail-calls it for every operation except
- *          `get_functor_type_tag`. Body matches line for line -
- *          `clone_functor_tag` (`a1==0`) allocator-constructs a copy
- *          (`sub_890080`/`sub_8900D0`), `destroy_functor_tag` (`a1==1`)
- *          destroys/deallocates it (`sub_88BAB0` + `operator delete`), and
- *          `check_functor_type_tag` (the `else`) compares `*a3`'s
- *          `std::type_info` against the same `bind_t<>` RTTI descriptor
- *          `manage` returns for `get_functor_type_tag`, handing back the
- *          object pointer on a match or null otherwise. `FUN_0088FDE0`
- *          (already `skip`, an ICF-shaped register-order twin) reaches the
- *          same body for a sibling `boost::function` instance built the same
- *          way. No separate C++ body is written for this one either - real
- *          vendored `<boost/function.hpp>`/`<boost/bind.hpp>` (both
- *          `#include`d at the top of this file) already emits it from the
- *          same `boost::bind(&func_ReceiveChat, nickname, data)` call.
- *
- * What it does:
- * IClientMgrUIInterface::ReceiveChat override: captures the sender's nickname
- * and the received chat payload, then posts the recovered func_ReceiveChat
- * decoder (which forwards to /lua/ui/game/gamemain.lua:ReceiveChat) onto the
- * main thread. The binary builds this callback via
- * `boost::bind(&func_ReceiveChat, nickname, data)` (a free-function bind
- * storing real `std::string`/`MemBuffer` copies, per the manager RTTI) rather
- * than a closure object -- expressed here the same way so this call site is
- * the one that actually instantiates the cited manager/invoker pair. The
- * MemBuffer's shared payload is kept alive by the bind_t's own copy.
- *
- * FUN_0088FAA0 sits a few bytes below this chain and stamps the identical
- * stru_1104128 = {manager=FUN_0088FC70, invoker=FUN_0088FC40} pair
- * FUN_0088F860 installs, then tears down a local buffer via FUN_0088BAB0 the
- * same way the rest of this chain does -- but like FUN_0088F9F0 on
- * NoteDisconnect above, it is not cited here: it has zero incoming
- * references anywhere (empty IDA-exported xrefs, empty callgraph-index
- * call_edges/incoming_xrefs, and no hit from a raw CALL/JMP-rel32 plus
- * absolute-address byte scan of both `bin/2025.7.1/ForgedAlliance.exe` and
- * `bin/external/ForgedAlliance.exe`). Left `skip` rather than folded into
- * this call site without evidence.
- */
-void moho::UI_ReceiveChat(
-  const IClient* const sender,
-  const gpg::MemBuffer<const char> data
-)
-{
-  const msvc8::string nickname = sender->GetNickname();
-  boost::function<void(), std::allocator<void>> callback = boost::bind(&func_ReceiveChat, nickname, data);
-  THREAD_InvokeAsync(callback, 0u);
-}
-
-namespace
-{
-  /**
-   * Typed view over the game-UI client-manager interface (CWldUiInterface). The
-   * only field the recovered overrides read is the local player slot index,
-   * which NoteGameSpeedChanged forwards as `slotZeroBased`.
-   */
-  struct CWldUiInterfaceRuntimeView
-  {
-    std::uint8_t base[0x20];          // vtable + interface base/earlier lanes
-    std::int32_t mLocalSlotZeroBased; // +0x20
-  };
-  static_assert(
-    offsetof(CWldUiInterfaceRuntimeView, mLocalSlotZeroBased) == 0x20,
-    "CWldUiInterfaceRuntimeView::mLocalSlotZeroBased offset must be 0x20"
-  );
-} // namespace
-
-/**
- * Address: 0x0088B960 (FUN_0088B960, Moho::CWldUiInterface::NoteGameSpeedChanged)
- * Address: 0x0088F410 (FUN_0088F410) - boost::function0<void>::assign_to<F>,
- *          magic-static-guarded install of the manager/invoker pair for this
- *          bind_t<>
- * Address: 0x0088F6A0 (FUN_0088F6A0) - vtable_type::assign_to payload store:
- *          writes {&UI_DriverNoteGameSpeedChanged, slotZeroBased, gameSpeed}
- *          into the function_buffer
- * Address: 0x0088FD00 (FUN_0088FD00) - basic_vtable<F>::manager (RTTI-
- *          confirmed via the embedded `bind_t<void,void(__cdecl*)(int,int),
- *          list2<value<unsigned int>,value<int>>>` type descriptor)
- * Address: 0x0088FCE0 (FUN_0088FCE0) - basic_vtable<F>::invoker: calls
- *          `(*buf[0])(buf[1], buf[2])`
- *
- * What it does:
- * IClientMgrUIInterface::NoteGameSpeedChanged override for the game UI: posts
- * the driver-gated game-speed-changed notice for this interface's local player
- * slot onto the main thread (via THREAD_InvokeAsync -> UI_DriverNoteGameSpeedChanged,
- * which forwards to the Lua UI when a sim driver is active). The binary builds
- * this callback via `boost::bind(&UI_DriverNoteGameSpeedChanged, slotZeroBased,
- * gameSpeed)` (a free-function bind, flat function_buffer, no this-adjustment)
- * rather than a closure object -- expressed here the same way to keep this
- * call site the one that actually instantiates the cited manager/invoker pair.
- */
-void moho::UI_InterfaceNoteGameSpeedChanged(
-  const IClientMgrUIInterface* const self,
-  const std::int32_t gameSpeed
-)
-{
-  const std::int32_t slotZeroBased = reinterpret_cast<const CWldUiInterfaceRuntimeView*>(self)->mLocalSlotZeroBased;
-  boost::function<void(), std::allocator<void>> callback =
-    boost::bind(&UI_DriverNoteGameSpeedChanged, slotZeroBased, gameSpeed);
-  THREAD_InvokeAsync(callback, 0u);
-}
-
-/**
- * Address: 0x0088B9B0 (FUN_0088B9B0, Moho::CWldUiInterface::ReportBottleneck)
- *
- * What it does:
- * Forwards one client-bottleneck snapshot to the GPGNet reporting lane.
- */
-void moho::UI_ReportBottleneck(
-  const SClientBottleneckInfo& info
-)
-{
-  GPGNET_ReportBottleneck(info);
-}
-
-/**
- * Address: 0x0088B9C0 (FUN_0088B9C0, Moho::CWldUiInterface::ReportBottleneckCleared)
- *
- * What it does:
- * Forwards one bottleneck-cleared notification to the GPGNet reporting lane.
- */
-void moho::UI_ReportBottleneckCleared()
-{
-  GPGNET_ReportBottleneckCleared();
-}
-
-/**
  * Address: 0x0083D740 (FUN_0083D740, ?UI_NoteGameOver@Moho@@YAXXZ)
  *
  * What it does:
@@ -27768,8 +27030,8 @@ int moho::cfunc_RemoveInputCaptureL(
 
 void moho::UI_ClearInputCapture()
 {
-  while (InputCaptureCount() > 0) {
-    RemoveInputCaptureAt(InputCaptureCount() - 1u);
+  while (!sInputCapture.empty()) {
+    RemoveInputCaptureAt(sInputCapture.size() - 1u);
   }
 }
 
@@ -28594,7 +27856,9 @@ int moho::cfunc_AddBlinkyBoxL(
 
 namespace
 {
-  struct CommandFeedbackBlipRuntimeView final
+  /// One `AddCommandFeedbackBlip` mesh: shown for `mDuration` seconds, aged by
+  /// `UI_UpdateCommandFeedbackBlips`.
+  struct SCommandFeedbackBlip final
   {
     moho::MeshInstance* mMeshInstance; // +0x00
     float mDuration;                   // +0x04
@@ -28602,142 +27866,17 @@ namespace
   };
 
   static_assert(
-    offsetof(CommandFeedbackBlipRuntimeView, mDuration) == 0x04,
-    "CommandFeedbackBlipRuntimeView::mDuration offset must be 0x04"
+    offsetof(SCommandFeedbackBlip, mDuration) == 0x04,
+    "SCommandFeedbackBlip::mDuration offset must be 0x04"
   );
   static_assert(
-    offsetof(CommandFeedbackBlipRuntimeView, mCurTime) == 0x08,
-    "CommandFeedbackBlipRuntimeView::mCurTime offset must be 0x08"
+    offsetof(SCommandFeedbackBlip, mCurTime) == 0x08,
+    "SCommandFeedbackBlip::mCurTime offset must be 0x08"
   );
-  static_assert(sizeof(CommandFeedbackBlipRuntimeView) == 0x0C, "CommandFeedbackBlipRuntimeView size must be 0x0C");
+  static_assert(sizeof(SCommandFeedbackBlip) == 0x0C, "SCommandFeedbackBlip size must be 0x0C");
 
-  msvc8::list<CommandFeedbackBlipRuntimeView> sCommandFeedbackBlips;
+  msvc8::list<SCommandFeedbackBlip> sCommandFeedbackBlips;
 
-  struct CommandFeedbackListNodeRuntimeView
-  {
-    CommandFeedbackListNodeRuntimeView* mNext; // +0x00
-    CommandFeedbackListNodeRuntimeView* mPrev; // +0x04
-    CommandFeedbackBlipRuntimeView mValue;     // +0x08
-  };
-  static_assert(
-    sizeof(CommandFeedbackListNodeRuntimeView) == 0x14,
-    "CommandFeedbackListNodeRuntimeView size must be 0x14"
-  );
-  static_assert(
-    offsetof(CommandFeedbackListNodeRuntimeView, mValue) == 0x08,
-    "CommandFeedbackListNodeRuntimeView::mValue offset must be 0x08"
-  );
-
-  struct CommandFeedbackListRuntimeView
-  {
-    msvc8::_Container_proxy* mProxy;           // +0x00
-    CommandFeedbackListNodeRuntimeView* mHead; // +0x04
-    std::uint32_t mSize;                       // +0x08
-  };
-  static_assert(sizeof(CommandFeedbackListRuntimeView) == 0x0C, "CommandFeedbackListRuntimeView size must be 0x0C");
-
-  /**
-   * Address: 0x00858340 (FUN_00858340)
-   *
-   * What it does:
-   * Stores the first live command-feedback list node into `outNode`.
-   */
-  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView** StoreCommandFeedbackFirstNodeLane(
-    CommandFeedbackListNodeRuntimeView** const outNode
-  ) noexcept
-  {
-    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
-    *outNode = listView->mHead->mNext;
-    return outNode;
-  }
-
-  /**
-   * Address: 0x00858350 (FUN_00858350)
-   *
-   * What it does:
-   * Stores the command-feedback list sentinel node into `outNode`.
-   */
-  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView** StoreCommandFeedbackSentinelNodeLane(
-    CommandFeedbackListNodeRuntimeView** const outNode
-  ) noexcept
-  {
-    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
-    *outNode = listView->mHead;
-    return outNode;
-  }
-  /**
-   * Address: 0x008584F0 (FUN_008584F0)
-   * Address: 0x00858730 (FUN_00858730, checked-allocate helper)
-   *
-   * What it does:
-   * Allocates one command-feedback list node and seeds next/prev/value lanes.
-   *
-   * Notes:
-   * `FUN_00858730` is the VC8 checked-allocate helper this inlines - the
-   * overflow guard `0xFFFFFFFF/count < 0x14` is unreachable at `count == 1`,
-   * so `::operator new(sizeof(CommandFeedbackListNodeRuntimeView))` here is
-   * the same call with the dead overflow branch elided. Element size 0x14
-   * matches `sizeof(CommandFeedbackListNodeRuntimeView)` (static_assert
-   * above).
-   */
-  [[maybe_unused]] [[nodiscard]] CommandFeedbackListNodeRuntimeView* AllocateCommandFeedbackBlipNodeLane(
-    const CommandFeedbackBlipRuntimeView* const value,
-    CommandFeedbackListNodeRuntimeView* const next,
-    CommandFeedbackListNodeRuntimeView* const prev
-  )
-  {
-    auto* const inserted =
-      static_cast<CommandFeedbackListNodeRuntimeView*>(::operator new(sizeof(CommandFeedbackListNodeRuntimeView)));
-    if (inserted != nullptr) {
-      inserted->mNext = next;
-    }
-    if (inserted != nullptr) {
-      inserted->mPrev = prev;
-    }
-    if (inserted != nullptr) {
-      inserted->mValue = *value;
-    }
-    return inserted;
-  }
-
-  /**
-   * Address: 0x00858530 (FUN_00858530, sCommandFeedbackBlips::inc)
-   *
-   * What it does:
-   * Performs VC8-style list-size overflow guard and increments command-feedback
-   * list size.
-   */
-  void IncrementCommandFeedbackListSizeChecked()
-  {
-    auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
-    if (listView->mSize == 0x15555555u) {
-      throw std::length_error("list<T> too long");
-    }
-    ++listView->mSize;
-  }
-
-  /**
-   * Address: 0x008583D0 (FUN_008583D0)
-   *
-   * What it does:
-   * Inserts one command-feedback blip node immediately before `position`,
-   * increments list size with VC8 overflow behavior, and relinks predecessor
-   * and successor lanes.
-   *
-   * Notes:
-   * Inlines allocation/size-check helpers from `FUN_008584F0` and
-   * `FUN_00858530`.
-   */
-  [[maybe_unused]] void InsertCommandFeedbackBlipBeforeNode(
-    const CommandFeedbackBlipRuntimeView* const value,
-    CommandFeedbackListNodeRuntimeView* const position
-  )
-  {
-    auto* const inserted = AllocateCommandFeedbackBlipNodeLane(value, position, position->mPrev);
-    IncrementCommandFeedbackListSizeChecked();
-    position->mPrev = inserted;
-    inserted->mPrev->mNext = inserted;
-  }
 
   [[nodiscard]] const char* LuaStringOrEmpty(
     const LuaPlus::LuaObject& object
@@ -28823,7 +27962,7 @@ void moho::RemoveCommandFeedbackBlips(
 {
   (void)unused;
 
-  for (msvc8::list<CommandFeedbackBlipRuntimeView>::iterator it = sCommandFeedbackBlips.begin();
+  for (msvc8::list<SCommandFeedbackBlip>::iterator it = sCommandFeedbackBlips.begin();
        it != sCommandFeedbackBlips.end();) {
     if (it->mCurTime < it->mDuration) {
       ++it;
@@ -28847,10 +27986,10 @@ void moho::UI_UpdateCommandFeedbackBlips(
 {
   (void)moho::MeshRenderer::GetInstance();
 
-  for (msvc8::list<CommandFeedbackBlipRuntimeView>::iterator it = sCommandFeedbackBlips.begin();
+  for (msvc8::list<SCommandFeedbackBlip>::iterator it = sCommandFeedbackBlips.begin();
        it != sCommandFeedbackBlips.end();
        ++it) {
-    CommandFeedbackBlipRuntimeView& blip = *it;
+    SCommandFeedbackBlip& blip = *it;
     const float updatedTime = blip.mCurTime + deltaSeconds;
     blip.mCurTime = updatedTime;
     if (updatedTime >= blip.mDuration) {
@@ -28918,13 +28057,12 @@ int moho::cfunc_AddCommandFeedbackBlipL(
     return 0;
   }
 
-  CommandFeedbackBlipRuntimeView blip{};
+  SCommandFeedbackBlip blip{};
   blip.mMeshInstance = meshInstance;
   blip.mDuration = static_cast<float>(lua_tonumber(state->m_state, 2));
   blip.mCurTime = 0.0f;
 
-  auto* const listView = reinterpret_cast<CommandFeedbackListRuntimeView*>(&sCommandFeedbackBlips);
-  InsertCommandFeedbackBlipBeforeNode(&blip, listView->mHead);
+  sCommandFeedbackBlips.push_back(blip);
 
   meshInstance->lifetimeParameter = blip.mDuration * 10.0f;
 
@@ -29762,7 +28900,7 @@ namespace
    * What it does:
    * Returns the global command-feedback blip-list lane.
    */
-  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>* GetCommandFeedbackBlipsLaneA(
+  [[maybe_unused]] [[nodiscard]] msvc8::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneA(
     const int /*unused*/
   ) noexcept
   {
@@ -29775,7 +28913,7 @@ namespace
    * What it does:
    * Secondary entrypoint returning the command-feedback blip-list lane.
    */
-  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>* GetCommandFeedbackBlipsLaneB(
+  [[maybe_unused]] [[nodiscard]] msvc8::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneB(
     const int /*unused*/
   ) noexcept
   {
@@ -29788,7 +28926,7 @@ namespace
    * What it does:
    * Third entrypoint returning the command-feedback blip-list lane.
    */
-  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>* GetCommandFeedbackBlipsLaneC(
+  [[maybe_unused]] [[nodiscard]] msvc8::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneC(
     const int /*unused*/
   ) noexcept
   {
@@ -29801,7 +28939,7 @@ namespace
    * What it does:
    * Fourth entrypoint returning the command-feedback blip-list lane.
    */
-  [[maybe_unused]] [[nodiscard]] msvc8::list<CommandFeedbackBlipRuntimeView>* GetCommandFeedbackBlipsLaneD() noexcept
+  [[maybe_unused]] [[nodiscard]] msvc8::list<SCommandFeedbackBlip>* GetCommandFeedbackBlipsLaneD() noexcept
   {
     return &sCommandFeedbackBlips;
   }

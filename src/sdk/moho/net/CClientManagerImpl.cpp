@@ -944,7 +944,7 @@ void CClientManagerImpl::DoBeat()
       (bottleneckInfo.mFloat >= uiBottleneckTimeMs + 5000.0f)) {
     SetBottleneckUiTimestampMs(*this, bottleneckInfo.mFloat);
     if (mInterface != nullptr) {
-      mInterface->ReportBottleneck();
+      mInterface->ReportBottleneck(bottleneckInfo);
     }
   }
 
