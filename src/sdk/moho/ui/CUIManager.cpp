@@ -129,7 +129,7 @@ namespace
 moho::CUIManager::CUIManager()
   : mUnknown04(0)
   , mFrames()
-  , mCursorLink{}
+  , mCursor()
   , mLuaState(nullptr)
   , mUnknown34(0)
   , mInputWindows()
@@ -149,7 +149,7 @@ moho::CUIManager::CUIManager()
  */
 void moho::CUIManager::DestroyCore()
 {
-  mCursorLink.Unlink();
+  mCursor.ResetFromObject(nullptr);
 
   if (!mFrames.Empty()) {
     ReleaseFrameSharedPtrRange(mFrames.begin(), mFrames.end());
@@ -447,7 +447,7 @@ float moho::CUIManager::GetUIControlsAlpha() const
  */
 void moho::CUIManager::SetCursor(CMauiCursor* const cursor)
 {
-  mCursorLink.AssignCursor(cursor);
+  mCursor.ResetFromObject(cursor);
 }
 
 /**
@@ -455,7 +455,7 @@ void moho::CUIManager::SetCursor(CMauiCursor* const cursor)
  */
 moho::CMauiCursor* moho::CUIManager::GetCursor() const
 {
-  return mCursorLink.GetCursor();
+  return mCursor.GetObjectPtr();
 }
 
 /**

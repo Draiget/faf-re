@@ -4271,7 +4271,7 @@ namespace msvc8
          * the surviving tail forward over the erased slots, releases the
          * now-orphan trailing control blocks, and rewinds mLast. Returns
          * `first`, the MSVC iterator-after-erase contract. Reached from
-         * `CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache`.)
+         * `CBuildDragPreview::ClearBuildPreviewCache`.)
          * Address: 0x005C6F00 (FUN_005C6F00,
          * msvc8::vector<Moho::SPerArmyReconInfo>::erase(first, last) for the
          * 52-byte element -- copy-assigns the `[last, mLast)` tail down over the
@@ -5798,7 +5798,7 @@ namespace msvc8
          * delete`. Reached from `push_back`'s capacity-full tail-call
          * (`insert(last_, value)` -> this method's own single-value
          * overload above -> this method with `count=1`) for
-         * `moho::CUIWorldViewBuildDragRuntimeView::mMeshes`
+         * `moho::CBuildDragPreview::mMeshes`
          * (UiRuntimeTypes.h:890) -- confirmed directly from
          * `PushBackMeshInstanceSharedPtrVector`'s (FUN_00855040,
          * UiRuntimeTypes.cpp, already recovered) own raw decompile, which

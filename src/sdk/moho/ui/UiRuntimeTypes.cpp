@@ -581,8 +581,7 @@ namespace moho
 namespace
 {
   using moho::CD3DFont;
-  using moho::CMauiCursorRuntimeView;
-  using moho::CMauiCursorTextureRuntimeView;
+  using moho::CMauiCursor;
   using moho::CMauiEdit;
   using moho::CScriptLazyVar_float;
 
@@ -593,25 +592,6 @@ namespace
   std::int32_t ReadBitmapCurrentFrame(const moho::CMauiBitmap* bitmap) noexcept;
   std::int32_t CountBitmapFramePatternEntries(const moho::CMauiBitmap* bitmap) noexcept;
   std::uint32_t EnableBitmapAnimationIfMultipleTextures(moho::CMauiBitmap* bitmap) noexcept;
-
-  static_assert(
-    sizeof(moho::CScriptLazyVar_float) >= sizeof(LuaPlus::LuaObject),
-    "CScriptLazyVar_float must remain LuaObject-compatible"
-  );
-
-  [[nodiscard]] LuaPlus::LuaObject& AsLazyVarObject(
-    moho::CScriptLazyVar_float& value
-  ) noexcept
-  {
-    return reinterpret_cast<LuaPlus::LuaObject&>(value);
-  }
-
-  [[nodiscard]] const LuaPlus::LuaObject& AsLazyVarObject(
-    const moho::CScriptLazyVar_float& value
-  ) noexcept
-  {
-    return reinterpret_cast<const LuaPlus::LuaObject&>(value);
-  }
 
   /// The state a control's layout lazy vars are created in: the control's
   /// Lua object's, or none.
@@ -1198,8 +1178,6 @@ namespace
   }
 
   using CMauiControlListNode = moho::TDatListItem<moho::CMauiControl, void>;
-  constexpr std::uint32_t kCMauiControlListNodeNextOffset =
-    static_cast<std::uint32_t>(offsetof(CMauiControlListNode, mNext));
 
   /// The control owning one `mParentList` node, i.e. one entry of a parent's
   /// `mChildrenList`.
@@ -1224,32 +1202,6 @@ namespace
     return moho::TDatList<moho::CMauiControl, void>::owner_from_member_node<
       moho::CMauiControl, &moho::CMauiControl::mParentList>(node);
   }
-
-  struct CScriptLazyVarFloatCachedValueView
-  {
-    std::uint8_t mUnknown00To13[0x14]{};
-    float mCachedValue = 0.0f; // +0x14
-
-    [[nodiscard]] static CScriptLazyVarFloatCachedValueView* FromLazyVar(
-      moho::CScriptLazyVar_float* value
-    ) noexcept
-    {
-      return reinterpret_cast<CScriptLazyVarFloatCachedValueView*>(value);
-    }
-
-    [[nodiscard]]
-    static const CScriptLazyVarFloatCachedValueView* FromLazyVar(
-      const moho::CScriptLazyVar_float* value
-    ) noexcept
-    {
-      return reinterpret_cast<const CScriptLazyVarFloatCachedValueView*>(value);
-    }
-  };
-
-  static_assert(
-    offsetof(CScriptLazyVarFloatCachedValueView, mCachedValue) == 0x14,
-    "CScriptLazyVarFloatCachedValueView::mCachedValue offset must be 0x14"
-  );
 
   [[nodiscard]] std::uint32_t PackVertexAlphaFromScalar(
     const float alpha
@@ -1538,15 +1490,15 @@ namespace
    * What it does:
    * Stores active cursor hotspot `(x,y)` lanes.
    */
-  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorHotspotXY(
-    CMauiCursorTextureRuntimeView* const cursorView,
+  [[maybe_unused]] CMauiCursor* SetCursorHotspotXY(
+    CMauiCursor* const cursor,
     const std::int32_t hotspotX,
     const std::int32_t hotspotY
   ) noexcept
   {
-    cursorView->mHotspotX = hotspotX;
-    cursorView->mHotspotY = hotspotY;
-    return cursorView;
+    cursor->mHotspotX = hotspotX;
+    cursor->mHotspotY = hotspotY;
+    return cursor;
   }
 
   /**
@@ -1555,15 +1507,15 @@ namespace
    * What it does:
    * Stores default cursor hotspot `(x,y)` lanes.
    */
-  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorDefaultHotspotXY(
-    CMauiCursorTextureRuntimeView* const cursorView,
+  [[maybe_unused]] CMauiCursor* SetCursorDefaultHotspotXY(
+    CMauiCursor* const cursor,
     const std::int32_t hotspotX,
     const std::int32_t hotspotY
   ) noexcept
   {
-    cursorView->mDefaultHotspotX = hotspotX;
-    cursorView->mDefaultHotspotY = hotspotY;
-    return cursorView;
+    cursor->mDefaultHotspotX = hotspotX;
+    cursor->mDefaultHotspotY = hotspotY;
+    return cursor;
   }
 
   /**
@@ -1572,16 +1524,16 @@ namespace
    * What it does:
    * Updates cursor-showing lane and marks cursor state dirty when value changes.
    */
-  [[maybe_unused]] CMauiCursorTextureRuntimeView* SetCursorShowingAndMarkDirty(
-    CMauiCursorTextureRuntimeView* const cursorView,
+  [[maybe_unused]] CMauiCursor* SetCursorShowingAndMarkDirty(
+    CMauiCursor* const cursor,
     const bool isShowing
   ) noexcept
   {
-    if (cursorView->mIsShowing != isShowing) {
-      cursorView->mIsShowing = isShowing;
-      cursorView->mIsDefaultTexture = true;
+    if (cursor->mIsShowing != isShowing) {
+      cursor->mIsShowing = isShowing;
+      cursor->mNeedsUpdate = true;
     }
-    return cursorView;
+    return cursor;
   }
 
   /**
@@ -1632,382 +1584,6 @@ namespace
       itemList->mCurSelection = currentSelection - 1;
     }
   }
-
-
-  // CameraTargetRuntimeView used to sit here: a one-pointer struct that
-  // reinterpret_cast a CameraImpl* and hand-dispatched vtable slot 10 through
-  // a raw function-pointer cast. That slot is CameraImpl::TargetLocation
-  // (0x007A82F0, ?TargetLocation@CameraImpl@Moho@@UAEXABV?$Vector3@M@Wm3@@M@Z),
-  // a recovered virtual with exactly that signature, and both call sites
-  // already held a typed CameraImpl*. They now make the virtual call directly.
-
-  struct CRenderWorldViewRuntimeView
-  {
-    void* vftable = nullptr;
-    moho::CameraImpl* mCamera = nullptr; // +0x04
-    std::uint8_t mUnknown08To17[0x10]{};
-    std::uint8_t mCanShake = 0;  // +0x18
-    std::uint8_t mIsMiniMap = 0; // +0x19
-    std::uint8_t mUnknown1ATo1B[0x02]{};
-
-    /**
-     * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)
-     *
-     * What it does:
-     * Returns the retained world-view camera pointer lane.
-     */
-    [[nodiscard]] moho::CameraImpl* GetCamera()
-    {
-      return mCamera;
-    }
-
-    /**
-     * Address: 0x0086DC90 (FUN_0086DC90, Moho::CRenderWorldView::IsMiniMap)
-     *
-     * What it does:
-     * Returns minimap-view toggle lane.
-     */
-    [[nodiscard]] bool IsMiniMap() const
-    {
-      return mIsMiniMap != 0;
-    }
-
-    /**
-     * Address: 0x0086EC10 (FUN_0086EC10, Moho::CRenderWorldView::CameraGetTargetZoom)
-     *
-     * What it does:
-     * Returns target zoom from the retained camera lane.
-     */
-    [[nodiscard]] float CameraGetTargetZoom() const
-    {
-      return mCamera->CameraGetTargetZoom();
-    }
-
-    /**
-     * Address: 0x0086EC30 (FUN_0086EC30, Moho::CRenderWorldView::CameraGetZoom)
-     *
-     * What it does:
-     * Returns current zoom from the retained camera lane.
-     */
-    [[nodiscard]] float CameraGetZoom() const
-    {
-      return mCamera->CameraGetZoom();
-    }
-
-    /**
-     * Address: 0x0086DC00 (FUN_0086DC00, Moho::CRenderWorldView::SetOrthographic)
-     *
-     * What it does:
-     * Stores the orthographic toggle lane and mirrors it to the active camera:
-     * enabling orthographic disables camera shake; disabling orthographic
-     * re-enables camera shake.
-     */
-    void SetOrthographic(
-      const bool orthographicEnabled
-    )
-    {
-      mCanShake = static_cast<std::uint8_t>(orthographicEnabled ? 1 : 0);
-
-      if (mCamera == nullptr) {
-        return;
-      }
-
-      mCamera->CameraSetOrtho(orthographicEnabled);
-      mCamera->CanShake(!orthographicEnabled);
-    }
-
-    /**
-     * Address: 0x0086DC60 (FUN_0086DC60, Moho::CRenderWorldView::CanShake)
-     *
-     * What it does:
-     * Returns the stored orthographic toggle lane.
-     */
-    [[nodiscard]] bool CanShake() const
-    {
-      return mCanShake != 0;
-    }
-
-    [[nodiscard]] bool IsOrthographic() const
-    {
-      return CanShake();
-    }
-  };
-
-  static_assert(
-    offsetof(CRenderWorldViewRuntimeView, mCamera) == 0x04,
-    "CRenderWorldViewRuntimeView::mCamera offset must be 0x04"
-  );
-  static_assert(
-    offsetof(CRenderWorldViewRuntimeView, mCanShake) == 0x18,
-    "CRenderWorldViewRuntimeView::mCanShake offset must be 0x18"
-  );
-  static_assert(
-    offsetof(CRenderWorldViewRuntimeView, mIsMiniMap) == 0x19,
-    "CRenderWorldViewRuntimeView::mIsMiniMap offset must be 0x19"
-  );
-
-  struct CUIWorldViewOverlayRuntimeView
-  {
-    void* vftable = nullptr;
-
-    void Draw(
-      moho::CD3DPrimBatcher* const primBatcher
-    )
-    {
-      using DrawFn = void(__thiscall*)(CUIWorldViewOverlayRuntimeView*, moho::CD3DPrimBatcher*);
-      auto** const table = reinterpret_cast<void**>(vftable);
-      auto* const fn = reinterpret_cast<DrawFn>(table[4]);
-      fn(this, primBatcher);
-    }
-  };
-
-  struct CUIWorldViewRuntimeView
-  {
-    std::uint8_t mUnknown00To47[0x48]{};
-    moho::CScriptLazyVar_float mViewLeft{}; // +0x48
-    std::uint8_t mUnknown5CTo6F[0x14]{};
-    moho::CScriptLazyVar_float mViewTop{}; // +0x70
-    std::uint8_t mUnknown84To97[0x14]{};
-    moho::CScriptLazyVar_float mViewWidth{};  // +0x98
-    moho::CScriptLazyVar_float mViewHeight{}; // +0xAC
-    std::uint8_t mUnknownC0To11B[0x5C]{};
-    // +0x11C is not a stored pointer to a separately-allocated CRenderWorldView --
-    // it is the vtable slot of the real, in-place `IRenderWorldView`/`CRenderWorldView`
-    // base subobject CUIWorldView's constructor placement-constructs there (see
-    // CUIWorldViewCtorRuntimeView::mRenderVftable and the ctor's own doc comment).
-    // Reading these 4 bytes as a pointer and dereferencing it, as an earlier
-    // recovery of this struct did via `CRenderWorldViewRuntimeHandle`, misreads
-    // the vtable address itself as an object pointer and corrupts/crashes on the
-    // first write through it. `RenderWorldView()` below reinterprets `this + 0x11C`
-    // directly instead, matching every other `AsXxxView`-style helper in this file.
-    std::uint8_t mRenderWorldViewVftable[0x04]{};
-    // Was modeled as `CRenderWorldViewViewportRuntimeView* mViewportCallback`,
-    // a stored pointer dispatched through a fabricated vtable shape
-    // (CameraName/SetViewRect/CameraGetOffset/CameraGetTargetZoom/LODMetric
-    // at slots 1/3/18/19/35). Proven wrong two ways: (1) this offset's real
-    // vtable, per `dumps/rtti_dump_all.hpp`'s RTTI for `CUIWorldView`
-    // ("Secondary vftable at subobject offset 284", i.e. 0x11C), has slot 3
-    // = 0x0086EBF0 = the already-recovered `CRenderWorldView::GetCamera`, not
-    // a SetViewRect-shaped setter; (2) a sibling call site 30 lines below
-    // this struct in the binary (`NewSelectionDragger`'s doc comment) reads
-    // this exact +0x120 field and states outright that it is "the raw
-    // pointer value ... stored verbatim into SelectionDragger::mCam with no
-    // dereference in between" -- i.e. a plain `CameraImpl*`. Matches
-    // `CUIWorldViewCtorRuntimeView::mCamera` at the same offset exactly.
-    moho::CameraImpl* mCamera = nullptr; // +0x120
-    float mCachedViewLeft = 0.0f;        // +0x124
-    float mCachedViewTop = 0.0f;         // +0x128
-    float mCachedViewWidth = 0.0f;       // +0x12C
-    float mCachedViewHeight = 0.0f;      // +0x130
-    std::uint8_t mUnknown134To135[0x2]{};
-    std::uint8_t mEnableResourceRendering = 0; // +0x136
-    std::uint8_t mUnknown137 = 0;
-    std::int32_t mInputLocks = 0;     // +0x138
-    std::int32_t mWorldViewDepth = 0; // +0x13C  (render-world-view depth; AddWorldView depth arg)
-    std::uint8_t mUnknown140To207[0xC8]{};
-    moho::CWldSession* mSession = nullptr; // +0x208
-    std::uint8_t mUnknown20CTo273[0x68]{};
-    std::uint8_t mShowConvertToPatrolCursor = 0; // +0x274
-    std::uint8_t mUnknown275To29B[0x27]{};
-    std::uint32_t mOverlayDrawToken = 0; // +0x29C
-    std::uint8_t mUnknown2A0To2A3[0x4]{};
-    std::uint8_t mHighlightEnabled = 0; // +0x2A4
-    std::uint8_t mUnknown2A5 = 0;
-    std::uint8_t mGetsGlobalCameraCommands = 0; // +0x2A6
-
-    [[nodiscard]] static CUIWorldViewRuntimeView* FromWorldView(
-      moho::CUIWorldView* worldView
-    ) noexcept
-    {
-      return reinterpret_cast<CUIWorldViewRuntimeView*>(worldView);
-    }
-
-    [[nodiscard]] CRenderWorldViewRuntimeView* RenderWorldView() noexcept
-    {
-      return reinterpret_cast<CRenderWorldViewRuntimeView*>(mRenderWorldViewVftable);
-    }
-  };
-
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mRenderWorldViewVftable) == 0x11C,
-    "CUIWorldViewRuntimeView::mRenderWorldViewVftable offset must be 0x11C"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewLeft) == 0x48,
-    "CUIWorldViewRuntimeView::mViewLeft offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewTop) == 0x70,
-    "CUIWorldViewRuntimeView::mViewTop offset must be 0x70"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewWidth) == 0x98,
-    "CUIWorldViewRuntimeView::mViewWidth offset must be 0x98"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mViewHeight) == 0xAC,
-    "CUIWorldViewRuntimeView::mViewHeight offset must be 0xAC"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCamera) == 0x120,
-    "CUIWorldViewRuntimeView::mCamera offset must be 0x120"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewLeft) == 0x124,
-    "CUIWorldViewRuntimeView::mCachedViewLeft offset must be 0x124"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewTop) == 0x128,
-    "CUIWorldViewRuntimeView::mCachedViewTop offset must be 0x128"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewWidth) == 0x12C,
-    "CUIWorldViewRuntimeView::mCachedViewWidth offset must be 0x12C"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mCachedViewHeight) == 0x130,
-    "CUIWorldViewRuntimeView::mCachedViewHeight offset must be 0x130"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mOverlayDrawToken) == 0x29C,
-    "CUIWorldViewRuntimeView::mOverlayDrawToken offset must be 0x29C"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mShowConvertToPatrolCursor) == 0x274,
-    "CUIWorldViewRuntimeView::mShowConvertToPatrolCursor offset must be 0x274"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mInputLocks) == 0x138,
-    "CUIWorldViewRuntimeView::mInputLocks offset must be 0x138"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mWorldViewDepth) == 0x13C,
-    "CUIWorldViewRuntimeView::mWorldViewDepth offset must be 0x13C"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mSession) == 0x208,
-    "CUIWorldViewRuntimeView::mSession offset must be 0x208"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mEnableResourceRendering) == 0x136,
-    "CUIWorldViewRuntimeView::mEnableResourceRendering offset must be 0x136"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mHighlightEnabled) == 0x2A4,
-    "CUIWorldViewRuntimeView::mHighlightEnabled offset must be 0x2A4"
-  );
-  static_assert(
-    offsetof(CUIWorldViewRuntimeView, mGetsGlobalCameraCommands) == 0x2A6,
-    "CUIWorldViewRuntimeView::mGetsGlobalCameraCommands offset must be 0x2A6"
-  );
-
-  struct CUIWorldViewLuaObjectRuntimeView
-  {
-    std::uint8_t mUnknown00To1F[0x20]{};
-    LuaPlus::LuaObject mLuaObject{}; // +0x20
-
-    [[nodiscard]] static CUIWorldViewLuaObjectRuntimeView* FromWorldView(
-      moho::CUIWorldView* worldView
-    ) noexcept
-    {
-      return reinterpret_cast<CUIWorldViewLuaObjectRuntimeView*>(worldView);
-    }
-  };
-
-  static_assert(
-    offsetof(CUIWorldViewLuaObjectRuntimeView, mLuaObject) == 0x20,
-    "CUIWorldViewLuaObjectRuntimeView::mLuaObject offset must be 0x20"
-  );
-
-  // Cached UI command-graph weak handle (graph ptr + shared control block).
-  struct CUIWorldViewCommandGraphHandle
-  {
-    void* mGraph = nullptr;                             // +0x00
-    boost::detail::sp_counted_base* mControl = nullptr; // +0x04
-  };
-  static_assert(sizeof(CUIWorldViewCommandGraphHandle) == 0x08);
-
-  // Construction-time overlay covering every field CUIWorldView::CUIWorldView
-  // initializes (offsets .asm-verified against FUN_0086E480). Flat layout: the
-  // IRenderWorldView subobject occupies 0x11C..0x137 (vtable@0x11C, camera@0x120,
-  // cached view bounds 0x124..0x133, mCanShake@0x134, mIsMiniMap@0x135,
-  // mEnableResourceRendering@0x136); the two command-mode copies via the existing
-  // moho::CommandModeData (0x60); the build-drag subobject via
-  // CUIWorldViewBuildDragRuntimeView (= struct_WorldView_object).
-#pragma pack(push, 1)
-  struct CUIWorldViewCtorRuntimeView
-  {
-    std::uint8_t mBase000To0EA[0xEB];
-    std::uint8_t mNeedsFrameUpdate; // +0xEB
-    std::uint8_t mBase0ECTo11B[0x30];
-    void* mRenderVftable;                              // +0x11C
-    moho::CameraImpl* mCamera;                         // +0x120
-    float mCachedViewLeft;                             // +0x124
-    float mCachedViewTop;                              // +0x128
-    float mCachedViewWidth;                            // +0x12C
-    float mCachedViewHeight;                           // +0x130
-    std::uint8_t mCanShake;                            // +0x134
-    std::uint8_t mIsMiniMap;                           // +0x135
-    std::uint8_t mEnableResourceRendering;             // +0x136
-    std::uint8_t mUnknown137;                          // +0x137
-    std::int32_t mInputLocks;                          // +0x138
-    std::int32_t mWorldViewDepth;                      // +0x13C
-    std::int32_t mState;                               // +0x140
-    std::uint8_t mUnknown144To147[0x04];               // +0x144
-    moho::CommandModeData mLeftMouseCommand;           // +0x148 (v11)
-    moho::CommandModeData mCommandData;                // +0x1A8
-    moho::CWldSession* mWldSession;                    // +0x208
-    CUIWorldViewCommandGraphHandle mComGraph;          // +0x20C
-    moho::CUIWorldViewBuildDragRuntimeView mSubobject; // +0x214
-    std::uint8_t mConvertToPatrolCursor;               // +0x274
-    // Set on MET_MouseEnter and cleared on MET_MouseExit by
-    // CUIWorldView::HandleEvent (0x008704E4 / 0x00870500); CUIWorldView::Frame
-    // gates its per-frame hover refresh on it (0x00871152).
-    std::uint8_t mCursorInside; // +0x275
-    // Space-drag camera rotation in progress. The name is the one the rest of
-    // the tree already uses for this byte; its observable effect is that unit
-    // icons are hidden while it is set (CUIWorldView::Frame, 0x0087144E, feeds
-    // it into `mIconsVisible`), and `CameraRevertRotation` is what clears the
-    // rotation it accumulated.
-    std::uint8_t mCameraRotationActive;  // +0x276
-    std::uint8_t mUnknown277To27F[0x09]; // +0x277
-    msvc8::string mCameraTrack;          // +0x280
-    // The pair at +0x29C is a weak link to the overlay this view draws, not a
-    // token: CUIWorldView::DoRender resolves it with the same `!= 0 && != 4`
-    // test and `- 4` adjustment every other sentinel in this file uses, and the
-    // destructor unlinks it from the overlay's chain.
-    moho::CMauiCurrentFocusControlRuntimeView mOverlayLink; // +0x29C
-    std::uint8_t mHighlightEnabled;                         // +0x2A4
-    std::uint8_t mIconsVisible;                             // +0x2A5
-    std::uint8_t mGlobalCameraCommands;                     // +0x2A6
-    std::uint8_t mUnknown2A7;                               // +0x2A7
-
-    [[nodiscard]] static CUIWorldViewCtorRuntimeView* FromWorldView(
-      moho::CUIWorldView* worldView
-    ) noexcept
-    {
-      return reinterpret_cast<CUIWorldViewCtorRuntimeView*>(worldView);
-    }
-  };
-#pragma pack(pop)
-
-  static_assert(sizeof(CUIWorldViewCtorRuntimeView) == 0x2A8, "CUIWorldViewCtorRuntimeView size must be 0x2A8");
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mNeedsFrameUpdate) == 0xEB);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mRenderVftable) == 0x11C);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCamera) == 0x120);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCachedViewLeft) == 0x124);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCanShake) == 0x134);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mEnableResourceRendering) == 0x136);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mInputLocks) == 0x138);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mWorldViewDepth) == 0x13C);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mState) == 0x140);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mLeftMouseCommand) == 0x148);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCommandData) == 0x1A8);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mWldSession) == 0x208);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mComGraph) == 0x20C);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mSubobject) == 0x214);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mCameraTrack) == 0x280);
-  static_assert(offsetof(CUIWorldViewCtorRuntimeView, mHighlightEnabled) == 0x2A4);
 
   // Reproduces the ctor's inline field-by-field init of one CommandModeData:
   // mode/caps/blueprint cleared, both drag snapshots zeroed with mIsDragger=-1,
@@ -2085,12 +1661,12 @@ namespace
   }
 
   [[nodiscard]] float SampleCursorTerrainElevation(
-    const CUIWorldViewRuntimeView& worldViewView,
+    const moho::CUIWorldView& worldView,
     const Wm3::Vec3f& cursorWorldPosition
   )
   {
     const auto* const map =
-      worldViewView.mSession->mWldMap->mTerrainRes->mMap;
+      worldView.mWldSession->mWldMap->mTerrainRes->mMap;
     return map->mHeightField->GetElevation(cursorWorldPosition.x, cursorWorldPosition.z);
   }
 
@@ -2111,24 +1687,6 @@ namespace
     StoreEngineFloatStat(focusStat, focusStatPath, focusDistance);
   }
 
-  struct CWldSessionCursorRuntimeView
-  {
-    std::uint8_t mUnknown00To4AF[0x4B0]{};
-    moho::MouseInfo mCursorInfo{}; // +0x4B0
-
-    [[nodiscard]] static CWldSessionCursorRuntimeView* FromSession(
-      moho::CWldSession* session
-    ) noexcept
-    {
-      return reinterpret_cast<CWldSessionCursorRuntimeView*>(session);
-    }
-  };
-
-  static_assert(
-    offsetof(CWldSessionCursorRuntimeView, mCursorInfo) == 0x4B0,
-    "CWldSessionCursorRuntimeView::mCursorInfo offset must be 0x4B0"
-  );
-
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(
     lua_State* const luaContext
   ) noexcept
@@ -2137,8 +1695,6 @@ namespace
   }
 
   using IMauiDragger = moho::IMauiDragger;
-
-  using DraggerLink = moho::TDatListItem<IMauiDragger, void>;
 
 } // namespace
 
@@ -2344,16 +1900,6 @@ namespace
   static_assert(offsetof(CMiniMapDragger, mCameraName) == 0x8, "CMiniMapDragger::mCameraName offset must be 0x8");
   static_assert(sizeof(CMiniMapDragger) == 0x24, "CMiniMapDragger size must be 0x24");
 
-  struct CurrentDraggerSentinel
-  {
-    DraggerLink* mPrev = nullptr;
-    DraggerLink* mNext = nullptr;
-  };
-
-  static_assert(
-    sizeof(CurrentDraggerSentinel) == sizeof(DraggerLink),
-    "CurrentDraggerSentinel must remain intrusive-link-compatible"
-  );
   constexpr std::int32_t kMauiLButtonCode = 301;
   constexpr std::int32_t kMauiRButtonCode = 302;
   constexpr std::int32_t kMauiMButtonCode = 304;
@@ -2361,7 +1907,9 @@ namespace
   constexpr std::int32_t kPostDraggerMiddleButton = 2;
   constexpr std::int32_t kPostDraggerRightButton = 3;
 
-  CurrentDraggerSentinel sCurrentDragger{};
+  /// The dragger that owns the mouse until it is released or replaced. A
+  /// weak link, so a dragger that deletes itself drops out of it.
+  moho::WeakPtr<IMauiDragger> sCurrentDragger{};
   std::int32_t sCurrentDraggerKeycode = 0;
   std::uint8_t sMouseIsCaptured = 0;
   std::uint8_t sMouseIsScrubbing = 0;
@@ -2370,69 +1918,10 @@ namespace
   bool sInvertMidMouseScrub = false;
   POINT sMouseScrubAnchor{};
 
-  /**
-   * Global intrusive sentinel that tracks the `CMauiControl` currently under
-   * the mouse cursor. Mirrors the binary `stru_10BDBA0` storage at
-   * `0x010BDBA0`. The lane is rebound to the new topmost control on every
-   * `MET_MouseEnter` / `MET_MouseExit` boundary inside `func_OnMouseMove`.
-   *
-   * Same shape and sentinel conventions as `Maui_CurrentFocusControl`:
-   * `0` = unbound, `4` = dead weak-owner sentinel.
-   */
-  moho::CMauiCurrentFocusControlRuntimeView gCurrentMouseOverControlLink{};
+  /// The control under the mouse as of the last mouse event (`0x010BDBA0`),
+  /// rebound on every MET_MouseEnter / MET_MouseExit in `func_OnMouseMove`.
+  moho::WeakPtr<moho::CMauiControl> gMouseOverControl{};
 
-  [[nodiscard]] DraggerLink* CurrentDraggerSentinelLink() noexcept
-  {
-    return reinterpret_cast<DraggerLink*>(&sCurrentDragger);
-  }
-
-  /**
-   * `lea ecx, [eax+4]` at 0x0078E594 (`func_SetCurDragger`): the dragger's
-   * weak-reference head cell is the link the current-dragger sentinel splices
-   * itself into. The cell is `WeakObject`'s only member, so its address is the
-   * `WeakObject` sub-object address - no offset arithmetic is needed.
-   */
-  [[nodiscard]] DraggerLink* DraggerLinkFromObject(
-    IMauiDragger* const dragger
-  ) noexcept
-  {
-    if (dragger == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<DraggerLink*>(static_cast<moho::WeakObject*>(dragger)->WeakLinkHeadSlot());
-  }
-
-  /**
-   * `add eax, -4` at 0x0078DDC9 (`func_GetCurrentDraggerFromMouseMoveLane`):
-   * the inverse of the above. Recovering the owner is the base-to-derived
-   * adjustment the compiler emits for `WeakObject` -> `IMauiDragger`, so it is
-   * expressed as that cast rather than as a hand-written subtraction.
-   */
-  [[nodiscard]] IMauiDragger* DraggerFromLink(
-    DraggerLink* const link
-  ) noexcept
-  {
-    if (link == nullptr) {
-      return nullptr;
-    }
-
-    return static_cast<IMauiDragger*>(reinterpret_cast<moho::WeakObject*>(link));
-  }
-
-  DraggerLink* DetachDraggerList(
-    DraggerLink*& head
-  ) noexcept
-  {
-    DraggerLink* node = head;
-    while (node != nullptr) {
-      head = node->mNext;
-      node->mPrev = nullptr;
-      node->mNext = nullptr;
-      node = head;
-    }
-    return node;
-  }
 
 } // namespace
 
@@ -3546,35 +3035,6 @@ namespace
     return screenPoint;
   }
 
-  struct UserUnitScreenPosRuntimeView
-  {
-    std::uint8_t mUnknown00To2B[0x2C]{};
-    moho::MeshInstance* mMeshInstance = nullptr; // +0x2C
-    std::uint8_t mUnknown30To147[0x118]{};
-    std::uint8_t mIUnitBridgeStorage[sizeof(moho::IUnit)]{}; // +0x148
-
-    [[nodiscard]] static const UserUnitScreenPosRuntimeView* FromUserUnit(
-      const moho::UserUnit* userUnit
-    ) noexcept
-    {
-      return reinterpret_cast<const UserUnitScreenPosRuntimeView*>(userUnit);
-    }
-
-    [[nodiscard]] const moho::IUnit* GetIUnitBridge() const noexcept
-    {
-      return reinterpret_cast<const moho::IUnit*>(mIUnitBridgeStorage);
-    }
-  };
-
-  static_assert(
-    offsetof(UserUnitScreenPosRuntimeView, mMeshInstance) == 0x2C,
-    "UserUnitScreenPosRuntimeView::mMeshInstance offset must be 0x2C"
-  );
-  static_assert(
-    offsetof(UserUnitScreenPosRuntimeView, mIUnitBridgeStorage) == 0x148,
-    "UserUnitScreenPosRuntimeView::mIUnitBridgeStorage offset must be 0x148"
-  );
-
   // CUIWorldMeshRuntimeView used to sit here: a pad-to-0x34 struct whose only
   // member aliased CUIWorldMesh::mMeshInstance. That member is public and
   // typed on the class, at the same offset and with its own static_assert, so
@@ -4307,154 +3767,6 @@ namespace
     cursor->SetDefaultTexture(texturePath);
   }
 
-  [[nodiscard]] std::uint32_t NarrowPointerToFocusField(
-    const void* const pointer
-  ) noexcept
-  {
-    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(pointer));
-  }
-
-  [[nodiscard]] std::uint32_t FocusControlNextFieldAddress(
-    moho::CMauiControl* const control
-  ) noexcept
-  {
-    if (control == nullptr) {
-      return 0u;
-    }
-
-    const std::uintptr_t nextFieldAddress = reinterpret_cast<std::uintptr_t>(control) + kCMauiControlListNodeNextOffset;
-    return static_cast<std::uint32_t>(nextFieldAddress);
-  }
-
-  [[nodiscard]] moho::CMauiControl* ResolveControlFromFocusField(
-    const std::uint32_t focusField
-  ) noexcept
-  {
-    if (focusField == 0u || focusField == kCMauiControlListNodeNextOffset) {
-      return nullptr;
-    }
-
-    const std::uintptr_t controlAddress = static_cast<std::uintptr_t>(focusField) - kCMauiControlListNodeNextOffset;
-    return reinterpret_cast<moho::CMauiControl*>(controlAddress);
-  }
-
-  /**
-   * Address: 0x0079DB80 (FUN_0079DB80)
-   * Address: 0x00873810 (FUN_00873810, sub_873810)
-   *
-   * What it does:
-   * Rebinds one two-word intrusive weak link to a new owner head slot: splices
-   * the link out of whatever chain currently holds it (walking the chain until
-   * the slot pointing back at this link is found), stores the new head address,
-   * and pushes the link onto the new owner's chain. A null head address just
-   * unbinds.
-   *
-   * 0x0079DB80 and 0x00873810 are byte-identical bodies - the same splice, the
-   * same `lea edx,[owner+4]` head-slot adjust, the same `mov [eax+4],0` unbind
-   * tail - emitted once per owner type. 0x0079DB80 is the `CMauiControl`
-   * emission (`SetCurrentFocusControlLink` below); 0x00873810 is the
-   * `IMauiDragger` one (`BindWorldViewOverlayDragger`, further down), whose
-   * `+0x04` is the `WeakObject` sub-object rather than a list node.
-   *
-   * Address: 0x0079DB60 (FUN_0079DB60, the unlink-only shared subroutine
-   * described below -- reproduced exactly by this function's unlink branch)
-   *
-   * A third address, 0x0079DB60 (`FUN_0079DB60`, 13 instructions), is the
-   * unlink-only half of this same splice, factored out as its own shared
-   * subroutine and reached by tail-jump (`jmp sub_79DB60`) from at least six
-   * call sites, including the out-of-line chunk of `MAUI_SetKeyboardFocus`
-   * (call site 0x00B78323, owner 0x0079CC10). It has no separate C++ body
-   * here because the unlink branch below already reproduces it exactly:
-   * `RebindIntrusiveOwnerLink`'s `if (currentFocusField != 0u) { ... }`
-   * block is 0x0079DB60's full behavior (walk by `kCMauiControlListNodeNextOffset`
-   * until the slot pointing back at `focusState` is found, splice it out),
-   * with the rebind-to-new-head tail folded in around it.
-   */
-  void RebindIntrusiveOwnerLink(
-    moho::CMauiCurrentFocusControlRuntimeView* const focusState,
-    const std::uint32_t newFocusField
-  ) noexcept
-  {
-    const std::uint32_t currentFocusField = focusState->mFocusedControlPrevNextField;
-    if (newFocusField == currentFocusField) {
-      return;
-    }
-
-    if (currentFocusField != 0u) {
-      std::uint32_t* focusCursor = reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(currentFocusField));
-      const std::uint32_t focusStateAddress = NarrowPointerToFocusField(focusState);
-      while (*focusCursor != focusStateAddress) {
-        focusCursor =
-          reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(*focusCursor) + kCMauiControlListNodeNextOffset);
-      }
-      *focusCursor = focusState->mNextPrevNextField;
-    }
-
-    focusState->mFocusedControlPrevNextField = newFocusField;
-    if (newFocusField != 0u) {
-      std::uint32_t* const focusFieldCursor =
-        reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(newFocusField));
-      focusState->mNextPrevNextField = *focusFieldCursor;
-      *focusFieldCursor = NarrowPointerToFocusField(focusState);
-    } else {
-      focusState->mNextPrevNextField = 0u;
-    }
-  }
-
-  /**
-   * Address: 0x0079DB80 (FUN_0079DB80)
-   *
-   * What it does:
-   * Rebinds one focus-owner intrusive link head to a new control `mNext` lane.
-   */
-  void SetCurrentFocusControlLink(
-    moho::CMauiCurrentFocusControlRuntimeView* const focusState,
-    moho::CMauiControl* const control
-  ) noexcept
-  {
-    RebindIntrusiveOwnerLink(focusState, FocusControlNextFieldAddress(control));
-  }
-
-  /**
-   * Address: 0x00873810 (FUN_00873810, sub_873810)
-   *
-   * IDA signature:
-   * int __usercall sub_873810@<eax>(int *overlayLink@<eax>, Moho::IMauiDragger *dragger@<ecx>);
-   *
-   * What it does:
-   * Makes the world view hold a weak reference to the dragger it has just
-   * posted: rebinds `mOverlayLink` onto `dragger`'s `WeakObject` owner-head
-   * slot, so the link goes dead by itself when the dragger destroys itself on
-   * release/cancel. Passing a null dragger unbinds the link.
-   *
-   * `IMauiDragger` is `{vptr, WeakObject}` and nothing else (`sizeof == 0x8`),
-   * so its weak-owner head is the object's `+0x04` - which is the `lea
-   * edx,[ecx+4]` the shipped body performs at 0x00873814. This is the exact
-   * inverse of `UnlinkFocusControlSentinel(&view->mOverlayLink)`, which
-   * `CUIWorldView`'s destructor already runs over the same field.
-   *
-   * `CUIWorldView::HandleEvent` calls it at 0x00870E35, right after
-   * `NewSelectionDragger` has posted the drag-select dragger.
-   *
-   * Follow-up (deliberately not done in this pass, to keep the change off the
-   * constructor/destructor sites): `mOverlayLink` is really a
-   * `WeakPtr<IMauiDragger>` - `sizeof(CMauiCurrentFocusControlRuntimeView) ==
-   * 0x8 == sizeof(WeakPtr<void>)` and this is the only thing ever bound into
-   * it - and retyping the field would remove the address arithmetic below.
-   */
-  void BindWorldViewOverlayDragger(
-    moho::CMauiCurrentFocusControlRuntimeView& overlayLink,
-    moho::IMauiDragger* const dragger
-  ) noexcept
-  {
-    // Typed access to the dragger's own weak-owner head lane - no `+ 4` byte
-    // arithmetic: the offset comes from the `WeakObject` sub-object itself.
-    std::uint32_t* const ownerHeadSlot =
-      dragger != nullptr ? &static_cast<moho::WeakObject*>(dragger)->weakLinkHead_ : nullptr;
-
-    RebindIntrusiveOwnerLink(&overlayLink, NarrowPointerToFocusField(ownerHeadSlot));
-  }
-
   class ScriptCallbackWeakGuard final
   {
   public:
@@ -4557,19 +3869,8 @@ gpg::RType* moho::CMauiScrollbar::sType = nullptr;
 gpg::RType* moho::CMauiText::sType = nullptr;
 gpg::RType* moho::CMauiItemList::sType = nullptr;
 gpg::RType* moho::CUIMapPreview::sType = nullptr;
-moho::CMauiCurrentFocusControlRuntimeView moho::Maui_CurrentFocusControl{};
+moho::WeakPtr<moho::CMauiControl> moho::Maui_CurrentFocusControl{};
 bool moho::Maui_ControlHasFocus = false;
-
-moho::CMauiControl* moho::CMauiCurrentFocusControlRuntimeView::ResolveFocusedControl() const noexcept
-{
-  if (mFocusedControlPrevNextField == 0u || mFocusedControlPrevNextField == kCMauiControlListNodeNextOffset) {
-    return nullptr;
-  }
-
-  const std::uintptr_t controlAddress =
-    static_cast<std::uintptr_t>(mFocusedControlPrevNextField) - kCMauiControlListNodeNextOffset;
-  return reinterpret_cast<CMauiControl*>(controlAddress);
-}
 
 /**
  * Address: 0x0079CC10 (FUN_0079CC10, Moho::MAUI_SetKeyboardFocus)
@@ -4583,62 +3884,28 @@ void moho::MAUI_SetKeyboardFocus(
   const bool blocksKeyDown
 )
 {
-  // The binary parks a two-word list node on the stack (`mPrev` at ebp-0x14,
-  // `v4` at ebp-0x10) and splices it in front of the current focus owner, so
-  // that the unlink `SetCurrentFocusControlLink` performs below terminates on
-  // this stack node instead of walking the live list - and so a nested unlink
-  // from `LosingKeyboardFocus` lands here too.
-  //
-  // Those two words have to be genuinely adjacent. Written as two separate
-  // locals the compiler is free to place them anywhere, and a debug build puts
-  // runtime-check guard bytes between them: the unlink loop then failed to
-  // recognise the marker, walked off the end of the list and faulted. The
-  // typed node is the same 8 bytes the binary uses.
-  CMauiCurrentFocusControlRuntimeView focusMarker{};
-  focusMarker.mFocusedControlPrevNextField = Maui_CurrentFocusControl.mFocusedControlPrevNextField;
-
-  if (focusMarker.mFocusedControlPrevNextField != 0u) {
-    std::uint32_t* const previousFocusCursor =
-      reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(focusMarker.mFocusedControlPrevNextField));
-    focusMarker.mNextPrevNextField = *previousFocusCursor;
-    *previousFocusCursor = NarrowPointerToFocusField(&focusMarker);
-  }
-
-  SetCurrentFocusControlLink(&Maui_CurrentFocusControl, control);
+  // The previous owner is held through a weak link for the notification
+  // below: the copy goes onto that control's weak chain, so if the callback
+  // destroys it the control's drain empties the link rather than leaving it
+  // dangling, and the copy's destructor takes it off the chain again (the
+  // 0x0079DB60 unlink the binary runs on the way out).
+  const WeakPtr<CMauiControl> previousFocus(Maui_CurrentFocusControl);
+  Maui_CurrentFocusControl.ResetFromObject(control);
   Maui_ControlHasFocus = blocksKeyDown;
 
-  if (focusMarker.mFocusedControlPrevNextField != 0u) {
-    // The notification is OnKeyboardFocusChange, not LosingKeyboardFocus. The
-    // binary calls through vtable+0x44, and the CMauiControl vtable has
-    // LosingKeyboardFocus at +0x40 and OnKeyboardFocusChange at +0x44.
-    //
-    // The difference is not cosmetic. This runs unconditionally on the previous
-    // owner, including when the previous owner is the control being focused -
-    // which is the normal case, because a click on an edit box focuses it once
-    // through the Lua binding and again from CMauiEdit::HandleClickEvent.
-    // CMauiEdit overrides LosingKeyboardFocus to abandon focus, so calling that
-    // one made the second acquire immediately clear the focus it had just set,
-    // and every keystroke then found no focus control and went nowhere.
-    if (
-      CMauiControl* const previousFocusOwner = ResolveControlFromFocusField(focusMarker.mFocusedControlPrevNextField);
-      previousFocusOwner != nullptr
-    ) {
-      previousFocusOwner->OnKeyboardFocusChange();
-    }
-
-    // Re-read the marker: the callback above is free to unlink the owner, and
-    // when it does it writes through this node.
-    if (focusMarker.mFocusedControlPrevNextField != 0u) {
-      std::uint32_t* restoreCursor =
-        reinterpret_cast<std::uint32_t*>(static_cast<std::uintptr_t>(focusMarker.mFocusedControlPrevNextField));
-      const std::uint32_t markerField = NarrowPointerToFocusField(&focusMarker);
-      while (*restoreCursor != markerField) {
-        restoreCursor = reinterpret_cast<std::uint32_t*>(
-          static_cast<std::uintptr_t>(*restoreCursor) + kCMauiControlListNodeNextOffset
-        );
-      }
-      *restoreCursor = focusMarker.mNextPrevNextField;
-    }
+  // The notification is OnKeyboardFocusChange, not LosingKeyboardFocus. The
+  // binary calls through vtable+0x44, and the CMauiControl vtable has
+  // LosingKeyboardFocus at +0x40 and OnKeyboardFocusChange at +0x44.
+  //
+  // The difference is not cosmetic. This runs unconditionally on the previous
+  // owner, including when the previous owner is the control being focused -
+  // which is the normal case, because a click on an edit box focuses it once
+  // through the Lua binding and again from CMauiEdit::HandleClickEvent.
+  // CMauiEdit overrides LosingKeyboardFocus to abandon focus, so calling that
+  // one made the second acquire immediately clear the focus it had just set,
+  // and every keystroke then found no focus control and went nowhere.
+  if (CMauiControl* const previousOwner = previousFocus.GetObjectPtr(); previousOwner != nullptr) {
+    previousOwner->OnKeyboardFocusChange();
   }
 }
 
@@ -4657,7 +3924,7 @@ bool moho::MAUI_KeyIsDown(
     return false;
   }
 
-  if (Maui_CurrentFocusControl.ResolveFocusedControl() != nullptr && Maui_ControlHasFocus) {
+  if (Maui_CurrentFocusControl.GetObjectPtr() != nullptr && Maui_ControlHasFocus) {
     return false;
   }
 
@@ -5258,8 +4525,7 @@ moho::CScriptLazyVar_float::CScriptLazyVar_float(
   LuaPlus::LuaState* const state
 )
 {
-  LuaPlus::LuaObject& lazyVarObject = AsLazyVarObject(*this);
-  new (&lazyVarObject) LuaPlus::LuaObject();
+  LuaPlus::LuaObject& lazyVarObject = *this;
 
   if (state == nullptr || state->m_state == nullptr) {
     return;
@@ -5305,7 +4571,7 @@ float moho::CScriptLazyVar_float::GetValue(
     return 0.0f;
   }
 
-  const LuaPlus::LuaObject& lazyVarObject = AsLazyVarObject(*value);
+  const LuaPlus::LuaObject& lazyVarObject = *value;
   if (lazyVarObject.m_state == nullptr) {
     return 0.0f;
   }
@@ -5362,7 +4628,7 @@ void moho::CScriptLazyVar_float::SetValue(
     return;
   }
 
-  LuaPlus::LuaObject& lazyVarObject = AsLazyVarObject(*value);
+  LuaPlus::LuaObject& lazyVarObject = *value;
   LuaPlus::LuaState* const activeState = lazyVarObject.GetActiveState();
   if (activeState == nullptr || activeState->m_state == nullptr) {
     return;
@@ -5434,52 +4700,6 @@ void moho::CScriptLazyVar_float::SetValue(
   return value;
 }
 
-void moho::CMauiCursorLink::AssignCursor(
-  CMauiCursor* const cursor
-) noexcept
-{
-  CMauiCursorLink** const nextOwnerHead =
-    cursor != nullptr ? &CMauiCursorRuntimeView::FromCursor(cursor)->ownerChainHead : nullptr;
-  if (nextOwnerHead == ownerHeadLink) {
-    return;
-  }
-
-  if (ownerHeadLink != nullptr) {
-    CMauiCursorLink** link = ownerHeadLink;
-    while (*link != nullptr && *link != this) {
-      link = &(*link)->nextInOwnerChain;
-    }
-
-    if (*link == this) {
-      *link = nextInOwnerChain;
-    }
-  }
-
-  ownerHeadLink = nextOwnerHead;
-  if (ownerHeadLink != nullptr) {
-    nextInOwnerChain = *ownerHeadLink;
-    *ownerHeadLink = this;
-  } else {
-    nextInOwnerChain = nullptr;
-  }
-}
-
-void moho::CMauiCursorLink::Unlink() noexcept
-{
-  AssignCursor(nullptr);
-}
-
-moho::CMauiCursor* moho::CMauiCursorLink::GetCursor() const noexcept
-{
-  if (ownerHeadLink == nullptr || ownerHeadLink == reinterpret_cast<CMauiCursorLink**>(0x4)) {
-    return nullptr;
-  }
-
-  const std::uintptr_t rawAddress = reinterpret_cast<std::uintptr_t>(ownerHeadLink);
-  const std::uintptr_t cursorAddress = rawAddress - offsetof(CMauiCursorRuntimeView, ownerChainHead);
-  return reinterpret_cast<CMauiCursor*>(cursorAddress);
-}
-
 /**
  * Address: 0x0078CB50 (FUN_0078CB50, Moho::CMauiCursor::CMauiCursor)
  *
@@ -5491,24 +4711,15 @@ moho::CMauiCursor::CMauiCursor(
   LuaPlus::LuaObject* const luaObject
 )
   : CScriptObject()
+  , mTexture()
+  , mDefaultTexture()
+  , mNeedsUpdate(true)
+  , mIsShowing(true)
+  , mHotspotX(0)
+  , mHotspotY(0)
+  , mDefaultHotspotX(0)
+  , mDefaultHotspotY(0)
 {
-  struct SharedPtrRuntimeStorage final
-  {
-    void* object = nullptr;
-    void* count = nullptr;
-  };
-  static_assert(sizeof(SharedPtrRuntimeStorage) == sizeof(boost::shared_ptr<RD3DTextureResource>));
-
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
-  *reinterpret_cast<SharedPtrRuntimeStorage*>(&cursorView->mTexture) = SharedPtrRuntimeStorage{};
-  *reinterpret_cast<SharedPtrRuntimeStorage*>(&cursorView->mDefaultTexture) = SharedPtrRuntimeStorage{};
-  cursorView->mHotspotX = 0;
-  cursorView->mHotspotY = 0;
-  cursorView->mDefaultHotspotX = 0;
-  cursorView->mDefaultHotspotY = 0;
-  cursorView->mIsDefaultTexture = true;
-  cursorView->mIsShowing = true;
-
   if (luaObject != nullptr) {
     SetLuaObject(*luaObject);
   }
@@ -5518,19 +4729,11 @@ moho::CMauiCursor::CMauiCursor(
  * Address: 0x0078CBF0 (FUN_0078CBF0, Moho::CMauiCursor::~CMauiCursor body)
  *
  * What it does:
- * Releases active/default cursor texture weak-owner lanes and destroys the
- * embedded script-object runtime base.
+ * Nothing of its own: the body is empty. The compiler releases
+ * `mDefaultTexture`, then `mTexture` (reverse declaration order, EH states
+ * 1 and 0 at 0x0078CC0B / 0x0078CC44), then runs ~CScriptObject.
  */
-moho::CMauiCursor::~CMauiCursor()
-{
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
-  cursorView->mTexture.reset();
-  cursorView->mDefaultTexture.reset();
-  // ~CScriptObject() now runs automatically after this body - CMauiCursor is
-  // a real CScriptObject base (see the mCursorStateStorage comment on the
-  // class in UiRuntimeTypes.h), so the compiler chains the base destructor
-  // here without an explicit qualified call.
-}
+moho::CMauiCursor::~CMauiCursor() = default;
 
 /**
  * Address: 0x0078C9A0 (FUN_0078C9A0, Moho::CMauiCursor::GetClass)
@@ -5638,10 +4841,9 @@ void moho::CMauiCursor::SetTexture(
   ID3DDeviceResources::TextureResourceHandle loadedTexture{};
   D3D_GetDevice()->GetResources()->GetTexture(loadedTexture, texturePath, 0, false);
 
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
-  if (loadedTexture.get() != cursorView->mTexture.get()) {
-    cursorView->mTexture = loadedTexture;
-    cursorView->mIsDefaultTexture = true;
+  if (loadedTexture.get() != mTexture.get()) {
+    mTexture = loadedTexture;
+    mNeedsUpdate = true;
   }
 }
 
@@ -5659,17 +4861,16 @@ void moho::CMauiCursor::SetDefaultTexture(
   ID3DDeviceResources::TextureResourceHandle loadedTexture{};
   D3D_GetDevice()->GetResources()->GetTexture(loadedTexture, texturePath, 0, false);
 
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
-  if (loadedTexture.get() == cursorView->mDefaultTexture.get()) {
+  if (loadedTexture.get() == mDefaultTexture.get()) {
     return;
   }
 
-  if (cursorView->mTexture.get() == cursorView->mDefaultTexture.get()) {
-    cursorView->mTexture = loadedTexture;
-    cursorView->mIsDefaultTexture = true;
+  if (mTexture.get() == mDefaultTexture.get()) {
+    mTexture = loadedTexture;
+    mNeedsUpdate = true;
   }
 
-  cursorView->mDefaultTexture = loadedTexture;
+  mDefaultTexture = loadedTexture;
 }
 
 /**
@@ -5680,12 +4881,11 @@ void moho::CMauiCursor::SetDefaultTexture(
  */
 void moho::CMauiCursor::ResetToDefault()
 {
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(this);
-  if (cursorView->mTexture.get() != cursorView->mDefaultTexture.get()) {
-    cursorView->mTexture = cursorView->mDefaultTexture;
-    cursorView->mHotspotX = cursorView->mDefaultHotspotX;
-    cursorView->mHotspotY = cursorView->mDefaultHotspotY;
-    cursorView->mIsDefaultTexture = true;
+  if (mTexture.get() != mDefaultTexture.get()) {
+    mTexture = mDefaultTexture;
+    mHotspotX = mDefaultHotspotX;
+    mHotspotY = mDefaultHotspotY;
+    mNeedsUpdate = true;
   }
 }
 
@@ -5761,8 +4961,7 @@ int moho::cfunc_CMauiCursorSetDefaultTextureL(
   }
   const int hotspotX = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorDefaultHotspotXY(cursorView, hotspotX, hotspotY);
+  (void)SetCursorDefaultHotspotXY(cursor, hotspotX, hotspotY);
   return 0;
 }
 
@@ -5838,8 +5037,7 @@ int moho::cfunc_CMauiCursorSetNewTextureL(
   }
   const int hotspotX = static_cast<int>(lua_tonumber(state->m_state, 3));
 
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorHotspotXY(cursorView, hotspotX, hotspotY);
+  (void)SetCursorHotspotXY(cursor, hotspotX, hotspotY);
   return 0;
 }
 
@@ -5948,8 +5146,7 @@ int moho::cfunc_CMauiCursorHideL(
 
   LuaPlus::LuaObject cursorObject(LuaPlus::LuaStackObject(state, 1));
   CMauiCursor* const cursor = ResolveCursorFromLuaObjectOrError(cursorObject, state);
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorShowingAndMarkDirty(cursorView, false);
+  (void)SetCursorShowingAndMarkDirty(cursor, false);
   return 0;
 }
 
@@ -6003,8 +5200,7 @@ int moho::cfunc_CMauiCursorShowL(
 
   LuaPlus::LuaObject cursorObject(LuaPlus::LuaStackObject(state, 1));
   CMauiCursor* const cursor = ResolveCursorFromLuaObjectOrError(cursorObject, state);
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorShowingAndMarkDirty(cursorView, true);
+  (void)SetCursorShowingAndMarkDirty(cursor, true);
   return 0;
 }
 
@@ -8299,7 +7495,7 @@ int moho::cfunc_CMauiControlGetCurrentFocusControlL(
     );
   }
 
-  CMauiControl* const focusedControl = Maui_CurrentFocusControl.ResolveFocusedControl();
+  CMauiControl* const focusedControl = Maui_CurrentFocusControl.GetObjectPtr();
   if (focusedControl != nullptr) {
     focusedControl->mLuaObj.PushStack(state);
     return 1;
@@ -9288,7 +8484,7 @@ void moho::IMauiDragger::OnCurrentDraggerReplaced()
  */
 moho::UIBuildDragger::UIBuildDragger(
   moho::CWldSession* const session,
-  moho::CUIWorldViewBuildDragRuntimeView* const worldView,
+  moho::CBuildDragPreview* const worldView,
   moho::CameraImpl* const camera
 )
   : mWldSession(session)
@@ -9555,7 +8751,7 @@ namespace
  * Initializes the world-view build-preview cache, invalid start/end vectors,
  * and empty preview mesh/material/decal state.
  */
-moho::CUIWorldViewBuildDragRuntimeView::CUIWorldViewBuildDragRuntimeView()
+moho::CBuildDragPreview::CBuildDragPreview()
   : mSession(moho::WLD_GetActiveSession())
   , mActiveBuildMesh(nullptr)
   , mMeshes()
@@ -9582,7 +8778,7 @@ moho::CUIWorldViewBuildDragRuntimeView::CUIWorldViewBuildDragRuntimeView()
  * Clears preview meshes, releases the preview material, and destroys the
  * position tree sentinel/storage.
  */
-moho::CUIWorldViewBuildDragRuntimeView::~CUIWorldViewBuildDragRuntimeView()
+moho::CBuildDragPreview::~CBuildDragPreview()
 {
   ClearBuildPreviewCache();
   mUnitPlaceMaterial.reset();
@@ -9595,7 +8791,7 @@ moho::CUIWorldViewBuildDragRuntimeView::~CUIWorldViewBuildDragRuntimeView()
  * Clears active build-preview mesh/blueprint caches and destroys the terrain
  * decal used by the preview lane.
  */
-void moho::CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache()
+void moho::CBuildDragPreview::ClearBuildPreviewCache()
 {
   // Drain mMeshes. FUN_008555E0 is this container's own
   // `erase(first, last)` emission -- releasing each shared control block as it
@@ -9614,7 +8810,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::ClearBuildPreviewCache()
   }
 }
 
-boost::shared_ptr<moho::MeshInstance> moho::CUIWorldViewBuildDragRuntimeView::CreateBuildPreviewMeshInstance(
+boost::shared_ptr<moho::MeshInstance> moho::CBuildDragPreview::CreateBuildPreviewMeshInstance(
   moho::RUnitBlueprint* const blueprint
 )
 {
@@ -9672,7 +8868,7 @@ void moho::PushBackMeshInstanceSharedPtrVector(
  * `PushBackMeshInstanceSharedPtrVector` (FUN_00855040) to preserve the
  * MSVC8 `vector<shared_ptr<MeshInstance>>::push_back` symbol shape.
  */
-void moho::CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh(
+void moho::CBuildDragPreview::AppendBuildPreviewMesh(
   moho::RUnitBlueprint* const blueprint
 )
 {
@@ -9688,7 +8884,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh(
  * Replaces one cached build-preview mesh/blueprint slot with a freshly created
  * `UnitPlace` mesh instance for the provided unit blueprint.
  */
-void moho::CUIWorldViewBuildDragRuntimeView::ReplaceBuildPreviewMesh(
+void moho::CBuildDragPreview::ReplaceBuildPreviewMesh(
   const std::size_t index,
   moho::RUnitBlueprint* const blueprint
 )
@@ -9798,7 +8994,7 @@ namespace
   }
 } // namespace
 
-void moho::CUIWorldViewBuildDragRuntimeView::RefreshQueuedBuildGhosts()
+void moho::CBuildDragPreview::RefreshQueuedBuildGhosts()
 {
   gGhostProbeScan.clear(); // TEMPORARY PROBE (do not commit)
   // Built from scratch every pass. Whatever stays behind in the map this one
@@ -9919,7 +9115,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::RefreshQueuedBuildGhosts()
   mPreviewPositions.swap(refreshed);
 }
 
-struct BuildDragStepStateRuntimeView
+struct SBuildDragStep
 {
   float mX;                // +0x00
   float mZ;                // +0x04
@@ -9928,10 +9124,10 @@ struct BuildDragStepStateRuntimeView
   std::int32_t mStepCount; // +0x10
 };
 
-static_assert(sizeof(BuildDragStepStateRuntimeView) == 0x14, "BuildDragStepStateRuntimeView size must be 0x14");
+static_assert(sizeof(SBuildDragStep) == 0x14, "SBuildDragStep size must be 0x14");
 static_assert(
-  offsetof(BuildDragStepStateRuntimeView, mStepCount) == 0x10,
-  "BuildDragStepStateRuntimeView::mStepCount offset must be 0x10"
+  offsetof(SBuildDragStep, mStepCount) == 0x10,
+  "SBuildDragStep::mStepCount offset must be 0x10"
 );
 
 /**
@@ -9942,7 +9138,7 @@ static_assert(
  * coordinates, deriving normalized per-step deltas and integer step count.
  */
 [[maybe_unused]] static void InitBuildDragStepState(
-  BuildDragStepStateRuntimeView* const state,
+  SBuildDragStep* const state,
   const float stepLength,
   const float startX,
   const float startZ,
@@ -10093,7 +9289,7 @@ static void IssueBuildDragOrders(
   gpg::fastvector_n<moho::SBuildTemplateInfo, 16> templates;
   (void)session->GetActiveBuildTemplate(&templateSpanZ, &templateSpanX, &templates);
 
-  BuildDragStepStateRuntimeView dragStep{};
+  SBuildDragStep dragStep{};
   moho::SOccupationResult occupation{};
   moho::CHeightField* const heightField = session->mWldMap->mTerrainRes->GetHeightField();
 
@@ -10256,8 +9452,8 @@ void moho::UIBuildDragger::DragRelease(
  * Thin forwarding lane that adapts drag-step initializer arguments and
  * returns the same state pointer.
  */
-[[maybe_unused]] static BuildDragStepStateRuntimeView* InitBuildDragStepStateAndReturnState(
-  BuildDragStepStateRuntimeView* const state,
+[[maybe_unused]] static SBuildDragStep* InitBuildDragStepStateAndReturnState(
+  SBuildDragStep* const state,
   const float stepLength,
   const float startX,
   const float startZ,
@@ -10276,7 +9472,7 @@ void moho::UIBuildDragger::DragRelease(
  * Drives the build-drag preview for one frame; see the header for the full
  * description.
  */
-void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
+void moho::CBuildDragPreview::UpdateDragPreview()
 {
   moho::CommandModeData mode;
   (void)mSession->GetLeftMouseButtonAction(&mode, &mSession->CursorInfo(), 0);
@@ -10368,7 +9564,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
   if (!buildTemplate.Empty()) {
     const float stepLength = spanCellsX > spanCellsZ ? templateSpanX : templateSpanZ;
 
-    BuildDragStepStateRuntimeView step{};
+    SBuildDragStep step{};
     (void)InitBuildDragStepStateAndReturnState(
       &step,
       stepLength,
@@ -10421,7 +9617,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
     // skirt extent along the dominant drag axis.
     const float stepLength = std::max(buildBlueprint->Physics.SkirtSizeX, buildBlueprint->Physics.SkirtSizeZ);
 
-    BuildDragStepStateRuntimeView step{};
+    SBuildDragStep step{};
     (void)InitBuildDragStepStateAndReturnState(
       &step,
       stepLength,
@@ -10497,7 +9693,7 @@ void moho::CUIWorldViewBuildDragRuntimeView::UpdateDragPreview()
  */
 static IMauiDragger* func_GetCurrentDraggerFromMouseMoveLane()
 {
-  return DraggerFromLink(sCurrentDragger.mPrev);
+  return sCurrentDragger.GetObjectPtr();
 }
 
 /**
@@ -10609,8 +9805,7 @@ static void func_ProcessMouseScrubbing()
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
 
   auto* const cursor = moho::g_UIManager->GetCursor();
-  auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorShowingAndMarkDirty(cursorView, false);
+  (void)SetCursorShowingAndMarkDirty(cursor, false);
 }
 
 void moho::UI_SetInvertMidMouseScrub(
@@ -10640,8 +9835,7 @@ static void func_StartMouseScrubbing(
   sMouseIsScrubbing = static_cast<std::uint8_t>(doStart);
 
   auto* const cursor = moho::g_UIManager->GetCursor();
-  auto* const cursorView = moho::CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  (void)SetCursorShowingAndMarkDirty(cursorView, !doStart);
+  (void)SetCursorShowingAndMarkDirty(cursor, !doStart);
 
   if (!doStart) {
     ::SetCursorPos(sMouseMoveStart.x, sMouseMoveStart.y);
@@ -10763,7 +9957,7 @@ CameraDragger::CameraDragger(
  *
  * What it does:
  * Disables mouse-scrub mode. The `~IMauiDragger` base tail then unlinks every
- * weak reference still aimed at this dragger - the `DetachDraggerList` half of
+ * weak reference still aimed at this dragger - the `WeakObject` drain half of
  * the shipped body, which MSVC emits rather than the programmer writing it.
  */
 CameraDragger::~CameraDragger()
@@ -10879,8 +10073,8 @@ void CMiniMapDragger::DragMove(
     return;
   }
 
-  auto* const sessionView = CWldSessionCursorRuntimeView::FromSession(activeSession);
-  if (sessionView->mCursorInfo.mHitValid == 0u) {
+  moho::MouseInfo& sessionCursor = activeSession->CursorInfo();
+  if (sessionCursor.mHitValid == 0u) {
     return;
   }
 
@@ -10890,10 +10084,10 @@ void CMiniMapDragger::DragMove(
     return;
   }
 
-  moho::MouseInfo cursorInfo = sessionView->mCursorInfo;
+  moho::MouseInfo cursorInfo = sessionCursor;
   cursorInfo.mMouseScreenPos.x = eventData->mMousePos.x;
   cursorInfo.mMouseScreenPos.y = eventData->mMousePos.y;
-  sessionView->mCursorInfo = cursorInfo;
+  sessionCursor = cursorInfo;
 
   camera->TargetLocation(cursorInfo.mMouseWorldPos, 0.0f);
 }
@@ -10928,34 +10122,28 @@ void CMiniMapDragger::OnCurrentDraggerReplaced()
  * Address: 0x0078E540 (FUN_0078E540, sub_78E540)
  *
  * What it does:
- * Clears the global current-dragger sentinel link lanes.
+ * Clears both words of the global current-dragger link without touching any
+ * chain, and returns the link. Nothing in the image references it.
  */
-static DraggerLink* func_ResetCurrentDraggerLink()
+static moho::WeakPtr<IMauiDragger>* func_ResetCurrentDraggerLink()
 {
-  sCurrentDragger.mPrev = nullptr;
-  sCurrentDragger.mNext = nullptr;
-  return CurrentDraggerSentinelLink();
+  sCurrentDragger.ClearLinkState();
+  return &sCurrentDragger;
 }
 
 /**
  * Address: 0x0078E560 (FUN_0078E560, sub_78E560)
  *
  * What it does:
- * Unlinks the global current-dragger sentinel from its intrusive owner lane.
+ * Takes the global current-dragger link off its dragger's weak chain and
+ * leaves its own two words as they were - the `~WeakPtr` walk, for this one
+ * global. Nothing in the image references it.
  */
-static DraggerLink* func_UnlinkCurrentDraggerLink()
+static void func_UnlinkCurrentDraggerLink()
 {
-  DraggerLink* const sentinelLink = CurrentDraggerSentinelLink();
-  DraggerLink* result = sCurrentDragger.mPrev;
-  if (sCurrentDragger.mPrev != nullptr) {
-    if (sCurrentDragger.mPrev->mPrev != sentinelLink) {
-      do {
-        result = result->mPrev->mNext;
-      } while (result->mPrev != sentinelLink);
-    }
-    result->mPrev = sCurrentDragger.mNext;
+  if (sCurrentDragger.IsLinkedInOwnerChain()) {
+    (void)sCurrentDragger.ReplaceInOwnerChain(sCurrentDragger.nextInOwner);
   }
-  return result;
 }
 
 /**
@@ -10964,21 +10152,12 @@ static DraggerLink* func_UnlinkCurrentDraggerLink()
  *
  * What it does:
  * Unlinks the global mouse-over control sentinel (`stru_10BDBA0` = local
- * `gCurrentMouseOverControlLink`) and clears the global mouse-capture flag so
+ * `gMouseOverControl`) and clears the global mouse-capture flag so
  * the next mapper instance starts with a clean tracking state.
  */
 moho::CMauiWxEventMapper::~CMauiWxEventMapper()
 {
-  // Unlink the mouse-over sentinel from whatever control it currently tracks.
-  // When the link is in the "dead weak-owner" state (`mPrev == 4`), clear
-  // lanes without dereferencing the dead address — same convention as
-  // `UnlinkFocusControlSentinel`.
-  if (gCurrentMouseOverControlLink.ResolveFocusedControl() != nullptr) {
-    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, nullptr);
-  } else {
-    gCurrentMouseOverControlLink.mFocusedControlPrevNextField = 0u;
-    gCurrentMouseOverControlLink.mNextPrevNextField = 0u;
-  }
+  gMouseOverControl.ResetFromObject(nullptr);
   sMouseIsCaptured = 0;
 }
 
@@ -10988,35 +10167,12 @@ moho::CMauiWxEventMapper::~CMauiWxEventMapper()
  * What it does:
  * Relinks the global current-dragger sentinel to track one dragger lane.
  */
-static DraggerLink* func_SetCurDragger(
+static moho::WeakPtr<IMauiDragger>* func_SetCurDragger(
   IMauiDragger* const dragger
 )
 {
-  DraggerLink* const sentinelLink = CurrentDraggerSentinelLink();
-  DraggerLink* const draggerLink = DraggerLinkFromObject(dragger);
-  DraggerLink* previous = sCurrentDragger.mPrev;
-
-  if (draggerLink != sCurrentDragger.mPrev) {
-    if (sCurrentDragger.mPrev != nullptr) {
-      if (sCurrentDragger.mPrev->mPrev != sentinelLink) {
-        do {
-          previous = previous->mPrev->mNext;
-        } while (previous->mPrev != sentinelLink);
-      }
-      previous->mPrev = sCurrentDragger.mNext;
-    }
-
-    sCurrentDragger.mPrev = draggerLink;
-    if (draggerLink != nullptr) {
-      sCurrentDragger.mNext = draggerLink->mPrev;
-      draggerLink->mPrev = sentinelLink;
-      return sentinelLink;
-    }
-
-    sCurrentDragger.mNext = nullptr;
-  }
-
-  return sentinelLink;
+  sCurrentDragger.ResetFromObject(dragger);
+  return &sCurrentDragger;
 }
 
 /**
@@ -11146,7 +10302,7 @@ static void func_NewUIBuildDragger(
   moho::CWldSession* const session,
   const moho::SMauiEventData* const eventData,
   moho::CameraImpl* const camera,
-  moho::CUIWorldViewBuildDragRuntimeView* const worldView
+  moho::CBuildDragPreview* const worldView
 )
 {
   auto* const storage = static_cast<moho::UIBuildDragger*>(::operator new(sizeof(moho::UIBuildDragger), std::nothrow));
@@ -11229,24 +10385,24 @@ static void func_NewCommandDragger(
  * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0),
  * recovered further down this file, which calls it by name from the
  * `COMMOD_Move` non-minimap arm of its left-button-press command switch and
- * then binds the returned dragger into the view's weak overlay link.
+ * then binds the returned dragger into `CRenderWorldView::mSelectionDragger`.
  * The disassembly at 0x00870E0C-0x00870E23 resolves the
  * call's arguments from the world view's own fields: `camera` from
- * `CUIWorldViewRuntimeView::mCamera` (+0x120, the raw pointer
+ * `CRenderWorldView::mCamera` (+0x120, the raw pointer
  * value the constructor chain stores verbatim into `SelectionDragger::mCam`
  * with no dereference in between), `session` from
- * `CUIWorldViewRuntimeView::mSession` (+0x208), and `originFrame` from
+ * `CRenderWorldView::mWldSession` (+0x208), and `originFrame` from
  * `CMauiControl::mRootFrame` (+0xFC); `eventData` is `HandleEvent`'s own event
  * argument forwarded through unchanged.
  */
-static moho::IMauiDragger* NewSelectionDragger(
+static moho::ISelectionDragger* NewSelectionDragger(
   moho::CameraImpl* const camera,
   moho::CWldSession* const session,
   moho::CMauiFrame* const originFrame,
   const moho::SMauiEventData* const eventData
 )
 {
-  moho::IMauiDragger* dragger = nullptr;
+  moho::ISelectionDragger* dragger = nullptr;
 
   if (moho::ui_DragSelect2D) {
     auto* const storage =
@@ -11389,28 +10545,6 @@ namespace
       gpg::Warnf("Error running '/lua/ui/game/construction.lua:OnMouseButtonPress': %s", message);
     }
   }
-  /**
-   * Unlinks one local focus-style intrusive sentinel from the control chain it
-   * currently tracks and zeroes its lanes. Mirrors the binary `sub_79DB60`
-   * tail used by FUN_007A4970 on every normal exit path.
-   *
-   * Guards against the `mFocusedControlPrevNextField == 4` "dead weak-owner"
-   * sentinel value by clearing lanes without dereferencing the dead address.
-   */
-  void UnlinkFocusControlSentinel(
-    moho::CMauiCurrentFocusControlRuntimeView* const sentinel
-  ) noexcept
-  {
-    if (sentinel == nullptr) {
-      return;
-    }
-    if (sentinel->mFocusedControlPrevNextField == kCMauiControlListNodeNextOffset) {
-      sentinel->mFocusedControlPrevNextField = 0u;
-      sentinel->mNextPrevNextField = 0u;
-      return;
-    }
-    SetCurrentFocusControlLink(sentinel, nullptr);
-  }
 } // namespace
 
 /**
@@ -11447,9 +10581,11 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   moho::SMauiEventData eventPayload = BuildMauiEventPayloadFromWxMouse(mouseEvent, mWindow);
 
   // ---- Step 2: Resolve topmost-control under the cursor ----
-  // The local tracking sentinel mirrors the binary's stack-local
-  // `TDatListItem_CScriptObject result` lane.
-  moho::CMauiCurrentFocusControlRuntimeView trackingSentinel{};
+  // The control under the cursor, held weakly: script reached from the
+  // PostEvent calls below may destroy it, and then this link reads null. The
+  // binary keeps it on the stack too; its destructor is the 0x0079DB60 unlink
+  // on every way out of this function.
+  moho::WeakPtr<moho::CMauiControl> hitControl;
 
   moho::CMauiControl* hitRoot = ResolveTopInputCaptureControl();
   if (hitRoot == nullptr) {
@@ -11458,26 +10594,22 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   moho::CMauiControl* topmostControl = hitRoot != nullptr
     ? moho::CMauiControl::GetTopmostControl(hitRoot, eventPayload.mMousePos.x, eventPayload.mMousePos.y)
     : nullptr;
-  SetCurrentFocusControlLink(&trackingSentinel, topmostControl);
+  hitControl.ResetFromObject(topmostControl);
 
   // When the initial hit-root yielded no topmost control, retry against the
   // mapper's owning frame so clicks on empty area inside the frame still
   // resolve a default target. If both attempts fail, there is no control to
   // route the event to.
-  if (trackingSentinel.ResolveFocusedControl() == nullptr) {
+  if (hitControl.GetObjectPtr() == nullptr) {
     moho::CMauiControl* const captureControl = ResolveTopInputCaptureControl();
     moho::CMauiControl* const fallbackRoot = captureControl != nullptr ? captureControl : mFrame;
     if (fallbackRoot == nullptr) {
-      // No hit-root candidate: ensure the tracking sentinel is detached and
-      // exit. The binary tail-calls `sub_79DB60` here; we do an equivalent
-      // intrusive unlink directly.
-      UnlinkFocusControlSentinel(&trackingSentinel);
       return;
     }
-    SetCurrentFocusControlLink(&trackingSentinel, fallbackRoot);
+    hitControl.ResetFromObject(fallbackRoot);
   }
 
-  moho::CMauiControl* const trackedControl = trackingSentinel.ResolveFocusedControl();
+  moho::CMauiControl* const trackedControl = hitControl.GetObjectPtr();
 
   // ---- Step 3: Emit MouseEnter/MouseExit if the hovered control changed ----
   //
@@ -11487,7 +10619,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   // tracking sentinel, not the raw pointer, is the live handle: it is an
   // intrusive link the control's destructor unlinks, and it has to be
   // re-resolved after anything that can re-enter script.
-  moho::CMauiControl* const previousOver = gCurrentMouseOverControlLink.ResolveFocusedControl();
+  moho::CMauiControl* const previousOver = gMouseOverControl.GetObjectPtr();
   if (trackedControl != previousOver) {
     if (previousOver != nullptr) {
       eventPayload.mEventType = moho::MET_MouseExit;
@@ -11495,13 +10627,13 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       previousOver->PostEvent(eventPayload);
     }
     if (
-      moho::CMauiControl* const enteredControl = trackingSentinel.ResolveFocusedControl(); enteredControl != nullptr
+      moho::CMauiControl* const enteredControl = hitControl.GetObjectPtr(); enteredControl != nullptr
     ) {
       eventPayload.mEventType = moho::MET_MouseEnter;
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(enteredControl);
       enteredControl->PostEvent(eventPayload);
     }
-    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, trackingSentinel.ResolveFocusedControl());
+    gMouseOverControl.ResetFromObject(hitControl.GetObjectPtr());
   }
 
   // ---- Step 4: Dispatch the wx mouse event into typed Maui paths ----
@@ -11541,7 +10673,6 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       } else if (trackedControl != nullptr) {
         trackedControl->PostEvent(eventPayload);
       }
-      UnlinkFocusControlSentinel(&trackingSentinel);
       return;
     }
 
@@ -11552,7 +10683,6 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       moho::IMauiDragger* const activeDragger = func_GetCurrentDraggerFromMouseMoveLane();
       if (activeDragger != nullptr) {
         activeDragger->DragMove(&eventPayload);
-        UnlinkFocusControlSentinel(&trackingSentinel);
         return;
       }
       if (sMouseIsCaptured != 0) {
@@ -11562,13 +10692,11 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       if (trackedControl != nullptr) {
         trackedControl->PostEvent(eventPayload);
       }
-      UnlinkFocusControlSentinel(&trackingSentinel);
       return;
     }
 
     if (mouseEvent.m_wheelRotation != 0) {
       if (trackedControl == nullptr) {
-        UnlinkFocusControlSentinel(&trackingSentinel);
         return;
       }
       eventPayload.mEventType = moho::MET_WheelRotation;
@@ -11576,14 +10704,12 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       eventPayload.mWheelData = mouseEvent.m_wheelDelta;
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
       trackedControl->PostEvent(eventPayload);
-      UnlinkFocusControlSentinel(&trackingSentinel);
       return;
     }
 
     // No release / motion / wheel rotation: mark wx event as skipped so the
     // framework continues propagation up the wx event chain.
     mouseEvent.Skip();
-    UnlinkFocusControlSentinel(&trackingSentinel);
     return;
   }
 
@@ -11592,7 +10718,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   // Notify the currently focused control that focus is being taken away when
   // the user clicked on a different control.
   if (
-    moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl();
+    moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.GetObjectPtr();
     focused != nullptr && focused != trackedControl
   ) {
     focused->LosingKeyboardFocus();
@@ -11604,19 +10730,17 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   RunGlobalOnMouseButtonPressLuaCallback(luaState, isPress, mouseEvent.m_x, mouseEvent.m_y);
 
   // Both the focus notification above and the Lua callback just run can tear
-  // down the control this press was aimed at, so ask the sentinel for it again
+  // down the control this press was aimed at, so ask the weak link for it again
   // rather than trusting the pointer resolved before either ran. Skipping the
   // last splash movie is the case that finds this: the click reaches script,
   // script destroys the splash screen group, and the stale pointer then walks
   // into a freed object.
-  if (moho::CMauiControl* const pressTarget = trackingSentinel.ResolveFocusedControl(); pressTarget != nullptr) {
+  if (moho::CMauiControl* const pressTarget = hitControl.GetObjectPtr(); pressTarget != nullptr) {
     eventPayload.mEventType = isPress ? moho::MET_ButtonPress : moho::MET_ButtonDClick;
     eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(mouseEvent.GetButton());
     eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(pressTarget);
     pressTarget->PostEvent(eventPayload);
   }
-
-  UnlinkFocusControlSentinel(&trackingSentinel);
 }
 
 namespace
@@ -11665,7 +10789,7 @@ namespace
     eventPayload.mSource = nullptr;
 
     if (
-      moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.ResolveFocusedControl(); focused != nullptr
+      moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.GetObjectPtr(); focused != nullptr
     ) {
       eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(focused);
       if (focused->HandleEvent(eventPayload)) {
@@ -14205,40 +13329,22 @@ moho::CMauiBorder::CMauiBorder(
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "border")
+  , mBorderWidthLV(LuaStateOf(luaObject))
+  , mBorderHeightLV(LuaStateOf(luaObject))
 {
-  mTex1 = {};
-  mTexHorz = {};
-  mTexUL = {};
-  mTexUR = {};
-  mTexLL = {};
-  mTexLR = {};
-
-  LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&mBorderWidthLV) CScriptLazyVar_float(activeState);
-  new (&mBorderHeightLV) CScriptLazyVar_float(activeState);
-
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("BorderWidth", &AsLazyVarObject(mBorderWidthLV));
-  controlLuaObject.SetObject("BorderHeight", &AsLazyVarObject(mBorderHeightLV));
+  controlLuaObject.SetObject("BorderWidth", &mBorderWidthLV);
+  controlLuaObject.SetObject("BorderHeight", &mBorderHeightLV);
 }
 
 /**
  * Address: 0x00784B40 (FUN_00784B40, Moho::CMauiBorder::~CMauiBorder)
  *
  * What it does:
- * Releases border lazy-var/object texture lanes before base `CMauiControl`
- * teardown.
+ * Nothing of its own: the compiler destroys the two lazy vars and the six
+ * texture handles in reverse declaration order, then runs `~CMauiControl`.
  */
-moho::CMauiBorder::~CMauiBorder()
-{
-  AsLazyVarObject(mBorderHeightLV).~LuaObject();
-  AsLazyVarObject(mBorderWidthLV).~LuaObject();
-
-  // The container/handle members are destroyed by the compiler-emitted
-  // member teardown after this body, in reverse declaration order, exactly
-  // as the binary does. Running them here as well would destroy each one
-  // twice.
-}
+moho::CMauiBorder::~CMauiBorder() = default;
 
 /**
  * Address: 0x00791FF0 (FUN_00791FF0, cfunc_InternalCreateEdit)
@@ -14821,26 +13927,23 @@ moho::CMauiText::CMauiText(
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "text")
+  , mFont(nullptr)
+  , mText()
+  , mColor(0xFFFFFFFFu)
+  , mDropShadow(false)
+  , mClipToWidth(false)
+  , mCenteredHorizontally(false)
+  , mCenteredVertically(false)
+  , mTextAdvanceLV(LuaStateOf(luaObject))
+  , mFontAscentLV(LuaStateOf(luaObject))
+  , mFontDescentLV(LuaStateOf(luaObject))
+  , mFontExternalLeadingLV(LuaStateOf(luaObject))
 {
-  mFont = nullptr;
-  new (&mText) msvc8::string();
-  mDropShadow = false;
-  mClipToWidth = false;
-  mCenteredHorizontally = false;
-  mCenteredVertically = false;
-  mColor = static_cast<std::uint32_t>(-1);
-
-  LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&mTextAdvanceLV) CScriptLazyVar_float(activeState);
-  new (&mFontAscentLV) CScriptLazyVar_float(activeState);
-  new (&mFontDescentLV) CScriptLazyVar_float(activeState);
-  new (&mFontExternalLeadingLV) CScriptLazyVar_float(activeState);
-
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("TextAdvance", &AsLazyVarObject(mTextAdvanceLV));
-  controlLuaObject.SetObject("FontAscent", &AsLazyVarObject(mFontAscentLV));
-  controlLuaObject.SetObject("FontDescent", &AsLazyVarObject(mFontDescentLV));
-  controlLuaObject.SetObject("FontExternalLeading", &AsLazyVarObject(mFontExternalLeadingLV));
+  controlLuaObject.SetObject("TextAdvance", &mTextAdvanceLV);
+  controlLuaObject.SetObject("FontAscent", &mFontAscentLV);
+  controlLuaObject.SetObject("FontDescent", &mFontDescentLV);
+  controlLuaObject.SetObject("FontExternalLeading", &mFontExternalLeadingLV);
 }
 
 /**
@@ -14858,17 +13961,10 @@ moho::CMauiText::CMauiText(
  */
 moho::CMauiText::~CMauiText()
 {
-  AsLazyVarObject(mFontExternalLeadingLV).~LuaObject();
-  AsLazyVarObject(mFontDescentLV).~LuaObject();
-  AsLazyVarObject(mFontAscentLV).~LuaObject();
-  AsLazyVarObject(mTextAdvanceLV).~LuaObject();
-
+  // The binary drops the font last, after the lazy vars and the string, which
+  // is where a smart-pointer member at +0x11C would put it. `mFont` is a raw
+  // pointer here, so the release runs from the body, ahead of them.
   ReleaseIntrusiveFont(mFont);
-
-  // The container/handle members are destroyed by the compiler-emitted
-  // member teardown after this body, in reverse declaration order, exactly
-  // as the binary does. Running them here as well would destroy each one
-  // twice.
 }
 
 /**
@@ -16900,20 +15996,18 @@ moho::CMauiMovie::CMauiMovie(
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "Movie")
+  , mMovie(nullptr)
+  , mIsPlaying(false)
+  , mDoLoop(false)
+  , mIsStopped(false)
+  , mIsMinimized(false)
+  , mSubtitleCache()
+  , mMovieWidthLV(luaObject->m_state)
+  , mMovieHeightLV(luaObject->m_state)
 {
-  mMovie = nullptr;
-  mIsPlaying = false;
-  mDoLoop = false;
-  mIsStopped = false;
-  mIsMinimized = false;
-
-  new (&mSubtitleCache) msvc8::string();
-  new (&mMovieWidthLV) CScriptLazyVar_float(luaObject->m_state);
-  new (&mMovieHeightLV) CScriptLazyVar_float(luaObject->m_state);
-
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("MovieWidth", AsLazyVarObject(mMovieWidthLV));
-  controlLuaObject.SetObject("MovieHeight", AsLazyVarObject(mMovieHeightLV));
+  controlLuaObject.SetObject("MovieWidth", mMovieWidthLV);
+  controlLuaObject.SetObject("MovieHeight", mMovieHeightLV);
 }
 
 /**
@@ -16978,20 +16072,12 @@ bool moho::CMauiMovie::LoadFile(
  * `moho::CMovie* mMovie` (+0x11C) via its virtual deleting
  * destructor when non-null, and then chains into `CMauiControl::~CMauiControl`
  * through the compiler-emitted base-class teardown.
- *
- * `CScriptLazyVar_float` keeps its `LuaObject` in raw storage and has no
- * destructor of its own, so the two lazy vars are torn down explicitly;
- * `mMovie` is a raw pointer. The subtitle string is a real member.
  */
 moho::CMauiMovie::~CMauiMovie()
 {
-
-  // Lazy-var lanes carry a LuaObject payload in their opaque storage; the
-  // type's own defaulted destructor does not run the LuaObject teardown, so
-  // we do it explicitly, matching the binary's destroy-in-reverse sequence.
-  reinterpret_cast<LuaPlus::LuaObject*>(&mMovieHeightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mMovieWidthLV)->~LuaObject();
-
+  // The binary deletes the movie last, after the lazy vars and the subtitle
+  // string, as an owning-pointer member at +0x11C would. `mMovie` is a raw
+  // pointer here, so the delete runs from the body, ahead of them.
   if (mMovie != nullptr) {
     delete mMovie;
     mMovie = nullptr;
@@ -17662,7 +16748,7 @@ moho::CMauiScrollbar::CMauiScrollbar(
   // asm 0x007A04ED clears the embedded `IMauiDragger` base's weak-reference
   // head at +0x120 and 0x007A04F3 installs its vptr at +0x11C; both are the
   // inlined `IMauiDragger` base constructor, which the compiler emits here.
-  mScrollableLink = {};
+  mScrollable = {};
   mThumbTop = {};
   mThumbBottom = {};
   mThumbMiddle = {};
@@ -17686,7 +16772,7 @@ moho::CMauiScrollbar::CMauiScrollbar(
  *      declaration order (`mBackground`, `mThumbMiddle`, `mThumbBottom`,
  *      `mThumbTop`) via each `shared_ptr` destructor's interlocked
  *      reference-count release at the count word (`+0x148/+0x140/+0x138/+0x130`).
- *   2. Unlink the bound scrollable focus sentinel (`mScrollableLink`, `+0x124`).
+ *   2. Unlink the bound scrollable focus sentinel (`mScrollable`, `+0x124`).
  *   3. Restore the embedded `IMauiDragger` sub-object vtable (`+0x11C`) and
  *      drain its `WeakObject` head (`+0x120`) - both are `~IMauiDragger`
  *      inlined, so the compiler emits them as part of base destruction.
@@ -17708,8 +16794,8 @@ moho::CMauiScrollbar::~CMauiScrollbar()
   // sequence the binary runs. Releasing them here as well would decrement
   // each refcount twice.
 
-  // Unlink the bound scrollable focus sentinel.
-  UnlinkFocusControlSentinel(&mScrollableLink);
+  // `mScrollable` is unlinked by its own destructor, after the textures -
+  // the binary's order, since it is declared first.
 
   // ---- Step 3: the embedded IMauiDragger sub-object ----
   // The binary rewrites the sub-object vtable at +0x11C back to
@@ -17782,7 +16868,7 @@ void moho::CMauiScrollbar::DoRender(
   float maxRange = 0.0f;
   float minVisible = 0.0f;
   float maxVisible = 0.0f;
-  if (CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl(); scrollableControl != nullptr) {
+  if (CMauiControl* const scrollableControl = mScrollable.GetObjectPtr(); scrollableControl != nullptr) {
     const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(mAxis);
     minRange = scrollValues.mMinRange;
     maxRange = scrollValues.mMaxRange;
@@ -17880,7 +16966,7 @@ bool moho::CMauiScrollbar::HandleEvent(
 )
 {
   const EMauiEventType eventType = eventData.mEventType;
-  CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl();
+  CMauiControl* const scrollableControl = mScrollable.GetObjectPtr();
 
   if ((eventType == MET_ButtonPress || eventType == MET_ButtonDClick) && eventData.mKeyCode == kPostDraggerLeftButton) {
     if (scrollableControl != nullptr) {
@@ -17957,7 +17043,7 @@ void moho::CMauiScrollbar::DragMove(
   const SMauiEventData* const eventData
 )
 {
-  CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl();
+  CMauiControl* const scrollableControl = mScrollable.GetObjectPtr();
   if (scrollableControl == nullptr) {
     return;
   }
@@ -18050,7 +17136,7 @@ int moho::cfunc_CMauiScrollbarSetScrollableL(
   const LuaPlus::LuaObject scrollableObject(LuaPlus::LuaStackObject(state, 2));
   CMauiControl* const scrollableControl = SCR_FromLua_CMauiControl(scrollableObject, state);
 
-  SetCurrentFocusControlLink(&scrollbar->mScrollableLink, scrollableControl);
+  scrollbar->mScrollable.ResetFromObject(scrollableControl);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -18230,7 +17316,7 @@ int moho::cfunc_CMauiScrollbarDoScrollLinesL(
   LuaPlus::LuaObject scrollbarObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  if (CMauiControl* const scrollableControl = scrollbar->mScrollableLink.ResolveFocusedControl()) {
+  if (CMauiControl* const scrollableControl = scrollbar->mScrollable.GetObjectPtr()) {
     LuaPlus::LuaStackObject amountArg(state, 2);
     if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&amountArg, "number");
@@ -18296,7 +17382,7 @@ int moho::cfunc_CMauiScrollbarDoScrollPagesL(
   LuaPlus::LuaObject scrollbarObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  if (CMauiControl* const scrollableControl = scrollbar->mScrollableLink.ResolveFocusedControl()) {
+  if (CMauiControl* const scrollableControl = scrollbar->mScrollable.GetObjectPtr()) {
     LuaPlus::LuaStackObject amountArg(state, 2);
     if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&amountArg, "number");
@@ -19866,7 +18952,7 @@ int moho::cfunc_CUIWorldViewSetCartographicL(
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   LuaPlus::LuaStackObject cartographicArg(state, 2);
-  CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->SetOrthographic(cartographicArg.GetBoolean());
+  worldView->SetOrthographic(cartographicArg.GetBoolean());
   return 0;
 }
 
@@ -19921,7 +19007,7 @@ int moho::cfunc_CUIWorldViewIsCartographicL(
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   lua_pushboolean(
-    state->m_state, CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->IsOrthographic()
+    state->m_state, worldView->CanShake()
   );
   (void)lua_gettop(state->m_state);
   return 1;
@@ -19980,7 +19066,7 @@ int moho::cfunc_CUIWorldViewEnableResourceRenderingL(
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   LuaPlus::LuaStackObject enabledArg(state, 2);
-  CUIWorldViewRuntimeView::FromWorldView(worldView)->mEnableResourceRendering =
+  worldView->mEnableResourceRendering =
     enabledArg.GetBoolean() ? static_cast<std::uint8_t>(1u) : static_cast<std::uint8_t>(0u);
   return 0;
 }
@@ -20037,7 +19123,7 @@ int moho::cfunc_CUIWorldViewIsResourceRenderingEnabledL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  lua_pushboolean(state->m_state, CUIWorldViewRuntimeView::FromWorldView(worldView)->mEnableResourceRendering != 0);
+  lua_pushboolean(state->m_state, worldView->mEnableResourceRendering != 0);
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -20097,8 +19183,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
+  if (moho::CameraImpl* const camera = worldView->GetCamera(); camera != nullptr) {
     LuaPlus::LuaStackObject yArg(state, 3);
     if (lua_type(state->m_state, 3) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&yArg, "number");
@@ -20112,7 +19197,7 @@ int moho::cfunc_CUIWorldViewZoomScaleL(
     float zoomAnchor[2] = {static_cast<float>(lua_tonumber(state->m_state, 2)), y};
     camera->CameraSetPivot(Wm3::Vector2f(zoomAnchor[0], zoomAnchor[1]));
 
-    moho::CameraImpl* const wheelCamera = worldViewView->RenderWorldView()->GetCamera();
+    moho::CameraImpl* const wheelCamera = worldView->GetCamera();
     LuaPlus::LuaStackObject wheelDeltaArg(state, 5);
     if (lua_type(state->m_state, 5) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&wheelDeltaArg, "number");
@@ -20175,7 +19260,7 @@ int moho::cfunc_UnProjectL(
 
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  moho::CameraImpl* const camera = CUIWorldViewRuntimeView::FromWorldView(worldView)->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = worldView->GetCamera();
 
   const LuaPlus::LuaObject screenPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector2f screenPoint = SCR_FromLuaCopy<Wm3::Vector2f>(screenPointObject);
@@ -20237,8 +19322,7 @@ int moho::cfunc_CUIWorldViewProjectL(
 
   const LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = worldView->GetCamera();
   if (camera == nullptr) {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
@@ -20284,85 +19368,65 @@ moho::CUIWorldView::CUIWorldView(
   : CMauiControl(luaObj, parent, msvc8::string("World View"))
 {
   {
-    auto* const control = static_cast<moho::CMauiControl*>(this);
-
-    auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
-
-    // The binary writes the +0x11C vtable twice here (0x0086E4DF the plain
+    // The +0x11C vtable is written twice (0x0086E4DF the plain
     // ??_7IRenderWorldView@Moho@@6B@, then 0x0086E4EF this class's own
-    // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@) - exactly what
-    // constructing the IRenderWorldView base and then the CRenderWorldView
-    // sub-object does. Both now happen implicitly as base construction, so
-    // there is nothing to place here. Every field that sub-object owns
-    // (mCamera, mIsMiniMap, mLeftMouseCommand, mComGraph, mBuildDrag,
-    // mCameraTrack, ...) occupies the exact same bytes as the
-    // CUIWorldViewCtorRuntimeView lanes the rest of this constructor writes
-    // below, so those writes are unchanged.
+    // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@): constructing the
+    // IRenderWorldView base and then this class. The CRenderWorldView members,
+    // mBuildDrag and mCameraTrack included, are constructed by then; the
+    // stores below are the values the binary writes into them.
+    mCamera = nullptr;              // +0x120
+    mCachedViewLeft = -1.0f;        // +0x124
+    mCachedViewTop = -1.0f;         // +0x128
+    mCachedViewWidth = -1.0f;       // +0x12C
+    mCachedViewHeight = -1.0f;      // +0x130
+    mWorldViewDepth = depth;        // +0x13C
+    mOrthographic = false;          // +0x134
+    mIsMiniMap = isMiniMap;         // +0x135
+    mEnableResourceRendering = true; // +0x136
+    mInputLocks = 0;                // +0x138
+    mState = 0;                     // +0x140
 
-    view->mCamera = nullptr;              // +0x120
-    view->mCachedViewLeft = -1.0f;        // +0x124
-    view->mCachedViewTop = -1.0f;         // +0x128
-    view->mCachedViewWidth = -1.0f;       // +0x12C
-    view->mCachedViewHeight = -1.0f;      // +0x130
-    view->mWorldViewDepth = depth;        // +0x13C
-    view->mCanShake = 0;                  // +0x134
-    view->mIsMiniMap = isMiniMap ? 1 : 0; // +0x135
-    view->mEnableResourceRendering = 1;   // +0x136
-    view->mInputLocks = 0;                // +0x138
-    view->mState = 0;                     // +0x140
+    ZeroInitCommandModeData(mLeftMouseCommand); // +0x148
+    ZeroInitCommandModeData(mCommandData);      // +0x1A8
 
-    ZeroInitCommandModeData(view->mLeftMouseCommand); // +0x148
-    ZeroInitCommandModeData(view->mCommandData);      // +0x1A8
+    mWldSession = moho::WLD_GetActiveSession(); // +0x208 (binary reads global sWldSession)
 
-    view->mWldSession = moho::WLD_GetActiveSession(); // +0x208 (binary reads global sWldSession)
-    view->mComGraph.mGraph = nullptr;                 // +0x20C
-    view->mComGraph.mControl = nullptr;               // +0x210
+    mConvertToPatrolCursor = false; // +0x274
+    mCursorInside = 0;              // +0x275
+    mCameraRotationActive = false;  // +0x276
 
-    // mSubobject (+0x214) is CRenderWorldView::mBuildDrag - already
-    // constructed by the placement-new above, via CUIWorldViewBuildDragRuntimeView's
-    // own default ctor as a member of CRenderWorldView. Re-placement-new'ing
-    // it here would construct a second live object over the first.
+    mCameraTrack = msvc8::string(cameraTrack, std::strlen(cameraTrack));
 
-    view->mConvertToPatrolCursor = 0; // +0x274
-    view->mCursorInside = 0;          // +0x275
-    view->mCameraRotationActive = 0;  // +0x276
+    mHighlightEnabled = true;       // +0x2A4
+    mIconsVisible = true;           // +0x2A5
+    mGlobalCameraCommands = false;  // +0x2A6
 
-    // mCameraTrack (+0x280) is likewise already default-constructed (empty)
-    // by the placement-new above; assign rather than placement-new over it.
-    view->mCameraTrack = msvc8::string(cameraTrack, std::strlen(cameraTrack));
-
-    view->mOverlayLink = {};         // +0x29C
-    view->mHighlightEnabled = 1;     // +0x2A4
-    view->mIconsVisible = 1;         // +0x2A5
-    view->mGlobalCameraCommands = 0; // +0x2A6
-
-    control->SetDebugName(msvc8::string(name, std::strlen(name)));
+    SetDebugName(msvc8::string(name, std::strlen(name)));
 
     moho::STIMap* const map =
-      view->mWldSession->mWldMap->mTerrainRes->mMap;
+      mWldSession->mWldMap->mTerrainRes->mMap;
     LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
     moho::RCamManager* const camManager = moho::CAM_GetManager();
     moho::CameraImpl* const camera = camManager->CreateCamera(gpg::StrArg(name), *map, activeState);
     // The camera slot was just null-initialized above, so the binary's
     // replace-existing-camera release branch is unreachable here.
-    view->mCamera = camera;
+    mCamera = camera;
 
     if (_stricmp(name, "WorldCamera") == 0) {
-      moho::func_SetWorldCamera(view->mCamera);
+      moho::func_SetWorldCamera(mCamera);
     }
 
     if (isMiniMap) {
-      view->mCamera->SetLODScale(moho::cam_DefaultMiniLOD);
-      view->mCamera->CanShake(false);
+      mCamera->SetLODScale(moho::cam_DefaultMiniLOD);
+      mCamera->CanShake(false);
     }
 
-    auto* const renderView = static_cast<moho::IRenderWorldView*>(this);
-    moho::CMauiControl* const rootFrame = control->mRootFrame;
-    // +0x130 on the root frame, which is a CMauiFrame - not a control field.
-    moho::CMauiFrame* const rootFrameView = reinterpret_cast<moho::CMauiFrame*>(rootFrame);
-    moho::ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
+    // The root frame's `mTargetHead` (+0x130) picks the viewport head.
+    moho::ren_Viewport->AddWorldView(
+      static_cast<moho::IRenderWorldView*>(this), static_cast<moho::CMauiFrame*>(mRootFrame)->mTargetHead, mWorldViewDepth
+    );
 
-    view->mNeedsFrameUpdate = 1;
+    mNeedsFrameUpdate = true;
 
     LuaPlus::LuaObject module =
       moho::SCR_Import(moho::g_UIManager->mLuaState, gpg::StrArg("/lua/ui/controls/worldview.lua"));
@@ -20441,7 +19505,6 @@ gpg::RRef moho::CUIWorldView::GetDerivedObjectRef()
  */
 moho::CUIWorldView::~CUIWorldView()
 {
-  auto* const view = CUIWorldViewCtorRuntimeView::FromWorldView(this);
 
   // A dragger outlives the control that posted it, so a view destroyed mid-drag
   // leaves the global lane pointing into freed memory.
@@ -20453,9 +19516,7 @@ moho::CUIWorldView::~CUIWorldView()
 
   ren_Viewport->RemoveWorldView(static_cast<IRenderWorldView*>(this));
 
-  UnlinkFocusControlSentinel(&view->mOverlayLink);
-
-  view->mCameraTrack = msvc8::string();
+  mCameraTrack = msvc8::string();
 
   // mBuildDrag is not destroyed here. It is a member of the CRenderWorldView
   // base, so the compiler destroys it as part of that base -- which is what
@@ -20470,18 +19531,18 @@ moho::CUIWorldView::~CUIWorldView()
   // would leak the reference and with it the whole command graph, ghost meshes
   // included. Same release `CRenderWorldView::RenderCommandGraph` performs when
   // Shift comes up.
-  if (view->mComGraph.mControl != nullptr) {
-    view->mComGraph.mControl->release();
+  if (mComGraph.pi != nullptr) {
+    mComGraph.pi->release();
   }
-  view->mComGraph = {};
+  mComGraph = {};
 
-  view->mCommandData = {};
-  view->mLeftMouseCommand = {};
+  mCommandData = {};
+  mLeftMouseCommand = {};
 
   // Vtable slot 0 with the delete flag set - the scalar deleting destructor.
-  if (CameraImpl* const camera = view->mCamera; camera != nullptr) {
+  if (CameraImpl* const camera = mCamera; camera != nullptr) {
     delete camera;
-    view->mCamera = nullptr;
+    mCamera = nullptr;
   }
 }
 
@@ -20544,7 +19605,7 @@ int moho::cfunc_CUIWorldView__initL(
   }
 
   reinterpret_cast<CMauiControl*>(worldView)->DoInit();
-  CUIWorldViewLuaObjectRuntimeView::FromWorldView(worldView)->mLuaObject.PushStack(state);
+  worldView->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -20630,12 +19691,11 @@ int moho::cfunc_CUIWorldViewCameraResetL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  if (moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera(); camera != nullptr) {
+  if (moho::CameraImpl* const camera = worldView->GetCamera(); camera != nullptr) {
     camera->CameraReset();
   }
 
-  CUIWorldViewLuaObjectRuntimeView::FromWorldView(worldView)->mLuaObject.PushStack(state);
+  worldView->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -20694,10 +19754,10 @@ int moho::cfunc_CUIWorldViewGetsGlobalCameraCommandsL(
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
 
   LuaPlus::LuaStackObject getsCommandsArg(state, 2);
-  CUIWorldViewRuntimeView::FromWorldView(worldView)->mGetsGlobalCameraCommands =
+  worldView->mGlobalCameraCommands =
     getsCommandsArg.GetBoolean() ? static_cast<std::uint8_t>(1u) : static_cast<std::uint8_t>(0u);
 
-  CUIWorldViewLuaObjectRuntimeView::FromWorldView(worldView)->mLuaObject.PushStack(state);
+  worldView->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -20755,10 +19815,10 @@ int moho::cfunc_CUIWorldViewGetRightMouseButtonOrderL(
   LuaPlus::LuaObject unused;
 
   CWldSession* const activeSession = WLD_GetActiveSession();
-  auto* const sessionView = CWldSessionCursorRuntimeView::FromSession(activeSession);
-  if (sessionView->mCursorInfo.mHitValid != 0u) {
+  moho::MouseInfo& sessionCursor = activeSession->CursorInfo();
+  if (sessionCursor.mHitValid != 0u) {
     CommandModeData commandMode{};
-    (void)func_GetRightMouseButtonAction(&commandMode, &sessionView->mCursorInfo, 0, activeSession);
+    (void)func_GetRightMouseButtonAction(&commandMode, &sessionCursor, 0, activeSession);
 
     if (commandMode.mMode == COMMOD_Order) {
       gpg::RRef commandCapRef{};
@@ -20827,8 +19887,8 @@ int moho::cfunc_CUIWorldViewHasHighlightCommandL(
   }
 
   CWldSession* const activeSession = WLD_GetActiveSession();
-  const auto* const sessionView = CWldSessionCursorRuntimeView::FromSession(activeSession);
-  lua_pushboolean(state->m_state, sessionView->mCursorInfo.mIsDragger != -1);
+  const moho::MouseInfo& sessionCursor = activeSession->CursorInfo();
+  lua_pushboolean(state->m_state, sessionCursor.mIsDragger != -1);
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -20885,8 +19945,7 @@ int moho::cfunc_CUIWorldShowConvertToPatrolCursorL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  const CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  lua_pushboolean(state->m_state, worldViewView->mShowConvertToPatrolCursor != 0);
+  lua_pushboolean(state->m_state, worldView->mConvertToPatrolCursor != 0);
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -20941,7 +20000,7 @@ int moho::cfunc_CUIWorldViewUnlockInputL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  --CUIWorldViewRuntimeView::FromWorldView(worldView)->mInputLocks;
+  --worldView->mInputLocks;
   return 0;
 }
 
@@ -20995,7 +20054,7 @@ int moho::cfunc_CUIWorldViewLockInputL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  ++CUIWorldViewRuntimeView::FromWorldView(worldView)->mInputLocks;
+  ++worldView->mInputLocks;
   return 0;
 }
 
@@ -21049,7 +20108,7 @@ int moho::cfunc_CUIWorldViewIsInputLockedL(
 
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
-  lua_pushboolean(state->m_state, CUIWorldViewRuntimeView::FromWorldView(worldView)->mInputLocks > 0);
+  lua_pushboolean(state->m_state, worldView->mInputLocks > 0);
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -21107,7 +20166,7 @@ int moho::cfunc_CUIWorldViewSetHighlightEnabledL(
   LuaPlus::LuaObject worldViewObject(LuaPlus::LuaStackObject(state, 1));
   CUIWorldView* const worldView = SCR_FromLua_CUIWorldView(worldViewObject, state);
   LuaPlus::LuaStackObject enabledArg(state, 2);
-  CUIWorldViewRuntimeView::FromWorldView(worldView)->mHighlightEnabled =
+  worldView->mHighlightEnabled =
     enabledArg.GetBoolean() ? static_cast<std::uint8_t>(1u) : static_cast<std::uint8_t>(0u);
   return 0;
 }
@@ -22542,8 +21601,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
   const Wm3::Vec3f& cursorWorldPosition
 )
 {
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  moho::CameraImpl* const camera = worldViewView->mCamera;
+  moho::CameraImpl* const camera = worldView->mCamera;
 
   if (_stricmp(camera->CameraGetName(), "WorldCamera") == 0) {
     const msvc8::string positionText =
@@ -22553,7 +21611,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
     StoreEngineFloatStat(
       gCameraCursorElevationStat,
       "Camera_Cursor_Elevation",
-      SampleCursorTerrainElevation(*worldViewView, cursorWorldPosition)
+      SampleCursorTerrainElevation(*worldView, cursorWorldPosition)
     );
 
     const auto cellX = static_cast<std::int16_t>(static_cast<int>(cursorWorldPosition.x - 0.5f));
@@ -22600,15 +21658,12 @@ void moho::CUIWorldView::SetHidden(
 {
   CMauiControl::SetHidden(hidden);
 
-  CUIWorldViewRuntimeView* const view = CUIWorldViewRuntimeView::FromWorldView(this);
   auto* const renderView = static_cast<IRenderWorldView*>(this);
   if (hidden) {
     ren_Viewport->RemoveWorldView(renderView);
   } else {
-    CMauiControl* const rootFrame = mRootFrame;
-    // +0x130 on the root frame, which is a CMauiFrame - not a control field.
-    moho::CMauiFrame* const rootFrameView = reinterpret_cast<CMauiFrame*>(rootFrame);
-    ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
+    // The root frame's `mTargetHead` (+0x130) picks the viewport head.
+    ren_Viewport->AddWorldView(renderView, static_cast<CMauiFrame*>(mRootFrame)->mTargetHead, mWorldViewDepth);
   }
 }
 
@@ -22626,32 +21681,31 @@ void moho::CUIWorldView::DoRender(
   const std::int32_t drawMask
 )
 {
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(this);
   if (drawMask == 1) {
-    const float left = CScriptLazyVar_float::GetValue(&worldViewView->mViewLeft);
-    const float top = CScriptLazyVar_float::GetValue(&worldViewView->mViewTop);
-    const float width = CScriptLazyVar_float::GetValue(&worldViewView->mViewWidth);
-    const float height = CScriptLazyVar_float::GetValue(&worldViewView->mViewHeight);
+    const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+    const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+    const float width = CScriptLazyVar_float::GetValue(&mWidthLV);
+    const float height = CScriptLazyVar_float::GetValue(&mHeightLV);
 
     if (
-      worldViewView->mCachedViewLeft != left || worldViewView->mCachedViewTop != top ||
-      worldViewView->mCachedViewWidth != width || worldViewView->mCachedViewHeight != height
+      mCachedViewLeft != left || mCachedViewTop != top ||
+      mCachedViewWidth != width || mCachedViewHeight != height
     ) {
-      worldViewView->mCachedViewLeft = left;
-      worldViewView->mCachedViewTop = top;
-      worldViewView->mCachedViewWidth = width;
-      worldViewView->mCachedViewHeight = height;
+      mCachedViewLeft = left;
+      mCachedViewTop = top;
+      mCachedViewWidth = width;
+      mCachedViewHeight = height;
 
       // `mCamera` (+0x120) is the world view's own CameraImpl* -- see the
       // field's doc comment. This is the one and only place that pushes the
-      // Lua-driven on-screen rect (worldview.lua resizes mViewLeft/Top/
+      // Lua-driven on-screen rect (worldview.lua resizes mLeftLV/Top/
       // Right/Bottom as part of its own layout pass) down to the camera;
       // without it the camera keeps the {0,0}/{1,1} unit placeholder its own
       // constructor seeds, so its frustum never covers real screen space and
       // nothing is ever collected to render (confirmed live via dbgrun:
       // MeshRenderer::Batch's frustum-volume query returned zero instances
       // every frame with the camera stuck at viewport width=1).
-      if (moho::CameraImpl* const camera = worldViewView->mCamera; camera != nullptr) {
+      if (moho::CameraImpl* const camera = mCamera; camera != nullptr) {
         // 0x0086EF40 passes the third and fourth lazy vars STRAIGHT THROUGH as the
         // extent - it stores Left/Top into v11 and the +0x98/+0xAC values into v12
         // and calls slot 3 with (v11, v12); there is no subtraction anywhere in the
@@ -22675,11 +21729,10 @@ void moho::CUIWorldView::DoRender(
     return;
   }
 
-  const std::uint32_t overlayToken = worldViewView->mOverlayDrawToken;
-  if (overlayToken != 0u && overlayToken != 4u) {
-    auto* const overlay =
-      reinterpret_cast<CUIWorldViewOverlayRuntimeView*>(static_cast<std::uintptr_t>(overlayToken) - 4u);
-    overlay->Draw(primBatcher);
+  // Any other pass draws the selection dragger this view posted, if it is
+  // still alive: `ISelectionDragger::Render`, vtable +0x10 (0x0086F06D).
+  if (ISelectionDragger* const selectionDragger = mSelectionDragger.GetObjectPtr(); selectionDragger != nullptr) {
+    selectionDragger->Render(primBatcher);
   }
 }
 
@@ -23586,8 +22639,7 @@ bool moho::CUIWorldView::HandleEvent(
       }
 
       {
-        IMauiDragger* const selectionDragger = NewSelectionDragger(mCamera, mWldSession, GetRootFrame(), &eventData);
-        BindWorldViewOverlayDragger(mOverlayLink, selectionDragger);
+        mSelectionDragger.ResetFromObject(NewSelectionDragger(mCamera, mWldSession, GetRootFrame(), &eventData));
       }
       return true;
 
@@ -23831,11 +22883,9 @@ int moho::cfunc_CUIWorldViewGetScreenPosL(
   const LuaPlus::LuaObject userUnitObject(LuaPlus::LuaStackObject(state, 2));
   const UserUnit* const userUnit = SCR_FromLua_UserUnit(userUnitObject, state);
 
-  CUIWorldViewRuntimeView* const worldViewView = CUIWorldViewRuntimeView::FromWorldView(worldView);
-  moho::CameraImpl* const camera = worldViewView->RenderWorldView()->GetCamera();
+  moho::CameraImpl* const camera = worldView->GetCamera();
 
-  const UserUnitScreenPosRuntimeView* const userUnitView = UserUnitScreenPosRuntimeView::FromUserUnit(userUnit);
-  MeshInstance* const meshInstance = userUnitView->mMeshInstance;
+  MeshInstance* const meshInstance = userUnit->mMeshInstance;
   if (meshInstance == nullptr) {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
@@ -23855,7 +22905,7 @@ int moho::cfunc_CUIWorldViewGetScreenPosL(
     return 1;
   }
 
-  const Wm3::Vec3f& unitPosition = userUnitView->GetIUnitBridge()->GetPosition();
+  const Wm3::Vec3f& unitPosition = static_cast<const IUnit*>(userUnit)->GetPosition();
   const Wm3::Vector2f normalizedPoint = cameraView.Project(unitPosition, -1.0f, 1.0f, -1.0f, 1.0f);
 
   const float viewportWidth = cameraView.viewport.r[3].z;
@@ -23975,13 +23025,13 @@ moho::CMauiControl::CMauiControl(
   }
 
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("Left", &AsLazyVarObject(mLeftLV));
-  controlLuaObject.SetObject("Right", &AsLazyVarObject(mRightLV));
-  controlLuaObject.SetObject("Top", &AsLazyVarObject(mTopLV));
-  controlLuaObject.SetObject("Bottom", &AsLazyVarObject(mBottomLV));
-  controlLuaObject.SetObject("Width", &AsLazyVarObject(mWidthLV));
-  controlLuaObject.SetObject("Height", &AsLazyVarObject(mHeightLV));
-  controlLuaObject.SetObject("Depth", &AsLazyVarObject(mDepthLV));
+  controlLuaObject.SetObject("Left", &mLeftLV);
+  controlLuaObject.SetObject("Right", &mRightLV);
+  controlLuaObject.SetObject("Top", &mTopLV);
+  controlLuaObject.SetObject("Bottom", &mBottomLV);
+  controlLuaObject.SetObject("Width", &mWidthLV);
+  controlLuaObject.SetObject("Height", &mHeightLV);
+  controlLuaObject.SetObject("Depth", &mDepthLV);
 
   mDepth = CScriptLazyVar_float::GetValue(&mDepthLV);
   if (mRenderedChildren.begin() != mRenderedChildren.end()) {
@@ -23998,49 +23048,14 @@ moho::CMauiControl::CMauiControl(
  */
 moho::CMauiControl::~CMauiControl()
 {
-  // Detach every focus sentinel still pointing at this control.
-  //
-  // A sentinel stores the control's address and resolves by plain arithmetic -
-  // it does not and cannot notice that the control died - so any sentinel left
-  // linked here keeps handing out this pointer after the memory is freed and
-  // reused. The mouse dispatcher parks one on the stack for the duration of an
-  // event, which is exactly the window in which script can destroy the control
-  // it is tracking; the splash screen does that on the click that leaves it.
-  // Clearing the chain makes every such sentinel resolve to null instead, which
-  // is what the re-resolve in OnMouseMove is checking for.
-  //
-  // The chain head lives at `this + offsetof(TDatListItem, mNext)` and each
-  // sentinel links through mNextPrevNextField; both 0 and the bare offset mean
-  // "empty" in this encoding (see ResolveControlFromFocusField).
-  {
-    auto* const sentinelChainHead =
-      reinterpret_cast<std::uint32_t*>(reinterpret_cast<std::uintptr_t>(this) + kCMauiControlListNodeNextOffset);
-    std::uint32_t sentinelCursor = *sentinelChainHead;
-    while (sentinelCursor != 0u && sentinelCursor != kCMauiControlListNodeNextOffset) {
-      auto* const sentinel =
-        reinterpret_cast<CMauiCurrentFocusControlRuntimeView*>(static_cast<std::uintptr_t>(sentinelCursor));
-      const std::uint32_t nextSentinel = sentinel->mNextPrevNextField;
-      sentinel->mFocusedControlPrevNextField = 0u;
-      sentinel->mNextPrevNextField = 0u;
-      sentinelCursor = nextSentinel;
-    }
-    *sentinelChainHead = 0u;
-  }
-
-  // Drop the two process-wide sentinels if either still names this control.
-  // They outlive any single control, and nothing else clears them: a destroyed
-  // control left in the mouse-over lane is read back on the next mouse event,
-  // and the MET_MouseExit that follows dispatches through a freed object. The
-  // splash screen finds this immediately - a click destroys the whole screen
-  // group while it is the hovered control. Resolving a sentinel only computes
-  // an address, so comparing against a dead one is safe; it is the PostEvent
-  // that follows which is not.
-  if (gCurrentMouseOverControlLink.ResolveFocusedControl() == this) {
-    SetCurrentFocusControlLink(&gCurrentMouseOverControlLink, nullptr);
-  }
-  if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
-    SetCurrentFocusControlLink(&Maui_CurrentFocusControl, nullptr);
-  }
+  // Empty every weak link aimed at this control - the focus and mouse-over
+  // links, and the one the mouse dispatcher keeps on its stack while script
+  // runs - before the children go. ~CScriptObject drains the same chain, and
+  // that is all the binary does; draining here as well is deliberate. Script
+  // can destroy the control it is being dispatched to (the splash screen does
+  // on the click that leaves it), and the children's destructors run before
+  // ~CScriptObject would get to it.
+  DetachAllWeakReferences();
 
   // And drop any input-capture entry naming this control. The capture stack is
   // the hit-test root - ResolveTopInputCaptureControl feeds GetTopmostControl -
@@ -24069,13 +23084,6 @@ moho::CMauiControl::~CMauiControl()
   // this body. The lazy vars are still raw storage (`CScriptLazyVar_float`),
   // so their Lua objects are released by hand, last-declared first, as the
   // binary does.
-  reinterpret_cast<LuaPlus::LuaObject*>(&mDepthLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mHeightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mWidthLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mBottomLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mTopLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mRightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&mLeftLV)->~LuaObject();
 
   childSentinel->ListUnlink();
 
@@ -24173,7 +23181,7 @@ moho::CMauiControl* moho::CMauiControl::GetParent() const
  */
 moho::CMauiFrame* moho::CMauiControl::GetRootFrame()
 {
-  return reinterpret_cast<CMauiFrame*>(mRootFrame);
+  return static_cast<CMauiFrame*>(mRootFrame);
 }
 
 /**
@@ -24369,7 +23377,7 @@ void moho::CMauiControl::Destroy()
     parentControl->Invalidate();
   }
 
-  CMauiFrame* const rootFrame = reinterpret_cast<CMauiFrame*>(mRootFrame);
+  CMauiFrame* const rootFrame = static_cast<CMauiFrame*>(mRootFrame);
   mInvisible = true;
   mParent = nullptr;
 
@@ -24773,7 +23781,7 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(
       continue;
     }
 
-    const float controlDepth = CScriptLazyVarFloatCachedValueView::FromLazyVar(&controlCursor->mDepthLV)->mCachedValue;
+    const float controlDepth = controlCursor->mDepth;
     if (controlDepth > topmostDepth) {
       topmostControl = controlCursor;
       topmostDepth = controlDepth;
@@ -24895,7 +23903,7 @@ void moho::CMauiControl::AcquireKeyboardFocus(
  */
 void moho::CMauiControl::AbandonKeyboardFocus()
 {
-  if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
+  if (Maui_CurrentFocusControl.GetObjectPtr() == this) {
     MAUI_SetKeyboardFocus(nullptr, true);
   }
 }
@@ -25119,12 +24127,9 @@ moho::CMauiBitmap::CMauiBitmap(
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "Bitmap")
+  , mBitmapWidthLV(LuaStateOf(luaObject))
+  , mBitmapHeightLV(LuaStateOf(luaObject))
 {
-
-  LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&mBitmapWidthLV) CScriptLazyVar_float(activeState);
-  new (&mBitmapHeightLV) CScriptLazyVar_float(activeState);
-
   mU1 = 1.0f;
   mV1 = 1.0f;
   mU0 = 0.0f;
@@ -25152,8 +24157,8 @@ moho::CMauiBitmap::CMauiBitmap(
   // the end of every CMauiBitmap block ever allocated.
 
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("BitmapWidth", &AsLazyVarObject(mBitmapWidthLV));
-  controlLuaObject.SetObject("BitmapHeight", &AsLazyVarObject(mBitmapHeightLV));
+  controlLuaObject.SetObject("BitmapWidth", &mBitmapWidthLV);
+  controlLuaObject.SetObject("BitmapHeight", &mBitmapHeightLV);
 }
 
 /**
@@ -25166,23 +24171,12 @@ moho::CMauiBitmap::CMauiBitmap(
  */
 moho::CMauiBitmap::~CMauiBitmap()
 {
-
   if (mHitMask != nullptr) {
     gpg::BitArray2D* const hitMask = static_cast<gpg::BitArray2D*>(mHitMask);
     hitMask->~BitArray2D();
     ::operator delete(hitMask);
     mHitMask = nullptr;
   }
-
-  // `CScriptLazyVar_float` has no destructor of its own, so its LuaObject
-  // payload still has to be torn down by hand.
-  AsLazyVarObject(mBitmapHeightLV).~LuaObject();
-  AsLazyVarObject(mBitmapWidthLV).~LuaObject();
-
-  // The container/handle members are destroyed by the compiler-emitted
-  // member teardown after this body, in reverse declaration order, exactly
-  // as the binary does. Running them here as well would destroy each one
-  // twice.
 }
 
 /**
@@ -25872,7 +24866,7 @@ bool moho::CMauiEdit::HandleEvent(
 void moho::CMauiEdit::AbandonKeyboardFocus()
 {
   (void)WriteEditCaretVisibleLane(this, false);
-  if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
+  if (Maui_CurrentFocusControl.GetObjectPtr() == this) {
     MAUI_SetKeyboardFocus(nullptr, true);
   }
 }
@@ -27935,8 +26929,7 @@ void moho::MAUI_UpdateCursor(
     return;
   }
 
-  CMauiCursorTextureRuntimeView* const cursorView = CMauiCursorTextureRuntimeView::FromCursor(cursor);
-  if (!cursorView->mIsDefaultTexture) {
+  if (!cursor->mNeedsUpdate) {
     return;
   }
 
@@ -27945,7 +26938,7 @@ void moho::MAUI_UpdateCursor(
     return;
   }
 
-  cursorView->mIsDefaultTexture = false;
+  cursor->mNeedsUpdate = false;
 
   gpg::gal::Device* const galDevice = gpg::gal::Device::GetInstance();
   gpg::gal::DeviceContext* const deviceContext = galDevice != nullptr ? galDevice->GetDeviceContext() : nullptr;
@@ -27954,12 +26947,12 @@ void moho::MAUI_UpdateCursor(
     primaryHead = &deviceContext->GetHead(0u);
   }
 
-  if (cursorView->mTexture.get() != nullptr) {
-    (void)device->SetCursor(cursorView->mHotspotX, cursorView->mHotspotY, cursorView->mTexture);
+  if (cursor->mTexture.get() != nullptr) {
+    (void)device->SetCursor(cursor->mHotspotX, cursor->mHotspotY, cursor->mTexture);
   }
 
   const bool shouldShowCursor =
-    cursorView->mIsShowing || (primaryHead != nullptr && !primaryHead->mWindowed && ui_WindowedAlwaysShowsCursor);
+    cursor->mIsShowing || (primaryHead != nullptr && !primaryHead->mWindowed && ui_WindowedAlwaysShowsCursor);
   (void)device->ShowCursor(shouldShowCursor);
 }
 
@@ -30691,7 +29684,7 @@ void moho::CUIKeyHandler::OnKeyDown(
   wxKeyEvent& keyEvent
 )
 {
-  if (moho::Maui_CurrentFocusControl.ResolveFocusedControl() != nullptr) {
+  if (moho::Maui_CurrentFocusControl.GetObjectPtr() != nullptr) {
     keyEvent.Skip();
     return;
   }

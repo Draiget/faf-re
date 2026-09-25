@@ -4935,7 +4935,7 @@ namespace msvc8
              *
              * Address: 0x00856950 (FUN_00856950, sub_856950) -- `msvc8::
              * map<CmdId, boost::shared_ptr<MeshInstance>>::erase_node` for
-             * `moho::CUIWorldViewBuildDragRuntimeView::mPreviewPositions`
+             * `moho::CBuildDragPreview::mPreviewPositions`
              * (`UiRuntimeTypes.h:896`, offset `0x28`), the same instantiation
              * as `erase_range`'s emission cited on that member above
              * (`FUN_008564E0`). Opens with the identical `_Isnil` check +
@@ -4958,7 +4958,7 @@ namespace msvc8
              * Reached from this instantiation's `erase_range` (`FUN_008564E0`,
              * cited above) via its general (non-whole-tree) loop branch. That
              * caller's own citation already records that its one real
-             * invocation (`~CUIWorldViewBuildDragRuntimeView()`, `FUN_00852B20`)
+             * invocation (`~CBuildDragPreview()`, `FUN_00852B20`)
              * always takes the fast whole-tree-clear path -- so, per this
              * file's established "template-instantiated but the per-node
              * erase-rebalance path is compiled, not separately runtime-
@@ -5671,13 +5671,13 @@ namespace msvc8
              *
              * Address: 0x008564E0 (FUN_008564E0, sub_8564E0) --
              * `msvc8::map<CmdId, boost::shared_ptr<MeshInstance>>::
-             * erase_range` for `moho::CUIWorldViewBuildDragRuntimeView::
+             * erase_range` for `moho::CBuildDragPreview::
              * mPreviewPositions` (`UiRuntimeTypes.h:896`, offset `0x28`).
              * Fast whole-tree path only (`first==leftmost() && last==
              * header()`): calls `sub_856F30` (`destroy_subtree`, cited
              * below), self-links the header, zeroes size -- matches this
              * member's fast branch exactly. Sole caller is
-             * `~CUIWorldViewBuildDragRuntimeView()` (`FUN_00852B20`,
+             * `~CBuildDragPreview()` (`FUN_00852B20`,
              * already recovered, "typed vector/material/tree/decal
              * teardown") via the compiler-generated implicit member
              * destructor call for `mPreviewPositions` -- no hand-written

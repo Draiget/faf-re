@@ -357,7 +357,7 @@ namespace moho
    * Address: 0x00854B70 (FUN_00854B70, sub_854B70)
    *
    * IDA signature:
-   * void __stdcall sub_854B70(CUIWorldViewBuildDragRuntimeView *buildDrag,
+   * void __stdcall sub_854B70(CBuildDragPreview *buildDrag,
    *   CD3DPrimBatcher *batcher, CameraImpl *camera);
    *
    * What it does:
@@ -387,7 +387,7 @@ namespace moho
    * return rather than folded into the loop guards below.
    */
   void DrawBuildDragAdjacencyHighlights(
-    CUIWorldViewBuildDragRuntimeView& buildDrag, CD3DPrimBatcher* const batcher, CameraImpl* const camera
+    CBuildDragPreview& buildDrag, CD3DPrimBatcher* const batcher, CameraImpl* const camera
   )
   {
     constexpr std::uint32_t kDefaultSkirtColor = 0xD800D800u;
@@ -471,7 +471,7 @@ namespace moho
    *
    * IDA signature:
    * void __fastcall Moho::DrawCommandGraph(CameraImpl *camera@<ecx>,
-   *   CUIWorldViewBuildDragRuntimeView *buildDrag@<edx>, CD3DPrimBatcher *batcher);
+   *   CBuildDragPreview *buildDrag@<edx>, CD3DPrimBatcher *batcher);
    *
    * What it does:
    * The build-drag overlay pass, called once per frame from
@@ -499,7 +499,7 @@ namespace moho
    * `ERuleBPUnitCommandCaps` enumerant `3`, while `COMMOD_BuildAnchored`
    * is a real, semantically exact match for "draw the build-assist radius").
    */
-  void DrawCommandGraph(CameraImpl* const camera, CUIWorldViewBuildDragRuntimeView& buildDrag, CD3DPrimBatcher* const batcher)
+  void DrawCommandGraph(CameraImpl* const camera, CBuildDragPreview& buildDrag, CD3DPrimBatcher* const batcher)
   {
     // Owning handle: the binary releases it at 0x00853F0B, on the way out of
     // this function, after the last `graphActive` read.

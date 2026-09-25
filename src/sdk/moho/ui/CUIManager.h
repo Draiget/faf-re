@@ -151,7 +151,7 @@ namespace moho
   public:
     std::uint32_t mUnknown04 = 0;           // +0x04
     gpg::fastvector_n<boost::shared_ptr<CMauiFrame>, 2> mFrames; // +0x08
-    CMauiCursorLink mCursorLink;            // +0x28
+    WeakPtr<CMauiCursor> mCursor;           // +0x28
     LuaPlus::LuaState* mLuaState = nullptr; // +0x30
     std::uint32_t mUnknown34 = 0;           // +0x34
     gpg::fastvector_n<wxWindow*, 2> mInputWindows; // +0x38

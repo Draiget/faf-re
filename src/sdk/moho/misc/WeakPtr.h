@@ -517,8 +517,6 @@ namespace moho
      * node from its previous intrusive owner chain when needed, and inserts it
      * at the head of the new owner chain.
      * Address: 0x007A5610 (FUN_007A5610 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` (unlink from the old chain, relink at the requested owner head); callers 0x007A4970; formerly `RebindIntrusiveOwnerSlotNodeRuntime` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x0084E330 (FUN_0084E330 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` with the owner head at `owner + 0x08`; callers 0x0084D000; formerly `RebindIntrusiveOwnerSlotNodeRuntimeB` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
-     * Address: 0x00873810 (FUN_00873810 -- `WeakPtr<T>::ResetFromOwnerLinkSlot` with the owner head at `owner + 0x08`; callers 0x008704B0; formerly `RebindIntrusiveOwnerSlotNodeRuntimeC` in moho/sim/SimRecoveryRuntime.cpp (RULE ONE), removed 2026-09-10.)
      */
     void ResetFromOwnerLinkSlot(void* newOwnerLinkSlot) noexcept
     {
@@ -573,6 +571,26 @@ namespace moho
      * Address: 0x004F72F0 (FUN_004F72F0 -- a second
      *   `WeakPtr<WWinManagedFrame>` emission (`lea edx, [ecx+178h]`) in the
      *   managed-window TU; zero callers.)
+     * Address: 0x0079DB80 (FUN_0079DB80 -- the `WeakPtr<CMauiControl>`
+     *   emission: node in EAX, control in ECX, `lea edx, [ecx+4]`. Callers
+     *   `MAUI_SetKeyboardFocus` 0x0079CC10 (`Maui_CurrentFocusControl`),
+     *   `cfunc_CMauiScrollbarSetScrollableL` 0x007A1820
+     *   (`CMauiScrollbar::mScrollable`) and `func_OnMouseMove` 0x007A4970
+     *   (the stack hit-control link and the mouse-over global). Formerly
+     *   `RebindIntrusiveOwnerLink`/`SetCurrentFocusControlLink` in
+     *   moho/ui/UiRuntimeTypes.cpp, removed 2026-09-25.)
+     * Address: 0x0084E330 (FUN_0084E330 -- the `WeakPtr<CMauiCursor>`
+     *   emission, `lea edx, [ecx+4]`; caller `CUIManager::SetCursor`
+     *   0x0084D000 (`CUIManager::mCursor`). Formerly
+     *   `CMauiCursorLink::AssignCursor`, removed 2026-09-25.)
+     * Address: 0x00873810 (FUN_00873810 -- the `WeakPtr<ISelectionDragger>`
+     *   emission, `lea edx, [ecx+4]`; caller `CUIWorldView::HandleEvent`
+     *   0x00870E35 (`CRenderWorldView::mSelectionDragger`, right after
+     *   `NewSelectionDragger`). Formerly `BindWorldViewOverlayDragger` in
+     *   moho/ui/UiRuntimeTypes.cpp, removed 2026-09-25.)
+     *
+     * All three share `function_sha256` 5c93862d...: one 70-byte body,
+     * emitted once per owner type.
      */
     void ResetFromObject(T* object) noexcept
     {
@@ -878,6 +896,11 @@ namespace moho
    * it. Formerly anchored in moho/app/WxRuntimeTypes.cpp.)
    * Address: 0x004F72D0 (FUN_004F72D0 -- the `WeakPtr<WWinManagedFrame>`
    * emission; zero callers, 0x004FAED0 inlines it.)
+   * Address: 0x0079DB60 (FUN_0079DB60 -- the `WeakPtr<CMauiControl>`
+   * emission, same `function_sha256` as 0x005A6DE0; the MAUI dispatch paths
+   * reach it by tail-jump, e.g. the out-of-line chunk of
+   * `MAUI_SetKeyboardFocus` at 0x00B78323. Formerly the unlink half of
+   * `RebindIntrusiveOwnerLink` in moho/ui/UiRuntimeTypes.cpp.)
    *
    * IDA signature:
    * void __fastcall sub_5A6DE0(WeakPtr<T> *this@<ecx>);

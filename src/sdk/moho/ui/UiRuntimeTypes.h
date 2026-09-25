@@ -61,6 +61,7 @@ namespace moho
   class IClient;
   class IClientMgrUIInterface;
   class CUIWorldView;
+  class ISelectionDragger;
   class CLuaWldUIProvider;
   class CUIWorldMesh;
   class CWldTerrainDecal;
@@ -820,7 +821,14 @@ namespace moho
   // WeakObject::weakLinkHead_ +0x38) = 0x3C complete-object size.
   static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
 
-  struct CUIWorldViewBuildDragRuntimeView
+  /**
+   * The world view's build-placement preview (`CRenderWorldView::mBuildDrag`,
+   * +0xF8; IDA's `struct_WorldView_object`): the translucent `UnitPlace` meshes
+   * stamped along a build drag, the ghosts shown at queued mobile-build orders,
+   * the preview material and terrain decal, and the drag endpoints.
+   * `UIBuildDragger` drives it while a build drag is in progress.
+   */
+  struct CBuildDragPreview
   {
     /**
      * Address: 0x008529C0 (FUN_008529C0, struct_WorldView_object::struct_WorldView_object)
@@ -829,7 +837,7 @@ namespace moho
      * Initializes the world-view build-preview cache, invalid start/end
      * vectors, and empty preview mesh/material/decal state.
      */
-    CUIWorldViewBuildDragRuntimeView();
+    CBuildDragPreview();
 
     /**
      * Address: 0x00852B20 (FUN_00852B20, struct_WorldView_object::~struct_WorldView_object)
@@ -838,7 +846,7 @@ namespace moho
      * Clears preview meshes, releases the preview material, and destroys the
      * position tree sentinel/storage.
      */
-    ~CUIWorldViewBuildDragRuntimeView();
+    ~CBuildDragPreview();
 
     /**
      * Address: 0x008549B0 (FUN_008549B0, struct_WorldView_object::Destroy)
@@ -930,52 +938,52 @@ namespace moho
     std::uint8_t mPad5E[0x02]{};
   };
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mSession) == 0x00,
-    "moho::CUIWorldViewBuildDragRuntimeView::mSession offset must be 0x00"
+    offsetof(CBuildDragPreview, mSession) == 0x00,
+    "moho::CBuildDragPreview::mSession offset must be 0x00"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveBuildMesh) == 0x04,
-    "moho::CUIWorldViewBuildDragRuntimeView::mActiveBuildMesh offset must be 0x04"
+    offsetof(CBuildDragPreview, mActiveBuildMesh) == 0x04,
+    "moho::CBuildDragPreview::mActiveBuildMesh offset must be 0x04"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mMeshes) == 0x08,
-    "moho::CUIWorldViewBuildDragRuntimeView::mMeshes offset must be 0x08"
+    offsetof(CBuildDragPreview, mMeshes) == 0x08,
+    "moho::CBuildDragPreview::mMeshes offset must be 0x08"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mBlueprints) == 0x18,
-    "moho::CUIWorldViewBuildDragRuntimeView::mBlueprints offset must be 0x18"
+    offsetof(CBuildDragPreview, mBlueprints) == 0x18,
+    "moho::CBuildDragPreview::mBlueprints offset must be 0x18"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mPreviewPositions) == 0x28,
-    "moho::CUIWorldViewBuildDragRuntimeView::mPreviewPositions offset must be 0x28"
+    offsetof(CBuildDragPreview, mPreviewPositions) == 0x28,
+    "moho::CBuildDragPreview::mPreviewPositions offset must be 0x28"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mUnitPlaceMaterial) == 0x34,
-    "moho::CUIWorldViewBuildDragRuntimeView::mUnitPlaceMaterial offset must be 0x34"
+    offsetof(CBuildDragPreview, mUnitPlaceMaterial) == 0x34,
+    "moho::CBuildDragPreview::mUnitPlaceMaterial offset must be 0x34"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mDecal) == 0x3C,
-    "moho::CUIWorldViewBuildDragRuntimeView::mDecal offset must be 0x3C"
+    offsetof(CBuildDragPreview, mDecal) == 0x3C,
+    "moho::CBuildDragPreview::mDecal offset must be 0x3C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mActiveCommandMode) == 0x40,
-    "moho::CUIWorldViewBuildDragRuntimeView::mActiveCommandMode offset must be 0x40"
+    offsetof(CBuildDragPreview, mActiveCommandMode) == 0x40,
+    "moho::CBuildDragPreview::mActiveCommandMode offset must be 0x40"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mStart) == 0x44,
-    "moho::CUIWorldViewBuildDragRuntimeView::mStart offset must be 0x44"
+    offsetof(CBuildDragPreview, mStart) == 0x44,
+    "moho::CBuildDragPreview::mStart offset must be 0x44"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mEnd) == 0x50,
-    "moho::CUIWorldViewBuildDragRuntimeView::mEnd offset must be 0x50"
+    offsetof(CBuildDragPreview, mEnd) == 0x50,
+    "moho::CBuildDragPreview::mEnd offset must be 0x50"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIWorldViewBuildDragRuntimeView, mPreviewInvalid) == 0x5C,
-    "moho::CUIWorldViewBuildDragRuntimeView::mPreviewInvalid offset must be 0x5C"
+    offsetof(CBuildDragPreview, mPreviewInvalid) == 0x5C,
+    "moho::CBuildDragPreview::mPreviewInvalid offset must be 0x5C"
   );
   FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CUIWorldViewBuildDragRuntimeView) == 0x60,
-    "moho::CUIWorldViewBuildDragRuntimeView size must be 0x60"
+    sizeof(CBuildDragPreview) == 0x60,
+    "moho::CBuildDragPreview size must be 0x60"
   );
 
   /**
@@ -1010,7 +1018,7 @@ namespace moho
      * Seeds build-drag start/end world positions from the current session
      * cursor world position and mirrors those lanes into the world-view state.
      */
-    UIBuildDragger(CWldSession* session, CUIWorldViewBuildDragRuntimeView* worldView, CameraImpl* camera);
+    UIBuildDragger(CWldSession* session, CBuildDragPreview* worldView, CameraImpl* camera);
 
     /**
      * Address: 0x00823BB0 (FUN_00823BB0, slot +0x04 of ??_7UIBuildDragger@Moho@@6B@)
@@ -1079,7 +1087,7 @@ namespace moho
     // +0x00 vptr and +0x04 `WeakObject::weakLinkHead_` both belong to the
     // `IMauiDragger` base; this class's own storage starts at +0x08.
     CWldSession* mWldSession = nullptr;                     // +0x08
-    CUIWorldViewBuildDragRuntimeView* mWldView = nullptr;   // +0x0C
+    CBuildDragPreview* mWldView = nullptr;   // +0x0C
     CameraImpl* mCam = nullptr;                             // +0x10
     Wm3::Vector3f mStart{};                                 // +0x14
     Wm3::Vector3f mEnd{};                                   // +0x20
@@ -1626,11 +1634,19 @@ namespace moho
   CScrLuaInitForm* register_IN_ClearKeyMap_LuaFuncDef();
 
   /**
-   * Binary-backed lazy-var wrapper stored with `LuaPlus::LuaObject` layout.
+   * One `/lua/lazyvar.lua` object: a Lua table whose index 1 caches the
+   * evaluated number and whose call operator re-evaluates it. The engine keeps
+   * it as a `LuaObject` and reads or writes the number through it.
+   *
+   * It is a `LuaObject` itself, not storage around one: the constructor at
+   * 0x007836E0 opens with `LuaObject::LuaObject` (0x009072A0) on `this`, and
+   * every owner's destructor destroys its lazy vars with
+   * `LuaObject::~LuaObject` (0x009075D0) directly - `~CMauiControl` at
+   * 0x00786DD9.., `~CMauiMovie` at 0x0079EF58/0x0079EF68.
    */
-  struct CScriptLazyVar_float
+  struct CScriptLazyVar_float : LuaPlus::LuaObject
   {
-    std::uint8_t mLuaObjectStorage[sizeof(LuaPlus::LuaObject)]{};
+    CScriptLazyVar_float() = default;
 
     /**
      * Address: 0x007836E0 (FUN_007836E0, ??0CScriptLazyVar_float@Moho@@QAE@@Z)
@@ -1639,7 +1655,6 @@ namespace moho
      * Imports `/lua/lazyvar.lua` and initializes this lazy-var from
      * `lazyvar.Create(0.0)`.
      */
-    CScriptLazyVar_float() = default;
     explicit CScriptLazyVar_float(LuaPlus::LuaState* state);
 
     /**
@@ -1660,27 +1675,7 @@ namespace moho
     static void SetValue(CScriptLazyVar_float* value, float next) noexcept;
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CScriptLazyVar_float) >= sizeof(LuaPlus::LuaObject),
-    "moho::CScriptLazyVar_float must remain at least LuaObject-sized"
-  );
-
-  struct CMauiCursorLink
-  {
-    CMauiCursorLink** ownerHeadLink = nullptr;
-    CMauiCursorLink* nextInOwnerChain = nullptr;
-
-    void AssignCursor(CMauiCursor* cursor) noexcept;
-    void Unlink() noexcept;
-    [[nodiscard]] CMauiCursor* GetCursor() const noexcept;
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiCursorLink) == 0x8, "moho::CMauiCursorLink size must be 0x8");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiCursorLink, ownerHeadLink) == 0x0, "moho::CMauiCursorLink::ownerHeadLink offset must be 0x0");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorLink, nextInOwnerChain) == 0x4,
-    "moho::CMauiCursorLink::nextInOwnerChain offset must be 0x4"
-  );
+  static_assert(sizeof(CScriptLazyVar_float) == 0x14, "moho::CScriptLazyVar_float size must be 0x14");
 
   class CMauiCursor : public CScriptObject
   {
@@ -1754,105 +1749,36 @@ namespace moho
      */
     virtual ~CMauiCursor();
 
-  private:
-    /**
-     * The cursor's own state block, +0x34 (right after the inherited
-     * CScriptObject sub-object) through +0x57. Every field in it is reached
-     * through the typed `CMauiCursorTextureRuntimeView` overlay
-     * (mTexture/mDefaultTexture at +0x34/+0x3C, hotspot lanes through
-     * +0x57) - reserved here rather than re-declared. `AllocateZeroedUiObject<
-     * CMauiCursor>(0x58u)` at the construction site sizes the allocation
-     * explicitly, independent of `sizeof(CMauiCursor)`, but this storage
-     * keeps that size assert honest and protects any future construction
-     * path that relies on `sizeof(CMauiCursor)`/`operator new` directly.
-     */
-    std::uint8_t mCursorStateStorage[0x24];
+  public:
+    // The cursor's own state, +0x34 (right after the CScriptObject base)
+    // through +0x57. The constructor at 0x0078CB50 clears both texture
+    // handles and the four hotspot words and raises both flags; the
+    // destructor at 0x0078CBF0 releases mDefaultTexture, then mTexture, then
+    // runs ~CScriptObject, which is plain reverse-declaration destruction.
+
+    /// The texture the cursor shows now.
+    boost::shared_ptr<RD3DTextureResource> mTexture;        // +0x34
+    /// The texture `ResetToDefault` goes back to.
+    boost::shared_ptr<RD3DTextureResource> mDefaultTexture; // +0x3C
+    /// The texture, hotspot or visibility changed since `MAUI_UpdateCursor`
+    /// last pushed them to the device; it clears this when it does.
+    bool mNeedsUpdate;                                      // +0x44
+    bool mIsShowing;                                        // +0x45
+    std::int32_t mHotspotX;                                 // +0x48
+    std::int32_t mHotspotY;                                 // +0x4C
+    std::int32_t mDefaultHotspotX;                          // +0x50
+    std::int32_t mDefaultHotspotY;                          // +0x54
   };
 
   static_assert(sizeof(CMauiCursor) == 0x58, "moho::CMauiCursor size must be 0x58");
-
-  struct CMauiCursorRuntimeView
-  {
-    void* vftable = nullptr;
-    CMauiCursorLink* ownerChainHead = nullptr;
-
-    [[nodiscard]] static CMauiCursorRuntimeView* FromCursor(CMauiCursor* cursor) noexcept
-    {
-      return reinterpret_cast<CMauiCursorRuntimeView*>(cursor);
-    }
-
-    [[nodiscard]] static const CMauiCursorRuntimeView* FromCursor(const CMauiCursor* cursor) noexcept
-    {
-      return reinterpret_cast<const CMauiCursorRuntimeView*>(cursor);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorRuntimeView, ownerChainHead) == 0x4,
-    "moho::CMauiCursorRuntimeView::ownerChainHead offset must be 0x4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiCursorRuntimeView) == 0x8, "moho::CMauiCursorRuntimeView size must be 0x8");
-
-  struct CMauiCursorTextureRuntimeView : CMauiCursorRuntimeView
-  {
-    std::uint8_t mUnknown08To33[0x2C]{};
-    boost::shared_ptr<RD3DTextureResource> mTexture;        // +0x34
-    boost::shared_ptr<RD3DTextureResource> mDefaultTexture; // +0x3C
-    bool mIsDefaultTexture = false;                         // +0x44
-    bool mIsShowing = false;                                // +0x45
-    std::uint8_t mUnknown46To47[0x2]{};
-    std::int32_t mHotspotX = 0;        // +0x48
-    std::int32_t mHotspotY = 0;        // +0x4C
-    std::int32_t mDefaultHotspotX = 0; // +0x50
-    std::int32_t mDefaultHotspotY = 0; // +0x54
-
-    [[nodiscard]] static CMauiCursorTextureRuntimeView* FromCursor(CMauiCursor* cursor) noexcept
-    {
-      return reinterpret_cast<CMauiCursorTextureRuntimeView*>(cursor);
-    }
-
-    [[nodiscard]] static const CMauiCursorTextureRuntimeView* FromCursor(const CMauiCursor* cursor) noexcept
-    {
-      return reinterpret_cast<const CMauiCursorTextureRuntimeView*>(cursor);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mTexture) == 0x34,
-    "CMauiCursorTextureRuntimeView::mTexture offset must be 0x34"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mDefaultTexture) == 0x3C,
-    "CMauiCursorTextureRuntimeView::mDefaultTexture offset must be 0x3C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mIsDefaultTexture) == 0x44,
-    "CMauiCursorTextureRuntimeView::mIsDefaultTexture offset must be 0x44"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mIsShowing) == 0x45,
-    "CMauiCursorTextureRuntimeView::mIsShowing offset must be 0x45"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mHotspotX) == 0x48,
-    "CMauiCursorTextureRuntimeView::mHotspotX offset must be 0x48"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mHotspotY) == 0x4C,
-    "CMauiCursorTextureRuntimeView::mHotspotY offset must be 0x4C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mDefaultHotspotX) == 0x50,
-    "CMauiCursorTextureRuntimeView::mDefaultHotspotX offset must be 0x50"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCursorTextureRuntimeView, mDefaultHotspotY) == 0x54,
-    "CMauiCursorTextureRuntimeView::mDefaultHotspotY offset must be 0x54"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CMauiCursorTextureRuntimeView) == 0x58,
-    "CMauiCursorTextureRuntimeView size must be 0x58"
-  );
+  static_assert(offsetof(CMauiCursor, mTexture) == 0x34, "CMauiCursor::mTexture offset must be 0x34");
+  static_assert(offsetof(CMauiCursor, mDefaultTexture) == 0x3C, "CMauiCursor::mDefaultTexture offset must be 0x3C");
+  static_assert(offsetof(CMauiCursor, mNeedsUpdate) == 0x44, "CMauiCursor::mNeedsUpdate offset must be 0x44");
+  static_assert(offsetof(CMauiCursor, mIsShowing) == 0x45, "CMauiCursor::mIsShowing offset must be 0x45");
+  static_assert(offsetof(CMauiCursor, mHotspotX) == 0x48, "CMauiCursor::mHotspotX offset must be 0x48");
+  static_assert(offsetof(CMauiCursor, mHotspotY) == 0x4C, "CMauiCursor::mHotspotY offset must be 0x4C");
+  static_assert(offsetof(CMauiCursor, mDefaultHotspotX) == 0x50, "CMauiCursor::mDefaultHotspotX offset must be 0x50");
+  static_assert(offsetof(CMauiCursor, mDefaultHotspotY) == 0x54, "CMauiCursor::mDefaultHotspotY offset must be 0x54");
 
   class CMauiControl : public CScriptObject
   {
@@ -2359,22 +2285,6 @@ namespace moho
   static_assert(offsetof(CMauiControl, mRenderPass) == 0xF8, "CMauiControl::mRenderPass offset must be 0xF8");
   static_assert(offsetof(CMauiControl, mRootFrame) == 0xFC, "CMauiControl::mRootFrame offset must be 0xFC");
   static_assert(offsetof(CMauiControl, mDebugName) == 0x100, "CMauiControl::mDebugName offset must be 0x100");
-
-  /**
-   * Runtime view for global keyboard-focus tracking lane.
-   *
-   * `mFocusedControlPrevNextField` stores an encoded intrusive-link value:
-   * - `0` means no focus owner.
-   * - `4` means the list sentinel lane.
-   * - any other value points to the focused control's embedded `mNext` lane.
-   */
-  struct CMauiCurrentFocusControlRuntimeView
-  {
-    std::uint32_t mFocusedControlPrevNextField = 0; // +0x0
-    std::uint32_t mNextPrevNextField = 0;           // +0x4
-
-    [[nodiscard]] CMauiControl* ResolveFocusedControl() const noexcept;
-  };
 
   /**
    * The edit control's embedded click-dragger sub-object.
@@ -3942,7 +3852,8 @@ namespace moho
     // old `CMauiScrollbarRuntimeView` overlay -- which described exactly this run -- wrote
     // past the end of the block.
     // ---------------------------------------------------------------------
-    CMauiCurrentFocusControlRuntimeView mScrollableLink{}; // +0x124
+    /// The control this scrollbar scrolls (`SetScrollable`).
+    WeakPtr<CMauiControl> mScrollable;                     // +0x124
     boost::shared_ptr<CD3DBatchTexture> mThumbTop{};       // +0x12C
     boost::shared_ptr<CD3DBatchTexture> mThumbBottom{};    // +0x134
     boost::shared_ptr<CD3DBatchTexture> mThumbMiddle{};    // +0x13C
@@ -3961,7 +3872,7 @@ namespace moho
   // 0x007A0503 replaces it with the scrollbar's own thunk vtable - so the
   // sub-object runs 0x11C..0x124, and the control's own state follows it up
   // to the 0x158 the binary allocates.
-  static_assert(offsetof(CMauiScrollbar, mScrollableLink) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
+  static_assert(offsetof(CMauiScrollbar, mScrollable) == 0x124, "moho::CMauiScrollbar must place IMauiDragger at 0x11C");
   static_assert(sizeof(CMauiScrollbar) == 0x158, "moho::CMauiScrollbar size must be 0x158");
   static_assert(offsetof(CMauiScrollbar, mThumbTop) == 0x12c, "CMauiScrollbar::mThumbTop offset must be 0x12c");
   static_assert(offsetof(CMauiScrollbar, mAxis) == 0x154, "CMauiScrollbar::mAxis offset must be 0x154");
@@ -4422,10 +4333,13 @@ namespace moho
     [[nodiscard]] bool CanShake() override;
 
     CameraImpl* mCamera = nullptr;              // +0x04
+    // The viewport rect `CUIWorldView::DoRender` last pushed to the camera:
+    // left/top and then the Width/Height lazy vars (+0x98/+0xAC), which
+    // 0x0086EF40 passes straight through as an extent.
     float mCachedViewLeft = 0.0f;               // +0x08
     float mCachedViewTop = 0.0f;                // +0x0C
-    float mCachedViewRight = 0.0f;              // +0x10
-    float mCachedViewBottom = 0.0f;             // +0x14
+    float mCachedViewWidth = 0.0f;              // +0x10
+    float mCachedViewHeight = 0.0f;             // +0x14
     bool mOrthographic = false;                 // +0x18
     bool mIsMiniMap = false;                    // +0x19
     bool mEnableResourceRendering = false;      // +0x1A
@@ -4442,7 +4356,7 @@ namespace moho
     CommandModeData mCommandData;               // +0x8C
     CWldSession* mWldSession = nullptr;         // +0xEC
     boost::SharedPtrRaw<UICommandGraph> mComGraph; // +0xF0
-    CUIWorldViewBuildDragRuntimeView mBuildDrag; // +0xF8
+    CBuildDragPreview mBuildDrag; // +0xF8
     bool mConvertToPatrolCursor = false;        // +0x158
     /// Set on MET_MouseEnter and cleared on MET_MouseExit by
     /// `CUIWorldView::HandleEvent` (0x008704E4 / 0x00870500): the cursor is
@@ -4460,7 +4374,10 @@ namespace moho
     /// at 0x00870A5F / 0x00870A68 (CUIWorldView +0x278 / +0x27C).
     Wm3::Vector2f mLastCursorScreenPos{};       // +0x15C
     msvc8::string mCameraTrack;                 // +0x164
-    CMauiCurrentFocusControlRuntimeView mOverlayLink; // +0x180
+    /// The selection dragger this view has posted and draws each frame
+    /// (`ISelectionDragger::Render`, from `CUIWorldView::DoRender`). A weak
+    /// link, so it clears itself when the dragger deletes itself on release.
+    WeakPtr<ISelectionDragger> mSelectionDragger;     // +0x180
     bool mHighlightEnabled = true;              // +0x188
     bool mIconsVisible = true;                  // +0x189
     bool mGlobalCameraCommands = false;         // +0x18A
@@ -4508,7 +4425,9 @@ namespace moho
     "CRenderWorldView::mLastCursorScreenPos offset must be 0x15C"
   );
   static_assert(offsetof(CRenderWorldView, mCameraTrack) == 0x164, "CRenderWorldView::mCameraTrack offset must be 0x164");
-  static_assert(offsetof(CRenderWorldView, mOverlayLink) == 0x180, "CRenderWorldView::mOverlayLink offset must be 0x180");
+  static_assert(
+    offsetof(CRenderWorldView, mSelectionDragger) == 0x180, "CRenderWorldView::mSelectionDragger offset must be 0x180"
+  );
   static_assert(
     offsetof(CRenderWorldView, mHighlightEnabled) == 0x188,
     "CRenderWorldView::mHighlightEnabled offset must be 0x188"
@@ -4556,8 +4475,7 @@ namespace moho
    * `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) - plus the
    * reflection pair and the deleting destructor at the head; everything else is
    * inherited. The second vtable the constructor installs at +0x11C belongs to
-   * the `IRenderWorldView` sub-object, which is still reached through
-   * `CUIWorldViewRuntimeView::mRenderWorldView`.
+   * the `IRenderWorldView` sub-object, the `CRenderWorldView` base below.
    */
   /**
    * Second-base evidence (re-read out of `bin/external/ForgedAlliance.exe`):
@@ -4754,18 +4672,9 @@ namespace moho
     "CRenderWorldView sub-object must start at CUIWorldView+0x11C"
   );
 
-
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiCurrentFocusControlRuntimeView) == 0x8, "CMauiCurrentFocusControlRuntimeView size must be 0x8");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCurrentFocusControlRuntimeView, mFocusedControlPrevNextField) == 0x0,
-    "CMauiCurrentFocusControlRuntimeView::mFocusedControlPrevNextField offset must be 0x0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiCurrentFocusControlRuntimeView, mNextPrevNextField) == 0x4,
-    "CMauiCurrentFocusControlRuntimeView::mNextPrevNextField offset must be 0x4"
-  );
-
-  extern CMauiCurrentFocusControlRuntimeView Maui_CurrentFocusControl;
+  /// The control that owns keyboard focus. A weak link, so a control that is
+  /// destroyed while focused simply drops out of it.
+  extern WeakPtr<CMauiControl> Maui_CurrentFocusControl;
   extern bool Maui_ControlHasFocus;
 
   /**
@@ -10160,20 +10069,10 @@ namespace moho
    * Per-T canonical-template-helper binding for the engine-instantiated
    * `vector<shared_ptr<MeshInstance>>::push_back(const&)` fast/slow-path
    * body (8-byte element stride: shared_ptr `(px, pi)` pair). Used by
-   * `CUIWorldViewBuildDragRuntimeView::AppendBuildPreviewMesh` to preserve
+   * `CBuildDragPreview::AppendBuildPreviewMesh` to preserve
    * the MSVC8 per-T template emission symbol shape.
    */
   void PushBackMeshInstanceSharedPtrVector(
     msvc8::vector<boost::shared_ptr<MeshInstance>>& destination,
     const boost::shared_ptr<MeshInstance>& value);
-
-  // ---------------------------------------------------------------------
-  // Every `*RuntimeView` in this header is reinterpret_cast over a real
-  // control, so a view larger than the object it overlays is an
-  // out-of-bounds write by construction -- which is exactly what eleven of
-  // these controls were doing while they declared no data members at all.
-  // Keep the relation asserted so it cannot come back.
-  // ---------------------------------------------------------------------
-  static_assert(sizeof(CMauiCursorRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorRuntimeView overruns CMauiCursor");
-  static_assert(sizeof(CMauiCursorTextureRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorTextureRuntimeView overruns CMauiCursor");
 } // namespace moho
