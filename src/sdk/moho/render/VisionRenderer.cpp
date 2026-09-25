@@ -62,13 +62,6 @@ namespace
   constexpr auto kVisionRingWrapLock = static_cast<gpg::gal::MohoD3DLockFlags>(1u);
 
   /**
-   * Inline capacity of the per-frame circle accumulator: the shipped body binds
-   * `capacity_` to `inlineVec_ + 3000 bytes` (0x0081C7BF / 0x0081C7F0), i.e. 250
-   * `Wm3::Circle2f` slots before the first heap growth.
-   */
-  constexpr std::size_t kVisibleCircleInlineCapacity = 250u;
-
-  /**
    * Cached `"Vision_Total"` engine-stat slot (`sEngineStat_Vision_Total`,
    * 0x010C77A8), resolved lazily on the first fog-of-war frame.
    */
@@ -345,7 +338,7 @@ namespace moho
     footprintBox.Extent[0] = terrainFootprint.Max.x - footprintBox.Center.x;
     footprintBox.Extent[1] = terrainFootprint.Max.z - footprintBox.Center.y;
 
-    gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity> visibleCircles;
+    gpg::fastvector_n<Wm3::Circle2f, VisionDB::kVisibleCircleInlineCapacity> visibleCircles;
     visionDb.TryAdd(visibleCircles, visionDb.rootNode_, footprintBox, interpolant);
 
     const auto visibleCircleCount = static_cast<std::int32_t>(visibleCircles.size());

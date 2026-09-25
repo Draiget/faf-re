@@ -273,6 +273,14 @@ namespace moho
     [[nodiscard]] Handle* NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous);
 
     /**
+     * Inline capacity of the circle accumulator `RenderFogOfWar` hands to
+     * `TryAdd`: the shipped body binds `capacity_` to `inlineVec_ + 3000 bytes`
+     * (0x0081C7BF / 0x0081C7F0), i.e. 250 `Wm3::Circle2f` slots before the
+     * first heap growth.
+     */
+    static constexpr std::size_t kVisibleCircleInlineCapacity = 250u;
+
+    /**
      * Address: 0x0081B490 (FUN_0081B490, Moho::VisionDB::Entry::TryAdd)
      *
      * IDA signature:
@@ -295,9 +303,17 @@ namespace moho
      * samples by `interpolant` and tests it against `box`. On overlap it either
      * appends that interpolated circle to `accumulator` (real, currently
      * visible emitter) or recurses over the entry's `mContained` sibling chain.
+     *
+     * `accumulator` is the renderer's inline-backed vector and has to stay typed
+     * as one: the append grows through the inline-aware lane (0x0081B6E0 ->
+     * 0x0081B830 -> 0x0081BBC0, which compares `start_` with `originalVec_` at
+     * +0x0C and never frees the inline window). Taken as the plain
+     * `gpg::fastvector<Wm3::Circle2f>` base, `FastVector::Reserve` handed the
+     * inline window - a stack buffer - to `operator delete` as soon as more
+     * than 250 circles were in view.
      */
     void TryAdd(
-      gpg::fastvector<Wm3::Circle2f>& accumulator,
+      gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
       Pool::Entry* entry,
       const Wm3::Box2f& box,
       float interpolant

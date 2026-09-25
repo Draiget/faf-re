@@ -611,9 +611,13 @@ void VisionDB::Handle::Update(
  *   +0x0C mIsReal (0x0081B546),    +0x0D mVis (0x0081B54C),
  *   +0x10/+0x14/+0x18 mPrevCircle  (0x0081B4BC/0x0081B4C1/0x0081B4ED),
  *   +0x1C/+0x20/+0x24 mCurCircle   (0x0081B4C6/0x0081B4CB/0x0081B4DC).
+ *
+ * The append at 0x0081B57E is the inline-backed vector's own `push_back`
+ * (0x0081B6E0), so `accumulator` keeps its `fastvector_n` type; see the
+ * header for what the plain base type did.
  */
 void VisionDB::TryAdd(
-  gpg::fastvector<Wm3::Circle2f>& accumulator,
+  gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
   Pool::Entry* const entry,
   const Wm3::Box2f& box,
   const float interpolant
