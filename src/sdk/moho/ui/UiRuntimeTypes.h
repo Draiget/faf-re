@@ -38,6 +38,7 @@ namespace LuaPlus
 
 namespace gpg
 {
+  class BitArray2D;
   class RType;
   class RRef;
   template <class T>
@@ -299,12 +300,16 @@ namespace moho
     void DestroyGameInterface() override;
 
   public:
-    std::uint8_t mUnknown38[0x4]{}; // +0x38
-    gpg::core::FastVector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x3C
+    /// The texture prefetches `CreateGameInterface` loads, held so the data
+    /// stays resident while the game UI is up. An `msvc8::vector`: the
+    /// constructor zeroes first/last/end at +0x3C..+0x44 (0x0086A56E..0x0086A574)
+    /// and never writes the allocator word at +0x38, and the `push_back` it
+    /// grows through (0x004A5C60, `lea edi,[ebx+38h]` at 0x0086A7AF) finds
+    /// first/last/end at +4/+8/+0xC of the object.
+    msvc8::vector<boost::shared_ptr<PrefetchData>> mPrefetchData; // +0x38
   };
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CLuaWldUIProvider, mUnknown38) == 0x38, "CLuaWldUIProvider::mUnknown38 offset must be 0x38");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x3C, "CLuaWldUIProvider::mPrefetchData offset must be 0x3C");
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
+  static_assert(offsetof(CLuaWldUIProvider, mPrefetchData) == 0x38, "CLuaWldUIProvider::mPrefetchData offset must be 0x38");
+  static_assert(sizeof(CLuaWldUIProvider) == 0x48, "CLuaWldUIProvider size must be 0x48");
 
   enum EUIState : std::int32_t
   {
@@ -2578,17 +2583,14 @@ namespace moho
     CD3DFont* mFont = nullptr;                   // +0x124
     std::uint32_t mForegroundColor = 0;          // +0x128
     bool mBackgroundVisible = false;             // +0x12C
-    std::uint8_t mUnknown12DTo12F[0x3]{};
     std::uint32_t mBackgroundColor = 0;          // +0x130
     std::uint32_t mHighlightForegroundColor = 0; // +0x134
     std::uint32_t mHighlightBackgroundColor = 0; // +0x138
     bool mDropShadow = false;                    // +0x13C
     bool mIsEnabled = false;                     // +0x13D
-    std::uint8_t mPad13ETo13F[0x2]{};
     msvc8::string mText{};                       // +0x140
     std::int32_t mCaretPosition = 0;             // +0x15C
     bool mCaretVisible = false;                  // +0x160
-    std::uint8_t mUnknown161To163[0x3]{};
     std::uint32_t mCaretColor = 0;               // +0x164
     std::uint32_t mCaretCycleCurrentAlpha = 0;   // +0x168
     float mCaretCycleSeconds = 0.0f;             // +0x16C
@@ -2601,13 +2603,15 @@ namespace moho
     std::int32_t mSelectionEnd = 0;              // +0x188
     std::int32_t mDragStart = 0;                 // +0x18C
     bool mTextChangeCallbackInProgress = false;  // +0x190
-    std::uint8_t mPad191To193[0x3]{};
     std::int32_t mMaxChars = 0;                  // +0x194
   };
 
   static_assert(sizeof(CMauiEdit) == 0x198, "moho::CMauiEdit size must be 0x198");
   static_assert(offsetof(CMauiEdit, mFont) == 0x124, "CMauiEdit::mFont offset must be 0x124");
   static_assert(offsetof(CMauiEdit, mText) == 0x140, "CMauiEdit::mText offset must be 0x140");
+  static_assert(offsetof(CMauiEdit, mBackgroundColor) == 0x130, "CMauiEdit::mBackgroundColor offset must be 0x130");
+  static_assert(offsetof(CMauiEdit, mCaretColor) == 0x164, "CMauiEdit::mCaretColor offset must be 0x164");
+  static_assert(offsetof(CMauiEdit, mMaxChars) == 0x194, "CMauiEdit::mMaxChars offset must be 0x194");
   static_assert(offsetof(CMauiEdit, mMaxChars) == 0x194, "CMauiEdit::mMaxChars offset must be 0x194");
 
   class CMauiFrame : public CMauiControl
@@ -2974,11 +2978,6 @@ namespace moho
     // heap block, which the debug CRT catches on free as
     // "HEAP CORRUPTION DETECTED: after Normal block" inside
     // `CMauiBitmap::~CMauiBitmap` via `CMauiFrame::PurgeDeleted`.
-    //
-    // `mFrames` is the proxy-less 0x0C form: the constructor zeroes exactly
-    // three consecutive dwords at 0x180/0x184/0x188 (not 0x184/0x188/0x18C),
-    // so there is no debug-proxy word ahead of the `{first, last, end}` triple
-    // -- which is also what makes the object end at 0x18C rather than 0x190.
     // ---------------------------------------------------------------------
     msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
     CScriptLazyVar_float mBitmapWidthLV{};                              // +0x12C
@@ -2987,25 +2986,31 @@ namespace moho
     float mV0 = 0.0f;                                                   // +0x158
     float mU1 = 0.0f;                                                   // +0x15C
     float mV1 = 0.0f;                                                   // +0x160
-    void* mHitMask = nullptr;                                           // +0x164
+    /// Per-pixel hit mask, owned: the destructor deletes it before anything
+    /// else (0x0077FC1A..0x0077FC36) and `HitTest` reads it as a bit grid.
+    gpg::BitArray2D* mHitMask = nullptr;                                // +0x164
     bool mUseAlphaHitTest = false;                                      // +0x168
     bool mIsTiled = false;                                              // +0x169
-    std::uint8_t mUnknown16ATo16B[0x2]{};
     float mFrameDurationSeconds = 0.0f;                                 // +0x16C
     bool mIsPlaying = false;                                            // +0x170
     bool mDoLoop = false;                                               // +0x171
-    std::uint8_t mUnknown172To173[0x2]{};
     std::int32_t mCurrentFrame = 0;                                     // +0x174
     float mCurrentFrameTimeSeconds = 0.0f;                              // +0x178
-    std::uint8_t mUnknown17CTo17F[0x4]{};
-    msvc8::vector<std::int32_t, false> mFrames;                         // +0x180
+    /// The frame pattern. An ordinary `msvc8::vector`: `SetFramePattern`
+    /// (0x007802D0) takes the object at `this+0x17C` and clears through
+    /// `[obj+8]`, and like `mTextureBatches` at +0x11C its allocator word is
+    /// never written - the constructor and destructor only touch
+    /// first/last/end at +0x180..+0x188.
+    msvc8::vector<std::int32_t> mFrames;                                // +0x17C
   };
 
   static_assert(sizeof(CMauiBitmap) == 0x18C, "CMauiBitmap size must be 0x18C");
   static_assert(offsetof(CMauiBitmap, mTextureBatches) == 0x11C, "CMauiBitmap::mTextureBatches offset must be 0x11C");
   static_assert(offsetof(CMauiBitmap, mBitmapWidthLV) == 0x12C, "CMauiBitmap::mBitmapWidthLV offset must be 0x12C");
   static_assert(offsetof(CMauiBitmap, mHitMask) == 0x164, "CMauiBitmap::mHitMask offset must be 0x164");
-  static_assert(offsetof(CMauiBitmap, mFrames) == 0x180, "CMauiBitmap::mFrames offset must be 0x180");
+  static_assert(offsetof(CMauiBitmap, mFrameDurationSeconds) == 0x16C, "CMauiBitmap::mFrameDurationSeconds offset must be 0x16C");
+  static_assert(offsetof(CMauiBitmap, mCurrentFrame) == 0x174, "CMauiBitmap::mCurrentFrame offset must be 0x174");
+  static_assert(offsetof(CMauiBitmap, mFrames) == 0x17C, "CMauiBitmap::mFrames offset must be 0x17C");
 
   class CMauiGroup : public CMauiControl
   {
@@ -3061,6 +3066,22 @@ namespace moho
      */
     void DoRender(CD3DPrimBatcher* primBatcher, std::int32_t drawMask) override;
   };
+
+  /**
+   * One histogram data series ("column"), 0x14 bytes: a packed colour (from
+   * `SCR_DecodeColor`) and the series' values. The values are an
+   * `msvc8::vector<float>` - the word at +0x04 that nothing initialises is its
+   * allocator slot, and a column's destructor is exactly that vector's
+   * `_Tidy` (`destroy_range` 0x00798D10: free first, then zero first/last/end
+   * at +0x08..+0x10).
+   */
+  struct SHistogramColumn
+  {
+    std::uint32_t mColor = 0;     // +0x00
+    msvc8::vector<float> mValues; // +0x04
+  };
+  static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
+  static_assert(offsetof(SHistogramColumn, mValues) == 0x04, "SHistogramColumn::mValues offset must be 0x04");
 
   class CMauiHistogram : public CMauiControl
   {
@@ -3134,21 +3155,17 @@ namespace moho
     // 0x11C and every access through the old `CMauiHistogramRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
-    // +0x124 is a real field whose meaning is still unknown: the constructor
-    // at 0x007977A0 and the destructor at 0x00797840 touch only
-    // 0x128/0x12C/0x130. It is not an MSVC8 vector proxy word -- the column
-    // array is a bare begin/end/capacity triple with no proxy.
-    std::int32_t mXIncrement = 0;              // +0x11C
-    std::int32_t mYIncrement = 0;              // +0x120
-    std::uint8_t mUnknown124To127[0x4]{};      // +0x124
-    SHistogramColumn* mDataStart = nullptr;    // +0x128
-    SHistogramColumn* mDataEnd = nullptr;      // +0x12C
-    SHistogramColumn* mDataCapacity = nullptr; // +0x130
+    std::int32_t mXIncrement = 0;           // +0x11C
+    std::int32_t mYIncrement = 0;           // +0x120
+    /// The data series. An `msvc8::vector`: the constructor (0x007977A0) and
+    /// the destructor (0x00797840) touch only first/last/end at +0x128..+0x130,
+    /// and the word at +0x124 they skip is its allocator slot.
+    msvc8::vector<SHistogramColumn> mColumns; // +0x124
   };
 
   static_assert(sizeof(CMauiHistogram) == 0x134, "CMauiHistogram size must be 0x134");
   static_assert(offsetof(CMauiHistogram, mXIncrement) == 0x11c, "CMauiHistogram::mXIncrement offset must be 0x11c");
-  static_assert(offsetof(CMauiHistogram, mDataStart) == 0x128, "CMauiHistogram::mDataStart offset must be 0x128");
+  static_assert(offsetof(CMauiHistogram, mColumns) == 0x124, "CMauiHistogram::mColumns offset must be 0x124");
 
   class CMauiItemList : public CMauiControl
   {
@@ -3364,11 +3381,11 @@ namespace moho
     std::int32_t mHoverItem = -1;                // +0x14C
     bool mShowSelection = false;                 // +0x150
     bool mShowMouseoverItem = false;             // +0x151
-    std::uint8_t mPad152To153[0x2]{};
     std::int32_t mScrollPosition = 0;            // +0x154
   };
 
   static_assert(sizeof(CMauiItemList) == 0x158, "CMauiItemList size must be 0x158");
+  static_assert(offsetof(CMauiItemList, mScrollPosition) == 0x154, "CMauiItemList::mScrollPosition offset must be 0x154");
   static_assert(offsetof(CMauiItemList, mFont) == 0x11c, "CMauiItemList::mFont offset must be 0x11c");
   static_assert(offsetof(CMauiItemList, mItems) == 0x138, "CMauiItemList::mItems offset must be 0x138");
   static_assert(offsetof(CMauiItemList, mScrollPosition) == 0x154, "CMauiItemList::mScrollPosition offset must be 0x154");
@@ -4566,22 +4583,6 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(boost::weak_ptr<CMauiFrame>) == 0x8, "boost::weak_ptr<CMauiFrame> size must be 0x8");
 
 
-  /**
-   * One histogram data series ("column"). Layout: 0x14 bytes. Only the value
-   * buffer at +0x08 owns heap storage; it is released (and the whole column
-   * array freed) when the owning CMauiHistogram is destroyed, via
-   * `ReleaseHistogramColumnValueBuffers` (FUN_00798D10, UiRuntimeTypes.cpp).
-   */
-  struct SHistogramColumn
-  {
-    std::uint32_t field_0x00 = 0;      // +0x00 (packed color from Moho::SCR_DecodeColor)
-    std::uint32_t field_0x04 = 0;      // +0x04
-    float* mValues = nullptr;          // +0x08 owned per-bar value buffer (begin)
-    float* mValuesEnd = nullptr;       // +0x0C
-    float* mValuesCapacity = nullptr;  // +0x10
-  };
-  static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
-  static_assert(offsetof(SHistogramColumn, mValues) == 0x08, "SHistogramColumn::mValues offset must be 0x08");
 
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::vector<msvc8::string>) == 0x10, "msvc8::vector<msvc8::string> size must be 0x10");

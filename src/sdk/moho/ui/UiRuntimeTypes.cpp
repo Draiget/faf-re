@@ -1692,17 +1692,15 @@ moho::CMauiLuaDragger::CMauiLuaDragger(
 namespace
 {
   /**
-   * The drag-move callback a `CameraDragger` carries at `+0x18`.
-   *
-   * In the image the slot holds a `__thiscall` pointer - `CameraDragger::
-   * DragMove` loads the drag target into `ecx` before the indirect call
-   * (0x0086E17F) and the one callback ever stored there, 0x00873BD0, tail-jumps
-   * straight into `CameraImpl::CameraPan` with `ecx` still holding the camera.
-   * MSVC only accepts `__thiscall` on member functions, so the recovered source
-   * carries the drag target as an ordinary leading parameter instead; the slot
-   * is still one pointer wide and nothing outside this file ever writes it.
+   * What a `CameraDragger` does with each frame's drag delta: a `CameraImpl`
+   * member, called through the camera. `CameraImpl` has more than one base,
+   * so MSVC stores a pointer to one of its members as `{code, this
+   * adjustment}` - the two words at +0x18/+0x1C, which the constructor takes
+   * as two stack arguments (0x0086E0AE/0x0086E0B1) and `DragMove` turns into
+   * `ecx = mCamera + [+0x1C]; call [+0x18]` (0x0086E146..0x0086E18D).
    */
-  using CameraDragDeltaFn = int (*)(void*, Wm3::Vector2f*);
+  using CameraDragDeltaFn = void (moho::CameraImpl::*)(const Wm3::Vector2f&);
+  static_assert(sizeof(CameraDragDeltaFn) == 0x8, "a CameraImpl member pointer must be {code, this adjustment}");
 
   /**
    * The middle-button camera drag.
@@ -1741,8 +1739,7 @@ namespace
       moho::CameraImpl* camera,
       const Wm3::Vector2f& mousePos,
       moho::CMauiControl* ownerControl,
-      CameraDragDeltaFn dragMoveFn,
-      std::int32_t dragMoveOffset
+      CameraDragDeltaFn dragDelta
     );
 
     /**
@@ -1787,15 +1784,26 @@ namespace
 
     moho::CameraImpl* mCamera = nullptr;     // +0x08
     Wm3::Vector2f mPos{};                    // +0x0C
+    // Neither the constructor nor any of the four slots reads or writes it.
     std::uint32_t mUnknown14 = 0;            // +0x14
-    CameraDragDeltaFn mDragMoveFn = nullptr; // +0x18
-    std::int32_t mDragMoveOffset = 0;        // +0x1C
+    /**
+     * The one delta handler ever stored here is `&CameraImpl::CameraPan`
+     * (`CUIWorldView::HandleEvent`'s middle-button press). It is virtual, so
+     * the code word is the compiler's vcall thunk for its slot:
+     *
+     * Address: 0x00873BD0 (FUN_00873BD0 -- `CameraImpl::`vcall'{128}'`:
+     * `mov eax,[ecx]; jmp [eax+80h]`, slot 32 of `??_7CameraImpl@Moho@@6B@`
+     * == 0x007A6F00 `CameraImpl::CameraPan`; pushed at 0x00870B66. Formerly
+     * `CameraDraggerPanCamera`, a stand-in free function taking the camera as
+     * an explicit argument, and before that
+     * `LegacyInvokeVirtualIntReaderSlot128RuntimeLaneAlpha`.)
+     */
+    CameraDragDeltaFn mDragDelta = nullptr;  // +0x18 code, +0x1C this adjustment
   };
 
   static_assert(offsetof(CameraDragger, mCamera) == 0x8, "CameraDragger::mCamera offset must be 0x8");
   static_assert(offsetof(CameraDragger, mPos) == 0xC, "CameraDragger::mPos offset must be 0xC");
-  static_assert(offsetof(CameraDragger, mDragMoveFn) == 0x18, "CameraDragger::mDragMoveFn offset must be 0x18");
-  static_assert(offsetof(CameraDragger, mDragMoveOffset) == 0x1C, "CameraDragger::mDragMoveOffset offset must be 0x1C");
+  static_assert(offsetof(CameraDragger, mDragDelta) == 0x18, "CameraDragger::mDragDelta offset must be 0x18");
   static_assert(sizeof(CameraDragger) == 0x20, "CameraDragger size must be 0x20");
 
   /**
@@ -3907,9 +3915,9 @@ int moho::register_CScrLuaMetatableFactory_CUIWorldView_Index()
 
 namespace
 {
-  struct UiRuntimeTypesFactoryIndexBootstrap
+  struct UiLuaFactoryIndexStartup
   {
-    UiRuntimeTypesFactoryIndexBootstrap()
+    UiLuaFactoryIndexStartup()
     {
       (void)moho::register_CScrLuaMetatableFactory_CMauiHistogram_Index();
       (void)moho::register_CScrLuaMetatableFactory_CMauiScrollbar_Index();
@@ -3919,157 +3927,8 @@ namespace
     }
   };
 
-  UiRuntimeTypesFactoryIndexBootstrap gUiRuntimeTypesFactoryIndexBootstrap;
+  UiLuaFactoryIndexStartup gUiLuaFactoryIndexStartup;
 } // namespace
-/**
- * Address: 0x00783B00 (FUN_00783B00, sub_783B00)
- * Address: 0x007861B0 (FUN_007861B0, sub_7861B0)
- * Address: 0x00794EC0 (FUN_00794EC0, sub_794EC0)
- * Address: 0x00798950 (FUN_00798950, sub_798950)
- * Address: 0x0079C940 (FUN_0079C940, sub_79C940)
- * Address: 0x0079EAC0 (FUN_0079EAC0, sub_79EAC0)
- * Address: 0x007A0140 (FUN_007A0140, sub_7A0140)
- * Address: 0x007A2700 (FUN_007A2700, sub_7A2700)
- * Address: 0x008513D0 (FUN_008513D0, sub_8513D0)
- *
- * What it does:
- * Adds `CMauiControl` as one base descriptor on the target UI runtime type.
- */
-[[maybe_unused]] static void AddCMauiControlBaseToUiRuntimeType(
-  gpg::RType* const typeInfo
-)
-{
-  gpg::RType* baseType = moho::CMauiControl::sType;
-  if (baseType == nullptr) {
-    baseType = gpg::LookupRType(typeid(moho::CMauiControl));
-    moho::CMauiControl::sType = baseType;
-  }
-
-  if (typeInfo == nullptr || baseType == nullptr) {
-    return;
-  }
-
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
-}
-
-/**
- * Address: 0x0078A680 (FUN_0078A680, sub_78A680)
- * Address: 0x0078D970 (FUN_0078D970, sub_78D970)
- * Address: 0x0078E690 (FUN_0078E690, sub_78E690)
- *
- * What it does:
- * Adds `CScriptObject` as one base descriptor on the target UI runtime type.
- */
-[[maybe_unused]] static void AddCScriptObjectBaseToUiRuntimeType(
-  gpg::RType* const typeInfo
-)
-{
-  gpg::RType* baseType = moho::CScriptObject::sType;
-  if (baseType == nullptr) {
-    baseType = gpg::LookupRType(typeid(moho::CScriptObject));
-    moho::CScriptObject::sType = baseType;
-  }
-
-  if (typeInfo == nullptr || baseType == nullptr) {
-    return;
-  }
-
-  gpg::RField baseField{};
-  baseField.mName = baseType->GetName();
-  baseField.mType = baseType;
-  baseField.mOffset = 0;
-  baseField.v4 = 0;
-  baseField.mDesc = nullptr;
-  typeInfo->AddBase(baseField);
-}
-
-/**
- * Address: 0x007A4280 (FUN_007A4280, sub_7A4280)
- *
- * What it does:
- * Adds `CMauiControl` as one base descriptor on a `CMauiText` type-info owner.
- */
-[[maybe_unused]] static void AddCMauiControlBaseToCMauiTextType(
-  gpg::RType* const typeInfo
-)
-{
-  AddCMauiControlBaseToUiRuntimeType(typeInfo);
-}
-
-/**
- * Address: 0x007A43B0 (FUN_007A43B0, sub_7A43B0)
- *
- * What it does:
- * Rebinds one startup factory-index lane for the `CMauiText` metatable factory
- * singleton and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiText>* RegisterCMauiTextMetatableFactoryInstance()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiText>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
- * Address: 0x00796F00 (FUN_00796F00)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiFrame>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiFrame>*
-startup_CScrLuaMetatableFactory_CMauiFrame_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiFrame>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-/**
- * Address: 0x007975A0 (FUN_007975A0)
- *
- * What it does:
- * Rebinds the startup metatable-factory index lane for
- * `CScrLuaMetatableFactory<CMauiGroup>` and returns that singleton.
- */
-[[maybe_unused]] static moho::CScrLuaMetatableFactory<moho::CMauiGroup>*
-startup_CScrLuaMetatableFactory_CMauiGroup_Index()
-{
-  auto& instance = moho::CScrLuaMetatableFactory<moho::CMauiGroup>::Instance();
-  instance.SetFactoryObjectIndexForRecovery(moho::CScrLuaObjectFactory::AllocateFactoryObjectIndex());
-  return &instance;
-}
-
-[[nodiscard]] static gpg::RType* CachedCMauiTextRuntimeType() noexcept
-{
-  static gpg::RType* cached = nullptr;
-  if (cached == nullptr) {
-    cached = gpg::LookupRType(typeid(moho::CMauiText));
-  }
-  return cached;
-}
-
-/**
- * Address: 0x007A43E0 (FUN_007A43E0, sub_7A43E0)
- *
- * What it does:
- * Upcasts one reflected object reference into the `CMauiText` lane and
- * returns the resolved object pointer.
- */
-[[maybe_unused]] static void* UpcastRefToCMauiTextObject(
-  const gpg::RRef& sourceRef
-)
-{
-  const gpg::RRef upcast = gpg::REF_UpcastPtr(sourceRef, CachedCMauiTextRuntimeType());
-  return upcast.mObj;
-}
-
 /**
  * Address: 0x007836E0 (FUN_007836E0, ??0CScriptLazyVar_float@Moho@@QAE@@Z)
  *
@@ -9428,51 +9287,6 @@ static void func_StartMouseScrubbing(
 }
 
 /**
- * Address: 0x00873BD0 (FUN_00873BD0)
- *
- * IDA signature:
- * int __thiscall sub_873BD0(Moho::CameraImpl *this@<ecx>, Wm3::Vector2f *delta);
- *
- * What it does:
- * The drag-move callback `CUIWorldView::HandleEvent` hands to
- * `CameraDragger`'s constructor for a middle-button camera drag: it forwards
- * the accumulated pointer delta straight to `CameraImpl::CameraPan`.
- *
- * The whole body is two instructions - `0x00873BD0 mov eax,[ecx]` followed by
- * `0x00873BD2 jmp dword ptr [eax+80h]` - so it is a tail-call through vtable
- * slot 32 of `??_7CameraImpl@Moho@@6B@` (0x00E3C474 +0x80 == 0x007A6F00 ==
- * `CameraImpl::CameraPan`). Because it is a `jmp` and not a `call`, the
- * caller's stack argument passes through untouched: this takes **two**
- * arguments, `this` in `ecx` and the `Wm3::Vector2f*` on the stack, matching
- * `CameraDragDeltaFn`.
- *
- * A previous pass recovered this address into `moho/misc/WinApiImportThunks.cpp`
- * as `LegacyInvokeVirtualIntReaderSlot128RuntimeLaneAlpha`, a one-argument
- * generic "read an int through vtable+0x80" thunk. That was wrong on arity, on
- * ownership and on intent, and the name encoded the vtable displacement, so it
- * has been deleted from that file along with the two runtime-view structs that
- * existed only to support it.
- *
- * Its single reference in the binary is the address-taken `push offset` at
- * 0x00870B66 inside `CUIWorldView::HandleEvent`, which is recovered below and
- * passes `&CameraDraggerPanCamera` to `CameraDragger`'s constructor from its
- * middle-button-press arm.
- *
- * The `int` return matches `CameraDragDeltaFn`; the binary leaves whatever
- * `CameraPan` (a `void` function) happened to put in `eax`, and
- * `CameraDragger::DragMove` discards it on the scrub path and returns it
- * unread on the other, so no observable behavior depends on the value.
- */
-static int CameraDraggerPanCamera(
-  void* const cameraTarget,
-  Wm3::Vector2f* const panDelta
-)
-{
-  static_cast<moho::CameraImpl*>(cameraTarget)->CameraPan(*panDelta);
-  return 0;
-}
-
-/**
  * Address: 0x0086E060 (FUN_0086E060, ??0CameraDragger@Moho@@QAE@@Z)
  *
  * What it does:
@@ -9486,14 +9300,12 @@ CameraDragger::CameraDragger(
   moho::CameraImpl* const camera,
   const Wm3::Vector2f& mousePos,
   moho::CMauiControl* const ownerControl,
-  CameraDragDeltaFn const dragMoveFn,
-  const std::int32_t dragMoveOffset
+  const CameraDragDeltaFn dragDelta
 )
   : moho::IMauiDragger()
   , mCamera(camera)
   , mPos(mousePos)
-  , mDragMoveFn(dragMoveFn)
-  , mDragMoveOffset(dragMoveOffset)
+  , mDragDelta(dragDelta)
 {
   func_StartMouseScrubbing(true, ownerControl);
 }
@@ -9524,19 +9336,16 @@ void CameraDragger::DragMove(
   const moho::SMauiEventData* const eventData
 )
 {
-  auto* const cameraBytes = reinterpret_cast<std::uint8_t*>(mCamera);
-  void* const dragTarget = cameraBytes + mDragMoveOffset;
-
   if (moho::ui_DisableCursorFixing) {
     const Wm3::Vector2f currentMousePos(eventData->mMousePos.x, eventData->mMousePos.y);
-    Wm3::Vector2f dragDelta(currentMousePos.x - mPos.x, currentMousePos.y - mPos.y);
-    (void)mDragMoveFn(dragTarget, &dragDelta);
+    const Wm3::Vector2f dragDelta(currentMousePos.x - mPos.x, currentMousePos.y - mPos.y);
+    (mCamera->*mDragDelta)(dragDelta);
     mPos = currentMousePos;
     return;
   }
 
-  Wm3::Vector2f dragDelta(static_cast<float>(sMouseScrubDelta.x), static_cast<float>(sMouseScrubDelta.y));
-  (void)mDragMoveFn(dragTarget, &dragDelta);
+  const Wm3::Vector2f dragDelta(static_cast<float>(sMouseScrubDelta.x), static_cast<float>(sMouseScrubDelta.y));
+  (mCamera->*mDragDelta)(dragDelta);
   sMouseScrubDelta.x = 0;
   sMouseScrubDelta.y = 0;
 }
@@ -13112,51 +12921,7 @@ moho::CMauiHistogram::CMauiHistogram(
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "group")
-{
-  mDataStart = nullptr;
-  mDataEnd = nullptr;
-  mDataCapacity = nullptr;
-}
-
-namespace
-{
-  /**
-   * Address: 0x00798D10 (FUN_00798D10, sub_798D10)
-   *
-   * What it does:
-   * Walks one half-open `SHistogramColumn` span and releases each column's
-   * owned value buffer (`mValues`), then resets that column's value-span
-   * lanes to the empty state. Shared teardown step reached from
-   * `CMauiHistogram::~CMauiHistogram` (0x00797840) and from six more not-yet
-   * -recovered `CMauiHistogram` column-storage methods (0x00798150,
-   * 0x00798360, 0x00798400, 0x00798490, 0x007984B0, 0x00798AD0) that manage
-   * `mDataStart`/`mDataEnd`/`mDataCapacity` growth/shrink -- confirmed via
-   * `_callgraph_index.sqlite` `call_edges` (7 real callers total). Previously
-   * duplicated in `LegacyContainerFillLanes.cpp` as
-   * `DestroyOwnedPointerTripletsInStride20Range` over an anonymous
-   * `Stride20OwnedPointerTripletRuntimeView` (a RULE ONE offset-struct
-   * reach-in); `SHistogramColumn` already names these exact fields, so that
-   * duplicate is retired in favor of this named helper. Not a container-lane
-   * operation: `SHistogramColumn`'s owning storage is a bare hand-rolled
-   * begin/end/capacity triple with no proxy word (see the Doxygen comment on
-   * `SHistogramColumn` above), deliberately not an MSVC8 vector.
-   */
-  void ReleaseHistogramColumnValueBuffers(
-    moho::SHistogramColumn* column,
-    moho::SHistogramColumn* const columnsEnd
-  ) noexcept
-  {
-    while (column != columnsEnd) {
-      if (column->mValues != nullptr) {
-        ::operator delete(column->mValues);
-      }
-      column->mValues = nullptr;
-      column->mValuesEnd = nullptr;
-      column->mValuesCapacity = nullptr;
-      ++column;
-    }
-  }
-} // namespace
+{}
 
 /**
  * Address: 0x00797840 (FUN_00797840, Moho::CMauiHistogram::~CMauiHistogram)
@@ -13165,24 +12930,11 @@ namespace
  * _DWORD* __usercall ~CMauiHistogram@<eax>(CMauiHistogram* this@<esi>);
  *
  * What it does:
- * Destroys the histogram column array: releases each column's owned value
- * buffer via `ReleaseHistogramColumnValueBuffers` (0x00798D10), frees the
- * column array storage, and clears the column-array lanes. Base
- * `CMauiControl` teardown is emitted implicitly by the compiler.
+ * Nothing of its own: the body is `mColumns`' destructor - each column
+ * destroyed (0x0079785C, `destroy_range` 0x00798D10), the array freed and
+ * first/last/end zeroed - then a tail jump into `~CMauiControl` (0x00797893).
  */
-moho::CMauiHistogram::~CMauiHistogram()
-{
-
-  SHistogramColumn* const columns = mDataStart;
-  if (columns != nullptr) {
-    ReleaseHistogramColumnValueBuffers(columns, mDataEnd);
-    ::operator delete(columns);
-  }
-
-  mDataStart = nullptr;
-  mDataEnd = nullptr;
-  mDataCapacity = nullptr;
-}
+moho::CMauiHistogram::~CMauiHistogram() = default;
 
 /**
  * Address: 0x00797900 (FUN_00797900, Moho::CMauiHistogram::Dump)
@@ -19681,8 +19433,8 @@ moho::CLuaWldUIProvider::CLuaWldUIProvider(
   : IWldUIProvider()
   , CScriptObject()
 {
-  // mPrefetchData default-constructs to an empty FastVector (start_/end_/
-  // capacity_ = nullptr), matching the three `mov [esi+3Ch/40h/44h], 0` stores.
+  // mPrefetchData default-constructs empty: the three `mov [esi+3Ch/40h/44h], 0`
+  // stores are its first/last/end.
   SetLuaObject(*luaObject);
 }
 
@@ -19696,7 +19448,7 @@ moho::CLuaWldUIProvider::CLuaWldUIProvider(
  *
  * What it does:
  * Tears down the provider in reverse construction order. The member
- * `mPrefetchData` (a `FastVector<boost::shared_ptr<PrefetchData>>`) is
+ * `mPrefetchData` (an `msvc8::vector<boost::shared_ptr<PrefetchData>>`) is
  * destroyed first — its inlined destructor releases each cached shared handle
  * (refcount drop + weak-dispose through the boost detail vtable) and frees the
  * element buffer, matching `sub_4A89A0` + `operator delete` in the binary.
@@ -22042,7 +21794,7 @@ bool moho::CUIWorldView::HandleEvent(
       auto* const storage = static_cast<CameraDragger*>(::operator new(sizeof(CameraDragger), std::nothrow));
       IMauiDragger* dragger = nullptr;
       if (storage != nullptr) {
-        dragger = new (storage) CameraDragger(mCamera.get(), cursorInfo.mMouseScreenPos, this, &CameraDraggerPanCamera, 0);
+        dragger = new (storage) CameraDragger(mCamera.get(), cursorInfo.mMouseScreenPos, this, &moho::CameraImpl::CameraPan);
       }
       func_PostDragger(GetRootFrame(), dragger, &eventData);
     }
@@ -23627,19 +23379,6 @@ moho::CMauiBitmap::CMauiBitmap(
   mDoLoop = false;
   mCurrentFrame = 0;
   mCurrentFrameTimeSeconds = 0.0f;
-  for (std::uint8_t& lane : mUnknown17CTo17F) {
-    lane = 0;
-  }
-  // `mTextureBatches` and `mFrames` are constructed by the compiler-emitted
-  // member initialisation before this body runs, which is what the binary
-  // does and what the source never spelled out. Placement-newing `mFrames`
-  // here spelled it `msvc8::vector<std::int32_t>` - the DEFAULT second
-  // template argument, i.e. the 0x10 proxied form - over a member declared
-  // as the 0x0C proxy-less `msvc8::vector<std::int32_t, false>` at +0x180.
-  // The object ends at 0x18C (`operator new(18Ch)` at 0x00780E2B; the ctor
-  // at 0x0077F950 writes its last three dwords to 0x180/0x184/0x188), so
-  // that construction wrote a fourth word at 0x18C..0x18F - four bytes past
-  // the end of every CMauiBitmap block ever allocated.
 
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
   controlLuaObject.SetObject("BitmapWidth", &mBitmapWidthLV);
@@ -23651,17 +23390,15 @@ moho::CMauiBitmap::CMauiBitmap(
  * Deleting thunk: 0x0077FAA0 (FUN_0077FAA0, Moho::CMauiBitmap::dtr)
  *
  * What it does:
- * Releases hit-mask/animation/lazy-var/runtime texture lanes before base
- * `CMauiControl` teardown.
+ * Deletes the hit mask (0x0077FC1A..0x0077FC36). The rest is member
+ * destruction - the frame pattern (0x0077FC3C), both lazy vars
+ * (0x0077FC6C/0x0077FC7C) and the texture batches (0x0077FC85) - before
+ * `~CMauiControl`.
  */
 moho::CMauiBitmap::~CMauiBitmap()
 {
-  if (mHitMask != nullptr) {
-    gpg::BitArray2D* const hitMask = static_cast<gpg::BitArray2D*>(mHitMask);
-    hitMask->~BitArray2D();
-    ::operator delete(hitMask);
-    mHitMask = nullptr;
-  }
+  delete mHitMask;
+  mHitMask = nullptr;
 }
 
 /**
@@ -23684,7 +23421,7 @@ bool moho::CMauiBitmap::HitTest(
   const float localX = x - CScriptLazyVar_float::GetValue(&mLeftLV);
   const float localY = y - CScriptLazyVar_float::GetValue(&mTopLV);
 
-  const auto* const hitMask = static_cast<const gpg::BitArray2D*>(mHitMask);
+  const gpg::BitArray2D* const hitMask = mHitMask;
   if (hitMask != nullptr) {
     const int sampleX = static_cast<int>(localX);
     const int sampleY = static_cast<int>(localY);
@@ -25971,14 +25708,18 @@ gpg::RType* moho::CLuaWldUIProvider::GetClass() const
  *   CLuaWldUIProvider *this, gpg::RRef *out);
  *
  * What it does:
- * Packs `{reflection-object (this - 4), GetClass()}` into a reflection
- * reference handle. The `- 4` adjusts from the reflection sub-object vtable to
- * the owning object, matching the binary's derived-object-ref layout.
+ * Packs `{this, GetClass()}` into a reflection reference handle.
+ *
+ * The `add esi, -4` at 0x0086A3CF is the compiler's, not the source's: this
+ * override sits in the table for the `RObject` sub-object at +4 (vftable
+ * 0x00E47D78), so it receives that sub-object and steps back to the complete
+ * object. Spelling it `reinterpret_cast<char*>(this) - 4` here, where `this` is
+ * already the complete object, published a reference 4 bytes before it.
  */
 gpg::RRef moho::CLuaWldUIProvider::GetDerivedObjectRef()
 {
   gpg::RRef ref{};
-  ref.mObj = reinterpret_cast<char*>(this) - 4;
+  ref.mObj = this;
   ref.mType = GetClass();
   return ref;
 }
@@ -27520,23 +27261,6 @@ namespace
   // the sentinel in `SelectionBracketRenderer.cpp`, so both readers share one
   // object instead of silently splitting the list in two.
 
-  /**
-   * Address: 0x007FC7F0 (FUN_007FC7F0)
-   *
-   * What it does:
-   * Unlinks the global blinky-box intrusive list sentinel from its neighbors,
-   * restores self-links, and returns the sentinel node.
-   */
-  [[maybe_unused]] [[nodiscard]] moho::TDatListItem<moho::BlinkyBox, void>*
-  ResetGlobalBlinkyBoxListSentinelRuntimeLaneAlpha() noexcept
-  {
-    moho::sBlinkyBoxes.mPrev->mNext = moho::sBlinkyBoxes.mNext;
-    moho::sBlinkyBoxes.mNext->mPrev = moho::sBlinkyBoxes.mPrev;
-    moho::sBlinkyBoxes.mNext = &moho::sBlinkyBoxes;
-    moho::sBlinkyBoxes.mPrev = &moho::sBlinkyBoxes;
-    return &moho::sBlinkyBoxes;
-  }
-
   void LinkBlinkyBoxUnitOwner(
     moho::UserEntity* const entity,
     moho::SSelectionWeakRefUserEntity& weakRef
@@ -28799,9 +28523,9 @@ namespace
    * This object is that call, and it is also the source-level invocation
    * that keeps the thunks out of the linker's dead-strip.
    */
-  struct UiRuntimeTypesLuaBinderBootstrap
+  struct UiLuaBinderStartup
   {
-    UiRuntimeTypesLuaBinderBootstrap()
+    UiLuaBinderStartup()
     {
       (void)::moho::register_FlushEvents_LuaFuncDef();
       (void)::moho::register_ClearCurrentFactoryForQueueDisplay_LuaFuncDef();
@@ -28811,7 +28535,7 @@ namespace
     }
   };
 
-  const UiRuntimeTypesLuaBinderBootstrap gUiRuntimeTypesLuaBinderBootstrap{};
+  const UiLuaBinderStartup gUiLuaBinderStartup{};
 } // namespace
 
 namespace
@@ -29450,9 +29174,9 @@ namespace
    * This object is that call, and the source-level invocation that keeps these
    * definitions off the linker's dead-strip list.
    */
-  struct UiRuntimeTypesLuaFuncDefBootstrap
+  struct UiLuaFuncDefStartup
   {
-    UiRuntimeTypesLuaFuncDefBootstrap()
+    UiLuaFuncDefStartup()
     {
       (void)::moho::func__c_CreateCursor_LuaFuncDef();
       (void)::moho::func_CMauiCursorSetDefaultTexture_LuaFuncDef();
@@ -29660,7 +29384,7 @@ namespace
     }
   };
 
-  const UiRuntimeTypesLuaFuncDefBootstrap gUiRuntimeTypesLuaFuncDefBootstrap{};
+  const UiLuaFuncDefStartup gUiLuaFuncDefStartup{};
 } // namespace
 
 namespace moho
