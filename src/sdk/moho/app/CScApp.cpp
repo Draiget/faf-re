@@ -1163,7 +1163,7 @@ bool CScApp::CreateDevice()
   const bool useD3D10 = moho::CFG_GetArgOption("/D3D10", 0, nullptr);
   moho::d3d_WindowsCursor = useD3D10;
 
-  gpg::gal::DeviceContext context(useD3D10 ? 2 : 1);
+  gpg::gal::DeviceContext context(useD3D10 ? gpg::gal::DeviceApi::Direct3D10 : gpg::gal::DeviceApi::Direct3D9);
   context.mVSync = moho::OPTIONS_GetInt("vsync") == 1;
   context.AddHead(gpg::gal::Head{});
 
@@ -1291,7 +1291,7 @@ bool CScApp::CreateDevice()
   }
 
   if (!CreateAppFrame(title, maximized, position, context)) {
-    gpg::gal::DeviceContext fallbackContext(useD3D10 ? 2 : 1);
+    gpg::gal::DeviceContext fallbackContext(useD3D10 ? gpg::gal::DeviceApi::Direct3D10 : gpg::gal::DeviceApi::Direct3D9);
     context = fallbackContext;
 
     gpg::gal::Head fallbackHead{};

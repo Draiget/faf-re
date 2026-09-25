@@ -668,7 +668,7 @@ namespace gal {
     public:
       int mCurThreadId = 0;                                    // +0x24 thread that ran Setup
       msvc8::vector<AdapterD3D9> mAdapters;                    // +0x28
-      DeviceContext mDeviceContext{0};                         // +0x38 the context actually in force
+      DeviceContext mDeviceContext{DeviceApi::Unset};          // +0x38 the context actually in force
       boost::shared_ptr<PipelineStateD3D9> mPipelineState;     // +0x6C
       IDirect3D9* mDirect3D = nullptr;                         // +0x74
       IDirect3DDevice9* mDevice = nullptr;                     // +0x78

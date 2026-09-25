@@ -161,15 +161,6 @@ namespace { // TEMPORARY PROBE (do not commit)
      */
     PipelineState::~PipelineState() = default;
 
-    // Mesh-batching hardware capability flags. Console-settable (see
-    // `Moho::CON_mesh_Rebatch`, moho/console/CConCommand.cpp), which writes
-    // these two bytes directly rather than through an accessor - so they need
-    // external linkage rather than living in the anonymous namespace below.
-    // No owning header exists for this backend TU yet; the consumer declares
-    // them `extern` locally where it writes them.
-    std::uint8_t sMeshAllowFloat16 = 1U;
-    std::uint8_t sMeshAllowInstancing = 1U;
-
     namespace
     {
 
@@ -994,112 +985,6 @@ namespace { // TEMPORARY PROBE (do not commit)
     }
 
     /**
-     * Address: 0x00940820 (FUN_00940820)
-     *
-     * What it does:
-     * Reports whether runtime mesh instancing is enabled in both global and
-     * device-context capability lanes.
-     */
-    BOOL func_AllowMeshInstancing()
-    {
-        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
-        return (sMeshAllowInstancing != 0U) && deviceContext->mHWBasedInstancing;
-    }
-
-    /**
-     * Address: 0x009407F0 (FUN_009407F0)
-     *
-     * What it does:
-     * Reports whether float16 mesh formatting is enabled in both global and
-     * device-context capability lanes.
-     */
-    BOOL func_AllowMeshFloat16()
-    {
-        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
-        return (sMeshAllowFloat16 != 0U) && deviceContext->mSupportsFloat16;
-    }
-
-    namespace
-    {
-        // Process-wide cache of the selected hardware vertex formatter
-        // (mirrors the binary global `sCurHardwareVertexFormatter`,
-        // 0x00F8E288). Resolved lazily on first request and reused thereafter.
-        MeshFormatter* sCurrentHardwareVertexFormatter = nullptr;
-
-        // The D3D9 device-type formatter candidates, most-capable first
-        // (mirrors the binary `HardwareVertexFormattersD3D9` table,
-        // 0x00F2E3D8): the float16 formatter is preferred; the plain
-        // hardware formatter is the fallback. The first candidate whose
-        // `AllowMeshInstancing()` gate passes for the current device wins.
-        [[nodiscard]] MeshFormatter* SelectFirstInstancingCapableFormatter(
-            MeshFormatter* const* const candidates
-        )
-        {
-            MeshFormatter* selected = candidates[0];
-            sCurrentHardwareVertexFormatter = selected;
-            if (selected == nullptr) {
-                return nullptr;
-            }
-
-            MeshFormatter* const* cursor = &candidates[1];
-            while (!selected->AllowMeshInstancing()) {
-                selected = *cursor++;
-                sCurrentHardwareVertexFormatter = selected;
-                if (selected == nullptr) {
-                    return nullptr;
-                }
-            }
-
-            return sCurrentHardwareVertexFormatter;
-        }
-    } // namespace
-
-    /**
-     * Address: 0x008E7550 (FUN_008E7550, func_GetHardwareVertexFormatter)
-     *
-     * What it does:
-     * Returns the process-wide hardware vertex formatter for the active
-     * device. Throws a GAL error for any device type other than D3D9/D3D10.
-     * On the first call it walks the device-type candidate list and caches the
-     * first formatter whose `AllowMeshInstancing()` gate passes; later calls
-     * return the cached formatter. The construction/fill/draw paths of
-     * `HardwareMeshBatch` all resolve their formatter through this accessor.
-     */
-    MeshFormatter* GetHardwareVertexFormatter()
-    {
-        const DeviceContext* const deviceContext = ActiveDeviceD3D9().GetDeviceContext();
-        const std::int32_t deviceTypeSelector = deviceContext->mDeviceType - 1;
-
-        if (sCurrentHardwareVertexFormatter != nullptr) {
-            return sCurrentHardwareVertexFormatter;
-        }
-
-        // Device type 1 (D3D9) uses the D3D9 formatter list; device type 2
-        // (D3D10) uses the D3D10 list. The two D3D9 singletons below are the
-        // float16 (preferred) and plain hardware formatters.
-        static Float16HardwareVertexFormatterD3D9 sFloat16FormatterD3D9;
-        static HardwareVertexFormatterD3D9 sHardwareFormatterD3D9;
-        static MeshFormatter* const kHardwareVertexFormattersD3D9[] = {
-            &sFloat16FormatterD3D9,
-            &sHardwareFormatterD3D9,
-            nullptr,
-        };
-
-        if (deviceTypeSelector == 0) {
-            return SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9);
-        }
-
-        if (deviceTypeSelector == 1) {
-            // The D3D10 device path selects from the D3D10 formatter table,
-            // which is owned by the D3D10 backend; the D3D9 backend build does
-            // not construct those singletons, so no candidate is available here.
-            return SelectFirstInstancingCapableFormatter(kHardwareVertexFormattersD3D9);
-        }
-
-        ThrowGalError("MeshVertex.cpp", 92, "unknown graphics API");
-    }
-
-    /**
      * Address: 0x00945160 (FUN_00945160)
      *
      * What it does:
@@ -1185,56 +1070,22 @@ namespace { // TEMPORARY PROBE (do not commit)
 
     /**
      * Address: 0x009451D0 (FUN_009451D0)
+     * Address: 0x00945600 (FUN_00945600, slot 0: the scalar deleting destructor)
      *
      * What it does:
-     * Runs the non-deleting teardown body and restores the base
-     * `MeshFormatter` vtable lane.
+     * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
      */
     HardwareVertexFormatterD3D9::~HardwareVertexFormatterD3D9() = default;
-
-    /**
-     * Address: 0x00C09610 (FUN_00C09610, ??1HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
-     *
-     * What it does:
-     * Preserves one startup-registered shutdown thunk lane by constructing one
-     * typed adapter object and forwarding teardown into
-     * `HardwareVertexFormatterD3D9::~HardwareVertexFormatterD3D9`
-     * (`FUN_009451D0`).
-     */
-    void ShutdownHardwareVertexFormatterD3D9Adapter()
-    {
-        alignas(HardwareVertexFormatterD3D9) unsigned char formatterStorage[sizeof(HardwareVertexFormatterD3D9)]{};
-        auto* const formatter = new (static_cast<void*>(formatterStorage)) HardwareVertexFormatterD3D9();
-        formatter->~HardwareVertexFormatterD3D9();
-    }
-
-    /**
-     * Address: 0x00945600 (FUN_00945600)
-     *
-     * What it does:
-     * Owns the scalar-deleting destroy thunk for hardware-vertex formatter instances.
-     */
-    MeshFormatter* HardwareVertexFormatterD3D9::Destroy(const std::uint8_t deleteFlags)
-    {
-        this->~HardwareVertexFormatterD3D9();
-        auto* const formatter = static_cast<MeshFormatter*>(this);
-        if ((deleteFlags & 1U) != 0U)
-        {
-            ::operator delete(formatter);
-        }
-
-        return formatter;
-    }
 
     /**
      * Address: 0x009451E0 (FUN_009451E0)
      *
      * What it does:
-     * Reports whether the hardware formatter can use mesh instancing.
+     * Tail-calls `MeshInstancingEnabled`.
      */
     bool HardwareVertexFormatterD3D9::AllowMeshInstancing()
     {
-        return func_AllowMeshInstancing() != FALSE;
+        return MeshInstancingEnabled();
     }
 
     /**
@@ -1274,57 +1125,22 @@ namespace { // TEMPORARY PROBE (do not commit)
 
     /**
      * Address: 0x00945390 (FUN_00945390)
+     * Address: 0x00945620 (FUN_00945620, slot 0: the scalar deleting destructor)
      *
      * What it does:
-     * Runs the non-deleting teardown body and restores the base
-     * `MeshFormatter` vtable lane.
+     * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
      */
     Float16HardwareVertexFormatterD3D9::~Float16HardwareVertexFormatterD3D9() = default;
-
-    /**
-     * Address: 0x00C09620 (FUN_00C09620, ??1Float16HardwareVertexFormatterD3D9@gal@gpg@@QAE@@Z)
-     *
-     * What it does:
-     * Preserves one startup-registered shutdown thunk lane by constructing one
-     * typed adapter object and forwarding teardown into
-     * `Float16HardwareVertexFormatterD3D9::~Float16HardwareVertexFormatterD3D9`
-     * (`FUN_00945390`).
-     */
-    void ShutdownFloat16HardwareVertexFormatterD3D9Adapter()
-    {
-        alignas(Float16HardwareVertexFormatterD3D9)
-            unsigned char formatterStorage[sizeof(Float16HardwareVertexFormatterD3D9)]{};
-        auto* const formatter = new (static_cast<void*>(formatterStorage)) Float16HardwareVertexFormatterD3D9();
-        formatter->~Float16HardwareVertexFormatterD3D9();
-    }
-
-    /**
-     * Address: 0x00945620 (FUN_00945620)
-     *
-     * What it does:
-     * Owns the scalar-deleting destroy thunk for float16 hardware-vertex formatter instances.
-     */
-    MeshFormatter* Float16HardwareVertexFormatterD3D9::Destroy(const std::uint8_t deleteFlags)
-    {
-        this->~Float16HardwareVertexFormatterD3D9();
-        auto* const formatter = static_cast<MeshFormatter*>(this);
-        if ((deleteFlags & 1U) != 0U)
-        {
-            ::operator delete(formatter);
-        }
-
-        return formatter;
-    }
 
     /**
      * Address: 0x009453A0 (FUN_009453A0)
      *
      * What it does:
-     * Reports whether float16 formatter instancing is allowed by both runtime gates.
+     * Needs both switches: instancing first, then float16.
      */
     bool Float16HardwareVertexFormatterD3D9::AllowMeshInstancing()
     {
-        return (func_AllowMeshInstancing() != FALSE) && (func_AllowMeshFloat16() != FALSE);
+        return MeshInstancingEnabled() && MeshFloat16Enabled();
     }
 
     /**
@@ -1601,7 +1417,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * What it does:
      * Builds an empty device: every member has its initializer, so the body
      * is empty (the stores at 0x008EFD84..0x008EFDB5 are those
-     * initializers, `DeviceContext(0)` included). `Device::Create` then
+     * initializers, `DeviceContext(DeviceApi::Unset)` included). `Device::Create` then
      * runs `Setup`.
      */
     DeviceD3D9::DeviceD3D9() = default;
@@ -1923,7 +1739,7 @@ namespace { // TEMPORARY PROBE (do not commit)
         SafeRelease(mDevice);
         SafeRelease(mDirect3D);
 
-        mDeviceContext = DeviceContext(0);
+        mDeviceContext = DeviceContext(DeviceApi::Unset);
     }
 
     void DeviceD3D9::Setup(const DeviceContext* const context)

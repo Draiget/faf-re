@@ -650,7 +650,7 @@ namespace gal {
       CreateDXGIFactoryFn mCreateDXGIFactory = nullptr;               // +0x48
       int mCurThreadId = 0;                                           // +0x4C
       msvc8::vector<msvc8::string> mLog{};                            // +0x50
-      DeviceContext mDeviceContext{0};                                // +0x60
+      DeviceContext mDeviceContext{DeviceApi::Unset};                 // +0x60
       msvc8::vector<AdapterD3D10> mAdapters{};                        // +0x94
       msvc8::vector<IDXGISwapChain*> mSwapChains{};                   // +0xA4
       boost::shared_ptr<PipelineStateD3D10> mPipelineState{};         // +0xB4

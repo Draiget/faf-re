@@ -24,18 +24,12 @@ namespace gpg::gal
 
 		/**
 		 * Address: 0x0094D780 (FUN_0094D780)
+		 * Address: 0x0094D910 (FUN_0094D910, slot 0: the scalar deleting destructor)
 		 *
 		 * What it does:
-		 * Runs the non-deleting destructor body and restores the base
-		 * `MeshFormatter` vtable lane.
+		 * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
 		 */
-		~Float16HardwareVertexFormatterD3D10();
-
-		/**
-		 * Address: 0x0094D910 (FUN_0094D910, scalar deleting destructor thunk)
-		 * Slot: 0
-		 */
-		MeshFormatter* Destroy(std::uint8_t deleteFlags) override;
+		~Float16HardwareVertexFormatterD3D10() override;
 
 		/**
 		 * Address: 0x0094D790 (FUN_0094D790)

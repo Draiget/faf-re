@@ -46,18 +46,11 @@
 #include "moho/terrain/water/WaterSurface.h"
 #include "gpg/core/containers/Rect2.h"
 #include "gpg/gal/Matrix.h"
+#include "gpg/gal/MeshFormatter.h"
 #include "gpg/core/utils/Logging.h"
 #include "moho/render/d3d/CD3DRenderTarget.h"
 
 extern "C" int FafProbeFrameSeq(); extern "C" int FafProbeFrameDiag(); // TEMPORARY PROBE (do not commit)
-namespace gpg::gal
-{
-  // Runtime mesh-instancing capability gate (defined in the D3D9 backend TU,
-  // 0x00940820). The hardware mesh-batch factory only allocates a
-  // HardwareMeshBatch when this reports enabled. Returns Win32 BOOL (int).
-  int func_AllowMeshInstancing();
-} // namespace gpg::gal
-
 namespace { // TEMPORARY PROBE (do not commit)
   // TEMPORARY PROBE (do not commit): describe a native IDirect3DTexture9 (level 0).
   void ProbeLogTextureDesc(const char* const tag, IDirect3DTexture9* const nativeTexture)
@@ -3975,7 +3968,7 @@ namespace moho
 
       // Instancing capability gate: with no hardware instancing the LOD keeps a
       // null cached batch and falls back to the non-batched draw path.
-      if (gpg::gal::func_AllowMeshInstancing() == 0) {
+      if (!gpg::gal::MeshInstancingEnabled()) {
         return nullptr;
       }
 

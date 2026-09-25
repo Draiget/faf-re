@@ -1123,9 +1123,8 @@ namespace moho
       return;
     }
 
-    constexpr std::int32_t kDeviceTypeD3D10 = 2;
     const int passCount = technique->BeginTechnique();
-    if (passCount == 1 && device->GetDeviceContext()->mDeviceType != kDeviceTypeD3D10) {
+    if (passCount == 1 && device->GetDeviceContext()->mDeviceType != gpg::gal::DeviceApi::Direct3D10) {
       technique->BeginPass(0);
       device->DrawIndexedPrimitive(&drawContext);
       sOpenPassTechnique = technique;

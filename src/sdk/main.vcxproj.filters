@@ -591,6 +591,9 @@
     <ClCompile Include="gpg\gal\MeshFormatter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="gpg\gal\MeshVertex.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="gpg\gal\StateCache.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

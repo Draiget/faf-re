@@ -88,8 +88,9 @@ namespace gpg::gal
      *
      * What it does:
      * Replaces the active device with a new backend for
-     * `context->mDeviceType` (1 = D3D9, 2 = D3D10; anything else throws
-     * "unknown API requested"), brings it up for `context`, and returns it.
+     * `context->mDeviceType` (`DeviceApi::Direct3D9` or `Direct3D10`; anything
+     * else throws "unknown API requested"), brings it up for `context`, and
+     * returns it.
      */
     static Device* Create(DeviceContext* context);
 

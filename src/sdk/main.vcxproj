@@ -1430,6 +1430,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="gpg\gal\GalInterfaces.cpp" />
     <ClCompile Include="gpg\gal\Matrix.cpp" />
     <ClCompile Include="gpg\gal\MeshFormatter.cpp" />
+    <ClCompile Include="gpg\gal\MeshVertex.cpp" />
     <ClCompile Include="gpg\gal\StateCache.cpp" />
     <ClCompile Include="gpg\gal\StringUtils.cpp">
       <ObjectFileName>$(IntDir)gpg_gal_StringUtils.obj</ObjectFileName>

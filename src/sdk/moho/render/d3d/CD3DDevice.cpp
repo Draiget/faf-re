@@ -21,7 +21,6 @@
 #include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
-#include "gpg/gal/MeshFormatter.h"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
@@ -65,7 +64,6 @@ namespace
   float sDeltaFrame = 0.0f;
   float sWeightedFrameRate = 0.0f;
   std::int32_t sCurGameTick = 0;
-  gpg::gal::MeshFormatter* sCurHardwareVertexFormatter = nullptr;
 
   [[nodiscard]] std::int32_t FloatToBits(const float value) noexcept
   {
@@ -2060,16 +2058,5 @@ namespace moho
   int REN_GetGameTick()
   {
     return sCurGameTick;
-  }
-
-  /**
-   * Address: 0x008E7540 (FUN_008E7540, func_ResetHarwareVertexFormatter)
-   *
-   * What it does:
-   * Clears the current hardware-vertex formatter cache pointer.
-   */
-  void REN_ResetHardwareVertexFormatter() noexcept
-  {
-    sCurHardwareVertexFormatter = nullptr;
   }
 } // namespace moho

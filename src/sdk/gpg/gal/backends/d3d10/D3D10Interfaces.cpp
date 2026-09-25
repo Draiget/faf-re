@@ -2163,7 +2163,7 @@ namespace gpg::gal
       ReleaseComLike(backend->mRttInputLayout);
 
       backend->mCursor.Destroy();
-      backend->mDeviceContext = DeviceContext(0);
+      backend->mDeviceContext = DeviceContext(DeviceApi::Unset);
       backend->mLog.clear();
       backend->mCurThreadId = 0;
 
@@ -2561,57 +2561,23 @@ namespace gpg::gal
 
   /**
    * Address: 0x0094D500 (FUN_0094D500)
+   * Address: 0x0094D8F0 (FUN_0094D8F0, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Runs the non-deleting teardown body and restores the base
-   * `MeshFormatter` vtable lane.
+   * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
    */
   HardwareVertexFormatterD3D10::~HardwareVertexFormatterD3D10() = default;
-
-  /**
-   * Address: 0x00C09630 (FUN_00C09630, ??1HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
-   *
-   * What it does:
-   * Preserves one startup-registered shutdown thunk lane by constructing one
-   * typed adapter object and forwarding teardown into
-   * `HardwareVertexFormatterD3D10::~HardwareVertexFormatterD3D10`
-   * (`FUN_0094D500`).
-   */
-  void ShutdownHardwareVertexFormatterD3D10Adapter()
-  {
-    alignas(HardwareVertexFormatterD3D10) unsigned char formatterStorage[sizeof(HardwareVertexFormatterD3D10)]{};
-    auto* const formatter = new (static_cast<void*>(formatterStorage)) HardwareVertexFormatterD3D10();
-    formatter->~HardwareVertexFormatterD3D10();
-  }
-
-  /**
-   * Address: 0x0094D8F0 (FUN_0094D8F0)
-   *
-   * What it does:
-   * Owns the scalar-deleting destroy thunk for hardware formatter wrappers.
-   */
-  MeshFormatter* HardwareVertexFormatterD3D10::Destroy(const std::uint8_t deleteFlags)
-  {
-    this->~HardwareVertexFormatterD3D10();
-    auto* const formatter = static_cast<MeshFormatter*>(this);
-    if ((deleteFlags & 1U) != 0U) {
-      ::operator delete(formatter);
-    }
-
-    return formatter;
-  }
 
   /**
    * Address: 0x0094D510 (FUN_0094D510)
    *
    * What it does:
-   * Reports whether hardware mesh instancing is enabled in the active
-   * device-context capability lane.
+   * Returns the active device context's hardware-instancing flag. Unlike the
+   * D3D9 formatters it ignores the `mesh_Rebatch` switches.
    */
   bool HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    const DeviceContext* const context = static_cast<DeviceD3D10*>(Device::GetInstance())->GetDeviceContext();
-    return context->mHWBasedInstancing;
+    return Device::GetInstance()->GetDeviceContext()->mHWBasedInstancing;
   }
 
   /**
@@ -2710,107 +2676,23 @@ namespace gpg::gal
 
   /**
    * Address: 0x0094D780 (FUN_0094D780)
+   * Address: 0x0094D910 (FUN_0094D910, slot 0: the scalar deleting destructor)
    *
    * What it does:
-   * Runs the non-deleting teardown body and restores the base
-   * `MeshFormatter` vtable lane.
+   * Nothing of its own; reinstalls the base `MeshFormatter` vtable.
    */
   Float16HardwareVertexFormatterD3D10::~Float16HardwareVertexFormatterD3D10() = default;
-
-  /**
-   * Address: 0x00C09640 (FUN_00C09640, ??1Float16HardwareVertexFormatterD3D10@gal@gpg@@QAE@@Z)
-   *
-   * What it does:
-   * Preserves one startup-registered shutdown thunk lane by constructing one
-   * typed adapter object and forwarding teardown into
-   * `Float16HardwareVertexFormatterD3D10::~Float16HardwareVertexFormatterD3D10`
-   * (`FUN_0094D780`).
-   */
-  void ShutdownFloat16HardwareVertexFormatterD3D10Adapter()
-  {
-    alignas(Float16HardwareVertexFormatterD3D10)
-      unsigned char formatterStorage[sizeof(Float16HardwareVertexFormatterD3D10)]{};
-    auto* const formatter = new (static_cast<void*>(formatterStorage)) Float16HardwareVertexFormatterD3D10();
-    formatter->~Float16HardwareVertexFormatterD3D10();
-  }
-
-  namespace
-  {
-    HardwareVertexFormatterD3D10 gHardwareVertexFormatterD3D10;
-    Float16HardwareVertexFormatterD3D10 gFloat16HardwareVertexFormatterD3D10;
-  } // namespace
-
-  /**
-   * Address: 0x00BE9B40 (FUN_00BE9B40, register_HardwareVertexFormatterD3D10)
-   *
-   * What it does:
-   * Constructs the process-wide D3D10 hardware-vertex formatter instance and
-   * installs its exit-time teardown (ShutdownHardwareVertexFormatterD3D10Adapter,
-   * matching the same "typed adapter" teardown lane its D3D9 sibling and this
-   * class's own destructor already model).
-   */
-  void register_HardwareVertexFormatterD3D10()
-  {
-    (void)gHardwareVertexFormatterD3D10;
-    (void)std::atexit(&ShutdownHardwareVertexFormatterD3D10Adapter);
-  }
-
-  /**
-   * Address: 0x00BE9B60 (FUN_00BE9B60, register_Float16HardwareVertexFormatterD3D10)
-   *
-   * What it does:
-   * Constructs the process-wide D3D10 float16 hardware-vertex formatter
-   * instance and installs its exit-time teardown
-   * (ShutdownFloat16HardwareVertexFormatterD3D10Adapter).
-   */
-  void register_Float16HardwareVertexFormatterD3D10()
-  {
-    (void)gFloat16HardwareVertexFormatterD3D10;
-    (void)std::atexit(&ShutdownFloat16HardwareVertexFormatterD3D10Adapter);
-  }
-
-  namespace
-  {
-    struct D3D10HardwareVertexFormatterBootstrap
-    {
-      D3D10HardwareVertexFormatterBootstrap()
-      {
-        register_HardwareVertexFormatterD3D10();
-        register_Float16HardwareVertexFormatterD3D10();
-      }
-    };
-
-    [[maybe_unused]] D3D10HardwareVertexFormatterBootstrap gD3D10HardwareVertexFormatterBootstrap;
-  } // namespace
-
-  /**
-   * Address: 0x0094D910 (FUN_0094D910)
-   *
-   * What it does:
-   * Owns the scalar-deleting destroy thunk for float16 formatter wrappers.
-   */
-  MeshFormatter* Float16HardwareVertexFormatterD3D10::Destroy(const std::uint8_t deleteFlags)
-  {
-    this->~Float16HardwareVertexFormatterD3D10();
-    auto* const formatter = static_cast<MeshFormatter*>(this);
-    if ((deleteFlags & 1U) != 0U) {
-      ::operator delete(formatter);
-    }
-
-    return formatter;
-  }
 
   /**
    * Address: 0x0094D790 (FUN_0094D790)
    *
    * What it does:
-   * Reports whether float16 mesh instancing is enabled by both device-context
-   * capability flags (`+0x11` and `+0x12`).
+   * Needs both of the active device context's flags, hardware instancing
+   * (+0x11) and float16 (+0x12); ignores the `mesh_Rebatch` switches.
    */
   bool Float16HardwareVertexFormatterD3D10::AllowMeshInstancing()
   {
-    Device* const device = Device::GetInstance();
-    const DeviceContext* const context = static_cast<DeviceD3D10*>(device)->GetDeviceContext();
+    const DeviceContext* const context = Device::GetInstance()->GetDeviceContext();
     return context->mHWBasedInstancing && context->mSupportsFloat16;
   }
 
@@ -4078,7 +3960,7 @@ namespace gpg::gal
    *
    * What it does:
    * Installs the vtable, builds the output context at +0x04, zeroes the
-   * module, export and COM lanes, builds the embedded `DeviceContext(0)` at
+   * module, export and COM lanes, builds the embedded `DeviceContext(Unset)` at
    * +0x60 and the cursor at +0x11C. Every one of those is a member
    * initializer on the class, so the body is empty: this used to be a free
    * factory that `new`ed an overlay and then reset each member by hand.

@@ -9,6 +9,22 @@
 namespace gpg::gal
 {
     /**
+     * The graphics API a device context asks for, stored as the dword at
+     * `DeviceContext` +0x04. `Device::Create` builds a `DeviceD3D9` for
+     * `Direct3D9` and a `DeviceD3D10` for `Direct3D10` and throws "unknown API
+     * requested" for anything else; `GetHardwareVertexFormatter` picks its
+     * formatter table by the same value. Each backend's own context starts out
+     * `Unset` (both constructors push 0) until `Setup` copies the requested one
+     * in.
+     */
+    enum class DeviceApi : std::int32_t
+    {
+        Unset = 0,
+        Direct3D9 = 1,
+        Direct3D10 = 2,
+    };
+
+    /**
      * VFTABLE: 0x00D420B4
      * COL:     0x00E5EAEC
      */
@@ -21,7 +37,7 @@ namespace gpg::gal
          * What it does:
          * Initializes one device-context record and records requested backend type.
          */
-        explicit DeviceContext(std::int32_t deviceType = 1);
+        explicit DeviceContext(DeviceApi deviceType = DeviceApi::Direct3D9);
 
         /**
          * Address: 0x00430480 (FUN_00430480)
@@ -85,7 +101,7 @@ namespace gpg::gal
         void AddHead(const Head& head);
 
     public:
-        std::int32_t mDeviceType = 0;        // +0x04
+        DeviceApi mDeviceType = DeviceApi::Unset; // +0x04
         bool mValidate = false;              // +0x08
         std::uint8_t padding0x09_[3]{};      // +0x09
         std::int32_t mAdapter = 0;           // +0x0C

@@ -19,6 +19,7 @@
 #include "gpg/core/streams/FileStream.h"
 #include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
+#include "gpg/gal/MeshFormatter.h"
 #include "legacy/containers/Vector.h"
 #include "lua/LuaObject.h"
 #include "lua/LuaRuntimeTypes.h"
@@ -3421,19 +3422,6 @@ void moho::CON_DumpPreloadedTextures(const msvc8::vector<msvc8::string>& args)
   stream.VirtClose(gpg::Stream::ModeBoth);
 }
 
-// `gpg::gal::sMeshAllowInstancing`/`sMeshAllowFloat16`
-// (gpg/gal/backends/d3d9/D3D9Interfaces.cpp) - the binary's `mesh_Rebatch`
-// body writes these two bytes directly, not through an accessor, so this TU
-// needs the same direct access. No owning header exists for the D3D9 backend
-// TU's globals yet, so they are declared `extern` here where they are
-// written, matching the pattern already used elsewhere in this codebase for
-// globals without a home header.
-namespace gpg::gal
-{
-  extern std::uint8_t sMeshAllowFloat16;
-  extern std::uint8_t sMeshAllowInstancing;
-} // namespace gpg::gal
-
 /**
  * Address: 0x007EC220 (FUN_007EC220, Moho::CON_mesh_Rebatch)
  *
@@ -3451,7 +3439,7 @@ void moho::CON_mesh_Rebatch(const msvc8::vector<msvc8::string>& args)
   gpg::gal::sMeshAllowInstancing = TokenEq(ConCommandArg(args, 1), "true") ? 1U : 0U;
   gpg::gal::sMeshAllowFloat16 = TokenEq(ConCommandArg(args, 2), "true") ? 1U : 0U;
 
-  REN_ResetHardwareVertexFormatter();
+  gpg::gal::ResetHardwareVertexFormatter();
   MeshRenderer::GetInstance()->Reset();
 }
 

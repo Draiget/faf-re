@@ -68,7 +68,7 @@ namespace gpg::gal
      * What it does:
      * Initializes one device-context record and records requested backend type.
      */
-    DeviceContext::DeviceContext(const std::int32_t deviceType)
+    DeviceContext::DeviceContext(const DeviceApi deviceType)
         : mDeviceType(deviceType)
     {
     }
@@ -168,14 +168,14 @@ namespace gpg::gal
 
         switch (context->mDeviceType)
         {
-        case 1:
+        case DeviceApi::Direct3D9:
         {
             DeviceD3D9* const device = new DeviceD3D9();
             sDeviceD3D.reset(device);
             device->Setup(context);
             break;
         }
-        case 2:
+        case DeviceApi::Direct3D10:
         {
             DeviceD3D10* const device = new DeviceD3D10();
             sDeviceD3D.reset(device);

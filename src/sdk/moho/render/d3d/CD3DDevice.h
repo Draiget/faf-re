@@ -857,13 +857,4 @@ namespace moho
    * Returns the current render-frame game tick published by `REN_Frame`.
    */
   [[nodiscard]] int REN_GetGameTick();
-
-  /**
-   * Address: 0x008E7540 (FUN_008E7540, func_ResetHarwareVertexFormatter)
-   *
-   * What it does:
-   * Clears the cached hardware-vertex formatter lane so the next mesh pass
-   * re-resolves formatter state.
-   */
-  void REN_ResetHardwareVertexFormatter() noexcept;
 } // namespace moho
