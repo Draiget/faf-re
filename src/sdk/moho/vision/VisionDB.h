@@ -21,6 +21,11 @@ namespace moho
   /**
    * VFTABLE: 0x00E422AC
    * COL:     0x00E98CA0
+   *
+   * The user-side vision database: a loose tree of circles over the map.
+   * `Init` lays down the structural quadtree nodes, every vision-granting user
+   * entity owns one emitter entry through a `Handle`, and the fog-of-war
+   * renderer walks the tree each frame (`TryAdd`).
    */
   class VisionDB
   {
@@ -28,138 +33,203 @@ namespace moho
     class Handle;
 
     /**
+     * One 0x28-byte node of the vision tree (IDA's `VisionDB::Entry`, also
+     * `struct1`). The tree is intrusive: a node points at its parent, at the
+     * first node of the chain it contains, and at the next node of its own
+     * chain. A node sits under the deepest node whose circles contain both of
+     * its own.
+     *
+     * Each node carries two circles, the previous and current samples of the
+     * same moving circle; `TryAdd` interpolates between them. They are
+     * `Wm3::Circle2f`: the binary builds them through that type's
+     * `(center, radius)` constructor, emitted in this TU at 0x0081A7E0.
+     */
+    struct Entry
+    {
+      /**
+       * Address: 0x0081AB70 (FUN_0081AB70)
+       *
+       * What it does:
+       * Zeroes the links, both flags and both circles. `Pool::NewEntry` hands
+       * it to the vector constructor iterator (`push 0x81AB70` at 0x0081AA4B)
+       * for every block it allocates.
+       */
+      Entry() noexcept;
+
+      /**
+       * Empty, but user-provided on purpose: `new Entry[500]` in
+       * `Pool::NewEntry` stores the element count ahead of the block and
+       * passes this destructor (folded into the shared `ret`, nullsub_3 at
+       * 0x006610E0) to the EH vector iterators there and in `~Pool`. A
+       * defaulted destructor would be trivial and drop both.
+       */
+      ~Entry() {}
+
+      /**
+       * Whether both of this node's circles enclose `other`'s. Inlined at
+       * every use (`PutInChain`, `Handle::Update`); the per-circle test has an
+       * uncalled out-of-line copy at 0x0081A7F0.
+       */
+      [[nodiscard]] bool Contains(const Entry& other) const noexcept;
+
+      /**
+       * Address: 0x0081A8C0 (FUN_0081A8C0)
+       * Address: 0x103E38B0
+       *
+       * What it does:
+       * Appends `entry` after the last node of the chain this node is in;
+       * `entry` joins that chain's parent.
+       */
+      void AddToChain(Entry* entry) noexcept;
+
+      /**
+       * Makes `entry` the first node this one contains, or appends it to the
+       * chain it already contains. Every caller inlines it (`PutInChain`,
+       * `RemoveFromChain`, `GenerateQuadTree`); the binary also keeps an
+       * uncalled out-of-line copy at 0x0081A890.
+       */
+      void AddContained(Entry* entry) noexcept;
+
+      /**
+       * Address: 0x0081A8E0 (FUN_0081A8E0)
+       * Address: 0x103E38D0
+       *
+       * What it does:
+       * Unlinks `entry` from the chain this node contains. The nodes `entry`
+       * contained move up into this node's chain, and `entry` is left with
+       * no links.
+       */
+      void RemoveFromChain(Entry* entry) noexcept;
+
+      /**
+       * Takes this node out of its parent's chain. `Handle::~Handle` and
+       * `Handle::Update` inline it (both reload `mParent` from the node right
+       * before the `RemoveFromChain` call); the binary also keeps an uncalled
+       * out-of-line copy at 0x0081B480.
+       */
+      void Remove() noexcept;
+
+      /**
+       * Address: 0x0081B310 (FUN_0081B310, Moho::VisionDB::Entry::PutInChain)
+       *
+       * What it does:
+       * Links this node under the deepest node, starting at `root`, whose
+       * circles contain both of its own, or under `root` itself when nothing
+       * below it does.
+       */
+      void PutInChain(Entry* root) noexcept;
+
+      Entry* mParent;             // +0x00
+      Entry* mContained;          // +0x04 first node of the chain this one contains
+      Entry* mNext;               // +0x08 next node in this node's own chain
+      bool mIsReal;               // +0x0C an emitter held by a Handle, not a quadtree node
+      bool mVisible;              // +0x0D the emitter currently grants vision
+      Wm3::Circle2f mPrevCircle;  // +0x10
+      Wm3::Circle2f mCurCircle;   // +0x1C
+    };
+    MOHO_VISIONDB_X86_ASSERT(sizeof(Entry) == 0x28, "VisionDB::Entry size must be 0x28");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mParent) == 0x00, "VisionDB::Entry::mParent offset must be 0x00");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mContained) == 0x04, "VisionDB::Entry::mContained offset must be 0x04");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mNext) == 0x08, "VisionDB::Entry::mNext offset must be 0x08");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mIsReal) == 0x0C, "VisionDB::Entry::mIsReal offset must be 0x0C");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mVisible) == 0x0D, "VisionDB::Entry::mVisible offset must be 0x0D");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mPrevCircle) == 0x10, "VisionDB::Entry::mPrevCircle offset must be 0x10");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Entry, mCurCircle) == 0x1C, "VisionDB::Entry::mCurCircle offset must be 0x1C");
+
+    /**
      * VFTABLE: 0x00E422B4
      * COL:     0x00E98C58
+     *
+     * Block allocator for entries: 500 at a time, recycled through a free
+     * list, and released only when the pool dies. Both lists hold one
+     * `Entry*` per node - the `{next, prev, value}` 0x0C node and
+     * `{proxy, head, size}` 0x0C head of `msvc8::list`, which is what IDA
+     * types the free list (`_List_nod_VisionDB_Entry::_Node`, 0x0081BA00).
      */
     class Pool
     {
     public:
-      /**
-       * 0x28-byte pooled vision node.
-       *
-       * Address: 0x0081AB70 (FUN_0081AB70)
-       * Mangled: ??0struct1@VisionDB@Moho@@QAE@@Z
-       *
-       * What it does:
-       * Stores owner/tree links, visibility flags, and previous/current 2D circles.
-       */
-      struct EntryCircle
-      {
-        float x{0.0f};      // +0x00
-        float y{0.0f};      // +0x04
-        float radius{0.0f}; // +0x08
-      };
-      MOHO_VISIONDB_X86_ASSERT(sizeof(EntryCircle) == 0x0C, "VisionDB::Pool::EntryCircle size must be 0x0C");
-
-      struct PooledNode
-      {
-        void* mParent{nullptr};      // +0x00
-        PooledNode* mContained{nullptr}; // +0x04
-        PooledNode* mNext{nullptr};      // +0x08
-        std::uint8_t mIsReal{0};         // +0x0C
-        std::uint8_t mVis{0};            // +0x0D
-        std::uint16_t mPad0E{0};         // +0x0E
-        EntryCircle mPrevCircle{};       // +0x10
-        EntryCircle mCurCircle{};        // +0x1C
-      };
-      MOHO_VISIONDB_X86_ASSERT(sizeof(PooledNode) == 0x28, "VisionDB::Pool::PooledNode size must be 0x28");
-      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mParent) == 0x00, "VisionDB::Pool::PooledNode::mParent offset must be 0x00");
-      MOHO_VISIONDB_X86_ASSERT(
-        offsetof(PooledNode, mContained) == 0x04, "VisionDB::Pool::PooledNode::mContained offset must be 0x04"
-      );
-      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mNext) == 0x08, "VisionDB::Pool::PooledNode::mNext offset must be 0x08");
-      MOHO_VISIONDB_X86_ASSERT(
-        offsetof(PooledNode, mIsReal) == 0x0C, "VisionDB::Pool::PooledNode::mIsReal offset must be 0x0C"
-      );
-      MOHO_VISIONDB_X86_ASSERT(offsetof(PooledNode, mVis) == 0x0D, "VisionDB::Pool::PooledNode::mVis offset must be 0x0D");
-      MOHO_VISIONDB_X86_ASSERT(
-        offsetof(PooledNode, mPrevCircle) == 0x10, "VisionDB::Pool::PooledNode::mPrevCircle offset must be 0x10"
-      );
-      MOHO_VISIONDB_X86_ASSERT(
-        offsetof(PooledNode, mCurCircle) == 0x1C, "VisionDB::Pool::PooledNode::mCurCircle offset must be 0x1C"
-      );
-
-      using Entry = PooledNode;
-
-      /**
-       * Both of this pool's lists hold one `PooledNode*` per node: the
-       * `{next, prev, value}` 0x0C node and the `{proxy, head, size}` 0x0C
-       * head are `msvc8::list<PooledNode*>` exactly, which is what IDA already
-       * types the free list (`_List_nod_VisionDB_Entry::_Node`, 0x0081BA00)
-       * and what the 0x3FFFFFFF `_Incsize` guard at 0x0081BA40 belongs to.
-       */
-      using EntryList = msvc8::list<PooledNode*>;
-
-      MOHO_VISIONDB_X86_ASSERT(sizeof(EntryList) == 0x0C, "VisionDB::Pool::EntryList size must be 0x0C");
+      /// `new Entry[500]` at 0x0081AA2D (`push 0x4E24` = 4 + 500 * 0x28).
+      static constexpr std::size_t kEntriesPerBlock = 500u;
 
       /**
        * Address: 0x0081ACA0 (FUN_0081ACA0)
        * Mangled: ??0Pool@VisionDB@Moho@@QAE@@Z
        *
        * What it does:
-       * Allocates and self-links zone/free-node list sentinels.
+       * Constructs both lists; each buys and self-links its header sentinel.
        */
       Pool();
 
       /**
-       * Address: 0x0081AD00 (FUN_0081AD00)
+       * Address: 0x0081AD20 (FUN_0081AD20)
+       * Address: 0x0081AD00 (FUN_0081AD00, scalar deleting destructor)
+       * Address: 0x103E3CA0
        * Address: 0x103E3C80
        * Slot: 0
-       * Demangled: Moho::VisionDB::Pool::dtr
        *
        * What it does:
-       * Invokes `Clear()` and optionally deletes the object (scalar deleting dtor).
+       * `delete[]`s every entry block, then the two lists are destroyed.
+       * 0x0081AD20 rewrites the vptr on entry, and `~VisionDB` calls it for
+       * its `pool_` member, so it is the destructor itself, not a `Clear`.
        */
       virtual ~Pool();
-
-      /**
-       * Address: 0x0081AD20 (FUN_0081AD20)
-       * Address: 0x103E3CA0
-       * Demangled: Moho::VisionDB::Pool::Clear
-       *
-       * What it does:
-       * Releases pooled-node blocks, clears both intrusive lists, and frees sentinels.
-       */
-      void Clear();
 
       /**
        * Address: 0x0081AA00 (FUN_0081AA00)
        *
        * What it does:
-       * Obtains one entry from the reusable pool, allocating and seeding a 500-entry
-       * block when the free-list is empty.
+       * Takes the first free entry - allocating a block of 500 and queueing
+       * all of them first when the free list is empty - and initialises it
+       * with the two circles, the emitter flag, no links and not visible.
        */
-      [[nodiscard]] Entry* NewEntry(const EntryCircle& previousCircle, const EntryCircle& currentCircle, bool isReal);
+      [[nodiscard]] Entry* NewEntry(const Wm3::Circle2f& previous, const Wm3::Circle2f& current, bool isReal);
 
-    private:
-      static void FreeZoneBlocks(EntryList& blocks);
+      /**
+       * Address: 0x0081ABF0 (FUN_0081ABF0)
+       * Address: 0x103E3B70
+       *
+       * What it does:
+       * Clears the entry's links and both flags (the circles are left as they
+       * were) and appends it to the free list.
+       */
+      void FreeEntry(Entry* entry);
 
-    public:
-      friend class Handle;
-
-      /// One entry per allocated block; the value is the block's first node,
-      /// and the block's element count sits in the dword before it.
-      EntryList mEntryBlocks{}; // +0x04
-      /// The reusable nodes handed back out by `NewEntry`.
-      EntryList mFreeEntries{}; // +0x10
+      /// One node per block allocated; the value is the block's first entry.
+      msvc8::list<Entry*> mEntryBlocks; // +0x04
+      /// The entries `NewEntry` hands out next.
+      msvc8::list<Entry*> mFreeEntries; // +0x10
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Pool) == 0x1C, "VisionDB::Pool size must be 0x1C");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mEntryBlocks) == 0x04, "VisionDB::Pool::mEntryBlocks offset must be 0x04");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Pool, mFreeEntries) == 0x10, "VisionDB::Pool::mFreeEntries offset must be 0x10");
 
     /**
      * VFTABLE: 0x00E422BC
      * COL:     0x00E98C0C
+     *
+     * One user entity's emitter entry in the tree (`UserEntity::mVisionHandle`).
      */
     class Handle
     {
     public:
       /**
-       * Address: 0x0081AE20 (FUN_0081AE20)
-       * Address: 0x103E3DA0
-       * Slot: 0
-       * Demangled: Moho::VisionDB::Handle::dtr
+       * Address: 0x0081AE10 (FUN_0081AE10)
        *
        * What it does:
-       * Unlinks the pooled node from its owner chain and returns it to the pool free-list.
+       * Stores the owning database and the entry. `NewHandle` inlines it
+       * (0x0081B03C); this is the uncalled out-of-line copy.
+       */
+      Handle(VisionDB* db, Entry* entry) noexcept;
+
+      /**
+       * Address: 0x0081AE60 (FUN_0081AE60)
+       * Address: 0x0081AE20 (FUN_0081AE20, scalar deleting destructor)
+       * Address: 0x103E3DA0
+       * Slot: 0
+       *
+       * What it does:
+       * Takes the entry out of the tree and returns it to the database's pool.
        */
       virtual ~Handle();
 
@@ -167,75 +237,23 @@ namespace moho
        * Address: 0x008B83B0 (FUN_008B83B0, Moho::VisionDB::Handle::Update)
        *
        * What it does:
-       * Refreshes this handle's previous/current circles and visibility bit,
-       * then reparents into the vision tree when containment no longer holds.
+       * Stores the visibility bit and both circles, then moves the entry back
+       * down from the root when its parent no longer contains it.
        */
       void Update(const Wm3::Vector2f& next, const Wm3::Vector2f& previous, float radius, bool visible);
 
-      /**
-       * Address: 0x0081AE10 (FUN_0081AE10)
-       *
-       * What it does:
-       * Stores owner and pooled-node pointers for this handle.
-       */
-      static Handle* Init(Handle* self, std::uintptr_t pooledNodePtr, std::uintptr_t ownerPtr);
-
-    private:
-      /**
-       * Address: 0x0081AE60 (FUN_0081AE60)
-       *
-       * What it does:
-       * Runs the non-deleting handle teardown lane: unlinks this handle's
-       * pooled node from the owner chain and returns it to the VisionDB pool.
-       */
-      void ReleasePooledNodeToOwnerPool();
-
-      struct OwnerChainView
-      {
-        void* mOwnerCookie;     // +0x00
-        Pool::PooledNode* mRoot; // +0x04
-      };
-      MOHO_VISIONDB_X86_ASSERT(sizeof(OwnerChainView) == 0x08, "VisionDB::Handle::OwnerChainView size must be 0x08");
-
-      /**
-       * Address: 0x0081A8C0 (FUN_0081A8C0)
-       * Address: 0x103E38B0
-       *
-       * What it does:
-       * Appends a sibling chain to the tail of another sibling chain.
-       */
-      static void AttachSiblingChain(Pool::PooledNode* tailChain, Pool::PooledNode* chainHead);
-      /**
-       * Address: 0x0081A8E0 (FUN_0081A8E0)
-       * Address: 0x103E38D0
-       *
-       * What it does:
-       * Unlinks a pooled node from its owner chain and reparents children.
-       */
-      static void UnlinkFromOwnerTree(OwnerChainView* ownerChain, Pool::PooledNode* node);
-      /**
-       * Address: 0x0081ABF0 (FUN_0081ABF0)
-       * Address: 0x103E3B70
-       *
-       * What it does:
-       * Clears one pooled node and pushes it back to the pool free-list.
-       */
-      static void ReturnNodeToFreeList(Pool* ownerPool, Pool::PooledNode* node);
-
-    public:
-      std::uintptr_t mDB{0};   // +0x04
-      std::uintptr_t mNode{0}; // +0x08
+      VisionDB* mDB;  // +0x04
+      Entry* mEntry;  // +0x08
     };
     MOHO_VISIONDB_X86_ASSERT(sizeof(Handle) == 0x0C, "VisionDB::Handle size must be 0x0C");
     MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mDB) == 0x04, "VisionDB::Handle::mDB offset must be 0x04");
-    MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mNode) == 0x08, "VisionDB::Handle::mNode offset must be 0x08");
+    MOHO_VISIONDB_X86_ASSERT(offsetof(Handle, mEntry) == 0x08, "VisionDB::Handle::mEntry offset must be 0x08");
 
     /**
      * Address: 0x0081AE90 (FUN_0081AE90, sub_81AE90)
      *
      * What it does:
-     * Initializes one `VisionDB` object: seeds the pool subobject and clears
-     * the root node pointer lane.
+     * Constructs the pool and clears the root.
      */
     VisionDB();
 
@@ -243,7 +261,7 @@ namespace moho
      * Address: 0x0081AF00 (FUN_0081AF00, Moho::VisionDB::Init)
      *
      * What it does:
-     * Allocates the root pooled-node entry covering a circle whose center is
+     * Allocates the root entry covering a circle whose center is
      * `(width/2, height/2)` and radius is `2 * sqrt((width/2)^2 + (height/2)^2)`,
      * stores it as the vision tree root, and recursively subdivides the area
      * via `GenerateQuadTree`.
@@ -258,17 +276,17 @@ namespace moho
      * NE, SE) when `level < maxLevel`. Each child covers a (width/2, height/2)
      * sub-rectangle centered at the corresponding offset from the parent's
      * stored circle center, with bounding-circle radius equal to the
-     * sub-rectangle's diagonal half-length. New nodes are linked into the
-     * parent's `mContained` chain.
+     * sub-rectangle's diagonal half-length.
      */
-    void GenerateQuadTree(Pool::PooledNode* parent, const Wm3::Vector2f& size, int level, int maxLevel);
+    void GenerateQuadTree(Entry* parent, const Wm3::Vector2f& size, int level, int maxLevel);
 
     /**
      * Address: 0x0081AFD0 (FUN_0081AFD0, Moho::VisionDB::NewHandle)
      *
      * What it does:
-     * Allocates one tracked vision handle using previous/current 2D positions
-     * and inserts its pooled node under the root vision entry.
+     * Takes an emitter entry from the pool for the previous/current positions
+     * (radius 0 until the first `Handle::Update`), puts it in the tree from
+     * the root and wraps it in a new `Handle`.
      */
     [[nodiscard]] Handle* NewHandle(const Wm3::Vector2f& current, const Wm3::Vector2f& previous);
 
@@ -302,7 +320,7 @@ namespace moho
      * Interpolates `entry`'s vision circle between its previous and current
      * samples by `interpolant` and tests it against `box`. On overlap it either
      * appends that interpolated circle to `accumulator` (real, currently
-     * visible emitter) or recurses over the entry's `mContained` sibling chain.
+     * visible emitter) or recurses over the entry's `mContained` chain.
      *
      * `accumulator` is the renderer's inline-backed vector and has to stay typed
      * as one: the append grows through the inline-aware lane (0x0081B6E0 ->
@@ -314,7 +332,7 @@ namespace moho
      */
     void TryAdd(
       gpg::fastvector_n<Wm3::Circle2f, kVisibleCircleInlineCapacity>& accumulator,
-      Pool::Entry* entry,
+      Entry* entry,
       const Wm3::Box2f& box,
       float interpolant
     ) const;
@@ -333,8 +351,8 @@ namespace moho
   public:
     friend struct VisionDBLayoutAsserts;
 
-    Pool pool_;                      // +0x04
-    Pool::Entry* rootNode_{nullptr}; // +0x20
+    Pool pool_;                // +0x04
+    Entry* rootNode_{nullptr}; // +0x20
   };
 
   struct VisionDBLayoutAsserts
