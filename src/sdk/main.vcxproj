@@ -344,7 +344,6 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="lua\LuaStateSerializer.cpp" />
     <ClCompile Include="lua\LuaStateTypeInfo.cpp" />
     <ClCompile Include="moho\lua\UnrecoveredLuaCallbackStubs.cpp" />
-    <ClCompile Include="moho\EngineMethodStubs2.cpp" />
     <ClCompile Include="gpg\core\streams\MemBufferStream.cpp" />
     <ClCompile Include="gpg\core\streams\PipeStream.cpp" />
     <ClCompile Include="gpg\core\streams\Stream.cpp" />
@@ -1216,6 +1215,7 @@ if exist "$(FafRunDir)" if exist "$(TargetDir)$(TargetName).pdb" xcopy /D /Y /Q 
     <ClCompile Include="moho\ui\CMauiGroupTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiHistogramTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiItemListTypeInfo.cpp" />
+    <ClCompile Include="moho\ui\CMauiMesh.cpp" />
     <ClCompile Include="moho\ui\CMauiMeshTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiMovieTypeInfo.cpp" />
     <ClCompile Include="moho\ui\CMauiScrollbarTypeInfo.cpp" />

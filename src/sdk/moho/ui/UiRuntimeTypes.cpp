@@ -4772,7 +4772,6 @@ bool moho::ui_ArrowKeysScrollView = true;
 moho::IWldUIProvider* moho::sWldUIProvider = nullptr;
 gpg::RType* moho::CMauiControl::sType = nullptr;
 gpg::RType* moho::CMauiBorder::sType = nullptr;
-gpg::RType* moho::CMauiMesh::sType = nullptr;
 gpg::RType* moho::CMauiCursor::sType = nullptr;
 gpg::RType* moho::CMauiBitmap::sType = nullptr;
 gpg::RType* moho::CMauiFrame::sType = nullptr;
@@ -14867,49 +14866,6 @@ int moho::cfunc_InternalCreateMeshL(
 }
 
 /**
- * Address: 0x0079DDB0 (FUN_0079DDB0, Moho::CMauiMesh::CMauiMesh)
- *
- * What it does:
- * Constructs one mesh control from Lua object + parent lanes and initializes
- * mesh texture/orientation/runtime defaults.
- */
-moho::CMauiMesh::CMauiMesh(
-  LuaPlus::LuaObject* const luaObject,
-  CMauiControl* const parent
-)
-  : CMauiControl(luaObject, parent, "Mesh")
-{
-  CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
-  meshView->mTexture = {};
-  meshView->mIsRotated = false;
-  meshView->mMeshBlueprint = nullptr;
-  meshView->mOrientation = Wm3::Quaternionf::Identity();
-  meshView->mUnknown13C = -1;
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
-}
-
-/**
- * Address: 0x0079DE70 (FUN_0079DE70, Moho::CMauiMesh::dtr)
- *
- * What it does:
- * Releases the mesh preview texture shared-pointer lane and continues base
- * control teardown.
- */
-moho::CMauiMesh::~CMauiMesh()
-{
-  CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
-  meshView->mTexture.reset();
-}
-
-/**
- * Address: 0x0079E580 (FUN_0079E580, Moho::CMauiMesh::Dump)
- *
- * What it does:
- * No-op dump lane used by the mesh control vtable.
- */
-void moho::CMauiMesh::Dump() {}
-
-/**
  * Address: 0x0079F540 (FUN_0079F540, cfunc_InternalCreateMovie)
  *
  * What it does:
@@ -17090,103 +17046,6 @@ int moho::cfunc_CMauiItemListGetStringAdvanceL(
 }
 
 /**
- * Address: 0x0079DF40 (FUN_0079DF40, Moho::CMauiMesh::SetMesh)
- *
- * What it does:
- * Resolves one mesh blueprint from active world rules and updates the mesh
- * control runtime lanes.
- */
-void moho::CMauiMesh::SetMesh(
-  const char* const meshBlueprintName
-)
-{
-  CWldSession* const worldSession = WLD_GetActiveSession();
-  if (worldSession == nullptr) {
-    return;
-  }
-
-  RResId meshId{};
-  gpg::STR_InitFilename(&meshId.name, meshBlueprintName != nullptr ? meshBlueprintName : "");
-
-  CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
-  meshView->mMeshBlueprint = worldSession->mRules->GetMeshBlueprint(meshId);
-  meshView->mIsRotated = true;
-}
-
-/**
- * Address: 0x0079E430 (FUN_0079E430, Moho::CMauiMesh::Draw)
- *
- * What it does:
- * Binds current mesh texture lane and draws one fullscreen quad over this
- * control rectangle with fixed UV mapping.
- */
-void moho::CMauiMesh::DoRender(
-  CD3DPrimBatcher* const primBatcher,
-  const std::int32_t drawMask
-)
-{
-  (void)drawMask;
-  const CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
-
-  const float left = CScriptLazyVar_float::GetValue(&meshView->mLeftLV);
-  const float top = CScriptLazyVar_float::GetValue(&meshView->mTopLV);
-  const float right = CScriptLazyVar_float::GetValue(&meshView->mRightLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&meshView->mBottomLV);
-
-  primBatcher->SetTexture(meshView->mTexture);
-
-  CD3DPrimBatcher::Vertex topLeft{};
-  topLeft.mX = left;
-  topLeft.mY = top;
-  topLeft.mZ = 0.0f;
-  topLeft.mColor = 0xFFFFFFFFu;
-  topLeft.mU = 0.0f;
-  topLeft.mV = 0.0f;
-
-  CD3DPrimBatcher::Vertex topRight{};
-  topRight.mX = right;
-  topRight.mY = top;
-  topRight.mZ = 0.0f;
-  topRight.mColor = 0xFFFFFFFFu;
-  topRight.mU = 1.0f;
-  topRight.mV = 0.0f;
-
-  CD3DPrimBatcher::Vertex bottomRight{};
-  bottomRight.mX = right;
-  bottomRight.mY = bottom;
-  bottomRight.mZ = 0.0f;
-  bottomRight.mColor = 0xFFFFFFFFu;
-  bottomRight.mU = 1.0f;
-  bottomRight.mV = 1.0f;
-
-  CD3DPrimBatcher::Vertex bottomLeft{};
-  bottomLeft.mX = left;
-  bottomLeft.mY = bottom;
-  bottomLeft.mZ = 0.0f;
-  bottomLeft.mColor = 0xFFFFFFFFu;
-  bottomLeft.mU = 0.0f;
-  bottomLeft.mV = 1.0f;
-
-  primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
-}
-
-/**
- * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
- *
- * What it does:
- * Stores one new orientation quaternion and enables mesh-rotation runtime
- * lane updates.
- */
-void moho::CMauiMesh::SetOrientation(
-  const Wm3::Quaternionf& orientation
-)
-{
-  CMauiMeshRuntimeView* const meshView = CMauiMeshRuntimeView::FromMesh(this);
-  meshView->mOrientation = orientation;
-  meshView->mIsRotated = true;
-}
-
-/**
  * Address: 0x0079E740 (FUN_0079E740, cfunc_CMauiMeshSetMesh)
  *
  * What it does:
@@ -17282,10 +17141,11 @@ moho::CScrLuaInitForm* moho::func_CMauiMeshSetOrientation_LuaFuncDef()
 }
 
 /**
- * Alias of FUN_0079E930 (non-canonical helper lane).
+ * Address: 0x0079E930 (FUN_0079E930, cfunc_CMauiMeshSetOrientationL)
  *
  * What it does:
- * Reads one `CMauiMesh` plus quaternion arg and stores mesh orientation.
+ * Reads one `CMauiMesh` plus quaternion arg and stores mesh orientation
+ * (`CMauiMesh::SetOrientation`, inlined here in the binary).
  */
 int moho::cfunc_CMauiMeshSetOrientationL(
   LuaPlus::LuaState* const state
@@ -27780,37 +27640,6 @@ gpg::RType* moho::CMauiBorder::GetClass() const
  * Packs `{this, GetClass()}` as a reflection reference handle.
  */
 gpg::RRef moho::CMauiBorder::GetDerivedObjectRef()
-{
-  gpg::RRef ref{};
-  ref.mObj = this;
-  ref.mType = GetClass();
-  return ref;
-}
-
-/**
- * Address: 0x0079DC10 (FUN_0079DC10, Moho::CMauiMesh::GetClass)
- *
- * What it does:
- * Returns the cached reflection descriptor for `CMauiMesh`, looked up by RTTI on
- * first use. Overrides the base CMauiControl accessor with the mesh-specific type
- * cache (the inherited stub returned the wrong/none type).
- */
-gpg::RType* moho::CMauiMesh::GetClass() const
-{
-  if (!sType) {
-    sType = gpg::LookupRType(typeid(CMauiMesh));
-  }
-  return sType;
-}
-
-/**
- * Address: 0x0079DC30 (FUN_0079DC30, Moho::CMauiMesh::GetDerivedObjectRef)
- *
- * What it does:
- * Packs `{this, GetClass()}` into a reflection reference handle (matching the
- * binary's `*out = this; out[1] = this->GetClass()`).
- */
-gpg::RRef moho::CMauiMesh::GetDerivedObjectRef()
 {
   gpg::RRef ref{};
   ref.mObj = this;

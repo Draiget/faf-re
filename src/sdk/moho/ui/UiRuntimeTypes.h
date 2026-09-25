@@ -3536,20 +3536,11 @@ namespace moho
      * Address: 0x0079E100 (FUN_0079E100, Moho::CMauiMesh::OnFrame)
      *
      * What it does:
-     * Recreates mesh thumbnail texture-sheet storage when control dimensions
-     * change, then refreshes mesh thumbnail rendering when mesh/rotation lanes
-     * are marked dirty.
-     *
-     * The elided body invokes the following helper; with the body
-     * stubbed in EngineMethodStubs2.cpp (typed
-     * `CD3DDynamicTextureSheet` lock/get-size/unlock surface and
-     * `REN_RequestThumbnail` chain still under recovery), this helper
-     * is never invoked from the modern source and its role is absorbed
-     * by the elision of the thumbnail refresh lane:
-     *   - 0x0079E0B0 (`ZeroDynamicTextureSheetBuffer` — locks the
-     *     dynamic texture sheet at `this->mTextureSheet`, memsets
-     *     the locked buffer to zero, then unlocks; called before
-     *     `REN_RequestThumbnail` to clear stale pixels)
+     * Keeps the thumbnail sheet the size of the control: creates it on the
+     * first frame, and releases and recreates it (marking the thumbnail dirty)
+     * when the control's width or height no longer match. While the thumbnail
+     * is dirty and a mesh is set, clears the sheet and queues a thumbnail
+     * render of the mesh at the current orientation into it.
      */
     void Frame(float deltaSeconds) override;
 
@@ -3581,11 +3572,9 @@ namespace moho
     void Dump() override;
 
     /**
-       * Address: 0x0079E930 (FUN_0079E930)
-     *
-     * What it does:
-     * Stores one new mesh orientation quaternion and marks this mesh as
-     * rotated for frame updates.
+     * Stores a new mesh orientation and marks the thumbnail dirty. Inlined into
+     * its only caller, `cfunc_CMauiMeshSetOrientationL` (0x0079E930); the
+     * binary has no out-of-line copy.
      */
     void SetOrientation(const Wm3::Quaternionf& orientation);
 
@@ -3622,25 +3611,40 @@ namespace moho
      * base `CMauiControl` teardown.
      */
     ~CMauiMesh() override;
-    // ---------------------------------------------------------------------
-    // State the binary allocates for this control, +0x11C..+0x140.
-    // `cfunc_InternalCreateMeshL` calls `operator new(0x140)`, but this class
-    // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiMeshRuntimeView` -- which describes
-    // exactly this run -- wrote past the end of the heap block.
-    // ---------------------------------------------------------------------
-    boost::shared_ptr<CD3DBatchTexture> mTexture;  // +0x11C
-    bool mIsRotated = false;                       // +0x124
-    std::uint8_t mPad125To127[0x3]{};
-    RMeshBlueprint* mMeshBlueprint = nullptr;      // +0x128
-    Wm3::Quaternionf mOrientation{};               // +0x12C
-    std::int32_t mUnknown13C = 0;                  // +0x13C
+
+  private:
+    /**
+     * Address: 0x0079E0B0 (FUN_0079E0B0)
+     *
+     * What it does:
+     * Locks the thumbnail sheet, zeroes `GetTextureSizeInBytes()` bytes of it
+     * and unlocks it, so a new thumbnail starts from a transparent sheet.
+     */
+    void ClearThumbnailSheet();
+
+  public:
+    // State the binary allocates for this control, +0x11C..+0x140
+    // (`cfunc_InternalCreateMeshL` calls `operator new(0x140)`).
+
+    /// Dynamic sheet the thumbnail renderer draws the mesh into and `DoRender`
+    /// shows; created by `ID3DDeviceResources::NewDynamicTextureSheet`.
+    boost::shared_ptr<ID3DTextureSheet> mThumbnailSheet; // +0x11C
+    /// Set by `SetMesh`, `SetOrientation` and a sheet resize; `Frame` renders
+    /// and clears it.
+    bool mThumbnailDirty = false;                        // +0x124
+    RMeshBlueprint* mMeshBlueprint = nullptr;            // +0x128
+    Wm3::Quaternionf mOrientation{};                     // +0x12C
+    /// `REN_RequestThumbnail`'s color argument; the constructor sets
+    /// 0xFFFFFFFF and nothing writes it afterwards.
+    std::uint32_t mThumbnailColor = 0;                   // +0x13C
   };
 
   static_assert(sizeof(CMauiMesh) == 0x140, "CMauiMesh size must be 0x140");
-  static_assert(offsetof(CMauiMesh, mTexture) == 0x11c, "CMauiMesh::mTexture offset must be 0x11c");
+  static_assert(offsetof(CMauiMesh, mThumbnailSheet) == 0x11C, "CMauiMesh::mThumbnailSheet offset must be 0x11C");
+  static_assert(offsetof(CMauiMesh, mThumbnailDirty) == 0x124, "CMauiMesh::mThumbnailDirty offset must be 0x124");
   static_assert(offsetof(CMauiMesh, mMeshBlueprint) == 0x128, "CMauiMesh::mMeshBlueprint offset must be 0x128");
-  static_assert(offsetof(CMauiMesh, mOrientation) == 0x12c, "CMauiMesh::mOrientation offset must be 0x12c");
+  static_assert(offsetof(CMauiMesh, mOrientation) == 0x12C, "CMauiMesh::mOrientation offset must be 0x12C");
+  static_assert(offsetof(CMauiMesh, mThumbnailColor) == 0x13C, "CMauiMesh::mThumbnailColor offset must be 0x13C");
 
   class CMauiMovie : public CMauiControl
   {
@@ -5366,42 +5370,6 @@ namespace moho
   FAF_RUNTIME_LAYOUT_ASSERT(
     offsetof(CMauiTextRuntimeView, mFontExternalLeadingLV) == 0x180,
     "CMauiTextRuntimeView::mFontExternalLeadingLV offset must be 0x180"
-  );
-
-  struct CMauiMeshRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    boost::shared_ptr<CD3DBatchTexture> mTexture; // +0x11C
-    bool mIsRotated = false; // +0x124
-    std::uint8_t mPad125To127[0x3]{};
-    RMeshBlueprint* mMeshBlueprint = nullptr; // +0x128
-    Wm3::Quaternionf mOrientation{}; // +0x12C
-    std::int32_t mUnknown13C = 0; // +0x13C
-
-    [[nodiscard]] static CMauiMeshRuntimeView* FromMesh(CMauiMesh* mesh) noexcept
-    {
-      return reinterpret_cast<CMauiMeshRuntimeView*>(mesh);
-    }
-
-    [[nodiscard]] static const CMauiMeshRuntimeView* FromMesh(const CMauiMesh* mesh) noexcept
-    {
-      return reinterpret_cast<const CMauiMeshRuntimeView*>(mesh);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiMeshRuntimeView, mIsRotated) == 0x124, "CMauiMeshRuntimeView::mIsRotated offset must be 0x124");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiMeshRuntimeView, mTexture) == 0x11C, "CMauiMeshRuntimeView::mTexture offset must be 0x11C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiMeshRuntimeView, mMeshBlueprint) == 0x128,
-    "CMauiMeshRuntimeView::mMeshBlueprint offset must be 0x128"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiMeshRuntimeView, mOrientation) == 0x12C,
-    "CMauiMeshRuntimeView::mOrientation offset must be 0x12C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiMeshRuntimeView, mUnknown13C) == 0x13C,
-    "CMauiMeshRuntimeView::mUnknown13C offset must be 0x13C"
   );
 
   struct CMauiBorderRuntimeView : CMauiControlRuntimeView
@@ -10835,7 +10803,6 @@ namespace moho
   static_assert(sizeof(CMauiFrameRuntimeView) <= sizeof(CMauiFrame), "CMauiFrameRuntimeView overruns CMauiFrame");
   static_assert(sizeof(CMauiHistogramRuntimeView) <= sizeof(CMauiHistogram), "CMauiHistogramRuntimeView overruns CMauiHistogram");
   static_assert(sizeof(CMauiItemListRuntimeView) <= sizeof(CMauiItemList), "CMauiItemListRuntimeView overruns CMauiItemList");
-  static_assert(sizeof(CMauiMeshRuntimeView) <= sizeof(CMauiMesh), "CMauiMeshRuntimeView overruns CMauiMesh");
   static_assert(sizeof(CMauiTextRuntimeView) <= sizeof(CMauiText), "CMauiTextRuntimeView overruns CMauiText");
   static_assert(sizeof(CUIMapPreviewRuntimeView) <= sizeof(CUIMapPreview), "CUIMapPreviewRuntimeView overruns CUIMapPreview");
 } // namespace moho
