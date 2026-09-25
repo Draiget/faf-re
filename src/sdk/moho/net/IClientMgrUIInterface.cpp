@@ -49,6 +49,14 @@ namespace moho
 {
   CWldUiInterface sCWldUiInterface;
 
+  /**
+   * Address: 0x0088B6C0 (FUN_0088B6C0)
+   * Address: 0x0088BB90 (FUN_0088BB90)
+   *
+   * What it does:
+   * Restores the base vtable in `sCWldUiInterface`; the two emissions of this
+   * destructor for that one object.
+   */
   IClientMgrUIInterface::~IClientMgrUIInterface() = default;
 
   /**

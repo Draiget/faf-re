@@ -1179,8 +1179,7 @@ namespace
 
   using CMauiControlListNode = moho::TDatListItem<moho::CMauiControl, void>;
 
-  /// The control owning one `mParentList` node, i.e. one entry of a parent's
-  /// `mChildrenList`.
+  /// The control one node of a parent's `mChildrenList` is the base of.
   [[nodiscard]] moho::CMauiControl* ControlFromParentListNode(
     CMauiControlListNode* node
   ) noexcept
@@ -1188,8 +1187,7 @@ namespace
     if (node == nullptr) {
       return nullptr;
     }
-    return moho::TDatList<moho::CMauiControl, void>::owner_from_member_node<
-      moho::CMauiControl, &moho::CMauiControl::mParentList>(node);
+    return static_cast<moho::CMauiControl*>(node);
   }
 
   [[nodiscard]] const moho::CMauiControl* ControlFromParentListNode(
@@ -1199,8 +1197,7 @@ namespace
     if (node == nullptr) {
       return nullptr;
     }
-    return moho::TDatList<moho::CMauiControl, void>::owner_from_member_node<
-      moho::CMauiControl, &moho::CMauiControl::mParentList>(node);
+    return static_cast<const moho::CMauiControl*>(node);
   }
 
   [[nodiscard]] std::uint32_t PackVertexAlphaFromScalar(
@@ -1242,7 +1239,7 @@ namespace
     }
 
     CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&parentControl->mChildrenList);
-    CMauiControlListNode* const siblingNode = control->mParentList.mNext;
+    CMauiControlListNode* const siblingNode = static_cast<CMauiControlListNode*>(control)->mNext;
     if (siblingNode == sentinel) {
       return nullptr;
     }
@@ -3182,12 +3179,6 @@ namespace
     CopyUtf8TextToClipboard(edit->GetSelection());
   }
 
-  [[nodiscard]] IMauiDragger* ResolveEditClickDragger(
-    CMauiEdit* const edit
-  ) noexcept
-  {
-    return &edit->mClickDragger;
-  }
 
   /**
    * Address: 0x0078F620 (FUN_0078F620, Moho::CMauiEdit::ApplyFontAndRefreshClip)
@@ -3310,7 +3301,6 @@ namespace
 
   void RenderEditTextAt(
     moho::CMauiEdit* const edit,
-    const CMauiEdit* const editView,
     moho::CD3DPrimBatcher* const primBatcher,
     const msvc8::string& text,
     const float x,
@@ -3321,7 +3311,7 @@ namespace
     const Wm3::Vector3f origin{x, y, 0.0f};
     const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
-    (void)editView->mFont->Render(
+    (void)edit->mFont->Render(
       text.c_str(),
       primBatcher,
       origin,
@@ -3335,7 +3325,6 @@ namespace
 
   float RenderEditTextRun(
     moho::CMauiEdit* const edit,
-    const CMauiEdit* const editView,
     moho::CD3DPrimBatcher* const primBatcher,
     const msvc8::string& text,
     const float x,
@@ -3343,11 +3332,11 @@ namespace
     const std::uint32_t color
   )
   {
-    const float advance = editView->mFont->GetAdvance(text.c_str(), 0);
-    if (editView->mDropShadow) {
-      RenderEditTextAt(edit, editView, primBatcher, text, x + 1.0f, baselineY + 1.0f, color & 0xFF000000u);
+    const float advance = edit->mFont->GetAdvance(text.c_str(), 0);
+    if (edit->mDropShadow) {
+      RenderEditTextAt(edit, primBatcher, text, x + 1.0f, baselineY + 1.0f, color & 0xFF000000u);
     }
-    RenderEditTextAt(edit, editView, primBatcher, text, x, baselineY, color);
+    RenderEditTextAt(edit, primBatcher, text, x, baselineY, color);
     return advance;
   }
 
@@ -4418,7 +4407,7 @@ int moho::cfunc__c_CreateCursorL(
   }
 
   // CMauiCursor shares the CScriptObject runtime layout (cObject @+0x0C, mLuaObj @+0x20).
-  reinterpret_cast<CScriptObject*>(cursor)->mLuaObj.PushStack(state);
+  cursor->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -10218,14 +10207,14 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   if (trackedControl != previousOver) {
     if (previousOver != nullptr) {
       eventPayload.mEventType = moho::MET_MouseExit;
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(previousOver);
+      eventPayload.mSource = previousOver;
       previousOver->PostEvent(eventPayload);
     }
     if (
       moho::CMauiControl* const enteredControl = hitControl.GetObjectPtr(); enteredControl != nullptr
     ) {
       eventPayload.mEventType = moho::MET_MouseEnter;
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(enteredControl);
+      eventPayload.mSource = enteredControl;
       enteredControl->PostEvent(eventPayload);
     }
     gMouseOverControl.ResetFromObject(hitControl.GetObjectPtr());
@@ -10259,7 +10248,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       eventPayload.mEventType = moho::MET_ButtonRelease;
       const std::int32_t buttonSelector = mouseEvent.GetButton();
       eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(buttonSelector);
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+      eventPayload.mSource = trackedControl;
 
       moho::IMauiDragger* const activeDragger = func_GetCurrentDraggerFromMouseMoveLane();
       if (activeDragger != nullptr && buttonSelector == sCurrentDraggerKeycode) {
@@ -10273,7 +10262,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
 
     if (mouseEvent.GetEventType() == wxEVT_MOTION) {
       eventPayload.mEventType = moho::MET_MouseMotion;
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+      eventPayload.mSource = trackedControl;
 
       moho::IMauiDragger* const activeDragger = func_GetCurrentDraggerFromMouseMoveLane();
       if (activeDragger != nullptr) {
@@ -10297,7 +10286,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
       eventPayload.mEventType = moho::MET_WheelRotation;
       eventPayload.mWheelRotation = mouseEvent.m_wheelRotation;
       eventPayload.mWheelData = mouseEvent.m_wheelDelta;
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(trackedControl);
+      eventPayload.mSource = trackedControl;
       trackedControl->PostEvent(eventPayload);
       return;
     }
@@ -10333,7 +10322,7 @@ void moho::CMauiWxEventMapper::OnMouseMove(
   if (moho::CMauiControl* const pressTarget = hitControl.GetObjectPtr(); pressTarget != nullptr) {
     eventPayload.mEventType = isPress ? moho::MET_ButtonPress : moho::MET_ButtonDClick;
     eventPayload.mKeyCode = static_cast<moho::EMauiKeyCode>(mouseEvent.GetButton());
-    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(pressTarget);
+    eventPayload.mSource = pressTarget;
     pressTarget->PostEvent(eventPayload);
   }
 }
@@ -10386,7 +10375,7 @@ namespace
     if (
       moho::CMauiControl* const focused = moho::Maui_CurrentFocusControl.GetObjectPtr(); focused != nullptr
     ) {
-      eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(focused);
+      eventPayload.mSource = focused;
       if (focused->HandleEvent(eventPayload)) {
         return;
       }
@@ -10401,7 +10390,7 @@ namespace
       return;
     }
 
-    eventPayload.mSource = reinterpret_cast<moho::CScriptObject*>(captureControl);
+    eventPayload.mSource = captureControl;
     (void)captureControl->HandleEvent(eventPayload);
   }
 } // namespace
@@ -13783,31 +13772,30 @@ int moho::cfunc_CMauiItemListSetNewColorsL(
 
   auto itemListObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  auto* const itemListView = reinterpret_cast<CMauiItemList*>(itemList);
 
   if (lua_type(state->m_state, 2) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2));
-    itemListView->mForegroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mForegroundColor = SCR_DecodeColor(state, colorObject);
   }
   if (lua_type(state->m_state, 3) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 3));
-    itemListView->mBackgroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mBackgroundColor = SCR_DecodeColor(state, colorObject);
   }
   if (lua_type(state->m_state, 4) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 4));
-    itemListView->mSelectedForegroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mSelectedForegroundColor = SCR_DecodeColor(state, colorObject);
   }
   if (lua_type(state->m_state, 5) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 5));
-    itemListView->mSelectedBackgroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mSelectedBackgroundColor = SCR_DecodeColor(state, colorObject);
   }
   if (lua_type(state->m_state, 6) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 6));
-    itemListView->mHighlightForegroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mHighlightForegroundColor = SCR_DecodeColor(state, colorObject);
   }
   if (lua_type(state->m_state, 7) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 7));
-    itemListView->mHighlightBackgroundColor = SCR_DecodeColor(state, colorObject);
+    itemList->mHighlightBackgroundColor = SCR_DecodeColor(state, colorObject);
   }
 
   lua_settop(state->m_state, 1);
@@ -14930,7 +14918,7 @@ bool moho::CMauiItemList::HandleEvent(
     return true;
   }
 
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  CScriptObject* const scriptObject = this;
 
   const auto runClickRowCallback = [&]() {
     const std::int32_t clickedRow = GetItem(eventData.mMousePos.y);
@@ -15693,7 +15681,7 @@ void moho::CMauiMovie::Frame(
     return;
   }
 
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  CScriptObject* const scriptObject = this;
   if (!mIsPlaying) {
     mNeedsFrameUpdate = false;
     (void)scriptObject->RunScript("OnFinished");
@@ -17830,7 +17818,7 @@ int moho::cfunc_GetCursorL(
     return 1;
   }
 
-  reinterpret_cast<CScriptObject*>(cursor)->mLuaObj.PushStack(state);
+  cursor->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -18927,8 +18915,8 @@ int moho::cfunc_CUIWorldViewProjectL(
   const LuaPlus::LuaObject worldPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f worldPoint = SCR_FromLuaCopy<Wm3::Vector3f>(worldPointObject);
 
-  const float height = CScriptLazyVar_float::GetValue(&(reinterpret_cast<CMauiControl*>(worldView))->mHeightLV);
-  const float width = CScriptLazyVar_float::GetValue(&(reinterpret_cast<CMauiControl*>(worldView))->mWidthLV);
+  const float height = CScriptLazyVar_float::GetValue(&worldView->mHeightLV);
+  const float width = CScriptLazyVar_float::GetValue(&worldView->mWidthLV);
 
   const Wm3::Vector2f projectedPoint = camera->CameraGetView().Project(worldPoint, 0.0f, width, height, 0.0f);
   LuaPlus::LuaObject projectedPointObject = SCR_ToLua<Wm3::Vector2f>(state, projectedPoint);
@@ -19199,7 +19187,7 @@ int moho::cfunc_CUIWorldView__initL(
     worldView = new (storage) CUIWorldView(&selfObject, parent, cameraName, depth, isMiniMap, trackCamera.c_str());
   }
 
-  reinterpret_cast<CMauiControl*>(worldView)->DoInit();
+  worldView->DoInit();
   worldView->mLuaObj.PushStack(state);
   return 1;
 }
@@ -22372,7 +22360,7 @@ void moho::CUIWorldView::Frame(
 
   if (mCursorInside != 0u && sMouseIsScrubbing == 0u) {
     UpdateSelection(mWldSession->CursorInfo().mMouseScreenPos);
-    reinterpret_cast<CScriptObject*>(this)->RunScript("OnUpdateCursor");
+    RunScript("OnUpdateCursor");
   }
 
   if (mInputLocks <= 0) {
@@ -22448,10 +22436,10 @@ void moho::CUIWorldView::Frame(
     const bool iconsVisible = !mCameraRotationActive && !cam_Free;
     if (iconsVisible != mIconsVisible) {
       mIconsVisible = iconsVisible;
-      reinterpret_cast<CScriptObject*>(this)->RunScriptWithBool("OnIconsVisible", iconsVisible);
+      RunScriptWithBool("OnIconsVisible", iconsVisible);
     }
 
-    reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+    RunScriptNum("OnFrame", deltaSeconds);
   }
 }
 
@@ -22582,7 +22570,7 @@ moho::CMauiControl::CMauiControl(
   msvc8::string controlKind
 )
   : CScriptObject()
-  , mParentList()
+  , TDatListItem<CMauiControl, void>()
   , mParent(parent)
   , mChildrenList()
   , mLeftLV(LuaStateOf(luaObject))
@@ -22612,7 +22600,7 @@ moho::CMauiControl::CMauiControl(
   }
 
   if (parent != nullptr) {
-    mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&parent->mChildrenList));
+    ListLinkBefore(static_cast<CMauiControlListNode*>(&parent->mChildrenList));
     SetHidden(parent->IsHidden());
 
     mRenderPass = parent->mRenderPass;
@@ -22682,8 +22670,7 @@ moho::CMauiControl::~CMauiControl()
 
   childSentinel->ListUnlink();
 
-  CMauiControlListNode* const parentListNode = &mParentList;
-  parentListNode->ListUnlink();
+  ListUnlink();
 
   // ~CScriptObject() runs automatically after this body: CMauiControl derives
   // from it for real, so the compiler chains the base destructor.
@@ -22935,11 +22922,11 @@ void moho::CMauiControl::SetParent(
     currentParent->Invalidate();
   }
 
-  mParentList.ListUnlink();
+  ListUnlink();
   mParent = newParent;
 
   if (newParent != nullptr) {
-    mParentList.ListLinkBefore(&newParent->mChildrenList);
+    ListLinkBefore(&newParent->mChildrenList);
     Invalidate();
   }
 }
@@ -22977,7 +22964,7 @@ void moho::CMauiControl::Destroy()
   mParent = nullptr;
 
   if (this != rootFrame) {
-    mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&rootFrame->mDeletedControlList));
+    ListLinkBefore(static_cast<CMauiControlListNode*>(&rootFrame->mDeletedControlList));
   }
 
   (void)RunScript("OnDestroy");
@@ -24082,7 +24069,7 @@ void moho::CMauiBitmap::StopAnimationPlayback()
 
   mIsPlaying = false;
   mNeedsFrameUpdate = false;
-  reinterpret_cast<CScriptObject*>(this)->RunScript("OnAnimationStopped");
+  RunScript("OnAnimationStopped");
 }
 
 /**
@@ -24128,7 +24115,7 @@ void moho::CMauiBitmap::Frame(
   const float deltaSeconds
 )
 {
-  reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+  RunScriptNum("OnFrame", deltaSeconds);
 
   if (!mIsPlaying) {
     return;
@@ -24183,10 +24170,10 @@ void moho::CMauiBitmap::OnPatternEnd()
       mNeedsFrameUpdate = false;
     }
 
-    reinterpret_cast<CScriptObject*>(this)->RunScript("OnAnimationFinished");
+    RunScript("OnAnimationFinished");
   }
 
-  reinterpret_cast<CScriptObject*>(this)->CallbackInt("OnAnimationFrame", mCurrentFrame);
+  CallbackInt("OnAnimationFrame", mCurrentFrame);
 }
 
 /**
@@ -24203,16 +24190,10 @@ void moho::CMauiBitmap::OnPatternEnd()
  * state and installs a default "Courier New" 14pt font. Field init order and
  * values mirror the binary exactly.
  *
- * IMauiDragger sub-object note:
- * The binary additionally writes the embedded IMauiDragger sub-object vtable at
- * +0x11C to Moho::CMauiEdit::`vftable'{for `Moho::IMauiDragger'} (asm 0x0078F04A,
- * thunk table VA 0x00E395CC) so the click-dragger DragMove slot dispatches to
- * Moho::CMauiEditDragMove (FUN_007913A0). We model that sub-object as the typed
- * `CMauiEditClickDragger` member `CMauiEdit::mClickDragger` (+0x11C);
- * placement-constructing it here makes the compiler emit + install the
- * CMauiEdit-specific override vtable exactly as the binary does, and the
- * `IMauiDragger` base's weak-reference head (+0x120) starts null (matches
- * `.c` line 19 `this->mList = 0`).
+ * The IMauiDragger base at +0x11C gets
+ * Moho::CMauiEdit::`vftable'{for `Moho::IMauiDragger'} (asm 0x0078F04A, VA
+ * 0x00E395CC) and a null weak-reference head (+0x120) from ordinary base
+ * construction.
  */
 moho::CMauiEdit::CMauiEdit(
   LuaPlus::LuaObject* const luaObject,
@@ -24220,15 +24201,6 @@ moho::CMauiEdit::CMauiEdit(
 )
   : CMauiControl(luaObject, parent, "edit")
 {
-
-  // asm 0x0078F04A: install the CMauiEdit-for-IMauiDragger override vtable (VA
-  // 0x00E395CC) into the embedded click-dragger sub-object at +0x11C. Because the
-  // runtime-view overlays raw CMauiEdit bytes (its member ctors do not run for
-  // us), construct the typed sub-object in place: the CMauiEditClickDragger ctor
-  // writes its vptr (DragMove -> Moho::CMauiEditDragMove) and clears the
-  // `IMauiDragger` base's weak-reference head (+0x120 -> null, matching `.c`
-  // line 19 `this->mList = 0`).
-  new (&mClickDragger) CMauiEditClickDragger();
 
   mFont = nullptr;
   mForegroundColor = 0xFFFFFFFFu;
@@ -24282,13 +24254,11 @@ moho::CMauiEdit::~CMauiEdit()
 {
   ReleaseIntrusiveFont(mFont);
 
-  // asm 0x0078F230: destroying the embedded IMauiDragger sub-object resets its
-  // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable, and
-  // asm 0x0078F236-0x0078F250 then drains the base's weak-reference head at
-  // +0x120, clearing each node's owner/next lanes. Both halves are
-  // `~IMauiDragger` (0x0078DB20) inlined. `mClickDragger` is a real member
-  // now, so the compiler emits that sub-object destruction after this body
-  // along with `mText`'s; neither belongs here.
+  // asm 0x0078F230: the IMauiDragger base's vptr at +0x11C goes back to
+  // ??_7IMauiDragger@Moho@@6B@, and 0x0078F236-0x0078F250 drain its
+  // weak-reference head at +0x120. Both halves are `~IMauiDragger`
+  // (0x0078DB20) inlined, which the compiler emits after this body along with
+  // `mText`'s destruction; neither belongs here.
 }
 
 /**
@@ -24302,7 +24272,7 @@ void moho::CMauiEdit::Frame(
   const float deltaSeconds
 )
 {
-  reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
+  RunScriptNum("OnFrame", deltaSeconds);
 
   const float cycleSeconds = mCaretCycleSeconds;
   const float nextCycleTime = mCaretCycleTime + deltaSeconds;
@@ -24366,7 +24336,7 @@ void moho::CMauiEdit::DoRender(
 
   if (firstRunEnd > clipStart) {
     const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), clipStart, firstRunEnd - clipStart);
-    penX += RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mForegroundColor);
+    penX += RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
   int selectedStart = mSelectionStart;
@@ -24397,7 +24367,7 @@ void moho::CMauiEdit::DoRender(
     }
 
     penX +=
-      RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mHighlightForegroundColor);
+      RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mHighlightForegroundColor);
   }
 
   int suffixStart = mSelectionEnd;
@@ -24407,7 +24377,7 @@ void moho::CMauiEdit::DoRender(
 
   if (clipEnd > suffixStart) {
     const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), suffixStart, clipEnd - suffixStart);
-    (void)RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mForegroundColor);
+    (void)RenderEditTextRun(this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
   if (!mCaretVisible) {
@@ -24476,7 +24446,7 @@ void moho::CMauiEdit::LosingKeyboardFocus()
 {
   CMauiControl* const control = this;
   control->AbandonKeyboardFocus();
-  (void)reinterpret_cast<CScriptObject*>(this)->RunScript("OnLoseKeyboardFocus");
+  (void)RunScript("OnLoseKeyboardFocus");
 }
 
 /**
@@ -24506,7 +24476,7 @@ msvc8::string moho::CMauiEdit::GetSelection()
  */
 bool moho::CMauiEdit::EnterPressed()
 {
-  return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool(
+  return RunScriptStringBool(
     "OnEnterPressed", std::string(mText.c_str())
   );
 }
@@ -24519,7 +24489,7 @@ bool moho::CMauiEdit::EnterPressed()
  */
 bool moho::CMauiEdit::EscPressed()
 {
-  return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool(
+  return RunScriptStringBool(
     "OnEscPressed", std::string(mText.c_str())
   );
 }
@@ -24624,7 +24594,7 @@ void moho::CMauiEdit::NonTextKeyPressed(
     mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   const LuaPlus::LuaObject* const createdEvent = CreateLuaEventObject(eventData, &eventObject, activeState);
-  reinterpret_cast<CScriptObject*>(this)->RunScriptIntObject("OnNonTextKeyPressed", keyCode, *createdEvent);
+  RunScriptIntObject("OnNonTextKeyPressed", keyCode, *createdEvent);
 }
 
 /**
@@ -24905,7 +24875,7 @@ void moho::CMauiEdit::HandleClickEvent(
   const int nearestCharacterIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX);
 
   if (eventData->mEventType == MET_ButtonPress) {
-    func_PostDragger(GetRootFrame(), ResolveEditClickDragger(this), eventData);
+    func_PostDragger(GetRootFrame(), static_cast<IMauiDragger*>(this), eventData);
 
     const int caretPosition = mClipOffset + nearestCharacterIndex;
     mDragStart = caretPosition;
@@ -24924,82 +24894,47 @@ void moho::CMauiEdit::HandleClickEvent(
 }
 
 /**
- * CMauiEditClickDragger override bodies.
- *
- * These are the slots of the CMauiEdit-for-IMauiDragger vtable (VA 0x00E395CC)
- * installed into the embedded click-dragger sub-object at CMauiEdit + 0x11C.
- * Each forwards to the recovered edit behavior; the sub-object `this` is
- * unadjusted back to the owning CMauiEdit through the MI offset (-0x11C).
- */
-void moho::CMauiEditClickDragger::DragMove(
-  const SMauiEventData* const eventData
-)
-{
-  // slot 1 (0x007913A0): forward to the recovered free function, which unadjusts
-  // this sub-object pointer to the owning CMauiEdit and performs the selection.
-  moho::CMauiEditDragMove(this, eventData);
-}
-
-void moho::CMauiEditClickDragger::DragRelease(
-  const SMauiEventData* const eventData
-)
-{
-  // slot 2 (0x007914C0): unadjust to the owning CMauiEdit and forward to the
-  // recovered CMauiEdit::DragRelease release hit-test lane.
-  auto* const edit = reinterpret_cast<CMauiEdit*>(reinterpret_cast<char*>(this) - 0x11C);
-  edit->DragRelease(eventData);
-}
-
-void moho::CMauiEditClickDragger::OnCurrentDraggerReplaced()
-{
-  // slot 3 (0x00791590): no-op replace hook (binary body is empty).
-}
-
-/**
  * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
  *
  * What it does:
- * IMauiDragger::DragMove override for the edit's embedded click-dragger: maps
- * the current mouse X to the nearest character index in the clipped text, then
- * extends the selection between the drag-start caret and that index (clearing it
- * when they coincide) and moves the caret to the dragged-to position.
- *
- * Notes:
- * Recovered as a free function taking the IMauiDragger sub-object pointer (the
- * dragger lives at CMauiEdit + 0x11C = CMauiEditClickDragger member); the owning
- * edit is recovered by unadjusting that multiple-inheritance sub-object offset.
- * Invoked by name from CMauiEditClickDragger::DragMove (the slot-1 override
- * installed by the CMauiEdit ctor), so it is reachable through that vtable slot.
+ * IMauiDragger slot 1: maps the current mouse X to the nearest character index
+ * in the clipped text, then extends the selection between the drag-start caret
+ * and that index (clearing it when they coincide) and moves the caret to the
+ * dragged-to position.
  */
-void moho::CMauiEditDragMove(
-  IMauiDragger* const dragger,
+void moho::CMauiEdit::DragMove(
   const SMauiEventData* const eventData
 )
 {
-  auto* const edit = reinterpret_cast<CMauiEdit*>(reinterpret_cast<char*>(dragger) - 0x11C);
+  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&mLeftLV);
+  msvc8::string clippedText = gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
+  const int caretIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + mClipOffset;
 
-  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&edit->mLeftLV);
-  msvc8::string clippedText =
-    gpg::STR_Utf8SubString(edit->mText.c_str(), edit->mClipOffset, edit->mClipLength);
-  const int caretIndex =
-    edit->mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + edit->mClipOffset;
-
-  const int dragStart = edit->mDragStart;
+  const int dragStart = mDragStart;
   if (caretIndex == dragStart) {
-    edit->mSelectionStart = 0;
-    edit->mSelectionEnd = 0;
+    mSelectionStart = 0;
+    mSelectionEnd = 0;
     return;
   }
 
   if (caretIndex >= dragStart) {
-    edit->mSelectionStart = dragStart;
-    edit->mSelectionEnd = caretIndex;
+    mSelectionStart = dragStart;
+    mSelectionEnd = caretIndex;
   } else {
-    edit->mSelectionStart = caretIndex;
-    edit->mSelectionEnd = dragStart;
+    mSelectionStart = caretIndex;
+    mSelectionEnd = dragStart;
   }
-  edit->SetCaretPosition(caretIndex);
+  SetCaretPosition(caretIndex);
 }
+
+/**
+ * Address: 0x00791590 (FUN_00791590, Moho::CMauiEdit::OnCurrentDraggerReplaced)
+ *
+ * What it does:
+ * IMauiDragger slot 3: nothing - unlike the base, the edit is not deleted when
+ * another dragger replaces it.
+ */
+void moho::CMauiEdit::OnCurrentDraggerReplaced() {}
 
 /**
  * Address: 0x00791780 (FUN_00791780, Moho::CMauiEdit::HandleKeyEvent)
@@ -25040,7 +24975,7 @@ void moho::CMauiEdit::HandleKeyEvent(
     if (keyCode <= MKEY_START) {
       // Script gets first refusal on the character; returning true means it
       // handled the key itself and nothing is typed.
-      if (!RunScriptOnCharPressedThunk(reinterpret_cast<CScriptObject*>(this), keyCode)) {
+      if (!RunScriptOnCharPressedThunk(this, keyCode)) {
         InsertChar(static_cast<wchar_t>(static_cast<std::uint16_t>(keyCode)));
       }
       return;
@@ -25253,7 +25188,7 @@ void moho::CMauiEdit::TextChanged(
   const msvc8::string& oldText
 )
 {
-  CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
+  CScriptObject* const scriptObject = this;
   WeakObject::ScopedWeakLinkGuard weakGuard(static_cast<WeakObject*>(scriptObject));
 
   LuaPlus::LuaObject callbackObject{};

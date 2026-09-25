@@ -74,7 +74,6 @@ namespace moho
   class CMauiBitmap;
   class CMauiControl;
   class CMauiEdit;
-  class CMauiEditClickDragger;
   struct SHistogramColumn;
   class CMauiLuaDragger;
   class CMauiBorder;
@@ -1780,7 +1779,7 @@ namespace moho
   static_assert(offsetof(CMauiCursor, mDefaultHotspotX) == 0x50, "CMauiCursor::mDefaultHotspotX offset must be 0x50");
   static_assert(offsetof(CMauiCursor, mDefaultHotspotY) == 0x54, "CMauiCursor::mDefaultHotspotY offset must be 0x54");
 
-  class CMauiControl : public CScriptObject
+  class CMauiControl : public CScriptObject, public TDatListItem<CMauiControl, void>
   {
   public:
     static gpg::RType* sType;
@@ -2229,13 +2228,12 @@ namespace moho
     [[nodiscard]] static CMauiControl* GetTopmostControl(CMauiControl* root, float x, float y);
 
   public:
-    // The control's own state, +0x34 (right after the CScriptObject base,
-    // mdisp=0 in dumps/rtti_dump_all.hpp) through +0x11B. The constructor
-    // (0x007867B0) builds these in this order and the destructor (0x00786D00)
-    // tears them down in reverse.
-
-    /// This control's node in its parent's `mChildrenList`.
-    TDatListItem<CMauiControl, void> mParentList;  // +0x34
+    // +0x34 is the TDatListItem<CMauiControl, void> base - this control's node
+    // in its parent's `mChildrenList`; dumps/rtti_dump_all.hpp lists it at
+    // mdisp=52, right after the 0x34-byte CScriptObject. The control's own
+    // state follows it, +0x3C through +0x11B. The constructor (0x007867B0)
+    // builds these in this order and the destructor (0x00786D00) tears them
+    // down in reverse, the list node last.
     CMauiControl* mParent;                         // +0x3C
     TDatList<CMauiControl, void> mChildrenList;    // +0x40
     // Layout lazy vars, published to Lua as Left/Right/Top/Bottom/Width/Height/Depth.
@@ -2263,7 +2261,7 @@ namespace moho
   };
 
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
-  static_assert(offsetof(CMauiControl, mParentList) == 0x34, "CMauiControl::mParentList offset must be 0x34");
+  static_assert(sizeof(TDatListItem<CMauiControl, void>) == 0x8, "CMauiControl's list-node base must be 0x8");
   static_assert(offsetof(CMauiControl, mParent) == 0x3C, "CMauiControl::mParent offset must be 0x3C");
   static_assert(offsetof(CMauiControl, mChildrenList) == 0x40, "CMauiControl::mChildrenList offset must be 0x40");
   static_assert(offsetof(CMauiControl, mLeftLV) == 0x48, "CMauiControl::mLeftLV offset must be 0x48");
@@ -2287,70 +2285,34 @@ namespace moho
   static_assert(offsetof(CMauiControl, mDebugName) == 0x100, "CMauiControl::mDebugName offset must be 0x100");
 
   /**
-   * The edit control's embedded click-dragger sub-object.
-   *
-   * Layout: this is the concrete `IMauiDragger`-derived object that the binary
-   * embeds inside `CMauiEdit` at offset +0x11C (see
-   * `CMauiEdit::mClickDragger`). Constructing it installs the
-   * CMauiEdit-specific IMauiDragger override vtable
-   * `??_7CMauiEdit@Moho@@6BIMauiDragger@Moho@@@` (VA 0x00E395CC), reproducing the
-   * secondary-vptr write at asm 0x0078F04A in the `CMauiEdit` constructor.
-   *
-   * Vtable slots (from the binary at VA 0x00E395CC):
-   *   slot 0 (0x00795A00) scalar-deleting dtor thunk (compiler-generated)
-   *   slot 1 (0x007913A0) DragMove   -> Moho::CMauiEditDragMove (FUN_007913A0)
-   *   slot 2 (0x007914C0) DragRelease -> Moho::CMauiEdit::DragRelease
-   *   slot 3 (0x00791590) OnCurrentDraggerReplaced -> no-op (FUN_00791590)
-   *
-   * Size is exactly 0x08 - both dwords come from the `IMauiDragger` base
-   * (vtable @+0x00, `WeakObject::weakLinkHead_` @+0x04), so this class adds no
-   * storage of its own. It occupies the same 8 bytes the raw
-   * `mClickDraggerStorage[0x8]` overlay used; `CMauiEdit`'s total layout/size
-   * is unchanged.
+   * The text-entry control. Its second base is the dragger a click posts: RTTI
+   * lists `IMauiDragger` at mdisp=284 (+0x11C), and the constructor installs
+   * `??_7CMauiEdit@Moho@@6BIMauiDragger@Moho@@@` (VA 0x00E395CC) there at
+   * 0x0078F04A. Slots of that table: 0 the deleting-destructor thunk
+   * (0x00795A00), 1 `DragMove`, 2 `DragRelease`, 3 `OnCurrentDraggerReplaced`.
    */
-  class CMauiEditClickDragger final : public IMauiDragger
+  class CMauiEdit : public CMauiControl, public IMauiDragger
   {
   public:
-    CMauiEditClickDragger() = default;
-    ~CMauiEditClickDragger() override = default;
-
     /**
      * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
+     * IMauiDragger slot 1.
      *
-     * Routes the click-dragger drag-move slot to the recovered
-     * `Moho::CMauiEditDragMove` free function, which unadjusts this MI
-     * sub-object pointer back to the owning `CMauiEdit`.
+     * What it does:
+     * Extends the selection between the drag-start caret and the character
+     * nearest the current mouse X, and moves the caret there.
      */
     void DragMove(const SMauiEventData* eventData) override;
 
     /**
-     * Address: 0x007914C0 (FUN_007914C0, Moho::CMauiEdit::DragRelease)
-     *
-     * Routes the click-dragger release slot to the owning edit's
-     * `CMauiEdit::DragRelease` after unadjusting this MI sub-object pointer.
-     */
-    void DragRelease(const SMauiEventData* eventData) override;
-
-    /**
      * Address: 0x00791590 (FUN_00791590, Moho::CMauiEdit::OnCurrentDraggerReplaced)
+     * IMauiDragger slot 3.
      *
-     * No-op replace hook for the edit's click-dragger lane.
+     * What it does:
+     * Nothing: the edit is not deleted when another dragger takes over.
      */
     void OnCurrentDraggerReplaced() override;
 
-    // No storage of its own: the whole sub-object is the `IMauiDragger` base
-    // (vptr +0x00, `WeakObject::weakLinkHead_` +0x04).
-  };
-
-  static_assert(sizeof(CMauiEditClickDragger) == 0x8, "moho::CMauiEditClickDragger size must be 0x8");
-
-  class CMauiEdit : public CMauiControl
-  {
-    // The embedded click-dragger sub-object routes its IMauiDragger::DragRelease
-    // slot to the (private) CMauiEdit::DragRelease release hit-test lane.
-    friend class CMauiEditClickDragger;
-
-  public:
     /**
      * Address: 0x0078EFE0 (FUN_0078EFE0, Moho::CMauiEdit::CMauiEdit)
      *
@@ -2623,7 +2585,7 @@ namespace moho
      * Computes release hit-testing against the clipped edit text and clears the
      * selection lane when the drag did not move away from its start position.
      */
-    void DragRelease(const SMauiEventData* eventData);
+    void DragRelease(const SMauiEventData* eventData) override;
 
     /**
      * Address: 0x00794F20 (FUN_00794F20, Moho::CMauiEdit::TextChanged)
@@ -2642,11 +2604,8 @@ namespace moho
     // 0x11C and every access through the old `CMauiEditRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     //
-    // The run opens with the embedded `IMauiDragger` sub-object the ctor's
-    // secondary-vptr write at 0x0078F04A installs, which is why this class had
-    // to wait for `CMauiEditClickDragger` to move above it.
+    // +0x11C..+0x123 is the IMauiDragger base; the edit's own state follows.
     // ---------------------------------------------------------------------
-    CMauiEditClickDragger mClickDragger{};       // +0x11C
     CD3DFont* mFont = nullptr;                   // +0x124
     std::uint32_t mForegroundColor = 0;          // +0x128
     bool mBackgroundVisible = false;             // +0x12C
@@ -2678,7 +2637,6 @@ namespace moho
   };
 
   static_assert(sizeof(CMauiEdit) == 0x198, "moho::CMauiEdit size must be 0x198");
-  static_assert(offsetof(CMauiEdit, mClickDragger) == 0x11c, "CMauiEdit::mClickDragger offset must be 0x11c");
   static_assert(offsetof(CMauiEdit, mFont) == 0x124, "CMauiEdit::mFont offset must be 0x124");
   static_assert(offsetof(CMauiEdit, mText) == 0x140, "CMauiEdit::mText offset must be 0x140");
   static_assert(offsetof(CMauiEdit, mMaxChars) == 0x194, "CMauiEdit::mMaxChars offset must be 0x194");
@@ -9468,17 +9426,6 @@ namespace moho
    * from underlying `MeshInstance` state.
    */
   int cfunc_CUIWorldMeshGetInterpolatedScrollL(LuaPlus::LuaState* state);
-
-  /**
-   * Address: 0x007913A0 (FUN_007913A0, Moho::CMauiEdit::DragMove)
-   *
-   * What it does:
-   * IMauiDragger::DragMove override for the edit's embedded click-dragger:
-   * extends the text selection between the drag-start caret and the character
-   * nearest the current mouse X. Recovered as a free function taking the
-   * IMauiDragger sub-object (at CMauiEdit + 0x11C).
-   */
-  void CMauiEditDragMove(IMauiDragger* dragger, const SMauiEventData* eventData);
 
   /**
    * Address: 0x0086F090 (FUN_0086F090)
