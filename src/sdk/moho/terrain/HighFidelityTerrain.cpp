@@ -79,6 +79,14 @@ namespace
                static_cast<unsigned>(desc.Type), static_cast<unsigned long>(desc.Usage), static_cast<unsigned>(desc.Pool),
                desc.Width, desc.Height, static_cast<unsigned long>(levels));
   }
+
+  // TEMPORARY PROBE (do not commit): the native texture behind a gal texture,
+  // or null when it is not a D3D9 one (these probes only speak D3D9).
+  IDirect3DTexture9* ProbeNativeTexture1(gpg::gal::Texture* const texture)
+  {
+    const auto* const d3d9 = dynamic_cast<const gpg::gal::TextureD3D9*>(texture);
+    return d3d9 != nullptr ? d3d9->GetTexture1() : nullptr;
+  }
   bool HighFidelityProbeToggle(const char* const name)
   {
     char dir[512] = {};
@@ -1371,17 +1379,17 @@ namespace moho
             if (albedoSheet != nullptr) {
               (void)albedoSheet->GetOriginalDimensions(&albedoDims);
             }
-            { static int sDescBudget = 0; if (sDescBudget < 2 && albedoHandle.get() != nullptr) { ++sDescBudget; ProbeLogTextureDesc("decal-albedo", static_cast<gpg::gal::TextureD3D9*>(albedoHandle.get())->GetTexture1()); } }
-          { static int sRefBudget = 0; if (sRefBudget < 4 && albedoHandle.get() != nullptr && static_cast<gpg::gal::TextureD3D9*>(albedoHandle.get())->GetTexture1() != nullptr) { ++sRefBudget; void* const tex = static_cast<gpg::gal::TextureD3D9*>(albedoHandle.get())->GetTexture1(); auto** const vt = *reinterpret_cast<void***>(tex); using ref_fn = unsigned long(__stdcall*)(void*); const unsigned long afterAdd = reinterpret_cast<ref_fn>(vt[1])(tex); const unsigned long afterRel = reinterpret_cast<ref_fn>(vt[2])(tex); gpg::Warnf("[DECALREF] tex=%p addref->%lu release->%lu sheet=%p resUse=%ld", tex, afterAdd, afterRel, static_cast<void*>(albedoSheet.get()), static_cast<long>(albedoSheet.use_count())); } } // TEMPORARY PROBE (do not commit)
-            if (sDecalDumpCount < 4 && albedoHandle.get() != nullptr && HighFidelityProbeToggle("dumpdecal.on")) {
+            { static int sDescBudget = 0; if (sDescBudget < 2 && albedoHandle.get() != nullptr) { ++sDescBudget; ProbeLogTextureDesc("decal-albedo", ProbeNativeTexture1(albedoHandle.get())); } }
+          { static int sRefBudget = 0; if (sRefBudget < 4 && albedoHandle.get() != nullptr && ProbeNativeTexture1(albedoHandle.get()) != nullptr) { ++sRefBudget; void* const tex = ProbeNativeTexture1(albedoHandle.get()); auto** const vt = *reinterpret_cast<void***>(tex); using ref_fn = unsigned long(__stdcall*)(void*); const unsigned long afterAdd = reinterpret_cast<ref_fn>(vt[1])(tex); const unsigned long afterRel = reinterpret_cast<ref_fn>(vt[2])(tex); gpg::Warnf("[DECALREF] tex=%p addref->%lu release->%lu sheet=%p resUse=%ld", tex, afterAdd, afterRel, static_cast<void*>(albedoSheet.get()), static_cast<long>(albedoSheet.use_count())); } } // TEMPORARY PROBE (do not commit)
+            if (sDecalDumpCount < 4 && ProbeNativeTexture1(albedoHandle.get()) != nullptr && HighFidelityProbeToggle("dumpdecal.on")) {
               char dir[512] = {};
               std::size_t length = 0;
               (void)::getenv_s(&length, dir, sizeof(dir), "FAF_TOGGLE_DIR");
               char path[600];
               (void)std::snprintf(path, sizeof(path), "%s\\decal_albedo_%d.bmp", dir, sDecalDumpCount);
-              const long hr = gpg::gal::DebugSaveTextureToFileA(path, 0U, static_cast<gpg::gal::TextureD3D9*>(albedoHandle.get())->GetTexture1());
+              const long hr = gpg::gal::DebugSaveTextureToFileA(path, 0U, ProbeNativeTexture1(albedoHandle.get()));
               { // mip-2 surface dump
-                void* const tex = static_cast<gpg::gal::TextureD3D9*>(albedoHandle.get())->GetTexture1();
+                void* const tex = ProbeNativeTexture1(albedoHandle.get());
                 auto** const vt = *reinterpret_cast<void***>(tex);
                 using get_surface_level_fn = long(__stdcall*)(void*, unsigned, void**);
                 void* surf = nullptr;
@@ -1444,7 +1452,7 @@ namespace moho
           if (sheet == nullptr || sProbed.count(sheet) != 0 || sProbed.size() > 12) { return; }
           sProbed.insert(sheet);
           ID3DTextureSheet::TextureHandle h{}; sheet->GetTexture(h);
-          void* const tex = (h && static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() != nullptr) ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() : nullptr;
+          void* const tex = (h && ProbeNativeTexture1(h.get()) != nullptr) ? ProbeNativeTexture1(h.get()) : nullptr;
           if (tex == nullptr) { gpg::Warnf("[DECALPROBE] %s sheet=%p no native texture", label, static_cast<void*>(sheet)); return; }
           auto** const vt = *reinterpret_cast<void***>(tex);
           using get_dword_fn = unsigned long(__stdcall*)(void*);
@@ -1468,14 +1476,14 @@ namespace moho
           auto* const res = static_cast<RD3DTextureResource*>(albedoSheet.get());
           res->ReloadTexture();
           ID3DTextureSheet::TextureHandle h{}; res->GetTexture(h);
-          gpg::Warnf("[DECALRELOAD] res=%p newTex=%p loc=%s", static_cast<void*>(res), h ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() : nullptr, res->mContext.location_.c_str());
+          gpg::Warnf("[DECALRELOAD] res=%p newTex=%p loc=%s", static_cast<void*>(res), h ? ProbeNativeTexture1(h.get()) : nullptr, res->mContext.location_.c_str());
         }
         shaderVars.decalAlbedoTexture.GetTexture(boost::static_pointer_cast<CD3DDynamicTextureSheet>(albedoSheet));
       } else if (HighFidelityProbeToggle("decaldirty.on")) { // TEMPORARY PROBE (do not commit): force a VRAM re-upload
         ID3DTextureSheet::TextureHandle h{};
         if (albedoSheet != nullptr) { albedoSheet->GetTexture(h); }
-        if (h && static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() != nullptr) {
-          void* const tex = static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1();
+        if (h && ProbeNativeTexture1(h.get()) != nullptr) {
+          void* const tex = ProbeNativeTexture1(h.get());
           auto** const vt = *reinterpret_cast<void***>(tex);
           using add_dirty_fn = long(__stdcall*)(void*, const void*);
           const long dr = reinterpret_cast<add_dirty_fn>(vt[21])(tex, nullptr);
@@ -1486,8 +1494,8 @@ namespace moho
       } else if (HighFidelityProbeToggle("decalpreload.on")) { // TEMPORARY PROBE (do not commit): force VRAM upload first
         ID3DTextureSheet::TextureHandle h{};
         if (albedoSheet != nullptr) { albedoSheet->GetTexture(h); }
-        if (h && static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() != nullptr) {
-          void* const tex = static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1();
+        if (h && ProbeNativeTexture1(h.get()) != nullptr) {
+          void* const tex = ProbeNativeTexture1(h.get());
           auto** const vt = *reinterpret_cast<void***>(tex);
           using preload_fn = void(__stdcall*)(void*);
           using get_lod_fn = unsigned long(__stdcall*)(void*);
@@ -1552,7 +1560,7 @@ namespace moho
     shaderVars.decalAlbedoTexture.GetTexture(
       boost::static_pointer_cast<CD3DDynamicTextureSheet>(sHighFidelityTextureBatcher->GetCompositeTexture())
     );
-    { static int sC = 0; if (sC < 4) { ++sC; auto ct = sHighFidelityTextureBatcher->GetCompositeTexture(); ID3DTextureSheet::TextureHandle h{}; if (ct) ct->GetTexture(h); gpg::Warnf("[SPLATTEX] composite=%p native=%p", static_cast<void*>(ct.get()), h ? static_cast<gpg::gal::TextureD3D9*>(h.get())->GetTexture1() : nullptr); } } // TEMPORARY PROBE (do not commit)
+    { static int sC = 0; if (sC < 4) { ++sC; auto ct = sHighFidelityTextureBatcher->GetCompositeTexture(); ID3DTextureSheet::TextureHandle h{}; if (ct) ct->GetTexture(h); gpg::Warnf("[SPLATTEX] composite=%p native=%p", static_cast<void*>(ct.get()), h ? ProbeNativeTexture1(h.get()) : nullptr); } } // TEMPORARY PROBE (do not commit)
 
     std::int32_t primitiveType = kTriangleListPrimitiveToken;
 
