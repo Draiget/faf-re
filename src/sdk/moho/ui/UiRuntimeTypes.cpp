@@ -1582,34 +1582,6 @@ namespace
     }
   }
 
-  // Reproduces the ctor's inline field-by-field init of one CommandModeData:
-  // mode/caps/blueprint cleared, both drag snapshots zeroed with mIsDragger=-1,
-  // trailing sentinels (mIsDragged / mReserved5C) set to -1.
-  void ZeroInitCommandModeData(
-    moho::CommandModeData& cmd
-  ) noexcept
-  {
-    cmd.mMode = moho::COMMOD_None;
-    cmd.mCommandCaps = static_cast<moho::ERuleBPUnitCommandCaps>(0);
-    cmd.mBlueprint = nullptr;
-
-    cmd.mMouseDragStart.mHitValid = 0;
-    cmd.mMouseDragStart.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-    cmd.mMouseDragStart.SetHoveredEntity(nullptr);
-    cmd.mMouseDragStart.mIsDragger = -1;
-    cmd.mMouseDragStart.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
-
-    cmd.mMouseDragEnd.mHitValid = 0;
-    cmd.mMouseDragEnd.mMouseWorldPos = Wm3::Vector3f(0.0f, 0.0f, 0.0f);
-    cmd.mMouseDragEnd.SetHoveredEntity(nullptr);
-    cmd.mMouseDragEnd.mIsDragger = -1;
-    cmd.mMouseDragEnd.mMouseScreenPos = Wm3::Vector2f(0.0f, 0.0f);
-
-    cmd.mModifiers = 0;
-    cmd.mIsDragged = -1;
-    cmd.mReserved5C = -1;
-  }
-
   moho::StatItem* gCameraCursorPositionStat = nullptr;
   moho::StatItem* gCameraCursorElevationStat = nullptr;
   moho::StatItem* gCameraCursorOCellStat = nullptr;
@@ -8236,22 +8208,13 @@ moho::UICommandDragger::UICommandDragger(
  * Deleting dtor: 0x008240A0 (slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
  *
  * What it does:
- * Drops the counted reference the constructor took on the session's UI command
- * graph, then lets `IMauiDragger`'s own teardown restore the base vtable and
- * drain the inherited `WeakObject` chain.
- *
- * `boost::SharedPtrRaw` is documented as a borrowing pair that never mutates
- * refcounts, so `= default` (which this body used to be) would leak the
- * reference `CWldSession::GetCommandGraph(true)` hands the constructor. The
- * binary does release it: 0x008240E9 `mov edi, [esi+18h]`, 0x008240F6
- * `lock xadd [edi+4], -1`, then `dispose()`/`destroy()` through control-block
- * vtable slots +4/+8 - `sp_counted_base::release()`, which is what
- * `SharedPtrRaw::release()` reproduces.
+ * Member and base teardown only: `mGraph`'s destructor releases the reference
+ * `CWldSession::GetCommandGraph(true)` handed the constructor (0x008240E9
+ * `mov edi, [esi+18h]`, 0x008240F6 `lock xadd [edi+4], -1`, then `dispose()`
+ * and `destroy()` through control-block slots +4/+8), then `IMauiDragger`
+ * restores its vtable and drains the inherited `WeakObject` chain.
  */
-moho::UICommandDragger::~UICommandDragger()
-{
-  mGraph.release();
-}
+moho::UICommandDragger::~UICommandDragger() = default;
 
 /**
  * Address: 0x008241B0 (FUN_008241B0, slot +0x04 of ??_7UICommandDragger@Moho@@6B@)
@@ -8272,7 +8235,7 @@ void moho::UICommandDragger::DragMove(
 {
   const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
   const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
-  moho::ProcessCommandDrag(surfacePoint, *mGraph.px, mCommandId, false);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, false);
 }
 
 /**
@@ -8296,7 +8259,7 @@ void moho::UICommandDragger::DragRelease(
 {
   const Wm3::Vector2f mousePos(eventData->mMousePos.x, eventData->mMousePos.y);
   const Wm3::Vector3f surfacePoint = mCam->CameraScreenToSurface(mousePos);
-  moho::ProcessCommandDrag(surfacePoint, *mGraph.px, mCommandId, true);
+  moho::ProcessCommandDrag(surfacePoint, *mGraph, mCommandId, true);
   func_OnCommandDragEnd(const_cast<moho::SMauiEventData*>(eventData), mCommandId, mSession->mState);
   delete this;
 }
@@ -8318,7 +8281,7 @@ void moho::UICommandDragger::DragRelease(
  */
 void moho::UICommandDragger::OnCurrentDraggerReplaced()
 {
-  moho::ReanchorCommandGraphDrawNode(*mGraph.px, mCommandId);
+  moho::ReanchorCommandGraphDrawNode(*mGraph, mCommandId);
   delete this;
 }
 
@@ -8351,21 +8314,21 @@ moho::CBuildDragPreview::CBuildDragPreview()
     )
   , mEnd(mStart)
   , mPreviewInvalid(false)
-  , mUnknown5D(false)
-  , mPad5E{}
+  , mQueuedGhostsHidden(false)
 {}
 
 /**
  * Address: 0x00852B20 (FUN_00852B20, struct_WorldView_object::~struct_WorldView_object)
  *
  * What it does:
- * Clears preview meshes, releases the preview material, and destroys the
- * position tree sentinel/storage.
+ * Clears the preview caches and the terrain decal (0x00852B46); the rest is
+ * member destruction in reverse order - the preview material's release
+ * (0x00852B50), the positions map (0x00852B97), then the blueprint and mesh
+ * vectors (0x00852BAB, 0x00852BCF).
  */
 moho::CBuildDragPreview::~CBuildDragPreview()
 {
   ClearBuildPreviewCache();
-  mUnitPlaceMaterial.reset();
 }
 
 /**
@@ -9969,13 +9932,13 @@ static void func_NewCommandDragger(
  * Invocation: sole caller is `Moho::CUIWorldView::HandleEvent` (0x008704B0),
  * recovered further down this file, which calls it by name from the
  * `COMMOD_Move` non-minimap arm of its left-button-press command switch and
- * then binds the returned dragger into `CRenderWorldView::mSelectionDragger`.
+ * then binds the returned dragger into `CUIWorldView::mSelectionDragger`.
  * The disassembly at 0x00870E0C-0x00870E23 resolves the
  * call's arguments from the world view's own fields: `camera` from
- * `CRenderWorldView::mCamera` (+0x120, the raw pointer
+ * `CUIWorldView::mCamera` (+0x120, the raw pointer
  * value the constructor chain stores verbatim into `SelectionDragger::mCam`
  * with no dereference in between), `session` from
- * `CRenderWorldView::mWldSession` (+0x208), and `originFrame` from
+ * `CUIWorldView::mWldSession` (+0x208), and `originFrame` from
  * `CMauiControl::mRootFrame` (+0xFC); `eventData` is `HandleEvent`'s own event
  * argument forwarded through unchanged.
  */
@@ -18935,8 +18898,8 @@ namespace
  * Address: 0x0086E480 (FUN_0086E480, Moho::CUIWorldView::CUIWorldView)
  *
  * What it does:
- * Constructs a world-view UI control: CMauiControl base ctor, ~40 field inits
- * (incl 2 command-mode copies + the build-drag subobject), camera creation,
+ * Constructs a world-view UI control: the CMauiControl base, the members (two
+ * command-mode blocks and the build-drag preview among them), the camera,
  * optional world-camera/minimap promotion, viewport registration, then reads
  * WorldViewParams from /lua/ui/controls/worldview.lua.
  */
@@ -18949,82 +18912,51 @@ moho::CUIWorldView::CUIWorldView(
   const char* const cameraTrack
 )
   : CMauiControl(luaObj, parent, msvc8::string("World View"))
+  , mIsMiniMap(isMiniMap)
+  , mWorldViewDepth(depth)
+  , mWldSession(moho::WLD_GetActiveSession()) // 0x0086E6A8 reads the global sWldSession
+  , mCameraTrack(cameraTrack)
 {
-  {
-    // The +0x11C vtable is written twice (0x0086E4DF the plain
-    // ??_7IRenderWorldView@Moho@@6B@, then 0x0086E4EF this class's own
-    // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@): constructing the
-    // IRenderWorldView base and then this class. The CRenderWorldView members,
-    // mBuildDrag and mCameraTrack included, are constructed by then; the
-    // stores below are the values the binary writes into them.
-    mCamera = nullptr;              // +0x120
-    mCachedViewLeft = -1.0f;        // +0x124
-    mCachedViewTop = -1.0f;         // +0x128
-    mCachedViewWidth = -1.0f;       // +0x12C
-    mCachedViewHeight = -1.0f;      // +0x130
-    mWorldViewDepth = depth;        // +0x13C
-    mOrthographic = false;          // +0x134
-    mIsMiniMap = isMiniMap;         // +0x135
-    mEnableResourceRendering = true; // +0x136
-    mInputLocks = 0;                // +0x138
-    mState = 0;                     // +0x140
+  // The +0x11C vtable is written twice (0x0086E4DF the plain
+  // ??_7IRenderWorldView@Moho@@6B@, then 0x0086E4EF this class's own
+  // ??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@): the interface base,
+  // then this class. Every member is constructed by then, with the values the
+  // stores at 0x0086E4F9..0x0086E742 write.
+  SetDebugName(msvc8::string(name));
 
-    ZeroInitCommandModeData(mLeftMouseCommand); // +0x148
-    ZeroInitCommandModeData(mCommandData);      // +0x1A8
+  moho::STIMap* const map =
+    mWldSession->mWldMap->mTerrainRes->mMap;
+  LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
+  moho::RCamManager* const camManager = moho::CAM_GetManager();
+  mCamera.reset(camManager->CreateCamera(gpg::StrArg(name), *map, activeState));
 
-    mWldSession = moho::WLD_GetActiveSession(); // +0x208 (binary reads global sWldSession)
+  if (_stricmp(name, "WorldCamera") == 0) {
+    moho::func_SetWorldCamera(mCamera.get());
+  }
 
-    mConvertToPatrolCursor = false; // +0x274
-    mCursorInside = 0;              // +0x275
-    mCameraRotationActive = false;  // +0x276
+  if (isMiniMap) {
+    mCamera->SetLODScale(moho::cam_DefaultMiniLOD);
+    mCamera->CanShake(false);
+  }
 
-    mCameraTrack = msvc8::string(cameraTrack, std::strlen(cameraTrack));
+  // The root frame's `mTargetHead` (+0x130) picks the viewport head.
+  moho::ren_Viewport->AddWorldView(this, static_cast<moho::CMauiFrame*>(mRootFrame)->mTargetHead, mWorldViewDepth);
 
-    mHighlightEnabled = true;       // +0x2A4
-    mIconsVisible = true;           // +0x2A5
-    mGlobalCameraCommands = false;  // +0x2A6
+  mNeedsFrameUpdate = true;
 
-    SetDebugName(msvc8::string(name, std::strlen(name)));
-
-    moho::STIMap* const map =
-      mWldSession->mWldMap->mTerrainRes->mMap;
-    LuaPlus::LuaState* const activeState = luaObj->GetActiveState();
-    moho::RCamManager* const camManager = moho::CAM_GetManager();
-    moho::CameraImpl* const camera = camManager->CreateCamera(gpg::StrArg(name), *map, activeState);
-    // The camera slot was just null-initialized above, so the binary's
-    // replace-existing-camera release branch is unreachable here.
-    mCamera = camera;
-
-    if (_stricmp(name, "WorldCamera") == 0) {
-      moho::func_SetWorldCamera(mCamera);
-    }
-
-    if (isMiniMap) {
-      mCamera->SetLODScale(moho::cam_DefaultMiniLOD);
-      mCamera->CanShake(false);
-    }
-
-    // The root frame's `mTargetHead` (+0x130) picks the viewport head.
-    moho::ren_Viewport->AddWorldView(
-      static_cast<moho::IRenderWorldView*>(this), static_cast<moho::CMauiFrame*>(mRootFrame)->mTargetHead, mWorldViewDepth
-    );
-
-    mNeedsFrameUpdate = true;
-
-    LuaPlus::LuaObject module =
-      moho::SCR_Import(moho::g_UIManager->mLuaState, gpg::StrArg("/lua/ui/controls/worldview.lua"));
-    if (!module.IsNil()) {
-      LuaPlus::LuaObject params = module["WorldViewParams"];
-      if (params.IsTable()) {
-        if (!params["ui_SelectTolerance"].IsNil()) {
-          moho::ui_SelectTolerance = params["ui_SelectTolerance"].GetNumber();
-        }
-        if (!params["ui_DisableCursorFixing"].IsNil()) {
-          moho::ui_DisableCursorFixing = params["ui_DisableCursorFixing"].GetBoolean();
-        }
-        if (!params["ui_ExtractSnapTolerance"].IsNil()) {
-          moho::ui_ExtractSnapTolerance = params["ui_ExtractSnapTolerance"].GetNumber();
-        }
+  LuaPlus::LuaObject module =
+    moho::SCR_Import(moho::g_UIManager->mLuaState, gpg::StrArg("/lua/ui/controls/worldview.lua"));
+  if (!module.IsNil()) {
+    LuaPlus::LuaObject params = module["WorldViewParams"];
+    if (params.IsTable()) {
+      if (!params["ui_SelectTolerance"].IsNil()) {
+        moho::ui_SelectTolerance = params["ui_SelectTolerance"].GetNumber();
+      }
+      if (!params["ui_DisableCursorFixing"].IsNil()) {
+        moho::ui_DisableCursorFixing = params["ui_DisableCursorFixing"].GetBoolean();
+      }
+      if (!params["ui_ExtractSnapTolerance"].IsNil()) {
+        moho::ui_ExtractSnapTolerance = params["ui_ExtractSnapTolerance"].GetNumber();
       }
     }
   }
@@ -19079,16 +19011,16 @@ gpg::RRef moho::CUIWorldView::GetDerivedObjectRef()
  * Deleting dtor: 0x0086EA20 (FUN_0086EA20, Moho::CUIWorldView::dtr)
  *
  * What it does:
- * Tears the world view down in the binary's order: cancel any dragger still
- * held, unregister the render-world-view from the global viewport, unlink the
- * overlay weak link, then release the camera-track name, the build-drag
- * sub-object, the command-graph reference, both command-mode blocks and the
- * camera. The `IRenderWorldView` vtable restore and the chain into
- * `~CMauiControl` are emitted by the compiler.
+ * Cancels any dragger still held and takes this view out of the global
+ * viewport. Everything after that is member destruction, in reverse
+ * declaration order: the selection-dragger link (0x0086EAB8), the camera-track
+ * name (0x0086EADE), the build-drag preview (0x0086EB18), the command-graph
+ * reference (0x0086EB22), both command-mode blocks (0x0086EB5C/0x0086EB67) and
+ * last the camera (0x0086EB71); then the interface vtable restore (0x0086EB85)
+ * and `~CMauiControl` (0x0086EB94).
  */
 moho::CUIWorldView::~CUIWorldView()
 {
-
   // A dragger outlives the control that posted it, so a view destroyed mid-drag
   // leaves the global lane pointing into freed memory.
   if (IMauiDragger* const currentDragger = func_GetCurrentDragger(); currentDragger != nullptr) {
@@ -19097,36 +19029,7 @@ moho::CUIWorldView::~CUIWorldView()
     sCurrentDraggerKeycode = 0;
   }
 
-  ren_Viewport->RemoveWorldView(static_cast<IRenderWorldView*>(this));
-
-  mCameraTrack = msvc8::string();
-
-  // mBuildDrag is not destroyed here. It is a member of the CRenderWorldView
-  // base, so the compiler destroys it as part of that base -- which is what
-  // the single call to struct_WorldView_object::~struct_WorldView_object at
-  // 0x0086EB18 is, sitting where reverse-declaration-order member destruction
-  // puts it, ahead of the two ~SCommandModeData calls at 0x0086EB5C/0x0086EB67
-  // for the same base's command-mode blocks. Calling it explicitly here ran it
-  // twice: the second pass re-entered ~map on mMeshes after the first had
-  // already released the tree, and read through the freed head.
-
-  // Owning handle, and this pair has no destructor - clearing the two words
-  // would leak the reference and with it the whole command graph, ghost meshes
-  // included. Same release `CRenderWorldView::RenderCommandGraph` performs when
-  // Shift comes up.
-  if (mComGraph.pi != nullptr) {
-    mComGraph.pi->release();
-  }
-  mComGraph = {};
-
-  mCommandData = {};
-  mLeftMouseCommand = {};
-
-  // Vtable slot 0 with the delete flag set - the scalar deleting destructor.
-  if (CameraImpl* const camera = mCamera; camera != nullptr) {
-    delete camera;
-    mCamera = nullptr;
-  }
+  ren_Viewport->RemoveWorldView(this);
 }
 
 /**
@@ -21184,7 +21087,7 @@ void moho::UIWorldViewUpdateCursorEngineStats(
   const Wm3::Vec3f& cursorWorldPosition
 )
 {
-  moho::CameraImpl* const camera = worldView->mCamera;
+  moho::CameraImpl* const camera = worldView->mCamera.get();
 
   if (_stricmp(camera->CameraGetName(), "WorldCamera") == 0) {
     const msvc8::string positionText =
@@ -21279,8 +21182,8 @@ void moho::CUIWorldView::DoRender(
       mCachedViewWidth = width;
       mCachedViewHeight = height;
 
-      // `mCamera` (+0x120) is the world view's own CameraImpl* -- see the
-      // field's doc comment. This is the one and only place that pushes the
+      // `mCamera` (+0x120) is the world view's own camera. This is the one
+      // and only place that pushes the
       // Lua-driven on-screen rect (worldview.lua resizes mLeftLV/Top/
       // Right/Bottom as part of its own layout pass) down to the camera;
       // without it the camera keeps the {0,0}/{1,1} unit placeholder its own
@@ -21288,7 +21191,7 @@ void moho::CUIWorldView::DoRender(
       // nothing is ever collected to render (confirmed live via dbgrun:
       // MeshRenderer::Batch's frustum-volume query returned zero instances
       // every frame with the camera stuck at viewport width=1).
-      if (moho::CameraImpl* const camera = mCamera; camera != nullptr) {
+      if (moho::CameraImpl* const camera = mCamera.get(); camera != nullptr) {
         // 0x0086EF40 passes the third and fourth lazy vars STRAIGHT THROUGH as the
         // extent - it stores Left/Top into v11 and the +0x98/+0xAC values into v12
         // and calls slot 3 with (v11, v12); there is no subtraction anywhere in the
@@ -21679,7 +21582,7 @@ void moho::CUIWorldView::UpdateSelection(
   CmdId highlightCommandId = -1;
   if (mHighlightEnabled && !mIsMiniMap) {
     highlightCommandId =
-      ResolveCommandGraphCursorHighlightIfPresent(mComGraph.px, mCamera->CameraGetView(), mouseScreenPos);
+      ResolveCommandGraphCursorHighlightIfPresent(mComGraph.get(), mCamera->CameraGetView(), mouseScreenPos);
   }
 
   float templateSpanZ = 0.0f;
@@ -21994,7 +21897,7 @@ bool moho::CUIWorldView::HandleEvent(
   // --- command-graph hover banners ---------------------------------------
   bool stopCursorText = true;
 
-  if (mComGraph.px != nullptr && HasHoveredCommand(cursorInfo)) {
+  if (mComGraph && HasHoveredCommand(cursorInfo)) {
     UserCommandIssueHelper* const hoveredCommand = FindCommandIssueHelperInSession(mWldSession, cursorInfo.mIsDragger);
 
     if (hoveredCommand != nullptr) {
@@ -22139,7 +22042,7 @@ bool moho::CUIWorldView::HandleEvent(
       auto* const storage = static_cast<CameraDragger*>(::operator new(sizeof(CameraDragger), std::nothrow));
       IMauiDragger* dragger = nullptr;
       if (storage != nullptr) {
-        dragger = new (storage) CameraDragger(mCamera, cursorInfo.mMouseScreenPos, this, &CameraDraggerPanCamera, 0);
+        dragger = new (storage) CameraDragger(mCamera.get(), cursorInfo.mMouseScreenPos, this, &CameraDraggerPanCamera, 0);
       }
       func_PostDragger(GetRootFrame(), dragger, &eventData);
     }
@@ -22173,7 +22076,7 @@ bool moho::CUIWorldView::HandleEvent(
     // the bare offset the slot is left holding when the entity dies. That is
     // exactly what `CWldSession::GetHoveredUserEntity()` resolves.
     if (mWldSession->GetHoveredUserEntity() != nullptr && !IsMiniMap()) {
-      mWldSession->HandleDoubleClickSelection(mCamera);
+      mWldSession->HandleDoubleClickSelection(mCamera.get());
     }
     return true;
   }
@@ -22197,7 +22100,7 @@ bool moho::CUIWorldView::HandleEvent(
 
     case COMMOD_Build:
     case COMMOD_BuildAnchored:
-      func_NewUIBuildDragger(GetRootFrame(), mWldSession, &eventData, mCamera, &mBuildDrag);
+      func_NewUIBuildDragger(GetRootFrame(), mWldSession, &eventData, mCamera.get(), &mBuildDrag);
       return true;
 
     case COMMOD_Move:
@@ -22222,12 +22125,12 @@ bool moho::CUIWorldView::HandleEvent(
       }
 
       {
-        mSelectionDragger.ResetFromObject(NewSelectionDragger(mCamera, mWldSession, GetRootFrame(), &eventData));
+        mSelectionDragger.ResetFromObject(NewSelectionDragger(mCamera.get(), mWldSession, GetRootFrame(), &eventData));
       }
       return true;
 
     case COMMOD_Reclaim:
-      func_NewCommandDragger(GetRootFrame(), mWldSession, &eventData, mCamera, cursorInfo.mIsDragger);
+      func_NewCommandDragger(GetRootFrame(), mWldSession, &eventData, mCamera.get(), cursorInfo.mIsDragger);
       return true;
 
     default:

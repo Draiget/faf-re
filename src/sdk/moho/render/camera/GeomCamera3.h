@@ -290,7 +290,7 @@ namespace moho
 
   /**
    * Address: 0x00858EA1..0x00858FD8 (inlined into Moho::CWldSession::DrawEconomyOverlay)
-   * Address: 0x0086010B..0x008601F0 (inlined into Moho::CRenderWorldView::RenderProjectileArcs)
+   * Address: 0x0086010B..0x008601F0 (inlined into Moho::RenderProjectileArcs)
    *
    * What it does:
    * Builds the pixel-exact screen-space projection both world-space overlays

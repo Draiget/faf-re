@@ -514,6 +514,14 @@ namespace boost
      * of that emission; zero callers, unreachable; formerly
      * `ConstructWeakCountFromSharedTailLaneAdapterA` in
      * gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089AE50 (FUN_0089AE50 -- `weak_ptr<Moho::UICommandGraph>::operator=
+     * (shared_ptr const&)`: `px`, then `weak_count = shared_count` with no
+     * same-block test - `weak_add_ref` on the incoming block (0x0089AE64), then
+     * `weak_release` on the old one (0x0089AE75, `destroy()` through slot +8).
+     * `CWldSession::GetCommandGraph` re-pointing the session's weak reference at
+     * a graph it just created (0x00895F34). Formerly
+     * `CopySharedToWeakCommandGraph` in moho/sim/CWldSession.cpp, removed
+     * 2026-09-25.)
      *
      * What it does:
      * Per-T binding of `boost::weak_ptr<TWeak>`'s converting constructor
@@ -538,6 +546,13 @@ namespace boost
      * `effect_` (24 call sites, 0x008F3CDF .. 0x00944DB8); formerly
      * `LockWeakEffectD3D9` in gpg/gal/backends/d3d9/D3D9Interfaces.cpp (RULE
      * ONE), removed 2026-09-24.)
+     * Address: 0x00898F70 (FUN_00898F70 -- `weak_ptr<Moho::UICommandGraph>::lock()`:
+     * empty when the block is gone or its use count is zero, otherwise
+     * `shared_count(weak_count const&)` (0x00447030) inside a try whose catch
+     * returns empty. `CWldSession::GetCommandGraph` (0x00895EE5) and
+     * `DirtyCommandGraph` (0x00895F7F, and inlined into `DoBeat` 0x00894F02 and
+     * `ISSUE_RemoveLastCommand` 0x008B1337). Formerly `LockWeakCommandGraph` in
+     * moho/sim/CWldSession.cpp, removed 2026-09-25.)
      *
      * What it does:
      * `boost::weak_ptr<T>::lock()`, per T: a retained `shared_ptr` while an owner
@@ -756,6 +771,7 @@ namespace boost
      * Address: 0x008FA550 (FUN_008FA550, shared_ptr<RenderTarget>::reset(RenderTargetD3D10*))
      * Address: 0x008EA250 (FUN_008EA250, shared_ptr<PipelineStateD3D9>::reset(PipelineStateD3D9*) - device setup 0x008F3320 and `Func9` 0x008F3070; formerly `AssignSharedPipelineStateFromRaw` in D3D9Interfaces.cpp, removed 2026-09-23)
      * Address: 0x008FA760 (FUN_008FA760, shared_ptr<PipelineStateD3D10>::reset(PipelineStateD3D10*) - `DeviceD3D10::Setup` 0x00900B30; formerly `AssignSharedPipelineStateD3D10FromRaw` in D3D10Interfaces.cpp, removed 2026-09-23)
+     * Address: 0x0089ADE0 (FUN_0089ADE0, shared_ptr<UICommandGraph>::reset(UICommandGraph*) - `CWldSession::GetCommandGraph` adopting a graph it just built, 0x00895F2D; formerly `AssignSharedCommandGraph` + `CreateBoostControlForUICommandGraph` in CWldSession.cpp, removed 2026-09-25)
      *
      * What it does:
      * Rebinds one initialized `boost::shared_ptr<T>` to a raw pointee by
@@ -813,6 +829,10 @@ namespace boost
 
     /**
      * Address: 0x00446010 (FUN_00446010)
+     * Address: 0x0086EDD0 (FUN_0086EDD0 -- `shared_ptr<Moho::UICommandGraph>::operator=`:
+     * `px` first, then retain the incoming count and release the old one
+     * through 0x004229B0. `CUIWorldView::RenderCommandGraph` caching the
+     * session's graph in `mComGraph` (0x0086ED3F).)
      *
      * What it does:
      * Copies one `boost::shared_ptr<T>` into caller-provided output storage.
@@ -855,6 +875,7 @@ namespace boost
      * Address: 0x0089B930 (FUN_0089B930 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForSSessionSaveData` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0089BC70 (FUN_0089BC70 -- `sp_counted_impl_p<T>::sp_counted_impl_p(T*)`: counts to 1, real vtable 0xe4b370, `px_` at +0x0C, `ret 4`; zero callers in the binary and none in source; formerly `SpCountedImplPConstructUICommandGraph` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x0089BCE0 (FUN_0089BCE0 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForUICommandGraph` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
+     * Address: 0x0089BCC0 (FUN_0089BCC0 -- `sp_counted_impl_p<Moho::UICommandGraph>`'s scalar deleting destructor, slot 0 of its vtable 0x00E4B370; formerly `SpCountedImplPDeletingDtorUICommandGraph` in gpg/core/utils/BoostWrappers.cpp, which nothing called, removed 2026-09-25.)
      * Address: 0x008E8B10 (FUN_008E8B10 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForTextureD3D9` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x008F9140 (FUN_008F9140 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForEffectD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
      * Address: 0x008F9150 (FUN_008F9150 -- the `sp_counted_base` base-subobject vtable install (`mov [reg], 0xd42210; ret`, 2 instructions) MSVC emits inside the constructor/destructor chain for this instantiation; zero callers in the binary and none in source; formerly `InitializeSpCountedBaseLaneForTextureD3D10` in gpg/core/utils/BoostWrappers.cpp (RULE ONE), removed 2026-09-18.)
@@ -891,6 +912,8 @@ namespace boost
      * Address: 0x008F9F80 (FUN_008F9F80, sp_counted_impl_p<gpg::gal::DepthStencilTargetD3D10>::dispose, vtable 0x00D43114 slot 1)
      * Address: 0x008F9F90 (FUN_008F9F90, sp_counted_impl_p<gpg::gal::VertexFormatD3D10>::dispose, vtable 0x00D43128 slot 1)
      * Address: 0x008F9FA0 (FUN_008F9FA0, sp_counted_impl_p<gpg::gal::VertexBufferD3D10>::dispose, vtable 0x00D4313C slot 1)
+     * Address: 0x0089BC90 (FUN_0089BC90, sp_counted_impl_p<Moho::UICommandGraph>::dispose, vtable 0x00E4B370 slot 1 - `checked_delete` through 0x0089BCF0; formerly `DisposeCountedUICommandGraphStorage` in CWldSession.cpp, removed 2026-09-25)
+     * Address: 0x0089B860 (FUN_0089B860, sp_counted_impl_p<Moho::SSessionSaveData>::dispose, vtable 0x00E4B35C slot 1; formerly `DisposeCountedSessionSaveDataStorage` in CWldSession.cpp, removed 2026-09-25)
      * Address: 0x005CC800 (FUN_005CC800, sp_counted_impl_p<Moho::Stats<Moho::StatItem>>::get_deleter, vtable 0x00E1DBE0 slot 3)
      * Address: 0x007146B0 (FUN_007146B0, sp_counted_impl_p<Moho::STrigger>::get_deleter, vtable 0x00E312EC slot 3)
      * Address: 0x00797080 (FUN_00797080, sp_counted_impl_p<Moho::CMauiFrame>::get_deleter, vtable 0x00E39A8C slot 3)
@@ -933,6 +956,7 @@ namespace boost
      * Address: 0x008F9A70 (FUN_008F9A70, shared_count(EffectD3D10*) - `DeviceD3D10::CreateEffect` 0x008FEF8F; formerly in D3D10Interfaces.cpp)
      * Address: 0x0094B6C0 (FUN_0094B6C0, shared_count(EffectTechniqueD3D10*) - `EffectD3D10::GetTechnique` 0x0094BC32 and `GetTechniques` 0x0094BE42; formerly in D3D10Interfaces.cpp)
      * Address: 0x0094B750 (FUN_0094B750, shared_count(EffectVariableD3D10*) - `EffectD3D10::GetVariable` 0x0094BA52; formerly in D3D10Interfaces.cpp)
+     * Address: 0x0089B960 (FUN_0089B960, shared_count(UICommandGraph*) - from `shared_ptr<UICommandGraph>::reset` 0x0089ADE0)
      *
      * `boost::checked_delete<Y>` as that catch path emits it for the D3D10
      * backend types (`if (p) p->~Y()` through the deleting destructor,
@@ -949,6 +973,7 @@ namespace boost
      * Address: 0x008F93E0 (FUN_008F93E0, checked_delete<PipelineStateD3D10>)
      * Address: 0x0094B680 (FUN_0094B680, checked_delete<EffectTechniqueD3D10>)
      * Address: 0x0094B6A0 (FUN_0094B6A0, checked_delete<EffectVariableD3D10>)
+     * Address: 0x0089BCF0 (FUN_0089BCF0, checked_delete<Moho::UICommandGraph> - `~UICommandGraph` then `operator delete`, the destructor being non-virtual; from dispose 0x0089BC90 and the catch of 0x0089B960; formerly `DestroyUICommandGraphOwned` in CWldSession.cpp, removed 2026-09-25)
      *
      * What it does:
      * Constructs one `boost::detail::shared_count` from a raw pointee in caller-provided storage.
@@ -1685,17 +1710,6 @@ namespace boost
      */
     [[nodiscard]] SpCountedImplStorage<moho::SSessionSaveData>* SpCountedImplPDeletingDtorSSessionSaveData(
         SpCountedImplStorage<moho::SSessionSaveData>* countedImpl,
-        unsigned char deleteFlag
-    ) noexcept;
-
-    /**
-     * Address: 0x0089BCC0 (FUN_0089BCC0, boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::dtr)
-     *
-     * What it does:
-     * Runs one scalar-deleting destructor thunk for `sp_counted_impl_p<UICommandGraph>`.
-     */
-    [[nodiscard]] SpCountedImplStorage<moho::UICommandGraph>* SpCountedImplPDeletingDtorUICommandGraph(
-        SpCountedImplStorage<moho::UICommandGraph>* countedImpl,
         unsigned char deleteFlag
     ) noexcept;
 

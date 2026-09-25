@@ -57,7 +57,6 @@ namespace moho
   class RRuleGameRulesImpl;
   class UserEntity;
   class CameraImpl;
-  class CRenderWorldView;
   class CD3DPrimBatcher;
   class UICommandGraph;
   class CFormation;
@@ -161,7 +160,21 @@ namespace moho
 
   struct CommandModeData
   {
-    CommandModeData() = default;
+    /**
+     * No out-of-line body: every construction is inline, e.g. twice in
+     * `CUIWorldView`'s constructor (0x0086E557..0x0086E6A2): mode, caps and
+     * blueprint zeroed, both cursor snapshots default-built (`mIsDragger`
+     * -1), modifiers zeroed and the two trailing sentinels at -1 - the same
+     * values the `(MouseInfo, modifiers)` constructor below leaves.
+     */
+    CommandModeData()
+      : mMode(COMMOD_None)
+      , mCommandCaps(static_cast<ERuleBPUnitCommandCaps>(0))
+      , mBlueprint(nullptr)
+      , mModifiers(0)
+      , mIsDragged(-1)
+      , mReserved5C(-1)
+    {}
 
     /**
      * Address: 0x0081F6C0 (FUN_0081F6C0, ??0SCommandModeData@Moho@@QAE@@Z)
@@ -1187,7 +1200,7 @@ namespace moho
      * Address: 0x008515B0 (FUN_008515B0, ?DrawCommandSplats@CWldSession@Moho@@QAEXXZ)
      *
      * The mangled name types this as a zero-argument `__thiscall`, but the
-     * sole call site (`CRenderWorldView::Render`, 0x0086EEE5..0x0086EEED)
+     * sole call site (`CUIWorldView::Render`, 0x0086EEE5..0x0086EEED)
      * pushes two explicit stack values before the call - the camera view
      * pointer (`CameraImpl::CameraGetView()`'s result) and the session
      * pointer itself, matching the same "IDA's declared prototype
@@ -1371,8 +1384,9 @@ namespace moho
      * Address: 0x00895F70 (FUN_00895F70, ?DirtyCommandGraph@CWldSession@Moho@@QAEXXZ)
      *
      * What it does:
-     * Locks the cached UI command-graph weak handle, marks it dirty when
-     * present, and releases the temporary shared hold.
+     * Marks the command graph dirty if one is alive, through a temporary
+     * strong hold. `DoBeat` and `ISSUE_RemoveLastCommand` inline it (their
+     * `lock()` calls at 0x00894F02 / 0x008B1337).
      */
     void DirtyCommandGraph();
 
@@ -1381,13 +1395,28 @@ namespace moho
      * ?GetCommandGraph@CWldSession@Moho@@QAE?AV?$shared_ptr@VUICommandGraph@Moho@@@boost@@_N@Z)
      *
      * What it does:
-     * Locks/returns cached command-graph weak handle and optionally creates it.
+     * Locks the session's weak reference to its command graph and, when none
+     * is alive and `allowCreate` is set, builds one (`operator new(0xDDC)`) and
+     * points the weak reference at it. The caller's strong reference is the
+     * only thing keeping a new graph alive.
      *
-     * Callers outside `CWldSession`: `Moho::DrawCommandGraph` (0x00853DC0) and
-     * `sub_85AF40` (0x0085AF40) both call this directly, so it can't stay
-     * private.
+     * Callers outside `CWldSession`: `Moho::DrawCommandGraph` (0x00853DC0),
+     * `CUIWorldView::RenderCommandGraph` (0x0086ECD0) and
+     * `UICommandDragger`'s constructor (0x00823FE0).
      */
-    [[nodiscard]] boost::SharedPtrRaw<UICommandGraph> GetCommandGraph(bool allowCreate);
+    [[nodiscard]] boost::shared_ptr<UICommandGraph> GetCommandGraph(bool allowCreate);
+
+    /**
+     * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
+     *
+     * What it does:
+     * Draws the command graph's mesh if a graph is alive, without creating one
+     * (`GetCommandGraph(false)` at 0x0085AF61, the draw at 0x0085AF8E, the
+     * temporary's release inlined after it). `CUIWorldView::RenderCommandGraph`
+     * calls it with the session in `ecx` and the camera view, batcher, game tick
+     * and tick fraction on the stack (0x0086ED55..0x0086ED72).
+     */
+    void RenderCommandGraph(const GeomCamera3& camera, CD3DPrimBatcher* batcher, std::int32_t gameTick, float tickFraction);
 
   private:
     /**
@@ -1486,8 +1515,11 @@ namespace moho
     /// this pointer.
     CommandManager* mCommandManager;                        // 0x03FC
     CFormation* mCurFormation;                              // 0x0400
-    UICommandGraph* mUICommandGraphPx;                      // 0x0404
-    boost::detail::sp_counted_base* mUICommandGraphControl; // 0x0408 (weak control block for mUICommandGraphPx)
+    /// The session's command graph, observed rather than owned: world views
+    /// and command drags hold it while they draw or edit it, and it dies when
+    /// the last of them lets go. `GetCommandGraph` locks it (0x00898F70) and
+    /// re-points it at a graph it creates (0x0089AE50, `weak_count` at +0x08).
+    boost::weak_ptr<UICommandGraph> mCommandGraph;           // 0x0404
     boost::SharedPtrRaw<void> mUnknownShared40C;            // 0x040C
     boost::SharedPtrRaw<CDebugCanvas> mDebugCanvas;         // 0x0414
     /// The beat-scoped debug canvas; `DoBeat` re-seats it from the packet.
@@ -2293,7 +2325,7 @@ namespace moho
   extern bool UI_SelectAnything;
 
   extern float UI_StrategicProjectileLOD;  // 0x00F57B20
-  // Gates the mass/hydro resource splats CRenderWorldView::Render draws through
+  // Gates the mass/hydro resource splats CUIWorldView::Render draws through
   // CWldSession::RenderResources (tested at 0x0086EE31). Ships enabled.
   extern bool UI_RenResources;             // 0x00F57A8E
   extern bool UI_RenProjectileIcons;       // 0x00F57A8F
@@ -2399,7 +2431,7 @@ namespace moho
    * Not a distinct binary function - promotes the file-private
    * `ResolveCommandGraphAnchorHistoryWorldPosition` (= FUN_0081CFD0) for
    * cross-TU callers (the command-graph render pass in
-   * `CRenderWorldView.cpp`). Resolves one command's fallback world-space
+   * `CUIWorldView.cpp`). Resolves one command's fallback world-space
    * anchor: the latest build-position sample in its command-graph history,
    * or the history's cached default sample when none exists.
    */
@@ -2408,7 +2440,7 @@ namespace moho
   /**
    * Address: 0x00827A00 (FUN_00827A00, sub_827A00)
    *
-   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * Defined in CUIWorldView.cpp (a free function, not a UICommandGraph
    * member - it has two independent callers, `UICommandGraph::
    * DrawCommandOrderline` and `Moho::DrawPathPreview`). See that definition
    * for the full doc comment.
@@ -2421,7 +2453,7 @@ namespace moho
   /**
    * Address: 0x0082A380 (FUN_0082A380, Moho::DrawPathPreview)
    *
-   * Defined in CWldSession.cpp, not CRenderWorldView.cpp: it reads
+   * Defined in CWldSession.cpp, not CUIWorldView.cpp: it reads
    * `UICommandGraph::mSession`/`mNodes` directly, and `UICommandGraph` is
    * only a complete type here (see `ResolveCommandGraphAnchorWorldPosition`
    * above) - a free function, `__stdcall`, no `this` in the strict sense,
@@ -2455,7 +2487,7 @@ namespace moho
   /**
    * Address: 0x0082A120 (FUN_0082A120, sub_82A120)
    *
-   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * Defined in CUIWorldView.cpp (a free function, not a UICommandGraph
    * member). Sole caller is `DrawPathPreview` above. See that definition for
    * the full doc comment.
    */
@@ -2467,7 +2499,7 @@ namespace moho
   /**
    * Address: 0x0082A2B0 (FUN_0082A2B0, sub_82A2B0)
    *
-   * Defined in CRenderWorldView.cpp (a free function, not a UICommandGraph
+   * Defined in CUIWorldView.cpp (a free function, not a UICommandGraph
    * member). Sole caller is `DrawPathPreview` above. See that definition for
    * the full doc comment.
    */
@@ -2476,18 +2508,7 @@ namespace moho
   /**
    * Not a distinct binary function - `UICommandGraph` is only a complete
    * type in CWldSession.cpp (see `ResolveCommandGraphAnchorWorldPosition`
-   * above), so `CRenderWorldView::RenderCommandGraph` (CRenderWorldView.cpp)
-   * calls `UICommandGraph::DrawCommandGraphMesh` through this wrapper rather
-   * than on the bare `UICommandGraph*` it holds, which is incomplete there.
-   * No-ops when `graph` is null.
-   */
-  void DrawCommandGraphMeshIfPresent(
-    UICommandGraph* graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction
-  );
-
-  /**
-   * Not a distinct binary function - `UICommandGraph` is only a complete
-   * type in CWldSession.cpp (see `DrawCommandGraphMeshIfPresent` above), so
+   * above), so
    * `Moho::CUIWorldView::UpdateSelection` (UiRuntimeTypes.cpp) calls
    * `UICommandGraph::ResolveCursorHighlightCommandId` through this wrapper
    * rather than on the bare `UICommandGraph*` its `mComGraph` holds, which is

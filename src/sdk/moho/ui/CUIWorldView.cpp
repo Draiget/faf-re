@@ -29,7 +29,7 @@ namespace moho
 {
 
   /**
-   * Address: 0x0086EE00 (FUN_0086EE00, Moho::CRenderWorldView::Render)
+   * Address: 0x0086EE00 (FUN_0086EE00, Moho::CUIWorldView::Render)
    * Slot: 0
    *
    * IDA signature:
@@ -51,7 +51,7 @@ namespace moho
    * Every pass that interpolates takes the fraction; only the projectile
    * icons (their glow timer) and the slot-2 tail also take the frame time.
    */
-  void CRenderWorldView::Render(
+  void CUIWorldView::Render(
     CD3DPrimBatcher* const batcher,
     const int gameTick,
     const float tickFraction,
@@ -71,10 +71,10 @@ namespace moho
       // `RenderStrategicIcons` forwards it to its custom-name and
       // selection-set label passes so the minimap draws status bars without
       // text. (An earlier pass recorded this dispatch as side-effect-only.)
-      mWldSession->RenderStrategicIcons(mCamera, batcher, tickFraction, IsMiniMap());
+      mWldSession->RenderStrategicIcons(mCamera.get(), batcher, tickFraction, IsMiniMap());
     }
 
-    mWldSession->RenderProjectileIcons(mCamera, batcher, tickFraction, frameSeconds);
+    mWldSession->RenderProjectileIcons(mCamera.get(), batcher, tickFraction, frameSeconds);
 
     if (UI_RenProjectileArcs) {
       RenderProjectileArcs(mWldSession, const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher, tickFraction);
@@ -92,13 +92,13 @@ namespace moho
 
     mWldSession->DrawCommandSplats(const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher);
 
-    mWldSession->DrawEconomyOverlay(mCamera, batcher, tickFraction);
+    mWldSession->DrawEconomyOverlay(mCamera.get(), batcher, tickFraction);
 
     RenderCommandGraph(batcher, gameTick, tickFraction, frameSeconds);
   }
 
   /**
-   * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CRenderWorldView::Func1)
+   * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CUIWorldView::Func1)
    * Slot: 1
    *
    * IDA signature:
@@ -112,7 +112,7 @@ namespace moho
    * This is the slot `WRenViewport::RenderAllHeads` dispatches once per
    * registered world view at the head of every frame.
    */
-  void CRenderWorldView::Func1()
+  void CUIWorldView::Func1()
   {
     if (mIsMiniMap) {
       return;
@@ -122,91 +122,91 @@ namespace moho
   }
 
   /**
-   * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)
+   * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CUIWorldView::GetCamera)
    * Slot: 3
    *
    * What it does:
    * Returns the camera this view renders through.
    */
-  CameraImpl* CRenderWorldView::GetCamera()
+  CameraImpl* CUIWorldView::GetCamera()
   {
-    return mCamera;
+    return mCamera.get();
   }
 
   /**
-   * Address: 0x0086EBE0 (FUN_0086EBE0, Moho::CRenderWorldView::GetCameraView)
+   * Address: 0x0086EBE0 (FUN_0086EBE0, Moho::CUIWorldView::GetCameraView)
    * Slot: 4
    *
    * What it does:
    * Forwards to the camera's view payload (a tail call through the camera's
    * own vtable in the binary).
    */
-  GeomCamera3* CRenderWorldView::GetCameraView()
+  GeomCamera3* CUIWorldView::GetCameraView()
   {
     return const_cast<GeomCamera3*>(&mCamera->CameraGetView());
   }
 
   /**
-   * Address: 0x0086EC00 (FUN_0086EC00, Moho::CRenderWorldView::GetCameraOffset)
+   * Address: 0x0086EC00 (FUN_0086EC00, Moho::CUIWorldView::GetCameraOffset)
    * Slot: 5
    *
    * What it does:
    * Forwards to the camera's positional offset lane.
    */
-  Wm3::Vector3f* CRenderWorldView::GetCameraOffset()
+  Wm3::Vector3f* CUIWorldView::GetCameraOffset()
   {
     return const_cast<Wm3::Vector3f*>(&mCamera->CameraGetOffset());
   }
 
   /**
-   * Address: 0x0086EC10 (FUN_0086EC10, Moho::CRenderWorldView::CameraGetTargetZoom)
+   * Address: 0x0086EC10 (FUN_0086EC10, Moho::CUIWorldView::CameraGetTargetZoom)
    * Slot: 6
    */
-  float CRenderWorldView::CameraGetTargetZoom()
+  float CUIWorldView::CameraGetTargetZoom()
   {
     return mCamera->CameraGetTargetZoom();
   }
 
   /**
-   * Address: 0x0086EC20 (FUN_0086EC20, Moho::CRenderWorldView::GetMaxZoom)
+   * Address: 0x0086EC20 (FUN_0086EC20, Moho::CUIWorldView::GetMaxZoom)
    * Slot: 7
    */
-  float CRenderWorldView::GetMaxZoom()
+  float CUIWorldView::GetMaxZoom()
   {
     return mCamera->GetMaxZoom();
   }
 
   /**
-   * Address: 0x0086EC30 (FUN_0086EC30, Moho::CRenderWorldView::CameraGetZoom)
+   * Address: 0x0086EC30 (FUN_0086EC30, Moho::CUIWorldView::CameraGetZoom)
    * Slot: 8
    */
-  float CRenderWorldView::CameraGetZoom()
+  float CUIWorldView::CameraGetZoom()
   {
     return mCamera->CameraGetZoom();
   }
 
   /**
-   * Address: 0x0086DC90 (FUN_0086DC90, Moho::CRenderWorldView::IsMiniMap)
+   * Address: 0x0086DC90 (FUN_0086DC90, Moho::CUIWorldView::IsMiniMap)
    * Slot: 10
    */
-  bool CRenderWorldView::IsMiniMap()
+  bool CUIWorldView::IsMiniMap()
   {
     return mIsMiniMap;
   }
 
   /**
-   * Address: 0x0086DC00 (FUN_0086DC00, Moho::CRenderWorldView::SetOrthographic)
+   * Address: 0x0086DC00 (FUN_0086DC00, Moho::CUIWorldView::SetOrthographic)
    * Slot: 11
    *
    * What it does:
    * Stores the orthographic toggle and mirrors it onto the camera. Going
    * orthographic disables camera shake; leaving it re-enables shake.
    */
-  void CRenderWorldView::SetOrthographic(const bool orthographicEnabled)
+  void CUIWorldView::SetOrthographic(const bool orthographicEnabled)
   {
     mOrthographic = orthographicEnabled;
 
-    if (mCamera == nullptr) {
+    if (!mCamera) {
       return;
     }
 
@@ -215,14 +215,14 @@ namespace moho
   }
 
   /**
-   * Address: 0x0086DC60 (FUN_0086DC60, Moho::CRenderWorldView::CanShake)
+   * Address: 0x0086DC60 (FUN_0086DC60, Moho::CUIWorldView::CanShake)
    * Slot: 12
    *
    * What it does:
    * Returns the stored orthographic toggle - the binary reuses this one byte
    * for both lanes, so an orthographic view reports "can shake".
    */
-  bool CRenderWorldView::CanShake()
+  bool CUIWorldView::CanShake()
   {
     return mOrthographic;
   }
@@ -470,7 +470,7 @@ namespace moho
    *
    * What it does:
    * The build-drag overlay pass, called once per frame from
-   * `CRenderWorldView::RenderCommandGraph` regardless of whether the command
+   * `CUIWorldView::RenderCommandGraph` regardless of whether the command
    * graph itself is showing.
    *
    * Latches every queued-order ghost mesh's hidden flag to whether a command
@@ -486,26 +486,23 @@ namespace moho
    * The decompile is flagged "positive sp value has been detected" and its
    * pseudocode mis-names two fields it gets from the wrong stack offset
    * (`mCursorInfo.mInWorld` and `mode.mBlueprint`); both were re-derived from
-   * the raw x86: `cmp byte ptr [ecx+4B0h], 0` at 0x00853E44 is
-   * `CursorInfoRuntimeView::mHitValid` (`CWldSession::GetCursorInfo()`'s
-   * backing field, offset confirmed against `CWldSessionCursorRuntimeView`
-   * in CWldSession.cpp), and `cmp dword ptr [esp+44h], 3` at 0x00853EAA is
+   * the raw x86: `cmp byte ptr [ecx+4B0h], 0` at 0x00853E44 is the session
+   * cursor's `MouseInfo::mHitValid` (`CWldSession::GetCursorInfo()`), and
+   * `cmp dword ptr [esp+44h], 3` at 0x00853EAA is
    * `CommandModeData::mMode == COMMOD_BuildAnchored` (there is no
    * `ERuleBPUnitCommandCaps` enumerant `3`, while `COMMOD_BuildAnchored`
    * is a real, semantically exact match for "draw the build-assist radius").
    */
   void DrawCommandGraph(CameraImpl* const camera, CBuildDragPreview& buildDrag, CD3DPrimBatcher* const batcher)
   {
-    // Owning handle: the binary releases it at 0x00853F0B, on the way out of
-    // this function, after the last `graphActive` read.
-    boost::SharedPtrRaw<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
-    const bool graphActive = (graph.px != nullptr);
-    graph.release();
+    // Held for the whole pass and released on the way out (0x00853F0B).
+    const boost::shared_ptr<UICommandGraph> graph = buildDrag.mSession->GetCommandGraph(false);
+    const bool graphActive = static_cast<bool>(graph);
 
-    if (buildDrag.mUnknown5D != graphActive) {
-      buildDrag.mUnknown5D = graphActive;
+    if (buildDrag.mQueuedGhostsHidden != graphActive) {
+      buildDrag.mQueuedGhostsHidden = graphActive;
       for (auto& [cmdId, mesh] : buildDrag.mPreviewPositions) {
-        mesh->isHidden = buildDrag.mUnknown5D;
+        mesh->isHidden = buildDrag.mQueuedGhostsHidden;
       }
     }
 
@@ -543,55 +540,43 @@ namespace moho
   }
 
   /**
-   * Address: 0x0086ECD0 (FUN_0086ECD0, Moho::CRenderWorldView::RenderCommandGraph)
+   * Address: 0x0086ECD0 (FUN_0086ECD0, Moho::CUIWorldView::RenderCommandGraph)
    * Slot: 2
    *
    * What it does:
-   * With Shift held on a non-minimap view, lazily creates/caches this view's
-   * command-graph handle (`mComGraph`), draws its mesh, and draws every
-   * pending mobile-build order's footprint skirt; otherwise drops the cached
-   * handle. Always draws the local build-drag overlay.
+   * With Shift held on a non-minimap view, takes and caches a strong hold on
+   * the session's command graph (creating it if need be), draws the graph's
+   * mesh through `CWldSession::RenderCommandGraph` (0x0085AF40, which looks the
+   * graph up again without creating one), and draws every pending mobile-build
+   * order's footprint skirt; otherwise lets the cached hold go. Always draws
+   * the local build-drag overlay.
    *
-   * Folds in `sub_85AF40` (0x0085AF40, 28 lines) - its sole caller - whose
-   * entire body is "peek the session's command graph (`allowCreate=false`,
-   * independent of the `mComGraph` cache above) and draw its mesh if
-   * present," already-named operations here rather than a standalone
-   * one-call helper. The two more register arguments its own `__userpurge`
-   * signature carried (`CRenderWorldView*`, `boost::shared_ptr<UICommandGraph>&`,
-   * i.e. `this` and `&mComGraph`) are dead - never dereferenced by
-   * `sub_829190` either, confirmed against every callsite in its
-   * disassembly.
+   * 0x0086ED3F is `shared_ptr::operator=` from `GetCommandGraph(true)`'s
+   * temporary, released at 0x0086ED50; 0x0086ED9E is `shared_ptr::reset()`.
+   * The graph-mesh pass gets `gameTick` and the `tickFraction` at
+   * `[ebp+10h]` (0x0086ED55..0x0086ED72); `frameSeconds` is not read.
    */
-  void CRenderWorldView::RenderCommandGraph(
+  void CUIWorldView::RenderCommandGraph(
     CD3DPrimBatcher* const batcher, const std::int32_t gameTick, const float tickFraction,
     [[maybe_unused]] const float frameSeconds
   )
   {
-    if (mIsMiniMap || !MAUI_KeyIsDown(MKEY_SHIFT)) {
-      // 0x0086ED0B drops the cached handle through the shared-count release,
-      // not by overwriting the (px, pi) pair. `SharedPtrRaw` is a layout
-      // mirror with no destructor, so an assignment here leaked the reference
-      // and the graph - with one live `UnitPlace` ghost mesh per queued build
-      // order hanging off its draw nodes - was never destroyed.
-      mComGraph.release();
-    } else {
-      if (mComGraph.px == nullptr) {
-        boost::SharedPtrRaw<UICommandGraph> created = mWldSession->GetCommandGraph(/*allowCreate=*/true);
-        mComGraph.reset_from(created);
-        created.release();
+    if (!mIsMiniMap && MAUI_KeyIsDown(MKEY_SHIFT)) {
+      if (!mComGraph) {
+        mComGraph = mWldSession->GetCommandGraph(/*allowCreate=*/true);
       }
 
-      // Every `GetCommandGraph` hands back an owning reference; the binary
-      // releases this one at 0x0085AF60 before returning from `sub_85AF40`.
-      boost::SharedPtrRaw<UICommandGraph> graph = mWldSession->GetCommandGraph(/*allowCreate=*/false);
-      DrawCommandGraphMeshIfPresent(graph.px, mCamera->CameraGetView(), *batcher, gameTick, tickFraction);
-      graph.release();
-
+      mWldSession->RenderCommandGraph(mCamera->CameraGetView(), batcher, gameTick, tickFraction);
       DrawAllUnitSkirts(batcher, mWldSession, mCamera->CameraGetView());
+    } else {
+      // Dropping the hold is what lets the graph - and the `UnitPlace` ghost
+      // mesh hanging off each of its draw nodes - be destroyed once no other
+      // view or drag holds it.
+      mComGraph.reset();
     }
 
     if (!mIsMiniMap) {
-      DrawCommandGraph(mCamera, mBuildDrag, batcher);
+      DrawCommandGraph(mCamera.get(), mBuildDrag, batcher);
     }
   }
 

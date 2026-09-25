@@ -585,7 +585,7 @@ namespace moho
      *   `CMauiCursorLink::AssignCursor`, removed 2026-09-25.)
      * Address: 0x00873810 (FUN_00873810 -- the `WeakPtr<ISelectionDragger>`
      *   emission, `lea edx, [ecx+4]`; caller `CUIWorldView::HandleEvent`
-     *   0x00870E35 (`CRenderWorldView::mSelectionDragger`, right after
+     *   0x00870E35 (`CUIWorldView::mSelectionDragger`, right after
      *   `NewSelectionDragger`). Formerly `BindWorldViewOverlayDragger` in
      *   moho/ui/UiRuntimeTypes.cpp, removed 2026-09-25.)
      *

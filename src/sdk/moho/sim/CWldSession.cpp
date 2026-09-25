@@ -2593,17 +2593,14 @@ namespace moho
      * overlay, then switches to a screen-space projection and draws every
      * node's ETA text label.
      *
-     * The `__userpurge` signature carries two more register arguments
-     * (`CRenderWorldView*`, `boost::shared_ptr<UICommandGraph>&`) that its
-     * caller (`sub_85AF40`) always supplies, but this function's own body
-     * never dereferences either - confirmed against every callsite in its
-     * disassembly. Dropped from this signature rather than kept unused.
+     * IDA's `__userpurge` signature adds two register arguments (typed
+     * `CRenderWorldView*` and `boost::shared_ptr<UICommandGraph>&` in the
+     * analyst database) that are only the caller's leftover `ecx`/`edx`; this
+     * body never reads either.
      *
      * Public (unlike its `DrawWaypointMarker`/`DrawCommandOrderline`/etc.
      * siblings above, which are only ever called from here): its real caller
-     * is `sub_85AF40`, outside this class - reached via
-     * `DrawCommandGraphMeshIfPresent` (CWldSession.h) from
-     * `CRenderWorldView::RenderCommandGraph`.
+     * is `CWldSession::RenderCommandGraph` (0x0085AF40), outside this class.
      */
     void DrawCommandGraphMesh(const GeomCamera3& camera, CD3DPrimBatcher& batcher, std::int32_t tick, float tickFraction);
 
@@ -4317,188 +4314,6 @@ namespace moho
         return PickGenericStrategicIconTexture(aux, iconData, /*wantHighlightVariant=*/false);
       }
       return iconData.mBlueprint->mStrategicIconRest;
-    }
-
-    /**
-     * The payload half of `sp_counted_impl_p<TPointee>`: boost's control-block
-     * base supplies the vptr and both counts, so the owned pointer lands at
-     * +0x0C without naming a vtable lane here.
-     */
-    template <typename TPointee>
-    struct SpCountedImplOwnedPointeeStorage : boost::detail::sp_counted_base
-    {
-      TPointee* mPointee; // +0x0C
-    };
-
-    /**
-     * Address: 0x0089B860 (FUN_0089B860)
-     *
-     * What it does:
-     * Disposes one `sp_counted_impl_p<SSessionSaveData>` payload by running
-     * non-deleting `SSessionSaveData` teardown and releasing owned storage.
-     */
-    void DisposeCountedSessionSaveDataStorage(
-      SpCountedImplOwnedPointeeStorage<SSessionSaveData>* const countedStorage
-    ) noexcept
-    {
-      SSessionSaveData* const saveData = countedStorage->mPointee;
-      if (saveData != nullptr) {
-        saveData->~SSessionSaveData();
-        ::operator delete(static_cast<void*>(saveData));
-      }
-    }
-
-    /**
-     * Address: 0x0089BCF0 (FUN_0089BCF0)
-     *
-     * What it does:
-     * Destroys one `UICommandGraph` instance and releases its owned storage.
-     */
-    void DestroyUICommandGraphOwned(UICommandGraph* const graph) noexcept
-    {
-      if (graph == nullptr) {
-        return;
-      }
-
-      graph->~UICommandGraph();
-      ::operator delete(graph);
-    }
-
-    /**
-     * Address: 0x0089BC90 (FUN_0089BC90)
-     *
-     * What it does:
-     * Disposes one `sp_counted_impl_p<UICommandGraph>` payload by running
-     * non-deleting `UICommandGraph` teardown and releasing owned storage.
-     */
-    void DisposeCountedUICommandGraphStorage(
-      SpCountedImplOwnedPointeeStorage<UICommandGraph>* const countedStorage
-    ) noexcept
-    {
-      DestroyUICommandGraphOwned(countedStorage->mPointee);
-    }
-
-    [[nodiscard]] boost::detail::sp_counted_base* CreateBoostControlForUICommandGraph(UICommandGraph* const graph)
-    {
-      if (!graph) {
-        return nullptr;
-      }
-
-      auto* const control = new (std::nothrow) boost::detail::sp_counted_impl_p<UICommandGraph>(graph);
-      if (!control) {
-        DestroyUICommandGraphOwned(graph);
-        return nullptr;
-      }
-      return control;
-    }
-
-    /**
-     * Address: 0x00898F70 (FUN_00898F70, ??0WeakPtr_UICommandGraph@Moho@@QAE@@Z_0)
-     *
-     * What it does:
-     * Performs one weak-lock operation for the session command-graph lane:
-     * if the control block still has live shared owners, returns one retained
-     * shared handle using the current payload pointer; otherwise returns empty.
-     */
-    [[nodiscard]] boost::SharedPtrRaw<UICommandGraph>
-    LockWeakCommandGraph(UICommandGraph* px, boost::detail::sp_counted_base* control)
-    {
-      if (!control) {
-        return {};
-      }
-
-      boost::SharedPtrRaw<UICommandGraph> out{};
-      out.px = px;
-      out.pi = control;
-      if (!out.add_ref_lock()) {
-        return {};
-      }
-      return out;
-    }
-
-    void AssignSharedCommandGraph(boost::SharedPtrRaw<UICommandGraph>& out, UICommandGraph* const graph)
-    {
-      boost::detail::sp_counted_base* const newControl = CreateBoostControlForUICommandGraph(graph);
-      UICommandGraph* const ownedGraph = newControl ? graph : nullptr;
-
-      out.release();
-
-      out.px = ownedGraph;
-      out.pi = newControl;
-    }
-
-    /**
-     * Address: 0x0089AE50 (FUN_0089AE50, Moho::WeakPtr_UICommandGraph::cpy --
-     * the store into `CWldSession`'s lane at session+0x404, reached from
-     * `GetCommandGraph` at 0x00895F34)
-     *
-     * A 2026-08-20 audit read this lane as strong and made both halves of it
-     * `add_ref_copy()`/`release()`. That is the wrong function: it looked at
-     * FUN_0086EDD0, which is the copy into `CRenderWorldView::mComGraph` - a
-     * genuinely strong handle - and not at the store into the session field.
-     * This one is weak, and says so twice in seven instructions: the acquire
-     * at 0x0089AE64 is `lock xadd [edi+8], 1`, `weak_count_` at +0x08, and the
-     * release at 0x0089AE75 decrements the same +0x08 lane and then dispatches
-     * through control-block vtable slot **+0x08** (`destroy()`) at 0x0089AE7D,
-     * not slot +0x04 (`dispose()`). A strong release would touch +0x04 for
-     * both.
-     *
-     * With it strong the session pinned its own command graph for the whole
-     * game. The graph hangs one `UnitPlace` ghost mesh off every draw node and
-     * only `~UICommandGraph` frees them, so every mobile-build order ever
-     * queued left a green ghost on the map - through construction, after
-     * completion and after cancellation.
-     *
-     * What it does:
-     * Copies one shared command-graph payload into `CWldSession`'s weak
-     * command-graph lane, rebinding the observer only when the incoming
-     * control block changes.
-     */
-    void CopySharedToWeakCommandGraph(
-      const boost::SharedPtrRaw<UICommandGraph>& shared,
-      UICommandGraph*& weakPx,
-      boost::detail::sp_counted_base*& weakControl
-    )
-    {
-      weakPx = shared.px;
-      boost::detail::sp_counted_base* const incomingControl = shared.pi;
-
-      if (incomingControl != weakControl) {
-        if (incomingControl != nullptr) {
-          incomingControl->weak_add_ref();
-        }
-
-        if (weakControl != nullptr) {
-          weakControl->weak_release();
-        }
-
-        weakControl = incomingControl;
-      }
-    }
-
-    /**
-     * Address: 0x00824060 (FUN_00824060, Moho::WeakPtr_UICommandGraph::Release)
-     *
-     * The 2026-08-20 audit paired this with a strong `release()`, on the same
-     * mistaken reading of the session lane corrected on
-     * `CopySharedToWeakCommandGraph` above. The lane is a weak observer -
-     * 0x0089AE64/0x0089AE75 both work `weak_count_` at +0x08 and the drop
-     * dispatches `destroy()` through vtable slot +0x08 - so its teardown is
-     * the matching weak drop. FUN_00824060 stays the citation for the strong
-     * release on `UICommandDragger::mGraph`, which really does own its
-     * reference.
-     *
-     * What it does:
-     * Drops `CWldSession`'s weak observer of its command graph on session
-     * teardown.
-     */
-    void ReleaseWeakCommandGraph(UICommandGraph*& px, boost::detail::sp_counted_base*& control)
-    {
-      if (control) {
-        control->weak_release();
-      }
-      px = nullptr;
-      control = nullptr;
     }
 
     template <typename TNode>
@@ -7181,11 +6996,11 @@ namespace moho
    * offsets) - recovered here as the same typed RB-tree/list walks every
    * sibling command-graph function already uses.
    *
-   * The `__userpurge` signature carries two more register arguments
-   * (`CRenderWorldView*`, `boost::shared_ptr<UICommandGraph>&`) that its
-   * caller (`sub_85AF40`) always supplies, but this function's own body
-   * never dereferences either - confirmed against every callsite in its
-   * disassembly. Dropped from this signature rather than kept unused.
+   * IDA's `__userpurge` signature adds two register arguments (typed
+   * `CRenderWorldView*` and `boost::shared_ptr<UICommandGraph>&` in the
+   * analyst database) that are only the caller's leftover `ecx`/`edx`
+   * (`CWldSession::RenderCommandGraph`, 0x0085AF40); this body never reads
+   * either.
    */
   void UICommandGraph::DrawCommandGraphMesh(
     const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick, const float tickFraction
@@ -7251,20 +7066,10 @@ namespace moho
     batcher.Flush();
   }
 
-  void DrawCommandGraphMeshIfPresent(
-    UICommandGraph* const graph, const GeomCamera3& camera, CD3DPrimBatcher& batcher, const std::int32_t tick,
-    const float tickFraction
-  )
-  {
-    if (graph != nullptr) {
-      graph->DrawCommandGraphMesh(camera, batcher, tick, tickFraction);
-    }
-  }
-
   /**
-   * Not a distinct binary function - see `DrawCommandGraphMeshIfPresent`
-   * above for why `UICommandGraph::ResolveCursorHighlightCommandId` needs a
-   * wrapper here. `Moho::CUIWorldView::UpdateSelection` (UiRuntimeTypes.cpp)
+   * Not a distinct binary function - `UICommandGraph` is only a complete
+   * type in this file, so `UICommandGraph::ResolveCursorHighlightCommandId`
+   * needs a wrapper here. `Moho::CUIWorldView::UpdateSelection` (UiRuntimeTypes.cpp)
    * calls this through the bare `UICommandGraph*` its `mComGraph` holds.
    * Returns -1 (no highlighted command) when `graph` is null.
    */
@@ -7794,7 +7599,7 @@ namespace moho
 
     // DecodeUserEntityWeakRef(const CameraUserEntityWeakRef&) lives in
     // CameraImpl.h/.cpp now - it decodes the same GetArmyUnitsInFrustum()
-    // lanes and CRenderWorldView's build-drag adjacency pass needs it too.
+    // lanes and CUIWorldView's build-drag adjacency pass needs it too.
     /**
      * Address: 0x0081FD2B..0x0081FD4E (inlined into
      * `Moho::SCommandModeData::HandleEvent`, FUN_0081FCD0)
@@ -7817,7 +7622,7 @@ namespace moho
 
     // GetHoveredUserEntity is now CWldSession::GetHoveredUserEntity, a public
     // member (declared near GetCursorInfo() in the header) - promoted so the
-    // command-graph render pass in CRenderWorldView.cpp can call it too.
+    // command-graph render pass in CUIWorldView.cpp can call it too.
 
     // ResolveIUnitBridge was a duplicate of UserUnit.h's GetIUnitBridge -
     // callers below now use that instead.
@@ -13965,8 +13770,6 @@ namespace moho
     // `CFormation::UpdateOrientation`, so leaving it null faults on the first
     // frame after the session starts playing.
     mCurFormation = new CFormation();
-    mUICommandGraphPx = nullptr;
-    mUICommandGraphControl = nullptr;
     mUnknownShared40C = {};
     mDebugCanvas = {};
     mBeatDebugCanvas = {};
@@ -14225,7 +14028,6 @@ namespace moho
       userArmies[armyIndex] = nullptr;
     }
 
-    ReleaseWeakCommandGraph(mUICommandGraphPx, mUICommandGraphControl);
     mSimResources.release();
     mBeatDebugCanvas.release();
     mDebugCanvas.release();
@@ -15422,22 +15224,40 @@ namespace moho
   /**
    * Address: 0x00895EB0 (FUN_00895EB0,
    * ?GetCommandGraph@CWldSession@Moho@@QAE?AV?$shared_ptr@VUICommandGraph@Moho@@@boost@@_N@Z)
+   *
+   * What it does:
+   * `lock()` into the return slot (0x00895EE5); when that is empty and
+   * `allowCreate` is set, `new UICommandGraph(this)` (0x00895F05, 0x00895F20),
+   * `reset` onto it (0x00895F2D) and the weak reference re-pointed at it
+   * (0x00895F34). The three calls are boost's own `weak_ptr::lock`,
+   * `shared_ptr::reset(Y*)` and `weak_ptr::operator=`, emitted for
+   * `UICommandGraph` (cited in BoostWrappers.h).
    */
-  boost::SharedPtrRaw<UICommandGraph> CWldSession::GetCommandGraph(const bool allowCreate)
+  boost::shared_ptr<UICommandGraph> CWldSession::GetCommandGraph(const bool allowCreate)
   {
-    boost::SharedPtrRaw<UICommandGraph> graph = LockWeakCommandGraph(mUICommandGraphPx, mUICommandGraphControl);
-    if (!graph.px && allowCreate) {
-      UICommandGraph* createdGraph = nullptr;
-      void* const raw = ::operator new(sizeof(UICommandGraph), std::nothrow);
-      if (raw) {
-        createdGraph = new (raw) UICommandGraph(this);
-      }
-
-      AssignSharedCommandGraph(graph, createdGraph);
-      CopySharedToWeakCommandGraph(graph, mUICommandGraphPx, mUICommandGraphControl);
+    boost::shared_ptr<UICommandGraph> graph = mCommandGraph.lock();
+    if (!graph && allowCreate) {
+      graph.reset(new UICommandGraph(this));
+      mCommandGraph = graph;
     }
-
     return graph;
+  }
+
+  /**
+   * Address: 0x0085AF40 (FUN_0085AF40, sub_85AF40)
+   *
+   * What it does:
+   * Peeks at the command graph - `GetCommandGraph(false)` (0x0085AF61), so
+   * this never creates one - and draws its mesh when one is alive
+   * (0x0085AF8E), releasing the temporary afterwards (0x0085AF9B..0x0085AFCB).
+   */
+  void CWldSession::RenderCommandGraph(
+    const GeomCamera3& camera, CD3DPrimBatcher* const batcher, const std::int32_t gameTick, const float tickFraction
+  )
+  {
+    if (const boost::shared_ptr<UICommandGraph> graph = GetCommandGraph(false)) {
+      graph->DrawCommandGraphMesh(camera, *batcher, gameTick, tickFraction);
+    }
   }
 
   /**
@@ -15484,16 +15304,14 @@ namespace moho
    * Address: 0x00895F70 (FUN_00895F70, ?DirtyCommandGraph@CWldSession@Moho@@QAEXXZ)
    *
    * What it does:
-   * Locks the cached UI command-graph weak handle, marks it dirty when
-   * present, and releases the temporary shared hold.
+   * `lock()` on the weak reference (0x00895F7F), a byte store into the graph's
+   * dirty flag when one is alive (0x00895F8C), and the temporary's release.
    */
   void CWldSession::DirtyCommandGraph()
   {
-    boost::SharedPtrRaw<UICommandGraph> graph = GetCommandGraph(false);
-    if (graph.px != nullptr) {
-      graph.px->MarkDirty();
+    if (const boost::shared_ptr<UICommandGraph> graph = mCommandGraph.lock()) {
+      graph->MarkDirty();
     }
-    graph.release();
   }
 
   /**
@@ -15839,17 +15657,10 @@ namespace moho
     DeleteCommandIssueHelpers(*mCommandManager, beat.mPendingReleasedCommandIds);
     { static int c = 0; if ((!beat.mPendingCommandEventRemovals.empty() || !beat.mPendingReleasedCommandIds.empty()) && c++ < 200) gpg::Warnf("[GHOST] DoBeat after mCommands=%u", static_cast<unsigned>(mCommandManager->mCommands.size())); } // TEMPORARY PROBE (do not commit)
 
-    // The command graph only gets marked here; the mesh rebuild it implies runs
-    // back in `SessionFrame`.
-    {
-      // Owning handle - `SharedPtrRaw` has no destructor, so it has to be
-      // released by hand exactly where the binary open-codes the release.
-      boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
-      if (commandGraph.px != nullptr) {
-        commandGraph.px->MarkDirty();
-      }
-      commandGraph.release();
-    }
+    // The command graph only gets marked here (`DirtyCommandGraph`, inlined:
+    // the `lock()` at 0x00894F02 and the byte store at 0x00894F17); the mesh
+    // rebuild it implies runs back in `SessionFrame`.
+    DirtyCommandGraph();
 
     if (worldCamera != nullptr) {
       for (const SCamFollowParams& follow : beat.mFollowCameras) {
@@ -16077,12 +15888,8 @@ namespace moho
       mTimeSinceLastTick = std::max(0.0f, std::min(remainder, 1.0f));
     }
 
-    {
-      boost::SharedPtrRaw<UICommandGraph> commandGraph = GetCommandGraph(false);
-      if (commandGraph.px != nullptr) {
-        commandGraph.px->CreateMeshes();
-      }
-      commandGraph.release();
+    if (const boost::shared_ptr<UICommandGraph> commandGraph = GetCommandGraph(false)) {
+      commandGraph->CreateMeshes();
     }
 
     // 0x00409AC0 - the binary names this `CTaskStage::DoFrame`; it is the same

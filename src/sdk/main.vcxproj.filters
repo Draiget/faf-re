@@ -1605,7 +1605,7 @@
     <ClCompile Include="moho\terrain\water\Shoreline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="moho\ui\CRenderWorldView.cpp">
+    <ClCompile Include="moho\ui\CUIWorldView.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="moho\ui\CUIManager.cpp">

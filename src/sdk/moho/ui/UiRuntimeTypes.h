@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "boost/scoped_ptr.h"
 #include "boost/shared_ptr.h"
 #include "gpg/core/containers/FastVector.h"
 #include "gpg/core/containers/String.h"
@@ -821,8 +822,8 @@ namespace moho
   static_assert(sizeof(CMauiLuaDragger) == 0x3C, "moho::CMauiLuaDragger size must be 0x3C");
 
   /**
-   * The world view's build-placement preview (`CRenderWorldView::mBuildDrag`,
-   * +0xF8; IDA's `struct_WorldView_object`): the translucent `UnitPlace` meshes
+   * The world view's build-placement preview (`CUIWorldView::mBuildDrag`,
+   * +0x214; IDA's `struct_WorldView_object`): the translucent `UnitPlace` meshes
    * stamped along a build drag, the ghosts shown at queued mobile-build orders,
    * the preview material and terrain decal, and the drag endpoints.
    * `UIBuildDragger` drives it while a build drag is in progress.
@@ -933,57 +934,37 @@ namespace moho
     Wm3::Vector3f mStart{};                                 // +0x44
     Wm3::Vector3f mEnd{};                                   // +0x50
     bool mPreviewInvalid = false;                           // +0x5C
-    bool mUnknown5D = false;                                // +0x5D
-    std::uint8_t mPad5E[0x02]{};
+    /// Whether the ghosts at queued build orders are hidden: `DrawCommandGraph`
+    /// (0x00853E10..0x00853E2F) latches it to "a command graph exists" and,
+    /// whenever that flips, copies it into every `mPreviewPositions` mesh's
+    /// hidden flag, so the ghosts give way while the full graph is drawn.
+    bool mQueuedGhostsHidden = false;                       // +0x5D
   };
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mSession) == 0x00,
-    "moho::CBuildDragPreview::mSession offset must be 0x00"
+  static_assert(offsetof(CBuildDragPreview, mSession) == 0x00, "CBuildDragPreview::mSession offset must be 0x00");
+  static_assert(
+    offsetof(CBuildDragPreview, mActiveBuildMesh) == 0x04, "CBuildDragPreview::mActiveBuildMesh offset must be 0x04"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mActiveBuildMesh) == 0x04,
-    "moho::CBuildDragPreview::mActiveBuildMesh offset must be 0x04"
+  static_assert(offsetof(CBuildDragPreview, mMeshes) == 0x08, "CBuildDragPreview::mMeshes offset must be 0x08");
+  static_assert(offsetof(CBuildDragPreview, mBlueprints) == 0x18, "CBuildDragPreview::mBlueprints offset must be 0x18");
+  static_assert(
+    offsetof(CBuildDragPreview, mPreviewPositions) == 0x28, "CBuildDragPreview::mPreviewPositions offset must be 0x28"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mMeshes) == 0x08,
-    "moho::CBuildDragPreview::mMeshes offset must be 0x08"
+  static_assert(
+    offsetof(CBuildDragPreview, mUnitPlaceMaterial) == 0x34, "CBuildDragPreview::mUnitPlaceMaterial offset must be 0x34"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mBlueprints) == 0x18,
-    "moho::CBuildDragPreview::mBlueprints offset must be 0x18"
+  static_assert(offsetof(CBuildDragPreview, mDecal) == 0x3C, "CBuildDragPreview::mDecal offset must be 0x3C");
+  static_assert(
+    offsetof(CBuildDragPreview, mActiveCommandMode) == 0x40, "CBuildDragPreview::mActiveCommandMode offset must be 0x40"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mPreviewPositions) == 0x28,
-    "moho::CBuildDragPreview::mPreviewPositions offset must be 0x28"
+  static_assert(offsetof(CBuildDragPreview, mStart) == 0x44, "CBuildDragPreview::mStart offset must be 0x44");
+  static_assert(offsetof(CBuildDragPreview, mEnd) == 0x50, "CBuildDragPreview::mEnd offset must be 0x50");
+  static_assert(
+    offsetof(CBuildDragPreview, mPreviewInvalid) == 0x5C, "CBuildDragPreview::mPreviewInvalid offset must be 0x5C"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mUnitPlaceMaterial) == 0x34,
-    "moho::CBuildDragPreview::mUnitPlaceMaterial offset must be 0x34"
+  static_assert(
+    offsetof(CBuildDragPreview, mQueuedGhostsHidden) == 0x5D, "CBuildDragPreview::mQueuedGhostsHidden offset must be 0x5D"
   );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mDecal) == 0x3C,
-    "moho::CBuildDragPreview::mDecal offset must be 0x3C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mActiveCommandMode) == 0x40,
-    "moho::CBuildDragPreview::mActiveCommandMode offset must be 0x40"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mStart) == 0x44,
-    "moho::CBuildDragPreview::mStart offset must be 0x44"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mEnd) == 0x50,
-    "moho::CBuildDragPreview::mEnd offset must be 0x50"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CBuildDragPreview, mPreviewInvalid) == 0x5C,
-    "moho::CBuildDragPreview::mPreviewInvalid offset must be 0x5C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    sizeof(CBuildDragPreview) == 0x60,
-    "moho::CBuildDragPreview size must be 0x60"
-  );
+  static_assert(sizeof(CBuildDragPreview) == 0x60, "CBuildDragPreview size must be 0x60");
 
   /**
    * Drag-build dragger: the one MAUI installs while the player sweeps out a
@@ -1167,17 +1148,11 @@ namespace moho
      * Deleting dtor: 0x008240A0 (slot +0x00 of ??_7UICommandDragger@Moho@@6B@)
      *
      * What it does:
-     * Drops the counted reference the constructor took on the session's UI
-     * command graph, then runs `IMauiDragger`'s own teardown (base vtable
-     * restore plus the `WeakObject` chain drain).
-     *
-     * The graph release is not optional bookkeeping: 0x008240E9 loads
-     * `[this+18h]` (the control-block half of `mGraph`) and 0x008240F6 does
-     * `lock xadd [pn+4], -1`, followed by `dispose()` through vtable slot +4
-     * and `destroy()` through slot +8 once the weak count also reaches zero -
-     * i.e. exactly `boost::detail::sp_counted_base::release()`. The
-     * constructor's own unwind funclet (0x00BC2238) releases the same lane
-     * via `Moho::WeakPtr_UICommandGraph::Release` (0x00824060).
+     * Nothing of its own: `mGraph`'s destructor drops the reference the
+     * constructor took on the session's command graph (0x008240E9 loads
+     * `[this+18h]`, 0x008240F6 `lock xadd [pn+4], -1`, then `dispose()` and
+     * `destroy()`), and `IMauiDragger`'s teardown follows. The constructor's
+     * unwind funclet (0x00BC2238) runs the same `~shared_ptr` (0x00824060).
      */
     ~UICommandDragger() override;
 
@@ -1239,22 +1214,16 @@ namespace moho
     CWldSession* mSession = nullptr;  // +0x08
     CameraImpl* mCam = nullptr;       // +0x0C
     CmdId mCommandId{};                // +0x10
-    // The ctor (0x00823FE0) writes CWldSession::GetCommandGraph(bool)'s
-    // hidden-return-value shared_ptr (px+pi, 8 bytes) directly into this
-    // slot via `lea ecx,[esi+14h]` -- a raw pointer here would overflow the
-    // object by 4 bytes. sizeof(UICommandDragger)==0x1C matches
-    // operator new(0x1C) at the sole factory call site.
-    boost::SharedPtrRaw<UICommandGraph> mGraph{}; // +0x14
+    /// The strong reference this drag holds on the session's command graph.
+    /// The constructor (0x00823FE0) builds it in place: `GetCommandGraph`'s
+    /// hidden return buffer is `lea ecx,[esi+14h]`.
+    boost::shared_ptr<UICommandGraph> mGraph; // +0x14
   };
 
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(UICommandDragger, mCam) == 0xC, "moho::UICommandDragger::mCam offset must be 0xC");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(UICommandDragger, mCommandId) == 0x10, "moho::UICommandDragger::mCommandId offset must be 0x10"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(UICommandDragger, mGraph) == 0x14, "moho::UICommandDragger::mGraph offset must be 0x14"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(UICommandDragger) == 0x1C, "moho::UICommandDragger size must be 0x1C");
+  static_assert(offsetof(UICommandDragger, mCam) == 0xC, "UICommandDragger::mCam offset must be 0xC");
+  static_assert(offsetof(UICommandDragger, mCommandId) == 0x10, "UICommandDragger::mCommandId offset must be 0x10");
+  static_assert(offsetof(UICommandDragger, mGraph) == 0x14, "UICommandDragger::mGraph offset must be 0x14");
+  static_assert(sizeof(UICommandDragger) == 0x1C, "UICommandDragger size must be 0x1C");
 
   class CMauiFrame;
 
@@ -4167,236 +4136,6 @@ namespace moho
 
 
   /**
-   * `Moho::CRenderWorldView` - the `IRenderWorldView` half of `CUIWorldView`.
-   *
-   * `CUIWorldView` is a two-base class: `CMauiControl` at offset 0 (0x11C
-   * bytes) and this one at offset 0x11C, which is where the constructor at
-   * 0x0086E480 installs the second vtable (the store at 0x0086E4EF). Every
-   * method the render vtable dispatches - `Render` at 0x0086EE00, `Func1` at
-   * 0x0086ECB0, `RenderCommandGraph` at 0x0086ECD0, `GetCamera` at 0x0086EBF0
-   * and the rest - is compiled against *this* sub-object pointer, not the
-   * complete object: `GetCamera` reads `[this+4]`, `Func1` tests `[this+0x19]`
-   * and hands `this+0xF8` to the build-drag update, `Render` reads the session
-   * from `[this+0xEC]` and the hide-resources flag from `[this+0x15A]`. Those
-   * are all fields of this class, which is why every field `CUIWorldView`
-   * carries past `CMauiControl` lives here rather than on the derived class.
-   *
-   * Sub-object offset + 0x11C gives the complete-object offset, e.g. the
-   * session at +0xEC here is +0x208 of a `CUIWorldView`.
-   */
-  class CRenderWorldView : public IRenderWorldView
-  {
-  public:
-    CRenderWorldView() noexcept = default;
-    // IRenderWorldView declares no virtual destructor - the render vtable is
-    // exactly the 13 render slots - so this one is not virtual either.
-    ~CRenderWorldView() noexcept = default;
-
-    CRenderWorldView(const CRenderWorldView&) = delete;
-    CRenderWorldView& operator=(const CRenderWorldView&) = delete;
-
-    /**
-     * Address: 0x0086EE00 (FUN_0086EE00, Moho::CRenderWorldView::Render)
-     * Slot: 0
-     *
-     * IDA signature:
-     * void __thiscall Moho::CRenderWorldView::Render(
-     *   CRenderWorldView* this, CD3DPrimBatcher* batcher, int a4,
-     *   CWldMap* map, float deltaT);
-     *
-     * What it does:
-     * Draws every world-space overlay this view owns for one frame: resource
-     * icons, strategic icons, projectile icons and arcs, mesh previews,
-     * command splats and the economy overlay, then the command graph.
-     */
-    void Render(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
-
-    /**
-     * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CRenderWorldView::Func1)
-     * Slot: 1
-     *
-     * What it does:
-     * Per-frame pre-render hook: refreshes the build-drag ghost placement for
-     * this view. Minimap views skip it.
-     */
-    void Func1() override;
-
-    /**
-     * Address: 0x0086ECD0 (FUN_0086ECD0, Moho::CRenderWorldView::RenderCommandGraph)
-     * Slot: 2
-     *
-     * What it does:
-     * With SHIFT held on a non-minimap view, draws the queued-order graph plus
-     * the footprint skirts of every pending mobile-build order; otherwise drops
-     * the cached graph handle. Always draws the local build-drag graph.
-     */
-    void RenderCommandGraph(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
-
-    /**
-     * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)
-     * Slot: 3
-     */
-    [[nodiscard]] CameraImpl* GetCamera() override;
-
-    /**
-     * Address: 0x0086EBE0 (FUN_0086EBE0, Moho::CRenderWorldView::GetCameraView)
-     * Slot: 4
-     */
-    [[nodiscard]] GeomCamera3* GetCameraView() override;
-
-    /**
-     * Address: 0x0086EC00 (FUN_0086EC00, Moho::CRenderWorldView::GetCameraOffset)
-     * Slot: 5
-     */
-    [[nodiscard]] Wm3::Vector3f* GetCameraOffset() override;
-
-    /**
-     * Address: 0x0086EC10 (FUN_0086EC10, Moho::CRenderWorldView::CameraGetTargetZoom)
-     * Slot: 6
-     */
-    [[nodiscard]] float CameraGetTargetZoom() override;
-
-    /**
-     * Address: 0x0086EC20 (FUN_0086EC20, Moho::CRenderWorldView::GetMaxZoom)
-     * Slot: 7
-     */
-    [[nodiscard]] float GetMaxZoom() override;
-
-    /**
-     * Address: 0x0086EC30 (FUN_0086EC30, Moho::CRenderWorldView::CameraGetZoom)
-     * Slot: 8
-     */
-    [[nodiscard]] float CameraGetZoom() override;
-
-    /**
-     * Address: 0x0086DC90 (FUN_0086DC90, Moho::CRenderWorldView::IsMiniMap)
-     * Slot: 10
-     */
-    [[nodiscard]] bool IsMiniMap() override;
-
-    /**
-     * Address: 0x0086DC00 (FUN_0086DC00, Moho::CRenderWorldView::SetOrthographic)
-     * Slot: 11
-     *
-     * What it does:
-     * Stores the orthographic toggle and mirrors it to the camera: going
-     * orthographic disables camera shake, leaving it re-enables shake.
-     */
-    void SetOrthographic(bool orthographicEnabled) override;
-
-    /**
-     * Address: 0x0086DC60 (FUN_0086DC60, Moho::CRenderWorldView::CanShake)
-     * Slot: 12
-     */
-    [[nodiscard]] bool CanShake() override;
-
-    CameraImpl* mCamera = nullptr;              // +0x04
-    // The viewport rect `CUIWorldView::DoRender` last pushed to the camera:
-    // left/top and then the Width/Height lazy vars (+0x98/+0xAC), which
-    // 0x0086EF40 passes straight through as an extent.
-    float mCachedViewLeft = 0.0f;               // +0x08
-    float mCachedViewTop = 0.0f;                // +0x0C
-    float mCachedViewWidth = 0.0f;              // +0x10
-    float mCachedViewHeight = 0.0f;             // +0x14
-    bool mOrthographic = false;                 // +0x18
-    bool mIsMiniMap = false;                    // +0x19
-    bool mEnableResourceRendering = false;      // +0x1A
-    std::uint8_t mPad1B = 0;                    // +0x1B
-    std::int32_t mInputLocks = 0;               // +0x1C
-    std::int32_t mWorldViewDepth = 0;           // +0x20
-    std::int32_t mState = 0;                    // +0x24
-    /// Event type of the last right-button action this view processed, stored
-    /// at 0x00870F2C and tested `== MET_ButtonDClick` at 0x008710B8 so the
-    /// release path can tell a double-click order from a single-click one.
-    /// Was dead padding until `HandleEvent`'s two accesses were mapped.
-    EMauiEventType mLastRightButtonEvent = MET_Unknown; // +0x28
-    CommandModeData mLeftMouseCommand;          // +0x2C
-    CommandModeData mCommandData;               // +0x8C
-    CWldSession* mWldSession = nullptr;         // +0xEC
-    boost::SharedPtrRaw<UICommandGraph> mComGraph; // +0xF0
-    CBuildDragPreview mBuildDrag; // +0xF8
-    bool mConvertToPatrolCursor = false;        // +0x158
-    /// Set on MET_MouseEnter and cleared on MET_MouseExit by
-    /// `CUIWorldView::HandleEvent` (0x008704E4 / 0x00870500): the cursor is
-    /// inside this view.
-    std::uint8_t mCursorInside = 0;             // +0x159
-    /// Space-drag camera rotation in progress. Raised on the first rotating
-    /// motion frame (0x00870A55) and dropped when the drag ends or the pointer
-    /// leaves (0x0087051F / 0x00870A8F). `Render` reads it at 0x0086EE0B to
-    /// suppress the resource-splat pass, which is what the previous name
-    /// (`mHideResources`) described - the effect rather than the cause.
-    bool mCameraRotationActive = false;         // +0x15A
-    std::uint8_t mPad15B = 0;                   // +0x15B
-    /// Cursor position the last rotation frame sampled, so the next frame can
-    /// hand `CameraSpin` a delta. Read at 0x008709DE / 0x008709F1 and rewritten
-    /// at 0x00870A5F / 0x00870A68 (CUIWorldView +0x278 / +0x27C).
-    Wm3::Vector2f mLastCursorScreenPos{};       // +0x15C
-    msvc8::string mCameraTrack;                 // +0x164
-    /// The selection dragger this view has posted and draws each frame
-    /// (`ISelectionDragger::Render`, from `CUIWorldView::DoRender`). A weak
-    /// link, so it clears itself when the dragger deletes itself on release.
-    WeakPtr<ISelectionDragger> mSelectionDragger;     // +0x180
-    bool mHighlightEnabled = true;              // +0x188
-    bool mIconsVisible = true;                  // +0x189
-    bool mGlobalCameraCommands = false;         // +0x18A
-    std::uint8_t mPad18B = 0;                   // +0x18B
-  };
-
-  static_assert(offsetof(CRenderWorldView, mCamera) == 0x04, "CRenderWorldView::mCamera offset must be 0x04");
-  static_assert(
-    offsetof(CRenderWorldView, mCachedViewLeft) == 0x08,
-    "CRenderWorldView::mCachedViewLeft offset must be 0x08"
-  );
-  static_assert(offsetof(CRenderWorldView, mOrthographic) == 0x18, "CRenderWorldView::mOrthographic offset must be 0x18");
-  static_assert(offsetof(CRenderWorldView, mIsMiniMap) == 0x19, "CRenderWorldView::mIsMiniMap offset must be 0x19");
-  static_assert(
-    offsetof(CRenderWorldView, mEnableResourceRendering) == 0x1A,
-    "CRenderWorldView::mEnableResourceRendering offset must be 0x1A"
-  );
-  static_assert(offsetof(CRenderWorldView, mInputLocks) == 0x1C, "CRenderWorldView::mInputLocks offset must be 0x1C");
-  static_assert(
-    offsetof(CRenderWorldView, mWorldViewDepth) == 0x20,
-    "CRenderWorldView::mWorldViewDepth offset must be 0x20"
-  );
-  static_assert(offsetof(CRenderWorldView, mState) == 0x24, "CRenderWorldView::mState offset must be 0x24");
-  static_assert(
-    offsetof(CRenderWorldView, mLeftMouseCommand) == 0x2C,
-    "CRenderWorldView::mLeftMouseCommand offset must be 0x2C"
-  );
-  static_assert(offsetof(CRenderWorldView, mCommandData) == 0x8C, "CRenderWorldView::mCommandData offset must be 0x8C");
-  static_assert(offsetof(CRenderWorldView, mWldSession) == 0xEC, "CRenderWorldView::mWldSession offset must be 0xEC");
-  static_assert(offsetof(CRenderWorldView, mComGraph) == 0xF0, "CRenderWorldView::mComGraph offset must be 0xF0");
-  static_assert(offsetof(CRenderWorldView, mBuildDrag) == 0xF8, "CRenderWorldView::mBuildDrag offset must be 0xF8");
-  static_assert(
-    offsetof(CRenderWorldView, mConvertToPatrolCursor) == 0x158,
-    "CRenderWorldView::mConvertToPatrolCursor offset must be 0x158"
-  );
-  static_assert(
-    offsetof(CRenderWorldView, mCursorInside) == 0x159, "CRenderWorldView::mCursorInside offset must be 0x159"
-  );
-  static_assert(
-    offsetof(CRenderWorldView, mCameraRotationActive) == 0x15A,
-    "CRenderWorldView::mCameraRotationActive offset must be 0x15A"
-  );
-  static_assert(
-    offsetof(CRenderWorldView, mLastCursorScreenPos) == 0x15C,
-    "CRenderWorldView::mLastCursorScreenPos offset must be 0x15C"
-  );
-  static_assert(offsetof(CRenderWorldView, mCameraTrack) == 0x164, "CRenderWorldView::mCameraTrack offset must be 0x164");
-  static_assert(
-    offsetof(CRenderWorldView, mSelectionDragger) == 0x180, "CRenderWorldView::mSelectionDragger offset must be 0x180"
-  );
-  static_assert(
-    offsetof(CRenderWorldView, mHighlightEnabled) == 0x188,
-    "CRenderWorldView::mHighlightEnabled offset must be 0x188"
-  );
-  static_assert(
-    offsetof(CRenderWorldView, mGlobalCameraCommands) == 0x18A,
-    "CRenderWorldView::mGlobalCameraCommands offset must be 0x18A"
-  );
-  static_assert(sizeof(CRenderWorldView) == 0x18C, "CRenderWorldView size must be 0x18C");
-
-  /**
    * Address: 0x0085ABD0 (FUN_0085ABD0, Moho::DrawUnitSkirt)
    *
    * What it does:
@@ -4428,35 +4167,29 @@ namespace moho
   /**
    * The 3D world view: the control the game renders the world into.
    *
-   * The binary's own vtable (`??_7CUIWorldView@Moho@@6B@`, VA 0x00E49074)
-   * overrides exactly four of `CMauiControl`'s slots - `DoRender` (+0x18),
-   * `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) - plus the
-   * reflection pair and the deleting destructor at the head; everything else is
-   * inherited. The second vtable the constructor installs at +0x11C belongs to
-   * the `IRenderWorldView` sub-object, the `CRenderWorldView` base below.
-   */
-  /**
-   * Second-base evidence (re-read out of `bin/external/ForgedAlliance.exe`):
+   * Two bases, as the complete-object locator at 0x00E9BCD8 records:
+   * `CMauiControl` at offset 0 and `IRenderWorldView` at `mdisp = 0x11C`.
+   * The constructor installs the primary table `??_7CUIWorldView@Moho@@6B@`
+   * (0x00E49074) and, at `[this+11Ch]`, the override table for the second base
+   * `??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@` (0x00E490DC, stored at
+   * 0x0086E4EF). 0x11C (`CMauiControl`) + 4 (the interface vptr) + 0x188 of
+   * members == 0x2A8, the size the Lua `__init` binder allocates.
    *
-   * `CUIWorldView`'s complete-object locator at 0x00E9BCD8 lists nine entries
-   * in its base-class array, the last of which is
-   * `.?AVIRenderWorldView@Moho@@` at `mdisp = 0x11C`, and the constructor
-   * (0x0086E4EF) installs `??_7CUIWorldView@Moho@@6BIRenderWorldView@Moho@@@`
-   * - the derived class's override table for that secondary base - at
-   * `[this+11Ch]`. The secondary locator behind it (0x00E490D8) records
-   * `offset = 0x11C` and names `.?AVCUIWorldView@Moho@@`, so every field from
-   * +0x120 up belongs to this class through that sub-object.
+   * The primary table overrides four of `CMauiControl`'s slots - `DoRender`
+   * (+0x18), `SetHidden` (+0x1C), `HandleEvent` (+0x30) and `Frame` (+0x34) -
+   * plus the reflection pair and the deleting destructor at the head. The
+   * second overrides every `IRenderWorldView` slot but slot 9. MSVC compiles
+   * an override of a virtual that a non-primary base introduced against that
+   * base's sub-object, so those bodies address members relative to +0x11C:
+   * `GetCamera` (0x0086EBF0) reads `[this+4]` for `mCamera` at +0x120, and
+   * `Render` reads the session from `[this+0ECh]`.
    *
-   * `Moho::CRenderWorldView` is NOT a class in the shipped image - the string
-   * `.?AVCRenderWorldView@Moho@@` does not appear anywhere in it. It is this
-   * tree's name for exactly that `IRenderWorldView`-derived portion, and every
-   * method it declares is a slot of the secondary vtable above (slot 0
-   * 0x0086EE00 `Render`, slot 10 0x0086DC90 `IsMiniMap`, ...). Deriving from
-   * it here is therefore layout-exact rather than an invention:
-   * `sizeof(CMauiControl) == 0x11C` + `sizeof(CRenderWorldView) == 0x18C`
-   * == 0x2A8, the size the sole allocation site asks the UI heap for.
+   * Nothing sits between the two bases. The base-class array has nine entries
+   * and no `CRenderWorldView`, and the string `.?AVCRenderWorldView@Moho@@` is
+   * nowhere in the image; that name came from the analyst database, and this
+   * tree carried these slots and members on a stand-in base under it.
    */
-  class CUIWorldView : public CMauiControl, public CRenderWorldView
+  class CUIWorldView : public CMauiControl, public IRenderWorldView
   {
   public:
     static gpg::RType* sType;
@@ -4616,19 +4349,196 @@ namespace moho
      * `OnFrame(deltaSeconds)`.
      */
     void Frame(float deltaSeconds) override;
+
+    /**
+     * Address: 0x0086EE00 (FUN_0086EE00, Moho::CUIWorldView::Render)
+     * Slot: 0
+     *
+     * IDA signature:
+     * void __thiscall Moho::CRenderWorldView::Render(
+     *   CRenderWorldView* this, CD3DPrimBatcher* batcher, int a4,
+     *   CWldMap* map, float deltaT);
+     *
+     * What it does:
+     * Draws every world-space overlay this view owns for one frame: resource
+     * icons, strategic icons, projectile icons and arcs, mesh previews,
+     * command splats and the economy overlay, then the command graph.
+     */
+    void Render(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
+
+    /**
+     * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CUIWorldView::Func1)
+     * Slot: 1
+     *
+     * What it does:
+     * Per-frame pre-render hook: refreshes the build-drag ghost placement for
+     * this view. Minimap views skip it.
+     */
+    void Func1() override;
+
+    /**
+     * Address: 0x0086ECD0 (FUN_0086ECD0, Moho::CUIWorldView::RenderCommandGraph)
+     * Slot: 2
+     *
+     * What it does:
+     * With SHIFT held on a non-minimap view, draws the queued-order graph plus
+     * the footprint skirts of every pending mobile-build order; otherwise drops
+     * the cached graph handle. Always draws the local build-drag graph.
+     */
+    void RenderCommandGraph(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
+
+    /**
+     * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CUIWorldView::GetCamera)
+     * Slot: 3
+     */
+    [[nodiscard]] CameraImpl* GetCamera() override;
+
+    /**
+     * Address: 0x0086EBE0 (FUN_0086EBE0, Moho::CUIWorldView::GetCameraView)
+     * Slot: 4
+     */
+    [[nodiscard]] GeomCamera3* GetCameraView() override;
+
+    /**
+     * Address: 0x0086EC00 (FUN_0086EC00, Moho::CUIWorldView::GetCameraOffset)
+     * Slot: 5
+     */
+    [[nodiscard]] Wm3::Vector3f* GetCameraOffset() override;
+
+    /**
+     * Address: 0x0086EC10 (FUN_0086EC10, Moho::CUIWorldView::CameraGetTargetZoom)
+     * Slot: 6
+     */
+    [[nodiscard]] float CameraGetTargetZoom() override;
+
+    /**
+     * Address: 0x0086EC20 (FUN_0086EC20, Moho::CUIWorldView::GetMaxZoom)
+     * Slot: 7
+     */
+    [[nodiscard]] float GetMaxZoom() override;
+
+    /**
+     * Address: 0x0086EC30 (FUN_0086EC30, Moho::CUIWorldView::CameraGetZoom)
+     * Slot: 8
+     */
+    [[nodiscard]] float CameraGetZoom() override;
+
+    /**
+     * Address: 0x0086DC90 (FUN_0086DC90, Moho::CUIWorldView::IsMiniMap)
+     * Slot: 10
+     */
+    [[nodiscard]] bool IsMiniMap() override;
+
+    /**
+     * Address: 0x0086DC00 (FUN_0086DC00, Moho::CUIWorldView::SetOrthographic)
+     * Slot: 11
+     *
+     * What it does:
+     * Stores the orthographic toggle and mirrors it to the camera: going
+     * orthographic disables camera shake, leaving it re-enables shake.
+     */
+    void SetOrthographic(bool orthographicEnabled) override;
+
+    /**
+     * Address: 0x0086DC60 (FUN_0086DC60, Moho::CUIWorldView::CanShake)
+     * Slot: 12
+     */
+    [[nodiscard]] bool CanShake() override;
+
+  public:
+    /// The camera this view renders through, owned. The constructor seats it
+    /// with `reset` (0x0086E7A6: store the new pointer, then delete the old
+    /// one through its scalar deleting destructor), and member destruction
+    /// deletes it last (0x0086EB71).
+    boost::scoped_ptr<CameraImpl> mCamera;          // +0x120
+    // The viewport rect `DoRender` last pushed to the camera: left/top and then
+    // the Width/Height lazy vars, which 0x0086EF40 passes straight through as
+    // an extent. -1 until the first draw (0x0086E50F..0x0086E527).
+    float mCachedViewLeft = -1.0f;                  // +0x124
+    float mCachedViewTop = -1.0f;                   // +0x128
+    float mCachedViewWidth = -1.0f;                 // +0x12C
+    float mCachedViewHeight = -1.0f;                // +0x130
+    bool mOrthographic = false;                     // +0x134
+    bool mIsMiniMap;                                // +0x135
+    bool mEnableResourceRendering = true;           // +0x136
+    std::int32_t mInputLocks = 0;                   // +0x138
+    std::int32_t mWorldViewDepth;                   // +0x13C
+    std::int32_t mState = 0;                        // +0x140
+    /// Event type of the last right-button action this view processed, stored
+    /// at 0x00870F2C and tested `== MET_ButtonDClick` at 0x008710B8 so the
+    /// release path can tell a double-click order from a single-click one.
+    EMauiEventType mLastRightButtonEvent = MET_Unknown; // +0x144
+    CommandModeData mLeftMouseCommand;              // +0x148
+    CommandModeData mCommandData;                   // +0x1A8
+    CWldSession* mWldSession;                       // +0x208
+    /// This view's hold on the session's command graph while Shift shows it:
+    /// `RenderCommandGraph` takes it (0x0086ED3F) and lets go when Shift comes
+    /// up (0x0086ED9E). The session keeps only a weak reference, so this is
+    /// what keeps the graph, and the ghost meshes hanging off it, alive.
+    boost::shared_ptr<UICommandGraph> mComGraph;    // +0x20C
+    CBuildDragPreview mBuildDrag;                   // +0x214
+    bool mConvertToPatrolCursor = false;            // +0x274
+    /// Set on MET_MouseEnter and cleared on MET_MouseExit by `HandleEvent`
+    /// (0x008704E4 / 0x00870500): the cursor is inside this view.
+    bool mCursorInside = false;                     // +0x275
+    /// Space-drag camera rotation in progress. Raised on the first rotating
+    /// motion frame (0x00870A55) and dropped when the drag ends or the pointer
+    /// leaves (0x0087051F / 0x00870A8F). `Render` reads it at 0x0086EE0B to
+    /// suppress the resource-splat pass.
+    bool mCameraRotationActive = false;             // +0x276
+    /// Cursor position the last rotation frame sampled, so the next frame can
+    /// hand `CameraSpin` a delta. Read at 0x008709DE / 0x008709F1 and rewritten
+    /// at 0x00870A5F / 0x00870A68.
+    Wm3::Vector2f mLastCursorScreenPos;             // +0x278
+    msvc8::string mCameraTrack;                     // +0x280
+    /// The selection dragger this view has posted and draws each frame
+    /// (`ISelectionDragger::Render`, from `DoRender`). A weak link, so it
+    /// clears itself when the dragger deletes itself on release.
+    WeakPtr<ISelectionDragger> mSelectionDragger;   // +0x29C
+    bool mHighlightEnabled = true;                  // +0x2A4
+    bool mIconsVisible = true;                      // +0x2A5
+    bool mGlobalCameraCommands = false;             // +0x2A6
   };
 
-  // 0x11C (CMauiControl) + 0x18C (the IRenderWorldView sub-object at +0x11C)
-  // == the 0x2A8 the Lua `__init` binder allocates for one world view.
-  static_assert(sizeof(CUIWorldView) == 0x2A8, "CUIWorldView size must be 0x2A8");
-  // The secondary base must land exactly on the +0x11C the constructor writes
-  // its override table to (0x0086E4EF). MSVC lays non-virtual bases out in
-  // declaration order, so this is `sizeof(CMauiControl)` - assert the two
-  // agree rather than trusting the ordering silently.
+  static_assert(offsetof(CUIWorldView, mCamera) == 0x120, "CUIWorldView::mCamera offset must be 0x120");
+  static_assert(offsetof(CUIWorldView, mCachedViewLeft) == 0x124, "CUIWorldView::mCachedViewLeft offset must be 0x124");
+  static_assert(offsetof(CUIWorldView, mOrthographic) == 0x134, "CUIWorldView::mOrthographic offset must be 0x134");
+  static_assert(offsetof(CUIWorldView, mIsMiniMap) == 0x135, "CUIWorldView::mIsMiniMap offset must be 0x135");
   static_assert(
-    sizeof(CMauiControl) == 0x11C,
-    "CRenderWorldView sub-object must start at CUIWorldView+0x11C"
+    offsetof(CUIWorldView, mEnableResourceRendering) == 0x136,
+    "CUIWorldView::mEnableResourceRendering offset must be 0x136"
   );
+  static_assert(offsetof(CUIWorldView, mInputLocks) == 0x138, "CUIWorldView::mInputLocks offset must be 0x138");
+  static_assert(offsetof(CUIWorldView, mWorldViewDepth) == 0x13C, "CUIWorldView::mWorldViewDepth offset must be 0x13C");
+  static_assert(offsetof(CUIWorldView, mState) == 0x140, "CUIWorldView::mState offset must be 0x140");
+  static_assert(
+    offsetof(CUIWorldView, mLastRightButtonEvent) == 0x144, "CUIWorldView::mLastRightButtonEvent offset must be 0x144"
+  );
+  static_assert(offsetof(CUIWorldView, mLeftMouseCommand) == 0x148, "CUIWorldView::mLeftMouseCommand offset must be 0x148");
+  static_assert(offsetof(CUIWorldView, mCommandData) == 0x1A8, "CUIWorldView::mCommandData offset must be 0x1A8");
+  static_assert(offsetof(CUIWorldView, mWldSession) == 0x208, "CUIWorldView::mWldSession offset must be 0x208");
+  static_assert(offsetof(CUIWorldView, mComGraph) == 0x20C, "CUIWorldView::mComGraph offset must be 0x20C");
+  static_assert(offsetof(CUIWorldView, mBuildDrag) == 0x214, "CUIWorldView::mBuildDrag offset must be 0x214");
+  static_assert(
+    offsetof(CUIWorldView, mConvertToPatrolCursor) == 0x274, "CUIWorldView::mConvertToPatrolCursor offset must be 0x274"
+  );
+  static_assert(offsetof(CUIWorldView, mCursorInside) == 0x275, "CUIWorldView::mCursorInside offset must be 0x275");
+  static_assert(
+    offsetof(CUIWorldView, mCameraRotationActive) == 0x276, "CUIWorldView::mCameraRotationActive offset must be 0x276"
+  );
+  static_assert(
+    offsetof(CUIWorldView, mLastCursorScreenPos) == 0x278, "CUIWorldView::mLastCursorScreenPos offset must be 0x278"
+  );
+  static_assert(offsetof(CUIWorldView, mCameraTrack) == 0x280, "CUIWorldView::mCameraTrack offset must be 0x280");
+  static_assert(
+    offsetof(CUIWorldView, mSelectionDragger) == 0x29C, "CUIWorldView::mSelectionDragger offset must be 0x29C"
+  );
+  static_assert(offsetof(CUIWorldView, mHighlightEnabled) == 0x2A4, "CUIWorldView::mHighlightEnabled offset must be 0x2A4");
+  static_assert(
+    offsetof(CUIWorldView, mGlobalCameraCommands) == 0x2A6, "CUIWorldView::mGlobalCameraCommands offset must be 0x2A6"
+  );
+  static_assert(sizeof(boost::scoped_ptr<CameraImpl>) == 0x4, "CUIWorldView::mCamera must be one pointer");
+  static_assert(sizeof(CUIWorldView) == 0x2A8, "CUIWorldView size must be 0x2A8");
 
   /// The control that owns keyboard focus. A weak link, so a control that is
   /// destroyed while focused simply drops out of it.

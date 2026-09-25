@@ -183,7 +183,7 @@ namespace moho
    *
    * Shared by every walk of `CameraImpl::GetArmyUnitsInFrustum()` - promoted
    * here from a file-private duplicate in `CWldSession.cpp` so
-   * `CRenderWorldView`'s build-drag adjacency highlighter can use it too.
+   * `CUIWorldView`'s build-drag adjacency highlighter can use it too.
    */
   [[nodiscard]] UserEntity* DecodeCameraFrustumWeakRef(const CameraUserEntityWeakRef& weakRef) noexcept;
 

@@ -266,7 +266,6 @@ namespace boost
    * Address: 0x0043F7E0 (FUN_0043F7E0)
    * Address: 0x0043FCF0 (FUN_0043FCF0)
    * Address: 0x0063FD90 (FUN_0063FD90)
-   * Address: 0x0089AE50 (FUN_0089AE50, Moho::WeakPtr_UICommandGraph::cpy)
    *
    * What it does:
    * Executes the same strong shared-count pair rebind as
@@ -2115,21 +2114,6 @@ namespace boost
    */
   SpCountedImplStorage<moho::SSessionSaveData>* SpCountedImplPDeletingDtorSSessionSaveData(
     SpCountedImplStorage<moho::SSessionSaveData>* const countedImpl,
-    const unsigned char deleteFlag
-  ) noexcept
-  {
-    return SpCountedImplDeletingDtorLane(countedImpl, deleteFlag);
-  }
-
-  /**
-   * Address: 0x0089BCC0 (FUN_0089BCC0, boost::detail::sp_counted_impl_p<Moho::UICommandGraph>::dtr)
-   *
-   * What it does:
-   * Executes one scalar-deleting destructor thunk for this control-block
-   * specialization.
-   */
-  SpCountedImplStorage<moho::UICommandGraph>* SpCountedImplPDeletingDtorUICommandGraph(
-    SpCountedImplStorage<moho::UICommandGraph>* const countedImpl,
     const unsigned char deleteFlag
   ) noexcept
   {

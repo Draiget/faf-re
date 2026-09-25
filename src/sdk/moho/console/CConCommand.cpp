@@ -8839,7 +8839,7 @@ namespace moho
    *
    * What it does:
    * Registers startup convar for `UI_RenProjectileArcs`, gating
-   * `CRenderWorldView::Render`'s whole projectile-arc pass. The registrar
+   * `CUIWorldView::Render`'s whole projectile-arc pass. The registrar
    * constructs a `TConVar<bool>` (vtable `??_7?$TConVar@_N@Moho@@6B@`) over
    * this storage -- the pre-existing `moho::UI_RenProjectileArcs` global was
    * mistyped `std::int32_t` (fixed alongside this recovery to `bool`, per
