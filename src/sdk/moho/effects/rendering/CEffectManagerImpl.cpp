@@ -13,6 +13,8 @@
 #include "moho/effects/rendering/IEffect.h"
 #include "moho/entity/Entity.h"
 #include "moho/misc/StartupHelpers.h"
+#include "moho/misc/StatItem.h"
+#include "moho/misc/Stats.h"
 #include "moho/particles/BeamRenderHelpers.h"
 #include "moho/particles/CParticleTextureCountedPtr.h"
 #include "moho/particles/SParticleBuffer.h"
@@ -61,6 +63,14 @@ namespace moho
 
   namespace
   {
+    /**
+     * `Render_ActiveEmitters` as `CEffectManagerImpl::Tick` binds it
+     * (`sEngineStat_Render_ActiveEmitters`, 0x010C743C). Tick zeroes it and
+     * every emitter that runs adds one, so it counts the emitters ticked in
+     * the latest effect-manager tick.
+     */
+    StatItem* sEngineStatRenderActiveEmitters = nullptr;
+
     [[nodiscard]] msvc8::string BuildParticleTexturePath(
       const msvc8::string& textureName,
       const char* const defaultPath
@@ -448,9 +458,20 @@ namespace moho
 
   /**
    * Address: 0x0066B4F0 (FUN_0066B4F0, Moho::CEffectManagerImpl::Tick)
+   *
+   * What it does:
+   * Zeroes `Render_ActiveEmitters` (the CAS loop at 0x0066B528, `SetInt`
+   * inlined), then ticks every active effect.
    */
   void CEffectManagerImpl::Tick()
   {
+    if (sEngineStatRenderActiveEmitters == nullptr) {
+      sEngineStatRenderActiveEmitters = GetEngineStats()->GetItem("Render_ActiveEmitters", true);
+      (void)sEngineStatRenderActiveEmitters->Release(0);
+    }
+    constexpr std::int32_t kNoEmitters = 0;
+    (void)sEngineStatRenderActiveEmitters->SetInt(&kNoEmitters);
+
     // Keep iteration semantics from the binary: capture next before invoking
     // effect code so list mutation during callback remains safe.
     TDatListItem<IEffect, void>* node = mActiveEffects.mNext;
