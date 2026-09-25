@@ -2288,21 +2288,13 @@ namespace moho
     //   [esp+0x0C] a literal `0.0f` (`fldz` at 0x007D1B90, stored 0x007D1BA0).
     // The mangled name confirms the float: `...@@QAEX <shared_ptr> <shared_ptr>
     // H H M <shared_ptr> PAVIRenderWorldView@2@ _N @Z` -- `M`, between the two
-    // `H`s and the batcher handle. It lands in the slot
-    // `IRenderWorldView::Render` declares as `CWldMap* map`, which is exactly
-    // the sub-tick interpolation fraction `CWldSession::RenderStrategicIcons`
-    // reads back out of that parameter with `std::bit_cast<float>(map)` (and
-    // which `CRenderWorldView::Render` loads with `fld [ebp+10h]` at
-    // 0x0086EE58). Nothing else drives slot 0, so leaving this call out left
-    // every world-space overlay the view owns unpainted: resource splats,
+    // `H`s and the batcher handle. It is slot 0's `tickFraction`, the sub-tick
+    // interpolation fraction the frame loop passes as `sDeltaFrame`. Nothing
+    // else drives slot 0 for a cartographic view, so leaving this call out
+    // left every world-space overlay the view owns unpainted: resource splats,
     // strategic icons, projectile icons and arcs, mesh previews, command
     // splats, the economy readout and the command graph.
-    worldView->Render(
-      primBatcher.get(),
-      static_cast<int>(headIndex),
-      std::bit_cast<CWldMap*>(deltaFrame),
-      0.0f
-    );
+    worldView->Render(primBatcher.get(), static_cast<int>(headIndex), deltaFrame, 0.0f);
 
     REN_DebugStuff(primBatcher, static_cast<int>(headIndex));
 

@@ -6,58 +6,32 @@ namespace
 {
   std::uint32_t gSimpleRenderWorldViewOffsetInit = 0;
   Wm3::Vector3f gSimpleRenderWorldViewOffset{};
-
-  struct SimpleRenderWorldViewCtorRuntimeView
-  {
-    void* vtable = nullptr;                    // +0x00
-    std::uint8_t canShake = 0;                 // +0x04
-    std::uint8_t padding05_07[3] = {0, 0, 0};  // +0x05
-    moho::GeomCamera3* cameraView = nullptr; // +0x08
-  };
-  static_assert(
-    offsetof(SimpleRenderWorldViewCtorRuntimeView, canShake) == 0x04,
-    "SimpleRenderWorldViewCtorRuntimeView::canShake offset must be 0x04"
-  );
-  static_assert(
-    offsetof(SimpleRenderWorldViewCtorRuntimeView, cameraView) == 0x08,
-    "SimpleRenderWorldViewCtorRuntimeView::cameraView offset must be 0x08"
-  );
-  static_assert(sizeof(SimpleRenderWorldViewCtorRuntimeView) == 0x0C, "SimpleRenderWorldViewCtorRuntimeView size must be 0x0C");
-
-  /**
-   * Address: 0x007F6290 (FUN_007F6290)
-   *
-   * What it does:
-   * Initializes one simple world-view runtime lane by rebinding its vtable,
-   * clearing `mCanShake`, and storing the camera-view lane pointer.
-   */
-  [[maybe_unused]] SimpleRenderWorldViewCtorRuntimeView* InitializeSimpleRenderWorldViewRuntimeLane(
-    SimpleRenderWorldViewCtorRuntimeView* const runtimeView,
-    moho::GeomCamera3* const cameraView
-  ) noexcept
-  {
-    static std::uint8_t sSimpleRenderWorldViewVtableTag = 0;
-    if (runtimeView != nullptr) {
-      runtimeView->vtable = &sSimpleRenderWorldViewVtableTag;
-      runtimeView->canShake = 0;
-      runtimeView->cameraView = cameraView;
-    }
-    return runtimeView;
-  }
 }
 
 namespace moho
 {
   /**
+   * Address: 0x007F6290 (FUN_007F6290)
+   *
+   * What it does:
+   * Installs this class's vtable (0x00E40584), clears the shake toggle and
+   * stores the camera payload the view reports from `GetCameraView`.
+   */
+  SimpleRenderWorldView::SimpleRenderWorldView(GeomCamera3* const cameraView)
+    : mCanShake(false)
+    , mCameraView(cameraView)
+  {}
+
+  /**
    * Address: 0x007F62A0 (FUN_007F62A0, nullsub_56)
    */
-  void SimpleRenderWorldView::Render(CD3DPrimBatcher*, int, CWldMap*, float)
+  void SimpleRenderWorldView::Render(CD3DPrimBatcher*, int, float, float)
   {}
 
   /**
    * Address: 0x007F62B0 (FUN_007F62B0, Moho::SimpleRenderWorldView::RenderCommandGraph)
    */
-  void SimpleRenderWorldView::RenderCommandGraph(CD3DPrimBatcher*, int, CWldMap*, float)
+  void SimpleRenderWorldView::RenderCommandGraph(CD3DPrimBatcher*, int, float, float)
   {}
 
   /**

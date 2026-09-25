@@ -19691,7 +19691,7 @@ namespace moho
    *    already-tracked blocker (see the `CFormationInstance` split notes).
    */
   void CWldSession::RenderStrategicIcons(
-    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, CWldMap* const map, const bool isMiniMap
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, const float tickFraction, const bool isMiniMap
   )
   {
     // Read once per frame, before the singleton is even built (0x0085B719).
@@ -19731,16 +19731,6 @@ namespace moho
 
     primBatcher->SetProjectionMatrix(MakeViewportPixelProjection(view));
     primBatcher->SetViewMatrix(VMatrix4::Identity());
-
-    // The binary reads this parameter's raw bits as a float sub-tick
-    // interpolation fraction for `GetInterpolatedTransform()` below,
-    // despite the mangled signature typing it `CWldMap*` - confirmed
-    // end-to-end via float-register (`fld`/`fstp`/`movss`) moves, both here
-    // (0x0085B85C, storing `[esp+argC]`) and at the real caller
-    // (`CRenderWorldView::Render`, 0x0086EE58/0x0086EE63, `fld [ebp+map]`).
-    // Preserved exactly rather than "fixed", per this project's
-    // binary-fidelity mandate.
-    const float tickFraction = std::bit_cast<float>(map);
 
     // "Current zoom" scalar used below as the mesh-fade-in comparison
     // baseline: the camera target position projected through row 1 of the
@@ -19982,15 +19972,24 @@ namespace moho
   }
 
   /**
-   * Address: 0x008621B0 (FUN_008621B0,
-   * ?RenderProjectileIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCRenderWorldView@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@M@Z)
+   * Address: 0x008621B0 (FUN_008621B0, CWldSession::RenderProjectileIcons)
+   *
+   * What it does:
+   * Draws a screen-space icon at every visible projectile and advances the
+   * shared icon glow timer.
+   *
+   * The two floats are not interchangeable: the icon position is interpolated
+   * with `tickFraction` (`movss xmm1, [ebp+0Ch]` at 0x00862491, the argument
+   * of `GetInterpolatedTransform` at 0x0086249F) and the glow timer advances
+   * by `frameSeconds` (`addss xmm2, [ebp+10h]` at 0x008628A6). Reading the
+   * frame time for both, as this used to, placed every icon a frame-length
+   * fraction past the previous tick instead of where the projectile is.
    */
   void CWldSession::RenderProjectileIcons(
     CameraImpl* const camera,
-    CRenderWorldView* const /*worldView*/,
     CD3DPrimBatcher* const primBatcher,
-    CWldMap* const /*map*/,
-    const float deltaSeconds
+    const float tickFraction,
+    const float frameSeconds
   )
   {
     const GeomCamera3& view = camera->CameraGetView();
@@ -20040,7 +20039,7 @@ namespace moho
         continue;
       }
 
-      const Wm3::Vec3f worldPosition = entity->GetInterpolatedTransform(deltaSeconds).pos_;
+      const Wm3::Vec3f worldPosition = entity->GetInterpolatedTransform(tickFraction).pos_;
 
       // Own and allied projectiles are always drawn; everyone else's have to be
       // under recon cover, and an underwater projectile is checked against the
@@ -20119,7 +20118,7 @@ namespace moho
       (void)primBatcher->Setup("TCommandGlow");
 
       UI_CurGlowTime =
-        (UI_CurGlowTime <= UI_RenProjectileGlowPeriod) ? UI_CurGlowTime + deltaSeconds : 0.0f;
+        (UI_CurGlowTime <= UI_RenProjectileGlowPeriod) ? UI_CurGlowTime + frameSeconds : 0.0f;
 
       const float halfPeriod = UI_RenProjectileGlowPeriod * 0.5f;
       float glowFrom = UI_RenProjectileGlowMax;
@@ -20550,7 +20549,7 @@ namespace moho
    * frustum - see the header for the full description.
    */
   void CWldSession::DrawEconomyOverlay(
-    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, [[maybe_unused]] CWldMap* const map
+    CameraImpl* const camera, CD3DPrimBatcher* const primBatcher, [[maybe_unused]] const float tickFraction
   )
   {
     if (!DisplayEconomyOverlay) {

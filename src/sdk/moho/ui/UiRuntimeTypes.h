@@ -4209,7 +4209,7 @@ namespace moho
      * icons, strategic icons, projectile icons and arcs, mesh previews,
      * command splats and the economy overlay, then the command graph.
      */
-    void Render(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+    void Render(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
 
     /**
      * Address: 0x0086ECB0 (FUN_0086ECB0, Moho::CRenderWorldView::Func1)
@@ -4230,7 +4230,7 @@ namespace moho
      * the footprint skirts of every pending mobile-build order; otherwise drops
      * the cached graph handle. Always draws the local build-drag graph.
      */
-    void RenderCommandGraph(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+    void RenderCommandGraph(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
 
     /**
      * Address: 0x0086EBF0 (FUN_0086EBF0, Moho::CRenderWorldView::GetCamera)

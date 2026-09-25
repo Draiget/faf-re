@@ -43,22 +43,19 @@ namespace moho
    * command graph through slot 2.
    *
    * Resource splats and strategic icons are suppressed together whenever the
-   * view hides resources or the free camera is active. `IsMiniMap` is
-   * dispatched and its result dropped - the binary calls the slot and never
-   * reads eax (0x0086EE4E..0x0086EE56).
+   * camera is being rotated or the free camera is active.
    *
-   * Argument note: every `fld` in this function reads `[ebp+10h]`, the `map`
-   * parameter (`D9 45 10` at 0x0086EE58/EE84/EEAC/EED4/EEF2/EF16);
-   * `[ebp+14h]`, `deltaSeconds`, is loaded only for `RenderProjectileIcons`
-   * and the slot-2 tail. That is why `RenderProjectileArcs` and
-   * `DrawEconomyOverlay` take the map as their trailing argument rather than
-   * the `float interpolant` both were first recovered with.
+   * Argument note: `[ebp+10h]` is `tickFraction` and `[ebp+14h]`
+   * `frameSeconds`, and both are only ever moved with `fld`/`fstp` (`D9 45 10`
+   * at 0x0086EE58/EE84/EEAC/EED4/EEF2/EF16, `D9 45 14` at 0x0086EE71/EF0C).
+   * Every pass that interpolates takes the fraction; only the projectile
+   * icons (their glow timer) and the slot-2 tail also take the frame time.
    */
   void CRenderWorldView::Render(
     CD3DPrimBatcher* const batcher,
-    const int renderPass,
-    CWldMap* const map,
-    const float deltaSeconds
+    const int gameTick,
+    const float tickFraction,
+    const float frameSeconds
   )
   {
     if (!mCameraRotationActive && !cam_Free) {
@@ -74,15 +71,13 @@ namespace moho
       // `RenderStrategicIcons` forwards it to its custom-name and
       // selection-set label passes so the minimap draws status bars without
       // text. (An earlier pass recorded this dispatch as side-effect-only.)
-      mWldSession->RenderStrategicIcons(mCamera, batcher, map, IsMiniMap());
+      mWldSession->RenderStrategicIcons(mCamera, batcher, tickFraction, IsMiniMap());
     }
 
-    mWldSession->RenderProjectileIcons(mCamera, this, batcher, map, deltaSeconds);
+    mWldSession->RenderProjectileIcons(mCamera, batcher, tickFraction, frameSeconds);
 
     if (UI_RenProjectileArcs) {
-      RenderProjectileArcs(
-        mWldSession, const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher, map
-      );
+      RenderProjectileArcs(mWldSession, const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher, tickFraction);
     }
 
     // The binary re-fetches the camera view before each of the next two
@@ -97,9 +92,9 @@ namespace moho
 
     mWldSession->DrawCommandSplats(const_cast<GeomCamera3*>(&mCamera->CameraGetView()), batcher);
 
-    mWldSession->DrawEconomyOverlay(mCamera, batcher, map);
+    mWldSession->DrawEconomyOverlay(mCamera, batcher, tickFraction);
 
-    RenderCommandGraph(batcher, renderPass, map, deltaSeconds);
+    RenderCommandGraph(batcher, gameTick, tickFraction, frameSeconds);
   }
 
   /**
@@ -568,8 +563,8 @@ namespace moho
    * disassembly.
    */
   void CRenderWorldView::RenderCommandGraph(
-    CD3DPrimBatcher* const batcher, const std::int32_t renderPass, [[maybe_unused]] CWldMap* const map,
-    const float deltaSeconds
+    CD3DPrimBatcher* const batcher, const std::int32_t gameTick, const float tickFraction,
+    [[maybe_unused]] const float frameSeconds
   )
   {
     if (mIsMiniMap || !MAUI_KeyIsDown(MKEY_SHIFT)) {
@@ -589,7 +584,7 @@ namespace moho
       // Every `GetCommandGraph` hands back an owning reference; the binary
       // releases this one at 0x0085AF60 before returning from `sub_85AF40`.
       boost::SharedPtrRaw<UICommandGraph> graph = mWldSession->GetCommandGraph(/*allowCreate=*/false);
-      DrawCommandGraphMeshIfPresent(graph.px, mCamera->CameraGetView(), *batcher, renderPass, deltaSeconds);
+      DrawCommandGraphMeshIfPresent(graph.px, mCamera->CameraGetView(), *batcher, gameTick, tickFraction);
       graph.release();
 
       DrawAllUnitSkirts(batcher, mWldSession, mCamera->CameraGetView());

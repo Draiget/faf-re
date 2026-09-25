@@ -1240,37 +1240,35 @@ namespace moho
      * What it does:
      * Classifies visible units and renders strategic icons, overlays, and lifebars.
      *
-     * Argument note: the body reads the third slot as a `float`, not as the
-     * `CWldMap*` the mangled name types it. Both reads are `movss` against
-     * `[esp+argC]` - 0x0085B843, which stores it into the icon-aux object's
-     * tick-fraction lane with `movss dword ptr [ebp+1Ch], xmm0`, and
-     * 0x0085BCF8, which loads it straight into `xmm1` as the interpolant for
-     * `UserEntity::GetInterpolatedTransform(float)` at 0x0085BD08. The
-     * declared type is kept because `CRenderWorldView::Render` (0x0086EE69)
-     * passes its own `map` parameter through unchanged and the same puzzle is
-     * already documented on `DrawEconomyOverlay` below; retyping the whole
-     * `map` slot chain is a separate pass that has to own CRenderWorldView.
-     */
-    /**
-     * `isMiniMap` is a fourth argument the mangled name does not carry.
-     * `CRenderWorldView::Render` dispatches `IsMiniMap()` at 0x0086EE4E and
+     * The analyst name above types the third slot `CWldMap*`, but the value
+     * is the world view's `tickFraction`, a float end to end: both reads are
+     * `movss` against `[esp+argC]` - 0x0085B843, which stores it into the
+     * icon-aux object's tick-fraction lane with `movss dword ptr [ebp+1Ch],
+     * xmm0`, and 0x0085BCF8, which loads it straight into `xmm1` as the
+     * interpolant for `UserEntity::GetInterpolatedTransform(float)` at
+     * 0x0085BD08 - and `CUIWorldView::Render` forwards it with `fld`/`fstp`.
+     *
+     * `isMiniMap` is a fourth argument that name does not carry either.
+     * `CUIWorldView::Render` dispatches `IsMiniMap()` at 0x0086EE4E and
      * pushes the result at 0x0086EE5B as the fifth stack slot (the first
      * holds `this`), and this function forwards it - unmodified, loop
      * invariant - to both label passes as their suppress flag: the minimap
      * draws bars but never text.
      */
-    void RenderStrategicIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map, bool isMiniMap);
+    void RenderStrategicIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, float tickFraction, bool isMiniMap);
 
     /**
-     * Address: 0x008621B0 (FUN_008621B0,
-     * ?RenderProjectileIcons@CWldSession@Moho@@QAEXPAVCameraImpl@2@PAVCRenderWorldView@2@PAVCD3DPrimBatcher@2@PAVCWldMap@2@M@Z)
+     * Address: 0x008621B0 (FUN_008621B0, CWldSession::RenderProjectileIcons)
      *
      * What it does:
      * Renders strategic projectile icons/glow overlays for visible projectile entities.
+     *
+     * The camera arrives in `ecx` and the session in `edx` (0x008621DA /
+     * 0x008621DF), then the batcher and the world view's two floats on the
+     * stack (0x0086EE71..0x0086EE8A). The analyst name carried a world-view
+     * pointer and a `CWldMap*` as well; neither is passed.
      */
-    void RenderProjectileIcons(
-      CameraImpl* camera, CRenderWorldView* worldView, CD3DPrimBatcher* primBatcher, CWldMap* map, float deltaSeconds
-    );
+    void RenderProjectileIcons(CameraImpl* camera, CD3DPrimBatcher* primBatcher, float tickFraction, float frameSeconds);
 
     /**
      * Address: 0x00862A80 (FUN_00862A80,
@@ -1301,22 +1299,21 @@ namespace moho
      * session is the first stack argument, so this is a `__usercall` in the
      * binary and a method here, matching the sibling render overlays.
      *
-     * `map` is passed by the caller and never read by the body: the only reads
-     * of incoming stack slots are +4 (session, `mov eax, [esp+0Ch+a1]`) and +8
-     * (batcher, `mov ebp, [esp+198h+a6]` = `[esp+1A0h]`). Slot +0xC is dead.
-     * It is kept in the signature because `Render` (0x0086EF07) does push it,
-     * and because the sibling overlay
-     * `RenderStrategicIcons(CameraImpl*, CD3DPrimBatcher*, CWldMap*)` - whose
-     * mangled name types that slot outright - takes the same triple.
+     * `tickFraction` is passed by the caller and never read by the body: the
+     * only reads of incoming stack slots are +4 (session,
+     * `mov eax, [esp+0Ch+a1]`) and +8 (batcher, `mov ebp, [esp+198h+a6]` =
+     * `[esp+1A0h]`). Slot +0xC is dead. It is kept in the signature because
+     * `CUIWorldView::Render` does push it (`fld [ebp+10h]` / `fstp` at
+     * 0x0086EEF2..0x0086EEFB, ahead of the call at 0x0086EF07).
      *
-     * There is no `float interpolant` parameter. The value this passes to
-     * `UserEntity::GetInterpolatedPosition` is a frame LOCAL at -4, stored once
-     * from a zeroed `ebx` (`xor ebx, ebx` 0x00858DAF ->
-     * `mov [esp+1A0h+interpolant], ebx` 0x00858E0E, raw `89 9C 24 9C 01 00 00`
-     * = `[esp+19Ch]`, i.e. 0x19C - 0x1A0 = -4) and never rewritten. So the
-     * overlay always samples entity positions at interpolant 0.
+     * The value this passes to `UserEntity::GetInterpolatedPosition` is a
+     * frame LOCAL at -4, stored once from a zeroed `ebx` (`xor ebx, ebx`
+     * 0x00858DAF -> `mov [esp+1A0h+interpolant], ebx` 0x00858E0E, raw
+     * `89 9C 24 9C 01 00 00` = `[esp+19Ch]`, i.e. 0x19C - 0x1A0 = -4) and never
+     * rewritten. So the overlay always samples entity positions at
+     * interpolant 0, not at the fraction it is handed.
      */
-    void DrawEconomyOverlay(CameraImpl* camera, CD3DPrimBatcher* primBatcher, CWldMap* map);
+    void DrawEconomyOverlay(CameraImpl* camera, CD3DPrimBatcher* primBatcher, float tickFraction);
 
   public:
     /**

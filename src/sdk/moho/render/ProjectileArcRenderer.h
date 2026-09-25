@@ -10,13 +10,12 @@
 namespace moho
 {
   class CD3DPrimBatcher;
-  class CWldMap;
   class CWldSession;
 
   /**
    * Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3_NA)
    *
-   * Gates the whole arc pass from `CRenderWorldView::Render` (0x0086EEA3).
+   * Gates the whole arc pass from `CUIWorldView::Render` (0x0086EEA3).
    * Zero-fill in the shipped image, so trails are off by default. Typed
    * `bool`, not `int32_t`: `register_SimConVar_UI_RenProjectileArcs`
    * (0x00BE5BF0) constructs a `TConVar<bool>` (vtable
@@ -132,12 +131,13 @@ namespace moho
   using ProjectileArcTable = msvc8::map<std::int32_t, ProjectileArcTrack>;
 
   /**
-   * Address: 0x008600E0 (FUN_008600E0, Moho::CRenderWorldView::RenderProjectileArcs)
+   * Address: 0x008600E0 (FUN_008600E0, Moho::RenderProjectileArcs)
    *
    * IDA signature:
    * void __usercall Moho::CRenderWorldView::RenderProjectileArcs(
    *   CD3DPrimBatcher *batcher@<edi>, CRenderWorldView *view@<esi>,
    *   CWldSession *session, GeomCamera3 *cam);
+   * (the analyst's names; the binary has no `CRenderWorldView` class)
    *
    * What it does:
    * Draws the screen-space trail behind every in-flight projectile, gated on
@@ -158,23 +158,19 @@ namespace moho
    * and the four real arguments are all on the stack. Recovered as a free
    * function accordingly.
    *
-   * The fourth argument is the map, not a `float interpolant`. Its sole caller
-   * `CRenderWorldView::Render` (0x0086EE00) stages `[ebp+10h]` into that slot at
-   * 0x0086EEAC (`D9 45 10`) - the same parameter it hands to
-   * `CWldSession::RenderProjectileIcons`, whose mangled name
-   * (`...PAVCWldMap@2@M@Z`) types it `CWldMap*`. Every `fld` in `Render` reads
-   * `[ebp+10h]`; `[ebp+14h]`, the real `float deltaSeconds`, is only ever loaded
-   * for `RenderProjectileIcons` and `RenderCommandGraph`.
+   * The fourth argument is the world view's `tickFraction`, the sub-tick
+   * interpolation fraction the frame loop passes down as `sDeltaFrame`. Its
+   * sole caller `CUIWorldView::Render` (0x0086EE00) stages `[ebp+10h]` into
+   * that slot with `fld`/`fstp` at 0x0086EEAC, and the body reads it back
+   * with `movss` at 0x0086044B as the argument of
+   * `UserEntity::GetInterpolatedTransform(float)`, so each trail sample lands
+   * where the projectile is drawn this frame.
    *
-   * The body then reads that argument back with `movss` at 0x0086044B and feeds
-   * it to `UserEntity::GetInterpolatedTransform(float)`, so the shipped engine
-   * interpolates arc samples at whatever a heap pointer's bit pattern denotes as
-   * a float - around 1e-13 for any real allocation, i.e. zero. Recovered as an
-   * explicit `0.0f`, which is bit-for-bit the same sample and does not pretend a
-   * pointer is a fraction. `CWldSession::DrawEconomyOverlay` had the identical
-   * defect and was corrected the same way in 0652678.
+   * An earlier reading took that slot for a `CWldMap*` (after an analyst name
+   * that types it so) and pinned the interpolant to `0.0f`, which left every
+   * trail a sub-tick behind its projectile.
    */
   void RenderProjectileArcs(
-    CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, CWldMap* map
+    CWldSession* session, GeomCamera3* camera, CD3DPrimBatcher* primBatcher, float tickFraction
   );
 } // namespace moho

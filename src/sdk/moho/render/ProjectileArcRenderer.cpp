@@ -42,7 +42,7 @@ namespace
 
 namespace moho
 {
-  /** Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3_NA) - tested by CRenderWorldView::Render. */
+  /** Address: 0x010A645C (?UI_RenProjectileArcs@Moho@@3_NA) - tested by CUIWorldView::Render. */
   bool UI_RenProjectileArcs = false;
 
   /** Address: 0x00F57B50 (?UI_RenProjectileArcsSampleInterval@Moho@@3HA). */
@@ -55,7 +55,7 @@ namespace moho
   float UI_RenProectileTrailWidth = 0.0f;
 
   /**
-   * Address: 0x008600E0 (FUN_008600E0, Moho::CRenderWorldView::RenderProjectileArcs)
+   * Address: 0x008600E0 (FUN_008600E0, Moho::RenderProjectileArcs)
    *
    * What it does: see the header.
    */
@@ -63,7 +63,7 @@ namespace moho
     CWldSession* const session,
     GeomCamera3* const camera,
     CD3DPrimBatcher* const primBatcher,
-    [[maybe_unused]] CWldMap* const map
+    const float tickFraction
   )
   {
     const float viewportWidth = static_cast<float>(static_cast<std::int32_t>(camera->viewport.r[3].z));
@@ -108,10 +108,9 @@ namespace moho
         continue;
       }
 
-      // Interpolant 0: the arc pass samples projectiles at the start of the
-      // tick. See the header for why the binary's `movss` off the fourth
-      // argument amounts to the same thing.
-      const VTransform transform = entity->GetInterpolatedTransform(0.0f);
+      // 0x0086044B: `movss xmm1, [ebp+14h]`, the fraction the world view hands
+      // down, is the interpolant.
+      const VTransform transform = entity->GetInterpolatedTransform(tickFraction);
       const bool visible =
         meshBlueprint->mIconFadeInZoom <= camera->viewport.ProjectViewportDepthRow1(transform.pos_);
 

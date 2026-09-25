@@ -15,13 +15,23 @@ namespace moho
   {
   public:
     /**
+     * Address: 0x007F6290 (FUN_007F6290)
+     *
+     * What it does:
+     * Binds the view to one camera payload, shake off. `RenderPreviewImage`
+     * (0x007F7400) builds its strategic-map preview view with this, inlined
+     * at 0x007F7612..0x007F761E.
+     */
+    explicit SimpleRenderWorldView(GeomCamera3* cameraView);
+
+    /**
      * Address: 0x007F62A0 (FUN_007F62A0, nullsub_56)
      * Slot: 0
      *
      * What it does:
      * Default world-view render callback; intentionally no-op.
      */
-    void Render(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+    void Render(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
 
     /**
      * Address: 0x007F62B0 (FUN_007F62B0, Moho::SimpleRenderWorldView::RenderCommandGraph)
@@ -30,7 +40,7 @@ namespace moho
      * What it does:
      * Default command-graph render callback; intentionally no-op.
      */
-    void RenderCommandGraph(CD3DPrimBatcher* batcher, int renderPass, CWldMap* map, float deltaSeconds) override;
+    void RenderCommandGraph(CD3DPrimBatcher* batcher, int gameTick, float tickFraction, float frameSeconds) override;
 
     /**
      * Address: 0x007F62C0 (FUN_007F62C0, Moho::SimpleRenderWorldView::GetCamera)
@@ -105,9 +115,8 @@ namespace moho
     [[nodiscard]] bool CanShake() override;
 
   public:
-    bool mCanShake = false;                        // +0x04
-    std::uint8_t mPadding05_07[3] = {0, 0, 0};    // +0x05
-    GeomCamera3* mCameraView = nullptr; // +0x08
+    bool mCanShake;           // +0x04
+    GeomCamera3* mCameraView; // +0x08
   };
 
   static_assert(offsetof(SimpleRenderWorldView, mCanShake) == 0x04, "SimpleRenderWorldView::mCanShake offset must be 0x04");

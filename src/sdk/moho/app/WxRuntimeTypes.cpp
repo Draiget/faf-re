@@ -3591,8 +3591,7 @@ void moho::WRenViewport::RenderPreviewImage([[maybe_unused]] const bool forceReg
   moho::ren_WorldBorder = false;
   moho::ren_Ui = false;
 
-  moho::SimpleRenderWorldView previewView{};
-  previewView.mCameraView = const_cast<moho::GeomCamera3*>(&camera->CameraGetView());
+  moho::SimpleRenderWorldView previewView(const_cast<moho::GeomCamera3*>(&camera->CameraGetView()));
 
   SWorldViewInfo worldViewEntry{};
   worldViewEntry.mView = &previewView;
@@ -4113,21 +4112,19 @@ void moho::WRenViewport::Render(const int head, msvc8::vector<SWorldViewInfo>& w
 
     // 0x007F95B3..0x007F95EA: the world view's own overlay pass, dispatched
     // through `IRenderWorldView` slot 0 on the `+0x2140` lane this loop seeded
-    // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7
-    // as `sWeightedFrameRate` (pushed last, through the x87 stack), the raw
-    // `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`, `sCurGameTick`, and
-    // `sDeltaFrame` -- the last of those landing in the parameter the interface
-    // declares as `CWldMap* map` and `CWldSession::RenderStrategicIcons` reads
-    // back with `std::bit_cast<float>(map)` as its sub-tick interpolation
-    // fraction. This is the dispatch that draws the overlays for an ordinary
-    // perspective view; the one in `Cartographic::Render` only ever runs for a
-    // view whose orthographic flag is set, which is the minimap and whichever
-    // view the player has toggled into cartographic mode.
+    // at 0x007F9379. The four arguments are laid down at 0x007F95BC..0x007F95E7:
+    // the raw `CD3DPrimBatcher*` from `mPrimBatcher` at `+0x215C`,
+    // `sCurGameTick`, then `sDeltaFrame` (the sub-tick interpolation fraction)
+    // and `sWeightedFrameRate`, both through the x87 stack. This is the
+    // dispatch that draws the overlays for an ordinary perspective view; the
+    // one in `Cartographic::Render` only ever runs for a view whose
+    // orthographic flag is set, which is the minimap and whichever view the
+    // player has toggled into cartographic mode.
     if (moho::ren_Ui && worldView->mView != nullptr) {
       worldView->mView->Render(
         mPrimBatcher.get(),
         static_cast<int>(moho::REN_GetGameTick()),
-        std::bit_cast<moho::CWldMap*>(moho::REN_GetSimDeltaSeconds()),
+        moho::REN_GetSimDeltaSeconds(),
         moho::REN_GetWeightedFrameSeconds()
       );
     }
