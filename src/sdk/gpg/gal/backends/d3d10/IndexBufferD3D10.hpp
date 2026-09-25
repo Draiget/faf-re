@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
@@ -38,9 +40,9 @@ namespace gal {
        */
       IndexBufferD3D10(
           const IndexBufferContext* context,
-          void* nativeDevice,
-          void* nativeBuffer,
-          void* stagingBuffer
+          ID3D10Device* nativeDevice,
+          ID3D10Buffer* nativeBuffer,
+          ID3D10Buffer* stagingBuffer
       );
       /**
        * Address: 0x00901C90 (FUN_00901C90)
@@ -90,13 +92,13 @@ namespace gal {
        * What it does:
        * Validates and returns the retained native index-buffer handle lane.
        */
-      void* GetNativeBufferOrThrow();
+      ID3D10Buffer* GetNativeBufferOrThrow();
 
     public:
       IndexBufferContext context_{}; // +0x04
-      void* nativeBuffer_ = nullptr; // +0x14
-      void* stagingBuffer_ = nullptr; // +0x18
-      void* nativeDevice_ = nullptr;  // +0x1C
+      ID3D10Buffer* nativeBuffer_ = nullptr;  // +0x14
+      ID3D10Buffer* stagingBuffer_ = nullptr; // +0x18 what Lock maps; Unlock copies it into nativeBuffer_
+      ID3D10Device* nativeDevice_ = nullptr;  // +0x1C held (AddRef) for that copy
       bool locked_ = false;           // +0x20
       std::uint8_t lockPadding_[3]{}; // +0x21
       void* mappedData_ = nullptr;    // +0x24

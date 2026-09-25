@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "boost/shared_ptr.h"
 #include "gpg/gal/EffectVariable.hpp"
 #include "legacy/containers/String.h"
@@ -27,7 +29,7 @@ namespace gpg::gal
          * Keeps the variable name and handles and AddRefs the native effect;
          * throws "invalid effect specified" when there is no effect.
          */
-        EffectVariableD3D10(const char* name, void* dxEffect, void* variableHandle);
+        EffectVariableD3D10(const char* name, ID3D10Effect* dxEffect, ID3D10EffectVariable* variableHandle);
 
         /**
          * Address: 0x0094C150 (FUN_0094C150)
@@ -197,8 +199,8 @@ namespace gpg::gal
 
     public:
         msvc8::string name_{};           // +0x04
-        void* dxEffect_ = nullptr;       // +0x20
-        void* variableHandle_ = nullptr; // +0x24
+        ID3D10Effect* dxEffect_ = nullptr;               // +0x20 held (AddRef) while the wrapper lives
+        ID3D10EffectVariable* variableHandle_ = nullptr; // +0x24 owned by the effect
     };
 
     static_assert(offsetof(EffectVariableD3D10, name_) == 0x04, "EffectVariableD3D10::name_ offset must be 0x04");

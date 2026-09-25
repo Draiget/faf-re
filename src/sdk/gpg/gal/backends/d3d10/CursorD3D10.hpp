@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <windows.h>
+
 namespace gpg::gal
 {
     class CursorContext;
@@ -45,17 +47,18 @@ namespace gpg::gal
          *
          * What it does:
          * Rebuilds icon/cursor state from one cursor context and applies the icon
-         * as the current native cursor.
+         * as the current native cursor; returns the cursor it replaced.
          */
-        void* SetCursor(const CursorContext* context);
+        HCURSOR SetCursor(const CursorContext* context);
 
         /**
          * Address: 0x008F8430 (FUN_008F8430)
          *
          * What it does:
-         * Validates icon initialization and applies the retained icon as current cursor.
+         * Validates icon initialization and applies the retained icon as current
+         * cursor; returns the cursor it replaced.
          */
-        void* InitCursor();
+        HCURSOR InitCursor();
 
         /**
          * Address: 0x008F84F0 (FUN_008F84F0)
@@ -69,11 +72,11 @@ namespace gpg::gal
         int ShowCursor(bool show);
 
     public:
-        void* cursorHandle_ = nullptr; // +0x04
-        void* iconHandle_ = nullptr;   // +0x08
+        HCURSOR previousCursor_ = nullptr; // +0x04 what SetCursor replaced; Destroy puts it back
+        HICON cursorIcon_ = nullptr;       // +0x08 built from the cursor texture
     };
 
-    static_assert(offsetof(CursorD3D10, cursorHandle_) == 0x04, "CursorD3D10::cursorHandle_ offset must be 0x04");
-    static_assert(offsetof(CursorD3D10, iconHandle_) == 0x08, "CursorD3D10::iconHandle_ offset must be 0x08");
+    static_assert(offsetof(CursorD3D10, previousCursor_) == 0x04, "CursorD3D10::previousCursor_ offset must be 0x04");
+    static_assert(offsetof(CursorD3D10, cursorIcon_) == 0x08, "CursorD3D10::cursorIcon_ offset must be 0x08");
     static_assert(sizeof(CursorD3D10) == 0x0C, "CursorD3D10 size must be 0x0C");
 }

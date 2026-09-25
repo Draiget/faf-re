@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "gpg/gal/VertexFormat.hpp"
 
 namespace gpg::gal
@@ -24,7 +26,7 @@ namespace gpg::gal
          * Adopts `vertexDeclaration` as the input layout for format `format`
          * and computes the per-stream strides.
          */
-        VertexFormatD3D10(std::uint32_t format, void* vertexDeclaration);
+        VertexFormatD3D10(std::uint32_t format, ID3D10InputLayout* vertexDeclaration);
 
         /**
          * Address: 0x009041E0 (FUN_009041E0)
@@ -41,7 +43,7 @@ namespace gpg::gal
          * What it does:
          * Returns the input layout, throwing "invalid vertex layout" when unset.
          */
-        void* ValidateLayoutOrThrow();
+        ID3D10InputLayout* ValidateLayoutOrThrow();
 
         /**
          * Address: 0x00904500 (FUN_00904500)
@@ -50,7 +52,7 @@ namespace gpg::gal
          * Replaces the input layout and format code and rebuilds the stream
          * strides from the format's element table.
          */
-        std::uint32_t Initialize(std::uint32_t format, void* vertexDeclaration);
+        std::uint32_t Initialize(std::uint32_t format, ID3D10InputLayout* vertexDeclaration);
 
         /**
          * Address: 0x00904180 (FUN_00904180)
@@ -61,7 +63,7 @@ namespace gpg::gal
         void ResetDeclaration();
 
     public:
-        void* vertexDeclaration_ = nullptr; // +0x18 ID3D10InputLayout*
+        ID3D10InputLayout* vertexDeclaration_ = nullptr; // +0x18
     };
 
     static_assert(offsetof(VertexFormatD3D10, vertexDeclaration_) == 0x18, "VertexFormatD3D10::vertexDeclaration_ offset must be 0x18");

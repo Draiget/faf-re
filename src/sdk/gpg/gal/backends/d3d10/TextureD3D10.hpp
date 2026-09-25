@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "gpg/core/streams/MemBufferStream.h"
 #include "gpg/gal/Texture.hpp"
 #include "gpg/gal/TextureContext.hpp"
@@ -36,7 +38,9 @@ namespace gpg::gal
          * Initializes one D3D10 texture wrapper from caller context + retained texture/SRV
          * handles, then rebuilds mip/format-dependent lock state.
          */
-        TextureD3D10(const TextureContext* context, void* texture, void* shaderResourceView);
+        TextureD3D10(
+            const TextureContext* context, ID3D10Texture2D* texture, ID3D10ShaderResourceView* shaderResourceView
+        );
 
         /**
          * Address: 0x00904030 (FUN_00904030)
@@ -93,7 +97,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained shader-resource-view lane.
          */
-        void* GetShaderResourceViewOrThrow();
+        ID3D10ShaderResourceView* GetShaderResourceViewOrThrow();
 
         /**
          * Address: 0x00903BE0 (FUN_00903BE0)
@@ -101,7 +105,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained texture lane.
          */
-        void* GetTextureOrThrow();
+        ID3D10Texture2D* GetTextureOrThrow();
 
         /**
          * Address: 0x00903D60 (FUN_00903D60)
@@ -120,13 +124,15 @@ namespace gpg::gal
          * Rebuilds texture wrapper state from caller context + texture/SRV handles and
          * allocates per-level lock-history storage.
          */
-        void InitializeState(const TextureContext* context, void* texture, void* shaderResourceView);
+        void InitializeState(
+            const TextureContext* context, ID3D10Texture2D* texture, ID3D10ShaderResourceView* shaderResourceView
+        );
 
     public:
         TextureContext context_{};                // +0x04
-        void* texture_ = nullptr;                 // +0x58
-        void* stagingTexture_ = nullptr;          // +0x5C
-        void* shaderResourceView_ = nullptr;      // +0x60
+        ID3D10Texture2D* texture_ = nullptr;                     // +0x58
+        ID3D10Texture2D* stagingTexture_ = nullptr;              // +0x5C
+        ID3D10ShaderResourceView* shaderResourceView_ = nullptr; // +0x60
         bool lockActive_ = false;                 // +0x64
         std::uint8_t lockPadding_[3]{};           // +0x65
         int lockLevel_ = 0;                       // +0x68

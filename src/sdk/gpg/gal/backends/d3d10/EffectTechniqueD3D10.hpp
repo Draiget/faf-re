@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "gpg/gal/EffectTechnique.hpp"
 #include "legacy/containers/String.h"
 
@@ -26,7 +28,7 @@ namespace gpg::gal
          * Keeps the technique name and handles and AddRefs the native effect;
          * throws "invalid effect specified" when there is no effect.
          */
-        EffectTechniqueD3D10(const char* name, void* dxEffect, void* techniqueHandle);
+        EffectTechniqueD3D10(const char* name, ID3D10Effect* dxEffect, ID3D10EffectTechnique* techniqueHandle);
 
         /**
          * Address: 0x00900F50 (FUN_00900F50)
@@ -121,8 +123,8 @@ namespace gpg::gal
 
     public:
         msvc8::string name_{};              // +0x04
-        void* dxEffect_ = nullptr;          // +0x20
-        void* techniqueHandle_ = nullptr;   // +0x24
+        ID3D10Effect* dxEffect_ = nullptr;                   // +0x20 held (AddRef) while the wrapper lives
+        ID3D10EffectTechnique* techniqueHandle_ = nullptr;   // +0x24 owned by the effect
         bool beginEndActive_ = false;       // +0x28
         std::uint8_t beginEndPadding_[3]{}; // +0x29
     };

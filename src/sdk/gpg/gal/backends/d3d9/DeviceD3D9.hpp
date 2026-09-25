@@ -543,7 +543,7 @@ namespace gal {
        * What it does:
        * Validates the topology and issues one indexed draw.
        */
-      int DrawIndexedPrimitive(const DrawIndexedContext* context) override;
+      void DrawIndexedPrimitive(const DrawIndexedContext* context) override;
       /**
        * Address: 0x008EE6B0 (FUN_008EE6B0)
        * Slot: 47
@@ -552,7 +552,7 @@ namespace gal {
        * What it does:
        * Validates the topology and issues one non-indexed draw.
        */
-      int DrawPrimitive(const DrawContext* context) override;
+      void DrawPrimitive(const DrawContext* context) override;
       /**
        * Address: 0x008EEA00 (FUN_008EEA00)
        * Slot: 48

@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "boost/shared_ptr.h"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectContext.hpp"
@@ -38,7 +40,7 @@ namespace gpg::gal
      * 0x0093FBE0, `mov [esi+0x68],0`), then adopts the caller's through
      * `SetEffect`. `DeviceD3D10::CreateEffect` constructs it (0x008FEF7A).
      */
-    EffectD3D10(const EffectContext& context, void* dxEffect);
+    EffectD3D10(const EffectContext& context, ID3D10Effect* dxEffect);
 
     /**
      * Address: 0x0094BF80 (FUN_0094BF80)
@@ -123,11 +125,11 @@ namespace gpg::gal
      * Resets, copies `context` into `context_`, adopts `dxEffect`, and empties the
      * copied source buffer -- the effect keeps the settings but not the bytes.
      */
-    void SetEffect(const EffectContext& context, void* dxEffect);
+    void SetEffect(const EffectContext& context, ID3D10Effect* dxEffect);
 
   public:
     EffectContext context_;    // +0x04 .. +0x67
-    void* dxEffect_ = nullptr; // +0x68
+    ID3D10Effect* dxEffect_ = nullptr; // +0x68
   };
 
   static_assert(offsetof(EffectD3D10, context_) == 0x04, "EffectD3D10::context_ offset must be 0x04");

@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include <d3d10.h>
+
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/VertexBuffer.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
@@ -38,9 +40,9 @@ namespace gal {
        */
       VertexBufferD3D10(
           const VertexBufferContext* context,
-          void* nativeDevice,
-          void* nativeBuffer,
-          void* stagingBuffer
+          ID3D10Device* nativeDevice,
+          ID3D10Buffer* nativeBuffer,
+          ID3D10Buffer* stagingBuffer
       );
       /**
        * Address: 0x0094DA80 (FUN_0094DA80)
@@ -91,13 +93,13 @@ namespace gal {
        * What it does:
        * Validates and returns the retained native vertex-buffer handle lane.
        */
-      void* GetNativeBufferOrThrow();
+      ID3D10Buffer* GetNativeBufferOrThrow();
 
     public:
       VertexBufferContext context_{}; // +0x04
-      void* nativeBuffer_ = nullptr;  // +0x18
-      void* stagingBuffer_ = nullptr; // +0x1C
-      void* nativeDevice_ = nullptr;  // +0x20
+      ID3D10Buffer* nativeBuffer_ = nullptr;  // +0x18
+      ID3D10Buffer* stagingBuffer_ = nullptr; // +0x1C what Lock maps; Unlock copies it into nativeBuffer_
+      ID3D10Device* nativeDevice_ = nullptr;  // +0x20 held (AddRef) for that copy
       bool locked_ = false;           // +0x24
       std::uint8_t lockPadding_[3]{}; // +0x25
       void* mappedData_ = nullptr;    // +0x28

@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <d3d10.h>
+
 #include "gpg/gal/RenderTarget.hpp"
 #include "gpg/gal/RenderTargetContext.hpp"
 
@@ -33,7 +35,11 @@ namespace gpg::gal
          * Initializes one render-target wrapper from retained texture/view pointers and
          * derives context width/height/format from the source texture descriptor.
          */
-        RenderTargetD3D10(void* renderTexture, void* renderTargetView, void* shaderResourceView);
+        RenderTargetD3D10(
+            ID3D10Texture2D* renderTexture,
+            ID3D10RenderTargetView* renderTargetView,
+            ID3D10ShaderResourceView* shaderResourceView
+        );
 
         /**
          * Address: 0x00903050 (FUN_00903050)
@@ -46,9 +52,9 @@ namespace gpg::gal
          */
         RenderTargetD3D10(
             const RenderTargetContext* context,
-            void* renderTexture,
-            void* renderTargetView,
-            void* shaderResourceView
+            ID3D10Texture2D* renderTexture,
+            ID3D10RenderTargetView* renderTargetView,
+            ID3D10ShaderResourceView* shaderResourceView
         );
 
         /**
@@ -92,7 +98,11 @@ namespace gpg::gal
          * Reinitializes state from retained texture/view pointers and rebuilds context
          * width/height/format from texture descriptor lanes.
          */
-        void InitializeFromResource(void* renderTexture, void* renderTargetView, void* shaderResourceView);
+        void InitializeFromResource(
+            ID3D10Texture2D* renderTexture,
+            ID3D10RenderTargetView* renderTargetView,
+            ID3D10ShaderResourceView* shaderResourceView
+        );
 
         /**
          * Address: 0x009030E0 (FUN_009030E0)
@@ -100,7 +110,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained render-texture lane.
          */
-        void* GetRenderTextureOrThrow();
+        ID3D10Texture2D* GetRenderTextureOrThrow();
 
         /**
          * Address: 0x00903190 (FUN_00903190)
@@ -108,7 +118,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained render-target-view lane.
          */
-        void* GetRenderTargetViewOrThrow();
+        ID3D10RenderTargetView* GetRenderTargetViewOrThrow();
 
         /**
          * Address: 0x00903240 (FUN_00903240)
@@ -116,13 +126,13 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained shader-resource-view lane.
          */
-        void* GetShaderResourceViewOrThrow();
+        ID3D10ShaderResourceView* GetShaderResourceViewOrThrow();
 
     public:
         RenderTargetContext context_{};    // +0x04
-        void* renderTexture_ = nullptr;    // +0x14
-        void* renderTargetView_ = nullptr; // +0x18
-        void* shaderResourceView_ = nullptr; // +0x1C
+        ID3D10Texture2D* renderTexture_ = nullptr;               // +0x14
+        ID3D10RenderTargetView* renderTargetView_ = nullptr;     // +0x18
+        ID3D10ShaderResourceView* shaderResourceView_ = nullptr; // +0x1C
     };
 
     static_assert(offsetof(RenderTargetD3D10, context_) == 0x04, "RenderTargetD3D10::context_ offset must be 0x04");

@@ -557,17 +557,19 @@ namespace gpg::gal
      * DeviceD3D9 overrides it at the same index)
      *
      * What it does:
-     * Issues one indexed draw.
+     * Issues one indexed draw. Nothing reads a result: the D3D9 body leaves the
+     * draw's HRESULT in eax and the D3D10 one whatever its void draw left, and
+     * every caller discards it.
      */
-    virtual int DrawIndexedPrimitive(const DrawIndexedContext* context) = 0;
+    virtual void DrawIndexedPrimitive(const DrawIndexedContext* context) = 0;
     /**
      * Slot: 47 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)
      *
      * What it does:
-     * Issues one non-indexed draw.
+     * Issues one non-indexed draw (no result, as slot 46).
      */
-    virtual int DrawPrimitive(const DrawContext* context) = 0;
+    virtual void DrawPrimitive(const DrawContext* context) = 0;
     /**
      * Slot: 48 (pure in ??_7Device@gal@gpg@@6B@ at 0x00D42224;
      * DeviceD3D9 overrides it at the same index)

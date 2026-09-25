@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+#include <d3d10.h>
+
 #include "gpg/gal/DepthStencilTarget.hpp"
 #include "gpg/gal/DepthStencilTargetContext.hpp"
 
@@ -26,9 +28,9 @@ namespace gpg::gal
          */
         DepthStencilTargetD3D10(
             const DepthStencilTargetContext* context,
-            void* depthStencilTexture,
-            void* depthStencilView,
-            void* shaderResourceView
+            ID3D10Texture2D* depthStencilTexture,
+            ID3D10DepthStencilView* depthStencilView,
+            ID3D10ShaderResourceView* shaderResourceView
         );
 
         /**
@@ -61,7 +63,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained depth-stencil-texture lane.
          */
-        void* GetDepthStencilTextureOrThrow();
+        ID3D10Texture2D* GetDepthStencilTextureOrThrow();
 
         /**
          * Address: 0x0094B420 (FUN_0094B420)
@@ -69,7 +71,7 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained depth-stencil-view lane.
          */
-        void* GetDepthStencilViewOrThrow();
+        ID3D10DepthStencilView* GetDepthStencilViewOrThrow();
 
         /**
          * Address: 0x0094B4D0 (FUN_0094B4D0)
@@ -77,13 +79,13 @@ namespace gpg::gal
          * What it does:
          * Validates and returns the retained shader-resource-view lane.
          */
-        void* GetShaderResourceViewOrThrow();
+        ID3D10ShaderResourceView* GetShaderResourceViewOrThrow();
 
     public:
         DepthStencilTargetContext context_{}; // +0x04
-        void* depthStencilTexture_ = nullptr; // +0x18
-        void* depthStencilView_ = nullptr;    // +0x1C
-        void* shaderResourceView_ = nullptr;  // +0x20
+        ID3D10Texture2D* depthStencilTexture_ = nullptr;         // +0x18
+        ID3D10DepthStencilView* depthStencilView_ = nullptr;     // +0x1C
+        ID3D10ShaderResourceView* shaderResourceView_ = nullptr; // +0x20
     };
 
     static_assert(offsetof(DepthStencilTargetD3D10, context_) == 0x04, "DepthStencilTargetD3D10::context_ offset must be 0x04");

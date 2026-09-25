@@ -3740,7 +3740,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Validates the topology and issues one non-indexed draw, converting the
      * context's vertex count into a primitive count.
      */
-    int DeviceD3D9::DrawPrimitive(const DrawContext* const context)
+    void DeviceD3D9::DrawPrimitive(const DrawContext* const context)
     {
         Func1();
 
@@ -3759,7 +3759,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
         RecordDraw(primitiveCount, context->vertexCount_);
-        return result;
     }
 
     /**
@@ -3769,7 +3768,7 @@ namespace { // TEMPORARY PROBE (do not commit)
      * Validates the topology and issues one indexed draw, converting the
      * context's index count into a primitive count.
      */
-    int DeviceD3D9::DrawIndexedPrimitive(const DrawIndexedContext* const context)
+    void DeviceD3D9::DrawIndexedPrimitive(const DrawIndexedContext* const context)
     {
         Func1();
 
@@ -3795,7 +3794,6 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
         RecordDraw(primitiveCount, context->vertexCount_);
-        return result;
     }
 
     /**

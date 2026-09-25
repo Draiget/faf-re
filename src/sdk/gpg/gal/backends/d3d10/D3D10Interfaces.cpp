@@ -20,11 +20,13 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
+#include "gpg/gal/DrawStatistics.h"
 #include "gpg/gal/EffectMacro.hpp"
 #include "gpg/gal/Error.hpp"
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/OutputContext.hpp"
 #include "gpg/gal/PipelineState.hpp"
+#include "gpg/gal/SafeRelease.h"
 #include "gpg/core/utils/BoostWrappers.h"
 #include "gpg/core/utils/Global.h"
 #include "platform/Platform.h"
@@ -42,81 +44,14 @@
 #include <stdexcept>
 #include <type_traits>
 
+// D3DXFloat32To16Array: the float16 formatter packs its halves with it, as the
+// D3D9 one does (both call the d3dx9 import at 0x00AC65C0).
+#include <d3dx9math.h>
+
 namespace gpg::gal
 {
   namespace
   {
-    using release_fn = unsigned long(__stdcall*)(void*);
-    using add_ref_fn = unsigned long(__stdcall*)(void*);
-    using effect_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
-    using effect_get_technique_by_index_fn = void*(__stdcall*)(void*, unsigned int);
-    using effect_get_technique_by_name_fn = void*(__stdcall*)(void*, const char*);
-    using effect_get_variable_by_name_fn = void*(__stdcall*)(void*, const char*);
-    using technique_get_annotation_by_name_fn = void*(__stdcall*)(void*, const char*);
-    using technique_is_valid_fn = BOOL(__stdcall*)(void*);
-    using technique_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
-    using technique_get_pass_counter_fn = void(__stdcall*)(void*, void*);
-    using technique_get_pass_by_index_fn = void*(__stdcall*)(void*, int);
-    using pass_get_desc_fn = HRESULT(__stdcall*)(void*, void*);
-    using pass_apply_fn = HRESULT(__stdcall*)(void*, unsigned int);
-    using variable_is_valid_fn = BOOL(__stdcall*)(void*);
-    using variable_get_annotation_by_name_fn = void*(__stdcall*)(void*, const char*);
-    using variable_as_scalar_fn = void*(__stdcall*)(void*);
-    using variable_as_vector_fn = void*(__stdcall*)(void*);
-    using variable_as_matrix_fn = void*(__stdcall*)(void*);
-    using variable_as_string_fn = void*(__stdcall*)(void*);
-    using variable_as_shader_resource_fn = void*(__stdcall*)(void*);
-    using variable_set_raw_value_fn = HRESULT(__stdcall*)(void*, const void*, unsigned int, unsigned int);
-    using scalar_get_bool_fn = HRESULT(__stdcall*)(void*, int*);
-    using scalar_get_int_fn = HRESULT(__stdcall*)(void*, int*);
-    using scalar_get_float_fn = HRESULT(__stdcall*)(void*, float*);
-    using scalar_set_bool_fn = HRESULT(__stdcall*)(void*, BOOL);
-    using scalar_set_int_fn = HRESULT(__stdcall*)(void*, int);
-    using scalar_set_float_fn = HRESULT(__stdcall*)(void*, float);
-    using matrix_set_matrix_fn = HRESULT(__stdcall*)(void*, const void*);
-    using matrix_set_matrix_array_fn = HRESULT(__stdcall*)(void*, const void*, unsigned int, unsigned int);
-    using vector_set_float_vector_fn = HRESULT(__stdcall*)(void*, const void*);
-    using vector_set_array_fn = HRESULT(__stdcall*)(void*, const void*, unsigned int, unsigned int);
-    using shader_resource_set_resource_fn = HRESULT(__stdcall*)(void*, void*);
-    using string_get_string_fn = HRESULT(__stdcall*)(void*, const char**);
-    using texture_get_desc_fn = void(__stdcall*)(void*, void*);
-    using texture_map_fn = HRESULT(__stdcall*)(void*, int, unsigned int, unsigned int, void*);
-    using texture_unmap_fn = void(__stdcall*)(void*, int);
-    using device_native_create_buffer_fn = HRESULT(__stdcall*)(void*, const void*, const void*, void**);
-    using device_native_create_texture2d_fn = HRESULT(__stdcall*)(void*, const void*, const void*, void**);
-    using device_native_create_shader_resource_view_fn = HRESULT(__stdcall*)(void*, void*, const void*, void**);
-    using device_native_create_render_target_view_fn = HRESULT(__stdcall*)(void*, void*, const void*, void**);
-    using device_native_create_depth_stencil_view_fn = HRESULT(__stdcall*)(void*, void*, const void*, void**);
-    using device_native_create_input_layout_fn =
-      HRESULT(__stdcall*)(void*, const void*, unsigned int, const void*, std::size_t, void**);
-    using device_native_copy_resource_fn = void(__stdcall*)(void*, void*, void*);
-    using device_native_set_shader_resources_fn = int(__stdcall*)(void*, unsigned int, unsigned int, void* const*);
-    using device_native_set_rasterizer_state_fn = void(__stdcall*)(void*, void*);
-    using device_native_set_depth_stencil_state_fn = void(__stdcall*)(void*, void*, unsigned int);
-    using device_native_set_blend_state_fn = int(__stdcall*)(void*, void*, const float*, unsigned int);
-    using device_native_set_input_layout_fn = int(__stdcall*)(void*, void*);
-    using device_native_set_vertex_buffers_fn =
-      void(__stdcall*)(void*, unsigned int, unsigned int, void* const*, const unsigned int*, const unsigned int*);
-    using device_native_set_index_buffer_fn = int(__stdcall*)(void*, void*, unsigned int, unsigned int);
-    using device_native_clear_target_fn = int(__stdcall*)(void*, unsigned int, void* const*, void*);
-    using device_native_clear_render_target_view_fn = void(__stdcall*)(void*, void*, const float*);
-    using device_native_clear_depth_stencil_view_fn = int(__stdcall*)(void*, void*, unsigned int, float, unsigned int);
-    using device_native_set_viewports_fn = int(__stdcall*)(void*, unsigned int, const void*);
-    using device_native_get_viewports_fn = void(__stdcall*)(void*, unsigned int*, void*);
-    using device_native_get_render_targets_fn = void(__stdcall*)(void*, unsigned int, void**, void**);
-    using device_native_set_primitive_topology_fn = void(__stdcall*)(void*, unsigned int);
-    using device_native_draw_fn = int(__stdcall*)(void*, unsigned int, unsigned int);
-    using device_native_draw_instanced_fn =
-      int(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, unsigned int);
-    using device_native_draw_indexed_fn = int(__stdcall*)(void*, unsigned int, unsigned int, int);
-    using device_native_draw_indexed_instanced_fn =
-      int(__stdcall*)(void*, unsigned int, unsigned int, unsigned int, int, unsigned int);
-    using readback_get_size_fn = int(__stdcall*)(void*);
-    using readback_get_data_fn = void*(__stdcall*)(void*);
-    using device_native_copy_subresource_region_fn = int(__stdcall*)(
-      void*, void*, unsigned int, unsigned int, unsigned int, unsigned int, void*, unsigned int, const D3D10_BOX*
-    );
-    using device_native_copy_resource_result_fn = int(__stdcall*)(void*, void*, void*);
 
     struct DXGIFormatPair final
     {
@@ -561,64 +496,6 @@ namespace gpg::gal
       head.mStrs.push_back(option);
     }
 
-    void AddRefComLike(void* const object) noexcept
-    {
-      if (object == nullptr) {
-        return;
-      }
-
-      auto** const vtable = *reinterpret_cast<void***>(object);
-      auto* const addRef = reinterpret_cast<add_ref_fn>(vtable[1]);
-      addRef(object);
-    }
-
-    void* GetDeviceNativeHandle(DeviceD3D10* const device) noexcept
-    {
-      return device->mDevice;
-    }
-
-    void* GetDeviceSignatureEffect(DeviceD3D10* const device) noexcept
-    {
-      return device->mSignatureEffect;
-    }
-
-    void* GetDeviceStretchRectEffect(DeviceD3D10* const device) noexcept
-    {
-      return device->mRttEffect;
-    }
-
-    void* GetDeviceStretchRectTechnique(DeviceD3D10* const device) noexcept
-    {
-      return device->mRttTechnique;
-    }
-
-    void* GetDeviceStretchRectVertexBuffer(DeviceD3D10* const device) noexcept
-    {
-      return device->mRttQuadVertexBuffer;
-    }
-
-    void* GetDeviceStretchRectInputLayout(DeviceD3D10* const device) noexcept
-    {
-      return device->mRttInputLayout;
-    }
-
-    /**
-     * `DrawPrimitive` (0x008FD049) and `DrawIndexedPrimitive` (0x008FD159) read
-     * this+0xD8 and draw instanced when it exceeds 1: stream 0's frequency,
-     * which `SetVertexBuffer` stores (`mov [esi+edi*4+0xD8], eax` at
-     * 0x008F970A) and `Setup` clears. The geometry stream's frequency is the
-     * instance count every caller passes for it.
-     */
-    std::uint32_t GetDeviceInstanceCount(DeviceD3D10* const device) noexcept
-    {
-      return static_cast<std::uint32_t>(device->mStreamFrequencies[0]);
-    }
-
-    msvc8::vector<IDXGISwapChain*>& GetDeviceSwapChains(DeviceD3D10* const device) noexcept
-    {
-      return device->mSwapChains;
-    }
-
     std::uint32_t ConvertCursorPixelRgbaToBgra(const std::uint32_t rgba) noexcept
     {
       return (rgba & 0xFF000000U) | ((rgba & 0x000000FFU) << 16U) | (rgba & 0x0000FF00U) |
@@ -689,326 +566,6 @@ namespace gpg::gal
       return iconHandle;
     }
 
-    HRESULT InvokeNativeCreateBuffer(DeviceD3D10* const device, const void* const description, void** const outBuffer)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createBuffer = reinterpret_cast<device_native_create_buffer_fn>(vtable[71]);
-      return createBuffer(nativeDevice, description, nullptr, outBuffer);
-    }
-
-    HRESULT
-    InvokeNativeCreateTexture2D(DeviceD3D10* const device, const void* const description, void** const outTexture)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createTexture2D = reinterpret_cast<device_native_create_texture2d_fn>(vtable[73]);
-      return createTexture2D(nativeDevice, description, nullptr, outTexture);
-    }
-
-    HRESULT InvokeNativeCreateShaderResourceView(
-      DeviceD3D10* const device, void* const resource, const void* const description, void** const outShaderResourceView
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createShaderResourceView = reinterpret_cast<device_native_create_shader_resource_view_fn>(vtable[75]);
-      return createShaderResourceView(nativeDevice, resource, description, outShaderResourceView);
-    }
-
-    HRESULT InvokeNativeCreateRenderTargetView(
-      DeviceD3D10* const device, void* const resource, const void* const description, void** const outRenderTargetView
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createRenderTargetView = reinterpret_cast<device_native_create_render_target_view_fn>(vtable[76]);
-      return createRenderTargetView(nativeDevice, resource, description, outRenderTargetView);
-    }
-
-    HRESULT InvokeNativeCreateDepthStencilView(
-      DeviceD3D10* const device, void* const resource, const void* const description, void** const outDepthStencilView
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createDepthStencilView = reinterpret_cast<device_native_create_depth_stencil_view_fn>(vtable[77]);
-      return createDepthStencilView(nativeDevice, resource, description, outDepthStencilView);
-    }
-
-    HRESULT InvokeNativeCreateInputLayout(
-      DeviceD3D10* const device,
-      const D3D10_INPUT_ELEMENT_DESC* const elements,
-      const std::uint32_t elementCount,
-      const void* const inputSignature,
-      const std::size_t inputSignatureSize,
-      void** const outInputLayout
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createInputLayout = reinterpret_cast<device_native_create_input_layout_fn>(vtable[42]);
-      return createInputLayout(
-        nativeDevice, elements, elementCount, inputSignature, inputSignatureSize, outInputLayout
-      );
-    }
-
-    int InvokeNativeSetInputLayout(DeviceD3D10* const device, void* const inputLayout)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const setInputLayout = reinterpret_cast<device_native_set_input_layout_fn>(vtable[11]);
-      return setInputLayout(nativeDevice, inputLayout);
-    }
-
-    void InvokeNativeSetVertexBuffers(
-      DeviceD3D10* const device,
-      const unsigned int streamSlot,
-      void* const* const buffers,
-      const unsigned int* const strides,
-      const unsigned int* const offsets
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const setVertexBuffers = reinterpret_cast<device_native_set_vertex_buffers_fn>(vtable[12]);
-      setVertexBuffers(nativeDevice, streamSlot, 1U, buffers, strides, offsets);
-    }
-
-    int InvokeNativeSetIndexBuffer(
-      DeviceD3D10* const device, void* const indexBuffer, const unsigned int formatToken, const unsigned int offset
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const setIndexBuffer = reinterpret_cast<device_native_set_index_buffer_fn>(vtable[13]);
-      return setIndexBuffer(nativeDevice, indexBuffer, formatToken, offset);
-    }
-
-    int InvokeNativeClearTarget(
-      DeviceD3D10* const device,
-      const unsigned int renderTargetCount,
-      void* const* const renderTargetViews,
-      void* const depthStencilView
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const clearTarget = reinterpret_cast<device_native_clear_target_fn>(vtable[24]);
-      return clearTarget(nativeDevice, renderTargetCount, renderTargetViews, depthStencilView);
-    }
-
-    void InvokeNativeClearRenderTargetView(
-      DeviceD3D10* const device, void* const renderTargetView, const float* const clearColor
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const clearRenderTargetView = reinterpret_cast<device_native_clear_render_target_view_fn>(vtable[35]);
-      clearRenderTargetView(nativeDevice, renderTargetView, clearColor);
-    }
-
-    int InvokeNativeClearDepthStencilView(
-      DeviceD3D10* const device,
-      void* const depthStencilView,
-      const unsigned int clearMask,
-      const float depth,
-      const unsigned int stencil
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const clearDepthStencilView = reinterpret_cast<device_native_clear_depth_stencil_view_fn>(vtable[36]);
-      return clearDepthStencilView(nativeDevice, depthStencilView, clearMask, depth, stencil);
-    }
-
-    int InvokeNativeSetViewport(DeviceD3D10* const device, const D3D10_VIEWPORT* const viewport)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const setViewports = reinterpret_cast<device_native_set_viewports_fn>(vtable[30]);
-      return setViewports(nativeDevice, 1U, viewport);
-    }
-
-    void InvokeNativeGetViewport(
-      DeviceD3D10* const device, unsigned int* const viewportCount, D3D10_VIEWPORT* const outViewport
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const getViewports = reinterpret_cast<device_native_get_viewports_fn>(vtable[61]);
-      getViewports(nativeDevice, viewportCount, outViewport);
-    }
-
-    void InvokeNativeGetRenderTargets(
-      DeviceD3D10* const device,
-      const unsigned int renderTargetCount,
-      void** const outRenderTargetView,
-      void** const outDepthStencilView
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const getRenderTargets = reinterpret_cast<device_native_get_render_targets_fn>(vtable[56]);
-      getRenderTargets(nativeDevice, renderTargetCount, outRenderTargetView, outDepthStencilView);
-    }
-
-    void InvokeNativeCopySubresourceRegion(
-      DeviceD3D10* const device,
-      void* const destinationResource,
-      const unsigned int destinationX,
-      const unsigned int destinationY,
-      void* const sourceResource,
-      const D3D10_BOX* const sourceBox
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const copySubresourceRegion = reinterpret_cast<device_native_copy_subresource_region_fn>(vtable[32]);
-      copySubresourceRegion(
-        nativeDevice, destinationResource, 0U, destinationX, destinationY, 0U, sourceResource, 0U, sourceBox
-      );
-    }
-
-    int InvokeNativeCopyResourceResult(
-      DeviceD3D10* const device, void* const destinationResource, void* const sourceResource
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const copyResource = reinterpret_cast<device_native_copy_resource_result_fn>(vtable[33]);
-      return copyResource(nativeDevice, destinationResource, sourceResource);
-    }
-
-    void InvokeNativeSetPrimitiveTopology(DeviceD3D10* const device, const std::uint32_t topology)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const setPrimitiveTopology = reinterpret_cast<device_native_set_primitive_topology_fn>(vtable[18]);
-      setPrimitiveTopology(nativeDevice, topology);
-    }
-
-    int InvokeNativeDraw(DeviceD3D10* const device, const std::uint32_t vertexCount, const std::uint32_t startVertex)
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const draw = reinterpret_cast<device_native_draw_fn>(vtable[9]);
-      return draw(nativeDevice, vertexCount, startVertex);
-    }
-
-    int InvokeNativeDrawInstanced(
-      DeviceD3D10* const device,
-      const std::uint32_t vertexCount,
-      const std::uint32_t instanceCount,
-      const std::uint32_t startVertex,
-      const std::uint32_t startInstance
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const drawInstanced = reinterpret_cast<device_native_draw_instanced_fn>(vtable[15]);
-      return drawInstanced(nativeDevice, vertexCount, instanceCount, startVertex, startInstance);
-    }
-
-    int InvokeNativeDrawIndexed(
-      DeviceD3D10* const device, const std::uint32_t indexCount, const std::uint32_t startIndex, const int baseVertex
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const drawIndexed = reinterpret_cast<device_native_draw_indexed_fn>(vtable[8]);
-      return drawIndexed(nativeDevice, indexCount, startIndex, baseVertex);
-    }
-
-    int InvokeNativeDrawIndexedInstanced(
-      DeviceD3D10* const device,
-      const std::uint32_t indexCount,
-      const std::uint32_t instanceCount,
-      const std::uint32_t startIndex,
-      const int baseVertex,
-      const std::uint32_t startInstance
-    )
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(device);
-      auto** const vtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const drawIndexedInstanced = reinterpret_cast<device_native_draw_indexed_instanced_fn>(vtable[14]);
-      return drawIndexedInstanced(nativeDevice, indexCount, instanceCount, startIndex, baseVertex, startInstance);
-    }
-
-    void InvokeTechniqueGetPassCount(void* const technique, D3D10_TECHNIQUE_DESC* const outPassCount);
-    void* InvokeEffectGetVariableByName(void* const effect, const char* const name);
-    void* InvokeVariableAsShaderResource(void* const variable);
-    HRESULT InvokeShaderResourceSetResource(void* const shaderResourceValue, void* const resourceView);
-    void* InvokeTechniqueGetPassByIndex(void* const technique, const int pass);
-    HRESULT InvokePassApply(void* const pass, const unsigned int flags);
-
-    /**
-     * Address: 0x008F8920 (FUN_008F8920)
-     *
-     * uint32_t,uint32_t,void *,void *
-     *
-     * What it does:
-     * Applies the recovered SRV->RTV fullscreen blit fallback lane used by
-     * `DeviceD3D10::StretchRect` when source/destination contexts differ.
-     */
-    int StretchRectFallbackBlit(
-      DeviceD3D10* const device,
-      const std::uint32_t destinationWidth,
-      const std::uint32_t destinationHeight,
-      void* const destinationRenderTargetView,
-      void* const sourceShaderResourceView
-    )
-    {
-      D3D10_VIEWPORT savedViewport{};
-      unsigned int savedViewportCount = 1U;
-      InvokeNativeGetViewport(device, &savedViewportCount, &savedViewport);
-
-      if (destinationRenderTargetView != nullptr) {
-        D3D10_VIEWPORT fullscreenViewport{};
-        fullscreenViewport.Width = destinationWidth;
-        fullscreenViewport.Height = destinationHeight;
-        fullscreenViewport.MinDepth = 0.0f;
-        fullscreenViewport.MaxDepth = 1.0f;
-        InvokeNativeSetViewport(device, &fullscreenViewport);
-      }
-
-      void* previousRenderTargetView = nullptr;
-      void* previousDepthStencilView = nullptr;
-      InvokeNativeGetRenderTargets(device, 1U, &previousRenderTargetView, &previousDepthStencilView);
-
-      InvokeNativeSetInputLayout(device, GetDeviceStretchRectInputLayout(device));
-
-      void* vertexBuffer = GetDeviceStretchRectVertexBuffer(device);
-      unsigned int stride = 0x14U;
-      unsigned int offset = 0U;
-      InvokeNativeSetVertexBuffers(device, 0U, &vertexBuffer, &stride, &offset);
-
-      InvokeNativeSetPrimitiveTopology(device, 5U);
-
-      if (destinationRenderTargetView != nullptr) {
-        void* renderTargets[1] = {destinationRenderTargetView};
-        static_cast<void>(InvokeNativeClearTarget(device, 1U, renderTargets, nullptr));
-      }
-
-      D3D10_TECHNIQUE_DESC passCountRuntime{};
-      InvokeTechniqueGetPassCount(GetDeviceStretchRectTechnique(device), &passCountRuntime);
-
-      for (unsigned int passIndex = 0U; passIndex < passCountRuntime.Passes; ++passIndex) {
-        void* const sourceVariable = InvokeEffectGetVariableByName(GetDeviceStretchRectEffect(device), "g_txSource");
-        void* const sourceAsShaderResource = InvokeVariableAsShaderResource(sourceVariable);
-        static_cast<void>(InvokeShaderResourceSetResource(sourceAsShaderResource, sourceShaderResourceView));
-
-        void* const pass =
-          InvokeTechniqueGetPassByIndex(GetDeviceStretchRectTechnique(device), static_cast<int>(passIndex));
-        static_cast<void>(InvokePassApply(pass, 0U));
-        static_cast<void>(InvokeNativeDraw(device, 4U, 0U));
-      }
-
-      InvokeNativeSetViewport(device, &savedViewport);
-      void* restoreRenderTargets[1] = {previousRenderTargetView};
-      return InvokeNativeClearTarget(device, 1U, restoreRenderTargets, previousDepthStencilView);
-    }
-
     [[noreturn]] void ThrowInvalidTopologyError(const int line)
     {
       ThrowGalError("DeviceD3D10.cpp", line, "invalid topology specified");
@@ -1019,317 +576,11 @@ namespace gpg::gal
       return kPrimitiveTopologyByToken[topologyToken];
     }
 
-    HRESULT InvokeEffectGetDesc(void* const effect, D3D10_EFFECT_DESC* const outDesc)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(effect);
-      auto* const getDesc = reinterpret_cast<effect_get_desc_fn>(vtable[6]);
-      return getDesc(effect, outDesc);
-    }
-
-    void* InvokeEffectGetTechniqueByIndex(void* const effect, const unsigned int index)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(effect);
-      auto* const getTechniqueByIndex = reinterpret_cast<effect_get_technique_by_index_fn>(vtable[12]);
-      return getTechniqueByIndex(effect, index);
-    }
-
-    void* InvokeEffectGetTechniqueByName(void* const effect, const char* const name)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(effect);
-      auto* const getTechniqueByName = reinterpret_cast<effect_get_technique_by_name_fn>(vtable[13]);
-      return getTechniqueByName(effect, name);
-    }
-
-    void* InvokeEffectGetVariableByName(void* const effect, const char* const name)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(effect);
-      auto* const getVariableByName = reinterpret_cast<effect_get_variable_by_name_fn>(vtable[10]);
-      return getVariableByName(effect, name);
-    }
-
-    void* InvokeTechniqueGetAnnotationByName(void* const technique, const char* const name)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(technique);
-      auto* const getAnnotationByName = reinterpret_cast<technique_get_annotation_by_name_fn>(vtable[3]);
-      return getAnnotationByName(technique, name);
-    }
-
-    BOOL InvokeTechniqueIsValid(void* const technique)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(technique);
-      auto* const isValid = reinterpret_cast<technique_is_valid_fn>(vtable[0]);
-      return isValid(technique);
-    }
-
-    HRESULT InvokeTechniqueGetDesc(void* const technique, D3D10_TECHNIQUE_DESC* const outDesc)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(technique);
-      auto* const getDesc = reinterpret_cast<technique_get_desc_fn>(vtable[1]);
-      return getDesc(technique, outDesc);
-    }
-
-    void* InvokeTechniqueGetPassByIndex(void* const technique, const int pass)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(technique);
-      auto* const getPassByIndex = reinterpret_cast<technique_get_pass_by_index_fn>(vtable[4]);
-      return getPassByIndex(technique, pass);
-    }
-
-    void InvokeTechniqueGetPassCount(void* const technique, D3D10_TECHNIQUE_DESC* const outPassCount)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(technique);
-      auto* const getPassCount = reinterpret_cast<technique_get_pass_counter_fn>(vtable[1]);
-      getPassCount(technique, outPassCount);
-    }
-
-    HRESULT InvokePassGetDesc(void* const pass, D3D10_PASS_DESC* const outDesc)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(pass);
-      auto* const getDesc = reinterpret_cast<pass_get_desc_fn>(vtable[1]);
-      return getDesc(pass, outDesc);
-    }
-
-    HRESULT InvokePassApply(void* const pass, const unsigned int flags)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(pass);
-      auto* const apply = reinterpret_cast<pass_apply_fn>(vtable[7]);
-      return apply(pass, flags);
-    }
-
-    BOOL InvokeVariableIsValid(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const isValid = reinterpret_cast<variable_is_valid_fn>(vtable[0]);
-      return isValid(variable);
-    }
-
-    void* InvokeVariableGetAnnotationByName(void* const variable, const char* const name)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const getAnnotationByName = reinterpret_cast<variable_get_annotation_by_name_fn>(vtable[4]);
-      return getAnnotationByName(variable, name);
-    }
-
-    void* InvokeVariableAsScalar(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const asScalar = reinterpret_cast<variable_as_scalar_fn>(vtable[10]);
-      return asScalar(variable);
-    }
-
-    void* InvokeVariableAsString(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const asString = reinterpret_cast<variable_as_string_fn>(vtable[13]);
-      return asString(variable);
-    }
-
-    void* InvokeVariableAsVector(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const asVector = reinterpret_cast<variable_as_vector_fn>(vtable[11]);
-      return asVector(variable);
-    }
-
-    void* InvokeVariableAsMatrix(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const asMatrix = reinterpret_cast<variable_as_matrix_fn>(vtable[12]);
-      return asMatrix(variable);
-    }
-
-    HRESULT InvokeVariableSetRawValue(
-      void* const variable, const void* const data, const unsigned int offsetBytes, const unsigned int valueBytes
-    )
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const setRawValue = reinterpret_cast<variable_set_raw_value_fn>(vtable[23]);
-      return setRawValue(variable, data, offsetBytes, valueBytes);
-    }
-
-    void* InvokeVariableAsShaderResource(void* const variable)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(variable);
-      auto* const asShaderResource = reinterpret_cast<variable_as_shader_resource_fn>(vtable[14]);
-      return asShaderResource(variable);
-    }
-
-    HRESULT InvokeScalarGetBool(void* const scalar, int* const outValue)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const getBool = reinterpret_cast<scalar_get_bool_fn>(vtable[34]);
-      return getBool(scalar, outValue);
-    }
-
-    HRESULT InvokeScalarSetBool(void* const scalar, const BOOL value)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const setBool = reinterpret_cast<scalar_set_bool_fn>(vtable[33]);
-      return setBool(scalar, value);
-    }
-
-    HRESULT InvokeScalarGetInt(void* const scalar, int* const outValue)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const getInt = reinterpret_cast<scalar_get_int_fn>(vtable[30]);
-      return getInt(scalar, outValue);
-    }
-
-    HRESULT InvokeScalarSetInt(void* const scalar, const int value)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const setInt = reinterpret_cast<scalar_set_int_fn>(vtable[29]);
-      return setInt(scalar, value);
-    }
-
-    HRESULT InvokeScalarGetFloat(void* const scalar, float* const outValue)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const getFloat = reinterpret_cast<scalar_get_float_fn>(vtable[26]);
-      return getFloat(scalar, outValue);
-    }
-
-    HRESULT InvokeScalarSetFloat(void* const scalar, const float value)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(scalar);
-      auto* const setFloat = reinterpret_cast<scalar_set_float_fn>(vtable[25]);
-      return setFloat(scalar, value);
-    }
-
-    HRESULT InvokeVectorSetFloatVector(void* const vectorValue, const void* const data)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(vectorValue);
-      auto* const setFloatVector = reinterpret_cast<vector_set_float_vector_fn>(vtable[27]);
-      return setFloatVector(vectorValue, data);
-    }
-
-    HRESULT InvokeMatrixSetMatrix(void* const matrixValue, const void* const data)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(matrixValue);
-      auto* const setMatrix = reinterpret_cast<matrix_set_matrix_fn>(vtable[25]);
-      return setMatrix(matrixValue, data);
-    }
-
-    HRESULT InvokeMatrixSetMatrixArray(
-      void* const matrixValue, const void* const data, const unsigned int offsetValues, const unsigned int valueCount
-    )
-    {
-      auto** const vtable = *reinterpret_cast<void***>(matrixValue);
-      auto* const setMatrixArray = reinterpret_cast<matrix_set_matrix_array_fn>(vtable[27]);
-      return setMatrixArray(matrixValue, data, offsetValues, valueCount);
-    }
-
-    HRESULT InvokeVectorSetArray(
-      void* const vectorValue, const void* const data, const unsigned int offsetValues, const unsigned int valueCount
-    )
-    {
-      auto** const vtable = *reinterpret_cast<void***>(vectorValue);
-      auto* const setArray = reinterpret_cast<vector_set_array_fn>(vtable[33]);
-      return setArray(vectorValue, data, offsetValues, valueCount);
-    }
-
-    HRESULT InvokeShaderResourceSetResource(void* const shaderResourceValue, void* const resourceView)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(shaderResourceValue);
-      auto* const setResource = reinterpret_cast<shader_resource_set_resource_fn>(vtable[25]);
-      return setResource(shaderResourceValue, resourceView);
-    }
-
-    HRESULT InvokeStringGetString(void* const stringVariable, const char** const outValue)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(stringVariable);
-      auto* const getString = reinterpret_cast<string_get_string_fn>(vtable[25]);
-      return getString(stringVariable, outValue);
-    }
-
     // `{proxy, first, last, end}` at 0x10 is `msvc8::vector<EffectMacro>`
     // itself, so the lane is the container, not a view over it.
     using EffectMacroVector = msvc8::vector<EffectMacro>;
 
     static_assert(sizeof(EffectMacroVector) == 0x10, "EffectMacroVector size must be 0x10");
-
-    template <class T>
-    void ReleaseComLike(T*& object) noexcept
-    {
-      void* rawObject = reinterpret_cast<void*>(object);
-      if (rawObject == nullptr) {
-        return;
-      }
-
-      auto** const vtable = *reinterpret_cast<void***>(rawObject);
-      auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-      release(rawObject);
-      object = nullptr;
-    }
-
-    template <class T>
-    int ReleaseComLikeWithResult(T*& object) noexcept
-    {
-      void* rawObject = reinterpret_cast<void*>(object);
-      if (rawObject == nullptr) {
-        return 0;
-      }
-
-      auto** const vtable = *reinterpret_cast<void***>(rawObject);
-      auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-      const int result = static_cast<int>(release(rawObject));
-      object = nullptr;
-      return result;
-    }
-
-    void InvokeTextureGetDesc(void* const texture, D3D10_TEXTURE2D_DESC* const outDesc)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(texture);
-      auto* const getDesc = reinterpret_cast<texture_get_desc_fn>(vtable[12]);
-      getDesc(texture, outDesc);
-    }
-
-    HRESULT InvokeTextureMap(
-      void* const texture, const int level, const unsigned int mapMode, D3D10_MAPPED_TEXTURE2D* const outMapped
-    )
-    {
-      auto** const vtable = *reinterpret_cast<void***>(texture);
-      auto* const map = reinterpret_cast<texture_map_fn>(vtable[10]);
-      return map(texture, level, mapMode, 0U, outMapped);
-    }
-
-    void InvokeTextureUnmap(void* const texture, const int level)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(texture);
-      auto* const unmap = reinterpret_cast<texture_unmap_fn>(vtable[11]);
-      unmap(texture, level);
-    }
-
-    /**
-     * Address: 0x008F8860 (FUN_008F8860)
-     *
-     * Device *,int,void **
-     *
-     * What it does:
-     * Forwards one helper call through the retained function-pointer lane
-     * at `Device+0x34`.
-     */
-    HRESULT InvokeDeviceHelper34(Device* const device, const int mode, void** const outValue)
-    {
-      // The binary thunk is `mov eax,[ecx+0x34]; jmp eax`: `this` is not an
-      // argument, the export sees exactly the caller's two stack arguments.
-      return static_cast<DeviceD3D10*>(device)->mD3D10CreateBlob(static_cast<std::uint32_t>(mode), outValue);
-    }
-
-    /**
-     * Address: 0x008F8880 (FUN_008F8880)
-     *
-     * Device *,void *,int,void **
-     *
-     * What it does:
-     * Forwards one helper call through the retained function-pointer lane
-     * at `Device+0x44`.
-     */
-    HRESULT InvokeDeviceHelper44(Device* const device, void* const texture, const int mode, void** const outValue)
-    {
-      // `mov ecx,[ecx+0x44]; jmp ecx`: as above, three stack arguments and no `this`.
-      return static_cast<DeviceD3D10*>(device)->mD3DX10SaveTextureToMemory(texture, mode, outValue);
-    }
 
     int ResolveImageFileFormatToken(const int token) noexcept
     {
@@ -1379,99 +630,6 @@ namespace gpg::gal
       return outDesc;
     }
 
-    int ReleaseComSlotAndNull(void** const slot) noexcept
-    {
-      if (slot == nullptr) {
-        return 0;
-      }
-
-      void* object = *slot;
-      if (object == nullptr) {
-        *slot = nullptr;
-        return 0;
-      }
-
-      auto** const vtable = *reinterpret_cast<void***>(object);
-      auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-      const int result = static_cast<int>(release(object));
-      *slot = nullptr;
-      return result;
-    }
-
-    /**
-     * Address: 0x008F5330 (FUN_008F5330)
-     *
-     * void **
-     *
-     * What it does:
-     * Calls COM-like vtable slot `+0x08` (`Release`) when slot payload is
-     * non-null, then clears the slot and returns the release/result lane.
-     */
-    int ReleaseComSlotVariant0(void** const slot) noexcept
-    {
-      void* const object = *slot;
-      int result = static_cast<int>(reinterpret_cast<std::uintptr_t>(object));
-      if (object != nullptr) {
-        auto** const vtable = *reinterpret_cast<void***>(object);
-        auto* const release = reinterpret_cast<release_fn>(vtable[2]);
-        result = static_cast<int>(release(object));
-      }
-      *slot = nullptr;
-      return result;
-    }
-
-    /**
-     * Address: 0x008F8D90 (FUN_008F8D90)
-     *
-     * void **
-     *
-     * What it does:
-     * Releases one COM-like pointer lane (if present) and clears the slot.
-     */
-    int ReleaseComSlotVariant1(void** const slot) noexcept
-    {
-      return ReleaseComSlotAndNull(slot);
-    }
-
-    /**
-     * Address: 0x008F8DF0 (FUN_008F8DF0)
-     *
-     * void **
-     *
-     * What it does:
-     * Releases one COM-like pointer lane (if present) and clears the slot.
-     */
-    int ReleaseComSlotVariant2(void** const slot) noexcept
-    {
-      return ReleaseComSlotAndNull(slot);
-    }
-
-    /**
-     * Address: 0x008F8E10 (FUN_008F8E10)
-     *
-     * void **
-     *
-     * What it does:
-     * Releases one COM-like pointer lane (if present) and clears the slot.
-     */
-    int ReleaseComSlotVariant3(void** const slot) noexcept
-    {
-      return ReleaseComSlotAndNull(slot);
-    }
-
-    /**
-     * Address: 0x008F8E30 (FUN_008F8E30)
-     *
-     * void **
-     *
-     * What it does:
-     * Releases one COM-like pointer lane (if present) and clears the slot.
-     */
-    int ReleaseComSlotVariant4(void** const slot) noexcept
-    {
-      return ReleaseComSlotAndNull(slot);
-    }
-
     void* AllocateArrayOrThrow(const std::uint32_t count, const std::uint32_t elementSize)
     {
       if ((count != 0U) && ((std::numeric_limits<std::uint32_t>::max() / count) < elementSize)) {
@@ -1493,142 +651,6 @@ namespace gpg::gal
     void* AllocateStride04Array(const std::uint32_t count)
     {
       return AllocateArrayOrThrow(count, 0x04U);
-    }
-
-    DeviceD3D10::D3D10CreateBlobFn GetDeviceCreateBlobApi(DeviceD3D10* const device) noexcept
-    {
-      return device->mD3D10CreateBlob;
-    }
-
-    DeviceD3D10::D3DX10CreateEffectFromMemoryFn GetDeviceCreateEffectFromMemoryApi(DeviceD3D10* const device) noexcept
-    {
-      return device->mD3DX10CreateEffectFromMemory;
-    }
-
-    DeviceD3D10::D3DX10CreateTextureFromMemoryFn GetDeviceCreateTextureFromMemoryApi(DeviceD3D10* const device) noexcept
-    {
-      return device->mD3DX10CreateTextureFromMemory;
-    }
-
-    DeviceD3D10::D3DX10SaveTextureToFileFn GetDeviceSaveTextureToFileApi(DeviceD3D10* const device) noexcept
-    {
-      return device->mD3DX10SaveTextureToFileA;
-    }
-
-    DeviceD3D10::D3DX10SaveTextureToMemoryFn GetDeviceSaveTextureToMemoryApi(DeviceD3D10* const device) noexcept
-    {
-      return device->mD3DX10SaveTextureToMemory;
-    }
-
-    HRESULT InvokeCreateBlobApi(DeviceD3D10* const device, void** const outBlob)
-    {
-      return GetDeviceCreateBlobApi(device)(0U, outBlob);
-    }
-
-    HRESULT InvokeCreateEffectFromMemoryApi(
-      DeviceD3D10* const device,
-      const void* const sourceData,
-      const std::uint32_t sourceBytes,
-      const D3D10_SHADER_MACRO* const defines,
-      ID3D10Effect** const outEffect,
-      void** const outErrors
-    )
-    {
-      return GetDeviceCreateEffectFromMemoryApi(device)(
-        sourceData,
-        sourceBytes,
-        nullptr,
-        defines,
-        nullptr,
-        0x1000U,
-        0U,
-        device->mDevice,
-        nullptr,
-        nullptr,
-        outEffect,
-        outErrors
-      );
-    }
-
-    HRESULT InvokeCreateTextureFromMemoryApi(
-      DeviceD3D10* const device,
-      const void* const sourceData,
-      const std::uint32_t sourceBytes,
-      const void* const loadInfo,
-      void** const outResource
-    )
-    {
-      return GetDeviceCreateTextureFromMemoryApi(device)(
-        GetDeviceNativeHandle(device), sourceData, sourceBytes, loadInfo, nullptr, outResource
-      );
-    }
-
-    HRESULT InvokeSaveTextureToFileApi(
-      DeviceD3D10* const device, void* const textureResource, const int fileFormat, const char* const filePath
-    )
-    {
-      return GetDeviceSaveTextureToFileApi(device)(textureResource, fileFormat, filePath);
-    }
-
-    HRESULT InvokeSaveTextureToMemoryApi(
-      DeviceD3D10* const device, void* const textureResource, const int fileFormat, void** const outReadback
-    )
-    {
-      return GetDeviceSaveTextureToMemoryApi(device)(textureResource, fileFormat, outReadback);
-    }
-
-    int GetReadbackSize(void* const readback)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(readback);
-      auto* const getSize = reinterpret_cast<readback_get_size_fn>(vtable[4]);
-      return getSize(readback);
-    }
-
-    void* GetReadbackData(void* const readback)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(readback);
-      auto* const getData = reinterpret_cast<readback_get_data_fn>(vtable[3]);
-      return getData(readback);
-    }
-
-    HRESULT QueryInterfaceTexture2D(void* const resource, void** const outTexture2D)
-    {
-      auto** const vtable = *reinterpret_cast<void***>(resource);
-      auto* const queryInterface = reinterpret_cast<HRESULT(__stdcall*)(void*, const IID&, void**)>(vtable[0]);
-      return queryInterface(resource, IID_ID3D10Texture2D, outTexture2D);
-    }
-
-    std::uint16_t FallbackFloat32To16(const float value)
-    {
-      std::uint32_t bits = 0U;
-      static_assert(sizeof(bits) == sizeof(value), "float/uint32_t size mismatch");
-      std::memcpy(&bits, &value, sizeof(bits));
-
-      const std::uint32_t sign = (bits >> 16U) & 0x8000U;
-      std::int32_t exponent = static_cast<std::int32_t>((bits >> 23U) & 0xFFU) - 127 + 15;
-      std::uint32_t mantissa = bits & 0x007FFFFFU;
-
-      if (exponent <= 0) {
-        if (exponent < -10) {
-          return static_cast<std::uint16_t>(sign);
-        }
-
-        mantissa = (mantissa | 0x00800000U) >> static_cast<std::uint32_t>(1 - exponent);
-        return static_cast<std::uint16_t>(sign | ((mantissa + 0x00001000U) >> 13U));
-      }
-
-      if (exponent >= 31) {
-        return static_cast<std::uint16_t>(sign | 0x7C00U);
-      }
-
-      return static_cast<std::uint16_t>(sign | (static_cast<std::uint32_t>(exponent) << 10U) | ((mantissa + 0x00001000U) >> 13U));
-    }
-
-    void ConvertFloat32To16Array(std::uint16_t* const outValues, const float* const inValues, const unsigned int count)
-    {
-      for (unsigned int index = 0U; index < count; ++index) {
-        outValues[index] = FallbackFloat32To16(inValues[index]);
-      }
     }
 
     /**
@@ -1686,40 +708,16 @@ namespace gpg::gal
      * Releases retained output COM lanes for every cached adapter-mode entry,
      * then releases the retained DXGI adapter lane.
      */
-    int ReleaseAdapterOutputAndDeviceRefs(AdapterD3D10* const adapter) noexcept
+    void ReleaseAdapterOutputAndDeviceRefs(AdapterD3D10* const adapter) noexcept
     {
       for (AdapterModeD3D10& mode : adapter->modes_) {
-        ReleaseComLike(mode.output_);
+        SafeRelease(mode.output_);
       }
-      return ReleaseComLikeWithResult(adapter->dxgiAdapter_);
+      SafeRelease(adapter->dxgiAdapter_);
     }
 
     // Defined later in this TU; used by the vector<void*>::_Insert_n grow lane below.
     [[noreturn]] void ThrowVectorTooLongLengthErrorB();
-
-    /**
-     * Address: 0x008F8670 (FUN_008F8670)
-     *
-     * What it does:
-     * Initializes one 13-lane texture-load info block with binary defaults.
-     */
-    std::int32_t* InitializeTextureLoadInfoDefaults(std::int32_t* const loadInfo) noexcept
-    {
-      loadInfo[0] = -1;
-      loadInfo[1] = -1;
-      loadInfo[2] = -1;
-      loadInfo[3] = -1;
-      loadInfo[4] = -1;
-      loadInfo[5] = -1;
-      loadInfo[6] = -1;
-      loadInfo[7] = -1;
-      loadInfo[8] = -1;
-      loadInfo[9] = -3;
-      loadInfo[10] = -1;
-      loadInfo[11] = -1;
-      loadInfo[12] = 0;
-      return loadInfo;
-    }
 
     int MapDxgiToGalRenderTargetFormat(const int dxgiFormat)
     {
@@ -1809,18 +807,17 @@ namespace gpg::gal
       DeviceD3D10* const device, const int formatToken, D3D10_PASS_DESC* const outPassDesc
     )
     {
-      void* const signatureEffect = GetDeviceSignatureEffect(device);
+      ID3D10Effect* const signatureEffect = device->mSignatureEffect;
       if (signatureEffect == nullptr) {
         ThrowGalError("DeviceD3D10.cpp", 1910, "internal D3D10 SignatureEffect error");
       }
 
-      void* const technique = InvokeEffectGetTechniqueByIndex(signatureEffect, static_cast<unsigned int>(formatToken));
+      ID3D10EffectTechnique* const technique = signatureEffect->GetTechniqueByIndex(static_cast<UINT>(formatToken));
       if (technique == nullptr) {
         ThrowGalError("DeviceD3D10.cpp", 1913, "invalid format/technique combination");
       }
 
-      void* const pass = InvokeTechniqueGetPassByIndex(technique, 0);
-      static_cast<void>(InvokePassGetDesc(pass, outPassDesc));
+      static_cast<void>(technique->GetPassByIndex(0U)->GetDesc(outPassDesc));
     }
 
     /**
@@ -1895,26 +892,22 @@ namespace gpg::gal
      * Creates a staging texture copy (`usage=3`, `bind=0`, `cpuAccess=0x20000`) from
      * the source texture and issues a native D3D10 copy-resource from source to staging.
      */
-    void* CreateStagingTextureCopyOrThrow(Device* const device, void* const sourceTexture)
+    ID3D10Texture2D* CreateStagingTextureCopyOrThrow(Device* const device, ID3D10Texture2D* const sourceTexture)
     {
       D3D10_TEXTURE2D_DESC textureDesc{};
-      InvokeTextureGetDesc(sourceTexture, &textureDesc);
+      sourceTexture->GetDesc(&textureDesc);
       textureDesc.Usage = D3D10_USAGE_STAGING;
       textureDesc.BindFlags = 0U;
       textureDesc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
 
       ID3D10Device* const nativeDevice = static_cast<DeviceD3D10*>(device)->mDevice;
-      auto** const nativeVtable = *reinterpret_cast<void***>(nativeDevice);
-
-      void* stagingTexture = nullptr;
-      auto* const createTexture2D = reinterpret_cast<device_native_create_texture2d_fn>(nativeVtable[73]);
-      const HRESULT createResult = createTexture2D(nativeDevice, &textureDesc, nullptr, &stagingTexture);
+      ID3D10Texture2D* stagingTexture = nullptr;
+      const HRESULT createResult = nativeDevice->CreateTexture2D(&textureDesc, nullptr, &stagingTexture);
       if (createResult < 0) {
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1635, createResult);
       }
 
-      auto* const copyResource = reinterpret_cast<device_native_copy_resource_fn>(nativeVtable[33]);
-      copyResource(nativeDevice, stagingTexture, sourceTexture);
+      nativeDevice->CopyResource(stagingTexture, sourceTexture);
       return stagingTexture;
     }
 
@@ -2129,63 +1122,6 @@ namespace gpg::gal
       );
     }
 
-    /**
-     * Address: 0x009001B0 (FUN_009001B0)
-     *
-     * What it does:
-     * Releases startup/runtime-owned D3D10 device resources and resets recovered
-     * context/module lanes.
-     */
-    BOOL ResetDeviceD3D10Runtime(DeviceD3D10* const backend)
-    {
-      if (backend == nullptr) {
-        return FALSE;
-      }
-
-      if (backend->mHeadOutputContexts != nullptr) {
-        delete[] backend->mHeadOutputContexts;
-        backend->mHeadOutputContexts = nullptr;
-      }
-
-      for (IDXGISwapChain*& swapChain : backend->mSwapChains) {
-        ReleaseComLike(swapChain);
-      }
-      backend->mSwapChains.clear();
-
-      backend->mAdapters.clear();
-      backend->mPipelineState.reset();
-
-      ReleaseComLike(backend->mDXGIFactory);
-      ReleaseComLike(backend->mDevice);
-      ReleaseComLike(backend->mSignatureEffect);
-      ReleaseComLike(backend->mRttEffect);
-      ReleaseComLike(backend->mRttQuadVertexBuffer);
-      ReleaseComLike(backend->mRttInputLayout);
-
-      backend->mCursor.Destroy();
-      backend->mDeviceContext = DeviceContext(DeviceApi::Unset);
-      backend->mLog.clear();
-      backend->mCurThreadId = 0;
-
-      ::FreeLibrary(backend->mDXGIModule);
-      backend->mDXGIModule = nullptr;
-
-      ::FreeLibrary(backend->mD3DX10Module);
-      backend->mD3DX10Module = nullptr;
-
-      const BOOL result = ::FreeLibrary(backend->mD3D10Module);
-      backend->mD3D10Module = nullptr;
-
-      backend->mD3D10CreateDevice = nullptr;
-      backend->mD3D10CreateBlob = nullptr;
-      backend->mD3DX10CreateEffectFromMemory = nullptr;
-      backend->mD3DX10CreateTextureFromMemory = nullptr;
-      backend->mD3DX10SaveTextureToFileA = nullptr;
-      backend->mD3DX10SaveTextureToMemory = nullptr;
-      backend->mCreateDXGIFactory = nullptr;
-      return result;
-    }
-
   } // namespace
 
   /**
@@ -2197,8 +1133,8 @@ namespace gpg::gal
    * Initializes one adapter wrapper from one DXGI adapter pointer and captures
    * the adapter descriptor payload.
    */
-  AdapterD3D10::AdapterD3D10(void* const dxgiAdapter)
-    : dxgiAdapter_(reinterpret_cast<IDXGIAdapter*>(dxgiAdapter))
+  AdapterD3D10::AdapterD3D10(IDXGIAdapter* const dxgiAdapter)
+    : dxgiAdapter_(dxgiAdapter)
     , description_()
     , modes_()
   {
@@ -2294,7 +1230,7 @@ namespace gpg::gal
    */
   AdapterD3D10::~AdapterD3D10()
   {
-    static_cast<void>(ReleaseAdapterOutputAndDeviceRefs(this));
+    ReleaseAdapterOutputAndDeviceRefs(this);
     // Each entry's inner mode vector goes with the outer one; both are real
     // containers, so `modes_ = {}` is the whole teardown (0x008F76C0).
     modes_ = msvc8::vector<AdapterModeD3D10>{};
@@ -2320,7 +1256,9 @@ namespace gpg::gal
     , depthStencilState2_(nullptr)
     , blendState2_(nullptr)
   {
-    AddRefComLike(device_);
+    if (device_ != nullptr) {
+      device_->AddRef();
+    }
     CreateState1();
     CreateState2();
   }
@@ -2532,23 +1470,14 @@ namespace gpg::gal
    */
   PipelineStateD3D10::~PipelineStateD3D10()
   {
-    ReleaseComLike(device_);
-    device_ = nullptr;
-
-    ReleaseComLike(rasterizerState1_);
-    rasterizerState1_ = nullptr;
-    ReleaseComLike(depthStencilState1_);
-    depthStencilState1_ = nullptr;
-    ReleaseComLike(blendState1_);
-    blendState1_ = nullptr;
-    ReleaseComLike(samplerState1_);
-    samplerState1_ = nullptr;
-    ReleaseComLike(rasterizerState2_);
-    rasterizerState2_ = nullptr;
-    ReleaseComLike(depthStencilState2_);
-    depthStencilState2_ = nullptr;
-    ReleaseComLike(blendState2_);
-    blendState2_ = nullptr;
+    SafeRelease(device_);
+    SafeRelease(rasterizerState1_);
+    SafeRelease(depthStencilState1_);
+    SafeRelease(blendState1_);
+    SafeRelease(samplerState1_);
+    SafeRelease(rasterizerState2_);
+    SafeRelease(depthStencilState2_);
+    SafeRelease(blendState2_);
   }
 
   /**
@@ -2748,17 +1677,17 @@ namespace gpg::gal
     auto& destination = *static_cast<Float16HardwareVertexInstance*>(destinationVertex);
     destination.instanceIndex = source.instanceIndex;
     destination.color = source.color;
-    ConvertFloat32To16Array(&destination.shaderTime, &source.shaderTime, 1U);
+    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.shaderTime), &source.shaderTime, 1U);
     static_cast<void>(CopyMatrix4x3Rows(
       destination.transform[0], destination.transform[1], destination.transform[2], destination.transform[3],
       source.transform
     ));
     destination.bonePaletteBase = source.bonePaletteBase;
     destination.secondaryDataMask = (source.useSecondaryData != 0U) ? static_cast<std::uint8_t>(0xFFU) : 0U;
-    ConvertFloat32To16Array(&destination.scroll[1], &source.scroll[1], 1U);
-    ConvertFloat32To16Array(&destination.scroll[0], &source.scroll[0], 1U);
+    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.scroll[1]), &source.scroll[1], 1U);
+    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.scroll[0]), &source.scroll[0], 1U);
     destination.dissolve = source.dissolve;
-    ConvertFloat32To16Array(&destination.parameter, &source.parameter, 1U);
+    D3DXFloat32To16Array(reinterpret_cast<D3DXFLOAT16*>(&destination.parameter), &source.parameter, 1U);
     destination.meshColor = source.meshColor;
   }
 
@@ -2786,7 +1715,9 @@ namespace gpg::gal
    * derives context width/height/format from the source texture descriptor.
    */
   RenderTargetD3D10::RenderTargetD3D10(
-    void* const renderTexture, void* const renderTargetView, void* const shaderResourceView
+    ID3D10Texture2D* const renderTexture,
+    ID3D10RenderTargetView* const renderTargetView,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
     : context_()
     , renderTexture_(nullptr)
@@ -2807,9 +1738,9 @@ namespace gpg::gal
    */
   RenderTargetD3D10::RenderTargetD3D10(
     const RenderTargetContext* const context,
-    void* const renderTexture,
-    void* const renderTargetView,
-    void* const shaderResourceView
+    ID3D10Texture2D* const renderTexture,
+    ID3D10RenderTargetView* const renderTargetView,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
     : context_()
     , renderTexture_(nullptr)
@@ -2835,13 +1766,15 @@ namespace gpg::gal
    * width/height/format from texture descriptor lanes.
    */
   void RenderTargetD3D10::InitializeFromResource(
-    void* const renderTexture, void* const renderTargetView, void* const shaderResourceView
+    ID3D10Texture2D* const renderTexture,
+    ID3D10RenderTargetView* const renderTargetView,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
   {
     DestroyState();
 
     D3D10_TEXTURE2D_DESC textureDesc{};
-    InvokeTextureGetDesc(renderTexture, &textureDesc);
+    renderTexture->GetDesc(&textureDesc);
     context_.format_ = static_cast<std::uint32_t>(MapDxgiToGalRenderTargetFormat(static_cast<int>(textureDesc.Format)));
     context_.width_ = textureDesc.Width;
     context_.height_ = textureDesc.Height;
@@ -2857,7 +1790,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained render-texture lane.
    */
-  void* RenderTargetD3D10::GetRenderTextureOrThrow()
+  ID3D10Texture2D* RenderTargetD3D10::GetRenderTextureOrThrow()
   {
     if (renderTexture_ == nullptr) {
       ThrowGalError("RenderTargetD3D10.cpp", 100, "invalid render target");
@@ -2907,9 +1840,9 @@ namespace gpg::gal
    */
   void RenderTargetD3D10::DestroyState()
   {
-    ReleaseComLike(renderTexture_);
-    ReleaseComLike(renderTargetView_);
-    ReleaseComLike(shaderResourceView_);
+    SafeRelease(renderTexture_);
+    SafeRelease(renderTargetView_);
+    SafeRelease(shaderResourceView_);
 
     const RenderTargetContext resetContext{};
     context_.width_ = resetContext.width_;
@@ -2923,7 +1856,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained render-target-view lane.
    */
-  void* RenderTargetD3D10::GetRenderTargetViewOrThrow()
+  ID3D10RenderTargetView* RenderTargetD3D10::GetRenderTargetViewOrThrow()
   {
     if (renderTargetView_ == nullptr) {
       ThrowGalError("RenderTargetD3D10.cpp", 106, "invalid render target view");
@@ -2938,7 +1871,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained shader-resource-view lane.
    */
-  void* RenderTargetD3D10::GetShaderResourceViewOrThrow()
+  ID3D10ShaderResourceView* RenderTargetD3D10::GetShaderResourceViewOrThrow()
   {
     if (shaderResourceView_ == nullptr) {
       ThrowGalError("RenderTargetD3D10.cpp", 112, "invalid shader resource view");
@@ -3024,9 +1957,9 @@ namespace gpg::gal
    */
   DepthStencilTargetD3D10::DepthStencilTargetD3D10(
     const DepthStencilTargetContext* const context,
-    void* const depthStencilTexture,
-    void* const depthStencilView,
-    void* const shaderResourceView
+    ID3D10Texture2D* const depthStencilTexture,
+    ID3D10DepthStencilView* const depthStencilView,
+    ID3D10ShaderResourceView* const shaderResourceView
   )
     : context_()
     , depthStencilTexture_(nullptr)
@@ -3074,8 +2007,8 @@ namespace gpg::gal
    */
   void DepthStencilTargetD3D10::DestroyState()
   {
-    ReleaseComLike(depthStencilTexture_);
-    ReleaseComLike(depthStencilView_);
+    SafeRelease(depthStencilTexture_);
+    SafeRelease(depthStencilView_);
 
     const DepthStencilTargetContext resetContext{};
     context_.width_ = resetContext.width_;
@@ -3090,7 +2023,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained depth-stencil-texture lane.
    */
-  void* DepthStencilTargetD3D10::GetDepthStencilTextureOrThrow()
+  ID3D10Texture2D* DepthStencilTargetD3D10::GetDepthStencilTextureOrThrow()
   {
     if (depthStencilTexture_ == nullptr) {
       ThrowGalError("DepthStencilTargetD3D10.cpp", 70, "invalid depth stencil texture");
@@ -3105,7 +2038,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained depth-stencil-view lane.
    */
-  void* DepthStencilTargetD3D10::GetDepthStencilViewOrThrow()
+  ID3D10DepthStencilView* DepthStencilTargetD3D10::GetDepthStencilViewOrThrow()
   {
     if (depthStencilView_ == nullptr) {
       ThrowGalError("DepthStencilTargetD3D10.cpp", 76, "invalid depth stencil view");
@@ -3120,7 +2053,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained shader-resource-view lane.
    */
-  void* DepthStencilTargetD3D10::GetShaderResourceViewOrThrow()
+  ID3D10ShaderResourceView* DepthStencilTargetD3D10::GetShaderResourceViewOrThrow()
   {
     if (shaderResourceView_ == nullptr) {
       ThrowGalError("DepthStencilTargetD3D10.cpp", 82, "invalid shader resource view");
@@ -3156,7 +2089,9 @@ namespace gpg::gal
    * Initializes one D3D10 texture wrapper from caller context + retained texture/SRV
    * handles, then rebuilds mip/format-dependent lock state.
    */
-  TextureD3D10::TextureD3D10(const TextureContext* const context, void* const texture, void* const shaderResourceView)
+  TextureD3D10::TextureD3D10(
+    const TextureContext* const context, ID3D10Texture2D* const texture, ID3D10ShaderResourceView* const shaderResourceView
+  )
     : context_()
     , texture_(nullptr)
     , stagingTexture_(nullptr)
@@ -3209,7 +2144,7 @@ namespace gpg::gal
       ThrowGalError("TextureD3D10.cpp", 59, "attempt to map invalid texture");
     }
 
-    void* const lockedTexture = texture_;
+    ID3D10Texture2D* const lockedTexture = texture_;
 
     if (level >= static_cast<int>(context_.mipmapLevels_)) {
       ThrowGalError("TextureD3D10.cpp", 60, "attempt to map invalid texture level");
@@ -3227,13 +2162,13 @@ namespace gpg::gal
     lock.flags = flags;
     lock.level = level;
 
-    unsigned int mapMode = 4U;
-    void* mapTexture = lockedTexture;
+    D3D10_MAP mapMode = D3D10_MAP_WRITE_DISCARD;
+    ID3D10Texture2D* mapTexture = lockedTexture;
     if (((flags & 1) == 0) && ((flags & 2) != 0)) {
-      mapMode = 1U;
+      mapMode = D3D10_MAP_READ;
 
       D3D10_TEXTURE2D_DESC textureDesc{};
-      InvokeTextureGetDesc(lockedTexture, &textureDesc);
+      lockedTexture->GetDesc(&textureDesc);
       if ((textureDesc.CPUAccessFlags & 0x20000U) == 0U) {
         Device* const device = Device::GetInstance();
         stagingTexture_ = CreateStagingTextureCopyOrThrow(device, lockedTexture);
@@ -3242,7 +2177,7 @@ namespace gpg::gal
     }
 
     D3D10_MAPPED_TEXTURE2D mapped{};
-    const HRESULT mapResult = InvokeTextureMap(mapTexture, level, mapMode, &mapped);
+    const HRESULT mapResult = mapTexture->Map(static_cast<UINT>(level), mapMode, 0U, &mapped);
     if (mapResult < 0) {
       ThrowGalErrorFromHresult("TextureD3D10.cpp", 96, mapResult);
     }
@@ -3274,12 +2209,18 @@ namespace gpg::gal
     }
 
     if (stagingTexture_ != nullptr) {
-      InvokeTextureUnmap(stagingTexture_, level);
+      stagingTexture_->Unmap(static_cast<UINT>(level));
     } else {
-      InvokeTextureUnmap(texture_, level);
+      texture_->Unmap(static_cast<UINT>(level));
     }
 
-    const int releaseResult = ReleaseComLikeWithResult(stagingTexture_);
+    // The binary returns what the staging copy's Release returned (or the null
+    // pointer when there was none) and clears the lock state after it.
+    int releaseResult = 0;
+    if (stagingTexture_ != nullptr) {
+      releaseResult = static_cast<int>(stagingTexture_->Release());
+      stagingTexture_ = nullptr;
+    }
     lockActive_ = false;
     lockLevel_ = 0;
     return releaseResult;
@@ -3309,33 +2250,33 @@ namespace gpg::gal
       ThrowGalError("TextureD3D10.cpp", 172, "attempt to unlock invalid texture");
     }
 
-    void* const texture = texture_;
+    ID3D10Texture2D* const texture = texture_;
 
-    Device* const device = Device::GetInstance();
+    auto* const device = static_cast<DeviceD3D10*>(Device::GetInstance());
 
-    void* helper34Object = nullptr;
-    HRESULT result = InvokeDeviceHelper34(device, 0, &helper34Object);
+    // An empty blob made first and released last; the encoded one below is
+    // never released (the binary leaks it).
+    ID3D10Blob* scratchBlob = nullptr;
+    HRESULT result = device->CreateBlob(0U, &scratchBlob);
     if (result < 0) {
       ThrowGalErrorFromHresult("TextureD3D10.cpp", 177, result);
     }
 
-    void* readbackObject = nullptr;
-    result = InvokeDeviceHelper44(device, texture, 4, &readbackObject);
+    ID3D10Blob* encodedBlob = nullptr;
+    result = device->SaveTextureToMemory(texture, D3DX10_IFF_DDS, &encodedBlob);
     if (result < 0) {
       ThrowGalErrorFromHresult("TextureD3D10.cpp", 178, result);
     }
 
-    const unsigned int readbackSize = static_cast<unsigned int>(GetReadbackSize(readbackObject));
-    if (outBuffer->Size() != readbackSize) {
-      gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(readbackSize);
+    const unsigned int encodedSize = static_cast<unsigned int>(encodedBlob->GetBufferSize());
+    if (outBuffer->Size() != encodedSize) {
+      gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(encodedSize);
       *outBuffer = resizedBuffer;
     }
 
-    void* const sourceBytes = GetReadbackData(readbackObject);
-    char* const destinationBytes = outBuffer->GetPtr(0U, 0U);
-    std::memcpy(destinationBytes, sourceBytes, readbackSize);
+    std::memcpy(outBuffer->GetPtr(0U, 0U), encodedBlob->GetBufferPointer(), encodedSize);
 
-    ReleaseComLike(helper34Object);
+    SafeRelease(scratchBlob);
   }
 
   /**
@@ -3344,7 +2285,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained texture lane.
    */
-  void* TextureD3D10::GetTextureOrThrow()
+  ID3D10Texture2D* TextureD3D10::GetTextureOrThrow()
   {
     if (texture_ == nullptr) {
       ThrowGalError("TextureD3D10.cpp", 224, "invalid texture");
@@ -3359,7 +2300,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained shader-resource-view lane.
    */
-  void* TextureD3D10::GetShaderResourceViewOrThrow()
+  ID3D10ShaderResourceView* TextureD3D10::GetShaderResourceViewOrThrow()
   {
     if (shaderResourceView_ == nullptr) {
       ThrowGalError("TextureD3D10.cpp", 230, "invalid shader resource view");
@@ -3384,8 +2325,8 @@ namespace gpg::gal
       delete[] lockHistory_;
     }
 
-    ReleaseComLike(texture_);
-    ReleaseComLike(shaderResourceView_);
+    SafeRelease(texture_);
+    SafeRelease(shaderResourceView_);
 
     const TextureContext resetContext{};
     context_.AssignFrom(resetContext);
@@ -3401,7 +2342,7 @@ namespace gpg::gal
    * allocates per-level lock-history storage.
    */
   void TextureD3D10::InitializeState(
-    const TextureContext* const context, void* const texture, void* const shaderResourceView
+    const TextureContext* const context, ID3D10Texture2D* const texture, ID3D10ShaderResourceView* const shaderResourceView
   )
   {
     DestroyState();
@@ -3410,7 +2351,7 @@ namespace gpg::gal
     texture_ = texture;
 
     D3D10_TEXTURE2D_DESC textureDesc{};
-    InvokeTextureGetDesc(texture_, &textureDesc);
+    texture_->GetDesc(&textureDesc);
     context_.mipmapLevels_ = textureDesc.MipLevels;
     context_.width_ = textureDesc.Width;
     context_.height_ = textureDesc.Height;
@@ -3467,9 +2408,9 @@ namespace gpg::gal
    */
   IndexBufferD3D10::IndexBufferD3D10(
     const IndexBufferContext* const context,
-    void* const nativeDevice,
-    void* const nativeBuffer,
-    void* const stagingBuffer
+    ID3D10Device* const nativeDevice,
+    ID3D10Buffer* const nativeBuffer,
+    ID3D10Buffer* const stagingBuffer
   )
     : context_()
     , nativeBuffer_(nullptr)
@@ -3486,7 +2427,9 @@ namespace gpg::gal
     nativeBuffer_ = nativeBuffer;
     stagingBuffer_ = stagingBuffer;
     nativeDevice_ = nativeDevice;
-    AddRefComLike(nativeDevice_);
+    if (nativeDevice_ != nullptr) {
+      nativeDevice_->AddRef();
+    }
   }
 
   /**
@@ -3545,9 +2488,7 @@ namespace gpg::gal
       mapMode = 2U;
     }
 
-    auto** const vtable = *reinterpret_cast<void***>(stagingBuffer_);
-    auto* const map = reinterpret_cast<HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void**)>(vtable[10]);
-    const HRESULT result = map(stagingBuffer_, mapMode, 0U, &mappedData_);
+    const HRESULT result = stagingBuffer_->Map(static_cast<D3D10_MAP>(mapMode), 0U, &mappedData_);
     if (result < 0) {
       ThrowGalErrorFromHresult("IndexBufferD3D10.cpp", 71, result);
     }
@@ -3572,14 +2513,8 @@ namespace gpg::gal
       ThrowGalError("IndexBufferD3D10.cpp", 80, "vertex buffer lock/unlock mismatch");
     }
 
-    auto** const stagingVtable = *reinterpret_cast<void***>(stagingBuffer_);
-    auto* const unmap = reinterpret_cast<void(__stdcall*)(void*)>(stagingVtable[11]);
-    unmap(stagingBuffer_);
-
-    auto** const nativeDeviceVtable = *reinterpret_cast<void***>(nativeDevice_);
-    auto* const copySubresourceRegion =
-      reinterpret_cast<device_native_copy_subresource_region_fn>(nativeDeviceVtable[32]);
-    copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
+    stagingBuffer_->Unmap();
+    nativeDevice_->CopySubresourceRegion(nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
 
     locked_ = false;
     mappedData_ = nullptr;
@@ -3593,9 +2528,9 @@ namespace gpg::gal
    */
   void IndexBufferD3D10::DestroyState()
   {
-    ReleaseComLike(nativeBuffer_);
-    ReleaseComLike(stagingBuffer_);
-    ReleaseComLike(nativeDevice_);
+    SafeRelease(nativeBuffer_);
+    SafeRelease(stagingBuffer_);
+    SafeRelease(nativeDevice_);
     locked_ = false;
     mappedData_ = nullptr;
 
@@ -3611,7 +2546,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained native index-buffer handle lane.
    */
-  void* IndexBufferD3D10::GetNativeBufferOrThrow()
+  ID3D10Buffer* IndexBufferD3D10::GetNativeBufferOrThrow()
   {
     if (nativeBuffer_ == nullptr) {
       ThrowGalError("IndexBufferD3D10.cpp", 115, "invalid index buffer");
@@ -3647,9 +2582,9 @@ namespace gpg::gal
    */
   VertexBufferD3D10::VertexBufferD3D10(
     const VertexBufferContext* const context,
-    void* const nativeDevice,
-    void* const nativeBuffer,
-    void* const stagingBuffer
+    ID3D10Device* const nativeDevice,
+    ID3D10Buffer* const nativeBuffer,
+    ID3D10Buffer* const stagingBuffer
   )
     : context_()
     , nativeBuffer_(nullptr)
@@ -3667,7 +2602,9 @@ namespace gpg::gal
     nativeBuffer_ = nativeBuffer;
     stagingBuffer_ = stagingBuffer;
     nativeDevice_ = nativeDevice;
-    AddRefComLike(nativeDevice_);
+    if (nativeDevice_ != nullptr) {
+      nativeDevice_->AddRef();
+    }
   }
 
   /**
@@ -3725,9 +2662,7 @@ namespace gpg::gal
       mapMode = 2U;
     }
 
-    auto** const vtable = *reinterpret_cast<void***>(stagingBuffer_);
-    auto* const map = reinterpret_cast<HRESULT(__stdcall*)(void*, unsigned int, unsigned int, void**)>(vtable[10]);
-    const HRESULT result = map(stagingBuffer_, mapMode, 0U, &mappedData_);
+    const HRESULT result = stagingBuffer_->Map(static_cast<D3D10_MAP>(mapMode), 0U, &mappedData_);
     if (result < 0) {
       ThrowGalErrorFromHresult("VertexBufferD3D10.cpp", 71, result);
     }
@@ -3753,14 +2688,8 @@ namespace gpg::gal
       ThrowGalError("VertexBufferD3D10.cpp", 80, "vertex buffer lock/unlock mismatch");
     }
 
-    auto** const stagingVtable = *reinterpret_cast<void***>(stagingBuffer_);
-    auto* const unmap = reinterpret_cast<void(__stdcall*)(void*)>(stagingVtable[11]);
-    unmap(stagingBuffer_);
-
-    auto** const nativeDeviceVtable = *reinterpret_cast<void***>(nativeDevice_);
-    auto* const copySubresourceRegion =
-      reinterpret_cast<device_native_copy_subresource_region_fn>(nativeDeviceVtable[32]);
-    copySubresourceRegion(nativeDevice_, nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
+    stagingBuffer_->Unmap();
+    nativeDevice_->CopySubresourceRegion(nativeBuffer_, 0U, 0U, 0U, 0U, stagingBuffer_, 0U, nullptr);
 
     locked_ = false;
     mappedData_ = nullptr;
@@ -3774,9 +2703,9 @@ namespace gpg::gal
    */
   void VertexBufferD3D10::DestroyState()
   {
-    ReleaseComLike(nativeBuffer_);
-    ReleaseComLike(stagingBuffer_);
-    ReleaseComLike(nativeDevice_);
+    SafeRelease(nativeBuffer_);
+    SafeRelease(stagingBuffer_);
+    SafeRelease(nativeDevice_);
     locked_ = false;
     mappedData_ = nullptr;
 
@@ -3793,7 +2722,7 @@ namespace gpg::gal
    * What it does:
    * Validates and returns the retained native vertex-buffer handle lane.
    */
-  void* VertexBufferD3D10::GetNativeBufferOrThrow()
+  ID3D10Buffer* VertexBufferD3D10::GetNativeBufferOrThrow()
   {
     if (nativeBuffer_ == nullptr) {
       ThrowGalError("VertexBufferD3D10.cpp", 115, "invalid vertex buffer");
@@ -3820,8 +2749,8 @@ namespace gpg::gal
    * Initializes one cursor wrapper and clears retained cursor/icon handle lanes.
    */
   CursorD3D10::CursorD3D10()
-    : cursorHandle_(nullptr)
-    , iconHandle_(nullptr)
+    : previousCursor_(nullptr)
+    , cursorIcon_(nullptr)
   {}
 
   /**
@@ -3842,9 +2771,9 @@ namespace gpg::gal
       return nullptr;
     }
 
-    const auto retainedCursorHandle = cursor->cursorHandle_;
+    const HCURSOR retainedCursor = cursor->previousCursor_;
     ::new (static_cast<void*>(cursor)) CursorD3D10();
-    cursor->cursorHandle_ = retainedCursorHandle;
+    cursor->previousCursor_ = retainedCursor;
     static_cast<void>(reserved);
     return cursor;
   }
@@ -3869,13 +2798,13 @@ namespace gpg::gal
    */
   void CursorD3D10::Destroy()
   {
-    ::SetCursor(reinterpret_cast<HCURSOR>(cursorHandle_));
-    if (iconHandle_ != nullptr) {
-      ::DestroyIcon(reinterpret_cast<HICON>(iconHandle_));
+    ::SetCursor(previousCursor_);
+    if (cursorIcon_ != nullptr) {
+      ::DestroyIcon(cursorIcon_);
     }
 
-    cursorHandle_ = nullptr;
-    iconHandle_ = nullptr;
+    previousCursor_ = nullptr;
+    cursorIcon_ = nullptr;
   }
 
   /**
@@ -3887,13 +2816,13 @@ namespace gpg::gal
    * Resets prior cursor/icon state, builds one icon from caller cursor context,
    * applies it as the active native cursor, and stores the returned prior cursor.
    */
-  void* CursorD3D10::SetCursor(const CursorContext* const context)
+  HCURSOR CursorD3D10::SetCursor(const CursorContext* const context)
   {
     Destroy();
 
-    iconHandle_ = BuildCursorIcon(context->hotspotX_, context->hotspotY_, context->texture_);
-    cursorHandle_ = ::SetCursor(reinterpret_cast<HCURSOR>(iconHandle_));
-    return cursorHandle_;
+    cursorIcon_ = BuildCursorIcon(context->hotspotX_, context->hotspotY_, context->texture_);
+    previousCursor_ = ::SetCursor(cursorIcon_);
+    return previousCursor_;
   }
 
   /**
@@ -3903,13 +2832,13 @@ namespace gpg::gal
    * Validates icon initialization state and applies the retained icon as
    * current native cursor.
    */
-  void* CursorD3D10::InitCursor()
+  HCURSOR CursorD3D10::InitCursor()
   {
-    if (iconHandle_ == nullptr) {
+    if (cursorIcon_ == nullptr) {
       ThrowGalError("CursorD3D10.cpp", 70, "attempt to use uninitialized cursor");
     }
 
-    return ::SetCursor(reinterpret_cast<HCURSOR>(iconHandle_));
+    return ::SetCursor(cursorIcon_);
   }
 
   /**
@@ -3923,7 +2852,7 @@ namespace gpg::gal
    */
   int CursorD3D10::ShowCursor(const bool show)
   {
-    if (iconHandle_ == nullptr) {
+    if (cursorIcon_ == nullptr) {
       ThrowGalError("CursorD3D10.cpp", 76, "attempt to use uninitialized cursor");
     }
 
@@ -3952,7 +2881,75 @@ namespace gpg::gal
    */
   DeviceD3D10::~DeviceD3D10()
   {
-    static_cast<void>(ResetDeviceD3D10Runtime(this));
+    Shutdown();
+  }
+
+  /**
+   * Address: 0x009001B0 (FUN_009001B0)
+   *
+   * What it does:
+   * Releases the head targets, every swap chain and adapter in place (the
+   * vectors keep their slots; the member destructors free them), the pipeline
+   * state, the factory, the device, both helper effects and the RTT quad and
+   * layout (not the RTT technique, which the effect owns), puts the cursor
+   * back, resets the context, and unloads the three libraries. The exports
+   * resolved from them are left as they were.
+   */
+  void DeviceD3D10::Shutdown()
+  {
+    delete[] mHeadOutputContexts;
+    mHeadOutputContexts = nullptr;
+
+    for (IDXGISwapChain*& swapChain : mSwapChains) {
+      SafeRelease(swapChain);
+    }
+
+    for (AdapterD3D10& adapter : mAdapters) {
+      ReleaseAdapterOutputAndDeviceRefs(&adapter);
+    }
+
+    mPipelineState.reset();
+
+    SafeRelease(mDXGIFactory);
+    SafeRelease(mDevice);
+    SafeRelease(mSignatureEffect);
+    SafeRelease(mRttEffect);
+    SafeRelease(mRttQuadVertexBuffer);
+    SafeRelease(mRttInputLayout);
+
+    mCursor.Destroy();
+    mDeviceContext = DeviceContext(DeviceApi::Unset);
+
+    ::FreeLibrary(mDXGIModule);
+    mDXGIModule = nullptr;
+    ::FreeLibrary(mD3DX10Module);
+    mD3DX10Module = nullptr;
+    ::FreeLibrary(mD3D10Module);
+    mD3D10Module = nullptr;
+  }
+
+  /**
+   * Address: 0x008F8860 (FUN_008F8860)
+   *
+   * What it does:
+   * Forwards to the linked `D3D10CreateBlob`.
+   */
+  HRESULT DeviceD3D10::CreateBlob(const SIZE_T size, ID3D10Blob** const outBlob)
+  {
+    return mD3D10CreateBlob(size, outBlob);
+  }
+
+  /**
+   * Address: 0x008F8880 (FUN_008F8880)
+   *
+   * What it does:
+   * Forwards to the linked `D3DX10SaveTextureToMemory`.
+   */
+  HRESULT DeviceD3D10::SaveTextureToMemory(
+    ID3D10Resource* const texture, const D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob** const outBlob
+  )
+  {
+    return mD3DX10SaveTextureToMemory(texture, format, outBlob);
   }
 
   /**
@@ -4115,7 +3112,7 @@ namespace gpg::gal
       nullptr,
       nullptr,
       nullptr,
-      0x800U,
+      D3D10_SHADER_ENABLE_STRICTNESS,
       0U,
       device,
       nullptr,
@@ -4144,7 +3141,7 @@ namespace gpg::gal
 
     ID3D10Buffer* quadVertexBuffer = nullptr;
     static_cast<void>(device->CreateBuffer(&vertexBufferDesc, &initialData, &quadVertexBuffer));
-    ReleaseComLike(mRttQuadVertexBuffer);
+    SafeRelease(mRttQuadVertexBuffer);
     mRttQuadVertexBuffer = quadVertexBuffer;
 
     D3D10_INPUT_ELEMENT_DESC inputElements[2]{};
@@ -4181,7 +3178,7 @@ namespace gpg::gal
       ThrowDeviceD3D10Hresult(1970, createInputLayoutResult);
     }
 
-    ReleaseComLike(mRttInputLayout);
+    SafeRelease(mRttInputLayout);
     mRttInputLayout = inputLayout;
   }
 
@@ -4328,7 +3325,7 @@ namespace gpg::gal
       auto* const swapChain = mSwapChains[headIndex];
 
       ID3D10Texture2D* backBuffer = nullptr;
-      const HRESULT getBufferResult = swapChain->GetBuffer(0U, IID_ID3D10Texture2D, reinterpret_cast<void**>(&backBuffer));
+      const HRESULT getBufferResult = swapChain->GetBuffer(0U, IID_PPV_ARGS(&backBuffer));
       if (getBufferResult < 0) {
         ThrowDeviceD3D10Hresult(1827, getBufferResult);
       }
@@ -4384,8 +3381,7 @@ namespace gpg::gal
     DynamicLink();
     mLog.clear();
 
-    // `CreateDXGIFactory` returns through `void**` in the SDK itself.
-    const HRESULT createFactoryResult = mCreateDXGIFactory(IID_IDXGIFactory, reinterpret_cast<void**>(&mDXGIFactory));
+    const HRESULT createFactoryResult = mCreateDXGIFactory(IID_PPV_ARGS(&mDXGIFactory));
     if (createFactoryResult < 0) {
       ThrowDeviceD3D10Hresult(610, createFactoryResult);
     }
@@ -4400,7 +3396,7 @@ namespace gpg::gal
       D3D10_DRIVER_TYPE_HARDWARE,
       nullptr,
       0U,
-      29U,
+      D3D10_SDK_VERSION,
       &mDevice
     );
     if (createDeviceResult < 0) {
@@ -4414,11 +3410,7 @@ namespace gpg::gal
       BuildSwapChainDescFromHead(&swapChainDesc, &head);
 
       IDXGISwapChain* swapChain = nullptr;
-      const HRESULT createSwapChainResult = dxgiFactory->CreateSwapChain(
-        reinterpret_cast<IUnknown*>(mDevice),
-        &swapChainDesc,
-        &swapChain
-      );
+      const HRESULT createSwapChainResult = dxgiFactory->CreateSwapChain(mDevice, &swapChainDesc, &swapChain);
       if (createSwapChainResult < 0) {
         ThrowDeviceD3D10Hresult(631, createSwapChainResult);
       }
@@ -4432,7 +3424,7 @@ namespace gpg::gal
       nullptr,
       nullptr,
       nullptr,
-      0x800U,
+      D3D10_SHADER_ENABLE_STRICTNESS,
       0U,
       mDevice,
       nullptr,
@@ -4537,23 +3529,34 @@ namespace gpg::gal
         defines[macroCount].Definition = nullptr;
       }
 
-      void* errorBlob = nullptr;
+      ID3D10Blob* errorBlob = nullptr;
       if (context.mSourceType != 2U) {
         ThrowGalError("DeviceD3D10.cpp", 818, "invalid source defined for effect");
       }
 
       const char* const sourceData = context.mSourceBuffer.mBegin;
-      const std::uint32_t sourceBytes =
-        static_cast<std::uint32_t>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
-      const HRESULT result =
-        InvokeCreateEffectFromMemoryApi(this, sourceData, sourceBytes, defines, &dxEffect, &errorBlob);
+      const SIZE_T sourceBytes = static_cast<SIZE_T>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
+      const HRESULT result = mD3DX10CreateEffectFromMemory(
+        sourceData,
+        sourceBytes,
+        nullptr,
+        defines,
+        nullptr,
+        D3D10_SHADER_ENABLE_BACKWARDS_COMPATIBILITY,
+        0U,
+        mDevice,
+        nullptr,
+        nullptr,
+        &dxEffect,
+        &errorBlob
+      );
 
       msvc8::string reason("unknown error");
       if ((result < 0) && (errorBlob != nullptr)) {
-        reason.assign_owned(reinterpret_cast<const char*>(GetReadbackData(errorBlob)));
+        reason.assign_owned(static_cast<const char*>(errorBlob->GetBufferPointer()));
       }
 
-      ReleaseComLike(errorBlob);
+      SafeRelease(errorBlob);
 
       if (result < 0) {
         msvc8::string message("unable to create effect: ");
@@ -4577,8 +3580,8 @@ namespace gpg::gal
    */
   boost::shared_ptr<Texture> DeviceD3D10::CreateTexture(const TextureContext* const context)
   {
-    void* nativeTexture = nullptr;
-    void* shaderResourceView = nullptr;
+    ID3D10Texture2D* nativeTexture = nullptr;
+    ID3D10ShaderResourceView* shaderResourceView = nullptr;
 
     if (context->source_ != 1U) {
       if (context->source_ != 2U) {
@@ -4612,7 +3615,7 @@ namespace gpg::gal
       textureDesc.CPUAccessFlags = 0x10000U;
       textureDesc.MiscFlags = 0U;
 
-      const HRESULT createTextureResult = InvokeNativeCreateTexture2D(this, &textureDesc, &nativeTexture);
+      const HRESULT createTextureResult = mDevice->CreateTexture2D(&textureDesc, nullptr, &nativeTexture);
       if (createTextureResult < 0) {
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 886, createTextureResult);
       }
@@ -4621,24 +3624,24 @@ namespace gpg::gal
         ThrowGalError("DeviceD3D10.cpp", 855, "attempt to create texture from uninitialized memory");
       }
 
-      void* textureResource = nullptr;
+      ID3D10Resource* textureResource = nullptr;
       const auto* const sourceData = reinterpret_cast<const void*>(static_cast<std::uintptr_t>(context->dataBegin_));
-      const std::uint32_t sourceBytes = context->dataEnd_ - context->dataBegin_;
+      const SIZE_T sourceBytes = context->dataEnd_ - context->dataBegin_;
       const HRESULT createFromMemoryResult =
-        InvokeCreateTextureFromMemoryApi(this, sourceData, sourceBytes, nullptr, &textureResource);
+        mD3DX10CreateTextureFromMemory(mDevice, sourceData, sourceBytes, nullptr, nullptr, &textureResource);
       if (createFromMemoryResult < 0) {
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 857, createFromMemoryResult);
       }
 
       if (textureResource != nullptr) {
-        static_cast<void>(QueryInterfaceTexture2D(textureResource, &nativeTexture));
-        ReleaseComLike(textureResource);
+        static_cast<void>(textureResource->QueryInterface(IID_PPV_ARGS(&nativeTexture)));
+        SafeRelease(textureResource);
       }
     }
 
     if (nativeTexture != nullptr) {
       D3D10_TEXTURE2D_DESC textureDesc{};
-      InvokeTextureGetDesc(nativeTexture, &textureDesc);
+      nativeTexture->GetDesc(&textureDesc);
 
       D3D10_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc{};
       shaderResourceViewDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -4648,7 +3651,7 @@ namespace gpg::gal
       shaderResourceViewDesc.Texture2D.MipLevels = textureDesc.MipLevels;
 
       const HRESULT createSrvResult =
-        InvokeNativeCreateShaderResourceView(this, nativeTexture, &shaderResourceViewDesc, &shaderResourceView);
+        mDevice->CreateShaderResourceView(nativeTexture, &shaderResourceViewDesc, &shaderResourceView);
       if (createSrvResult < 0) {
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 912, createSrvResult);
       }
@@ -4680,14 +3683,14 @@ namespace gpg::gal
     textureDesc.CPUAccessFlags = 0U;
     textureDesc.MiscFlags = 0U;
 
-    void* nativeTexture = nullptr;
-    const HRESULT createTextureResult = InvokeNativeCreateTexture2D(this, &textureDesc, &nativeTexture);
+    ID3D10Texture2D* nativeTexture = nullptr;
+    const HRESULT createTextureResult = mDevice->CreateTexture2D(&textureDesc, nullptr, &nativeTexture);
     if (createTextureResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 941, createTextureResult);
     }
 
-    void* renderTargetView = nullptr;
-    const HRESULT createRtvResult = InvokeNativeCreateRenderTargetView(this, nativeTexture, nullptr, &renderTargetView);
+    ID3D10RenderTargetView* renderTargetView = nullptr;
+    const HRESULT createRtvResult = mDevice->CreateRenderTargetView(nativeTexture, nullptr, &renderTargetView);
     if (createRtvResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 945, createRtvResult);
     }
@@ -4698,9 +3701,9 @@ namespace gpg::gal
     shaderResourceViewDesc.Texture2D.MostDetailedMip = 0U;
     shaderResourceViewDesc.Texture2D.MipLevels = textureDesc.MipLevels;
 
-    void* shaderResourceView = nullptr;
+    ID3D10ShaderResourceView* shaderResourceView = nullptr;
     const HRESULT createSrvResult =
-      InvokeNativeCreateShaderResourceView(this, nativeTexture, &shaderResourceViewDesc, &shaderResourceView);
+      mDevice->CreateShaderResourceView(nativeTexture, &shaderResourceViewDesc, &shaderResourceView);
     if (createSrvResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 954, createSrvResult);
     }
@@ -4755,8 +3758,8 @@ namespace gpg::gal
     textureDesc.CPUAccessFlags = 0U;
     textureDesc.MiscFlags = 0U;
 
-    void* depthTexture = nullptr;
-    const HRESULT createTextureResult = InvokeNativeCreateTexture2D(this, &textureDesc, &depthTexture);
+    ID3D10Texture2D* depthTexture = nullptr;
+    const HRESULT createTextureResult = mDevice->CreateTexture2D(&textureDesc, nullptr, &depthTexture);
     if (createTextureResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 993, createTextureResult);
     }
@@ -4766,14 +3769,14 @@ namespace gpg::gal
     depthStencilViewDesc.ViewDimension = D3D10_DSV_DIMENSION_TEXTURE2D;
     depthStencilViewDesc.Texture2D.MipSlice = 0U;
 
-    void* depthStencilView = nullptr;
+    ID3D10DepthStencilView* depthStencilView = nullptr;
     const HRESULT createDsvResult =
-      InvokeNativeCreateDepthStencilView(this, depthTexture, &depthStencilViewDesc, &depthStencilView);
+      mDevice->CreateDepthStencilView(depthTexture, &depthStencilViewDesc, &depthStencilView);
     if (createDsvResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1001, createDsvResult);
     }
 
-    void* shaderResourceView = nullptr;
+    ID3D10ShaderResourceView* shaderResourceView = nullptr;
     if (context->field0x10_) {
       D3D10_SHADER_RESOURCE_VIEW_DESC shaderResourceViewDesc{};
       shaderResourceViewDesc.Format = depthFormat;
@@ -4782,7 +3785,7 @@ namespace gpg::gal
       shaderResourceViewDesc.Texture2D.MipLevels = 1U;
 
       const HRESULT createSrvResult =
-        InvokeNativeCreateShaderResourceView(this, depthTexture, &shaderResourceViewDesc, &shaderResourceView);
+        mDevice->CreateShaderResourceView(depthTexture, &shaderResourceViewDesc, &shaderResourceView);
       if (createSrvResult < 0) {
         ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1013, createSrvResult);
       }
@@ -4809,9 +3812,9 @@ namespace gpg::gal
     D3D10_PASS_DESC passDesc{};
     GetVertexInputSignatureOrThrow(this, static_cast<int>(formatToken), &passDesc);
 
-    void* inputLayout = nullptr;
-    const HRESULT createInputLayoutResult = InvokeNativeCreateInputLayout(
-      this, elements, elementCount, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &inputLayout
+    ID3D10InputLayout* inputLayout = nullptr;
+    const HRESULT createInputLayoutResult = mDevice->CreateInputLayout(
+      elements, elementCount, passDesc.pIAInputSignature, passDesc.IAInputSignatureSize, &inputLayout
     );
     if (createInputLayoutResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1029, createInputLayoutResult);
@@ -4838,8 +3841,8 @@ namespace gpg::gal
     gpuBufferDesc.CPUAccessFlags = (context->usage_ == 2U) ? 0x10000U : 0U;
     gpuBufferDesc.MiscFlags = 0U;
 
-    void* gpuBuffer = nullptr;
-    const HRESULT createGpuBufferResult = InvokeNativeCreateBuffer(this, &gpuBufferDesc, &gpuBuffer);
+    ID3D10Buffer* gpuBuffer = nullptr;
+    const HRESULT createGpuBufferResult = mDevice->CreateBuffer(&gpuBufferDesc, nullptr, &gpuBuffer);
     if (createGpuBufferResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1049, createGpuBufferResult);
     }
@@ -4851,14 +3854,14 @@ namespace gpg::gal
     stagingBufferDesc.CPUAccessFlags = 0x10000U;
     stagingBufferDesc.MiscFlags = 0U;
 
-    void* stagingBuffer = nullptr;
-    const HRESULT createStagingBufferResult = InvokeNativeCreateBuffer(this, &stagingBufferDesc, &stagingBuffer);
+    ID3D10Buffer* stagingBuffer = nullptr;
+    const HRESULT createStagingBufferResult = mDevice->CreateBuffer(&stagingBufferDesc, nullptr, &stagingBuffer);
     if (createStagingBufferResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1056, createStagingBufferResult);
     }
 
     return boost::shared_ptr<VertexBuffer>(
-      new VertexBufferD3D10(context, GetDeviceNativeHandle(this), gpuBuffer, stagingBuffer)
+      new VertexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer)
     );
   }
 
@@ -4881,8 +3884,8 @@ namespace gpg::gal
     gpuBufferDesc.CPUAccessFlags = (context->type_ == 2U) ? 0x10000U : 0U;
     gpuBufferDesc.MiscFlags = 0U;
 
-    void* gpuBuffer = nullptr;
-    const HRESULT createGpuBufferResult = InvokeNativeCreateBuffer(this, &gpuBufferDesc, &gpuBuffer);
+    ID3D10Buffer* gpuBuffer = nullptr;
+    const HRESULT createGpuBufferResult = mDevice->CreateBuffer(&gpuBufferDesc, nullptr, &gpuBuffer);
     if (createGpuBufferResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1076, createGpuBufferResult);
     }
@@ -4894,14 +3897,14 @@ namespace gpg::gal
     stagingBufferDesc.CPUAccessFlags = 0x10000U;
     stagingBufferDesc.MiscFlags = 0U;
 
-    void* stagingBuffer = nullptr;
-    const HRESULT createStagingBufferResult = InvokeNativeCreateBuffer(this, &stagingBufferDesc, &stagingBuffer);
+    ID3D10Buffer* stagingBuffer = nullptr;
+    const HRESULT createStagingBufferResult = mDevice->CreateBuffer(&stagingBufferDesc, nullptr, &stagingBuffer);
     if (createStagingBufferResult < 0) {
       ThrowGalErrorFromHresult("DeviceD3D10.cpp", 1083, createStagingBufferResult);
     }
 
     return boost::shared_ptr<IndexBuffer>(
-      new IndexBufferD3D10(context, GetDeviceNativeHandle(this), gpuBuffer, stagingBuffer)
+      new IndexBufferD3D10(context, mDevice, gpuBuffer, stagingBuffer)
     );
   }
 
@@ -4924,9 +3927,9 @@ namespace gpg::gal
       ThrowGalError("DeviceD3D10.cpp", 1231, "Missing dest   texture");
     }
 
-    void* const sourceResource = static_cast<RenderTargetD3D10*>(source.get())->GetRenderTextureOrThrow();
-    void* const destinationResource = static_cast<TextureD3D10*>(destination.get())->GetTextureOrThrow();
-    static_cast<void>(InvokeNativeCopyResourceResult(this, destinationResource, sourceResource));
+    ID3D10Texture2D* const sourceResource = static_cast<RenderTargetD3D10*>(source.get())->GetRenderTextureOrThrow();
+    ID3D10Texture2D* const destinationResource = static_cast<TextureD3D10*>(destination.get())->GetTextureOrThrow();
+    mDevice->CopyResource(destinationResource, sourceResource);
   }
 
   /**
@@ -4981,23 +3984,73 @@ namespace gpg::gal
         sourceBoxPtr = &sourceBox;
       }
 
-      void* const sourceResource = sourceTarget->GetRenderTextureOrThrow();
-      void* const destinationResource = destinationTarget->GetRenderTextureOrThrow();
-      InvokeNativeCopySubresourceRegion(
-        this, destinationResource, destinationX, destinationY, sourceResource, sourceBoxPtr
+      ID3D10Texture2D* const sourceResource = sourceTarget->GetRenderTextureOrThrow();
+      ID3D10Texture2D* const destinationResource = destinationTarget->GetRenderTextureOrThrow();
+      mDevice->CopySubresourceRegion(
+        destinationResource, 0U, destinationX, destinationY, 0U, sourceResource, 0U, sourceBoxPtr
       );
       return;
     }
 
-    void* const sourceShaderResourceView = sourceTarget->GetShaderResourceViewOrThrow();
-    void* const destinationRenderTargetView = destinationTarget->GetRenderTargetViewOrThrow();
-    static_cast<void>(StretchRectFallbackBlit(
-      this,
+    StretchRectBlit(
       destinationContext->width_,
       destinationContext->height_,
-      destinationRenderTargetView,
-      sourceShaderResourceView
-    ));
+      destinationTarget->GetRenderTargetViewOrThrow(),
+      sourceTarget->GetShaderResourceViewOrThrow()
+    );
+  }
+
+  /**
+   * Address: 0x008F8920 (FUN_008F8920)
+   *
+   * What it does:
+   * Saves the viewport, covers the destination with one when there is a
+   * destination, saves the bound targets, binds the RTT layout, quad strip and
+   * destination, then draws the four-vertex strip once per RTT pass with
+   * `g_txSource` set to `source`, and restores the viewport and targets.
+   */
+  void DeviceD3D10::StretchRectBlit(
+    const UINT width, const UINT height, ID3D10RenderTargetView* const destination, ID3D10ShaderResourceView* const source
+  )
+  {
+    D3D10_VIEWPORT savedViewport{};
+    UINT savedViewportCount = 1U;
+    mDevice->RSGetViewports(&savedViewportCount, &savedViewport);
+
+    if (destination != nullptr) {
+      D3D10_VIEWPORT fullViewport{};
+      fullViewport.Width = width;
+      fullViewport.Height = height;
+      fullViewport.MinDepth = 0.0f;
+      fullViewport.MaxDepth = 1.0f;
+      mDevice->RSSetViewports(1U, &fullViewport);
+    }
+
+    ID3D10RenderTargetView* previousRenderTargetView = nullptr;
+    ID3D10DepthStencilView* previousDepthStencilView = nullptr;
+    mDevice->OMGetRenderTargets(1U, &previousRenderTargetView, &previousDepthStencilView);
+
+    mDevice->IASetInputLayout(mRttInputLayout);
+    const UINT stride = sizeof(RttVertex);
+    const UINT offset = 0U;
+    mDevice->IASetVertexBuffers(0U, 1U, &mRttQuadVertexBuffer, &stride, &offset);
+    mDevice->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    if (destination != nullptr) {
+      ID3D10RenderTargetView* const renderTargets[1] = {destination};
+      mDevice->OMSetRenderTargets(1U, renderTargets, nullptr);
+    }
+
+    D3D10_TECHNIQUE_DESC techniqueDesc{};
+    mRttTechnique->GetDesc(&techniqueDesc);
+    for (UINT passIndex = 0U; passIndex < techniqueDesc.Passes; ++passIndex) {
+      mRttEffect->GetVariableByName("g_txSource")->AsShaderResource()->SetResource(source);
+      mRttTechnique->GetPassByIndex(passIndex)->Apply(0U);
+      mDevice->Draw(4U, 0U);
+    }
+
+    mDevice->RSSetViewports(1U, &savedViewport);
+    mDevice->OMSetRenderTargets(1U, &previousRenderTargetView, previousDepthStencilView);
   }
 
   /**
@@ -5049,61 +4102,61 @@ namespace gpg::gal
         sourceBoxPtr = &sourceBox;
       }
 
-      void* const sourceResource = sourceTexture->GetTextureOrThrow();
-      void* const destinationResource = destinationTexture->GetTextureOrThrow();
-      InvokeNativeCopySubresourceRegion(
-        this, destinationResource, destinationX, destinationY, sourceResource, sourceBoxPtr
+      ID3D10Texture2D* const sourceResource = sourceTexture->GetTextureOrThrow();
+      ID3D10Texture2D* const destinationResource = destinationTexture->GetTextureOrThrow();
+      mDevice->CopySubresourceRegion(
+        destinationResource, 0U, destinationX, destinationY, 0U, sourceResource, 0U, sourceBoxPtr
       );
       return;
     }
 
-    void* createBlobScratch = nullptr;
-    HRESULT result = InvokeCreateBlobApi(this, &createBlobScratch);
+    ID3D10Blob* createBlobScratch = nullptr;
+    HRESULT result = mD3D10CreateBlob(0U, &createBlobScratch);
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1109, result);
     }
 
-    void* encodedTextureBlob = nullptr;
-    result = InvokeSaveTextureToMemoryApi(this, sourceTexture->GetTextureOrThrow(), 4, &encodedTextureBlob);
+    ID3D10Blob* encodedTextureBlob = nullptr;
+    result = mD3DX10SaveTextureToMemory(sourceTexture->GetTextureOrThrow(), D3DX10_IFF_DDS, &encodedTextureBlob);
     if (result < 0) {
-      ReleaseComLike(createBlobScratch);
+      SafeRelease(createBlobScratch);
       ThrowDeviceD3D10Hresult(1112, result);
     }
 
-    std::int32_t loadInfo[14];
-    static_cast<void>(InitializeTextureLoadInfoDefaults(loadInfo));
-    loadInfo[13] = -1;
-    loadInfo[4] = 1;
-    loadInfo[9] = 77;
-    loadInfo[12] = 0;
+    // The SDK constructor's defaults (the out-of-line copy is 0x008F8670),
+    // then one mip level of DXT5.
+    D3DX10_IMAGE_LOAD_INFO loadInfo;
+    loadInfo.MipLevels = 1U;
+    loadInfo.Format = DXGI_FORMAT_BC3_UNORM;
 
-    void* recreatedTexture = nullptr;
+    ID3D10Resource* recreatedTexture = nullptr;
     if (encodedTextureBlob != nullptr) {
-      result = InvokeCreateTextureFromMemoryApi(
-        this,
-        GetReadbackData(encodedTextureBlob),
-        static_cast<std::uint32_t>(GetReadbackSize(encodedTextureBlob)),
-        loadInfo,
+      result = mD3DX10CreateTextureFromMemory(
+        mDevice,
+        encodedTextureBlob->GetBufferPointer(),
+        encodedTextureBlob->GetBufferSize(),
+        &loadInfo,
+        nullptr,
         &recreatedTexture
       );
       if (result < 0) {
-        ReleaseComLike(encodedTextureBlob);
-        ReleaseComLike(createBlobScratch);
+        SafeRelease(encodedTextureBlob);
+        SafeRelease(createBlobScratch);
         ThrowDeviceD3D10Hresult(1130, result);
       }
     }
 
     if (recreatedTexture != nullptr) {
-      InvokeNativeCopyResourceResult(this, destinationTexture->GetTextureOrThrow(), recreatedTexture);
+      mDevice->CopyResource(destinationTexture->GetTextureOrThrow(), recreatedTexture);
     }
 
     if (encodedTextureBlob == createBlobScratch) {
       createBlobScratch = nullptr;
     }
 
-    ReleaseComLike(recreatedTexture);
-    ReleaseComLike(encodedTextureBlob);
-    ReleaseComLike(createBlobScratch);
+    SafeRelease(recreatedTexture);
+    SafeRelease(encodedTextureBlob);
+    SafeRelease(createBlobScratch);
   }
 
   /**
@@ -5119,8 +4172,9 @@ namespace gpg::gal
   {
     const int imageFileFormat = ResolveImageFileFormatToken(fileFormat);
     auto* const target = static_cast<RenderTargetD3D10*>(renderTarget.get());
-    const HRESULT result =
-      InvokeSaveTextureToFileApi(this, target->GetRenderTextureOrThrow(), imageFileFormat, filePath.c_str());
+    const HRESULT result = mD3DX10SaveTextureToFileA(
+      target->GetRenderTextureOrThrow(), static_cast<D3DX10_IMAGE_FILE_FORMAT>(imageFileFormat), filePath.c_str()
+    );
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1286, result);
     }
@@ -5145,38 +4199,41 @@ namespace gpg::gal
     auto* const sourceTexture = static_cast<TextureD3D10*>(texture.get());
 
     if (outBuffer == nullptr) {
-      const HRESULT result =
-        InvokeSaveTextureToFileApi(this, sourceTexture->GetTextureOrThrow(), imageFileFormat, filePath.c_str());
+      const HRESULT result = mD3DX10SaveTextureToFileA(
+        sourceTexture->GetTextureOrThrow(), static_cast<D3DX10_IMAGE_FILE_FORMAT>(imageFileFormat), filePath.c_str()
+      );
       if (result < 0) {
         ThrowDeviceD3D10Hresult(1275, result);
       }
       return;
     }
 
-    void* createBlobScratch = nullptr;
-    HRESULT result = InvokeCreateBlobApi(this, &createBlobScratch);
+    ID3D10Blob* createBlobScratch = nullptr;
+    HRESULT result = mD3D10CreateBlob(0U, &createBlobScratch);
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1259, result);
     }
 
-    void* readbackBlob = nullptr;
-    result = InvokeSaveTextureToMemoryApi(this, sourceTexture->GetTextureOrThrow(), imageFileFormat, &readbackBlob);
+    ID3D10Blob* encodedBlob = nullptr;
+    result = mD3DX10SaveTextureToMemory(
+      sourceTexture->GetTextureOrThrow(), static_cast<D3DX10_IMAGE_FILE_FORMAT>(imageFileFormat), &encodedBlob
+    );
     if (result >= 0) {
-      const std::size_t readbackBytes = static_cast<std::size_t>(GetReadbackSize(readbackBlob));
-      if (outBuffer->Size() != readbackBytes) {
-        gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(readbackBytes);
+      const std::size_t encodedBytes = encodedBlob->GetBufferSize();
+      if (outBuffer->Size() != encodedBytes) {
+        gpg::MemBuffer<char> resizedBuffer = gpg::AllocMemBuffer(encodedBytes);
         *outBuffer = resizedBuffer;
       }
 
-      std::memcpy(outBuffer->GetPtr(0U, 0U), GetReadbackData(readbackBlob), readbackBytes);
+      std::memcpy(outBuffer->GetPtr(0U, 0U), encodedBlob->GetBufferPointer(), encodedBytes);
     }
 
-    if (readbackBlob == createBlobScratch) {
+    if (encodedBlob == createBlobScratch) {
       createBlobScratch = nullptr;
     }
 
-    ReleaseComLike(readbackBlob);
-    ReleaseComLike(createBlobScratch);
+    SafeRelease(encodedBlob);
+    SafeRelease(createBlobScratch);
 
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1270, result);
@@ -5204,15 +4261,13 @@ namespace gpg::gal
       return;
     }
 
-    std::int32_t loadInfo[14];
-    static_cast<void>(InitializeTextureLoadInfoDefaults(loadInfo));
-    loadInfo[13] = -1;
-    loadInfo[4] = 1;
-    loadInfo[9] = 77;
-    loadInfo[12] = 0;
+    // The SDK constructor's defaults (inlined here), then one mip level of DXT5.
+    D3DX10_IMAGE_LOAD_INFO loadInfo;
+    loadInfo.MipLevels = 1U;
+    loadInfo.Format = DXGI_FORMAT_BC3_UNORM;
 
-    void* decodedResource = nullptr;
-    HRESULT result = InvokeCreateTextureFromMemoryApi(this, sourceData, sourceBytes, loadInfo, &decodedResource);
+    ID3D10Resource* decodedResource = nullptr;
+    HRESULT result = mD3DX10CreateTextureFromMemory(mDevice, sourceData, sourceBytes, &loadInfo, nullptr, &decodedResource);
     if (result < 0) {
       ThrowDeviceD3D10Hresult(1317, result);
     }
@@ -5221,21 +4276,17 @@ namespace gpg::gal
       return;
     }
 
-    void* sourceTexture = nullptr;
-    {
-      auto** const resourceVtable = *reinterpret_cast<void***>(decodedResource);
-      using query_interface_fn = HRESULT(__stdcall*)(void*, const IID*, void**);
-      auto* const queryInterface = reinterpret_cast<query_interface_fn>(resourceVtable[0]);
-      queryInterface(decodedResource, &IID_ID3D10Texture2D, &sourceTexture);
-    }
-
+    ID3D10Texture2D* sourceTexture = nullptr;
+    static_cast<void>(decodedResource->QueryInterface(IID_PPV_ARGS(&sourceTexture)));
     if (sourceTexture == nullptr) {
-      sourceTexture = decodedResource;
-      AddRefComLike(sourceTexture);
+      // Kept from the binary: without the interface it uses the resource as a
+      // 2D texture anyway.
+      sourceTexture = static_cast<ID3D10Texture2D*>(decodedResource);
+      sourceTexture->AddRef();
     }
 
     D3D10_TEXTURE2D_DESC textureDesc{};
-    InvokeTextureGetDesc(sourceTexture, &textureDesc);
+    sourceTexture->GetDesc(&textureDesc);
     *outWidth = textureDesc.Width;
     *outHeight = static_cast<int>(textureDesc.Height);
 
@@ -5243,28 +4294,22 @@ namespace gpg::gal
     textureDesc.BindFlags = 0U;
     textureDesc.CPUAccessFlags = D3D10_CPU_ACCESS_READ;
 
-    void* stagingTexture = nullptr;
-    {
-      void* const nativeDevice = GetDeviceNativeHandle(this);
-      auto** const nativeVtable = *reinterpret_cast<void***>(nativeDevice);
-      auto* const createTexture2D = reinterpret_cast<device_native_create_texture2d_fn>(nativeVtable[73]);
-      result = createTexture2D(nativeDevice, &textureDesc, nullptr, &stagingTexture);
-      if (result < 0) {
-        ReleaseComLike(sourceTexture);
-        ReleaseComLike(decodedResource);
-        ThrowDeviceD3D10Hresult(1343, result);
-      }
-
-      auto* const copyResource = reinterpret_cast<device_native_copy_resource_fn>(nativeVtable[33]);
-      copyResource(nativeDevice, stagingTexture, sourceTexture);
+    ID3D10Texture2D* stagingTexture = nullptr;
+    result = mDevice->CreateTexture2D(&textureDesc, nullptr, &stagingTexture);
+    if (result < 0) {
+      SafeRelease(sourceTexture);
+      SafeRelease(decodedResource);
+      ThrowDeviceD3D10Hresult(1343, result);
     }
 
+    mDevice->CopyResource(stagingTexture, sourceTexture);
+
     D3D10_MAPPED_TEXTURE2D mappedTexture{};
-    result = InvokeTextureMap(stagingTexture, 0, 1U, &mappedTexture);
+    result = stagingTexture->Map(0U, D3D10_MAP_READ, 0U, &mappedTexture);
     if (result < 0) {
-      ReleaseComLike(stagingTexture);
-      ReleaseComLike(sourceTexture);
-      ReleaseComLike(decodedResource);
+      SafeRelease(stagingTexture);
+      SafeRelease(sourceTexture);
+      SafeRelease(decodedResource);
       ThrowDeviceD3D10Hresult(1352, result);
     }
 
@@ -5288,10 +4333,10 @@ namespace gpg::gal
       }
     }
 
-    InvokeTextureUnmap(stagingTexture, 0);
-    ReleaseComLike(stagingTexture);
-    ReleaseComLike(sourceTexture);
-    ReleaseComLike(decodedResource);
+    stagingTexture->Unmap(0U);
+    SafeRelease(stagingTexture);
+    SafeRelease(sourceTexture);
+    SafeRelease(decodedResource);
   }
 
   /**
@@ -5428,7 +4473,7 @@ namespace gpg::gal
     viewportCopy.Height = viewport->Height;
     viewportCopy.MinDepth = viewport->MinZ;
     viewportCopy.MaxDepth = viewport->MaxZ;
-    static_cast<void>(InvokeNativeSetViewport(this, &viewportCopy));
+    mDevice->RSSetViewports(1U, &viewportCopy);
   }
 
   /**
@@ -5441,9 +4486,9 @@ namespace gpg::gal
    */
   void DeviceD3D10::GetViewport(D3DVIEWPORT9* const outViewport)
   {
-    unsigned int viewportCount = 1U;
+    UINT viewportCount = 1U;
     D3D10_VIEWPORT viewport{};
-    InvokeNativeGetViewport(this, &viewportCount, &viewport);
+    mDevice->RSGetViewports(&viewportCount, &viewport);
 
     outViewport->X = static_cast<DWORD>(viewport.TopLeftX);
     outViewport->Y = static_cast<DWORD>(viewport.TopLeftY);
@@ -5477,7 +4522,7 @@ namespace gpg::gal
    * Validates the topology, binds the native primitive topology, then dispatches
    * `Draw` vs `DrawInstanced` using the instance count at `this+0xD8`.
    */
-  int DeviceD3D10::DrawPrimitive(const DrawContext* const context)
+  void DeviceD3D10::DrawPrimitive(const DrawContext* const context)
   {
     // D3D10's Draw takes the vertex count as is (`mov edx,[edi+8]` at
     // 0x008FD05D); only the D3D9 backend converts it to primitives.
@@ -5485,13 +4530,18 @@ namespace gpg::gal
       ThrowInvalidTopologyError(1561);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(context->topology_));
-    const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
+    mDevice->IASetPrimitiveTopology(static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_)));
+
+    // Slot 0's frequency is the instance count (0x008FD049 reads this+0xD8).
+    const UINT instanceCount = static_cast<UINT>(mStreamFrequencies[0]);
     if (instanceCount > 1U) {
-      return InvokeNativeDrawInstanced(this, context->vertexCount_, instanceCount, context->startVertex_, 0U);
+      mDevice->DrawInstanced(context->vertexCount_, instanceCount, context->startVertex_, 0U);
+    } else {
+      mDevice->Draw(context->vertexCount_, context->startVertex_);
     }
 
-    return InvokeNativeDraw(this, context->vertexCount_, context->startVertex_);
+    // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
+    RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
   /**
@@ -5501,7 +4551,7 @@ namespace gpg::gal
    * Validates the topology, binds the native primitive topology, then
    * dispatches `DrawIndexed` vs `DrawIndexedInstanced`.
    */
-  int DeviceD3D10::DrawIndexedPrimitive(const DrawIndexedContext* const context)
+  void DeviceD3D10::DrawIndexedPrimitive(const DrawIndexedContext* const context)
   {
     // As above: DrawIndexed takes the index count as is (`mov edx,[edi+0x10]`
     // at 0x008FD16E).
@@ -5509,15 +4559,18 @@ namespace gpg::gal
       ThrowInvalidTopologyError(1580);
     }
 
-    InvokeNativeSetPrimitiveTopology(this, ResolvePrimitiveTopology(context->topology_));
-    const std::uint32_t instanceCount = GetDeviceInstanceCount(this);
+    mDevice->IASetPrimitiveTopology(static_cast<D3D10_PRIMITIVE_TOPOLOGY>(ResolvePrimitiveTopology(context->topology_)));
+
+    // Slot 0's frequency is the instance count (0x008FD159 reads this+0xD8).
+    const UINT instanceCount = static_cast<UINT>(mStreamFrequencies[0]);
     if (instanceCount > 1U) {
-      return InvokeNativeDrawIndexedInstanced(
-        this, context->indexCount_, instanceCount, context->startIndex_, 0, 0U
-      );
+      mDevice->DrawIndexedInstanced(context->indexCount_, instanceCount, context->startIndex_, 0, 0U);
+    } else {
+      mDevice->DrawIndexed(context->indexCount_, context->startIndex_, 0);
     }
 
-    return InvokeNativeDrawIndexed(this, context->indexCount_, context->startIndex_, 0);
+    // FAF instrumentation (see gpg/gal/DrawStatistics.h); not in the binary.
+    RecordDraw(context->GetPrimitiveCount(), context->vertexCount_);
   }
 
   /**
@@ -5533,8 +4586,8 @@ namespace gpg::gal
   {
     Device::ClearTarget(context);
 
-    void* renderTargetView = nullptr;
-    void* depthStencilView = nullptr;
+    ID3D10RenderTargetView* renderTargetView = nullptr;
+    ID3D10DepthStencilView* depthStencilView = nullptr;
 
     if (context != nullptr) {
       if (context->surface.get() != nullptr) {
@@ -5547,8 +4600,7 @@ namespace gpg::gal
       }
     }
 
-    void* renderTargetViews[1] = {renderTargetView};
-    static_cast<void>(InvokeNativeClearTarget(this, 1U, renderTargetViews, depthStencilView));
+    mDevice->OMSetRenderTargets(1U, &renderTargetView, depthStencilView);
   }
 
   /**
@@ -5569,8 +4621,8 @@ namespace gpg::gal
     const int stencil
   )
   {
-    void* renderTargetView = nullptr;
-    void* depthStencilView = nullptr;
+    ID3D10RenderTargetView* renderTargetView = nullptr;
+    ID3D10DepthStencilView* depthStencilView = nullptr;
 
     if (outputContext_.surface.get() != nullptr) {
       renderTargetView = static_cast<RenderTargetD3D10*>(outputContext_.surface.get())->GetRenderTargetViewOrThrow();
@@ -5588,7 +4640,7 @@ namespace gpg::gal
         static_cast<float>(packedColor & 0xFFU),
         static_cast<float>((packedColor >> 24U) & 0xFFU),
       };
-      InvokeNativeClearRenderTargetView(this, renderTargetView, clearColorRgba);
+      mDevice->ClearRenderTargetView(renderTargetView, clearColorRgba);
     }
 
     int clearMask = 0;
@@ -5600,9 +4652,9 @@ namespace gpg::gal
     }
 
     if ((clearMask != 0) && (depthStencilView != nullptr)) {
-      static_cast<void>(InvokeNativeClearDepthStencilView(
-        this, depthStencilView, static_cast<unsigned int>(clearMask), depth, static_cast<unsigned int>(stencil)
-      ));
+      mDevice->ClearDepthStencilView(
+        depthStencilView, static_cast<UINT>(clearMask), depth, static_cast<UINT8>(stencil)
+      );
     }
   }
 
@@ -5663,7 +4715,7 @@ namespace gpg::gal
    */
   void DeviceD3D10::SetVertexDeclaration(const boost::shared_ptr<VertexFormat> vertexFormat)
   {
-    InvokeNativeSetInputLayout(this, static_cast<VertexFormatD3D10*>(vertexFormat.get())->ValidateLayoutOrThrow());
+    mDevice->IASetInputLayout(static_cast<VertexFormatD3D10*>(vertexFormat.get())->ValidateLayoutOrThrow());
   }
 
   /**
@@ -5683,12 +4735,10 @@ namespace gpg::gal
   )
   {
     const VertexBufferContext* const context = vertexBuffer->GetContext();
-    void* const nativeVertexBuffer = static_cast<VertexBufferD3D10*>(vertexBuffer.get())->GetNativeBufferOrThrow();
-    const unsigned int stride = context->stride_;
-    const unsigned int offset = static_cast<unsigned int>(startVertex * static_cast<int>(stride));
-
-    void* buffers[1] = {nativeVertexBuffer};
-    InvokeNativeSetVertexBuffers(this, streamSlot, buffers, &stride, &offset);
+    ID3D10Buffer* const nativeVertexBuffer = static_cast<VertexBufferD3D10*>(vertexBuffer.get())->GetNativeBufferOrThrow();
+    const UINT stride = context->stride_;
+    const UINT offset = static_cast<UINT>(startVertex * static_cast<int>(stride));
+    mDevice->IASetVertexBuffers(streamSlot, 1U, &nativeVertexBuffer, &stride, &offset);
 
     mStreamFrequencies[streamSlot] = streamFrequencyToken;
   }
@@ -5703,9 +4753,9 @@ namespace gpg::gal
   void DeviceD3D10::SetBufferIndices(const boost::shared_ptr<IndexBuffer> indexBuffer)
   {
     const IndexBufferContext* const context = indexBuffer->GetContext();
-    const unsigned int indexFormatToken = (context->format_ == 2U) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
-    void* const nativeIndexBuffer = static_cast<IndexBufferD3D10*>(indexBuffer.get())->GetNativeBufferOrThrow();
-    InvokeNativeSetIndexBuffer(this, nativeIndexBuffer, indexFormatToken, 0U);
+    const DXGI_FORMAT indexFormat = (context->format_ == 2U) ? DXGI_FORMAT_R32_UINT : DXGI_FORMAT_R16_UINT;
+    ID3D10Buffer* const nativeIndexBuffer = static_cast<IndexBufferD3D10*>(indexBuffer.get())->GetNativeBufferOrThrow();
+    mDevice->IASetIndexBuffer(nativeIndexBuffer, indexFormat, 0U);
   }
 
   /**
@@ -5739,7 +4789,7 @@ namespace gpg::gal
    * Initializes one D3D10 vertex-format wrapper from caller format/declaration
    * inputs and rebuilds per-stream stride lanes.
    */
-  VertexFormatD3D10::VertexFormatD3D10(const std::uint32_t format, void* const vertexDeclaration)
+  VertexFormatD3D10::VertexFormatD3D10(const std::uint32_t format, ID3D10InputLayout* const vertexDeclaration)
     : vertexDeclaration_(nullptr)
   {
     formatCode_ = 0x17U;
@@ -5768,7 +4818,7 @@ namespace gpg::gal
    */
   void VertexFormatD3D10::ResetDeclaration()
   {
-    ReleaseComLike(vertexDeclaration_);
+    SafeRelease(vertexDeclaration_);
     formatCode_ = 0x17U;
   }
 
@@ -5778,7 +4828,7 @@ namespace gpg::gal
    * What it does:
    * Validates that one retained declaration handle is bound and returns it.
    */
-  void* VertexFormatD3D10::ValidateLayoutOrThrow()
+  ID3D10InputLayout* VertexFormatD3D10::ValidateLayoutOrThrow()
   {
     if (vertexDeclaration_ == nullptr) {
       ThrowGalError("VertexFormatD3D10.cpp", 149, "invalid vertex layout");
@@ -5796,7 +4846,7 @@ namespace gpg::gal
    * Rebinds declaration state, validates static table ownership for the format
    * token, and rebuilds per-stream stride lanes from recovered element records.
    */
-  std::uint32_t VertexFormatD3D10::Initialize(const std::uint32_t format, void* const vertexDeclaration)
+  std::uint32_t VertexFormatD3D10::Initialize(const std::uint32_t format, ID3D10InputLayout* const vertexDeclaration)
   {
     ResetDeclaration();
     vertexDeclaration_ = vertexDeclaration;
@@ -5832,7 +4882,7 @@ namespace gpg::gal
    * Starts from an empty context and a null effect, then adopts the caller's
    * through `SetEffect`.
    */
-  EffectD3D10::EffectD3D10(const EffectContext& context, void* const dxEffect)
+  EffectD3D10::EffectD3D10(const EffectContext& context, ID3D10Effect* const dxEffect)
   {
     SetEffect(context, dxEffect);
   }
@@ -5845,7 +4895,7 @@ namespace gpg::gal
    */
   void EffectD3D10::Reset()
   {
-    ReleaseComLike(dxEffect_);
+    SafeRelease(dxEffect_);
     context_ = EffectContext();
   }
 
@@ -5857,7 +4907,7 @@ namespace gpg::gal
    * the copied source buffer (the four words at this+0x48..+0x54, releasing
    * the shared owner at +0x4C first).
    */
-  void EffectD3D10::SetEffect(const EffectContext& context, void* const dxEffect)
+  void EffectD3D10::SetEffect(const EffectContext& context, ID3D10Effect* const dxEffect)
   {
     Reset();
     context_ = context;
@@ -5906,19 +4956,19 @@ namespace gpg::gal
     }
 
     D3D10_EFFECT_DESC effectDesc{};
-    HRESULT result = InvokeEffectGetDesc(dxEffect_, &effectDesc);
+    HRESULT result = dxEffect_->GetDesc(&effectDesc);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectD3D10.cpp", 57, result);
     }
 
-    for (unsigned int index = 0; index < effectDesc.Techniques; ++index) {
-      void* const techniqueHandle = InvokeEffectGetTechniqueByIndex(dxEffect_, index);
-      if ((techniqueHandle == nullptr) || (InvokeTechniqueIsValid(techniqueHandle) == FALSE)) {
+    for (UINT index = 0U; index < effectDesc.Techniques; ++index) {
+      ID3D10EffectTechnique* const techniqueHandle = dxEffect_->GetTechniqueByIndex(index);
+      if ((techniqueHandle == nullptr) || !techniqueHandle->IsValid()) {
         continue;
       }
 
       D3D10_TECHNIQUE_DESC techniqueDesc{};
-      result = InvokeTechniqueGetDesc(techniqueHandle, &techniqueDesc);
+      result = techniqueHandle->GetDesc(&techniqueDesc);
       if (result < 0) {
         ThrowGalErrorFromHresult("EffectD3D10.cpp", 69, result);
       }
@@ -5944,7 +4994,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 79, "invalid effect");
     }
 
-    void* const variableHandle = InvokeEffectGetVariableByName(dxEffect_, variableName);
+    ID3D10EffectVariable* const variableHandle = dxEffect_->GetVariableByName(variableName);
     if (variableHandle == nullptr) {
       char message[512] = {};
       std::snprintf(
@@ -5971,7 +5021,7 @@ namespace gpg::gal
       ThrowGalError("EffectD3D10.cpp", 89, "invalid effect");
     }
 
-    void* const techniqueHandle = InvokeEffectGetTechniqueByName(dxEffect_, techniqueName);
+    ID3D10EffectTechnique* const techniqueHandle = dxEffect_->GetTechniqueByName(techniqueName);
     if (techniqueHandle == nullptr) {
       char message[512] = {};
       std::snprintf(
@@ -5995,7 +5045,9 @@ namespace gpg::gal
    * Initializes wrapper state for one D3D10 technique and retains the backing
    * effect interface through `AddRef`.
    */
-  EffectTechniqueD3D10::EffectTechniqueD3D10(const char* const name, void* const dxEffect, void* const techniqueHandle)
+  EffectTechniqueD3D10::EffectTechniqueD3D10(
+    const char* const name, ID3D10Effect* const dxEffect, ID3D10EffectTechnique* const techniqueHandle
+  )
     : name_()
     , dxEffect_(dxEffect)
     , techniqueHandle_(techniqueHandle)
@@ -6008,7 +5060,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 39, "invalid effect specified");
     }
 
-    AddRefComLike(dxEffect_);
+    dxEffect_->AddRef();
   }
 
   /**
@@ -6021,7 +5073,7 @@ namespace gpg::gal
    */
   EffectTechniqueD3D10::~EffectTechniqueD3D10()
   {
-    ReleaseComLike(dxEffect_);
+    SafeRelease(dxEffect_);
   }
 
   /**
@@ -6050,7 +5102,7 @@ namespace gpg::gal
     Device::GetInstance()->BeginTechnique();
 
     D3D10_TECHNIQUE_DESC techniqueDesc{};
-    const HRESULT result = InvokeTechniqueGetDesc(techniqueHandle_, &techniqueDesc);
+    const HRESULT result = techniqueHandle_->GetDesc(&techniqueDesc);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 67, result);
     }
@@ -6087,8 +5139,7 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 89, "effect technique begin/end mismatch");
     }
 
-    void* const passHandle = InvokeTechniqueGetPassByIndex(techniqueHandle_, pass);
-    const HRESULT result = InvokePassApply(passHandle, 0U);
+    const HRESULT result = techniqueHandle_->GetPassByIndex(static_cast<UINT>(pass))->Apply(0U);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 93, result);
     }
@@ -6119,14 +5170,13 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 105, "invalid effect technique");
     }
 
-    void* const variable = InvokeTechniqueGetAnnotationByName(techniqueHandle_, annotationName.c_str());
-    if ((variable == nullptr) || (InvokeVariableIsValid(variable) == FALSE)) {
+    ID3D10EffectVariable* const annotation = techniqueHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    int boolValue = 0;
-    void* const scalar = InvokeVariableAsScalar(variable);
-    const HRESULT result = InvokeScalarGetBool(scalar, &boolValue);
+    BOOL boolValue = FALSE;
+    const HRESULT result = annotation->AsScalar()->GetBool(&boolValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 115, result);
     }
@@ -6147,13 +5197,12 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 124, "invalid effect technique");
     }
 
-    void* const variable = InvokeTechniqueGetAnnotationByName(techniqueHandle_, annotationName.c_str());
-    if ((variable == nullptr) || (InvokeVariableIsValid(variable) == FALSE)) {
+    ID3D10EffectVariable* const annotation = techniqueHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    void* const scalar = InvokeVariableAsScalar(variable);
-    const HRESULT result = InvokeScalarGetInt(scalar, outValue);
+    const HRESULT result = annotation->AsScalar()->GetInt(outValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 133, result);
     }
@@ -6173,13 +5222,12 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 140, "invalid effect technique");
     }
 
-    void* const variable = InvokeTechniqueGetAnnotationByName(techniqueHandle_, annotationName.c_str());
-    if ((variable == nullptr) || (InvokeVariableIsValid(variable) == FALSE)) {
+    ID3D10EffectVariable* const annotation = techniqueHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    void* const scalar = InvokeVariableAsScalar(variable);
-    const HRESULT result = InvokeScalarGetFloat(scalar, outValue);
+    const HRESULT result = annotation->AsScalar()->GetFloat(outValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 149, result);
     }
@@ -6199,14 +5247,13 @@ namespace gpg::gal
       ThrowGalError("EffectTechniqueD3D10.cpp", 156, "invalid effect technique");
     }
 
-    void* const variable = InvokeTechniqueGetAnnotationByName(techniqueHandle_, annotationName.c_str());
-    if ((variable == nullptr) || (InvokeVariableIsValid(variable) == FALSE)) {
+    ID3D10EffectVariable* const annotation = techniqueHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    const char* text = nullptr;
-    void* const stringVariable = InvokeVariableAsString(variable);
-    const HRESULT result = InvokeStringGetString(stringVariable, &text);
+    LPCSTR text = nullptr;
+    const HRESULT result = annotation->AsString()->GetString(&text);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 166, result);
     }
@@ -6223,7 +5270,9 @@ namespace gpg::gal
    * What it does:
    * Initializes variable wrapper lanes and retains the backing effect interface.
    */
-  EffectVariableD3D10::EffectVariableD3D10(const char* const name, void* const dxEffect, void* const variableHandle)
+  EffectVariableD3D10::EffectVariableD3D10(
+    const char* const name, ID3D10Effect* const dxEffect, ID3D10EffectVariable* const variableHandle
+  )
     : name_()
     , dxEffect_(dxEffect)
     , variableHandle_(variableHandle)
@@ -6234,7 +5283,7 @@ namespace gpg::gal
       ThrowGalError("EffectVariableD3D10.cpp", 39, "invalid effect specified");
     }
 
-    AddRefComLike(dxEffect_);
+    dxEffect_->AddRef();
   }
 
   /**
@@ -6247,7 +5296,7 @@ namespace gpg::gal
    */
   EffectVariableD3D10::~EffectVariableD3D10()
   {
-    ReleaseComLike(dxEffect_);
+    SafeRelease(dxEffect_);
   }
 
   /**
@@ -6281,11 +5330,10 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetRenderTarget(const boost::shared_ptr<RenderTarget> renderTarget)
   {
-    void* const shaderResourceVariable = InvokeVariableAsShaderResource(variableHandle_);
-    void* const shaderResourceView = (renderTarget.get() != nullptr)
+    ID3D10ShaderResourceView* const shaderResourceView = (renderTarget.get() != nullptr)
       ? static_cast<RenderTargetD3D10*>(renderTarget.get())->GetShaderResourceViewOrThrow()
       : nullptr;
-    const HRESULT result = InvokeShaderResourceSetResource(shaderResourceVariable, shaderResourceView);
+    const HRESULT result = variableHandle_->AsShaderResource()->SetResource(shaderResourceView);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 144, result);
     }
@@ -6299,10 +5347,9 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetTexture(const boost::shared_ptr<Texture> texture)
   {
-    void* const shaderResourceVariable = InvokeVariableAsShaderResource(variableHandle_);
-    void* const shaderResourceView =
+    ID3D10ShaderResourceView* const shaderResourceView =
       (texture.get() != nullptr) ? static_cast<TextureD3D10*>(texture.get())->GetShaderResourceViewOrThrow() : nullptr;
-    const HRESULT result = InvokeShaderResourceSetResource(shaderResourceVariable, shaderResourceView);
+    const HRESULT result = variableHandle_->AsShaderResource()->SetResource(shaderResourceView);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 132, result);
     }
@@ -6316,8 +5363,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetMatrix4x4(const Matrix* const matrix)
   {
-    void* const matrixValue = InvokeVariableAsMatrix(variableHandle_);
-    const HRESULT result = InvokeMatrixSetMatrix(matrixValue, matrix);
+    const HRESULT result = variableHandle_->AsMatrix()->SetMatrix(const_cast<float*>(&matrix->r[0].x));
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 110, result);
     }
@@ -6331,8 +5377,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetBool(const bool value)
   {
-    void* const scalar = InvokeVariableAsScalar(variableHandle_);
-    const HRESULT result = InvokeScalarSetBool(scalar, value ? TRUE : FALSE);
+    const HRESULT result = variableHandle_->AsScalar()->SetBool(value ? TRUE : FALSE);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 60, result);
     }
@@ -6346,8 +5391,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetInt(const int value)
   {
-    void* const scalar = InvokeVariableAsScalar(variableHandle_);
-    const HRESULT result = InvokeScalarSetInt(scalar, value);
+    const HRESULT result = variableHandle_->AsScalar()->SetInt(value);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 66, result);
     }
@@ -6361,8 +5405,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetFloat(const float value)
   {
-    void* const scalar = InvokeVariableAsScalar(variableHandle_);
-    const HRESULT result = InvokeScalarSetFloat(scalar, value);
+    const HRESULT result = variableHandle_->AsScalar()->SetFloat(value);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 72, result);
     }
@@ -6376,8 +5419,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetVector(const float* const value)
   {
-    void* const vectorValue = InvokeVariableAsVector(variableHandle_);
-    const HRESULT result = InvokeVectorSetFloatVector(vectorValue, value);
+    const HRESULT result = variableHandle_->AsVector()->SetFloatVector(const_cast<float*>(value));
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 78, result);
     }
@@ -6393,7 +5435,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetValue(const void* const data, const std::uint32_t byteCount)
   {
-    const HRESULT result = InvokeVariableSetRawValue(variableHandle_, data, 0U, byteCount);
+    const HRESULT result = variableHandle_->SetRawValue(const_cast<void*>(data), 0U, byteCount);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 103, result);
     }
@@ -6409,7 +5451,7 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetFloatArray(const std::uint32_t count, const float* const values)
   {
-    const HRESULT result = InvokeVariableSetRawValue(variableHandle_, values, 0U, count * 4U);
+    const HRESULT result = variableHandle_->SetRawValue(const_cast<float*>(values), 0U, count * 4U);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 96, result);
     }
@@ -6429,10 +5471,10 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetMatrixArray(const std::uint32_t count, const Matrix* const matrices)
   {
-    void* const matrixValue = InvokeVariableAsMatrix(variableHandle_);
-    HRESULT result = InvokeMatrixSetMatrixArray(matrixValue, &matrices, 0U, count);
+    auto* const parameterAddress = reinterpret_cast<float*>(const_cast<const Matrix**>(&matrices));
+    HRESULT result = variableHandle_->AsMatrix()->SetMatrixArray(parameterAddress, 0U, count);
     if (result < 0) {
-      result = InvokeVariableSetRawValue(variableHandle_, matrices, 0U, count * 4U);
+      result = variableHandle_->SetRawValue(const_cast<Matrix*>(matrices), 0U, count * 4U);
       if (result < 0) {
         ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 121, result);
       }
@@ -6452,8 +5494,8 @@ namespace gpg::gal
    */
   void EffectVariableD3D10::SetVectorArray(const std::uint32_t count, const float* const vectors4)
   {
-    void* const vectorValue = InvokeVariableAsVector(variableHandle_);
-    const HRESULT result = InvokeVectorSetArray(vectorValue, &vectors4, 0U, count);
+    auto* const parameterAddress = reinterpret_cast<float*>(const_cast<const float**>(&vectors4));
+    const HRESULT result = variableHandle_->AsVector()->SetFloatVectorArray(parameterAddress, 0U, count);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 88, result);
     }
@@ -6471,14 +5513,13 @@ namespace gpg::gal
       ThrowGalError("EffectVariableD3D10.cpp", 154, "invalid effect variable");
     }
 
-    void* const annotation = InvokeVariableGetAnnotationByName(variableHandle_, annotationName.c_str());
-    if ((annotation == nullptr) || (InvokeVariableIsValid(annotation) == FALSE)) {
+    ID3D10EffectVariable* const annotation = variableHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    int boolValue = 0;
-    void* const scalar = InvokeVariableAsScalar(annotation);
-    const HRESULT result = InvokeScalarGetBool(scalar, &boolValue);
+    BOOL boolValue = FALSE;
+    const HRESULT result = annotation->AsScalar()->GetBool(&boolValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 164, result);
     }
@@ -6499,13 +5540,12 @@ namespace gpg::gal
       ThrowGalError("EffectVariableD3D10.cpp", 173, "invalid effect variable");
     }
 
-    void* const annotation = InvokeVariableGetAnnotationByName(variableHandle_, annotationName.c_str());
-    if ((annotation == nullptr) || (InvokeVariableIsValid(annotation) == FALSE)) {
+    ID3D10EffectVariable* const annotation = variableHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    void* const scalar = InvokeVariableAsScalar(annotation);
-    const HRESULT result = InvokeScalarGetInt(scalar, outValue);
+    const HRESULT result = annotation->AsScalar()->GetInt(outValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 182, result);
     }
@@ -6525,13 +5565,12 @@ namespace gpg::gal
       ThrowGalError("EffectVariableD3D10.cpp", 189, "invalid effect variable");
     }
 
-    void* const annotation = InvokeVariableGetAnnotationByName(variableHandle_, annotationName.c_str());
-    if ((annotation == nullptr) || (InvokeVariableIsValid(annotation) == FALSE)) {
+    ID3D10EffectVariable* const annotation = variableHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    void* const scalar = InvokeVariableAsScalar(annotation);
-    const HRESULT result = InvokeScalarGetFloat(scalar, outValue);
+    const HRESULT result = annotation->AsScalar()->GetFloat(outValue);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 198, result);
     }
@@ -6551,14 +5590,13 @@ namespace gpg::gal
       ThrowGalError("EffectVariableD3D10.cpp", 205, "invalid effect variable");
     }
 
-    void* const annotation = InvokeVariableGetAnnotationByName(variableHandle_, annotationName.c_str());
-    if ((annotation == nullptr) || (InvokeVariableIsValid(annotation) == FALSE)) {
+    ID3D10EffectVariable* const annotation = variableHandle_->GetAnnotationByName(annotationName.c_str());
+    if ((annotation == nullptr) || !annotation->IsValid()) {
       return false;
     }
 
-    const char* text = nullptr;
-    void* const stringVariable = InvokeVariableAsString(annotation);
-    const HRESULT result = InvokeStringGetString(stringVariable, &text);
+    LPCSTR text = nullptr;
+    const HRESULT result = annotation->AsString()->GetString(&text);
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectVariableD3D10.cpp", 215, result);
     }

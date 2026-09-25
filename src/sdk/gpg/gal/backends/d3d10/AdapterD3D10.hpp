@@ -12,7 +12,7 @@ namespace gpg::gal
     struct AdapterModeD3D10
     {
         std::uint32_t format_ = 0U;              // +0x00 (DXGI_FORMAT)
-        void* output_ = nullptr;                 // +0x04 (IDXGIOutput*)
+        IDXGIOutput* output_ = nullptr;          // +0x04
         DXGI_OUTPUT_DESC outputDesc_{};          // +0x08 (0x5C bytes)
         msvc8::vector<DXGI_MODE_DESC> modes_{};  // +0x64
     };
@@ -53,7 +53,7 @@ namespace gpg::gal
          * Initializes one adapter wrapper from one DXGI adapter pointer and
          * captures the adapter descriptor payload.
          */
-        explicit AdapterD3D10(void* dxgiAdapter);
+        explicit AdapterD3D10(IDXGIAdapter* dxgiAdapter);
 
         /**
          * Address: 0x008FF450 (FUN_008FF450)

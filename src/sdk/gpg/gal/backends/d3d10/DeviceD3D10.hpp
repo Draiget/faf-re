@@ -6,6 +6,9 @@
 #include <cstdint>
 
 #include <d3d10.h>
+#include <d3dx10async.h>
+#include <d3dx10core.h>
+#include <d3dx10tex.h>
 #include <dxgi.h>
 
 #include "AdapterD3D10.hpp"
@@ -513,7 +516,7 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches indexed draw or indexed-instanced draw.
        */
-      int DrawIndexedPrimitive(const DrawIndexedContext* context) override;
+      void DrawIndexedPrimitive(const DrawIndexedContext* context) override;
       /**
        * Address: 0x008FCF90
        * Slot: 47
@@ -522,7 +525,7 @@ namespace gal {
        * What it does:
        * Applies topology mapping and dispatches draw or draw-instanced.
        */
-      int DrawPrimitive(const DrawContext* context) override;
+      void DrawPrimitive(const DrawContext* context) override;
       /**
        * Address: 0x008F9810
        * Slot: 48
@@ -618,32 +621,85 @@ namespace gal {
        */
       DeviceD3D10();
 
-      // Export signatures resolved by `DynamicLink`. The effect loader is the
-      // early (Feb/Apr 2007) twelve-argument D3DX10 form: the call passes
-      // 0x800 in the slot that later SDKs gave to `pProfile`, which only fits
-      // `HLSLFlags` here.
-      using D3D10CreateDeviceFn =
-        HRESULT(__stdcall*)(IDXGIAdapter*, D3D10_DRIVER_TYPE, HMODULE, UINT, UINT, ID3D10Device**);
-      using D3D10CreateBlobFn = HRESULT(__stdcall*)(std::uint32_t, void**);
-      using D3DX10CreateEffectFromMemoryFn = HRESULT(__stdcall*)(
-        const void*,
-        std::size_t,
-        const char*,
-        const D3D10_SHADER_MACRO*,
-        void*,
-        unsigned int,
-        unsigned int,
-        ID3D10Device*,
-        void*,
-        void*,
-        ID3D10Effect**,
-        void**
+      /**
+       * Address: 0x009001B0 (FUN_009001B0)
+       *
+       * What it does:
+       * Releases everything `Setup` built - head targets, swap chains,
+       * adapters, pipeline state, the factory, the device, the two helper
+       * effects and the RTT quad - empties the context and the log, and unloads
+       * dxgi.dll, d3dx10.dll and d3d10.dll in that order. The destructor's body.
+       */
+      void Shutdown();
+
+      /**
+       * Address: 0x008F8920 (FUN_008F8920)
+       *
+       * What it does:
+       * Draws `source` into `destination`, a `width` x `height` target, with
+       * the RTT effect's fullscreen strip, then restores the viewport and the
+       * render targets it found bound. `StretchRect` falls back to it when the
+       * two targets differ in size or format. The views `OMGetRenderTargets`
+       * hands back are never released - the binary leaks one reference each.
+       */
+      void StretchRectBlit(
+        UINT width, UINT height, ID3D10RenderTargetView* destination, ID3D10ShaderResourceView* source
       );
-      using D3DX10CreateTextureFromMemoryFn =
-        HRESULT(__stdcall*)(void*, const void*, std::uint32_t, const void*, void*, void**);
-      using D3DX10SaveTextureToFileFn = HRESULT(__stdcall*)(void*, int, const char*);
-      using D3DX10SaveTextureToMemoryFn = HRESULT(__stdcall*)(void*, int, void**);
-      using CreateDXGIFactoryFn = HRESULT(__stdcall*)(const IID&, void**);
+
+      /**
+       * Address: 0x008F8860 (FUN_008F8860)
+       *
+       * What it does:
+       * `D3D10CreateBlob` through the linked export (`mov eax,[ecx+0x34]; jmp
+       * eax` - the call's own arguments go straight through).
+       */
+      HRESULT CreateBlob(SIZE_T size, ID3D10Blob** outBlob);
+
+      /**
+       * Address: 0x008F8880 (FUN_008F8880)
+       *
+       * What it does:
+       * `D3DX10SaveTextureToMemory` through the linked export
+       * (`mov ecx,[ecx+0x44]; jmp ecx`).
+       */
+      HRESULT SaveTextureToMemory(ID3D10Resource* texture, D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob** outBlob);
+
+      // Exports resolved by `DynamicLink`. d3d10.dll and dxgi.dll keep their
+      // SDK signatures. d3dx10.dll is the unversioned library of the early
+      // (Feb/Apr 2007) SDKs, whose loaders took fewer parameters than the June
+      // 2010 headers declare: `CreateEffectFromMemory` has no `pProfile` (the
+      // calls pass their HLSL flags, 0x800 and 0x1000, where that slot later
+      // went) and no `pHResult`, `CreateTextureFromMemory` no `pHResult`, and
+      // `SaveTextureToMemory` no `Flags`. The parameter types are the SDK's.
+      using D3D10CreateDeviceFn = decltype(&::D3D10CreateDevice);
+      using D3D10CreateBlobFn = decltype(&::D3D10CreateBlob);
+      using D3DX10CreateEffectFromMemoryFn = HRESULT(WINAPI*)(
+        LPCVOID data,
+        SIZE_T dataLength,
+        LPCSTR sourceFileName,
+        const D3D10_SHADER_MACRO* defines,
+        ID3D10Include* include,
+        UINT hlslFlags,
+        UINT fxFlags,
+        ID3D10Device* device,
+        ID3D10EffectPool* effectPool,
+        ID3DX10ThreadPump* pump,
+        ID3D10Effect** outEffect,
+        ID3D10Blob** outErrors
+      );
+      using D3DX10CreateTextureFromMemoryFn = HRESULT(WINAPI*)(
+        ID3D10Device* device,
+        LPCVOID sourceData,
+        SIZE_T sourceDataSize,
+        D3DX10_IMAGE_LOAD_INFO* loadInfo,
+        ID3DX10ThreadPump* pump,
+        ID3D10Resource** outTexture
+      );
+      using D3DX10SaveTextureToFileFn =
+        HRESULT(WINAPI*)(ID3D10Resource* texture, D3DX10_IMAGE_FILE_FORMAT format, LPCSTR fileName);
+      using D3DX10SaveTextureToMemoryFn =
+        HRESULT(WINAPI*)(ID3D10Resource* texture, D3DX10_IMAGE_FILE_FORMAT format, ID3D10Blob** outBlob);
+      using CreateDXGIFactoryFn = decltype(&::CreateDXGIFactory);
 
       // Layout recovered from the constructor at 0x008FE5D0 and the 0x128-byte
       // allocation in `func_CreateDeviceD3D`. Each lane is named for what the
