@@ -156,7 +156,7 @@ namespace gpg::gal
      * `{width, height, refresh}` triples, the element `Head::adapterModes`
      * holds: the D3D9 body pushes 12-byte elements (0x008F0170) and the options
      * code that calls it walks the result at a 12-byte stride (0x008D2305). The
-     * D3D10 backend leaves the slot empty (0x008F86F0, `ret 8`).
+     * shipped D3D10 body is empty (0x008F86F0, `ret 8`); FAF fills it.
      */
     virtual void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) = 0;
     /**

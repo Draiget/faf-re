@@ -1303,6 +1303,86 @@ namespace gpg::gal
       depthStencilDesc.BackFace = depthStencilDesc.FrontFace;
       return depthStencilDesc;
     }
+
+    // FAF addition, not in the shipped binary. GPG's D3D10 SetColorWriteState
+    // and SetWireframeState (0x008FE6F0, 0x008FE6E0) are empty, so the engine's
+    // colour-write masks (13 call sites) and wireframe toggle did nothing under
+    // /D3D10. These hold what the engine last asked for; one device exists at a
+    // time, and the binary-sized PipelineStateD3D10 has no room for them.
+    UINT8 sColorWriteMask = D3D10_COLOR_WRITE_ENABLE_ALL;
+    bool sWireframe = false;
+
+    /**
+     * FAF addition. The D3D9 backend's mask for the two flags
+     * (`PipelineStateD3D9::SetColorWriteState`, 0x009461F0): both or neither
+     * write everything, colour alone RGB, alpha alone A. D3D10's write-enable
+     * bits are D3D9's.
+     */
+    [[nodiscard]] UINT8 ColorWriteMask(const bool writeColor, const bool writeAlpha) noexcept
+    {
+      constexpr UINT8 kRgb =
+        D3D10_COLOR_WRITE_ENABLE_RED | D3D10_COLOR_WRITE_ENABLE_GREEN | D3D10_COLOR_WRITE_ENABLE_BLUE;
+      if (writeColor) {
+        return writeAlpha ? static_cast<UINT8>(D3D10_COLOR_WRITE_ENABLE_ALL) : kRgb;
+      }
+      return writeAlpha ? static_cast<UINT8>(D3D10_COLOR_WRITE_ENABLE_ALPHA)
+                        : static_cast<UINT8>(D3D10_COLOR_WRITE_ENABLE_ALL);
+    }
+
+    /**
+     * FAF addition. Lays the engine's colour-write mask and fill mode over the
+     * blend and rasterizer states an effect pass just bound, where the pass
+     * left them at their defaults (write everything, solid). A pass that
+     * restricts its own mask or draws wireframe keeps its choice, as a D3D9
+     * pass that sets COLORWRITEENABLE or FILLMODE overrides the backend's
+     * render state. D3D10 hands back the existing object for a description it
+     * has seen, so nothing needs caching here.
+     */
+    void ApplyStateOverrides(ID3D10Device* const device)
+    {
+      if (sColorWriteMask != D3D10_COLOR_WRITE_ENABLE_ALL) {
+        ID3D10BlendState* bound = nullptr;
+        FLOAT blendFactor[4]{};
+        UINT sampleMask = 0U;
+        device->OMGetBlendState(&bound, blendFactor, &sampleMask);
+
+        D3D10_BLEND_DESC blendDesc = OpaqueBlendDesc(); // the pipeline default when nothing is bound
+        if (bound != nullptr) {
+          bound->GetDesc(&blendDesc);
+        }
+        if (blendDesc.RenderTargetWriteMask[0] == D3D10_COLOR_WRITE_ENABLE_ALL) {
+          blendDesc.RenderTargetWriteMask[0] = sColorWriteMask;
+          ID3D10BlendState* masked = nullptr;
+          if (SUCCEEDED(device->CreateBlendState(&blendDesc, &masked))) {
+            device->OMSetBlendState(masked, blendFactor, sampleMask);
+            masked->Release();
+          }
+        }
+        SafeRelease(bound);
+      }
+
+      if (sWireframe) {
+        ID3D10RasterizerState* bound = nullptr;
+        device->RSGetState(&bound);
+
+        D3D10_RASTERIZER_DESC rasterizerDesc{}; // the pipeline default when nothing is bound
+        rasterizerDesc.FillMode = D3D10_FILL_SOLID;
+        rasterizerDesc.CullMode = D3D10_CULL_BACK;
+        rasterizerDesc.DepthClipEnable = TRUE;
+        if (bound != nullptr) {
+          bound->GetDesc(&rasterizerDesc);
+        }
+        if (rasterizerDesc.FillMode == D3D10_FILL_SOLID) {
+          rasterizerDesc.FillMode = D3D10_FILL_WIREFRAME;
+          ID3D10RasterizerState* wireframe = nullptr;
+          if (SUCCEEDED(device->CreateRasterizerState(&rasterizerDesc, &wireframe))) {
+            device->RSSetState(wireframe);
+            wireframe->Release();
+          }
+        }
+        SafeRelease(bound);
+      }
+    }
   } // namespace
 
   /**
@@ -3009,13 +3089,36 @@ namespace gpg::gal
   /**
    * Address: 0x008F86F0 (FUN_008F86F0)
    *
-   * int,int
-   *
    * What it does:
-   * Preserves the binary no-op adapter-modes slot (`retn 8` shape).
+   * The shipped body is a bare `ret 8`, which left the options screen with no
+   * resolutions under /D3D10.
+   *
+   * FAF addition: fills `outModes` the way the D3D9 backend does (0x008F0170),
+   * from the modes `SetupDXGIDevice` already enumerated for the adapter's
+   * outputs. Only the swap chain's format is listed (`BuildSwapChainDescFromHead`
+   * asks for R8G8B8A8_UNORM); the enumeration covers eight formats, so taking
+   * them all would repeat each resolution. An index past the adapter list
+   * leaves the list empty, as on D3D9.
    */
-  void DeviceD3D10::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& /*outModes*/, const int /*adapterIndex*/)
+  void DeviceD3D10::GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, const int adapterIndex)
   {
+    outModes.clear();
+    if (adapterIndex < 0 || adapterIndex >= static_cast<int>(mAdapters.size())) {
+      return;
+    }
+
+    for (const AdapterModeD3D10& output : mAdapters[static_cast<std::size_t>(adapterIndex)].modes_) {
+      for (const DXGI_MODE_DESC& mode : output.modes_) {
+        if (mode.Format != DXGI_FORMAT_R8G8B8A8_UNORM) {
+          continue;
+        }
+
+        const UINT refreshRate = (mode.RefreshRate.Denominator != 0U)
+          ? (mode.RefreshRate.Numerator / mode.RefreshRate.Denominator)
+          : mode.RefreshRate.Numerator;
+        outModes.push_back(HeadAdapterMode{mode.Width, mode.Height, refreshRate});
+      }
+    }
   }
 
   /**
@@ -4634,11 +4737,15 @@ namespace gpg::gal
     }
 
     if (clearColor && (renderTargetView != nullptr)) {
+      // FAF fix: the shipped body converts each 0-255 channel to float and
+      // stops there (`cvtsi2ss` with no scale), so every nonzero channel
+      // cleared to 1.0. ClearRenderTargetView takes normalized colours.
+      constexpr float kChannelScale = 1.0f / 255.0f;
       float clearColorRgba[4] = {
-        static_cast<float>((packedColor >> 16U) & 0xFFU),
-        static_cast<float>((packedColor >> 8U) & 0xFFU),
-        static_cast<float>(packedColor & 0xFFU),
-        static_cast<float>((packedColor >> 24U) & 0xFFU),
+        static_cast<float>((packedColor >> 16U) & 0xFFU) * kChannelScale,
+        static_cast<float>((packedColor >> 8U) & 0xFFU) * kChannelScale,
+        static_cast<float>(packedColor & 0xFFU) * kChannelScale,
+        static_cast<float>((packedColor >> 24U) & 0xFFU) * kChannelScale,
       };
       mDevice->ClearRenderTargetView(renderTargetView, clearColorRgba);
     }
@@ -4678,20 +4785,26 @@ namespace gpg::gal
    * Address: 0x008FE6E0 (FUN_008FE6E0)
    *
    * What it does:
-   * Preserves the binary no-op wireframe-state lane.
+   * The shipped body is empty. FAF addition: records the toggle; every effect
+   * pass applied afterwards draws wireframe unless it sets its own fill mode
+   * (`ApplyStateOverrides`).
    */
-  void DeviceD3D10::SetWireframeState(const bool /*enabled*/)
+  void DeviceD3D10::SetWireframeState(const bool enabled)
   {
+    sWireframe = enabled;
   }
 
   /**
    * Address: 0x008FE6F0 (FUN_008FE6F0)
    *
    * What it does:
-   * Preserves the binary no-op color-write-state lane.
+   * The shipped body is empty. FAF addition: records the mask the D3D9 backend
+   * would use; every effect pass applied afterwards writes only those
+   * channels unless it restricts its own (`ApplyStateOverrides`).
    */
-  void DeviceD3D10::SetColorWriteState(const bool /*writeColor*/, const bool /*writeAlpha*/)
+  void DeviceD3D10::SetColorWriteState(const bool writeColor, const bool writeAlpha)
   {
+    sColorWriteMask = ColorWriteMask(writeColor, writeAlpha);
   }
 
   /**
@@ -5143,6 +5256,9 @@ namespace gpg::gal
     if (result < 0) {
       ThrowGalErrorFromHresult("EffectTechniqueD3D10.cpp", 93, result);
     }
+
+    // FAF addition (see ApplyStateOverrides); the shipped body ends at Apply.
+    ApplyStateOverrides(static_cast<DeviceD3D10*>(Device::GetInstance())->mDevice);
   }
 
   /**

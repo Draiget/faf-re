@@ -114,7 +114,8 @@ namespace gal {
        * Demangled: gpg::gal::DeviceD3D10::GetModesForAdapter
        *
        * What it does:
-       * Preserves the binary no-op slot with `retn 8` calling-shape.
+       * Empty in the shipped binary (`ret 8`); FAF fills it from the enumerated
+       * R8G8B8A8_UNORM modes, as the D3D9 backend does.
        */
       void GetModesForAdapter(msvc8::vector<HeadAdapterMode>& outModes, int adapterIndex) override;
       /**
@@ -496,7 +497,8 @@ namespace gal {
        * Demangled: gpg::gal::DeviceD3D10::SetWireframeState
        *
        * What it does:
-       * Preserves the binary no-op wireframe-state slot.
+       * Empty in the shipped binary; FAF records the toggle for the passes that
+       * follow.
        */
       void SetWireframeState(bool enabled) override;
       /**
@@ -505,7 +507,8 @@ namespace gal {
        * Demangled: gpg::gal::DeviceD3D10::SetColorWriteState
        *
        * What it does:
-       * Preserves the binary no-op color-write-state slot.
+       * Empty in the shipped binary; FAF records the D3D9 backend's mask for the
+       * passes that follow.
        */
       void SetColorWriteState(bool writeColor, bool writeAlpha) override;
       /**
