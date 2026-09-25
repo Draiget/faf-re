@@ -904,6 +904,22 @@ namespace { // TEMPORARY PROBE (do not commit)
         }
 
         /**
+         * FAF addition, not in the shipped binary: whether `macros` defines
+         * `name`.
+         */
+        [[nodiscard]] bool DefinesMacro(const msvc8::vector<EffectMacro>& macros, const char* const name)
+        {
+            for (const EffectMacro& macro : macros)
+            {
+                if (std::strcmp(macro.keyText_.c_str(), name) == 0)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
          * Address: 0x008F04A0 (FUN_008F04A0)
          *
          * What it does:
@@ -1703,6 +1719,15 @@ namespace { // TEMPORARY PROBE (do not commit)
 
         const D3DXMACRO* const defines = BuildD3DXMacroDefines(context.mMacros);
 
+        // FAF: the FAF_BONE_TEXTURE variant of mesh.fx is shader model 3
+        // throughout, and for ps_3_0 the legacy compiler weighs dynamic
+        // branches: 44 seconds for mesh.fx against 4 for its 2.0 build, paid
+        // at every launch because FAF's init empties the shader cache. Asking
+        // it to avoid flow control brings that back to 4 seconds and keeps the
+        // shaders flattened like their 2.0 builds.
+        const DWORD flowControlFlags =
+            DefinesMacro(context.mMacros, "FAF_BONE_TEXTURE") ? D3DXSHADER_AVOID_FLOW_CONTROL : 0U;
+
         ID3DXEffectCompiler* effectCompiler = nullptr;
         ID3DXBuffer* compiledEffect = nullptr;
         ID3DXEffect* effect = nullptr;
@@ -1714,8 +1739,8 @@ namespace { // TEMPORARY PROBE (do not commit)
                 static_cast<unsigned int>(context.mSourceBuffer.mEnd - context.mSourceBuffer.mBegin);
 
             HRESULT result = D3DXCreateEffectCompiler(
-                sourceData, sourceBytes, defines, nullptr, D3DXSHADER_DEBUG | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL,
-                &effectCompiler, &errors
+                sourceData, sourceBytes, defines, nullptr,
+                D3DXSHADER_DEBUG | D3DXSHADER_USE_LEGACY_D3DX9_31_DLL | flowControlFlags, &effectCompiler, &errors
             );
             if (FAILED(result))
             {
@@ -1725,7 +1750,7 @@ namespace { // TEMPORARY PROBE (do not commit)
             }
             SafeRelease(errors);
 
-            result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG, &compiledEffect, &errors);
+            result = effectCompiler->CompileEffect(D3DXSHADER_DEBUG | flowControlFlags, &compiledEffect, &errors);
             if (FAILED(result))
             {
                 const msvc8::string message =

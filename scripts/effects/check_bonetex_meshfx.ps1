@@ -50,13 +50,17 @@ $e2 = Compile $Changed 'd3d9states.compat' '' 'fx_2_0' 'changed' @('/LD')
 "1. without FAF_BONE_TEXTURE: exit original={0} changed={1}, same shaders={2}" -f $e1, $e2, `
   (SameBytes (Join-Path $Work 'original.asm') (Join-Path $Work 'changed.asm'))
 
-$e3 = Compile $Changed 'd3d9states.compat' "#define FAF_BONE_TEXTURE 1`n" 'fx_2_0' 'bonetex' @('/LD')
+# /Gfa as the engine does for this variant (D3DXSHADER_AVOID_FLOW_CONTROL):
+# without it the legacy compiler spends about ten times longer on ps_3_0.
+$started = Get-Date
+$e3 = Compile $Changed 'd3d9states.compat' "#define FAF_BONE_TEXTURE 1`n" 'fx_2_0' 'bonetex' @('/LD', '/Gfa')
+$seconds = ((Get-Date) - $started).TotalSeconds
 $asmPath = Join-Path $Work 'bonetex.asm'
 $asm = if (Test-Path $asmPath) { [IO.File]::ReadAllText($asmPath) } else { '' }
 $errors = @(Get-Content (Join-Path $Work 'bonetex.err') | Where-Object { $_ -match 'error' })
-"2. with FAF_BONE_TEXTURE: exit={0} errors={1} vs_3_0={2} ps_3_0={3} older profiles={4} vertex texture reads={5}" -f `
+"2. with FAF_BONE_TEXTURE: exit={0} errors={1} vs_3_0={2} ps_3_0={3} older profiles={4} vertex texture reads={5} ({6:N1} s)" -f `
   $e3, $errors.Count, ([regex]::Matches($asm, '(?m)^\s*vs_3_0\b').Count), ([regex]::Matches($asm, '(?m)^\s*ps_3_0\b').Count), `
-  ([regex]::Matches($asm, '(?m)^\s*(vs_1_1|vs_2_0|ps_2_0|ps_2_x)\b').Count), ([regex]::Matches($asm, '\btexldl\b').Count)
+  ([regex]::Matches($asm, '(?m)^\s*(vs_1_1|vs_2_0|ps_2_0|ps_2_x)\b').Count), ([regex]::Matches($asm, '\btexldl\b').Count), $seconds
 $errors | Select-Object -First 10
 
 $e4 = Compile $Original 'd3d10states.compat' '' 'fx_4_0' 'd3d10_original' @('/Gec')
