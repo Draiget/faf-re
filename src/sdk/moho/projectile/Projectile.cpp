@@ -140,11 +140,20 @@ namespace
     return out;
   }
 
-  // Pops (and, when not auto-owned, destroys) the top task off the entity's own
-  // CTask-subobject owner thread. Mirrors the inline teardown the projectile ctor
-  // performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C and
-  // 0x0069BD23-0069BD47). The `[ebp+40h]` receiver is the Entity's CTask subobject
-  // `mOwnerThread` (CTask base at Entity+0x34, mOwnerThread at +0x0C -> Entity+0x40).
+  // Pops the top task off the entity's own CTask-subobject owner thread, deleting
+  // it only when the thread owns it. Mirrors the inline teardown the projectile
+  // ctor performs after each immediate Entity::Destroy() (asm 0x0069BC0F-0069BC3C
+  // and 0x0069BD23-0069BD47). The `[ebp+40h]` receiver is the Entity's CTask
+  // subobject `mOwnerThread` (CTask base at Entity+0x34, mOwnerThread at +0x0C ->
+  // Entity+0x40).
+  //
+  // The popped task is normally the projectile itself, whose CTask is built
+  // with `mAutoDelete` false: `cmp byte [task+14h], 0; je` (0x0069BC25) skips
+  // the deleting destructor for it, exactly like CTaskThread's own pops. With
+  // the test inverted the projectile deleted itself inside its constructor while
+  // Destroy() had already queued it, the allocator handed the same block to the
+  // next projectile, and the deletion queue then held one address twice -
+  // OnDestroy ran twice on it and CEntityDb::Purge deleted it twice.
   void PopOwnedTaskThreadTop(moho::Entity* const entity) noexcept
   {
     moho::CTaskThread* const thread = static_cast<moho::CTask*>(entity)->mOwnerThread;
@@ -158,10 +167,10 @@ namespace
     }
 
     thread->mTaskTop = task->mSubtask;
-    const bool autoOwned = task->mAutoDelete;
+    const bool autoDelete = task->mAutoDelete;
     task->mSubtask = nullptr;
     task->mOwnerThread = nullptr;
-    if (!autoOwned) {
+    if (autoDelete) {
       // Binary calls the task's scalar-deleting destructor lane (`dtr(this, 1)`).
       delete task;
     }
