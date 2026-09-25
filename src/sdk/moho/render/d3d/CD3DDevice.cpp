@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <iterator>
 #include <memory>
@@ -633,6 +634,65 @@ namespace
   private:
     moho::CD3DDeviceResources mResources{};
   };
+
+  /**
+   * FAF instrumentation, not in the shipped binary.
+   *
+   * With FAF_DRAW_STATS_LOG=<frames> in the environment, logs the draw calls,
+   * primitives and vertices submitted per frame, averaged over every <frames>
+   * frames: figures to compare renderer changes by without driving the UI.
+   * An instanced draw counts once, with one instance's primitives.
+   */
+  class DrawStatisticsLog
+  {
+  public:
+    void AddFrame(const gpg::gal::DrawStatistics& frame)
+    {
+      if (mInterval < 0) {
+        mInterval = ReadInterval();
+      }
+      if (mInterval == 0) {
+        return;
+      }
+
+      mDrawCalls += frame.drawCalls;
+      mPrimitives += frame.primitives;
+      mVertices += frame.vertices;
+      if (++mFrames < mInterval) {
+        return;
+      }
+
+      const double frames = static_cast<double>(mFrames);
+      gpg::Logf(
+        "Draw stats over %d frames: %.1f draw calls, %.0f primitives, %.0f vertices per frame",
+        mFrames, static_cast<double>(mDrawCalls) / frames, static_cast<double>(mPrimitives) / frames,
+        static_cast<double>(mVertices) / frames
+      );
+      mFrames = 0;
+      mDrawCalls = 0;
+      mPrimitives = 0;
+      mVertices = 0;
+    }
+
+  private:
+    [[nodiscard]] static int ReadInterval() noexcept
+    {
+      char text[16] = {};
+      std::size_t length = 0;
+      if (::getenv_s(&length, text, sizeof(text), "FAF_DRAW_STATS_LOG") != 0 || length == 0u) {
+        return 0;
+      }
+      return std::max(0, std::atoi(text));
+    }
+
+    int mInterval = -1; // -1 until the environment has been read
+    int mFrames = 0;
+    std::uint64_t mDrawCalls = 0;
+    std::uint64_t mPrimitives = 0;
+    std::uint64_t mVertices = 0;
+  };
+
+  DrawStatisticsLog sDrawStatisticsLog;
 } // namespace
 
 namespace moho
@@ -1310,6 +1370,7 @@ namespace moho
     (void)AddToStatCounter(EnsureEngineIntStat(sEngineStatRenderDrawPrimCalls, "Render_DrawPrimCalls"), submitted.drawCalls);
     (void)AddPrimStats(submitted.primitives, false);
     (void)AddVertexStats(submitted.vertices, false);
+    sDrawStatisticsLog.AddFrame(submitted);
   }
 
   /**
