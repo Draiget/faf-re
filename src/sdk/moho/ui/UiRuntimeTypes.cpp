@@ -1789,14 +1789,10 @@ namespace
     /**
      * The one delta handler ever stored here is `&CameraImpl::CameraPan`
      * (`CUIWorldView::HandleEvent`'s middle-button press). It is virtual, so
-     * the code word is the compiler's vcall thunk for its slot:
-     *
-     * Address: 0x00873BD0 (FUN_00873BD0 -- `CameraImpl::`vcall'{128}'`:
-     * `mov eax,[ecx]; jmp [eax+80h]`, slot 32 of `??_7CameraImpl@Moho@@6B@`
-     * == 0x007A6F00 `CameraImpl::CameraPan`; pushed at 0x00870B66. Formerly
+     * the code word is the compiler's vcall thunk for slot 32, 0x00873BD0
+     * (cited on `CameraImpl::CameraPan`). That thunk used to be recovered as
      * `CameraDraggerPanCamera`, a stand-in free function taking the camera as
-     * an explicit argument, and before that
-     * `LegacyInvokeVirtualIntReaderSlot128RuntimeLaneAlpha`.)
+     * an explicit argument.
      */
     CameraDragDeltaFn mDragDelta = nullptr;  // +0x18 code, +0x1C this adjustment
   };

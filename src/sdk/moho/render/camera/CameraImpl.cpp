@@ -3011,6 +3011,10 @@ void moho::CameraImpl::InterpolateBasis(const float interpolationAlpha, const fl
  * Address: 0x007A6F00 (FUN_007A6F00, Moho::CameraImpl::CameraPan)
  * Mangled: ?CameraPan@CameraImpl@Moho@@UAEXABV?$Vector2@M@Wm3@@@Z
  * Slot: 32 (vtable ??_7CameraImpl@Moho@@6B@ at 0x00E3C474, VTABLE_CONFIRMED)
+ * Address: 0x00873BD0 (FUN_00873BD0 -- `CameraImpl::`vcall'{128}'`, the thunk MSVC
+ *   emits for a pointer to this virtual: `mov eax,[ecx]; jmp [eax+80h]`. Taken as
+ *   `&CameraImpl::CameraPan` by `CUIWorldView::HandleEvent` for its camera drag
+ *   (0x00870B66), and called through `CameraDragger::mDragDelta`.)
  *
  * IDA signature:
  *   _DWORD *__thiscall CameraPan(CameraImpl *this, const Wm3::Vector2f *delta)
