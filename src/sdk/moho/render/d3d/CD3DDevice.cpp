@@ -668,6 +668,7 @@ namespace
         mFrames, static_cast<double>(mDrawCalls) / frames, static_cast<double>(mPrimitives) / frames,
         static_cast<double>(mVertices) / frames
       );
+      LogEntityCounts();
       mFrames = 0;
       mDrawCalls = 0;
       mPrimitives = 0;
@@ -675,6 +676,34 @@ namespace
     }
 
   private:
+    /**
+     * The id-based entity counts `EntityDB` keeps per family (reserve +1,
+     * `~Entity` -1) next to the live object counts `InstanceCounter` keeps,
+     * so a growing total shows which kind of entity piles up and whether the
+     * objects are really alive. Read-only: a stat nobody has created yet
+     * prints as -1.
+     */
+    static void LogEntityCounts()
+    {
+      moho::EngineStats* const stats = moho::GetEngineStats();
+      if (stats == nullptr) {
+        return;
+      }
+      const auto value = [stats](const char* const path) {
+        const moho::StatItem* const item = stats->GetItem(path, false);
+        return item != nullptr ? static_cast<int>(item->mPrimaryValueBits) : -1;
+      };
+      gpg::Logf(
+        "Entity counts: ids %d (unit %d, projectile %d, prop %d, blip %d, shield %d, other %d); "
+        "live Entity %d, Unit %d, Projectile %d, Prop %d, ReconBlip %d",
+        value("EntityCount"), value("EntityCount_Unit"), value("EntityCount_Projectile"),
+        value("EntityCount_Prop"), value("EntityCount_Blip"), value("EntityCount_Shield"),
+        value("EntityCount_Other"), value("Instance Counts_class moho::Entity"),
+        value("Instance Counts_class moho::Unit"), value("Instance Counts_class moho::Projectile"),
+        value("Instance Counts_class moho::Prop"), value("Instance Counts_class moho::ReconBlip")
+      );
+    }
+
     [[nodiscard]] static int ReadInterval() noexcept
     {
       char text[16] = {};
