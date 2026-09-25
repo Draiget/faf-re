@@ -581,19 +581,18 @@ namespace moho
 namespace
 {
   using moho::CD3DFont;
-  using moho::CMauiControlExtendedRuntimeView;
   using moho::CMauiCursorRuntimeView;
   using moho::CMauiCursorTextureRuntimeView;
-  using moho::CMauiEditRuntimeView;
+  using moho::CMauiEdit;
   using moho::CScriptLazyVar_float;
 
-  moho::CMauiBitmapRuntimeView*
-  SetBitmapAlphaHitTestEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
-  moho::CMauiBitmapRuntimeView* SetBitmapTiledEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
-  moho::CMauiBitmapRuntimeView* SetBitmapLoopEnabled(moho::CMauiBitmapRuntimeView* bitmapView, bool enabled) noexcept;
-  std::int32_t ReadBitmapCurrentFrame(const moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
-  std::int32_t CountBitmapFramePatternEntries(const moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
-  std::uint32_t EnableBitmapAnimationIfMultipleTextures(moho::CMauiBitmapRuntimeView* bitmapView) noexcept;
+  moho::CMauiBitmap*
+  SetBitmapAlphaHitTestEnabled(moho::CMauiBitmap* bitmap, bool enabled) noexcept;
+  moho::CMauiBitmap* SetBitmapTiledEnabled(moho::CMauiBitmap* bitmap, bool enabled) noexcept;
+  moho::CMauiBitmap* SetBitmapLoopEnabled(moho::CMauiBitmap* bitmap, bool enabled) noexcept;
+  std::int32_t ReadBitmapCurrentFrame(const moho::CMauiBitmap* bitmap) noexcept;
+  std::int32_t CountBitmapFramePatternEntries(const moho::CMauiBitmap* bitmap) noexcept;
+  std::uint32_t EnableBitmapAnimationIfMultipleTextures(moho::CMauiBitmap* bitmap) noexcept;
 
   static_assert(
     sizeof(moho::CScriptLazyVar_float) >= sizeof(LuaPlus::LuaObject),
@@ -614,11 +613,18 @@ namespace
     return reinterpret_cast<const LuaPlus::LuaObject&>(value);
   }
 
+  /// The state a control's layout lazy vars are created in: the control's
+  /// Lua object's, or none.
+  [[nodiscard]] LuaPlus::LuaState* LuaStateOf(const LuaPlus::LuaObject* const luaObject) noexcept
+  {
+    return luaObject != nullptr ? luaObject->m_state : nullptr;
+  }
+
   [[nodiscard]] std::int32_t GetItemListEntryCount(
-    const moho::CMauiItemListRuntimeView& itemListView
+    const moho::CMauiItemList& itemList
   ) noexcept
   {
-    return itemListView.mItems.data() != nullptr ? static_cast<std::int32_t>(itemListView.mItems.size()) : 0;
+    return itemList.mItems.data() != nullptr ? static_cast<std::int32_t>(itemList.mItems.size()) : 0;
   }
 
   /**
@@ -631,15 +637,15 @@ namespace
    * shape so callers can use it as a clamped item count.
    */
   std::uint32_t SetItemListSelectionByRow(
-    moho::CMauiItemListRuntimeView& itemListView,
+    moho::CMauiItemList& itemList,
     const std::uint32_t requestedRow
   ) noexcept
   {
-    const auto count = static_cast<std::uint32_t>(GetItemListEntryCount(itemListView));
+    const auto count = static_cast<std::uint32_t>(GetItemListEntryCount(itemList));
     if (count != 0u && requestedRow < count) {
-      itemListView.mCurSelection = static_cast<std::int32_t>(requestedRow);
+      itemList.mCurSelection = static_cast<std::int32_t>(requestedRow);
     } else {
-      itemListView.mCurSelection = -1;
+      itemList.mCurSelection = -1;
     }
     return count;
   }
@@ -1191,105 +1197,12 @@ namespace
     }
   }
 
-  struct CMauiControlScriptObjectRuntimeView
-  {
-    std::uint8_t mUnknown00To1F[0x20]{};
-    LuaPlus::LuaObject mLuaObj{}; // +0x20
-
-    [[nodiscard]] static CMauiControlScriptObjectRuntimeView* FromControl(
-      moho::CMauiControl* control
-    ) noexcept
-    {
-      return reinterpret_cast<CMauiControlScriptObjectRuntimeView*>(control);
-    }
-
-    [[nodiscard]]
-    static const CMauiControlScriptObjectRuntimeView* FromControl(
-      const moho::CMauiControl* control
-    ) noexcept
-    {
-      return reinterpret_cast<const CMauiControlScriptObjectRuntimeView*>(control);
-    }
-  };
-
-  static_assert(
-    offsetof(CMauiControlScriptObjectRuntimeView, mLuaObj) == 0x20,
-    "CMauiControlScriptObjectRuntimeView::mLuaObj offset must be 0x20"
-  );
-
   using CMauiControlListNode = moho::TDatListItem<moho::CMauiControl, void>;
   constexpr std::uint32_t kCMauiControlListNodeNextOffset =
     static_cast<std::uint32_t>(offsetof(CMauiControlListNode, mNext));
 
-  struct CMauiControlHierarchyRuntimeView
-  {
-    std::uint8_t mUnknown00To33[0x34]{};
-    CMauiControlListNode mParentList{};                       // +0x34
-    moho::CMauiControl* mParent = nullptr;                    // +0x3C
-    moho::TDatList<moho::CMauiControl, void> mChildrenList{}; // +0x40
-    moho::CScriptLazyVar_float mLeftLV{};                     // +0x48
-    moho::CScriptLazyVar_float mRightLV{};                    // +0x5C
-    moho::CScriptLazyVar_float mTopLV{};                      // +0x70
-    moho::CScriptLazyVar_float mBottomLV{};                   // +0x84
-    moho::CScriptLazyVar_float mWidthLV{};                    // +0x98
-    moho::CScriptLazyVar_float mHeightLV{};                   // +0xAC
-    moho::CScriptLazyVar_float mDepthLV{};                    // +0xC0
-    float mDepth = 0.0f;                                      // +0xD4
-    std::uint8_t mUnknown0D8To0E7[0x10]{};
-    bool mInvalidated = false;      // +0xE8
-    bool mDisableHitTest = false;   // +0xE9
-    bool mIsHidden = false;         // +0xEA
-    bool mNeedsFrameUpdate = false; // +0xEB
-
-    [[nodiscard]] static CMauiControlHierarchyRuntimeView* FromControl(
-      moho::CMauiControl* control
-    ) noexcept
-    {
-      return reinterpret_cast<CMauiControlHierarchyRuntimeView*>(control);
-    }
-
-    [[nodiscard]]
-    static const CMauiControlHierarchyRuntimeView* FromControl(
-      const moho::CMauiControl* control
-    ) noexcept
-    {
-      return reinterpret_cast<const CMauiControlHierarchyRuntimeView*>(control);
-    }
-  };
-
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mParentList) == 0x34,
-    "CMauiControlHierarchyRuntimeView::mParentList offset must be 0x34"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mParent) == 0x3C,
-    "CMauiControlHierarchyRuntimeView::mParent offset must be 0x3C"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mChildrenList) == 0x40,
-    "CMauiControlHierarchyRuntimeView::mChildrenList offset must be 0x40"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mLeftLV) == 0x48,
-    "CMauiControlHierarchyRuntimeView::mLeftLV offset must be 0x48"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mDepthLV) == 0xC0,
-    "CMauiControlHierarchyRuntimeView::mDepthLV offset must be 0xC0"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mDepth) == 0xD4,
-    "CMauiControlHierarchyRuntimeView::mDepth offset must be 0xD4"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mInvalidated) == 0xE8,
-    "CMauiControlHierarchyRuntimeView::mInvalidated offset must be 0xE8"
-  );
-  static_assert(
-    offsetof(CMauiControlHierarchyRuntimeView, mDisableHitTest) == 0xE9,
-    "CMauiControlHierarchyRuntimeView::mDisableHitTest offset must be 0xE9"
-  );
-
+  /// The control owning one `mParentList` node, i.e. one entry of a parent's
+  /// `mChildrenList`.
   [[nodiscard]] moho::CMauiControl* ControlFromParentListNode(
     CMauiControlListNode* node
   ) noexcept
@@ -1297,9 +1210,8 @@ namespace
     if (node == nullptr) {
       return nullptr;
     }
-
-    constexpr std::size_t kParentListOffset = offsetof(CMauiControlHierarchyRuntimeView, mParentList);
-    return reinterpret_cast<moho::CMauiControl*>(reinterpret_cast<std::uint8_t*>(node) - kParentListOffset);
+    return moho::TDatList<moho::CMauiControl, void>::owner_from_member_node<
+      moho::CMauiControl, &moho::CMauiControl::mParentList>(node);
   }
 
   [[nodiscard]] const moho::CMauiControl* ControlFromParentListNode(
@@ -1309,9 +1221,8 @@ namespace
     if (node == nullptr) {
       return nullptr;
     }
-
-    constexpr std::size_t kParentListOffset = offsetof(CMauiControlHierarchyRuntimeView, mParentList);
-    return reinterpret_cast<const moho::CMauiControl*>(reinterpret_cast<const std::uint8_t*>(node) - kParentListOffset);
+    return moho::TDatList<moho::CMauiControl, void>::owner_from_member_node<
+      moho::CMauiControl, &moho::CMauiControl::mParentList>(node);
   }
 
   struct CScriptLazyVarFloatCachedValueView
@@ -1356,9 +1267,8 @@ namespace
       return nullptr;
     }
 
-    CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(control);
-    CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
-    CMauiControlListNode* const firstChildNode = controlView->mChildrenList.mNext;
+    CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&control->mChildrenList);
+    CMauiControlListNode* const firstChildNode = control->mChildrenList.mNext;
     if (firstChildNode == sentinel) {
       return nullptr;
     }
@@ -1374,15 +1284,13 @@ namespace
       return nullptr;
     }
 
-    CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(control);
-    moho::CMauiControl* const parentControl = controlView->mParent;
+    moho::CMauiControl* const parentControl = control->mParent;
     if (parentControl == nullptr) {
       return nullptr;
     }
 
-    CMauiControlHierarchyRuntimeView* const parentView = CMauiControlHierarchyRuntimeView::FromControl(parentControl);
-    CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&parentView->mChildrenList);
-    CMauiControlListNode* const siblingNode = controlView->mParentList.mNext;
+    CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&parentControl->mChildrenList);
+    CMauiControlListNode* const siblingNode = control->mParentList.mNext;
     if (siblingNode == sentinel) {
       return nullptr;
     }
@@ -1405,13 +1313,12 @@ namespace
       return false;
     }
 
-    CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(control);
-    const float resolvedDepth = moho::CScriptLazyVar_float::GetValue(&controlView->mDepthLV);
-    if (controlView->mDepth == resolvedDepth) {
+    const float resolvedDepth = moho::CScriptLazyVar_float::GetValue(&control->mDepthLV);
+    if (control->mDepth == resolvedDepth) {
       return false;
     }
 
-    controlView->mDepth = resolvedDepth;
+    control->mDepth = resolvedDepth;
     return true;
   }
 
@@ -1465,16 +1372,15 @@ namespace
     moho::CMauiControl* const subtreeRoot
   )
   {
-    CMauiControlExtendedRuntimeView* const rootView = CMauiControlExtendedRuntimeView::FromControl(subtreeRoot);
-    rootView->mRenderedChildren.clear();
+    subtreeRoot->mRenderedChildren.clear();
 
     for (moho::CMauiControl* controlCursor = subtreeRoot; controlCursor != nullptr;
          controlCursor = controlCursor->DepthFirstSuccessor(subtreeRoot)) {
-      if (CMauiControlExtendedRuntimeView::FromControl(controlCursor)->mInvisible) {
+      if (controlCursor->mInvisible) {
         continue;
       }
 
-      rootView->mRenderedChildren.push_back(controlCursor);
+      subtreeRoot->mRenderedChildren.push_back(controlCursor);
     }
   }
 
@@ -1522,9 +1428,7 @@ namespace
         return lhs != nullptr && rhs == nullptr;
       }
 
-      const auto* const lhsView = CMauiControlHierarchyRuntimeView::FromControl(lhs);
-      const auto* const rhsView = CMauiControlHierarchyRuntimeView::FromControl(rhs);
-      return lhsView->mDepth < rhsView->mDepth;
+      return lhs->mDepth < rhs->mDepth;
     }
     );
   }
@@ -1702,161 +1606,33 @@ namespace
    * the selection lane consistent with the post-delete vector size.
    */
   void RemoveItemListEntryAtIndex(
-    moho::CMauiItemListRuntimeView* const itemListView,
+    moho::CMauiItemList* const itemList,
     const std::int32_t index
   )
   {
-    if (itemListView == nullptr || index < 0) {
+    if (itemList == nullptr || index < 0) {
       return;
     }
-    const std::size_t count = itemListView->mItems.size();
+    const std::size_t count = itemList->mItems.size();
     if (static_cast<std::size_t>(index) >= count) {
       return;
     }
 
     for (std::size_t i = static_cast<std::size_t>(index) + 1u; i < count; ++i) {
-      itemListView->mItems[i - 1u] = itemListView->mItems[i];
+      itemList->mItems[i - 1u] = itemList->mItems[i];
     }
-    itemListView->mItems.pop_back();
+    itemList->mItems.pop_back();
 
-    const std::int32_t currentSelection = itemListView->mCurSelection;
+    const std::int32_t currentSelection = itemList->mCurSelection;
     if (index >= currentSelection) {
-      if (currentSelection == GetItemListEntryCount(*itemListView)) {
-        itemListView->mCurSelection = -1;
+      if (currentSelection == GetItemListEntryCount(*itemList)) {
+        itemList->mCurSelection = -1;
       }
     } else {
-      itemListView->mCurSelection = currentSelection - 1;
+      itemList->mCurSelection = currentSelection - 1;
     }
   }
 
-  struct CMauiMovieRuntimeView : moho::CMauiControlFrameUpdateRuntimeView
-  {
-    // +0xEC..0x11B are CMauiControl's own tail (mInvisible, mAlpha,
-    // mVertexAlpha, mRenderPass, mRootFrame, mDebugName) - reach them through
-    // CMauiControlExtendedRuntimeView rather than redeclaring them here.
-    std::uint8_t mUnknown0ECTo11B[0x30]{};
-    moho::CMovie* mMovie = nullptr;              // +0x11C
-    bool mIsPlaying = false;                     // +0x120
-    bool mDoLoop = false;                        // +0x121
-    bool mIsStopped = false;                     // +0x122
-    bool mIsMinimized = false;                   // +0x123
-    msvc8::string mSubtitleCache{};              // +0x124
-    moho::CScriptLazyVar_float mMovieWidthLV{};  // +0x140
-    moho::CScriptLazyVar_float mMovieHeightLV{}; // +0x154
-
-    [[nodiscard]] static CMauiMovieRuntimeView* FromMovie(
-      moho::CMauiMovie* const movie
-    ) noexcept
-    {
-      return reinterpret_cast<CMauiMovieRuntimeView*>(movie);
-    }
-
-    [[nodiscard]] static const CMauiMovieRuntimeView* FromMovie(
-      const moho::CMauiMovie* const movie
-    ) noexcept
-    {
-      return reinterpret_cast<const CMauiMovieRuntimeView*>(movie);
-    }
-  };
-
-  static_assert(offsetof(CMauiMovieRuntimeView, mMovie) == 0x11C, "CMauiMovieRuntimeView::mMovie offset must be 0x11C");
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mIsPlaying) == 0x120,
-    "CMauiMovieRuntimeView::mIsPlaying offset must be 0x120"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mDoLoop) == 0x121,
-    "CMauiMovieRuntimeView::mDoLoop offset must be 0x121"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mIsStopped) == 0x122,
-    "CMauiMovieRuntimeView::mIsStopped offset must be 0x122"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mIsMinimized) == 0x123,
-    "CMauiMovieRuntimeView::mIsMinimized offset must be 0x123"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mSubtitleCache) == 0x124,
-    "CMauiMovieRuntimeView::mSubtitleCache offset must be 0x124"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mMovieWidthLV) == 0x140,
-    "CMauiMovieRuntimeView::mMovieWidthLV offset must be 0x140"
-  );
-  static_assert(
-    offsetof(CMauiMovieRuntimeView, mMovieHeightLV) == 0x154,
-    "CMauiMovieRuntimeView::mMovieHeightLV offset must be 0x154"
-  );
-
-  struct CMauiScrollbarRuntimeView
-  {
-    // +0x11C/+0x120 are the embedded `IMauiDragger` sub-object (vptr and
-    // `WeakObject::weakLinkHead_`); they are modelled by `CMauiScrollbar`'s own
-    // base and are deliberately not re-declared here.
-    std::uint8_t mUnknown00To123[0x124]{};
-    moho::CMauiCurrentFocusControlRuntimeView mScrollableLink{};         // +0x124
-    boost::shared_ptr<moho::CD3DBatchTexture> mThumbTop{};               // +0x12C
-    boost::shared_ptr<moho::CD3DBatchTexture> mThumbBottom{};            // +0x134
-    boost::shared_ptr<moho::CD3DBatchTexture> mThumbMiddle{};            // +0x13C
-    boost::shared_ptr<moho::CD3DBatchTexture> mBackground{};             // +0x144
-    float mDragStart = 0.0f;                                             // +0x14C
-    float mTopAtDragStart = 0.0f;                                        // +0x150
-    moho::EMauiScrollAxis mAxis = static_cast<moho::EMauiScrollAxis>(0); // +0x154
-
-    [[nodiscard]] static CMauiScrollbarRuntimeView* FromScrollbar(
-      moho::CMauiScrollbar* const scrollbar
-    ) noexcept
-    {
-      return reinterpret_cast<CMauiScrollbarRuntimeView*>(scrollbar);
-    }
-
-    [[nodiscard]]
-    static const CMauiScrollbarRuntimeView* FromScrollbar(
-      const moho::CMauiScrollbar* const scrollbar
-    ) noexcept
-    {
-      return reinterpret_cast<const CMauiScrollbarRuntimeView*>(scrollbar);
-    }
-
-    [[nodiscard]] moho::CMauiControl* ResolveScrollableControl() const noexcept
-    {
-      return mScrollableLink.ResolveFocusedControl();
-    }
-  };
-
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mScrollableLink) == 0x124,
-    "CMauiScrollbarRuntimeView::mScrollableLink offset must be 0x124"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mThumbTop) == 0x12C,
-    "CMauiScrollbarRuntimeView::mThumbTop offset must be 0x12C"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mThumbBottom) == 0x134,
-    "CMauiScrollbarRuntimeView::mThumbBottom offset must be 0x134"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mThumbMiddle) == 0x13C,
-    "CMauiScrollbarRuntimeView::mThumbMiddle offset must be 0x13C"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mBackground) == 0x144,
-    "CMauiScrollbarRuntimeView::mBackground offset must be 0x144"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mDragStart) == 0x14C,
-    "CMauiScrollbarRuntimeView::mDragStart offset must be 0x14C"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mTopAtDragStart) == 0x150,
-    "CMauiScrollbarRuntimeView::mTopAtDragStart offset must be 0x150"
-  );
-  static_assert(
-    offsetof(CMauiScrollbarRuntimeView, mAxis) == 0x154,
-    "CMauiScrollbarRuntimeView::mAxis offset must be 0x154"
-  );
 
   // CameraTargetRuntimeView used to sit here: a one-pointer struct that
   // reinterpret_cast a CameraImpl* and hand-dispatched vtable slot 10 through
@@ -3844,11 +3620,11 @@ namespace
    * back to `0.0f` when no font is bound.
    */
   [[nodiscard]] float MeasureEditStringAdvanceOrZero(
-    CMauiEditRuntimeView* const editView,
+    CMauiEdit* const edit,
     const char* const text
   )
   {
-    CD3DFont* const font = editView->mFont;
+    CD3DFont* const font = edit->mFont;
     if (font == nullptr) {
       return 0.0f;
     }
@@ -3864,9 +3640,8 @@ namespace
     moho::CMauiEdit* const edit
   )
   {
-    CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-    if (editView->mIsEnabled) {
-      editView->mCaretVisible = true;
+    if (edit->mIsEnabled) {
+      edit->mCaretVisible = true;
       moho::MAUI_SetKeyboardFocus(edit, true);
     }
   }
@@ -3877,10 +3652,10 @@ namespace
    * Returns CMauiEdit background-visible lane.
    */
   [[maybe_unused]] bool ReadEditBackgroundVisibleLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mBackgroundVisible;
+    return edit->mBackgroundVisible;
   }
 
   /**
@@ -3902,13 +3677,13 @@ namespace
    * What it does:
    * Stores edit drop-shadow enable lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditDropShadowLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditDropShadowLane(
+    CMauiEdit* const edit,
     const bool enabled
   ) noexcept
   {
-    editView->mDropShadow = enabled;
-    return editView;
+    edit->mDropShadow = enabled;
+    return edit;
   }
 
   /**
@@ -3918,10 +3693,10 @@ namespace
    * Returns edit max-char limit lane.
    */
   [[maybe_unused]] std::int32_t ReadEditMaxCharsLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mMaxChars;
+    return edit->mMaxChars;
   }
 
   /**
@@ -3931,10 +3706,10 @@ namespace
    * Reads edit-bound font height lane (`0.0f` when font is missing).
    */
   [[maybe_unused]] float ReadEditFontHeightLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    const CD3DFont* const font = editView->mFont;
+    const CD3DFont* const font = edit->mFont;
     return font != nullptr ? font->mHeight : 0.0f;
   }
 
@@ -3944,13 +3719,13 @@ namespace
    * What it does:
    * Stores edit foreground color lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditForegroundColorLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditForegroundColorLane(
+    CMauiEdit* const edit,
     const std::uint32_t color
   ) noexcept
   {
-    editView->mForegroundColor = color;
-    return editView;
+    edit->mForegroundColor = color;
+    return edit;
   }
 
   /**
@@ -3960,10 +3735,10 @@ namespace
    * Returns edit foreground color lane.
    */
   [[maybe_unused]] std::uint32_t ReadEditForegroundColorLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mForegroundColor;
+    return edit->mForegroundColor;
   }
 
   /**
@@ -3972,13 +3747,13 @@ namespace
    * What it does:
    * Stores edit background-visible lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditBackgroundVisibleLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditBackgroundVisibleLane(
+    CMauiEdit* const edit,
     const bool visible
   ) noexcept
   {
-    editView->mBackgroundVisible = visible;
-    return editView;
+    edit->mBackgroundVisible = visible;
+    return edit;
   }
 
   /**
@@ -3988,10 +3763,10 @@ namespace
    * Returns edit background-visible lane.
    */
   [[maybe_unused]] bool ReadEditBackgroundVisibleLaneAlias(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mBackgroundVisible;
+    return edit->mBackgroundVisible;
   }
 
   /**
@@ -4000,14 +3775,14 @@ namespace
    * What it does:
    * Enables background rendering and stores edit background color lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* EnableEditBackgroundAndWriteColor(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* EnableEditBackgroundAndWriteColor(
+    CMauiEdit* const edit,
     const std::uint32_t color
   ) noexcept
   {
-    editView->mBackgroundVisible = true;
-    editView->mBackgroundColor = color;
-    return editView;
+    edit->mBackgroundVisible = true;
+    edit->mBackgroundColor = color;
+    return edit;
   }
 
   /**
@@ -4017,10 +3792,10 @@ namespace
    * Returns edit background color lane.
    */
   [[maybe_unused]] std::uint32_t ReadEditBackgroundColorLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mBackgroundColor;
+    return edit->mBackgroundColor;
   }
 
   /**
@@ -4029,13 +3804,13 @@ namespace
    * What it does:
    * Stores edit highlight-foreground color lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditHighlightForegroundColorLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditHighlightForegroundColorLane(
+    CMauiEdit* const edit,
     const std::uint32_t color
   ) noexcept
   {
-    editView->mHighlightForegroundColor = color;
-    return editView;
+    edit->mHighlightForegroundColor = color;
+    return edit;
   }
 
   /**
@@ -4045,10 +3820,10 @@ namespace
    * Returns edit highlight-foreground color lane.
    */
   [[maybe_unused]] std::uint32_t ReadEditHighlightForegroundColorLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mHighlightForegroundColor;
+    return edit->mHighlightForegroundColor;
   }
 
   /**
@@ -4057,13 +3832,13 @@ namespace
    * What it does:
    * Stores edit highlight-background color lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditHighlightBackgroundColorLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditHighlightBackgroundColorLane(
+    CMauiEdit* const edit,
     const std::uint32_t color
   ) noexcept
   {
-    editView->mHighlightBackgroundColor = color;
-    return editView;
+    edit->mHighlightBackgroundColor = color;
+    return edit;
   }
 
   /**
@@ -4073,10 +3848,10 @@ namespace
    * Returns edit highlight-background color lane.
    */
   [[maybe_unused]] std::uint32_t ReadEditHighlightBackgroundColorLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mHighlightBackgroundColor;
+    return edit->mHighlightBackgroundColor;
   }
 
   /**
@@ -4086,10 +3861,10 @@ namespace
    * Returns edit caret-position lane.
    */
   [[maybe_unused]] std::int32_t ReadEditCaretPositionLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mCaretPosition;
+    return edit->mCaretPosition;
   }
 
   /**
@@ -4098,13 +3873,13 @@ namespace
    * What it does:
    * Stores edit caret-visible lane.
    */
-  [[maybe_unused]] CMauiEditRuntimeView* WriteEditCaretVisibleLane(
-    CMauiEditRuntimeView* const editView,
+  [[maybe_unused]] CMauiEdit* WriteEditCaretVisibleLane(
+    CMauiEdit* const edit,
     const bool visible
   ) noexcept
   {
-    editView->mCaretVisible = visible;
-    return editView;
+    edit->mCaretVisible = visible;
+    return edit;
   }
 
   /**
@@ -4114,10 +3889,10 @@ namespace
    * Returns edit caret-visible lane.
    */
   [[maybe_unused]] bool ReadEditCaretVisibleLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mCaretVisible;
+    return edit->mCaretVisible;
   }
 
   /**
@@ -4127,10 +3902,10 @@ namespace
    * Returns edit caret color lane.
    */
   [[maybe_unused]] std::uint32_t ReadEditCaretColorLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mCaretColor;
+    return edit->mCaretColor;
   }
 
   /**
@@ -4140,10 +3915,10 @@ namespace
    * Returns edit input-enabled lane.
    */
   [[maybe_unused]] bool ReadEditInputEnabledLane(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mIsEnabled;
+    return edit->mIsEnabled;
   }
 
   /**
@@ -4153,10 +3928,10 @@ namespace
    * Returns whether selection start/end lanes differ.
    */
   [[maybe_unused]] bool HasEditSelectionRange(
-    const CMauiEditRuntimeView* const editView
+    const CMauiEdit* const edit
   ) noexcept
   {
-    return editView->mSelectionStart != editView->mSelectionEnd;
+    return edit->mSelectionStart != edit->mSelectionEnd;
   }
 
   /**
@@ -4171,9 +3946,8 @@ namespace
     const bool enabled
   )
   {
-    CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-    editView->mIsEnabled = enabled;
-    editView->mCaretVisible = enabled;
+    edit->mIsEnabled = enabled;
+    edit->mCaretVisible = enabled;
     if (!enabled) {
       edit->AbandonKeyboardFocus();
     }
@@ -4217,25 +3991,25 @@ namespace
    * edit text, font, and width lazy-var lane.
    */
   void SetEditClipOffsetLeft(
-    CMauiEditRuntimeView* const editView,
+    CMauiEdit* const edit,
     int position
   )
   {
-    if (!editView) {
+    if (!edit) {
       return;
     }
 
-    editView->mClipOffset = position;
-    CD3DFont* const font = editView->mFont;
+    edit->mClipOffset = position;
+    CD3DFont* const font = edit->mFont;
     if (font == nullptr) {
       return;
     }
 
-    const char* const text = editView->mText.c_str();
+    const char* const text = edit->mText.c_str();
     const float advanceToOffset = font->GetAdvance(text, position);
-    const float width = CScriptLazyVar_float::GetValue(&editView->mWidthLV);
+    const float width = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
     if (advanceToOffset <= width) {
-      editView->mClipLength = gpg::STR_Utf8Len(text);
+      edit->mClipLength = gpg::STR_Utf8Len(text);
       return;
     }
 
@@ -4252,7 +4026,7 @@ namespace
       wchar_t decoded = 0;
       const char* const next = gpg::STR_DecodeUtf8Char(cursor, decoded);
       clippedAdvance += font->GetCharInfo(decoded).mAdvance;
-      const float dynamicWidth = CScriptLazyVar_float::GetValue(&editView->mWidthLV);
+      const float dynamicWidth = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
       cursor = next;
       if (clippedAdvance > dynamicWidth || cursor == nullptr) {
         break;
@@ -4262,12 +4036,12 @@ namespace
     const std::size_t clippedBytes =
       (cursor != nullptr && cursor > start) ? static_cast<std::size_t>(cursor - start) : 0u;
     if (clippedBytes == 0u) {
-      editView->mClipLength = 0;
+      edit->mClipLength = 0;
       return;
     }
 
     const std::string clippedText(start, clippedBytes);
-    editView->mClipLength = gpg::STR_Utf8Len(clippedText.c_str());
+    edit->mClipLength = gpg::STR_Utf8Len(clippedText.c_str());
   }
 
   /**
@@ -4278,19 +4052,19 @@ namespace
    * the visible width while preserving right-side character count.
    */
   void SetEditClipOffsetRight(
-    CMauiEditRuntimeView* const editView,
+    CMauiEdit* const edit,
     int charsAfterCaret
   )
   {
-    if (editView == nullptr || editView->mFont == nullptr) {
+    if (edit == nullptr || edit->mFont == nullptr) {
       return;
     }
 
-    const char* const text = editView->mText.c_str();
-    const float advanceToRight = editView->mFont->GetAdvance(text, charsAfterCaret);
-    const float width = CScriptLazyVar_float::GetValue(&editView->mWidthLV);
+    const char* const text = edit->mText.c_str();
+    const float advanceToRight = edit->mFont->GetAdvance(text, charsAfterCaret);
+    const float width = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
     if (advanceToRight <= width) {
-      editView->mClipLength = gpg::STR_Utf8Len(text);
+      edit->mClipLength = gpg::STR_Utf8Len(text);
       return;
     }
 
@@ -4312,8 +4086,8 @@ namespace
 
         wchar_t decoded = 0;
         const char* const next = gpg::STR_DecodeUtf8Char(previous, decoded);
-        clippedAdvance += editView->mFont->GetCharInfo(decoded).mAdvance;
-        const float dynamicWidth = CScriptLazyVar_float::GetValue(&editView->mWidthLV);
+        clippedAdvance += edit->mFont->GetCharInfo(decoded).mAdvance;
+        const float dynamicWidth = CScriptLazyVar_float::GetValue(&edit->mWidthLV);
         if (clippedAdvance > dynamicWidth) {
           threshold = next;
           break;
@@ -4330,8 +4104,8 @@ namespace
     const std::size_t visibleBytes = copiedBytes > 0 ? static_cast<std::size_t>(copiedBytes) : 0u;
     const std::string visibleText(threshold, visibleBytes);
 
-    editView->mClipLength = gpg::STR_Utf8Len(visibleText.c_str());
-    editView->mClipOffset = caretPosition - editView->mClipLength;
+    edit->mClipLength = gpg::STR_Utf8Len(visibleText.c_str());
+    edit->mClipOffset = caretPosition - edit->mClipLength;
   }
 
   void CopyUtf8TextToClipboard(
@@ -4354,10 +4128,10 @@ namespace
   }
 
   [[nodiscard]] IMauiDragger* ResolveEditClickDragger(
-    CMauiEditRuntimeView* const editView
+    CMauiEdit* const edit
   ) noexcept
   {
-    return &editView->mClickDragger;
+    return &edit->mClickDragger;
   }
 
   /**
@@ -4368,23 +4142,23 @@ namespace
    * intrusive font ownership, and recomputes text clipping at current offset.
    */
   void ApplyEditFontAndRefreshClip(
-    CMauiEditRuntimeView* const editView,
+    CMauiEdit* const edit,
     const boost::SharedPtrRaw<CD3DFont>& requestedFont
   )
   {
-    if (!editView) {
+    if (!edit) {
       return;
     }
 
     if (requestedFont.px != nullptr) {
-      AssignIntrusiveFont(editView->mFont, requestedFont.px);
+      AssignIntrusiveFont(edit->mFont, requestedFont.px);
     } else {
       boost::SharedPtrRaw<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
-      AssignIntrusiveFont(editView->mFont, defaultFont.px);
+      AssignIntrusiveFont(edit->mFont, defaultFont.px);
       defaultFont.release();
     }
 
-    SetEditClipOffsetLeft(editView, editView->mClipOffset);
+    SetEditClipOffsetLeft(edit, edit->mClipOffset);
   }
 
   [[nodiscard]] moho::CD3DPrimBatcher::Vertex MakeBorderVertex(
@@ -4481,7 +4255,7 @@ namespace
 
   void RenderEditTextAt(
     moho::CMauiEdit* const edit,
-    const CMauiEditRuntimeView* const editView,
+    const CMauiEdit* const editView,
     moho::CD3DPrimBatcher* const primBatcher,
     const msvc8::string& text,
     const float x,
@@ -4506,7 +4280,7 @@ namespace
 
   float RenderEditTextRun(
     moho::CMauiEdit* const edit,
-    const CMauiEditRuntimeView* const editView,
+    const CMauiEdit* const editView,
     moho::CD3DPrimBatcher* const primBatcher,
     const msvc8::string& text,
     const float x,
@@ -6288,8 +6062,7 @@ int moho::cfunc_CMauiBitmapSetNewTextureL(
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  bitmapView->mTextureBatches.clear();
+  bitmap->mTextureBatches.clear();
   bitmap->SetFrame(0);
 
   int border = 1;
@@ -6399,8 +6172,7 @@ int moho::cfunc_CMauiBitmapInternalSetSolidColorL(
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  bitmapView->mTextureBatches.clear();
+  bitmap->mTextureBatches.clear();
   bitmap->SetFrame(0);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
@@ -6463,8 +6235,8 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetUV_LuaFuncDef()
  * Clamps one bitmap UV quad `(u0,v0,u1,v1)` to `[0,1]` and writes the
  * runtime UV lanes.
  */
-[[maybe_unused]] static moho::CMauiBitmapRuntimeView* func_SetBitmapUvClamped(
-  moho::CMauiBitmapRuntimeView* const bitmapView,
+[[maybe_unused]] static moho::CMauiBitmap* func_SetBitmapUvClamped(
+  moho::CMauiBitmap* const bitmap,
   const float u0,
   const float v0,
   const float u1,
@@ -6481,11 +6253,11 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetUV_LuaFuncDef()
     return value;
   };
 
-  bitmapView->mU0 = clamp01(u0);
-  bitmapView->mV0 = clamp01(v0);
-  bitmapView->mU1 = clamp01(u1);
-  bitmapView->mV1 = clamp01(v1);
-  return bitmapView;
+  bitmap->mU0 = clamp01(u0);
+  bitmap->mV0 = clamp01(v0);
+  bitmap->mU1 = clamp01(u1);
+  bitmap->mV1 = clamp01(v1);
+  return bitmap;
 }
 
 /**
@@ -6531,8 +6303,7 @@ int moho::cfunc_CMauiBitmapSetUVL(
   }
   float u0 = static_cast<float>(lua_tonumber(state->m_state, 2));
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  (void)func_SetBitmapUvClamped(bitmapView, u0, v0, u1, v1);
+  (void)func_SetBitmapUvClamped(bitmap, u0, v0, u1, v1);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6591,7 +6362,7 @@ int moho::cfunc_CMauiBitmapUseAlphaHitTestL(
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject enabledArg(state, 2);
-  (void)SetBitmapAlphaHitTestEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), enabledArg.GetBoolean());
+  (void)SetBitmapAlphaHitTestEnabled(bitmap, enabledArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6649,7 +6420,7 @@ int moho::cfunc_CMauiBitmapSetTiledL(
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject tiledArg(state, 2);
-  (void)SetBitmapTiledEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), tiledArg.GetBoolean());
+  (void)SetBitmapTiledEnabled(bitmap, tiledArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6706,7 +6477,7 @@ int moho::cfunc_CMauiBitmapLoopL(
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
   LuaPlus::LuaStackObject loopArg(state, 2);
-  (void)SetBitmapLoopEnabled(CMauiBitmapRuntimeView::FromBitmap(bitmap), loopArg.GetBoolean());
+  (void)SetBitmapLoopEnabled(bitmap, loopArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6762,7 +6533,7 @@ int moho::cfunc_CMauiBitmapPlayL(
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
 
-  (void)EnableBitmapAnimationIfMultipleTextures(CMauiBitmapRuntimeView::FromBitmap(bitmap));
+  (void)EnableBitmapAnimationIfMultipleTextures(bitmap);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -6938,7 +6709,7 @@ int moho::cfunc_CMauiBitmapGetFrameL(
 
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
-  const int frameIndex = ReadBitmapCurrentFrame(CMauiBitmapRuntimeView::FromBitmap(bitmap));
+  const int frameIndex = ReadBitmapCurrentFrame(bitmap);
 
   lua_pushnumber(state->m_state, static_cast<float>(frameIndex));
   (void)lua_gettop(state->m_state);
@@ -6995,7 +6766,7 @@ int moho::cfunc_CMauiBitMapGetNumFramesL(
 
   LuaPlus::LuaObject bitmapObject(LuaPlus::LuaStackObject(state, 1));
   CMauiBitmap* const bitmap = SCR_FromLua_CMauiBitmap(bitmapObject, state);
-  const int frameCount = CountBitmapFramePatternEntries(CMauiBitmapRuntimeView::FromBitmap(bitmap));
+  const int frameCount = CountBitmapFramePatternEntries(bitmap);
   lua_pushnumber(state->m_state, static_cast<float>(frameCount));
   (void)lua_gettop(state->m_state);
   return 1;
@@ -7040,13 +6811,13 @@ moho::CScrLuaInitForm* moho::func_CMauiBitmapSetFrameRate_LuaFuncDef()
  * What it does:
  * Updates one bitmap frame-duration lane from `frameRate` as `1.0f / fps`.
  */
-[[maybe_unused]] static moho::CMauiBitmapRuntimeView* func_SetBitmapFrameRate(
-  moho::CMauiBitmapRuntimeView* const bitmapView,
+[[maybe_unused]] static moho::CMauiBitmap* func_SetBitmapFrameRate(
+  moho::CMauiBitmap* const bitmap,
   const float frameRate
 ) noexcept
 {
-  bitmapView->mFrameDurationSeconds = 1.0f / frameRate;
-  return bitmapView;
+  bitmap->mFrameDurationSeconds = 1.0f / frameRate;
+  return bitmap;
 }
 
 /**
@@ -7074,8 +6845,7 @@ int moho::cfunc_CMauiBitmapSetFrameRateL(
   }
 
   const float frameRate = static_cast<float>(lua_tonumber(state->m_state, 2));
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(bitmap);
-  (void)func_SetBitmapFrameRate(bitmapView, frameRate);
+  (void)func_SetBitmapFrameRate(bitmap, frameRate);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -7493,8 +7263,7 @@ int moho::cfunc_CMauiControlDestroyL(
   LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
   CMauiControl* const control = ResolveControlFromLuaObjectOptionalOrError(controlObject, state);
   if (control != nullptr) {
-    const CMauiControlExtendedRuntimeView* const controlView = CMauiControlExtendedRuntimeView::FromControl(control);
-    if (control == controlView->mRootFrame) {
+    if (control == control->mRootFrame) {
       LuaPlus::LuaState::Error(state, "Cannot destroy the root frame");
     }
     control->Destroy();
@@ -7557,7 +7326,7 @@ int moho::cfunc_CMauiControlGetParentL(
 
   CMauiControl* const parent = control->GetParent();
   if (parent != nullptr) {
-    CMauiControlScriptObjectRuntimeView::FromControl(parent)->mLuaObj.PushStack(state);
+    parent->mLuaObj.PushStack(state);
   } else {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);
@@ -8532,7 +8301,7 @@ int moho::cfunc_CMauiControlGetCurrentFocusControlL(
 
   CMauiControl* const focusedControl = Maui_CurrentFocusControl.ResolveFocusedControl();
   if (focusedControl != nullptr) {
-    CMauiControlScriptObjectRuntimeView::FromControl(focusedControl)->mLuaObj.PushStack(state);
+    focusedControl->mLuaObj.PushStack(state);
     return 1;
   }
 
@@ -8831,7 +8600,7 @@ int moho::cfunc_CMauiControlGetRootFrameL(
   LuaPlus::LuaObject controlObject(LuaPlus::LuaStackObject(state, 1));
   CMauiControl* const control = SCR_FromLua_CMauiControl(controlObject, state);
   CMauiFrame* const rootFrame = control->GetRootFrame();
-  CMauiControlScriptObjectRuntimeView::FromControl(static_cast<CMauiControl*>(rootFrame))->mLuaObj.PushStack(state);
+  (static_cast<CMauiControl*>(rootFrame))->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -8911,10 +8680,8 @@ int moho::cfunc_CMauiControlSetAlphaL(
     if (traversalCursor != nullptr) {
       const std::uint32_t vertexAlpha = PackVertexAlphaFromScalar(alpha);
       do {
-        CMauiControlExtendedRuntimeView* const controlView =
-          CMauiControlExtendedRuntimeView::FromControl(traversalCursor);
-        controlView->mAlpha = alpha;
-        controlView->mVertexAlpha = vertexAlpha;
+        traversalCursor->mAlpha = alpha;
+        traversalCursor->mVertexAlpha = vertexAlpha;
         traversalCursor = traversalCursor->DepthFirstSuccessor(control);
       } while (traversalCursor != nullptr);
     }
@@ -9364,8 +9131,7 @@ int moho::cfunc_CMauiFrameGetTargetHeadL(
 
   LuaPlus::LuaObject frameObject(LuaPlus::LuaStackObject(state, 1));
   CMauiFrame* const frame = SCR_FromLua_CMauiFrame(frameObject, state);
-  const CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame);
-  lua_pushnumber(state->m_state, static_cast<float>(frameView->mTargetHead));
+  lua_pushnumber(state->m_state, static_cast<float>(frame->mTargetHead));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -9427,8 +9193,7 @@ int moho::cfunc_CMauiFrameSetTargetHeadL(
     LuaPlus::LuaStackObject::TypeError(&targetHeadArg, "number");
   }
 
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame);
-  frameView->mTargetHead = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
+  frame->mTargetHead = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -10910,13 +10675,12 @@ static void func_StartMouseScrubbing(
     }
   }
 
-  auto* const controlView = moho::CMauiControlRuntimeView::FromControl(control);
-  const float top = moho::CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float height = moho::CScriptLazyVar_float::GetValue(&controlView->mHeightLV);
+  const float top = moho::CScriptLazyVar_float::GetValue(&control->mTopLV);
+  const float height = moho::CScriptLazyVar_float::GetValue(&control->mHeightLV);
   const LONG scrubY = static_cast<LONG>(top + static_cast<float>(viewportRect.top) + (height * 0.5f));
 
-  const float left = moho::CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  const float width = moho::CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
+  const float left = moho::CScriptLazyVar_float::GetValue(&control->mLeftLV);
+  const float width = moho::CScriptLazyVar_float::GetValue(&control->mWidthLV);
   sMouseScrubAnchor.x = static_cast<LONG>(left + static_cast<float>(viewportRect.left) + (width * 0.5f));
   sMouseScrubAnchor.y = scrubY;
   ::SetCursorPos(sMouseScrubAnchor.x, sMouseScrubAnchor.y);
@@ -11472,8 +11236,7 @@ static void func_NewCommandDragger(
  * value the constructor chain stores verbatim into `SelectionDragger::mCam`
  * with no dereference in between), `session` from
  * `CUIWorldViewRuntimeView::mSession` (+0x208), and `originFrame` from
- * `CMauiControlExtendedRuntimeView::mRootFrame` (+0xFC, part of the
- * `CMauiControl` base layout); `eventData` is `HandleEvent`'s own event
+ * `CMauiControl::mRootFrame` (+0xFC); `eventData` is `HandleEvent`'s own event
  * argument forwarded through unchanged.
  */
 static moho::IMauiDragger* NewSelectionDragger(
@@ -12216,7 +11979,7 @@ int moho::cfunc_CMauiEditSetNewFontL(
 
   boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(pointSize, familyName);
   if (createdFont.px != nullptr) {
-    ApplyEditFontAndRefreshClip(CMauiEditRuntimeView::FromEdit(edit), createdFont);
+    ApplyEditFontAndRefreshClip(edit, createdFont);
     lua_settop(state->m_state, 1);
   } else {
     lua_pushnil(state->m_state);
@@ -12279,7 +12042,7 @@ int moho::cfunc_CMauiEditSetNewForegroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  (void)WriteEditForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject));
+  (void)WriteEditForegroundColorLane(edit, SCR_DecodeColor(state, colorObject));
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -12337,7 +12100,7 @@ int moho::cfunc_CMauiEditGetForegroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
+    SCR_EncodeColor(state, ReadEditForegroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -12397,8 +12160,7 @@ int moho::cfunc_CMauiEditSetNewBackgroundColorL(
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t backgroundColor = SCR_DecodeColor(state, colorObject);
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  (void)EnableEditBackgroundAndWriteColor(editView, backgroundColor);
+  (void)EnableEditBackgroundAndWriteColor(edit, backgroundColor);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -12456,7 +12218,7 @@ int moho::cfunc_CMauiEditGetBackgroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditBackgroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
+    SCR_EncodeColor(state, ReadEditBackgroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -12514,7 +12276,7 @@ int moho::cfunc_CMauiEditShowBackgroundL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject visibleArg(state, 2);
-  (void)WriteEditBackgroundVisibleLane(CMauiEditRuntimeView::FromEdit(edit), visibleArg.GetBoolean());
+  (void)WriteEditBackgroundVisibleLane(edit, visibleArg.GetBoolean());
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -12571,7 +12333,7 @@ int moho::cfunc_CMauiEditIsBackgroundVisibleL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushboolean(state->m_state, ReadEditBackgroundVisibleLaneAlias(CMauiEditRuntimeView::FromEdit(edit)));
+  lua_pushboolean(state->m_state, ReadEditBackgroundVisibleLaneAlias(edit));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -12859,7 +12621,7 @@ int moho::cfunc_CMauiEditGetCaretPositionL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushnumber(state->m_state, static_cast<float>(ReadEditCaretPositionLane(CMauiEditRuntimeView::FromEdit(edit))));
+  lua_pushnumber(state->m_state, static_cast<float>(ReadEditCaretPositionLane(edit)));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -12915,7 +12677,7 @@ int moho::cfunc_CMauiEditShowCaretL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject visibleArg(state, 2);
-  (void)WriteEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(edit), visibleArg.GetBoolean());
+  (void)WriteEditCaretVisibleLane(edit, visibleArg.GetBoolean());
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -12969,7 +12731,7 @@ int moho::cfunc_CMauiEditIsCaretVisibleL(
 
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
-  lua_pushboolean(state->m_state, ReadEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(edit)));
+  lua_pushboolean(state->m_state, ReadEditCaretVisibleLane(edit));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -13013,12 +12775,12 @@ moho::CScrLuaInitForm* moho::func_CMauiEditSetNewCaretColor_LuaFuncDef()
  * Masks one caret color lane to RGB24 and stores it in edit runtime state.
  */
 [[maybe_unused]] static std::uint32_t func_SetEditCaretColorRgb24(
-  moho::CMauiEditRuntimeView* const editView,
+  moho::CMauiEdit* const edit,
   const std::uint32_t color
 ) noexcept
 {
   const std::uint32_t color24 = color & 0x00FFFFFFu;
-  editView->mCaretColor = color24;
+  edit->mCaretColor = color24;
   return color24;
 }
 
@@ -13042,7 +12804,7 @@ int moho::cfunc_CMauiEditSetNewCaretColorL(
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   const std::uint32_t caretColor = SCR_DecodeColor(state, colorObject);
-  (void)func_SetEditCaretColorRgb24(CMauiEditRuntimeView::FromEdit(edit), caretColor);
+  (void)func_SetEditCaretColorRgb24(edit, caretColor);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -13097,7 +12859,7 @@ int moho::cfunc_CMauiEditGetCaretColorL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditCaretColorLane(CMauiEditRuntimeView::FromEdit(edit)));
+  LuaPlus::LuaObject colorObject = SCR_EncodeColor(state, ReadEditCaretColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -13161,10 +12923,9 @@ int moho::cfunc_CMauiEditSetCaretCycleL(
   LuaPlus::LuaObject offAlphaObject(LuaPlus::LuaStackObject(state, 3));
   LuaPlus::LuaObject onAlphaObject(LuaPlus::LuaStackObject(state, 4));
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
-  editView->mCaretCycleSeconds = cycleSeconds;
-  editView->mCaretCycleOnAlpha = static_cast<std::uint8_t>(SCR_DecodeColor(state, onAlphaObject));
-  editView->mCaretCycleOffAlpha = static_cast<std::uint8_t>(SCR_DecodeColor(state, offAlphaObject));
+  edit->mCaretCycleSeconds = cycleSeconds;
+  edit->mCaretCycleOnAlpha = static_cast<std::uint8_t>(SCR_DecodeColor(state, onAlphaObject));
+  edit->mCaretCycleOffAlpha = static_cast<std::uint8_t>(SCR_DecodeColor(state, offAlphaObject));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -13285,7 +13046,7 @@ int moho::cfunc_CMauiEditGetMaxCharsL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  lua_pushnumber(state->m_state, static_cast<float>(ReadEditMaxCharsLane(CMauiEditRuntimeView::FromEdit(edit))));
+  lua_pushnumber(state->m_state, static_cast<float>(ReadEditMaxCharsLane(edit)));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -13339,7 +13100,7 @@ int moho::cfunc_CMauiEditIsEnabledL(
 
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
-  lua_pushboolean(state->m_state, ReadEditInputEnabledLane(CMauiEditRuntimeView::FromEdit(edit)));
+  lua_pushboolean(state->m_state, ReadEditInputEnabledLane(edit));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -13510,7 +13271,7 @@ int moho::cfunc_CMauiEditSetNewHighlightForegroundColorL(
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   (void)WriteEditHighlightForegroundColorLane(
-    CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject)
+    edit, SCR_DecodeColor(state, colorObject)
   );
   lua_settop(state->m_state, 1);
   return 1;
@@ -13570,7 +13331,7 @@ int moho::cfunc_CMauiEditGetHighlightForegroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditHighlightForegroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
+    SCR_EncodeColor(state, ReadEditHighlightForegroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -13631,7 +13392,7 @@ int moho::cfunc_CMauiEditSetNewHighlightBackgroundColorL(
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
   (void)WriteEditHighlightBackgroundColorLane(
-    CMauiEditRuntimeView::FromEdit(edit), SCR_DecodeColor(state, colorObject)
+    edit, SCR_DecodeColor(state, colorObject)
   );
   lua_settop(state->m_state, 1);
   return 1;
@@ -13691,7 +13452,7 @@ int moho::cfunc_CMauiEditGetHighlightBackgroundColorL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaObject colorObject =
-    SCR_EncodeColor(state, ReadEditHighlightBackgroundColorLane(CMauiEditRuntimeView::FromEdit(edit)));
+    SCR_EncodeColor(state, ReadEditHighlightBackgroundColorLane(edit));
   colorObject.PushStack(state);
   return 1;
 }
@@ -13746,7 +13507,7 @@ int moho::cfunc_CMauiEditGetFontHeightL(
   LuaPlus::LuaObject editObject(LuaPlus::LuaStackObject(state, 1));
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
-  const float fontHeight = ReadEditFontHeightLane(CMauiEditRuntimeView::FromEdit(edit));
+  const float fontHeight = ReadEditFontHeightLane(edit);
   lua_pushnumber(state->m_state, static_cast<float>(static_cast<int>(fontHeight)));
   (void)lua_gettop(state->m_state);
   return 1;
@@ -13919,7 +13680,7 @@ int moho::cfunc_CMauiEditSetDropShadowL(
   CMauiEdit* const edit = SCR_FromLua_CMauiEdit(editObject, state);
 
   LuaPlus::LuaStackObject dropShadowArg(state, 2);
-  (void)WriteEditDropShadowLane(CMauiEditRuntimeView::FromEdit(edit), dropShadowArg.GetBoolean());
+  (void)WriteEditDropShadowLane(edit, dropShadowArg.GetBoolean());
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -13982,7 +13743,7 @@ int moho::cfunc_CMauiEditGetStringAdvanceL(
     LuaPlus::LuaStackObject::TypeError(&textArg, "string");
   }
 
-  const float advance = MeasureEditStringAdvanceOrZero(CMauiEditRuntimeView::FromEdit(edit), text);
+  const float advance = MeasureEditStringAdvanceOrZero(edit, text);
   lua_pushnumber(state->m_state, advance);
   (void)lua_gettop(state->m_state);
   return 1;
@@ -14045,8 +13806,7 @@ int moho::cfunc_CMauiHistogramSetXIncrementL(
     LuaPlus::LuaStackObject::TypeError(&incrementArg, "integer");
   }
 
-  CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(histogram);
-  histogramView->mXIncrement = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
+  histogram->mXIncrement = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -14108,8 +13868,7 @@ int moho::cfunc_CMauiHistogramSetYIncrementL(
     LuaPlus::LuaStackObject::TypeError(&incrementArg, "integer");
   }
 
-  CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(histogram);
-  histogramView->mYIncrement = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
+  histogram->mYIncrement = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -14252,7 +14011,7 @@ int moho::cfunc_InternalCreateBitmapL(
   auto* const bitmap = AllocateZeroedUiObject<CMauiBitmap>(0x18Cu);
   new (bitmap) CMauiBitmap(&luaObject, parentControl);
   bitmap->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(bitmap)->mLuaObj.PushStack(state);
+  bitmap->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14306,16 +14065,12 @@ int moho::cfunc_InternalCreateFrameL(
   }
 
   LuaPlus::LuaObject luaObject(LuaPlus::LuaStackObject(state, 1));
-  // Binary: `operator new(0x134)` - the frame's real object size. The recovered
-  // `CMauiFrame` is a thin behaviour class (the layout lives in
-  // CMauiFrameRuntimeView), so `sizeof` here is just the vptr: a plain `new`
-  // hands back a 4-byte block and the base ctor writes straight past it,
-  // corrupting the allocator's free list. Allocate the real size, construct in
-  // place - which is exactly what the binary does.
+  // Binary: `operator new(0x134)`, i.e. `sizeof(CMauiFrame)`, then the
+  // constructor in place.
   auto* const frame = AllocateZeroedUiObject<CMauiFrame>(0x134u);
   new (frame) CMauiFrame(&luaObject, nullptr);
   frame->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(frame)->mLuaObj.PushStack(state);
+  frame->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14434,7 +14189,7 @@ int moho::cfunc_InternalCreateBorderL(
   auto* const border = AllocateZeroedUiObject<CMauiBorder>(0x174u);
   new (border) CMauiBorder(&luaObject, parentControl);
   border->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(border)->mLuaObj.PushStack(state);
+  border->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14451,21 +14206,20 @@ moho::CMauiBorder::CMauiBorder(
 )
   : CMauiControl(luaObject, parent, "border")
 {
-  CMauiBorderRuntimeView* const borderView = CMauiBorderRuntimeView::FromBorder(this);
-  borderView->mTex1 = {};
-  borderView->mTexHorz = {};
-  borderView->mTexUL = {};
-  borderView->mTexUR = {};
-  borderView->mTexLL = {};
-  borderView->mTexLR = {};
+  mTex1 = {};
+  mTexHorz = {};
+  mTexUL = {};
+  mTexUR = {};
+  mTexLL = {};
+  mTexLR = {};
 
   LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&borderView->mBorderWidthLV) CScriptLazyVar_float(activeState);
-  new (&borderView->mBorderHeightLV) CScriptLazyVar_float(activeState);
+  new (&mBorderWidthLV) CScriptLazyVar_float(activeState);
+  new (&mBorderHeightLV) CScriptLazyVar_float(activeState);
 
-  LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
-  controlLuaObject.SetObject("BorderWidth", &AsLazyVarObject(borderView->mBorderWidthLV));
-  controlLuaObject.SetObject("BorderHeight", &AsLazyVarObject(borderView->mBorderHeightLV));
+  LuaPlus::LuaObject& controlLuaObject = mLuaObj;
+  controlLuaObject.SetObject("BorderWidth", &AsLazyVarObject(mBorderWidthLV));
+  controlLuaObject.SetObject("BorderHeight", &AsLazyVarObject(mBorderHeightLV));
 }
 
 /**
@@ -14477,9 +14231,8 @@ moho::CMauiBorder::CMauiBorder(
  */
 moho::CMauiBorder::~CMauiBorder()
 {
-  CMauiBorderRuntimeView* const borderView = CMauiBorderRuntimeView::FromBorder(this);
-  AsLazyVarObject(borderView->mBorderHeightLV).~LuaObject();
-  AsLazyVarObject(borderView->mBorderWidthLV).~LuaObject();
+  AsLazyVarObject(mBorderHeightLV).~LuaObject();
+  AsLazyVarObject(mBorderWidthLV).~LuaObject();
 
   // The container/handle members are destroyed by the compiler-emitted
   // member teardown after this body, in reverse declaration order, exactly
@@ -14544,7 +14297,7 @@ int moho::cfunc_InternalCreateEditL(
   auto* const edit = AllocateZeroedUiObject<CMauiEdit>(0x198u);
   new (edit) CMauiEdit(&luaObject, parentControl);
   edit->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(edit)->mLuaObj.PushStack(state);
+  edit->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14604,7 +14357,7 @@ int moho::cfunc_InternalCreateGroupL(
   auto* const group = AllocateZeroedUiObject<CMauiGroup>(0x11Cu);
   new (group) CMauiGroup(&luaObject, parentControl);
   group->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(group)->mLuaObj.PushStack(state);
+  group->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14690,7 +14443,7 @@ int moho::cfunc_InternalCreateHistogramL(
   auto* const histogram = AllocateZeroedUiObject<CMauiHistogram>(0x134u);
   new (histogram) CMauiHistogram(&luaObject, parentControl);
   histogram->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(histogram)->mLuaObj.PushStack(state);
+  histogram->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14707,10 +14460,9 @@ moho::CMauiHistogram::CMauiHistogram(
 )
   : CMauiControl(luaObject, parent, "group")
 {
-  CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(this);
-  histogramView->mDataStart = nullptr;
-  histogramView->mDataEnd = nullptr;
-  histogramView->mDataCapacity = nullptr;
+  mDataStart = nullptr;
+  mDataEnd = nullptr;
+  mDataCapacity = nullptr;
 }
 
 namespace
@@ -14767,17 +14519,16 @@ namespace
  */
 moho::CMauiHistogram::~CMauiHistogram()
 {
-  CMauiHistogramRuntimeView* const histogramView = CMauiHistogramRuntimeView::FromHistogram(this);
 
-  SHistogramColumn* const columns = histogramView->mDataStart;
+  SHistogramColumn* const columns = mDataStart;
   if (columns != nullptr) {
-    ReleaseHistogramColumnValueBuffers(columns, histogramView->mDataEnd);
+    ReleaseHistogramColumnValueBuffers(columns, mDataEnd);
     ::operator delete(columns);
   }
 
-  histogramView->mDataStart = nullptr;
-  histogramView->mDataEnd = nullptr;
-  histogramView->mDataCapacity = nullptr;
+  mDataStart = nullptr;
+  mDataEnd = nullptr;
+  mDataCapacity = nullptr;
 }
 
 /**
@@ -14861,7 +14612,7 @@ int moho::cfunc_InternalCreateMeshL(
   auto* const mesh = AllocateZeroedUiObject<CMauiMesh>(0x140u);
   new (mesh) CMauiMesh(&luaObject, parentControl);
   mesh->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(mesh)->mLuaObj.PushStack(state);
+  mesh->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14922,7 +14673,7 @@ int moho::cfunc_InternalCreateMovieL(
   auto* const movie = AllocateZeroedUiObject<CMauiMovie>(0x168u);
   new (movie) CMauiMovie(&luaObject, parentControl);
   movie->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(movie)->mLuaObj.PushStack(state);
+  movie->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -14994,7 +14745,7 @@ int moho::cfunc_InternalCreateScrollbarL(
   auto* const scrollbar = AllocateZeroedUiObject<CMauiScrollbar>(0x158u);
   new (scrollbar) CMauiScrollbar(&luaObject, parentControl, axis);
   scrollbar->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(scrollbar)->mLuaObj.PushStack(state);
+  scrollbar->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -15054,7 +14805,7 @@ int moho::cfunc_InternalCreateTextL(
   auto* const text = AllocateZeroedUiObject<CMauiText>(0x194u);
   new (text) CMauiText(&luaObject, parentControl);
   text->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(text)->mLuaObj.PushStack(state);
+  text->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -15071,26 +14822,25 @@ moho::CMauiText::CMauiText(
 )
   : CMauiControl(luaObject, parent, "text")
 {
-  CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
-  textView->mFont = nullptr;
-  new (&textView->mText) msvc8::string();
-  textView->mDropShadow = false;
-  textView->mClipToWidth = false;
-  textView->mCenteredHorizontally = false;
-  textView->mCenteredVertically = false;
-  textView->mColor = static_cast<std::uint32_t>(-1);
+  mFont = nullptr;
+  new (&mText) msvc8::string();
+  mDropShadow = false;
+  mClipToWidth = false;
+  mCenteredHorizontally = false;
+  mCenteredVertically = false;
+  mColor = static_cast<std::uint32_t>(-1);
 
   LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&textView->mTextAdvanceLV) CScriptLazyVar_float(activeState);
-  new (&textView->mFontAscentLV) CScriptLazyVar_float(activeState);
-  new (&textView->mFontDescentLV) CScriptLazyVar_float(activeState);
-  new (&textView->mFontExternalLeadingLV) CScriptLazyVar_float(activeState);
+  new (&mTextAdvanceLV) CScriptLazyVar_float(activeState);
+  new (&mFontAscentLV) CScriptLazyVar_float(activeState);
+  new (&mFontDescentLV) CScriptLazyVar_float(activeState);
+  new (&mFontExternalLeadingLV) CScriptLazyVar_float(activeState);
 
-  LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
-  controlLuaObject.SetObject("TextAdvance", &AsLazyVarObject(textView->mTextAdvanceLV));
-  controlLuaObject.SetObject("FontAscent", &AsLazyVarObject(textView->mFontAscentLV));
-  controlLuaObject.SetObject("FontDescent", &AsLazyVarObject(textView->mFontDescentLV));
-  controlLuaObject.SetObject("FontExternalLeading", &AsLazyVarObject(textView->mFontExternalLeadingLV));
+  LuaPlus::LuaObject& controlLuaObject = mLuaObj;
+  controlLuaObject.SetObject("TextAdvance", &AsLazyVarObject(mTextAdvanceLV));
+  controlLuaObject.SetObject("FontAscent", &AsLazyVarObject(mFontAscentLV));
+  controlLuaObject.SetObject("FontDescent", &AsLazyVarObject(mFontDescentLV));
+  controlLuaObject.SetObject("FontExternalLeading", &AsLazyVarObject(mFontExternalLeadingLV));
 }
 
 /**
@@ -15108,13 +14858,12 @@ moho::CMauiText::CMauiText(
  */
 moho::CMauiText::~CMauiText()
 {
-  CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
-  AsLazyVarObject(textView->mFontExternalLeadingLV).~LuaObject();
-  AsLazyVarObject(textView->mFontDescentLV).~LuaObject();
-  AsLazyVarObject(textView->mFontAscentLV).~LuaObject();
-  AsLazyVarObject(textView->mTextAdvanceLV).~LuaObject();
+  AsLazyVarObject(mFontExternalLeadingLV).~LuaObject();
+  AsLazyVarObject(mFontDescentLV).~LuaObject();
+  AsLazyVarObject(mFontAscentLV).~LuaObject();
+  AsLazyVarObject(mTextAdvanceLV).~LuaObject();
 
-  ReleaseIntrusiveFont(textView->mFont);
+  ReleaseIntrusiveFont(mFont);
 
   // The container/handle members are destroyed by the compiler-emitted
   // member teardown after this body, in reverse declaration order, exactly
@@ -15135,23 +14884,22 @@ moho::CMauiItemList::CMauiItemList(
 )
   : CMauiControl(luaObject, parent, "itemlist")
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  itemListView->mFont = nullptr;
-  itemListView->mForegroundColor = 0xFF808080u;
-  itemListView->mBackgroundColor = 0xFF000000u;
-  itemListView->mSelectedForegroundColor = 0xFF000000u;
-  itemListView->mSelectedBackgroundColor = 0xFF808080u;
-  itemListView->mHighlightForegroundColor = 0xFFA0A0A0u;
-  itemListView->mHighlightBackgroundColor = 0xFF202020u;
-  itemListView->mItems.release_storage_without_free();
-  itemListView->mCurSelection = -1;
-  itemListView->mHoverItem = -1;
-  itemListView->mShowSelection = true;
-  itemListView->mShowMouseoverItem = false;
-  itemListView->mScrollPosition = 0;
+  mFont = nullptr;
+  mForegroundColor = 0xFF808080u;
+  mBackgroundColor = 0xFF000000u;
+  mSelectedForegroundColor = 0xFF000000u;
+  mSelectedBackgroundColor = 0xFF808080u;
+  mHighlightForegroundColor = 0xFFA0A0A0u;
+  mHighlightBackgroundColor = 0xFF202020u;
+  mItems.release_storage_without_free();
+  mCurSelection = -1;
+  mHoverItem = -1;
+  mShowSelection = true;
+  mShowMouseoverItem = false;
+  mScrollPosition = 0;
 
   boost::SharedPtrRaw<CD3DFont> createdFont = CD3DFont::Create(16, "New Times Roman");
-  AssignIntrusiveFont(itemListView->mFont, createdFont.px);
+  AssignIntrusiveFont(mFont, createdFont.px);
   createdFont.release();
 }
 
@@ -15212,7 +14960,7 @@ int moho::cfunc_InternalCreateItemListL(
   auto* const itemList = AllocateZeroedUiObject<CMauiItemList>(0x158u);
   new (itemList) CMauiItemList(&luaObject, parentControl);
   itemList->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(itemList)->mLuaObj.PushStack(state);
+  itemList->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -15344,7 +15092,7 @@ int moho::cfunc_CMauiItemListSetNewColorsL(
 
   auto itemListObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 1));
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  auto* const itemListView = reinterpret_cast<CMauiItemListRuntimeView*>(itemList);
+  auto* const itemListView = reinterpret_cast<CMauiItemList*>(itemList);
 
   if (lua_type(state->m_state, 2) != LUA_TNIL) {
     auto colorObject = LuaPlus::LuaObject(LuaPlus::LuaStackObject(state, 2));
@@ -15434,8 +15182,7 @@ int moho::cfunc_CMauiItemListSetSelectionL(
   const int index = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
 
   if (index >= 0) {
-    CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-    (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(index));
+    (void)SetItemListSelectionByRow(*itemList, static_cast<std::uint32_t>(index));
   }
 
   lua_settop(state->m_state, 1);
@@ -15500,8 +15247,7 @@ int moho::cfunc_CMauiItemListGetItemL(
   }
   const int index = static_cast<std::int32_t>(lua_tonumber(state->m_state, 2));
 
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  msvc8::string* const itemBase = itemListView->mItems.data();
+  msvc8::string* const itemBase = itemList->mItems.data();
   const msvc8::string& itemName = itemBase[index];
   lua_pushstring(state->m_state, itemName.c_str());
   (void)lua_gettop(state->m_state);
@@ -15558,8 +15304,7 @@ int moho::cfunc_CMauiItemListGetItemCountL(
 
   LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
   const CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  const int itemCount = GetItemListEntryCount(*itemListView);
+  const int itemCount = GetItemListEntryCount(*itemList);
 
   lua_pushnumber(state->m_state, static_cast<float>(static_cast<std::uint32_t>(itemCount)));
   (void)lua_gettop(state->m_state);
@@ -15615,8 +15360,7 @@ int moho::cfunc_CMauiItemListEmptyL(
 
   LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
   const CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  const int itemCount = GetItemListEntryCount(*itemListView);
+  const int itemCount = GetItemListEntryCount(*itemList);
 
   lua_pushboolean(state->m_state, itemCount == 0);
   (void)lua_gettop(state->m_state);
@@ -15845,8 +15589,7 @@ int moho::cfunc_CMauiItemListGetRowHeightL(
 
   LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
   const CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  const CD3DFont* const font = itemListView->mFont;
+  const CD3DFont* const font = itemList->mFont;
 
   lua_pushnumber(state->m_state, font->mExternalLeading + font->mHeight);
   (void)lua_gettop(state->m_state);
@@ -15905,8 +15648,7 @@ int moho::cfunc_CMauiItemListShowMouseoverItemL(
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
 
   LuaPlus::LuaStackObject flagArg(state, 2);
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  itemListView->mShowMouseoverItem = LuaPlus::LuaStackObject::GetBoolean(&flagArg);
+  itemList->mShowMouseoverItem = LuaPlus::LuaStackObject::GetBoolean(&flagArg);
   return 0;
 }
 
@@ -15962,8 +15704,7 @@ int moho::cfunc_CMauiItemListShowSelectionL(
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
 
   LuaPlus::LuaStackObject flagArg(state, 2);
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  itemListView->mShowSelection = LuaPlus::LuaStackObject::GetBoolean(&flagArg);
+  itemList->mShowSelection = LuaPlus::LuaStackObject::GetBoolean(&flagArg);
   return 0;
 }
 
@@ -16033,9 +15774,8 @@ int moho::cfunc_CMauiItemListNeedsScrollBarL(
  */
 moho::CMauiItemList::~CMauiItemList()
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  itemListView->mItems = msvc8::vector<msvc8::string>{};
-  ReleaseIntrusiveFont(itemListView->mFont);
+  mItems = msvc8::vector<msvc8::string>{};
+  ReleaseIntrusiveFont(mFont);
 }
 
 /**
@@ -16049,14 +15789,13 @@ void moho::CMauiItemList::SetFont(
   CD3DFont* const font
 )
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
   if (font != nullptr) {
-    AssignIntrusiveFont(itemListView->mFont, font);
+    AssignIntrusiveFont(mFont, font);
     return;
   }
 
   boost::SharedPtrRaw<CD3DFont> defaultFont = CD3DFont::Create(16, "New Times Roman");
-  AssignIntrusiveFont(itemListView->mFont, defaultFont.px);
+  AssignIntrusiveFont(mFont, defaultFont.px);
   defaultFont.release();
 }
 
@@ -16077,28 +15816,25 @@ void moho::CMauiItemList::DoRender(
   const std::int32_t /*drawMask*/
 )
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  const CD3DFont* const font = itemListView->mFont;
+  const CD3DFont* const font = mFont;
   if (font == nullptr) {
     return;
   }
 
-  const CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
 
   const std::int32_t visibleLineCount = LinesVisible();
 
-  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
-  const std::uint32_t vertexColor = extendedView->mVertexAlpha;
+  const std::uint32_t vertexColor = mVertexAlpha;
 
   // Background quad spanning the full control rectangle.
   {
     const boost::shared_ptr<CD3DBatchTexture> backgroundTexture =
-      CD3DBatchTexture::FromSolidColor(itemListView->mBackgroundColor);
+      CD3DBatchTexture::FromSolidColor(mBackgroundColor);
     primBatcher->SetTexture(backgroundTexture);
 
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
@@ -16111,16 +15847,16 @@ void moho::CMauiItemList::DoRender(
   const float rowHeight = font->mHeight + font->mExternalLeading;
 
   // Mouse-over highlight row quad.
-  if (itemListView->mShowMouseoverItem) {
-    const std::int32_t hoverItem = itemListView->mHoverItem;
-    const std::int32_t scrollPosition = itemListView->mScrollPosition;
+  if (mShowMouseoverItem) {
+    const std::int32_t hoverItem = mHoverItem;
+    const std::int32_t scrollPosition = mScrollPosition;
     if (hoverItem >= scrollPosition && hoverItem < scrollPosition + visibleLineCount) {
       const std::int32_t visibleRow = hoverItem - scrollPosition;
       const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
       const float rowBottom = font->mHeight + rowTop;
 
       const boost::shared_ptr<CD3DBatchTexture> highlightTexture =
-        CD3DBatchTexture::FromSolidColor(itemListView->mHighlightBackgroundColor);
+        CD3DBatchTexture::FromSolidColor(mHighlightBackgroundColor);
       primBatcher->SetTexture(highlightTexture);
 
       const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, rowTop, vertexColor, 0.0f, 0.0f);
@@ -16132,16 +15868,16 @@ void moho::CMauiItemList::DoRender(
   }
 
   // Selection highlight row quad.
-  if (itemListView->mShowSelection) {
-    const std::int32_t curSelection = itemListView->mCurSelection;
-    const std::int32_t scrollPosition = itemListView->mScrollPosition;
+  if (mShowSelection) {
+    const std::int32_t curSelection = mCurSelection;
+    const std::int32_t scrollPosition = mScrollPosition;
     if (curSelection >= scrollPosition && curSelection < scrollPosition + visibleLineCount) {
       const std::int32_t visibleRow = curSelection - scrollPosition;
       const float rowTop = rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + top;
       const float rowBottom = font->mHeight + rowTop;
 
       const boost::shared_ptr<CD3DBatchTexture> selectedTexture =
-        CD3DBatchTexture::FromSolidColor(itemListView->mSelectedBackgroundColor);
+        CD3DBatchTexture::FromSolidColor(mSelectedBackgroundColor);
       primBatcher->SetTexture(selectedTexture);
 
       const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, rowTop, vertexColor, 0.0f, 0.0f);
@@ -16158,20 +15894,20 @@ void moho::CMauiItemList::DoRender(
   }
 
   for (std::int32_t visibleRow = 0; visibleRow < visibleLineCount; ++visibleRow) {
-    const msvc8::string* const itemStorage = itemListView->mItems.data();
-    const std::int32_t itemIndex = visibleRow + itemListView->mScrollPosition;
-    if (itemStorage == nullptr || static_cast<std::uint32_t>(itemIndex) >= itemListView->mItems.size()) {
+    const msvc8::string* const itemStorage = mItems.data();
+    const std::int32_t itemIndex = visibleRow + mScrollPosition;
+    if (itemStorage == nullptr || static_cast<std::uint32_t>(itemIndex) >= mItems.size()) {
       break;
     }
 
-    std::uint32_t textColor = itemListView->mForegroundColor;
-    if (itemIndex == itemListView->mHoverItem && itemListView->mShowMouseoverItem) {
-      textColor = itemListView->mHighlightForegroundColor;
-    } else if (itemIndex == itemListView->mCurSelection && itemListView->mShowSelection) {
-      textColor = itemListView->mSelectedForegroundColor;
+    std::uint32_t textColor = mForegroundColor;
+    if (itemIndex == mHoverItem && mShowMouseoverItem) {
+      textColor = mHighlightForegroundColor;
+    } else if (itemIndex == mCurSelection && mShowSelection) {
+      textColor = mSelectedForegroundColor;
     }
 
-    const float maxAdvance = CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
+    const float maxAdvance = CScriptLazyVar_float::GetValue(&mWidthLV);
     const float baselineY =
       rowHeight * static_cast<float>(static_cast<std::uint32_t>(visibleRow)) + font->mAscent + top;
 
@@ -16179,7 +15915,7 @@ void moho::CMauiItemList::DoRender(
     const Wm3::Vector3f origin{left, baselineY, 0.0f};
     const Wm3::Vector3f xAxis{1.0f, 0.0f, 0.0f};
     const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
-    (void)itemListView->mFont->Render(itemText.c_str(), primBatcher, origin, xAxis, yAxis, textColor, 1.0f, maxAdvance);
+    (void)mFont->Render(itemText.c_str(), primBatcher, origin, xAxis, yAxis, textColor, 1.0f, maxAdvance);
   }
 }
 
@@ -16195,9 +15931,8 @@ void moho::CMauiItemList::ModifyItem(
   msvc8::string text
 )
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  msvc8::string* const itemBase = itemListView->mItems.data();
-  const std::uint32_t itemCount = itemBase != nullptr ? static_cast<std::uint32_t>(itemListView->mItems.size()) : 0u;
+  msvc8::string* const itemBase = mItems.data();
+  const std::uint32_t itemCount = itemBase != nullptr ? static_cast<std::uint32_t>(mItems.size()) : 0u;
 
   if (itemBase == nullptr || index >= itemCount) {
     throw std::runtime_error(
@@ -16219,17 +15954,16 @@ void moho::CMauiItemList::DeleteItem(
   const std::int32_t index
 )
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
   if (index < 0) {
     return;
   }
 
-  msvc8::string* const itemBase = itemListView->mItems.data();
-  if (itemBase == nullptr || static_cast<std::size_t>(index) >= itemListView->mItems.size()) {
+  msvc8::string* const itemBase = mItems.data();
+  if (itemBase == nullptr || static_cast<std::size_t>(index) >= mItems.size()) {
     return;
   }
 
-  RemoveItemListEntryAtIndex(itemListView, index);
+  RemoveItemListEntryAtIndex(this, index);
 }
 
 /**
@@ -16242,7 +15976,7 @@ void moho::CMauiItemList::AddItem(
   msvc8::string text
 )
 {
-  CMauiItemListRuntimeView::FromItemList(this)->mItems.push_back(text);
+  mItems.push_back(text);
 }
 
 /**
@@ -16256,16 +15990,15 @@ std::int32_t moho::CMauiItemList::GetItem(
   const float yCoordinate
 )
 {
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  const CD3DFont* const font = itemListView->mFont;
+  const CD3DFont* const font = mFont;
 
-  const float localY = yCoordinate - CScriptLazyVar_float::GetValue(&itemListView->mTopLV);
+  const float localY = yCoordinate - CScriptLazyVar_float::GetValue(&mTopLV);
   const float rowHeight = font->mExternalLeading + font->mHeight;
 
-  const auto* const itemBase = itemListView->mItems.data();
-  const std::int32_t rowIndex = itemListView->mScrollPosition + static_cast<std::int32_t>(localY / rowHeight);
+  const auto* const itemBase = mItems.data();
+  const std::int32_t rowIndex = mScrollPosition + static_cast<std::int32_t>(localY / rowHeight);
   if (
-    itemBase != nullptr && rowIndex >= 0 && static_cast<std::size_t>(rowIndex) < itemListView->mItems.size() &&
+    itemBase != nullptr && rowIndex >= 0 && static_cast<std::size_t>(rowIndex) < mItems.size() &&
     font->mHeight > std::fmod(localY, rowHeight)
   ) {
     return rowIndex;
@@ -16283,26 +16016,25 @@ std::int32_t moho::CMauiItemList::GetItem(
 void moho::CMauiItemList::Dump()
 {
   CMauiControl::Dump();
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
 
   gpg::Logf("CMauiItemList");
   gpg::Logf(
     "FG Color = %#08X BG Color = %#08X HLFG Color = %#08X HLBG Color = %#08X MOFG Color = %#08X MOBG Color = %#08X",
-    itemListView->mForegroundColor,
-    itemListView->mBackgroundColor,
-    itemListView->mSelectedForegroundColor,
-    itemListView->mSelectedBackgroundColor,
-    itemListView->mHighlightForegroundColor,
-    itemListView->mHighlightBackgroundColor
+    mForegroundColor,
+    mBackgroundColor,
+    mSelectedForegroundColor,
+    mSelectedBackgroundColor,
+    mHighlightForegroundColor,
+    mHighlightBackgroundColor
   );
 
-  const std::int32_t curSelection = itemListView->mCurSelection;
+  const std::int32_t curSelection = mCurSelection;
   if (curSelection == -1) {
     gpg::Logf("Current Selection = %d Text = %s", curSelection, "");
     return;
   }
 
-  const msvc8::string* const itemStorage = itemListView->mItems.data();
+  const msvc8::string* const itemStorage = mItems.data();
   const msvc8::string& selectedItem = itemStorage[curSelection];
   gpg::Logf("Current Selection = %d Text = %s", curSelection, selectedItem.c_str());
 }
@@ -16318,13 +16050,12 @@ moho::SMauiScrollValues moho::CMauiItemList::GetScrollValues(
 )
 {
   const int visibleLineCount = LinesVisible();
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
 
   SMauiScrollValues scrollValues{};
   scrollValues.mMinRange = 0.0f;
-  scrollValues.mMaxRange = static_cast<float>(GetItemListEntryCount(*itemListView));
-  scrollValues.mMinVisible = static_cast<float>(itemListView->mScrollPosition);
-  scrollValues.mMaxVisible = static_cast<float>(itemListView->mScrollPosition + visibleLineCount);
+  scrollValues.mMaxRange = static_cast<float>(GetItemListEntryCount(*this));
+  scrollValues.mMinVisible = static_cast<float>(mScrollPosition);
+  scrollValues.mMaxVisible = static_cast<float>(mScrollPosition + visibleLineCount);
   return scrollValues;
 }
 
@@ -16341,11 +16072,10 @@ void moho::CMauiItemList::ScrollLines(
 )
 {
   const int visibleLineCount = LinesVisible();
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+  int clampedTop = GetItemListEntryCount(*this) - visibleLineCount;
 
   const int lineDelta = static_cast<int>(std::nearbyintf(amount));
-  const int candidateTop = itemListView->mScrollPosition + lineDelta;
+  const int candidateTop = mScrollPosition + lineDelta;
   if (candidateTop < clampedTop) {
     clampedTop = candidateTop;
   }
@@ -16354,7 +16084,7 @@ void moho::CMauiItemList::ScrollLines(
     clampedTop = 0;
   }
 
-  itemListView->mScrollPosition = clampedTop;
+  mScrollPosition = clampedTop;
 }
 
 /**
@@ -16370,8 +16100,7 @@ void moho::CMauiItemList::ScrollSetTop(
 )
 {
   const int visibleLineCount = LinesVisible();
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+  int clampedTop = GetItemListEntryCount(*this) - visibleLineCount;
 
   const int requestedTop = static_cast<int>(std::nearbyintf(amount));
   if (requestedTop < clampedTop) {
@@ -16382,7 +16111,7 @@ void moho::CMauiItemList::ScrollSetTop(
     clampedTop = 0;
   }
 
-  itemListView->mScrollPosition = clampedTop;
+  mScrollPosition = clampedTop;
 }
 
 /**
@@ -16398,13 +16127,12 @@ void moho::CMauiItemList::ScrollPages(
 )
 {
   const int visibleLineCount = LinesVisible();
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  int clampedTop = GetItemListEntryCount(*itemListView) - visibleLineCount;
+  int clampedTop = GetItemListEntryCount(*this) - visibleLineCount;
 
   const auto visibleLineCountUnsigned = static_cast<std::uint32_t>(visibleLineCount);
   const float scaledDelta = static_cast<float>(visibleLineCountUnsigned) * amount;
   const int pageDelta = static_cast<int>(std::nearbyintf(scaledDelta));
-  const int candidateTop = itemListView->mScrollPosition + pageDelta;
+  const int candidateTop = mScrollPosition + pageDelta;
   if (candidateTop < clampedTop) {
     clampedTop = candidateTop;
   }
@@ -16413,7 +16141,7 @@ void moho::CMauiItemList::ScrollPages(
     clampedTop = 0;
   }
 
-  itemListView->mScrollPosition = clampedTop;
+  mScrollPosition = clampedTop;
 }
 
 /**
@@ -16425,25 +16153,24 @@ void moho::CMauiItemList::ScrollPages(
  */
 std::int32_t moho::CMauiItemList::LinesVisible()
 {
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  const CD3DFont* const font = itemListView->mFont;
-  const float controlHeight = CScriptLazyVar_float::GetValue(&itemListView->mHeightLV);
+  const CD3DFont* const font = mFont;
+  const float controlHeight = CScriptLazyVar_float::GetValue(&mHeightLV);
   const float lineHeight = font->mHeight + font->mExternalLeading;
   const float visibleLineRatio = (font->mExternalLeading + controlHeight) / lineHeight;
   const int visibleLineCount = static_cast<std::int32_t>(std::floor(visibleLineRatio));
 
-  const int itemCount = GetItemListEntryCount(*itemListView);
+  const int itemCount = GetItemListEntryCount(*this);
   if (visibleLineCount > itemCount) {
-    itemListView->mScrollPosition = 0;
+    mScrollPosition = 0;
     return itemCount;
   }
 
-  if (visibleLineCount + itemListView->mScrollPosition > itemCount) {
+  if (visibleLineCount + mScrollPosition > itemCount) {
     if (itemCount == 0) {
-      itemListView->mScrollPosition = -visibleLineCount;
+      mScrollPosition = -visibleLineCount;
       return visibleLineCount;
     }
-    itemListView->mScrollPosition = itemCount - visibleLineCount;
+    mScrollPosition = itemCount - visibleLineCount;
   }
 
   return visibleLineCount;
@@ -16458,8 +16185,7 @@ std::int32_t moho::CMauiItemList::LinesVisible()
  */
 void moho::CMauiItemList::ScrollToBottom()
 {
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  const int itemCount = GetItemListEntryCount(*itemListView);
+  const int itemCount = GetItemListEntryCount(*this);
   ScrollSetTop(kVerticalScrollAxis, static_cast<float>(itemCount));
 }
 
@@ -16474,8 +16200,7 @@ void moho::CMauiItemList::ShowItem(
 )
 {
   const std::int32_t visibleLineCount = LinesVisible();
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  const std::int32_t scrollPosition = itemListView->mScrollPosition;
+  const std::int32_t scrollPosition = mScrollPosition;
   if (index < scrollPosition || index >= (scrollPosition + visibleLineCount)) {
     ScrollSetTop(kVerticalScrollAxis, static_cast<float>(index));
   }
@@ -16514,7 +16239,6 @@ bool moho::CMauiItemList::HandleEvent(
     return true;
   }
 
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
   CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
 
   const auto runClickRowCallback = [&]() {
@@ -16525,7 +16249,7 @@ bool moho::CMauiItemList::HandleEvent(
 
     const char* const callbackName = eventData.mEventType == MET_ButtonPress ? "OnClick" : "OnDoubleClick";
     LuaPlus::LuaState* const activeState =
-      CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
+      mLuaObj.GetActiveState();
     LuaPlus::LuaObject eventObject{};
     const LuaPlus::LuaObject* const createdEvent =
       CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);
@@ -16534,23 +16258,23 @@ bool moho::CMauiItemList::HandleEvent(
 
   switch (eventData.mEventType) {
   case MET_MouseMotion: {
-    if (!itemListView->mShowMouseoverItem) {
+    if (!mShowMouseoverItem) {
       return false;
     }
 
-    const std::int32_t previousHover = itemListView->mHoverItem;
+    const std::int32_t previousHover = mHoverItem;
     const std::int32_t newHover = GetItem(eventData.mMousePos.y);
-    itemListView->mHoverItem = newHover;
+    mHoverItem = newHover;
     if (previousHover != newHover) {
-      scriptObject->CallbackInt("OnMouseoverItem", itemListView->mHoverItem);
+      scriptObject->CallbackInt("OnMouseoverItem", mHoverItem);
     }
     return true;
   }
 
   case MET_MouseExit: {
-    if (itemListView->mHoverItem != -1) {
-      itemListView->mHoverItem = -1;
-      scriptObject->CallbackInt("OnMouseoverItem", itemListView->mHoverItem);
+    if (mHoverItem != -1) {
+      mHoverItem = -1;
+      scriptObject->CallbackInt("OnMouseoverItem", mHoverItem);
     }
     return true;
   }
@@ -16571,67 +16295,67 @@ bool moho::CMauiItemList::HandleEvent(
     switch (eventData.mKeyCode) {
     case MKEY_PRIOR:
     case MKEY_PAGEUP: {
-      const std::int32_t cursorOffsetInPage = itemListView->mCurSelection - itemListView->mScrollPosition;
-      const std::int32_t scrollBeforePage = itemListView->mScrollPosition;
+      const std::int32_t cursorOffsetInPage = mCurSelection - mScrollPosition;
+      const std::int32_t scrollBeforePage = mScrollPosition;
       ScrollPages(kVerticalScrollAxis, -1.0f);
 
       std::int32_t newRow = 0;
-      if (scrollBeforePage != itemListView->mScrollPosition) {
-        newRow = itemListView->mScrollPosition + cursorOffsetInPage;
+      if (scrollBeforePage != mScrollPosition) {
+        newRow = mScrollPosition + cursorOffsetInPage;
       }
-      (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      (void)SetItemListSelectionByRow(*this, static_cast<std::uint32_t>(newRow));
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
     case MKEY_NEXT:
     case MKEY_PAGEDOWN: {
-      const std::int32_t cursorOffsetInPage = itemListView->mCurSelection - itemListView->mScrollPosition;
-      const std::int32_t scrollBeforePage = itemListView->mScrollPosition;
+      const std::int32_t cursorOffsetInPage = mCurSelection - mScrollPosition;
+      const std::int32_t scrollBeforePage = mScrollPosition;
       ScrollPages(kVerticalScrollAxis, 1.0f);
 
-      const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
+      const std::int32_t lastRow = GetItemListEntryCount(*this) - 1;
       std::int32_t newRow = lastRow;
-      if (scrollBeforePage != itemListView->mScrollPosition) {
-        const std::int32_t candidate = itemListView->mScrollPosition + cursorOffsetInPage;
+      if (scrollBeforePage != mScrollPosition) {
+        const std::int32_t candidate = mScrollPosition + cursorOffsetInPage;
         newRow = candidate >= lastRow ? lastRow : candidate;
       }
-      (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      (void)SetItemListSelectionByRow(*this, static_cast<std::uint32_t>(newRow));
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
     case MKEY_END: {
       ScrollToBottom();
-      const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
-      (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(lastRow));
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      const std::int32_t lastRow = GetItemListEntryCount(*this) - 1;
+      (void)SetItemListSelectionByRow(*this, static_cast<std::uint32_t>(lastRow));
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
     case MKEY_HOME: {
       ScrollSetTop(kVerticalScrollAxis, 0.0f);
-      (void)SetItemListSelectionByRow(*itemListView, 0u);
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      (void)SetItemListSelectionByRow(*this, 0u);
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
     case MKEY_UP: {
-      const std::int32_t candidate = itemListView->mCurSelection - 1;
+      const std::int32_t candidate = mCurSelection - 1;
       const std::int32_t newRow = candidate <= 0 ? 0 : candidate;
-      (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
-      ShowItem(itemListView->mCurSelection);
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      (void)SetItemListSelectionByRow(*this, static_cast<std::uint32_t>(newRow));
+      ShowItem(mCurSelection);
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
     case MKEY_DOWN: {
-      const std::int32_t lastRow = GetItemListEntryCount(*itemListView) - 1;
-      const std::int32_t candidate = itemListView->mCurSelection + 1;
+      const std::int32_t lastRow = GetItemListEntryCount(*this) - 1;
+      const std::int32_t candidate = mCurSelection + 1;
       const std::int32_t newRow = candidate >= lastRow ? lastRow : candidate;
-      (void)SetItemListSelectionByRow(*itemListView, static_cast<std::uint32_t>(newRow));
-      ShowItem(itemListView->mCurSelection);
-      scriptObject->CallbackInt("OnKeySelect", itemListView->mCurSelection);
+      (void)SetItemListSelectionByRow(*this, static_cast<std::uint32_t>(newRow));
+      ShowItem(mCurSelection);
+      scriptObject->CallbackInt("OnKeySelect", mCurSelection);
       return true;
     }
 
@@ -16660,8 +16384,7 @@ bool moho::CMauiItemList::HandleEvent(
 bool moho::CMauiItemList::NeedsScrollBar()
 {
   const int visibleLineCount = LinesVisible();
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(this);
-  return visibleLineCount < GetItemListEntryCount(*itemListView);
+  return visibleLineCount < GetItemListEntryCount(*this);
 }
 
 /**
@@ -16947,10 +16670,9 @@ int moho::cfunc_CMauiItemListDeleteAllItemsL(
 
   LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
-  CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
 
-  itemListView->mItems.clear();
-  itemListView->mCurSelection = -1;
+  itemList->mItems.clear();
+  itemList->mCurSelection = -1;
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -16974,7 +16696,7 @@ int moho::cfunc_CMauiItemListGetSelectionL(
   LuaPlus::LuaObject itemListObject(LuaPlus::LuaStackObject(state, 1));
   CMauiItemList* const itemList = SCR_FromLua_CMauiItemList(itemListObject, state);
 
-  lua_pushnumber(state->m_state, static_cast<float>(CMauiItemListRuntimeView::FromItemList(itemList)->mCurSelection));
+  lua_pushnumber(state->m_state, static_cast<float>(itemList->mCurSelection));
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -17037,8 +16759,7 @@ int moho::cfunc_CMauiItemListGetStringAdvanceL(
     LuaPlus::LuaStackObject::TypeError(&textArg, "string");
   }
 
-  const CMauiItemListRuntimeView* const itemListView = CMauiItemListRuntimeView::FromItemList(itemList);
-  CD3DFont* const font = itemListView->mFont;
+  CD3DFont* const font = itemList->mFont;
   const float advance = font != nullptr ? font->GetAdvance(text, 0) : 0.0f;
   lua_pushnumber(state->m_state, advance);
   (void)lua_gettop(state->m_state);
@@ -17180,20 +16901,19 @@ moho::CMauiMovie::CMauiMovie(
 )
   : CMauiControl(luaObject, parent, "Movie")
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  movieView->mMovie = nullptr;
-  movieView->mIsPlaying = false;
-  movieView->mDoLoop = false;
-  movieView->mIsStopped = false;
-  movieView->mIsMinimized = false;
+  mMovie = nullptr;
+  mIsPlaying = false;
+  mDoLoop = false;
+  mIsStopped = false;
+  mIsMinimized = false;
 
-  new (&movieView->mSubtitleCache) msvc8::string();
-  new (&movieView->mMovieWidthLV) CScriptLazyVar_float(luaObject->m_state);
-  new (&movieView->mMovieHeightLV) CScriptLazyVar_float(luaObject->m_state);
+  new (&mSubtitleCache) msvc8::string();
+  new (&mMovieWidthLV) CScriptLazyVar_float(luaObject->m_state);
+  new (&mMovieHeightLV) CScriptLazyVar_float(luaObject->m_state);
 
-  LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
-  controlLuaObject.SetObject("MovieWidth", AsLazyVarObject(movieView->mMovieWidthLV));
-  controlLuaObject.SetObject("MovieHeight", AsLazyVarObject(movieView->mMovieHeightLV));
+  LuaPlus::LuaObject& controlLuaObject = mLuaObj;
+  controlLuaObject.SetObject("MovieWidth", AsLazyVarObject(mMovieWidthLV));
+  controlLuaObject.SetObject("MovieHeight", AsLazyVarObject(mMovieHeightLV));
 }
 
 /**
@@ -17216,7 +16936,6 @@ bool moho::CMauiMovie::LoadFile(
     return false;
   }
 
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
 
   // Allocate + construct a fresh CMovie (binary: CMovie::operator new).
   moho::CMovie* newMovie = nullptr;
@@ -17224,25 +16943,25 @@ bool moho::CMauiMovie::LoadFile(
 
   // Swap it into the movie slot, deleting the previous movie (if distinct)
   // through the IMovie virtual deleting destructor.
-  moho::CMovie* const previousMovie = movieView->mMovie;
+  moho::CMovie* const previousMovie = mMovie;
   if (newMovie != previousMovie && previousMovie != nullptr) {
     delete previousMovie;
   }
-  movieView->mMovie = newMovie;
+  mMovie = newMovie;
 
   if (!newMovie->OpenMovie(filename)) {
     gpg::Warnf("Error opening movie %s", filename);
-    if (movieView->mMovie != nullptr) {
-      delete movieView->mMovie;
+    if (mMovie != nullptr) {
+      delete mMovie;
     }
-    movieView->mMovie = nullptr;
-    movieView->mIsPlaying = false;
+    mMovie = nullptr;
+    mIsPlaying = false;
     return false;
   }
 
   SetDebugName(gpg::STR_Printf("Movie filename = %s", filename));
-  moho::CScriptLazyVar_float::SetValue(&movieView->mMovieWidthLV, static_cast<float>(newMovie->GetWidth()));
-  moho::CScriptLazyVar_float::SetValue(&movieView->mMovieHeightLV, static_cast<float>(newMovie->GetHeight()));
+  moho::CScriptLazyVar_float::SetValue(&mMovieWidthLV, static_cast<float>(newMovie->GetWidth()));
+  moho::CScriptLazyVar_float::SetValue(&mMovieHeightLV, static_cast<float>(newMovie->GetHeight()));
   return true;
 }
 
@@ -17260,25 +16979,22 @@ bool moho::CMauiMovie::LoadFile(
  * destructor when non-null, and then chains into `CMauiControl::~CMauiControl`
  * through the compiler-emitted base-class teardown.
  *
- * The CMauiMovie class in the SDK currently carries its payload fields
- * only through `CMauiMovieRuntimeView` (reinterpret-cast view), so this
- * destructor explicitly tears down each lane; without that, the compiler
- * would only destroy the base `CMauiControl` and leak the lazy-var and
- * subtitle-string storage.
+ * `CScriptLazyVar_float` keeps its `LuaObject` in raw storage and has no
+ * destructor of its own, so the two lazy vars are torn down explicitly;
+ * `mMovie` is a raw pointer. The subtitle string is a real member.
  */
 moho::CMauiMovie::~CMauiMovie()
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
 
   // Lazy-var lanes carry a LuaObject payload in their opaque storage; the
   // type's own defaulted destructor does not run the LuaObject teardown, so
   // we do it explicitly, matching the binary's destroy-in-reverse sequence.
-  reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieHeightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&movieView->mMovieWidthLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mMovieHeightLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mMovieWidthLV)->~LuaObject();
 
-  if (movieView->mMovie != nullptr) {
-    delete movieView->mMovie;
-    movieView->mMovie = nullptr;
+  if (mMovie != nullptr) {
+    delete mMovie;
+    mMovie = nullptr;
   }
 }
 
@@ -17292,37 +17008,36 @@ void moho::CMauiMovie::Frame(
   const float deltaSeconds
 )
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  if (movieView->mIsMinimized) {
+  if (mIsMinimized) {
     return;
   }
 
   CScriptObject* const scriptObject = reinterpret_cast<CScriptObject*>(this);
-  if (!movieView->mIsPlaying) {
-    CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+  if (!mIsPlaying) {
+    mNeedsFrameUpdate = false;
     (void)scriptObject->RunScript("OnFinished");
     return;
   }
 
   scriptObject->RunScriptNum("OnFrame", deltaSeconds);
 
-  if (movieView->mIsStopped) {
-    CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+  if (mIsStopped) {
+    mNeedsFrameUpdate = false;
     (void)scriptObject->RunScript("OnStopped");
     return;
   }
 
-  moho::CMovie* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = mMovie;
   if (moviePlayback == nullptr) {
     return;
   }
 
   if (moviePlayback->HasPlaybackFinished()) {
-    if (movieView->mDoLoop) {
+    if (mDoLoop) {
       moviePlayback->StartMoviePlaybackFromName();
     } else {
-      movieView->mIsPlaying = false;
-      CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+      mIsPlaying = false;
+      mNeedsFrameUpdate = false;
       (void)scriptObject->RunScript("OnFinished");
     }
     return;
@@ -17331,8 +17046,8 @@ void moho::CMauiMovie::Frame(
   moviePlayback->UpdatePlaybackFrame();
 
   const msvc8::string* const subtitle = moviePlayback->GetSubtitleText();
-  if (subtitle != nullptr && movieView->mSubtitleCache.view() != subtitle->view()) {
-    movieView->mSubtitleCache.assign_owned(subtitle->view());
+  if (subtitle != nullptr && mSubtitleCache.view() != subtitle->view()) {
+    mSubtitleCache.assign_owned(subtitle->view());
     const char* subtitleText = subtitle->c_str();
     scriptObject->CallbackStr("OnSubtitle", &subtitleText);
   }
@@ -17351,17 +17066,15 @@ void moho::CMauiMovie::DoRender(
 {
   (void)drawMask;
 
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  moho::CMovie* const moviePlayback = movieView->mMovie;
-  if (moviePlayback == nullptr || !movieView->mIsPlaying) {
+  moho::CMovie* const moviePlayback = mMovie;
+  if (moviePlayback == nullptr || !mIsPlaying) {
     return;
   }
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
   // Slot 14 hands back a retained (px, pi) pair, which the binary pushes as
   // two words into the sheet overload of SetTexture (0x00438870) - not the
@@ -17374,7 +17087,7 @@ void moho::CMauiMovie::DoRender(
   // and 0x0079F403/F413/F423/F43F store it into all four vertices' mColor.
   // The UVs are the plain corner constants: `xorps xmm0,xmm0` supplies 0.0 and
   // `movss xmm1, ds:a7` (0x00DFEC20 = 1.0f) supplies 1.0.
-  const std::uint32_t vertexColor = CMauiControlExtendedRuntimeView::FromControl(this)->mVertexAlpha;
+  const std::uint32_t vertexColor = mVertexAlpha;
 
   CD3DPrimBatcher::Vertex topLeft{};
   topLeft.mX = left;
@@ -17422,21 +17135,20 @@ void moho::CMauiMovie::OnMinimized(
   const bool minimized
 )
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
 
   if (minimized) {
-    if (movieView->mIsPlaying && !movieView->mIsStopped) {
-      moho::CMovie* const moviePlayback = movieView->mMovie;
+    if (mIsPlaying && !mIsStopped) {
+      moho::CMovie* const moviePlayback = mMovie;
       if (moviePlayback != nullptr) {
         moviePlayback->Stop();
-        movieView->mIsMinimized = true;
+        mIsMinimized = true;
         CMauiControl::OnMinimized(minimized);
         return;
       }
     }
-  } else if (movieView->mIsMinimized) {
-    movieView->mMovie->PlayMovie();
-    movieView->mIsMinimized = false;
+  } else if (mIsMinimized) {
+    mMovie->PlayMovie();
+    mIsMinimized = false;
   }
 
   CMauiControl::OnMinimized(minimized);
@@ -17452,7 +17164,7 @@ void moho::CMauiMovie::Loop(
   const bool shouldLoop
 )
 {
-  CMauiMovieRuntimeView::FromMovie(this)->mDoLoop = shouldLoop;
+  mDoLoop = shouldLoop;
 }
 
 /**
@@ -17463,15 +17175,14 @@ void moho::CMauiMovie::Loop(
  */
 void moho::CMauiMovie::Play()
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  moho::CMovie* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = mMovie;
 
-  movieView->mIsPlaying = false;
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+  mIsPlaying = false;
+  mNeedsFrameUpdate = true;
   if (moviePlayback != nullptr) {
     moviePlayback->PlayMovie();
-    movieView->mIsPlaying = true;
-    movieView->mIsStopped = false;
+    mIsPlaying = true;
+    mIsStopped = false;
   }
 }
 
@@ -17483,10 +17194,9 @@ void moho::CMauiMovie::Play()
  */
 void moho::CMauiMovie::Stop()
 {
-  CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  moho::CMovie* const moviePlayback = movieView->mMovie;
+  moho::CMovie* const moviePlayback = mMovie;
   if (moviePlayback != nullptr) {
-    movieView->mIsStopped = true;
+    mIsStopped = true;
     moviePlayback->Stop();
   }
 }
@@ -17499,8 +17209,7 @@ void moho::CMauiMovie::Stop()
  */
 bool moho::CMauiMovie::IsLoaded() const
 {
-  const CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  return movieView->mMovie != nullptr && movieView->mMovie->IsLoaded();
+  return mMovie != nullptr && mMovie->IsLoaded();
 }
 
 /**
@@ -17511,7 +17220,7 @@ bool moho::CMauiMovie::IsLoaded() const
  */
 std::int32_t moho::CMauiMovie::GetNumFrames() const
 {
-  return CMauiMovieRuntimeView::FromMovie(this)->mMovie->GetFrameCount();
+  return mMovie->GetFrameCount();
 }
 
 /**
@@ -17522,7 +17231,7 @@ std::int32_t moho::CMauiMovie::GetNumFrames() const
  */
 float moho::CMauiMovie::GetFrameRate() const
 {
-  return CMauiMovieRuntimeView::FromMovie(this)->mMovie->GetFrameRate();
+  return mMovie->GetFrameRate();
 }
 
 /**
@@ -17536,8 +17245,7 @@ void moho::CMauiMovie::Dump()
   CMauiControl::Dump();
   gpg::Logf("CMauiMovie");
 
-  const CMauiMovieRuntimeView* const movieView = CMauiMovieRuntimeView::FromMovie(this);
-  const char* const isPlaying = movieView->mIsPlaying ? "true" : "false";
+  const char* const isPlaying = mIsPlaying ? "true" : "false";
   gpg::Logf("Is Playing = %s", isPlaying);
 }
 
@@ -17954,15 +17662,14 @@ moho::CMauiScrollbar::CMauiScrollbar(
   // asm 0x007A04ED clears the embedded `IMauiDragger` base's weak-reference
   // head at +0x120 and 0x007A04F3 installs its vptr at +0x11C; both are the
   // inlined `IMauiDragger` base constructor, which the compiler emits here.
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
-  scrollbarView->mScrollableLink = {};
-  scrollbarView->mThumbTop = {};
-  scrollbarView->mThumbBottom = {};
-  scrollbarView->mThumbMiddle = {};
-  scrollbarView->mBackground = {};
-  scrollbarView->mDragStart = 0.0f;
-  scrollbarView->mTopAtDragStart = 0.0f;
-  scrollbarView->mAxis = axis;
+  mScrollableLink = {};
+  mThumbTop = {};
+  mThumbBottom = {};
+  mThumbMiddle = {};
+  mBackground = {};
+  mDragStart = 0.0f;
+  mTopAtDragStart = 0.0f;
+  mAxis = axis;
 }
 
 /**
@@ -17974,10 +17681,7 @@ moho::CMauiScrollbar::CMauiScrollbar(
  *
  * What it does:
  * Tears down one scrollbar control in-place in reverse construction order.
- * The scrollbar's payload lanes live only through `CMauiScrollbarRuntimeView`
- * (a reinterpret-cast overlay), so the compiler-generated portion of this
- * destructor would only run the base-class teardown; this body therefore
- * releases each overlay-owned lane explicitly, matching the binary sequence:
+ * The binary sequence:
  *   1. Release the four `CD3DBatchTexture` shared-pointer lanes in reverse
  *      declaration order (`mBackground`, `mThumbMiddle`, `mThumbBottom`,
  *      `mThumbTop`) via each `shared_ptr` destructor's interlocked
@@ -17998,7 +17702,6 @@ moho::CMauiScrollbar::CMauiScrollbar(
  */
 moho::CMauiScrollbar::~CMauiScrollbar()
 {
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
 
   // The four texture lanes are real members now, so the compiler emits their
   // `~shared_ptr` after this body in reverse declaration order - the same
@@ -18006,7 +17709,7 @@ moho::CMauiScrollbar::~CMauiScrollbar()
   // each refcount twice.
 
   // Unlink the bound scrollable focus sentinel.
-  UnlinkFocusControlSentinel(&scrollbarView->mScrollableLink);
+  UnlinkFocusControlSentinel(&mScrollableLink);
 
   // ---- Step 3: the embedded IMauiDragger sub-object ----
   // The binary rewrites the sub-object vtable at +0x11C back to
@@ -18029,19 +17732,18 @@ void moho::CMauiScrollbar::SetTextures(
   const boost::shared_ptr<CD3DBatchTexture>& thumbBottom
 )
 {
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
 
   if (background.get() != nullptr) {
-    scrollbarView->mBackground = background;
+    mBackground = background;
   }
   if (thumbMiddle.get() != nullptr) {
-    scrollbarView->mThumbMiddle = thumbMiddle;
+    mThumbMiddle = thumbMiddle;
   }
   if (thumbTop.get() != nullptr) {
-    scrollbarView->mThumbTop = thumbTop;
+    mThumbTop = thumbTop;
   }
   if (thumbBottom.get() != nullptr) {
-    scrollbarView->mThumbBottom = thumbBottom;
+    mThumbBottom = thumbBottom;
   }
 }
 
@@ -18069,22 +17771,19 @@ void moho::CMauiScrollbar::DoRender(
     return;
   }
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  const CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-  const CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
-  const bool vertical = scrollbarView->mAxis == MSA_Vert;
+  const bool vertical = mAxis == MSA_Vert;
 
-  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
   float minRange = 0.0f;
   float maxRange = 0.0f;
   float minVisible = 0.0f;
   float maxVisible = 0.0f;
-  if (CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl(); scrollableControl != nullptr) {
-    const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(scrollbarView->mAxis);
+  if (CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl(); scrollableControl != nullptr) {
+    const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(mAxis);
     minRange = scrollValues.mMinRange;
     maxRange = scrollValues.mMaxRange;
     minVisible = scrollValues.mMinVisible;
@@ -18106,18 +17805,18 @@ void moho::CMauiScrollbar::DoRender(
   thumbEnd = static_cast<float>(FloorFrndintAdjustDown(thumbEnd));
 
   const ScrollbarQuadUvs uvs = MakeScrollbarQuadUvs(vertical);
-  const std::uint32_t color = extendedView->mVertexAlpha;
+  const std::uint32_t color = mVertexAlpha;
 
-  if (scrollbarView->mBackground) {
-    DrawScrollbarQuad(primBatcher, scrollbarView->mBackground, left, top, right, bottom, color, uvs);
+  if (mBackground) {
+    DrawScrollbarQuad(primBatcher, mBackground, left, top, right, bottom, color, uvs);
   }
 
-  if (!scrollbarView->mThumbTop || !scrollbarView->mThumbBottom || !scrollbarView->mThumbMiddle) {
+  if (!mThumbTop || !mThumbBottom || !mThumbMiddle) {
     return;
   }
 
-  const float topCapLength = static_cast<float>(scrollbarView->mThumbTop->mHeight);
-  const float bottomCapLength = static_cast<float>(scrollbarView->mThumbBottom->mHeight);
+  const float topCapLength = static_cast<float>(mThumbTop->mHeight);
+  const float bottomCapLength = static_cast<float>(mThumbBottom->mHeight);
   const float capLength = topCapLength + bottomCapLength;
   if (capLength >= (thumbEnd - thumbStart)) {
     const float thumbCenter = thumbEnd - ((thumbEnd - thumbStart) * 0.5f);
@@ -18127,16 +17826,16 @@ void moho::CMauiScrollbar::DoRender(
 
   if (vertical) {
     DrawScrollbarQuad(
-      primBatcher, scrollbarView->mThumbTop, left, thumbStart, right, thumbStart + topCapLength, color, uvs
+      primBatcher, mThumbTop, left, thumbStart, right, thumbStart + topCapLength, color, uvs
     );
     DrawScrollbarQuad(
-      primBatcher, scrollbarView->mThumbBottom, left, thumbEnd - bottomCapLength, right, thumbEnd, color, uvs
+      primBatcher, mThumbBottom, left, thumbEnd - bottomCapLength, right, thumbEnd, color, uvs
     );
 
     if (std::fabs(thumbEnd - thumbStart) > capLength) {
       DrawScrollbarQuad(
         primBatcher,
-        scrollbarView->mThumbMiddle,
+        mThumbMiddle,
         left,
         (thumbStart + topCapLength) - 1.0f,
         right,
@@ -18149,16 +17848,16 @@ void moho::CMauiScrollbar::DoRender(
   }
 
   DrawScrollbarQuad(
-    primBatcher, scrollbarView->mThumbTop, thumbStart - topCapLength, top, thumbStart, bottom, color, uvs
+    primBatcher, mThumbTop, thumbStart - topCapLength, top, thumbStart, bottom, color, uvs
   );
   DrawScrollbarQuad(
-    primBatcher, scrollbarView->mThumbBottom, thumbEnd, top, thumbEnd + bottomCapLength, bottom, color, uvs
+    primBatcher, mThumbBottom, thumbEnd, top, thumbEnd + bottomCapLength, bottom, color, uvs
   );
 
   if (std::fabs(thumbEnd - thumbStart) > capLength) {
     DrawScrollbarQuad(
       primBatcher,
-      scrollbarView->mThumbMiddle,
+      mThumbMiddle,
       thumbStart - topCapLength,
       top,
       thumbEnd + bottomCapLength,
@@ -18181,19 +17880,17 @@ bool moho::CMauiScrollbar::HandleEvent(
 )
 {
   const EMauiEventType eventType = eventData.mEventType;
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
-  CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl();
+  CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl();
 
   if ((eventType == MET_ButtonPress || eventType == MET_ButtonDClick) && eventData.mKeyCode == kPostDraggerLeftButton) {
     if (scrollableControl != nullptr) {
-      const EMauiScrollAxis axis = scrollbarView->mAxis;
-      const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
+      const EMauiScrollAxis axis = mAxis;
 
-      const CScriptLazyVar_float* topLane = &controlView->mTopLV;
-      const CScriptLazyVar_float* bottomLane = &controlView->mBottomLV;
+      const CScriptLazyVar_float* topLane = &mTopLV;
+      const CScriptLazyVar_float* bottomLane = &mBottomLV;
       if (axis != MSA_Vert) {
-        topLane = &controlView->mRightLV;
-        bottomLane = &controlView->mLeftLV;
+        topLane = &mRightLV;
+        bottomLane = &mLeftLV;
       }
 
       const float topEdge = CScriptLazyVar_float::GetValue(topLane);
@@ -18221,8 +17918,8 @@ bool moho::CMauiScrollbar::HandleEvent(
         }
 
         if (thumbEnd > mousePosition) {
-          scrollbarView->mDragStart = mousePosition;
-          scrollbarView->mTopAtDragStart = minVisible;
+          mDragStart = mousePosition;
+          mTopAtDragStart = minVisible;
           SMauiEventData mutableEventData = eventData;
           func_PostDragger(GetRootFrame(), static_cast<moho::IMauiDragger*>(this), &mutableEventData);
           return true;
@@ -18241,7 +17938,7 @@ bool moho::CMauiScrollbar::HandleEvent(
     return false;
   }
 
-  if (scrollableControl != nullptr && scrollbarView->mAxis == MSA_Vert) {
+  if (scrollableControl != nullptr && mAxis == MSA_Vert) {
     const float lineDelta = eventData.mWheelRotation <= 0 ? 1.0f : -1.0f;
     scrollableControl->ScrollLines(MSA_Vert, lineDelta);
   }
@@ -18260,26 +17957,24 @@ void moho::CMauiScrollbar::DragMove(
   const SMauiEventData* const eventData
 )
 {
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(this);
-  CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl();
+  CMauiControl* const scrollableControl = mScrollableLink.ResolveFocusedControl();
   if (scrollableControl == nullptr) {
     return;
   }
 
-  const EMauiScrollAxis axis = scrollbarView->mAxis;
+  const EMauiScrollAxis axis = mAxis;
   const float mousePosition = axis == MSA_Vert ? eventData->mMousePos.y : eventData->mMousePos.x;
-  const float delta = mousePosition - scrollbarView->mDragStart;
+  const float delta = mousePosition - mDragStart;
 
   const SMauiScrollValues scrollValues = scrollableControl->GetScrollValues(axis);
   const float minRange = scrollValues.mMinRange;
   const float maxRange = scrollValues.mMaxRange;
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
   const float rangePerPixel = (maxRange - minRange) / (bottom - top);
 
-  scrollableControl->ScrollSetTop(axis, (rangePerPixel * delta) + scrollbarView->mTopAtDragStart);
+  scrollableControl->ScrollSetTop(axis, (rangePerPixel * delta) + mTopAtDragStart);
 }
 
 /**
@@ -18355,8 +18050,7 @@ int moho::cfunc_CMauiScrollbarSetScrollableL(
   const LuaPlus::LuaObject scrollableObject(LuaPlus::LuaStackObject(state, 2));
   CMauiControl* const scrollableControl = SCR_FromLua_CMauiControl(scrollableObject, state);
 
-  CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(scrollbar);
-  SetCurrentFocusControlLink(&scrollbarView->mScrollableLink, scrollableControl);
+  SetCurrentFocusControlLink(&scrollbar->mScrollableLink, scrollableControl);
 
   lua_settop(state->m_state, 1);
   return 1;
@@ -18536,15 +18230,14 @@ int moho::cfunc_CMauiScrollbarDoScrollLinesL(
   LuaPlus::LuaObject scrollbarObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  const CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(scrollbar);
-  if (CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl()) {
+  if (CMauiControl* const scrollableControl = scrollbar->mScrollableLink.ResolveFocusedControl()) {
     LuaPlus::LuaStackObject amountArg(state, 2);
     if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&amountArg, "number");
     }
 
     const float amount = static_cast<float>(lua_tonumber(state->m_state, 2));
-    scrollableControl->ScrollLines(scrollbarView->mAxis, amount);
+    scrollableControl->ScrollLines(scrollbar->mAxis, amount);
   }
 
   lua_settop(state->m_state, 1);
@@ -18603,15 +18296,14 @@ int moho::cfunc_CMauiScrollbarDoScrollPagesL(
   LuaPlus::LuaObject scrollbarObject(LuaPlus::LuaStackObject(state, 1));
   CMauiScrollbar* const scrollbar = SCR_FromLua_CMauiScrollbar(scrollbarObject, state);
 
-  const CMauiScrollbarRuntimeView* const scrollbarView = CMauiScrollbarRuntimeView::FromScrollbar(scrollbar);
-  if (CMauiControl* const scrollableControl = scrollbarView->ResolveScrollableControl()) {
+  if (CMauiControl* const scrollableControl = scrollbar->mScrollableLink.ResolveFocusedControl()) {
     LuaPlus::LuaStackObject amountArg(state, 2);
     if (lua_type(state->m_state, 2) != LUA_TNUMBER) {
       LuaPlus::LuaStackObject::TypeError(&amountArg, "number");
     }
 
     const float amount = static_cast<float>(lua_tonumber(state->m_state, 2));
-    scrollableControl->ScrollPages(scrollbarView->mAxis, amount);
+    scrollableControl->ScrollPages(scrollbar->mAxis, amount);
   }
 
   lua_settop(state->m_state, 1);
@@ -18628,20 +18320,19 @@ void moho::CMauiText::SetNewFont(
   CD3DFont* const font
 )
 {
-  CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
-  AssignIntrusiveFont(textView->mFont, font);
+  AssignIntrusiveFont(mFont, font);
 
-  if (textView->mFont != nullptr) {
-    const float advance = textView->mFont->GetAdvance(textView->mText.c_str(), 0);
-    CScriptLazyVar_float::SetValue(&textView->mTextAdvanceLV, advance);
-    CScriptLazyVar_float::SetValue(&textView->mFontAscentLV, textView->mFont->mAscent);
-    CScriptLazyVar_float::SetValue(&textView->mFontDescentLV, ReadFontDescentLane(textView->mFont));
-    CScriptLazyVar_float::SetValue(&textView->mFontExternalLeadingLV, textView->mFont->mExternalLeading);
+  if (mFont != nullptr) {
+    const float advance = mFont->GetAdvance(mText.c_str(), 0);
+    CScriptLazyVar_float::SetValue(&mTextAdvanceLV, advance);
+    CScriptLazyVar_float::SetValue(&mFontAscentLV, mFont->mAscent);
+    CScriptLazyVar_float::SetValue(&mFontDescentLV, ReadFontDescentLane(mFont));
+    CScriptLazyVar_float::SetValue(&mFontExternalLeadingLV, mFont->mExternalLeading);
   } else {
-    CScriptLazyVar_float::SetValue(&textView->mTextAdvanceLV, 0.0f);
-    CScriptLazyVar_float::SetValue(&textView->mFontAscentLV, 0.0f);
-    CScriptLazyVar_float::SetValue(&textView->mFontDescentLV, 0.0f);
-    CScriptLazyVar_float::SetValue(&textView->mFontExternalLeadingLV, 0.0f);
+    CScriptLazyVar_float::SetValue(&mTextAdvanceLV, 0.0f);
+    CScriptLazyVar_float::SetValue(&mFontAscentLV, 0.0f);
+    CScriptLazyVar_float::SetValue(&mFontDescentLV, 0.0f);
+    CScriptLazyVar_float::SetValue(&mFontExternalLeadingLV, 0.0f);
   }
 }
 
@@ -18656,13 +18347,12 @@ void moho::CMauiText::SetText(
   const char* const text
 )
 {
-  CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
   const char* const safeText = text != nullptr ? text : "";
-  textView->mText.assign_owned(safeText);
+  mText.assign_owned(safeText);
 
-  if (textView->mFont != nullptr) {
-    const float advance = textView->mFont->GetAdvance(textView->mText.c_str(), 0);
-    CScriptLazyVar_float::SetValue(&textView->mTextAdvanceLV, advance);
+  if (mFont != nullptr) {
+    const float advance = mFont->GetAdvance(mText.c_str(), 0);
+    CScriptLazyVar_float::SetValue(&mTextAdvanceLV, advance);
   }
 }
 
@@ -18675,11 +18365,10 @@ void moho::CMauiText::SetText(
 void moho::CMauiText::Dump()
 {
   CMauiControl::Dump();
-  const CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
 
   gpg::Logf("CMauiText");
-  gpg::Logf("Color = %#08X", textView->mColor);
-  gpg::Logf("Text = %s", textView->mText.c_str());
+  gpg::Logf("Color = %#08X", mColor);
+  gpg::Logf("Text = %s", mText.c_str());
 }
 
 /**
@@ -18706,33 +18395,31 @@ void moho::CMauiText::DoRender(
 {
   (void)drawMask;
 
-  const CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(this);
-  CD3DFont* const font = textView->mFont;
+  CD3DFont* const font = mFont;
   if (font == nullptr) {
     return;
   }
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  const char* const text = textView->mText.c_str();
+  const char* const text = mText.c_str();
 
   // Horizontal origin.
   float originX;
-  if (textView->mCenteredHorizontally) {
+  if (mCenteredHorizontally) {
     const float advance = font->GetAdvance(text, 0);
-    const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-    originX = CScriptLazyVar_float::GetValue(&controlView->mWidthLV) * 0.5f + left - 0.5f * advance;
+    const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+    originX = CScriptLazyVar_float::GetValue(&mWidthLV) * 0.5f + left - 0.5f * advance;
   } else {
-    originX = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+    originX = CScriptLazyVar_float::GetValue(&mLeftLV);
   }
 
   // Baseline Y.
   float baselineY;
-  if (textView->mCenteredVertically) {
+  if (mCenteredVertically) {
     const float centeredAscent = font->mAscent - font->mInternalLeading;
-    const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-    baselineY = CScriptLazyVar_float::GetValue(&controlView->mHeightLV) * 0.5f + 0.5f * centeredAscent + top;
+    const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+    baselineY = CScriptLazyVar_float::GetValue(&mHeightLV) * 0.5f + 0.5f * centeredAscent + top;
   } else {
-    const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
+    const float top = CScriptLazyVar_float::GetValue(&mTopLV);
     baselineY = font->mAscent + top;
   }
 
@@ -18740,23 +18427,23 @@ void moho::CMauiText::DoRender(
   const Wm3::Vector3f yAxis{0.0f, -1.0f, 0.0f};
 
   // Optional drop shadow, offset by (+1, +1).
-  if (textView->mDropShadow) {
-    const std::uint32_t shadowColor = this->AdjustARGBAlpha(textView->mColor & 0xFF000000u);
-    const float shadowMaxAdvance = textView->mClipToWidth ? CScriptLazyVar_float::GetValue(&controlView->mWidthLV)
+  if (mDropShadow) {
+    const std::uint32_t shadowColor = this->AdjustARGBAlpha(mColor & 0xFF000000u);
+    const float shadowMaxAdvance = mClipToWidth ? CScriptLazyVar_float::GetValue(&mWidthLV)
                                                           : std::numeric_limits<float>::quiet_NaN();
     const Wm3::Vector3f shadowOrigin{originX + 1.0f, baselineY + 1.0f, 0.0f};
     (void)font->Render(text, primBatcher, shadowOrigin, xAxis, yAxis, shadowColor, 1.0f, shadowMaxAdvance);
   }
 
   // Main text run.
-  const float maxAdvance = textView->mClipToWidth ? CScriptLazyVar_float::GetValue(&controlView->mWidthLV)
+  const float maxAdvance = mClipToWidth ? CScriptLazyVar_float::GetValue(&mWidthLV)
                                                   : std::numeric_limits<float>::quiet_NaN();
 
   // Alpha byte derived from mAlpha exactly as the binary does: negate-scale,
   // truncate toward zero, then subtract the shifted magnitude.
-  const float alphaScaled = CMauiControlExtendedRuntimeView::FromControl(this)->mAlpha * -255.0f;
+  const float alphaScaled = mAlpha * -255.0f;
   const std::uint32_t alphaMagnitude = static_cast<std::uint32_t>(static_cast<std::int64_t>(alphaScaled));
-  const std::uint32_t color = (textView->mColor & 0x00FFFFFFu) - (alphaMagnitude << 24);
+  const std::uint32_t color = (mColor & 0x00FFFFFFu) - (alphaMagnitude << 24);
 
   const Wm3::Vector3f origin{originX, baselineY, 0.0f};
   (void)font->Render(text, primBatcher, origin, xAxis, yAxis, color, 1.0f, maxAdvance);
@@ -18950,8 +18637,7 @@ int moho::cfunc_CMauiTextGetTextL(
 
   LuaPlus::LuaObject textObject(LuaPlus::LuaStackObject(state, 1));
   const CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
-  const CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(textControl);
-  lua_pushstring(state->m_state, textView->mText.c_str());
+  lua_pushstring(state->m_state, textControl->mText.c_str());
   (void)lua_gettop(state->m_state);
   return 1;
 }
@@ -19007,7 +18693,7 @@ int moho::cfunc_CMauiTextSetNewColorL(
   CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
 
   LuaPlus::LuaObject colorObject(LuaPlus::LuaStackObject(state, 2));
-  CMauiTextRuntimeView::FromText(textControl)->mColor = SCR_DecodeColor(state, colorObject);
+  textControl->mColor = SCR_DecodeColor(state, colorObject);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -19064,7 +18750,7 @@ int moho::cfunc_CMauiTextSetDropShadowL(
   CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
 
   LuaPlus::LuaStackObject dropShadowArg(state, 2);
-  CMauiTextRuntimeView::FromText(textControl)->mDropShadow = LuaPlus::LuaStackObject::GetBoolean(&dropShadowArg);
+  textControl->mDropShadow = LuaPlus::LuaStackObject::GetBoolean(&dropShadowArg);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -19123,7 +18809,7 @@ int moho::cfunc_CMauiTextSetCenteredHorizontallyL(
   CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
 
   LuaPlus::LuaStackObject centeredArg(state, 2);
-  CMauiTextRuntimeView::FromText(textControl)->mCenteredHorizontally =
+  textControl->mCenteredHorizontally =
     LuaPlus::LuaStackObject::GetBoolean(&centeredArg);
   lua_settop(state->m_state, 1);
   return 1;
@@ -19181,7 +18867,7 @@ int moho::cfunc_CMauiTextSetCenteredVerticallyL(
   CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
 
   LuaPlus::LuaStackObject centeredArg(state, 2);
-  CMauiTextRuntimeView::FromText(textControl)->mCenteredVertically = LuaPlus::LuaStackObject::GetBoolean(&centeredArg);
+  textControl->mCenteredVertically = LuaPlus::LuaStackObject::GetBoolean(&centeredArg);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -19244,8 +18930,7 @@ int moho::cfunc_CMauiTextGetStringAdvanceL(
     LuaPlus::LuaStackObject::TypeError(&textArg, "string");
   }
 
-  const CMauiTextRuntimeView* const textView = CMauiTextRuntimeView::FromText(textControl);
-  CD3DFont* const font = textView->mFont;
+  CD3DFont* const font = textControl->mFont;
   const float advance = font != nullptr ? font->GetAdvance(text, 0) : 0.0f;
   lua_pushnumber(state->m_state, advance);
   (void)lua_gettop(state->m_state);
@@ -19304,7 +18989,7 @@ int moho::cfunc_CMauiTextSetNewClipToWidthL(
   CMauiText* const textControl = SCR_FromLua_CMauiText(textObject, state);
 
   LuaPlus::LuaStackObject clipArg(state, 2);
-  CMauiTextRuntimeView::FromText(textControl)->mClipToWidth = LuaPlus::LuaStackObject::GetBoolean(&clipArg);
+  textControl->mClipToWidth = LuaPlus::LuaStackObject::GetBoolean(&clipArg);
   lua_settop(state->m_state, 1);
   return 1;
 }
@@ -19775,7 +19460,7 @@ int moho::cfunc_InternalCreateMapPreviewL(
   auto* const mapPreview = AllocateZeroedUiObject<CUIMapPreview>(0x124u);
   new (mapPreview) CUIMapPreview(&luaObject, parentControl);
   mapPreview->DoInit();
-  CMauiControlScriptObjectRuntimeView::FromControl(mapPreview)->mLuaObj.PushStack(state);
+  mapPreview->mLuaObj.PushStack(state);
   return 1;
 }
 
@@ -19792,8 +19477,7 @@ moho::CUIMapPreview::CUIMapPreview(
 )
   : CMauiControl(luaObject, parent, "mappreview")
 {
-  CUIMapPreviewRuntimeView* const mapPreviewView = CUIMapPreviewRuntimeView::FromMapPreview(this);
-  mapPreviewView->mTexture = {};
+  mTexture = {};
 }
 
 /**
@@ -19805,7 +19489,7 @@ moho::CUIMapPreview::CUIMapPreview(
  */
 moho::CUIMapPreview::~CUIMapPreview()
 {
-  CUIMapPreviewRuntimeView::FromMapPreview(this)->mTexture = {};
+  mTexture = {};
 }
 
 /**
@@ -19839,8 +19523,7 @@ bool moho::CUIMapPreview::SetTexture(
   const char* const texturePath
 )
 {
-  CUIMapPreviewRuntimeView* const mapPreviewView = CUIMapPreviewRuntimeView::FromMapPreview(this);
-  mapPreviewView->mTexture = {};
+  mTexture = {};
 
   if (texturePath == nullptr || texturePath[0] == '\0') {
     return false;
@@ -19853,8 +19536,8 @@ bool moho::CUIMapPreview::SetTexture(
     }
   }
 
-  mapPreviewView->mTexture = boost::static_pointer_cast<ID3DTextureSheet>(loadedTexture);
-  return mapPreviewView->mTexture.get() != nullptr;
+  mTexture = boost::static_pointer_cast<ID3DTextureSheet>(loadedTexture);
+  return mTexture.get() != nullptr;
 }
 
 /**
@@ -19869,8 +19552,7 @@ bool moho::CUIMapPreview::SetTextureFromMap(
   const char* const mapPath
 )
 {
-  CUIMapPreviewRuntimeView* const mapPreviewView = CUIMapPreviewRuntimeView::FromMapPreview(this);
-  mapPreviewView->mTexture = {};
+  mTexture = {};
 
   if (mapPath == nullptr || mapPath[0] == '\0') {
     return false;
@@ -19878,10 +19560,10 @@ bool moho::CUIMapPreview::SetTextureFromMap(
 
   msvc8::auto_ptr<CWldMap> loadedMap = WLD_LoadMapPreview(mapPath);
   if (loadedMap.get() != nullptr && loadedMap->mMapPreviewChunk != nullptr) {
-    mapPreviewView->mTexture = loadedMap->mMapPreviewChunk->mPreviewTexture;
+    mTexture = loadedMap->mMapPreviewChunk->mPreviewTexture;
   }
 
-  return mapPreviewView->mTexture.get() != nullptr;
+  return mTexture.get() != nullptr;
 }
 
 /**
@@ -19892,7 +19574,7 @@ bool moho::CUIMapPreview::SetTextureFromMap(
  */
 void moho::CUIMapPreview::ClearTexture()
 {
-  CUIMapPreviewRuntimeView::FromMapPreview(this)->mTexture = {};
+  mTexture = {};
 }
 
 /**
@@ -19915,19 +19597,17 @@ void moho::CUIMapPreview::DoRender(
 {
   (void)drawMask;
 
-  CUIMapPreviewRuntimeView* const view = CUIMapPreviewRuntimeView::FromMapPreview(this);
-  if (!view->mTexture) {
+  if (!mTexture) {
     return;
   }
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
   Wm3::Vector3f dimensions{};
-  (void)view->mTexture->GetDimensions(&dimensions);
+  (void)mTexture->GetDimensions(&dimensions);
 
   const float scaleX = (right - left) / dimensions.x;
   const float scaleY = (bottom - top) / dimensions.y;
@@ -19941,7 +19621,7 @@ void moho::CUIMapPreview::DoRender(
     bottom = bottom - pad;
   }
 
-  primBatcher->SetTexture(view->mTexture);
+  primBatcher->SetTexture(mTexture);
 
   constexpr std::uint32_t vertexColor = 0xFFFFFFFFu;
   const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, vertexColor, 0.0f, 0.0f);
@@ -20568,10 +20248,8 @@ int moho::cfunc_CUIWorldViewProjectL(
   const LuaPlus::LuaObject worldPointObject(LuaPlus::LuaStackObject(state, 2));
   const Wm3::Vector3f worldPoint = SCR_FromLuaCopy<Wm3::Vector3f>(worldPointObject);
 
-  const CMauiControlRuntimeView* const controlView =
-    CMauiControlRuntimeView::FromControl(reinterpret_cast<CMauiControl*>(worldView));
-  const float height = CScriptLazyVar_float::GetValue(&controlView->mHeightLV);
-  const float width = CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
+  const float height = CScriptLazyVar_float::GetValue(&(reinterpret_cast<CMauiControl*>(worldView))->mHeightLV);
+  const float width = CScriptLazyVar_float::GetValue(&(reinterpret_cast<CMauiControl*>(worldView))->mWidthLV);
 
   const Wm3::Vector2f projectedPoint = camera->CameraGetView().Project(worldPoint, 0.0f, width, height, 0.0f);
   LuaPlus::LuaObject projectedPointObject = SCR_ToLua<Wm3::Vector2f>(state, projectedPoint);
@@ -20679,12 +20357,9 @@ moho::CUIWorldView::CUIWorldView(
     }
 
     auto* const renderView = static_cast<moho::IRenderWorldView*>(this);
-    moho::CMauiControlExtendedRuntimeView* const extendedView =
-      moho::CMauiControlExtendedRuntimeView::FromControl(control);
-    moho::CMauiControl* const rootFrame = extendedView->mRootFrame;
+    moho::CMauiControl* const rootFrame = control->mRootFrame;
     // +0x130 on the root frame, which is a CMauiFrame - not a control field.
-    moho::CMauiFrameRuntimeView* const rootFrameView =
-      moho::CMauiFrameRuntimeView::FromFrame(reinterpret_cast<moho::CMauiFrame*>(rootFrame));
+    moho::CMauiFrame* const rootFrameView = reinterpret_cast<moho::CMauiFrame*>(rootFrame);
     moho::ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
 
     view->mNeedsFrameUpdate = 1;
@@ -22930,10 +22605,9 @@ void moho::CUIWorldView::SetHidden(
   if (hidden) {
     ren_Viewport->RemoveWorldView(renderView);
   } else {
-    CMauiControl* const rootFrame = CMauiControlExtendedRuntimeView::FromControl(this)->mRootFrame;
+    CMauiControl* const rootFrame = mRootFrame;
     // +0x130 on the root frame, which is a CMauiFrame - not a control field.
-    CMauiFrameRuntimeView* const rootFrameView =
-      CMauiFrameRuntimeView::FromFrame(reinterpret_cast<CMauiFrame*>(rootFrame));
+    moho::CMauiFrame* const rootFrameView = reinterpret_cast<CMauiFrame*>(rootFrame);
     ren_Viewport->AddWorldView(renderView, rootFrameView->mTargetHead, view->mWorldViewDepth);
   }
 }
@@ -24263,64 +23937,55 @@ moho::CMauiControl::CMauiControl(
   msvc8::string controlKind
 )
   : CScriptObject()
+  , mParentList()
+  , mParent(parent)
+  , mChildrenList()
+  , mLeftLV(LuaStateOf(luaObject))
+  , mRightLV(LuaStateOf(luaObject))
+  , mTopLV(LuaStateOf(luaObject))
+  , mBottomLV(LuaStateOf(luaObject))
+  , mWidthLV(LuaStateOf(luaObject))
+  , mHeightLV(LuaStateOf(luaObject))
+  , mDepthLV(LuaStateOf(luaObject))
+  , mDepth(0.0f)
+  , mRenderedChildren()
+  , mInvalidated(true)
+  , mDisableHitTest(false)
+  , mIsHidden(false)
+  , mNeedsFrameUpdate(false)
+  , mInvisible(false)
+  , mAlpha(1.0f)
+  , mVertexAlpha(0xFFFFFFFFu)
+  , mRenderPass(0)
+  , mRootFrame(nullptr)
+  , mDebugName()
 {
-  CMauiControlHierarchyRuntimeView* const hierarchyView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-
-  new (&hierarchyView->mParentList) CMauiControlListNode();
-  hierarchyView->mParent = parent;
-  new (&hierarchyView->mChildrenList) TDatList<CMauiControl, void>();
-
-  LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&hierarchyView->mLeftLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mRightLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mTopLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mBottomLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mWidthLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mHeightLV) CScriptLazyVar_float(activeState);
-  new (&hierarchyView->mDepthLV) CScriptLazyVar_float(activeState);
-
-  extendedView->mDepth = 0.0f;
-  new (&extendedView->mRenderedChildren) msvc8::vector<CMauiControl*>();
-  hierarchyView->mInvalidated = true;
-  hierarchyView->mDisableHitTest = false;
-  hierarchyView->mIsHidden = false;
-  hierarchyView->mNeedsFrameUpdate = false;
-  extendedView->mInvisible = false;
-  extendedView->mAlpha = 1.0f;
-  extendedView->mVertexAlpha = static_cast<std::uint32_t>(-1);
-  extendedView->mRenderPass = 0;
-  extendedView->mRootFrame = nullptr;
-  new (&extendedView->mDebugName) msvc8::string();
-  extendedView->mDebugName = controlKind;
+  mDebugName = controlKind;
 
   if (luaObject != nullptr) {
     SetLuaObject(*luaObject);
   }
 
   if (parent != nullptr) {
-    CMauiControlHierarchyRuntimeView* const parentView = CMauiControlHierarchyRuntimeView::FromControl(parent);
-    hierarchyView->mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&parentView->mChildrenList));
+    mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&parent->mChildrenList));
     SetHidden(parent->IsHidden());
 
-    const CMauiControlExtendedRuntimeView* const parentExtendedView =
-      CMauiControlExtendedRuntimeView::FromControl(parent);
-    extendedView->mRenderPass = parentExtendedView->mRenderPass;
-    extendedView->mRootFrame = parentExtendedView->mRootFrame;
+    mRenderPass = parent->mRenderPass;
+    mRootFrame = parent->mRootFrame;
   }
 
   LuaPlus::LuaObject& controlLuaObject = mLuaObj;
-  controlLuaObject.SetObject("Left", &AsLazyVarObject(hierarchyView->mLeftLV));
-  controlLuaObject.SetObject("Right", &AsLazyVarObject(hierarchyView->mRightLV));
-  controlLuaObject.SetObject("Top", &AsLazyVarObject(hierarchyView->mTopLV));
-  controlLuaObject.SetObject("Bottom", &AsLazyVarObject(hierarchyView->mBottomLV));
-  controlLuaObject.SetObject("Width", &AsLazyVarObject(hierarchyView->mWidthLV));
-  controlLuaObject.SetObject("Height", &AsLazyVarObject(hierarchyView->mHeightLV));
-  controlLuaObject.SetObject("Depth", &AsLazyVarObject(hierarchyView->mDepthLV));
+  controlLuaObject.SetObject("Left", &AsLazyVarObject(mLeftLV));
+  controlLuaObject.SetObject("Right", &AsLazyVarObject(mRightLV));
+  controlLuaObject.SetObject("Top", &AsLazyVarObject(mTopLV));
+  controlLuaObject.SetObject("Bottom", &AsLazyVarObject(mBottomLV));
+  controlLuaObject.SetObject("Width", &AsLazyVarObject(mWidthLV));
+  controlLuaObject.SetObject("Height", &AsLazyVarObject(mHeightLV));
+  controlLuaObject.SetObject("Depth", &AsLazyVarObject(mDepthLV));
 
-  extendedView->mDepth = CScriptLazyVar_float::GetValue(&hierarchyView->mDepthLV);
-  if (extendedView->mRenderedChildren.begin() != extendedView->mRenderedChildren.end()) {
-    extendedView->mRenderedChildren.clear();
+  mDepth = CScriptLazyVar_float::GetValue(&mDepthLV);
+  if (mRenderedChildren.begin() != mRenderedChildren.end()) {
+    mRenderedChildren.clear();
   }
 }
 
@@ -24385,14 +24050,13 @@ moho::CMauiControl::~CMauiControl()
   // the group is destroyed on the click that leaves the splash.
   func_RemoveInputCapture(this);
 
-  CMauiControlHierarchyRuntimeView* const hierarchyView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  hierarchyView->mInvalidated = true;
+  mInvalidated = true;
 
-  if (CMauiControl* const parentControl = hierarchyView->mParent; parentControl != nullptr) {
+  if (CMauiControl* const parentControl = mParent; parentControl != nullptr) {
     parentControl->Invalidate();
   }
 
-  CMauiControlListNode* const childSentinel = static_cast<CMauiControlListNode*>(&hierarchyView->mChildrenList);
+  CMauiControlListNode* const childSentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
   while (childSentinel->mNext != childSentinel) {
     CMauiControlListNode* const childNode = childSentinel->mPrev;
     childNode->ListUnlink();
@@ -24401,27 +24065,25 @@ moho::CMauiControl::~CMauiControl()
     }
   }
 
-  CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-  extendedView->mDebugName.~string();
-  extendedView->mRenderedChildren.~vector();
-
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mDepthLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mHeightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mWidthLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mBottomLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mTopLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mRightLV)->~LuaObject();
-  reinterpret_cast<LuaPlus::LuaObject*>(&hierarchyView->mLeftLV)->~LuaObject();
+  // `mDebugName` and `mRenderedChildren` are destroyed by the compiler after
+  // this body. The lazy vars are still raw storage (`CScriptLazyVar_float`),
+  // so their Lua objects are released by hand, last-declared first, as the
+  // binary does.
+  reinterpret_cast<LuaPlus::LuaObject*>(&mDepthLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mHeightLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mWidthLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mBottomLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mTopLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mRightLV)->~LuaObject();
+  reinterpret_cast<LuaPlus::LuaObject*>(&mLeftLV)->~LuaObject();
 
   childSentinel->ListUnlink();
 
-  CMauiControlListNode* const parentListNode = &hierarchyView->mParentList;
+  CMauiControlListNode* const parentListNode = &mParentList;
   parentListNode->ListUnlink();
 
-  // ~CScriptObject() now runs automatically after this body - CMauiControl is
-  // a real CScriptObject base (see the mControlStateStorage comment on the
-  // class in UiRuntimeTypes.h), so the compiler chains the base destructor
-  // here without an explicit qualified call.
+  // ~CScriptObject() runs automatically after this body: CMauiControl derives
+  // from it for real, so the compiler chains the base destructor.
 }
 
 /**
@@ -24432,7 +24094,7 @@ moho::CMauiControl::~CMauiControl()
  */
 moho::CScriptLazyVar_float& moho::CMauiControl::Left()
 {
-  return CMauiControlRuntimeView::FromControl(this)->mLeftLV;
+  return mLeftLV;
 }
 
 /**
@@ -24443,7 +24105,7 @@ moho::CScriptLazyVar_float& moho::CMauiControl::Left()
  */
 moho::CScriptLazyVar_float& moho::CMauiControl::Right()
 {
-  return CMauiControlRuntimeView::FromControl(this)->mRightLV;
+  return mRightLV;
 }
 
 /**
@@ -24454,7 +24116,7 @@ moho::CScriptLazyVar_float& moho::CMauiControl::Right()
  */
 moho::CScriptLazyVar_float& moho::CMauiControl::Top()
 {
-  return CMauiControlRuntimeView::FromControl(this)->mTopLV;
+  return mTopLV;
 }
 
 /**
@@ -24465,7 +24127,7 @@ moho::CScriptLazyVar_float& moho::CMauiControl::Top()
  */
 moho::CScriptLazyVar_float& moho::CMauiControl::Bottom()
 {
-  return CMauiControlRuntimeView::FromControl(this)->mBottomLV;
+  return mBottomLV;
 }
 
 /**
@@ -24476,7 +24138,7 @@ moho::CScriptLazyVar_float& moho::CMauiControl::Bottom()
  */
 std::uint32_t moho::CMauiControl::GetVertexAlpha()
 {
-  return CMauiControlExtendedRuntimeView::FromControl(this)->mVertexAlpha;
+  return mVertexAlpha;
 }
 
 /**
@@ -24489,7 +24151,7 @@ void moho::CMauiControl::SetNeedsFrameUpdate(
   const bool needsFrameUpdate
 )
 {
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = needsFrameUpdate;
+  mNeedsFrameUpdate = needsFrameUpdate;
 }
 
 /**
@@ -24500,7 +24162,7 @@ void moho::CMauiControl::SetNeedsFrameUpdate(
  */
 moho::CMauiControl* moho::CMauiControl::GetParent() const
 {
-  return CMauiControlRuntimeView::FromControl(this)->mParent;
+  return mParent;
 }
 
 /**
@@ -24511,7 +24173,7 @@ moho::CMauiControl* moho::CMauiControl::GetParent() const
  */
 moho::CMauiFrame* moho::CMauiControl::GetRootFrame()
 {
-  return reinterpret_cast<CMauiFrame*>(CMauiControlExtendedRuntimeView::FromControl(this)->mRootFrame);
+  return reinterpret_cast<CMauiFrame*>(mRootFrame);
 }
 
 /**
@@ -24524,9 +24186,8 @@ void moho::CMauiControl::SetAlpha(
   const float alpha
 )
 {
-  CMauiControlExtendedRuntimeView* const controlView = CMauiControlExtendedRuntimeView::FromControl(this);
-  controlView->mAlpha = alpha;
-  controlView->mVertexAlpha = PackVertexAlphaFromScalar(alpha);
+  mAlpha = alpha;
+  mVertexAlpha = PackVertexAlphaFromScalar(alpha);
 }
 
 /**
@@ -24540,7 +24201,7 @@ std::uint32_t moho::CMauiControl::AdjustARGBAlpha(
   const std::uint32_t color
 )
 {
-  const float alpha = CMauiControlExtendedRuntimeView::FromControl(this)->mAlpha;
+  const float alpha = mAlpha;
   const std::int32_t alphaByteLane = static_cast<std::int32_t>(alpha * -255.0f);
   return (color & 0x00FFFFFFu) - (static_cast<std::uint32_t>(alphaByteLane) << 24u);
 }
@@ -24553,7 +24214,7 @@ std::uint32_t moho::CMauiControl::AdjustARGBAlpha(
  */
 float moho::CMauiControl::GetAlpha()
 {
-  return CMauiControlExtendedRuntimeView::FromControl(this)->mAlpha;
+  return mAlpha;
 }
 
 /**
@@ -24564,7 +24225,7 @@ float moho::CMauiControl::GetAlpha()
  */
 bool moho::CMauiControl::IsInvisible()
 {
-  return CMauiControlExtendedRuntimeView::FromControl(this)->mInvisible;
+  return mInvisible;
 }
 
 /**
@@ -24577,7 +24238,7 @@ void moho::CMauiControl::SetRenderPass(
   const std::int32_t renderPass
 )
 {
-  CMauiControlExtendedRuntimeView::FromControl(this)->mRenderPass = renderPass;
+  mRenderPass = renderPass;
 }
 
 /**
@@ -24588,7 +24249,7 @@ void moho::CMauiControl::SetRenderPass(
  */
 std::int32_t moho::CMauiControl::GetRenderPass()
 {
-  return CMauiControlExtendedRuntimeView::FromControl(this)->mRenderPass;
+  return mRenderPass;
 }
 
 namespace
@@ -24632,7 +24293,7 @@ bool moho::CMauiControl::GetCustomRender() const
  */
 bool moho::CMauiControl::NeedsFrameUpdate()
 {
-  return CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate;
+  return mNeedsFrameUpdate;
 }
 
 /**
@@ -24645,9 +24306,8 @@ void moho::CMauiControl::Invalidate()
 {
   CMauiControl* controlCursor = this;
   while (controlCursor != nullptr) {
-    CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(controlCursor);
-    controlView->mInvalidated = true;
-    controlCursor = controlView->mParent;
+    controlCursor->mInvalidated = true;
+    controlCursor = controlCursor->mParent;
   }
 }
 
@@ -24662,23 +24322,21 @@ void moho::CMauiControl::SetParent(
   CMauiControl* const newParent
 )
 {
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControl* const currentParent = controlView->mParent;
+  CMauiControl* const currentParent = mParent;
   if (newParent == currentParent) {
     return;
   }
 
-  controlView->mInvalidated = true;
+  mInvalidated = true;
   if (currentParent != nullptr) {
     currentParent->Invalidate();
   }
 
-  controlView->mParentList.ListUnlink();
-  controlView->mParent = newParent;
+  mParentList.ListUnlink();
+  mParent = newParent;
 
   if (newParent != nullptr) {
-    CMauiControlHierarchyRuntimeView* const parentView = CMauiControlHierarchyRuntimeView::FromControl(newParent);
-    controlView->mParentList.ListLinkBefore(&parentView->mChildrenList);
+    mParentList.ListLinkBefore(&newParent->mChildrenList);
     Invalidate();
   }
 }
@@ -24704,22 +24362,19 @@ void moho::CMauiControl::DoInit()
  */
 void moho::CMauiControl::Destroy()
 {
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControl* const parentControl = controlView->mParent;
+  CMauiControl* const parentControl = mParent;
 
-  controlView->mInvalidated = true;
+  mInvalidated = true;
   if (parentControl != nullptr) {
     parentControl->Invalidate();
   }
 
-  CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-  CMauiFrame* const rootFrame = reinterpret_cast<CMauiFrame*>(extendedView->mRootFrame);
-  extendedView->mInvisible = true;
-  controlView->mParent = nullptr;
+  CMauiFrame* const rootFrame = reinterpret_cast<CMauiFrame*>(mRootFrame);
+  mInvisible = true;
+  mParent = nullptr;
 
   if (this != rootFrame) {
-    moho::CMauiFrameRuntimeView* const rootFrameView = moho::CMauiFrameRuntimeView::FromFrame(rootFrame);
-    controlView->mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&rootFrameView->mDeletedControlList));
+    mParentList.ListLinkBefore(static_cast<CMauiControlListNode*>(&rootFrame->mDeletedControlList));
   }
 
   (void)RunScript("OnDestroy");
@@ -24734,8 +24389,7 @@ void moho::CMauiControl::Destroy()
  */
 void moho::CMauiControl::ClearChildren()
 {
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
+  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
 
   while (sentinel->mNext != sentinel) {
     CMauiControlListNode* const childNode = sentinel->mNext;
@@ -24755,20 +24409,18 @@ void moho::CMauiControl::ClearChildren()
  */
 void moho::CMauiControl::Render()
 {
-  CMauiControlExtendedRuntimeView* const rootView = CMauiControlExtendedRuntimeView::FromControl(this);
-  if (rootView->mInvisible) {
+  if (mInvisible) {
     return;
   }
 
-  CMauiControlHierarchyRuntimeView* const rootHierarchy = CMauiControlHierarchyRuntimeView::FromControl(this);
   const bool depthChanged = RefreshDepthLaneForSubtree(this);
-  if (!depthChanged && !rootHierarchy->mInvalidated) {
+  if (!depthChanged && !mInvalidated) {
     return;
   }
 
   RebuildRenderedChildrenLane(this);
-  SortRenderedChildrenByDepth(rootView->mRenderedChildren);
-  rootHierarchy->mInvalidated = false;
+  SortRenderedChildrenByDepth(mRenderedChildren);
+  mInvalidated = false;
 }
 
 /**
@@ -24792,7 +24444,7 @@ moho::CMauiControl* moho::CMauiControl::DepthFirstSuccessor(
     if (CMauiControl* const siblingControl = NextSiblingControl(traversalCursor); siblingControl != nullptr) {
       return siblingControl;
     }
-    traversalCursor = CMauiControlHierarchyRuntimeView::FromControl(traversalCursor)->mParent;
+    traversalCursor = traversalCursor->mParent;
   }
 
   return nullptr;
@@ -24810,18 +24462,17 @@ void moho::CMauiFrame::RenderChildControls(
   const std::int32_t drawMask
 )
 {
-  if (CMauiControlExtendedRuntimeView::FromControl(this)->mInvisible) {
+  if (mInvisible) {
     return;
   }
 
   for (std::uint32_t childIndex = 0;; ++childIndex) {
-    const CMauiControlExtendedRuntimeView* const frameView = CMauiControlExtendedRuntimeView::FromControl(this);
-    CMauiControl* const* const renderedBegin = frameView->mRenderedChildren.begin();
+    CMauiControl* const* const renderedBegin = mRenderedChildren.begin();
     if (renderedBegin == nullptr) {
       break;
     }
 
-    const std::int32_t renderedCount = static_cast<std::int32_t>(frameView->mRenderedChildren.end() - renderedBegin);
+    const std::int32_t renderedCount = static_cast<std::int32_t>(mRenderedChildren.end() - renderedBegin);
     if (childIndex >= static_cast<std::uint32_t>(renderedCount)) {
       break;
     }
@@ -24831,8 +24482,7 @@ void moho::CMauiFrame::RenderChildControls(
       continue;
     }
 
-    const CMauiControlExtendedRuntimeView* const childView = CMauiControlExtendedRuntimeView::FromControl(childControl);
-    if ((drawMask & childView->mRenderPass) == 0) {
+    if ((drawMask & childControl->mRenderPass) == 0) {
       continue;
     }
 
@@ -24855,11 +24505,10 @@ void moho::CMauiControl::SetHidden(
     return;
   }
 
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  controlView->mIsHidden = hidden;
+  mIsHidden = hidden;
 
-  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
-  for (CMauiControlListNode* childNode = controlView->mChildrenList.mNext; childNode != sentinel;
+  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
        childNode = childNode->mNext) {
     if (CMauiControl* const childControl = ControlFromParentListNode(childNode); childControl != nullptr) {
       childControl->SetHidden(hidden);
@@ -24888,7 +24537,7 @@ bool moho::CMauiControl::OnHide(
 
   try {
     LuaPlus::LuaFunction<bool> callback(callbackObject);
-    return callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, hidden);
+    return callback(mLuaObj, hidden);
   } catch (const std::exception& exception) {
     LogOnHideCallbackException(weakGuard.ResolveObjectForWarning(), exception);
   }
@@ -24935,7 +24584,7 @@ bool moho::CMauiControl::GetIsScrollable(
   try {
     LuaPlus::LuaFunction<bool> callback(callbackObject);
     return callback(
-      CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, axisLexical != nullptr ? axisLexical : ""
+      mLuaObj, axisLexical != nullptr ? axisLexical : ""
     );
   } catch (const std::exception& exception) {
     LogIsScrollableCallbackException(scriptObject, exception);
@@ -24969,7 +24618,7 @@ void moho::CMauiControl::DoRender(
  */
 bool moho::CMauiControl::IsHidden()
 {
-  return CMauiControlHierarchyRuntimeView::FromControl(this)->mIsHidden;
+  return mIsHidden;
 }
 
 /**
@@ -24982,9 +24631,8 @@ void moho::CMauiControl::OnMinimized(
   const bool minimized
 )
 {
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
-  for (CMauiControlListNode* childNode = controlView->mChildrenList.mNext; childNode != sentinel;
+  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
        childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
@@ -25005,15 +24653,14 @@ void moho::CMauiControl::DisableHitTest(
   const bool applyChildren
 )
 {
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  controlView->mDisableHitTest = disableHitTest;
+  mDisableHitTest = disableHitTest;
 
   if (!applyChildren) {
     return;
   }
 
-  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
-  for (CMauiControlListNode* childNode = controlView->mChildrenList.mNext; childNode != sentinel;
+  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
        childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
@@ -25030,7 +24677,7 @@ void moho::CMauiControl::DisableHitTest(
  */
 bool moho::CMauiControl::IsHitTestDisabled()
 {
-  return CMauiControlHierarchyRuntimeView::FromControl(this)->mDisableHitTest;
+  return mDisableHitTest;
 }
 
 /**
@@ -25099,11 +24746,10 @@ bool moho::CMauiControl::HitTest(
   const float y
 )
 {
-  const CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  return x >= CScriptLazyVar_float::GetValue(&controlView->mLeftLV) &&
-    CScriptLazyVar_float::GetValue(&controlView->mRightLV) > x &&
-    y >= CScriptLazyVar_float::GetValue(&controlView->mTopLV) &&
-    CScriptLazyVar_float::GetValue(&controlView->mBottomLV) > y;
+  return x >= CScriptLazyVar_float::GetValue(&mLeftLV) &&
+    CScriptLazyVar_float::GetValue(&mRightLV) > x &&
+    y >= CScriptLazyVar_float::GetValue(&mTopLV) &&
+    CScriptLazyVar_float::GetValue(&mBottomLV) > y;
 }
 
 /**
@@ -25127,8 +24773,7 @@ moho::CMauiControl* moho::CMauiControl::GetTopmostControl(
       continue;
     }
 
-    const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(controlCursor);
-    const float controlDepth = CScriptLazyVarFloatCachedValueView::FromLazyVar(&controlView->mDepthLV)->mCachedValue;
+    const float controlDepth = CScriptLazyVarFloatCachedValueView::FromLazyVar(&controlCursor->mDepthLV)->mCachedValue;
     if (controlDepth > topmostDepth) {
       topmostControl = controlCursor;
       topmostDepth = controlDepth;
@@ -25154,14 +24799,14 @@ void moho::CMauiControl::PostEvent(
   // Nothing reachable from a dispatch may be freed until it unwinds: control
   // deletes are deferred by CMauiFrame::PurgeDeleted, frame deletes by
   // CUIManager's retired-frame list. Both key off MAUI_EventDispatchInProgress.
-  CMauiControl* parentControl = CMauiControlHierarchyRuntimeView::FromControl(this)->mParent;
+  CMauiControl* parentControl = mParent;
   if (HandleEvent(eventData)) {
     return;
   }
 
   while (parentControl != nullptr) {
     CMauiControl* const controlCursor = parentControl;
-    parentControl = CMauiControlHierarchyRuntimeView::FromControl(parentControl)->mParent;
+    parentControl = parentControl->mParent;
     if (controlCursor->HandleEvent(eventData)) {
       break;
     }
@@ -25179,7 +24824,7 @@ bool moho::CMauiControl::HandleEvent(
 )
 {
   LuaPlus::LuaState* const activeState =
-    CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
+    mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   CreateLuaEventObject(const_cast<SMauiEventData*>(&eventData), &eventObject, activeState);
   return RunScriptBool("HandleEvent", eventObject);
@@ -25270,7 +24915,7 @@ moho::SMauiScrollValues moho::CMauiControl::GetScrollValues(
   SMauiScrollValues values{};
   CScriptObject* const scriptObject = this;
   LuaPlus::LuaState* const activeState =
-    CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
+    mLuaObj.GetActiveState();
   if (scriptObject == nullptr || activeState == nullptr || activeState->m_state == nullptr) {
     return values;
   }
@@ -25314,15 +24959,14 @@ void moho::CMauiControl::ApplyFunction(
 )
 {
   LuaPlus::LuaFunction<void> callback(functionObject);
-  callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj);
+  callback(mLuaObj);
 
-  CMauiControlHierarchyRuntimeView* const controlView = CMauiControlHierarchyRuntimeView::FromControl(this);
-  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&controlView->mChildrenList);
-  for (CMauiControlListNode* childNode = controlView->mChildrenList.mNext; childNode != sentinel;
+  CMauiControlListNode* const sentinel = static_cast<CMauiControlListNode*>(&mChildrenList);
+  for (CMauiControlListNode* childNode = mChildrenList.mNext; childNode != sentinel;
        childNode = childNode->mNext) {
     CMauiControl* const childControl = ControlFromParentListNode(childNode);
     if (childControl != nullptr) {
-      callback(CMauiControlScriptObjectRuntimeView::FromControl(childControl)->mLuaObj);
+      callback(childControl->mLuaObj);
     }
   }
 }
@@ -25335,7 +24979,7 @@ void moho::CMauiControl::ApplyFunction(
  */
 msvc8::string moho::CMauiControl::GetDebugName()
 {
-  return CMauiControlExtendedRuntimeView::FromControl(this)->mDebugName;
+  return mDebugName;
 }
 
 /**
@@ -25348,17 +24992,17 @@ void moho::CMauiControl::SetDebugName(
   msvc8::string debugName
 )
 {
-  CMauiControlExtendedRuntimeView::FromControl(this)->mDebugName = debugName;
+  mDebugName = debugName;
 }
 
 namespace
 {
   [[nodiscard]] std::int32_t GetBitmapTextureBatchCount(
-    const moho::CMauiBitmapRuntimeView* const bitmapView
+    const moho::CMauiBitmap* const bitmap
   ) noexcept
   {
-    const boost::shared_ptr<moho::CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
-    return textureStart != nullptr ? static_cast<std::int32_t>(bitmapView->mTextureBatches.end() - textureStart) : 0;
+    const boost::shared_ptr<moho::CD3DBatchTexture>* const textureStart = bitmap->mTextureBatches.begin();
+    return textureStart != nullptr ? static_cast<std::int32_t>(bitmap->mTextureBatches.end() - textureStart) : 0;
   }
 
   /**
@@ -25367,13 +25011,13 @@ namespace
    * What it does:
    * Stores one alpha-hit-test boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapAlphaHitTestEnabled(
-    moho::CMauiBitmapRuntimeView* const bitmapView,
+  [[maybe_unused]] moho::CMauiBitmap* SetBitmapAlphaHitTestEnabled(
+    moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
   {
-    bitmapView->mUseAlphaHitTest = enabled;
-    return bitmapView;
+    bitmap->mUseAlphaHitTest = enabled;
+    return bitmap;
   }
 
   /**
@@ -25382,13 +25026,13 @@ namespace
    * What it does:
    * Stores one tiled-render boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapTiledEnabled(
-    moho::CMauiBitmapRuntimeView* const bitmapView,
+  [[maybe_unused]] moho::CMauiBitmap* SetBitmapTiledEnabled(
+    moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
   {
-    bitmapView->mIsTiled = enabled;
-    return bitmapView;
+    bitmap->mIsTiled = enabled;
+    return bitmap;
   }
 
   /**
@@ -25397,13 +25041,13 @@ namespace
    * What it does:
    * Stores one loop-enabled boolean lane into one bitmap runtime view.
    */
-  [[maybe_unused]] moho::CMauiBitmapRuntimeView* SetBitmapLoopEnabled(
-    moho::CMauiBitmapRuntimeView* const bitmapView,
+  [[maybe_unused]] moho::CMauiBitmap* SetBitmapLoopEnabled(
+    moho::CMauiBitmap* const bitmap,
     const bool enabled
   ) noexcept
   {
-    bitmapView->mDoLoop = enabled;
-    return bitmapView;
+    bitmap->mDoLoop = enabled;
+    return bitmap;
   }
 
   /**
@@ -25413,10 +25057,10 @@ namespace
    * Reads one current-frame index lane from one bitmap runtime view.
    */
   [[maybe_unused]] std::int32_t ReadBitmapCurrentFrame(
-    const moho::CMauiBitmapRuntimeView* const bitmapView
+    const moho::CMauiBitmap* const bitmap
   ) noexcept
   {
-    return bitmapView->mCurrentFrame;
+    return bitmap->mCurrentFrame;
   }
 
   /**
@@ -25426,14 +25070,14 @@ namespace
    * Returns frame count from one bitmap frame-pattern vector lane.
    */
   [[maybe_unused]] std::int32_t CountBitmapFramePatternEntries(
-    const moho::CMauiBitmapRuntimeView* const bitmapView
+    const moho::CMauiBitmap* const bitmap
   ) noexcept
   {
-    const std::int32_t* const frameStart = bitmapView->mFrames.begin();
+    const std::int32_t* const frameStart = bitmap->mFrames.begin();
     if (frameStart == nullptr) {
       return 0;
     }
-    return static_cast<std::int32_t>(bitmapView->mFrames.end() - frameStart);
+    return static_cast<std::int32_t>(bitmap->mFrames.end() - frameStart);
   }
 
   /**
@@ -25444,19 +25088,19 @@ namespace
    * textures; returns remaining texture-slot count.
    */
   [[maybe_unused]] std::uint32_t EnableBitmapAnimationIfMultipleTextures(
-    moho::CMauiBitmapRuntimeView* const bitmapView
+    moho::CMauiBitmap* const bitmap
   ) noexcept
   {
-    const auto* const batchCursor = bitmapView->mTextureBatches.end();
+    const auto* const batchCursor = bitmap->mTextureBatches.end();
     if (batchCursor == nullptr) {
       return 0u;
     }
 
     const std::uint32_t remainingSlots =
-      static_cast<std::uint32_t>(bitmapView->mTextureBatches.capacity() - bitmapView->mTextureBatches.size());
+      static_cast<std::uint32_t>(bitmap->mTextureBatches.capacity() - bitmap->mTextureBatches.size());
     if (remainingSlots > 1u) {
-      bitmapView->mIsPlaying = true;
-      reinterpret_cast<moho::CMauiControlFrameUpdateRuntimeView*>(bitmapView)->mNeedsFrameUpdate = true;
+      bitmap->mIsPlaying = true;
+      bitmap->mNeedsFrameUpdate = true;
     }
     return remainingSlots;
   }
@@ -25476,25 +25120,24 @@ moho::CMauiBitmap::CMauiBitmap(
 )
   : CMauiControl(luaObject, parent, "Bitmap")
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
 
   LuaPlus::LuaState* const activeState = luaObject != nullptr ? luaObject->m_state : nullptr;
-  new (&bitmapView->mBitmapWidthLV) CScriptLazyVar_float(activeState);
-  new (&bitmapView->mBitmapHeightLV) CScriptLazyVar_float(activeState);
+  new (&mBitmapWidthLV) CScriptLazyVar_float(activeState);
+  new (&mBitmapHeightLV) CScriptLazyVar_float(activeState);
 
-  bitmapView->mU1 = 1.0f;
-  bitmapView->mV1 = 1.0f;
-  bitmapView->mU0 = 0.0f;
-  bitmapView->mV0 = 0.0f;
-  bitmapView->mHitMask = nullptr;
-  bitmapView->mUseAlphaHitTest = false;
-  bitmapView->mIsTiled = false;
-  bitmapView->mFrameDurationSeconds = 1.0f / 12.0f;
-  bitmapView->mIsPlaying = false;
-  bitmapView->mDoLoop = false;
-  bitmapView->mCurrentFrame = 0;
-  bitmapView->mCurrentFrameTimeSeconds = 0.0f;
-  for (std::uint8_t& lane : bitmapView->mUnknown17CTo17F) {
+  mU1 = 1.0f;
+  mV1 = 1.0f;
+  mU0 = 0.0f;
+  mV0 = 0.0f;
+  mHitMask = nullptr;
+  mUseAlphaHitTest = false;
+  mIsTiled = false;
+  mFrameDurationSeconds = 1.0f / 12.0f;
+  mIsPlaying = false;
+  mDoLoop = false;
+  mCurrentFrame = 0;
+  mCurrentFrameTimeSeconds = 0.0f;
+  for (std::uint8_t& lane : mUnknown17CTo17F) {
     lane = 0;
   }
   // `mTextureBatches` and `mFrames` are constructed by the compiler-emitted
@@ -25508,9 +25151,9 @@ moho::CMauiBitmap::CMauiBitmap(
   // that construction wrote a fourth word at 0x18C..0x18F - four bytes past
   // the end of every CMauiBitmap block ever allocated.
 
-  LuaPlus::LuaObject& controlLuaObject = CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj;
-  controlLuaObject.SetObject("BitmapWidth", &AsLazyVarObject(bitmapView->mBitmapWidthLV));
-  controlLuaObject.SetObject("BitmapHeight", &AsLazyVarObject(bitmapView->mBitmapHeightLV));
+  LuaPlus::LuaObject& controlLuaObject = mLuaObj;
+  controlLuaObject.SetObject("BitmapWidth", &AsLazyVarObject(mBitmapWidthLV));
+  controlLuaObject.SetObject("BitmapHeight", &AsLazyVarObject(mBitmapHeightLV));
 }
 
 /**
@@ -25523,19 +25166,18 @@ moho::CMauiBitmap::CMauiBitmap(
  */
 moho::CMauiBitmap::~CMauiBitmap()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
 
-  if (bitmapView->mHitMask != nullptr) {
-    gpg::BitArray2D* const hitMask = static_cast<gpg::BitArray2D*>(bitmapView->mHitMask);
+  if (mHitMask != nullptr) {
+    gpg::BitArray2D* const hitMask = static_cast<gpg::BitArray2D*>(mHitMask);
     hitMask->~BitArray2D();
     ::operator delete(hitMask);
-    bitmapView->mHitMask = nullptr;
+    mHitMask = nullptr;
   }
 
   // `CScriptLazyVar_float` has no destructor of its own, so its LuaObject
   // payload still has to be torn down by hand.
-  AsLazyVarObject(bitmapView->mBitmapHeightLV).~LuaObject();
-  AsLazyVarObject(bitmapView->mBitmapWidthLV).~LuaObject();
+  AsLazyVarObject(mBitmapHeightLV).~LuaObject();
+  AsLazyVarObject(mBitmapWidthLV).~LuaObject();
 
   // The container/handle members are destroyed by the compiler-emitted
   // member teardown after this body, in reverse declaration order, exactly
@@ -25560,11 +25202,10 @@ bool moho::CMauiBitmap::HitTest(
     return false;
   }
 
-  const CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  const float localX = x - CScriptLazyVar_float::GetValue(&bitmapView->mLeftLV);
-  const float localY = y - CScriptLazyVar_float::GetValue(&bitmapView->mTopLV);
+  const float localX = x - CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float localY = y - CScriptLazyVar_float::GetValue(&mTopLV);
 
-  const auto* const hitMask = static_cast<const gpg::BitArray2D*>(bitmapView->mHitMask);
+  const auto* const hitMask = static_cast<const gpg::BitArray2D*>(mHitMask);
   if (hitMask != nullptr) {
     const int sampleX = static_cast<int>(localX);
     const int sampleY = static_cast<int>(localY);
@@ -25574,13 +25215,13 @@ bool moho::CMauiBitmap::HitTest(
     return (hitMask->ptr[wordIndex] & static_cast<std::int32_t>(bitMask)) != 0;
   }
 
-  if (!bitmapView->mUseAlphaHitTest) {
+  if (!mUseAlphaHitTest) {
     return baseHit;
   }
 
-  const std::int32_t* const frameStart = bitmapView->mFrames.begin();
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
-  const std::int32_t frameTextureIndex = frameStart[bitmapView->mCurrentFrame];
+  const std::int32_t* const frameStart = mFrames.begin();
+  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  const std::int32_t frameTextureIndex = frameStart[mCurrentFrame];
   const boost::shared_ptr<CD3DBatchTexture>& texture = textureStart[frameTextureIndex];
   if (!texture) {
     return baseHit;
@@ -25610,21 +25251,19 @@ void moho::CMauiBitmap::DoRender(
 {
   (void)drawMask;
 
-  CMauiBitmapRuntimeView* const view = CMauiBitmapRuntimeView::FromBitmap(this);
-  if (view->mFrames.empty() || view->mTextureBatches.empty()) {
+  if (mFrames.empty() || mTextureBatches.empty()) {
     return;
   }
 
-  const std::int32_t frameIndex = view->mFrames[view->mCurrentFrame];
-  if (!view->mTextureBatches[frameIndex]) {
+  const std::int32_t frameIndex = mFrames[mCurrentFrame];
+  if (!mTextureBatches[frameIndex]) {
     return;
   }
 
-  const CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(this);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
-  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
 
   gpg::Rect2f destRect;
   destRect.x0 = left;
@@ -25632,12 +25271,12 @@ void moho::CMauiBitmap::DoRender(
   destRect.x1 = right;
   destRect.z1 = bottom;
 
-  const boost::shared_ptr<CD3DBatchTexture> texture = view->mTextureBatches[frameIndex];
+  const boost::shared_ptr<CD3DBatchTexture> texture = mTextureBatches[frameIndex];
   primBatcher->SetTexture(texture);
 
-  const std::uint32_t vertexColor = CMauiControlExtendedRuntimeView::FromControl(this)->mVertexAlpha;
+  const std::uint32_t vertexColor = mVertexAlpha;
 
-  if (view->mIsTiled) {
+  if (mIsTiled) {
     gpg::Rect2f tileRect;
     tileRect.x0 = 0.0f;
     tileRect.z0 = 0.0f;
@@ -25646,10 +25285,10 @@ void moho::CMauiBitmap::DoRender(
     DRAW_TiledQuad(primBatcher, destRect, tileRect, destRect, vertexColor);
   } else {
     gpg::Rect2f uvRect;
-    uvRect.x0 = view->mU0;
-    uvRect.z0 = view->mV0;
-    uvRect.x1 = view->mU1;
-    uvRect.z1 = view->mV1;
+    uvRect.x0 = mU0;
+    uvRect.z0 = mV0;
+    uvRect.x1 = mU1;
+    uvRect.z1 = mV1;
     DRAW_ClippedQuad(primBatcher, destRect, uvRect, destRect, vertexColor);
   }
 }
@@ -25665,14 +25304,12 @@ void moho::CMauiBitmap::ShareTextures(
   CMauiBitmap* const sourceBitmap
 )
 {
-  CMauiBitmapRuntimeView* const destinationView = CMauiBitmapRuntimeView::FromBitmap(this);
-  const CMauiBitmapRuntimeView* const sourceView = CMauiBitmapRuntimeView::FromBitmap(sourceBitmap);
 
-  destinationView->mTextureBatches = sourceView->mTextureBatches;
+  mTextureBatches = sourceBitmap->mTextureBatches;
 
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = destinationView->mTextureBatches.begin();
-  CScriptLazyVar_float::SetValue(&destinationView->mBitmapWidthLV, static_cast<float>(textureStart->get()->mWidth));
-  CScriptLazyVar_float::SetValue(&destinationView->mBitmapHeightLV, static_cast<float>(textureStart->get()->mHeight));
+  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  CScriptLazyVar_float::SetValue(&mBitmapWidthLV, static_cast<float>(textureStart->get()->mWidth));
+  CScriptLazyVar_float::SetValue(&mBitmapHeightLV, static_cast<float>(textureStart->get()->mHeight));
 }
 
 /**
@@ -25686,22 +25323,21 @@ void moho::CMauiBitmap::SetTexture(
   const boost::shared_ptr<CD3DBatchTexture>& texture
 )
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  AppendBitmapTextureBatch(bitmapView->mTextureBatches, texture);
+  AppendBitmapTextureBatch(mTextureBatches, texture);
 
-  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = bitmapView->mTextureBatches.begin();
-  if (textureStart != nullptr && (bitmapView->mTextureBatches.end() - textureStart) == 1) {
-    CScriptLazyVar_float::SetValue(&bitmapView->mBitmapWidthLV, static_cast<float>(texture->mWidth));
-    CScriptLazyVar_float::SetValue(&bitmapView->mBitmapHeightLV, static_cast<float>(texture->mHeight));
+  const boost::shared_ptr<CD3DBatchTexture>* const textureStart = mTextureBatches.begin();
+  if (textureStart != nullptr && (mTextureBatches.end() - textureStart) == 1) {
+    CScriptLazyVar_float::SetValue(&mBitmapWidthLV, static_cast<float>(texture->mWidth));
+    CScriptLazyVar_float::SetValue(&mBitmapHeightLV, static_cast<float>(texture->mHeight));
     return;
   }
 
-  const boost::shared_ptr<CD3DBatchTexture>* const parentTexture = bitmapView->mTextureBatches.begin();
+  const boost::shared_ptr<CD3DBatchTexture>* const parentTexture = mTextureBatches.begin();
   const CD3DBatchTexture* const addedTexture = texture.get();
   if (addedTexture->mWidth != (*parentTexture)->mWidth || addedTexture->mHeight != (*parentTexture)->mHeight) {
     gpg::Warnf(
       "CMauiBitmap:SetTexture - bitmap #%d in sequence does not have same width and height as parent.",
-      GetBitmapTextureBatchCount(bitmapView)
+      GetBitmapTextureBatchCount(this)
     );
   }
 }
@@ -25717,10 +25353,9 @@ void moho::CMauiBitmap::SetFramePattern(
   const msvc8::vector<std::int32_t>& framePattern
 )
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mFrames.clear();
+  mFrames.clear();
 
-  const std::int32_t textureCount = GetBitmapTextureBatchCount(bitmapView);
+  const std::int32_t textureCount = GetBitmapTextureBatchCount(this);
   const std::int32_t* const frameStart = framePattern.begin();
   if (frameStart == nullptr) {
     return;
@@ -25748,7 +25383,7 @@ void moho::CMauiBitmap::SetFramePattern(
     if (clampedFrame < 0) {
       clampedFrame = 0;
     }
-    bitmapView->mFrames.push_back(clampedFrame);
+    mFrames.push_back(clampedFrame);
   }
 }
 
@@ -25760,12 +25395,11 @@ void moho::CMauiBitmap::SetFramePattern(
  */
 void moho::CMauiBitmap::SetForwardPattern()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mFrames.clear();
+  mFrames.clear();
 
-  const std::int32_t textureCount = GetBitmapTextureBatchCount(bitmapView);
+  const std::int32_t textureCount = GetBitmapTextureBatchCount(this);
   for (std::int32_t frameIndex = 0; frameIndex < textureCount; ++frameIndex) {
-    bitmapView->mFrames.push_back(frameIndex);
+    mFrames.push_back(frameIndex);
   }
 }
 
@@ -25777,12 +25411,11 @@ void moho::CMauiBitmap::SetForwardPattern()
  */
 void moho::CMauiBitmap::SetBackwardPattern()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mFrames.clear();
+  mFrames.clear();
 
-  const std::int32_t textureCount = GetBitmapTextureBatchCount(bitmapView);
+  const std::int32_t textureCount = GetBitmapTextureBatchCount(this);
   for (std::int32_t remaining = textureCount; remaining > 0; --remaining) {
-    bitmapView->mFrames.push_back(remaining - 1);
+    mFrames.push_back(remaining - 1);
   }
 }
 
@@ -25794,16 +25427,15 @@ void moho::CMauiBitmap::SetBackwardPattern()
  */
 void moho::CMauiBitmap::SetPingPongPattern()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mFrames.clear();
+  mFrames.clear();
 
-  const std::int32_t textureCount = GetBitmapTextureBatchCount(bitmapView);
+  const std::int32_t textureCount = GetBitmapTextureBatchCount(this);
   if (textureCount <= 0) {
     return;
   }
 
   for (std::int32_t frameIndex = 0; frameIndex < textureCount; ++frameIndex) {
-    bitmapView->mFrames.push_back(frameIndex);
+    mFrames.push_back(frameIndex);
   }
 
   if (textureCount == 1) {
@@ -25811,7 +25443,7 @@ void moho::CMauiBitmap::SetPingPongPattern()
   }
 
   for (std::int32_t frameIndex = textureCount - 2; frameIndex >= 0; --frameIndex) {
-    bitmapView->mFrames.push_back(frameIndex);
+    mFrames.push_back(frameIndex);
   }
 }
 
@@ -25824,12 +25456,11 @@ void moho::CMauiBitmap::SetPingPongPattern()
  */
 void moho::CMauiBitmap::SetLoopPingPongPattern()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  bitmapView->mFrames.clear();
+  mFrames.clear();
 
-  const std::int32_t textureCount = GetBitmapTextureBatchCount(bitmapView);
+  const std::int32_t textureCount = GetBitmapTextureBatchCount(this);
   for (std::int32_t frameIndex = 0; frameIndex < textureCount; ++frameIndex) {
-    bitmapView->mFrames.push_back(frameIndex);
+    mFrames.push_back(frameIndex);
   }
 
   if (textureCount <= 2) {
@@ -25837,7 +25468,7 @@ void moho::CMauiBitmap::SetLoopPingPongPattern()
   }
 
   for (std::int32_t frameIndex = textureCount - 2; frameIndex > 0; --frameIndex) {
-    bitmapView->mFrames.push_back(frameIndex);
+    mFrames.push_back(frameIndex);
   }
 }
 
@@ -25850,19 +25481,18 @@ void moho::CMauiBitmap::SetLoopPingPongPattern()
  */
 void moho::CMauiBitmap::StopAnimationPlayback()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  const auto* const batchBegin = bitmapView->mTextureBatches.begin();
+  const auto* const batchBegin = mTextureBatches.begin();
   if (batchBegin == nullptr) {
     return;
   }
 
-  const std::ptrdiff_t batchCount = bitmapView->mTextureBatches.end() - batchBegin;
+  const std::ptrdiff_t batchCount = mTextureBatches.end() - batchBegin;
   if (batchCount <= 1) {
     return;
   }
 
-  bitmapView->mIsPlaying = false;
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+  mIsPlaying = false;
+  mNeedsFrameUpdate = false;
   reinterpret_cast<CScriptObject*>(this)->RunScript("OnAnimationStopped");
 }
 
@@ -25876,12 +25506,11 @@ std::int32_t moho::CMauiBitmap::SetFrame(
   const std::int32_t frameIndex
 )
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
 
   std::int32_t selectedFrame = 0;
-  const std::int32_t* const frameStart = bitmapView->mFrames.begin();
+  const std::int32_t* const frameStart = mFrames.begin();
   if (frameStart != nullptr) {
-    const std::int32_t frameCount = static_cast<std::int32_t>(bitmapView->mFrames.end() - frameStart);
+    const std::int32_t frameCount = static_cast<std::int32_t>(mFrames.end() - frameStart);
     if (frameCount > 0) {
       selectedFrame = frameCount - 1;
     }
@@ -25894,7 +25523,7 @@ std::int32_t moho::CMauiBitmap::SetFrame(
     selectedFrame = 0;
   }
 
-  bitmapView->mCurrentFrame = selectedFrame;
+  mCurrentFrame = selectedFrame;
   return selectedFrame;
 }
 
@@ -25912,18 +25541,17 @@ void moho::CMauiBitmap::Frame(
 {
   reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
 
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  if (!bitmapView->mIsPlaying) {
+  if (!mIsPlaying) {
     return;
   }
 
-  const float nextFrameTime = deltaSeconds + bitmapView->mCurrentFrameTimeSeconds;
-  bitmapView->mCurrentFrameTimeSeconds = nextFrameTime;
-  if (nextFrameTime <= bitmapView->mFrameDurationSeconds) {
+  const float nextFrameTime = deltaSeconds + mCurrentFrameTimeSeconds;
+  mCurrentFrameTimeSeconds = nextFrameTime;
+  if (nextFrameTime <= mFrameDurationSeconds) {
     return;
   }
 
-  bitmapView->mCurrentFrameTimeSeconds = 0.0f;
+  mCurrentFrameTimeSeconds = 0.0f;
   OnPatternEnd();
 }
 
@@ -25936,41 +25564,40 @@ void moho::CMauiBitmap::Frame(
  */
 void moho::CMauiBitmap::OnPatternEnd()
 {
-  CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
-  const std::int32_t* const frameStart = bitmapView->mFrames.begin();
+  const std::int32_t* const frameStart = mFrames.begin();
   if (frameStart == nullptr) {
     return;
   }
 
-  const std::int32_t frameCount = static_cast<std::int32_t>(bitmapView->mFrames.end() - frameStart);
+  const std::int32_t frameCount = static_cast<std::int32_t>(mFrames.end() - frameStart);
   if (frameCount <= 1) {
     return;
   }
 
-  ++bitmapView->mCurrentFrame;
-  if (bitmapView->mCurrentFrame < 0) {
-    bitmapView->mCurrentFrame = 0;
+  ++mCurrentFrame;
+  if (mCurrentFrame < 0) {
+    mCurrentFrame = 0;
   }
 
-  const std::int32_t* const currentFrameStart = bitmapView->mFrames.begin();
+  const std::int32_t* const currentFrameStart = mFrames.begin();
   const std::int32_t currentFrameCount =
-    currentFrameStart != nullptr ? static_cast<std::int32_t>(bitmapView->mFrames.end() - currentFrameStart) : 0;
-  if (bitmapView->mCurrentFrame >= currentFrameCount) {
-    if (bitmapView->mDoLoop) {
-      bitmapView->mCurrentFrame = 0;
+    currentFrameStart != nullptr ? static_cast<std::int32_t>(mFrames.end() - currentFrameStart) : 0;
+  if (mCurrentFrame >= currentFrameCount) {
+    if (mDoLoop) {
+      mCurrentFrame = 0;
     } else {
-      const std::int32_t* const terminalFrameStart = bitmapView->mFrames.begin();
+      const std::int32_t* const terminalFrameStart = mFrames.begin();
       const std::int32_t terminalFrameCount =
-        terminalFrameStart != nullptr ? static_cast<std::int32_t>(bitmapView->mFrames.end() - terminalFrameStart) : 0;
-      bitmapView->mCurrentFrame = terminalFrameCount - 1;
-      bitmapView->mIsPlaying = false;
-      CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = false;
+        terminalFrameStart != nullptr ? static_cast<std::int32_t>(mFrames.end() - terminalFrameStart) : 0;
+      mCurrentFrame = terminalFrameCount - 1;
+      mIsPlaying = false;
+      mNeedsFrameUpdate = false;
     }
 
     reinterpret_cast<CScriptObject*>(this)->RunScript("OnAnimationFinished");
   }
 
-  reinterpret_cast<CScriptObject*>(this)->CallbackInt("OnAnimationFrame", bitmapView->mCurrentFrame);
+  reinterpret_cast<CScriptObject*>(this)->CallbackInt("OnAnimationFrame", mCurrentFrame);
 }
 
 /**
@@ -25992,7 +25619,7 @@ void moho::CMauiBitmap::OnPatternEnd()
  * +0x11C to Moho::CMauiEdit::`vftable'{for `Moho::IMauiDragger'} (asm 0x0078F04A,
  * thunk table VA 0x00E395CC) so the click-dragger DragMove slot dispatches to
  * Moho::CMauiEditDragMove (FUN_007913A0). We model that sub-object as the typed
- * `CMauiEditClickDragger` member `CMauiEditRuntimeView::mClickDragger` (+0x11C);
+ * `CMauiEditClickDragger` member `CMauiEdit::mClickDragger` (+0x11C);
  * placement-constructing it here makes the compiler emit + install the
  * CMauiEdit-specific override vtable exactly as the binary does, and the
  * `IMauiDragger` base's weak-reference head (+0x120) starts null (matches
@@ -26004,7 +25631,6 @@ moho::CMauiEdit::CMauiEdit(
 )
   : CMauiControl(luaObject, parent, "edit")
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
   // asm 0x0078F04A: install the CMauiEdit-for-IMauiDragger override vtable (VA
   // 0x00E395CC) into the embedded click-dragger sub-object at +0x11C. Because the
@@ -26013,35 +25639,35 @@ moho::CMauiEdit::CMauiEdit(
   // writes its vptr (DragMove -> Moho::CMauiEditDragMove) and clears the
   // `IMauiDragger` base's weak-reference head (+0x120 -> null, matching `.c`
   // line 19 `this->mList = 0`).
-  new (&editView->mClickDragger) CMauiEditClickDragger();
+  new (&mClickDragger) CMauiEditClickDragger();
 
-  editView->mFont = nullptr;
-  editView->mForegroundColor = 0xFFFFFFFFu;
-  editView->mBackgroundVisible = true;
-  editView->mBackgroundColor = 0xFF000000u;
-  editView->mHighlightForegroundColor = 0xFF000000u;
-  editView->mHighlightBackgroundColor = 0xFFFFFFFFu;
-  editView->mDropShadow = false;
-  editView->mIsEnabled = true;
+  mFont = nullptr;
+  mForegroundColor = 0xFFFFFFFFu;
+  mBackgroundVisible = true;
+  mBackgroundColor = 0xFF000000u;
+  mHighlightForegroundColor = 0xFF000000u;
+  mHighlightBackgroundColor = 0xFFFFFFFFu;
+  mDropShadow = false;
+  mIsEnabled = true;
   // mText (+0x140) is already default-constructed (empty) by the runtime-view /
   // base construction; the binary's inline SSO reset is the empty-string init.
 
-  editView->mCaretCycleCurrentAlpha = 255u; // .c mCaretCurColor
-  editView->mCaretCycleSeconds = 1.5f;      // .c mCaretCycleSeconds
-  editView->mCaretCycleOnAlpha = 255u;      // .c mCaretCycleOnColor
-  editView->mCaretPosition = 0;
-  editView->mCaretVisible = false;
-  editView->mCaretColor = 16711422u;   // .c mCaretColor (0xFEFEFE)
-  editView->mCaretCycleOffAlpha = 62u; // .c mCaretCycleOffColor
-  editView->mCaretCycleTime = 0.0f;    // .c mCaretTime
+  mCaretCycleCurrentAlpha = 255u; // .c mCaretCurColor
+  mCaretCycleSeconds = 1.5f;      // .c mCaretCycleSeconds
+  mCaretCycleOnAlpha = 255u;      // .c mCaretCycleOnColor
+  mCaretPosition = 0;
+  mCaretVisible = false;
+  mCaretColor = 16711422u;   // .c mCaretColor (0xFEFEFE)
+  mCaretCycleOffAlpha = 62u; // .c mCaretCycleOffColor
+  mCaretCycleTime = 0.0f;    // .c mCaretTime
 
-  editView->mClipOffset = 0;
-  editView->mClipLength = 0;
-  editView->mSelectionStart = 0;
-  editView->mSelectionEnd = 0;
-  editView->mDragStart = 0;
-  editView->mTextChangeCallbackInProgress = false; // .c mDoingCallback
-  editView->mMaxChars = 1024;
+  mClipOffset = 0;
+  mClipLength = 0;
+  mSelectionStart = 0;
+  mSelectionEnd = 0;
+  mDragStart = 0;
+  mTextChangeCallbackInProgress = false; // .c mDoingCallback
+  mMaxChars = 1024;
 
   // Create the default "Courier New" 14pt font and apply it. Mirrors the
   // sibling `cfunc_CMauiEditSetNewFontL` idiom: CD3DFont::Create ->
@@ -26049,10 +25675,10 @@ moho::CMauiEdit::CMauiEdit(
   // sub_78F620 is the elided requested-clip-offset lane already handled inside
   // ApplyEditFontAndRefreshClip (FUN_0078F620).
   boost::SharedPtrRaw<CD3DFont> defaultFont = CD3DFont::Create(14, "Courier New");
-  ApplyEditFontAndRefreshClip(editView, defaultFont);
+  ApplyEditFontAndRefreshClip(this, defaultFont);
   defaultFont.release();
 
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+  mNeedsFrameUpdate = true;
 }
 
 /**
@@ -26065,8 +25691,7 @@ moho::CMauiEdit::CMauiEdit(
  */
 moho::CMauiEdit::~CMauiEdit()
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  ReleaseIntrusiveFont(editView->mFont);
+  ReleaseIntrusiveFont(mFont);
 
   // asm 0x0078F230: destroying the embedded IMauiDragger sub-object resets its
   // vptr at +0x11C back to the plain ??_7IMauiDragger@Moho@@6B@ vtable, and
@@ -26088,26 +25713,25 @@ void moho::CMauiEdit::Frame(
   const float deltaSeconds
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
   reinterpret_cast<CScriptObject*>(this)->RunScriptNum("OnFrame", deltaSeconds);
 
-  const float cycleSeconds = editView->mCaretCycleSeconds;
-  const float nextCycleTime = editView->mCaretCycleTime + deltaSeconds;
-  editView->mCaretCycleTime = nextCycleTime;
+  const float cycleSeconds = mCaretCycleSeconds;
+  const float nextCycleTime = mCaretCycleTime + deltaSeconds;
+  mCaretCycleTime = nextCycleTime;
   if (nextCycleTime > cycleSeconds) {
-    editView->mCaretCycleTime = 0.0f;
+    mCaretCycleTime = 0.0f;
   }
 
-  const float cycleBlendFactor = editView->mCaretCycleTime <= (cycleSeconds * 0.5f)
-    ? ((editView->mCaretCycleTime / cycleSeconds) * 2.0f)
-    : (((cycleSeconds - editView->mCaretCycleTime) / cycleSeconds) * 2.0f);
+  const float cycleBlendFactor = mCaretCycleTime <= (cycleSeconds * 0.5f)
+    ? ((mCaretCycleTime / cycleSeconds) * 2.0f)
+    : (((cycleSeconds - mCaretCycleTime) / cycleSeconds) * 2.0f);
 
-  const int offAlpha = static_cast<int>(editView->mCaretCycleOffAlpha);
-  const int alphaDelta = static_cast<int>(editView->mCaretCycleOnAlpha) - offAlpha;
+  const int offAlpha = static_cast<int>(mCaretCycleOffAlpha);
+  const int alphaDelta = static_cast<int>(mCaretCycleOnAlpha) - offAlpha;
   const int blendedAlpha = static_cast<int>(
     (static_cast<double>(alphaDelta) * static_cast<double>(cycleBlendFactor)) + static_cast<double>(offAlpha)
   );
-  editView->mCaretCycleCurrentAlpha = static_cast<std::uint32_t>(blendedAlpha);
+  mCaretCycleCurrentAlpha = static_cast<std::uint32_t>(blendedAlpha);
 }
 
 /**
@@ -26127,93 +25751,91 @@ void moho::CMauiEdit::DoRender(
     return;
   }
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  CD3DFont* const font = editView->mFont;
+  CD3DFont* const font = mFont;
   if (font == nullptr) {
     return;
   }
 
-  const CMauiControlExtendedRuntimeView* const extendedView = CMauiControlExtendedRuntimeView::FromControl(this);
-  const float left = CScriptLazyVar_float::GetValue(&editView->mLeftLV);
-  const float right = CScriptLazyVar_float::GetValue(&editView->mRightLV);
-  const float top = CScriptLazyVar_float::GetValue(&editView->mTopLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&editView->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
-  if (editView->mBackgroundVisible) {
-    DrawSolidColorQuad(primBatcher, editView->mBackgroundColor, left, top, right, bottom, extendedView->mVertexAlpha);
+  if (mBackgroundVisible) {
+    DrawSolidColorQuad(primBatcher, mBackgroundColor, left, top, right, bottom, mVertexAlpha);
   }
 
-  const int clipStart = editView->mClipOffset;
-  const int clipEnd = clipStart + editView->mClipLength;
+  const int clipStart = mClipOffset;
+  const int clipEnd = clipStart + mClipLength;
   const float baselineY = top + font->mAscent;
 
   float penX = left;
-  int firstRunEnd = editView->mSelectionStart;
+  int firstRunEnd = mSelectionStart;
   if (firstRunEnd >= clipEnd) {
     firstRunEnd = clipEnd;
   }
 
   if (firstRunEnd > clipStart) {
-    const msvc8::string runText = gpg::STR_Utf8SubString(editView->mText.c_str(), clipStart, firstRunEnd - clipStart);
-    penX += RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mForegroundColor);
+    const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), clipStart, firstRunEnd - clipStart);
+    penX += RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
-  int selectedStart = editView->mSelectionStart;
+  int selectedStart = mSelectionStart;
   if (selectedStart < clipStart) {
     selectedStart = clipStart;
   }
 
-  int selectedEnd = editView->mSelectionEnd;
+  int selectedEnd = mSelectionEnd;
   if (selectedEnd >= clipEnd) {
     selectedEnd = clipEnd;
   }
 
   if (selectedEnd > selectedStart) {
     const msvc8::string runText =
-      gpg::STR_Utf8SubString(editView->mText.c_str(), selectedStart, selectedEnd - selectedStart);
+      gpg::STR_Utf8SubString(mText.c_str(), selectedStart, selectedEnd - selectedStart);
     const float runAdvance = font->GetAdvance(runText.c_str(), 0);
 
-    if (editView->mBackgroundVisible) {
+    if (mBackgroundVisible) {
       DrawSolidColorQuad(
         primBatcher,
-        editView->mHighlightBackgroundColor,
+        mHighlightBackgroundColor,
         penX,
         top,
         penX + runAdvance,
         bottom,
-        extendedView->mVertexAlpha
+        mVertexAlpha
       );
     }
 
     penX +=
-      RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mHighlightForegroundColor);
+      RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mHighlightForegroundColor);
   }
 
-  int suffixStart = editView->mSelectionEnd;
+  int suffixStart = mSelectionEnd;
   if (suffixStart < clipStart) {
     suffixStart = clipStart;
   }
 
   if (clipEnd > suffixStart) {
-    const msvc8::string runText = gpg::STR_Utf8SubString(editView->mText.c_str(), suffixStart, clipEnd - suffixStart);
-    (void)RenderEditTextRun(this, editView, primBatcher, runText, penX, baselineY, editView->mForegroundColor);
+    const msvc8::string runText = gpg::STR_Utf8SubString(mText.c_str(), suffixStart, clipEnd - suffixStart);
+    (void)RenderEditTextRun(this, this, primBatcher, runText, penX, baselineY, mForegroundColor);
   }
 
-  if (!editView->mCaretVisible) {
+  if (!mCaretVisible) {
     return;
   }
 
-  const int caretPosition = editView->mCaretPosition;
+  const int caretPosition = mCaretPosition;
   if (caretPosition < clipStart || caretPosition > clipEnd) {
     return;
   }
 
   const msvc8::string caretPrefix =
-    gpg::STR_Utf8SubString(editView->mText.c_str(), clipStart, caretPosition - clipStart);
+    gpg::STR_Utf8SubString(mText.c_str(), clipStart, caretPosition - clipStart);
   const float caretX = left + font->GetAdvance(caretPrefix.c_str(), 0);
   const float caretBottom = top + font->mAscent + font->mDescent;
-  const std::uint32_t caretColor = editView->mCaretColor | (editView->mCaretCycleCurrentAlpha << 24u);
-  DrawSolidColorQuad(primBatcher, editView->mForegroundColor, caretX, top, caretX + 1.0f, caretBottom, caretColor);
+  const std::uint32_t caretColor = mCaretColor | (mCaretCycleCurrentAlpha << 24u);
+  DrawSolidColorQuad(primBatcher, mForegroundColor, caretX, top, caretX + 1.0f, caretBottom, caretColor);
 }
 
 /**
@@ -26249,7 +25871,7 @@ bool moho::CMauiEdit::HandleEvent(
  */
 void moho::CMauiEdit::AbandonKeyboardFocus()
 {
-  (void)WriteEditCaretVisibleLane(CMauiEditRuntimeView::FromEdit(this), false);
+  (void)WriteEditCaretVisibleLane(this, false);
   if (Maui_CurrentFocusControl.ResolveFocusedControl() == this) {
     MAUI_SetKeyboardFocus(nullptr, true);
   }
@@ -26277,12 +25899,11 @@ void moho::CMauiEdit::LosingKeyboardFocus()
 msvc8::string moho::CMauiEdit::GetSelection()
 {
   msvc8::string selectionText{};
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
-  const int selectionStart = editView->mSelectionStart;
-  const int selectionEnd = editView->mSelectionEnd;
-  if (HasEditSelectionRange(editView)) {
-    selectionText = gpg::STR_Utf8SubString(editView->mText.c_str(), selectionStart, selectionEnd - selectionStart);
+  const int selectionStart = mSelectionStart;
+  const int selectionEnd = mSelectionEnd;
+  if (HasEditSelectionRange(this)) {
+    selectionText = gpg::STR_Utf8SubString(mText.c_str(), selectionStart, selectionEnd - selectionStart);
   }
 
   return selectionText;
@@ -26296,9 +25917,8 @@ msvc8::string moho::CMauiEdit::GetSelection()
  */
 bool moho::CMauiEdit::EnterPressed()
 {
-  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
   return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool(
-    "OnEnterPressed", std::string(editView->mText.c_str())
+    "OnEnterPressed", std::string(mText.c_str())
   );
 }
 
@@ -26310,9 +25930,8 @@ bool moho::CMauiEdit::EnterPressed()
  */
 bool moho::CMauiEdit::EscPressed()
 {
-  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
   return reinterpret_cast<CScriptObject*>(this)->RunScriptStringBool(
-    "OnEscPressed", std::string(editView->mText.c_str())
+    "OnEscPressed", std::string(mText.c_str())
   );
 }
 
@@ -26354,51 +25973,50 @@ void moho::CMauiEdit::ReplaceSelection(
   const msvc8::string& replacementText
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
   msvc8::string insertText{};
   const int replacementLength = gpg::STR_Utf8Len(replacementText.c_str());
-  const int currentLength = gpg::STR_Utf8Len(editView->mText.c_str());
-  if ((currentLength + replacementLength) <= editView->mMaxChars) {
+  const int currentLength = gpg::STR_Utf8Len(mText.c_str());
+  if ((currentLength + replacementLength) <= mMaxChars) {
     insertText = replacementText;
   } else {
-    if (currentLength >= editView->mMaxChars) {
+    if (currentLength >= mMaxChars) {
       return;
     }
 
-    const int maxInsertChars = editView->mMaxChars - currentLength;
+    const int maxInsertChars = mMaxChars - currentLength;
     insertText = gpg::STR_Utf8SubString(replacementText.c_str(), 0, maxInsertChars);
   }
 
   DeleteSelection(false);
-  const msvc8::string oldText = editView->mText;
+  const msvc8::string oldText = mText;
 
   if (insertText.size() != 0u) {
-    const int caretPosition = editView->mCaretPosition;
-    if (caretPosition == gpg::STR_Utf8Len(editView->mText.c_str())) {
-      editView->mText += insertText;
+    const int caretPosition = mCaretPosition;
+    if (caretPosition == gpg::STR_Utf8Len(mText.c_str())) {
+      mText += insertText;
       const int insertedLength = gpg::STR_Utf8Len(insertText.c_str());
-      editView->mCaretPosition += insertedLength;
-      editView->mClipLength += insertedLength;
-      SetEditClipOffsetRight(editView, 0);
+      mCaretPosition += insertedLength;
+      mClipLength += insertedLength;
+      SetEditClipOffsetRight(this, 0);
     } else {
-      const int caretByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), caretPosition);
-      (void)editView->mText.replace(static_cast<std::size_t>(caretByteOffset), 0u, insertText.view());
+      const int caretByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), caretPosition);
+      (void)mText.replace(static_cast<std::size_t>(caretByteOffset), 0u, insertText.view());
 
-      editView->mCaretPosition += gpg::STR_Utf8Len(insertText.c_str());
-      if (editView->mCaretPosition >= (editView->mClipOffset + editView->mClipLength)) {
-        const int nextTextLength = gpg::STR_Utf8Len(editView->mText.c_str());
-        SetEditClipOffsetRight(editView, nextTextLength - editView->mCaretPosition);
+      mCaretPosition += gpg::STR_Utf8Len(insertText.c_str());
+      if (mCaretPosition >= (mClipOffset + mClipLength)) {
+        const int nextTextLength = gpg::STR_Utf8Len(mText.c_str());
+        SetEditClipOffsetRight(this, nextTextLength - mCaretPosition);
       } else {
-        SetEditClipOffsetLeft(editView, editView->mClipOffset);
+        SetEditClipOffsetLeft(this, mClipOffset);
       }
     }
   }
 
-  if (!editView->mTextChangeCallbackInProgress) {
-    editView->mTextChangeCallbackInProgress = true;
-    TextChanged(editView->mText, oldText);
-    editView->mTextChangeCallbackInProgress = false;
+  if (!mTextChangeCallbackInProgress) {
+    mTextChangeCallbackInProgress = true;
+    TextChanged(mText, oldText);
+    mTextChangeCallbackInProgress = false;
   }
 }
 
@@ -26414,7 +26032,7 @@ void moho::CMauiEdit::NonTextKeyPressed(
 )
 {
   LuaPlus::LuaState* const activeState =
-    CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj.GetActiveState();
+    mLuaObj.GetActiveState();
   LuaPlus::LuaObject eventObject{};
   const LuaPlus::LuaObject* const createdEvent = CreateLuaEventObject(eventData, &eventObject, activeState);
   reinterpret_cast<CScriptObject*>(this)->RunScriptIntObject("OnNonTextKeyPressed", keyCode, *createdEvent);
@@ -26431,35 +26049,34 @@ void moho::CMauiEdit::DeleteSelection(
   const bool suppressCallback
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  if (editView->mSelectionStart == editView->mSelectionEnd) {
+  if (mSelectionStart == mSelectionEnd) {
     return;
   }
 
-  const msvc8::string oldText = editView->mText;
-  const int textLength = gpg::STR_Utf8Len(editView->mText.c_str());
-  if (editView->mSelectionEnd > textLength) {
-    editView->mSelectionEnd = textLength;
+  const msvc8::string oldText = mText;
+  const int textLength = gpg::STR_Utf8Len(mText.c_str());
+  if (mSelectionEnd > textLength) {
+    mSelectionEnd = textLength;
   }
 
-  const int selectionStart = editView->mSelectionStart;
-  editView->mCaretPosition = selectionStart;
+  const int selectionStart = mSelectionStart;
+  mCaretPosition = selectionStart;
 
-  const int selectionStartByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), selectionStart);
-  const int selectionEndByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), editView->mSelectionEnd);
-  editView->mText.erase(selectionStartByteOffset, selectionEndByteOffset - selectionStartByteOffset);
+  const int selectionStartByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), selectionStart);
+  const int selectionEndByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), mSelectionEnd);
+  mText.erase(selectionStartByteOffset, selectionEndByteOffset - selectionStartByteOffset);
 
-  if (editView->mCaretPosition < editView->mClipOffset) {
-    editView->mClipOffset = editView->mCaretPosition;
+  if (mCaretPosition < mClipOffset) {
+    mClipOffset = mCaretPosition;
   }
 
-  editView->mSelectionStart = 0;
-  editView->mSelectionEnd = 0;
+  mSelectionStart = 0;
+  mSelectionEnd = 0;
 
-  if (!suppressCallback && !editView->mTextChangeCallbackInProgress) {
-    editView->mTextChangeCallbackInProgress = true;
-    TextChanged(editView->mText, oldText);
-    editView->mTextChangeCallbackInProgress = false;
+  if (!suppressCallback && !mTextChangeCallbackInProgress) {
+    mTextChangeCallbackInProgress = true;
+    TextChanged(mText, oldText);
+    mTextChangeCallbackInProgress = false;
   }
 }
 
@@ -26471,7 +26088,7 @@ void moho::CMauiEdit::DeleteSelection(
  */
 msvc8::string moho::CMauiEdit::GetText()
 {
-  return CMauiEditRuntimeView::FromEdit(this)->mText;
+  return mText;
 }
 
 /**
@@ -26485,28 +26102,27 @@ void moho::CMauiEdit::DeleteCharAtCaret(
   const bool deleteToRight
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  const msvc8::string oldText = editView->mText;
+  const msvc8::string oldText = mText;
 
-  if (editView->mSelectionStart != editView->mSelectionEnd) {
+  if (mSelectionStart != mSelectionEnd) {
     DeleteSelection(false);
-    SetEditClipOffsetLeft(editView, editView->mClipOffset);
+    SetEditClipOffsetLeft(this, mClipOffset);
   } else if (deleteToRight) {
-    const int caretPosition = editView->mCaretPosition;
-    if (caretPosition != gpg::STR_Utf8Len(editView->mText.c_str())) {
-      const int deleteStartByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), caretPosition);
-      const int deleteEndByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), caretPosition + 1);
-      editView->mText.erase(deleteStartByteOffset, deleteEndByteOffset - deleteStartByteOffset);
+    const int caretPosition = mCaretPosition;
+    if (caretPosition != gpg::STR_Utf8Len(mText.c_str())) {
+      const int deleteStartByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), caretPosition);
+      const int deleteEndByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), caretPosition + 1);
+      mText.erase(deleteStartByteOffset, deleteEndByteOffset - deleteStartByteOffset);
     }
 
-    SetEditClipOffsetLeft(editView, editView->mClipOffset);
-  } else if (editView->mCaretPosition != 0) {
-    const int deleteStartCharIndex = editView->mCaretPosition - 1;
-    const int deleteStartByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), deleteStartCharIndex);
-    const int deleteEndByteOffset = gpg::STR_Utf8ByteOffset(editView->mText.c_str(), editView->mCaretPosition);
-    editView->mText.erase(deleteStartByteOffset, deleteEndByteOffset - deleteStartByteOffset);
+    SetEditClipOffsetLeft(this, mClipOffset);
+  } else if (mCaretPosition != 0) {
+    const int deleteStartCharIndex = mCaretPosition - 1;
+    const int deleteStartByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), deleteStartCharIndex);
+    const int deleteEndByteOffset = gpg::STR_Utf8ByteOffset(mText.c_str(), mCaretPosition);
+    mText.erase(deleteStartByteOffset, deleteEndByteOffset - deleteStartByteOffset);
 
-    const int currentCaretPosition = editView->mCaretPosition;
+    const int currentCaretPosition = mCaretPosition;
     if (currentCaretPosition != 0) {
       int caretStep = 1;
       if (currentCaretPosition <= 1) {
@@ -26515,15 +26131,15 @@ void moho::CMauiEdit::DeleteCharAtCaret(
       SetCaretPosition(currentCaretPosition - caretStep);
     }
 
-    if (editView->mCaretPosition != 0 && editView->mCaretPosition == editView->mClipOffset) {
-      SetEditClipOffsetLeft(editView, editView->mClipOffset - 1);
+    if (mCaretPosition != 0 && mCaretPosition == mClipOffset) {
+      SetEditClipOffsetLeft(this, mClipOffset - 1);
     }
   }
 
-  if (!editView->mTextChangeCallbackInProgress) {
-    editView->mTextChangeCallbackInProgress = true;
-    TextChanged(editView->mText, oldText);
-    editView->mTextChangeCallbackInProgress = false;
+  if (!mTextChangeCallbackInProgress) {
+    mTextChangeCallbackInProgress = true;
+    TextChanged(mText, oldText);
+    mTextChangeCallbackInProgress = false;
   }
 }
 
@@ -26538,29 +26154,28 @@ void moho::CMauiEdit::SetCaretPosition(
   int position
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
-  if (position < editView->mCaretPosition) {
-    editView->mCaretPosition = position;
-    if (position < editView->mClipOffset) {
-      SetEditClipOffsetLeft(editView, position);
+  if (position < mCaretPosition) {
+    mCaretPosition = position;
+    if (position < mClipOffset) {
+      SetEditClipOffsetLeft(this, position);
     }
     return;
   }
 
-  if (position <= editView->mCaretPosition) {
+  if (position <= mCaretPosition) {
     return;
   }
 
-  const int textLength = gpg::STR_Utf8Len(editView->mText.c_str());
+  const int textLength = gpg::STR_Utf8Len(mText.c_str());
   if (position >= textLength) {
     position = textLength;
   }
 
-  const int clipEnd = editView->mClipOffset + editView->mClipLength;
-  editView->mCaretPosition = position;
+  const int clipEnd = mClipOffset + mClipLength;
+  mCaretPosition = position;
   if (position >= clipEnd) {
-    SetEditClipOffsetRight(editView, textLength - editView->mCaretPosition);
+    SetEditClipOffsetRight(this, textLength - mCaretPosition);
   }
 }
 
@@ -26574,7 +26189,7 @@ void moho::CMauiEdit::MoveCaretLeft(
   int amount
 )
 {
-  const int caretPosition = CMauiEditRuntimeView::FromEdit(this)->mCaretPosition;
+  const int caretPosition = mCaretPosition;
   if (caretPosition == 0) {
     return;
   }
@@ -26596,7 +26211,7 @@ void moho::CMauiEdit::MoveCaretRight(
   const int amount
 )
 {
-  const int caretPosition = CMauiEditRuntimeView::FromEdit(this)->mCaretPosition;
+  const int caretPosition = mCaretPosition;
   SetCaretPosition(caretPosition + amount);
 }
 
@@ -26611,14 +26226,13 @@ void moho::CMauiEdit::MoveSelectionLeft(
   int amount
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  if (editView->mSelectionStart == editView->mSelectionEnd) {
-    const int caretPosition = editView->mCaretPosition;
-    editView->mSelectionStart = caretPosition;
-    editView->mSelectionEnd = caretPosition;
+  if (mSelectionStart == mSelectionEnd) {
+    const int caretPosition = mCaretPosition;
+    mSelectionStart = caretPosition;
+    mSelectionEnd = caretPosition;
   }
 
-  const int oldCaretPosition = editView->mCaretPosition;
+  const int oldCaretPosition = mCaretPosition;
   if (oldCaretPosition != 0) {
     if (amount >= oldCaretPosition) {
       amount = oldCaretPosition;
@@ -26626,18 +26240,18 @@ void moho::CMauiEdit::MoveSelectionLeft(
     SetCaretPosition(oldCaretPosition - amount);
   }
 
-  const int newCaretPosition = editView->mCaretPosition;
+  const int newCaretPosition = mCaretPosition;
   if (oldCaretPosition == newCaretPosition) {
     return;
   }
 
-  if (editView->mSelectionStart == newCaretPosition) {
-    editView->mSelectionStart = 0;
-    editView->mSelectionEnd = 0;
-  } else if (editView->mSelectionStart >= newCaretPosition) {
-    editView->mSelectionStart = newCaretPosition;
+  if (mSelectionStart == newCaretPosition) {
+    mSelectionStart = 0;
+    mSelectionEnd = 0;
+  } else if (mSelectionStart >= newCaretPosition) {
+    mSelectionStart = newCaretPosition;
   } else {
-    editView->mSelectionEnd = newCaretPosition;
+    mSelectionEnd = newCaretPosition;
   }
 }
 
@@ -26652,28 +26266,27 @@ void moho::CMauiEdit::MoveSelectionRight(
   const int amount
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  if (editView->mSelectionStart == editView->mSelectionEnd) {
-    const int caretPosition = editView->mCaretPosition;
-    editView->mSelectionStart = caretPosition;
-    editView->mSelectionEnd = caretPosition;
+  if (mSelectionStart == mSelectionEnd) {
+    const int caretPosition = mCaretPosition;
+    mSelectionStart = caretPosition;
+    mSelectionEnd = caretPosition;
   }
 
-  const int oldCaretPosition = editView->mCaretPosition;
+  const int oldCaretPosition = mCaretPosition;
   SetCaretPosition(oldCaretPosition + amount);
 
-  const int newCaretPosition = editView->mCaretPosition;
+  const int newCaretPosition = mCaretPosition;
   if (oldCaretPosition == newCaretPosition) {
     return;
   }
 
-  if (editView->mSelectionEnd == newCaretPosition) {
-    editView->mSelectionStart = 0;
-    editView->mSelectionEnd = 0;
-  } else if (editView->mSelectionEnd <= newCaretPosition) {
-    editView->mSelectionEnd = newCaretPosition;
+  if (mSelectionEnd == newCaretPosition) {
+    mSelectionStart = 0;
+    mSelectionEnd = 0;
+  } else if (mSelectionEnd <= newCaretPosition) {
+    mSelectionEnd = newCaretPosition;
   } else {
-    editView->mSelectionStart = newCaretPosition;
+    mSelectionStart = newCaretPosition;
   }
 }
 
@@ -26692,22 +26305,21 @@ void moho::CMauiEdit::HandleClickEvent(
     return;
   }
 
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  if (editView->mIsEnabled) {
-    editView->mCaretVisible = true;
+  if (mIsEnabled) {
+    mCaretVisible = true;
     MAUI_SetKeyboardFocus(this, true);
   }
 
-  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&editView->mLeftLV);
+  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&mLeftLV);
   msvc8::string clippedText =
-    gpg::STR_Utf8SubString(editView->mText.c_str(), editView->mClipOffset, editView->mClipLength);
-  const int nearestCharacterIndex = editView->mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX);
+    gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
+  const int nearestCharacterIndex = mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX);
 
   if (eventData->mEventType == MET_ButtonPress) {
-    func_PostDragger(GetRootFrame(), ResolveEditClickDragger(editView), eventData);
+    func_PostDragger(GetRootFrame(), ResolveEditClickDragger(this), eventData);
 
-    const int caretPosition = editView->mClipOffset + nearestCharacterIndex;
-    editView->mDragStart = caretPosition;
+    const int caretPosition = mClipOffset + nearestCharacterIndex;
+    mDragStart = caretPosition;
     SetCaretPosition(caretPosition);
     return;
   }
@@ -26715,10 +26327,10 @@ void moho::CMauiEdit::HandleClickEvent(
   const int wordStartIndex = gpg::STR_GetWordStartIndex(clippedText, nearestCharacterIndex);
   const int selectionEndOffset = gpg::STR_GetNextWordStartIndex(clippedText, wordStartIndex);
 
-  const int selectionStart = editView->mClipOffset + wordStartIndex;
-  const int selectionEnd = editView->mClipOffset + selectionEndOffset;
-  editView->mSelectionStart = selectionStart;
-  editView->mSelectionEnd = selectionEnd;
+  const int selectionStart = mClipOffset + wordStartIndex;
+  const int selectionEnd = mClipOffset + selectionEndOffset;
+  mSelectionStart = selectionStart;
+  mSelectionEnd = selectionEnd;
   SetCaretPosition(selectionEnd);
 }
 
@@ -26776,27 +26388,26 @@ void moho::CMauiEditDragMove(
 )
 {
   auto* const edit = reinterpret_cast<CMauiEdit*>(reinterpret_cast<char*>(dragger) - 0x11C);
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(edit);
 
-  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&editView->mLeftLV);
+  const float localMouseX = eventData->mMousePos.x - CScriptLazyVar_float::GetValue(&edit->mLeftLV);
   msvc8::string clippedText =
-    gpg::STR_Utf8SubString(editView->mText.c_str(), editView->mClipOffset, editView->mClipLength);
+    gpg::STR_Utf8SubString(edit->mText.c_str(), edit->mClipOffset, edit->mClipLength);
   const int caretIndex =
-    editView->mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + editView->mClipOffset;
+    edit->mFont->GetNearestCharacterIndex(clippedText.c_str(), localMouseX) + edit->mClipOffset;
 
-  const int dragStart = editView->mDragStart;
+  const int dragStart = edit->mDragStart;
   if (caretIndex == dragStart) {
-    editView->mSelectionStart = 0;
-    editView->mSelectionEnd = 0;
+    edit->mSelectionStart = 0;
+    edit->mSelectionEnd = 0;
     return;
   }
 
   if (caretIndex >= dragStart) {
-    editView->mSelectionStart = dragStart;
-    editView->mSelectionEnd = caretIndex;
+    edit->mSelectionStart = dragStart;
+    edit->mSelectionEnd = caretIndex;
   } else {
-    editView->mSelectionStart = caretIndex;
-    editView->mSelectionEnd = dragStart;
+    edit->mSelectionStart = caretIndex;
+    edit->mSelectionEnd = dragStart;
   }
   edit->SetCaretPosition(caretIndex);
 }
@@ -26812,7 +26423,6 @@ void moho::CMauiEdit::HandleKeyEvent(
   SMauiEventData* const eventData
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
   const int keyCode = eventData->mKeyCode;
 
   auto processDefaultKeyPath = [&]() {
@@ -26856,15 +26466,15 @@ void moho::CMauiEdit::HandleKeyEvent(
     switch (static_cast<EMauiKeyCode>(keyCode)) {
     case MKEY_HOME:
       if ((eventData->mModifiers & MEM_Shift) != 0u) {
-        const int moveAmount = editView->mCaretPosition;
+        const int moveAmount = mCaretPosition;
         if (moveAmount != 0) {
           MoveSelectionLeft(moveAmount);
         }
       } else {
-        editView->mCaretPosition = 0;
-        editView->mSelectionStart = 0;
-        editView->mSelectionEnd = 0;
-        SetEditClipOffsetLeft(editView, 0);
+        mCaretPosition = 0;
+        mSelectionStart = 0;
+        mSelectionEnd = 0;
+        SetEditClipOffsetLeft(this, 0);
       }
       break;
 
@@ -26872,7 +26482,7 @@ void moho::CMauiEdit::HandleKeyEvent(
       if ((eventData->mModifiers & MEM_Shift) != 0u) {
         if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
           const int moveAmount =
-            editView->mCaretPosition - gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+            mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
           if (moveAmount != 0) {
             MoveSelectionLeft(moveAmount);
           }
@@ -26881,21 +26491,21 @@ void moho::CMauiEdit::HandleKeyEvent(
         }
       } else {
         if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
-          const int wordStart = gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+          const int wordStart = gpg::STR_GetWordStartIndex(mText, mCaretPosition);
           SetCaretPosition(wordStart);
         } else {
           MoveCaretLeft(1);
         }
-        editView->mSelectionStart = 0;
-        editView->mSelectionEnd = 0;
+        mSelectionStart = 0;
+        mSelectionEnd = 0;
       }
       break;
 
     case MKEY_RIGHT:
       if ((eventData->mModifiers & MEM_Shift) != 0u) {
         if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
-          const int nextWordStart = gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition);
-          const int moveAmount = nextWordStart - editView->mCaretPosition;
+          const int nextWordStart = gpg::STR_GetNextWordStartIndex(mText, mCaretPosition);
+          const int moveAmount = nextWordStart - mCaretPosition;
           if (moveAmount != 0) {
             MoveSelectionRight(moveAmount);
           }
@@ -26903,14 +26513,14 @@ void moho::CMauiEdit::HandleKeyEvent(
           MoveSelectionRight(1);
         }
       } else {
-        int nextCaretPosition = editView->mCaretPosition + 1;
+        int nextCaretPosition = mCaretPosition + 1;
         if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
-          nextCaretPosition = gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition);
+          nextCaretPosition = gpg::STR_GetNextWordStartIndex(mText, mCaretPosition);
         }
 
         SetCaretPosition(nextCaretPosition);
-        editView->mSelectionStart = 0;
-        editView->mSelectionEnd = 0;
+        mSelectionStart = 0;
+        mSelectionEnd = 0;
       }
       break;
 
@@ -26932,16 +26542,16 @@ void moho::CMauiEdit::HandleKeyEvent(
 
   if (keyCode == MKEY_END) {
     if ((eventData->mModifiers & MEM_Shift) != 0u) {
-      const int textLength = gpg::STR_Utf8Len(editView->mText.c_str());
-      const int moveAmount = textLength - editView->mCaretPosition;
+      const int textLength = gpg::STR_Utf8Len(mText.c_str());
+      const int moveAmount = textLength - mCaretPosition;
       if (moveAmount != 0) {
         MoveSelectionRight(moveAmount);
       }
     } else {
-      editView->mCaretPosition = gpg::STR_Utf8Len(editView->mText.c_str());
-      editView->mSelectionStart = 0;
-      editView->mSelectionEnd = 0;
-      SetEditClipOffsetRight(editView, 0);
+      mCaretPosition = gpg::STR_Utf8Len(mText.c_str());
+      mSelectionStart = 0;
+      mSelectionEnd = 0;
+      SetEditClipOffsetRight(this, 0);
     }
     return;
   }
@@ -26960,7 +26570,7 @@ void moho::CMauiEdit::HandleKeyEvent(
 
     {
       const int moveAmount =
-        editView->mCaretPosition - gpg::STR_GetWordStartIndex(editView->mText, editView->mCaretPosition);
+        mCaretPosition - gpg::STR_GetWordStartIndex(mText, mCaretPosition);
       if (moveAmount != 0) {
         MoveSelectionLeft(moveAmount);
       }
@@ -26970,7 +26580,7 @@ void moho::CMauiEdit::HandleKeyEvent(
 
   case MKEY_RETURN:
     if (!EnterPressed()) {
-      if (editView->mText.size() != 0u) {
+      if (mText.size() != 0u) {
         ClearText();
       } else {
         AbandonKeyboardFocus();
@@ -26983,7 +26593,7 @@ void moho::CMauiEdit::HandleKeyEvent(
       return;
     }
 
-    if (editView->mText.size() != 0u) {
+    if (mText.size() != 0u) {
       ClearText();
     } else {
       AbandonKeyboardFocus();
@@ -26999,7 +26609,7 @@ void moho::CMauiEdit::HandleKeyEvent(
 
     if ((eventData->mModifiers & MEM_Ctrl) != 0u) {
       const int moveAmount =
-        gpg::STR_GetNextWordStartIndex(editView->mText, editView->mCaretPosition) - editView->mCaretPosition;
+        gpg::STR_GetNextWordStartIndex(mText, mCaretPosition) - mCaretPosition;
       if (moveAmount != 0) {
         MoveSelectionRight(moveAmount);
       }
@@ -27028,18 +26638,17 @@ void moho::CMauiEdit::DragRelease(
   const SMauiEventData* const eventData
 )
 {
-  const float left = CScriptLazyVar_float::GetValue(&CMauiEditRuntimeView::FromEdit(this)->mLeftLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
   const float releaseX = eventData->mMousePos.x - left;
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
 
   msvc8::string clippedText =
-    gpg::STR_Utf8SubString(editView->mText.c_str(), editView->mClipOffset, editView->mClipLength);
+    gpg::STR_Utf8SubString(mText.c_str(), mClipOffset, mClipLength);
   const int releaseCaret =
-    editView->mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + editView->mClipOffset;
+    mFont->GetNearestCharacterIndex(clippedText.c_str(), releaseX) + mClipOffset;
 
-  if (releaseCaret == editView->mDragStart) {
-    editView->mSelectionStart = 0;
-    editView->mSelectionEnd = 0;
+  if (releaseCaret == mDragStart) {
+    mSelectionStart = 0;
+    mSelectionEnd = 0;
   }
 }
 
@@ -27065,7 +26674,7 @@ void moho::CMauiEdit::TextChanged(
   }
 
   LuaPlus::LuaFunction<void> callback(callbackObject);
-  callback(CMauiControlScriptObjectRuntimeView::FromControl(this)->mLuaObj, newText.c_str(), oldText.c_str());
+  callback(mLuaObj, newText.c_str(), oldText.c_str());
 }
 
 /**
@@ -27079,19 +26688,18 @@ void moho::CMauiEdit::SetText(
   const msvc8::string& text
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  const msvc8::string previousText = editView->mText;
+  const msvc8::string previousText = mText;
 
-  editView->mText = gpg::STR_Utf8SubString(text.c_str(), 0, editView->mMaxChars);
-  editView->mCaretPosition = gpg::STR_Utf8Len(editView->mText.c_str());
-  editView->mClipOffset = 0;
-  editView->mClipLength = gpg::STR_Utf8Len(editView->mText.c_str());
-  SetEditClipOffsetRight(editView, 0);
+  mText = gpg::STR_Utf8SubString(text.c_str(), 0, mMaxChars);
+  mCaretPosition = gpg::STR_Utf8Len(mText.c_str());
+  mClipOffset = 0;
+  mClipLength = gpg::STR_Utf8Len(mText.c_str());
+  SetEditClipOffsetRight(this, 0);
 
-  if (!editView->mTextChangeCallbackInProgress) {
-    editView->mTextChangeCallbackInProgress = true;
-    TextChanged(editView->mText, previousText);
-    editView->mTextChangeCallbackInProgress = false;
+  if (!mTextChangeCallbackInProgress) {
+    mTextChangeCallbackInProgress = true;
+    TextChanged(mText, previousText);
+    mTextChangeCallbackInProgress = false;
   }
 }
 
@@ -27104,20 +26712,19 @@ void moho::CMauiEdit::SetText(
  */
 void moho::CMauiEdit::ClearText()
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  const msvc8::string previousText = editView->mText;
+  const msvc8::string previousText = mText;
 
-  editView->mText.clear();
-  editView->mCaretPosition = 0;
-  editView->mClipLength = 0;
-  editView->mClipOffset = 0;
-  editView->mSelectionStart = 0;
-  editView->mSelectionEnd = 0;
+  mText.clear();
+  mCaretPosition = 0;
+  mClipLength = 0;
+  mClipOffset = 0;
+  mSelectionStart = 0;
+  mSelectionEnd = 0;
 
-  if (!editView->mTextChangeCallbackInProgress) {
-    editView->mTextChangeCallbackInProgress = true;
-    TextChanged(editView->mText, previousText);
-    editView->mTextChangeCallbackInProgress = false;
+  if (!mTextChangeCallbackInProgress) {
+    mTextChangeCallbackInProgress = true;
+    TextChanged(mText, previousText);
+    mTextChangeCallbackInProgress = false;
   }
 }
 
@@ -27132,12 +26739,11 @@ void moho::CMauiEdit::SetMaxChars(
   const int newMaxChars
 )
 {
-  CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  editView->mMaxChars = newMaxChars;
+  mMaxChars = newMaxChars;
 
-  const int textLength = gpg::STR_Utf8Len(editView->mText.c_str());
+  const int textLength = gpg::STR_Utf8Len(mText.c_str());
   if (newMaxChars < textLength) {
-    editView->mText = gpg::STR_Utf8SubString(editView->mText.c_str(), 0, newMaxChars);
+    mText = gpg::STR_Utf8SubString(mText.c_str(), 0, newMaxChars);
   }
 }
 
@@ -27155,27 +26761,26 @@ void moho::CMauiBitmap::Dump()
   CMauiControl::Dump();
   gpg::Logf("CMauiBitmap");
 
-  const CMauiBitmapRuntimeView* const bitmapView = CMauiBitmapRuntimeView::FromBitmap(this);
 
-  const int textureCount = static_cast<int>(bitmapView->mTextureBatches.size());
+  const int textureCount = static_cast<int>(mTextureBatches.size());
 
   // The binary fetches height first then width on the FPU stack � preserve order.
-  const float bitmapHeight = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapHeightLV);
-  const float bitmapWidth = CScriptLazyVar_float::GetValue(&bitmapView->mBitmapWidthLV);
+  const float bitmapHeight = CScriptLazyVar_float::GetValue(&mBitmapHeightLV);
+  const float bitmapWidth = CScriptLazyVar_float::GetValue(&mBitmapWidthLV);
   gpg::Logf("Num Textures = %d Width = %.3f Height = %.3f", textureCount, bitmapWidth, bitmapHeight);
-  gpg::Logf("uv = %.3f,%.3f %.3f,%.3f", bitmapView->mU0, bitmapView->mV0, bitmapView->mU1, bitmapView->mV1);
+  gpg::Logf("uv = %.3f,%.3f %.3f,%.3f", mU0, mV0, mU1, mV1);
 
-  const char* const alphaHitTest = bitmapView->mUseAlphaHitTest ? "true" : "false";
+  const char* const alphaHitTest = mUseAlphaHitTest ? "true" : "false";
   gpg::Logf("Alpha Hit Test = %s", alphaHitTest);
 
-  const char* const playing = bitmapView->mIsPlaying ? "true" : "false";
-  const int frameCount = static_cast<int>(bitmapView->mFrames.size());
+  const char* const playing = mIsPlaying ? "true" : "false";
+  const int frameCount = static_cast<int>(mFrames.size());
   gpg::Logf(
     "Num frames = %d Frame rate = %.3f Playing = %s Current Frame = %d",
     frameCount,
-    bitmapView->mFrameDurationSeconds,
+    mFrameDurationSeconds,
     playing,
-    bitmapView->mCurrentFrame
+    mCurrentFrame
   );
 }
 
@@ -27191,18 +26796,17 @@ void moho::CMauiEdit::Dump()
   CMauiControl::Dump();
   gpg::Logf("CMauiEdit");
 
-  const CMauiEditRuntimeView* const editView = CMauiEditRuntimeView::FromEdit(this);
-  const char* const showBackground = ReadEditBackgroundVisibleLane(editView) ? "true" : "false";
+  const char* const showBackground = ReadEditBackgroundVisibleLane(this) ? "true" : "false";
   gpg::Logf(
     "FG Color = %#08X BG Color = %#08X HLFG Color = %#08X HLBG Color = %#08X Show BG = %s MaxChars = %d",
-    editView->mForegroundColor,
-    editView->mBackgroundColor,
-    editView->mHighlightForegroundColor,
-    editView->mHighlightBackgroundColor,
+    mForegroundColor,
+    mBackgroundColor,
+    mHighlightForegroundColor,
+    mHighlightBackgroundColor,
     showBackground,
-    editView->mMaxChars
+    mMaxChars
   );
-  gpg::Logf("Current Text = %s", editView->mText.c_str());
+  gpg::Logf("Current Text = %s", mText.c_str());
 }
 
 /**
@@ -27215,36 +26819,35 @@ void moho::CMauiControl::Dump()
 {
   gpg::Logf("--");
 
-  const CMauiControlExtendedRuntimeView* const controlView = CMauiControlExtendedRuntimeView::FromControl(this);
   const char* parentName = "no parent";
   msvc8::string parentNameStorage{};
-  if (controlView->mParent != nullptr) {
-    parentNameStorage = controlView->mParent->GetDebugName();
+  if (mParent != nullptr) {
+    parentNameStorage = mParent->GetDebugName();
     parentName = parentNameStorage.c_str();
   }
 
-  gpg::Logf("CMauiControl name = %s, parent = %s", controlView->mDebugName.c_str(), parentName);
+  gpg::Logf("CMauiControl name = %s, parent = %s", mDebugName.c_str(), parentName);
 
-  const char* const frameUpdateLabel = controlView->mNeedsFrameUpdate ? "true" : "false";
-  const char* const hiddenLabel = controlView->mIsHidden ? "true" : "false";
-  const char* const disabledHitTestLabel = controlView->mDisableHitTest ? "true" : "false";
+  const char* const frameUpdateLabel = mNeedsFrameUpdate ? "true" : "false";
+  const char* const hiddenLabel = mIsHidden ? "true" : "false";
+  const char* const disabledHitTestLabel = mDisableHitTest ? "true" : "false";
   gpg::Logf(
     "Disabled hit test = %s Hidden = %s Frame Update = %s Render Pass = %d Alpha = %.3f",
     disabledHitTestLabel,
     hiddenLabel,
     frameUpdateLabel,
-    controlView->mRenderPass,
-    controlView->mAlpha
+    mRenderPass,
+    mAlpha
   );
 
-  if (!controlView->mIsHidden) {
-    const float depth = CScriptLazyVar_float::GetValue(&controlView->mDepthLV);
-    const float height = CScriptLazyVar_float::GetValue(&controlView->mHeightLV);
-    const float width = CScriptLazyVar_float::GetValue(&controlView->mWidthLV);
-    const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
-    const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-    const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-    const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
+  if (!mIsHidden) {
+    const float depth = CScriptLazyVar_float::GetValue(&mDepthLV);
+    const float height = CScriptLazyVar_float::GetValue(&mHeightLV);
+    const float width = CScriptLazyVar_float::GetValue(&mWidthLV);
+    const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
+    const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+    const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+    const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
     gpg::Logf(
       "Left = %f Right = %.3f Top = %.3f Bottom = %.3f Width = %.3f Height = %.3f Depth = %.3f",
       left,
@@ -27273,22 +26876,12 @@ void moho::CMauiControl::Dump()
  * fields, creates one frame-owned wx event mapper, and marks this control as
  * requiring one frame update from itself as root owner.
  */
-// The ctor below seeds four fields through CMauiFrameRuntimeView into the
-// 0x134 block cfunc_InternalCreateFrameL allocates, so the view has to end
-// inside it. The FAF_RUNTIME_LAYOUT_ASSERT offsets on the view are compiled
-// out unless FAF_ENFORCE_STRICT_LAYOUT_ASSERTS is on; this one is not.
-static_assert(
-  sizeof(moho::CMauiFrameRuntimeView) <= 0x134,
-  "CMauiFrameRuntimeView must fit inside the 0x134 CMauiFrame allocation"
-);
-
 moho::CMauiFrame::CMauiFrame(
   LuaPlus::LuaObject* const luaObject,
   CMauiControl* const parent
 )
   : CMauiControl(luaObject, parent, "frame")
 {
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
 
   // Construct the weak self-reference; do not assign to it. This is fresh
   // memory - CMauiControl's ctor does not touch these bytes - so
@@ -27296,17 +26889,17 @@ moho::CMauiFrame::CMauiFrame(
   // to hold and write through it. The binary zeroes the two words outright
   // (`this->mPtr.px = 0; this->mPtr.pn.pi_ = 0` at 0x00796360), which is the
   // same thing a placement-construct emits.
-  new (&frameView->mSelfWeak) boost::weak_ptr<CMauiFrame>{};
+  new (&mSelfWeak) boost::weak_ptr<CMauiFrame>{};
 
-  auto* const deletedListHead = static_cast<CMauiControlListNode*>(&frameView->mDeletedControlList);
-  frameView->mDeletedControlList.mNext = deletedListHead;
-  frameView->mDeletedControlList.mPrev = deletedListHead;
+  auto* const deletedListHead = static_cast<CMauiControlListNode*>(&mDeletedControlList);
+  mDeletedControlList.mNext = deletedListHead;
+  mDeletedControlList.mPrev = deletedListHead;
 
-  frameView->mTargetHead = 0;
-  frameView->mEventHandler = new CMauiWxEventMapper(this);
+  mTargetHead = 0;
+  mEventHandler = new CMauiWxEventMapper(this);
 
-  CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
-  CMauiControlExtendedRuntimeView::FromControl(this)->mRootFrame = this;
+  mNeedsFrameUpdate = true;
+  mRootFrame = this;
 }
 
 /**
@@ -27322,14 +26915,13 @@ moho::CMauiFrame::~CMauiFrame()
 {
   PurgeDeleted();
 
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
-  if (frameView->mEventHandler != nullptr) {
-    delete frameView->mEventHandler;
-    frameView->mEventHandler = nullptr;
+  if (mEventHandler != nullptr) {
+    delete mEventHandler;
+    mEventHandler = nullptr;
   }
 
-  static_cast<CMauiControlListNode*>(&frameView->mDeletedControlList)->ListUnlink();
-  frameView->mSelfWeak = boost::weak_ptr<CMauiFrame>{};
+  static_cast<CMauiControlListNode*>(&mDeletedControlList)->ListUnlink();
+  mSelfWeak = boost::weak_ptr<CMauiFrame>{};
 }
 
 /**
@@ -27350,7 +26942,7 @@ void moho::CMauiFrame::PurgeDeleted()
   }
 
   auto* const deletedListHead =
-    static_cast<CMauiControlListNode*>(&CMauiFrameRuntimeView::FromFrame(this)->mDeletedControlList);
+    static_cast<CMauiControlListNode*>(&mDeletedControlList);
   while (deletedListHead->mNext != deletedListHead) {
     CMauiControlListNode* const deletedNode = deletedListHead->mPrev;
     deletedNode->ListUnlink();
@@ -27373,7 +26965,7 @@ float moho::CMauiFrame::GetTopmostDepth()
   for (CMauiControl* controlCursor = DepthFirstSuccessor(this); controlCursor != nullptr;
        controlCursor = controlCursor->DepthFirstSuccessor(this)) {
     const float controlDepth =
-      CScriptLazyVar_float::GetValue(&CMauiControlRuntimeView::FromControl(controlCursor)->mDepthLV);
+      CScriptLazyVar_float::GetValue(&controlCursor->mDepthLV);
     if (topmostDepth <= controlDepth) {
       topmostDepth = controlDepth;
     }
@@ -27404,9 +26996,8 @@ void moho::CMauiFrame::DumpGraph()
 void moho::CMauiFrame::Dump()
 {
   CMauiControl::Dump();
-  const CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
   gpg::Logf(
-    "Root Frame, head#d\n", static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(frameView->mEventHandler))
+    "Root Frame, head#d\n", static_cast<std::int32_t>(reinterpret_cast<std::uintptr_t>(mEventHandler))
   );
 }
 
@@ -27422,11 +27013,10 @@ void moho::CMauiFrame::SetBounds(
   const int height
 )
 {
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
-  CScriptLazyVar_float::SetValue(&frameView->mLeftLV, 0.0f);
-  CScriptLazyVar_float::SetValue(&frameView->mTopLV, 0.0f);
-  CScriptLazyVar_float::SetValue(&frameView->mWidthLV, static_cast<float>(width));
-  CScriptLazyVar_float::SetValue(&frameView->mHeightLV, static_cast<float>(height));
+  CScriptLazyVar_float::SetValue(&mLeftLV, 0.0f);
+  CScriptLazyVar_float::SetValue(&mTopLV, 0.0f);
+  CScriptLazyVar_float::SetValue(&mWidthLV, static_cast<float>(width));
+  CScriptLazyVar_float::SetValue(&mHeightLV, static_cast<float>(height));
 }
 
 /**
@@ -27447,11 +27037,10 @@ void moho::CMauiFrame::Frame(
   const float deltaSeconds
 )
 {
-  CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(this);
 
   // Pin this frame's shared owner for the duration of the tick so descendants
   // cannot tear down the root while they're still iterating.
-  boost::shared_ptr<CMauiFrame> selfLock(frameView->mSelfWeak);
+  boost::shared_ptr<CMauiFrame> selfLock(mSelfWeak);
 
   // TEMPORARY PROBE (do not commit). Does any control actually get ticked?
   // The faction loading overlay fades itself out from `OnFrame`, so if this
@@ -27467,12 +27056,11 @@ void moho::CMauiFrame::Frame(
     CMauiControl* const currentControl = nextControl;
     nextControl = currentControl->DepthFirstSuccessor(this);
 
-    auto* const controlView = reinterpret_cast<CMauiControlExtendedRuntimeView*>(currentControl);
     ++probeVisited;
-    if (controlView->mInvisible) {
+    if (currentControl->mInvisible) {
       ++probeInvisible;
     }
-    if (!controlView->mInvisible && controlView->mNeedsFrameUpdate) {
+    if (!currentControl->mInvisible && currentControl->mNeedsFrameUpdate) {
       ++probeTicked;
       currentControl->Frame(deltaSeconds);
     }
@@ -27496,7 +27084,6 @@ void moho::CMauiFrame::Frame(
       int dumped = 0;
       for (CMauiControl* cursor = DepthFirstSuccessor(this); cursor != nullptr && dumped < 40;
            cursor = cursor->DepthFirstSuccessor(this)) {
-        auto* const view = reinterpret_cast<CMauiControlExtendedRuntimeView*>(cursor);
         const msvc8::string name = cursor->GetDebugName();
         char line[224];
         sprintf_s(
@@ -27505,12 +27092,12 @@ void moho::CMauiFrame::Frame(
           "[TREEDUMP] %02d name=%.50s pass=%d alpha=%d/1000 hidden=%d invis=%d depth=%d rendered=%d\n",
           dumped,
           name.c_str(),
-          view->mRenderPass,
-          static_cast<int>(view->mAlpha * 1000.0f),
-          view->mIsHidden ? 1 : 0,
-          view->mInvisible ? 1 : 0,
-          static_cast<int>(view->mDepth),
-          static_cast<int>(view->mRenderedChildren.end() - view->mRenderedChildren.begin())
+          cursor->mRenderPass,
+          static_cast<int>(cursor->mAlpha * 1000.0f),
+          cursor->mIsHidden ? 1 : 0,
+          cursor->mInvisible ? 1 : 0,
+          static_cast<int>(cursor->mDepth),
+          static_cast<int>(cursor->mRenderedChildren.size())
         );
         ::OutputDebugStringA(line);
         ++dumped;
@@ -27580,8 +27167,7 @@ boost::shared_ptr<moho::CMauiFrame> moho::CMauiFrame::Create(
   CMauiFrame* const frame = ResolveFrameFromLuaObjectOrError(frameLuaObject, state);
   if (frame != nullptr) {
     outFrame = boost::shared_ptr<CMauiFrame>(frame);
-    CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame);
-    (void)AssignFrameWeakSelfFromSharedOwner(outFrame, &frameView->mSelfWeak);
+    (void)AssignFrameWeakSelfFromSharedOwner(outFrame, &frame->mSelfWeak);
   }
 
   lua_settop(rawState, savedTop);
@@ -28026,31 +27612,30 @@ void moho::CMauiBorder::SetTextures(
   const boost::shared_ptr<CD3DBatchTexture>& lr
 )
 {
-  CMauiBorderRuntimeView* const border = CMauiBorderRuntimeView::FromBorder(this);
   if (vert) {
-    border->mTex1 = vert;
-    CScriptLazyVar_float::SetValue(&border->mBorderWidthLV, static_cast<float>(vert->mWidth));
+    mTex1 = vert;
+    CScriptLazyVar_float::SetValue(&mBorderWidthLV, static_cast<float>(vert->mWidth));
   }
 
   if (horz) {
-    border->mTexHorz = horz;
-    CScriptLazyVar_float::SetValue(&border->mBorderHeightLV, static_cast<float>(horz->mHeight));
+    mTexHorz = horz;
+    CScriptLazyVar_float::SetValue(&mBorderHeightLV, static_cast<float>(horz->mHeight));
   }
 
   if (ul) {
-    border->mTexUL = ul;
+    mTexUL = ul;
   }
 
   if (ur) {
-    border->mTexUR = ur;
+    mTexUR = ur;
   }
 
   if (ll) {
-    border->mTexLL = ll;
+    mTexLL = ll;
   }
 
   if (lr) {
-    border->mTexLR = lr;
+    mTexLR = lr;
   }
 }
 
@@ -28065,9 +27650,8 @@ void moho::CMauiBorder::Dump()
   CMauiControl::Dump();
   gpg::Logf("CMauiBorder");
 
-  const CMauiBorderRuntimeView* const border = CMauiBorderRuntimeView::FromBorder(this);
-  const double borderHeight = static_cast<double>(CScriptLazyVar_float::GetValue(&border->mBorderHeightLV));
-  const double borderWidth = static_cast<double>(CScriptLazyVar_float::GetValue(&border->mBorderWidthLV));
+  const double borderHeight = static_cast<double>(CScriptLazyVar_float::GetValue(&mBorderHeightLV));
+  const double borderWidth = static_cast<double>(CScriptLazyVar_float::GetValue(&mBorderWidthLV));
   gpg::Logf("BorderWidth = %.3f BorderHeight = %.3f", borderWidth, borderHeight);
 }
 
@@ -28088,28 +27672,27 @@ void moho::CMauiBorder::DoRender(
     return;
   }
 
-  const CMauiBorderRuntimeView* const border = CMauiBorderRuntimeView::FromBorder(this);
-  if (!border->mTex1 || !border->mTexHorz || !border->mTexUL || !border->mTexUR || !border->mTexLL || !border->mTexLR) {
+  if (!mTex1 || !mTexHorz || !mTexUL || !mTexUR || !mTexLL || !mTexLR) {
     return;
   }
 
-  const float left = CScriptLazyVar_float::GetValue(&border->mLeftLV);
-  const float top = CScriptLazyVar_float::GetValue(&border->mTopLV);
-  const float right = CScriptLazyVar_float::GetValue(&border->mRightLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&border->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+  const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+  const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
   const float borderWidth =
-    static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&border->mBorderWidthLV)));
+    static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&mBorderWidthLV)));
   const float borderHeight =
-    static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&border->mBorderHeightLV)));
+    static_cast<float>(FloorFrndintAdjustDown(CScriptLazyVar_float::GetValue(&mBorderHeightLV)));
 
   const float innerLeft = left + borderWidth;
   const float innerRight = right - borderWidth;
   const float innerTop = top + borderHeight;
   const float innerBottom = bottom - borderHeight;
 
-  const std::uint32_t color = border->mVertexAlpha;
+  const std::uint32_t color = mVertexAlpha;
 
-  primBatcher->SetTexture(border->mTexUL);
+  primBatcher->SetTexture(mTexUL);
   {
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, top, color, 0.0f, 0.0f);
     const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(innerLeft, top, color, 1.0f, 0.0f);
@@ -28118,7 +27701,7 @@ void moho::CMauiBorder::DoRender(
     primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
   }
 
-  primBatcher->SetTexture(border->mTexUR);
+  primBatcher->SetTexture(mTexUR);
   {
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(innerRight, top, color, 0.0f, 0.0f);
     const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, top, color, 1.0f, 0.0f);
@@ -28127,7 +27710,7 @@ void moho::CMauiBorder::DoRender(
     primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
   }
 
-  primBatcher->SetTexture(border->mTexLL);
+  primBatcher->SetTexture(mTexLL);
   {
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, innerBottom, color, 0.0f, 0.0f);
     const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(innerLeft, innerBottom, color, 1.0f, 0.0f);
@@ -28136,7 +27719,7 @@ void moho::CMauiBorder::DoRender(
     primBatcher->DrawQuad(topLeft, topRight, bottomRight, bottomLeft);
   }
 
-  primBatcher->SetTexture(border->mTexLR);
+  primBatcher->SetTexture(mTexLR);
   {
     const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(innerRight, innerBottom, color, 0.0f, 0.0f);
     const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(right, innerBottom, color, 1.0f, 0.0f);
@@ -28146,7 +27729,7 @@ void moho::CMauiBorder::DoRender(
   }
 
   if ((right - left) > (borderWidth * 2.0f)) {
-    primBatcher->SetTexture(border->mTexHorz);
+    primBatcher->SetTexture(mTexHorz);
     {
       const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(innerLeft, top, color, 0.0f, 0.0f);
       const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(innerRight, top, color, 1.0f, 0.0f);
@@ -28165,7 +27748,7 @@ void moho::CMauiBorder::DoRender(
   }
 
   if ((bottom - top) > (borderHeight * 2.0f)) {
-    primBatcher->SetTexture(border->mTex1);
+    primBatcher->SetTexture(mTex1);
     {
       const CD3DPrimBatcher::Vertex topLeft = MakeBorderVertex(left, innerTop, color, 0.0f, 0.0f);
       const CD3DPrimBatcher::Vertex topRight = MakeBorderVertex(innerLeft, innerTop, color, 1.0f, 0.0f);
@@ -29049,7 +28632,7 @@ int moho::cfunc_GetInputCaptureL(
   }
 
   if (CMauiControl* const control = ResolveTopInputCaptureControl()) {
-    CMauiControlScriptObjectRuntimeView::FromControl(control)->mLuaObj.PushStack(state);
+    control->mLuaObj.PushStack(state);
   } else {
     lua_pushnil(state->m_state);
     (void)lua_gettop(state->m_state);

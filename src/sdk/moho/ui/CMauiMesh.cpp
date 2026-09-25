@@ -75,7 +75,7 @@ namespace moho
     , mOrientation(Wm3::Quaternionf::Identity())
     , mThumbnailColor(0xFFFFFFFFu)
   {
-    CMauiControlFrameUpdateRuntimeView::FromControl(this)->mNeedsFrameUpdate = true;
+    mNeedsFrameUpdate = true;
   }
 
   /**
@@ -147,14 +147,13 @@ namespace moho
   void CMauiMesh::Frame(const float deltaSeconds)
   {
     (void)deltaSeconds;
-    const CMauiControlRuntimeView* const layout = CMauiControlRuntimeView::FromControl(this);
 
-    const auto newThumbnailSheet = [layout] {
+    const auto newThumbnailSheet = [this] {
       ID3DDeviceResources::DynamicTextureSheetHandle sheet;
       (void)D3D_GetDevice()->GetResources()->NewDynamicTextureSheet(
         sheet,
-        static_cast<int>(CScriptLazyVar_float::GetValue(&layout->mWidthLV)),
-        static_cast<int>(CScriptLazyVar_float::GetValue(&layout->mHeightLV)),
+        static_cast<int>(CScriptLazyVar_float::GetValue(&mWidthLV)),
+        static_cast<int>(CScriptLazyVar_float::GetValue(&mHeightLV)),
         kThumbnailSheetFormat
       );
       return sheet;
@@ -163,8 +162,8 @@ namespace moho
     if (mThumbnailSheet) {
       Wm3::Vector3f dimensions{};
       (void)mThumbnailSheet->GetDimensions(&dimensions);
-      if (dimensions.x != CScriptLazyVar_float::GetValue(&layout->mWidthLV)
-          || dimensions.y != CScriptLazyVar_float::GetValue(&layout->mHeightLV)) {
+      if (dimensions.x != CScriptLazyVar_float::GetValue(&mWidthLV)
+          || dimensions.y != CScriptLazyVar_float::GetValue(&mHeightLV)) {
         mThumbnailSheet.reset();
         mThumbnailSheet = newThumbnailSheet();
         mThumbnailDirty = true;
@@ -198,12 +197,11 @@ namespace moho
   void CMauiMesh::DoRender(CD3DPrimBatcher* const primBatcher, const std::int32_t drawMask)
   {
     (void)drawMask;
-    const CMauiControlRuntimeView* const layout = CMauiControlRuntimeView::FromControl(this);
 
-    const float left = CScriptLazyVar_float::GetValue(&layout->mLeftLV);
-    const float top = CScriptLazyVar_float::GetValue(&layout->mTopLV);
-    const float right = CScriptLazyVar_float::GetValue(&layout->mRightLV);
-    const float bottom = CScriptLazyVar_float::GetValue(&layout->mBottomLV);
+    const float left = CScriptLazyVar_float::GetValue(&mLeftLV);
+    const float top = CScriptLazyVar_float::GetValue(&mTopLV);
+    const float right = CScriptLazyVar_float::GetValue(&mRightLV);
+    const float bottom = CScriptLazyVar_float::GetValue(&mBottomLV);
 
     primBatcher->SetTexture(mThumbnailSheet);
 

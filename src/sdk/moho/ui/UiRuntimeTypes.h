@@ -1760,8 +1760,7 @@ namespace moho
      * CScriptObject sub-object) through +0x57. Every field in it is reached
      * through the typed `CMauiCursorTextureRuntimeView` overlay
      * (mTexture/mDefaultTexture at +0x34/+0x3C, hotspot lanes through
-     * +0x57) - reserved here rather than re-declared, matching
-     * `CMauiControl::mControlStateStorage`. `AllocateZeroedUiObject<
+     * +0x57) - reserved here rather than re-declared. `AllocateZeroedUiObject<
      * CMauiCursor>(0x58u)` at the construction site sizes the allocation
      * explicitly, independent of `sizeof(CMauiCursor)`, but this storage
      * keeps that size assert honest and protects any future construction
@@ -2047,7 +2046,6 @@ namespace moho
     virtual void Dump();
 
 
-
     /**
      * Address: 0x00786F60 (FUN_00786F60, Moho::CMauiControl::ClearChildren)
      *
@@ -2068,8 +2066,6 @@ namespace moho
      void Render();
 
 
-
-
     /**
      * Address: 0x0078A700 (FUN_0078A700, Moho::CMauiControl::OnHide)
      *
@@ -2088,12 +2084,6 @@ namespace moho
      * bool result when callback is present.
      */
     [[nodiscard]] bool GetIsScrollable(const char* axisLexical);
-
-
-
-
-
-
 
 
     /**
@@ -2286,9 +2276,6 @@ namespace moho
     void ApplyFunction(const LuaPlus::LuaObject& functionObject);
 
 
-
-
-
     /**
      * Address: 0x0077F6F0 (FUN_0077F6F0, Moho::CMauiControl::GetDebugName)
      *
@@ -2315,34 +2302,63 @@ namespace moho
      */
     [[nodiscard]] static CMauiControl* GetTopmostControl(CMauiControl* root, float x, float y);
 
-  protected:
-    /**
-     * The control's own state block, +0x34 (right after the inherited
-     * CScriptObject sub-object) through +0x11B. Every field in it is reached
-     * through the typed `CMauiControl*RuntimeView` overlays -
-     * `CMauiControlRuntimeView`/`CMauiControlHierarchyRuntimeView` for the
-     * parent/children lists and layout lazy-vars (starting at +0x34, right
-     * where this storage begins), and `CMauiControlExtendedRuntimeView` for
-     * the render lanes - so it is reserved here rather than re-declared.
-     *
-     * Ground truth (`FUN_007867B0.c`) opens with
-     * `Moho::CScriptObject::CScriptObject(this)` before touching any of these
-     * fields, and `dumps/rtti_dump_all.hpp` lists CScriptObject as
-     * CMauiControl's first real base (mdisp=0) - this storage's own
-     * "+0x00..+0x33 unknown" prefix, before this class inherited
-     * CScriptObject for real, was that exact sub-object modelled as raw
-     * bytes instead of a base.
-     *
-     * Reserving it is not cosmetic. Without it a derived class that adds a
-     * second base gets that base immediately after CScriptObject, straight on
-     * top of the parent-list link: `CMauiScrollbar`'s `IMauiDragger` vptr
-     * landed there and every scrollbar destroyed afterwards walked a vtable
-     * address as if it were a weak-link node and faulted writing to .rdata.
-     */
-    std::uint8_t mControlStateStorage[0xE8];
+  public:
+    // The control's own state, +0x34 (right after the CScriptObject base,
+    // mdisp=0 in dumps/rtti_dump_all.hpp) through +0x11B. The constructor
+    // (0x007867B0) builds these in this order and the destructor (0x00786D00)
+    // tears them down in reverse.
+
+    /// This control's node in its parent's `mChildrenList`.
+    TDatListItem<CMauiControl, void> mParentList;  // +0x34
+    CMauiControl* mParent;                         // +0x3C
+    TDatList<CMauiControl, void> mChildrenList;    // +0x40
+    // Layout lazy vars, published to Lua as Left/Right/Top/Bottom/Width/Height/Depth.
+    CScriptLazyVar_float mLeftLV;                  // +0x48
+    CScriptLazyVar_float mRightLV;                 // +0x5C
+    CScriptLazyVar_float mTopLV;                   // +0x70
+    CScriptLazyVar_float mBottomLV;                // +0x84
+    CScriptLazyVar_float mWidthLV;                 // +0x98
+    CScriptLazyVar_float mHeightLV;                // +0xAC
+    CScriptLazyVar_float mDepthLV;                 // +0xC0
+    /// `mDepthLV`'s value, cached for depth sorting.
+    float mDepth;                                  // +0xD4
+    /// Children in draw order, rebuilt when the control is invalidated.
+    msvc8::vector<CMauiControl*> mRenderedChildren; // +0xD8
+    bool mInvalidated;                             // +0xE8
+    bool mDisableHitTest;                          // +0xE9
+    bool mIsHidden;                                // +0xEA
+    bool mNeedsFrameUpdate;                        // +0xEB
+    bool mInvisible;                               // +0xEC
+    float mAlpha;                                  // +0xF0
+    std::uint32_t mVertexAlpha;                    // +0xF4
+    std::int32_t mRenderPass;                      // +0xF8
+    CMauiControl* mRootFrame;                      // +0xFC
+    msvc8::string mDebugName;                      // +0x100
   };
 
   static_assert(sizeof(CMauiControl) == 0x11C, "moho::CMauiControl size must be 0x11C");
+  static_assert(offsetof(CMauiControl, mParentList) == 0x34, "CMauiControl::mParentList offset must be 0x34");
+  static_assert(offsetof(CMauiControl, mParent) == 0x3C, "CMauiControl::mParent offset must be 0x3C");
+  static_assert(offsetof(CMauiControl, mChildrenList) == 0x40, "CMauiControl::mChildrenList offset must be 0x40");
+  static_assert(offsetof(CMauiControl, mLeftLV) == 0x48, "CMauiControl::mLeftLV offset must be 0x48");
+  static_assert(offsetof(CMauiControl, mRightLV) == 0x5C, "CMauiControl::mRightLV offset must be 0x5C");
+  static_assert(offsetof(CMauiControl, mTopLV) == 0x70, "CMauiControl::mTopLV offset must be 0x70");
+  static_assert(offsetof(CMauiControl, mBottomLV) == 0x84, "CMauiControl::mBottomLV offset must be 0x84");
+  static_assert(offsetof(CMauiControl, mWidthLV) == 0x98, "CMauiControl::mWidthLV offset must be 0x98");
+  static_assert(offsetof(CMauiControl, mHeightLV) == 0xAC, "CMauiControl::mHeightLV offset must be 0xAC");
+  static_assert(offsetof(CMauiControl, mDepthLV) == 0xC0, "CMauiControl::mDepthLV offset must be 0xC0");
+  static_assert(offsetof(CMauiControl, mDepth) == 0xD4, "CMauiControl::mDepth offset must be 0xD4");
+  static_assert(offsetof(CMauiControl, mRenderedChildren) == 0xD8, "CMauiControl::mRenderedChildren offset must be 0xD8");
+  static_assert(offsetof(CMauiControl, mInvalidated) == 0xE8, "CMauiControl::mInvalidated offset must be 0xE8");
+  static_assert(offsetof(CMauiControl, mDisableHitTest) == 0xE9, "CMauiControl::mDisableHitTest offset must be 0xE9");
+  static_assert(offsetof(CMauiControl, mIsHidden) == 0xEA, "CMauiControl::mIsHidden offset must be 0xEA");
+  static_assert(offsetof(CMauiControl, mNeedsFrameUpdate) == 0xEB, "CMauiControl::mNeedsFrameUpdate offset must be 0xEB");
+  static_assert(offsetof(CMauiControl, mInvisible) == 0xEC, "CMauiControl::mInvisible offset must be 0xEC");
+  static_assert(offsetof(CMauiControl, mAlpha) == 0xF0, "CMauiControl::mAlpha offset must be 0xF0");
+  static_assert(offsetof(CMauiControl, mVertexAlpha) == 0xF4, "CMauiControl::mVertexAlpha offset must be 0xF4");
+  static_assert(offsetof(CMauiControl, mRenderPass) == 0xF8, "CMauiControl::mRenderPass offset must be 0xF8");
+  static_assert(offsetof(CMauiControl, mRootFrame) == 0xFC, "CMauiControl::mRootFrame offset must be 0xFC");
+  static_assert(offsetof(CMauiControl, mDebugName) == 0x100, "CMauiControl::mDebugName offset must be 0x100");
 
   /**
    * Runtime view for global keyboard-focus tracking lane.
@@ -2365,7 +2381,7 @@ namespace moho
    *
    * Layout: this is the concrete `IMauiDragger`-derived object that the binary
    * embeds inside `CMauiEdit` at offset +0x11C (see
-   * `CMauiEditRuntimeView::mClickDragger`). Constructing it installs the
+   * `CMauiEdit::mClickDragger`). Constructing it installs the
    * CMauiEdit-specific IMauiDragger override vtable
    * `??_7CMauiEdit@Moho@@6BIMauiDragger@Moho@@@` (VA 0x00E395CC), reproducing the
    * secondary-vptr write at asm 0x0078F04A in the `CMauiEdit` constructor.
@@ -2713,7 +2729,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x198.
     // `cfunc_InternalCreateEditL` calls `operator new(0x198)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiEditRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiEditRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     //
     // The run opens with the embedded `IMauiDragger` sub-object the ctor's
@@ -2921,7 +2937,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x134.
     // `cfunc_InternalCreateFrameL` calls `operator new(0x134)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiFrameRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiFrameRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     boost::weak_ptr<CMauiFrame> mSelfWeak;              // +0x11C
@@ -3116,7 +3132,7 @@ namespace moho
     // `sizeof(CMauiBitmap)` was whatever `CMauiControl` ends at (0x11C) while
     // `cfunc_InternalCreateBitmapL` allocates `operator new(0x18C)` at
     // 0x00780E2B (`push 18Ch`) and the constructor at 0x0077F950 writes as far
-    // out as `[esi+188h]`. Every access through `CMauiBitmapRuntimeView` --
+    // out as `[esi+188h]`. Every access through the old `CMauiBitmapRuntimeView` overlay --
     // which describes exactly this run -- therefore wrote past the end of the
     // heap block, which the debug CRT catches on free as
     // "HEAP CORRUPTION DETECTED: after Normal block" inside
@@ -3278,7 +3294,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x134.
     // `cfunc_InternalCreateHistogramL` calls `operator new(0x134)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiHistogramRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiHistogramRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     // +0x124 is a real field whose meaning is still unknown: the constructor
@@ -3496,7 +3512,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x158.
     // `cfunc_InternalCreateItemListL` calls `operator new(0x158)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiItemListRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiItemListRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                   // +0x11C
@@ -3791,7 +3807,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x168.
     // `cfunc_InternalCreateMovieL` calls `operator new(0x168)` at 0x0079F64B,
     // but this class declared no data members at all, so it inherited only
-    // `CMauiControl`'s 0x11C and every access through `CMauiMovieRuntimeView`
+    // `CMauiControl`'s 0x11C and every access through the old `CMauiMovieRuntimeView` overlay
     // -- which describes exactly this run -- wrote past the end of the block.
     // ---------------------------------------------------------------------
     CMovie* mMovie = nullptr;              // +0x11C
@@ -3922,8 +3938,8 @@ namespace moho
     // State the binary allocates for this control, +0x124..+0x158 -- the run
     // that starts right after the embedded `IMauiDragger` sub-object.
     // `cfunc_InternalCreateScrollbarL` calls `operator new(0x158)` at
-    // 0x007A16F7, but this class stopped at 0x124, so every access through
-    // `CMauiScrollbarRuntimeView` -- which describes exactly this run -- wrote
+    // 0x007A16F7, but this class stopped at 0x124, so every access through the
+    // old `CMauiScrollbarRuntimeView` overlay -- which described exactly this run -- wrote
     // past the end of the block.
     // ---------------------------------------------------------------------
     CMauiCurrentFocusControlRuntimeView mScrollableLink{}; // +0x124
@@ -4040,7 +4056,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x194.
     // `cfunc_InternalCreateTextL` calls `operator new(0x194)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiTextRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiTextRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     CD3DFont* mFont = nullptr;                     // +0x11C
@@ -4150,7 +4166,7 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x174.
     // `cfunc_InternalCreateBorderL` calls `operator new(0x174)`, but this class
     // declared no data members at all, so it inherited only `CMauiControl`'s
-    // 0x11C and every access through `CMauiBorderRuntimeView` -- which describes
+    // 0x11C and every access through the old `CMauiBorderRuntimeView` overlay -- which described
     // exactly this run -- wrote past the end of the heap block.
     // ---------------------------------------------------------------------
     boost::shared_ptr<CD3DBatchTexture> mTex1;    // +0x11C
@@ -4266,8 +4282,8 @@ namespace moho
     // State the binary allocates for this control, +0x11C..+0x124.
     // `cfunc_InternalCreateMapPreviewL` calls `operator new(0x124)` at
     // 0x00850E2B, but this class declared no data members at all, so it
-    // inherited only `CMauiControl`'s 0x11C and every access through
-    // `CUIMapPreviewRuntimeView` wrote past the end of the block. This one
+    // inherited only `CMauiControl`'s 0x11C and every access through the
+    // old `CUIMapPreviewRuntimeView` overlay wrote past the end of the block. This one
     // draws on the loading screen, which is where it showed up.
     // ---------------------------------------------------------------------
     boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
@@ -4276,161 +4292,8 @@ namespace moho
   static_assert(sizeof(CUIMapPreview) == 0x124, "moho::CUIMapPreview size must be 0x124");
   static_assert(offsetof(CUIMapPreview, mTexture) == 0x11c, "CUIMapPreview::mTexture offset must be 0x11c");
 
-  struct CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown00To33[0x34]{};
-    TDatListItem<CMauiControl, void> mParentList{}; // +0x34
-    CMauiControl* mParent = nullptr; // +0x3C
-    TDatList<CMauiControl, void> mChildrenList{}; // +0x40
-    CScriptLazyVar_float mLeftLV;   // +0x48
-    CScriptLazyVar_float mRightLV;  // +0x5C
-    CScriptLazyVar_float mTopLV;    // +0x70
-    CScriptLazyVar_float mBottomLV; // +0x84
-    CScriptLazyVar_float mWidthLV;  // +0x98
-    CScriptLazyVar_float mHeightLV; // +0xAC
-    CScriptLazyVar_float mDepthLV;  // +0xC0
 
-    [[nodiscard]] static CMauiControlRuntimeView* FromControl(CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<CMauiControlRuntimeView*>(control);
-    }
-
-    [[nodiscard]] static const CMauiControlRuntimeView* FromControl(const CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<const CMauiControlRuntimeView*>(control);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlRuntimeView, mParentList) == 0x34,
-    "CMauiControlRuntimeView::mParentList offset must be 0x34"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mParent) == 0x3C, "CMauiControlRuntimeView::mParent offset must be 0x3C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlRuntimeView, mChildrenList) == 0x40,
-    "CMauiControlRuntimeView::mChildrenList offset must be 0x40"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mLeftLV) == 0x48, "CMauiControlRuntimeView::mLeftLV offset must be 0x48");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mRightLV) > offsetof(CMauiControlRuntimeView, mLeftLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mTopLV) > offsetof(CMauiControlRuntimeView, mRightLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mBottomLV) > offsetof(CMauiControlRuntimeView, mTopLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mWidthLV) > offsetof(CMauiControlRuntimeView, mBottomLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mHeightLV) > offsetof(CMauiControlRuntimeView, mWidthLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiControlRuntimeView, mDepthLV) == 0xC0, "CMauiControlRuntimeView::mDepthLV offset must be 0xC0");
-
-  struct CMauiControlFrameUpdateRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To0EA[0x17]{};
-    bool mNeedsFrameUpdate = false; // +0xEB
-
-    [[nodiscard]] static CMauiControlFrameUpdateRuntimeView* FromControl(CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<CMauiControlFrameUpdateRuntimeView*>(control);
-    }
-
-    [[nodiscard]]
-    static const CMauiControlFrameUpdateRuntimeView* FromControl(const CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<const CMauiControlFrameUpdateRuntimeView*>(control);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlFrameUpdateRuntimeView, mNeedsFrameUpdate) == 0xEB,
-    "CMauiControlFrameUpdateRuntimeView::mNeedsFrameUpdate offset must be 0xEB"
-  );
-
-  struct CMauiControlExtendedRuntimeView : CMauiControlRuntimeView
-  {
-    float mDepth = 0.0f; // +0xD4
-    // +0xD8, 0x10 bytes. The MSVC8 vector stores its allocator as a real data
-    // member ahead of the first/last/end triple, so the container starts at
-    // 0xD8 and the pointers land at 0xDC/0xE0/0xE4 - it is not a 4-byte hole
-    // followed by a 12-byte vector. Modelling it that way pushed every field
-    // from mInvalidated onwards 4 bytes too high.
-    msvc8::vector<CMauiControl*> mRenderedChildren{}; // +0xD8
-    bool mInvalidated = false; // +0xE8
-    bool mDisableHitTest = false; // +0xE9
-    bool mIsHidden = false;       // +0xEA
-    bool mNeedsFrameUpdate = false; // +0xEB
-    bool mInvisible = false; // +0xEC
-    std::uint8_t mUnknown0EDTo0EF[0x3]{};
-    float mAlpha = 1.0f; // +0xF0
-    std::uint32_t mVertexAlpha = 0; // +0xF4
-    std::int32_t mRenderPass = 0; // +0xF8
-    CMauiControl* mRootFrame = nullptr; // +0xFC
-    msvc8::string mDebugName{}; // +0x100 .. 0x11B - last field of the control
-
-    // NOTE: the control's own layout ends at 0x11C. The 0x18 bytes that used
-    // to be modelled here (a 0x14 "unknown" run plus mEventMapper at 0x130)
-    // are CMauiFrame's fields - see CMauiFrameRuntimeView - and claiming them
-    // here made every derived view's fields overrun the object the binary
-    // allocates (`operator new(0x134)` for a frame).
-
-    [[nodiscard]] static CMauiControlExtendedRuntimeView* FromControl(CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<CMauiControlExtendedRuntimeView*>(control);
-    }
-
-    [[nodiscard]] static const CMauiControlExtendedRuntimeView* FromControl(const CMauiControl* control) noexcept
-    {
-      return reinterpret_cast<const CMauiControlExtendedRuntimeView*>(control);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mRenderPass) == 0xF8,
-    "CMauiControlExtendedRuntimeView::mRenderPass offset must be 0xF8"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mDisableHitTest) == 0xE9,
-    "CMauiControlExtendedRuntimeView::mDisableHitTest offset must be 0xE9"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mInvalidated) == 0xE8,
-    "CMauiControlExtendedRuntimeView::mInvalidated offset must be 0xE8"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mIsHidden) == 0xEA,
-    "CMauiControlExtendedRuntimeView::mIsHidden offset must be 0xEA"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mNeedsFrameUpdate) == 0xEB,
-    "CMauiControlExtendedRuntimeView::mNeedsFrameUpdate offset must be 0xEB"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mRenderedChildren) == 0xD8,
-    "CMauiControlExtendedRuntimeView::mRenderedChildren offset must be 0xD8"
-  );
   static_assert(sizeof(msvc8::vector<CMauiControl*>) == 0x10, "msvc8::vector must be 0x10");
-  static_assert(
-    sizeof(CMauiControlExtendedRuntimeView) == 0x11C,
-    "CMauiControlExtendedRuntimeView size must be 0x11C - CMauiFrame's fields start there"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mDepth) == 0xD4,
-    "CMauiControlExtendedRuntimeView::mDepth offset must be 0xD4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mInvisible) == 0xEC,
-    "CMauiControlExtendedRuntimeView::mInvisible offset must be 0xEC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mAlpha) == 0xF0,
-    "CMauiControlExtendedRuntimeView::mAlpha offset must be 0xF0"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mVertexAlpha) == 0xF4,
-    "CMauiControlExtendedRuntimeView::mVertexAlpha offset must be 0xF4"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mRootFrame) == 0xFC,
-    "CMauiControlExtendedRuntimeView::mRootFrame offset must be 0xFC"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiControlExtendedRuntimeView, mDebugName) == 0x100,
-    "CMauiControlExtendedRuntimeView::mDebugName offset must be 0x100"
-  );
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::string) == 0x1C, "msvc8::string size must be 0x1C");
 
 
@@ -4922,247 +4785,9 @@ namespace moho
    */
   [[nodiscard]] bool MAUI_KeyIsDown(EMauiKeyCode keyCode);
 
-  struct CMauiFrameRuntimeView : CMauiControlExtendedRuntimeView
-  {
-    boost::weak_ptr<CMauiFrame> mSelfWeak; // +0x11C
-    TDatList<CMauiControl, void> mDeletedControlList{}; // +0x124
-    CMauiWxEventMapper* mEventHandler = nullptr;
-    std::int32_t mTargetHead = -1;
 
-    [[nodiscard]] static CMauiFrameRuntimeView* FromFrame(CMauiFrame* frame) noexcept
-    {
-      return reinterpret_cast<CMauiFrameRuntimeView*>(frame);
-    }
-
-    [[nodiscard]] static const CMauiFrameRuntimeView* FromFrame(const CMauiFrame* frame) noexcept
-    {
-      return reinterpret_cast<const CMauiFrameRuntimeView*>(frame);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiFrameRuntimeView, mSelfWeak) == 0x11C, "CMauiFrameRuntimeView::mSelfWeak offset must be 0x11C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiFrameRuntimeView, mDeletedControlList) == 0x124,
-    "CMauiFrameRuntimeView::mDeletedControlList offset must be 0x124"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiFrameRuntimeView, mRenderPass) == 0xF8, "CMauiFrameRuntimeView::mRenderPass offset must be 0xF8");
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(boost::weak_ptr<CMauiFrame>) == 0x8, "boost::weak_ptr<CMauiFrame> size must be 0x8");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiFrameRuntimeView, mEventHandler) > offsetof(CMauiFrameRuntimeView, mSelfWeak));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiFrameRuntimeView, mTargetHead) > offsetof(CMauiFrameRuntimeView, mEventHandler));
 
-  struct CMauiBitmapRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    // The MSVC8 vector is 0x10 bytes - it carries its allocator as a real data
-    // member ahead of the first/last/end triple - so this container already
-    // covers 0x11C..0x12B and the next field follows immediately. The 4 bytes
-    // of padding that used to sit here double-counted that allocator word and
-    // pushed every field from mBitmapWidthLV onwards 4 bytes too high, so a
-    // bitmap wrote past the object the binary allocates for it and over its
-    // neighbours. Same trap as the one called out on
-    // CMauiControlExtendedRuntimeView::mRenderedChildren.
-    msvc8::vector<boost::shared_ptr<CD3DBatchTexture>> mTextureBatches; // +0x11C
-    CScriptLazyVar_float mBitmapWidthLV{};  // +0x12C
-    CScriptLazyVar_float mBitmapHeightLV{}; // +0x140
-    float mU0 = 0.0f; // +0x154
-    float mV0 = 0.0f; // +0x158
-    float mU1 = 0.0f; // +0x15C
-    float mV1 = 0.0f; // +0x160
-    void* mHitMask = nullptr; // +0x164
-    bool mUseAlphaHitTest = false; // +0x168
-    bool mIsTiled = false;         // +0x169
-    std::uint8_t mUnknown16ATo16B[0x2]{};
-    float mFrameDurationSeconds = 0.0f; // +0x16C
-    bool mIsPlaying = false; // +0x170
-    bool mDoLoop = false;    // +0x171
-    std::uint8_t mUnknown172To173[0x2]{};
-    std::int32_t mCurrentFrame = 0; // +0x174
-    float mCurrentFrameTimeSeconds = 0.0f; // +0x178
-    std::uint8_t mUnknown17CTo17F[0x4]{};
-    // Proxy-less 0x0C form, matching `CMauiBitmap::mFrames`: the constructor at
-    // 0x0077F950 zeroes three consecutive dwords at 0x180/0x184/0x188, so there
-    // is no debug-proxy word ahead of the triple. Spelling it as the default
-    // 0x10 vector made this view 0x190 long over an object the binary allocates
-    // as 0x18C (`push 18Ch` at 0x00780E2B), so touching the end pointer ran four
-    // bytes past the block.
-    msvc8::vector<std::int32_t, false> mFrames; // +0x180
-
-    [[nodiscard]] static CMauiBitmapRuntimeView* FromBitmap(CMauiBitmap* bitmap) noexcept
-    {
-      return reinterpret_cast<CMauiBitmapRuntimeView*>(bitmap);
-    }
-
-    [[nodiscard]] static const CMauiBitmapRuntimeView* FromBitmap(const CMauiBitmap* bitmap) noexcept
-    {
-      return reinterpret_cast<const CMauiBitmapRuntimeView*>(bitmap);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mTextureBatches) == 0x11C,
-    "CMauiBitmapRuntimeView::mTextureBatches offset must be 0x11C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mBitmapWidthLV) == 0x12C,
-    "CMauiBitmapRuntimeView::mBitmapWidthLV offset must be 0x12C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mBitmapHeightLV) == 0x140,
-    "CMauiBitmapRuntimeView::mBitmapHeightLV offset must be 0x140"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mU0) == 0x154, "CMauiBitmapRuntimeView::mU0 offset must be 0x154");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mV0) == 0x158, "CMauiBitmapRuntimeView::mV0 offset must be 0x158");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mU1) == 0x15C, "CMauiBitmapRuntimeView::mU1 offset must be 0x15C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mV1) == 0x160, "CMauiBitmapRuntimeView::mV1 offset must be 0x160");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mHitMask) == 0x164, "CMauiBitmapRuntimeView::mHitMask offset must be 0x164");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mUseAlphaHitTest) == 0x168,
-    "CMauiBitmapRuntimeView::mUseAlphaHitTest offset must be 0x168"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mIsTiled) == 0x169,
-    "CMauiBitmapRuntimeView::mIsTiled offset must be 0x169"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mFrameDurationSeconds) == 0x16C,
-    "CMauiBitmapRuntimeView::mFrameDurationSeconds offset must be 0x16C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mIsPlaying) == 0x170, "CMauiBitmapRuntimeView::mIsPlaying offset must be 0x170");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mDoLoop) == 0x171, "CMauiBitmapRuntimeView::mDoLoop offset must be 0x171");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mCurrentFrame) == 0x174, "CMauiBitmapRuntimeView::mCurrentFrame offset must be 0x174");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiBitmapRuntimeView, mCurrentFrameTimeSeconds) == 0x178,
-    "CMauiBitmapRuntimeView::mCurrentFrameTimeSeconds offset must be 0x178"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBitmapRuntimeView, mFrames) == 0x180, "CMauiBitmapRuntimeView::mFrames offset must be 0x180");
-
-  struct CMauiEditRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    CMauiEditClickDragger mClickDragger{}; // +0x11C (embedded IMauiDragger sub-object)
-    CD3DFont* mFont = nullptr;          // +0x124
-    std::uint32_t mForegroundColor = 0; // +0x128
-    bool mBackgroundVisible = false;    // +0x12C
-    std::uint8_t mUnknown12DTo12F[0x3]{};
-    std::uint32_t mBackgroundColor = 0; // +0x130
-    std::uint32_t mHighlightForegroundColor = 0; // +0x134
-    std::uint32_t mHighlightBackgroundColor = 0; // +0x138
-    bool mDropShadow = false;                    // +0x13C
-    bool mIsEnabled = false;                     // +0x13D
-    std::uint8_t mPad13ETo13F[0x2]{};
-    msvc8::string mText{};              // +0x140
-    std::int32_t mCaretPosition = 0;    // +0x15C
-    bool mCaretVisible = false;         // +0x160
-    std::uint8_t mUnknown161To163[0x3]{};
-    std::uint32_t mCaretColor = 0;      // +0x164
-    std::uint32_t mCaretCycleCurrentAlpha = 0; // +0x168
-    float mCaretCycleSeconds = 0.0f;    // +0x16C
-    std::uint32_t mCaretCycleOnAlpha = 0; // +0x170
-    std::uint32_t mCaretCycleOffAlpha = 0; // +0x174
-    float mCaretCycleTime = 0.0f;       // +0x178
-    std::int32_t mClipOffset = 0;         // +0x17C
-    std::int32_t mClipLength = 0;         // +0x180
-    std::int32_t mSelectionStart = 0;     // +0x184
-    std::int32_t mSelectionEnd = 0;       // +0x188
-    std::int32_t mDragStart = 0;          // +0x18C
-    bool mTextChangeCallbackInProgress = false; // +0x190
-    std::uint8_t mPad191To193[0x3]{};
-    std::int32_t mMaxChars = 0;           // +0x194
-
-    [[nodiscard]] static CMauiEditRuntimeView* FromEdit(CMauiEdit* edit) noexcept
-    {
-      return reinterpret_cast<CMauiEditRuntimeView*>(edit);
-    }
-
-    [[nodiscard]] static const CMauiEditRuntimeView* FromEdit(const CMauiEdit* edit) noexcept
-    {
-      return reinterpret_cast<const CMauiEditRuntimeView*>(edit);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mFont) == 0x124,
-    "CMauiEditRuntimeView::mFont offset must be 0x124"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mClickDragger) == 0x11C,
-    "CMauiEditRuntimeView::mClickDragger offset must be 0x11C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mForegroundColor) == 0x128,
-    "CMauiEditRuntimeView::mForegroundColor offset must be 0x128"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mBackgroundVisible) == 0x12C,
-    "CMauiEditRuntimeView::mBackgroundVisible offset must be 0x12C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mBackgroundColor) == 0x130,
-    "CMauiEditRuntimeView::mBackgroundColor offset must be 0x130"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mHighlightForegroundColor) == 0x134,
-    "CMauiEditRuntimeView::mHighlightForegroundColor offset must be 0x134"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mHighlightBackgroundColor) == 0x138,
-    "CMauiEditRuntimeView::mHighlightBackgroundColor offset must be 0x138"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mDropShadow) == 0x13C, "CMauiEditRuntimeView::mDropShadow offset must be 0x13C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mIsEnabled) == 0x13D, "CMauiEditRuntimeView::mIsEnabled offset must be 0x13D");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mText) == 0x140, "CMauiEditRuntimeView::mText offset must be 0x140");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretPosition) == 0x15C,
-    "CMauiEditRuntimeView::mCaretPosition offset must be 0x15C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mCaretVisible) == 0x160, "CMauiEditRuntimeView::mCaretVisible offset must be 0x160");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mCaretColor) == 0x164, "CMauiEditRuntimeView::mCaretColor offset must be 0x164");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretCycleCurrentAlpha) == 0x168,
-    "CMauiEditRuntimeView::mCaretCycleCurrentAlpha offset must be 0x168"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretCycleSeconds) == 0x16C,
-    "CMauiEditRuntimeView::mCaretCycleSeconds offset must be 0x16C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretCycleOnAlpha) == 0x170,
-    "CMauiEditRuntimeView::mCaretCycleOnAlpha offset must be 0x170"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretCycleOffAlpha) == 0x174,
-    "CMauiEditRuntimeView::mCaretCycleOffAlpha offset must be 0x174"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mCaretCycleTime) == 0x178,
-    "CMauiEditRuntimeView::mCaretCycleTime offset must be 0x178"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mClipOffset) == 0x17C,
-    "CMauiEditRuntimeView::mClipOffset offset must be 0x17C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mClipLength) == 0x180,
-    "CMauiEditRuntimeView::mClipLength offset must be 0x180"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mSelectionStart) == 0x184,
-    "CMauiEditRuntimeView::mSelectionStart offset must be 0x184"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mSelectionEnd) == 0x188,
-    "CMauiEditRuntimeView::mSelectionEnd offset must be 0x188"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiEditRuntimeView, mDragStart) == 0x18C, "CMauiEditRuntimeView::mDragStart offset must be 0x18C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mTextChangeCallbackInProgress) == 0x190,
-    "CMauiEditRuntimeView::mTextChangeCallbackInProgress offset must be 0x190"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiEditRuntimeView, mMaxChars) == 0x194,
-    "CMauiEditRuntimeView::mMaxChars offset must be 0x194"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiEditRuntimeView) == 0x198, "CMauiEditRuntimeView size must be 0x198");
 
   /**
    * One histogram data series ("column"). Layout: 0x14 bytes. Only the value
@@ -5181,252 +4806,9 @@ namespace moho
   static_assert(sizeof(SHistogramColumn) == 0x14, "SHistogramColumn size must be 0x14");
   static_assert(offsetof(SHistogramColumn, mValues) == 0x08, "SHistogramColumn::mValues offset must be 0x08");
 
-  struct CMauiHistogramRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    std::int32_t mXIncrement = 0;              // +0x11C
-    std::int32_t mYIncrement = 0;              // +0x120
-    // +0x124 is a real field of this control that was missing from the model,
-    // so the column-array triple below sat 4 bytes low and a histogram wrote
-    // past the object the binary allocates for it. No histogram function in
-    // the binary reads or writes +0x124 - the constructor at 0x007977A0 and
-    // the destructor at 0x00797840 touch only 0x128/0x12C/0x130 - so its
-    // meaning is still unknown. It is deliberately not modelled as an MSVC8
-    // vector allocator proxy: SHistogramColumn keeps its own value buffer as a
-    // bare begin/end/capacity triple with no proxy word (sizeof 0x14), so this
-    // control does not use vectors for its arrays.
-    std::uint8_t mUnknown124To127[0x4]{};      // +0x124
-    SHistogramColumn* mDataStart = nullptr;    // +0x128 column-array begin (owned)
-    SHistogramColumn* mDataEnd = nullptr;      // +0x12C column-array end
-    SHistogramColumn* mDataCapacity = nullptr; // +0x130 column-array capacity
-
-    [[nodiscard]] static CMauiHistogramRuntimeView* FromHistogram(CMauiHistogram* histogram) noexcept
-    {
-      return reinterpret_cast<CMauiHistogramRuntimeView*>(histogram);
-    }
-
-    [[nodiscard]] static const CMauiHistogramRuntimeView* FromHistogram(const CMauiHistogram* histogram) noexcept
-    {
-      return reinterpret_cast<const CMauiHistogramRuntimeView*>(histogram);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mXIncrement) == 0x11C,
-    "CMauiHistogramRuntimeView::mXIncrement offset must be 0x11C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mYIncrement) == 0x120,
-    "CMauiHistogramRuntimeView::mYIncrement offset must be 0x120"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mDataStart) == 0x128,
-    "CMauiHistogramRuntimeView::mDataStart offset must be 0x128"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mDataEnd) == 0x12C,
-    "CMauiHistogramRuntimeView::mDataEnd offset must be 0x12C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiHistogramRuntimeView, mDataCapacity) == 0x130,
-    "CMauiHistogramRuntimeView::mDataCapacity offset must be 0x130"
-  );
-
-  struct CMauiItemListRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    CD3DFont* mFont = nullptr; // +0x11C
-    std::uint32_t mForegroundColor = 0;         // +0x120
-    std::uint32_t mBackgroundColor = 0;         // +0x124
-    std::uint32_t mSelectedForegroundColor = 0; // +0x128
-    std::uint32_t mSelectedBackgroundColor = 0; // +0x12C
-    std::uint32_t mHighlightForegroundColor = 0; // +0x130
-    std::uint32_t mHighlightBackgroundColor = 0; // +0x134
-    msvc8::vector<msvc8::string> mItems; // +0x138
-    std::int32_t mCurSelection = -1; // +0x148
-    std::int32_t mHoverItem = -1; // +0x14C
-    bool mShowSelection = false; // +0x150
-    bool mShowMouseoverItem = false; // +0x151
-    std::uint8_t mPad152To153[0x2]{};
-    std::int32_t mScrollPosition = 0; // +0x154
-
-    [[nodiscard]] static CMauiItemListRuntimeView* FromItemList(CMauiItemList* itemList) noexcept
-    {
-      return reinterpret_cast<CMauiItemListRuntimeView*>(itemList);
-    }
-
-    [[nodiscard]] static const CMauiItemListRuntimeView* FromItemList(const CMauiItemList* itemList) noexcept
-    {
-      return reinterpret_cast<const CMauiItemListRuntimeView*>(itemList);
-    }
-  };
 
   FAF_RUNTIME_LAYOUT_ASSERT(sizeof(msvc8::vector<msvc8::string>) == 0x10, "msvc8::vector<msvc8::string> size must be 0x10");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiItemListRuntimeView, mFont) == 0x11C, "CMauiItemListRuntimeView::mFont offset must be 0x11C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mForegroundColor) == 0x120,
-    "CMauiItemListRuntimeView::mForegroundColor offset must be 0x120"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mBackgroundColor) == 0x124,
-    "CMauiItemListRuntimeView::mBackgroundColor offset must be 0x124"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mSelectedForegroundColor) == 0x128,
-    "CMauiItemListRuntimeView::mSelectedForegroundColor offset must be 0x128"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mSelectedBackgroundColor) == 0x12C,
-    "CMauiItemListRuntimeView::mSelectedBackgroundColor offset must be 0x12C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mHighlightForegroundColor) == 0x130,
-    "CMauiItemListRuntimeView::mHighlightForegroundColor offset must be 0x130"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mHighlightBackgroundColor) == 0x134,
-    "CMauiItemListRuntimeView::mHighlightBackgroundColor offset must be 0x134"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiItemListRuntimeView, mItems) == 0x138, "CMauiItemListRuntimeView::mItems offset must be 0x138");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mCurSelection) == 0x148,
-    "CMauiItemListRuntimeView::mCurSelection offset must be 0x148"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mHoverItem) == 0x14C,
-    "CMauiItemListRuntimeView::mHoverItem offset must be 0x14C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mShowSelection) == 0x150,
-    "CMauiItemListRuntimeView::mShowSelection offset must be 0x150"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mShowMouseoverItem) == 0x151,
-    "CMauiItemListRuntimeView::mShowMouseoverItem offset must be 0x151"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiItemListRuntimeView, mScrollPosition) == 0x154,
-    "CMauiItemListRuntimeView::mScrollPosition offset must be 0x154"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(sizeof(CMauiItemListRuntimeView) == 0x158, "CMauiItemListRuntimeView size must be 0x158");
 
-  struct CMauiTextRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    CD3DFont* mFont = nullptr; // +0x11C
-    msvc8::string mText{}; // +0x120
-    std::uint32_t mColor = 0; // +0x13C
-    bool mDropShadow = false; // +0x140
-    bool mClipToWidth = false; // +0x141
-    bool mCenteredHorizontally = false; // +0x142
-    bool mCenteredVertically = false; // +0x143
-    CScriptLazyVar_float mTextAdvanceLV{}; // +0x144
-    CScriptLazyVar_float mFontAscentLV{}; // +0x158
-    CScriptLazyVar_float mFontDescentLV{}; // +0x16C
-    CScriptLazyVar_float mFontExternalLeadingLV{}; // +0x180
-
-    [[nodiscard]] static CMauiTextRuntimeView* FromText(CMauiText* text) noexcept
-    {
-      return reinterpret_cast<CMauiTextRuntimeView*>(text);
-    }
-
-    [[nodiscard]] static const CMauiTextRuntimeView* FromText(const CMauiText* text) noexcept
-    {
-      return reinterpret_cast<const CMauiTextRuntimeView*>(text);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiTextRuntimeView, mFont) == 0x11C, "CMauiTextRuntimeView::mFont offset must be 0x11C");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiTextRuntimeView, mText) == 0x120, "CMauiTextRuntimeView::mText offset must be 0x120");
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiTextRuntimeView, mColor) == 0x13C, "CMauiTextRuntimeView::mColor offset must be 0x13C");
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mDropShadow) == 0x140,
-    "CMauiTextRuntimeView::mDropShadow offset must be 0x140"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mClipToWidth) == 0x141,
-    "CMauiTextRuntimeView::mClipToWidth offset must be 0x141"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mCenteredHorizontally) == 0x142,
-    "CMauiTextRuntimeView::mCenteredHorizontally offset must be 0x142"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mCenteredVertically) == 0x143,
-    "CMauiTextRuntimeView::mCenteredVertically offset must be 0x143"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mTextAdvanceLV) == 0x144,
-    "CMauiTextRuntimeView::mTextAdvanceLV offset must be 0x144"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mFontAscentLV) == 0x158,
-    "CMauiTextRuntimeView::mFontAscentLV offset must be 0x158"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mFontDescentLV) == 0x16C,
-    "CMauiTextRuntimeView::mFontDescentLV offset must be 0x16C"
-  );
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CMauiTextRuntimeView, mFontExternalLeadingLV) == 0x180,
-    "CMauiTextRuntimeView::mFontExternalLeadingLV offset must be 0x180"
-  );
-
-  struct CMauiBorderRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To0F3[0x20]{};
-    std::uint32_t mVertexAlpha = 0; // +0xF4
-    std::uint8_t mUnknown0F8To11B[0x24]{};
-    boost::shared_ptr<CD3DBatchTexture> mTex1;    // +0x11C
-    boost::shared_ptr<CD3DBatchTexture> mTexHorz; // +0x124
-    boost::shared_ptr<CD3DBatchTexture> mTexUL;   // +0x12C
-    boost::shared_ptr<CD3DBatchTexture> mTexUR;   // +0x134
-    boost::shared_ptr<CD3DBatchTexture> mTexLL;   // +0x13C
-    boost::shared_ptr<CD3DBatchTexture> mTexLR;   // +0x144
-    CScriptLazyVar_float mBorderWidthLV;          // +0x14C
-    CScriptLazyVar_float mBorderHeightLV;         // +0x160
-
-    [[nodiscard]] static CMauiBorderRuntimeView* FromBorder(CMauiBorder* border) noexcept
-    {
-      return reinterpret_cast<CMauiBorderRuntimeView*>(border);
-    }
-
-    [[nodiscard]] static const CMauiBorderRuntimeView* FromBorder(const CMauiBorder* border) noexcept
-    {
-      return reinterpret_cast<const CMauiBorderRuntimeView*>(border);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mVertexAlpha) > offsetof(CMauiControlRuntimeView, mHeightLV));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTex1) > offsetof(CMauiBorderRuntimeView, mVertexAlpha));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTexHorz) > offsetof(CMauiBorderRuntimeView, mTex1));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTexUL) > offsetof(CMauiBorderRuntimeView, mTexHorz));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTexUR) > offsetof(CMauiBorderRuntimeView, mTexUL));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTexLL) > offsetof(CMauiBorderRuntimeView, mTexUR));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mTexLR) > offsetof(CMauiBorderRuntimeView, mTexLL));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mBorderWidthLV) > offsetof(CMauiBorderRuntimeView, mTexLR));
-  FAF_RUNTIME_LAYOUT_ASSERT(offsetof(CMauiBorderRuntimeView, mBorderHeightLV) > offsetof(CMauiBorderRuntimeView, mBorderWidthLV));
-
-  struct CUIMapPreviewRuntimeView : CMauiControlRuntimeView
-  {
-    std::uint8_t mUnknown0D4To11B[0x48]{};
-    boost::shared_ptr<ID3DTextureSheet> mTexture; // +0x11C
-
-    [[nodiscard]] static CUIMapPreviewRuntimeView* FromMapPreview(CUIMapPreview* mapPreview) noexcept
-    {
-      return reinterpret_cast<CUIMapPreviewRuntimeView*>(mapPreview);
-    }
-
-    [[nodiscard]] static const CUIMapPreviewRuntimeView* FromMapPreview(const CUIMapPreview* mapPreview) noexcept
-    {
-      return reinterpret_cast<const CUIMapPreviewRuntimeView*>(mapPreview);
-    }
-  };
-
-  FAF_RUNTIME_LAYOUT_ASSERT(
-    offsetof(CUIMapPreviewRuntimeView, mTexture) == 0x11C,
-    "CUIMapPreviewRuntimeView::mTexture offset must be 0x11C"
-  );
 
   /**
    * Address: 0x008C65B0 (FUN_008C65B0, Moho::USER_GetLuaState)
@@ -10792,17 +10174,6 @@ namespace moho
   // these controls were doing while they declared no data members at all.
   // Keep the relation asserted so it cannot come back.
   // ---------------------------------------------------------------------
-  static_assert(sizeof(CMauiBitmapRuntimeView) <= sizeof(CMauiBitmap), "CMauiBitmapRuntimeView overruns CMauiBitmap");
-  static_assert(sizeof(CMauiBorderRuntimeView) <= sizeof(CMauiBorder), "CMauiBorderRuntimeView overruns CMauiBorder");
-  static_assert(sizeof(CMauiControlExtendedRuntimeView) <= sizeof(CMauiControl), "CMauiControlExtendedRuntimeView overruns CMauiControl");
-  static_assert(sizeof(CMauiControlFrameUpdateRuntimeView) <= sizeof(CMauiControl), "CMauiControlFrameUpdateRuntimeView overruns CMauiControl");
-  static_assert(sizeof(CMauiControlRuntimeView) <= sizeof(CMauiControl), "CMauiControlRuntimeView overruns CMauiControl");
   static_assert(sizeof(CMauiCursorRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorRuntimeView overruns CMauiCursor");
   static_assert(sizeof(CMauiCursorTextureRuntimeView) <= sizeof(CMauiCursor), "CMauiCursorTextureRuntimeView overruns CMauiCursor");
-  static_assert(sizeof(CMauiEditRuntimeView) <= sizeof(CMauiEdit), "CMauiEditRuntimeView overruns CMauiEdit");
-  static_assert(sizeof(CMauiFrameRuntimeView) <= sizeof(CMauiFrame), "CMauiFrameRuntimeView overruns CMauiFrame");
-  static_assert(sizeof(CMauiHistogramRuntimeView) <= sizeof(CMauiHistogram), "CMauiHistogramRuntimeView overruns CMauiHistogram");
-  static_assert(sizeof(CMauiItemListRuntimeView) <= sizeof(CMauiItemList), "CMauiItemListRuntimeView overruns CMauiItemList");
-  static_assert(sizeof(CMauiTextRuntimeView) <= sizeof(CMauiText), "CMauiTextRuntimeView overruns CMauiText");
-  static_assert(sizeof(CUIMapPreviewRuntimeView) <= sizeof(CUIMapPreview), "CUIMapPreviewRuntimeView overruns CUIMapPreview");
 } // namespace moho

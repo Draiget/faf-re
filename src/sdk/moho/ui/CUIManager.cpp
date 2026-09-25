@@ -257,7 +257,7 @@ bool moho::CUIManager::SetNewLuaState(LuaPlus::LuaState* const state)
 
     mFrames.PushBack(frame);
 
-    CMauiFrameRuntimeView* const frameView = CMauiFrameRuntimeView::FromFrame(frame.get());
+    moho::CMauiFrame* const frameView = frame.get();
     frameView->mRenderPass = 8;
 
     // Sized from the input window, not the host: both GetClientSize calls
@@ -612,11 +612,10 @@ void moho::CUIManager::DebugMouseOverControl(CD3DPrimBatcher* const primBatcher)
   const boost::shared_ptr<CD3DBatchTexture> texture = CD3DBatchTexture::FromSolidColor(0xFFFF00FFu);
   primBatcher->SetTexture(texture);
 
-  CMauiControlRuntimeView* const controlView = CMauiControlRuntimeView::FromControl(control);
-  const float left = CScriptLazyVar_float::GetValue(&controlView->mLeftLV);
-  const float right = CScriptLazyVar_float::GetValue(&controlView->mRightLV);
-  const float top = CScriptLazyVar_float::GetValue(&controlView->mTopLV);
-  const float bottom = CScriptLazyVar_float::GetValue(&controlView->mBottomLV);
+  const float left = CScriptLazyVar_float::GetValue(&control->mLeftLV);
+  const float right = CScriptLazyVar_float::GetValue(&control->mRightLV);
+  const float top = CScriptLazyVar_float::GetValue(&control->mTopLV);
+  const float bottom = CScriptLazyVar_float::GetValue(&control->mBottomLV);
 
   const Vector3f topLeft{left, top, 0.0f};
   const Vector3f widthAxis{right - left, 0.0f, 0.0f};
