@@ -5,7 +5,7 @@
 
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/gal/Device.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/resource/ResourceManager.h"
 #include "moho/serialization/PrefetchHandleBase.h"
@@ -64,7 +64,7 @@ namespace moho
     }
 
     gpg::MemBuffer<char> decodedBlocks;
-    gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
     if (device == nullptr) {
       return outResource;
     }

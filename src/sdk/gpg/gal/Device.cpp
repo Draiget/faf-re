@@ -190,6 +190,31 @@ namespace gpg::gal
     }
 
     /**
+     * FAF addition, not in the shipped binary.
+     *
+     * What it does:
+     * Dispatches on the active device's API to its backend's own query.
+     */
+    bool SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+    {
+        Device* const device = Device::GetInstance();
+        if (device == nullptr)
+        {
+            return false;
+        }
+
+        switch (device->GetDeviceContext()->mDeviceType)
+        {
+        case DeviceApi::Direct3D9:
+            return static_cast<DeviceD3D9*>(device)->SupportsVertexTextureFormat(textureFormat);
+        case DeviceApi::Direct3D10:
+            return static_cast<DeviceD3D10*>(device)->SupportsVertexTextureFormat(textureFormat);
+        default:
+            return false;
+        }
+    }
+
+    /**
      * Address: 0x008E81B0 (FUN_008E81B0)
      *
      * What it does:

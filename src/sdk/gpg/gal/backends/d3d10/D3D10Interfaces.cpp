@@ -4287,6 +4287,25 @@ namespace gpg::gal
   }
 
   /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Asks the device whether the format's DXGI equivalent can be a 2D texture
+   * that shaders sample.
+   */
+  bool DeviceD3D10::SupportsVertexTextureFormat(const std::uint32_t textureFormat)
+  {
+    const auto dxgiFormat = static_cast<DXGI_FORMAT>(MapGalTextureFormatToDxgi(static_cast<int>(textureFormat)));
+    if (mDevice == nullptr || dxgiFormat == DXGI_FORMAT_UNKNOWN) {
+      return false;
+    }
+
+    UINT support = 0U;
+    return SUCCEEDED(mDevice->CheckFormatSupport(dxgiFormat, &support)) &&
+           (support & D3D10_FORMAT_SUPPORT_TEXTURE2D) != 0U && (support & D3D10_FORMAT_SUPPORT_SHADER_SAMPLE) != 0U;
+  }
+
+  /**
    * Address: 0x008FD500 (FUN_008FD500)
    *
    * What it does:

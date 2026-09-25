@@ -8,7 +8,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
 
@@ -67,7 +67,7 @@ namespace moho
   {
     ResetRenderResources();
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     if (!device) {
       return;
     }

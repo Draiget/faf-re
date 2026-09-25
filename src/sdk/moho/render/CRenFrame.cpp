@@ -270,7 +270,7 @@ namespace moho
    */
   void CRenFrame::Render(const int width, const int height)
   {
-    auto* const galDevice = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const galDevice = gpg::gal::Device::GetInstance();
 
     CD3DDevice* device = D3D_GetDevice();
     device->SelectFxFile("frame");

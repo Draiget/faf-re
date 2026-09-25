@@ -7,7 +7,6 @@
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/Head.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
@@ -79,7 +78,7 @@ namespace
     const msvc8::string& techniqueName
   )
   {
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     // 0x007D090B resolves the head and drops the result on the floor - `eax` is
     // overwritten by the effect lookup at 0x007D0914 before it is ever read.
@@ -180,7 +179,7 @@ namespace moho
     const GeomCamera3& camera
   )
   {
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
 
     const STIMap* const map = session.GetSTIMap();

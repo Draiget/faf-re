@@ -1081,7 +1081,7 @@ namespace moho
     }
 
     CD3DDevice* const d3dDevice = D3D_GetDevice();
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     // Ensure the process-wide hardware vertex formatter singleton is realized
     // before the draw (the binary discards the returned pointer here — the call

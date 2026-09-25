@@ -20,7 +20,7 @@
 #include "gpg/core/streams/Stream.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/Error.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "lua/LuaObject.h"
 #include "gpg/core/utils/Logging.h"
 #include "legacy/containers/Map.h"
@@ -1564,7 +1564,7 @@ namespace moho
     // device online before the GAL singleton is queried.
     (void)D3D_GetDevice();
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     if (device != nullptr) {
       ID3DTextureSheet::TextureHandle texture{};
       mPreviewTexture->GetTexture(texture);

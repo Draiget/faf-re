@@ -579,6 +579,16 @@ namespace gal {
       std::uint32_t CheckAvailableFormats(DeviceContext* context);
 
       /**
+       * FAF addition, not in the shipped binary.
+       *
+       * What it does:
+       * Reports whether vertex shaders can read a texture of gal format
+       * `textureFormat`. Direct3D 10 has no per-stage texture caps, so any
+       * format a shader can sample as a 2D texture qualifies.
+       */
+      [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
+
+      /**
        * Address: 0x008FD500 (FUN_008FD500)
        *
        * What it does:

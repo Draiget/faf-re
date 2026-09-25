@@ -8,7 +8,7 @@
 #include "gpg/gal/DrawIndexedContext.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/IndexBuffer.hpp"
 #include "gpg/gal/VertexBuffer.hpp"
@@ -173,7 +173,7 @@ namespace moho
     }
 
     CD3DDevice* const d3dDevice = D3D_GetDevice();
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     CD3DEffect* const effect = d3dDevice->GetCurEffect();
 
     int renderCount = mMaxParticles - startIndex;
@@ -222,7 +222,7 @@ namespace moho
       return false;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(deviceBase);
+    auto* const device = deviceBase;
 
     boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
     vertexFormat = device->CreateVertexFormat(19U);

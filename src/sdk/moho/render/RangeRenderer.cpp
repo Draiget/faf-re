@@ -9,7 +9,6 @@
 #include <stdexcept>
 #include <string_view>
 
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
@@ -347,7 +346,7 @@ namespace
     const int dynamicStreamStartVertex
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     boost::shared_ptr<gpg::gal::Effect> effect = AcquireRangeRingBaseEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> castTechnique = effect->GetTechnique("Cast");
@@ -456,7 +455,7 @@ namespace
     const std::int32_t heightSpan = playableRect.maxZ - playableRect.minZ;
     const float playableMapSpan = static_cast<float>(widthSpan < heightSpan ? heightSpan : widthSpan);
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     gpg::gal::DeviceContext* const deviceContext = device->GetDeviceContext();
     const gpg::gal::Head& head = deviceContext->GetHead(headIndex);
 
@@ -1422,7 +1421,7 @@ namespace moho
   {
     ResetRenderResources();
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     if (!device) {
       return;
     }

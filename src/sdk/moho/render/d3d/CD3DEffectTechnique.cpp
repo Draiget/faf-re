@@ -18,7 +18,6 @@
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
 #include "gpg/gal/TextureContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/console/CConCommand.h"
 #include "moho/misc/FileWaitHandleSet.h"
 #include "moho/misc/StartupHelpers.h"
@@ -80,8 +79,7 @@ namespace moho
         return false;
       }
 
-      auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
-      return device != nullptr && device->SupportsVertexTextureFormat(gpg::gal::kTextureFormatFloat4);
+      return gpg::gal::SupportsVertexTextureFormat(gpg::gal::kTextureFormatFloat4);
     }
 
     /**

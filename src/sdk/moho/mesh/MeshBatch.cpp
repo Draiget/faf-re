@@ -3,7 +3,6 @@
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/mesh/Mesh.h"
 #include "moho/render/d3d/CD3DDevice.h"
 #include "moho/misc/ID3DDeviceResources.h"
@@ -113,7 +112,7 @@ namespace moho
     mUseBoneRemap = static_cast<std::uint8_t>(remapToReferenceResource ? 1u : 0u);
     mCurrentResource = currentResource;
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     ID3DDeviceResources* const resources = D3D_GetDevice()->GetResources();
     const gpg::gal::DeviceContext* const deviceContext = device->GetDeviceContext();
 

@@ -4786,7 +4786,7 @@ void moho::WRenViewport::FogOn(const float offsetMultiplier)
 {
   const moho::SFogInfo& fogInfo = moho::REN_GetTerrainRes()->GetFogInfo();
   const float fogOffset = moho::fog_OffsetMultiplier * offsetMultiplier;
-  gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
   if (!moho::fog_DistanceFog) {
     device->SetFogState(false, nullptr, 0.0f, 1.0f, 0);
     // FAF: see below.
@@ -4815,7 +4815,7 @@ void moho::WRenViewport::FogOn(const float offsetMultiplier)
  */
 void moho::WRenViewport::FogOff()
 {
-  gpg::gal::DeviceD3D9* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+  gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
   device->SetFogState(false, nullptr, 0.0f, 1.0f, 0);
 
   // FAF: the shader model 3 mesh pixel shaders stop fogging too (see FogOn).

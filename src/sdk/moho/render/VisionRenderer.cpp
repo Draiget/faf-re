@@ -12,7 +12,6 @@
 #include "gpg/gal/Head.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
@@ -176,7 +175,7 @@ namespace moho
   {
     ResetRenderResources();
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     if (!device) {
       return;
     }
@@ -313,7 +312,7 @@ namespace moho
     const float interpolant
   )
   {
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
 
     const boost::shared_ptr<gpg::gal::Effect> effect = AcquireVisionBaseEffect();

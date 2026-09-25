@@ -8,7 +8,7 @@
 
 #include "gpg/core/utils/Global.h"
 #include "gpg/gal/Device.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "moho/render/d3d/CD3DVertexFormat.h"
 #include "moho/render/d3d/CD3DVertexStream.h"
 
@@ -278,7 +278,7 @@ namespace moho
    */
   void CD3DVertexSheet::Func9()
   {
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     mVertexFormat->SetVertexDeclaration();
 
     const std::uint32_t streamCount = static_cast<std::uint32_t>(mStreams.size());

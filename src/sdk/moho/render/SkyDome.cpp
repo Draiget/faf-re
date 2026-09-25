@@ -14,7 +14,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/VertexBufferContext.hpp"
-#include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
+#include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/Effect.hpp"
 #include "gpg/gal/EffectTechnique.hpp"
 #include "gpg/gal/EffectVariable.hpp"
@@ -619,7 +619,7 @@ void SkyDome::Destroy()
     const float radiusDivCos = domeRadius / std::cos(startAngleRadians);
     const float baseHeight = radiusDivCos * std::sin(startAngleRadians);
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     const int widthPlusOne = widthSegments + 1;
     mDomeVertexCount = (heightSegments * widthPlusOne) + 1;
 
@@ -673,7 +673,7 @@ void SkyDome::Destroy()
       return;
     }
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     mDomeIndexCount = widthSegments * ((6 * (heightSegments - 1)) + 3);
 
     gpg::gal::IndexBufferContext context{};
@@ -728,7 +728,7 @@ void SkyDome::Destroy()
       return;
     }
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     gpg::gal::VertexBufferContext quadContext{};
     quadContext.vertexCount_ = 4u;
@@ -768,7 +768,7 @@ void SkyDome::Destroy()
       return;
     }
 
-    auto* const device = reinterpret_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     gpg::gal::IndexBufferContext context{};
     context.size_ = 6u;
@@ -844,7 +844,7 @@ void SkyDome::Destroy()
    */
   void SkyDome::RenderDomeUsing(boost::shared_ptr<gpg::gal::EffectTechnique> technique)
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     gpg::gal::EffectTechnique* const techniqueImpl = technique.get();
 
     device->SetVertexDeclaration(mDomeFormat->mFormat);
@@ -959,7 +959,7 @@ void SkyDome::Destroy()
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Cumulus");
 
@@ -1018,7 +1018,7 @@ void SkyDome::Destroy()
 
     UpdateDecalBuffer();
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     boost::shared_ptr<gpg::gal::Effect> effect = ResolveSkyEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique("Decal");
 

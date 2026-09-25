@@ -590,5 +590,17 @@ namespace gpg::gal
   };
 
   static_assert(sizeof(Device) == 0x24, "Device size must be 0x24");
+
+  /**
+   * FAF addition, not in the shipped binary.
+   *
+   * What it does:
+   * Asks the active backend whether vertex shaders can read a texture of gal
+   * format `textureFormat` (the FAF skinning palette texture). The backends
+   * answer through a member of their own rather than a `Device` slot, which
+   * would change the binary's vtable. False without a device or before it is
+   * set up.
+   */
+  [[nodiscard]] bool SupportsVertexTextureFormat(std::uint32_t textureFormat);
 } // namespace gpg::gal
 

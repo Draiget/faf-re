@@ -1313,7 +1313,7 @@ namespace moho
       return;
     }
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     boost::shared_ptr<gpg::gal::VertexFormat> vertexFormat;
     vertexFormat = device->CreateVertexFormat(kCartographicVertexFormatToken);
@@ -1426,7 +1426,7 @@ namespace moho
 
     UploadDecalVerticesIfDirty();
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     boost::shared_ptr<gpg::gal::Effect> effect = GetCartographicEffect();
     boost::shared_ptr<gpg::gal::EffectTechnique> technique = effect->GetTechnique(mTechniqueName.c_str());
 
@@ -1493,7 +1493,7 @@ namespace moho
    */
   void Cartographic::InitializeFrame()
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     boost::shared_ptr<gpg::gal::VertexFormat> frameVertexFormat;
     frameVertexFormat = device->CreateVertexFormat(kCartographicFrameVertexFormatToken);
@@ -1561,7 +1561,7 @@ namespace moho
       topographicSamples, kCartographicMinTopographicBands, kCartographicMaxTopographicBands
     );
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     // Everything below works in "normalized elevation": 0 at the tier box
     // floor, 1 at its ceiling. A degenerate band keeps a unit scale so the
@@ -1733,7 +1733,7 @@ namespace moho
     const std::uint32_t hypsometricColor4
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
 
     STIMap& map = CartographicTerrainMap(*terrain);
     const CHeightField& heightField = *map.GetHeightField();
@@ -1968,7 +1968,7 @@ namespace moho
    */
   void Cartographic::RenderTerrainStage0(const GeomCamera3& camera, [[maybe_unused]] const bool mirrored)
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     device->Clear(
       true,
       true,
@@ -2063,7 +2063,7 @@ namespace moho
     const boost::shared_ptr<gpg::gal::RenderTarget> colorTarget
   )
   {
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     // 0x007D35C9..0x007D35D1: the head's output context, its colour target, and
     // that target's creation descriptor (`RenderTarget` slot 1).
     const gpg::gal::RenderTargetContext& headTarget =
@@ -2180,7 +2180,7 @@ namespace moho
     const bool previousAlwaysRenderStrategicIcons = ui_AlwaysRenderStrategicIcons;
     ui_AlwaysRenderStrategicIcons = true;
 
-    auto* const device = static_cast<gpg::gal::DeviceD3D9*>(gpg::gal::Device::GetInstance());
+    auto* const device = gpg::gal::Device::GetInstance();
     const gpg::gal::Head& head = device->GetDeviceContext()->GetHead(headIndex);
     gpg::gal::OutputContext& headOutputContext = *device->GetHeadOutputContext(headIndex);
     (void)device->ClearTextures();
