@@ -49,7 +49,15 @@ namespace gpg
 	 * Dispatches one message to the current process-global die handler when set.
 	 */
 	void InvokeDieHandler(const char*);
-	void Die(const char* args, ...); // 0x00939000
+
+	/**
+	 * Address: 0x00939000 (FUN_00939000, gpg::Die)
+	 *
+	 * What it does:
+	 * Formats the message, hands it to the die handler and never returns.
+	 * Every call site in the binary ends at the call, with no code after it.
+	 */
+	[[noreturn]] void Die(const char* args, ...);
 
 	/**
 	 * Address: 0x00957EF0 (FUN_00957EF0, func_SetMemHook)

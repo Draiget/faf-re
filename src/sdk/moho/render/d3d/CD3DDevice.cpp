@@ -13,6 +13,7 @@
 #include <unordered_map>
 
 #include "gpg/core/utils/BoostWrappers.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 #include "gpg/gal/CursorContext.hpp"
 #include "gpg/gal/Device.hpp"
@@ -600,44 +601,50 @@ namespace
      * What it does:
      * Emits device-exit callbacks/events, tears down tracked resources and
      * per-head writer locks, resets cursor context lanes, and dispatches backend
-     * destroy.
+     * destroy. The whole body runs under `catch (const gpg::gal::Error&)`
+     * (FuncInfo 0x00F1DD54, try over states 0..1): the handler at 0x0042E9A3
+     * hands the error's file, line and text to `gpg::Die`.
      */
     void Destroy() override
     {
       CD3DDeviceRuntimeView* const runtime = CD3DDeviceRuntimeView::FromDevice(this);
-      runtime->mInitialized = 0;
-      // true = app shutdown (the binary pushes 1 at 0x0042E786): the batchers
-      // and the map-imager border go too, and the mesh renderer is fully shut
-      // down rather than reset.
-      if (runtime->mViewport != nullptr) {
-        runtime->mViewport->D3DWindowOnDeviceExit(true);
-      }
-
-      const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
-      (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
-      ResetResourcesForContextTransition(mResources, true);
-      mResources.ClearCachedVertexFormats();
-
-      gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-      int headCount = 0;
-      if (device != nullptr) {
-        if (gpg::gal::DeviceContext* const context = device->GetDeviceContext(); context != nullptr) {
-          headCount = context->GetHeadCount();
+      try {
+        runtime->mInitialized = 0;
+        // true = app shutdown (the binary pushes 1 at 0x0042E786): the batchers
+        // and the map-imager border go too, and the mesh renderer is fully shut
+        // down rather than reset.
+        if (runtime->mViewport != nullptr) {
+          runtime->mViewport->D3DWindowOnDeviceExit(true);
         }
-      }
 
-      const std::size_t lockHeadCount =
-        std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
-      for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
-        ReleaseHeadWriterLocks(*runtime, headIndex);
-      }
+        const moho::SD3DDeviceEvent deviceExitEvent{1u, true, {0u, 0u, 0u}};
+        (void)DispatchDeviceEventToListeners(deviceExitEvent, static_cast<moho::Broadcaster*>(this));
+        ResetResourcesForContextTransition(mResources, true);
+        mResources.ClearCachedVertexFormats();
 
-      // 0x0042E902: back to a default cursor - a temporary context,
-      // copy-assigned over the device's.
-      runtime->mCursorContext = gpg::gal::CursorContext();
+        gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
+        int headCount = 0;
+        if (device != nullptr) {
+          if (gpg::gal::DeviceContext* const context = device->GetDeviceContext(); context != nullptr) {
+            headCount = context->GetHeadCount();
+          }
+        }
 
-      if (device != nullptr) {
-        gpg::gal::Device::DestroyInstance();
+        const std::size_t lockHeadCount =
+          std::min(static_cast<std::size_t>(headCount), std::size(runtime->mReaderWriterLocks1));
+        for (std::size_t headIndex = 0U; headIndex < lockHeadCount; ++headIndex) {
+          ReleaseHeadWriterLocks(*runtime, headIndex);
+        }
+
+        // 0x0042E902: back to a default cursor - a temporary context,
+        // copy-assigned over the device's.
+        runtime->mCursorContext = gpg::gal::CursorContext();
+
+        if (device != nullptr) {
+          gpg::gal::Device::DestroyInstance();
+        }
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
       }
     }
 
@@ -1512,33 +1519,47 @@ namespace moho
    * What it does:
    * Binds one vertex/index sheet pair, iterates active effect passes, and
    * submits one indexed draw context with zero start/base offsets.
+   *
+   * Two nested `catch (const gpg::gal::Error&)` blocks (FuncInfo 0x00F188A0),
+   * both fatal through `gpg::Die`: the outer try (states 0..3, handler
+   * 0x0042FCBE) covers everything after the device lookup, the inner one
+   * (states 1..2, handler 0x0042FC77) only each pass's draw.
    */
   bool CD3DDevice::DrawIndexedSheetPrimitive(
     ID3DVertexSheet* const vertexSheet, ID3DIndexSheet* const indexSheet, std::int32_t* const primitiveType
   )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    vertexSheet->Func9();
-    indexSheet->SetBufferIndices();
+    try {
+      vertexSheet->Func9();
+      indexSheet->SetBufferIndices();
 
-    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
-    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
-    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
-      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
+      const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+      for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+        technique->BeginPass(static_cast<int>(passIndex));
 
-      // 0x0042FC32: the five-argument constructor, so the sheet's vertex count
-      // is the vertex count and the index sheet's size the index count.
-      gpg::gal::DrawIndexedContext drawContext(
-        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
-        static_cast<std::uint32_t>(vertexSheet->Func5()),
-        indexSheet->GetSize(),
-        0U,
-        0U
-      );
-      (void)device->DrawIndexedPrimitive(&drawContext);
-      technique->EndPass();
+        try {
+          // 0x0042FC32: the five-argument constructor, so the sheet's vertex count
+          // is the vertex count and the index sheet's size the index count.
+          gpg::gal::DrawIndexedContext drawContext(
+            static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+            static_cast<std::uint32_t>(vertexSheet->Func5()),
+            indexSheet->GetSize(),
+            0U,
+            0U
+          );
+          (void)device->DrawIndexedPrimitive(&drawContext);
+        } catch (const gpg::gal::Error& error) {
+          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        }
+
+        technique->EndPass();
+      }
+      technique->EndTechnique();
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
     }
-    technique->EndTechnique();
     return true;
   }
 
@@ -1550,29 +1571,43 @@ namespace moho
    * What it does:
    * Binds one vertex-sheet view, iterates active effect passes, and submits one
    * non-indexed primitive draw per pass.
+   *
+   * Two nested `catch (const gpg::gal::Error&)` blocks (FuncInfo 0x00F189C8),
+   * both fatal through `gpg::Die`: the outer try (states 0..3, handler
+   * 0x0042F9E4) covers everything after the device lookup, the inner one
+   * (states 1..2, handler 0x0042F994) only each pass's draw.
    */
   bool CD3DDevice::DrawPrimitiveList(
     const SD3DVertexRange* const vertexSheetView, std::int32_t* const primitiveType
   )
   {
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    vertexSheetView->sheet->Func9();
+    try {
+      vertexSheetView->sheet->Func9();
 
-    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
-    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
-    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
-      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
+      const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+      for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+        technique->BeginPass(static_cast<int>(passIndex));
 
-      // The first vertex is the view's base vertex (+0x04), not its start.
-      gpg::gal::DrawContext drawContext(
-        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
-        static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->startVertex) + 1),
-        static_cast<std::uint32_t>(vertexSheetView->baseVertex)
-      );
-      (void)device->DrawPrimitive(&drawContext);
-      technique->EndPass();
+        try {
+          // The first vertex is the view's base vertex (+0x04), not its start.
+          gpg::gal::DrawContext drawContext(
+            static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+            static_cast<std::uint32_t>((vertexSheetView->endVertex - vertexSheetView->startVertex) + 1),
+            static_cast<std::uint32_t>(vertexSheetView->baseVertex)
+          );
+          (void)device->DrawPrimitive(&drawContext);
+        } catch (const gpg::gal::Error& error) {
+          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        }
+
+        technique->EndPass();
+      }
+      technique->EndTechnique();
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
     }
-    technique->EndTechnique();
     return true;
   }
 
@@ -1584,6 +1619,11 @@ namespace moho
    * What it does:
    * Binds vertex/index views, iterates active effect passes, and submits one
    * indexed primitive draw per pass.
+   *
+   * Two nested `catch (const gpg::gal::Error&)` blocks (FuncInfo 0x00F18934),
+   * both fatal through `gpg::Die`: the outer try (states 0..3, handler
+   * 0x0042FB5E) covers everything after the device lookup, the inner one
+   * (states 1..2, handler 0x0042FB0E) only each pass's draw.
    */
   bool CD3DDevice::DrawTriangleList(
     const SD3DVertexRange* const vertexSheetView,
@@ -1597,26 +1637,35 @@ namespace moho
     }
 
     gpg::gal::Device* const device = gpg::gal::Device::GetInstance();
-    vertexSheetView->sheet->Func9();
-    indexSheetView->sheet->SetBufferIndices();
+    try {
+      vertexSheetView->sheet->Func9();
+      indexSheetView->sheet->SetBufferIndices();
 
-    gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
-    const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
-    for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
-      technique->BeginPass(static_cast<int>(passIndex));
+      gpg::gal::EffectTechnique* const technique = GetCurEffect()->mCurrentTechnique.get();
+      const unsigned int passCount = static_cast<unsigned int>(technique->BeginTechnique());
+      for (unsigned int passIndex = 0; passIndex < passCount; ++passIndex) {
+        technique->BeginPass(static_cast<int>(passIndex));
 
-      gpg::gal::DrawIndexedContext drawContext(
-        static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
-        static_cast<std::uint32_t>(vertexSheetView->startVertex),
-        static_cast<std::uint32_t>(vertexCount),
-        static_cast<std::uint32_t>(indexSheetView->indexCount),
-        static_cast<std::uint32_t>(indexSheetView->startIndex),
-        vertexSheetView->baseVertex
-      );
-      (void)device->DrawIndexedPrimitive(&drawContext);
-      technique->EndPass();
+        try {
+          gpg::gal::DrawIndexedContext drawContext(
+            static_cast<gpg::gal::DrawContext::TOPOLOGY>(*primitiveType),
+            static_cast<std::uint32_t>(vertexSheetView->startVertex),
+            static_cast<std::uint32_t>(vertexCount),
+            static_cast<std::uint32_t>(indexSheetView->indexCount),
+            static_cast<std::uint32_t>(indexSheetView->startIndex),
+            vertexSheetView->baseVertex
+          );
+          (void)device->DrawIndexedPrimitive(&drawContext);
+        } catch (const gpg::gal::Error& error) {
+          gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+        }
+
+        technique->EndPass();
+      }
+      technique->EndTechnique();
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
     }
-    technique->EndTechnique();
     return true;
   }
 

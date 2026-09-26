@@ -136,7 +136,8 @@ namespace moho
      * Address: 0x00442940 (FUN_00442940)
      *
      * What it does:
-     * Recreates retained texture ownership from the current texture context.
+     * Recreates retained texture ownership from the current texture context;
+     * a gal error is fatal (`gpg::Die`). Always returns true.
      */
     bool CreateTexture();
 

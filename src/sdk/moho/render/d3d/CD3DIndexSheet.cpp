@@ -1,7 +1,9 @@
 #include "CD3DIndexSheet.h"
 
+#include "gpg/core/utils/Global.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "moho/render/d3d/CD3DDevice.h"
 
@@ -152,6 +154,8 @@ namespace moho
    *
    * What it does:
    * Locks one index range in units of 16-bit indices and returns mapped data.
+   * A gal error is fatal: the handler at 0x0043F9D1 (FuncInfo 0x00EC2CA0,
+   * try over state 0) hands the error's file, line and text to `gpg::Die`.
    */
   std::int16_t* CD3DIndexSheet::Lock(
     const std::uint32_t startIndex,
@@ -173,11 +177,15 @@ namespace moho
       lockFlags |= static_cast<std::uint32_t>(gpg::gal::MohoD3DLockFlags::Discard);
     }
 
-    return indexBuffer->Lock(
-      kIndexElementSizeBytes * startIndex,
-      kIndexElementSizeBytes * indexCount,
-      static_cast<gpg::gal::MohoD3DLockFlags>(lockFlags)
-    );
+    try {
+      return indexBuffer->Lock(
+        kIndexElementSizeBytes * startIndex,
+        kIndexElementSizeBytes * indexCount,
+        static_cast<gpg::gal::MohoD3DLockFlags>(lockFlags)
+      );
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
   }
 
   /**
@@ -212,11 +220,18 @@ namespace moho
    *
    * What it does:
    * Creates one gal index-buffer wrapper from retained context metadata.
+   * A gal error is fatal: the handler at 0x0043F7B6 (FuncInfo 0x00EDD6C4,
+   * try over states 0..1) hands the error's file, line and text to
+   * `gpg::Die`.
    */
   bool CD3DIndexSheet::CreateBuffer()
   {
     if (mBuffer.get() == nullptr) {
-      mBuffer = gpg::gal::IndexBuffer::Create(mContext);
+      try {
+        mBuffer = gpg::gal::IndexBuffer::Create(mContext);
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      }
     }
 
     return true;

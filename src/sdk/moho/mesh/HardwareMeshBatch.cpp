@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "Mesh.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/core/utils/Logging.h"
 
 #include "moho/animation/CAniPose.h"
@@ -22,6 +23,7 @@
 #include "gpg/gal/Device.hpp"
 #include "gpg/gal/DeviceContext.hpp"
 #include "gpg/gal/DrawIndexedContext.hpp"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/IndexBufferContext.hpp"
 #include "gpg/gal/MeshVertex.h"
 #include "gpg/gal/Texture.hpp"
@@ -1117,23 +1119,40 @@ namespace moho
     // single-pass technique now stays begun from the batch's first draw to
     // EndBatch, and the later draws only commit the parameters that changed
     // since (the skinning palettes). Multi-pass techniques keep the loop below.
+    // The two open-pass draws are FAF's; they keep the binary's fatal handling
+    // of a failed draw, as the per-pass draw below does.
     if (sOpenPassTechnique != nullptr && technique == sOpenPassTechnique) {
       static_cast<gpg::gal::EffectTechniqueD3D9*>(technique)->CommitChanges();
-      device->DrawIndexedPrimitive(&drawContext);
+      try {
+        device->DrawIndexedPrimitive(&drawContext);
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      }
       return;
     }
 
     const int passCount = technique->BeginTechnique();
     if (passCount == 1 && device->GetDeviceContext()->mDeviceType != gpg::gal::DeviceApi::Direct3D10) {
       technique->BeginPass(0);
-      device->DrawIndexedPrimitive(&drawContext);
+      try {
+        device->DrawIndexedPrimitive(&drawContext);
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      }
       sOpenPassTechnique = technique;
       return;
     }
 
     for (int pass = 0; pass < passCount; ++pass) {
       technique->BeginPass(pass);
-      device->DrawIndexedPrimitive(&drawContext);
+      // 0x007E8AE0: only the draw is guarded (FuncInfo 0x00F19680, try over
+      // state 1); a gal error is fatal, the handler at 0x007E8B0A hands the
+      // error's file, line and text to `gpg::Die`.
+      try {
+        device->DrawIndexedPrimitive(&drawContext);
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      }
       technique->EndPass();
     }
     technique->EndTechnique();

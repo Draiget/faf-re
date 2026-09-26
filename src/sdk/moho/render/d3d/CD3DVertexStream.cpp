@@ -1,7 +1,9 @@
 #include "CD3DVertexStream.h"
 
+#include "gpg/core/utils/Global.h"
 #include "gpg/gal/D3D9Utils.h"
 #include "gpg/gal/Device.hpp"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 
 namespace moho
@@ -71,6 +73,9 @@ namespace moho
    *
    * What it does:
    * Locks one vertex range using context stride and returns mapped data.
+   * Only the buffer lock is guarded: a gal error from it is fatal, the
+   * handler at 0x0043FE26 (FuncInfo 0x00EC2C48, try over state 0) hands the
+   * error's file, line and text to `gpg::Die`.
    */
   void* CD3DVertexStream::Lock(
     const int startVertex,
@@ -92,11 +97,15 @@ namespace moho
     const int byteOffset = startVertex * static_cast<int>(strideBytes);
     const int byteSize = vertexCount * static_cast<int>(strideBytes);
 
-    return mBuffer.get()->Lock(
-      static_cast<std::uint32_t>(byteOffset),
-      static_cast<std::uint32_t>(byteSize),
-      static_cast<gpg::gal::MohoD3DLockFlags>(lockFlags)
-    );
+    try {
+      return mBuffer.get()->Lock(
+        static_cast<std::uint32_t>(byteOffset),
+        static_cast<std::uint32_t>(byteSize),
+        static_cast<gpg::gal::MohoD3DLockFlags>(lockFlags)
+      );
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
   }
 
   /**
@@ -139,6 +148,9 @@ namespace moho
    *
    * What it does:
    * Creates one gal vertex-buffer wrapper from retained context metadata.
+   * A gal error is fatal: the handler at 0x0043FCC5 (FuncInfo 0x00EDD628,
+   * try over states 0..1) hands the error's file, line and text to
+   * `gpg::Die`.
    */
   bool CD3DVertexStream::CreateBuffer()
   {
@@ -147,7 +159,11 @@ namespace moho
         return false;
       }
 
-      mBuffer = gpg::gal::VertexBuffer::Create(mContext);
+      try {
+        mBuffer = gpg::gal::VertexBuffer::Create(mContext);
+      } catch (const gpg::gal::Error& error) {
+        gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+      }
     }
 
     return true;

@@ -2,7 +2,9 @@
 
 #include "gpg/core/streams/BinaryReader.h"
 #include "gpg/core/streams/Stream.h"
+#include "gpg/core/utils/Global.h"
 #include "gpg/gal/D3D9Utils.h"
+#include "gpg/gal/Error.hpp"
 #include "gpg/gal/backends/d3d9/DeviceD3D9.hpp"
 #include "gpg/gal/backends/d3d9/TextureD3D9.hpp"
 #include "moho/render/d3d/CD3DDevice.h"
@@ -192,14 +194,20 @@ namespace moho
    * Address: 0x0043E870 (FUN_0043E870)
    *
    * What it does:
-   * Unlocks retained texture level 0.
+   * Unlocks retained texture level 0. A gal error is fatal: the handler at
+   * 0x0043E8B7 (FuncInfo 0x00EC2CF8, try over state 0) hands the error's
+   * file, line and text to `gpg::Die`.
    */
   bool CD3DDynamicTextureSheet::Unlock()
   {
     if (mTexture.get() == nullptr) {
       return false;
     }
-    mTexture->Unlock(0);
+    try {
+      mTexture->Unlock(0);
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
     return true;
   }
 
@@ -210,6 +218,9 @@ namespace moho
    *
    * What it does:
    * Reads raw texture bytes from archive and recreates the wrapped texture.
+   * The recreate is `CreateTexture` inlined: FuncInfo 0x00F03604's try over
+   * states 2..3 and its `gpg::Die` handler at 0x0043EA72 match 0x00442940
+   * instruction for instruction.
    */
   bool CD3DDynamicTextureSheet::ReadFromArchive(gpg::BinaryReader* const reader)
   {
@@ -237,6 +248,9 @@ namespace moho
    *
    * What it does:
    * Saves retained texture bytes to stream, with optional byte-count prefix.
+   * A gal error while reading the texture back is fatal: the handler at
+   * 0x0043EB96 (FuncInfo 0x00EDD9F8, try over state 1) hands the error's
+   * file, line and text to `gpg::Die`.
    */
   bool CD3DDynamicTextureSheet::SaveToArchive(gpg::Stream* const stream, const bool writeSizeHeader)
   {
@@ -245,7 +259,11 @@ namespace moho
     }
 
     gpg::MemBuffer<char> textureBytes{};
-    mTexture->SaveToBuffer(&textureBytes);
+    try {
+      mTexture->SaveToBuffer(&textureBytes);
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
+    }
 
     const std::uint32_t byteCount = static_cast<std::uint32_t>(textureBytes.Size());
     if (writeSizeHeader) {
@@ -263,21 +281,19 @@ namespace moho
    * Address: 0x00442940 (FUN_00442940)
    *
    * What it does:
-   * Recreates retained texture ownership from the current texture context.
+   * Recreates retained texture ownership from the current texture context
+   * through `gpg::gal::Texture::Create` (0x008E7C50). A gal error is fatal:
+   * the handler at 0x004429EF (FuncInfo 0x00EDD594, try over states 0..1)
+   * hands the error's file, line and text to `gpg::Die`. There is no device
+   * check and the result is always true.
    */
   bool CD3DDynamicTextureSheet::CreateTexture()
   {
-    if (mDevice == nullptr) {
-      mTexture.reset();
-      return false;
+    try {
+      mTexture = gpg::gal::Texture::Create(mContext);
+    } catch (const gpg::gal::Error& error) {
+      gpg::Die("%s(%d) %s", error.GetRuntimeMessage(), error.GetRuntimeLine(), error.what());
     }
-
-    if (mDevice->GetGalDevice() == nullptr) {
-      mTexture.reset();
-      return false;
-    }
-
-    mTexture = gpg::gal::Texture::Create(mContext);
-    return mTexture.get() != nullptr;
+    return true;
   }
 } // namespace moho
