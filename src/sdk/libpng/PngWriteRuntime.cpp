@@ -2532,8 +2532,9 @@ extern "C" void png_write_find_filter(png_structp png_ptr, png_row_infop row_inf
  * optional MNG intrapixel filter, and png_write_find_filter -- then invokes
  * the optional write_row_fn progress callback.
  *
- * Callers: png_write_rows (0x009E89A2), png_write_image (0x009E89C6),
- * wxPNGHandler::SaveFile (0x00975370, direct per-row calls).
+ * Callers: png_write_rows (0x009E89A2) and png_write_image (0x009E89C6).
+ * wxPNGHandler::SaveFile (0x00975370) does not call it directly: it calls
+ * png_write_rows(png_ptr, &row_ptr, 1) once per row (0x009755C7).
  */
 extern "C" void png_write_row(png_structp png_ptr, std::uint8_t* row)
 {
