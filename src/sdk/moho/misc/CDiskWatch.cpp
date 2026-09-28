@@ -606,8 +606,6 @@ CDiskWatch::CDiskWatch()
   , mOpaque10{}
   , mDirWatchMap{}
 {
-  mListeners.mPrev = &mListeners;
-  mListeners.mNext = &mListeners;
   (void)EnablePrivileges();
 }
 
@@ -615,20 +613,16 @@ CDiskWatch::CDiskWatch()
  * Address: 0x004628C0 (FUN_004628C0, ??1CDiskWatch@Moho@@QAE@XZ)
  *
  * What it does:
- * Unlinks listeners, releases watched-directory nodes, and destroys map/lock
- * state (`0x00462870` is the in-function cleanup block).
+ * Deletes every watched directory. The rest is member teardown: the map
+ * (0x0046292B), the lock (0x00462952) and the listener ring head
+ * (0x00462957). Listeners are not visited; each one still names this watch
+ * and removes itself in its own destructor, so they must be gone first.
  */
 CDiskWatch::~CDiskWatch()
 {
-  for (auto* node = mListeners.mNext; node != &mListeners;) {
-    auto* const next = node->mNext;
-    CDiskWatchListener* const listener = LinkOwnerFromNode(node);
-    listener->mLink.ListUnlink();
-    listener->mWatch = nullptr;
-    node = next;
+  for (auto& entry : mDirWatchMap) {
+    delete entry.second;
   }
-
-  // The map's own teardown is `~map()`, which MSVC emits for the member.
 }
 
 /**
