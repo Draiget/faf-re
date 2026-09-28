@@ -57,13 +57,13 @@ namespace moho
      */
     virtual void Handle(const msvc8::vector<msvc8::string>& args) = 0;
 
-    const char* mName;              // 0x04
-    const char* mDescription;       // 0x08
-    std::uintptr_t mHandlerOrValue; // 0x0C (callback pointer / typed value pointer)
+    CConCommand(const CConCommand&) = delete;
+    CConCommand& operator=(const CConCommand&) = delete;
+
+    const char* mName;        // 0x04
+    const char* mDescription; // 0x08
 
   protected:
-    CConCommand() noexcept = default;
-
     /**
      * Address: 0x0041E580 (FUN_0041E580)
      *
@@ -71,15 +71,27 @@ namespace moho
      *
      * What it does:
      * Initializes base command metadata and registers the command when name is
-     * present.
+     * present. Every console global's dynamic initializer inlines it: MSVC
+     * folds the vptr/name/description stores into the object's .data image
+     * and leaves only the `CON_GetMap()` insert, then the derived vptr and
+     * payload stores (e.g. 0x00BC3A10 for `con_TestVar`).
      */
     CConCommand(const char* name, const char* description) noexcept;
+
+    /**
+     * Address: 0x0041E5A0 (FUN_0041E5A0)
+     *
+     * What it does:
+     * Unregisters the command when it has a name. Non-virtual: the vtable's
+     * only slot is `Handle`. Each console global's `atexit` destructor
+     * inlines it.
+     */
+    ~CConCommand();
   };
 
-  static_assert(sizeof(CConCommand) == 0x10, "CConCommand size must be 0x10");
+  static_assert(sizeof(CConCommand) == 0x0C, "CConCommand size must be 0x0C");
   static_assert(offsetof(CConCommand, mName) == 0x04, "CConCommand::mName offset must be 0x04");
   static_assert(offsetof(CConCommand, mDescription) == 0x08, "CConCommand::mDescription offset must be 0x08");
-  static_assert(offsetof(CConCommand, mHandlerOrValue) == 0x0C, "CConCommand::mHandlerOrValue offset must be 0x0C");
 
   // Address-backed startup convar payloads.
   extern bool con_TestVarBool;
@@ -147,38 +159,6 @@ namespace moho
    * Unregisters command definition from the process-global console command table by command name.
    */
   void UnregisterConCommand(CConCommand& command);
-
-  /**
-   * Address: 0x0041E5A0 (FUN_0041E5A0)
-   *
-   * What it does:
-   * Base unwind/teardown helper that removes command registration when name is set.
-   */
-  void TeardownConCommandRegistration(CConCommand& command);
-
-  /**
-   * Shared startup-registration glue for statically constructed console
-   * commands and convars.
-   *
-   * Every `register_*` / `cleanup_*` pair the binary emits for a static
-   * `CConCommand` or `TConVar<T>` object expands to the same two-instruction
-   * shape (`CON_GetMap()` insert + `_atexit(dtor)` on the way in,
-   * `CON_ReregisterCom` on the way out). These stay templates so each owning
-   * subsystem's registration translation unit reuses one definition instead of
-   * re-emitting a per-command copy.
-   */
-  template <typename TCommand>
-  void CleanupStartupConCommand(TCommand& command) noexcept
-  {
-    TeardownConCommandRegistration(command);
-  }
-
-  template <typename TCommand>
-  void RegisterStartupConVar(TCommand& conVar, void (*cleanupFn)()) noexcept
-  {
-    RegisterConCommand(conVar);
-    (void)std::atexit(cleanupFn);
-  }
 
   /**
    * Address: 0x0041BFF0 (FUN_0041BFF0, ?CON_ParseCommand@Moho@@YAXVStrArg@gpg@@AAV?$vector@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@V?$allocator@V?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@std@@@2@@std@@AAV?$basic_string@DU?$char_traits@D@std@@V?$allocator@D@2@@5@@Z)
@@ -480,142 +460,21 @@ namespace moho
    */
   void CON_Debug_Throw(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BC6450 (FUN_00BC6450, register_CConFunc_LUADOC)
-   *
-   * What it does:
-   * Registers the startup console command that dumps Lua API docs.
-   */
-  void register_CConFunc_LUADOC();
 
-  /**
-   * Address: 0x00BE8A20 (FUN_00BE8A20, register_CConFunc_LUA)
-   *
-   * What it does:
-   * Registers the startup console command that evaluates one Lua command line.
-   */
-  void register_CConFunc_LUA();
 
-  /**
-   * Address: 0x00BDF9D0 (FUN_00BDF9D0, register_CConFunc_ExecutePasteBuffer)
-   *
-   * What it does:
-   * Registers the startup console command that executes clipboard text as Lua.
-   */
-  void register_CConFunc_ExecutePasteBuffer();
 
-  /**
-   * Address: 0x00BDF780 (FUN_00BDF780, register_CConFunc_UI_ResetView)
-   *
-   * What it does:
-   * Registers the startup console command that resets one or more named
-   * cameras to their default runtime view state.
-   */
-  void register_CConFunc_UI_ResetView();
 
-  /**
-   * Address: 0x00BE4850 (FUN_00BE4850, register_CConFunc_IN_BindKey)
-   *
-   * What it does:
-   * Registers the `IN_BindKey` startup console callback with its exact command
-   * metadata and schedules the generated command-object cleanup lane.
-   */
-  void register_CConFunc_IN_BindKey();
 
-  /**
-   * Address: 0x00BE48D0 (FUN_00BE48D0, register_CConFunc_IN_SetKeyName)
-   *
-   * What it does:
-   * Registers the `IN_SetKeyName` startup console callback with its exact
-   * command metadata and schedules the generated command-object cleanup lane.
-   */
-  void register_CConFunc_IN_SetKeyName();
 
-  /**
-   * Address: 0x00BDF8D0 (FUN_00BDF8D0, register_CConFunc_ANI_DumpSkeleton)
-   *
-   * What it does:
-   * Registers the startup console command that dumps the current selection's
-   * animation skeleton bone hierarchy. `Moho::ANI_DumpSkeleton` takes no
-   * arguments; the binary force-casts it to `CConFunc::Callback` at the
-   * store (`Moho__CConFunc_ANI_DumpSkeleton.mFunc = offset
-   * Moho__ANI_DumpSkeleton`, 0x00BDF8F0), matching the same
-   * `reinterpret_cast<CConFunc::Callback>` shape already used for the other
-   * zero-argument command in this file, `CON_ExecuteLastCommand`.
-   */
-  void register_CConFunc_ANI_DumpSkeleton();
 
-  /**
-   * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
-   *
-   * What it does:
-   * Registers the startup console command that prints engine stats.
-   */
-  void register_CConFunc_PrintStats();
 
-  /**
-   * Address: 0x00BC3480 (FUN_00BC3480, register_CConFunc_ClearStats)
-   *
-   * What it does:
-   * Registers the startup console command that clears engine stats lanes.
-   */
-  void register_CConFunc_ClearStats();
 
-  /**
-   * Address: 0x00BC34C0 (FUN_00BC34C0, register_CConFunc_BeginLoggingStats)
-   *
-   * What it does:
-   * Registers the startup console command that begins stats logging.
-   */
-  void register_CConFunc_BeginLoggingStats();
 
-  /**
-   * Address: 0x00BC3500 (FUN_00BC3500, register_CConFunc_EndLoggingStats)
-   *
-   * What it does:
-   * Registers the startup console command that ends stats logging.
-   */
-  void register_CConFunc_EndLoggingStats();
 
-  /**
-   * Address: 0x00BC6630 (FUN_00BC6630, register_CConFunc_GetVersion)
-   *
-   * What it does:
-   * Registers the startup console command that prints engine version text.
-   */
-  void register_CConFunc_GetVersion();
 
-  /**
-   * Address: 0x00BC7270 (FUN_00BC7270, register_CConFunc_exit)
-   *
-   * What it does:
-   * Registers the startup console command that exits the application.
-   */
-  void register_CConFunc_exit();
 
-  /**
-   * Address: 0x00BC7360 (FUN_00BC7360, register_CConFunc_WIN_ToggleLogDialog)
-   *
-   * What it does:
-   * Registers the startup console command that toggles the log dialog.
-   */
-  void register_CConFunc_WIN_ToggleLogDialog();
 
-  /**
-   * Address: 0x00BC73A0 (FUN_00BC73A0, register_CConFunc_WIN_ShowLogDialog)
-   *
-   * What it does:
-   * Registers the startup console command that shows the log dialog.
-   */
-  void register_CConFunc_WIN_ShowLogDialog();
 
-  /**
-   * Address: 0x00BC73F0 (FUN_00BC73F0, register_CConFunc_WxInputBox)
-   *
-   * What it does:
-   * Registers the startup console command that opens the wx input box.
-   */
-  void register_CConFunc_WxInputBox();
 
   /**
    * Address: 0x00500AF0 (FUN_00500AF0, Moho::CON_p4_Edit)
@@ -1138,24 +997,23 @@ namespace moho
    */
   void CON_ExecutePasteBuffer();
 
+  /**
+   * A console variable bound to one typed global. Each instance is a
+   * namespace-scope global: its constructor registers it and its destructor
+   * (run through `atexit`) unregisters it.
+   */
   template <typename T>
   class TConVar final : public CConCommand
   {
   public:
     TConVar(const char* name, const char* description, T* value) noexcept
-    {
-      mName = name;
-      mDescription = description;
-      mHandlerOrValue = reinterpret_cast<std::uintptr_t>(value);
-    }
+      : CConCommand(name, description)
+      , mValue(value)
+    {}
 
     void Handle(const msvc8::vector<msvc8::string>& args) override;
 
-    [[nodiscard]]
-    T* ValuePtr() const noexcept
-    {
-      return reinterpret_cast<T*>(mHandlerOrValue);
-    }
+    T* mValue; // 0x0C
   };
 
   /**
@@ -1237,4 +1095,5 @@ namespace moho
   static_assert(sizeof(TConVar<float>) == 0x10, "TConVar<float> size must be 0x10");
   static_assert(sizeof(TConVar<std::uint32_t>) == 0x10, "TConVar<uint32_t> size must be 0x10");
   static_assert(sizeof(TConVar<msvc8::string>) == 0x10, "TConVar<string> size must be 0x10");
+  static_assert(offsetof(TConVar<int>, mValue) == 0x0C, "TConVar<T>::mValue offset must be 0x0C");
 } // namespace moho

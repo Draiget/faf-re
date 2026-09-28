@@ -690,8 +690,8 @@ namespace moho
    * What it does:
    * Console-command callback that opens an interactive `WxInputBox` with
    * fixed test prompts and prints either the entered text or a "Canceled"
-   * message. Registered as the `WxInputBox` startup console command by
-   * `register_CConFunc_WxInputBox`.
+   * message. Bound to the `WxInputBox` console command (`gCConFunc_WxInputBox`
+   * in CConCommand.cpp).
    */
   void CON_WxInputBox(const msvc8::vector<msvc8::string>& args);
 

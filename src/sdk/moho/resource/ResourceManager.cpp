@@ -2605,28 +2605,47 @@ namespace
     watcher->mWatchedEnd = end;
   }
 
-  constexpr const char* kResSpewLoadSpamDescription = "Enable resource-manager load/prefetch debug spew.";
-  constexpr const char* kResEnablePrefetchingDescription = "Enable asynchronous resource prefetching.";
+  constexpr const char* kResSpewLoadSpamDescription = "If true, spew spam with each resource load.";
+  constexpr const char* kResEnablePrefetchingDescription = "If true, enable prefetching.";
   constexpr const char* kResPrefetcherActivityDelayDescription =
-    "Delay in seconds between prefetcher work iterations.";
+    "Number of seconds to delay prefetching after there is foreground disk activity.";
   constexpr const char* kResAfterPrefetchDelayDescription =
-    "Sleep duration in seconds after each prefetch work item.";
+    "Number of milliseconds to nap after prefetching something.  So the prefetcher thread doesn't bog us down too much.";
 
+  /**
+   * Address: 0x00BC5AC0 (FUN_00BC5AC0, dynamic initializer for `gTConVar_res_SpewLoadSpam`)
+   * Address: 0x00BF04F0 (FUN_00BF04F0, dynamic atexit destructor for `gTConVar_res_SpewLoadSpam`)
+   */
   moho::TConVar<bool> gTConVar_res_SpewLoadSpam(
     "res_SpewLoadSpam",
     kResSpewLoadSpamDescription,
     &moho::res_SpewLoadSpam
   );
+
+  /**
+   * Address: 0x00BC5B00 (FUN_00BC5B00, dynamic initializer for `gTConVar_res_EnablePrefetching`)
+   * Address: 0x00BF0520 (FUN_00BF0520, dynamic atexit destructor for `gTConVar_res_EnablePrefetching`)
+   */
   moho::TConVar<bool> gTConVar_res_EnablePrefetching(
     "res_EnablePrefetching",
     kResEnablePrefetchingDescription,
     &moho::res_EnablePrefetching
   );
+
+  /**
+   * Address: 0x00BC5B40 (FUN_00BC5B40, dynamic initializer for `gTConVar_res_PrefetcherActivityDelay`)
+   * Address: 0x00BF0550 (FUN_00BF0550, dynamic atexit destructor for `gTConVar_res_PrefetcherActivityDelay`)
+   */
   moho::TConVar<int> gTConVar_res_PrefetcherActivityDelay(
     "res_PrefetcherActivityDelay",
     kResPrefetcherActivityDelayDescription,
     &moho::res_PrefetcherActivityDelay
   );
+
+  /**
+   * Address: 0x00BC5B80 (FUN_00BC5B80, dynamic initializer for `gTConVar_res_AfterPrefetchDelay`)
+   * Address: 0x00BF0580 (FUN_00BF0580, dynamic atexit destructor for `gTConVar_res_AfterPrefetchDelay`)
+   */
   moho::TConVar<int> gTConVar_res_AfterPrefetchDelay(
     "res_AfterPrefetchDelay",
     kResAfterPrefetchDelayDescription,
@@ -2650,116 +2669,6 @@ namespace
   }
 } // namespace
 
-namespace moho
-{
-  /**
-   * Address: 0x00BF04F0 (FUN_00BF04F0, ??1TConVar_res_SpewLoadSpam@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `res_SpewLoadSpam`.
-   */
-  void cleanup_TConVar_res_SpewLoadSpam()
-  {
-    TeardownConCommandRegistration(gTConVar_res_SpewLoadSpam);
-  }
-
-  /**
-   * Address: 0x00BC5AC0 (FUN_00BC5AC0, register_TConVar_res_SpewLoadSpam)
-   *
-   * What it does:
-   * Registers startup convar for `res_SpewLoadSpam`.
-   */
-  void register_TConVar_res_SpewLoadSpam()
-  {
-    RegisterConCommand(gTConVar_res_SpewLoadSpam);
-    (void)std::atexit(&cleanup_TConVar_res_SpewLoadSpam);
-  }
-
-  /**
-   * Address: 0x00BF0520 (FUN_00BF0520, ??1TConVar_res_EnablePrefetching@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `res_EnablePrefetching`.
-   */
-  void cleanup_TConVar_res_EnablePrefetching()
-  {
-    TeardownConCommandRegistration(gTConVar_res_EnablePrefetching);
-  }
-
-  /**
-   * Address: 0x00BC5B00 (FUN_00BC5B00, register_TConVar_res_EnablePrefetching)
-   *
-   * What it does:
-   * Registers startup convar for `res_EnablePrefetching`.
-   */
-  void register_TConVar_res_EnablePrefetching()
-  {
-    RegisterConCommand(gTConVar_res_EnablePrefetching);
-    (void)std::atexit(&cleanup_TConVar_res_EnablePrefetching);
-  }
-
-  /**
-   * Address: 0x00BF0550 (FUN_00BF0550, ??1TConVar_res_PrefetcherActivityDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `res_PrefetcherActivityDelay`.
-   */
-  void cleanup_TConVar_res_PrefetcherActivityDelay()
-  {
-    TeardownConCommandRegistration(gTConVar_res_PrefetcherActivityDelay);
-  }
-
-  /**
-   * Address: 0x00BC5B40 (FUN_00BC5B40, register_TConVar_res_PrefetcherActivityDelay)
-   *
-   * What it does:
-   * Registers startup convar for `res_PrefetcherActivityDelay`.
-   */
-  void register_TConVar_res_PrefetcherActivityDelay()
-  {
-    RegisterConCommand(gTConVar_res_PrefetcherActivityDelay);
-    (void)std::atexit(&cleanup_TConVar_res_PrefetcherActivityDelay);
-  }
-
-  /**
-   * Address: 0x00BF0580 (FUN_00BF0580, ??1TConVar_res_AfterPrefetchDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `res_AfterPrefetchDelay`.
-   */
-  void cleanup_TConVar_res_AfterPrefetchDelay()
-  {
-    TeardownConCommandRegistration(gTConVar_res_AfterPrefetchDelay);
-  }
-
-  /**
-   * Address: 0x00BC5B80 (FUN_00BC5B80, register_TConVar_res_AfterPrefetchDelay)
-   *
-   * What it does:
-   * Registers startup convar for `res_AfterPrefetchDelay`.
-   */
-  void register_TConVar_res_AfterPrefetchDelay()
-  {
-    RegisterConCommand(gTConVar_res_AfterPrefetchDelay);
-    (void)std::atexit(&cleanup_TConVar_res_AfterPrefetchDelay);
-  }
-} // namespace moho
-
-namespace
-{
-  struct ResourceManagerConVarStartupBootstrap
-  {
-    ResourceManagerConVarStartupBootstrap()
-    {
-      moho::register_TConVar_res_SpewLoadSpam();
-      moho::register_TConVar_res_EnablePrefetching();
-      moho::register_TConVar_res_PrefetcherActivityDelay();
-      moho::register_TConVar_res_AfterPrefetchDelay();
-    }
-  };
-
-  ResourceManagerConVarStartupBootstrap gResourceManagerConVarStartupBootstrap;
-} // namespace
 
 /**
  * Address: 0x004A9DD0 (FUN_004A9DD0)

@@ -46,7 +46,7 @@
 namespace moho
 {
   // `dbg_Projectile` is the recovered `TConVar<bool>` debug toggle registered by
-  // ProjectileStartupRegistrations (register_TConVar_dbg_Projectile @0x00BD62F0).
+  // ProjectileStartupRegistrations.cpp (`gTConVar_dbg_Projectile`).
   // MotionTick reads it as `?dbg_Projectile@Moho@@3_NA` at asm 0x0069C570.
   extern bool dbg_Projectile;
 } // namespace moho

@@ -150,12 +150,4 @@ namespace moho
    */
   void SC_CameraScaleLOD(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE9540 (FUN_00BE9540, skip -- xc_a static initializer lane)
-   *
-   * What it does:
-   * Registers the `SC_CameraScaleLOD` console command and schedules
-   * process-exit teardown.
-   */
-  void register_CConFunc_SC_CameraScaleLOD();
 } // namespace moho

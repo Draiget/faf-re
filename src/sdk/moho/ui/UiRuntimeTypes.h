@@ -1489,9 +1489,9 @@ namespace moho
    * What it does:
    * The `IN_BindKey` console command. Validates the token vector, parses token
    * 1 as a key mask, joins every token from index 2 with a trailing space, and
-   * assigns the result to the key-action map. `register_CConFunc_IN_BindKey`
-   * (0x00BE4850) takes this function's address when it registers the command,
-   * which is why the declaration has to be visible from `CConCommand.cpp`.
+   * assigns the result to the key-action map. The `IN_BindKey` console
+   * command global in `CConCommand.cpp` (initializer 0x00BE4850) holds this
+   * function's address, which is why the declaration has to be visible from `CConCommand.cpp`.
    */
   void IN_BindKey(const msvc8::vector<msvc8::string>& args);
 
@@ -1507,8 +1507,8 @@ namespace moho
    * token 1 as a hex key code, rejects codes above 0xFF, then either renames
    * `in_keyNames[keyCode]` (when token 2's name isn't already used by
    * another key) or reports the name collision.
-   * `register_CConFunc_IN_SetKeyName` (0x00BE48D0) takes this function's
-   * address when it registers the command, which is why the declaration
+   * The `IN_SetKeyName` console command global in `CConCommand.cpp`
+   * (initializer 0x00BE48D0) holds this function's address, which is why the declaration
    * has to be visible from `CConCommand.cpp`.
    */
   void IN_SetKeyName(const msvc8::vector<msvc8::string>& args);

@@ -1,6 +1,5 @@
 #include "moho/console/CConAlias.h"
 
-#include <new>
 #include <string>
 #include <string_view>
 
@@ -8,8 +7,6 @@
 
 namespace
 {
-  constexpr std::size_t kAliasCommandOffset = 0x0C;
-
   [[nodiscard]]
   bool AliasArgNeedsQuotes(const std::string_view token) noexcept
   {
@@ -69,47 +66,18 @@ namespace
   }
 } // namespace
 
-moho::CConAlias::CConAlias() noexcept
-{
-  mName = nullptr;
-  mDescription = nullptr;
-  new (AliasCommandStorageAddress()) msvc8::string{};
-}
-
 /**
  * Address: 0x0041E600 (FUN_0041E600)
  *
- * const char* description, const char* name, const char* aliasCommandText
+ * const char* name, const char* description, const char* aliasText
  *
  * What it does:
- * Rebuilds constructor-style alias initialization, including command registration.
+ * Initializes/registers the base command, then copies the expansion text.
  */
-void moho::CConAlias::InitializeRecovered(const char* description, const char* name, const char* aliasCommandText)
-{
-  mName = name;
-  mDescription = description;
-
-  if (mName != nullptr) {
-    RegisterConCommand(*this);
-  }
-
-  const char* const text = aliasCommandText != nullptr ? aliasCommandText : "";
-  AliasCommandStorage() = text;
-}
-
-/**
- * Address: 0x00BFE370/FUN_00BFE370-family cleanup lanes
- *
- * What it does:
- * Resets owned alias text storage and unregisters this alias command entry.
- */
-void moho::CConAlias::ShutdownRecovered()
-{
-  msvc8::string& aliasCommand = AliasCommandStorage();
-  aliasCommand.tidy(true, 0U);
-
-  TeardownConCommandRegistration(*this);
-}
+moho::CConAlias::CConAlias(const char* const name, const char* const description, const char* const aliasText)
+  : CConCommand(name, description)
+  , mAliasText(aliasText)
+{}
 
 /**
  * Address: 0x0041E6A0 (FUN_0041E6A0)
@@ -119,39 +87,11 @@ void moho::CConAlias::ShutdownRecovered()
  */
 void moho::CConAlias::Handle(const msvc8::vector<msvc8::string>& args)
 {
-
-  std::string expandedCommand{AliasCommandStorage().view()};
+  std::string expandedCommand{mAliasText.view()};
   if (args.size() > 1) {
     expandedCommand.push_back(' ');
     expandedCommand.append(BuildAliasArgumentSuffix(args));
   }
 
   ExecuteConsoleCommandText(expandedCommand.c_str());
-}
-
-const msvc8::string& moho::CConAlias::AliasCommandText() const noexcept
-{
-  return AliasCommandStorage();
-}
-
-msvc8::string& moho::CConAlias::AliasCommandStorage() noexcept
-{
-  auto* const rawStorage = static_cast<msvc8::string*>(AliasCommandStorageAddress());
-  return *std::launder(rawStorage);
-}
-
-const msvc8::string& moho::CConAlias::AliasCommandStorage() const noexcept
-{
-  const auto* const rawStorage = static_cast<const msvc8::string*>(AliasCommandStorageAddress());
-  return *std::launder(rawStorage);
-}
-
-void* moho::CConAlias::AliasCommandStorageAddress() noexcept
-{
-  return reinterpret_cast<std::uint8_t*>(this) + kAliasCommandOffset;
-}
-
-const void* moho::CConAlias::AliasCommandStorageAddress() const noexcept
-{
-  return reinterpret_cast<const std::uint8_t*>(this) + kAliasCommandOffset;
 }

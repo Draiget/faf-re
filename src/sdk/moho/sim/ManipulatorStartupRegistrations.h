@@ -32,22 +32,7 @@ namespace moho
    */
   CScrLuaInitForm* register_CAimManipulatorLuaBaseClass();
 
-  /**
-   * Address: 0x00BD2230 (FUN_00BD2230, register_TConVar_dbg_Ballistics)
-   *
-   * What it does:
-   * Registers startup console convar `dbg_Ballistics` and installs process-exit
-   * cleanup.
-   */
-  void register_TConVar_dbg_Ballistics();
 
-  /**
-   * Address: 0x00BFA8D0 (FUN_00BFA8D0, cleanup_TConVar_dbg_Ballistics)
-   *
-   * What it does:
-   * Unregisters startup console convar `dbg_Ballistics`.
-   */
-  void cleanup_TConVar_dbg_Ballistics();
 
   /**
    * Address: 0x00BD2270 (FUN_00BD2270, register_CAimManipulatorTypeInfo)

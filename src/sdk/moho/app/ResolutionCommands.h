@@ -34,16 +34,6 @@ namespace moho
    */
   void SC_PrimaryAdapter(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE9480 (FUN_00BE9480, register_CConFunc_SC_PrimaryAdapter)
-   *
-   * What it does:
-   * Registers the `SC_PrimaryAdapter` startup console command and installs
-   * its process-exit teardown. The store
-   * `Moho__CConFunc_SC_PrimaryAdapter.mFunc = offset Moho__SC_PrimaryAdapter`
-   * at 0x00BE94A0 is the only reference to `SC_PrimaryAdapter` in the image.
-   */
-  void register_CConFunc_SC_PrimaryAdapter();
 
   /**
    * Address: 0x008D3BE0 (FUN_008D3BE0)
@@ -61,16 +51,6 @@ namespace moho
    */
   void SC_VerticalSync(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE9580 (FUN_00BE9580, register_CConFunc_SC_VerticalSync)
-   *
-   * What it does:
-   * Registers the `SC_VerticalSync` startup console command and installs its
-   * process-exit teardown. The store
-   * `dword_F5BE9C = offset sub_8D3BE0` at 0x00BE958C is the only reference to
-   * `Moho::SC_VerticalSync` in the image.
-   */
-  void register_CConFunc_SC_VerticalSync();
 
   /**
    * Address: 0x008D41B0 (FUN_008D41B0)
@@ -88,16 +68,6 @@ namespace moho
    */
   void SC_ToggleCursorClip(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE96C0 (FUN_00BE96C0, register_CConFunc_SC_ToggleCursorClip)
-   *
-   * What it does:
-   * Registers the `SC_ToggleCursorClip` startup console command and installs
-   * its process-exit teardown. The store
-   * `dword_F5BEEC = offset sub_8D41B0` at 0x00BE96CC is the only reference to
-   * `Moho::SC_ToggleCursorClip` in the image.
-   */
-  void register_CConFunc_SC_ToggleCursorClip();
 
   /**
    * Address: 0x008D37C0 (FUN_008D37C0)
@@ -114,14 +84,4 @@ namespace moho
    */
   void SC_SecondaryAdapter(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE94C0 (FUN_00BE94C0, register_CConFunc_SC_SecondaryAdapter)
-   *
-   * What it does:
-   * Registers the `SC_SecondaryAdapter` startup console command and installs
-   * its process-exit teardown. The store
-   * `dword_F5BE6C = offset sub_8D37C0` at 0x00BE94D8 is the only reference to
-   * `Moho::SC_SecondaryAdapter` in the image.
-   */
-  void register_CConFunc_SC_SecondaryAdapter();
 } // namespace moho

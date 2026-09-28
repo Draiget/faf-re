@@ -239,41 +239,19 @@ namespace
     return &typeInfo;
   }
 
-  [[nodiscard]] moho::TConVar<bool>& GetDbgCollisionBeamConVar()
-  {
-    static moho::TConVar<bool> conVar(
-      "dbg_CollisionBeam",
-      "Enable collision beam debug diagnostics",
-      &moho::dbg_CollisionBeam
-    );
-    return conVar;
-  }
-
   /**
-   * Address: 0x00BFC2A0 (FUN_00BFC2A0, Moho::TConVar_dbg_CollisionBeam::~TConVar_dbg_CollisionBeam)
+   * Address: 0x00BD4BA0 (FUN_00BD4BA0, dynamic initializer for `gTConVar_dbg_CollisionBeam`)
+   * Address: 0x00BFC2A0 (FUN_00BFC2A0, dynamic atexit destructor for `gTConVar_dbg_CollisionBeam`)
    *
-   * What it does:
-   * Tears down the static `dbg_CollisionBeam` console-variable registration via
-   * the shared `TeardownConCommandRegistration` helper. Registered via
-   * `atexit` from the convar startup path.
+   * The shipped exe's description bytes are blanked; the text is taken from
+   * the same command in MohoEngine.dll.
    */
-  void cleanup_TConVar_dbg_CollisionBeam_atexit()
-  {
-    moho::TeardownConCommandRegistration(GetDbgCollisionBeamConVar());
-  }
+  moho::TConVar<bool> gTConVar_dbg_CollisionBeam("dbg_CollisionBeam", "Draw collision beam debug stuff.", &moho::dbg_CollisionBeam);
+
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x00BD4BA0 (FUN_00BD4BA0, register_TConVar_dbg_CollisionBeam)
-   */
-  void register_TConVar_dbg_CollisionBeam()
-  {
-    RegisterConCommand(GetDbgCollisionBeamConVar());
-    (void)std::atexit(&cleanup_TConVar_dbg_CollisionBeam_atexit);
-  }
-
   /**
    * Address: 0x00BD4B40 (FUN_00BD4B40, initialize_CollisionBeamTrigConstants)
    */
@@ -450,7 +428,6 @@ namespace
     CollisionBeamStartupRegistrationsBootstrap()
     {
       moho::initialize_CollisionBeamTrigConstants();
-      moho::register_TConVar_dbg_CollisionBeam();
       (void)moho::register_ECollisionBeamEventTypeInfo();
       (void)moho::register_ManyToOneBroadcaster_ECollisionBeamEvent_TypeInfo();
       (void)moho::register_ManyToOneListener_ECollisionBeamEvent_TypeInfo();

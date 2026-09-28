@@ -95,7 +95,12 @@ bool moho::con_TestVarBool = false;
 int moho::con_TestVar = 0;
 std::uint8_t moho::con_TestVarUByte = 0;
 float moho::con_TestVarFloat = 0.0f;
-msvc8::string moho::con_TestVarStr;
+
+/**
+ * Address: 0x00BC3AB0 (FUN_00BC3AB0, dynamic initializer for `con_TestVarStr`)
+ * Address: 0x00BEED60 (FUN_00BEED60, dynamic atexit destructor for `con_TestVarStr`)
+ */
+msvc8::string moho::con_TestVarStr("string");
 bool moho::snd_ExtraDoWorkCalls = false;
 int moho::recon_debug = 0;
 bool moho::sPathDebuggerEnabled = false;
@@ -164,30 +169,6 @@ namespace
   constexpr const char* kConsoleStartupDoSimCommandDescription = "do a sim command.";
 
   msvc8::vector<msvc8::string> gSavedConsoleCommands;
-
-  /**
-   * Address: 0x0041FA70 (FUN_0041FA70, ??0ConVar_con_TestVarUByte@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Registers legacy test uint8 console variable (`con_TestVarUByte`).
-   */
-  struct ConVar_con_TestVarUByte
-  {
-    ConVar_con_TestVarUByte() noexcept
-      : mConVar("con_TestVarUByte", "Test variable - not used.", &moho::con_TestVarUByte)
-    {
-      RegisterConCommand(mConVar);
-    }
-
-    moho::TConVar<std::uint8_t> mConVar;
-  };
-
-  alignas(ConVar_con_TestVarUByte) std::byte gConVar_con_TestVarUByteStorage[sizeof(ConVar_con_TestVarUByte)]{};
-
-  [[nodiscard]] ConVar_con_TestVarUByte& StartupConVar_con_TestVarUByte() noexcept
-  {
-    return *reinterpret_cast<ConVar_con_TestVarUByte*>(gConVar_con_TestVarUByteStorage);
-  }
 
   [[nodiscard]] LuaPlus::LuaState* ResolveBindingState(lua_State* const luaContext) noexcept
   {
@@ -990,10 +971,22 @@ namespace
 moho::CConCommand::CConCommand(const char* const name, const char* const description) noexcept
   : mName(name)
   , mDescription(description)
-  , mHandlerOrValue(0u)
 {
   if (mName != nullptr) {
     RegisterConCommand(*this);
+  }
+}
+
+/**
+ * Address: 0x0041E5A0 (FUN_0041E5A0)
+ *
+ * What it does:
+ * Unregisters the command when it has a name.
+ */
+moho::CConCommand::~CConCommand()
+{
+  if (mName != nullptr) {
+    UnregisterConCommand(*this);
   }
 }
 
@@ -1033,19 +1026,6 @@ void moho::UnregisterConCommand(CConCommand& command)
   }
 
   registry.commandsByName.erase(it);
-}
-
-/**
- * Address: 0x0041E5A0 (FUN_0041E5A0)
- *
- * What it does:
- * Base teardown helper that unregisters command metadata when name is set.
- */
-void moho::TeardownConCommandRegistration(CConCommand& command)
-{
-  if (command.mName != nullptr) {
-    UnregisterConCommand(command);
-  }
 }
 
 /**
@@ -3735,7 +3715,7 @@ void moho::register_console_command_buffer()
 template <>
 void moho::TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  HandleBoolConVarCommand(args, mName, ValuePtr());
+  HandleBoolConVarCommand(args, mName, mValue);
 }
 
 /**
@@ -3748,7 +3728,7 @@ void moho::TConVar<bool>::Handle(const msvc8::vector<msvc8::string>& args)
 template <>
 void moho::TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  int* const value = ValuePtr();
+  int* const value = mValue;
   if (value == nullptr) {
     return;
   }
@@ -3770,7 +3750,7 @@ void moho::TConVar<int>::Handle(const msvc8::vector<msvc8::string>& args)
 template <>
 void moho::TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  std::uint8_t* const value = ValuePtr();
+  std::uint8_t* const value = mValue;
   if (value == nullptr) {
     return;
   }
@@ -3792,7 +3772,7 @@ void moho::TConVar<std::uint8_t>::Handle(const msvc8::vector<msvc8::string>& arg
 template <>
 void moho::TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  float* const value = ValuePtr();
+  float* const value = mValue;
   if (value == nullptr) {
     return;
   }
@@ -3814,7 +3794,7 @@ void moho::TConVar<float>::Handle(const msvc8::vector<msvc8::string>& args)
 template <>
 void moho::TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  std::uint32_t* const value = ValuePtr();
+  std::uint32_t* const value = mValue;
   if (value == nullptr) {
     return;
   }
@@ -3836,29 +3816,29 @@ void moho::TConVar<std::uint32_t>::Handle(const msvc8::vector<msvc8::string>& ar
 template <>
 void moho::TConVar<msvc8::string>::Handle(const msvc8::vector<msvc8::string>& args)
 {
-  HandleStringConVarCommand(args, mName, ValuePtr());
+  HandleStringConVarCommand(args, mName, mValue);
 }
 
 namespace
 {
   constexpr const char* kConsoleStartupTestVarDescription = "Test variable - not used.";
-  constexpr const char* kConsoleStartupGraphicsFidelityDescription = "Graphics fidelity level.";
-  constexpr const char* kConsoleStartupGraphicsFidelitySupportedDescription = "Supported graphics fidelity levels.";
-  constexpr const char* kConsoleStartupShadowFidelityDescription = "Shadow fidelity level.";
-  constexpr const char* kConsoleStartupShadowFidelitySupportedDescription = "Supported shadow fidelity levels.";
-  constexpr const char* kConsoleStartupD3DUseRefRastDescription = "Force D3D reference rasterizer.";
-  constexpr const char* kConsoleStartupD3DForceSoftwareVPDescription = "Force D3D software vertex processing.";
-  constexpr const char* kConsoleStartupD3DNoPureDeviceDescription = "Disable D3D pure device usage.";
-  constexpr const char* kConsoleStartupD3DForceDirect3DDebugDescription = "Enable D3D debug runtime usage.";
-  constexpr const char* kConsoleStartupD3DWindowsCursorDescription = "Use the Windows cursor in D3D mode.";
-  constexpr const char* kConsoleStartupSndExtraDoWorkCallsDescription = "Enable extra audio-engine do-work calls.";
-  constexpr const char* kConsoleStartupConEchoDescription = "Echo command arguments to console output.";
-  constexpr const char* kConsoleStartupConListCommandsDescription = "List all registered console commands.";
-  constexpr const char* kConsoleStartupConLuaDocDescription = "Dump Lua API binder docs.";
-  constexpr const char* kConsoleStartupConLuaDescription = "Execute one Lua command line in the user Lua state.";
+  constexpr const char* kConsoleStartupGraphicsFidelityDescription = "current graphics fidelity setting";
+  constexpr const char* kConsoleStartupGraphicsFidelitySupportedDescription = "maximum graphics fidelity supported";
+  constexpr const char* kConsoleStartupShadowFidelityDescription = "current shadow fidelity setting";
+  constexpr const char* kConsoleStartupShadowFidelitySupportedDescription = "maximum shadow fidelity supported";
+  constexpr const char* kConsoleStartupD3DUseRefRastDescription = "Force D3d to do rasterization in software.";
+  constexpr const char* kConsoleStartupD3DForceSoftwareVPDescription = "Force D3d to do vertex processing in software.";
+  constexpr const char* kConsoleStartupD3DNoPureDeviceDescription = "Use a non-pure D3D hardware device.";
+  constexpr const char* kConsoleStartupD3DForceDirect3DDebugDescription = "Disable shader optimization and allow D3D debugging.";
+  constexpr const char* kConsoleStartupD3DWindowsCursorDescription = "";
+  constexpr const char* kConsoleStartupSndExtraDoWorkCallsDescription = "Enable mid-frame DoWork calls.";
+  constexpr const char* kConsoleStartupConEchoDescription = "Echo out input to function.";
+  constexpr const char* kConsoleStartupConListCommandsDescription = "List all console commands and variables.";
+  constexpr const char* kConsoleStartupConLuaDocDescription = "Dump out documentation for Lua functions";
+  constexpr const char* kConsoleStartupConLuaDescription = "Run a bit of lua code.";
   constexpr const char* kConsoleStartupConExecutePasteBufferDescription =
-    "Execute UTF-8 clipboard text as a Lua chunk.";
-  constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset one or more named cameras.";
+    "Execute paste buffer in clipboard.";
+  constexpr const char* kConsoleStartupConUiResetViewDescription = "Reset a named camera to the default view";
   constexpr const char* kConsoleStartupConInBindKeyDescription =
     "Specify a key combo and a console command, binds console command to key";
   constexpr const char* kConsoleStartupConInDumpKeyBindingsDescription = "Shows all the key bindings";
@@ -3866,29 +3846,29 @@ namespace
   // No trailing period: the registrar's stru_F5B1BC description pointer
   // (0x00E43DB8) spells this exactly "Shows all the key names".
   constexpr const char* kConsoleStartupConInDumpKeyNamesDescription = "Shows all the key names";
-  constexpr const char* kConsoleStartupConGetVersionDescription = "Print current engine version text.";
-  constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Execute the most recently saved command.";
-  constexpr const char* kConsoleStartupConPrintStatsDescription = "Print the selected engine stats subtree.";
-  constexpr const char* kConsoleStartupConClearStatsDescription = "Clear a selected engine stats subtree.";
-  constexpr const char* kConsoleStartupConBeginLoggingStatsDescription = "Begin engine stats logging.";
-  constexpr const char* kConsoleStartupConEndLoggingStatsDescription = "End engine stats logging.";
-  constexpr const char* kConsoleStartupConD3DAntiAliasingSamplesDescription = "Set D3D anti-aliasing sample count.";
-  constexpr const char* kConsoleStartupConRenMipSkipLevelsDescription = "Set D3D texture mip-skip levels.";
+  constexpr const char* kConsoleStartupConGetVersionDescription = "Get game version";
+  constexpr const char* kConsoleStartupConExecuteLastCommandDescription = "Repeat the last command.";
+  constexpr const char* kConsoleStartupConPrintStatsDescription = "Test the stat system";
+  constexpr const char* kConsoleStartupConClearStatsDescription = "Clear stats starting with given parent";
+  constexpr const char* kConsoleStartupConBeginLoggingStatsDescription = "Begin logging stats";
+  constexpr const char* kConsoleStartupConEndLoggingStatsDescription = "End logging stats";
+  constexpr const char* kConsoleStartupConD3DAntiAliasingSamplesDescription = "";
+  constexpr const char* kConsoleStartupConRenMipSkipLevelsDescription = "";
   constexpr const char* kConsoleStartupConDumpPreloadedTexturesDescription =
-    "Dump preloaded D3D texture list to PreloadedTextures.txt.";
-  constexpr const char* kConsoleStartupConLogDescription = "Emit one info-severity log line.";
-  constexpr const char* kConsoleStartupConDebugWarnDescription = "Emit one warning-severity log line.";
-  constexpr const char* kConsoleStartupConDebugErrorDescription = "Terminate engine with one debug error line.";
-  constexpr const char* kConsoleStartupConDebugAssertDescription = "Invoke debug assert command callback.";
-  constexpr const char* kConsoleStartupConDebugCrashDescription = "Force an intentional debug crash.";
-  constexpr const char* kConsoleStartupConDebugThrowDescription = "Throw one debug exception.";
+    "Dump debug texture info";
+  constexpr const char* kConsoleStartupConLogDescription = "Log a string (for debugging purposes)";
+  constexpr const char* kConsoleStartupConDebugWarnDescription = "Log a warning string (for debugging purposes)";
+  constexpr const char* kConsoleStartupConDebugErrorDescription = "Log an error string (for debugging purposes)";
+  constexpr const char* kConsoleStartupConDebugAssertDescription = "Fail an assertion (for debugging purposes)";
+  constexpr const char* kConsoleStartupConDebugCrashDescription = "Cause a crash (for debugging purposes)";
+  constexpr const char* kConsoleStartupConDebugThrowDescription = "Throw a std::exception.";
   constexpr const char* kConsoleStartupConStartCommandModeDescription =
-    "Start/toggle a UI command mode (e.g. RULEUCC_Move) for the active selection.";
+    "Set the UI context for some commands.";
   constexpr const char* kConsoleStartupConDebugGenerateBuildTemplateDescription =
-    "Generate build templates from current selection.";
+    "debug generate and enable build templates from the current selection.";
   constexpr const char* kConsoleStartupConDebugClearBuildTemplatesDescription =
-    "Clear all generated build templates.";
-  constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn one prop at cursor world position.";
+    "debug clear and disable the build templates.";
+  constexpr const char* kConsoleStartupConCreatePropDescription = "Spawn a prop underneath the mouse cursor";
   // Command name/description pairs below are the exact `.data` initializers the
   // binary stores in each `CConFunc` global (the registrar only writes the
   // vftable and callback words); read back from `ForgedAlliance.exe` at the
@@ -3900,7 +3880,7 @@ namespace
   constexpr const char* kConsoleStartupConKillSelectedUnitsDescription = "kill selected units.";
   constexpr const char* kConsoleStartupConDestroySelectedUnitsDescription = "destroy selected units.";
   constexpr const char* kConsoleStartupConCopySelectedUnitsToClipboardDescription =
-    "copy selected units as a CreateUnitAtMouse Lua script to the clipboard.";
+    "Copy all the selected units to the clipboard.";
   /// 0x00E4B6D8, the `.data` initializer of `Moho::CConFunc_AddSplat` (read
   /// directly from the shipped exe, matching this file's established
   /// `.data`-readback convention for these description constants).
@@ -3911,107 +3891,407 @@ namespace
   constexpr const char* kConsoleStartupConRenameUnitDescription =
     "Give selected unit a custom name, or with no parameters print name";
   constexpr const char* kConsoleStartupConIssueCommandDescription =
-    "Issue a fixed unit command (Stop/Pause/Dive/SiloBuildTactical/SiloBuildNuke) to the current selection.";
+    "Issue the buildSilo/dive/stop command to the selected units.";
   constexpr const char* kConsoleStartupConMeshRebatchDescription =
-    "Toggle hardware mesh-batching capability flags (instancing, float16) and rebuild mesh render state.";
+    "Override mesh batch settings";
   /// 0x00F59EDC, the `.data` initializer of `Moho::CConFunc_EFX_CreateEmitterWindow`.
   constexpr const char* kConsoleStartupConEfxCreateEmitterWindowDescription = "Create emitter control window";
-  constexpr const char* kConsoleStartupConP4EditDescription = "Perforce edit bridge command (unsupported in this build).";
+  constexpr const char* kConsoleStartupConP4EditDescription = "Check out file(s) from perfoce";
   constexpr const char* kConsoleStartupConP4IsOpenedForEditDescription =
-    "Perforce opened-for-edit query command (unsupported in this build).";
+    "Is the specified file opened for edit?";
   constexpr const char* kConsoleStartupConExitDescription = "Exit the application.";
-  constexpr const char* kConsoleStartupConWinToggleLogDialogDescription = "Toggle the log dialog.";
-  constexpr const char* kConsoleStartupConWinShowLogDialogDescription = "Show the log dialog.";
-  constexpr const char* kConsoleStartupConWxInputBoxDescription = "Open the wx input box.";
-  constexpr const char* kConsoleStartupReconDebugDescription = "Army index for recon debug rendering output.";
+  constexpr const char* kConsoleStartupConWinToggleLogDialogDescription = "Show/hide log dialog box";
+  constexpr const char* kConsoleStartupConWinShowLogDialogDescription = "Explicit show/hide log dialog box";
+  constexpr const char* kConsoleStartupConWxInputBoxDescription = "Text the WWxInputBox dialog.";
+  constexpr const char* kConsoleStartupReconDebugDescription = "Show debug recon info for specified army index";
   constexpr const char* kConsoleStartupRuleParanoidDescription =
-    "Paranoid-mode flag controlling rule-driven defensive runtime checks.";
+    "Paranoid mode for RULE system, print all error messages.";
   constexpr const char* kConsoleStartupRuleBlueprintReloadDelayDescription =
-    "Minimum delay in seconds between blueprint hot-reload probes.";
+    "seconds to delay before reloading a blueprint once we notice that it has changed.";
   /// 0x00E3C758, the `.data` initializer of `Moho::CConFunc_ANI_DumpSkeleton` (+0x08).
   constexpr const char* kConsoleStartupConAniDumpSkeletonDescription = "Dump the skeleton for the selected entity";
 
-  CConFunc gCConFunc_CON_Echo{};
-  CConFunc gCConFunc_CON_ListCommands{};
-  CConFunc gCConFunc_PrintStats{};
-  CConFunc gCConFunc_ClearStats{};
-  CConFunc gCConFunc_BeginLoggingStats{};
-  CConFunc gCConFunc_EndLoggingStats{};
-  CConFunc gCConFunc_LUADOC{};
-  CConFunc gCConFunc_LUA{};
-  CConFunc gCConFunc_ExecutePasteBuffer{};
-  CConFunc gCConFunc_UI_ResetView{};
-  CConFunc gCConFunc_IN_BindKey{};
-  CConFunc gCConFunc_IN_DumpKeyBindings{};
-  CConFunc gCConFunc_IN_SetKeyName{};
-  CConFunc gCConFunc_IN_DumpKeyNames{};
-  CConFunc gCConFunc_GetVersion{};
-  CConFunc gCConFunc_CON_ExecuteLastCommand{};
-  CConFunc gCConFunc_ANI_DumpSkeleton{};
-  CConFunc gCConFunc_d3d_AntiAliasingSamples{};
-  CConFunc gCConFunc_ren_MipSkipLevels{};
-  CConFunc gCConFunc_DumpPreloadedTextures{};
-  CConFunc gCConFunc_Log{};
-  CConFunc gCConFunc_Debug_Warn{};
-  CConFunc gCConFunc_Debug_Error{};
-  CConFunc gCConFunc_Debug_Assert{};
-  CConFunc gCConFunc_Debug_Crash{};
-  CConFunc gCConFunc_Debug_Throw{};
-  CConFunc gCConFunc_StartCommandMode{};
-  CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection{};
-  CConFunc gCConFunc_DebugClearBuildTemplates{};
-  CConFunc gCConFunc_CreateProp{};
-  CConFunc gCConFunc_CreateUnit{};
-  CConFunc gCConFunc_LotsOfProps{};
-  CConFunc gCConFunc_KillSelectedUnits{};
-  CConFunc gCConFunc_DestroySelectedUnits{};
-  CConFunc gCConFunc_CopySelectedUnitsToClipboard{};
-  CConFunc gCConFunc_AddSplat{};
-  CConFunc gCConFunc_ProcessInfoPair{};
-  CConFunc gCConFunc_UI_TrackUnit{};
-  CConFunc gCConFunc_RenameUnit{};
-  CConFunc gCConFunc_SkipUIChecks{};
-  CConFunc gCConFunc_WLD_RestartBeat{};
-  CConFunc gCConFunc_WLD_AdvanceBeat{};
-  CConFunc gCConFunc_WLD_SingleStep{};
-  CConFunc gCConFunc_WLD_GameSpeed{};
-  CConFunc gCConFunc_FindUnit{};
-  CConFunc gCConFunc_SC_LuaDebugger{};
-  CConFunc gCConFunc_DoSimCommand{};
-  CConFunc gCConFunc_IssueCommand{};
-  CConFunc gCConFunc_mesh_Rebatch{};
-  CConFunc gCConFunc_EFX_CreateEmitterWindow{};
-  CConFunc gCConFunc_p4_Edit{};
-  CConFunc gCConFunc_p4_IsOpenedForEdit{};
-  CConFunc gCConFunc_exit{};
-  CConFunc gCConFunc_WIN_ToggleLogDialog{};
-  CConFunc gCConFunc_WIN_ShowLogDialog{};
-  CConFunc gCConFunc_WxInputBox{};
+  /**
+   * Address: 0x00BC3910 (FUN_00BC3910, dynamic initializer for `gCConFunc_CON_Echo`)
+   * Address: 0x00BEEC10 (FUN_00BEEC10, dynamic atexit destructor for `gCConFunc_CON_Echo`)
+   */
+  CConFunc gCConFunc_CON_Echo("CON_Echo", kConsoleStartupConEchoDescription, &moho::CON_Echo);
 
+  /**
+   * Address: 0x00BC3950 (FUN_00BC3950, dynamic initializer for `gCConFunc_CON_ListCommands`)
+   * Address: 0x00BEEC40 (FUN_00BEEC40, dynamic atexit destructor for `gCConFunc_CON_ListCommands`)
+   */
+  CConFunc gCConFunc_CON_ListCommands("CON_ListCommands", kConsoleStartupConListCommandsDescription, &moho::CON_ListCommands);
+
+  /**
+   * Address: 0x00BC3440 (FUN_00BC3440, dynamic initializer for `gCConFunc_PrintStats`)
+   * Address: 0x00BEE7F0 (FUN_00BEE7F0, dynamic atexit destructor for `gCConFunc_PrintStats`)
+   */
+  CConFunc gCConFunc_PrintStats("PrintStats", kConsoleStartupConPrintStatsDescription, &moho::CON_PrintStats);
+
+  /**
+   * Address: 0x00BC3480 (FUN_00BC3480, dynamic initializer for `gCConFunc_ClearStats`)
+   * Address: 0x00BEE820 (FUN_00BEE820, dynamic atexit destructor for `gCConFunc_ClearStats`)
+   */
+  CConFunc gCConFunc_ClearStats("ClearStats", kConsoleStartupConClearStatsDescription, &moho::CON_ClearStats);
+
+  /**
+   * Address: 0x00BC34C0 (FUN_00BC34C0, dynamic initializer for `gCConFunc_BeginLoggingStats`)
+   * Address: 0x00BEE850 (FUN_00BEE850, dynamic atexit destructor for `gCConFunc_BeginLoggingStats`)
+   */
+  CConFunc gCConFunc_BeginLoggingStats("BeginLoggingStats", kConsoleStartupConBeginLoggingStatsDescription, &moho::CON_BeginLoggingStats);
+
+  /**
+   * Address: 0x00BC3500 (FUN_00BC3500, dynamic initializer for `gCConFunc_EndLoggingStats`)
+   * Address: 0x00BEE880 (FUN_00BEE880, dynamic atexit destructor for `gCConFunc_EndLoggingStats`)
+   */
+  CConFunc gCConFunc_EndLoggingStats("EndLoggingStats", kConsoleStartupConEndLoggingStatsDescription, &moho::CON_EndLoggingStats);
+
+  /**
+   * Address: 0x00BC6450 (FUN_00BC6450, dynamic initializer for `gCConFunc_LUADOC`)
+   * Address: 0x00BF0C90 (FUN_00BF0C90, dynamic atexit destructor for `gCConFunc_LUADOC`)
+   */
+  CConFunc gCConFunc_LUADOC("LUADOC", kConsoleStartupConLuaDocDescription, &moho::CON_LUADOC);
+
+  /**
+   * Address: 0x00BE8A20 (FUN_00BE8A20, dynamic initializer for `gCConFunc_LUA`)
+   * Address: 0x00C08820 (FUN_00C08820, dynamic atexit destructor for `gCConFunc_LUA`)
+   */
+  CConFunc gCConFunc_LUA("LUA", kConsoleStartupConLuaDescription, &moho::CON_LUA);
+
+  /**
+   * Address: 0x00BDF9D0 (FUN_00BDF9D0, dynamic initializer for `gCConFunc_ExecutePasteBuffer`)
+   * Address: 0x00C03750 (FUN_00C03750, dynamic atexit destructor for `gCConFunc_ExecutePasteBuffer`)
+   */
+  CConFunc gCConFunc_ExecutePasteBuffer("ExecutePasteBuffer", kConsoleStartupConExecutePasteBufferDescription, reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecutePasteBuffer));
+
+  /**
+   * Address: 0x00BDF780 (FUN_00BDF780, dynamic initializer for `gCConFunc_UI_ResetView`)
+   * Address: 0x00C03620 (FUN_00C03620, dynamic atexit destructor for `gCConFunc_UI_ResetView`)
+   */
+  CConFunc gCConFunc_UI_ResetView("UI_ResetView", kConsoleStartupConUiResetViewDescription, &moho::UI_ResetView);
+
+  /**
+   * Address: 0x00BE4850 (FUN_00BE4850, dynamic initializer for `gCConFunc_IN_BindKey`)
+   * Address: 0x00C06760 (FUN_00C06760, dynamic atexit destructor for `gCConFunc_IN_BindKey`)
+   */
+  CConFunc gCConFunc_IN_BindKey("IN_BindKey", kConsoleStartupConInBindKeyDescription, &moho::IN_BindKey);
+
+  /**
+   * Address: 0x00BE4890 (FUN_00BE4890, dynamic initializer for `gCConFunc_IN_DumpKeyBindings`)
+   * Address: 0x00C06790 (FUN_00C06790, dynamic atexit destructor for `gCConFunc_IN_DumpKeyBindings`)
+   */
+  CConFunc gCConFunc_IN_DumpKeyBindings("IN_DumpKeyBindings", kConsoleStartupConInDumpKeyBindingsDescription, &moho::IN_DumpKeyBindings);
+
+  /**
+   * Address: 0x00BE48D0 (FUN_00BE48D0, dynamic initializer for `gCConFunc_IN_SetKeyName`)
+   * Address: 0x00C067C0 (FUN_00C067C0, dynamic atexit destructor for `gCConFunc_IN_SetKeyName`)
+   */
+  CConFunc gCConFunc_IN_SetKeyName("IN_SetKeyName", kConsoleStartupConInSetKeyNameDescription, &moho::IN_SetKeyName);
+
+  /**
+   * Address: 0x00BE4910 (FUN_00BE4910, dynamic initializer for `gCConFunc_IN_DumpKeyNames`)
+   * Address: 0x00C067F0 (FUN_00C067F0, dynamic atexit destructor for `gCConFunc_IN_DumpKeyNames`)
+   */
+  CConFunc gCConFunc_IN_DumpKeyNames("IN_DumpKeyNames", kConsoleStartupConInDumpKeyNamesDescription, &moho::IN_DumpKeyNames);
+
+  /**
+   * Address: 0x00BC6630 (FUN_00BC6630, dynamic initializer for `gCConFunc_GetVersion`)
+   * Address: 0x00BF0D10 (FUN_00BF0D10, dynamic atexit destructor for `gCConFunc_GetVersion`)
+   */
+  CConFunc gCConFunc_GetVersion("GetVersion", kConsoleStartupConGetVersionDescription, &moho::CON_GetVersion);
+
+  /**
+   * Address: 0x00BC3990 (FUN_00BC3990, dynamic initializer for `gCConFunc_CON_ExecuteLastCommand`)
+   * Address: 0x00BEEC70 (FUN_00BEEC70, dynamic atexit destructor for `gCConFunc_CON_ExecuteLastCommand`)
+   */
+  CConFunc gCConFunc_CON_ExecuteLastCommand("CON_ExecuteLastCommand", kConsoleStartupConExecuteLastCommandDescription, reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand));
+
+  /**
+   * Address: 0x00BDF8D0 (FUN_00BDF8D0, dynamic initializer for `gCConFunc_ANI_DumpSkeleton`)
+   * Address: 0x00C036D0 (FUN_00C036D0, dynamic atexit destructor for `gCConFunc_ANI_DumpSkeleton`)
+   */
+  CConFunc gCConFunc_ANI_DumpSkeleton("ANI_DumpSkeleton", kConsoleStartupConAniDumpSkeletonDescription, reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton));
+
+  /**
+   * Address: 0x00BC3F40 (FUN_00BC3F40, dynamic initializer for `gCConFunc_d3d_AntiAliasingSamples`)
+   * Address: 0x00BEF0E0 (FUN_00BEF0E0, dynamic atexit destructor for `gCConFunc_d3d_AntiAliasingSamples`)
+   */
+  CConFunc gCConFunc_d3d_AntiAliasingSamples("d3d_AntiAliasingSamples", kConsoleStartupConD3DAntiAliasingSamplesDescription, &CD3DEffect::CON_d3d_AntiAliasingSamples);
+
+  /**
+   * Address: 0x00BC4150 (FUN_00BC4150, dynamic initializer for `gCConFunc_ren_MipSkipLevels`)
+   * Address: 0x00BEF1F0 (FUN_00BEF1F0, dynamic atexit destructor for `gCConFunc_ren_MipSkipLevels`)
+   */
+  CConFunc gCConFunc_ren_MipSkipLevels("ren_MipSkipLevels", kConsoleStartupConRenMipSkipLevelsDescription, &CON_ren_MipSkipLevels);
+
+  /**
+   * Address: 0x00BC4190 (FUN_00BC4190, dynamic initializer for `gCConFunc_DumpPreloadedTextures`)
+   * Address: 0x00BEF220 (FUN_00BEF220, dynamic atexit destructor for `gCConFunc_DumpPreloadedTextures`)
+   */
+  CConFunc gCConFunc_DumpPreloadedTextures("DumpPreloadedTextures", kConsoleStartupConDumpPreloadedTexturesDescription, &CON_DumpPreloadedTextures);
+
+  /**
+   * Address: 0x00BC4B70 (FUN_00BC4B70, dynamic initializer for `gCConFunc_Log`)
+   * Address: 0x00BEF8C0 (FUN_00BEF8C0, dynamic atexit destructor for `gCConFunc_Log`)
+   */
+  CConFunc gCConFunc_Log("Log", kConsoleStartupConLogDescription, &CON_Log);
+
+  /**
+   * Address: 0x00BC4BB0 (FUN_00BC4BB0, dynamic initializer for `gCConFunc_Debug_Warn`)
+   * Address: 0x00BEF8F0 (FUN_00BEF8F0, dynamic atexit destructor for `gCConFunc_Debug_Warn`)
+   */
+  CConFunc gCConFunc_Debug_Warn("Debug_Warn", kConsoleStartupConDebugWarnDescription, &CON_Debug_Warn);
+
+  /**
+   * Address: 0x00BC4BF0 (FUN_00BC4BF0, dynamic initializer for `gCConFunc_Debug_Error`)
+   * Address: 0x00BEF920 (FUN_00BEF920, dynamic atexit destructor for `gCConFunc_Debug_Error`)
+   */
+  CConFunc gCConFunc_Debug_Error("Debug_Error", kConsoleStartupConDebugErrorDescription, &CON_Debug_Error);
+
+  /**
+   * Address: 0x00BC4C30 (FUN_00BC4C30, dynamic initializer for `gCConFunc_Debug_Assert`)
+   * Address: 0x00BEF950 (FUN_00BEF950, dynamic atexit destructor for `gCConFunc_Debug_Assert`)
+   */
+  CConFunc gCConFunc_Debug_Assert("Debug_Assert", kConsoleStartupConDebugAssertDescription, &CON_Debug_Assert);
+
+  /**
+   * Address: 0x00BC4C70 (FUN_00BC4C70, dynamic initializer for `gCConFunc_Debug_Crash`)
+   * Address: 0x00BEF980 (FUN_00BEF980, dynamic atexit destructor for `gCConFunc_Debug_Crash`)
+   */
+  CConFunc gCConFunc_Debug_Crash("Debug_Crash", kConsoleStartupConDebugCrashDescription, &CON_Debug_Crash);
+
+  /**
+   * Address: 0x00BC4CB0 (FUN_00BC4CB0, dynamic initializer for `gCConFunc_Debug_Throw`)
+   * Address: 0x00BEF9B0 (FUN_00BEF9B0, dynamic atexit destructor for `gCConFunc_Debug_Throw`)
+   */
+  CConFunc gCConFunc_Debug_Throw("Debug_Throw", kConsoleStartupConDebugThrowDescription, &CON_Debug_Throw);
+
+  /**
+   * Address: 0x00BE3FF0 (FUN_00BE3FF0, dynamic initializer for `gCConFunc_StartCommandMode`)
+   * Address: 0x00C06160 (FUN_00C06160, dynamic atexit destructor for `gCConFunc_StartCommandMode`)
+   */
+  CConFunc gCConFunc_StartCommandMode("StartCommandMode", kConsoleStartupConStartCommandModeDescription, &CON_StartCommandMode);
+
+  /**
+   * Address: 0x00BE40B0 (FUN_00BE40B0, dynamic initializer for `gCConFunc_DebugGenerateBuildTemplateFromSelection`)
+   * Address: 0x00C061F0 (FUN_00C061F0, dynamic atexit destructor for `gCConFunc_DebugGenerateBuildTemplateFromSelection`)
+   */
+  CConFunc gCConFunc_DebugGenerateBuildTemplateFromSelection("DebugGenerateBuildTemplateFromSelection", kConsoleStartupConDebugGenerateBuildTemplateDescription, &CON_DebugGenerateBuildTemplateFromSelection);
+
+  /**
+   * Address: 0x00BE40F0 (FUN_00BE40F0, dynamic initializer for `gCConFunc_DebugClearBuildTemplates`)
+   * Address: 0x00C06220 (FUN_00C06220, dynamic atexit destructor for `gCConFunc_DebugClearBuildTemplates`)
+   */
+  CConFunc gCConFunc_DebugClearBuildTemplates("DebugClearBuildTemplates", kConsoleStartupConDebugClearBuildTemplatesDescription, &CON_DebugClearBuildTemplates);
+
+  /**
+   * Address: 0x00BE3F70 (FUN_00BE3F70, dynamic initializer for `gCConFunc_CreateProp`)
+   * Address: 0x00C06100 (FUN_00C06100, dynamic atexit destructor for `gCConFunc_CreateProp`)
+   */
+  CConFunc gCConFunc_CreateProp("CreateProp", kConsoleStartupConCreatePropDescription, &CON_CreateProp);
+
+  /**
+   * Address: 0x00BE3EF0 (FUN_00BE3EF0, dynamic initializer for `gCConFunc_CreateUnit`)
+   * Address: 0x00C060A0 (FUN_00C060A0, dynamic atexit destructor for `gCConFunc_CreateUnit`)
+   */
+  CConFunc gCConFunc_CreateUnit("CreateUnit", kConsoleStartupConCreateUnitDescription, &CON_CreateUnit);
+
+  /**
+   * Address: 0x00BE3F30 (FUN_00BE3F30, dynamic initializer for `gCConFunc_LotsOfProps`)
+   * Address: 0x00C060D0 (FUN_00C060D0, dynamic atexit destructor for `gCConFunc_LotsOfProps`)
+   */
+  CConFunc gCConFunc_LotsOfProps("LotsOfProps", kConsoleStartupConLotsOfPropsDescription, &CON_LotsOfProps);
+
+  /**
+   * Address: 0x00BE4030 (FUN_00BE4030, dynamic initializer for `gCConFunc_KillSelectedUnits`)
+   * Address: 0x00C06190 (FUN_00C06190, dynamic atexit destructor for `gCConFunc_KillSelectedUnits`)
+   */
+  CConFunc gCConFunc_KillSelectedUnits("KillSelectedUnits", kConsoleStartupConKillSelectedUnitsDescription, &CON_KillSelectedUnits);
+
+  /**
+   * Address: 0x00BE4070 (FUN_00BE4070, dynamic initializer for `gCConFunc_DestroySelectedUnits`)
+   * Address: 0x00C061C0 (FUN_00C061C0, dynamic atexit destructor for `gCConFunc_DestroySelectedUnits`)
+   */
+  CConFunc gCConFunc_DestroySelectedUnits("DestroySelectedUnits", kConsoleStartupConDestroySelectedUnitsDescription, &CON_DestroySelectedUnits);
+
+  /**
+   * Address: 0x00BDF990 (FUN_00BDF990, dynamic initializer for `gCConFunc_CopySelectedUnitsToClipboard`)
+   * Address: 0x00C03720 (FUN_00C03720, dynamic atexit destructor for `gCConFunc_CopySelectedUnitsToClipboard`)
+   */
+  CConFunc gCConFunc_CopySelectedUnitsToClipboard("CopySelectedUnitsToClipboard", kConsoleStartupConCopySelectedUnitsToClipboardDescription, &CON_CopySelectedUnitsToClipboard);
+
+  /**
+   * Address: 0x00BE7CE0 (FUN_00BE7CE0, dynamic initializer for `gCConFunc_AddSplat`)
+   * Address: 0x00C08480 (FUN_00C08480, dynamic atexit destructor for `gCConFunc_AddSplat`)
+   */
+  CConFunc gCConFunc_AddSplat("AddSplat", kConsoleStartupConAddSplatDescription, &CON_AddSplat);
+
+  /**
+   * Address: 0x00BE4170 (FUN_00BE4170, dynamic initializer for `gCConFunc_ProcessInfoPair`)
+   * Address: 0x00C06280 (FUN_00C06280, dynamic atexit destructor for `gCConFunc_ProcessInfoPair`)
+   */
+  CConFunc gCConFunc_ProcessInfoPair("ProcessInfoPair", kConsoleStartupConProcessInfoPairDescription, &CON_ProcessInfoPair);
+
+  /**
+   * Address: 0x00BE41B0 (FUN_00BE41B0, dynamic initializer for `gCConFunc_UI_TrackUnit`)
+   * Address: 0x00C062B0 (FUN_00C062B0, dynamic atexit destructor for `gCConFunc_UI_TrackUnit`)
+   */
+  CConFunc gCConFunc_UI_TrackUnit("UI_TrackUnit", kConsoleStartupConUITrackUnitDescription, &UI_TrackUnit);
+
+  /**
+   * Address: 0x00BE44F0 (FUN_00BE44F0, dynamic initializer for `gCConFunc_RenameUnit`)
+   * Address: 0x00C06520 (FUN_00C06520, dynamic atexit destructor for `gCConFunc_RenameUnit`)
+   */
+  CConFunc gCConFunc_RenameUnit("RenameUnit", kConsoleStartupConRenameUnitDescription, &RenameUnit);
+
+  /**
+   * Address: 0x00BE77D0 (FUN_00BE77D0, dynamic initializer for `gCConFunc_SkipUIChecks`)
+   * Address: 0x00C08250 (FUN_00C08250, dynamic atexit destructor for `gCConFunc_SkipUIChecks`)
+   */
+  CConFunc gCConFunc_SkipUIChecks("SkipUIChecks", kConsoleStartupSkipUIChecksDescription, &moho::SkipUIChecks);
+
+  /**
+   * Address: 0x00BE7810 (FUN_00BE7810, dynamic initializer for `gCConFunc_WLD_RestartBeat`)
+   * Address: 0x00C08280 (FUN_00C08280, dynamic atexit destructor for `gCConFunc_WLD_RestartBeat`)
+   */
+  CConFunc gCConFunc_WLD_RestartBeat("WLD_RestartBeat", kConsoleStartupWLDRestartBeatDescription, &moho::WLD_RestartBeat);
+
+  /**
+   * Address: 0x00BE7850 (FUN_00BE7850, dynamic initializer for `gCConFunc_WLD_AdvanceBeat`)
+   * Address: 0x00C082B0 (FUN_00C082B0, dynamic atexit destructor for `gCConFunc_WLD_AdvanceBeat`)
+   */
+  CConFunc gCConFunc_WLD_AdvanceBeat("WLD_AdvanceBeat", kConsoleStartupWLDAdvanceBeatDescription, &moho::WLD_AdvanceBeat);
+
+  /**
+   * Address: 0x00BE7430 (FUN_00BE7430, dynamic initializer for `gCConFunc_WLD_SingleStep`)
+   * Address: 0x00C07FF0 (FUN_00C07FF0, dynamic atexit destructor for `gCConFunc_WLD_SingleStep`)
+   */
+  CConFunc gCConFunc_WLD_SingleStep("WLD_SingleStep", kConsoleStartupWLDSingleStepDescription, &moho::WLD_SingleStep);
+
+  /**
+   * Address: 0x00BE7470 (FUN_00BE7470, dynamic initializer for `gCConFunc_WLD_GameSpeed`)
+   * Address: 0x00C08020 (FUN_00C08020, dynamic atexit destructor for `gCConFunc_WLD_GameSpeed`)
+   */
+  CConFunc gCConFunc_WLD_GameSpeed("WLD_GameSpeed", kConsoleStartupWLDGameSpeedDescription, &moho::WLD_GameSpeed);
+
+  /**
+   * Address: 0x00BE95C0 (FUN_00BE95C0, dynamic initializer for `gCConFunc_FindUnit`)
+   * Address: 0x00C08E20 (FUN_00C08E20, dynamic atexit destructor for `gCConFunc_FindUnit`)
+   */
+  CConFunc gCConFunc_FindUnit("FindUnit", kConsoleStartupConFindUnitDescription, &moho::CON_FindUnit);
+
+  /**
+   * Address: 0x00BE9680 (FUN_00BE9680, dynamic initializer for `gCConFunc_SC_LuaDebugger`)
+   * Address: 0x00C08EB0 (FUN_00C08EB0, dynamic atexit destructor for `gCConFunc_SC_LuaDebugger`)
+   */
+  CConFunc gCConFunc_SC_LuaDebugger("SC_LuaDebugger", kConsoleStartupSCLuaDebuggerDescription, &moho::SC_LuaDebugger);
+
+  /**
+   * Address: 0x00BE74D0 (FUN_00BE74D0, dynamic initializer for `gCConFunc_DoSimCommand`)
+   * Address: 0x00C08050 (FUN_00C08050, dynamic atexit destructor for `gCConFunc_DoSimCommand`)
+   */
+  CConFunc gCConFunc_DoSimCommand("DoSimCommand", kConsoleStartupDoSimCommandDescription, &moho::DoSimCommand);
+
+  /**
+   * Address: 0x00BE3FB0 (FUN_00BE3FB0, dynamic initializer for `gCConFunc_IssueCommand`)
+   * Address: 0x00C06130 (FUN_00C06130, dynamic atexit destructor for `gCConFunc_IssueCommand`)
+   */
+  CConFunc gCConFunc_IssueCommand("IssueCommand", kConsoleStartupConIssueCommandDescription, &CON_IssueCommand);
+
+  /**
+   * Address: 0x00BE0A20 (FUN_00BE0A20, dynamic initializer for `gCConFunc_mesh_Rebatch`)
+   * Address: 0x00C03F00 (FUN_00C03F00, dynamic atexit destructor for `gCConFunc_mesh_Rebatch`)
+   */
+  CConFunc gCConFunc_mesh_Rebatch("mesh_Rebatch", kConsoleStartupConMeshRebatchDescription, &moho::CON_mesh_Rebatch);
+
+  /**
+   * Address: 0x00BD44C0 (FUN_00BD44C0, dynamic initializer for `gCConFunc_EFX_CreateEmitterWindow`)
+   * Address: 0x00BFBF50 (FUN_00BFBF50, dynamic atexit destructor for `gCConFunc_EFX_CreateEmitterWindow`)
+   */
+  CConFunc gCConFunc_EFX_CreateEmitterWindow("EFX_CreateEmitterWindow", kConsoleStartupConEfxCreateEmitterWindowDescription, &moho::EFX_CreateEmitterWindow);
+
+  /**
+   * Address: 0x00BC76F0 (FUN_00BC76F0, dynamic initializer for `gCConFunc_p4_Edit`)
+   * Address: 0x00BF1C20 (FUN_00BF1C20, dynamic atexit destructor for `gCConFunc_p4_Edit`)
+   */
+  CConFunc gCConFunc_p4_Edit("p4_Edit", kConsoleStartupConP4EditDescription, &moho::CON_p4_Edit);
+
+  /**
+   * Address: 0x00BC7730 (FUN_00BC7730, dynamic initializer for `gCConFunc_p4_IsOpenedForEdit`)
+   * Address: 0x00BF1C50 (FUN_00BF1C50, dynamic atexit destructor for `gCConFunc_p4_IsOpenedForEdit`)
+   */
+  CConFunc gCConFunc_p4_IsOpenedForEdit("p4_IsOpenedForEdit", kConsoleStartupConP4IsOpenedForEditDescription, &moho::CON_p4_IsOpenedForEdit);
+
+  /**
+   * Address: 0x00BC7270 (FUN_00BC7270, dynamic initializer for `gCConFunc_exit`)
+   * Address: 0x00BF1880 (FUN_00BF1880, dynamic atexit destructor for `gCConFunc_exit`)
+   */
+  CConFunc gCConFunc_exit("exit", kConsoleStartupConExitDescription, reinterpret_cast<CConFunc::Callback>(&WIN_AppRequestExit));
+
+  /**
+   * Address: 0x00BC7360 (FUN_00BC7360, dynamic initializer for `gCConFunc_WIN_ToggleLogDialog`)
+   * Address: 0x00BF18E0 (FUN_00BF18E0, dynamic atexit destructor for `gCConFunc_WIN_ToggleLogDialog`)
+   */
+  CConFunc gCConFunc_WIN_ToggleLogDialog("WIN_ToggleLogDialog", kConsoleStartupConWinToggleLogDialogDescription, reinterpret_cast<CConFunc::Callback>(&WIN_ToggleLogDialog));
+
+  /**
+   * Address: 0x00BC73A0 (FUN_00BC73A0, dynamic initializer for `gCConFunc_WIN_ShowLogDialog`)
+   * Address: 0x00BF1910 (FUN_00BF1910, dynamic atexit destructor for `gCConFunc_WIN_ShowLogDialog`)
+   */
+  CConFunc gCConFunc_WIN_ShowLogDialog("WIN_ShowLogDialog", kConsoleStartupConWinShowLogDialogDescription, reinterpret_cast<CConFunc::Callback>(&WIN_ShowLogDialog));
+
+  /**
+   * Address: 0x00BC73F0 (FUN_00BC73F0, dynamic initializer for `gCConFunc_WxInputBox`)
+   * Address: 0x00BF1960 (FUN_00BF1960, dynamic atexit destructor for `gCConFunc_WxInputBox`)
+   */
+  CConFunc gCConFunc_WxInputBox("WxInputBox", kConsoleStartupConWxInputBoxDescription, reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox));
+
+  /**
+   * Address: 0x00BC39D0 (FUN_00BC39D0, dynamic initializer for `gTConVar_con_TestVarBool`)
+   * Address: 0x00BEECA0 (FUN_00BEECA0, dynamic atexit destructor for `gTConVar_con_TestVarBool`)
+   */
   TConVar<bool> gTConVar_con_TestVarBool(
     "con_TestVarBool",
     kConsoleStartupTestVarDescription,
     &moho::con_TestVarBool
   );
+
+  /**
+   * Address: 0x00BC3A10 (FUN_00BC3A10, dynamic initializer for `gTConVar_con_TestVar`)
+   * Address: 0x00BEECD0 (FUN_00BEECD0, dynamic atexit destructor for `gTConVar_con_TestVar`)
+   */
   TConVar<int> gTConVar_con_TestVar("con_TestVar", kConsoleStartupTestVarDescription, &moho::con_TestVar);
+
+  /**
+   * Address: 0x00BC3A70 (FUN_00BC3A70, dynamic initializer for `gTConVar_con_TestVarFloat`)
+   * Address: 0x00BEED30 (FUN_00BEED30, dynamic atexit destructor for `gTConVar_con_TestVarFloat`)
+   */
   TConVar<float> gTConVar_con_TestVarFloat(
     "con_TestVarFloat",
     kConsoleStartupTestVarDescription,
     &moho::con_TestVarFloat
   );
+
+  /**
+   * Address: 0x00BC3AD0 (FUN_00BC3AD0, dynamic initializer for `gTConVar_con_TestVarStr`)
+   * Address: 0x00BEED90 (FUN_00BEED90, dynamic atexit destructor for `gTConVar_con_TestVarStr`)
+   */
   TConVar<msvc8::string> gTConVar_con_TestVarStr(
     "con_TestVarStr",
     kConsoleStartupTestVarDescription,
     &moho::con_TestVarStr
   );
-  TConVar<int> gTConVar_recon_debug("recon_debug", kConsoleStartupReconDebugDescription, &moho::recon_debug);
+
   /**
-   * Address: 0x00BF3950 (FUN_00BF3950, Moho::TConVar_rule_Paranoid::~TConVar_rule_Paranoid)
-   *
-   * The implicit `~TConVar<int>()` destructor runs at process exit on this
-   * global, chaining through `~CConCommand` to reset the vftable and (when a
-   * name lane is still set) reregister the slot via `CON_ReregisterCom`. The
-   * binary records this teardown as a per-instance generated dtor.
+   * Address: 0x00BCDB70 (FUN_00BCDB70, dynamic initializer for `gTConVar_recon_debug`)
+   * Address: 0x00BF77B0 (FUN_00BF77B0, dynamic atexit destructor for `gTConVar_recon_debug`)
+   */
+  TConVar<int> gTConVar_recon_debug("recon_debug", kConsoleStartupReconDebugDescription, &moho::recon_debug);
+
+  /**
+   * Address: 0x00BC8DC0 (FUN_00BC8DC0, dynamic initializer for `gTConVar_rule_Paranoid`)
+   * Address: 0x00BF3950 (FUN_00BF3950, dynamic atexit destructor for `gTConVar_rule_Paranoid`)
    */
   TConVar<int> gTConVar_rule_Paranoid(
     "rule_Paranoid",
@@ -4020,2175 +4300,127 @@ namespace
   );
 
   /**
-   * Address: 0x00BF3980 (FUN_00BF3980, Moho::TConVar_rule_BlueprintReloadDelay::~TConVar_rule_BlueprintReloadDelay)
-   *
-   * The implicit `~TConVar<float>()` destructor runs at process exit on this
-   * global, mirroring the same `~CConCommand`-driven teardown shape as the
-   * other recovered rule-bucket convars.
+   * Address: 0x00BC8E00 (FUN_00BC8E00, dynamic initializer for `gTConVar_rule_BlueprintReloadDelay`)
+   * Address: 0x00BF3980 (FUN_00BF3980, dynamic atexit destructor for `gTConVar_rule_BlueprintReloadDelay`)
    */
   TConVar<float> gTConVar_rule_BlueprintReloadDelay(
     "rule_BlueprintReloadDelay",
     kConsoleStartupRuleBlueprintReloadDelayDescription,
     &moho::rule_BlueprintReloadDelay
   );
+
+  /**
+   * Address: 0x00BC3D00 (FUN_00BC3D00, dynamic initializer for `gTConVar_graphics_Fidelity`)
+   * Address: 0x00BEEF30 (FUN_00BEEF30, dynamic atexit destructor for `gTConVar_graphics_Fidelity`)
+   */
   TConVar<int> gTConVar_graphics_Fidelity(
     "graphics_Fidelity",
     kConsoleStartupGraphicsFidelityDescription,
     &moho::graphics_Fidelity
   );
+
+  /**
+   * Address: 0x00BC3D40 (FUN_00BC3D40, dynamic initializer for `gTConVar_graphics_FidelitySupported`)
+   * Address: 0x00BEEF60 (FUN_00BEEF60, dynamic atexit destructor for `gTConVar_graphics_FidelitySupported`)
+   */
   TConVar<int> gTConVar_graphics_FidelitySupported(
     "graphics_FidelitySupported",
     kConsoleStartupGraphicsFidelitySupportedDescription,
     &moho::graphics_FidelitySupported
   );
+
+  /**
+   * Address: 0x00BC3D80 (FUN_00BC3D80, dynamic initializer for `gTConVar_shadow_Fidelity`)
+   * Address: 0x00BEEF90 (FUN_00BEEF90, dynamic atexit destructor for `gTConVar_shadow_Fidelity`)
+   */
   TConVar<int> gTConVar_shadow_Fidelity(
     "shadow_Fidelity",
     kConsoleStartupShadowFidelityDescription,
     &moho::shadow_Fidelity
   );
+
+  /**
+   * Address: 0x00BC3DC0 (FUN_00BC3DC0, dynamic initializer for `gTConVar_shadow_FidelitySupported`)
+   * Address: 0x00BEEFC0 (FUN_00BEEFC0, dynamic atexit destructor for `gTConVar_shadow_FidelitySupported`)
+   */
   TConVar<int> gTConVar_shadow_FidelitySupported(
     "shadow_FidelitySupported",
     kConsoleStartupShadowFidelitySupportedDescription,
     &moho::shadow_FidelitySupported
   );
+
+  /**
+   * Address: 0x00BC3E00 (FUN_00BC3E00, dynamic initializer for `gTConVar_d3d_UseRefRast`)
+   * Address: 0x00BEEFF0 (FUN_00BEEFF0, dynamic atexit destructor for `gTConVar_d3d_UseRefRast`)
+   */
   TConVar<bool> gTConVar_d3d_UseRefRast(
     "d3d_UseRefRast",
     kConsoleStartupD3DUseRefRastDescription,
     &moho::d3d_UseRefRast
   );
+
+  /**
+   * Address: 0x00BC3E40 (FUN_00BC3E40, dynamic initializer for `gTConVar_d3d_ForceSoftwareVP`)
+   * Address: 0x00BEF020 (FUN_00BEF020, dynamic atexit destructor for `gTConVar_d3d_ForceSoftwareVP`)
+   */
   TConVar<bool> gTConVar_d3d_ForceSoftwareVP(
     "d3d_ForceSoftwareVP",
     kConsoleStartupD3DForceSoftwareVPDescription,
     &moho::d3d_ForceSoftwareVP
   );
+
+  /**
+   * Address: 0x00BC3E80 (FUN_00BC3E80, dynamic initializer for `gTConVar_d3d_NoPureDevice`)
+   * Address: 0x00BEF050 (FUN_00BEF050, dynamic atexit destructor for `gTConVar_d3d_NoPureDevice`)
+   */
   TConVar<bool> gTConVar_d3d_NoPureDevice(
     "d3d_NoPureDevice",
     kConsoleStartupD3DNoPureDeviceDescription,
     &moho::d3d_NoPureDevice
   );
+
+  /**
+   * Address: 0x00BC3EC0 (FUN_00BC3EC0, dynamic initializer for `gTConVar_d3d_ForceDirect3DDebugEnabled`)
+   * Address: 0x00BEF080 (FUN_00BEF080, dynamic atexit destructor for `gTConVar_d3d_ForceDirect3DDebugEnabled`)
+   */
   TConVar<bool> gTConVar_d3d_ForceDirect3DDebugEnabled(
     "d3d_ForceDirect3DDebugEnabled",
     kConsoleStartupD3DForceDirect3DDebugDescription,
     &moho::d3d_ForceDirect3DDebugEnabled
   );
+
+  /**
+   * Address: 0x00BC3F00 (FUN_00BC3F00, dynamic initializer for `gTConVar_d3d_WindowsCursor`)
+   * Address: 0x00BEF0B0 (FUN_00BEF0B0, dynamic atexit destructor for `gTConVar_d3d_WindowsCursor`)
+   */
   TConVar<bool> gTConVar_d3d_WindowsCursor(
     "d3d_WindowsCursor",
     kConsoleStartupD3DWindowsCursorDescription,
     &moho::d3d_WindowsCursor
   );
+
+  /**
+   * Address: 0x00BC6780 (FUN_00BC6780, dynamic initializer for `gTConVar_snd_ExtraDoWorkCalls`)
+   * Address: 0x00BF0D80 (FUN_00BF0D80, dynamic atexit destructor for `gTConVar_snd_ExtraDoWorkCalls`)
+   */
   TConVar<bool> gTConVar_snd_ExtraDoWorkCalls(
     "snd_ExtraDoWorkCalls",
     kConsoleStartupSndExtraDoWorkCallsDescription,
     &moho::snd_ExtraDoWorkCalls
   );
 
-  // `CleanupStartupConCommand` / `RegisterStartupConVar` now live in
-  // CConCommand.h so every subsystem's registration translation unit shares one
-  // definition instead of re-emitting a private copy. The `register_*` /
-  // `cleanup_*` bodies below sit in `namespace moho` and pick them up by
-  // ordinary unqualified lookup.
-
-  void RegisterStartupConFunc(
-    CConFunc& conFunc,
-    const char* const description,
-    const char* const name,
-    const CConFunc::Callback callback,
-    void (*cleanupFn)()
-  ) noexcept
-  {
-    conFunc.InitializeRecovered(description, name, callback);
-    (void)std::atexit(cleanupFn);
-  }
+  /**
+   * Address: 0x00BC3A50 (FUN_00BC3A50, dynamic initializer for `gTConVar_con_TestVarUByte`)
+   * Address: 0x0041FA70 (FUN_0041FA70, the initializer's constructor call:
+   *   `TConVar<uint8_t>`'s constructor cloned with `this` bound to this global)
+   * Address: 0x00BEED00 (FUN_00BEED00, dynamic atexit destructor for `gTConVar_con_TestVarUByte`)
+   */
+  TConVar<std::uint8_t> gTConVar_con_TestVarUByte(
+    "con_TestVarUByte",
+    kConsoleStartupTestVarDescription,
+    &moho::con_TestVarUByte
+  );
 } // namespace
-
-namespace moho
-{
-  /**
-   * Address: 0x00BF1C20 (FUN_00BF1C20, ??1CConFunc_p4_Edit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `p4_Edit`.
-   */
-  void cleanup_CConFunc_p4_Edit()
-  {
-    CleanupStartupConCommand(gCConFunc_p4_Edit);
-  }
-
-  /**
-   * Address: 0x00C03F00 (FUN_00C03F00, ??1CConFunc_mesh_Rebatch@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `mesh_Rebatch`.
-   */
-  void cleanup_CConFunc_mesh_Rebatch()
-  {
-    CleanupStartupConCommand(gCConFunc_mesh_Rebatch);
-  }
-
-  /**
-   * Address: 0x00BE0A20 (FUN_00BE0A20, register_CConFunc_mesh_Rebatch)
-   *
-   * What it does:
-   * Registers startup console callback for `mesh_Rebatch`. The store
-   * `Moho__CConFunc_mesh_Rebatch.mFunc = offset Moho__CON_mesh_Rebatch` is the
-   * only reference to `Moho::CON_mesh_Rebatch` anywhere in the image.
-   */
-  void register_CConFunc_mesh_Rebatch()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_mesh_Rebatch,
-      kConsoleStartupConMeshRebatchDescription,
-      "mesh_Rebatch",
-      &moho::CON_mesh_Rebatch,
-      &cleanup_CConFunc_mesh_Rebatch
-    );
-  }
-
-  /**
-   * Address: 0x00BFBF50 (FUN_00BFBF50, ??1CConFunc_EFX_CreateEmitterWindow@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `EFX_CreateEmitterWindow`.
-   */
-  void cleanup_CConFunc_EFX_CreateEmitterWindow()
-  {
-    CleanupStartupConCommand(gCConFunc_EFX_CreateEmitterWindow);
-  }
-
-  /**
-   * Address: 0x00BD44C0 (FUN_00BD44C0, register_CConFunc_EFX_CreateEmitterWindow)
-   *
-   * What it does:
-   * Registers the startup console callback for `EFX_CreateEmitterWindow`. The
-   * store `Moho__CConFunc_EFX_CreateEmitterWindow.mFunc = offset
-   * Moho__EFX_CreateEmitterWindow` at 0x00BD44E0 is the only reference to
-   * `Moho::EFX_CreateEmitterWindow` anywhere in the image. Name and
-   * description are the `.data` initializers the global already carries at
-   * `+0x04`/`+0x08` (0x00F59ED8 / 0x00F59EDC).
-   */
-  void register_CConFunc_EFX_CreateEmitterWindow()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_EFX_CreateEmitterWindow,
-      kConsoleStartupConEfxCreateEmitterWindowDescription,
-      "EFX_CreateEmitterWindow",
-      &moho::EFX_CreateEmitterWindow,
-      &cleanup_CConFunc_EFX_CreateEmitterWindow
-    );
-  }
-
-  /**
-   * Address: 0x00BC76F0 (FUN_00BC76F0, register_CConFunc_p4_Edit)
-   *
-   * What it does:
-   * Registers startup console callback for `p4_Edit`.
-   */
-  void register_CConFunc_p4_Edit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_p4_Edit,
-      kConsoleStartupConP4EditDescription,
-      "p4_Edit",
-      &moho::CON_p4_Edit,
-      &cleanup_CConFunc_p4_Edit
-    );
-  }
-
-  /**
-   * Address: 0x00BF1C50 (FUN_00BF1C50, ??1CConFunc_p4_IsOpenedForEdit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `p4_IsOpenedForEdit`.
-   */
-  void cleanup_CConFunc_p4_IsOpenedForEdit()
-  {
-    CleanupStartupConCommand(gCConFunc_p4_IsOpenedForEdit);
-  }
-
-  /**
-   * Address: 0x00BC7730 (FUN_00BC7730, register_CConFunc_p4_IsOpenedForEdit)
-   *
-   * What it does:
-   * Registers startup console callback for `p4_IsOpenedForEdit`.
-   */
-  void register_CConFunc_p4_IsOpenedForEdit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_p4_IsOpenedForEdit,
-      kConsoleStartupConP4IsOpenedForEditDescription,
-      "p4_IsOpenedForEdit",
-      &moho::CON_p4_IsOpenedForEdit,
-      &cleanup_CConFunc_p4_IsOpenedForEdit
-    );
-  }
-
-  /**
-   * Address: 0x00C08250 (FUN_00C08250, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SkipUIChecks`.
-   */
-  void cleanup_CConFunc_SkipUIChecks()
-  {
-    CleanupStartupConCommand(gCConFunc_SkipUIChecks);
-  }
-
-  /**
-   * Address: 0x00BE77D0 (FUN_00BE77D0, register_CConFunc_SkipUIChecks)
-   *
-   * What it does:
-   * Registers startup console callback for `SkipUIChecks`. The store
-   * `dword_F5B7B0 = offset sub_897580` at 0x00BE77DC is the only reference to
-   * `Moho::SkipUIChecks` anywhere in the image.
-   */
-  void register_CConFunc_SkipUIChecks()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_SkipUIChecks,
-      kConsoleStartupSkipUIChecksDescription,
-      "SkipUIChecks",
-      &moho::SkipUIChecks,
-      &cleanup_CConFunc_SkipUIChecks
-    );
-  }
-
-  /**
-   * Address: 0x00C08280 (FUN_00C08280, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_RestartBeat`.
-   */
-  void cleanup_CConFunc_WLD_RestartBeat()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_RestartBeat);
-  }
-
-  /**
-   * Address: 0x00BE7810 (FUN_00BE7810, register_CConFunc_WLD_RestartBeat)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_RestartBeat`. The store
-   * `dword_F5B7C0 = offset sub_897630` at 0x00BE781C is the only reference to
-   * `Moho::WLD_RestartBeat` anywhere in the image.
-   */
-  void register_CConFunc_WLD_RestartBeat()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_RestartBeat,
-      kConsoleStartupWLDRestartBeatDescription,
-      "WLD_RestartBeat",
-      &moho::WLD_RestartBeat,
-      &cleanup_CConFunc_WLD_RestartBeat
-    );
-  }
-
-  /**
-   * Address: 0x00C082B0 (FUN_00C082B0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_AdvanceBeat`.
-   */
-  void cleanup_CConFunc_WLD_AdvanceBeat()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_AdvanceBeat);
-  }
-
-  /**
-   * Address: 0x00BE7850 (FUN_00BE7850, register_CConFunc_WLD_AdvanceBeat)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_AdvanceBeat`. The store
-   * `dword_F5B7D0 = offset sub_8976D0` at 0x00BE785C is the only reference to
-   * `Moho::WLD_AdvanceBeat` anywhere in the image.
-   */
-  void register_CConFunc_WLD_AdvanceBeat()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_AdvanceBeat,
-      kConsoleStartupWLDAdvanceBeatDescription,
-      "WLD_AdvanceBeat",
-      &moho::WLD_AdvanceBeat,
-      &cleanup_CConFunc_WLD_AdvanceBeat
-    );
-  }
-
-  /**
-   * Address: 0x00C07FF0 (FUN_00C07FF0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_SingleStep`.
-   */
-  void cleanup_CConFunc_WLD_SingleStep()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_SingleStep);
-  }
-
-  /**
-   * Address: 0x00BE7430 (FUN_00BE7430, register_CConFunc_WLD_SingleStep)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_SingleStep`. The store
-   * `dword_F5B740 = offset sub_88E0B0` at 0x00BE743C is the only reference to
-   * `Moho::WLD_SingleStep` anywhere in the image.
-   */
-  void register_CConFunc_WLD_SingleStep()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_SingleStep,
-      kConsoleStartupWLDSingleStepDescription,
-      "WLD_SingleStep",
-      &moho::WLD_SingleStep,
-      &cleanup_CConFunc_WLD_SingleStep
-    );
-  }
-
-  /**
-   * Address: 0x00C08020 (FUN_00C08020, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_GameSpeed`.
-   */
-  void cleanup_CConFunc_WLD_GameSpeed()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_GameSpeed);
-  }
-
-  /**
-   * Address: 0x00BE7470 (FUN_00BE7470, register_CConFunc_WLD_GameSpeed)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_GameSpeed`. The store
-   * `dword_F5B750 = offset sub_88E150` at 0x00BE747C is the only reference to
-   * `Moho::WLD_GameSpeed` anywhere in the image.
-   */
-  void register_CConFunc_WLD_GameSpeed()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_GameSpeed,
-      kConsoleStartupWLDGameSpeedDescription,
-      "WLD_GameSpeed",
-      &moho::WLD_GameSpeed,
-      &cleanup_CConFunc_WLD_GameSpeed
-    );
-  }
-
-  /**
-   * Address: 0x00C08E20 (FUN_00C08E20, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `FindUnit`.
-   */
-  void cleanup_CConFunc_FindUnit()
-  {
-    CleanupStartupConCommand(gCConFunc_FindUnit);
-  }
-
-  /**
-   * Address: 0x00BE95C0 (FUN_00BE95C0, register_CConFunc_FindUnit)
-   *
-   * What it does:
-   * Registers startup console callback for `FindUnit`. The store
-   * `dword_F5BEAC = offset sub_8D3CC0` at 0x00BE95CC is the only reference to
-   * `Moho::CON_FindUnit` anywhere in the image.
-   */
-  void register_CConFunc_FindUnit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_FindUnit,
-      kConsoleStartupConFindUnitDescription,
-      "FindUnit",
-      &moho::CON_FindUnit,
-      &cleanup_CConFunc_FindUnit
-    );
-  }
-
-  /**
-   * Address: 0x00C08EB0 (FUN_00C08EB0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_LuaDebugger`.
-   */
-  void cleanup_CConFunc_SC_LuaDebugger()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_LuaDebugger);
-  }
-
-  /**
-   * Address: 0x00BE9680 (FUN_00BE9680, register_CConFunc_SC_LuaDebugger)
-   *
-   * What it does:
-   * Registers startup console callback for `SC_LuaDebugger`. The store
-   * `dword_F5BEDC = offset sub_8D4150` at 0x00BE968C is the only reference to
-   * `Moho::SC_LuaDebugger` anywhere in the image.
-   */
-  void register_CConFunc_SC_LuaDebugger()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_SC_LuaDebugger,
-      kConsoleStartupSCLuaDebuggerDescription,
-      "SC_LuaDebugger",
-      &moho::SC_LuaDebugger,
-      &cleanup_CConFunc_SC_LuaDebugger
-    );
-  }
-
-  /**
-   * Address: 0x00C08050 (FUN_00C08050, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DoSimCommand`.
-   */
-  void cleanup_CConFunc_DoSimCommand()
-  {
-    CleanupStartupConCommand(gCConFunc_DoSimCommand);
-  }
-
-  /**
-   * Address: 0x00BE74D0 (FUN_00BE74D0, register_CConFunc_DoSimCommand)
-   *
-   * What it does:
-   * Registers startup console callback for `DoSimCommand`. The store
-   * `dword_F5B760 = offset sub_88E440` at 0x00BE74F0 is the only reference to
-   * `Moho::DoSimCommand` anywhere in the image.
-   */
-  void register_CConFunc_DoSimCommand()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DoSimCommand,
-      kConsoleStartupDoSimCommandDescription,
-      "DoSimCommand",
-      &moho::DoSimCommand,
-      &cleanup_CConFunc_DoSimCommand
-    );
-  }
-
-  /**
-   * Address: 0x00BF1880 (FUN_00BF1880, ??1CConFunc_exit@Moho@@QAE@XZ)
-   *
-   * What it does:
-   * Unregisters startup command storage for `exit`.
-   */
-  void cleanup_CConFunc_exit()
-  {
-    CleanupStartupConCommand(gCConFunc_exit);
-  }
-
-  /**
-   * Address: 0x00BF18E0 (FUN_00BF18E0, ??1CConFunc_WIN_ToggleLogDialog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WIN_ToggleLogDialog`.
-   */
-  void cleanup_CConFunc_WIN_ToggleLogDialog()
-  {
-    CleanupStartupConCommand(gCConFunc_WIN_ToggleLogDialog);
-  }
-
-  /**
-   * Address: 0x00BF1910 (FUN_00BF1910, ??1CConFunc_WIN_ShowLogDialog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WIN_ShowLogDialog`.
-   */
-  void cleanup_CConFunc_WIN_ShowLogDialog()
-  {
-    CleanupStartupConCommand(gCConFunc_WIN_ShowLogDialog);
-  }
-
-  /**
-   * Address: 0x00BF1960 (FUN_00BF1960, ??1CConFunc_WxInputBox@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WxInputBox`.
-   */
-  void cleanup_CConFunc_WxInputBox()
-  {
-    CleanupStartupConCommand(gCConFunc_WxInputBox);
-  }
-
-  /**
-   * Address: 0x00BC7270 (FUN_00BC7270, register_CConFunc_exit)
-   *
-   * What it does:
-   * Registers the startup console command that exits the application.
-   */
-  void register_CConFunc_exit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_exit,
-      kConsoleStartupConExitDescription,
-      "exit",
-      reinterpret_cast<CConFunc::Callback>(&WIN_AppRequestExit),
-      &cleanup_CConFunc_exit
-    );
-  }
-
-  /**
-   * Address: 0x00BC7360 (FUN_00BC7360, register_CConFunc_WIN_ToggleLogDialog)
-   *
-   * What it does:
-   * Registers the startup console command that toggles the log dialog.
-   */
-  void register_CConFunc_WIN_ToggleLogDialog()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WIN_ToggleLogDialog,
-      kConsoleStartupConWinToggleLogDialogDescription,
-      "WIN_ToggleLogDialog",
-      reinterpret_cast<CConFunc::Callback>(&WIN_ToggleLogDialog),
-      &cleanup_CConFunc_WIN_ToggleLogDialog
-    );
-  }
-
-  /**
-   * Address: 0x00BC73A0 (FUN_00BC73A0, register_CConFunc_WIN_ShowLogDialog)
-   *
-   * What it does:
-   * Registers the startup console command that shows the log dialog.
-   */
-  void register_CConFunc_WIN_ShowLogDialog()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WIN_ShowLogDialog,
-      kConsoleStartupConWinShowLogDialogDescription,
-      "WIN_ShowLogDialog",
-      reinterpret_cast<CConFunc::Callback>(&WIN_ShowLogDialog),
-      &cleanup_CConFunc_WIN_ShowLogDialog
-    );
-  }
-
-  /**
-   * Address: 0x00BC73F0 (FUN_00BC73F0, register_CConFunc_WxInputBox)
-   *
-   * What it does:
-   * Registers the startup console command that opens the wx input box.
-   */
-  void register_CConFunc_WxInputBox()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WxInputBox,
-      kConsoleStartupConWxInputBoxDescription,
-      "WxInputBox",
-      reinterpret_cast<CConFunc::Callback>(&CON_WxInputBox),
-      &cleanup_CConFunc_WxInputBox
-    );
-  }
-
-  /**
-   * Address: 0x00BEE7F0 (FUN_00BEE7F0, ??1CConFunc_PrintStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `PrintStats`.
-   */
-  void cleanup_CConFunc_PrintStats()
-  {
-    CleanupStartupConCommand(gCConFunc_PrintStats);
-  }
-
-  /**
-   * Address: 0x00BC3440 (FUN_00BC3440, register_CConFunc_PrintStats)
-   *
-   * What it does:
-   * Registers startup console callback for `PrintStats`.
-   */
-  void register_CConFunc_PrintStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_PrintStats,
-      kConsoleStartupConPrintStatsDescription,
-      "PrintStats",
-      &moho::CON_PrintStats,
-      &cleanup_CConFunc_PrintStats
-    );
-  }
-
-  /**
-   * Address: 0x00BEE820 (FUN_00BEE820, ??1CConFunc_ClearStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ClearStats`.
-   */
-  void cleanup_CConFunc_ClearStats()
-  {
-    CleanupStartupConCommand(gCConFunc_ClearStats);
-  }
-
-  /**
-   * Address: 0x00BC3480 (FUN_00BC3480, register_CConFunc_ClearStats)
-   *
-   * What it does:
-   * Registers startup console callback for `ClearStats`.
-   */
-  void register_CConFunc_ClearStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ClearStats,
-      kConsoleStartupConClearStatsDescription,
-      "ClearStats",
-      &moho::CON_ClearStats,
-      &cleanup_CConFunc_ClearStats
-    );
-  }
-
-  /**
-   * Address: 0x00BEE850 (FUN_00BEE850, ??1CConFunc_BeginLoggingStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `BeginLoggingStats`.
-   */
-  void cleanup_CConFunc_BeginLoggingStats()
-  {
-    CleanupStartupConCommand(gCConFunc_BeginLoggingStats);
-  }
-
-  /**
-   * Address: 0x00BC34C0 (FUN_00BC34C0, register_CConFunc_BeginLoggingStats)
-   *
-   * What it does:
-   * Registers startup console callback for `BeginLoggingStats`.
-   */
-  void register_CConFunc_BeginLoggingStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_BeginLoggingStats,
-      kConsoleStartupConBeginLoggingStatsDescription,
-      "BeginLoggingStats",
-      &moho::CON_BeginLoggingStats,
-      &cleanup_CConFunc_BeginLoggingStats
-    );
-  }
-
-  /**
-   * Address: 0x00BEE880 (FUN_00BEE880, ??1CConFunc_EndLoggingStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `EndLoggingStats`.
-   */
-  void cleanup_CConFunc_EndLoggingStats()
-  {
-    CleanupStartupConCommand(gCConFunc_EndLoggingStats);
-  }
-
-  /**
-   * Address: 0x00BC3500 (FUN_00BC3500, register_CConFunc_EndLoggingStats)
-   *
-   * What it does:
-   * Registers startup console callback for `EndLoggingStats`.
-   */
-  void register_CConFunc_EndLoggingStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_EndLoggingStats,
-      kConsoleStartupConEndLoggingStatsDescription,
-      "EndLoggingStats",
-      &moho::CON_EndLoggingStats,
-      &cleanup_CConFunc_EndLoggingStats
-    );
-  }
-
-  /**
-   * Address: 0x00BEEC10 (FUN_00BEEC10, ??1CConFunc_CON_Echo@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CON_Echo`.
-   */
-  void cleanup_CConFunc_CON_Echo()
-  {
-    CleanupStartupConCommand(gCConFunc_CON_Echo);
-  }
-
-  /**
-   * Address: 0x00BC3910 (FUN_00BC3910, register_CConFunc_CON_Echo)
-   *
-   * What it does:
-   * Registers startup console callback for `CON_Echo`.
-   */
-  void register_CConFunc_CON_Echo()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CON_Echo,
-      kConsoleStartupConEchoDescription,
-      "CON_Echo",
-      &moho::CON_Echo,
-      &cleanup_CConFunc_CON_Echo
-    );
-  }
-
-  /**
-   * Address: 0x00BEEC40 (FUN_00BEEC40, ??1CConFunc_CON_ListCommands@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CON_ListCommands`.
-   */
-  void cleanup_CConFunc_CON_ListCommands()
-  {
-    CleanupStartupConCommand(gCConFunc_CON_ListCommands);
-  }
-
-  /**
-   * Address: 0x00BC3950 (FUN_00BC3950, register_CConFunc_CON_ListCommands)
-   *
-   * What it does:
-   * Registers startup console callback for `CON_ListCommands`.
-   */
-  void register_CConFunc_CON_ListCommands()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CON_ListCommands,
-      kConsoleStartupConListCommandsDescription,
-      "CON_ListCommands",
-      &moho::CON_ListCommands,
-      &cleanup_CConFunc_CON_ListCommands
-    );
-  }
-
-  /**
-   * Address: 0x00BF0C90 (FUN_00BF0C90, ??1CConFunc_LUADOC@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `LUADOC`.
-   */
-  void cleanup_CConFunc_LUADOC()
-  {
-    CleanupStartupConCommand(gCConFunc_LUADOC);
-  }
-
-  /**
-   * Address: 0x00BC6450 (FUN_00BC6450, register_CConFunc_LUADOC)
-   *
-   * What it does:
-   * Registers startup console callback for `LUADOC`.
-   */
-  void register_CConFunc_LUADOC()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_LUADOC,
-      kConsoleStartupConLuaDocDescription,
-      "LUADOC",
-      &moho::CON_LUADOC,
-      &cleanup_CConFunc_LUADOC
-    );
-  }
-
-  /**
-   * Address: 0x00C08820 (FUN_00C08820, ??1CConFunc_LUA@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `LUA`.
-   */
-  void cleanup_CConFunc_LUA()
-  {
-    CleanupStartupConCommand(gCConFunc_LUA);
-  }
-
-  /**
-   * Address: 0x00BE8A20 (FUN_00BE8A20, register_CConFunc_LUA)
-   *
-   * What it does:
-   * Registers startup console callback for `LUA`.
-   */
-  void register_CConFunc_LUA()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_LUA,
-      kConsoleStartupConLuaDescription,
-      "LUA",
-      &moho::CON_LUA,
-      &cleanup_CConFunc_LUA
-    );
-  }
-
-  /**
-   * Address: 0x00C03750 (FUN_00C03750, ??1CConFunc_ExecutePasteBuffer@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ExecutePasteBuffer`.
-   */
-  void cleanup_CConFunc_ExecutePasteBuffer()
-  {
-    CleanupStartupConCommand(gCConFunc_ExecutePasteBuffer);
-  }
-
-  /**
-   * Address: 0x00BDF9D0 (FUN_00BDF9D0, register_CConFunc_ExecutePasteBuffer)
-   *
-   * What it does:
-   * Registers startup console callback for `ExecutePasteBuffer`.
-   */
-  void register_CConFunc_ExecutePasteBuffer()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ExecutePasteBuffer,
-      kConsoleStartupConExecutePasteBufferDescription,
-      "ExecutePasteBuffer",
-      reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecutePasteBuffer),
-      &cleanup_CConFunc_ExecutePasteBuffer
-    );
-  }
-
-  /**
-   * Address: 0x00C03620 (FUN_00C03620, ??1CConFunc_UI_ResetView@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_ResetView`.
-   */
-  void cleanup_CConFunc_UI_ResetView()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_ResetView);
-  }
-
-  /**
-   * Address: 0x00BDF780 (FUN_00BDF780, register_CConFunc_UI_ResetView)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_ResetView`.
-   */
-  void register_CConFunc_UI_ResetView()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_ResetView,
-      kConsoleStartupConUiResetViewDescription,
-      "UI_ResetView",
-      &moho::UI_ResetView,
-      &cleanup_CConFunc_UI_ResetView
-    );
-  }
-
-  /**
-   * Address: 0x00C06760 (FUN_00C06760, ??1CConFunc_IN_BindKey@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `IN_BindKey`.
-   */
-  void cleanup_CConFunc_IN_BindKey()
-  {
-    CleanupStartupConCommand(gCConFunc_IN_BindKey);
-  }
-
-  /**
-   * Address: 0x00BE4850 (FUN_00BE4850, register_CConFunc_IN_BindKey)
-   *
-   * What it does:
-   * Registers the `IN_BindKey` console name and exact description, stores the
-   * recovered callback at CConFunc +0x0C, and schedules its cleanup at exit.
-   */
-  void register_CConFunc_IN_BindKey()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_IN_BindKey,
-      kConsoleStartupConInBindKeyDescription,
-      "IN_BindKey",
-      &moho::IN_BindKey,
-      &cleanup_CConFunc_IN_BindKey
-    );
-  }
-
-  /**
-   * Address: 0x00C06790 (FUN_00C06790, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `IN_DumpKeyBindings`.
-   */
-  void cleanup_CConFunc_IN_DumpKeyBindings()
-  {
-    CleanupStartupConCommand(gCConFunc_IN_DumpKeyBindings);
-  }
-
-  /**
-   * Address: 0x00BE4890 (FUN_00BE4890, register_CConFunc_IN_DumpKeyBindings)
-   *
-   * What it does:
-   * Registers the `IN_DumpKeyBindings` startup console callback with its exact
-   * command metadata (name and description read from the registrar's
-   * stru_F5B19C in the PE .data image: name pointer 0x00E43CC4
-   * "IN_DumpKeyBindings", description pointer 0x00E43CA8 "Shows all the key
-   * bindings") and schedules the generated command-object cleanup lane.
-   *
-   * The registrar stores the callback at CConFunc +0x0C as
-   * `mov dword ptr [0x00F5B1A8], 0x0083A070` -- the address of a five-byte
-   * `jmp` thunk onto the command body at 0x00839DC0, which is why the body
-   * itself carries no direct caller.
-   */
-  void register_CConFunc_IN_DumpKeyBindings()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_IN_DumpKeyBindings,
-      kConsoleStartupConInDumpKeyBindingsDescription,
-      "IN_DumpKeyBindings",
-      &moho::IN_DumpKeyBindings,
-      &cleanup_CConFunc_IN_DumpKeyBindings
-    );
-  }
-
-  /**
-   * Address: 0x00C067C0 (FUN_00C067C0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `IN_SetKeyName`.
-   */
-  void cleanup_CConFunc_IN_SetKeyName()
-  {
-    CleanupStartupConCommand(gCConFunc_IN_SetKeyName);
-  }
-
-  /**
-   * Address: 0x00BE48D0 (FUN_00BE48D0, register_CConFunc_IN_SetKeyName)
-   *
-   * What it does:
-   * Registers the `IN_SetKeyName` startup console callback with its exact
-   * command metadata (name and description confirmed from the registrar's
-   * stru_F5B1AC in the PE .data image) and schedules the generated
-   * command-object cleanup lane.
-   */
-  void register_CConFunc_IN_SetKeyName()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_IN_SetKeyName,
-      kConsoleStartupConInSetKeyNameDescription,
-      "IN_SetKeyName",
-      &moho::IN_SetKeyName,
-      &cleanup_CConFunc_IN_SetKeyName
-    );
-  }
-
-  // Compiler-generated global cleanup lane for FUN_00BE4910's atexit callee.
-  // The owning source construct is the typed CConFunc object registered
-  // below; no standalone engine behavior is attached to that artifact
-  // address.
-  void cleanup_CConFunc_IN_DumpKeyNames()
-  {
-    CleanupStartupConCommand(gCConFunc_IN_DumpKeyNames);
-  }
-
-  /**
-   * Address: 0x00BE4910 (FUN_00BE4910, register_CConFunc_IN_DumpKeyNames)
-   *
-   * What it does:
-   * Registers the `IN_DumpKeyNames` startup console callback with its exact
-   * command metadata (name and description confirmed from the registrar's
-   * stru_F5B1BC in the PE .data image) and schedules the generated
-   * command-object cleanup lane.
-   */
-  void register_CConFunc_IN_DumpKeyNames()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_IN_DumpKeyNames,
-      kConsoleStartupConInDumpKeyNamesDescription,
-      "IN_DumpKeyNames",
-      &moho::IN_DumpKeyNames,
-      &cleanup_CConFunc_IN_DumpKeyNames
-    );
-  }
-
-  /**
-   * Address: 0x00BF0D10 (FUN_00BF0D10, ??1CConFunc_GetVersion@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `GetVersion`.
-   */
-  void cleanup_CConFunc_GetVersion()
-  {
-    CleanupStartupConCommand(gCConFunc_GetVersion);
-  }
-
-  /**
-   * Address: 0x00BC6630 (FUN_00BC6630, register_CConFunc_GetVersion)
-   *
-   * What it does:
-   * Registers startup console callback for `GetVersion`.
-   */
-  void register_CConFunc_GetVersion()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_GetVersion,
-      kConsoleStartupConGetVersionDescription,
-      "GetVersion",
-      &moho::CON_GetVersion,
-      &cleanup_CConFunc_GetVersion
-    );
-  }
-
-  /**
-   * Address: 0x00BEEC70 (FUN_00BEEC70, ??1CConFunc_CON_ExecuteLastCommand@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CON_ExecuteLastCommand`.
-   */
-  void cleanup_CConFunc_CON_ExecuteLastCommand()
-  {
-    CleanupStartupConCommand(gCConFunc_CON_ExecuteLastCommand);
-  }
-
-  /**
-   * Address: 0x00BC3990 (FUN_00BC3990, register_CConFunc_CON_ExecuteLastCommand)
-   *
-   * What it does:
-   * Registers startup console callback for `CON_ExecuteLastCommand`.
-   */
-  void register_CConFunc_CON_ExecuteLastCommand()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CON_ExecuteLastCommand,
-      kConsoleStartupConExecuteLastCommandDescription,
-      "CON_ExecuteLastCommand",
-      reinterpret_cast<CConFunc::Callback>(&moho::CON_ExecuteLastCommand),
-      &cleanup_CConFunc_CON_ExecuteLastCommand
-    );
-  }
-
-  /**
-   * Address: 0x00C036D0 (FUN_00C036D0, ??1CConFunc_ANI_DumpSkeleton@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ANI_DumpSkeleton`.
-   */
-  void cleanup_CConFunc_ANI_DumpSkeleton()
-  {
-    CleanupStartupConCommand(gCConFunc_ANI_DumpSkeleton);
-  }
-
-  /**
-   * Address: 0x00BDF8D0 (FUN_00BDF8D0, register_CConFunc_ANI_DumpSkeleton)
-   *
-   * What it does:
-   * Registers startup console callback for `ANI_DumpSkeleton`. The store
-   * `Moho__CConFunc_ANI_DumpSkeleton.mFunc = offset Moho__ANI_DumpSkeleton`
-   * at 0x00BDF8F0 is the only reference to `Moho::ANI_DumpSkeleton` in the
-   * image. `Moho::ANI_DumpSkeleton` takes no arguments, so it is cast to
-   * `CConFunc::Callback` the same way the other zero-argument command in
-   * this file (`CON_ExecuteLastCommand`, above) is.
-   */
-  void register_CConFunc_ANI_DumpSkeleton()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ANI_DumpSkeleton,
-      kConsoleStartupConAniDumpSkeletonDescription,
-      "ANI_DumpSkeleton",
-      reinterpret_cast<CConFunc::Callback>(&moho::ANI_DumpSkeleton),
-      &cleanup_CConFunc_ANI_DumpSkeleton
-    );
-  }
-
-  /**
-   * Address: 0x00BEECA0 (FUN_00BEECA0, ??1TConVar_con_TestVarBool@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `con_TestVarBool`.
-   */
-  void cleanup_TConVar_con_TestVarBool()
-  {
-    CleanupStartupConCommand(gTConVar_con_TestVarBool);
-  }
-
-  /**
-   * Address: 0x00BC39D0 (FUN_00BC39D0, register_TConVar_con_TestVarBool)
-   *
-   * What it does:
-   * Registers startup convar for `con_TestVarBool`.
-   */
-  void register_TConVar_con_TestVarBool()
-  {
-    RegisterStartupConVar(gTConVar_con_TestVarBool, &cleanup_TConVar_con_TestVarBool);
-  }
-
-  /**
-   * Address: 0x00BEECD0 (FUN_00BEECD0, ??1TConVar_con_TestVar@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `con_TestVar`.
-   */
-  void cleanup_TConVar_con_TestVar()
-  {
-    CleanupStartupConCommand(gTConVar_con_TestVar);
-  }
-
-  /**
-   * Address: 0x00BC3A10 (FUN_00BC3A10, register_TConVar_con_TestVar)
-   *
-   * What it does:
-   * Registers startup convar for `con_TestVar`.
-   */
-  void register_TConVar_con_TestVar()
-  {
-    RegisterStartupConVar(gTConVar_con_TestVar, &cleanup_TConVar_con_TestVar);
-  }
-
-  /**
-   * Address: 0x00BEED00 (FUN_00BEED00, ??1ConVar_con_TestVarUByte@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `con_TestVarUByte`.
-   */
-  void cleanup_ConVar_con_TestVarUByte()
-  {
-    StartupConVar_con_TestVarUByte().~ConVar_con_TestVarUByte();
-  }
-
-  /**
-   * Address: 0x00BC3A50 (FUN_00BC3A50, register_ConVar_con_TestVarUByte)
-   *
-   * What it does:
-   * Constructs and registers startup convar storage for `con_TestVarUByte`.
-   */
-  void register_ConVar_con_TestVarUByte()
-  {
-    new (&StartupConVar_con_TestVarUByte()) ConVar_con_TestVarUByte();
-    (void)std::atexit(&cleanup_ConVar_con_TestVarUByte);
-  }
-
-  /**
-   * Address: 0x00BEED30 (FUN_00BEED30, ??1TConVar_con_TestVarFloat@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `con_TestVarFloat`.
-   */
-  void cleanup_TConVar_con_TestVarFloat()
-  {
-    CleanupStartupConCommand(gTConVar_con_TestVarFloat);
-  }
-
-  /**
-   * Address: 0x00BC3A70 (FUN_00BC3A70, register_TConVar_con_TestVarFloat)
-   *
-   * What it does:
-   * Registers startup convar for `con_TestVarFloat`.
-   */
-  void register_TConVar_con_TestVarFloat()
-  {
-    RegisterStartupConVar(gTConVar_con_TestVarFloat, &cleanup_TConVar_con_TestVarFloat);
-  }
-
-  /**
-   * Address: 0x00BEED60 (FUN_00BEED60, sub_BEED60)
-   *
-   * What it does:
-   * Clears startup string storage for `con_TestVarStr`.
-   */
-  void cleanup_con_TestVarStr()
-  {
-    con_TestVarStr.tidy(true, 0U);
-  }
-
-  /**
-   * Address: 0x00BC3AB0 (FUN_00BC3AB0, register_con_TestVarStr)
-   *
-   * What it does:
-   * Initializes startup string storage for `con_TestVarStr`.
-   */
-  void register_con_TestVarStr()
-  {
-    con_TestVarStr.assign_owned("string");
-    (void)std::atexit(&cleanup_con_TestVarStr);
-  }
-
-  /**
-   * Address: 0x00BEED90 (FUN_00BEED90, ??1TConVar_con_TestVarStr@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `con_TestVarStr`.
-   */
-  void cleanup_TConVar_con_TestVarStr()
-  {
-    CleanupStartupConCommand(gTConVar_con_TestVarStr);
-  }
-
-  /**
-   * Address: 0x00BC3AD0 (FUN_00BC3AD0, register_TConVar_con_TestVarStr)
-   *
-   * What it does:
-   * Registers startup convar for `con_TestVarStr`.
-   */
-  void register_TConVar_con_TestVarStr()
-  {
-    RegisterStartupConVar(gTConVar_con_TestVarStr, &cleanup_TConVar_con_TestVarStr);
-  }
-
-  /**
-   * Address: 0x00BEEF30 (FUN_00BEEF30, ??1TConVar_graphics_Fidelity@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `graphics_Fidelity`.
-   */
-  void cleanup_TConVar_graphics_Fidelity()
-  {
-    CleanupStartupConCommand(gTConVar_graphics_Fidelity);
-  }
-
-  /**
-   * Address: 0x00BC3D00 (FUN_00BC3D00, register_TConVar_graphics_Fidelity)
-   *
-   * What it does:
-   * Registers startup convar for `graphics_Fidelity`.
-   */
-  void register_TConVar_graphics_Fidelity()
-  {
-    RegisterStartupConVar(gTConVar_graphics_Fidelity, &cleanup_TConVar_graphics_Fidelity);
-  }
-
-  /**
-   * Address: 0x00BEEF60 (FUN_00BEEF60, ??1TConVar_graphics_FidelitySupported@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `graphics_FidelitySupported`.
-   */
-  void cleanup_TConVar_graphics_FidelitySupported()
-  {
-    CleanupStartupConCommand(gTConVar_graphics_FidelitySupported);
-  }
-
-  /**
-   * Address: 0x00BC3D40 (FUN_00BC3D40, register_TConVar_graphics_FidelitySupported)
-   *
-   * What it does:
-   * Registers startup convar for `graphics_FidelitySupported`.
-   */
-  void register_TConVar_graphics_FidelitySupported()
-  {
-    RegisterStartupConVar(gTConVar_graphics_FidelitySupported, &cleanup_TConVar_graphics_FidelitySupported);
-  }
-
-  /**
-   * Address: 0x00BEEF90 (FUN_00BEEF90, ??1TConVar_shadow_Fidelity@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `shadow_Fidelity`.
-   */
-  void cleanup_TConVar_shadow_Fidelity()
-  {
-    CleanupStartupConCommand(gTConVar_shadow_Fidelity);
-  }
-
-  /**
-   * Address: 0x00BC3D80 (FUN_00BC3D80, register_TConVar_shadow_Fidelity)
-   *
-   * What it does:
-   * Registers startup convar for `shadow_Fidelity`.
-   */
-  void register_TConVar_shadow_Fidelity()
-  {
-    RegisterStartupConVar(gTConVar_shadow_Fidelity, &cleanup_TConVar_shadow_Fidelity);
-  }
-
-  /**
-   * Address: 0x00BEEFC0 (FUN_00BEEFC0, ??1TConVar_shadow_FidelitySupported@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `shadow_FidelitySupported`.
-   */
-  void cleanup_TConVar_shadow_FidelitySupported()
-  {
-    CleanupStartupConCommand(gTConVar_shadow_FidelitySupported);
-  }
-
-  /**
-   * Address: 0x00BC3DC0 (FUN_00BC3DC0, register_TConVar_shadow_FidelitySupported)
-   *
-   * What it does:
-   * Registers startup convar for `shadow_FidelitySupported`.
-   */
-  void register_TConVar_shadow_FidelitySupported()
-  {
-    RegisterStartupConVar(gTConVar_shadow_FidelitySupported, &cleanup_TConVar_shadow_FidelitySupported);
-  }
-
-  /**
-   * Address: 0x00BEEFF0 (FUN_00BEEFF0, ??1TConVar_d3d_UseRefRast@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `d3d_UseRefRast`.
-   */
-  void cleanup_TConVar_d3d_UseRefRast()
-  {
-    CleanupStartupConCommand(gTConVar_d3d_UseRefRast);
-  }
-
-  /**
-   * Address: 0x00BC3E00 (FUN_00BC3E00, register_TConVar_d3d_UseRefRast)
-   *
-   * What it does:
-   * Registers startup convar for `d3d_UseRefRast`.
-   */
-  void register_TConVar_d3d_UseRefRast()
-  {
-    RegisterStartupConVar(gTConVar_d3d_UseRefRast, &cleanup_TConVar_d3d_UseRefRast);
-  }
-
-  /**
-   * Address: 0x00BEF020 (FUN_00BEF020, ??1TConVar_d3d_ForceSoftwareVP@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `d3d_ForceSoftwareVP`.
-   */
-  void cleanup_TConVar_d3d_ForceSoftwareVP()
-  {
-    CleanupStartupConCommand(gTConVar_d3d_ForceSoftwareVP);
-  }
-
-  /**
-   * Address: 0x00BC3E40 (FUN_00BC3E40, register_TConVar_d3d_ForceSoftwareVP)
-   *
-   * What it does:
-   * Registers startup convar for `d3d_ForceSoftwareVP`.
-   */
-  void register_TConVar_d3d_ForceSoftwareVP()
-  {
-    RegisterStartupConVar(gTConVar_d3d_ForceSoftwareVP, &cleanup_TConVar_d3d_ForceSoftwareVP);
-  }
-
-  /**
-   * Address: 0x00BEF050 (FUN_00BEF050, ??1TConVar_d3d_NoPureDevice@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `d3d_NoPureDevice`.
-   */
-  void cleanup_TConVar_d3d_NoPureDevice()
-  {
-    CleanupStartupConCommand(gTConVar_d3d_NoPureDevice);
-  }
-
-  /**
-   * Address: 0x00BC3E80 (FUN_00BC3E80, register_TConVar_d3d_NoPureDevice)
-   *
-   * What it does:
-   * Registers startup convar for `d3d_NoPureDevice`.
-   */
-  void register_TConVar_d3d_NoPureDevice()
-  {
-    RegisterStartupConVar(gTConVar_d3d_NoPureDevice, &cleanup_TConVar_d3d_NoPureDevice);
-  }
-
-  /**
-   * Address: 0x00BEF080 (FUN_00BEF080, ??1TConVar_d3d_ForceDirect3DDebugEnabled@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `d3d_ForceDirect3DDebugEnabled`.
-   */
-  void cleanup_TConVar_d3d_ForceDirect3DDebugEnabled()
-  {
-    CleanupStartupConCommand(gTConVar_d3d_ForceDirect3DDebugEnabled);
-  }
-
-  /**
-   * Address: 0x00BC3EC0 (FUN_00BC3EC0, register_TConVar_d3d_ForceDirect3DDebugEnabled)
-   *
-   * What it does:
-   * Registers startup convar for `d3d_ForceDirect3DDebugEnabled`.
-   */
-  void register_TConVar_d3d_ForceDirect3DDebugEnabled()
-  {
-    RegisterStartupConVar(gTConVar_d3d_ForceDirect3DDebugEnabled, &cleanup_TConVar_d3d_ForceDirect3DDebugEnabled);
-  }
-
-  /**
-   * Address: 0x00BEF0B0 (FUN_00BEF0B0, ??1TConVar_d3d_WindowsCursor@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `d3d_WindowsCursor`.
-   */
-  void cleanup_TConVar_d3d_WindowsCursor()
-  {
-    CleanupStartupConCommand(gTConVar_d3d_WindowsCursor);
-  }
-
-  /**
-   * Address: 0x00BC3F00 (FUN_00BC3F00, register_TConVar_d3d_WindowsCursor)
-   *
-   * What it does:
-   * Registers startup convar for `d3d_WindowsCursor`.
-   */
-  void register_TConVar_d3d_WindowsCursor()
-  {
-    RegisterStartupConVar(gTConVar_d3d_WindowsCursor, &cleanup_TConVar_d3d_WindowsCursor);
-  }
-
-  /**
-   * Address: 0x00BF0D80 (FUN_00BF0D80, ??1TConVar_snd_ExtraDoWorkCalls@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `snd_ExtraDoWorkCalls`.
-   */
-  void cleanup_TConVar_snd_ExtraDoWorkCalls()
-  {
-    CleanupStartupConCommand(gTConVar_snd_ExtraDoWorkCalls);
-  }
-
-  /**
-   * Address: 0x00BC6780 (FUN_00BC6780, register_TConVar_snd_ExtraDoWorkCalls)
-   *
-   * What it does:
-   * Registers startup convar for `snd_ExtraDoWorkCalls`.
-   */
-  void register_TConVar_snd_ExtraDoWorkCalls()
-  {
-    RegisterStartupConVar(gTConVar_snd_ExtraDoWorkCalls, &cleanup_TConVar_snd_ExtraDoWorkCalls);
-  }
-
-  /**
-   * Address: 0x00BEF0E0 (FUN_00BEF0E0, ??1CConFunc_d3d_AntiAliasingSamples@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `d3d_AntiAliasingSamples`.
-   */
-  void cleanup_CConFunc_d3d_AntiAliasingSamples()
-  {
-    CleanupStartupConCommand(gCConFunc_d3d_AntiAliasingSamples);
-  }
-
-  /**
-   * Address: 0x00BC3F40 (FUN_00BC3F40, register_CConFunc_d3d_AntiAliasingSamples)
-   *
-   * What it does:
-   * Registers startup command callback for `d3d_AntiAliasingSamples`.
-   */
-  void register_CConFunc_d3d_AntiAliasingSamples()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_d3d_AntiAliasingSamples,
-      kConsoleStartupConD3DAntiAliasingSamplesDescription,
-      "d3d_AntiAliasingSamples",
-      &CD3DEffect::CON_d3d_AntiAliasingSamples,
-      &cleanup_CConFunc_d3d_AntiAliasingSamples
-    );
-  }
-
-  /**
-   * Address: 0x00BEF1F0 (FUN_00BEF1F0, ??1CConFunc_ren_MipSkipLevels@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ren_MipSkipLevels`.
-   */
-  void cleanup_CConFunc_ren_MipSkipLevels()
-  {
-    CleanupStartupConCommand(gCConFunc_ren_MipSkipLevels);
-  }
-
-  /**
-   * Address: 0x00BC4150 (FUN_00BC4150, register_CConFunc_ren_MipSkipLevels)
-   *
-   * What it does:
-   * Registers startup console callback for `ren_MipSkipLevels`.
-   */
-  void register_CConFunc_ren_MipSkipLevels()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ren_MipSkipLevels,
-      kConsoleStartupConRenMipSkipLevelsDescription,
-      "ren_MipSkipLevels",
-      &CON_ren_MipSkipLevels,
-      &cleanup_CConFunc_ren_MipSkipLevels
-    );
-  }
-
-  /**
-   * Address: 0x00BEF220 (FUN_00BEF220, ??1CConFunc_DumpPreloadedTextures@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DumpPreloadedTextures`.
-   */
-  void cleanup_CConFunc_DumpPreloadedTextures()
-  {
-    CleanupStartupConCommand(gCConFunc_DumpPreloadedTextures);
-  }
-
-  /**
-   * Address: 0x00BC4190 (FUN_00BC4190, register_CConFunc_DumpPreloadedTextures)
-   *
-   * What it does:
-   * Registers startup console callback for `DumpPreloadedTextures`.
-   */
-  void register_CConFunc_DumpPreloadedTextures()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DumpPreloadedTextures,
-      kConsoleStartupConDumpPreloadedTexturesDescription,
-      "DumpPreloadedTextures",
-      &CON_DumpPreloadedTextures,
-      &cleanup_CConFunc_DumpPreloadedTextures
-    );
-  }
-
-  /**
-   * Address: 0x00C06160 (FUN_00C06160, ??1CConFunc_StartCommandMode@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `StartCommandMode`.
-   */
-  void cleanup_CConFunc_StartCommandMode()
-  {
-    CleanupStartupConCommand(gCConFunc_StartCommandMode);
-  }
-
-  /**
-   * Address: 0x00BE3FF0 (FUN_00BE3FF0, register_CConFunc_StartCommandMode)
-   *
-   * What it does:
-   * Registers startup console callback for `StartCommandMode`. The binary
-   * stores `&Moho::CON_StartCommandMode` into `gCConFunc_StartCommandMode`'s
-   * function-pointer payload at CRT static-init time and schedules the
-   * matching cleanup lane at process exit.
-   */
-  void register_CConFunc_StartCommandMode()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_StartCommandMode,
-      kConsoleStartupConStartCommandModeDescription,
-      "StartCommandMode",
-      &CON_StartCommandMode,
-      &cleanup_CConFunc_StartCommandMode
-    );
-  }
-
-  /**
-   * Address: 0x00C061F0 (FUN_00C061F0, ??1CConFunc_DebugGenerateBuildTemplateFromSelection@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DebugGenerateBuildTemplateFromSelection`.
-   */
-  void cleanup_CConFunc_DebugGenerateBuildTemplateFromSelection()
-  {
-    CleanupStartupConCommand(gCConFunc_DebugGenerateBuildTemplateFromSelection);
-  }
-
-  /**
-   * Address: 0x00BE40B0 (FUN_00BE40B0, register_CConFunc_DebugGenerateBuildTemplateFromSelection)
-   *
-   * What it does:
-   * Registers startup console callback for `DebugGenerateBuildTemplateFromSelection`.
-   */
-  void register_CConFunc_DebugGenerateBuildTemplateFromSelection()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DebugGenerateBuildTemplateFromSelection,
-      kConsoleStartupConDebugGenerateBuildTemplateDescription,
-      "DebugGenerateBuildTemplateFromSelection",
-      &CON_DebugGenerateBuildTemplateFromSelection,
-      &cleanup_CConFunc_DebugGenerateBuildTemplateFromSelection
-    );
-  }
-
-  /**
-   * Address: 0x00C06220 (FUN_00C06220, ??1CConFunc_DebugClearBuildTemplates@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DebugClearBuildTemplates`.
-   */
-  void cleanup_CConFunc_DebugClearBuildTemplates()
-  {
-    CleanupStartupConCommand(gCConFunc_DebugClearBuildTemplates);
-  }
-
-  /**
-   * Address: 0x00BE40F0 (FUN_00BE40F0, register_CConFunc_DebugClearBuildTemplates)
-   *
-   * What it does:
-   * Registers startup console callback for `DebugClearBuildTemplates`.
-   */
-  void register_CConFunc_DebugClearBuildTemplates()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DebugClearBuildTemplates,
-      kConsoleStartupConDebugClearBuildTemplatesDescription,
-      "DebugClearBuildTemplates",
-      &CON_DebugClearBuildTemplates,
-      &cleanup_CConFunc_DebugClearBuildTemplates
-    );
-  }
-
-  /**
-   * Address: 0x00C06100 (FUN_00C06100, ??1CConFunc_CreateProp@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CreateProp`.
-   */
-  void cleanup_CConFunc_CreateProp()
-  {
-    CleanupStartupConCommand(gCConFunc_CreateProp);
-  }
-
-  /**
-   * Address: 0x00BE3F70 (FUN_00BE3F70, register_CConFunc_CreateProp)
-   *
-   * What it does:
-   * Registers startup console callback for `CreateProp`.
-   */
-  void register_CConFunc_CreateProp()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CreateProp,
-      kConsoleStartupConCreatePropDescription,
-      "CreateProp",
-      &CON_CreateProp,
-      &cleanup_CConFunc_CreateProp
-    );
-  }
-
-  /**
-   * Address: 0x00C060A0 (FUN_00C060A0, ??1CConFunc_CreateUnit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CreateUnit`.
-   */
-  void cleanup_CConFunc_CreateUnit()
-  {
-    CleanupStartupConCommand(gCConFunc_CreateUnit);
-  }
-
-  /**
-   * Address: 0x00BE3EF0 (FUN_00BE3EF0, register_CConFunc_CreateUnit)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_00832C50.xrefs.txt` -> `code from=0x00BE3F10 owner=0x00BE3EF0 type= 1
-   * from_name=register_CConFunc_CreateUnit owner_name=register_CConFunc_CreateUnit`
-   * (`mov Moho__CConFunc_CreateUnit.mFunc, offset Moho__CON_CreateUnit`).
-   *
-   * What it does:
-   * Registers startup console callback for `CreateUnit` and schedules the
-   * matching cleanup lane at process exit.
-   */
-  void register_CConFunc_CreateUnit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CreateUnit,
-      kConsoleStartupConCreateUnitDescription,
-      "CreateUnit",
-      &CON_CreateUnit,
-      &cleanup_CConFunc_CreateUnit
-    );
-  }
-
-  /**
-   * Address: 0x00C060D0 (FUN_00C060D0, ??1CConFunc_LotsOfProps@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `LotsOfProps`.
-   */
-  void cleanup_CConFunc_LotsOfProps()
-  {
-    CleanupStartupConCommand(gCConFunc_LotsOfProps);
-  }
-
-  /**
-   * Address: 0x00BE3F30 (FUN_00BE3F30, register_CConFunc_LotsOfProps)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_008330B0.xrefs.txt` -> `code from=0x00BE3F50 owner=0x00BE3F30 type= 1
-   * from_name=register_CConFunc_LotsOfProps owner_name=register_CConFunc_LotsOfProps`
-   * (`mov Moho__CConFunc_LotsOfProps.mFunc, offset Moho__CON_LotsOfProps`).
-   *
-   * What it does:
-   * Registers startup console callback for `LotsOfProps`.
-   */
-  void register_CConFunc_LotsOfProps()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_LotsOfProps,
-      kConsoleStartupConLotsOfPropsDescription,
-      "LotsOfProps",
-      &CON_LotsOfProps,
-      &cleanup_CConFunc_LotsOfProps
-    );
-  }
-
-  /**
-   * Address: 0x00C06190 (FUN_00C06190, ??1CConFunc_KillSelectedUnits@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `KillSelectedUnits`.
-   */
-  void cleanup_CConFunc_KillSelectedUnits()
-  {
-    CleanupStartupConCommand(gCConFunc_KillSelectedUnits);
-  }
-
-  /**
-   * Address: 0x00BE4030 (FUN_00BE4030, register_CConFunc_KillSelectedUnits)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_00833C70.xrefs.txt` -> `code from=0x00BE4050 owner=0x00BE4030 type= 1
-   * from_name=register_CConFunc_KillSelectedUnits owner_name=register_CConFunc_KillSelectedUnits`
-   * (`mov Moho__CConFunc_KillSelectedUnits.mFunc, offset Moho__CON_CConFunc_KillSelectedUnits`).
-   *
-   * What it does:
-   * Registers startup console callback for `KillSelectedUnits`.
-   */
-  void register_CConFunc_KillSelectedUnits()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_KillSelectedUnits,
-      kConsoleStartupConKillSelectedUnitsDescription,
-      "KillSelectedUnits",
-      &CON_KillSelectedUnits,
-      &cleanup_CConFunc_KillSelectedUnits
-    );
-  }
-
-  /**
-   * Address: 0x00C061C0 (FUN_00C061C0, ??1CConFunc_DestroySelectedUnits@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DestroySelectedUnits`.
-   */
-  void cleanup_CConFunc_DestroySelectedUnits()
-  {
-    CleanupStartupConCommand(gCConFunc_DestroySelectedUnits);
-  }
-
-  /**
-   * Address: 0x00BE4070 (FUN_00BE4070, register_CConFunc_DestroySelectedUnits)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_00833D60.xrefs.txt` -> `code from=0x00BE4090 owner=0x00BE4070 type= 1
-   * from_name=register_CConFunc_DestroySelectedUnits owner_name=register_CConFunc_DestroySelectedUnits`
-   * (`mov Moho__CConFunc_DestroySelectedUnits.mFunc, offset Moho__CON_DestroySelectedUnits`).
-   *
-   * What it does:
-   * Registers startup console callback for `DestroySelectedUnits`.
-   */
-  void register_CConFunc_DestroySelectedUnits()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DestroySelectedUnits,
-      kConsoleStartupConDestroySelectedUnitsDescription,
-      "DestroySelectedUnits",
-      &CON_DestroySelectedUnits,
-      &cleanup_CConFunc_DestroySelectedUnits
-    );
-  }
-
-  /**
-   * Address: 0x00C03720 (FUN_00C03720, ??1CConFunc_CopySelectedUnitsToClipboard@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `CopySelectedUnitsToClipboard`.
-   */
-  void cleanup_CConFunc_CopySelectedUnitsToClipboard()
-  {
-    CleanupStartupConCommand(gCConFunc_CopySelectedUnitsToClipboard);
-  }
-
-  /**
-   * Address: 0x00BDF990 (FUN_00BDF990, register_CConFunc_CopySelectedUnitsToClipboard)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_007B55D0.xrefs.txt` -> `code from=0x00BDF9B0 owner=0x00BDF990 type= 1
-   * from_name=register_CConFunc_CopySelectedUnitsToClipboard owner_name=register_CConFunc_CopySelectedUnitsToClipboard`
-   * (`mov Moho__CConFunc_CopySelectedUnitsToClipboard.mFunc, offset Moho__CON_CopySelectedUnitsToClipboard`).
-   *
-   * What it does:
-   * Registers startup console callback for `CopySelectedUnitsToClipboard`.
-   */
-  void register_CConFunc_CopySelectedUnitsToClipboard()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_CopySelectedUnitsToClipboard,
-      kConsoleStartupConCopySelectedUnitsToClipboardDescription,
-      "CopySelectedUnitsToClipboard",
-      &CON_CopySelectedUnitsToClipboard,
-      &cleanup_CConFunc_CopySelectedUnitsToClipboard
-    );
-  }
-
-  /**
-   * Address: 0x00C08480 (FUN_00C08480, ??1CConFunc_AddSplat@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `AddSplat`.
-   */
-  void cleanup_CConFunc_AddSplat()
-  {
-    CleanupStartupConCommand(gCConFunc_AddSplat);
-  }
-
-  /**
-   * Address: 0x00BE7CE0 (FUN_00BE7CE0, register_CConFunc_AddSplat)
-   *
-   * Callsite evidence (class 2, data xref into a function-pointer table):
-   * `FUN_0089E3C0.xrefs.txt` -> `code from=0x00BE7D00 owner=0x00BE7CE0 ...
-   * mov Moho__CConFunc_AddSplat.mFunc, offset Moho__CON_AddSplat`.
-   *
-   * What it does:
-   * Registers startup console callback for `AddSplat`.
-   */
-  void register_CConFunc_AddSplat()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_AddSplat,
-      kConsoleStartupConAddSplatDescription,
-      "AddSplat",
-      &CON_AddSplat,
-      &cleanup_CConFunc_AddSplat
-    );
-  }
-
-  /**
-   * Address: 0x00C06280 (FUN_00C06280, ??1CConFunc_ProcessInfoPair@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ProcessInfoPair`.
-   */
-  void cleanup_CConFunc_ProcessInfoPair()
-  {
-    CleanupStartupConCommand(gCConFunc_ProcessInfoPair);
-  }
-
-  /**
-   * Address: 0x00BE4170 (FUN_00BE4170, register_CConFunc_ProcessInfoPair)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_00834240.xrefs.txt` -> `code from=0x00BE4190 owner=0x00BE4170 type= 1
-   * from_name=register_CConFunc_ProcessInfoPair owner_name=register_CConFunc_ProcessInfoPair`
-   * (`mov Moho__CConFunc_ProcessInfoPair.mFunc, offset Moho__CON_ProcessInfoPair`).
-   *
-   * What it does:
-   * Registers startup console callback for `ProcessInfoPair`.
-   */
-  void register_CConFunc_ProcessInfoPair()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ProcessInfoPair,
-      kConsoleStartupConProcessInfoPairDescription,
-      "ProcessInfoPair",
-      &CON_ProcessInfoPair,
-      &cleanup_CConFunc_ProcessInfoPair
-    );
-  }
-
-  /**
-   * Address: 0x00C062B0 (FUN_00C062B0, ??1CConFunc_UI_TrackUnit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_TrackUnit`.
-   */
-  void cleanup_CConFunc_UI_TrackUnit()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_TrackUnit);
-  }
-
-  /**
-   * Address: 0x00BE41B0 (FUN_00BE41B0, register_CConFunc_UI_TrackUnit)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_00834460.xrefs.txt` -> `code from=0x00BE41D0 owner=0x00BE41B0 type= 1
-   * from_name=register_CConFunc_UI_TrackUnit owner_name=register_CConFunc_UI_TrackUnit`
-   * (`mov Moho__CConFunc_UI_TrackUnit.mFunc, offset Moho__UI_TrackUnit`).
-   *
-   * What it does:
-   * Registers startup console callback for `UI_TrackUnit`.
-   */
-  void register_CConFunc_UI_TrackUnit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_TrackUnit,
-      kConsoleStartupConUITrackUnitDescription,
-      "UI_TrackUnit",
-      &UI_TrackUnit,
-      &cleanup_CConFunc_UI_TrackUnit
-    );
-  }
-
-  /**
-   * Address: 0x00C06520 (FUN_00C06520, ??1CConFunc_RenameUnit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `RenameUnit`.
-   */
-  void cleanup_CConFunc_RenameUnit()
-  {
-    CleanupStartupConCommand(gCConFunc_RenameUnit);
-  }
-
-  /**
-   * Address: 0x00BE44F0 (FUN_00BE44F0, register_CConFunc_RenameUnit)
-   *
-   * Callsite evidence (class 1, code xref):
-   * `FUN_008354B0.xrefs.txt` -> `code from=0x00BE4510 owner=0x00BE44F0 type= 1
-   * from_name=register_CConFunc_RenameUnit owner_name=register_CConFunc_RenameUnit`
-   * (`mov Moho__CConFunc_RenameUnit.mFunc, offset Moho__RenameUnit`).
-   *
-   * What it does:
-   * Registers startup console callback for `RenameUnit`.
-   */
-  void register_CConFunc_RenameUnit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_RenameUnit,
-      kConsoleStartupConRenameUnitDescription,
-      "RenameUnit",
-      &RenameUnit,
-      &cleanup_CConFunc_RenameUnit
-    );
-  }
-
-  /**
-   * Address: 0x00C06130 (FUN_00C06130, ??1CConFunc_IssueCommand@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `IssueCommand`.
-   */
-  void cleanup_CConFunc_IssueCommand()
-  {
-    CleanupStartupConCommand(gCConFunc_IssueCommand);
-  }
-
-  /**
-   * Address: 0x00BE3FB0 (FUN_00BE3FB0, register_CConFunc_IssueCommand)
-   *
-   * What it does:
-   * Registers startup console callback for `IssueCommand`.
-   */
-  void register_CConFunc_IssueCommand()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_IssueCommand,
-      kConsoleStartupConIssueCommandDescription,
-      "IssueCommand",
-      &CON_IssueCommand,
-      &cleanup_CConFunc_IssueCommand
-    );
-  }
-
-  /**
-   * Address: 0x00BEF8C0 (FUN_00BEF8C0, ??1CConFunc_Log@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Log`.
-   */
-  void cleanup_CConFunc_Log()
-  {
-    CleanupStartupConCommand(gCConFunc_Log);
-  }
-
-  /**
-   * Address: 0x00BC4B70 (FUN_00BC4B70, register_CConFunc_Log)
-   *
-   * What it does:
-   * Registers startup console callback for `Log`.
-   */
-  void register_CConFunc_Log()
-  {
-    RegisterStartupConFunc(gCConFunc_Log, kConsoleStartupConLogDescription, "Log", &CON_Log, &cleanup_CConFunc_Log);
-  }
-
-  /**
-   * Address: 0x00BEF8F0 (FUN_00BEF8F0, ??1CConFunc_Debug_Warn@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Debug_Warn`.
-   */
-  void cleanup_CConFunc_Debug_Warn()
-  {
-    CleanupStartupConCommand(gCConFunc_Debug_Warn);
-  }
-
-  /**
-   * Address: 0x00BC4BB0 (FUN_00BC4BB0, register_CConFunc_Debug_Warn)
-   *
-   * What it does:
-   * Registers startup console callback for `Debug_Warn`.
-   */
-  void register_CConFunc_Debug_Warn()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_Debug_Warn,
-      kConsoleStartupConDebugWarnDescription,
-      "Debug_Warn",
-      &CON_Debug_Warn,
-      &cleanup_CConFunc_Debug_Warn
-    );
-  }
-
-  /**
-   * Address: 0x00BEF920 (FUN_00BEF920, ??1CConFunc_Debug_Error@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Debug_Error`.
-   */
-  void cleanup_CConFunc_Debug_Error()
-  {
-    CleanupStartupConCommand(gCConFunc_Debug_Error);
-  }
-
-  /**
-   * Address: 0x00BC4BF0 (FUN_00BC4BF0, register_CConFunc_Debug_Error)
-   *
-   * What it does:
-   * Registers startup console callback for `Debug_Error`.
-   */
-  void register_CConFunc_Debug_Error()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_Debug_Error,
-      kConsoleStartupConDebugErrorDescription,
-      "Debug_Error",
-      &CON_Debug_Error,
-      &cleanup_CConFunc_Debug_Error
-    );
-  }
-
-  /**
-   * Address: 0x00BEF950 (FUN_00BEF950, ??1CConFunc_Debug_Assert@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Debug_Assert`.
-   */
-  void cleanup_CConFunc_Debug_Assert()
-  {
-    CleanupStartupConCommand(gCConFunc_Debug_Assert);
-  }
-
-  /**
-   * Address: 0x00BC4C30 (FUN_00BC4C30, register_CConFunc_Debug_Assert)
-   *
-   * What it does:
-   * Registers startup console callback for `Debug_Assert`.
-   */
-  void register_CConFunc_Debug_Assert()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_Debug_Assert,
-      kConsoleStartupConDebugAssertDescription,
-      "Debug_Assert",
-      &CON_Debug_Assert,
-      &cleanup_CConFunc_Debug_Assert
-    );
-  }
-
-  /**
-   * Address: 0x00BEF980 (FUN_00BEF980, ??1CConFunc_Debug_Crash@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Debug_Crash`.
-   */
-  void cleanup_CConFunc_Debug_Crash()
-  {
-    CleanupStartupConCommand(gCConFunc_Debug_Crash);
-  }
-
-  /**
-   * Address: 0x00BC4C70 (FUN_00BC4C70, register_CConFunc_Debug_Crash)
-   *
-   * What it does:
-   * Registers startup console callback for `Debug_Crash`.
-   */
-  void register_CConFunc_Debug_Crash()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_Debug_Crash,
-      kConsoleStartupConDebugCrashDescription,
-      "Debug_Crash",
-      &CON_Debug_Crash,
-      &cleanup_CConFunc_Debug_Crash
-    );
-  }
-
-  /**
-   * Address: 0x00BEF9B0 (FUN_00BEF9B0, ??1CConFunc_Debug_Throw@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `Debug_Throw`.
-   */
-  void cleanup_CConFunc_Debug_Throw()
-  {
-    CleanupStartupConCommand(gCConFunc_Debug_Throw);
-  }
-
-  /**
-   * Address: 0x00BC4CB0 (FUN_00BC4CB0, register_CConFunc_Debug_Throw)
-   *
-   * What it does:
-   * Registers startup console callback for `Debug_Throw`.
-   */
-  void register_CConFunc_Debug_Throw()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_Debug_Throw,
-      kConsoleStartupConDebugThrowDescription,
-      "Debug_Throw",
-      &CON_Debug_Throw,
-      &cleanup_CConFunc_Debug_Throw
-    );
-  }
-
-  /**
-   * Address: 0x00BF77B0 (FUN_00BF77B0, ??1TConVar_recon_debug@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `recon_debug`.
-   */
-  void cleanup_TConVar_recon_debug()
-  {
-    CleanupStartupConCommand(gTConVar_recon_debug);
-  }
-
-  /**
-   * Address: 0x00BCDB70 (FUN_00BCDB70, register_TConVar_recon_debug)
-   *
-   * What it does:
-   * Registers startup convar for `recon_debug`.
-   */
-  void register_TConVar_recon_debug()
-  {
-    RegisterStartupConVar(gTConVar_recon_debug, &cleanup_TConVar_recon_debug);
-  }
-
-  /**
-   * Address: 0x00BF3910 (FUN_00BF3910, ??1TConVar_rule_Paranoid@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `rule_Paranoid`.
-   */
-  void cleanup_TConVar_rule_Paranoid()
-  {
-    CleanupStartupConCommand(gTConVar_rule_Paranoid);
-  }
-
-  /**
-   * Address: 0x00BC8DC0 (FUN_00BC8DC0, register_TConVar_rule_Paranoid)
-   *
-   * What it does:
-   * Registers startup convar for `rule_Paranoid`, inserting the typed int
-   * convar into the process-global console command map and scheduling the
-   * cleanup lane at exit.
-   */
-  void register_TConVar_rule_Paranoid()
-  {
-    RegisterStartupConVar(gTConVar_rule_Paranoid, &cleanup_TConVar_rule_Paranoid);
-  }
-
-  /**
-   * Address: 0x00BF3940 (FUN_00BF3940, ??1TConVar_rule_BlueprintReloadDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `rule_BlueprintReloadDelay`.
-   */
-  void cleanup_TConVar_rule_BlueprintReloadDelay()
-  {
-    CleanupStartupConCommand(gTConVar_rule_BlueprintReloadDelay);
-  }
-
-  /**
-   * Address: 0x00BC8E00 (FUN_00BC8E00, register_TConVar_rule_BlueprintReloadDelay)
-   *
-   * What it does:
-   * Registers startup convar for `rule_BlueprintReloadDelay`, inserting the
-   * typed float convar into the process-global console command map and
-   * scheduling the cleanup lane at exit.
-   */
-  void register_TConVar_rule_BlueprintReloadDelay()
-  {
-    RegisterStartupConVar(gTConVar_rule_BlueprintReloadDelay, &cleanup_TConVar_rule_BlueprintReloadDelay);
-  }
-} // namespace moho
 
 namespace
 {
@@ -6196,105 +4428,13 @@ namespace
   {
     ConsoleStartupRegistrationsRender()
     {
-      moho::register_CConFunc_CON_Echo();
-      moho::register_CConFunc_CON_ListCommands();
-      moho::register_CConFunc_GetVersion();
-      moho::register_CConFunc_CON_ExecuteLastCommand();
-      moho::register_CConFunc_ANI_DumpSkeleton();
-      moho::register_CConFunc_IN_BindKey();
-      moho::register_CConFunc_IN_DumpKeyBindings();
-      moho::register_CConFunc_IN_SetKeyName();
-      moho::register_CConFunc_IN_DumpKeyNames();
       moho::register_console_command_buffer();
       moho::register_sConsoleOutputHandlers();
-      moho::register_TConVar_con_TestVarBool();
-      moho::register_TConVar_con_TestVar();
-      moho::register_ConVar_con_TestVarUByte();
-      moho::register_TConVar_con_TestVarFloat();
-      moho::register_con_TestVarStr();
-      moho::register_TConVar_con_TestVarStr();
-      moho::register_TConVar_graphics_Fidelity();
-      moho::register_TConVar_graphics_FidelitySupported();
-      moho::register_TConVar_shadow_Fidelity();
-      moho::register_TConVar_shadow_FidelitySupported();
-      moho::register_TConVar_d3d_UseRefRast();
-      moho::register_TConVar_d3d_ForceSoftwareVP();
-      moho::register_TConVar_d3d_NoPureDevice();
-      moho::register_TConVar_d3d_ForceDirect3DDebugEnabled();
-      moho::register_TConVar_d3d_WindowsCursor();
-      moho::register_TConVar_snd_ExtraDoWorkCalls();
-      moho::register_CConFunc_d3d_AntiAliasingSamples();
-      moho::register_CConFunc_ren_MipSkipLevels();
-      moho::register_CConFunc_DumpPreloadedTextures();
     }
   };
 
   [[maybe_unused]] ConsoleStartupRegistrationsRender gConsoleStartupRegistrationsRender;
 
-  struct ConsoleStartupRegistrationsDebug
-  {
-    ConsoleStartupRegistrationsDebug()
-    {
-      moho::register_CConFunc_LUADOC();
-      moho::register_CConFunc_LUA();
-      moho::register_CConFunc_ExecutePasteBuffer();
-      moho::register_CConFunc_UI_ResetView();
-      moho::register_CConFunc_PrintStats();
-      moho::register_CConFunc_ClearStats();
-      moho::register_CConFunc_BeginLoggingStats();
-      moho::register_CConFunc_EndLoggingStats();
-      moho::register_CConFunc_mesh_Rebatch();
-      moho::register_CConFunc_EFX_CreateEmitterWindow();
-      moho::register_CConFunc_p4_Edit();
-      moho::register_CConFunc_p4_IsOpenedForEdit();
-      moho::register_CConFunc_Log();
-      moho::register_CConFunc_CreateProp();
-      moho::register_CConFunc_CreateUnit();
-      moho::register_CConFunc_LotsOfProps();
-      moho::register_CConFunc_KillSelectedUnits();
-      moho::register_CConFunc_DestroySelectedUnits();
-      moho::register_CConFunc_CopySelectedUnitsToClipboard();
-      moho::register_CConFunc_AddSplat();
-      moho::register_CConFunc_ProcessInfoPair();
-      moho::register_CConFunc_UI_TrackUnit();
-      moho::register_CConFunc_RenameUnit();
-      moho::register_CConFunc_IssueCommand();
-      moho::register_CConFunc_SkipUIChecks();
-      moho::register_CConFunc_WLD_RestartBeat();
-      moho::register_CConFunc_WLD_AdvanceBeat();
-      moho::register_CConFunc_WLD_SingleStep();
-      moho::register_CConFunc_WLD_GameSpeed();
-      moho::register_CConFunc_FindUnit();
-      moho::register_CConFunc_SC_LuaDebugger();
-      moho::register_CConFunc_DoSimCommand();
-      moho::register_CConFunc_StartCommandMode();
-      moho::register_CConFunc_DebugGenerateBuildTemplateFromSelection();
-      moho::register_CConFunc_DebugClearBuildTemplates();
-      moho::register_CConFunc_Debug_Warn();
-      moho::register_CConFunc_Debug_Error();
-      moho::register_CConFunc_Debug_Assert();
-      moho::register_CConFunc_Debug_Crash();
-      moho::register_CConFunc_Debug_Throw();
-      moho::register_TConVar_recon_debug();
-      moho::register_TConVar_rule_Paranoid();
-      moho::register_TConVar_rule_BlueprintReloadDelay();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsDebug gConsoleStartupRegistrationsDebug;
-
-  struct ConsoleStartupRegistrationsWindow
-  {
-    ConsoleStartupRegistrationsWindow()
-    {
-      moho::register_CConFunc_exit();
-      moho::register_CConFunc_WIN_ToggleLogDialog();
-      moho::register_CConFunc_WIN_ShowLogDialog();
-      moho::register_CConFunc_WxInputBox();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsWindow gConsoleStartupRegistrationsWindow;
 } // namespace
 
 namespace
@@ -6361,76 +4501,28 @@ namespace
 
 namespace moho
 {
+  /**
+   * Address: 0x00BDCFB0 (FUN_00BDCFB0, dynamic initializer for `gTConVar_ai_InitialEnergyCurrency`)
+   * Address: 0x00C02130 (FUN_00C02130, dynamic atexit destructor for `gTConVar_ai_InitialEnergyCurrency`)
+   */
   TConVar<float> gTConVar_ai_InitialEnergyCurrency(
     "ai_InitialEnergyCurrency",
     kConsoleStartupAiInitialEnergyCurrencyDescription,
     &moho::ai_InitialEnergyCurrency
   );
+
+  /**
+   * Address: 0x00BDD030 (FUN_00BDD030, dynamic initializer for `gTConVar_ai_InitialEnergyCurrencyMax`)
+   * Address: 0x00C02190 (FUN_00C02190, dynamic atexit destructor for `gTConVar_ai_InitialEnergyCurrencyMax`)
+   */
   TConVar<float> gTConVar_ai_InitialEnergyCurrencyMax(
     "ai_InitialEnergyCurrencyMax",
     kConsoleStartupAiInitialEnergyCurrencyMaxDescription,
     &moho::ai_InitialEnergyCurrencyMax
   );
 
-  /**
-   * Address: 0x00C02130 (FUN_00C02130, ??1TConVar_ai_InitialEnergyCurrency@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ai_InitialEnergyCurrency`.
-   */
-  void cleanup_TConVar_ai_InitialEnergyCurrency()
-  {
-    CleanupStartupConCommand(gTConVar_ai_InitialEnergyCurrency);
-  }
-
-  /**
-   * Address: 0x00BDCFB0 (FUN_00BDCFB0, register_TConVar_ai_InitialEnergyCurrency)
-   *
-   * What it does:
-   * Registers startup convar for `ai_InitialEnergyCurrency`.
-   */
-  void register_TConVar_ai_InitialEnergyCurrency()
-  {
-    RegisterStartupConVar(gTConVar_ai_InitialEnergyCurrency, &cleanup_TConVar_ai_InitialEnergyCurrency);
-  }
-
-  /**
-   * Address: 0x00C02190 (FUN_00C02190, ??1TConVar_ai_InitialEnergyCurrencyMax@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ai_InitialEnergyCurrencyMax`.
-   */
-  void cleanup_TConVar_ai_InitialEnergyCurrencyMax()
-  {
-    CleanupStartupConCommand(gTConVar_ai_InitialEnergyCurrencyMax);
-  }
-
-  /**
-   * Address: 0x00BDD030 (FUN_00BDD030, register_TConVar_ai_InitialEnergyCurrencyMax)
-   *
-   * What it does:
-   * Registers startup convar for `ai_InitialEnergyCurrencyMax`.
-   */
-  void register_TConVar_ai_InitialEnergyCurrencyMax()
-  {
-    RegisterStartupConVar(gTConVar_ai_InitialEnergyCurrencyMax, &cleanup_TConVar_ai_InitialEnergyCurrencyMax);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsAi
-  {
-    ConsoleStartupRegistrationsAi()
-    {
-      moho::register_TConVar_ai_InitialEnergyCurrency();
-      moho::register_TConVar_ai_InitialEnergyCurrencyMax();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsAi gConsoleStartupRegistrationsAi;
-} // namespace
 
 namespace
 {
@@ -6460,328 +4552,118 @@ namespace moho
   extern float net_ResendPingMultiplier;
   extern int net_SendDelay;
 
+  /**
+   * Address: 0x00BC4EF0 (FUN_00BC4EF0, dynamic initializer for `gTConVar_net_AckDelay`)
+   * Address: 0x00BEFB50 (FUN_00BEFB50, dynamic atexit destructor for `gTConVar_net_AckDelay`)
+   */
   TConVar<int> gTConVar_net_AckDelay(
     "net_AckDelay",
     kConsoleStartupNetAckDelayDescription,
     &moho::net_AckDelay
   );
+
+  /**
+   * Address: 0x00BC50B0 (FUN_00BC50B0, dynamic initializer for `gTConVar_net_CompressionMethod`)
+   * Address: 0x00BEFCA0 (FUN_00BEFCA0, dynamic atexit destructor for `gTConVar_net_CompressionMethod`)
+   */
   TConVar<int> gTConVar_net_CompressionMethod(
     "net_CompressionMethod",
     kConsoleStartupNetCompressionMethodDescription,
     &moho::net_CompressionMethod
   );
+
+  /**
+   * Address: 0x00BC4EB0 (FUN_00BC4EB0, dynamic initializer for `gTConVar_net_DebugLevel`)
+   * Address: 0x00BEFB20 (FUN_00BEFB20, dynamic atexit destructor for `gTConVar_net_DebugLevel`)
+   */
   TConVar<int> gTConVar_net_DebugLevel(
     "net_DebugLevel",
     kConsoleStartupNetDebugLevelDescription,
     &moho::net_DebugLevel
   );
+
+  /**
+   * Address: 0x00BDB8E0 (FUN_00BDB8E0, dynamic initializer for `gTConVar_net_Lag`)
+   * Address: 0x00C00C00 (FUN_00C00C00, dynamic atexit destructor for `gTConVar_net_Lag`)
+   */
   TConVar<float> gTConVar_net_Lag(
     "net_Lag",
     kConsoleStartupNetLagDescription,
     &moho::net_Lag
   );
+
+  /**
+   * Address: 0x00BC4F70 (FUN_00BC4F70, dynamic initializer for `gTConVar_net_LogPackets`)
+   * Address: 0x00BEFBB0 (FUN_00BEFBB0, dynamic atexit destructor for `gTConVar_net_LogPackets`)
+   */
   TConVar<bool> gTConVar_net_LogPackets(
     "net_LogPackets",
     kConsoleStartupNetLogPacketsDescription,
     &moho::net_LogPackets
   );
+
+  /**
+   * Address: 0x00BC5070 (FUN_00BC5070, dynamic initializer for `gTConVar_net_MaxBacklog`)
+   * Address: 0x00BEFC70 (FUN_00BEFC70, dynamic atexit destructor for `gTConVar_net_MaxBacklog`)
+   */
   TConVar<int> gTConVar_net_MaxBacklog(
     "net_MaxBacklog",
     kConsoleStartupNetMaxBacklogDescription,
     &moho::net_MaxBacklog
   );
+
+  /**
+   * Address: 0x00BC4FF0 (FUN_00BC4FF0, dynamic initializer for `gTConVar_net_MaxResendDelay`)
+   * Address: 0x00BEFC10 (FUN_00BEFC10, dynamic atexit destructor for `gTConVar_net_MaxResendDelay`)
+   */
   TConVar<int> gTConVar_net_MaxResendDelay(
     "net_MaxResendDelay",
     kConsoleStartupNetMaxResendDelayDescription,
     &moho::net_MaxResendDelay
   );
+
+  /**
+   * Address: 0x00BC5030 (FUN_00BC5030, dynamic initializer for `gTConVar_net_MaxSendRate`)
+   * Address: 0x00BEFC40 (FUN_00BEFC40, dynamic atexit destructor for `gTConVar_net_MaxSendRate`)
+   */
   TConVar<int> gTConVar_net_MaxSendRate(
     "net_MaxSendRate",
     kConsoleStartupNetMaxSendRateDescription,
     &moho::net_MaxSendRate
   );
+
+  /**
+   * Address: 0x00BC4FB0 (FUN_00BC4FB0, dynamic initializer for `gTConVar_net_MinResendDelay`)
+   * Address: 0x00BEFBE0 (FUN_00BEFBE0, dynamic atexit destructor for `gTConVar_net_MinResendDelay`)
+   */
   TConVar<int> gTConVar_net_MinResendDelay(
     "net_MinResendDelay",
     kConsoleStartupNetMinResendDelayDescription,
     &moho::net_MinResendDelay
   );
+
+  /**
+   * Address: 0x00BC50F0 (FUN_00BC50F0, dynamic initializer for `gTConVar_net_ResendPingMultiplier`)
+   * Address: 0x00BEFCD0 (FUN_00BEFCD0, dynamic atexit destructor for `gTConVar_net_ResendPingMultiplier`)
+   */
   TConVar<float> gTConVar_net_ResendPingMultiplier(
     "net_ResendPingMultiplier",
     kConsoleStartupNetResendPingMultiplierDescription,
     &moho::net_ResendPingMultiplier
   );
+
+  /**
+   * Address: 0x00BC4F30 (FUN_00BC4F30, dynamic initializer for `gTConVar_net_SendDelay`)
+   * Address: 0x00BEFB80 (FUN_00BEFB80, dynamic atexit destructor for `gTConVar_net_SendDelay`)
+   */
   TConVar<int> gTConVar_net_SendDelay(
     "net_SendDelay",
     kConsoleStartupNetSendDelayDescription,
     &moho::net_SendDelay
   );
 
-  /**
-   * Address: 0x00BEFB50 (FUN_00BEFB50, ??1TConVar_net_AckDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_AckDelay`.
-   */
-  void cleanup_TConVar_net_AckDelay()
-  {
-    CleanupStartupConCommand(gTConVar_net_AckDelay);
-  }
-
-  /**
-   * Address: 0x00BC4EF0 (FUN_00BC4EF0, register_TConVar_net_AckDelay)
-   *
-   * What it does:
-   * Registers startup convar for `net_AckDelay`.
-   */
-  void register_TConVar_net_AckDelay()
-  {
-    RegisterStartupConVar(gTConVar_net_AckDelay, &cleanup_TConVar_net_AckDelay);
-  }
-
-  /**
-   * Address: 0x00BEFCA0 (FUN_00BEFCA0, ??1TConVar_net_CompressionMethod@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_CompressionMethod`.
-   */
-  void cleanup_TConVar_net_CompressionMethod()
-  {
-    CleanupStartupConCommand(gTConVar_net_CompressionMethod);
-  }
-
-  /**
-   * Address: 0x00BC50B0 (FUN_00BC50B0, register_TConVar_net_CompressionMethod)
-   *
-   * What it does:
-   * Registers startup convar for `net_CompressionMethod`.
-   */
-  void register_TConVar_net_CompressionMethod()
-  {
-    RegisterStartupConVar(gTConVar_net_CompressionMethod, &cleanup_TConVar_net_CompressionMethod);
-  }
-
-  /**
-   * Address: 0x00BEFB20 (FUN_00BEFB20, ??1TConVar_net_DebugLevel@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_DebugLevel`.
-   */
-  void cleanup_TConVar_net_DebugLevel()
-  {
-    CleanupStartupConCommand(gTConVar_net_DebugLevel);
-  }
-
-  /**
-   * Address: 0x00BC4EB0 (FUN_00BC4EB0, register_TConVar_net_DebugLevel)
-   *
-   * What it does:
-   * Registers startup convar for `net_DebugLevel`.
-   */
-  void register_TConVar_net_DebugLevel()
-  {
-    RegisterStartupConVar(gTConVar_net_DebugLevel, &cleanup_TConVar_net_DebugLevel);
-  }
-
-  /**
-   * Address: 0x00C00C00 (FUN_00C00C00, ??1TConVar_net_Lag@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_Lag`.
-   */
-  void cleanup_TConVar_net_Lag()
-  {
-    CleanupStartupConCommand(gTConVar_net_Lag);
-  }
-
-  /**
-   * Address: 0x00BDB8E0 (FUN_00BDB8E0, register_TConVar_net_Lag)
-   *
-   * What it does:
-   * Registers startup convar for `net_Lag`.
-   */
-  void register_TConVar_net_Lag()
-  {
-    RegisterStartupConVar(gTConVar_net_Lag, &cleanup_TConVar_net_Lag);
-  }
-
-  /**
-   * Address: 0x00BEFBB0 (FUN_00BEFBB0, ??1TConVar_net_LogPackets@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_LogPackets`.
-   */
-  void cleanup_TConVar_net_LogPackets()
-  {
-    CleanupStartupConCommand(gTConVar_net_LogPackets);
-  }
-
-  /**
-   * Address: 0x00BC4F70 (FUN_00BC4F70, register_TConVar_net_LogPackets)
-   *
-   * What it does:
-   * Registers startup convar for `net_LogPackets`.
-   */
-  void register_TConVar_net_LogPackets()
-  {
-    RegisterStartupConVar(gTConVar_net_LogPackets, &cleanup_TConVar_net_LogPackets);
-  }
-
-  /**
-   * Address: 0x00BEFC70 (FUN_00BEFC70, ??1TConVar_net_MaxBacklog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_MaxBacklog`.
-   */
-  void cleanup_TConVar_net_MaxBacklog()
-  {
-    CleanupStartupConCommand(gTConVar_net_MaxBacklog);
-  }
-
-  /**
-   * Address: 0x00BC5070 (FUN_00BC5070, register_TConVar_net_MaxBacklog)
-   *
-   * What it does:
-   * Registers startup convar for `net_MaxBacklog`.
-   */
-  void register_TConVar_net_MaxBacklog()
-  {
-    RegisterStartupConVar(gTConVar_net_MaxBacklog, &cleanup_TConVar_net_MaxBacklog);
-  }
-
-  /**
-   * Address: 0x00BEFC10 (FUN_00BEFC10, ??1TConVar_net_MaxResendDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_MaxResendDelay`.
-   */
-  void cleanup_TConVar_net_MaxResendDelay()
-  {
-    CleanupStartupConCommand(gTConVar_net_MaxResendDelay);
-  }
-
-  /**
-   * Address: 0x00BC4FF0 (FUN_00BC4FF0, register_TConVar_net_MaxResendDelay)
-   *
-   * What it does:
-   * Registers startup convar for `net_MaxResendDelay`.
-   */
-  void register_TConVar_net_MaxResendDelay()
-  {
-    RegisterStartupConVar(gTConVar_net_MaxResendDelay, &cleanup_TConVar_net_MaxResendDelay);
-  }
-
-  /**
-   * Address: 0x00BEFC40 (FUN_00BEFC40, ??1TConVar_net_MaxSendRate@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_MaxSendRate`.
-   */
-  void cleanup_TConVar_net_MaxSendRate()
-  {
-    CleanupStartupConCommand(gTConVar_net_MaxSendRate);
-  }
-
-  /**
-   * Address: 0x00BC5030 (FUN_00BC5030, register_TConVar_net_MaxSendRate)
-   *
-   * What it does:
-   * Registers startup convar for `net_MaxSendRate`.
-   */
-  void register_TConVar_net_MaxSendRate()
-  {
-    RegisterStartupConVar(gTConVar_net_MaxSendRate, &cleanup_TConVar_net_MaxSendRate);
-  }
-
-  /**
-   * Address: 0x00BEFBE0 (FUN_00BEFBE0, ??1TConVar_net_MinResendDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_MinResendDelay`.
-   */
-  void cleanup_TConVar_net_MinResendDelay()
-  {
-    CleanupStartupConCommand(gTConVar_net_MinResendDelay);
-  }
-
-  /**
-   * Address: 0x00BC4FB0 (FUN_00BC4FB0, register_TConVar_net_MinResendDelay)
-   *
-   * What it does:
-   * Registers startup convar for `net_MinResendDelay`.
-   */
-  void register_TConVar_net_MinResendDelay()
-  {
-    RegisterStartupConVar(gTConVar_net_MinResendDelay, &cleanup_TConVar_net_MinResendDelay);
-  }
-
-  /**
-   * Address: 0x00BEFCD0 (FUN_00BEFCD0, ??1TConVar_net_ResendPingMultiplier@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_ResendPingMultiplier`.
-   */
-  void cleanup_TConVar_net_ResendPingMultiplier()
-  {
-    CleanupStartupConCommand(gTConVar_net_ResendPingMultiplier);
-  }
-
-  /**
-   * Address: 0x00BC50F0 (FUN_00BC50F0, register_TConVar_net_ResendPingMultiplier)
-   *
-   * What it does:
-   * Registers startup convar for `net_ResendPingMultiplier`.
-   */
-  void register_TConVar_net_ResendPingMultiplier()
-  {
-    RegisterStartupConVar(gTConVar_net_ResendPingMultiplier, &cleanup_TConVar_net_ResendPingMultiplier);
-  }
-
-  /**
-   * Address: 0x00BEFB80 (FUN_00BEFB80, ??1TConVar_net_SendDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `net_SendDelay`.
-   */
-  void cleanup_TConVar_net_SendDelay()
-  {
-    CleanupStartupConCommand(gTConVar_net_SendDelay);
-  }
-
-  /**
-   * Address: 0x00BC4F30 (FUN_00BC4F30, register_TConVar_net_SendDelay)
-   *
-   * What it does:
-   * Registers startup convar for `net_SendDelay`.
-   */
-  void register_TConVar_net_SendDelay()
-  {
-    RegisterStartupConVar(gTConVar_net_SendDelay, &cleanup_TConVar_net_SendDelay);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsNet
-  {
-    ConsoleStartupRegistrationsNet()
-    {
-      moho::register_TConVar_net_AckDelay();
-      moho::register_TConVar_net_CompressionMethod();
-      moho::register_TConVar_net_DebugLevel();
-      moho::register_TConVar_net_Lag();
-      moho::register_TConVar_net_LogPackets();
-      moho::register_TConVar_net_MaxBacklog();
-      moho::register_TConVar_net_MaxResendDelay();
-      moho::register_TConVar_net_MaxSendRate();
-      moho::register_TConVar_net_MinResendDelay();
-      moho::register_TConVar_net_ResendPingMultiplier();
-      moho::register_TConVar_net_SendDelay();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsNet gConsoleStartupRegistrationsNet;
-} // namespace
 
 namespace
 {
@@ -6808,244 +4690,88 @@ namespace moho
   extern bool sim_KeepAllLogFiles;
   extern bool sim_ShowDamage;
 
+  /**
+   * Address: 0x00BDBA50 (FUN_00BDBA50, dynamic initializer for `gTConVar_sim_DebugCheats`)
+   * Address: 0x00C00CE0 (FUN_00C00CE0, dynamic atexit destructor for `gTConVar_sim_DebugCheats`)
+   */
   TConVar<bool> gTConVar_sim_DebugCheats(
     "sim_DebugCheats",
     kConsoleStartupSimDebugCheatsDescription,
     &moho::sim_DebugCheats
   );
+
+  /**
+   * Address: 0x00BDB920 (FUN_00BDB920, dynamic initializer for `gTConVar_sim_DebugDelay`)
+   * Address: 0x00C00C30 (FUN_00C00C30, dynamic atexit destructor for `gTConVar_sim_DebugDelay`)
+   */
   TConVar<int> gTConVar_sim_DebugDelay(
     "sim_DebugDelay",
     kConsoleStartupSimDebugDelayDescription,
     &moho::sim_DebugDelay
   );
+
+  /**
+   * Address: 0x00BDB860 (FUN_00BDB860, dynamic initializer for `gTConVar_sim_Interlocked`)
+   * Address: 0x00C00BA0 (FUN_00C00BA0, dynamic atexit destructor for `gTConVar_sim_Interlocked`)
+   */
   TConVar<bool> gTConVar_sim_Interlocked(
     "sim_Interlocked",
     kConsoleStartupSimInterlockedDescription,
     &moho::sim_Interlocked
   );
+
+  /**
+   * Address: 0x00BDB8A0 (FUN_00BDB8A0, dynamic initializer for `gTConVar_sim_IssueThreadDebugLevel`)
+   * Address: 0x00C00BD0 (FUN_00C00BD0, dynamic atexit destructor for `gTConVar_sim_IssueThreadDebugLevel`)
+   */
   TConVar<int> gTConVar_sim_IssueThreadDebugLevel(
     "sim_IssueThreadDebugLevel",
     kConsoleStartupSimIssueThreadDebugLevelDescription,
     &moho::sim_IssueThreadDebugLevel
   );
+
+  /**
+   * Address: 0x00BDBA10 (FUN_00BDBA10, dynamic initializer for `gTConVar_sim_KeepAllLogFiles`)
+   * Address: 0x00C00CB0 (FUN_00C00CB0, dynamic atexit destructor for `gTConVar_sim_KeepAllLogFiles`)
+   */
   TConVar<bool> gTConVar_sim_KeepAllLogFiles(
     "sim_KeepAllLogFiles",
     kConsoleStartupSimKeepAllLogFilesDescription,
     &moho::sim_KeepAllLogFiles
   );
+
+  /**
+   * Address: 0x00BDB9D0 (FUN_00BDB9D0, dynamic initializer for `gTConVar_sim_LogSize`)
+   * Address: 0x00C00C80 (FUN_00C00C80, dynamic atexit destructor for `gTConVar_sim_LogSize`)
+   */
   TConVar<int> gTConVar_sim_LogSize(
     "sim_LogSize",
     kConsoleStartupSimLogSizeDescription,
     &moho::sim_LogSize
   );
+
+  /**
+   * Address: 0x00BDBA90 (FUN_00BDBA90, dynamic initializer for `gTConVar_sim_ReportCheats`)
+   * Address: 0x00C00D10 (FUN_00C00D10, dynamic atexit destructor for `gTConVar_sim_ReportCheats`)
+   */
   TConVar<bool> gTConVar_sim_ReportCheats(
     "sim_ReportCheats",
     kConsoleStartupSimReportCheatsDescription,
     &moho::sim_ReportCheats
   );
+
+  /**
+   * Address: 0x00BDB6B0 (FUN_00BDB6B0, dynamic initializer for `gTConVar_sim_ShowDamage`)
+   * Address: 0x00C00AE0 (FUN_00C00AE0, dynamic atexit destructor for `gTConVar_sim_ShowDamage`)
+   */
   TConVar<bool> gTConVar_sim_ShowDamage(
     "sim_ShowDamage",
     kConsoleStartupSimShowDamageDescription,
     &moho::sim_ShowDamage
   );
 
-  /**
-   * Address: 0x00C00CE0 (FUN_00C00CE0, ??1TConVar_sim_DebugCheats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_DebugCheats`.
-   */
-  void cleanup_TConVar_sim_DebugCheats()
-  {
-    CleanupStartupConCommand(gTConVar_sim_DebugCheats);
-  }
-
-  /**
-   * Address: 0x00BDBA50 (FUN_00BDBA50, register_TConVar_sim_DebugCheats)
-   *
-   * What it does:
-   * Registers startup convar for `sim_DebugCheats`.
-   */
-  void register_TConVar_sim_DebugCheats()
-  {
-    RegisterStartupConVar(gTConVar_sim_DebugCheats, &cleanup_TConVar_sim_DebugCheats);
-  }
-
-  /**
-   * Address: 0x00C00C30 (FUN_00C00C30, ??1TConVar_sim_DebugDelay@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_DebugDelay`.
-   */
-  void cleanup_TConVar_sim_DebugDelay()
-  {
-    CleanupStartupConCommand(gTConVar_sim_DebugDelay);
-  }
-
-  /**
-   * Address: 0x00BDB920 (FUN_00BDB920, register_TConVar_sim_DebugDelay)
-   *
-   * What it does:
-   * Registers startup convar for `sim_DebugDelay`.
-   */
-  void register_TConVar_sim_DebugDelay()
-  {
-    RegisterStartupConVar(gTConVar_sim_DebugDelay, &cleanup_TConVar_sim_DebugDelay);
-  }
-
-  /**
-   * Address: 0x00C00BA0 (FUN_00C00BA0, ??1TConVar_sim_Interlocked@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_Interlocked`.
-   */
-  void cleanup_TConVar_sim_Interlocked()
-  {
-    CleanupStartupConCommand(gTConVar_sim_Interlocked);
-  }
-
-  /**
-   * Address: 0x00BDB860 (FUN_00BDB860, register_TConVar_sim_Interlocked)
-   *
-   * What it does:
-   * Registers startup convar for `sim_Interlocked`.
-   */
-  void register_TConVar_sim_Interlocked()
-  {
-    RegisterStartupConVar(gTConVar_sim_Interlocked, &cleanup_TConVar_sim_Interlocked);
-  }
-
-  /**
-   * Address: 0x00C00BD0 (FUN_00C00BD0, ??1TConVar_sim_IssueThreadDebugLevel@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_IssueThreadDebugLevel`.
-   */
-  void cleanup_TConVar_sim_IssueThreadDebugLevel()
-  {
-    CleanupStartupConCommand(gTConVar_sim_IssueThreadDebugLevel);
-  }
-
-  /**
-   * Address: 0x00BDB8A0 (FUN_00BDB8A0, register_TConVar_sim_IssueThreadDebugLevel)
-   *
-   * What it does:
-   * Registers startup convar for `sim_IssueThreadDebugLevel`.
-   */
-  void register_TConVar_sim_IssueThreadDebugLevel()
-  {
-    RegisterStartupConVar(gTConVar_sim_IssueThreadDebugLevel, &cleanup_TConVar_sim_IssueThreadDebugLevel);
-  }
-
-  /**
-   * Address: 0x00C00CB0 (FUN_00C00CB0, ??1TConVar_sim_KeepAllLogFiles@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_KeepAllLogFiles`.
-   */
-  void cleanup_TConVar_sim_KeepAllLogFiles()
-  {
-    CleanupStartupConCommand(gTConVar_sim_KeepAllLogFiles);
-  }
-
-  /**
-   * Address: 0x00BDBA10 (FUN_00BDBA10, register_TConVar_sim_KeepAllLogFiles)
-   *
-   * What it does:
-   * Registers startup convar for `sim_KeepAllLogFiles`.
-   */
-  void register_TConVar_sim_KeepAllLogFiles()
-  {
-    RegisterStartupConVar(gTConVar_sim_KeepAllLogFiles, &cleanup_TConVar_sim_KeepAllLogFiles);
-  }
-
-  /**
-   * Address: 0x00C00C80 (FUN_00C00C80, ??1TConVar_sim_LogSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_LogSize`.
-   */
-  void cleanup_TConVar_sim_LogSize()
-  {
-    CleanupStartupConCommand(gTConVar_sim_LogSize);
-  }
-
-  /**
-   * Address: 0x00BDB9D0 (FUN_00BDB9D0, register_TConVar_sim_LogSize)
-   *
-   * What it does:
-   * Registers startup convar for `sim_LogSize`.
-   */
-  void register_TConVar_sim_LogSize()
-  {
-    RegisterStartupConVar(gTConVar_sim_LogSize, &cleanup_TConVar_sim_LogSize);
-  }
-
-  /**
-   * Address: 0x00C00D10 (FUN_00C00D10, ??1TConVar_sim_ReportCheats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_ReportCheats`.
-   */
-  void cleanup_TConVar_sim_ReportCheats()
-  {
-    CleanupStartupConCommand(gTConVar_sim_ReportCheats);
-  }
-
-  /**
-   * Address: 0x00BDBA90 (FUN_00BDBA90, register_TConVar_sim_ReportCheats)
-   *
-   * What it does:
-   * Registers startup convar for `sim_ReportCheats`.
-   */
-  void register_TConVar_sim_ReportCheats()
-  {
-    RegisterStartupConVar(gTConVar_sim_ReportCheats, &cleanup_TConVar_sim_ReportCheats);
-  }
-
-  /**
-   * Address: 0x00C00AE0 (FUN_00C00AE0, ??1TConVar_sim_ShowDamage@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sim_ShowDamage`.
-   */
-  void cleanup_TConVar_sim_ShowDamage()
-  {
-    CleanupStartupConCommand(gTConVar_sim_ShowDamage);
-  }
-
-  /**
-   * Address: 0x00BDB6B0 (FUN_00BDB6B0, register_TConVar_sim_ShowDamage)
-   *
-   * What it does:
-   * Registers startup convar for `sim_ShowDamage`.
-   */
-  void register_TConVar_sim_ShowDamage()
-  {
-    RegisterStartupConVar(gTConVar_sim_ShowDamage, &cleanup_TConVar_sim_ShowDamage);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsSim2
-  {
-    ConsoleStartupRegistrationsSim2()
-    {
-      moho::register_TConVar_sim_DebugCheats();
-      moho::register_TConVar_sim_DebugDelay();
-      moho::register_TConVar_sim_Interlocked();
-      moho::register_TConVar_sim_IssueThreadDebugLevel();
-      moho::register_TConVar_sim_KeepAllLogFiles();
-      moho::register_TConVar_sim_LogSize();
-      moho::register_TConVar_sim_ReportCheats();
-      moho::register_TConVar_sim_ShowDamage();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsSim2 gConsoleStartupRegistrationsSim2;
-} // namespace
 
 namespace
 {
@@ -7089,468 +4815,168 @@ namespace moho
   extern float cam_ZoomSpeedLarge;
   extern float cam_ZoomSpeedSmall;
 
+  /**
+   * Address: 0x00BE66E0 (FUN_00BE66E0, dynamic initializer for `gTConVar_cam_DefaultMiniLOD`)
+   * Address: 0x00C077E0 (FUN_00C077E0, dynamic atexit destructor for `gTConVar_cam_DefaultMiniLOD`)
+   */
   TConVar<float> gTConVar_cam_DefaultMiniLOD(
     "cam_DefaultMiniLOD",
     kConsoleStartupCamDefaultMiniLODDescription,
     &moho::cam_DefaultMiniLOD
   );
+
+  /**
+   * Address: 0x00BDF540 (FUN_00BDF540, dynamic initializer for `gTConVar_cam_EntityBoxExpand`)
+   * Address: 0x00C03550 (FUN_00C03550, dynamic atexit destructor for `gTConVar_cam_EntityBoxExpand`)
+   */
   TConVar<float> gTConVar_cam_EntityBoxExpand(
     "cam_EntityBoxExpand",
     kConsoleStartupCamEntityBoxExpandDescription,
     &moho::cam_EntityBoxExpand
   );
+
+  /**
+   * Address: 0x00BDF2C0 (FUN_00BDF2C0, dynamic initializer for `gTConVar_cam_FarFOV`)
+   * Address: 0x00C03370 (FUN_00C03370, dynamic atexit destructor for `gTConVar_cam_FarFOV`)
+   */
   TConVar<float> gTConVar_cam_FarFOV(
     "cam_FarFOV",
     kConsoleStartupCamFarFOVDescription,
     &moho::cam_FarFOV
   );
+
+  /**
+   * Address: 0x00BDF340 (FUN_00BDF340, dynamic initializer for `gTConVar_cam_FarPitch`)
+   * Address: 0x00C033D0 (FUN_00C033D0, dynamic atexit destructor for `gTConVar_cam_FarPitch`)
+   */
   TConVar<float> gTConVar_cam_FarPitch(
     "cam_FarPitch",
     kConsoleStartupCamFarPitchDescription,
     &moho::cam_FarPitch
   );
+
+  /**
+   * Address: 0x00BE66A0 (FUN_00BE66A0, dynamic initializer for `gTConVar_cam_Free`)
+   * Address: 0x00C077B0 (FUN_00C077B0, dynamic atexit destructor for `gTConVar_cam_Free`)
+   */
   TConVar<bool> gTConVar_cam_Free(
     "cam_Free",
     kConsoleStartupCamFreeDescription,
     &moho::cam_Free
   );
+
+  /**
+   * Address: 0x00BDF580 (FUN_00BDF580, dynamic initializer for `gTConVar_cam_MinSpinPitch`)
+   * Address: 0x00C03580 (FUN_00C03580, dynamic atexit destructor for `gTConVar_cam_MinSpinPitch`)
+   */
   TConVar<float> gTConVar_cam_MinSpinPitch(
     "cam_MinSpinPitch",
     kConsoleStartupCamMinSpinPitchDescription,
     &moho::cam_MinSpinPitch
   );
+
+  /**
+   * Address: 0x00BDF280 (FUN_00BDF280, dynamic initializer for `gTConVar_cam_NearFOV`)
+   * Address: 0x00C03340 (FUN_00C03340, dynamic atexit destructor for `gTConVar_cam_NearFOV`)
+   */
   TConVar<float> gTConVar_cam_NearFOV(
     "cam_NearFOV",
     kConsoleStartupCamNearFOVDescription,
     &moho::cam_NearFOV
   );
+
+  /**
+   * Address: 0x00BDF300 (FUN_00BDF300, dynamic initializer for `gTConVar_cam_NearPitch`)
+   * Address: 0x00C033A0 (FUN_00C033A0, dynamic atexit destructor for `gTConVar_cam_NearPitch`)
+   */
   TConVar<float> gTConVar_cam_NearPitch(
     "cam_NearPitch",
     kConsoleStartupCamNearPitchDescription,
     &moho::cam_NearPitch
   );
+
+  /**
+   * Address: 0x00BDF240 (FUN_00BDF240, dynamic initializer for `gTConVar_cam_NearZoom`)
+   * Address: 0x00C03310 (FUN_00C03310, dynamic atexit destructor for `gTConVar_cam_NearZoom`)
+   */
   TConVar<float> gTConVar_cam_NearZoom(
     "cam_NearZoom",
     kConsoleStartupCamNearZoomDescription,
     &moho::cam_NearZoom
   );
+
+  /**
+   * Address: 0x00BDF4C0 (FUN_00BDF4C0, dynamic initializer for `gTConVar_cam_PanSpeed`)
+   * Address: 0x00C034F0 (FUN_00C034F0, dynamic atexit destructor for `gTConVar_cam_PanSpeed`)
+   */
   TConVar<float> gTConVar_cam_PanSpeed(
     "cam_PanSpeed",
     kConsoleStartupCamPanSpeedDescription,
     &moho::cam_PanSpeed
   );
+
+  /**
+   * Address: 0x00BDF500 (FUN_00BDF500, dynamic initializer for `gTConVar_cam_ShakeMult`)
+   * Address: 0x00C03520 (FUN_00C03520, dynamic atexit destructor for `gTConVar_cam_ShakeMult`)
+   */
   TConVar<float> gTConVar_cam_ShakeMult(
     "cam_ShakeMult",
     kConsoleStartupCamShakeMultDescription,
     &moho::cam_ShakeMult
   );
+
+  /**
+   * Address: 0x00BDF480 (FUN_00BDF480, dynamic initializer for `gTConVar_cam_SpinSpeed`)
+   * Address: 0x00C034C0 (FUN_00C034C0, dynamic atexit destructor for `gTConVar_cam_SpinSpeed`)
+   */
   TConVar<float> gTConVar_cam_SpinSpeed(
     "cam_SpinSpeed",
     kConsoleStartupCamSpinSpeedDescription,
     &moho::cam_SpinSpeed
   );
+
+  /**
+   * Address: 0x00BDF440 (FUN_00BDF440, dynamic initializer for `gTConVar_cam_TrackProjectileTimeout`)
+   * Address: 0x00C03490 (FUN_00C03490, dynamic atexit destructor for `gTConVar_cam_TrackProjectileTimeout`)
+   */
   TConVar<float> gTConVar_cam_TrackProjectileTimeout(
     "cam_TrackProjectileTimeout",
     kConsoleStartupCamTrackProjectileTimeoutDescription,
     &moho::cam_TrackProjectileTimeout
   );
+
+  /**
+   * Address: 0x00BDF380 (FUN_00BDF380, dynamic initializer for `gTConVar_cam_ZoomAmount`)
+   * Address: 0x00C03400 (FUN_00C03400, dynamic atexit destructor for `gTConVar_cam_ZoomAmount`)
+   */
   TConVar<float> gTConVar_cam_ZoomAmount(
     "cam_ZoomAmount",
     kConsoleStartupCamZoomAmountDescription,
     &moho::cam_ZoomAmount
   );
+
+  /**
+   * Address: 0x00BDF400 (FUN_00BDF400, dynamic initializer for `gTConVar_cam_ZoomSpeedLarge`)
+   * Address: 0x00C03460 (FUN_00C03460, dynamic atexit destructor for `gTConVar_cam_ZoomSpeedLarge`)
+   */
   TConVar<float> gTConVar_cam_ZoomSpeedLarge(
     "cam_ZoomSpeedLarge",
     kConsoleStartupCamZoomSpeedLargeDescription,
     &moho::cam_ZoomSpeedLarge
   );
+
+  /**
+   * Address: 0x00BDF3C0 (FUN_00BDF3C0, dynamic initializer for `gTConVar_cam_ZoomSpeedSmall`)
+   * Address: 0x00C03430 (FUN_00C03430, dynamic atexit destructor for `gTConVar_cam_ZoomSpeedSmall`)
+   */
   TConVar<float> gTConVar_cam_ZoomSpeedSmall(
     "cam_ZoomSpeedSmall",
     kConsoleStartupCamZoomSpeedSmallDescription,
     &moho::cam_ZoomSpeedSmall
   );
 
-  /**
-   * Address: 0x00C077E0 (FUN_00C077E0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_DefaultMiniLOD`.
-   */
-  void cleanup_TConVar_cam_DefaultMiniLOD()
-  {
-    CleanupStartupConCommand(gTConVar_cam_DefaultMiniLOD);
-  }
-
-  /**
-   * Address: 0x00BE66E0 (FUN_00BE66E0, register_TConVar_cam_DefaultMiniLOD)
-   *
-   * What it does:
-   * Registers startup convar for `cam_DefaultMiniLOD`.
-   */
-  void register_TConVar_cam_DefaultMiniLOD()
-  {
-    RegisterStartupConVar(gTConVar_cam_DefaultMiniLOD, &cleanup_TConVar_cam_DefaultMiniLOD);
-  }
-
-  /**
-   * Address: 0x00C03550 (FUN_00C03550, ??1TConVar_cam_EntityBoxExpand@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_EntityBoxExpand`.
-   */
-  void cleanup_TConVar_cam_EntityBoxExpand()
-  {
-    CleanupStartupConCommand(gTConVar_cam_EntityBoxExpand);
-  }
-
-  /**
-   * Address: 0x00BDF540 (FUN_00BDF540, register_TConVar_cam_EntityBoxExpand)
-   *
-   * What it does:
-   * Registers startup convar for `cam_EntityBoxExpand`.
-   */
-  void register_TConVar_cam_EntityBoxExpand()
-  {
-    RegisterStartupConVar(gTConVar_cam_EntityBoxExpand, &cleanup_TConVar_cam_EntityBoxExpand);
-  }
-
-  /**
-   * Address: 0x00C03370 (FUN_00C03370, ??1TConVar_cam_FarFOV@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_FarFOV`.
-   */
-  void cleanup_TConVar_cam_FarFOV()
-  {
-    CleanupStartupConCommand(gTConVar_cam_FarFOV);
-  }
-
-  /**
-   * Address: 0x00BDF2C0 (FUN_00BDF2C0, register_TConVar_cam_FarFOV)
-   *
-   * What it does:
-   * Registers startup convar for `cam_FarFOV`.
-   */
-  void register_TConVar_cam_FarFOV()
-  {
-    RegisterStartupConVar(gTConVar_cam_FarFOV, &cleanup_TConVar_cam_FarFOV);
-  }
-
-  /**
-   * Address: 0x00C033D0 (FUN_00C033D0, ??1TConVar_cam_FarPitch@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_FarPitch`.
-   */
-  void cleanup_TConVar_cam_FarPitch()
-  {
-    CleanupStartupConCommand(gTConVar_cam_FarPitch);
-  }
-
-  /**
-   * Address: 0x00BDF340 (FUN_00BDF340, register_TConVar_cam_FarPitch)
-   *
-   * What it does:
-   * Registers startup convar for `cam_FarPitch`.
-   */
-  void register_TConVar_cam_FarPitch()
-  {
-    RegisterStartupConVar(gTConVar_cam_FarPitch, &cleanup_TConVar_cam_FarPitch);
-  }
-
-  /**
-   * Address: 0x00C077B0 (FUN_00C077B0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_Free`.
-   */
-  void cleanup_TConVar_cam_Free()
-  {
-    CleanupStartupConCommand(gTConVar_cam_Free);
-  }
-
-  /**
-   * Address: 0x00BE66A0 (FUN_00BE66A0, register_TConVar_cam_Free)
-   *
-   * What it does:
-   * Registers startup convar for `cam_Free`.
-   */
-  void register_TConVar_cam_Free()
-  {
-    RegisterStartupConVar(gTConVar_cam_Free, &cleanup_TConVar_cam_Free);
-  }
-
-  /**
-   * Address: 0x00C03580 (FUN_00C03580, ??1TConVar_cam_MinSpinPitch@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_MinSpinPitch`.
-   */
-  void cleanup_TConVar_cam_MinSpinPitch()
-  {
-    CleanupStartupConCommand(gTConVar_cam_MinSpinPitch);
-  }
-
-  /**
-   * Address: 0x00BDF580 (FUN_00BDF580, register_TConVar_cam_MinSpinPitch)
-   *
-   * What it does:
-   * Registers startup convar for `cam_MinSpinPitch`.
-   */
-  void register_TConVar_cam_MinSpinPitch()
-  {
-    RegisterStartupConVar(gTConVar_cam_MinSpinPitch, &cleanup_TConVar_cam_MinSpinPitch);
-  }
-
-  /**
-   * Address: 0x00C03340 (FUN_00C03340, ??1TConVar_cam_NearFOV@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_NearFOV`.
-   */
-  void cleanup_TConVar_cam_NearFOV()
-  {
-    CleanupStartupConCommand(gTConVar_cam_NearFOV);
-  }
-
-  /**
-   * Address: 0x00BDF280 (FUN_00BDF280, register_TConVar_cam_NearFOV)
-   *
-   * What it does:
-   * Registers startup convar for `cam_NearFOV`.
-   */
-  void register_TConVar_cam_NearFOV()
-  {
-    RegisterStartupConVar(gTConVar_cam_NearFOV, &cleanup_TConVar_cam_NearFOV);
-  }
-
-  /**
-   * Address: 0x00C033A0 (FUN_00C033A0, ??1TConVar_cam_NearPitch@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_NearPitch`.
-   */
-  void cleanup_TConVar_cam_NearPitch()
-  {
-    CleanupStartupConCommand(gTConVar_cam_NearPitch);
-  }
-
-  /**
-   * Address: 0x00BDF300 (FUN_00BDF300, register_TConVar_cam_NearPitch)
-   *
-   * What it does:
-   * Registers startup convar for `cam_NearPitch`.
-   */
-  void register_TConVar_cam_NearPitch()
-  {
-    RegisterStartupConVar(gTConVar_cam_NearPitch, &cleanup_TConVar_cam_NearPitch);
-  }
-
-  /**
-   * Address: 0x00C03310 (FUN_00C03310, ??1TConVar_cam_NearZoom@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_NearZoom`.
-   */
-  void cleanup_TConVar_cam_NearZoom()
-  {
-    CleanupStartupConCommand(gTConVar_cam_NearZoom);
-  }
-
-  /**
-   * Address: 0x00BDF240 (FUN_00BDF240, register_TConVar_cam_NearZoom)
-   *
-   * What it does:
-   * Registers startup convar for `cam_NearZoom`.
-   */
-  void register_TConVar_cam_NearZoom()
-  {
-    RegisterStartupConVar(gTConVar_cam_NearZoom, &cleanup_TConVar_cam_NearZoom);
-  }
-
-  /**
-   * Address: 0x00C034F0 (FUN_00C034F0, ??1TConVar_cam_PanSpeed@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_PanSpeed`.
-   */
-  void cleanup_TConVar_cam_PanSpeed()
-  {
-    CleanupStartupConCommand(gTConVar_cam_PanSpeed);
-  }
-
-  /**
-   * Address: 0x00BDF4C0 (FUN_00BDF4C0, register_TConVar_cam_PanSpeed)
-   *
-   * What it does:
-   * Registers startup convar for `cam_PanSpeed`.
-   */
-  void register_TConVar_cam_PanSpeed()
-  {
-    RegisterStartupConVar(gTConVar_cam_PanSpeed, &cleanup_TConVar_cam_PanSpeed);
-  }
-
-  /**
-   * Address: 0x00C03520 (FUN_00C03520, ??1TConVar_cam_ShakeMult@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_ShakeMult`.
-   */
-  void cleanup_TConVar_cam_ShakeMult()
-  {
-    CleanupStartupConCommand(gTConVar_cam_ShakeMult);
-  }
-
-  /**
-   * Address: 0x00BDF500 (FUN_00BDF500, register_TConVar_cam_ShakeMult)
-   *
-   * What it does:
-   * Registers startup convar for `cam_ShakeMult`.
-   */
-  void register_TConVar_cam_ShakeMult()
-  {
-    RegisterStartupConVar(gTConVar_cam_ShakeMult, &cleanup_TConVar_cam_ShakeMult);
-  }
-
-  /**
-   * Address: 0x00C034C0 (FUN_00C034C0, ??1TConVar_cam_SpinSpeed@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_SpinSpeed`.
-   */
-  void cleanup_TConVar_cam_SpinSpeed()
-  {
-    CleanupStartupConCommand(gTConVar_cam_SpinSpeed);
-  }
-
-  /**
-   * Address: 0x00BDF480 (FUN_00BDF480, register_TConVar_cam_SpinSpeed)
-   *
-   * What it does:
-   * Registers startup convar for `cam_SpinSpeed`.
-   */
-  void register_TConVar_cam_SpinSpeed()
-  {
-    RegisterStartupConVar(gTConVar_cam_SpinSpeed, &cleanup_TConVar_cam_SpinSpeed);
-  }
-
-  /**
-   * Address: 0x00C03490 (FUN_00C03490, ??1TConVar_cam_TrackProjectileTimeout@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_TrackProjectileTimeout`.
-   */
-  void cleanup_TConVar_cam_TrackProjectileTimeout()
-  {
-    CleanupStartupConCommand(gTConVar_cam_TrackProjectileTimeout);
-  }
-
-  /**
-   * Address: 0x00BDF440 (FUN_00BDF440, register_TConVar_cam_TrackProjectileTimeout)
-   *
-   * What it does:
-   * Registers startup convar for `cam_TrackProjectileTimeout`.
-   */
-  void register_TConVar_cam_TrackProjectileTimeout()
-  {
-    RegisterStartupConVar(gTConVar_cam_TrackProjectileTimeout, &cleanup_TConVar_cam_TrackProjectileTimeout);
-  }
-
-  /**
-   * Address: 0x00C03400 (FUN_00C03400, ??1TConVar_cam_ZoomAmount@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_ZoomAmount`.
-   */
-  void cleanup_TConVar_cam_ZoomAmount()
-  {
-    CleanupStartupConCommand(gTConVar_cam_ZoomAmount);
-  }
-
-  /**
-   * Address: 0x00BDF380 (FUN_00BDF380, register_TConVar_cam_ZoomAmount)
-   *
-   * What it does:
-   * Registers startup convar for `cam_ZoomAmount`.
-   */
-  void register_TConVar_cam_ZoomAmount()
-  {
-    RegisterStartupConVar(gTConVar_cam_ZoomAmount, &cleanup_TConVar_cam_ZoomAmount);
-  }
-
-  /**
-   * Address: 0x00C03460 (FUN_00C03460, ??1TConVar_cam_ZoomSpeedLarge@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_ZoomSpeedLarge`.
-   */
-  void cleanup_TConVar_cam_ZoomSpeedLarge()
-  {
-    CleanupStartupConCommand(gTConVar_cam_ZoomSpeedLarge);
-  }
-
-  /**
-   * Address: 0x00BDF400 (FUN_00BDF400, register_TConVar_cam_ZoomSpeedLarge)
-   *
-   * What it does:
-   * Registers startup convar for `cam_ZoomSpeedLarge`.
-   */
-  void register_TConVar_cam_ZoomSpeedLarge()
-  {
-    RegisterStartupConVar(gTConVar_cam_ZoomSpeedLarge, &cleanup_TConVar_cam_ZoomSpeedLarge);
-  }
-
-  /**
-   * Address: 0x00C03430 (FUN_00C03430, ??1TConVar_cam_ZoomSpeedSmall@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `cam_ZoomSpeedSmall`.
-   */
-  void cleanup_TConVar_cam_ZoomSpeedSmall()
-  {
-    CleanupStartupConCommand(gTConVar_cam_ZoomSpeedSmall);
-  }
-
-  /**
-   * Address: 0x00BDF3C0 (FUN_00BDF3C0, register_TConVar_cam_ZoomSpeedSmall)
-   *
-   * What it does:
-   * Registers startup convar for `cam_ZoomSpeedSmall`.
-   */
-  void register_TConVar_cam_ZoomSpeedSmall()
-  {
-    RegisterStartupConVar(gTConVar_cam_ZoomSpeedSmall, &cleanup_TConVar_cam_ZoomSpeedSmall);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsCam
-  {
-    ConsoleStartupRegistrationsCam()
-    {
-      moho::register_TConVar_cam_DefaultMiniLOD();
-      moho::register_TConVar_cam_EntityBoxExpand();
-      moho::register_TConVar_cam_FarFOV();
-      moho::register_TConVar_cam_FarPitch();
-      moho::register_TConVar_cam_Free();
-      moho::register_TConVar_cam_MinSpinPitch();
-      moho::register_TConVar_cam_NearFOV();
-      moho::register_TConVar_cam_NearPitch();
-      moho::register_TConVar_cam_NearZoom();
-      moho::register_TConVar_cam_PanSpeed();
-      moho::register_TConVar_cam_ShakeMult();
-      moho::register_TConVar_cam_SpinSpeed();
-      moho::register_TConVar_cam_TrackProjectileTimeout();
-      moho::register_TConVar_cam_ZoomAmount();
-      moho::register_TConVar_cam_ZoomSpeedLarge();
-      moho::register_TConVar_cam_ZoomSpeedSmall();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsCam gConsoleStartupRegistrationsCam;
-} // namespace
 
 namespace
 {
@@ -7559,7 +4985,7 @@ namespace
   constexpr const char* kConsoleStartupDebugMovieDescription = "debug movie output";
   constexpr const char* kConsoleStartupDumpRateDescription = "Frame rate to use for movie dumps";
   constexpr const char* kConsoleStartupDumpOutputFrameNumberDescription = "Starting frame to dump on";
-  constexpr const char* kConsoleStartupEdEnableHookDescription = "ed_EnableHook tuning value.";
+  constexpr const char* kConsoleStartupEdEnableHookDescription = "";
   constexpr const char* kConsoleStartupEfxWaveCutoffDescription = "Shoreline LOD cutoff";
   constexpr const char* kConsoleStartupFogDistanceFogDescription = "Distance fog enabled?";
   constexpr const char* kConsoleStartupFogOffsetMultiplierDescription = "amount to fudge offset by to make fog go away as we zoom out";
@@ -7608,664 +5034,238 @@ namespace moho
   extern int wnd_MinDragHeight;
   extern int wnd_MinDragWidth;
 
+  /**
+   * Address: 0x00BE76F0 (FUN_00BE76F0, dynamic initializer for `gTConVar_dbg_Metronome`)
+   * Address: 0x00C08160 (FUN_00C08160, dynamic atexit destructor for `gTConVar_dbg_Metronome`)
+   */
   TConVar<bool> gTConVar_dbg_Metronome(
     "dbg_Metronome",
     kConsoleStartupDbgMetronomeDescription,
     &moho::dbg_Metronome
   );
+
+  /**
+   * Address: 0x00BE8F60 (FUN_00BE8F60, dynamic initializer for `gTConVar_dbg_MonitorAddressSpace`)
+   * Address: 0x00C08C10 (FUN_00C08C10, dynamic atexit destructor for `gTConVar_dbg_MonitorAddressSpace`)
+   */
   TConVar<bool> gTConVar_dbg_MonitorAddressSpace(
     "dbg_MonitorAddressSpace",
     kConsoleStartupDbgMonitorAddressSpaceDescription,
     &moho::dbg_MonitorAddressSpace
   );
+
+  /**
+   * Address: 0x00BE6C40 (FUN_00BE6C40, dynamic initializer for `gTConVar_debug_movie`)
+   * Address: 0x00C07B10 (FUN_00C07B10, dynamic atexit destructor for `gTConVar_debug_movie`)
+   */
   TConVar<bool> gTConVar_debug_movie(
     "debug_movie",
     kConsoleStartupDebugMovieDescription,
     &moho::debug_movie
   );
+
+  /**
+   * Address: 0x00BE0F10 (FUN_00BE0F10, dynamic initializer for `gTConVar_dump_Rate`)
+   * Address: 0x00C04210 (FUN_00C04210, dynamic atexit destructor for `gTConVar_dump_Rate`)
+   */
   TConVar<float> gTConVar_dump_Rate(
     "dump_Rate",
     kConsoleStartupDumpRateDescription,
     &moho::dump_Rate
   );
+
+  /**
+   * Address: 0x00BE0ED0 (FUN_00BE0ED0, dynamic initializer for `gTConVar_dump_outputFrameNumber`)
+   * Address: 0x00C041E0 (FUN_00C041E0, dynamic atexit destructor for `gTConVar_dump_outputFrameNumber`)
+   */
   TConVar<int> gTConVar_dump_outputFrameNumber(
     "dump_outputFrameNumber",
     kConsoleStartupDumpOutputFrameNumberDescription,
     &moho::dump_outputFrameNumber
   );
+
+  /**
+   * Address: 0x00BE1A10 (FUN_00BE1A10, dynamic initializer for `gTConVar_ed_EnableHook`)
+   * Address: 0x00C04990 (FUN_00C04990, dynamic atexit destructor for `gTConVar_ed_EnableHook`)
+   */
   TConVar<bool> gTConVar_ed_EnableHook(
     "ed_EnableHook",
     kConsoleStartupEdEnableHookDescription,
     &moho::ed_EnableHook
   );
+
+  /**
+   * Address: 0x00BE71B0 (FUN_00BE71B0, dynamic initializer for `gTConVar_efx_WaveCutoff`)
+   * Address: 0x00C07E60 (FUN_00C07E60, dynamic atexit destructor for `gTConVar_efx_WaveCutoff`)
+   */
   TConVar<float> gTConVar_efx_WaveCutoff(
     "efx_WaveCutoff",
     kConsoleStartupEfxWaveCutoffDescription,
     &moho::efx_WaveCutoff
   );
+
+  /**
+   * Address: 0x00BE16D0 (FUN_00BE16D0, dynamic initializer for `gTConVar_fog_DistanceFog`)
+   * Address: 0x00C04720 (FUN_00C04720, dynamic atexit destructor for `gTConVar_fog_DistanceFog`)
+   */
   TConVar<bool> gTConVar_fog_DistanceFog(
     "fog_DistanceFog",
     kConsoleStartupFogDistanceFogDescription,
     &moho::fog_DistanceFog
   );
+
+  /**
+   * Address: 0x00BE1C10 (FUN_00BE1C10, dynamic initializer for `gTConVar_fog_OffsetMultiplier`)
+   * Address: 0x00C04B10 (FUN_00C04B10, dynamic atexit destructor for `gTConVar_fog_OffsetMultiplier`)
+   */
   TConVar<float> gTConVar_fog_OffsetMultiplier(
     "fog_OffsetMultiplier",
     kConsoleStartupFogOffsetMultiplierDescription,
     &moho::fog_OffsetMultiplier
   );
+
+  /**
+   * Address: 0x00BE8DA0 (FUN_00BE8DA0, dynamic initializer for `gTConVar_sc_FrameTimeClamp`)
+   * Address: 0x00C08AC0 (FUN_00C08AC0, dynamic atexit destructor for `gTConVar_sc_FrameTimeClamp`)
+   */
   TConVar<float> gTConVar_sc_FrameTimeClamp(
     "sc_FrameTimeClamp",
     kConsoleStartupScFrameTimeClampDescription,
     &moho::sc_FrameTimeClamp
   );
+
+  /**
+   * Address: 0x00BE8D60 (FUN_00BE8D60, dynamic initializer for `gTConVar_sc_SkipIntro`)
+   * Address: 0x00C08A90 (FUN_00C08A90, dynamic atexit destructor for `gTConVar_sc_SkipIntro`)
+   */
   TConVar<bool> gTConVar_sc_SkipIntro(
     "sc_SkipIntro",
     kConsoleStartupScSkipIntroDescription,
     &moho::sc_SkipIntro
   );
+
+  /**
+   * Address: 0x00BE7E40 (FUN_00BE7E40, dynamic initializer for `gTConVar_snd_CheckDistance`)
+   * Address: 0x00C08520 (FUN_00C08520, dynamic atexit destructor for `gTConVar_snd_CheckDistance`)
+   */
   TConVar<bool> gTConVar_snd_CheckDistance(
     "snd_CheckDistance",
     kConsoleStartupSndCheckDistanceDescription,
     &moho::snd_CheckDistance
   );
+
+  /**
+   * Address: 0x00BE7E80 (FUN_00BE7E80, dynamic initializer for `gTConVar_snd_CheckLOS`)
+   * Address: 0x00C08550 (FUN_00C08550, dynamic atexit destructor for `gTConVar_snd_CheckLOS`)
+   */
   TConVar<bool> gTConVar_snd_CheckLOS(
     "snd_CheckLOS",
     kConsoleStartupSndCheckLOSDescription,
     &moho::snd_CheckLOS
   );
+
+  /**
+   * Address: 0x00BE7EC0 (FUN_00BE7EC0, dynamic initializer for `gTConVar_snd_SpewSound`)
+   * Address: 0x00C08580 (FUN_00C08580, dynamic atexit destructor for `gTConVar_snd_SpewSound`)
+   */
   TConVar<bool> gTConVar_snd_SpewSound(
     "snd_SpewSound",
     kConsoleStartupSndSpewSoundDescription,
     &moho::snd_SpewSound
   );
+
+  /**
+   * Address: 0x00BE7730 (FUN_00BE7730, dynamic initializer for `gTConVar_wld_RunWithTheWind`)
+   * Address: 0x00C08190 (FUN_00C08190, dynamic atexit destructor for `gTConVar_wld_RunWithTheWind`)
+   */
   TConVar<bool> gTConVar_wld_RunWithTheWind(
     "wld_RunWithTheWind",
     kConsoleStartupWldRunWithTheWindDescription,
     &moho::wld_RunWithTheWind
   );
+
+  /**
+   * Address: 0x00BE7290 (FUN_00BE7290, dynamic initializer for `gTConVar_wld_SkewRateAdjustBase`)
+   * Address: 0x00C07F00 (FUN_00C07F00, dynamic atexit destructor for `gTConVar_wld_SkewRateAdjustBase`)
+   */
   TConVar<float> gTConVar_wld_SkewRateAdjustBase(
     "wld_SkewRateAdjustBase",
     kConsoleStartupWldSkewRateAdjustBaseDescription,
     &moho::wld_SkewRateAdjustBase
   );
+
+  /**
+   * Address: 0x00BE72D0 (FUN_00BE72D0, dynamic initializer for `gTConVar_wld_SkewRateAdjustMax`)
+   * Address: 0x00C07F30 (FUN_00C07F30, dynamic atexit destructor for `gTConVar_wld_SkewRateAdjustMax`)
+   */
   TConVar<float> gTConVar_wld_SkewRateAdjustMax(
     "wld_SkewRateAdjustMax",
     kConsoleStartupWldSkewRateAdjustMaxDescription,
     &moho::wld_SkewRateAdjustMax
   );
+
+  /**
+   * Address: 0x00BE8F20 (FUN_00BE8F20, dynamic initializer for `gTConVar_wnd_DefaultCreateHeight`)
+   * Address: 0x00C08BE0 (FUN_00C08BE0, dynamic atexit destructor for `gTConVar_wnd_DefaultCreateHeight`)
+   */
   TConVar<int> gTConVar_wnd_DefaultCreateHeight(
     "wnd_DefaultCreateHeight",
     kConsoleStartupWndDefaultCreateHeightDescription,
     &moho::wnd_DefaultCreateHeight
   );
+
+  /**
+   * Address: 0x00BE8EE0 (FUN_00BE8EE0, dynamic initializer for `gTConVar_wnd_DefaultCreateWidth`)
+   * Address: 0x00C08BB0 (FUN_00C08BB0, dynamic atexit destructor for `gTConVar_wnd_DefaultCreateWidth`)
+   */
   TConVar<int> gTConVar_wnd_DefaultCreateWidth(
     "wnd_DefaultCreateWidth",
     kConsoleStartupWndDefaultCreateWidthDescription,
     &moho::wnd_DefaultCreateWidth
   );
+
+  /**
+   * Address: 0x00BE8E20 (FUN_00BE8E20, dynamic initializer for `gTConVar_wnd_MinCmdLineHeight`)
+   * Address: 0x00C08B20 (FUN_00C08B20, dynamic atexit destructor for `gTConVar_wnd_MinCmdLineHeight`)
+   */
   TConVar<int> gTConVar_wnd_MinCmdLineHeight(
     "wnd_MinCmdLineHeight",
     kConsoleStartupWndMinCmdLineHeightDescription,
     &moho::wnd_MinCmdLineHeight
   );
+
+  /**
+   * Address: 0x00BE8DE0 (FUN_00BE8DE0, dynamic initializer for `gTConVar_wnd_MinCmdLineWidth`)
+   * Address: 0x00C08AF0 (FUN_00C08AF0, dynamic atexit destructor for `gTConVar_wnd_MinCmdLineWidth`)
+   */
   TConVar<int> gTConVar_wnd_MinCmdLineWidth(
     "wnd_MinCmdLineWidth",
     kConsoleStartupWndMinCmdLineWidthDescription,
     &moho::wnd_MinCmdLineWidth
   );
+
+  /**
+   * Address: 0x00BE8EA0 (FUN_00BE8EA0, dynamic initializer for `gTConVar_wnd_MinDragHeight`)
+   * Address: 0x00C08B80 (FUN_00C08B80, dynamic atexit destructor for `gTConVar_wnd_MinDragHeight`)
+   */
   TConVar<int> gTConVar_wnd_MinDragHeight(
     "wnd_MinDragHeight",
     kConsoleStartupWndMinDragHeightDescription,
     &moho::wnd_MinDragHeight
   );
+
+  /**
+   * Address: 0x00BE8E60 (FUN_00BE8E60, dynamic initializer for `gTConVar_wnd_MinDragWidth`)
+   * Address: 0x00C08B50 (FUN_00C08B50, dynamic atexit destructor for `gTConVar_wnd_MinDragWidth`)
+   */
   TConVar<int> gTConVar_wnd_MinDragWidth(
     "wnd_MinDragWidth",
     kConsoleStartupWndMinDragWidthDescription,
     &moho::wnd_MinDragWidth
   );
 
-  /**
-   * Address: 0x00C08160 (FUN_00C08160, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `dbg_Metronome`.
-   */
-  void cleanup_TConVar_dbg_Metronome()
-  {
-    CleanupStartupConCommand(gTConVar_dbg_Metronome);
-  }
-
-  /**
-   * Address: 0x00BE76F0 (FUN_00BE76F0, register_TConVar_dbg_Metronome)
-   *
-   * What it does:
-   * Registers startup convar for `dbg_Metronome`.
-   */
-  void register_TConVar_dbg_Metronome()
-  {
-    RegisterStartupConVar(gTConVar_dbg_Metronome, &cleanup_TConVar_dbg_Metronome);
-  }
-
-  /**
-   * Address: 0x00C08C10 (FUN_00C08C10, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `dbg_MonitorAddressSpace`.
-   */
-  void cleanup_TConVar_dbg_MonitorAddressSpace()
-  {
-    CleanupStartupConCommand(gTConVar_dbg_MonitorAddressSpace);
-  }
-
-  /**
-   * Address: 0x00BE8F60 (FUN_00BE8F60, register_TConVar_dbg_MonitorAddressSpace)
-   *
-   * What it does:
-   * Registers startup convar for `dbg_MonitorAddressSpace`.
-   */
-  void register_TConVar_dbg_MonitorAddressSpace()
-  {
-    RegisterStartupConVar(gTConVar_dbg_MonitorAddressSpace, &cleanup_TConVar_dbg_MonitorAddressSpace);
-  }
-
-  /**
-   * Address: 0x00C07B10 (FUN_00C07B10, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `debug_movie`.
-   */
-  void cleanup_TConVar_debug_movie()
-  {
-    CleanupStartupConCommand(gTConVar_debug_movie);
-  }
-
-  /**
-   * Address: 0x00BE6C40 (FUN_00BE6C40, register_TConVar_debug_movie)
-   *
-   * What it does:
-   * Registers startup convar for `debug_movie`.
-   */
-  void register_TConVar_debug_movie()
-  {
-    RegisterStartupConVar(gTConVar_debug_movie, &cleanup_TConVar_debug_movie);
-  }
-
-  /**
-   * Address: 0x00C04210 (FUN_00C04210, ??1TConVar_dump_Rate@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `dump_Rate`.
-   */
-  void cleanup_TConVar_dump_Rate()
-  {
-    CleanupStartupConCommand(gTConVar_dump_Rate);
-  }
-
-  /**
-   * Address: 0x00BE0F10 (FUN_00BE0F10, register_TConVar_dump_Rate)
-   *
-   * What it does:
-   * Registers startup convar for `dump_Rate`.
-   */
-  void register_TConVar_dump_Rate()
-  {
-    RegisterStartupConVar(gTConVar_dump_Rate, &cleanup_TConVar_dump_Rate);
-  }
-
-  /**
-   * Address: 0x00C041E0 (FUN_00C041E0, ??1TConVar_dump_outputFrameNumber@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `dump_outputFrameNumber`.
-   */
-  void cleanup_TConVar_dump_outputFrameNumber()
-  {
-    CleanupStartupConCommand(gTConVar_dump_outputFrameNumber);
-  }
-
-  /**
-   * Address: 0x00BE0ED0 (FUN_00BE0ED0, register_TConVar_dump_outputFrameNumber)
-   *
-   * What it does:
-   * Registers startup convar for `dump_outputFrameNumber`.
-   */
-  void register_TConVar_dump_outputFrameNumber()
-  {
-    RegisterStartupConVar(gTConVar_dump_outputFrameNumber, &cleanup_TConVar_dump_outputFrameNumber);
-  }
-
-  /**
-   * Address: 0x00C04990 (FUN_00C04990, ??1TConVar_ed_EnableHook@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ed_EnableHook`.
-   */
-  void cleanup_TConVar_ed_EnableHook()
-  {
-    CleanupStartupConCommand(gTConVar_ed_EnableHook);
-  }
-
-  /**
-   * Address: 0x00BE1A10 (FUN_00BE1A10, register_TConVar_ed_EnableHook)
-   *
-   * What it does:
-   * Registers startup convar for `ed_EnableHook`.
-   */
-  void register_TConVar_ed_EnableHook()
-  {
-    RegisterStartupConVar(gTConVar_ed_EnableHook, &cleanup_TConVar_ed_EnableHook);
-  }
-
-  /**
-   * Address: 0x00C07E60 (FUN_00C07E60, ??1TConVar_efx_WaveCutoff@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `efx_WaveCutoff`.
-   */
-  void cleanup_TConVar_efx_WaveCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_efx_WaveCutoff);
-  }
-
-  /**
-   * Address: 0x00BE71B0 (FUN_00BE71B0, register_TConVar_efx_WaveCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `efx_WaveCutoff`.
-   */
-  void register_TConVar_efx_WaveCutoff()
-  {
-    RegisterStartupConVar(gTConVar_efx_WaveCutoff, &cleanup_TConVar_efx_WaveCutoff);
-  }
-
-  /**
-   * Address: 0x00C04720 (FUN_00C04720, ??1TConVar_fog_DistanceFog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `fog_DistanceFog`.
-   */
-  void cleanup_TConVar_fog_DistanceFog()
-  {
-    CleanupStartupConCommand(gTConVar_fog_DistanceFog);
-  }
-
-  /**
-   * Address: 0x00BE16D0 (FUN_00BE16D0, register_TConVar_fog_DistanceFog)
-   *
-   * What it does:
-   * Registers startup convar for `fog_DistanceFog`.
-   */
-  void register_TConVar_fog_DistanceFog()
-  {
-    RegisterStartupConVar(gTConVar_fog_DistanceFog, &cleanup_TConVar_fog_DistanceFog);
-  }
-
-  /**
-   * Address: 0x00C04B10 (FUN_00C04B10, ??1TConVar_fog_OffsetMultiplier@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `fog_OffsetMultiplier`.
-   */
-  void cleanup_TConVar_fog_OffsetMultiplier()
-  {
-    CleanupStartupConCommand(gTConVar_fog_OffsetMultiplier);
-  }
-
-  /**
-   * Address: 0x00BE1C10 (FUN_00BE1C10, register_TConVar_fog_OffsetMultiplier)
-   *
-   * What it does:
-   * Registers startup convar for `fog_OffsetMultiplier`.
-   */
-  void register_TConVar_fog_OffsetMultiplier()
-  {
-    RegisterStartupConVar(gTConVar_fog_OffsetMultiplier, &cleanup_TConVar_fog_OffsetMultiplier);
-  }
-
-  /**
-   * Address: 0x00C08AC0 (FUN_00C08AC0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sc_FrameTimeClamp`.
-   */
-  void cleanup_TConVar_sc_FrameTimeClamp()
-  {
-    CleanupStartupConCommand(gTConVar_sc_FrameTimeClamp);
-  }
-
-  /**
-   * Address: 0x00BE8DA0 (FUN_00BE8DA0, register_TConVar_sc_FrameTimeClamp)
-   *
-   * What it does:
-   * Registers startup convar for `sc_FrameTimeClamp`.
-   */
-  void register_TConVar_sc_FrameTimeClamp()
-  {
-    RegisterStartupConVar(gTConVar_sc_FrameTimeClamp, &cleanup_TConVar_sc_FrameTimeClamp);
-  }
-
-  /**
-   * Address: 0x00C08A90 (FUN_00C08A90, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `sc_SkipIntro`.
-   */
-  void cleanup_TConVar_sc_SkipIntro()
-  {
-    CleanupStartupConCommand(gTConVar_sc_SkipIntro);
-  }
-
-  /**
-   * Address: 0x00BE8D60 (FUN_00BE8D60, register_TConVar_sc_SkipIntro)
-   *
-   * What it does:
-   * Registers startup convar for `sc_SkipIntro`.
-   */
-  void register_TConVar_sc_SkipIntro()
-  {
-    RegisterStartupConVar(gTConVar_sc_SkipIntro, &cleanup_TConVar_sc_SkipIntro);
-  }
-
-  /**
-   * Address: 0x00C08520 (FUN_00C08520, ??1TConVar_snd_CheckDistance@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `snd_CheckDistance`.
-   */
-  void cleanup_TConVar_snd_CheckDistance()
-  {
-    CleanupStartupConCommand(gTConVar_snd_CheckDistance);
-  }
-
-  /**
-   * Address: 0x00BE7E40 (FUN_00BE7E40, register_TConVar_snd_CheckDistance)
-   *
-   * What it does:
-   * Registers startup convar for `snd_CheckDistance`.
-   */
-  void register_TConVar_snd_CheckDistance()
-  {
-    RegisterStartupConVar(gTConVar_snd_CheckDistance, &cleanup_TConVar_snd_CheckDistance);
-  }
-
-  /**
-   * Address: 0x00C08550 (FUN_00C08550, ??1TConVar_snd_CheckLOS@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `snd_CheckLOS`.
-   */
-  void cleanup_TConVar_snd_CheckLOS()
-  {
-    CleanupStartupConCommand(gTConVar_snd_CheckLOS);
-  }
-
-  /**
-   * Address: 0x00BE7E80 (FUN_00BE7E80, register_TConVar_snd_CheckLOS)
-   *
-   * What it does:
-   * Registers startup convar for `snd_CheckLOS`.
-   */
-  void register_TConVar_snd_CheckLOS()
-  {
-    RegisterStartupConVar(gTConVar_snd_CheckLOS, &cleanup_TConVar_snd_CheckLOS);
-  }
-
-  /**
-   * Address: 0x00C08580 (FUN_00C08580, ??1TConVar_snd_SpewSound@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `snd_SpewSound`.
-   */
-  void cleanup_TConVar_snd_SpewSound()
-  {
-    CleanupStartupConCommand(gTConVar_snd_SpewSound);
-  }
-
-  /**
-   * Address: 0x00BE7EC0 (FUN_00BE7EC0, register_TConVar_snd_SpewSound)
-   *
-   * What it does:
-   * Registers startup convar for `snd_SpewSound`.
-   */
-  void register_TConVar_snd_SpewSound()
-  {
-    RegisterStartupConVar(gTConVar_snd_SpewSound, &cleanup_TConVar_snd_SpewSound);
-  }
-
-  /**
-   * Address: 0x00C08190 (FUN_00C08190, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wld_RunWithTheWind`.
-   */
-  void cleanup_TConVar_wld_RunWithTheWind()
-  {
-    CleanupStartupConCommand(gTConVar_wld_RunWithTheWind);
-  }
-
-  /**
-   * Address: 0x00BE7730 (FUN_00BE7730, register_TConVar_wld_RunWithTheWind)
-   *
-   * What it does:
-   * Registers startup convar for `wld_RunWithTheWind`.
-   */
-  void register_TConVar_wld_RunWithTheWind()
-  {
-    RegisterStartupConVar(gTConVar_wld_RunWithTheWind, &cleanup_TConVar_wld_RunWithTheWind);
-  }
-
-  /**
-   * Address: 0x00C07F00 (FUN_00C07F00, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wld_SkewRateAdjustBase`.
-   */
-  void cleanup_TConVar_wld_SkewRateAdjustBase()
-  {
-    CleanupStartupConCommand(gTConVar_wld_SkewRateAdjustBase);
-  }
-
-  /**
-   * Address: 0x00BE7290 (FUN_00BE7290, register_TConVar_wld_SkewRateAdjustBase)
-   *
-   * What it does:
-   * Registers startup convar for `wld_SkewRateAdjustBase`.
-   */
-  void register_TConVar_wld_SkewRateAdjustBase()
-  {
-    RegisterStartupConVar(gTConVar_wld_SkewRateAdjustBase, &cleanup_TConVar_wld_SkewRateAdjustBase);
-  }
-
-  /**
-   * Address: 0x00C07F30 (FUN_00C07F30, ??1TConVar_wld_SkewRateAdjustMax@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wld_SkewRateAdjustMax`.
-   */
-  void cleanup_TConVar_wld_SkewRateAdjustMax()
-  {
-    CleanupStartupConCommand(gTConVar_wld_SkewRateAdjustMax);
-  }
-
-  /**
-   * Address: 0x00BE72D0 (FUN_00BE72D0, register_TConVar_wld_SkewRateAdjustMax)
-   *
-   * What it does:
-   * Registers startup convar for `wld_SkewRateAdjustMax`.
-   */
-  void register_TConVar_wld_SkewRateAdjustMax()
-  {
-    RegisterStartupConVar(gTConVar_wld_SkewRateAdjustMax, &cleanup_TConVar_wld_SkewRateAdjustMax);
-  }
-
-  /**
-   * Address: 0x00C08BE0 (FUN_00C08BE0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_DefaultCreateHeight`.
-   */
-  void cleanup_TConVar_wnd_DefaultCreateHeight()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_DefaultCreateHeight);
-  }
-
-  /**
-   * Address: 0x00BE8F20 (FUN_00BE8F20, register_TConVar_wnd_DefaultCreateHeight)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_DefaultCreateHeight`.
-   */
-  void register_TConVar_wnd_DefaultCreateHeight()
-  {
-    RegisterStartupConVar(gTConVar_wnd_DefaultCreateHeight, &cleanup_TConVar_wnd_DefaultCreateHeight);
-  }
-
-  /**
-   * Address: 0x00C08BB0 (FUN_00C08BB0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_DefaultCreateWidth`.
-   */
-  void cleanup_TConVar_wnd_DefaultCreateWidth()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_DefaultCreateWidth);
-  }
-
-  /**
-   * Address: 0x00BE8EE0 (FUN_00BE8EE0, register_TConVar_wnd_DefaultCreateWidth)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_DefaultCreateWidth`.
-   */
-  void register_TConVar_wnd_DefaultCreateWidth()
-  {
-    RegisterStartupConVar(gTConVar_wnd_DefaultCreateWidth, &cleanup_TConVar_wnd_DefaultCreateWidth);
-  }
-
-  /**
-   * Address: 0x00C08B20 (FUN_00C08B20, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_MinCmdLineHeight`.
-   */
-  void cleanup_TConVar_wnd_MinCmdLineHeight()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_MinCmdLineHeight);
-  }
-
-  /**
-   * Address: 0x00BE8E20 (FUN_00BE8E20, register_TConVar_wnd_MinCmdLineHeight)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_MinCmdLineHeight`.
-   */
-  void register_TConVar_wnd_MinCmdLineHeight()
-  {
-    RegisterStartupConVar(gTConVar_wnd_MinCmdLineHeight, &cleanup_TConVar_wnd_MinCmdLineHeight);
-  }
-
-  /**
-   * Address: 0x00C08AF0 (FUN_00C08AF0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_MinCmdLineWidth`.
-   */
-  void cleanup_TConVar_wnd_MinCmdLineWidth()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_MinCmdLineWidth);
-  }
-
-  /**
-   * Address: 0x00BE8DE0 (FUN_00BE8DE0, register_TConVar_wnd_MinCmdLineWidth)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_MinCmdLineWidth`.
-   */
-  void register_TConVar_wnd_MinCmdLineWidth()
-  {
-    RegisterStartupConVar(gTConVar_wnd_MinCmdLineWidth, &cleanup_TConVar_wnd_MinCmdLineWidth);
-  }
-
-  /**
-   * Address: 0x00C08B80 (FUN_00C08B80, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_MinDragHeight`.
-   */
-  void cleanup_TConVar_wnd_MinDragHeight()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_MinDragHeight);
-  }
-
-  /**
-   * Address: 0x00BE8EA0 (FUN_00BE8EA0, register_TConVar_wnd_MinDragHeight)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_MinDragHeight`.
-   */
-  void register_TConVar_wnd_MinDragHeight()
-  {
-    RegisterStartupConVar(gTConVar_wnd_MinDragHeight, &cleanup_TConVar_wnd_MinDragHeight);
-  }
-
-  /**
-   * Address: 0x00C08B50 (FUN_00C08B50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `wnd_MinDragWidth`.
-   */
-  void cleanup_TConVar_wnd_MinDragWidth()
-  {
-    CleanupStartupConCommand(gTConVar_wnd_MinDragWidth);
-  }
-
-  /**
-   * Address: 0x00BE8E60 (FUN_00BE8E60, register_TConVar_wnd_MinDragWidth)
-   *
-   * What it does:
-   * Registers startup convar for `wnd_MinDragWidth`.
-   */
-  void register_TConVar_wnd_MinDragWidth()
-  {
-    RegisterStartupConVar(gTConVar_wnd_MinDragWidth, &cleanup_TConVar_wnd_MinDragWidth);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsMisc
-  {
-    ConsoleStartupRegistrationsMisc()
-    {
-      moho::register_TConVar_dbg_Metronome();
-      moho::register_TConVar_dbg_MonitorAddressSpace();
-      moho::register_TConVar_debug_movie();
-      moho::register_TConVar_dump_Rate();
-      moho::register_TConVar_dump_outputFrameNumber();
-      moho::register_TConVar_ed_EnableHook();
-      moho::register_TConVar_efx_WaveCutoff();
-      moho::register_TConVar_fog_DistanceFog();
-      moho::register_TConVar_fog_OffsetMultiplier();
-      moho::register_TConVar_sc_FrameTimeClamp();
-      moho::register_TConVar_sc_SkipIntro();
-      moho::register_TConVar_snd_CheckDistance();
-      moho::register_TConVar_snd_CheckLOS();
-      moho::register_TConVar_snd_SpewSound();
-      moho::register_TConVar_wld_RunWithTheWind();
-      moho::register_TConVar_wld_SkewRateAdjustBase();
-      moho::register_TConVar_wld_SkewRateAdjustMax();
-      moho::register_TConVar_wnd_DefaultCreateHeight();
-      moho::register_TConVar_wnd_DefaultCreateWidth();
-      moho::register_TConVar_wnd_MinCmdLineHeight();
-      moho::register_TConVar_wnd_MinCmdLineWidth();
-      moho::register_TConVar_wnd_MinDragHeight();
-      moho::register_TConVar_wnd_MinDragWidth();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsMisc gConsoleStartupRegistrationsMisc;
-} // namespace
 
 namespace
 {
@@ -8281,7 +5281,7 @@ namespace
   // description text is inferred from the toggle's documented behavior
   // ("Gates the whole arc pass", ProjectileArcRenderer.h) and this file's own
   // "toggle X on/off" phrasing convention, not byte-verified.
-  constexpr const char* kConsoleStartupUIRenProjectileArcsDescription = "toggle projectile trail arcs on/off";
+  constexpr const char* kConsoleStartupUIRenProjectileArcsDescription = "toggle projectile trails on/off";
   constexpr const char* kConsoleStartupUIRenProjectileArcsSampleIntervalDescription = "How often the position is updated for the projectile trail";
   constexpr const char* kConsoleStartupUIRenProjectileGlowDescription = "Toggle projectile icon glow";
   constexpr const char* kConsoleStartupUIRenProjectileGlowMaxDescription = "Maximum glow alpha on projecile icon";
@@ -8431,146 +5431,289 @@ namespace moho
   extern bool ui_WindowedAlwaysShowsCursor;
   extern float ui_lifebarHeight;
 
+  /**
+   * Address: 0x00BE5C70 (FUN_00BE5C70, dynamic initializer for `gTConVar_UI_RenProectileTrailWidth`)
+   * Address: 0x00C071F0 (FUN_00C071F0, dynamic atexit destructor for `gTConVar_UI_RenProectileTrailWidth`)
+   */
   TConVar<float> gTConVar_UI_RenProectileTrailWidth(
     "UI_RenProectileTrailWidth",
     kConsoleStartupUIRenProectileTrailWidthDescription,
     &moho::UI_RenProectileTrailWidth
   );
+
+  /**
+   * Address: 0x00BE5BF0 (FUN_00BE5BF0, dynamic initializer for `gTConVar_UI_RenProjectileArcs`)
+   * Address: 0x00C07190 (FUN_00C07190, dynamic atexit destructor for `gTConVar_UI_RenProjectileArcs`)
+   *
+   * The shipped exe's name and description bytes are blanked; both are
+   * taken from the same command in MohoEngine.dll.
+   */
   TConVar<bool> gTConVar_UI_RenProjectileArcs(
     "UI_RenProjectileArcs",
     kConsoleStartupUIRenProjectileArcsDescription,
     &moho::UI_RenProjectileArcs
   );
+
+  /**
+   * Address: 0x00BE5CB0 (FUN_00BE5CB0, dynamic initializer for `gTConVar_UI_RenProjectileArcsSampleInterval`)
+   * Address: 0x00C07220 (FUN_00C07220, dynamic atexit destructor for `gTConVar_UI_RenProjectileArcsSampleInterval`)
+   */
   TConVar<int> gTConVar_UI_RenProjectileArcsSampleInterval(
     "UI_RenProjectileArcsSampleInterval",
     kConsoleStartupUIRenProjectileArcsSampleIntervalDescription,
     &moho::UI_RenProjectileArcsSampleInterval
   );
+
+  /**
+   * Address: 0x00BE5E20 (FUN_00BE5E20, dynamic initializer for `gTConVar_UI_RenProjectileGlow`)
+   * Address: 0x00C07310 (FUN_00C07310, dynamic atexit destructor for `gTConVar_UI_RenProjectileGlow`)
+   */
   TConVar<bool> gTConVar_UI_RenProjectileGlow(
     "UI_RenProjectileGlow",
     kConsoleStartupUIRenProjectileGlowDescription,
     &moho::UI_RenProjectileGlow
   );
+
+  /**
+   * Address: 0x00BE5EA0 (FUN_00BE5EA0, dynamic initializer for `gTConVar_UI_RenProjectileGlowMax`)
+   * Address: 0x00C07370 (FUN_00C07370, dynamic atexit destructor for `gTConVar_UI_RenProjectileGlowMax`)
+   */
   TConVar<float> gTConVar_UI_RenProjectileGlowMax(
     "UI_RenProjectileGlowMax",
     kConsoleStartupUIRenProjectileGlowMaxDescription,
     &moho::UI_RenProjectileGlowMax
   );
+
+  /**
+   * Address: 0x00BE5E60 (FUN_00BE5E60, dynamic initializer for `gTConVar_UI_RenProjectileGlowMin`)
+   * Address: 0x00C07340 (FUN_00C07340, dynamic atexit destructor for `gTConVar_UI_RenProjectileGlowMin`)
+   */
   TConVar<float> gTConVar_UI_RenProjectileGlowMin(
     "UI_RenProjectileGlowMin",
     kConsoleStartupUIRenProjectileGlowMinDescription,
     &moho::UI_RenProjectileGlowMin
   );
+
+  /**
+   * Address: 0x00BE5EE0 (FUN_00BE5EE0, dynamic initializer for `gTConVar_UI_RenProjectileGlowPeriod`)
+   * Address: 0x00C073A0 (FUN_00C073A0, dynamic atexit destructor for `gTConVar_UI_RenProjectileGlowPeriod`)
+   */
   TConVar<float> gTConVar_UI_RenProjectileGlowPeriod(
     "UI_RenProjectileGlowPeriod",
     kConsoleStartupUIRenProjectileGlowPeriodDescription,
     &moho::UI_RenProjectileGlowPeriod
   );
+
+  /**
+   * Address: 0x00BE5DA0 (FUN_00BE5DA0, dynamic initializer for `gTConVar_UI_RenProjectileIcons`)
+   * Address: 0x00C072B0 (FUN_00C072B0, dynamic atexit destructor for `gTConVar_UI_RenProjectileIcons`)
+   */
   TConVar<bool> gTConVar_UI_RenProjectileIcons(
     "UI_RenProjectileIcons",
     kConsoleStartupUIRenProjectileIconsDescription,
     &moho::UI_RenProjectileIcons
   );
+
+  /**
+   * Address: 0x00BE5C30 (FUN_00BE5C30, dynamic initializer for `gTConVar_UI_RenProjectileTrailColor`)
+   * Address: 0x00C071C0 (FUN_00C071C0, dynamic atexit destructor for `gTConVar_UI_RenProjectileTrailColor`)
+   */
   TConVar<int> gTConVar_UI_RenProjectileTrailColor(
     "UI_RenProjectileTrailColor",
     kConsoleStartupUIRenProjectileTrailColorDescription,
     &moho::UI_RenProjectileTrailColor
   );
+
+  /**
+   * Address: 0x00BE5FD0 (FUN_00BE5FD0, dynamic initializer for `gTConVar_UI_RenResources`)
+   * Address: 0x00C07420 (FUN_00C07420, dynamic atexit destructor for `gTConVar_UI_RenResources`)
+   */
   TConVar<bool> gTConVar_UI_RenResources(
     "UI_RenResources",
     kConsoleStartupUIRenResourcesDescription,
     &moho::UI_RenResources
   );
+
+  /**
+   * Address: 0x00BE6010 (FUN_00BE6010, dynamic initializer for `gTConVar_UI_ResourceLODCutoff`)
+   * Address: 0x00C07450 (FUN_00C07450, dynamic atexit destructor for `gTConVar_UI_ResourceLODCutoff`)
+   */
   TConVar<float> gTConVar_UI_ResourceLODCutoff(
     "UI_ResourceLODCutoff",
     kConsoleStartupUIResourceLODCutoffDescription,
     &moho::UI_ResourceLODCutoff
   );
+
+  /**
+   * Address: 0x00BE6180 (FUN_00BE6180, dynamic initializer for `gTConVar_UI_SelectAnything`)
+   * Address: 0x00C07520 (FUN_00C07520, dynamic atexit destructor for `gTConVar_UI_SelectAnything`)
+   */
   TConVar<bool> gTConVar_UI_SelectAnything(
     "UI_SelectAnything",
     kConsoleStartupUISelectAnythingDescription,
     &moho::UI_SelectAnything
   );
+
+  /**
+   * Address: 0x00BE19D0 (FUN_00BE19D0, dynamic initializer for `gTConVar_UI_ShowControlUnderMouse`)
+   * Address: 0x00C04960 (FUN_00C04960, dynamic atexit destructor for `gTConVar_UI_ShowControlUnderMouse`)
+   */
   TConVar<bool> gTConVar_UI_ShowControlUnderMouse(
     "UI_ShowControlUnderMouse",
     kConsoleStartupUIShowControlUnderMouseDescription,
     &moho::UI_ShowControlUnderMouse
   );
+
+  /**
+   * Address: 0x00BE5DE0 (FUN_00BE5DE0, dynamic initializer for `gTConVar_UI_StrategicProjectileLOD`)
+   * Address: 0x00C072E0 (FUN_00C072E0, dynamic atexit destructor for `gTConVar_UI_StrategicProjectileLOD`)
+   */
   TConVar<float> gTConVar_UI_StrategicProjectileLOD(
     "UI_StrategicProjectileLOD",
     kConsoleStartupUIStrategicProjectileLODDescription,
     &moho::UI_StrategicProjectileLOD
   );
+
+  /**
+   * Address: 0x00BE5F20 (FUN_00BE5F20, dynamic initializer for `gTConVar_UI_forceWeaponsToYellow`)
+   * Address: 0x00C073D0 (FUN_00C073D0, dynamic atexit destructor for `gTConVar_UI_forceWeaponsToYellow`)
+   */
   TConVar<bool> gTConVar_UI_forceWeaponsToYellow(
     "UI_forceWeaponsToYellow",
     kConsoleStartupUIForceWeaponsToYellowDescription,
     &moho::UI_forceWeaponsToYellow
   );
+
+  /**
+   * Address: 0x00BE5B00 (FUN_00BE5B00, dynamic initializer for `gTConVar_ui_AlwaysRenderStrategicIcons`)
+   * Address: 0x00C070E0 (FUN_00C070E0, dynamic atexit destructor for `gTConVar_ui_AlwaysRenderStrategicIcons`)
+   */
   TConVar<bool> gTConVar_ui_AlwaysRenderStrategicIcons(
     "ui_AlwaysRenderStrategicIcons",
     kConsoleStartupUiAlwaysRenderStrategicIconsDescription,
     &moho::ui_AlwaysRenderStrategicIcons
   );
+
+  /**
+   * Address: 0x00BE6720 (FUN_00BE6720, dynamic initializer for `gTConVar_ui_ArrowKeysScrollView`)
+   * Address: 0x00C07810 (FUN_00C07810, dynamic atexit destructor for `gTConVar_ui_ArrowKeysScrollView`)
+   */
   TConVar<bool> gTConVar_ui_ArrowKeysScrollView(
     "ui_ArrowKeysScrollView",
     kConsoleStartupUiArrowKeysScrollViewDescription,
     &moho::ui_ArrowKeysScrollView
   );
+
+  /**
+   * Address: 0x00BE50E0 (FUN_00BE50E0, dynamic initializer for `gTConVar_ui_BuildPlaceTarmacAlpha`)
+   * Address: 0x00C06950 (FUN_00C06950, dynamic atexit destructor for `gTConVar_ui_BuildPlaceTarmacAlpha`)
+   */
   TConVar<float> gTConVar_ui_BuildPlaceTarmacAlpha(
     "ui_BuildPlaceTarmacAlpha",
     kConsoleStartupUiBuildPlaceTarmacAlphaDescription,
     &moho::ui_BuildPlaceTarmacAlpha
   );
+
+  /**
+   * Address: 0x00BE3E40 (FUN_00BE3E40, dynamic initializer for `gTConVar_ui_CommandClickScale`)
+   * Address: 0x00C06050 (FUN_00C06050, dynamic atexit destructor for `gTConVar_ui_CommandClickScale`)
+   */
   TConVar<float> gTConVar_ui_CommandClickScale(
     "ui_CommandClickScale",
     kConsoleStartupUiCommandClickScaleDescription,
     &moho::ui_CommandClickScale
   );
+
+  /**
+   * Address: 0x00BE3CC0 (FUN_00BE3CC0, dynamic initializer for `gTConVar_ui_CommandGraphMaxNodeUnits`)
+   * Address: 0x00C05F30 (FUN_00C05F30, dynamic atexit destructor for `gTConVar_ui_CommandGraphMaxNodeUnits`)
+   */
   TConVar<int> gTConVar_ui_CommandGraphMaxNodeUnits(
     "ui_CommandGraphMaxNodeUnits",
     kConsoleStartupUiCommandGraphMaxNodeUnitsDescription,
     &moho::ui_CommandGraphMaxNodeUnits
   );
+
+  /**
+   * Address: 0x00BE3BC0 (FUN_00BE3BC0, dynamic initializer for `gTConVar_ui_CurveSegments`)
+   * Address: 0x00C05E70 (FUN_00C05E70, dynamic atexit destructor for `gTConVar_ui_CurveSegments`)
+   */
   TConVar<int> gTConVar_ui_CurveSegments(
     "ui_CurveSegments",
     kConsoleStartupUiCurveSegmentsDescription,
     &moho::ui_CurveSegments
   );
+
+  /**
+   * Address: 0x00BE3C00 (FUN_00BE3C00, dynamic initializer for `gTConVar_ui_CurveSmoothness`)
+   * Address: 0x00C05EA0 (FUN_00C05EA0, dynamic atexit destructor for `gTConVar_ui_CurveSmoothness`)
+   */
   TConVar<float> gTConVar_ui_CurveSmoothness(
     "ui_CurveSmoothness",
     kConsoleStartupUiCurveSmoothnessDescription,
     &moho::ui_CurveSmoothness
   );
+
+  /**
+   * Address: 0x00BE56A0 (FUN_00BE56A0, dynamic initializer for `gTConVar_ui_CustomNameColor`)
+   * Address: 0x00C06D80 (FUN_00C06D80, dynamic atexit destructor for `gTConVar_ui_CustomNameColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_CustomNameColor(
     "ui_CustomNameColor",
     kConsoleStartupUiCustomNameColorDescription,
     &moho::ui_CustomNameColor
   );
+
+  /**
+   * Address: 0x00BE5740 (FUN_00BE5740, dynamic initializer for `gTConVar_ui_CustomNameFont`)
+   * Address: 0x00C06E10 (FUN_00C06E10, dynamic atexit destructor for `gTConVar_ui_CustomNameFont`)
+   */
   TConVar<msvc8::string> gTConVar_ui_CustomNameFont(
     "ui_CutsomNameFont",
     kConsoleStartupUiCustomNameFontDescription,
     &moho::ui_CustomNameFont
   );
+
+  /**
+   * Address: 0x00BE56E0 (FUN_00BE56E0, dynamic initializer for `gTConVar_ui_CustomNameFontSize`)
+   * Address: 0x00C06DB0 (FUN_00C06DB0, dynamic atexit destructor for `gTConVar_ui_CustomNameFontSize`)
+   */
   TConVar<int> gTConVar_ui_CustomNameFontSize(
     "ui_CustomNameFontSize",
     kConsoleStartupUiCustomNameFontSizeDescription,
     &moho::ui_CustomNameFontSize
   );
+
+  /**
+   * Address: 0x00BE60E0 (FUN_00BE60E0, dynamic initializer for `gTConVar_ui_DebugAltClick`)
+   * Address: 0x00C074B0 (FUN_00C074B0, dynamic atexit destructor for `gTConVar_ui_DebugAltClick`)
+   */
   TConVar<bool> gTConVar_ui_DebugAltClick(
     "ui_DebugAltClick",
     kConsoleStartupUiDebugAltClickDescription,
     &moho::ui_DebugAltClick
   );
+
+  /**
+   * Address: 0x00BE67E0 (FUN_00BE67E0, dynamic initializer for `gTConVar_ui_DisableCursorFixing`)
+   * Address: 0x00C078A0 (FUN_00C078A0, dynamic atexit destructor for `gTConVar_ui_DisableCursorFixing`)
+   */
   TConVar<bool> gTConVar_ui_DisableCursorFixing(
     "ui_DisableCursorFixing",
     kConsoleStartupUiDisableCursorFixingDescription,
     &moho::ui_DisableCursorFixing
   );
+
+  /**
+   * Address: 0x00BE6120 (FUN_00BE6120, dynamic initializer for `gTConVar_ui_DragSelect2D`)
+   * Address: 0x00C074E0 (FUN_00C074E0, dynamic atexit destructor for `gTConVar_ui_DragSelect2D`)
+   */
   TConVar<bool> gTConVar_ui_DragSelect2D(
     "ui_DragSelect2D",
     kConsoleStartupUiDragSelect2DDescription,
     &moho::ui_DragSelect2D
   );
+
   // Not in the binary: the switch for the attack-ground deviation (see
   // `ui_AttackGroundIgnoresFireState` in UiRuntimeTypes.h).
   TConVar<bool> gTConVar_ui_AttackGroundIgnoresFireState(
@@ -8578,1868 +5721,437 @@ namespace moho
     kConsoleStartupUiAttackGroundIgnoresFireStateDescription,
     &moho::ui_AttackGroundIgnoresFireState
   );
+
+  /**
+   * Address: 0x00BE3D80 (FUN_00BE3D80, dynamic initializer for `gTConVar_ui_DrawPathPreview`)
+   * Address: 0x00C05FC0 (FUN_00C05FC0, dynamic atexit destructor for `gTConVar_ui_DrawPathPreview`)
+   */
   TConVar<bool> gTConVar_ui_DrawPathPreview(
     "ui_DrawPathPreview",
     kConsoleStartupUiDrawPathPreviewDescription,
     &moho::ui_DrawPathPreview
   );
+
+  /**
+   * Address: 0x00BE6820 (FUN_00BE6820, dynamic initializer for `gTConVar_ui_ExtractSnapTolerance`)
+   * Address: 0x00C078D0 (FUN_00C078D0, dynamic atexit destructor for `gTConVar_ui_ExtractSnapTolerance`)
+   */
   TConVar<float> gTConVar_ui_ExtractSnapTolerance(
     "ui_ExtractSnapTolerance",
     kConsoleStartupUiExtractSnapToleranceDescription,
     &moho::ui_ExtractSnapTolerance
   );
+
+  /**
+   * Address: 0x00BE5370 (FUN_00BE5370, dynamic initializer for `gTConVar_ui_FootprintMinThickness`)
+   * Address: 0x00C06B50 (FUN_00C06B50, dynamic atexit destructor for `gTConVar_ui_FootprintMinThickness`)
+   */
   TConVar<float> gTConVar_ui_FootprintMinThickness(
     "ui_FootprintMinThickness",
     kConsoleStartupUiFootprintMinThicknessDescription,
     &moho::ui_FootprintMinThickness
   );
+
+  /**
+   * Address: 0x00BE55A0 (FUN_00BE55A0, dynamic initializer for `gTConVar_ui_ForceLifbarsOnEnemy`)
+   * Address: 0x00C06CC0 (FUN_00C06CC0, dynamic atexit destructor for `gTConVar_ui_ForceLifbarsOnEnemy`)
+   */
   TConVar<bool> gTConVar_ui_ForceLifbarsOnEnemy(
     "ui_ForceLifbarsOnEnemy",
     kConsoleStartupUiForceLifbarsOnEnemyDescription,
     &moho::ui_ForceLifbarsOnEnemy
   );
+
+  /**
+   * Address: 0x00BE5A00 (FUN_00BE5A00, dynamic initializer for `gTConVar_ui_FuelBarColor`)
+   * Address: 0x00C07020 (FUN_00C07020, dynamic atexit destructor for `gTConVar_ui_FuelBarColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_FuelBarColor(
     "ui_FuelBarColor",
     kConsoleStartupUiFuelBarColorDescription,
     &moho::ui_FuelBarColor
   );
+
+  /**
+   * Address: 0x00BE5840 (FUN_00BE5840, dynamic initializer for `gTConVar_ui_FuelEmptyBlinkRate`)
+   * Address: 0x00C06ED0 (FUN_00C06ED0, dynamic atexit destructor for `gTConVar_ui_FuelEmptyBlinkRate`)
+   */
   TConVar<float> gTConVar_ui_FuelEmptyBlinkRate(
     "ui_FuelEmptyBlinkRate",
     kConsoleStartupUiFuelEmptyBlinkRateDescription,
     &moho::ui_FuelEmptyBlinkRate
   );
+
+  /**
+   * Address: 0x00BE5A40 (FUN_00BE5A40, dynamic initializer for `gTConVar_ui_FuelWarningColor`)
+   * Address: 0x00C07050 (FUN_00C07050, dynamic atexit destructor for `gTConVar_ui_FuelWarningColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_FuelWarningColor(
     "ui_FuelWarningColor",
     kConsoleStartupUiFuelWarningColorDescription,
     &moho::ui_FuelWarningColor
   );
+
+  /**
+   * Address: 0x00BE6980 (FUN_00BE6980, dynamic initializer for `gTConVar_ui_KeyboardPanAccelerateMultiplier`)
+   * Address: 0x00C07A20 (FUN_00C07A20, dynamic atexit destructor for `gTConVar_ui_KeyboardPanAccelerateMultiplier`)
+   */
   TConVar<float> gTConVar_ui_KeyboardPanAccelerateMultiplier(
     "ui_KeyboardPanAccelerateMultiplier",
     kConsoleStartupUiKeyboardPanAccelerateMultiplierDescription,
     &moho::ui_KeyboardPanAccelerateMultiplier
   );
+
+  /**
+   * Address: 0x00BE6940 (FUN_00BE6940, dynamic initializer for `gTConVar_ui_KeyboardPanSpeed`)
+   * Address: 0x00C079F0 (FUN_00C079F0, dynamic atexit destructor for `gTConVar_ui_KeyboardPanSpeed`)
+   */
   TConVar<float> gTConVar_ui_KeyboardPanSpeed(
     "ui_KeyboardPanSpeed",
     kConsoleStartupUiKeyboardPanSpeedDescription,
     &moho::ui_KeyboardPanSpeed
   );
+
+  /**
+   * Address: 0x00BE6A00 (FUN_00BE6A00, dynamic initializer for `gTConVar_ui_KeyboardRotateAccelerateMultiplier`)
+   * Address: 0x00C07A80 (FUN_00C07A80, dynamic atexit destructor for `gTConVar_ui_KeyboardRotateAccelerateMultiplier`)
+   */
   TConVar<float> gTConVar_ui_KeyboardRotateAccelerateMultiplier(
     "ui_KeyboardRotateAccelerateMultiplier",
     kConsoleStartupUiKeyboardRotateAccelerateMultiplierDescription,
     &moho::ui_KeyboardRotateAccelerateMultiplier
   );
+
+  /**
+   * Address: 0x00BE69C0 (FUN_00BE69C0, dynamic initializer for `gTConVar_ui_KeyboardRotateSpeed`)
+   * Address: 0x00C07A50 (FUN_00C07A50, dynamic atexit destructor for `gTConVar_ui_KeyboardRotateSpeed`)
+   */
   TConVar<float> gTConVar_ui_KeyboardRotateSpeed(
     "ui_KeyboardRotateSpeed",
     kConsoleStartupUiKeyboardRotateSpeedDescription,
     &moho::ui_KeyboardRotateSpeed
   );
+
+  /**
+   * Address: 0x00BE5940 (FUN_00BE5940, dynamic initializer for `gTConVar_ui_LifeBarBadColor`)
+   * Address: 0x00C06F90 (FUN_00C06F90, dynamic atexit destructor for `gTConVar_ui_LifeBarBadColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_LifeBarBadColor(
     "ui_LifeBarBadColor",
     kConsoleStartupUiLifeBarBadColorDescription,
     &moho::ui_LifeBarBadColor
   );
+
+  /**
+   * Address: 0x00BE59C0 (FUN_00BE59C0, dynamic initializer for `gTConVar_ui_LifeBarBadCutoff`)
+   * Address: 0x00C06FF0 (FUN_00C06FF0, dynamic atexit destructor for `gTConVar_ui_LifeBarBadCutoff`)
+   */
   TConVar<float> gTConVar_ui_LifeBarBadCutoff(
     "ui_LifeBarBadCutoff",
     kConsoleStartupUiLifeBarBadCutoffDescription,
     &moho::ui_LifeBarBadCutoff
   );
+
+  /**
+   * Address: 0x00BE58C0 (FUN_00BE58C0, dynamic initializer for `gTConVar_ui_LifeBarGoodColor`)
+   * Address: 0x00C06F30 (FUN_00C06F30, dynamic atexit destructor for `gTConVar_ui_LifeBarGoodColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_LifeBarGoodColor(
     "ui_LifeBarGoodColor",
     kConsoleStartupUiLifeBarGoodColorDescription,
     &moho::ui_LifeBarGoodColor
   );
+
+  /**
+   * Address: 0x00BE5980 (FUN_00BE5980, dynamic initializer for `gTConVar_ui_LifeBarGoodCutoff`)
+   * Address: 0x00C06FC0 (FUN_00C06FC0, dynamic atexit destructor for `gTConVar_ui_LifeBarGoodCutoff`)
+   */
   TConVar<float> gTConVar_ui_LifeBarGoodCutoff(
     "ui_LifeBarGoodCutoff",
     kConsoleStartupUiLifeBarGoodCutoffDescription,
     &moho::ui_LifeBarGoodCutoff
   );
+
+  /**
+   * Address: 0x00BE5900 (FUN_00BE5900, dynamic initializer for `gTConVar_ui_LifeBarMedColor`)
+   * Address: 0x00C06F60 (FUN_00C06F60, dynamic atexit destructor for `gTConVar_ui_LifeBarMedColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_LifeBarMedColor(
     "ui_LifeBarMedColor",
     kConsoleStartupUiLifeBarMedColorDescription,
     &moho::ui_LifeBarMedColor
   );
+
+  /**
+   * Address: 0x00BE54E0 (FUN_00BE54E0, dynamic initializer for `gTConVar_ui_LifebarLOD`)
+   * Address: 0x00C06C30 (FUN_00C06C30, dynamic atexit destructor for `gTConVar_ui_LifebarLOD`)
+   */
   TConVar<float> gTConVar_ui_LifebarLOD(
     "ui_LifebarLOD",
     kConsoleStartupUiLifebarLODDescription,
     &moho::ui_LifebarLOD
   );
+
+  /**
+   * Address: 0x00BE5520 (FUN_00BE5520, dynamic initializer for `gTConVar_ui_LifebarOffset`)
+   * Address: 0x00C06C60 (FUN_00C06C60, dynamic atexit destructor for `gTConVar_ui_LifebarOffset`)
+   */
   TConVar<float> gTConVar_ui_LifebarOffset(
     "ui_LifebarOffset",
     kConsoleStartupUiLifebarOffsetDescription,
     &moho::ui_LifebarOffset
   );
+
+  /**
+   * Address: 0x00BE54A0 (FUN_00BE54A0, dynamic initializer for `gTConVar_ui_LifebarWidth`)
+   * Address: 0x00C06C00 (FUN_00C06C00, dynamic atexit destructor for `gTConVar_ui_LifebarWidth`)
+   */
   TConVar<float> gTConVar_ui_LifebarWidth(
     "ui_LifebarWidth",
     kConsoleStartupUiLifebarWidthDescription,
     &moho::ui_LifebarWidth
   );
+
+  /**
+   * Address: 0x00BE68A0 (FUN_00BE68A0, dynamic initializer for `gTConVar_ui_MaxExtractSnapPixels`)
+   * Address: 0x00C07930 (FUN_00C07930, dynamic atexit destructor for `gTConVar_ui_MaxExtractSnapPixels`)
+   */
   TConVar<float> gTConVar_ui_MaxExtractSnapPixels(
     "ui_MaxExtractSnapPixels",
     kConsoleStartupUiMaxExtractSnapPixelsDescription,
     &moho::ui_MaxExtractSnapPixels
   );
+
+  /**
+   * Address: 0x00BE3C80 (FUN_00BE3C80, dynamic initializer for `gTConVar_ui_MaxTextLOD`)
+   * Address: 0x00C05F00 (FUN_00C05F00, dynamic atexit destructor for `gTConVar_ui_MaxTextLOD`)
+   */
   TConVar<float> gTConVar_ui_MaxTextLOD(
     "ui_MaxTextLOD",
     kConsoleStartupUiMaxTextLODDescription,
     &moho::ui_MaxTextLOD
   );
+
+  /**
+   * Address: 0x00BE3D40 (FUN_00BE3D40, dynamic initializer for `gTConVar_ui_MaxWaypointSize`)
+   * Address: 0x00C05F90 (FUN_00C05F90, dynamic atexit destructor for `gTConVar_ui_MaxWaypointSize`)
+   */
   TConVar<float> gTConVar_ui_MaxWaypointSize(
     "ui_MaxWaypointSize",
     kConsoleStartupUiMaxWaypointSizeDescription,
     &moho::ui_MaxWaypointSize
   );
+
+  /**
+   * Address: 0x00BE6860 (FUN_00BE6860, dynamic initializer for `gTConVar_ui_MinExtractSnapPixels`)
+   * Address: 0x00C07900 (FUN_00C07900, dynamic atexit destructor for `gTConVar_ui_MinExtractSnapPixels`)
+   */
   TConVar<float> gTConVar_ui_MinExtractSnapPixels(
     "ui_MinExtractSnapPixels",
     kConsoleStartupUiMinExtractSnapPixelsDescription,
     &moho::ui_MinExtractSnapPixels
   );
+
+  /**
+   * Address: 0x00BE3D00 (FUN_00BE3D00, dynamic initializer for `gTConVar_ui_MinWaypointSize`)
+   * Address: 0x00C05F60 (FUN_00C05F60, dynamic atexit destructor for `gTConVar_ui_MinWaypointSize`)
+   */
   TConVar<float> gTConVar_ui_MinWaypointSize(
     "ui_MinWaypointSize",
     kConsoleStartupUiMinWaypointSizeDescription,
     &moho::ui_MinWaypointSize
   );
+
+  /**
+   * Address: 0x00BE5620 (FUN_00BE5620, dynamic initializer for `gTConVar_ui_NisRenderIcons`)
+   * Address: 0x00C06D20 (FUN_00C06D20, dynamic atexit destructor for `gTConVar_ui_NisRenderIcons`)
+   */
   TConVar<bool> gTConVar_ui_NisRenderIcons(
     "ui_NisRenderIcons",
     kConsoleStartupUiNisRenderIconsDescription,
     &moho::ui_NisRenderIcons
   );
+
+  /**
+   * Address: 0x00BE3DC0 (FUN_00BE3DC0, dynamic initializer for `gTConVar_ui_PathPreview`)
+   * Address: 0x00C05FF0 (FUN_00C05FF0, dynamic atexit destructor for `gTConVar_ui_PathPreview`)
+   */
   TConVar<bool> gTConVar_ui_PathPreview(
     "ui_PathPreview",
     kConsoleStartupUiPathPreviewDescription,
     &moho::ui_PathPreview
   );
+
+  /**
+   * Address: 0x00BE3C40 (FUN_00BE3C40, dynamic initializer for `gTConVar_ui_PathSmoothness`)
+   * Address: 0x00C05ED0 (FUN_00C05ED0, dynamic atexit destructor for `gTConVar_ui_PathSmoothness`)
+   */
   TConVar<float> gTConVar_ui_PathSmoothness(
     "ui_PathSmoothness",
     kConsoleStartupUiPathSmoothnessDescription,
     &moho::ui_PathSmoothness
   );
+
+  /**
+   * Address: 0x00BE5AC0 (FUN_00BE5AC0, dynamic initializer for `gTConVar_ui_ProgressBarColor`)
+   * Address: 0x00C070B0 (FUN_00C070B0, dynamic atexit destructor for `gTConVar_ui_ProgressBarColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_ProgressBarColor(
     "ui_ProgressBarColor",
     kConsoleStartupUiProgressBarColorDescription,
     &moho::ui_ProgressBarColor
   );
+
+  /**
+   * Address: 0x00BE5660 (FUN_00BE5660, dynamic initializer for `gTConVar_ui_RenderCustomNames`)
+   * Address: 0x00C06D50 (FUN_00C06D50, dynamic atexit destructor for `gTConVar_ui_RenderCustomNames`)
+   */
   TConVar<bool> gTConVar_ui_RenderCustomNames(
     "ui_RenderCustomNames",
     kConsoleStartupUiRenderCustomNamesDescription,
     &moho::ui_RenderCustomNames
   );
+
+  /**
+   * Address: 0x00BE55E0 (FUN_00BE55E0, dynamic initializer for `gTConVar_ui_RenderIcons`)
+   * Address: 0x00C06CF0 (FUN_00C06CF0, dynamic atexit destructor for `gTConVar_ui_RenderIcons`)
+   */
   TConVar<bool> gTConVar_ui_RenderIcons(
     "ui_RenderIcons",
     kConsoleStartupUiRenderIconsDescription,
     &moho::ui_RenderIcons
   );
+
+  /**
+   * Address: 0x00BE5780 (FUN_00BE5780, dynamic initializer for `gTConVar_ui_RenderSelectionSetNames`)
+   * Address: 0x00C06E40 (FUN_00C06E40, dynamic atexit destructor for `gTConVar_ui_RenderSelectionSetNames`)
+   */
   TConVar<bool> gTConVar_ui_RenderSelectionSetNames(
     "ui_RenderSelectionSetNames",
     kConsoleStartupUiRenderSelectionSetNamesDescription,
     &moho::ui_RenderSelectionSetNames
   );
+
+  /**
+   * Address: 0x00BE5560 (FUN_00BE5560, dynamic initializer for `gTConVar_ui_RenderUnitBars`)
+   * Address: 0x00C06C90 (FUN_00C06C90, dynamic atexit destructor for `gTConVar_ui_RenderUnitBars`)
+   */
   TConVar<bool> gTConVar_ui_RenderUnitBars(
     "ui_RenderUnitBars",
     kConsoleStartupUiRenderUnitBarsDescription,
     &moho::ui_RenderUnitBars
   );
+
+  /**
+   * Address: 0x00BE6760 (FUN_00BE6760, dynamic initializer for `gTConVar_ui_ScreenEdgeScrollView`)
+   * Address: 0x00C07840 (FUN_00C07840, dynamic atexit destructor for `gTConVar_ui_ScreenEdgeScrollView`)
+   */
   TConVar<bool> gTConVar_ui_ScreenEdgeScrollView(
     "ui_ScreenEdgeScrollView",
     kConsoleStartupUiScreenEdgeScrollViewDescription,
     &moho::ui_ScreenEdgeScrollView
   );
+
+  /**
+   * Address: 0x00BE67A0 (FUN_00BE67A0, dynamic initializer for `gTConVar_ui_SelectTolerance`)
+   * Address: 0x00C07870 (FUN_00C07870, dynamic atexit destructor for `gTConVar_ui_SelectTolerance`)
+   */
   TConVar<float> gTConVar_ui_SelectTolerance(
     "ui_SelectTolerance",
     kConsoleStartupUiSelectToleranceDescription,
     &moho::ui_SelectTolerance
   );
+
+  /**
+   * Address: 0x00BE57C0 (FUN_00BE57C0, dynamic initializer for `gTConVar_ui_SelectionSetNamesColor`)
+   * Address: 0x00C06E70 (FUN_00C06E70, dynamic atexit destructor for `gTConVar_ui_SelectionSetNamesColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_SelectionSetNamesColor(
     "ui_SelectionSetNamesColor",
     kConsoleStartupUiSelectionSetNamesColorDescription,
     &moho::ui_SelectionSetNamesColor
   );
+
+  /**
+   * Address: 0x00BE5A80 (FUN_00BE5A80, dynamic initializer for `gTConVar_ui_ShieldBarColor`)
+   * Address: 0x00C07080 (FUN_00C07080, dynamic atexit destructor for `gTConVar_ui_ShieldBarColor`)
+   */
   TConVar<unsigned int> gTConVar_ui_ShieldBarColor(
     "ui_ShieldBarColor",
     kConsoleStartupUiShieldBarColorDescription,
     &moho::ui_ShieldBarColor
   );
+
+  /**
+   * Address: 0x00BE5880 (FUN_00BE5880, dynamic initializer for `gTConVar_ui_StrategicIconBlinkDuration`)
+   * Address: 0x00C06F00 (FUN_00C06F00, dynamic atexit destructor for `gTConVar_ui_StrategicIconBlinkDuration`)
+   */
   TConVar<float> gTConVar_ui_StrategicIconBlinkDuration(
     "ui_StrategicIconBlinkDuration",
     kConsoleStartupUiStrategicIconBlinkDurationDescription,
     &moho::ui_StrategicIconBlinkDuration
   );
+
+  /**
+   * Address: 0x00BE5800 (FUN_00BE5800, dynamic initializer for `gTConVar_ui_StrategicIconBlinkRate`)
+   * Address: 0x00C06EA0 (FUN_00C06EA0, dynamic atexit destructor for `gTConVar_ui_StrategicIconBlinkRate`)
+   */
   TConVar<float> gTConVar_ui_StrategicIconBlinkRate(
     "ui_StrategicIconBlinkRate",
     kConsoleStartupUiStrategicIconBlinkRateDescription,
     &moho::ui_StrategicIconBlinkRate
   );
+
+  /**
+   * Address: 0x00BE3E00 (FUN_00BE3E00, dynamic initializer for `gTConVar_ui_WaypointLineScale`)
+   * Address: 0x00C06020 (FUN_00C06020, dynamic atexit destructor for `gTConVar_ui_WaypointLineScale`)
+   */
   TConVar<float> gTConVar_ui_WaypointLineScale(
     "ui_WaypointLineScale",
     kConsoleStartupUiWaypointLineScaleDescription,
     &moho::ui_WaypointLineScale
   );
+
+  /**
+   * Address: 0x00BDDFB0 (FUN_00BDDFB0, dynamic initializer for `gTConVar_ui_WindowedAlwaysShowsCursor`)
+   * Address: 0x00C02C40 (FUN_00C02C40, dynamic atexit destructor for `gTConVar_ui_WindowedAlwaysShowsCursor`)
+   */
   TConVar<bool> gTConVar_ui_WindowedAlwaysShowsCursor(
     "ui_WindowedAlwaysShowsCursor",
     kConsoleStartupUiWindowedAlwaysShowsCursorDescription,
     &moho::ui_WindowedAlwaysShowsCursor
   );
+
+  /**
+   * Address: 0x00BE5420 (FUN_00BE5420, dynamic initializer for `gTConVar_ui_fuelbarHeight`)
+   * Address: 0x00C06BA0 (FUN_00C06BA0, dynamic atexit destructor for `gTConVar_ui_fuelbarHeight`)
+   */
   TConVar<float> gTConVar_ui_fuelbarHeight(
     "ui_fuelbarHeight",
     kConsoleStartupUiFuelbarHeightDescription,
     &moho::ui_fuelbarHeight
   );
+
+  /**
+   * Address: 0x00BE5460 (FUN_00BE5460, dynamic initializer for `gTConVar_ui_lifebarHeight`)
+   * Address: 0x00C06BD0 (FUN_00C06BD0, dynamic atexit destructor for `gTConVar_ui_lifebarHeight`)
+   */
   TConVar<float> gTConVar_ui_lifebarHeight(
     "ui_lifebarHeight",
     kConsoleStartupUiLifebarHeightDescription,
     &moho::ui_lifebarHeight
   );
 
-  /**
-   * Address: 0x00C071F0 (FUN_00C071F0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProectileTrailWidth`.
-   */
-  void cleanup_TConVar_UI_RenProectileTrailWidth()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProectileTrailWidth);
-  }
-
-  /**
-   * Address: 0x00BE5C70 (FUN_00BE5C70, register_TConVar_UI_RenProectileTrailWidth)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProectileTrailWidth`.
-   */
-  void register_TConVar_UI_RenProectileTrailWidth()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProectileTrailWidth, &cleanup_TConVar_UI_RenProectileTrailWidth);
-  }
-
-  /**
-   * Address: 0x00C07190 (FUN_00C07190, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileArcs`.
-   */
-  void cleanup_TConVar_UI_RenProjectileArcs()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileArcs);
-  }
-
-  /**
-   * Address: 0x00BE5BF0 (FUN_00BE5BF0, register_SimConVar_UI_RenProjectileArcs)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileArcs`, gating
-   * `CUIWorldView::Render`'s whole projectile-arc pass. The registrar
-   * constructs a `TConVar<bool>` (vtable `??_7?$TConVar@_N@Moho@@6B@`) over
-   * this storage -- the pre-existing `moho::UI_RenProjectileArcs` global was
-   * mistyped `std::int32_t` (fixed alongside this recovery to `bool`, per
-   * `ProjectileArcRenderer.h`/`.cpp`).
-   */
-  void register_TConVar_UI_RenProjectileArcs()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileArcs, &cleanup_TConVar_UI_RenProjectileArcs);
-  }
-
-  /**
-   * Address: 0x00C07220 (FUN_00C07220, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileArcsSampleInterval`.
-   */
-  void cleanup_TConVar_UI_RenProjectileArcsSampleInterval()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileArcsSampleInterval);
-  }
-
-  /**
-   * Address: 0x00BE5CB0 (FUN_00BE5CB0, register_TConVar_UI_RenProjectileArcsSampleInterval)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileArcsSampleInterval`.
-   */
-  void register_TConVar_UI_RenProjectileArcsSampleInterval()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileArcsSampleInterval, &cleanup_TConVar_UI_RenProjectileArcsSampleInterval);
-  }
-
-  /**
-   * Address: 0x00C07310 (FUN_00C07310, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileGlow`.
-   */
-  void cleanup_TConVar_UI_RenProjectileGlow()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlow);
-  }
-
-  /**
-   * Address: 0x00BE5E20 (FUN_00BE5E20, register_TConVar_UI_RenProjectileGlow)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileGlow`.
-   */
-  void register_TConVar_UI_RenProjectileGlow()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileGlow, &cleanup_TConVar_UI_RenProjectileGlow);
-  }
-
-  /**
-   * Address: 0x00C07370 (FUN_00C07370, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileGlowMax`.
-   */
-  void cleanup_TConVar_UI_RenProjectileGlowMax()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowMax);
-  }
-
-  /**
-   * Address: 0x00BE5EA0 (FUN_00BE5EA0, register_TConVar_UI_RenProjectileGlowMax)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileGlowMax`.
-   */
-  void register_TConVar_UI_RenProjectileGlowMax()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowMax, &cleanup_TConVar_UI_RenProjectileGlowMax);
-  }
-
-  /**
-   * Address: 0x00C07340 (FUN_00C07340, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileGlowMin`.
-   */
-  void cleanup_TConVar_UI_RenProjectileGlowMin()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowMin);
-  }
-
-  /**
-   * Address: 0x00BE5E60 (FUN_00BE5E60, register_TConVar_UI_RenProjectileGlowMin)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileGlowMin`.
-   */
-  void register_TConVar_UI_RenProjectileGlowMin()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowMin, &cleanup_TConVar_UI_RenProjectileGlowMin);
-  }
-
-  /**
-   * Address: 0x00C073A0 (FUN_00C073A0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileGlowPeriod`.
-   */
-  void cleanup_TConVar_UI_RenProjectileGlowPeriod()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileGlowPeriod);
-  }
-
-  /**
-   * Address: 0x00BE5EE0 (FUN_00BE5EE0, register_TConVar_UI_RenProjectileGlowPeriod)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileGlowPeriod`.
-   */
-  void register_TConVar_UI_RenProjectileGlowPeriod()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileGlowPeriod, &cleanup_TConVar_UI_RenProjectileGlowPeriod);
-  }
-
-  /**
-   * Address: 0x00C072B0 (FUN_00C072B0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileIcons`.
-   */
-  void cleanup_TConVar_UI_RenProjectileIcons()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileIcons);
-  }
-
-  /**
-   * Address: 0x00BE5DA0 (FUN_00BE5DA0, register_TConVar_UI_RenProjectileIcons)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileIcons`.
-   */
-  void register_TConVar_UI_RenProjectileIcons()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileIcons, &cleanup_TConVar_UI_RenProjectileIcons);
-  }
-
-  /**
-   * Address: 0x00C071C0 (FUN_00C071C0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenProjectileTrailColor`.
-   */
-  void cleanup_TConVar_UI_RenProjectileTrailColor()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenProjectileTrailColor);
-  }
-
-  /**
-   * Address: 0x00BE5C30 (FUN_00BE5C30, register_TConVar_UI_RenProjectileTrailColor)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenProjectileTrailColor`.
-   */
-  void register_TConVar_UI_RenProjectileTrailColor()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenProjectileTrailColor, &cleanup_TConVar_UI_RenProjectileTrailColor);
-  }
-
-  /**
-   * Address: 0x00C07420 (FUN_00C07420, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_RenResources`.
-   */
-  void cleanup_TConVar_UI_RenResources()
-  {
-    CleanupStartupConCommand(gTConVar_UI_RenResources);
-  }
-
-  /**
-   * Address: 0x00BE5FD0 (FUN_00BE5FD0, register_TConVar_UI_RenResources)
-   *
-   * What it does:
-   * Registers startup convar for `UI_RenResources`.
-   */
-  void register_TConVar_UI_RenResources()
-  {
-    RegisterStartupConVar(gTConVar_UI_RenResources, &cleanup_TConVar_UI_RenResources);
-  }
-
-  /**
-   * Address: 0x00C07450 (FUN_00C07450, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_ResourceLODCutoff`.
-   */
-  void cleanup_TConVar_UI_ResourceLODCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_UI_ResourceLODCutoff);
-  }
-
-  /**
-   * Address: 0x00BE6010 (FUN_00BE6010, register_TConVar_UI_ResourceLODCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `UI_ResourceLODCutoff`.
-   */
-  void register_TConVar_UI_ResourceLODCutoff()
-  {
-    RegisterStartupConVar(gTConVar_UI_ResourceLODCutoff, &cleanup_TConVar_UI_ResourceLODCutoff);
-  }
-
-  /**
-   * Address: 0x00C07520 (FUN_00C07520, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_SelectAnything`.
-   */
-  void cleanup_TConVar_UI_SelectAnything()
-  {
-    CleanupStartupConCommand(gTConVar_UI_SelectAnything);
-  }
-
-  /**
-   * Address: 0x00BE6180 (FUN_00BE6180, register_TConVar_UI_SelectAnything)
-   *
-   * What it does:
-   * Registers startup convar for `UI_SelectAnything`.
-   */
-  void register_TConVar_UI_SelectAnything()
-  {
-    RegisterStartupConVar(gTConVar_UI_SelectAnything, &cleanup_TConVar_UI_SelectAnything);
-  }
-
-  /**
-   * Address: 0x00C04960 (FUN_00C04960, ??1TConVar_UI_ShowControlUnderMouse@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_ShowControlUnderMouse`.
-   */
-  void cleanup_TConVar_UI_ShowControlUnderMouse()
-  {
-    CleanupStartupConCommand(gTConVar_UI_ShowControlUnderMouse);
-  }
-
-  /**
-   * Address: 0x00BE19D0 (FUN_00BE19D0, register_TConVar_UI_ShowControlUnderMouse)
-   *
-   * What it does:
-   * Registers startup convar for `UI_ShowControlUnderMouse`.
-   */
-  void register_TConVar_UI_ShowControlUnderMouse()
-  {
-    RegisterStartupConVar(gTConVar_UI_ShowControlUnderMouse, &cleanup_TConVar_UI_ShowControlUnderMouse);
-  }
-
-  /**
-   * Address: 0x00C072E0 (FUN_00C072E0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_StrategicProjectileLOD`.
-   */
-  void cleanup_TConVar_UI_StrategicProjectileLOD()
-  {
-    CleanupStartupConCommand(gTConVar_UI_StrategicProjectileLOD);
-  }
-
-  /**
-   * Address: 0x00BE5DE0 (FUN_00BE5DE0, register_TConVar_UI_StrategicProjectileLOD)
-   *
-   * What it does:
-   * Registers startup convar for `UI_StrategicProjectileLOD`.
-   */
-  void register_TConVar_UI_StrategicProjectileLOD()
-  {
-    RegisterStartupConVar(gTConVar_UI_StrategicProjectileLOD, &cleanup_TConVar_UI_StrategicProjectileLOD);
-  }
-
-  /**
-   * Address: 0x00C073D0 (FUN_00C073D0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `UI_forceWeaponsToYellow`.
-   */
-  void cleanup_TConVar_UI_forceWeaponsToYellow()
-  {
-    CleanupStartupConCommand(gTConVar_UI_forceWeaponsToYellow);
-  }
-
-  /**
-   * Address: 0x00BE5F20 (FUN_00BE5F20, register_TConVar_UI_forceWeaponsToYellow)
-   *
-   * What it does:
-   * Registers startup convar for `UI_forceWeaponsToYellow`.
-   */
-  void register_TConVar_UI_forceWeaponsToYellow()
-  {
-    RegisterStartupConVar(gTConVar_UI_forceWeaponsToYellow, &cleanup_TConVar_UI_forceWeaponsToYellow);
-  }
-
-  /**
-   * Address: 0x00C070E0 (FUN_00C070E0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_AlwaysRenderStrategicIcons`.
-   */
-  void cleanup_TConVar_ui_AlwaysRenderStrategicIcons()
-  {
-    CleanupStartupConCommand(gTConVar_ui_AlwaysRenderStrategicIcons);
-  }
-
-  /**
-   * Address: 0x00BE5B00 (FUN_00BE5B00, register_TConVar_ui_AlwaysRenderStrategicIcons)
-   *
-   * What it does:
-   * Registers startup convar for `ui_AlwaysRenderStrategicIcons`.
-   */
-  void register_TConVar_ui_AlwaysRenderStrategicIcons()
-  {
-    RegisterStartupConVar(gTConVar_ui_AlwaysRenderStrategicIcons, &cleanup_TConVar_ui_AlwaysRenderStrategicIcons);
-  }
-
-  /**
-   * Address: 0x00C07810 (FUN_00C07810, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ArrowKeysScrollView`.
-   */
-  void cleanup_TConVar_ui_ArrowKeysScrollView()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ArrowKeysScrollView);
-  }
-
-  /**
-   * Address: 0x00BE6720 (FUN_00BE6720, register_TConVar_ui_ArrowKeysScrollView)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ArrowKeysScrollView`.
-   */
-  void register_TConVar_ui_ArrowKeysScrollView()
-  {
-    RegisterStartupConVar(gTConVar_ui_ArrowKeysScrollView, &cleanup_TConVar_ui_ArrowKeysScrollView);
-  }
-
-  /**
-   * Address: 0x00C06950 (FUN_00C06950, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_BuildPlaceTarmacAlpha`.
-   */
-  void cleanup_TConVar_ui_BuildPlaceTarmacAlpha()
-  {
-    CleanupStartupConCommand(gTConVar_ui_BuildPlaceTarmacAlpha);
-  }
-
-  /**
-   * Address: 0x00BE50E0 (FUN_00BE50E0, register_TConVar_ui_BuildPlaceTarmacAlpha)
-   *
-   * What it does:
-   * Registers startup convar for `ui_BuildPlaceTarmacAlpha`.
-   */
-  void register_TConVar_ui_BuildPlaceTarmacAlpha()
-  {
-    RegisterStartupConVar(gTConVar_ui_BuildPlaceTarmacAlpha, &cleanup_TConVar_ui_BuildPlaceTarmacAlpha);
-  }
-
-  /**
-   * Address: 0x00C06050 (FUN_00C06050, ??1TConVar_ui_CommandClickScale@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CommandClickScale`.
-   */
-  void cleanup_TConVar_ui_CommandClickScale()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CommandClickScale);
-  }
-
-  /**
-   * Address: 0x00BE3E40 (FUN_00BE3E40, register_TConVar_ui_CommandClickScale)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CommandClickScale`.
-   */
-  void register_TConVar_ui_CommandClickScale()
-  {
-    RegisterStartupConVar(gTConVar_ui_CommandClickScale, &cleanup_TConVar_ui_CommandClickScale);
-  }
-
-  /**
-   * Address: 0x00C05F30 (FUN_00C05F30, ??1TConVar_ui_CommandGraphMaxNodeUnits@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CommandGraphMaxNodeUnits`.
-   */
-  void cleanup_TConVar_ui_CommandGraphMaxNodeUnits()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CommandGraphMaxNodeUnits);
-  }
-
-  /**
-   * Address: 0x00BE3CC0 (FUN_00BE3CC0, register_TConVar_ui_CommandGraphMaxNodeUnits)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CommandGraphMaxNodeUnits`.
-   */
-  void register_TConVar_ui_CommandGraphMaxNodeUnits()
-  {
-    RegisterStartupConVar(gTConVar_ui_CommandGraphMaxNodeUnits, &cleanup_TConVar_ui_CommandGraphMaxNodeUnits);
-  }
-
-  /**
-   * Address: 0x00C05E70 (FUN_00C05E70, ??1TConVar_ui_CurveSegments@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CurveSegments`.
-   */
-  void cleanup_TConVar_ui_CurveSegments()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CurveSegments);
-  }
-
-  /**
-   * Address: 0x00BE3BC0 (FUN_00BE3BC0, register_TConVar_ui_CurveSegments)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CurveSegments`.
-   */
-  void register_TConVar_ui_CurveSegments()
-  {
-    RegisterStartupConVar(gTConVar_ui_CurveSegments, &cleanup_TConVar_ui_CurveSegments);
-  }
-
-  /**
-   * Address: 0x00C05EA0 (FUN_00C05EA0, ??1TConVar_ui_CurveSmoothness@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CurveSmoothness`.
-   */
-  void cleanup_TConVar_ui_CurveSmoothness()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CurveSmoothness);
-  }
-
-  /**
-   * Address: 0x00BE3C00 (FUN_00BE3C00, register_TConVar_ui_CurveSmoothness)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CurveSmoothness`.
-   */
-  void register_TConVar_ui_CurveSmoothness()
-  {
-    RegisterStartupConVar(gTConVar_ui_CurveSmoothness, &cleanup_TConVar_ui_CurveSmoothness);
-  }
-
-  /**
-   * Address: 0x00C06D80 (FUN_00C06D80, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CustomNameColor`.
-   */
-  void cleanup_TConVar_ui_CustomNameColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CustomNameColor);
-  }
-
-  /**
-   * Address: 0x00BE56A0 (FUN_00BE56A0, register_TConVar_ui_CustomNameColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CustomNameColor`.
-   */
-  void register_TConVar_ui_CustomNameColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_CustomNameColor, &cleanup_TConVar_ui_CustomNameColor);
-  }
-
-  /**
-   * Address: 0x00C06E10 (FUN_00C06E10, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CustomNameFont`.
-   */
-  void cleanup_TConVar_ui_CustomNameFont()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CustomNameFont);
-  }
-
-  /**
-   * Address: 0x00BE5740 (FUN_00BE5740, register_ui_CutsomNameFont_ConVarDef)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CustomNameFont`. The registered console
-   * name is byte-verified from the binary's own `.rdata` as
-   * `"ui_CutsomNameFont"` -- the transposition typo is genuinely shipped in
-   * the binary, not a transcription error here, so it is preserved exactly
-   * (matching the underlying `ui_CutsomNameFont_ConVarDef` IDA export name).
-   */
-  void register_TConVar_ui_CustomNameFont()
-  {
-    RegisterStartupConVar(gTConVar_ui_CustomNameFont, &cleanup_TConVar_ui_CustomNameFont);
-  }
-
-  /**
-   * Address: 0x00C06DB0 (FUN_00C06DB0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_CustomNameFontSize`.
-   */
-  void cleanup_TConVar_ui_CustomNameFontSize()
-  {
-    CleanupStartupConCommand(gTConVar_ui_CustomNameFontSize);
-  }
-
-  /**
-   * Address: 0x00BE56E0 (FUN_00BE56E0, register_TConVar_ui_CustomNameFontSize)
-   *
-   * What it does:
-   * Registers startup convar for `ui_CustomNameFontSize`.
-   */
-  void register_TConVar_ui_CustomNameFontSize()
-  {
-    RegisterStartupConVar(gTConVar_ui_CustomNameFontSize, &cleanup_TConVar_ui_CustomNameFontSize);
-  }
-
-  /**
-   * Address: 0x00C074B0 (FUN_00C074B0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_DebugAltClick`.
-   */
-  void cleanup_TConVar_ui_DebugAltClick()
-  {
-    CleanupStartupConCommand(gTConVar_ui_DebugAltClick);
-  }
-
-  /**
-   * Address: 0x00BE60E0 (FUN_00BE60E0, register_TConVar_ui_DebugAltClick)
-   *
-   * What it does:
-   * Registers startup convar for `ui_DebugAltClick`.
-   */
-  void register_TConVar_ui_DebugAltClick()
-  {
-    RegisterStartupConVar(gTConVar_ui_DebugAltClick, &cleanup_TConVar_ui_DebugAltClick);
-  }
-
-  /**
-   * Address: 0x00C078A0 (FUN_00C078A0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_DisableCursorFixing`.
-   */
-  void cleanup_TConVar_ui_DisableCursorFixing()
-  {
-    CleanupStartupConCommand(gTConVar_ui_DisableCursorFixing);
-  }
-
-  /**
-   * Address: 0x00BE67E0 (FUN_00BE67E0, register_TConVar_ui_DisableCursorFixing)
-   *
-   * What it does:
-   * Registers startup convar for `ui_DisableCursorFixing`.
-   */
-  void register_TConVar_ui_DisableCursorFixing()
-  {
-    RegisterStartupConVar(gTConVar_ui_DisableCursorFixing, &cleanup_TConVar_ui_DisableCursorFixing);
-  }
-
-  /**
-   * Address: 0x00C074E0 (FUN_00C074E0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_DragSelect2D`.
-   */
-  void cleanup_TConVar_ui_DragSelect2D()
-  {
-    CleanupStartupConCommand(gTConVar_ui_DragSelect2D);
-  }
-
-  /**
-   * Address: 0x00BE6120 (FUN_00BE6120, register_TConVar_ui_DragSelect2D)
-   *
-   * What it does:
-   * Registers startup convar for `ui_DragSelect2D`.
-   */
-  void register_TConVar_ui_DragSelect2D()
-  {
-    RegisterStartupConVar(gTConVar_ui_DragSelect2D, &cleanup_TConVar_ui_DragSelect2D);
-  }
-
   // Not in the binary: the attack-ground deviation switch's cleanup and
   // registrar, shaped like every retail convar pair around it.
-  void cleanup_TConVar_ui_AttackGroundIgnoresFireState()
-  {
-    CleanupStartupConCommand(gTConVar_ui_AttackGroundIgnoresFireState);
-  }
-
-  void register_TConVar_ui_AttackGroundIgnoresFireState()
-  {
-    RegisterStartupConVar(gTConVar_ui_AttackGroundIgnoresFireState, &cleanup_TConVar_ui_AttackGroundIgnoresFireState);
-  }
-
-  /**
-   * Address: 0x00C05FC0 (FUN_00C05FC0, ??1TConVar_ui_DrawPathPreview@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_DrawPathPreview`.
-   */
-  void cleanup_TConVar_ui_DrawPathPreview()
-  {
-    CleanupStartupConCommand(gTConVar_ui_DrawPathPreview);
-  }
-
-  /**
-   * Address: 0x00BE3D80 (FUN_00BE3D80, register_TConVar_ui_DrawPathPreview)
-   *
-   * What it does:
-   * Registers startup convar for `ui_DrawPathPreview`.
-   */
-  void register_TConVar_ui_DrawPathPreview()
-  {
-    RegisterStartupConVar(gTConVar_ui_DrawPathPreview, &cleanup_TConVar_ui_DrawPathPreview);
-  }
-
-  /**
-   * Address: 0x00C078D0 (FUN_00C078D0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ExtractSnapTolerance`.
-   */
-  void cleanup_TConVar_ui_ExtractSnapTolerance()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ExtractSnapTolerance);
-  }
-
-  /**
-   * Address: 0x00BE6820 (FUN_00BE6820, register_TConVar_ui_ExtractSnapTolerance)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ExtractSnapTolerance`.
-   */
-  void register_TConVar_ui_ExtractSnapTolerance()
-  {
-    RegisterStartupConVar(gTConVar_ui_ExtractSnapTolerance, &cleanup_TConVar_ui_ExtractSnapTolerance);
-  }
-
-  /**
-   * Address: 0x00C06B50 (FUN_00C06B50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_FootprintMinThickness`.
-   */
-  void cleanup_TConVar_ui_FootprintMinThickness()
-  {
-    CleanupStartupConCommand(gTConVar_ui_FootprintMinThickness);
-  }
-
-  /**
-   * Address: 0x00BE5370 (FUN_00BE5370, register_TConVar_ui_FootprintMinThickness)
-   *
-   * What it does:
-   * Registers startup convar for `ui_FootprintMinThickness`.
-   */
-  void register_TConVar_ui_FootprintMinThickness()
-  {
-    RegisterStartupConVar(gTConVar_ui_FootprintMinThickness, &cleanup_TConVar_ui_FootprintMinThickness);
-  }
-
-  /**
-   * Address: 0x00C06CC0 (FUN_00C06CC0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ForceLifbarsOnEnemy`.
-   */
-  void cleanup_TConVar_ui_ForceLifbarsOnEnemy()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ForceLifbarsOnEnemy);
-  }
-
-  /**
-   * Address: 0x00BE55A0 (FUN_00BE55A0, register_TConVar_ui_ForceLifbarsOnEnemy)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ForceLifbarsOnEnemy`.
-   */
-  void register_TConVar_ui_ForceLifbarsOnEnemy()
-  {
-    RegisterStartupConVar(gTConVar_ui_ForceLifbarsOnEnemy, &cleanup_TConVar_ui_ForceLifbarsOnEnemy);
-  }
-
-  /**
-   * Address: 0x00C07020 (FUN_00C07020, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_FuelBarColor`.
-   */
-  void cleanup_TConVar_ui_FuelBarColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_FuelBarColor);
-  }
-
-  /**
-   * Address: 0x00BE5A00 (FUN_00BE5A00, register_TConVar_ui_FuelBarColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_FuelBarColor`.
-   */
-  void register_TConVar_ui_FuelBarColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_FuelBarColor, &cleanup_TConVar_ui_FuelBarColor);
-  }
-
-  /**
-   * Address: 0x00C06ED0 (FUN_00C06ED0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_FuelEmptyBlinkRate`.
-   */
-  void cleanup_TConVar_ui_FuelEmptyBlinkRate()
-  {
-    CleanupStartupConCommand(gTConVar_ui_FuelEmptyBlinkRate);
-  }
-
-  /**
-   * Address: 0x00BE5840 (FUN_00BE5840, register_TConVar_ui_FuelEmptyBlinkRate)
-   *
-   * What it does:
-   * Registers startup convar for `ui_FuelEmptyBlinkRate`.
-   */
-  void register_TConVar_ui_FuelEmptyBlinkRate()
-  {
-    RegisterStartupConVar(gTConVar_ui_FuelEmptyBlinkRate, &cleanup_TConVar_ui_FuelEmptyBlinkRate);
-  }
-
-  /**
-   * Address: 0x00C07050 (FUN_00C07050, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_FuelWarningColor`.
-   */
-  void cleanup_TConVar_ui_FuelWarningColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_FuelWarningColor);
-  }
-
-  /**
-   * Address: 0x00BE5A40 (FUN_00BE5A40, register_TConVar_ui_FuelWarningColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_FuelWarningColor`.
-   */
-  void register_TConVar_ui_FuelWarningColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_FuelWarningColor, &cleanup_TConVar_ui_FuelWarningColor);
-  }
-
-  /**
-   * Address: 0x00C07A20 (FUN_00C07A20, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_KeyboardPanAccelerateMultiplier`.
-   */
-  void cleanup_TConVar_ui_KeyboardPanAccelerateMultiplier()
-  {
-    CleanupStartupConCommand(gTConVar_ui_KeyboardPanAccelerateMultiplier);
-  }
-
-  /**
-   * Address: 0x00BE6980 (FUN_00BE6980, register_TConVar_ui_KeyboardPanAccelerateMultiplier)
-   *
-   * What it does:
-   * Registers startup convar for `ui_KeyboardPanAccelerateMultiplier`.
-   */
-  void register_TConVar_ui_KeyboardPanAccelerateMultiplier()
-  {
-    RegisterStartupConVar(gTConVar_ui_KeyboardPanAccelerateMultiplier, &cleanup_TConVar_ui_KeyboardPanAccelerateMultiplier);
-  }
-
-  /**
-   * Address: 0x00C079F0 (FUN_00C079F0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_KeyboardPanSpeed`.
-   */
-  void cleanup_TConVar_ui_KeyboardPanSpeed()
-  {
-    CleanupStartupConCommand(gTConVar_ui_KeyboardPanSpeed);
-  }
-
-  /**
-   * Address: 0x00BE6940 (FUN_00BE6940, register_TConVar_ui_KeyboardPanSpeed)
-   *
-   * What it does:
-   * Registers startup convar for `ui_KeyboardPanSpeed`.
-   */
-  void register_TConVar_ui_KeyboardPanSpeed()
-  {
-    RegisterStartupConVar(gTConVar_ui_KeyboardPanSpeed, &cleanup_TConVar_ui_KeyboardPanSpeed);
-  }
-
-  /**
-   * Address: 0x00C07A80 (FUN_00C07A80, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_KeyboardRotateAccelerateMultiplier`.
-   */
-  void cleanup_TConVar_ui_KeyboardRotateAccelerateMultiplier()
-  {
-    CleanupStartupConCommand(gTConVar_ui_KeyboardRotateAccelerateMultiplier);
-  }
-
-  /**
-   * Address: 0x00BE6A00 (FUN_00BE6A00, register_TConVar_ui_KeyboardRotateAccelerateMultiplier)
-   *
-   * What it does:
-   * Registers startup convar for `ui_KeyboardRotateAccelerateMultiplier`.
-   */
-  void register_TConVar_ui_KeyboardRotateAccelerateMultiplier()
-  {
-    RegisterStartupConVar(gTConVar_ui_KeyboardRotateAccelerateMultiplier, &cleanup_TConVar_ui_KeyboardRotateAccelerateMultiplier);
-  }
-
-  /**
-   * Address: 0x00C07A50 (FUN_00C07A50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_KeyboardRotateSpeed`.
-   */
-  void cleanup_TConVar_ui_KeyboardRotateSpeed()
-  {
-    CleanupStartupConCommand(gTConVar_ui_KeyboardRotateSpeed);
-  }
-
-  /**
-   * Address: 0x00BE69C0 (FUN_00BE69C0, register_TConVar_ui_KeyboardRotateSpeed)
-   *
-   * What it does:
-   * Registers startup convar for `ui_KeyboardRotateSpeed`.
-   */
-  void register_TConVar_ui_KeyboardRotateSpeed()
-  {
-    RegisterStartupConVar(gTConVar_ui_KeyboardRotateSpeed, &cleanup_TConVar_ui_KeyboardRotateSpeed);
-  }
-
-  /**
-   * Address: 0x00C06F90 (FUN_00C06F90, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifeBarBadColor`.
-   */
-  void cleanup_TConVar_ui_LifeBarBadColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifeBarBadColor);
-  }
-
-  /**
-   * Address: 0x00BE5940 (FUN_00BE5940, register_TConVar_ui_LifeBarBadColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifeBarBadColor`.
-   */
-  void register_TConVar_ui_LifeBarBadColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifeBarBadColor, &cleanup_TConVar_ui_LifeBarBadColor);
-  }
-
-  /**
-   * Address: 0x00C06FF0 (FUN_00C06FF0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifeBarBadCutoff`.
-   */
-  void cleanup_TConVar_ui_LifeBarBadCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifeBarBadCutoff);
-  }
-
-  /**
-   * Address: 0x00BE59C0 (FUN_00BE59C0, register_TConVar_ui_LifeBarBadCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifeBarBadCutoff`.
-   */
-  void register_TConVar_ui_LifeBarBadCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifeBarBadCutoff, &cleanup_TConVar_ui_LifeBarBadCutoff);
-  }
-
-  /**
-   * Address: 0x00C06F30 (FUN_00C06F30, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifeBarGoodColor`.
-   */
-  void cleanup_TConVar_ui_LifeBarGoodColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifeBarGoodColor);
-  }
-
-  /**
-   * Address: 0x00BE58C0 (FUN_00BE58C0, register_TConVar_ui_LifeBarGoodColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifeBarGoodColor`.
-   */
-  void register_TConVar_ui_LifeBarGoodColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifeBarGoodColor, &cleanup_TConVar_ui_LifeBarGoodColor);
-  }
-
-  /**
-   * Address: 0x00C06FC0 (FUN_00C06FC0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifeBarGoodCutoff`.
-   */
-  void cleanup_TConVar_ui_LifeBarGoodCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifeBarGoodCutoff);
-  }
-
-  /**
-   * Address: 0x00BE5980 (FUN_00BE5980, register_TConVar_ui_LifeBarGoodCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifeBarGoodCutoff`.
-   */
-  void register_TConVar_ui_LifeBarGoodCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifeBarGoodCutoff, &cleanup_TConVar_ui_LifeBarGoodCutoff);
-  }
-
-  /**
-   * Address: 0x00C06F60 (FUN_00C06F60, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifeBarMedColor`.
-   */
-  void cleanup_TConVar_ui_LifeBarMedColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifeBarMedColor);
-  }
-
-  /**
-   * Address: 0x00BE5900 (FUN_00BE5900, register_TConVar_ui_LifeBarMedColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifeBarMedColor`.
-   */
-  void register_TConVar_ui_LifeBarMedColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifeBarMedColor, &cleanup_TConVar_ui_LifeBarMedColor);
-  }
-
-  /**
-   * Address: 0x00C06C30 (FUN_00C06C30, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifebarLOD`.
-   */
-  void cleanup_TConVar_ui_LifebarLOD()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifebarLOD);
-  }
-
-  /**
-   * Address: 0x00BE54E0 (FUN_00BE54E0, register_TConVar_ui_LifebarLOD)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifebarLOD`.
-   */
-  void register_TConVar_ui_LifebarLOD()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifebarLOD, &cleanup_TConVar_ui_LifebarLOD);
-  }
-
-  /**
-   * Address: 0x00C06C60 (FUN_00C06C60, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifebarOffset`.
-   */
-  void cleanup_TConVar_ui_LifebarOffset()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifebarOffset);
-  }
-
-  /**
-   * Address: 0x00BE5520 (FUN_00BE5520, register_TConVar_ui_LifebarOffset)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifebarOffset`.
-   */
-  void register_TConVar_ui_LifebarOffset()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifebarOffset, &cleanup_TConVar_ui_LifebarOffset);
-  }
-
-  /**
-   * Address: 0x00C06C00 (FUN_00C06C00, ??0TConVar_ui_LifebarWidth@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_LifebarWidth`.
-   */
-  void cleanup_TConVar_ui_LifebarWidth()
-  {
-    CleanupStartupConCommand(gTConVar_ui_LifebarWidth);
-  }
-
-  /**
-   * Address: 0x00BE54A0 (FUN_00BE54A0, register_TConVar_ui_LifebarWidth)
-   *
-   * What it does:
-   * Registers startup convar for `ui_LifebarWidth`.
-   */
-  void register_TConVar_ui_LifebarWidth()
-  {
-    RegisterStartupConVar(gTConVar_ui_LifebarWidth, &cleanup_TConVar_ui_LifebarWidth);
-  }
-
-  /**
-   * Address: 0x00C07930 (FUN_00C07930, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_MaxExtractSnapPixels`.
-   */
-  void cleanup_TConVar_ui_MaxExtractSnapPixels()
-  {
-    CleanupStartupConCommand(gTConVar_ui_MaxExtractSnapPixels);
-  }
-
-  /**
-   * Address: 0x00BE68A0 (FUN_00BE68A0, register_TConVar_ui_MaxExtractSnapPixels)
-   *
-   * What it does:
-   * Registers startup convar for `ui_MaxExtractSnapPixels`.
-   */
-  void register_TConVar_ui_MaxExtractSnapPixels()
-  {
-    RegisterStartupConVar(gTConVar_ui_MaxExtractSnapPixels, &cleanup_TConVar_ui_MaxExtractSnapPixels);
-  }
-
-  /**
-   * Address: 0x00C05F00 (FUN_00C05F00, ??1TConVar_ui_MaxTextLOD@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_MaxTextLOD`.
-   */
-  void cleanup_TConVar_ui_MaxTextLOD()
-  {
-    CleanupStartupConCommand(gTConVar_ui_MaxTextLOD);
-  }
-
-  /**
-   * Address: 0x00BE3C80 (FUN_00BE3C80, register_TConVar_ui_MaxTextLOD)
-   *
-   * What it does:
-   * Registers startup convar for `ui_MaxTextLOD`.
-   */
-  void register_TConVar_ui_MaxTextLOD()
-  {
-    RegisterStartupConVar(gTConVar_ui_MaxTextLOD, &cleanup_TConVar_ui_MaxTextLOD);
-  }
-
-  /**
-   * Address: 0x00C05F90 (FUN_00C05F90, ??1TConVar_ui_MaxWaypointSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_MaxWaypointSize`.
-   */
-  void cleanup_TConVar_ui_MaxWaypointSize()
-  {
-    CleanupStartupConCommand(gTConVar_ui_MaxWaypointSize);
-  }
-
-  /**
-   * Address: 0x00BE3D40 (FUN_00BE3D40, register_TConVar_ui_MaxWaypointSize)
-   *
-   * What it does:
-   * Registers startup convar for `ui_MaxWaypointSize`.
-   */
-  void register_TConVar_ui_MaxWaypointSize()
-  {
-    RegisterStartupConVar(gTConVar_ui_MaxWaypointSize, &cleanup_TConVar_ui_MaxWaypointSize);
-  }
-
-  /**
-   * Address: 0x00C07900 (FUN_00C07900, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_MinExtractSnapPixels`.
-   */
-  void cleanup_TConVar_ui_MinExtractSnapPixels()
-  {
-    CleanupStartupConCommand(gTConVar_ui_MinExtractSnapPixels);
-  }
-
-  /**
-   * Address: 0x00BE6860 (FUN_00BE6860, register_TConVar_ui_MinExtractSnapPixels)
-   *
-   * What it does:
-   * Registers startup convar for `ui_MinExtractSnapPixels`.
-   */
-  void register_TConVar_ui_MinExtractSnapPixels()
-  {
-    RegisterStartupConVar(gTConVar_ui_MinExtractSnapPixels, &cleanup_TConVar_ui_MinExtractSnapPixels);
-  }
-
-  /**
-   * Address: 0x00C05F60 (FUN_00C05F60, ??1TConVar_ui_MinWaypointSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_MinWaypointSize`.
-   */
-  void cleanup_TConVar_ui_MinWaypointSize()
-  {
-    CleanupStartupConCommand(gTConVar_ui_MinWaypointSize);
-  }
-
-  /**
-   * Address: 0x00BE3D00 (FUN_00BE3D00, register_TConVar_ui_MinWaypointSize)
-   *
-   * What it does:
-   * Registers startup convar for `ui_MinWaypointSize`.
-   */
-  void register_TConVar_ui_MinWaypointSize()
-  {
-    RegisterStartupConVar(gTConVar_ui_MinWaypointSize, &cleanup_TConVar_ui_MinWaypointSize);
-  }
-
-  /**
-   * Address: 0x00C06D20 (FUN_00C06D20, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_NisRenderIcons`.
-   */
-  void cleanup_TConVar_ui_NisRenderIcons()
-  {
-    CleanupStartupConCommand(gTConVar_ui_NisRenderIcons);
-  }
-
-  /**
-   * Address: 0x00BE5620 (FUN_00BE5620, register_TConVar_ui_NisRenderIcons)
-   *
-   * What it does:
-   * Registers startup convar for `ui_NisRenderIcons`.
-   */
-  void register_TConVar_ui_NisRenderIcons()
-  {
-    RegisterStartupConVar(gTConVar_ui_NisRenderIcons, &cleanup_TConVar_ui_NisRenderIcons);
-  }
-
-  /**
-   * Address: 0x00C05FF0 (FUN_00C05FF0, ??1TConVar_ui_PathPreview@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_PathPreview`.
-   */
-  void cleanup_TConVar_ui_PathPreview()
-  {
-    CleanupStartupConCommand(gTConVar_ui_PathPreview);
-  }
-
-  /**
-   * Address: 0x00BE3DC0 (FUN_00BE3DC0, register_TConVar_ui_PathPreview)
-   *
-   * What it does:
-   * Registers startup convar for `ui_PathPreview`.
-   */
-  void register_TConVar_ui_PathPreview()
-  {
-    RegisterStartupConVar(gTConVar_ui_PathPreview, &cleanup_TConVar_ui_PathPreview);
-  }
-
-  /**
-   * Address: 0x00C05ED0 (FUN_00C05ED0, ??1TConVar_ui_PathSmoothness@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_PathSmoothness`.
-   */
-  void cleanup_TConVar_ui_PathSmoothness()
-  {
-    CleanupStartupConCommand(gTConVar_ui_PathSmoothness);
-  }
-
-  /**
-   * Address: 0x00BE3C40 (FUN_00BE3C40, register_TConVar_ui_PathSmoothness)
-   *
-   * What it does:
-   * Registers startup convar for `ui_PathSmoothness`.
-   */
-  void register_TConVar_ui_PathSmoothness()
-  {
-    RegisterStartupConVar(gTConVar_ui_PathSmoothness, &cleanup_TConVar_ui_PathSmoothness);
-  }
-
-  /**
-   * Address: 0x00C070B0 (FUN_00C070B0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ProgressBarColor`.
-   */
-  void cleanup_TConVar_ui_ProgressBarColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ProgressBarColor);
-  }
-
-  /**
-   * Address: 0x00BE5AC0 (FUN_00BE5AC0, register_TConVar_ui_ProgressBarColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ProgressBarColor`.
-   */
-  void register_TConVar_ui_ProgressBarColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_ProgressBarColor, &cleanup_TConVar_ui_ProgressBarColor);
-  }
-
-  /**
-   * Address: 0x00C06D50 (FUN_00C06D50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_RenderCustomNames`.
-   */
-  void cleanup_TConVar_ui_RenderCustomNames()
-  {
-    CleanupStartupConCommand(gTConVar_ui_RenderCustomNames);
-  }
-
-  /**
-   * Address: 0x00BE5660 (FUN_00BE5660, register_TConVar_ui_RenderCustomNames)
-   *
-   * What it does:
-   * Registers startup convar for `ui_RenderCustomNames`.
-   */
-  void register_TConVar_ui_RenderCustomNames()
-  {
-    RegisterStartupConVar(gTConVar_ui_RenderCustomNames, &cleanup_TConVar_ui_RenderCustomNames);
-  }
-
-  /**
-   * Address: 0x00C06CF0 (FUN_00C06CF0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_RenderIcons`.
-   */
-  void cleanup_TConVar_ui_RenderIcons()
-  {
-    CleanupStartupConCommand(gTConVar_ui_RenderIcons);
-  }
-
-  /**
-   * Address: 0x00BE55E0 (FUN_00BE55E0, register_TConVar_ui_RenderIcons)
-   *
-   * What it does:
-   * Registers startup convar for `ui_RenderIcons`.
-   */
-  void register_TConVar_ui_RenderIcons()
-  {
-    RegisterStartupConVar(gTConVar_ui_RenderIcons, &cleanup_TConVar_ui_RenderIcons);
-  }
-
-  /**
-   * Address: 0x00C06E40 (FUN_00C06E40, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_RenderSelectionSetNames`.
-   */
-  void cleanup_TConVar_ui_RenderSelectionSetNames()
-  {
-    CleanupStartupConCommand(gTConVar_ui_RenderSelectionSetNames);
-  }
-
-  /**
-   * Address: 0x00BE5780 (FUN_00BE5780, register_TConVar_ui_RenderSelectionSetNames)
-   *
-   * What it does:
-   * Registers startup convar for `ui_RenderSelectionSetNames`.
-   */
-  void register_TConVar_ui_RenderSelectionSetNames()
-  {
-    RegisterStartupConVar(gTConVar_ui_RenderSelectionSetNames, &cleanup_TConVar_ui_RenderSelectionSetNames);
-  }
-
-  /**
-   * Address: 0x00C06C90 (FUN_00C06C90, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_RenderUnitBars`.
-   */
-  void cleanup_TConVar_ui_RenderUnitBars()
-  {
-    CleanupStartupConCommand(gTConVar_ui_RenderUnitBars);
-  }
-
-  /**
-   * Address: 0x00BE5560 (FUN_00BE5560, register_TConVar_ui_RenderUnitBars)
-   *
-   * What it does:
-   * Registers startup convar for `ui_RenderUnitBars`.
-   */
-  void register_TConVar_ui_RenderUnitBars()
-  {
-    RegisterStartupConVar(gTConVar_ui_RenderUnitBars, &cleanup_TConVar_ui_RenderUnitBars);
-  }
-
-  /**
-   * Address: 0x00C07840 (FUN_00C07840, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ScreenEdgeScrollView`.
-   */
-  void cleanup_TConVar_ui_ScreenEdgeScrollView()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ScreenEdgeScrollView);
-  }
-
-  /**
-   * Address: 0x00BE6760 (FUN_00BE6760, register_TConVar_ui_ScreenEdgeScrollView)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ScreenEdgeScrollView`.
-   */
-  void register_TConVar_ui_ScreenEdgeScrollView()
-  {
-    RegisterStartupConVar(gTConVar_ui_ScreenEdgeScrollView, &cleanup_TConVar_ui_ScreenEdgeScrollView);
-  }
-
-  /**
-   * Address: 0x00C07870 (FUN_00C07870, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_SelectTolerance`.
-   */
-  void cleanup_TConVar_ui_SelectTolerance()
-  {
-    CleanupStartupConCommand(gTConVar_ui_SelectTolerance);
-  }
-
-  /**
-   * Address: 0x00BE67A0 (FUN_00BE67A0, register_TConVar_ui_SelectTolerance)
-   *
-   * What it does:
-   * Registers startup convar for `ui_SelectTolerance`.
-   */
-  void register_TConVar_ui_SelectTolerance()
-  {
-    RegisterStartupConVar(gTConVar_ui_SelectTolerance, &cleanup_TConVar_ui_SelectTolerance);
-  }
-
-  /**
-   * Address: 0x00C06E70 (FUN_00C06E70, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_SelectionSetNamesColor`.
-   */
-  void cleanup_TConVar_ui_SelectionSetNamesColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_SelectionSetNamesColor);
-  }
-
-  /**
-   * Address: 0x00BE57C0 (FUN_00BE57C0, register_TConVar_ui_SelectionSetNamesColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_SelectionSetNamesColor`.
-   */
-  void register_TConVar_ui_SelectionSetNamesColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_SelectionSetNamesColor, &cleanup_TConVar_ui_SelectionSetNamesColor);
-  }
-
-  /**
-   * Address: 0x00C07080 (FUN_00C07080, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_ShieldBarColor`.
-   */
-  void cleanup_TConVar_ui_ShieldBarColor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_ShieldBarColor);
-  }
-
-  /**
-   * Address: 0x00BE5A80 (FUN_00BE5A80, register_TConVar_ui_ShieldBarColor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_ShieldBarColor`.
-   */
-  void register_TConVar_ui_ShieldBarColor()
-  {
-    RegisterStartupConVar(gTConVar_ui_ShieldBarColor, &cleanup_TConVar_ui_ShieldBarColor);
-  }
-
-  /**
-   * Address: 0x00C06F00 (FUN_00C06F00, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_StrategicIconBlinkDuration`.
-   */
-  void cleanup_TConVar_ui_StrategicIconBlinkDuration()
-  {
-    CleanupStartupConCommand(gTConVar_ui_StrategicIconBlinkDuration);
-  }
-
-  /**
-   * Address: 0x00BE5880 (FUN_00BE5880, register_TConVar_ui_StrategicIconBlinkDuration)
-   *
-   * What it does:
-   * Registers startup convar for `ui_StrategicIconBlinkDuration`.
-   */
-  void register_TConVar_ui_StrategicIconBlinkDuration()
-  {
-    RegisterStartupConVar(gTConVar_ui_StrategicIconBlinkDuration, &cleanup_TConVar_ui_StrategicIconBlinkDuration);
-  }
-
-  /**
-   * Address: 0x00C06EA0 (FUN_00C06EA0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_StrategicIconBlinkRate`.
-   */
-  void cleanup_TConVar_ui_StrategicIconBlinkRate()
-  {
-    CleanupStartupConCommand(gTConVar_ui_StrategicIconBlinkRate);
-  }
-
-  /**
-   * Address: 0x00BE5800 (FUN_00BE5800, register_TConVar_ui_StrategicIconBlinkRate)
-   *
-   * What it does:
-   * Registers startup convar for `ui_StrategicIconBlinkRate`.
-   */
-  void register_TConVar_ui_StrategicIconBlinkRate()
-  {
-    RegisterStartupConVar(gTConVar_ui_StrategicIconBlinkRate, &cleanup_TConVar_ui_StrategicIconBlinkRate);
-  }
-
-  /**
-   * Address: 0x00C06020 (FUN_00C06020, ??1TConVar_ui_WaypointLineScale@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_WaypointLineScale`.
-   */
-  void cleanup_TConVar_ui_WaypointLineScale()
-  {
-    CleanupStartupConCommand(gTConVar_ui_WaypointLineScale);
-  }
-
-  /**
-   * Address: 0x00BE3E00 (FUN_00BE3E00, register_TConVar_ui_WaypointLineScale)
-   *
-   * What it does:
-   * Registers startup convar for `ui_WaypointLineScale`.
-   */
-  void register_TConVar_ui_WaypointLineScale()
-  {
-    RegisterStartupConVar(gTConVar_ui_WaypointLineScale, &cleanup_TConVar_ui_WaypointLineScale);
-  }
-
-  /**
-   * Address: 0x00C02C40 (FUN_00C02C40, ??1TConVar_ui_WindowedAlwaysShowsCursor@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_WindowedAlwaysShowsCursor`.
-   */
-  void cleanup_TConVar_ui_WindowedAlwaysShowsCursor()
-  {
-    CleanupStartupConCommand(gTConVar_ui_WindowedAlwaysShowsCursor);
-  }
-
-  /**
-   * Address: 0x00BDDFB0 (FUN_00BDDFB0, register_TConVar_ui_WindowedAlwaysShowsCursor)
-   *
-   * What it does:
-   * Registers startup convar for `ui_WindowedAlwaysShowsCursor`.
-   */
-  void register_TConVar_ui_WindowedAlwaysShowsCursor()
-  {
-    RegisterStartupConVar(gTConVar_ui_WindowedAlwaysShowsCursor, &cleanup_TConVar_ui_WindowedAlwaysShowsCursor);
-  }
-
-  /**
-   * Address: 0x00C06BA0 (FUN_00C06BA0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_fuelbarHeight`.
-   */
-  void cleanup_TConVar_ui_fuelbarHeight()
-  {
-    CleanupStartupConCommand(gTConVar_ui_fuelbarHeight);
-  }
-
-  /**
-   * Address: 0x00BE5420 (FUN_00BE5420, register_TConVar_ui_fuelbarHeight)
-   *
-   * What it does:
-   * Registers startup convar for `ui_fuelbarHeight`.
-   */
-  void register_TConVar_ui_fuelbarHeight()
-  {
-    RegisterStartupConVar(gTConVar_ui_fuelbarHeight, &cleanup_TConVar_ui_fuelbarHeight);
-  }
-
-  /**
-   * Address: 0x00C06BD0 (FUN_00C06BD0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ui_lifebarHeight`.
-   */
-  void cleanup_TConVar_ui_lifebarHeight()
-  {
-    CleanupStartupConCommand(gTConVar_ui_lifebarHeight);
-  }
-
-  /**
-   * Address: 0x00BE5460 (FUN_00BE5460, register_TConVar_ui_lifebarHeight)
-   *
-   * What it does:
-   * Registers startup convar for `ui_lifebarHeight`.
-   */
-  void register_TConVar_ui_lifebarHeight()
-  {
-    RegisterStartupConVar(gTConVar_ui_lifebarHeight, &cleanup_TConVar_ui_lifebarHeight);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsUiTuning
-  {
-    ConsoleStartupRegistrationsUiTuning()
-    {
-      moho::register_TConVar_UI_RenProectileTrailWidth();
-      moho::register_TConVar_UI_RenProjectileArcs();
-      moho::register_TConVar_UI_RenProjectileArcsSampleInterval();
-      moho::register_TConVar_UI_RenProjectileGlow();
-      moho::register_TConVar_UI_RenProjectileGlowMax();
-      moho::register_TConVar_UI_RenProjectileGlowMin();
-      moho::register_TConVar_UI_RenProjectileGlowPeriod();
-      moho::register_TConVar_UI_RenProjectileIcons();
-      moho::register_TConVar_UI_RenProjectileTrailColor();
-      moho::register_TConVar_UI_RenResources();
-      moho::register_TConVar_UI_ResourceLODCutoff();
-      moho::register_TConVar_UI_SelectAnything();
-      moho::register_TConVar_UI_ShowControlUnderMouse();
-      moho::register_TConVar_UI_StrategicProjectileLOD();
-      moho::register_TConVar_UI_forceWeaponsToYellow();
-      moho::register_TConVar_ui_AlwaysRenderStrategicIcons();
-      moho::register_TConVar_ui_ArrowKeysScrollView();
-      moho::register_TConVar_ui_BuildPlaceTarmacAlpha();
-      moho::register_TConVar_ui_CommandClickScale();
-      moho::register_TConVar_ui_CommandGraphMaxNodeUnits();
-      moho::register_TConVar_ui_CurveSegments();
-      moho::register_TConVar_ui_CurveSmoothness();
-      moho::register_TConVar_ui_CustomNameColor();
-      moho::register_TConVar_ui_CustomNameFont();
-      moho::register_TConVar_ui_CustomNameFontSize();
-      moho::register_TConVar_ui_DebugAltClick();
-      moho::register_TConVar_ui_DisableCursorFixing();
-      moho::register_TConVar_ui_DragSelect2D();
-      moho::register_TConVar_ui_AttackGroundIgnoresFireState();
-      moho::register_TConVar_ui_DrawPathPreview();
-      moho::register_TConVar_ui_ExtractSnapTolerance();
-      moho::register_TConVar_ui_FootprintMinThickness();
-      moho::register_TConVar_ui_ForceLifbarsOnEnemy();
-      moho::register_TConVar_ui_FuelBarColor();
-      moho::register_TConVar_ui_FuelEmptyBlinkRate();
-      moho::register_TConVar_ui_FuelWarningColor();
-      moho::register_TConVar_ui_KeyboardPanAccelerateMultiplier();
-      moho::register_TConVar_ui_KeyboardPanSpeed();
-      moho::register_TConVar_ui_KeyboardRotateAccelerateMultiplier();
-      moho::register_TConVar_ui_KeyboardRotateSpeed();
-      moho::register_TConVar_ui_LifeBarBadColor();
-      moho::register_TConVar_ui_LifeBarBadCutoff();
-      moho::register_TConVar_ui_LifeBarGoodColor();
-      moho::register_TConVar_ui_LifeBarGoodCutoff();
-      moho::register_TConVar_ui_LifeBarMedColor();
-      moho::register_TConVar_ui_LifebarLOD();
-      moho::register_TConVar_ui_LifebarOffset();
-      moho::register_TConVar_ui_LifebarWidth();
-      moho::register_TConVar_ui_MaxExtractSnapPixels();
-      moho::register_TConVar_ui_MaxTextLOD();
-      moho::register_TConVar_ui_MaxWaypointSize();
-      moho::register_TConVar_ui_MinExtractSnapPixels();
-      moho::register_TConVar_ui_MinWaypointSize();
-      moho::register_TConVar_ui_NisRenderIcons();
-      moho::register_TConVar_ui_PathPreview();
-      moho::register_TConVar_ui_PathSmoothness();
-      moho::register_TConVar_ui_ProgressBarColor();
-      moho::register_TConVar_ui_RenderCustomNames();
-      moho::register_TConVar_ui_RenderIcons();
-      moho::register_TConVar_ui_RenderSelectionSetNames();
-      moho::register_TConVar_ui_RenderUnitBars();
-      moho::register_TConVar_ui_ScreenEdgeScrollView();
-      moho::register_TConVar_ui_SelectTolerance();
-      moho::register_TConVar_ui_SelectionSetNamesColor();
-      moho::register_TConVar_ui_ShieldBarColor();
-      moho::register_TConVar_ui_StrategicIconBlinkDuration();
-      moho::register_TConVar_ui_StrategicIconBlinkRate();
-      moho::register_TConVar_ui_WaypointLineScale();
-      moho::register_TConVar_ui_WindowedAlwaysShowsCursor();
-      moho::register_TConVar_ui_fuelbarHeight();
-      moho::register_TConVar_ui_lifebarHeight();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsUiTuning gConsoleStartupRegistrationsUiTuning;
-} // namespace
 
 namespace
 {
   constexpr const char* kConsoleStartupRenBandwidthDisplayKernelDescription = "Width of bandwidth filter (in seconds).";
   constexpr const char* kConsoleStartupRenBandwidthDisplaySecondsDescription = "Number of seconds of bandwidth data to display.";
-  constexpr const char* kConsoleStartupRenBgLowerBoundDescription = "ren_BgLowerBound tuning value.";
+  constexpr const char* kConsoleStartupRenBgLowerBoundDescription = "";
   constexpr const char* kConsoleStartupRenBloomDescription = "Render Blooms?";
   constexpr const char* kConsoleStartupRenBloomBlurCountDescription = "Bloom Blur Count";
   constexpr const char* kConsoleStartupRenBloomBlurKernelScaleDescription = "Amount to scale blurred amount by.";
@@ -10448,10 +6160,10 @@ namespace
   constexpr const char* kConsoleStartupRenClipDecalLevelDescription = "Level at which we clip decals for super quick reject";
   constexpr const char* kConsoleStartupRenClipDecalsDescription = "Clip Decals vertex count";
   constexpr const char* kConsoleStartupRenClutterDescription = "Render clutter";
-  constexpr const char* kConsoleStartupRenClutterRadiusDescription = "ren_ClutterRadius tuning value.";
+  constexpr const char* kConsoleStartupRenClutterRadiusDescription = "";
   constexpr const char* kConsoleStartupRenDecalAlbedoLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for albedos";
   constexpr const char* kConsoleStartupRenDecalFadeFractionDescription = "fraction (0..1) of their range that decals start to fade";
-  constexpr const char* kConsoleStartupRenDecalFidelityDescription = "ren_DecalFidelity tuning value.";
+  constexpr const char* kConsoleStartupRenDecalFidelityDescription = "";
   constexpr const char* kConsoleStartupRenDecalFlatTolDescription = "flatness tolerance";
   constexpr const char* kConsoleStartupRenDecalNormalLodCutoffDescription = "Fudge factor for decal cutoff on zoom out for normals";
   constexpr const char* kConsoleStartupRenDecalOverDrawDescription = "Render overdraw display for decals";
@@ -10466,15 +6178,15 @@ namespace
   constexpr const char* kConsoleStartupRenHideSecondaryDescription = "Hide secondary views";
   constexpr const char* kConsoleStartupRenIgnoreDecalLODDescription = "Force decals to render regardless of LOD";
   constexpr const char* kConsoleStartupRenMeshDissolveDescription = "Fade mesh alpha from 1.0 to 0.0";
-  constexpr const char* kConsoleStartupRenMeshDissolveCutoffDescription = "ren_MeshDissolveCutoff tuning value.";
+  constexpr const char* kConsoleStartupRenMeshDissolveCutoffDescription = "";
   constexpr const char* kConsoleStartupRenMeshSkinnedDescription = "toggle rendering of meshes which have and use skeletons";
   constexpr const char* kConsoleStartupRenMeshStaticDescription = "toggle rendering of meshes which do not have or ignore skeletons";
   constexpr const char* kConsoleStartupRenNewFogUpdateDescription = "Use new fog update code";
-  constexpr const char* kConsoleStartupRenNewPipelineDescription = "ren_NewPipeline tuning value.";
+  constexpr const char* kConsoleStartupRenNewPipelineDescription = "";
   constexpr const char* kConsoleStartupRenNormalDecalsDescription = "Render Normal Decals";
-  constexpr const char* kConsoleStartupRenOblivionDescription = "ren_Oblivion tuning value.";
+  constexpr const char* kConsoleStartupRenOblivionDescription = "";
   constexpr const char* kConsoleStartupRenOnlyFirstViewDescription = "Render only the first view in the list";
-  constexpr const char* kConsoleStartupRenPlayableBoundaryDescription = "ren_PlayableBoundary tuning value.";
+  constexpr const char* kConsoleStartupRenPlayableBoundaryDescription = "";
   constexpr const char* kConsoleStartupRenReflectionDescription = "Render reflection?";
   constexpr const char* kConsoleStartupRenRefractionDescription = "Render refraction?";
   constexpr const char* kConsoleStartupRenRegenShoreDescription = "Regenerate shoreline (editor only)";
@@ -10487,11 +6199,11 @@ namespace
   constexpr const char* kConsoleStartupRenSelectionHeightFudgeDescription = "How far off the ground selection boxes are fudged";
   constexpr const char* kConsoleStartupRenSelectionSizeFudgeDescription = "How much selection box extents are fudged (multiplier)";
   constexpr const char* kConsoleStartupRenShadowBlurDescription = "Toggle shadow blurring";
-  constexpr const char* kConsoleStartupRenShadowCoeffDescription = "ren_ShadowCoeff tuning value.";
+  constexpr const char* kConsoleStartupRenShadowCoeffDescription = "";
   constexpr const char* kConsoleStartupRenShadowLODDescription = "At what LODMetric do we stop rendering shadows";
   constexpr const char* kConsoleStartupRenShadowSizeDescription = "Sizeof shadow texture";
   constexpr const char* kConsoleStartupRenShadowsDescription = "Render Shadows?";
-  constexpr const char* kConsoleStartupRenShoreErrorCoeffDescription = "ren_ShoreErrorCoeff tuning value.";
+  constexpr const char* kConsoleStartupRenShoreErrorCoeffDescription = "";
   constexpr const char* kConsoleStartupRenShorelineDescription = "Render shoreline";
   constexpr const char* kConsoleStartupRenShorelineCutoffDescription = "Shoreline LOD cutoff";
   constexpr const char* kConsoleStartupRenShowBandwidthUsageDescription = "Show the amount of network bandwidth we are using.";
@@ -10511,8 +6223,8 @@ namespace
   constexpr const char* kConsoleStartupRenTreesDescription = "Show or hide the trees.";
   constexpr const char* kConsoleStartupRenUiDescription = "Render UI?";
   constexpr const char* kConsoleStartupRenUnitSelectionScaleDescription = "How much unit selection box extents are scaled (multiplier)";
-  constexpr const char* kConsoleStartupRenUnitSilhouetteDescription = "ren_UnitSilhouette tuning value.";
-  constexpr const char* kConsoleStartupRenViewErrorDescription = "ren_ViewError tuning value.";
+  constexpr const char* kConsoleStartupRenUnitSilhouetteDescription = "";
+  constexpr const char* kConsoleStartupRenViewErrorDescription = "";
   constexpr const char* kConsoleStartupRenWaterDescription = "Show or hide the water.";
   constexpr const char* kConsoleStartupRenWorldBorderDescription = "Render UI world border frame?";
   constexpr const char* kConsoleStartupRenBicubicnormalsDescription = "Sample normal map basis using bicubic filter";
@@ -10607,2288 +6319,818 @@ namespace moho
   extern bool ren_fog;
   extern bool ren_glowingDecals;
 
+  /**
+   * Address: 0x00BE0D40 (FUN_00BE0D40, dynamic initializer for `gTConVar_ren_BandwidthDisplayKernel`)
+   * Address: 0x00C040E0 (FUN_00C040E0, dynamic atexit destructor for `gTConVar_ren_BandwidthDisplayKernel`)
+   */
   TConVar<float> gTConVar_ren_BandwidthDisplayKernel(
     "ren_BandwidthDisplayKernel",
     kConsoleStartupRenBandwidthDisplayKernelDescription,
     &moho::ren_BandwidthDisplayKernel
   );
+
+  /**
+   * Address: 0x00BE0D00 (FUN_00BE0D00, dynamic initializer for `gTConVar_ren_BandwidthDisplaySeconds`)
+   * Address: 0x00C040B0 (FUN_00C040B0, dynamic atexit destructor for `gTConVar_ren_BandwidthDisplaySeconds`)
+   */
   TConVar<float> gTConVar_ren_BandwidthDisplaySeconds(
     "ren_BandwidthDisplaySeconds",
     kConsoleStartupRenBandwidthDisplaySecondsDescription,
     &moho::ren_BandwidthDisplaySeconds
   );
+
+  /**
+   * Address: 0x00BE68E0 (FUN_00BE68E0, dynamic initializer for `gTConVar_ren_BgLowerBound`)
+   * Address: 0x00C07960 (FUN_00C07960, dynamic atexit destructor for `gTConVar_ren_BgLowerBound`)
+   */
   TConVar<float> gTConVar_ren_BgLowerBound(
     "ren_BgLowerBound",
     kConsoleStartupRenBgLowerBoundDescription,
     &moho::ren_BgLowerBound
   );
+
+  /**
+   * Address: 0x00BE1710 (FUN_00BE1710, dynamic initializer for `gTConVar_ren_Bloom`)
+   * Address: 0x00C04750 (FUN_00C04750, dynamic atexit destructor for `gTConVar_ren_Bloom`)
+   */
   TConVar<bool> gTConVar_ren_Bloom(
     "ren_Bloom",
     kConsoleStartupRenBloomDescription,
     &moho::ren_Bloom
   );
+
+  /**
+   * Address: 0x00BE0E00 (FUN_00BE0E00, dynamic initializer for `gTConVar_ren_BloomBlurCount`)
+   * Address: 0x00C04130 (FUN_00C04130, dynamic atexit destructor for `gTConVar_ren_BloomBlurCount`)
+   */
   TConVar<int> gTConVar_ren_BloomBlurCount(
     "ren_BloomBlurCount",
     kConsoleStartupRenBloomBlurCountDescription,
     &moho::ren_BloomBlurCount
   );
+
+  /**
+   * Address: 0x00BE1040 (FUN_00BE1040, dynamic initializer for `gTConVar_ren_BloomBlurKernelScale`)
+   * Address: 0x00C04300 (FUN_00C04300, dynamic atexit destructor for `gTConVar_ren_BloomBlurKernelScale`)
+   */
   TConVar<float> gTConVar_ren_BloomBlurKernelScale(
     "ren_BloomBlurKernelScale",
     kConsoleStartupRenBloomBlurKernelScaleDescription,
     &moho::ren_BloomBlurKernelScale
   );
+
+  /**
+   * Address: 0x00BE1080 (FUN_00BE1080, dynamic initializer for `gTConVar_ren_BloomGlowCopyScale`)
+   * Address: 0x00C04330 (FUN_00C04330, dynamic atexit destructor for `gTConVar_ren_BloomGlowCopyScale`)
+   */
   TConVar<float> gTConVar_ren_BloomGlowCopyScale(
     "ren_BloomGlowCopyScale",
     kConsoleStartupRenBloomGlowCopyScaleDescription,
     &moho::ren_BloomGlowCopyScale
   );
+
+  /**
+   * Address: 0x00BE31D0 (FUN_00BE31D0, dynamic initializer for `gTConVar_ren_BorderSize`)
+   * Address: 0x00C05A00 (FUN_00C05A00, dynamic atexit destructor for `gTConVar_ren_BorderSize`)
+   */
   TConVar<float> gTConVar_ren_BorderSize(
     "ren_BorderSize",
     kConsoleStartupRenBorderSizeDescription,
     &moho::ren_BorderSize
   );
+
+  /**
+   * Address: 0x00BE3190 (FUN_00BE3190, dynamic initializer for `gTConVar_ren_ClipDecalLevel`)
+   * Address: 0x00C059D0 (FUN_00C059D0, dynamic atexit destructor for `gTConVar_ren_ClipDecalLevel`)
+   */
   TConVar<int> gTConVar_ren_ClipDecalLevel(
     "ren_ClipDecalLevel",
     kConsoleStartupRenClipDecalLevelDescription,
     &moho::ren_ClipDecalLevel
   );
+
+  /**
+   * Address: 0x00BE3150 (FUN_00BE3150, dynamic initializer for `gTConVar_ren_ClipDecals`)
+   * Address: 0x00C059A0 (FUN_00C059A0, dynamic atexit destructor for `gTConVar_ren_ClipDecals`)
+   */
   TConVar<bool> gTConVar_ren_ClipDecals(
     "ren_ClipDecals",
     kConsoleStartupRenClipDecalsDescription,
     &moho::ren_ClipDecals
   );
+
+  /**
+   * Address: 0x00BE1810 (FUN_00BE1810, dynamic initializer for `gTConVar_ren_Clutter`)
+   * Address: 0x00C04810 (FUN_00C04810, dynamic atexit destructor for `gTConVar_ren_Clutter`)
+   */
   TConVar<bool> gTConVar_ren_Clutter(
     "ren_Clutter",
     kConsoleStartupRenClutterDescription,
     &moho::ren_Clutter
   );
+
+  /**
+   * Address: 0x00BE0200 (FUN_00BE0200, dynamic initializer for `gTConVar_ren_ClutterRadius`)
+   * Address: 0x00C03AC0 (FUN_00C03AC0, dynamic atexit destructor for `gTConVar_ren_ClutterRadius`)
+   */
   TConVar<float> gTConVar_ren_ClutterRadius(
     "ren_ClutterRadius",
     kConsoleStartupRenClutterRadiusDescription,
     &moho::ren_ClutterRadius
   );
+
+  /**
+   * Address: 0x00BE7A40 (FUN_00BE7A40, dynamic initializer for `gTConVar_ren_DecalAlbedoLodCutoff`)
+   * Address: 0x00C083C0 (FUN_00C083C0, dynamic atexit destructor for `gTConVar_ren_DecalAlbedoLodCutoff`)
+   */
   TConVar<float> gTConVar_ren_DecalAlbedoLodCutoff(
     "ren_DecalAlbedoLodCutoff",
     kConsoleStartupRenDecalAlbedoLodCutoffDescription,
     &moho::ren_DecalAlbedoLodCutoff
   );
+
+  /**
+   * Address: 0x00BE7A80 (FUN_00BE7A80, dynamic initializer for `gTConVar_ren_DecalFadeFraction`)
+   * Address: 0x00C083F0 (FUN_00C083F0, dynamic atexit destructor for `gTConVar_ren_DecalFadeFraction`)
+   */
   TConVar<float> gTConVar_ren_DecalFadeFraction(
     "ren_DecalFadeFraction",
     kConsoleStartupRenDecalFadeFractionDescription,
     &moho::ren_DecalFadeFraction
   );
+
+  /**
+   * Address: 0x00BE2550 (FUN_00BE2550, dynamic initializer for `gTConVar_ren_DecalFidelity`)
+   * Address: 0x00C05180 (FUN_00C05180, dynamic atexit destructor for `gTConVar_ren_DecalFidelity`)
+   */
   TConVar<int> gTConVar_ren_DecalFidelity(
     "ren_DecalFidelity",
     kConsoleStartupRenDecalFidelityDescription,
     &moho::ren_DecalFidelity
   );
+
+  /**
+   * Address: 0x00BE7AC0 (FUN_00BE7AC0, dynamic initializer for `gTConVar_ren_DecalFlatTol`)
+   * Address: 0x00C08420 (FUN_00C08420, dynamic atexit destructor for `gTConVar_ren_DecalFlatTol`)
+   */
   TConVar<float> gTConVar_ren_DecalFlatTol(
     "ren_DecalFlatTol",
     kConsoleStartupRenDecalFlatTolDescription,
     &moho::ren_DecalFlatTol
   );
+
+  /**
+   * Address: 0x00BE7A00 (FUN_00BE7A00, dynamic initializer for `gTConVar_ren_DecalNormalLodCutoff`)
+   * Address: 0x00C08390 (FUN_00C08390, dynamic atexit destructor for `gTConVar_ren_DecalNormalLodCutoff`)
+   */
   TConVar<float> gTConVar_ren_DecalNormalLodCutoff(
     "ren_DecalNormalLodCutoff",
     kConsoleStartupRenDecalNormalLodCutoffDescription,
     &moho::ren_DecalNormalLodCutoff
   );
+
+  /**
+   * Address: 0x00BE2410 (FUN_00BE2410, dynamic initializer for `gTConVar_ren_DecalOverDraw`)
+   * Address: 0x00C05090 (FUN_00C05090, dynamic atexit destructor for `gTConVar_ren_DecalOverDraw`)
+   */
   TConVar<bool> gTConVar_ren_DecalOverDraw(
     "ren_DecalOverDraw",
     kConsoleStartupRenDecalOverDrawDescription,
     &moho::ren_DecalOverDraw
   );
+
+  /**
+   * Address: 0x00BE2290 (FUN_00BE2290, dynamic initializer for `gTConVar_ren_Decals`)
+   * Address: 0x00C04F70 (FUN_00C04F70, dynamic atexit destructor for `gTConVar_ren_Decals`)
+   */
   TConVar<bool> gTConVar_ren_Decals(
     "ren_Decals",
     kConsoleStartupRenDecalsDescription,
     &moho::ren_Decals
   );
+
+  /**
+   * Address: 0x00BE3250 (FUN_00BE3250, dynamic initializer for `gTConVar_ren_ErrorCache`)
+   * Address: 0x00C05A60 (FUN_00C05A60, dynamic atexit destructor for `gTConVar_ren_ErrorCache`)
+   */
   TConVar<bool> gTConVar_ren_ErrorCache(
     "ren_ErrorCache",
     kConsoleStartupRenErrorCacheDescription,
     &moho::ren_ErrorCache
   );
+
+  /**
+   * Address: 0x00BE8120 (FUN_00BE8120, dynamic initializer for `gTConVar_ren_FogIntensity`)
+   * Address: 0x00C08640 (FUN_00C08640, dynamic atexit destructor for `gTConVar_ren_FogIntensity`)
+   */
   TConVar<int> gTConVar_ren_FogIntensity(
     "ren_FogIntensity",
     kConsoleStartupRenFogIntensityDescription,
     &moho::ren_FogIntensity
   );
+
+  /**
+   * Address: 0x00BE2210 (FUN_00BE2210, dynamic initializer for `gTConVar_ren_FogOfWar`)
+   * Address: 0x00C04F10 (FUN_00C04F10, dynamic atexit destructor for `gTConVar_ren_FogOfWar`)
+   */
   TConVar<bool> gTConVar_ren_FogOfWar(
     "ren_FogOfWar",
     kConsoleStartupRenFogOfWarDescription,
     &moho::ren_FogOfWar
   );
+
+  /**
+   * Address: 0x00BE2450 (FUN_00BE2450, dynamic initializer for `gTConVar_ren_ForceUpdateMinimapTerrain`)
+   * Address: 0x00C050C0 (FUN_00C050C0, dynamic atexit destructor for `gTConVar_ren_ForceUpdateMinimapTerrain`)
+   */
   TConVar<bool> gTConVar_ren_ForceUpdateMinimapTerrain(
     "ren_ForceUpdateMinimapTerrain",
     kConsoleStartupRenForceUpdateMinimapTerrainDescription,
     &moho::ren_ForceUpdateMinimapTerrain
   );
+
+  /**
+   * Address: 0x00BE1A90 (FUN_00BE1A90, dynamic initializer for `gTConVar_ren_FrameTimeSeconds`)
+   * Address: 0x00C049F0 (FUN_00C049F0, dynamic atexit destructor for `gTConVar_ren_FrameTimeSeconds`)
+   */
   TConVar<float> gTConVar_ren_FrameTimeSeconds(
     "ren_FrameTimeSeconds",
     kConsoleStartupRenFrameTimeSecondsDescription,
     &moho::ren_FrameTimeSeconds
   );
+
+  /**
+   * Address: 0x00BE14D0 (FUN_00BE14D0, dynamic initializer for `gTConVar_ren_Fx`)
+   * Address: 0x00C045A0 (FUN_00C045A0, dynamic atexit destructor for `gTConVar_ren_Fx`)
+   */
   TConVar<bool> gTConVar_ren_Fx(
     "ren_Fx",
     kConsoleStartupRenFxDescription,
     &moho::ren_Fx
   );
+
+  /**
+   * Address: 0x00BE2350 (FUN_00BE2350, dynamic initializer for `gTConVar_ren_GenerateMesh`)
+   * Address: 0x00C05000 (FUN_00C05000, dynamic atexit destructor for `gTConVar_ren_GenerateMesh`)
+   */
   TConVar<bool> gTConVar_ren_GenerateMesh(
     "ren_GenerateMesh",
     kConsoleStartupRenGenerateMeshDescription,
     &moho::ren_GenerateMesh
   );
+
+  /**
+   * Address: 0x00BE1950 (FUN_00BE1950, dynamic initializer for `gTConVar_ren_HideSecondary`)
+   * Address: 0x00C04900 (FUN_00C04900, dynamic atexit destructor for `gTConVar_ren_HideSecondary`)
+   */
   TConVar<bool> gTConVar_ren_HideSecondary(
     "ren_HideSecondary",
     kConsoleStartupRenHideSecondaryDescription,
     &moho::ren_HideSecondary
   );
+
+  /**
+   * Address: 0x00BE2390 (FUN_00BE2390, dynamic initializer for `gTConVar_ren_IgnoreDecalLOD`)
+   * Address: 0x00C05030 (FUN_00C05030, dynamic atexit destructor for `gTConVar_ren_IgnoreDecalLOD`)
+   */
   TConVar<bool> gTConVar_ren_IgnoreDecalLOD(
     "ren_IgnoreDecalLOD",
     kConsoleStartupRenIgnoreDecalLODDescription,
     &moho::ren_IgnoreDecalLOD
   );
+
+  /**
+   * Address: 0x00BE03A0 (FUN_00BE03A0, dynamic initializer for `gTConVar_ren_MeshDissolve`)
+   * Address: 0x00C03B90 (FUN_00C03B90, dynamic atexit destructor for `gTConVar_ren_MeshDissolve`)
+   */
   TConVar<float> gTConVar_ren_MeshDissolve(
     "ren_MeshDissolve",
     kConsoleStartupRenMeshDissolveDescription,
     &moho::ren_MeshDissolve
   );
+
+  /**
+   * Address: 0x00BE03E0 (FUN_00BE03E0, dynamic initializer for `gTConVar_ren_MeshDissolveCutoff`)
+   * Address: 0x00C03BC0 (FUN_00C03BC0, dynamic atexit destructor for `gTConVar_ren_MeshDissolveCutoff`)
+   */
   TConVar<float> gTConVar_ren_MeshDissolveCutoff(
     "ren_MeshDissolveCutoff",
     kConsoleStartupRenMeshDissolveCutoffDescription,
     &moho::ren_MeshDissolveCutoff
   );
+
+  /**
+   * Address: 0x00BE0320 (FUN_00BE0320, dynamic initializer for `gTConVar_ren_MeshSkinned`)
+   * Address: 0x00C03B30 (FUN_00C03B30, dynamic atexit destructor for `gTConVar_ren_MeshSkinned`)
+   */
   TConVar<bool> gTConVar_ren_MeshSkinned(
     "ren_MeshSkinned",
     kConsoleStartupRenMeshSkinnedDescription,
     &moho::ren_MeshSkinned
   );
+
+  /**
+   * Address: 0x00BE0360 (FUN_00BE0360, dynamic initializer for `gTConVar_ren_MeshStatic`)
+   * Address: 0x00C03B60 (FUN_00C03B60, dynamic atexit destructor for `gTConVar_ren_MeshStatic`)
+   */
   TConVar<bool> gTConVar_ren_MeshStatic(
     "ren_MeshStatic",
     kConsoleStartupRenMeshStaticDescription,
     &moho::ren_MeshStatic
   );
+
+  /**
+   * Address: 0x00BE24D0 (FUN_00BE24D0, dynamic initializer for `gTConVar_ren_NewFogUpdate`)
+   * Address: 0x00C05120 (FUN_00C05120, dynamic atexit destructor for `gTConVar_ren_NewFogUpdate`)
+   */
   TConVar<bool> gTConVar_ren_NewFogUpdate(
     "ren_NewFogUpdate",
     kConsoleStartupRenNewFogUpdateDescription,
     &moho::ren_NewFogUpdate
   );
+
+  /**
+   * Address: 0x00BE1390 (FUN_00BE1390, dynamic initializer for `gTConVar_ren_NewPipeline`)
+   * Address: 0x00C044B0 (FUN_00C044B0, dynamic atexit destructor for `gTConVar_ren_NewPipeline`)
+   */
   TConVar<bool> gTConVar_ren_NewPipeline(
     "ren_NewPipeline",
     kConsoleStartupRenNewPipelineDescription,
     &moho::ren_NewPipeline
   );
+
+  /**
+   * Address: 0x00BE22D0 (FUN_00BE22D0, dynamic initializer for `gTConVar_ren_NormalDecals`)
+   * Address: 0x00C04FA0 (FUN_00C04FA0, dynamic atexit destructor for `gTConVar_ren_NormalDecals`)
+   */
   TConVar<bool> gTConVar_ren_NormalDecals(
     "ren_NormalDecals",
     kConsoleStartupRenNormalDecalsDescription,
     &moho::ren_NormalDecals
   );
+
+  /**
+   * Address: 0x00BE1410 (FUN_00BE1410, dynamic initializer for `gTConVar_ren_Oblivion`)
+   * Address: 0x00C04510 (FUN_00C04510, dynamic atexit destructor for `gTConVar_ren_Oblivion`)
+   */
   TConVar<bool> gTConVar_ren_Oblivion(
     "ren_Oblivion",
     kConsoleStartupRenOblivionDescription,
     &moho::ren_Oblivion
   );
+
+  /**
+   * Address: 0x00BE1750 (FUN_00BE1750, dynamic initializer for `gTConVar_ren_OnlyFirstView`)
+   * Address: 0x00C04780 (FUN_00C04780, dynamic atexit destructor for `gTConVar_ren_OnlyFirstView`)
+   */
   TConVar<bool> gTConVar_ren_OnlyFirstView(
     "ren_OnlyFirstView",
     kConsoleStartupRenOnlyFirstViewDescription,
     &moho::ren_OnlyFirstView
   );
+
+  /**
+   * Address: 0x00BE1650 (FUN_00BE1650, dynamic initializer for `gTConVar_ren_PlayableBoundary`)
+   * Address: 0x00C046C0 (FUN_00C046C0, dynamic atexit destructor for `gTConVar_ren_PlayableBoundary`)
+   */
   TConVar<bool> gTConVar_ren_PlayableBoundary(
     "ren_PlayableBoundary",
     kConsoleStartupRenPlayableBoundaryDescription,
     &moho::ren_PlayableBoundary
   );
+
+  /**
+   * Address: 0x00BE1510 (FUN_00BE1510, dynamic initializer for `gTConVar_ren_Reflection`)
+   * Address: 0x00C045D0 (FUN_00C045D0, dynamic atexit destructor for `gTConVar_ren_Reflection`)
+   */
   TConVar<bool> gTConVar_ren_Reflection(
     "ren_Reflection",
     kConsoleStartupRenReflectionDescription,
     &moho::ren_Reflection
   );
+
+  /**
+   * Address: 0x00BE1550 (FUN_00BE1550, dynamic initializer for `gTConVar_ren_Refraction`)
+   * Address: 0x00C04600 (FUN_00C04600, dynamic atexit destructor for `gTConVar_ren_Refraction`)
+   */
   TConVar<bool> gTConVar_ren_Refraction(
     "ren_Refraction",
     kConsoleStartupRenRefractionDescription,
     &moho::ren_Refraction
   );
+
+  /**
+   * Address: 0x00BE18D0 (FUN_00BE18D0, dynamic initializer for `gTConVar_ren_RegenShore`)
+   * Address: 0x00C048A0 (FUN_00C048A0, dynamic atexit destructor for `gTConVar_ren_RegenShore`)
+   */
   TConVar<bool> gTConVar_ren_RegenShore(
     "ren_RegenShore",
     kConsoleStartupRenRegenShoreDescription,
     &moho::ren_RegenShore
   );
+
+  /**
+   * Address: 0x00BE13D0 (FUN_00BE13D0, dynamic initializer for `gTConVar_ren_RenderNothing`)
+   * Address: 0x00C044E0 (FUN_00C044E0, dynamic atexit destructor for `gTConVar_ren_RenderNothing`)
+   */
   TConVar<bool> gTConVar_ren_RenderNothing(
     "ren_RenderNothing",
     kConsoleStartupRenRenderNothingDescription,
     &moho::ren_RenderNothing
   );
+
+  /**
+   * Address: 0x00BE1590 (FUN_00BE1590, dynamic initializer for `gTConVar_ren_Select`)
+   * Address: 0x00C04630 (FUN_00C04630, dynamic atexit destructor for `gTConVar_ren_Select`)
+   */
   TConVar<bool> gTConVar_ren_Select(
     "ren_Select",
     kConsoleStartupRenSelectDescription,
     &moho::ren_Select
   );
+
+  /**
+   * Address: 0x00BE1E40 (FUN_00BE1E40, dynamic initializer for `gTConVar_ren_SelectBoxes`)
+   * Address: 0x00C04C80 (FUN_00C04C80, dynamic atexit destructor for `gTConVar_ren_SelectBoxes`)
+   */
   TConVar<bool> gTConVar_ren_SelectBoxes(
     "ren_SelectBoxes",
     kConsoleStartupRenSelectBoxesDescription,
     &moho::ren_SelectBoxes
   );
+
+  /**
+   * Address: 0x00BE1D80 (FUN_00BE1D80, dynamic initializer for `gTConVar_ren_SelectBracketMinPixelSize`)
+   * Address: 0x00C04BF0 (FUN_00C04BF0, dynamic atexit destructor for `gTConVar_ren_SelectBracketMinPixelSize`)
+   */
   TConVar<float> gTConVar_ren_SelectBracketMinPixelSize(
     "ren_SelectBracketMinPixelSize",
     kConsoleStartupRenSelectBracketMinPixelSizeDescription,
     &moho::ren_SelectBracketMinPixelSize
   );
+
+  /**
+   * Address: 0x00BE1DC0 (FUN_00BE1DC0, dynamic initializer for `gTConVar_ren_SelectBracketSize`)
+   * Address: 0x00C04C20 (FUN_00C04C20, dynamic atexit destructor for `gTConVar_ren_SelectBracketSize`)
+   */
   TConVar<float> gTConVar_ren_SelectBracketSize(
     "ren_SelectBracketSize",
     kConsoleStartupRenSelectBracketSizeDescription,
     &moho::ren_SelectBracketSize
   );
+
+  /**
+   * Address: 0x00BE1E00 (FUN_00BE1E00, dynamic initializer for `gTConVar_ren_SelectColor`)
+   * Address: 0x00C04C50 (FUN_00C04C50, dynamic atexit destructor for `gTConVar_ren_SelectColor`)
+   */
   TConVar<unsigned int> gTConVar_ren_SelectColor(
     "ren_SelectColor",
     kConsoleStartupRenSelectColorDescription,
     &moho::ren_SelectColor
   );
+
+  /**
+   * Address: 0x00BE1D00 (FUN_00BE1D00, dynamic initializer for `gTConVar_ren_SelectionHeightFudge`)
+   * Address: 0x00C04B90 (FUN_00C04B90, dynamic atexit destructor for `gTConVar_ren_SelectionHeightFudge`)
+   */
   TConVar<float> gTConVar_ren_SelectionHeightFudge(
     "ren_SelectionHeightFudge",
     kConsoleStartupRenSelectionHeightFudgeDescription,
     &moho::ren_SelectionHeightFudge
   );
+
+  /**
+   * Address: 0x00BE1CC0 (FUN_00BE1CC0, dynamic initializer for `gTConVar_ren_SelectionSizeFudge`)
+   * Address: 0x00C04B60 (FUN_00C04B60, dynamic atexit destructor for `gTConVar_ren_SelectionSizeFudge`)
+   */
   TConVar<float> gTConVar_ren_SelectionSizeFudge(
     "ren_SelectionSizeFudge",
     kConsoleStartupRenSelectionSizeFudgeDescription,
     &moho::ren_SelectionSizeFudge
   );
+
+  /**
+   * Address: 0x00BE1850 (FUN_00BE1850, dynamic initializer for `gTConVar_ren_ShadowBlur`)
+   * Address: 0x00C04840 (FUN_00C04840, dynamic atexit destructor for `gTConVar_ren_ShadowBlur`)
+   */
   TConVar<bool> gTConVar_ren_ShadowBlur(
     "ren_ShadowBlur",
     kConsoleStartupRenShadowBlurDescription,
     &moho::ren_ShadowBlur
   );
+
+  /**
+   * Address: 0x00BE1FA0 (FUN_00BE1FA0, dynamic initializer for `gTConVar_ren_ShadowCoeff`)
+   * Address: 0x00C04D80 (FUN_00C04D80, dynamic atexit destructor for `gTConVar_ren_ShadowCoeff`)
+   */
   TConVar<float> gTConVar_ren_ShadowCoeff(
     "ren_ShadowCoeff",
     kConsoleStartupRenShadowCoeffDescription,
     &moho::ren_ShadowCoeff
   );
+
+  /**
+   * Address: 0x00BE1FE0 (FUN_00BE1FE0, dynamic initializer for `gTConVar_ren_ShadowLOD`)
+   * Address: 0x00C04DB0 (FUN_00C04DB0, dynamic atexit destructor for `gTConVar_ren_ShadowLOD`)
+   */
   TConVar<float> gTConVar_ren_ShadowLOD(
     "ren_ShadowLOD",
     kConsoleStartupRenShadowLODDescription,
     &moho::ren_ShadowLOD
   );
+
+  /**
+   * Address: 0x00BE1890 (FUN_00BE1890, dynamic initializer for `gTConVar_ren_ShadowSize`)
+   * Address: 0x00C04870 (FUN_00C04870, dynamic atexit destructor for `gTConVar_ren_ShadowSize`)
+   */
   TConVar<int> gTConVar_ren_ShadowSize(
     "ren_ShadowSize",
     kConsoleStartupRenShadowSizeDescription,
     &moho::ren_ShadowSize
   );
+
+  /**
+   * Address: 0x00BE17D0 (FUN_00BE17D0, dynamic initializer for `gTConVar_ren_Shadows`)
+   * Address: 0x00C047E0 (FUN_00C047E0, dynamic atexit destructor for `gTConVar_ren_Shadows`)
+   */
   TConVar<bool> gTConVar_ren_Shadows(
     "ren_Shadows",
     kConsoleStartupRenShadowsDescription,
     &moho::ren_Shadows
   );
+
+  /**
+   * Address: 0x00BE3210 (FUN_00BE3210, dynamic initializer for `gTConVar_ren_ShoreErrorCoeff`)
+   * Address: 0x00C05A30 (FUN_00C05A30, dynamic atexit destructor for `gTConVar_ren_ShoreErrorCoeff`)
+   */
   TConVar<float> gTConVar_ren_ShoreErrorCoeff(
     "ren_ShoreErrorCoeff",
     kConsoleStartupRenShoreErrorCoeffDescription,
     &moho::ren_ShoreErrorCoeff
   );
+
+  /**
+   * Address: 0x00BE37B0 (FUN_00BE37B0, dynamic initializer for `gTConVar_ren_Shoreline`)
+   * Address: 0x00C05CF0 (FUN_00C05CF0, dynamic atexit destructor for `gTConVar_ren_Shoreline`)
+   */
   TConVar<bool> gTConVar_ren_Shoreline(
     "ren_Shoreline",
     kConsoleStartupRenShorelineDescription,
     &moho::ren_Shoreline
   );
+
+  /**
+   * Address: 0x00BE37F0 (FUN_00BE37F0, dynamic initializer for `gTConVar_ren_ShorelineCutoff`)
+   * Address: 0x00C05D20 (FUN_00C05D20, dynamic atexit destructor for `gTConVar_ren_ShorelineCutoff`)
+   */
   TConVar<float> gTConVar_ren_ShorelineCutoff(
     "ren_ShorelineCutoff",
     kConsoleStartupRenShorelineCutoffDescription,
     &moho::ren_ShorelineCutoff
   );
+
+  /**
+   * Address: 0x00BE1B10 (FUN_00BE1B10, dynamic initializer for `gTConVar_ren_ShowBandwidthUsage`)
+   * Address: 0x00C04A50 (FUN_00C04A50, dynamic atexit destructor for `gTConVar_ren_ShowBandwidthUsage`)
+   */
   TConVar<bool> gTConVar_ren_ShowBandwidthUsage(
     "ren_ShowBandwidthUsage",
     kConsoleStartupRenShowBandwidthUsageDescription,
     &moho::ren_ShowBandwidthUsage
   );
+
+  /**
+   * Address: 0x00BE1910 (FUN_00BE1910, dynamic initializer for `gTConVar_ren_ShowBoneNames`)
+   * Address: 0x00C048D0 (FUN_00C048D0, dynamic atexit destructor for `gTConVar_ren_ShowBoneNames`)
+   */
   TConVar<bool> gTConVar_ren_ShowBoneNames(
     "ren_ShowBoneNames",
     kConsoleStartupRenShowBoneNamesDescription,
     &moho::ren_ShowBoneNames
   );
+
+  /**
+   * Address: 0x00BE2190 (FUN_00BE2190, dynamic initializer for `gTConVar_ren_ShowDirtyTerrain`)
+   * Address: 0x00C04EB0 (FUN_00C04EB0, dynamic atexit destructor for `gTConVar_ren_ShowDirtyTerrain`)
+   */
   TConVar<bool> gTConVar_ren_ShowDirtyTerrain(
     "ren_ShowDirtyTerrain",
     kConsoleStartupRenShowDirtyTerrainDescription,
     &moho::ren_ShowDirtyTerrain
   );
+
+  /**
+   * Address: 0x00BE1A50 (FUN_00BE1A50, dynamic initializer for `gTConVar_ren_ShowFrameTimes`)
+   * Address: 0x00C049C0 (FUN_00C049C0, dynamic atexit destructor for `gTConVar_ren_ShowFrameTimes`)
+   */
   TConVar<bool> gTConVar_ren_ShowFrameTimes(
     "ren_ShowFrameTimes",
     kConsoleStartupRenShowFrameTimesDescription,
     &moho::ren_ShowFrameTimes
   );
+
+  /**
+   * Address: 0x00BE1AD0 (FUN_00BE1AD0, dynamic initializer for `gTConVar_ren_ShowNetworkStats`)
+   * Address: 0x00C04A20 (FUN_00C04A20, dynamic atexit destructor for `gTConVar_ren_ShowNetworkStats`)
+   */
   TConVar<bool> gTConVar_ren_ShowNetworkStats(
     "ren_ShowNetworkStats",
     kConsoleStartupRenShowNetworkStatsDescription,
     &moho::ren_ShowNetworkStats
   );
+
+  /**
+   * Address: 0x00BE2110 (FUN_00BE2110, dynamic initializer for `gTConVar_ren_ShowNormals`)
+   * Address: 0x00C04E50 (FUN_00C04E50, dynamic atexit destructor for `gTConVar_ren_ShowNormals`)
+   */
   TConVar<bool> gTConVar_ren_ShowNormals(
     "ren_ShowNormals",
     kConsoleStartupRenShowNormalsDescription,
     &moho::ren_ShowNormals
   );
+
+  /**
+   * Address: 0x00BE15D0 (FUN_00BE15D0, dynamic initializer for `gTConVar_ren_ShowWireframe`)
+   * Address: 0x00C04660 (FUN_00C04660, dynamic atexit destructor for `gTConVar_ren_ShowWireframe`)
+   */
   TConVar<bool> gTConVar_ren_ShowWireframe(
     "ren_ShowWireframe",
     kConsoleStartupRenShowWireframeDescription,
     &moho::ren_ShowWireframe
   );
+
+  /**
+   * Address: 0x00BE2510 (FUN_00BE2510, dynamic initializer for `gTConVar_ren_Skirt`)
+   * Address: 0x00C05150 (FUN_00C05150, dynamic atexit destructor for `gTConVar_ren_Skirt`)
+   */
   TConVar<bool> gTConVar_ren_Skirt(
     "ren_Skirt",
     kConsoleStartupRenSkirtDescription,
     &moho::ren_Skirt
   );
+
+  /**
+   * Address: 0x00BE1790 (FUN_00BE1790, dynamic initializer for `gTConVar_ren_SkyDome`)
+   * Address: 0x00C047B0 (FUN_00C047B0, dynamic atexit destructor for `gTConVar_ren_SkyDome`)
+   */
   TConVar<bool> gTConVar_ren_SkyDome(
     "ren_SkyDome",
     kConsoleStartupRenSkyDomeDescription,
     &moho::ren_SkyDome
   );
+
+  /**
+   * Address: 0x00BE2310 (FUN_00BE2310, dynamic initializer for `gTConVar_ren_Splats`)
+   * Address: 0x00C04FD0 (FUN_00C04FD0, dynamic atexit destructor for `gTConVar_ren_Splats`)
+   */
   TConVar<bool> gTConVar_ren_Splats(
     "ren_Splats",
     kConsoleStartupRenSplatsDescription,
     &moho::ren_Splats
   );
+
+  /**
+   * Address: 0x00BE7D90 (FUN_00BE7D90, dynamic initializer for `gTConVar_ren_SyncTerrainLOD`)
+   * Address: 0x00C084D0 (FUN_00C084D0, dynamic atexit destructor for `gTConVar_ren_SyncTerrainLOD`)
+   */
   TConVar<float> gTConVar_ren_SyncTerrainLOD(
     "ren_SyncTerrainLOD",
     kConsoleStartupRenSyncTerrainLODDescription,
     &moho::ren_SyncTerrainLOD
   );
+
+  /**
+   * Address: 0x00BE2490 (FUN_00BE2490, dynamic initializer for `gTConVar_ren_TTerrainGlow`)
+   * Address: 0x00C050F0 (FUN_00C050F0, dynamic atexit destructor for `gTConVar_ren_TTerrainGlow`)
+   */
   TConVar<bool> gTConVar_ren_TTerrainGlow(
     "ren_TTerrainGlow",
     kConsoleStartupRenTTerrainGlowDescription,
     &moho::ren_TTerrainGlow
   );
+
+  /**
+   * Address: 0x00BE86E0 (FUN_00BE86E0, dynamic initializer for `gTConVar_ren_TeamColorLookupCount`)
+   * Address: 0x00C08750 (FUN_00C08750, dynamic atexit destructor for `gTConVar_ren_TeamColorLookupCount`)
+   */
   TConVar<int> gTConVar_ren_TeamColorLookupCount(
     "ren_TeamColorLookupCount",
     kConsoleStartupRenTeamColorLookupCountDescription,
     &moho::ren_TeamColorLookupCount
   );
+
+  /**
+   * Address: 0x00BE2150 (FUN_00BE2150, dynamic initializer for `gTConVar_ren_Terrain`)
+   * Address: 0x00C04E80 (FUN_00C04E80, dynamic atexit destructor for `gTConVar_ren_Terrain`)
+   */
   TConVar<bool> gTConVar_ren_Terrain(
     "ren_Terrain",
     kConsoleStartupRenTerrainDescription,
     &moho::ren_Terrain
   );
+
+  /**
+   * Address: 0x00BE21D0 (FUN_00BE21D0, dynamic initializer for `gTConVar_ren_Trees`)
+   * Address: 0x00C04EE0 (FUN_00C04EE0, dynamic atexit destructor for `gTConVar_ren_Trees`)
+   */
   TConVar<bool> gTConVar_ren_Trees(
     "ren_Trees",
     kConsoleStartupRenTreesDescription,
     &moho::ren_Trees
   );
+
+  /**
+   * Address: 0x00BE1450 (FUN_00BE1450, dynamic initializer for `gTConVar_ren_Ui`)
+   * Address: 0x00C04540 (FUN_00C04540, dynamic atexit destructor for `gTConVar_ren_Ui`)
+   */
   TConVar<bool> gTConVar_ren_Ui(
     "ren_Ui",
     kConsoleStartupRenUiDescription,
     &moho::ren_Ui
   );
+
+  /**
+   * Address: 0x00BE1D40 (FUN_00BE1D40, dynamic initializer for `gTConVar_ren_UnitSelectionScale`)
+   * Address: 0x00C04BC0 (FUN_00C04BC0, dynamic atexit destructor for `gTConVar_ren_UnitSelectionScale`)
+   */
   TConVar<float> gTConVar_ren_UnitSelectionScale(
     "ren_UnitSelectionScale",
     kConsoleStartupRenUnitSelectionScaleDescription,
     &moho::ren_UnitSelectionScale
   );
+
+  /**
+   * Address: 0x00BE1990 (FUN_00BE1990, dynamic initializer for `gTConVar_ren_UnitSilhouette`)
+   * Address: 0x00C04930 (FUN_00C04930, dynamic atexit destructor for `gTConVar_ren_UnitSilhouette`)
+   */
   TConVar<bool> gTConVar_ren_UnitSilhouette(
     "ren_UnitSilhouette",
     kConsoleStartupRenUnitSilhouetteDescription,
     &moho::ren_UnitSilhouette
   );
+
+  /**
+   * Address: 0x00BE3110 (FUN_00BE3110, dynamic initializer for `gTConVar_ren_ViewError`)
+   * Address: 0x00C05970 (FUN_00C05970, dynamic atexit destructor for `gTConVar_ren_ViewError`)
+   */
   TConVar<float> gTConVar_ren_ViewError(
     "ren_ViewError",
     kConsoleStartupRenViewErrorDescription,
     &moho::ren_ViewError
   );
+
+  /**
+   * Address: 0x00BE2250 (FUN_00BE2250, dynamic initializer for `gTConVar_ren_Water`)
+   * Address: 0x00C04F40 (FUN_00C04F40, dynamic atexit destructor for `gTConVar_ren_Water`)
+   */
   TConVar<bool> gTConVar_ren_Water(
     "ren_Water",
     kConsoleStartupRenWaterDescription,
     &moho::ren_Water
   );
+
+  /**
+   * Address: 0x00BE1490 (FUN_00BE1490, dynamic initializer for `gTConVar_ren_WorldBorder`)
+   * Address: 0x00C04570 (FUN_00C04570, dynamic atexit destructor for `gTConVar_ren_WorldBorder`)
+   */
   TConVar<bool> gTConVar_ren_WorldBorder(
     "ren_WorldBorder",
     kConsoleStartupRenWorldBorderDescription,
     &moho::ren_WorldBorder
   );
+
+  /**
+   * Address: 0x00BE20D0 (FUN_00BE20D0, dynamic initializer for `gTConVar_ren_bicubicnormals`)
+   * Address: 0x00C04E20 (FUN_00C04E20, dynamic atexit destructor for `gTConVar_ren_bicubicnormals`)
+   */
   TConVar<bool> gTConVar_ren_bicubicnormals(
     "ren_bicubicnormals",
     kConsoleStartupRenBicubicnormalsDescription,
     &moho::ren_bicubicnormals
   );
+
+  /**
+   * Address: 0x00BE1610 (FUN_00BE1610, dynamic initializer for `gTConVar_ren_fog`)
+   * Address: 0x00C04690 (FUN_00C04690, dynamic atexit destructor for `gTConVar_ren_fog`)
+   */
   TConVar<bool> gTConVar_ren_fog(
     "ren_fog",
     kConsoleStartupRenFogDescription,
     &moho::ren_fog
   );
+
+  /**
+   * Address: 0x00BE23D0 (FUN_00BE23D0, dynamic initializer for `gTConVar_ren_glowingDecals`)
+   * Address: 0x00C05060 (FUN_00C05060, dynamic atexit destructor for `gTConVar_ren_glowingDecals`)
+   */
   TConVar<bool> gTConVar_ren_glowingDecals(
     "ren_glowingDecals",
     kConsoleStartupRenGlowingDecalsDescription,
     &moho::ren_glowingDecals
   );
 
-  /**
-   * Address: 0x00C040E0 (FUN_00C040E0, ??1TConVar_ren_BandwidthDisplayKernel@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BandwidthDisplayKernel`.
-   */
-  void cleanup_TConVar_ren_BandwidthDisplayKernel()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BandwidthDisplayKernel);
-  }
-
-  /**
-   * Address: 0x00BE0D40 (FUN_00BE0D40, register_TConVar_ren_BandwidthDisplayKernel)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BandwidthDisplayKernel`.
-   */
-  void register_TConVar_ren_BandwidthDisplayKernel()
-  {
-    RegisterStartupConVar(gTConVar_ren_BandwidthDisplayKernel, &cleanup_TConVar_ren_BandwidthDisplayKernel);
-  }
-
-  /**
-   * Address: 0x00C040B0 (FUN_00C040B0, ??1TConVar_ren_BandwidthDisplaySeconds@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BandwidthDisplaySeconds`.
-   */
-  void cleanup_TConVar_ren_BandwidthDisplaySeconds()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BandwidthDisplaySeconds);
-  }
-
-  /**
-   * Address: 0x00BE0D00 (FUN_00BE0D00, register_TConVar_ren_BandwidthDisplaySeconds)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BandwidthDisplaySeconds`.
-   */
-  void register_TConVar_ren_BandwidthDisplaySeconds()
-  {
-    RegisterStartupConVar(gTConVar_ren_BandwidthDisplaySeconds, &cleanup_TConVar_ren_BandwidthDisplaySeconds);
-  }
-
-  /**
-   * Address: 0x00C07960 (FUN_00C07960, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BgLowerBound`.
-   */
-  void cleanup_TConVar_ren_BgLowerBound()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BgLowerBound);
-  }
-
-  /**
-   * Address: 0x00BE68E0 (FUN_00BE68E0, register_TConVar_ren_BgLowerBound)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BgLowerBound`.
-   */
-  void register_TConVar_ren_BgLowerBound()
-  {
-    RegisterStartupConVar(gTConVar_ren_BgLowerBound, &cleanup_TConVar_ren_BgLowerBound);
-  }
-
-  /**
-   * Address: 0x00C04750 (FUN_00C04750, ??1TConVar_ren_Bloom@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Bloom`.
-   */
-  void cleanup_TConVar_ren_Bloom()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Bloom);
-  }
-
-  /**
-   * Address: 0x00BE1710 (FUN_00BE1710, register_TConVar_ren_Bloom)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Bloom`.
-   */
-  void register_TConVar_ren_Bloom()
-  {
-    RegisterStartupConVar(gTConVar_ren_Bloom, &cleanup_TConVar_ren_Bloom);
-  }
-
-  /**
-   * Address: 0x00C04130 (FUN_00C04130, ??1TConVar_ren_BloomBlurCount@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BloomBlurCount`.
-   */
-  void cleanup_TConVar_ren_BloomBlurCount()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BloomBlurCount);
-  }
-
-  /**
-   * Address: 0x00BE0E00 (FUN_00BE0E00, register_TConVar_ren_BloomBlurCount)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BloomBlurCount`.
-   */
-  void register_TConVar_ren_BloomBlurCount()
-  {
-    RegisterStartupConVar(gTConVar_ren_BloomBlurCount, &cleanup_TConVar_ren_BloomBlurCount);
-  }
-
-  /**
-   * Address: 0x00C04300 (FUN_00C04300, ??1TConVar_ren_BloomBlurKernelScale@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BloomBlurKernelScale`.
-   */
-  void cleanup_TConVar_ren_BloomBlurKernelScale()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BloomBlurKernelScale);
-  }
-
-  /**
-   * Address: 0x00BE1040 (FUN_00BE1040, register_TConVar_ren_BloomBlurKernelScale)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BloomBlurKernelScale`.
-   */
-  void register_TConVar_ren_BloomBlurKernelScale()
-  {
-    RegisterStartupConVar(gTConVar_ren_BloomBlurKernelScale, &cleanup_TConVar_ren_BloomBlurKernelScale);
-  }
-
-  /**
-   * Address: 0x00C04330 (FUN_00C04330, ??1TConVar_ren_BloomGlowCopyScale@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BloomGlowCopyScale`.
-   */
-  void cleanup_TConVar_ren_BloomGlowCopyScale()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BloomGlowCopyScale);
-  }
-
-  /**
-   * Address: 0x00BE1080 (FUN_00BE1080, register_TConVar_ren_BloomGlowCopyScale)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BloomGlowCopyScale`.
-   */
-  void register_TConVar_ren_BloomGlowCopyScale()
-  {
-    RegisterStartupConVar(gTConVar_ren_BloomGlowCopyScale, &cleanup_TConVar_ren_BloomGlowCopyScale);
-  }
-
-  /**
-   * Address: 0x00C05A00 (FUN_00C05A00, ??1TConVar_ren_BorderSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_BorderSize`.
-   */
-  void cleanup_TConVar_ren_BorderSize()
-  {
-    CleanupStartupConCommand(gTConVar_ren_BorderSize);
-  }
-
-  /**
-   * Address: 0x00BE31D0 (FUN_00BE31D0, register_TConVar_ren_BorderSize)
-   *
-   * What it does:
-   * Registers startup convar for `ren_BorderSize`.
-   */
-  void register_TConVar_ren_BorderSize()
-  {
-    RegisterStartupConVar(gTConVar_ren_BorderSize, &cleanup_TConVar_ren_BorderSize);
-  }
-
-  /**
-   * Address: 0x00C059D0 (FUN_00C059D0, ??1TConVar_ren_ClipDecalLevel@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ClipDecalLevel`.
-   */
-  void cleanup_TConVar_ren_ClipDecalLevel()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ClipDecalLevel);
-  }
-
-  /**
-   * Address: 0x00BE3190 (FUN_00BE3190, register_TConVar_ren_ClipDecalLevel)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ClipDecalLevel`.
-   */
-  void register_TConVar_ren_ClipDecalLevel()
-  {
-    RegisterStartupConVar(gTConVar_ren_ClipDecalLevel, &cleanup_TConVar_ren_ClipDecalLevel);
-  }
-
-  /**
-   * Address: 0x00C059A0 (FUN_00C059A0, ??1TConVar_ren_ClipDecals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ClipDecals`.
-   */
-  void cleanup_TConVar_ren_ClipDecals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ClipDecals);
-  }
-
-  /**
-   * Address: 0x00BE3150 (FUN_00BE3150, register_TConVar_ren_ClipDecals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ClipDecals`.
-   */
-  void register_TConVar_ren_ClipDecals()
-  {
-    RegisterStartupConVar(gTConVar_ren_ClipDecals, &cleanup_TConVar_ren_ClipDecals);
-  }
-
-  /**
-   * Address: 0x00C04810 (FUN_00C04810, ??1TConVar_ren_Clutter@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Clutter`.
-   */
-  void cleanup_TConVar_ren_Clutter()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Clutter);
-  }
-
-  /**
-   * Address: 0x00BE1810 (FUN_00BE1810, register_TConVar_ren_Clutter)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Clutter`.
-   */
-  void register_TConVar_ren_Clutter()
-  {
-    RegisterStartupConVar(gTConVar_ren_Clutter, &cleanup_TConVar_ren_Clutter);
-  }
-
-  /**
-   * Address: 0x00C03AC0 (FUN_00C03AC0, ??1TConVar_ren_ClutterRadius@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ClutterRadius`.
-   */
-  void cleanup_TConVar_ren_ClutterRadius()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ClutterRadius);
-  }
-
-  /**
-   * Address: 0x00BE0200 (FUN_00BE0200, register_TConVar_ren_ClutterRadius)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ClutterRadius`.
-   */
-  void register_TConVar_ren_ClutterRadius()
-  {
-    RegisterStartupConVar(gTConVar_ren_ClutterRadius, &cleanup_TConVar_ren_ClutterRadius);
-  }
-
-  /**
-   * Address: 0x00C083C0 (FUN_00C083C0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalAlbedoLodCutoff`.
-   */
-  void cleanup_TConVar_ren_DecalAlbedoLodCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalAlbedoLodCutoff);
-  }
-
-  /**
-   * Address: 0x00BE7A40 (FUN_00BE7A40, register_TConVar_ren_DecalAlbedoLodCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalAlbedoLodCutoff`.
-   */
-  void register_TConVar_ren_DecalAlbedoLodCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalAlbedoLodCutoff, &cleanup_TConVar_ren_DecalAlbedoLodCutoff);
-  }
-
-  /**
-   * Address: 0x00C083F0 (FUN_00C083F0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalFadeFraction`.
-   */
-  void cleanup_TConVar_ren_DecalFadeFraction()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalFadeFraction);
-  }
-
-  /**
-   * Address: 0x00BE7A80 (FUN_00BE7A80, register_TConVar_ren_DecalFadeFraction)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalFadeFraction`.
-   */
-  void register_TConVar_ren_DecalFadeFraction()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalFadeFraction, &cleanup_TConVar_ren_DecalFadeFraction);
-  }
-
-  /**
-   * Address: 0x00C05180 (FUN_00C05180, ??1TConVar_ren_DecalFidelity@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalFidelity`.
-   */
-  void cleanup_TConVar_ren_DecalFidelity()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalFidelity);
-  }
-
-  /**
-   * Address: 0x00BE2550 (FUN_00BE2550, register_TConVar_ren_DecalFidelity)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalFidelity`.
-   */
-  void register_TConVar_ren_DecalFidelity()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalFidelity, &cleanup_TConVar_ren_DecalFidelity);
-  }
-
-  /**
-   * Address: 0x00C08420 (FUN_00C08420, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalFlatTol`.
-   */
-  void cleanup_TConVar_ren_DecalFlatTol()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalFlatTol);
-  }
-
-  /**
-   * Address: 0x00BE7AC0 (FUN_00BE7AC0, register_TConVar_ren_DecalFlatTol)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalFlatTol`.
-   */
-  void register_TConVar_ren_DecalFlatTol()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalFlatTol, &cleanup_TConVar_ren_DecalFlatTol);
-  }
-
-  /**
-   * Address: 0x00C08390 (FUN_00C08390, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalNormalLodCutoff`.
-   */
-  void cleanup_TConVar_ren_DecalNormalLodCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalNormalLodCutoff);
-  }
-
-  /**
-   * Address: 0x00BE7A00 (FUN_00BE7A00, register_TConVar_ren_DecalNormalLodCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalNormalLodCutoff`.
-   */
-  void register_TConVar_ren_DecalNormalLodCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalNormalLodCutoff, &cleanup_TConVar_ren_DecalNormalLodCutoff);
-  }
-
-  /**
-   * Address: 0x00C05090 (FUN_00C05090, ??1TConVar_ren_DecalOverDraw@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_DecalOverDraw`.
-   */
-  void cleanup_TConVar_ren_DecalOverDraw()
-  {
-    CleanupStartupConCommand(gTConVar_ren_DecalOverDraw);
-  }
-
-  /**
-   * Address: 0x00BE2410 (FUN_00BE2410, register_TConVar_ren_DecalOverDraw)
-   *
-   * What it does:
-   * Registers startup convar for `ren_DecalOverDraw`.
-   */
-  void register_TConVar_ren_DecalOverDraw()
-  {
-    RegisterStartupConVar(gTConVar_ren_DecalOverDraw, &cleanup_TConVar_ren_DecalOverDraw);
-  }
-
-  /**
-   * Address: 0x00C04F70 (FUN_00C04F70, ??1TConVar_ren_Decals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Decals`.
-   */
-  void cleanup_TConVar_ren_Decals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Decals);
-  }
-
-  /**
-   * Address: 0x00BE2290 (FUN_00BE2290, register_TConVar_ren_Decals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Decals`.
-   */
-  void register_TConVar_ren_Decals()
-  {
-    RegisterStartupConVar(gTConVar_ren_Decals, &cleanup_TConVar_ren_Decals);
-  }
-
-  /**
-   * Address: 0x00C05A60 (FUN_00C05A60, ??1TConVar_ren_ErrorCache@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ErrorCache`.
-   */
-  void cleanup_TConVar_ren_ErrorCache()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ErrorCache);
-  }
-
-  /**
-   * Address: 0x00BE3250 (FUN_00BE3250, register_TConVar_ren_ErrorCache)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ErrorCache`.
-   */
-  void register_TConVar_ren_ErrorCache()
-  {
-    RegisterStartupConVar(gTConVar_ren_ErrorCache, &cleanup_TConVar_ren_ErrorCache);
-  }
-
-  /**
-   * Address: 0x00C08640 (FUN_00C08640, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_FogIntensity`.
-   */
-  void cleanup_TConVar_ren_FogIntensity()
-  {
-    CleanupStartupConCommand(gTConVar_ren_FogIntensity);
-  }
-
-  /**
-   * Address: 0x00BE8120 (FUN_00BE8120, register_TConVar_ren_FogIntensity)
-   *
-   * What it does:
-   * Registers startup convar for `ren_FogIntensity`.
-   */
-  void register_TConVar_ren_FogIntensity()
-  {
-    RegisterStartupConVar(gTConVar_ren_FogIntensity, &cleanup_TConVar_ren_FogIntensity);
-  }
-
-  /**
-   * Address: 0x00C04F10 (FUN_00C04F10, ??1TConVar_ren_FogOfWar@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_FogOfWar`.
-   */
-  void cleanup_TConVar_ren_FogOfWar()
-  {
-    CleanupStartupConCommand(gTConVar_ren_FogOfWar);
-  }
-
-  /**
-   * Address: 0x00BE2210 (FUN_00BE2210, register_TConVar_ren_FogOfWar)
-   *
-   * What it does:
-   * Registers startup convar for `ren_FogOfWar`.
-   */
-  void register_TConVar_ren_FogOfWar()
-  {
-    RegisterStartupConVar(gTConVar_ren_FogOfWar, &cleanup_TConVar_ren_FogOfWar);
-  }
-
-  /**
-   * Address: 0x00C050C0 (FUN_00C050C0, ??1TConVar_ren_ForceUpdateMinimapTerrain@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ForceUpdateMinimapTerrain`.
-   */
-  void cleanup_TConVar_ren_ForceUpdateMinimapTerrain()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ForceUpdateMinimapTerrain);
-  }
-
-  /**
-   * Address: 0x00BE2450 (FUN_00BE2450, register_TConVar_ren_ForceUpdateMinimapTerrain)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ForceUpdateMinimapTerrain`.
-   */
-  void register_TConVar_ren_ForceUpdateMinimapTerrain()
-  {
-    RegisterStartupConVar(gTConVar_ren_ForceUpdateMinimapTerrain, &cleanup_TConVar_ren_ForceUpdateMinimapTerrain);
-  }
-
-  /**
-   * Address: 0x00C049F0 (FUN_00C049F0, ??1TConVar_ren_FrameTimeSeconds@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_FrameTimeSeconds`.
-   */
-  void cleanup_TConVar_ren_FrameTimeSeconds()
-  {
-    CleanupStartupConCommand(gTConVar_ren_FrameTimeSeconds);
-  }
-
-  /**
-   * Address: 0x00BE1A90 (FUN_00BE1A90, register_TConVar_ren_FrameTimeSeconds)
-   *
-   * What it does:
-   * Registers startup convar for `ren_FrameTimeSeconds`.
-   */
-  void register_TConVar_ren_FrameTimeSeconds()
-  {
-    RegisterStartupConVar(gTConVar_ren_FrameTimeSeconds, &cleanup_TConVar_ren_FrameTimeSeconds);
-  }
-
-  /**
-   * Address: 0x00C045A0 (FUN_00C045A0, ??1TConVar_ren_Fx@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Fx`.
-   */
-  void cleanup_TConVar_ren_Fx()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Fx);
-  }
-
-  /**
-   * Address: 0x00BE14D0 (FUN_00BE14D0, register_TConVar_ren_Fx)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Fx`.
-   */
-  void register_TConVar_ren_Fx()
-  {
-    RegisterStartupConVar(gTConVar_ren_Fx, &cleanup_TConVar_ren_Fx);
-  }
-
-  /**
-   * Address: 0x00C05000 (FUN_00C05000, ??1TConVar_ren_GenerateMesh@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_GenerateMesh`.
-   */
-  void cleanup_TConVar_ren_GenerateMesh()
-  {
-    CleanupStartupConCommand(gTConVar_ren_GenerateMesh);
-  }
-
-  /**
-   * Address: 0x00BE2350 (FUN_00BE2350, register_TConVar_ren_GenerateMesh)
-   *
-   * What it does:
-   * Registers startup convar for `ren_GenerateMesh`.
-   */
-  void register_TConVar_ren_GenerateMesh()
-  {
-    RegisterStartupConVar(gTConVar_ren_GenerateMesh, &cleanup_TConVar_ren_GenerateMesh);
-  }
-
-  /**
-   * Address: 0x00C04900 (FUN_00C04900, ??1TConVar_ren_HideSecondary@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_HideSecondary`.
-   */
-  void cleanup_TConVar_ren_HideSecondary()
-  {
-    CleanupStartupConCommand(gTConVar_ren_HideSecondary);
-  }
-
-  /**
-   * Address: 0x00BE1950 (FUN_00BE1950, register_TConVar_ren_HideSecondary)
-   *
-   * What it does:
-   * Registers startup convar for `ren_HideSecondary`.
-   */
-  void register_TConVar_ren_HideSecondary()
-  {
-    RegisterStartupConVar(gTConVar_ren_HideSecondary, &cleanup_TConVar_ren_HideSecondary);
-  }
-
-  /**
-   * Address: 0x00C05030 (FUN_00C05030, ??1TConVar_ren_IgnoreDecalLOD@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_IgnoreDecalLOD`.
-   */
-  void cleanup_TConVar_ren_IgnoreDecalLOD()
-  {
-    CleanupStartupConCommand(gTConVar_ren_IgnoreDecalLOD);
-  }
-
-  /**
-   * Address: 0x00BE2390 (FUN_00BE2390, register_TConVar_ren_IgnoreDecalLOD)
-   *
-   * What it does:
-   * Registers startup convar for `ren_IgnoreDecalLOD`.
-   */
-  void register_TConVar_ren_IgnoreDecalLOD()
-  {
-    RegisterStartupConVar(gTConVar_ren_IgnoreDecalLOD, &cleanup_TConVar_ren_IgnoreDecalLOD);
-  }
-
-  /**
-   * Address: 0x00C03B90 (FUN_00C03B90, ??1TConVar_ren_MeshDissolve@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_MeshDissolve`.
-   */
-  void cleanup_TConVar_ren_MeshDissolve()
-  {
-    CleanupStartupConCommand(gTConVar_ren_MeshDissolve);
-  }
-
-  /**
-   * Address: 0x00BE03A0 (FUN_00BE03A0, register_TConVar_ren_MeshDissolve)
-   *
-   * What it does:
-   * Registers startup convar for `ren_MeshDissolve`.
-   */
-  void register_TConVar_ren_MeshDissolve()
-  {
-    RegisterStartupConVar(gTConVar_ren_MeshDissolve, &cleanup_TConVar_ren_MeshDissolve);
-  }
-
-  /**
-   * Address: 0x00C03BC0 (FUN_00C03BC0, ??1TConVar_ren_MeshDissolveCutoff@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_MeshDissolveCutoff`.
-   */
-  void cleanup_TConVar_ren_MeshDissolveCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_MeshDissolveCutoff);
-  }
-
-  /**
-   * Address: 0x00BE03E0 (FUN_00BE03E0, register_TConVar_ren_MeshDissolveCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_MeshDissolveCutoff`.
-   */
-  void register_TConVar_ren_MeshDissolveCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ren_MeshDissolveCutoff, &cleanup_TConVar_ren_MeshDissolveCutoff);
-  }
-
-  /**
-   * Address: 0x00C03B30 (FUN_00C03B30, ??1TConVar_ren_MeshSkinned@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_MeshSkinned`.
-   */
-  void cleanup_TConVar_ren_MeshSkinned()
-  {
-    CleanupStartupConCommand(gTConVar_ren_MeshSkinned);
-  }
-
-  /**
-   * Address: 0x00BE0320 (FUN_00BE0320, register_TConVar_ren_MeshSkinned)
-   *
-   * What it does:
-   * Registers startup convar for `ren_MeshSkinned`.
-   */
-  void register_TConVar_ren_MeshSkinned()
-  {
-    RegisterStartupConVar(gTConVar_ren_MeshSkinned, &cleanup_TConVar_ren_MeshSkinned);
-  }
-
-  /**
-   * Address: 0x00C03B60 (FUN_00C03B60, ??1TConVar_ren_MeshStatic@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_MeshStatic`.
-   */
-  void cleanup_TConVar_ren_MeshStatic()
-  {
-    CleanupStartupConCommand(gTConVar_ren_MeshStatic);
-  }
-
-  /**
-   * Address: 0x00BE0360 (FUN_00BE0360, register_TConVar_ren_MeshStatic)
-   *
-   * What it does:
-   * Registers startup convar for `ren_MeshStatic`.
-   */
-  void register_TConVar_ren_MeshStatic()
-  {
-    RegisterStartupConVar(gTConVar_ren_MeshStatic, &cleanup_TConVar_ren_MeshStatic);
-  }
-
-  /**
-   * Address: 0x00C05120 (FUN_00C05120, ??1TConVar_ren_NewFogUpdate@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_NewFogUpdate`.
-   */
-  void cleanup_TConVar_ren_NewFogUpdate()
-  {
-    CleanupStartupConCommand(gTConVar_ren_NewFogUpdate);
-  }
-
-  /**
-   * Address: 0x00BE24D0 (FUN_00BE24D0, register_TConVar_ren_NewFogUpdate)
-   *
-   * What it does:
-   * Registers startup convar for `ren_NewFogUpdate`.
-   */
-  void register_TConVar_ren_NewFogUpdate()
-  {
-    RegisterStartupConVar(gTConVar_ren_NewFogUpdate, &cleanup_TConVar_ren_NewFogUpdate);
-  }
-
-  /**
-   * Address: 0x00C044B0 (FUN_00C044B0, ??1TConVar_ren_NewPipeline@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_NewPipeline`.
-   */
-  void cleanup_TConVar_ren_NewPipeline()
-  {
-    CleanupStartupConCommand(gTConVar_ren_NewPipeline);
-  }
-
-  /**
-   * Address: 0x00BE1390 (FUN_00BE1390, register_TConVar_ren_NewPipeline)
-   *
-   * What it does:
-   * Registers startup convar for `ren_NewPipeline`.
-   */
-  void register_TConVar_ren_NewPipeline()
-  {
-    RegisterStartupConVar(gTConVar_ren_NewPipeline, &cleanup_TConVar_ren_NewPipeline);
-  }
-
-  /**
-   * Address: 0x00C04FA0 (FUN_00C04FA0, ??1TConVar_ren_NormalDecals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_NormalDecals`.
-   */
-  void cleanup_TConVar_ren_NormalDecals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_NormalDecals);
-  }
-
-  /**
-   * Address: 0x00BE22D0 (FUN_00BE22D0, register_TConVar_ren_NormalDecals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_NormalDecals`.
-   */
-  void register_TConVar_ren_NormalDecals()
-  {
-    RegisterStartupConVar(gTConVar_ren_NormalDecals, &cleanup_TConVar_ren_NormalDecals);
-  }
-
-  /**
-   * Address: 0x00C04510 (FUN_00C04510, ??1TConVar_ren_Oblivion@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Oblivion`.
-   */
-  void cleanup_TConVar_ren_Oblivion()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Oblivion);
-  }
-
-  /**
-   * Address: 0x00BE1410 (FUN_00BE1410, register_TConVar_ren_Oblivion)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Oblivion`.
-   */
-  void register_TConVar_ren_Oblivion()
-  {
-    RegisterStartupConVar(gTConVar_ren_Oblivion, &cleanup_TConVar_ren_Oblivion);
-  }
-
-  /**
-   * Address: 0x00C04780 (FUN_00C04780, ??1TConVar_ren_OnlyFirstView@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_OnlyFirstView`.
-   */
-  void cleanup_TConVar_ren_OnlyFirstView()
-  {
-    CleanupStartupConCommand(gTConVar_ren_OnlyFirstView);
-  }
-
-  /**
-   * Address: 0x00BE1750 (FUN_00BE1750, register_TConVar_ren_OnlyFirstView)
-   *
-   * What it does:
-   * Registers startup convar for `ren_OnlyFirstView`.
-   */
-  void register_TConVar_ren_OnlyFirstView()
-  {
-    RegisterStartupConVar(gTConVar_ren_OnlyFirstView, &cleanup_TConVar_ren_OnlyFirstView);
-  }
-
-  /**
-   * Address: 0x00C046C0 (FUN_00C046C0, ??1TConVar_ren_PlayableBoundary@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_PlayableBoundary`.
-   */
-  void cleanup_TConVar_ren_PlayableBoundary()
-  {
-    CleanupStartupConCommand(gTConVar_ren_PlayableBoundary);
-  }
-
-  /**
-   * Address: 0x00BE1650 (FUN_00BE1650, register_TConVar_ren_PlayableBoundary)
-   *
-   * What it does:
-   * Registers startup convar for `ren_PlayableBoundary`.
-   */
-  void register_TConVar_ren_PlayableBoundary()
-  {
-    RegisterStartupConVar(gTConVar_ren_PlayableBoundary, &cleanup_TConVar_ren_PlayableBoundary);
-  }
-
-  /**
-   * Address: 0x00C045D0 (FUN_00C045D0, ??1TConVar_ren_Reflection@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Reflection`.
-   */
-  void cleanup_TConVar_ren_Reflection()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Reflection);
-  }
-
-  /**
-   * Address: 0x00BE1510 (FUN_00BE1510, register_TConVar_ren_Reflection)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Reflection`.
-   */
-  void register_TConVar_ren_Reflection()
-  {
-    RegisterStartupConVar(gTConVar_ren_Reflection, &cleanup_TConVar_ren_Reflection);
-  }
-
-  /**
-   * Address: 0x00C04600 (FUN_00C04600, ??1TConVar_ren_Refraction@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Refraction`.
-   */
-  void cleanup_TConVar_ren_Refraction()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Refraction);
-  }
-
-  /**
-   * Address: 0x00BE1550 (FUN_00BE1550, register_TConVar_ren_Refraction)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Refraction`.
-   */
-  void register_TConVar_ren_Refraction()
-  {
-    RegisterStartupConVar(gTConVar_ren_Refraction, &cleanup_TConVar_ren_Refraction);
-  }
-
-  /**
-   * Address: 0x00C048A0 (FUN_00C048A0, ??1TConVar_ren_RegenShore@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_RegenShore`.
-   */
-  void cleanup_TConVar_ren_RegenShore()
-  {
-    CleanupStartupConCommand(gTConVar_ren_RegenShore);
-  }
-
-  /**
-   * Address: 0x00BE18D0 (FUN_00BE18D0, register_TConVar_ren_RegenShore)
-   *
-   * What it does:
-   * Registers startup convar for `ren_RegenShore`.
-   */
-  void register_TConVar_ren_RegenShore()
-  {
-    RegisterStartupConVar(gTConVar_ren_RegenShore, &cleanup_TConVar_ren_RegenShore);
-  }
-
-  /**
-   * Address: 0x00C044E0 (FUN_00C044E0, ??1TConVar_ren_RenderNothing@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_RenderNothing`.
-   */
-  void cleanup_TConVar_ren_RenderNothing()
-  {
-    CleanupStartupConCommand(gTConVar_ren_RenderNothing);
-  }
-
-  /**
-   * Address: 0x00BE13D0 (FUN_00BE13D0, register_TConVar_ren_RenderNothing)
-   *
-   * What it does:
-   * Registers startup convar for `ren_RenderNothing`.
-   */
-  void register_TConVar_ren_RenderNothing()
-  {
-    RegisterStartupConVar(gTConVar_ren_RenderNothing, &cleanup_TConVar_ren_RenderNothing);
-  }
-
-  /**
-   * Address: 0x00C04630 (FUN_00C04630, ??1TConVar_ren_Select@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Select`.
-   */
-  void cleanup_TConVar_ren_Select()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Select);
-  }
-
-  /**
-   * Address: 0x00BE1590 (FUN_00BE1590, register_TConVar_ren_Select)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Select`.
-   */
-  void register_TConVar_ren_Select()
-  {
-    RegisterStartupConVar(gTConVar_ren_Select, &cleanup_TConVar_ren_Select);
-  }
-
-  /**
-   * Address: 0x00C04C80 (FUN_00C04C80, ??1TConVar_ren_SelectBoxes@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectBoxes`.
-   */
-  void cleanup_TConVar_ren_SelectBoxes()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectBoxes);
-  }
-
-  /**
-   * Address: 0x00BE1E40 (FUN_00BE1E40, register_TConVar_ren_SelectBoxes)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectBoxes`.
-   */
-  void register_TConVar_ren_SelectBoxes()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectBoxes, &cleanup_TConVar_ren_SelectBoxes);
-  }
-
-  /**
-   * Address: 0x00C04BF0 (FUN_00C04BF0, ??1TConVar_ren_SelectBracketMinPixelSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectBracketMinPixelSize`.
-   */
-  void cleanup_TConVar_ren_SelectBracketMinPixelSize()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectBracketMinPixelSize);
-  }
-
-  /**
-   * Address: 0x00BE1D80 (FUN_00BE1D80, register_TConVar_ren_SelectBracketMinPixelSize)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectBracketMinPixelSize`.
-   */
-  void register_TConVar_ren_SelectBracketMinPixelSize()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectBracketMinPixelSize, &cleanup_TConVar_ren_SelectBracketMinPixelSize);
-  }
-
-  /**
-   * Address: 0x00C04C20 (FUN_00C04C20, ??1TConVar_ren_SelectBracketSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectBracketSize`.
-   */
-  void cleanup_TConVar_ren_SelectBracketSize()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectBracketSize);
-  }
-
-  /**
-   * Address: 0x00BE1DC0 (FUN_00BE1DC0, register_TConVar_ren_SelectBracketSize)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectBracketSize`.
-   */
-  void register_TConVar_ren_SelectBracketSize()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectBracketSize, &cleanup_TConVar_ren_SelectBracketSize);
-  }
-
-  /**
-   * Address: 0x00C04C50 (FUN_00C04C50, ??1TConVar_ren_SelectColor@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectColor`.
-   */
-  void cleanup_TConVar_ren_SelectColor()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectColor);
-  }
-
-  /**
-   * Address: 0x00BE1E00 (FUN_00BE1E00, register_TConVar_ren_SelectColor)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectColor`.
-   */
-  void register_TConVar_ren_SelectColor()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectColor, &cleanup_TConVar_ren_SelectColor);
-  }
-
-  /**
-   * Address: 0x00C04B90 (FUN_00C04B90, ??1TConVar_ren_SelectionHeightFudge@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectionHeightFudge`.
-   */
-  void cleanup_TConVar_ren_SelectionHeightFudge()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectionHeightFudge);
-  }
-
-  /**
-   * Address: 0x00BE1D00 (FUN_00BE1D00, register_TConVar_ren_SelectionHeightFudge)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectionHeightFudge`.
-   */
-  void register_TConVar_ren_SelectionHeightFudge()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectionHeightFudge, &cleanup_TConVar_ren_SelectionHeightFudge);
-  }
-
-  /**
-   * Address: 0x00C04B60 (FUN_00C04B60, ??1TConVar_ren_SelectionSizeFudge@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SelectionSizeFudge`.
-   */
-  void cleanup_TConVar_ren_SelectionSizeFudge()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SelectionSizeFudge);
-  }
-
-  /**
-   * Address: 0x00BE1CC0 (FUN_00BE1CC0, register_TConVar_ren_SelectionSizeFudge)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SelectionSizeFudge`.
-   */
-  void register_TConVar_ren_SelectionSizeFudge()
-  {
-    RegisterStartupConVar(gTConVar_ren_SelectionSizeFudge, &cleanup_TConVar_ren_SelectionSizeFudge);
-  }
-
-  /**
-   * Address: 0x00C04840 (FUN_00C04840, ??1TConVar_ren_ShadowBlur@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShadowBlur`.
-   */
-  void cleanup_TConVar_ren_ShadowBlur()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShadowBlur);
-  }
-
-  /**
-   * Address: 0x00BE1850 (FUN_00BE1850, register_TConVar_ren_ShadowBlur)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShadowBlur`.
-   */
-  void register_TConVar_ren_ShadowBlur()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShadowBlur, &cleanup_TConVar_ren_ShadowBlur);
-  }
-
-  /**
-   * Address: 0x00C04D80 (FUN_00C04D80, ??1TConVar_ren_ShadowCoeff@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShadowCoeff`.
-   */
-  void cleanup_TConVar_ren_ShadowCoeff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShadowCoeff);
-  }
-
-  /**
-   * Address: 0x00BE1FA0 (FUN_00BE1FA0, register_TConVar_ren_ShadowCoeff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShadowCoeff`.
-   */
-  void register_TConVar_ren_ShadowCoeff()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShadowCoeff, &cleanup_TConVar_ren_ShadowCoeff);
-  }
-
-  /**
-   * Address: 0x00C04DB0 (FUN_00C04DB0, ??1TConVar_ren_ShadowLOD@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShadowLOD`.
-   */
-  void cleanup_TConVar_ren_ShadowLOD()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShadowLOD);
-  }
-
-  /**
-   * Address: 0x00BE1FE0 (FUN_00BE1FE0, register_TConVar_ren_ShadowLOD)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShadowLOD`.
-   */
-  void register_TConVar_ren_ShadowLOD()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShadowLOD, &cleanup_TConVar_ren_ShadowLOD);
-  }
-
-  /**
-   * Address: 0x00C04870 (FUN_00C04870, ??1TConVar_ren_ShadowSize@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShadowSize`.
-   */
-  void cleanup_TConVar_ren_ShadowSize()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShadowSize);
-  }
-
-  /**
-   * Address: 0x00BE1890 (FUN_00BE1890, register_TConVar_ren_ShadowSize)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShadowSize`.
-   */
-  void register_TConVar_ren_ShadowSize()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShadowSize, &cleanup_TConVar_ren_ShadowSize);
-  }
-
-  /**
-   * Address: 0x00C047E0 (FUN_00C047E0, ??1TConVar_ren_Shadows@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Shadows`.
-   */
-  void cleanup_TConVar_ren_Shadows()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Shadows);
-  }
-
-  /**
-   * Address: 0x00BE17D0 (FUN_00BE17D0, register_TConVar_ren_Shadows)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Shadows`.
-   */
-  void register_TConVar_ren_Shadows()
-  {
-    RegisterStartupConVar(gTConVar_ren_Shadows, &cleanup_TConVar_ren_Shadows);
-  }
-
-  /**
-   * Address: 0x00C05A30 (FUN_00C05A30, ??1TConVar_ren_ShoreErrorCoeff@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShoreErrorCoeff`.
-   */
-  void cleanup_TConVar_ren_ShoreErrorCoeff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShoreErrorCoeff);
-  }
-
-  /**
-   * Address: 0x00BE3210 (FUN_00BE3210, register_TConVar_ren_ShoreErrorCoeff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShoreErrorCoeff`.
-   */
-  void register_TConVar_ren_ShoreErrorCoeff()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShoreErrorCoeff, &cleanup_TConVar_ren_ShoreErrorCoeff);
-  }
-
-  /**
-   * Address: 0x00C05CF0 (FUN_00C05CF0, ??1TConVar_ren_Shoreline@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Shoreline`.
-   */
-  void cleanup_TConVar_ren_Shoreline()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Shoreline);
-  }
-
-  /**
-   * Address: 0x00BE37B0 (FUN_00BE37B0, register_TConVar_ren_Shoreline)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Shoreline`.
-   */
-  void register_TConVar_ren_Shoreline()
-  {
-    RegisterStartupConVar(gTConVar_ren_Shoreline, &cleanup_TConVar_ren_Shoreline);
-  }
-
-  /**
-   * Address: 0x00C05D20 (FUN_00C05D20, ??1TConVar_ren_ShorelineCutoff@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShorelineCutoff`.
-   */
-  void cleanup_TConVar_ren_ShorelineCutoff()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShorelineCutoff);
-  }
-
-  /**
-   * Address: 0x00BE37F0 (FUN_00BE37F0, register_TConVar_ren_ShorelineCutoff)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShorelineCutoff`.
-   */
-  void register_TConVar_ren_ShorelineCutoff()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShorelineCutoff, &cleanup_TConVar_ren_ShorelineCutoff);
-  }
-
-  /**
-   * Address: 0x00C04A50 (FUN_00C04A50, ??1TConVar_ren_ShowBandwidthUsage@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowBandwidthUsage`.
-   */
-  void cleanup_TConVar_ren_ShowBandwidthUsage()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowBandwidthUsage);
-  }
-
-  /**
-   * Address: 0x00BE1B10 (FUN_00BE1B10, register_TConVar_ren_ShowBandwidthUsage)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowBandwidthUsage`.
-   */
-  void register_TConVar_ren_ShowBandwidthUsage()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowBandwidthUsage, &cleanup_TConVar_ren_ShowBandwidthUsage);
-  }
-
-  /**
-   * Address: 0x00C048D0 (FUN_00C048D0, ??1TConVar_ren_ShowBoneNames@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowBoneNames`.
-   */
-  void cleanup_TConVar_ren_ShowBoneNames()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowBoneNames);
-  }
-
-  /**
-   * Address: 0x00BE1910 (FUN_00BE1910, register_TConVar_ren_ShowBoneNames)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowBoneNames`.
-   */
-  void register_TConVar_ren_ShowBoneNames()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowBoneNames, &cleanup_TConVar_ren_ShowBoneNames);
-  }
-
-  /**
-   * Address: 0x00C04EB0 (FUN_00C04EB0, ??1TConVar_ren_ShowDirtyTerrain@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowDirtyTerrain`.
-   */
-  void cleanup_TConVar_ren_ShowDirtyTerrain()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowDirtyTerrain);
-  }
-
-  /**
-   * Address: 0x00BE2190 (FUN_00BE2190, register_TConVar_ren_ShowDirtyTerrain)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowDirtyTerrain`.
-   */
-  void register_TConVar_ren_ShowDirtyTerrain()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowDirtyTerrain, &cleanup_TConVar_ren_ShowDirtyTerrain);
-  }
-
-  /**
-   * Address: 0x00C049C0 (FUN_00C049C0, ??1TConVar_ren_ShowFrameTimes@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowFrameTimes`.
-   */
-  void cleanup_TConVar_ren_ShowFrameTimes()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowFrameTimes);
-  }
-
-  /**
-   * Address: 0x00BE1A50 (FUN_00BE1A50, register_TConVar_ren_ShowFrameTimes)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowFrameTimes`.
-   */
-  void register_TConVar_ren_ShowFrameTimes()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowFrameTimes, &cleanup_TConVar_ren_ShowFrameTimes);
-  }
-
-  /**
-   * Address: 0x00C04A20 (FUN_00C04A20, ??1TConVar_ren_ShowNetworkStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowNetworkStats`.
-   */
-  void cleanup_TConVar_ren_ShowNetworkStats()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowNetworkStats);
-  }
-
-  /**
-   * Address: 0x00BE1AD0 (FUN_00BE1AD0, register_TConVar_ren_ShowNetworkStats)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowNetworkStats`.
-   */
-  void register_TConVar_ren_ShowNetworkStats()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowNetworkStats, &cleanup_TConVar_ren_ShowNetworkStats);
-  }
-
-  /**
-   * Address: 0x00C04E50 (FUN_00C04E50, ??1TConVar_ren_ShowNormals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowNormals`.
-   */
-  void cleanup_TConVar_ren_ShowNormals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowNormals);
-  }
-
-  /**
-   * Address: 0x00BE2110 (FUN_00BE2110, register_TConVar_ren_ShowNormals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowNormals`.
-   */
-  void register_TConVar_ren_ShowNormals()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowNormals, &cleanup_TConVar_ren_ShowNormals);
-  }
-
-  /**
-   * Address: 0x00C04660 (FUN_00C04660, ??1TConVar_ren_ShowWireframe@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShowWireframe`.
-   */
-  void cleanup_TConVar_ren_ShowWireframe()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShowWireframe);
-  }
-
-  /**
-   * Address: 0x00BE15D0 (FUN_00BE15D0, register_TConVar_ren_ShowWireframe)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShowWireframe`.
-   */
-  void register_TConVar_ren_ShowWireframe()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShowWireframe, &cleanup_TConVar_ren_ShowWireframe);
-  }
-
-  /**
-   * Address: 0x00C05150 (FUN_00C05150, ??1TConVar_ren_Skirt@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Skirt`.
-   */
-  void cleanup_TConVar_ren_Skirt()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Skirt);
-  }
-
-  /**
-   * Address: 0x00BE2510 (FUN_00BE2510, register_TConVar_ren_Skirt)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Skirt`.
-   */
-  void register_TConVar_ren_Skirt()
-  {
-    RegisterStartupConVar(gTConVar_ren_Skirt, &cleanup_TConVar_ren_Skirt);
-  }
-
-  /**
-   * Address: 0x00C047B0 (FUN_00C047B0, ??1TConVar_ren_SkyDome@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SkyDome`.
-   */
-  void cleanup_TConVar_ren_SkyDome()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SkyDome);
-  }
-
-  /**
-   * Address: 0x00BE1790 (FUN_00BE1790, register_TConVar_ren_SkyDome)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SkyDome`.
-   */
-  void register_TConVar_ren_SkyDome()
-  {
-    RegisterStartupConVar(gTConVar_ren_SkyDome, &cleanup_TConVar_ren_SkyDome);
-  }
-
-  /**
-   * Address: 0x00C04FD0 (FUN_00C04FD0, ??1TConVar_ren_Splats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Splats`.
-   */
-  void cleanup_TConVar_ren_Splats()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Splats);
-  }
-
-  /**
-   * Address: 0x00BE2310 (FUN_00BE2310, register_TConVar_ren_Splats)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Splats`.
-   */
-  void register_TConVar_ren_Splats()
-  {
-    RegisterStartupConVar(gTConVar_ren_Splats, &cleanup_TConVar_ren_Splats);
-  }
-
-  /**
-   * Address: 0x00C084D0 (FUN_00C084D0, ??1TConVar_ren_SyncTerrainLOD@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_SyncTerrainLOD`.
-   */
-  void cleanup_TConVar_ren_SyncTerrainLOD()
-  {
-    CleanupStartupConCommand(gTConVar_ren_SyncTerrainLOD);
-  }
-
-  /**
-   * Address: 0x00BE7D90 (FUN_00BE7D90, register_TConVar_ren_SyncTerrainLOD)
-   *
-   * What it does:
-   * Registers startup convar for `ren_SyncTerrainLOD`.
-   */
-  void register_TConVar_ren_SyncTerrainLOD()
-  {
-    RegisterStartupConVar(gTConVar_ren_SyncTerrainLOD, &cleanup_TConVar_ren_SyncTerrainLOD);
-  }
-
-  /**
-   * Address: 0x00C050F0 (FUN_00C050F0, ??1TConVar_ren_TTerrainGlow@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_TTerrainGlow`.
-   */
-  void cleanup_TConVar_ren_TTerrainGlow()
-  {
-    CleanupStartupConCommand(gTConVar_ren_TTerrainGlow);
-  }
-
-  /**
-   * Address: 0x00BE2490 (FUN_00BE2490, register_TConVar_ren_TTerrainGlow)
-   *
-   * What it does:
-   * Registers startup convar for `ren_TTerrainGlow`.
-   */
-  void register_TConVar_ren_TTerrainGlow()
-  {
-    RegisterStartupConVar(gTConVar_ren_TTerrainGlow, &cleanup_TConVar_ren_TTerrainGlow);
-  }
-
-  /**
-   * Address: 0x00C08750 (FUN_00C08750, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_TeamColorLookupCount`.
-   */
-  void cleanup_TConVar_ren_TeamColorLookupCount()
-  {
-    CleanupStartupConCommand(gTConVar_ren_TeamColorLookupCount);
-  }
-
-  /**
-   * Address: 0x00BE86E0 (FUN_00BE86E0, register_TConVar_ren_TeamColorLookupCount)
-   *
-   * What it does:
-   * Registers startup convar for `ren_TeamColorLookupCount`.
-   */
-  void register_TConVar_ren_TeamColorLookupCount()
-  {
-    RegisterStartupConVar(gTConVar_ren_TeamColorLookupCount, &cleanup_TConVar_ren_TeamColorLookupCount);
-  }
-
-  /**
-   * Address: 0x00C04E80 (FUN_00C04E80, ??1TConVar_ren_Terrain@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Terrain`.
-   */
-  void cleanup_TConVar_ren_Terrain()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Terrain);
-  }
-
-  /**
-   * Address: 0x00BE2150 (FUN_00BE2150, register_TConVar_ren_Terrain)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Terrain`.
-   */
-  void register_TConVar_ren_Terrain()
-  {
-    RegisterStartupConVar(gTConVar_ren_Terrain, &cleanup_TConVar_ren_Terrain);
-  }
-
-  /**
-   * Address: 0x00C04EE0 (FUN_00C04EE0, ??1TConVar_ren_Trees@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Trees`.
-   */
-  void cleanup_TConVar_ren_Trees()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Trees);
-  }
-
-  /**
-   * Address: 0x00BE21D0 (FUN_00BE21D0, register_TConVar_ren_Trees)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Trees`.
-   */
-  void register_TConVar_ren_Trees()
-  {
-    RegisterStartupConVar(gTConVar_ren_Trees, &cleanup_TConVar_ren_Trees);
-  }
-
-  /**
-   * Address: 0x00C04540 (FUN_00C04540, ??1TConVar_ren_Ui@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Ui`.
-   */
-  void cleanup_TConVar_ren_Ui()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Ui);
-  }
-
-  /**
-   * Address: 0x00BE1450 (FUN_00BE1450, register_TConVar_ren_Ui)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Ui`.
-   */
-  void register_TConVar_ren_Ui()
-  {
-    RegisterStartupConVar(gTConVar_ren_Ui, &cleanup_TConVar_ren_Ui);
-  }
-
-  /**
-   * Address: 0x00C04BC0 (FUN_00C04BC0, ??1TConVar_ren_UnitSelectionScale@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_UnitSelectionScale`.
-   */
-  void cleanup_TConVar_ren_UnitSelectionScale()
-  {
-    CleanupStartupConCommand(gTConVar_ren_UnitSelectionScale);
-  }
-
-  /**
-   * Address: 0x00BE1D40 (FUN_00BE1D40, register_TConVar_ren_UnitSelectionScale)
-   *
-   * What it does:
-   * Registers startup convar for `ren_UnitSelectionScale`.
-   */
-  void register_TConVar_ren_UnitSelectionScale()
-  {
-    RegisterStartupConVar(gTConVar_ren_UnitSelectionScale, &cleanup_TConVar_ren_UnitSelectionScale);
-  }
-
-  /**
-   * Address: 0x00C04930 (FUN_00C04930, ??1TConVar_ren_UnitSilhouette@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_UnitSilhouette`.
-   */
-  void cleanup_TConVar_ren_UnitSilhouette()
-  {
-    CleanupStartupConCommand(gTConVar_ren_UnitSilhouette);
-  }
-
-  /**
-   * Address: 0x00BE1990 (FUN_00BE1990, register_TConVar_ren_UnitSilhouette)
-   *
-   * What it does:
-   * Registers startup convar for `ren_UnitSilhouette`.
-   */
-  void register_TConVar_ren_UnitSilhouette()
-  {
-    RegisterStartupConVar(gTConVar_ren_UnitSilhouette, &cleanup_TConVar_ren_UnitSilhouette);
-  }
-
-  /**
-   * Address: 0x00C05970 (FUN_00C05970, ??1TConVar_ren_maxViewError@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ViewError`.
-   */
-  void cleanup_TConVar_ren_ViewError()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ViewError);
-  }
-
-  /**
-   * Address: 0x00BE3110 (FUN_00BE3110, register_TConVar_ren_ViewError)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ViewError`.
-   */
-  void register_TConVar_ren_ViewError()
-  {
-    RegisterStartupConVar(gTConVar_ren_ViewError, &cleanup_TConVar_ren_ViewError);
-  }
-
-  /**
-   * Address: 0x00C04F40 (FUN_00C04F40, ??1TConVar_ren_Water@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_Water`.
-   */
-  void cleanup_TConVar_ren_Water()
-  {
-    CleanupStartupConCommand(gTConVar_ren_Water);
-  }
-
-  /**
-   * Address: 0x00BE2250 (FUN_00BE2250, register_TConVar_ren_Water)
-   *
-   * What it does:
-   * Registers startup convar for `ren_Water`.
-   */
-  void register_TConVar_ren_Water()
-  {
-    RegisterStartupConVar(gTConVar_ren_Water, &cleanup_TConVar_ren_Water);
-  }
-
-  /**
-   * Address: 0x00C04570 (FUN_00C04570, ??1TConVar_ren_WorldBorder@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_WorldBorder`.
-   */
-  void cleanup_TConVar_ren_WorldBorder()
-  {
-    CleanupStartupConCommand(gTConVar_ren_WorldBorder);
-  }
-
-  /**
-   * Address: 0x00BE1490 (FUN_00BE1490, register_TConVar_ren_WorldBorder)
-   *
-   * What it does:
-   * Registers startup convar for `ren_WorldBorder`.
-   */
-  void register_TConVar_ren_WorldBorder()
-  {
-    RegisterStartupConVar(gTConVar_ren_WorldBorder, &cleanup_TConVar_ren_WorldBorder);
-  }
-
-  /**
-   * Address: 0x00C04E20 (FUN_00C04E20, ??1TConVar_ren_bicubicnormals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_bicubicnormals`.
-   */
-  void cleanup_TConVar_ren_bicubicnormals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_bicubicnormals);
-  }
-
-  /**
-   * Address: 0x00BE20D0 (FUN_00BE20D0, register_TConVar_ren_bicubicnormals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_bicubicnormals`.
-   */
-  void register_TConVar_ren_bicubicnormals()
-  {
-    RegisterStartupConVar(gTConVar_ren_bicubicnormals, &cleanup_TConVar_ren_bicubicnormals);
-  }
-
-  /**
-   * Address: 0x00C04690 (FUN_00C04690, ??1TConVar_ren_fog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_fog`.
-   */
-  void cleanup_TConVar_ren_fog()
-  {
-    CleanupStartupConCommand(gTConVar_ren_fog);
-  }
-
-  /**
-   * Address: 0x00BE1610 (FUN_00BE1610, register_TConVar_ren_fog)
-   *
-   * What it does:
-   * Registers startup convar for `ren_fog`.
-   */
-  void register_TConVar_ren_fog()
-  {
-    RegisterStartupConVar(gTConVar_ren_fog, &cleanup_TConVar_ren_fog);
-  }
-
-  /**
-   * Address: 0x00C05060 (FUN_00C05060, ??1TConVar_ren_glowingDecals@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_glowingDecals`.
-   */
-  void cleanup_TConVar_ren_glowingDecals()
-  {
-    CleanupStartupConCommand(gTConVar_ren_glowingDecals);
-  }
-
-  /**
-   * Address: 0x00BE23D0 (FUN_00BE23D0, register_TConVar_ren_glowingDecals)
-   *
-   * What it does:
-   * Registers startup convar for `ren_glowingDecals`.
-   */
-  void register_TConVar_ren_glowingDecals()
-  {
-    RegisterStartupConVar(gTConVar_ren_glowingDecals, &cleanup_TConVar_ren_glowingDecals);
-  }
-
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsRenTuning
-  {
-    ConsoleStartupRegistrationsRenTuning()
-    {
-      moho::register_TConVar_ren_BandwidthDisplayKernel();
-      moho::register_TConVar_ren_BandwidthDisplaySeconds();
-      moho::register_TConVar_ren_BgLowerBound();
-      moho::register_TConVar_ren_Bloom();
-      moho::register_TConVar_ren_BloomBlurCount();
-      moho::register_TConVar_ren_BloomBlurKernelScale();
-      moho::register_TConVar_ren_BloomGlowCopyScale();
-      moho::register_TConVar_ren_BorderSize();
-      moho::register_TConVar_ren_ClipDecalLevel();
-      moho::register_TConVar_ren_ClipDecals();
-      moho::register_TConVar_ren_Clutter();
-      moho::register_TConVar_ren_ClutterRadius();
-      moho::register_TConVar_ren_DecalAlbedoLodCutoff();
-      moho::register_TConVar_ren_DecalFadeFraction();
-      moho::register_TConVar_ren_DecalFidelity();
-      moho::register_TConVar_ren_DecalFlatTol();
-      moho::register_TConVar_ren_DecalNormalLodCutoff();
-      moho::register_TConVar_ren_DecalOverDraw();
-      moho::register_TConVar_ren_Decals();
-      moho::register_TConVar_ren_ErrorCache();
-      moho::register_TConVar_ren_FogIntensity();
-      moho::register_TConVar_ren_FogOfWar();
-      moho::register_TConVar_ren_ForceUpdateMinimapTerrain();
-      moho::register_TConVar_ren_FrameTimeSeconds();
-      moho::register_TConVar_ren_Fx();
-      moho::register_TConVar_ren_GenerateMesh();
-      moho::register_TConVar_ren_HideSecondary();
-      moho::register_TConVar_ren_IgnoreDecalLOD();
-      moho::register_TConVar_ren_MeshDissolve();
-      moho::register_TConVar_ren_MeshDissolveCutoff();
-      moho::register_TConVar_ren_MeshSkinned();
-      moho::register_TConVar_ren_MeshStatic();
-      moho::register_TConVar_ren_NewFogUpdate();
-      moho::register_TConVar_ren_NewPipeline();
-      moho::register_TConVar_ren_NormalDecals();
-      moho::register_TConVar_ren_Oblivion();
-      moho::register_TConVar_ren_OnlyFirstView();
-      moho::register_TConVar_ren_PlayableBoundary();
-      moho::register_TConVar_ren_Reflection();
-      moho::register_TConVar_ren_Refraction();
-      moho::register_TConVar_ren_RegenShore();
-      moho::register_TConVar_ren_RenderNothing();
-      moho::register_TConVar_ren_Select();
-      moho::register_TConVar_ren_SelectBoxes();
-      moho::register_TConVar_ren_SelectBracketMinPixelSize();
-      moho::register_TConVar_ren_SelectBracketSize();
-      moho::register_TConVar_ren_SelectColor();
-      moho::register_TConVar_ren_SelectionHeightFudge();
-      moho::register_TConVar_ren_SelectionSizeFudge();
-      moho::register_TConVar_ren_ShadowBlur();
-      moho::register_TConVar_ren_ShadowCoeff();
-      moho::register_TConVar_ren_ShadowLOD();
-      moho::register_TConVar_ren_ShadowSize();
-      moho::register_TConVar_ren_Shadows();
-      moho::register_TConVar_ren_ShoreErrorCoeff();
-      moho::register_TConVar_ren_Shoreline();
-      moho::register_TConVar_ren_ShorelineCutoff();
-      moho::register_TConVar_ren_ShowBandwidthUsage();
-      moho::register_TConVar_ren_ShowBoneNames();
-      moho::register_TConVar_ren_ShowDirtyTerrain();
-      moho::register_TConVar_ren_ShowFrameTimes();
-      moho::register_TConVar_ren_ShowNetworkStats();
-      moho::register_TConVar_ren_ShowNormals();
-      moho::register_TConVar_ren_ShowWireframe();
-      moho::register_TConVar_ren_Skirt();
-      moho::register_TConVar_ren_SkyDome();
-      moho::register_TConVar_ren_Splats();
-      moho::register_TConVar_ren_SyncTerrainLOD();
-      moho::register_TConVar_ren_TTerrainGlow();
-      moho::register_TConVar_ren_TeamColorLookupCount();
-      moho::register_TConVar_ren_Terrain();
-      moho::register_TConVar_ren_Trees();
-      moho::register_TConVar_ren_Ui();
-      moho::register_TConVar_ren_UnitSelectionScale();
-      moho::register_TConVar_ren_UnitSilhouette();
-      moho::register_TConVar_ren_ViewError();
-      moho::register_TConVar_ren_Water();
-      moho::register_TConVar_ren_WorldBorder();
-      moho::register_TConVar_ren_bicubicnormals();
-      moho::register_TConVar_ren_fog();
-      moho::register_TConVar_ren_glowingDecals();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsRenTuning gConsoleStartupRegistrationsRenTuning;
-} // namespace
 
 namespace
 {
@@ -12914,560 +7156,116 @@ namespace
 
 namespace moho
 {
-  CConFunc gCConFunc_cam_SetLOD{};
-  CConFunc gCConFunc_DumpCamera{};
-  CConFunc gCConFunc_PopupCreateUnitMenu{};
-  CConFunc gCConFunc_PathDebug{};
-  CConFunc gCConFunc_TeleportSelectedUnits{};
-  CConFunc gCConFunc_SetFocusArmy{};
-  CConFunc gCConFunc_UI_SetSkin{};
-  CConFunc gCConFunc_UI_RotateSkin{};
-  CConFunc gCConFunc_UI_RotateLayout{};
-  CConFunc gCConFunc_UI_ToggleGamePanels{};
-  CConFunc gCConFunc_UI_Quit{};
-  CConFunc gCConFunc_UI_MakeSelectionSet{};
-  CConFunc gCConFunc_UI_ApplySelectionSet{};
-  CConFunc gCConFunc_UI_CreateHead1Map{};
-  CConFunc gCConFunc_UI_Lua{};
-  CConFunc gCConFunc_UI_ShowRenameDialog{};
-  CConFunc gCConFunc_UI_DumpControls{};
-  CConFunc gCConFunc_UI_DumpControlsUnderCursor{};
+  /**
+   * Address: 0x00BDF7C0 (FUN_00BDF7C0, dynamic initializer for `gCConFunc_cam_SetLOD`)
+   * Address: 0x00C03650 (FUN_00C03650, dynamic atexit destructor for `gCConFunc_cam_SetLOD`)
+   */
+  CConFunc gCConFunc_cam_SetLOD("cam_SetLOD", kConsoleStartupCamSetLODDescription, &moho::CAM_SetLOD);
 
   /**
-   * Address: 0x00C03650 (FUN_00C03650, ??1CConFunc_cam_SetLOD@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `cam_SetLOD`.
+   * Address: 0x00BDF800 (FUN_00BDF800, dynamic initializer for `gCConFunc_DumpCamera`)
+   * Address: 0x00C03680 (FUN_00C03680, dynamic atexit destructor for `gCConFunc_DumpCamera`)
    */
-  void cleanup_CConFunc_cam_SetLOD()
-  {
-    CleanupStartupConCommand(gCConFunc_cam_SetLOD);
-  }
+  CConFunc gCConFunc_DumpCamera("DumpCamera", kConsoleStartupDumpCameraDescription, &moho::CON_DumpCamera);
 
   /**
-   * Address: 0x00BDF7C0 (FUN_00BDF7C0, register_CConFunc_cam_SetLOD)
-   *
-   * What it does:
-   * Registers startup console callback for `cam_SetLOD`.
+   * Address: 0x00BDFA80 (FUN_00BDFA80, dynamic initializer for `gCConFunc_PopupCreateUnitMenu`)
+   * Address: 0x00C037A0 (FUN_00C037A0, dynamic atexit destructor for `gCConFunc_PopupCreateUnitMenu`)
    */
-  void register_CConFunc_cam_SetLOD()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_cam_SetLOD,
-      kConsoleStartupCamSetLODDescription,
-      "cam_SetLOD",
-      &moho::CAM_SetLOD,
-      &cleanup_CConFunc_cam_SetLOD
-    );
-  }
+  CConFunc gCConFunc_PopupCreateUnitMenu("PopupCreateUnitMenu", kConsoleStartupPopupCreateUnitMenuDescription, &moho::CON_PopupCreateUnitMenu);
 
   /**
-   * Address: 0x00C03680 (FUN_00C03680, ??1CConFunc_DumpCamera@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DumpCamera`.
+   * Address: 0x00BDFB90 (FUN_00BDFB90, dynamic initializer for `gCConFunc_PathDebug`)
+   * Address: 0x00C03850 (FUN_00C03850, dynamic atexit destructor for `gCConFunc_PathDebug`)
    */
-  void cleanup_CConFunc_DumpCamera()
-  {
-    CleanupStartupConCommand(gCConFunc_DumpCamera);
-  }
+  CConFunc gCConFunc_PathDebug("PathDebug", kConsoleStartupPathDebugDescription, &moho::CON_PathDebug);
 
   /**
-   * Address: 0x00BDF800 (FUN_00BDF800, register_CConFunc_DumpCamera)
-   *
-   * What it does:
-   * Registers startup console callback for `DumpCamera`.
+   * Address: 0x00BE4130 (FUN_00BE4130, dynamic initializer for `gCConFunc_TeleportSelectedUnits`)
+   * Address: 0x00C06250 (FUN_00C06250, dynamic atexit destructor for `gCConFunc_TeleportSelectedUnits`)
    */
-  void register_CConFunc_DumpCamera()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DumpCamera,
-      kConsoleStartupDumpCameraDescription,
-      "DumpCamera",
-      &moho::CON_DumpCamera,
-      &cleanup_CConFunc_DumpCamera
-    );
-  }
+  CConFunc gCConFunc_TeleportSelectedUnits("TeleportSelectedUnits", kConsoleStartupTeleportSelectedUnitsDescription, &moho::CON_TeleportSelectedUnits);
 
   /**
-   * Address: 0x00C037A0 (FUN_00C037A0, ??1CON_PopupCreateUnitMenu@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `PopupCreateUnitMenu`.
+   * Address: 0x00BE43F0 (FUN_00BE43F0, dynamic initializer for `gCConFunc_SetFocusArmy`)
+   * Address: 0x00C06460 (FUN_00C06460, dynamic atexit destructor for `gCConFunc_SetFocusArmy`)
    */
-  void cleanup_CConFunc_PopupCreateUnitMenu()
-  {
-    CleanupStartupConCommand(gCConFunc_PopupCreateUnitMenu);
-  }
+  CConFunc gCConFunc_SetFocusArmy("SetFocusArmy", kConsoleStartupSetFocusArmyDescription, &moho::SetFocusArmy);
 
   /**
-   * Address: 0x00BDFA80 (FUN_00BDFA80, register_CConFunc_PopupCreateUnitMenu)
-   *
-   * What it does:
-   * Registers startup console callback for `PopupCreateUnitMenu`.
+   * Address: 0x00BE41F0 (FUN_00BE41F0, dynamic initializer for `gCConFunc_UI_SetSkin`)
+   * Address: 0x00C062E0 (FUN_00C062E0, dynamic atexit destructor for `gCConFunc_UI_SetSkin`)
    */
-  void register_CConFunc_PopupCreateUnitMenu()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_PopupCreateUnitMenu,
-      kConsoleStartupPopupCreateUnitMenuDescription,
-      "PopupCreateUnitMenu",
-      &moho::CON_PopupCreateUnitMenu,
-      &cleanup_CConFunc_PopupCreateUnitMenu
-    );
-  }
+  CConFunc gCConFunc_UI_SetSkin("UI_SetSkin", kConsoleStartupUISetSkinDescription, &moho::CON_UI_SetSkin);
 
   /**
-   * Address: 0x00C03850 (FUN_00C03850, ??1CConFunc_PathDebug@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `PathDebug`.
+   * Address: 0x00BE4230 (FUN_00BE4230, dynamic initializer for `gCConFunc_UI_RotateSkin`)
+   * Address: 0x00C06310 (FUN_00C06310, dynamic atexit destructor for `gCConFunc_UI_RotateSkin`)
    */
-  void cleanup_CConFunc_PathDebug()
-  {
-    CleanupStartupConCommand(gCConFunc_PathDebug);
-  }
+  CConFunc gCConFunc_UI_RotateSkin("UI_RotateSkin", kConsoleStartupUIRotateSkinDescription, &moho::UI_RotateSkin);
 
   /**
-   * Address: 0x00BDFB90 (FUN_00BDFB90, register_CConFunc_PathDebug)
-   *
-   * What it does:
-   * Registers startup console callback for `PathDebug`.
+   * Address: 0x00BE4270 (FUN_00BE4270, dynamic initializer for `gCConFunc_UI_RotateLayout`)
+   * Address: 0x00C06340 (FUN_00C06340, dynamic atexit destructor for `gCConFunc_UI_RotateLayout`)
    */
-  void register_CConFunc_PathDebug()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_PathDebug,
-      kConsoleStartupPathDebugDescription,
-      "PathDebug",
-      &moho::CON_PathDebug,
-      &cleanup_CConFunc_PathDebug
-    );
-  }
+  CConFunc gCConFunc_UI_RotateLayout("UI_RotateLayout", kConsoleStartupUIRotateLayoutDescription, &moho::UI_RotateLayout);
 
   /**
-   * Address: 0x00C06250 (FUN_00C06250, ??1CConFunc_TeleportSelectedUnits@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `TeleportSelectedUnits`.
+   * Address: 0x00BE42F0 (FUN_00BE42F0, dynamic initializer for `gCConFunc_UI_ToggleGamePanels`)
+   * Address: 0x00C063A0 (FUN_00C063A0, dynamic atexit destructor for `gCConFunc_UI_ToggleGamePanels`)
    */
-  void cleanup_CConFunc_TeleportSelectedUnits()
-  {
-    CleanupStartupConCommand(gCConFunc_TeleportSelectedUnits);
-  }
+  CConFunc gCConFunc_UI_ToggleGamePanels("UI_ToggleGamePanels", kConsoleStartupUIToggleGamePanelsDescription, &moho::CON_UI_ToggleGamePanels);
 
   /**
-   * Address: 0x00BE4130 (FUN_00BE4130, register_CConFunc_TeleportSelectedUnits)
-   *
-   * What it does:
-   * Registers startup console callback for `TeleportSelectedUnits`.
+   * Address: 0x00BE42B0 (FUN_00BE42B0, dynamic initializer for `gCConFunc_UI_Quit`)
+   * Address: 0x00C06370 (FUN_00C06370, dynamic atexit destructor for `gCConFunc_UI_Quit`)
    */
-  void register_CConFunc_TeleportSelectedUnits()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_TeleportSelectedUnits,
-      kConsoleStartupTeleportSelectedUnitsDescription,
-      "TeleportSelectedUnits",
-      &moho::CON_TeleportSelectedUnits,
-      &cleanup_CConFunc_TeleportSelectedUnits
-    );
-  }
+  CConFunc gCConFunc_UI_Quit("UI_Quit", kConsoleStartupUIQuitDescription, &moho::UI_Quit);
 
   /**
-   * Address: 0x00C06460 (FUN_00C06460, ??1CConFunc_SetFocusArmy@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SetFocusArmy`.
+   * Address: 0x00BE4330 (FUN_00BE4330, dynamic initializer for `gCConFunc_UI_MakeSelectionSet`)
+   * Address: 0x00C063D0 (FUN_00C063D0, dynamic atexit destructor for `gCConFunc_UI_MakeSelectionSet`)
    */
-  void cleanup_CConFunc_SetFocusArmy()
-  {
-    CleanupStartupConCommand(gCConFunc_SetFocusArmy);
-  }
+  CConFunc gCConFunc_UI_MakeSelectionSet("UI_MakeSelectionSet", kConsoleStartupUIMakeSelectionSetDescription, &moho::UI_MakeSelectionSet);
 
   /**
-   * Address: 0x00BE43F0 (FUN_00BE43F0, register_CConFunc_SetFocusArmy)
-   *
-   * What it does:
-   * Registers startup console callback for `SetFocusArmy`.
+   * Address: 0x00BE4370 (FUN_00BE4370, dynamic initializer for `gCConFunc_UI_ApplySelectionSet`)
+   * Address: 0x00C06400 (FUN_00C06400, dynamic atexit destructor for `gCConFunc_UI_ApplySelectionSet`)
    */
-  void register_CConFunc_SetFocusArmy()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_SetFocusArmy,
-      kConsoleStartupSetFocusArmyDescription,
-      "SetFocusArmy",
-      &moho::SetFocusArmy,
-      &cleanup_CConFunc_SetFocusArmy
-    );
-  }
+  CConFunc gCConFunc_UI_ApplySelectionSet("UI_ApplySelectionSet", kConsoleStartupUIApplySelectionSetDescription, &moho::UI_ApplySelectionSet);
 
   /**
-   * Address: 0x00C062E0 (FUN_00C062E0, ??1CConFunc_UI_SetSkin@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_SetSkin`.
+   * Address: 0x00BE43B0 (FUN_00BE43B0, dynamic initializer for `gCConFunc_UI_CreateHead1Map`)
+   * Address: 0x00C06430 (FUN_00C06430, dynamic atexit destructor for `gCConFunc_UI_CreateHead1Map`)
    */
-  void cleanup_CConFunc_UI_SetSkin()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_SetSkin);
-  }
+  CConFunc gCConFunc_UI_CreateHead1Map("UI_CreateHead1Map", kConsoleStartupUICreateHead1MapDescription, &moho::CON_UI_CreateHead1Map);
 
   /**
-   * Address: 0x00BE41F0 (FUN_00BE41F0, register_CConFunc_UI_SetSkin)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_SetSkin`.
+   * Address: 0x00BE44B0 (FUN_00BE44B0, dynamic initializer for `gCConFunc_UI_Lua`)
+   * Address: 0x00C064F0 (FUN_00C064F0, dynamic atexit destructor for `gCConFunc_UI_Lua`)
    */
-  void register_CConFunc_UI_SetSkin()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_SetSkin,
-      kConsoleStartupUISetSkinDescription,
-      "UI_SetSkin",
-      &moho::CON_UI_SetSkin,
-      &cleanup_CConFunc_UI_SetSkin
-    );
-  }
+  CConFunc gCConFunc_UI_Lua("UI_Lua", kConsoleStartupUILuaDescription, &moho::UI_Lua);
 
   /**
-   * Address: 0x00C06310 (FUN_00C06310, ??1CConFunc_UI_RotateSkin@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_RotateSkin`.
+   * Address: 0x00BE4530 (FUN_00BE4530, dynamic initializer for `gCConFunc_UI_ShowRenameDialog`)
+   * Address: 0x00C06550 (FUN_00C06550, dynamic atexit destructor for `gCConFunc_UI_ShowRenameDialog`)
    */
-  void cleanup_CConFunc_UI_RotateSkin()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_RotateSkin);
-  }
+  CConFunc gCConFunc_UI_ShowRenameDialog("UI_ShowRenameDialog", kConsoleStartupUIShowRenameDialogDescription, reinterpret_cast<CConFunc::Callback>(&moho::UI_ShowRenameDialog));
 
   /**
-   * Address: 0x00BE4230 (FUN_00BE4230, register_CConFunc_UI_RotateSkin)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_RotateSkin`.
+   * Address: 0x00BE4570 (FUN_00BE4570, dynamic initializer for `gCConFunc_UI_DumpControls`)
+   * Address: 0x00C06580 (FUN_00C06580, dynamic atexit destructor for `gCConFunc_UI_DumpControls`)
    */
-  void register_CConFunc_UI_RotateSkin()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_RotateSkin,
-      kConsoleStartupUIRotateSkinDescription,
-      "UI_RotateSkin",
-      &moho::UI_RotateSkin,
-      &cleanup_CConFunc_UI_RotateSkin
-    );
-  }
+  CConFunc gCConFunc_UI_DumpControls("UI_DumpControls", kConsoleStartupUIDumpControlsDescription, &moho::UI_DumpControls);
 
   /**
-   * Address: 0x00C06340 (FUN_00C06340, ??1CConFunc_UI_RotateLayout@Moho@@QAE@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_RotateLayout`.
+   * Address: 0x00BE45B0 (FUN_00BE45B0, dynamic initializer for `gCConFunc_UI_DumpControlsUnderCursor`)
+   * Address: 0x00C065B0 (FUN_00C065B0, dynamic atexit destructor for `gCConFunc_UI_DumpControlsUnderCursor`)
    */
-  void cleanup_CConFunc_UI_RotateLayout()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_RotateLayout);
-  }
-
-  /**
-   * Address: 0x00BE4270 (FUN_00BE4270, register_CConFunc_UI_RotateLayout)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_RotateLayout`.
-   */
-  void register_CConFunc_UI_RotateLayout()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_RotateLayout,
-      kConsoleStartupUIRotateLayoutDescription,
-      "UI_RotateLayout",
-      &moho::UI_RotateLayout,
-      &cleanup_CConFunc_UI_RotateLayout
-    );
-  }
-
-  /**
-   * Address: 0x00C063A0 (FUN_00C063A0, ??1CConFunc_UI_ToggleGamePanels@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_ToggleGamePanels`.
-   */
-  void cleanup_CConFunc_UI_ToggleGamePanels()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_ToggleGamePanels);
-  }
-
-  /**
-   * Address: 0x00BE42F0 (FUN_00BE42F0, register_CConFunc_UI_ToggleGamePanels)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_ToggleGamePanels`.
-   */
-  void register_CConFunc_UI_ToggleGamePanels()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_ToggleGamePanels,
-      kConsoleStartupUIToggleGamePanelsDescription,
-      "UI_ToggleGamePanels",
-      &moho::CON_UI_ToggleGamePanels,
-      &cleanup_CConFunc_UI_ToggleGamePanels
-    );
-  }
-
-  /**
-   * Address: 0x00C06370 (FUN_00C06370, ??1CConFunc_UI_Quit@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_Quit`.
-   */
-  void cleanup_CConFunc_UI_Quit()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_Quit);
-  }
-
-  /**
-   * Address: 0x00BE42B0 (FUN_00BE42B0, register_CConFunc_UI_Quit)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_Quit`.
-   */
-  void register_CConFunc_UI_Quit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_Quit,
-      kConsoleStartupUIQuitDescription,
-      "UI_Quit",
-      &moho::UI_Quit,
-      &cleanup_CConFunc_UI_Quit
-    );
-  }
-
-  /**
-   * Address: 0x00C063D0 (FUN_00C063D0, ??1CConFunc_UI_MakeSelectionSet@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_MakeSelectionSet`.
-   */
-  void cleanup_CConFunc_UI_MakeSelectionSet()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_MakeSelectionSet);
-  }
-
-  /**
-   * Address: 0x00BE4330 (FUN_00BE4330, register_CConFunc_UI_MakeSelectionSet)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_MakeSelectionSet`.
-   */
-  void register_CConFunc_UI_MakeSelectionSet()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_MakeSelectionSet,
-      kConsoleStartupUIMakeSelectionSetDescription,
-      "UI_MakeSelectionSet",
-      &moho::UI_MakeSelectionSet,
-      &cleanup_CConFunc_UI_MakeSelectionSet
-    );
-  }
-
-  /**
-   * Address: 0x00C06400 (FUN_00C06400, ??1CConFunc_UI_ApplySelectionSet@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_ApplySelectionSet`.
-   */
-  void cleanup_CConFunc_UI_ApplySelectionSet()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_ApplySelectionSet);
-  }
-
-  /**
-   * Address: 0x00BE4370 (FUN_00BE4370, register_CConFunc_UI_ApplySelectionSet)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_ApplySelectionSet`.
-   */
-  void register_CConFunc_UI_ApplySelectionSet()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_ApplySelectionSet,
-      kConsoleStartupUIApplySelectionSetDescription,
-      "UI_ApplySelectionSet",
-      &moho::UI_ApplySelectionSet,
-      &cleanup_CConFunc_UI_ApplySelectionSet
-    );
-  }
-
-  /**
-   * Address: 0x00C06430 (FUN_00C06430, ??1CConFunc_UI_CreateHead1Map@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_CreateHead1Map`.
-   */
-  void cleanup_CConFunc_UI_CreateHead1Map()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_CreateHead1Map);
-  }
-
-  /**
-   * Address: 0x00BE43B0 (FUN_00BE43B0, register_CConFunc_UI_CreateHead1Map)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_CreateHead1Map`.
-   */
-  void register_CConFunc_UI_CreateHead1Map()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_CreateHead1Map,
-      kConsoleStartupUICreateHead1MapDescription,
-      "UI_CreateHead1Map",
-      &moho::CON_UI_CreateHead1Map,
-      &cleanup_CConFunc_UI_CreateHead1Map
-    );
-  }
-
-  /**
-   * Address: 0x00C064F0 (FUN_00C064F0, ??1CConFunc_UI_Lua@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_Lua`.
-   */
-  void cleanup_CConFunc_UI_Lua()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_Lua);
-  }
-
-  /**
-   * Address: 0x00BE44B0 (FUN_00BE44B0, register_CConFunc_UI_Lua)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_Lua`.
-   */
-  void register_CConFunc_UI_Lua()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_Lua,
-      kConsoleStartupUILuaDescription,
-      "UI_Lua",
-      &moho::UI_Lua,
-      &cleanup_CConFunc_UI_Lua
-    );
-  }
-
-  /**
-   * Address: 0x00C06550 (FUN_00C06550, ??1CConFunc_UI_ShowRenameDialog@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_ShowRenameDialog`.
-   */
-  void cleanup_CConFunc_UI_ShowRenameDialog()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_ShowRenameDialog);
-  }
-
-  /**
-   * Address: 0x00BE4530 (FUN_00BE4530, register_CConFunc_UI_ShowRenameDialog)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_ShowRenameDialog`.
-   */
-  void register_CConFunc_UI_ShowRenameDialog()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_ShowRenameDialog,
-      kConsoleStartupUIShowRenameDialogDescription,
-      "UI_ShowRenameDialog",
-      reinterpret_cast<CConFunc::Callback>(&moho::UI_ShowRenameDialog),
-      &cleanup_CConFunc_UI_ShowRenameDialog
-    );
-  }
-
-  /**
-   * Address: 0x00C06580 (FUN_00C06580, ??1CConFunc_UI_DumpControls@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_DumpControls`.
-   */
-  void cleanup_CConFunc_UI_DumpControls()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_DumpControls);
-  }
-
-  /**
-   * Address: 0x00BE4570 (FUN_00BE4570, register_CConFunc_UI_DumpControls)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_DumpControls`.
-   */
-  void register_CConFunc_UI_DumpControls()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_DumpControls,
-      kConsoleStartupUIDumpControlsDescription,
-      "UI_DumpControls",
-      &moho::UI_DumpControls,
-      &cleanup_CConFunc_UI_DumpControls
-    );
-  }
-
-  /**
-   * Address: 0x00C065B0 (FUN_00C065B0, ??1CConFunc_UI_DumpControlsUnderCursor@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_DumpControlsUnderCursor`.
-   */
-  void cleanup_CConFunc_UI_DumpControlsUnderCursor()
-  {
-    CleanupStartupConCommand(gCConFunc_UI_DumpControlsUnderCursor);
-  }
-
-  /**
-   * Address: 0x00BE45B0 (FUN_00BE45B0, register_CConFunc_UI_DumpControlsUnderCursor)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_DumpControlsUnderCursor`.
-   */
-  void register_CConFunc_UI_DumpControlsUnderCursor()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_UI_DumpControlsUnderCursor,
-      kConsoleStartupUIDumpControlsUnderCursorDescription,
-      "UI_DumpControlsUnderCursor",
-      &moho::UI_DumpControlsUnderCursor,
-      &cleanup_CConFunc_UI_DumpControlsUnderCursor
-    );
-  }
+  CConFunc gCConFunc_UI_DumpControlsUnderCursor("UI_DumpControlsUnderCursor", kConsoleStartupUIDumpControlsUnderCursorDescription, &moho::UI_DumpControlsUnderCursor);
 
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsUiMisc
-  {
-    ConsoleStartupRegistrationsUiMisc()
-    {
-      moho::register_CConFunc_cam_SetLOD();
-      moho::register_CConFunc_DumpCamera();
-      moho::register_CConFunc_PopupCreateUnitMenu();
-      moho::register_CConFunc_PathDebug();
-      moho::register_CConFunc_TeleportSelectedUnits();
-      moho::register_CConFunc_SetFocusArmy();
-      moho::register_CConFunc_UI_SetSkin();
-      moho::register_CConFunc_UI_RotateSkin();
-      moho::register_CConFunc_UI_RotateLayout();
-      moho::register_CConFunc_UI_ToggleGamePanels();
-      moho::register_CConFunc_UI_Quit();
-      moho::register_CConFunc_UI_MakeSelectionSet();
-      moho::register_CConFunc_UI_ApplySelectionSet();
-      moho::register_CConFunc_UI_CreateHead1Map();
-      moho::register_CConFunc_UI_Lua();
-      moho::register_CConFunc_UI_ShowRenameDialog();
-      moho::register_CConFunc_UI_DumpControls();
-      moho::register_CConFunc_UI_DumpControlsUnderCursor();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsUiMisc gConsoleStartupRegistrationsUiMisc;
-} // namespace
 
 namespace
 {
@@ -13479,7 +7277,7 @@ namespace
   constexpr const char* kConsoleStartupRenShowSkeletonsDescription = "Show mesh skeletons";
   constexpr const char* kConsoleStartupTimestampDescription = "Dump out EXE timestamp";
   constexpr const char* kConsoleStartupSCCreateEntityDialogDescription = "Create object editing box for the primary selected unit";
-  constexpr const char* kConsoleStartupSCAntiAliasingSamplesDescription = "SC_AntiAliasingSamples console command.";
+  constexpr const char* kConsoleStartupSCAntiAliasingSamplesDescription = "";
   constexpr const char* kConsoleStartupQuitDescription = "Quit the session.";
   constexpr const char* kConsoleStartupWLDIncreaseSimRateDescription = "Increase the game speed.";
   constexpr const char* kConsoleStartupWLDDecreaseSimRateDescription = "Decrease the game speed.";
@@ -13488,410 +7286,86 @@ namespace
 
 namespace moho
 {
-  CConFunc gCConFunc_DumpActiveLoops{};
-  CConFunc gCConFunc_ShowArmyStats{};
-  CConFunc gCConFunc_ShowStats{};
-  CConFunc gCConFunc_ren_MapBorderAdd{};
-  CConFunc gCConFunc_ren_MapBorderClear{};
-  CConFunc gCConFunc_ren_ShowSkeletons{};
-  CConFunc gCConFunc_timestamp{};
-  CConFunc gCConFunc_SC_CreateEntityDialog{};
-  CConFunc gCConFunc_SC_AntiAliasingSamples{};
-  CConFunc gCConFunc_quit{};
-  CConFunc gCConFunc_WLD_IncreaseSimRate{};
-  CConFunc gCConFunc_WLD_DecreaseSimRate{};
-  CConFunc gCConFunc_WLD_ResetSimRate{};
+  /**
+   * Address: 0x00BE7F70 (FUN_00BE7F70, dynamic initializer for `gCConFunc_DumpActiveLoops`)
+   * Address: 0x00C085D0 (FUN_00C085D0, dynamic atexit destructor for `gCConFunc_DumpActiveLoops`)
+   */
+  CConFunc gCConFunc_DumpActiveLoops("DumpActiveLoops", kConsoleStartupDumpActiveLoopsDescription, reinterpret_cast<CConFunc::Callback>(&moho::Con_DumpActiveLoops));
 
   /**
-   * Address: 0x00C085D0 (FUN_00C085D0, ??1CConFunc_DumpActiveLoops@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `DumpActiveLoops`.
+   * Address: 0x00BE4470 (FUN_00BE4470, dynamic initializer for `gCConFunc_ShowArmyStats`)
+   * Address: 0x00C064C0 (FUN_00C064C0, dynamic atexit destructor for `gCConFunc_ShowArmyStats`)
    */
-  void cleanup_CConFunc_DumpActiveLoops()
-  {
-    CleanupStartupConCommand(gCConFunc_DumpActiveLoops);
-  }
+  CConFunc gCConFunc_ShowArmyStats("ShowArmyStats", kConsoleStartupShowArmyStatsDescription, &moho::ShowArmyStats);
 
   /**
-   * Address: 0x00BE7F70 (FUN_00BE7F70, register_CConFunc_DumpActiveLoops)
-   *
-   * What it does:
-   * Registers startup console callback for `DumpActiveLoops`.
+   * Address: 0x00BE4430 (FUN_00BE4430, dynamic initializer for `gCConFunc_ShowStats`)
+   * Address: 0x00C06490 (FUN_00C06490, dynamic atexit destructor for `gCConFunc_ShowStats`)
    */
-  void register_CConFunc_DumpActiveLoops()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_DumpActiveLoops,
-      kConsoleStartupDumpActiveLoopsDescription,
-      "DumpActiveLoops",
-      reinterpret_cast<CConFunc::Callback>(&moho::Con_DumpActiveLoops),
-      &cleanup_CConFunc_DumpActiveLoops
-    );
-  }
+  CConFunc gCConFunc_ShowStats("ShowStats", kConsoleStartupShowStatsDescription, &moho::ShowStats);
 
   /**
-   * Address: 0x00C064C0 (FUN_00C064C0, ??1CConFunc_ShowArmyStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ShowArmyStats`.
+   * Address: 0x00BE1B90 (FUN_00BE1B90, dynamic initializer for `gCConFunc_ren_MapBorderAdd`)
+   * Address: 0x00C04AB0 (FUN_00C04AB0, dynamic atexit destructor for `gCConFunc_ren_MapBorderAdd`)
    */
-  void cleanup_CConFunc_ShowArmyStats()
-  {
-    CleanupStartupConCommand(gCConFunc_ShowArmyStats);
-  }
+  CConFunc gCConFunc_ren_MapBorderAdd("ren_MapBorderAdd", kConsoleStartupRenMapBorderAddDescription, &moho::REN_MapBorderAdd);
 
   /**
-   * Address: 0x00BE4470 (FUN_00BE4470, register_CConFunc_ShowArmyStats)
-   *
-   * What it does:
-   * Registers startup console callback for `ShowArmyStats`.
+   * Address: 0x00BE1BD0 (FUN_00BE1BD0, dynamic initializer for `gCConFunc_ren_MapBorderClear`)
+   * Address: 0x00C04AE0 (FUN_00C04AE0, dynamic atexit destructor for `gCConFunc_ren_MapBorderClear`)
    */
-  void register_CConFunc_ShowArmyStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ShowArmyStats,
-      kConsoleStartupShowArmyStatsDescription,
-      "ShowArmyStats",
-      &moho::ShowArmyStats,
-      &cleanup_CConFunc_ShowArmyStats
-    );
-  }
+  CConFunc gCConFunc_ren_MapBorderClear("ren_MapBorderClear", kConsoleStartupRenMapBorderClearDescription, &moho::REN_MapBorderClear);
 
   /**
-   * Address: 0x00C06490 (FUN_00C06490, ??1CConFunc_ShowStats@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ShowStats`.
+   * Address: 0x00BE1B50 (FUN_00BE1B50, dynamic initializer for `gCConFunc_ren_ShowSkeletons`)
+   * Address: 0x00C04A80 (FUN_00C04A80, dynamic atexit destructor for `gCConFunc_ren_ShowSkeletons`)
    */
-  void cleanup_CConFunc_ShowStats()
-  {
-    CleanupStartupConCommand(gCConFunc_ShowStats);
-  }
+  CConFunc gCConFunc_ren_ShowSkeletons("ren_ShowSkeletons", kConsoleStartupRenShowSkeletonsDescription, reinterpret_cast<CConFunc::Callback>(&moho::REN_ShowSkeletons));
 
   /**
-   * Address: 0x00BE4430 (FUN_00BE4430, register_CConFunc_ShowStats)
-   *
-   * What it does:
-   * Registers startup console callback for `ShowStats`.
+   * Address: 0x00BE9600 (FUN_00BE9600, dynamic initializer for `gCConFunc_timestamp`)
+   * Address: 0x00C08E50 (FUN_00C08E50, dynamic atexit destructor for `gCConFunc_timestamp`)
    */
-  void register_CConFunc_ShowStats()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ShowStats,
-      kConsoleStartupShowStatsDescription,
-      "ShowStats",
-      &moho::ShowStats,
-      &cleanup_CConFunc_ShowStats
-    );
-  }
+  CConFunc gCConFunc_timestamp("timestamp", kConsoleStartupTimestampDescription, reinterpret_cast<CConFunc::Callback>(&moho::PrintExecutableTimestampToConsole));
 
   /**
-   * Address: 0x00C04AB0 (FUN_00C04AB0, ??1CConFunc_ren_MapBorderAdd@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ren_MapBorderAdd`.
+   * Address: 0x00BE9640 (FUN_00BE9640, dynamic initializer for `gCConFunc_SC_CreateEntityDialog`)
+   * Address: 0x00C08E80 (FUN_00C08E80, dynamic atexit destructor for `gCConFunc_SC_CreateEntityDialog`)
    */
-  void cleanup_CConFunc_ren_MapBorderAdd()
-  {
-    CleanupStartupConCommand(gCConFunc_ren_MapBorderAdd);
-  }
+  CConFunc gCConFunc_SC_CreateEntityDialog("SC_CreateEntityDialog", kConsoleStartupSCCreateEntityDialogDescription, reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog));
 
   /**
-   * Address: 0x00BE1B90 (FUN_00BE1B90, register_CConFunc_ren_MapBorderAdd)
-   *
-   * What it does:
-   * Registers startup console callback for `ren_MapBorderAdd`.
+   * Address: 0x00BE9500 (FUN_00BE9500, dynamic initializer for `gCConFunc_SC_AntiAliasingSamples`)
+   * Address: 0x00C08D90 (FUN_00C08D90, dynamic atexit destructor for `gCConFunc_SC_AntiAliasingSamples`)
    */
-  void register_CConFunc_ren_MapBorderAdd()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ren_MapBorderAdd,
-      kConsoleStartupRenMapBorderAddDescription,
-      "ren_MapBorderAdd",
-      &moho::REN_MapBorderAdd,
-      &cleanup_CConFunc_ren_MapBorderAdd
-    );
-  }
+  CConFunc gCConFunc_SC_AntiAliasingSamples("SC_AntiAliasingSamples", kConsoleStartupSCAntiAliasingSamplesDescription, &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken);
 
   /**
-   * Address: 0x00C04AE0 (FUN_00C04AE0, ??1CConFunc_ren_MapBorderClear@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ren_MapBorderClear`.
+   * Address: 0x00BE7550 (FUN_00BE7550, dynamic initializer for `gCConFunc_quit`)
+   * Address: 0x00C080B0 (FUN_00C080B0, dynamic atexit destructor for `gCConFunc_quit`)
    */
-  void cleanup_CConFunc_ren_MapBorderClear()
-  {
-    CleanupStartupConCommand(gCConFunc_ren_MapBorderClear);
-  }
+  CConFunc gCConFunc_quit("quit", kConsoleStartupQuitDescription, &moho::CON_WLD_RequestEndSession);
 
   /**
-   * Address: 0x00BE1BD0 (FUN_00BE1BD0, register_CConFunc_ren_MapBorderClear)
-   *
-   * What it does:
-   * Registers startup console callback for `ren_MapBorderClear`.
+   * Address: 0x00BE7370 (FUN_00BE7370, dynamic initializer for `gCConFunc_WLD_IncreaseSimRate`)
+   * Address: 0x00C07F60 (FUN_00C07F60, dynamic atexit destructor for `gCConFunc_WLD_IncreaseSimRate`)
    */
-  void register_CConFunc_ren_MapBorderClear()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ren_MapBorderClear,
-      kConsoleStartupRenMapBorderClearDescription,
-      "ren_MapBorderClear",
-      &moho::REN_MapBorderClear,
-      &cleanup_CConFunc_ren_MapBorderClear
-    );
-  }
+  CConFunc gCConFunc_WLD_IncreaseSimRate("WLD_IncreaseSimRate", kConsoleStartupWLDIncreaseSimRateDescription, reinterpret_cast<CConFunc::Callback>(&moho::WLD_IncreaseSimRate));
 
   /**
-   * Address: 0x00C04A80 (FUN_00C04A80, ??1CConFunc_ren_ShowSkeletons@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `ren_ShowSkeletons`.
+   * Address: 0x00BE73F0 (FUN_00BE73F0, dynamic initializer for `gCConFunc_WLD_DecreaseSimRate`)
+   * Address: 0x00C07FC0 (FUN_00C07FC0, dynamic atexit destructor for `gCConFunc_WLD_DecreaseSimRate`)
    */
-  void cleanup_CConFunc_ren_ShowSkeletons()
-  {
-    CleanupStartupConCommand(gCConFunc_ren_ShowSkeletons);
-  }
+  CConFunc gCConFunc_WLD_DecreaseSimRate("WLD_DecreaseSimRate", kConsoleStartupWLDDecreaseSimRateDescription, reinterpret_cast<CConFunc::Callback>(&moho::WLD_DecreaseSimRate));
 
   /**
-   * Address: 0x00BE1B50 (FUN_00BE1B50, register_CConFunc_ren_ShowSkeletons)
-   *
-   * What it does:
-   * Registers startup console callback for `ren_ShowSkeletons`.
+   * Address: 0x00BE73B0 (FUN_00BE73B0, dynamic initializer for `gCConFunc_WLD_ResetSimRate`)
+   * Address: 0x00C07F90 (FUN_00C07F90, dynamic atexit destructor for `gCConFunc_WLD_ResetSimRate`)
    */
-  void register_CConFunc_ren_ShowSkeletons()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_ren_ShowSkeletons,
-      kConsoleStartupRenShowSkeletonsDescription,
-      "ren_ShowSkeletons",
-      reinterpret_cast<CConFunc::Callback>(&moho::REN_ShowSkeletons),
-      &cleanup_CConFunc_ren_ShowSkeletons
-    );
-  }
-
-  /**
-   * Address: 0x00C08E50 (FUN_00C08E50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `timestamp`.
-   */
-  void cleanup_CConFunc_timestamp()
-  {
-    CleanupStartupConCommand(gCConFunc_timestamp);
-  }
-
-  /**
-   * Address: 0x00BE9600 (FUN_00BE9600, register_CConFunc_timestamp)
-   *
-   * What it does:
-   * Registers startup console callback for `timestamp`.
-   */
-  void register_CConFunc_timestamp()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_timestamp,
-      kConsoleStartupTimestampDescription,
-      "timestamp",
-      reinterpret_cast<CConFunc::Callback>(&moho::PrintExecutableTimestampToConsole),
-      &cleanup_CConFunc_timestamp
-    );
-  }
-
-  /**
-   * Address: 0x00C08E80 (FUN_00C08E80, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_CreateEntityDialog`.
-   */
-  void cleanup_CConFunc_SC_CreateEntityDialog()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_CreateEntityDialog);
-  }
-
-  /**
-   * Address: 0x00BE9640 (FUN_00BE9640, register_CConFunc_SC_CreateEntityDialog)
-   *
-   * What it does:
-   * Registers startup console callback for `SC_CreateEntityDialog`.
-   */
-  void register_CConFunc_SC_CreateEntityDialog()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_SC_CreateEntityDialog,
-      kConsoleStartupSCCreateEntityDialogDescription,
-      "SC_CreateEntityDialog",
-      reinterpret_cast<CConFunc::Callback>(&moho::funcl_SC_CreateEntityDialog),
-      &cleanup_CConFunc_SC_CreateEntityDialog
-    );
-  }
-
-  /**
-   * Address: 0x00C08D90 (FUN_00C08D90, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_AntiAliasingSamples`.
-   */
-  void cleanup_CConFunc_SC_AntiAliasingSamples()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_AntiAliasingSamples);
-  }
-
-  /**
-   * Address: 0x00BE9500 (FUN_00BE9500, register_CConFunc_SC_AntiAliasingSamples)
-   *
-   * What it does:
-   * Registers startup console callback for `SC_AntiAliasingSamples`.
-   */
-  void register_CConFunc_SC_AntiAliasingSamples()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_SC_AntiAliasingSamples,
-      kConsoleStartupSCAntiAliasingSamplesDescription,
-      "SC_AntiAliasingSamples",
-      &moho::CON_d3d_AntiAliasingSamplesSeedFromFirstToken,
-      &cleanup_CConFunc_SC_AntiAliasingSamples
-    );
-  }
-
-  /**
-   * Address: 0x00C080B0 (FUN_00C080B0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `quit`.
-   */
-  void cleanup_CConFunc_quit()
-  {
-    CleanupStartupConCommand(gCConFunc_quit);
-  }
-
-  /**
-   * Address: 0x00BE7550 (FUN_00BE7550, register_CConFunc_quit)
-   *
-   * What it does:
-   * Registers startup console callback for `quit`.
-   */
-  void register_CConFunc_quit()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_quit,
-      kConsoleStartupQuitDescription,
-      "quit",
-      &moho::CON_WLD_RequestEndSession,
-      &cleanup_CConFunc_quit
-    );
-  }
-
-  /**
-   * Address: 0x00C07F60 (FUN_00C07F60, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_IncreaseSimRate`.
-   */
-  void cleanup_CConFunc_WLD_IncreaseSimRate()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_IncreaseSimRate);
-  }
-
-  /**
-   * Address: 0x00BE7370 (FUN_00BE7370, register_CConFunc_WLD_IncreaseSimRate)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_IncreaseSimRate`.
-   */
-  void register_CConFunc_WLD_IncreaseSimRate()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_IncreaseSimRate,
-      kConsoleStartupWLDIncreaseSimRateDescription,
-      "WLD_IncreaseSimRate",
-      reinterpret_cast<CConFunc::Callback>(&moho::WLD_IncreaseSimRate),
-      &cleanup_CConFunc_WLD_IncreaseSimRate
-    );
-  }
-
-  /**
-   * Address: 0x00C07FC0 (FUN_00C07FC0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_DecreaseSimRate`.
-   */
-  void cleanup_CConFunc_WLD_DecreaseSimRate()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_DecreaseSimRate);
-  }
-
-  /**
-   * Address: 0x00BE73F0 (FUN_00BE73F0, register_CConFunc_WLD_DecreaseSimRate)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_DecreaseSimRate`.
-   */
-  void register_CConFunc_WLD_DecreaseSimRate()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_DecreaseSimRate,
-      kConsoleStartupWLDDecreaseSimRateDescription,
-      "WLD_DecreaseSimRate",
-      reinterpret_cast<CConFunc::Callback>(&moho::WLD_DecreaseSimRate),
-      &cleanup_CConFunc_WLD_DecreaseSimRate
-    );
-  }
-
-  /**
-   * Address: 0x00C07F90 (FUN_00C07F90, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `WLD_ResetSimRate`.
-   */
-  void cleanup_CConFunc_WLD_ResetSimRate()
-  {
-    CleanupStartupConCommand(gCConFunc_WLD_ResetSimRate);
-  }
-
-  /**
-   * Address: 0x00BE73B0 (FUN_00BE73B0, register_CConFunc_WLD_ResetSimRate)
-   *
-   * What it does:
-   * Registers startup console callback for `WLD_ResetSimRate`.
-   */
-  void register_CConFunc_WLD_ResetSimRate()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_WLD_ResetSimRate,
-      kConsoleStartupWLDResetSimRateDescription,
-      "WLD_ResetSimRate",
-      reinterpret_cast<CConFunc::Callback>(&moho::WLD_ResetSimRate),
-      &cleanup_CConFunc_WLD_ResetSimRate
-    );
-  }
+  CConFunc gCConFunc_WLD_ResetSimRate("WLD_ResetSimRate", kConsoleStartupWLDResetSimRateDescription, reinterpret_cast<CConFunc::Callback>(&moho::WLD_ResetSimRate));
 
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsMisc2
-  {
-    ConsoleStartupRegistrationsMisc2()
-    {
-      moho::register_CConFunc_DumpActiveLoops();
-      moho::register_CConFunc_ShowArmyStats();
-      moho::register_CConFunc_ShowStats();
-      moho::register_CConFunc_ren_MapBorderAdd();
-      moho::register_CConFunc_ren_MapBorderClear();
-      moho::register_CConFunc_ren_ShowSkeletons();
-      moho::register_CConFunc_timestamp();
-      moho::register_CConFunc_SC_CreateEntityDialog();
-      moho::register_CConFunc_SC_AntiAliasingSamples();
-      moho::register_CConFunc_quit();
-      moho::register_CConFunc_WLD_IncreaseSimRate();
-      moho::register_CConFunc_WLD_DecreaseSimRate();
-      moho::register_CConFunc_WLD_ResetSimRate();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsMisc2 gConsoleStartupRegistrationsMisc2;
-} // namespace
 
 namespace
 {
@@ -13900,50 +7374,14 @@ namespace
 
 namespace moho
 {
-  CConFunc gCConFunc_wld_ClientDebugDump{};
-
   /**
-   * Address: 0x00C08080 (FUN_00C08080, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `wld_ClientDebugDump`.
+   * Address: 0x00BE7510 (FUN_00BE7510, dynamic initializer for `gCConFunc_wld_ClientDebugDump`)
+   * Address: 0x00C08080 (FUN_00C08080, dynamic atexit destructor for `gCConFunc_wld_ClientDebugDump`)
    */
-  void cleanup_CConFunc_wld_ClientDebugDump()
-  {
-    CleanupStartupConCommand(gCConFunc_wld_ClientDebugDump);
-  }
+  CConFunc gCConFunc_wld_ClientDebugDump("wld_ClientDebugDump", kConsoleStartupWldClientDebugDumpDescription, reinterpret_cast<CConFunc::Callback>(&SimDriverDebugClientManagerRuntime));
 
-  /**
-   * Address: 0x00BE7510 (FUN_00BE7510, register_CConFunc_wld_ClientDebugDump)
-   *
-   * What it does:
-   * Registers startup console callback for `wld_ClientDebugDump`.
-   */
-  void register_CConFunc_wld_ClientDebugDump()
-  {
-    RegisterStartupConFunc(
-      gCConFunc_wld_ClientDebugDump,
-      kConsoleStartupWldClientDebugDumpDescription,
-      "wld_ClientDebugDump",
-      reinterpret_cast<CConFunc::Callback>(&SimDriverDebugClientManagerRuntime),
-      &cleanup_CConFunc_wld_ClientDebugDump
-    );
-  }
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsMisc3
-  {
-    ConsoleStartupRegistrationsMisc3()
-    {
-      moho::register_CConFunc_wld_ClientDebugDump();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsMisc3 gConsoleStartupRegistrationsMisc3;
-} // namespace
 
 namespace
 {
@@ -13956,102 +7394,35 @@ namespace moho
 {
   extern float ren_ShadowBias;
 
+  /**
+   * Address: 0x00BDCFF0 (FUN_00BDCFF0, dynamic initializer for `gTConVar_ai_InitialMassCurrency`)
+   * Address: 0x00C02160 (FUN_00C02160, dynamic atexit destructor for `gTConVar_ai_InitialMassCurrency`)
+   */
   TConVar<float> gTConVar_ai_InitialMassCurrency(
     "ai_InitialMassCurrency",
     kConsoleStartupAiInitialMassCurrencyDescription,
     &moho::ai_InitialMassCurrency
   );
+
+  /**
+   * Address: 0x00BDD070 (FUN_00BDD070, dynamic initializer for `gTConVar_ai_InitialMassCurrencyMax`)
+   * Address: 0x00C021C0 (FUN_00C021C0, dynamic atexit destructor for `gTConVar_ai_InitialMassCurrencyMax`)
+   */
   TConVar<float> gTConVar_ai_InitialMassCurrencyMax(
     "ai_InitialMassCurrencyMax",
     kConsoleStartupAiInitialMassCurrencyMaxDescription,
     &moho::ai_InitialMassCurrencyMax
   );
+
+  /**
+   * Address: 0x00BE1F60 (FUN_00BE1F60, dynamic initializer for `gTConVar_ren_ShadowBias`)
+   * Address: 0x00C04D50 (FUN_00C04D50, dynamic atexit destructor for `gTConVar_ren_ShadowBias`)
+   */
   TConVar<float> gTConVar_ren_ShadowBias(
     "ren_ShadowBias",
     kConsoleStartupRenShadowBiasDescription,
     &moho::ren_ShadowBias
   );
 
-  /**
-   * Address: 0x00C02160 (FUN_00C02160, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ai_InitialMassCurrency`.
-   */
-  void cleanup_TConVar_ai_InitialMassCurrency()
-  {
-    CleanupStartupConCommand(gTConVar_ai_InitialMassCurrency);
-  }
-
-  /**
-   * Address: 0x00BDCFF0 (FUN_00BDCFF0, register_TConVar_ai_InitialMassCurrency)
-   *
-   * What it does:
-   * Registers startup convar for `ai_InitialMassCurrency`.
-   */
-  void register_TConVar_ai_InitialMassCurrency()
-  {
-    RegisterStartupConVar(gTConVar_ai_InitialMassCurrency, &cleanup_TConVar_ai_InitialMassCurrency);
-  }
-
-  /**
-   * Address: 0x00C021C0 (FUN_00C021C0, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ai_InitialMassCurrencyMax`.
-   */
-  void cleanup_TConVar_ai_InitialMassCurrencyMax()
-  {
-    CleanupStartupConCommand(gTConVar_ai_InitialMassCurrencyMax);
-  }
-
-  /**
-   * Address: 0x00BDD070 (FUN_00BDD070, register_TConVar_ai_InitialMassCurrencyMax)
-   *
-   * What it does:
-   * Registers startup convar for `ai_InitialMassCurrencyMax`.
-   */
-  void register_TConVar_ai_InitialMassCurrencyMax()
-  {
-    RegisterStartupConVar(gTConVar_ai_InitialMassCurrencyMax, &cleanup_TConVar_ai_InitialMassCurrencyMax);
-  }
-
-  /**
-   * Address: 0x00C04D50 (FUN_00C04D50, the `atexit` target the registrar below installs)
-   *
-   * What it does:
-   * Unregisters startup convar storage for `ren_ShadowBias`.
-   */
-  void cleanup_TConVar_ren_ShadowBias()
-  {
-    CleanupStartupConCommand(gTConVar_ren_ShadowBias);
-  }
-
-  /**
-   * Address: 0x00BE1F60 (FUN_00BE1F60, register_TConVar_ren_ShadowBias)
-   *
-   * What it does:
-   * Registers startup convar for `ren_ShadowBias`, the shadow depth bias
-   * `MeshRenderer::ConfigureShader`'s shadow lane already reads from the
-   * plain `moho::ren_ShadowBias` global (Mesh.cpp).
-   */
-  void register_TConVar_ren_ShadowBias()
-  {
-    RegisterStartupConVar(gTConVar_ren_ShadowBias, &cleanup_TConVar_ren_ShadowBias);
-  }
 } // namespace moho
 
-namespace
-{
-  struct ConsoleStartupRegistrationsMisc4
-  {
-    ConsoleStartupRegistrationsMisc4()
-    {
-      moho::register_TConVar_ai_InitialMassCurrency();
-      moho::register_TConVar_ai_InitialMassCurrencyMax();
-      moho::register_TConVar_ren_ShadowBias();
-    }
-  };
-
-  [[maybe_unused]] ConsoleStartupRegistrationsMisc4 gConsoleStartupRegistrationsMisc4;
-} // namespace

@@ -34,76 +34,10 @@ namespace
   int gRecoveredCScrLuaMetatableFactoryReconBlipIndex = 0;
   int gRecoveredCScrLuaMetatableFactoryEntityIndex = 0;
 
-  [[nodiscard]] moho::CConAlias& ConAlias_path_ArmyBudget()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_MaxInstantWorkUnits()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_UnreachableTimeoutSearchSteps()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AirLookAheadMult()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_RandomElevationOffset()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_ShowRaisedPlatforms()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_tree_AccelFactor()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_tree_SpringFactor()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_tree_DampFactor()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_tree_UprootFactor()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::TSimConVar<int>& SimConVar_path_ArmyBudget()
   {
     static moho::TSimConVar<int> sVar(false, "path_ArmyBudget", 2500);
     return sVar;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_RenderBombDropZone()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
   }
 
   [[nodiscard]] moho::TSimConVar<bool>& SimConVar_AI_RenderBombDropZone()
@@ -300,13 +234,11 @@ namespace
   }
 
   alignas(moho::CConAlias) unsigned char gReconFlushConAliasStorage[sizeof(moho::CConAlias)] = {};
-  bool gReconFlushConAliasConstructed = false;
 
   alignas(moho::CSimConFunc) unsigned char gReconFlushSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
   bool gReconFlushSimConFuncConstructed = false;
 
   alignas(moho::CConAlias) unsigned char gScenarioMethodConAliasStorage[sizeof(moho::CConAlias)] = {};
-  bool gScenarioMethodConAliasConstructed = false;
 
   alignas(moho::CSimConFunc) unsigned char gScenarioMethodSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
   bool gScenarioMethodSimConFuncConstructed = false;
@@ -328,21 +260,6 @@ namespace
   SimConVarStartupStorage<int> gPathMaxInstantWorkUnitsSimConVarSlot{}; // Original startup slot offset: 0x10AEDB4
   SimConVarStartupStorage<int> gPathUnreachableTimeoutSearchStepsSimConVarSlot{}; // Original startup slot offset: 0x10AEDCC
 
-  [[nodiscard]] moho::CConAlias& ReconFlushConAlias()
-  {
-    return *std::launder(reinterpret_cast<moho::CConAlias*>(gReconFlushConAliasStorage));
-  }
-
-  [[nodiscard]] moho::CConAlias& ConstructReconFlushConAlias()
-  {
-    if (!gReconFlushConAliasConstructed) {
-      new (gReconFlushConAliasStorage) moho::CConAlias();
-      gReconFlushConAliasConstructed = true;
-    }
-
-    return ReconFlushConAlias();
-  }
-
   [[nodiscard]] moho::CSimConFunc& ReconFlushSimConFunc()
   {
     return *std::launder(reinterpret_cast<moho::CSimConFunc*>(gReconFlushSimConFuncStorage));
@@ -356,21 +273,6 @@ namespace
     }
 
     return ReconFlushSimConFunc();
-  }
-
-  [[nodiscard]] moho::CConAlias& ScenarioMethodConAlias()
-  {
-    return *std::launder(reinterpret_cast<moho::CConAlias*>(gScenarioMethodConAliasStorage));
-  }
-
-  [[nodiscard]] moho::CConAlias& ConstructScenarioMethodConAlias()
-  {
-    if (!gScenarioMethodConAliasConstructed) {
-      new (gScenarioMethodConAliasStorage) moho::CConAlias();
-      gScenarioMethodConAliasConstructed = true;
-    }
-
-    return ScenarioMethodConAlias();
   }
 
   [[nodiscard]] moho::CSimConFunc& ScenarioMethodSimConFunc()
@@ -439,23 +341,14 @@ namespace
   {
     SimStartupRegistrationsBootstrapA()
     {
-      moho::register_tree_AccelFactor_ConAliasDef();
       moho::register_tree_AccelFactor_SimConVarDef();
-      moho::register_tree_SpringFactor_ConAliasDef();
       moho::register_tree_SpringFactor_SimConVarDef();
-      moho::register_tree_DampFactor_ConAliasDef();
       moho::register_tree_DampFactor_SimConVarDef();
-      moho::register_tree_UprootFactor_ConAliasDef();
       moho::register_tree_UprootFactor_SimConVarDef();
-      moho::register_ShowRaisedPlatforms_ConAlias();
       moho::register_ShowRaisedPlatforms_SimConVar();
-      moho::register_RandomElevationOffset_ConAlias();
       moho::register_RandomElevationOffset_SimConVarDef();
-      moho::register_AirLookAheadMult_ConAlias();
       moho::register_AirLookAheadMult_SimConVarDef();
-      moho::register_path_MaxInstantWorkUnits_ConAliasDef();
       moho::register_path_MaxInstantWorkUnits_SimConVarDef();
-      moho::register_path_UnreachableTimeoutSearchSteps_ConAliasDef();
       moho::register_path_UnreachableTimeoutSearchSteps_SimConVarDef();
       (void)moho::register_sim_SimInits_mForms_reconBlipAnchorA();
       (void)moho::register_ReconBlipLuaBaseClass();
@@ -470,9 +363,7 @@ namespace
       (void)moho::register_ReconBlipIsOnSonar_LuaFuncDef();
       (void)moho::register_ReconBlipIsOnRadar_LuaFuncDef();
       (void)moho::register_ReconBlipIsKnownFake_LuaFuncDef();
-      moho::register_ReconFlush_ConAliasDef();
       moho::register_ReconFlush_SimConFuncDef();
-      moho::register_CConAlias_ScenarioMethod();
       moho::register_ScenarioMethod_SimConFuncDef();
     }
   };
@@ -483,32 +374,10 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BFCFB0 (FUN_00BFCFB0, cleanup_tree_AccelFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_AccelFactor` alias startup storage.
+   * Address: 0x00BD59E0 (FUN_00BD59E0, dynamic initializer for `gConAlias_tree_AccelFactor`)
+   * Address: 0x00BFCFB0 (FUN_00BFCFB0, dynamic atexit destructor for `gConAlias_tree_AccelFactor`)
    */
-  void cleanup_tree_AccelFactor_ConAlias()
-  {
-    ConAlias_tree_AccelFactor().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD59E0 (FUN_00BD59E0, register_tree_AccelFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_AccelFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_AccelFactor_ConAliasDef()
-  {
-    ConAlias_tree_AccelFactor().InitializeRecovered(
-      "How quickly falling trees accelerate",
-      "tree_AccelFactor",
-      "DoSimCommand tree_AccelFactor"
-    );
-    RegisterAtexitCleanup<&cleanup_tree_AccelFactor_ConAlias>();
-  }
+  moho::CConAlias gConAlias_tree_AccelFactor("tree_AccelFactor", "How quickly falling trees accelerate", "DoSimCommand tree_AccelFactor");
 
   /**
    * Address: 0x00BFD000 (FUN_00BFD000, cleanup_tree_AccelFactor_SimConVarDef)
@@ -535,32 +404,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD010 (FUN_00BFD010, cleanup_tree_SpringFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_SpringFactor` alias startup storage.
+   * Address: 0x00BD5A60 (FUN_00BD5A60, dynamic initializer for `gConAlias_tree_SpringFactor`)
+   * Address: 0x00BFD010 (FUN_00BFD010, dynamic atexit destructor for `gConAlias_tree_SpringFactor`)
    */
-  void cleanup_tree_SpringFactor_ConAlias()
-  {
-    ConAlias_tree_SpringFactor().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD5A60 (FUN_00BD5A60, register_tree_SpringFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_SpringFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_SpringFactor_ConAliasDef()
-  {
-    ConAlias_tree_SpringFactor().InitializeRecovered(
-      "How quickly swaying trees spring back",
-      "tree_SpringFactor",
-      "DoSimCommand tree_SpringFactor"
-    );
-    RegisterAtexitCleanup<&cleanup_tree_SpringFactor_ConAlias>();
-  }
+  moho::CConAlias gConAlias_tree_SpringFactor("tree_SpringFactor", "How quickly swaying trees spring back", "DoSimCommand tree_SpringFactor");
 
   /**
    * Address: 0x00BFD060 (FUN_00BFD060, cleanup_tree_SpringFactor_SimConVarDef)
@@ -587,32 +434,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD070 (FUN_00BFD070, cleanup_tree_DampFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_DampFactor` alias startup storage.
+   * Address: 0x00BD5AE0 (FUN_00BD5AE0, dynamic initializer for `gConAlias_tree_DampFactor`)
+   * Address: 0x00BFD070 (FUN_00BFD070, dynamic atexit destructor for `gConAlias_tree_DampFactor`)
    */
-  void cleanup_tree_DampFactor_ConAlias()
-  {
-    ConAlias_tree_DampFactor().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD5AE0 (FUN_00BD5AE0, register_tree_DampFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_DampFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_DampFactor_ConAliasDef()
-  {
-    ConAlias_tree_DampFactor().InitializeRecovered(
-      "Damping on swaying trees (0 to 1)",
-      "tree_DampFactor",
-      "DoSimCommand tree_DampFactor"
-    );
-    RegisterAtexitCleanup<&cleanup_tree_DampFactor_ConAlias>();
-  }
+  moho::CConAlias gConAlias_tree_DampFactor("tree_DampFactor", "Damping on swaying trees (0 to 1)", "DoSimCommand tree_DampFactor");
 
   /**
    * Address: 0x00BFD0C0 (FUN_00BFD0C0, cleanup_tree_DampFactor_SimConVarDef)
@@ -639,32 +464,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD0D0 (FUN_00BFD0D0, cleanup_tree_UprootFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_UprootFactor` alias startup storage.
+   * Address: 0x00BD5B60 (FUN_00BD5B60, dynamic initializer for `gConAlias_tree_UprootFactor`)
+   * Address: 0x00BFD0D0 (FUN_00BFD0D0, dynamic atexit destructor for `gConAlias_tree_UprootFactor`)
    */
-  void cleanup_tree_UprootFactor_ConAlias()
-  {
-    ConAlias_tree_UprootFactor().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD5B60 (FUN_00BD5B60, register_tree_UprootFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_UprootFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_UprootFactor_ConAliasDef()
-  {
-    ConAlias_tree_UprootFactor().InitializeRecovered(
-      "How far to raise falling trees up out of the ground",
-      "tree_UprootFactor",
-      "DoSimCommand tree_UprootFactor"
-    );
-    RegisterAtexitCleanup<&cleanup_tree_UprootFactor_ConAlias>();
-  }
+  moho::CConAlias gConAlias_tree_UprootFactor("tree_UprootFactor", "How far to raise falling trees up out of the ground", "DoSimCommand tree_UprootFactor");
 
   /**
    * Address: 0x00BFD120 (FUN_00BFD120, cleanup_tree_UprootFactor_SimConVarDef)
@@ -711,31 +514,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFD880 (FUN_00BFD880, cleanup_ShowRaisedPlatforms_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `ShowRaisedPlatforms` alias startup storage.
+   * Address: 0x00BD69F0 (FUN_00BD69F0, dynamic initializer for `gConAlias_ShowRaisedPlatforms`)
+   * Address: 0x00BFD880 (FUN_00BFD880, dynamic atexit destructor for `gConAlias_ShowRaisedPlatforms`)
    */
-  void cleanup_ShowRaisedPlatforms_ConAlias()
-  {
-    ConAlias_ShowRaisedPlatforms().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD69F0 (FUN_00BD69F0, register_ShowRaisedPlatforms_ConAlias)
-   *
-   * What it does:
-   * Registers the `ShowRaisedPlatforms` alias used by sim debug rendering.
-   */
-  void register_ShowRaisedPlatforms_ConAlias()
-  {
-    ConAlias_ShowRaisedPlatforms().InitializeRecovered(
-      "Turns on or off rendering of raised platform for tweaking and setting up purposes",
-      "ShowRaisedPlatforms",
-      "DoSimCommand ShowRaisedPlatforms"
-    );
-    RegisterAtexitCleanup<&cleanup_ShowRaisedPlatforms_ConAlias>();
-  }
+  moho::CConAlias gConAlias_ShowRaisedPlatforms("ShowRaisedPlatforms", "Turns on or off rendering of raised platform for tweaking and setting up purposes", "DoSimCommand ShowRaisedPlatforms");
 
   /**
    * Address: 0x00BFD8D0 (FUN_00BFD8D0, cleanup_ShowRaisedPlatforms_SimConVar)
@@ -766,32 +548,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFDE30 (FUN_00BFDE30, cleanup_RandomElevationOffset_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `RandomElevationOffset` alias startup storage.
+   * Address: 0x00BD6F60 (FUN_00BD6F60, dynamic initializer for `gConAlias_RandomElevationOffset`)
+   * Address: 0x00BFDE30 (FUN_00BFDE30, dynamic atexit destructor for `gConAlias_RandomElevationOffset`)
    */
-  void cleanup_RandomElevationOffset_ConAlias()
-  {
-    ConAlias_RandomElevationOffset().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD6F60 (FUN_00BD6F60, register_RandomElevationOffset_ConAlias)
-   *
-   * What it does:
-   * Initializes recovered `RandomElevationOffset` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_RandomElevationOffset_ConAlias()
-  {
-    ConAlias_RandomElevationOffset().InitializeRecovered(
-      "Alter random non-combat elevation offset so plane don't all stick on the same plane",
-      "RandomElevationOffset",
-      "DoSimCommand RandomElevationOffset"
-    );
-    RegisterAtexitCleanup<&cleanup_RandomElevationOffset_ConAlias>();
-  }
+  moho::CConAlias gConAlias_RandomElevationOffset("RandomElevationOffset", "Alter random non-combat elevation offset so plane don't all stick on the same plane", "DoSimCommand RandomElevationOffset");
 
   /**
    * Address: 0x00BFDE80 (FUN_00BFDE80, cleanup_RandomElevationOffset_SimConVarDef)
@@ -818,32 +578,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE0F0 (FUN_00BFE0F0, cleanup_AirLookAheadMult_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `AirLookAheadMult` alias startup storage.
+   * Address: 0x00BD74B0 (FUN_00BD74B0, dynamic initializer for `gConAlias_AirLookAheadMult`)
+   * Address: 0x00BFE0F0 (FUN_00BFE0F0, dynamic atexit destructor for `gConAlias_AirLookAheadMult`)
    */
-  void cleanup_AirLookAheadMult_ConAlias()
-  {
-    ConAlias_AirLookAheadMult().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD74B0 (FUN_00BD74B0, register_AirLookAheadMult_ConAlias)
-   *
-   * What it does:
-   * Initializes recovered `AirLookAheadMult` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_AirLookAheadMult_ConAlias()
-  {
-    ConAlias_AirLookAheadMult().InitializeRecovered(
-      "Alter the air units look ahead distance",
-      "AirLookAheadMult",
-      "DoSimCommand AirLookAheadMult"
-    );
-    RegisterAtexitCleanup<&cleanup_AirLookAheadMult_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AirLookAheadMult("AirLookAheadMult", "Alter the air units look ahead distance", "DoSimCommand AirLookAheadMult");
 
   /**
    * Address: 0x00BFE140 (FUN_00BFE140, cleanup_AirLookAheadMult_SimConVarDef)
@@ -1518,37 +1256,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9B20 (FUN_00BD9B20, register_path_ArmyBudget_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_ArmyBudget` console alias text for sim-command dispatch.
+   * Address: 0x00BD9B20 (FUN_00BD9B20, dynamic initializer for `gConAlias_path_ArmyBudget`)
+   * Address: 0x00BFE530 (FUN_00BFE530, dynamic atexit destructor for `gConAlias_path_ArmyBudget`)
    */
-  /**
-   * Address: 0x00BFE530 (FUN_00BFE530, cleanup_path_ArmyBudget_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_ArmyBudget`.
-   */
-  void cleanup_path_ArmyBudget_ConAliasDef()
-  {
-    ConAlias_path_ArmyBudget().ShutdownRecovered();
-  }
-
-  void register_path_ArmyBudget_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_ArmyBudget().InitializeRecovered(
-      "Budget for each army to do pathfinding each tick",
-      "path_ArmyBudget",
-      "DoSimCommand path_ArmyBudget"
-    );
-    RegisterAtexitCleanup<&cleanup_path_ArmyBudget_ConAliasDef>();
-  }
+  moho::CConAlias gConAlias_path_ArmyBudget("path_ArmyBudget", "Budget for each army to do pathfinding each tick", "DoSimCommand path_ArmyBudget");
 
   /**
    * Address: 0x00BD9B50 (FUN_00BD9B50, register_path_ArmyBudget_SimConVarDef)
@@ -1562,37 +1273,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF70E0 (FUN_00BF70E0, sub_BF70E0)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_MaxInstantWorkUnits`.
+   * Address: 0x00BCCBF0 (FUN_00BCCBF0, dynamic initializer for `gConAlias_path_MaxInstantWorkUnits`)
+   * Address: 0x00BF70E0 (FUN_00BF70E0, dynamic atexit destructor for `gConAlias_path_MaxInstantWorkUnits`)
    */
-  void cleanup_path_MaxInstantWorkUnits_ConAliasDef()
-  {
-    ConAlias_path_MaxInstantWorkUnits().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BCCBF0 (FUN_00BCCBF0, register_path_MaxInstantWorkUnits_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_MaxInstantWorkUnits` console alias.
-   */
-  void register_path_MaxInstantWorkUnits_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_MaxInstantWorkUnits().InitializeRecovered(
-      "Budget for instant pathfinds by the AI",
-      "path_MaxInstantWorkUnits",
-      "DoSimCommand path_MaxInstantWorkUnits"
-    );
-    RegisterAtexitCleanup<&cleanup_path_MaxInstantWorkUnits_ConAliasDef>();
-  }
+  moho::CConAlias gConAlias_path_MaxInstantWorkUnits("path_MaxInstantWorkUnits", "Budget for instant pathfinds by the AI", "DoSimCommand path_MaxInstantWorkUnits");
 
   /**
    * Address: 0x00BF7130 (FUN_00BF7130, sub_BF7130)
@@ -1619,38 +1303,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF7140 (FUN_00BF7140, sub_BF7140)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for
-   * `path_UnreachableTimeoutSearchSteps`.
+   * Address: 0x00BCCC70 (FUN_00BCCC70, dynamic initializer for `gConAlias_path_UnreachableTimeoutSearchSteps`)
+   * Address: 0x00BF7140 (FUN_00BF7140, dynamic atexit destructor for `gConAlias_path_UnreachableTimeoutSearchSteps`)
    */
-  void cleanup_path_UnreachableTimeoutSearchSteps_ConAliasDef()
-  {
-    ConAlias_path_UnreachableTimeoutSearchSteps().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BCCC70 (FUN_00BCCC70, register_path_UnreachableTimeoutSearchSteps_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_UnreachableTimeoutSearchSteps` console alias.
-   */
-  void register_path_UnreachableTimeoutSearchSteps_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_UnreachableTimeoutSearchSteps().InitializeRecovered(
-      "Maximum number of ticks to allow a single pathfind to take for an unreachable path",
-      "path_UnreachableTimeoutSearchSteps",
-      "DoSimCommand path_UnreachableTimeoutSearchSteps"
-    );
-    RegisterAtexitCleanup<&cleanup_path_UnreachableTimeoutSearchSteps_ConAliasDef>();
-  }
+  moho::CConAlias gConAlias_path_UnreachableTimeoutSearchSteps("path_UnreachableTimeoutSearchSteps", "Maximum number of ticks to allow a single pathfind to take for an unreachable path", "DoSimCommand path_UnreachableTimeoutSearchSteps");
 
   /**
    * Address: 0x00BF7190 (FUN_00BF7190, sub_BF7190)
@@ -1678,38 +1334,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8710 (FUN_00BD8710, register_AI_RenderBombDropZone_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `AI_RenderBombDropZone` console alias text for sim-command
-   * dispatch.
+   * Address: 0x00BD8710 (FUN_00BD8710, dynamic initializer for `gConAlias_AI_RenderBombDropZone`)
+   * Address: 0x00BFF2C0 (FUN_00BFF2C0, dynamic atexit destructor for `gConAlias_AI_RenderBombDropZone`)
    */
-  /**
-   * Address: 0x00BFF2C0 (FUN_00BFF2C0, cleanup_AI_RenderBombDropZone_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `AI_RenderBombDropZone`.
-   */
-  void cleanup_AI_RenderBombDropZone_ConAliasDef()
-  {
-    ConAlias_AI_RenderBombDropZone().ShutdownRecovered();
-  }
-
-  void register_AI_RenderBombDropZone_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_AI_RenderBombDropZone().InitializeRecovered(
-      "Toggle on/off rendering of bomb drop zone",
-      "AI_RenderBombDropZone",
-      "DoSimCommand AI_RenderBombDropZone"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_RenderBombDropZone_ConAliasDef>();
-  }
+  moho::CConAlias gConAlias_AI_RenderBombDropZone("AI_RenderBombDropZone", "Toggle on/off rendering of bomb drop zone", "DoSimCommand AI_RenderBombDropZone");
 
   /**
    * Address: 0x00BD8740 (FUN_00BD8740, register_AI_RenderBombDropZone_SimConVarDef)
@@ -1895,22 +1523,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF7AE0 (FUN_00BF7AE0, cleanup_ReconFlush_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned `ReconFlush` console alias payload.
-   */
-  void cleanup_ReconFlush_ConAliasDef()
-  {
-    if (!gReconFlushConAliasConstructed) {
-      return;
-    }
-
-    ReconFlushConAlias().ShutdownRecovered();
-    gReconFlushConAliasConstructed = false;
-  }
-
-  /**
    * Address: 0x00BF7B30 (FUN_00BF7B30, cleanup_ReconFlush_SimConFuncDef)
    *
    * What it does:
@@ -1928,26 +1540,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCDE90 (FUN_00BCDE90, register_ReconFlush_ConAliasDef)
-   *
-   * What it does:
-   * Registers startup-owned `ReconFlush` console alias.
+   * Address: 0x00BCDE90 (FUN_00BCDE90, dynamic initializer for `gConAlias_ReconFlush`)
+   * Address: 0x00BF7AE0 (FUN_00BF7AE0, dynamic atexit destructor for `gConAlias_ReconFlush`)
    */
-  void register_ReconFlush_ConAliasDef()
-  {
-    static bool sRegistered = false;
-    if (sRegistered) {
-      return;
-    }
-
-    sRegistered = true;
-    ConstructReconFlushConAlias().InitializeRecovered(
-      "Flush all recon databases (destroys all blips)",
-      "ReconFlush",
-      "DoSimCommand ReconFlush"
-    );
-    RegisterAtexitCleanup<&cleanup_ReconFlush_ConAliasDef>();
-  }
+  moho::CConAlias gConAlias_ReconFlush("ReconFlush", "Flush all recon databases (destroys all blips)", "DoSimCommand ReconFlush");
 
   /**
    * Address: 0x00BCDEC0 (FUN_00BCDEC0, register_ReconFlush_SimConFuncDef)
@@ -1968,22 +1564,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C00EF0 (FUN_00C00EF0, CConAlias_ScenarioMethod cleanup)
-   *
-   * What it does:
-   * Tears down startup-owned `ScenarioMethod` console alias payload.
-   */
-  void cleanup_CConAlias_ScenarioMethod()
-  {
-    if (!gScenarioMethodConAliasConstructed) {
-      return;
-    }
-
-    ScenarioMethodConAlias().ShutdownRecovered();
-    gScenarioMethodConAliasConstructed = false;
-  }
-
-  /**
    * Address: 0x00C00F40 (FUN_00C00F40, cleanup_ScenarioMethod_SimConFuncDef)
    *
    * What it does:
@@ -2001,26 +1581,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDBCD0 (FUN_00BDBCD0, register_CConAlias_ScenarioMethod)
-   *
-   * What it does:
-   * Registers startup-owned `ScenarioMethod` command alias.
+   * Address: 0x00BDBCD0 (FUN_00BDBCD0, dynamic initializer for `gConAlias_ScenarioMethod`)
+   * Address: 0x00C00EF0 (FUN_00C00EF0, dynamic atexit destructor for `gConAlias_ScenarioMethod`)
    */
-  void register_CConAlias_ScenarioMethod()
-  {
-    static bool sRegistered = false;
-    if (sRegistered) {
-      return;
-    }
-
-    sRegistered = true;
-    ConstructScenarioMethodConAlias().InitializeRecovered(
-      "Run a scenario-specific command",
-      "ScenarioMethod",
-      "DoSimCommand ScenarioMethod"
-    );
-    RegisterAtexitCleanup<&cleanup_CConAlias_ScenarioMethod>();
-  }
+  moho::CConAlias gConAlias_ScenarioMethod("ScenarioMethod", "Run a scenario-specific command", "DoSimCommand ScenarioMethod");
 
   /**
    * Address: 0x00BDBD00 (FUN_00BDBD00, register_ScenarioMethod_SimConFuncDef)

@@ -99,79 +99,19 @@ namespace moho
 
   extern bool ren_Ranges;
 
-  /**
-   * Address: 0x00C03F50 (FUN_00C03F50, ??1TConVar_range_RenderSelected@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_RenderSelected();
 
-  /**
-   * Address: 0x00BE0AD0 (FUN_00BE0AD0, register_TConVar_range_RenderSelected)
-   */
-  void register_TConVar_range_RenderSelected();
 
-  /**
-   * Address: 0x00C03F80 (FUN_00C03F80, ??1TConVar_range_RenderHighlighted@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_RenderHighlighted();
 
-  /**
-   * Address: 0x00BE0B10 (FUN_00BE0B10, register_TConVar_range_RenderHighlighted)
-   */
-  void register_TConVar_range_RenderHighlighted();
 
-  /**
-   * Address: 0x00C03FB0 (FUN_00C03FB0, ??1TConVar_range_RenderBuild@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_RenderBuild();
 
-  /**
-   * Address: 0x00BE0B50 (FUN_00BE0B50, register_TConVar_range_RenderBuild)
-   */
-  void register_TConVar_range_RenderBuild();
 
-  /**
-   * Address: 0x00C03FE0 (FUN_00C03FE0, ??1TConVar_range_Fill@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_Fill();
 
-  /**
-   * Address: 0x00BE0B90 (FUN_00BE0B90, register_TConVar_range_Fill)
-   */
-  void register_TConVar_range_Fill();
 
-  /**
-   * Address: 0x00C04010 (FUN_00C04010, ??1TConVar_range_InnerThicknessCoeff@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_InnerThicknessCoeff();
 
-  /**
-   * Address: 0x00BE0BD0 (FUN_00BE0BD0, register_TConVar_range_InnerThicknessCoeff)
-   */
-  void register_TConVar_range_InnerThicknessCoeff();
 
-  /**
-   * Address: 0x00C04040 (FUN_00C04040, ??1TConVar_range_OuterThicknessCoeff@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_range_OuterThicknessCoeff();
 
-  /**
-   * Address: 0x00BE0C10 (FUN_00BE0C10, register_TConVar_range_OuterThicknessCoeff)
-   */
-  void register_TConVar_range_OuterThicknessCoeff();
 
-  /** NOT IN THE ORIGINAL BINARY - additive extension, see above. */
-  void cleanup_TConVar_range_RenderHoveredAttack();
 
-  /** NOT IN THE ORIGINAL BINARY - additive extension, see above. */
-  void register_TConVar_range_RenderHoveredAttack();
 
-  /**
-   * Address: 0x00C046F0 (FUN_00C046F0, ??1TConVar_ren_Ranges@Moho@@QAE@@Z)
-   */
-  void cleanup_TConVar_ren_Ranges();
 
-  /**
-   * Address: 0x00BE1690 (FUN_00BE1690, register_TConVar_ren_Ranges)
-   */
-  void register_TConVar_ren_Ranges();
 } // namespace moho

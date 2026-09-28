@@ -43,10 +43,29 @@ namespace
 
 
 
+  /**
+   * Address: 0x00BC47E0 (FUN_00BC47E0, dynamic initializer for `gTConVar_cam_HighLOD`)
+   * Address: 0x00BEF640 (FUN_00BEF640, dynamic atexit destructor for `gTConVar_cam_HighLOD`)
+   */
   moho::TConVar<float> gTConVar_cam_HighLOD("cam_HighLOD", "", &moho::cam_HighLOD);
+
+  /**
+   * Address: 0x00BC4820 (FUN_00BC4820, dynamic initializer for `gTConVar_cam_MediumLOD`)
+   * Address: 0x00BEF670 (FUN_00BEF670, dynamic atexit destructor for `gTConVar_cam_MediumLOD`)
+   */
   moho::TConVar<float> gTConVar_cam_MediumLOD("cam_MediumLOD", "", &moho::cam_MediumLOD);
+
+  /**
+   * Address: 0x00BC4860 (FUN_00BC4860, dynamic initializer for `gTConVar_cam_LowLOD`)
+   * Address: 0x00BEF6A0 (FUN_00BEF6A0, dynamic atexit destructor for `gTConVar_cam_LowLOD`)
+   */
   moho::TConVar<float> gTConVar_cam_LowLOD("cam_LowLOD", "", &moho::cam_LowLOD);
-  moho::TConVar<float> gTConVar_cam_DefaultLOD("cam_DefaultLOD", "", &moho::cam_DefaultLOD);
+
+  /**
+   * Address: 0x00BC48A0 (FUN_00BC48A0, dynamic initializer for `gTConVar_cam_DefaultLOD`)
+   * Address: 0x00BEF6D0 (FUN_00BEF6D0, dynamic atexit destructor for `gTConVar_cam_DefaultLOD`)
+   */
+  moho::TConVar<float> gTConVar_cam_DefaultLOD("cam_DefaultLOD", "default value for camera level-of-detail scaling factor", &moho::cam_DefaultLOD);
 
   void DestroyCamManager()
   {
@@ -59,55 +78,6 @@ namespace
     gCamManagerInitialized = false;
   }
 
-  /**
-   * Address: 0x00BEF640 (FUN_00BEF640, Moho::TConVar_cam_HighLOD::~TConVar_cam_HighLOD)
-   *
-   * What it does:
-   * Tears down the static `cam_HighLOD` console-variable registration: restores
-   * the base `CConCommand` vftable and reregisters the slot when a name lane is
-   * still set. Registered via `atexit` from the convar startup path.
-   */
-  void CleanupTConVar_cam_HighLOD() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_cam_HighLOD);
-  }
-
-  /**
-   * Address: 0x00BEF670 (FUN_00BEF670, Moho::TConVar_cam_MediumLOD::~TConVar_cam_MediumLOD)
-   *
-   * What it does:
-   * Tears down the static `cam_MediumLOD` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper.
-   */
-  void CleanupTConVar_cam_MediumLOD() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_cam_MediumLOD);
-  }
-
-  /**
-   * Address: 0x00BEF6A0 (FUN_00BEF6A0, Moho::TConVar_cam_LowLOD::~TConVar_cam_LowLOD)
-   *
-   * What it does:
-   * Tears down the static `cam_LowLOD` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper.
-   */
-  void CleanupTConVar_cam_LowLOD() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_cam_LowLOD);
-  }
-
-  /**
-   * Address: 0x00BEF6D0 (FUN_00BEF6D0, Moho::TConVar_cam_DefaultLOD::~TConVar_cam_DefaultLOD)
-   *
-   * What it does:
-   * Tears down the static `cam_DefaultLOD` console-variable registration via
-   * the shared `TeardownConCommandRegistration` helper.
-   */
-  void CleanupTConVar_cam_DefaultLOD() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_cam_DefaultLOD);
-  }
-
   /// 0x00E00779 (the shared empty-string literal also used by
   /// `ResolutionCommands.cpp`'s startup commands), the `.data` initializer
   /// of `Moho::CConFunc_SC_CameraScaleLOD` (+0x08). No console-help text in
@@ -118,7 +88,11 @@ namespace
   // `mHandlerOrValue` slot at +0x0C; the name and (empty) description
   // lanes are `.data` initializers, matching the `SC_PrimaryAdapter`/
   // `SC_ToggleCursorClip` pattern in ResolutionCommands.cpp.
-  moho::CConFunc gCConFunc_SC_CameraScaleLOD{};
+  /**
+   * Address: 0x00BE9540 (FUN_00BE9540, dynamic initializer for `gCConFunc_SC_CameraScaleLOD`)
+   * Address: 0x00C08DC0 (FUN_00C08DC0, dynamic atexit destructor for `gCConFunc_SC_CameraScaleLOD`)
+   */
+  moho::CConFunc gCConFunc_SC_CameraScaleLOD("SC_CameraScaleLOD", kConsoleStartupSCCameraScaleLODDescription, &moho::SC_CameraScaleLOD);
 } // namespace
 
 namespace moho
@@ -279,54 +253,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BC47E0 (FUN_00BC47E0, register_TConVar_cam_HighLOD)
-   *
-   * What it does:
-   * Registers the highest camera LOD convar and schedules process-exit teardown.
-   */
-  void register_TConVar_cam_HighLOD()
-  {
-    RegisterConCommand(gTConVar_cam_HighLOD);
-    (void)std::atexit(&CleanupTConVar_cam_HighLOD);
-  }
-
-  /**
-   * Address: 0x00BC4820 (FUN_00BC4820, register_TConVar_cam_MediumLOD)
-   *
-   * What it does:
-   * Registers the medium camera LOD convar and schedules process-exit teardown.
-   */
-  void register_TConVar_cam_MediumLOD()
-  {
-    RegisterConCommand(gTConVar_cam_MediumLOD);
-    (void)std::atexit(&CleanupTConVar_cam_MediumLOD);
-  }
-
-  /**
-   * Address: 0x00BC4860 (FUN_00BC4860, register_TConVar_cam_LowLOD)
-   *
-   * What it does:
-   * Registers the low camera LOD convar and schedules process-exit teardown.
-   */
-  void register_TConVar_cam_LowLOD()
-  {
-    RegisterConCommand(gTConVar_cam_LowLOD);
-    (void)std::atexit(&CleanupTConVar_cam_LowLOD);
-  }
-
-  /**
-   * Address: 0x00BC48A0 (FUN_00BC48A0, register_TConVar_cam_DefaultLOD)
-   *
-   * What it does:
-   * Registers the default camera LOD selector convar and schedules process-exit teardown.
-   */
-  void register_TConVar_cam_DefaultLOD()
-  {
-    RegisterConCommand(gTConVar_cam_DefaultLOD);
-    (void)std::atexit(&CleanupTConVar_cam_DefaultLOD);
-  }
-
-  /**
    * Address: 0x007AAC00 (FUN_007AAC00, ?CAM_GetManager@Moho@@YAPAVRCamManager@1@XZ)
    */
   RCamManager* CAM_GetManager()
@@ -442,46 +368,5 @@ namespace moho
     }
   }
 
-  /**
-   * Address: 0x00C08DC0 (FUN_00C08DC0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_CameraScaleLOD`.
-   */
-  void cleanup_CConFunc_SC_CameraScaleLOD()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_CameraScaleLOD);
-  }
-
-  /**
-   * Address: 0x00BE9540 (FUN_00BE9540, skip -- xc_a static initializer
-   * lane; patches the vftable + callback slot on the already-`.data`-
-   * initialized `gCConFunc_SC_CameraScaleLOD` and registers process-exit
-   * teardown)
-   */
-  void register_CConFunc_SC_CameraScaleLOD()
-  {
-    gCConFunc_SC_CameraScaleLOD.InitializeRecovered(
-      kConsoleStartupSCCameraScaleLODDescription, "SC_CameraScaleLOD", &moho::SC_CameraScaleLOD
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_CameraScaleLOD);
-  }
 } // namespace moho
 
-namespace
-{
-  struct RCamManagerStartupBootstrap
-  {
-    RCamManagerStartupBootstrap()
-    {
-      moho::register_TConVar_cam_HighLOD();
-      moho::register_TConVar_cam_MediumLOD();
-      moho::register_TConVar_cam_LowLOD();
-      moho::register_TConVar_cam_DefaultLOD();
-      moho::register_CConFunc_SC_CameraScaleLOD();
-    }
-  };
-
-  [[maybe_unused]] RCamManagerStartupBootstrap gRCamManagerStartupBootstrap;
-} // namespace

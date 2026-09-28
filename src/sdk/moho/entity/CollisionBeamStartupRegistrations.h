@@ -48,13 +48,6 @@ namespace moho
 
   static_assert(sizeof(ECollisionBeamEventTypeInfo) == 0x78, "ECollisionBeamEventTypeInfo size must be 0x78");
 
-  /**
-   * Address: 0x00BD4BA0 (FUN_00BD4BA0, register_TConVar_dbg_CollisionBeam)
-   *
-   * What it does:
-   * Registers startup `dbg_CollisionBeam` `TConVar<bool>` and installs exit cleanup.
-   */
-  void register_TConVar_dbg_CollisionBeam();
 
   /**
    * Address: 0x00BD4B40 (FUN_00BD4B40, initialize_CollisionBeamTrigConstants)

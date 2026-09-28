@@ -512,68 +512,27 @@ namespace
   /// 0x00E4F23C, the `.data` initializer of `Moho::CConFunc_SC_StartMemoryLog`
   /// (+0x08), read directly from the shipped PE.
   constexpr const char* kConsoleStartupSCStartMemoryLogDescription = "Start up memory logging to filename";
-  moho::CConFunc gCConFunc_SC_StartMemoryLog{};
+
+  /**
+   * Address: 0x00BE9700 (FUN_00BE9700, dynamic initializer for `gCConFunc_SC_StartMemoryLog`)
+   * Address: 0x00C08F10 (FUN_00C08F10, dynamic atexit destructor for `gCConFunc_SC_StartMemoryLog`)
+   */
+  moho::CConFunc gCConFunc_SC_StartMemoryLog("SC_StartMemoryLog", kConsoleStartupSCStartMemoryLogDescription, &SC_StartMemoryLog);
 
   /// 0x00E4F274, the `.data` initializer of `Moho::CConFunc_SC_StopMemoryLog`
   /// (+0x08), read directly from the shipped PE.
   constexpr const char* kConsoleStartupSCStopMemoryLogDescription = "Stop memory logging";
-  moho::CConFunc gCConFunc_SC_StopMemoryLog{};
 
   /**
-   * Address: 0x00C08F10 (FUN_00C08F10, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_StartMemoryLog`.
+   * Address: 0x00BE9740 (FUN_00BE9740, dynamic initializer for `gCConFunc_SC_StopMemoryLog`)
+   * Address: 0x00C08F40 (FUN_00C08F40, dynamic atexit destructor for `gCConFunc_SC_StopMemoryLog`)
    */
-  void cleanup_CConFunc_SC_StartMemoryLog()
-  {
-    moho::CleanupStartupConCommand(gCConFunc_SC_StartMemoryLog);
-  }
-
-  void register_CConFunc_SC_StartMemoryLog()
-  {
-    gCConFunc_SC_StartMemoryLog.InitializeRecovered(
-      kConsoleStartupSCStartMemoryLogDescription, "SC_StartMemoryLog", &SC_StartMemoryLog
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_StartMemoryLog);
-  }
-
-  /**
-   * Address: 0x00C08F40 (FUN_00C08F40, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_StopMemoryLog`.
-   */
-  void cleanup_CConFunc_SC_StopMemoryLog()
-  {
-    moho::CleanupStartupConCommand(gCConFunc_SC_StopMemoryLog);
-  }
-
-  void register_CConFunc_SC_StopMemoryLog()
-  {
-    gCConFunc_SC_StopMemoryLog.InitializeRecovered(
-      kConsoleStartupSCStopMemoryLogDescription, "SC_StopMemoryLog", &SC_StopMemoryLog
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_StopMemoryLog);
-  }
+  moho::CConFunc gCConFunc_SC_StopMemoryLog("SC_StopMemoryLog", kConsoleStartupSCStopMemoryLogDescription, &SC_StopMemoryLog);
 
   // The binary runs these registrars from the CRT static-initializer array;
   // this file-scope bootstrap object reproduces that, matching the
   // `ResolutionConsoleRegistrations`/`FrameDumpConsoleRegistrations` pattern
   // established in moho/app/ResolutionCommands.cpp / FrameDumpCommands.cpp.
-  struct WinMainConsoleRegistrations
-  {
-    WinMainConsoleRegistrations()
-    {
-      register_CConFunc_SC_StartMemoryLog();
-      register_CConFunc_SC_StopMemoryLog();
-    }
-  };
-
-  [[maybe_unused]] WinMainConsoleRegistrations gWinMainConsoleRegistrations;
-
   /**
    * Address: 0x004F1500 (FUN_004F1500)
    *

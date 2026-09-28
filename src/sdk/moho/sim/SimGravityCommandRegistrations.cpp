@@ -9,12 +9,6 @@
 
 namespace
 {
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_Gravity()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
   alignas(moho::CSimConFunc) unsigned char gSimConFunc_sim_GravityStorage[sizeof(moho::CSimConFunc)] = {};
   bool gSimConFunc_sim_GravityConstructed = false;
 
@@ -43,7 +37,6 @@ namespace
   {
     SimGravityCommandRegistrationsBootstrap()
     {
-      moho::register_sim_Gravity_ConAliasDef();
       moho::register_sim_Gravity_SimConFuncDef();
     }
   };
@@ -54,32 +47,10 @@ namespace
 namespace moho
 {
   /**
-   * Address: 0x00BFD490 (FUN_00BFD490, cleanup_sim_Gravity_ConAlias)
-   *
-   * What it does:
-   * Clears the `sim_Gravity` alias payload and unregisters the startup-owned
-   * console command wrapper.
+   * Address: 0x00BD6090 (FUN_00BD6090, dynamic initializer for `gConAlias_sim_Gravity`)
+   * Address: 0x00BFD490 (FUN_00BFD490, dynamic atexit destructor for `gConAlias_sim_Gravity`)
    */
-  void cleanup_sim_Gravity_ConAlias()
-  {
-    ConAlias_sim_Gravity().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD6090 (FUN_00BD6090, register_sim_Gravity_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_Gravity` console alias and arms its exit cleanup.
-   */
-  void register_sim_Gravity_ConAliasDef()
-  {
-    ConAlias_sim_Gravity().InitializeRecovered(
-      "Show or change the current gravity.  Units are ogrids/(second^2)",
-      "sim_Gravity",
-      "DoSimCommand sim_Gravity"
-    );
-    RegisterAtexitCleanup<&cleanup_sim_Gravity_ConAlias>();
-  }
+  moho::CConAlias gConAlias_sim_Gravity("sim_Gravity", "Show or change the current gravity.  Units are ogrids/(second^2)", "DoSimCommand sim_Gravity");
 
   /**
    * Address: 0x00BFD4E0 (FUN_00BFD4E0, cleanup_sim_Gravity_SimConFunc)

@@ -48,7 +48,7 @@ using namespace moho;
 namespace moho
 {
   /**
-   * Address: 0x00F5A758 (Moho__lob_IgnoreNames)
+   * Address: 0x00F5A754 (Moho__lob_IgnoreNames)
    *
    * What it does:
    * Stores comma-separated player names that should be ignored by lobby peer-connect flow.
@@ -56,16 +56,16 @@ namespace moho
   msvc8::string lob_IgnoreNames{};
 
   /**
-   * Address: 0x00F5A770 (ConVar_lob_IgnoreNames)
+   * Address: 0x00BDFD50 (FUN_00BDFD50, dynamic initializer for `gTConVar_lob_IgnoreNames`)
+   * Address: 0x00C03930 (FUN_00C03930, dynamic atexit destructor for `gTConVar_lob_IgnoreNames`)
    *
-   * What it does:
-   * Console command definition that exposes `lob_IgnoreNames` for runtime tuning.
+   * Console variable over `lob_IgnoreNames` (.data 0x00F5A770).
    */
-  TConVar<msvc8::string> ConVar_lob_IgnoreNames{
+  TConVar<msvc8::string> gTConVar_lob_IgnoreNames(
     "lob_IgnoreNames",
-    "Comma seperated list of player names to ignore.",
+    "Comma seperated list of names of people to ignore.  For debugging purposes.",
     &lob_IgnoreNames
-  };
+  );
 
   int cfunc_CLobbySendDataL(LuaPlus::LuaState* state);
   int cfunc_CLobbyMakeValidPlayerNameL(LuaPlus::LuaState* state);
@@ -170,8 +170,6 @@ namespace
     LuaPlus::LuaObject mOptions;
   };
   static_assert(sizeof(LaunchPlayerOptionEntry) == 0x18, "LaunchPlayerOptionEntry size must be 0x18");
-
-  bool sLobbyIgnoreNamesConVarRegistered = false;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
   {
@@ -451,45 +449,6 @@ namespace
 
     return false;
   }
-
-  /**
-   * Address: 0x00C03930 (sub_C03930)
-   *
-   * What it does:
-   * Unregisters `lob_IgnoreNames` from the global console registry at process shutdown.
-   */
-  void UnregisterLobbyIgnoreNamesConVarDefinition()
-  {
-    if (!sLobbyIgnoreNamesConVarRegistered) {
-      return;
-    }
-
-    UnregisterConCommand(moho::ConVar_lob_IgnoreNames);
-    sLobbyIgnoreNamesConVarRegistered = false;
-  }
-
-  /**
-   * Address: 0x00BDFD50 (register_lob_IgnoreNames_ConVarDef)
-   *
-   * What it does:
-   * Registers `lob_IgnoreNames` convar once and wires shutdown teardown.
-   */
-  void RegisterLobbyIgnoreNamesConVarDefinition()
-  {
-    if (sLobbyIgnoreNamesConVarRegistered) {
-      return;
-    }
-
-    RegisterConCommand(moho::ConVar_lob_IgnoreNames);
-    sLobbyIgnoreNamesConVarRegistered = true;
-    std::atexit(&UnregisterLobbyIgnoreNamesConVarDefinition);
-  }
-
-  // Binary uses static initializer hooks for this convar; mirror that once-per-process registration.
-  [[maybe_unused]] const bool sLobbyIgnoreNamesConVarInit = []() {
-    RegisterLobbyIgnoreNamesConVarDefinition();
-    return true;
-  }();
 } // namespace
 
 namespace moho

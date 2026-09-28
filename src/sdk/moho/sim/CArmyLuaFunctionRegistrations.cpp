@@ -42,12 +42,6 @@ namespace
   constexpr const char* kCivilianArmyColorFieldName = "CivilianArmyColor";
   constexpr const char* kUnidentifiedColorFieldName = "UnidentifiedColor";
 
-  [[nodiscard]] moho::CConAlias& ConAlias_SetArmyColor()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc& SimConFunc_SetArmyColor()
   {
     static moho::CSimConFunc sCommand(false, "SetArmyColor", &moho::Sim::SetArmyColor);
@@ -928,38 +922,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD9EA0 (FUN_00BD9EA0, register_SetArmyColor_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SetArmyColor` console alias that routes to
-   * `DoSimCommand SetArmyColor`.
+   * Address: 0x00BD9EA0 (FUN_00BD9EA0, dynamic initializer for `gConAlias_SetArmyColor`)
+   * Address: 0x00BFF4F0 (FUN_00BFF4F0, dynamic atexit destructor for `gConAlias_SetArmyColor`)
    */
-  /**
-   * Address: 0x00BFF4F0 (FUN_00BFF4F0, cleanup_SetArmyColor_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SetArmyColor`.
-   */
-  void cleanup_SetArmyColor_ConAliasDef()
-  {
-    ConAlias_SetArmyColor().ShutdownRecovered();
-  }
-
-  void register_SetArmyColor_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SetArmyColor().InitializeRecovered(
-      "SetArmyColor(army,r,g,b)",
-      "SetArmyColor",
-      "DoSimCommand SetArmyColor"
-    );
-    (void)std::atexit(&cleanup_SetArmyColor_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_SetArmyColor("SetArmyColor", "SetArmyColor(army,r,g,b)", "DoSimCommand SetArmyColor");
 
   /**
    * Address: 0x00BD9ED0 (FUN_00BD9ED0, register_SetArmyColor_SimConFuncDef)

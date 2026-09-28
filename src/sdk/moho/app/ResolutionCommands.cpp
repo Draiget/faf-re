@@ -26,25 +26,44 @@ namespace
   // `mFunc` slot at +0x0C; the name and (empty) description lanes are
   // `.data` initializers, matching the pattern already established for the
   // `dump_Frames`/`dump_Frame` registrars in FrameDumpCommands.cpp.
-  moho::CConFunc gCConFunc_SC_PrimaryAdapter{};
+  /**
+   * Address: 0x00BE9480 (FUN_00BE9480, dynamic initializer for `gCConFunc_SC_PrimaryAdapter`)
+   * Address: 0x00C08D30 (FUN_00C08D30, dynamic atexit destructor for `gCConFunc_SC_PrimaryAdapter`)
+   */
+  moho::CConFunc gCConFunc_SC_PrimaryAdapter("SC_PrimaryAdapter", kConsoleStartupSCPrimaryAdapterDescription, &moho::SC_PrimaryAdapter);
 
   /// 0x00E00779 (the same shared empty-string literal `SC_PrimaryAdapter`
   /// uses), the `.data` initializer of `Moho::CConFunc_SC_VerticalSync`
   /// (+0x08). No console-help text in the binary.
   constexpr const char* kConsoleStartupSCVerticalSyncDescription = "";
-  moho::CConFunc gCConFunc_SC_VerticalSync{};
+
+  /**
+   * Address: 0x00BE9580 (FUN_00BE9580, dynamic initializer for `gCConFunc_SC_VerticalSync`)
+   * Address: 0x00C08DF0 (FUN_00C08DF0, dynamic atexit destructor for `gCConFunc_SC_VerticalSync`)
+   */
+  moho::CConFunc gCConFunc_SC_VerticalSync("SC_VerticalSync", kConsoleStartupSCVerticalSyncDescription, &moho::SC_VerticalSync);
 
   /// 0x00E4F1E0, the `.data` initializer of `Moho::CConFunc_SC_ToggleCursorClip`
   /// (+0x08), read directly from the shipped PE.
   constexpr const char* kConsoleStartupSCToggleCursorClipDescription =
     "Set the cursor clip to either the pre-launch clip or the current clip";
-  moho::CConFunc gCConFunc_SC_ToggleCursorClip{};
+
+  /**
+   * Address: 0x00BE96C0 (FUN_00BE96C0, dynamic initializer for `gCConFunc_SC_ToggleCursorClip`)
+   * Address: 0x00C08EE0 (FUN_00C08EE0, dynamic atexit destructor for `gCConFunc_SC_ToggleCursorClip`)
+   */
+  moho::CConFunc gCConFunc_SC_ToggleCursorClip("SC_ToggleCursorClip", kConsoleStartupSCToggleCursorClipDescription, &moho::SC_ToggleCursorClip);
 
   /// 0x00E00779 (the same shared empty-string literal `SC_PrimaryAdapter`
   /// uses), the `.data` initializer of `Moho::CConFunc_SC_SecondaryAdapter`
   /// (+0x08). No console-help text in the binary.
   constexpr const char* kConsoleStartupSCSecondaryAdapterDescription = "";
-  moho::CConFunc gCConFunc_SC_SecondaryAdapter{};
+
+  /**
+   * Address: 0x00BE94C0 (FUN_00BE94C0, dynamic initializer for `gCConFunc_SC_SecondaryAdapter`)
+   * Address: 0x00C08D60 (FUN_00C08D60, dynamic atexit destructor for `gCConFunc_SC_SecondaryAdapter`)
+   */
+  moho::CConFunc gCConFunc_SC_SecondaryAdapter("SC_SecondaryAdapter", kConsoleStartupSCSecondaryAdapterDescription, &moho::SC_SecondaryAdapter);
 
   /// Style bits observed at the "argument is literally `windowed`" branch's
   /// `SetWindowStyleFlag` call site (0x008D35DB): decodes to
@@ -156,26 +175,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C08D30 (FUN_00C08D30, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_PrimaryAdapter`.
-   */
-  void cleanup_CConFunc_SC_PrimaryAdapter()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_PrimaryAdapter);
-  }
-
-  void register_CConFunc_SC_PrimaryAdapter()
-  {
-    gCConFunc_SC_PrimaryAdapter.InitializeRecovered(
-      kConsoleStartupSCPrimaryAdapterDescription, "SC_PrimaryAdapter", &moho::SC_PrimaryAdapter
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_PrimaryAdapter);
-  }
-
-  /**
    * Address: 0x008D3BE0 (FUN_008D3BE0, sub_8D3BE0)
    *
    * What it does:
@@ -202,26 +201,6 @@ namespace moho
     }
 
     sDeviceLock = false;
-  }
-
-  /**
-   * Address: 0x00C08DF0 (FUN_00C08DF0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_VerticalSync`.
-   */
-  void cleanup_CConFunc_SC_VerticalSync()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_VerticalSync);
-  }
-
-  void register_CConFunc_SC_VerticalSync()
-  {
-    gCConFunc_SC_VerticalSync.InitializeRecovered(
-      kConsoleStartupSCVerticalSyncDescription, "SC_VerticalSync", &moho::SC_VerticalSync
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_VerticalSync);
   }
 
   /**
@@ -268,26 +247,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C08EE0 (FUN_00C08EE0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_ToggleCursorClip`.
-   */
-  void cleanup_CConFunc_SC_ToggleCursorClip()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_ToggleCursorClip);
-  }
-
-  void register_CConFunc_SC_ToggleCursorClip()
-  {
-    gCConFunc_SC_ToggleCursorClip.InitializeRecovered(
-      kConsoleStartupSCToggleCursorClipDescription, "SC_ToggleCursorClip", &moho::SC_ToggleCursorClip
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_ToggleCursorClip);
-  }
-
-  /**
    * Address: 0x008D37C0 (FUN_008D37C0, sub_8D37C0)
    *
    * What it does:
@@ -307,25 +266,6 @@ namespace moho
     SetupSecondaryAdapterSettings(adapterNotCommandLineOverridden);
   }
 
-  /**
-   * Address: 0x00C08D60 (FUN_00C08D60, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `SC_SecondaryAdapter`.
-   */
-  void cleanup_CConFunc_SC_SecondaryAdapter()
-  {
-    CleanupStartupConCommand(gCConFunc_SC_SecondaryAdapter);
-  }
-
-  void register_CConFunc_SC_SecondaryAdapter()
-  {
-    gCConFunc_SC_SecondaryAdapter.InitializeRecovered(
-      kConsoleStartupSCSecondaryAdapterDescription, "SC_SecondaryAdapter", &moho::SC_SecondaryAdapter
-    );
-    (void)std::atexit(&cleanup_CConFunc_SC_SecondaryAdapter);
-  }
 } // namespace moho
 
 namespace
@@ -333,16 +273,4 @@ namespace
   // The binary runs this registrar from the CRT static-initializer array; a
   // file-scope bootstrap object reproduces that, matching
   // `FrameDumpConsoleRegistrations` in FrameDumpCommands.cpp.
-  struct ResolutionConsoleRegistrations
-  {
-    ResolutionConsoleRegistrations()
-    {
-      moho::register_CConFunc_SC_PrimaryAdapter();
-      moho::register_CConFunc_SC_VerticalSync();
-      moho::register_CConFunc_SC_ToggleCursorClip();
-      moho::register_CConFunc_SC_SecondaryAdapter();
-    }
-  };
-
-  [[maybe_unused]] ResolutionConsoleRegistrations gResolutionConsoleRegistrations;
 } // namespace

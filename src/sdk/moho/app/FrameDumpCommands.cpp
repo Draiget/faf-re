@@ -30,8 +30,17 @@ namespace
   // 0x00F5A8F8 and 0x00F5A908. The registrars below only patch the vftable and
   // the `mFunc` slot at +0x0C; the name and description lanes are `.data`
   // initializers, which is where the two strings above come from.
-  moho::CConFunc gCConFunc_dump_Frames{};
-  moho::CConFunc gCConFunc_dump_Frame{};
+  /**
+   * Address: 0x00BE0F50 (FUN_00BE0F50, dynamic initializer for `gCConFunc_dump_Frames`)
+   * Address: 0x00C04240 (FUN_00C04240, dynamic atexit destructor for `gCConFunc_dump_Frames`)
+   */
+  moho::CConFunc gCConFunc_dump_Frames("dump_Frames", kConsoleStartupConDumpFramesDescription, &moho::DUMP_Frames);
+
+  /**
+   * Address: 0x00BE0F90 (FUN_00BE0F90, dynamic initializer for `gCConFunc_dump_Frame`)
+   * Address: 0x00C04270 (FUN_00C04270, dynamic atexit destructor for `gCConFunc_dump_Frame`)
+   */
+  moho::CConFunc gCConFunc_dump_Frame("dump_Frame", kConsoleStartupConDumpFrameDescription, &moho::DUMP_Frame);
 } // namespace
 
 namespace moho
@@ -173,73 +182,10 @@ namespace moho
     DUMP_UpdateTimestamp();
   }
 
-  /**
-   * Address: 0x00C04240 (FUN_00C04240, ??1CConFunc_dump_Frames@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `dump_Frames`.
-   */
-  void cleanup_CConFunc_dump_Frames()
-  {
-    CleanupStartupConCommand(gCConFunc_dump_Frames);
-  }
-
-  /**
-   * Address: 0x00C04270 (FUN_00C04270, ??1CConFunc_dump_Frame@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Unregisters startup command storage for `dump_Frame`.
-   */
-  void cleanup_CConFunc_dump_Frame()
-  {
-    CleanupStartupConCommand(gCConFunc_dump_Frame);
-  }
-
-  /**
-   * Address: 0x00BE0F50 (FUN_00BE0F50, register_CConFunc_dump_Frames)
-   *
-   * What it does:
-   * Registers the startup console callback for `dump_Frames`. The store
-   * `Moho__CConFunc_dump_Frames.mFunc = offset Moho__DUMP_Frames` at
-   * 0x00BE0F70 is the only reference to `Moho::DUMP_Frames` in the image.
-   */
-  void register_CConFunc_dump_Frames()
-  {
-    gCConFunc_dump_Frames.InitializeRecovered(
-      kConsoleStartupConDumpFramesDescription, "dump_Frames", &moho::DUMP_Frames
-    );
-    (void)std::atexit(&cleanup_CConFunc_dump_Frames);
-  }
-
-  /**
-   * Address: 0x00BE0F90 (FUN_00BE0F90, register_CConFunc_dump_Frame)
-   *
-   * What it does:
-   * Registers the startup console callback for `dump_Frame`. The store
-   * `Moho__CConFunc_dump_Frame.mFunc = offset Moho__DUMP_Frame` at 0x00BE0FB0
-   * is the only reference to `Moho::DUMP_Frame` in the image.
-   */
-  void register_CConFunc_dump_Frame()
-  {
-    gCConFunc_dump_Frame.InitializeRecovered(
-      kConsoleStartupConDumpFrameDescription, "dump_Frame", &moho::DUMP_Frame
-    );
-    (void)std::atexit(&cleanup_CConFunc_dump_Frame);
-  }
 } // namespace moho
 
 namespace
 {
   // The binary runs both registrars from the CRT static-initializer array; a
   // file-scope bootstrap object reproduces that.
-  struct FrameDumpConsoleRegistrations
-  {
-    FrameDumpConsoleRegistrations()
-    {
-      moho::register_CConFunc_dump_Frames();
-      moho::register_CConFunc_dump_Frame();
-    }
-  };
-
-  [[maybe_unused]] FrameDumpConsoleRegistrations gFrameDumpConsoleRegistrations;
 } // namespace

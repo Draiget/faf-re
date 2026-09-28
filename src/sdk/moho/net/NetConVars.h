@@ -18,13 +18,4 @@ namespace moho
   extern int32_t net_CompressionMethod;  // 0x00F58DF8
   extern float net_ResendPingMultiplier; // 0x00F58DFC
   extern int32_t net_ResendDelayBias;    // 0x00F58E00
-
-  /**
-   * Address bundle:
-   * - 0x00BC4E70..0x00BC5130 (register_net_*_ConVarDef)
-   *
-   * What it does:
-   * Registers static net convar definitions into the global console command registry.
-   */
-  void NET_RegisterConVarDefinitions();
 } // namespace moho

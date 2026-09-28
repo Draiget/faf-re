@@ -790,33 +790,12 @@ namespace
 
   constexpr const char* kConsoleStartupUIExpandCurrentSelectionDescription =
     "Expand selection to all units in view that is found in our current selection group";
-  moho::CConFunc gCConFunc_UI_ExpandCurrentSelection{};
 
   /**
-   * Address: 0x00C07550 (FUN_00C07550, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_ExpandCurrentSelection`.
+   * Address: 0x00BE61C0 (FUN_00BE61C0, dynamic initializer for `gCConFunc_UI_ExpandCurrentSelection`)
+   * Address: 0x00C07550 (FUN_00C07550, dynamic atexit destructor for `gCConFunc_UI_ExpandCurrentSelection`)
    */
-  void cleanup_CConFunc_UI_ExpandCurrentSelection()
-  {
-    moho::CleanupStartupConCommand(gCConFunc_UI_ExpandCurrentSelection);
-  }
-
-  /**
-   * Address: 0x00BE61C0 (FUN_00BE61C0, register_CConFunc_UI_ExpandCurrentSelection)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_ExpandCurrentSelection`.
-   */
-  void register_CConFunc_UI_ExpandCurrentSelection()
-  {
-    gCConFunc_UI_ExpandCurrentSelection.InitializeRecovered(
-      kConsoleStartupUIExpandCurrentSelectionDescription, "UI_ExpandCurrentSelection", &UI_ExpandCurrentSelection
-    );
-    (void)std::atexit(&cleanup_CConFunc_UI_ExpandCurrentSelection);
-  }
+  moho::CConFunc gCConFunc_UI_ExpandCurrentSelection("UI_ExpandCurrentSelection", kConsoleStartupUIExpandCurrentSelectionDescription, &UI_ExpandCurrentSelection);
 
   /**
    * Address: 0x00866A30 (FUN_00866A30, sub_866A30)
@@ -925,49 +904,17 @@ namespace
   }
 
   constexpr const char* kConsoleStartupUISelectByCategoryDescription = "Select a set of units by category";
-  moho::CConFunc gCConFunc_UI_SelectByCategory{};
 
   /**
-   * Address: 0x00C07580 (FUN_00C07580, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Unregisters startup command storage for `UI_SelectByCategory`.
+   * Address: 0x00BE6200 (FUN_00BE6200, dynamic initializer for `gCConFunc_UI_SelectByCategory`)
+   * Address: 0x00C07580 (FUN_00C07580, dynamic atexit destructor for `gCConFunc_UI_SelectByCategory`)
    */
-  void cleanup_CConFunc_UI_SelectByCategory()
-  {
-    moho::CleanupStartupConCommand(gCConFunc_UI_SelectByCategory);
-  }
-
-  /**
-   * Address: 0x00BE6200 (FUN_00BE6200, register_CConFunc_UI_SelectByCategory)
-   *
-   * What it does:
-   * Registers startup console callback for `UI_SelectByCategory`.
-   */
-  void register_CConFunc_UI_SelectByCategory()
-  {
-    gCConFunc_UI_SelectByCategory.InitializeRecovered(
-      kConsoleStartupUISelectByCategoryDescription, "UI_SelectByCategory", &UI_SelectByCategory
-    );
-    (void)std::atexit(&cleanup_CConFunc_UI_SelectByCategory);
-  }
+  moho::CConFunc gCConFunc_UI_SelectByCategory("UI_SelectByCategory", kConsoleStartupUISelectByCategoryDescription, &UI_SelectByCategory);
 
   // The binary runs this registrar from the CRT static-initializer array;
   // this file-scope bootstrap object reproduces that, matching the
   // `ResolutionConsoleRegistrations` pattern established in
   // moho/app/ResolutionCommands.cpp.
-  struct CCommandLuaFunctionConsoleRegistrations
-  {
-    CCommandLuaFunctionConsoleRegistrations()
-    {
-      register_CConFunc_UI_SelectByCategory();
-      register_CConFunc_UI_ExpandCurrentSelection();
-    }
-  };
-
-  [[maybe_unused]] CCommandLuaFunctionConsoleRegistrations gCCommandLuaFunctionConsoleRegistrations;
-
   [[nodiscard]] bool TryParseUnitCommandTypeLexical(
     const char* const lexicalCommandType,
     moho::EUnitCommandType& outCommandType

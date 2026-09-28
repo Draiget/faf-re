@@ -10,13 +10,15 @@ namespace moho
   /**
    * VFTABLE: 0x00E01708
    * COL:     0x00E5E2C8
+   *
+   * A console command bound to one handler function. Each instance is a
+   * namespace-scope global: its constructor registers it and its destructor
+   * (run through `atexit`) unregisters it.
    */
   class CConFunc final : public CConCommand
   {
   public:
     using Callback = void(__cdecl*)(const msvc8::vector<msvc8::string>& args);
-
-    CConFunc() noexcept;
 
     /**
      * Address: 0x0041E5C0 (FUN_0041E5C0, ??0CConFunc@Moho@@QAE@PBD0@Z)
@@ -24,31 +26,22 @@ namespace moho
      * const char* name, const char* description, Callback callback
      *
      * What it does:
-     * Runs base command initialization/registration and stores callback payload.
+     * Runs base command initialization/registration and stores the handler.
      */
     CConFunc(const char* name, const char* description, Callback callback) noexcept;
-
-    /**
-     * Address: <synthetic initializer built from CConCommand registration shape>
-     *
-     * const char* description, const char* name, Callback callback
-     *
-     * What it does:
-     * Initializes command metadata and callback payload, then registers by name.
-     */
-    void InitializeRecovered(const char* description, const char* name, Callback callback) noexcept;
 
     /**
      * Address: 0x1001DC00 (MohoEngine.dll, FUN_1001DC00)
      * Address: 0x0041E5F0 (ForgedAlliance.exe, FUN_0041E5F0)
      *
      * What it does:
-     * Forwards command args to callback stored at payload offset +0x0C.
+     * Forwards command args to the stored handler.
      */
     void Handle(const msvc8::vector<msvc8::string>& args) override;
 
-    [[nodiscard]] Callback GetCallback() const noexcept;
+    Callback mFunc; // 0x0C
   };
 
   static_assert(sizeof(CConFunc) == 0x10, "CConFunc size must be 0x10");
+  static_assert(offsetof(CConFunc, mFunc) == 0x0C, "CConFunc::mFunc offset must be 0x0C");
 } // namespace moho

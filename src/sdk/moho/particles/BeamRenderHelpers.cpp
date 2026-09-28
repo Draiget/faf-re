@@ -36,25 +36,16 @@ namespace moho
 
 namespace
 {
-  moho::TConVar<bool> gTConVar_ren_Beams("ren_Beams", "", &moho::ren_Beams);
+  /**
+   * Address: 0x00BC5530 (FUN_00BC5530, dynamic initializer for `gTConVar_ren_Beams`)
+   * Address: 0x00BF0030 (FUN_00BF0030, dynamic atexit destructor for `gTConVar_ren_Beams`)
+   */
+  moho::TConVar<bool> gTConVar_ren_Beams("ren_Beams", "Render the beam fx.", &moho::ren_Beams);
 
   constexpr const char* kParticleRendererSourcePath = "c:\\work\\rts\\main\\code\\src\\core\\ParticleRenderer.cpp";
   constexpr const char* kUnreachableAssertText = "Reached the supposably unreachable.";
   constexpr int kParticleSelectTechniqueAssertLine = 1359;
   constexpr int kParticleSelectTechniqueWithDragAssertLine = 1026;
-
-  /**
-   * Address: 0x00BF0030 (FUN_00BF0030, Moho::TConVar_ren_Beams::~TConVar_ren_Beams)
-   *
-   * What it does:
-   * Tears down the static `ren_Beams` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper. Registered via `atexit`
-   * from the convar startup path.
-   */
-  void CleanupTConVar_ren_Beams() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_ren_Beams);
-  }
 
   template <typename TType>
   [[nodiscard]] bool IsSharedHandleLessForBucket(
@@ -275,18 +266,6 @@ namespace moho
       return true;
     }
     return IsSharedHandleLessForBucket(lhs.texture1, rhs.texture1);
-  }
-
-  /**
-   * Address: 0x00BC5530 (FUN_00BC5530, register_TConVar_ren_Beams)
-   *
-   * What it does:
-   * Registers the beam-render enable convar and schedules process-exit teardown.
-   */
-  void register_TConVar_ren_Beams()
-  {
-    RegisterConCommand(gTConVar_ren_Beams);
-    (void)std::atexit(&CleanupTConVar_ren_Beams);
   }
 
   /**
@@ -832,18 +811,6 @@ namespace moho
   }
 } // namespace moho
 
-namespace
-{
-  struct BeamRenderHelpersStartupBootstrap
-  {
-    BeamRenderHelpersStartupBootstrap()
-    {
-      moho::register_TConVar_ren_Beams();
-    }
-  };
-
-  [[maybe_unused]] BeamRenderHelpersStartupBootstrap gBeamRenderHelpersStartupBootstrap;
-} // namespace
 
 namespace moho
 {

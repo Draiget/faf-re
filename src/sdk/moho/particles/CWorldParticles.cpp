@@ -144,42 +144,21 @@ namespace
     (void)std::atexit(&CleanupParticleShaderVarRegistration<SlotAddress>);
   }
 
+  /**
+   * Address: 0x00BC5570 (FUN_00BC5570, dynamic initializer for `gTConVar_efx_ParticleWaterSurface`)
+   * Address: 0x00BF0060 (FUN_00BF0060, dynamic atexit destructor for `gTConVar_efx_ParticleWaterSurface`)
+   */
   moho::TConVar<float> gTConVar_efx_ParticleWaterSurface(
     "efx_ParticleWaterSurface",
-    "Particle water-surface control variable.",
+    "Sort order at which particles start rendering under water",
     &moho::efx_ParticleWaterSurface
   );
-
-  /**
-   * Address: 0x00BF0060 (FUN_00BF0060, Moho::TConVar_efx_ParticleWaterSurface::~TConVar_efx_ParticleWaterSurface)
-   *
-   * What it does:
-   * Tears down the static `efx_ParticleWaterSurface` console-variable
-   * registration via the shared `TeardownConCommandRegistration` helper.
-   * Registered via `atexit` from the convar startup path.
-   */
-  void CleanupTConVar_efx_ParticleWaterSurface() noexcept
-  {
-    moho::TeardownConCommandRegistration(gTConVar_efx_ParticleWaterSurface);
-  }
 
   void CleanupSharedTrailQuadIndexSheetAtProcessExit() noexcept
   {
     if (sSharedTrailQuadIndexSheet != nullptr) {
       delete sSharedTrailQuadIndexSheet;
     }
-  }
-
-  /**
-   * Address: 0x00BC5570 (FUN_00BC5570, register_TConVar_efx_ParticleWaterSurface)
-   *
-   * What it does:
-   * Registers startup convar for `efx_ParticleWaterSurface`.
-   */
-  void register_TConVar_efx_ParticleWaterSurface()
-  {
-    moho::RegisterConCommand(gTConVar_efx_ParticleWaterSurface);
-    (void)std::atexit(&CleanupTConVar_efx_ParticleWaterSurface);
   }
 
   /**
@@ -341,7 +320,6 @@ namespace
   {
     ParticleShaderVarBootstrap()
     {
-      register_TConVar_efx_ParticleWaterSurface();
       register_ShaderVarParticleWorldToProjection();
       register_ShaderVarParticleViewMatrix();
       register_ShaderVarParticleInverseViewMatrix();

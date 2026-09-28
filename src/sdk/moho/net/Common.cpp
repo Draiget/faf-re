@@ -785,12 +785,10 @@ SNetCommandArg moho::NET_DecodeSocketArg(gpg::BinaryReader& reader)
  * Address: 0x0047F5A0 (FUN_0047F5A0, NET_Init)
  *
  * What it does:
- * Registers net convars and lazily initializes Winsock (WSA 1.1) once.
+ * Lazily initializes Winsock (WSA 1.1) once.
  */
 bool moho::NET_Init()
 {
-  NET_RegisterConVarDefinitions();
-
 #if defined(_WIN32)
   static bool sWinsockInitialized = false;
   if (!sWinsockInitialized) {

@@ -331,36 +331,6 @@ namespace
     owner->context.Update(wordLane, 4u);
   }
 
-  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_path_graph()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid_type()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_imap_debug_grid_army()
-  {
-    static moho::CConAlias sAlias;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::TSimConVar<bool>& SimConVar_imap_debug()
   {
     static moho::TSimConVar<bool> sVar(false, "imap_debug", false);
@@ -2259,34 +2229,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDA3E0 (FUN_00BDA3E0, register_imap_debug_ConAliasDef)
+   * Address: 0x00BDA3E0 (FUN_00BDA3E0, dynamic initializer for `gConAlias_imap_debug`)
+   * Address: 0x00BFFCD0 (FUN_00BFFCD0, dynamic atexit destructor for `gConAlias_imap_debug`)
    */
-  /**
-   * Address: 0x00BFFCD0 (FUN_00BFFCD0, cleanup_imap_debug_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `imap_debug`.
-   */
-  void cleanup_imap_debug_ConAliasDef()
-  {
-    ConAlias_imap_debug().ShutdownRecovered();
-  }
-
-  void register_imap_debug_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_imap_debug().InitializeRecovered(
-      "Toggle influence map debug info.",
-      "imap_debug",
-      "DoSimCommand imap_debug"
-    );
-    (void)std::atexit(&cleanup_imap_debug_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_imap_debug("imap_debug", "Toggle influence map debug info.", "DoSimCommand imap_debug");
 
   /**
    * Address: 0x00BDA410 (FUN_00BDA410, register_imap_debug_SimConVarDef)
@@ -2297,34 +2243,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDA460 (FUN_00BDA460, register_imap_debug_grid_ConAliasDef)
+   * Address: 0x00BDA460 (FUN_00BDA460, dynamic initializer for `gConAlias_imap_debug_grid`)
+   * Address: 0x00BFFD30 (FUN_00BFFD30, dynamic atexit destructor for `gConAlias_imap_debug_grid`)
    */
-  /**
-   * Address: 0x00BFFD30 (FUN_00BFFD30, cleanup_imap_debug_grid_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `imap_debug_grid`.
-   */
-  void cleanup_imap_debug_grid_ConAliasDef()
-  {
-    ConAlias_imap_debug_grid().ShutdownRecovered();
-  }
-
-  void register_imap_debug_grid_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_imap_debug_grid().InitializeRecovered(
-      "Toggle influence map debug grid info.",
-      "imap_debug_grid",
-      "DoSimCommand imap_debug_grid"
-    );
-    (void)std::atexit(&cleanup_imap_debug_grid_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_imap_debug_grid("imap_debug_grid", "Toggle influence map debug grid info.", "DoSimCommand imap_debug_grid");
 
   /**
    * Address: 0x00BDA490 (FUN_00BDA490, func_imap_debug_grid_SimConVarDef)
@@ -2335,34 +2257,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDA4E0 (FUN_00BDA4E0, register_imap_debug_path_graph_ConAliasDef)
+   * Address: 0x00BDA4E0 (FUN_00BDA4E0, dynamic initializer for `gConAlias_imap_debug_path_graph`)
+   * Address: 0x00BFFD90 (FUN_00BFFD90, dynamic atexit destructor for `gConAlias_imap_debug_path_graph`)
    */
-  /**
-   * Address: 0x00BFFD90 (FUN_00BFFD90, cleanup_imap_debug_path_graph_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `imap_debug_path_graph`.
-   */
-  void cleanup_imap_debug_path_graph_ConAliasDef()
-  {
-    ConAlias_imap_debug_path_graph().ShutdownRecovered();
-  }
-
-  void register_imap_debug_path_graph_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_imap_debug_path_graph().InitializeRecovered(
-      "Toggle map hints path graph.",
-      "imap_debug_path_graph",
-      "DoSimCommand imap_debug_path_graph"
-    );
-    (void)std::atexit(&cleanup_imap_debug_path_graph_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_imap_debug_path_graph("imap_debug_path_graph", "Toggle map hints path graph.", "DoSimCommand imap_debug_path_graph");
 
   /**
    * Address: 0x00BDA510 (FUN_00BDA510, func_imap_debug_path_graph_SimConVarDef)
@@ -2373,34 +2271,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDA560 (FUN_00BDA560, register_imap_debug_grid_type_ConAliasDef)
+   * Address: 0x00BDA560 (FUN_00BDA560, dynamic initializer for `gConAlias_imap_debug_grid_type`)
+   * Address: 0x00BFFDF0 (FUN_00BFFDF0, dynamic atexit destructor for `gConAlias_imap_debug_grid_type`)
    */
-  /**
-   * Address: 0x00BFFDF0 (FUN_00BFFDF0, cleanup_imap_debug_grid_type_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `imap_debug_grid_type`.
-   */
-  void cleanup_imap_debug_grid_type_ConAliasDef()
-  {
-    ConAlias_imap_debug_grid_type().ShutdownRecovered();
-  }
-
-  void register_imap_debug_grid_type_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_imap_debug_grid_type().InitializeRecovered(
-      "Set influence map debug grid threat type.",
-      "imap_debug_grid_type",
-      "DoSimCommand imap_debug_grid_type"
-    );
-    (void)std::atexit(&cleanup_imap_debug_grid_type_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_imap_debug_grid_type("imap_debug_grid_type", "Set influence map debug grid threat type.", "DoSimCommand imap_debug_grid_type");
 
   /**
    * Address: 0x00BDA590 (FUN_00BDA590, func_imap_debug_grid_type_SimConVarDef)
@@ -2411,34 +2285,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDA5E0 (FUN_00BDA5E0, register_imap_debug_grid_army_ConAliasDef)
+   * Address: 0x00BDA5E0 (FUN_00BDA5E0, dynamic initializer for `gConAlias_imap_debug_grid_army`)
+   * Address: 0x00BFFE50 (FUN_00BFFE50, dynamic atexit destructor for `gConAlias_imap_debug_grid_army`)
    */
-  /**
-   * Address: 0x00BFFE50 (FUN_00BFFE50, cleanup_imap_debug_grid_army_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `imap_debug_grid_army`.
-   */
-  void cleanup_imap_debug_grid_army_ConAliasDef()
-  {
-    ConAlias_imap_debug_grid_army().ShutdownRecovered();
-  }
-
-  void register_imap_debug_grid_army_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_imap_debug_grid_army().InitializeRecovered(
-      "Set influence map debug grid for which army threat type.",
-      "imap_debug_grid_army",
-      "DoSimCommand imap_debug_grid_army"
-    );
-    (void)std::atexit(&cleanup_imap_debug_grid_army_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_imap_debug_grid_army("imap_debug_grid_army", "Set influence map debug grid for which army threat type.", "DoSimCommand imap_debug_grid_army");
 
   /**
    * Address: 0x00BDA610 (FUN_00BDA610, func_imap_debug_grid_army_SimConVarDef)
@@ -3618,15 +3468,10 @@ namespace
   {
     CInfluenceMapDebugBootstrap()
     {
-      moho::register_imap_debug_ConAliasDef();
       moho::register_imap_debug_SimConVarDef();
-      moho::register_imap_debug_grid_ConAliasDef();
       moho::func_imap_debug_grid_SimConVarDef();
-      moho::register_imap_debug_path_graph_ConAliasDef();
       moho::func_imap_debug_path_graph_SimConVarDef();
-      moho::register_imap_debug_grid_type_ConAliasDef();
       moho::func_imap_debug_grid_type_SimConVarDef();
-      moho::register_imap_debug_grid_army_ConAliasDef();
       moho::func_imap_debug_grid_army_SimConVarDef();
     }
   };

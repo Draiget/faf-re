@@ -78,21 +78,5 @@ namespace moho
    */
   void DUMP_Frame(const msvc8::vector<msvc8::string>& args);
 
-  /**
-   * Address: 0x00BE0F50 (FUN_00BE0F50, register_CConFunc_dump_Frames)
-   *
-   * What it does:
-   * Registers the `dump_Frames` startup console command and installs its
-   * process-exit teardown.
-   */
-  void register_CConFunc_dump_Frames();
 
-  /**
-   * Address: 0x00BE0F90 (FUN_00BE0F90, register_CConFunc_dump_Frame)
-   *
-   * What it does:
-   * Registers the `dump_Frame` startup console command and installs its
-   * process-exit teardown.
-   */
-  void register_CConFunc_dump_Frame();
 } // namespace moho

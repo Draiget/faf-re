@@ -657,8 +657,8 @@ msvc8::string& msvc8::string::operator=(const char* s) noexcept {
     // caller's pointer and set myRes to its length, which marks the string
     // heap-backed to the rest of the class - so a later tidy() ran
     // ::operator delete over whatever was assigned. Every one of these was a
-    // string literal: CConAlias::ShutdownRecovered freed .rdata at process
-    // exit and took the engine allocator down with it.
+    // string literal: the console aliases' exit-time teardown freed .rdata
+    // at process exit and took the engine allocator down with it.
     assign_owned(std::string_view(s, n));
     return *this;
 }

@@ -394,30 +394,6 @@ namespace
     (void)std::atexit(Cleanup);
   }
 
-  [[nodiscard]] moho::CConAlias& ConAlias_efx_NewEmitter()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_efx_AttachEmitter()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AddLightParticle()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AddBeam()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc& SimConFunc_efx_NewEmitter()
   {
     return *reinterpret_cast<moho::CSimConFunc*>(gSimConFunc_efx_NewEmitterStorage);
@@ -476,94 +452,39 @@ namespace
     return SimConFunc_AddBeam();
   }
 
-  [[nodiscard]] moho::TConVar<float>& GetEfxWaterOffsetConVar()
-  {
-    static moho::TConVar<float> conVar(
-      "efx_WaterOffset",
-      "Offsets emitter particles from the waterline height",
-      &moho::efx_WaterOffset
-    );
-    return conVar;
-  }
-
-  [[nodiscard]] moho::TConVar<bool>& GetDbgEmitterConVar()
-  {
-    static moho::TConVar<bool> conVar(
-      "dbg_Emitter",
-      "Enable emitter debug diagnostics",
-      &moho::dbg_Emitter
-    );
-    return conVar;
-  }
-
-  [[nodiscard]] moho::TConVar<bool>& GetDbgTrailConVar()
-  {
-    static moho::TConVar<bool> conVar(
-      "dbg_Trail",
-      "Enable trail debug diagnostics",
-      &moho::dbg_Trail
-    );
-    return conVar;
-  }
-
-  [[nodiscard]] moho::TConVar<bool>& GetDbgEfxBeamsConVar()
-  {
-    static moho::TConVar<bool> conVar(
-      "dbg_EfxBeams",
-      "Enable beam effect debug diagnostics",
-      &moho::dbg_EfxBeams
-    );
-    return conVar;
-  }
+  /**
+   * Address: 0x00BD4210 (FUN_00BD4210, dynamic initializer for `gTConVar_efx_WaterOffset`)
+   * Address: 0x00BFBCB0 (FUN_00BFBCB0, dynamic atexit destructor for `gTConVar_efx_WaterOffset`)
+   */
+  moho::TConVar<float> gTConVar_efx_WaterOffset("efx_WaterOffset", "Amount that particles which are clamped to the waters surfaces are offset from it.", &moho::efx_WaterOffset);
 
   /**
-   * Address: 0x00BFBCB0 (FUN_00BFBCB0, Moho::TConVar_efx_WaterOffset::~TConVar_efx_WaterOffset)
+   * Address: 0x00BD4250 (FUN_00BD4250, dynamic initializer for `gTConVar_dbg_Emitter`)
+   * Address: 0x00BFBCE0 (FUN_00BFBCE0, dynamic atexit destructor for `gTConVar_dbg_Emitter`)
    *
-   * What it does:
-   * Tears down the static `efx_WaterOffset` console-variable registration via
-   * the shared `TeardownConCommandRegistration` helper. Registered via
-   * `atexit` from the convar startup path.
+   * The shipped exe's name and description bytes are blanked; both are
+   * taken from the same command in MohoEngine.dll.
    */
-  void cleanup_TConVar_efx_WaterOffset_atexit()
-  {
-    moho::TeardownConCommandRegistration(GetEfxWaterOffsetConVar());
-  }
+  moho::TConVar<bool> gTConVar_dbg_Emitter("dbg_Emitter", "Show emitter positions.", &moho::dbg_Emitter);
 
   /**
-   * Address: 0x00BFBCE0 (FUN_00BFBCE0, Moho::TConVar_dbg_Emitter::~TConVar_dbg_Emitter)
+   * Address: 0x00BD4910 (FUN_00BD4910, dynamic initializer for `gTConVar_dbg_Trail`)
+   * Address: 0x00BFC1C0 (FUN_00BFC1C0, dynamic atexit destructor for `gTConVar_dbg_Trail`)
    *
-   * What it does:
-   * Tears down the static `dbg_Emitter` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper.
+   * The shipped exe's description bytes are blanked; the text is taken from
+   * the same command in MohoEngine.dll.
    */
-  void cleanup_TConVar_dbg_Emitter_atexit()
-  {
-    moho::TeardownConCommandRegistration(GetDbgEmitterConVar());
-  }
+  moho::TConVar<bool> gTConVar_dbg_Trail("dbg_Trail", "Draw trail debug stuff.", &moho::dbg_Trail);
 
   /**
-   * Address: 0x00BFC1C0 (FUN_00BFC1C0, Moho::TConVar_dbg_Trail::~TConVar_dbg_Trail)
+   * Address: 0x00BD3EF0 (FUN_00BD3EF0, dynamic initializer for `gTConVar_dbg_EfxBeams`)
+   * Address: 0x00BFB880 (FUN_00BFB880, dynamic atexit destructor for `gTConVar_dbg_EfxBeams`)
    *
-   * What it does:
-   * Tears down the static `dbg_Trail` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper.
+   * The shipped exe's description bytes are blanked and MohoEngine.dll has
+   * no such command, so the text is unknown.
    */
-  void cleanup_TConVar_dbg_Trail_atexit()
-  {
-    moho::TeardownConCommandRegistration(GetDbgTrailConVar());
-  }
+  moho::TConVar<bool> gTConVar_dbg_EfxBeams("dbg_EfxBeams", "", &moho::dbg_EfxBeams);
 
-  /**
-   * Address: 0x00BFB880 (FUN_00BFB880, Moho::TConVar_dbg_EfxBeams::~TConVar_dbg_EfxBeams)
-   *
-   * What it does:
-   * Tears down the static `dbg_EfxBeams` console-variable registration via the
-   * shared `TeardownConCommandRegistration` helper.
-   */
-  void cleanup_TConVar_dbg_EfxBeams_atexit()
-  {
-    moho::TeardownConCommandRegistration(GetDbgEfxBeamsConVar());
-  }
 } // namespace
 
 namespace moho
@@ -2835,68 +2756,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3EF0 (FUN_00BD3EF0, register_TConVar_dbg_EfxBeams)
-   *
-   * What it does:
-   * Registers startup `dbg_EfxBeams` convar and installs process-exit teardown.
+   * Address: 0x00BD3FE0 (FUN_00BD3FE0, dynamic initializer for `gConAlias_AddBeam`)
+   * Address: 0x00BFB940 (FUN_00BFB940, dynamic atexit destructor for `gConAlias_AddBeam`)
    */
-  void register_TConVar_dbg_EfxBeams()
-  {
-    RegisterConCommand(GetDbgEfxBeamsConVar());
-    RegisterAtexitCleanup<&cleanup_TConVar_dbg_EfxBeams_atexit>();
-  }
-
-  /**
-   * Address: 0x00BD4210 (FUN_00BD4210, register_TConVar_efx_WaterOffset)
-   *
-   * What it does:
-   * Registers startup `efx_WaterOffset` convar and installs process-exit teardown.
-   */
-  void register_TConVar_efx_WaterOffset()
-  {
-    RegisterConCommand(GetEfxWaterOffsetConVar());
-    RegisterAtexitCleanup<&cleanup_TConVar_efx_WaterOffset_atexit>();
-  }
-
-  /**
-   * Address: 0x00BD4250 (FUN_00BD4250, register_TConVar_dbg_Emitter)
-   *
-   * What it does:
-   * Registers startup `dbg_Emitter` convar and installs process-exit teardown.
-   */
-  void register_TConVar_dbg_Emitter()
-  {
-    RegisterConCommand(GetDbgEmitterConVar());
-    RegisterAtexitCleanup<&cleanup_TConVar_dbg_Emitter_atexit>();
-  }
-
-  /**
-   * Address: 0x00BFB940 (FUN_00BFB940, cleanup_AddBeam_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `AddBeam` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_AddBeam_ConAlias()
-  {
-    ConAlias_AddBeam().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD3FE0 (FUN_00BD3FE0, register_AddBeam_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `AddBeam` alias and arms startup teardown.
-   */
-  void register_AddBeam_ConAliasDef()
-  {
-    ConAlias_AddBeam().InitializeRecovered(
-      "Add a test beam into the world",
-      "AddBeam",
-      "DoSimCommand AddBeam"
-    );
-    RegisterAtexitCleanup<&cleanup_AddBeam_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AddBeam("AddBeam", "Add a test beam into the world", "DoSimCommand AddBeam");
 
   /**
    * Address: 0x00657170 (FUN_00657170, func_AddBeam_SimConFunc)
@@ -3038,18 +2901,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBDE0 (FUN_00BFBDE0, cleanup_efx_NewEmitter_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `efx_NewEmitter` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_efx_NewEmitter_ConAlias()
-  {
-    ConAlias_efx_NewEmitter().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BFBE30 (FUN_00BFBE30, cleanup_efx_NewEmitter_SimConFunc)
    *
    * What it does:
@@ -3066,20 +2917,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4350 (FUN_00BD4350, register_efx_NewEmitter_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `efx_NewEmitter` alias and arms startup teardown.
+   * Address: 0x00BD4350 (FUN_00BD4350, dynamic initializer for `gConAlias_efx_NewEmitter`)
+   * Address: 0x00BFBDE0 (FUN_00BFBDE0, dynamic atexit destructor for `gConAlias_efx_NewEmitter`)
    */
-  void register_efx_NewEmitter_ConAliasDef()
-  {
-    ConAlias_efx_NewEmitter().InitializeRecovered(
-      "Create an emitter, must specify blueprint",
-      "efx_NewEmitter",
-      "DoSimCommand efx_NewEmitter"
-    );
-    RegisterAtexitCleanup<&cleanup_efx_NewEmitter_ConAlias>();
-  }
+  moho::CConAlias gConAlias_efx_NewEmitter("efx_NewEmitter", "Create an emitter, must specify blueprint", "DoSimCommand efx_NewEmitter");
 
   /**
    * Address: 0x00BD4380 (FUN_00BD4380, register_efx_NewEmitter_SimConFuncDef)
@@ -3094,32 +2935,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFBE40 (FUN_00BFBE40, cleanup_efx_AttachEmitter_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `efx_AttachEmitter` alias payload and unregisters command
-   * binding.
+   * Address: 0x00BD43C0 (FUN_00BD43C0, dynamic initializer for `gConAlias_efx_AttachEmitter`)
+   * Address: 0x00BFBE40 (FUN_00BFBE40, dynamic atexit destructor for `gConAlias_efx_AttachEmitter`)
    */
-  void cleanup_efx_AttachEmitter_ConAlias()
-  {
-    ConAlias_efx_AttachEmitter().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD43C0 (FUN_00BD43C0, register_efx_AttachEmitter_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `efx_AttachEmitter` alias and arms startup teardown.
-   */
-  void register_efx_AttachEmitter_ConAliasDef()
-  {
-    ConAlias_efx_AttachEmitter().InitializeRecovered(
-      "Attach an emitter to selected unit, must specify bone name and blueprint",
-      "efx_AttachEmitter",
-      "DoSimCommand efx_AttachEmitter"
-    );
-    RegisterAtexitCleanup<&cleanup_efx_AttachEmitter_ConAlias>();
-  }
+  moho::CConAlias gConAlias_efx_AttachEmitter("efx_AttachEmitter", "Attach an emitter to selected unit, must specify bone name and blueprint", "DoSimCommand efx_AttachEmitter");
 
   /**
    * Address: 0x00BFBE90 (FUN_00BFBE90, cleanup_efx_AttachEmitter_SimConFunc)
@@ -3151,18 +2970,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC090 (FUN_00BFC090, cleanup_AddLightParticle_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `AddLightParticle` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_AddLightParticle_ConAlias()
-  {
-    ConAlias_AddLightParticle().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BFC0E0 (FUN_00BFC0E0, cleanup_AddLightParticle_SimConFunc)
    *
    * What it does:
@@ -3179,20 +2986,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4640 (FUN_00BD4640, register_AddLightParticle_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `AddLightParticle` alias and arms startup teardown.
+   * Address: 0x00BD4640 (FUN_00BD4640, dynamic initializer for `gConAlias_AddLightParticle`)
+   * Address: 0x00BFC090 (FUN_00BFC090, dynamic atexit destructor for `gConAlias_AddLightParticle`)
    */
-  void register_AddLightParticle_ConAliasDef()
-  {
-    ConAlias_AddLightParticle().InitializeRecovered(
-      "Add a light to the world under the cursor",
-      "AddLightParticle",
-      "DoSimCommand AddLightParticle"
-    );
-    RegisterAtexitCleanup<&cleanup_AddLightParticle_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AddLightParticle("AddLightParticle", "Add a light to the world under the cursor", "DoSimCommand AddLightParticle");
 
   /**
    * Address: 0x00BD4670 (FUN_00BD4670, register_AddLightParticle_SimConFuncDef)
@@ -3432,17 +3229,6 @@ namespace moho
     return index;
   }
 
-  /**
-   * Address: 0x00BD4910 (FUN_00BD4910, register_TConVar_dbg_Trail)
-   *
-   * What it does:
-   * Registers startup `dbg_Trail` convar and installs process-exit teardown.
-   */
-  void register_TConVar_dbg_Trail()
-  {
-    RegisterConCommand(GetDbgTrailConVar());
-    (void)std::atexit(&cleanup_TConVar_dbg_Trail_atexit);
-  }
 } // namespace moho
 
 namespace
@@ -3456,16 +3242,9 @@ namespace
       (void)moho::register_CreateBeamEntityToEntity_LuaFuncDef();
       (void)moho::j_func_AttachBeamEntityToEntity_LuaFuncDef();
       (void)moho::register_AttachBeamToEntity_LuaFuncDef();
-      moho::register_AddBeam_ConAliasDef();
       moho::register_AddBeam_SimConFuncDef();
-      moho::register_TConVar_dbg_EfxBeams();
-      moho::register_TConVar_efx_WaterOffset();
-      moho::register_TConVar_dbg_Emitter();
-      moho::register_efx_NewEmitter_ConAliasDef();
       moho::register_efx_NewEmitter_SimConFuncDef();
-      moho::register_efx_AttachEmitter_ConAliasDef();
       moho::register_efx_AttachEmitter_SimConFuncDef();
-      moho::register_AddLightParticle_ConAliasDef();
       moho::register_AddLightParticle_SimConFuncDef();
       (void)moho::register_sim_SimInitFormListAnchor();
       (void)moho::j_func_IEffectSetBeamParam_LuaFuncDef();
@@ -3490,7 +3269,6 @@ namespace
       (void)moho::j_func_CreateEmitterAtBone_LuaFuncDef();
       (void)moho::register_CScrLuaMetatableFactory_IEffect_Index();
       (void)moho::register_CScrLuaMetatableFactory_CDecalHandle_Index();
-      moho::register_TConVar_dbg_Trail();
     }
   };
 

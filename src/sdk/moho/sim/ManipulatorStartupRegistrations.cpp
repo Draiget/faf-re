@@ -92,11 +92,14 @@ namespace
     return result;
   }
 
-  [[nodiscard]] moho::TConVar<bool>& StartupConVar_dbg_Ballistics() noexcept
-  {
-    static moho::TConVar<bool> conVar("dbg_Ballistics", "", &moho::dbg_Ballistics);
-    return conVar;
-  }
+  /**
+   * Address: 0x00BD2230 (FUN_00BD2230, dynamic initializer for `gTConVar_dbg_Ballistics`)
+   * Address: 0x00BFA8D0 (FUN_00BFA8D0, dynamic atexit destructor for `gTConVar_dbg_Ballistics`)
+   *
+   * The shipped exe's description bytes are blanked; the text is taken from
+   * the same command in MohoEngine.dll.
+   */
+  moho::TConVar<bool> gTConVar_dbg_Ballistics("dbg_Ballistics", "Draw ballistic debug stuff.", &moho::dbg_Ballistics);
 
   class RVectorTypeBool final : public gpg::RType, public gpg::RIndexed
   {
@@ -607,30 +610,6 @@ namespace moho
       "derived from IAniManipulator"
     );
     return &spec;
-  }
-
-  /**
-   * Address: 0x00BFA8D0 (FUN_00BFA8D0, cleanup_TConVar_dbg_Ballistics)
-   *
-   * What it does:
-   * Unregisters startup console convar `dbg_Ballistics`.
-   */
-  void cleanup_TConVar_dbg_Ballistics()
-  {
-    TeardownConCommandRegistration(StartupConVar_dbg_Ballistics());
-  }
-
-  /**
-   * Address: 0x00BD2230 (FUN_00BD2230, register_TConVar_dbg_Ballistics)
-   *
-   * What it does:
-   * Registers startup console convar `dbg_Ballistics` and installs process-exit
-   * cleanup.
-   */
-  void register_TConVar_dbg_Ballistics()
-  {
-    RegisterConCommand(StartupConVar_dbg_Ballistics());
-    (void)std::atexit(&cleanup_TConVar_dbg_Ballistics);
   }
 
   /**
@@ -1229,7 +1208,6 @@ namespace
       (void)moho::register_sim_SimInits_mForms_offVariant1();
       (void)moho::register_sim_SimInits_mForms_offVariant2();
       (void)moho::register_CAimManipulatorLuaBaseClass();
-      (void)moho::register_TConVar_dbg_Ballistics();
       moho::register_CAimManipulatorTypeInfo();
       moho::register_CAimManipulatorSerializer();
       (void)moho::register_CScrLuaMetatableFactory_CAimManipulator_Index();

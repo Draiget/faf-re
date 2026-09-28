@@ -11,30 +11,26 @@ namespace moho
   /**
    * VFTABLE: 0x00E01710
    * COL:     0x00E5E278
+   *
+   * A console command that expands to another command line. Each instance is
+   * a namespace-scope global: its constructor registers it and its destructor
+   * (run through `atexit`) frees the text and unregisters it. Every
+   * `TSimConVar`/`CSimConFunc` has one, `"<name>"` -> `"DoSimCommand <name>"`,
+   * so the user console forwards to the sim.
    */
   class CConAlias final : public CConCommand
   {
   public:
-    CConAlias() noexcept;
-
     /**
      * Address: 0x0041E600 (FUN_0041E600)
      *
-     * const char* description, const char* name, const char* aliasCommandText
+     * const char* name, const char* description, const char* aliasText
      *
      * What it does:
-     * Initializes alias metadata, registers by command name, and stores expansion text.
+     * Runs base command initialization/registration, then copies the
+     * expansion text.
      */
-    void InitializeRecovered(const char* description, const char* name, const char* aliasCommandText);
-
-    /**
-     * Address: 0x00BFE370/FUN_00BFE370-family cleanup lanes
-     *
-     * What it does:
-     * Resets alias command-text storage and tears down command registration for
-     * startup-owned cleanup thunks.
-     */
-    void ShutdownRecovered();
+    CConAlias(const char* name, const char* description, const char* aliasText);
 
     /**
      * Address: 0x0041E6A0 (FUN_0041E6A0)
@@ -44,16 +40,9 @@ namespace moho
      */
     void Handle(const msvc8::vector<msvc8::string>& args) override;
 
-    [[nodiscard]] const msvc8::string& AliasCommandText() const noexcept;
-
-  private:
-    [[nodiscard]] void* AliasCommandStorageAddress() noexcept;
-    [[nodiscard]] const void* AliasCommandStorageAddress() const noexcept;
-    [[nodiscard]] msvc8::string& AliasCommandStorage() noexcept;
-    [[nodiscard]] const msvc8::string& AliasCommandStorage() const noexcept;
-
-    std::uint8_t mAliasStorageTail[0x18]{};
+    msvc8::string mAliasText; // 0x0C
   };
 
   static_assert(sizeof(CConAlias) == 0x28, "CConAlias size must be 0x28");
+  static_assert(offsetof(CConAlias, mAliasText) == 0x0C, "CConAlias::mAliasText offset must be 0x0C");
 } // namespace moho

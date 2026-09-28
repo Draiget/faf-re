@@ -55,15 +55,14 @@ namespace moho
 
 namespace
 {
-  [[nodiscard]] moho::TConVar<bool>& GetDbgProjectileConVar()
-  {
-    static moho::TConVar<bool> conVar(
-      "dbg_Projectile",
-      "Enable projectile debug diagnostics",
-      &moho::dbg_Projectile
-    );
-    return conVar;
-  }
+  /**
+   * Address: 0x00BD62F0 (FUN_00BD62F0, dynamic initializer for `gTConVar_dbg_Projectile`)
+   * Address: 0x00BFD510 (FUN_00BFD510, dynamic atexit destructor for `gTConVar_dbg_Projectile`)
+   *
+   * The shipped exe's description bytes are blanked; the text is taken from
+   * the same command in MohoEngine.dll.
+   */
+  moho::TConVar<bool> gTConVar_dbg_Projectile("dbg_Projectile", "Draw projectile debug stuff.", &moho::dbg_Projectile);
 
   constexpr const char* kLuaExpectedArgsWarning = "%s\n  expected %d args, but got %d";
   constexpr const char* kLuaExpectedBetweenArgsWarning = "%s\n  expected between %d and %d args, but got %d";
@@ -750,7 +749,6 @@ namespace
     ProjectileStartupBootstrap()
     {
       (void)moho::register_CScrLuaMetatableFactory_Projectile_Index();
-      moho::register_TConVar_dbg_Projectile();
       (void)moho::register_EProjectileImpactEventTypeInfo();
       (void)moho::register_CProjectileAttributesTypeInfo();
       (void)moho::register_ManyToOneBroadcaster_EProjectileImpactEvent_TypeInfo();
@@ -3051,23 +3049,6 @@ namespace moho
   {}
 
   CProjectileAttributesSerializer::~CProjectileAttributesSerializer() = default;
-
-  /**
-   * Address: 0x00BFD510 (FUN_00BFD510, cleanup_TConVar_dbg_Projectile)
-   */
-  void cleanup_TConVar_dbg_Projectile()
-  {
-    TeardownConCommandRegistration(GetDbgProjectileConVar());
-  }
-
-  /**
-   * Address: 0x00BD62F0 (FUN_00BD62F0, register_TConVar_dbg_Projectile)
-   */
-  void register_TConVar_dbg_Projectile()
-  {
-    RegisterConCommand(GetDbgProjectileConVar());
-    (void)std::atexit(&cleanup_TConVar_dbg_Projectile);
-  }
 
   /**
    * Address: 0x00BFD540 (FUN_00BFD540, cleanup_EProjectileImpactEventTypeInfo)

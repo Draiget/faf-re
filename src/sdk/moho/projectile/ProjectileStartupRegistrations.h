@@ -54,21 +54,7 @@ namespace moho
     void Init() override;
   };
 
-  /**
-   * Address: 0x00BFD510 (FUN_00BFD510, cleanup_TConVar_dbg_Projectile)
-   *
-   * What it does:
-   * Unregisters recovered `dbg_Projectile` console variable at process exit.
-   */
-  void cleanup_TConVar_dbg_Projectile();
 
-  /**
-   * Address: 0x00BD62F0 (FUN_00BD62F0, register_TConVar_dbg_Projectile)
-   *
-   * What it does:
-   * Registers startup `dbg_Projectile` `TConVar<bool>` and installs exit cleanup.
-   */
-  void register_TConVar_dbg_Projectile();
 
   /**
    * Address: 0x00BFD540 (FUN_00BFD540, cleanup_EProjectileImpactEventTypeInfo)

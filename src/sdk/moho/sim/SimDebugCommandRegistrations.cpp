@@ -11,25 +11,9 @@
 namespace
 {
   alignas(moho::CConAlias) unsigned char gDbgConAliasStorage[sizeof(moho::CConAlias)] = {};
-  bool gDbgConAliasConstructed = false;
 
   alignas(moho::CSimConFunc) unsigned char gDbgSimConFuncStorage[sizeof(moho::CSimConFunc)] = {};
   bool gDbgSimConFuncConstructed = false;
-
-  [[nodiscard]] moho::CConAlias& DbgConAlias()
-  {
-    return *std::launder(reinterpret_cast<moho::CConAlias*>(gDbgConAliasStorage));
-  }
-
-  [[nodiscard]] moho::CConAlias& ConstructDbgConAlias()
-  {
-    if (!gDbgConAliasConstructed) {
-      new (gDbgConAliasStorage) moho::CConAlias{};
-      gDbgConAliasConstructed = true;
-    }
-
-    return DbgConAlias();
-  }
 
   [[nodiscard]] moho::CSimConFunc& DbgSimConFunc()
   {
@@ -46,99 +30,11 @@ namespace
     return DbgSimConFunc();
   }
 
-  [[nodiscard]] moho::CConAlias& ConAlias_Purge()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_NoDamage()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_RunOpponentAI()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_DebugArmyIndex()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_RenderDebugAttackVectors()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_RenderDebugPlayableRect()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_DebugCollision()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_AI_DebugIgnorePlayableRect()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_ai_InstaBuild()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_ai_FreeBuild()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_ai_SteeringAirTolerance()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::TConVar<bool>& ConVar_ren_Steering()
-  {
-    static moho::TConVar<bool> conVar(
-      "ren_Steering",
-      "",
-      reinterpret_cast<bool*>(&moho::ren_Steering)
-    );
-    return conVar;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_NeedRefuelThresholdRatio()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_NeedRepairThresholdRatio()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_SallyShears_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
+  /**
+   * Address: 0x00BCE420 (FUN_00BCE420, dynamic initializer for `gTConVar_ren_Steering`)
+   * Address: 0x00BF80A0 (FUN_00BF80A0, dynamic atexit destructor for `gTConVar_ren_Steering`)
+   */
+  moho::TConVar<bool> gTConVar_ren_Steering("ren_Steering", "", reinterpret_cast<bool*>(&moho::ren_Steering));
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_SallyShears_slot()
   {
@@ -146,22 +42,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_BlingBling_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_BlingBling_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_ZeroExtraStorage_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_ZeroExtraStorage_slot()
@@ -174,18 +58,6 @@ namespace
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DamageUnit_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_AddImpulse_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_AddImpulse_slot()
@@ -368,12 +240,6 @@ namespace
     return AiSteeringAirToleranceSimConVar();
   }
 
-  [[nodiscard]] moho::CConAlias& ConAlias_WeaponTerrainBlockageTest()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
   alignas(moho::TSimConVar<bool>)
   unsigned char gWeaponTerrainBlockageTestStorage[sizeof(moho::TSimConVar<bool>)] = {};
   bool gWeaponTerrainBlockageTestConstructed = false;
@@ -429,22 +295,10 @@ namespace
     return NeedRepairThresholdRatioSimConVar();
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugAIStatesOff_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugAIStatesOff_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugAIStatesOn_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugAIStatesOn_slot()
@@ -453,22 +307,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_TrackStats_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_TrackStats_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DumpUnits_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DumpUnits_slot()
@@ -477,22 +319,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetPlayableRect_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetPlayableRect_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugDumpArmyStats_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugDumpArmyStats_slot()
@@ -501,22 +331,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetProductionInActive_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetProductionInActive_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetProductionActive_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetProductionActive_slot()
@@ -525,22 +343,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetConsumptionInActive_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetConsumptionInActive_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DebugSetConsumptionActive_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DebugSetConsumptionActive_slot()
@@ -555,22 +361,10 @@ namespace
     return sCommand;
   }
 
-  [[nodiscard]] moho::CConAlias*& ConAlias_KillAll_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
-  }
-
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_KillAll_slot()
   {
     static moho::CSimConFunc* sCommand = nullptr;
     return sCommand;
-  }
-
-  [[nodiscard]] moho::CConAlias*& ConAlias_DestroyAll_slot()
-  {
-    static moho::CConAlias* sAlias = nullptr;
-    return sAlias;
   }
 
   [[nodiscard]] moho::CSimConFunc*& SimConFunc_DestroyAll_slot()
@@ -598,868 +392,157 @@ namespace
     }
   }
 
-  void EnsureConAliasRegistration(
-    moho::CConAlias*& slot,
-    const char* const description,
-    const char* const aliasName,
-    const char* const aliasCommand
-  )
-  {
-    if (slot == nullptr) {
-      slot = new moho::CConAlias();
-      slot->InitializeRecovered(description, aliasName, aliasCommand);
-    }
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarBool()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  /**
+   * Address: 0x00BDB130 (FUN_00BDB130, dynamic initializer for `gConAlias_sim_TestVarBool`)
+   * Address: 0x00C00670 (FUN_00C00670, dynamic atexit destructor for `gConAlias_sim_TestVarBool`)
+   */
+  moho::CConAlias gConAlias_sim_TestVarBool("sim_TestVarBool", "Test variable - not used.", "DoSimCommand sim_TestVarBool");
 
   /**
-   * Address: 0x00C00670 (FUN_00C00670, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestVarBool`.
+   * Address: 0x00BDB1B0 (FUN_00BDB1B0, dynamic initializer for `gConAlias_sim_TestVar`)
+   * Address: 0x00C006D0 (FUN_00C006D0, dynamic atexit destructor for `gConAlias_sim_TestVar`)
    */
-  void cleanup_sim_TestVarBool_ConAliasDef()
-  {
-    ConAlias_sim_TestVarBool().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_sim_TestVar("sim_TestVar", "Test variable - not used.", "DoSimCommand sim_TestVar");
 
   /**
-   * Address: 0x00BDB130 (FUN_00BDB130, register_sim_TestVarBool_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestVarBool` console alias text for sim-command dispatch.
+   * Address: 0x00BDB230 (FUN_00BDB230, dynamic initializer for `gConAlias_sim_TestVarUByte`)
+   * Address: 0x00C00730 (FUN_00C00730, dynamic atexit destructor for `gConAlias_sim_TestVarUByte`)
    */
-  void register_sim_TestVarBool_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestVarBool().InitializeRecovered(
-      "Test variable - not used.",
-      "sim_TestVarBool",
-      "DoSimCommand sim_TestVarBool"
-    );
-    (void)std::atexit(&cleanup_sim_TestVarBool_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVar()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_sim_TestVarUByte("sim_TestVarUByte", "Test variable - not used.", "DoSimCommand sim_TestVarUByte");
 
   /**
-   * Address: 0x00C006D0 (FUN_00C006D0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestVar`.
+   * Address: 0x00BDB2B0 (FUN_00BDB2B0, dynamic initializer for `gConAlias_sim_TestVarFloat`)
+   * Address: 0x00C00790 (FUN_00C00790, dynamic atexit destructor for `gConAlias_sim_TestVarFloat`)
    */
-  void cleanup_sim_TestVar_ConAliasDef()
-  {
-    ConAlias_sim_TestVar().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_sim_TestVarFloat("sim_TestVarFloat", "Test variable - not used.", "DoSimCommand sim_TestVarFloat");
 
   /**
-   * Address: 0x00BDB1B0 (FUN_00BDB1B0, register_sim_TestVar_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestVar` console alias text for sim-command dispatch.
+   * Address: 0x00BDB330 (FUN_00BDB330, dynamic initializer for `gConAlias_sim_TestVarStr`)
+   * Address: 0x00C007F0 (FUN_00C007F0, dynamic atexit destructor for `gConAlias_sim_TestVarStr`)
    */
-  void register_sim_TestVar_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestVar().InitializeRecovered(
-      "Test variable - not used.",
-      "sim_TestVar",
-      "DoSimCommand sim_TestVar"
-    );
-    (void)std::atexit(&cleanup_sim_TestVar_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarUByte()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_sim_TestVarStr("sim_TestVarStr", "Test variable - not used.", "DoSimCommand sim_TestVarStr");
 
   /**
-   * Address: 0x00C00730 (FUN_00C00730, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestVarUByte`.
+   * Address: 0x00BDB3A0 (FUN_00BDB3A0, dynamic initializer for `gConAlias_sim_TestFunc`)
+   * Address: 0x00C00880 (FUN_00C00880, dynamic atexit destructor for `gConAlias_sim_TestFunc`)
    */
-  void cleanup_sim_TestVarUByte_ConAliasDef()
-  {
-    ConAlias_sim_TestVarUByte().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_sim_TestFunc("sim_TestFunc", "Test function - not used.", "DoSimCommand sim_TestFunc");
 
   /**
-   * Address: 0x00BDB230 (FUN_00BDB230, register_sim_TestVarUByte_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestVarUByte` console alias text for sim-command dispatch.
+   * Address: 0x00BDB410 (FUN_00BDB410, dynamic initializer for `gConAlias_SimLog`)
+   * Address: 0x00C008E0 (FUN_00C008E0, dynamic atexit destructor for `gConAlias_SimLog`)
    */
-  void register_sim_TestVarUByte_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestVarUByte().InitializeRecovered(
-      "Test variable - not used.",
-      "sim_TestVarUByte",
-      "DoSimCommand sim_TestVarUByte"
-    );
-    (void)std::atexit(&cleanup_sim_TestVarUByte_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarFloat()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_SimLog("SimLog", "Log a string (for debugging purposes)", "DoSimCommand SimLog");
 
   /**
-   * Address: 0x00C00790 (FUN_00C00790, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestVarFloat`.
+   * Address: 0x00BDB480 (FUN_00BDB480, dynamic initializer for `gConAlias_SimWarn`)
+   * Address: 0x00C00940 (FUN_00C00940, dynamic atexit destructor for `gConAlias_SimWarn`)
    */
-  void cleanup_sim_TestVarFloat_ConAliasDef()
-  {
-    ConAlias_sim_TestVarFloat().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_SimWarn("SimWarn", "Log a warning string (for debugging purposes)", "DoSimCommand SimWarn");
 
   /**
-   * Address: 0x00BDB2B0 (FUN_00BDB2B0, register_sim_TestVarFloat_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestVarFloat` console alias text for sim-command dispatch.
+   * Address: 0x00BDB4F0 (FUN_00BDB4F0, dynamic initializer for `gConAlias_SimError`)
+   * Address: 0x00C009A0 (FUN_00C009A0, dynamic atexit destructor for `gConAlias_SimError`)
    */
-  void register_sim_TestVarFloat_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestVarFloat().InitializeRecovered(
-      "Test variable - not used.",
-      "sim_TestVarFloat",
-      "DoSimCommand sim_TestVarFloat"
-    );
-    (void)std::atexit(&cleanup_sim_TestVarFloat_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestVarStr()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_SimError("SimError", "Log an error string (for debugging purposes)", "DoSimCommand SimError");
 
   /**
-   * Address: 0x00C007F0 (FUN_00C007F0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestVarStr`.
+   * Address: 0x00BDB560 (FUN_00BDB560, dynamic initializer for `gConAlias_SimAssert`)
+   * Address: 0x00C00A00 (FUN_00C00A00, dynamic atexit destructor for `gConAlias_SimAssert`)
    */
-  void cleanup_sim_TestVarStr_ConAliasDef()
-  {
-    ConAlias_sim_TestVarStr().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_SimAssert("SimAssert", "Fail an assertion (for debugging purposes)", "DoSimCommand SimAssert");
 
   /**
-   * Address: 0x00BDB330 (FUN_00BDB330, register_sim_TestVarStr_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestVarStr` console alias text for sim-command dispatch.
+   * Address: 0x00BDB5D0 (FUN_00BDB5D0, dynamic initializer for `gConAlias_SimCrash`)
+   * Address: 0x00C00A60 (FUN_00C00A60, dynamic atexit destructor for `gConAlias_SimCrash`)
    */
-  void register_sim_TestVarStr_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestVarStr().InitializeRecovered(
-      "Test variable - not used.",
-      "sim_TestVarStr",
-      "DoSimCommand sim_TestVarStr"
-    );
-    (void)std::atexit(&cleanup_sim_TestVarStr_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_TestFunc()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_SimCrash("SimCrash", "Cause a crash (for debugging purposes)", "DoSimCommand SimCrash");
 
   /**
-   * Address: 0x00C00880 (FUN_00C00880, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_TestFunc`.
+   * Address: 0x00BDBAD0 (FUN_00BDBAD0, dynamic initializer for `gConAlias_path_BackgroundUpdate`)
+   * Address: 0x00C00D40 (FUN_00C00D40, dynamic atexit destructor for `gConAlias_path_BackgroundUpdate`)
    */
-  void cleanup_sim_TestFunc_ConAliasDef()
-  {
-    ConAlias_sim_TestFunc().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_path_BackgroundUpdate("path_BackgroundUpdate", "Update pathfinding tables in background", "DoSimCommand path_BackgroundUpdate");
 
   /**
-   * Address: 0x00BDB3A0 (FUN_00BDB3A0, register_sim_TestFunc_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_TestFunc` console alias text for sim-command dispatch.
+   * Address: 0x00BDBB50 (FUN_00BDBB50, dynamic initializer for `gConAlias_path_BackgroundBudget`)
+   * Address: 0x00C00DA0 (FUN_00C00DA0, dynamic atexit destructor for `gConAlias_path_BackgroundBudget`)
    */
-  void register_sim_TestFunc_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_TestFunc().InitializeRecovered(
-      "Test function - not used.",
-      "sim_TestFunc",
-      "DoSimCommand sim_TestFunc"
-    );
-    (void)std::atexit(&cleanup_sim_TestFunc_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimLog()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_path_BackgroundBudget("path_BackgroundBudget", "Maximum number of steps to run pathfinder in background", "DoSimCommand path_BackgroundBudget");
 
   /**
-   * Address: 0x00C008E0 (FUN_00C008E0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimLog`.
+   * Address: 0x00BDBBD0 (FUN_00BDBBD0, dynamic initializer for `gConAlias_sim_ChecksumPeriod`)
+   * Address: 0x00C00E00 (FUN_00C00E00, dynamic atexit destructor for `gConAlias_sim_ChecksumPeriod`)
    */
-  void cleanup_SimLog_ConAliasDef()
-  {
-    ConAlias_SimLog().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_sim_ChecksumPeriod("sim_ChecksumPeriod", "How many beats between checksums.", "DoSimCommand sim_ChecksumPeriod");
 
   /**
-   * Address: 0x00BDB410 (FUN_00BDB410, register_SimLog_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimLog` console alias text for sim-command dispatch.
+   * Address: 0x00BDBD50 (FUN_00BDBD50, dynamic initializer for `gConAlias_sim_DebugCrash`)
+   * Address: 0x00C00F50 (FUN_00C00F50, dynamic atexit destructor for `gConAlias_sim_DebugCrash`)
    */
-  void register_SimLog_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimLog().InitializeRecovered(
-      "Log a string (for debugging purposes)",
-      "SimLog",
-      "DoSimCommand SimLog"
-    );
-    (void)std::atexit(&cleanup_SimLog_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimWarn()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_sim_DebugCrash("sim_DebugCrash", "Crash the sim.", "DoSimCommand sim_DebugCrash");
 
   /**
-   * Address: 0x00C00940 (FUN_00C00940, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimWarn`.
+   * Address: 0x00BDBF10 (FUN_00BDBF10, dynamic initializer for `gConAlias_SimLua`)
+   * Address: 0x00C01210 (FUN_00C01210, dynamic atexit destructor for `gConAlias_SimLua`)
    */
-  void cleanup_SimWarn_ConAliasDef()
-  {
-    ConAlias_SimWarn().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_SimLua("SimLua", "Run some lua code in the sim's Lua.", "DoSimCommand SimLua");
 
   /**
-   * Address: 0x00BDB480 (FUN_00BDB480, register_SimWarn_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimWarn` console alias text for sim-command dispatch.
+   * Address: 0x00BDC220 (FUN_00BDC220, dynamic initializer for `gConAlias_DebugMoveCamera`)
+   * Address: 0x00C01330 (FUN_00C01330, dynamic atexit destructor for `gConAlias_DebugMoveCamera`)
    */
-  void register_SimWarn_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimWarn().InitializeRecovered(
-      "Log a warning string (for debugging purposes)",
-      "SimWarn",
-      "DoSimCommand SimWarn"
-    );
-    (void)std::atexit(&cleanup_SimWarn_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimError()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
+  moho::CConAlias gConAlias_DebugMoveCamera("DebugMoveCamera", "Debug function for moving the camera in sim script.", "DoSimCommand DebugMoveCamera");
 
   /**
-   * Address: 0x00C009A0 (FUN_00C009A0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimError`.
+   * Address: 0x00BDC7A0 (FUN_00BDC7A0, dynamic initializer for `gConAlias_path_TimeoutPreview`)
+   * Address: 0x00C01970 (FUN_00C01970, dynamic atexit destructor for `gConAlias_path_TimeoutPreview`)
    */
-  void cleanup_SimError_ConAliasDef()
-  {
-    ConAlias_SimError().ShutdownRecovered();
-  }
+  moho::CConAlias gConAlias_path_TimeoutPreview("path_TimeoutPreview", "Maximum number of ticks to allow pathfinder preview to take", "DoSimCommand path_TimeoutPreview");
 
   /**
-   * Address: 0x00BDB4F0 (FUN_00BDB4F0, register_SimError_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimError` console alias text for sim-command dispatch.
+   * Address: 0x00BDC820 (FUN_00BDC820, dynamic initializer for `gConAlias_path_GeneratePreview`)
+   * Address: 0x00C019D0 (FUN_00C019D0, dynamic atexit destructor for `gConAlias_path_GeneratePreview`)
    */
-  void register_SimError_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimError().InitializeRecovered(
-      "Log an error string (for debugging purposes)",
-      "SimError",
-      "DoSimCommand SimError"
-    );
-    (void)std::atexit(&cleanup_SimError_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimAssert()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00A00 (FUN_00C00A00, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimAssert`.
-   */
-  void cleanup_SimAssert_ConAliasDef()
-  {
-    ConAlias_SimAssert().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDB560 (FUN_00BDB560, register_SimAssert_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimAssert` console alias text for sim-command dispatch.
-   */
-  void register_SimAssert_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimAssert().InitializeRecovered(
-      "Fail an assertion (for debugging purposes)",
-      "SimAssert",
-      "DoSimCommand SimAssert"
-    );
-    (void)std::atexit(&cleanup_SimAssert_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimCrash()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00A60 (FUN_00C00A60, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimCrash`.
-   */
-  void cleanup_SimCrash_ConAliasDef()
-  {
-    ConAlias_SimCrash().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDB5D0 (FUN_00BDB5D0, register_SimCrash_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimCrash` console alias text for sim-command dispatch.
-   */
-  void register_SimCrash_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimCrash().InitializeRecovered(
-      "Cause a crash (for debugging purposes)",
-      "SimCrash",
-      "DoSimCommand SimCrash"
-    );
-    (void)std::atexit(&cleanup_SimCrash_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_BackgroundUpdate()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00D40 (FUN_00C00D40, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_BackgroundUpdate`.
-   */
-  void cleanup_path_BackgroundUpdate_ConAliasDef()
-  {
-    ConAlias_path_BackgroundUpdate().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDBAD0 (FUN_00BDBAD0, register_path_BackgroundUpdate_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_BackgroundUpdate` console alias text for sim-command dispatch.
-   */
-  void register_path_BackgroundUpdate_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_BackgroundUpdate().InitializeRecovered(
-      "Update pathfinding tables in background",
-      "path_BackgroundUpdate",
-      "DoSimCommand path_BackgroundUpdate"
-    );
-    (void)std::atexit(&cleanup_path_BackgroundUpdate_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_BackgroundBudget()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00DA0 (FUN_00C00DA0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_BackgroundBudget`.
-   */
-  void cleanup_path_BackgroundBudget_ConAliasDef()
-  {
-    ConAlias_path_BackgroundBudget().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDBB50 (FUN_00BDBB50, register_path_BackgroundBudget_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_BackgroundBudget` console alias text for sim-command dispatch.
-   */
-  void register_path_BackgroundBudget_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_BackgroundBudget().InitializeRecovered(
-      "Maximum number of steps to run pathfinder in background",
-      "path_BackgroundBudget",
-      "DoSimCommand path_BackgroundBudget"
-    );
-    (void)std::atexit(&cleanup_path_BackgroundBudget_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_ChecksumPeriod()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00E00 (FUN_00C00E00, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_ChecksumPeriod`.
-   */
-  void cleanup_sim_ChecksumPeriod_ConAliasDef()
-  {
-    ConAlias_sim_ChecksumPeriod().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDBBD0 (FUN_00BDBBD0, register_sim_ChecksumPeriod_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_ChecksumPeriod` console alias text for sim-command dispatch.
-   */
-  void register_sim_ChecksumPeriod_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_ChecksumPeriod().InitializeRecovered(
-      "How many beats between checksums.",
-      "sim_ChecksumPeriod",
-      "DoSimCommand sim_ChecksumPeriod"
-    );
-    (void)std::atexit(&cleanup_sim_ChecksumPeriod_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_sim_DebugCrash()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C00F50 (FUN_00C00F50, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `sim_DebugCrash`.
-   */
-  void cleanup_sim_DebugCrash_ConAliasDef()
-  {
-    ConAlias_sim_DebugCrash().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDBD50 (FUN_00BDBD50, register_sim_DebugCrash_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `sim_DebugCrash` console alias text for sim-command dispatch.
-   */
-  void register_sim_DebugCrash_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_sim_DebugCrash().InitializeRecovered(
-      "Crash the sim.",
-      "sim_DebugCrash",
-      "DoSimCommand sim_DebugCrash"
-    );
-    (void)std::atexit(&cleanup_sim_DebugCrash_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_SimLua()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C01210 (FUN_00C01210, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `SimLua`.
-   */
-  void cleanup_SimLua_ConAliasDef()
-  {
-    ConAlias_SimLua().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDBF10 (FUN_00BDBF10, register_SimLua_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SimLua` console alias text for sim-command dispatch.
-   */
-  void register_SimLua_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_SimLua().InitializeRecovered(
-      "Run some lua code in the sim's Lua.",
-      "SimLua",
-      "DoSimCommand SimLua"
-    );
-    (void)std::atexit(&cleanup_SimLua_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_DebugMoveCamera()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C01330 (FUN_00C01330, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `DebugMoveCamera`.
-   */
-  void cleanup_DebugMoveCamera_ConAliasDef()
-  {
-    ConAlias_DebugMoveCamera().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDC220 (FUN_00BDC220, register_DebugMoveCamera_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `DebugMoveCamera` console alias text for sim-command dispatch.
-   */
-  void register_DebugMoveCamera_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_DebugMoveCamera().InitializeRecovered(
-      "Debug function for moving the camera in sim script.",
-      "DebugMoveCamera",
-      "DoSimCommand DebugMoveCamera"
-    );
-    (void)std::atexit(&cleanup_DebugMoveCamera_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_TimeoutPreview()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C01970 (FUN_00C01970, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_TimeoutPreview`.
-   */
-  void cleanup_path_TimeoutPreview_ConAliasDef()
-  {
-    ConAlias_path_TimeoutPreview().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDC7A0 (FUN_00BDC7A0, register_path_TimeoutPreview_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_TimeoutPreview` console alias text for sim-command dispatch.
-   */
-  void register_path_TimeoutPreview_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_TimeoutPreview().InitializeRecovered(
-      "Maximum number of ticks to allow pathfinder preview to take",
-      "path_TimeoutPreview",
-      "DoSimCommand path_TimeoutPreview"
-    );
-    (void)std::atexit(&cleanup_path_TimeoutPreview_ConAliasDef);
-  }
-
-  [[nodiscard]] moho::CConAlias& ConAlias_path_GeneratePreview()
-  {
-    static moho::CConAlias sAlias{};
-    return sAlias;
-  }
-
-  /**
-   * Address: 0x00C019D0 (FUN_00C019D0, the `atexit` target the registrar
-   * below installs)
-   *
-   * What it does:
-   * Tears down startup-owned alias payload for `path_GeneratePreview`.
-   */
-  void cleanup_path_GeneratePreview_ConAliasDef()
-  {
-    ConAlias_path_GeneratePreview().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BDC820 (FUN_00BDC820, register_path_GeneratePreview_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_GeneratePreview` console alias text for sim-command dispatch.
-   */
-  void register_path_GeneratePreview_ConAliasDef()
-  {
-    static bool sInitialized = false;
-    if (sInitialized) {
-      return;
-    }
-
-    sInitialized = true;
-    ConAlias_path_GeneratePreview().InitializeRecovered(
-      "Do a pathfind for the UI preview",
-      "path_GeneratePreview",
-      "DoSimCommand path_GeneratePreview"
-    );
-    (void)std::atexit(&cleanup_path_GeneratePreview_ConAliasDef);
-  }
+  moho::CConAlias gConAlias_path_GeneratePreview("path_GeneratePreview", "Do a pathfind for the UI preview", "DoSimCommand path_GeneratePreview");
 
   struct SimDebugCommandRegistrationsBootstrap
   {
     SimDebugCommandRegistrationsBootstrap()
     {
-      moho::register_NeedRefuelThresholdRatio_ConAliasDef();
       moho::register_NeedRefuelThresholdRatio_SimConVarDef();
-      moho::register_NeedRepairThresholdRatio_ConAliasDef();
       moho::register_NeedRepairThresholdRatio_SimConVarDef();
-      moho::register_SallyShears_ConAliasDef();
       moho::register_SallyShears_SimConFuncDef();
-      moho::register_BlingBling_ConAlias();
       moho::register_BlingBling_SimConFunc();
-      moho::register_ZeroExtraStorage_ConAliasDef();
       moho::register_ZeroExtraStorage_SimConFuncDef();
-      moho::register_DamageUnit_ConAlias();
       moho::register_DamageUnit_SimConFunc();
-      moho::register_AddImpulse_ConAliasDef();
       moho::register_AddImpulse_SimConFuncDef();
-      moho::register_WeaponTerrainBlockageTest_ConAliasDef();
       moho::register_WeaponTerrainBlockageTest_SimConVarDef();
-      moho::register_dbg_ConAlias();
       moho::register_dbg_SimConFunc();
-      moho::register_NoDamage_ConAliasDef();
       moho::register_NoDamage_SimConVarDef();
-      moho::register_AI_RunOpponentAI_ConAlias();
       moho::register_AI_RunOpponentAI_SimConVarDef();
-      moho::register_AI_DebugArmyIndex_ConAlias();
       moho::register_AI_DebugArmyIndex_SimConDef();
-      moho::register_AI_RenderDebugAttackVectors_ConAlias();
       moho::register_AI_RenderDebugAttackVectors_SimConVarDef();
-      moho::register_AI_RenderDebugPlayableRect_ConAlias();
       moho::register_AI_RenderDebugPlayableRect_SimConVarDef();
-      moho::register_AI_DebugCollision_ConAlias();
       moho::register_AI_DebugCollision_SimConVarDef();
-      moho::register_AI_DebugIgnorePlayableRect_ConAlias();
       moho::register_AI_DebugIgnorePlayableRect_SimConVarDef();
-      moho::register_ai_InstaBuild_ConAliasDef();
       moho::register_ai_InstaBuild_SimConVarDef();
-      moho::register_ai_FreeBuild_ConAliasDef();
       moho::register_ai_FreeBuild_SimConVarDef();
-      moho::register_ai_SteeringAirTolerance_ConAliasDef();
       moho::register_ai_SteeringAirTolerance_SimConVarDef();
-      moho::register_TConVar_ren_Steering();
-      moho::register_Purge_ConAliasDef();
       moho::register_Purge_SimConFuncDef();
-      moho::register_KillAll_ConAliasDef();
       moho::register_KillAll_SimConFuncDef();
-      moho::register_DestroyAll_ConAliasDef();
       moho::register_DestroyAll_SimConFuncDef();
-      moho::register_DebugSetConsumptionActive_ConAliasDef();
       moho::register_DebugSetConsumptionActive_SimConFuncDef();
-      moho::register_DebugSetConsumptionInActive_ConAliasDef();
       moho::register_DebugSetConsumptionInActive_SimConFuncDef();
-      moho::register_DebugSetProductionActive_ConAliasDef();
       moho::register_DebugSetProductionActive_SimConFuncDef();
-      moho::register_DebugSetProductionInActive_ConAliasDef();
       moho::register_DebugSetProductionInActive_SimConFuncDef();
-      moho::register_DebugAIStatesOn_ConAlias();
       moho::register_DebugAIStatesOn_SimConFunc();
-      moho::register_DebugAIStatesOff_ConAlias();
       moho::register_DebugAIStatesOff_SimConFunc();
-      moho::register_TrackStats_ConAliasDef();
       moho::register_TrackStats_SimConFuncDef();
-      moho::register_DumpUnits_ConAliasDef();
       moho::register_DumpUnits_SimConFuncDef();
-      moho::register_DebugSetPlayableRect_ConAliasDef();
       moho::register_DebugSetPlayableRect_SimConFuncDef();
-      moho::register_DebugDumpArmyStats_ConAliasDef();
       moho::register_DebugDumpArmyStats_SimConFuncDef();
       moho::register_path_GeneratePreview_SimConFuncDef();
-      register_sim_TestVarBool_ConAliasDef();
-      register_sim_TestVar_ConAliasDef();
-      register_sim_TestVarUByte_ConAliasDef();
-      register_sim_TestVarFloat_ConAliasDef();
-      register_sim_TestVarStr_ConAliasDef();
-      register_sim_TestFunc_ConAliasDef();
-      register_SimLog_ConAliasDef();
-      register_SimWarn_ConAliasDef();
-      register_SimError_ConAliasDef();
-      register_SimAssert_ConAliasDef();
-      register_SimCrash_ConAliasDef();
-      register_path_BackgroundUpdate_ConAliasDef();
-      register_path_BackgroundBudget_ConAliasDef();
-      register_sim_ChecksumPeriod_ConAliasDef();
-      register_sim_DebugCrash_ConAliasDef();
-      register_SimLua_ConAliasDef();
-      register_DebugMoveCamera_ConAliasDef();
-      register_path_TimeoutPreview_ConAliasDef();
-      register_path_GeneratePreview_ConAliasDef();
     }
   };
 
@@ -1479,24 +562,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB7D0 (FUN_00BFB7D0, cleanup_dbg_ConAlias)
-   *
-   * What it does:
-   * Tears down the startup-owned `dbg` alias payload and unregisters the
-   * command binding.
-   */
-  void cleanup_dbg_ConAlias()
-  {
-    if (!gDbgConAliasConstructed) {
-      return;
-    }
-
-    DbgConAlias().ShutdownRecovered();
-    DbgConAlias().~CConAlias();
-    gDbgConAliasConstructed = false;
-  }
-
-  /**
    * Address: 0x00BFB820 (FUN_00BFB820, cleanup_dbg_SimConFunc)
    *
    * What it does:
@@ -1513,20 +578,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3D80 (FUN_00BD3D80, register_dbg_ConAlias)
-   *
-   * What it does:
-   * Registers the startup-owned `dbg` console alias and installs exit cleanup.
+   * Address: 0x00BD3D80 (FUN_00BD3D80, dynamic initializer for `gConAlias_dbg`)
+   * Address: 0x00BFB7D0 (FUN_00BFB7D0, dynamic atexit destructor for `gConAlias_dbg`)
    */
-  void register_dbg_ConAlias()
-  {
-    ConstructDbgConAlias().InitializeRecovered(
-      "Enable/Disable debug overlay",
-      "dbg",
-      "DoSimCommand dbg"
-    );
-    RegisterAtexitCleanup<&cleanup_dbg_ConAlias>();
-  }
+  moho::CConAlias gConAlias_dbg("dbg", "Enable/Disable debug overlay", "DoSimCommand dbg");
 
   /**
    * Address: 0x00BD3DB0 (FUN_00BD3DB0, register_dbg_SimConFunc)
@@ -1542,18 +597,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB470 (FUN_00BFB470, sub_BFB470)
-   */
-  void cleanup_SallyShears_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_SallyShears_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFB4C0 (FUN_00BFB4C0, sub_BFB4C0)
    */
   void cleanup_SallyShears_SimConFunc()
@@ -1561,18 +604,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_SallyShears_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00BFB4D0 (FUN_00BFB4D0, sub_BFB4D0)
-   */
-  void cleanup_BlingBling_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_BlingBling_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -1588,18 +619,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB530 (FUN_00BFB530, sub_BFB530)
-   */
-  void cleanup_ZeroExtraStorage_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_ZeroExtraStorage_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFB580 (FUN_00BFB580, sub_BFB580)
    */
   void cleanup_ZeroExtraStorage_SimConFunc()
@@ -1611,9 +630,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFB590 (FUN_00BFB590, sub_BFB590)
-   */
-  /**
    * Address: 0x00BFB5A0 (FUN_00BFB5A0)
    */
   void cleanup_DamageUnit_SimConFunc()
@@ -1621,27 +637,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_DamageUnit_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  void cleanup_DamageUnit_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DamageUnit_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00BFB5F0 (FUN_00BFB5F0, sub_BFB5F0)
-   */
-  void cleanup_AddImpulse_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_AddImpulse_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -1657,21 +652,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3890 (FUN_00BD3890, register_SallyShears_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `SallyShears` console alias and installs startup cleanup.
+   * Address: 0x00BD3890 (FUN_00BD3890, dynamic initializer for `gConAlias_SallyShears`)
+   * Address: 0x00BFB470 (FUN_00BFB470, dynamic atexit destructor for `gConAlias_SallyShears`)
    */
-  void register_SallyShears_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_SallyShears_slot(),
-      "Reveal entire map.",
-      "SallyShears",
-      "DoSimCommand SallyShears"
-    );
-    RegisterAtexitCleanup<&cleanup_SallyShears_ConAlias>();
-  }
+  moho::CConAlias gConAlias_SallyShears("SallyShears", "Reveal entire map.", "DoSimCommand SallyShears");
 
   /**
    * Address: 0x00BD38C0 (FUN_00BD38C0, register_SallyShears_SimConFuncDef)
@@ -1687,21 +671,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3900 (FUN_00BD3900, register_BlingBling_ConAlias)
-   *
-   * What it does:
-   * Registers the `BlingBling` console alias and installs startup cleanup.
+   * Address: 0x00BD3900 (FUN_00BD3900, dynamic initializer for `gConAlias_BlingBling`)
+   * Address: 0x00BFB4D0 (FUN_00BFB4D0, dynamic atexit destructor for `gConAlias_BlingBling`)
    */
-  void register_BlingBling_ConAlias()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_BlingBling_slot(),
-      "Cash money yo",
-      "BlingBling",
-      "DoSimCommand BlingBling"
-    );
-    RegisterAtexitCleanup<&cleanup_BlingBling_ConAlias>();
-  }
+  moho::CConAlias gConAlias_BlingBling("BlingBling", "Cash money yo", "DoSimCommand BlingBling");
 
   /**
    * Address: 0x00BD3930 (FUN_00BD3930, register_BlingBling_SimConFunc)
@@ -1717,22 +690,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3970 (FUN_00BD3970, register_ZeroExtraStorage_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `ZeroExtraStorage` console alias and installs startup
-   * cleanup.
+   * Address: 0x00BD3970 (FUN_00BD3970, dynamic initializer for `gConAlias_ZeroExtraStorage`)
+   * Address: 0x00BFB530 (FUN_00BFB530, dynamic atexit destructor for `gConAlias_ZeroExtraStorage`)
    */
-  void register_ZeroExtraStorage_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_ZeroExtraStorage_slot(),
-      "Set energy and mass extra storage to 0",
-      "ZeroExtraStorage",
-      "DoSimCommand ZeroExtraStorage"
-    );
-    RegisterAtexitCleanup<&cleanup_ZeroExtraStorage_ConAlias>();
-  }
+  moho::CConAlias gConAlias_ZeroExtraStorage("ZeroExtraStorage", "Set energy and mass extra storage to 0", "DoSimCommand ZeroExtraStorage");
 
   /**
    * Address: 0x00BD39A0 (FUN_00BD39A0, func_ZeroExtraStorage_SimConFuncDef)
@@ -1748,21 +709,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD39E0 (FUN_00BD39E0, register_DamageUnit_ConAlias)
-   *
-   * What it does:
-   * Registers the `DamageUnit` console alias and installs startup cleanup.
+   * Address: 0x00BD39E0 (FUN_00BD39E0, dynamic initializer for `gConAlias_DamageUnit`)
+   * Address: 0x00BFB590 (FUN_00BFB590, dynamic atexit destructor for `gConAlias_DamageUnit`)
    */
-  void register_DamageUnit_ConAlias()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DamageUnit_slot(),
-      "Damage the selected unit (negative values heal)",
-      "DamageUnit",
-      "DoSimCommand DamageUnit"
-    );
-    RegisterAtexitCleanup<&cleanup_DamageUnit_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DamageUnit("DamageUnit", "Damage the selected unit (negative values heal)", "DoSimCommand DamageUnit");
 
   /**
    * Address: 0x00BD3A10 (FUN_00BD3A10, register_DamageUnit_SimConFunc)
@@ -1815,21 +765,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD3A50 (FUN_00BD3A50, register_AddImpulse_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `AddImpulse` console alias and installs startup cleanup.
+   * Address: 0x00BD3A50 (FUN_00BD3A50, dynamic initializer for `gConAlias_AddImpulse`)
+   * Address: 0x00BFB5F0 (FUN_00BFB5F0, dynamic atexit destructor for `gConAlias_AddImpulse`)
    */
-  void register_AddImpulse_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_AddImpulse_slot(),
-      "AddImpulse (x,y,z)",
-      "AddImpulse",
-      "DoSimCommand AddImpulse"
-    );
-    RegisterAtexitCleanup<&cleanup_AddImpulse_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AddImpulse("AddImpulse", "AddImpulse (x,y,z)", "DoSimCommand AddImpulse");
 
   /**
    * Address: 0x00BD3A80 (FUN_00BD3A80, register_AddImpulse_SimConFuncDef)
@@ -1845,32 +784,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFA720 (FUN_00BFA720, cleanup_NeedRefuelThresholdRatio_ConAlias)
-   *
-   * What it does:
-   * Tears down the startup-owned `NeedRefuelThresholdRatio` alias storage.
+   * Address: 0x00BD1F60 (FUN_00BD1F60, dynamic initializer for `gConAlias_NeedRefuelThresholdRatio`)
+   * Address: 0x00BFA720 (FUN_00BFA720, dynamic atexit destructor for `gConAlias_NeedRefuelThresholdRatio`)
    */
-  void cleanup_NeedRefuelThresholdRatio_ConAlias()
-  {
-    ConAlias_NeedRefuelThresholdRatio().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD1F60 (FUN_00BD1F60, register_NeedRefuelThresholdRatio_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `NeedRefuelThresholdRatio` console alias and installs
-   * startup cleanup.
-   */
-  void register_NeedRefuelThresholdRatio_ConAliasDef()
-  {
-    ConAlias_NeedRefuelThresholdRatio().InitializeRecovered(
-      "Start looking for refueling platform when fuel ratio drops below this point",
-      "NeedRefuelThresholdRatio",
-      "DoSimCommand NeedRefuelThresholdRatio"
-    );
-    RegisterAtexitCleanup<&cleanup_NeedRefuelThresholdRatio_ConAlias>();
-  }
+  moho::CConAlias gConAlias_NeedRefuelThresholdRatio("NeedRefuelThresholdRatio", "Start looking for refueling platform when fuel ratio drops below this point", "DoSimCommand NeedRefuelThresholdRatio");
 
   /**
    * Address: 0x00BFA770 (FUN_00BFA770, cleanup_NeedRefuelThresholdRatio_SimConVar)
@@ -1902,32 +819,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFA780 (FUN_00BFA780, cleanup_NeedRepairThresholdRatio_ConAlias)
-   *
-   * What it does:
-   * Tears down the startup-owned `NeedRepairThresholdRatio` alias storage.
+   * Address: 0x00BD1FE0 (FUN_00BD1FE0, dynamic initializer for `gConAlias_NeedRepairThresholdRatio`)
+   * Address: 0x00BFA780 (FUN_00BFA780, dynamic atexit destructor for `gConAlias_NeedRepairThresholdRatio`)
    */
-  void cleanup_NeedRepairThresholdRatio_ConAlias()
-  {
-    ConAlias_NeedRepairThresholdRatio().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BD1FE0 (FUN_00BD1FE0, register_NeedRepairThresholdRatio_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `NeedRepairThresholdRatio` console alias and installs
-   * startup cleanup.
-   */
-  void register_NeedRepairThresholdRatio_ConAliasDef()
-  {
-    ConAlias_NeedRepairThresholdRatio().InitializeRecovered(
-      "Start looking for refueling platform when health ratio drops below this point",
-      "NeedRepairThresholdRatio",
-      "DoSimCommand NeedRepairThresholdRatio"
-    );
-    RegisterAtexitCleanup<&cleanup_NeedRepairThresholdRatio_ConAlias>();
-  }
+  moho::CConAlias gConAlias_NeedRepairThresholdRatio("NeedRepairThresholdRatio", "Start looking for refueling platform when health ratio drops below this point", "DoSimCommand NeedRepairThresholdRatio");
 
   /**
    * Address: 0x00BFA7D0 (FUN_00BFA7D0, cleanup_NeedRepairThresholdRatio_SimConVar)
@@ -1959,17 +854,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFC630 (FUN_00BFC630, sub_BFC630)
-   *
-   * What it does:
-   * Clears startup-owned `NoDamage` alias payload and unregisters command binding.
-   */
-  void cleanup_NoDamage_ConAlias()
-  {
-    ConAlias_NoDamage().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BFC680 (FUN_00BFC680, sub_BFC680)
    *
    * What it does:
@@ -1984,20 +868,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD4E80 (FUN_00BD4E80, register_NoDamage_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `NoDamage` console alias and installs startup cleanup.
+   * Address: 0x00BD4E80 (FUN_00BD4E80, dynamic initializer for `gConAlias_NoDamage`)
+   * Address: 0x00BFC630 (FUN_00BFC630, dynamic atexit destructor for `gConAlias_NoDamage`)
    */
-  void register_NoDamage_ConAliasDef()
-  {
-    ConAlias_NoDamage().InitializeRecovered(
-      "Disables all damage to units when set.",
-      "NoDamage",
-      "DoSimCommand NoDamage"
-    );
-    RegisterAtexitCleanup<&cleanup_NoDamage_ConAlias>();
-  }
+  moho::CConAlias gConAlias_NoDamage("NoDamage", "Disables all damage to units when set.", "DoSimCommand NoDamage");
 
   /**
    * Address: 0x00BD4EB0 (FUN_00BD4EB0, register_NoDamage_SimConVarDef)
@@ -2025,18 +899,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF5F80 (FUN_00BF5F80, sub_BF5F80)
-   *
-   * What it does:
-   * Clears startup-owned `AI_RunOpponentAI` alias payload and unregisters
-   * command binding.
-   */
-  void cleanup_AI_RunOpponentAI_ConAlias()
-  {
-    ConAlias_AI_RunOpponentAI().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BF5FD0 (FUN_00BF5FD0, sub_BF5FD0)
    *
    * What it does:
@@ -2053,21 +915,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB050 (FUN_00BCB050, register_AI_RunOpponentAI_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_RunOpponentAI` console alias and installs startup
-   * cleanup.
+   * Address: 0x00BCB050 (FUN_00BCB050, dynamic initializer for `gConAlias_AI_RunOpponentAI`)
+   * Address: 0x00BF5F80 (FUN_00BF5F80, dynamic atexit destructor for `gConAlias_AI_RunOpponentAI`)
    */
-  void register_AI_RunOpponentAI_ConAlias()
-  {
-    ConAlias_AI_RunOpponentAI().InitializeRecovered(
-      "Turns on or off Opponent AI",
-      "AI_RunOpponentAI",
-      "DoSimCommand AI_RunOpponentAI"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_RunOpponentAI_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_RunOpponentAI("AI_RunOpponentAI", "Turns on or off Opponent AI", "DoSimCommand AI_RunOpponentAI");
 
   /**
    * Address: 0x00BCB080 (FUN_00BCB080, register_AI_RunOpponentAI_SimConVarDef)
@@ -2097,18 +948,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF5FE0 (FUN_00BF5FE0, sub_BF5FE0)
-   *
-   * What it does:
-   * Clears startup-owned `AI_DebugArmyIndex` alias payload and unregisters
-   * command binding.
-   */
-  void cleanup_AI_DebugArmyIndex_ConAlias()
-  {
-    ConAlias_AI_DebugArmyIndex().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BF6030 (FUN_00BF6030, sub_BF6030)
    *
    * What it does:
@@ -2125,21 +964,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB0D0 (FUN_00BCB0D0, register_AI_DebugArmyIndex_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_DebugArmyIndex` console alias and installs startup
-   * cleanup.
+   * Address: 0x00BCB0D0 (FUN_00BCB0D0, dynamic initializer for `gConAlias_AI_DebugArmyIndex`)
+   * Address: 0x00BF5FE0 (FUN_00BF5FE0, dynamic atexit destructor for `gConAlias_AI_DebugArmyIndex`)
    */
-  void register_AI_DebugArmyIndex_ConAlias()
-  {
-    ConAlias_AI_DebugArmyIndex().InitializeRecovered(
-      "Set up a army index for debugging purposes",
-      "AI_DebugArmyIndex",
-      "DoSimCommand AI_DebugArmyIndex"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_DebugArmyIndex_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_DebugArmyIndex("AI_DebugArmyIndex", "Set up a army index for debugging purposes", "DoSimCommand AI_DebugArmyIndex");
 
   /**
    * Address: 0x00BCB100 (FUN_00BCB100, register_AI_DebugArmyIndex_SimConDef)
@@ -2151,18 +979,6 @@ namespace moho
   {
     (void)ConstructAiDebugArmyIndexSimConVar();
     RegisterAtexitCleanup<&cleanup_AI_DebugArmyIndex_SimConDef>();
-  }
-
-  /**
-   * Address: 0x00BF6040 (FUN_00BF6040, sub_BF6040)
-   *
-   * What it does:
-   * Clears startup-owned `AI_RenderDebugAttackVectors` alias payload and
-   * unregisters command binding.
-   */
-  void cleanup_AI_RenderDebugAttackVectors_ConAlias()
-  {
-    ConAlias_AI_RenderDebugAttackVectors().ShutdownRecovered();
   }
 
   /**
@@ -2183,21 +999,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB150 (FUN_00BCB150, register_AI_RenderDebugAttackVectors_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_RenderDebugAttackVectors` console alias and installs
-   * startup cleanup.
+   * Address: 0x00BCB150 (FUN_00BCB150, dynamic initializer for `gConAlias_AI_RenderDebugAttackVectors`)
+   * Address: 0x00BF6040 (FUN_00BF6040, dynamic atexit destructor for `gConAlias_AI_RenderDebugAttackVectors`)
    */
-  void register_AI_RenderDebugAttackVectors_ConAlias()
-  {
-    ConAlias_AI_RenderDebugAttackVectors().InitializeRecovered(
-      "Toggle on/off rendering of debug base attack vectors",
-      "AI_RenderDebugAttackVectors",
-      "DoSimCommand AI_RenderDebugAttackVectors"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_RenderDebugAttackVectors_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_RenderDebugAttackVectors("AI_RenderDebugAttackVectors", "Toggle on/off rendering of debug base attack vectors", "DoSimCommand AI_RenderDebugAttackVectors");
 
   /**
    * Address: 0x00BCB180 (FUN_00BCB180, register_AI_RenderDebugAttackVectors_SimConVarDef)
@@ -2210,18 +1015,6 @@ namespace moho
   {
     (void)ConstructAiRenderDebugAttackVectorsSimConVar();
     RegisterAtexitCleanup<&cleanup_AI_RenderDebugAttackVectors_SimConVarDef>();
-  }
-
-  /**
-   * Address: 0x00BF60A0 (FUN_00BF60A0, sub_BF60A0)
-   *
-   * What it does:
-   * Clears startup-owned `AI_RenderDebugPlayableRect` alias payload and
-   * unregisters command binding.
-   */
-  void cleanup_AI_RenderDebugPlayableRect_ConAlias()
-  {
-    ConAlias_AI_RenderDebugPlayableRect().ShutdownRecovered();
   }
 
   /**
@@ -2242,21 +1035,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB1D0 (FUN_00BCB1D0, register_AI_RenderDebugPlayableRect_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_RenderDebugPlayableRect` console alias and installs
-   * startup cleanup.
+   * Address: 0x00BCB1D0 (FUN_00BCB1D0, dynamic initializer for `gConAlias_AI_RenderDebugPlayableRect`)
+   * Address: 0x00BF60A0 (FUN_00BF60A0, dynamic atexit destructor for `gConAlias_AI_RenderDebugPlayableRect`)
    */
-  void register_AI_RenderDebugPlayableRect_ConAlias()
-  {
-    ConAlias_AI_RenderDebugPlayableRect().InitializeRecovered(
-      "Toggle on/off rendering of debug playable rect",
-      "AI_RenderDebugPlayableRect",
-      "DoSimCommand AI_RenderDebugPlayableRect"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_RenderDebugPlayableRect_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_RenderDebugPlayableRect("AI_RenderDebugPlayableRect", "Toggle on/off rendering of debug playable rect", "DoSimCommand AI_RenderDebugPlayableRect");
 
   /**
    * Address: 0x00BCB200 (FUN_00BCB200, register_AI_RenderDebugPlayableRect_SimConVarDef)
@@ -2269,18 +1051,6 @@ namespace moho
   {
     (void)ConstructAiRenderDebugPlayableRectSimConVar();
     RegisterAtexitCleanup<&cleanup_AI_RenderDebugPlayableRect_SimConVarDef>();
-  }
-
-  /**
-   * Address: 0x00BF6100 (FUN_00BF6100, sub_BF6100)
-   *
-   * What it does:
-   * Clears startup-owned `AI_DebugCollision` alias payload and unregisters
-   * command binding.
-   */
-  void cleanup_AI_DebugCollision_ConAlias()
-  {
-    ConAlias_AI_DebugCollision().ShutdownRecovered();
   }
 
   /**
@@ -2300,21 +1070,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB250 (FUN_00BCB250, register_AI_DebugCollision_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_DebugCollision` console alias and installs startup
-   * cleanup.
+   * Address: 0x00BCB250 (FUN_00BCB250, dynamic initializer for `gConAlias_AI_DebugCollision`)
+   * Address: 0x00BF6100 (FUN_00BF6100, dynamic atexit destructor for `gConAlias_AI_DebugCollision`)
    */
-  void register_AI_DebugCollision_ConAlias()
-  {
-    ConAlias_AI_DebugCollision().InitializeRecovered(
-      "Toggle on/off collision detection",
-      "AI_DebugCollision",
-      "DoSimCommand AI_DebugCollision"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_DebugCollision_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_DebugCollision("AI_DebugCollision", "Toggle on/off collision detection", "DoSimCommand AI_DebugCollision");
 
   /**
    * Address: 0x00BCB280 (FUN_00BCB280, register_AI_DebugCollision_SimConVarDef)
@@ -2326,18 +1085,6 @@ namespace moho
   {
     (void)ConstructAiDebugCollisionSimConVar();
     RegisterAtexitCleanup<&cleanup_AI_DebugCollision_SimConVarDef>();
-  }
-
-  /**
-   * Address: 0x00BF6160 (FUN_00BF6160, sub_BF6160)
-   *
-   * What it does:
-   * Clears startup-owned `AI_DebugIgnorePlayableRect` alias payload and
-   * unregisters command binding.
-   */
-  void cleanup_AI_DebugIgnorePlayableRect_ConAlias()
-  {
-    ConAlias_AI_DebugIgnorePlayableRect().ShutdownRecovered();
   }
 
   /**
@@ -2358,21 +1105,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCB2D0 (FUN_00BCB2D0, register_AI_DebugIgnorePlayableRect_ConAlias)
-   *
-   * What it does:
-   * Registers the `AI_DebugIgnorePlayableRect` console alias and installs
-   * startup cleanup.
+   * Address: 0x00BCB2D0 (FUN_00BCB2D0, dynamic initializer for `gConAlias_AI_DebugIgnorePlayableRect`)
+   * Address: 0x00BF6160 (FUN_00BF6160, dynamic atexit destructor for `gConAlias_AI_DebugIgnorePlayableRect`)
    */
-  void register_AI_DebugIgnorePlayableRect_ConAlias()
-  {
-    ConAlias_AI_DebugIgnorePlayableRect().InitializeRecovered(
-      "Toggle on/off ignore playable rect",
-      "AI_DebugIgnorePlayableRect",
-      "DoSimCommand AI_DebugIgnorePlayableRect"
-    );
-    RegisterAtexitCleanup<&cleanup_AI_DebugIgnorePlayableRect_ConAlias>();
-  }
+  moho::CConAlias gConAlias_AI_DebugIgnorePlayableRect("AI_DebugIgnorePlayableRect", "Toggle on/off ignore playable rect", "DoSimCommand AI_DebugIgnorePlayableRect");
 
   /**
    * Address: 0x00BCB300 (FUN_00BCB300, register_AI_DebugIgnorePlayableRect_SimConVarDef)
@@ -2385,18 +1121,6 @@ namespace moho
   {
     (void)ConstructAiDebugIgnorePlayableRectSimConVar();
     RegisterAtexitCleanup<&cleanup_AI_DebugIgnorePlayableRect_SimConVarDef>();
-  }
-
-  /**
-   * Address: 0x00BF9180 (FUN_00BF9180, cleanup_ai_InstaBuild_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `ai_InstaBuild` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_ai_InstaBuild_ConAlias()
-  {
-    ConAlias_ai_InstaBuild().ShutdownRecovered();
   }
 
   /**
@@ -2414,18 +1138,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF91E0 (FUN_00BF91E0, cleanup_ai_FreeBuild_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `ai_FreeBuild` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_ai_FreeBuild_ConAlias()
-  {
-    ConAlias_ai_FreeBuild().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BF9230 (FUN_00BF9230, cleanup_ai_FreeBuild_SimConVar)
    *
    * What it does:
@@ -2440,20 +1152,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCF710 (FUN_00BCF710, register_ai_InstaBuild_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `ai_InstaBuild` console alias and installs startup cleanup.
+   * Address: 0x00BCF710 (FUN_00BCF710, dynamic initializer for `gConAlias_ai_InstaBuild`)
+   * Address: 0x00BF9180 (FUN_00BF9180, dynamic atexit destructor for `gConAlias_ai_InstaBuild`)
    */
-  void register_ai_InstaBuild_ConAliasDef()
-  {
-    ConAlias_ai_InstaBuild().InitializeRecovered(
-      "Units build instantly.",
-      "ai_InstaBuild",
-      "DoSimCommand ai_InstaBuild"
-    );
-    RegisterAtexitCleanup<&cleanup_ai_InstaBuild_ConAlias>();
-  }
+  moho::CConAlias gConAlias_ai_InstaBuild("ai_InstaBuild", "Units build instantly.", "DoSimCommand ai_InstaBuild");
 
   /**
    * Address: 0x00BCF740 (FUN_00BCF740, register_ai_InstaBuild_SimConVarDef)
@@ -2471,20 +1173,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCF790 (FUN_00BCF790, register_ai_FreeBuild_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `ai_FreeBuild` console alias and installs startup cleanup.
+   * Address: 0x00BCF790 (FUN_00BCF790, dynamic initializer for `gConAlias_ai_FreeBuild`)
+   * Address: 0x00BF91E0 (FUN_00BF91E0, dynamic atexit destructor for `gConAlias_ai_FreeBuild`)
    */
-  void register_ai_FreeBuild_ConAliasDef()
-  {
-    ConAlias_ai_FreeBuild().InitializeRecovered(
-      "Unit build costs are 0",
-      "ai_FreeBuild",
-      "DoSimCommand ai_FreeBuild"
-    );
-    RegisterAtexitCleanup<&cleanup_ai_FreeBuild_ConAlias>();
-  }
+  moho::CConAlias gConAlias_ai_FreeBuild("ai_FreeBuild", "Unit build costs are 0", "DoSimCommand ai_FreeBuild");
 
   /**
    * Address: 0x00BCF7C0 (FUN_00BCF7C0, register_ai_FreeBuild_SimConVarDef)
@@ -2499,18 +1191,6 @@ namespace moho
       conVar = new TSimConVar<bool>(false, "ai_FreeBuild", false);
     }
     RegisterAtexitCleanup<&cleanup_ai_FreeBuild_SimConVar>();
-  }
-
-  /**
-   * Address: 0x00BF8040 (FUN_00BF8040, cleanup_ai_SteeringAirTolerance_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `ai_SteeringAirTolerance` alias payload and unregisters
-   * command binding.
-   */
-  void cleanup_ai_SteeringAirTolerance_ConAlias()
-  {
-    ConAlias_ai_SteeringAirTolerance().ShutdownRecovered();
   }
 
   /**
@@ -2530,32 +1210,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BF80A0 (FUN_00BF80A0, cleanup_TConVar_ren_Steering)
-   *
-   * What it does:
-   * Tears down startup-owned `ren_Steering` console convar registration.
+   * Address: 0x00BCE3A0 (FUN_00BCE3A0, dynamic initializer for `gConAlias_ai_SteeringAirTolerance`)
+   * Address: 0x00BF8040 (FUN_00BF8040, dynamic atexit destructor for `gConAlias_ai_SteeringAirTolerance`)
    */
-  void cleanup_TConVar_ren_Steering()
-  {
-    TeardownConCommandRegistration(ConVar_ren_Steering());
-  }
-
-  /**
-   * Address: 0x00BCE3A0 (FUN_00BCE3A0, register_ai_SteeringAirTolerance_ConAliasDef)
-   *
-   * What it does:
-   * Registers `ai_SteeringAirTolerance` console alias and installs startup
-   * cleanup.
-   */
-  void register_ai_SteeringAirTolerance_ConAliasDef()
-  {
-    ConAlias_ai_SteeringAirTolerance().InitializeRecovered(
-      "Tolerance used to detect whether an aircraft has reached its destination.",
-      "ai_SteeringAirTolerance",
-      "DoSimCommand ai_SteeringAirTolerance"
-    );
-    RegisterAtexitCleanup<&cleanup_ai_SteeringAirTolerance_ConAlias>();
-  }
+  moho::CConAlias gConAlias_ai_SteeringAirTolerance("ai_SteeringAirTolerance", "Tolerance used to detect whether an aircraft has reached its destination.", "DoSimCommand ai_SteeringAirTolerance");
 
   /**
    * Address: 0x00BCE3D0 (FUN_00BCE3D0, register_ai_SteeringAirTolerance_SimConVarDef)
@@ -2571,45 +1229,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BCE420 (FUN_00BCE420, register_TConVar_ren_Steering)
-   *
-   * What it does:
-   * Registers startup `ren_Steering` convar and installs startup cleanup.
+   * Address: 0x00BCE6D0 (FUN_00BCE6D0, dynamic initializer for `gConAlias_WeaponTerrainBlockageTest`)
+   * Address: 0x00BF81E0 (FUN_00BF81E0, dynamic atexit destructor for `gConAlias_WeaponTerrainBlockageTest`)
    */
-  void register_TConVar_ren_Steering()
-  {
-    RegisterConCommand(ConVar_ren_Steering());
-    RegisterAtexitCleanup<&cleanup_TConVar_ren_Steering>();
-  }
-
-  /**
-   * Address: 0x00BF81E0 (FUN_00BF81E0, cleanup_WeaponTerrainBlockageTest_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `WeaponTerrainBlockageTest` alias payload and
-   * unregisters command binding.
-   */
-  void cleanup_WeaponTerrainBlockageTest_ConAlias()
-  {
-    ConAlias_WeaponTerrainBlockageTest().ShutdownRecovered();
-  }
-
-  /**
-   * Address: 0x00BCE6D0 (FUN_00BCE6D0, register_WeaponTerrainBlockageTest_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `WeaponTerrainBlockageTest` console alias and installs
-   * startup cleanup.
-   */
-  void register_WeaponTerrainBlockageTest_ConAliasDef()
-  {
-    ConAlias_WeaponTerrainBlockageTest().InitializeRecovered(
-      "Toggle on/off wepaon collision tests against terrain blockages",
-      "WeaponTerrainBlockageTest",
-      "DoSimCommand WeaponTerrainBlockageTest"
-    );
-    RegisterAtexitCleanup<&cleanup_WeaponTerrainBlockageTest_ConAlias>();
-  }
+  moho::CConAlias gConAlias_WeaponTerrainBlockageTest("WeaponTerrainBlockageTest", "Toggle on/off wepaon collision tests against terrain blockages", "DoSimCommand WeaponTerrainBlockageTest");
 
   /**
    * Address: 0x00BF8230 (FUN_00BF8230, cleanup_WeaponTerrainBlockageTest_SimConVar)
@@ -2641,17 +1264,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFCB00 (FUN_00BFCB00, sub_BFCB00)
-   *
-   * What it does:
-   * Clears startup-owned `Purge` alias payload and unregisters command binding.
-   */
-  void cleanup_Purge_ConAlias()
-  {
-    ConAlias_Purge().ShutdownRecovered();
-  }
-
-  /**
    * Address: 0x00BFCB50 (FUN_00BFCB50, cleanup_Purge_SimConFunc)
    *
    * What it does:
@@ -2662,22 +1274,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_Purge_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-    * Alias of FUN_00BFE370 (non-canonical helper lane).
-   *
-   * What it does:
-   * Tears down `DebugAIStatesOff` alias registration and frees startup-owned
-   * alias storage.
-   */
-  void cleanup_DebugAIStatesOff_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugAIStatesOff_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -2696,18 +1292,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE310 (FUN_00BFE310, sub_BFE310)
-   */
-  void cleanup_DebugAIStatesOn_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugAIStatesOn_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFE360 (FUN_00BFE360, sub_BFE360)
    */
   void cleanup_DebugAIStatesOn_SimConFunc()
@@ -2715,22 +1299,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_DebugAIStatesOn_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00C01390 (FUN_00C01390, cleanup_TrackStats_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `TrackStats` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_TrackStats_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_TrackStats_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -2749,22 +1317,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C013F0 (FUN_00C013F0, cleanup_DumpUnits_ConAlias)
-   *
-   * What it does:
-   * Clears startup-owned `DumpUnits` alias payload and unregisters command
-   * binding.
-   */
-  void cleanup_DumpUnits_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DumpUnits_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00C01440 (FUN_00C01440, cleanup_DumpUnits_SimConFunc)
    *
    * What it does:
@@ -2775,23 +1327,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_DumpUnits_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00C01270 (FUN_00C01270, sub_C01270)
-   *
-   * What it does:
-   * Clears the startup-owned `DebugSetPlayableRect` alias payload and
-   * unregisters the command binding. `_atexit`-installed by
-   * `register_DebugSetPlayableRect_ConAliasDef` at 0x00BDC159.
-   */
-  void cleanup_DebugSetPlayableRect_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugSetPlayableRect_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -2812,22 +1347,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00C012D0 (FUN_00C012D0, cleanup_DebugDumpArmyStats_ConAlias)
-   *
-   * What it does:
-   * Clears the startup-owned `DebugDumpArmyStats` alias payload and
-   * unregisters the command binding.
-   */
-  void cleanup_DebugDumpArmyStats_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugDumpArmyStats_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00C01320 (FUN_00C01320, cleanup_DebugDumpArmyStats_SimConFunc)
    *
    * What it does:
@@ -2843,18 +1362,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE2B0 (FUN_00BFE2B0, sub_BFE2B0)
-   */
-  void cleanup_DebugSetProductionInActive_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugSetProductionInActive_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFE300 (FUN_00BFE300, sub_BFE300)
    */
   void cleanup_DebugSetProductionInActive_SimConFunc()
@@ -2862,18 +1369,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_DebugSetProductionInActive_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00BFE250 (FUN_00BFE250, sub_BFE250)
-   */
-  void cleanup_DebugSetProductionActive_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugSetProductionActive_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -2889,18 +1384,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFE1F0 (FUN_00BFE1F0, sub_BFE1F0)
-   */
-  void cleanup_DebugSetConsumptionInActive_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugSetConsumptionInActive_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFE240 (FUN_00BFE240, sub_BFE240)
    */
   void cleanup_DebugSetConsumptionInActive_SimConFunc()
@@ -2908,18 +1391,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_DebugSetConsumptionInActive_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00BFE190 (FUN_00BFE190, sub_BFE190)
-   */
-  void cleanup_DebugSetConsumptionActive_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DebugSetConsumptionActive_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -2935,22 +1406,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8380 (FUN_00BD8380, register_DebugAIStatesOff_ConAlias)
-   *
-   * What it does:
-   * Registers `DebugAIStatesOff` console alias and installs matching cleanup
-   * thunk in startup `atexit` lane.
+   * Address: 0x00BD8380 (FUN_00BD8380, dynamic initializer for `gConAlias_DebugAIStatesOff`)
+   * Address: 0x00BFE370 (FUN_00BFE370, dynamic atexit destructor for `gConAlias_DebugAIStatesOff`)
    */
-  void register_DebugAIStatesOff_ConAlias()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugAIStatesOff_slot(),
-      "debug function to show some AI states",
-      "DebugAIStatesOff",
-      "DoSimCommand DebugAIStatesOff"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugAIStatesOff_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugAIStatesOff("DebugAIStatesOff", "debug function to show some AI states", "DoSimCommand DebugAIStatesOff");
 
   /**
    * Address: 0x00BD83B0 (FUN_00BD83B0, register_DebugAIStatesOff_SimConFunc)
@@ -2965,18 +1424,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8310 (FUN_00BD8310, register_DebugAIStatesOn_ConAlias)
+   * Address: 0x00BD8310 (FUN_00BD8310, dynamic initializer for `gConAlias_DebugAIStatesOn`)
+   * Address: 0x00BFE310 (FUN_00BFE310, dynamic atexit destructor for `gConAlias_DebugAIStatesOn`)
    */
-  void register_DebugAIStatesOn_ConAlias()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugAIStatesOn_slot(),
-      "debug function to show some AI states",
-      "DebugAIStatesOn",
-      "DoSimCommand DebugAIStatesOn"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugAIStatesOn_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugAIStatesOn("DebugAIStatesOn", "debug function to show some AI states", "DoSimCommand DebugAIStatesOn");
 
   /**
    * Address: 0x00BD8340 (FUN_00BD8340, register_DebugAIStatesOn_SimConFunc)
@@ -2991,21 +1442,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDC350 (FUN_00BDC350, register_TrackStats_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `TrackStats` console alias and installs startup cleanup.
+   * Address: 0x00BDC350 (FUN_00BDC350, dynamic initializer for `gConAlias_TrackStats`)
+   * Address: 0x00C01390 (FUN_00C01390, dynamic atexit destructor for `gConAlias_TrackStats`)
    */
-  void register_TrackStats_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_TrackStats_slot(),
-      "Begin/End tracking stats of selected units.",
-      "TrackStats",
-      "DoSimCommand TrackStats"
-    );
-    RegisterAtexitCleanup<&cleanup_TrackStats_ConAlias>();
-  }
+  moho::CConAlias gConAlias_TrackStats("TrackStats", "Begin/End tracking stats of selected units.", "DoSimCommand TrackStats");
 
   /**
    * Address: 0x00BDC380 (FUN_00BDC380, register_TrackStats_SimConFuncDef)
@@ -3024,21 +1464,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDC3C0 (FUN_00BDC3C0, register_DumpUnits_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `DumpUnits` console alias and installs startup cleanup.
+   * Address: 0x00BDC3C0 (FUN_00BDC3C0, dynamic initializer for `gConAlias_DumpUnits`)
+   * Address: 0x00C013F0 (FUN_00C013F0, dynamic atexit destructor for `gConAlias_DumpUnits`)
    */
-  void register_DumpUnits_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DumpUnits_slot(),
-      "Print out units in play",
-      "DumpUnits",
-      "DoSimCommand DumpUnits"
-    );
-    RegisterAtexitCleanup<&cleanup_DumpUnits_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DumpUnits("DumpUnits", "Print out units in play", "DoSimCommand DumpUnits");
 
   /**
    * Address: 0x00BDC3F0 (FUN_00BDC3F0, register_DumpUnits_SimConFuncDef)
@@ -3057,25 +1486,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDC140 (FUN_00BDC140, register_DebugSetPlayableRect_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `DebugSetPlayableRect` console alias and installs startup
-   * cleanup. All three strings are the binary's own, pushed at 0x00BDC140
-   * ("DoSimCommand DebugSetPlayableRect"), 0x00BDC145
-   * ("DebugSetPlayableRect") and 0x00BDC14F
-   * ("Set the playable rect of the map (minX, minZ, maxX, maxZ).").
+   * Address: 0x00BDC140 (FUN_00BDC140, dynamic initializer for `gConAlias_DebugSetPlayableRect`)
+   * Address: 0x00C01270 (FUN_00C01270, dynamic atexit destructor for `gConAlias_DebugSetPlayableRect`)
    */
-  void register_DebugSetPlayableRect_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugSetPlayableRect_slot(),
-      "Set the playable rect of the map (minX, minZ, maxX, maxZ).",
-      "DebugSetPlayableRect",
-      "DoSimCommand DebugSetPlayableRect"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugSetPlayableRect_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugSetPlayableRect("DebugSetPlayableRect", "Set the playable rect of the map (minX, minZ, maxX, maxZ).", "DoSimCommand DebugSetPlayableRect");
 
   /**
    * Address: 0x00BDC170 (FUN_00BDC170, register_DebugSetPlayableRect_SimConFuncDef)
@@ -3096,24 +1510,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BDC1B0 (FUN_00BDC1B0, register_DebugDumpArmyStats_ConAlias)
-   *
-   * What it does:
-   * Registers the `DebugDumpArmyStats` console alias and installs startup
-   * cleanup. All three strings are the binary's own, pushed at 0x00BDC1B0
-   * ("DoSimCommand DebugDumpArmyStats"), 0x00BDC1B5 ("DebugDumpArmyStats")
-   * and 0x00BDC1BF ("Dump current stats for army index.").
+   * Address: 0x00BDC1B0 (FUN_00BDC1B0, dynamic initializer for `gConAlias_DebugDumpArmyStats`)
+   * Address: 0x00C012D0 (FUN_00C012D0, dynamic atexit destructor for `gConAlias_DebugDumpArmyStats`)
    */
-  void register_DebugDumpArmyStats_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugDumpArmyStats_slot(),
-      "Dump current stats for army index.",
-      "DebugDumpArmyStats",
-      "DoSimCommand DebugDumpArmyStats"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugDumpArmyStats_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugDumpArmyStats("DebugDumpArmyStats", "Dump current stats for army index.", "DoSimCommand DebugDumpArmyStats");
 
   /**
    * Address: 0x00BDC1E0 (FUN_00BDC1E0, register_DebugDumpArmyStats_SimConFunc)
@@ -3133,18 +1533,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD82A0 (FUN_00BD82A0, register_DebugSetProductionInActive_ConAliasDef)
+   * Address: 0x00BD82A0 (FUN_00BD82A0, dynamic initializer for `gConAlias_DebugSetProductionInActive`)
+   * Address: 0x00BFE2B0 (FUN_00BFE2B0, dynamic atexit destructor for `gConAlias_DebugSetProductionInActive`)
    */
-  void register_DebugSetProductionInActive_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugSetProductionInActive_slot(),
-      "debug function to turn selected units production of resources into inactive state",
-      "DebugSetProductionInActive",
-      "DoSimCommand DebugSetProductionInActive"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugSetProductionInActive_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugSetProductionInActive("DebugSetProductionInActive", "debug function to turn selected units production of resources into inactive state", "DoSimCommand DebugSetProductionInActive");
 
   /**
    * Address: 0x00BD82D0 (FUN_00BD82D0, register_DebugSetProductionInActive_SimConFuncDef)
@@ -3159,18 +1551,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8230 (FUN_00BD8230, register_DebugSetProductionActive_ConAliasDef)
+   * Address: 0x00BD8230 (FUN_00BD8230, dynamic initializer for `gConAlias_DebugSetProductionActive`)
+   * Address: 0x00BFE250 (FUN_00BFE250, dynamic atexit destructor for `gConAlias_DebugSetProductionActive`)
    */
-  void register_DebugSetProductionActive_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugSetProductionActive_slot(),
-      "debug function to turn selected units production of resources into active state",
-      "DebugSetProductionActive",
-      "DoSimCommand DebugSetProductionActive"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugSetProductionActive_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugSetProductionActive("DebugSetProductionActive", "debug function to turn selected units production of resources into active state", "DoSimCommand DebugSetProductionActive");
 
   /**
    * Address: 0x00BD8260 (FUN_00BD8260, register_DebugSetProductionActive_SimConFuncDef)
@@ -3185,18 +1569,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD81C0 (FUN_00BD81C0, register_DebugSetConsumptionInActive_ConAliasDef)
+   * Address: 0x00BD81C0 (FUN_00BD81C0, dynamic initializer for `gConAlias_DebugSetConsumptionInActive`)
+   * Address: 0x00BFE1F0 (FUN_00BFE1F0, dynamic atexit destructor for `gConAlias_DebugSetConsumptionInActive`)
    */
-  void register_DebugSetConsumptionInActive_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugSetConsumptionInActive_slot(),
-      "debug function to turn selected units consumption of resources into inactive state",
-      "DebugSetConsumptionInActive",
-      "DoSimCommand DebugSetConsumptionInActive"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugSetConsumptionInActive_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugSetConsumptionInActive("DebugSetConsumptionInActive", "debug function to turn selected units consumption of resources into inactive state", "DoSimCommand DebugSetConsumptionInActive");
 
   /**
    * Address: 0x00BD81F0 (FUN_00BD81F0, register_DebugSetConsumptionInActive_SimConFuncDef)
@@ -3211,18 +1587,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD8150 (FUN_00BD8150, register_DebugSetConsumptionActive_ConAliasDef)
+   * Address: 0x00BD8150 (FUN_00BD8150, dynamic initializer for `gConAlias_DebugSetConsumptionActive`)
+   * Address: 0x00BFE190 (FUN_00BFE190, dynamic atexit destructor for `gConAlias_DebugSetConsumptionActive`)
    */
-  void register_DebugSetConsumptionActive_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DebugSetConsumptionActive_slot(),
-      "debug function to turn selected units consumption of resources into active state",
-      "DebugSetConsumptionActive",
-      "DoSimCommand DebugSetConsumptionActive"
-    );
-    RegisterAtexitCleanup<&cleanup_DebugSetConsumptionActive_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DebugSetConsumptionActive("DebugSetConsumptionActive", "debug function to turn selected units consumption of resources into active state", "DoSimCommand DebugSetConsumptionActive");
 
   /**
    * Address: 0x00BD8180 (FUN_00BD8180, register_DebugSetConsumptionActive_SimConFuncDef)
@@ -3237,20 +1605,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD51E0 (FUN_00BD51E0, register_Purge_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `Purge` console alias and installs its startup cleanup thunk.
+   * Address: 0x00BD51E0 (FUN_00BD51E0, dynamic initializer for `gConAlias_Purge`)
+   * Address: 0x00BFCB00 (FUN_00BFCB00, dynamic atexit destructor for `gConAlias_Purge`)
    */
-  void register_Purge_ConAliasDef()
-  {
-    ConAlias_Purge().InitializeRecovered(
-      "Purge all entities of a specified type <shield|projectile|unit|all>.  If any optional army indices are supplied, destroy those army's entities.",
-      "Purge",
-      "DoSimCommand Purge"
-    );
-    RegisterAtexitCleanup<&cleanup_Purge_ConAlias>();
-  }
+  moho::CConAlias gConAlias_Purge("Purge", "Purge all entities of a specified type <shield|projectile|unit|all>.  If any optional army indices are supplied, destroy those army's entities.", "DoSimCommand Purge");
 
   /**
    * Address: 0x00BD5210 (FUN_00BD5210, register_Purge_SimConFuncDef)
@@ -3265,22 +1623,6 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BFDD50 (FUN_00BFDD50, cleanup_KillAll_ConAlias)
-   *
-   * What it does:
-   * Tears down `KillAll` alias registration and frees startup-owned alias
-   * storage.
-   */
-  void cleanup_KillAll_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_KillAll_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
-    }
-  }
-
-  /**
    * Address: 0x00BFDDA0 (FUN_00BFDDA0, cleanup_KillAll_SimConFunc)
    *
    * What it does:
@@ -3291,22 +1633,6 @@ namespace moho
     if (CSimConFunc*& command = SimConFunc_KillAll_slot(); command != nullptr) {
       delete command;
       command = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x00BFDDB0 (FUN_00BFDDB0, cleanup_DestroyAll_ConAlias)
-   *
-   * What it does:
-   * Tears down `DestroyAll` alias registration and frees startup-owned alias
-   * storage.
-   */
-  void cleanup_DestroyAll_ConAlias()
-  {
-    if (CConAlias*& alias = ConAlias_DestroyAll_slot(); alias != nullptr) {
-      alias->ShutdownRecovered();
-      delete alias;
-      alias = nullptr;
     }
   }
 
@@ -3325,21 +1651,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD6C90 (FUN_00BD6C90, register_KillAll_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `KillAll` console alias and attaches startup cleanup.
+   * Address: 0x00BD6C90 (FUN_00BD6C90, dynamic initializer for `gConAlias_KillAll`)
+   * Address: 0x00BFDD50 (FUN_00BFDD50, dynamic atexit destructor for `gConAlias_KillAll`)
    */
-  void register_KillAll_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_KillAll_slot(),
-      "Kill all units",
-      "KillAll",
-      "DoSimCommand KillAll"
-    );
-    RegisterAtexitCleanup<&cleanup_KillAll_ConAlias>();
-  }
+  moho::CConAlias gConAlias_KillAll("KillAll", "Kill all units", "DoSimCommand KillAll");
 
   /**
    * Address: 0x00BD6CC0 (FUN_00BD6CC0, register_KillAll_SimConFuncDef)
@@ -3354,21 +1669,10 @@ namespace moho
   }
 
   /**
-   * Address: 0x00BD6D00 (FUN_00BD6D00, register_DestroyAll_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `DestroyAll` console alias and attaches startup cleanup.
+   * Address: 0x00BD6D00 (FUN_00BD6D00, dynamic initializer for `gConAlias_DestroyAll`)
+   * Address: 0x00BFDDB0 (FUN_00BFDDB0, dynamic atexit destructor for `gConAlias_DestroyAll`)
    */
-  void register_DestroyAll_ConAliasDef()
-  {
-    EnsureConAliasRegistration(
-      ConAlias_DestroyAll_slot(),
-      "Destroy all units.  If any optional army indices are supplied, destroy those army's units.",
-      "DestroyAll",
-      "DoSimCommand DestroyAll"
-    );
-    RegisterAtexitCleanup<&cleanup_DestroyAll_ConAlias>();
-  }
+  moho::CConAlias gConAlias_DestroyAll("DestroyAll", "Destroy all units.  If any optional army indices are supplied, destroy those army's units.", "DoSimCommand DestroyAll");
 
   /**
    * Address: 0x00BD6D30 (FUN_00BD6D30, register_DestroyAll_SimConFuncDef)

@@ -64,22 +64,7 @@ namespace moho
    */
   CScrLuaInitForm* func_ReconBlipIsKnownFake_LuaFuncDef();
 
-  /**
-   * Address: 0x00BFCFB0 (FUN_00BFCFB0, cleanup_tree_AccelFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_AccelFactor` alias startup storage.
-   */
-  void cleanup_tree_AccelFactor_ConAlias();
 
-  /**
-   * Address: 0x00BD59E0 (FUN_00BD59E0, register_tree_AccelFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_AccelFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_AccelFactor_ConAliasDef();
 
   /**
    * Address: 0x00BFD000 (FUN_00BFD000, cleanup_tree_AccelFactor_SimConVarDef)
@@ -98,22 +83,7 @@ namespace moho
    */
   void register_tree_AccelFactor_SimConVarDef();
 
-  /**
-   * Address: 0x00BFD010 (FUN_00BFD010, cleanup_tree_SpringFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_SpringFactor` alias startup storage.
-   */
-  void cleanup_tree_SpringFactor_ConAlias();
 
-  /**
-   * Address: 0x00BD5A60 (FUN_00BD5A60, register_tree_SpringFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_SpringFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_SpringFactor_ConAliasDef();
 
   /**
    * Address: 0x00BFD060 (FUN_00BFD060, cleanup_tree_SpringFactor_SimConVarDef)
@@ -132,22 +102,7 @@ namespace moho
    */
   void register_tree_SpringFactor_SimConVarDef();
 
-  /**
-   * Address: 0x00BFD070 (FUN_00BFD070, cleanup_tree_DampFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_DampFactor` alias startup storage.
-   */
-  void cleanup_tree_DampFactor_ConAlias();
 
-  /**
-   * Address: 0x00BD5AE0 (FUN_00BD5AE0, register_tree_DampFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_DampFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_DampFactor_ConAliasDef();
 
   /**
    * Address: 0x00BFD0C0 (FUN_00BFD0C0, cleanup_tree_DampFactor_SimConVarDef)
@@ -166,22 +121,7 @@ namespace moho
    */
   void register_tree_DampFactor_SimConVarDef();
 
-  /**
-   * Address: 0x00BFD0D0 (FUN_00BFD0D0, cleanup_tree_UprootFactor_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `tree_UprootFactor` alias startup storage.
-   */
-  void cleanup_tree_UprootFactor_ConAlias();
 
-  /**
-   * Address: 0x00BD5B60 (FUN_00BD5B60, register_tree_UprootFactor_ConAliasDef)
-   *
-   * What it does:
-   * Initializes recovered `tree_UprootFactor` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_tree_UprootFactor_ConAliasDef();
 
   /**
    * Address: 0x00BFD120 (FUN_00BFD120, cleanup_tree_UprootFactor_SimConVarDef)
@@ -236,22 +176,7 @@ namespace moho
    */
   [[nodiscard]] CSimConVarBase* GetTreeUprootFactorSimConVarDef();
 
-  /**
-   * Address: 0x00BFDE30 (FUN_00BFDE30, cleanup_RandomElevationOffset_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `RandomElevationOffset` alias startup storage.
-   */
-  void cleanup_RandomElevationOffset_ConAlias();
 
-  /**
-   * Address: 0x00BD6F60 (FUN_00BD6F60, register_RandomElevationOffset_ConAlias)
-   *
-   * What it does:
-   * Initializes recovered `RandomElevationOffset` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_RandomElevationOffset_ConAlias();
 
   /**
    * Address: 0x00BFDE80 (FUN_00BFDE80, cleanup_RandomElevationOffset_SimConVarDef)
@@ -270,22 +195,7 @@ namespace moho
    */
   void register_RandomElevationOffset_SimConVarDef();
 
-  /**
-   * Address: 0x00BFE0F0 (FUN_00BFE0F0, cleanup_AirLookAheadMult_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `AirLookAheadMult` alias startup storage.
-   */
-  void cleanup_AirLookAheadMult_ConAlias();
 
-  /**
-   * Address: 0x00BD74B0 (FUN_00BD74B0, register_AirLookAheadMult_ConAlias)
-   *
-   * What it does:
-   * Initializes recovered `AirLookAheadMult` console alias and registers
-   * process-exit cleanup.
-   */
-  void register_AirLookAheadMult_ConAlias();
 
   /**
    * Address: 0x00BFE140 (FUN_00BFE140, cleanup_AirLookAheadMult_SimConVarDef)
@@ -729,21 +639,7 @@ namespace moho
    */
   CScrLuaInitForm* register_DrawCircle_LuaFuncDef();
 
-  /**
-   * Address: 0x00BFD880 (FUN_00BFD880, cleanup_ShowRaisedPlatforms_ConAlias)
-   *
-   * What it does:
-   * Tears down recovered `ShowRaisedPlatforms` alias startup storage.
-   */
-  void cleanup_ShowRaisedPlatforms_ConAlias();
 
-  /**
-   * Address: 0x00BD69F0 (FUN_00BD69F0, register_ShowRaisedPlatforms_ConAlias)
-   *
-   * What it does:
-   * Registers the `ShowRaisedPlatforms` alias used by sim debug rendering.
-   */
-  void register_ShowRaisedPlatforms_ConAlias();
 
   /**
    * Address: 0x00BFD8D0 (FUN_00BFD8D0, cleanup_ShowRaisedPlatforms_SimConVar)
@@ -770,13 +666,6 @@ namespace moho
    */
   [[nodiscard]] CSimConVarBase* GetShowRaisedPlatformsSimConVarDef();
 
-  /**
-   * Address: 0x00BD9B20 (FUN_00BD9B20, register_path_ArmyBudget_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_ArmyBudget` console alias.
-   */
-  void register_path_ArmyBudget_ConAliasDef();
 
   /**
    * Address: 0x00BD9B50 (FUN_00BD9B50, register_path_ArmyBudget_SimConVarDef)
@@ -786,13 +675,6 @@ namespace moho
    */
   void register_path_ArmyBudget_SimConVarDef();
 
-  /**
-   * Address: 0x00BCCBF0 (FUN_00BCCBF0, register_path_MaxInstantWorkUnits_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_MaxInstantWorkUnits` console alias.
-   */
-  void register_path_MaxInstantWorkUnits_ConAliasDef();
 
   /**
    * Address: 0x00BCCC20 (FUN_00BCCC20, register_path_MaxInstantWorkUnits_SimConVarDef)
@@ -803,13 +685,6 @@ namespace moho
    */
   void register_path_MaxInstantWorkUnits_SimConVarDef();
 
-  /**
-   * Address: 0x00BCCC70 (FUN_00BCCC70, register_path_UnreachableTimeoutSearchSteps_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `path_UnreachableTimeoutSearchSteps` console alias.
-   */
-  void register_path_UnreachableTimeoutSearchSteps_ConAliasDef();
 
   /**
    * Address: 0x00BCCCA0 (FUN_00BCCCA0, register_path_UnreachableTimeoutSearchSteps_SimConVarDef)
@@ -820,13 +695,6 @@ namespace moho
    */
   void register_path_UnreachableTimeoutSearchSteps_SimConVarDef();
 
-  /**
-   * Address: 0x00BD8710 (FUN_00BD8710, register_AI_RenderBombDropZone_ConAliasDef)
-   *
-   * What it does:
-   * Registers the `AI_RenderBombDropZone` alias used by `DoSimCommand`.
-   */
-  void register_AI_RenderBombDropZone_ConAliasDef();
 
   /**
    * Address: 0x00BD8740 (FUN_00BD8740, register_AI_RenderBombDropZone_SimConVarDef)
@@ -951,13 +819,6 @@ namespace moho
    */
   CScrLuaInitForm* register_ReconBlipIsKnownFake_LuaFuncDef();
 
-  /**
-   * Address: 0x00BF7AE0 (FUN_00BF7AE0, cleanup_ReconFlush_ConAliasDef)
-   *
-   * What it does:
-   * Tears down startup-owned `ReconFlush` console alias payload.
-   */
-  void cleanup_ReconFlush_ConAliasDef();
 
   /**
    * Address: 0x00BF7B30 (FUN_00BF7B30, cleanup_ReconFlush_SimConFuncDef)
@@ -967,13 +828,6 @@ namespace moho
    */
   void cleanup_ReconFlush_SimConFuncDef();
 
-  /**
-   * Address: 0x00BCDE90 (FUN_00BCDE90, register_ReconFlush_ConAliasDef)
-   *
-   * What it does:
-   * Registers startup-owned `ReconFlush` console alias.
-   */
-  void register_ReconFlush_ConAliasDef();
 
   /**
    * Address: 0x00BCDEC0 (FUN_00BCDEC0, register_ReconFlush_SimConFuncDef)
@@ -983,13 +837,6 @@ namespace moho
    */
   void register_ReconFlush_SimConFuncDef();
 
-  /**
-   * Address: 0x00C00EF0 (FUN_00C00EF0, CConAlias_ScenarioMethod cleanup)
-   *
-   * What it does:
-   * Tears down startup-owned `ScenarioMethod` console alias payload.
-   */
-  void cleanup_CConAlias_ScenarioMethod();
 
   /**
    * Address: 0x00C00F40 (FUN_00C00F40, cleanup_ScenarioMethod_SimConFuncDef)
@@ -999,13 +846,6 @@ namespace moho
    */
   void cleanup_ScenarioMethod_SimConFuncDef();
 
-  /**
-   * Address: 0x00BDBCD0 (FUN_00BDBCD0, register_CConAlias_ScenarioMethod)
-   *
-   * What it does:
-   * Registers startup-owned `ScenarioMethod` command alias.
-   */
-  void register_CConAlias_ScenarioMethod();
 
   /**
    * Address: 0x00BDBD00 (FUN_00BDBD00, register_ScenarioMethod_SimConFuncDef)
