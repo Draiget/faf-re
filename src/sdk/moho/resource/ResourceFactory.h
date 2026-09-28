@@ -74,7 +74,21 @@ namespace moho
     ) = 0;
 
   protected:
-    ~ResourceFactoryBase() = default;
+    /**
+     * What it does:
+     * Attaches this factory to the resource manager. Every factory
+     * constructor in the binary inlines this: it stores this vftable
+     * (0x00E07614), calls `RES_GetResourceManager()->AttachFactory(this)`,
+     * then stores the derived vftable.
+     */
+    ResourceFactoryBase();
+
+    /**
+     * What it does:
+     * Detaches this factory from the resource manager (inlined into every
+     * factory destructor after the base vftable is restored).
+     */
+    ~ResourceFactoryBase();
   };
 
   static_assert(sizeof(ResourceFactoryBase) == 0x04, "ResourceFactoryBase size must be 0x04");
@@ -85,6 +99,18 @@ namespace moho
   public:
     using ResourceHandle = boost::shared_ptr<TResource>;
     using PrefetchHandle = boost::shared_ptr<TResource>;
+
+    /**
+     * Address: 0x00539200 (FUN_00539200, Moho::ResourceFactory_RScmResource::ResourceFactory_RScmResource)
+     * Address: 0x0053AA40 (FUN_0053AA40, Moho::ResourceFactory_RScaResource::ResourceFactory_RScaResource)
+     * Address: 0x00448090 (FUN_00448090, Moho::ResourceFactory_SBatchTextureData::ResourceFactory_SBatchTextureData)
+     *
+     * What it does:
+     * Runs the attaching base constructor, then installs this vftable. The
+     * binary keeps one out-of-line copy per resource type, each with `this`
+     * folded to the one static factory object.
+     */
+    ResourceFactory() = default;
 
     /**
      * Address: 0x0044A320 (FUN_0044A320, Moho::ResourceFactory_SBatchTextureData::Init)
@@ -312,6 +338,25 @@ namespace moho
     using ResourceHandle = boost::shared_ptr<RScmResource>;
 
     /**
+     * Address: 0x005391A0 (FUN_005391A0, Moho::CScmResourceFactory::CScmResourceFactory)
+     *
+     * What it does:
+     * Out-of-line copy of the constructor (`this` folded to the static
+     * factory): the attaching template constructor, then this vftable
+     * (0x00E163B0).
+     */
+    CScmResourceFactory() = default;
+
+    /**
+     * Address: 0x005391C0 (FUN_005391C0, Moho::CScmResourceFactory::~CScmResourceFactory)
+     *
+     * What it does:
+     * Out-of-line copy of the destructor: restores the base vftable and
+     * detaches from the resource manager.
+     */
+    ~CScmResourceFactory() = default;
+
+    /**
      * Address: 0x005396F0 (FUN_005396F0, Moho::ResourceFactory_RScmResource::Init)
      *
      * What it does:
@@ -335,32 +380,6 @@ namespace moho
      */
     ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
   };
-
-  /**
-   * Address: 0x00539200 (FUN_00539200, Moho::ResourceFactory_RScmResource::ResourceFactory_RScmResource)
-   *
-   * What it does:
-   * Attaches the process-lifetime SCM resource-factory singleton to
-   * `ResourceManager` and returns it.
-   */
-  [[nodiscard]] CScmResourceFactory* construct_CScmResourceFactory();
-
-  /**
-   * Address: 0x00BC9180 (FUN_00BC9180, register_CScmResourceFactory)
-   *
-   * What it does:
-   * Registers SCM factory startup and schedules process-exit cleanup.
-   */
-  void register_CScmResourceFactory();
-
-  /**
-   * Address: 0x00BF3CA0 (FUN_00BF3CA0, Moho::CScmResourceFactory::~CScmResourceFactory teardown lane)
-   *
-   * What it does:
-   * Detaches SCM factory startup registration from the resource-manager
-   * singleton.
-   */
-  void cleanup_CScmResourceFactory();
 
   static_assert(sizeof(CScmResourceFactory) == 0x0C, "CScmResourceFactory size must be 0x0C");
 } // namespace moho

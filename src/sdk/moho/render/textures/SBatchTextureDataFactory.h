@@ -15,22 +15,24 @@ namespace moho
     using PrefetchDataHandle = ResourceHandle;
 
     /**
-     * Address: 0x00448090 (FUN_00448090, Moho::SBatchTextureDataFactory::SBatchTextureDataFactory)
+     * Address: 0x00448030 (FUN_00448030, Moho::SBatchTextureDataFactory::SBatchTextureDataFactory)
      *
      * What it does:
-     * Attaches the batch-texture data factory singleton to the resource manager.
+     * Out-of-line copy of the constructor (`this` folded to the static
+     * factory): the attaching template constructor, then this vftable
+     * (0x00E02AF4).
      */
-    SBatchTextureDataFactory();
+    SBatchTextureDataFactory() = default;
 
     /**
-     * Address: 0x00BEF4E0 (FUN_00BEF4E0, Moho::SBatchTextureDataFactory::~SBatchTextureDataFactory)
-     * Address: 0x00448050 (FUN_00448050, detach lane 1)
-     * Address: 0x004480E0 (FUN_004480E0, detach lane 2)
+     * Address: 0x00448050 (FUN_00448050, Moho::SBatchTextureDataFactory::~SBatchTextureDataFactory)
+     * Address: 0x004480E0 (FUN_004480E0, Moho::ResourceFactory_SBatchTextureData::~ResourceFactory_SBatchTextureData)
      *
      * What it does:
-     * Detaches this factory registration from the resource manager.
+     * Out-of-line copies of the destructor chain: restore the base vftable
+     * and detach from the resource manager.
      */
-    ~SBatchTextureDataFactory();
+    ~SBatchTextureDataFactory() = default;
 
     /**
      * Address: 0x00447DD0 (FUN_00447DD0, Moho::SBatchTextureDataFactory::LoadImpl)
@@ -46,16 +48,6 @@ namespace moho
 
   static_assert(sizeof(ResourceFactory<SBatchTextureData>) == 0x0C, "ResourceFactory<SBatchTextureData> size must be 0x0C");
   static_assert(sizeof(SBatchTextureDataFactory) == 0x0C, "SBatchTextureDataFactory size must be 0x0C");
-
-  /**
-   * Address: 0x00448030 (FUN_00448030, ctor bootstrap lane)
-   */
-  [[nodiscard]] SBatchTextureDataFactory* construct_SBatchTextureDataFactory();
-
-  /**
-   * Address: 0x00BC4420 (FUN_00BC4420, register_SBatchTextureDataFactory)
-   */
-  void register_SBatchTextureDataFactory();
 
   /**
    * Address: 0x0044A6C0 (FUN_0044A6C0)

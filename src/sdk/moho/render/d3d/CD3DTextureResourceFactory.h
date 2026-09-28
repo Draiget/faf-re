@@ -16,6 +16,29 @@ namespace moho
     using PrefetchDataHandle = boost::shared_ptr<PrefetchData>;
 
     /**
+     * Address: 0x0043E410 (FUN_0043E410, Moho::CD3DTextureResourceFactory::CD3DTextureResourceFactory)
+     * Address: 0x0043E470 (FUN_0043E470, ??0ResourceFactoryPreload@Moho@@QAE@@Z)
+     *
+     * What it does:
+     * Out-of-line copies of the constructor chain (`this` folded to the
+     * static factory): the binary's intermediate `ResourceFactoryPreload`
+     * constructor (base vftable, attach, vftable 0x00E02958), then this
+     * vftable (0x00E02938). The intermediate layer is folded into this class
+     * here.
+     */
+    CD3DTextureResourceFactory() = default;
+
+    /**
+     * Address: 0x0043E430 (FUN_0043E430, Moho::CD3DTextureResourceFactory::~CD3DTextureResourceFactory)
+     * Address: 0x0043E4C0 (FUN_0043E4C0, Moho::ResourceFactoryPreload::~ResourceFactoryPreload)
+     *
+     * What it does:
+     * Out-of-line copies of the destructor chain: restore the base vftable
+     * and detach from the resource manager.
+     */
+    ~CD3DTextureResourceFactory() = default;
+
+    /**
      * Address: 0x004434E0 (FUN_004434E0)
      *
      * What it does:
@@ -143,48 +166,6 @@ namespace moho
   };
 
   /**
-   * Address: 0x0043E410 (FUN_0043E410, func_CreateTextureResourceFactory)
-   *
-   * What it does:
-   * Returns the texture-factory singleton after its constructor lane has run.
-   */
-  [[nodiscard]] CD3DTextureResourceFactory* func_CreateTextureResourceFactory();
-
-  /**
-   * Address: 0x0043E430 (FUN_0043E430, unregister_TextureResourceFactoryPrimary)
-   *
-   * What it does:
-   * Runs one texture-factory registration lane against the resource-manager singleton.
-   */
-  void unregister_TextureResourceFactoryPrimary();
-
-  /**
-   * Address: 0x0043E470 (FUN_0043E470, ??0ResourceFactoryPreload@Moho@@QAE@@Z)
-   *
-   * What it does:
-   * Runs the preload-constructor registration lane for the texture-factory singleton.
-   */
-  [[nodiscard]] CD3DTextureResourceFactory* construct_TextureResourceFactoryPreload();
-
-  /**
-   * Address: 0x00BC4210 (FUN_00BC4210, register_CD3DTextureResourceFactory)
-   *
-   * What it does:
-   * Runs texture-factory preload construction and registers process-exit
-   * cleanup for the startup factory slot.
-   */
-  void register_CD3DTextureResourceFactory();
-
-  /**
-   * Address: 0x00BEF310 (FUN_00BEF310, cleanup_CD3DTextureResourceFactory)
-   *
-   * What it does:
-   * Detaches the startup texture-factory registration lane from the resource
-   * manager during process-exit teardown.
-   */
-  void cleanup_CD3DTextureResourceFactory();
-
-  /**
    * Address: 0x00BC4230 (FUN_00BC4230, register_PrefetchType_d3d_textures)
    *
    * What it does:
@@ -193,13 +174,15 @@ namespace moho
    */
   void register_PrefetchType_d3d_textures();
 
+  static_assert(sizeof(CD3DTextureResourceFactory) == 0x0C, "CD3DTextureResourceFactory size must be 0x0C");
+
   /**
-   * Address: 0x0043E4C0 (FUN_0043E4C0, unregister_TextureResourceFactorySecondary)
+   * Address: 0x00BC4210 (FUN_00BC4210, dynamic initializer for `gTextureResourceFactory`)
+   * Address: 0x00BEF310 (FUN_00BEF310, dynamic atexit destructor for `gTextureResourceFactory`)
    *
    * What it does:
-   * Runs the second texture-factory registration lane against the resource-manager singleton.
+   * The process-lifetime D3D texture factory (0x010A7A10); constructing it
+   * attaches it to the resource manager.
    */
-  void unregister_TextureResourceFactorySecondary();
-
-  static_assert(sizeof(CD3DTextureResourceFactory) == 0x0C, "CD3DTextureResourceFactory size must be 0x0C");
+  extern CD3DTextureResourceFactory gTextureResourceFactory;
 } // namespace moho

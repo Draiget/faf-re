@@ -16,78 +16,27 @@ namespace
     delete[] reinterpret_cast<const char*>(scmFile);
   }
 
-  [[nodiscard]] moho::CScmResourceFactory& ScmResourceFactorySingleton()
-  {
-    static moho::CScmResourceFactory sFactory;
-    return sFactory;
-  }
-
-  [[nodiscard]] moho::CScmResourceFactory* AttachScmResourceFactory()
-  {
-    moho::RES_EnsureResourceManager();
-
-    moho::ResourceManager* const manager = moho::RES_GetResourceManager();
-    moho::CScmResourceFactory& factory = ScmResourceFactorySingleton();
-    if (manager != nullptr) {
-      manager->AttachFactory(&factory);
-    }
-
-    return &factory;
-  }
-
-  void DetachScmResourceFactory()
-  {
-    moho::RES_EnsureResourceManager();
-
-    moho::ResourceManager* const manager = moho::RES_GetResourceManager();
-    moho::CScmResourceFactory& factory = ScmResourceFactorySingleton();
-    if (manager != nullptr) {
-      manager->DetachFactory(&factory);
-    }
-  }
-
-  template <void (*Cleanup)()>
-  void RegisterExitCleanup() noexcept
-  {
-    (void)std::atexit(Cleanup);
-  }
-
-  struct ScmResourceFactoryStartupBootstrap
-  {
-    ScmResourceFactoryStartupBootstrap()
-    {
-      moho::register_CScmResourceFactory();
-    }
-  };
-
-  [[maybe_unused]] ScmResourceFactoryStartupBootstrap gScmResourceFactoryStartupBootstrap;
+  /**
+   * Address: 0x00BC9180 (FUN_00BC9180, dynamic initializer for `sScmResourceFactory`)
+   * Address: 0x00BF3CA0 (FUN_00BF3CA0, dynamic atexit destructor for `sScmResourceFactory`)
+   *
+   * What it does:
+   * The process-lifetime `.scm` factory; constructing it attaches it to the
+   * resource manager and destroying it detaches it.
+   */
+  moho::CScmResourceFactory sScmResourceFactory;
 } // namespace
 
 namespace moho
 {
-  /**
-   * Address: 0x005391A0 (FUN_005391A0)
-   *
-   * What it does:
-   * Materializes the process-lifetime SCM resource-factory singleton object and
-   * returns the canonical storage pointer.
-   */
-  [[maybe_unused]] CScmResourceFactory* ConstructScmResourceFactorySingletonObject()
+  ResourceFactoryBase::ResourceFactoryBase()
   {
-    CScmResourceFactory& factory = ScmResourceFactorySingleton();
-    return &factory;
+    RES_GetResourceManager()->AttachFactory(this);
   }
 
-  /**
-   * Address: 0x005391C0 (FUN_005391C0)
-   *
-   * What it does:
-   * Legacy startup lane that ensures the resource-manager singleton is alive
-   * and attaches the process-lifetime SCM factory instance.
-   */
-  [[maybe_unused]] void AttachScmResourceFactoryLegacyInitLane()
+  ResourceFactoryBase::~ResourceFactoryBase()
   {
-    (void)AttachScmResourceFactory();
+    RES_GetResourceManager()->DetachFactory(this);
   }
 
   /**
@@ -159,40 +108,4 @@ namespace moho
     return outResource;
   }
 
-  /**
-   * Address: 0x00539200 (FUN_00539200, Moho::ResourceFactory_RScmResource::ResourceFactory_RScmResource)
-   *
-   * What it does:
-   * Attaches the process-lifetime SCM resource-factory singleton to
-   * `ResourceManager` and returns it.
-   */
-  CScmResourceFactory* construct_CScmResourceFactory()
-  {
-    (void)ConstructScmResourceFactorySingletonObject();
-    return AttachScmResourceFactory();
-  }
-
-  /**
-   * Address: 0x00BF3CA0 (FUN_00BF3CA0, Moho::CScmResourceFactory::~CScmResourceFactory teardown lane)
-   *
-   * What it does:
-   * Detaches SCM factory startup registration from the resource-manager
-   * singleton.
-   */
-  void cleanup_CScmResourceFactory()
-  {
-    DetachScmResourceFactory();
-  }
-
-  /**
-   * Address: 0x00BC9180 (FUN_00BC9180, register_CScmResourceFactory)
-   *
-   * What it does:
-   * Registers SCM factory startup and schedules process-exit cleanup.
-   */
-  void register_CScmResourceFactory()
-  {
-    (void)construct_CScmResourceFactory();
-    RegisterExitCleanup<&cleanup_CScmResourceFactory>();
-  }
 } // namespace moho

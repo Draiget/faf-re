@@ -274,11 +274,6 @@ namespace
     }
   };
 
-  [[nodiscard]] CScaResourceFactory& ScaResourceFactorySingleton()
-  {
-    static CScaResourceFactory sFactory;
-    return sFactory;
-  }
 } // namespace
 
 /**
@@ -414,25 +409,6 @@ void SaveConstructArgs_RScaResourceThunk(
   SaveConstructArgs_RScaResource(archive, objectPtr, version, ownerRef, result);
 }
 
-/**
- * Address: 0x0053AA40 (FUN_0053AA40)
- *
- * What it does:
- * Ensures the resource-manager singleton, attaches process-lifetime SCA
- * factory registration, and returns the attached factory object.
- */
-CScaResourceFactory* construct_CScaResourceFactoryPreload()
-{
-  RES_EnsureResourceManager();
-
-  ResourceManager* const manager = RES_GetResourceManager();
-  CScaResourceFactory& factory = ScaResourceFactorySingleton();
-  if (manager != nullptr) {
-    manager->AttachFactory(&factory);
-  }
-
-  return &factory;
-}
 
 /**
  * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
@@ -634,33 +610,22 @@ void register_RScaResourceAnimPrefetchType()
 namespace
 {
   /**
-   * Address: 0x00BF3DA0 (FUN_00BF3DA0)
+   * Address: 0x00BC9260 (FUN_00BC9260, dynamic initializer for `sScaResourceFactory`)
+   * Address: 0x00BF3DA0 (FUN_00BF3DA0, dynamic atexit destructor for `sScaResourceFactory`)
    *
    * What it does:
-   * atexit half of the SCA factory static initialiser: detaches the factory
-   * singleton from the resource manager (the base-vftable reset is the
-   * singleton's destructor semantics).
+   * The process-lifetime `.sca` factory; constructing it attaches it to the
+   * resource manager, which is what gives `RES_GetResource` a factory for
+   * `RScaResource` (without it every PlayAnim gets an expired handle).
+   * Defined ahead of the bootstrap below, as 0x00BC9260 precedes the "anims"
+   * prefetch key's initializer 0x00BC9280.
    */
-  void DetachScaResourceFactoryAtExit()
-  {
-    moho::RES_EnsureResourceManager();
-    moho::ResourceManager* const manager = moho::RES_GetResourceManager();
-    if (manager != nullptr) {
-      manager->DetachFactory(&ScaResourceFactorySingleton());
-    }
-  }
+  CScaResourceFactory sScaResourceFactory;
+
   struct RScaResourcePrefetchBootstrap
   {
     RScaResourcePrefetchBootstrap()
     {
-      // 0x00BC9260 (static initialiser, `__xc_a`): construct the SCA factory
-      // singleton and attach it to the resource manager (0x0053AA40), then
-      // register the process-exit detach (0x00BF3DA0). Without this attach
-      // RES_GetResource has no factory for RScaResource's type and every
-      // PlayAnim gets an expired handle. 0x00BC9280 (the "anims" prefetch key)
-      // is the next initialiser in the same table.
-      (void)moho::construct_CScaResourceFactoryPreload();
-      (void)std::atexit(&DetachScaResourceFactoryAtExit);
       moho::register_RScaResourceAnimPrefetchType();
     }
   };

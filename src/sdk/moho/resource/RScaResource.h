@@ -156,6 +156,16 @@ namespace moho
     using ResourceHandle = boost::shared_ptr<RScaResource>;
 
     /**
+     * Address: 0x0053A9E0 (FUN_0053A9E0, Moho::CScaResourceFactory::CScaResourceFactory)
+     *
+     * What it does:
+     * Out-of-line copy of the constructor (`this` folded to the static
+     * factory): the attaching template constructor, then this vftable
+     * (0x00E1646C).
+     */
+    CScaResourceFactory() = default;
+
+    /**
      * Address: 0x0053AD00 (FUN_0053AD00, Moho::ResourceFactory_RScaResource::Init)
      *
      * What it does:
@@ -186,15 +196,6 @@ namespace moho
      */
     ResourceHandle& LoadImpl(ResourceHandle& outResource, const char* path) override;
   };
-
-  /**
-   * Address: 0x0053AA40 (FUN_0053AA40)
-   *
-   * What it does:
-   * Ensures the resource-manager singleton, attaches process-lifetime SCA
-   * factory registration, and returns the attached factory object.
-   */
-  CScaResourceFactory* construct_CScaResourceFactoryPreload();
 
   /**
    * Address: 0x0053B100 (FUN_0053B100)

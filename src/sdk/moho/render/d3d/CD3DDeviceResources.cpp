@@ -65,7 +65,7 @@ namespace moho
 
     CD3DTextureResourceFactory* GetTextureFactory()
     {
-      return func_CreateTextureResourceFactory();
+      return &gTextureResourceFactory;
     }
 
     /**
