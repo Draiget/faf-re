@@ -33,20 +33,6 @@ namespace
   // WriteArchive construction.
   moho::RTrailBlueprintConstruct gRTrailBlueprintConstructHelper;
 
-  /**
-   * Address: 0x00BF2650 (FUN_00BF2650)
-   *
-   * What it does:
-   * Unlinks the `RTrailBlueprintConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8170) as the
-   * global's `atexit` teardown.
-   */
-  void CleanupRTrailBlueprintConstruct()
-  {
-    gRTrailBlueprintConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -117,9 +103,19 @@ namespace moho
   RTrailBlueprintConstruct::RTrailBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RTrailBlueprint))
     , mDeleteCallback(&Delete_RTrailBlueprint)
-  {
-    (void)std::atexit(&CleanupRTrailBlueprintConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF2650 (FUN_00BF2650, dynamic atexit destructor for `gRTrailBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8170).
+   * `FUN_00510060` and `FUN_00510090` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RTrailBlueprintConstruct::~RTrailBlueprintConstruct() = default;
 
   /**
    * Address: 0x00510700 (FUN_00510700, gpg::SerConstructHelper<Moho::RTrailBlueprint>::Init)

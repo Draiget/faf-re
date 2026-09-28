@@ -32,25 +32,6 @@ namespace
   // WriteArchive construction.
   moho::RProjectileBlueprintConstruct gRProjectileBlueprintConstructHelper;
 
-  /**
-   * Address: 0x00BF2F80 (FUN_00BF2F80)
-   *
-   * What it does:
-   * Unlinks the `RProjectileBlueprintConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8700) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x0051CAC0 (FUN_0051CAC0) and 0x0051CAF0 (FUN_0051CAF0) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRProjectileBlueprintConstruct()
-  {
-    gRProjectileBlueprintConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -127,9 +108,19 @@ namespace moho
   RProjectileBlueprintConstruct::RProjectileBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RProjectileBlueprint))
     , mDeleteCallback(&Delete_RProjectileBlueprint)
-  {
-    (void)std::atexit(&CleanupRProjectileBlueprintConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF2F80 (FUN_00BF2F80, dynamic atexit destructor for `gRProjectileBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8700).
+   * `FUN_0051CAC0` and `FUN_0051CAF0` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RProjectileBlueprintConstruct::~RProjectileBlueprintConstruct() = default;
 
   /**
    * Address: 0x0051CD10 (FUN_0051CD10, gpg::SerConstructHelper<Moho::RProjectileBlueprint>::Init)

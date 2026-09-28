@@ -24,22 +24,6 @@ namespace
   // ReadArchive/WriteArchive construction.
   moho::CIntelCounterHandleConstruct gCIntelCounterHandleConstruct;
 
-  /**
-   * Address: 0x00C01F60 (FUN_00C01F60)
-   *
-   * What it does:
-   * Unlinks the `CIntelCounterHandleConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BDCD50) as the
-   * global's `atexit` teardown. `FUN_0076F8A0` and `FUN_0076F8D0` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCIntelCounterHandleConstruct()
-  {
-    gCIntelCounterHandleConstruct.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -117,9 +101,19 @@ namespace moho
   CIntelCounterHandleConstruct::CIntelCounterHandleConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCIntelCounterHandleSerializerThunk))
     , mDeleteCallback(&CIntelCounterHandleConstruct::Deconstruct)
-  {
-    (void)std::atexit(&CleanupCIntelCounterHandleConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00C01F60 (FUN_00C01F60, dynamic atexit destructor for `gCIntelCounterHandleConstruct`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BDCD50).
+   * `FUN_0076F8A0` and `FUN_0076F8D0` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CIntelCounterHandleConstruct::~CIntelCounterHandleConstruct() = default;
 
   /**
    * Address: 0x0076FBA0 (FUN_0076FBA0, gpg::SerConstructHelper_CIntelCounterHandle::Init)

@@ -10,7 +10,6 @@
 
 namespace
 {
-  void cleanup_UnitSetSerializer();
 
   [[nodiscard]] gpg::RType* ResolveEntitySetBaseType()
   {
@@ -145,9 +144,19 @@ namespace moho
   UnitSetSerializer::UnitSetSerializer()
     : mDeserialize(&UnitSetSerializer::Deserialize)
     , mSerialize(&UnitSetSerializer::Serialize)
-  {
-    (void)std::atexit(&cleanup_UnitSetSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00BFE450 (FUN_00BFE450, dynamic atexit destructor for `gUnitSetSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BD8480).
+   * `FUN_006D2AB0` and `FUN_006D2AE0` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  UnitSetSerializer::~UnitSetSerializer() = default;
 } // namespace moho
 
 namespace
@@ -155,16 +164,4 @@ namespace
   // Address: 0x010B75D4 -- process-global `UnitSetSerializer` singleton.
   moho::UnitSetSerializer gUnitSetSerializer;
 
-  /**
-   * Address: 0x00BFE450 (FUN_00BFE450, cleanup_UnitSetSerializer)
-   *
-   * What it does:
-   * Unlinks `UnitSetSerializer` helper-node links and rewires self-links.
-   * The real ctor registers this plain free function (not a mangled
-   * destructor) as its explicit atexit target.
-   */
-  void cleanup_UnitSetSerializer()
-  {
-    gUnitSetSerializer.ResetLinks();
-  }
 } // namespace

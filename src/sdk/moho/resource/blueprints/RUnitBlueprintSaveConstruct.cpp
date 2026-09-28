@@ -35,24 +35,6 @@ namespace
   // WriteArchive construction.
   moho::RUnitBlueprintSaveConstruct gRUnitBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF3750 (FUN_00BF3750)
-   *
-   * What it does:
-   * Unlinks the `RUnitBlueprintSaveConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8C30) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x00522B80 (FUN_00522B80) and 0x00522BB0 (FUN_00522BB0) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRUnitBlueprintSaveConstruct()
-  {
-    gRUnitBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -117,8 +99,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupRUnitBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF3750 (FUN_00BF3750, dynamic atexit destructor for `gRUnitBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8C30).
+   * `FUN_00522B80` and `FUN_00522BB0` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RUnitBlueprintSaveConstruct::~RUnitBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x005236C0 (FUN_005236C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::Init)

@@ -42,25 +42,11 @@ namespace
 
   // Address: 0x010AFDA0 -- process-global `CAiSiloBuildImplSerializer`
   // singleton. Constructing it runs CAiSiloBuildImplSerializer::
-  // CAiSiloBuildImplSerializer() (0x00BCE150), which splices this helper
-  // into gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // CAiSiloBuildImplSerializer() (0x00BCE150), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
+  // `atexit`.
   CAiSiloBuildImplSerializer gCAiSiloBuildImplSerializer;
 
-  /**
-   * Address: 0x00BF7F60 (FUN_00BF7F60)
-   *
-   * What it does:
-   * Unlinks the global `CAiSiloBuildImplSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCE150) as the global's
-   * `atexit` teardown.
-   */
-  void CleanupCAiSiloBuildImplSerializer()
-  {
-    gCAiSiloBuildImplSerializer.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -167,16 +153,26 @@ void CAiSiloBuildImplSerializer::Serialize(gpg::WriteArchive* const archive, con
  * `CAiSiloBuildImplSerializer` singleton)
  *
  * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup (this class has no user-declared destructor).
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
+ * `sNewHelpers`) and binds the load/save callback fields; the compiler
+ * registers the destructor with `atexit`.
  */
 CAiSiloBuildImplSerializer::CAiSiloBuildImplSerializer()
   : mLoadCallback(&CAiSiloBuildImplSerializer::Deserialize)
   , mSaveCallback(&CAiSiloBuildImplSerializer::Serialize)
-{
-  (void)std::atexit(&CleanupCAiSiloBuildImplSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF7F60 (FUN_00BF7F60, dynamic atexit destructor for `gCAiSiloBuildImplSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCE150).
+ * `FUN_005CF920` and `FUN_005CF950` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiSiloBuildImplSerializer::~CAiSiloBuildImplSerializer() = default;
 
 /**
  * Address: 0x005CFF30 (FUN_005CFF30)

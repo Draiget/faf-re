@@ -76,22 +76,6 @@ namespace
   // WriteArchive construction.
   CAiNavigatorLandConstruct gCAiNavigatorLandConstruct;
 
-  /**
-   * Address: 0x00BF6E80 (FUN_00BF6E80, cleanup_CAiNavigatorLandConstruct)
-   *
-   * What it does:
-   * Unlinks the `CAiNavigatorLandConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BCC7A0) as the
-   * global's `atexit` teardown. `FUN_005A46D0` and `FUN_005A4700` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCAiNavigatorLandConstructStartup()
-  {
-    gCAiNavigatorLandConstruct.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -131,9 +115,19 @@ void CAiNavigatorLandConstruct::Deconstruct(void* const object)
 CAiNavigatorLandConstruct::CAiNavigatorLandConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorLandConstruct::Construct))
   , mDeleteCallback(&CAiNavigatorLandConstruct::Deconstruct)
-{
-  (void)std::atexit(&CleanupCAiNavigatorLandConstructStartup);
-}
+{}
+
+/**
+ * Address: 0x00BF6E80 (FUN_00BF6E80, dynamic atexit destructor for `gCAiNavigatorLandConstruct`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCC7A0).
+ * `FUN_005A46D0` and `FUN_005A4700` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiNavigatorLandConstruct::~CAiNavigatorLandConstruct() = default;
 
 /**
  * Address: 0x005A73B0 (FUN_005A73B0, gpg::SerConstructHelper_CAiNavigatorLand::Init)

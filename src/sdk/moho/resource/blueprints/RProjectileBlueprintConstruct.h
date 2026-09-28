@@ -42,6 +42,18 @@ namespace moho
     RProjectileBlueprintConstruct();
 
     /**
+     * Address: 0x00BF2F80 (FUN_00BF2F80, dynamic atexit destructor for `gRProjectileBlueprintConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC8700).
+     * `FUN_0051CAC0` and `FUN_0051CAF0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RProjectileBlueprintConstruct();
+
+    /**
      * Address: 0x0051CD10 (FUN_0051CD10, gpg::SerConstructHelper<Moho::RProjectileBlueprint>::Init)
      *
      * What it does:

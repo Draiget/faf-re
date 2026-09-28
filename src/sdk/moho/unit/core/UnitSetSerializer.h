@@ -27,6 +27,18 @@ namespace moho
     UnitSetSerializer();
 
     /**
+     * Address: 0x00BFE450 (FUN_00BFE450, dynamic atexit destructor for `gUnitSetSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD8480).
+     * `FUN_006D2AB0` and `FUN_006D2AE0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~UnitSetSerializer();
+
+    /**
      * Address: 0x006D2A00 (FUN_006D2A00, sub_6D2A00)
      *
      * What it does:

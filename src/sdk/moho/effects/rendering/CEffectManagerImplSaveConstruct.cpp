@@ -77,21 +77,6 @@ namespace
   // WriteArchive construction.
   moho::CEffectManagerImplSaveConstruct gCEffectManagerImplSaveConstruct;
 
-  /**
-   * Address: 0x00BFC000 (FUN_00BFC000, cleanup_CEffectManagerImplSaveConstruct)
-   *
-   * What it does:
-   * Process-exit cleanup that unlinks the `CEffectManagerImplSaveConstruct`
-   * helper node. The real ctor pushes this plain free function (not a
-   * mangled destructor) as its atexit target. `FUN_0066BA00` and
-   * `FUN_0066BA30` are duplicate-emission twins of this exact unlink/reset
-   * lane (same `ResetLinks()` shape, folded to separate addresses); they
-   * have no distinct source-level body of their own.
-   */
-  void cleanup_CEffectManagerImplSaveConstruct()
-  {
-    gCEffectManagerImplSaveConstruct.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -101,17 +86,27 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * save-construct-args callback field, then registers
-   * `cleanup_CEffectManagerImplSaveConstruct` as the explicit atexit
-   * teardown.
+   * save-construct-args callback field; the compiler registers the destructor
+   * with `atexit`.
    */
   CEffectManagerImplSaveConstruct::CEffectManagerImplSaveConstruct()
     : mSaveConstructArgsCallback(
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_CEffectManagerImpl)
       )
   {
-    (void)std::atexit(&cleanup_CEffectManagerImplSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BFC000 (FUN_00BFC000, dynamic atexit destructor for `gCEffectManagerImplSaveConstruct`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BD4590).
+   * `FUN_0066BA00` and `FUN_0066BA30` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CEffectManagerImplSaveConstruct::~CEffectManagerImplSaveConstruct() = default;
 
   /**
    * Address: 0x0066C060 (FUN_0066C060, gpg::SerSaveConstructHelper_CEffectManagerImpl::Init)

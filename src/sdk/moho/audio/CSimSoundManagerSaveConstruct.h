@@ -31,6 +31,18 @@ namespace moho
     CSimSoundManagerSaveConstruct();
 
     /**
+     * Address: 0x00C01560 (FUN_00C01560, dynamic atexit destructor for `gCSimSoundManagerSaveConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDC520).
+     * `FUN_00761100` and `FUN_00761130` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CSimSoundManagerSaveConstruct();
+
+    /**
      * Address: 0x007610B0 (FUN_007610B0)
      *
      * What it does:

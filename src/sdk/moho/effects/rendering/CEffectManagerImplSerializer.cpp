@@ -136,21 +136,6 @@ namespace
   // WriteArchive construction.
   moho::CEffectManagerImplSerializer gCEffectManagerImplSerializer;
 
-  /**
-   * Address: 0x00BFC060 (FUN_00BFC060, cleanup_CEffectManagerImplSerializer)
-   *
-   * What it does:
-   * Process-exit cleanup that unlinks the `CEffectManagerImplSerializer`
-   * helper node. The real ctor pushes this plain free function (not a
-   * mangled destructor) as its atexit target. `FUN_0066BC20` and
-   * `FUN_0066BC50` are duplicate-emission twins of this exact unlink/reset
-   * lane (same `ResetLinks()` shape, folded to separate addresses); they
-   * have no distinct source-level body of their own.
-   */
-  void cleanup_CEffectManagerImplSerializer()
-  {
-    gCEffectManagerImplSerializer.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -159,16 +144,25 @@ namespace moho
    * Address: 0x00BD4600 (FUN_00BD4600, register_CEffectManagerImplSerializer)
    *
    * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields, then registers
-   * `cleanup_CEffectManagerImplSerializer` as the explicit atexit teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
+   * callback fields; the compiler registers the destructor with `atexit`.
    */
   CEffectManagerImplSerializer::CEffectManagerImplSerializer()
     : mLoadCallback(&Deserialize_CEffectManagerImpl)
     , mSaveCallback(&Serialize_CEffectManagerImpl)
-  {
-    (void)std::atexit(&cleanup_CEffectManagerImplSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00BFC060 (FUN_00BFC060, dynamic atexit destructor for `gCEffectManagerImplSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BD4600).
+   * `FUN_0066BC20` and `FUN_0066BC50` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CEffectManagerImplSerializer::~CEffectManagerImplSerializer() = default;
 
   /**
    * Address: 0x0066C160 (FUN_0066C160, gpg::SerSaveLoadHelper_CEffectManagerImpl::Init)

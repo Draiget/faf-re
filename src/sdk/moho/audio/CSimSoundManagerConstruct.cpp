@@ -26,22 +26,6 @@ namespace
   // on it from within the first ReadArchive/WriteArchive construction.
   moho::CSimSoundManagerConstruct gCSimSoundManagerConstruct;
 
-  /**
-   * Address: 0x00C01590 (FUN_00C01590)
-   *
-   * What it does:
-   * Unlinks the `CSimSoundManagerConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BDC550) as the
-   * global's `atexit` teardown. `FUN_007611E0` and `FUN_00761210` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCSimSoundManagerConstruct()
-  {
-    gCSimSoundManagerConstruct.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -58,9 +42,19 @@ namespace moho
   CSimSoundManagerConstruct::CSimSoundManagerConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CSimSoundManagerConstruct::Construct))
     , mDeleteCallback(&CSimSoundManagerConstruct::Deconstruct)
-  {
-    (void)std::atexit(&CleanupCSimSoundManagerConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00C01590 (FUN_00C01590, dynamic atexit destructor for `gCSimSoundManagerConstruct`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BDC550).
+   * `FUN_007611E0` and `FUN_00761210` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CSimSoundManagerConstruct::~CSimSoundManagerConstruct() = default;
 
   /**
    * Address: 0x00761240 (FUN_00761240, Moho::CSimSoundManagerConstruct::Construct)

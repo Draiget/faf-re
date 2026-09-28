@@ -64,22 +64,6 @@ namespace
   // WriteArchive construction.
   CAiPersonalityConstruct gCAiPersonalityConstruct;
 
-  /**
-   * Address: 0x00BF7710 (FUN_00BF7710, cleanup_CAiPersonalityConstruct)
-   *
-   * What it does:
-   * Unlinks the `CAiPersonalityConstruct` helper node from whatever intrusive
-   * list it currently sits in and restores a self-linked sentinel state.
-   * Registered by the real dynamic initializer (0x00BCD620) as the global's
-   * `atexit` teardown. `FUN_005B6980` and `FUN_005B69B0` are duplicate-
-   * emission twins of this exact unlink/reset lane (same `ResetLinks()`
-   * shape, folded to separate addresses); neither has a distinct
-   * source-level body of its own.
-   */
-  void CleanupCAiPersonalityConstructStartup()
-  {
-    gCAiPersonalityConstruct.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -121,9 +105,19 @@ void CAiPersonalityConstruct::Deconstruct(void* const object)
 CAiPersonalityConstruct::CAiPersonalityConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiPersonalityConstruct::Construct))
   , mDeleteCallback(&CAiPersonalityConstruct::Deconstruct)
-{
-  (void)std::atexit(&CleanupCAiPersonalityConstructStartup);
-}
+{}
+
+/**
+ * Address: 0x00BF7710 (FUN_00BF7710, dynamic atexit destructor for `gCAiPersonalityConstruct`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCD620).
+ * `FUN_005B6980` and `FUN_005B69B0` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiPersonalityConstruct::~CAiPersonalityConstruct() = default;
 
 /**
  * Address: 0x005B92D0 (FUN_005B92D0, gpg::SerConstructHelper_CAiPersonality::Init)

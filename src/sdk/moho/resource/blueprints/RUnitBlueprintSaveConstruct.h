@@ -42,6 +42,18 @@ namespace moho
     RUnitBlueprintSaveConstruct();
 
     /**
+     * Address: 0x00BF3750 (FUN_00BF3750, dynamic atexit destructor for `gRUnitBlueprintSaveConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC8C30).
+     * `FUN_00522B80` and `FUN_00522BB0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RUnitBlueprintSaveConstruct();
+
+    /**
      * Address: 0x005236C0 (FUN_005236C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprint>::Init)
      *
      * What it does:

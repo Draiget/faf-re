@@ -1188,12 +1188,23 @@ namespace
      * `CUnitFerryTaskSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitFerryTaskSerializerHelper();
+
+    /**
+     * Address: 0x00BF9DA0 (FUN_00BF9DA0, dynamic atexit destructor for `gCUnitFerryTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD0900).
+     * `FUN_0060DCB0` and `FUN_0060DCE0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitFerryTaskSerializerHelper() = default;
 
     /**
      * Address: 0x00610000 (FUN_00610000, gpg::SerSaveLoadHelper<Moho::CUnitFerryTask>::Init)
@@ -1222,32 +1233,10 @@ namespace
 
   CUnitFerryTaskSerializerHelper gCUnitFerryTaskSerializer;
 
-  /**
-   * Address: 0x00BF9DA0 (FUN_00BF9DA0)
-   *
-   * What it does:
-   * Unlinks `CUnitFerryTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   * Registered by this helper's own constructor (0x00BD0900) as this
-   * global's `atexit` teardown. `FUN_0060DCB0` and `FUN_0060DCE0` are
-   * byte-identical ICF twins of this same body (marked `skip`).
-   */
-  void CleanupUnlinkCUnitFerryTaskSerializerNode()
-  {
-    gCUnitFerryTaskSerializer.ResetLinks();
-  }
-
-  void cleanup_CUnitFerryTaskSerializer_atexit()
-  {
-    CleanupUnlinkCUnitFerryTaskSerializerNode();
-  }
-
   CUnitFerryTaskSerializerHelper::CUnitFerryTaskSerializerHelper()
     : mLoadCallback(&moho::DeserializeCUnitFerryTaskSerializerCallback)
     , mSaveCallback(&moho::SerializeCUnitFerryTaskSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitFerryTaskSerializer_atexit);
-  }
+  {}
 
   void CUnitFerryTaskSerializerHelper::Init()
   {

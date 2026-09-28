@@ -64,22 +64,6 @@ namespace moho
   HPathCellSerializer gHPathCellSerializer;
 
   /**
-   * Address: 0x00C016E0 (FUN_00C016E0, atexit-registered cleanup target)
-   * ICF twins: 0x00762FF0 (FUN_00762FF0), 0x00763020 (FUN_00763020) --
-   * identical unlink/self-link bodies hardcoded to the same global; only
-   * 0x00C016E0 is the one `register_HPathCellSerializer` (0x00BDC630)
-   * actually registers via `atexit`.
-   *
-   * What it does:
-   * Unlinks this helper node from the intrusive serializer-helper list and
-   * restores a self-linked sentinel state.
-   */
-  void cleanup_HPathCellSerializer()
-  {
-    gHPathCellSerializer.ResetLinks();
-  }
-
-  /**
    * Address: 0x00BDC630 (FUN_00BDC630, register_HPathCellSerializer,
    * dynamic initializer for the global `HPathCellSerializer` singleton)
    *
@@ -92,9 +76,19 @@ namespace moho
   HPathCellSerializer::HPathCellSerializer()
     : mLoadCallback(&DeserializeHPathCellCallback)
     , mSaveCallback(&SerializeHPathCellCallback)
-  {
-    (void)std::atexit(&cleanup_HPathCellSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00C016E0 (FUN_00C016E0, dynamic atexit destructor for `gHPathCellSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BDC630).
+   * `FUN_00762FF0` and `FUN_00763020` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  HPathCellSerializer::~HPathCellSerializer() = default;
 
   /**
    * Address: 0x007632D0 (FUN_007632D0, gpg::SerSaveLoadHelper<Moho::HPathCell>::Init)

@@ -75,21 +75,6 @@ namespace
   // WriteArchive construction.
   moho::CEffectManagerImplConstruct gCEffectManagerImplConstruct;
 
-  /**
-   * Address: 0x00BFC030 (FUN_00BFC030, cleanup_CEffectManagerImplConstruct)
-   *
-   * What it does:
-   * Process-exit cleanup that unlinks the `CEffectManagerImplConstruct`
-   * helper node. The real ctor pushes this plain free function (not a
-   * mangled destructor) as its atexit target. `FUN_0066BAE0` and
-   * `FUN_0066BB10` are duplicate-emission twins of this exact unlink/reset
-   * lane (same `ResetLinks()` shape, folded to separate addresses); they
-   * have no distinct source-level body of their own.
-   */
-  void cleanup_CEffectManagerImplConstruct()
-  {
-    gCEffectManagerImplConstruct.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -99,15 +84,25 @@ namespace moho
    *
    * What it does:
    * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * construct/delete callback fields, then registers
-   * `cleanup_CEffectManagerImplConstruct` as the explicit atexit teardown.
+   * construct/delete callback fields; the compiler registers the destructor
+   * with `atexit`.
    */
   CEffectManagerImplConstruct::CEffectManagerImplConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_CEffectManagerImpl))
     , mDeleteCallback(&Delete_CEffectManagerImpl)
-  {
-    (void)std::atexit(&cleanup_CEffectManagerImplConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BFC030 (FUN_00BFC030, dynamic atexit destructor for `gCEffectManagerImplConstruct`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BD45C0).
+   * `FUN_0066BAE0` and `FUN_0066BB10` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CEffectManagerImplConstruct::~CEffectManagerImplConstruct() = default;
 
   /**
    * Address: 0x0066C0E0 (FUN_0066C0E0, gpg::SerConstructHelper_CEffectManagerImpl::Init)

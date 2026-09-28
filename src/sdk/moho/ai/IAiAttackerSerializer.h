@@ -24,6 +24,18 @@ namespace moho
     IAiAttackerSerializer();
 
     /**
+     * Address: 0x00BF82E0 (FUN_00BF82E0, dynamic atexit destructor for `gIAiAttackerSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCE7D0).
+     * `FUN_005D5CA0` and `FUN_005D5CD0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~IAiAttackerSerializer();
+
+    /**
      * Address: 0x005DE8D0 (FUN_005DE8D0, sub_5DE8D0)
      *
      * What it does:

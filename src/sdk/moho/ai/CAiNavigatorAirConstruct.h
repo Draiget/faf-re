@@ -33,6 +33,18 @@ namespace moho
     CAiNavigatorAirConstruct();
 
     /**
+     * Address: 0x00BF6F40 (FUN_00BF6F40, dynamic atexit destructor for `gCAiNavigatorAirConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCC840).
+     * `FUN_005A55D0` and `FUN_005A5600` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiNavigatorAirConstruct();
+
+    /**
      * Alias of FUN_005A5630 (non-canonical helper lane).
      *
      * What it does:

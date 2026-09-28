@@ -21,6 +21,18 @@ namespace moho
     CAniDefaultSkelConstruct();
 
     /**
+     * Address: 0x00BF4570 (FUN_00BF4570, dynamic atexit destructor for `gCAniDefaultSkelConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC9900).
+     * `FUN_0054AB50` and `FUN_0054AB80` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAniDefaultSkelConstruct();
+
+    /**
      * Address: 0x0054C550 (FUN_0054C550)
      * Slot: 0
      *

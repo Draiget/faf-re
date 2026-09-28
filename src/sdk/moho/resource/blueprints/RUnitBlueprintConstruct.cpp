@@ -42,25 +42,6 @@ namespace
   // Init() on it from within the first ReadArchive/WriteArchive construction.
   moho::RUnitBlueprintConstruct gRUnitBlueprintConstructHelper;
 
-  /**
-   * Address: 0x00BF3780 (FUN_00BF3780)
-   *
-   * What it does:
-   * Unlinks the `RUnitBlueprintConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8C60) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x00522C60 (FUN_00522C60) and 0x00522C90 (FUN_00522C90) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRUnitBlueprintConstruct()
-  {
-    gRUnitBlueprintConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -135,9 +116,19 @@ namespace moho
   RUnitBlueprintConstruct::RUnitBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RUnitBlueprint))
     , mDeleteCallback(&Delete_RUnitBlueprint)
-  {
-    (void)std::atexit(&CleanupRUnitBlueprintConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF3780 (FUN_00BF3780, dynamic atexit destructor for `gRUnitBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8C60).
+   * `FUN_00522C60` and `FUN_00522C90` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RUnitBlueprintConstruct::~RUnitBlueprintConstruct() = default;
 
   /**
    * Address: 0x00523740 (FUN_00523740, gpg::SerConstructHelper<Moho::RUnitBlueprint>::Init)

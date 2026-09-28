@@ -34,14 +34,13 @@ namespace moho
      * `CAiSteeringImplSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields. Confirmed from raw
-     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
-     * then installs `??_7CAiSteeringImplSerializer@Moho@@6B@` -- no eager
-     * `Init()` call exists here, and this class has no user-declared
-     * destructor (the real binary explicitly registers
-     * `atexit(&sub_BF8190)` instead).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CAiSteeringImplSerializer@Moho@@6B@` -- no eager `Init()` call
+     * exists here. The trailing `atexit` push is the compiler registering the
+     * destructor.
      *
      * This helper had never been wired up at all in the previously-recovered
      * source: `Deserialize`/`Serialize` were undeclared, no
@@ -52,6 +51,18 @@ namespace moho
      * the real `gpg::SerHelperBase` base.
      */
     CAiSteeringImplSerializer();
+
+    /**
+     * Address: 0x00BF8190 (FUN_00BF8190, dynamic atexit destructor for `gCAiSteeringImplSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCE4A0).
+     * `FUN_005D3BD0` and `FUN_005D3C00` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiSteeringImplSerializer();
 
     /**
      * Address: 0x005D3EB0 (FUN_005D3EB0)

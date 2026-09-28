@@ -496,6 +496,18 @@ namespace
     CUnitCarrierRetrieveSerializerHelper();
 
     /**
+     * Address: 0x00BF9930 (FUN_00BF9930, dynamic atexit destructor for `gCUnitCarrierRetrieveSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD0220).
+     * `FUN_006063F0` and `FUN_00606420` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitCarrierRetrieveSerializerHelper() = default;
+
+    /**
      * Address: 0x00607730 (FUN_00607730, gpg::SerSaveLoadHelper<Moho::CUnitCarrierRetrieve>::Init)
      *
      * What it does:
@@ -543,41 +555,10 @@ namespace
       ->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x006063F0 (FUN_006063F0)
-   *
-   * What it does:
-   * Unlinks `CUnitCarrierRetrieveSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitCarrierRetrieveSerializerNodePrimary()
-  {
-    gCUnitCarrierRetrieveSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00606420 (FUN_00606420)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCarrierRetrieveSerializer` helper storage.
-   */
-  [[maybe_unused]] void UnlinkCUnitCarrierRetrieveSerializerNodeSecondary()
-  {
-    gCUnitCarrierRetrieveSerializer.ResetLinks();
-  }
-
-  void cleanup_CUnitCarrierRetrieveSerializer_atexit()
-  {
-    UnlinkCUnitCarrierRetrieveSerializerNodePrimary();
-  }
-
   CUnitCarrierRetrieveSerializerHelper::CUnitCarrierRetrieveSerializerHelper()
     : mLoadCallback(&DeserializeCUnitCarrierRetrieveSerializerCallback)
     , mSaveCallback(&SerializeCUnitCarrierRetrieveSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitCarrierRetrieveSerializer_atexit);
-  }
+  {}
 
   void CUnitCarrierRetrieveSerializerHelper::Init()
   {

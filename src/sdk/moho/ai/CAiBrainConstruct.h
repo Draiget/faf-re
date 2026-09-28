@@ -24,11 +24,12 @@ namespace moho
      * disassembly: this address calls `gpg::SerHelperBase::SerHelperBase()`
      * directly (`__imp_??0SerHelperBase@gpg@@QAE@XZ`), then installs
      * `??_7CAiBrainConstruct@Moho@@6B@` (the more-derived vtable, standard
-     * base-then-derived ctor chaining), sets both callback fields, and
-     * registers `atexit` cleanup -- it does NOT eagerly call `Init()`. The
-     * previously-recovered body here (an eager `RegisterConstructFunction()`
-     * call, plus a hand-rolled self-link that bypassed the real
-     * `SerHelperBase` base ctor entirely) did not match this evidence.
+     * base-then-derived ctor chaining), sets both callback fields (the compiler
+     * then registers the destructor with `atexit`) -- it does NOT eagerly call
+     * `Init()`. The previously-recovered body here (an eager
+     * `RegisterConstructFunction()` call, plus a hand-rolled self-link that
+     * bypassed the real `SerHelperBase` base ctor entirely) did not match this
+     * evidence.
      *
      * `mDeleteCallback` is bound to `&DeleteConstructedCAiBrain`
      * (CAiBrainConstruct.cpp) -- the typed specialization of the shared
@@ -42,6 +43,18 @@ namespace moho
      * separate recovery.
      */
     CAiBrainConstruct();
+
+    /**
+     * Address: 0x00BF62C0 (FUN_00BF62C0, dynamic atexit destructor for `gCAiBrainConstructStartupHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCB3F0).
+     * `FUN_00579C90` and `FUN_00579CC0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiBrainConstruct();
 
     /**
      * Address: 0x0057E3E0 (FUN_0057E3E0, gpg::SerConstructHelper_CAiBrain::Init)

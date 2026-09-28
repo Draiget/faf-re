@@ -432,12 +432,23 @@ namespace
      * `CUnitCarrierLaunchSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitCarrierLaunchSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF9A50 (FUN_00BF9A50, dynamic atexit destructor for `gCUnitCarrierLaunchSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD02E0).
+     * `FUN_00607620` and `FUN_00607650` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitCarrierLaunchSerializerHelperNode() = default;
 
     /**
      * Address: 0x006078B0 (FUN_006078B0, gpg::SerSaveLoadHelper<Moho::CUnitCarrierLaunch>::Init)
@@ -466,30 +477,6 @@ namespace
   );
 
   CUnitCarrierLaunchSerializerHelperNode gCUnitCarrierLaunchSerializer;
-
-  /**
-   * Address: 0x00607620 (FUN_00607620)
-   *
-   * What it does:
-   * Unlinks `CUnitCarrierLaunchSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitCarrierLaunchSerializerNodePrimary()
-  {
-    gCUnitCarrierLaunchSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00607650 (FUN_00607650)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitCarrierLaunchSerializer` helper storage.
-   */
-  [[maybe_unused]] void UnlinkCUnitCarrierLaunchSerializerNodeSecondary()
-  {
-    gCUnitCarrierLaunchSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x006075D0 (FUN_006075D0, Moho::CUnitCarrierLaunchSerializer::Deserialize)
@@ -537,25 +524,10 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BF9A50 (FUN_00BF9A50, Moho::CUnitCarrierLaunchSerializer::~CUnitCarrierLaunchSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `CUnitCarrierLaunchSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
-   */
-  void cleanup_CUnitCarrierLaunchSerializer_atexit()
-  {
-    UnlinkCUnitCarrierLaunchSerializerNodePrimary();
-  }
-
   CUnitCarrierLaunchSerializerHelperNode::CUnitCarrierLaunchSerializerHelperNode()
     : mSerLoadFunc(&DeserializeCUnitCarrierLaunchSerializerCallback)
     , mSerSaveFunc(&SerializeCUnitCarrierLaunchSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitCarrierLaunchSerializer_atexit);
-  }
+  {}
 
   void CUnitCarrierLaunchSerializerHelperNode::Init()
   {

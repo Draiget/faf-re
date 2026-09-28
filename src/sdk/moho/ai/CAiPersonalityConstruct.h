@@ -34,6 +34,18 @@ namespace moho
     CAiPersonalityConstruct();
 
     /**
+     * Address: 0x00BF7710 (FUN_00BF7710, dynamic atexit destructor for `gCAiPersonalityConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCD620).
+     * `FUN_005B6980` and `FUN_005B69B0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiPersonalityConstruct();
+
+    /**
      * Address: 0x005B69E0 (FUN_005B69E0)
      *
      * What it does:

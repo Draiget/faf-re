@@ -37,15 +37,26 @@ namespace moho
      * splices it into the process-global `sNewHelpers` pending list), then
      * binds the load/save callback fields. Confirmed from raw disassembly:
      * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
-     * `??_7SAttachPointSerializer@Moho@@6B@` -- no eager `Init()` call
-     * exists here, and this class has no user-declared destructor (the real
-     * binary explicitly registers `atexit(&sub_BF8A90)` instead). Note: the
-     * previous recovery mis-attributed this class's `Init()` to 0x005E42D0
-     * (`nullsub_1636`, a genuinely empty function elsewhere in the binary) --
-     * the real dispatch address for this helper's `Init()` has not been
-     * located and is left uncited below.
+     * `??_7SAttachPointSerializer@Moho@@6B@` -- no eager `Init()` call exists
+     * here. The trailing `atexit` push is the compiler registering the
+     * destructor. Note: the previous recovery mis-attributed this class's
+     * `Init()` to 0x005E42D0 (`nullsub_1636`, a genuinely empty function
+     * elsewhere in the binary) -- the real dispatch address for this helper's
+     * `Init()` has not been located and is left uncited below.
      */
     SAttachPointSerializer();
+
+    /**
+     * Address: 0x00BF8A90 (FUN_00BF8A90, dynamic atexit destructor for `gSAttachPointSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCEDF0).
+     * `FUN_005E4340` and `FUN_005E4370` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SAttachPointSerializer();
 
     /**
      * What it does:

@@ -30,19 +30,6 @@ namespace
   // WriteArchive construction.
   moho::RTrailBlueprintSaveConstruct gRTrailBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF2620 (FUN_00BF2620)
-   *
-   * What it does:
-   * Unlinks the `RTrailBlueprintSaveConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8140) as the
-   * global's `atexit` teardown.
-   */
-  void CleanupRTrailBlueprintSaveConstruct()
-  {
-    gRTrailBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -107,8 +94,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RTrailBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupRTrailBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF2620 (FUN_00BF2620, dynamic atexit destructor for `gRTrailBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8140).
+   * `FUN_0050FF80` and `FUN_0050FFB0` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RTrailBlueprintSaveConstruct::~RTrailBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x00510680 (FUN_00510680, gpg::SerSaveConstructHelper<Moho::RTrailBlueprint>::Init)

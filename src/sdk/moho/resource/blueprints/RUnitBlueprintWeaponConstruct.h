@@ -41,6 +41,18 @@ namespace moho
     RUnitBlueprintWeaponConstruct();
 
     /**
+     * Address: 0x00BF37E0 (FUN_00BF37E0, dynamic atexit destructor for `gRUnitBlueprintWeaponConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC8CD0).
+     * `FUN_00522EE0` and `FUN_00522F10` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RUnitBlueprintWeaponConstruct();
+
+    /**
      * Address: 0x00523840 (FUN_00523840, gpg::SerConstructHelper<Moho::RUnitBlueprintWeapon>::Init)
      *
      * What it does:

@@ -39,10 +39,22 @@ namespace moho
      * binds the load/save callback fields. Confirmed from raw disassembly:
      * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
      * `??_7LAiAttackerImplSerializer@Moho@@6B@` -- no eager `Init()` call
-     * exists here, and this class has no user-declared destructor (the real
-     * binary explicitly registers `atexit(&sub_BF83D0)` instead).
+     * exists here. The trailing `atexit` push is the compiler registering the
+     * destructor.
      */
     LAiAttackerImplSerializer();
+
+    /**
+     * Address: 0x00BF83D0 (FUN_00BF83D0, dynamic atexit destructor for `gLAiAttackerImplSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCE850).
+     * `FUN_005D6240` and `FUN_005D6270` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~LAiAttackerImplSerializer();
 
     /**
      * Address: 0x005DBF80 (FUN_005DBF80)

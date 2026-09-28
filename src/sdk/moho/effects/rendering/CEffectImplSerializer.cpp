@@ -101,18 +101,6 @@ namespace
   // WriteArchive construction.
   moho::CEffectImplSerializer gCEffectImplSerializer;
 
-  /**
-   * Address: 0x00BFBA20 (FUN_00BFBA20, cleanup_CEffectImplSerializer)
-   *
-   * What it does:
-   * Process-exit cleanup that unlinks the `CEffectImplSerializer` helper
-   * node. The real ctor pushes this plain free function (not a mangled
-   * destructor) as its atexit target.
-   */
-  void cleanup_CEffectImplSerializer()
-  {
-    gCEffectImplSerializer.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -121,16 +109,25 @@ namespace moho
    * Address: 0x00BD40E0 (FUN_00BD40E0, register_CEffectImplSerializer)
    *
    * What it does:
-   * Default-constructs the `gpg::SerHelperBase` base and binds the
-   * load/save callback fields, then registers
-   * `cleanup_CEffectImplSerializer` as the explicit atexit teardown.
+   * Default-constructs the `gpg::SerHelperBase` base and binds the load/save
+   * callback fields; the compiler registers the destructor with `atexit`.
    */
   CEffectImplSerializer::CEffectImplSerializer()
     : mLoadCallback(&CEffectImplSerializer::Deserialize)
     , mSaveCallback(&CEffectImplSerializer::Serialize)
-  {
-    (void)std::atexit(&cleanup_CEffectImplSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00BFBA20 (FUN_00BFBA20, dynamic atexit destructor for `gCEffectImplSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BD40E0).
+   * `FUN_006598F0` and `FUN_00659920` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CEffectImplSerializer::~CEffectImplSerializer() = default;
 
   /**
    * Address: 0x006598A0 (FUN_006598A0, Moho::CEffectImplSerializer::Deserialize)

@@ -125,22 +125,6 @@ namespace
   // recovery: this constructor is their sole source-level representative.
   CAiBrainConstruct gCAiBrainConstructStartupHelper;
 
-  /**
-   * Address: 0x00BF62C0 (FUN_00BF62C0)
-   *
-   * What it does:
-   * Unlinks the `CAiBrainConstruct` helper node from whatever intrusive list
-   * it currently sits in and restores a self-linked sentinel state.
-   * Registered by the real dynamic initializer (0x00BCB3F0) as the global's
-   * `atexit` teardown. `FUN_00579C90` and `FUN_00579CC0` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCAiBrainConstructStartup()
-  {
-    gCAiBrainConstructStartupHelper.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -155,9 +139,19 @@ namespace
 CAiBrainConstruct::CAiBrainConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructCAiBrainForResultThunk))
   , mDeleteCallback(&DeleteConstructedCAiBrain)
-{
-  (void)std::atexit(&CleanupCAiBrainConstructStartup);
-}
+{}
+
+/**
+ * Address: 0x00BF62C0 (FUN_00BF62C0, dynamic atexit destructor for `gCAiBrainConstructStartupHelper`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCB3F0).
+ * `FUN_00579C90` and `FUN_00579CC0` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiBrainConstruct::~CAiBrainConstruct() = default;
 
 /**
  * Address: 0x0057E3E0 (FUN_0057E3E0, gpg::SerConstructHelper_CAiBrain::Init)

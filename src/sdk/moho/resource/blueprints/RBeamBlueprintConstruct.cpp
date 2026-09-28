@@ -32,25 +32,6 @@ namespace
   // Init() on it from within the first ReadArchive/WriteArchive construction.
   moho::RBeamBlueprintConstruct gRBeamBlueprintConstructHelper;
 
-  /**
-   * Address: 0x00BF26B0 (FUN_00BF26B0)
-   *
-   * What it does:
-   * Unlinks the `RBeamBlueprintConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC81E0) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x005102E0 (FUN_005102E0) and 0x00510310 (FUN_00510310) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRBeamBlueprintConstruct()
-  {
-    gRBeamBlueprintConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -121,9 +102,19 @@ namespace moho
   RBeamBlueprintConstruct::RBeamBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RBeamBlueprint))
     , mDeleteCallback(&Delete_RBeamBlueprint)
-  {
-    (void)std::atexit(&CleanupRBeamBlueprintConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF26B0 (FUN_00BF26B0, dynamic atexit destructor for `gRBeamBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC81E0).
+   * `FUN_005102E0` and `FUN_00510310` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RBeamBlueprintConstruct::~RBeamBlueprintConstruct() = default;
 
   /**
    * Address: 0x00510800 (FUN_00510800, gpg::SerConstructHelper<Moho::RBeamBlueprint>::Init)

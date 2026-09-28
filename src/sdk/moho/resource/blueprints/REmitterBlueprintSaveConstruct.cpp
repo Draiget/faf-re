@@ -31,19 +31,6 @@ namespace
   // WriteArchive construction.
   moho::REmitterBlueprintSaveConstruct gREmitterBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF25C0 (FUN_00BF25C0)
-   *
-   * What it does:
-   * Unlinks the `REmitterBlueprintSaveConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC80D0) as the
-   * global's `atexit` teardown.
-   */
-  void CleanupREmitterBlueprintSaveConstruct()
-  {
-    gREmitterBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -108,8 +95,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_REmitterBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupREmitterBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF25C0 (FUN_00BF25C0, dynamic atexit destructor for `gREmitterBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC80D0).
+   * `FUN_0050FD00` and `FUN_0050FD30` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  REmitterBlueprintSaveConstruct::~REmitterBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x00510580 (FUN_00510580, gpg::SerSaveConstructHelper<Moho::REmitterBlueprint>::Init)

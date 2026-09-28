@@ -39,6 +39,18 @@ namespace moho
     RBeamBlueprintConstruct();
 
     /**
+     * Address: 0x00BF26B0 (FUN_00BF26B0, dynamic atexit destructor for `gRBeamBlueprintConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC81E0).
+     * `FUN_005102E0` and `FUN_00510310` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RBeamBlueprintConstruct();
+
+    /**
      * Address: 0x00510800 (FUN_00510800, gpg::SerConstructHelper<Moho::RBeamBlueprint>::Init)
      *
      * IDA signature:

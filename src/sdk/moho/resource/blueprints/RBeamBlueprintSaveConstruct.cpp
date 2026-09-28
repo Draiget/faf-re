@@ -30,23 +30,6 @@ namespace
   // WriteArchive construction.
   moho::RBeamBlueprintSaveConstruct gRBeamBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF2680 (FUN_00BF2680)
-   *
-   * What it does:
-   * Unlinks the `RBeamBlueprintSaveConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC81B0) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twin: 0x00510230 (FUN_00510230) is a byte-identical duplicate
-   * hardcoded to this same global's link fields, confirmed zero independent
-   * callers via the callgraph index -- a dead linker-emitted copy.
-   */
-  void CleanupRBeamBlueprintSaveConstruct()
-  {
-    gRBeamBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -111,8 +94,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RBeamBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupRBeamBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF2680 (FUN_00BF2680, dynamic atexit destructor for `gRBeamBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC81B0).
+   * `FUN_00510200` and `FUN_00510230` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RBeamBlueprintSaveConstruct::~RBeamBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x00510780 (FUN_00510780, gpg::SerSaveConstructHelper<Moho::RBeamBlueprint>::Init)

@@ -32,25 +32,6 @@ namespace
   // Init() on it from within the first ReadArchive/WriteArchive construction.
   moho::RMeshBlueprintConstruct gRMeshBlueprintConstructHelper;
 
-  /**
-   * Address: 0x00BF2CF0 (FUN_00BF2CF0)
-   *
-   * What it does:
-   * Unlinks the `RMeshBlueprintConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8580) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x00519040 (FUN_00519040) and 0x00519070 (FUN_00519070) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRMeshBlueprintConstruct()
-  {
-    gRMeshBlueprintConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RRuleGameRules* ReadRuleGameRulesPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -127,9 +108,19 @@ namespace moho
   RMeshBlueprintConstruct::RMeshBlueprintConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RMeshBlueprint))
     , mDeleteCallback(&Delete_RMeshBlueprint)
-  {
-    (void)std::atexit(&CleanupRMeshBlueprintConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF2CF0 (FUN_00BF2CF0, dynamic atexit destructor for `gRMeshBlueprintConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8580).
+   * `FUN_00519040` and `FUN_00519070` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RMeshBlueprintConstruct::~RMeshBlueprintConstruct() = default;
 
   /**
    * Address: 0x005194F0 (FUN_005194F0, gpg::SerConstructHelper<Moho::RMeshBlueprint>::Init)

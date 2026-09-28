@@ -34,24 +34,6 @@ namespace
   // ReadArchive/WriteArchive construction.
   moho::RUnitBlueprintWeaponSaveConstruct gRUnitBlueprintWeaponSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF37B0 (FUN_00BF37B0)
-   *
-   * What it does:
-   * Unlinks the `RUnitBlueprintWeaponSaveConstruct` helper node from
-   * whatever intrusive list it currently sits in and restores a self-linked
-   * sentinel state. Registered by the real dynamic initializer (0x00BC8CA0)
-   * as the global's `atexit` teardown.
-   *
-   * ICF twins: 0x00522E00 (FUN_00522E00) and 0x00522E30 (FUN_00522E30) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRUnitBlueprintWeaponSaveConstruct()
-  {
-    gRUnitBlueprintWeaponSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -116,8 +98,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RUnitBlueprintWeaponThunk)
       )
   {
-    (void)std::atexit(&CleanupRUnitBlueprintWeaponSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF37B0 (FUN_00BF37B0, dynamic atexit destructor for `gRUnitBlueprintWeaponSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8CA0).
+   * `FUN_00522E00` and `FUN_00522E30` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RUnitBlueprintWeaponSaveConstruct::~RUnitBlueprintWeaponSaveConstruct() = default;
 
   /**
    * Address: 0x005237C0 (FUN_005237C0, gpg::SerSaveConstructHelper<Moho::RUnitBlueprintWeapon>::Init)

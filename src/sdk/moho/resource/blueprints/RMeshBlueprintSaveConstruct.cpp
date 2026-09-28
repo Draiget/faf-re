@@ -30,24 +30,6 @@ namespace
   // WriteArchive construction.
   moho::RMeshBlueprintSaveConstruct gRMeshBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF2CC0 (FUN_00BF2CC0)
-   *
-   * What it does:
-   * Unlinks the `RMeshBlueprintSaveConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8550) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x00518F60 (FUN_00518F60) and 0x00518F90 (FUN_00518F90) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRMeshBlueprintSaveConstruct()
-  {
-    gRMeshBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -112,8 +94,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RMeshBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupRMeshBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF2CC0 (FUN_00BF2CC0, dynamic atexit destructor for `gRMeshBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8550).
+   * `FUN_00518F60` and `FUN_00518F90` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RMeshBlueprintSaveConstruct::~RMeshBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x00519470 (FUN_00519470, gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::Init)

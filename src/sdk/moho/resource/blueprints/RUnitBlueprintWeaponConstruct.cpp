@@ -38,25 +38,6 @@ namespace
   // WriteArchive construction.
   moho::RUnitBlueprintWeaponConstruct gRUnitBlueprintWeaponConstructHelper;
 
-  /**
-   * Address: 0x00BF37E0 (FUN_00BF37E0)
-   *
-   * What it does:
-   * Unlinks the `RUnitBlueprintWeaponConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC8CD0) as the
-   * global's `atexit` teardown.
-   *
-   * ICF twins: 0x00522EE0 (FUN_00522EE0) and 0x00522F10 (FUN_00522F10) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRUnitBlueprintWeaponConstruct()
-  {
-    gRUnitBlueprintWeaponConstructHelper.ResetLinks();
-  }
-
   [[nodiscard]] moho::RUnitBlueprint* ReadUnitBlueprintPointer(gpg::ReadArchive* const archive)
   {
     const gpg::TrackedPointerInfo tracked = gpg::ReadRawPointer(archive, gpg::RRef{});
@@ -131,9 +112,19 @@ namespace moho
   RUnitBlueprintWeaponConstruct::RUnitBlueprintWeaponConstruct()
     : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&Construct_RUnitBlueprintWeapon))
     , mDeleteCallback(&Delete_RUnitBlueprintWeapon)
-  {
-    (void)std::atexit(&CleanupRUnitBlueprintWeaponConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF37E0 (FUN_00BF37E0, dynamic atexit destructor for `gRUnitBlueprintWeaponConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC8CD0).
+   * `FUN_00522EE0` and `FUN_00522F10` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RUnitBlueprintWeaponConstruct::~RUnitBlueprintWeaponConstruct() = default;
 
   /**
    * Address: 0x00523840 (FUN_00523840, gpg::SerConstructHelper<Moho::RUnitBlueprintWeapon>::Init)

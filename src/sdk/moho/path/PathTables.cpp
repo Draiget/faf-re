@@ -802,6 +802,18 @@ namespace moho
       PathQueueSerializerHelper();
 
       /**
+       * Address: 0x00C01AB0 (FUN_00C01AB0, dynamic atexit destructor for `gPathQueueSerializerHelper`)
+       *
+       * What it does:
+       * Unlinks this helper node from the serializer-helper list (the
+       * `TDatListItem` base destructor). The compiler registers it with
+       * `atexit` from the global's dynamic initializer (0x00BDC920).
+       * `FUN_007669F0` and `FUN_00766A20` are
+       * unreferenced out-of-line copies of the same body.
+       */
+      ~PathQueueSerializerHelper() = default;
+
+      /**
        * Address: 0x00767080 (FUN_00767080, gpg::SerSaveLoadHelper<Moho::PathQueue>::Init)
        *
        * What it does:
@@ -826,28 +838,10 @@ namespace moho
 
     PathQueueSerializerHelper gPathQueueSerializerHelper;
 
-    /**
-     * Address: 0x00C01AB0 (FUN_00C01AB0, atexit-registered cleanup target)
-     * ICF twins: 0x007669F0 (FUN_007669F0), 0x00766A20 (FUN_00766A20) --
-     * identical unlink/self-link bodies hardcoded to the same global; only
-     * 0x00C01AB0 is the one `register_PathQueueSerializer` (0x00BDC920)
-     * actually registers via `atexit`.
-     *
-     * What it does:
-     * Unlinks this helper node from the intrusive serializer-helper list and
-     * restores a self-linked sentinel state.
-     */
-    void cleanup_PathQueueSerializer()
-    {
-      gPathQueueSerializerHelper.ResetLinks();
-    }
-
     PathQueueSerializerHelper::PathQueueSerializerHelper()
       : mLoadCallback(&PathQueueSerializerDeserialize)
       , mSaveCallback(&PathQueueSerializerSerialize)
-    {
-      (void)std::atexit(&cleanup_PathQueueSerializer);
-    }
+    {}
 
     /**
      * Address: 0x00767080 (FUN_00767080, gpg::SerSaveLoadHelper<Moho::PathQueue>::Init)
@@ -1216,6 +1210,18 @@ namespace moho
       PathQueueImplSerializerHelper();
 
       /**
+       * Address: 0x00C01B40 (FUN_00C01B40, dynamic atexit destructor for `gPathQueueImplSerializerHelper`)
+       *
+       * What it does:
+       * Unlinks this helper node from the serializer-helper list (the
+       * `TDatListItem` base destructor). The compiler registers it with
+       * `atexit` from the global's dynamic initializer (0x00BDC980).
+       * `FUN_00766C00` and `FUN_00766C30` are
+       * unreferenced out-of-line copies of the same body.
+       */
+      ~PathQueueImplSerializerHelper() = default;
+
+      /**
        * Address: 0x00767140 (FUN_00767140, gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::Init)
        *
        * What it does:
@@ -1242,28 +1248,10 @@ namespace moho
 
     PathQueueImplSerializerHelper gPathQueueImplSerializerHelper;
 
-    /**
-     * Address: 0x00C01B40 (FUN_00C01B40, atexit-registered cleanup target)
-     * ICF twins: 0x00766C00 (FUN_00766C00), 0x00766C30 (FUN_00766C30) --
-     * identical unlink/self-link bodies hardcoded to the same global; only
-     * 0x00C01B40 is the one `register_PathQueueImplSerializer` (0x00BDC980)
-     * actually registers via `atexit`.
-     *
-     * What it does:
-     * Unlinks this helper node from the intrusive serializer-helper list and
-     * restores a self-linked sentinel state.
-     */
-    void cleanup_PathQueueImplSerializer()
-    {
-      gPathQueueImplSerializerHelper.ResetLinks();
-    }
-
     PathQueueImplSerializerHelper::PathQueueImplSerializerHelper()
       : mLoadCallback(reinterpret_cast<gpg::RType::load_func_t>(&DeserializePathQueueImplRefCallback))
       , mSaveCallback(reinterpret_cast<gpg::RType::save_func_t>(&SavePathQueueImplRefCallback))
-    {
-      (void)std::atexit(&cleanup_PathQueueImplSerializer);
-    }
+    {}
 
     /**
      * Address: 0x00767140 (FUN_00767140, gpg::SerSaveLoadHelper<Moho::PathQueue::Impl>::Init)

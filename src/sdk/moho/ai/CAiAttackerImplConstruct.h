@@ -44,13 +44,24 @@ namespace moho
      * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
      * splices it into the process-global `sNewHelpers` pending list), then
      * binds the construct/delete callback fields. Confirmed from raw
-     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
-     * then installs `??_7CAiAttackerImplConstruct@Moho@@6B@` -- no eager
-     * `Init()` call exists here, and this class has no user-declared
-     * destructor (the real binary explicitly registers `atexit(&sub_BF8400)`
-     * instead).
+     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly, then
+     * installs `??_7CAiAttackerImplConstruct@Moho@@6B@` -- no eager `Init()`
+     * call exists here. The trailing `atexit` push is the compiler registering
+     * the destructor.
      */
     CAiAttackerImplConstruct();
+
+    /**
+     * Address: 0x00BF8400 (FUN_00BF8400, dynamic atexit destructor for `gCAiAttackerImplConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCE890).
+     * `FUN_005D8330` and `FUN_005D8360` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiAttackerImplConstruct();
 
     /**
      * Address: 0x005DC050 (FUN_005DC050)

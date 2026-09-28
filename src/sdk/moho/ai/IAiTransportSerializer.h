@@ -28,6 +28,18 @@ namespace moho
     IAiTransportSerializer();
 
     /**
+     * Address: 0x00BF8BB0 (FUN_00BF8BB0, dynamic atexit destructor for `gIAiTransportSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCEEB0).
+     * `FUN_005E48D0` and `FUN_005E4900` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~IAiTransportSerializer();
+
+    /**
      * Address: 0x005E4880 (FUN_005E4880, IAiTransportSerializer::Deserialize)
      *
      * What it does:

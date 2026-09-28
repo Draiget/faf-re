@@ -24,44 +24,6 @@ namespace
   // within the first ReadArchive/WriteArchive construction.
   moho::CSimSoundManagerSerializer gCSimSoundManagerSerializer;
 
-  /**
-   * Address: 0x00C015C0 (FUN_00C015C0, sub_C015C0)
-   *
-   * What it does:
-   * Unlinks the `CSimSoundManagerSerializer` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked
-   * sentinel state. Registered by the real dynamic initializer
-   * (0x00BDC590) as the global's `atexit` teardown.
-   */
-  void CleanupCSimSoundManagerSerializer()
-  {
-    gCSimSoundManagerSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00761350 (FUN_00761350)
-   *
-   * What it does:
-   * Unlinks startup `CSimSoundManagerSerializer` helper links and rewires the
-   * node into one self-linked sentinel lane.
-   */
-  [[maybe_unused]] void UnlinkCSimSoundManagerSerializerNodeVariantA() noexcept
-  {
-    gCSimSoundManagerSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00761380 (FUN_00761380)
-   *
-   * What it does:
-   * Duplicate unlink/reset lane for the startup `CSimSoundManagerSerializer`
-   * helper node.
-   */
-  [[maybe_unused]] void UnlinkCSimSoundManagerSerializerNodeVariantB() noexcept
-  {
-    gCSimSoundManagerSerializer.ResetLinks();
-  }
-
   void SerializeAudioRequestFastVectorRuntime(
     gpg::WriteArchive* archive,
     int objectPtr,
@@ -308,9 +270,19 @@ namespace moho
   CSimSoundManagerSerializer::CSimSoundManagerSerializer()
     : mLoadCallback(&CSimSoundManagerSerializer::Deserialize)
     , mSaveCallback(&CSimSoundManagerSerializer::Serialize)
-  {
-    (void)std::atexit(&CleanupCSimSoundManagerSerializer);
-  }
+  {}
+
+  /**
+   * Address: 0x00C015C0 (FUN_00C015C0, dynamic atexit destructor for `gCSimSoundManagerSerializer`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BDC590).
+   * `FUN_00761350` and `FUN_00761380` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CSimSoundManagerSerializer::~CSimSoundManagerSerializer() = default;
 
   /**
    * Address: 0x00761E90 (FUN_00761E90, gpg::SerSaveLoadHelper_CSimSoundManager::Init)

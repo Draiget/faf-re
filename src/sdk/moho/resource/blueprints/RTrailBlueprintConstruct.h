@@ -41,6 +41,18 @@ namespace moho
     RTrailBlueprintConstruct();
 
     /**
+     * Address: 0x00BF2650 (FUN_00BF2650, dynamic atexit destructor for `gRTrailBlueprintConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC8170).
+     * `FUN_00510060` and `FUN_00510090` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RTrailBlueprintConstruct();
+
+    /**
      * Address: 0x00510700 (FUN_00510700, gpg::SerConstructHelper<Moho::RTrailBlueprint>::Init)
      *
      * What it does:

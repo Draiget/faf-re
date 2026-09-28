@@ -75,22 +75,6 @@ namespace
   // WriteArchive construction.
   CAiNavigatorAirConstruct gCAiNavigatorAirConstruct;
 
-  /**
-   * Address: 0x00BF6F40 (FUN_00BF6F40, cleanup_CAiNavigatorAirConstruct)
-   *
-   * What it does:
-   * Unlinks the `CAiNavigatorAirConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BCC840) as the
-   * global's `atexit` teardown. `FUN_005A5600` and `FUN_005A55D0` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCAiNavigatorAirConstructStartup()
-  {
-    gCAiNavigatorAirConstruct.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -126,9 +110,19 @@ void CAiNavigatorAirConstruct::Deconstruct(void* const object)
 CAiNavigatorAirConstruct::CAiNavigatorAirConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiNavigatorAirConstruct::Construct))
   , mDeleteCallback(&CAiNavigatorAirConstruct::Deconstruct)
-{
-  (void)std::atexit(&CleanupCAiNavigatorAirConstructStartup);
-}
+{}
+
+/**
+ * Address: 0x00BF6F40 (FUN_00BF6F40, dynamic atexit destructor for `gCAiNavigatorAirConstruct`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCC840).
+ * `FUN_005A55D0` and `FUN_005A5600` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiNavigatorAirConstruct::~CAiNavigatorAirConstruct() = default;
 
 /**
  * Address: 0x005A74D0 (FUN_005A74D0, gpg::SerConstructHelper_CAiNavigatorAir::Init)

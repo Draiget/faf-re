@@ -29,11 +29,23 @@ namespace moho
      * disassembly: this address calls `gpg::SerHelperBase::SerHelperBase()`
      * directly (`__imp_??0SerHelperBase@gpg@@QAE@XZ`), then installs
      * `??_7CAiBuilderImplConstruct@Moho@@6B@` (the more-derived vtable,
-     * standard base-then-derived ctor chaining), sets both callback fields,
-     * and registers `atexit` cleanup -- it does NOT eagerly call
-     * `RegisterConstructFunction()`/`Init()`.
+     * standard base-then-derived ctor chaining), sets both callback fields (the
+     * compiler then registers the destructor with `atexit`) -- it does NOT
+     * eagerly call `RegisterConstructFunction()`/`Init()`.
      */
     CAiBuilderImplConstruct();
+
+    /**
+     * Address: 0x00BF6AC0 (FUN_00BF6AC0, dynamic atexit destructor for `gCAiBuilderImplConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCC2E0).
+     * `FUN_0059FD20` and `FUN_0059FD50` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiBuilderImplConstruct();
 
     /**
      * Address: 0x0059FD80 (FUN_0059FD80, construct callback)

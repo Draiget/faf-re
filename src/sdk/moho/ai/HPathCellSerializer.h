@@ -38,12 +38,23 @@ namespace moho
      * dynamic initializer for the global `HPathCellSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the deserialize/serialize callback fields and installs
-     * process-exit cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the deserialize/serialize callback fields.
      */
     HPathCellSerializer();
+
+    /**
+     * Address: 0x00C016E0 (FUN_00C016E0, dynamic atexit destructor for `gHPathCellSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDC630).
+     * `FUN_00762FF0` and `FUN_00763020` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~HPathCellSerializer();
 
     /**
      * Address: 0x007632D0 (FUN_007632D0, gpg::SerSaveLoadHelper<Moho::HPathCell>::Init)

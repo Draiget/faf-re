@@ -69,12 +69,23 @@ namespace
      * `CUnitGuardTaskSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitGuardTaskSerializerHelper();
+
+    /**
+     * Address: 0x00BF9EE0 (FUN_00BF9EE0, dynamic atexit destructor for `gCUnitGuardTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD0BB0).
+     * `FUN_00611090` and `FUN_006110C0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitGuardTaskSerializerHelper() = default;
 
     /**
      * Address: 0x006148A0 (FUN_006148A0, gpg::SerSaveLoadHelper<Moho::CUnitGuardTask>::Init)
@@ -123,43 +134,10 @@ namespace
     reinterpret_cast<const moho::CUnitGuardTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00611090 (FUN_00611090)
-   *
-   * What it does:
-   * Unlinks `CUnitGuardTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitGuardTaskSerializerNodePrimary()
-  {
-    gCUnitGuardTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x006110C0 (FUN_006110C0)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitGuardTaskSerializer` helper storage.
-   */
-  // Address 0x006110C0 (the "Secondary" unlink/self-link duplicate formerly
-  // modeled here) is dead: zero data_refs/call_edges and no source-level
-  // caller anywhere in src/sdk/**. UnlinkCUnitGuardTaskSerializerNodePrimary
-  // above is the real body -- cleanup_CUnitGuardTaskSerializer_atexit below
-  // calls it directly, and that cleanup function is atexit-registered from
-  // the ctor.
-
-  void cleanup_CUnitGuardTaskSerializer_atexit()
-  {
-    UnlinkCUnitGuardTaskSerializerNodePrimary();
-  }
-
   CUnitGuardTaskSerializerHelper::CUnitGuardTaskSerializerHelper()
     : mLoadCallback(&DeserializeCUnitGuardTaskSerializerCallback)
     , mSaveCallback(&SerializeCUnitGuardTaskSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitGuardTaskSerializer_atexit);
-  }
+  {}
 
   void CUnitGuardTaskSerializerHelper::Init()
   {
@@ -467,7 +445,7 @@ namespace moho
   // for both, and no source-level caller anywhere in src/sdk/**.
   // `SerializeCUnitGuardTaskSerializerCallback` above (wired into
   // `CUnitGuardTaskSerializerHelper`'s ctor) already forwards into
-  // `CUnitGuardTask::MemberSerialize` and is the real, atexit-registered
+  // `CUnitGuardTask::MemberSerialize` and is the real
   // body.
 
   /**

@@ -90,22 +90,6 @@ namespace
   // ReadArchive/WriteArchive construction.
   moho::CAniDefaultSkelConstruct gCAniDefaultSkelConstruct;
 
-  /**
-   * Address: 0x00BF4570 (FUN_00BF4570)
-   *
-   * What it does:
-   * Unlinks the `CAniDefaultSkelConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BC9900) as the
-   * global's `atexit` teardown. `FUN_0054AB50` and `FUN_0054AB80` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCAniDefaultSkelConstruct()
-  {
-    gCAniDefaultSkelConstruct.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -122,9 +106,19 @@ namespace moho
   CAniDefaultSkelConstruct::CAniDefaultSkelConstruct()
     : mSerConstructFunc(reinterpret_cast<gpg::RType::construct_func_t>(&ConstructDefaultSkeletonSharedObject))
     , mDeleteFunc(&DeleteDefaultSkelObject)
-  {
-    (void)std::atexit(&CleanupCAniDefaultSkelConstruct);
-  }
+  {}
+
+  /**
+   * Address: 0x00BF4570 (FUN_00BF4570, dynamic atexit destructor for `gCAniDefaultSkelConstruct`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC9900).
+   * `FUN_0054AB50` and `FUN_0054AB80` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  CAniDefaultSkelConstruct::~CAniDefaultSkelConstruct() = default;
 
   /**
    * Address: 0x0054C550 (FUN_0054C550)

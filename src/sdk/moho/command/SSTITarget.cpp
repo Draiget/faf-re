@@ -50,7 +50,6 @@ namespace
   // further down in this same anonymous namespace.
   void DeserializeSSTITargetSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeSSTITargetSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void cleanup_SSTITargetSerializer_atexit();
 
   [[nodiscard]] gpg::RType* CachedSSTITargetType()
   {
@@ -81,6 +80,18 @@ namespace
     SSTITargetSerializer();
 
     /**
+     * Address: 0x00BF5170 (FUN_00BF5170, dynamic atexit destructor for `gSSTITargetSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCA310).
+     * `FUN_0055B170` and `FUN_0055B1A0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~SSTITargetSerializer() = default;
+
+    /**
      * What it does:
      * Resolves `SSTITarget` reflected type metadata and publishes this
      * helper's load/save callback lanes to it.
@@ -102,9 +113,7 @@ namespace
   SSTITargetSerializer::SSTITargetSerializer()
     : mSerLoadFunc(&DeserializeSSTITargetSerializerCallback)
     , mSerSaveFunc(&SerializeSSTITargetSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_SSTITargetSerializer_atexit);
-  }
+  {}
 
   void SSTITargetSerializer::Init()
   {
@@ -116,30 +125,6 @@ namespace
   }
 
   SSTITargetSerializer gSSTITargetSerializer;
-
-  /**
-   * Address: 0x0055B170 (FUN_0055B170, SerSaveLoadHelper<SSTITarget>::unlink lane A)
-   *
-   * What it does:
-   * Unlinks `SSTITarget` serializer helper links and restores self-links for
-   * intrusive-list sentinel state.
-   */
-  [[maybe_unused]] void UnlinkSSTITargetSerializerLaneA() noexcept
-  {
-    gSSTITargetSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0055B1A0 (FUN_0055B1A0, SerSaveLoadHelper<SSTITarget>::unlink lane B)
-   *
-   * What it does:
-   * Mirrors lane A unlink/self-link reset for the `SSTITarget` serializer
-   * helper node.
-   */
-  [[maybe_unused]] void UnlinkSSTITargetSerializerLaneB() noexcept
-  {
-    gSSTITargetSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x0055B120 (FUN_0055B120, Moho::SSTITargetSerializer::Deserialize)
@@ -185,19 +170,6 @@ namespace
       return;
     }
     target->MemberSerialize(archive);
-  }
-
-  /**
-   * Address: 0x00BF5170 (FUN_00BF5170, Moho::SSTITargetSerializer::~SSTITargetSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `SSTITargetSerializer` helper node,
-   * matching the sibling unlink lanes used across other serializer
-   * registrars.
-   */
-  void cleanup_SSTITargetSerializer_atexit()
-  {
-    gSSTITargetSerializer.ResetLinks();
   }
 
   [[nodiscard]] gpg::RType* ResolveTypeByAnyName(const std::initializer_list<const char*> names)

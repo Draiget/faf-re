@@ -73,25 +73,6 @@ namespace
   // WriteArchive construction.
   moho::IAiAttackerSerializer gIAiAttackerSerializer;
 
-  /**
-   * Address: 0x00BF82E0 (FUN_00BF82E0, sub_BF82E0)
-   *
-   * What it does:
-   * Unlinks the `IAiAttackerSerializer` helper node from whatever intrusive
-   * list it currently sits in and restores a self-linked sentinel state.
-   * Registered by the real dynamic initializer (0x00BCE7D0) as the global's
-   * `atexit` teardown.
-   */
-  void cleanup_IAiAttackerSerializer()
-  {
-    gIAiAttackerSerializer.ResetLinks();
-  }
-
-  // Addresses 0x005D5CA0/0x005D5CD0 (the "StartupThunkA"/"StartupThunkB"
-  // unlink/reset duplicates formerly modeled here) are dead: zero
-  // data_refs/call_edges for both, and no source-level caller anywhere in
-  // src/sdk/**. `cleanup_IAiAttackerSerializer` above is the real,
-  // atexit-registered teardown (see the ctor below).
 } // namespace
 
 /**
@@ -140,9 +121,19 @@ void IAiAttackerSerializer::Serialize(gpg::WriteArchive* const archive, const in
 IAiAttackerSerializer::IAiAttackerSerializer()
   : mLoadCallback(&IAiAttackerDeserializeThunk)
   , mSaveCallback(&IAiAttackerSerializeThunk)
-{
-  (void)std::atexit(&cleanup_IAiAttackerSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF82E0 (FUN_00BF82E0, dynamic atexit destructor for `gIAiAttackerSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCE7D0).
+ * `FUN_005D5CA0` and `FUN_005D5CD0` are
+ * unreferenced out-of-line copies of the same body.
+ */
+IAiAttackerSerializer::~IAiAttackerSerializer() = default;
 
 /**
  * Address: 0x005DBC90 (FUN_005DBC90, gpg::SerSaveLoadHelper_IAiAttacker::Init)

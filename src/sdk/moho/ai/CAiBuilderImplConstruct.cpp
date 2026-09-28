@@ -67,22 +67,6 @@ namespace
   // WriteArchive construction.
   CAiBuilderImplConstruct gCAiBuilderImplConstruct;
 
-  /**
-   * Address: 0x00BF6AC0 (FUN_00BF6AC0, cleanup_CAiBuilderImplConstruct)
-   *
-   * What it does:
-   * Unlinks the `CAiBuilderImplConstruct` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BCC2E0) as the
-   * global's `atexit` teardown. `FUN_0059FD20` and `FUN_0059FD50` are
-   * duplicate-emission twins of this exact unlink/reset lane (same
-   * `ResetLinks()` shape, folded to separate addresses); they have no
-   * distinct source-level body of their own.
-   */
-  void CleanupCAiBuilderImplConstructStartup()
-  {
-    gCAiBuilderImplConstruct.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -119,9 +103,19 @@ void CAiBuilderImplConstruct::Deconstruct(void* const object)
 CAiBuilderImplConstruct::CAiBuilderImplConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiBuilderImplConstruct::Construct))
   , mDeleteCallback(&CAiBuilderImplConstruct::Deconstruct)
-{
-  (void)std::atexit(&CleanupCAiBuilderImplConstructStartup);
-}
+{}
+
+/**
+ * Address: 0x00BF6AC0 (FUN_00BF6AC0, dynamic atexit destructor for `gCAiBuilderImplConstruct`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCC2E0).
+ * `FUN_0059FD20` and `FUN_0059FD50` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiBuilderImplConstruct::~CAiBuilderImplConstruct() = default;
 
 /**
  * Address: 0x005A0650 (FUN_005A0650, gpg::SerConstructHelper_CAiBuilderImpl::Init)

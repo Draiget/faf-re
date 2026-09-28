@@ -17,18 +17,27 @@ namespace moho
      * Address: 0x00BD45C0 (FUN_00BD45C0, register_CEffectManagerImplConstruct)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list) and
-     * binds the construct/delete callback fields. Confirmed from raw
-     * disassembly: calls `gpg::SerHelperBase::SerHelperBase()` directly,
-     * then installs `??_7CEffectManagerImplConstruct@Moho@@6B@` -- no eager
-     * `Init()` call exists here. Its atexit target is the plain (unmangled)
-     * free function `cleanup_CEffectManagerImplConstruct`, already
-     * correctly named from a prior recovery pass, so it stays an explicit
-     * `std::atexit` registration rather than becoming an implicit
-     * destructor (see `ReconBlipSerializer` for the same variant).
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list) and binds
+     * the construct/delete callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * `??_7CEffectManagerImplConstruct@Moho@@6B@` -- no eager `Init()` call
+     * exists here. The trailing `atexit` push is the compiler registering the
+     * destructor.
      */
     CEffectManagerImplConstruct();
+
+    /**
+     * Address: 0x00BFC030 (FUN_00BFC030, dynamic atexit destructor for `gCEffectManagerImplConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD45C0).
+     * `FUN_0066BAE0` and `FUN_0066BB10` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CEffectManagerImplConstruct();
 
     /**
      * Address: 0x0066C0E0 (FUN_0066C0E0, gpg::SerConstructHelper_CEffectManagerImpl::Init)

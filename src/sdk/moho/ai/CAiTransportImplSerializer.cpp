@@ -56,25 +56,11 @@ namespace
 
   // Address: 0x010B07D8 -- process-global `CAiTransportImplSerializer`
   // singleton. Constructing it runs CAiTransportImplSerializer::
-  // CAiTransportImplSerializer() (0x00BCEF50), which splices this helper
-  // into gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // CAiTransportImplSerializer() (0x00BCEF50), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
+  // `atexit`.
   CAiTransportImplSerializer gCAiTransportImplSerializer;
 
-  /**
-   * Address: 0x00BF8C70 (FUN_00BF8C70)
-   *
-   * What it does:
-   * Unlinks the global `CAiTransportImplSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCEF50) as the global's
-   * `atexit` teardown.
-   */
-  void CleanupCAiTransportImplSerializer()
-  {
-    gCAiTransportImplSerializer.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -115,16 +101,26 @@ void CAiTransportImplSerializer::Serialize(
  * `CAiTransportImplSerializer` singleton)
  *
  * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
+ * `sNewHelpers`) and binds the load/save callback fields; the compiler
+ * registers the destructor with `atexit`.
  */
 CAiTransportImplSerializer::CAiTransportImplSerializer()
   : mLoadCallback(&CAiTransportImplSerializer::Deserialize)
   , mSaveCallback(&CAiTransportImplSerializer::Serialize)
-{
-  (void)std::atexit(&CleanupCAiTransportImplSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF8C70 (FUN_00BF8C70, dynamic atexit destructor for `gCAiTransportImplSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCEF50).
+ * `FUN_005E85E0` and `FUN_005E8610` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiTransportImplSerializer::~CAiTransportImplSerializer() = default;
 
 /**
  * Address: 0x005E9C30 (FUN_005E9C30)

@@ -55,27 +55,13 @@ namespace
     result->SetUnowned(MakeCAiAttackerImplRef(object), 0u);
   }
 
-  // Address: 0x010B028C -- process-global `CAiAttackerImplConstruct`
-  // singleton. Constructing it runs CAiAttackerImplConstruct::
-  // CAiAttackerImplConstruct() (0x00BCE890), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // Address: 0x010B028C -- process-global `CAiAttackerImplConstruct` singleton.
+  // Constructing it runs CAiAttackerImplConstruct::CAiAttackerImplConstruct()
+  // (0x00BCE890), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
+  // `atexit`.
   moho::CAiAttackerImplConstruct gCAiAttackerImplConstruct;
 
-  /**
-   * Address: 0x00BF8400 (FUN_00BF8400, sub_BF8400)
-   *
-   * What it does:
-   * Unlinks the global `CAiAttackerImplConstruct` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCE890) as the global's
-   * `atexit` teardown.
-   */
-  void CleanupCAiAttackerImplConstruct()
-  {
-    gCAiAttackerImplConstruct.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -110,16 +96,26 @@ void CAiAttackerImplConstruct::Deconstruct(void* const object)
  * `CAiAttackerImplConstruct` singleton)
  *
  * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the construct/delete callback fields, and
- * explicitly registers `atexit` cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
+ * `sNewHelpers`) and binds the construct/delete callback fields; the compiler
+ * registers the destructor with `atexit`.
  */
 CAiAttackerImplConstruct::CAiAttackerImplConstruct()
   : mConstructCallback(reinterpret_cast<gpg::RType::construct_func_t>(&CAiAttackerImplConstruct::Construct))
   , mDeleteCallback(&CAiAttackerImplConstruct::Deconstruct)
-{
-  (void)std::atexit(&CleanupCAiAttackerImplConstruct);
-}
+{}
+
+/**
+ * Address: 0x00BF8400 (FUN_00BF8400, dynamic atexit destructor for `gCAiAttackerImplConstruct`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCE890).
+ * `FUN_005D8330` and `FUN_005D8360` are
+ * unreferenced out-of-line copies of the same body.
+ */
+CAiAttackerImplConstruct::~CAiAttackerImplConstruct() = default;
 
 /**
  * Address: 0x005DC050 (FUN_005DC050)

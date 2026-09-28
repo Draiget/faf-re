@@ -1158,12 +1158,23 @@ namespace
      * `CUnitPatrolTaskSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitPatrolTaskSerializerHelperNode();
+
+    /**
+     * Address: 0x00BFA1B0 (FUN_00BFA1B0, dynamic atexit destructor for `gCUnitPatrolTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD1340).
+     * `FUN_0061ADF0` and `FUN_0061AE20` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitPatrolTaskSerializerHelperNode() = default;
 
     /**
      * Address: 0x0061C6E0 (FUN_0061C6E0, gpg::SerSaveLoadHelper<Moho::CUnitPatrolTask>::Init)
@@ -1243,49 +1254,10 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x0061ADF0 (FUN_0061ADF0)
-   *
-   * What it does:
-   * Unlinks `CUnitPatrolTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitPatrolTaskSerializerNodePrimary()
-  {
-    gCUnitPatrolTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x0061AE20 (FUN_0061AE20)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitPatrolTaskSerializer` helper storage.
-   */
-  [[maybe_unused]] void UnlinkCUnitPatrolTaskSerializerNodeSecondary()
-  {
-    gCUnitPatrolTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00BFA1B0 (FUN_00BFA1B0, Moho::CUnitPatrolTaskSerializer::~CUnitPatrolTaskSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `CUnitPatrolTask` serializer helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
-   */
-  void cleanup_CUnitPatrolTaskSerializer_atexit()
-  {
-    UnlinkCUnitPatrolTaskSerializerNodePrimary();
-  }
-
   CUnitPatrolTaskSerializerHelperNode::CUnitPatrolTaskSerializerHelperNode()
     : mSerLoadFunc(&CUnitPatrolTaskSerializerDeserialize)
     , mSerSaveFunc(&CUnitPatrolTaskSerializerSerialize)
-  {
-    (void)std::atexit(&cleanup_CUnitPatrolTaskSerializer_atexit);
-  }
+  {}
 
   void CUnitPatrolTaskSerializerHelperNode::Init()
   {
@@ -1314,10 +1286,9 @@ namespace
      * `CUnitPatrolTaskConstruct` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the construct/delete callback fields and installs
-     * process-exit cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the construct/delete callback fields.
      */
     CUnitPatrolTaskConstruct();
 

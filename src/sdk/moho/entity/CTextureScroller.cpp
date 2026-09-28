@@ -779,7 +779,7 @@ namespace moho
   // for both, and no source-level caller anywhere in src/sdk/**.
   // `DeserializeCTextureScrollerSerializerCallback` below (wired into
   // `CTextureScrollerSerializer`'s ctor) already forwards into
-  // `CTextureScroller::MemberDeserialize` and is the real, atexit-registered
+  // `CTextureScroller::MemberDeserialize` and is the real
   // body.
 
   /**
@@ -814,7 +814,7 @@ namespace moho
   // for both, and no source-level caller anywhere in src/sdk/**.
   // `SerializeCTextureScrollerSerializerCallback` below (wired into
   // `CTextureScrollerSerializer`'s ctor) already forwards into
-  // `CTextureScroller::MemberSerialize` and is the real, atexit-registered
+  // `CTextureScroller::MemberSerialize` and is the real
   // body.
 } // namespace moho
 
@@ -824,7 +824,6 @@ namespace
   // these as its load/save callback pointers; bodies defined below.
   void DeserializeCTextureScrollerSerializerCallback(gpg::ReadArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
   void SerializeCTextureScrollerSerializerCallback(gpg::WriteArchive* archive, int objectPtr, int unusedTag, gpg::RRef* ownerRef);
-  void cleanup_CTextureScrollerSerializer_atexit();
 
   /**
    * Demangled: gpg::SerSaveLoadHelper<class Moho::CTextureScroller>
@@ -842,6 +841,18 @@ namespace
      * list.
      */
     CTextureScrollerSerializer();
+
+    /**
+     * Address: 0x00C02770 (FUN_00C02770, dynamic atexit destructor for `gCTextureScrollerSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDD750).
+     * `FUN_00777D90` and `FUN_00777DC0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CTextureScrollerSerializer() = default;
 
     /**
      * Address: 0x00777F80 (FUN_00777F80, gpg::SerSaveLoadHelper_CTextureScroller::Init)
@@ -869,9 +880,7 @@ namespace
   CTextureScrollerSerializer::CTextureScrollerSerializer()
     : mLoadCallback(&DeserializeCTextureScrollerSerializerCallback)
     , mSaveCallback(&SerializeCTextureScrollerSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CTextureScrollerSerializer_atexit);
-  }
+  {}
 
   void CTextureScrollerSerializer::Init()
   {
@@ -914,10 +923,6 @@ namespace
     reinterpret_cast<const moho::CTextureScroller*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  void cleanup_CTextureScrollerSerializer_atexit()
-  {
-    gCTextureScrollerSerializer.ResetLinks();
-  }
 } // namespace
 
 namespace

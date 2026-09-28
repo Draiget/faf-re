@@ -33,6 +33,18 @@ namespace moho
     CAiNavigatorLandConstruct();
 
     /**
+     * Address: 0x00BF6E80 (FUN_00BF6E80, dynamic atexit destructor for `gCAiNavigatorLandConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCC7A0).
+     * `FUN_005A46D0` and `FUN_005A4700` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiNavigatorLandConstruct();
+
+    /**
      * Address: 0x005A4730 (FUN_005A4730, construct callback)
      *
      * What it does:

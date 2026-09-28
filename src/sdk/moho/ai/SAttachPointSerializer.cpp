@@ -76,27 +76,13 @@ namespace
     return 1;
   }
 
-  // Address: 0x010B07C4 -- process-global `SAttachPointSerializer`
-  // singleton. Constructing it runs SAttachPointSerializer::
-  // SAttachPointSerializer() (0x00BCEDF0), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // Address: 0x010B07C4 -- process-global `SAttachPointSerializer` singleton.
+  // Constructing it runs SAttachPointSerializer::SAttachPointSerializer()
+  // (0x00BCEDF0), which splices this helper into
+  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
+  // `atexit`.
   SAttachPointSerializer gSAttachPointSerializer;
 
-  /**
-   * Address: 0x00BF8A90 (FUN_00BF8A90)
-   *
-   * What it does:
-   * Unlinks the global `SAttachPointSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCEDF0) as the global's
-   * `atexit` teardown.
-   */
-  void CleanupSAttachPointSerializer()
-  {
-    gSAttachPointSerializer.ResetLinks();
-  }
 } // namespace
 
 /**
@@ -130,16 +116,26 @@ void SAttachPointSerializer::Serialize(gpg::WriteArchive* const archive, const i
  * `SAttachPointSerializer` singleton)
  *
  * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
+ * `sNewHelpers`) and binds the load/save callback fields; the compiler
+ * registers the destructor with `atexit`.
  */
 SAttachPointSerializer::SAttachPointSerializer()
   : mLoadCallback(&SAttachPointSerializer::Deserialize)
   , mSaveCallback(&SAttachPointSerializer::Serialize)
-{
-  (void)std::atexit(&CleanupSAttachPointSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF8A90 (FUN_00BF8A90, dynamic atexit destructor for `gSAttachPointSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCEDF0).
+ * `FUN_005E4340` and `FUN_005E4370` are
+ * unreferenced out-of-line copies of the same body.
+ */
+SAttachPointSerializer::~SAttachPointSerializer() = default;
 
 void SAttachPointSerializer::Init()
 {

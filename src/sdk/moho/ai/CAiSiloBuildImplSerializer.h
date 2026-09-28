@@ -113,17 +113,26 @@ namespace moho
      *
      * What it does:
      * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
-     * splices it into the process-global `sNewHelpers` pending list), binds
-     * the load/save callback fields, then explicitly registers
-     * `atexit(&sub_BF7F60)`. Confirmed from raw disassembly: calls
-     * `gpg::SerHelperBase::SerHelperBase()` directly, then installs
+     * splices it into the process-global `sNewHelpers` pending list) and
+     * binds the load/save callback fields. Confirmed from raw disassembly:
+     * calls `gpg::SerHelperBase::SerHelperBase()` directly, then installs
      * `??_7CAiSiloBuildImplSerializer@Moho@@6B@` -- no eager `Init()` call
-     * exists here, and (unlike `SSiloBuildInfoSerializer` above) this class
-     * has no user-declared destructor, so the real binary registers its
-     * `atexit` unlink callback explicitly rather than relying on an implicit
-     * non-trivial-destructor registration.
+     * exists here. The trailing `atexit` push is the compiler registering
+     * the destructor, exactly as for `SSiloBuildInfoSerializer` above.
      */
     CAiSiloBuildImplSerializer();
+
+    /**
+     * Address: 0x00BF7F60 (FUN_00BF7F60, dynamic atexit destructor for `gCAiSiloBuildImplSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCE150).
+     * `FUN_005CF920` and `FUN_005CF950` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CAiSiloBuildImplSerializer();
 
     /**
      * Address: 0x005CFF30 (FUN_005CFF30)

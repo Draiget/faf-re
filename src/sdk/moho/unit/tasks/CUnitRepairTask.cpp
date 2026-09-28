@@ -642,12 +642,23 @@ namespace
      * `CUnitRepairTaskSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitRepairTaskSerializerHelperNode();
+
+    /**
+     * Address: 0x00BF9450 (FUN_00BF9450, dynamic atexit destructor for `gCUnitRepairTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BCF950).
+     * `FUN_005F91D0` and `FUN_005F9200` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitRepairTaskSerializerHelperNode() = default;
 
     /**
      * Address: 0x005FBD50 (FUN_005FBD50, gpg::SerSaveLoadHelper<Moho::CUnitRepairTask>::Init)
@@ -676,15 +687,6 @@ namespace
   );
 
   CUnitRepairTaskSerializerHelperNode gCUnitRepairTaskSerializer;
-
-  /**
-   * Unlinks `CUnitRepairTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitRepairTaskSerializerNodePrimary()
-  {
-    gCUnitRepairTaskSerializer.ResetLinks();
-  }
 
   /**
    * Address: 0x005F9170 (FUN_005F9170, Moho::CUnitRepairTaskSerializer::Deserialize)
@@ -732,25 +734,10 @@ namespace
     task->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00BF9450 (FUN_00BF9450, Moho::CUnitRepairTaskSerializer::~CUnitRepairTaskSerializer)
-   *
-   * What it does:
-   * Process-exit teardown: unlinks the `CUnitRepairTaskSerializer` helper
-   * node, matching the sibling unlink lanes used across other serializer
-   * registrars.
-   */
-  void cleanup_CUnitRepairTaskSerializer_atexit()
-  {
-    UnlinkCUnitRepairTaskSerializerNodePrimary();
-  }
-
   CUnitRepairTaskSerializerHelperNode::CUnitRepairTaskSerializerHelperNode()
     : mSerLoadFunc(&DeserializeCUnitRepairTaskSerializerCallback)
     , mSerSaveFunc(&SerializeCUnitRepairTaskSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitRepairTaskSerializer_atexit);
-  }
+  {}
 
   void CUnitRepairTaskSerializerHelperNode::Init()
   {

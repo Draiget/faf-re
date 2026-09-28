@@ -75,24 +75,9 @@ namespace
   // Address: 0x010B0358 -- process-global `LAiAttackerImplSerializer`
   // singleton. Constructing it runs LAiAttackerImplSerializer::
   // LAiAttackerImplSerializer() (0x00BCE850), which splices this helper into
-  // gpg::SerHelperBase::sNewHelpers and explicitly registers this
-  // translation unit's unlink callback via `atexit` (this class has no
-  // user-declared destructor).
+  // gpg::SerHelperBase::sNewHelpers; the compiler registers its destructor with
+  // `atexit`.
   LAiAttackerImplSerializer gLAiAttackerImplSerializer;
-
-  /**
-   * Address: 0x00BF83D0 (FUN_00BF83D0, sub_BF83D0)
-   *
-   * What it does:
-   * Unlinks the global `LAiAttackerImplSerializer` helper node from the
-   * intrusive serializer chain and restores it to a self-linked node.
-   * Registered by the real dynamic initializer (0x00BCE850) as the global's
-   * `atexit` teardown.
-   */
-  void CleanupLAiAttackerImplSerializer()
-  {
-    gLAiAttackerImplSerializer.ResetLinks();
-  }
 
   [[nodiscard]] LAiAttackerImpl* AsLAiAttackerImpl(const int objectPtr)
   {
@@ -166,16 +151,26 @@ void LAiAttackerImplSerializer::Serialize(gpg::WriteArchive* const archive, cons
  * `LAiAttackerImplSerializer` singleton)
  *
  * What it does:
- * Default-constructs the `gpg::SerHelperBase` base (self-links and splices
- * into `sNewHelpers`), binds the load/save callback fields, and explicitly
- * registers `atexit` cleanup.
+ * Default-constructs the `gpg::SerHelperBase` base (self-links and splices into
+ * `sNewHelpers`) and binds the load/save callback fields; the compiler
+ * registers the destructor with `atexit`.
  */
 LAiAttackerImplSerializer::LAiAttackerImplSerializer()
   : mLoadCallback(&LAiAttackerImplSerializer::Deserialize)
   , mSaveCallback(&LAiAttackerImplSerializer::Serialize)
-{
-  (void)std::atexit(&CleanupLAiAttackerImplSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF83D0 (FUN_00BF83D0, dynamic atexit destructor for `gLAiAttackerImplSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCE850).
+ * `FUN_005D6240` and `FUN_005D6270` are
+ * unreferenced out-of-line copies of the same body.
+ */
+LAiAttackerImplSerializer::~LAiAttackerImplSerializer() = default;
 
 /**
  * Address: 0x005DBF80 (FUN_005DBF80)

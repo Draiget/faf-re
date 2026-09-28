@@ -42,6 +42,18 @@ namespace moho
     RMeshBlueprintSaveConstruct();
 
     /**
+     * Address: 0x00BF2CC0 (FUN_00BF2CC0, dynamic atexit destructor for `gRMeshBlueprintSaveConstructHelper`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BC8550).
+     * `FUN_00518F60` and `FUN_00518F90` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~RMeshBlueprintSaveConstruct();
+
+    /**
      * Address: 0x00519470 (FUN_00519470, gpg::SerSaveConstructHelper<Moho::RMeshBlueprint>::Init)
      *
      * What it does:

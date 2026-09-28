@@ -76,25 +76,6 @@ namespace
     archive->Write(broadcasterType, broadcasterLane, ownerRef);
   }
 
-  /**
-   * Address: 0x00BF8BB0 (FUN_00BF8BB0, sub_BF8BB0)
-   *
-   * What it does:
-   * Unlinks the `IAiTransportSerializer` helper node from whatever
-   * intrusive list it currently sits in and restores a self-linked sentinel
-   * state. Registered by the real dynamic initializer (0x00BCEEB0) as the
-   * global's `atexit` teardown.
-   */
-  void cleanup_IAiTransportSerializer()
-  {
-    gIAiTransportSerializer.ResetLinks();
-  }
-
-  // Addresses 0x005E48D0/0x005E4900 (the "StartupThunkA"/"StartupThunkB"
-  // unlink/reset duplicates formerly modeled here) are dead: zero
-  // data_refs/call_edges for both, and no source-level caller anywhere in
-  // src/sdk/**. `cleanup_IAiTransportSerializer` above is the real,
-  // atexit-registered teardown (see the ctor below).
 } // namespace
 
 /**
@@ -137,9 +118,19 @@ void IAiTransportSerializer::Serialize(gpg::WriteArchive* const archive, const i
 IAiTransportSerializer::IAiTransportSerializer()
   : mLoadCallback(&IAiTransportSerializer::Deserialize)
   , mSaveCallback(&IAiTransportSerializer::Serialize)
-{
-  (void)std::atexit(&cleanup_IAiTransportSerializer);
-}
+{}
+
+/**
+ * Address: 0x00BF8BB0 (FUN_00BF8BB0, dynamic atexit destructor for `gIAiTransportSerializer`)
+ *
+ * What it does:
+ * Unlinks this helper node from the serializer-helper list (the
+ * `TDatListItem` base destructor). The compiler registers it with
+ * `atexit` from the global's dynamic initializer (0x00BCEEB0).
+ * `FUN_005E48D0` and `FUN_005E4900` are
+ * unreferenced out-of-line copies of the same body.
+ */
+IAiTransportSerializer::~IAiTransportSerializer() = default;
 
 /**
  * Address: 0x005E9530 (FUN_005E9530, gpg::SerSaveLoadHelper_IAiTransport::Init)

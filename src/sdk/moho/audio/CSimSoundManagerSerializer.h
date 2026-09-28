@@ -39,6 +39,18 @@ namespace moho
     CSimSoundManagerSerializer();
 
     /**
+     * Address: 0x00C015C0 (FUN_00C015C0, dynamic atexit destructor for `gCSimSoundManagerSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDC590).
+     * `FUN_00761350` and `FUN_00761380` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CSimSoundManagerSerializer();
+
+    /**
      * Address: 0x00762440 (FUN_00762440)
      *
      * What it does:

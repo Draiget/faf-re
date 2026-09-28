@@ -30,24 +30,6 @@ namespace
   // ReadArchive/WriteArchive construction.
   moho::RProjectileBlueprintSaveConstruct gRProjectileBlueprintSaveConstructHelper;
 
-  /**
-   * Address: 0x00BF2F50 (FUN_00BF2F50)
-   *
-   * What it does:
-   * Unlinks the `RProjectileBlueprintSaveConstruct` helper node from
-   * whatever intrusive list it currently sits in and restores a self-linked
-   * sentinel state. Registered by the real dynamic initializer (0x00BC86D0)
-   * as the global's `atexit` teardown.
-   *
-   * ICF twins: 0x0051C9E0 (FUN_0051C9E0) and 0x0051CA10 (FUN_0051CA10) are
-   * byte-identical duplicates hardcoded to this same global's link fields,
-   * confirmed zero independent callers via the callgraph index -- dead
-   * linker-emitted copies, not separate binary behavior.
-   */
-  void CleanupRProjectileBlueprintSaveConstruct()
-  {
-    gRProjectileBlueprintSaveConstructHelper.ResetLinks();
-  }
 } // namespace
 
 namespace moho
@@ -112,8 +94,19 @@ namespace moho
         reinterpret_cast<gpg::RType::save_construct_args_func_t>(&SaveConstructArgs_RProjectileBlueprintThunk)
       )
   {
-    (void)std::atexit(&CleanupRProjectileBlueprintSaveConstruct);
   }
+
+  /**
+   * Address: 0x00BF2F50 (FUN_00BF2F50, dynamic atexit destructor for `gRProjectileBlueprintSaveConstructHelper`)
+   *
+   * What it does:
+   * Unlinks this helper node from the serializer-helper list (the
+   * `TDatListItem` base destructor). The compiler registers it with
+   * `atexit` from the global's dynamic initializer (0x00BC86D0).
+   * `FUN_0051C9E0` and `FUN_0051CA10` are
+   * unreferenced out-of-line copies of the same body.
+   */
+  RProjectileBlueprintSaveConstruct::~RProjectileBlueprintSaveConstruct() = default;
 
   /**
    * Address: 0x0051CC90 (FUN_0051CC90, gpg::SerSaveConstructHelper<Moho::RProjectileBlueprint>::Init)

@@ -31,6 +31,18 @@ namespace moho
     CIntelPosHandleConstruct();
 
     /**
+     * Address: 0x00C01EA0 (FUN_00C01EA0, dynamic atexit destructor for `gCIntelPosHandleConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDCCB0).
+     * `FUN_0076F2E0` and `FUN_0076F310` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CIntelPosHandleConstruct();
+
+    /**
      * Address: 0x0076F350 (FUN_0076F350, Moho::CIntelPosHandleConstruct::Construct)
      *
      * What it does:

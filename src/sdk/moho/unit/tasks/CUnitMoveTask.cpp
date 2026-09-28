@@ -956,12 +956,23 @@ namespace
      * `CUnitMoveTaskSerializer` singleton)
      *
      * What it does:
-     * Default-constructs the `gpg::SerHelperBase` base (self-links `this`
-     * and splices it into the process-global `sNewHelpers` pending list),
-     * then binds the load/save callback fields and installs process-exit
-     * cleanup via `atexit`.
+     * Default-constructs the `gpg::SerHelperBase` base (self-links `this` and
+     * splices it into the process-global `sNewHelpers` pending list), then
+     * binds the load/save callback fields.
      */
     CUnitMoveTaskSerializerHelper();
+
+    /**
+     * Address: 0x00BFA040 (FUN_00BFA040, dynamic atexit destructor for `gCUnitMoveTaskSerializer`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BD1050).
+     * `FUN_00619040` and `FUN_00619070` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CUnitMoveTaskSerializerHelper() = default;
 
     /**
      * Address: 0x00619C20 (FUN_00619C20, gpg::SerSaveLoadHelper<Moho::CUnitMoveTask>::Init)
@@ -1010,41 +1021,10 @@ namespace
     reinterpret_cast<const moho::CUnitMoveTask*>(static_cast<std::uintptr_t>(objectPtr))->MemberSerialize(archive);
   }
 
-  /**
-   * Address: 0x00619040 (FUN_00619040)
-   *
-   * What it does:
-   * Unlinks `CUnitMoveTaskSerializer` helper node from the intrusive
-   * serializer-helper list and restores one self-linked node lane.
-   */
-  void UnlinkCUnitMoveTaskSerializerNodePrimary()
-  {
-    gCUnitMoveTaskSerializer.ResetLinks();
-  }
-
-  /**
-   * Address: 0x00619070 (FUN_00619070)
-   *
-   * What it does:
-   * Performs the same intrusive-list unlink/self-link sequence for
-   * `CUnitMoveTaskSerializer` helper storage.
-   */
-  [[maybe_unused]] void UnlinkCUnitMoveTaskSerializerNodeSecondary()
-  {
-    gCUnitMoveTaskSerializer.ResetLinks();
-  }
-
-  void cleanup_CUnitMoveTaskSerializer_atexit()
-  {
-    UnlinkCUnitMoveTaskSerializerNodePrimary();
-  }
-
   CUnitMoveTaskSerializerHelper::CUnitMoveTaskSerializerHelper()
     : mLoadCallback(&DeserializeCUnitMoveTaskSerializerCallback)
     , mSaveCallback(&SerializeCUnitMoveTaskSerializerCallback)
-  {
-    (void)std::atexit(&cleanup_CUnitMoveTaskSerializer_atexit);
-  }
+  {}
 
   void CUnitMoveTaskSerializerHelper::Init()
   {

@@ -31,6 +31,18 @@ namespace moho
     CIntelCounterHandleConstruct();
 
     /**
+     * Address: 0x00C01F60 (FUN_00C01F60, dynamic atexit destructor for `gCIntelCounterHandleConstruct`)
+     *
+     * What it does:
+     * Unlinks this helper node from the serializer-helper list (the
+     * `TDatListItem` base destructor). The compiler registers it with
+     * `atexit` from the global's dynamic initializer (0x00BDCD50).
+     * `FUN_0076F8A0` and `FUN_0076F8D0` are
+     * unreferenced out-of-line copies of the same body.
+     */
+    ~CIntelCounterHandleConstruct();
+
+    /**
      * Address: 0x0076F910 (FUN_0076F910, Moho::CIntelCounterHandleConstruct::Construct)
      *
      * What it does:
