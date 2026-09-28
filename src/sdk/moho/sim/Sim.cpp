@@ -4839,47 +4839,19 @@ namespace
     }
   }
 
-  using DebugOverlayClassLink = TDatListItem<RDebugOverlayClass, void>;
-  using DebugOverlayLink = TDatListItem<RDebugOverlay, void>;
-
-  [[nodiscard]] RDebugOverlayClass* DebugOverlayClassFromLink(DebugOverlayClassLink* const link) noexcept
+  // Every walk below goes forward from the head's +0x04 slot, as `Sim::dbg`
+  // (0x00651B00) does for both rings (`mov esi, [esi+4]`).
+  [[nodiscard]] auto RegisteredDebugOverlayClasses()
   {
-    if (link == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<RDebugOverlayClass*>(
-      reinterpret_cast<std::uint8_t*>(link) - offsetof(RDebugOverlayClass, mOverlayClassLink)
-    );
-  }
-
-  [[nodiscard]] const RDebugOverlayClass* DebugOverlayClassFromLink(const DebugOverlayClassLink* const link) noexcept
-  {
-    if (link == nullptr) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<const RDebugOverlayClass*>(
-      reinterpret_cast<const std::uint8_t*>(link) - offsetof(RDebugOverlayClass, mOverlayClassLink)
-    );
+    return GetDbgOverlays().owners_member<RDebugOverlayClass, &RDebugOverlayClass::mOverlayClassLink>();
   }
 
   [[nodiscard]] gpg::RType* TryFindExactDebugOverlayType(const std::string& requestedName) noexcept
   {
-    DebugOverlayClassLink* const overlays = GetDbgOverlays();
-    if (overlays == nullptr) {
-      return nullptr;
-    }
-
-    for (DebugOverlayClassLink* link = overlays->mPrev; link != overlays; link = link->mPrev) {
-      const RDebugOverlayClass* const overlayClass = DebugOverlayClassFromLink(link);
-      if (overlayClass == nullptr) {
-        continue;
-      }
-
+    for (RDebugOverlayClass* const overlayClass : RegisteredDebugOverlayClasses()) {
       const char* const overlayName = overlayClass->mOverlayToken.c_str();
       if (overlayName != nullptr && gpg::STR_CompareNoCase(overlayName, requestedName.c_str()) == 0) {
-        return const_cast<RDebugOverlayClass*>(overlayClass);
+        return overlayClass;
       }
     }
 
@@ -4908,17 +4880,7 @@ namespace
     std::vector<const RDebugOverlayClass*>& outMatches
   )
   {
-    DebugOverlayClassLink* const overlays = GetDbgOverlays();
-    if (overlays == nullptr) {
-      return;
-    }
-
-    for (DebugOverlayClassLink* link = overlays->mPrev; link != overlays; link = link->mPrev) {
-      const RDebugOverlayClass* const overlayClass = DebugOverlayClassFromLink(link);
-      if (overlayClass == nullptr) {
-        continue;
-      }
-
+    for (const RDebugOverlayClass* const overlayClass : RegisteredDebugOverlayClasses()) {
       const char* const overlayName = overlayClass->mOverlayToken.c_str();
       if (overlayName != nullptr && gpg::STR_StartsWithNoCase(overlayName, requestedName.c_str())) {
         PushBackDebugOverlayClassPtrVector(outMatches, overlayClass);
@@ -4930,26 +4892,15 @@ namespace
   {
     sim.Printf(kDbgAvailableOverlaysText);
 
-    DebugOverlayClassLink* const overlays = GetDbgOverlays();
-    if (overlays == nullptr) {
-      return;
-    }
-
-    for (DebugOverlayClassLink* link = overlays->mPrev; link != overlays; link = link->mPrev) {
-      const RDebugOverlayClass* const overlayClass = DebugOverlayClassFromLink(link);
-      if (overlayClass == nullptr) {
-        continue;
-      }
-
+    for (const RDebugOverlayClass* const overlayClass : RegisteredDebugOverlayClasses()) {
       sim.Printf("  %s - %s", overlayClass->GetName(), overlayClass->mOverlayDescription.c_str());
     }
   }
 
   [[nodiscard]] RDebugOverlay* FindDebugOverlayInstanceByType(Sim& sim, const gpg::RType& overlayType) noexcept
   {
-    for (DebugOverlayLink* link = sim.mDebugOverlays.mPrev; link != &sim.mDebugOverlays; link = link->mPrev) {
-      RDebugOverlay* const overlay = static_cast<RDebugOverlay*>(link);
-      if (overlay != nullptr && overlay->GetClass() == &overlayType) {
+    for (RDebugOverlay* const overlay : sim.mDebugOverlays.owners()) {
+      if (overlay->GetClass() == &overlayType) {
         return overlay;
       }
     }
@@ -4962,16 +4913,9 @@ namespace
     return RDebugOverlay::NewPtr(overlayType);
   }
 
-  void LinkDebugOverlayFront(Sim& sim, RDebugOverlay& overlay)
-  {
-    auto* const overlayLink = static_cast<DebugOverlayLink*>(&overlay);
-    overlayLink->ListLinkAfter(&sim.mDebugOverlays);
-  }
-
   void RemoveDebugOverlayInstance(RDebugOverlay& overlay)
   {
-    auto* const overlayLink = static_cast<DebugOverlayLink*>(&overlay);
-    overlayLink->ListUnlink();
+    // 0x00651E6D: the deleting destructor alone; `~RDebugOverlay` unlinks.
     delete &overlay;
   }
 
@@ -9318,9 +9262,9 @@ int Sim::dbg(
     return 0;
   }
 
-  if (RDebugOverlay* const newOverlay = CreateDebugOverlayInstance(*selectedType); newOverlay != nullptr) {
-    LinkDebugOverlayFront(*sim, *newOverlay);
-  }
+  // 0x00651E52: no null test (`NewPtr` asserts its result); unlink, then
+  // link before the head.
+  sim->mDebugOverlays.push_back(CreateDebugOverlayInstance(*selectedType));
 
   return 0;
 }
@@ -10962,8 +10906,8 @@ void Sim::AdvanceBeat(const int amt)
     UpdateChecksum();
   }
 
-  for (auto* node = mDebugOverlays.mPrev; node != &mDebugOverlays; node = node->mPrev) {
-    auto* overlay = static_cast<RDebugOverlay*>(node);
+  // 0x0074A5A2: forward from the head's +0x04 slot.
+  for (RDebugOverlay* const overlay : mDebugOverlays.owners()) {
     TickDebugOverlay(overlay, this);
   }
 

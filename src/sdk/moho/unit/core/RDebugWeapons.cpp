@@ -103,22 +103,6 @@ namespace
     return type;
   }
 
-  /**
-   * Address: 0x00653820 (FUN_00653820, Moho::RDebugWeapons non-deleting dtor body)
-   *
-   * What it does:
-   * Runs the typed debug-overlay intrusive unlink lane for one
-   * `RDebugWeapons` instance and restores singleton link state.
-   */
-  [[maybe_unused]] void DestroyRDebugWeaponsNonDeletingBody(moho::RDebugWeapons* const overlay) noexcept
-  {
-    if (overlay == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
-    node->ListUnlinkSelf();
-  }
 } // namespace
 
 namespace moho
@@ -152,6 +136,7 @@ namespace moho
 
   /**
    * Address: 0x006537E0 (FUN_006537E0, Moho::RDebugWeapons::dtr)
+   * Address: 0x00653820 (FUN_00653820, non-deleting body; formerly `DestroyRDebugWeaponsNonDeletingBody`)
    */
   RDebugWeapons::~RDebugWeapons() = default;
 

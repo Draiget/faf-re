@@ -41,22 +41,6 @@ namespace
     }
   }
 
-  /**
-   * Address: 0x00650FF0 (FUN_00650FF0, Moho::RDebugNavWaypoints non-deleting dtor body)
-   *
-   * What it does:
-   * Runs the typed debug-overlay intrusive unlink lane for one
-   * `RDebugNavWaypoints` instance and restores singleton link state.
-   */
-  [[maybe_unused]] void DestroyRDebugNavWaypointsNonDeletingBody(moho::RDebugNavWaypoints* const overlay) noexcept
-  {
-    if (overlay == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
-    node->ListUnlinkSelf();
-  }
 } // namespace
 
 namespace moho
@@ -90,6 +74,7 @@ namespace moho
 
   /**
    * Address: 0x00650F40 (FUN_00650F40, Moho::RDebugNavWaypoints::dtr)
+   * Address: 0x00650FF0 (FUN_00650FF0, non-deleting body; formerly `DestroyRDebugNavWaypointsNonDeletingBody`)
    */
   RDebugNavWaypoints::~RDebugNavWaypoints() = default;
 

@@ -3,7 +3,7 @@
 #include <cstddef>
 
 #include "gpg/core/reflection/Reflection.h"
-#include "moho/containers/TDatList.h"
+#include "gpg/core/containers/DList.h"
 
 namespace moho
 {
@@ -12,8 +12,11 @@ namespace moho
   /**
    * VFTABLE: 0x00E2346C
    * COL: 0x00E7D62C
+   *
+   * RTTI: `gpg::DListItem<RDebugOverlay>` at +0x04, the node on
+   * `Sim::mDebugOverlays`.
    */
-  class RDebugOverlay : public gpg::RObject, public TDatListItem<RDebugOverlay, void>
+  class RDebugOverlay : public gpg::RObject, public gpg::DListItem<RDebugOverlay>
   {
   public:
     /**
@@ -27,11 +30,14 @@ namespace moho
 
     /**
      * Address: 0x0064C1E0 (FUN_0064C1E0, scalar deleting body)
+     * Address: 0x0064C1B0 (FUN_0064C1B0, the non-deleting body: vtable back to
+     *   `RDebugOverlay`'s, the node unlinks (the `DListItem` base), vtable back
+     *   to `gpg::RObject`'s; formerly `DestroyRDebugOverlayNonDeletingBody`)
      * Slot: 2
      *
      * What it does:
-     * Unlinks this overlay from the intrusive debug-overlay list and tears down
-     * base reflection object state.
+     * Nothing of its own; the base destructor takes the overlay off
+     * `Sim::mDebugOverlays`.
      */
     ~RDebugOverlay() override;
 

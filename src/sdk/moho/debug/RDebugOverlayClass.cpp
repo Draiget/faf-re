@@ -31,56 +31,6 @@ namespace
     return sType;
   }
 
-  [[nodiscard]] moho::TDatList<moho::RDebugOverlayClass, void>& GlobalDebugOverlayClassList()
-  {
-    static moho::TDatList<moho::RDebugOverlayClass, void> sOverlayClassList;
-    return sOverlayClassList;
-  }
-
-  /**
-   * Address: 0x00651F20 (FUN_00651F20)
-   *
-   * What it does:
-   * Resets the global debug-overlay intrusive head so prev/next point to
-   * itself and returns that head lane.
-   */
-  [[nodiscard]] moho::TDatListItem<moho::RDebugOverlayClass, void>* ResetDbgOverlayHeadLinks()
-  {
-    auto& overlays = GlobalDebugOverlayClassList();
-    overlays.mPrev = &overlays;
-    overlays.mNext = &overlays;
-    return &overlays;
-  }
-
-  /**
-   * Address: 0x006517A0 (FUN_006517A0, sDBGOverlays intrusive unlink/reset helper)
-   *
-   * What it does:
-   * Unlinks the global debug-overlay intrusive head from its current lane and
-   * restores self-linked singleton list state.
-   */
-  [[nodiscard]] moho::TDatListItem<moho::RDebugOverlayClass, void>* UnlinkAndResetDbgOverlaysPrimary()
-  {
-    auto& overlays = GlobalDebugOverlayClassList();
-    overlays.mPrev->mNext = overlays.mNext;
-    overlays.mNext->mPrev = overlays.mPrev;
-    overlays.mNext = &overlays;
-    overlays.mPrev = &overlays;
-    return &overlays;
-  }
-
-  /**
-   * Address: 0x00BFB730 (??1sDBGOverlays@Moho@@QAE@@Z, cleanup_sDBGOverlays)
-   *
-   * What it does:
-   * Unlinks the global debug-overlay registry head and restores singleton
-   * list state.
-   */
-  void cleanup_sDBGOverlays()
-  {
-    (void)UnlinkAndResetDbgOverlaysPrimary();
-  }
-
   moho::RDebugGridTypeInfo* gRDebugGridTypeInfo = nullptr;
   moho::RDebugRadarTypeInfo* gRDebugRadarTypeInfo = nullptr;
   moho::RDebugNavPathTypeInfo* gRDebugNavPathTypeInfo = nullptr;
@@ -214,7 +164,8 @@ namespace moho
   {
     mOverlayToken = overlayToken ? overlayToken : "";
     mOverlayDescription = overlayDescription ? overlayDescription : "";
-    mOverlayClassLink.ListLinkAfter(GetDbgOverlays());
+    // 0x006519A4: unlink, then link before the head (appends).
+    mOverlayClassLink.ListLinkBefore(&GetDbgOverlays());
   }
 
   void RDebugOverlayClass::RegisterOverlayClassToken(const char* const overlayToken)
@@ -224,20 +175,20 @@ namespace moho
 
   /**
    * Address: 0x00651760 (FUN_00651760, GetDbgOverlays)
+   * Address: 0x00651F20 (FUN_00651F20, the static's constructor out of line:
+   *   self-link the head; zero callers)
+   * Address: 0x00BFB730 (FUN_00BFB730, the static's `atexit` destructor:
+   *   unlink and self-link the head; formerly `cleanup_sDBGOverlays`)
+   * Address: 0x006517A0 (FUN_006517A0, byte-identical copy of that
+   *   destructor; zero callers)
    *
    * What it does:
-   * Lazily initializes the global active-overlay intrusive list head and
-   * registers its teardown handler.
+   * Returns the registry of debug-overlay classes (`sDBGOverlays`).
    */
-  TDatListItem<RDebugOverlayClass, void>* GetDbgOverlays()
+  TDatList<RDebugOverlayClass, void>& GetDbgOverlays()
   {
-    static bool sInitialized = false;
-    if (!sInitialized) {
-      sInitialized = true;
-      (void)ResetDbgOverlayHeadLinks();
-      (void)std::atexit(&cleanup_sDBGOverlays);
-    }
-    return &GlobalDebugOverlayClassList();
+    static TDatList<RDebugOverlayClass, void> sDBGOverlays;
+    return sDBGOverlays;
   }
 
   /**

@@ -87,11 +87,12 @@ namespace moho
    * Address: 0x00651760 (FUN_00651760, GetDbgOverlays)
    *
    * What it does:
-   * Returns the process-global intrusive registry head for debug-overlay class
-   * overlays and lazily wires its atexit cleanup.
+   * Returns the registry of debug-overlay classes: a function-local static
+   * list, constructed on first use with its destructor registered with
+   * `atexit`.
    */
   [[nodiscard]]
-  TDatListItem<RDebugOverlayClass, void>* GetDbgOverlays();
+  TDatList<RDebugOverlayClass, void>& GetDbgOverlays();
 
   static_assert(
     offsetof(RDebugOverlayClass, mOverlayClassPad0064) == 0x64,

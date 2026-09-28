@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include "gpg/core/containers/DList.h"
 #include "../../gpg/core/reflection/Reflection.h"
 #include "../../legacy/containers/String.h"
 #include "../../legacy/containers/Vector.h"
@@ -1489,7 +1490,7 @@ namespace moho
     uint32_t mReserved990;
     boost::shared_ptr<SParticleBuffer> mParticleBuffer;
     CDecalBuffer* mDecalBuffer;
-    TDatList<RDebugOverlay, void> mDebugOverlays;
+    gpg::DList<RDebugOverlay> mDebugOverlays;
     msvc8::vector<CSimConVarInstanceBase*> mSimVars;
     /// Queued camera-follow-transition records: one per constructed
     /// projectile whose blueprint sets `Display.CameraFollowsProjectile`

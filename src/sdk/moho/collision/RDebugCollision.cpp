@@ -9,7 +9,8 @@
 #include "moho/entity/Entity.h"
 #include "moho/collision/CColPrimitiveBase.h"
 #include "moho/entity/EntityDb.h"
-#include "moho/sim/Sim.h"
+#include "moho/sim/Sim.h"
+
 #include "gpg/core/reflection/StaticInitPhase.h"
 
 namespace
@@ -85,23 +86,6 @@ namespace
   }
 
   /**
-   * Address: 0x0064C8A0 (FUN_0064C8A0, Moho::RDebugCollision non-deleting dtor body)
-   *
-   * What it does:
-   * Runs the typed debug-overlay intrusive unlink lane for one
-   * `RDebugCollision` instance and restores singleton link state.
-   */
-  [[maybe_unused]] void DestroyRDebugCollisionNonDeletingBody(moho::RDebugCollision* const overlay) noexcept
-  {
-    if (overlay == nullptr) {
-      return;
-    }
-
-    auto* const node = static_cast<moho::TDatListItem<moho::RDebugOverlay, void>*>(static_cast<moho::RDebugOverlay*>(overlay));
-    node->ListUnlinkSelf();
-  }
-
-  /**
    * Address: 0x0064C4F0 (FUN_0064C4F0)
    *
    * What it does:
@@ -169,6 +153,7 @@ namespace moho
 
   /**
    * Address: 0x0064C860 (FUN_0064C860, scalar deleting body)
+   * Address: 0x0064C8A0 (FUN_0064C8A0, non-deleting body; formerly `DestroyRDebugCollisionNonDeletingBody`)
    */
   RDebugCollision::~RDebugCollision() = default;
 
