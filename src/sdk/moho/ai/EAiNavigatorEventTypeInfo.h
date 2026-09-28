@@ -67,7 +67,7 @@ namespace moho
    * `mSaveCallback` to `FUN_005A7720`/`FUN_005A7740`, installs the
    * `PrimitiveSerHelper<EAiNavigatorEvent,int>` vtable, and pushes plain
    * unmangled `FUN_00BF6CD0` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
    * `FUN_005A3130`/`FUN_005A3160` are dead, zero-xref duplicate-emission
    * twins of that exact `FUN_00BF6CD0` body (function_sha256-confirmed),

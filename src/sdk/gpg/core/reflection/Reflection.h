@@ -7,6 +7,7 @@
 #include <typeinfo>
 #include <vector>
 
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/containers/ArchiveSerialization.h"
 #include "gpg/core/containers/ReadArchive.h"
 #include "gpg/core/containers/WriteArchive.h"
@@ -280,15 +281,12 @@ namespace gpg
    * (via `Init()`) to bind its construct/delete or load/save callback(s) onto
    * a reflected `RType`.
    *
-   * The intrusive prev/next pair is the project's shared `moho::TDatListItem`
-   * node (`moho/containers/TDatList.h`), not a hand-rolled pointer pair - see
-   * `FUN_009501D0`'s raw disassembly: the ctor writes `??_7SerHelperBase@gpg@@6B@`
-   * at `this+0`, then self-links the two pointers starting at `this+4`, and
-   * `FUN_00950D50` recovers the owning object from a link-node address via
-   * `node - 4`. That `(vtable@0x00, node@0x04)` shape is exactly a
-   * `TDatListItem`-based derived class, not a bespoke 3-field struct.
+   * RTTI: `gpg::DListItem<SerHelperBase>` at +0x04 (with its
+   * `boost::noncopyable`), after the vtable. `FUN_009501D0` self-links that
+   * node and appends it to `sNewHelpers`; `FUN_00950D50` pops each node and
+   * recovers the helper as `node - 4`.
    */
-  struct SerHelperBase : public moho::TDatListItem<SerHelperBase, void>
+  struct SerHelperBase : public DListItem<SerHelperBase>
   {
     /**
      * Address: 0x009501D0 (FUN_009501D0, gpg::SerHelperBase::SerHelperBase)
@@ -313,18 +311,6 @@ namespace gpg
     virtual void Init() = 0;
 
     /**
-     * Address: 0x004027D0 (FUN_004027D0) -- 16+ further ICF twins across
-     * this binary's 90+ inlined call sites; see the definition's own
-     * Doxygen block (Reflection.cpp) for the full list and a fidelity fix
-     * (this calls `ListUnlink()`, not `ListUnlinkSelf()`).
-     *
-     * What it does:
-     * Unlinks this helper node from its current intrusive list and restores
-     * singleton self-links.
-     */
-    void ResetLinks() noexcept;
-
-    /**
      * Address: 0x00950D50 (FUN_00950D50, gpg::SerHelperBase::InitNewHelpers)
      * Address: 0x00953BE0 caller lane (`gpg::WriteArchive::WriteArchive`)
      *
@@ -335,7 +321,7 @@ namespace gpg
     static void InitNewHelpers();
 
     // Address: 0x00F8ECB8 - process-global pending helper intrusive-list root.
-    static moho::TDatList<SerHelperBase, void>* sNewHelpers;
+    static DList<SerHelperBase>* sNewHelpers;
   };
   static_assert(sizeof(SerHelperBase) == 0xC, "SerHelperBase size must be 0xC");
 
@@ -4851,7 +4837,7 @@ namespace gpg
    * cleanup thunk (not a mangled `~PrimitiveSerHelper<T,int>` destructor
    * symbol IDA could associate back to this class) as its `atexit` target;
    * every one checked decompiles to the same unlink-then-self-link shape as
-   * `SerHelperBase::ResetLinks()`. Modeled here as the compiler's own
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`). Modeled here as the compiler's own
    * implicit static-destructor registration for a global with a
    * non-trivial destructor: this template declares a real destructor and
    * relies on the compiler to emit the matching registration at each

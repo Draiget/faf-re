@@ -515,7 +515,7 @@ namespace moho
    * `FUN_0062F980`/`FUN_0062F9A0`, installs the
    * `PrimitiveSerHelper<EPathPointState,int>` vtable, and explicitly
    * registers `atexit(&sub_BFA7F0)` -- confirmed bare unlink-then-self-link
-   * shape matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`) -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
    * `FUN_0062F5F0`/`FUN_0062F620` are dead, zero-xref duplicate-emission
    * twins of that exact `FUN_00BFA7F0` atexit body (function_sha256-

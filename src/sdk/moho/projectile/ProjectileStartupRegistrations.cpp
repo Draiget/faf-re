@@ -591,7 +591,7 @@ namespace
    * `mSaveCallback` to `FUN_0069EEC0`/`FUN_0069EEE0`, installs the
    * `PrimitiveSerHelper<EProjectileImpactEvent,int>` vtable, and pushes
    * plain unmangled `FUN_00BFD550` (bare unlink-then-self-link shape,
-   * matching `SerHelperBase::ResetLinks()`) as its `atexit` target -- no
+   * matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- no
    * eager `Init()` call exists in the real ctor. `FUN_0069A7F0`/
    * `FUN_0069A820` are dead, zero-xref duplicate-emission twins of that
    * exact `FUN_00BFD550` body (function_sha256-confirmed), formerly modeled

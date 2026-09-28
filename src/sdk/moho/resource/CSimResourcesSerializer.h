@@ -26,7 +26,7 @@ namespace moho
    * `FUN_00546B80`/`FUN_00546BD0`, installs the `CSimResourcesSerializer`
    * vtable, and pushes the real mangled destructor
    * `??1CSimResourcesSerializer@Moho@@QAE@@Z` (`FUN_00BF42C0`, confirmed
-   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * unlink-then-self-link shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as
    * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
    * call exists in the real ctor. Two more zero-xref duplicate emissions of
    * that same unlink logic (`FUN_00546C50`, `FUN_00546C80`, formerly

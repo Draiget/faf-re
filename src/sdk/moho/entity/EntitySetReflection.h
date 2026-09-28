@@ -243,7 +243,7 @@ namespace moho
    * emitted vtable head, `gpg::SerSaveLoadHelper<Moho::EntitySetTemplate<
    * Moho::Entity>>`'s, and `FUN_00693950`/`FUN_00693980`, two
    * byte-identical dead unlink-then-self-link bodies superseded by
-   * `SerHelperBase::ResetLinks()`).
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)).
    *
    * `Deserialize`/`Serialize` (0x006938A0/0x006938E0) do NOT call
    * `EntitySetTemplate<Entity>::MemberDeserialize`/`MemberSerialize` on
@@ -328,7 +328,7 @@ namespace moho
    * emitted vtable head, `gpg::SerSaveLoadHelper<Moho::WeakEntitySetTemplate<
    * Moho::Entity>>`'s, and `FUN_00693BA0`/`FUN_00693BD0`, two
    * byte-identical dead unlink-then-self-link bodies superseded by
-   * `SerHelperBase::ResetLinks()`).
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)).
    *
    * Unlike the other three classes in this file, the real ctor's `atexit`
    * target (`FUN_00BFCE40`) demangles to no meaningful/mangled symbol at

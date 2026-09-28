@@ -36,7 +36,7 @@ namespace moho
      * 0x005AB280, 0x005AB2A0, 0x005AB590, 0x005AB5C0, 0x005AB6C0,
      * 0x005AB6D0, 0x005AB830, 0x005AB840) implement the same generic
      * "unlink/self-link a `gpg::SerHelperBase*` node passed in a register"
-     * primitive as `gpg::SerHelperBase::ResetLinks()` (canonical body
+     * primitive as the helper node's unlink (`gpg::DListItem::ListUnlink`) (canonical body
      * 0x004027D0) -- not hardcoded to this global, so not specific to this
      * class; a prior recovery pass mis-attributed them here as bespoke
      * per-file helpers. None have any caller or incoming xref in the

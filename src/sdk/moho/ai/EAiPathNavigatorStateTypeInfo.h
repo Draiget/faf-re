@@ -46,7 +46,7 @@ namespace moho
    * binds `mLoadCallback`/`mSaveCallback` to `FUN_005B0290`/`FUN_005B02B0`,
    * installs the `PrimitiveSerHelper<CAiPathNavigator::State,int>` vtable,
    * and pushes plain unmangled `FUN_00BF7330` (bare unlink-then-self-link
-   * shape, matching `SerHelperBase::ResetLinks()`) as its `atexit` target --
+   * shape, matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target --
    * modeled by the template's own real destructor, no explicit `atexit`
    * call needed.
    *

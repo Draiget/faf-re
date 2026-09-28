@@ -77,7 +77,7 @@ namespace moho
    * gpg@@QAE@@Z` -- a synthetic/heuristic name, not real MSVC mangling for
    * this template) as its `atexit` target; confirmed to be the same bare
    * unlink-then-self-link shape as every other instantiation's atexit
-   * target, matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * target, matching the helper node's unlink (`gpg::DListItem::ListUnlink`) -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
    *
    * The previous recovery modeled this as a hand-rolled raw-struct mimic of

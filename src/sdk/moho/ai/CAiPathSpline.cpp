@@ -501,7 +501,7 @@ namespace
    * `FUN_00598400`/`FUN_00598420`, installs the
    * `PrimitiveSerHelper<ECollisionType,int>` vtable, and explicitly
    * registers `atexit(&sub_BF6520)` -- confirmed bare unlink-then-self-link
-   * shape matching `SerHelperBase::ResetLinks()` -- modeled by the
+   * shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`) -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed. Two
    * zero-xref duplicate emissions of that same unlink logic
    * (`FUN_005966D0`, `FUN_00596700`) are already correctly marked `skip`.

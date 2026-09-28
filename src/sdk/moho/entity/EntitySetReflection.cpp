@@ -754,7 +754,7 @@ namespace moho
    * (identical ctor body, own vtable), `FUN_00693DB0` (same ctor body but
    * writes the OTHER emitted vtable head, `gpg::SerSaveLoadHelper<Moho::
    * EntitySetBase>`'s), and `FUN_00693700`/`FUN_00693730` (byte-identical
-   * unlink-then-self-link bodies matching `SerHelperBase::ResetLinks()`).
+   * unlink-then-self-link bodies matching the helper node's unlink (`gpg::DListItem::ListUnlink`)).
    * All four marked `skip`.
    */
   EntitySetBaseSerializer::EntitySetBaseSerializer()
@@ -865,7 +865,7 @@ namespace moho
    * writes the OTHER emitted vtable head, `gpg::SerSaveLoadHelper<Moho::
    * WeakEntitySetTemplate<Moho::Entity>>`'s), and `FUN_00693BA0`/
    * `FUN_00693BD0` (byte-identical unlink-then-self-link bodies matching
-   * `SerHelperBase::ResetLinks()`). All four marked `skip`.
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)). All four marked `skip`.
    */
   WeakEntitySetSerializer::WeakEntitySetSerializer()
     : mDeserialize(reinterpret_cast<gpg::RType::load_func_t>(&WeakEntitySetSerializer::Deserialize))

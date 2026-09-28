@@ -50,7 +50,7 @@ namespace
    * `mSaveCallback` to `FUN_00523AB0`/`FUN_00523AD0`, installs the
    * `PrimitiveSerHelper<ERuleBPUnitMovementType,int>` vtable, and explicitly
    * registers `atexit(&sub_BF31E0)` -- confirmed bare unlink-then-self-link
-   * shape matching `SerHelperBase::ResetLinks()`. Two zero-xref duplicate
+   * shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`). Two zero-xref duplicate
    * emissions of that unlink logic (`FUN_0051FC20`, `FUN_0051FC50`, formerly
    * `CleanupERuleBPUnitMovementTypePrimitiveSerializerNodePrimary/Secondary`)
    * are dead ICF twins (sha256-identical), never invoked.

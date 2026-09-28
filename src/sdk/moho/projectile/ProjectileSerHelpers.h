@@ -22,7 +22,7 @@ namespace moho
    * `gpg::SerHelperBase`, binds `mSaveConstructArgsCallback` to
    * `FUN_0069E370`, installs the `ProjectileSaveConstruct` vtable, and
    * pushes plain unmangled `FUN_00BFD670` (bare unlink-then-self-link
-   * shape, matching `SerHelperBase::ResetLinks()`) as its `atexit` target
+   * shape, matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target
    * -- no eager `RegisterSaveConstructArgsFunction`/`Init()` call exists
    * in the real ctor.
    */
@@ -93,7 +93,7 @@ namespace moho
    * `gpg::SerHelperBase`, binds `mConstructCallback`/`mDeconstructCallback`
    * to `FUN_0069E500`/`FUN_0069F880`, installs the `ProjectileConstruct`
    * vtable, and pushes plain unmangled `FUN_00BFD6A0` (bare
-   * unlink-then-self-link shape, matching `SerHelperBase::ResetLinks()`) as
+   * unlink-then-self-link shape, matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as
    * its `atexit` target -- no eager `RegisterConstructFunction`/`Init()`
    * call exists in the real ctor.
    */
@@ -173,7 +173,7 @@ namespace moho
    * `FUN_0069E5D0`/`FUN_0069E5E0`, installs the `ProjectileSerializer`
    * vtable, and pushes the real mangled destructor
    * `??1ProjectileSerializer@Moho@@QAE@@Z` (`FUN_00BFD6D0`, confirmed
-   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * unlink-then-self-link shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as
    * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
    * call exists in the real ctor.
    */

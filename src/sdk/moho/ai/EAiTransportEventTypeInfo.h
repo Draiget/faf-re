@@ -63,7 +63,7 @@ namespace moho
    * `mSaveCallback` to `FUN_005E9DD0`/`FUN_005E9DF0`, installs the
    * `PrimitiveSerHelper<EAiTransportEvent,int>` vtable, and pushes plain
    * unmangled `FUN_00BF8970` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
    *
    * Unlike the other AI enum serializers in this cluster, this global has

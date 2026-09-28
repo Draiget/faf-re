@@ -56,7 +56,7 @@ namespace moho
    * `FUN_005E35B0`/`FUN_005E35D0`, installs the
    * `PrimitiveSerHelper<EAiTargetType,int>` vtable, and pushes plain
    * unmangled `FUN_00BF8880` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by the
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by the
    * template's own real destructor, no explicit `atexit` call needed.
    *
    * The previous recovery modeled this as a hand-rolled raw-struct mimic of

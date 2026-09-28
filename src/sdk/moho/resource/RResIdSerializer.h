@@ -19,7 +19,7 @@ namespace moho
    * `FUN_004A9690`/`FUN_004A96B0`, installs the `RResIdSerializer` vtable,
    * and pushes the real mangled destructor
    * `??1RResIdSerializer@Moho@@QAE@@Z` (`FUN_00BF04C0`, confirmed
-   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * unlink-then-self-link shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as
    * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
    * call exists in the real ctor. Two zero-xref duplicate emissions of that
    * same unlink logic (`FUN_004A9700`, `FUN_004A9730`, formerly

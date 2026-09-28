@@ -104,7 +104,7 @@ namespace moho
    * `mSerialize` to `FUN_0069A990`/`FUN_0069A9A0`, installs the
    * `CProjectileAttributesSerializer` vtable, and pushes plain unmangled
    * `FUN_00BFD5E0` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- no eager
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- no eager
    * `RegisterSerializeFunctions`/`Init()` call exists in the real ctor.
    */
   class CProjectileAttributesSerializer : public gpg::SerHelperBase

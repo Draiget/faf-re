@@ -48,7 +48,7 @@ namespace moho
    * `mSaveCallback` to `FUN_0060BCD0`/`FUN_0060BCF0`, installs the
    * `PrimitiveSerHelper<EAiResult,int>` vtable, and pushes plain unmangled
    * `FUN_00BF9AB0` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target. `Init()` is
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target. `Init()` is
    * `FUN_0060B980`, found via a vtable-slot xref search on
    * `??_7?$PrimitiveSerHelper@W4EAiResult@Moho@@H@gpg@@6B@`; its body
    * matches the template's `Init()` exactly.

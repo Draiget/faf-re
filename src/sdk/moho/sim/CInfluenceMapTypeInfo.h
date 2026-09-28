@@ -118,7 +118,7 @@ namespace moho
    *
    * The real ctor's tail pushes plain, unmangled `FUN_00BFFCA0` as its
    * `atexit` target (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) -- modeled by the template's own real
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) -- modeled by the template's own real
    * destructor, no explicit `atexit` call needed. `FUN_007156F0`/
    * `FUN_00715720` are dead, zero-xref duplicate-emission twins of that
    * exact `FUN_00BFFCA0` body (function_sha256-confirmed), formerly modeled

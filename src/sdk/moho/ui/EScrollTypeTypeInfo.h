@@ -63,7 +63,7 @@ namespace moho
    * `mLoadCallback`/`mSaveCallback` to `FUN_00777FF0`/`FUN_00778010`,
    * installs the `PrimitiveSerHelper<EScrollType,int>` vtable, and pushes
    * plain unmangled `FUN_00C02650` (bare unlink-then-self-link shape,
-   * matching `SerHelperBase::ResetLinks()`) as its `atexit` target --
+   * matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target --
    * modeled by the template's own real destructor, no explicit `atexit`
    * call needed.
    *

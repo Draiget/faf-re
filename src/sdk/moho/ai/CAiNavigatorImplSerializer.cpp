@@ -77,18 +77,6 @@ CAiNavigatorImplSerializer::CAiNavigatorImplSerializer()
 {}
 
 /**
- * Address: 0x00BF6DA0 (FUN_00BF6DA0, Moho::CAiNavigatorImplSerializer::~CAiNavigatorImplSerializer)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits
- * in and restores a self-linked sentinel state.
- */
-CAiNavigatorImplSerializer::~CAiNavigatorImplSerializer()
-{
-  ResetLinks();
-}
-
-/**
  * Address: 0x005A72A0 (FUN_005A72A0)
  *
  * What it does:

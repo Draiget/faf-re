@@ -86,18 +86,17 @@ namespace
     SValuePairSerializer();
 
     /**
-     * Address: 0x00BF7640 (FUN_00BF7640, Moho::SValuePairSerializer::~SValuePairSerializer)
+     * Address: 0x00BF7680 (FUN_00BF7680, dynamic atexit destructor for
+     *   `gSValuePairSerializer`, pushed by 0x00BCD5C0)
      * Address: 0x005B67B0 (FUN_005B67B0), Address: 0x005B67E0 (FUN_005B67E0)
-     * -- duplicate emissions of the same unlink/self-link sequence hardcoded
-     * to the identical global; zero callers and zero incoming xrefs in the
-     * callgraph index.
+     * -- unreferenced out-of-line copies of the same body.
      *
      * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently sits
-     * in and restores a self-linked sentinel state. Registered by the real
-     * dynamic initializer (0x00BCD5C0) as the global's `atexit` teardown.
+     * Unlinks this helper node from the serializer-helper list (the
+     * `DListItem` base destructor). The tree cited 0x00BF7640, which is inside
+     * `cleanup_SValuePairTypeInfo` (0x00BF7620), and unlinked twice.
      */
-    ~SValuePairSerializer();
+    ~SValuePairSerializer() = default;
 
     /**
      * Address: 0x005B6720 (FUN_005B6720, Moho::SValuePairSerializer::Deserialize)
@@ -300,18 +299,6 @@ SValuePairSerializer::SValuePairSerializer()
   : mDeserialize(&SValuePairSerializer::Deserialize)
   , mSerialize(&SValuePairSerializer::Serialize)
 {}
-
-/**
- * Address: 0x00BF7640 (FUN_00BF7640, Moho::SValuePairSerializer::~SValuePairSerializer)
- *
- * What it does:
- * Unlinks this helper node from whatever intrusive list it currently sits
- * in and restores a self-linked sentinel state.
- */
-SValuePairSerializer::~SValuePairSerializer()
-{
-  ResetLinks();
-}
 
 void SValuePairSerializer::Init()
 {

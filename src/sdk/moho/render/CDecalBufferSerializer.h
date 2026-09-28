@@ -69,7 +69,7 @@ namespace moho
    * `mLoadCallback`/`mSaveCallback` to `FUN_00779C30`/`FUN_00779C40`,
    * installs the `CDecalBufferSerializer` vtable, and pushes plain
    * unmangled `FUN_00C028B0` (bare unlink-then-self-link shape, matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- modeled by
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- modeled by
    * the template's own real destructor, no explicit `atexit` call needed.
    * Two zero-xref duplicate emissions of that unlink logic
    * (`FUN_00779C80`, `FUN_00779CB0`, formerly

@@ -2334,7 +2334,7 @@ namespace moho
    * SerSaveLoadHelper<Moho::EntityDB>`'s -- a base-subobject ctor variant
    * the linker never wired to any call site), and both `FUN_00684960`/
    * `FUN_00684990` (byte-identical unlink-then-self-link bodies matching
-   * `SerHelperBase::ResetLinks()`, superseded by that shared
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`), superseded by that shared
    * implementation). All four marked `skip`.
    */
   EntityDBSerializer::EntityDBSerializer()

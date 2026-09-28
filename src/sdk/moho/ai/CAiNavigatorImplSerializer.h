@@ -34,18 +34,17 @@ namespace moho
     CAiNavigatorImplSerializer();
 
     /**
-     * Address: 0x00BF6DA0 (FUN_00BF6DA0, Moho::CAiNavigatorImplSerializer::~CAiNavigatorImplSerializer)
+     * Address: 0x00BF6DF0 (FUN_00BF6DF0, dynamic atexit destructor for
+     *   `gCAiNavigatorImplSerializer`, pushed by 0x00BCC720)
      * Address: 0x005A3A60 (FUN_005A3A60), Address: 0x005A3A90 (FUN_005A3A90)
-     * -- duplicate emissions of the same unlink/self-link sequence on the
-     * identical global; zero callers and zero incoming xrefs in the
-     * callgraph index.
+     * -- unreferenced out-of-line copies of the same body.
      *
      * What it does:
-     * Unlinks this helper node from whatever intrusive list it currently sits
-     * in and restores a self-linked sentinel state. Registered by the real
-     * dynamic initializer (0x00BCC720) as the global's `atexit` teardown.
+     * Unlinks this helper node from the serializer-helper list (the
+     * `DListItem` base destructor). The tree cited 0x00BF6DA0, which is inside
+     * `~CAiNavigatorImplTypeInfo` (0x00BF6D90), and unlinked twice.
      */
-    ~CAiNavigatorImplSerializer();
+    ~CAiNavigatorImplSerializer() = default;
 
     /**
      * Address: 0x005A39F0 (FUN_005A39F0, Moho::CAiNavigatorImplSerializer::Deserialize)

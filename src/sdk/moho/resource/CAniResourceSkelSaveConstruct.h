@@ -28,7 +28,7 @@ namespace moho
    * `CAniResourceSkelSaveConstruct` vtable, and pushes the real mangled
    * destructor `??1CAniResourceSkelSaveConstruct@Moho@@QAE@@Z`
    * (`FUN_00BF3B80`, confirmed unlink-then-self-link shape matching
-   * `SerHelperBase::ResetLinks()`) as its `atexit` target -- no eager
+   * the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target -- no eager
    * `RegisterSaveConstructArgsFunction`/`Init()` call exists in the real
    * ctor; that call was fabricated in the previous recovery's
    * `register_CAniResourceSkelSaveConstruct()` free function (its own

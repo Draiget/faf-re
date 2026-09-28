@@ -230,7 +230,7 @@ namespace moho
    * `FUN_004F0740`/`FUN_004F0760`, installs the `VTransformSerializer`
    * vtable, and pushes the real mangled destructor
    * `??1VTransformSerializer@Moho@@QAE@@Z` (`FUN_00BF17D0`, confirmed
-   * unlink-then-self-link shape matching `SerHelperBase::ResetLinks()`) as
+   * unlink-then-self-link shape matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as
    * its `atexit` target -- no eager `RegisterSerializeFunctions`/`Init()`
    * call exists in the real ctor. Two zero-xref duplicate emissions of
    * that unlink logic (`FUN_004F07B0`, `FUN_004F07E0`, formerly

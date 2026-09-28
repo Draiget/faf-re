@@ -98,7 +98,7 @@ namespace
    * `mLoadCallback`/`mSaveCallback` to `FUN_0070F8E0`/`FUN_0070F900`,
    * installs the `PrimitiveSerHelper<ETriggerOperator,int>` vtable, and
    * pushes plain unmangled `FUN_00BFF580` (bare unlink-then-self-link shape,
-   * matching `SerHelperBase::ResetLinks()`) as its `atexit` target --
+   * matching the helper node's unlink (`gpg::DListItem::ListUnlink`)) as its `atexit` target --
    * modeled by the template's own real destructor, no explicit `atexit`
    * call needed. `FUN_0070AF50`/`FUN_0070AF80` are dead, zero-xref
    * duplicate-emission twins of that exact `FUN_00BFF580` body
