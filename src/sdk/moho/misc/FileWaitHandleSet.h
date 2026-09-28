@@ -12,6 +12,7 @@
 #include "gpg/core/streams/Stream.h"
 #include "legacy/containers/AutoPtr.h"
 #include "legacy/containers/Map.h"
+#include "moho/containers/TDatList.h"
 #include "moho/misc/CVirtualFileSystem.h"
 
 struct lua_State;
@@ -59,24 +60,21 @@ namespace moho
   static_assert(sizeof(SDiskFileInfo) == 0x10, "SDiskFileInfo size must be 0x10");
   static_assert(alignof(SDiskFileInfo) == 8, "SDiskFileInfo must be 8-aligned");
 
-  struct SFileWaitHandle
+  struct SFileWaitHandle : TDatListItem<SFileWaitHandle, void>
   {
     /**
      * Address: 0x00458CC0 (FUN_00458CC0, ??1FWHSZipFile@Moho@@QAE@XZ)
      * Mangled: ??1FWHSZipFile@Moho@@QAE@XZ
      *
      * What it does:
-     * Closes the owned zip file, then unlinks this handle from the
-     * active-handle ring and re-points both links at itself.
+     * Closes the owned zip file; the list-item base then unlinks this handle
+     * from the mounted-archive list.
      *
-     * The unlink lives here rather than in the callers, which is what keeps a
-     * handle visible on the ring for as long as it is being torn down - see
-     * `FWaitHandleSet::RemoveEntry`.
+     * The unlink comes last, which is what keeps a handle visible on the list
+     * for as long as it is being torn down - see `FWaitHandleSet::RemoveEntry`.
      */
     ~SFileWaitHandle();
 
-    SFileWaitHandle* mNext = this; // +0x00
-    SFileWaitHandle* mPrev = this; // +0x04
     volatile long mLock = 0;       // +0x08
     CZipFile* mZipFile = nullptr;  // +0x0C
   };
@@ -122,40 +120,31 @@ namespace moho
   static_assert(sizeof(FWHSFileInfoMap) == 0x0C, "FWHSFileInfoMap size must be 0x0C");
   static_assert(sizeof(FWHSFileInfoMap::value_type) == 0x30, "FWHSFileInfoMap::value_type size must be 0x30");
 
-  struct FWHSLockRuntime
-  {
-    boost::mutex* mMutex = nullptr;   // +0x00 (runtime-owned lock pointer)
-    std::uint8_t mPadding04[4]{};     // +0x04
-  };
-
-  static_assert(sizeof(FWHSLockRuntime) == 0x08, "FWHSLockRuntime size must be 0x08");
-
-  struct FWHSThreadStateRuntime
-  {
-    void* mTss = nullptr; // +0x00 (boost tss key runtime lane)
-  };
-
-  static_assert(sizeof(FWHSThreadStateRuntime) == 0x04, "FWHSThreadStateRuntime size must be 0x04");
-
   /**
-   * Address context:
-   * - `func_EnsureFileCWaitHandleSet` (`0x00457F90`) publishes the global pointer.
-   * - `func_InitFileCWaitHandleSet` (`0x00457FF0`) initializes this object.
+   * The shared/exclusive gate at the front of `FWaitHandleSet`: readers
+   * `Wait`/`Notify`, the one writer `Lock`/`NotifyAll`. Its constructor,
+   * destructor and the four gate operations sit together at 0x00413EC0..
+   * 0x004141xx, apart from the rest of the wait-handle set.
    */
-  struct FWaitHandleSet
+  class FWHSLock
   {
-    FWHSLockRuntime mLock{};                          // +0x00
-    boost::condition mObjectSender{};                 // +0x08
-    std::int32_t mLockLevel = 0;                      // +0x20
-    std::int32_t mWaitingLevel = 0;                   // +0x24
-    std::uint8_t mIsLocked = 0;                       // +0x28
-    std::uint8_t mPadding29[3]{};                     // +0x29
-    SFileWaitHandle* mPrev = nullptr;                 // +0x2C
-    SFileWaitHandle* mNext = nullptr;                 // +0x30
-    FWHSZipEntryMap mZipEntries{};                    // +0x34
-    FWHSFileInfoMap mFileInfo{};                      // +0x40
-    CVirtualFileSystem* mHandle = nullptr;            // +0x4C
-    FWHSThreadStateRuntime mThreadStateInd{};         // +0x50
+  public:
+    /**
+     * Address: 0x00413EC0 (FUN_00413EC0, func_InitFileWaitSet)
+     *
+     * What it does:
+     * Constructs the mutex and condition and clears the three counters.
+     */
+    FWHSLock() = default;
+
+    /**
+     * Address: 0x00413F20 (FUN_00413F20)
+     *
+     * What it does:
+     * Takes and drops the mutex once, so no gate operation is mid-flight, then
+     * destroys the condition and the mutex.
+     */
+    ~FWHSLock();
 
     /**
      * Address: 0x00413F90 (FUN_00413F90, Moho::FWaitHandleSet::Wait)
@@ -191,6 +180,74 @@ namespace moho
      * Releases the exclusive lock lane and wakes all waiters.
      */
     void NotifyAll();
+
+    boost::mutex mLock;                  // +0x00
+    boost::condition mObjectSender;      // +0x08
+    std::int32_t mLockLevel = 0;         // +0x20
+    std::int32_t mWaitingLevel = 0;      // +0x24
+    std::uint8_t mIsLocked = 0;          // +0x28
+  };
+
+  static_assert(sizeof(boost::mutex) == 0x08, "boost::mutex size must be 0x08");
+  static_assert(sizeof(FWHSLock) == 0x2C, "FWHSLock size must be 0x2C");
+
+  /**
+   * The per-thread error-string slot (the binary's
+   * `boost::thread_specific_ptr<std::string>`).
+   */
+  struct FWHSThreadStateRuntime
+  {
+    /**
+     * Address: 0x0045B210 (FUN_0045B210, Moho::CDiskThreadState::Create)
+     *
+     * What it does:
+     * Creates the thread-specific slot `FWaitHandleSet::ErrorString` reads.
+     */
+    FWHSThreadStateRuntime();
+
+    /**
+     * Address: 0x0045B290 (FUN_0045B290, boost::thread_specific_ptr::release)
+     *
+     * What it does:
+     * Releases the calling thread's error string and the slot.
+     */
+    ~FWHSThreadStateRuntime();
+
+    void* mTss = nullptr; // +0x00 (boost tss key runtime lane)
+  };
+
+  static_assert(sizeof(FWHSThreadStateRuntime) == 0x04, "FWHSThreadStateRuntime size must be 0x04");
+
+  /**
+   * The process's file layer: the mounted archives, their entry index, the
+   * file-info cache and the VFS, behind one shared/exclusive gate.
+   * `FILE_EnsureWaitHandleSet` (0x00457F90) owns the one instance.
+   */
+  struct FWaitHandleSet : FWHSLock
+  {
+    /**
+     * Address: 0x00457FF0 (FUN_00457FF0, func_InitFileCWaitHandleSet)
+     *
+     * What it does:
+     * Constructs the gate, the empty archive list and maps, no VFS, and the
+     * thread-specific error slot.
+     */
+    FWaitHandleSet();
+
+    /**
+     * Address: 0x004580C0 (FUN_004580C0)
+     *
+     * What it does:
+     * Deletes the VFS and unpublishes `sPFWaitHandleSet`; the members then
+     * release the error slot, both maps and the archive list.
+     */
+    ~FWaitHandleSet();
+
+    TDatList<SFileWaitHandle, void> mZipFiles;       // +0x2C
+    FWHSZipEntryMap mZipEntries{};                    // +0x34
+    FWHSFileInfoMap mFileInfo{};                      // +0x40
+    CVirtualFileSystem* mHandle = nullptr;            // +0x4C
+    FWHSThreadStateRuntime mThreadStateInd{};         // +0x50
 
     /**
      * Address: 0x00458BC0 (FUN_00458BC0, Moho::FWaitHandleSet::RemoveEntry)
@@ -260,22 +317,12 @@ namespace moho
   static_assert(offsetof(FWaitHandleSet, mLockLevel) == 0x20, "FWaitHandleSet::mLockLevel offset must be 0x20");
   static_assert(offsetof(FWaitHandleSet, mWaitingLevel) == 0x24, "FWaitHandleSet::mWaitingLevel offset must be 0x24");
   static_assert(offsetof(FWaitHandleSet, mIsLocked) == 0x28, "FWaitHandleSet::mIsLocked offset must be 0x28");
-  static_assert(offsetof(FWaitHandleSet, mPrev) == 0x2C, "FWaitHandleSet::mPrev offset must be 0x2C");
-  static_assert(offsetof(FWaitHandleSet, mNext) == 0x30, "FWaitHandleSet::mNext offset must be 0x30");
+  static_assert(offsetof(FWaitHandleSet, mZipFiles) == 0x2C, "FWaitHandleSet::mZipFiles offset must be 0x2C");
   static_assert(offsetof(FWaitHandleSet, mZipEntries) == 0x34, "FWaitHandleSet::mZipEntries offset must be 0x34");
   static_assert(offsetof(FWaitHandleSet, mFileInfo) == 0x40, "FWaitHandleSet::mFileInfo offset must be 0x40");
   static_assert(offsetof(FWaitHandleSet, mHandle) == 0x4C, "FWaitHandleSet::mHandle offset must be 0x4C");
   static_assert(offsetof(FWaitHandleSet, mThreadStateInd) == 0x50, "FWaitHandleSet::mThreadStateInd offset must be 0x50");
   static_assert(sizeof(FWaitHandleSet) == 0x54, "FWaitHandleSet size must be 0x54");
-
-  /**
-   * Address: 0x00457FF0 (FUN_00457FF0, func_InitFileCWaitHandleSet)
-   *
-   * What it does:
-   * Initializes process-global file wait-handle runtime storage and publishes
-   * the singleton pointer.
-   */
-  FWaitHandleSet* FILE_InitWaitHandleSet();
 
   /**
    * Address: 0x00457F90 (FUN_00457F90, func_EnsureFileCWaitHandleSet)

@@ -26,9 +26,7 @@ namespace moho
 
 namespace
 {
-  moho::FWaitHandleSet sFWaitHandleSet{};
   moho::FWaitHandleSet* sPFWaitHandleSet = nullptr;
-  std::once_flag sFileWaitHandleSetInitOnce;
   using DiskThreadStateStringMap = std::unordered_map<const moho::FWHSThreadStateRuntime*, msvc8::string*>;
 
   /**
@@ -36,10 +34,10 @@ namespace
    * `boost::thread_specific_ptr` the binary keeps in `FWHSThreadStateRuntime`.
    *
    * The map is allocated once per thread and deliberately never destroyed.
-   * FileWaitHandleSetAtProcessExit is an atexit handler, and MSVC runs those
-   * after the primary thread's thread_local destructors, so a plain
-   * `thread_local` map was already gone by the time the handler reached in to
-   * release its entry - the find faulted inside _Find_last on freed bucket
+   * The wait-handle set is a function-local static whose destructor runs from
+   * atexit, and MSVC runs those after the primary thread's thread_local
+   * destructors, so a plain `thread_local` map was already gone by the time
+   * the error slot's destructor reached in to release its entry - the find faulted inside _Find_last on freed bucket
    * storage. A TSS slot has the same lifetime shape: it outlives everything
    * that reads it, and its contents go with the process.
    */
@@ -85,20 +83,6 @@ namespace
   ) noexcept
   {
     return luaContext ? luaContext->stateUserData : nullptr;
-  }
-
-  /**
-   * Address: 0x0045B210 (FUN_0045B210, Moho::CDiskThreadState::Create)
-   *
-   * What it does:
-   * Initializes one disk-thread-state TSS slot descriptor used by
-   * `FWaitHandleSet::ErrorString`.
-   */
-  void CreateDiskThreadStateRuntime(
-    moho::FWHSThreadStateRuntime& runtime
-  )
-  {
-    runtime.mTss = &runtime;
   }
 
   /**
@@ -153,16 +137,6 @@ namespace
     lua_pushvalue(state->m_state, lua_gettop(state->m_state) - 1);
     lua_settable(state->m_state, ownerTableIndex);
     return LuaPlus::LuaStackObject(state, lua_gettop(state->m_state));
-  }
-
-  boost::mutex& EnsureFileWaitSetMutex(
-    moho::FWHSLockRuntime& lockRuntime
-  )
-  {
-    if (lockRuntime.mMutex == nullptr) {
-      lockRuntime.mMutex = new boost::mutex();
-    }
-    return *lockRuntime.mMutex;
   }
 
   /**
@@ -535,23 +509,13 @@ namespace
   }
 
   [[nodiscard]]
-  moho::SFileWaitHandle* WaitHandleListSentinel(
-    moho::FWaitHandleSet& waitHandleSet
-  )
-  {
-    return reinterpret_cast<moho::SFileWaitHandle*>(&waitHandleSet.mPrev);
-  }
-
-  [[nodiscard]]
   moho::SFileWaitHandle* FindMountedZipHandleByCanonicalPath(
     moho::FWaitHandleSet& waitHandleSet,
     const msvc8::string& canonicalPath
   )
   {
-    moho::SFileWaitHandle* const sentinel = WaitHandleListSentinel(waitHandleSet);
-    for (moho::SFileWaitHandle* node = waitHandleSet.mNext; node != sentinel; node = node->mNext) {
-      const moho::CZipFile* const zipFile = node != nullptr ? node->mZipFile : nullptr;
-      if (zipFile != nullptr && zipFile->mPath == canonicalPath) {
+    for (moho::SFileWaitHandle* const node : waitHandleSet.mZipFiles.owners()) {
+      if (node->mZipFile->mPath == canonicalPath) {
         return node;
       }
     }
@@ -567,11 +531,7 @@ namespace
       return;
     }
 
-    moho::SFileWaitHandle* const sentinel = WaitHandleListSentinel(waitHandleSet);
-    handle->mPrev = sentinel->mPrev;
-    handle->mNext = sentinel;
-    sentinel->mPrev->mNext = handle;
-    sentinel->mPrev = handle;
+    handle->ListLinkBefore(&waitHandleSet.mZipFiles);
   }
 
   /**
@@ -669,146 +629,79 @@ namespace
     return mountedHandle.release();
   }
 
-  void ReleaseWaitHandleSetVfs(
-    moho::FWaitHandleSet& waitHandleSet
-  )
-  {
-    moho::CVirtualFileSystem* const vfs = waitHandleSet.mHandle;
-    waitHandleSet.mHandle = nullptr;
-    if (vfs != nullptr) {
-      delete vfs;
-    }
-  }
-
-  /**
-   * Address: 0x0045B290 (FUN_0045B290, boost::thread_specific_ptr::release)
-   *
-   * What it does:
-   * Releases one current-thread disk-thread-state value lane and clears the
-   * owning TSS slot descriptor.
-   */
-  void ReleaseWaitHandleThreadStateRuntime(
-    moho::FWHSThreadStateRuntime& runtime
-  )
-  {
-    CleanupDiskThreadStateValue(runtime);
-    runtime.mTss = nullptr;
-  }
-
-  void UnlinkWaitHandleSetSentinel(
-    moho::FWaitHandleSet& waitHandleSet
-  )
-  {
-    if (waitHandleSet.mPrev != nullptr) {
-      waitHandleSet.mPrev->mNext = waitHandleSet.mNext;
-    }
-    if (waitHandleSet.mNext != nullptr) {
-      waitHandleSet.mNext->mPrev = waitHandleSet.mPrev;
-    }
-
-    moho::SFileWaitHandle* const sentinel = reinterpret_cast<moho::SFileWaitHandle*>(&waitHandleSet.mPrev);
-    waitHandleSet.mPrev = sentinel;
-    waitHandleSet.mNext = sentinel;
-  }
-
-  /**
-   * Address: 0x00413EC0 (FUN_00413EC0, func_InitFileWaitHandleSet)
-   *
-   * What it does:
-   * Initializes the static file wait-handle object runtime lanes before the
-   * singleton publish step.
-   */
-  moho::FWaitHandleSet* InitializeStaticFileWaitHandleSet(
-    moho::FWaitHandleSet& waitHandleSet
-  )
-  {
-    if (waitHandleSet.mLock.mMutex == nullptr) {
-      waitHandleSet.mLock.mMutex = new boost::mutex();
-    }
-    waitHandleSet.mLockLevel = 0;
-    waitHandleSet.mWaitingLevel = 0;
-    waitHandleSet.mIsLocked = 0;
-    return &waitHandleSet;
-  }
-
-  /**
-   * Address: 0x00413F20 (FUN_00413F20, sub_413F20)
-   *
-   * What it does:
-   * Performs process-shutdown synchronization teardown for the static
-   * wait-handle mutex lane.
-   */
-  void DestroyStaticFileWaitHandleSet(
-    moho::FWaitHandleSet& waitHandleSet
-  )
-  {
-    if (waitHandleSet.mLock.mMutex != nullptr) {
-      waitHandleSet.mLock.mMutex->lock();
-      waitHandleSet.mLock.mMutex->unlock();
-      delete waitHandleSet.mLock.mMutex;
-      waitHandleSet.mLock.mMutex = nullptr;
-    }
-  }
-
-  /**
-   * Address: 0x004580C0 (FUN_004580C0, sub_4580C0)
-   * Address: 0x00BEF5A0 (FUN_00BEF5A0, sub_BEF5A0)
-   *
-   * What it does:
-   * `atexit` hook that tears down static wait-handle runtime lanes (VFS pointer,
-   * TLS lane, maps, intrusive list links, and synchronization lane).
-   */
-  void FileWaitHandleSetAtProcessExit()
-  {
-    ReleaseWaitHandleSetVfs(sFWaitHandleSet);
-    sPFWaitHandleSet = nullptr;
-    ReleaseWaitHandleThreadStateRuntime(sFWaitHandleSet.mThreadStateInd);
-
-    // The two map teardowns the binary runs between here and the sentinel
-    // unlink are `~map()` on `sFWaitHandleSet`'s own members. MSVC emits them
-    // for a file-static; naming them here would free the same headers twice.
-    UnlinkWaitHandleSetSentinel(sFWaitHandleSet);
-    DestroyStaticFileWaitHandleSet(sFWaitHandleSet);
-  }
 } // namespace
+
+/**
+ * Address: 0x0045B210 (FUN_0045B210, Moho::CDiskThreadState::Create)
+ *
+ * What it does:
+ * Creates the thread-specific slot `FWaitHandleSet::ErrorString` reads.
+ */
+moho::FWHSThreadStateRuntime::FWHSThreadStateRuntime()
+  : mTss(this)
+{}
+
+/**
+ * Address: 0x0045B290 (FUN_0045B290, boost::thread_specific_ptr::release)
+ *
+ * What it does:
+ * Releases the calling thread's error string and the slot.
+ */
+moho::FWHSThreadStateRuntime::~FWHSThreadStateRuntime()
+{
+  CleanupDiskThreadStateValue(*this);
+  mTss = nullptr;
+}
+
+/**
+ * Address: 0x00413F20 (FUN_00413F20)
+ *
+ * What it does:
+ * Takes and drops the mutex once, so no gate operation is mid-flight, before
+ * the condition and the mutex are destroyed.
+ */
+moho::FWHSLock::~FWHSLock()
+{
+  boost::mutex::scoped_lock guard(mLock);
+}
 
 /**
  * Address: 0x00457FF0 (FUN_00457FF0, func_InitFileCWaitHandleSet)
  *
  * What it does:
- * Initializes process-global file wait-handle runtime storage and publishes
- * the singleton pointer.
+ * Constructs the gate, the empty archive list and maps, no VFS, and the
+ * thread-specific error slot. The binary's copy has `this` folded to the one
+ * instance in `FILE_EnsureWaitHandleSet`.
  */
-moho::FWaitHandleSet* moho::FILE_InitWaitHandleSet()
+moho::FWaitHandleSet::FWaitHandleSet() = default;
+
+/**
+ * Address: 0x004580C0 (FUN_004580C0)
+ *
+ * What it does:
+ * Deletes the VFS and unpublishes `sPFWaitHandleSet`; the members then
+ * release the error slot, both maps and the archive list, and the gate
+ * destructor runs last.
+ */
+moho::FWaitHandleSet::~FWaitHandleSet()
 {
-  (void)InitializeStaticFileWaitHandleSet(sFWaitHandleSet);
-  sFWaitHandleSet.mPrev = reinterpret_cast<SFileWaitHandle*>(&sFWaitHandleSet.mPrev);
-  sFWaitHandleSet.mNext = reinterpret_cast<SFileWaitHandle*>(&sFWaitHandleSet.mPrev);
-  sFWaitHandleSet.mZipEntries.clear();
-  sFWaitHandleSet.mFileInfo.clear();
-  sFWaitHandleSet.mHandle = nullptr;
-  CreateDiskThreadStateRuntime(sFWaitHandleSet.mThreadStateInd);
-  sPFWaitHandleSet = &sFWaitHandleSet;
-  return sPFWaitHandleSet;
+  CVirtualFileSystem* const vfs = mHandle;
+  mHandle = nullptr;
+  delete vfs;
+  sPFWaitHandleSet = nullptr;
 }
 
 /**
  * Address: 0x00457F90 (FUN_00457F90, func_EnsureFileCWaitHandleSet)
+ * Address: 0x00BEF5A0 (FUN_00BEF5A0, atexit destructor of the FWaitHandleSet object)
  *
  * What it does:
- * Lazily ensures file wait-handle runtime storage is initialized and
- * globally published.
+ * Constructs the process's wait-handle set on first use and publishes it.
  */
 void moho::FILE_EnsureWaitHandleSet()
 {
-  std::call_once(sFileWaitHandleSetInitOnce, [] {
-    (void)FILE_InitWaitHandleSet();
-    (void)std::atexit(&FileWaitHandleSetAtProcessExit);
-  });
-
-  if (sPFWaitHandleSet == nullptr) {
-    sPFWaitHandleSet = &sFWaitHandleSet;
-  }
+  static FWaitHandleSet sWaitHandleSet;
+  sPFWaitHandleSet = &sWaitHandleSet;
 }
 
 /**
@@ -1499,9 +1392,9 @@ namespace
  * Acquires one shared read lane for wait-handle state and waits while an
  * exclusive locker or queued lock waiters are active.
  */
-void moho::FWaitHandleSet::Wait()
+void moho::FWHSLock::Wait()
 {
-  boost::mutex::scoped_lock guard(EnsureFileWaitSetMutex(mLock));
+  boost::mutex::scoped_lock guard(mLock);
   while (mIsLocked != 0 || mWaitingLevel != 0) {
     mObjectSender.wait(guard);
   }
@@ -1515,9 +1408,9 @@ void moho::FWaitHandleSet::Wait()
  * Releases one shared read lane and wakes queued exclusive waiters when the
  * shared-reader count reaches zero.
  */
-void moho::FWaitHandleSet::Notify()
+void moho::FWHSLock::Notify()
 {
-  boost::mutex::scoped_lock guard(EnsureFileWaitSetMutex(mLock));
+  boost::mutex::scoped_lock guard(mLock);
   --mLockLevel;
   if (mWaitingLevel != 0 && mLockLevel == 0) {
     mObjectSender.notify_all();
@@ -1531,9 +1424,9 @@ void moho::FWaitHandleSet::Notify()
  * Acquires the exclusive lock lane, waiting for active readers and any
  * existing exclusive owner to drain.
  */
-void moho::FWaitHandleSet::Lock()
+void moho::FWHSLock::Lock()
 {
-  boost::mutex::scoped_lock guard(EnsureFileWaitSetMutex(mLock));
+  boost::mutex::scoped_lock guard(mLock);
   if (mLockLevel != 0 || mIsLocked != 0) {
     ++mWaitingLevel;
     while (mLockLevel != 0 || mIsLocked != 0) {
@@ -1550,9 +1443,9 @@ void moho::FWaitHandleSet::Lock()
  * What it does:
  * Releases the exclusive lock lane and wakes all waiters.
  */
-void moho::FWaitHandleSet::NotifyAll()
+void moho::FWHSLock::NotifyAll()
 {
-  boost::mutex::scoped_lock guard(EnsureFileWaitSetMutex(mLock));
+  boost::mutex::scoped_lock guard(mLock);
   mIsLocked = 0;
   mObjectSender.notify_all();
 }
@@ -1572,11 +1465,6 @@ void moho::FWaitHandleSet::NotifyAll()
 moho::SFileWaitHandle::~SFileWaitHandle()
 {
   delete mZipFile;
-
-  mNext->mPrev = mPrev;
-  mPrev->mNext = mNext;
-  mNext = this;
-  mPrev = this;
 }
 
 /**
@@ -1600,9 +1488,9 @@ void moho::FWaitHandleSet::RemoveEntry(
     return;
   }
 
-  // The handle stays linked into the ring until `delete handle` below runs
-  // `~SFileWaitHandle`, which is what unlinks it. Anything woken by the
-  // NotifyAll at the end of this function still sees it on the ring.
+  // The handle stays on the archive list until `delete handle` below runs
+  // `~SFileWaitHandle`, whose list-item base is what unlinks it. Anything woken by the
+  // NotifyAll at the end of this function still sees it on the list.
   while (true) {
     const FWHSZipEntryMap::iterator entryToErase = FindZipEntryByHandle(mZipEntries, handle);
     if (entryToErase == mZipEntries.end()) {
