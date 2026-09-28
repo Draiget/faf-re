@@ -16,6 +16,17 @@ namespace moho
 
   struct PrefetchRequestRuntime
   {
+    PrefetchRequestRuntime() = default;
+
+    /**
+     * Address: 0x004A9AA0 (FUN_004A9AA0)
+     *
+     * What it does:
+     * Copies only the key; the copy starts idle with an empty waiter list.
+     */
+    PrefetchRequestRuntime(const PrefetchRequestRuntime& other);
+    PrefetchRequestRuntime& operator=(const PrefetchRequestRuntime&) = delete;
+
     RResId mResourceId;                 // +0x00
     gpg::RType* mResourceType;          // +0x1C
     std::uint8_t mIsLoading;            // +0x20

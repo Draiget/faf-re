@@ -49,6 +49,14 @@ namespace moho
      */
     SEntitySetTemplateUnit(const SEntitySetTemplateUnit& other);
 
+    /**
+     * What it does:
+     * Replaces this set's entities with `other`'s and keeps this set's own
+     * place in its ring. Inlined into the element loop of the unit-set
+     * vector's `_Copy_opt` (0x007056A0) as one `AddAll` call per element.
+     */
+    SEntitySetTemplateUnit& operator=(const SEntitySetTemplateUnit& other);
+
     [[nodiscard]] static Unit* UnitFromEntry(Entity* entity) noexcept;
     [[nodiscard]] static const Unit* UnitFromEntry(const Entity* entity) noexcept;
 

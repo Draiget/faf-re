@@ -51,10 +51,9 @@ namespace moho
      * order listeners are *notified* in, which came out reversed. Only
      * `Broadcaster::BroadcastEvent(EFormationdStatus)` had it right.
      *
-     * The binary additionally inlines `~TDatList` on the local sentinel, on both
-     * the early-return and the loop-exit path. `TDatList` carries no destructor
-     * in this tree, so nothing is emitted for it here; both copies are pure
-     * self-assignment on an already-empty node, so no behaviour rides on it.
+     * The binary also inlines `pending`'s destructor (`~TDatListItem`) on both
+     * the early-return and the loop-exit path. Both copies act on an
+     * already-empty node, so no behaviour rides on them.
      */
     template <class TListener, class TEvent>
     void DispatchToListeners(const TEvent& event)

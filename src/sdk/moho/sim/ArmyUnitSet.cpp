@@ -92,6 +92,12 @@ namespace moho
     // initialisation; the body is empty.
   }
 
+  SEntitySetTemplateUnit& SEntitySetTemplateUnit::operator=(const SEntitySetTemplateUnit& other)
+  {
+    (void)mVec.AddAll(&other.mVec);
+    return *this;
+  }
+
   Unit* SEntitySetTemplateUnit::UnitFromEntry(Entity* const entity) noexcept
   {
     if (IsInvalidEntitySetEntry(entity)) {
@@ -110,13 +116,11 @@ namespace moho
    *
    * What it does:
    * Releases heap-backed set storage, restores inline lanes, and unlinks this
-   * intrusive node from whatever ring currently owns it.
+   * intrusive node from whatever ring currently owns it. Both are implicit:
+   * `mVec`'s destructor (the 0x00401DE0 body, inlined), then the
+   * `TDatListItem` base's (0x005796C2).
    */
-  SEntitySetTemplateUnit::~SEntitySetTemplateUnit() noexcept
-  {
-    mVec.ResetStorageToInline();
-    this->ListUnlink();
-  }
+  SEntitySetTemplateUnit::~SEntitySetTemplateUnit() noexcept = default;
 
   bool SEntitySetTemplateUnit::Empty() const noexcept
   {

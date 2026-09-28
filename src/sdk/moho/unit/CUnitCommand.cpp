@@ -991,25 +991,13 @@ namespace
 
   struct CUnitCommandDestroyRuntimeView
   {
-    std::uint8_t pad_0000_0034[0x34];
-    BroadcasterOwnerSlotNode broadcasterOwnerChainNode;
-    std::uint8_t pad_003C_00F0[0xB4];
-    CommandOwnerSlotNode unitSetOwnerChainNode;
-    std::uint8_t pad_00F8_0118[0x20];
+    std::uint8_t pad_0000_0118[0x118];
     CountedObject* formationObject;
     std::uint8_t pad_011C_0120[0x04];
     CommandOwnerSlotNode coordinatingOrdersOwnerChainNode;
     std::uint8_t pad_0128_0158[0x30];
     EntityOwnerSlotNode sidecarOwnerChainNode;
   };
-  static_assert(
-    offsetof(CUnitCommandDestroyRuntimeView, broadcasterOwnerChainNode) == 0x34,
-    "CUnitCommandDestroyRuntimeView::broadcasterOwnerChainNode"
-  );
-  static_assert(
-    offsetof(CUnitCommandDestroyRuntimeView, unitSetOwnerChainNode) == 0xF0,
-    "CUnitCommandDestroyRuntimeView::unitSetOwnerChainNode"
-  );
   static_assert(
     offsetof(CUnitCommandDestroyRuntimeView, formationObject) == 0x118,
     "CUnitCommandDestroyRuntimeView::formationObject"
@@ -2035,13 +2023,15 @@ void CUnitCommand::DestroyInternal()
 
   // +0x0F8 command unit-set vector payload.
   mUnitSet.mVec = gpg::core::FastVectorN<CScriptObject*, 4>{};
-  runtime.unitSetOwnerChainNode.UnlinkFromOwnerChain();
 
   // +0x0068 legacy msvc8::string payload in constant command data.
   mConstDat.unk2 = msvc8::string{};
 
-  // +0x0034 broadcaster/list base slice.
-  runtime.broadcasterOwnerChainNode.UnlinkFromOwnerChain();
+  // `mUnitSet`'s list node (+0xF0, unlinked and self-linked at 0x006E8689)
+  // and the `Broadcaster` base (+0x34, at 0x006E86E4) are ordinary ring
+  // nodes, destroyed by their own `~TDatListItem` after this body. They used
+  // to be "unlinked" here as weak-owner slots, which walked the command's
+  // listener ring as if it were a weak chain and then nulled both words.
 }
 
 /**

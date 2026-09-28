@@ -8,40 +8,6 @@
 
 using namespace moho;
 
-namespace
-{
-  /**
-    * Alias of FUN_0047C320 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks one `SMsgReceiverLinkage` from both intrusive list lanes
-   * (dispatcher lane and receiver lane) without deleting storage.
-   */
-  TDatListItem<SMsgReceiverLinkage, void>* UnlinkReceiverLinkageNodes(SMsgReceiverLinkage* const linkage)
-  {
-    auto* const receiverNode =
-      static_cast<TDatListItem<IMessageReceiver, void>*>(static_cast<IMessageReceiver*>(linkage));
-    receiverNode->ListUnlink();
-
-    auto* const dispatcherNode = static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(linkage);
-    return dispatcherNode->ListUnlink();
-  }
-
-  /**
-    * Alias of FUN_0047C2E0 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks one `SMsgReceiverLinkage` from both intrusive list lanes and
-   * then releases the allocation with scalar `operator delete`.
-   */
-  SMsgReceiverLinkage* DestroyReceiverLinkageNodes(SMsgReceiverLinkage* const linkage)
-  {
-    UnlinkReceiverLinkageNodes(linkage);
-    ::operator delete(linkage);
-    return linkage;
-  }
-} // namespace
-
 /**
  * Address: 0x0047C240 (FUN_0047C240, Moho::CMessageDispatcher::CMessageDispatcher)
  *
@@ -58,17 +24,14 @@ CMessageDispatcher::CMessageDispatcher()
  * Address: 0x0047C280 (FUN_0047C280, Moho::CMessageDispatcher::~CMessageDispatcher)
  *
  * What it does:
- * Unlinks and deletes all receiver linkages owned by this dispatcher.
+ * Deletes all receiver linkages owned by this dispatcher. The trailing
+ * unlink at 0x0047C2C9 is the `TDatListItem` base's destructor.
  */
 CMessageDispatcher::~CMessageDispatcher()
 {
-  auto* const head = static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(this);
-  while (head->mNext != head) {
-    auto* const linkage = static_cast<SMsgReceiverLinkage*>(head->mNext);
-    DestroyReceiverLinkageNodes(linkage);
+  while (mNext != this) {
+    delete static_cast<SMsgReceiverLinkage*>(mNext);
   }
-
-  head->ListUnlink();
 }
 
 /**
@@ -132,8 +95,7 @@ void CMessageDispatcher::RemoveLinkage(SMsgReceiverLinkage* linkage)
     }
   }
 
-  UnlinkReceiverLinkageNodes(linkage);
-  ::operator delete(linkage);
+  delete linkage;
 }
 
 /**
@@ -165,15 +127,10 @@ IMessageReceiver::IMessageReceiver()
  */
 IMessageReceiver::~IMessageReceiver()
 {
-  auto* const head = static_cast<TDatListItem<IMessageReceiver, void>*>(this);
-  while (head->mNext != head) {
-    auto* const nextNode = head->mNext;
-    auto* const receiverBase = reinterpret_cast<IMessageReceiver*>(reinterpret_cast<std::byte*>(nextNode) - 0x4);
-    auto* const linkage = static_cast<SMsgReceiverLinkage*>(receiverBase);
+  while (mNext != this) {
+    auto* const linkage = static_cast<SMsgReceiverLinkage*>(static_cast<IMessageReceiver*>(mNext));
     linkage->mDispatcher->RemoveLinkage(linkage);
   }
-
-  head->ListUnlink();
 }
 
 /**
@@ -196,6 +153,12 @@ SMsgReceiverLinkage::SMsgReceiverLinkage(
  *
  * What it does:
  * Unlinks receiver-linkage node from receiver and dispatcher intrusive rings.
+ *
+ * In the binary these two unlinks are the two `TDatListItem` destructors
+ * alone (inlined at 0x0047C49A in `RemoveLinkage`), with no vptr store and no
+ * ring walk, so the second base there is not `IMessageReceiver`. Here it is,
+ * and `~IMessageReceiver` walks its ring and removes every linkage on it. The
+ * body therefore has to unlink first, until that base is resolved.
  */
 SMsgReceiverLinkage::~SMsgReceiverLinkage()
 {

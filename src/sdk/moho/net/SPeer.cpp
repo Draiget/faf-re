@@ -42,12 +42,11 @@ namespace moho
    * Address: 0x007C1340 (FUN_007C1340)
    *
    * What it does:
-   * Unlinks the peer node before member destruction, matching binary list-detach behavior.
+   * Destroys `establishedUids`, then `playerName`, then unlinks the peer
+   * through its `TDatListItem` base (inlined at 0x007C13AE). There is no
+   * hand-written body; all three are member and base destruction.
    */
-  SPeer::~SPeer()
-  {
-    ListUnlink();
-  }
+  SPeer::~SPeer() = default;
 
   /**
    * Address: 0x007C0690 (FUN_007C0690)

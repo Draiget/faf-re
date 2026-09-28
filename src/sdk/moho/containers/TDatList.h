@@ -16,7 +16,7 @@ namespace moho
    * `mPrev` below actually names the next link. Verified from two independent
    * functions:
    *
-   *   - `FUN_00632BC0` (the generic unlink for this very node) does
+   *   - `FUN_00632BC0` (an out-of-line `~TDatListItem`) does
    *     `[+0]->[+4] = [+4]` then `[+4]->[+0] = [+0]`, i.e.
    *     `next->prev = prev; prev->next = next`.
    *   - `FUN_007AE2B0` (`Broadcaster<SCameraTracking>::BroadcastEvent`) splices
@@ -60,70 +60,21 @@ namespace moho
     {}
 
     /**
-     * Address: 0x00442DA0 (FUN_00442DA0)
-     * Address: 0x00443020 (FUN_00443020)
-     * Address: 0x00443230 (FUN_00443230)
-     * Address: 0x0063C060 (FUN_0063C060, typed-instantiation lane)
-     * Address: 0x004856F0 (FUN_004856F0, typed-instantiation lane)
-     * Address: 0x00485780 (FUN_00485780, typed-instantiation lane)
-     * Address: 0x0063BFF0 (FUN_0063BFF0 -- the `moho::TDatListItem<IAniManipulator, void>`
-     *   emission; ICF twin of 0x00442DA0/0x00443020/0x00443230 above, which is
-     *   what identifies it. Zero callers, unreachable; formerly
-     *   `InitializeNodeSelfLinks` over an `IntrusiveNodeRuntimeView` in
-     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
-     *
-     * What it does:
-     * Resets one intrusive node to a self-linked singleton state.
+     * A node is not a value: neighbours point at it by address, so a copy that
+     * took over `mPrev`/`mNext` would claim a place in a ring that never
+     * linked it. The only two link holders the binary copies both rebuild
+     * their own links instead: `PrefetchRequestRuntime`'s copy (0x004A9AA0)
+     * self-links its waiter head, and `SEntitySetTemplateUnit`'s assignment
+     * (inlined in 0x007056A0) leaves its links alone. Owners that are copied
+     * spell out what they copy.
      */
-    void ListResetLinks() noexcept
-    {
-      mNext = this;
-      mPrev = this;
-    }
-
-    /**
-     * CORRECTED (this sweep): this block previously listed 0x00443A50,
-     * 0x00443AA0, 0x00443AC0, 0x00443AE0, 0x00443B00, 0x00443B60,
-     * 0x0047C260, 0x0047C540, 0x0047CA00, 0x0047CA60, 0x0047FA20, and
-     * 0x00480910 -- all twelve are actually `function_sha256`-identical to
-     * `ListUnlinkSelf()` below (the "return `this`" shape), not this
-     * method (confirmed via decompiled `.c`: none of them capture/return
-     * the original `mNext`). Moved to `ListUnlinkSelf()`'s block. The
-     * addresses actually verified for THIS method (captures `mNext` before
-     * the prev/next fixup, returns the captured value) are cited on
-     * `gpg::SerHelperBase::ResetLinks()` instead (Reflection.cpp/.h),
-     * which force-inlines this exact body at 90+ real call sites --
-     * see that method's own Doxygen block for the full twin list,
-     * including 0x009064E0 (formerly duplicated in
-     * moho/containers/LegacyContainerFillLanes.cpp as
-     * `UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi`, deleted).
-     *
-     * What it does:
-     * Unlinks this node from its current ring and resets it to singleton state.
-     * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils: unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7340 (FUN_005A7340 -- an iterator over that ring, stored through a caller slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7370 (FUN_005A7370 -- that iterator read back out of its slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `LoadNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A75C0 (FUN_005A75C0 -- `mNext` stored through the caller's cursor slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7A10 (FUN_005A7A10 -- a second emission of that `mNext` store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7A20 (FUN_005A7A20 -- a second emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` -- step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     * Address: 0x005A7AF0 (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
-     */
-    item_t* ListUnlink() noexcept
-    {
-      item_t* const nxt = mNext;
-      mPrev->mNext = mNext;
-      mNext->mPrev = mPrev;
-      ListResetLinks();
-      return nxt;
-    }
+    TDatListItem(const TDatListItem&) = delete;
+    TDatListItem& operator=(const TDatListItem&) = delete;
 
     /**
      * Address: 0x00632BC0 (FUN_00632BC0)
      * Address: 0x00443A50 (FUN_00443A50, relocated from `ListUnlink()`'s
-     *   block above -- see the CORRECTED note there)
+     *   block below -- see the CORRECTED note there)
      * Address: 0x00443AA0 (FUN_00443AA0, relocated, same correction)
      * Address: 0x00443AC0 (FUN_00443AC0, relocated, same correction)
      * Address: 0x00443AE0 (FUN_00443AE0, relocated, same correction)
@@ -195,10 +146,6 @@ namespace moho
      * Address: 0x00773B30 (FUN_00773B30, formerly
      *   UnlinkAndSelfLinkForwardNode773B30 in LegacyContainerFillLanes.cpp,
      *   a thin wrapper around the address directly above)
-     *
-     * What it does:
-     * Unlinks this node from its current ring and returns this node after
-     * restoring singleton self-links.
      * Address: 0x005A7690 (FUN_005A7690 -- `ListUnlinkSelf` -- neighbours adopt each other, then self-link, handing this node back for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNode` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x005A7A90 (FUN_005A7A90 -- a second emission of that unlink for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `UnlinkAndResetGenericNodeAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00632DF0 (FUN_00632DF0 -- the `moho::TDatListItem<IAniManipulator, void>`
@@ -209,17 +156,98 @@ namespace moho
      *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNodeRuntimeView` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
      * Address: 0x007C0CA0 (FUN_007C0CA0 -- the `TDatListItem<SPeer, void>`
-     *   destructor, out of line only for EH unwind: it is reached solely by
-     *   `jmp` from the funclets that destroy `CLobby::peers` if
-     *   `CLobby::CLobby` throws (0x00BB43F2) or `~CLobby` unwinds (0x00BAFF75).
-     *   On the normal path both inline it -- `~CLobby` at 0x007C1293, as the
-     *   member destructor after `mSocket`'s -- and `SPeer::~SPeer` inlines it
-     *   at 0x007C13AE, after its own members, which places it on the base. So
-     *   the binary's `TDatListItem` has a destructor that unlinks, which this
-     *   template does not declare; all 88 twins of this body are reached only
-     *   from unwind funclets. Formerly `UnlinkPeerListHead` in
+     *   emission, reached by `jmp` from the funclets that destroy
+     *   `CLobby::peers` if `CLobby::CLobby` throws (0x00BB43F2) or `~CLobby`
+     *   unwinds (0x00BAFF75). Inlined on the normal path in `~CLobby` at
+     *   0x007C1293, as the member destructor after `mSocket`'s, and in
+     *   `SPeer::~SPeer` at 0x007C13AE, after `SPeer`'s own members, which is
+     *   what places it on this base. Formerly `UnlinkPeerListHead` in
      *   moho/net/CLobby.cpp, written into the ctor and dtor bodies (RULE ONE),
      *   removed 2026-09-28.)
+     *
+     * What it does:
+     * Unlinks this node from its ring and leaves it self-linked.
+     *
+     * The binary holds 88 byte-identical copies of this body. Each copy is
+     * reached only by `jmp` from an EH unwind funclet (26) or not at all
+     * (62). Nothing calls one by name. On the normal path the compiler
+     * inlines it wherever an object holding a link is destroyed, after that
+     * object's later members, which is why no destructor body in the engine
+     * spells the unlink out.
+     */
+    ~TDatListItem()
+    {
+      ListUnlink();
+    }
+
+    /**
+     * Address: 0x00442DA0 (FUN_00442DA0)
+     * Address: 0x00443020 (FUN_00443020)
+     * Address: 0x00443230 (FUN_00443230)
+     * Address: 0x0063C060 (FUN_0063C060, typed-instantiation lane)
+     * Address: 0x004856F0 (FUN_004856F0, typed-instantiation lane)
+     * Address: 0x00485780 (FUN_00485780, typed-instantiation lane)
+     * Address: 0x0063BFF0 (FUN_0063BFF0 -- the `moho::TDatListItem<IAniManipulator, void>`
+     *   emission; ICF twin of 0x00442DA0/0x00443020/0x00443230 above, which is
+     *   what identifies it. Zero callers, unreachable; formerly
+     *   `InitializeNodeSelfLinks` over an `IntrusiveNodeRuntimeView` in
+     *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
+     *
+     * What it does:
+     * Resets one intrusive node to a self-linked singleton state.
+     */
+    void ListResetLinks() noexcept
+    {
+      mNext = this;
+      mPrev = this;
+    }
+
+    /**
+     * CORRECTED (this sweep): this block previously listed 0x00443A50,
+     * 0x00443AA0, 0x00443AC0, 0x00443AE0, 0x00443B00, 0x00443B60,
+     * 0x0047C260, 0x0047C540, 0x0047CA00, 0x0047CA60, 0x0047FA20, and
+     * 0x00480910 -- all twelve are actually `function_sha256`-identical to
+     * `ListUnlinkSelf()` below (the "return `this`" shape), not this
+     * method (confirmed via decompiled `.c`: none of them capture/return
+     * the original `mNext`). Moved to `ListUnlinkSelf()`'s block, and from
+     * there to `~TDatListItem()` above once every copy of that body turned
+     * out to be the destructor (2026-09-28). The
+     * addresses actually verified for THIS method (captures `mNext` before
+     * the prev/next fixup, returns the captured value) are cited on
+     * `gpg::SerHelperBase::ResetLinks()` instead (Reflection.cpp/.h),
+     * which force-inlines this exact body at 90+ real call sites --
+     * see that method's own Doxygen block for the full twin list,
+     * including 0x009064E0 (formerly duplicated in
+     * moho/containers/LegacyContainerFillLanes.cpp as
+     * `UnlinkIntrusiveNodeAndRestoreSelfLinksBatchPhi`, deleted).
+     *
+     * What it does:
+     * Unlinks this node from its current ring and resets it to singleton state.
+     * Address: 0x009064B0 (FUN_009064B0 -- the pipe-chunk ring's unlink in gpg/core/streams: unlink the node from its ring, self-link it, hand back the successor; callers 0x00906510 (unreached); formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x00936200 (FUN_00936200 -- the log-target ring's unlink in gpg/core/utils: unlink the node from its ring, self-link it, hand back the successor; callers 0x00936770; formerly `UnlinkIntrusiveNodeAndReturnNext` and its two `[[maybe_unused]]` wrappers in gpg/core/utils/Logging.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7340 (FUN_005A7340 -- an iterator over that ring, stored through a caller slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7370 (FUN_005A7370 -- that iterator read back out of its slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `LoadNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A75C0 (FUN_005A75C0 -- `mNext` stored through the caller's cursor slot for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A10 (FUN_005A7A10 -- a second emission of that `mNext` store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeNextCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7A20 (FUN_005A7A20 -- a second emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AB0 (FUN_005A7AB0 -- a third emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias2` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AC0 (FUN_005A7AC0 -- `operator++` -- step the cursor to `mNext` for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `AdvanceNodeCursor` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     * Address: 0x005A7AF0 (FUN_005A7AF0 -- a fourth emission of the iterator store for `moho::TDatListItem<void, void>` (the navigator's listener ring; the 0x08 `{prev, next}` node the `Listener<EAiNavigatorEvent>` links through); zero callers, unreachable; formerly `StoreNodeCursorAlias3` in moho/ai/IAiNavigator.cpp (RULE ONE), removed 2026-09-11.)
+     */
+    item_t* ListUnlink() noexcept
+    {
+      item_t* const nxt = mNext;
+      mPrev->mNext = mNext;
+      mNext->mPrev = mPrev;
+      ListResetLinks();
+      return nxt;
+    }
+
+    /**
+     * What it does:
+     * Unlinks this node from its current ring and returns this node after
+     * restoring singleton self-links. Every binary copy of this body is the
+     * destructor above, so this helper has no address of its own.
      */
     item_t* ListUnlinkSelf() noexcept
     {

@@ -129,30 +129,28 @@ namespace
     return request;
   }
 
-  /**
-   * Address: 0x004A9AA0 (FUN_004A9AA0)
-   *
-   * What it does:
-   * Copy-initializes one prefetch request runtime entry from an existing key
-   * while clearing active load/result lanes.
-   */
-  PrefetchRequestRuntime* InitializePrefetchRequestFromTemplate(
-    PrefetchRequestRuntime* const request,
-    const PrefetchRequestRuntime& source
-  )
-  {
-    request->mResourceId.name = source.mResourceId.name;
-    request->mResourceType = source.mResourceType;
-    request->mIsLoading = 0;
-    request->mLoadWakePending = 0;
-    request->mResolved.px = nullptr;
-    request->mResolved.pi = nullptr;
-    request->mHadLoadFailure = 0;
-    request->mPrefetch.px = nullptr;
-    request->mPrefetch.pi = nullptr;
-    request->mWaiterListHead.ListResetLinks();
-    return request;
-  }
+} // namespace
+
+/**
+ * Address: 0x004A9AA0 (FUN_004A9AA0)
+ *
+ * What it does:
+ * Copies the request key (resource id and type) and starts the copy idle:
+ * load flags cleared, both handles empty, waiter list empty. The prefetch
+ * set's node builder (0x004AED80) inlines the same body.
+ */
+moho::PrefetchRequestRuntime::PrefetchRequestRuntime(const PrefetchRequestRuntime& other)
+  : mResourceId(other.mResourceId)
+  , mResourceType(other.mResourceType)
+  , mIsLoading(0)
+  , mLoadWakePending(0)
+  , mResolved{}
+  , mHadLoadFailure(0)
+  , mPrefetch{}
+{}
+
+namespace
+{
 
   /**
    * Address: 0x004A9B10 (FUN_004A9B10)
@@ -3417,8 +3415,8 @@ boost::SharedCountPair* moho::ResourceManager::GetResource(
   const auto requestLookup = mPrefetchRequests.insert(probe.get());
   PrefetchRequestRuntime& request = MutableRequest(requestLookup.first);
   if (requestLookup.second || request.mResourceId.name.empty()) {
-    // Built from the path, never copied: `mWaiterListHead` is self-linked, so
-    // a member-wise copy would leave the node's list pointing at the probe.
+    // The set's copy (0x004A9AA0) already took only the key and left the
+    // waiter list empty; this rebuilds the entry from the path as well.
     (void)InitializePrefetchRequestFromPath(&request, canonicalPath.c_str(), resourceType);
   }
 
