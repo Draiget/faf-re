@@ -6,7 +6,7 @@
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/time/Timer.h"
 #include "INetConnection.h"
-#include "moho/containers/TDatList.h"
+#include "gpg/core/containers/DList.h"
 #include "NetConstants.h"
 #include "NetTransportEnums.h"
 #include "platform/Platform.h"
@@ -18,8 +18,11 @@ namespace moho
   /**
    * VFTABLE: 0x00E049F8
    * COL:     0x00E60B20
+   *
+   * RTTI: `gpg::DListItem<CNetTCPConnection>` at +0x410 (mdisp 1040), with its
+   * `noncopyable` base at the same offset -- the connector's ring node.
    */
-  class CNetTCPConnection : public INetConnection, public TDatListItem<CNetTCPConnection, void>
+  class CNetTCPConnection : public INetConnection, public gpg::DListItem<CNetTCPConnection>
   {
   public:
     /**

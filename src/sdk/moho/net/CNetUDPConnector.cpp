@@ -70,9 +70,7 @@ bool CNetUDPConnector::SignalSocketEvent() noexcept
  */
 CNetUDPConnection& CNetUDPConnector::RelinkConnectionToFront(CNetUDPConnection& connection) noexcept
 {
-  auto* const connectionNode = static_cast<TDatListItem<CNetUDPConnection, void>*>(&connection);
-  auto* const listHead = static_cast<TDatListItem<CNetUDPConnection, void>*>(&mConnections);
-  connectionNode->moho::TDatListItem<CNetUDPConnection, void>::ListLinkAfter(listHead);
+  mConnections.push_front(&connection);
   return connection;
 }
 

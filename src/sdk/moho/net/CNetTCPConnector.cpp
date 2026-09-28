@@ -344,8 +344,7 @@ INetConnection* CNetTCPConnector::Connect(const u_long address, const u_short po
  */
 bool CNetTCPConnector::FindNextAddress(u_long& outAddress, u_short& outPort)
 {
-  for (auto* node = mConnections.mNext; node != &mConnections; node = node->mNext) {
-    auto* const connection = static_cast<CNetTCPConnection*>(node);
+  for (CNetTCPConnection* const connection : mConnections) {
     if (connection->mState == kNetStatePending) {
       outAddress = connection->GetAddr();
       outPort = connection->GetPort();
@@ -366,8 +365,7 @@ INetConnection* CNetTCPConnector::Accept(const u_long address, const u_short por
 {
   gpg::Logf("CNetTCPConnector::Accept(%s:%d)", NET_GetHostName(address).c_str(), port);
 
-  for (auto* node = mConnections.mNext; node != &mConnections; node = node->mNext) {
-    auto* const connection = static_cast<CNetTCPConnection*>(node);
+  for (CNetTCPConnection* const connection : mConnections) {
     if (connection->GetAddr() == address && connection->GetPort() == port && connection->mState == kNetStatePending) {
       connection->mState = kNetStateEstablishing;
       return connection;
@@ -388,8 +386,7 @@ void CNetTCPConnector::Reject(const u_long address, const u_short port)
 {
   gpg::Logf("CNetTCPConnector::Reject(%s:%d)", NET_GetHostName(address).c_str(), port);
 
-  for (auto* node = mConnections.mNext; node != &mConnections; node = node->mNext) {
-    auto* const connection = static_cast<CNetTCPConnection*>(node);
+  for (CNetTCPConnection* const connection : mConnections) {
     if (connection->GetAddr() == address && connection->GetPort() == port && connection->mState == kNetStatePending) {
       connection->ScheduleDestroy();
       return;
@@ -439,10 +436,7 @@ void CNetTCPConnector::Pull()
     current->Pull();
   }
 
-  auto* const connectionHead = static_cast<TDatListItem<CNetTCPConnection, void>*>(&mConnections);
-  for (auto* node = connectionHead->mNext; node != connectionHead;) {
-    auto* const current = static_cast<CNetTCPConnection*>(node);
-    node = node->mNext;
+  for (CNetTCPConnection* const current : mConnections.owners_safe()) {
     current->Pull();
     if (!workFrame.IsAlive()) {
       return;
@@ -475,8 +469,7 @@ void CNetTCPConnector::SelectEvent(const HANDLE ev)
 {
   ::WSAEventSelect(mSocket, ev, FD_ACCEPT);
 
-  for (auto* node = mConnections.mNext; node != &mConnections; node = node->mNext) {
-    auto* const connection = static_cast<CNetTCPConnection*>(node);
+  for (CNetTCPConnection* const connection : mConnections) {
     ::WSAEventSelect(connection->mSocket, ev, FD_READ | FD_CONNECT | FD_CLOSE);
   }
 }
@@ -529,8 +522,7 @@ void CNetTCPConnector::ReadFromStream(
 )
 {
   CNetTCPConnection* connection = nullptr;
-  for (auto* node = mConnections.mNext; node != &mConnections; node = node->mNext) {
-    auto* const current = static_cast<CNetTCPConnection*>(node);
+  for (CNetTCPConnection* const current : mConnections) {
     if (current->GetAddr() == address && current->GetPort() == port && current->mState == kNetStateAnswering) {
       connection = current;
       connection->AdoptSocketAndSetEstablishing(socket);
@@ -558,8 +550,7 @@ void CNetTCPConnector::ReadFromStream(
 void CNetTCPConnector::CleanupConnectionsAndPartials()
 {
   while (!mConnections.empty()) {
-    auto* const node = mConnections.pop_front();
-    delete static_cast<CNetTCPConnection*>(node);
+    delete mConnections.pop_front();
   }
 
   if (mSocket != INVALID_SOCKET) {

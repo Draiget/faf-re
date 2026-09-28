@@ -3,6 +3,7 @@
 
 #include "boost/weak_ptr.h"
 #include "gpg/core/algorithms/MD5.h"
+#include "gpg/core/containers/DList.h"
 #include "gpg/core/streams/PipeStream.h"
 #include "gpg/core/streams/ZLibOutputFilterStream.h"
 #include "gpg/core/time/Timer.h"
@@ -21,10 +22,11 @@ namespace moho
   /**
    * VFTABLE: 0x00E06118
    * COL:     0x00E60D70
+   *
+   * RTTI: `gpg::DListItem<CNetUDPConnection>` at +0x410 (mdisp 1040), with its
+   * `noncopyable` base at the same offset -- the connector's ring node.
    */
-  class CNetUDPConnection : public INetConnection,
-                            public TDatListItem<CNetUDPConnection, void>,
-                            public boost::noncopyable_::noncopyable
+  class CNetUDPConnection : public INetConnection, public gpg::DListItem<CNetUDPConnection>
   {
   public:
     /**

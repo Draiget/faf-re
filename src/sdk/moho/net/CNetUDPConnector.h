@@ -323,7 +323,7 @@ namespace moho
     SOCKET socket_{INVALID_SOCKET};
     HANDLE event_{nullptr};
     boost::weak_ptr<INetNATTraversalProvider> mNatTraversalProvider;
-    TDatList<CNetUDPConnection, void> mConnections;
+    gpg::DList<CNetUDPConnection> mConnections;
     TDatList<SNetPacket, void> mPacketList;
     uint32_t mPacketPoolSize{0};
     // FILETIME-based absolute microsecond baseline captured at ctor.

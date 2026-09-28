@@ -112,10 +112,10 @@ namespace moho
      * Forwards CMessageStream write window [mWriteStart, mWriteHead) to virtual Write(NetDataSpan*).
      */
     void Write(const CMessageStream& stream);
-
-  private:
-    // +0x40C, observed from derived-class field starts; semantic meaning not recovered yet.
-    std::int32_t mReserved0x40C{0};
   };
-  static_assert(sizeof(INetConnection) == 0x410, "INetConnection size must be 0x410");
+  // The vtable and `CMessageDispatcher` (+0x04, 0x408). A derived connection's
+  // own `gpg::DListItem` then starts at +0x410, not +0x40C: its empty
+  // `noncopyable` base may not share an address with the one inside
+  // `CMessageDispatcher::mLinkages`.
+  static_assert(sizeof(INetConnection) == 0x40C, "INetConnection size must be 0x40C");
 } // namespace moho

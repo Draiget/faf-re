@@ -387,7 +387,7 @@ CNetUDPConnection::~CNetUDPConnection()
   }
 
   // The ctor links this node into CNetUDPConnector::mConnections; the
-  // `TDatListItem` base's destructor takes it out (0x00486110 is that
+  // `gpg::DListItem` base's destructor takes it out (0x00486110 is that
   // destructor's unwind copy).
 }
 

@@ -271,7 +271,6 @@ CNetTCPConnection::CNetTCPConnection(
   const ENetConnectionState state
 )
   : INetConnection()
-  , TDatListItem<CNetTCPConnection, void>()
   , mConnector(connector)
   , mSocket(socket)
   , mAddr(address)

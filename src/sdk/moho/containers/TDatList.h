@@ -169,10 +169,6 @@ namespace moho
      *   `~DeviceExitListener` that also freed itself.)
      * Address: 0x00484B00 (FUN_00484B00 -- `CNetTCPConnector::mPartials`';
      *   formerly `ResetPartialListHead`, called from the destructor body.)
-     * Address: 0x00484B20 (FUN_00484B20 -- `CNetTCPConnector::mConnections`';
-     *   formerly `ResetConnectionListHead`, likewise.)
-     * Address: 0x00486110 (FUN_00486110 -- `CNetUDPConnection`'s connector-list
-     *   base; formerly `CNetUDPConnection::UnlinkFromConnectorList`.)
      * Address: 0x004A9B30 (FUN_004A9B30 -- `PrefetchRequestRuntime::
      *   mWaiterListHead`'s; formerly `UnlinkIntrusiveListNode`.)
      * Address: 0x004ACF00 (FUN_004ACF00 -- a second ResourceManager emission;

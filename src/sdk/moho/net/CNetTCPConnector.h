@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "gpg/core/containers/DList.h"
 #include "INetConnector.h"
 #include "moho/containers/TDatList.h"
 #include "platform/Platform.h"
@@ -196,7 +197,7 @@ namespace moho
 
     STcpConnWorkList mWorkingList{};                 // +0x04
     SOCKET mSocket{INVALID_SOCKET};                  // +0x08
-    TDatList<CNetTCPConnection, void> mConnections;  // +0x0C
+    gpg::DList<CNetTCPConnection> mConnections;      // +0x0C
     TDatList<STcpPartialConnection, void> mPartials; // +0x14
     HANDLE mHandle{nullptr};                         // +0x1C
   };

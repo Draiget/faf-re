@@ -47,6 +47,13 @@ namespace gpg
 
     /**
      * Dtor unlinks from the list and resets to singleton.
+     *
+     * Byte-identical to `moho::TDatListItem`'s destructor; these copies of the
+     * shared body belong to `gpg::DListItem` nodes:
+     * Address: 0x00484B20 (FUN_00484B20 -- `CNetTCPConnector::mConnections`';
+     *   formerly `ResetConnectionListHead`.)
+     * Address: 0x00486110 (FUN_00486110 -- `CNetUDPConnection`'s connector-list
+     *   base; formerly `CNetUDPConnection::UnlinkFromConnectorList`.)
      */
     ~DListItem()
     {
@@ -353,6 +360,74 @@ namespace gpg
       while (!empty()) {
         this->mNext->ListUnlink();
       }
+    }
+
+    /**
+     * The elements as a range, spelled as `moho::TDatList::owners()` is.
+     */
+    struct owner_range
+    {
+      iterator b, e;
+      iterator begin() const noexcept
+      {
+        return b;
+      }
+      iterator end() const noexcept
+      {
+        return e;
+      }
+    };
+
+    owner_range owners() noexcept
+    {
+      return {begin(), end()};
+    }
+
+    /**
+     * Walk that survives the loop body unlinking or deleting the element it
+     * was handed: the successor is read when the element is dereferenced.
+     */
+    struct owner_safe_iterator
+    {
+      item_t* pos{nullptr};
+      item_t* next{nullptr};
+
+      owner_safe_iterator& operator++() noexcept
+      {
+        if (next == nullptr) {
+          next = pos->mNext;
+        }
+        pos = next;
+        next = nullptr;
+        return *this;
+      }
+      type* operator*() noexcept
+      {
+        next = pos->mNext;
+        return pos->Get();
+      }
+      bool operator!=(const owner_safe_iterator& rhs) const noexcept
+      {
+        return pos != rhs.pos;
+      }
+    };
+
+    struct owner_safe_range
+    {
+      owner_safe_iterator b, e;
+      owner_safe_iterator begin() const noexcept
+      {
+        return b;
+      }
+      owner_safe_iterator end() const noexcept
+      {
+        return e;
+      }
+    };
+
+    owner_safe_range owners_safe() noexcept
+    {
+      return {owner_safe_iterator{this->mNext}, owner_safe_iterator{this}};
     }
   };
 } // namespace gpg
