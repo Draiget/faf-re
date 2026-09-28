@@ -9,18 +9,22 @@
 #include "Common.h"
 #include "ELobbyMsg.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/WeakPtr.h"
 
 using namespace moho;
 
 namespace moho
 {
   /**
-    * Alias of FUN_00484660 (non-canonical helper lane).
+   * An accepted socket that has not yet said which port its peer listens on.
+   * It buffers the stream until the first message -- the peer's local port --
+   * decodes, then hands socket and stream to `CNetTCPConnector::ReadFromStream`.
    *
-   * What it does:
-   * Tracks an accepted socket until first TCP connect payload is decoded.
+   * The name is the binary's: the constructor is
+   * `??0SPartialConnection@Moho@@QAE@@Z` and `Pull` logs as
+   * `SPartialConnection<%s:%d>::Pull()`.
    */
-  struct STcpPartialConnection : TDatListItem<STcpPartialConnection, void>
+  struct SPartialConnection : TDatListItem<SPartialConnection, void>
   {
     CNetTCPConnector* mConnector;
     SOCKET mSocket;
@@ -35,8 +39,8 @@ namespace moho
     /**
      * Address: 0x00484660 (FUN_00484660, Moho::SPartialConnection::SPartialConnection)
      */
-    STcpPartialConnection(CNetTCPConnector* connector, const SOCKET socket, const u_long address, const u_short port)
-      : TDatListItem<STcpPartialConnection, void>()
+    SPartialConnection(CNetTCPConnector* connector, const SOCKET socket, const u_long address, const u_short port)
+      : TDatListItem<SPartialConnection, void>()
       , mConnector(connector)
       , mSocket(socket)
       , mAddr(address)
@@ -50,7 +54,7 @@ namespace moho
      * Address: 0x004846E0 (FUN_004846E0)
      * Address: 0x00484980 (FUN_00484980, deleting destructor thunk)
      */
-    ~STcpPartialConnection()
+    ~SPartialConnection()
     {
       if (mSocket != INVALID_SOCKET) {
         ::closesocket(mSocket);
@@ -112,130 +116,43 @@ namespace moho
       delete this;
     }
   };
-  static_assert(offsetof(STcpPartialConnection, mConnector) == 0x08, "STcpPartialConnection::mConnector must be +0x08");
-  static_assert(offsetof(STcpPartialConnection, mSocket) == 0x0C, "STcpPartialConnection::mSocket must be +0x0C");
-  static_assert(offsetof(STcpPartialConnection, mAddr) == 0x10, "STcpPartialConnection::mAddr must be +0x10");
-  static_assert(offsetof(STcpPartialConnection, mPort) == 0x14, "STcpPartialConnection::mPort must be +0x14");
-  static_assert(offsetof(STcpPartialConnection, mStream) == 0x18, "STcpPartialConnection::mStream must be +0x18");
-  static_assert(offsetof(STcpPartialConnection, mMessage) == 0x60, "STcpPartialConnection::mMessage must be +0x60");
-  static_assert(offsetof(STcpPartialConnection, mPad0xB4) == 0xB4, "STcpPartialConnection::mPad0xB4 must be +0xB4");
-  static_assert(sizeof(STcpPartialConnection) == 0xB8, "STcpPartialConnection size must be 0xB8");
-
-  /**
-   * Active per-call work-link node shape used by `CNetTCPConnection::Pull`
-   * and `CNetTCPConnector::Pull` while connected into `mWorkingList`.
-   */
-  struct STcpConnWorkFrame
-  {
-    STcpConnWorkList* owner{nullptr};
-    STcpConnWorkFrame* next{nullptr};
-  };
-  static_assert(sizeof(STcpConnWorkFrame) == 0x8, "STcpConnWorkFrame size must be 0x8");
-
-  STcpConnWorkFrame* AsWorkFrame(STcpConnWorkList* const link) noexcept
-  {
-    return reinterpret_cast<STcpConnWorkFrame*>(link);
-  }
-
-  STcpConnWorkList* AsWorkListLink(STcpConnWorkFrame* const frame) noexcept
-  {
-    return reinterpret_cast<STcpConnWorkList*>(frame);
-  }
-
-  /**
-   * Address: 0x00485830 (FUN_00485830)
-   *
-   * What it does:
-   * Reports whether a pull work frame is still linked to a live connector
-   * owner chain.
-   */
-  bool HasLinkedOwner(const STcpConnWorkFrame& frame) noexcept
-  {
-    return frame.owner != nullptr;
-  }
-
-  /**
-   * Address: 0x00485810 (FUN_00485810, helper inside connector pull flow)
-   *
-   * What it does:
-   * Registers an in-flight stack frame in connector work-chain to allow
-   * asynchronous cleanup code to null out active frames safely.
-   */
-  void LinkWorkFrame(STcpConnWorkList& owner, STcpConnWorkFrame& frame) noexcept
-  {
-    frame.owner = &owner;
-    frame.next = AsWorkFrame(owner.next);
-    owner.next = AsWorkListLink(&frame);
-  }
-
-  /**
-    * Alias of FUN_00485810 (non-canonical helper lane).
-   *
-   * What it does:
-   * Unlinks an in-flight frame from connector work-chain if still active.
-   */
-  void UnlinkWorkFrame(STcpConnWorkFrame& frame) noexcept
-  {
-    STcpConnWorkList* const owner = frame.owner;
-    if (!owner) {
-      return;
-    }
-
-    STcpConnWorkFrame* prev = nullptr;
-    STcpConnWorkFrame* cur = AsWorkFrame(owner->next);
-    while (cur) {
-      if (cur == &frame) {
-        if (prev) {
-          prev->next = cur->next;
-        } else {
-          owner->next = AsWorkListLink(cur->next);
-        }
-        frame.owner = nullptr;
-        frame.next = nullptr;
-        return;
-      }
-      prev = cur;
-      cur = cur->next;
-    }
-
-    frame.owner = nullptr;
-    frame.next = nullptr;
-  }
-
-  class ScopedTcpWorkFrame
-  {
-  public:
-    explicit ScopedTcpWorkFrame(STcpConnWorkList& owner) noexcept
-    {
-      LinkWorkFrame(owner, mFrame);
-    }
-
-    ~ScopedTcpWorkFrame()
-    {
-      UnlinkWorkFrame(mFrame);
-    }
-
-    [[nodiscard]] bool IsAlive() const noexcept
-    {
-      return HasLinkedOwner(mFrame);
-    }
-
-  private:
-    STcpConnWorkFrame mFrame{};
-  };
-
+  static_assert(offsetof(SPartialConnection, mConnector) == 0x08, "SPartialConnection::mConnector must be +0x08");
+  static_assert(offsetof(SPartialConnection, mSocket) == 0x0C, "SPartialConnection::mSocket must be +0x0C");
+  static_assert(offsetof(SPartialConnection, mAddr) == 0x10, "SPartialConnection::mAddr must be +0x10");
+  static_assert(offsetof(SPartialConnection, mPort) == 0x14, "SPartialConnection::mPort must be +0x14");
+  static_assert(offsetof(SPartialConnection, mStream) == 0x18, "SPartialConnection::mStream must be +0x18");
+  static_assert(offsetof(SPartialConnection, mMessage) == 0x60, "SPartialConnection::mMessage must be +0x60");
+  static_assert(offsetof(SPartialConnection, mPad0xB4) == 0xB4, "SPartialConnection::mPad0xB4 must be +0xB4");
+  static_assert(sizeof(SPartialConnection) == 0xB8, "SPartialConnection size must be 0xB8");
 } // namespace moho
 
 /**
- * Address: 0x00484AE0 (FUN_00484AE0)
+ * Address: 0x00484B40 (FUN_00484B40)
+ * Address: 0x00484AE0 (FUN_00484AE0, scalar deleting destructor)
  * Address: 0x1007E6E0 (sub_1007E6E0)
  *
  * What it does:
- * Deletes all TCP connections/partials and closes listening socket.
+ * Deletes every connection -- each unlinks itself from `mConnections` as it
+ * goes -- and closes the listening socket. Partial connections are left
+ * alone: the binary never deletes them here, and `mPartials`' own destructor
+ * (0x00484BA8) only unlinks the head from their ring. `mConnections`
+ * unlinks in its destructor at 0x00484BC1.
+ *
+ * The weak-reference detach at 0x00484BD5 runs after both of those member
+ * destructors, where `WeakObject`'s teardown sits; any `Pull` frame still on
+ * the stack sees its `WeakPtr<CNetTCPConnector>` go null.
  */
 CNetTCPConnector::~CNetTCPConnector()
 {
-  CleanupConnectionsAndPartials();
+  while (!mConnections.empty()) {
+    delete mConnections.front();
+  }
+
+  if (mSocket != INVALID_SOCKET) {
+    ::closesocket(mSocket);
+  }
+
+  DetachAllWeakReferences();
 }
 
 /**
@@ -419,26 +336,22 @@ void CNetTCPConnector::Pull()
       "CNetTCPConnector::Pull(): accepted connection from %s:%d", NET_GetHostName(hostAddress).c_str(), hostPort
     );
 
-    auto* const partial = new (std::nothrow) STcpPartialConnection(this, accepted, hostAddress, hostPort);
-    if (partial) {
-      mPartials.push_front(partial);
-    } else {
-      ::closesocket(accepted);
-    }
+    // 0x004852B3 splices the node in ahead of the head, so a new partial is
+    // pulled last.
+    mPartials.push_back(new SPartialConnection(this, accepted, hostAddress, hostPort));
   }
 
-  ScopedTcpWorkFrame workFrame{mWorkingList};
+  // A connection's message handlers may destroy this connector (and with it
+  // every connection); the weak reference going null is how the loop learns.
+  const WeakPtr<CNetTCPConnector> self{this};
 
-  auto* const partialHead = static_cast<TDatListItem<STcpPartialConnection, void>*>(&mPartials);
-  for (auto* node = partialHead->mNext; node != partialHead;) {
-    auto* const current = static_cast<STcpPartialConnection*>(node);
-    node = node->mNext;
-    current->Pull();
+  for (SPartialConnection* const partial : mPartials.owners_safe()) {
+    partial->Pull();
   }
 
-  for (CNetTCPConnection* const current : mConnections.owners_safe()) {
-    current->Pull();
-    if (!workFrame.IsAlive()) {
+  for (CNetTCPConnection* const connection : mConnections.owners_safe()) {
+    connection->Pull();
+    if (self.GetObjectPtr() == nullptr) {
       return;
     }
   }
@@ -504,7 +417,8 @@ SSendStampView CNetTCPConnector::SnapshotSendStamps(const int32_t /*since*/)
  * Initializes TCP connector around already-open listening socket.
  */
 CNetTCPConnector::CNetTCPConnector(const SOCKET socket) noexcept
-  : mWorkingList{nullptr}
+  : INetConnector()
+  , WeakObject() // 0x00484AB2: the weak-reference head is zeroed first
   , mSocket(socket)
   , mConnections()
   , mPartials()
@@ -515,7 +429,11 @@ CNetTCPConnector::CNetTCPConnector(const SOCKET socket) noexcept
  * Address: 0x004853D0 (FUN_004853D0)
  *
  * What it does:
- * Binds accepted partial socket stream to a TCP connection.
+ * Takes over a partial connection's socket and buffered stream: an answering
+ * connection for the same endpoint adopts the socket and starts
+ * establishing, otherwise a new pending connection is made for it. The
+ * connection's input then gets a `LOBMSG_ConnMade` followed by everything the
+ * partial had buffered.
  */
 void CNetTCPConnector::ReadFromStream(
   const SOCKET socket, const u_long address, const u_short port, gpg::PipeStream& stream
@@ -531,43 +449,16 @@ void CNetTCPConnector::ReadFromStream(
   }
 
   if (!connection) {
-    connection = new (std::nothrow) CNetTCPConnection(this, socket, address, port, kNetStatePending);
-    if (!connection) {
-      ::closesocket(socket);
-      return;
-    }
-  }
-  connection->AdoptIncomingStream(socket, stream);
-}
-
-/**
- * Address: 0x00484B40 (FUN_00484B40)
- *
- * What it does:
- * Runs connector cleanup body: deletes connection objects, closes listener,
- * resets intrusive heads, and clears active work-link frames.
- */
-void CNetTCPConnector::CleanupConnectionsAndPartials()
-{
-  while (!mConnections.empty()) {
-    delete mConnections.pop_front();
+    connection = new CNetTCPConnection(this, socket, address, port, kNetStatePending);
   }
 
-  if (mSocket != INVALID_SOCKET) {
-    ::closesocket(mSocket);
-    mSocket = INVALID_SOCKET;
-  }
+  CMessage connMade{ELobbyMsg::LOBMSG_ConnMade};
+  connection->mInputStream.Write(connMade.mBuff);
 
-  // `mPartials` and `mConnections` unlink in their own destructors
-  // (0x00484BBC, 0x00484BD0); 0x00484B00/0x00484B20 are those destructors'
-  // unwind copies.
-
-  auto* work = reinterpret_cast<STcpConnWorkFrame*>(mWorkingList.next);
-  while (work != nullptr) {
-    auto* const next = work->next;
-    mWorkingList.next = reinterpret_cast<STcpConnWorkList*>(next);
-    work->owner = nullptr;
-    work->next = nullptr;
-    work = next;
+  stream.Close(gpg::Stream::ModeSend);
+  char buffer[kNetTcpIoChunkSize];
+  while (!stream.Empty()) {
+    const size_t count = stream.Read(buffer, sizeof(buffer));
+    connection->mInputStream.Write(buffer, count);
   }
 }

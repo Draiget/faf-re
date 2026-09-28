@@ -8,31 +8,12 @@
 #include "ELobbyMsg.h"
 #include "gpg/core/containers/String.h"
 #include "gpg/core/utils/Logging.h"
+#include "moho/misc/WeakPtr.h"
 
 using namespace moho;
 
 namespace
 {
-  void AppendToPipeStream(gpg::PipeStream& stream, const char* const bytes, const size_t byteCount)
-  {
-    char* const writeHead = stream.mWriteHead;
-    const size_t capacity = static_cast<size_t>(stream.mWriteEnd - writeHead);
-    if (byteCount > capacity) {
-      stream.VirtWrite(bytes, byteCount);
-      return;
-    }
-
-    if (byteCount != 0) {
-      std::memcpy(writeHead, bytes, byteCount);
-      stream.mWriteHead += byteCount;
-    }
-  }
-
-  void AppendMessageToPipeStream(gpg::PipeStream& stream, const CMessage& message)
-  {
-    AppendToPipeStream(stream, message.mBuff.start_, message.mBuff.Size());
-  }
-
   void DispatchConnectionEvent(CNetTCPConnection& connection, const ELobbyMsg messageType)
   {
     CMessage event{messageType};
@@ -46,88 +27,34 @@ namespace
 
     const auto localPort = static_cast<std::uint16_t>(connection.mConnector->GetLocalPort());
     payload.Write(reinterpret_cast<const char*>(&localPort), sizeof(localPort));
-    AppendMessageToPipeStream(connection.mOutputStream, handshake);
+    connection.mOutputStream.Write(handshake.mBuff);
   }
 
-  struct STcpConnWorkFrame
+  /**
+   * What it does:
+   * Settles a connection after one of its message handlers ran. A handler
+   * can destroy the connector, which deletes every connection it owns, this
+   * one included; or it can schedule this connection's destruction, which is
+   * carried out here. Returns true when the connection no longer exists and
+   * the caller must not touch it again.
+   *
+   * `CNetTCPConnection::Pull` inlines this after every event it dispatches
+   * except the timed-out branch's (0x00483E7C, 0x00484256, 0x00484361,
+   * 0x0048448F): a null slot returns at once, otherwise
+   * `mScheduleDestroy` decides.
+   */
+  bool DestroyedByHandler(CNetTCPConnection& connection, const WeakPtr<CNetTCPConnector>& connector)
   {
-    STcpConnWorkList* owner{nullptr};
-    STcpConnWorkFrame* next{nullptr};
-  };
-  static_assert(sizeof(STcpConnWorkFrame) == 0x8, "STcpConnWorkFrame size must be 0x8");
+    if (connector.GetObjectPtr() == nullptr) {
+      return true;
+    }
 
-  STcpConnWorkFrame* AsWorkFrame(STcpConnWorkList* const link) noexcept
-  {
-    return reinterpret_cast<STcpConnWorkFrame*>(link);
+    if (connection.mScheduleDestroy) {
+      delete &connection;
+      return true;
+    }
+    return false;
   }
-
-  STcpConnWorkList* AsWorkListLink(STcpConnWorkFrame* const frame) noexcept
-  {
-    return reinterpret_cast<STcpConnWorkList*>(frame);
-  }
-
-  void LinkConnectorWorkFrame(STcpConnWorkList& owner, STcpConnWorkFrame& frame) noexcept
-  {
-    frame.owner = &owner;
-    frame.next = AsWorkFrame(owner.next);
-    owner.next = AsWorkListLink(&frame);
-  }
-
-  void UnlinkConnectorWorkFrame(STcpConnWorkFrame& frame) noexcept
-  {
-    STcpConnWorkList* const owner = frame.owner;
-    if (!owner) {
-      return;
-    }
-
-    STcpConnWorkFrame* prev = nullptr;
-    STcpConnWorkFrame* cur = AsWorkFrame(owner->next);
-    while (cur) {
-      if (cur == &frame) {
-        if (prev) {
-          prev->next = cur->next;
-        } else {
-          owner->next = AsWorkListLink(cur->next);
-        }
-        frame.owner = nullptr;
-        frame.next = nullptr;
-        return;
-      }
-      prev = cur;
-      cur = cur->next;
-    }
-
-    frame.owner = nullptr;
-    frame.next = nullptr;
-  }
-
-  class ScopedConnectorWorkFrame
-  {
-  public:
-    explicit ScopedConnectorWorkFrame(CNetTCPConnector* const connector) noexcept
-      : mLinked(connector != nullptr)
-    {
-      if (connector) {
-        LinkConnectorWorkFrame(connector->WorkingList(), mFrame);
-      }
-    }
-
-    ~ScopedConnectorWorkFrame()
-    {
-      if (mLinked) {
-        UnlinkConnectorWorkFrame(mFrame);
-      }
-    }
-
-    [[nodiscard]] bool IsAlive() const noexcept
-    {
-      return !mLinked || mFrame.owner != nullptr;
-    }
-
-  private:
-    bool mLinked{false};
-    STcpConnWorkFrame mFrame{};
-  };
 } // namespace
 
 /**
@@ -217,7 +144,7 @@ void CNetTCPConnection::Write(NetDataSpan* const data)
 {
   const auto* const begin = reinterpret_cast<const char*>(data->start);
   const size_t size = static_cast<size_t>(data->end - data->start);
-  AppendToPipeStream(mOutputStream, begin, size);
+  mOutputStream.Write(begin, size);
 }
 
 /**
@@ -292,12 +219,11 @@ CNetTCPConnection::CNetTCPConnection(
   , mScheduleDestroy(0)
   , mPad0xD2B{}
 {
-  if (mConnector) {
-    mConnector->mConnections.push_back(this);
-    const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
-    if (connectorEvent) {
-      ::WSAEventSelect(mSocket, connectorEvent, FD_READ | FD_CONNECT | FD_CLOSE);
-    }
+  // 0x00483737: linked with no null test on the connector.
+  mConnector->mConnections.push_back(this);
+  const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
+  if (connectorEvent) {
+    ::WSAEventSelect(mSocket, connectorEvent, FD_READ | FD_CONNECT | FD_CLOSE);
   }
 }
 
@@ -322,17 +248,22 @@ CNetTCPConnection::~CNetTCPConnection()
  *
  * What it does:
  * Polls socket input/connect state and dispatches buffered messages.
+ *
+ * A message handler can destroy the connector, and the connector deletes
+ * every connection with it, so `this` is not safe to touch after a dispatch
+ * until the weak reference to the connector says it survived.
  */
 void CNetTCPConnection::Pull()
 {
-  ScopedConnectorWorkFrame workFrame{mConnector};
+  const WeakPtr<CNetTCPConnector> connector{mConnector};
 
   if (mScheduleDestroy) {
     delete this;
     return;
   }
 
-  if (mState == kNetStateConnecting) {
+  switch (mState) {
+  case kNetStateConnecting: {
     fd_set writeFds{};
     writeFds.fd_count = 1;
     writeFds.fd_array[0] = mSocket;
@@ -352,62 +283,67 @@ void CNetTCPConnection::Pull()
       mState = kNetStateEstablishing;
 
       CMessage connMade{ELobbyMsg::LOBMSG_ConnMade};
-      AppendMessageToPipeStream(mInputStream, connMade);
+      mInputStream.Write(connMade.mBuff);
     } else if (FD_ISSET(mSocket, &exceptFds)) {
       gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): connection failed", NET_GetHostName(mAddr).c_str(), mPort);
       mState = kNetStateErrored;
       DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnFailed);
+      DestroyedByHandler(*this, connector);
       return;
     }
 
+    // Neither set still sends the handshake and reads (0x00483D80 -> 0x00483D12).
     QueueConnectorLocalPortHandshake(*this);
-  } else if (mState == kNetStateTimedOut) {
+    [[fallthrough]];
+  }
+
+  case kNetStateEstablishing:
+    break;
+
+  case kNetStateTimedOut:
     if (mPushFailed) {
       mState = kNetStateErrored;
       DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostErrored);
     }
     return;
-  }
 
-  if (mState != kNetStateEstablishing) {
+  default:
     return;
   }
 
   bool recvFailedWithError = false;
   char recvBuf[kNetTcpIoChunkSize];
-  if (!mPullFailed) {
-    while (!mPullFailed) {
-      const int received = ::recv(mSocket, recvBuf, static_cast<int>(sizeof(recvBuf)), 0);
-      if (received < 0) {
-        if (::WSAGetLastError() == WSAEWOULDBLOCK) {
-          break;
-        }
-
-        gpg::Logf(
-          "CNetTCPConnection<%s:%d>::Pull(): recv() failed: %s",
-          NET_GetHostName(mAddr).c_str(),
-          mPort,
-          NET_GetWinsockErrorString()
-        );
-        mInputStream.Close(gpg::Stream::ModeSend);
-        mPullFailed = 1;
-        recvFailedWithError = true;
+  while (!mPullFailed) {
+    const int received = ::recv(mSocket, recvBuf, static_cast<int>(sizeof(recvBuf)), 0);
+    if (received < 0) {
+      if (::WSAGetLastError() == WSAEWOULDBLOCK) {
         break;
       }
 
-      mTimer.Reset();
-      if (received == 0) {
-        gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): at end of stream.", NET_GetHostName(mAddr).c_str(), mPort);
-        mInputStream.Close(gpg::Stream::ModeSend);
-        mPullFailed = 1;
-        break;
-      }
-
-      AppendToPipeStream(mInputStream, recvBuf, static_cast<size_t>(received));
+      gpg::Logf(
+        "CNetTCPConnection<%s:%d>::Pull(): recv() failed: %s",
+        NET_GetHostName(mAddr).c_str(),
+        mPort,
+        NET_GetWinsockErrorString()
+      );
+      mInputStream.Close(gpg::Stream::ModeSend);
+      mPullFailed = 1;
+      recvFailedWithError = true;
+      break;
     }
+
+    mTimer.Reset();
+    if (received == 0) {
+      gpg::Logf("CNetTCPConnection<%s:%d>::Pull(): at end of stream.", NET_GetHostName(mAddr).c_str(), mPort);
+      mInputStream.Close(gpg::Stream::ModeSend);
+      mPullFailed = 1;
+      break;
+    }
+
+    mInputStream.Write(recvBuf, static_cast<size_t>(received));
   }
 
-  while (mDatagram.Read(&mInputStream)) {
+  for (; mDatagram.Read(&mInputStream); mDatagram.Clear()) {
     auto* const receiver = mReceivers[mDatagram.GetType().raw()];
     if (receiver) {
       receiver->ReceiveMessage(&mDatagram, this);
@@ -420,14 +356,7 @@ void CNetTCPConnection::Pull()
       );
     }
 
-    if (!workFrame.IsAlive()) {
-      return;
-    }
-
-    mDatagram.Clear();
-
-    if (mScheduleDestroy) {
-      delete this;
+    if (DestroyedByHandler(*this, connector)) {
       return;
     }
   }
@@ -435,12 +364,14 @@ void CNetTCPConnection::Pull()
   if (recvFailedWithError || mPushFailed) {
     mState = kNetStateErrored;
     DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostErrored);
+    DestroyedByHandler(*this, connector);
     return;
   }
 
   if (mInputStream.Empty()) {
     mState = kNetStateTimedOut;
     DispatchConnectionEvent(*this, ELobbyMsg::LOBMSG_ConnLostEof);
+    DestroyedByHandler(*this, connector);
   }
 }
 
@@ -473,14 +404,8 @@ void CNetTCPConnection::Push()
           chunk = available;
         }
 
-        char* const dst = mSendBuffer + mSendBufferSize;
-        const size_t readable = static_cast<size_t>(mOutputStream.mReadEnd - mOutputStream.mReadHead);
-        if (chunk > readable) {
-          mOutputStream.VirtRead(dst, chunk);
-        } else if (chunk != 0) {
-          std::memcpy(dst, mOutputStream.mReadHead, chunk);
-          mOutputStream.mReadHead += chunk;
-        }
+        // The count `Read` returns is dropped (0x00483984 adds `chunk`).
+        mOutputStream.Read(mSendBuffer + mSendBufferSize, chunk);
         mSendBufferSize += static_cast<std::uint32_t>(chunk);
       }
     }
@@ -501,11 +426,10 @@ void CNetTCPConnection::Push()
 
       gpg::Logf("CNetTCPConnection::Push: send() failed: %s", NET_GetWinsockErrorString());
       mPushFailed = 1;
-      if (mConnector) {
-        const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
-        if (connectorEvent) {
-          ::SetEvent(connectorEvent);
-        }
+      // Wake the connector's poll so the next `Pull` reports the failure.
+      const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
+      if (connectorEvent) {
+        ::SetEvent(connectorEvent);
       }
       return;
     }
@@ -514,38 +438,6 @@ void CNetTCPConnection::Push()
       std::memmove(mSendBuffer, mSendBuffer + sent, mSendBufferSize - static_cast<std::uint32_t>(sent));
     }
     mSendBufferSize -= static_cast<std::uint32_t>(sent);
-  }
-}
-
-/**
- * Address: <synthetic host-build helper>
- *
- * What it does:
- * Attaches accepted socket stream payload to this connection.
- */
-void CNetTCPConnection::AdoptIncomingStream(const SOCKET socket, gpg::PipeStream& stream)
-{
-  mSocket = socket;
-
-  CMessage connMade{ELobbyMsg::LOBMSG_ConnMade};
-  mInputStream.Write(connMade.mBuff.start_, connMade.mBuff.Size());
-
-  stream.Close(gpg::Stream::ModeSend);
-  char temp[kNetTcpIoChunkSize];
-  while (true) {
-    if (stream.mReadHead == stream.mReadEnd && stream.VirtAtEnd()) {
-      break;
-    }
-
-    size_t chunk = kNetTcpIoChunkSize;
-    const size_t readable = static_cast<size_t>(stream.mReadEnd - stream.mReadHead);
-    if (readable < chunk) {
-      chunk = stream.VirtRead(temp, chunk);
-    } else {
-      std::memcpy(temp, stream.mReadHead, chunk);
-      stream.mReadHead += chunk;
-    }
-    mInputStream.Write(temp, chunk);
   }
 }
 

@@ -5,6 +5,7 @@
 #include "gpg/core/containers/DList.h"
 #include "INetConnector.h"
 #include "moho/containers/TDatList.h"
+#include "moho/misc/WeakObject.h"
 #include "platform/Platform.h"
 
 namespace gpg
@@ -15,28 +16,30 @@ namespace gpg
 namespace moho
 {
   class CNetTCPConnection;
-  struct STcpPartialConnection;
-
-  struct STcpConnWorkList
-  {
-    STcpConnWorkList* next{nullptr};
-  };
-  static_assert(sizeof(STcpConnWorkList) == 0x4, "STcpConnWorkList size must be 0x4");
+  struct SPartialConnection;
 
   /**
    * VFTABLE: 0x00E049C0
    * COL:     0x00E60BE8
+   *
+   * RTTI: `Moho::WeakObject` at +0x04 (mdisp 4). Its chain holds the
+   * `WeakPtr<CNetTCPConnector>` that `Pull` and `CNetTCPConnection::Pull` keep
+   * on the stack while message handlers run: a handler may destroy the
+   * connector, and the destructor's detach is how those frames find out.
    */
-  class CNetTCPConnector : public INetConnector
+  class CNetTCPConnector : public INetConnector, public WeakObject
   {
   public:
     /**
-     * Address: 0x00484AE0 (FUN_00484AE0)
+     * Address: 0x00484B40 (FUN_00484B40)
+     * Address: 0x00484AE0 (FUN_00484AE0, scalar deleting destructor)
      * Address: 0x1007E6E0 (sub_1007E6E0)
      * Slot: 0
      *
      * What it does:
-     * Deletes all TCP connections/partials and closes listening socket.
+     * Deletes every connection, closes the listening socket and detaches the
+     * weak references still held by in-flight `Pull` frames. Pending partial
+     * connections are not deleted; only their list head unlinks.
      */
     ~CNetTCPConnector() override;
 
@@ -174,32 +177,14 @@ namespace moho
      */
     [[nodiscard]] HANDLE GetSelectedEventHandle() const noexcept;
 
-    // Source-side helper for connection work-frame bookkeeping.
-    STcpConnWorkList& WorkingList() noexcept
-    {
-      return mWorkingList;
-    }
-
-  private:
-    /**
-     * Address: 0x00484B40 (FUN_00484B40)
-     *
-     * What it does:
-     * Runs non-deleting connector cleanup body: drains connection objects,
-     * resets intrusive list heads, closes listener socket, and clears active
-     * work-link frames.
-     */
-    void CleanupConnectionsAndPartials();
-
   private:
     friend class CNetTCPConnection;
-    friend struct STcpPartialConnection;
+    friend struct SPartialConnection;
 
-    STcpConnWorkList mWorkingList{};                 // +0x04
-    SOCKET mSocket{INVALID_SOCKET};                  // +0x08
-    gpg::DList<CNetTCPConnection> mConnections;      // +0x0C
-    TDatList<STcpPartialConnection, void> mPartials; // +0x14
-    HANDLE mHandle{nullptr};                         // +0x1C
+    SOCKET mSocket{INVALID_SOCKET};               // +0x08
+    gpg::DList<CNetTCPConnection> mConnections;   // +0x0C
+    TDatList<SPartialConnection, void> mPartials; // +0x14
+    HANDLE mHandle{nullptr};                      // +0x1C
   };
   static_assert(sizeof(CNetTCPConnector) == 0x20, "CNetTCPConnector size must be 0x20");
 } // namespace moho

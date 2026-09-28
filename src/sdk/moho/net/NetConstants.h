@@ -8,7 +8,8 @@ namespace moho
    * Address bundle:
    * - 0x00483A60 (CNetTCPConnection::Pull recv scratch)
    * - 0x00484540/0x004838D0 related TCP stream staging paths
-   * - 0x00484770 (STcpPartialConnection::Pull recv scratch)
+   * - 0x00484770 (SPartialConnection::Pull recv scratch)
+   * - 0x004853D0 (CNetTCPConnector::ReadFromStream drain scratch)
    *
    * What it does:
    * Shared net I/O chunk size used by TCP recv/send staging loops.

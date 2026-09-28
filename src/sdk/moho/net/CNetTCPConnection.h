@@ -165,14 +165,6 @@ namespace moho
     void Push();
 
     /**
-     * Address: <synthetic host-build helper>
-     *
-     * What it does:
-     * Attaches accepted socket stream payload to this connection.
-     */
-    void AdoptIncomingStream(SOCKET socket, gpg::PipeStream& stream);
-
-    /**
      * Address: 0x00484640 (FUN_00484640, Moho::CNetTCPConnection::SelectSocket)
      *
      * What it does:

@@ -339,6 +339,18 @@ namespace moho
       return ownerLinkSlot != nullptr && !IsSentinel();
     }
 
+    /**
+     * Address: 0x00485830 (FUN_00485830 -- the `WeakPtr<CNetTCPConnector>`
+     *   emission, node in EAX: `slot ? slot - 4 : 0`. Called from
+     *   `CNetTCPConnector::Pull` (0x0048534B) after each connection's `Pull`;
+     *   ICF twin of 0x0057D540 above. Formerly `HasLinkedOwner` over an
+     *   `STcpConnWorkFrame` overlay in moho/net/CNetTCPConnector.cpp,
+     *   removed 2026-09-28.)
+     *
+     * What it does:
+     * Returns the object this node refers to, or null once the owner has
+     * detached its weak references.
+     */
     [[nodiscard]] T* GetObjectPtr() const noexcept
     {
       return DecodeOwnerObject(ownerLinkSlot);
@@ -901,6 +913,12 @@ namespace moho
    * reach it by tail-jump, e.g. the out-of-line chunk of
    * `MAUI_SetKeyboardFocus` at 0x00B78323. Formerly the unlink half of
    * `RebindIntrusiveOwnerLink` in moho/ui/UiRuntimeTypes.cpp.)
+   * Address: 0x00485810 (FUN_00485810 -- the `WeakPtr<CNetTCPConnector>`
+   * emission, reached only by `jmp` from the unwind funclets of
+   * `CNetTCPConnection::Pull` (0x00BAEFF6) and `CNetTCPConnector::Pull`
+   * (0x00BB3486), whose normal paths inline it. Formerly `LinkWorkFrame` /
+   * `UnlinkWorkFrame` over an `STcpConnWorkFrame` overlay in
+   * moho/net/CNetTCPConnector.cpp, removed 2026-09-28.)
    *
    * IDA signature:
    * void __fastcall sub_5A6DE0(WeakPtr<T> *this@<ecx>);
