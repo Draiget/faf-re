@@ -35,6 +35,7 @@ namespace moho
 
     /**
      * Address: 0x0053BC20 (FUN_0053BC20)
+     * Address: 0x0053BC70 (FUN_0053BC70)
      * Address: 0x101294E0 (sub_101294E0)
      * Slot: 13 (IClient path)
      */

@@ -124,8 +124,6 @@ CClientManagerImpl::CClientManagerImpl(
   , mDispatchedTimer()
   , mTimer2()
 {
-  ListResetLinks();
-  std::memset(mReceivers, 0, sizeof(mReceivers));
   mClients.resize(clientCount, nullptr);
 }
 

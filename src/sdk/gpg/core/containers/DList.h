@@ -1,6 +1,8 @@
 #pragma once
 #include <type_traits>
 
+#include "boost/noncopyable.hpp"
+
 namespace gpg
 {
   /**
@@ -9,10 +11,20 @@ namespace gpg
    *  - T must publicly inherit DListItem<T, U>
    *  - No virtuals; standard-layout; first base at offset 0
    *  - On x86 the raw layout is: [prev (4)][next (4)]
+   *
+   * Every `DListItem` in the binary's RTTI carries a private
+   * `boost::noncopyable` base at its own offset (attr 0x4d), e.g.
+   * `DListItem<Listener<EAiAttackerEvent>,void>` at mdisp 4 with `noncopyable`
+   * at mdisp 4. That empty base is not layout-neutral: MSVC will not overlap it
+   * with an earlier `noncopyable` subobject, so a `DListItem` that follows
+   * another one (`SMsgReceiverLinkage`'s second base, +0x0C instead of +0x08)
+   * or follows a class holding a `DList` (`CNetTCPConnection`'s own
+   * `DListItem` at +0x410 after `CMessageDispatcher` ends at +0x40C) starts
+   * four bytes later.
    */
 #pragma pack(push, 4)
   template <class T, class U = void>
-  struct DListItem
+  struct DListItem : private boost::noncopyable
   {
     using type = T;
     using unk_t = U;
@@ -86,81 +98,63 @@ namespace gpg
      *
      * Address: 0x00956560 (FUN_00956560) [PipeStreamBuffer specialization lane]
      *
-     * Assembly pattern matches the decompiled code: write neighbor links first,
-     * then self-links (prev/next -> self).
+     * Unconditional: neighbours adopt each other, then the node self-links.
+     * No copy of this body tests for an already-unlinked node first.
      * Address: 0x00956430 (FUN_00956430 -- `ListUnlink` -- neighbours adopt each other, then self-link, returning the successor for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_A` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x009564B0 (FUN_009564B0 -- a second emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_B` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x00956590 (FUN_00956590 -- a third emission of that unlink for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `UnlinkPipeBufferNode_C` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
     void ListUnlink() noexcept
     {
-      // Fast path: already singleton
-      if (mNext == this) {
-        mPrev = this; // keep strictly the same final shape
-        return;
-      }
-      // Neighbors adopt each other
-      mNext->mPrev = mPrev;
       mPrev->mNext = mNext;
-      // Reset self as singleton
-      mPrev = this;
+      mNext->mPrev = mPrev;
       mNext = this;
+      mPrev = this;
     }
 
     /**
      * Insert this node immediately BEFORE 'that' node.
      * Equivalent to: [... that->mPrev] <-> [this] <-> [that]
-     * Matches the observed store order:
-     *  - unlink self
-     *  - set self prev/next
-     *  - fix neighbors both sides
+     * Store order as `CMessageDispatcher::PushReceiver` inlines it
+     * (0x0047C3AC): unlink, own links, the anchor, then the old predecessor.
      * Address: 0x00956450 (FUN_00956450 -- `ListLinkBefore` -- unlink, then splice ahead of the anchor for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `RelinkPipeBufferNodeBeforeAnchor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      * Address: 0x009564F0 (FUN_009564F0 -- a second emission of that splice for `gpg::DListItem<gpg::PipeStreamBuffer, void>` (the pipe stream's 4KB buffer ring; node `{prev, next}` at 0x08 followed by the 0x1000 payload); zero callers, unreachable; formerly `InsertPipeBufferNodeBeforeAnchor` in gpg/core/streams/PipeStream.cpp (RULE ONE), removed 2026-09-11.)
      */
-    void ListLinkBefore(type* that) noexcept
+    void ListLinkBefore(item_t* that) noexcept
     {
-      auto* casted = static_cast<item_t*>(that);
-      // Safe for re-linking: ensure we are singleton first.
       ListUnlink();
-
-      // this between that->prev and that
-      mPrev = casted->mPrev;
-      mNext = casted;
-      casted->mPrev->mNext = this;
-      casted->mPrev = this;
+      mPrev = that->mPrev;
+      mNext = that;
+      that->mPrev = this;
+      mPrev->mNext = this;
     }
 
     /**
      * Insert this node immediately AFTER 'that' node.
      * Equivalent to: [that] <-> [this] <-> [that->mNext]
-     * Store order mirrors ListLinkBefore to match common patterns.
      */
-    void ListLinkAfter(type* that) noexcept
-    {
-      auto* casted = static_cast<item_t*>(that);
-      // Ensure singleton
-      ListUnlink();
-
-      // this between that and that->next
-      mPrev = casted;
-      mNext = casted->mNext;
-      casted->mNext->mPrev = this;
-      casted->mNext = this;
-    }
-
-    // Optional overloads that accept item_t*, handy for sentinel usage.
-    void ListLinkBefore(item_t* that) noexcept
-    {
-      ListLinkBefore(static_cast<type*>(that));
-    }
     void ListLinkAfter(item_t* that) noexcept
     {
-      ListLinkAfter(static_cast<type*>(that));
+      ListUnlink();
+      mPrev = that;
+      mNext = that->mNext;
+      that->mNext = this;
+      mNext->mPrev = this;
     }
 
-  protected:
-    // Enforce CRTP usage at compile time (non-failing on dependent contexts).
-    static_assert(std::is_empty_v<U> || !std::is_empty_v<U> || true, "U is an arbitrary tag and unused at runtime.");
+    // An anchor that is itself a `T` converts to its node here. A list head is
+    // a `DList`, not a `T`, so it takes the `item_t*` overloads directly; the
+    // old routing of those through `static_cast<type*>` claimed the head was a
+    // `T` and, for a node that is not `T`'s first base, shifted it by that
+    // base's offset and back.
+    void ListLinkBefore(type* that) noexcept
+    {
+      ListLinkBefore(static_cast<item_t*>(that));
+    }
+    void ListLinkAfter(type* that) noexcept
+    {
+      ListLinkAfter(static_cast<item_t*>(that));
+    }
   };
 #pragma pack(pop)
 

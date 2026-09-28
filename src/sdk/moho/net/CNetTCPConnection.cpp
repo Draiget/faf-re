@@ -293,8 +293,6 @@ CNetTCPConnection::CNetTCPConnection(
   , mScheduleDestroy(0)
   , mPad0xD2B{}
 {
-  std::memset(mReceivers, 0, sizeof(mReceivers));
-
   if (mConnector) {
     mConnector->mConnections.push_back(this);
     const HANDLE connectorEvent = mConnector->GetSelectedEventHandle();
@@ -309,20 +307,14 @@ CNetTCPConnection::CNetTCPConnection(
  * Address: 0x00483A40 (FUN_00483A40, deleting destructor thunk)
  *
  * What it does:
- * Closes socket/streams and unlinks from connector intrusive list.
+ * Closes the socket. The rest is member and base teardown: the datagram and
+ * both pipe streams, the connector-list unlink at 0x0048386D, and
+ * `~CMessageDispatcher` (0x00483897), which deletes the receiver linkages.
  */
 CNetTCPConnection::~CNetTCPConnection()
 {
-  auto* const dispatchHead =
-    static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(static_cast<CMessageDispatcher*>(this));
-  while (dispatchHead->mNext != dispatchHead) {
-    auto* const linkage = static_cast<SMsgReceiverLinkage*>(dispatchHead->mNext);
-    RemoveLinkage(linkage);
-  }
-
   if (mSocket != INVALID_SOCKET) {
     ::closesocket(mSocket);
-    mSocket = INVALID_SOCKET;
   }
 }
 

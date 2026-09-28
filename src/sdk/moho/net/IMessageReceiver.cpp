@@ -16,7 +16,6 @@ using namespace moho;
  */
 CMessageDispatcher::CMessageDispatcher()
 {
-  TDatListItem<SMsgReceiverLinkage, void>::ListResetLinks();
   std::fill_n(mReceivers, std::size(mReceivers), nullptr);
 }
 
@@ -25,12 +24,12 @@ CMessageDispatcher::CMessageDispatcher()
  *
  * What it does:
  * Deletes all receiver linkages owned by this dispatcher. The trailing
- * unlink at 0x0047C2C9 is the `TDatListItem` base's destructor.
+ * unlink at 0x0047C2C9 is `mLinkages`' destructor.
  */
 CMessageDispatcher::~CMessageDispatcher()
 {
-  while (mNext != this) {
-    delete static_cast<SMsgReceiverLinkage*>(mNext);
+  while (!mLinkages.empty()) {
+    delete mLinkages.mNext->Get();
   }
 }
 
@@ -41,8 +40,8 @@ void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned i
 {
   auto* const linkage = new SMsgReceiverLinkage{lower, upper, rec, this};
 
-  linkage->TDatListItem<SMsgReceiverLinkage, void>::ListLinkBefore(this);
-  linkage->TDatListItem<IMessageReceiver, void>::ListLinkBefore(rec);
+  mLinkages.push_back(linkage);
+  rec->mLinkages.push_back(linkage);
 
   if (lower < upper) {
     std::fill_n(&mReceivers[lower], upper - lower, rec);
@@ -59,14 +58,11 @@ void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned i
  */
 void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned int upper, IMessageReceiver* rec)
 {
-  auto* const listEnd = static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(this);
-  auto* linkage = static_cast<SMsgReceiverLinkage*>(listEnd->mNext);
-  while (static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(linkage) != listEnd) {
+  for (SMsgReceiverLinkage* const linkage : mLinkages) {
     if (linkage->mLower == lower && linkage->mUpper == upper && linkage->mReceiver == rec) {
       RemoveLinkage(linkage);
       return;
     }
-    linkage = static_cast<SMsgReceiverLinkage*>(linkage->TDatListItem<SMsgReceiverLinkage, void>::mNext);
   }
 
   gpg::HandleAssertFailure("Reached the supposably unreachable.", 241, "c:\\work\\rts\\main\\code\\src\\core\\Message.cpp");
@@ -74,11 +70,17 @@ void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned
 
 /**
  * Address: 0x0047C450 (FUN_0047C450)
+ *
+ * What it does:
+ * Hands each message type this linkage answered to the newest linkage pushed
+ * after it that also covers the type, or to nobody, then deletes it. The scan
+ * starts at the linkage's own successor (0x0047C457), so older linkages never
+ * win a slot back.
  */
 void CMessageDispatcher::RemoveLinkage(SMsgReceiverLinkage* linkage)
 {
-  auto* const listEnd = static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(this);
-  auto* const nextLink = static_cast<SMsgReceiverLinkage*>(linkage->TDatListItem<SMsgReceiverLinkage, void>::mNext);
+  using LinkageList = decltype(mLinkages);
+  const LinkageList::iterator later{static_cast<SMsgReceiverLinkage::DispatcherLink*>(linkage)->mNext, &mLinkages};
 
   for (unsigned val = linkage->mLower; val < linkage->mUpper; ++val) {
     auto& receiverSlot = mReceivers[val];
@@ -87,8 +89,7 @@ void CMessageDispatcher::RemoveLinkage(SMsgReceiverLinkage* linkage)
     }
 
     receiverSlot = nullptr;
-    for (auto* it = nextLink; static_cast<TDatListItem<SMsgReceiverLinkage, void>*>(it) != listEnd;
-         it = static_cast<SMsgReceiverLinkage*>(it->TDatListItem<SMsgReceiverLinkage, void>::mNext)) {
+    for (auto it = later; it != mLinkages.end(); ++it) {
       if (it->mLower <= val && val < it->mUpper) {
         receiverSlot = it->mReceiver;
       }
@@ -116,19 +117,24 @@ bool CMessageDispatcher::Dispatch(CMessage* msg)
 
 /**
  * Address: 0x0053BC60 (FUN_0053BC60)
+ *
+ * What it does:
+ * Installs the interface vtable; `mLinkages`' constructor self-links the ring.
  */
-IMessageReceiver::IMessageReceiver()
-{
-  TDatListItem<IMessageReceiver, void>::ListResetLinks();
-}
+IMessageReceiver::IMessageReceiver() = default;
 
 /**
  * Address: 0x0047C4F0 (FUN_0047C4F0)
+ *
+ * What it does:
+ * Removes every linkage still routing to this receiver, through the
+ * dispatcher that owns it. The trailing unlink at 0x0047C51C is `mLinkages`'
+ * destructor.
  */
 IMessageReceiver::~IMessageReceiver()
 {
-  while (mNext != this) {
-    auto* const linkage = static_cast<SMsgReceiverLinkage*>(static_cast<IMessageReceiver*>(mNext));
+  while (!mLinkages.empty()) {
+    SMsgReceiverLinkage* const linkage = mLinkages.mNext->Get();
     linkage->mDispatcher->RemoveLinkage(linkage);
   }
 }
@@ -140,34 +146,8 @@ IMessageReceiver::~IMessageReceiver()
 SMsgReceiverLinkage::SMsgReceiverLinkage(
   const unsigned int lower, const unsigned int upper, IMessageReceiver* rec, CMessageDispatcher* dispatcher
 )
-  : IMessageReceiver()
-  , mLower(lower)
+  : mLower(lower)
   , mUpper(upper)
   , mReceiver(rec)
   , mDispatcher(dispatcher)
 {}
-
-/**
- * Address: 0x0047C320 (FUN_0047C320, non-deleting destructor lane)
- * Address: 0x0047C2E0 (FUN_0047C2E0, deleting-destructor thunk)
- *
- * What it does:
- * Unlinks receiver-linkage node from receiver and dispatcher intrusive rings.
- *
- * In the binary these two unlinks are the two `TDatListItem` destructors
- * alone (inlined at 0x0047C49A in `RemoveLinkage`), with no vptr store and no
- * ring walk, so the second base there is not `IMessageReceiver`. Here it is,
- * and `~IMessageReceiver` walks its ring and removes every linkage on it. The
- * body therefore has to unlink first, until that base is resolved.
- */
-SMsgReceiverLinkage::~SMsgReceiverLinkage()
-{
-  TDatListItem<IMessageReceiver, void>::ListUnlink();
-  TDatListItem<SMsgReceiverLinkage, void>::ListUnlink();
-}
-
-void SMsgReceiverLinkage::ReceiveMessage(CMessage* message, CMessageDispatcher* dispatcher)
-{
-  (void)message;
-  (void)dispatcher;
-}

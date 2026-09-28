@@ -10,47 +10,6 @@
 
 using namespace moho;
 
-namespace
-{
-  void DestroyIMessageReceiverSubobject(
-    IMessageReceiver* const receiver
-  )
-  {
-    if (receiver != nullptr) {
-      receiver->IMessageReceiver::~IMessageReceiver();
-    }
-  }
-
-  void DestroyCClientBaseSubobject(
-    CClientBase* const base
-  )
-  {
-    if (base != nullptr) {
-      base->CClientBase::~CClientBase();
-    }
-  }
-
-  /**
-   * Address: 0x0053BC70 (FUN_0053BC70)
-   *
-   * What it does:
-   * Preserves one constructor-unwind teardown lane by destroying the
-   * `IMessageReceiver` base subobject first, then `CClientBase`.
-   */
-  [[maybe_unused]] void DestroyCNetClientBaseSubobjectsInOrder(
-    CNetClient* const client
-  )
-  {
-    if (client != nullptr) {
-      DestroyIMessageReceiverSubobject(static_cast<IMessageReceiver*>(client));
-      DestroyCClientBaseSubobject(static_cast<CClientBase*>(client));
-    } else {
-      DestroyIMessageReceiverSubobject(nullptr);
-      DestroyCClientBaseSubobject(nullptr);
-    }
-  }
-} // namespace
-
 /**
  * Address: 0x0053BB60 (FUN_0053BB60)
  * Address: 0x10129420 (sub_10129420)
@@ -75,8 +34,13 @@ CNetClient::CNetClient(
 }
 
 /**
- * Address: 0x0053BC20 (FUN_0053BC20)
+ * Address: 0x0053BC20 (FUN_0053BC20, scalar deleting destructor)
+ * Address: 0x0053BC70 (FUN_0053BC70, the same base teardown without the delete)
  * Address: 0x101294E0 (sub_101294E0)
+ *
+ * What it does:
+ * Nothing of its own: `~IMessageReceiver` on the +0xD8 base, then
+ * `~CClientBase`.
  */
 CNetClient::~CNetClient() = default;
 
