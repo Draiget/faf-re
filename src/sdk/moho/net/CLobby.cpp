@@ -171,24 +171,6 @@ namespace
   };
   static_assert(sizeof(LaunchPlayerOptionEntry) == 0x18, "LaunchPlayerOptionEntry size must be 0x18");
 
-  /**
-   * Address: 0x007C0CA0 (FUN_007C0CA0)
-   *
-   * What it does:
-   * Unlinks one intrusive peer-list head node from its current ring and
-   * restores self-linked sentinel lanes.
-   */
-  moho::TDatListItem<moho::SPeer, void>* UnlinkPeerListHead(
-    moho::TDatListItem<moho::SPeer, void>* const head
-  ) noexcept
-  {
-    head->mPrev->mNext = head->mNext;
-    head->mNext->mPrev = head->mPrev;
-    head->mPrev = head;
-    head->mNext = head;
-    return head;
-  }
-
   bool sLobbyIgnoreNamesConVarRegistered = false;
 
   [[nodiscard]] moho::CScrLuaInitFormSet* FindUserLuaInitSet() noexcept
@@ -210,48 +192,6 @@ namespace
 
     static moho::CScrLuaInitFormSet fallbackSet("User");
     return fallbackSet;
-  }
-
-  [[nodiscard]] bool TryRemoveReceiverLinkage(
-    CMessageDispatcher& dispatcher,
-    const unsigned int lower,
-    const unsigned int upper,
-    const IMessageReceiver* const receiver
-  )
-  {
-    using LinkNode = TDatListItem<SMsgReceiverLinkage, void>;
-    auto* const head = static_cast<LinkNode*>(&dispatcher);
-    for (LinkNode* node = head->mNext; node != head; node = node->mNext) {
-      auto* const linkage = static_cast<SMsgReceiverLinkage*>(node);
-      if (
-        linkage->mLower == lower && linkage->mUpper == upper &&
-        linkage->mReceiver == const_cast<IMessageReceiver*>(receiver)
-      ) {
-        dispatcher.RemoveLinkage(linkage);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  void DetachLobbyReceiverRanges(
-    INetConnection* const connection,
-    const IMessageReceiver* const receiver
-  )
-  {
-    GPG_ASSERT(connection != nullptr);
-    auto& dispatcher = *static_cast<CMessageDispatcher*>(connection);
-
-    const bool removedLobbyBase = TryRemoveReceiverLinkage(dispatcher, MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, receiver);
-    if (!removedLobbyBase) {
-      GPG_UNREACHABLE("Reached the supposably unreachable.");
-    }
-
-    const bool removedLobbyJoin =
-      TryRemoveReceiverLinkage(dispatcher, MSGTYPE_LobbyMsgStart, MSGTYPE_LobbyMsgEnd, receiver);
-    if (!removedLobbyJoin) {
-      GPG_UNREACHABLE("Reached the supposably unreachable.");
-    }
   }
 
   [[nodiscard]] int32_t ParseOwnerId(
@@ -660,7 +600,6 @@ CLobby::CLobby(
 
   this->connector->SelectEvent(event);
   WIN_GetWaitHandleSet()->AddHandle(event);
-  (void)UnlinkPeerListHead(&peers);
 }
 
 /**
@@ -697,9 +636,6 @@ CLobby::~CLobby()
   while (!peers.empty()) {
     delete static_cast<SPeer*>(peers.mNext);
   }
-
-  (void)UnlinkPeerListHead(&peers);
-  mSocket.reset();
 }
 
 msvc8::string CLobby::GetErrorDescription()
@@ -3539,7 +3475,8 @@ void CLobby::LaunchGame(
     }
 
     if (peer->state == ENetworkPlayerState::kEstablished) {
-      DetachLobbyReceiverRanges(peer->peerConnection, this);
+      peer->peerConnection->RemoveReceiver(MSGTYPE_LobbyBase, MSGTYPE_LobbyEnd, this);
+      peer->peerConnection->RemoveReceiver(MSGTYPE_LobbyMsgStart, MSGTYPE_LobbyMsgEnd, this);
       sessionInfo->mClientManager->CreateNetClient(
         peer->playerName.c_str(), peer->mClientInd, peer->uid, peer->mCmdSource, peer->peerConnection
       );

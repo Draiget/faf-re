@@ -91,6 +91,8 @@ void CMessageDispatcher::PushReceiver(const unsigned int lower, const unsigned i
  *
  * What it does:
  * Finds and removes one range receiver linkage matching `(lower, upper, rec)`.
+ * `CLobby::LaunchGame` inlines it twice (0x007C4B36, 0x007C4B68); both copies
+ * share this body's Message.cpp line-241 assert at 0x007C4E4D.
  */
 void CMessageDispatcher::RemoveReceiver(const unsigned int lower, const unsigned int upper, IMessageReceiver* rec)
 {

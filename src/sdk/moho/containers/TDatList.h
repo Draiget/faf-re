@@ -208,6 +208,18 @@ namespace moho
      *   unlinks; zero callers, unreachable; formerly
      *   `UnlinkNodeAndRestoreSelfLinks` over an `IntrusiveNodeRuntimeView` in
      *   moho/animation/IAniManipulator.cpp (RULE ONE), removed 2026-09-22.)
+     * Address: 0x007C0CA0 (FUN_007C0CA0 -- the `TDatListItem<SPeer, void>`
+     *   destructor, out of line only for EH unwind: it is reached solely by
+     *   `jmp` from the funclets that destroy `CLobby::peers` if
+     *   `CLobby::CLobby` throws (0x00BB43F2) or `~CLobby` unwinds (0x00BAFF75).
+     *   On the normal path both inline it -- `~CLobby` at 0x007C1293, as the
+     *   member destructor after `mSocket`'s -- and `SPeer::~SPeer` inlines it
+     *   at 0x007C13AE, after its own members, which places it on the base. So
+     *   the binary's `TDatListItem` has a destructor that unlinks, which this
+     *   template does not declare; all 88 twins of this body are reached only
+     *   from unwind funclets. Formerly `UnlinkPeerListHead` in
+     *   moho/net/CLobby.cpp, written into the ctor and dtor bodies (RULE ONE),
+     *   removed 2026-09-28.)
      */
     item_t* ListUnlinkSelf() noexcept
     {
