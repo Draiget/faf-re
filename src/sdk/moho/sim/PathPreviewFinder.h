@@ -11,7 +11,7 @@ namespace moho
    * Destroys one heap-allocated `PathPreviewFinder` through its real
    * destructor chain: the implicit `PathPreviewFinder::~PathPreviewFinder()`
    * (no members of its own require teardown) chains to the already-recovered
-   * `IPathTraveler::~IPathTraveler()`, which unlinks `mPathQueueNode` from
+   * `IPathTraveler::~IPathTraveler()`, which unlinks the queue node from
    * whatever path-queue ring it is currently threaded into, before the
    * storage is released. The real binary emits this identical body multiple
    * times (standalone at 0x007657D0; inlined directly into

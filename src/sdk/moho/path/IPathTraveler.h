@@ -6,7 +6,7 @@
 #include "gpg/core/reflection/Reflection.h"
 #include "gpg/core/containers/Rect2.h"
 #include "moho/ai/IAiNavigator.h"
-#include "moho/containers/TDatList.h"
+#include "gpg/core/containers/DList.h"
 #include "moho/sim/SFootprint.h"
 
 namespace moho
@@ -15,22 +15,26 @@ namespace moho
 
   /**
    * PathQueue traveler interface used by CAiPathFinder.
-   * The intrusive queue node is linked/unlinked by path queue dispatch.
+   *
+   * RTTI: `gpg::DListItem<IPathTraveler>` at +0x04, the node the path queue
+   * links onto its pending and in-flight lists (both
+   * `gpg::DList<IPathTraveler>`).
    */
-  class IPathTraveler
+  class IPathTraveler : public gpg::DListItem<IPathTraveler>
   {
   public:
     /**
      * Address: 0x005A9F80 (FUN_005A9F80)
      *
      * What it does:
-     * Initializes one detached path-traveler queue node.
+     * Self-links the queue node (the base) and installs the interface
+     * vtable 0x00E1C304; `this` in EAX, inlined everywhere.
      */
-    IPathTraveler();
+    IPathTraveler() = default;
 
     /**
      * What it does:
-     * Unlinks `mPathQueueNode` from the path-queue ring before base teardown,
+     * Unlinks the queue node (the `DListItem` base) from the path queue before base teardown,
      * so a traveler destroyed while still queued does not leave a dangling
      * node behind.
      *
@@ -139,10 +143,7 @@ namespace moho
      */
     virtual void GetResultCell(HPathCell* outCell) const = 0;
 
-  public:
-    TDatListItem<void, void> mPathQueueNode;
   };
 
   static_assert(sizeof(IPathTraveler) == 0x0C, "IPathTraveler size must be 0x0C");
-  static_assert(offsetof(IPathTraveler, mPathQueueNode) == 0x04, "IPathTraveler::mPathQueueNode offset must be 0x04");
 } // namespace moho

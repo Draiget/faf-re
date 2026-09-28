@@ -4028,8 +4028,8 @@ namespace moho
    *
    * RTTI: vftable@0x00E35D5C, 12 primary slots (inherited from `Moho::IPathTraveler`,
    * `??_7PathPreviewFinder@Moho@@6B@`); bases `Moho::IPathTraveler` (mdisp=0),
-   * `.?AV?$DListItem@VIPathTraveler@Moho@@X@gpg@@` (mdisp=4, modeled by
-   * `IPathTraveler::mPathQueueNode`), `boost::noncopyable` (mdisp=4) - all already
+   * `.?AV?$DListItem@VIPathTraveler@Moho@@X@gpg@@` (mdisp=4, `IPathTraveler`'s
+   * base), `boost::noncopyable` (mdisp=4) - all already
    * covered by deriving from the already-recovered `Moho::IPathTraveler`.
    */
   class PathPreviewFinder final : public IPathTraveler
@@ -4344,7 +4344,7 @@ namespace moho
       return;
     }
 
-    mPathQueueNode.ListUnlink();
+    ListUnlink();
     mFootprint = nullptr;
   }
 } // namespace moho

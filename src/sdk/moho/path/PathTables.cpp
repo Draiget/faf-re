@@ -53,15 +53,6 @@ namespace
     "c:\\work\\rts\\main\\code\\src\\libs\\gpgcore\\reflection\\serialization.h";
 
   /**
-   * The traveler ring node. `moho::TDatListItem` is `{mPrev, mNext}` in that order,
-   * which is what the binary uses: `PathQueue::Work` tests emptiness with
-   * `cmp [ecx+4], ecx` (0x00765EE5) and reaches the current traveler through
-   * `[edi+50h]` (0x00766141), i.e. through the *second* word of the node at
-   * +0x4C. An earlier reconstruction had these two fields the other way round.
-   */
-  using PathQueueIntrusiveNode = moho::TDatListItem<void, void>;
-
-  /**
    * Orders cell keys by their packed 32-bit representation, which is how the
    * binary compares them (`cmp` on the whole dword at node+8, unsigned).
    */
@@ -85,7 +76,10 @@ namespace
    *
    * Layout:
    *   +0x00 : gpg::AStarSearch base   (node hash_map 0x28 + open heap 0x24)
-   *   +0x4C : mTraveler       traveler ring head (at most one entry is live)
+   *   +0x4C : mTraveler       in-flight traveler (a list; at most one entry).
+   *                           `PathQueue::Work` tests it with `cmp [ecx+4], ecx`
+   *                           (0x00765EE5) and reads the traveler through the
+   *                           +0x04 slot (0x00766141)
    *   +0x54 : mClosestCell    best cell seen so far, by heuristic
    *   +0x58 : mClosestDistance
    *   +0x5C : mClusterMap     cluster map selected for this traveler's footprint
@@ -97,7 +91,7 @@ namespace
   struct PathQueueImplBaseRuntime
     : gpg::AStarSearch<moho::SOCellPos, PathQueueImplBaseRuntime, PathQueueCellTraits>
   {
-    PathQueueIntrusiveNode mTraveler;         // +0x4C
+    gpg::DList<moho::IPathTraveler> mTraveler; // +0x4C
     moho::SOCellPos mClosestCell;                   // +0x54
     float mClosestDistance;                   // +0x58
     gpg::HaStar::ClusterMap* mClusterMap;     // +0x5C
@@ -106,6 +100,15 @@ namespace
     std::int32_t mExpandCount;                // +0x74
     std::int32_t mPathCap;                    // +0x78
 
+    /**
+     * Address: 0x00765B90 (FUN_00765B90, ??0ImplBase@PathQueue@Moho@@QAE@@Z)
+     *          0x00766CE0 (FUN_00766CE0) - open-heap freelist arming
+     *          0x00767600 (FUN_00767600) - node-table arming
+     *
+     * What it does:
+     * Empty traveler list, zero closest cell, empty result path; the search
+     * structures arm themselves in the base constructor.
+     */
     PathQueueImplBaseRuntime()
       : mClosestCell()
       , mClosestDistance(0.0f)
@@ -115,6 +118,20 @@ namespace
       , mPathCap(0)
     {
     }
+
+    /**
+     * Address: 0x00765BE0 (FUN_00765BE0, ~ImplBase, `this` in ESI)
+     * Address: 0x00765C30 (FUN_00765C30, the `AStarSearch` base's part)
+     *          0x007672E0 (FUN_007672E0) - open-heap release
+     *          0x007676A0 (FUN_007676A0) - node-table element release
+     *          0x00767C70 (FUN_00767C70) - bucket-window release
+     *
+     * What it does:
+     * Nothing of its own: `mResultCells` is freed, then the traveler list
+     * unlinks, then the search base releases its tables -- reverse member
+     * order, as 0x00765BE0 runs it.
+     */
+    ~PathQueueImplBaseRuntime() = default;
 
     /** The traveler currently being served, or null when the ring is empty. */
     [[nodiscard]] moho::IPathTraveler* CurrentTraveler() const noexcept;
@@ -126,7 +143,6 @@ namespace
     void NoteCandidateCell(const moho::SOCellPos& cell, float estimate) noexcept;
   };
 
-  static_assert(sizeof(PathQueueIntrusiveNode) == 0x08, "PathQueueIntrusiveNode size must be 0x08");
   static_assert(sizeof(PathQueueImplBaseRuntime) == 0x7C, "PathQueueImplBaseRuntime size must be 0x7C");
   static_assert(offsetof(PathQueueImplBaseRuntime, mTraveler) == 0x4C, "PathQueueImplBaseRuntime::mTraveler offset must be 0x4C");
   static_assert(offsetof(PathQueueImplBaseRuntime, mClosestCell) == 0x54, "PathQueueImplBaseRuntime::mClosestCell offset must be 0x54");
@@ -137,42 +153,17 @@ namespace
   static_assert(offsetof(PathQueueImplBaseRuntime, mPathCap) == 0x78, "PathQueueImplBaseRuntime::mPathCap offset must be 0x78");
 
   /**
-   * Address: 0x00765B90 (FUN_00765B90, ??0ImplBase@PathQueue@Moho@@QAE@@Z)
-   *          0x00766CE0 (FUN_00766CE0) - open-heap freelist arming
-   *          0x00767600 (FUN_00767600) - node-table arming
-   *
-   * What it does:
-   * Brings one `ImplBase` up to its empty-but-usable state: the traveler ring
-   * is self-linked and the search structures are armed by their own
-   * constructors.
-   */
-  void InitializePathQueueImplBase(PathQueueImplBaseRuntime& implBase)
-  {
-    implBase.mTraveler.mNext = &implBase.mTraveler;
-    implBase.mTraveler.mPrev = &implBase.mTraveler;
-    implBase.mClosestCell = moho::SOCellPos();
-    implBase.mResultCells.clear();
-  }
-
-  /**
    * Address: 0x00766141 / 0x007684E3 / 0x0076614B (the recurring
    *          `mov eax, [reg+50h]` + `lea .., [eax-4]` pair)
    *
    * What it does:
-   * Recovers the traveler from its ring node. `moho::IPathTraveler::mPathQueueNode`
-   * sits at +0x04, which is the `-4` the binary applies; a null head means the
-   * ring is empty.
+   * The traveler being served: the list's front, recovered from its node at
+   * `IPathTraveler`+0x04 (the `-4` the binary applies); null when empty.
    */
   moho::IPathTraveler* PathQueueImplBaseRuntime::CurrentTraveler() const noexcept
   {
-    PathQueueIntrusiveNode* const head = mTraveler.mNext;
-    if (head == nullptr || head == &mTraveler) {
-      return nullptr;
-    }
-
-    return reinterpret_cast<moho::IPathTraveler*>(
-      reinterpret_cast<std::uint8_t*>(head) - offsetof(moho::IPathTraveler, mPathQueueNode)
-    );
+    // The A* traits hooks are const; the traveler they call is not.
+    return const_cast<moho::IPathTraveler*>(mTraveler.front());
   }
 
   /**
@@ -204,91 +195,6 @@ namespace
       mClosestCell = cell;
       mClosestDistance = estimate;
     }
-  }
-
-  void ResetPathQueueNodeLinks(PathQueueIntrusiveNode& node)
-  {
-    node.mNext = &node;
-    node.mPrev = &node;
-  }
-
-  void UnlinkAndResetPathQueueNode(PathQueueIntrusiveNode& node)
-  {
-    PathQueueIntrusiveNode* const next = node.mNext;
-    PathQueueIntrusiveNode* const prev = node.mPrev;
-    next->mPrev = prev;
-    prev->mNext = next;
-    ResetPathQueueNodeLinks(node);
-  }
-
-  /**
-   * Splices every node currently linked into the circular `source` ring into
-   * the destination ring immediately after `afterNode`, then resets `source`
-   * back to an empty self-linked singleton.
-   *
-   * This is the O(1) whole-ring transfer the binary open-codes inline in
-   * `DeserializePathQueueImplRefCallback` (0x00768A10) via three pointer
-   * rewrites: the deserialized `mBase.mTraveler` traveler ring is drained into
-   * the height-sentinel ring (the ring whose head node `afterNode` is the
-   * sentinel's predecessor), preserving traveler order.
-   *
-   * Returns the source ring's original first node (`source.mNext`) when the
-   * ring was non-empty, or `&source` when it was already empty, mirroring the
-   * binary's `eax` return lane (discarded by the `load_func_t` callback).
-   */
-  PathQueueIntrusiveNode* SplicePathQueueNodesAfter(
-    PathQueueIntrusiveNode& source,
-    PathQueueIntrusiveNode* const afterNode
-  ) noexcept
-  {
-    if (source.mPrev == &source) {
-      // Empty ring: nothing to move; return the empty-ring sentinel address.
-      return source.mPrev;
-    }
-
-    PathQueueIntrusiveNode* const first = source.mNext;
-    PathQueueIntrusiveNode* const last = source.mPrev;
-    PathQueueIntrusiveNode* const afterOldNext = afterNode->mNext;
-
-    // Stitch the moved chain [first .. last] between afterNode and its old next.
-    afterOldNext->mPrev = last;
-    afterNode->mNext = first;
-    first->mPrev = afterNode;
-    last->mNext = afterOldNext;
-
-    // Source ring becomes empty again.
-    ResetPathQueueNodeLinks(source);
-    return first;
-  }
-
-  /**
-   * Address: 0x00765C30 (FUN_00765C30, Moho::PathQueue::ImplBase::~ImplBase)
-   *
-   * Reaches, through `AStarSearch::ResetSearch`:
-   *   0x007672E0 (FUN_007672E0) - open-heap reset
-   *   0x007676A0 (FUN_007676A0) - node-table element release
-   *   0x00767C70 (FUN_00767C70) - bucket-window re-arm
-   *
-   * What it does:
-   * Releases every search record and open-heap entry owned by one `ImplBase`,
-   * leaving both structures armed for the next traveler.
-   */
-  void DestroyPathQueueImplBase(PathQueueImplBaseRuntime& implBase)
-  {
-    implBase.mResultCells.clear();
-    implBase.ResetSearch();
-  }
-
-  /**
-   * Address: 0x00765BE0 (FUN_00765BE0)
-   *
-   * What it does:
-   * Detaches the traveler ring before releasing the search structures.
-   */
-  void DestroyPathQueueImpl(PathQueueImplBaseRuntime& implBase)
-  {
-    UnlinkAndResetPathQueueNode(implBase.mTraveler);
-    DestroyPathQueueImplBase(implBase);
   }
 
   // ---------------------------------------------------------------------
@@ -617,9 +523,8 @@ namespace moho
      * Mangled: ??0Impl@PathQueue@Moho@@QAE@@Z_0
      *
      * What it does:
-     * Initializes one `PathQueue::Impl` lane to empty state by zeroing queue
-     * size, self-linking the height sentinel, and constructing the ImplBase
-     * runtime owner lanes.
+     * Null owner, empty pending list (self-linked at +0x04), then the
+     * `ImplBase` at +0x0C.
      */
     Impl();
 
@@ -628,8 +533,8 @@ namespace moho
     // (`[[owner] + 0x1C][footprintIndex]`) to pick this traveler's cluster map.
     // It is still typed as a word here because nothing in this translation unit
     // dereferences it yet; the Work chain retypes it.
-    PathTables* mOwner;                     // +0x00
-    PathQueueIntrusiveNode mHeightSentinel; // +0x04
+    PathTables* mOwner;                                // +0x00
+    gpg::DList<moho::IPathTraveler> mPendingTravelers; // +0x04
     // mBase now spans +0x0C..+0x88: the previous reconstruction stopped it at
     // +0x80 and padded the remainder, which hid `mExpandCount` / `mPathCap`.
     PathQueueImplBaseRuntime mBase;         // +0x0C
@@ -689,10 +594,8 @@ namespace moho
      *
      * What it does:
      * Loads the owned `PathQueue::Impl` payload, installs it, and tears down
-     * whatever the queue was holding. The old payload's search structures and
-     * traveler ring go first, then its height sentinel leaves the queue's ring,
-     * then the block itself is freed -- the same order the typeinfo delete lane
-     * below uses.
+     * whatever the queue was holding: `delete` on the old payload, whose
+     * implicit destructor releases the search state, then the pending list.
      */
     void LoadPathQueueImplPayload(gpg::ReadArchive* const archive, PathQueueRuntimeView* const runtime)
     {
@@ -709,11 +612,7 @@ namespace moho
       moho::PathQueue::Impl* const prior = runtime->mImpl;
       runtime->mImpl = loaded;
 
-      if (prior != nullptr) {
-        DestroyPathQueueImpl(prior->mBase);
-        UnlinkAndResetPathQueueNode(prior->mHeightSentinel);
-        ::operator delete(prior);
-      }
+      delete prior;
     }
 
     /**
@@ -881,14 +780,7 @@ namespace moho
         return;
       }
 
-      if (runtime->mImpl != nullptr) {
-        auto* const impl = runtime->mImpl;
-        DestroyPathQueueImpl(impl->mBase);
-        UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
-        ::operator delete(impl);
-        runtime->mImpl = nullptr;
-      }
-
+      delete runtime->mImpl;
       ::operator delete(runtime);
     }
 
@@ -901,16 +793,13 @@ namespace moho
      */
     void DestructPathQueueRefCallback(void* const objectStorage)
     {
+      // 0x00767990 deletes the payload and leaves the slot as it was.
       auto* const runtime = static_cast<PathQueueRuntimeView*>(objectStorage);
-      if (runtime == nullptr || runtime->mImpl == nullptr) {
+      if (runtime == nullptr) {
         return;
       }
 
-      auto* const impl = runtime->mImpl;
-      DestroyPathQueueImpl(impl->mBase);
-      UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
-      ::operator delete(impl);
-      runtime->mImpl = nullptr;
+      delete runtime->mImpl;
     }
 
     /**
@@ -953,14 +842,7 @@ namespace moho
      */
     void DeletePathQueueImplRefCallback(void* const objectStorage)
     {
-      auto* const impl = static_cast<PathQueue::Impl*>(objectStorage);
-      if (impl == nullptr) {
-        return;
-      }
-
-      DestroyPathQueueImpl(impl->mBase);
-      UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
-      ::operator delete(impl);
+      delete static_cast<PathQueue::Impl*>(objectStorage);
     }
 
     /**
@@ -977,8 +859,7 @@ namespace moho
         return;
       }
 
-      DestroyPathQueueImpl(impl->mBase);
-      UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
+      impl->~Impl();
     }
 
     /**
@@ -1062,7 +943,7 @@ namespace moho
      * Reflected save callback for `Moho::PathQueue::Impl`:
      *   1) reads the `PathTables*` lane at the impl header (+0x00) and writes
      *      it as an UNOWNED tracked raw pointer via `RRef_PathTables`;
-     *   2) writes the height sentinel (`mHeightSentinel`, +0x04) as a
+     *   2) writes the pending travelers (`mPendingTravelers`, +0x04) as a
      *      `gpg::DList<Moho::IPathTraveler,void>` value;
      *   3) writes the base traveler list head (`mBase.mTraveler`, +0x58) as a
      *      `gpg::DList<Moho::IPathTraveler,void>` value.
@@ -1087,15 +968,13 @@ namespace moho
      * `SavePathQueueImplRefCallback` (0x00768AD0):
      *   1) reads the tracked `PathTables*` owner lane into the impl header
      *      (+0x00) via `ReadArchive::ReadPointer_PathTables`;
-     *   2) reads the height sentinel ring (`mHeightSentinel`, +0x04) as a
+     *   2) reads the pending travelers (`mPendingTravelers`, +0x04) as a
      *      `gpg::DList<Moho::IPathTraveler,void>` value;
      *   3) reads the base traveler ring head (`mBase.mTraveler`, +0x58) as a
      *      `gpg::DList<Moho::IPathTraveler,void>` value;
-     *   4) splices every deserialized traveler node out of `mBase.mTraveler`
-     *      and into the height-sentinel ring immediately after the sentinel's
-     *      predecessor (`mHeightSentinel.mPrev`), leaving `mBase.mTraveler`
-     *      empty. This re-homes the freshly read travelers onto the live queue
-     *      ring the runtime iterates.
+     *   4) moves the in-flight traveler (`mBase.mTraveler`) to the front of
+     *      the pending list, leaving `mBase.mTraveler` empty, so the
+     *      interrupted query restarts first.
      *
      * The `DList<IPathTraveler,void>` reflected type is resolved once through a
      * cached `sType` singleton (lazy `LookupRType`), matching both the binary's
@@ -1119,9 +998,9 @@ namespace moho
         dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
       }
 
-      // (2) Height sentinel ring (+0x04).
+      // (2) Pending travelers (+0x04).
       gpg::RRef heightRef{};
-      archive->Read(dlistType, &impl->mHeightSentinel, heightRef);
+      archive->Read(dlistType, &impl->mPendingTravelers, heightRef);
 
       if (dlistType == nullptr) {
         dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
@@ -1131,9 +1010,10 @@ namespace moho
       gpg::RRef travelerRef{};
       archive->Read(dlistType, &impl->mBase.mTraveler, travelerRef);
 
-      // (4) Splice the deserialized travelers into the height-sentinel ring
-      // right after the sentinel's predecessor, then empty the source ring.
-      (void)SplicePathQueueNodesAfter(impl->mBase.mTraveler, impl->mHeightSentinel.mPrev);
+      // (4) The in-flight traveler goes back to the front of the pending
+      // list (0x00768AA8), so the query restarts first. The tree spliced it
+      // onto the back.
+      impl->mPendingTravelers.splice_front(impl->mBase.mTraveler);
     }
 
     void SavePathQueueImplRefCallback(PathQueue::Impl* const impl, gpg::WriteArchive& archive)
@@ -1151,7 +1031,7 @@ namespace moho
       }
 
       gpg::RRef heightRef{};
-      archive.Write(dlistType, &impl->mHeightSentinel, heightRef);
+      archive.Write(dlistType, &impl->mPendingTravelers, heightRef);
 
       if (dlistType == nullptr) {
         dlistType = gpg::LookupRType(typeid(gpg::DList<moho::IPathTraveler, void>));
@@ -1872,17 +1752,12 @@ namespace moho
    * Mangled: ??0Impl@PathQueue@Moho@@QAE@@Z_0
    *
    * What it does:
-   * Initializes one `PathQueue::Impl` lane to empty state by zeroing queue
-   * size, self-linking the height sentinel, and constructing the ImplBase
-   * runtime owner lanes.
+   * Null owner, empty pending list (self-linked at +0x04), then the
+   * `ImplBase` at +0x0C.
    */
   PathQueue::Impl::Impl()
     : mOwner(nullptr)
-  {
-    mHeightSentinel.mNext = &mHeightSentinel;
-    mHeightSentinel.mPrev = &mHeightSentinel;
-    InitializePathQueueImplBase(mBase);
-  }
+  {}
 
   /**
    * Address: 0x00765D30 (FUN_00765D30, ??0PathQueue@Moho@@QA@Z)
@@ -1907,6 +1782,11 @@ namespace moho
     ::new (impl) PathQueue::Impl();
     impl->mOwner = owner;
     mImpl = impl;
+  }
+
+  PathQueue::~PathQueue()
+  {
+    delete mImpl;
   }
 
   /**
@@ -2008,7 +1888,7 @@ namespace moho
   )
   {
     // "mTraveler.empty()", PathQueue.cpp:148
-    assert(implBase.mTraveler.mNext == &implBase.mTraveler);
+    assert(implBase.mTraveler.empty());
 
     const SFootprint* const footprint = traveler.GetFootprint();
 
@@ -2029,13 +1909,8 @@ namespace moho
     implBase.ResetSearch();
     implBase.mResultCells.clear();
 
-    // Move the traveler from the pending ring to the active slot.
-    UnlinkAndResetPathQueueNode(traveler.mPathQueueNode);
-    PathQueueIntrusiveNode& node = traveler.mPathQueueNode;
-    node.mPrev = implBase.mTraveler.mPrev;
-    node.mNext = &implBase.mTraveler;
-    implBase.mTraveler.mPrev = &node;
-    node.mPrev->mNext = &node;
+    // Move the traveler from the pending list to the in-flight one.
+    implBase.mTraveler.push_back(&traveler);
 
     implBase.AddStartNode(implBase.mClosestCell, implBase);
   }
@@ -2060,11 +1935,11 @@ namespace moho
     implBase.mResultCells.clear();
     (void)implBase.BuildPath(implBase.mClosestCell, implBase.mResultCells);
 
-    UnlinkAndResetPathQueueNode(implBase.mTraveler);
-
+    // 0x00766186: the traveler's own node leaves the in-flight list.
     if (traveler == nullptr) {
       return;
     }
+    traveler->ListUnlink();
 
     const SNavPath& path = *reinterpret_cast<const SNavPath*>(&implBase.mResultCells);
     if (reachedGoal) {
@@ -2103,22 +1978,17 @@ namespace moho
     while (budget > 0) {
       Impl& impl = *mImpl;
 
-      const bool queryInFlight = impl.mBase.mTraveler.mNext != &impl.mBase.mTraveler;
-      if (!queryInFlight) {
-        if (impl.mHeightSentinel.mNext == &impl.mHeightSentinel) {
+      if (impl.mBase.mTraveler.empty()) {
+        if (impl.mPendingTravelers.empty()) {
           // Nothing queued; the remaining budget goes unspent.
           return;
         }
 
-        auto* const pendingNode = impl.mHeightSentinel.mNext;
-        auto* const pending = reinterpret_cast<IPathTraveler*>(
-          reinterpret_cast<std::uint8_t*>(pendingNode) - offsetof(IPathTraveler, mPathQueueNode)
-        );
-        BeginPathQueueQuery(impl.mBase, *pending, *impl.mOwner);
+        BeginPathQueueQuery(impl.mBase, *impl.mPendingTravelers.front(), *impl.mOwner);
       }
 
       // "!mTraveler.empty()", PathQueue.cpp:169
-      assert(impl.mBase.mTraveler.mNext != &impl.mBase.mTraveler);
+      assert(!impl.mBase.mTraveler.empty());
 
       impl.mBase.mBudget = budget;
       const PathQueueStep step = PathQueueWorkOnce(impl.mBase);
@@ -2150,62 +2020,36 @@ namespace moho
   void PathQueue::WorkImmediate(int& budget, IPathTraveler& traveller)
   {
     PathQueueImplBaseRuntime scratch;
-    InitializePathQueueImplBase(scratch);
 
     BeginPathQueueQuery(scratch, traveller, *mImpl->mOwner);
 
     // "!mTraveler.empty()", PathQueue.cpp:169
-    assert(scratch.mTraveler.mNext != &scratch.mTraveler);
+    assert(!scratch.mTraveler.empty());
 
     scratch.mBudget = budget;
     const PathQueueStep step = PathQueueWorkOnce(scratch);
     budget = scratch.mBudget;
 
     FinishPathQueueQuery(scratch, step == PathQueueStep::GoalReached);
-
-    scratch.mResultCells.clear();
-    UnlinkAndResetPathQueueNode(scratch.mTraveler);
-    DestroyPathQueueImplBase(scratch);
   }
 
   void PathQueue::QueueTraveler(IPathTraveler& traveller)
   {
-    PathQueueIntrusiveNode& node = traveller.mPathQueueNode;
-    PathQueueIntrusiveNode& sentinel = mImpl->mHeightSentinel;
-
-    (void)node.ListUnlink();
-    node.mPrev = node.mNext = &node;
-
-    node.mPrev = sentinel.mPrev;
-    node.mNext = &sentinel;
-    sentinel.mPrev = &node;
-    node.mPrev->mNext = &node;
+    mImpl->mPendingTravelers.push_back(&traveller);
   }
 
   /**
    * Address: 0x00701AD0 (FUN_00701AD0, Moho::PathQueue::Move)
    *
    * What it does:
-   * Replaces one owner slot with a new queue pointer, then tears down and
-   * frees the previous queue payload when present.
+   * Stores the new queue in the owner's slot, then deletes the previous one
+   * (`~PathQueue` deletes its `Impl`) -- `scoped_ptr::reset` inlined.
    */
   void PathQueue::Move(PathQueue** const slot, PathQueue* const replacement) noexcept
   {
     PathQueue* const previous = *slot;
     *slot = replacement;
-
-    if (previous == nullptr) {
-      return;
-    }
-
-    Impl* const impl = previous->mImpl;
-    if (impl != nullptr) {
-      DestroyPathQueueImpl(impl->mBase);
-      UnlinkAndResetPathQueueNode(impl->mHeightSentinel);
-      ::operator delete(impl);
-    }
-
-    ::operator delete(previous);
+    delete previous;
   }
 
   /**

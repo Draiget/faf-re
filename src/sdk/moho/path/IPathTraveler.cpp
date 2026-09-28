@@ -3,24 +3,16 @@
 namespace moho
 {
   /**
-   * Address: 0x005A9F80 (FUN_005A9F80)
-   */
-  IPathTraveler::IPathTraveler()
-  {
-    mPathQueueNode.ListUnlinkSelf();
-  }
-
-  /**
    * Address: 0x007657A0 (FUN_007657A0, `PathPreviewFinder`'s scalar-deleting
    * destructor, `??_7PathPreviewFinder@Moho@@6B@+0x8`)
    *
    * What it does:
-   * Unlinks `mPathQueueNode` from whatever path-queue ring it is currently
+   * Unlinks the queue node from whatever path-queue list it is currently
    * threaded into before the derived object's storage is released --
    * `*(mNext_slot+4) = mNext; *mNext = mPrev; self-reset` matches this
    * struct's `ListUnlink()` exactly (offset +0x04 from `this`, i.e.
-   * `mPathQueueNode` at `IPathTraveler+0x04`). That is `mPathQueueNode`'s own
-   * `~TDatListItem`, so the body is empty. It is what keeps a still-queued
+   * the node at `IPathTraveler+0x04`). That is the `DListItem` base's
+   * destructor, so the body is empty. It is what keeps a still-queued
    * traveler (e.g. a `PathPreviewFinder` dropped mid-search) from leaving the
    * path-queue dispatcher holding a dangling node, for every
    * `IPathTraveler`-derived class.

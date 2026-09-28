@@ -71,7 +71,7 @@ namespace gpg
 
 namespace
 {
-  using PathTravelerListNode = moho::TDatListItem<void, void>;
+  using PathTravelerList = gpg::DList<moho::IPathTraveler>;
 
   msvc8::string gDListIPathTravelerTypeName;
   std::uint32_t gDListIPathTravelerTypeNameInitGuard = 0;
@@ -181,7 +181,7 @@ msvc8::string gpg::RDListType_IPathTraveler::GetLexical(const gpg::RRef& ref) co
  */
 void gpg::RDListType_IPathTraveler::Init()
 {
-  size_ = sizeof(PathTravelerListNode);
+  size_ = sizeof(PathTravelerList);
   version_ = 1;
   serLoadFunc_ = &RDListType_IPathTraveler::SerLoad;
   serSaveFunc_ = &RDListType_IPathTraveler::SerSave;
@@ -201,18 +201,20 @@ void gpg::RDListType_IPathTraveler::SerLoad(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const listHead = PointerFromArchiveInt<PathTravelerListNode>(objectPtr);
+  auto* const listHead = PointerFromArchiveInt<PathTravelerList>(objectPtr);
   GPG_ASSERT(archive != nullptr);
   GPG_ASSERT(listHead != nullptr);
   if (!archive || !listHead) {
     return;
   }
 
+  // 0x0076752D: unlink, then link before the head -- a push_back, so the
+  // list comes back in the order it was saved. The tree linked after the
+  // head, reversing it.
   moho::IPathTraveler* traveler = nullptr;
   archive->ReadPointer_IPathTraveler(&traveler, ownerRef);
   while (traveler != nullptr) {
-    auto* const travelerNode = &traveler->mPathQueueNode;
-    travelerNode->ListLinkAfter(listHead);
+    listHead->push_back(traveler);
 
     traveler = nullptr;
     archive->ReadPointer_IPathTraveler(&traveler, ownerRef);
@@ -234,17 +236,14 @@ void gpg::RDListType_IPathTraveler::SerSave(
   gpg::RRef* const ownerRef
 )
 {
-  auto* const listHead = PointerFromArchiveInt<PathTravelerListNode>(objectPtr);
+  auto* const listHead = PointerFromArchiveInt<PathTravelerList>(objectPtr);
   if (archive == nullptr || listHead == nullptr) {
     return;
   }
 
   const gpg::RRef owner = ownerRef != nullptr ? *ownerRef : gpg::RRef{};
 
-  for (auto* node = listHead->mNext; node != listHead; node = node->mNext) {
-    auto* const traveler = reinterpret_cast<moho::IPathTraveler*>(
-      reinterpret_cast<std::uint8_t*>(node) - offsetof(moho::IPathTraveler, mPathQueueNode)
-    );
+  for (moho::IPathTraveler* const traveler : listHead->owners()) {
     gpg::RRef travelerRef{};
     (void)gpg::RRef_IPathTraveler(&travelerRef, traveler);
     gpg::WriteRawPointer(archive, travelerRef, gpg::TrackedPointerState::Unowned, owner);

@@ -44,6 +44,19 @@ namespace moho
     explicit PathQueue(PathTables* owner);
 
     /**
+     * What it does:
+     * Deletes the owned `Impl` (its implicit destructor releases the search
+     * state, then the pending list). Inlined wherever a queue is deleted:
+     * `PathQueue::Move` (0x00701AE1), `PathQueueTypeInfo::Delete`
+     * (0x00767900) and `::Destruct` (0x0076799C, which leaves `mImpl` as
+     * it was).
+     */
+    ~PathQueue();
+
+    PathQueue(const PathQueue&) = delete;
+    PathQueue& operator=(const PathQueue&) = delete;
+
+    /**
      * Address: 0x00765ED0 (FUN_00765ED0, Moho::PathQueue::Work)
      *
      * IDA signature:

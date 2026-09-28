@@ -375,6 +375,26 @@ namespace gpg
     }
 
     /**
+     * Move every node of `from` to the front of this list, in order, and
+     * leave `from` empty. Store order as `PathQueueImplSerializer`'s load
+     * (0x00768AA8) inlines it.
+     */
+    void splice_front(DList& from) noexcept
+    {
+      item_t* const front = this->mNext;
+      if (from.empty()) {
+        return;
+      }
+      item_t* const beforeFront = front->mPrev;
+      beforeFront->mNext = from.mNext;
+      front->mPrev = from.mPrev;
+      from.mPrev->mNext = front;
+      from.mNext->mPrev = beforeFront;
+      from.mNext = &from;
+      from.mPrev = &from;
+    }
+
+    /**
      * Clear the list (does NOT destroy payload objects).
      */
     void clear() noexcept
